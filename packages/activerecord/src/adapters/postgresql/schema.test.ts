@@ -577,7 +577,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(result1).not.toBeNull();
       expect(result1![0]).toBe("id");
       expect(result1![1]!.schema).toBe(SCHEMA_NAME);
-      expect(result1![1]!.name).toBe(`${PK_TABLE_NAME}_id_seq`);
+      expect(result1![1]!.identifier).toBe(`${PK_TABLE_NAME}_id_seq`);
 
       const result2 = await adapter.pkAndSequenceFor(
         `"${SCHEMA_NAME}"."${UNMATCHED_PK_TABLE_NAME}"`,
@@ -585,7 +585,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(result2).not.toBeNull();
       expect(result2![0]).toBe("id");
       expect(result2![1]!.schema).toBe(SCHEMA_NAME);
-      expect(result2![1]!.name).toBe(UNMATCHED_SEQUENCE_NAME);
+      expect(result2![1]!.identifier).toBe(UNMATCHED_SEQUENCE_NAME);
     });
 
     it("current schema", async () => {
@@ -656,7 +656,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const tableName = `${SCHEMA_NAME}.${PK_TABLE_NAME}`;
       await adapter.setPkSequenceBang(tableName, 123);
       const result = await adapter.pkAndSequenceFor(`"${SCHEMA_NAME}"."${PK_TABLE_NAME}"`);
-      const qualifiedSeq = `"${result![1]!.schema}"."${result![1]!.name}"`;
+      const qualifiedSeq = result![1]!.quoted();
       const rows = await adapter.execute(`SELECT nextval('${qualifiedSeq}') AS val`);
       expect(Number(rows[0].val)).toBe(124);
       await adapter.resetPkSequenceBang(tableName);

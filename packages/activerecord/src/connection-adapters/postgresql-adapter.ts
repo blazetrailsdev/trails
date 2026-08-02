@@ -3845,11 +3845,10 @@ export class PostgreSQLAdapter
         const seqSuffix = `_${pk}_seq`;
         const maxSeqPrefix = maxLen - seqSuffix.length;
         const expectedOldSeq = `${unqualifiedOld.slice(0, maxSeqPrefix)}${seqSuffix}`;
-        if (seq.name === expectedOldSeq) {
+        if (seq.identifier === expectedOldSeq) {
           const newSeqName = `${unqualifiedNew.slice(0, maxSeqPrefix)}${seqSuffix}`;
-          const qualifiedOldSeq = `${this.quoteIdentifier(seq.schema)}.${this.quoteIdentifier(seq.name)}`;
           await this.exec(
-            `ALTER SEQUENCE IF EXISTS ${qualifiedOldSeq} RENAME TO ${this.quoteIdentifier(newSeqName)}`,
+            `ALTER SEQUENCE IF EXISTS ${seq.quoted()} RENAME TO ${this.quoteIdentifier(newSeqName)}`,
           );
         }
       }
@@ -4693,9 +4692,7 @@ export interface PostgreSQLAdapter {
 
   primaryKey(tableName: string): Promise<string | string[] | null>;
 
-  pkAndSequenceFor(
-    tableName: string,
-  ): Promise<[string, { schema: string; name: string } | null] | null>;
+  pkAndSequenceFor(tableName: string): Promise<[string, Name | null] | null>;
 
   resetPkSequence(tableName: string): Promise<void>;
 

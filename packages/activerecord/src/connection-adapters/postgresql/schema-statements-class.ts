@@ -1774,82 +1774,65 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     return names as string[];
   }
 
-  async pkAndSequenceFor(
-    tableName: string,
-  ): Promise<[string, { schema: string; name: string } | null] | null> {
+  async pkAndSequenceFor(tableName: string): Promise<[string, Name | null] | null> {
     // Rails wraps the whole of `pk_and_sequence_for` in a bare `rescue nil`, so
     // ANY error — not just an unknown table — yields nil.
     try {
-      // Mirrors Rails pk_and_sequence_for's `#{quote(quote_table_name(table))}::regclass`:
-      // regclass resolves a schema-qualified or bare name itself, and the quoting
-      // keeps a mixed-case name like "CamelCase" case-sensitive.
-      //
-      // Deviation: `to_regclass(...)` rather than a bare `::regclass` cast. The
-      // outer `rescue nil` already turns an unknown table into nil either way,
-      // but PG aborts the enclosing transaction when the cast raises — and a
-      // Ruby rescue leaves the transaction untouched. to_regclass yields NULL
-      // (hence no rows, hence nil) without ever entering the aborted state.
-      const tableCondition = `t.oid = to_regclass(${this.pg.quote(this.pg.quoteTableName(tableName))})`;
+      const quotedTable = this.pg.quote(this.pg.quoteTableName(tableName));
 
-      const rows = await this.pg.schemaQuery(
-        `SELECT a.attname AS pk,
-                pg_get_serial_sequence(quote_ident(n.nspname) || '.' || quote_ident(t.relname), a.attname) AS seq,
-                pg_get_expr(ad.adbin, ad.adrelid) AS default_expr,
-                n.nspname AS schema_name
-         FROM pg_index i
-         JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
-         JOIN pg_class t ON t.oid = i.indrelid
-         JOIN pg_namespace n ON n.oid = t.relnamespace
-         LEFT JOIN pg_attrdef ad ON ad.adrelid = t.oid AND ad.adnum = a.attnum
-         WHERE ${tableCondition}
-           AND i.indisprimary = true
-         -- Resolve the FIRST primary-key column deterministically (mirrors Rails
-         -- pk_and_sequence_for's cons.conkey[1]); without the ORDER BY a composite
-         -- PK's ANY(i.indkey) join could return an arbitrary column under LIMIT 1.
-         ORDER BY array_position(i.indkey, a.attnum)
-         LIMIT 1`,
-      );
+      // First try looking for a sequence with a dependency on the
+      // given table's primary key.
+      let result = (
+        await this.pg.query(
+          `SELECT attr.attname, nsp.nspname, seq.relname
+           FROM pg_class      seq,
+                pg_attribute  attr,
+                pg_depend     dep,
+                pg_constraint cons,
+                pg_namespace  nsp
+           WHERE seq.oid           = dep.objid
+             AND seq.relkind       = 'S'
+             AND attr.attrelid     = dep.refobjid
+             AND attr.attnum       = dep.refobjsubid
+             AND attr.attrelid     = cons.conrelid
+             AND attr.attnum       = cons.conkey[1]
+             AND seq.relnamespace  = nsp.oid
+             AND cons.contype      = 'p'
+             AND dep.classid       = 'pg_class'::regclass
+             AND dep.refobjid      = ${quotedTable}::regclass`,
+          "SCHEMA",
+        )
+      )[0];
 
-      if (rows.length === 0) return null;
-
-      const pk = rows[0].pk as string;
-      const tableSchema = rows[0].schema_name as string;
-      let seq: { schema: string; name: string } | null = null;
-
-      if (rows[0].seq) {
-        const fullSeq = rows[0].seq as string;
-        const parts = splitQuotedIdentifier(fullSeq);
-        seq =
-          parts.length > 1
-            ? { schema: parts[0], name: parts[1] }
-            : { schema: tableSchema, name: parts[0] };
-      } else {
-        const defaultExpr = rows[0].default_expr as string | null;
-        if (defaultExpr) {
-          const match = defaultExpr.match(/nextval\('([^']+)'::regclass\)/);
-          if (match) {
-            // Rails' fallback query pairs `nsp.nspname` — the TABLE's namespace —
-            // with a CASE that strips everything through the dot, so a
-            // `nextval('other_schema.seq')` default still yields
-            // `Name.new(table_schema, "seq")`. Keep the sequence identifier only.
-            const parts = splitQuotedIdentifier(match[1]);
-            seq = { schema: tableSchema, name: parts[parts.length - 1] };
-          }
-        }
+      if (result == null || result.length === 0) {
+        result = (
+          await this.pg.query(
+            `SELECT attr.attname, nsp.nspname,
+               CASE
+                 WHEN pg_get_expr(def.adbin, def.adrelid) !~* 'nextval' THEN NULL
+                 WHEN split_part(pg_get_expr(def.adbin, def.adrelid), '''', 2) ~ '.' THEN
+                   substr(split_part(pg_get_expr(def.adbin, def.adrelid), '''', 2),
+                          strpos(split_part(pg_get_expr(def.adbin, def.adrelid), '''', 2), '.')+1)
+                 ELSE split_part(pg_get_expr(def.adbin, def.adrelid), '''', 2)
+               END
+             FROM pg_class       t
+             JOIN pg_attribute   attr ON (t.oid = attrelid)
+             JOIN pg_attrdef     def  ON (adrelid = attrelid AND adnum = attnum)
+             JOIN pg_constraint  cons ON (conrelid = adrelid AND adnum = conkey[1])
+             JOIN pg_namespace   nsp  ON (t.relnamespace = nsp.oid)
+             WHERE t.oid = ${quotedTable}::regclass
+               AND cons.contype = 'p'
+               AND pg_get_expr(def.adbin, def.adrelid) ~* 'nextval|uuid_generate|gen_random_uuid'`,
+            "SCHEMA",
+          )
+        )[0];
       }
 
-      if (seq) return [pk, seq];
-
-      // No owning sequence. Mirrors Rails pk_and_sequence_for: its fallback query
-      // matches `nextval|uuid_generate|gen_random_uuid` defaults, so a uuid-default
-      // pk still returns a row (with a nil sequence) → `[pk, nil]`, whereas a pk
-      // with no such default matches neither query and yields nil (the whole
-      // result). See uuid_test.rb#test_pk_and_sequence_for_with_uuid_primary_key.
-      const defaultExpr = rows[0].default_expr as string | null;
-      if (defaultExpr && /uuid_generate|gen_random_uuid/i.test(defaultExpr)) {
-        return [pk, null];
+      const [pk, schema, identifier] = result as unknown as [string, string | null, string | null];
+      if (identifier != null) {
+        return [pk, new Name(schema, identifier)];
       }
-      return null;
+      return [pk, null];
     } catch {
       return null;
     }
@@ -1909,7 +1892,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     const [pk, seq] = result ?? [null, null];
     if (!pk) return;
     if (seq) {
-      const quotedSequence = this.pg.quoteTableName(`${seq.schema}.${seq.name}`);
+      const quotedSequence = this.pg.quoteTableName(seq.toString());
       await this.queryValue(`SELECT setval(${this.pg.quote(quotedSequence)}, ${value})`, "SCHEMA");
     } else {
       this.pg.logger?.warn?.(`${tableName} has primary key ${pk} with no default sequence.`);
@@ -1928,7 +1911,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     if (!pk || !sequence) {
       const [defaultPk, defaultSeq] = (await this.pkAndSequenceFor(tableName)) ?? [null, null];
       pk = pk ?? defaultPk;
-      sequence = sequence ?? (defaultSeq ? `${defaultSeq.schema}.${defaultSeq.name}` : null);
+      sequence = sequence ?? defaultSeq?.toString() ?? null;
     }
 
     if (pk && !sequence) {

@@ -39,6 +39,7 @@ import { NullPool } from "../../connection-adapters/abstract/connection-pool.js"
 import { QueryAttribute } from "../../relation/query-attribute.js";
 import { Value, Integer } from "../../type.js";
 import { withSecondAdapter } from "../../support/second-connection.js";
+import { Name } from "../../connection-adapters/postgresql/utils.js";
 
 const EX_DEFAULT = "id serial primary key, number integer, data character varying(255)";
 
@@ -355,7 +356,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         expect(result).not.toBeNull();
         const [pk, seq] = result!;
         expect(pk).toBe("id");
-        expect(`${seq!.schema}.${seq!.name}`).toBe(await adapter.defaultSequenceName("ex", "id"));
+        expect(seq!.toString()).toBe(await adapter.defaultSequenceName("ex", "id"));
       });
     });
 
@@ -367,9 +368,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           expect(result).not.toBeNull();
           const [pk, seq] = result!;
           expect(pk).toBe("code");
-          expect(`${seq!.schema}.${seq!.name}`).toBe(
-            await adapter.defaultSequenceName("ex", "code"),
-          );
+          expect(seq!.toString()).toBe(await adapter.defaultSequenceName("ex", "code"));
         },
         "code serial primary key",
       );
@@ -433,7 +432,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
         const result = await adapter.pkAndSequenceFor("ex");
         expect(result).not.toBeNull();
-        expect(result![1]).toEqual({ schema: "public", name: "ex_id_seq" });
+        expect(result![1]).toEqual(new Name("public", "ex_id_seq"));
 
         await adapter.exec(
           `DELETE FROM pg_depend WHERE objid = 'ex2_id_seq'::regclass AND refobjid = 'ex'::regclass AND deptype = 'a'`,
