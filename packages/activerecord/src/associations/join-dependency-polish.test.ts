@@ -65,7 +65,7 @@ describe("joinType propagation in joinConstraints", () => {
   });
 
   it("emits InnerJoin when joinType is InnerJoin", () => {
-    const jd = new JoinDependency(Post, Nodes.InnerJoin);
+    const jd = new JoinDependency(Post, undefined, undefined, Nodes.InnerJoin);
     jd.addAssociation("comments");
 
     const joins = jd.joinConstraints([]);
@@ -76,7 +76,7 @@ describe("joinType propagation in joinConstraints", () => {
   });
 
   it("emits OuterJoin when joinType is OuterJoin", () => {
-    const jd = new JoinDependency(Post, Nodes.OuterJoin);
+    const jd = new JoinDependency(Post, undefined, undefined, Nodes.OuterJoin);
     jd.addAssociation("comments");
 
     const joins = jd.joinConstraints([]);
