@@ -2,27 +2,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/sqlite3/database-statements.ts",
-    "rubyName": "begin_db_transaction",
-    "call": "internal_begin_transaction",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/sqlite3/database-statements.ts",
-    "rubyName": "begin_deferred_transaction",
-    "call": "internal_begin_transaction",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/sqlite3/database-statements.ts",
-    "rubyName": "begin_isolated_db_transaction",
-    "call": "internal_begin_transaction",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/sqlite3/database-statements.ts",
     "rubyName": "commit_db_transaction",
     "call": "internal_execute",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

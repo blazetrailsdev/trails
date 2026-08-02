@@ -676,20 +676,16 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
 
   // Mirrors: SQLite3::DatabaseStatements#begin_deferred_transaction
   async beginDeferredTransaction(isolation?: string | null): Promise<void> {
-    if (isolation) return this._internalBeginTransaction("DEFERRED", isolation);
-    await this.internalExecute("BEGIN DEFERRED TRANSACTION", "TRANSACTION", {
-      materializeTransactions: false,
-    });
-    this._inTransaction = true;
+    return this.internalBeginTransaction("DEFERRED", isolation ?? null);
   }
 
   // Mirrors: SQLite3::DatabaseStatements#begin_isolated_db_transaction
   async beginIsolatedDbTransaction(isolation: string): Promise<void> {
-    return this._internalBeginTransaction("DEFERRED", isolation);
+    return this.internalBeginTransaction("DEFERRED", isolation);
   }
 
   // Mirrors: SQLite3::DatabaseStatements#internal_begin_transaction
-  private async _internalBeginTransaction(mode: string, isolation: string | null): Promise<void> {
+  private async internalBeginTransaction(mode: string, isolation: string | null): Promise<void> {
     if (isolation) {
       if (isolation !== "read_uncommitted") {
         throw new TransactionIsolationError(
@@ -707,9 +703,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     });
     this._inTransaction = true;
     if (isolation) {
-      const ruStmt = await this.driver.prepare("PRAGMA read_uncommitted");
-      const row = (await ruStmt.get()) as { read_uncommitted: number } | undefined;
-      this._previousReadUncommitted = row?.read_uncommitted ?? 0;
+      this._previousReadUncommitted = (await this.queryValue("PRAGMA read_uncommitted")) ?? 0;
       await this.internalExecute("PRAGMA read_uncommitted=ON", "TRANSACTION", {
         materializeTransactions: false,
       });
@@ -844,13 +838,12 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     });
   }
 
+  // Mirrors: SQLite3::DatabaseStatements#begin_db_transaction
   async beginDbTransaction(): Promise<void> {
-    if (!this._inTransaction) {
-      await this.internalExecute("BEGIN IMMEDIATE TRANSACTION", "TRANSACTION", {
-        materializeTransactions: false,
-      });
-      this._inTransaction = true;
-    }
+    // DEVIATION: Rails has no re-entrancy guard; the pool proxy can replay a
+    // begin against an already-open connection and SQLite rejects nested BEGIN.
+    if (this._inTransaction) return;
+    return this.internalBeginTransaction("IMMEDIATE", null);
   }
 
   async beginTransaction(): Promise<void> {
@@ -2244,35 +2237,21 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     tableName: string,
     expressionOrOptions?: string | { name?: string; ifExists?: boolean },
   ): Promise<void> {
-    if (
-      expressionOrOptions === undefined ||
-      (typeof expressionOrOptions === "object" && !expressionOrOptions?.name)
-    ) {
-      throw new Error("removeCheckConstraint requires either an expression or { name } option");
+    const expression = typeof expressionOrOptions === "string" ? expressionOrOptions : undefined;
+    const options = typeof expressionOrOptions === "object" ? (expressionOrOptions ?? {}) : {};
+
+    if (options.ifExists === true) {
+      const probe: { name?: string } = {};
+      if (options.name !== undefined) probe.name = options.name;
+      if (!(await this.checkConstraintExists(tableName, probe))) return;
     }
 
-    const ifExists =
-      typeof expressionOrOptions === "object" && expressionOrOptions?.ifExists === true;
-    const existingChecks = await this.checkConstraints(tableName);
-    let nameToRemove: string | undefined;
-
-    if (typeof expressionOrOptions === "string") {
-      const normalized = expressionOrOptions.trim();
-      const found = existingChecks.find((c) => c.expression === normalized);
-      nameToRemove = found?.name;
-    } else if (expressionOrOptions?.name) {
-      nameToRemove = expressionOrOptions.name;
-    }
-
-    if (!nameToRemove) {
-      if (ifExists) return;
-      throw new Error(
-        `Table '${tableName}' has no check constraint matching ${JSON.stringify(expressionOrOptions)}`,
-      );
-    }
-
-    const remainingChecks = existingChecks.filter((c) => c.name !== nameToRemove);
-    await this.alterTable(tableName, undefined, remainingChecks);
+    const checkConstraints = await this.checkConstraints(tableName);
+    const lookup: { name?: string; expression?: string } = { expression };
+    if (options.name !== undefined) lookup.name = options.name;
+    const chkNameToDelete = (await this.checkConstraintForBang(tableName, lookup)).name;
+    const remainingChecks = checkConstraints.filter((chk) => chk.name !== chkNameToDelete);
+    await this.alterTable(tableName, await this.foreignKeys(tableName), remainingChecks);
   }
 
   // --- Private: alter_table copy strategy (Rails: SQLite3Adapter#alter_table) ---

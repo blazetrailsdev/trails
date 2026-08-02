@@ -100,6 +100,7 @@ import type {
   IdHashOptions,
   AddReferenceOptions,
   RemoveReferenceOptions,
+  CheckConstraintDefinition,
 } from "./abstract/schema-definitions.js";
 import type { SchemaCreation } from "./abstract/schema-creation.js";
 import type { Column } from "./column.js";
@@ -425,10 +426,16 @@ export interface AbstractAdapter {
     expression: string,
     options?: { name?: string; validate?: boolean; ifNotExists?: boolean; [key: string]: unknown },
   ): Promise<void>;
+  checkConstraints(tableName: string): Promise<CheckConstraintDefinition[]>;
   checkConstraintExists(
     tableName: string,
     options: { name?: string; expression?: string },
   ): Promise<boolean>;
+  /** @internal */
+  checkConstraintForBang(
+    tableName: string,
+    options?: { name?: string; expression?: string },
+  ): Promise<CheckConstraintDefinition>;
   removeCheckConstraint(
     tableName: string,
     expressionOrOptions?: string | { name?: string; ifExists?: boolean },
