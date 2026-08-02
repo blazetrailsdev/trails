@@ -1676,7 +1676,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     // step to be explicit adapter surface. The shape is modelled on Rails' own
     // type-DDL quartet (create_enum postgresql_adapter.rb:541, drop_enum :571,
     // rename_enum, rename_enum_value; stubbed on the base at
-    // abstract_adapter.rb:576-580), which all `reload_type_map` after mutating
+    // abstract_adapter.rb:576-592), which all `reload_type_map` after mutating
     // the type universe. reloadTypeMap
     // also drops the prepared-statement name map, so a cached write-path plan
     // built against a prior incarnation of the type (drop + recreate reassigns

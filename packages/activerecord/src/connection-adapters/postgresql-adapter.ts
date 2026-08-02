@@ -4827,7 +4827,7 @@ export interface PostgreSQLAdapter {
    *   trails feature, not unfinished porting, so it is permanent rather than convergeable.
    *   `createRange`/`dropRange` are modelled on the shape of Rails' own type-DDL quartet
    *   (`create_enum` postgresql_adapter.rb:541, `drop_enum` :571, `rename_enum`,
-   *   `rename_enum_value`, stubbed on the base at abstract_adapter.rb:576-580), including their
+   *   `rename_enum_value`, stubbed on the base at abstract_adapter.rb:576-592), including their
    *   `reload_type_map` epilogue; the implementation lives at the emitting call site,
    *   connection-adapters/postgresql/schema-statements-class.ts. Deliberately PostgreSQL-only: the
    *   no-op stubs that shadowed these on AbstractAdapter were deleted rather than allowlisted,
@@ -4841,7 +4841,7 @@ export interface PostgreSQLAdapter {
    *   `Range` lets a Rails app get away with a raw `execute("CREATE TYPE … AS RANGE")`) JavaScript
    *   has no Range analogue to lean on, so the DDL step is deliberate trails surface. Modelled on
    *   Rails' type-DDL quartet (`create_enum` postgresql_adapter.rb:541, `drop_enum` :571,
-   *   `rename_enum`, `rename_enum_value`, stubbed on the base at abstract_adapter.rb:576-580),
+   *   `rename_enum`, `rename_enum_value`, stubbed on the base at abstract_adapter.rb:576-592),
    *   including their `reload_type_map` epilogue. Deliberately PostgreSQL-only: the no-op stubs
    *   that shadowed these on AbstractAdapter were deleted rather than allowlisted, since Rails
    *   stubs only the enum quartet on the base.
