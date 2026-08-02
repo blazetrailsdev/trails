@@ -413,7 +413,14 @@ export interface AbstractAdapter {
     tableName: string,
     options: { name?: string; expression?: string },
   ): Promise<boolean>;
+  removeCheckConstraint(
+    tableName: string,
+    expressionOrOptions?: string | { name?: string; ifExists?: boolean },
+    options?: { name?: string; ifExists?: boolean },
+  ): Promise<void>;
   removeConstraint(tableName: string, constraintName: string): Promise<void>;
+  updateTableDefinition(tableName: string, base?: unknown): Table;
+  assumeMigratedUptoVersion(version: number | string): Promise<void>;
   createJoinTable(
     table1: string,
     table2: string,

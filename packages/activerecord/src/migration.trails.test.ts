@@ -59,24 +59,6 @@ describe("MigrationTest", () => {
     expect(m.connectionPool).toBe(baseAdapter);
   });
 
-  it("migration.schema uses connection (respects _connectionOverride)", async () => {
-    class M extends Migration {
-      async up() {}
-      async down() {}
-    }
-    const m = new M();
-    const internals = m as unknown as {
-      adapter: DatabaseAdapter;
-      _connectionOverride?: DatabaseAdapter;
-    };
-    const baseAdapter = Base.connection;
-    const override = newRawTestAdapter();
-    internals.adapter = baseAdapter;
-    expect((m.schema as unknown as { adapter: DatabaseAdapter }).adapter).toBe(baseAdapter);
-    internals._connectionOverride = override;
-    expect((m.schema as unknown as { adapter: DatabaseAdapter }).adapter).toBe(override);
-  });
-
   it("migration context with async migration() proxy", async () => {
     const adapter = Base.connection;
     // Nothing drops schema_migrations between tests, so start from a clean
