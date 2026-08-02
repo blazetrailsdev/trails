@@ -2130,6 +2130,13 @@ function flattenedOrderKeysForRawSqlCheck(orderArgs: unknown[]): (string | symbo
   return result;
 }
 
+/** Rails' `node.public_send(dir.downcase)` — asc/desc on the resolved order column. */
+function orderedNode(node: unknown, dir: unknown): unknown {
+  return String(dir).toLowerCase() === "desc"
+    ? new Nodes.Descending(node)
+    : new Nodes.Ascending(node);
+}
+
 /** @internal */
 export function preprocessOrderArgs(this: QueryMethodsHost, orderArgs: unknown[]): void {
   // disallowRawSqlBang skips symbols — resolve symbol names to strings first
@@ -2148,32 +2155,18 @@ export function preprocessOrderArgs(this: QueryMethodsHost, orderArgs: unknown[]
   const mapped: unknown[] = [];
   for (const arg of orderArgs) {
     if (typeof arg === "symbol") {
-      // Resolve against the current relation's table, not a table named after the column.
-      const name = symbolToName(arg);
-      const modelTable = this.table;
-      const attr = modelTable ? modelTable.get(name) : arelSql(name);
-      mapped.push(new Nodes.Ascending(attr));
+      mapped.push(new Nodes.Ascending(orderColumn.call(this, symbolToName(arg))));
     } else if (isPlainObject(arg)) {
-      for (const [key, value] of Object.entries(arg)) {
+      for (const rawKey of Reflect.ownKeys(arg)) {
+        const key = typeof rawKey === "symbol" ? symbolToName(rawKey) : rawKey;
+        const value = (arg as Record<PropertyKey, unknown>)[rawKey];
         if (isPlainObject(value)) {
-          // Nested hash: { table: { col: dir } } → table.col DESC/ASC (quoted via ArelTable)
+          // Nested hash: { table: { col: dir } } → order_column("table.col")
           for (const [field, dir] of Object.entries(value)) {
-            const attr = new ArelTable(key).get(field);
-            mapped.push(
-              String(dir).toLowerCase() === "desc"
-                ? new Nodes.Descending(attr)
-                : new Nodes.Ascending(attr),
-            );
+            mapped.push(orderedNode(orderColumn.call(this, [key, field].join(".")), dir));
           }
         } else {
-          // Flat hash: { col: dir } — resolve against the current table.
-          const modelTable = this.table;
-          const attr = modelTable ? modelTable.get(key) : arelSql(key);
-          mapped.push(
-            String(value).toLowerCase() === "desc"
-              ? new Nodes.Descending(attr)
-              : new Nodes.Ascending(attr),
-          );
+          mapped.push(orderedNode(orderColumn.call(this, key), value));
         }
       }
     } else {
