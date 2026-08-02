@@ -373,10 +373,6 @@ export class CollectionAssociation extends Association {
         );
       }
 
-      // Rails keeps the not-found decision in `find`, not in the scan helper
-      // (collection_association.rb:104-111): `find_by_scan` only scans, and the
-      // miss is routed through the *scope's* `raise_record_not_found_exception!`
-      // so the message carries the association scope's conditions.
       const result = this.findByScan(ids);
       const resultSize = Array.isArray(result) ? result.length : result == null ? 0 : 1;
       if (!result || resultSize !== argsFlatten.length) {
