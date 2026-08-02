@@ -6,7 +6,7 @@ import { Association } from "./association.js";
 import { foreignKeyPresentFor, ownerForeignKeyColumns } from "./foreign-association.js";
 import { throughForeignKeyPresent } from "./through-association.js";
 import type { AssociationReflection } from "../reflection.js";
-import { RecordNotSaved, Rollback } from "../errors.js";
+import { RecordNotFound, RecordNotSaved, Rollback } from "../errors.js";
 import { CollectionIdsAssignmentError, CollectionPersistedAssignmentError } from "./errors.js";
 import { raiseNotFoundAll } from "../relation/finder-methods.js";
 import { normalizeAssociationKey } from "./key-normalization.js";
@@ -359,19 +359,32 @@ export class CollectionAssociation extends Association {
    * delegates to the association scope.
    */
   async find(...args: unknown[]): Promise<Base | Base[] | null> {
-    const ids = (args as any[]).flat().filter((id) => id != null);
+    const scope = this.scope();
 
     if (this.reflection.options.inverseOf && this.isLoaded()) {
-      const model = this.scope().model;
-      if (ids.length === 0) {
-        throw new Error(`Couldn't find ${model.name} without an ID`);
+      const argsFlatten = (args as any[]).flat();
+      const model = scope.model;
+
+      if (argsFlatten.length === 0) {
+        throw new RecordNotFound(
+          `Couldn't find ${model.name} without an ID`,
+          model.name,
+          String(model.primaryKey),
+          args,
+        );
       }
-      return this.findByScan(ids);
+
+      const result = this.findByScan(args);
+
+      const resultSize = Array.isArray(result) ? result.length : result == null ? 0 : 1;
+      if (!result || resultSize !== argsFlatten.length) {
+        scope.raiseRecordNotFoundExceptionBang(argsFlatten, resultSize, argsFlatten.length);
+      }
+      return result as Base | Base[];
     }
 
-    const rel = this.scope();
-    if (rel && typeof rel.find === "function") {
-      return await rel.find(...ids);
+    if (scope && typeof scope.find === "function") {
+      return await scope.find(...args);
     }
     return null;
   }
@@ -1239,7 +1252,9 @@ export class CollectionAssociation extends Association {
     return merged;
   }
 
-  private findByScan(ids: unknown[]): Base | Base[] {
+  private findByScan(args: unknown[]): Base | Array<Base | undefined> | undefined {
+    const expectsArray = Array.isArray(args[0]);
+    const ids = args.flat().filter((id) => id != null);
     // Fold each key through `normalizeAssociationKey` before stringifying: an
     // in-memory target PK is a BigInt (int8 default under PG bigserial) while a
     // `find(id)` argument is a number, and a raw `JSON.stringify` of a BigInt
@@ -1254,28 +1269,17 @@ export class CollectionAssociation extends Association {
       JSON.stringify(
         Array.isArray(v) ? v.map(normalizeAssociationKey) : normalizeAssociationKey(v),
       );
-    const normalizedIds = ids.map(normalize);
+    const normalizedIds = [...new Set(ids.map(normalize))];
 
-    if (ids.length === 1) {
-      const found = this.target.find(
+    if (normalizedIds.length === 1) {
+      const record = this.target.find(
         (r) => normalize(this.primaryKeyValue(r)) === normalizedIds[0],
       );
-      if (!found) {
-        throw new Error(`Couldn't find ${this.klass.name} with ID ${normalizedIds[0]}`);
-      }
-      return found;
+      return expectsArray ? [record] : record;
     }
 
     const idSet = new Set(normalizedIds);
-    const found = this.target.filter((r) => idSet.has(normalize(this.primaryKeyValue(r))));
-    if (found.length !== ids.length) {
-      const foundSet = new Set(found.map((r) => normalize(this.primaryKeyValue(r))));
-      const missing = ids.filter((id) => !foundSet.has(normalize(id)));
-      throw new Error(
-        `Couldn't find all ${this.klass.name} with IDs (${missing.map(normalize).join(", ")})`,
-      );
-    }
-    return found;
+    return this.target.filter((r) => idSet.has(normalize(this.primaryKeyValue(r))));
   }
 }
 
