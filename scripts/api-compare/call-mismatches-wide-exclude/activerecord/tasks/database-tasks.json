@@ -16,13 +16,6 @@
   {
     "package": "activerecord",
     "tsFile": "tasks/database-tasks.ts",
-    "rubyName": "check_protected_environments!",
-    "call": "check_current_protected_environment!",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "tasks/database-tasks.ts",
     "rubyName": "check_schema_file",
     "call": "exist?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
