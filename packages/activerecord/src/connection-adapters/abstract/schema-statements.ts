@@ -27,6 +27,8 @@ import {
   type AddForeignKeyOptions,
   type AddIndexOptions,
   type AddReferenceOptions,
+  type RemoveReferenceOptions,
+  type IndexDefinitionRow,
   ReferenceDefinition,
   type ColumnType,
   type ColumnOptions,
@@ -765,12 +767,7 @@ export class SchemaStatements {
   async removeReference(
     tableName: string,
     refName: string,
-    options: {
-      polymorphic?: boolean;
-      foreignKey?: boolean | { toTable?: string; column?: string };
-      ifExists?: boolean;
-      ifNotExists?: boolean;
-    } = {},
+    options: RemoveReferenceOptions = {},
   ): Promise<void> {
     const conditionalOptions: { ifExists?: boolean; ifNotExists?: boolean } = {};
     if (options.ifExists !== undefined) conditionalOptions.ifExists = options.ifExists;
@@ -798,12 +795,7 @@ export class SchemaStatements {
   async removeBelongsTo(
     tableName: string,
     refName: string,
-    options: {
-      polymorphic?: boolean;
-      foreignKey?: boolean | { toTable?: string; column?: string };
-      ifExists?: boolean;
-      ifNotExists?: boolean;
-    } = {},
+    options: RemoveReferenceOptions = {},
   ): Promise<void> {
     return this.removeReference(tableName, refName, options);
   }
@@ -1205,38 +1197,14 @@ export class SchemaStatements {
     }
   }
 
-  async indexes(
-    tableName: string,
-    // `columns` is a string for expression indexes (the raw expression) and an
-    // array of column names otherwise, mirroring Rails' IndexDefinition#columns.
-    // `where` (partial-index predicate) and `orders` (per-column sort
-    // directions, or a single direction for the whole index) are carried at
-    // runtime by the SQLite/PostgreSQL arms, so the static type surfaces them
-    // as optional rather than `as`-casting them away.
-  ): Promise<
-    Array<{
-      name: string;
-      columns: string | string[];
-      unique: boolean;
-      where?: string;
-      orders?: Record<string, string> | string;
-    }>
-  > {
+  async indexes(tableName: string): Promise<IndexDefinitionRow[]> {
     switch (this.adapterName as AdapterName) {
       case "sqlite":
         // Share the concrete SQLite3 introspection so this fallback arm
         // produces the same result shape (skips `sqlite_*` auto-indexes,
         // recovers partial-index WHERE clauses and expression/DESC columns
         // from the index SQL) rather than a lower-fidelity subset.
-        return sqliteIndexes(this as unknown as DatabaseAdapter, tableName) as Promise<
-          Array<{
-            name: string;
-            columns: string | string[];
-            unique: boolean;
-            where?: string;
-            orders?: Record<string, string> | string;
-          }>
-        >;
+        return sqliteIndexes(this as unknown as DatabaseAdapter, tableName);
       case "postgres": {
         // The LEFT JOIN on pg_attribute (below) is deliberate: an expression
         // key has attnum 0 with no pg_attribute row, so an inner join would drop
@@ -1400,14 +1368,10 @@ export class SchemaStatements {
   // `array_agg`/`pg_get_indexdef` columns), unlike the lighter SchemaStatements
   // `indexes()` helper whose columns don't round-trip cleanly on every adapter.
   // Used by the index-name resolution / existence paths that compare columns.
-  private adapterIndexes(
-    tableName: string,
-  ): Promise<Array<{ name: string; columns: string[]; unique: boolean }>> {
-    return (
-      this as unknown as {
-        indexes(t: string): Promise<Array<{ name: string; columns: string[]; unique: boolean }>>;
-      }
-    ).indexes(tableName);
+  private adapterIndexes(tableName: string): Promise<IndexDefinitionRow[]> {
+    return (this as unknown as { indexes(t: string): Promise<IndexDefinitionRow[]> }).indexes(
+      tableName,
+    );
   }
 
   async indexExists(
@@ -2120,7 +2084,7 @@ export class SchemaStatements {
       return options.name;
     }
 
-    const checks: Array<(idx: { name: string; columns: string[] }) => boolean> = [];
+    const checks: Array<(idx: IndexDefinitionRow) => boolean> = [];
     let columnNames: string[];
 
     if (!options.name && this.isExpressionColumnName(columnName ?? "")) {

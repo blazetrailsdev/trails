@@ -113,6 +113,7 @@ import {
   type ColumnOptions,
   type RemoveForeignKeyOptions,
   type ForeignKeyLookupOptions,
+  type IndexDefinitionRow,
 } from "./abstract/schema-definitions.js";
 import { Base } from "../base.js";
 import { Column } from "./column.js";
@@ -2147,7 +2148,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     return fields.map((field) => newColumnFromField(this, tableName, field, fields));
   }
 
-  async indexes(tableName: string): Promise<unknown[]> {
+  async indexes(tableName: string): Promise<IndexDefinitionRow[]> {
     return sqliteIndexes(this, tableName);
   }
 

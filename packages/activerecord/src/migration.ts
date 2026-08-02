@@ -23,6 +23,7 @@ import {
   type ForeignKeyLookupOptions,
   type AddIndexOptions,
   type IdHashOptions,
+  type IndexDefinitionRow,
 } from "./connection-adapters/abstract/schema-definitions.js";
 import {
   type JoinTableOptions,
@@ -652,7 +653,7 @@ export abstract class Migration {
       return;
     }
     tableName = this._pt(tableName);
-    await this.connection.addReference(tableName, refName, options as Record<string, unknown>);
+    await this.connection.addReference(tableName, refName, options);
   }
 
   /** Alias of addReference (Rails: `alias :add_belongs_to :add_reference`). */
@@ -1054,14 +1055,8 @@ export abstract class Migration {
     return this.connection.columns(this._pt(tableName));
   }
 
-  async indexes(
-    tableName: string,
-    // `columns` is a string for expression indexes, an array otherwise —
-    // mirrors Rails' IndexDefinition#columns.
-  ): Promise<Array<{ name: string; columns: string | string[]; unique: boolean }>> {
-    return this.connection.indexes(this._pt(tableName)) as Promise<
-      Array<{ name: string; columns: string | string[]; unique: boolean }>
-    >;
+  async indexes(tableName: string): Promise<IndexDefinitionRow[]> {
+    return this.connection.indexes(this._pt(tableName));
   }
 
   async primaryKey(tableName: string): Promise<string | string[] | null> {
