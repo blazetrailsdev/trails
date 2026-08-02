@@ -3313,26 +3313,16 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   /**
    * Find records within the association by id or array of ids.
    *
-   * Mirrors: ActiveRecord::Associations::CollectionProxy#find
+   * Mirrors: ActiveRecord::Associations::CollectionProxy#find — a bare
+   * delegation to `@association.find(*args)`. Rails' `return super if
+   * block_given?` arm forwards to `Enumerable#find`'s predicate form, which
+   * has no analogue here (this `find` takes ids only; the block form is
+   * `Array#find` over an awaited collection).
    */
   override find(ids: unknown[]): Promise<T[]>;
   override find(id: unknown): Promise<T>;
   override find(...ids: unknown[]): Promise<T | T[]>;
   override async find(...args: unknown[]): Promise<T | T[]> {
-    // Rails (collection_proxy.rb:107-109) is a bare delegation:
-    //   def find(*args)
-    //     return super if block_given?
-    //     @association.find(*args)
-    //   end
-    // The `block_given?` arm forwards to `Enumerable#find`'s predicate form,
-    // which has no trails analogue (this `find` takes ids only — the block
-    // form is `Array#find` over an awaited collection), so only the
-    // delegation arm exists. `CollectionAssociation#find` owns the whole
-    // decision: the `inverse_of && loaded?` in-memory scan, the not-found
-    // raising through `scope.raise_record_not_found_exception!`, and the
-    // `scope.find(*args)` fallback. That fallback builds a FRESH scope from
-    // the owner's current foreign-key state, so a proxy loaded empty before
-    // the owner was saved still queries rather than scanning a stale target.
     const assoc = this._record.association(this._assocName) as unknown as {
       find(...args: unknown[]): Promise<Base | Base[] | null>;
     };

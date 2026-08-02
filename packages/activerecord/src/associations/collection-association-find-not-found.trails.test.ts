@@ -9,11 +9,10 @@
  * association scope's conditions.
  *
  * `CollectionProxy#find` is a bare delegation (collection_proxy.rb:107-109), so
- * driving the proxy is driving the association body. These cases sit outside
- * the ported Rails tests: Rails' own `test_raise_record_not_found_error_when_*`
- * assert only that a `RecordNotFound` escapes, not the message payload, and the
- * partial-miss count and `to_s`-shaped key comparison have no Rails test at
- * all.
+ * driving the proxy drives the association body. These cases sit outside the
+ * ported Rails tests, which assert only that a `RecordNotFound` escapes — not
+ * the message payload — and cover neither the partial-miss count nor the
+ * `to_s`-shaped key comparison.
  */
 import { describe, it, expect } from "vitest";
 import { Base, RecordNotFound } from "../index.js";
