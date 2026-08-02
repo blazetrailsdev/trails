@@ -3735,8 +3735,6 @@ export class Relation<T extends Base> {
       disallowRawSqlBang(stringColumns, resolveColumnNameMatcher(this._conn()));
     }
 
-    // Rails arel_column reads the `table` attr_reader, so an aliased relation
-    // qualifies to the alias rather than the model's own arel_table.
     const table = this.table;
     // Rails columns_hash.key? — qualify a bare known column to the base table.
     const knownColumns = new Set(this._modelClass.attributeNames());
