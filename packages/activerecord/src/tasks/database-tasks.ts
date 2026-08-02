@@ -344,7 +344,8 @@ export class DatabaseTasks {
    * answers that list instead — the same override Rails' own
    * `migrator_class` test helper uses.
    */
-  private static async _migrationContextFor(
+  /** @internal */
+  static async _migrationContextFor(
     adapter: import("../connection-adapters/abstract-adapter.js").AbstractAdapter,
     dbConfig: DatabaseConfig,
   ): Promise<import("../migration.js").MigrationContext> {
@@ -635,26 +636,8 @@ export class DatabaseTasks {
       return;
     }
 
-    const { NoDatabaseError } = await import("../errors.js");
-    const { EnvironmentMismatchError } = await import("../migration.js");
-
     for (const config of configs) {
-      try {
-        await this.withTemporaryConnection(config, async (adapter) => {
-          const context = await this._migrationContextFor(adapter, config);
-          const current = context.currentEnvironment;
-          const stored = await context.lastStoredEnvironment();
-          if (stored && (await context.protectedEnvironment())) {
-            throw new ProtectedEnvironmentError(stored);
-          }
-          if (stored && stored !== current) {
-            throw new EnvironmentMismatchError(current, stored);
-          }
-        });
-      } catch (error) {
-        if (error instanceof NoDatabaseError) continue;
-        throw error;
-      }
+      await checkCurrentProtectedEnvironmentBang(config);
     }
   }
 
@@ -1603,9 +1586,24 @@ export function structureLoadFlagsFor(adapter: string): string | string[] | null
 export async function checkCurrentProtectedEnvironmentBang(
   dbConfig: DatabaseConfig,
 ): Promise<void> {
-  await DatabaseTasks.withTemporaryConnection(dbConfig, async () => {
-    await DatabaseTasks.checkProtectedEnvironmentsBang(dbConfig.envName);
-  });
+  const { NoDatabaseError } = await import("../errors.js");
+  const { EnvironmentMismatchError } = await import("../migration.js");
+  try {
+    await DatabaseTasks.withTemporaryConnection(dbConfig, async (adapter) => {
+      const context = await DatabaseTasks._migrationContextFor(adapter, dbConfig);
+      const current = context.currentEnvironment;
+      const stored = await context.lastStoredEnvironment();
+      if (stored && (await context.protectedEnvironment())) {
+        throw new ProtectedEnvironmentError(stored);
+      }
+      if (stored && stored !== current) {
+        throw new EnvironmentMismatchError(current, stored);
+      }
+    });
+  } catch (error) {
+    if (error instanceof NoDatabaseError) return;
+    throw error;
+  }
 }
 
 /** @internal */
