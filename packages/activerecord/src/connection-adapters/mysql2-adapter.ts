@@ -324,8 +324,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       // connected" message is promoted to ConnectionNotEstablished;
       // everything else in this family is ConnectionFailed.
       const msg = (e as Error).message;
-      // Rails repeats this literal regex in both branches (mysql2_adapter.rb:176
-      // and abstract_mysql_adapter.rb:818) rather than sharing a constant.
       if (/MySQL client is not connected/i.test(msg)) {
         return new ConnectionNotEstablished(msg, { cause: e });
       }

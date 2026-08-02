@@ -1110,7 +1110,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
    * teardown behavior.
    *
    * @noRailsEquivalent PERMANENT — Rails' `disconnect!`
-   * (sqlite3_adapter.rb:245) closes the handle synchronously and has nothing to
+   * (sqlite3_adapter.rb:221) closes the handle synchronously and has nothing to
    * drain, so no Rails method can map onto this hook.
    */
   whenClosed(): Promise<void> {
@@ -2753,7 +2753,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
    * Complete a deferred async connection. No-op when already connected
    * synchronously. Invoked by `openAsync()` and `verifyBang()`. @internal
    *
-   * @noRailsEquivalent PERMANENT — Rails' `connect` (sqlite3_adapter.rb:825)
+   * @noRailsEquivalent PERMANENT — Rails' `connect` (sqlite3_adapter.rb:806)
    * opens the handle synchronously inside `initialize`, so there is nothing
    * left to finish afterwards. Drivers whose `open()` returns a Promise cannot
    * be opened from a synchronous constructor or a synchronous pool checkout,
@@ -2804,7 +2804,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
    *
    * @noRailsEquivalent PERMANENT — the async twin of `new`, for the same reason
    * as `completeAsyncConnect`: Ruby's sqlite3 gem opens synchronously, so
-   * `SQLite3Adapter.new` (sqlite3_adapter.rb:120) is the only entry point Rails
+   * `SQLite3Adapter.new` (sqlite3_adapter.rb:102) is the only entry point Rails
    * has or can have.
    */
   static async openAsync(
