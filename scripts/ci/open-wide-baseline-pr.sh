@@ -45,7 +45,14 @@ The \`Wide ratchet baseline reseed (main)\` step found the committed wide
 call-mismatch baseline out of sync with a clean reseed after ${sha}. This
 commit is that reseed, produced by \`pnpm api:calls:wide:reseed\`."
 
-git push --force origin "$BRANCH"
+# Push under the same token that will open the PR, not the checkout's
+# persisted credentials, so a configured MAINTENANCE_PR_TOKEN also owns the
+# push event and the branch's own workflow runs.
+remote="origin"
+if [[ -n "${GITHUB_REPOSITORY:-}" ]]; then
+  remote="https://x-access-token:${GH_TOKEN:-$GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+fi
+git push --force "$remote" "HEAD:refs/heads/${BRANCH}"
 
 readonly TITLE="chore(api-compare): reseed the wide ratchet baseline (${shortSha})"
 body=$(
@@ -62,6 +69,20 @@ scratch on each drifting merge, so this PR always reflects the newest baseline
 — review the diff as it stands rather than commit by commit.
 EOF
 )
+
+# GitHub refuses to trigger workflows from events authored by GITHUB_TOKEN, so
+# on the fallback token this PR opens with no checks at all and cannot satisfy
+# required status checks. Say so in the body rather than leaving a maintainer
+# to work out why the checks list is empty.
+if [[ "${MAINTENANCE_PR_TOKEN_SET:-false}" != "true" ]]; then
+  body="${body}
+
+**CI will not start on its own here.** This PR was authored by
+\`GITHUB_TOKEN\`, and GitHub does not trigger workflow runs from events that
+token creates. Close and reopen the PR (or push any commit to the branch) to
+start the checks. Setting a \`MAINTENANCE_PR_TOKEN\` secret — a PAT or GitHub
+App token with contents+pull-requests write — removes this step."
+fi
 
 # A closed-but-unmerged PR still owns the branch and makes `gh pr create`
 # refuse to open a second one, so reopen that instead of failing. A MERGED one

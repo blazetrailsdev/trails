@@ -1520,7 +1520,13 @@ jobs:
           bash scripts/ci/open-wide-baseline-pr.sh
           exit 1
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Prefer MAINTENANCE_PR_TOKEN (PAT or GitHub App installation token)
+          # when configured: GitHub does not trigger workflow runs from events
+          # authored by GITHUB_TOKEN, so on the fallback the maintenance PR
+          # opens with no checks and needs a close/reopen before it can merge.
+          # The script says so in the PR body when it lands on the fallback.
+          GH_TOKEN: ${{ secrets.MAINTENANCE_PR_TOKEN || secrets.GITHUB_TOKEN }}
+          MAINTENANCE_PR_TOKEN_SET: ${{ secrets.MAINTENANCE_PR_TOKEN != '' }}
       - name: Wide call-mismatches ratchet
         # Gates the RFC 0047 wide artifact against the split call-mismatches-wide-exclude/ baseline dir.
         # Fails on a new wide mismatch, a stale baseline entry, or more
