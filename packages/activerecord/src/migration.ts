@@ -1059,13 +1059,9 @@ export abstract class Migration {
     // `columns` is a string for expression indexes, an array otherwise —
     // mirrors Rails' IndexDefinition#columns.
   ): Promise<Array<{ name: string; columns: string | string[]; unique: boolean }>> {
-    // The adapter interface types `indexes` loosely (`unknown[]`); the
-    // concrete adapters all return IndexDefinition-shaped rows.
-    return (await this.connection.indexes(this._pt(tableName))) as Array<{
-      name: string;
-      columns: string | string[];
-      unique: boolean;
-    }>;
+    return this.connection.indexes(this._pt(tableName)) as Promise<
+      Array<{ name: string; columns: string | string[]; unique: boolean }>
+    >;
   }
 
   async primaryKey(tableName: string): Promise<string | string[] | null> {
