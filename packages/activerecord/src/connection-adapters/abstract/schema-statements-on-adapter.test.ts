@@ -69,8 +69,6 @@ class CapturingAdapter extends AbstractAdapter {
   executeMutation(_sql: string) {
     return Promise.resolve(0);
   }
-  // The catalog probes read through queryValues → query → internalExecQuery
-  // (Rails' query_values path), which never reaches `execute`.
   override internalExecQuery(sql: string, _name?: string | null, binds?: unknown[]) {
     this.lastSql = sql;
     this.lastParams = binds ?? [];
