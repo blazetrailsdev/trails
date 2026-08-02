@@ -56,6 +56,18 @@ const NON_EMITTING: ReadonlyMap<string, string> = new Map([
 ]);
 
 /**
+ * A getter whose body reads a private field brand-checks its receiver and
+ * throws when the recording view is that receiver. That is the one throw the
+ * recorder may answer by re-reading off the real adapter; anything else is a
+ * genuine failure in the getter body, and swallowing it would let the trace go
+ * quietly shallower for that member instead of failing — the drift the guard's
+ * staleness rule exists to prevent. Match the brand-check shape only.
+ */
+function isPrivateFieldBrandCheck(error: unknown): boolean {
+  return error instanceof TypeError && /private (member|field|method)/i.test(error.message);
+}
+
+/**
  * Lay the canonical schema through a proxy that records every adapter member
  * the loader reaches for.
  *
@@ -101,7 +113,8 @@ async function recordLayPath(): Promise<Set<string>> {
         let value: unknown;
         try {
           value = Reflect.get(target, prop, self);
-        } catch {
+        } catch (error) {
+          if (!isPrivateFieldBrandCheck(error)) throw error;
           value = Reflect.get(target, prop, target);
         }
         return typeof value === "function"
@@ -174,6 +187,26 @@ describe("STUBBED_DDL_METHODS", () => {
         `${stale.join(", ")}. Delete them from this file — an exemption nobody can re-derive ` +
         `from the code is how the guarded set drifts back out of date.`,
     ).toEqual([]);
+  });
+
+  test("falls back only for a private-field brand check", () => {
+    class Branded {
+      #field = 1;
+      get value(): number {
+        return this.#field;
+      }
+    }
+    const branded = new Branded();
+    let brandCheck: unknown;
+    try {
+      Reflect.get(branded, "value", new Proxy(branded, {}));
+    } catch (error) {
+      brandCheck = error;
+    }
+
+    expect(isPrivateFieldBrandCheck(brandCheck)).toBe(true);
+    expect(isPrivateFieldBrandCheck(new TypeError("something genuinely broke"))).toBe(false);
+    expect(isPrivateFieldBrandCheck(new Error("Cannot read private member #x"))).toBe(false);
   });
 
   test("gives every exemption a reason", () => {
