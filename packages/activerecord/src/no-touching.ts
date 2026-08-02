@@ -48,7 +48,7 @@ export function isAppliedTo(modelClass: typeof Base): boolean {
  *
  * Mirrors: ActiveRecord::NoTouching#no_touching?
  */
-export function isNoTouching(this: { constructor: unknown }): boolean {
+export function isNoTouching(this: Base): boolean {
   return isAppliedTo(this.constructor as typeof Base);
 }
 
