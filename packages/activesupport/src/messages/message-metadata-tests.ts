@@ -156,8 +156,6 @@ export function messageMetadataTests<T>(hooks: MetadataCodecHooks<T>): void {
   });
 
   it(":expires_at overrides :expires_in", () => {
-    // Rails travels without freezing first; `travel` is only reachable inside
-    // `freezeTime` here, and freezing changes nothing about what is asserted.
     freezeTime((travel) => {
       each((data, codec) => {
         const message = encode(data, codec, {
