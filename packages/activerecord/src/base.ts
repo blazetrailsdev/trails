@@ -230,11 +230,7 @@ import {
   noTouching as _noTouchingBlock,
   isAppliedTo as _isNoTouchingApplied,
 } from "./no-touching.js";
-import {
-  suppress as _suppressBlock,
-  isSuppressed as _isSuppressed,
-  registry as _suppressorRegistry,
-} from "./suppressor.js";
+import { suppress as _suppressBlock, registry as _suppressorRegistry } from "./suppressor.js";
 import {
   inspect as _inspect,
   attributeForInspect as _attributeForInspect,
@@ -1407,6 +1403,13 @@ export class Base extends Model {
    * a getter can't await without wrapping instances in a `Proxy`.
    *
    * @internal
+   * @noRailsEquivalent PERMANENT No `def ensure_schema_loaded` exists anywhere
+   * in Rails: Ruby reflects lazily and synchronously from `method_missing` /
+   * `define_attribute_methods` around
+   * `vendor/rails/activerecord/lib/active_record/model_schema.rb:534`
+   * (`def load_schema`), where the blocking DB round-trip is invisible to the
+   * caller. Every trails DB call is a promise, so the lazy hook has to be an
+   * awaitable named entry point on the query/persistence path.
    */
   static ensureSchemaLoaded(this: typeof Base): Promise<void> {
     // A model whose declared attributes are all virtual (e.g. Rails'
@@ -1937,10 +1940,6 @@ export class Base extends Model {
     return _suppressBlock(this, fn);
   }
 
-  static get isSuppressed(): boolean {
-    return _isSuppressed(this);
-  }
-
   static get registry(): Record<string, true | undefined> {
     return _suppressorRegistry();
   }
@@ -2319,20 +2318,6 @@ export class Base extends Model {
   ) => Promise<InstanceType<T>>;
 
   /**
-   * Dynamic finder by a single attribute name.
-   * e.g., User.findByName("Alice") → User.findBy({ name: "Alice" })
-   *
-   * Mirrors: ActiveRecord::Base.find_by_* dynamic finders
-   */
-  static async findByAttribute<T extends typeof Base>(
-    this: T,
-    attribute: string,
-    value: unknown,
-  ): Promise<InstanceType<T> | null> {
-    return this.findBy({ [attribute]: value });
-  }
-
-  /**
    * Check if a dynamic finder method name is valid.
    *
    * Mirrors: ActiveRecord::Base.respond_to_missing?
@@ -2618,6 +2603,14 @@ export class Base extends Model {
    *
    * Rails: `Base.new(attributes = nil, &block)` — recurses on arrays and
    * yields each record to the block before returning.
+   *
+   * @noRailsEquivalent PERMANENT Ruby never writes `def new` for this — the
+   * allocator is `Class#new` and the model side is
+   * `vendor/rails/activerecord/lib/active_record/core.rb:471` (`def
+   * initialize`), so no `.rb` can ever declare a matching name. TS reserves
+   * `new` for the constructor, which cannot recurse over an array of attribute
+   * hashes nor yield each record to a block, so the `Model.new(attrs, &block)`
+   * semantics have to live on a static factory of the same name.
    */
   static new<T extends typeof Base>(
     this: T,
@@ -4406,6 +4399,11 @@ export class Base extends Model {
    * Compare two records for equality based on class and primary key.
    *
    * Mirrors: ActiveRecord::Core#==
+   *
+   * @noRailsEquivalent PERMANENT This is `def ==` at
+   * `vendor/rails/activerecord/lib/active_record/core.rb:631`. TS cannot name a
+   * method `==` and cannot overload the operator, so the ported body needs a
+   * spelled-out identifier; there is no `def is_equal` in Rails to match it.
    */
   declare equals: (other: unknown) => boolean;
 
@@ -4422,16 +4420,6 @@ export class Base extends Model {
    * Mirrors: ActiveRecord::Core#hash
    */
   declare hash: () => unknown;
-
-  /**
-   * Return a string suitable for use as a URL slug.
-   * Override in subclasses for friendly URLs.
-   *
-   * Mirrors: ActiveRecord::Base#to_param
-   */
-  toSlug(): string | null {
-    return this.toParam();
-  }
 
   // becomesBang / updateAttributeBang extracted to persistence.ts.
 
@@ -4616,7 +4604,28 @@ export class Base extends Model {
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Base extends Included<typeof AutosaveAssociation> {
   association(name: string): AssociationInstance;
+  /**
+   * Explicitly load a `belongsTo` target and resolve to it.
+   *
+   * @noRailsEquivalent PERMANENT Ruby has no counterpart because it needs none:
+   * `post.author` is a plain reader that blocks on I/O
+   * (`vendor/rails/activerecord/lib/active_record/associations/builder/association.rb:102`
+   * generates it via `define_readers`), so `def load_belongs_to` exists nowhere
+   * in Rails. A JS getter cannot await, so the async half of the reader has to be
+   * a separately named method. It is also the deliberate strict-loading escape
+   * hatch: an explicit call bumps the bypass count for the duration of the load
+   * (`associations/instance-methods.ts:104`), which is how a caller says "this
+   * lazy load is intentional" — the role Ruby fills by simply calling the
+   * reader.
+   */
   loadBelongsTo(name: string): Promise<Base | null>;
+  /**
+   * Explicitly load a `hasOne` target and resolve to it.
+   *
+   * @noRailsEquivalent PERMANENT Same reasoning as {@link Base.loadBelongsTo}:
+   * no `def load_has_one` exists in Rails, the Ruby reader blocks on I/O, and
+   * the explicit call doubles as the strict-loading bypass.
+   */
   loadHasOne(name: string): Promise<Base | null>;
   readAttributeForValidation(attribute: string): unknown;
   validate(context?: ValidationContextArg): Promise<boolean>;
