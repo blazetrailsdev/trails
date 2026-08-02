@@ -13,6 +13,7 @@ function withSchemaStatements(adapter: DatabaseAdapter): PostgreSQLAdapter {
 interface FakeOptions {
   logger?: { warn: (msg: string) => void };
   schemaQuery?: (sql: string) => Promise<Record<string, unknown>[]>;
+  query?: (sql: string) => Promise<unknown[][]>;
   queryValue?: (sql: string) => Promise<unknown>;
   maxIdentifierLength?: number;
 }
@@ -47,6 +48,10 @@ function makeAdapter(options: FakeOptions = {}) {
     schemaQuery: vi.fn(async (text: string) => {
       sql.push(text);
       return options.schemaQuery ? await options.schemaQuery(text) : [];
+    }),
+    query: vi.fn(async (text: string) => {
+      sql.push(text);
+      return options.query ? await options.query(text) : [];
     }),
     queryValue: vi.fn(async (text: string) => {
       sql.push(text);
@@ -256,19 +261,22 @@ describe("PostgreSQLSchemaStatements#changeTable", () => {
 describe("PostgreSQLSchemaStatements#indexes", () => {
   it("keeps the schema-qualified table name from the argument", async () => {
     const { adapter } = makeAdapter({
-      schemaQuery: async () => [
-        {
-          index_name: "index_things_on_name",
-          is_unique: false,
-          using: "btree",
-          columns: ["name"],
-          has_expressions: false,
-          definition: "CREATE INDEX index_things_on_name ON my_schema.things USING btree (name)",
-          options: [0],
-          is_valid: true,
-          comment: null,
-        },
-      ],
+      // Rails' `indexes` runs two positional `query` calls: the pg_index scan,
+      // then the attnum -> attname lookup behind columnNamesFromColumnNumbers.
+      query: async (text) =>
+        text.includes("pg_attribute")
+          ? [[1, "name"]]
+          : [
+              [
+                "index_things_on_name",
+                false,
+                "1",
+                "CREATE INDEX index_things_on_name ON my_schema.things USING btree (name)",
+                12345,
+                null,
+                true,
+              ],
+            ],
     });
     const ss = withSchemaStatements(adapter);
     const [index] = await ss.indexes("my_schema.things");

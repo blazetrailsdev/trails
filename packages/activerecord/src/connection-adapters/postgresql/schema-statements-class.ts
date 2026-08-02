@@ -63,7 +63,6 @@ interface PgSchemaAdapter {
   extractSchemaQualifiedName(string: string): [string | null, string];
   maxIdentifierLength(): number;
   getDatabaseVersion(): Promise<number>;
-  supportsIndexInclude(): boolean;
   dataSourceSql(name?: string | null, options?: { type?: string }): string;
   quotedScope(
     name?: string | null,
@@ -130,112 +129,92 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
   // ---------------------------------------------------------------------------
 
   async indexes(tableName: string): Promise<IndexDefinition[]> {
-    // supportsIndexInclude() reads databaseVersion; ensure it's populated.
-    await this.pg.getDatabaseVersion();
-    const [schema, table] = this.pg.extractSchemaQualifiedName(tableName);
+    const scope = this.pg.quotedScope(tableName);
 
-    let tableCondition: string;
-    const binds: unknown[] = [];
-
-    if (schema) {
-      binds.push(table, schema);
-      tableCondition = `t.relname = $1 AND n.nspname = $2`;
-    } else {
-      binds.push(tableName);
-      tableCondition = `t.oid = to_regclass($1)`;
-    }
-
-    // ix.indnkeyatts was added in PG11 (covering indexes); on older servers
-    // INCLUDE columns don't exist, so all indkey columns are key columns.
-    const includeFilter = this.pg.supportsIndexInclude() ? `WHERE k < ix.indnkeyatts` : "";
-
-    const rows = await this.pg.schemaQuery(
-      `SELECT i.relname AS index_name,
-              ix.indisunique AS is_unique,
-              am.amname AS using,
-              ARRAY(
-                SELECT pg_get_indexdef(ix.indexrelid, k + 1, true)
-                FROM generate_subscripts(ix.indkey, 1) AS k
-                ${includeFilter}
-                ORDER BY k
-              ) AS columns,
-              (ix.indexprs IS NOT NULL) AS has_expressions,
-              pg_get_indexdef(ix.indexrelid) AS definition,
-              ix.indoption AS options,
-              ix.indisvalid AS is_valid,
-              obj_description(ix.indexrelid, 'pg_class') AS comment
+    const result = await this.pg.query(
+      `SELECT distinct i.relname, d.indisunique, d.indkey, pg_get_indexdef(d.indexrelid), t.oid,
+                      pg_catalog.obj_description(i.oid, 'pg_class') AS comment, d.indisvalid
        FROM pg_class t
-       JOIN pg_index ix ON t.oid = ix.indrelid
-       JOIN pg_class i ON i.oid = ix.indexrelid
-       JOIN pg_namespace n ON n.oid = t.relnamespace
-       JOIN pg_am am ON am.oid = i.relam
-       WHERE ${tableCondition}
-         AND i.relkind IN ('i', 'I')
-         AND ix.indisprimary = false
+       INNER JOIN pg_index d ON t.oid = d.indrelid
+       INNER JOIN pg_class i ON d.indexrelid = i.oid
+       LEFT JOIN pg_namespace n ON n.oid = t.relnamespace
+       WHERE i.relkind IN ('i', 'I')
+         AND d.indisprimary = 'f'
+         AND t.relname = ${scope.name}
+         AND n.nspname = ${scope.schema}
        ORDER BY i.relname`,
-      binds,
+      "SCHEMA",
     );
 
-    return rows.map((row) => {
-      const def = row.definition as string;
+    return Promise.all(
+      result.map(async (row) => {
+        const indexName = row[0] as string;
+        const unique = row[1] as boolean;
+        const indkey = toS(row[2])
+          .split(" ")
+          .map((n) => Number(n));
+        const inddef = row[3] as string;
+        const oid = Number(row[4]);
+        const comment = row[5] as string | null;
+        const valid = row[6] as boolean;
 
-      // Extract the expressions, INCLUDE, NULLS NOT DISTINCT, and WHERE clauses.
-      // Mirrors Rails' regex: / USING (\w+?) \((.+?)\)(?: INCLUDE \((.+?)\))?( NULLS NOT DISTINCT)?(?: WHERE (.+))?\z/m
-      const defMatch = def.match(
-        / USING \w+? \((.+?)\)(?: INCLUDE \((.+?)\))?( NULLS NOT DISTINCT)?(?: WHERE (.+))?$/s,
-      );
-      const expressions = defMatch?.[1] ?? "";
-      const includeStr = defMatch?.[2];
-      const nullsNotDistinctStr = defMatch?.[3];
-      const whereStr = defMatch?.[4];
+        // Mirrors Rails' regex: / USING (\w+?) \((.+?)\)(?: INCLUDE \((.+?)\))?( NULLS NOT DISTINCT)?(?: WHERE (.+))?\z/m
+        const defMatch = inddef.match(
+          / USING (\w+?) \((.+?)\)(?: INCLUDE \((.+?)\))?( NULLS NOT DISTINCT)?(?: WHERE (.+))?$/s,
+        );
+        const using = defMatch?.[1] ?? "";
+        const expressions = defMatch?.[2] ?? "";
+        const includeStr = defMatch?.[3];
+        const nullsNotDistinctStr = defMatch?.[4];
+        const whereStr = defMatch?.[5];
 
-      const include = includeStr
-        ? includeStr.split(",").map((c) => c.trim().replace(/^"|"$/g, "").replace(/""/g, '"'))
-        : undefined;
-      const where = whereStr?.trim();
-      const nullsNotDistinct = nullsNotDistinctStr ? true : undefined;
+        const orders: Record<string, string> = {};
+        const opclasses: Record<string, string> = {};
+        const includeColumns = includeStr
+          ? includeStr.split(",").map((c) => unquoteIdentifier(c.trim().replace(/""/g, '"')))
+          : [];
 
-      // Mirrors Rails (postgresql/schema_statements.rb:117-118): an expression
-      // index (`indkey.include?(0)`) stores `columns` as the raw expression
-      // string, so a conflict target / schema dump emits it verbatim rather
-      // than quoting it as a column name. Plain indexes keep the column array
-      // and parse opclasses/orders.
-      const hasExpressions = row.has_expressions as boolean;
-      const columns: string | string[] = hasExpressions ? expressions : (row.columns as string[]);
+        // Mirrors Rails (postgresql/schema_statements.rb:117-118): an expression
+        // index (`indkey.include?(0)`) stores `columns` as the raw expression
+        // string, so a conflict target / schema dump emits it verbatim rather
+        // than quoting it as a column name.
+        let columns: string | string[];
+        if (indkey.includes(0)) {
+          columns = expressions;
+        } else {
+          const names = await this.columnNamesFromColumnNumbers(oid, indkey);
 
-      const opclassesMap: Record<string, string> = {};
-      const ordersMap: Record<string, string> = {};
-      if (!hasExpressions) {
-        // Mirrors Rails regex: /(?<column>\w+)"?\s?(?<opclass>\w+_ops(_\w+)?)?\s?(?<desc>DESC)?\s?(?<nulls>NULLS (?:FIRST|LAST))?/
-        const COL_RE = /(\w+)"?\s?(\w+_ops(?:_\w+)?)?\s?(DESC)?\s?(NULLS (?:FIRST|LAST))?/g;
-        for (const [, column, opclass, desc, nulls] of expressions.matchAll(COL_RE)) {
-          if (opclass) opclassesMap[column] = opclass;
-          if (nulls) {
-            ordersMap[column] = [desc, nulls].filter(Boolean).join(" ");
-          } else if (desc) {
-            ordersMap[column] = "desc";
+          // prevent INCLUDE columns from being matched
+          columns = names.filter((c) => !includeColumns.includes(c));
+
+          // add info on sort order (only desc order is explicitly specified, asc is the default)
+          // and non-default opclasses
+          // Mirrors Rails regex: /(?<column>\w+)"?\s?(?<opclass>\w+_ops(_\w+)?)?\s?(?<desc>DESC)?\s?(?<nulls>NULLS (?:FIRST|LAST))?/
+          const COL_RE = /(\w+)"?\s?(\w+_ops(?:_\w+)?)?\s?(DESC)?\s?(NULLS (?:FIRST|LAST))?/g;
+          for (const [, column, opclass, desc, nulls] of expressions.matchAll(COL_RE)) {
+            if (opclass) opclasses[column] = opclass;
+            if (nulls) {
+              orders[column] = [desc, nulls].filter(Boolean).join(" ");
+            } else if (desc) {
+              orders[column] = "desc";
+            }
           }
         }
-      }
 
-      return new IndexDefinition(
-        tableName,
-        row.index_name as string,
-        row.is_unique as boolean,
-        columns,
-        {
-          using: row.using as string,
-          orders: ordersMap,
-          opclasses: opclassesMap,
-          include,
-          where,
-          nullsNotDistinct,
+        return new IndexDefinition(tableName, indexName, unique, columns, {
+          orders,
+          opclasses,
+          where: whereStr?.trim(),
+          using,
+          // Mirrors Rails' `include_columns.presence` — an empty list → nil.
+          include: includeColumns.length > 0 ? includeColumns : undefined,
+          nullsNotDistinct: nullsNotDistinctStr ? true : undefined,
           // Mirrors Rails' `comment.presence` — blank (incl. whitespace-only) → nil.
-          comment: (row.comment as string | null)?.trim() ? (row.comment as string) : undefined,
-          valid: row.is_valid as boolean,
-        },
-      );
-    });
+          comment: comment?.trim() ? comment : undefined,
+          valid,
+        });
+      }),
+    );
   }
 
   async indexNameExists(tableName: string, indexName: string): Promise<boolean> {
