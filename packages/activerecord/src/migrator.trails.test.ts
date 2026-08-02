@@ -95,9 +95,6 @@ describe("Migrator trails extensions", () => {
     expect(await up.executeMigrationInTransaction(proxy)).toBe("1");
     expect(calls).toEqual([["up", 1]]);
 
-    // A second Migrator sees version 1 as applied, so the up guard skips it and
-    // the down guard lets the revert through — without pre-filtering by
-    // runnable().
     const again = new Migrator(adapter, [proxy]);
     expect(await again.executeMigrationInTransaction(proxy)).toBeUndefined();
     expect(calls).toEqual([["up", 1]]);
