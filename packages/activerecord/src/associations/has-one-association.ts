@@ -732,7 +732,7 @@ export class HasOneAssociation extends SingularAssociation {
 export function sameRecord(a: Base | null, b: Base | null): boolean {
   if (a === b) return true;
   if (a == null || b == null) return false;
-  return (a as { isEqual?: (other: unknown) => boolean }).isEqual?.(b) === true;
+  return (a as { equals?: (other: unknown) => boolean }).equals?.(b) === true;
 }
 
 /**

@@ -279,7 +279,10 @@ for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
         tagStatic(host.classMethods, true),
       )) {
         const b = bucketFor(m.file ?? host.file, FUNCTIONS_KEY);
-        pushMethod(b.names, b.seen, m.name, false);
+        // Operators port to top-level functions here too (`ActiveRecord::Core#==`
+        // → core.ts `equals`), so the class-specific spelling still applies —
+        // staticness is what a standalone module drops, not the mapping.
+        pushMethod(b.names, b.seen, m.name, false, operatorSpelling(host.fqn, m.name));
       }
     }
   };

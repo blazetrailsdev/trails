@@ -88,7 +88,7 @@ describe("AggregationsTest", () => {
     await CustomerModel.updateAll({ gps_location: "24x113" });
     await david.reload();
     expect(david.readAttribute("gps_location")).toBe("24x113");
-    expect(david.gpsLocation.isEqual(new GpsLocation("24x113"))).toBe(true);
+    expect(david.gpsLocation.equals(new GpsLocation("24x113"))).toBe(true);
   });
 
   // Rails: test_allow_nil_address_set_to_nil
@@ -151,12 +151,12 @@ describe("AggregationsTest", () => {
 
   // Rails: test_gps_equality
   it("gps equality", () => {
-    expect(new GpsLocation("39x110").isEqual(new GpsLocation("39x110"))).toBe(true);
+    expect(new GpsLocation("39x110").equals(new GpsLocation("39x110"))).toBe(true);
   });
 
   // Rails: test_gps_inequality
   it("gps inequality", () => {
-    expect(new GpsLocation("39x110").isEqual(new GpsLocation("39x111"))).toBe(false);
+    expect(new GpsLocation("39x110").equals(new GpsLocation("39x111"))).toBe(false);
   });
 
   // Rails: test_custom_constructor

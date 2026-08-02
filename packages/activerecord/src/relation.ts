@@ -6224,7 +6224,7 @@ export class Relation<T extends Base> {
     const a = await this.toArray();
     const b = await other;
     if (a.length !== b.length) return false;
-    return a.every((rec, i) => rec.isEqual(b[i]));
+    return a.every((rec, i) => rec.equals(b[i]));
   }
 
   /**
@@ -6357,7 +6357,7 @@ export class Relation<T extends Base> {
       !this._havingClause.isEmpty()
     ) {
       const records = await this.toArray();
-      return records.some((r) => r.isEqual(record));
+      return records.some((r) => r.equals(record));
     }
     // Unloaded fast path: probe existence by primary key. Composite-PK models
     // (Rails `record.class.composite_primary_key?`) carry a tuple id, which

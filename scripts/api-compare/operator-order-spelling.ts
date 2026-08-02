@@ -51,6 +51,9 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   // and `compare`. `===` / `=~` share that line but have no TS member, so they
   // stay unmapped.
   "ActiveModel::Name": { "==": ["equals"], "<=>": ["compare"] },
+  // core.rb:631 `def ==(comparison_object)` / :665 `def <=>(other_object)` →
+  // core.ts `equals` / `compare`. The aliased `eql?` (:637) has no TS member.
+  "ActiveRecord::Core": { "==": ["equals"], "<=>": ["compare"] },
   // association_relation.rb:14 `def ==(other)` → association-relation.ts `equals`.
   "ActiveRecord::AssociationRelation": { "==": ["equals"] },
   // reflection.rb:440 `def ==(other_aggregation)` → reflection.ts `equals`

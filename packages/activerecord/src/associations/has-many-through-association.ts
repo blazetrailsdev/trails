@@ -815,7 +815,7 @@ function deleteThroughRecords(assoc: HasManyThroughAssociation, records: Base[])
 function distribution(records: Base[]): Array<{ record: Base; count: number }> {
   const buckets: Array<{ record: Base; count: number }> = [];
   for (const record of records) {
-    const bucket = buckets.find((b) => b.record.isEqual(record));
+    const bucket = buckets.find((b) => b.record.equals(record));
     if (bucket) bucket.count += 1;
     else buckets.push({ record, count: 1 });
   }
@@ -824,7 +824,7 @@ function distribution(records: Base[]): Array<{ record: Base; count: number }> {
 
 /** @internal */
 function markOccurrence(buckets: Array<{ record: Base; count: number }>, record: Base): boolean {
-  const bucket = buckets.find((b) => b.record.isEqual(record));
+  const bucket = buckets.find((b) => b.record.equals(record));
   if (!bucket || bucket.count <= 0) return false;
   bucket.count -= 1;
   return true;

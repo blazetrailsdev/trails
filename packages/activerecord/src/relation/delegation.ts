@@ -849,7 +849,7 @@ const RECORD_DELEGATES: Record<string, RecordDelegate> = {
   // aliases `eql?` to `==` (id equality) — so this must use record equality, not
   // JS identity via `Array#includes`.
   isIntersect: (records, other: Base[]) =>
-    records.some((record) => other.some((o) => record.isEqual(o))),
+    records.some((record) => other.some((o) => record.equals(o))),
   reverse: (records) => [...records].reverse(),
   compact: (records) => records.filter((record) => record != null),
   index: (records, valueOrFn: Base | ((record: Base) => unknown)) => {

@@ -173,7 +173,8 @@ const PORTED_METHODS_FROM_UNPORTED_MIXINS: Record<string, string[]> = {
  *
  * `to_a`/`to_ary` camelize to `toA`/`toAry`; the JS spelling of that protocol
  * is `toArray`. `==` is an operator — TS has no operator overloading, so the
- * port is a named `equals`. Ruby copy semantics come from `Object#clone`/`#dup`
+ * port is a named `equals`, and `<=>` a named `compare` (the spelling
+ * OPERATOR_SPELLING_BY_FQN already pins for every class that ports it). Ruby copy semantics come from `Object#clone`/`#dup`
  * (never `def`ed in Rails) plus the `initialize_copy` hook the class DOES
  * define; JS has no `Object#clone`, so the faithful port of that pair is a
  * `clone`/`dup` method on the class.
@@ -182,6 +183,7 @@ const MIRROR_CANDIDATE_OVERRIDES: Record<string, string[]> = {
   to_a: ["toArray"],
   to_ary: ["toArray"],
   "==": ["equals"],
+  "<=>": ["compare"],
   initialize_copy: ["clone", "dup"],
   initialize_dup: ["dup"],
   initialize_clone: ["clone"],
