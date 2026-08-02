@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { DEFAULT_REASON, suppressedCallsIn } from "./missing-rails-call-tags.js";
+import { reconcileFileText } from "./build.js";
 
 const block = (...lines: string[]): string =>
   ["/**", ...lines.map((l) => ` * ${l}`), " */"].join("\n");
@@ -58,6 +59,28 @@ describe("suppressedCallsIn", () => {
     expect(suppressedCallsIn(comment)).toEqual(["reset"]);
   });
 
+  it("parses a one-line comment carrying a tag", () => {
+    expect(
+      suppressedCallsIn("/** @missingRailsCall first — the caller already ordered. */"),
+    ).toEqual(["first"]);
+  });
+
+  it("keeps the prose of a one-line comment out of the call set", () => {
+    const comment = "  /** Prose. @missingRailsCall first — the caller already ordered. */";
+    expect(suppressedCallsIn(comment)).toEqual(["first"]);
+  });
+
+  it("throws on a bare one-line tag (the empty-reason contract)", () => {
+    expect(() => suppressedCallsIn("/** @missingRailsCall first */")).toThrow(/needs a reason/);
+  });
+
+  it("names the source line of an offending one-line tag", () => {
+    const comment = "// lead\n/** @missingRailsCall first */";
+    expect(() => suppressedCallsIn(comment, { fileName: "a/b.ts", startLine: 10 })).toThrow(
+      /a\/b\.ts:11/,
+    );
+  });
+
   it("does not treat the seeded placeholder as a justification", () => {
     expect(suppressedCallsIn(block(`@missingRailsCall synchronize — ${DEFAULT_REASON}`))).toEqual(
       [],
@@ -73,5 +96,29 @@ describe("suppressedCallsIn", () => {
       " */",
     ].join("\n");
     expect(suppressedCallsIn(wrapped)).toEqual([]);
+  });
+});
+
+describe("api:build over a hand-written one-line tag", () => {
+  const expectations = new Map([["bar", { rubyNames: ["bar"], calls: new Set(["first"]) }]]);
+  const reason = "the caller already ordered.";
+  const src = [
+    "export class Foo {",
+    "  /** @missingRailsCall first — the caller already ordered. */",
+    "  bar(): void {}",
+    "}",
+  ].join("\n");
+
+  it("normalizes it to block form, preserving the curated reason", () => {
+    const { text } = reconcileFileText("foo.ts", src, expectations, () => reason);
+    expect(text).not.toBeNull();
+    expect(text!).toContain(
+      ["  /**", "   * @missingRailsCall first — the caller already ordered.", "   */"].join("\n"),
+    );
+  });
+
+  it("makes no further edit on a second run", () => {
+    const first = reconcileFileText("foo.ts", src, expectations, () => reason).text!;
+    expect(reconcileFileText("foo.ts", first, expectations, () => reason).text).toBeNull();
   });
 });
