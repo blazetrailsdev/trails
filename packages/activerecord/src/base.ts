@@ -893,11 +893,6 @@ function writePathValueNode(
   return new Nodes.BindParam(raw);
 }
 
-// Backing store for Base.signedIdVerifierSecret. Rails' class_attribute is
-// per-class-overridable; trails keeps a single value since Rails only ever sets
-// it on Base.
-let _signedIdVerifierSecretValue: string | (() => string | null | undefined) | null = null;
-
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Base extends Model {
   // --- Translation mixin (wired via extend() after class) ---
@@ -1023,6 +1018,9 @@ export class Base extends Model {
 
   /** Mirrors: ActiveRecord::SignedId::ClassMethods#signed_id_verifier */
   declare static signedIdVerifier: _MessageVerifier;
+
+  /** Mirrors: ActiveRecord::SignedId#signed_id_verifier_secret */
+  declare static signedIdVerifierSecret: string | (() => string | null | undefined) | null;
 
   static _requireConcreteClass(): void {
     // Rails: `abstract_class? || self == Base` (inheritance.rb:57) — Base
@@ -1821,20 +1819,6 @@ export class Base extends Model {
     options?: Parameters<typeof _NestedAttributes.acceptsNestedAttributesFor>[2],
   ): void {
     _NestedAttributes.acceptsNestedAttributesFor(this, associationName, options);
-  }
-
-  /**
-   * Rails: `class_attribute :signed_id_verifier_secret, instance_writer: false`
-   * declared in `ActiveRecord::SignedId`'s `included do` block, i.e. on Base.
-   *
-   * Mirrors: ActiveRecord::Base.signed_id_verifier_secret
-   */
-  static get signedIdVerifierSecret(): string | (() => string | null | undefined) | null {
-    return _signedIdVerifierSecretValue;
-  }
-
-  static set signedIdVerifierSecret(value: string | (() => string | null | undefined) | null) {
-    _signedIdVerifierSecretValue = value;
   }
 
   /** Mirrors: ActiveRecord.verbose_query_logs, verbose_query_logs= */

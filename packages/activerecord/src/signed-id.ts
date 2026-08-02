@@ -12,8 +12,25 @@ import { UnknownPrimaryKey } from "./errors.js";
  * Mirrors: ActiveRecord::SignedId
  */
 
+let _signedIdVerifierSecret: string | (() => string | null | undefined) | null = null;
+
 /** Mirrors: ActiveRecord::SignedId::ClassMethods */
 export class ClassMethods {
+  /**
+   * Rails: `class_attribute :signed_id_verifier_secret, instance_writer: false`,
+   * declared in `ActiveRecord::SignedId`'s `included do` block. Trails backs it
+   * with a single value — Rails only ever sets it on `ActiveRecord::Base`.
+   *
+   * Mirrors: ActiveRecord::SignedId#signed_id_verifier_secret
+   */
+  static get signedIdVerifierSecret(): string | (() => string | null | undefined) | null {
+    return _signedIdVerifierSecret;
+  }
+
+  static set signedIdVerifierSecret(value: string | (() => string | null | undefined) | null) {
+    _signedIdVerifierSecret = value;
+  }
+
   /** Mirrors: ActiveRecord::SignedId::ClassMethods#signed_id_verifier */
   static get signedIdVerifier(): MessageVerifier {
     if ((this as any)._signedIdVerifier) {
