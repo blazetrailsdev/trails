@@ -127,8 +127,6 @@ import * as Inheritance from "./inheritance.js";
 import * as SignedId from "./signed-id.js";
 import {
   signedId as _signedId,
-  signedIdVerifierSecret as _signedIdVerifierSecret,
-  setSignedIdVerifierSecret as _setSignedIdVerifierSecret,
   findSigned as _findSigned,
   findSignedBang as _findSignedBang,
 } from "./signed-id.js";
@@ -894,6 +892,11 @@ function writePathValueNode(
   if (def?.type?.name === "array") return arelSql(adapter.quote(raw));
   return new Nodes.BindParam(raw);
 }
+
+// Backing store for Base.signedIdVerifierSecret. Rails' class_attribute is
+// per-class-overridable; trails keeps a single value since Rails only ever sets
+// it on Base.
+let _signedIdVerifierSecretValue: string | (() => string | null | undefined) | null = null;
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Base extends Model {
@@ -1821,16 +1824,17 @@ export class Base extends Model {
   }
 
   /**
-   * Secret backing signed_id_verifier (process-global in trails).
+   * Rails: `class_attribute :signed_id_verifier_secret, instance_writer: false`
+   * declared in `ActiveRecord::SignedId`'s `included do` block, i.e. on Base.
    *
    * Mirrors: ActiveRecord::Base.signed_id_verifier_secret
    */
   static get signedIdVerifierSecret(): string | (() => string | null | undefined) | null {
-    return _signedIdVerifierSecret();
+    return _signedIdVerifierSecretValue;
   }
 
   static set signedIdVerifierSecret(value: string | (() => string | null | undefined) | null) {
-    _setSignedIdVerifierSecret(value);
+    _signedIdVerifierSecretValue = value;
   }
 
   /** Mirrors: ActiveRecord.verbose_query_logs, verbose_query_logs= */

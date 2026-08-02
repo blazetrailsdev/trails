@@ -12,39 +12,6 @@ import { UnknownPrimaryKey } from "./errors.js";
  * Mirrors: ActiveRecord::SignedId
  */
 
-let _signedIdVerifierSecret: string | (() => string | null | undefined) | null = null;
-const _cachedVerifierClasses = new Set<any>();
-
-/**
- * Rails: `class_attribute :signed_id_verifier_secret, instance_writer: false` —
- * the secret backing `signed_id_verifier`. Trails holds it in a module-level
- * variable (the secret is process-global, not per-model); expose the reader so
- * `Model.signedIdVerifierSecret` matches Rails (the `=`/`?` forms map to the
- * same accessor; the imperative setter is `setSignedIdVerifierSecret`).
- *
- * Mirrors: ActiveRecord::SignedId#signed_id_verifier_secret
- */
-export function signedIdVerifierSecret(): string | (() => string | null | undefined) | null {
-  return _signedIdVerifierSecret;
-}
-
-/**
- * Set the secret used for signed ID verification.
- * Clears any cached verifiers so they pick up the new secret.
- *
- * Mirrors: ActiveRecord::Base.signed_id_verifier_secret=
- * @internal
- */
-export function setSignedIdVerifierSecret(
-  secret: string | (() => string | null | undefined) | null,
-): void {
-  _signedIdVerifierSecret = secret;
-  for (const cls of _cachedVerifierClasses) {
-    cls._signedIdVerifier = null;
-  }
-  _cachedVerifierClasses.clear();
-}
-
 /** Mirrors: ActiveRecord::SignedId::ClassMethods */
 export class ClassMethods {
   /** Mirrors: ActiveRecord::SignedId::ClassMethods#signed_id_verifier */
@@ -53,7 +20,10 @@ export class ClassMethods {
       return (this as any)._signedIdVerifier;
     }
 
-    const secret = _signedIdVerifierSecret;
+    const secret = (this as any).signedIdVerifierSecret as
+      | string
+      | (() => string | null | undefined)
+      | null;
     const resolvedSecret = typeof secret === "function" ? secret() : secret;
     if (!resolvedSecret) {
       throw new Error(
@@ -66,7 +36,6 @@ export class ClassMethods {
       url_safe: true,
     });
     (this as any)._signedIdVerifier = verifier;
-    _cachedVerifierClasses.add(this);
     return verifier;
   }
 

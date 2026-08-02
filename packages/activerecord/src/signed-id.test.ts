@@ -8,7 +8,6 @@ import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { travel, travelBack } from "@blazetrails/activesupport";
 import { Base, RecordNotFound, registerModel } from "./index.js";
 import { UnknownPrimaryKey } from "./errors.js";
-import { setSignedIdVerifierSecret } from "./signed-id.js";
 import { Account } from "./test-helpers/models/account.js";
 import { Toy } from "./test-helpers/models/toy.js";
 import { Company } from "./test-helpers/models/company.js";
@@ -43,14 +42,14 @@ describe("SignedIdTest", () => {
   let account: Account;
   let toy: Toy;
   beforeEach(async () => {
-    setSignedIdVerifierSecret(SIGNED_ID_VERIFIER_TEST_SECRET);
+    Base.signedIdVerifierSecret = SIGNED_ID_VERIFIER_TEST_SECRET;
     account = (await Account.first())!;
     toy = (await Toy.first())!;
   });
 
   afterEach(() => {
     travelBack();
-    setSignedIdVerifierSecret(SIGNED_ID_VERIFIER_TEST_SECRET);
+    Base.signedIdVerifierSecret = SIGNED_ID_VERIFIER_TEST_SECRET;
   });
 
   it("find signed record", async () => {
@@ -203,22 +202,24 @@ describe("SignedIdTest", () => {
   });
 
   it("fail to work without a signed_id_verifier_secret", async () => {
-    setSignedIdVerifierSecret(null);
+    Base.signedIdVerifierSecret = null;
+    (Account as any)._signedIdVerifier = null;
 
     try {
       expect(() => (account as any).signedId()).toThrow();
     } finally {
-      setSignedIdVerifierSecret(SIGNED_ID_VERIFIER_TEST_SECRET);
+      Base.signedIdVerifierSecret = SIGNED_ID_VERIFIER_TEST_SECRET;
     }
   });
 
   it("fail to work without when signed_id_verifier_secret lambda is nil", async () => {
-    setSignedIdVerifierSecret(() => null);
+    Base.signedIdVerifierSecret = () => null;
+    (Account as any)._signedIdVerifier = null;
 
     try {
       expect(() => (account as any).signedId()).toThrow();
     } finally {
-      setSignedIdVerifierSecret(SIGNED_ID_VERIFIER_TEST_SECRET);
+      Base.signedIdVerifierSecret = SIGNED_ID_VERIFIER_TEST_SECRET;
     }
   });
 
