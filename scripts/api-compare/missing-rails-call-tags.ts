@@ -61,6 +61,11 @@ export interface JsdocOrigin {
 }
 
 const TAG_LINE = /^\s*\*?\s*@missingRailsCall\s+(\S+)(?:\s+—\s?(.*))?$/;
+// A tag written with NO call at all — the bare tag, or one that goes straight
+// to the em-dash. `TAG_LINE` needs a call, so such a line used to match nothing
+// and be read as prose: no suppression, no stale-tag report, no empty-reason
+// error. Same quiet-direction hazard as the one-line form, one level up.
+const CALL_LESS_TAG_LINE = /^\s*\*?\s*@missingRailsCall(?:\s+—(?:\s.*)?)?\s*$/;
 // A line opening a NEW JSDoc tag: at most one space after the `*`. Curated
 // reasons can contain Ruby ivar names (`@primary_key`), and the wrapper's
 // hang indent (`*   `) can place one at line start — deeper-indented `@`
@@ -118,6 +123,10 @@ function toCommentLines(comment: string): CommentLine[] {
  *  and its `@missingRailsCall` entries. Continuation lines (not starting a new
  *  `@` tag) attach to the preceding entry.
  *
+ *  A tag with no call at all is a hard error too, in the same family: it names
+ *  nothing to suppress and nothing to reconcile, so accepting it silently is
+ *  the one remaining way to write a tag the parser ignores without complaint.
+ *
  *  An empty reason is a hard error, matching `@noRailsEquivalent` (RFC 0080):
  *  every tag in the tree is written with a reason — the generator only emits a
  *  tag when it has a curated baseline row's prose to carry — so a bare tag is
@@ -133,7 +142,15 @@ export function parseJsdoc(
   const entries: TagEntry[] = [];
   const tagLineOf = new Map<TagEntry, number>();
   let open: TagEntry | null = null;
+  const at = (sourceIndex: number): string =>
+    origin ? ` ${origin.fileName}:${origin.startLine + sourceIndex}` : "";
   for (const { text: line, sourceIndex, synthetic } of toCommentLines(comment)) {
+    if (CALL_LESS_TAG_LINE.test(line)) {
+      throw new Error(
+        `${TAG} needs a call:${at(sourceIndex)} — name the Rails call that is ` +
+          `not made here, as \`${TAG} <ruby_call> — <reason>\`.`,
+      );
+    }
     const m = line.match(TAG_LINE);
     if (m) {
       // Trimmed at capture: `TAG_LINE` absorbs only one space after the
@@ -157,11 +174,8 @@ export function parseJsdoc(
   }
   for (const entry of entries) {
     if (entry.reason !== "") continue;
-    const at = origin
-      ? ` ${origin.fileName}:${origin.startLine + (tagLineOf.get(entry) ?? 0)}`
-      : "";
     throw new Error(
-      `${TAG} needs a reason:${at} — state why the Rails call ` +
+      `${TAG} needs a reason:${at(tagLineOf.get(entry) ?? 0)} — state why the Rails call ` +
         `\`${entry.call}\` is not made here.`,
     );
   }

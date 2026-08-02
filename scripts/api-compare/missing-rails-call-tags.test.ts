@@ -35,6 +35,38 @@ describe("suppressedCallsIn", () => {
     );
   });
 
+  it("throws on a call-less tag", () => {
+    expect(() => suppressedCallsIn(block("@missingRailsCall"))).toThrow(/needs a call/);
+  });
+
+  it("throws on a call-less tag that goes straight to the em-dash", () => {
+    expect(() => suppressedCallsIn(block("@missingRailsCall — the caller does it."))).toThrow(
+      /needs a call/,
+    );
+  });
+
+  it("throws on a call-less one-line tag", () => {
+    expect(() => suppressedCallsIn("/** @missingRailsCall */")).toThrow(/needs a call/);
+  });
+
+  it("names the file:line of a call-less tag", () => {
+    const comment = block("Prose.", "@missingRailsCall");
+    expect(() => suppressedCallsIn(comment, { fileName: "a/b.ts", startLine: 10 })).toThrow(
+      /a\/b\.ts:12/,
+    );
+  });
+
+  it("names the file:line of a call-less one-line tag", () => {
+    const comment = "// lead\n/** @missingRailsCall */";
+    expect(() => suppressedCallsIn(comment, { fileName: "a/b.ts", startLine: 10 })).toThrow(
+      /a\/b\.ts:11/,
+    );
+  });
+
+  it("does not treat a prose mention of the tag word as call-less", () => {
+    expect(suppressedCallsIn(block("@missingRailsCallSite is a different thing."))).toEqual([]);
+  });
+
   it("names the file:line of the offending tag", () => {
     const comment = block("Prose.", "@missingRailsCall synchronize");
     expect(() => suppressedCallsIn(comment, { fileName: "a/b.ts", startLine: 10 })).toThrow(
