@@ -1,5 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { env, setEnv } from "@blazetrails/activesupport/process-adapter";
+import {
+  env,
+  setEnv,
+  getProcessAdapter,
+  registerProcessAdapter,
+} from "@blazetrails/activesupport/process-adapter";
 import { createProgram } from "../cli.js";
 import {
   loadDatabaseConfig,
@@ -2099,6 +2104,75 @@ export class CreateDogs extends Migration {
     expect(await tableExists(animalsDb, "dogs")).toBe(true);
     expect(await tableExists(primaryDb, "users")).toBe(true);
     expect(logs).toContain("All migrations are up to date.");
+  });
+
+  it("db:migrate respects timestamp ordering across databases", async () => {
+    const primaryDb = path.join(tmpDir, "ordering-primary.sqlite3");
+    const animalsDb = path.join(tmpDir, "ordering-animals.sqlite3");
+    fs.writeFileSync(
+      path.join(tmpDir, "config", "database.ts"),
+      `export default {
+  development: {
+    primary: { adapter: "sqlite3", database: ${JSON.stringify(primaryDb)} },
+    animals: { adapter: "sqlite3", database: ${JSON.stringify(animalsDb)} },
+  },
+  test: {
+    primary: { adapter: "sqlite3", database: ${JSON.stringify(primaryDb)} },
+    animals: { adapter: "sqlite3", database: ${JSON.stringify(animalsDb)} },
+  },
+};`,
+    );
+    fs.mkdirSync(path.join(tmpDir, "db", "migrations_animals"), { recursive: true });
+    const migration = (cls: string, table: string) =>
+      `import { Migration } from "@blazetrails/activerecord";
+export class ${cls} extends Migration {
+  async up() { await this.createTable(${JSON.stringify(table)}, (t) => { t.string("name"); }); }
+  async down() { await this.dropTable(${JSON.stringify(table)}); }
+}`;
+    fs.writeFileSync(
+      path.join(tmpDir, "db", "migrations", "20260101000001-one-migration.ts"),
+      migration("OneMigration", "ones"),
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, "db", "migrations_animals", "20260101000002-two-migration.ts"),
+      migration("TwoMigration", "twos"),
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, "db", "migrations", "20260101000003-three-migration.ts"),
+      migration("ThreeMigration", "threes"),
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, "db", "migrations_animals", "20260101000004-four-migration.ts"),
+      migration("FourMigration", "fours"),
+    );
+
+    await runDb(["create"]);
+
+    const previous = getProcessAdapter();
+    let output = "";
+    registerProcessAdapter({
+      ...previous,
+      stdout: {
+        ...previous.stdout,
+        write: (chunk: string) => {
+          output += chunk;
+          return true;
+        },
+      },
+    });
+    try {
+      await runDb(["migrate"]);
+    } finally {
+      registerProcessAdapter(previous);
+    }
+
+    const entries = [...output.matchAll(/^== (\d+).+migrated/gm)].map((m) => m[1]);
+    expect(entries).toEqual([
+      "20260101000001",
+      "20260101000002",
+      "20260101000003",
+      "20260101000004",
+    ]);
   });
 
   it("db migrate --database=animals targets only the named DB", async () => {

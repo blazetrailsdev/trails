@@ -600,6 +600,55 @@ async function withMigrationTasksForDb(
   await dumpSchemaAfterMigrate(ctx.raw, ctx.config);
 }
 
+/**
+ * `db:migrate` — `DatabaseTasks.migrate_all` followed by `db:_dump`
+ * (`railties/databases.rake:88-92`). `migrate_all` owns the multi-database
+ * routing (single-primary fast path, then `db_configs_with_versions` sorted so
+ * one timestamp runs across every config before the next), so the migrations
+ * for each config are registered up front and the whole run happens inside a
+ * single `configs_for` registration rather than a per-database loop.
+ */
+async function runMigrateAll(targetVersion: string | null): Promise<void> {
+  const envName = resolveEnv();
+  const entries = await taskableDatabaseEntries({}, envName);
+  const migrationsFor = new Map<string, Awaited<ReturnType<typeof discoverMigrations>>>();
+  for (const { name, raw, hashConfig } of entries) {
+    const migrations = await discoverMigrationsFromDirs(await migrationsDirsForConfig(name, raw));
+    migrationsFor.set(name, migrations);
+    DatabaseTasks.registerMigrations(migrations, hashConfig);
+  }
+  if ([...migrationsFor.values()].every((m) => m.length === 0)) {
+    console.log("No migrations found.");
+    return;
+  }
+
+  // Rails' `load_config` leaves the primary connection established, which is
+  // what `migrate_all`'s single-primary fast path migrates directly. The dump
+  // stays inside that same scope so a `:memory:` database — whose data dies
+  // with its pool — is dumped from the connection that was just migrated.
+  const primary = entries.find((e) => e.name === "primary") ?? entries[0];
+  const configs = entries.map((e) => e.hashConfig);
+  const multiDb = entries.length > 1;
+  await withRegisteredConfigurations(configs, envName, () =>
+    DatabaseTasks.withTemporaryPool(primary.hashConfig, async () => {
+      await DatabaseTasks.migrateAll({ targetVersion });
+      for (const { name, raw, hashConfig } of entries) {
+        const prefix = multiDb ? `[${name}] ` : "";
+        await DatabaseTasks.withTemporaryPool(hashConfig, async (pool) => {
+          const migrations = migrationsFor.get(name) ?? [];
+          const migrator = new Migrator(await pool.leaseConnection(), migrations, {
+            environment: hashConfig.envName,
+            internalMetadataEnabled: hashConfig.useMetadataTable,
+          });
+          const pending = await migrator.pendingMigrations();
+          if (pending.length === 0) console.log(`${prefix}All migrations are up to date.`);
+          await dumpSchemaAfterMigrate(raw, hashConfig);
+        });
+      }
+    }),
+  );
+}
+
 export function dbCommand(): Command {
   const cmd = new Command("db");
   cmd.description("Database management commands");
@@ -615,6 +664,10 @@ export function dbCommand(): Command {
       // to null so an empty VERSION="" doesn't fail BigInt parsing.
       const rawVersion = opts.version != null ? String(opts.version).trim() : env.VERSION?.trim();
       const targetVersion = rawVersion && rawVersion.length > 0 ? rawVersion : null;
+      if (opts.database === undefined) {
+        await runMigrateAll(targetVersion);
+        return;
+      }
       await forEachDatabase(opts, async (ctx) => {
         await withMigrationTasksForDb(
           ctx,
