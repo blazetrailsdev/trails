@@ -142,6 +142,38 @@ export function renderExcess(count: number, mark: number, markPath: string): str
   );
 }
 
+/**
+ * Slack between the committed mark and what a clean reseed would write: a
+ * mark that sits ABOVE the current unreviewed count (RFC 0083).
+ *
+ * The excess arm above only fires when the count RISES past the mark, so a
+ * mark left stale-HIGH — rows converged out of the baseline, or reasons were
+ * reviewed, without a reseed to lower it — never surfaces: the ratchet passes
+ * either way. That silence is what makes the next story's measured delta wrong,
+ * because its "before" value is a number no clean tree produces. Slack is
+ * therefore gated, not advisory: a mark is a measurement, and one that only
+ * shrinks is always safe to tighten. `--write` tightens it for you, and any
+ * change that drops rows already has to reseed for the STALE-entry arm, so a
+ * legitimately-reseeded tree has zero slack by construction.
+ *
+ * Negative slack (count above the mark) is the excess arm's job; this returns 0.
+ */
+export function markSlack(count: number, mark: number): number {
+  return Math.max(0, mark - count);
+}
+
+export function renderSlack(count: number, mark: number, markPath: string): string {
+  return (
+    `\nwide call-mismatches unreviewed ratchet: STALE high-water mark — ${markPath} says ` +
+    `${mark}, but only ${count} baselined entr(ies) still carry the seeded default reason ` +
+    `(${markSlack(count, mark)} of slack).\n` +
+    "The mark is a measurement of remaining unreviewed debt; left high it hands the next " +
+    "story a “before” value no clean tree produces, and the drift is discovered only " +
+    "when someone reseeds. The mark only shrinks, so tightening is always safe:\n" +
+    "  pnpm api:calls:wide:reseed\n"
+  );
+}
+
 export function renderWriteSummary(
   count: number,
   newly: CallMismatchKey[],
