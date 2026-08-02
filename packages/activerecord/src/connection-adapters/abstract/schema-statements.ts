@@ -422,7 +422,7 @@ export class SchemaStatements {
     }
 
     if (!options.force) {
-      this.internalSchemaCache?.clearDataSourceCacheBang(this.pool, name);
+      await this.schemaCache.clearDataSourceCacheBang(name);
     }
 
     const td = this.buildCreateTableDefinition(name, options, definer);
@@ -510,7 +510,7 @@ export class SchemaStatements {
     }
     const ifExists = options.ifExists ? " IF EXISTS" : "";
     for (const name of tableNames) {
-      this.internalSchemaCache?.clearDataSourceCacheBang(this.pool, name);
+      await this.schemaCache.clearDataSourceCacheBang(name);
       await this.execute(`DROP TABLE${ifExists} ${this._qt(name)}`);
     }
   }
@@ -523,7 +523,7 @@ export class SchemaStatements {
   ): Promise<void> {
     const addColumnDef = await this.buildAddColumnDefinition(tableName, columnName, type, options);
     if (!addColumnDef) return;
-    this.internalSchemaCache?.clearDataSourceCacheBang(this.pool, tableName);
+    await this.schemaCache.clearDataSourceCacheBang(tableName);
     await this.execute(await this.schemaCreation.accept(addColumnDef));
   }
 
@@ -539,12 +539,12 @@ export class SchemaStatements {
     if (options.ifExists && !(await this.columnExists(tableName, columnName))) {
       return;
     }
-    this.internalSchemaCache?.clearDataSourceCacheBang(this.pool, tableName);
+    await this.schemaCache.clearDataSourceCacheBang(tableName);
     await this.execute(`ALTER TABLE ${this._qi(tableName)} DROP COLUMN ${this._qi(columnName)}`);
   }
 
   async renameColumn(tableName: string, oldName: string, newName: string): Promise<void> {
-    this.internalSchemaCache?.clearDataSourceCacheBang(this.pool, tableName);
+    await this.schemaCache.clearDataSourceCacheBang(tableName);
     await this.execute(
       `ALTER TABLE ${this._qi(tableName)} RENAME COLUMN ${this._qi(oldName)} TO ${this._qi(newName)}`,
     );
@@ -562,7 +562,7 @@ export class SchemaStatements {
     // connection (`undefined?.gte(...) !== true`); addIndex runs on the
     // shared-worker reconstruct path before any query warms the cache.
     await this.getDatabaseVersion?.();
-    this.internalSchemaCache?.clearDataSourceCacheBang(this.pool, tableName);
+    await this.schemaCache.clearDataSourceCacheBang(tableName);
     const createIndex = await this.buildCreateIndexDefinition(
       tableName,
       columns,
@@ -604,7 +604,7 @@ export class SchemaStatements {
       if (!present) return;
     }
 
-    this.internalSchemaCache?.clearDataSourceCacheBang(this.pool, tableName);
+    await this.schemaCache.clearDataSourceCacheBang(tableName);
     // Rails resolves the concrete index name via `index_name_for_remove`, which
     // raises ArgumentError when the spec matches no index (or is ambiguous), and
     // then drops by that real name — never a silent DROP ... IF EXISTS.
@@ -625,7 +625,7 @@ export class SchemaStatements {
     type: ColumnType,
     options: ColumnOptions = {},
   ): Promise<void> {
-    this.internalSchemaCache?.clearDataSourceCacheBang(this.pool, tableName);
+    await this.schemaCache.clearDataSourceCacheBang(tableName);
     const sqlType = this.schemaCreation.typeToSql(type, options);
     const table = this._qi(tableName);
     const col = this._qi(columnName);
@@ -665,8 +665,8 @@ export class SchemaStatements {
   }
 
   async renameTable(oldName: string, newName: string): Promise<void> {
-    this.internalSchemaCache?.clearDataSourceCacheBang(this.pool, oldName);
-    this.internalSchemaCache?.clearDataSourceCacheBang(this.pool, newName);
+    await this.schemaCache.clearDataSourceCacheBang(oldName);
+    await this.schemaCache.clearDataSourceCacheBang(newName);
     await this.execute(`ALTER TABLE ${this._qi(oldName)} RENAME TO ${this._qi(newName)}`);
   }
 
@@ -724,7 +724,7 @@ export class SchemaStatements {
     // (extract_new_default_value, schema_statements.rb:1820); a bare structured
     // default like `{ to: 1 }` without :from is the literal default.
     const defaultVal = this.extractNewDefaultValue(options);
-    this.internalSchemaCache?.clearDataSourceCacheBang(this.pool, tableName);
+    await this.schemaCache.clearDataSourceCacheBang(tableName);
     const clause = await this.quoteDefaultExpression(defaultVal);
     await this.execute(
       `ALTER TABLE ${this._qi(tableName)} ALTER COLUMN ${this._qi(columnName)} SET DEFAULT ${clause || "NULL"}`,
@@ -1020,7 +1020,7 @@ export class SchemaStatements {
 
     const oldIndexDef = (await this.indexes(tableName)).find((i) => i.name === oldName);
     if (!oldIndexDef) return;
-    this.internalSchemaCache?.clearDataSourceCacheBang(this.pool, tableName);
+    await this.schemaCache.clearDataSourceCacheBang(tableName);
     await this.addIndex(tableName, oldIndexDef.columns, {
       name: newName,
       unique: oldIndexDef.unique,
@@ -1061,7 +1061,7 @@ export class SchemaStatements {
         "You must specify at least one column name. Example: remove_columns(:people, :first_name)",
       );
     }
-    this.internalSchemaCache?.clearDataSourceCacheBang(this.pool, tableName);
+    await this.schemaCache.clearDataSourceCacheBang(tableName);
     const fragments = this.removeColumnsForAlter(tableName, columns, { ...opts } as Record<
       string,
       unknown

@@ -371,7 +371,7 @@ describe("sync loadSchema / columnsHash", () => {
     expect(Post._attributeDefinitions.get("title")?.source).toBe("user");
   });
 
-  // A internalSchemaCache that starts warm and tracks whether resetColumnInformation
+  // An internalSchemaCache that starts warm and tracks whether resetColumnInformation
   // cleared it.
   function makeResettableAdapter(cols: Record<string, unknown>) {
     let warm = true;

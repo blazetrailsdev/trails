@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { SchemaCache, SchemaReflection, FakePool } from "./schema-cache.js";
+import { SchemaCache, SchemaReflection, BoundSchemaReflection, FakePool } from "./schema-cache.js";
 import { Column } from "./column.js";
 import { SqlTypeMetadata } from "./sql-type-metadata.js";
 import { ActiveRecord } from "../ar-config.js";
@@ -712,7 +712,7 @@ describe("SchemaReflectionTest", () => {
 // mock adapter, and asserts the entry is gone afterwards.
 //
 // Tests marked .skip are BLOCKED on F2, which will inline
-// internalSchemaCache.clearDataSourceCacheBang() at the missing DDL sites. Once F2
+// schemaCache.clearDataSourceCacheBang() at the missing DDL sites. Once F2
 // lands these are unskipped — the skip rationale names the exact method where
 // the call must be added.
 //
@@ -725,7 +725,7 @@ class MockAdapter {
   quoteTableName = (n: string) => `"${n}"`;
   executeMutation = vi.fn().mockResolvedValue(0);
   execute = vi.fn().mockResolvedValue([]);
-  internalSchemaCache: SchemaCache;
+  schemaCache: BoundSchemaReflection;
   pool = {};
   quoteDefaultExpression = (_v: unknown) => "";
   supportsDatetimeWithPrecision = () => false;
@@ -733,7 +733,10 @@ class MockAdapter {
     new TableDefinition(n, { ...opts, adapterName: "sqlite" });
 
   constructor(cache: SchemaCache) {
-    this.internalSchemaCache = cache;
+    this.schemaCache = BoundSchemaReflection.forLoneConnection(
+      new SchemaReflection(null, cache),
+      this,
+    );
   }
 
   // SchemaStatements' bodies reach the adapter through `this.adapter`; on a

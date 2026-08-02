@@ -294,11 +294,13 @@ describe("AbstractMysqlAdapter#renameColumn wiring", () => {
     adapter.getDatabaseVersion = async () => {};
     adapter.quoteColumnName = (s: string) => `\`${s}\``;
     adapter.quoteTableName = (s: string) => `\`${s}\``;
-    adapter._schemaCache = {
-      clearDataSourceCacheBang: (_pool: unknown, tableName: string) => {
-        events.push(`clear:${tableName}`);
+    Object.defineProperty(adapter, "schemaCache", {
+      value: {
+        clearDataSourceCacheBang: async (tableName: string) => {
+          events.push(`clear:${tableName}`);
+        },
       },
-    };
+    });
     adapter._execMutation = async (sql: string) => {
       events.push(`exec:${sql}`);
     };

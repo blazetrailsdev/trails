@@ -1659,8 +1659,8 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
 
   async renameTable(tableName: string, newName: string): Promise<void> {
     this.validateTableLengthBang(newName);
-    this.internalSchemaCache.clearDataSourceCacheBang(this.pool, tableName);
-    this.internalSchemaCache.clearDataSourceCacheBang(this.pool, newName);
+    await this.schemaCache.clearDataSourceCacheBang(tableName);
+    await this.schemaCache.clearDataSourceCacheBang(newName);
     await this.execute(
       `ALTER TABLE ${quoteTableName(tableName)} RENAME TO ${quoteTableName(newName)}`,
     );
@@ -1697,7 +1697,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     // SchemaStatements#addColumn (which clears before mutating). Without this
     // the SQLite override would leave a stale columns entry after an
     // `ALTER TABLE … ADD COLUMN`.
-    this.internalSchemaCache?.clearDataSourceCacheBang(this.pool, tableName);
+    await this.schemaCache.clearDataSourceCacheBang(tableName);
     await this.execute(sql);
   }
 
@@ -1729,7 +1729,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     // :from and :to (schema_statements.rb:1820); a bare structured default like
     // `{}` is the literal default, not a changes hash.
     const newDefault = this.extractNewDefaultValue(defaultOrChanges);
-    this.internalSchemaCache?.clearDataSourceCacheBang(this.pool, tableName);
+    await this.schemaCache.clearDataSourceCacheBang(tableName);
     await this.alterTable(tableName, undefined, undefined, undefined, (definition) => {
       // The raw value, not a literal: schemaCreation re-emits it through
       // quoteDefaultExpression, which serializes it through the column's cast
@@ -1774,7 +1774,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
 
   async renameColumn(tableName: string, columnName: string, newColumnName: string): Promise<void> {
     const column = await this.columnFor(tableName, columnName);
-    this.internalSchemaCache?.clearDataSourceCacheBang(this.pool, tableName);
+    await this.schemaCache.clearDataSourceCacheBang(tableName);
     await this.alterTable(tableName, undefined, undefined, {
       rename: { [column.name]: newColumnName },
     });
@@ -2330,7 +2330,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       });
     });
 
-    this.internalSchemaCache.clear();
+    this.schemaCache.clearBang();
     // The rebuild issues its index, DROP TABLE and content-copy DDL via
     // driver.exec (to manage savepoint nesting), bypassing the executeMutation
     // path that dirtiesQueryCache wraps. Rails' alter_table dirties the cache as

@@ -1446,7 +1446,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     const cascade = options.force === "cascade" ? " CASCADE" : "";
     const quoted = tableNames.map((n) => this.quoteTableName(n)).join(", ");
     for (const name of tableNames) {
-      this.internalSchemaCache?.clearDataSourceCacheBang(this.pool, name);
+      await this.schemaCache.clearDataSourceCacheBang(name);
     }
     await this.execute(`DROP${temporary} TABLE${ifExists} ${quoted}${cascade}`);
   }

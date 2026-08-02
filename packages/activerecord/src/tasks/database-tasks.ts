@@ -436,7 +436,7 @@ export class DatabaseTasks {
       // reflected schema so post-migration introspection re-reads the
       // freshly-migrated tables. Optional-chained so an adapter without a
       // schema cache is a no-op rather than a crash.
-      adapter.internalSchemaCache?.clear();
+      adapter.schemaCache.clearBang();
     };
 
     try {
@@ -478,7 +478,7 @@ export class DatabaseTasks {
     const adapter = await pool.leaseConnection();
     const context = await this._migrationContextFor(adapter, pool.dbConfig);
     await context.run(direction, version);
-    adapter.internalSchemaCache?.clear();
+    adapter.schemaCache.clearBang();
   }
 
   private static async _stepMigrations(
@@ -490,7 +490,7 @@ export class DatabaseTasks {
     const dbConfig = pool.dbConfig;
     const migrator = await this._migratorFor(adapter, dbConfig);
     await migrator[direction](steps);
-    adapter.internalSchemaCache?.clear();
+    adapter.schemaCache.clearBang();
   }
 
   // Cached sync reference to Base, populated on the first _migrationAdapter() call.
@@ -1095,7 +1095,7 @@ export class DatabaseTasks {
         await this.withTemporaryConnection(dbConfig, async (adapter) => {
           const migrator = await this._migratorFor(adapter, dbConfig);
           await migrator.migrate(version ?? null);
-          adapter.internalSchemaCache?.clear();
+          adapter.schemaCache.clearBang();
         });
       }
     }

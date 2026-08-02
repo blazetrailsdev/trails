@@ -103,7 +103,7 @@ export class MysqlSchemaStatements extends BaseSchemaStatements {
     const ifExists = options.ifExists ? " IF EXISTS" : "";
     const cascade = options.force === "cascade" ? " CASCADE" : "";
     for (const name of tableNames) {
-      this.internalSchemaCache?.clearDataSourceCacheBang(this.pool, name);
+      await this.schemaCache.clearDataSourceCacheBang(name);
     }
     const quoted = tableNames.map((n) => this.quoteTableName(n)).join(", ");
     await this.execute(`DROP${temporary} TABLE${ifExists} ${quoted}${cascade}`);

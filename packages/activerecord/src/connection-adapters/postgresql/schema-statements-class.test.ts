@@ -18,8 +18,8 @@ function makeFakeAdapter() {
     execute: vi.fn(async (sql: string) => {
       executed.push(sql);
     }),
-    internalSchemaCache: {
-      clearDataSourceCacheBang: vi.fn((_pool: unknown, name: string) => {
+    schemaCache: {
+      clearDataSourceCacheBang: vi.fn(async (name: string) => {
         clearedTables.push(name);
       }),
     },

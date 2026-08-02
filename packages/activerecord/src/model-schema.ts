@@ -1529,9 +1529,9 @@ export function cachedTableExists(this: SchemaHost): boolean | undefined {
 
 export async function tableExists(this: SchemaHost): Promise<boolean> {
   const conn = reflectionAdapter(this);
-  const cache = conn.internalSchemaCache;
+  const cache = conn.schemaCache;
   if (!cache || typeof cache.dataSourceExists !== "function") return true;
-  const exists = await cache.dataSourceExists(new FakePool(conn), this.tableName);
+  const exists = await cache.dataSourceExists(this.tableName);
   return exists !== false;
 }
 

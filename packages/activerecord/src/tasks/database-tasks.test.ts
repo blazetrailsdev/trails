@@ -1070,7 +1070,7 @@ describe("DatabaseTasksMigrateErrorTest", () => {
   });
 
   it("migrate clears schema cache afterward", async () => {
-    const { SchemaCache } = await import("../connection-adapters/schema-cache.js");
+    const { SchemaReflection } = await import("../connection-adapters/schema-cache.js");
     const originalVersion = process.env.VERSION;
     delete process.env.VERSION;
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-migrate-cache-"));
@@ -1081,7 +1081,7 @@ describe("DatabaseTasksMigrateErrorTest", () => {
       [DatabaseTasks.env]: { adapter: "sqlite3", database: dbFile },
     });
     DatabaseTasks.registerMigrations([]);
-    const clearSpy = vi.spyOn(SchemaCache.prototype, "clear");
+    const clearSpy = vi.spyOn(SchemaReflection.prototype, "clearBang");
     try {
       await DatabaseTasks.migrate();
       expect(clearSpy).toHaveBeenCalled();
