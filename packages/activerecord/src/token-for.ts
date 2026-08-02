@@ -5,20 +5,8 @@
  */
 
 import { InvalidSignature, MessageVerifier } from "@blazetrails/activesupport/message-verifier";
-import { getEnv } from "@blazetrails/activesupport";
-import { UnknownPrimaryKey } from "./errors.js";
+import { ActiveSupportJSON, getEnv } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
-
-/** Rails' `find_by_token_for` resolves through `primary_key`, which raises
- * UnknownPrimaryKey for a table with no primary key. */
-function requirePrimaryKey(modelClass: typeof Base): string | string[] {
-  const pk = modelClass.primaryKey as string | string[] | null | undefined;
-  const present = Array.isArray(pk)
-    ? pk.length > 0 && pk.every((k) => typeof k === "string" && k.length > 0)
-    : typeof pk === "string" && pk.length > 0;
-  if (!present) throw new UnknownPrimaryKey(modelClass);
-  return pk as string | string[];
-}
 
 export { InvalidSignature };
 
@@ -83,6 +71,15 @@ function resolvedVerifier(modelClass: object): MessageVerifier | null {
   return null;
 }
 
+/**
+ * Ruby's `Object#as_json` (core_ext/object/json.rb), which `payload_for` calls
+ * on the block's return value: the JSON-ready projection of the value, so the
+ * payload compares equal to the one decoded back out of a token.
+ */
+function asJson(value: unknown): unknown {
+  return ActiveSupportJSON.decode(ActiveSupportJSON.encode(value));
+}
+
 function resolveSecret(): string {
   if (_tokenForSecret) {
     return typeof _tokenForSecret === "function" ? _tokenForSecret() : _tokenForSecret;
@@ -130,7 +127,7 @@ export class TokenDefinition {
     // — return the resolved (own or inherited) verifier if set, otherwise build
     // from the secret and assign it to the defining class's own slot.
     const cls = this.definingClass;
-    let verifier = resolvedVerifier(cls);
+    let verifier = generatedTokenVerifier(cls);
     if (!verifier) {
       verifier = new MessageVerifier(resolveSecret());
       setGeneratedTokenVerifier(cls, verifier);
@@ -144,7 +141,7 @@ export class TokenDefinition {
     // coercion in signed-id.ts#signedId).
     const coerce = (v: unknown): unknown => (typeof v === "bigint" ? Number(v) : v);
     const id = Array.isArray(model.id) ? (model.id as unknown[]).map(coerce) : coerce(model.id);
-    return this.block ? [id, this.block(model)] : [id];
+    return this.block ? [id, asJson(this.block(model))] : [id];
   }
 
   generateToken(model: Base): string {
@@ -192,36 +189,17 @@ function resolvedDefinitions(modelClass: object): Map<string, TokenDefinition> |
 }
 
 /**
- * The class's *own* registry entry, seeding it on first write with a snapshot of
- * the currently-inherited definitions — mirroring the class-attribute write
- * `self.token_definitions = token_definitions.merge(...)`, which reads the
- * inherited hash *once* and assigns the result to this class's own slot. After
- * that, later parent writes no longer affect this class.
- */
-function ownDefinitions(modelClass: typeof Base): Map<string, TokenDefinition> {
-  let map = tokenDefinitionRegistry.get(modelClass);
-  if (!map) {
-    const inherited = resolvedDefinitions(Object.getPrototypeOf(modelClass));
-    map = new Map(inherited ?? []);
-    tokenDefinitionRegistry.set(modelClass, map);
-  }
-  return map;
-}
-
-function getDefinition(modelClass: typeof Base, purpose: string): TokenDefinition | undefined {
-  return resolvedDefinitions(modelClass)?.get(purpose);
-}
-
-/**
  * The `token_definitions` hash. Ruby's Hash carries `fetch`, which every finder
  * goes through (`token_definitions.fetch(purpose)`), so the port hands the same
  * verb back rather than making each caller re-spell the unknown-purpose raise.
  */
 type TokenDefinitionsHash = Readonly<Record<string, TokenDefinition>> & {
   fetch(purpose: string): TokenDefinition;
+  merge(other: Record<string, TokenDefinition>): Record<string, TokenDefinition>;
 };
 
-/** `fetch` is non-enumerable so the hash still iterates as `purpose => definition`. */
+/** `fetch`/`merge` are non-enumerable so the hash still iterates as
+ * `purpose => definition`. */
 function withFetch(entries: Record<string, TokenDefinition>): TokenDefinitionsHash {
   Object.defineProperty(entries, "fetch", {
     value(purpose: string): TokenDefinition {
@@ -232,6 +210,11 @@ function withFetch(entries: Record<string, TokenDefinition>): TokenDefinitionsHa
         throw error;
       }
       return definition;
+    },
+  });
+  Object.defineProperty(entries, "merge", {
+    value(other: Record<string, TokenDefinition>): Record<string, TokenDefinition> {
+      return { ...entries, ...other };
     },
   });
   return entries as TokenDefinitionsHash;
@@ -245,7 +228,7 @@ function withFetch(entries: Record<string, TokenDefinition>): TokenDefinitionsHa
  * `self.token_definitions = token_definitions.merge(...)`. So a subclass that
  * has declared its own token sees the inherited purposes captured at that point
  * (not parent purposes added afterwards). Trails seeds the subclass's own
- * snapshot on first write (see `ownDefinitions`); the reader returns the
+ * snapshot on each `generates_token_for` write; the reader returns the
  * resolved map — the class's own snapshot, or the parent's map if it never wrote.
  *
  * Mirrors: ActiveRecord::TokenFor#token_definitions
@@ -319,7 +302,7 @@ export function generatesTokenFor(
   } = {},
 ): void {
   const def = new TokenDefinition(modelClass, purpose, options.expiresIn, options.generator);
-  ownDefinitions(modelClass).set(purpose, def);
+  setTokenDefinitions(modelClass, tokenDefinitions(modelClass).merge({ [purpose]: def }));
 
   if (!(modelClass.prototype as any).generateTokenFor) {
     Object.defineProperty(modelClass.prototype, "generateTokenFor", {
@@ -362,9 +345,9 @@ export function generatesTokenFor(
  * Mirrors: ActiveRecord::TokenFor#generate_token_for
  */
 export function generateTokenFor(record: Base, purpose: string): string {
-  const def = getDefinition(record.constructor as typeof Base, purpose);
-  if (!def) throw new Error(`Unknown token purpose: ${purpose}`);
-  return def.generateToken(record);
+  return tokenDefinitions(record.constructor as typeof Base)
+    .fetch(purpose)
+    .generateToken(record);
 }
 
 /**
@@ -377,20 +360,7 @@ export async function findByTokenFor(
   purpose: string,
   token: string,
 ): Promise<Base | null> {
-  // Rails (token_for.rb:42-43) checks `model.primary_key` first, then
-  // `token_definitions.fetch(purpose)` — so a no-PK model raises
-  // UnknownPrimaryKey even for an unknown purpose.
-  const pk = requirePrimaryKey(modelClass);
-  const def = getDefinition(modelClass, purpose);
-  if (!def) throw new Error(`Unknown token purpose: ${purpose}`);
-  return def.resolveToken(token, async (id) => {
-    if (typeof pk === "string") {
-      return modelClass.findBy({ [pk]: id });
-    }
-    if (!Array.isArray(id) || id.length !== pk.length) return null;
-    const conditions = Object.fromEntries(pk.map((key, i) => [key, id[i]]));
-    return modelClass.findBy(conditions);
-  });
+  return modelClass.all().findByTokenFor(purpose, token);
 }
 
 /**
@@ -403,14 +373,5 @@ export async function findByTokenForBang(
   purpose: string,
   token: string,
 ): Promise<Base> {
-  // Rails `find_by_token_for!` (token_for.rb:50-51) has NO primary_key guard
-  // (unlike the non-bang path): it goes straight to `token_definitions
-  // .fetch(purpose)` — which raises KeyError for an unknown purpose, distinct
-  // from the InvalidSignature raised for a bad/expired token — then `find(id)`
-  // (which itself surfaces UnknownPrimaryKey for a no-PK model).
-  const def = getDefinition(modelClass, purpose);
-  if (!def) throw new Error(`Unknown token purpose: ${purpose}`);
-  const result = await def.resolveToken(token, (id) => modelClass.find(id));
-  if (!result) throw new InvalidSignature();
-  return result;
+  return modelClass.all().findByTokenForBang(purpose, token);
 }
