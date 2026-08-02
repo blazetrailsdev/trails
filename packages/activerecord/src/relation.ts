@@ -3291,10 +3291,10 @@ export class Relation<T extends Base> {
     // are also present the left-outer JD folds into the inner JD's
     // join_constraints (Rails build_join_buckets: stashed_left_joins.unshift),
     // deduping a both-ways association to a single INNER JOIN via `walk`. The
-    // eager JoinDependency rides in `joins_values` and is folded into the SAME
-    // `join_constraints` call, so an association named in BOTH `left_outer_joins`
-    // and `eager_load`/promoted `includes` dedups through that fold too — no
-    // exclusion filter, exactly as in Rails and in the subquery half.
+    // eager JoinDependency rides in `joins_values` and folds into the SAME
+    // `join_constraints` call, so `walk` decides what a left-outer value already
+    // covered by `eager_load` emits — no exclusion filter here, matching Rails
+    // and the subquery half.
     _qm.assertValidLeftOuterJoinsBang(this._leftOuterJoinsValues);
     // Partition CTE-name symbols out of the left-outer values into LEFT OUTER
     // JOIN nodes, mirroring buildJoinBuckets' `select_named_joins` block
