@@ -4713,7 +4713,7 @@ export interface PostgreSQLAdapter {
 
   columnsForDistinct(columns: string | string[], orders?: (string | Nodes.Node)[]): string;
 
-  indexes(tableName: string): Promise<AbstractIndexDefinition[]>;
+  indexes(tableName: string): Promise<IndexDefinition[]>;
 
   indexNameExists(tableName: string, indexName: string): Promise<boolean>;
 
