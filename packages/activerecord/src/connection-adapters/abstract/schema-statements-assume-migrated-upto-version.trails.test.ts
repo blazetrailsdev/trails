@@ -23,9 +23,9 @@ function makeStatements(
     },
     config: {},
   };
-  const ss = new SchemaStatements(
-    adapter as unknown as ConstructorParameters<typeof SchemaStatements>[0],
-  );
+  // The bodies under test are prototype methods mixed into the adapter, so
+  // give the fake adapter that prototype and call them the way production does.
+  const ss = Object.setPrototypeOf(adapter, SchemaStatements.prototype) as SchemaStatements;
   return { ss, executed };
 }
 

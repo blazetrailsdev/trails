@@ -1194,20 +1194,6 @@ export class AbstractAdapter implements Quoting {
     return "Abstract";
   }
 
-  /**
-   * Returns `this` typed as `AbstractAdapter & SchemaQuoter`. SchemaStatements
-   * methods (mixed in via `include()` below) reference `this.adapter` to
-   * call quoting and execution helpers on the adapter — when those methods
-   * run with `this` bound to an adapter instance, `this.adapter` must
-   * resolve to the same object.
-   * @internal
-   */
-  protected get adapter(): import("./abstract/assert-schema-adapter.js").SchemaQuoter &
-    AbstractAdapter {
-    return this as unknown as import("./abstract/assert-schema-adapter.js").SchemaQuoter &
-      AbstractAdapter;
-  }
-
   /** @internal */
   protected _qi(name: string): string {
     return this.quoteIdentifier(name);

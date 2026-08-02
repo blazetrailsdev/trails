@@ -30,7 +30,7 @@ import type { AddIndexOptions, SchemaStatementsLike } from "../abstract/schema-d
 export class MysqlSchemaStatements extends BaseSchemaStatements {
   private _mysqlSchemaCreation?: MysqlSchemaCreation;
   override get schemaCreation(): MysqlSchemaCreation {
-    return (this._mysqlSchemaCreation ??= new MysqlSchemaCreation(this.adapter));
+    return (this._mysqlSchemaCreation ??= new MysqlSchemaCreation(this));
   }
 
   /** Mirrors: MySQL::SchemaStatements#update_table_definition */
@@ -66,7 +66,7 @@ export class MysqlSchemaStatements extends BaseSchemaStatements {
       return;
     }
     const createDef = new CreateIndexDefinition(idx, false, algorithmClause);
-    await this.adapter.execute(await this.schemaCreation.accept(createDef));
+    await this.execute(await this.schemaCreation.accept(createDef));
   }
 
   /** Mirrors: MySQL::SchemaStatements#remove_column */
@@ -91,9 +91,9 @@ export class MysqlSchemaStatements extends BaseSchemaStatements {
     const hasOpts = last !== null && last !== undefined && typeof last === "object";
     const opts = (hasOpts ? last : {}) as { temporary?: boolean };
     if (opts.temporary) {
-      return (
-        this.adapter as unknown as { dropTable(...args: unknown[]): Promise<void> }
-      ).dropTable(...(args as unknown[]));
+      return (this as unknown as { dropTable(...args: unknown[]): Promise<void> }).dropTable(
+        ...(args as unknown[]),
+      );
     }
 
     return super.dropTable(...(args as any));
