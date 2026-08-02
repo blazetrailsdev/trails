@@ -462,7 +462,7 @@ export async function performFirstBang(this: FinderRelation): Promise<any> {
 }
 
 function orderByPk(rel: FinderRelation, direction: "asc" | "desc"): any {
-  const pk = rel._modelClass.primaryKey;
+  const pk = rel.primaryKey;
   if (Array.isArray(pk)) {
     return rel.order(...pk.map((col: string) => ({ [col]: direction })));
   }
@@ -959,7 +959,7 @@ export async function findLast(rel: FinderRelation, limit?: number): Promise<any
 /** @internal */
 export function orderedRelation(rel: FinderRelation): any {
   const mc = rel.model as any;
-  const pk = mc?.primaryKey;
+  const pk = rel.primaryKey;
   const implicitOrder: string | null | undefined = mc?.implicitOrderColumn;
   const constraintsList: string[] | null = mc ? _queryConstraintsListFn.call(mc) : null;
   if (!hasOrder(rel) && (implicitOrder || constraintsList != null || pk)) {
