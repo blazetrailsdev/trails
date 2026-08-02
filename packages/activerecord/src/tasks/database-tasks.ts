@@ -1618,21 +1618,22 @@ export async function checkCurrentProtectedEnvironmentBang(
 
 /** @internal */
 export async function initializeDatabase(dbConfig: DatabaseConfig): Promise<boolean> {
-  return DatabaseTasks.withTemporaryConnection(dbConfig, async (adapter) => {
-    const { NoDatabaseError } = await import("../errors.js");
-    const { SchemaMigration } = await import("../schema-migration.js");
+  const { NoDatabaseError } = await import("../errors.js");
+  const { SchemaMigration } = await import("../schema-migration.js");
+  return DatabaseTasks.withTemporaryPool(dbConfig, async (pool) => {
     let alreadyInitialized = false;
-    try {
-      // Probe DB connectivity first — throws NoDatabaseError if the DB doesn't exist.
-      // tableExists() swallows all errors internally so can't detect a missing DB.
-      await adapter.execute("SELECT 1");
-      const sm = new SchemaMigration(adapter);
-      alreadyInitialized = await sm.tableExists();
-    } catch (error) {
-      if (error instanceof NoDatabaseError) {
+    for (;;) {
+      try {
+        const adapter = await pool.leaseConnection();
+        // Probe DB connectivity first — throws NoDatabaseError if the DB doesn't exist.
+        // tableExists() swallows all errors internally so can't detect a missing DB.
+        await adapter.execute("SELECT 1");
+        const sm = new SchemaMigration(adapter);
+        alreadyInitialized = await sm.tableExists();
+        break;
+      } catch (error) {
+        if (!(error instanceof NoDatabaseError)) throw error;
         await DatabaseTasks.create(dbConfig);
-      } else {
-        throw error;
       }
     }
     if (!alreadyInitialized) {
