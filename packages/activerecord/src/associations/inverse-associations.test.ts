@@ -10,6 +10,7 @@ import {
   registerSubclass,
   InverseOfAssociationNotFoundError,
   InverseOfAssociationRecursiveError,
+  RecordNotFound,
 } from "../index.js";
 import { findTarget as findHasManyTarget } from "./has-many-association.js";
 import { fixtures } from "../test-fixtures.js";
@@ -860,6 +861,36 @@ describe("InverseHasManyTests", () => {
       "belongsTo",
     )) as any;
     expect(reloaded.id).toBe((post2 as any).id);
+  });
+
+  it("raise record not found error when invalid ids are passed", async () => {
+    await Interest.deleteAll();
+
+    const human = await Human.createBang();
+
+    const invalidId = 245324523;
+    await expect((human as any).interests.find(invalidId)).rejects.toThrow(RecordNotFound);
+
+    const invalidIds = [8432342, 2390102913, 2453245234523452];
+    await expect((human as any).interests.find(invalidIds)).rejects.toThrow(RecordNotFound);
+  });
+
+  it("raise record not found error when no ids are passed", async () => {
+    const human = await Human.createBang();
+
+    const exception = await (async () => {
+      try {
+        await (human as any).interests.load();
+        await (human as any).interests.find();
+      } catch (e) {
+        return e as RecordNotFound;
+      }
+      throw new Error("expected RecordNotFound");
+    })();
+
+    expect(exception).toBeInstanceOf(RecordNotFound);
+    expect(exception.model).toBe("Interest");
+    expect(exception.primaryKey).toBe("id");
   });
 });
 
