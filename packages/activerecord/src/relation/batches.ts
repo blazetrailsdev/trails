@@ -49,9 +49,7 @@ export async function ensureValidOptionsForBatchingBang(
         : [primaryKey];
   if (pkArr.some((key) => !cursorArr.includes(key))) {
     const model = relation.model;
-    const indexes = (await model
-      .schemaCache()
-      .indexes(model.connectionPool(), relation.tableName)) as Array<{
+    const indexes = (await model.schemaCache().indexes(relation.tableName)) as Array<{
       unique: boolean;
       where?: string | null;
       columns: string[];
