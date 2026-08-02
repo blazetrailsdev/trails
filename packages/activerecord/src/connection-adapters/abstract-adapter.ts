@@ -75,6 +75,7 @@ import { include } from "@blazetrails/activesupport";
 import {
   SchemaStatements,
   type CommentOrChanges,
+  type IndexDefinitionRow,
   type JoinTableOptions,
 } from "./abstract/schema-statements.js";
 import { Savepoints as SavepointsMixin } from "./abstract/savepoints.js";
@@ -100,6 +101,7 @@ import type {
   ColumnOptions,
   IdHashOptions,
   AddReferenceOptions,
+  RemoveReferenceOptions,
 } from "./abstract/schema-definitions.js";
 import type { SchemaCreation } from "./abstract/schema-creation.js";
 import type { Column } from "./column.js";
@@ -390,13 +392,7 @@ export interface AbstractAdapter {
   dataSourceSql(name?: string | null, options?: { type?: string }): string;
   columns(tableName: string): Promise<Column[]>;
   primaryKey(tableName: string): Promise<string | string[] | null>;
-  /**
-   * drift-ok: the SchemaStatements base spells out the row shape, but the
-   * concrete adapters override `indexes` with `Promise<unknown[]>`, so
-   * narrowing here makes every one of them unassignable to AbstractAdapter.
-   * Converging the adapters is `converge-adapter-indexes-return-type`.
-   */
-  indexes(tableName: string): Promise<unknown[]>;
+  indexes(tableName: string): Promise<IndexDefinitionRow[]>;
   foreignKeys(tableName: string): Promise<ForeignKeyDefinition[]>;
   foreignKeyExists(
     fromTable: string,
@@ -416,23 +412,13 @@ export interface AbstractAdapter {
   removeReference(
     tableName: string,
     refName: string,
-    options?: {
-      polymorphic?: boolean;
-      foreignKey?: boolean | { toTable?: string; column?: string };
-      ifExists?: boolean;
-      ifNotExists?: boolean;
-    },
+    options?: RemoveReferenceOptions,
   ): Promise<void>;
   /** Alias of removeReference (Rails: `alias :remove_belongs_to :remove_reference`). */
   removeBelongsTo(
     tableName: string,
     refName: string,
-    options?: {
-      polymorphic?: boolean;
-      foreignKey?: boolean | { toTable?: string; column?: string };
-      ifExists?: boolean;
-      ifNotExists?: boolean;
-    },
+    options?: RemoveReferenceOptions,
   ): Promise<void>;
   addTimestamps(tableName: string, options?: ColumnOptions): Promise<void>;
   removeTimestamps(tableName: string): Promise<void>;

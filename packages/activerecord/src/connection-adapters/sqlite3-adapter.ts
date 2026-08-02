@@ -30,6 +30,7 @@ import {
   indexNameForRemoveFrom,
   indexExistsForRemoveFrom,
   canRemoveIndexByName,
+  type IndexDefinitionRow,
 } from "./abstract/schema-statements.js";
 import { captureUnwrappedExecute, dirtiesQueryCache } from "./abstract/query-cache.js";
 import { execInsertReturningReadback } from "./abstract/database-statements.js";
@@ -2147,7 +2148,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     return fields.map((field) => newColumnFromField(this, tableName, field, fields));
   }
 
-  async indexes(tableName: string): Promise<unknown[]> {
+  async indexes(tableName: string): Promise<IndexDefinitionRow[]> {
     return sqliteIndexes(this, tableName);
   }
 

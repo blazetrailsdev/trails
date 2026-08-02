@@ -13,7 +13,10 @@ import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js"
 import type { CheckConstraintDefinition } from "../abstract/schema-definitions.js";
 import { SqlTypeMetadata } from "../sql-type-metadata.js";
 import { SchemaCreation } from "./schema-creation.js";
-import { SchemaStatements as AbstractSchemaStatements } from "../abstract/schema-statements.js";
+import {
+  SchemaStatements as AbstractSchemaStatements,
+  type IndexDefinitionRow,
+} from "../abstract/schema-statements.js";
 import { SchemaDumper as AbstractSchemaDumper } from "../abstract/schema-dumper.js";
 import { SchemaDumper } from "./schema-dumper.js";
 import { Column } from "./column.js";
@@ -100,7 +103,10 @@ const INDEX_ON_REGEX =
  * adapter delegates here. Schema-qualified names (e.g. `temp.widgets`) place
  * the qualifier before the PRAGMA keyword.
  */
-export async function indexes(adapter: DatabaseAdapter, tableName: string): Promise<unknown[]> {
+export async function indexes(
+  adapter: DatabaseAdapter,
+  tableName: string,
+): Promise<IndexDefinitionRow[]> {
   const { schema, bare } = splitTableName(tableName);
   const pragmaPrefix = schema ? `${quoteColumnName(schema)}.` : "";
   const rows = (await adapter.schemaQuery(

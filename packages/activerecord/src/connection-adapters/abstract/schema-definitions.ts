@@ -535,6 +535,13 @@ export interface AddIndexOptions {
   algorithm?: string;
 }
 
+export interface RemoveReferenceOptions {
+  polymorphic?: boolean;
+  foreignKey?: boolean | { toTable?: string; column?: string };
+  ifExists?: boolean;
+  ifNotExists?: boolean;
+}
+
 export interface AddReferenceOptions extends Omit<ColumnOptions, "index"> {
   polymorphic?: boolean | Record<string, unknown>;
   foreignKey?: boolean | ReferenceForeignKeyOptions;
