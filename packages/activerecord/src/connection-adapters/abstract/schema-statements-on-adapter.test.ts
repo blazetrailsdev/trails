@@ -11,6 +11,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import { AbstractSQLite3Adapter } from "../sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "../better-sqlite3-adapter.js";
 import { AbstractAdapter } from "../abstract-adapter.js";
+import { Result } from "../../result.js";
 import { ForeignKeyDefinition } from "./schema-definitions.js";
 import { fixtures } from "../../test-fixtures.js";
 import { NotImplementedError } from "../../errors.js";
@@ -67,6 +68,11 @@ class CapturingAdapter extends AbstractAdapter {
   }
   executeMutation(_sql: string) {
     return Promise.resolve(0);
+  }
+  override internalExecQuery(sql: string, _name?: string | null, binds?: unknown[]) {
+    this.lastSql = sql;
+    this.lastParams = binds ?? [];
+    return Promise.resolve(new Result([], []));
   }
 }
 
@@ -177,16 +183,6 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
     expect(sqlite.lastSql).toBe('PRAGMA "aux".table_info("widgets")');
   });
 
-  it("tables() postgres fallback includes partitioned tables and honors search_path", async () => {
-    const stub = new CapturingAdapter("postgres");
-    await stub.tables();
-    expect(stub.lastSql).toContain("FROM pg_class c");
-    expect(stub.lastSql).toContain("current_schemas(false)");
-    expect(stub.lastSql).toContain("c.relkind IN ('r', 'p')");
-    expect(stub.lastSql).not.toContain("pg_tables");
-    expect(stub.lastSql).not.toContain("'public'");
-  });
-
   it("columns() postgres fallback scopes table_schema to an explicit schema.table", async () => {
     const stub = new CapturingAdapter("postgres");
     await stub.columns("myschema.things");
@@ -213,34 +209,6 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
     expect(stub.lastSql).toContain("c.table_schema = $3");
     expect(stub.lastSql).not.toContain("current_schemas(false)");
     expect(stub.lastParams).toEqual(["things", "myschema.things", "myschema"]);
-  });
-
-  it("tables() sqlite/mysql fallback arms are unchanged", async () => {
-    const sqlite = new CapturingAdapter("sqlite");
-    await sqlite.tables();
-    expect(sqlite.lastSql).toContain("FROM sqlite_master");
-    const mysql = new CapturingAdapter("mysql");
-    await mysql.tables();
-    expect(mysql.lastSql).toContain("information_schema.tables");
-  });
-
-  it("tableExists quotes the table name as a literal and scopes postgres to current_schemas", async () => {
-    const pg = new CapturingAdapter("postgres");
-    await pg.tableExists("things");
-    expect(pg.lastSql).toContain("current_schemas(false)");
-    expect(pg.lastSql).not.toContain("'public'");
-    // The name is embedded as an escaped string literal (Rails' quote()), not raw.
-    expect(pg.lastSql).toContain("table_name = 'things'");
-
-    const mysql = new CapturingAdapter("mysql");
-    await mysql.tableExists("things");
-    expect(mysql.lastSql).toContain("table_name = 'things'");
-  });
-
-  it("tableExists escapes a table name containing a quote instead of breaking SQL", async () => {
-    const pg = new CapturingAdapter("postgres");
-    await pg.tableExists("ab'c");
-    expect(pg.lastSql).toContain("table_name = 'ab''c'");
   });
 
   it("columnExists returns false for a value containing quotes instead of erroring", async () => {

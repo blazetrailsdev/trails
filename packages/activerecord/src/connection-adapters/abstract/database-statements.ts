@@ -486,7 +486,10 @@ export async function query(
   name?: string | null,
   binds?: unknown[],
 ): Promise<unknown[][]> {
-  const result = await internalExecQuery.call(this, sql, name ?? "SQL", binds);
+  // Dispatch through the instance so an adapter's internalExecQuery override
+  // wins, as Ruby's virtual call does.
+  const run = (this.internalExecQuery ?? internalExecQuery).bind(this);
+  const result = await run(sql, name ?? "SQL", binds);
   return result.rows;
 }
 
