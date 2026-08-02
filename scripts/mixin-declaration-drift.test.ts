@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 import * as fs from "fs/promises";
+import { BetterSQLite3Adapter } from "../packages/activerecord/src/connection-adapters/better-sqlite3-adapter.js";
+import { PostgreSQLAdapter } from "../packages/activerecord/src/connection-adapters/postgresql-adapter.js";
 import {
   findDrift,
+  findUninstalled,
   interfaceSignatures,
   mixinSignatures,
+  requiredInterfaceMethodNames,
   type SignatureEntry,
 } from "./mixin-declaration-drift.js";
 
@@ -12,6 +16,13 @@ const ADAPTERS = "packages/activerecord/src/connection-adapters/";
 /**
  * Every `include(<Adapter>, <Mixin>)` pair whose mixed-in surface the adapter
  * restates in a declaration-merged interface.
+ *
+ * `witness` is the concrete class the declared surface is checked against.
+ * `AbstractAdapter` cannot vouch for itself: a handful of its declared methods
+ * (`beginTransaction`, `commit`, `rollback`, `executeMutation`,
+ * `currentDatabase`) are the base's abstract contract, implemented only by
+ * concrete adapters — SQLite stands in for them, as it does in
+ * `quoting-contract.test.ts`.
  */
 const PAIRS = [
   {
@@ -20,6 +31,7 @@ const PAIRS = [
     mixinClass: "SchemaStatements",
     adapterFile: `${ADAPTERS}abstract-adapter.ts`,
     adapterInterface: "AbstractAdapter",
+    witness: BetterSQLite3Adapter,
   },
   {
     label: "PostgreSQLAdapter / PostgreSQL::SchemaStatements",
@@ -27,6 +39,7 @@ const PAIRS = [
     mixinClass: "PostgreSQLSchemaStatements",
     adapterFile: `${ADAPTERS}postgresql-adapter.ts`,
     adapterInterface: "PostgreSQLAdapter",
+    witness: PostgreSQLAdapter,
   },
 ] as const;
 
@@ -49,7 +62,37 @@ describe("mixin declaration drift", () => {
       expect(declared.length).toBeGreaterThan(0);
       expect(findDrift(mixin, declared)).toEqual([]);
     });
+
+    it(`${pair.label}: every declared method is installed on the adapter`, async () => {
+      // AbstractAdapter defers its own `include()` to the first construction (see
+      // ensureAbstractAdapterMixinsApplied), so a prototype read before any
+      // adapter exists sees none of the mixed-in methods.
+      new BetterSQLite3Adapter(":memory:").disconnectBang();
+
+      const source = await fs.readFile(pair.adapterFile, "utf8");
+      const names = requiredInterfaceMethodNames(pair.adapterFile, source, pair.adapterInterface);
+      expect(names.length).toBeGreaterThan(0);
+      expect(findUninstalled(names, pair.witness.prototype)).toEqual([]);
+    });
   }
+
+  it("reports a declared method nothing on the prototype chain provides", () => {
+    const base = { addIndex() {} };
+    const prototype = Object.create(base) as object;
+    expect(findUninstalled(["addIndex", "renamedAway"], prototype)).toEqual(["renamedAway"]);
+  });
+
+  it("does not require optional or waived members to be installed", () => {
+    const source = [
+      "export interface Adapter {",
+      "  addIndex(name: string): void;",
+      "  explain?(sql: string): void;",
+      "  /** drift-ok: subclasses only. */",
+      "  castResult(row: unknown): void;",
+      "}",
+    ].join("\n");
+    expect(requiredInterfaceMethodNames("adapter.ts", source, "Adapter")).toEqual(["addIndex"]);
+  });
 
   it("reports a mixin signature the interface no longer matches", () => {
     const mixin: SignatureEntry[] = [{ name: "addIndex", signature: "(name: string): void" }];

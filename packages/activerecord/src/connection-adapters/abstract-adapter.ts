@@ -672,7 +672,13 @@ export interface AbstractAdapter {
   currentSavepointName(): string | null;
   readonly inTransaction: boolean;
   changeTableComment?(tableName: string, commentOrChanges: CommentOrChanges): Promise<void>;
-  currentDatabase(): Promise<string>;
+  /**
+   * Rails defines `current_database` only on PostgreSQL::SchemaStatements
+   * (postgresql/schema_statements.rb:220) and AbstractMysqlAdapter
+   * (abstract_mysql_adapter.rb:296) — SQLite has none, which is why
+   * migration.ts guards every call with a `typeof` check.
+   */
+  currentDatabase?(): Promise<string>;
   /** @internal */
   createAlterTable?(name: string): AlterTable;
 

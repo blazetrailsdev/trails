@@ -139,6 +139,42 @@ export function interfaceSignatures(
   return entries;
 }
 
+/**
+ * Names the interface declares as required methods — the set that must exist at
+ * runtime. Optional members (`explain?`) declare a method the base may not have
+ * at all and callers reach with `?.`, so they are excluded; waived members are
+ * excluded for the reason their comment gives.
+ */
+export function requiredInterfaceMethodNames(
+  fileName: string,
+  source: string,
+  interfaceName: string,
+): string[] {
+  const names: string[] = [];
+  for (const statement of parse(fileName, source).statements) {
+    if (!ts.isInterfaceDeclaration(statement) || statement.name.text !== interfaceName) continue;
+    for (const member of statement.members) {
+      if (!ts.isMethodSignature(member) || member.questionToken || isWaived(source, member)) {
+        continue;
+      }
+      names.push(member.name.getText());
+    }
+  }
+  return [...new Set(names)];
+}
+
+/**
+ * Declared method names nothing on the prototype chain provides. A mixin method
+ * that is renamed or deleted leaves its interface declaration behind, and
+ * `include()` stops installing it — call sites keep typechecking against a
+ * method that is no longer there. The chain (not just the mixin) is the
+ * reference because an adapter's interface also restates methods its own class,
+ * its superclasses, and its other mixins provide.
+ */
+export function findUninstalled(declaredNames: string[], prototype: object): string[] {
+  return declaredNames.filter((name) => !(name in prototype)).sort();
+}
+
 /** Signature equality, with the mixin's inferred-type wildcards matching anything. */
 export function matches(mixinSignature: string, declaredSignature: string): boolean {
   if (!mixinSignature.includes(WILDCARD)) return mixinSignature === declaredSignature;
