@@ -374,6 +374,7 @@ export interface AbstractAdapter {
     options?: Omit<ForeignKeyLookupOptions, "toTable">,
   ): Promise<boolean>;
   addForeignKey(fromTable: string, toTable: string, options?: AddForeignKeyOptions): Promise<void>;
+  isUseForeignKeys(): boolean;
   removeForeignKey(
     fromTable: string,
     toTableOrOptions?: string | RemoveForeignKeyOptions,
