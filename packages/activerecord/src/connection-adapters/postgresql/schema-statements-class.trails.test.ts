@@ -3,6 +3,7 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import { PostgreSQLAdapter } from "../postgresql-adapter.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
 import { Table as PgTable } from "./schema-definitions.js";
+import { Name } from "./utils.js";
 
 // The bodies under test are prototype methods on the adapter, so give the fake
 // adapter that prototype and call them the way production does.
@@ -13,6 +14,7 @@ function withSchemaStatements(adapter: DatabaseAdapter): PostgreSQLAdapter {
 interface FakeOptions {
   logger?: { warn: (msg: string) => void };
   schemaQuery?: (sql: string) => Promise<Record<string, unknown>[]>;
+  query?: (sql: string) => Promise<unknown[][]>;
   queryValue?: (sql: string) => Promise<unknown>;
   maxIdentifierLength?: number;
 }
@@ -47,6 +49,10 @@ function makeAdapter(options: FakeOptions = {}) {
     schemaQuery: vi.fn(async (text: string) => {
       sql.push(text);
       return options.schemaQuery ? await options.schemaQuery(text) : [];
+    }),
+    query: vi.fn(async (text: string) => {
+      sql.push(text);
+      return options.query ? await options.query(text) : [];
     }),
     queryValue: vi.fn(async (text: string) => {
       sql.push(text);
@@ -149,36 +155,44 @@ describe("PostgreSQLSchemaStatements#indexNameExists", () => {
 });
 
 describe("PostgreSQLSchemaStatements#pkAndSequenceFor", () => {
-  // Rails' fallback query selects `nsp.nspname` — the TABLE's namespace — and a
-  // CASE that strips everything through the dot, so the sequence's own schema
-  // never survives (schema_statements.rb:382-407).
-  it("pairs the table schema with the bare sequence name on the default_expr fallback", async () => {
-    const { adapter } = makeAdapter({
-      schemaQuery: async () => [
-        {
-          pk: "id",
-          seq: null,
-          default_expr: "nextval('other_schema.things_id_seq'::regclass)",
-          schema_name: "public",
-        },
-      ],
+  it("falls back to the pg_attrdef query when the pg_depend lookup finds nothing", async () => {
+    const { adapter, sql } = makeAdapter({
+      query: async (text) =>
+        text.includes("pg_depend") ? [] : [["id", "public", "things_id_seq"]],
     });
     const ss = withSchemaStatements(adapter);
     expect(await ss.pkAndSequenceFor("things")).toEqual([
       "id",
-      { schema: "public", name: "things_id_seq" },
+      new Name("public", "things_id_seq"),
     ]);
+    expect(sql).toHaveLength(2);
+    expect(sql[0]).toContain("pg_depend");
+    expect(sql[1]).toContain("pg_attrdef");
+  });
+
+  it("returns a null sequence when the fallback row carries no sequence name", async () => {
+    const { adapter } = makeAdapter({
+      query: async (text) => (text.includes("pg_depend") ? [] : [["id", "public", null]]),
+    });
+    const ss = withSchemaStatements(adapter);
+    expect(await ss.pkAndSequenceFor("pg_uuids")).toEqual(["id", null]);
   });
 
   // Rails' bare `rescue nil` covers the whole method, not just unknown tables.
   it("returns null when the lookup raises", async () => {
     const { adapter } = makeAdapter({
-      schemaQuery: async () => {
+      query: async () => {
         throw new Error("boom");
       },
     });
     const ss = withSchemaStatements(adapter);
     expect(await ss.pkAndSequenceFor("things")).toBeNull();
+  });
+
+  it("returns null when neither query matches", async () => {
+    const { adapter } = makeAdapter({ query: async () => [] });
+    const ss = withSchemaStatements(adapter);
+    expect(await ss.pkAndSequenceFor("unobtainium")).toBeNull();
   });
 });
 

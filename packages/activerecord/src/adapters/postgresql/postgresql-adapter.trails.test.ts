@@ -126,7 +126,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const result = await adapter.pkAndSequenceFor("ex_custom_seqt");
       expect(result).not.toBeNull();
       expect(result![0]).toBe("id");
-      expect(result![1]!.name).toBe("ex_custom_seq");
+      expect(result![1]!.identifier).toBe("ex_custom_seq");
     });
 
     it("columns for distinct", async () => {
