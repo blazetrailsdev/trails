@@ -31,7 +31,7 @@ import {
   suppressTaggedCalls,
 } from "./compare.js";
 import { rubyMethodToTs } from "./conventions.js";
-import type { ApiManifest, ClassInfo, MethodInfo, PackageInfo } from "./types.js";
+import type { ApiManifest, ClassInfo, MethodInfo, PackageInfo, ParamInfo } from "./types.js";
 
 function cls(file: string, name: string, superclass?: string): ClassInfo {
   return {
@@ -78,7 +78,8 @@ describe("narrowCallsApplies", () => {
 });
 
 describe("resolvePortedWithArgsSigs", () => {
-  const sig = (n: number) => Array.from({ length: n }, (_, i) => ({ name: `a${i}` }) as never);
+  const sig = (n: number): ParamInfo[] =>
+    Array.from({ length: n }, (_, i) => ({ name: `a${i}`, kind: "required" }) as ParamInfo);
   const byFileName = new Map([
     ["arel/nodes.ts", new Map([["first", [sig(0)]]])],
     ["relation.ts", new Map([["first", [sig(1)]]])],

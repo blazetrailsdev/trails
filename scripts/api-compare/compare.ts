@@ -1384,14 +1384,8 @@ export function main() {
     // pooling all signatures and matching ANY (see matchArityAgainst) finds the
     // true arity and keeps those bindings/overloads from false-positiving.
     const tsParamsByName = new Map<string, ParamInfo[][]>();
-    // Same signatures, but ONLY from this package — no dep packages. The
-    // calls-parity ported-with-args gate (see checkCalls) resolves against
-    // same-file-then-this-package, never the global pool: with deps folded in,
-    // one same-named method taking a parameter ANYWHERE in the package or its
-    // deps satisfied the gate for every file, so porting a single widely-called
-    // method (`Relation#first`) tripped unrelated bodies (arel's `first`) at
-    // once. Arity keeps the global pool on purpose (mixin re-export bindings);
-    // do not widen this one back to match it.
+    // Same signatures, but ONLY from this package — no dep packages. Feeds the
+    // calls-parity ported-with-args gate; see resolvePortedWithArgsSigs.
     const tsParamsByNameInPkg = new Map<string, ParamInfo[][]>();
     // Per-(file, name) resolved options-object keys (null = uncheckable).
     // Scoped per-FILE — unlike arity's global pool — so a sibling adapter's
@@ -1445,11 +1439,15 @@ export function main() {
       }
       return includeGraphCallSets(entities, tsName, includeGraph);
     };
-    const recordTsParams = (m: MethodInfo, file = m.file ?? "", inPkg = true) => {
+    const recordTsParams = (
+      m: MethodInfo,
+      file = m.file ?? "",
+      scope: "package" | "dep" = "package",
+    ) => {
       const sigs = tsParamsByName.get(m.name) ?? [];
       sigs.push(m.params);
       tsParamsByName.set(m.name, sigs);
-      if (inPkg) {
+      if (scope === "package") {
         const pkgSigs = tsParamsByNameInPkg.get(m.name) ?? [];
         pkgSigs.push(m.params);
         tsParamsByNameInPkg.set(m.name, pkgSigs);
@@ -1523,11 +1521,11 @@ export function main() {
       if (!depPkg) continue;
       for (const ent of [...Object.values(depPkg.classes), ...Object.values(depPkg.modules)]) {
         for (const m of [...ent.instanceMethods, ...ent.classMethods]) {
-          if (tsShouldInclude(m)) recordTsParams(m, m.file ?? "", false);
+          if (tsShouldInclude(m)) recordTsParams(m, m.file ?? "", "dep");
         }
       }
       for (const fns of Object.values(depPkg.fileFunctions ?? {})) {
-        for (const fn of fns) if (tsShouldInclude(fn)) recordTsParams(fn, fn.file ?? "", false);
+        for (const fn of fns) if (tsShouldInclude(fn)) recordTsParams(fn, fn.file ?? "", "dep");
       }
     }
 
@@ -1948,8 +1946,6 @@ export function main() {
           // A `this:` receiver is not an argument — counting it would
           // promote zero-arg readers (`spawn`, `readonlyAttributeQ`) past the
           // gate the moment alias bindings started carrying real params.
-          // Candidates resolve same-file first, then this package
-          // (tsParamsByNameInPkg) — never the dep-wide pool.
           (c) => portedWithArgsSigs(tsFile, c).some((sig) => stripThis(sig).length > 0),
           rubyMethodToTs,
           callsSignificant,
