@@ -6,7 +6,7 @@ import { ownRailsDefs, reachableRailsDefs } from "./rails-scope.js";
 import { resolvePath } from "../../vendor/sources.js";
 const AR_ROOT = resolvePath("activerecord");
 const AR_LIB = path.dirname(AR_ROOT);
-export { rubyDefinedMethods } from "./rails-scope.js";
+export { scopedRubyDefs } from "./rails-scope.js";
 function railsSource(railsRelPath: string): string {
   const abs = path.join(AR_LIB, railsRelPath);
   return existsSync(abs) ? readFileSync(abs, "utf8") : "";
@@ -187,10 +187,10 @@ export function defaultAsyncManifest(): AsyncManifest {
   manifestCache ??= buildAsyncManifest(portTreeFiles());
   return manifestCache;
 }
-export function asyncMethodsForRailsFile(
+export async function asyncMethodsForRailsFile(
   railsRelPath: string,
   manifest: AsyncManifest = defaultAsyncManifest(),
-): Set<string> {
+): Promise<Set<string>> {
   const short = railsRelPath.replace(/^active_record\//, "");
   const twinTsPath = rubyFileToTs(short);
   const twinTsAbs = path.join(TRAILS_AR_SRC, twinTsPath);
@@ -199,10 +199,10 @@ export function asyncMethodsForRailsFile(
   return resolveAsyncNames({
     twinTs,
     relationTs: relationFamily ? readFileOr(path.join(TRAILS_AR_SRC, "relation.ts")) : undefined,
-    ownRubyDefs: relationFamily ? ownRailsDefs(railsRelPath) : undefined,
+    ownRubyDefs: relationFamily ? await ownRailsDefs(railsRelPath) : undefined,
     crossFile: crossFileAsyncNames(manifest, {
       twinTsPath,
-      railsDefs: reachableRailsDefs(railsRelPath),
+      railsDefs: await reachableRailsDefs(railsRelPath),
     }),
     inferFromRuby: existsSync(twinTsAbs) ? undefined : railsSource(railsRelPath),
   });

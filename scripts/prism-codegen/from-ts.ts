@@ -35,7 +35,7 @@ async function main() {
   const rb = path.join(AR_LIB, rel);
   const { code, coverage, perDef, parseErrorCount } = await generateFromSource(
     readFileSync(rb, "utf8"),
-    asyncMethodsForRailsFile(rel),
+    await asyncMethodsForRailsFile(rel),
     undefined,
     undefined,
     undefined,

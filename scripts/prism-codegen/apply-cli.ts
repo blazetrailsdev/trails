@@ -58,7 +58,7 @@ async function main() {
 
   const { code, perDef } = await generateFromSource(
     await fs.readFile(rubyAbsPath(target), "utf8"),
-    asyncMethodsForRailsFile(target.ruby),
+    await asyncMethodsForRailsFile(target.ruby),
     undefined,
     undefined,
     undefined,

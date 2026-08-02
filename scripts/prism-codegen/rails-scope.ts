@@ -1,15 +1,45 @@
 import { existsSync, readFileSync } from "node:fs";
 import * as path from "node:path";
+import { loadPrism } from "@ruby/prism";
 import { methodName } from "./naming.js";
 import { rubyAbsPathFor } from "./files.js";
+import type { PrismNode } from "./types.js";
 
-const RUBY_DEF = /^\s*def\s+(?:self\.)?([A-Za-z_][\w]*[?!=]?)/gm;
 const MIXIN_LINE = /^[ \t]*(?:include|extend)[ \t]+([A-Z][\w:]*(?:[ \t]*,[ \t]*[A-Z][\w:]*)*)/gm;
 
-export function rubyDefinedMethods(rubySource: string): Set<string> {
+let prismParse: Promise<Awaited<ReturnType<typeof loadPrism>>> | undefined;
+
+/**
+ * The method names a Ruby file's own class/module can dispatch to, honouring
+ * class nesting. A `def` inside a class nested in the file's class — Relation's
+ * `ExplainProxy#pluck` (relation.rb:6) — belongs to that inner object, not to
+ * the file's, so it is out of scope. Nested *modules* (`ClassMethods`) stay in:
+ * Rails mixes them into the enclosing class, so their defs really are reachable.
+ *
+ * `class << self` bodies and `def self.x` are kept: a generated file's
+ * class-level self-calls dispatch to them.
+ */
+export async function scopedRubyDefs(rubySource: string): Promise<Set<string>> {
+  prismParse ??= loadPrism();
+  const parse = await prismParse;
   const defs = new Set<string>();
-  for (const m of rubySource.matchAll(RUBY_DEF)) defs.add(methodName(m[1]));
+  walkScoped((parse(rubySource).value as unknown as PrismNode) ?? null, 0, defs);
   return defs;
+}
+
+function walkScoped(node: PrismNode | null, classDepth: number, defs: Set<string>): void {
+  if (!node?.constructor) return;
+  const kind = node.constructor.name;
+  if (kind === "ClassNode") {
+    if (classDepth >= 1) return;
+    for (const child of node.compactChildNodes()) walkScoped(child, classDepth + 1, defs);
+    return;
+  }
+  if (kind === "DefNode") {
+    defs.add(methodName(String(node.name)));
+    return;
+  }
+  for (const child of node.compactChildNodes()) walkScoped(child, classDepth, defs);
 }
 
 /**
@@ -173,9 +203,9 @@ const readRuby: RubySourceReader = (rel) => {
   return existsSync(abs) ? readFileSync(abs, "utf8") : undefined;
 };
 
-/** Ruby method names defined directly in one Rails file. */
-export function ownRailsDefs(railsRelPath: string): Set<string> {
-  return rubyDefinedMethods(readRuby(stripPrefix(railsRelPath)) ?? "");
+/** Ruby method names one Rails file defines in its own class/module scope. */
+export function ownRailsDefs(railsRelPath: string): Promise<Set<string>> {
+  return scopedRubyDefs(readRuby(stripPrefix(railsRelPath)) ?? "");
 }
 
 const reachableCache = new Map<string, Set<string>>();
@@ -191,14 +221,14 @@ const reachableCache = new Map<string, Set<string>>();
  * in unrelated files indistinguishable, and the async one dragged an await
  * onto the sync one's self-call.
  *
- * `def`s are collected flat, so a `def` in an inner class (`Relation`'s
- * `ExplainProxy`) counts as reachable. That errs toward the old, wider scope
- * and never drops a name the file really can dispatch to.
+ * `def`s are attributed to their enclosing class, so a `def` in an inner class
+ * (`Relation`'s `ExplainProxy`) is not reachable from the outer file — see
+ * `scopedRubyDefs`.
  */
-export function reachableRailsDefs(
+export async function reachableRailsDefs(
   railsRelPath: string,
   readSource: RubySourceReader = readRuby,
-): Set<string> {
+): Promise<Set<string>> {
   const cached = readSource === readRuby ? reachableCache.get(railsRelPath) : undefined;
   if (cached) return cached;
   const defs = new Set<string>();
@@ -210,7 +240,7 @@ export function reachableRailsDefs(
     seen.add(rel);
     const source = readSource(rel);
     if (source === undefined) continue;
-    for (const name of rubyDefinedMethods(source)) defs.add(name);
+    for (const name of await scopedRubyDefs(source)) defs.add(name);
     for (const mixin of parseMixinNames(source)) {
       const resolved = resolveMixinPath(rel, mixin, readSource);
       if (resolved !== undefined && !seen.has(resolved)) queue.push(resolved);

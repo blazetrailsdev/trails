@@ -84,7 +84,7 @@ export async function generateTarget(f: TargetFile): Promise<GeneratedTarget> {
   const src = await fs.readFile(rubyAbsPath(f), "utf8");
   const result = await generateFromSource(
     src,
-    asyncMethodsForRailsFile(f.ruby),
+    await asyncMethodsForRailsFile(f.ruby),
     runtimeImportPathFor(outName),
     await inheritedDelegationsFor(f),
     await targetLinearization(),
