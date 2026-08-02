@@ -75,6 +75,7 @@ import { AbstractAdapter, RAW_CONNECTION_DEPRECATION_MESSAGE } from "./abstract-
 import { deprecator } from "../deprecator.js";
 import { captureUnwrappedExecute, dirtiesQueryCache } from "./abstract/query-cache.js";
 import { PostgreSQLSchemaStatements } from "./postgresql/schema-statements-class.js";
+import type { SchemaStatements } from "./abstract/schema-statements.js";
 import type {
   JoinTableOptions,
   ValidateConstraintStatements,
@@ -4712,7 +4713,7 @@ export interface PostgreSQLAdapter {
 
   columnsForDistinct(columns: string | string[], orders?: (string | Nodes.Node)[]): string;
 
-  indexes(tableName: string): Promise<IndexDefinition[]>;
+  indexes(tableName: string): Promise<PgIndexDefinition[]>;
 
   indexNameExists(tableName: string, indexName: string): Promise<boolean>;
 
@@ -4732,7 +4733,7 @@ export interface PostgreSQLAdapter {
     tableName: string,
     columnName: string,
     type: string,
-    options?: ColumnOptions & { using?: string; castAs?: string },
+    options?: ColumnOptions & { using?: string; castAs?: string; comment?: string | null },
   ): Promise<void>;
 
   createJoinTable(
@@ -4802,13 +4803,13 @@ export interface PostgreSQLAdapter {
 
   validateCheckConstraint(
     tableName: string,
-    nameOrOptions: string | { name: string },
+    nameOrOptions: string | { name: string; expression?: string },
   ): Promise<void>;
 
   validateForeignKey(
     fromTable: string,
     toTable?: string,
-    options?: Omit<ForeignKeyLookupOptions, "toTable">,
+    options?: ForeignKeyLookupOptions,
   ): Promise<void>;
 
   typeToSql(
@@ -4904,11 +4905,7 @@ export interface PostgreSQLAdapter {
 
   recreateDatabase(name: string, options?: CreateDatabaseOptions): Promise<void>;
 
-  dropTable(
-    ...args:
-      | [string, ...string[]]
-      | [string, ...string[], { ifExists?: boolean; force?: "cascade" }]
-  ): Promise<void>;
+  dropTable(...args: Parameters<SchemaStatements["dropTable"]>): Promise<void>;
 
   currentDatabase(): Promise<string>;
 

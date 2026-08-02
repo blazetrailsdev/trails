@@ -72,7 +72,11 @@ import {
 } from "./abstract/quoting.js";
 import type { Quoting } from "./abstract/quoting.js";
 import { include } from "@blazetrails/activesupport";
-import { SchemaStatements, type JoinTableOptions } from "./abstract/schema-statements.js";
+import {
+  SchemaStatements,
+  type CommentOrChanges,
+  type JoinTableOptions,
+} from "./abstract/schema-statements.js";
 import { Savepoints as SavepointsMixin } from "./abstract/savepoints.js";
 import {
   maxIdentifierLength,
@@ -95,6 +99,7 @@ import type {
   ColumnType,
   ColumnOptions,
   IdHashOptions,
+  AddReferenceOptions,
 } from "./abstract/schema-definitions.js";
 import type { SchemaCreation } from "./abstract/schema-creation.js";
 import type { Column } from "./column.js";
@@ -256,12 +261,12 @@ export interface AbstractAdapter {
   changeColumnDefault(
     tableName: string,
     columnName: string,
-    defaultOrChanges: unknown,
+    options: { from?: unknown; to: unknown } | unknown,
   ): Promise<void>;
   changeColumnNull(
     tableName: string,
     columnName: string,
-    nullable: boolean,
+    allowNull: boolean,
     defaultValue?: unknown,
   ): Promise<void>;
   addColumns(
@@ -279,18 +284,37 @@ export interface AbstractAdapter {
   addIndexOptions(
     tableName: string,
     columnName: string | string[],
-    options?: Record<string, unknown>,
+    options?: {
+      name?: string;
+      ifNotExists?: boolean;
+      internal?: boolean;
+      unique?: boolean;
+      where?: string;
+      using?: string;
+      type?: string;
+      algorithm?: string;
+      [key: string]: unknown;
+    },
   ): Promise<[IndexDefinition, string | undefined, boolean]>;
   /**
-   * Concrete adapters may return `undefined` (MySQL short-circuits
-   * `ifNotExists` when the index already exists); the SchemaStatements base
-   * always returns a definition.
+   * drift-ok: concrete adapters may return `undefined` (MySQL short-circuits
+   * `ifNotExists` when the index already exists), so the declared return type
+   * widens the SchemaStatements base, which always returns a definition.
    * @internal
    */
   buildCreateIndexDefinition(
     tableName: string,
     columnName: string | string[],
-    options?: Record<string, unknown>,
+    options?: {
+      name?: string;
+      unique?: boolean;
+      where?: string;
+      using?: string;
+      type?: string;
+      algorithm?: string;
+      ifNotExists?: boolean;
+      [key: string]: unknown;
+    },
   ): Promise<CreateIndexDefinition | undefined>;
   /** @internal */
   indexAlgorithm(algorithm?: string): string | undefined;
@@ -328,8 +352,8 @@ export interface AbstractAdapter {
   indexNameOptions(columnNames: string | string[]): { column: string | string[] };
   indexExists(
     tableName: string,
-    columns: string | string[] | null | undefined,
-    options?: { name?: string; unique?: boolean; valid?: boolean },
+    columnName: string | string[] | null | undefined,
+    options?: { unique?: boolean; name?: string; valid?: boolean; column?: string | string[] },
   ): Promise<boolean>;
   /** @internal */
   indexNameForRemove(
@@ -366,6 +390,12 @@ export interface AbstractAdapter {
   dataSourceSql(name?: string | null, options?: { type?: string }): string;
   columns(tableName: string): Promise<Column[]>;
   primaryKey(tableName: string): Promise<string | string[] | null>;
+  /**
+   * drift-ok: the SchemaStatements base spells out the row shape, but the
+   * concrete adapters override `indexes` with `Promise<unknown[]>`, so
+   * narrowing here makes every one of them unassignable to AbstractAdapter.
+   * Converging the adapters is `converge-adapter-indexes-return-type`.
+   */
   indexes(tableName: string): Promise<unknown[]>;
   foreignKeys(tableName: string): Promise<ForeignKeyDefinition[]>;
   foreignKeyExists(
@@ -380,34 +410,36 @@ export interface AbstractAdapter {
     toTableOrOptions?: string | RemoveForeignKeyOptions,
     options?: RemoveForeignKeyOptions,
   ): Promise<void>;
-  addReference(
-    tableName: string,
-    refName: string,
-    options?: Record<string, unknown>,
-  ): Promise<void>;
+  addReference(tableName: string, refName: string, options?: AddReferenceOptions): Promise<void>;
   /** Alias of addReference (Rails: `alias :add_belongs_to :add_reference`). */
-  addBelongsTo(
-    tableName: string,
-    refName: string,
-    options?: Record<string, unknown>,
-  ): Promise<void>;
+  addBelongsTo(tableName: string, refName: string, options?: AddReferenceOptions): Promise<void>;
   removeReference(
     tableName: string,
     refName: string,
-    options?: Record<string, unknown>,
+    options?: {
+      polymorphic?: boolean;
+      foreignKey?: boolean | { toTable?: string; column?: string };
+      ifExists?: boolean;
+      ifNotExists?: boolean;
+    },
   ): Promise<void>;
   /** Alias of removeReference (Rails: `alias :remove_belongs_to :remove_reference`). */
   removeBelongsTo(
     tableName: string,
     refName: string,
-    options?: Record<string, unknown>,
+    options?: {
+      polymorphic?: boolean;
+      foreignKey?: boolean | { toTable?: string; column?: string };
+      ifExists?: boolean;
+      ifNotExists?: boolean;
+    },
   ): Promise<void>;
   addTimestamps(tableName: string, options?: ColumnOptions): Promise<void>;
   removeTimestamps(tableName: string): Promise<void>;
   addCheckConstraint(
     tableName: string,
     expression: string,
-    options?: Record<string, unknown>,
+    options?: { name?: string; validate?: boolean; ifNotExists?: boolean; [key: string]: unknown },
   ): Promise<void>;
   checkConstraintExists(
     tableName: string,
@@ -427,7 +459,7 @@ export interface AbstractAdapter {
     options?: JoinTableOptions | ((t: TableDefinition) => void),
     fn?: (t: TableDefinition) => void,
   ): Promise<void>;
-  dropJoinTable(table1: string, table2: string, options?: Record<string, unknown>): Promise<void>;
+  dropJoinTable(table1: string, table2: string, options?: { tableName?: string }): Promise<void>;
   changeTable(
     tableName: string,
     fnOrOptions?: ((t: Table) => void | Promise<void>) | { bulk?: boolean },
@@ -452,7 +484,7 @@ export interface AbstractAdapter {
   /** @internal */
   extractNewDefaultValue(defaultOrChanges: unknown): unknown;
   /** @internal */
-  extractNewCommentValue(commentOrChanges: unknown): unknown;
+  extractNewCommentValue(defaultOrChanges: unknown): unknown;
   tableAliasFor(tableName: string): string;
   // Provided by the DatabaseLimits mixin (included below); tableAliasFor
   // resolves it through here rather than a duplicate on SchemaStatements.
@@ -639,11 +671,14 @@ export interface AbstractAdapter {
   rollbackToSavepoint(name: string): Promise<void>;
   currentSavepointName(): string | null;
   readonly inTransaction: boolean;
-  changeTableComment?(
-    tableName: string,
-    comment: string | null | Record<string, string | null>,
-  ): Promise<void>;
-  currentDatabase(): Promise<string>;
+  changeTableComment?(tableName: string, commentOrChanges: CommentOrChanges): Promise<void>;
+  /**
+   * Rails defines `current_database` only on PostgreSQL::SchemaStatements
+   * (postgresql/schema_statements.rb:220) and AbstractMysqlAdapter
+   * (abstract_mysql_adapter.rb:296) — SQLite has none, which is why
+   * migration.ts guards every call with a `typeof` check.
+   */
+  currentDatabase?(): Promise<string>;
   /** @internal */
   createAlterTable?(name: string): AlterTable;
 

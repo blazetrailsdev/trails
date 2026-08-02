@@ -568,7 +568,10 @@ export class SchemaStatements {
 
   async removeIndex(
     tableName: string,
-    columnOrOptions: string | string[] | { column?: string | string[]; name?: string } = {},
+    columnOrOptions:
+      | string
+      | string[]
+      | { column?: string | string[]; name?: string; ifExists?: boolean } = {},
     options: { column?: string | string[]; name?: string; ifExists?: boolean } = {},
   ): Promise<void> {
     // Rails: `remove_index(table_name, column_name = nil, **options)` — the column
@@ -1931,10 +1934,7 @@ export class SchemaStatements {
     return "default" in options && !(options.null === false && options.default == null);
   }
 
-  async changeTableComment(
-    _tableName: string,
-    _commentOrChanges: string | null | { from?: string; to?: string },
-  ): Promise<void> {
+  async changeTableComment(_tableName: string, _commentOrChanges: CommentOrChanges): Promise<void> {
     throw new Error(
       `NotImplementedError: ${this.adapterName} does not support changing table comments`,
     );
