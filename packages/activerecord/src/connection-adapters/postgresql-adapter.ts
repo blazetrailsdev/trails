@@ -1397,7 +1397,7 @@ export class PostgreSQLAdapter
         this._rawConnection = null;
         this._connectionConfigured = false;
         this._typeMapEagerLoaded = false;
-        this._statementPool?.detach();
+        this._statementPool?._detach();
         this._statementPool = null;
       }
       this._teardownRacedClient(client, acquireGen);
@@ -1572,7 +1572,7 @@ export class PostgreSQLAdapter
    * clears on disconnect).
    */
   private _releaseStatementPool(): void {
-    this._statementPool?.detach();
+    this._statementPool?._detach();
     this._statementPool = null;
   }
 
@@ -2625,6 +2625,13 @@ export class PostgreSQLAdapter
   // (postgresql_adapter.rb:620-622). The null guard makes it a no-op once
   // warmed; the memo persists across reconnects, mirroring Rails' `||=` which
   // never resets.
+  /**
+   * @noRailsEquivalent PERMANENT — Rails' `max_identifier_length`
+   * (postgresql_adapter.rb:620) does the `SHOW max_identifier_length` query
+   * inside the synchronous reader via `||=`. trails queries are Promises, so
+   * the reader cannot issue one and the round-trip has to live in a separate
+   * async warmer. No Rails method can ever map onto it.
+   */
   async warmMaxIdentifierLength(): Promise<number> {
     if (this._maxIdentifierLength == null) {
       const rows = (await this.schemaQuery("SHOW max_identifier_length")) as Array<{
@@ -2865,7 +2872,7 @@ export class PostgreSQLAdapter
     this._client = null;
     this._connectionConfigured = false;
     this._typeMapEagerLoaded = false;
-    this._statementPool?.detach();
+    this._statementPool?._detach();
     this._statementPool = null;
     this._needsDeallocateAll = false;
     this._inTransaction = false;
@@ -3009,7 +3016,7 @@ export class PostgreSQLAdapter
               this._rawConnection = null;
               this._connectionConfigured = false;
               this._typeMapEagerLoaded = false;
-              this._statementPool?.detach();
+              this._statementPool?._detach();
               this._statementPool = null;
             }
             live.end().catch(() => {});
@@ -3064,7 +3071,7 @@ export class PostgreSQLAdapter
     this._client = null;
     this._connectionConfigured = false;
     this._typeMapEagerLoaded = false;
-    this._statementPool?.detach();
+    this._statementPool?._detach();
     this._statementPool = null;
     this._needsDeallocateAll = false;
     this._inTransaction = false;
@@ -3101,7 +3108,7 @@ export class PostgreSQLAdapter
     this._client = null;
     this._connectionConfigured = false;
     this._typeMapEagerLoaded = false;
-    this._statementPool?.detach();
+    this._statementPool?._detach();
     this._statementPool = null;
     this._needsDeallocateAll = false;
     this._inTransaction = false;
@@ -3724,7 +3731,7 @@ export class PostgreSQLAdapter
    * a per-column pg_type query.
    * @internal
    */
-  serialFromDefaultFunction(
+  _serialFromDefaultFunction(
     tableName: string,
     columnName: string,
     defaultFunction: string | null,
@@ -3960,31 +3967,6 @@ export class PostgreSQLAdapter
 
   // Mirrors: ReferentialIntegrity#check_all_foreign_keys_valid!
   checkAllForeignKeysValidBang = checkAllForeignKeysValidBang;
-
-  async enumValues(name: string): Promise<string[]> {
-    const [schema, enumName] = this.extractSchemaQualifiedName(name);
-    let sql = `SELECT e.enumlabel AS value
-       FROM pg_enum e
-       JOIN pg_type t ON t.oid = e.enumtypid
-       JOIN pg_namespace n ON n.oid = t.typnamespace`;
-    const params: unknown[] = [];
-
-    if (schema) {
-      sql += `
-       WHERE t.typname = $1 AND n.nspname = $2
-       ORDER BY e.enumsortorder`;
-      params.push(enumName, schema);
-    } else {
-      sql += `
-       WHERE t.typname = $1
-         AND n.nspname = ANY(current_schemas(false))
-       ORDER BY e.enumsortorder`;
-      params.push(enumName);
-    }
-
-    const rows = await this.schemaQuery(sql, params);
-    return rows.map((r) => r.value as string);
-  }
 
   // ---------------------------------------------------------------------------
   // Private helpers
@@ -4675,10 +4657,6 @@ export interface PostgreSQLAdapter {
 
   pkAndSequenceFor(tableName: string): Promise<[string, Name | null] | null>;
 
-  resetPkSequence(tableName: string): Promise<void>;
-
-  setPkSequence(tableName: string, value: number): Promise<void>;
-
   columns(tableName: string): Promise<Column[]>;
 
   changeColumn(
@@ -5084,9 +5062,11 @@ export class StatementPool extends GenericStatementPool<PreparedStatement> {
    * Mark the pool detached from its client (e.g. on connection release
    * or close). Prevents late DEALLOCATE calls from racing with a
    * client that's already back in the pg.Pool — the server will
-   * discard statements on session end anyway.
+   * discard statements on session end anyway. Rails' StatementPool holds the
+   * raw connection for its whole lifetime and has no counterpart, so this stays
+   * Rails-private.
    */
-  detach(): void {
+  _detach(): void {
     this._client = null;
   }
 }

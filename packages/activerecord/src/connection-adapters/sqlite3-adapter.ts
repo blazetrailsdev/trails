@@ -321,10 +321,12 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   /**
    * Whether this connection was opened with strict-strings mode (DQS disabled).
    * Reflects the resolved value of the `strict` constructor option, which
-   * defaults to `SQLite3Adapter.strictStringsByDefault`.
+   * defaults to `SQLite3Adapter.strictStringsByDefault`. Rails keeps the
+   * resolved value in `@config[:strict]` (sqlite3_adapter.rb:127) and exposes
+   * no reader, so this one stays Rails-private.
    * @internal
    */
-  get strictStrings(): boolean {
+  get _strictStrings(): boolean {
     return this._strict;
   }
 
@@ -583,16 +585,6 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     if (cols.some((c) => c.type !== null && /bigint/i.test(c.type))) {
       stmt.setReadBigInts(true);
     }
-  }
-
-  /**
-   * Get or set a PRAGMA value.
-   *
-   * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter#pragma
-   */
-  async pragma(name: string): Promise<unknown> {
-    await this.ensureConnected();
-    return await this.driver.pragma(name);
   }
 
   /**
@@ -1116,6 +1108,10 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
    * Rails' `disconnect!` is synchronous; this drain is a TypeScript-async
    * necessity for promise-returning drivers, not a divergence in observable
    * teardown behavior.
+   *
+   * @noRailsEquivalent PERMANENT — Rails' `disconnect!`
+   * (sqlite3_adapter.rb:245) closes the handle synchronously and has nothing to
+   * drain, so no Rails method can map onto this hook.
    */
   whenClosed(): Promise<void> {
     return this._closingDriver ?? Promise.resolve();
@@ -2756,6 +2752,12 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   /**
    * Complete a deferred async connection. No-op when already connected
    * synchronously. Invoked by `openAsync()` and `verifyBang()`. @internal
+   *
+   * @noRailsEquivalent PERMANENT — Rails' `connect` (sqlite3_adapter.rb:825)
+   * opens the handle synchronously inside `initialize`, so there is nothing
+   * left to finish afterwards. Drivers whose `open()` returns a Promise cannot
+   * be opened from a synchronous constructor or a synchronous pool checkout,
+   * so the deferred completion is a seam Ruby never needs.
    */
   async completeAsyncConnect(): Promise<void> {
     if (!this._asyncConnectPending) return;
@@ -2799,6 +2801,11 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
    * Async construction entry point — works for both sync drivers (returns an
    * already-connected adapter) and async-only drivers (awaits the deferred
    * connection).
+   *
+   * @noRailsEquivalent PERMANENT — the async twin of `new`, for the same reason
+   * as `completeAsyncConnect`: Ruby's sqlite3 gem opens synchronously, so
+   * `SQLite3Adapter.new` (sqlite3_adapter.rb:120) is the only entry point Rails
+   * has or can have.
    */
   static async openAsync(
     this: new (filename?: string, options?: SQLite3AdapterOptions) => AbstractSQLite3Adapter,
@@ -3019,22 +3026,6 @@ export class SQLite3IntegerType extends IntegerType {
  * SQLite3-specific statement pool backed by the generic StatementPool.
  */
 export class StatementPool extends GenericStatementPool<SqliteStatement> {}
-
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter::SQLite3Integer
- *
- * SQLite stores integers as up to 8-byte signed values. This type
- * represents the range of values SQLite can natively handle.
- */
-export class SQLite3Integer {
-  static readonly MIN = -(2n ** 63n);
-  static readonly MAX = 2n ** 63n - 1n;
-
-  static inRange(value: bigint | number): boolean {
-    const v = BigInt(value);
-    return v >= SQLite3Integer.MIN && v <= SQLite3Integer.MAX;
-  }
-}
 
 /** @internal */
 function extractValueFromDefault(default_: string | null): unknown {

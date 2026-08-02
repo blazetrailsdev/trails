@@ -218,7 +218,7 @@ describe("SQLite adapter driver binding", () => {
     await Promise.all([
       adapter.execute("SELECT 1 AS one"),
       adapter.execQuery("SELECT 2 AS two"),
-      adapter.pragma("foreign_keys"),
+      adapter.execute("PRAGMA foreign_keys"),
     ]);
     expect(opens).toBe(1);
     adapter.disconnectBang();

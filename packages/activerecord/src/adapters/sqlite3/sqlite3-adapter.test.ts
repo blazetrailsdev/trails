@@ -214,11 +214,11 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     const fk = await adapter.execute(`PRAGMA foreign_keys`);
     expect(fk[0].foreign_keys).toBe(1);
     // Can turn it off
-    await adapter.pragma("foreign_keys = OFF");
+    await adapter.execute(`PRAGMA foreign_keys = OFF`);
     const fk2 = await adapter.execute(`PRAGMA foreign_keys`);
     expect(fk2[0].foreign_keys).toBe(0);
     // Restore
-    await adapter.pragma("foreign_keys = ON");
+    await adapter.execute(`PRAGMA foreign_keys = ON`);
   });
 
   it("overriding default journal mode pragma", async () => {
@@ -226,21 +226,21 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     // Test that pragma call doesn't throw
     const jm = await adapter.execute(`PRAGMA journal_mode`);
     expect(jm[0].journal_mode).toBeDefined();
-    await adapter.pragma("journal_mode = DELETE");
+    await adapter.execute(`PRAGMA journal_mode = DELETE`);
     const jm2 = await adapter.execute(`PRAGMA journal_mode`);
     // In-memory DB ignores journal_mode changes, stays "memory"
     expect(jm2[0].journal_mode).toBeDefined();
   });
 
   it("overriding default synchronous pragma", async () => {
-    await adapter.pragma("synchronous = OFF");
+    await adapter.execute(`PRAGMA synchronous = OFF`);
     const rows = await adapter.execute(`PRAGMA synchronous`);
     expect(rows[0].synchronous).toBe(0);
-    await adapter.pragma("synchronous = NORMAL");
+    await adapter.execute(`PRAGMA synchronous = NORMAL`);
   });
 
   it("overriding default journal size limit pragma", async () => {
-    await adapter.pragma("journal_size_limit = 1048576");
+    await adapter.execute(`PRAGMA journal_size_limit = 1048576`);
     const rows = await adapter.execute(`PRAGMA journal_size_limit`);
     expect(rows[0].journal_size_limit).toBe(1048576);
   });
@@ -248,24 +248,24 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   it("overriding default mmap size pragma", async () => {
     // mmap_size pragma returns empty on in-memory databases,
     // so just verify the pragma call doesn't reject
-    await adapter.pragma("mmap_size = 0");
+    await adapter.execute(`PRAGMA mmap_size = 0`);
   });
 
   it("overriding default cache size pragma", async () => {
-    await adapter.pragma("cache_size = 5000");
+    await adapter.execute(`PRAGMA cache_size = 5000`);
     const rows = await adapter.execute(`PRAGMA cache_size`);
     expect(rows[0].cache_size).toBe(5000);
   });
 
   it("setting new pragma", async () => {
-    await adapter.pragma("temp_store = MEMORY");
+    await adapter.execute(`PRAGMA temp_store = MEMORY`);
     const rows = await adapter.execute(`PRAGMA temp_store`);
     expect(rows[0].temp_store).toBe(2); // MEMORY = 2
   });
 
   it("setting invalid pragma", async () => {
     // SQLite silently ignores unknown pragmas — no rejection
-    await adapter.pragma("not_a_real_pragma");
+    await adapter.execute(`PRAGMA not_a_real_pragma`);
   });
 
   it("exec no binds", async () => {
@@ -670,7 +670,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     // Default class config is false — new connections are non-strict.
     expect(AbstractSQLite3Adapter.strictStringsByDefault).toBe(false);
     const conn = new BetterSQLite3Adapter(":memory:");
-    expect(conn.strictStrings).toBe(false);
+    expect(conn._strictStrings).toBe(false);
     // Rails: assert_nothing_raised { conn.add_index :testings, :non_existent }
     // — non-strict connections allow DQS fallback so unknown double-quoted
     //   identifiers are treated as string literals and the index is created
@@ -682,7 +682,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     AbstractSQLite3Adapter.strictStringsByDefault = true;
     try {
       const strict = new BetterSQLite3Adapter(":memory:");
-      expect(strict.strictStrings).toBe(true);
+      expect(strict._strictStrings).toBe(true);
       await strict.exec(`CREATE TABLE "testings" ("id" INTEGER PRIMARY KEY)`);
       await expect(
         strict.exec(`CREATE INDEX "idx_non_existent2" ON "testings" ("non_existent2")`),
@@ -697,7 +697,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     // Explicit strict: true in options always enables strict mode.
     const conn = new BetterSQLite3Adapter(":memory:", { strict: true });
     try {
-      expect(conn.strictStrings).toBe(true);
+      expect(conn._strictStrings).toBe(true);
       await conn.exec(`CREATE TABLE "testings" ("id" INTEGER PRIMARY KEY)`);
       await expect(
         conn.exec(`CREATE INDEX "idx_non_existent" ON "testings" ("non_existent")`),
@@ -711,7 +711,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     try {
       const strict = new BetterSQLite3Adapter(":memory:", { strict: true });
       try {
-        expect(strict.strictStrings).toBe(true);
+        expect(strict._strictStrings).toBe(true);
         await strict.exec(`CREATE TABLE "testings" ("id" INTEGER PRIMARY KEY)`);
         await expect(
           strict.exec(`CREATE INDEX "idx_non_existent2" ON "testings" ("non_existent2")`),
@@ -728,7 +728,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     // Explicit strict: false in options disables strict mode.
     const conn = new BetterSQLite3Adapter(":memory:", { strict: false });
     try {
-      expect(conn.strictStrings).toBe(false);
+      expect(conn._strictStrings).toBe(false);
       // Rails: assert_nothing_raised { conn.add_index :testings, :non_existent }
       // — strict: false keeps DQS enabled so the index creation succeeds silently.
       // Omitted here for the same reason as test 1 (better-sqlite3 SQLITE_DQS=0).
@@ -741,7 +741,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     try {
       const strict = new BetterSQLite3Adapter(":memory:", { strict: false });
       try {
-        expect(strict.strictStrings).toBe(false);
+        expect(strict._strictStrings).toBe(false);
       } finally {
         await strict.close();
       }
@@ -795,7 +795,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
       const conn = new BetterSQLite3Adapter(":memory:", { driver: fakeDriver });
       try {
         expect(capture.config?.strict).toBe(true);
-        expect(conn.strictStrings).toBe(true);
+        expect(conn._strictStrings).toBe(true);
       } finally {
         await conn.close();
       }
@@ -810,7 +810,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     });
     try {
       expect((capture.config as SqliteOpenConfig | null)?.strict).toBe(false);
-      expect(explicit.strictStrings).toBe(false);
+      expect(explicit._strictStrings).toBe(false);
     } finally {
       await explicit.close();
     }

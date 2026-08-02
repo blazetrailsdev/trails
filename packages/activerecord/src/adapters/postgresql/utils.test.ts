@@ -20,7 +20,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("reset pk sequence on empty table", async () => {
       await adapter.exec(`CREATE TABLE utils_reset_pk (id serial primary key, name text)`);
       await adapter.exec(`SELECT setval('utils_reset_pk_id_seq', 123)`);
-      await adapter.resetPkSequence("utils_reset_pk");
+      await adapter.resetPkSequenceBang("utils_reset_pk");
       const rows = await adapter.execute(`SELECT nextval('utils_reset_pk_id_seq') AS val`);
       expect(Number(rows[0].val)).toBe(1);
     });
@@ -32,7 +32,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.executeMutation(`INSERT INTO utils_reset_pk_custom (name) VALUES ('a')`);
       await adapter.executeMutation(`INSERT INTO utils_reset_pk_custom (name) VALUES ('b')`);
       await adapter.exec(`SELECT setval('utils_reset_pk_custom_custom_id_seq', 100)`);
-      await adapter.resetPkSequence("utils_reset_pk_custom");
+      await adapter.resetPkSequenceBang("utils_reset_pk_custom");
       const rows = await adapter.execute(
         `SELECT nextval('utils_reset_pk_custom_custom_id_seq') AS val`,
       );

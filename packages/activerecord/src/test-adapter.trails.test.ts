@@ -30,11 +30,11 @@ describe("ambientPoolConfiguration", () => {
   test.skipIf(!currentAdapter("SQLite3Adapter"))(
     "newRawTestAdapter opens sqlite with the ambient strict setting",
     async () => {
-      const adapter = newRawTestAdapter() as unknown as { strictStrings: boolean } & {
+      const adapter = newRawTestAdapter() as unknown as { _strictStrings: boolean } & {
         disconnectBang(): Promise<void>;
       };
       try {
-        expect(adapter.strictStrings).toBe(Boolean(ambientPoolConfiguration().strict));
+        expect(adapter._strictStrings).toBe(Boolean(ambientPoolConfiguration().strict));
       } finally {
         await adapter.disconnectBang();
       }
