@@ -434,6 +434,16 @@ describe("lowerMarksForDropped", () => {
     ).rejects.toThrow(/ENOENT/);
   });
 
+  it("writes nothing when the run dropped no rows", async () => {
+    const dir = await tmpMarkDir({ "activerecord/relation.json": 3 });
+    const before = await fs.stat(path.join(dir, "activerecord/relation.json"));
+    const marks = await lowerMarksForDropped(dir, [], [seeded("relation.ts", "merge!")]);
+    expect(marks.get("activerecord/relation.json")).toBe(3);
+    expect((await fs.stat(path.join(dir, "activerecord/relation.json"))).mtimeMs).toBe(
+      before.mtimeMs,
+    );
+  });
+
   it("never raises a mark that already sits below the remaining count", async () => {
     const dir = await tmpMarkDir({ "activerecord/relation.json": 1 });
     const marks = await lowerMarksForDropped(
