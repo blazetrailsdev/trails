@@ -39,7 +39,14 @@ export async function ensureValidOptionsForBatchingBang(
   // covers the cursor. `schema_cache.indexes` is async here, which is why the
   // whole check (and so this method) is a promise.
   const primaryKey = relation.primaryKey;
-  const pkArr = Array.isArray(primaryKey) ? primaryKey : [primaryKey];
+  // Ruby `Array(nil)` is `[]`, so a model with no primary key subtracts to an
+  // empty set and skips the check entirely (batches.rb:314).
+  const pkArr =
+    primaryKey == null
+      ? []
+      : Array.isArray(primaryKey)
+        ? primaryKey.filter((k) => k != null)
+        : [primaryKey];
   if (pkArr.some((key) => !cursorArr.includes(key))) {
     const model = relation.model;
     const indexes = (await model
