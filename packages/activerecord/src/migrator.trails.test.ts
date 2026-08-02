@@ -462,7 +462,6 @@ describe("Migrator advisory lock wrapping", () => {
       supportsAdvisoryLocks: () => true,
       getAdvisoryLock: async (_id: unknown) => true,
       releaseAdvisoryLock: async (_id: unknown) => true,
-      isNoDatabaseError: () => false,
       // currentDatabase intentionally absent
     } as unknown as import("./connection-adapters/abstract-adapter.js").AbstractAdapter;
     const migrator = new Migrator(rawAdapter, []);

@@ -819,24 +819,6 @@ export class AbstractAdapter implements Quoting {
 
   _queryCache: Store | null = null;
 
-  /**
-   * Returns true when `error` is a raw driver error indicating the database
-   * does not exist. Concrete adapters override this with driver-specific checks.
-   * The base implementation always returns false (safe default for custom adapters).
-   *
-   * @noRailsEquivalent CONVERGEABLE (story: converge-no-database-error-to-connect-site).
-   * Rails recognizes the no-such-database condition inline at the connect site
-   *   and raises
-   *   `ActiveRecord::NoDatabaseError` there (postgresql_adapter.rb:63, sqlite3_adapter.rb:38,120) —
-   *   there is no named predicate to mirror. trails needs the predicate separated from raising
-   *   because `DatabaseTasks._isMissingDatabaseError` (tasks/database-tasks.ts) classifies an
-   *   already-raised raw driver error, after the adapter failed to construct. Identical shape on all
-   *   three: the base returns false, each concrete adapter overrides with its driver check.
-   */
-  isNoDatabaseError(_error: unknown): boolean {
-    return false;
-  }
-
   pool: unknown = null;
   logger: unknown = null;
   lock: unknown = null;

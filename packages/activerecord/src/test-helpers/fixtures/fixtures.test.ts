@@ -28,7 +28,6 @@ function makeAdapter(): DatabaseAdapter {
     createSavepoint: vi.fn(async () => {}),
     releaseSavepoint: vi.fn(async () => {}),
     rollbackToSavepoint: vi.fn(async () => {}),
-    isNoDatabaseError: () => false,
     quote: (v: unknown) => (typeof v === "string" ? `'${v}'` : String(v)),
     quoteTableName: (n: string) => `"${n}"`,
     quoteColumnName: (n: string) => `"${n}"`,

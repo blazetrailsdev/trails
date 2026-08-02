@@ -1629,7 +1629,7 @@ export async function initializeDatabase(dbConfig: DatabaseConfig): Promise<bool
       const sm = new SchemaMigration(adapter);
       alreadyInitialized = await sm.tableExists();
     } catch (error) {
-      if (error instanceof NoDatabaseError || _isMissingDatabaseError(error, adapter)) {
+      if (error instanceof NoDatabaseError) {
         await DatabaseTasks.create(dbConfig);
       } else {
         throw error;
@@ -1648,17 +1648,4 @@ export async function initializeDatabase(dbConfig: DatabaseConfig): Promise<bool
     }
     return !alreadyInitialized;
   });
-}
-
-// Defensive fallback for SQL-level errors that slip through pool proxies or
-// adapters that don't yet translate at connection time.
-function _isMissingDatabaseError(
-  error: unknown,
-  adapter?: import("../connection-adapters/abstract-adapter.js").AbstractAdapter,
-): boolean {
-  // Delegate to the adapter's per-driver check when available.
-  if (typeof adapter?.isNoDatabaseError === "function") return adapter.isNoDatabaseError(error);
-  // Legacy fallback: PostgreSQL SQLSTATE 3D000.
-  if (!error || typeof error !== "object") return false;
-  return (error as { code?: unknown }).code === "3D000";
 }

@@ -213,23 +213,6 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   }
 
   /**
-   * Returns true for raw SQLite driver errors that indicate a missing or unopenable database
-   * file (SQLITE_CANTOPEN).
-   *
-   * @noRailsEquivalent CONVERGEABLE (story: converge-no-database-error-to-connect-site).
-   * Rails recognizes the no-such-database condition inline at the connect site
-   *   and raises
-   *   `ActiveRecord::NoDatabaseError` there (postgresql_adapter.rb:63, sqlite3_adapter.rb:38,120) —
-   *   there is no named predicate to mirror. trails needs the predicate separated from raising
-   *   because `DatabaseTasks._isMissingDatabaseError` (tasks/database-tasks.ts) classifies an
-   *   already-raised raw driver error, after the adapter failed to construct. Identical shape on all
-   *   three: the base returns false, each concrete adapter overrides with its driver check.
-   */
-  isNoDatabaseError(error: unknown): boolean {
-    return _isSqliteMissingDbError(error);
-  }
-
-  /**
    * When true, new connections inherit `strict: true` unless the caller
    * explicitly passes `strict: false`. Mirrors Rails' class_attribute.
    */
@@ -2717,6 +2700,14 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       this.driver = syncConn as SqliteConnection;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
+      // Mirrors Rails' `SQLite3Adapter.new_client` rescue (sqlite3_adapter.rb:38):
+      // a driver failure that means "no such database file" is raised as the typed
+      // NoDatabaseError right here, at the connect site.
+      if (_isSqliteMissingDbError(e)) {
+        throw new NoDatabaseError(`Unable to open database '${this._filename}': ${msg}`, {
+          cause: e,
+        });
+      }
       throw new DatabaseConnectionError(`Unable to open database '${this._filename}': ${msg}`, {
         cause: e,
       });
@@ -2756,6 +2747,14 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       this.driver = conn;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
+      // Mirrors Rails' `SQLite3Adapter.new_client` rescue (sqlite3_adapter.rb:38):
+      // a driver failure that means "no such database file" is raised as the typed
+      // NoDatabaseError right here, at the connect site.
+      if (_isSqliteMissingDbError(e)) {
+        throw new NoDatabaseError(`Unable to open database '${this._filename}': ${msg}`, {
+          cause: e,
+        });
+      }
       throw new DatabaseConnectionError(`Unable to open database '${this._filename}': ${msg}`, {
         cause: e,
       });
