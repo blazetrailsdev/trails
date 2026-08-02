@@ -410,29 +410,32 @@ export function buildExpectations(
  * value. Only-shrink comes free from `nextMarks` (it takes the min), and a
  * shard that reaches 0 is deleted rather than left as `{"max": 0}`.
  *
- * Returns the marks now on disk. Dropping nothing writes nothing: a run with no
+ * Returns the marks now on disk alongside the shards this run actually moved,
+ * so the caller reports its own footprint rather than the whole tree's size. Dropping nothing writes nothing: a run with no
  * migrations must not rewrite the tree it has no measurement for.
  */
 export async function lowerMarksForDropped(
   markDir: string,
   droppedEntries: ExcludeEntry[],
   remaining: ExcludeEntry[],
-): Promise<MarkSet> {
+): Promise<{ marks: MarkSet; moved: string[] }> {
   const marks = await loadMarks(markDir);
   const touched = new Set(droppedEntries.map(relPathFor));
-  if (touched.size === 0) return marks;
+  if (touched.size === 0) return { marks, moved: [] };
   const counts = unreviewedCounts(remaining, DEFAULT_TAG_REASON, relPathFor);
   const scoped: MarkSet = new Map();
   for (const rel of touched) if (marks.has(rel)) scoped.set(rel, counts.get(rel) ?? 0);
   const lowered = nextMarks(scoped, marks);
   const next = new Map(marks);
+  const moved: string[] = [];
   for (const rel of scoped.keys()) {
     const max = lowered.get(rel);
     if (max === undefined) next.delete(rel);
     else next.set(rel, max);
+    if (next.get(rel) !== marks.get(rel)) moved.push(rel);
   }
   await writeMarks(markDir, next);
-  return next;
+  return { marks: next, moved: moved.sort() };
 }
 
 async function main(argv: string[]): Promise<number> {
@@ -513,11 +516,13 @@ async function main(argv: string[]): Promise<number> {
   const dropped = droppedEntries.length;
   if (dropped > 0 && !dryRun) {
     await writeSplitBaseline(remaining, WIDE_BASELINE_DIR);
-    const marks = await lowerMarksForDropped(MARK_DIR, droppedEntries, remaining);
+    const { marks, moved } = await lowerMarksForDropped(MARK_DIR, droppedEntries, remaining);
     console.log(
-      `api:build: lowered ${path.relative(ROOT_DIR, MARK_DIR)}/ for the source(s) rewritten ` +
-        `above (${marks.size} shard(s) remain, totalling ${totalMark(marks)}).`,
+      `api:build: lowered ${moved.length} unreviewed high-water mark(s) under ` +
+        `${path.relative(ROOT_DIR, MARK_DIR)}/ for the source(s) rewritten above ` +
+        `(${totalMark(marks)} unreviewed entr(ies) still marked repo-wide).`,
     );
+    for (const rel of moved) console.log(`  - ${rel}`);
   }
   console.log(
     `api:build: ${dropped} baseline entr(ies) ${dryRun ? "would migrate" : "migrated"} to ` +

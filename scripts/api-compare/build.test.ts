@@ -413,11 +413,12 @@ describe("lowerMarksForDropped", () => {
       "activerecord/relation.json": 3,
       "activerecord/base.json": 2,
     });
-    const marks = await lowerMarksForDropped(
+    const { marks, moved } = await lowerMarksForDropped(
       dir,
       [seeded("relation.ts", "save")],
       [seeded("relation.ts", "merge!"), seeded("base.ts", "save")],
     );
+    expect(moved).toEqual(["activerecord/relation.json"]);
     expect(marks.get("activerecord/relation.json")).toBe(1);
     expect(marks.get("activerecord/base.json")).toBe(2);
     expect(await fs.readFile(path.join(dir, "activerecord/base.json"), "utf-8")).toBe(
@@ -427,7 +428,7 @@ describe("lowerMarksForDropped", () => {
 
   it("deletes a shard whose source has no unreviewed rows left", async () => {
     const dir = await tmpMarkDir({ "activerecord/relation.json": 1 });
-    const marks = await lowerMarksForDropped(dir, [seeded("relation.ts", "save")], []);
+    const { marks } = await lowerMarksForDropped(dir, [seeded("relation.ts", "save")], []);
     expect(marks.has("activerecord/relation.json")).toBe(false);
     await expect(
       fs.readFile(path.join(dir, "activerecord/relation.json"), "utf-8"),
@@ -437,7 +438,7 @@ describe("lowerMarksForDropped", () => {
   it("writes nothing when the run dropped no rows", async () => {
     const dir = await tmpMarkDir({ "activerecord/relation.json": 3 });
     const before = await fs.stat(path.join(dir, "activerecord/relation.json"));
-    const marks = await lowerMarksForDropped(dir, [], [seeded("relation.ts", "merge!")]);
+    const { marks } = await lowerMarksForDropped(dir, [], [seeded("relation.ts", "merge!")]);
     expect(marks.get("activerecord/relation.json")).toBe(3);
     expect((await fs.stat(path.join(dir, "activerecord/relation.json"))).mtimeMs).toBe(
       before.mtimeMs,
@@ -446,11 +447,12 @@ describe("lowerMarksForDropped", () => {
 
   it("never raises a mark that already sits below the remaining count", async () => {
     const dir = await tmpMarkDir({ "activerecord/relation.json": 1 });
-    const marks = await lowerMarksForDropped(
+    const { marks, moved } = await lowerMarksForDropped(
       dir,
       [seeded("relation.ts", "save")],
       [seeded("relation.ts", "merge!"), seeded("relation.ts", "reset")],
     );
+    expect(moved).toEqual([]);
     expect(marks.get("activerecord/relation.json")).toBe(1);
   });
 });
