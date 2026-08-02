@@ -553,7 +553,10 @@ export class SchemaStatements {
 
   async removeIndex(
     tableName: string,
-    columnOrOptions: string | string[] | { column?: string | string[]; name?: string } = {},
+    columnOrOptions:
+      | string
+      | string[]
+      | { column?: string | string[]; name?: string; ifExists?: boolean } = {},
     options: { column?: string | string[]; name?: string; ifExists?: boolean } = {},
   ): Promise<void> {
     // Rails: `remove_index(table_name, column_name = nil, **options)` — the column
@@ -1925,10 +1928,7 @@ export class SchemaStatements {
     return "default" in options && !(options.null === false && options.default == null);
   }
 
-  async changeTableComment(
-    _tableName: string,
-    _commentOrChanges: string | null | { from?: string; to?: string },
-  ): Promise<void> {
+  async changeTableComment(_tableName: string, _commentOrChanges: CommentOrChanges): Promise<void> {
     throw new Error(
       `NotImplementedError: ${this.adapterName} does not support changing table comments`,
     );
@@ -2560,7 +2560,7 @@ export class SchemaStatements {
   }
 
   /** @internal */
-  dataSourceSql(_name?: string, _options?: { type?: string }): string {
+  dataSourceSql(_name?: string | null, _options?: { type?: string }): string {
     // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/schema_statements.rb:1890
     throw new NotImplementedError(
       "ActiveRecord::ConnectionAdapters::SchemaStatements#data_source_sql is not implemented",
