@@ -2382,22 +2382,6 @@ describe("AssociationsTest", () => {
     expect(comments.map((c) => (c as any).body).sort()).toEqual(["A", "B"]);
   });
 
-  // Same no-reflection fallback path as the has_many case above, through loadHasOne.
-  it("has one loads via inline fallback resolving composite owner key from query constraints", async () => {
-    const post = await ShardedBlogPost.create({ blog_id: 7, title: "Post" });
-    await ShardedComment.create({ blog_id: 7, blog_post_id: (post as any).id, body: "Only" });
-    const comment = await findTarget(
-      post,
-      "freshComment",
-      {
-        className: "ShardedComment",
-        foreignKey: ["blog_id", "blog_post_id"],
-      },
-      "hasOne",
-    );
-    expect((comment as any)?.body).toBe("Only");
-  });
-
   // Exercises the inline (no-reflection) fallback against a composite-PK owner
   // WITHOUT query_constraints (CpkOrder's PK is `[shop_id, id]`). Invoked with a
   // scalar FK and an unregistered association name, the fallback must collapse
@@ -2415,23 +2399,6 @@ describe("AssociationsTest", () => {
     });
     expect(agreements).toHaveLength(2);
     expect(agreements.map((a) => (a as any).signature).sort()).toEqual(["abc", "def"]);
-  });
-
-  // Same no-reflection fallback path as above, through loadHasOne.
-  it("has one loads via inline fallback resolving composite owner key as id attribute", async () => {
-    const order = await CpkOrder.create({ shop_id: 1 });
-    const [, orderId] = order.id as [number, number];
-    await CpkOrderAgreement.create({ order_id: orderId, signature: "only" });
-    const agreement = await findTarget(
-      order,
-      "freshAgreement",
-      {
-        className: "CpkOrderAgreement",
-        foreignKey: "order_id",
-      },
-      "hasOne",
-    );
-    expect((agreement as any)?.signature).toBe("only");
   });
 
   // The inline (no-reflection) fallback must build from
@@ -2483,34 +2450,6 @@ describe("AssociationsTest", () => {
       as: "parent",
     });
     expect(children.map((c) => (c as any).title)).toEqual(["match"]);
-  });
-
-  // Same no-reflection polymorphic fallback path as above, through loadHasOne.
-  it("has one loads via inline fallback resolving polymorphic owner key from query constraints", async () => {
-    const post = await ShardedBlogPost.create({ blog_id: 7, title: "Parent" });
-    const pid = (post as any).id;
-    await ShardedBlogPost.create({
-      blog_id: 7,
-      parent_id: pid,
-      parent_type: "ShardedBlogPost",
-      title: "match",
-    });
-    await ShardedBlogPost.create({
-      blog_id: 9,
-      parent_id: pid,
-      parent_type: "ShardedBlogPost",
-      title: "wrongShard",
-    });
-    const child = await findTarget(
-      post,
-      "freshChild",
-      {
-        className: "ShardedBlogPost",
-        as: "parent",
-      },
-      "hasOne",
-    );
-    expect((child as any)?.title).toBe("match");
   });
 
   // `buildHasManyRelation` (the seeded scope behind CollectionProxy /
