@@ -52,9 +52,6 @@ describe("DatabaseTasksCheckProtectedEnvironmentsCurrentEnvironmentTest", () => 
   it.skipIf(adapterType !== "sqlite" || inMemoryDb())(
     "compares the stored environment against the global default environment",
     async () => {
-      // Rails compares `migration_context.current_environment`
-      // (`DEFAULT_ENV.call`) rather than the db_config's own env, so a config
-      // under `storyenv` stamped with the global default env passes.
       await stampedConfig(DatabaseConfigurations.currentEnv());
       await DatabaseTasks.checkProtectedEnvironmentsBang(env);
     },
