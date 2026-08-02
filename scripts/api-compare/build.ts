@@ -43,7 +43,20 @@ import {
   loadBaseline as loadNarrowBaseline,
   missingScope,
 } from "./lint-call-mismatches.js";
-import { loadSplitBaseline, writeSplitBaseline } from "./lint-call-mismatches-wide.js";
+import {
+  MARK_DIR,
+  loadSplitBaseline,
+  relPathFor,
+  writeSplitBaseline,
+} from "./lint-call-mismatches-wide.js";
+import {
+  type MarkSet,
+  loadMarks,
+  nextMarks,
+  totalMark,
+  unreviewedCounts,
+  writeMarks,
+} from "./unreviewed-ratchet.js";
 import {
   DEFAULT_REASON,
   NARROW_DEFAULT_REASON,
@@ -381,6 +394,40 @@ export function buildExpectations(
   return byFile;
 }
 
+/**
+ * Lower the unreviewed high-water marks of the sources whose baseline rows this
+ * run just migrated into `@missingRailsCall` tags (RFC 0083).
+ *
+ * A dropped row that carried the seeded {@link DEFAULT_REASON} in the WIDE
+ * baseline (its tag reason came from the curated narrow one, which wins) leaves
+ * its shard stale-HIGH, and the gate's slack arm reds on the next run — with a
+ * whole-repo `api:calls:wide:reseed`, a compare regeneration this run never
+ * needed, as the only remedy. The shard makes the fix precise: only the sources
+ * actually rewritten are recomputed, so every other shard keeps its committed
+ * value. Only-shrink comes free from `nextMarks` (it takes the min), and a
+ * shard that reaches 0 is deleted rather than left as `{"max": 0}`.
+ */
+export async function lowerMarksForDropped(
+  markDir: string,
+  droppedEntries: ExcludeEntry[],
+  remaining: ExcludeEntry[],
+): Promise<MarkSet> {
+  const marks = await loadMarks(markDir);
+  const touched = new Set(droppedEntries.map(relPathFor));
+  const counts = unreviewedCounts(remaining, DEFAULT_TAG_REASON, relPathFor);
+  const scoped: MarkSet = new Map();
+  for (const rel of touched) if (marks.has(rel)) scoped.set(rel, counts.get(rel) ?? 0);
+  const lowered = nextMarks(scoped, marks);
+  const next = new Map(marks);
+  for (const rel of scoped.keys()) {
+    const max = lowered.get(rel);
+    if (max === undefined) next.delete(rel);
+    else next.set(rel, max);
+  }
+  await writeMarks(markDir, next);
+  return next;
+}
+
 async function main(argv: string[]): Promise<number> {
   const pkgIdx = argv.indexOf("--package");
   const pkg = pkgIdx !== -1 ? argv[pkgIdx + 1] : undefined;
@@ -455,8 +502,16 @@ async function main(argv: string[]): Promise<number> {
     }
   }
   const remaining = wideBaseline.filter((e) => !migrated.has(keyOf(e)));
-  const dropped = wideBaseline.length - remaining.length;
-  if (dropped > 0 && !dryRun) await writeSplitBaseline(remaining, WIDE_BASELINE_DIR);
+  const droppedEntries = wideBaseline.filter((e) => migrated.has(keyOf(e)));
+  const dropped = droppedEntries.length;
+  if (dropped > 0 && !dryRun) {
+    await writeSplitBaseline(remaining, WIDE_BASELINE_DIR);
+    const marks = await lowerMarksForDropped(MARK_DIR, droppedEntries, remaining);
+    console.log(
+      `api:build: lowered ${path.relative(ROOT_DIR, MARK_DIR)}/ for the source(s) rewritten ` +
+        `above (${marks.size} shard(s) remain, totalling ${totalMark(marks)}).`,
+    );
+  }
   console.log(
     `api:build: ${dropped} baseline entr(ies) ${dryRun ? "would migrate" : "migrated"} to ` +
       `@missingRailsCall tags and ${dryRun ? "would be" : "were"} dropped from ` +
