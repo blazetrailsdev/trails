@@ -1479,6 +1479,33 @@ jobs:
         # (output/call-mismatches-wide.json) over WIDE_SIGNIFICANT_CALLS (all
         # ported names except `super`). Distinct file from the narrow run above.
         run: pnpm exec tsx scripts/api-compare/compare.ts --wide-calls
+      - name: Wide ratchet baseline reseed (main)
+        # RFC 0083. The ratchet below only READS the committed baseline, so a
+        # merge that converges or seeds rows leaves `main` stale and every
+        # branch cut afterwards inherits the failure (#5869 paid for that
+        # diagnosis on 5 unrelated STALE rows). Reseeding on the merge itself
+        # attributes the drift to the commit that caused it. Non-PR events only
+        # — on a branch the ratchet below is already the signal. `--write`
+        # skips its own regeneration under CI, so this reuses the artifact the
+        # step above wrote.
+        if: github.event_name != 'pull_request'
+        run: |
+          set -euo pipefail
+          pnpm exec tsx scripts/api-compare/lint-call-mismatches-wide.ts --write
+          baseline='scripts/api-compare/call-mismatches-wide-exclude'
+          mark='scripts/api-compare/call-mismatches-wide-unreviewed.json'
+          # A reseed can add a baseline file for a package/file that had none.
+          # Untracked paths are invisible to `git diff`, so record them as
+          # intent-to-add first or the drift check silently passes.
+          git add --intent-to-add -- "$baseline" "$mark"
+          if git diff --quiet -- "$baseline" "$mark"; then
+            echo "Wide ratchet baseline is in sync with a clean reseed."
+            exit 0
+          fi
+          echo "::error title=Wide ratchet baseline drift::${{ github.sha }} left the committed wide call-mismatch baseline out of sync with a clean reseed. Run \`pnpm api:calls:wide:reseed\` and commit the result."
+          git --no-pager diff --stat -- "$baseline" "$mark"
+          git --no-pager diff -- "$baseline" "$mark"
+          exit 1
       - name: Wide call-mismatches ratchet
         # Gates the RFC 0047 wide artifact against the split call-mismatches-wide-exclude/ baseline dir.
         # Fails on a new wide mismatch, a stale baseline entry, or more
