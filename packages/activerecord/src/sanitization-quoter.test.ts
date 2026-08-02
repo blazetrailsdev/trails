@@ -11,7 +11,7 @@ const quoteVal = (v: unknown) => (typeof v === "string" ? `'${v.replace(/'/g, "'
 
 const sqliteQuoter: Quoter = {
   quote: quoteVal,
-  quoteIdentifier: dq,
+  quoteColumnName: dq,
   quoteTableNameForAssignment: (_t, a) => dq(a),
   quoteString: (s) => s.replace(/'/g, "''"),
   castBoundValue: (v) => v,
@@ -19,7 +19,7 @@ const sqliteQuoter: Quoter = {
 const pgQuoter: Quoter = { ...sqliteQuoter };
 const mysqlQuoter: Quoter = {
   quote: quoteVal,
-  quoteIdentifier: bq,
+  quoteColumnName: bq,
   quoteTableNameForAssignment: (t, a) => `${bq(t)}.${bq(a)}`,
   quoteString: (s) => s.replace(/'/g, "''"),
   castBoundValue: (v) => v,

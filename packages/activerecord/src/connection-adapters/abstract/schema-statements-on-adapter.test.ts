@@ -79,11 +79,15 @@ class CapturingAdapter extends AbstractAdapter {
 /**
  * SQLite-flavoured capturing stub: records every SQL string so the
  * introspection-PRAGMA arms can be asserted against the exact output. Inherits
- * AbstractAdapter's quoteIdentifier (double-quote) and quote (string literal),
- * which is what the converged sqlite arm uses.
+ * AbstractAdapter's quote (string literal) and, like SQLite3Adapter, defines
+ * its own double-quote `quoteColumnName` — the abstract base raises
+ * NotImplementedError there, mirroring Rails.
  */
 class SqliteCapturingAdapter extends AbstractAdapter {
   allSql: string[] = [];
+  override quoteColumnName(name: string): string {
+    return `"${name.replace(/"/g, '""')}"`;
+  }
   constructor(private readonly firstRows: Record<string, unknown>[] = []) {
     super();
   }

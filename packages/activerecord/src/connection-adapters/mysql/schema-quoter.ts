@@ -4,18 +4,18 @@
  *
  * Identifier/table/value quoting dispatches through the adapter instance when
  * one is threaded — so a future sub-adapter (e.g. a MariaDB/MySQL split) can
- * override `quoteIdentifier` / `quoteTableName` / `quote` polymorphically —
+ * override `quoteColumnName` / `quoteTableName` / `quote` polymorphically —
  * falling back to the dialect's standalone helpers for host-less (unit-test)
  * construction. `quoteDefaultExpression` stays on the abstract implementation
  * to preserve the exact emitted SQL.
  */
 
-import { quote, quoteIdentifier, quoteTableName, quotedBinary } from "./quoting.js";
+import { quote, quoteColumnName, quoteTableName, quotedBinary } from "./quoting.js";
 import { quoteDefaultExpression } from "../abstract/quoting.js";
 
 /** @internal Schema-quoter surface the MySQL visitor depends on. */
 export interface MysqlSchemaQuoter {
-  quoteIdentifier(name: string): string;
+  quoteColumnName(name: string): string;
   quoteTableName(name: string): string;
   quoteDefaultExpression(value: unknown, column?: unknown): string | Promise<string>;
   quote(value: unknown): string;
@@ -25,7 +25,7 @@ export interface MysqlSchemaQuoter {
 /** @internal */
 export function mysqlSchemaQuoter(host?: Partial<MysqlSchemaQuoter>): MysqlSchemaQuoter {
   return {
-    quoteIdentifier: host?.quoteIdentifier?.bind(host) ?? quoteIdentifier,
+    quoteColumnName: host?.quoteColumnName?.bind(host) ?? quoteColumnName,
     quoteTableName: host?.quoteTableName?.bind(host) ?? quoteTableName,
     quote: host?.quote?.bind(host) ?? quote,
     // `quote` binary self-dispatches through its receiver, and both `quote` and

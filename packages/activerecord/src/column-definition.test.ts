@@ -13,7 +13,7 @@ import type {
 class DummyCreation extends SchemaCreation {
   constructor() {
     super("sqlite", {
-      quoteIdentifier: (name: string) => name,
+      quoteColumnName: (name: string) => name,
       quoteTableName: (name: string) => name,
       quoteDefaultExpression,
     });

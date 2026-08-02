@@ -1269,7 +1269,7 @@ describe("MigrationTest", () => {
       await m.run(adapter, "up");
       // Use adapter quoting so MySQL (no ANSI_QUOTES) works alongside PG/SQLite.
       const qt = adapter.quoteTableName("prefix_reminders_suffix");
-      const qc = adapter.quoteIdentifier("content");
+      const qc = adapter.quoteColumnName("content");
       await adapter.executeMutation(`INSERT INTO ${qt} (${qc}) VALUES ('hello')`);
       const rows = await adapter.execute(`SELECT * FROM ${qt}`);
       expect(rows).toHaveLength(1);
@@ -2398,9 +2398,8 @@ function mockMigration(): { migration: Migration; sql: string[] } {
     createSavepoint: async () => {},
     releaseSavepoint: async () => {},
     rollbackToSavepoint: async () => {},
-    quoteIdentifier: (n: string) => `"${n.replace(/"/g, '""')}"`,
-    quoteTableName: (n: string) => `"${n.replace(/"/g, '""')}"`,
     quoteColumnName: (n: string) => `"${n.replace(/"/g, '""')}"`,
+    quoteTableName: (n: string) => `"${n.replace(/"/g, '""')}"`,
     quoteDefaultExpression: quoteDefaultExpression,
   };
   return { migration, sql };

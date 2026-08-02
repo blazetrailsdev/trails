@@ -57,7 +57,6 @@ import {
   unquoteIdentifier as mysqlUnquoteIdentifier,
   columnNameMatcher as mysqlColumnNameMatcher,
   columnNameWithOrderMatcher as mysqlColumnNameWithOrderMatcher,
-  quoteIdentifier as mysqlQuoteIdentifier,
   quoteTableName as mysqlQuoteTableName,
   quoteColumnName as mysqlQuoteColumnName,
   unquotedTrue as mysqlUnquotedTrue,
@@ -370,15 +369,14 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    * MySQL dialect overrides — backtick identifiers and integer bool
    * coercion. Matches Rails:
    *
-   * - `quote_column_name` / `quote_table_name` / `quote_identifier` — backticks
-   *   (`mysql/quoting.rb:48-53`).
+   * - `quote_column_name` / `quote_table_name` — backticks
+   *   (`mysql/quoting.rb:46-52`).
    * - `unquoted_true` / `unquoted_false` → `1` / `0`
    *   (`mysql/quoting.rb:72-77`).
    *
    * `quotedTrue`/`quotedFalse` are NOT overridden — Rails MySQL inherits the
    * abstract `"TRUE"`/`"FALSE"`. Binds serialize to 1/0 via `cast_bound_value`.
    */
-  override quoteIdentifier = mysqlQuoteIdentifier;
   override quoteTableName = mysqlQuoteTableName;
   override quoteColumnName = mysqlQuoteColumnName;
 
@@ -773,7 +771,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     }
     await this._execMutation(
       `ALTER TABLE ${this.quoteTableName(tableName)} RENAME INDEX ` +
-        `${this.quoteIdentifier(oldName)} TO ${this.quoteIdentifier(newName)}`,
+        `${this.quoteColumnName(oldName)} TO ${this.quoteColumnName(newName)}`,
     );
   }
 
@@ -879,7 +877,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   ): Promise<void> {
     this.validateChangeColumnNullArgumentBang(null_);
     if (!null_ && default_ != null) {
-      const colId = this.quoteIdentifier(columnName);
+      const colId = this.quoteColumnName(columnName);
       await this._execMutation(
         `UPDATE ${this.quoteTableName(tableName)} SET ${colId}=${this.quote(default_)} WHERE ${colId} IS NULL`,
       );
@@ -1905,7 +1903,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     // connections. getDatabaseVersion() memoizes after the first DB round-trip.
     await this.getDatabaseVersion();
     if (this.supportsRenameColumn()) {
-      return `RENAME COLUMN ${this.quoteIdentifier(columnName)} TO ${this.quoteIdentifier(newColumnName)}`;
+      return `RENAME COLUMN ${this.quoteColumnName(columnName)} TO ${this.quoteColumnName(newColumnName)}`;
     }
     // Fallback for MySQL <8.0.3 / MariaDB <10.5.2: mirrors Rails' rename_column_for_alter
     // (abstract_mysql_adapter.rb:863-878). Route through columnFor so function-default and
@@ -1992,7 +1990,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     const parts: string[] = [];
     if (indexType) parts.push(indexType);
     parts.push("INDEX");
-    parts.push(this.quoteIdentifier(idx.name));
+    parts.push(this.quoteColumnName(idx.name));
     if (idx.using) parts.push(`USING ${idx.using}`);
     const quotedCols = columnNames
       .map((c) => {

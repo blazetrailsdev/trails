@@ -989,9 +989,6 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     return s.replace(/'/g, "''");
   }
 
-  // quoteIdentifier is NOT overridden: Rails has no `quote_identifier`
-  // method (it is a Trails-only uniform-interface alias), so SQLite inherits
-  // AbstractAdapter's double-quote form rather than carrying a redundant copy.
   // quoteTableName / quoteColumnName ARE kept: Rails' SQLite3::Quoting defines
   // both explicitly (sqlite3/quoting.rb:44-50) — column → `"x"`, table →
   // dot-split `"."` — while Rails' abstract leaves quote_column_name a

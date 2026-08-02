@@ -52,7 +52,6 @@ interface PgSchemaAdapter {
   internalExecute(sql: string, name?: string): Promise<unknown>;
   clearCacheBang(): void;
   quote(value: unknown): string;
-  quoteIdentifier(name: string): string;
   quoteColumnName(name: string): string;
   quoteTableName(name: string): string;
   readonly logger: { warn?(message: string): void } | null;
@@ -1558,8 +1557,8 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
   ): Promise<void> {
     const [schema, enumName] = this.pg.extractSchemaQualifiedName(name);
     const qualifiedName = schema
-      ? `${this.pg.quoteIdentifier(schema)}.${this.pg.quoteIdentifier(enumName)}`
-      : this.pg.quoteIdentifier(enumName);
+      ? `${this.pg.quoteColumnName(schema)}.${this.pg.quoteColumnName(enumName)}`
+      : this.pg.quoteColumnName(enumName);
     const valueList = values.map((v) => this.pg.quoteLiteral(v)).join(", ");
     // Mirrors Rails create_enum: guard with IF NOT EXISTS so re-running a
     // Schema.define under a different search_path is idempotent. The schema
@@ -1586,8 +1585,8 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
   async dropEnum(name: string, options: { ifExists?: boolean } = {}): Promise<void> {
     const [schema, enumName] = this.pg.extractSchemaQualifiedName(name);
     const qualifiedName = schema
-      ? `${this.pg.quoteIdentifier(schema)}.${this.pg.quoteIdentifier(enumName)}`
-      : this.pg.quoteIdentifier(enumName);
+      ? `${this.pg.quoteColumnName(schema)}.${this.pg.quoteColumnName(enumName)}`
+      : this.pg.quoteColumnName(enumName);
     const ifExists = options.ifExists ? " IF EXISTS" : "";
     await this.pg.exec(`DROP TYPE${ifExists} ${qualifiedName}`);
     // Mirrors Rails drop_enum: `internal_exec_query(query).tap { reload_type_map }`
@@ -1607,9 +1606,9 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     }
     const [schema, enumName] = this.pg.extractSchemaQualifiedName(name);
     const qualifiedName = schema
-      ? `${this.pg.quoteIdentifier(schema)}.${this.pg.quoteIdentifier(enumName)}`
-      : this.pg.quoteIdentifier(enumName);
-    await this.pg.exec(`ALTER TYPE ${qualifiedName} RENAME TO ${this.pg.quoteIdentifier(newName)}`);
+      ? `${this.pg.quoteColumnName(schema)}.${this.pg.quoteColumnName(enumName)}`
+      : this.pg.quoteColumnName(enumName);
+    await this.pg.exec(`ALTER TYPE ${qualifiedName} RENAME TO ${this.pg.quoteColumnName(newName)}`);
     // Mirrors Rails rename_enum: `exec_query(...).tap { reload_type_map }`
     // (postgresql_adapter.rb:584).
     await this.pg.reloadTypeMap();
@@ -1622,8 +1621,8 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
   ): Promise<void> {
     const [schema, enumName] = this.pg.extractSchemaQualifiedName(name);
     const qualifiedName = schema
-      ? `${this.pg.quoteIdentifier(schema)}.${this.pg.quoteIdentifier(enumName)}`
-      : this.pg.quoteIdentifier(enumName);
+      ? `${this.pg.quoteColumnName(schema)}.${this.pg.quoteColumnName(enumName)}`
+      : this.pg.quoteColumnName(enumName);
     const ifNotExists = options.ifNotExists ? " IF NOT EXISTS" : "";
     if (options.before && options.after) {
       throw new Error("Cannot specify both `before` and `after` for addEnumValue");
@@ -1645,8 +1644,8 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
   async renameEnumValue(name: string, options: { from: string; to: string }): Promise<void> {
     const [schema, enumName] = this.pg.extractSchemaQualifiedName(name);
     const qualifiedName = schema
-      ? `${this.pg.quoteIdentifier(schema)}.${this.pg.quoteIdentifier(enumName)}`
-      : this.pg.quoteIdentifier(enumName);
+      ? `${this.pg.quoteColumnName(schema)}.${this.pg.quoteColumnName(enumName)}`
+      : this.pg.quoteColumnName(enumName);
     await this.pg.exec(
       `ALTER TYPE ${qualifiedName} RENAME VALUE ${this.pg.quoteLiteral(options.from)} TO ${this.pg.quoteLiteral(options.to)}`,
     );
@@ -1665,8 +1664,8 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
   ): Promise<void> {
     const [schema, rangeName] = this.pg.extractSchemaQualifiedName(name);
     const qualifiedName = schema
-      ? `${this.pg.quoteIdentifier(schema)}.${this.pg.quoteIdentifier(rangeName)}`
-      : this.pg.quoteIdentifier(rangeName);
+      ? `${this.pg.quoteColumnName(schema)}.${this.pg.quoteColumnName(rangeName)}`
+      : this.pg.quoteColumnName(rangeName);
     const quoteQualifiedIdentifier = (identifier: string, param: string) => {
       if (/[\s()]/.test(identifier)) {
         throw new Error(
@@ -1682,8 +1681,8 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
       }
       const [s, t] = this.pg.extractSchemaQualifiedName(identifier);
       return s
-        ? `${this.pg.quoteIdentifier(s)}.${this.pg.quoteIdentifier(t)}`
-        : this.pg.quoteIdentifier(t);
+        ? `${this.pg.quoteColumnName(s)}.${this.pg.quoteColumnName(t)}`
+        : this.pg.quoteColumnName(t);
     };
     const parts = [`SUBTYPE = ${quoteQualifiedIdentifier(options.subtype, "subtype")}`];
     if (options.subtypeDiff) {
@@ -1704,8 +1703,8 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
   async dropRange(name: string, options: { ifExists?: boolean } = {}): Promise<void> {
     const [schema, rangeName] = this.pg.extractSchemaQualifiedName(name);
     const qualifiedName = schema
-      ? `${this.pg.quoteIdentifier(schema)}.${this.pg.quoteIdentifier(rangeName)}`
-      : this.pg.quoteIdentifier(rangeName);
+      ? `${this.pg.quoteColumnName(schema)}.${this.pg.quoteColumnName(rangeName)}`
+      : this.pg.quoteColumnName(rangeName);
     const ifExists = options.ifExists ? " IF EXISTS" : "";
     await this.pg.exec(`DROP TYPE${ifExists} ${qualifiedName}`);
     // See createRange: mirror Rails' type-DDL `reload_type_map` pattern.

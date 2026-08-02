@@ -68,7 +68,7 @@ export class InternalMetadata {
   readonly arelTable: Table;
 
   private _q(name: string): string {
-    return this._connection.quoteIdentifier(name);
+    return this._connection.quoteColumnName(name);
   }
 
   get primaryKey(): string {

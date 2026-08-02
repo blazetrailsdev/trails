@@ -8,7 +8,7 @@ import type { Quoting } from "./quoting.js";
  */
 export type SchemaQuoter = Pick<
   Quoting,
-  "quoteIdentifier" | "quoteTableName" | "quoteDefaultExpression"
+  "quoteColumnName" | "quoteTableName" | "quoteDefaultExpression"
 >;
 
 /**
@@ -24,12 +24,12 @@ export function assertSchemaAdapter(
 ): asserts adapter is DatabaseAdapter & SchemaQuoter {
   const a = adapter as Partial<SchemaQuoter>;
   if (
-    typeof a.quoteIdentifier !== "function" ||
+    typeof a.quoteColumnName !== "function" ||
     typeof a.quoteTableName !== "function" ||
     typeof a.quoteDefaultExpression !== "function"
   ) {
     throw new Error(
-      `Adapter ${(adapter as { adapterName?: string }).adapterName ?? "<unknown>"} does not implement the Quoting surface required by SchemaStatements (quoteIdentifier / quoteTableName / quoteDefaultExpression)`,
+      `Adapter ${(adapter as { adapterName?: string }).adapterName ?? "<unknown>"} does not implement the Quoting surface required by SchemaStatements (quoteColumnName / quoteTableName / quoteDefaultExpression)`,
     );
   }
 }

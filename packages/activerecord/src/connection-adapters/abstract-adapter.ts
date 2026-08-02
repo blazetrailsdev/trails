@@ -57,7 +57,6 @@ import {
   quote as abstractQuote,
   typeCast as abstractTypeCast,
   quoteString as abstractQuoteString,
-  quoteIdentifier as abstractQuoteIdentifier,
   quoteColumnName as abstractQuoteColumnName,
   isSqlLiteral,
   quotedTrue as abstractQuotedTrue,
@@ -922,10 +921,6 @@ export class AbstractAdapter implements Quoting {
     return abstractQuoteString(s);
   }
 
-  quoteIdentifier(name: string): string {
-    return abstractQuoteIdentifier(name);
-  }
-
   quoteTableName(name: string): string {
     // Rails: abstract quote_table_name delegates to quote_column_name via
     // dynamic dispatch (abstract/quoting.rb:66-67), so an adapter that
@@ -1198,7 +1193,7 @@ export class AbstractAdapter implements Quoting {
 
   /** @internal */
   protected _qi(name: string): string {
-    return this.quoteIdentifier(name);
+    return this.quoteColumnName(name);
   }
 
   /** @internal */

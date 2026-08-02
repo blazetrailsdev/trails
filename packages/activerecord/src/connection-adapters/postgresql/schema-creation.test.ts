@@ -18,7 +18,7 @@ import {
 // type_to_sql to @conn).
 const s = () =>
   new SchemaCreation({
-    quoteIdentifier: (n: string) => `"${n}"`,
+    quoteColumnName: (n: string) => `"${n}"`,
     quoteTableName: (n: string) => `"${n}"`,
     quoteDefaultExpression: (v: unknown) => ` DEFAULT ${typeof v === "string" ? `'${v}'` : v}`,
     typeToSql: (type: string, options: Record<string, unknown> = {}) => {
@@ -209,7 +209,7 @@ describe("PostgreSQL SchemaCreation", () => {
 
   it("quotedIncludeColumnsForIndex delegates to the adapter when threaded", () => {
     const sc = new SchemaCreation({
-      quoteIdentifier: (n: string) => `"${n}"`,
+      quoteColumnName: (n: string) => `"${n}"`,
       quoteTableName: (n: string) => `"${n}"`,
       quoteDefaultExpression: (v: unknown) => ` DEFAULT ${v}`,
       typeToSql: (type: string) => type,
@@ -224,7 +224,7 @@ describe("PostgreSQL SchemaCreation", () => {
   // against the empty placeholder — not even without an adapter threaded.
   it("resolves datetime through datetimeType with no adapter threaded", () => {
     const hostless = new SchemaCreation({
-      quoteIdentifier: (n: string) => `"${n}"`,
+      quoteColumnName: (n: string) => `"${n}"`,
       quoteTableName: (n: string) => `"${n}"`,
       quoteDefaultExpression: (v: unknown) => ` DEFAULT ${v}`,
     } as any);
