@@ -27,6 +27,55 @@ export function serializeBaseline(value: unknown): string {
   return JSON.stringify(value, null, 2) + "\n";
 }
 
+/**
+ * Recursively list *.json files under `dir` as absolute paths (empty if the
+ * directory does not exist yet). Shared by every SPLIT baseline that mirrors
+ * the source tree — the wide exclude entries and the wide unreviewed marks — so
+ * the two trees are walked by one implementation and cannot drift apart.
+ */
+export async function listJsonFiles(dir: string): Promise<string[]> {
+  const out: string[] = [];
+  let dirents;
+  try {
+    dirents = await fs.readdir(dir, { withFileTypes: true });
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === "ENOENT") return out;
+    throw e;
+  }
+  for (const d of dirents) {
+    const full = path.join(dir, d.name);
+    if (d.isDirectory()) out.push(...(await listJsonFiles(full)));
+    else if (d.name.endsWith(".json")) out.push(full);
+  }
+  return out;
+}
+
+/**
+ * Recursively remove empty subdirectories under `dir` (keeps `dir` itself), so
+ * a split tree that lost its last file for a source leaves no empty chain
+ * behind. Returns whether `dir` itself ended up empty.
+ */
+export async function pruneEmptyDirs(dir: string): Promise<boolean> {
+  let dirents;
+  try {
+    dirents = await fs.readdir(dir, { withFileTypes: true });
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === "ENOENT") return true;
+    throw e;
+  }
+  let empty = true;
+  for (const d of dirents) {
+    if (d.isDirectory()) {
+      const sub = path.join(dir, d.name);
+      if (await pruneEmptyDirs(sub)) await fs.rmdir(sub);
+      else empty = false;
+    } else {
+      empty = false;
+    }
+  }
+  return empty;
+}
+
 // Baseline files whose bytes are not the canonical serialization of their own
 // contents — i.e. exactly the files a no-op `--write` would rewrite.
 export async function findNonCanonicalBaselines(files: string[]): Promise<string[]> {
