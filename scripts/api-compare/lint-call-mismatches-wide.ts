@@ -114,8 +114,11 @@ import {
   nextMark,
   renderExcess,
   droppedReviewed,
+  droppedSeeded,
   markSlack,
   renderDroppedReviewed,
+  renderDroppedSeeded,
+  DROPPED_SEEDED_KEYS_ARG,
   renderSlack,
   renderWriteSummary,
   unreviewedEntries,
@@ -445,7 +448,7 @@ async function readJsonIfPresent<T>(file: string): Promise<T | undefined> {
   }
 }
 
-async function main(write: boolean): Promise<number> {
+async function main(write: boolean, showSeededKeys = false): Promise<number> {
   const baseline = await loadBaseline();
   const artifact = await loadArtifact();
   const current = flattenArtifact(artifact);
@@ -491,6 +494,11 @@ async function main(write: boolean): Promise<number> {
     console.log(renderWriteSummary(count, newly, mark, path.relative(ROOT_DIR, MARK_PATH)));
     const dropped = renderDroppedReviewed(droppedReviewed(next, baseline, DEFAULT_REASON));
     if (dropped) console.log(dropped);
+    const seeded = renderDroppedSeeded(
+      droppedSeeded(next, baseline, DEFAULT_REASON),
+      showSeededKeys,
+    );
+    if (seeded) console.log(seeded);
     return 0;
   }
 
@@ -618,7 +626,7 @@ async function runAsScript(): Promise<void> {
         process.exit(2);
       }
     }
-    process.exit(await main(argv.includes("--write")));
+    process.exit(await main(argv.includes("--write"), argv.includes(DROPPED_SEEDED_KEYS_ARG)));
   }
   let top: number;
   try {
