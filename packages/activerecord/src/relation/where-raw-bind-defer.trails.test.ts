@@ -25,7 +25,7 @@ describe("where value defer-to-bind casting", () => {
   it("whereNot with an un-castable string binds it instead of IS NOT NULL", async () => {
     const first = topics("first");
     await first.update({ parent_id: 0 });
-    const rel = Topic.whereNot({ parent_id: "not-a-number" });
+    const rel = Topic.where().not({ parent_id: "not-a-number" });
     expect(rel.toSql()).not.toMatch(/IS NOT NULL/i);
     // `parent_id != NULL` matches nothing — including rows whose parent_id IS NULL.
     expect(await rel).toHaveLength(0);

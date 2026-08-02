@@ -425,7 +425,7 @@ describe("FinderTest", () => {
         .or(Topic.where({ id: big }))
         .exists(),
     ).toBe(true);
-    expect(await Topic.whereNot({ id: big }).exists()).toBe(true);
+    expect(await Topic.where().not({ id: big }).exists()).toBe(true);
 
     // Rails' 3-arg `predicate_builder[:id, val, :gt/:gteq/:lt/:lteq]` builds an
     // Arel comparison node whose right-hand side is a bind attribute; we stand
@@ -458,7 +458,7 @@ describe("FinderTest", () => {
     expect(inRel.toSql()).toMatch(/IN \(NULL\)/);
     expect(await inRel.exists()).toBe(false);
 
-    const notInRel = Topic.whereNot({ id: [big, negBig] });
+    const notInRel = Topic.where().not({ id: [big, negBig] });
     expect(notInRel.toSql()).toMatch(/NOT IN \(NULL\)/);
     expect(await notInRel.exists()).toBe(false);
   });

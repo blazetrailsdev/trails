@@ -269,7 +269,7 @@ describe("BindParameterTest", () => {
     let topics = Topic.where({ id: ids });
     expect(await topics.count()).toBe(await Topic.count());
 
-    topics = Topic.whereNot({ id: ids });
+    topics = Topic.where().not({ id: ids });
     expect(await topics.count()).toBe(0);
   });
 
@@ -283,7 +283,7 @@ describe("BindParameterTest", () => {
       let topics = Topic.where({ id: ids });
       expect(await topics.count()).toBe(await Topic.count());
 
-      topics = Topic.whereNot({ id: ids });
+      topics = Topic.where().not({ id: ids });
       expect(await topics.count()).toBe(0);
     } finally {
       conn.disableQueryCacheBang();

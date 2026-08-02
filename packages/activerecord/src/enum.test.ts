@@ -113,8 +113,8 @@ describe("EnumTest", () => {
     expect((await Book.where({ status: written }).first())?.id).not.toBe(book.id);
     expect((await Book.where({ status: [published, published] }).first())?.id).toBe(book.id);
     expect((await Book.where({ status: [written, written] }).first())?.id).not.toBe(book.id);
-    expect((await Book.whereNot({ status: published }).first())?.id).not.toBe(book.id);
-    expect((await Book.whereNot({ status: written }).first())?.id).toBe(book.id);
+    expect((await Book.where().not({ status: published }).first())?.id).not.toBe(book.id);
+    expect((await Book.where().not({ status: written }).first())?.id).toBe(book.id);
   });
 
   it("find via where with values.to_s", async () => {
@@ -126,8 +126,8 @@ describe("EnumTest", () => {
     expect((await Book.where({ status: written }).first())?.id).not.toBe(book.id);
     expect((await Book.where({ status: [published, published] }).first())?.id).toBe(book.id);
     expect((await Book.where({ status: [written, written] }).first())?.id).not.toBe(book.id);
-    expect((await Book.whereNot({ status: published }).first())?.id).not.toBe(book.id);
-    expect((await Book.whereNot({ status: written }).first())?.id).toBe(book.id);
+    expect((await Book.where().not({ status: published }).first())?.id).not.toBe(book.id);
+    expect((await Book.where().not({ status: written }).first())?.id).toBe(book.id);
     expect((await Book.where({ cover: (Book as any).covers.soft }).first())?.id).toBe(book.id);
   });
 
@@ -138,12 +138,12 @@ describe("EnumTest", () => {
     expect((await Book.where({ status: "written" }).first())?.id).not.toBe(book.id);
     expect((await Book.where({ status: ["published", "published"] }).first())?.id).toBe(book.id);
     expect((await Book.where({ status: ["written", "written"] }).first())?.id).not.toBe(book.id);
-    expect((await Book.whereNot({ status: "published" }).first())?.id).not.toBe(book.id);
-    expect((await Book.whereNot({ status: "written" }).first())?.id).toBe(book.id);
+    expect((await Book.where().not({ status: "published" }).first())?.id).not.toBe(book.id);
+    expect((await Book.where().not({ status: "written" }).first())?.id).toBe(book.id);
     expect((await Book.where({ last_read: "forgotten" }).first())?.id).toBe(books("ddd").id);
     expect(await Book.where({ status: "prohibited" }).first()).toBeNull();
     expect((await Book.where({ cover: "soft" }).first())?.id).toBe(book.id);
-    expect((await Book.whereNot({ cover: "hard" }).first())?.id).toBe(book.id);
+    expect((await Book.where().not({ cover: "hard" }).first())?.id).toBe(book.id);
   });
 
   it("find via where with strings", async () => {
@@ -152,8 +152,8 @@ describe("EnumTest", () => {
     expect((await Book.where({ status: "written" }).first())?.id).not.toBe(book.id);
     expect((await Book.where({ status: ["published", "published"] }).first())?.id).toBe(book.id);
     expect((await Book.where({ status: ["written", "written"] }).first())?.id).not.toBe(book.id);
-    expect((await Book.whereNot({ status: "published" }).first())?.id).not.toBe(book.id);
-    expect((await Book.whereNot({ status: "written" }).first())?.id).toBe(book.id);
+    expect((await Book.where().not({ status: "published" }).first())?.id).not.toBe(book.id);
+    expect((await Book.where().not({ status: "written" }).first())?.id).toBe(book.id);
     expect((await Book.where({ last_read: "forgotten" }).first())?.id).toBe(books("ddd").id);
     expect(await Book.where({ status: "prohibited" }).first()).toBeNull();
   });
@@ -181,7 +181,7 @@ describe("EnumTest", () => {
     const enabled = String((Book as any).boolean_statuses.enabled);
     expect((await Book.where({ boolean_status: enabled }).last())?.id).toBe(created.id);
     expect((await Book.where({ cover: "soft" }).first())?.id).toBe(books("awdr").id);
-    expect((await Book.whereNot({ cover: "hard" }).first())?.id).toBe(books("awdr").id);
+    expect((await Book.where().not({ cover: "hard" }).first())?.id).toBe(books("awdr").id);
   });
 
   it("build from scope", () => {

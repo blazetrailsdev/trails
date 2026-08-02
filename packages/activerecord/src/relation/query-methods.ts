@@ -43,6 +43,8 @@ import { foreignKey } from "@blazetrails/activesupport";
  */
 export interface WhereChainScope<R> {
   whereNot(conditions: Record<string, unknown>): R;
+  whereNot(conditions: unknown[]): R;
+  whereNot(cols: string[], tuples: unknown[][]): R;
   whereAssociated(...associationNames: string[]): R;
   whereMissing(...associationNames: string[]): R;
   exists(conditions?: unknown): Promise<boolean>;
@@ -61,7 +63,20 @@ export class WhereChain<R = any> {
     this._scope = scope;
   }
 
-  not(conditions: Record<string, unknown>): R {
+  not(conditions: Record<string, unknown>): R;
+  not(conditions: unknown[]): R;
+  not(cols: string[], tuples: unknown[][]): R;
+  not(conditions: Record<string, unknown> | unknown[], tuples?: unknown[][]): R {
+    // Rails' `not` forwards `*args` to `build_where_clause(...).invert`
+    // (query_methods.rb:49), so it accepts every shape `where` does — including
+    // the sanitized-conditions array and the trails composite-key
+    // `(cols, tuples)` pair.
+    if (tuples !== undefined) {
+      return this._scope.whereNot(conditions as string[], tuples);
+    }
+    if (Array.isArray(conditions)) {
+      return this._scope.whereNot(conditions);
+    }
     return this._scope.whereNot(conditions);
   }
 

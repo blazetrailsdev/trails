@@ -1,3 +1,3 @@
 import { Customer } from "./models.js";
 
-export default Customer.whereNot({ last_name: null });
+export default Customer.where().not({ last_name: null });

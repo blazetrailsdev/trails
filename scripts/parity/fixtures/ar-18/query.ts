@@ -1,3 +1,3 @@
 import { User, Comment } from "./models.js";
 
-export default User.whereNot({ id: Comment.select("user_id").distinct() });
+export default User.where().not({ id: Comment.select("user_id").distinct() });

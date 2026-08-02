@@ -69,7 +69,7 @@ describe("WhereChain not inversion shapes (trails)", () => {
   fixtures(["posts", "authors", "authorAddresses", "customers"]);
 
   it("inverts an array containing null as NOT (IN ... OR IS NULL)", async () => {
-    const relation = Post.whereNot({
+    const relation = Post.where().not({
       title: [null, "Welcome to the weblog", "So I was thinking"],
     });
     // Positive ArrayHandler shape `(title IN (...) OR title IS NULL)`, inverted
@@ -85,7 +85,7 @@ describe("WhereChain not inversion shapes (trails)", () => {
 
   it("inverts a multi-column aggregate group as one NOT over the AND group", async () => {
     const david = await Customer.find(1);
-    const relation = Customer.whereNot({ address: david.address });
+    const relation = Customer.where().not({ address: david.address });
     // expand_from_hash builds the three mapped-column equalities positively;
     // WhereClause#invert wraps them in a single NOT(...) group.
     expect(relation.toSql()).toMatch(
@@ -103,7 +103,9 @@ describe("WhereChain not inversion shapes (trails)", () => {
     // Arel builds `gteq(begin) AND lt(end)`; And has no invert override, so
     // Node#invert yields `NOT (id >= 1 AND id < 5)` — not a re-derived
     // `(id < 1 OR id >= 5)`.
-    const sql = Post.whereNot({ id: new Range(1, 5, true) }).toSql();
+    const sql = Post.where()
+      .not({ id: new Range(1, 5, true) })
+      .toSql();
     expect(sql).toMatch(/NOT \(.*id.*>=.*AND.*id.*<.*\)/is);
   });
 
@@ -111,7 +113,7 @@ describe("WhereChain not inversion shapes (trails)", () => {
     // Rails WhereChain#not routes through build_where_clause (query_methods.rb:49),
     // which resolves alias_attribute keys before expand_from_hash — so
     // `where.not(newName: ...)` lands on the real `name` column, inverted.
-    const sql = Company.whereNot({ newName: "37signals" }).toSql();
+    const sql = Company.where().not({ newName: "37signals" }).toSql();
     expect(sql).toMatch(/["`]name["`]\s*!=/);
     expect(sql).not.toMatch(/newName/);
   });

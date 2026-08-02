@@ -308,7 +308,7 @@ describe("WhereTest", () => {
 
   it("where not polymorphic association", async () => {
     const sapphire = treasures("sapphire") as any;
-    const actual = await PriceEstimate.whereNot({ estimateOf: sapphire });
+    const actual = await PriceEstimate.where().not({ estimateOf: sapphire });
     const only = await PriceEstimate.where({ estimateOf: sapphire });
 
     const sapphireEstimateIds = [
@@ -327,7 +327,7 @@ describe("WhereTest", () => {
 
   it("where not polymorphic id and type as nand", async () => {
     const sapphire = treasures("sapphire") as any;
-    const actual = await PriceEstimate.whereNot({
+    const actual = await PriceEstimate.where().not({
       estimate_of_type: "Treasure",
       estimate_of_id: sapphire.id,
     });
@@ -382,7 +382,7 @@ describe("WhereTest", () => {
   it("polymorphic nested array where not", async () => {
     const treasure = treasures("diamond") as any;
     const car = cars("honda") as any;
-    const actual = await PriceEstimate.whereNot({ estimateOf: [treasure, car] });
+    const actual = await PriceEstimate.where().not({ estimateOf: [treasure, car] });
     const expected = [
       (priceEstimates("sapphire_1") as any).id,
       (priceEstimates("sapphire_2") as any).id,

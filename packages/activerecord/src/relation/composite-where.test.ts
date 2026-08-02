@@ -337,12 +337,15 @@ describe("Relation#where — composite-key form", () => {
   it("Base.whereNot(cols, tuples) routes through Relation#whereNot composite form", async () => {
     await CpkBook.create({ id: [1, 100], title: "exclude" });
     await CpkBook.create({ id: [2, 200], title: "keep" });
-    const matched = await (CpkBook as any).whereNot(["author_id", "id"], [[1, 100]]).toArray();
+    const matched = await (CpkBook as any)
+      .where()
+      .not(["author_id", "id"], [[1, 100]])
+      .toArray();
     expect(matched.map((r: any) => r.title)).toEqual(["keep"]);
   });
 
   it("Base.whereNot(single array arg) routes to the sanitized-conditions form, not composite", () => {
-    const sql = (CpkBook as any).whereNot(["author_id = 1"]).toSql();
+    const sql = (CpkBook as any).where().not(["author_id = 1"]).toSql();
     expect(sql).toMatch(/NOT \(author_id = 1\)/);
   });
 
@@ -354,7 +357,7 @@ describe("Relation#where — composite-key form", () => {
     expect(() => (CpkBook as any).all().whereNot(["author_id", 5], [[1, 2]])).toThrow(
       /wrong number of bind variables/,
     );
-    expect(() => (CpkBook as any).whereNot(["author_id", 5], [[1, 2]])).toThrow(
+    expect(() => (CpkBook as any).where().not(["author_id", 5], [[1, 2]])).toThrow(
       /wrong number of bind variables/,
     );
   });

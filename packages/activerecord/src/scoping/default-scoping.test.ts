@@ -376,15 +376,17 @@ describe("DefaultScopingTest", () => {
 
     const expected4 = names(await Developer.order("salary DESC"));
     const received4 = names(
-      await DeveloperOrderedBySalary.whereNot({ name: "Jamis" }).unscope({ where: "name" }),
+      await DeveloperOrderedBySalary.where().not({ name: "Jamis" }).unscope({ where: "name" }),
     );
     expect(received4.sort()).toEqual(expected4.sort());
 
     const expected5 = names(await Developer.order("salary DESC"));
     const received5 = names(
-      await DeveloperOrderedBySalary.whereNot({ name: ["Jamis", "David"] }).unscope({
-        where: "name",
-      }),
+      await DeveloperOrderedBySalary.where()
+        .not({ name: ["Jamis", "David"] })
+        .unscope({
+          where: "name",
+        }),
     );
     expect(received5.sort()).toEqual(expected5.sort());
 
