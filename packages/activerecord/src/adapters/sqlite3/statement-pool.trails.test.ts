@@ -1,13 +1,13 @@
 import { it, expect, afterEach } from "vitest";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
-import { AbstractSQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
+import { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "../../connection-adapters/better-sqlite3-adapter.js";
 
 describeIfSqlite("SQLite3StatementPoolTest", () => {
   // Track every adapter created so a failing assertion can't leak an
   // open SQLite handle into later tests.
-  const openAdapters: AbstractSQLite3Adapter[] = [];
-  const track = (adapter: AbstractSQLite3Adapter): AbstractSQLite3Adapter => {
+  const openAdapters: SQLite3Adapter[] = [];
+  const track = (adapter: SQLite3Adapter): SQLite3Adapter => {
     openAdapters.push(adapter);
     return adapter;
   };

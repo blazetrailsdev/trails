@@ -1297,7 +1297,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    * fresh `TypeMap` (abstract_mysql_adapter.rb:711). trails keeps that Rails
    * name for the registration pass and puts the allocate-then-register wrapper
    * behind the Rails-private `_` prefix, matching the already-converged
-   * spelling on `AbstractSQLite3Adapter._buildTypeMap`.
+   * spelling on `SQLite3Adapter._buildTypeMap`.
    */
   protected static _buildTypeMap(
     this: typeof AbstractMysqlAdapter,
@@ -1334,7 +1334,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    * The memoized native type map. Rails reaches it through the adapter's own
    * `type_map` (abstract_adapter.rb) and never exposes a separate public
    * accessor, so this stays Rails-private (`_` prefix) — the same spelling
-   * `AbstractSQLite3Adapter` uses for its `_nativeTypeMap` slot.
+   * `SQLite3Adapter` uses for its `_nativeTypeMap` slot.
    */
   get _nativeTypeMap(): TypeMap {
     if (!this._typeMap) {

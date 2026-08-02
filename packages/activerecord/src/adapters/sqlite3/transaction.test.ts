@@ -9,7 +9,7 @@
 import { it, expect, afterEach } from "vitest";
 import { getFsAsync } from "@blazetrails/activesupport/fs-adapter";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
-import { AbstractSQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
+import { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "../../connection-adapters/better-sqlite3-adapter.js";
 import { TransactionIsolationError } from "../../errors.js";
 
@@ -19,7 +19,7 @@ import { TransactionIsolationError } from "../../errors.js";
 // `file::memory:?cache=shared` next to the repo, so afterEach unlinks it.
 const SHARED_CACHE_DB = "file::memory:?cache=shared";
 
-const openAdapters: AbstractSQLite3Adapter[] = [];
+const openAdapters: SQLite3Adapter[] = [];
 afterEach(async () => {
   while (openAdapters.length) {
     try {
@@ -38,14 +38,14 @@ afterEach(async () => {
   }
 });
 
-function withConn(opts: { sharedCache?: boolean } = {}): AbstractSQLite3Adapter {
+function withConn(opts: { sharedCache?: boolean } = {}): SQLite3Adapter {
   const filename = opts.sharedCache ? SHARED_CACHE_DB : ":memory:";
   const adapter = new BetterSQLite3Adapter(filename);
   openAdapters.push(adapter);
   return adapter;
 }
 
-function readUncommitted(conn: AbstractSQLite3Adapter): boolean {
+function readUncommitted(conn: SQLite3Adapter): boolean {
   const row = (conn as any).driver.prepare("PRAGMA read_uncommitted").get() as {
     read_uncommitted: number;
   };

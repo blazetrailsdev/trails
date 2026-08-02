@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { AbstractSQLite3Adapter } from "./sqlite3-adapter.js";
+import { SQLite3Adapter } from "./sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "./better-sqlite3-adapter.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 
@@ -10,7 +10,7 @@ import { ArgumentError } from "@blazetrails/activemodel";
 // the file (or `:memory:`). trails accepts that Rails-shaped hash while keeping
 // the legacy positional `(filename, options)` form as a bridge.
 describe("SQLite3Adapter hash-only constructor", () => {
-  let adapter: AbstractSQLite3Adapter | undefined;
+  let adapter: SQLite3Adapter | undefined;
   let tmpDir: string | undefined;
 
   afterEach(async () => {

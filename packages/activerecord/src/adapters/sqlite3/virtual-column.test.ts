@@ -9,7 +9,7 @@ import { FixtureSet } from "../../fixtures.js";
 import { fixtures } from "../../test-fixtures.js";
 import { virtualColumnFixtureData } from "../../test-helpers/fixtures/virtual-columns.js";
 import { itIfSupports } from "../../support/supports.js";
-import type { AbstractSQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
+import type { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 import type { Column } from "../../connection-adapters/sqlite3/column.js";
 
 beforeAll(() => {
@@ -22,7 +22,7 @@ afterAll(() => {
 
 fixtures([], { useTransactionalTests: false });
 
-let adapter: AbstractSQLite3Adapter;
+let adapter: SQLite3Adapter;
 
 class VirtualColumn extends Base {
   static tableName = "virtual_columns";
@@ -32,7 +32,7 @@ class VirtualColumn extends Base {
 }
 
 beforeEach(async () => {
-  adapter = Base.connection as AbstractSQLite3Adapter;
+  adapter = Base.connection as SQLite3Adapter;
   await adapter.createTable("virtual_columns", { force: true }, (t) => {
     t.string("name");
     t.virtual("upper_name", { type: "string", as: "UPPER(name)", stored: true });

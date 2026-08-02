@@ -164,7 +164,7 @@ const remoteCapabilities: SqliteDriverCapabilities = {
  * libsql driver for remote Turso connections (`libsql://`, `https://`, etc.).
  *
  * Remote handles are network-backed; they must go through the async-open path
- * (`AbstractSQLite3Adapter.openAsync()` / `completeAsyncConnect()`). The driver
+ * (`SQLite3Adapter.openAsync()` / `completeAsyncConnect()`). The driver
  * intentionally omits `openSync` so the abstract base defers to `connectAsync`.
  * `restoreFromPath` and `databaseExists` are omitted — remote databases have no
  * local-file counterpart.

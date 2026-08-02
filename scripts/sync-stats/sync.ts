@@ -3,7 +3,7 @@ import { mkdirSync, readdirSync, readFileSync } from "fs";
 import { homedir } from "os";
 import { dirname, join } from "path";
 import { Base } from "@blazetrails/activerecord";
-import type { AbstractSQLite3Adapter } from "@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js";
+import type { SQLite3Adapter } from "@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js";
 import { parseTestCompareFromLogs } from "./parse-test-compare.js";
 
@@ -406,7 +406,7 @@ class SyncLog extends Base {
 // Schema setup via the adapter schema DSL
 // ---------------------------------------------------------------------------
 
-async function tableExists(adapter: AbstractSQLite3Adapter, name: string): Promise<boolean> {
+async function tableExists(adapter: SQLite3Adapter, name: string): Promise<boolean> {
   const rows = await adapter.execute(
     `SELECT name FROM sqlite_master WHERE type='table' AND name=?`,
     [name],
@@ -415,7 +415,7 @@ async function tableExists(adapter: AbstractSQLite3Adapter, name: string): Promi
 }
 
 async function columnExists(
-  adapter: AbstractSQLite3Adapter,
+  adapter: SQLite3Adapter,
   table: string,
   column: string,
 ): Promise<boolean> {
@@ -424,7 +424,7 @@ async function columnExists(
   return cols.some((c) => c.name === column);
 }
 
-async function migrateDb(adapter: AbstractSQLite3Adapter) {
+async function migrateDb(adapter: SQLite3Adapter) {
   const hasExistingSchema = await tableExists(adapter, "sync_log");
 
   if (hasExistingSchema) {

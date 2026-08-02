@@ -243,7 +243,7 @@ export async function install(): Promise<void> {
   if (!ddlProfileEnabled() || installed) return;
   installed = true;
 
-  const [{ PostgreSQLAdapter }, { Mysql2Adapter }, { AbstractSQLite3Adapter }] = await Promise.all([
+  const [{ PostgreSQLAdapter }, { Mysql2Adapter }, { SQLite3Adapter }] = await Promise.all([
     import("../connection-adapters/postgresql-adapter.js"),
     import("../connection-adapters/mysql2-adapter.js"),
     import("../connection-adapters/sqlite3-adapter.js"),
@@ -254,7 +254,7 @@ export async function install(): Promise<void> {
   // (abstract/mysql/sqlite), so wrapping it too would double-count batched
   // truncate/fixture DDL — and the leaf calls give better per-statement
   // attribution (real table names, real per-statement timing).
-  for (const klass of [PostgreSQLAdapter, Mysql2Adapter, AbstractSQLite3Adapter]) {
+  for (const klass of [PostgreSQLAdapter, Mysql2Adapter, SQLite3Adapter]) {
     const proto = klass.prototype as unknown as Record<string, unknown>;
     wrap(proto, "execute", 0);
     wrap(proto, "executeMutation", 0);

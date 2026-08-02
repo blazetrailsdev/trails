@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterAll } from "vitest";
-import { AbstractSQLite3Adapter } from "../connection-adapters/sqlite3-adapter.js";
+import { SQLite3Adapter } from "../connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "../connection-adapters/better-sqlite3-adapter.js";
 import { setupAdapterSuite } from "./setup-adapter-suite.js";
 
@@ -9,7 +9,7 @@ interface RawAdapter {
 }
 
 describe("setupAdapterSuite — schema + transactional rollback", () => {
-  const setup = vi.fn(async (adapter: AbstractSQLite3Adapter) => {
+  const setup = vi.fn(async (adapter: SQLite3Adapter) => {
     await adapter.exec(`CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT)`);
   });
 

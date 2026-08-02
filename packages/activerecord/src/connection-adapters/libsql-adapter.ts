@@ -1,11 +1,11 @@
 import type { SqliteDriver } from "../sqlite-adapter.js";
 import { libsqlDriver } from "../sqlite/libsql.js";
-import { AbstractSQLite3Adapter } from "./sqlite3-adapter.js";
+import { SQLite3Adapter } from "./sqlite3-adapter.js";
 
 /**
  * SQLite adapter backed by the `libsql` client (Turso/libSQL, local-file MVP).
  *
- * Thin subclass of `AbstractSQLite3Adapter`: all SQLite dialect, quoting, and
+ * Thin subclass of `SQLite3Adapter`: all SQLite dialect, quoting, and
  * schema logic lives in the abstract base. This class only binds the base to a
  * concrete client library, mirroring how Rails' `Mysql2Adapter` /
  * `TrilogyAdapter` subclass `AbstractMysqlAdapter`.
@@ -18,7 +18,7 @@ import { AbstractSQLite3Adapter } from "./sqlite3-adapter.js";
  * base and binds each client in its own thin subclass; there is nothing to
  * converge these names onto upstream.
  */
-export class LibSQLAdapter extends AbstractSQLite3Adapter {
+export class LibSQLAdapter extends SQLite3Adapter {
   protected override defaultSqliteDriver(): SqliteDriver {
     return libsqlDriver;
   }

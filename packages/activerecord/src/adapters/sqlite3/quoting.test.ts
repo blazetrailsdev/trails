@@ -6,16 +6,16 @@ import "../../index.js";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
 import { Base } from "../../base.js";
 import { fixtures } from "../../test-fixtures.js";
-import type { AbstractSQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
+import type { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 
-let adapter: AbstractSQLite3Adapter;
+let adapter: SQLite3Adapter;
 
 // -- Rails test class: quoting_test.rb --
 describeIfSqlite("SQLite3QuotingTest", () => {
   fixtures([]);
 
   beforeEach(async () => {
-    adapter = (await Base.leaseConnection()) as unknown as AbstractSQLite3Adapter;
+    adapter = (await Base.leaseConnection()) as unknown as SQLite3Adapter;
   });
 
   afterEach(async () => {

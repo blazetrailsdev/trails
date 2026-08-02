@@ -16,7 +16,7 @@ import { fixtures } from "./test-fixtures.js";
 import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";
 import { WrongReply } from "./test-helpers/models/reply.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
-import { AbstractSQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
+import { SQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapter.js";
 import { AbstractAdapter } from "./index.js";
 
@@ -43,7 +43,7 @@ interface AdapterTxView {
   currentTransaction?(): unknown;
 }
 
-const openAdapters: AbstractSQLite3Adapter[] = [];
+const openAdapters: SQLite3Adapter[] = [];
 
 async function makeSQLiteTopic() {
   const adp = new BetterSQLite3Adapter(":memory:");

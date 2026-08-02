@@ -4,9 +4,9 @@ import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
 import { BigIntegerType, IntegerType, BooleanType } from "@blazetrails/activemodel";
 import { Base } from "../../base.js";
 import { fixtures } from "../../test-fixtures.js";
-import type { AbstractSQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
+import type { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 
-let adapter: AbstractSQLite3Adapter;
+let adapter: SQLite3Adapter;
 const bigType = new BigIntegerType();
 const intType = new IntegerType();
 const boolType = new BooleanType();
@@ -15,7 +15,7 @@ describeIfSqlite("SQLite3 bigint round-trip", () => {
   fixtures([]);
 
   beforeEach(async () => {
-    adapter = (await Base.leaseConnection()) as unknown as AbstractSQLite3Adapter;
+    adapter = (await Base.leaseConnection()) as unknown as SQLite3Adapter;
     await adapter.exec(`
       CREATE TABLE "big_items" (
         "id"     INTEGER PRIMARY KEY AUTOINCREMENT,

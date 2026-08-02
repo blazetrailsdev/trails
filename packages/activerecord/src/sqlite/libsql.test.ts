@@ -202,7 +202,7 @@ describe("LibSQLAdapter — local-file smoke", () => {
     expect(rows.map((r) => (r as { name: string }).name)).toEqual(["apple", "banana"]);
   });
 
-  it("reflects schema ops via the shared AbstractSQLite3Adapter dialect", async () => {
+  it("reflects schema ops via the shared SQLite3Adapter dialect", async () => {
     const tables = await adapter.tables();
     expect(tables).toContain("items");
     const columns = await adapter.columns("items");

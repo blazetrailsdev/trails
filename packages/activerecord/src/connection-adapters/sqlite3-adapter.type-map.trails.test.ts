@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { AbstractSQLite3Adapter } from "./sqlite3-adapter.js";
+import type { SQLite3Adapter } from "./sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "./better-sqlite3-adapter.js";
 
 // trails-only coverage for the SQLite `register_class_with_limit` convergence
@@ -13,7 +13,7 @@ import { BetterSQLite3Adapter } from "./better-sqlite3-adapter.js";
 // (`fetchTypeMetadata` → `lookupCastTypeFromColumn`) carries the limit without
 // the reflective cast-type rebuild that previously stood in for it.
 describe("SQLite3Adapter type-map limit threading", () => {
-  let adapter: AbstractSQLite3Adapter;
+  let adapter: SQLite3Adapter;
   let tmpDir: string;
 
   beforeEach(() => {

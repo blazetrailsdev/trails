@@ -1546,10 +1546,21 @@ export function main() {
 
       // When multiple entities share a name, pick the best parent by
       // file path proximity (most shared directory segments).
-      const resolveParent = (name: string, childFile: string): ClassInfo | null => {
+      const resolveParent = (
+        name: string,
+        childFile: string,
+        declFile?: string,
+      ): ClassInfo | null => {
         const candidates = entitiesByName.get(name) || [];
         if (candidates.length === 0) return null;
         if (candidates.length === 1) return candidates[0];
+        // An include()/extend() edge knows the file its module was declared in;
+        // that beats filename proximity, which cannot separate same-named
+        // modules in sibling adapter directories.
+        if (declFile) {
+          const exact = candidates.find((c) => c.file === declFile);
+          if (exact) return exact;
+        }
         const childParts = (childFile || "").split("/");
         let best: ClassInfo | null = null;
         let bestScore = -1;
@@ -1590,7 +1601,7 @@ export function main() {
         }
 
         for (const ext of entity.extends || []) {
-          const parent = resolveParent(ext, entity.file || "");
+          const parent = resolveParent(ext, entity.file || "", entity.extendsFiles?.[ext]);
           if (parent) {
             for (const m of getInherited(parent, visited)) methods.add(m);
           }

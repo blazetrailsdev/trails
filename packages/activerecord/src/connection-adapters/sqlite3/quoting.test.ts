@@ -4,7 +4,7 @@ import { BinaryData } from "@blazetrails/activemodel";
 import { Base } from "../../base.js";
 import { fixtures } from "../../test-fixtures.js";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
-import { type AbstractSQLite3Adapter, SQLite3DateTime } from "../sqlite3-adapter.js";
+import { type SQLite3Adapter, SQLite3DateTime } from "../sqlite3-adapter.js";
 import { Date as DateType } from "../../type/date.js";
 import { Time as TimeType } from "../../type/time.js";
 import {
@@ -27,7 +27,7 @@ import {
 // prefix on times, and quotedBinary so binary self-dispatch reaches SQLite's
 // `x'..'` hex form, and the boolean pair so the inherited abstract boolean arm
 // self-dispatches back to SQLite's 1/0 — the same overrides
-// AbstractSQLite3Adapter supplies.
+// SQLite3Adapter supplies.
 const HOST = {
   quotedDate,
   quotedTime,
@@ -346,10 +346,10 @@ describe("SQLite3::Quoting", () => {
   });
 
   describeIfSqlite("SQLite microsecond round-trip — integration", () => {
-    let adapter: AbstractSQLite3Adapter;
+    let adapter: SQLite3Adapter;
 
     beforeEach(async () => {
-      adapter = Base.connection as AbstractSQLite3Adapter;
+      adapter = Base.connection as SQLite3Adapter;
       await adapter.exec(`DROP TABLE IF EXISTS "quoting_events"`);
       await adapter.exec(`CREATE TABLE "quoting_events" (
         "id" INTEGER PRIMARY KEY AUTOINCREMENT,

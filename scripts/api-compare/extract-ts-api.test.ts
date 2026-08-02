@@ -931,6 +931,26 @@ describe("extractFromProgram — include() detection", () => {
     expect(info.classes["node.ts:Node"].extends).toContain("Math");
   });
 
+  it("records the mod's declaration file on host.extendsFiles", () => {
+    // Two modules share the short name `SchemaStatements` (abstract/ and
+    // postgresql/); only the declaration file separates them, so the edge
+    // carries it for the consumer that resolves the parent.
+    const info = extractFromFiles("/p", {
+      "abstract/schema-statements.ts": `export const SchemaStatements = { addColumn() {} };`,
+      "postgresql/schema-statements-class.ts": `export const SchemaStatements = { quoteSchemaName() {} };`,
+      "postgresql-adapter.ts": `export class PostgreSQLAdapter {}`,
+      "wire.ts": `
+        import { include } from "@blazetrails/activesupport";
+        import { PostgreSQLAdapter } from "./postgresql-adapter.js";
+        import { SchemaStatements } from "./postgresql/schema-statements-class.js";
+        include(PostgreSQLAdapter, SchemaStatements);
+      `,
+    });
+    const host = info.classes["postgresql-adapter.ts:PostgreSQLAdapter"];
+    expect(host.extends).toContain("SchemaStatements");
+    expect(host.extendsFiles?.["SchemaStatements"]).toBe("postgresql/schema-statements-class.ts");
+  });
+
   it("follows import aliases (`Math as MathMixin`) to the original module name", () => {
     const info = extractFromFiles("/p", {
       "math.ts": `export const Math = { add() {} };`,
