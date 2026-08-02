@@ -32,7 +32,6 @@ const NON_EMITTING: ReadonlyMap<string, string> = new Map([
     "capability read — skips expression indexes on adapters that lack them",
   ],
   ["supportsIndexesInCreate", "capability read — decides whether indexes ride inside CREATE TABLE"],
-  ["adapter", "self-reference — the mixed-in SchemaStatements bodies reach the adapter through it"],
   [
     "buildCreateTableDefinition",
     "definition factory — a stub returns no TableDefinition and dies at once, so it cannot silently lay nothing",
@@ -109,7 +108,6 @@ async function recordLayPath(): Promise<Set<string>> {
       get(target, prop, receiver) {
         if (typeof prop !== "string") return Reflect.get(target, prop, receiver);
         touched.add(prop);
-        if (prop === "adapter") return self;
         let value: unknown;
         try {
           value = Reflect.get(target, prop, self);

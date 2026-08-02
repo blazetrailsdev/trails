@@ -285,13 +285,13 @@ interface SchemaMigrationPool {
   };
 }
 
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging */
 /**
  * `SchemaStatements` is only ever mixed into an adapter (`include()` at the
  * bottom of each adapter module), so its bodies call plain `this` methods the
  * way Rails' module does. This merged interface gives those calls the adapter's
  * type. @internal
  */
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface SchemaStatements
   extends
     Omit<
@@ -306,8 +306,9 @@ export interface SchemaStatements
     >,
     SchemaQuoter {}
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class SchemaStatements {
+  /* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
+
   /**
    * `AbstractAdapter#pool` is typed `unknown` (it holds a NullPool until a real
    * ConnectionPool claims the connection); narrow it once here. @internal
