@@ -157,7 +157,12 @@ const oneLineProse = (line: string): string =>
     .trim();
 
 /** Rebuild a JSDoc comment from its non-tag lines plus reconciled entries.
- *  Returns null when nothing remains (comment should be removed entirely). */
+ *  Returns null when nothing remains (comment should be removed entirely).
+ *
+ *  A one-line `/** ... *\/` comment keeps its prose on the `/**` line, which
+ *  the `head`/`hasProse` split cannot see; with no entries it is returned
+ *  verbatim, so an ordinary doc comment on an untagged method is not deleted
+ *  as "tags-only". */
 export function renderJsdoc(rest: string[], entries: TagEntry[], indent: string): string | null {
   // Order entries by call name (code-unit order, matching the ratchet).
   const ordered = [...entries].sort((a, b) => (a.call < b.call ? -1 : a.call > b.call ? 1 : 0));
@@ -165,10 +170,6 @@ export function renderJsdoc(rest: string[], entries: TagEntry[], indent: string)
   if (body.length === 0 || !body[0].trimStart().startsWith("/**")) {
     body = [`${indent}/**`, `${indent} */`];
   }
-  // A one-line `/** ... */` comment keeps its prose on the `/**` line, where
-  // the `head`/`hasProse` split below cannot see it — returning it verbatim is
-  // what keeps an ordinary doc comment on an untagged method from being
-  // deleted as "tags-only".
   if (ordered.length === 0 && body.length === 1) {
     return oneLineProse(body[0]) === "" ? null : body[0];
   }
