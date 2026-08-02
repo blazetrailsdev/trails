@@ -6,6 +6,7 @@ import {
   Notifications,
   getErrorReporter,
   runLoadHooks,
+  include,
 } from "@blazetrails/activesupport";
 import { sql as arelSql, Nodes, Visitors } from "@blazetrails/arel";
 import { isRubyTruthy } from "../ruby-truthy.js";
@@ -178,6 +179,7 @@ function toError(value: unknown): Error {
  * shape where driver params and adapter knobs share one hash.
  * Uses a connection pool internally for concurrent access.
  */
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class PostgreSQLAdapter
   extends AbstractAdapter
   implements
@@ -2602,10 +2604,6 @@ export class PostgreSQLAdapter
     await this.execute("SET standard_conforming_strings = on");
   }
 
-  async enumTypes(): Promise<[string, string[]][]> {
-    return this.pgSchemaStatements().enumTypes();
-  }
-
   // Mirrors: PostgreSQLAdapter#max_identifier_length (postgresql_adapter.rb:620)
   // Rails memoizes `query_value("SHOW max_identifier_length", "SCHEMA").to_i`
   // and reads it synchronously. trails queries are async, so the query lives in
@@ -3481,33 +3479,6 @@ export class PostgreSQLAdapter
     return true;
   }
 
-  // ---------------------------------------------------------------------------
-  // Schema management
-  // ---------------------------------------------------------------------------
-
-  async schemaNames(): Promise<string[]> {
-    return this.pgSchemaStatements().schemaNames();
-  }
-
-  async createSchema(
-    name: string,
-    options: { force?: boolean; ifNotExists?: boolean } = {},
-  ): Promise<void> {
-    await this.pgSchemaStatements().createSchema(name, options);
-  }
-
-  async dropSchema(name: string, options: { ifExists?: boolean } = {}): Promise<void> {
-    await this.pgSchemaStatements().dropSchema(name, options);
-  }
-
-  async schemaExists(name: string): Promise<boolean> {
-    return this.pgSchemaStatements().schemaExists(name);
-  }
-
-  async currentSchema(): Promise<string> {
-    return this.pgSchemaStatements().currentSchema();
-  }
-
   quoteColumnName(name: string): string {
     return pgQuoteColumnName(name);
   }
@@ -3700,10 +3671,6 @@ export class PostgreSQLAdapter
     );
   }
 
-  columnsForDistinct(columns: string | string[], orders?: (string | Nodes.Node)[]): string {
-    return this.pgSchemaStatements().columnsForDistinct(columns, orders);
-  }
-
   async extensions(): Promise<string[]> {
     // Rails does not filter plpgsql or any built-in extension — the full list
     // (including pg_catalog.plpgsql) is returned, matching PostgreSQLAdapter#extensions.
@@ -3779,179 +3746,14 @@ export class PostgreSQLAdapter
     await this.reloadTypeMap();
   }
 
-  async indexes(tableName: string): Promise<IndexDefinition[]> {
-    return this.pgSchemaStatements().indexes(tableName);
-  }
-
-  async indexNameExists(tableName: string, indexName: string): Promise<boolean> {
-    return this.pgSchemaStatements().indexNameExists(tableName, indexName);
-  }
-
-  async primaryKey(tableName: string): Promise<string | string[] | null> {
-    return this.pgSchemaStatements().primaryKey(tableName);
-  }
-
-  async pkAndSequenceFor(
-    tableName: string,
-  ): Promise<[string, { schema: string; name: string } | null] | null> {
-    return this.pgSchemaStatements().pkAndSequenceFor(tableName);
-  }
-
-  async resetPkSequence(tableName: string): Promise<void> {
-    await this.pgSchemaStatements().resetPkSequence(tableName);
-  }
-
-  async setPkSequence(tableName: string, value: number): Promise<void> {
-    await this.pgSchemaStatements().setPkSequence(tableName, value);
-  }
-
   async renameIndex(tableName: string, oldName: string, newName: string): Promise<void> {
     this.schemaCache?.clearDataSourceCacheBang(this.pool, tableName);
-    this.pgSchemaStatements().validateIndexLengthBang(tableName, newName);
+    this.validateIndexLengthBang(tableName, newName);
     const [schema] = this.extractSchemaQualifiedName(tableName);
     const qualifier = schema ? `${this.quoteTableName(schema)}.` : "";
     await this.execute(
       `ALTER INDEX ${qualifier}${this.quoteColumnName(oldName)} RENAME TO ${this.quoteTableName(newName)}`,
     );
-  }
-
-  async columns(tableName: string): Promise<Column[]> {
-    return this.pgSchemaStatements().columns(tableName);
-  }
-
-  async changeColumn(
-    tableName: string,
-    columnName: string,
-    type: string,
-    options: ColumnOptions & { using?: string; castAs?: string } = {},
-  ): Promise<void> {
-    await this.pgSchemaStatements().changeColumn(tableName, columnName, type, options);
-  }
-
-  async createJoinTable(
-    table1: string,
-    table2: string,
-    options?: JoinTableOptions | ((t: AbstractTableDefinition) => void),
-    fn?: (t: AbstractTableDefinition) => void,
-  ): Promise<void> {
-    await this.pgSchemaStatements().createJoinTable(table1, table2, options, fn);
-  }
-
-  async addColumn(
-    tableName: string,
-    columnName: string,
-    type: ColumnType,
-    options: ColumnOptions & {
-      comment?: string | null;
-      ifNotExists?: boolean;
-    } = {},
-  ): Promise<void> {
-    await this.pgSchemaStatements().addColumn(tableName, columnName, type, options);
-  }
-
-  async renameColumn(tableName: string, columnName: string, newColumnName: string): Promise<void> {
-    await this.pgSchemaStatements().renameColumn(tableName, columnName, newColumnName);
-  }
-
-  async changeColumnDefault(
-    tableName: string,
-    columnName: string,
-    defaultOrChanges: unknown,
-  ): Promise<void> {
-    await this.pgSchemaStatements().changeColumnDefault(tableName, columnName, defaultOrChanges);
-  }
-
-  buildChangeColumnDefinition(
-    tableName: string,
-    columnName: string,
-    type: string,
-    options: {
-      using?: string;
-      castAs?: string;
-      default?: unknown;
-      null?: boolean;
-      array?: boolean;
-    } = {},
-  ): ChangeColumnDefinition {
-    return this.pgSchemaStatements().buildChangeColumnDefinition(
-      tableName,
-      columnName,
-      type,
-      options,
-    );
-  }
-
-  async buildChangeColumnDefaultDefinition(
-    tableName: string,
-    columnName: string,
-    defaultOrChanges: unknown,
-  ): Promise<ChangeColumnDefaultDefinition | undefined> {
-    return this.pgSchemaStatements().buildChangeColumnDefaultDefinition(
-      tableName,
-      columnName,
-      defaultOrChanges,
-    );
-  }
-
-  async changeColumnNull(
-    tableName: string,
-    columnName: string,
-    nullable: boolean,
-    defaultValue: unknown = null,
-  ): Promise<void> {
-    await this.pgSchemaStatements().changeColumnNull(tableName, columnName, nullable, defaultValue);
-  }
-
-  async changeColumnComment(
-    tableName: string,
-    columnName: string,
-    commentOrChanges: string | null | { from?: string | null; to?: string | null },
-  ): Promise<void> {
-    await this.pgSchemaStatements().changeColumnComment(tableName, columnName, commentOrChanges);
-  }
-
-  async changeTableComment(
-    tableName: string,
-    commentOrChanges: string | null | { from?: string | null; to?: string | null },
-  ): Promise<void> {
-    await this.pgSchemaStatements().changeTableComment(tableName, commentOrChanges);
-  }
-
-  /** @internal */
-  async validateConstraint(tableName: string, constraintName: string): Promise<void> {
-    await this.pgSchemaStatements().validateConstraint(tableName, constraintName);
-  }
-
-  async validateCheckConstraint(
-    tableName: string,
-    nameOrOptions: string | { name: string },
-  ): Promise<void> {
-    await this.pgSchemaStatements().validateCheckConstraint(tableName, nameOrOptions);
-  }
-
-  async validateForeignKey(
-    fromTable: string,
-    toTable?: string,
-    options?: Omit<ForeignKeyLookupOptions, "toTable">,
-  ): Promise<void> {
-    await this.pgSchemaStatements().validateForeignKey(fromTable, toTable, options);
-  }
-
-  typeToSql(
-    type: string,
-    options: {
-      limit?: number;
-      precision?: number;
-      scale?: number;
-      array?: boolean;
-      enumType?: string;
-    } = {},
-  ): string {
-    return this.pgSchemaStatements().typeToSql(type, options);
-  }
-
-  foreignKeyColumnFor(tableName: string, columnName = "id"): string {
-    return this.pgSchemaStatements().foreignKeyColumnFor(tableName, columnName);
   }
 
   /**
@@ -3973,33 +3775,6 @@ export class PostgreSQLAdapter
     return this.sequenceNameFromParts(tableName, columnName, suffix) === sequenceName;
   }
 
-  /** @internal */
-  sequenceNameFromParts(tableName: string, columnName: string, suffix: string): string {
-    return this.pgSchemaStatements().sequenceNameFromParts(tableName, columnName, suffix);
-  }
-
-  /** @internal */
-  assertValidDeferrable(deferrable: unknown): void {
-    this.pgSchemaStatements().assertValidDeferrable(deferrable);
-  }
-
-  /** @internal */
-  extractForeignKeyAction(specifier: string): "cascade" | "nullify" | "restrict" | undefined {
-    return this.pgSchemaStatements().extractForeignKeyAction(specifier);
-  }
-
-  /** @internal */
-  extractConstraintDeferrable(
-    deferrable: boolean,
-    deferred: boolean,
-  ): "deferred" | "immediate" | false {
-    return this.pgSchemaStatements().extractConstraintDeferrable(deferrable, deferred);
-  }
-
-  async foreignKeys(tableName: string): Promise<ForeignKeyDefinition[]> {
-    return this.pgSchemaStatements().foreignKeys(tableName);
-  }
-
   async foreignTables(): Promise<string[]> {
     const names = await this.queryValues(
       this.dataSourceSql(null, { type: "FOREIGN TABLE" }),
@@ -4015,10 +3790,6 @@ export class PostgreSQLAdapter
       "SCHEMA",
     );
     return names.length > 0;
-  }
-
-  quotedIncludeColumnsForIndex(columnNames: string | string[]): string {
-    return this.pgSchemaStatements().quotedIncludeColumnsForIndex(columnNames);
   }
 
   /** @internal */
@@ -4061,11 +3832,6 @@ export class PostgreSQLAdapter
   referenceNameForTable(tableName: string): string {
     const [, table] = this.extractSchemaQualifiedName(tableName);
     return singularize(table);
-  }
-
-  /** @internal */
-  async columnNamesFromColumnNumbers(tableOid: number, columnNumbers: number[]): Promise<string[]> {
-    return this.pgSchemaStatements().columnNamesFromColumnNumbers(tableOid, columnNumbers);
   }
 
   async renameTable(oldName: string, newName: string): Promise<void> {
@@ -4116,18 +3882,6 @@ export class PostgreSQLAdapter
     await this.renameTableIndexes(oldName, newName);
   }
 
-  async tables(): Promise<string[]> {
-    return this.pgSchemaStatements().tables();
-  }
-
-  async views(): Promise<string[]> {
-    return this.pgSchemaStatements().views();
-  }
-
-  async tableExists(name: string): Promise<boolean> {
-    return this.pgSchemaStatements().tableExists(name);
-  }
-
   async addIndex(
     tableName: string,
     columns: string | string[],
@@ -4152,9 +3906,6 @@ export class PostgreSQLAdapter
     await this.getDatabaseVersion();
     this.schemaCache?.clearDataSourceCacheBang(this.pool, tableName);
 
-    // Called on the adapter, not on pgSchemaStatements(): PG overrides
-    // add_index_options to quote a bare-column-name `:where`, and only the
-    // adapter's override is on this path.
     const createIndex = (await this.buildCreateIndexDefinition(tableName, columns, options))!;
     await this.execute(await this.schemaCreation.accept(createIndex));
 
@@ -4243,14 +3994,6 @@ export class PostgreSQLAdapter
     await super.addForeignKey(fromTable, toTable, options);
   }
 
-  async foreignKeyExists(
-    fromTable: string,
-    toTable?: string | ForeignKeyLookupOptions,
-    options: Omit<ForeignKeyLookupOptions, "toTable"> = {},
-  ): Promise<boolean> {
-    return this.pgSchemaStatements().foreignKeyExists(fromTable, toTable, options);
-  }
-
   // Mirrors: ReferentialIntegrity#disable_referential_integrity. Extracted to
   // postgresql/referential-integrity.ts (Rails houses this in the
   // ReferentialIntegrity module, not schema_statements.rb).
@@ -4258,79 +4001,6 @@ export class PostgreSQLAdapter
 
   // Mirrors: ReferentialIntegrity#check_all_foreign_keys_valid!
   checkAllForeignKeysValidBang = checkAllForeignKeysValidBang;
-
-  async createDatabase(name: string, options: CreateDatabaseOptions = {}): Promise<void> {
-    await this.pgSchemaStatements().createDatabase(name, options);
-  }
-
-  // ---------------------------------------------------------------------------
-  // Enum types
-  // ---------------------------------------------------------------------------
-
-  async createEnum(
-    name: string,
-    values: string[],
-    options?: Record<string, unknown>,
-  ): Promise<void> {
-    await this.pgSchemaStatements().createEnum(name, values, options);
-  }
-
-  async dropEnum(name: string, options: { ifExists?: boolean } = {}): Promise<void> {
-    await this.pgSchemaStatements().dropEnum(name, options);
-  }
-
-  // ---------------------------------------------------------------------------
-  // Range types
-  // ---------------------------------------------------------------------------
-
-  /**
-   * @noRailsEquivalent CONVERGEABLE (story: delete-invented-pg-range-ddl-helpers).
-   * Rails has no range-type DDL helper anywhere — ranges are created with a raw
-   *   `execute("CREATE
-   *   TYPE … AS RANGE")`. trails adds `createRange`/`dropRange` following Rails' own type-DDL helpers
-   *   (create_enum/drop_enum/rename_enum, postgresql_adapter.rb:541-615), including their
-   *   `reload_type_map` epilogue; the implementation and the full justification live at the emitting
-   *   call site, connection-adapters/postgresql/schema-statements-class.ts. Deliberately
-   *   PostgreSQL-only: the no-op stubs that shadowed these on AbstractAdapter were deleted rather
-   *   than allowlisted, since Rails stubs only the enum quartet on the base.
-   */
-  async createRange(
-    name: string,
-    options: { subtype: string; subtypeDiff?: string },
-  ): Promise<void> {
-    await this.pgSchemaStatements().createRange(name, options);
-  }
-
-  /**
-   * @noRailsEquivalent CONVERGEABLE (story: delete-invented-pg-range-ddl-helpers).
-   * Rails has no range-type DDL helper anywhere — ranges are created with a raw
-   *   `execute("CREATE
-   *   TYPE … AS RANGE")`. trails adds `createRange`/`dropRange` following Rails' own type-DDL helpers
-   *   (create_enum/drop_enum/rename_enum, postgresql_adapter.rb:541-615), including their
-   *   `reload_type_map` epilogue; the implementation and the full justification live at the emitting
-   *   call site, connection-adapters/postgresql/schema-statements-class.ts. Deliberately
-   *   PostgreSQL-only: the no-op stubs that shadowed these on AbstractAdapter were deleted rather
-   *   than allowlisted, since Rails stubs only the enum quartet on the base.
-   */
-  async dropRange(name: string, options: { ifExists?: boolean } = {}): Promise<void> {
-    await this.pgSchemaStatements().dropRange(name, options);
-  }
-
-  async renameEnum(name: string, newNameOrOptions: string | { to: string }): Promise<void> {
-    await this.pgSchemaStatements().renameEnum(name, newNameOrOptions);
-  }
-
-  async addEnumValue(
-    name: string,
-    value: string,
-    options: { before?: string; after?: string; ifNotExists?: boolean } = {},
-  ): Promise<void> {
-    await this.pgSchemaStatements().addEnumValue(name, value, options);
-  }
-
-  async renameEnumValue(name: string, options: { from: string; to: string }): Promise<void> {
-    await this.pgSchemaStatements().renameEnumValue(name, options);
-  }
 
   async enumValues(name: string): Promise<string[]> {
     const [schema, enumName] = this.extractSchemaQualifiedName(name);
@@ -4532,172 +4202,6 @@ export class PostgreSQLAdapter
     return translated;
   }
 
-  async dropDatabase(name: string): Promise<void> {
-    await this.pgSchemaStatements().dropDatabase(name);
-  }
-
-  async recreateDatabase(name: string, options: CreateDatabaseOptions = {}): Promise<void> {
-    await this.pgSchemaStatements().recreateDatabase(name, options);
-  }
-
-  /**
-   * The PostgreSQL-specific half of `PostgreSQL::SchemaStatements`, still a companion class
-   * rather than a mixin: every method below delegates into it. Story
-   * `dissolve-the-postgresql-schema-statements-companion` folds it onto the adapter the way
-   * MySQL's is folded on, at which point this accessor goes away.
-   * @internal
-   */
-  private pgSchemaStatements(): PostgreSQLSchemaStatements {
-    return new PostgreSQLSchemaStatements(this as unknown as DatabaseAdapter);
-  }
-
-  async dropTable(
-    ...args:
-      | [string, ...string[]]
-      | [string, ...string[], { ifExists?: boolean; force?: "cascade" }]
-  ): Promise<void> {
-    // Rails: PostgreSQLAdapter has no separate `drop_table` — the method comes
-    // solely from the included `PostgreSQL::SchemaStatements` module. Delegate
-    // here so schema-cache eviction + single-statement CASCADE behavior lives
-    // in one place (PostgreSQLSchemaStatements#dropTable).
-    await this.pgSchemaStatements().dropTable(...args);
-  }
-
-  async currentDatabase(): Promise<string> {
-    return this.pgSchemaStatements().currentDatabase();
-  }
-
-  async encoding(): Promise<string> {
-    return this.pgSchemaStatements().encoding();
-  }
-
-  async collation(): Promise<string> {
-    return this.pgSchemaStatements().collation();
-  }
-
-  async ctype(): Promise<string> {
-    return this.pgSchemaStatements().ctype();
-  }
-
-  async schemaSearchPath(): Promise<string> {
-    return this.pgSchemaStatements().schemaSearchPath();
-  }
-
-  async setSchemaSearchPath(searchPath: string | null): Promise<void> {
-    await this.pgSchemaStatements().setSchemaSearchPath(searchPath);
-  }
-
-  async clientMinMessages(): Promise<string> {
-    return this.pgSchemaStatements().clientMinMessages();
-  }
-
-  async setClientMinMessages(level: string): Promise<void> {
-    await this.pgSchemaStatements().setClientMinMessages(level);
-  }
-
-  async tableComment(tableName: string): Promise<string | null> {
-    return this.pgSchemaStatements().tableComment(tableName);
-  }
-
-  async tablePartitionDefinition(tableName: string): Promise<string | null> {
-    return this.pgSchemaStatements().tablePartitionDefinition(tableName);
-  }
-
-  async inheritedTableNames(tableName: string): Promise<string[]> {
-    return this.pgSchemaStatements().inheritedTableNames(tableName);
-  }
-
-  async tableOptions(tableName: string): Promise<Record<string, unknown>> {
-    return this.pgSchemaStatements().tableOptions(tableName);
-  }
-
-  async serialSequence(tableName: string, column: string): Promise<string | null> {
-    return this.pgSchemaStatements().serialSequence(tableName, column);
-  }
-
-  async defaultSequenceName(
-    tableName: string,
-    pk: string | string[] = "id",
-  ): Promise<string | null> {
-    return this.pgSchemaStatements().defaultSequenceName(tableName, pk);
-  }
-
-  async setPkSequenceBang(tableName: string, value: number): Promise<void> {
-    await this.pgSchemaStatements().setPkSequenceBang(tableName, value);
-  }
-
-  async resetPkSequenceBang(
-    tableName: string,
-    pk: string | null = null,
-    sequence: string | null = null,
-  ): Promise<void> {
-    await this.pgSchemaStatements().resetPkSequenceBang(tableName, pk, sequence);
-  }
-
-  async primaryKeys(tableName: string): Promise<string[]> {
-    return this.pgSchemaStatements().primaryKeys(tableName);
-  }
-
-  async checkConstraints(tableName: string): Promise<CheckConstraintDefinition[]> {
-    return this.pgSchemaStatements().checkConstraints(tableName);
-  }
-
-  exclusionConstraintOptions(
-    tableName: string,
-    expression: string,
-    options: Record<string, unknown>,
-  ): Record<string, unknown> {
-    return this.pgSchemaStatements().exclusionConstraintOptions(tableName, expression, options);
-  }
-
-  async addExclusionConstraint(
-    tableName: string,
-    expression: string,
-    options: ExclusionConstraintOptions = {},
-  ): Promise<void> {
-    return this.pgSchemaStatements().addExclusionConstraint(tableName, expression, options);
-  }
-
-  async removeExclusionConstraint(
-    tableName: string,
-    expressionOrOptions?: string | Record<string, unknown> | null,
-    options: Record<string, unknown> = {},
-  ): Promise<void> {
-    return this.pgSchemaStatements().removeExclusionConstraint(
-      tableName,
-      expressionOrOptions,
-      options,
-    );
-  }
-
-  uniqueConstraintOptions(
-    tableName: string,
-    columnName: string | string[] | null | undefined,
-    options: Record<string, unknown>,
-  ): Record<string, unknown> {
-    return this.pgSchemaStatements().uniqueConstraintOptions(tableName, columnName, options);
-  }
-
-  async addUniqueConstraint(
-    tableName: string,
-    columnName?: string | string[] | null,
-    options: UniqueConstraintOptions = {},
-  ): Promise<void> {
-    return this.pgSchemaStatements().addUniqueConstraint(tableName, columnName, options);
-  }
-
-  async removeUniqueConstraint(
-    tableName: string,
-    columnNameOrOptions?: string | string[] | Record<string, unknown> | null,
-    options: Record<string, unknown> = {},
-  ): Promise<void> {
-    return this.pgSchemaStatements().removeUniqueConstraint(
-      tableName,
-      columnNameOrOptions,
-      options,
-    );
-  }
-
   indexName(
     tableName: string,
     options: { column?: string | string[]; name?: string; _usesLegacyIndexName?: boolean },
@@ -4732,8 +4236,7 @@ export class PostgreSQLAdapter
   ): Promise<[AbstractIndexDefinition, string | undefined, boolean]> {
     const opts = { ...options };
     if (typeof opts.where === "string") {
-      const ss = this.pgSchemaStatements();
-      if ((await ss.tableExists(tableName)) && (await ss.columnExists(tableName, opts.where))) {
+      if ((await this.tableExists(tableName)) && (await this.columnExists(tableName, opts.where))) {
         opts.where = this.quoteColumnName(opts.where);
       }
     }
@@ -4742,10 +4245,6 @@ export class PostgreSQLAdapter
 
   get schemaCreation(): PgSchemaCreation {
     return new PgSchemaCreation(this);
-  }
-
-  updateTableDefinition(tableName: string, base?: unknown): PgTable {
-    return this.pgSchemaStatements().updateTableDefinition(tableName, base ?? this);
   }
 
   createSchemaDumper(source: SchemaSource, options: Record<string, unknown> = {}): PgSchemaDumper {
@@ -4937,58 +4436,6 @@ export class PostgreSQLAdapter
     return super.addOptionsForIndexColumns(quotedColumns, options);
   }
 
-  async exclusionConstraints(tableName: string): Promise<ExclusionConstraintDefinition[]> {
-    return this.pgSchemaStatements().exclusionConstraints(tableName);
-  }
-
-  async uniqueConstraints(tableName: string): Promise<UniqueConstraintDefinition[]> {
-    return this.pgSchemaStatements().uniqueConstraints(tableName);
-  }
-
-  /** @internal */
-  exclusionConstraintName(tableName: string, options: Record<string, unknown> = {}): string {
-    return this.pgSchemaStatements().exclusionConstraintName(tableName, options);
-  }
-
-  /** @internal */
-  async exclusionConstraintFor(
-    tableName: string,
-    options: Record<string, unknown> = {},
-  ): Promise<ExclusionConstraintDefinition | undefined> {
-    return this.pgSchemaStatements().exclusionConstraintFor(tableName, options);
-  }
-
-  /** @internal */
-  async exclusionConstraintForBang(
-    tableName: string,
-    expression?: string | null,
-    options: Record<string, unknown> = {},
-  ): Promise<ExclusionConstraintDefinition> {
-    return this.pgSchemaStatements().exclusionConstraintForBang(tableName, expression, options);
-  }
-
-  /** @internal */
-  uniqueConstraintName(tableName: string, options: Record<string, unknown> = {}): string {
-    return this.pgSchemaStatements().uniqueConstraintName(tableName, options);
-  }
-
-  /** @internal */
-  async uniqueConstraintFor(
-    tableName: string,
-    options: Record<string, unknown> = {},
-  ): Promise<UniqueConstraintDefinition | undefined> {
-    return this.pgSchemaStatements().uniqueConstraintFor(tableName, options);
-  }
-
-  /** @internal */
-  async uniqueConstraintForBang(
-    tableName: string,
-    column?: string | string[] | null,
-    options: Record<string, unknown> = {},
-  ): Promise<UniqueConstraintDefinition> {
-    return this.pgSchemaStatements().uniqueConstraintForBang(tableName, column, options);
-  }
-
   /** @internal */
   extractSchemaQualifiedName(string: string): [string | null, string] {
     const name = Utils.extractSchemaQualifiedName(string);
@@ -5175,28 +4622,6 @@ export class PostgreSQLAdapter
   }
 
   /**
-   * Fetch raw column metadata rows from pg_attribute for a table.
-   * Mirrors: PostgreSQLAdapter#column_definitions
-   * @internal
-   */
-  async columnDefinitions(tableName: string): Promise<
-    {
-      attname: string;
-      format_type: string;
-      pg_get_expr: string | null;
-      attnotnull: boolean;
-      atttypid: number;
-      atttypmod: number;
-      collname: string | null;
-      comment: string | null;
-      identity: string | null;
-      attgenerated: string | null;
-    }[]
-  > {
-    return this.pgSchemaStatements().columnDefinitions(tableName);
-  }
-
-  /**
    * Build the per-adapter StatementPool (used on initialization).
    * Mirrors: PostgreSQLAdapter#build_statement_pool
    * @internal
@@ -5263,6 +4688,361 @@ export class PostgreSQLAdapter
   _rawConnectionForTest(): pg.Client | null {
     return this._rawConnection;
   }
+}
+
+// `include()` installs the module's methods on the prototype at runtime, where the
+// class type can't see them, so the `include PostgreSQL::SchemaStatements` surface
+// is declared here — the same shape AbstractAdapter uses for `SchemaStatements`.
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface PostgreSQLAdapter {
+  /** @internal */
+  validateIndexLengthBang(tableName: string, newName: string, internal?: boolean): void;
+
+  enumTypes(): Promise<[string, string[]][]>;
+
+  schemaNames(): Promise<string[]>;
+
+  createSchema(name: string, options?: { force?: boolean; ifNotExists?: boolean }): Promise<void>;
+
+  dropSchema(name: string, options?: { ifExists?: boolean }): Promise<void>;
+
+  schemaExists(name: string): Promise<boolean>;
+
+  currentSchema(): Promise<string>;
+
+  columnsForDistinct(columns: string | string[], orders?: (string | Nodes.Node)[]): string;
+
+  indexes(tableName: string): Promise<IndexDefinition[]>;
+
+  indexNameExists(tableName: string, indexName: string): Promise<boolean>;
+
+  primaryKey(tableName: string): Promise<string | string[] | null>;
+
+  pkAndSequenceFor(
+    tableName: string,
+  ): Promise<[string, { schema: string; name: string } | null] | null>;
+
+  resetPkSequence(tableName: string): Promise<void>;
+
+  setPkSequence(tableName: string, value: number): Promise<void>;
+
+  columns(tableName: string): Promise<Column[]>;
+
+  changeColumn(
+    tableName: string,
+    columnName: string,
+    type: string,
+    options?: ColumnOptions & { using?: string; castAs?: string },
+  ): Promise<void>;
+
+  createJoinTable(
+    table1: string,
+    table2: string,
+    options?: JoinTableOptions | ((t: AbstractTableDefinition) => void),
+    fn?: (t: AbstractTableDefinition) => void,
+  ): Promise<void>;
+
+  addColumn(
+    tableName: string,
+    columnName: string,
+    type: ColumnType,
+    options?: ColumnOptions & {
+      comment?: string | null;
+      ifNotExists?: boolean;
+    },
+  ): Promise<void>;
+
+  renameColumn(tableName: string, columnName: string, newColumnName: string): Promise<void>;
+
+  changeColumnDefault(
+    tableName: string,
+    columnName: string,
+    defaultOrChanges: unknown,
+  ): Promise<void>;
+
+  buildChangeColumnDefinition(
+    tableName: string,
+    columnName: string,
+    type: string,
+    options?: {
+      using?: string;
+      castAs?: string;
+      default?: unknown;
+      null?: boolean;
+      array?: boolean;
+    },
+  ): ChangeColumnDefinition;
+
+  buildChangeColumnDefaultDefinition(
+    tableName: string,
+    columnName: string,
+    defaultOrChanges: unknown,
+  ): Promise<ChangeColumnDefaultDefinition | undefined>;
+
+  changeColumnNull(
+    tableName: string,
+    columnName: string,
+    nullable: boolean,
+    defaultValue?: unknown,
+  ): Promise<void>;
+
+  changeColumnComment(
+    tableName: string,
+    columnName: string,
+    commentOrChanges: string | null | { from?: string | null; to?: string | null },
+  ): Promise<void>;
+
+  changeTableComment(
+    tableName: string,
+    commentOrChanges: string | null | { from?: string | null; to?: string | null },
+  ): Promise<void>;
+
+  /** @internal */
+  validateConstraint(tableName: string, constraintName: string): Promise<void>;
+
+  validateCheckConstraint(
+    tableName: string,
+    nameOrOptions: string | { name: string },
+  ): Promise<void>;
+
+  validateForeignKey(
+    fromTable: string,
+    toTable?: string,
+    options?: Omit<ForeignKeyLookupOptions, "toTable">,
+  ): Promise<void>;
+
+  typeToSql(
+    type: string,
+    options?: {
+      limit?: number;
+      precision?: number;
+      scale?: number;
+      array?: boolean;
+      enumType?: string;
+    },
+  ): string;
+
+  foreignKeyColumnFor(tableName: string, columnName?: string): string;
+
+  /** @internal */
+  sequenceNameFromParts(tableName: string, columnName: string, suffix: string): string;
+
+  /** @internal */
+  assertValidDeferrable(deferrable: unknown): void;
+
+  /** @internal */
+  extractForeignKeyAction(specifier: string): "cascade" | "nullify" | "restrict" | undefined;
+
+  /** @internal */
+  extractConstraintDeferrable(
+    deferrable: boolean,
+    deferred: boolean,
+  ): "deferred" | "immediate" | false;
+
+  foreignKeys(tableName: string): Promise<ForeignKeyDefinition[]>;
+
+  quotedIncludeColumnsForIndex(columnNames: string | string[]): string;
+
+  /** @internal */
+  columnNamesFromColumnNumbers(tableOid: number, columnNumbers: number[]): Promise<string[]>;
+
+  tables(): Promise<string[]>;
+
+  views(): Promise<string[]>;
+
+  tableExists(name: string): Promise<boolean>;
+
+  foreignKeyExists(
+    fromTable: string,
+    toTable?: string | ForeignKeyLookupOptions,
+    options?: Omit<ForeignKeyLookupOptions, "toTable">,
+  ): Promise<boolean>;
+
+  createDatabase(name: string, options?: CreateDatabaseOptions): Promise<void>;
+
+  createEnum(name: string, values: string[], options?: Record<string, unknown>): Promise<void>;
+
+  dropEnum(name: string, options?: { ifExists?: boolean }): Promise<void>;
+
+  /**
+   * @noRailsEquivalent CONVERGEABLE (story: delete-invented-pg-range-ddl-helpers).
+   * Rails has no range-type DDL helper anywhere — ranges are created with a raw
+   *   `execute("CREATE
+   *   TYPE … AS RANGE")`. trails adds `createRange`/`dropRange` following Rails' own type-DDL helpers
+   *   (create_enum/drop_enum/rename_enum, postgresql_adapter.rb:541-615), including their
+   *   `reload_type_map` epilogue; the implementation and the full justification live at the emitting
+   *   call site, connection-adapters/postgresql/schema-statements-class.ts. Deliberately
+   *   PostgreSQL-only: the no-op stubs that shadowed these on AbstractAdapter were deleted rather
+   *   than allowlisted, since Rails stubs only the enum quartet on the base.
+   */
+  createRange(name: string, options: { subtype: string; subtypeDiff?: string }): Promise<void>;
+
+  /**
+   * @noRailsEquivalent CONVERGEABLE (story: delete-invented-pg-range-ddl-helpers).
+   * Rails has no range-type DDL helper anywhere — ranges are created with a raw
+   *   `execute("CREATE
+   *   TYPE … AS RANGE")`. trails adds `createRange`/`dropRange` following Rails' own type-DDL helpers
+   *   (create_enum/drop_enum/rename_enum, postgresql_adapter.rb:541-615), including their
+   *   `reload_type_map` epilogue; the implementation and the full justification live at the emitting
+   *   call site, connection-adapters/postgresql/schema-statements-class.ts. Deliberately
+   *   PostgreSQL-only: the no-op stubs that shadowed these on AbstractAdapter were deleted rather
+   *   than allowlisted, since Rails stubs only the enum quartet on the base.
+   */
+  dropRange(name: string, options?: { ifExists?: boolean }): Promise<void>;
+
+  renameEnum(name: string, newNameOrOptions: string | { to: string }): Promise<void>;
+
+  addEnumValue(
+    name: string,
+    value: string,
+    options?: { before?: string; after?: string; ifNotExists?: boolean },
+  ): Promise<void>;
+
+  renameEnumValue(name: string, options: { from: string; to: string }): Promise<void>;
+
+  dropDatabase(name: string): Promise<void>;
+
+  recreateDatabase(name: string, options?: CreateDatabaseOptions): Promise<void>;
+
+  dropTable(
+    ...args:
+      | [string, ...string[]]
+      | [string, ...string[], { ifExists?: boolean; force?: "cascade" }]
+  ): Promise<void>;
+
+  currentDatabase(): Promise<string>;
+
+  encoding(): Promise<string>;
+
+  collation(): Promise<string>;
+
+  ctype(): Promise<string>;
+
+  schemaSearchPath(): Promise<string>;
+
+  setSchemaSearchPath(searchPath: string | null): Promise<void>;
+
+  clientMinMessages(): Promise<string>;
+
+  setClientMinMessages(level: string): Promise<void>;
+
+  tableComment(tableName: string): Promise<string | null>;
+
+  tablePartitionDefinition(tableName: string): Promise<string | null>;
+
+  inheritedTableNames(tableName: string): Promise<string[]>;
+
+  tableOptions(tableName: string): Promise<Record<string, unknown>>;
+
+  serialSequence(tableName: string, column: string): Promise<string | null>;
+
+  defaultSequenceName(tableName: string, pk?: string | string[]): Promise<string | null>;
+
+  setPkSequenceBang(tableName: string, value: number): Promise<void>;
+
+  resetPkSequenceBang(
+    tableName: string,
+    pk?: string | null,
+    sequence?: string | null,
+  ): Promise<void>;
+
+  primaryKeys(tableName: string): Promise<string[]>;
+
+  checkConstraints(tableName: string): Promise<CheckConstraintDefinition[]>;
+
+  exclusionConstraintOptions(
+    tableName: string,
+    expression: string,
+    options: Record<string, unknown>,
+  ): Record<string, unknown>;
+
+  addExclusionConstraint(
+    tableName: string,
+    expression: string,
+    options?: ExclusionConstraintOptions,
+  ): Promise<void>;
+
+  removeExclusionConstraint(
+    tableName: string,
+    expressionOrOptions?: string | Record<string, unknown> | null,
+    options?: Record<string, unknown>,
+  ): Promise<void>;
+
+  uniqueConstraintOptions(
+    tableName: string,
+    columnName: string | string[] | null | undefined,
+    options: Record<string, unknown>,
+  ): Record<string, unknown>;
+
+  addUniqueConstraint(
+    tableName: string,
+    columnName?: string | string[] | null,
+    options?: UniqueConstraintOptions,
+  ): Promise<void>;
+
+  removeUniqueConstraint(
+    tableName: string,
+    columnNameOrOptions?: string | string[] | Record<string, unknown> | null,
+    options?: Record<string, unknown>,
+  ): Promise<void>;
+
+  updateTableDefinition(tableName: string, base?: unknown): PgTable;
+
+  exclusionConstraints(tableName: string): Promise<ExclusionConstraintDefinition[]>;
+
+  uniqueConstraints(tableName: string): Promise<UniqueConstraintDefinition[]>;
+
+  /** @internal */
+  exclusionConstraintName(tableName: string, options?: Record<string, unknown>): string;
+
+  /** @internal */
+  exclusionConstraintFor(
+    tableName: string,
+    options?: Record<string, unknown>,
+  ): Promise<ExclusionConstraintDefinition | undefined>;
+
+  /** @internal */
+  exclusionConstraintForBang(
+    tableName: string,
+    expression?: string | null,
+    options?: Record<string, unknown>,
+  ): Promise<ExclusionConstraintDefinition>;
+
+  /** @internal */
+  uniqueConstraintName(tableName: string, options?: Record<string, unknown>): string;
+
+  /** @internal */
+  uniqueConstraintFor(
+    tableName: string,
+    options?: Record<string, unknown>,
+  ): Promise<UniqueConstraintDefinition | undefined>;
+
+  /** @internal */
+  uniqueConstraintForBang(
+    tableName: string,
+    column?: string | string[] | null,
+    options?: Record<string, unknown>,
+  ): Promise<UniqueConstraintDefinition>;
+
+  /**
+   * Fetch raw column metadata rows from pg_attribute for a table.
+   * Mirrors: PostgreSQLAdapter#column_definitions
+   * @internal
+   */
+  columnDefinitions(tableName: string): Promise<
+    {
+      attname: string;
+      format_type: string;
+      pg_get_expr: string | null;
+      attnotnull: boolean;
+      atttypid: number;
+      atttypmod: number;
+      collname: string | null;
+      comment: string | null;
+      identity: string | null;
+      attgenerated: string | null;
+    }[]
+  >;
 }
 
 export type IndexDefinition = PgIndexDefinition;
@@ -5423,6 +5203,9 @@ dirtiesQueryCache(PostgreSQLAdapter, "execInsert", "rollbackDbTransaction", "rol
 // `internal_exec_query`.
 captureUnwrappedExecute(PostgreSQLAdapter);
 dirtiesQueryCache(PostgreSQLAdapter, "execQuery", "execute");
+
+// Rails: `include PostgreSQL::SchemaStatements` (postgresql_adapter.rb:185).
+include(PostgreSQLAdapter, PostgreSQLSchemaStatements);
 
 // Mirrors `ActiveSupport.run_load_hooks(:active_record_postgresqladapter, self)`
 // at the bottom of Rails' postgresql_adapter.rb — lets railtie initializers

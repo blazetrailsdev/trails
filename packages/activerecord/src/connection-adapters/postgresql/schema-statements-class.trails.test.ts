@@ -1,8 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { PostgreSQLSchemaStatements } from "./schema-statements-class.js";
+import { PostgreSQLAdapter } from "../postgresql-adapter.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
 import { Table as PgTable } from "./schema-definitions.js";
+
+// The bodies under test are prototype methods on the adapter, so give the fake
+// adapter that prototype and call them the way production does.
+function withSchemaStatements(adapter: DatabaseAdapter): PostgreSQLAdapter {
+  return Object.setPrototypeOf(adapter, PostgreSQLAdapter.prototype) as PostgreSQLAdapter;
+}
 
 interface FakeOptions {
   logger?: { warn: (msg: string) => void };
@@ -58,7 +64,7 @@ function makeAdapter(options: FakeOptions = {}) {
 // silently changing emitted DDL and dumped schema.
 describe("PostgreSQLSchemaStatements constraint name digests", () => {
   it("derives the exclusion constraint name Rails derives", () => {
-    const ss = new PostgreSQLSchemaStatements(makeAdapter().adapter);
+    const ss = withSchemaStatements(makeAdapter().adapter);
     expect(
       ss.exclusionConstraintName("invoices", {
         expression: "daterange(start_date, end_date) WITH &&",
@@ -67,21 +73,21 @@ describe("PostgreSQLSchemaStatements constraint name digests", () => {
   });
 
   it("derives the unique constraint name Rails derives from a column list", () => {
-    const ss = new PostgreSQLSchemaStatements(makeAdapter().adapter);
+    const ss = withSchemaStatements(makeAdapter().adapter);
     expect(ss.uniqueConstraintName("sections", { column: ["position"] })).toBe(
       "uniq_rails_1e07660b77",
     );
   });
 
   it("derives the unique constraint name Rails derives from usingIndex", () => {
-    const ss = new PostgreSQLSchemaStatements(makeAdapter().adapter);
+    const ss = withSchemaStatements(makeAdapter().adapter);
     expect(ss.uniqueConstraintName("sections", { usingIndex: "unique_index" })).toBe(
       "uniq_rails_79b901ffb4",
     );
   });
 
   it("returns an explicit :name option unchanged", () => {
-    const ss = new PostgreSQLSchemaStatements(makeAdapter().adapter);
+    const ss = withSchemaStatements(makeAdapter().adapter);
     expect(ss.exclusionConstraintName("invoices", { name: "my_excl", expression: "x" })).toBe(
       "my_excl",
     );
@@ -94,7 +100,7 @@ describe("PostgreSQLSchemaStatements constraint name digests", () => {
 describe("PostgreSQLSchemaStatements sequence helpers warn without a sequence", () => {
   it("setPkSequenceBang warns when the table has a primary key but no sequence", async () => {
     const warn = vi.fn();
-    const ss = new PostgreSQLSchemaStatements(makeAdapter({ logger: { warn } }).adapter);
+    const ss = withSchemaStatements(makeAdapter({ logger: { warn } }).adapter);
     vi.spyOn(ss, "pkAndSequenceFor").mockResolvedValue(["id", null]);
     await ss.setPkSequenceBang("postgresql_uuids", 42);
     expect(warn).toHaveBeenCalledWith(
@@ -104,7 +110,7 @@ describe("PostgreSQLSchemaStatements sequence helpers warn without a sequence", 
 
   it("resetPkSequenceBang warns when the table has a primary key but no sequence", async () => {
     const warn = vi.fn();
-    const ss = new PostgreSQLSchemaStatements(makeAdapter({ logger: { warn } }).adapter);
+    const ss = withSchemaStatements(makeAdapter({ logger: { warn } }).adapter);
     vi.spyOn(ss, "pkAndSequenceFor").mockResolvedValue(["id", null]);
     await ss.resetPkSequenceBang("postgresql_uuids");
     expect(warn).toHaveBeenCalledWith(
@@ -113,14 +119,14 @@ describe("PostgreSQLSchemaStatements sequence helpers warn without a sequence", 
   });
 
   it("stays silent when no logger is configured", async () => {
-    const ss = new PostgreSQLSchemaStatements(makeAdapter().adapter);
+    const ss = withSchemaStatements(makeAdapter().adapter);
     vi.spyOn(ss, "pkAndSequenceFor").mockResolvedValue(["id", null]);
     await expect(ss.setPkSequenceBang("postgresql_uuids", 42)).resolves.toBeUndefined();
   });
 
   it("does not warn when the table has no primary key at all", async () => {
     const warn = vi.fn();
-    const ss = new PostgreSQLSchemaStatements(makeAdapter({ logger: { warn } }).adapter);
+    const ss = withSchemaStatements(makeAdapter({ logger: { warn } }).adapter);
     vi.spyOn(ss, "pkAndSequenceFor").mockResolvedValue(null);
     await ss.setPkSequenceBang("postgresql_uuids", 42);
     expect(warn).not.toHaveBeenCalled();
@@ -135,7 +141,7 @@ describe("PostgreSQLSchemaStatements#indexNameExists", () => {
     const { adapter, sql } = makeAdapter({
       queryValue: async () => 1,
     });
-    const ss = new PostgreSQLSchemaStatements(adapter);
+    const ss = withSchemaStatements(adapter);
     expect(await ss.indexNameExists("my_schema.things", "my_schema.index_a")).toBe(true);
     expect(sql[0]).toContain("i.relname = 'index_a'");
     expect(sql[0]).not.toContain("'my_schema.index_a'");
@@ -157,7 +163,7 @@ describe("PostgreSQLSchemaStatements#pkAndSequenceFor", () => {
         },
       ],
     });
-    const ss = new PostgreSQLSchemaStatements(adapter);
+    const ss = withSchemaStatements(adapter);
     expect(await ss.pkAndSequenceFor("things")).toEqual([
       "id",
       { schema: "public", name: "things_id_seq" },
@@ -171,7 +177,7 @@ describe("PostgreSQLSchemaStatements#pkAndSequenceFor", () => {
         throw new Error("boom");
       },
     });
-    const ss = new PostgreSQLSchemaStatements(adapter);
+    const ss = withSchemaStatements(adapter);
     expect(await ss.pkAndSequenceFor("things")).toBeNull();
   });
 });
@@ -180,7 +186,7 @@ describe("PostgreSQLSchemaStatements#resetPkSequenceBang", () => {
   // Ruby's `max_pk ? true : false` is a nil check; 0 is truthy in Ruby.
   it("emits setval(..., 0, true) when the max primary key is 0", async () => {
     const { adapter, sql } = makeAdapter({ queryValue: async () => 0 });
-    const ss = new PostgreSQLSchemaStatements(adapter);
+    const ss = withSchemaStatements(adapter);
     await ss.resetPkSequenceBang("things", "id", "public.things_id_seq");
     expect(sql.at(-1)).toContain(`SELECT setval('"public"."things_id_seq"', 0, true)`);
   });
@@ -189,7 +195,7 @@ describe("PostgreSQLSchemaStatements#resetPkSequenceBang", () => {
     const { adapter, sql } = makeAdapter({
       queryValue: async (text) => (text.includes("seqmin") ? 1 : null),
     });
-    const ss = new PostgreSQLSchemaStatements(adapter);
+    const ss = withSchemaStatements(adapter);
     await ss.resetPkSequenceBang("things", "id", "public.things_id_seq");
     expect(sql.at(-1)).toContain(`SELECT setval('"public"."things_id_seq"', 1, false)`);
   });
@@ -198,7 +204,7 @@ describe("PostgreSQLSchemaStatements#resetPkSequenceBang", () => {
 describe("PostgreSQLSchemaStatements sequenceNameFromParts identifier budget", () => {
   it("truncates against the server's maxIdentifierLength, not a hardcoded 63", () => {
     const { adapter } = makeAdapter({ maxIdentifierLength: 31 });
-    const ss = new PostgreSQLSchemaStatements(adapter);
+    const ss = withSchemaStatements(adapter);
     const name = ss.sequenceNameFromParts("a".repeat(40), "b".repeat(10), "seq");
     expect(name).toBe(`${"a".repeat(16)}_${"b".repeat(10)}_seq`);
     expect(name.length).toBe(31);
@@ -206,7 +212,7 @@ describe("PostgreSQLSchemaStatements sequenceNameFromParts identifier budget", (
 
   it("splits the overage across column and table under a short limit", () => {
     const { adapter } = makeAdapter({ maxIdentifierLength: 31 });
-    const ss = new PostgreSQLSchemaStatements(adapter);
+    const ss = withSchemaStatements(adapter);
     const name = ss.sequenceNameFromParts("a".repeat(40), "b".repeat(30), "seq");
     expect(name).toBe(`${"a".repeat(13)}_${"b".repeat(13)}_seq`);
     expect(name.length).toBe(31);
@@ -214,7 +220,7 @@ describe("PostgreSQLSchemaStatements sequenceNameFromParts identifier budget", (
 
   it("leaves names within the limit untouched", () => {
     const { adapter } = makeAdapter({ maxIdentifierLength: 31 });
-    const ss = new PostgreSQLSchemaStatements(adapter);
+    const ss = withSchemaStatements(adapter);
     expect(ss.sequenceNameFromParts("things", "id", "seq")).toBe("things_id_seq");
   });
 });
@@ -222,13 +228,13 @@ describe("PostgreSQLSchemaStatements sequenceNameFromParts identifier budget", (
 describe("PostgreSQLSchemaStatements#typeToSql enum validation", () => {
   it("resolves an enum column to its enum type", () => {
     const { adapter } = makeAdapter();
-    const ss = new PostgreSQLSchemaStatements(adapter);
+    const ss = withSchemaStatements(adapter);
     expect(ss.typeToSql("enum", { enumType: "color" })).toBe("color");
   });
 
   it("raises ArgumentError when enum_type is absent", () => {
     const { adapter } = makeAdapter();
-    const ss = new PostgreSQLSchemaStatements(adapter);
+    const ss = withSchemaStatements(adapter);
     expect(() => ss.typeToSql("enum")).toThrow(
       new ArgumentError("enum_type is required for enums"),
     );
@@ -238,7 +244,7 @@ describe("PostgreSQLSchemaStatements#typeToSql enum validation", () => {
 describe("PostgreSQLSchemaStatements#changeTable", () => {
   it("yields the PostgreSQL Table subclass", async () => {
     const { adapter } = makeAdapter();
-    const ss = new PostgreSQLSchemaStatements(adapter);
+    const ss = withSchemaStatements(adapter);
     let yielded: unknown;
     await ss.changeTable("things", (t) => {
       yielded = t;
