@@ -2063,9 +2063,14 @@ export class MigrationContext {
     if (currentVersion !== 0 && !currentMigration) {
       throw new UnknownMigrationVersionError(currentVersion);
     }
+    // Rails' `migrations.index(current_migration)` is `Array#index`, i.e.
+    // `MigrationProxy#==` — Struct value equality, not identity. Versions are
+    // unique (`Migrator#validate`), so matching on version is that comparison.
     const migrations = migrator.migrations;
     const startIndex =
-      currentVersion === 0 ? 0 : migrations.findIndex((m) => m === currentMigration);
+      currentVersion === 0
+        ? 0
+        : migrations.findIndex((m) => m.version === currentMigration!.version);
     const finish = migrations[startIndex + steps];
     const version = finish ? Number(finish.version) : 0;
     return direction === "up" ? this.up(version) : this.down(version);

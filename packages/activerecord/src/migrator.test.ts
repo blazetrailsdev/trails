@@ -12,6 +12,7 @@ import type { MigrationProxy } from "./migration.js";
 import { Base } from "./base.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { SchemaMigration } from "./schema-migration.js";
+import { InternalMetadata } from "./internal-metadata.js";
 import { fixtures } from "./test-fixtures.js";
 import { anonymousMigration } from "./test-helpers/anonymous-migration.js";
 
@@ -73,6 +74,22 @@ describe("MigratorTest", () => {
   function migratorClass(count: number): { calls: Array<[string, number]>; migrator: Migrator } {
     const { calls, migrations } = sensors(count);
     return { calls, migrator: new Migrator(adapter, migrations) };
+  }
+
+  // Rails' migrator_class(count) subclasses MigrationContext and overrides
+  // #migrations to return the sensor list, which is why its `.new("valid", ...)`
+  // path argument is never read. Same shape here.
+  function migrationContextClass(count: number): {
+    calls: Array<[string, number]>;
+    context: MigrationContext;
+  } {
+    const { calls, migrations } = sensors(count);
+    const context = new (class extends MigrationContext {
+      override get migrations(): MigrationProxy[] {
+        return migrations;
+      }
+    })([`${MIGRATIONS_ROOT}/valid`], new SchemaMigration(adapter), new InternalMetadata(adapter));
+    return { calls, context };
   }
 
   async function seedVersions(...versions: Array<string | number>): Promise<SchemaMigration> {
@@ -452,6 +469,38 @@ describe("MigratorTest", () => {
     expect(calls).toEqual([]);
 
     expect(await migrator.currentVersion()).toBe(0);
+  });
+
+  it("migrator rollback", async () => {
+    const { context } = migrationContextClass(3);
+
+    await context.migrate();
+    expect(await context.currentVersion()).toBe(3);
+
+    await context.rollback();
+    expect(await context.currentVersion()).toBe(2);
+
+    await context.rollback();
+    expect(await context.currentVersion()).toBe(1);
+
+    await context.rollback();
+    expect(await context.currentVersion()).toBe(0);
+
+    await context.rollback();
+    expect(await context.currentVersion()).toBe(0);
+  });
+
+  it("migrator forward", async () => {
+    const { context } = migrationContextClass(3);
+
+    await context.migrate(1);
+    expect(await context.currentVersion()).toBe(1);
+
+    await context.forward(2);
+    expect(await context.currentVersion()).toBe(3);
+
+    await context.forward();
+    expect(await context.currentVersion()).toBe(3);
   });
 
   it("migrator verbosity", async () => {
