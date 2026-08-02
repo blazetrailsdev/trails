@@ -213,6 +213,31 @@ function getDefinition(modelClass: typeof Base, purpose: string): TokenDefinitio
 }
 
 /**
+ * The `token_definitions` hash. Ruby's Hash carries `fetch`, which every finder
+ * goes through (`token_definitions.fetch(purpose)`), so the port hands the same
+ * verb back rather than making each caller re-spell the unknown-purpose raise.
+ */
+type TokenDefinitionsHash = Readonly<Record<string, TokenDefinition>> & {
+  fetch(purpose: string): TokenDefinition;
+};
+
+/** `fetch` is non-enumerable so the hash still iterates as `purpose => definition`. */
+function withFetch(entries: Record<string, TokenDefinition>): TokenDefinitionsHash {
+  Object.defineProperty(entries, "fetch", {
+    value(purpose: string): TokenDefinition {
+      const definition = entries[purpose];
+      if (definition === undefined) {
+        const error = new Error(`key not found: ${JSON.stringify(purpose)}`);
+        error.name = "KeyError";
+        throw error;
+      }
+      return definition;
+    },
+  });
+  return entries as TokenDefinitionsHash;
+}
+
+/**
  * Rails: `class_attribute :token_definitions, default: {}` — the per-model
  * `purpose => TokenDefinition` map populated by `generates_token_for`. The
  * `class_attribute` reader inherits the parent value until the subclass writes,
@@ -225,11 +250,9 @@ function getDefinition(modelClass: typeof Base, purpose: string): TokenDefinitio
  *
  * Mirrors: ActiveRecord::TokenFor#token_definitions
  */
-export function tokenDefinitions(
-  modelClass: typeof Base,
-): Readonly<Record<string, TokenDefinition>> {
+export function tokenDefinitions(modelClass: typeof Base): TokenDefinitionsHash {
   const map = resolvedDefinitions(modelClass);
-  return map ? Object.fromEntries(map) : {};
+  return withFetch(map ? Object.fromEntries(map) : {});
 }
 
 /**
