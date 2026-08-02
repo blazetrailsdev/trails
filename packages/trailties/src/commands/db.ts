@@ -18,6 +18,7 @@ import { discoverMigrations } from "../migration-loader.js";
 import {
   DatabaseTasks,
   HashConfig,
+  InternalMetadata,
   Migrator,
   eachCurrentEnvironment,
 } from "@blazetrails/activerecord";
@@ -377,12 +378,23 @@ function createMigrator(
   raw?: RawConfig,
 ): Migrator {
   const envName = resolveEnv();
-  const internalMetadataEnabled =
-    raw == null || (raw as { useMetadataTable?: boolean }).useMetadataTable !== false;
   return new Migrator(adapter, migrations, {
     environment: envName,
-    internalMetadataEnabled,
+    internalMetadataEnabled: metadataTableEnabled(raw),
   });
+}
+
+function metadataTableEnabled(raw?: RawConfig): boolean {
+  return raw == null || (raw as { useMetadataTable?: boolean }).useMetadataTable !== false;
+}
+
+/**
+ * `db:environment:set` stamps the metadata table without running migrations —
+ * Rails reads it off the connection pool there (`databases.rake:12-15`)
+ * rather than going through a `Migrator`.
+ */
+function internalMetadataFor(adapter: DatabaseAdapter, raw?: RawConfig): InternalMetadata {
+  return new InternalMetadata(adapter, { enabled: metadataTableEnabled(raw) });
 }
 
 async function runMigrate(
@@ -722,12 +734,12 @@ export function dbCommand(): Command {
     .action(async (opts: DatabaseOpts) => {
       await forEachDatabase(opts, async ({ adapter, raw, prefix }) => {
         const envName = resolveEnv();
-        const migrator = createMigrator(adapter, [], raw);
-        if (!migrator.internalMetadata.enabled) {
+        const internalMetadata = internalMetadataFor(adapter, raw);
+        if (!internalMetadata.enabled) {
           const { EnvironmentStorageError } = await import("@blazetrails/activerecord");
           throw new EnvironmentStorageError();
         }
-        await migrator.internalMetadata.createTableAndSetFlags(envName);
+        await internalMetadata.createTableAndSetFlags(envName);
         console.log(`${prefix}Stamped schema with environment: ${envName}`);
       });
     });

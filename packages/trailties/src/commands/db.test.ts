@@ -1144,7 +1144,7 @@ export class CreatePosts extends Migration {
   it("checkProtectedEnvironmentsBang raises when stored env is protected", async () => {
     const {
       DatabaseTasks,
-      Migrator,
+      InternalMetadata,
       ProtectedEnvironmentError,
       DatabaseConfigurations,
       HashConfig,
@@ -1155,13 +1155,13 @@ export class CreatePosts extends Migration {
     const dbFile = path.join(tmpDir, "prod.sqlite3");
     const adapter = new BetterSQLite3Adapter(dbFile);
     try {
-      const migrator = new Migrator(adapter, []);
+      const internalMetadata = new InternalMetadata(adapter);
       // Rails' last_stored_environment returns nil at current_version == 0, so
       // record a version (as database_tasks_test.rb does) to make the DB stamped.
       await new SchemaMigration(adapter).createTable();
       await new SchemaMigration(adapter).createVersion("1");
-      await migrator.internalMetadata.createTable();
-      await migrator.internalMetadata.set("environment", "production");
+      await internalMetadata.createTable();
+      await internalMetadata.set("environment", "production");
     } finally {
       await adapter.close();
     }
@@ -1188,7 +1188,7 @@ export class CreatePosts extends Migration {
   it("checkProtectedEnvironmentsBang raises EnvironmentMismatchError when stored != current", async () => {
     const {
       DatabaseTasks,
-      Migrator,
+      InternalMetadata,
       EnvironmentMismatchError,
       DatabaseConfigurations,
       HashConfig,
@@ -1199,13 +1199,13 @@ export class CreatePosts extends Migration {
     const dbFile = path.join(tmpDir, "staging.sqlite3");
     const adapter = new BetterSQLite3Adapter(dbFile);
     try {
-      const migrator = new Migrator(adapter, []);
+      const internalMetadata = new InternalMetadata(adapter);
       // Rails' last_stored_environment returns nil at current_version == 0, so
       // record a version (as database_tasks_test.rb does) to make the DB stamped.
       await new SchemaMigration(adapter).createTable();
       await new SchemaMigration(adapter).createVersion("1");
-      await migrator.internalMetadata.createTable();
-      await migrator.internalMetadata.set("environment", "staging");
+      await internalMetadata.createTable();
+      await internalMetadata.set("environment", "staging");
     } finally {
       await adapter.close();
     }
@@ -1227,7 +1227,7 @@ export class CreatePosts extends Migration {
   });
 
   it("DISABLE_DATABASE_ENVIRONMENT_CHECK bypasses the check", async () => {
-    const { DatabaseTasks, Migrator, DatabaseConfigurations, HashConfig } =
+    const { DatabaseTasks, InternalMetadata, DatabaseConfigurations, HashConfig } =
       await import("@blazetrails/activerecord");
     const { BetterSQLite3Adapter } =
       await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
@@ -1235,13 +1235,13 @@ export class CreatePosts extends Migration {
     const dbFile = path.join(tmpDir, "prod2.sqlite3");
     const adapter = new BetterSQLite3Adapter(dbFile);
     try {
-      const migrator = new Migrator(adapter, []);
+      const internalMetadata = new InternalMetadata(adapter);
       // Rails' last_stored_environment returns nil at current_version == 0, so
       // record a version (as database_tasks_test.rb does) to make the DB stamped.
       await new SchemaMigration(adapter).createTable();
       await new SchemaMigration(adapter).createVersion("1");
-      await migrator.internalMetadata.createTable();
-      await migrator.internalMetadata.set("environment", "production");
+      await internalMetadata.createTable();
+      await internalMetadata.set("environment", "production");
     } finally {
       await adapter.close();
     }
@@ -1267,7 +1267,8 @@ export class CreatePosts extends Migration {
   });
 
   it("Migrator.checkProtectedEnvironments is read-only and a no-op on fresh DB", async () => {
-    const { Migrator, ProtectedEnvironmentError, Base } = await import("@blazetrails/activerecord");
+    const { Migrator, InternalMetadata, ProtectedEnvironmentError, Base } =
+      await import("@blazetrails/activerecord");
     const { BetterSQLite3Adapter } =
       await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
 
@@ -1284,13 +1285,14 @@ export class CreatePosts extends Migration {
       expect(await migrator.protectedEnvironment()).toBe(false);
 
       // Verify no ar_internal_metadata was created by the check.
-      expect(await migrator.internalMetadata.tableExists()).toBe(false);
+      const internalMetadata = new InternalMetadata(adapter);
+      expect(await internalMetadata.tableExists()).toBe(false);
 
       // After stamping as production, both calls reflect the protected state.
       await new SchemaMigration(adapter).createTable();
       await new SchemaMigration(adapter).createVersion("1");
-      await migrator.internalMetadata.createTable();
-      await migrator.internalMetadata.set("environment", "production");
+      await internalMetadata.createTable();
+      await internalMetadata.set("environment", "production");
       expect(await migrator.protectedEnvironment()).toBe(true);
       await expect(migrator.checkProtectedEnvironments()).rejects.toBeInstanceOf(
         ProtectedEnvironmentError,
@@ -1323,24 +1325,6 @@ export class CreatePosts extends Migration {
       await expect(disabledMeta.set("environment", "test")).rejects.toBeInstanceOf(
         EnvironmentStorageError,
       );
-    } finally {
-      await adapter.close();
-    }
-  });
-
-  it("Migrator plumbs internalMetadataEnabled=false through to InternalMetadata", async () => {
-    const { Migrator, EnvironmentStorageError } = await import("@blazetrails/activerecord");
-    const { BetterSQLite3Adapter } =
-      await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
-
-    const dbFile = path.join(tmpDir, "disabled-migrator.sqlite3");
-    const adapter = new BetterSQLite3Adapter(dbFile);
-    try {
-      const migrator = new Migrator(adapter, [], { internalMetadataEnabled: false });
-      expect(migrator.internalMetadata.enabled).toBe(false);
-      await expect(
-        migrator.internalMetadata.set("environment", "production"),
-      ).rejects.toBeInstanceOf(EnvironmentStorageError);
     } finally {
       await adapter.close();
     }
@@ -1420,7 +1404,7 @@ export class CreatePosts extends Migration {
   it("SQLiteDatabaseTasks.truncateAll deletes user tables but keeps schema_migrations + ar_internal_metadata", async () => {
     const {
       SQLiteDatabaseTasks,
-      Migrator,
+      InternalMetadata,
       HashConfig: HC,
     } = await import("@blazetrails/activerecord");
     const { BetterSQLite3Adapter } =
@@ -1431,8 +1415,7 @@ export class CreatePosts extends Migration {
     try {
       await seedAdapter.executeMutation("CREATE TABLE posts (id INTEGER PRIMARY KEY, title TEXT)");
       await seedAdapter.executeMutation("INSERT INTO posts (title) VALUES ('a'), ('b')");
-      const migrator = new Migrator(seedAdapter, []);
-      await migrator.internalMetadata.createTableAndSetFlags("development");
+      await new InternalMetadata(seedAdapter).createTableAndSetFlags("development");
       await seedAdapter.executeMutation(
         "CREATE TABLE IF NOT EXISTS schema_migrations (version VARCHAR NOT NULL PRIMARY KEY)",
       );

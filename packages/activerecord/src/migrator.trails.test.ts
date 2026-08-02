@@ -73,7 +73,7 @@ describe("Migrator trails extensions", () => {
       environment: "test",
     });
     await migrator.up();
-    const env = await migrator.internalMetadata.get("environment");
+    const env = await new InternalMetadata(adapter).get("environment");
     expect(env).toBe(envName(adapter));
   });
 
@@ -205,7 +205,7 @@ describe("Migrator trails extensions", () => {
     // Rails' record_environment returns early when down? (migration.rb:1511).
     const migrator = new Migrator(adapter, [makeMigration("1", "M1")], { environment: "test" });
     await migrator.down();
-    expect(await migrator.internalMetadata.get("environment")).toBeNull();
+    expect(await new InternalMetadata(adapter).get("environment")).toBeNull();
   });
 
   it("checkEnvironment raises NoEnvironmentInSchemaError when no environment stored", async () => {
@@ -218,7 +218,7 @@ describe("Migrator trails extensions", () => {
       environment: "production",
     });
     await migrator1.up();
-    await migrator1.internalMetadata.set("environment", "production");
+    await new InternalMetadata(adapter).set("environment", "production");
 
     const migrator2 = new Migrator(adapter, [makeMigration("1", "M1")], {
       environment: "development",
@@ -231,7 +231,7 @@ describe("Migrator trails extensions", () => {
       environment: "development",
     });
     await migrator.up();
-    await migrator.internalMetadata.set("environment", "development");
+    await new InternalMetadata(adapter).set("environment", "development");
     await expect(migrator.checkEnvironment()).resolves.toBeUndefined();
   });
 
@@ -240,7 +240,7 @@ describe("Migrator trails extensions", () => {
       environment: "production",
     });
     await migrator.up();
-    await migrator.internalMetadata.set("environment", "production");
+    await new InternalMetadata(adapter).set("environment", "production");
     await expect(migrator.checkProtectedEnvironments()).rejects.toThrow(ProtectedEnvironmentError);
   });
 
@@ -261,7 +261,7 @@ describe("Migrator trails extensions", () => {
       environment: "development",
     });
     await migrator.up();
-    await migrator.internalMetadata.set("environment", "development");
+    await new InternalMetadata(adapter).set("environment", "development");
     await expect(migrator.checkProtectedEnvironments()).resolves.toBeUndefined();
   });
 
