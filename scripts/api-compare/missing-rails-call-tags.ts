@@ -16,16 +16,17 @@
 export const TAG = "@missingRailsCall";
 
 /**
- * The reason `api:build` stamps on a tag it mints with nothing curated to
- * migrate — the RFC 0047 seed prose, shared with the wide baseline's
- * `DEFAULT_REASON` (an entry carrying it is what the unreviewed high-water
- * mark counts).
+ * The wide baseline's seeded `reason` — the RFC 0047 seed prose. An entry
+ * carrying it is what the unreviewed high-water mark counts.
  *
- * A tag carrying it is deliberately NOT a justification: `api:build` mints one
- * per still-missing call, so if the placeholder suppressed, a single
- * `api:build --package <pkg>` run would move the whole baseline into inert
- * tags and zero the wide gate. It has to be replaced with real per-entry prose
- * before the call leaves the population.
+ * A tag carrying it is deliberately NOT a justification: it stands in for a
+ * reason rather than arguing one, so if it suppressed, the whole baseline would
+ * be blessed by prose nobody wrote. It has to be replaced with real per-entry
+ * prose before the call leaves the population.
+ *
+ * `api:build` no longer MINTS tags carrying it (RFC 0083) — it only writes a
+ * tag it has curated prose to migrate — but tags predating that policy still
+ * carry it in the tree.
  */
 export const DEFAULT_REASON =
   "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; " +
@@ -60,8 +61,8 @@ const ANY_TAG_LINE = /^\s*\*?\s?@\S/;
  *  `@` tag) attach to the preceding entry.
  *
  *  An empty reason is a hard error, matching `@noRailsEquivalent` (RFC 0080):
- *  every tag in the tree is written with a reason — the generator always emits
- *  the curated baseline row's prose or a placeholder — so a bare tag is
+ *  every tag in the tree is written with a reason — the generator only emits a
+ *  tag when it has a curated baseline row's prose to carry — so a bare tag is
  *  necessarily hand-authored, and backfilling it with a placeholder would turn
  *  an unjustified allowlist entry into a silently blessed one. The family's
  *  empty-reason contract is stated in

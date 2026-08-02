@@ -64,7 +64,7 @@ describe("parseJsdoc", () => {
 describe("reconcile", () => {
   it("keeps still-missing, adds new, drops satisfied", () => {
     const { entries } = parseJsdoc("/**\n * @missingRailsCall a — kept note\n */");
-    const r = reconcile(entries, new Set(["a", "b"]), reasonFor);
+    const r = reconcile(entries, new Set(["a", "b"]), () => "curated");
     expect(r.kept.map((e) => e.call)).toEqual(["a"]);
     expect(r.kept[0].reason).toBe("kept note");
     expect(r.added.map((e) => e.call)).toEqual(["b"]);
@@ -73,9 +73,23 @@ describe("reconcile", () => {
     expect(r2.dropped.map((e) => e.call)).toEqual(["a"]);
   });
 
-  it("falls back to the placeholder when a curated reason is blank", () => {
+  it("mints no tag when the curated reason is blank", () => {
     const r = reconcile([], new Set(["a"]), () => "  ");
-    expect(r.added[0].reason).toBe(DEFAULT_TAG_REASON);
+    expect(r.added).toEqual([]);
+    expect(r.skipped).toEqual(["a"]);
+  });
+
+  it("mints no tag when the baseline reason is still the placeholder", () => {
+    const r = reconcile([], new Set(["a"]), reasonFor);
+    expect(r.added).toEqual([]);
+    expect(r.skipped).toEqual(["a"]);
+  });
+
+  it("keeps a pre-existing placeholder tag rather than rewriting it", () => {
+    const { entries } = parseJsdoc(`/**\n * @missingRailsCall a — ${DEFAULT_TAG_REASON}\n */`);
+    const r = reconcile(entries, new Set(["a"]), reasonFor);
+    expect(r.kept.map((e) => e.call)).toEqual(["a"]);
+    expect(r.skipped).toEqual([]);
   });
 });
 
@@ -115,6 +129,20 @@ describe("reconcileFileText", () => {
     expect(text!).toContain("bar(): void {}");
     expect(text!).toContain("baz(): void {}");
     expect(harvested.map((h) => h.entry.call)).toEqual(["stale_call"]);
+  });
+
+  it("produces zero edits when every missing call is still baselined by placeholder", () => {
+    const src = ["export class Foo {", "  bar(): void {}", "}"].join("\n");
+    const expectations = new Map([["bar", { rubyNames: ["bar"], calls: new Set(["save"]) }]]);
+    const r = reconcileFileText("foo.ts", src, expectations, () => DEFAULT_TAG_REASON);
+    expect(r.text).toBeNull();
+    expect(r.skipped).toBe(1);
+    expect(r.tagged).toEqual([]);
+  });
+
+  it("still harvests a human-authored reason when its call converges", () => {
+    const r = reconcileFileText("foo.ts", FILE, new Map(), () => DEFAULT_TAG_REASON);
+    expect(r.harvested.map((h) => h.entry.reason)).toEqual(["placeholder to drop"]);
   });
 
   it("is idempotent: a second run produces zero edits", () => {
