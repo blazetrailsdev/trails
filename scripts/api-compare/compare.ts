@@ -1387,6 +1387,11 @@ export function main() {
     // Same signatures, but ONLY from this package — no dep packages. Feeds the
     // calls-parity ported-with-args gate; see resolvePortedWithArgsSigs.
     const tsParamsByNameInPkg = new Map<string, ParamInfo[][]>();
+    // Per-(file, name) counterpart. Separate from tsParamsByFileName, which
+    // also holds dep-package files: relative paths collide across packages
+    // (`attribute-methods.ts` exists in both activemodel and activerecord), so
+    // a same-file lookup there would still let a dep signature open the gate.
+    const tsParamsByFileNameInPkg = new Map<string, Map<string, ParamInfo[][]>>();
     // Per-(file, name) resolved options-object keys (null = uncheckable).
     // Scoped per-FILE — unlike arity's global pool — so a sibling adapter's
     // same-named method (e.g. PostgreSQL `createDatabase`) can't lend its keys
@@ -1425,7 +1430,7 @@ export function main() {
       return byName;
     };
     const portedWithArgsSigs = (tsFile: string, name: string): ParamInfo[][] =>
-      resolvePortedWithArgsSigs(tsParamsByFileName, tsParamsByNameInPkg, tsFile, name);
+      resolvePortedWithArgsSigs(tsParamsByFileNameInPkg, tsParamsByNameInPkg, tsFile, name);
     const includeGraph = buildIncludeGraph(
       tsPkg ? [...Object.values(tsPkg.classes), ...Object.values(tsPkg.modules)] : [],
       tsPkg?.fileFunctions ?? {},
@@ -1451,6 +1456,9 @@ export function main() {
         const pkgSigs = tsParamsByNameInPkg.get(m.name) ?? [];
         pkgSigs.push(m.params);
         tsParamsByNameInPkg.set(m.name, pkgSigs);
+        const pkgByName = tsParamsByFileNameInPkg.get(file) ?? new Map<string, ParamInfo[][]>();
+        pkgByName.set(m.name, [...(pkgByName.get(m.name) ?? []), m.params]);
+        tsParamsByFileNameInPkg.set(file, pkgByName);
       }
       const byName = tsParamsByFileName.get(file) ?? new Map<string, ParamInfo[][]>();
       byName.set(m.name, [...(byName.get(m.name) ?? []), m.params]);
