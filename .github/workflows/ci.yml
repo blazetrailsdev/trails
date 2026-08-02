@@ -17,6 +17,10 @@ on:
     #                         only main / the weekly sweep / workflow_dispatch).
     #                         Opting in also gates the merge on it: the job is
     #                         in the `ci` aggregator's `needs:`.
+    #   run-guides          — the Guides Code Type Check (otherwise only
+    #                         main / the weekly sweep / workflow_dispatch).
+    #                         Opting in also gates the merge on it: the job is
+    #                         in the `ci` aggregator's `needs:`.
     #   run-db-adapters     — force the PostgreSQL + MariaDB AR suites on a
     #                         draft PR that doesn't touch adapter paths; they
     #                         run unconditionally once it is ready for review.
@@ -625,11 +629,14 @@ jobs:
           fi
           echo "No forbidden Claude attribution found in commit messages."
 
-  # Draft-deferred like the PG/MariaDB suites: this is a documentation-drift
-  # merge gate (guide snippets vs. the public type surface), not review signal,
-  # and GUIDES_PKGS_RE spans every AR-adjacent package so it fired on nearly
-  # every source PR. `ready_for_review` is in the workflow's `on:` types, so a
-  # PR can't reach ready with no event left to start it.
+  # Off on PRs entirely. This is a documentation-drift gate — guide snippets vs.
+  # the public type surface — not review signal, and GUIDES_PKGS_RE spans every
+  # AR-adjacent package, so it fired on nearly every source PR to tell nobody
+  # anything. It runs on `main`, on the Monday sweep (where `changes` forces
+  # every gate true), on `workflow_dispatch`, and on a PR labelled
+  # `run-guides`. It is in the `ci` aggregator's `needs:`, so whenever it does
+  # run a failure blocks the merge; drift introduced by a PR is caught by the
+  # push-to-main run and the weekly sweep instead of by that PR.
   guides-typecheck:
     name: Guides Code Type Check
     needs: changes
@@ -637,7 +644,7 @@ jobs:
       needs.changes.outputs.docs_only != 'true' &&
       needs.changes.outputs.guides_affected == 'true' &&
       (github.event_name != 'pull_request' ||
-      github.event.pull_request.draft == false)
+       contains(github.event.pull_request.labels.*.name, 'run-guides'))
     runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 20
     steps:
@@ -1872,7 +1879,7 @@ jobs:
           SQLITE_MEM_UNLABELLED: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'run-sqlite-mem') }}
           MYSQL_PREPARED_UNLABELLED: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'run-mysql-prepared') }}
           DB_ADAPTERS_DRAFT_DEFERRED: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft && needs.changes.outputs.db_adapter_affected != 'true' && !contains(github.event.pull_request.labels.*.name, 'run-db-adapters') }}
-          GUIDES_DRAFT_DEFERRED: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft }}
+          GUIDES_UNLABELLED: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'run-guides') }}
         run: |
           set -euo pipefail
           echo "$NEEDS_JSON"
@@ -1964,7 +1971,7 @@ jobs:
                   ;;
                 guides-typecheck)
                   if [ "$GUIDES_AFFECTED" = "false" ] || \
-                     [ "$GUIDES_DRAFT_DEFERRED" = "true" ]; then
+                     [ "$GUIDES_UNLABELLED" = "true" ]; then
                     continue
                   fi
                   ;;
@@ -2000,7 +2007,7 @@ jobs:
                   [ "$any_parity" = "false" ] && continue
                   ;;
               esac
-              echo "Unexpectedly skipped job: $job (docs_only=$DOCS_ONLY ar_affected=$AR_AFFECTED ap_affected=$AP_AFFECTED av_affected=$AV_AFFECTED rack_affected=$RACK_AFFECTED trailties_affected=$TRAILTIES_AFFECTED trails_tsc_affected=$TRAILS_TSC_AFFECTED tse_compiler_affected=$TSE_COMPILER_AFFECTED unit_tests_affected=$UNIT_TESTS_AFFECTED guides_affected=$GUIDES_AFFECTED website_affected=$WEBSITE_AFFECTED comparison_affected=$COMPARISON_AFFECTED website_label=$WEBSITE_LABEL parity_sqlite=$PARITY_SQLITE parity_postgres=$PARITY_POSTGRES parity_mysql=$PARITY_MYSQL db_adapters_draft_deferred=$DB_ADAPTERS_DRAFT_DEFERRED guides_draft_deferred=$GUIDES_DRAFT_DEFERRED)"
+              echo "Unexpectedly skipped job: $job (docs_only=$DOCS_ONLY ar_affected=$AR_AFFECTED ap_affected=$AP_AFFECTED av_affected=$AV_AFFECTED rack_affected=$RACK_AFFECTED trailties_affected=$TRAILTIES_AFFECTED trails_tsc_affected=$TRAILS_TSC_AFFECTED tse_compiler_affected=$TSE_COMPILER_AFFECTED unit_tests_affected=$UNIT_TESTS_AFFECTED guides_affected=$GUIDES_AFFECTED website_affected=$WEBSITE_AFFECTED comparison_affected=$COMPARISON_AFFECTED website_label=$WEBSITE_LABEL parity_sqlite=$PARITY_SQLITE parity_postgres=$PARITY_POSTGRES parity_mysql=$PARITY_MYSQL db_adapters_draft_deferred=$DB_ADAPTERS_DRAFT_DEFERRED guides_unlabelled=$GUIDES_UNLABELLED)"
               unexpected=1
             done < <(echo "$NEEDS_JSON" | jq -r 'to_entries[] | "\(.key) \(.value.result)"')
           fi
