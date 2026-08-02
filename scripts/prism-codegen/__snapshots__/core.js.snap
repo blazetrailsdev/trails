@@ -17,7 +17,7 @@ included(() => {
     classAttribute("_destroy_association_async_job", { instance_accessor: false, default: "ActiveRecord::DestroyAssociationAsyncJob" });
     export function destroyAssociationAsyncJob() {
         try {
-            if (this._destroyAssociationAsyncJob.isA(String)) {
+            if (typeof this._destroyAssociationAsyncJob === "string") {
                 this._destroyAssociationAsyncJob = this._destroyAssociationAsyncJob.constantize();
             }
             return this._destroyAssociationAsyncJob;
@@ -72,10 +72,10 @@ included(() => {
     }
     export function currentRole() {
         this.connectedToStack().reverseEach(hash => {
-            if (hash["role"] && hash["klasses"].isInclude(Base)) {
+            if (hash["role"] && hash["klasses"].includes(Base)) {
                 return hash["role"];
             }
-            if (hash["role"] && hash["klasses"].isInclude(this.connectionClassForSelf())) {
+            if (hash["role"] && hash["klasses"].includes(this.connectionClassForSelf())) {
                 return hash["role"];
             }
         });
@@ -83,10 +83,10 @@ included(() => {
     }
     export function currentShard() {
         this.connectedToStack().reverseEach(hash => {
-            if (hash["shard"] && hash["klasses"].isInclude(Base)) {
+            if (hash["shard"] && hash["klasses"].includes(Base)) {
                 return hash["shard"];
             }
-            if (hash["shard"] && hash["klasses"].isInclude(this.connectionClassForSelf())) {
+            if (hash["shard"] && hash["klasses"].includes(this.connectionClassForSelf())) {
                 return hash["shard"];
             }
         });
@@ -94,10 +94,10 @@ included(() => {
     }
     export function currentPreventingWrites() {
         this.connectedToStack().reverseEach(hash => {
-            if (!hash["prevent_writes"].nil() && hash["klasses"].isInclude(Base)) {
+            if (!(hash["prevent_writes"] == null) && hash["klasses"].includes(Base)) {
                 return hash["prevent_writes"];
             }
-            if (!hash["prevent_writes"].nil() && hash["klasses"].isInclude(this.connectionClassForSelf())) {
+            if (!(hash["prevent_writes"] == null) && hash["klasses"].includes(this.connectionClassForSelf())) {
                 return hash["prevent_writes"];
             }
         });
@@ -105,10 +105,10 @@ included(() => {
     }
     export function isPreventingWrites(class_name) {
         this.connectedToStack().reverseEach(hash => {
-            if (!hash["prevent_writes"].nil() && hash["klasses"].isInclude(Base)) {
+            if (!(hash["prevent_writes"] == null) && hash["klasses"].includes(Base)) {
                 return hash["prevent_writes"];
             }
-            if (!hash["prevent_writes"].nil() && hash["klasses"].isAny(klass => klass.name() === class_name)) {
+            if (!(hash["prevent_writes"] == null) && hash["klasses"].some(klass => klass.name() === class_name)) {
                 return hash["prevent_writes"];
             }
         });
@@ -169,7 +169,7 @@ export async function find(...ids, block) {
     if (!(ids.length() === 1)) {
         return __PRISM_SUPER_OUTSIDE_CORPUS("Core::ClassMethods#find");
     }
-    if (block !== undefined || this.primaryKey.nil() || this.isScopeAttributes) {
+    if (block !== undefined || this.primaryKey == null || this.isScopeAttributes) {
         return __PRISM_SUPER_OUTSIDE_CORPUS("Core::ClassMethods#find");
     }
     id = ids.first();
@@ -200,7 +200,7 @@ export function generatedAssociationMethods() {
     return this.generated_association_methods ||= __PRISM_TODO("BeginNode");
 }
 export function filterAttributes() {
-    if (this.filter_attributes.nil()) {
+    if (this.filter_attributes == null) {
         return this.superclass.filterAttributes();
     }
     else {
@@ -212,7 +212,7 @@ export function filterAttributes(filter_attributes) {
     return this.filter_attributes = filter_attributes;
 }
 export function inspectionFilter() {
-    if (this.filter_attributes.nil()) {
+    if (this.filter_attributes == null) {
         return this.superclass.inspectionFilter();
     }
     else {
@@ -286,7 +286,7 @@ export function cachedFindBy(keys, values) {
     return this.withConnection(connection => {
         statement = this.cachedFindByStatement(connection, keys, params => {
             wheres = keys.indexWith(key => {
-                if (key.isA(Array)) {
+                if (Array.isArray(key)) {
                     return [key.map(() => params.bind())];
                 }
                 else {
@@ -307,7 +307,7 @@ export function cachedFindBy(keys, values) {
 }
 export function constructor(attributes = null, block) {
     this.new_record = true;
-    this.attributes = this.class()._defaultAttributes().deepDup();
+    this.attributes = this.constructor._defaultAttributes().deepDup();
     this.initInternals();
     this.initializeInternalsCallback();
     if (block !== undefined) {
@@ -318,7 +318,7 @@ export function constructor(attributes = null, block) {
 export function initWith(coder, block) {
     let attributes;
     coder = LegacyYamlAdapter.convert(coder);
-    attributes = this.class().yamlEncoder().decode(coder);
+    attributes = this.constructor.yamlEncoder().decode(coder);
     return this.initWithAttributes(attributes, coder["new_record"], block);
 }
 export function initWithAttributes(attributes, new_record = false, block) {
@@ -344,8 +344,10 @@ export function initializeDup(other) {
 export function initAttributes(_) {
     let attrs;
     attrs = this.attributes.deepDup();
-    if (this.class().isCompositePrimaryKey()) {
-        this.primary_key.each(key => attrs.reset(key));
+    if (this.constructor.isCompositePrimaryKey()) {
+        for (const key of this.primary_key) {
+            attrs.reset(key);
+        }
     }
     else {
         attrs.reset(this.primary_key);
@@ -353,7 +355,7 @@ export function initAttributes(_) {
     return attrs;
 }
 export function encodeWith(coder) {
-    this.class().yamlEncoder().encode(this.attributes, coder);
+    this.constructor.yamlEncoder().encode(this.attributes, coder);
     coder["new_record"] = this.isNewRecord;
     return coder["active_record_yaml_version"] = 2;
 }
@@ -390,7 +392,7 @@ export function isStrictLoading() {
     return this.strict_loading;
 }
 export function strictLoadingBang(value = true, { mode = "all" } = {}) {
-    if (!["all", "n_plus_one_only"].isInclude(mode)) {
+    if (!["all", "n_plus_one_only"].includes(mode)) {
         throw new ArgumentError(`The :mode option must be one of [:all, :n_plus_one_only] but ${mode.inspect()} was provided.`);
     }
     this.strict_loading_mode = mode;
@@ -407,7 +409,7 @@ export function readonlyBang() {
     return this.readonly = true;
 }
 export function connectionHandler() {
-    return this.class().connectionHandler();
+    return this.constructor.connectionHandler();
 }
 export function inspect() {
     return this.inspectWithAttributes(this.attributesForInspect());
@@ -422,9 +424,9 @@ export function prettyPrint(pp) {
     }
     return pp.objectAddressGroup(this, () => {
         if (this.attributes) {
-            attr_names = this.attributesForInspect().select(name => this.is_hasAttribute(name.toString()));
+            attr_names = this.attributesForInspect().select(name => this.is_hasAttribute(String(name)));
             return pp.seplist(attr_names, this.proc(() => pp.text(",")), attr_name => {
-                attr_name = attr_name.toString();
+                attr_name = String(attr_name);
                 pp.breakable(" ");
                 return pp.group(1, () => {
                     pp.text(attr_name);
@@ -453,7 +455,7 @@ export function initInternals() {
     this.marked_for_destruction = false;
     this.destroyed_by_association = null;
     this._start_transaction_state = null;
-    klass = this.class();
+    klass = this.constructor;
     this.primary_key = klass.primaryKey();
     this.strict_loading = klass.strictLoadingByDefault();
     this.strict_loading_mode = klass.strictLoadingMode();
@@ -462,7 +464,7 @@ export function initInternals() {
 export function initializeInternalsCallback() {
 }
 export function isCustomInspectMethodDefined() {
-    return this.class().instanceMethod("inspect").owner() !== ActiveRecord.Base.instanceMethod("inspect").owner();
+    return this.constructor.instanceMethod("inspect").owner() !== ActiveRecord.Base.instanceMethod("inspect").owner();
 }
 export class InspectionMask extends DelegateClass(String) {
     prettyPrint(pp) {
@@ -471,24 +473,24 @@ export class InspectionMask extends DelegateClass(String) {
 }
 privateConstant("InspectionMask");
 export function inspectionFilter() {
-    return this.class().inspectionFilter();
+    return this.constructor.inspectionFilter();
 }
 export function inspectWithAttributes(attributes_to_list) {
     let inspection, name;
     inspection = this.attributes ? attributes_to_list.filterMap(name => {
-        name = name.toString();
+        name = String(name);
         if (this.is_hasAttribute(name)) {
             return `${name}: ${this.attributeForInspect(name)}`;
         }
     }).join(", ") : "not initialized";
-    return `#<${this.class()} ${inspection}>`;
+    return `#<${this.constructor} ${inspection}>`;
 }
 export function attributesForInspect() {
-    if (this.class().attributesForInspect() === "all") {
+    if (this.constructor.attributesForInspect() === "all") {
         return this.allAttributesForInspect();
     }
     else {
-        return this.class().attributesForInspect();
+        return this.constructor.attributesForInspect();
     }
 }
 export function allAttributesForInspect() {

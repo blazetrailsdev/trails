@@ -40,8 +40,8 @@ export function eagerLoadBang() {
 export function association(name) {
     let association, reflection;
     association = this.associationInstanceGet(name);
-    if (association.nil()) {
-        if (!(reflection = this.class()._reflectOnAssociation(name))) {
+    if (association == null) {
+        if (!(reflection = this.constructor._reflectOnAssociation(name))) {
             throw new AssociationNotFoundError(this, name);
         }
         association = new (reflection.associationClass())(this, reflection);
@@ -98,11 +98,11 @@ export function hasAndBelongsToMany(name, scope = null, { ...options } = {}, ext
     hm_options = {};
     hm_options["through"] = middle_reflection.name();
     hm_options["source"] = join_model.rightReflection().name();
-    ["before_add", "after_add", "before_remove", "after_remove", "autosave", "validate", "join_table", "class_name", "extend", "strict_loading"].each(k => {
+    for (const k of ["before_add", "after_add", "before_remove", "after_remove", "autosave", "validate", "join_table", "class_name", "extend", "strict_loading"]) {
         if (options.isKey(k)) {
-            return hm_options[k] = options[k];
+            hm_options[k] = options[k];
         }
-    });
+    }
     this.hasMany(name, scope, { ...hm_options }, extension);
     return this._reflections[name].parentReflection = habtm_reflection;
 }

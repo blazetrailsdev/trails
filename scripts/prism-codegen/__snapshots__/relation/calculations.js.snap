@@ -39,7 +39,7 @@ export class ColumnAliasTracker {
 }
 export async function count(column_name = null, block) {
     if (block !== undefined) {
-        if (!column_name.nil()) {
+        if (!(column_name == null)) {
             throw new ArgumentError("Column name argument is not supported when a block is passed.");
         }
         return __PRISM_SUPER_OUTSIDE_CORPUS("Calculations#count");
@@ -82,7 +82,7 @@ export function asyncSum(identity_or_column = null) {
 }
 export function calculate(operation, column_name) {
     let result, relation;
-    operation = operation.toString().downcase();
+    operation = String(operation).downcase();
     if (this.none) {
         if (caseEq("count", operation) || caseEq("sum", operation)) {
             result = this.groupValues.isAny() ? new Hash() : 0;
@@ -100,7 +100,7 @@ export function calculate(operation, column_name) {
                 relation.distinctBang();
                 relation.selectValues = this.Array(this.model.primaryKey() || this.table[Arel.star()]);
             }
-            if (this.groupValues.isEmpty()) {
+            if (this.groupValues.length === 0) {
                 relation.orderValues = [];
             }
         }
@@ -204,24 +204,24 @@ export function aggregateColumn(column_name) {
 }
 __PRISM_TODO("CallNode");
 export function isAllAttributes(column_names) {
-    return (column_names.map(x => x.toString()) - this.model.attributeNames() - this.model.attributeAliases().keys()).isEmpty();
+    return (column_names.map(x => x.toString()) - this.model.attributeNames() - this.model.attributeAliases().keys()).length === 0;
 }
 export function hasInclude(column_name) {
     return this.isEagerLoading || (this.includesValues.isPresent() && column_name && column_name !== "all");
 }
 export function performCalculation(operation, column_name) {
     let distinct;
-    operation = operation.toString().downcase();
+    operation = String(operation).downcase();
     distinct = this.distinctValue;
     if (operation === "count") {
         column_name ||= this.selectForCount();
         if (column_name === "all") {
             if (!distinct) {
-                if (this.groupValues.isEmpty()) {
+                if (this.groupValues.length === 0) {
                     distinct = this.isDistinctSelect(this.selectForCount());
                 }
             }
-            else if (this.groupValues.isAny() || this.selectValues.isEmpty() && this.orderValues.isEmpty()) {
+            else if (this.groupValues.isAny() || this.selectValues.length === 0 && this.orderValues.length === 0) {
                 column_name = this.model.primaryKey;
             }
         }
@@ -269,7 +269,7 @@ export function executeSimpleCalculation(operation, column_name, distinct) {
     query_result = relation.whereClause().isContradiction() ? this.async ? FutureResult.wrap(ActiveRecord.Result.empty()) : ActiveRecord.Result.empty() : this.skipQueryCacheIfNecessary(() => this.model.withConnection(c => c.selectAll(query_builder, `${this.model.name()} ${operation.capitalize()}`, { async: this.async })));
     return query_result.then(result => {
         if (operation !== "count") {
-            type = column.try("type_caster") || this.lookupCastTypeFromJoinDependencies(column_name.toString()) || Type.defaultValue();
+            type = column.try("type_caster") || this.lookupCastTypeFromJoinDependencies(String(column_name)) || Type.defaultValue();
             if (__PRISM_TODO("CallNode")) {
                 type = type.subtype();
             }
@@ -298,15 +298,15 @@ export function executeGroupedCalculation(operation, column_name, distinct) {
             if (Arel.isArelNode(field)) {
                 field = connection.visitor().compile(field);
             }
-            return column_alias_tracker.aliasFor(field.toString().downcase());
+            return column_alias_tracker.aliasFor(String(field).downcase());
         });
         group_columns = group_aliases.zip(group_fields);
         column = relation.aggregateColumn(column_name);
-        column_alias = column_alias_tracker.aliasFor(`${operation} ${column_name.toString().downcase()}`);
+        column_alias = column_alias_tracker.aliasFor(`${operation} ${String(column_name).downcase()}`);
         select_value = this.operationOverAggregateColumn(column, operation, distinct);
         select_value.as(this.model.adapterClass().quoteColumnName(column_alias));
         select_values = [select_value];
-        if (!this.havingClause.isEmpty()) {
+        if (!(this.havingClause.length === 0)) {
             select_values += this.selectValues();
         }
         select_values.concat(group_columns.map((aliaz, field) => {
@@ -323,14 +323,14 @@ export function executeGroupedCalculation(operation, column_name, distinct) {
         result = this.skipQueryCacheIfNecessary(() => connection.selectAll(relation.arel(), `${this.model.name()} ${operation.capitalize()}`, { async: this.async }));
         return result.then(calculated_data => {
             if (association) {
-                key_ids = calculated_data.collect(row => row[group_aliases.first()]);
+                key_ids = calculated_data.map(row => row[group_aliases.first()]);
                 key_records = association.klass().baseClass().where({ [association.klass().baseClass().primaryKey()]: key_ids });
                 key_records = key_records.indexBy(x => x.id());
             }
             key_types = __PRISM_TODO("CallNode");
             hash_rows = calculated_data.castValues(key_types).mapBang(row => __PRISM_TODO("CallNode"));
             if (operation !== "count") {
-                type = column.try("type_caster") || this.lookupCastTypeFromJoinDependencies(column_name.toString()) || Type.defaultValue();
+                type = column.try("type_caster") || this.lookupCastTypeFromJoinDependencies(String(column_name)) || Type.defaultValue();
                 if (__PRISM_TODO("CallNode")) {
                     type = type.subtype();
                 }
@@ -350,7 +350,7 @@ export function executeGroupedCalculation(operation, column_name, distinct) {
 }
 export function typeFor(field, block) {
     let field_name;
-    field_name = field.respondTo("name") ? field.name().toString() : field.toString().split(".").last();
+    field_name = field.respondTo("name") ? String(field.name()) : String(field).split(".").last();
     return this.model.typeForAttribute(field_name, block);
 }
 export function lookupCastTypeFromJoinDependencies(name, join_dependencies = this.buildJoinDependencies()) {
@@ -388,7 +388,7 @@ export function typeCastCalculatedValue(value, operation, type) {
     }
 }
 export function selectForCount() {
-    if (this.selectValues.isEmpty()) {
+    if (this.selectValues.length === 0) {
         return "all";
     }
     else {

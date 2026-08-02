@@ -3,6 +3,7 @@ import type { Emitter, PrismNode } from "../types.js";
 import type { Registry } from "../registry.js";
 import type { AsyncArm } from "../await-policy.js";
 import { isRaiseThrow, mergeAsyncArms, raiseArguments, scopeAsyncArm } from "../await-policy.js";
+import { eachToForOf } from "./stdlib.js";
 const f = ts.factory;
 export function registerControl(r: Registry): void {
   r.onStmt("IfNode", (n, e, isLast) => [ifStmt(n, e, isLast, false)]);
@@ -85,7 +86,7 @@ export function registerControl(r: Registry): void {
     return [f.createTryStatement(tryArm.value, catchClause, finallyBlock)];
   });
   r.onStmt("CallNode", (n, e) => {
-    if (!isRaiseThrow(n)) return null;
+    if (!isRaiseThrow(n)) return eachToForOf(n, e);
     const args = raiseArguments(n);
     if (args.length === 1) return [f.createThrowStatement(e.expr(args[0]))];
     return [

@@ -23,34 +23,34 @@ export class WhereChain {
     }
     associated(...associations) {
         let reflection, association_conditions;
-        associations.each(association => {
+        for (const association of associations) {
             reflection = this.scopeAssociationReflection(association);
-            if (!(this.scope.joinsValues().isInclude(reflection.name()) || this.scope.leftOuterJoinsValues().isInclude(reflection.name()))) {
+            if (!(this.scope.joinsValues().includes(reflection.name()) || this.scope.leftOuterJoinsValues().includes(reflection.name()))) {
                 this.scope.joinsBang(association);
             }
             association_conditions = this.Array(reflection.associationPrimaryKey()).indexWith(null);
             if (reflection.options()["class_name"]) {
-                return this.not({ [association]: association_conditions });
+                this.not({ [association]: association_conditions });
             }
             else {
-                return this.not({ [reflection.tableName()]: association_conditions });
+                this.not({ [reflection.tableName()]: association_conditions });
             }
-        });
+        }
         return this.scope;
     }
     missing(...associations) {
         let reflection, association_conditions;
-        associations.each(association => {
+        for (const association of associations) {
             reflection = this.scopeAssociationReflection(association);
             this.scope.leftOuterJoinsBang(association);
             association_conditions = this.Array(reflection.associationPrimaryKey()).indexWith(null);
             if (reflection.options()["class_name"]) {
-                return this.scope.whereBang({ [association]: association_conditions });
+                this.scope.whereBang({ [association]: association_conditions });
             }
             else {
-                return this.scope.whereBang({ [reflection.tableName()]: association_conditions });
+                this.scope.whereBang({ [reflection.tableName()]: association_conditions });
             }
-        });
+        }
         return this.scope;
     }
     scopeAssociationReflection(association) {
@@ -70,7 +70,7 @@ export class CTEJoin {
 }
 const FROZEN_EMPTY_ARRAY = [].freeze();
 const FROZEN_EMPTY_HASH = {}.freeze();
-Relation.VALUE_METHODS.each(name => {
+for (const name of Relation.VALUE_METHODS) {
     __PRISM_TODO("MultiWriteNode");
     classEval(`        def ${method_name}                     # def includes_values
           @values.fetch(:${name}, ${__PRISM_TODO("LocalVariableReadNode")})  #   @values.fetch(:includes, FROZEN_EMPTY_ARRAY)
@@ -81,7 +81,7 @@ Relation.VALUE_METHODS.each(name => {
           @values[:${name}] = value            #   @values[:includes] = value
         end                                    # end
 `, __PRISM_TODO("SourceFileNode"), __PRISM_TODO("SourceLineNode") + 1);
-});
+}
 const extensions = extendingValues;
 export function includes(...args) {
     this.checkIfMethodHasArgumentsBang(this.__callee__, args);
@@ -111,7 +111,7 @@ export function preloadBang(...args) {
     return this;
 }
 export function extractAssociated(association) {
-    return this.preload(association).collect(association);
+    return this.preload(association).map(association);
 }
 export function references(...table_names) {
     this.checkIfMethodHasArgumentsBang(this.__callee__, table_names);
@@ -182,7 +182,7 @@ export function order(...args) {
     return this.spawn.orderBang(...args);
 }
 export function orderBang(...args) {
-    if (!args.isEmpty()) {
+    if (!(args.length === 0)) {
         this.preprocessOrderArgs(args);
     }
     __PRISM_TODO("CallOperatorWriteNode");
@@ -191,18 +191,18 @@ export function orderBang(...args) {
 export function inOrderOf(column, values, { filter = true } = {}) {
     let references, arel_column, scope, where_clause;
     this.model.disallowRawSqlBang([column], { permit: this.model.adapterClass().columnNameWithOrderMatcher() });
-    if (values.isEmpty()) {
+    if (values.length === 0) {
         return this.spawn.noneBang();
     }
     references = this.columnReferences([column]);
-    if (!references.isEmpty()) {
+    if (!(references.length === 0)) {
         __PRISM_TODO("CallOperatorWriteNode");
     }
     values = values.map(value => this.model.typeCaster().typeCastForDatabase(column, value));
-    arel_column = column.isA(Arel.Nodes.SqlLiteral) ? column : this.orderColumn(column.toString());
+    arel_column = column.isA(Arel.Nodes.SqlLiteral) ? column : this.orderColumn(String(column));
     scope = this.spawn.orderBang(this.buildCaseForValuePosition(arel_column, values, { filter: filter }));
     if (filter) {
-        where_clause = values.isInclude(null) ? arel_column.in(values.compact()).or(arel_column.eq(null)) : arel_column.in(values);
+        where_clause = values.includes(null) ? arel_column.in(values.compact()).or(arel_column.eq(null)) : arel_column.in(values);
         scope = scope.whereBang(where_clause);
     }
     return scope;
@@ -226,30 +226,30 @@ export function unscope(...args) {
 export function unscopeBang(...args) {
     let target_values, scope;
     this.unscopeValues += args;
-    args.each(scope => {
+    for (const scope of args) {
         if (caseEq(Symbol, scope)) {
             if (scope === "left_joins") {
                 scope = "left_outer_joins";
             }
-            if (!VALID_UNSCOPING_VALUES.isInclude(scope)) {
-                throw new ArgumentError(`Called unscope() with invalid unscoping argument ':${scope}'. Valid arguments are :${VALID_UNSCOPING_VALUES.toA().join(", :")}.`);
+            if (!VALID_UNSCOPING_VALUES.includes(scope)) {
+                throw new ArgumentError(`Called unscope() with invalid unscoping argument ':${scope}'. Valid arguments are :${VALID_UNSCOPING_VALUES.toArray().join(", :")}.`);
             }
             this.assertModifiableBang();
-            return this.values.delete(scope);
+            this.values.delete(scope);
         }
         else if (caseEq(Hash, scope)) {
-            return scope.each((key, target_value) => {
+            for (const [key, target_value] of scope) {
                 if (key !== "where") {
                     throw new ArgumentError("Hash arguments in .unscope(*args) must have :where as the key.");
                 }
                 target_values = this.resolveArelAttributes(Array.wrap(target_value));
-                return this.whereClause = this.whereClause.except(...target_values);
-            });
+                this.whereClause = this.whereClause.except(...target_values);
+            }
         }
         else {
             throw new ArgumentError(`Unrecognized scoping: ${args.inspect()}. Use .unscope(where: :attribute_name) or .unscope(:order), for example.`);
         }
-    });
+    }
     return this;
 }
 export function joins(...args) {
@@ -270,7 +270,7 @@ export function leftOuterJoinsBang(...args) {
     return this;
 }
 export function where(...args) {
-    if (args.isEmpty()) {
+    if (args.length === 0) {
         return new WhereChain(this.spawn);
     }
     else if (args.length() === 1 && args.first().isBlank()) {
@@ -286,7 +286,7 @@ export function whereBang(opts, ...rest) {
 }
 export function rewhere(conditions) {
     let scope, where_clause;
-    if (conditions.nil()) {
+    if (conditions == null) {
         return this.unscope("where");
     }
     scope = this.spawn;
@@ -303,20 +303,20 @@ export function invertWhereBang() {
     return this;
 }
 export function isStructurallyCompatible(other) {
-    return this.structurallyIncompatibleValuesFor(other).isEmpty();
+    return this.structurallyIncompatibleValuesFor(other).length === 0;
 }
 export function and(other) {
-    if (other.isA(Relation)) {
+    if (other instanceof Relation) {
         return this.spawn.andBang(other);
     }
     else {
-        throw new ArgumentError(`You have passed ${other.class().name()} object to #and. Pass an ActiveRecord::Relation object instead.`);
+        throw new ArgumentError(`You have passed ${other.constructor.name()} object to #and. Pass an ActiveRecord::Relation object instead.`);
     }
 }
 export function andBang(other) {
     let incompatible_values;
     incompatible_values = this.structurallyIncompatibleValuesFor(other);
-    if (!incompatible_values.isEmpty()) {
+    if (!(incompatible_values.length === 0)) {
         throw new ArgumentError(`Relation passed to #and must be structurally compatible. Incompatible values: ${incompatible_values}`);
     }
     __PRISM_TODO("CallOperatorWriteNode");
@@ -325,7 +325,7 @@ export function andBang(other) {
     return this;
 }
 export function or(other) {
-    if (other.isA(Relation)) {
+    if (other instanceof Relation) {
         if (this.none) {
             return other.spawn();
         }
@@ -334,13 +334,13 @@ export function or(other) {
         }
     }
     else {
-        throw new ArgumentError(`You have passed ${other.class().name()} object to #or. Pass an ActiveRecord::Relation object instead.`);
+        throw new ArgumentError(`You have passed ${other.constructor.name()} object to #or. Pass an ActiveRecord::Relation object instead.`);
     }
 }
 export function orBang(other) {
     let incompatible_values;
     incompatible_values = this.structurallyIncompatibleValuesFor(other);
-    if (!incompatible_values.isEmpty()) {
+    if (!(incompatible_values.length === 0)) {
         throw new ArgumentError(`Relation passed to #or must be structurally compatible. Incompatible values: ${incompatible_values}`);
     }
     this.whereClause = this.whereClause.or(other.whereClause());
@@ -495,7 +495,7 @@ export function annotateBang(...args) {
 export function uniqBang(name) {
     let values;
     if (values = this.values[name]) {
-        if (values.isA(Array) && !values.isEmpty()) {
+        if (Array.isArray(values) && !(values.length === 0)) {
             values.uniqBang();
         }
     }
@@ -503,10 +503,10 @@ export function uniqBang(name) {
 }
 export function excluding(...records) {
     let relations;
-    relations = records.extractBang(element => element.isA(Relation));
+    relations = records.extractBang(element => element instanceof Relation);
     records.flattenBang(1);
     records.compactBang();
-    if (!(records.isAll(this.model) && relations.isAll(relation => relation.model() === this.model))) {
+    if (!(records.isAll(this.model) && relations.every(relation => relation.model() === this.model))) {
         throw new ArgumentError(`You must only pass a single or collection of ${this.model.name()} objects to #${this.__callee__}.`);
     }
     return this.spawn.excludingBang(records + relations.flatMap(x => x.ids()));
@@ -529,7 +529,7 @@ export function buildSubquery(subquery_alias, select_value) {
     let subquery;
     subquery = this.except("optimizer_hints").arel().as(subquery_alias);
     return new Arel.SelectManager(subquery).project(select_value).tap(arel => {
-        if (!this.optimizerHintsValues.isEmpty()) {
+        if (!(this.optimizerHintsValues.length === 0)) {
             return arel.optimizerHints(...this.optimizerHintsValues);
         }
     });
@@ -537,35 +537,35 @@ export function buildSubquery(subquery_alias, select_value) {
 export function buildWhereClause(opts, rest = []) {
     let parts, key, references;
     opts = this.sanitizeForbiddenAttributes(opts);
-    if (opts.isA(Array)) {
+    if (Array.isArray(opts)) {
         __PRISM_TODO("MultiWriteNode");
     }
     if (caseEq(String, opts)) {
-        if (rest.isEmpty()) {
+        if (rest.length === 0) {
             parts = [Arel.sql(opts)];
         }
-        else if (rest.first().isA(Hash) && /:\w+/.isMatch(opts)) {
+        else if (rest.first() instanceof Hash && /:\w+/.isMatch(opts)) {
             parts = [this.buildNamedBoundSqlLiteral(opts, rest.first())];
         }
-        else if (opts.isInclude("?")) {
+        else if (opts.includes("?")) {
             parts = [this.buildBoundSqlLiteral(opts, rest)];
         }
         else {
-            parts = [this.model.sanitizeSql(rest.isEmpty() ? opts : [opts, ...rest])];
+            parts = [this.model.sanitizeSql(rest.length === 0 ? opts : [opts, ...rest])];
         }
     }
     else if (caseEq(Hash, opts)) {
         opts = opts.transformKeys(key => {
-            if (key.isA(Array)) {
-                return key.map(k => this.model.attributeAliases()[k.toString()] || k.toString());
+            if (Array.isArray(key)) {
+                return key.map(k => this.model.attributeAliases()[String(k)] || String(k));
             }
             else {
-                key = key.toString();
+                key = String(key);
                 return this.model.attributeAliases()[key] || key;
             }
         });
         references = PredicateBuilder.references(opts);
-        if (!references.isEmpty()) {
+        if (!(references.length === 0)) {
             __PRISM_TODO("CallOperatorWriteNode");
         }
         parts = this.predicateBuilder.buildFromHash(opts, table_name => this.lookupTableKlassFromJoinDependencies(table_name));
@@ -574,7 +574,7 @@ export function buildWhereClause(opts, rest = []) {
         parts = [opts];
     }
     else {
-        throw new ArgumentError(`Unsupported argument type: ${opts} (${opts.class()})`);
+        throw new ArgumentError(`Unsupported argument type: ${opts} (${opts.constructor})`);
     }
     return new Relation.WhereClause(parts);
 }
@@ -619,7 +619,7 @@ export function buildNamedBoundSqlLiteral(statement, values) {
                     return v;
                 }
             });
-            if (values.isEmpty()) {
+            if (values.length === 0) {
                 return null;
             }
             else {
@@ -655,7 +655,7 @@ export function buildBoundSqlLiteral(statement, values) {
                     return v;
                 }
             });
-            if (values.isEmpty()) {
+            if (values.length === 0) {
                 return null;
             }
             else {
@@ -685,15 +685,17 @@ export function lookupTableKlassFromJoinDependencies(table_name) {
     return null;
 }
 export function eachJoinDependencies(join_dependencies = this.buildJoinDependencies(), block) {
-    return join_dependencies.each(join_dependency => join_dependency.each(block));
+    for (const join_dependency of join_dependencies) {
+        join_dependency.forEach(block);
+    }
 }
 export function buildJoinDependencies() {
     let joins, join_dependencies;
     joins = __PRISM_TODO("CallNode");
-    if (!this.eagerLoadValues.isEmpty()) {
+    if (!(this.eagerLoadValues.length === 0)) {
         __PRISM_TODO("LocalVariableOperatorWriteNode");
     }
-    if (!this.includesValues.isEmpty()) {
+    if (!(this.includesValues.length === 0)) {
         __PRISM_TODO("LocalVariableOperatorWriteNode");
     }
     join_dependencies = [];
@@ -708,10 +710,10 @@ export function buildArel(connection, aliases = null) {
     let arel, annotates;
     arel = new Arel.SelectManager(this.table);
     this.buildJoins(arel.joinSources(), aliases);
-    if (!this.whereClause.isEmpty()) {
+    if (!(this.whereClause.length === 0)) {
         arel.where(this.whereClause.ast());
     }
-    if (!this.havingClause.isEmpty()) {
+    if (!(this.havingClause.length === 0)) {
         arel.having(this.havingClause.ast());
     }
     if (this.limitValue) {
@@ -720,23 +722,23 @@ export function buildArel(connection, aliases = null) {
     if (this.offsetValue) {
         arel.skip(this.buildCastValue("OFFSET", this.offsetValue.toI()));
     }
-    if (!this.groupValues.isEmpty()) {
+    if (!(this.groupValues.length === 0)) {
         arel.group(...this.arelColumns(this.groupValues.uniq()));
     }
     this.buildOrder(arel);
     this.buildWith(arel);
     this.buildSelect(arel);
-    if (!this.optimizerHintsValues.isEmpty()) {
+    if (!(this.optimizerHintsValues.length === 0)) {
         arel.optimizerHints(...this.optimizerHintsValues);
     }
     arel.distinct(this.distinctValue);
-    if (!this.fromClause.isEmpty()) {
+    if (!(this.fromClause.length === 0)) {
         arel.from(this.buildFrom());
     }
     if (this.lockValue) {
         arel.lock(this.lockValue);
     }
-    if (!this.annotateValues.isEmpty()) {
+    if (!(this.annotateValues.length === 0)) {
         annotates = this.annotateValues;
         if (annotates.size() > 1) {
             annotates = annotates.uniq();
@@ -757,7 +759,7 @@ export function buildFrom() {
             opts = opts.send("apply_join_dependency");
         }
         name ||= "subquery";
-        return opts.arel().as(name.toString());
+        return opts.arel().as(String(name));
     }
     else {
         return opts;
@@ -765,42 +767,44 @@ export function buildFrom() {
 }
 export function selectNamedJoins(join_names, stashed_joins = null, block) {
     let cte_joins, associations;
-    [cte_joins, associations] = join_names.partition(join_name => __PRISM_TODO("CallNode") && this.withValues.isAny(() => _1.isKey(join_name)));
-    cte_joins.each(cte_name => block.call(new CTEJoin(cte_name)));
+    [cte_joins, associations] = join_names.partition(join_name => __PRISM_TODO("CallNode") && this.withValues.some(() => _1.isKey(join_name)));
+    for (const cte_name of cte_joins) {
+        block.call(new CTEJoin(cte_name));
+    }
     return this.selectAssociationList(associations, stashed_joins, block);
 }
 export function selectAssociationList(associations, stashed_joins = null, block) {
     let result;
     result = [];
-    associations.each(association => {
+    for (const association of associations) {
         if (caseEq(Hash, association) || caseEq(Symbol, association) || caseEq(Array, association)) {
-            return result.push(association);
+            result.push(association);
         }
         else if (caseEq(ActiveRecord.Associations.JoinDependency, association)) {
-            return stashed_joins.push(association);
+            stashed_joins.push(association);
         }
         else {
             if (block !== undefined) {
-                return block(association);
+                block(association);
             }
         }
-    });
+    }
     return result;
 }
 export function buildJoinBuckets() {
     let buckets, stashed_left_joins, left_joins, joins, stashed_eager_load, join_node;
     buckets = new Hash();
-    if (!this.leftOuterJoinsValues.isEmpty()) {
+    if (!(this.leftOuterJoinsValues.length === 0)) {
         stashed_left_joins = [];
         left_joins = this.selectNamedJoins(this.leftOuterJoinsValues, stashed_left_joins, left_join => {
-            if (left_join.isA(CTEJoin)) {
+            if (left_join instanceof CTEJoin) {
                 return buckets["join_node"].push(this.buildWithJoinNode(left_join.name(), Arel.Nodes.OuterJoin));
             }
             else {
                 throw new ArgumentError("only Hash, Symbol and Array are allowed");
             }
         });
-        if (this.joinsValues.isEmpty()) {
+        if (this.joinsValues.length === 0) {
             buckets["named_join"] = left_joins;
             buckets["stashed_join"] = stashed_left_joins;
             return [buckets, Arel.Nodes.OuterJoin];
@@ -816,7 +820,7 @@ export function buildJoinBuckets() {
         }
     }
     joins.eachWithIndex((join, i) => {
-        if (join.isA(String)) {
+        if (typeof join === "string") {
             return joins[i] = new Arel.Nodes.StringJoin(Arel.sql(join.strip()));
         }
     });
@@ -833,11 +837,11 @@ export function buildJoinBuckets() {
         if (join.isA(Arel.Nodes.Join)) {
             return buckets["join_node"].push(join);
         }
-        else if (join.isA(CTEJoin)) {
+        else if (join instanceof CTEJoin) {
             return buckets["join_node"].push(this.buildWithJoinNode(join.name()));
         }
         else {
-            throw "unknown class: %s" % join.class().name();
+            throw "unknown class: %s" % join.constructor.name();
         }
     });
     if (stashed_left_joins) {
@@ -850,7 +854,7 @@ export function buildJoinBuckets() {
 }
 export function buildJoins(join_sources, aliases = null) {
     let buckets, join_type, named_joins, stashed_joins, leading_joins, join_nodes, alias_tracker, join_dependency;
-    if (this.joinsValues.isEmpty() && this.leftOuterJoinsValues.isEmpty()) {
+    if (this.joinsValues.length === 0 && this.leftOuterJoinsValues.length === 0) {
         return join_sources;
     }
     [buckets, join_type] = this.buildJoinBuckets();
@@ -858,15 +862,15 @@ export function buildJoins(join_sources, aliases = null) {
     stashed_joins = buckets["stashed_join"];
     leading_joins = buckets["leading_join"];
     join_nodes = buckets["join_node"];
-    if (!leading_joins.isEmpty()) {
+    if (!(leading_joins.length === 0)) {
         join_sources.concat(leading_joins);
     }
-    if (!(named_joins.isEmpty() && stashed_joins.isEmpty())) {
+    if (!(named_joins.length === 0 && stashed_joins.length === 0)) {
         alias_tracker = this.aliasTracker(leading_joins + join_nodes, aliases);
         join_dependency = this.constructJoinDependency(named_joins, join_type);
         join_sources.concat(join_dependency.joinConstraints(stashed_joins, alias_tracker, this.referencesValues));
     }
-    if (!join_nodes.isEmpty()) {
+    if (!(join_nodes.length === 0)) {
         join_sources.concat(join_nodes);
     }
     return join_sources;
@@ -884,7 +888,7 @@ export function buildSelect(arel) {
 }
 export function buildWith(arel) {
     let with_statements;
-    if (this.withValues.isEmpty()) {
+    if (this.withValues.length === 0) {
         return;
     }
     with_statements = this.withValues.map(with_value => this.buildWithValueFromHash(with_value));
@@ -922,18 +926,18 @@ export function buildWithExpressionFromValue(value, nested = false) {
         return parts.reduce((result, value) => new Arel.Nodes.UnionAll(result, value));
     }
     else {
-        throw new ArgumentError(`Unsupported argument type: \`${value}\` ${value.class()}`);
+        throw new ArgumentError(`Unsupported argument type: \`${value}\` ${value.constructor}`);
     }
 }
 export function buildWithJoinNode(name, kind = Arel.Nodes.InnerJoin) {
     let with_table;
     with_table = new Arel.Table(name);
-    return this.table.join(with_table, kind).on(with_table[this.model.modelName().toString().foreignKey()].eq(this.table[this.model.primaryKey()])).joinSources().first();
+    return this.table.join(with_table, kind).on(with_table[String(this.model.modelName()).foreignKey()].eq(this.table[this.model.primaryKey()])).joinSources().first();
 }
 export function arelColumnsFromHash(fields) {
     let table_name;
     return fields.flatMap((table_name, columns) => {
-        if (table_name.isA(Symbol)) {
+        if (typeof table_name === "string") {
             table_name = table_name.name();
         }
         if (caseEq(Symbol, columns) || caseEq(String, columns)) {
@@ -943,13 +947,13 @@ export function arelColumnsFromHash(fields) {
             return columns.map(column => this.arelColumnWithTable(table_name, column));
         }
         else {
-            throw new TypeError(`Expected Symbol, String or Array, got: ${columns.class()}`);
+            throw new TypeError(`Expected Symbol, String or Array, got: ${columns.constructor}`);
         }
     });
 }
 export function arelColumnWithTable(table_name, column_name) {
     __PRISM_TODO("CallOperatorWriteNode");
-    if (column_name.isA(Symbol) || !column_name.isMatch(/\W/)) {
+    if (typeof column_name === "string" || !column_name.isMatch(/\W/)) {
         return this.predicateBuilder.resolveArelAttribute(table_name, column_name, () => this.lookupTableKlassFromJoinDependencies(table_name));
     }
     else {
@@ -958,10 +962,10 @@ export function arelColumnWithTable(table_name, column_name) {
 }
 export function arelColumn(field, block) {
     let is_symbol, from;
-    if (is_symbol = field.isA(Symbol)) {
+    if (is_symbol = typeof field === "string") {
         field = field.name();
     }
-    field = this.model.attributeAliases()[field] || field.toString();
+    field = this.model.attributeAliases()[field] || String(field);
     from = this.fromClause.name() || this.fromClause.value();
     if (this.model.columnsHash().isKey(field) && (!from || this.isTableNameMatches(from))) {
         return this.table[field];
@@ -983,10 +987,10 @@ export function isTableNameMatches(from) {
     let table_name, quoted_table_name;
     table_name = Regexp.escape(this.table.name());
     quoted_table_name = Regexp.escape(this.model.adapterClass().quoteTableName(this.table.name()));
-    return __PRISM_TODO("InterpolatedRegularExpressionNode").isMatch(from.toString());
+    return __PRISM_TODO("InterpolatedRegularExpressionNode").isMatch(String(from));
 }
 export function reverseSqlOrder(order_query) {
-    if (order_query.isEmpty()) {
+    if (order_query.length === 0) {
         if (this.model.primaryKey) {
             return [this.table[this.model.primaryKey].desc()];
         }
@@ -1017,38 +1021,38 @@ export function reverseSqlOrder(order_query) {
     });
 }
 export function isDoesNotSupportReverse(order) {
-    if (!order.instanceOf(String)) {
+    if (!(typeof order === "string")) {
         order = new String(order);
     }
-    return (order.isInclude(",") && order.split(",").find(section => section.count("(") !== section.count(")"))) || /\bnulls\s+(?:first|last)\b/.isMatch(order);
+    return (order.includes(",") && order.split(",").find(section => section.count("(") !== section.count(")"))) || /\bnulls\s+(?:first|last)\b/.isMatch(order);
 }
 export function buildOrder(arel) {
     let orders;
     orders = this.orderValues.compactBlank();
-    if (!orders.isEmpty()) {
+    if (!(orders.length === 0)) {
         return arel.order(...orders);
     }
 }
 const VALID_DIRECTIONS = ["asc", "desc", "ASC", "DESC", "asc", "desc", "ASC", "DESC"].toSet();
 export function validateOrderArgs(args) {
-    return args.each(arg => {
-        if (!arg.isA(Hash)) {
-            return;
+    for (const arg of args) {
+        if (!(arg instanceof Hash)) {
+            continue;
         }
-        return arg.each((_key, value) => {
-            if (value.isA(Hash)) {
-                return this.validateOrderArgs([value]);
+        for (const [_key, value] of arg) {
+            if (value instanceof Hash) {
+                this.validateOrderArgs([value]);
             }
             else if (VALID_DIRECTIONS.isExclude(value)) {
-                throw new ArgumentError(`Direction "${value}" is invalid. Valid directions are: ${VALID_DIRECTIONS.toA().inspect()}`);
+                throw new ArgumentError(`Direction "${value}" is invalid. Valid directions are: ${VALID_DIRECTIONS.toArray().inspect()}`);
             }
-        });
-    });
+        }
+    }
 }
 export function flattenedArgs(args) {
     return args.flatMap(e => {
-        if ((e.isA(Hash) || e.isA(Array))) {
-            return this.flattenedArgs(e.toA());
+        if ((e instanceof Hash || Array.isArray(e))) {
+            return this.flattenedArgs(e.toArray());
         }
         else {
             return e;
@@ -1060,24 +1064,24 @@ export function preprocessOrderArgs(order_args) {
     this.model.disallowRawSqlBang(this.flattenedArgs(order_args), { permit: this.model.adapterClass().columnNameWithOrderMatcher() });
     this.validateOrderArgs(order_args);
     references = this.columnReferences(order_args);
-    if (!references.isEmpty()) {
+    if (!(references.length === 0)) {
         __PRISM_TODO("CallOperatorWriteNode");
     }
     return order_args.mapBang(arg => {
         if (caseEq(Symbol, arg)) {
-            return this.orderColumn(arg.toString()).asc();
+            return this.orderColumn(String(arg)).asc();
         }
         else if (caseEq(Hash, arg)) {
             return arg.map((key, value) => {
-                if (value.isA(Hash)) {
-                    return value.map((field, dir) => this.orderColumn([key.toString(), field.toString()].join(".")).publicSend(dir.downcase()));
+                if (value instanceof Hash) {
+                    return value.map((field, dir) => this.orderColumn([String(key), String(field)].join(".")).publicSend(dir.downcase()));
                 }
                 else {
                     if (caseEq(Arel.Nodes.SqlLiteral, key) || caseEq(Arel.Nodes.Node, key) || caseEq(Arel.Attribute, key)) {
                         return key.publicSend(value.downcase());
                     }
                     else {
-                        return this.orderColumn(key.toString()).publicSend(value.downcase());
+                        return this.orderColumn(String(key)).publicSend(value.downcase());
                     }
                 }
             });
@@ -1098,10 +1102,10 @@ export function columnReferences(order_args) {
         else if (caseEq(Hash, arg)) {
             return arg.map((key, value) => {
                 if (caseEq(Hash, value)) {
-                    return key.toString();
+                    return String(key);
                 }
                 else {
-                    if (key.isA(String) || key.isA(Symbol)) {
+                    if (typeof key === "string" || typeof key === "string") {
                         return this.extractTableNameFrom(key);
                     }
                 }
@@ -1126,7 +1130,7 @@ export function extractTableNameFrom(string) {
 }
 export function orderColumn(field) {
     return this.arelColumn(field, attr_name => {
-        if (attr_name === "count" && !this.groupValues.isEmpty()) {
+        if (attr_name === "count" && !(this.groupValues.length === 0)) {
             return this.table[attr_name];
         }
         else {
@@ -1151,13 +1155,13 @@ export function resolveArelAttributes(attrs) {
         }
         else if (caseEq(Hash, attr)) {
             return attr.flatMap((table, columns) => {
-                table = table.toString();
-                return this.Array(columns).map(column => this.predicateBuilder.resolveArelAttribute(table, column));
+                table = String(table);
+                return (columns == null ? [] : Array.isArray(columns) ? columns : [columns]).map(column => this.predicateBuilder.resolveArelAttribute(table, column));
             });
         }
         else {
-            attr = attr.toString();
-            if (attr.isInclude(".")) {
+            attr = String(attr);
+            if (attr.includes(".")) {
                 [table, column] = attr.split(".", 2);
                 return this.predicateBuilder.resolveArelAttribute(table, column);
             }
@@ -1181,7 +1185,7 @@ export function checkIfMethodHasArgumentsBang(method_name, args, message = null,
 }
 export function processSelectArgs(fields) {
     return fields.flatMap(field => {
-        if (field.isA(Hash)) {
+        if (field instanceof Hash) {
             return this.arelColumnAliasesFromHash(field);
         }
         else {
@@ -1192,22 +1196,22 @@ export function processSelectArgs(fields) {
 export function arelColumnAliasesFromHash(fields) {
     let table_name;
     return fields.flatMap((key, columns_aliases) => {
-        table_name = key.isA(Symbol) ? key.name() : key;
+        table_name = typeof key === "string" ? key.name() : key;
         if (caseEq(Hash, columns_aliases)) {
-            return columns_aliases.map((column, column_alias) => this.arelColumnWithTable(table_name, column).as(this.model.adapterClass().quoteColumnName(column_alias.toString())));
+            return columns_aliases.map((column, column_alias) => this.arelColumnWithTable(table_name, column).as(this.model.adapterClass().quoteColumnName(String(column_alias))));
         }
         else if (caseEq(Array, columns_aliases)) {
             return columns_aliases.map(column => this.arelColumnWithTable(table_name, column));
         }
         else if (caseEq(String, columns_aliases) || caseEq(Symbol, columns_aliases)) {
-            return this.arelColumn(key).as(this.model.adapterClass().quoteColumnName(columns_aliases.toString()));
+            return this.arelColumn(key).as(this.model.adapterClass().quoteColumnName(String(columns_aliases)));
         }
     });
 }
 export function processWithArgs(args) {
     return args.flatMap(arg => {
-        if (!arg.isA(Hash)) {
-            throw new ArgumentError(`Unsupported argument type: ${arg} ${arg.class()}`);
+        if (!(arg instanceof Hash)) {
+            throw new ArgumentError(`Unsupported argument type: ${arg} ${arg.constructor}`);
         }
         return arg.map((k, v) => ({ [k]: v }));
     });
@@ -1218,8 +1222,8 @@ export function structurallyIncompatibleValuesFor(other) {
     values = other.values();
     return STRUCTURAL_VALUE_METHODS.reject(method => {
         [v1, v2] = [this.values[method], values[method]];
-        if (v1.isA(Array)) {
-            if (!v2.isA(Array)) {
+        if (Array.isArray(v1)) {
+            if (!Array.isArray(v2)) {
                 return true;
             }
             v1 = v1.uniq();
