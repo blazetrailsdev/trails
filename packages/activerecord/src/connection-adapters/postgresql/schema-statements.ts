@@ -12,4 +12,5 @@ export interface CreateDatabaseOptions {
   template?: string;
   tablespace?: string;
   connectionLimit?: number;
+  [key: string]: unknown;
 }

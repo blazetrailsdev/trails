@@ -97,6 +97,10 @@ interface PgSchemaAdapter {
   _schemaSearchPathMemo: string | null;
 }
 
+function toS(value: unknown): string {
+  return value == null ? "" : String(value);
+}
+
 export class PostgreSQLSchemaStatements extends SchemaStatements {
   private get pg(): PgSchemaAdapter {
     return this as unknown as PgSchemaAdapter;
@@ -511,30 +515,42 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
   // ---------------------------------------------------------------------------
 
   async createDatabase(name: string, options: CreateDatabaseOptions = {}): Promise<void> {
-    const encoding = options.encoding ?? "utf8";
-    let optionString = ` ENCODING = ${this.pg.quoteLiteral(encoding)}`;
-    if (options.collation)
-      optionString += ` LC_COLLATE = ${this.pg.quoteLiteral(options.collation)}`;
-    if (options.ctype) optionString += ` LC_CTYPE = ${this.pg.quoteLiteral(options.ctype)}`;
-    if (options.owner) optionString += ` OWNER = ${this.pg.quoteIdentifier(options.owner)}`;
-    if (options.template)
-      optionString += ` TEMPLATE = ${this.pg.quoteIdentifier(options.template)}`;
-    if (options.tablespace)
-      optionString += ` TABLESPACE = ${this.pg.quoteIdentifier(options.tablespace)}`;
-    if (options.connectionLimit != null) {
-      const limit = options.connectionLimit;
-      if (!Number.isInteger(limit) || (limit < 0 && limit !== -1)) {
-        throw new ArgumentError(
-          `connectionLimit must be -1 (unlimited) or a non-negative integer, got: ${limit}`,
-        );
+    const mergedOptions: CreateDatabaseOptions = { encoding: "utf8", ...options };
+
+    let optionString = "";
+    for (const [key, value] of Object.entries(mergedOptions)) {
+      switch (key) {
+        case "owner":
+          optionString += ` OWNER = "${toS(value)}"`;
+          break;
+        case "template":
+          optionString += ` TEMPLATE = "${toS(value)}"`;
+          break;
+        case "encoding":
+          optionString += ` ENCODING = '${toS(value)}'`;
+          break;
+        case "collation":
+          optionString += ` LC_COLLATE = '${toS(value)}'`;
+          break;
+        case "ctype":
+          optionString += ` LC_CTYPE = '${toS(value)}'`;
+          break;
+        case "tablespace":
+          optionString += ` TABLESPACE = "${toS(value)}"`;
+          break;
+        case "connectionLimit":
+          optionString += ` CONNECTION LIMIT = ${toS(value)}`;
+          break;
+        default:
+          break;
       }
-      optionString += ` CONNECTION LIMIT = ${limit}`;
     }
-    await this.execute(`CREATE DATABASE ${this.pg.quoteIdentifier(name)}${optionString}`);
+
+    await this.execute(`CREATE DATABASE ${this.pg.quoteTableName(name)}${optionString}`);
   }
 
   async dropDatabase(name: string): Promise<void> {
-    await this.execute(`DROP DATABASE IF EXISTS ${this.pg.quoteIdentifier(name)}`);
+    await this.execute(`DROP DATABASE IF EXISTS ${this.pg.quoteTableName(name)}`);
   }
 
   async recreateDatabase(name: string, options: CreateDatabaseOptions = {}): Promise<void> {
