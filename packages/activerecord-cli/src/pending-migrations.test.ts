@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import { run } from "./cli.js";
-import { DatabaseTasks, Migration, Migrator } from "@blazetrails/activerecord";
+import { DatabaseTasks, Migration, Migrator, MigrationContext } from "@blazetrails/activerecord";
 import { checkPendingMigrations } from "./pending-migrations.js";
 
 const FAKE_CONFIG = `
@@ -42,7 +42,7 @@ describe("PendingMigrationsTest", () => {
     err = [];
     vi.spyOn(console, "log").mockImplementation((m) => void out.push(String(m)));
     vi.spyOn(console, "error").mockImplementation((m) => void err.push(String(m)));
-    vi.spyOn(Migrator, "discoverMigrations").mockReturnValue([]);
+    vi.spyOn(MigrationContext.prototype, "migrations", "get").mockReturnValue([]);
     withTemporaryConnectionSpy = vi.fn();
     vi.spyOn(DatabaseTasks, "withTemporaryConnection").mockImplementation(
       withTemporaryConnectionSpy,
