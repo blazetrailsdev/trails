@@ -730,16 +730,11 @@ describe("AssociationScope", () => {
     const membership = await Membership.create({ member_id: member.id });
     const memberDetail = await MemberDetail.create({ member_id: member.id });
 
-    const loaded = (await findSingularTarget(
-      memberDetail,
-      "membership",
-      {
-        className: "Membership",
-        through: "member",
-        source: "membership",
-      },
-      "hasOne",
-    )) as Membership | null;
+    const loaded = (await findSingularTarget(memberDetail, "membership", {
+      className: "Membership",
+      through: "member",
+      source: "membership",
+    })) as Membership | null;
     expect(loaded).not.toBeNull();
     expect(loaded!.id).toBe(membership.id);
   });
@@ -779,16 +774,11 @@ describe("AssociationScope", () => {
     const club = await Club.create({ name: "Great club" });
     await CurrentMembership.create({ member_id: member.id, club_id: club.id });
 
-    const loaded = (await findSingularTarget(
-      member,
-      "club",
-      {
-        className: "Club",
-        through: "currentMembership",
-        source: "club",
-      },
-      "hasOne",
-    )) as Club | null;
+    const loaded = (await findSingularTarget(member, "club", {
+      className: "Club",
+      through: "currentMembership",
+      source: "club",
+    })) as Club | null;
     expect(loaded).not.toBeNull();
     expect(loaded!.name).toBe("Great club");
   });

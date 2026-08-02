@@ -582,7 +582,7 @@ export class HasOneAssociation extends SingularAssociation {
     // See `Association#_loaderWritebackSuppressed`.
     this._loaderWritebackSuppressed++;
     try {
-      return await findTarget(this.owner, this.reflection.name, this.reflection.options, "hasOne");
+      return await findTarget(this.owner, this.reflection.name, this.reflection.options);
     } finally {
       this._loaderWritebackSuppressed--;
     }
@@ -770,7 +770,7 @@ async function preloadDestroyInverseBelongsTo(
   if (typeof (target as any).association !== "function") return;
   const ownFk = JSON.stringify((assoc as any).foreignKeyColumns());
 
-  for (const ref of reflectOnAllAssociations(targetCtor, "belongsTo")) {
+  for (const ref of reflectOnAllAssociations(targetCtor)) {
     const concrete = ref as unknown as { name: string; foreignKey: unknown; klass?: typeof Base };
     let fk: unknown;
     let klass: typeof Base | undefined;

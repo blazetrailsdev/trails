@@ -26,15 +26,15 @@ describe("SingularAssociation#findTarget — undeclared association name", () =>
 
   it("raises AssociationNotFoundError for a belongs_to name with no reflection", async () => {
     const post = posts("welcome");
-    await expect(
-      findTarget(post, "undeclaredAuthor", { className: "Author" }, "belongsTo"),
-    ).rejects.toThrow(AssociationNotFoundError);
+    await expect(findTarget(post, "undeclaredAuthor", { className: "Author" })).rejects.toThrow(
+      AssociationNotFoundError,
+    );
   });
 
   it("raises AssociationNotFoundError for a has_one name with no reflection", async () => {
     const post = posts("welcome");
-    await expect(
-      findTarget(post, "undeclaredComment", { className: "Comment" }, "hasOne"),
-    ).rejects.toThrow(AssociationNotFoundError);
+    await expect(findTarget(post, "undeclaredComment", { className: "Comment" })).rejects.toThrow(
+      AssociationNotFoundError,
+    );
   });
 });

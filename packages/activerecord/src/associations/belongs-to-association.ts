@@ -320,12 +320,7 @@ export class BelongsToAssociation extends SingularAssociation {
     // which the stale-key check cannot see. See `_loaderWritebackSuppressed`.
     this._loaderWritebackSuppressed++;
     try {
-      return await findTarget(
-        this.owner,
-        this.reflection.name,
-        this.reflection.options,
-        "belongsTo",
-      );
+      return await findTarget(this.owner, this.reflection.name, this.reflection.options);
     } finally {
       this._loaderWritebackSuppressed--;
     }
