@@ -40,6 +40,7 @@ interface SQLite3SchemaAdapter extends DatabaseAdapter {
   removeCheckConstraint(
     tableName: string,
     expressionOrOptions?: string | Record<string, unknown>,
+    options?: Record<string, unknown>,
   ): Promise<void>;
   fetchTypeMetadata(sqlType: string): SqlTypeMetadata;
 }
@@ -82,8 +83,9 @@ export async function removeCheckConstraint(
   adapter: SQLite3SchemaAdapter,
   tableName: string,
   expressionOrOptions?: string | Record<string, unknown>,
+  options?: Record<string, unknown>,
 ): Promise<void> {
-  return adapter.removeCheckConstraint(tableName, expressionOrOptions);
+  return adapter.removeCheckConstraint(tableName, expressionOrOptions, options);
 }
 
 // Matches the ON clause of a CREATE INDEX statement, capturing the

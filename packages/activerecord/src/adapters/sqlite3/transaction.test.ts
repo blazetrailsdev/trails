@@ -72,9 +72,15 @@ describeIfSqlite("SQLite3TransactionTest", () => {
 
   it("raises when trying to open a read_uncommitted transaction but shared-cache mode is turned off", async () => {
     const conn = withConn();
-    await expect(conn.beginIsolatedDbTransaction("read_uncommitted")).rejects.toThrow(
-      TransactionIsolationError,
-    );
+    let error: Error | undefined;
+    await expect(
+      conn.beginIsolatedDbTransaction("read_uncommitted").catch((e: Error) => {
+        error = e;
+        throw e;
+      }),
+    ).rejects.toThrow(Error);
+
+    expect(error?.message).toMatch("You need to enable the shared-cache mode");
   });
 
   it.skip("opens a `read_uncommitted` transaction", async () => {

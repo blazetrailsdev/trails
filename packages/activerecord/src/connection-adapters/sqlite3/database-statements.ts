@@ -43,27 +43,22 @@ export function isWriteQuery(sql: string): boolean {
   return !READ_QUERY.test(stripSqlComments(sql));
 }
 
-export async function beginDbTransaction(adapter: ExecutableAdapter): Promise<void> {
-  await adapter.executeMutation("BEGIN IMMEDIATE TRANSACTION");
+export async function beginDbTransaction(this: InternalBeginTransactionHost): Promise<void> {
+  await internalBeginTransaction.call(this, "immediate", null);
 }
 
 export async function beginDeferredTransaction(
-  adapter: ExecutableAdapter,
-  _isolation?: string | null,
+  this: InternalBeginTransactionHost,
+  isolation?: string | null,
 ): Promise<void> {
-  await adapter.executeMutation("BEGIN DEFERRED TRANSACTION");
+  await internalBeginTransaction.call(this, "deferred", isolation);
 }
 
 export async function beginIsolatedDbTransaction(
-  adapter: ExecutableAdapter,
+  this: InternalBeginTransactionHost,
   isolation: string,
 ): Promise<void> {
-  if (isolation !== "read_uncommitted") {
-    throw new TransactionIsolationError(
-      "SQLite3 only supports the `read_uncommitted` transaction isolation level",
-    );
-  }
-  await adapter.executeMutation("BEGIN DEFERRED TRANSACTION");
+  await internalBeginTransaction.call(this, "deferred", isolation);
 }
 
 export async function commitDbTransaction(adapter: ExecutableAdapter): Promise<void> {
@@ -137,7 +132,11 @@ export async function internalBeginTransaction(
       );
     }
     if (this.isSharedCache && !this.isSharedCache()) {
-      throw new TransactionIsolationError(
+      // Rails raises a bare StandardError here, distinct from the
+      // TransactionIsolationError above (database_statements.rb:67-68).
+      // StandardError has no ported subclass — `Error` is its analogue.
+      // eslint-disable-next-line blazetrails/rails-error-parity
+      throw new Error(
         "You need to enable the shared-cache mode in SQLite mode before attempting to change the transaction isolation level",
       );
     }
