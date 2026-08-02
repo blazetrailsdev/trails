@@ -380,9 +380,6 @@ function compareKeys(a: unknown[] | null, b: unknown[] | null): number | undefin
   return Math.sign(a.length - b.length);
 }
 
-// Ruby compares key components with `<=>`, which is `nil` for values of
-// different types; JS `<` would silently coerce, so mixed types report
-// "incomparable" (`undefined`) instead.
 function compareValues(a: unknown, b: unknown): number | undefined {
   if (typeof a !== typeof b) return undefined;
   if (typeof a === "number" || typeof a === "bigint" || typeof a === "string") {

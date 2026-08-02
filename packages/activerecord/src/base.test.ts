@@ -388,8 +388,6 @@ describe("BasicsTest", () => {
   it("comparison with different objects", async () => {
     const topic = await CanonicalTopic.create({});
     const category = await Category.create({ name: "comparison" });
-    // Rails: `assert_nil topic <=> category` — `Core#<=>` is `compare` here,
-    // and Ruby's nil (incomparable) is `undefined`.
     expect(topic.compare(category)).toBeUndefined();
     expect(topic.equals(category)).toBe(false);
   });
