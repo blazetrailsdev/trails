@@ -2951,43 +2951,14 @@ export class Migrator {
     return this._internalMetadata;
   }
 
-  // --- MigrationContext-style methods (Rails: MigrationContext) ---
-  //
-  // What is left of the block RFC 0051 is dismantling. Every member below is
-  // MigrationContext's in `migration.rb:1211-1402` and now has a real body
-  // there — these are the copies kept alive only by their remaining callers,
-  // which `migrator-run-surface-caller-migration` repoints at
-  // `MigrationContext` before deleting them.
-
-  get schemaMigration(): SchemaMigration {
-    return this._schemaMigration;
-  }
-
   /**
-   * Mirrors: ActiveRecord::MigrationContext#open (migration.rb:1278-1280).
-   *
-   * Returns a *fresh* Migrator, as Rails does. Callers that read
-   * {@link pendingMigrations} repeatedly (`CheckPending`) rely on this: the
-   * `migrated` memo lives on the per-run Migrator, so a new one is what makes
-   * each read see current schema_migrations.
+   * @internal The shared helper of {@link checkEnvironment} and
+   * {@link checkProtectedEnvironments}, which are `Tasks::DatabaseTasks`
+   * methods (`database_tasks.rb:635-650`) that trails parked on `Migrator` —
+   * a separate deviation from the one RFC 0051 is closing here, with its own
+   * tests. `MigrationContext` owns the Rails-sited copy
+   * (`migration.rb:1348-1357`).
    */
-  open(): Migrator {
-    return new Migrator(this._adapter, this._migrations, this._runOptions("up", null));
-  }
-
-  async needsMigration(): Promise<boolean> {
-    return (await this.pendingMigrationVersions()).length > 0;
-  }
-
-  async pendingMigrationVersions(): Promise<string[]> {
-    const applied = new Set(await this.getAllVersions());
-    return this._migrations.map((m) => m.version).filter((v) => !applied.has(v));
-  }
-
-  get currentEnvironment(): string {
-    return this._environment;
-  }
-
   async lastStoredEnvironment(): Promise<string | null> {
     // When metadata storage is explicitly opted out (`use_metadata_table:
     // false`), treat the DB as unstamped even if a stale
@@ -3008,6 +2979,7 @@ export class Migrator {
     return environment;
   }
 
+  /** @internal Mirrors: ActiveRecord::Migrator#current_migration (`migration.rb:1439-1441`) */
   async currentMigration(): Promise<MigrationProxy | null> {
     const version = await this.currentVersion();
     if (version === 0) return null;
@@ -3015,7 +2987,7 @@ export class Migrator {
     return this._migrations.find((m) => m.version === versionStr) ?? null;
   }
 
-  /** Alias of currentMigration (Rails: `alias :current :current_migration`). */
+  /** @internal Mirrors: ActiveRecord::Migrator `alias :current :current_migration` (`migration.rb:1442`) */
   async current(): Promise<MigrationProxy | null> {
     return this.currentMigration();
   }
@@ -3088,7 +3060,8 @@ export class CheckPending {
 
   async call(env: Record<string, unknown>): Promise<unknown> {
     if (this._migrator) {
-      const pending = await this._migrator.open().pendingMigrations();
+      await this._migrator.loadMigrated();
+      const pending = await this._migrator.pendingMigrations();
       this._throwIfPending(pending.length);
     } else if (this._pendingConnection) {
       if (this._migrations.length === 0) {

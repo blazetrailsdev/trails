@@ -715,19 +715,21 @@ describe("MigrationTest", () => {
 
   it("migration detection without schema migration table", async () => {
     const adapter = Base.connection;
-    const migrations: MigrationProxy[] = [
-      {
-        version: "1",
-        name: "First",
-        migration: () => anonymousMigration("First", "1"),
-      },
-    ];
-    const migrator = new Migrator(adapter, migrations);
+    const { fileURLToPath } = await import("node:url");
+    const { dirname, join } = await import("node:path");
+    const migrationsPath = join(
+      dirname(fileURLToPath(import.meta.url)),
+      "test-helpers",
+      "migrations",
+      "valid",
+    );
+    const schemaMigration = new SchemaMigration(adapter);
+    const migrator = new MigrationContext([migrationsPath], schemaMigration);
     try {
-      await migrator.schemaMigration.dropTable();
+      await schemaMigration.dropTable();
       expect(await migrator.needsMigration()).toBe(true);
     } finally {
-      await migrator.schemaMigration.createTable();
+      await schemaMigration.createTable();
     }
   });
 

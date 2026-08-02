@@ -471,38 +471,6 @@ describe("MigratorTest", () => {
     expect(await migrator.currentVersion()).toBe(0);
   });
 
-  it("migrator rollback", async () => {
-    const { context } = migrationContextClass(3);
-
-    await context.migrate();
-    expect(await context.currentVersion()).toBe(3);
-
-    await context.rollback();
-    expect(await context.currentVersion()).toBe(2);
-
-    await context.rollback();
-    expect(await context.currentVersion()).toBe(1);
-
-    await context.rollback();
-    expect(await context.currentVersion()).toBe(0);
-
-    await context.rollback();
-    expect(await context.currentVersion()).toBe(0);
-  });
-
-  it("migrator forward", async () => {
-    const { context } = migrationContextClass(3);
-
-    await context.migrate(1);
-    expect(await context.currentVersion()).toBe(1);
-
-    await context.forward(2);
-    expect(await context.currentVersion()).toBe(3);
-
-    await context.forward();
-    expect(await context.currentVersion()).toBe(3);
-  });
-
   it("migrator verbosity", async () => {
     const lines: string[] = [];
     // Rails counts messages via `Migration.message_count`, which its test
@@ -612,7 +580,7 @@ describe("MigratorTest", () => {
   });
 
   it("migrator rollback", async () => {
-    const { migrator } = migratorClass(3);
+    const { context: migrator } = migrationContextClass(3);
 
     await migrator.migrate();
     expect(await migrator.currentVersion()).toBe(3);
@@ -641,7 +609,7 @@ describe("MigratorTest", () => {
   });
 
   it("migrator forward", async () => {
-    const { migrator } = migratorClass(3);
+    const { context: migrator } = migrationContextClass(3);
     await migrator.migrate(1);
     expect(await migrator.currentVersion()).toBe(1);
 
