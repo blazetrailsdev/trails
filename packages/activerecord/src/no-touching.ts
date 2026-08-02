@@ -53,17 +53,6 @@ export function isNoTouching(this: Base): boolean {
 }
 
 /**
- * Mirrors: ActiveRecord::NoTouching#touch_later
- */
-export async function touchLater(
-  this: { isNoTouching?(): boolean; touch(...args: any[]): Promise<any> },
-  ...args: any[]
-): Promise<any> {
-  if (this.isNoTouching?.()) return;
-  return this.touch(...args);
-}
-
-/**
  * Mirrors: ActiveRecord::NoTouching.apply_to
  */
 export function applyTo<R>(klass: any, fn: () => R | Promise<R>): R | Promise<R> {
