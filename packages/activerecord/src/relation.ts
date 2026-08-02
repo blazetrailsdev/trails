@@ -2604,8 +2604,8 @@ export class Relation<T extends Base> {
    * (e.g. `Post.includes(:comments, :author).joins(:comments)` join-loads both,
    * with `author` as a deduped OUTER join). So once any include is also in
    * `joins(...)`, promote every include — mirroring `_includesToPromoteFromReferences`.
-   * `_buildEagerJoinManager` then skips re-emitting the eager OUTER JOIN for the
-   * intersecting tables (the named INNER JOIN already covers them).
+   * The eager JoinDependency then rides in `joins_values`, so the JD `walk` fold
+   * dedups the intersecting tables against the named INNER JOIN.
    */
   private _includesToPromoteFromJoins(): AssociationSpec[] {
     if (this._joinedIncludesValues().length === 0) return [];
@@ -2813,7 +2813,7 @@ export class Relation<T extends Base> {
     // This avoids `IN (SELECT ... LIMIT n)`, which MariaDB does not support.
     let limitedIds: unknown[] | undefined;
     const hasLimit = this._limitValue !== null || this._offsetValue !== null;
-    if (hasLimit && jd.nodes.some((n) => n.assocType === "hasMany")) {
+    if (hasLimit && !this._eagerJoinDependencyIsLimitable(jd)) {
       limitedIds = await this._materializeLimitedIds(jd, basePk);
       if (limitedIds.length === 0) {
         this._records = [];
@@ -2821,14 +2821,13 @@ export class Relation<T extends Base> {
       }
     }
 
-    const manager = this._buildEagerJoinManager(jd, basePk, limitedIds);
-
-    const [sqlBase, eagerBinds] = this._compileAstWithBinds(manager.ast);
-    let sql = sqlBase;
-    if (this._annotations.length > 0) {
-      const comments = this._annotationComments();
-      sql = `${sql} ${comments}`;
-    }
+    // Rails' `apply_join_dependency { |relation, jd| … relation.to_sql }`
+    // (relation.rb:1211-1214): build arel from the yielded relation, so CTEs and
+    // annotate() comments fold in through the ordinary path.
+    const eagerRelation = this._applyEagerJoinDependency(jd, basePk, limitedIds);
+    jd.applyColumnAliases(eagerRelation);
+    const manager = eagerRelation._buildArel();
+    const [sql, eagerBinds] = this._compileAstWithBinds(manager.ast);
 
     // Read through selectAll (not execute) so the adapter-reported result
     // column_types are available to type-cast extra/computed `select` columns
@@ -3208,8 +3207,8 @@ export class Relation<T extends Base> {
     // `columns_for_distinct`), which projects the pk as a single column. Rails
     // only takes that `distinct_relation_for_primary_key` path for a limit/offset
     // over NON-limitable (collection) reflections (finder_methods.rb:463-488), so
-    // bypass a composite PK only in exactly that case — mirroring the narrower
-    // `hasLimit && jd hasMany` guard the eager execute path already applies. A
+    // bypass a composite PK only in exactly that case — the same two-clause
+    // `using_limitable_reflections?` test the eager paths apply. A
     // composite-PK `includes(:belongs_to)` (limitable) with a limit still JOINs,
     // as does the through-preloader's own unlimited `includes(source)` query, so
     // a scoped source through a composite-PK model JOINs like Rails. The
@@ -3290,19 +3289,15 @@ export class Relation<T extends Base> {
     // clauses, the shared AliasTracker, and the left_outer/joins/eager dedup fold.
     const leadingJoins: Nodes.Join[] = [];
     const joinNodes: Nodes.Join[] = [];
-    // Left_outer_joins_values resolved via JoinDependency. Exclude associations
-    // already covered by _eagerLoadAssociations OR by includes promoted to eager
-    // load (includes().references()) — both cause _buildEagerJoinManager to emit
-    // LEFT OUTER JOINs, so re-emitting here would duplicate JOINs / raise
-    // ambiguous-column errors. (The subquery path folds eager as a stashed JD
-    // instead, so it has no equivalent filter.) When named INNER joins are also
-    // present the left-outer JD folds into the inner JD's join_constraints (Rails
-    // build_join_buckets: stashed_left_joins.unshift), deduping a both-ways
-    // association to a single INNER JOIN via `walk`.
+    // Left_outer_joins_values resolved via JoinDependency. When named INNER joins
+    // are also present the left-outer JD folds into the inner JD's
+    // join_constraints (Rails build_join_buckets: stashed_left_joins.unshift),
+    // deduping a both-ways association to a single INNER JOIN via `walk`. The
+    // eager JoinDependency rides in `joins_values` and folds into the SAME
+    // `join_constraints` call, so `walk` decides what a left-outer value already
+    // covered by `eager_load` emits — no exclusion filter here, matching Rails
+    // and the subquery half.
     _qm.assertValidLeftOuterJoinsBang(this._leftOuterJoinsValues);
-    const promotedIncludes = this._includesToPromoteFromReferences();
-    const eagerCovered = new Set([...this._eagerLoadAssociations, ...promotedIncludes]);
-    const pendingLeftOuter = this._leftOuterJoinsValues.filter((v) => !eagerCovered.has(v));
     // Partition CTE-name symbols out of the left-outer values into LEFT OUTER
     // JOIN nodes, mirroring buildJoinBuckets' `select_named_joins` block
     // (query_methods.rb:1830-1836). Only true associations remain for the JD;
@@ -3322,7 +3317,7 @@ export class Relation<T extends Base> {
     const leftStashed: JoinDependency[] = [];
     const leftAssociations = _qm.selectNamedJoins.call(
       this as any,
-      pendingLeftOuter,
+      this._leftOuterJoinsValues,
       leftStashed,
       (left: unknown) => {
         if (left instanceof _qm.CTEJoin) {
@@ -4834,11 +4829,7 @@ export class Relation<T extends Base> {
       eagerSpecs as any,
       Nodes.OuterJoin,
     );
-    const rel = this._clone();
-    rel._eagerLoadAssociations = [];
-    rel._includesAssociations = [];
-    rel._preloadAssociations = [];
-    QueryMethodBangs.joinsBang.call(rel as any, joinDependency as any);
+    const rel = this._exceptEagerValues(joinDependency);
 
     // Rails `apply_join_dependency`, for a limit/offset over non-limitable
     // (collection) reflections, replaces the relation with
@@ -5181,75 +5172,66 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * Shared helper used by both _buildEagerSql (toSql path) and _executeEagerLoad
-   * (execution path). Builds a SelectManager with JoinDependency column aliases,
-   * LEFT OUTER JOINs, WHERE/ORDER/DISTINCT/GROUP/HAVING/LOCK/HINTS applied, and
-   * LIMIT/OFFSET handling via the limitable-reflections check.
+   * Mirrors Rails `apply_join_dependency` (finder_methods.rb:456-488) for the
+   * eager-load paths that construct their JoinDependency locally: return the
+   * relation Rails yields to its block — `except(:includes, :eager_load,
+   * :preload).joins!(join_dependency)`. The caller then builds arel from it, so
+   * projections, wheres, order, distinct, group, having, lock and hints all come
+   * from the ordinary `build_arel` path.
    *
-   * Mirrors: ActiveRecord::Relation#apply_join_dependency +
-   *          ActiveRecord::Associations::JoinDependency#apply_column_aliases
+   * Rails resolves a limit/offset over non-limitable (collection) reflections by
+   * EXECUTING `distinct_relation_for_primary_key` and rewriting the relation as
+   * `pk IN (ids)` with limit/offset cleared. `limitedIds` is that materialized
+   * list on the async path; the synchronous `toSql` path cannot execute a query,
+   * so it nests the same DISTINCT-pk query inline as a subquery — the one
+   * deviation, kept in the same relation-rewrite shape.
    */
-  private _buildEagerJoinManager(
+  private _applyEagerJoinDependency(
     jd: JoinDependency,
     basePk: string,
     limitedIds?: unknown[],
-  ): SelectManager {
-    const table = this._modelClass.arelTable;
-
-    // Emit the manual joins AND the eager JoinDependency through the single
-    // `build_joins` port (`emitJoinPlan`), folding `jd` into `stashedJoins` the
-    // way Rails `apply_join_dependency` folds the eager JD into `joins_values`.
-    // One shared `AliasTracker` spans every join, and `walk` dedups an eager node
-    // that coincides with a manual INNER / left-outer join — replacing the former
-    // parallel eager tracker (`_buildEagerSharedJoinTracker`) and the
-    // `_dedupedManualJoinTables` table-name skip. The fold aliases `jd`'s nodes
-    // in place, so the column-alias projection below reads their resolved tables
-    // (a deduped node now points at the manual join's un-aliased table).
-    const manager = table.project();
-    this._withEagerJoinDependency(jd)._applyJoinsToManager(manager);
-
-    // Mirrors Rails' apply_column_aliases + `_select!(-> { aliases.columns })`:
-    // an explicit `select` keeps its own projection and the JoinDependency only
-    // contributes the base PK (t0_r0) plus the joined tables' alias columns.
-    // Without a select, the base table projects every column as `t0_r*`. Runs
-    // AFTER `emitJoinPlan` so each node's emit-time alias is resolved.
-    const selectCols = this._selectColumns ?? [];
-    const aliasNodes = jd.applyColumnAliases(this);
-    const projection =
-      selectCols.length > 0 ? [...this.arelColumns(selectCols), ...aliasNodes] : aliasNodes;
-    manager.project(...(projection as Parameters<typeof manager.project>));
-
-    this._applyWheresToManager(manager, table);
-    this._applyOrderToManager(manager, table);
-    if (this._isDistinct) manager.distinct();
-    for (const col of this._groupColumns) manager.group(groupColumnToArel(col, table));
-    if (!this._havingClause.isEmpty()) manager.having(this._havingClause.ast);
-    if (this._lockValue) manager.lock(this._lockValue);
-    if (this._optimizerHints.length > 0) manager.optimizerHints(...this._optimizerHints);
-
-    // LIMIT/OFFSET: use a subquery for collection associations to avoid fan-out
-    // (mirrors Rails' using_limitable_reflections? check in finder_methods.rb).
-    // Non-collection associations (belongsTo, hasOne) are limitable — apply directly.
+  ): Relation<T> {
+    let rel = this._exceptEagerValues(jd);
     const hasLimit = this._limitValue !== null || this._offsetValue !== null;
-    if (hasLimit) {
-      const isLimitable = jd.nodes.every((n) => n.assocType !== "hasMany");
-      if (isLimitable) {
-        if (this._limitValue !== null) manager.take(this._limitValue);
-        if (this._offsetValue !== null) manager.skip(this._offsetValue);
-      } else if (limitedIds !== undefined) {
-        // Execution path: the limited parent IDs were materialized in a
-        // separate query (mirrors Rails' distinct_relation_for_primary_key),
-        // so embed them as a literal `pk IN (...)` list — no nested LIMIT
-        // subquery. MariaDB rejects `IN (SELECT ... LIMIT n)` (ER_NOT_SUPPORTED_YET).
-        manager.where(table.get(basePk).in(limitedIds));
-      } else {
-        // toSql/synchronous path: no separate query is possible, so emit the
-        // parent-ID subquery inline (`pk IN (SELECT DISTINCT ... LIMIT n)`).
-        manager.where(table.get(basePk).in(this._buildEagerIdSubquery(jd, basePk)));
-      }
+    if (hasLimit && !this._eagerJoinDependencyIsLimitable(jd)) {
+      const ids = limitedIds ?? this._buildEagerIdSubquery(jd, basePk);
+      rel = rel.where(this._modelClass.arelTable.get(basePk).in(ids as never));
+      rel._limitValue = null;
+      rel._offsetValue = null;
     }
+    return rel;
+  }
 
-    return manager;
+  /**
+   * Rails' two-clause `using_limitable_reflections?` guard in
+   * `apply_join_dependency` (finder_methods.rb:463-470), for the paths that
+   * already hold the eager JoinDependency: BOTH its own reflections AND those of
+   * `select_association_list(joins_values) ∪ select_association_list(left_outer_joins_values)`
+   * must be non-collection. A collection reflection in `joins`/`leftOuterJoins`
+   * forces the distinct-parent-id rewrite even when every eager reflection is
+   * singular. Sibling of `_applyJoinDependencyIsLimitable`, which resolves the
+   * first clause from specs instead of a built dependency.
+   */
+  private _eagerJoinDependencyIsLimitable(jd: JoinDependency): boolean {
+    return (
+      this.usingLimitableReflections(jd.reflections as never) &&
+      this._joinsReflectionsAreLimitable()
+    );
+  }
+
+  /**
+   * Rails `except(:includes, :eager_load, :preload).joins!(join_dependency)`
+   * (finder_methods.rb:460) — the relation rewrite both `apply_join_dependency`
+   * entry points share. With the JoinDependency in `joins_values`, `build_joins`
+   * folds it into the single `join_constraints` call alongside the manual joins,
+   * under one shared AliasTracker and the `walk` dedup.
+   */
+  private _exceptEagerValues(jd: JoinDependency): Relation<T> {
+    const rel = this._withEagerJoinDependency(jd);
+    rel._eagerLoadAssociations = [];
+    rel._includesAssociations = [];
+    rel._preloadAssociations = [];
+    return rel;
   }
 
   /**
@@ -5285,8 +5267,8 @@ export class Relation<T extends Base> {
     // This subquery is its own `build_joins` statement: fold the eager JD into
     // `stashedJoins` so it emits through the single `emitJoinPlan` port with one
     // shared `AliasTracker` spanning the eager JoinDependency and the manual
-    // joins, deduping coinciding nodes via `walk` — same threading as
-    // `_buildEagerJoinManager`.
+    // joins, deduping coinciding nodes via `walk` — same threading as the
+    // relation `_applyEagerJoinDependency` yields.
     this._withEagerJoinDependency(jd)._applyJoinsToManager(idSubquery);
     this._applyWheresToManager(idSubquery, table);
     this._applyOrderToManager(idSubquery, table);
@@ -5399,7 +5381,9 @@ export class Relation<T extends Base> {
     this._addEagerSpecsToJoinDependency(jd, allEager);
     if (jd.nodes.length === 0) return null;
 
-    return this._buildEagerJoinManager(jd, basePk);
+    const eagerRelation = this._applyEagerJoinDependency(jd, basePk);
+    jd.applyColumnAliases(eagerRelation);
+    return eagerRelation._buildSelectManager();
   }
 
   /**
@@ -5414,19 +5398,16 @@ export class Relation<T extends Base> {
     // in which case projections, FROM, and ORDER BY must all reference the alias
     // so they stay consistent with the WHERE clause the predicate builder wrote.
     const table = this.table;
-    const projections = this._buildProjections(table);
     // `Table#project` seeds a SelectManager whose FROM is the table. A table
     // ALIAS (Nodes.TableAlias, from `Relation.create(Model, table: alias)`) is a
     // plain AST node without that factory helper, so seed the manager directly —
     // `new SelectManager(node)` sets FROM to the alias (`developers omg_developers`).
-    const manager =
-      table instanceof Table
-        ? table.project(...(projections as any))
-        : ((m) => {
-            if (projections.length > 0) m.project(...(projections as any));
-            return m;
-          })(new SelectManager(table as any));
+    const manager = table instanceof Table ? table.project() : new SelectManager(table as any);
 
+    // Rails `build_arel` runs `build_joins` BEFORE `build_select`
+    // (query_methods.rb), which is what lets a Proc select value —
+    // `apply_column_aliases`' `-> { aliases.columns }` — read the JoinDependency
+    // aliases that `join_constraints` only resolves at join-emit time.
     this._applyJoinsToManager(manager, aliases);
 
     this._applyWheresToManager(manager, table);
@@ -5441,6 +5422,9 @@ export class Relation<T extends Base> {
     }
 
     if (!this._havingClause.isEmpty()) manager.having(this._havingClause.ast);
+
+    const projections = this._buildProjections(table);
+    if (projections.length > 0) manager.project(...(projections as any));
 
     if (this._lockValue) {
       manager.lock(this._lockValue);

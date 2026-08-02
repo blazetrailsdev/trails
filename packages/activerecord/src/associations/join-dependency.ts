@@ -1117,14 +1117,14 @@ export class JoinDependency {
    * then `relation._select!(-> { aliases.columns })`. When the relation carries
    * an explicit `select`, the base table's alias columns shrink to its primary
    * key (`!join_root_alias`); the relation's own select list then supplies the
-   * rest of the projection. Returns the alias-column Arel nodes so callers that
-   * build the projection manually (the eager-load SelectManager) can append them
-   * after the relation's explicit select.
+   * rest of the projection. The select value is a thunk, as in Rails, so the
+   * alias columns are resolved during `build_select` — after `build_joins` has
+   * aliased this dependency's nodes against the shared AliasTracker.
    */
-  applyColumnAliases(relation: any): Nodes.As[] {
+  applyColumnAliases(relation: any): any {
     this._joinRootAlias = (relation?.selectValues?.length ?? 0) === 0;
     this._aliasesCache = undefined;
-    return this._buildSelectArelNodes();
+    return relation._selectBang(() => this._buildSelectArelNodes());
   }
 
   each(callback: (part: JoinPart, index: number) => void): void {

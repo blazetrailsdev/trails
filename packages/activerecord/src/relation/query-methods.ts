@@ -485,6 +485,9 @@ function _selectBang(this: QueryMethodsHost, ...columns: any[]): any {
   const normalized = flat.map((c: any) => {
     if (c instanceof Nodes.Node) return c;
     if (typeof c === "symbol") return c;
+    // Rails' `_select!(-> { aliases.columns })` (join_dependency.rb:155) stores
+    // the Proc itself; `arel_columns` calls it at build_select time.
+    if (typeof c === "function") return c;
     if (typeof c === "object" && c !== null && "value" in c)
       return new Nodes.SqlLiteral((c as { value: string }).value);
     return String(c);
@@ -504,10 +507,12 @@ function _selectBang(this: QueryMethodsHost, ...columns: any[]): any {
     if (bucket) bucket.push(node);
     else seenNodeHashes.set(h, [node]);
   };
+  const seenThunks = new Set<unknown>();
   for (const existing of this._selectColumns) {
     if (typeof existing === "string") seenStrings.add(existing);
     else if (typeof existing === "symbol") seenStrings.add(symbolToName(existing));
     else if (existing instanceof Nodes.Node) addNodeToSeen(existing);
+    else if (typeof existing === "function") seenThunks.add(existing);
     else seenStrings.add((existing as { value: string }).value);
   }
   for (const col of normalized) {
@@ -521,6 +526,12 @@ function _selectBang(this: QueryMethodsHost, ...columns: any[]): any {
       if (!nodeIsDuplicate(col)) {
         this._selectColumns.push(col);
         addNodeToSeen(col);
+      }
+    } else if (typeof col === "function") {
+      // Ruby `|=` dedups Procs by object identity.
+      if (!seenThunks.has(col)) {
+        this._selectColumns.push(col);
+        seenThunks.add(col);
       }
     } else {
       const key = (col as { value: string }).value;
@@ -2955,11 +2966,10 @@ export function buildJoinBuckets(
  * stashed JoinDependencies to fold into the primary named/left JD. Both the
  * live SQL path (`_applyJoinsToManager`) and the `from(relation)` subquery path
  * (`buildJoins`) compute a plan and hand it to the shared emitter, so there is
- * one Rails `build_joins` port. The two callers differ only in how they fill
- * the plan (eager handling: the live path pre-emits eager JOINs via
- * `_buildEagerJoinManager` and excludes them here, while `buildJoins` folds
- * eager into `stashedJoins` via `buildJoinBuckets`) and in `aliases` (only the
- * subquery path threads a tracker in from `build_from`).
+ * one Rails `build_joins` port. Both fill the plan the same way for eager
+ * loading — the eager JoinDependency rides in `joins_values` (Rails
+ * `apply_join_dependency`) and is stashed from there — and differ only in
+ * `aliases` (only the subquery path threads a tracker in from `build_from`).
  *
  * @internal
  */

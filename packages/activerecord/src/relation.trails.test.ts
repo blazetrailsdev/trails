@@ -317,10 +317,10 @@ describe("RelationTest", () => {
   });
 
   it("includes().references() + leftJoins(): no duplicate LEFT OUTER JOIN in SQL", () => {
-    // Regression: includes promoted to eager load via references() causes
-    // _buildEagerJoinManager to emit the LEFT OUTER JOIN. The pendingLeftOuter
-    // filter must exclude promoted includes so leftJoins(:assoc) doesn't emit
-    // a second JOIN for the same association.
+    // Regression: includes promoted to eager load via references() puts the eager
+    // JoinDependency in `joins_values`, and `leftJoins(:assoc)` constructs a
+    // left-outer JD for the same association. Both fold into one
+    // `join_constraints` call, so the JD `walk` dedups them to a single JOIN.
     class Author extends Base {
       static {
         this.tableName = "authors";
@@ -915,5 +915,27 @@ describe("aliasTracker (trails)", () => {
     const join = new Nodes.InnerJoin(table, new Nodes.On(new Nodes.SqlLiteral("1=1")));
     const seeded = CanonPost.all().aliasTracker([join]);
     expect(seeded.aliasedTableFor(table, "comments_posts").right).toBe("comments_posts");
+  });
+});
+
+describe("apply_join_dependency limitable reflections (trails)", () => {
+  fixtures([]);
+
+  it("materializes distinct parent ids when a joined reflection is a collection", () => {
+    // finder_methods.rb:463-470 gates the distinct_relation_for_primary_key
+    // rewrite on BOTH using_limitable_reflections? clauses: the eager
+    // JoinDependency's reflections AND those of
+    // select_association_list(joins_values) + left_outer_joins_values. `author`
+    // is singular, but the joined `comments` collection is not, so a limit here
+    // takes the rewrite rather than a direct LIMIT on the fanned-out join.
+    const sql = CanonPost.eagerLoad("author").joins("comments").limit(1).toSql();
+    expect(sql).toMatch(/WHERE .*IN \(SELECT DISTINCT /);
+    expect(sql).not.toMatch(/\bLIMIT 1\s*$/);
+  });
+
+  it("applies the limit directly when every eager and joined reflection is singular", () => {
+    const sql = CanonPost.eagerLoad("author").limit(1).toSql();
+    expect(sql).not.toContain("SELECT DISTINCT");
+    expect(sql).toMatch(/\bLIMIT 1\s*$/);
   });
 });
