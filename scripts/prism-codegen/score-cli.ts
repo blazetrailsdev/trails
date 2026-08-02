@@ -6,6 +6,7 @@ import { portMethodNames } from "./port-symbols.js";
 import { generateFromSource } from "./index.js";
 import { asyncMethodsForRailsFile, buildAsyncManifest } from "./async-source.js";
 import { TOPLEVEL } from "./codegen.js";
+import { unresolvedMixinReport } from "./rails-scope.js";
 import {
   TARGET_FILES,
   TRAILS_AR_SRC,
@@ -153,6 +154,21 @@ async function compositionCheck(): Promise<{ points: number; failure?: string }>
   return { points, failure: compositionFailureMessage(failures) };
 }
 
+/**
+ * Mixin constants no file in the corpus defines. Each one is a module missing
+ * from the await scope of the file that includes it, so the count is printed
+ * even without `--verbose` — a silent miss is what this reporting exists to
+ * prevent. Most are legitimately outside the corpus (`Enumerable`,
+ * `ActiveModel::*`), which is why it is a report and not a failure.
+ */
+function reportUnresolvedMixins(verbose: boolean): void {
+  const unresolved = unresolvedMixinReport();
+  if (!unresolved.length) return;
+  console.log(`\n  ${unresolved.length} mixin constants resolved to no file in the corpus.`);
+  if (!verbose) return;
+  for (const { fromRel, moduleName } of unresolved) console.log(`    ${fromRel} :: ${moduleName}`);
+}
+
 async function main() {
   const verbose = process.argv.includes("--verbose");
   const write = process.argv.includes("--write");
@@ -234,6 +250,7 @@ async function main() {
       `${(present ? ((totMatched + totReordered) / present) * 100 : 0).toFixed(1).padStart(6)}%`,
   );
   console.log(`\n  ${totElsewhere} defs resolved in a different port file than the Rails twin.`);
+  reportUnresolvedMixins(verbose);
   console.log(
     `\n  present-in-both = matched + divergent. "missing" = clean generated def with no` +
       `\n  port symbol under any name candidate — either a genuinely unported method, a` +
