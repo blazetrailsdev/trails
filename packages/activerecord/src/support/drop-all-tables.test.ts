@@ -213,8 +213,6 @@ describe("purge-only pre-snapshot path", () => {
     return { dropAllTablesModule, loadSchemaHelper };
   }
 
-  // adapterName is deliberately not one of the three real lanes: every guard
-  // under test throws before any statement would be issued.
   const inertAdapter = { adapterName: "none" } as unknown as DatabaseAdapter;
 
   it("rejects a reset that runs before the boot-laid snapshot", async () => {

@@ -56,8 +56,7 @@ if (await canonicalSchemaUpToDate(await Base.leaseConnection())) {
   // tables are `force: true` throughout, and a worker recycled onto a database
   // an earlier worker's tests ran against finds them dropped —
   // `purgeToCanonicalTables` drops every table outside the canonical half, and
-  // the arm below re-lays the adapter-specific ones it took with it. That order
-  // is load-bearing, and the purge refuses to run on the wrong side of it.
+  // the arm below re-lays the adapter-specific ones it took with it.
   const conn = await Base.leaseConnection();
   await purgeToCanonicalTables(conn);
   await loadAdapterSpecificSchema(conn);

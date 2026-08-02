@@ -639,11 +639,13 @@ function assertNotStubbed(adapter: DatabaseAdapter, method: string): void {
  *   Splitting a real load into its halves is how the two arms drifted apart
  *   before, so do not reach for this one to hand-roll `load_schema`.
  *
+ * Calling this marks the arm as run for `drop-all-tables.ts`, whose
+ * pre-snapshot purge drops exactly the tables laid here and so must never run
+ * on this side of the boot order.
+ *
  * @internal
  */
 export async function loadAdapterSpecificSchema(adapter: DatabaseAdapter): Promise<void> {
-  // Noted whether or not this adapter has an arm: what the marker guards is the
-  // *boot order*, and reaching this point at all means the purge is late.
   noteAdapterSpecificSchemaLoaded();
   const adapterSpecificSchema = ADAPTER_SPECIFIC_SCHEMAS[adapter.adapterName];
   if (adapterSpecificSchema) await adapterSpecificSchema(adapter);
