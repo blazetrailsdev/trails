@@ -89,11 +89,13 @@ describe("generateSchemaFile", () => {
     expect(content).toContain('default: () => "CURRENT_TIMESTAMP"');
   });
 
-  it("handles primaryKey:false, composite PK, and null:false on CPK columns", () => {
+  it("handles primaryKey:false and composite PK", () => {
     expect(content).toContain('"drafts", { id: false }');
     expect(content).toContain('primaryKey: ["book_id","edition_num"]');
-    expect(content).toContain('"book_id", "integer", { null: false }');
-    expect(content).toContain('"edition_num", "integer", { null: false }');
+    // Bare, as schema.rb declares composite-PK columns: Rails'
+    // visit_PrimaryKeyDefinition emits only PRIMARY KEY (a, b).
+    expect(content).toContain('"book_id", "integer", {}');
+    expect(content).toContain('"edition_num", "integer", {}');
   });
 
   it("does not emit force:cascade for non-mysql/pg adapters", () => {
@@ -112,7 +114,7 @@ describe("generateSchemaFile", () => {
 
   it("keeps a single-column string custom PK as the array (non-serial) form", () => {
     expect(content).toContain('primaryKey: ["code"]');
-    // The string PK column is still emitted as a column (NOT NULL via composite path).
+    // The string PK column is still emitted as a column.
     expect(content).toContain('"code", "string"');
   });
 });

@@ -66,8 +66,8 @@ interface IndexOpts {
  * Thin `create_table` block builder. Each `t.<type>()` maps to the same
  * `t.column(name, mappedType, options)` call `defineSchema` emits — including
  * the per-adapter type map, the single-column serial PK emitted inline at its
- * declared offset, composite-PK NOT NULL, and the MySQL `DATETIME(6)` upgrade —
- * so the resulting DDL is identical. Indexes are collected and applied after the
+ * declared offset and the MySQL `DATETIME(6)` upgrade — so the resulting DDL is
+ * identical. Indexes are collected and applied after the
  * table is created (with the same expression-index / MySQL-length gating).
  */
 class TableBuilder {
@@ -78,7 +78,6 @@ class TableBuilder {
     private readonly adapterName: string,
     private readonly typeMap: Record<string, string | undefined>,
     private readonly serialPk: string | null,
-    private readonly compositePk: Set<string> | null,
   ) {}
 
   private col(name: string, primitive: string, o: ColOpts = {}): void {
@@ -101,8 +100,11 @@ class TableBuilder {
     } else if (o.default !== undefined) {
       options["default"] = o.default;
     }
-    // Composite-PK columns are NOT NULL (SQLite otherwise admits NULLs).
-    if (this.compositePk?.has(name)) options["null"] = false;
+    // Composite-PK columns get no forced NOT NULL: schema.rb:243-250 declares
+    // them bare and visit_PrimaryKeyDefinition (schema_creation.rb:79-81) emits
+    // only `PRIMARY KEY (a, b)`. SQLite does admit NULLs in a non-INTEGER PK,
+    // but Rails runs its own suite against that, so adding one here to match
+    // PG/MySQL would be a deviation, not a transcription.
     // MySQL DATETIME without precision = DATETIME(0); upgrade to DATETIME(6)
     // unless an explicit precision (incl. null) opted out.
     if (
@@ -277,12 +279,9 @@ export async function runTable(
     createOpts.id = false;
   }
   if (meta.primaryKey !== undefined) createOpts.primaryKey = meta.primaryKey;
-  const compositePk =
-    meta.primaryKey !== undefined && meta.serialPk === undefined ? new Set(meta.primaryKey) : null;
-
   let builder!: TableBuilder;
   await ss.createTable(name, createOpts, (t: TableDefinition) => {
-    builder = new TableBuilder(t, adapter.adapterName, typeMap, meta.serialPk ?? null, compositePk);
+    builder = new TableBuilder(t, adapter.adapterName, typeMap, meta.serialPk ?? null);
     fn(builder);
   });
 
@@ -2144,7 +2143,7 @@ export async function canonicalForeignKeyDependents(): Promise<Map<string, strin
         dependents.set(toTable, children);
       },
     } as unknown as TableDefinition;
-    def.fn(new TableBuilder(probe, "sqlite", COLUMN_TYPE_MAP_SQLITE, null, null));
+    def.fn(new TableBuilder(probe, "sqlite", COLUMN_TYPE_MAP_SQLITE, null));
   }
   _dependents = dependents;
   return dependents;
@@ -2161,24 +2160,15 @@ export async function canonicalForeignKeyDependents(): Promise<Map<string, strin
  * type map is a near-identity and whose column path applies no adapter munging
  * (no MySQL `DATETIME(6)` upgrade, no `serial` PK rewrite), so what comes back
  * is the *declared* shape rather than one adapter's rendering of it. The probe
- * is likewise built with no `serialPk` and no composite-PK set, so `col`'s
- * generic branch runs for every column — both of the branches it skips rewrite
- * what was declared:
- *   - `serialPk` *discards* the declared options wholesale in favour of
- *     `serialIdType` + `{primaryKey: true}`;
- *   - the composite-PK branch forces `null: false`, which is a trails addition,
- *     not something `schema.rb` states. Rails' `visit_PrimaryKeyDefinition`
- *     (schema_creation.rb:79-81) emits nothing but `PRIMARY KEY (a, b)`, and
- *     schema.rb:243-250 declares `cpk_books.author_id` as a bare `t.integer`.
- *     Our NOT NULL exists so SQLite (which admits NULLs in a non-INTEGER PK)
- *     matches the other adapters; whether that is faithful is a live question,
- *     tracked separately — reporting the *declared* shape keeps this comparator
- *     honest about schema.rb either way, which is what it exists to check.
+ * is likewise built with no `serialPk`, so `col`'s generic branch runs for every
+ * column — the one branch it skips *discards* the declared options wholesale in
+ * favour of `serialIdType` + `{primaryKey: true}`. Composite-PK columns need no
+ * such handling any more: `col` no longer rewrites them, so what they declare is
+ * what the DDL carries.
  * Taking the generic branch is therefore the right reading, but only while no
- * PK column declares something those branches would have rewritten;
- * {@link assertSerialPkIsPlainInteger} and {@link assertCompositePkDeclaresNoNull}
- * fail loudly the moment one does, rather than letting the replay report a shape
- * the real DDL never had.
+ * `serialPk` column declares something that branch would have rewritten;
+ * {@link assertSerialPkIsPlainInteger} fails loudly the moment one does, rather
+ * than letting the replay report a shape the real DDL never had.
  *
  * @internal Read by `scripts/schema-compare/compare.ts`. Lives here, next to the
  * registry it replays, for the same reason as
@@ -2194,14 +2184,14 @@ export async function canonicalRegistrySchema(): Promise<Schema> {
       },
       foreignKey: () => {},
     } as unknown as TableDefinition;
-    def.fn(new TableBuilder(probe, "sqlite", COLUMN_TYPE_MAP_SQLITE, null, null));
+    def.fn(new TableBuilder(probe, "sqlite", COLUMN_TYPE_MAP_SQLITE, null));
     if (def.meta.serialPk !== undefined) {
       assertSerialPkIsPlainInteger(def.name, def.meta.serialPk, columns[def.meta.serialPk]);
     }
     if (def.meta.primaryKey !== undefined && def.meta.serialPk === undefined) {
-      for (const column of def.meta.primaryKey) {
-        assertCompositePkDeclaresNoNull(def.name, column, columns[column]);
-      }
+      // `col` leaves these as declared, so nothing to reconcile; declaredSpec
+      // still raises when `primaryKey:` names a column the block never declared.
+      for (const column of def.meta.primaryKey) declaredSpec(def.name, column, columns[column]);
     }
     schema[def.name] = columns;
   }
@@ -2235,29 +2225,6 @@ function assertSerialPkIsPlainInteger(
       `${JSON.stringify(spec)}, but the serialPk path emits only serialIdType(...) with ` +
       `primaryKey: true — the declared type/options would never reach the DDL. Teach ` +
       `canonicalRegistrySchema to model the rendered form before declaring it this way.`,
-  );
-}
-
-/**
- * Guard the composite-PK branch the replay likewise skips. That branch overrides
- * whatever the column declared with `null: false`, so "declared" and "rendered"
- * agree only where the declaration says nothing about nullability (every live
- * composite-PK column today) or already says `null: false`. A column declared
- * `null: true` would be reported nullable here while the DDL made it NOT NULL —
- * precisely the silent mis-report {@link assertSerialPkIsPlainInteger} exists to
- * prevent.
- */
-function assertCompositePkDeclaresNoNull(
-  table: string,
-  column: string,
-  spec: ColumnSpec | undefined,
-): void {
-  if (declaredSpec(table, column, spec).null !== true) return;
-  throw new ActiveRecordError(
-    `canonical registry: composite-PK column ${table}.${column} declares null: true, but the ` +
-      `composite-PK path overrides it to null: false — the declared shape would never reach ` +
-      `the DDL. Teach canonicalRegistrySchema to model the rendered form before declaring it ` +
-      `this way.`,
   );
 }
 

@@ -723,10 +723,9 @@ describe("against the canonical registry", () => {
   it("reports a composite-PK column with the nullability schema.rb declares", async () => {
     // Rails' visit_PrimaryKeyDefinition (schema_creation.rb:79-81) emits only
     // PRIMARY KEY (a, b), and schema.rb:243-250 declares cpk_books.author_id as
-    // a bare t.integer — so the declared view is nullable. The registry's
-    // NOT NULL forcing is a trails addition tracked separately; the replay must
-    // not paper over it, and assertCompositePkDeclaresNoNull raises if a column
-    // ever declares a nullability that branch would override.
+    // a bare t.integer — so the declared view is nullable, and the DDL the
+    // registry lays says the same: TableBuilder.col forces no NOT NULL on
+    // composite-PK columns.
     const registry = await canonicalRegistrySchema();
     expect(describeSpec(columnsOfRegistry(registry, "cpk_books", "author_id"))).toBe("integer");
   });
