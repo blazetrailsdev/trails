@@ -29,8 +29,5 @@ export interface CreateDatabaseOptions {
   template?: string;
   tablespace?: string;
   connectionLimit?: number;
-  // Rails passes a whole database config here (`create_database config[:database], config`),
-  // so unrecognised keys must reach the option-string builder's no-op arm rather
-  // than being rejected at the call site.
   [key: string]: unknown;
 }

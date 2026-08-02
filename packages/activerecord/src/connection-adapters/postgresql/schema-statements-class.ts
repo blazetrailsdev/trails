@@ -530,9 +530,6 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
   // ---------------------------------------------------------------------------
 
   async createDatabase(name: string, options: CreateDatabaseOptions = {}): Promise<void> {
-    // Rails: `{ encoding: "utf8" }.merge!(options.symbolize_keys)` — spreading a
-    // later `encoding` overwrites the value while keeping the default's leading
-    // position, which is what `merge!` does and what the emitted order asserts.
     const mergedOptions: CreateDatabaseOptions = { encoding: "utf8", ...options };
 
     let optionString = "";
@@ -564,11 +561,11 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
       }
     }
 
-    await this.execute(`CREATE DATABASE ${this.pg.quoteIdentifier(name)}${optionString}`);
+    await this.execute(`CREATE DATABASE ${this.pg.quoteTableName(name)}${optionString}`);
   }
 
   async dropDatabase(name: string): Promise<void> {
-    await this.execute(`DROP DATABASE IF EXISTS ${this.pg.quoteIdentifier(name)}`);
+    await this.execute(`DROP DATABASE IF EXISTS ${this.pg.quoteTableName(name)}`);
   }
 
   async recreateDatabase(name: string, options: CreateDatabaseOptions = {}): Promise<void> {

@@ -1263,11 +1263,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
   });
 
-  // Rails builds create_database's option string by iterating the *merged*
-  // options hash, so keys it has no arm for fall through the `else` and
-  // contribute nothing — they are neither emitted nor rejected. Rails covers
-  // only encoding/collation/ctype; the remaining arms and the pass-through are
-  // trails-side regression cover.
   describe("createDatabase option string", () => {
     it("emits the remaining option arms in merged-hash order", async () => {
       const sqls = await captureSql(
