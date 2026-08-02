@@ -12,7 +12,6 @@
 
 import type { Base } from "../base.js";
 import type { AssociationSpec } from "../relation/query-methods.js";
-import { argumentError } from "../relation/query-methods.js";
 import {
   underscore as _toUnderscore,
   camelize as _camelize,
@@ -244,9 +243,11 @@ export class JoinDependency {
             `Can't join '${onModel}' to association named '${assocName}'; perhaps you misspelled it?`,
           );
         }
-        throw argumentError(
+        const err = new Error(
           `Association named '${assocName}' was not found on ${onModel}; perhaps you misspelled it?`,
         );
+        err.name = "ArgumentError";
+        throw err;
       }
       const children = tree[key];
       if (children != null && Reflect.ownKeys(children).length > 0) {
