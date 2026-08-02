@@ -139,7 +139,7 @@ tester.run("no-load-schema-with-stubbed-ddl", rule, {
     {
       filename: FILENAME,
       code: `
-        const stub = { schemaStatements: () => ({ createTable: async () => {} }) };
+        const stub = { addIndex: async () => {} };
         await loadSchema(stub);
       `,
       errors: [{ messageId: "misrouted" }],
@@ -215,7 +215,7 @@ tester.run("no-load-schema-with-stubbed-ddl", rule, {
       filename: FILENAME,
       code: `
         class Probe extends BetterSQLite3Adapter {
-          schemaStatements = () => fakeSchemaStatements;
+          createTable = async () => {};
         }
         await loadSchema(new Probe(":memory:"));
       `,
