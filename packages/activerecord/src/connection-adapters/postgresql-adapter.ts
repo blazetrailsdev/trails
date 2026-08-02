@@ -3431,23 +3431,20 @@ export class PostgreSQLAdapter
     return true;
   }
 
-  // Advisory locks are session-scoped — acquire and release must use the
-  // same connection. With the dual-pool collapse the adapter owns one
-  // persistent pg.Client, so the lock naturally lives on `_rawConnection`
-  // for its duration with no separate checkout.
+  // Advisory locks are session-scoped — acquire and release must use the same
+  // connection. `queryValue` satisfies that here: it runs through
+  // `internalExecQuery` -> `withRawConnection`, and this adapter owns exactly
+  // one persistent pg.Client (`_acquireFreshClient` returns `_rawConnection`),
+  // so every statement lands on the session the caller holds. That is why the
+  // formerly pinned-client routing could be dropped for Rails' primitive.
   async getAdvisoryLock(lockId: number | bigint | string): Promise<boolean> {
-    const client = await this._acquireFreshClient();
-    const [sql, param] = _pgAdvisoryLockSql("pg_try_advisory_lock", "locked", lockId);
-    const result = await this._serializePinnedQuery(client, () => client.query(sql, [param]));
-    return result.rows[0]?.locked === true;
+    _assertPgAdvisoryLockId(lockId);
+    return (await this.queryValue(`SELECT pg_try_advisory_lock(${lockId})`)) === true;
   }
 
   async releaseAdvisoryLock(lockId: number | bigint | string): Promise<boolean> {
-    if (!this._rawConnection) return false;
-    const client = await this._acquireFreshClient();
-    const [sql, param] = _pgAdvisoryLockSql("pg_advisory_unlock", "unlocked", lockId);
-    const result = await this._serializePinnedQuery(client, () => client.query(sql, [param]));
-    return result.rows[0]?.unlocked === true;
+    _assertPgAdvisoryLockId(lockId);
+    return (await this.queryValue(`SELECT pg_advisory_unlock(${lockId})`)) === true;
   }
 
   supportsExplain(): boolean {
@@ -5156,14 +5153,20 @@ export class MoneyDecoder {
   }
 }
 
-function _pgAdvisoryLockSql(
-  fn: string,
-  col: string,
-  lockId: number | bigint | string,
-): [string, unknown] {
-  if (typeof lockId === "bigint") return [`SELECT ${fn}($1::bigint) AS ${col}`, lockId.toString()];
-  if (typeof lockId === "number") return [`SELECT ${fn}($1) AS ${col}`, lockId];
-  return [`SELECT ${fn}(hashtext($1)) AS ${col}`, lockId];
+/**
+ * Mirrors the `lock_id.is_a?(Integer) && lock_id.bit_length <= 63` guard shared
+ * by PostgreSQLAdapter#get_advisory_lock / #release_advisory_lock
+ * (postgresql_adapter.rb:459-471). Ruby's Integer covers both of JS' integral
+ * numeric types, so `number` (integral only) and `bigint` pass; strings — which
+ * trails used to hash through `hashtext()` — and fractional numbers raise, as
+ * they do in Rails. `bit_length <= 63` is exactly the signed 64-bit range,
+ * negatives included (`(-2**63).bit_length == 63`).
+ */
+function _assertPgAdvisoryLockId(lockId: number | bigint | string): void {
+  const isInteger = typeof lockId === "bigint" || Number.isInteger(lockId);
+  if (!isInteger || BigInt(lockId) < -(2n ** 63n) || BigInt(lockId) >= 2n ** 63n) {
+    throw new ArgumentError("PostgreSQL requires advisory lock ids to be a signed 64 bit integer");
+  }
 }
 
 /**

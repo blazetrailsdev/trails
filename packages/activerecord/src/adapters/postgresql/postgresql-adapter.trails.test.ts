@@ -1379,3 +1379,50 @@ describe("PostgreSQLAdapter supports_* predicates (unit)", () => {
     expect(adapter.typeToSql("datetime")).toBe("timestamp");
   });
 });
+
+// Rails has no test for the `is_a?(Integer) && bit_length <= 63` guard in
+// postgresql_adapter.rb:459-471, so these are trails-only covers for it. The
+// session-identity half of advisory locks is pinned by
+// PostgresqlConnectionTest#"get and release advisory lock" in connection.test.ts:
+// pg_advisory_unlock only returns true on the session that took the lock.
+describe("PostgreSQLAdapter advisory lock id guard (unit)", () => {
+  const message = "PostgreSQL requires advisory lock ids to be a signed 64 bit integer";
+
+  function makeAdapter(): PostgreSQLAdapter {
+    return new PostgreSQLAdapter({ host: "stub", port: 0 });
+  }
+
+  it("getAdvisoryLock raises ArgumentError for a string lock id", async () => {
+    const adapter = makeAdapter();
+    await expect(adapter.getAdvisoryLock("some-lock-name")).rejects.toThrow(message);
+  });
+
+  it("releaseAdvisoryLock raises ArgumentError for a string lock id", async () => {
+    const adapter = makeAdapter();
+    await expect(adapter.releaseAdvisoryLock("some-lock-name")).rejects.toThrow(message);
+  });
+
+  it("raises ArgumentError for a fractional lock id", async () => {
+    const adapter = makeAdapter();
+    await expect(adapter.getAdvisoryLock(1.5)).rejects.toThrow(message);
+  });
+
+  it("raises ArgumentError for a lock id wider than 63 bits", async () => {
+    const adapter = makeAdapter();
+    await expect(adapter.getAdvisoryLock(2n ** 63n)).rejects.toThrow(message);
+    await expect(adapter.getAdvisoryLock(-(2n ** 63n) - 1n)).rejects.toThrow(message);
+  });
+
+  it("accepts the signed 64 bit boundaries and interpolates them into the SQL", async () => {
+    const adapter = makeAdapter();
+    const queryValue = vi.spyOn(adapter, "queryValue").mockResolvedValue(true);
+
+    expect(await adapter.getAdvisoryLock(2n ** 63n - 1n)).toBe(true);
+    expect(await adapter.releaseAdvisoryLock(-(2n ** 63n))).toBe(true);
+
+    expect(queryValue.mock.calls.map((c) => c[0])).toEqual([
+      "SELECT pg_try_advisory_lock(9223372036854775807)",
+      "SELECT pg_advisory_unlock(-9223372036854775808)",
+    ]);
+  });
+});

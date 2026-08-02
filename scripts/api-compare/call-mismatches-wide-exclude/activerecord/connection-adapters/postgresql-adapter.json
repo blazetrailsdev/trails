@@ -170,13 +170,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "get_advisory_lock",
-    "call": "query_value",
-    "reason": "Deliberate deviation (RFC 0072 converge-pg-session-and-transaction-exec-primitive-routing): PG advisory locks are session-scoped, so the lock must be taken on the pinned raw client and serialized against in-flight maintenance queries (_acquireFreshClient + _serializePinnedQuery). Routing through query_value would run it on whatever connection selectAll materializes and could hand the lock to a connection the caller does not hold. trails also accepts string lock ids (hashtext) that Rails rejects outright."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
     "rubyName": "get_database_version",
     "call": "with_raw_connection",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -264,13 +257,6 @@
     "rubyName": "reconfigure_connection_timezone",
     "call": "raw_execute",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "release_advisory_lock",
-    "call": "query_value",
-    "reason": "Deliberate deviation (RFC 0072 converge-pg-session-and-transaction-exec-primitive-routing): mirror of get_advisory_lock — the unlock must target the same pinned session that took the lock, so it runs on the pinned raw client rather than through query_value."
   },
   {
     "package": "activerecord",
