@@ -337,6 +337,34 @@ describe("CI runs every tooling test suite", () => {
     }
   });
 
+  // guides-typecheck is draft-deferred with no opt-in of its own, so the job
+  // gate and the aggregate's skip allow-list are a two-clause pair rather than
+  // the four-clause one above. A narrower aggregate wedges every draft PR on
+  // "unexpectedly skipped"; a wider one passes a guides break that never ran.
+  it("keeps the guides-typecheck draft deferral and the ci aggregate in agreement", async () => {
+    const wf = parseYaml(await readFile(CI_YML, "utf8"));
+    const optIn = wf.jobs["guides-typecheck"].if.replace(/\s+/g, " ").trim();
+
+    // Without the ready flip in `on:` a PR reaches ready with no event left to
+    // start the deferred job. (Also asserted for the DB pair above; repeated
+    // here so removing that test can't silently unpin this one.)
+    expect(wf.on.pull_request.types).toContain("ready_for_review");
+
+    const deferred = wf.jobs.ci.steps[0].env.GUIDES_DRAFT_DEFERRED.replace(/\s+/g, " ");
+    for (const [jobClause, aggregateClause] of [
+      ["github.event_name != 'pull_request'", "github.event_name == 'pull_request'"],
+      ["github.event.pull_request.draft == false", "github.event.pull_request.draft"],
+    ]) {
+      expect(optIn).toContain(jobClause);
+      expect(deferred).toContain(aggregateClause);
+    }
+
+    // The gate that decides whether the job is relevant at all must survive
+    // alongside the deferral — dropping it would run the job on every draft-
+    // less PR regardless of whether anything it compiles changed.
+    expect(optIn).toContain("needs.changes.outputs.guides_affected == 'true'");
+  });
+
   it("keeps comparison_affected off for website-only changes", async () => {
     const runGate = await gateRunner(await readFile(CI_YML, "utf8"));
     expect((await runGate("packages/website/src/app.ts")).comparison_affected).toBe("false");

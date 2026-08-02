@@ -625,12 +625,23 @@ jobs:
           fi
           echo "No forbidden Claude attribution found in commit messages."
 
+  # Draft-deferred, same shape as the PG/MariaDB suites. This compiles the
+  # fenced TS blocks in packages/website/docs/guides/** against the public type
+  # surface — a documentation-drift merge gate, not review signal: a reviewer
+  # of a packages/**/src diff never acts on its result, and the fix (adjust the
+  # guide snippet) is identical at ready-for-review time. Its gate
+  # (GUIDES_PKGS_RE) spans every AR-adjacent package, so pre-ready it fired on
+  # nearly every source PR for ~40-80s of runner time nobody read.
+  # `ready_for_review` is in the workflow's `on:` types, so a PR can't reach
+  # ready without an event left to start this.
   guides-typecheck:
     name: Guides Code Type Check
     needs: changes
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
-      needs.changes.outputs.guides_affected == 'true'
+      needs.changes.outputs.guides_affected == 'true' &&
+      (github.event_name != 'pull_request' ||
+      github.event.pull_request.draft == false)
     runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 20
     steps:
@@ -1865,6 +1876,7 @@ jobs:
           SQLITE_MEM_UNLABELLED: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'run-sqlite-mem') }}
           MYSQL_PREPARED_UNLABELLED: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'run-mysql-prepared') }}
           DB_ADAPTERS_DRAFT_DEFERRED: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft && needs.changes.outputs.db_adapter_affected != 'true' && !contains(github.event.pull_request.labels.*.name, 'run-db-adapters') }}
+          GUIDES_DRAFT_DEFERRED: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft }}
         run: |
           set -euo pipefail
           echo "$NEEDS_JSON"
@@ -1955,7 +1967,10 @@ jobs:
                   [ "$UNIT_TESTS_AFFECTED" = "false" ] && continue
                   ;;
                 guides-typecheck)
-                  [ "$GUIDES_AFFECTED" = "false" ] && continue
+                  if [ "$GUIDES_AFFECTED" = "false" ] || \
+                     [ "$GUIDES_DRAFT_DEFERRED" = "true" ]; then
+                    continue
+                  fi
                   ;;
                 rails-comparison)
                   # Legitimate skip when no comparison-relevant path changed
@@ -1989,7 +2004,7 @@ jobs:
                   [ "$any_parity" = "false" ] && continue
                   ;;
               esac
-              echo "Unexpectedly skipped job: $job (docs_only=$DOCS_ONLY ar_affected=$AR_AFFECTED ap_affected=$AP_AFFECTED av_affected=$AV_AFFECTED rack_affected=$RACK_AFFECTED trailties_affected=$TRAILTIES_AFFECTED trails_tsc_affected=$TRAILS_TSC_AFFECTED tse_compiler_affected=$TSE_COMPILER_AFFECTED unit_tests_affected=$UNIT_TESTS_AFFECTED guides_affected=$GUIDES_AFFECTED website_affected=$WEBSITE_AFFECTED comparison_affected=$COMPARISON_AFFECTED website_label=$WEBSITE_LABEL parity_sqlite=$PARITY_SQLITE parity_postgres=$PARITY_POSTGRES parity_mysql=$PARITY_MYSQL db_adapters_draft_deferred=$DB_ADAPTERS_DRAFT_DEFERRED)"
+              echo "Unexpectedly skipped job: $job (docs_only=$DOCS_ONLY ar_affected=$AR_AFFECTED ap_affected=$AP_AFFECTED av_affected=$AV_AFFECTED rack_affected=$RACK_AFFECTED trailties_affected=$TRAILTIES_AFFECTED trails_tsc_affected=$TRAILS_TSC_AFFECTED tse_compiler_affected=$TSE_COMPILER_AFFECTED unit_tests_affected=$UNIT_TESTS_AFFECTED guides_affected=$GUIDES_AFFECTED website_affected=$WEBSITE_AFFECTED comparison_affected=$COMPARISON_AFFECTED website_label=$WEBSITE_LABEL parity_sqlite=$PARITY_SQLITE parity_postgres=$PARITY_POSTGRES parity_mysql=$PARITY_MYSQL db_adapters_draft_deferred=$DB_ADAPTERS_DRAFT_DEFERRED guides_draft_deferred=$GUIDES_DRAFT_DEFERRED)"
               unexpected=1
             done < <(echo "$NEEDS_JSON" | jq -r 'to_entries[] | "\(.key) \(.value.result)"')
           fi
