@@ -1751,6 +1751,7 @@ export function constructJoinDependency(
   const jd = new JoinDependency(
     this.model,
     joinType as typeof Nodes.InnerJoin | typeof Nodes.OuterJoin | undefined,
+    this.table,
   );
   const modelName = (this.model as any).name ?? "model";
   const specs = Array.isArray(associations) ? associations : [associations];
