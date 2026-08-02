@@ -4828,8 +4828,8 @@ export interface PostgreSQLAdapter {
    *   `createRange`/`dropRange` are modelled on the shape of Rails' own enum type-DDL helpers
    *   (`create_enum` postgresql_adapter.rb:541, `drop_enum` :571, `rename_enum` :579,
    *   `add_enum_value` :588, `rename_enum_value` :606, all five stubbed as no-ops on the base at
-   *   abstract_adapter.rb:576-593), including their
-   *   `reload_type_map` epilogue; the implementation lives at the emitting call site,
+   *   abstract_adapter.rb:576-593), including their `reload_type_map` epilogue; the
+   *   implementation lives at the emitting call site,
    *   connection-adapters/postgresql/schema-statements-class.ts. Deliberately PostgreSQL-only: the
    *   no-op stubs that shadowed these on AbstractAdapter were deleted rather than allowlisted,
    *   since Rails stubs only the enum helpers on the base.
