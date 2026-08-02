@@ -17,6 +17,7 @@ import {
 import { withSecondAdapter } from "../../support/second-connection.js";
 import { Column as PgColumn } from "../../connection-adapters/postgresql/column.js";
 import { captureSql } from "../../testing/sql-capture.js";
+import { itIfSupports } from "../../support/supports.js";
 
 async function withExtensionDisabled(
   adapter: PostgreSQLAdapter,
@@ -98,6 +99,22 @@ describeIfPg("PostgreSQLAdapter", () => {
         | undefined;
       expect(nndIdx?.nullsNotDistinct).toBe(await expectedNullsNotDistinctValue(adapter));
     });
+
+    itIfSupports(
+      "index_include",
+      "indexes() keeps INCLUDE columns out of the key column list",
+      async () => {
+        await adapter.exec(
+          `CREATE TABLE "ex_idx_incl" ("id" SERIAL PRIMARY KEY, "n" INTEGER, "d" TEXT)`,
+        );
+        await adapter.exec(`CREATE INDEX "ex_idx_incl_i" ON "ex_idx_incl" ("n") INCLUDE ("d")`);
+        const index = (await adapter.indexes("ex_idx_incl")).find(
+          (i) => i.name === "ex_idx_incl_i",
+        )!;
+        expect(index.columns).toEqual(["n"]);
+        expect(index.include).toEqual(["d"]);
+      },
+    );
 
     it("pk and sequence for table with serial pk", async () => {
       await adapter.exec(`CREATE TABLE "ex_serial" ("id" SERIAL PRIMARY KEY, "name" TEXT)`);

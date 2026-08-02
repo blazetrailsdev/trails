@@ -270,19 +270,20 @@ describe("PostgreSQLSchemaStatements#changeTable", () => {
 describe("PostgreSQLSchemaStatements#indexes", () => {
   it("keeps the schema-qualified table name from the argument", async () => {
     const { adapter } = makeAdapter({
-      schemaQuery: async () => [
-        {
-          index_name: "index_things_on_name",
-          is_unique: false,
-          using: "btree",
-          columns: ["name"],
-          has_expressions: false,
-          definition: "CREATE INDEX index_things_on_name ON my_schema.things USING btree (name)",
-          options: [0],
-          is_valid: true,
-          comment: null,
-        },
-      ],
+      query: async (text) =>
+        text.includes("pg_attribute")
+          ? [[1, "name"]]
+          : [
+              [
+                "index_things_on_name",
+                false,
+                "1",
+                "CREATE INDEX index_things_on_name ON my_schema.things USING btree (name)",
+                12345,
+                null,
+                true,
+              ],
+            ],
     });
     const ss = withSchemaStatements(adapter);
     const [index] = await ss.indexes("my_schema.things");
