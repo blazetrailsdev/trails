@@ -69,18 +69,20 @@ function rehydrateColumn(data: unknown): Column {
 /**
  * `IndexDefinition#conciseOptions` collapses a per-column option map to a bare
  * scalar when every key column shares the value, so a serialized row can carry
- * either shape. Re-expand the scalar to a per-column map before handing it back
- * to the constructor, which collapses it again — round-tripping a collapsed
- * value straight through would make `conciseOptions` walk the scalar itself.
+ * either shape. Re-expand the scalar over the key columns before handing it
+ * back to the constructor, which collapses it again. An expression index has no
+ * key columns to expand over — `columns` is the raw expression string — so its
+ * scalar passes straight through to `conciseOptions`, which leaves a non-map
+ * value alone.
  */
 function expandIndexOption<T>(
   columns: string | string[],
   value: unknown,
-): Record<string, T> | undefined {
+): Record<string, T> | T | undefined {
   if (value === null || value === undefined) return undefined;
   if (typeof value === "object") return value as Record<string, T>;
-  const cols = Array.isArray(columns) ? columns : [columns];
-  return Object.fromEntries(cols.map((c) => [c, value as T]));
+  if (!Array.isArray(columns)) return value as T;
+  return Object.fromEntries(columns.map((c) => [c, value as T]));
 }
 
 /**

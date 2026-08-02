@@ -581,9 +581,9 @@ export class IndexDefinition {
     columns: string | string[] = [],
     options: {
       where?: string;
-      orders?: Record<string, string>;
+      orders?: Record<string, string> | string;
       lengths?: number | null | Record<string, number>;
-      opclasses?: Record<string, string>;
+      opclasses?: Record<string, string> | string;
       type?: string;
       using?: string;
       include?: string[];
@@ -667,8 +667,9 @@ export class IndexDefinition {
   }
 
   /** @internal */
-  private conciseOptions<T>(options: Record<string, T>): Record<string, T> | T {
-    const values = Object.values(options);
+  private conciseOptions<T>(options: Record<string, T> | T): Record<string, T> | T {
+    if (options == null || typeof options !== "object") return options;
+    const values = Object.values(options as Record<string, T>);
     if (this.columns.length === values.length && new Set(values).size === 1) {
       return values[0];
     }

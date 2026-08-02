@@ -3,6 +3,7 @@ import {
   ForeignKeyDefinition,
   CheckConstraintDefinition,
   ReferenceDefinition,
+  IndexDefinition,
   TableDefinition,
   type ReferenceDefinitionConnection,
 } from "./schema-definitions.js";
@@ -227,5 +228,19 @@ describe("ColumnMethods#primary_key", () => {
 
     expect(td.columns[0].type).toBe("primary_key");
     expect(td.columns[0].options.primaryKey).toBe(true);
+  });
+});
+
+describe("IndexDefinition concise options", () => {
+  it("leaves an already-collapsed scalar alone", () => {
+    const index = new IndexDefinition("posts", "index_posts_on_abc", false, ["a", "b", "c"], {
+      orders: "desc",
+      opclasses: "aaa",
+      lengths: 10,
+    });
+
+    expect(index.orders).toBe("desc");
+    expect(index.opclasses).toBe("aaa");
+    expect(index.lengths).toBe(10);
   });
 });

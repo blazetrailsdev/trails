@@ -72,11 +72,16 @@ describe("SchemaCacheIndexDefinitionRoundTripTest", () => {
 
   it("expression indexes keep their raw expression through the cache", async () => {
     const live = [
-      new IndexDefinition("people", "index_people_on_lower_name", false, "lower(first_name)"),
+      new IndexDefinition("people", "index_people_on_lower_name", false, "lower(first_name)", {
+        orders: "desc",
+        opclasses: "text_pattern_ops",
+      }),
     ];
     const [loaded] = await roundTrip(live);
 
     expect(loaded.columns).toBe("lower(first_name)");
+    expect(loaded.orders).toBe("desc");
+    expect(loaded.opclasses).toBe("text_pattern_ops");
     expect(loaded.columnOptions()).toEqual(live[0].columnOptions());
     expect(loaded.isDefinedFor("lower(first_name)")).toBe(true);
   });
