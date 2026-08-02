@@ -4,8 +4,6 @@ import {
   _builtAssociationScope,
   _canRouteThroughViaDisableJoinsAssociationScope,
   _findTargetReachable,
-  _inlineOwnerKey,
-  _inlinePolymorphicKeys,
   _loadSingularThroughViaDisableJoinsScope,
   _ownerChainReflection,
   _routeThroughViaAssociationScope,
@@ -23,12 +21,11 @@ import {
 } from "../associations.js";
 import { Association } from "./association.js";
 import { ownerForeignKeyColumns } from "./foreign-association.js";
-import { CompositePrimaryKeyMismatchError } from "./errors.js";
+import { AssociationNotFoundError, CompositePrimaryKeyMismatchError } from "./errors.js";
 import {
   routeThroughCheckValidity,
   validateThroughReflection,
 } from "./validate-through-reflection.js";
-import { polymorphicName } from "../inheritance.js";
 import { camelize, underscore } from "@blazetrails/activesupport";
 import { strictLoadingViolationBang } from "../core.js";
 import { RecordInvalid } from "../validations.js";
@@ -399,7 +396,8 @@ async function _findBelongsToTarget(
   }
 
   const ctor = record.constructor as typeof Base;
-  const defaultFk = `${underscore(assocName)}_id`;
+  const reflection = ctor._reflectOnAssociation?.(assocName);
+  if (!reflection) throw new AssociationNotFoundError(record, assocName);
 
   // Polymorphic: use the _type column to determine the target model
   let targetModel: typeof Base;
@@ -420,36 +418,19 @@ async function _findBelongsToTarget(
     validateInverseOf(targetModel, assocName, options.inverseOf);
   }
 
-  // Resolve foreign key and primary key (may be arrays for CPK).
-  const foreignKey =
-    options.foreignKey ??
-    (options.queryConstraints
-      ? options.queryConstraints
-      : Array.isArray(targetModel.primaryKey) && !options.primaryKey
-        ? targetModel.primaryKey.map((col: string) => `${underscore(assocName)}_${col}`)
-        : defaultFk);
-  const primaryKey = options.primaryKey ?? targetModel.primaryKey;
-
-  // Route through AssociationScope when reflection is registered.
   // For polymorphic belongsTo, AssociationScope receives the
   // runtime-resolved klass; the reflection's own joinPrimaryKey
   // returns associationPrimaryKey (target's PK) and joinForeignKey
   // returns the owner-side FK, so the WHERE shape is identical to
   // the non-polymorphic case.
-  const reflection = ctor._reflectOnAssociation?.(assocName);
   // Null-FK short-circuit: avoid a query when owner's FK column is null.
   // The check must read the SAME columns the eventual query uses —
-  // reflection.joinForeignKey when routing through AssociationScope,
-  // options-derived foreignKey otherwise. Reading from a different
-  // column would silently return null while a real query would have
-  // found the row (or vice versa).
-  const fkColsForCheck = reflection
-    ? Array.isArray(reflection.joinForeignKey)
-      ? reflection.joinForeignKey
-      : [reflection.joinForeignKey]
-    : Array.isArray(foreignKey)
-      ? foreignKey
-      : [foreignKey];
+  // reflection.joinForeignKey. Reading from a different column would
+  // silently return null while a real query would have found the row (or
+  // vice versa).
+  const fkColsForCheck = Array.isArray(reflection.joinForeignKey)
+    ? reflection.joinForeignKey
+    : [reflection.joinForeignKey];
   for (const fk of fkColsForCheck) {
     const v = record._readAttribute(fk);
     if (v === null || v === undefined) return null;
@@ -464,49 +445,21 @@ async function _findBelongsToTarget(
   const staleSnapshot = staleCols.map((col) => record._readAttribute(col));
 
   let result: Base | null;
-  if (reflection) {
-    if (!_skipSingularStatementCache(reflection, targetModel, options)) {
-      // Statement-cache path (Rails `Association#find_target` via
-      // `reflection.association_scope_cache` / `sc.execute(binds, c)`).
-      result = await _loadSingularViaStatementCache(record, assocName, reflection, targetModel);
-    } else {
-      const built = _builtAssociationScope(record, assocName, reflection, targetModel);
-      const baseRelation = _scopeForAssociation(targetModel);
-      let rel = baseRelation.merge(built);
-      rel = applyAssociationScope(rel, options.scope, record, reflection.scope);
-      // Rails' normal singular-load path (`Association#find_target` via the
-      // statement cache) returns an array and calls `Array#first` — no ORDER BY
-      // in SQL. `take` (unordered LIMIT 1) is the closest equivalent; `first`
-      // would route through `ordered_relation` and add a spurious ORDER BY. See
-      // has_one_associations_test `test_has_one_does_not_use_order_by`.
-      result = await rel.take();
-    }
+  if (!_skipSingularStatementCache(reflection, targetModel, options)) {
+    // Statement-cache path (Rails `Association#find_target` via
+    // `reflection.association_scope_cache` / `sc.execute(binds, c)`).
+    result = await _loadSingularViaStatementCache(record, assocName, reflection, targetModel);
   } else {
-    // Inline fallback: no reflection registered.
-    if (Array.isArray(foreignKey)) {
-      const pkCols = Array.isArray(primaryKey) ? primaryKey : [primaryKey];
-      if (pkCols.length !== foreignKey.length) {
-        // Route through the reflection's canonical checkValidityBang (Rails'
-        // single raise site) so the error carries the Rails-faithful message.
-        routeThroughCheckValidity(ctor, assocName);
-        // No reflection registered (lower-level test helper) — minimal guard.
-        throw new CompositePrimaryKeyMismatchError({
-          activeRecord: ctor.name,
-          name: assocName,
-          primaryKey: pkCols,
-          foreignKey,
-        });
-      }
-      const conditions: Record<string, unknown> = {};
-      for (let i = 0; i < foreignKey.length; i++) {
-        conditions[pkCols[i]] = record._readAttribute(foreignKey[i]);
-      }
-      result = await targetModel.findBy(conditions);
-    } else {
-      result = await targetModel.findBy({
-        [primaryKey as string]: record._readAttribute(foreignKey),
-      });
-    }
+    const built = _builtAssociationScope(record, assocName, reflection, targetModel);
+    const baseRelation = _scopeForAssociation(targetModel);
+    let rel = baseRelation.merge(built);
+    rel = applyAssociationScope(rel, options.scope, record, reflection.scope);
+    // Rails' normal singular-load path (`Association#find_target` via the
+    // statement cache) returns an array and calls `Array#first` — no ORDER BY
+    // in SQL. `take` (unordered LIMIT 1) is the closest equivalent; `first`
+    // would route through `ordered_relation` and add a spurious ORDER BY. See
+    // has_one_associations_test `test_has_one_does_not_use_order_by`.
+    result = await rel.take();
   }
 
   // Rails' `find_target` is synchronous, so it never observes the owner's
@@ -588,6 +541,9 @@ async function _findHasOneTarget(
   }
 
   const ctor = record.constructor as typeof Base;
+  const reflection = ctor._reflectOnAssociation?.(assocName);
+  if (!reflection) throw new AssociationNotFoundError(record, assocName);
+
   const className = options.className ?? camelize(assocName);
   const primaryKey = options.primaryKey ?? ctor.primaryKey;
 
@@ -610,7 +566,6 @@ async function _findHasOneTarget(
       // single raise site) so the error carries the Rails-faithful message;
       // a no-op for polymorphic `:as` (Rails permits no composite key there).
       routeThroughCheckValidity(ctor, assocName);
-      // No reflection resolvable — minimal trails-only fallback guard.
       throw new CompositePrimaryKeyMismatchError({
         activeRecord: ctor.name,
         name: assocName,
@@ -623,7 +578,6 @@ async function _findHasOneTarget(
       // single raise site) so the error carries the Rails-faithful message;
       // a no-op for polymorphic `:as` (Rails permits no composite key there).
       routeThroughCheckValidity(ctor, assocName);
-      // No reflection resolvable — minimal trails-only fallback guard.
       throw new CompositePrimaryKeyMismatchError({
         activeRecord: ctor.name,
         name: assocName,
@@ -635,7 +589,6 @@ async function _findHasOneTarget(
   // Route through AssociationScope (handles scalar, composite, :as, STI
   // in a single Rails-faithful path). reflection.isCollection() === false
   // for hasOne, so AssociationScope.scope adds limit(1) automatically.
-  const reflection = ctor._reflectOnAssociation?.(assocName);
   // Null-PK short-circuit: read the SAME columns the eventual query
   // reads. For non-through, reflection.joinForeignKey is the owner-
   // side activeRecordPrimaryKey for hasOne. For through reflections the
@@ -654,68 +607,18 @@ async function _findHasOneTarget(
   }
 
   let result: Base | null;
-  if (reflection) {
-    if (!_skipSingularStatementCache(reflection, targetModel, options)) {
-      // Statement-cache path (Rails `Association#find_target` via
-      // `reflection.association_scope_cache` / `sc.execute(binds, c)`).
-      result = await _loadSingularViaStatementCache(record, assocName, reflection, targetModel);
-    } else {
-      const built = _builtAssociationScope(record, assocName, reflection, targetModel);
-      const baseRelation = _scopeForAssociation(targetModel);
-      let rel = baseRelation.merge(built);
-      rel = applyAssociationScope(rel, options.scope, record, reflection.scope);
-      // Unordered LIMIT 1: Rails' singular load returns an array and calls
-      // `Array#first`, emitting no ORDER BY. `take` matches; `first` would add one.
-      result = await rel.take();
-    }
+  if (!_skipSingularStatementCache(reflection, targetModel, options)) {
+    // Statement-cache path (Rails `Association#find_target` via
+    // `reflection.association_scope_cache` / `sc.execute(binds, c)`).
+    result = await _loadSingularViaStatementCache(record, assocName, reflection, targetModel);
   } else {
-    // Inline fallback: no reflection registered.
-    if (Array.isArray(foreignKey)) {
-      const ownerKey = _inlineOwnerKey(ctor, options, primaryKey);
-      const pkCols = Array.isArray(ownerKey) ? ownerKey : [ownerKey];
-      if (pkCols.length !== foreignKey.length) {
-        // Route through the reflection's canonical checkValidityBang (Rails'
-        // single raise site) so the error carries the Rails-faithful message.
-        routeThroughCheckValidity(ctor, assocName);
-        // No reflection registered (lower-level test helper) — minimal guard.
-        throw new CompositePrimaryKeyMismatchError({
-          activeRecord: ctor.name,
-          name: assocName,
-          primaryKey: pkCols,
-          foreignKey,
-        });
-      }
-      const conditions: Record<string, unknown> = {};
-      for (let i = 0; i < foreignKey.length; i++) {
-        conditions[foreignKey[i]] = record._readAttribute(pkCols[i]);
-      }
-      result = await targetModel.findBy(conditions);
-    } else if (options.as) {
-      const typeCol = `${underscore(options.as)}_type`;
-      const { fkCols, ownerKeyCols } = _inlinePolymorphicKeys(
-        ctor,
-        options,
-        primaryKey,
-        foreignKey,
-      );
-      const conditions: Record<string, unknown> = { [typeCol]: polymorphicName(ctor) };
-      for (let i = 0; i < fkCols.length; i++) {
-        conditions[fkCols[i]] = record._readAttribute(ownerKeyCols[i]);
-      }
-      result = await targetModel.findBy(conditions);
-    } else if (options.scope) {
-      const ownerKey = _inlineOwnerKey(ctor, options, primaryKey);
-      let rel = targetModel
-        .all()
-        .where({ [foreignKey]: record._readAttribute(ownerKey as string) });
-      rel = applyAssociationScope(rel, options.scope, record);
-      result = await rel.take();
-    } else {
-      const ownerKey = _inlineOwnerKey(ctor, options, primaryKey);
-      result = await targetModel.findBy({
-        [foreignKey]: record._readAttribute(ownerKey as string),
-      });
-    }
+    const built = _builtAssociationScope(record, assocName, reflection, targetModel);
+    const baseRelation = _scopeForAssociation(targetModel);
+    let rel = baseRelation.merge(built);
+    rel = applyAssociationScope(rel, options.scope, record, reflection.scope);
+    // Unordered LIMIT 1: Rails' singular load returns an array and calls
+    // `Array#first`, emitting no ORDER BY. `take` matches; `first` would add one.
+    result = await rel.take();
   }
 
   // Set inverse_of: store reference back to the owner. Resolve via the
@@ -733,7 +636,10 @@ async function _findHasOneTarget(
  * Loads a singular association's target.
  *
  * Mirrors: ActiveRecord::Associations::SingularAssociation#find_target
- * (`singular_association.rb:47`).
+ * (`singular_association.rb:47`). Like Rails, which builds an `Association`
+ * from a validated reflection (`association.rb:41-45`), an association name the
+ * model never declared raises `AssociationNotFoundError` (`associations.rb:56`)
+ * before any load runs.
  *
  * DEVIATION: Rails' `find_target(async: false)` takes no macro parameter and
  * has no dispatcher layer — it is the loader body itself, and
