@@ -1400,6 +1400,19 @@ export function hasInclude(
   return false;
 }
 
+/**
+ * Narrows the resolved `column_name` to what `aggregate_column` accepts. Rails
+ * hands its own resolved value straight through (calculations.rb:414-423), so a
+ * composite `primary_key` reaches Arel as an array and emits broken SQL there
+ * too; the join here picks one spelling for that already-degenerate case rather
+ * than pretending trails supports it.
+ * @internal
+ */
+function aggregateTarget(columnName: string | string[] | Nodes.Node | null): string | Nodes.Node {
+  if (columnName == null) return "*";
+  return Array.isArray(columnName) ? columnName.join(",") : columnName;
+}
+
 /** @internal */
 function coercesNumeric(fn: AggFn): boolean {
   return fn !== "minimum" && fn !== "maximum";
@@ -1409,7 +1422,7 @@ function coercesNumeric(fn: AggFn): boolean {
 export function performCalculation(
   rel: CalculationRelation,
   operation: string,
-  columnName: string | Nodes.Node | null,
+  columnName: string | string[] | Nodes.Node | null,
 ): Promise<unknown> {
   const op = operation.toLowerCase();
 
@@ -1428,7 +1441,7 @@ export function performCalculation(
         rel._groupColumns.length > 0 ||
         (rel.selectValues.length === 0 && rel._orderClauses.length === 0)
       ) {
-        column = Array.isArray(rel.primaryKey) ? rel.primaryKey.join(", ") : rel.primaryKey;
+        column = rel.primaryKey;
       }
     } else if (isDistinctSelect(rel, column)) {
       distinct = null;
@@ -1444,7 +1457,7 @@ export function performCalculation(
 /** @internal */
 export function isDistinctSelect(
   _rel: CalculationRelation,
-  columnName: string | Nodes.Node,
+  columnName: string | string[] | Nodes.Node,
 ): boolean {
   return typeof columnName === "string" && /\bDISTINCT[\s(]/i.test(columnName);
 }
@@ -1463,7 +1476,7 @@ export function operationOverAggregateColumn(
 export async function executeSimpleCalculation(
   rel: CalculationRelation,
   operation: string,
-  columnName: string | Nodes.Node | null,
+  columnName: string | string[] | Nodes.Node | null,
   distinct: boolean | null,
 ): Promise<unknown> {
   const fn = operation.toLowerCase() as AggFn;
@@ -1473,14 +1486,14 @@ export async function executeSimpleCalculation(
   // shared `singleAggregate` helper. The resolved `distinct` is threaded into
   // it so it reaches `operation_over_aggregate_column` (calculations.rb:481)
   // rather than being re-read off the relation.
-  return singleAggregate(rel, fn, columnName ?? "*", coercesNumeric(fn), distinct);
+  return singleAggregate(rel, fn, aggregateTarget(columnName), coercesNumeric(fn), distinct);
 }
 
 /** @internal */
 export async function executeGroupedCalculation(
   rel: CalculationRelation,
   operation: string,
-  columnName: string | Nodes.Node | null,
+  columnName: string | string[] | Nodes.Node | null,
   distinct: boolean | null,
 ): Promise<Map<unknown, unknown>> {
   const fn = operation.toLowerCase() as AggFn;
@@ -1490,7 +1503,7 @@ export async function executeGroupedCalculation(
   // key-record lookup — lives in the shared `groupedAggregate` helper. The
   // resolved `distinct` is threaded into it so it reaches
   // `operation_over_aggregate_column` (calculations.rb:538).
-  return groupedAggregate(rel, fn, columnName ?? "*", coercesNumeric(fn), distinct);
+  return groupedAggregate(rel, fn, aggregateTarget(columnName), coercesNumeric(fn), distinct);
 }
 
 /** @internal */
