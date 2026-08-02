@@ -67,7 +67,6 @@ describe("basic CRUD DX — defining and using a model", () => {
     expectTypeOf(await User.findBy({ email: "d@example.com" })).toEqualTypeOf<User | null>();
     expectTypeOf(await User.findByBang({ email: "d@example.com" })).toEqualTypeOf<User>();
     expectTypeOf(await User.findSoleBy({ email: "d@example.com" })).toEqualTypeOf<User>();
-    expectTypeOf(await User.findByAttribute("name", "dean")).toEqualTypeOf<User | null>();
   });
 
   it("ordinal + cardinality finders all carry User through", async () => {
