@@ -61,10 +61,6 @@ export interface JsdocOrigin {
 }
 
 const TAG_LINE = /^\s*\*?\s*@missingRailsCall\s+(\S+)(?:\s+—\s?(.*))?$/;
-// A tag written with NO call at all — the bare tag, or one that goes straight
-// to the em-dash. `TAG_LINE` needs a call, so such a line used to match nothing
-// and be read as prose: no suppression, no stale-tag report, no empty-reason
-// error. Same quiet-direction hazard as the one-line form, one level up.
 const CALL_LESS_TAG_LINE = /^\s*\*?\s*@missingRailsCall(?:\s+—(?:\s.*)?)?\s*$/;
 // A line opening a NEW JSDoc tag: at most one space after the `*`. Curated
 // reasons can contain Ruby ivar names (`@primary_key`), and the wrapper's
@@ -123,9 +119,12 @@ function toCommentLines(comment: string): CommentLine[] {
  *  and its `@missingRailsCall` entries. Continuation lines (not starting a new
  *  `@` tag) attach to the preceding entry.
  *
- *  A tag with no call at all is a hard error too, in the same family: it names
- *  nothing to suppress and nothing to reconcile, so accepting it silently is
- *  the one remaining way to write a tag the parser ignores without complaint.
+ *  A tag with NO call at all — the bare tag, or one going straight to the
+ *  em-dash — is a hard error too, distinguished from the empty-reason one by
+ *  "needs a call". It matches no other rule here, so before RFC 0083 it was
+ *  read as prose: no suppression, no stale-tag report, no empty-reason error.
+ *  That was the last way to write a tag the parser ignores without complaint,
+ *  the same quiet-direction hazard as the one-line form one level up.
  *
  *  An empty reason is a hard error, matching `@noRailsEquivalent` (RFC 0080):
  *  every tag in the tree is written with a reason — the generator only emits a
