@@ -11,7 +11,7 @@ import { AbstractSQLite3Adapter } from "./sqlite3-adapter.js";
  * `TrilogyAdapter` subclass `AbstractMysqlAdapter`.
  *
  * @noRailsEquivalent PERMANENT — Ruby binds exactly one SQLite driver
- * (`gem "sqlite3"`, sqlite3_adapter.rb:15), so Rails declares a single
+ * (`gem "sqlite3"`, sqlite3_adapter.rb:14), so Rails declares a single
  * `SQLite3Adapter` (sqlite3_adapter.rb:30) and has no class to map a
  * per-driver subclass onto. The JS ecosystem has several interchangeable
  * SQLite clients, so trails keeps the sqlite3_adapter.rb port on the shared
