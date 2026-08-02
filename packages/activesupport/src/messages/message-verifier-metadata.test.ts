@@ -2,20 +2,28 @@ import { describe, expect, it } from "vitest";
 
 import { InvalidSignature, MessageVerifier } from "../message-verifier.js";
 import { Temporal } from "../temporal.js";
-import { Encoding } from "../json/encoding.js";
 import { currentTimeInstant } from "../time-travel.js";
+import type { MessageSerializer } from "./codec.js";
+import type { Format } from "./serializer-with-fallback.js";
 import {
   eachScenario as eachSerializerScenario,
   freezeTime,
+  messageMetadataTests,
   usingMessageSerializerForMetadata,
 } from "./message-metadata-tests.js";
 
 describe("MessageVerifierMetadataTest", () => {
+  const makeCodec = (serializer: Format | MessageSerializer): MessageVerifier =>
+    new MessageVerifier("secret", { serializer });
+
+  messageMetadataTests<MessageVerifier>({
+    makeCodec,
+    encode: (data, verifier, options) => verifier.generate(data, options),
+    decode: (message, verifier, options) => verifier.verified(message, options),
+  });
+
   const eachScenario = (block: (data: unknown, verifier: MessageVerifier) => void): void =>
-    eachSerializerScenario(
-      (serializer) => new MessageVerifier("secret", { serializer }),
-      (verifier) => block({ a_number: 123, an_object: { key: "value" } }, verifier),
-    );
+    eachSerializerScenario(makeCodec, block);
 
   it("#verify raises when :purpose does not match", () => {
     eachScenario((data, verifier) => {
@@ -65,21 +73,6 @@ describe("MessageVerifierMetadataTest", () => {
         expect(() => verifier.verify(message)).toThrow(InvalidSignature);
       });
     });
-  });
-
-  it("expiration works with ActiveSupport.use_standard_json_time_format = false", () => {
-    const original = Encoding.useStandardJsonTimeFormat;
-    Encoding.useStandardJsonTimeFormat = false;
-    try {
-      eachScenario((data, verifier) => {
-        const message = verifier.generate(data, {
-          expiresAt: currentTimeInstant().add({ hours: 1 }),
-        });
-        expect(verifier.verified(message)).toEqual(data);
-      });
-    } finally {
-      Encoding.useStandardJsonTimeFormat = original;
-    }
   });
 
   it("messages are readable by legacy versions when use_message_serializer_for_metadata = false", () => {
