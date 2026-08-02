@@ -176,7 +176,7 @@ const ARTIFACT_PATH = path.join(OUTPUT_DIR, "call-mismatches-wide.json");
 // Committed high-water marks for the unreviewed-reason counter (RFC 0083),
 // sharded per source file exactly like the baseline above so the two trees
 // share one merge-conflict boundary; see unreviewed-ratchet.ts.
-const MARK_DIR = path.join(
+export const MARK_DIR = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
   "call-mismatches-wide-unreviewed",
 );

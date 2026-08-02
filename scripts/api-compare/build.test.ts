@@ -1,4 +1,7 @@
-import { describe, expect, it } from "vitest";
+import * as fs from "fs/promises";
+import * as os from "os";
+import * as path from "path";
+import { afterAll, describe, expect, it } from "vitest";
 import {
   DEFAULT_TAG_REASON,
   parseJsdoc,
@@ -6,7 +9,9 @@ import {
   reconcileFileText,
   renderJsdoc,
   buildExpectations,
+  lowerMarksForDropped,
 } from "./build.js";
+import { serializeBaseline } from "./baseline-json.js";
 import { NARROW_DEFAULT_REASON } from "./missing-rails-call-tags.js";
 
 const reasonFor = () => DEFAULT_TAG_REASON;
@@ -377,5 +382,77 @@ describe("reconcileFileText with two Ruby names on one TS method", () => {
       rubyName === "bar_all" ? "curated" : DEFAULT_TAG_REASON,
     );
     expect(text!).toContain("@missingRailsCall save — curated");
+  });
+});
+
+describe("lowerMarksForDropped", () => {
+  const tmpDirs: string[] = [];
+  async function tmpMarkDir(shards: Record<string, number>): Promise<string> {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "api-build-marks-"));
+    tmpDirs.push(dir);
+    for (const [rel, max] of Object.entries(shards)) {
+      await fs.mkdir(path.dirname(path.join(dir, rel)), { recursive: true });
+      await fs.writeFile(path.join(dir, rel), serializeBaseline({ max }));
+    }
+    return dir;
+  }
+  afterAll(async () => {
+    for (const dir of tmpDirs.splice(0)) await fs.rm(dir, { recursive: true, force: true });
+  });
+
+  const seeded = (tsFile: string, call: string) => ({
+    package: "activerecord",
+    tsFile,
+    rubyName: "bar",
+    call,
+    reason: DEFAULT_TAG_REASON,
+  });
+
+  it("lowers only the shard of a source whose seeded rows were dropped", async () => {
+    const dir = await tmpMarkDir({
+      "activerecord/relation.json": 3,
+      "activerecord/base.json": 2,
+    });
+    const { marks, moved } = await lowerMarksForDropped(
+      dir,
+      [seeded("relation.ts", "save")],
+      [seeded("relation.ts", "merge!"), seeded("base.ts", "save")],
+    );
+    expect(moved).toEqual(["activerecord/relation.json"]);
+    expect(marks.get("activerecord/relation.json")).toBe(1);
+    expect(marks.get("activerecord/base.json")).toBe(2);
+    expect(await fs.readFile(path.join(dir, "activerecord/base.json"), "utf-8")).toBe(
+      serializeBaseline({ max: 2 }),
+    );
+  });
+
+  it("deletes a shard whose source has no unreviewed rows left", async () => {
+    const dir = await tmpMarkDir({ "activerecord/relation.json": 1 });
+    const { marks } = await lowerMarksForDropped(dir, [seeded("relation.ts", "save")], []);
+    expect(marks.has("activerecord/relation.json")).toBe(false);
+    await expect(
+      fs.readFile(path.join(dir, "activerecord/relation.json"), "utf-8"),
+    ).rejects.toThrow(/ENOENT/);
+  });
+
+  it("writes nothing when the run dropped no rows", async () => {
+    const dir = await tmpMarkDir({ "activerecord/relation.json": 3 });
+    const before = await fs.stat(path.join(dir, "activerecord/relation.json"));
+    const { marks } = await lowerMarksForDropped(dir, [], [seeded("relation.ts", "merge!")]);
+    expect(marks.get("activerecord/relation.json")).toBe(3);
+    expect((await fs.stat(path.join(dir, "activerecord/relation.json"))).mtimeMs).toBe(
+      before.mtimeMs,
+    );
+  });
+
+  it("never raises a mark that already sits below the remaining count", async () => {
+    const dir = await tmpMarkDir({ "activerecord/relation.json": 1 });
+    const { marks, moved } = await lowerMarksForDropped(
+      dir,
+      [seeded("relation.ts", "save")],
+      [seeded("relation.ts", "merge!"), seeded("relation.ts", "reset")],
+    );
+    expect(moved).toEqual([]);
+    expect(marks.get("activerecord/relation.json")).toBe(1);
   });
 });
