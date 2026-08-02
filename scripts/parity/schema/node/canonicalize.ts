@@ -35,7 +35,7 @@ export interface NativeIndex {
 }
 
 export interface NativeTable {
-  /** Columns in declaration order (as returned by introspectColumns). */
+  /** Columns in declaration order (as returned by the adapter's `columns()`). */
   columns: NativeColumn[];
   indexes: NativeIndex[];
   /**

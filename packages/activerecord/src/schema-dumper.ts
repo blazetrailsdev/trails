@@ -20,7 +20,6 @@
  */
 
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
-import type * as SchemaIntrospectionModule from "./schema-introspection.js";
 import * as adapterDumper from "./connection-adapters/abstract/schema-dumper.js";
 import type {
   SchemaDumperMixinHost,
@@ -46,16 +45,6 @@ export function _registerBase(base: typeof Base): void {
 function baseClass(): typeof Base {
   if (!_base) throw new ActiveRecordError("ActiveRecord::Base has not finished loading");
   return _base;
-}
-
-// Lazy-load schema-introspection to break the static cycle
-// (schema-dumper -> schema-introspection -> schema-statements ->
-// abstract/schema-dumper -> schema-dumper). The type-only import
-// above preserves the compile-time reference.
-let schemaIntrospectionModulePromise: Promise<typeof SchemaIntrospectionModule> | undefined;
-async function loadSchemaIntrospection(): Promise<typeof SchemaIntrospectionModule> {
-  schemaIntrospectionModulePromise ??= import("./schema-introspection.js");
-  return schemaIntrospectionModulePromise;
 }
 
 export interface ColumnInfo {
@@ -253,13 +242,11 @@ class AdapterSchemaSource implements SchemaSource {
 
   /** @internal */
   async tables(): Promise<string[]> {
-    const mod = await loadSchemaIntrospection();
-    return mod.introspectTables(this._adapter);
+    return this._adapter.tables();
   }
 
   async columns(tableName: string): Promise<ColumnInfo[]> {
-    const mod = await loadSchemaIntrospection();
-    const cols = await mod.introspectColumns(this._adapter, tableName);
+    const cols = await this._adapter.columns(tableName);
     return cols.map((col) => {
       // Generated/virtual columns: carry the flag through so the dialect dumper's
       // schemaTypeWithVirtual / prepareColumnOptions emit `t.virtual` with

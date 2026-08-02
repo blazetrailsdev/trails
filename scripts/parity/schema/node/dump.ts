@@ -18,14 +18,23 @@ import { join, resolve } from "node:path";
 // Relative imports so tsx can resolve from source without a prior build.
 // These paths are resolved relative to this file's location by the module system.
 import { Base } from "../../../../packages/activerecord/src/base.js";
-import {
-  introspectTables,
-  introspectColumns,
-  introspectIndexes,
-  introspectPrimaryKey,
-} from "../../../../packages/activerecord/src/schema-introspection.js";
 import { canonicalize } from "./canonicalize.js";
 import type { NativeDump, NativeColumn, NativeIndex } from "./canonicalize.js";
+
+/**
+ * Minimal index descriptor shared by all adapters — the shape this dump reads
+ * off `adapter.indexes()`, whose declared return type is `unknown[]`.
+ * Mirrors Rails' IndexDefinition (name / columns / unique / where).
+ */
+interface IntrospectedIndex {
+  name: string;
+  // A string for expression indexes (the raw expression), an array of column
+  // names otherwise — mirrors Rails' IndexDefinition#columns.
+  columns: string | string[];
+  unique: boolean;
+  /** Partial-index predicate; undefined when adapter does not surface it. */
+  where?: string;
+}
 
 interface ExpectedManifest {
   tables: string[];
@@ -78,13 +87,13 @@ async function main(): Promise<void> {
     const adapter = Base.adapter;
 
     // 3. Introspect tables, columns, indexes
-    const tables = (await introspectTables(adapter)).filter((t) => !FILTERED_TABLES.has(t)).sort();
+    const tables = (await adapter.tables()).filter((t) => !FILTERED_TABLES.has(t)).sort();
 
     const nativeDump: NativeDump = {};
 
     for (const tableName of tables) {
-      const cols = await introspectColumns(adapter, tableName);
-      const idxDefs = await introspectIndexes(adapter, tableName);
+      const cols = await adapter.columns(tableName);
+      const idxDefs = (await adapter.indexes(tableName)) as IntrospectedIndex[];
 
       const columns: NativeColumn[] = cols.map((col) => ({
         name: col.name,
@@ -111,7 +120,8 @@ async function main(): Promise<void> {
         };
       });
 
-      const primaryKeyColumns = await introspectPrimaryKey(adapter, tableName);
+      const pk = await adapter.primaryKey(tableName);
+      const primaryKeyColumns = pk === null ? [] : Array.isArray(pk) ? pk : [pk];
       nativeDump[tableName] = { columns, indexes, primaryKeyColumns };
     }
 

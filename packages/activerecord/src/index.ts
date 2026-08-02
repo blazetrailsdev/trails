@@ -161,11 +161,6 @@ export { Stats as RuntimeStats } from "./runtime-registry.js";
 export { SchemaStatements } from "./connection-adapters/abstract/schema-statements.js";
 export { SchemaDumper } from "./connection-adapters/abstract/schema-dumper.js";
 export type { SchemaSource, ColumnInfo, IndexInfo } from "./schema-dumper.js";
-export {
-  introspectTables,
-  introspectColumns,
-  introspectPrimaryKey,
-} from "./schema-introspection.js";
 export { generateModels } from "./model-codegen.js";
 export type { IntrospectedTable, GenerateModelsOptions } from "./model-codegen.js";
 export {

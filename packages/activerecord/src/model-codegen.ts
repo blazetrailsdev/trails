@@ -20,18 +20,16 @@ import { metadataTableNames } from "./tasks/database-tasks.js";
 
 /**
  * One table worth of introspection data, sufficient for codegen.
- * Callers will assemble this by running introspectTables +
- * introspectPrimaryKey + introspectColumns from
- * schema-introspection.ts, plus the adapter's own `foreignKeys()`.
+ * Callers will assemble this from the adapter's own `tables()` /
+ * `primaryKey()` / `columns()` / `foreignKeys()`.
  */
 export interface IntrospectedTable {
   name: string;
   /**
    * Primary-key column name(s) in PK-position order, or `null` / `[]`
    * when the table has no primary key (likely a view). Both no-PK forms
-   * are skipped entirely by the generator. introspectPrimaryKey() in
-   * schema-introspection.ts normalises adapter-level null to [], so the
-   * documented pipeline feeds []; `null` remains accepted for callers
+   * are skipped entirely by the generator. Callers that normalise the
+   * adapter's null to [] feed []; `null` remains accepted for callers
    * that distinguish null-vs-empty at a lower level.
    */
   primaryKey: string | string[] | null;
@@ -92,7 +90,7 @@ interface PlannedClass {
  *   - `"other schema"."authors"` — qualified, schema needs quoting
  *   - `"a""b"."c"`               — embedded double quote ("" escape)
  *
- * `introspectTables()` returns unqualified, unquoted names, so the FK
+ * `tables()` returns unqualified, unquoted names, so the FK
  * target needs both the schema prefix stripped AND the surrounding
  * quotes removed — otherwise `classes.get(toTableUnqual)` silently
  * misses and the association drops. We walk the string tracking quote
@@ -156,10 +154,9 @@ export function generateModels(
   // internal-metadata table is still ignored — matching the runtime read
   // paths (SchemaMigration/InternalMetadata/SchemaDumper/truncateAll).
   const builtinIgnore = metadataTableNames();
-  // Accept both `null` and `[]` as the "no PK" signal — introspectPrimaryKey()
-  // in schema-introspection.ts normalises adapter-level null to [], so the
-  // documented pipeline (introspectTables + introspectPrimaryKey + ...) feeds
-  // [] for PK-less tables. Handling both forms means callers don't have to
+  // Accept both `null` and `[]` as the "no PK" signal — callers that
+  // normalise the adapter's `primaryKey()` null to [] feed [] for PK-less
+  // tables. Handling both forms means callers don't have to
   // re-normalise before calling generateModels.
   const hasNoPk = (pk: string | string[] | null): boolean =>
     pk === null || (Array.isArray(pk) && pk.length === 0);
@@ -239,7 +236,7 @@ export function generateModels(
     for (const fk of fks) {
       // Normalise PG-qualified table names (e.g. "other_schema.authors" →
       // "authors") before class lookup and name derivation. classes Map is
-      // keyed by the unqualified names returned from introspectTables().
+      // keyed by the unqualified names returned from `tables()`.
       const toTableUnqual = unqualify(fk.toTable);
       // Composite FK: emit TODO comment, no association. Composites arrive as
       // arrays (MySQL/PG introspection) or legacy comma-joined strings (SQLite).
