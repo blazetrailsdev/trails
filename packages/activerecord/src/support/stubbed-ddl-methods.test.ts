@@ -3,7 +3,6 @@ import "../sqlite/better-sqlite3.js";
 import { BetterSQLite3Adapter } from "../connection-adapters/better-sqlite3-adapter.js";
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
 import { loadCanonicalSchema } from "./canonical-schema.js";
-import { SchemaStatements } from "../connection-adapters/abstract/schema-statements.js";
 import { STUBBED_DDL_METHODS } from "./stubbed-ddl-methods.js";
 
 /**
@@ -33,58 +32,59 @@ const NON_EMITTING: ReadonlyMap<string, string> = new Map([
     "capability read — skips expression indexes on adapters that lack them",
   ],
   ["supportsIndexesInCreate", "capability read — decides whether indexes ride inside CREATE TABLE"],
-  ["indexNameLength", "limit read used to validate/truncate an index name"],
+  ["adapter", "self-reference — the mixed-in SchemaStatements bodies reach the adapter through it"],
   [
-    "createTableDefinition",
+    "buildCreateTableDefinition",
     "definition factory — a stub returns no TableDefinition and dies at once, so it cannot silently lay nothing",
   ],
-  ["_config", "config read behind supportsForeignKeys/foreign_keys, not a DDL emitter"],
-  ["supportsForeignKeys", "capability read — decides whether an FK clause rides inline"],
-  ["nativeDatabaseTypes", "renderer input — the type map typeToSql resolves a column type against"],
-  ["quoteIdentifier", "renderer input — quotes a column name into the DDL string"],
-  ["quoteTableName", "renderer input — quotes a table name into the DDL string"],
-  ["quoteDefaultExpression", "renderer input — quotes a column default into the DDL string"],
-  ["quotedColumnsForIndex", "renderer input — builds the column list of a CREATE INDEX"],
+  [
+    "buildCreateIndexDefinition",
+    "definition factory — a stub returns no CreateIndexDefinition and dies at once",
+  ],
+  ["databaseVersion", "version read behind the index sort-order predicates"],
+  ["_databaseVersion", "memoized backing slot of the databaseVersion read"],
+  ["_statementPool", "prepared-statement slot clearCacheBang resets, not a DDL emitter"],
 ]);
 
 /**
  * Lay the canonical schema through a proxy that records every adapter member
  * the loader reaches for.
  *
- * `schemaStatements()` is answered with a `SchemaStatements` bound to the proxy.
- * That is instrumentation, not the production shape — in production the accessor
- * returns the adapter itself and the module bodies are the adapter's own. Binding
- * a module view to the proxy is what pins the *adapter* boundary specifically:
- * every `this.adapter.<member>` a module body makes is recorded one hop deep,
- * while the calls the real adapter then makes to itself stay unrecorded. That
- * boundary — the one a cover can intercept — is the whole scope of this guard.
+ * The mixed-in `SchemaStatements` bodies are the adapter's own methods, so a
+ * proxy that bound them to the real adapter would see only the loader's first
+ * call and nothing those bodies do. The recorder is therefore two levels deep:
+ * a member reached off the proxy is recorded and bound to a second recording
+ * view, so the `this.<member>` calls the mixed-in body makes are recorded one
+ * hop deep, while the calls that view then makes to the real adapter stay
+ * unrecorded. That boundary — the one a cover can intercept — is the whole
+ * scope of this guard.
  *
- * `schemaCreation` is the one member the device cannot see: a module view builds
- * its own SchemaCreation (Rails' `SchemaCreation.new(self)`), where in production
- * the adapter's own getter is what the mixed-in bodies hit. It stays in the
- * guarded set for that reason. The renderer's own quoting/type reads
- * (`quoteIdentifier`, `quoteDefaultExpression`, `nativeDatabaseTypes`, …) do come
- * back through the proxy and are exempted below as renderer inputs.
+ * `schemaCreation` is the one member the device cannot see through: the renderer
+ * it returns is built off the real adapter, so its own quoting/type reads
+ * (`quoteIdentifier`, `quoteDefaultExpression`, `nativeDatabaseTypes`, …) never
+ * come back through the proxy. It stays in the guarded set for that reason.
  */
 async function recordLayPath(): Promise<Set<string>> {
   const real = new BetterSQLite3Adapter(":memory:") as unknown as AbstractAdapter;
   const touched = new Set<string>();
-  const proxy: AbstractAdapter = new Proxy(real, {
-    get(target, prop, receiver) {
-      if (typeof prop !== "string") return Reflect.get(target, prop, receiver);
-      touched.add(prop);
-      if (prop === "schemaStatements") {
-        return () =>
-          new SchemaStatements(
-            proxy as unknown as ConstructorParameters<typeof SchemaStatements>[0],
-          );
-      }
-      const value = Reflect.get(target, prop, target) as unknown;
-      return typeof value === "function"
-        ? (value as (...a: unknown[]) => unknown).bind(target)
-        : value;
-    },
-  });
+  const recorder = (inner: AbstractAdapter): AbstractAdapter => {
+    const self: AbstractAdapter = new Proxy(real, {
+      get(target, prop, receiver) {
+        if (typeof prop !== "string") return Reflect.get(target, prop, receiver);
+        touched.add(prop);
+        // `SchemaStatements` bodies reach the adapter as `this.adapter`, which on
+        // a mixed-in body is the adapter itself. Answer it with this same view so
+        // the hop through it stays recorded.
+        if (prop === "adapter") return self;
+        const value = Reflect.get(target, prop, target) as unknown;
+        return typeof value === "function"
+          ? (value as (...a: unknown[]) => unknown).bind(inner)
+          : value;
+      },
+    });
+    return self;
+  };
+  const proxy: AbstractAdapter = recorder(recorder(real));
 
   try {
     await loadCanonicalSchema(proxy);
@@ -118,8 +118,8 @@ describe("STUBBED_DDL_METHODS", () => {
     // Floor: a proxy that recorded almost nothing would pass the subset check
     // vacuously.
     expect(touched.has("execute")).toBe(true);
-    expect(touched.has("schemaStatements")).toBe(true);
-    expect(touched.has("createTableDefinition")).toBe(true);
+    expect(touched.has("createTable")).toBe(true);
+    expect(touched.has("addIndex")).toBe(true);
 
     const unaccounted = [...touched]
       .filter((name) => !STUBBED_DDL_METHODS.includes(name) && !NON_EMITTING.has(name))

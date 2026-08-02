@@ -730,7 +730,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     tableName: string,
     commentOrChanges: string | Record<string, string | null>,
   ): Promise<void> {
-    const raw = this.schemaStatements().extractNewCommentValue(commentOrChanges);
+    const raw = this.extractNewCommentValue(commentOrChanges);
     // Mirrors Rails: `comment = "" if comment.nil?` then `COMMENT #{quote(comment)}`.
     const c = raw == null ? "" : String(raw);
     await this._execMutation(
@@ -739,19 +739,19 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   async renameTable(tableName: string, newName: string): Promise<void> {
-    this.schemaStatements().validateTableLengthBang(newName);
+    this.validateTableLengthBang(newName);
     this.schemaCache.clearDataSourceCacheBang(this.pool, tableName);
     this.schemaCache.clearDataSourceCacheBang(this.pool, newName);
     await this._execMutation(
       `RENAME TABLE ${this.quoteTableName(tableName)} TO ${this.quoteTableName(newName)}`,
     );
-    await this.schemaStatements().renameTableIndexes(tableName, newName);
+    await this.renameTableIndexes(tableName, newName);
   }
 
   async renameIndex(tableName: string, oldName: string, newName: string): Promise<void> {
     this.schemaCache?.clearDataSourceCacheBang(this.pool, tableName);
     await this.getDatabaseVersion();
-    this.schemaStatements().validateIndexLengthBang(tableName, newName);
+    this.validateIndexLengthBang(tableName, newName);
     if (!this.supportsRenameIndex()) {
       // Mirrors Rails AbstractAdapter#rename_index super path: drop the
       // existing index and recreate under the new name.
@@ -857,7 +857,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     defaultOrChanges: unknown,
   ): Promise<ChangeColumnDefaultDefinition> {
     const column = await this.columnFor(tableName, columnName);
-    const extracted = this.schemaStatements().extractNewDefaultValue(defaultOrChanges);
+    const extracted = this.extractNewDefaultValue(defaultOrChanges);
     // Normalize JS-only `undefined` → `null` so the schema-creation
     // visitor's SET branch produces `SET DEFAULT NULL` rather than the
     // bare `SET` that quoteDefaultExpression(undefined) → "" would emit.
@@ -877,7 +877,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     null_: boolean,
     default_?: unknown,
   ): Promise<void> {
-    this.schemaStatements().validateChangeColumnNullArgumentBang(null_);
+    this.validateChangeColumnNullArgumentBang(null_);
     if (!null_ && default_ != null) {
       const colId = this.quoteIdentifier(columnName);
       await this._execMutation(
@@ -901,7 +901,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     // Rails too, so the type explicitly requires both.
     commentOrChanges: string | null | { from: unknown; to: string | null },
   ): Promise<void> {
-    const extracted = this.schemaStatements().extractNewCommentValue(commentOrChanges);
+    const extracted = this.extractNewCommentValue(commentOrChanges);
     // Normalize JS-only `undefined` → `null` so changeColumn doesn't
     // misinterpret an explicit clear (`{from, to: undefined}` shape) as
     // "no comment key present" and silently keep the existing comment.
@@ -966,7 +966,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     // columnsHash() read re-reflects the renamed column rather than a stale entry.
     this.schemaCache?.clearDataSourceCacheBang(this.pool, tableName);
     await this._execMutation(`ALTER TABLE ${this.quoteTableName(tableName)} ${fragment}`);
-    await this.schemaStatements().renameColumnIndexes(tableName, columnName, newColumnName);
+    await this.renameColumnIndexes(tableName, columnName, newColumnName);
   }
 
   async addIndex(
@@ -976,7 +976,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   ): Promise<void> {
     const createIndex = await this.buildCreateIndexDefinition(tableName, columnName, options);
     if (!createIndex) return;
-    await this._execMutation(await this.schemaStatements().schemaCreation.accept(createIndex));
+    await this._execMutation(await this.schemaCreation.accept(createIndex));
   }
 
   /**
@@ -995,13 +995,12 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     columnName: string | string[],
     options: Record<string, unknown> = {},
   ): Promise<CreateIndexDefinition | undefined> {
-    const ss = this.schemaStatements();
-    const [idx, algorithmClause, ifNotExists] = await ss.addIndexOptions(
+    const [idx, algorithmClause, ifNotExists] = await this.addIndexOptions(
       tableName,
       columnName,
       options,
     );
-    if (ifNotExists && (await ss.indexExists(tableName, idx.columns, { name: idx.name }))) {
+    if (ifNotExists && (await this.indexExists(tableName, idx.columns, { name: idx.name }))) {
       return undefined;
     }
     return new CreateIndexDefinition(idx, false, algorithmClause);

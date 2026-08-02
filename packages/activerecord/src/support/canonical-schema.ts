@@ -249,12 +249,7 @@ let _registry: CanonicalTableDef[] | null = null;
 export async function prepareSchema(
   adapter: DatabaseAdapter,
 ): Promise<{ ss: SchemaStatements; typeMap: Record<string, string | undefined> }> {
-  const { SchemaStatements: SchemaStatementsCtor } =
-    await import("../connection-adapters/abstract/schema-statements.js");
-  const withSs = adapter as unknown as { schemaStatements?: () => SchemaStatements };
-  const ss = withSs.schemaStatements
-    ? withSs.schemaStatements()
-    : new SchemaStatementsCtor(adapter);
+  const ss = adapter as unknown as SchemaStatements;
   const typeMap =
     adapter.adapterName === "postgres"
       ? COLUMN_TYPE_MAP_PG

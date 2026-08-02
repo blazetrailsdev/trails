@@ -1677,13 +1677,13 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   }
 
   async renameTable(tableName: string, newName: string): Promise<void> {
-    this.schemaStatements().validateTableLengthBang(newName);
+    this.validateTableLengthBang(newName);
     this.schemaCache.clearDataSourceCacheBang(this.pool, tableName);
     this.schemaCache.clearDataSourceCacheBang(this.pool, newName);
     await this.execute(
       `ALTER TABLE ${quoteTableName(tableName)} RENAME TO ${quoteTableName(newName)}`,
     );
-    await this.schemaStatements().renameTableIndexes(tableName, newName);
+    await this.renameTableIndexes(tableName, newName);
   }
 
   async addColumn(
@@ -1747,7 +1747,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     // Rails' extract_new_default_value only unwraps a Hash when it carries BOTH
     // :from and :to (schema_statements.rb:1820); a bare structured default like
     // `{}` is the literal default, not a changes hash.
-    const newDefault = this.schemaStatements().extractNewDefaultValue(defaultOrChanges);
+    const newDefault = this.extractNewDefaultValue(defaultOrChanges);
     this.schemaCache?.clearDataSourceCacheBang(this.pool, tableName);
     await this.alterTable(tableName, undefined, undefined, undefined, (definition) => {
       // The raw value, not a literal: schemaCreation re-emits it through
@@ -1764,7 +1764,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     allowNull: boolean,
     defaultValue?: unknown,
   ): Promise<void> {
-    this.schemaStatements().validateChangeColumnNullArgumentBang(allowNull);
+    this.validateChangeColumnNullArgumentBang(allowNull);
     if (!allowNull && defaultValue !== undefined) {
       // Rails backfills NULLs via quote_default_expression, which serializes the
       // value through the column's cast type (abstract/schema_statements.rb).
@@ -1797,7 +1797,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     await this.alterTable(tableName, undefined, undefined, {
       rename: { [column.name]: newColumnName },
     });
-    await this.schemaStatements().renameColumnIndexes(tableName, column.name, newColumnName);
+    await this.renameColumnIndexes(tableName, column.name, newColumnName);
   }
 
   async addTimestamps(tableName: string, options?: Record<string, unknown>): Promise<void> {
@@ -2183,10 +2183,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     assertValidDeferrable(options.deferrable);
 
     await this.alterTable(fromTable, undefined, undefined, undefined, (definition) => {
-      definition.foreignKey(
-        this.schemaStatements().stripTableNamePrefixAndSuffix(toTable),
-        options,
-      );
+      definition.foreignKey(this.stripTableNamePrefixAndSuffix(toTable), options);
     });
   }
 
@@ -2215,7 +2212,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     delete matchOptions.validate;
 
     const inferred = String(matchOptions.column ?? "").replace(/_id$/, "");
-    const table = this.schemaStatements().stripTableNamePrefixAndSuffix(
+    const table = this.stripTableNamePrefixAndSuffix(
       toTable ?? (Base.pluralizeTableNames ? pluralize(inferred) : inferred),
     );
 
@@ -2229,8 +2226,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     // single-column.
     const fkToRemove = existingFks.find(
       (fk) =>
-        this.schemaStatements().stripTableNamePrefixAndSuffix(fk.toTable) === table &&
-        fk.isDefinedFor(matchOptions),
+        this.stripTableNamePrefixAndSuffix(fk.toTable) === table && fk.isDefinedFor(matchOptions),
     );
 
     if (!fkToRemove) {
@@ -2328,7 +2324,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     const caller = (definition: SQLite3TableDefinition): void => {
       for (const fk of fks) {
         const column = typeof fk.column === "string" ? (rename[fk.column] ?? fk.column) : fk.column;
-        const toTable = this.schemaStatements().stripTableNamePrefixAndSuffix(fk.toTable);
+        const toTable = this.stripTableNamePrefixAndSuffix(fk.toTable);
         definition.foreignKey(toTable, {
           column,
           primaryKey: fk.primaryKey,

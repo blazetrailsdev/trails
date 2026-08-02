@@ -2,9 +2,8 @@
  * The adapter members an arm-content cover can intercept to stop
  * `loadCanonicalSchema` from really laying its tables.
  *
- * `runTable` (canonical-schema.ts) does not call `adapter.createTable` — it
- * resolves a `SchemaStatements` companion through `adapter.schemaStatements()`
- * and lays every table through it, and that companion reaches the database via
+ * `runTable` (canonical-schema.ts) lays every table through the adapter's own
+ * mixed-in `SchemaStatements` bodies, which reach the database via
  * `adapter.execute` after rendering DDL through `adapter.schemaCreation`.
  * Indexes go the same way (`emitTableIndexes` → `ss.addIndex` →
  * `adapter.execute`), and a `force:` create drops through `dropTable` first.
@@ -36,5 +35,4 @@ export const STUBBED_DDL_METHODS: readonly string[] = [
   "addIndex",
   "execute",
   "schemaCreation",
-  "schemaStatements",
 ];

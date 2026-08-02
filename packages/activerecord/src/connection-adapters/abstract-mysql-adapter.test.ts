@@ -302,11 +302,13 @@ describe("AbstractMysqlAdapter#renameColumn wiring", () => {
     adapter._execMutation = async (sql: string) => {
       events.push(`exec:${sql}`);
     };
-    adapter.schemaStatements = () => ({
-      renameColumnIndexes: async (tableName: string, columnName: string, newColumnName: string) => {
-        events.push(`indexes:${tableName}:${columnName}:${newColumnName}`);
-      },
-    });
+    adapter.renameColumnIndexes = async (
+      tableName: string,
+      columnName: string,
+      newColumnName: string,
+    ) => {
+      events.push(`indexes:${tableName}:${columnName}:${newColumnName}`);
+    };
     return { adapter, events };
   }
 
@@ -682,7 +684,7 @@ describe("AbstractMysqlAdapter#changeColumnNull (#1568)", () => {
   async function makeSequencingAdapter() {
     const events: Array<["exec", string] | ["changeColumn", unknown[]]> = [];
     const adapter = await makeMinimalMysqlAdapter({
-      schemaStatements: () => ({ validateChangeColumnNullArgumentBang: (_: boolean) => {} }),
+      validateChangeColumnNullArgumentBang: (_: boolean) => {},
       _execMutation: async (sql: string) => {
         events.push(["exec", sql]);
       },
@@ -718,11 +720,9 @@ describe("AbstractMysqlAdapter#changeColumnNull (#1568)", () => {
     const executed: string[] = [];
     const changeColumnCalls: unknown[] = [];
     const adapter = await makeMinimalMysqlAdapter({
-      schemaStatements: () => ({
-        validateChangeColumnNullArgumentBang: () => {
-          throw new Error("bad null arg");
-        },
-      }),
+      validateChangeColumnNullArgumentBang: () => {
+        throw new Error("bad null arg");
+      },
       _execMutation: async (sql: string) => {
         executed.push(sql);
       },
@@ -740,8 +740,8 @@ describe("AbstractMysqlAdapter#changeColumnNull (#1568)", () => {
 
 describe("AbstractMysqlAdapter#changeColumnComment (#1568)", () => {
   async function makeAdapterCapturingChangeColumn() {
-    // Use the real, inherited schemaStatements() so these tests exercise the
-    // production extractNewCommentValue path and catch regressions in it.
+    // Use the real, inherited extractNewCommentValue so these tests exercise
+    // the production path and catch regressions in it.
     const calls: Array<[string, string, string, Record<string, unknown>]> = [];
     const adapter = await makeMinimalMysqlAdapter({
       changeColumn: async (t: string, c: string, type: string, opts: Record<string, unknown>) => {
