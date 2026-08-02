@@ -1,6 +1,6 @@
 import { afterEach, describe, it, expect, beforeAll, vi } from "vitest";
 import { Base } from "../base.js";
-import { dropAllTables, resetTestTables } from "./drop-all-tables.js";
+import { dropAllTables, purgeToCanonicalTables, resetTestTables } from "./drop-all-tables.js";
 import { provisionSecondDatabase } from "./setup-second-pool.js";
 import { ARUnit2Model } from "../test-helpers/models/arunit2-model.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
@@ -192,5 +192,61 @@ describe("dropAllTables (shared worker database)", () => {
     expect(tables.length).toBeGreaterThan(0);
     expect(tables).toContain("items");
     expect(tables).toContain("posts");
+  });
+});
+
+/**
+ * The pre-snapshot path is purge-only by construction: it protects the canonical
+ * `schema.rb` half and nothing else, so the adapter-specific tables it drops are
+ * the caller's to re-lay. These cover the two ways that contract can be broken
+ * silently — a `reset` reaching the pre-snapshot path without meaning to, and
+ * the `test-setup-dy.ts` boot order flipping so the arm runs before the purge.
+ */
+describe("purge-only pre-snapshot path", () => {
+  async function freshModules(): Promise<{
+    dropAllTablesModule: typeof import("./drop-all-tables.js");
+    loadSchemaHelper: typeof import("./load-schema-helper.js");
+  }> {
+    vi.resetModules();
+    const dropAllTablesModule = await import("./drop-all-tables.js");
+    const loadSchemaHelper = await import("./load-schema-helper.js");
+    return { dropAllTablesModule, loadSchemaHelper };
+  }
+
+  const inertAdapter = { adapterName: "none" } as unknown as DatabaseAdapter;
+
+  // The sqlite arm lays its one table through createTable and nothing else, so
+  // stubbing that member runs the arm without touching a database.
+  const armOnlyAdapter = {
+    adapterName: "sqlite",
+    createTable: async () => {},
+  } as unknown as DatabaseAdapter;
+
+  it("rejects a reset that runs before the boot-laid snapshot", async () => {
+    const { dropAllTablesModule } = await freshModules();
+
+    await expect(dropAllTablesModule.resetTestTables(inertAdapter)).rejects.toThrow(
+      /before recordBootLaidTables/,
+    );
+  });
+
+  it("rejects a purge that runs after the adapter-specific arm", async () => {
+    const { dropAllTablesModule, loadSchemaHelper } = await freshModules();
+    await loadSchemaHelper.loadAdapterSpecificSchema(armOnlyAdapter);
+
+    await expect(dropAllTablesModule.purgeToCanonicalTables(inertAdapter)).rejects.toThrow(
+      /after the adapter-specific schema arm/,
+    );
+  });
+
+  it("leaves the purge available on an adapter that has no arm to run", async () => {
+    const { dropAllTablesModule, loadSchemaHelper } = await freshModules();
+    await loadSchemaHelper.loadAdapterSpecificSchema(inertAdapter);
+
+    await expect(dropAllTablesModule.purgeToCanonicalTables(inertAdapter)).resolves.toBeUndefined();
+  });
+
+  it("rejects a purge that runs after the boot-laid snapshot", async () => {
+    await expect(purgeToCanonicalTables(adapter)).rejects.toThrow(/after recordBootLaidTables/);
   });
 });

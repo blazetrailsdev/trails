@@ -5,6 +5,7 @@ import type { AbstractMysqlAdapter } from "../connection-adapters/abstract-mysql
 import type { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
 import { ActiveRecordError } from "../errors.js";
 import { loadCanonicalSchema } from "./canonical-schema.js";
+import { noteAdapterSpecificSchemaLoaded } from "./drop-all-tables.js";
 import { STUBBED_DDL_METHODS } from "./stubbed-ddl-methods.js";
 
 /**
@@ -638,9 +639,17 @@ function assertNotStubbed(adapter: DatabaseAdapter, method: string): void {
  *   Splitting a real load into its halves is how the two arms drifted apart
  *   before, so do not reach for this one to hand-roll `load_schema`.
  *
+ * An arm that runs marks itself for `drop-all-tables.ts`, whose pre-snapshot
+ * purge drops exactly the tables it lays and so must never run on this side of
+ * the boot order. An adapter with no arm — Rails' missing
+ * `adapter_specific_schema_file` — lays nothing and marks nothing.
+ *
  * @internal
  */
 export async function loadAdapterSpecificSchema(adapter: DatabaseAdapter): Promise<void> {
   const adapterSpecificSchema = ADAPTER_SPECIFIC_SCHEMAS[adapter.adapterName];
-  if (adapterSpecificSchema) await adapterSpecificSchema(adapter);
+  if (adapterSpecificSchema) {
+    noteAdapterSpecificSchemaLoaded();
+    await adapterSpecificSchema(adapter);
+  }
 }
