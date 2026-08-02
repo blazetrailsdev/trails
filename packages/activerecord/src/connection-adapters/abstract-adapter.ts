@@ -2627,24 +2627,12 @@ export class AbstractAdapter implements Quoting {
     // A `TableAlias` relation may carry a `SqlLiteral` name (set-op / subquery
     // derived table); unwrap to the bare identifier for the schema-cache lookup.
     const tableName = relationName(attribute.relation.name);
-    // Mirrors Rails' `schema_cache.columns_hash(table_name)`: a standalone
-    // adapter carries a NullPool, whose `schema_cache` is nil, so Rails binds
-    // the reflection to a `FakePool` over the connection itself
-    // (abstract_adapter.rb:298). Pass that same FakePool here so the cold-cache
-    // lookup reflects through this adapter instead of bailing on the null-pool
-    // guard — callers like `caseSensitiveComparison` need the collation even
-    // when model class creation cleared the cache (resetColumnInformation).
-    const cache = this.schemaCache as any;
-    if (this.pool == null || this.pool instanceof NullPool) {
-      let hash: Record<string, import("./column.js").Column> | undefined;
-      try {
-        hash = await cache.columnsHash(new FakePool(this), tableName);
-      } catch {
-        // no connection / no such table — return undefined below
-      }
-      return hash?.[attribute.name];
-    }
-    const hash = await cache.columnsHash(this.pool, tableName);
+    // A standalone adapter's NullPool has no `schemaCache`, which is Rails'
+    // signal to bind the reflection to the connection itself
+    // (abstract_adapter.rb:298).
+    const pool =
+      this.pool == null || this.pool instanceof NullPool ? new FakePool(this) : this.pool;
+    const hash = await (this.schemaCache as any).columnsHash(pool, tableName);
     return hash?.[attribute.name];
   }
 

@@ -304,10 +304,8 @@ export class SchemaCache {
 
     // Null-pool guard: a caller may pass `null` (or the NullPool a standalone
     // adapter carries) to consult only the warm cache. Neither can yield a
-    // connection — Rails never gets here because `AbstractAdapter#schema_cache`
-    // binds a `FakePool` over the adapter itself when `pool.schema_cache` is
-    // nil (abstract_adapter.rb:298) — so return undefined and let the caller
-    // fall back to the schema-less NullColumn shape.
+    // connection, so return undefined and let the caller fall back to the
+    // schema-less NullColumn shape.
     if (pool == null || pool instanceof NullPool) return undefined;
 
     return withConnection(pool, async (connection) => {

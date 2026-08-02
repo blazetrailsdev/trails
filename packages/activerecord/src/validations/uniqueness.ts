@@ -354,8 +354,6 @@ async function isCoveredByUniqueIndex(
  * assigned adapter carries, which exposes neither `withConnection` nor
  * `indexes`, so the cache would introspect the NullPool and quietly yield `[]`
  * — leaving covered_by_unique_index? permanently false for every such model.
- * It also keeps the lookup on the transaction-pinned connection resolved
- * below rather than checking a second one out of the pool.
  *
  * @internal
  */

@@ -1242,10 +1242,8 @@ export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
   const cache = startingAdapter.schemaCache;
   if (!cache) return;
   const table = this.tableName;
-  // Resolve the schemaCache target the way Rails does for a lone connection:
-  // `BoundSchemaReflection.for_lone_connection` wraps the connection we already
-  // hold in a FakePool (schema_cache.rb:155). That matters here beyond fidelity
-  // — on lone-connection pools (SQLite :memory: + size 1) the connection is
+  // Rails' `for_lone_connection` shape (schema_cache.rb:155): on
+  // lone-connection pools (SQLite :memory: + size 1) the connection is
   // permanently checked out, so routing through pool.withConnection deadlocks.
   const pool = new FakePool(startingAdapter);
 
