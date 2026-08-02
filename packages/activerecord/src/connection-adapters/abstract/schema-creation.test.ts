@@ -91,7 +91,7 @@ describe("SchemaCreation#quotedColumns delegates to the connection", () => {
   // order/opclass decoration inline — that's the single source of truth
   // (SchemaStatements#quoted_columns_for_index -> add_options_for_index_columns).
   const host = {
-    quoteIdentifier: (c: string) => `"${c}"`,
+    quoteColumnName: (c: string) => `"${c}"`,
     quoteTableName: (t: string) => `"${t}"`,
     quoteDefaultExpression: (v: unknown) => String(v),
     quotedColumnsForIndex(cols: string[], options: any) {

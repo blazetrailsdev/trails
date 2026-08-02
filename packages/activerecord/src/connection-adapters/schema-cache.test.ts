@@ -721,7 +721,7 @@ describe("SchemaReflectionTest", () => {
 
 class MockAdapter {
   adapterName = "sqlite" as const;
-  quoteIdentifier = (n: string) => `"${n}"`;
+  quoteColumnName = (n: string) => `"${n}"`;
   quoteTableName = (n: string) => `"${n}"`;
   executeMutation = vi.fn().mockResolvedValue(0);
   execute = vi.fn().mockResolvedValue([]);

@@ -77,7 +77,7 @@ describe("AbstractMysqlAdapter#renameColumnForAlter fallback", () => {
     const adapter = Object.create(AbstractMysqlAdapter.prototype);
     adapter.supportsRenameColumn = () => supportsRename;
     adapter.getDatabaseVersion = async () => {};
-    adapter.quoteIdentifier = (s: string) => `\`${s}\``;
+    adapter.quoteColumnName = (s: string) => `\`${s}\``;
     adapter.columnDefinitions = async (_: string) => [
       {
         Field: columnName,
@@ -292,7 +292,7 @@ describe("AbstractMysqlAdapter#renameColumn wiring", () => {
     adapter.pool = {};
     adapter.supportsRenameColumn = () => true;
     adapter.getDatabaseVersion = async () => {};
-    adapter.quoteIdentifier = (s: string) => `\`${s}\``;
+    adapter.quoteColumnName = (s: string) => `\`${s}\``;
     adapter.quoteTableName = (s: string) => `\`${s}\``;
     adapter._schemaCache = {
       clearDataSourceCacheBang: (_pool: unknown, tableName: string) => {
@@ -547,7 +547,7 @@ function makeChangeColumnTextColumn(opts: { null_?: boolean; default_?: unknown 
 async function makeMinimalMysqlAdapter(overrides: Record<string, unknown> = {}) {
   const { AbstractMysqlAdapter } = await import("./abstract-mysql-adapter.js");
   const adapter = Object.create(AbstractMysqlAdapter.prototype);
-  adapter.quoteIdentifier = (s: string) => `\`${s}\``;
+  adapter.quoteColumnName = (s: string) => `\`${s}\``;
   adapter.quoteTableName = (s: string) => `\`${s}\``;
   adapter.quote = mysqlQuote;
   Object.assign(adapter, overrides);

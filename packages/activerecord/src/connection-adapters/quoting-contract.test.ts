@@ -37,7 +37,7 @@ describe("Quoting interface", () => {
 
       expect(typeof q.quote).toBe("function");
       expect(typeof q.quoteString).toBe("function");
-      expect(typeof q.quoteIdentifier).toBe("function");
+      expect(typeof q.quoteColumnName).toBe("function");
       expect(typeof q.quoteTableName).toBe("function");
       expect(typeof q.quoteColumnName).toBe("function");
       expect(typeof q.quoteTableNameForAssignment).toBe("function");
@@ -64,7 +64,7 @@ describe("Quoting interface", () => {
       expect(adapter.quotedTrue()).toBe("1");
       expect(adapter.quotedFalse()).toBe("0");
       expect(adapter.quote(true)).toBe("1");
-      expect(adapter.quoteIdentifier("foo")).toBe('"foo"');
+      expect(adapter.quoteColumnName("foo")).toBe('"foo"');
     } finally {
       adapter.disconnectBang();
     }

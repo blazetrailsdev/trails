@@ -60,7 +60,7 @@ export interface VisitorHostAdapter {
   /** Quoting surface consulted polymorphically by the visitor when the real adapter is
    * threaded; absent on the host-less (unit-test) path, which falls back to the standalone
    * MySQL helpers in {@link mysqlSchemaQuoter}. */
-  quoteIdentifier?(name: string): string;
+  quoteColumnName?(name: string): string;
   quoteTableName?(name: string): string;
   quote?(value: unknown): string;
 }
@@ -240,7 +240,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
       statements.push(await visit());
     }
     if (o.compositePrimaryKey && o.compositePrimaryKey.length > 0) {
-      const cols = o.compositePrimaryKey.map((k) => this.adapter.quoteIdentifier(k)).join(", ");
+      const cols = o.compositePrimaryKey.map((k) => this.adapter.quoteColumnName(k)).join(", ");
       statements.push(`PRIMARY KEY (${cols})`);
     }
     if (this.supportsIndexesInCreate()) {
@@ -275,7 +275,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
 
   /** @internal */
   protected async visitChangeColumnDefinition(o: ChangeColumnDefinition): Promise<string> {
-    const sql = `CHANGE ${this.adapter.quoteIdentifier(o.name)} ${await this.accept(o.column)}`;
+    const sql = `CHANGE ${this.adapter.quoteColumnName(o.name)} ${await this.accept(o.column)}`;
     return this.addColumnPositionBang(sql, this.columnOptions(o.column) as MysqlColumnOptions);
   }
 
@@ -283,7 +283,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
   protected async visitChangeColumnDefaultDefinition(
     o: ChangeColumnDefaultDefinition,
   ): Promise<string> {
-    let sql = `ALTER COLUMN ${this.adapter.quoteIdentifier(o.column.name)} `;
+    let sql = `ALTER COLUMN ${this.adapter.quoteColumnName(o.column.name)} `;
     if (o.default == null && !o.column.null) {
       sql += "DROP DEFAULT";
     } else {
@@ -305,7 +305,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
     const parts: string[] = create ? ["CREATE"] : [];
     if (indexType) parts.push(indexType);
     parts.push("INDEX");
-    parts.push(this.adapter.quoteIdentifier(o.name));
+    parts.push(this.adapter.quoteColumnName(o.name));
     if (o.using) parts.push(`USING ${o.using}`);
     if (create) parts.push(`ON ${this.adapter.quoteTableName(o.table)}`);
     parts.push(`(${this.quotedColumns(o)})`);
@@ -318,7 +318,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
     if (typeof o.columns === "string") return o.columns;
     const idx = o as IndexDefinition;
     const quotedMap = new Map<string, string>(
-      o.columns.map((c) => [c, this.adapter.quoteIdentifier(c)]),
+      o.columns.map((c) => [c, this.adapter.quoteColumnName(c)]),
     );
     // The createTable path warms getDatabaseVersion() upstream so the version-gated
     // supportsIndexSortOrder read isn't cold.
@@ -387,7 +387,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
   /** @internal */
   protected addColumnPositionBang(sql: string, options: MysqlColumnOptions): string {
     if (options.first) return `${sql} FIRST`;
-    if (options.after) return `${sql} AFTER ${this.adapter.quoteIdentifier(options.after)}`;
+    if (options.after) return `${sql} AFTER ${this.adapter.quoteColumnName(options.after)}`;
     return sql;
   }
 

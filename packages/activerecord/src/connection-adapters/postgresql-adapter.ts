@@ -3705,7 +3705,7 @@ export class PostgreSQLAdapter
         const originalSearchPath = rows[0]?.search_path as string;
         await client.query(`SELECT set_config('search_path', $1, false)`, [options.schema]);
         try {
-          await client.query(`DROP EXTENSION IF EXISTS ${this.quoteIdentifier(extName)}${cascade}`);
+          await client.query(`DROP EXTENSION IF EXISTS ${this.quoteColumnName(extName)}${cascade}`);
         } finally {
           await client.query(`SELECT set_config('search_path', $1, false)`, [
             originalSearchPath ?? "public",
@@ -3713,7 +3713,7 @@ export class PostgreSQLAdapter
         }
       });
     } else {
-      await this.exec(`DROP EXTENSION IF EXISTS ${this.quoteIdentifier(extName)}${cascade}`);
+      await this.exec(`DROP EXTENSION IF EXISTS ${this.quoteColumnName(extName)}${cascade}`);
     }
     // Mirrors Rails' disable_extension, which reloads the type map after the
     // drop; reloadTypeMap also drops the prepared-statement name map so a later
@@ -3816,7 +3816,7 @@ export class PostgreSQLAdapter
     this.schemaCache.clearDataSourceCacheBang(this.pool, oldName);
     this.schemaCache.clearDataSourceCacheBang(this.pool, newName);
     await this.execute(
-      `ALTER TABLE ${this.quoteTableName(oldName)} RENAME TO ${this.quoteIdentifier(unqualifiedNew)}`,
+      `ALTER TABLE ${this.quoteTableName(oldName)} RENAME TO ${this.quoteColumnName(unqualifiedNew)}`,
     );
     // Rails reads max_identifier_length here, which lazily runs the SHOW query
     // on first use; warm the memo so the truncation limit is the real server
@@ -3824,7 +3824,7 @@ export class PostgreSQLAdapter
     const maxLen = await this.warmMaxIdentifierLength();
     // After rename the table lives in the old schema; build the correct name for lookup.
     const renamedName = oldSchema
-      ? `${this.quoteIdentifier(oldSchema)}.${this.quoteIdentifier(unqualifiedNew)}`
+      ? `${this.quoteColumnName(oldSchema)}.${this.quoteColumnName(unqualifiedNew)}`
       : unqualifiedNew;
     const result = await this.pkAndSequenceFor(renamedName).catch(() => null);
     if (result) {
@@ -3834,11 +3834,11 @@ export class PostgreSQLAdapter
       const oldIdx = `${unqualifiedOld.slice(0, maxPkeyPrefix)}${pkeySuffix}`;
       const newIdx = `${unqualifiedNew.slice(0, maxPkeyPrefix)}${pkeySuffix}`;
       const qualifiedOldIdx = oldSchema
-        ? `${this.quoteIdentifier(oldSchema)}.${this.quoteIdentifier(oldIdx)}`
-        : this.quoteIdentifier(oldIdx);
+        ? `${this.quoteColumnName(oldSchema)}.${this.quoteColumnName(oldIdx)}`
+        : this.quoteColumnName(oldIdx);
       // Always rename the pkey index when a PK exists (mirrors Rails schema_statements.rb:443-445).
       await this.exec(
-        `ALTER INDEX IF EXISTS ${qualifiedOldIdx} RENAME TO ${this.quoteIdentifier(newIdx)}`,
+        `ALTER INDEX IF EXISTS ${qualifiedOldIdx} RENAME TO ${this.quoteColumnName(newIdx)}`,
       );
       // Only rename the sequence when the PK has one (SERIAL/BIGSERIAL; not UUID).
       if (seq) {
@@ -3848,7 +3848,7 @@ export class PostgreSQLAdapter
         if (seq.identifier === expectedOldSeq) {
           const newSeqName = `${unqualifiedNew.slice(0, maxSeqPrefix)}${seqSuffix}`;
           await this.exec(
-            `ALTER SEQUENCE IF EXISTS ${seq.quoted()} RENAME TO ${this.quoteIdentifier(newSeqName)}`,
+            `ALTER SEQUENCE IF EXISTS ${seq.quoted()} RENAME TO ${this.quoteColumnName(newSeqName)}`,
           );
         }
       }
@@ -4004,10 +4004,6 @@ export class PostgreSQLAdapter
   // ---------------------------------------------------------------------------
   // Private helpers
   // ---------------------------------------------------------------------------
-
-  // quoteIdentifier is NOT overridden: PG's identifier quoting is
-  // byte-identical to AbstractAdapter's double-quote form (`"x"` with
-  // `"` → `""`), so the inherited base method produces the same SQL.
 
   /**
    * Mirrors: PostgreSQL::Quoting#quote_table_name_for_assignment

@@ -330,7 +330,7 @@ export class SchemaStatements {
   }
 
   protected _qi(name: string): string {
-    return this.quoteIdentifier(name);
+    return this.quoteColumnName(name);
   }
 
   protected _qt(tableName: string): string {
@@ -2462,7 +2462,7 @@ export class SchemaStatements {
 
   /** @internal */
   renameColumnSql(_tableName: string, columnName: string, newColumnName: string): string {
-    return `RENAME COLUMN ${this.quoteIdentifier(columnName)} TO ${this.quoteIdentifier(newColumnName)}`;
+    return `RENAME COLUMN ${this.quoteColumnName(columnName)} TO ${this.quoteColumnName(newColumnName)}`;
   }
 
   /** @internal */
@@ -2472,7 +2472,7 @@ export class SchemaStatements {
     _type?: ColumnType,
     _options: ColumnOptions = {},
   ): string {
-    return `DROP COLUMN ${this.quoteIdentifier(columnName)}`;
+    return `DROP COLUMN ${this.quoteColumnName(columnName)}`;
   }
 
   /** @internal */

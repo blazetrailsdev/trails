@@ -72,11 +72,11 @@ export class SchemaCreation {
 
   // Quoting delegations. Rails declares these as `delegate ... to: :@conn`
   // (abstract/schema_creation.rb:16-19); here `@conn` is the {@link SchemaQuoter}
-  // threaded in as `this.adapter`. `quote_column_name` maps to `quoteIdentifier`.
+  // threaded in as `this.adapter`. `quote_column_name` maps to `quoteColumnName`.
 
   /** @internal */
   protected quoteColumnName(name: string): string {
-    return this.adapter.quoteIdentifier(name);
+    return this.adapter.quoteColumnName(name);
   }
 
   /** @internal */
@@ -113,7 +113,7 @@ export class SchemaCreation {
    */
   protected quotedIncludeColumns(o: string | string[]): string {
     if (typeof o === "string") return o;
-    return o.map((c) => this.adapter.quoteIdentifier(c)).join(", ");
+    return o.map((c) => this.adapter.quoteColumnName(c)).join(", ");
   }
 
   // Async since the PG quoter's default-expression path issues a live regtype
@@ -218,7 +218,7 @@ export class SchemaCreation {
       }
       throw e;
     }
-    let sql = `${this.adapter.quoteIdentifier(o.name)} ${o.sqlType}`;
+    let sql = `${this.adapter.quoteColumnName(o.name)} ${o.sqlType}`;
     if (o.type !== "primary_key") {
       sql = await this.addColumnOptionsBang(sql, this.columnOptions(o) as ColumnOptions);
     }
@@ -252,7 +252,7 @@ export class SchemaCreation {
       parts.push(this.visitDropConstraint(name));
     }
     for (const change of o.columnDefaultChanges) {
-      const col = this.adapter.quoteIdentifier(change.columnName);
+      const col = this.adapter.quoteColumnName(change.columnName);
       if (change.defaultValue == null) {
         parts.push(`ALTER COLUMN ${col} DROP DEFAULT`);
       } else {
@@ -279,7 +279,7 @@ export class SchemaCreation {
     if (o.ifNotExists) parts.push("IF NOT EXISTS");
     if (index.type) parts.push(index.type.toUpperCase());
     parts.push(
-      `${this.adapter.quoteIdentifier(index.name)} ON ${this.adapter.quoteTableName(index.table)}`,
+      `${this.adapter.quoteColumnName(index.name)} ON ${this.adapter.quoteTableName(index.table)}`,
     );
     if (this.supportsIndexUsing() && index.using) parts.push(`USING ${index.using}`);
     parts.push(`(${this.quotedColumns(index)})`);
@@ -317,17 +317,17 @@ export class SchemaCreation {
     if (typeof host.quotedColumnsForIndex === "function") {
       return host.quotedColumnsForIndex(columnNames, options);
     }
-    return columnNames.map((c) => this.adapter.quoteIdentifier(c)).join(", ");
+    return columnNames.map((c) => this.adapter.quoteColumnName(c)).join(", ");
   }
 
   protected visitForeignKeyDefinition(o: ForeignKeyDefinition): string {
     const quotedColumns = (Array.isArray(o.column) ? o.column : [o.column])
-      .map((c) => this.adapter.quoteIdentifier(c))
+      .map((c) => this.adapter.quoteColumnName(c))
       .join(", ");
     const quotedPrimaryKeys = (Array.isArray(o.primaryKey) ? o.primaryKey : [o.primaryKey])
-      .map((c) => this.adapter.quoteIdentifier(c))
+      .map((c) => this.adapter.quoteColumnName(c))
       .join(", ");
-    let sql = `CONSTRAINT ${this.adapter.quoteIdentifier(o.name)} `;
+    let sql = `CONSTRAINT ${this.adapter.quoteColumnName(o.name)} `;
     sql += `FOREIGN KEY (${quotedColumns}) `;
     sql += `REFERENCES ${this.adapter.quoteTableName(o.toTable)} (${quotedPrimaryKeys})`;
     if (o.onDelete) sql += ` ${this.actionSql("DELETE", o.onDelete)}`;
@@ -339,7 +339,7 @@ export class SchemaCreation {
     if (!o.validate && this.adapterName !== "postgres") {
       throw new Error("Check constraint validate: false is only supported on PostgreSQL");
     }
-    return `CONSTRAINT ${this.adapter.quoteIdentifier(o.name)} CHECK (${o.expression})`;
+    return `CONSTRAINT ${this.adapter.quoteColumnName(o.name)} CHECK (${o.expression})`;
   }
 
   async addColumnOptions(sql: string, options: ColumnOptions): Promise<string> {
@@ -448,12 +448,12 @@ export class SchemaCreation {
 
   /** @internal */
   protected visitPrimaryKeyDefinition(o: { name: string[] }): string {
-    return `PRIMARY KEY (${o.name.map((n) => this.adapter.quoteIdentifier(n)).join(", ")})`;
+    return `PRIMARY KEY (${o.name.map((n) => this.adapter.quoteColumnName(n)).join(", ")})`;
   }
 
   /** @internal */
   protected visitDropConstraint(name: string): string {
-    return `DROP CONSTRAINT ${this.adapter.quoteIdentifier(name)}`;
+    return `DROP CONSTRAINT ${this.adapter.quoteColumnName(name)}`;
   }
 
   /** @internal */

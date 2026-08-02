@@ -149,13 +149,13 @@ export class SchemaCreation extends AbstractSchemaCreation {
 
   /** @internal */
   protected visitValidateConstraint(name: string): string {
-    return `VALIDATE CONSTRAINT ${this.adapter.quoteIdentifier(name)}`;
+    return `VALIDATE CONSTRAINT ${this.adapter.quoteColumnName(name)}`;
   }
 
   /** @internal */
   protected visitExclusionConstraintDefinition(o: ExclusionConstraintDefinition): string {
     const p: string[] = [];
-    if (o.name) p.push("CONSTRAINT", this.adapter.quoteIdentifier(o.name));
+    if (o.name) p.push("CONSTRAINT", this.adapter.quoteColumnName(o.name));
     p.push("EXCLUDE");
     if (o.using) p.push(`USING ${o.using}`);
     p.push(`(${o.expression})`);
@@ -173,17 +173,17 @@ export class SchemaCreation extends AbstractSchemaCreation {
   /** @internal */
   protected visitUniqueConstraintDefinition(o: UniqueConstraintDefinition): string {
     const p: string[] = [];
-    if (o.name) p.push("CONSTRAINT", this.adapter.quoteIdentifier(o.name));
+    if (o.name) p.push("CONSTRAINT", this.adapter.quoteColumnName(o.name));
     p.push("UNIQUE");
     if (this.supportsNullsNotDistinct() && o.nullsNotDistinct) p.push("NULLS NOT DISTINCT");
     if (o.usingIndex) {
-      p.push(`USING INDEX ${this.adapter.quoteIdentifier(o.usingIndex)}`);
+      p.push(`USING INDEX ${this.adapter.quoteColumnName(o.usingIndex)}`);
     } else {
       // Rails wraps with `Array(o.column)`, so a nil column renders `UNIQUE ()`
       // and PostgreSQL owns the rejection — `[null]` would throw in the quoter
       // first (add_unique_constraint has no pre-raise for the empty case).
       const cols = wrap(o.column)
-        .map((c) => this.adapter.quoteIdentifier(c))
+        .map((c) => this.adapter.quoteColumnName(c))
         .join(", ");
       p.push(`(${cols})`);
     }
@@ -231,14 +231,14 @@ export class SchemaCreation extends AbstractSchemaCreation {
   protected async visitChangeColumnDefinition(o: ChangeColumnDefinition): Promise<string> {
     const column = o.column;
     column.sqlType = this.typeToSql(column.type, column.options);
-    const quotedName = this.adapter.quoteIdentifier(o.name);
+    const quotedName = this.adapter.quoteColumnName(o.name);
 
     let sql = `ALTER COLUMN ${quotedName} TYPE ${column.sqlType}`;
 
     const options = this.columnOptions(column);
 
     if (options["collation"]) {
-      sql += ` COLLATE ${this.adapter.quoteIdentifier(String(options["collation"]))}`;
+      sql += ` COLLATE ${this.adapter.quoteColumnName(String(options["collation"]))}`;
     }
     if (options["using"]) {
       sql += ` USING ${options["using"]}`;
@@ -269,7 +269,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
   protected async visitChangeColumnDefaultDefinition(
     o: ChangeColumnDefaultDefinition,
   ): Promise<string> {
-    const col = this.adapter.quoteIdentifier(o.column.name);
+    const col = this.adapter.quoteColumnName(o.column.name);
     // Mirrors Rails postgresql/schema_creation.rb:110 — column is passed
     // to quote_default_expression so PG's typeMap/array branch fires.
     const action =
@@ -283,7 +283,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
   protected override addColumnOptionsBang(sql: string, options: AddColumnOptions): Promise<string> {
     const opts = options as Record<string, unknown>;
     if (opts["collation"]) {
-      sql += ` COLLATE ${this.adapter.quoteIdentifier(String(opts["collation"]))}`;
+      sql += ` COLLATE ${this.adapter.quoteColumnName(String(opts["collation"]))}`;
     }
     const col = opts["column"] as { type?: string; name?: string } | undefined;
     if (col?.type === "uuid" && opts["primaryKey"] && !("default" in opts)) {
@@ -334,7 +334,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
       return host.quotedIncludeColumnsForIndex(o);
     }
     if (typeof o === "string") return o;
-    return o.map((c) => this.adapter.quoteIdentifier(c)).join(", ");
+    return o.map((c) => this.adapter.quoteColumnName(c)).join(", ");
   }
 
   /**

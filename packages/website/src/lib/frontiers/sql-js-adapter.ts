@@ -51,16 +51,16 @@ export class SqlJsAdapter {
     this.db.run(`ROLLBACK TO SAVEPOINT "${name.replace(/"/g, '""')}"`);
   }
 
-  quoteIdentifier(name: string): string {
+  quoteColumnName(name: string): string {
     return `"${name.replace(/"/g, '""')}"`;
   }
   quoteColumnName(name: string): string {
-    return this.quoteIdentifier(name);
+    return this.quoteColumnName(name);
   }
   quoteTableName(name: string): string {
     return name
       .split(".")
-      .map((part) => this.quoteIdentifier(part))
+      .map((part) => this.quoteColumnName(part))
       .join(".");
   }
   quote(value: unknown): string {

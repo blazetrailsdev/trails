@@ -22,7 +22,7 @@ import {
 /** Subset of {@link Quoting} the sanitization helpers need. @internal */
 export type Quoter = Pick<
   Quoting,
-  "quote" | "quoteIdentifier" | "quoteTableNameForAssignment" | "quoteString" | "castBoundValue"
+  "quote" | "quoteColumnName" | "quoteTableNameForAssignment" | "quoteString" | "castBoundValue"
 >;
 
 /**
@@ -36,7 +36,7 @@ const ABSTRACT_QUOTER: Quoter = {
   // `abstractQuote` requires a host receiver; this ANSI fallback has no adapter,
   // so bind a bare host — date/time values route through the module helpers.
   quote: (v) => abstractQuote.call({}, v),
-  quoteIdentifier: (n) => abstractQuoteIdentifier(n),
+  quoteColumnName: (n) => abstractQuoteIdentifier(n),
   // ANSI fallback: the abstract `quoteTableNameForAssignment` delegates to the
   // throwing `quoteColumnName`, so render `"table"."attr"` directly here.
   quoteTableNameForAssignment: (t, a) =>
@@ -123,7 +123,7 @@ function _sanitizeSqlHashForAssignment(
       // Rails sanitization.rb:112 — PG/SQLite drop the table prefix.
       const col = table
         ? quoter.quoteTableNameForAssignment(table, attr)
-        : quoter.quoteIdentifier(attr);
+        : quoter.quoteColumnName(attr);
       return `${col} = ${quoter.quote(value)}`;
     })
     .join(", ");

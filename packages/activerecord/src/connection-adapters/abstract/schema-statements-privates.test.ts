@@ -20,7 +20,7 @@ function makeStatements(
 ) {
   const adapter: Record<string, unknown> = {
     adapterName: "sqlite" as const,
-    quoteIdentifier: (n: string) => `"${n}"`,
+    quoteColumnName: (n: string) => `"${n}"`,
     quoteTableName: (n: string) => `"${n}"`,
     quoteDefaultExpression: (v: unknown) => `${v}`,
     execute: vi.fn().mockResolvedValue([]),

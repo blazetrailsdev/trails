@@ -31,7 +31,7 @@ export function splitColumnNames(
 /**
  * @internal Shared identifier guard for MySQL bare-identifier emission
  * (charset/collation). MySQL requires `CHARACTER SET`/`COLLATE` as bare
- * identifiers — `quoteIdentifier` (backtick-wrapping) produces invalid DDL
+ * identifiers — `quoteColumnName` (backtick-wrapping) produces invalid DDL
  * like `COLLATE \`utf8mb4_bin\``. This regex substitutes for quoting: only
  * safe charset/collation names pass.
  */

@@ -349,7 +349,7 @@ export function quoteDefaultExpression(
  * functions. Mirrors the `ABSTRACT_QUOTER` crutch in `sanitization.ts`.
  */
 export const ABSTRACT_SCHEMA_QUOTER: SchemaQuoter = {
-  quoteIdentifier,
+  quoteColumnName: quoteIdentifier,
   // The adapter-free fallback renders schema-qualified names ANSI-style by
   // quoting each dot-separated part. The public `quoteTableName` mirrors Rails
   // (delegates to the throwing `quoteColumnName`), so it can't back this crutch.
@@ -723,17 +723,6 @@ export interface Quoting {
    * literal-quoting helpers for legacy call sites.
    */
   quoteString(s: string): string;
-
-  /**
-   * Identifier-form quoting. PG/SQLite double-quote, MySQL backtick.
-   *
-   * @noRailsEquivalent CONVERGEABLE (story:
-   * converge-quote-identifier-onto-quote-column-name). Rails' `Quoting` has
-   * no `quote_identifier`; every adapter implements this as a pure synonym
-   * of `quoteColumnName`, so converging is a call-site rewrite (~123 of
-   * them), not a port.
-   */
-  quoteIdentifier(name: string): string;
 
   /** Mirrors: Quoting#quote_table_name (handles schema-qualified names). */
   quoteTableName(name: string): string;

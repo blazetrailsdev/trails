@@ -136,7 +136,7 @@ describe("MigrationTest", () => {
     class M extends Migration {}
     const m = new M();
     (m as unknown as { _connectionOverride: unknown })._connectionOverride = {
-      quoteIdentifier: (n: string) => n,
+      quoteColumnName: (n: string) => n,
       quoteTableName: (n: string) => n,
       quoteDefaultExpression: (v: unknown) => String(v),
       updateTableDefinition(tableName: string, base: unknown) {

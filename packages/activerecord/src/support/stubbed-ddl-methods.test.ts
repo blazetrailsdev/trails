@@ -45,7 +45,7 @@ const NON_EMITTING: ReadonlyMap<string, string> = new Map([
   ["_statementPool", "prepared-statement slot clearCacheBang resets, not a DDL emitter"],
   ["_schemaCache", "memoized backing slot of the schemaCache read"],
   ["_sqlite3SchemaCreation", "memoized backing slot of the schemaCreation renderer"],
-  ["quoteIdentifier", "renderer input — quotes a name into DDL the renderer is already building"],
+  ["quoteColumnName", "renderer input — quotes a name into DDL the renderer is already building"],
   ["quoteTableName", "renderer input — quotes a table name into DDL, emits nothing itself"],
   ["quoteDefaultExpression", "renderer input — renders a column default, emits nothing itself"],
   ["quotedColumnsForIndex", "renderer input — renders an index's column list"],
@@ -83,7 +83,7 @@ function isPrivateFieldBrandCheck(error: unknown): boolean {
  * evaluated with the view as receiver, not the real adapter, so whatever it
  * builds off `this` keeps recording: `schemaCreation` hands back a renderer
  * holding the view, and the renderer's own quoting and type reads
- * (`quoteIdentifier`, `quoteDefaultExpression`, `nativeDatabaseTypes`, …) come
+ * (`quoteColumnName`, `quoteDefaultExpression`, `nativeDatabaseTypes`, …) come
  * back through the proxy and are pinned again. Getters that read a private
  * field brand-check their receiver and throw on a proxy; those fall back to
  * evaluating on the real adapter, unrecorded.

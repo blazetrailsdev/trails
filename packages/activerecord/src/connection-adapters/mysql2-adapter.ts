@@ -897,7 +897,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    * converts them to backticks at execution time, so MySQL-specific quoting is
    * handled in one place rather than threaded through every SQL builder.
    * Adapter-specific DDL or raw SQL fragments may still use backticks or
-   * quoteIdentifier(..., "mysql") directly where appropriate.
+   * quoteColumnName(..., "mysql") directly where appropriate.
    */
   private mysqlQuote(sql: string): string {
     // Replace "identifier" with `identifier`, but not inside single-quoted strings.

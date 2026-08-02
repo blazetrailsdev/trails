@@ -193,12 +193,12 @@ export function buildPkWhere(this: typeof Base, idValue: unknown): string {
     for (let i = 0; i < pk.length; i++) {
       const v = idValue[i];
       if (v === undefined || v === null) return "1=0";
-      conditions.push(`${a.quoteIdentifier(pk[i])} = ${a.quote(v)}`);
+      conditions.push(`${a.quoteColumnName(pk[i])} = ${a.quote(v)}`);
     }
     return conditions.join(" AND ");
   }
   if (idValue === undefined || idValue === null) return "1=0";
-  return `${a.quoteIdentifier(pk)} = ${a.quote(idValue)}`;
+  return `${a.quoteColumnName(pk)} = ${a.quote(idValue)}`;
 }
 
 /**
@@ -543,27 +543,27 @@ export async function createTable(this: typeof Base): Promise<void> {
   if (pks.length === 1) {
     const pk = pks[0];
     const pkDef = isPg
-      ? `${a.quoteIdentifier(pk)} SERIAL PRIMARY KEY`
+      ? `${a.quoteColumnName(pk)} SERIAL PRIMARY KEY`
       : isMysql
-        ? `${a.quoteIdentifier(pk)} BIGINT AUTO_INCREMENT PRIMARY KEY`
-        : `${a.quoteIdentifier(pk)} INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL`;
+        ? `${a.quoteColumnName(pk)} BIGINT AUTO_INCREMENT PRIMARY KEY`
+        : `${a.quoteColumnName(pk)} INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL`;
     colDefs.push(pkDef);
   } else {
     for (const pk of pks) {
       const pkDef = this._attributeDefinitions.get(pk);
       const pkType = sqlTypeFor(pkDef?.type?.name || "integer", adapterName);
-      colDefs.push(`${a.quoteIdentifier(pk)} ${pkType} NOT NULL`);
+      colDefs.push(`${a.quoteColumnName(pk)} ${pkType} NOT NULL`);
     }
   }
 
   for (const [name, def] of this._attributeDefinitions) {
     if (pkSet.has(name)) continue;
     const sqlType = sqlTypeFor(def.type?.name || "string", adapterName);
-    colDefs.push(`${a.quoteIdentifier(name)} ${sqlType}`);
+    colDefs.push(`${a.quoteColumnName(name)} ${sqlType}`);
   }
 
   if (pks.length > 1) {
-    colDefs.push(`PRIMARY KEY (${pks.map((pk) => a.quoteIdentifier(pk)).join(", ")})`);
+    colDefs.push(`PRIMARY KEY (${pks.map((pk) => a.quoteColumnName(pk)).join(", ")})`);
   }
 
   await a.execute(

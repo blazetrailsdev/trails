@@ -3,7 +3,7 @@ import { BinaryData } from "@blazetrails/activemodel";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import {
   quote as quoteFn,
-  quoteIdentifier,
+  quoteColumnName,
   typeCast as typeCastFn,
   quotedBinary,
   unquoteIdentifier,
@@ -163,17 +163,17 @@ describe("MySQL quoting — quotedBinary", () => {
   });
 });
 
-describe("MySQL quoting — quoteIdentifier", () => {
+describe("MySQL quoting — quoteColumnName", () => {
   it("wraps in backticks", () => {
-    expect(quoteIdentifier("foo")).toBe("`foo`");
+    expect(quoteColumnName("foo")).toBe("`foo`");
   });
 
   it("escapes embedded backticks by doubling", () => {
-    expect(quoteIdentifier("foo`bar")).toBe("`foo``bar`");
+    expect(quoteColumnName("foo`bar")).toBe("`foo``bar`");
   });
 
   it("passes * through unquoted (column-list star)", () => {
-    expect(quoteIdentifier("*")).toBe("*");
+    expect(quoteColumnName("*")).toBe("*");
   });
 });
 

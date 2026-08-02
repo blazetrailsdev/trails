@@ -467,7 +467,7 @@ describe("TableDefinition#toSql", () => {
     // Stub adapter mirrors PostgreSQLAdapter.NATIVE_DATABASE_TYPES lowercase
     // output — verifies that the visitor delegates to the adapter's typeToSql.
     const stubAdapter = {
-      quoteIdentifier: (s: string) => `"${s}"`,
+      quoteColumnName: (s: string) => `"${s}"`,
       quoteTableName: (s: string) => `"${s}"`,
       quoteDefaultExpression: (v: unknown) => ` DEFAULT ${String(v)}`,
       typeToSql: (type: string) => type, // returns lowercase verbatim (mirrors PG native types)

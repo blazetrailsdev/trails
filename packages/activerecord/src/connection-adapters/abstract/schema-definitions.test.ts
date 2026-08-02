@@ -473,7 +473,7 @@ describe("Table#aliasedTypes", () => {
 
 describe("TableDefinition id hash form", () => {
   const mysqlAdapter = {
-    quoteIdentifier: (s: string) => `\`${s}\``,
+    quoteColumnName: (s: string) => `\`${s}\``,
     quoteTableName: (s: string) => `\`${s}\``,
     quoteDefaultExpression: (_v: unknown) => "",
   };

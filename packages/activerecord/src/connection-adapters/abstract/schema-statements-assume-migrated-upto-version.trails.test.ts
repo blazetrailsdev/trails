@@ -7,7 +7,7 @@ function makeStatements(
   const executed: string[] = [];
   const adapter = {
     adapterName: "sqlite" as const,
-    quoteIdentifier: (n: string) => `"${n}"`,
+    quoteColumnName: (n: string) => `"${n}"`,
     quoteTableName: (n: string) => `"${n}"`,
     quote: (v: unknown) => (typeof v === "number" ? String(v) : `'${String(v)}'`),
     execute: vi.fn(async (sql: string) => {
