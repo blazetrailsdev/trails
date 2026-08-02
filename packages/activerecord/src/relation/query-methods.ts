@@ -221,6 +221,8 @@ interface QueryMethodsHost {
   _skipQueryCache: boolean | undefined;
   _modelClass: typeof import("../base.js").Base;
   model: QueryMethodsHost["_modelClass"];
+  /** Rails `attr_reader :table` (relation.rb:71) — the relation's own Arel table. */
+  table: ArelTable;
   predicateBuilder: import("./predicate-builder.js").PredicateBuilder;
 }
 
@@ -2006,10 +2008,9 @@ export function reverseSqlOrder(this: QueryMethodsHost, orderQuery: unknown[]): 
     // Array, which is truthy, so it takes the same `table[primary_key].desc`
     // path as a scalar one. The raise is reserved for a nil primary key.
     if (pk) {
-      const modelClass: any = (this as any)._modelClass;
-      const arelTable =
-        modelClass?.arelTable ??
-        (modelClass?.tableName ? new ArelTable(modelClass.tableName) : null);
+      // Rails: `return [table[primary_key].desc] if primary_key` — the
+      // relation's own table, so an aliased relation reverses on the alias.
+      const arelTable: any = (this as any).table;
       return [
         arelTable
           ? new Nodes.Descending(arelTable.get(pk))
@@ -2139,7 +2140,7 @@ export function preprocessOrderArgs(this: QueryMethodsHost, orderArgs: unknown[]
     if (typeof arg === "symbol") {
       // Resolve against the current relation's table, not a table named after the column.
       const name = symbolToName(arg);
-      const modelTable = (this as any)._modelClass?.arelTable;
+      const modelTable = (this as any).table;
       const attr = modelTable ? modelTable.get(name) : arelSql(name);
       mapped.push(new Nodes.Ascending(attr));
     } else if (isPlainObject(arg)) {
@@ -2156,7 +2157,7 @@ export function preprocessOrderArgs(this: QueryMethodsHost, orderArgs: unknown[]
           }
         } else {
           // Flat hash: { col: dir } — resolve against the current table.
-          const modelTable = (this as any)._modelClass?.arelTable;
+          const modelTable = (this as any).table;
           const attr = modelTable ? modelTable.get(key) : arelSql(key);
           mapped.push(
             String(value).toLowerCase() === "desc"
@@ -2325,7 +2326,7 @@ function safeQuoteColumnName(modelClass: any, name: string): string {
 
 /** @internal */
 export function isTableNameMatches(this: QueryMethodsHost, from: unknown): boolean {
-  const table: any = (this as any)._modelClass?.arelTable;
+  const table: any = (this as any).table;
   if (!table) return false;
   const modelClass: any = this.model;
   const name = escapeRegex(table.name);
@@ -2343,7 +2344,7 @@ export function arelColumn(
   fallback?: (attr: string) => unknown,
 ): unknown {
   const modelClass: any = this.model;
-  const table: any = modelClass?.arelTable;
+  const table: any = (this as any).table;
   // Rails: a raw Arel node has no columns_hash/table.column form; it falls to
   // the block, else passes through unchanged (query_methods.rb:1996-2003).
   if (field instanceof Nodes.Node) return fallback ? fallback(field as any) : field;
@@ -2432,7 +2433,7 @@ export function arelColumnsFromHash(
 /** @internal */
 export function orderColumn(this: QueryMethodsHost, field: string): unknown {
   const modelClass: any = this.model;
-  const table: any = modelClass?.arelTable;
+  const table: any = (this as any).table;
   return arelColumn.call(this, field, (attrName: string) => {
     if (attrName === "count" && ((this as any)._groupColumns ?? []).length > 0) {
       return table?.get(attrName) ?? arelSql(attrName);
@@ -2712,8 +2713,8 @@ export function buildArel(
   _connection?: unknown,
   aliases?: AliasTracker,
 ): any {
-  const mc = (this as any)._modelClass;
-  const table: any = mc?.arelTable;
+  // Rails `build_arel`: `Arel::SelectManager.new(table)` (query_methods.rb:1751).
+  const table: any = (this as any).table;
   const arel = new SelectManager(table);
 
   buildJoins.call(this, arel, aliases);
@@ -3201,7 +3202,7 @@ export function buildWithJoinNode(
   kind: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin = Nodes.InnerJoin,
 ): unknown {
   const mc = this.model;
-  const table: any = mc?.arelTable;
+  const table: any = (this as any).table;
   if (!table) throw new ActiveRecordError("Cannot build CTE join node: model has no arelTable");
   const withTable = new ArelTable(name);
   // Rails: with_table[model.model_name.to_s.foreign_key].eq(table[model.primary_key])
