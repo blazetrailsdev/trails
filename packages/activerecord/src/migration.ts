@@ -25,8 +25,6 @@ import {
   type IdHashOptions,
 } from "./connection-adapters/abstract/schema-definitions.js";
 import {
-  SchemaStatements,
-  assertSchemaAdapter,
   type JoinTableOptions,
   type ValidateConstraintStatements,
   type CommentOrChanges,
@@ -320,12 +318,6 @@ export abstract class Migration {
     return this.connection.adapterName as "sqlite" | "postgres" | "mysql";
   }
 
-  get schema(): SchemaStatements {
-    const conn = this.connection;
-    assertSchemaAdapter(conn);
-    return conn as unknown as SchemaStatements;
-  }
-
   /**
    * Mirrors: ActiveRecord::Migration#initialize
    */
@@ -424,10 +416,10 @@ export abstract class Migration {
     // Subclasses override
   }
 
-  // -- Schema operations (delegated to SchemaStatements) --
+  // -- Schema operations (delegated to the connection adapter) --
   // Migration records operations for reversibility, then delegates
-  // actual SQL execution to this.schema (a SchemaStatements instance).
-  // In Rails, these methods live on the connection adapter via
+  // actual SQL execution to this.connection. In Rails, these methods
+  // live on the connection adapter via
   // ActiveRecord::ConnectionAdapters::SchemaStatements.
 
   /** @internal Mirrors Rails Migration#method_missing's proper_table_name dispatch. */
@@ -468,7 +460,7 @@ export abstract class Migration {
       return;
     }
     const tname = this._pt(name);
-    await this.schema.createTable(tname, optionsOrFn, fn);
+    await this.connection.createTable(tname, optionsOrFn, fn);
   }
 
   async dropTable(
@@ -499,9 +491,9 @@ export abstract class Migration {
     }
     const tnames = names.map((n) => this._pt(n)) as [string, ...string[]];
     if (options) {
-      await this.schema.dropTable(...tnames, options);
+      await this.connection.dropTable(...tnames, options);
     } else {
-      await this.schema.dropTable(...tnames);
+      await this.connection.dropTable(...tnames);
     }
   }
 
@@ -516,7 +508,7 @@ export abstract class Migration {
       return;
     }
     tableName = this._pt(tableName);
-    await this.schema.addColumn(tableName, columnName, type, options);
+    await this.connection.addColumn(tableName, columnName, type, options);
   }
 
   async removeColumn(
@@ -532,7 +524,7 @@ export abstract class Migration {
       return;
     }
     tableName = this._pt(tableName);
-    await this.schema.removeColumn(tableName, columnName, type, opts);
+    await this.connection.removeColumn(tableName, columnName, type, opts);
   }
 
   async renameColumn(tableName: string, oldName: string, newName: string): Promise<void> {
@@ -541,7 +533,7 @@ export abstract class Migration {
       return;
     }
     tableName = this._pt(tableName);
-    await this.schema.renameColumn(tableName, oldName, newName);
+    await this.connection.renameColumn(tableName, oldName, newName);
   }
 
   async addIndex(
@@ -554,7 +546,7 @@ export abstract class Migration {
       return;
     }
     tableName = this._pt(tableName);
-    await this.schema.addIndex(tableName, columns, options);
+    await this.connection.addIndex(tableName, columns, options);
   }
 
   // Rails migration compatibility: `remove_index(table_name, column_name = nil, **options)`.
@@ -578,7 +570,7 @@ export abstract class Migration {
       return;
     }
     tableName = this._pt(tableName);
-    await this.schema.removeIndex(tableName, columnOrOptions, options);
+    await this.connection.removeIndex(tableName, columnOrOptions, options);
   }
 
   async changeColumn(
@@ -592,7 +584,7 @@ export abstract class Migration {
       return;
     }
     tableName = this._pt(tableName);
-    await this.schema.changeColumn(tableName, columnName, type, options);
+    await this.connection.changeColumn(tableName, columnName, type, options);
   }
 
   async renameTable(oldName: string, newName: string): Promise<void> {
@@ -602,11 +594,11 @@ export abstract class Migration {
     }
     oldName = this._pt(oldName);
     newName = this._pt(newName);
-    await this.schema.renameTable(oldName, newName);
+    await this.connection.renameTable(oldName, newName);
   }
 
   async tableExists(tableName: string): Promise<boolean> {
-    return this.schema.tableExists(this._pt(tableName));
+    return this.connection.tableExists(this._pt(tableName));
   }
 
   async columnExists(
@@ -615,7 +607,7 @@ export abstract class Migration {
     type?: string | null,
     options?: ColumnExistsOptions,
   ): Promise<boolean> {
-    return this.schema.columnExists(this._pt(tableName), columnName, type, options);
+    return this.connection.columnExists(this._pt(tableName), columnName, type, options);
   }
 
   async changeColumnDefault(
@@ -628,7 +620,7 @@ export abstract class Migration {
       return;
     }
     tableName = this._pt(tableName);
-    await this.schema.changeColumnDefault(tableName, columnName, options);
+    await this.connection.changeColumnDefault(tableName, columnName, options);
   }
 
   async changeColumnNull(
@@ -642,9 +634,7 @@ export abstract class Migration {
       return;
     }
     tableName = this._pt(tableName);
-    const conn = this.connection;
-    assertSchemaAdapter(conn);
-    await conn.changeColumnNull(tableName, columnName, allowNull, defaultValue);
+    await this.connection.changeColumnNull(tableName, columnName, allowNull, defaultValue);
   }
 
   async addReference(
@@ -662,7 +652,7 @@ export abstract class Migration {
       return;
     }
     tableName = this._pt(tableName);
-    await this.schema.addReference(tableName, refName, options);
+    await this.connection.addReference(tableName, refName, options as Record<string, unknown>);
   }
 
   /** Alias of addReference (Rails: `alias :add_belongs_to :add_reference`). */
@@ -689,7 +679,7 @@ export abstract class Migration {
       return;
     }
     tableName = this._pt(tableName);
-    await this.schema.removeReference(tableName, refName, options);
+    await this.connection.removeReference(tableName, refName, options);
   }
 
   /** Alias of removeReference (Rails: `alias :remove_belongs_to :remove_reference`). */
@@ -711,7 +701,7 @@ export abstract class Migration {
       return;
     }
     fromTable = this._pt(fromTable);
-    await this.schema.addForeignKey(fromTable, toTable, options);
+    await this.connection.addForeignKey(fromTable, toTable, options);
   }
 
   async removeForeignKey(
@@ -732,7 +722,7 @@ export abstract class Migration {
     }
     fromTable = this._pt(fromTable);
     if (typeof toTableOrOptions === "string") toTableOrOptions = this._pt(toTableOrOptions);
-    await this.schema.removeForeignKey(fromTable, toTableOrOptions, options);
+    await this.connection.removeForeignKey(fromTable, toTableOrOptions, options);
   }
 
   async addCheckConstraint(
@@ -752,7 +742,7 @@ export abstract class Migration {
       return;
     }
     tableName = this._pt(tableName);
-    await this.schema.addCheckConstraint(tableName, expression, options);
+    await this.connection.addCheckConstraint(tableName, expression, options);
   }
 
   async removeCheckConstraint(
@@ -770,7 +760,7 @@ export abstract class Migration {
       return;
     }
     tableName = this._pt(tableName);
-    await this.schema.removeCheckConstraint(tableName, expressionOrOptions, options);
+    await this.connection.removeCheckConstraint(tableName, expressionOrOptions, options);
   }
 
   async validateCheckConstraint(
@@ -926,7 +916,7 @@ export abstract class Migration {
       return;
     }
     tableName = this._pt(tableName);
-    await this.schema.addTimestamps(tableName, options);
+    await this.connection.addTimestamps(tableName, options);
   }
 
   async removeTimestamps(tableName: string): Promise<void> {
@@ -935,7 +925,7 @@ export abstract class Migration {
       return;
     }
     tableName = this._pt(tableName);
-    await this.schema.removeTimestamps(tableName);
+    await this.connection.removeTimestamps(tableName);
   }
 
   async createJoinTable(
@@ -949,7 +939,7 @@ export abstract class Migration {
       return;
     }
     table1 = this._pt(table1);
-    await this.schema.createJoinTable(table1, table2, options, fn);
+    await this.connection.createJoinTable(table1, table2, options, fn);
   }
 
   async dropJoinTable(
@@ -962,7 +952,7 @@ export abstract class Migration {
       return;
     }
     table1 = this._pt(table1);
-    await this.schema.dropJoinTable(table1, table2, options);
+    await this.connection.dropJoinTable(table1, table2, options);
   }
 
   async changeTable(
@@ -987,10 +977,10 @@ export abstract class Migration {
       // records ops via a Proxy and coalesces into a single ALTER. Apply
       // tableNamePrefix here since SchemaStatements doesn't.
       const tname = this._pt(tableName);
-      await this.schema.changeTable(tname, options, callback);
+      await this.connection.changeTable(tname, options, callback);
       return;
     }
-    const table = this.schema.updateTableDefinition(tableName, this);
+    const table = this.connection.updateTableDefinition(tableName, this);
     if (callback) await callback(table);
   }
 
@@ -1000,14 +990,14 @@ export abstract class Migration {
       return;
     }
     tableName = this._pt(tableName);
-    await this.schema.renameIndex(tableName, oldName, newName);
+    await this.connection.renameIndex(tableName, oldName, newName);
   }
 
   indexName(
     tableName: string,
     options: { column?: string | string[]; name?: string; _usesLegacyIndexName?: boolean },
   ): string {
-    return this.schema.indexName(this._pt(tableName), options);
+    return this.connection.indexName(this._pt(tableName), options);
   }
 
   async removeColumns(tableName: string, ...columns: string[]): Promise<void>;
@@ -1061,7 +1051,7 @@ export abstract class Migration {
   }
 
   async columns(tableName: string): Promise<import("./connection-adapters/column.js").Column[]> {
-    return this.schema.columns(this._pt(tableName));
+    return this.connection.columns(this._pt(tableName));
   }
 
   async indexes(
@@ -1069,23 +1059,29 @@ export abstract class Migration {
     // `columns` is a string for expression indexes, an array otherwise —
     // mirrors Rails' IndexDefinition#columns.
   ): Promise<Array<{ name: string; columns: string | string[]; unique: boolean }>> {
-    return this.schema.indexes(this._pt(tableName));
+    // The adapter interface types `indexes` loosely (`unknown[]`); the
+    // concrete adapters all return IndexDefinition-shaped rows.
+    return (await this.connection.indexes(this._pt(tableName))) as Array<{
+      name: string;
+      columns: string | string[];
+      unique: boolean;
+    }>;
   }
 
   async primaryKey(tableName: string): Promise<string | string[] | null> {
-    return this.schema.primaryKey(this._pt(tableName));
+    return this.connection.primaryKey(this._pt(tableName));
   }
 
   async foreignKeys(tableName: string): Promise<ForeignKeyDefinition[]> {
-    return this.schema.foreignKeys(this._pt(tableName));
+    return this.connection.foreignKeys(this._pt(tableName));
   }
 
   async tables(): Promise<string[]> {
-    return this.schema.tables();
+    return this.connection.tables();
   }
 
   async views(): Promise<string[]> {
-    return this.schema.views();
+    return this.connection.views();
   }
 
   /**
@@ -1242,7 +1238,7 @@ export abstract class Migration {
   }
 
   async viewExists(viewName: string): Promise<boolean> {
-    return this.schema.viewExists(viewName);
+    return this.connection.viewExists(viewName);
   }
 
   async indexExists(
@@ -1250,7 +1246,7 @@ export abstract class Migration {
     columnName: string | string[],
     options?: { unique?: boolean; name?: string; valid?: boolean },
   ): Promise<boolean> {
-    return this.schema.indexExists(this._pt(tableName), columnName, options);
+    return this.connection.indexExists(this._pt(tableName), columnName, options);
   }
 
   /**

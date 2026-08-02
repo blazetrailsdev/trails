@@ -39,7 +39,7 @@ export class MysqlSchemaStatements extends BaseSchemaStatements {
   }
 
   /**
-   * `Migration#addIndex` routes through `this.schema.addIndex(...)`, so
+   * `Migration#addIndex` routes through `this.connection.addIndex(...)`, so
    * we override here. Mirrors Rails' `AbstractMysqlAdapter#add_index` /
    * `#build_create_index_definition` pair: pre-flight via
    * `indexExists()` and emit `CREATE INDEX` without `IF NOT EXISTS`

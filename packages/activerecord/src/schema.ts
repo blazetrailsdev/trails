@@ -88,14 +88,14 @@ export class Schema extends Current {
     await schemaMigration.createTable();
     if (info.version !== undefined) {
       // Go through SchemaStatements#assumeMigratedUptoVersion (reached
-      // via the inherited Migration.schema getter) so the known
+      // via the inherited Migration.connection getter) so the known
       // migration list is pulled from pool.migrationContext.migrations
       // — matches Rails' `connection.assume_migrated_upto_version`
       // (see connection-adapters/abstract/schema-statements.ts:1157).
       // Bypassing that path and calling SchemaMigration directly would
       // only record the target version without backfilling the
       // migrations between.
-      await schema.schema.assumeMigratedUptoVersion(info.version);
+      await schema.connection.assumeMigratedUptoVersion(info.version);
     }
     // Honour the use_metadata_table / useMetadataTable opt-out so
     // schema loading doesn't create / stamp ar_internal_metadata when
