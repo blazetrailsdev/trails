@@ -32,7 +32,7 @@ import {
 export interface AttributeMethods {
   hasAttribute(name: string): boolean;
   attributePresent(name: string): boolean;
-  attributeNamesList: string[];
+  attributeNames(): string[];
 }
 
 interface AttributeRecord {
@@ -123,7 +123,7 @@ export function attributePresent(this: AttributeRecord, name: string): boolean {
  *
  * Mirrors: ActiveRecord::AttributeMethods#attribute_names
  */
-export function attributeNamesList(this: AttributeRecord): string[] {
+export function attributeNames(this: AttributeRecord): string[] {
   return [...this._attributes.keys()];
 }
 
@@ -636,7 +636,7 @@ interface AttributeNamesHost {
  * walk `column_names` first and append the non-column declarations in
  * declaration order.
  */
-export function attributeNames(this: AttributeNamesHost): string[] {
+function classAttributeNames(this: AttributeNamesHost): string[] {
   // Rails' `@attribute_names ||= ...freeze` memo, own-property per class (a
   // subclass never reads its parent's memo — Rails nils `@attribute_names` in
   // `inherited`), revision-stamped so the reset paths that clear
@@ -682,6 +682,10 @@ export function attributeNames(this: AttributeNamesHost): string[] {
   }
   return names;
 }
+
+export const ClassMethods = {
+  attributeNames: classAttributeNames,
+};
 
 // ---------------------------------------------------------------------------
 // Instance methods mirrored from attribute_methods.rb

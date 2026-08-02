@@ -4,7 +4,7 @@ import { fixtures } from "../test-fixtures.js";
 import {
   defineAttributeMethods,
   isAttributeMethodsGenerated,
-  attributeNames,
+  ClassMethods,
 } from "../attribute-methods.js";
 
 fixtures({});
@@ -25,7 +25,7 @@ describe("ReadTest", () => {
       static _attributeMethodsGenerated = false;
       static defineAttributeMethods = defineAttributeMethods;
       static attributeMethodsGenerated = isAttributeMethodsGenerated;
-      static attributeNames = attributeNames;
+      static attributeNames = ClassMethods.attributeNames;
     }
     return Klass;
   }
