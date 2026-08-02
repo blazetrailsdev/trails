@@ -30,8 +30,8 @@
  * output/call-mismatches.json by shelling out to `pnpm api:compare`, sharing
  * the wide gate's opt-out contract via gate-regen.ts (RFC 0083): `--no-regen`,
  * API_COMPARE_SKIP_WIDE_REGEN=1, any CI value, or — for `--write` —
- * API_COMPARE_FORCE, which is how api:calls:reseed signals it already ran the
- * forced regeneration. The partial-scope determinism guard below runs
+ * API_COMPARE_FORCE. api:calls:reseed opts out with `--no-regen`, having just
+ * run the forced regeneration itself. The partial-scope determinism guard below runs
  * unchanged either way.
  *
  * `--write` regenerates the baseline from the current artifact, preserving the
@@ -54,7 +54,7 @@
  *   2. reseed ONLY through the canonical path below, which force-rebuilds every
  *      cache first so the artifact can't be a warm-cache under-report:
  *
- *        pnpm api:calls:reseed  # API_COMPARE_FORCE=1 api:compare && this --write
+ *        pnpm api:calls:reseed  # API_COMPARE_FORCE=1 api:compare && this --write --no-regen
  *
  *   3. as a backstop, the artifact records the `packages` it compared and this
  *      script ABORTS (gate AND `--write`) unless that set covers every

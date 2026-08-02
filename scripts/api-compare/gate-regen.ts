@@ -30,9 +30,11 @@ export const REGEN_SKIP_ENV = "API_COMPARE_SKIP_WIDE_REGEN";
 
 // A reseed regenerating a stale artifact is the same bug this closes, one
 // severity worse: `--write` commits the stale population as the new baseline.
-// So `--write` regenerates too — except under API_COMPARE_FORCE, which is the
-// api:calls:reseed / api:calls:wide:reseed scripts' own marker that they just
-// ran the (forced) regeneration themselves.
+// So `--write` regenerates too — except under API_COMPARE_FORCE, the marker
+// that the caller just ran the forced regeneration itself. (The reseed scripts
+// pass `--no-regen` as well: their `API_COMPARE_FORCE=1 pnpm api:compare && …`
+// assignment prefix applies only to the first command, so the `--write` step
+// never sees the env marker.)
 export function shouldRegenerate(argv: string[], env: Record<string, string | undefined>): boolean {
   if (argv.some((a) => REGEN_SKIP_ARGS.includes(a))) return false;
   if (argv.includes("--write") && env.API_COMPARE_FORCE) return false;
