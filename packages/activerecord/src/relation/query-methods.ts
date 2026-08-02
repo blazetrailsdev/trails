@@ -67,10 +67,6 @@ export class WhereChain<R = any> {
   not(conditions: unknown[]): R;
   not(cols: string[], tuples: unknown[][]): R;
   not(conditions: Record<string, unknown> | unknown[], tuples?: unknown[][]): R {
-    // Rails' `not` forwards `*args` to `build_where_clause(...).invert`
-    // (query_methods.rb:49), so it accepts every shape `where` does — including
-    // the sanitized-conditions array and the trails composite-key
-    // `(cols, tuples)` pair.
     if (tuples !== undefined) {
       return this._scope.whereNot(conditions as string[], tuples);
     }
