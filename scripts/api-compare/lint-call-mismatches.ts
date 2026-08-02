@@ -65,6 +65,7 @@ import * as path from "path";
 import { fileURLToPath } from "url";
 import { OUTPUT_DIR, PACKAGES, ROOT_DIR } from "./config.js";
 import { reportNonCanonicalBaselines, serializeBaseline } from "./baseline-json.js";
+import { NARROW_DEFAULT_REASON as DEFAULT_REASON } from "./missing-rails-call-tags.js";
 
 const BASELINE_PATH = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -76,10 +77,6 @@ const BASELINE_PATH = path.join(
 // the compare tooling, and gating them would ratchet internal-method bodies
 // that have no Rails public-contract obligation.
 const ARTIFACT_PATH = path.join(OUTPUT_DIR, "call-mismatches.json");
-
-const DEFAULT_REASON =
-  "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet " +
-  "landed; pending per-cluster burndown review.";
 
 // One flagged Ruby body call on a matched pair. The artifact groups several
 // `missing` calls under one (package, rubyName, tsFile) record; the baseline is

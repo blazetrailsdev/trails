@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { DEFAULT_REASON, suppressedCallsIn } from "./missing-rails-call-tags.js";
+import {
+  DEFAULT_REASON,
+  NARROW_DEFAULT_REASON,
+  suppressedCallsIn,
+} from "./missing-rails-call-tags.js";
 import { reconcileFileText } from "./build.js";
 
 const block = (...lines: string[]): string =>
@@ -85,6 +89,12 @@ describe("suppressedCallsIn", () => {
     expect(suppressedCallsIn(block(`@missingRailsCall synchronize — ${DEFAULT_REASON}`))).toEqual(
       [],
     );
+  });
+
+  it("does not treat the narrow baseline's seeded placeholder as a justification", () => {
+    expect(
+      suppressedCallsIn(block(`@missingRailsCall synchronize — ${NARROW_DEFAULT_REASON}`)),
+    ).toEqual([]);
   });
 
   it("treats the placeholder as unjustified even when api:build wrapped it", () => {
