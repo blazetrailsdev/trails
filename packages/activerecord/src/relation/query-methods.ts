@@ -1638,7 +1638,7 @@ function excludingBang(this: QueryMethodsHost, records: any[]): any {
   // marker carries a pk-select subquery only as a `toSql()` display fallback for
   // the (rare) no-load path; eager materialization here would require an async
   // `excluding`, breaking the chainable contract.
-  const attribute = (this._modelClass as any).arelTable.get(pk);
+  const attribute = this.predicateBuilder.table.arelTable.get(pk);
   // Mirror the array handler's `x.is_a?(Base) ? x.id : x` deref.
   const literalIds = literalRecords.map((r) => (isBaseInstance(r) ? (r as any).id : r));
   // Build the positive `IN (subquery)` (Rails builds positively and inverts);
