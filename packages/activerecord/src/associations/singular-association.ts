@@ -396,6 +396,9 @@ async function _findBelongsToTarget(
   }
 
   const ctor = record.constructor as typeof Base;
+  const reflection = ctor._reflectOnAssociation?.(assocName);
+  if (!reflection) throw new AssociationNotFoundError(record, assocName);
+
   // Polymorphic: use the _type column to determine the target model
   let targetModel: typeof Base;
   if (options.polymorphic) {
@@ -420,11 +423,6 @@ async function _findBelongsToTarget(
   // returns associationPrimaryKey (target's PK) and joinForeignKey
   // returns the owner-side FK, so the WHERE shape is identical to
   // the non-polymorphic case.
-  const reflection = ctor._reflectOnAssociation?.(assocName);
-  // Rails constructs an Association from a validated reflection
-  // (association.rb:41-45); a name the model never declared raises from
-  // `association` (associations.rb:56) long before any load runs.
-  if (!reflection) throw new AssociationNotFoundError(record, assocName);
   // Null-FK short-circuit: avoid a query when owner's FK column is null.
   // The check must read the SAME columns the eventual query uses —
   // reflection.joinForeignKey. Reading from a different column would
@@ -543,6 +541,9 @@ async function _findHasOneTarget(
   }
 
   const ctor = record.constructor as typeof Base;
+  const reflection = ctor._reflectOnAssociation?.(assocName);
+  if (!reflection) throw new AssociationNotFoundError(record, assocName);
+
   const className = options.className ?? camelize(assocName);
   const primaryKey = options.primaryKey ?? ctor.primaryKey;
 
@@ -565,7 +566,6 @@ async function _findHasOneTarget(
       // single raise site) so the error carries the Rails-faithful message;
       // a no-op for polymorphic `:as` (Rails permits no composite key there).
       routeThroughCheckValidity(ctor, assocName);
-      // No reflection resolvable — minimal trails-only fallback guard.
       throw new CompositePrimaryKeyMismatchError({
         activeRecord: ctor.name,
         name: assocName,
@@ -578,7 +578,6 @@ async function _findHasOneTarget(
       // single raise site) so the error carries the Rails-faithful message;
       // a no-op for polymorphic `:as` (Rails permits no composite key there).
       routeThroughCheckValidity(ctor, assocName);
-      // No reflection resolvable — minimal trails-only fallback guard.
       throw new CompositePrimaryKeyMismatchError({
         activeRecord: ctor.name,
         name: assocName,
@@ -590,11 +589,6 @@ async function _findHasOneTarget(
   // Route through AssociationScope (handles scalar, composite, :as, STI
   // in a single Rails-faithful path). reflection.isCollection() === false
   // for hasOne, so AssociationScope.scope adds limit(1) automatically.
-  const reflection = ctor._reflectOnAssociation?.(assocName);
-  // Rails constructs an Association from a validated reflection
-  // (association.rb:41-45); a name the model never declared raises from
-  // `association` (associations.rb:56) long before any load runs.
-  if (!reflection) throw new AssociationNotFoundError(record, assocName);
   // Null-PK short-circuit: read the SAME columns the eventual query
   // reads. For non-through, reflection.joinForeignKey is the owner-
   // side activeRecordPrimaryKey for hasOne. For through reflections the
@@ -642,7 +636,10 @@ async function _findHasOneTarget(
  * Loads a singular association's target.
  *
  * Mirrors: ActiveRecord::Associations::SingularAssociation#find_target
- * (`singular_association.rb:47`).
+ * (`singular_association.rb:47`). Like Rails, which builds an `Association`
+ * from a validated reflection (`association.rb:41-45`), an association name the
+ * model never declared raises `AssociationNotFoundError` (`associations.rb:56`)
+ * before any load runs.
  *
  * DEVIATION: Rails' `find_target(async: false)` takes no macro parameter and
  * has no dispatcher layer — it is the loader body itself, and
