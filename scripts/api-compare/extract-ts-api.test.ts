@@ -2366,6 +2366,16 @@ describe("@missingRailsCall extraction", () => {
     expect(cls.instanceMethods[0].missingRailsCalls).toEqual(["synchronize"]);
   });
 
+  it("records a tag written as a one-line comment", () => {
+    const cls = extractFromSource(`
+      export class Foo {
+        /** @missingRailsCall synchronize — trails is single-threaded. */
+        bar(): void {}
+      }
+    `);
+    expect(cls.instanceMethods[0].missingRailsCalls).toEqual(["synchronize"]);
+  });
+
   it("leaves an untagged method's missingRailsCalls undefined", () => {
     const cls = extractFromSource(`
       export class Foo {

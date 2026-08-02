@@ -54,26 +54,51 @@ const TAG_LINE = /^\s*\*?\s*@missingRailsCall\s+(\S+)(?:\s+—\s?(.*))?$/;
 // lines are continuations, not tag boundaries (found by the activerecord-wide
 // run: core.ts initInternals).
 const ANY_TAG_LINE = /^\s*\*?\s?@\S/;
-// A whole JSDoc comment on one line. `TAG_LINE` is end-anchored, so a
-// hand-written `/** @missingRailsCall first — reason */` matched nothing and
-// the tag was a silent no-op in all three consumers at once (RFC 0083).
 const ONE_LINE_COMMENT = /^(\s*)\/\*\*(.*)\*\/\s*$/;
 
-/** Split a one-line JSDoc comment carrying at least one tag into the tag-free
- *  comment (which stays in `rest`, where `renderJsdoc`'s own one-line
- *  normalization re-indents it into block form) and one synthetic line per tag.
- *  Returns null for any other line. */
-function expandOneLineComment(line: string): { rest: string; tags: string[] } | null {
-  const m = line.match(ONE_LINE_COMMENT);
-  if (!m) return null;
-  const [, indent, inner] = m;
-  if (!inner.includes(TAG)) return null;
-  const chunks = inner.split(TAG);
-  const prose = chunks[0].replace(/^\s*\*?\s*/, "").trim();
-  return {
-    rest: `${indent}/**${prose === "" ? " " : ` ${prose} `}*/`,
-    tags: chunks.slice(1).map((chunk) => ` * ${TAG} ${chunk.trim()}`),
-  };
+/** One line of a comment as the parser sees it, carrying the line of the
+ *  SOURCE comment it came from (so an offending tag is reported at the line it
+ *  was written on) and whether the parser synthesized it. */
+interface CommentLine {
+  text: string;
+  sourceIndex: number;
+  /** True for a tag lifted out of a one-line comment. Such an entry keeps no
+   *  verbatim `rawLines`, so `renderEntry` re-wraps it — which is what turns a
+   *  hand-written one-liner into the block form `api:build` emits — and it
+   *  takes no continuation lines, since a one-line comment's reason ends with
+   *  its line and whatever follows the comment is code. */
+  synthetic: boolean;
+}
+
+/** Split a comment into the lines the tag parser walks, lifting the tags out of
+ *  a one-line `/** ... *\/` comment.
+ *
+ *  `TAG_LINE` is anchored at end of line, so before RFC 0083 a hand-written
+ *  `/** @missingRailsCall first — reason *\/` matched nothing: the trailing
+ *  `*\/` is part of the line. The tag was then a silent no-op in all three
+ *  consumers at once. The tag-free remainder stays a one-line comment, which
+ *  `renderJsdoc` already normalizes to block form under the right indent. */
+function toCommentLines(comment: string): CommentLine[] {
+  const lines: CommentLine[] = [];
+  for (const [sourceIndex, text] of comment.split("\n").entries()) {
+    const match = text.match(ONE_LINE_COMMENT);
+    if (!match?.[2].includes(TAG)) {
+      lines.push({ text, sourceIndex, synthetic: false });
+      continue;
+    }
+    const [, indent, inner] = match;
+    const [prose, ...tags] = inner.split(TAG);
+    const stripped = prose.replace(/^\s*\*?\s*/, "").trim();
+    lines.push({
+      text: `${indent}/**${stripped === "" ? "" : ` ${stripped}`} */`,
+      sourceIndex,
+      synthetic: false,
+    });
+    for (const tag of tags) {
+      lines.push({ text: ` * ${TAG} ${tag.trim()}`, sourceIndex, synthetic: true });
+    }
+  }
+  return lines;
 }
 
 /** Parse a JSDoc comment's text (including delimiters) into its non-tag lines
@@ -91,39 +116,21 @@ export function parseJsdoc(
   comment: string,
   origin?: JsdocOrigin,
 ): { rest: string[]; entries: TagEntry[] } {
-  const lines: string[] = [];
-  // Expanded lines can outnumber the source lines, so an offending tag still
-  // reports the file:line it was WRITTEN on, not its position after expansion.
-  const sourceLineOf: number[] = [];
-  // A synthetic tag line carries no verbatim `rawLines`: `renderEntry` re-wraps
-  // it, which is what turns a hand-written one-liner into block form.
-  const synthetic = new Set<number>();
-  for (const [index, line] of comment.split("\n").entries()) {
-    const expanded = expandOneLineComment(line);
-    for (const out of expanded ? [expanded.rest, ...expanded.tags] : [line]) {
-      if (expanded && out !== expanded.rest) synthetic.add(lines.length);
-      lines.push(out);
-      sourceLineOf.push(index);
-    }
-  }
   const rest: string[] = [];
   const entries: TagEntry[] = [];
   const tagLineOf = new Map<TagEntry, number>();
   let open: TagEntry | null = null;
-  for (const [index, line] of lines.entries()) {
+  for (const { text: line, sourceIndex, synthetic } of toCommentLines(comment)) {
     const m = line.match(TAG_LINE);
     if (m) {
       // Trimmed at capture: `TAG_LINE` absorbs only one space after the
       // em-dash, so trailing whitespace would otherwise read as a non-empty
       // reason and slide past the empty-reason gate below. `rawLines` keeps
       // the line verbatim, so idempotency is unaffected.
-      const isSynthetic = synthetic.has(index);
-      open = { call: m[1], reason: (m[2] ?? "").trim(), rawLines: isSynthetic ? [] : [line] };
+      open = { call: m[1], reason: (m[2] ?? "").trim(), rawLines: synthetic ? [] : [line] };
       entries.push(open);
-      tagLineOf.set(open, index);
-      // A one-line comment's reason ends with its line; leaving the entry open
-      // would swallow whatever follows the comment as a continuation.
-      if (isSynthetic) open = null;
+      tagLineOf.set(open, sourceIndex);
+      if (synthetic) open = null;
       continue;
     }
     const closes = line.trim() === "*/" || line.trim().endsWith("*/");
@@ -138,7 +145,7 @@ export function parseJsdoc(
   for (const entry of entries) {
     if (entry.reason !== "") continue;
     const at = origin
-      ? ` ${origin.fileName}:${origin.startLine + (sourceLineOf[tagLineOf.get(entry) ?? 0] ?? 0)}`
+      ? ` ${origin.fileName}:${origin.startLine + (tagLineOf.get(entry) ?? 0)}`
       : "";
     throw new Error(
       `${TAG} needs a reason:${at} — state why the Rails call ` +
