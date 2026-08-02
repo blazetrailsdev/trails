@@ -183,14 +183,18 @@ export class JoinDependency {
     string,
     { aliased: TableRef; effectiveName: string; terminated: boolean }
   > = new Map();
-  constructor(baseModel: typeof Base, joinType?: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin) {
+  constructor(
+    baseModel: typeof Base,
+    joinType?: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin,
+    table?: TableRef,
+  ) {
     this._baseModel = baseModel;
-    this._baseAlias = (baseModel as any).tableName;
+    const baseTable = table ?? (baseModel as any).arelTable;
+    this._baseAlias = baseTable.name ?? (baseModel as any).tableName;
     this._aliasTracker = new AliasTracker(
       this._baseTableAliasLength(),
       new Map([[this._baseAlias, 1]]),
     );
-    const baseTable = (baseModel as any).arelTable;
     this._joinRoot = new JoinBase(baseModel, baseTable);
     this._joinType = joinType ?? Nodes.OuterJoin;
   }

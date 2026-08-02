@@ -264,6 +264,8 @@ export function raiseNotFoundSingle(
 
 interface FinderRelation {
   model: FinderRelation["_modelClass"];
+  /** Rails `attr_reader :table` (relation.rb:71) — the relation's own Arel table. */
+  table: { get(name: string): Nodes.Node };
   /** Rails `delegate :primary_key, to: :model` (delegation.rb:106). */
   primaryKey: string | string[];
   _modelClass: {
@@ -883,7 +885,7 @@ export async function findSome(rel: FinderRelation, ids: unknown[]): Promise<any
   let relation = (rel as any).where({ [pk]: ids });
   // Rails: `relation = relation.select(table[primary_key]) unless select_values.empty?`
   if ((rel as any).selectValues.length > 0) {
-    relation = relation.select((rel as any)._modelClass.arelTable.get(pk));
+    relation = relation.select(rel.table.get(pk));
   }
   const records = await relation.toArray();
 
@@ -914,7 +916,7 @@ export async function findSomeOrdered(rel: FinderRelation, ids: unknown[]): Prom
   relation._limitValue = null;
   relation._offsetValue = null;
   if ((rel as any).selectValues.length > 0) {
-    relation = relation.select((rel.model as any).arelTable.get(pk));
+    relation = relation.select(rel.table.get(pk));
   }
   const records: any[] = await relation.toArray();
 

@@ -352,6 +352,7 @@ function makeFindSomeRel(
   return {
     _modelClass: postModelStub,
     model: postModelStub,
+    table: postModelStub.arelTable,
     primaryKey: postModelStub.primaryKey,
     _limitValue: opts.limit ?? null,
     _offsetValue: opts.offset ?? null,
@@ -407,6 +408,7 @@ describe("findSome — narrows to pk column when select_values non-empty (ordere
     const rel: any = {
       _modelClass: postModelStub,
       model: postModelStub,
+      table: postModelStub.arelTable,
       primaryKey: postModelStub.primaryKey,
       _limitValue: null,
       _offsetValue: null,
@@ -454,6 +456,7 @@ function makeFindSomeOrderedRel(
   return {
     _modelClass: postModelStub,
     model: postModelStub,
+    table: postModelStub.arelTable,
     primaryKey: postModelStub.primaryKey,
     _limitValue: opts.limit ?? null,
     _offsetValue: opts.offset ?? null,

@@ -3849,7 +3849,7 @@ export class Relation<T extends Base> {
     if (this._isEmptyRelation()) return 0;
     await this._materializeDeferredDistinctPkPredicates();
 
-    const table = this._modelClass.arelTable;
+    const table = this.table;
     const updateValues: [InstanceType<typeof Nodes.Node>, unknown][] = this._substituteValues(
       Object.entries(updates),
     );
@@ -3867,7 +3867,7 @@ export class Relation<T extends Base> {
   private async _execUpdateAll(
     updateValues: [Nodes.Node, unknown][] | Nodes.SqlLiteral | Nodes.BoundSqlLiteral,
   ): Promise<number> {
-    const table = this._modelClass.arelTable;
+    const table = this.table;
     const primaryKey = this.primaryKey;
     let stmtAst;
     if (typeof primaryKey === "string" || Array.isArray(primaryKey)) {
@@ -3934,7 +3934,7 @@ export class Relation<T extends Base> {
       throw new ActiveRecordError(`delete_all doesn't support ${invalidMethods.join(", ")}`);
     }
 
-    const table = this._modelClass.arelTable;
+    const table = this.table;
     const primaryKey = this.model.primaryKey;
     let stmtAst;
     if (typeof primaryKey === "string" || Array.isArray(primaryKey)) {
@@ -4751,7 +4751,7 @@ export class Relation<T extends Base> {
             const dir = batchOrders[0][1];
             const first = tuples[0][0];
             const last = tuples[tuples.length - 1][0];
-            const attr = self._modelClass.arelTable.get(col) as any;
+            const attr = self.table.get(col) as any;
             const lo = dir === "desc" ? last : first;
             const hi = dir === "desc" ? first : last;
             batchRel._whereClause.predicates.push(attr.gteq(lo).and(attr.lteq(hi)));
@@ -6081,9 +6081,7 @@ export class Relation<T extends Base> {
       // `updates[attr.name] = _increment_attribute(attr, value)` (relation.rb:930).
       // resolveAliasedColumn bridges a counter cache on an aliased column to the
       // real column (Rails resolves it inside Arel::Table#[]).
-      const attr = this._modelClass.arelTable.get(
-        resolveAliasedColumn(this._modelClass, counterName),
-      );
+      const attr = this.table.get(resolveAliasedColumn(this._modelClass, counterName));
       updates[attr.name] = this._incrementAttribute(attr, value);
     }
 
@@ -6511,7 +6509,7 @@ export class Relation<T extends Base> {
   }
 
   bindAttribute(column: string, value: unknown): unknown {
-    return this.predicateBuilder.build(this._modelClass.arelTable.get(column), value);
+    return this.predicateBuilder.build(this.table.get(column), value);
   }
 
   /**
@@ -7025,7 +7023,7 @@ export class Relation<T extends Base> {
   // Mirrors relation.rb:1381-1393.
   private _substituteValues(values: [string, unknown][]): [any, any][] {
     return values.map(([name, value]) => {
-      const attr = this._modelClass.arelTable.get(name);
+      const attr = this.table.get(name);
       // Mirrors `Arel.arel_node?` (arel.rb): Node, SqlLiteral, or Attribute.
       if (
         value instanceof Nodes.Node ||
@@ -7050,7 +7048,7 @@ export class Relation<T extends Base> {
 
   private _incrementAttribute(attribute: any, value = 1): any {
     const unqual = new Nodes.UnqualifiedColumn(
-      typeof attribute === "string" ? this._modelClass.arelTable.get(attribute) : attribute,
+      typeof attribute === "string" ? this.table.get(attribute) : attribute,
     );
     const coalesced = new Nodes.NamedFunction("COALESCE", [unqual, new Nodes.Quoted(0)]);
     const bind = new Nodes.Quoted(Math.abs(value));
