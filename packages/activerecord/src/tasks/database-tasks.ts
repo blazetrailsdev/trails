@@ -378,9 +378,18 @@ export class DatabaseTasks {
 
   static async migrate(
     version?: number | string,
-    { skipInitialize = false }: { skipInitialize?: boolean } = {},
+    {
+      skipInitialize = false,
+      targetVersion,
+    }: { skipInitialize?: boolean; targetVersion?: number | string | null } = {},
   ): Promise<void> {
-    const raw = version ?? this.targetVersion();
+    // `targetVersion` is the in-process stand-in for Rails' `ENV["VERSION"]`:
+    // the rake task never passes an argument, so `target_version` reads the
+    // env. trails has no env writer (`getEnv` is read-only), so a CLI
+    // `--version` flag has to hand the target down explicitly. It must NOT
+    // travel as `version` — that argument is the exact-version *filter*
+    // (migrate:up semantics), not "migrate up to here".
+    const raw = version ?? targetVersion ?? this.targetVersion();
     const effectiveVersion = typeof raw === "string" ? raw.trim() || null : raw;
     this.checkTargetVersion(effectiveVersion ?? undefined);
 
@@ -452,6 +461,21 @@ export class DatabaseTasks {
   /** @internal Same deviation as {@link rollback}, for `db:forward` (`databases.rake:279`). */
   static async forward(steps: number = 1): Promise<void> {
     await this._stepMigrations("forward", steps);
+  }
+
+  /**
+   * @internal Same deviation as {@link rollback}: `db:migrate:up` /
+   * `db:migrate:down` (`railties/databases.rake:174-177`, `:205-208`) inline
+   * `migration_connection_pool.migration_context.run(direction, target_version)`.
+   * The body lives here because the CLI has no pool handle of its own.
+   */
+  static async runMigration(direction: "up" | "down", version: number | string): Promise<void> {
+    this.checkTargetVersion(version);
+    const pool = await this.migrationConnectionPool();
+    const adapter = await pool.leaseConnection();
+    const context = await this._migrationContextFor(adapter, pool.dbConfig);
+    await context.run(direction, version);
+    adapter.schemaCache?.clear();
   }
 
   private static async _stepMigrations(

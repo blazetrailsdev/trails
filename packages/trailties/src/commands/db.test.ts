@@ -1066,6 +1066,50 @@ export class CreatePosts extends Migration {
     }
   });
 
+  it("db migrate --version migrates up to that version, not only that version", async () => {
+    // Guards the DatabaseTasks.migrate seam: an explicit positional argument
+    // there is an exact-version *filter* (migrate:up semantics), so --version
+    // has to travel as the target version instead. With three migrations and
+    // a target of the second, target semantics runs the first two.
+    const dbFile = path.join(tmpDir, "test.sqlite3");
+    fs.writeFileSync(
+      path.join(tmpDir, "config", "database.ts"),
+      `export default {
+  development: { adapter: "sqlite3", database: ${JSON.stringify(dbFile)} },
+  test: { adapter: "sqlite3", database: ${JSON.stringify(dbFile)} },
+};`,
+    );
+    for (const [version, table, cls] of [
+      ["20260101000000", "posts", "CreatePosts"],
+      ["20260101000001", "comments", "CreateComments"],
+      ["20260101000002", "authors", "CreateAuthors"],
+    ]) {
+      fs.writeFileSync(
+        path.join(tmpDir, "db", "migrations", `${version}-create-${table}.ts`),
+        `import { Migration } from "@blazetrails/activerecord";
+export class ${cls} extends Migration {
+  async up() { await this.createTable(${JSON.stringify(table)}, (t) => { t.string("title"); }); }
+  async down() { await this.dropTable(${JSON.stringify(table)}); }
+}`,
+      );
+    }
+
+    await runDb(["migrate", "--version=20260101000001"]);
+
+    const { BetterSQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
+    const a = new BetterSQLite3Adapter(dbFile);
+    try {
+      const rows = (await a.execute(
+        `SELECT name FROM sqlite_master WHERE type='table' AND name IN ('posts','comments','authors')`,
+      )) as Array<{ name: string }>;
+      const names = rows.map((r) => r.name).sort();
+      expect(names).toEqual(["comments", "posts"]);
+    } finally {
+      await a.close();
+    }
+  });
+
   it("db migrate:down reverts the named migration", async () => {
     const dbFile = path.join(tmpDir, "test.sqlite3");
     fs.writeFileSync(

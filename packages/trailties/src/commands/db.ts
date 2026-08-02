@@ -539,45 +539,6 @@ async function runDrop(opts: DatabaseOpts = {}): Promise<void> {
 }
 
 /**
- * Shared helper for migrate/rollback/forward — discover migrations for
- * the named DB, construct a Migrator, run the caller-provided operation,
- * log output, and dump the schema. Extracts the pattern so the three
- * commands can't drift.
- */
-async function withMigratorForDb(
-  ctx: {
-    adapter: DatabaseAdapter;
-    raw: RawConfig;
-    name: string;
-    prefix: string;
-    config: HashConfig;
-  },
-  operation: (migrator: Migrator) => Promise<void>,
-  opts?: {
-    skipDump?: boolean;
-    /** Called after migration completes — use for messages that
-     *  should appear after the migration output. */
-    afterOutput?: (migrator: Migrator) => void | Promise<void>;
-  },
-): Promise<void> {
-  const mDirs = await migrationsDirsForConfig(ctx.name, ctx.raw);
-  const migrations = await discoverMigrationsFromDirs(mDirs);
-  if (migrations.length === 0) {
-    console.log(`${ctx.prefix}No migrations found.`);
-    return;
-  }
-  const migrator = new Migrator(ctx.adapter, migrations, {
-    environment: ctx.config.envName,
-    internalMetadataEnabled: ctx.config.useMetadataTable,
-  });
-  await withPrefixedStdout(ctx.prefix, async () => {
-    await operation(migrator);
-    if (opts?.afterOutput) await opts.afterOutput(migrator);
-  });
-  if (!opts?.skipDump) await dumpSchemaAfterMigrate(ctx.raw, ctx.config);
-}
-
-/**
  * Migration output goes to stdout (Rails' Migration#write is `puts`), so the
  * per-database prefix is applied by swapping in a stdout-wrapping process
  * adapter for the duration of the run.
@@ -654,16 +615,24 @@ export function dbCommand(): Command {
       // to null so an empty VERSION="" doesn't fail BigInt parsing.
       const rawVersion = opts.version != null ? String(opts.version).trim() : env.VERSION?.trim();
       const targetVersion = rawVersion && rawVersion.length > 0 ? rawVersion : null;
+      // Rails' `db:migrate` is `DatabaseTasks.migrate_all` + `db:_dump`, and
+      // the per-database `db:migrate:<name>` is
+      // `with_temporary_pool_for_each { DatabaseTasks.migrate }` + `db:_dump:<name>`
+      // (`databases.rake:88-92`, `:118-126`). forEachDatabase is the
+      // with_temporary_pool_for_each analogue, so both shapes route through
+      // the per-config task here; that keeps the `[name] ` output prefix and
+      // the per-config dump migrate_all has no seam for.
       await forEachDatabase(opts, async (ctx) => {
-        await withMigratorForDb(
+        await withMigrationTasksForDb(
           ctx,
-          async (migrator) => {
-            await migrator.migrate(targetVersion);
-          },
+          // targetVersion, not the positional argument: an explicit argument to
+          // DatabaseTasks.migrate is an exact-version filter (migrate:up
+          // semantics), whereas --version means "migrate up to this version",
+          // which is what Rails' ENV["VERSION"] does.
+          () => DatabaseTasks.migrate(undefined, { targetVersion }),
           {
-            afterOutput: async (migrator) => {
-              const pending = await migrator.pendingMigrations();
-              if (pending.length === 0) {
+            afterPending: (pending) => {
+              if (pending === 0) {
                 console.log(`${ctx.prefix}All migrations are up to date.`);
               }
             },
@@ -803,12 +772,8 @@ export function dbCommand(): Command {
     .requiredOption("--version <version>", "Migration version to run up")
     .option("--database <name>", "Target a specific named database")
     .action(async (opts) => {
-      await forEachDatabase(opts, async ({ adapter, raw, name, prefix, config }) => {
-        const mDirs = await migrationsDirsForConfig(name, raw);
-        const migrations = await discoverMigrationsFromDirs(mDirs);
-        const migrator = createMigrator(adapter, migrations, raw);
-        await migrator.run("up", opts.version);
-        await dumpSchemaAfterMigrate(raw, config);
+      await forEachDatabase(opts, async (ctx) => {
+        await withMigrationTasksForDb(ctx, () => DatabaseTasks.runMigration("up", opts.version));
       });
     });
 
@@ -818,12 +783,8 @@ export function dbCommand(): Command {
     .requiredOption("--version <version>", "Migration version to run down")
     .option("--database <name>", "Target a specific named database")
     .action(async (opts) => {
-      await forEachDatabase(opts, async ({ adapter, raw, name, prefix, config }) => {
-        const mDirs = await migrationsDirsForConfig(name, raw);
-        const migrations = await discoverMigrationsFromDirs(mDirs);
-        const migrator = createMigrator(adapter, migrations, raw);
-        await migrator.run("down", opts.version);
-        await dumpSchemaAfterMigrate(raw, config);
+      await forEachDatabase(opts, async (ctx) => {
+        await withMigrationTasksForDb(ctx, () => DatabaseTasks.runMigration("down", opts.version));
       });
     });
 
@@ -1035,9 +996,7 @@ export function dbCommand(): Command {
       await runDrop(primary);
       await runCreate(primary);
       await forEachDatabase(primary, async (ctx) => {
-        await withMigratorForDb(ctx, async (migrator) => {
-          await migrator.migrate(null);
-        });
+        await withMigrationTasksForDb(ctx, () => DatabaseTasks.migrate());
         await withSeedAdapter(ctx.adapter, () => runSeed(ctx.prefix));
       });
     });
@@ -1049,9 +1008,7 @@ export function dbCommand(): Command {
       const primary: DatabaseOpts = { database: "primary" };
       await runCreate(primary);
       await forEachDatabase(primary, async (ctx) => {
-        await withMigratorForDb(ctx, async (migrator) => {
-          await migrator.migrate(null);
-        });
+        await withMigrationTasksForDb(ctx, () => DatabaseTasks.migrate());
         await withSeedAdapter(ctx.adapter, () => runSeed(ctx.prefix));
       });
     });
