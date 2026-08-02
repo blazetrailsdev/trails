@@ -770,7 +770,7 @@ async function preloadDestroyInverseBelongsTo(
   if (typeof (target as any).association !== "function") return;
   const ownFk = JSON.stringify((assoc as any).foreignKeyColumns());
 
-  for (const ref of reflectOnAllAssociations(targetCtor)) {
+  for (const ref of reflectOnAllAssociations(targetCtor, "belongsTo")) {
     const concrete = ref as unknown as { name: string; foreignKey: unknown; klass?: typeof Base };
     let fk: unknown;
     let klass: typeof Base | undefined;
