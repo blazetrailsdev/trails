@@ -617,6 +617,22 @@ describe("distinctRelationForPrimaryKey", () => {
   });
 });
 
+describe("unsupported-adapter bodies", () => {
+  it("foreignKeys raises NotImplementedError", async () => {
+    const ss = makeStatements();
+
+    await expect(ss.foreignKeys("astronauts")).rejects.toThrow(
+      new NotImplementedError("foreign_keys is not implemented"),
+    );
+  });
+
+  it("checkConstraints raises NotImplementedError", async () => {
+    const ss = makeStatements();
+
+    await expect(ss.checkConstraints("astronauts")).rejects.toBeInstanceOf(NotImplementedError);
+  });
+});
+
 describe("tableExists NotImplementedError fallback", () => {
   it("returns false for a blank table name without querying", async () => {
     const execute = vi.fn().mockResolvedValue([]);

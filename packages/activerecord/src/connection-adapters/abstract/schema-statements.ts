@@ -1373,11 +1373,9 @@ export class SchemaStatements {
     }
   }
 
-  // Rails raises `NotImplementedError, "foreign_keys is not implemented"` here
-  // (schema_statements.rb:1103). trails' `introspectForeignKeys` is built on the
-  // `[]`; story `converge-schema-statements-not-implemented-bodies` retires it.
   async foreignKeys(_tableName: string): Promise<ForeignKeyDefinition[]> {
-    return [];
+    // @nie disposition=TODO
+    throw new NotImplementedError("foreign_keys is not implemented");
   }
 
   async tables(): Promise<string[]> {
