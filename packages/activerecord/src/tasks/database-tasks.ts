@@ -642,12 +642,7 @@ export class DatabaseTasks {
       try {
         await this.withTemporaryConnection(config, async (adapter) => {
           const context = await this._migrationContextFor(adapter, config);
-          // Rails reads `migration_context.current_environment`, i.e. the global
-          // `DEFAULT_ENV.call` (`database_tasks.rb:638`). trails compares against
-          // the config's own env instead — pinned by
-          // database-tasks-protected-environments-env.trails.test.ts, since
-          // `checkProtectedEnvironmentsBang` takes the environment explicitly.
-          const current = config.envName;
+          const current = context.currentEnvironment;
           const stored = await context.lastStoredEnvironment();
           if (stored && (await context.protectedEnvironment())) {
             throw new ProtectedEnvironmentError(stored);
