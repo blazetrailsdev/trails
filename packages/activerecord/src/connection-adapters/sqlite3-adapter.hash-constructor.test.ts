@@ -42,7 +42,7 @@ describe("SQLite3Adapter hash-only constructor", () => {
 
   it("threads adapter options from the config hash", () => {
     adapter = new BetterSQLite3Adapter({ database: ":memory:", strict: true, statementLimit: 7 });
-    expect(adapter.strictStrings).toBe(true);
+    expect(adapter._strictStrings).toBe(true);
     expect(adapter.statementLimit).toBe(7);
   });
 
@@ -59,6 +59,6 @@ describe("SQLite3Adapter hash-only constructor", () => {
 
   it("still accepts the legacy positional (filename, options) form", () => {
     adapter = new BetterSQLite3Adapter(":memory:", { strict: true });
-    expect(adapter.strictStrings).toBe(true);
+    expect(adapter._strictStrings).toBe(true);
   });
 });

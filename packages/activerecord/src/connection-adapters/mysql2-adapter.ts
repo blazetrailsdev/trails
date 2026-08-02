@@ -89,7 +89,7 @@ class Mysql2StatementPool extends MysqlStatementPool {
     }
   }
 
-  detach(): void {
+  _detach(): void {
     this._conn = null;
   }
 }
@@ -324,7 +324,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       // connected" message is promoted to ConnectionNotEstablished;
       // everything else in this family is ConnectionFailed.
       const msg = (e as Error).message;
-      if (AbstractMysqlAdapter.isClientNotConnected(e)) {
+      if (/MySQL client is not connected/i.test(msg)) {
         return new ConnectionNotEstablished(msg, { cause: e });
       }
       return new ConnectionFailed(msg, { sql, binds, cause: e });
@@ -1652,7 +1652,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   private _closeRawHandle(): void {
     this._inTransaction = false;
     this._connectionConfigured = false;
-    this._statementPool?.detach();
+    this._statementPool?._detach();
     this._statementPool = null;
     if (this._client) {
       // Chain onto any in-flight teardown so repeated disconnect/reconnect
@@ -1687,7 +1687,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     super.discardBang();
     this._inTransaction = false;
     this._connectionConfigured = false;
-    this._statementPool?.detach();
+    this._statementPool?._detach();
     this._statementPool = null;
     // Safe to read `_client` after `super.discardBang()` — unlike
     // `disconnectBang`, the base `discardBang` (abstract-adapter.ts) is a true
@@ -1708,7 +1708,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     this._connectGeneration++;
     this._inTransaction = false;
     this._connectionConfigured = false;
-    this._statementPool?.detach();
+    this._statementPool?._detach();
     this._statementPool = null;
     if (this._client) {
       await this._client.end();

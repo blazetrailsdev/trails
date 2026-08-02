@@ -81,7 +81,7 @@ interface PgSchemaAdapter {
     name?: string;
   }): Type;
   reloadTypeMap(): Promise<void>;
-  serialFromDefaultFunction(
+  _serialFromDefaultFunction(
     tableName: string,
     columnName: string,
     defaultFunction: string | null,
@@ -682,7 +682,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
       const defaultFunction = attgenerated
         ? rawDefault
         : this.pg.extractDefaultFunction(defaultValue, rawDefault);
-      const isSerial = this.pg.serialFromDefaultFunction(
+      const isSerial = this.pg._serialFromDefaultFunction(
         tableName,
         r.name as string,
         defaultFunction,
@@ -1860,10 +1860,6 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     return `${tbl}_${col}_${suffix}`;
   }
 
-  async setPkSequence(tableName: string, value: number): Promise<void> {
-    await this.setPkSequenceBang(tableName, value);
-  }
-
   async setPkSequenceBang(tableName: string, value: number): Promise<void> {
     const result = await this.pkAndSequenceFor(tableName);
     const [pk, seq] = result ?? [null, null];
@@ -1874,10 +1870,6 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     } else {
       this.pg.logger?.warn?.(`${tableName} has primary key ${pk} with no default sequence.`);
     }
-  }
-
-  async resetPkSequence(tableName: string): Promise<void> {
-    await this.resetPkSequenceBang(tableName);
   }
 
   async resetPkSequenceBang(

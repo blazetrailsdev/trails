@@ -152,7 +152,6 @@ const ER_LOCK_WAIT_TIMEOUT = 1205;
 const ER_QUERY_INTERRUPTED = 1317;
 const ER_QUERY_TIMEOUT = 3024;
 const ER_FILSORT_ABORT = 1028;
-const ER_TABLE_EXISTS = 1050;
 const ER_DB_CREATE_EXISTS = 1007;
 const ER_SERVER_SHUTDOWN = 1053;
 const ER_CONNECTION_KILLED = 1927;
@@ -1004,10 +1003,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return new CreateIndexDefinition(idx, false, algorithmClause);
   }
 
-  addSqlComment(sql: string, comment: string): string {
-    return `${sql} /* ${comment.replace(/\*\//g, "* /")} */`;
-  }
-
   addSqlCommentBang(sql: string, comment: string): string {
     if (comment) return `${sql} COMMENT ${this.quote(comment)}`;
     return sql;
@@ -1138,38 +1133,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
       if (e instanceof StatementInvalid) return null;
       throw e;
     }
-  }
-
-  /**
-   * Set a MySQL session variable to the given value.
-   * Emits `SET SESSION <name> = <quoted value>` against the active connection.
-   * Pass the symbol `"DEFAULT"` (case-insensitive) or the value `null` to
-   * restore the variable to its default. Identifier is validated against
-   * MySQL variable-name characters before interpolation.
-   *
-   * trails-only helper — Rails inlines this in `configure_connection`
-   * via the `variables:` pool-init shape. Exposed here as a cheaper
-   * alternative when callers just need to flip a session flag mid-test
-   * (e.g. `sql_mode`) without rebuilding the pool.
-   *
-   * Caveat: this SETs the variable on whichever pool connection happens
-   * to be checked out, then releases it. Subsequent calls may land on a
-   * different connection where the variable is unchanged. Callers must
-   * pin to a single connection (e.g. `connectionLimit: 1` or an active
-   * transaction) for the variable to be observed across calls. For
-   * pool-wide configuration, use the `variables:` pool-init option.
-   *
-   * @internal
-   */
-  async setSessionVariable(name: string, value: unknown): Promise<void> {
-    if (!/^\w+$/.test(name)) {
-      throw new Error(`setSessionVariable: invalid variable name ${name}`);
-    }
-    const quotedValue =
-      value === null || (typeof value === "string" && value.toUpperCase() === "DEFAULT")
-        ? "DEFAULT"
-        : this.quote(value);
-    await this._execMutation(`SET SESSION ${name} = ${quotedValue}`);
   }
 
   async primaryKeys(tableName: string): Promise<string[]> {
@@ -1432,34 +1395,12 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   static readonly ER_QUERY_INTERRUPTED = ER_QUERY_INTERRUPTED;
   static readonly ER_QUERY_TIMEOUT = ER_QUERY_TIMEOUT;
   static readonly ER_FILSORT_ABORT = ER_FILSORT_ABORT;
-  static readonly ER_TABLE_EXISTS = ER_TABLE_EXISTS;
   static readonly ER_DB_CREATE_EXISTS = ER_DB_CREATE_EXISTS;
   static readonly ER_SERVER_SHUTDOWN = ER_SERVER_SHUTDOWN;
   static readonly ER_CONNECTION_KILLED = ER_CONNECTION_KILLED;
   static readonly CR_SERVER_GONE_ERROR = CR_SERVER_GONE_ERROR;
   static readonly CR_SERVER_LOST = CR_SERVER_LOST;
   static readonly ER_CLIENT_INTERACTION_TIMEOUT = ER_CLIENT_INTERACTION_TIMEOUT;
-
-  /**
-   * Mirrors the message regex Rails' `Mysql2Adapter#translate_exception`
-   * uses to distinguish `ConnectionNotEstablished` from `ConnectionFailed`
-   * when a `Mysql2::Error::ConnectionError` arrives. Centralized so the
-   * abstract `when nil` branch and the Mysql2Adapter `ConnectionError`
-   * branch cannot drift if mysql2 changes the wording.
-   * @internal
-   */
-  static readonly CLIENT_NOT_CONNECTED_RE = /MySQL client is not connected/i;
-
-  /**
-   * Predicate form of {@link CLIENT_NOT_CONNECTED_RE}. Single point of truth
-   * shared by the abstract `when nil` branch and the `Mysql2Adapter`
-   * `ConnectionError` branch so they cannot drift.
-   * @internal
-   */
-  static isClientNotConnected(e: unknown): boolean {
-    const msg = e instanceof Error ? e.message : typeof e === "string" ? e : "";
-    return AbstractMysqlAdapter.CLIENT_NOT_CONNECTED_RE.test(msg);
-  }
 
   /**
    * Boolean MySQL EXPLAIN flags. MySQL 8.0.18+ supports `EXPLAIN
@@ -1675,7 +1616,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
       // errno (e.g. node-mysql2 surfacing a closed-socket failure as a
       // generic Error) get promoted to ConnectionNotEstablished when the
       // message indicates the client lost the server handshake.
-      if (AbstractMysqlAdapter.isClientNotConnected(e)) {
+      if (/MySQL client is not connected/i.test(msg)) {
         return new ConnectionNotEstablished(msg, { cause });
       }
     }
