@@ -62,9 +62,6 @@ describe("SchemaCacheIndexDefinitionRoundTripTest", () => {
     ];
     const [loaded] = await roundTrip(live);
 
-    // `opclasses` collapses to the bare scalar both columns share, `orders`
-    // and `lengths` stay per-column — the loaded index must land on the same
-    // side of `conciseOptions` as the live one.
     expect(loaded.columnOptions()).toEqual(live[0].columnOptions());
     expect(loaded.opclasses).toBe("text_pattern_ops");
     expect(loaded.where).toBe("deleted_at IS NULL");
