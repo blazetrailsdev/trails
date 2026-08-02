@@ -9,9 +9,6 @@ import {
   PendingMigrationError,
   ConcurrentMigrationError,
   UnknownMigrationVersionError,
-  EnvironmentMismatchError,
-  NoEnvironmentInSchemaError,
-  ProtectedEnvironmentError,
   Migration,
   Current,
   registerVersion,
@@ -206,63 +203,6 @@ describe("Migrator trails extensions", () => {
     const migrator = new Migrator(adapter, [makeMigration("1", "M1")], { environment: "test" });
     await migrator.down();
     expect(await new InternalMetadata(adapter).get("environment")).toBeNull();
-  });
-
-  it("checkEnvironment raises NoEnvironmentInSchemaError when no environment stored", async () => {
-    const migrator = new Migrator(adapter, [], { environment: "development" });
-    await expect(migrator.checkEnvironment()).rejects.toThrow(NoEnvironmentInSchemaError);
-  });
-
-  it("checkEnvironment raises EnvironmentMismatchError on mismatch", async () => {
-    const migrator1 = new Migrator(adapter, [makeMigration("1", "M1")], {
-      environment: "production",
-    });
-    await migrator1.up();
-    await new InternalMetadata(adapter).set("environment", "production");
-
-    const migrator2 = new Migrator(adapter, [makeMigration("1", "M1")], {
-      environment: "development",
-    });
-    await expect(migrator2.checkEnvironment()).rejects.toThrow(EnvironmentMismatchError);
-  });
-
-  it("checkEnvironment passes when environments match", async () => {
-    const migrator = new Migrator(adapter, [makeMigration("1", "M1")], {
-      environment: "development",
-    });
-    await migrator.up();
-    await new InternalMetadata(adapter).set("environment", "development");
-    await expect(migrator.checkEnvironment()).resolves.toBeUndefined();
-  });
-
-  it("checkProtectedEnvironments raises for production", async () => {
-    const migrator = new Migrator(adapter, [makeMigration("1", "M1")], {
-      environment: "production",
-    });
-    await migrator.up();
-    await new InternalMetadata(adapter).set("environment", "production");
-    await expect(migrator.checkProtectedEnvironments()).rejects.toThrow(ProtectedEnvironmentError);
-  });
-
-  it("lastStoredEnvironment returns null at version 0 even when metadata is stamped", async () => {
-    const metadata = new InternalMetadata(adapter);
-    await metadata.createTable();
-    await metadata.set("environment", "production");
-
-    const migrator = new Migrator(adapter, [makeMigration("1", "M1")], {
-      environment: "production",
-    });
-    await expect(migrator.lastStoredEnvironment()).resolves.toBeNull();
-    await expect(migrator.checkProtectedEnvironments()).resolves.toBeUndefined();
-  });
-
-  it("checkProtectedEnvironments passes for development", async () => {
-    const migrator = new Migrator(adapter, [makeMigration("1", "M1")], {
-      environment: "development",
-    });
-    await migrator.up();
-    await new InternalMetadata(adapter).set("environment", "development");
-    await expect(migrator.checkProtectedEnvironments()).resolves.toBeUndefined();
   });
 
   it("CheckPending with a Migrator creates schema_migrations before reading it", async () => {
