@@ -156,6 +156,8 @@ export type OrderArg =
 // Uses TS `private` keyword fields which are accessible at runtime.
 // ---------------------------------------------------------------------------
 interface QueryMethodsHost {
+  /** Rails `delegate :primary_key, to: :model` (delegation.rb:106). */
+  primaryKey: string | string[];
   _whereClause: WhereClause;
   _orderClauses: Array<string | [string, "asc" | "desc"] | Nodes.Node>;
   _rawOrderClauses: string[];
@@ -1573,7 +1575,7 @@ function uniqBang(this: QueryMethodsHost, name?: string): any {
 }
 
 function excludingBang(this: QueryMethodsHost, records: any[]): any {
-  const primaryKey = this._modelClass.primaryKey;
+  const primaryKey = this.primaryKey;
   if (Array.isArray(primaryKey)) {
     throw new Error("excluding does not support models with composite primary keys");
   }

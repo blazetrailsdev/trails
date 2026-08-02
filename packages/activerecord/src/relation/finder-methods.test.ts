@@ -352,6 +352,7 @@ function makeFindSomeRel(
   return {
     _modelClass: postModelStub,
     model: postModelStub,
+    primaryKey: postModelStub.primaryKey,
     _limitValue: opts.limit ?? null,
     _offsetValue: opts.offset ?? null,
     // ordered=true simulates a relation with ORDER BY (findSome stays in the accounting path)
@@ -406,6 +407,7 @@ describe("findSome — narrows to pk column when select_values non-empty (ordere
     const rel: any = {
       _modelClass: postModelStub,
       model: postModelStub,
+      primaryKey: postModelStub.primaryKey,
       _limitValue: null,
       _offsetValue: null,
       _orderClauses: ["id ASC"],
@@ -452,6 +454,7 @@ function makeFindSomeOrderedRel(
   return {
     _modelClass: postModelStub,
     model: postModelStub,
+    primaryKey: postModelStub.primaryKey,
     _limitValue: opts.limit ?? null,
     _offsetValue: opts.offset ?? null,
     _orderClauses: [],
@@ -586,7 +589,7 @@ function makeRelForOrder(mc: {
   implicitOrderColumn?: string | null;
   _queryConstraintsList?: string[] | null;
 }): any {
-  return { _modelClass: mc, model: mc };
+  return { _modelClass: mc, model: mc, primaryKey: mc.primaryKey };
 }
 
 describe("_orderColumns — Rails _order_columns precedence", () => {
@@ -631,6 +634,7 @@ describe("finder not-found message fidelity", () => {
     const rel: any = {
       _modelClass: carModelStub,
       model: carModelStub,
+      primaryKey: carModelStub.primaryKey,
       raiseRecordNotFoundExceptionBang,
       _whereClause: { isEmpty: () => true },
       findBy: async () => null,
@@ -652,6 +656,7 @@ describe("finder not-found message fidelity", () => {
     const rel: any = {
       _modelClass: mercedesModelStub,
       model: mercedesModelStub,
+      primaryKey: mercedesModelStub.primaryKey,
       _limitValue: null,
       _offsetValue: null,
       selectValues: [],

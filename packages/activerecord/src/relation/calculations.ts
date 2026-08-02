@@ -62,6 +62,8 @@ interface CalculationConnection {
 
 interface CalculationRelation {
   model: CalculationRelation["_modelClass"];
+  /** Rails `delegate :primary_key, to: :model` (delegation.rb:106). */
+  primaryKey: string | string[];
   _modelClass: {
     arelTable: any;
     primaryKey: string | string[];
@@ -764,8 +766,8 @@ export async function performCount(
   // grouped calculation — groupedAggregate has no hasInclude guard.
   if (this._groupColumns.length > 0 && hasInclude(this, column ?? null)) {
     // CPK + grouped eagerLoad not yet supported; fall through to plain groupedAggregate.
-    if (!Array.isArray(this._modelClass.primaryKey)) {
-      const pk = this._modelClass.primaryKey;
+    if (!Array.isArray(this.model.primaryKey)) {
+      const pk = this.model.primaryKey;
       // Mirror `calculate` (calculations.rb:217-238): apply the eager join then
       // dispatch to the grouped calculation. The eager associations stay on the
       // relation so `groupedAggregate` folds them through the shared
@@ -803,7 +805,7 @@ export async function performCount(
     // nodes in place, so the id and count queries cannot share one instance.
     const eagerJoined = (): CalculationRelation => eagerJoinedRelation(this, false);
     if (eagerJoined() !== this) {
-      const pk = this._modelClass.primaryKey;
+      const pk = this.model.primaryKey;
       if (!Array.isArray(pk)) {
         const table = this._modelClass.arelTable;
         if (this._limitValue !== null || this._offsetValue !== null) {
@@ -1154,7 +1156,7 @@ export async function performCount(
   }
 
   if (this._isDistinct) {
-    const pk = this._modelClass.primaryKey;
+    const pk = this.primaryKey;
     if (Array.isArray(pk)) {
       // Multi-column DISTINCT COUNT requires a subquery since
       // COUNT(DISTINCT col1, col2) isn't valid on SQLite/PG

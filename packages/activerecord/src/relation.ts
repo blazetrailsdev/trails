@@ -3866,7 +3866,7 @@ export class Relation<T extends Base> {
     updateValues: [Nodes.Node, unknown][] | Nodes.SqlLiteral | Nodes.BoundSqlLiteral,
   ): Promise<number> {
     const table = this._modelClass.arelTable;
-    const primaryKey = this._modelClass.primaryKey;
+    const primaryKey = this.primaryKey;
     let stmtAst;
     if (typeof primaryKey === "string" || Array.isArray(primaryKey)) {
       const arel = this._eagerLoadingForSql()
@@ -4654,7 +4654,7 @@ export class Relation<T extends Base> {
     useRanges?: boolean | null;
   } = {}): BatchEnumerator<LoadedRelation<Relation<T>>> {
     const self = this;
-    const pk = this._modelClass.primaryKey;
+    const pk = this.primaryKey;
     const effectiveCursor = cursor ?? pk;
     const cursorArr = Array.isArray(effectiveCursor) ? effectiveCursor : [effectiveCursor];
     _ensureValidOptionsForBatchingBang(cursorArr, start, finish, (order ?? "asc") as any);
@@ -4667,7 +4667,7 @@ export class Relation<T extends Base> {
       if (!cursorIncludesPk) {
         const cache = self._modelClass.schemaCache();
         const pool = self._modelClass.connectionPool();
-        const idxs = (await cache.indexes(pool, self._modelClass.tableName)) as Array<{
+        const idxs = (await cache.indexes(pool, self.tableName)) as Array<{
           unique: boolean;
           where?: string | null;
           columns: string[];
