@@ -12,7 +12,6 @@ import type { ColumnJSON } from "./column.js";
 import { Column as MysqlColumn } from "./mysql/column.js";
 import { isSchemaCacheIgnoredTable } from "../ar-config.js";
 import { StatementInvalid } from "../errors.js";
-import { NullPool } from "./abstract/connection-pool.js";
 import { IndexDefinition } from "./abstract/schema-definitions.js";
 
 // ---------------------------------------------------------------------------
@@ -303,12 +302,6 @@ export class SchemaCache {
     if (this._columns.has(tableName)) {
       return this._columns.get(tableName);
     }
-
-    // Null-pool guard: a caller may pass `null` (or the NullPool a standalone
-    // adapter carries) to consult only the warm cache. Neither can yield a
-    // connection, so return undefined and let the caller fall back to the
-    // schema-less NullColumn shape.
-    if (pool == null || pool instanceof NullPool) return undefined;
 
     return withConnection(pool, async (connection) => {
       if (typeof connection.columns === "function") {
