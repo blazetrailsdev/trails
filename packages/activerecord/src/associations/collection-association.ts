@@ -362,8 +362,6 @@ export class CollectionAssociation extends Association {
     const scope = this.scope();
 
     if (this.reflection.options.inverseOf && this.isLoaded()) {
-      // Ruby's `Array#flatten` is recursive, so `find([[id]])` collapses to a
-      // single scannable id (collection_association.rb:96).
       const argsFlatten = (args as any[]).flat(Infinity);
       const model = scope.model;
 
