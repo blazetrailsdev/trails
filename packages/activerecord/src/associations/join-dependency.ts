@@ -1238,9 +1238,6 @@ export class JoinDependency {
         if (value != null) JoinDependency.walkTree(value, hash[key]);
       }
     } else {
-      // Mirrors Rails' `raise ConfigurationError, associations.inspect`
-      // (join_dependency.rb:66) for a spec that is none of Symbol/String/
-      // Array/Hash.
       let desc: string;
       try {
         desc = JSON.stringify(associations) ?? String(associations);

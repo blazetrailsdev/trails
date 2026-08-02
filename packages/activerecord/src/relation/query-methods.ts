@@ -1650,16 +1650,16 @@ function excludingBang(this: QueryMethodsHost, records: any[]): any {
   return this;
 }
 
-/** @internal */
+/**
+ * Mirrors: ActiveRecord::QueryMethods#construct_join_dependency
+ * (query_methods.rb:1598).
+ * @internal
+ */
 export function constructJoinDependency(
   this: QueryMethodsHost,
   associations: string | AssociationSpec[],
   joinType?: unknown,
 ): JoinDependency {
-  // Mirrors: ActiveRecord::QueryMethods#construct_join_dependency
-  // (query_methods.rb:1598). The join type (InnerJoin for joins(), OuterJoin
-  // for eager_load/left_outer_joins) is threaded into the JoinDependency so
-  // joinConstraints emits the requested join.
   return new JoinDependency(
     this.model,
     this.table,
