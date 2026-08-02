@@ -1,4 +1,5 @@
 import ts from "typescript";
+import { methodNameCandidates, rubyFileToTs } from "./naming.js";
 
 export interface ScoreEntry {
   name: string;
@@ -23,6 +24,66 @@ export interface GlobalPortIndex {
 
 export interface PortIndex {
   byName: Map<string, ts.FunctionLikeDeclaration>;
+}
+
+/**
+ * Which port file each Rails method name is already claimed by: `name` →
+ * the port twins of every Rails file that defines a method of that name.
+ *
+ * The cross-file fallback exists for methods ported *away* from their twin
+ * file, but a same-named method in another file is usually not that — it is
+ * another Rails class' own method, sitting in its own twin. `SchemaCache`
+ * defines `initialize_dup` just as `Associations` does; without ownership the
+ * scorer resolved `associations.rb::initializeDup` to schema-cache.ts and
+ * reported an unrelated body as a divergence.
+ *
+ * A def can never be blocked from its own twin: {@link resolvePortFn} searches
+ * the twin's index first and only falls back cross-file when that misses, so a
+ * hit the source file itself owns is already resolved by then.
+ */
+export interface PortOwnership {
+  claimedBy: Map<string, Set<string>>;
+}
+
+/**
+ * Every `def name` in a Rails source, under every TS spelling it may be ported
+ * as. A predicate like `has_one?` is legitimately `hasOne` or `isHasOne`, and
+ * {@link resolvePortFn} tries both when resolving — so ownership has to claim
+ * both, or the fallback spelling slips past the guard.
+ */
+function rubyDefNames(source: string): string[] {
+  const out: string[] = [];
+  const re = /^\s*def\s+(?:self\.)?([A-Za-z_][A-Za-z0-9_]*[?!=]?)/gm;
+  let m;
+  while ((m = re.exec(source))) out.push(...methodNameCandidates(m[1]));
+  return out;
+}
+
+/**
+ * Build the ownership index from Rails sources. Method names come from a `def`
+ * scan, which trusts the vendored lib to declare its methods at statement
+ * position — a heredoc line starting `def foo` would claim a name spuriously.
+ */
+export function buildPortOwnership(rubyFiles: { path: string; source: string }[]): PortOwnership {
+  const claimedBy = new Map<string, Set<string>>();
+  for (const { path: rubyPath, source } of rubyFiles) {
+    const portPath = rubyFileToTs(rubyPath.replace(/^active_record\//, ""));
+    for (const name of rubyDefNames(source)) {
+      const set = claimedBy.get(name) ?? new Set<string>();
+      set.add(portPath);
+      claimedBy.set(name, set);
+    }
+  }
+  return { claimedBy };
+}
+
+/**
+ * A cross-file hit is borrowable unless the file that holds it is the twin of a
+ * Rails file that defines the same method itself.
+ */
+function isBorrowable(name: string, file: string, ownership?: PortOwnership): boolean {
+  const owners = ownership?.claimedBy.get(name);
+  return !owners || !owners.has(file);
 }
 
 /**
@@ -297,6 +358,7 @@ export function scoreFile(
   portSource: string,
   cleanDefs: ReadonlySet<string>,
   globalIndex?: GlobalPortIndex,
+  ownership?: PortOwnership,
 ): FileScore {
   const genSf = ts.createSourceFile(
     "gen.js",
@@ -321,7 +383,7 @@ export function scoreFile(
   const entries: ScoreEntry[] = [];
   for (const [name, fn] of genFns) {
     if (!cleanDefs.has(name)) continue;
-    const resolved = resolvePortFn(name, fn, port, globalIndex);
+    const resolved = resolvePortFn(name, fn, port, globalIndex, ownership);
     if (!resolved) {
       entries.push({ name, status: "missing" });
       continue;
@@ -389,6 +451,7 @@ export function resolvePortFn(
   genFn: ts.FunctionLikeDeclaration,
   port: PortIndex,
   globalIndex?: GlobalPortIndex,
+  ownership?: PortOwnership,
 ): { fn: ts.FunctionLikeDeclaration; file?: string } | undefined {
   const candidates = nameCandidates(name);
   for (let i = 0; i < candidates.length; i++) {
@@ -403,8 +466,14 @@ export function resolvePortFn(
   if (globalIndex) {
     for (let i = 0; i < candidates.length; i++) {
       const hits = globalIndex.byName.get(candidates[i]) ?? [];
-      // Only an unambiguous cross-file hit counts; collisions stay missing.
-      if (hits.length === 1 && (i === 0 || paramCount(hits[0].fn) === paramCount(genFn))) {
+      // Only an unambiguous cross-file hit counts; collisions stay missing, and
+      // a hit owned by another Rails file's twin is that file's method, not a
+      // relocated port of this one.
+      if (
+        hits.length === 1 &&
+        isBorrowable(candidates[i], hits[0].file, ownership) &&
+        (i === 0 || paramCount(hits[0].fn) === paramCount(genFn))
+      ) {
         return hits[0];
       }
     }

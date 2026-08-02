@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { indexPortFile, indexPortTree, scoreFile, nameCandidates } from "./score.js";
+import {
+  buildPortOwnership,
+  indexPortFile,
+  indexPortTree,
+  scoreFile,
+  nameCandidates,
+} from "./score.js";
 import { generateFromSource } from "./index.js";
 import { TOPLEVEL } from "./codegen.js";
 
@@ -337,6 +343,85 @@ describe("prism-codegen scorer", () => {
     );
     expect(score.entries).toEqual([
       expect.objectContaining({ name: "findKey", status: "matched" }),
+    ]);
+  });
+  it("does not borrow a cross-file symbol another Rails file's twin owns", () => {
+    // associations.rb and connection_adapters/schema_cache.rb both define
+    // `initialize_dup`; only the latter is ported, in its own twin. Without
+    // ownership the scorer read SchemaCache's body as Associations' divergence.
+    const globalIndex = indexPortTree([
+      { path: "associations.ts", source: `export function associationCached() { return 1; }` },
+      {
+        path: "connection-adapters/schema-cache.ts",
+        source: `export class SchemaCache {
+          initializeDup() { return new SchemaCache(this.columns); }
+        }`,
+      },
+    ]);
+    const ownership = buildPortOwnership([
+      { path: "active_record/associations.rb", source: "def initialize_dup(*)\nend\n" },
+      {
+        path: "active_record/connection_adapters/schema_cache.rb",
+        source: "def initialize_dup(other)\nend\n",
+      },
+    ]);
+    const gen = `function initializeDup() { this.associationCache(); }`;
+
+    const borrowed = scoreFile(gen, "", new Set(["initializeDup"]), globalIndex);
+    expect(borrowed.entries).toEqual([
+      expect.objectContaining({
+        name: "initializeDup",
+        status: "divergent",
+        portFile: "connection-adapters/schema-cache.ts",
+      }),
+    ]);
+
+    const owned = scoreFile(gen, "", new Set(["initializeDup"]), globalIndex, ownership);
+    expect(owned.entries).toEqual([{ name: "initializeDup", status: "missing" }]);
+  });
+
+  it("claims a Rails def under the TS spelling of its own nested twin", () => {
+    const ownership = buildPortOwnership([
+      {
+        path: "active_record/connection_adapters/schema_cache.rb",
+        source: "  def initialize_dup(other)\n  end\n  def data_source_exists?(name)\n  end\n",
+      },
+    ]);
+    expect(ownership.claimedBy.get("initializeDup")).toEqual(
+      new Set(["connection-adapters/schema-cache.ts"]),
+    );
+    expect(ownership.claimedBy.get("isDataSourceExists")).toEqual(
+      new Set(["connection-adapters/schema-cache.ts"]),
+    );
+  });
+
+  it("claims both spellings of an already-predicate Ruby name", () => {
+    // `has_one?` ports as `hasOne` or the disambiguating `isHasOne`; the
+    // resolver tries both candidates, so ownership has to claim both.
+    const ownership = buildPortOwnership([
+      { path: "active_record/reflection.rb", source: "  def has_one?\n  end\n" },
+    ]);
+    expect(ownership.claimedBy.get("hasOne")).toEqual(new Set(["reflection.ts"]));
+    expect(ownership.claimedBy.get("isHasOne")).toEqual(new Set(["reflection.ts"]));
+  });
+
+  it("still borrows a cross-file symbol no other Rails file claims", () => {
+    const globalIndex = indexPortTree([
+      { path: "base.ts", source: `export function ensureProperType() { this.writeAttribute(); }` },
+    ]);
+    const ownership = buildPortOwnership([
+      { path: "active_record/inheritance.rb", source: "def ensure_proper_type\nend\n" },
+      { path: "active_record/base.rb", source: "class Base\nend\n" },
+    ]);
+    const score = scoreFile(
+      `function ensureProperType() { this.writeAttribute(); }`,
+      "",
+      new Set(["ensureProperType"]),
+      globalIndex,
+      ownership,
+    );
+    expect(score.entries).toEqual([
+      expect.objectContaining({ name: "ensureProperType", status: "matched", portFile: "base.ts" }),
     ]);
   });
 });

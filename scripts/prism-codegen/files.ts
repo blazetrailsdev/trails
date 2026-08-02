@@ -87,6 +87,10 @@ export const RELATION_DELEGATION_SOURCE = "active_record/relation/delegation.rb"
 export function inheritsRelationDelegation(ruby: string): boolean {
   return ruby === "active_record/relation.rb" || ruby.startsWith("active_record/relation/");
 }
+/** `.../activerecord/lib/active_record` — the root every `active_record/…` path hangs off. */
+export function railsLibRoot(): string {
+  return AR_ROOT;
+}
 export function railsLibRelPaths(): string[] {
   return TARGET_FILES.map((f) => f.ruby);
 }

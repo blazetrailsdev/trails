@@ -11,6 +11,7 @@ import {
   TARGET_FILES,
   TRAILS_AR_SRC,
   portTreeFiles,
+  railsLibRoot,
   rubyAbsPath,
   rubyAbsPathFor,
 } from "./files.js";
@@ -30,7 +31,7 @@ import {
   targetLinearization,
 } from "./golden.js";
 import { rubyFileToTs } from "./naming.js";
-import { scoreFile, indexPortTree, type ScoreEntry } from "./score.js";
+import { buildPortOwnership, scoreFile, indexPortTree, type ScoreEntry } from "./score.js";
 import {
   buildCatalog,
   catalogueDivergent,
@@ -57,6 +58,26 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const API_COMPARE = path.join(HERE, "..", "api-compare");
 const BASELINE_PATH = path.join(HERE, "convergence-baseline.json");
 const SIGNOFF_PATH = path.join(HERE, "convergence-signoff.json");
+
+/** Every Rails AR source, keyed `active_record/<rel>` — the ownership index's input. */
+async function railsLibFiles(): Promise<{ path: string; source: string }[]> {
+  const root = railsLibRoot();
+  const out: { path: string; source: string }[] = [];
+  const walk = async (dir: string) => {
+    for (const entry of await fs.readdir(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) await walk(full);
+      else if (entry.name.endsWith(".rb")) {
+        out.push({
+          path: path.join("active_record", path.relative(root, full)),
+          source: await fs.readFile(full, "utf8"),
+        });
+      }
+    }
+  };
+  await walk(root);
+  return out;
+}
 
 async function listJsonFiles(dir: string): Promise<string[]> {
   const out: string[] = [];
@@ -175,6 +196,7 @@ async function main() {
   const guard = process.argv.includes("--guard") || write;
   const portFiles = portTreeFiles();
   const globalIndex = indexPortTree(portFiles);
+  const ownership = buildPortOwnership(await railsLibFiles());
   const asyncManifest = buildAsyncManifest(portFiles);
   const catalog = buildCatalog(await loadExcludes(), "activerecord");
   let totMatched = 0;
@@ -212,7 +234,13 @@ async function main() {
     const cleanDefs = new Set(
       [...perDef].filter(([n, d]) => n !== TOPLEVEL && d.passthrough === 0).map(([n]) => n),
     );
-    const score = scoreFile(code, readFileSync(portPath, "utf8"), cleanDefs, globalIndex);
+    const score = scoreFile(
+      code,
+      readFileSync(portPath, "utf8"),
+      cleanDefs,
+      globalIndex,
+      ownership,
+    );
     totMatched += score.matched;
     totReordered += score.reordered;
     totDivergent += score.divergent;
