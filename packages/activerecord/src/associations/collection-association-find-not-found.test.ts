@@ -60,6 +60,19 @@ describe("CollectionAssociation#find not-found on the loaded inverse_of path", (
     expect(error.message).toContain("(found 0 results, but was looking for 2)");
   });
 
+  it("wraps the single-id result when the first argument is an array", async () => {
+    const firm = (await Firm.find(companies("first_firm").id)) as Base;
+    const clients = await internals(firm).clientsOfFirm.load();
+    const assoc = internals(firm)._associationInstances.get("clientsOfFirm")!;
+    const id = (clients[0] as unknown as { _readAttribute(n: string): unknown })._readAttribute(
+      "id",
+    );
+
+    const found = await assoc.find([id]);
+    expect(Array.isArray(found)).toBe(true);
+    expect((found as Base[])[0]).toBe(clients[0]);
+  });
+
   it("raises RecordNotFound when no ids are passed", async () => {
     const { assoc } = await loadedClientsOfFirm();
 

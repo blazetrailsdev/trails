@@ -359,7 +359,7 @@ export class CollectionAssociation extends Association {
    * delegates to the association scope.
    */
   async find(...args: unknown[]): Promise<Base | Base[] | null> {
-    const argsFlatten = args.flat();
+    const argsFlatten = args.flat(Infinity);
     const ids = argsFlatten.filter((id) => id != null);
 
     if (this.reflection.options.inverseOf && this.isLoaded()) {
@@ -373,12 +373,12 @@ export class CollectionAssociation extends Association {
         );
       }
 
-      const result = this.findByScan(ids);
+      const result = this.findByScan(...args);
       const resultSize = Array.isArray(result) ? result.length : result == null ? 0 : 1;
       if (!result || resultSize !== argsFlatten.length) {
         this.scope().raiseRecordNotFoundExceptionBang(argsFlatten, resultSize, argsFlatten.length);
       }
-      return result;
+      return result as Base | Base[];
     }
 
     const rel = this.scope();
@@ -1255,14 +1255,12 @@ export class CollectionAssociation extends Association {
    * Mirrors: ActiveRecord::Associations::CollectionAssociation#find_by_scan —
    * scans the loaded target and returns what it found (`null` for a single-id
    * miss, a short array for a multi-id one). It never raises; `find` owns the
-   * not-found decision (collection_association.rb:521-532).
-   *
-   * Deviation: Rails' `expects_array` (a leading Array argument wraps the
-   * single-id result) isn't reproduced — `find` compacts and flattens before
-   * calling, so the scalar/array shape follows the id count, as it did before.
+   * not-found decision (collection_association.rb:521-532). A leading Array
+   * argument sets Rails' `expects_array`, so the single-id result is wrapped —
+   * including the miss, which Rails returns as `[nil]`.
    * @internal
    */
-  private findByScan(ids: unknown[]): Base | Base[] | null {
+  private findByScan(...args: unknown[]): Base | Array<Base | null> | null {
     // Fold each key through `normalizeAssociationKey` before stringifying: an
     // in-memory target PK is a BigInt (int8 default under PG bigserial) while a
     // `find(id)` argument is a number, and a raw `JSON.stringify` of a BigInt
@@ -1277,12 +1275,22 @@ export class CollectionAssociation extends Association {
       JSON.stringify(
         Array.isArray(v) ? v.map(normalizeAssociationKey) : normalizeAssociationKey(v),
       );
-    const normalizedIds = ids.map(normalize);
+    // Rails: `expects_array = args.first.kind_of?(Array)` /
+    // `ids = args.flatten.compact.map(&:to_s).uniq`.
+    const expectsArray = Array.isArray(args[0]);
+    const normalizedIds = [
+      ...new Set(
+        args
+          .flat(Infinity)
+          .filter((id) => id != null)
+          .map(normalize),
+      ),
+    ];
 
-    if (ids.length === 1) {
-      return (
-        this.target.find((r) => normalize(this.primaryKeyValue(r)) === normalizedIds[0]) ?? null
-      );
+    if (normalizedIds.length === 1) {
+      const record =
+        this.target.find((r) => normalize(this.primaryKeyValue(r)) === normalizedIds[0]) ?? null;
+      return expectsArray ? [record] : record;
     }
 
     const idSet = new Set(normalizedIds);
