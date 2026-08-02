@@ -215,6 +215,13 @@ describe("purge-only pre-snapshot path", () => {
 
   const inertAdapter = { adapterName: "none" } as unknown as DatabaseAdapter;
 
+  // The sqlite arm lays its one table through createTable and nothing else, so
+  // stubbing that member runs the arm without touching a database.
+  const armOnlyAdapter = {
+    adapterName: "sqlite",
+    createTable: async () => {},
+  } as unknown as DatabaseAdapter;
+
   it("rejects a reset that runs before the boot-laid snapshot", async () => {
     const { dropAllTablesModule } = await freshModules();
 
@@ -225,11 +232,18 @@ describe("purge-only pre-snapshot path", () => {
 
   it("rejects a purge that runs after the adapter-specific arm", async () => {
     const { dropAllTablesModule, loadSchemaHelper } = await freshModules();
-    await loadSchemaHelper.loadAdapterSpecificSchema(inertAdapter);
+    await loadSchemaHelper.loadAdapterSpecificSchema(armOnlyAdapter);
 
     await expect(dropAllTablesModule.purgeToCanonicalTables(inertAdapter)).rejects.toThrow(
       /after the adapter-specific schema arm/,
     );
+  });
+
+  it("leaves the purge available on an adapter that has no arm to run", async () => {
+    const { dropAllTablesModule, loadSchemaHelper } = await freshModules();
+    await loadSchemaHelper.loadAdapterSpecificSchema(inertAdapter);
+
+    await expect(dropAllTablesModule.purgeToCanonicalTables(inertAdapter)).resolves.toBeUndefined();
   });
 
   it("rejects a purge that runs after the boot-laid snapshot", async () => {
