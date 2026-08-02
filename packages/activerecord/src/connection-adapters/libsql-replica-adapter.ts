@@ -26,6 +26,14 @@ import { AbstractSQLite3Adapter } from "./sqlite3-adapter.js";
  * default — without it the replica is caller-driven only — and the loop lives
  * in the libsql handle, so it stops on `disconnect`/`close`; there is no
  * adapter-owned JS timer to clear.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby binds exactly one SQLite driver
+ * (`gem "sqlite3"`, sqlite3_adapter.rb:15), so Rails declares a single
+ * `SQLite3Adapter` (sqlite3_adapter.rb:30) and has no class to map a
+ * per-driver subclass onto. The JS ecosystem has several interchangeable
+ * SQLite clients, so trails keeps the sqlite3_adapter.rb port on the shared
+ * base and binds each client in its own thin subclass; there is nothing to
+ * converge these names onto upstream.
  */
 export class LibSQLReplicaAdapter extends AbstractSQLite3Adapter {
   protected override defaultSqliteDriver(): SqliteDriver {
@@ -36,6 +44,11 @@ export class LibSQLReplicaAdapter extends AbstractSQLite3Adapter {
    * Pull the latest changes from the remote primary into the local replica.
    * Caller-driven — there is no background sync. Reaches the libsql connection's
    * `sync()` escape hatch (not part of the core `SqliteConnection` interface).
+   *
+   * @noRailsEquivalent PERMANENT — a member of a driver-variant class Rails has
+   * no counterpart for (see the class tag above): Rails' only SQLite class is
+   * `SQLite3Adapter` (sqlite3_adapter.rb:30), bound to the sqlite3 gem, which
+   * has no embedded-replica mode and so nothing to name this after.
    */
   async syncReplica(): Promise<void> {
     const conn = (await this.sqliteConnection()) as Partial<SyncableSqliteConnection>;
