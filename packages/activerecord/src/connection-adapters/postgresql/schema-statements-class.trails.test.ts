@@ -4,10 +4,8 @@ import { PostgreSQLAdapter } from "../postgresql-adapter.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
 import { Table as PgTable } from "./schema-definitions.js";
 
-// `PostgreSQL::SchemaStatements` is mixed into `PostgreSQLAdapter` (Rails:
-// `include PostgreSQL::SchemaStatements`), so the bodies under test are prototype
-// methods on the adapter. Give the fake adapter that prototype and call them the
-// way production does.
+// The bodies under test are prototype methods on the adapter, so give the fake
+// adapter that prototype and call them the way production does.
 function withSchemaStatements(adapter: DatabaseAdapter): PostgreSQLAdapter {
   return Object.setPrototypeOf(adapter, PostgreSQLAdapter.prototype) as PostgreSQLAdapter;
 }

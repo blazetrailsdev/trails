@@ -179,8 +179,6 @@ function toError(value: unknown): Error {
  * shape where driver params and adapter knobs share one hash.
  * Uses a connection pool internally for concurrent access.
  */
-// Merged with the `PostgreSQLAdapter` interface below (the `include
-// PostgreSQL::SchemaStatements` surface).
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class PostgreSQLAdapter
   extends AbstractAdapter
@@ -4692,10 +4690,9 @@ export class PostgreSQLAdapter
   }
 }
 
-// Declaration merge for `include(PostgreSQLAdapter, PostgreSQLSchemaStatements)` at
-// the bottom of this file: `include()` installs the module's methods on the
-// prototype at runtime, but TypeScript can't see them on the class type. Mirrors
-// the way AbstractAdapter declares its `include SchemaStatements` surface.
+// `include()` installs the module's methods on the prototype at runtime, where the
+// class type can't see them, so the `include PostgreSQL::SchemaStatements` surface
+// is declared here — the same shape AbstractAdapter uses for `SchemaStatements`.
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface PostgreSQLAdapter {
   /** @internal */
@@ -5208,8 +5205,6 @@ captureUnwrappedExecute(PostgreSQLAdapter);
 dirtiesQueryCache(PostgreSQLAdapter, "execQuery", "execute");
 
 // Rails: `include PostgreSQL::SchemaStatements` (postgresql_adapter.rb:185).
-// Methods defined in the class body above win over the mixin, exactly as Ruby's
-// ancestry places the class above an included module.
 include(PostgreSQLAdapter, PostgreSQLSchemaStatements);
 
 // Mirrors `ActiveSupport.run_load_hooks(:active_record_postgresqladapter, self)`
