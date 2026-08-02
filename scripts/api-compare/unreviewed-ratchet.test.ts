@@ -15,7 +15,6 @@ import {
   renderDroppedReviewed,
   nextMarks,
   parseMark,
-  markSlack,
   renderExcess,
   renderSlack,
   renderWriteSummary,
@@ -143,7 +142,7 @@ describe("the per-file aggregate contract", () => {
   it("still fails when the swap grows that file's total", () => {
     const after = [entry("a"), entry("b"), entry("c")];
     expect(excessByPath(unreviewedCounts(after, SEED, pathFor), marks({ [REL]: 2 }))).toEqual([
-      [REL, 3, 2],
+      { file: REL, count: 3, mark: 2 },
     ]);
   });
 
@@ -164,7 +163,7 @@ describe("the per-file aggregate contract", () => {
   it("fails a cross-file swap that the old repo-wide number would have passed", () => {
     const counts = unreviewedCounts([entry("a"), entry("b", SEED, "model.ts")], SEED, pathFor);
     const committed = marks({ [REL]: 2, [MODEL]: 0 });
-    expect(excessByPath(counts, committed).map(([rel]) => rel)).toEqual([MODEL]);
+    expect(excessByPath(counts, committed).map((d) => d.file)).toEqual([MODEL]);
   });
 });
 
@@ -219,8 +218,10 @@ describe("loadMarks / writeMarks", () => {
     ).rejects.toThrow();
   });
 
-  it("never writes a zero shard even when handed one", async () => {
-    await writeMarks(dir, marks({ [REL]: 7, [MODEL]: 0 }));
+  // A non-positive max would round-trip through parseMark as a hard error, so
+  // it is dropped on the way out rather than committed.
+  it("never writes a non-positive shard even when handed one", async () => {
+    await writeMarks(dir, marks({ [REL]: 7, [MODEL]: 0, [path.join("arel", "n.json")]: -1 }));
     expect([...(await loadMarks(dir))]).toEqual([[REL, 7]]);
   });
 
@@ -229,11 +230,20 @@ describe("loadMarks / writeMarks", () => {
   it("reports a source with no shard as zero, not as unbounded headroom", async () => {
     await writeMarks(dir, marks({ [REL]: 7 }));
     const loaded = await loadMarks(dir);
-    expect(excessByPath(marks({ [MODEL]: 1 }), loaded)).toEqual([[MODEL, 1, 0]]);
+    expect(excessByPath(marks({ [MODEL]: 1 }), loaded)).toEqual([
+      { file: MODEL, count: 1, mark: 0 },
+    ]);
   });
 
-  it("names the emptied ratchet tree rather than silently disarming", async () => {
-    await expect(loadMarks(dir)).rejects.toThrow(/committed ratchet tree/);
+  // Deleting the tree cannot silently disarm the ratchet: every seeded row then
+  // exceeds a mark of 0 and the excess arm names each file. Erroring instead
+  // would make the ratchet throw on its own success state (the last shard is
+  // deleted when the last seeded reason is reviewed).
+  it("reads a missing tree as an empty mark set, leaving the excess arm to red the gate", async () => {
+    expect([...(await loadMarks(path.join(dir, "never-written")))]).toEqual([]);
+    expect(excessByPath(marks({ [REL]: 131 }), await loadMarks(dir))).toEqual([
+      { file: REL, count: 131, mark: 0 },
+    ]);
   });
 });
 
@@ -241,13 +251,15 @@ describe("excessByPath", () => {
   it("reports only the files over their own mark, worst overshoot first", () => {
     const over = excessByPath(marks({ [REL]: 5, [MODEL]: 9 }), marks({ [REL]: 4, [MODEL]: 4 }));
     expect(over).toEqual([
-      [MODEL, 9, 4],
-      [REL, 5, 4],
+      { file: MODEL, count: 9, mark: 4 },
+      { file: REL, count: 5, mark: 4 },
     ]);
   });
 
   it("treats a file with no committed shard as a mark of zero", () => {
-    expect(excessByPath(marks({ [MODEL]: 2 }), marks({}))).toEqual([[MODEL, 2, 0]]);
+    expect(excessByPath(marks({ [MODEL]: 2 }), marks({}))).toEqual([
+      { file: MODEL, count: 2, mark: 0 },
+    ]);
   });
 
   it("says nothing about a file sitting at or under its mark", () => {
@@ -257,7 +269,7 @@ describe("excessByPath", () => {
 
 describe("renderExcess", () => {
   it("names the excess as the newly-seeded rows held out of each file's mark", () => {
-    const msg = renderExcess([[REL, 133, 131]], "scripts/api-compare/marks");
+    const msg = renderExcess([{ file: REL, count: 133, mark: 131 }], "scripts/api-compare/marks");
     expect(msg).toContain("2 baselined entr(ies) across 1 source file(s)");
     // Both ways a row can gain the placeholder — a reseed, or a reverted reason.
     expect(msg).toContain("reverted to the seed");
@@ -337,32 +349,20 @@ describe("droppedSeeded", () => {
   });
 });
 
-describe("markSlack", () => {
-  it("reports how far a stale-high mark sits above what a clean reseed would write", () => {
-    expect(markSlack(2787, 2837)).toBe(50);
-  });
-
-  it("is zero when the mark already matches the current count", () => {
-    expect(markSlack(2787, 2787)).toBe(0);
-  });
-
-  it("leaves a count above the mark to the excess arm", () => {
-    expect(markSlack(2840, 2837)).toBe(0);
-  });
-});
-
 describe("slackByPath", () => {
   it("reports each file whose own mark sits above its count, slackest first", () => {
     expect(slackByPath(marks({ [REL]: 130 }), marks({ [REL]: 131, [MODEL]: 4 }))).toEqual([
-      [MODEL, 0, 4],
-      [REL, 130, 131],
+      { file: MODEL, count: 0, mark: 4 },
+      { file: REL, count: 130, mark: 131 },
     ]);
   });
 
   // An orphan shard — a mark whose source converged out of the baseline
   // entirely — is pure slack, and the next `--write` deletes it.
   it("catches an orphan shard whose source has no unreviewed rows left", () => {
-    expect(slackByPath(marks({}), marks({ [MODEL]: 4 }))).toEqual([[MODEL, 0, 4]]);
+    expect(slackByPath(marks({}), marks({ [MODEL]: 4 }))).toEqual([
+      { file: MODEL, count: 0, mark: 4 },
+    ]);
   });
 
   it("leaves a file above its mark to the excess arm", () => {
@@ -372,10 +372,10 @@ describe("slackByPath", () => {
 
 describe("renderSlack", () => {
   it("names the files, the slack, and the one-command fix", () => {
-    const msg = renderSlack([[REL, 2787, 2837]], "scripts/api-compare/marks");
+    const msg = renderSlack([{ file: REL, count: 2787, mark: 2837 }], "scripts/api-compare/marks");
     expect(msg).toContain("STALE high-water mark");
     expect(msg).toContain("1 file(s)");
-    expect(msg).toContain("2837 of slack".replace("2837", "50"));
+    expect(msg).toContain("50 of slack");
     expect(msg).toContain(`  - ${REL}  mark 2837, only 2787 unreviewed`);
     expect(msg).toContain("pnpm api:calls:wide:reseed");
   });

@@ -24,7 +24,7 @@
  *     (RFC 0083 — see unreviewed-ratchet.ts for why that is a second ratchet,
  *     and why the mark is sharded per source file like the baseline itself);
  *   - a high-water mark left ABOVE what a clean reseed would write (RFC 0083 —
- *     see unreviewed-ratchet.ts#markSlack). The other arms all pass on a
+ *     see unreviewed-ratchet.ts#slackByPath). The other arms all pass on a
  *     stale-HIGH mark, so drift used to surface only when the next story
  *     reseeded and found its own before-value was never reproducible. It is a
  *     GATE, not advisory: the mark only shrinks, so tightening is always safe,

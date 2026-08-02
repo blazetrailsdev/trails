@@ -73,6 +73,16 @@ export interface UnreviewedMark {
  */
 export type MarkSet = Map<string, number>;
 
+/** One source file's standing against its own shard, as the gate arms report it. */
+export interface MarkDelta {
+  /** The shard's `<package>/<tsFile .ts→.json>` path. */
+  file: string;
+  /** Baselined entries in that source still carrying the seed reason. */
+  count: number;
+  /** That source's committed high-water mark; 0 when it has no shard. */
+  mark: number;
+}
+
 /** Sum of the shards: the one number the console reports as the total. */
 export function totalMark(marks: MarkSet): number {
   let sum = 0;
@@ -189,21 +199,22 @@ export function parseMark(text: string): number {
 }
 
 /**
- * Read every shard under `dir`. A source with no mark file is reported as 0 —
- * the strict reading, so a deleted shard reds the gate on its file's first
- * unreviewed row rather than silently granting headroom. Losing the WHOLE tree
- * is the silent-disarm case, so that one is named loudly.
+ * Read every shard under `dir`. A source with no shard reads as 0 — the strict
+ * direction, so a deleted shard reds the gate on its file's first unreviewed
+ * row rather than silently granting headroom.
+ *
+ * A missing or empty tree is therefore NOT an error, which is a change the
+ * split earns. The monolithic mark needed a loud ENOENT guard because deleting
+ * one file silently disarmed the whole ratchet; here, deleting the tree makes
+ * every seeded row in the baseline exceed a mark of 0, so `excessByPath` reds
+ * the gate maximally and names each file. Keeping the guard would instead make
+ * the ratchet throw on its own SUCCESS state: the last shard is deleted when
+ * the last seeded reason is reviewed, and an empty tree cannot survive a clone
+ * anyway (git does not track empty directories).
  */
 export async function loadMarks(dir: string): Promise<MarkSet> {
-  const files = await listJsonFiles(dir);
-  if (files.length === 0) {
-    throw new Error(
-      `unreviewed high-water mark: ${dir} holds no mark files. It is a committed ratchet ` +
-        "tree; restore it from git rather than regenerating, or the marks are lost.",
-    );
-  }
   const marks: MarkSet = new Map();
-  for (const f of files.sort()) {
+  for (const f of (await listJsonFiles(dir)).sort()) {
     marks.set(path.relative(dir, f), parseMark(await fs.readFile(f, "utf-8")));
   }
   return marks;
@@ -247,8 +258,10 @@ export function nextMarks(counts: MarkSet, marks: MarkSet): MarkSet {
  */
 export async function writeMarks(dir: string, marks: MarkSet): Promise<void> {
   const existing = new Set((await listJsonFiles(dir)).map((f) => path.relative(dir, f)));
-  for (const [rel, max] of [...marks].sort()) {
-    if (max === 0) continue;
+  for (const [rel, max] of marks) {
+    // A source at or below 0 has no shard at all, so its file is left to the
+    // deletion pass below rather than written as `{"max": 0}`.
+    if (max <= 0) continue;
     const dest = path.join(dir, rel);
     await fs.mkdir(path.dirname(dest), { recursive: true });
     await fs.writeFile(dest, serializeBaseline({ max } satisfies UnreviewedMark));
@@ -258,18 +271,24 @@ export async function writeMarks(dir: string, marks: MarkSet): Promise<void> {
   await pruneEmptyDirs(dir);
 }
 
-/** Sources whose unreviewed count sits ABOVE their own mark, worst first. */
-export function excessByPath(counts: MarkSet, marks: MarkSet): [string, number, number][] {
-  const out: [string, number, number][] = [];
-  for (const [rel, count] of counts) {
-    const mark = marks.get(rel) ?? 0;
-    if (count > mark) out.push([rel, count, mark]);
-  }
-  return out.sort((a, b) => b[1] - b[2] - (a[1] - a[2]) || (a[0] < b[0] ? -1 : 1));
+// Ties in either arm fall back to the shard path, so a listing of equal-sized
+// deltas is stable run to run.
+function compareFiles(a: MarkDelta, b: MarkDelta): number {
+  return a.file < b.file ? -1 : a.file > b.file ? 1 : 0;
 }
 
-export function renderExcess(excess: [string, number, number][], markDir: string): string {
-  const total = excess.reduce((n, [, count, mark]) => n + count - mark, 0);
+/** Sources whose unreviewed count sits ABOVE their own mark, worst overshoot first. */
+export function excessByPath(counts: MarkSet, marks: MarkSet): MarkDelta[] {
+  const out: MarkDelta[] = [];
+  for (const [file, count] of counts) {
+    const mark = marks.get(file) ?? 0;
+    if (count > mark) out.push({ file, count, mark });
+  }
+  return out.sort((a, b) => b.count - b.mark - (a.count - a.mark) || compareFiles(a, b));
+}
+
+export function renderExcess(excess: MarkDelta[], markDir: string): string {
+  const total = excess.reduce((n, d) => n + d.count - d.mark, 0);
   return (
     `\nwide call-mismatches unreviewed ratchet: ${total} baselined entr(ies) across ` +
     `${excess.length} source file(s) carry the seeded default reason beyond that file's ` +
@@ -279,16 +298,16 @@ export function renderExcess(excess: [string, number, number][], markDir: string
     "be reviewed as it is added, not inherited as unreviewed debt: replace each placeholder " +
     `\`reason\` with a real one-line explanation, then re-run \`--write\` to lower ${markDir}/.\n` +
     "(Each mark only shrinks; reseeding can never raise one.)\n" +
-    excess.map(([rel, count, mark]) => `  + ${rel}  ${count} unreviewed, mark ${mark}`).join("\n")
+    excess.map((d) => `  + ${d.file}  ${d.count} unreviewed, mark ${d.mark}`).join("\n")
   );
 }
 
 /**
- * Slack between the committed mark and what a clean reseed would write: a
- * mark that sits ABOVE the current unreviewed count (RFC 0083).
+ * Slack between a committed shard and what a clean reseed would write for it: a
+ * mark that sits ABOVE that source's current unreviewed count (RFC 0083).
  *
- * The excess arm above only fires when the count RISES past the mark, so a
- * mark left stale-HIGH — rows converged out of the baseline, or reasons were
+ * The excess arm above only fires when a count RISES past its mark, so a mark
+ * left stale-HIGH — rows converged out of the baseline, or reasons were
  * reviewed, without a reseed to lower it — never surfaces: the ratchet passes
  * either way. That silence is what makes the next story's measured delta wrong,
  * because its "before" value is a number no clean tree produces. Slack is
@@ -297,28 +316,23 @@ export function renderExcess(excess: [string, number, number][], markDir: string
  * change that drops rows already has to reseed for the STALE-entry arm, so a
  * legitimately-reseeded tree has zero slack by construction.
  *
- * Negative slack (count above the mark) is the excess arm's job; this returns 0.
+ * A file whose count sits ABOVE its mark is the excess arm's job, not this one.
  *
- * Sharded, this also covers the ORPHAN shard: a mark file whose source has no
- * unreviewed rows left (or no baseline file at all) is a count of 0 under a
- * positive mark, i.e. pure slack, and is deleted by the next `--write`.
+ * Sharded, this also covers the ORPHAN shard: a mark whose source has no
+ * unreviewed rows left — or no baseline file at all — is a count of 0 under a
+ * positive mark, i.e. pure slack, and the next `--write` deletes it.
  */
-export function markSlack(count: number, mark: number): number {
-  return Math.max(0, mark - count);
-}
-
-/** Sources whose own mark sits ABOVE their unreviewed count, slackest first. */
-export function slackByPath(counts: MarkSet, marks: MarkSet): [string, number, number][] {
-  const out: [string, number, number][] = [];
-  for (const [rel, mark] of marks) {
-    const count = counts.get(rel) ?? 0;
-    if (mark > count) out.push([rel, count, mark]);
+export function slackByPath(counts: MarkSet, marks: MarkSet): MarkDelta[] {
+  const out: MarkDelta[] = [];
+  for (const [file, mark] of marks) {
+    const count = counts.get(file) ?? 0;
+    if (mark > count) out.push({ file, count, mark });
   }
-  return out.sort((a, b) => b[2] - b[1] - (a[2] - a[1]) || (a[0] < b[0] ? -1 : 1));
+  return out.sort((a, b) => b.mark - b.count - (a.mark - a.count) || compareFiles(a, b));
 }
 
-export function renderSlack(slack: [string, number, number][], markDir: string): string {
-  const total = slack.reduce((n, [, count, mark]) => n + mark - count, 0);
+export function renderSlack(slack: MarkDelta[], markDir: string): string {
+  const total = slack.reduce((n, d) => n + d.mark - d.count, 0);
   return (
     `\nwide call-mismatches unreviewed ratchet: STALE high-water mark — ${slack.length} file(s) ` +
     `under ${markDir}/ claim more unreviewed entr(ies) than the baseline still carries ` +
@@ -327,9 +341,7 @@ export function renderSlack(slack: [string, number, number][], markDir: string):
     "story a “before” value no clean tree produces, and the drift is discovered only " +
     "when someone reseeds. A mark only shrinks, so tightening is always safe:\n" +
     "  pnpm api:calls:wide:reseed\n" +
-    slack
-      .map(([rel, count, mark]) => `  - ${rel}  mark ${mark}, only ${count} unreviewed`)
-      .join("\n")
+    slack.map((d) => `  - ${d.file}  mark ${d.mark}, only ${d.count} unreviewed`).join("\n")
   );
 }
 
