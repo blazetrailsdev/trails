@@ -1,4 +1,5 @@
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
+import { ActiveRecordError } from "../errors.js";
 import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 
 /**
@@ -12,13 +13,28 @@ const BOOKKEEPING_TABLE_NAMES: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Fallback for a reset that runs before {@link recordBootLaidTables} — the
- * canonical `schema.rb` mirror, which is the registry the load itself lays from.
- * The adapter-specific half is absent here; only the snapshot knows it.
+ * The canonical `schema.rb` mirror — the registry `loadCanonicalSchema` lays
+ * from. The `<adapter>_specific_schema.rb` half is deliberately absent: this is
+ * the *protected* set of {@link purgeToCanonicalTables}, whose whole job is to
+ * drop the adapter-specific tables so the arm can re-lay them.
  */
 const CANONICAL_TABLE_NAMES: ReadonlySet<string> = new Set(Object.keys(TEST_SCHEMA));
 
 let _bootLaidTableNames: ReadonlySet<string> | null = null;
+let _adapterSpecificSchemaLoaded = false;
+
+/**
+ * Records that the `<adapter>_specific_schema.rb` arm has run in this process,
+ * so {@link purgeToCanonicalTables} can refuse to run after it — a purge on that
+ * side of the arm drops `defaults`, `postgresql_times`, `binary_fields`, … and
+ * nothing re-lays them, which surfaces far away as `table "defaults" does not
+ * exist`.
+ *
+ * @internal Called by `loadAdapterSpecificSchema`; not for test files.
+ */
+export function noteAdapterSpecificSchemaLoaded(): void {
+  _adapterSpecificSchemaLoaded = true;
+}
 
 /**
  * Snapshot the tables the schema load just laid — both halves of Rails'
@@ -29,7 +45,7 @@ let _bootLaidTableNames: ReadonlySet<string> | null = null;
  * what is protected, on whichever lane is running, with nothing to keep in step.
  *
  * Every table then present must therefore *be* boot-laid. `test-setup-dy.ts`
- * guarantees that by running {@link resetTestTables} between the canonical load
+ * guarantees that by running {@link purgeToCanonicalTables} between the canonical load
  * and the adapter-specific arm: `DatabaseTasks.loadSchema` only drop+recreates
  * the tables the schema file declares, so on the shared PG/MySQL database a
  * bespoke table from a previous run would otherwise be snapshotted as boot-laid
@@ -42,8 +58,47 @@ export async function recordBootLaidTables(adapter: DatabaseAdapter): Promise<vo
   _bootLaidTableNames = new Set(laid);
 }
 
+/**
+ * Reset for a caller that runs *before* {@link recordBootLaidTables}, protecting
+ * only the canonical half — i.e. **purge-only by construction**: every
+ * adapter-specific table is dropped, and the caller owns re-laying them.
+ *
+ * The one caller is `test-setup-dy.ts`'s fast path, which purges between the
+ * canonical load and the adapter-specific arm and re-lays that arm immediately
+ * after (PR #5659). It is a separate entry point rather than a fallback inside
+ * {@link resetTestTables} so that intent is stated at the call site: a
+ * pre-snapshot reset that did *not* mean to lose the adapter-specific tables now
+ * throws instead of silently losing them.
+ *
+ * @internal Boot/template setup paths only.
+ */
+export async function purgeToCanonicalTables(adapter: DatabaseAdapter): Promise<void> {
+  if (_bootLaidTableNames !== null) {
+    throw new ActiveRecordError(
+      "purgeToCanonicalTables ran after recordBootLaidTables — the boot-laid " +
+        "snapshot is the protected set once it exists; call resetTestTables.",
+    );
+  }
+  if (_adapterSpecificSchemaLoaded) {
+    throw new ActiveRecordError(
+      "purgeToCanonicalTables ran after the adapter-specific schema arm — it " +
+        "would drop the tables that arm just laid (defaults, postgresql_times, " +
+        "binary_fields, …) with nothing to re-lay them. Purge first, then load.",
+    );
+  }
+  await resetTables(adapter, "reset", CANONICAL_TABLE_NAMES);
+}
+
 function bootLaidTableNames(): ReadonlySet<string> {
-  return _bootLaidTableNames ?? CANONICAL_TABLE_NAMES;
+  if (_bootLaidTableNames === null) {
+    throw new ActiveRecordError(
+      "resetTestTables ran before recordBootLaidTables — with no snapshot there " +
+        "is no set to protect. A deliberate pre-snapshot purge wants " +
+        "purgeToCanonicalTables, which drops the adapter-specific tables and " +
+        "expects its caller to re-lay them.",
+    );
+  }
+  return _bootLaidTableNames;
 }
 
 /**
@@ -53,7 +108,7 @@ function bootLaidTableNames(): ReadonlySet<string> {
  * MySQL and sqlite both go through `disableReferentialIntegrity`.
  */
 export async function dropAllTables(adapter: DatabaseAdapter): Promise<void> {
-  await resetTables(adapter, "drop-all");
+  await resetTables(adapter, "drop-all", new Set());
 }
 
 /**
@@ -68,20 +123,24 @@ export async function dropAllTables(adapter: DatabaseAdapter): Promise<void> {
  * `schema_migrations` / `ar_internal_metadata` bookkeeping tables.
  * Views/matviews are never canonical, so they are always dropped.
  *
- * Runs at worker boot only (`test-setup-dy.ts`), between the canonical load and
- * the adapter-specific arm. There is no between-test reset: Rails'
+ * Requires the boot-laid snapshot: the protected set is what
+ * {@link recordBootLaidTables} saw, never a declared stand-in. The pre-snapshot
+ * boot purge is {@link purgeToCanonicalTables}. There is no between-test reset: Rails'
  * `teardown_fixtures` rolls the per-test transaction back and never truncates
  * or drops (`test_fixtures.rb:146-158`), so a file that creates bespoke tables
  * owns dropping them itself.
  */
 export async function resetTestTables(adapter: DatabaseAdapter): Promise<void> {
-  await resetTables(adapter, "reset");
+  await resetTables(adapter, "reset", bootLaidTableNames());
 }
 
 type ResetMode = "drop-all" | "reset";
 
-async function resetTables(adapter: DatabaseAdapter, mode: ResetMode): Promise<void> {
-  const bootLaid = bootLaidTableNames();
+async function resetTables(
+  adapter: DatabaseAdapter,
+  mode: ResetMode,
+  bootLaid: ReadonlySet<string>,
+): Promise<void> {
   switch (adapter.adapterName) {
     case "postgres":
       await resetPgTables(adapter, mode, bootLaid);

@@ -40,7 +40,7 @@ const mysqlExclusive = adapter === "mysql" && !!getEnv("AR_MYSQL_EXCLUSIVE_DB");
 const ownsDatabase =
   (adapter === "sqlite" && envConfig.database !== ":memory:") || pgExclusive || mysqlExclusive;
 
-const { recordBootLaidTables, dropAllTables, resetTestTables } =
+const { recordBootLaidTables, dropAllTables, purgeToCanonicalTables } =
   await import("./support/drop-all-tables.js");
 const { loadSchema, loadAdapterSpecificSchema } = await import("./support/load-schema-helper.js");
 const { canonicalSchemaUpToDate, stampCanonicalSchema } =
@@ -54,12 +54,14 @@ if (await canonicalSchemaUpToDate(await Base.leaseConnection())) {
   // Only the canonical arm is skipped here — those tables are already laid, and
   // now empty. The adapter-specific arm is re-run as on the full path: its
   // tables are `force: true` throughout, and a worker recycled onto a database
-  // an earlier worker's tests ran against finds them dropped — `resetTestTables`
-  // drops every table it did not snapshot as boot-laid.
+  // an earlier worker's tests ran against finds them dropped —
+  // `purgeToCanonicalTables` drops every table outside the canonical half, and
+  // the arm below re-lays the adapter-specific ones it took with it. That order
+  // is load-bearing, and the purge refuses to run on the wrong side of it.
   const conn = await Base.leaseConnection();
-  await resetTestTables(conn);
+  await purgeToCanonicalTables(conn);
   await loadAdapterSpecificSchema(conn);
-  // Re-stamp: `resetTestTables` drops `ar_internal_metadata` along with the
+  // Re-stamp: the purge drops `ar_internal_metadata` along with the
   // other bookkeeping tables, so the stamp this boot consumed is gone. What is
   // left behind is the same state the full-load arm below stamps — canonical
   // plus adapter-specific, laid and empty — so the next worker recycled onto

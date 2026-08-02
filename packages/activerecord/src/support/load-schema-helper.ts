@@ -5,6 +5,7 @@ import type { AbstractMysqlAdapter } from "../connection-adapters/abstract-mysql
 import type { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
 import { ActiveRecordError } from "../errors.js";
 import { loadCanonicalSchema } from "./canonical-schema.js";
+import { noteAdapterSpecificSchemaLoaded } from "./drop-all-tables.js";
 import { STUBBED_DDL_METHODS } from "./stubbed-ddl-methods.js";
 
 /**
@@ -641,6 +642,9 @@ function assertNotStubbed(adapter: DatabaseAdapter, method: string): void {
  * @internal
  */
 export async function loadAdapterSpecificSchema(adapter: DatabaseAdapter): Promise<void> {
+  // Noted whether or not this adapter has an arm: what the marker guards is the
+  // *boot order*, and reaching this point at all means the purge is late.
+  noteAdapterSpecificSchemaLoaded();
   const adapterSpecificSchema = ADAPTER_SPECIFIC_SCHEMAS[adapter.adapterName];
   if (adapterSpecificSchema) await adapterSpecificSchema(adapter);
 }
