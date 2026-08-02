@@ -1638,9 +1638,6 @@ function excludingBang(this: QueryMethodsHost, records: any[]): any {
   // marker carries a pk-select subquery only as a `toSql()` display fallback for
   // the (rare) no-load path; eager materialization here would require an async
   // `excluding`, breaking the chainable contract.
-  // Same read as the literal arm: Rails' `predicate_builder[primary_key, ...]`
-  // takes the attribute off the builder's own arel table, not the model's
-  // default one (an aliased relation carries different table metadata).
   const attribute = this.predicateBuilder.table.arelTable.get(pk);
   // Mirror the array handler's `x.is_a?(Base) ? x.id : x` deref.
   const literalIds = literalRecords.map((r) => (isBaseInstance(r) ? (r as any).id : r));
