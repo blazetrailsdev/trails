@@ -110,7 +110,6 @@ describe("DelegationTest", () => {
     //     QUERYING_METHODS name) below — `withCte` is the same delegator.
     const QUERYING_METHODS = [
       "where",
-      "whereNot",
       "select",
       "reselect",
       "order",

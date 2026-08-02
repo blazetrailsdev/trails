@@ -117,14 +117,14 @@ describe("ForbiddenAttributesProtectionTest", () => {
   it("where not checks permitted", () => {
     const params = new ProtectedParams({ first_name: "Guille", gender: "m" });
 
-    expect(() => Person.whereNot(params)).toThrow(ForbiddenAttributesError);
+    expect(() => Person.where().not(params)).toThrow(ForbiddenAttributesError);
   });
 
   it("where not works with permitted params", async () => {
     const params = new ProtectedParams({ first_name: "Guille" }).permitBang();
     await Person.createBang(params);
 
-    const remaining = (await Person.whereNot(params)).filter(
+    const remaining = (await Person.where().not(params)).filter(
       (p) => p.readAttribute("first_name") === "Guille",
     );
     expect(remaining).toHaveLength(0);

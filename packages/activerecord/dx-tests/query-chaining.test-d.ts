@@ -161,7 +161,7 @@ describe("query chaining DX", () => {
   it("Post.all() / Post.from(...) / Post.whereNot(...) preserve the generic", () => {
     expectTypeOf(Post.all()).toMatchTypeOf<Relation<Post>>();
     expectTypeOf(Post.from("posts")).toMatchTypeOf<Relation<Post>>();
-    expectTypeOf(Post.whereNot({ published: false })).toMatchTypeOf<Relation<Post>>();
+    expectTypeOf(Post.where().not({ published: false })).toMatchTypeOf<Relation<Post>>();
   });
 
   it("Post.joins / distinct / none / unscoped all return Relation<Post>", () => {
@@ -205,6 +205,6 @@ describe("query chaining DX", () => {
   it("Post.where accepts a Record or a SQL-string + binds", () => {
     assertType(Post.where({ title: "x" }));
     assertType(Post.where("title = ?", "x"));
-    assertType(Post.whereNot({ published: false }));
+    assertType(Post.where().not({ published: false }));
   });
 });

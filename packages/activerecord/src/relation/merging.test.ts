@@ -127,7 +127,7 @@ describe("RelationMergingTest", () => {
     const mary = authors("mary");
     const bob = authors("bob");
 
-    const nonMaryAndBob = Author.whereNot({ id: [mary, bob] });
+    const nonMaryAndBob = Author.where().not({ id: [mary, bob] });
 
     expect(await ids(nonMaryAndBob)).toEqual([david.id]);
 
@@ -141,7 +141,9 @@ describe("RelationMergingTest", () => {
     const mary = authors("mary");
     const bob = authors("bob");
 
-    const lessThanBob = Author.whereNot({ id: new Range(bob.id, Infinity) }).order("id");
+    const lessThanBob = Author.where()
+      .not({ id: new Range(bob.id, Infinity) })
+      .order("id");
 
     expect(await ids(lessThanBob)).toEqual([david.id, mary.id]);
 
@@ -155,7 +157,7 @@ describe("RelationMergingTest", () => {
     const mary = authors("mary");
     const bob = authors("bob");
 
-    const nonMaryAndBob = Author.whereNot({ id: [mary, bob] });
+    const nonMaryAndBob = Author.where().not({ id: [mary, bob] });
 
     const authorId = quoteTableName("authors.id");
     await assertQueriesMatch(

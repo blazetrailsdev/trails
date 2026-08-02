@@ -332,7 +332,7 @@ describe("TransactionTest", () => {
   it("transaction does not apply default scope", async () => {
     // Regression test for https://github.com/rails/rails/issues/50368
     const topic = (await Topic.find((topics("fifth") as any).id)) as any;
-    await (Topic.whereNot({ id: topic.id }) as any).transaction(async () => {
+    await (Topic.where().not({ id: topic.id }) as any).transaction(async () => {
       expect(await Topic.find(topic.id)).not.toBeNull();
     });
   });

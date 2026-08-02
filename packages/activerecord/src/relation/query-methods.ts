@@ -43,6 +43,8 @@ import { foreignKey } from "@blazetrails/activesupport";
  */
 export interface WhereChainScope<R> {
   whereNot(conditions: Record<string, unknown>): R;
+  whereNot(conditions: unknown[]): R;
+  whereNot(cols: string[], tuples: unknown[][]): R;
   whereAssociated(...associationNames: string[]): R;
   whereMissing(...associationNames: string[]): R;
   exists(conditions?: unknown): Promise<boolean>;
@@ -61,7 +63,16 @@ export class WhereChain<R = any> {
     this._scope = scope;
   }
 
-  not(conditions: Record<string, unknown>): R {
+  not(conditions: Record<string, unknown>): R;
+  not(conditions: unknown[]): R;
+  not(cols: string[], tuples: unknown[][]): R;
+  not(conditions: Record<string, unknown> | unknown[], tuples?: unknown[][]): R {
+    if (tuples !== undefined) {
+      return this._scope.whereNot(conditions as string[], tuples);
+    }
+    if (Array.isArray(conditions)) {
+      return this._scope.whereNot(conditions);
+    }
     return this._scope.whereNot(conditions);
   }
 
@@ -1104,7 +1115,7 @@ function invertWhereBang(this: QueryMethodsHost): any {
  * catch it the same way they would catch Rails' ArgumentError
  * (`catch err if err.name === 'ArgumentError'`). Exported so other
  * modules (PredicateBuilder, Relation public methods, Base.where /
- * Base.whereNot, etc.) can raise the same shape without
+ * WhereChain#not, etc.) can raise the same shape without
  * re-declaring the helper.
  */
 export function argumentError(message: string): Error {

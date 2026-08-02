@@ -1,3 +1,3 @@
 import { Book } from "./models.js";
 
-export default Book.whereNot({ author_id: null });
+export default Book.where().not({ author_id: null });

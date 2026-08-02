@@ -261,6 +261,7 @@ import {
 import * as _Reflection from "./reflection.js";
 import * as _AssocInstance from "./associations/instance-methods.js";
 import { argumentError } from "./relation/query-methods.js";
+import type { WhereChain } from "./relation/query-methods.js";
 import {
   ScopeRegistry,
   scopeRegistry as _scopeRegistry,
@@ -2398,6 +2399,7 @@ export class Base extends Model {
    *
    * Mirrors: ActiveRecord::Base.where
    */
+  static where<T extends typeof Base>(this: T): WhereChain<Relation<InstanceType<T>>>;
   static where<T extends typeof Base>(
     this: T,
     conditions: Record<string, unknown>,
@@ -2416,9 +2418,12 @@ export class Base extends Model {
   static where<T extends typeof Base>(this: T, node: Nodes.Node): Relation<InstanceType<T>>;
   static where<T extends typeof Base>(
     this: T,
-    conditionsOrSql: Record<string, unknown> | string | string[] | unknown[] | Nodes.Node,
+    conditionsOrSql?: Record<string, unknown> | string | string[] | unknown[] | Nodes.Node,
     ...rest: unknown[]
-  ): Relation<InstanceType<T>> {
+  ): Relation<InstanceType<T>> | WhereChain<Relation<InstanceType<T>>> {
+    if (conditionsOrSql === undefined) {
+      return this.all().where();
+    }
     if (conditionsOrSql instanceof Nodes.Node) {
       return this.all().where(conditionsOrSql);
     }
@@ -2451,47 +2456,6 @@ export class Base extends Model {
       return this.all().where(conditionsOrSql as unknown[]);
     }
     return this.all().where(conditionsOrSql);
-  }
-
-  static whereNot<T extends typeof Base>(
-    this: T,
-    conditions: Record<string, unknown>,
-  ): Relation<InstanceType<T>>;
-  static whereNot<T extends typeof Base>(this: T, conditions: unknown[]): Relation<InstanceType<T>>;
-  static whereNot<T extends typeof Base>(
-    this: T,
-    cols: string[],
-    tuples: unknown[][],
-  ): Relation<InstanceType<T>>;
-  static whereNot<T extends typeof Base>(
-    this: T,
-    conditions: Record<string, unknown> | string[] | unknown[],
-    tuples?: unknown[][],
-  ): Relation<InstanceType<T>> {
-    // Rails' `where.not` mirrors `where` — a single array argument is the
-    // sanitized-conditions form (`where.not(["name = ?", x])`, query_methods.rb:28)
-    // built via `build_where_clause(...).invert`; the composite-key form is the
-    // two-argument `whereNot(cols, tuples)`. Disambiguate by argument count, and
-    // require the column list to be all strings (symmetric with `where`) so a
-    // mixed-type array routes to the sanitized-conditions path.
-    if (
-      Array.isArray(conditions) &&
-      tuples !== undefined &&
-      conditions.every((c) => typeof c === "string")
-    ) {
-      if (!Array.isArray(tuples)) {
-        throw argumentError(
-          `${(this as { name?: string }).name ?? "Model"}.whereNot(cols, tuples): composite-key form requires a tuples argument as an array of arrays`,
-        );
-      }
-      return this.all().whereNot(conditions as string[], tuples);
-    }
-    if (Array.isArray(conditions)) {
-      // Single-array sanitized-conditions form; any extra positional arg is
-      // dropped, matching Rails' `build_where_clause` overwrite (as in `where`).
-      return this.all().whereNot(conditions as unknown[]);
-    }
-    return this.all().whereNot(conditions);
   }
 
   // insertAll / upsertAll / updateAll / deleteAll / destroyBy / deleteBy
