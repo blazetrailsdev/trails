@@ -16,6 +16,7 @@ import {
 } from "../../errors.js";
 import { withSecondAdapter } from "../../support/second-connection.js";
 import { Column as PgColumn } from "../../connection-adapters/postgresql/column.js";
+import { captureSql } from "../../testing/sql-capture.js";
 
 async function withExtensionDisabled(
   adapter: PostgreSQLAdapter,
@@ -1259,6 +1260,38 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("addColumn datetime null precision omits precision suffix", async () => {
       await adapter.addColumn("dt_prec_test", "happened_at", "datetime", { precision: null });
       expect(await columnSqlType("happened_at")).toBe("timestamp without time zone");
+    });
+  });
+
+  // Rails builds create_database's option string by iterating the *merged*
+  // options hash, so keys it has no arm for fall through the `else` and
+  // contribute nothing — they are neither emitted nor rejected. Rails covers
+  // only encoding/collation/ctype; the remaining arms and the pass-through are
+  // trails-side regression cover.
+  describe("createDatabase option string", () => {
+    it("emits the remaining option arms in merged-hash order", async () => {
+      const sqls = await captureSql(
+        () =>
+          adapter.createDatabase("db", {
+            owner: "alice",
+            template: "template0",
+            tablespace: "fast",
+            connectionLimit: -1,
+          }),
+        { stub: adapter },
+      );
+      expect(sqls[0]).toBe(
+        `CREATE DATABASE "db" ENCODING = 'utf8' OWNER = "alice" TEMPLATE = "template0"` +
+          ` TABLESPACE = "fast" CONNECTION LIMIT = -1`,
+      );
+    });
+
+    it("ignores keys it has no arm for instead of rejecting them", async () => {
+      const sqls = await captureSql(
+        () => adapter.createDatabase("db", { adapter: "postgresql", host: "localhost" }),
+        { stub: adapter },
+      );
+      expect(sqls[0]).toBe(`CREATE DATABASE "db" ENCODING = 'utf8'`);
     });
   });
 });
