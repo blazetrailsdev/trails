@@ -84,7 +84,10 @@
  *
  * `--write` regenerates the baseline from the current wide artifact, preserving
  * the `reason` of entries that still flag and dropping stale rows, then
- * repartitions it across the split files (adding/removing files as needed).
+ * repartitions it across the split files (adding/removing files as needed). It
+ * reports the rows it dropped so the author can tell a converged port from a
+ * widened resolution gate: reviewed rows are listed individually, seeded rows
+ * are counted, and `--show-dropped-seeded` lists the seeded keys too.
  *
  * Hard rules: no node:* imports, no process.* in the library surface (the CLI
  * entry guard is the sole exception, matching lint-call-mismatches.ts), async fs.
@@ -448,7 +451,7 @@ async function readJsonIfPresent<T>(file: string): Promise<T | undefined> {
   }
 }
 
-async function main(write: boolean, showSeededKeys = false): Promise<number> {
+async function main(write: boolean, showSeededKeys: boolean): Promise<number> {
   const baseline = await loadBaseline();
   const artifact = await loadArtifact();
   const current = flattenArtifact(artifact);

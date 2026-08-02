@@ -120,7 +120,7 @@ export function renderDroppedSeeded(dropped: ExcludeEntry[], showKeys: boolean):
       `larger than the change you made, it is the gate, not the port.`,
   ];
   if (showKeys) {
-    lines.push(...dropped.map((e) => `  · ${e.package}  ${e.tsFile}  ${e.rubyName}  ${e.call}`));
+    lines.push(...dropped.map((e) => `  - ${e.package}  ${e.tsFile}  ${e.rubyName}  ${e.call}`));
   } else {
     lines.push(`  Re-run with \`${DROPPED_SEEDED_KEYS_ARG}\` to list the keys.`);
   }
