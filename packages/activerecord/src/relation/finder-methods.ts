@@ -885,7 +885,7 @@ export async function findSome(rel: FinderRelation, ids: unknown[]): Promise<any
   let relation = (rel as any).where({ [pk]: ids });
   // Rails: `relation = relation.select(table[primary_key]) unless select_values.empty?`
   if ((rel as any).selectValues.length > 0) {
-    relation = relation.select((rel as any).table.get(pk));
+    relation = relation.select(rel.table.get(pk));
   }
   const records = await relation.toArray();
 
@@ -916,7 +916,7 @@ export async function findSomeOrdered(rel: FinderRelation, ids: unknown[]): Prom
   relation._limitValue = null;
   relation._offsetValue = null;
   if ((rel as any).selectValues.length > 0) {
-    relation = relation.select((rel as any).table.get(pk));
+    relation = relation.select(rel.table.get(pk));
   }
   const records: any[] = await relation.toArray();
 

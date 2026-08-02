@@ -352,7 +352,6 @@ function makeFindSomeRel(
   return {
     _modelClass: postModelStub,
     model: postModelStub,
-    // Rails `Relation#table` attr_reader (relation.rb:71); find_some reads it.
     table: postModelStub.arelTable,
     primaryKey: postModelStub.primaryKey,
     _limitValue: opts.limit ?? null,
@@ -409,7 +408,6 @@ describe("findSome — narrows to pk column when select_values non-empty (ordere
     const rel: any = {
       _modelClass: postModelStub,
       model: postModelStub,
-      // Rails `Relation#table` attr_reader (relation.rb:71); find_some reads it.
       table: postModelStub.arelTable,
       primaryKey: postModelStub.primaryKey,
       _limitValue: null,
@@ -458,7 +456,6 @@ function makeFindSomeOrderedRel(
   return {
     _modelClass: postModelStub,
     model: postModelStub,
-    // Rails `Relation#table` attr_reader (relation.rb:71); find_some reads it.
     table: postModelStub.arelTable,
     primaryKey: postModelStub.primaryKey,
     _limitValue: opts.limit ?? null,
