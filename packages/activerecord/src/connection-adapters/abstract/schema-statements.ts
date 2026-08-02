@@ -232,7 +232,7 @@ export interface CommentStatements {
 /** Extension DDL — PostgreSQL only. */
 export interface ExtensionStatements {
   enableExtension(name: string, options?: Record<string, unknown>): Promise<void>;
-  disableExtension(name: string, options?: { force?: "cascade"; schema?: string }): Promise<void>;
+  disableExtension(name: string, options?: { force?: "cascade" }): Promise<void>;
 }
 
 /** Enum type DDL — PostgreSQL only. */

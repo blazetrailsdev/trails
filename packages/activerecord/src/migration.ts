@@ -818,10 +818,7 @@ export abstract class Migration {
     await connection.enableExtension(name, options);
   }
 
-  async disableExtension(
-    name: string,
-    options?: { force?: "cascade"; schema?: string },
-  ): Promise<void> {
+  async disableExtension(name: string, options?: { force?: "cascade" }): Promise<void> {
     if (this._recording) {
       this._recorder.record("disableExtension", [name, options]);
       return;

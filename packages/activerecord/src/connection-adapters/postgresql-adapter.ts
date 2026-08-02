@@ -3649,15 +3649,22 @@ export class PostgreSQLAdapter
   async extensions(): Promise<string[]> {
     // Rails does not filter plpgsql or any built-in extension — the full list
     // (including pg_catalog.plpgsql) is returned, matching PostgreSQLAdapter#extensions.
-    const rows = await this.schemaQuery(`
-      SELECT pg_extension.extname, n.nspname AS schema,
-             current_schema() AS current_schema
+    const query = `
+      SELECT
+        pg_extension.extname,
+        n.nspname AS schema
       FROM pg_extension
       JOIN pg_namespace n ON pg_extension.extnamespace = n.oid
-    `);
-    return rows.map((r) => {
-      const schema = r.schema === r.current_schema ? null : (r.schema as string);
-      return [schema, r.extname as string].filter(Boolean).join(".");
+    `;
+    const currentSchema = await this.currentSchema();
+    const result = await this.internalExecQuery(query, "SCHEMA", [], {
+      allowRetry: true,
+      materializeTransactions: false,
+    });
+    return (result.castValues() as unknown[][]).map((row) => {
+      const name = row[0] as string;
+      const schema = row[1] === currentSchema ? null : (row[1] as string);
+      return [schema, name].filter((part) => part != null).join(".");
     });
   }
 
@@ -3681,40 +3688,18 @@ export class PostgreSQLAdapter
 
   async enableExtension(name: string, _options?: Record<string, unknown>): Promise<void> {
     const parts = String(name).split(".");
-    const extName = parts[parts.length - 1];
-    const schema = parts.length > 1 ? parts[parts.length - 2] : null;
+    const [schema, extName] = [parts.at(-2) ?? null, parts.at(-1)!];
     let sql = `CREATE EXTENSION IF NOT EXISTS "${extName}"`;
     if (schema) sql += ` SCHEMA ${schema}`;
-    await this.exec(sql);
+    await this.internalExecQuery(sql);
     await this.reloadTypeMap();
   }
 
-  async disableExtension(
-    name: string,
-    options: { force?: "cascade"; schema?: string } = {},
-  ): Promise<void> {
-    // Mirrors Rails: _schema, name = name.to_s.split(".").values_at(-2, -1)
-    // Extensions are global in PG — DROP uses only extname, not schema.
+  async disableExtension(name: string, options: { force?: "cascade" } = {}): Promise<void> {
     const parts = String(name).split(".");
-    const extName = parts[parts.length - 1];
+    const extName = parts.at(-1)!;
     const cascade = options.force === "cascade" ? " CASCADE" : "";
-    if (options.schema) {
-      await this.withRawConnection(async (conn) => {
-        const client = conn as unknown as pg.Client;
-        const { rows } = await client.query(`SHOW search_path`);
-        const originalSearchPath = rows[0]?.search_path as string;
-        await client.query(`SELECT set_config('search_path', $1, false)`, [options.schema]);
-        try {
-          await client.query(`DROP EXTENSION IF EXISTS ${this.quoteColumnName(extName)}${cascade}`);
-        } finally {
-          await client.query(`SELECT set_config('search_path', $1, false)`, [
-            originalSearchPath ?? "public",
-          ]);
-        }
-      });
-    } else {
-      await this.exec(`DROP EXTENSION IF EXISTS ${this.quoteColumnName(extName)}${cascade}`);
-    }
+    await this.internalExecQuery(`DROP EXTENSION IF EXISTS "${extName}"${cascade}`);
     // Mirrors Rails' disable_extension, which reloads the type map after the
     // drop; reloadTypeMap also drops the prepared-statement name map so a later
     // query doesn't re-execute a plan that referenced the dropped type's OID.
