@@ -32,9 +32,6 @@ import {
   performLast as basePerformLast,
   findTake as baseFindTake,
   findTakeWithLimit as baseFindTakeWithLimit,
-  normalizeFindArgs,
-  raiseNotFoundAll,
-  raiseNotFoundSingle,
 } from "../relation/finder-methods.js";
 import type { Nodes } from "@blazetrails/arel";
 import { underscore, singularize, camelize, constantize } from "@blazetrails/activesupport";
@@ -3322,126 +3319,24 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   override find(id: unknown): Promise<T>;
   override find(...ids: unknown[]): Promise<T | T[]>;
   override async find(...args: unknown[]): Promise<T | T[]> {
-    // Rails-faithful cache gate: CollectionAssociation#find in Rails
-    // only uses the in-memory loaded target when BOTH `inverse_of` is
-    // declared AND the association is `loaded?`. Otherwise it
-    // delegates to `scope.find(...)` (i.e. Relation.find via SQL).
-    // Gate runs FIRST so the non-cache path doesn't do duplicate
-    // arg-normalization — super.find runs its own normalize.
-    const inverseOf = this._assocDef.options.inverseOf;
-    const useCache = !!inverseOf && this._targetLoaded;
-    if (!useCache) {
-      // Non-cache path mirrors Rails `CollectionAssociation#find` →
-      // `scope.find(*args)`: it queries through a FRESH association
-      // scope built from the owner's current foreign-key state, never
-      // the (possibly stale) loaded target. Routing `super.find` on the
-      // proxy itself would scan `this`'s loaded `_records` when the
-      // collection was loaded earlier (e.g. an empty `to_a` before the
-      // owner was saved), so a record created later via belongs_to
-      // assignment is missed even though it is persisted with the FK.
-      // `scope()` rebuilds the WHERE from the live owner, so the DB
-      // query finds it. Enforce strict-loading the same way the other
-      // query-executing proxy methods do.
-      this._checkStrictLoading();
-      return (await this.scope().find(...args)) as T | T[];
-    }
-
-    const targetModel = this.model;
-    const pk = targetModel.primaryKey ?? "id";
-    const composite = Array.isArray(pk);
-
-    // Shared arg normalization + deterministic-error raising (empty
-    // list / composite arity). Same message + id shape as
-    // Relation.performFind.
-    const normalized = normalizeFindArgs(targetModel.name, pk, args);
-    const { ids, wantArray, tuples } = normalized;
-
-    const records = this._target;
-
-    // Cast incoming ids through the target model's attribute types so
-    // in-memory find matches Relation.find's WHERE-condition casting
-    // (e.g. proxy.find("1") on an integer PK — the DB path's QueryAttribute
-    // bind casts at compile time, so the loaded-target path must cast too).
-    // For composite keys, cast each tuple element by its PK column.
-    const typeFor = (col: string): { cast(value: unknown): unknown } =>
-      targetModel.typeForAttribute(col);
-    const castId = (id: unknown): unknown => {
-      if (composite) {
-        const cols = pk;
-        const values = id as unknown[];
-        return cols.map((c, i) => typeFor(c).cast(values[i]));
-      }
-      return typeFor(pk).cast(id);
+    // Rails (collection_proxy.rb:107-109) is a bare delegation:
+    //   def find(*args)
+    //     return super if block_given?
+    //     @association.find(*args)
+    //   end
+    // The `block_given?` arm forwards to `Enumerable#find`'s predicate form,
+    // which has no trails analogue (this `find` takes ids only — the block
+    // form is `Array#find` over an awaited collection), so only the
+    // delegation arm exists. `CollectionAssociation#find` owns the whole
+    // decision: the `inverse_of && loaded?` in-memory scan, the not-found
+    // raising through `scope.raise_record_not_found_exception!`, and the
+    // `scope.find(*args)` fallback. That fallback builds a FRESH scope from
+    // the owner's current foreign-key state, so a proxy loaded empty before
+    // the owner was saved still queries rather than scanning a stale target.
+    const assoc = this._record.association(this._assocName) as unknown as {
+      find(...args: unknown[]): Promise<Base | Base[] | null>;
     };
-
-    // Index records by PK once — O(records + ids) instead of
-    // O(records × ids). Composite keys join with a NUL separator
-    // (unambiguous + bigint-safe; JSON.stringify throws on bigint
-    // and this codebase's big_integer type casts to bigint).
-    const TUPLE_SEP = "\u0000";
-    const keyForTuple = (tuple: unknown[]): string => tuple.map((x) => String(x)).join(TUPLE_SEP);
-    const keyForRecord = (r: Base): string => {
-      if (composite) {
-        const cols = pk;
-        return keyForTuple(cols.map((c) => r._readAttribute(c)));
-      }
-      return String(r._readAttribute(pk));
-    };
-    const keyForCastedId = (castedId: unknown): string => {
-      if (composite) return keyForTuple(castedId as unknown[]);
-      return String(castedId);
-    };
-    const byPk = new Map<string, T>();
-    for (const r of records) byPk.set(keyForRecord(r), r);
-
-    // Rails calls `scope.raise_record_not_found_exception!`, so the message
-    // carries the association scope's WHERE clause (owner FK + scope
-    // conditions + STI type). Mirror that by threading the scope's
-    // `[WHERE …]` conditions clause into the not-found raisers. Computed
-    // lazily (only when raising) — building the scope relation is wasted
-    // work on the hot path where every id is found.
-    // Built exactly as Rails' raise_record_not_found_exception! does
-    // (finder_methods.rb:418): `" [#{arel.where_sql(model)}]" unless
-    // where_clause.empty?` — off the scope relation, since Rails raises via
-    // `scope.raise_record_not_found_exception!`.
-    const conditionsClause = (): string => {
-      const scope = this.scope() as unknown as {
-        _whereClause: { isEmpty(): boolean };
-        arel(): { whereSql(engine: unknown): Nodes.SqlLiteral | null };
-      };
-      return scope._whereClause.isEmpty()
-        ? ""
-        : ` [${scope.arel().whereSql(targetModel)?.value ?? ""}]`;
-    };
-
-    // Composite + any-multi: always use the "Couldn't find all" shape
-    // (matches performFind). Simple-PK single-id uses "with 'pk'=id".
-    if (tuples || wantArray || ids.length > 1) {
-      // Duplicate-id handling matches performFind: compare distinct
-      // found keys to requested count. `find([1, 1])` raises.
-      const castedIds = ids.map(castId);
-      const uniqueFoundKeys = new Set(castedIds.map(keyForCastedId).filter((k) => byPk.has(k)));
-      if (uniqueFoundKeys.size !== ids.length) {
-        raiseNotFoundAll(
-          targetModel.name,
-          pk,
-          normalized,
-          uniqueFoundKeys.size,
-          ids.length,
-          conditionsClause(),
-        );
-      }
-      // Return in DB/load order, matching performFind.
-      const wantedKeys = new Set(castedIds.map(keyForCastedId));
-      const found = records.filter((r) => wantedKeys.has(keyForRecord(r)));
-      return wantArray ? found : found[0];
-    }
-
-    // Simple PK, single scalar id.
-    const id = ids[0];
-    const match = byPk.get(keyForCastedId(castId(id)));
-    if (!match) raiseNotFoundSingle(targetModel.name, pk as string, id, conditionsClause());
-    return match;
+    return (await assoc.find(...args)) as T | T[];
   }
 
   /**
