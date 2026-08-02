@@ -72,13 +72,7 @@ function serialIdType(spec: ColumnSpec | undefined, adapterName?: string): strin
   return isBig ? "bigint" : "integer";
 }
 
-function colOpts(
-  spec: ColumnSpec,
-  colName: string,
-  cpkCols: Set<string> | null,
-  primitive: string,
-  adapterName?: string,
-): string {
+function colOpts(spec: ColumnSpec, primitive: string, adapterName?: string): string {
   const parts: string[] = [];
   const hasPrecision = typeof spec === "object" && spec.precision !== undefined;
   if (typeof spec === "object") {
@@ -93,9 +87,6 @@ function colOpts(
     }
     if (spec.array) parts.push(`array: true`);
     if (spec.primary) parts.push(`primaryKey: true`);
-  }
-  if (cpkCols?.has(colName) && !parts.some((p) => p.startsWith("null:"))) {
-    parts.push(`null: false`);
   }
   // Mirrors schema-types.ts: MySQL DATETIME without precision defaults to
   // DATETIME(0), which rejects fractional seconds. Inject precision:6 unless
@@ -152,7 +143,6 @@ function generateCode(
     // schema-types.ts, which applies the same rule for the fixtures path.
     const serialPkName =
       Array.isArray(pk) && pk.length === 1 && isIntegerSpec(cols[pk[0]]) ? pk[0] : null;
-    const cpkCols = Array.isArray(pk) && serialPkName === null ? new Set(pk) : null;
 
     const tOptsEntries: string[] = [];
     if (pk === false) tOptsEntries.push(`id: false`);
@@ -198,7 +188,7 @@ function generateCode(
         }
         const primitive = typeof colSpec === "string" ? colSpec : colSpec.type;
         lines.push(
-          `    t.column(${JSON.stringify(colName)}, ${JSON.stringify(toArType(primitive))}, ${colOpts(colSpec, colName, cpkCols, primitive, adapterName)});`,
+          `    t.column(${JSON.stringify(colName)}, ${JSON.stringify(toArType(primitive))}, ${colOpts(colSpec, primitive, adapterName)});`,
         );
       }
       lines.push(...fkLines);
