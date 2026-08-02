@@ -542,14 +542,21 @@ async function runDrop(opts: DatabaseOpts = {}): Promise<void> {
  * Migration output goes to stdout (Rails' Migration#write is `puts`), so the
  * per-database prefix is applied by swapping in a stdout-wrapping process
  * adapter for the duration of the run.
+ *
+ * A callback prefix is resolved per write, for runs like `migrate_all` that
+ * interleave databases within one wrapped block and so have no single prefix.
  */
-async function withPrefixedStdout(prefix: string, fn: () => Promise<void>): Promise<void> {
-  const prevAdapter = prefix ? getProcessAdapter() : null;
+async function withPrefixedStdout(
+  prefix: string | (() => string),
+  fn: () => Promise<void>,
+): Promise<void> {
+  const resolvePrefix = typeof prefix === "function" ? prefix : () => prefix;
+  const prevAdapter = prefix === "" ? null : getProcessAdapter();
   if (prevAdapter) {
     registerProcessAdapter({
       ...prevAdapter,
       stdout: {
-        write: (chunk) => prevAdapter.stdout.write(`${prefix}${chunk}`),
+        write: (chunk) => prevAdapter.stdout.write(`${resolvePrefix()}${chunk}`),
         get isTTY() {
           return prevAdapter.stdout.isTTY;
         },
@@ -629,9 +636,23 @@ async function runMigrateAll(targetVersion: string | null): Promise<void> {
   const primary = entries.find((e) => e.name === "primary") ?? entries[0];
   const configs = entries.map((e) => e.hashConfig);
   const multiDb = entries.length > 1;
+  // migrate_all interleaves databases by version, so the prefix has to follow
+  // whichever config it currently has established rather than being fixed for
+  // the whole run.
+  const { Base } = await import("@blazetrails/activerecord");
+  const currentDbPrefix = (): string => {
+    if (!multiDb) return "";
+    try {
+      const name = Base.connectionDbConfig()?.name;
+      return name ? `[${name}] ` : "";
+    } catch {
+      return "";
+    }
+  };
+
   await withRegisteredConfigurations(configs, envName, () =>
     DatabaseTasks.withTemporaryPool(primary.hashConfig, async () => {
-      await DatabaseTasks.migrateAll({ targetVersion });
+      await withPrefixedStdout(currentDbPrefix, () => DatabaseTasks.migrateAll({ targetVersion }));
       for (const { name, raw, hashConfig } of entries) {
         const prefix = multiDb ? `[${name}] ` : "";
         await DatabaseTasks.withTemporaryPool(hashConfig, async (pool) => {

@@ -2166,12 +2166,15 @@ export class ${cls} extends Migration {
       registerProcessAdapter(previous);
     }
 
-    const entries = [...output.matchAll(/^== (\d+).+migrated/gm)].map((m) => m[1]);
+    const entries = [...output.matchAll(/^\[(\w+)\] == (\d+).+migrated/gm)].map((m) => [
+      m[1],
+      m[2],
+    ]);
     expect(entries).toEqual([
-      "20260101000001",
-      "20260101000002",
-      "20260101000003",
-      "20260101000004",
+      ["primary", "20260101000001"],
+      ["animals", "20260101000002"],
+      ["primary", "20260101000003"],
+      ["animals", "20260101000004"],
     ]);
   });
 
