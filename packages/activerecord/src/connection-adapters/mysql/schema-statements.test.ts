@@ -447,7 +447,6 @@ describe("MySQL::SchemaStatements", () => {
       "pages",
     );
     expect(idx).toHaveLength(1);
-    // conciseOptions collapses the single-column map to a bare length.
     expect(idx[0].lengths).toBe(10);
     expect(idx[0].orders).toEqual({});
   });
@@ -466,7 +465,6 @@ describe("MySQL::SchemaStatements", () => {
       ]),
       "pages",
     );
-    // conciseOptions collapses the single-column map to a bare direction.
     expect(idx[0].orders).toBe("desc");
     expect(idx[0].lengths).toEqual({});
   });

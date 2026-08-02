@@ -222,9 +222,6 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
         columns,
         {
           using: row.using as string,
-          // conciseOptions collapses these maps to a single scalar when every
-          // key column shares the same value; `columns` is already key-only
-          // because the SQL limits to ix.indnkeyatts.
           orders: ordersMap,
           opclasses: opclassesMap,
           include,

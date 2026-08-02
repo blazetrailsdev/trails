@@ -1258,8 +1258,6 @@ export class SchemaStatements {
               }
             }
           }
-          // IndexDefinition#conciseOptions collapses a uniform order map to a
-          // single value, so no local collapse is needed here.
           return new IndexDefinition(tableName, row.name, row.unique === true, columns, {
             where,
             orders: ordersMap,

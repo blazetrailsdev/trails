@@ -213,8 +213,6 @@ describe("SQLite3Adapter schema introspection", () => {
     expect(byName["widgets_on_lower_name"]?.columns).toBe("lower(name)");
     expect(byName["widgets_on_code"]?.unique).toBe(true);
     expect(byName["widgets_on_code"]?.where).toBe("code IS NOT NULL");
-    // conciseOptions collapses the single-column order map to a bare direction,
-    // mirroring Rails' IndexDefinition.
     expect(byName["widgets_on_name_desc"]?.orders).toBe("desc");
   });
 
