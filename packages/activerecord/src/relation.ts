@@ -2810,7 +2810,7 @@ export class Relation<T extends Base> {
     // This avoids `IN (SELECT ... LIMIT n)`, which MariaDB does not support.
     let limitedIds: unknown[] | undefined;
     const hasLimit = this._limitValue !== null || this._offsetValue !== null;
-    if (hasLimit && jd.nodes.some((n) => n.assocType === "hasMany")) {
+    if (hasLimit && !this._eagerJoinDependencyIsLimitable(jd)) {
       limitedIds = await this._materializeLimitedIds(jd, basePk);
       if (limitedIds.length === 0) {
         this._records = [];
@@ -3204,8 +3204,8 @@ export class Relation<T extends Base> {
     // `columns_for_distinct`), which projects the pk as a single column. Rails
     // only takes that `distinct_relation_for_primary_key` path for a limit/offset
     // over NON-limitable (collection) reflections (finder_methods.rb:463-488), so
-    // bypass a composite PK only in exactly that case — mirroring the narrower
-    // `hasLimit && jd hasMany` guard the eager execute path already applies. A
+    // bypass a composite PK only in exactly that case — the same two-clause
+    // `using_limitable_reflections?` test the eager paths apply. A
     // composite-PK `includes(:belongs_to)` (limitable) with a limit still JOINs,
     // as does the through-preloader's own unlimited `includes(source)` query, so
     // a scoped source through a composite-PK model JOINs like Rails. The
@@ -5208,13 +5208,30 @@ export class Relation<T extends Base> {
   ): Relation<T> {
     let rel = this._exceptEagerValues(jd);
     const hasLimit = this._limitValue !== null || this._offsetValue !== null;
-    if (hasLimit && jd.nodes.some((n) => n.assocType === "hasMany")) {
+    if (hasLimit && !this._eagerJoinDependencyIsLimitable(jd)) {
       const ids = limitedIds ?? this._buildEagerIdSubquery(jd, basePk);
       rel = rel.where(this._modelClass.arelTable.get(basePk).in(ids as never));
       rel._limitValue = null;
       rel._offsetValue = null;
     }
     return rel;
+  }
+
+  /**
+   * Rails' two-clause `using_limitable_reflections?` guard in
+   * `apply_join_dependency` (finder_methods.rb:463-470), for the paths that
+   * already hold the eager JoinDependency: BOTH its own reflections AND those of
+   * `select_association_list(joins_values) ∪ select_association_list(left_outer_joins_values)`
+   * must be non-collection. A collection reflection in `joins`/`leftOuterJoins`
+   * forces the distinct-parent-id rewrite even when every eager reflection is
+   * singular. Sibling of `_applyJoinDependencyIsLimitable`, which resolves the
+   * first clause from specs instead of a built dependency.
+   */
+  private _eagerJoinDependencyIsLimitable(jd: JoinDependency): boolean {
+    return (
+      this.usingLimitableReflections(jd.reflections as never) &&
+      this._joinsReflectionsAreLimitable()
+    );
   }
 
   /**
