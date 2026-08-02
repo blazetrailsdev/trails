@@ -9,8 +9,8 @@ extend(ActiveSupport.Concern);
 // module ClassMethods
 export function create(attributes = null, block) {
     let object;
-    if (attributes.isA(Array)) {
-        return attributes.collect(async (attr) => await this.create(attr, block));
+    if (Array.isArray(attributes)) {
+        return attributes.map(async (attr) => await this.create(attr, block));
     }
     else {
         object = this.constructor(attributes, block);
@@ -20,8 +20,8 @@ export function create(attributes = null, block) {
 }
 export function createBang(attributes = null, block) {
     let object;
-    if (attributes.isA(Array)) {
-        return attributes.collect(async (attr) => await this.createBang(attr, block));
+    if (Array.isArray(attributes)) {
+        return attributes.map(async (attr) => await this.createBang(attr, block));
     }
     else {
         object = this.constructor(attributes, block);
@@ -30,8 +30,8 @@ export function createBang(attributes = null, block) {
     }
 }
 export function build(attributes = null, block) {
-    if (attributes.isA(Array)) {
-        return attributes.collect(attr => this.build(attr, block));
+    if (Array.isArray(attributes)) {
+        return attributes.map(attr => this.build(attr, block));
     }
     else {
         return this.constructor(attributes, block);
@@ -43,15 +43,17 @@ export function instantiate(attributes, column_types = {}, block) {
     return this.instantiateInstanceOf(klass, attributes, column_types, block);
 }
 export function update(id = "all") {
-    let object;
-    if (id.isA(Array)) {
+    let record, object;
+    if (Array.isArray(id)) {
         if (id.isAny(ActiveRecord.Base)) {
             throw new ArgumentError("You are passing an array of ActiveRecord::Base instances to `update`. Please pass the ids of the objects by calling `pluck(:id)` or `map(&:id)`.");
         }
         return id.map(one_id => this.find(one_id)).eachWithIndex((object, idx) => object.update(attributes[idx]));
     }
     else if (id === "all") {
-        return this.all().each(record => record.update(attributes));
+        for (const record of this.all()) {
+            record.update(attributes);
+        }
     }
     else {
         if (__PRISM_TODO("CallNode")) {
@@ -63,15 +65,17 @@ export function update(id = "all") {
     }
 }
 export function updateBang(id = "all") {
-    let object;
-    if (id.isA(Array)) {
+    let record, object;
+    if (Array.isArray(id)) {
         if (id.isAny(ActiveRecord.Base)) {
             throw new ArgumentError("You are passing an array of ActiveRecord::Base instances to `update!`. Please pass the ids of the objects by calling `pluck(:id)` or `map(&:id)`.");
         }
         return id.map(one_id => this.find(one_id)).eachWithIndex((object, idx) => object.updateBang(attributes[idx]));
     }
     else if (id === "all") {
-        return this.all().each(record => record.updateBang(attributes));
+        for (const record of this.all()) {
+            record.updateBang(attributes);
+        }
     }
     else {
         if (__PRISM_TODO("CallNode")) {
@@ -83,7 +87,7 @@ export function updateBang(id = "all") {
     }
 }
 export function queryConstraints(...columns_list) {
-    if (columns_list.isEmpty()) {
+    if (columns_list.length === 0) {
         throw new ArgumentError("You must specify at least one column to be used in querying");
     }
     this.query_constraints_list = columns_list.map(x => x.toString());
@@ -96,7 +100,7 @@ export function queryConstraintsList() {
     return this.query_constraints_list ||= this.isBaseClass() || this.primaryKey !== this.baseClass.primaryKey() ? __PRISM_TODO("IfNode") : this.baseClass.queryConstraintsList();
 }
 export function compositeQueryConstraintsList() {
-    return this.composite_query_constraints_list ||= this.queryConstraintsList() || this.Array(this.primaryKey);
+    return this.composite_query_constraints_list ||= this.queryConstraintsList() || (this.primaryKey == null ? [] : Array.isArray(this.primaryKey) ? this.primaryKey : [this.primaryKey]);
 }
 export function _insertRecord(connection, values, returning) {
     let primary_key, primary_key_value, im;
@@ -106,7 +110,7 @@ export function _insertRecord(connection, values, returning) {
         values[primary_key] ||= __PRISM_TODO("BeginNode");
     }
     im = new Arel.InsertManager(this.arelTable);
-    if (values.isEmpty()) {
+    if (values.length === 0) {
         im.insert(connection.emptyInsertStatementValue(primary_key));
     }
     else {
@@ -163,7 +167,7 @@ export function buildDefaultConstraint() {
         return;
     }
     default_where_clause = this.defaultScoped({ all_queries: true }).whereClause();
-    if (!default_where_clause.isEmpty()) {
+    if (!(default_where_clause.length === 0)) {
         return default_where_clause.ast();
     }
 }
@@ -231,13 +235,13 @@ export function becomesBang(klass) {
     return became;
 }
 export async function updateAttribute(name, value) {
-    name = name.toString();
+    name = String(name);
     this.verifyReadonlyAttribute(name);
     this.publicSend(`${name}=`, value);
     return await this.save({ validate: false });
 }
 export async function updateAttributeBang(name, value) {
-    name = name.toString();
+    name = String(name);
     this.verifyReadonlyAttribute(name);
     this.publicSend(`${name}=`, value);
     return await this.saveBang({ validate: false });
@@ -269,13 +273,13 @@ export function updateColumns(attributes) {
         this._raiseReadonlyRecordError();
     }
     attributes = attributes.transformKeys(key => {
-        name = key.toString();
-        name = this.class().attributeAliases()[name] || name;
+        name = String(key);
+        name = this.constructor.attributeAliases()[name] || name;
         return this.verifyReadonlyAttribute(name) || name;
     });
     update_constraints = this._queryConstraintsHash();
     attributes = __PRISM_TODO("CallNode");
-    affected_rows = this.class()._updateRecord(attributes, update_constraints);
+    affected_rows = this.constructor._updateRecord(attributes, update_constraints);
     return affected_rows === 1;
 }
 export function increment(attribute, by = 1) {
@@ -287,7 +291,7 @@ export function incrementBang(attribute, by = 1, { touch = null } = {}) {
     let change;
     this.increment(attribute, by);
     change = this.publicSend(attribute) - (this.publicSend(__PRISM_TODO("InterpolatedSymbolNode")) || 0);
-    this.class().updateCounters(this.id, { [attribute]: change, touch: touch });
+    this.constructor.updateCounters(this.id, { [attribute]: change, touch: touch });
     this.publicSend(__PRISM_TODO("InterpolatedSymbolNode"));
     return this;
 }
@@ -306,8 +310,8 @@ export function toggleBang(attribute) {
 }
 export function reload(options = null) {
     let fresh_object;
-    this.class().connectionPool().clearQueryCache();
-    fresh_object = this.isApplyScoping(options) ? this._findRecord((options || {}).merge({ all_queries: true })) : this.class().unscoped(() => this._findRecord(options));
+    this.constructor.connectionPool().clearQueryCache();
+    fresh_object = this.isApplyScoping(options) ? this._findRecord((options || {}).merge({ all_queries: true })) : this.constructor.unscoped(() => this._findRecord(options));
     this.association_cache = fresh_object.instanceVariableGet("@association_cache");
     this.association_cache.eachValue(association => association.owner = this);
     this.attributes = fresh_object.instanceVariableGet("@attributes");
@@ -325,12 +329,12 @@ export function touch(...names, { time = null } = {}) {
     }
     attribute_names = this.timestampAttributesForUpdateInModel();
     attribute_names = (__PRISM_TODO("CallNode")).mapBang(name => {
-        name = name.toString();
-        name = this.class().attributeAliases()[name] || name;
+        name = String(name);
+        name = this.constructor.attributeAliases()[name] || name;
         this.verifyReadonlyAttribute(name);
         return name;
     });
-    if (!attribute_names.isEmpty()) {
+    if (!(attribute_names.length === 0)) {
         affected_rows = this._touchRow(attribute_names, time);
         return this._trigger_update_callback = affected_rows === 1;
     }
@@ -350,7 +354,7 @@ export function strictLoadedAssociations() {
 export function _findRecord(options) {
     let all_queries, base;
     all_queries = options ? options["all_queries"] : null;
-    base = this.class().all({ all_queries: all_queries }).preload(this.strictLoadedAssociations());
+    base = this.constructor.all({ all_queries: all_queries }).preload(this.strictLoadedAssociations());
     if (options && options["lock"]) {
         return base.lock(options["lock"]).findByBang(this._inMemoryQueryConstraintsHash());
     }
@@ -359,22 +363,22 @@ export function _findRecord(options) {
     }
 }
 export function _inMemoryQueryConstraintsHash() {
-    if (this.class().queryConstraintsList().nil()) {
+    if (this.constructor.queryConstraintsList() == null) {
         return { [this.primary_key]: this.id };
     }
     else {
-        return this.class().queryConstraintsList().indexWith(column_name => this.attribute(column_name));
+        return this.constructor.queryConstraintsList().indexWith(column_name => this.attribute(column_name));
     }
 }
 export function isApplyScoping(options) {
-    return !(options && options["unscoped"]) && (this.class().isDefaultScopes({ all_queries: true }) || this.class().globalCurrentScope());
+    return !(options && options["unscoped"]) && (this.constructor.isDefaultScopes({ all_queries: true }) || this.constructor.globalCurrentScope());
 }
 export function _queryConstraintsHash() {
-    if (this.class().queryConstraintsList().nil()) {
+    if (this.constructor.queryConstraintsList() == null) {
         return { [this.primary_key]: this.idInDatabase() };
     }
     else {
-        return this.class().queryConstraintsList().indexWith(column_name => this.attributeInDatabase(column_name));
+        return this.constructor.queryConstraintsList().indexWith(column_name => this.attributeInDatabase(column_name));
     }
 }
 export function destroyAssociations() {
@@ -383,15 +387,18 @@ export function destroyRow() {
     return this._deleteRow();
 }
 export function _deleteRow() {
-    return this.class()._deleteRecord(this._queryConstraintsHash());
+    return this.constructor._deleteRecord(this._queryConstraintsHash());
 }
 export function _touchRow(attribute_names, time) {
+    let attr_name;
     time ||= this.currentTimeFromProperTimezone();
-    attribute_names.each(attr_name => this._writeAttribute(attr_name, time));
+    for (const attr_name of attribute_names) {
+        this._writeAttribute(attr_name, time);
+    }
     return this._updateRow(attribute_names, "touch");
 }
 export function _updateRow(attribute_names, attempted_action = "update") {
-    return this.class()._updateRecord(this.attributesWithValues(attribute_names), this._queryConstraintsHash());
+    return this.constructor._updateRecord(this.attributesWithValues(attribute_names), this._queryConstraintsHash());
 }
 export function createOrUpdate({ ...opts } = {}, block) {
     let result;
@@ -407,7 +414,7 @@ export function createOrUpdate({ ...opts } = {}, block) {
 export async function _updateRecord(attribute_names = this.attributeNames(), block) {
     let affected_rows;
     attribute_names = this.attributesForUpdate(attribute_names);
-    if (attribute_names.isEmpty()) {
+    if (attribute_names.length === 0) {
         affected_rows = 0;
         this._trigger_update_callback = true;
     }
@@ -422,17 +429,17 @@ export async function _updateRecord(attribute_names = this.attributeNames(), blo
     return affected_rows;
 }
 export function _createRecord(attribute_names = this.attributeNames(), block) {
-    let returning_columns, returning_values;
+    let returning_columns, returning_values, column, value;
     attribute_names = this.attributesForCreate(attribute_names);
-    this.class().withConnection(connection => {
-        returning_columns = this.class()._returningColumnsForInsert(connection);
-        returning_values = this.class()._insertRecord(connection, this.attributesWithValues(attribute_names), returning_columns);
+    this.constructor.withConnection(connection => {
+        returning_columns = this.constructor._returningColumnsForInsert(connection);
+        returning_values = this.constructor._insertRecord(connection, this.attributesWithValues(attribute_names), returning_columns);
         if (returning_values) {
-            return returning_columns.zip(returning_values).each((column, value) => {
+            for (const [column, value] of returning_columns.zip(returning_values)) {
                 if (!this._readAttribute(column)) {
-                    return this._writeAttribute(column, this.typeForAttribute(column).deserialize(value));
+                    this._writeAttribute(column, this.typeForAttribute(column).deserialize(value));
                 }
-            });
+            }
         }
     });
     this.new_record = false;
@@ -443,7 +450,7 @@ export function _createRecord(attribute_names = this.attributeNames(), block) {
     return this.id;
 }
 export function verifyReadonlyAttribute(name) {
-    if (this.class().isReadonlyAttribute(name)) {
+    if (this.constructor.isReadonlyAttribute(name)) {
         throw new ActiveRecordError(`${name} is marked as readonly`);
     }
 }
@@ -451,15 +458,15 @@ export function _raiseRecordNotDestroyed() {
     let key;
     try {
         this._association_destroy_exception ||= null;
-        key = this.class().primaryKey();
-        throw this._association_destroy_exception || new RecordNotDestroyed(`Failed to destroy ${this.class()} with ${key}=${this.id}`, this);
+        key = this.constructor.primaryKey();
+        throw this._association_destroy_exception || new RecordNotDestroyed(`Failed to destroy ${this.constructor} with ${key}=${this.id}`, this);
     }
     finally {
         this._association_destroy_exception = null;
     }
 }
 export function _raiseReadonlyRecordError() {
-    throw new ReadOnlyRecord(`${this.class()} is marked as readonly`);
+    throw new ReadOnlyRecord(`${this.constructor} is marked as readonly`);
 }
 export function _raiseRecordNotTouchedError() {
     throw new ActiveRecordError("Cannot touch on a new or destroyed record object. Consider using\npersisted?, new_record?, or destroyed? before touching.\n".squish());

@@ -34,10 +34,10 @@ export function takeBang() {
 export async function sole() {
     let found, undesired;
     [found, undesired] = await this.first(2);
-    if (found.nil()) {
+    if (found == null) {
         return this.raiseRecordNotFoundExceptionBang();
     }
-    else if (undesired.nil()) {
+    else if (undesired == null) {
         return found;
     }
     else {
@@ -144,21 +144,21 @@ export function isInclude(record) {
         return false;
     }
     if (this.isLoaded || this.offsetValue || this.limitValue || this.havingClause.isAny()) {
-        return this.records.isInclude(record);
+        return this.records.includes(record);
     }
     else {
-        id = record.class().isCompositePrimaryKey() ? record.class().primaryKey().zip(record.id()).toH() : record.id();
+        id = record.constructor.isCompositePrimaryKey() ? record.constructor.primaryKey().zip(record.id()).toH() : record.id();
         return this.isExists(id);
     }
 }
 const isMember = isInclude;
 export function raiseRecordNotFoundExceptionBang(ids = null, result_size = null, expected_size = null, key = this.model.primaryKey, not_found_ids = null) {
     let conditions, name, error;
-    if (!this.whereClause.isEmpty()) {
+    if (!(this.whereClause.length === 0)) {
         conditions = ` [${this.arel().whereSql(this.model)}]`;
     }
     name = this.model.name();
-    if (ids.nil()) {
+    if (ids == null) {
         error = +`Couldn't find ${name}`;
         if (conditions) {
             error.push(` with${conditions}`);
@@ -173,7 +173,7 @@ export function raiseRecordNotFoundExceptionBang(ids = null, result_size = null,
         error = +`Couldn't find all ${name.pluralize()} with '${key}': `;
         error.push(`(${ids.join(", ")})${conditions} (found ${result_size} results, but was looking for ${expected_size}).`);
         if (not_found_ids) {
-            error.push(` Couldn't find ${name.pluralize(not_found_ids.size())} with ${key.toString().pluralize(not_found_ids.size())} ${not_found_ids.join(", ")}.`);
+            error.push(` Couldn't find ${name.pluralize(not_found_ids.size())} with ${String(key).pluralize(not_found_ids.size())} ${not_found_ids.join(", ")}.`);
         }
         throw new RecordNotFound(error, name, key, ids);
     }
@@ -189,7 +189,7 @@ export function constructRelationForExists(conditions) {
         relation = this.except("select", "distinct", "order")._selectBang(ONE_AS_ONE).limitBang(1);
     }
     if (caseEq(Array, conditions) || caseEq(Hash, conditions)) {
-        if (!conditions.isEmpty()) {
+        if (!(conditions.length === 0)) {
             relation.whereBang(conditions);
         }
     }
@@ -200,7 +200,7 @@ export function constructRelationForExists(conditions) {
     }
     return relation;
 }
-export function applyJoinDependency({ eager_loading = this.groupValues.isEmpty() } = {}, block) {
+export function applyJoinDependency({ eager_loading = this.groupValues.length === 0 } = {}, block) {
     let join_dependency, relation;
     join_dependency = this.constructJoinDependency(__PRISM_TODO("CallNode"), Arel.Nodes.OuterJoin);
     relation = this.except("includes", "eager_load", "preload").joinsBang(join_dependency);
@@ -219,11 +219,11 @@ export function isUsingLimitableReflections(reflections) {
 }
 export async function findWithIds(...ids) {
     let expects_array, model_name, result, error_message;
-    if (this.model.primaryKey.nil()) {
+    if (this.model.primaryKey == null) {
         throw new UnknownPrimaryKey(this.model);
     }
-    expects_array = this.model.isCompositePrimaryKey() ? ids.first().first().isA(Array) : ids.first().isA(Array);
-    if (expects_array && ids.first().isEmpty()) {
+    expects_array = this.model.isCompositePrimaryKey() ? Array.isArray(ids.first().first()) : Array.isArray(ids.first());
+    if (expects_array && ids.first().length === 0) {
         return [];
     }
     if (expects_array) {
@@ -266,10 +266,10 @@ export async function findSome(ids) {
         return await this.findSomeOrdered(ids);
     }
     relation = this.where({ [this.model.primaryKey]: ids });
-    if (!this.selectValues.isEmpty()) {
+    if (!(this.selectValues.length === 0)) {
         relation = relation.select(this.table[this.model.primaryKey]);
     }
-    result = relation.toA();
+    result = relation.toArray();
     expected_size = this.limitValue && ids.size() > this.limitValue ? this.limitValue : ids.size();
     if (this.offsetValue && (ids.size() - this.offsetValue < expected_size)) {
         expected_size = ids.size() - this.offsetValue;
@@ -286,7 +286,7 @@ export function findSomeOrdered(ids) {
     ids = ids.slice(this.offsetValue || 0, this.limitValue || ids.size()) || [];
     relation = this.except("limit", "offset");
     relation = relation.where({ [this.model.primaryKey]: ids });
-    if (!this.selectValues.isEmpty()) {
+    if (!(this.selectValues.length === 0)) {
         relation = relation.select(this.table[this.model.primaryKey]);
     }
     result = relation.records();
@@ -310,7 +310,7 @@ export function findTakeWithLimit(limit) {
         return this.records.take(limit);
     }
     else {
-        return this.limit(limit).toA();
+        return this.limit(limit).toArray();
     }
 }
 export async function findNth(index) {
@@ -331,7 +331,7 @@ export function findNthWithLimit(index, limit) {
             if (!index.isZero()) {
                 relation = relation.offset((this.offsetValue || 0) + index);
             }
-            return relation.limit(limit).toA();
+            return relation.limit(limit).toArray();
         }
         else {
             return [];
@@ -345,7 +345,7 @@ export function findNthFromLast(index) {
     }
     else {
         relation = this.orderedRelation();
-        if (relation.orderValues().isEmpty() || relation.hasLimitOrOffset()) {
+        if (relation.orderValues().length === 0 || relation.hasLimitOrOffset()) {
             return relation.records()[-index];
         }
         else {
@@ -362,7 +362,7 @@ export function findLast(limit) {
     }
 }
 export function orderedRelation() {
-    if (this.orderValues.isEmpty() && (this.model.implicitOrderColumn() || !this.model.queryConstraintsList().nil() || this.model.primaryKey)) {
+    if (this.orderValues.length === 0 && (this.model.implicitOrderColumn() || !(this.model.queryConstraintsList() == null) || this.model.primaryKey)) {
         return this.order(this._orderColumns().map(column => this.table[column].asc()));
     }
     else {
@@ -378,7 +378,7 @@ export function _orderColumns() {
     if (this.model.queryConstraintsList()) {
         oc.push(this.model.queryConstraintsList());
     }
-    if (this.model.primaryKey() && this.model.queryConstraintsList().nil()) {
+    if (this.model.primaryKey() && this.model.queryConstraintsList() == null) {
         oc.push(this.model.primaryKey());
     }
     return oc.flatten().uniq().compact();

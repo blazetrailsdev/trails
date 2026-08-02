@@ -538,15 +538,15 @@ describe("prism-codegen", () => {
       `module M
         def create(attrs)
           attrs.collect { |attr| save(attr) }
-          attrs.each { |attr| attr.each { |x| save(x) } }
-          attrs.each { |attr| attr.size }
+          a = attrs.each { |attr| attr.collect { |x| save(x) } }
+          b = attrs.each { |attr| attr.size }
         end
       end`,
       new Set(["save", "create"]),
     );
-    expect(code).toContain("attrs.collect(async (attr) => await this.save(attr))");
-    expect(code).toContain("attrs.each(attr => attr.each(async (x) => await this.save(x)))");
-    expect(code).toContain("attrs.each(attr => attr.size())");
+    expect(code).toContain("attrs.map(async (attr) => await this.save(attr))");
+    expect(code).toContain("attrs.forEach(attr => attr.map(async (x) => await this.save(x)))");
+    expect(code).toContain("attrs.forEach(attr => attr.size())");
   });
   it("never awaits async-named calls inside a sync method", async () => {
     const { code } = await generateFromSource(
@@ -607,7 +607,7 @@ describe("prism-codegen", () => {
     expect(parseErrorCount).toBe(0);
     expect(code).toContain("this.buildColumns(list)"); // receiverless w/ args → self-call
     expect(code).toContain("oc.concat(this.defaultColumns)"); // local stays bare; parenless → getter
-    expect(code).toContain("this.orderValues.isEmpty()"); // parenless chain roots on this
+    expect(code).toContain("this.orderValues.length === 0"); // parenless chain roots on this
     expect(code).toContain("return oc;"); // local read, never this-ified
   });
 

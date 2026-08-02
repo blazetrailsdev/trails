@@ -27,7 +27,7 @@ included(() => {
     initializeLoadSchemaMonitor;
 });
 export function deriveJoinTableName(first_table, second_table) {
-    return [first_table.toString(), second_table.toString()].sort().join("\0").gsub(/^(.*[_.])(.+)\0\1(.+)/, "\\1\\2_\\3").tr("\0", "_");
+    return [String(first_table), String(second_table)].sort().join("\0").gsub(/^(.*[_.])(.+)\0\1(.+)/, "\\1\\2_\\3").tr("\0", "_");
 }
 // module ClassMethods
 export function tableName() {
@@ -37,7 +37,7 @@ export function tableName() {
     return this.table_name;
 }
 export function tableName(value) {
-    value = value && value.toString();
+    value = value && String(value);
     if (typeof (this.table_name) !== "undefined") {
         if (value === this.table_name) {
             return;
@@ -60,10 +60,10 @@ export function resetTableName() {
     return this.tableName = __PRISM_TODO("IfNode");
 }
 export function fullTableNamePrefix() {
-    return (this.moduleParents.detect(p => p.respondTo("table_name_prefix")) || this).tableNamePrefix();
+    return (this.moduleParents.find(p => p.respondTo("table_name_prefix")) || this).tableNamePrefix();
 }
 export function fullTableNameSuffix() {
-    return (this.moduleParents.detect(p => p.respondTo("table_name_suffix")) || this).tableNameSuffix();
+    return (this.moduleParents.find(p => p.respondTo("table_name_suffix")) || this).tableNameSuffix();
 }
 export function protectedEnvironments() {
     if (typeof (this.protected_environments) !== "undefined") {
@@ -77,7 +77,7 @@ export function protectedEnvironments(environments) {
     return this.protected_environments = environments.map(x => x.toString());
 }
 export function realInheritanceColumn(value) {
-    return this._inheritanceColumn = value.toString();
+    return this._inheritanceColumn = String(value);
 }
 export function ignoredColumns() {
     return this.ignored_columns || this.superclass.ignoredColumns();
@@ -99,7 +99,7 @@ export function resetSequenceName() {
     return this.sequence_name = this.withConnection(c => c.defaultSequenceName(this.tableName, this.primaryKey));
 }
 export function sequenceName(value) {
-    this.sequence_name = value.toString();
+    this.sequence_name = String(value);
     return this.explicit_sequence_name = true;
 }
 export function isPrefetchPrimaryKey() {
@@ -130,7 +130,7 @@ export function yamlEncoder() {
     return this.yaml_encoder ||= new ActiveModel.AttributeSet.YAMLEncoder(this.attributeTypes());
 }
 export function columnForAttribute(name) {
-    name = name.toString();
+    name = String(name);
     return this.columnsHash.fetch(name, () => new ConnectionAdapters.NullColumn(name));
 }
 export function columnDefaults() {
@@ -149,7 +149,7 @@ export function contentColumns() {
 }
 export function resetColumnInformation() {
     this.connectionPool.activeConnection().clearCacheBang();
-    ([this] + this.descendants).each(x => x.undefineAttributeMethods());
+    ([this] + this.descendants).forEach(x => x.undefineAttributeMethods());
     this.schemaCache.clearDataSourceCacheBang(this.tableName);
     this.reloadSchemaFromCache();
     return this.initializeFindByCache;
@@ -177,6 +177,7 @@ export function initializeLoadSchemaMonitor() {
     return this.load_schema_monitor = new Monitor();
 }
 export function reloadSchemaFromCache(recursive = true) {
+    let descendant;
     this._returning_columns_for_insert = null;
     this.arel_table = null;
     this.column_names = null;
@@ -190,7 +191,9 @@ export function reloadSchemaFromCache(recursive = true) {
     this.attribute_names = null;
     this.yaml_encoder = null;
     if (recursive) {
-        return this.subclasses.each(descendant => descendant.send("reload_schema_from_cache"));
+        for (const descendant of this.subclasses) {
+            descendant.send("reload_schema_from_cache");
+        }
     }
 }
 __PRISM_TODO("CallNode");
@@ -208,7 +211,7 @@ export function loadSchema() {
         throw new ActiveRecord.TableNotSpecified(`${this} has no table configured. Set one with ${this}.table_name=`);
     }
     columns_hash = this.schemaCache.columnsHash(this.tableName);
-    if (!this.ignoredColumns.isEmpty()) {
+    if (!(this.ignoredColumns.length === 0)) {
         columns_hash = columns_hash.except(...this.ignoredColumns);
     }
     this.columns_hash = columns_hash.freeze();
@@ -216,7 +219,7 @@ export function loadSchema() {
 }
 export function undecoratedTableName(model_name) {
     let table_name;
-    table_name = model_name.toString().demodulize().underscore();
+    table_name = String(model_name).demodulize().underscore();
     if (this.pluralizeTableNames) {
         return table_name.pluralize();
     }

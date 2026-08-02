@@ -31,7 +31,7 @@ export class Relation {
         let reflection, attr, bind;
         if (reflection = this.model._reflectOnAssociation(name)) {
             name = reflection.foreignKey();
-            if (!value.nil()) {
+            if (!(value == null)) {
                 value = value.readAttribute(reflection.associationPrimaryKey());
             }
         }
@@ -40,8 +40,8 @@ export class Relation {
         return block(attr, bind);
     }
     constructor(attributes = null, block) {
-        if (attributes.isA(Array)) {
-            attributes.collect(attr => {
+        if (Array.isArray(attributes)) {
+            attributes.map(attr => {
                 this.constructor(attr, block);
             });
         }
@@ -53,8 +53,8 @@ export class Relation {
         }
     }
     async create(attributes = null, block) {
-        if (attributes.isA(Array)) {
-            return attributes.collect(async (attr) => await this.create(attr, block));
+        if (Array.isArray(attributes)) {
+            return attributes.map(async (attr) => await this.create(attr, block));
         }
         else {
             block = this.currentScopeRestoringBlock(block);
@@ -62,8 +62,8 @@ export class Relation {
         }
     }
     async createBang(attributes = null, block) {
-        if (attributes.isA(Array)) {
-            return attributes.collect(async (attr) => await this.createBang(attr, block));
+        if (Array.isArray(attributes)) {
+            return attributes.map(async (attr) => await this.createBang(attr, block));
         }
         else {
             block = this.currentScopeRestoringBlock(block);
@@ -144,7 +144,7 @@ export class Relation {
             return true;
         }
         if (this.isLoaded) {
-            return this.records.isEmpty();
+            return this.records.length === 0;
         }
         else {
             return !this.isExists();
@@ -215,7 +215,7 @@ export class Relation {
     }
     computeCacheVersion(timestamp_column) {
         let size, timestamp, collection, column, select_values, query, subquery_alias, subquery_column, arel, column_type;
-        timestamp_column = timestamp_column.toString();
+        timestamp_column = String(timestamp_column);
         if (this.isLoaded) {
             size = this.records.size();
             if (size > 0) {
@@ -229,7 +229,7 @@ export class Relation {
                 select_values = `COUNT(*) AS ${this.model.adapterClass().quoteColumnName("size")}, MAX(%s) AS timestamp`;
                 if (collection.hasLimitOrOffset()) {
                     query = collection.select(`${column} AS collection_cache_key_timestamp`);
-                    if (this.distinctValue && collection.selectValues().isEmpty()) {
+                    if (this.distinctValue && collection.selectValues().length === 0) {
                         query._selectBang(this.table[Arel.star()]);
                     }
                     subquery_alias = "subquery_for_cache_key";
@@ -288,7 +288,7 @@ export class Relation {
         if (this.none) {
             return 0;
         }
-        if (updates.isA(Hash)) {
+        if (updates instanceof Hash) {
             if (this.model.isLockingEnabled() && !updates.isKey(this.model.lockingColumn()) && !updates.isKey(this.model.lockingColumn().toSym())) {
                 attr = this.table[this.model.lockingColumn()];
                 updates[attr.name()] = this._incrementAttribute(attr);
@@ -302,7 +302,7 @@ export class Relation {
             arel = this.isEagerLoading ? this.applyJoinDependency().arel() : this.buildArel(c);
             arel.source().left = this.table;
             group_values_arel_columns = this.arelColumns(this.groupValues.uniq());
-            if (!this.havingClause.isEmpty()) {
+            if (!(this.havingClause.length === 0)) {
                 having_clause_ast = this.havingClause.ast();
             }
             key = this.model.isCompositePrimaryKey() ? this.model.primaryKey.map(pk => this.table[pk]) : this.table[this.model.primaryKey];
@@ -345,13 +345,13 @@ export class Relation {
         return InsertAll.execute(this, attributes, { on_duplicate: on_duplicate, update_only: update_only, returning: returning, unique_by: unique_by, record_timestamps: record_timestamps });
     }
     async updateCounters(counters) {
-        let touch, updates, attr, names, options, touch_updates;
+        let touch, updates, counter_name, value, attr, names, options, touch_updates;
         touch = counters.delete("touch");
         updates = {};
-        counters.each((counter_name, value) => {
+        for (const [counter_name, value] of counters) {
             attr = this.table[counter_name];
-            return updates[attr.name()] = this._incrementAttribute(attr, value);
-        });
+            updates[attr.name()] = this._incrementAttribute(attr, value);
+        }
         if (touch) {
             if (touch !== true) {
                 names = touch;
@@ -359,7 +359,7 @@ export class Relation {
             names = Array.wrap(names);
             options = names.extractOptionsBang();
             touch_updates = this.model.touchAttributesWithTime(...names, { ...options });
-            if (!touch_updates.isEmpty()) {
+            if (!(touch_updates.length === 0)) {
                 updates.mergeBang(touch_updates);
             }
         }
@@ -369,7 +369,7 @@ export class Relation {
         return await this.updateAll(this.model.touchAttributesWithTime(...names, { time: time }));
     }
     destroyAll() {
-        return this.records.each(x => x.destroy()).tap(() => this.reset());
+        return this.records.forEach(x => x.destroy()).tap(() => this.reset());
     }
     deleteAll() {
         let invalid_methods, value, arel, group_values_arel_columns, having_clause_ast, key, stmt;
@@ -392,7 +392,7 @@ export class Relation {
             arel = this.isEagerLoading ? this.applyJoinDependency().arel() : this.buildArel(c);
             arel.source().left = this.table;
             group_values_arel_columns = this.arelColumns(this.groupValues.uniq());
-            if (!this.havingClause.isEmpty()) {
+            if (!(this.havingClause.length === 0)) {
                 having_clause_ast = this.havingClause.ast();
             }
             key = this.model.isCompositePrimaryKey() ? this.model.primaryKey.map(pk => this.table[pk]) : this.table[this.model.primaryKey];
@@ -401,16 +401,16 @@ export class Relation {
         });
     }
     delete(id_or_array) {
-        if (id_or_array.nil() || (id_or_array.isA(Array) && id_or_array.isEmpty())) {
+        if (id_or_array == null || (Array.isArray(id_or_array) && id_or_array.length === 0)) {
             return 0;
         }
         return this.where({ [this.model.primaryKey()]: id_or_array }).deleteAll();
     }
     destroy(id) {
         let multiple_ids;
-        multiple_ids = this.model.isCompositePrimaryKey() ? id.first().isA(Array) : id.isA(Array);
+        multiple_ids = this.model.isCompositePrimaryKey() ? Array.isArray(id.first()) : Array.isArray(id);
         if (multiple_ids) {
-            return this.find(id).each(x => x.destroy());
+            return this.find(id).forEach(x => x.destroy());
         }
         else {
             return this.find(id).destroy();
@@ -430,7 +430,7 @@ export class Relation {
             }
             if (!this.isLoaded) {
                 result = this.execMainQuery({ async: !c.currentTransaction().isJoinable() });
-                if (result.isA(Array)) {
+                if (Array.isArray(result)) {
                     this.records = result;
                 }
                 else {
@@ -485,10 +485,12 @@ export class Relation {
         return this.whereClause.toH(relation_table_name);
     }
     scopeForCreate() {
-        let hash;
+        let hash, k, v;
         hash = this.whereClause.toH(this.model.tableName(), { equality_only: true });
-        if (!this.createWithValue.isEmpty()) {
-            this.createWithValue.each((k, v) => hash[k.toString()] = v);
+        if (!(this.createWithValue.length === 0)) {
+            for (const [k, v] of this.createWithValue) {
+                hash[String(k)] = v;
+            }
         }
         return hash;
     }
@@ -526,7 +528,7 @@ export class Relation {
         if (entries.size() === 11) {
             entries[10] = "...";
         }
-        return `#<${this.class().name()} [${entries.join(", ")}]>`;
+        return `#<${this.constructor.name()} [${entries.join(", ")}]>`;
     }
     isEmptyScope() {
         return this.values === this.model.unscoped().values();
@@ -538,13 +540,15 @@ export class Relation {
         return ActiveRecord.Associations.AliasTracker.create(this.model.connectionPool(), this.table.name(), joins, aliases);
     }
     preloadAssociations(records) {
-        let preload, scope;
+        let preload, scope, associations;
         preload = this.preloadValues;
         if (!this.isEagerLoading) {
             preload += this.includesValues;
         }
         scope = this.strictLoadingValue ? StrictLoadingScope : null;
-        return preload.each(associations => new ActiveRecord.Associations.Preloader({ records: records, associations: associations, scope: scope }).call());
+        for (const associations of preload) {
+            new ActiveRecord.Associations.Preloader({ records: records, associations: associations, scope: scope }).call();
+        }
     }
     loadRecords(records) {
         this.records = records.freeze();
@@ -612,7 +616,7 @@ export class Relation {
         return expr.expr();
     }
     execQueries(block) {
-        let rows, records;
+        let rows, records, record;
         return this.skipQueryCacheIfNecessary(async () => {
             rows = __PRISM_TODO("IfNode");
             records = this.instantiateRecords(rows, block);
@@ -620,10 +624,12 @@ export class Relation {
                 await this.preloadAssociations(records);
             }
             if (this.readonlyValue) {
-                records.each(x => x.readonlyBang());
+                records.forEach(x => x.readonlyBang());
             }
-            if (!this.strictLoadingValue.nil()) {
-                records.each(record => record.strictLoadingBang(this.strictLoadingValue));
+            if (!(this.strictLoadingValue == null)) {
+                for (const record of records) {
+                    record.strictLoadingBang(this.strictLoadingValue);
+                }
             }
             return records;
         });
@@ -661,7 +667,7 @@ export class Relation {
     }
     instantiateRecords(rows, block) {
         let records;
-        if (rows.isEmpty()) {
+        if (rows.length === 0) {
             return [].freeze();
         }
         if (this.isEagerLoading) {
@@ -693,7 +699,7 @@ export class Relation {
         });
         joined_tables.push(this.table.name());
         joined_tables.mapBang(x => x.downcase());
-        return !(this.referencesValues.map(x => x.toString()) - joined_tables).isEmpty();
+        return !((this.referencesValues.map(x => x.toString()) - joined_tables).length === 0);
     }
     tablesInString(string) {
         if (string.isBlank()) {

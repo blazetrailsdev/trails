@@ -20,10 +20,10 @@ export function constructor(attributes = null, block) {
     }
     if (this.is_hasAttribute(this.inheritanceColumn)) {
         subclass = this.subclassFromAttributes(attributes);
-        if (subclass.nil() && (scope_attributes = this.currentScope.scopeForCreate())) {
+        if (subclass == null && (scope_attributes = this.currentScope.scopeForCreate())) {
             subclass = this.subclassFromAttributes(scope_attributes);
         }
-        if (subclass.nil() && this.isBaseClass()) {
+        if (subclass == null && this.isBaseClass()) {
             subclass = this.subclassFromAttributes(this.columnDefaults);
         }
     }
@@ -41,7 +41,7 @@ export function isDescendsFromActiveRecord() {
         return this.superclass.isDescendsFromActiveRecord();
     }
     else {
-        return this.superclass === Base || !this.columnsHash.isInclude(this.inheritanceColumn);
+        return this.superclass === Base || !this.columnsHash.includes(this.inheritanceColumn);
     }
 }
 export function isFinderNeedsTypeCondition() {
@@ -110,7 +110,7 @@ export function initializeClone(other) {
 }
 __PRISM_TODO("CallNode");
 export function computeType(type_name) {
-    let type_candidate, type_constant, candidates, constant;
+    let type_candidate, type_constant, candidates, candidate, constant;
     if (type_name.isStartWith("::")) {
         return type_name.constantize();
     }
@@ -122,13 +122,13 @@ export function computeType(type_name) {
         candidates = [];
         this.name.scan(/::|$/, () => candidates.unshift(`${__PRISM_TODO("BackReferenceReadNode")}::${type_name}`));
         candidates.push(type_name);
-        candidates.each(candidate => {
+        for (const candidate of candidates) {
             constant = candidate.safeConstantize();
-            if (candidate === constant.toString()) {
+            if (candidate === String(constant)) {
                 this._type_candidates_cache[type_name] = candidate;
                 return constant;
             }
-        });
+        }
         throw new NameError(`uninitialized constant ${candidates.first()}`, candidates.first());
     }
 }
@@ -156,7 +156,7 @@ export function findStiClass(type_name) {
     let subclass;
     type_name = this.baseClass.typeForAttribute(this.inheritanceColumn).cast(type_name);
     subclass = this.stiClassFor(type_name);
-    if (!(subclass === this || this.descendants.isInclude(subclass))) {
+    if (!(subclass === this || this.descendants.includes(subclass))) {
         throw new SubclassNotFound(`Invalid single-table inheritance type: ${subclass.name()} is not a subclass of ${this.name}`);
     }
     return subclass;
@@ -172,7 +172,7 @@ export function subclassFromAttributes(attrs) {
     if (attrs.respondTo("permitted?")) {
         attrs = attrs.toH();
     }
-    if (attrs.isA(Hash)) {
+    if (attrs instanceof Hash) {
         subclass_name = attrs[this.inheritanceColumn] || attrs[this.inheritanceColumn.toSym()];
         if (subclass_name.isPresent()) {
             return this.findStiClass(subclass_name);
@@ -190,7 +190,7 @@ export function initializeInternalsCallback() {
 }
 export function ensureProperType() {
     let klass;
-    klass = this.class();
+    klass = this.constructor;
     if (klass.isFinderNeedsTypeCondition()) {
         return this._writeAttribute(klass.inheritanceColumn(), klass.stiName());
     }

@@ -4,6 +4,7 @@ import type { Registry } from "../registry.js";
 import { methodName, isJsIdentName, isBindableIdent } from "../naming.js";
 import { rubyStr } from "../types.js";
 import { TOPLEVEL } from "../codegen.js";
+import { stdlibImage, stdlibRename, blockParamNames } from "./stdlib.js";
 import {
   asyncBindingKey,
   clearAsyncProvenance,
@@ -195,6 +196,9 @@ function emitCall(n: PrismNode, e: Emitter): ts.Expression | null {
     );
   }
 
+  const image = stdlibImage(n, e);
+  if (image) return image;
+
   if (name === "block_given?" && !hasRecv && argNodes.length === 0 && !n.block) {
     if (!e.blockParamName) return null;
     return f.createBinaryExpression(
@@ -239,7 +243,7 @@ function emitCall(n: PrismNode, e: Emitter): ts.Expression | null {
       [],
     );
   }
-  const jsName = methodName(name);
+  const jsName = (hasRecv ? stdlibRename(name, block != null) : undefined) ?? methodName(name);
   const selfCall = !hasRecv && e.currentDef !== TOPLEVEL;
   if (hasRecv || selfCall ? !isJsIdentName(jsName) : !isBindableIdent(jsName)) return null;
   let blockParams: string[] | null = null;
@@ -393,19 +397,6 @@ function containsAwait(node: ts.Node): boolean {
   visit(node);
   return found;
 }
-function blockParamNames(params: PrismNode | undefined): string[] | null {
-  if (!params) return [];
-  const inner = (params.parameters as PrismNode) ?? params;
-  const reqs = (inner.requireds as PrismNode[]) ?? [];
-  const names: string[] = [];
-  for (const p of reqs) {
-    const name = String(p.name ?? "");
-    if (!isBindableIdent(name)) return null;
-    names.push(name);
-  }
-  return names;
-}
-
 function isEmittableTarget(t: PrismNode): boolean {
   switch (t.constructor.name) {
     case "LocalVariableTargetNode":

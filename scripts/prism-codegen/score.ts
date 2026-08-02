@@ -152,6 +152,19 @@ export function skeletonTokens(fn: ts.FunctionLikeDeclaration): string[] {
       case ts.SyntaxKind.IfStatement:
         tokens.push("if");
         break;
+      case ts.SyntaxKind.BinaryExpression: {
+        // `a || b` and the port's `const x = a; if (!x) b` are the same
+        // conditional reach — token the logical operator as `if` between its
+        // operands so the two spellings fold.
+        const bin = node as ts.BinaryExpression;
+        if (LOGICAL_OPS.has(bin.operatorToken.kind)) {
+          walk(bin.left);
+          tokens.push("if");
+          walk(bin.right);
+          return;
+        }
+        break;
+      }
       case ts.SyntaxKind.WhileStatement:
       case ts.SyntaxKind.ForStatement:
       case ts.SyntaxKind.ForOfStatement:
@@ -198,6 +211,9 @@ export function skeletonTokens(fn: ts.FunctionLikeDeclaration): string[] {
         if (ts.isNumericLiteral(idx)) {
           const ordinal = ORDINALS[Number(idx.text)];
           tokens.push(ordinal ? `ref:${ordinal}` : `ref:at`);
+        } else {
+          // Ruby's `h[k]` and the port's `map.get(k)` are the same keyed read.
+          tokens.push("ref:get");
         }
         break;
       }
@@ -207,6 +223,15 @@ export function skeletonTokens(fn: ts.FunctionLikeDeclaration): string[] {
   if (fn.body) walk(fn.body);
   return tokens;
 }
+
+const LOGICAL_OPS: ReadonlySet<ts.SyntaxKind> = new Set([
+  ts.SyntaxKind.BarBarToken,
+  ts.SyntaxKind.AmpersandAmpersandToken,
+  ts.SyntaxKind.QuestionQuestionToken,
+  ts.SyntaxKind.BarBarEqualsToken,
+  ts.SyntaxKind.AmpersandAmpersandEqualsToken,
+  ts.SyntaxKind.QuestionQuestionEqualsToken,
+]);
 
 const ORDINALS: Record<number, string> = {
   0: "first",
@@ -220,10 +245,6 @@ const TOKEN_CANON: Record<string, string> = {
   forEach: "each",
   eachWithIndex: "each",
   withIndex: "each",
-  collect: "map",
-  detect: "find",
-  inject: "reduce",
-  toA: "toArray",
   size: "length",
   modelClass: "model",
   arelTable: "table",
@@ -235,7 +256,7 @@ export function normalizeName(name: string): string {
   if (perform) n = perform[1].toLowerCase() + perform[2];
   const pred = /^is([A-Z])(.*)$/.exec(n);
   if (pred) n = pred[1].toLowerCase() + pred[2];
-  return TOKEN_CANON[n] ?? n;
+  return Object.hasOwn(TOKEN_CANON, n) ? TOKEN_CANON[n] : n;
 }
 
 function paramCount(fn: ts.FunctionLikeDeclaration): number {

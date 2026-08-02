@@ -38,7 +38,7 @@ describe("prism-codegen scorer", () => {
          list.first
        end`,
       `export function takeOne(list: unknown[]): unknown {
-         if (list.empty()) {
+         if (list.length === 0) {
            throw new ArgumentError("empty");
          }
          return list.first;
@@ -116,11 +116,11 @@ describe("prism-codegen scorer", () => {
   it("canonicalizes stdlib idiom tokens on both sides (each/forEach, size/length)", async () => {
     const score = await scoreRuby(
       `def tally(rows)
-         rows.each { |r| record(r) }
+         tallied = rows.each { |r| record(r) }
          rows.size
        end`,
       `export function tally(this: R, rows: unknown[]): number {
-         rows.forEach((r) => this.record(r));
+         const tallied = rows.forEach((r) => this.record(r));
          return rows.length;
        }`,
     );
@@ -280,7 +280,7 @@ describe("prism-codegen scorer", () => {
          list.first
        end`,
       `export const takeOne = (list: unknown[]): unknown => {
-         if (list.empty()) {
+         if (list.length === 0) {
            throw new ArgumentError("empty");
          }
          return list.first;
