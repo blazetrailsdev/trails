@@ -17,13 +17,13 @@ import {
   extractFileConstants,
   extractFileLocalHelpers,
   extractFromProgram,
-  getAllTsFiles,
   harvestObjectLiteralMethods,
   packageFingerprint,
   tsLiteralValue,
 } from "./extract-ts-api.js";
 import { collectTsFileNames } from "./extra-surface.js";
 import { overlappingSubDirs, packageSrcDir } from "./config.js";
+import { COMPARED_TS_FILES, walkTsFilesSync } from "./ts-file-walk.js";
 import type { ClassInfo, MethodInfo, PackageInfo } from "./types.js";
 
 const VIRTUAL = "virtual.ts";
@@ -2044,8 +2044,10 @@ describe("sub-package de-overlap", () => {
 
   it("omits an excluded subdir from the walked file list", () => {
     const { srcDir, subDir } = fixture();
-    expect(getAllTsFiles(srcDir)).toContain(path.join(subDir, "helper.ts"));
-    expect(getAllTsFiles(srcDir, [subDir])).toEqual([path.join(srcDir, "parent.ts")]);
+    expect(walkTsFilesSync(srcDir, COMPARED_TS_FILES)).toContain(path.join(subDir, "helper.ts"));
+    expect(walkTsFilesSync(srcDir, COMPARED_TS_FILES, [subDir])).toEqual([
+      path.join(srcDir, "parent.ts"),
+    ]);
   });
 
   it("omits an excluded subdir's classes even when the parent imports them", () => {

@@ -259,7 +259,7 @@ export async function main() {
 
   for (const pkg of PACKAGES) {
     const pkgDir = packageSrcDir(pkg);
-    const files = getAllTsFiles(pkgDir, overlappingSubDirs(pkg));
+    const files = walkTsFilesSync(pkgDir, COMPARED_TS_FILES, overlappingSubDirs(pkg));
     const dirName = PACKAGE_DIR_OVERRIDES[pkg] ?? pkg;
     const pkgRoot = path.join(ROOT_DIR, "packages", dirName);
     const tsConfigPath = path.join(pkgRoot, "tsconfig.json");
@@ -410,7 +410,7 @@ interface PendingReExport {
 
 function extractPackage(pkgName: string, srcDir: string): WorkerOutput {
   const subPackageDirs = overlappingSubDirs(pkgName);
-  const files = getAllTsFiles(srcDir, subPackageDirs);
+  const files = walkTsFilesSync(srcDir, COMPARED_TS_FILES, subPackageDirs);
 
   // Create a TypeScript program
   const dirName = PACKAGE_DIR_OVERRIDES[pkgName] ?? pkgName;
@@ -2694,11 +2694,6 @@ function memberVisibility(member: ts.ClassElement): "public" | "private" | "prot
 
 function isExported(node: ts.Node): boolean {
   return hasModifier(node, ts.SyntaxKind.ExportKeyword);
-}
-
-/** The compared population: what api-compare measures against Rails. */
-export function getAllTsFiles(dir: string, excludeDirs: readonly string[] = []): string[] {
-  return walkTsFilesSync(dir, COMPARED_TS_FILES, excludeDirs);
 }
 
 // Run main() only on the main thread when invoked as a script.
