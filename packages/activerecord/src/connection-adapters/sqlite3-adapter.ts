@@ -2147,7 +2147,16 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     return fields.map((field) => newColumnFromField(this, tableName, field, fields));
   }
 
-  async indexes(tableName: string): Promise<unknown[]> {
+  async indexes(tableName: string): Promise<
+    Array<{
+      table: string;
+      name: string;
+      columns: string[] | string;
+      unique: boolean;
+      where?: string;
+      orders: Record<string, string>;
+    }>
+  > {
     return sqliteIndexes(this, tableName);
   }
 

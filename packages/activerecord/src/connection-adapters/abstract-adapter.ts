@@ -390,13 +390,15 @@ export interface AbstractAdapter {
   dataSourceSql(name?: string | null, options?: { type?: string }): string;
   columns(tableName: string): Promise<Column[]>;
   primaryKey(tableName: string): Promise<string | string[] | null>;
-  /**
-   * drift-ok: the SchemaStatements base spells out the row shape, but the
-   * concrete adapters override `indexes` with `Promise<unknown[]>`, so
-   * narrowing here makes every one of them unassignable to AbstractAdapter.
-   * Converging the adapters is `converge-adapter-indexes-return-type`.
-   */
-  indexes(tableName: string): Promise<unknown[]>;
+  indexes(tableName: string): Promise<
+    Array<{
+      name: string;
+      columns: string | string[];
+      unique: boolean;
+      where?: string;
+      orders?: Record<string, string> | string;
+    }>
+  >;
   foreignKeys(tableName: string): Promise<ForeignKeyDefinition[]>;
   foreignKeyExists(
     fromTable: string,

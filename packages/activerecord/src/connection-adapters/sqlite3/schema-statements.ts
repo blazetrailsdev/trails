@@ -100,7 +100,19 @@ const INDEX_ON_REGEX =
  * adapter delegates here. Schema-qualified names (e.g. `temp.widgets`) place
  * the qualifier before the PRAGMA keyword.
  */
-export async function indexes(adapter: DatabaseAdapter, tableName: string): Promise<unknown[]> {
+export async function indexes(
+  adapter: DatabaseAdapter,
+  tableName: string,
+): Promise<
+  Array<{
+    table: string;
+    name: string;
+    columns: string[] | string;
+    unique: boolean;
+    where?: string;
+    orders: Record<string, string>;
+  }>
+> {
   const { schema, bare } = splitTableName(tableName);
   const pragmaPrefix = schema ? `${quoteColumnName(schema)}.` : "";
   const rows = (await adapter.schemaQuery(
