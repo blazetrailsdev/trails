@@ -84,7 +84,7 @@ export function belongsTo(name, scope = null, { ...options } = {}) {
     return Reflection.addReflection(this, name, reflection);
 }
 export function hasAndBelongsToMany(name, scope = null, { ...options } = {}, extension) {
-    let habtm_reflection, builder, join_model, middle_reflection, hm_options, k;
+    let habtm_reflection, builder, join_model, middle_reflection, hm_options;
     habtm_reflection = new ActiveRecord.Reflection.HasAndBelongsToManyReflection(name, scope, options, this);
     builder = new Builder.HasAndBelongsToMany(name, this, options);
     join_model = builder.throughModel();

@@ -4,7 +4,6 @@
 
 import { caseEq } from "../../runtime.js";
 
-let name;
 require("active_record/relation/from_clause");
 require("active_record/relation/query_attribute");
 require("active_record/relation/where_clause");
@@ -23,13 +22,13 @@ export class WhereChain {
         return this.scope;
     }
     associated(...associations) {
-        let association, reflection, association_conditions;
+        let reflection, association_conditions;
         for (const association of associations) {
             reflection = this.scopeAssociationReflection(association);
             if (!(this.scope.joinsValues().includes(reflection.name()) || this.scope.leftOuterJoinsValues().includes(reflection.name()))) {
                 this.scope.joinsBang(association);
             }
-            association_conditions = (reflection.associationPrimaryKey() == null ? [] : Array.isArray(reflection.associationPrimaryKey()) ? reflection.associationPrimaryKey() : [reflection.associationPrimaryKey()]).indexWith(null);
+            association_conditions = this.Array(reflection.associationPrimaryKey()).indexWith(null);
             if (reflection.options()["class_name"]) {
                 this.not({ [association]: association_conditions });
             }
@@ -40,11 +39,11 @@ export class WhereChain {
         return this.scope;
     }
     missing(...associations) {
-        let association, reflection, association_conditions;
+        let reflection, association_conditions;
         for (const association of associations) {
             reflection = this.scopeAssociationReflection(association);
             this.scope.leftOuterJoinsBang(association);
-            association_conditions = (reflection.associationPrimaryKey() == null ? [] : Array.isArray(reflection.associationPrimaryKey()) ? reflection.associationPrimaryKey() : [reflection.associationPrimaryKey()]).indexWith(null);
+            association_conditions = this.Array(reflection.associationPrimaryKey()).indexWith(null);
             if (reflection.options()["class_name"]) {
                 this.scope.whereBang({ [association]: association_conditions });
             }
@@ -225,7 +224,7 @@ export function unscope(...args) {
     return this.spawn.unscopeBang(...args);
 }
 export function unscopeBang(...args) {
-    let scope, key, target_value, target_values;
+    let target_values, scope;
     this.unscopeValues += args;
     for (const scope of args) {
         if (caseEq(Symbol, scope)) {
@@ -686,7 +685,6 @@ export function lookupTableKlassFromJoinDependencies(table_name) {
     return null;
 }
 export function eachJoinDependencies(join_dependencies = this.buildJoinDependencies(), block) {
-    let join_dependency;
     for (const join_dependency of join_dependencies) {
         join_dependency.forEach(block);
     }
@@ -768,7 +766,7 @@ export function buildFrom() {
     }
 }
 export function selectNamedJoins(join_names, stashed_joins = null, block) {
-    let cte_joins, associations, cte_name;
+    let cte_joins, associations;
     [cte_joins, associations] = join_names.partition(join_name => __PRISM_TODO("CallNode") && this.withValues.some(() => _1.isKey(join_name)));
     for (const cte_name of cte_joins) {
         block.call(new CTEJoin(cte_name));
@@ -776,7 +774,7 @@ export function selectNamedJoins(join_names, stashed_joins = null, block) {
     return this.selectAssociationList(associations, stashed_joins, block);
 }
 export function selectAssociationList(associations, stashed_joins = null, block) {
-    let result, association;
+    let result;
     result = [];
     for (const association of associations) {
         if (caseEq(Hash, association) || caseEq(Symbol, association) || caseEq(Array, association)) {
@@ -1037,7 +1035,6 @@ export function buildOrder(arel) {
 }
 const VALID_DIRECTIONS = ["asc", "desc", "ASC", "DESC", "asc", "desc", "ASC", "DESC"].toSet();
 export function validateOrderArgs(args) {
-    let arg, _key, value;
     for (const arg of args) {
         if (!(arg instanceof Hash)) {
             continue;

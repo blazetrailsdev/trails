@@ -98,7 +98,7 @@ export function calculate(operation, column_name) {
         if (operation === "count") {
             if (!(this.distinctValue || this.isDistinctSelect(column_name || this.selectForCount()))) {
                 relation.distinctBang();
-                relation.selectValues = (this.model.primaryKey() || this.table[Arel.star()]) == null ? [] : Array.isArray(this.model.primaryKey() || this.table[Arel.star()]) ? this.model.primaryKey() || this.table[Arel.star()] : [this.model.primaryKey() || this.table[Arel.star()]];
+                relation.selectValues = this.Array(this.model.primaryKey() || this.table[Arel.star()]);
             }
             if (this.groupValues.length === 0) {
                 relation.orderValues = [];
@@ -165,7 +165,7 @@ export function asyncPick(...column_names) {
 }
 export function ids() {
     let primary_key_array, result, relation, columns;
-    primary_key_array = this.model.primaryKey == null ? [] : Array.isArray(this.model.primaryKey) ? this.model.primaryKey : [this.model.primaryKey];
+    primary_key_array = this.Array(this.model.primaryKey);
     if (this.isLoaded) {
         result = this.records.map(record => {
             if (primary_key_array.isOne()) {
@@ -287,7 +287,7 @@ export function executeGroupedCalculation(operation, column_name, distinct) {
         association = this.model._reflectOnAssociation(group_fields.first());
         associated = association && association.isBelongsTo();
         if (associated) {
-            group_fields = association.foreignKey() == null ? [] : Array.isArray(association.foreignKey()) ? association.foreignKey() : [association.foreignKey()];
+            group_fields = this.Array(association.foreignKey());
         }
     }
     relation = this.except("group").distinctBang(false);

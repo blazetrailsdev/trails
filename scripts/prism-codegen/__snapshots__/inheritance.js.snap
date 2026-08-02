@@ -110,7 +110,7 @@ export function initializeClone(other) {
 }
 __PRISM_TODO("CallNode");
 export function computeType(type_name) {
-    let type_candidate, type_constant, candidates, candidate, constant;
+    let type_candidate, type_constant, candidates, constant;
     if (type_name.isStartWith("::")) {
         return type_name.constantize();
     }

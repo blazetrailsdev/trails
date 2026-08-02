@@ -177,7 +177,6 @@ export function initializeLoadSchemaMonitor() {
     return this.load_schema_monitor = new Monitor();
 }
 export function reloadSchemaFromCache(recursive = true) {
-    let descendant;
     this._returning_columns_for_insert = null;
     this.arel_table = null;
     this.column_names = null;

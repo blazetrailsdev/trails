@@ -4,10 +4,6 @@ import { isBindableIdent } from "../naming.js";
 import { mergeAsyncArms, scopeAsyncArm } from "../await-policy.js";
 const f = ts.factory;
 
-/**
- * Ruby-core class checks with a direct JS image. Symbols map to strings in
- * trails, so Symbol shares String's typeof image.
- */
 const TYPEOF_IMAGE: Record<string, string> = {
   String: "string",
   Symbol: "string",
@@ -17,11 +13,7 @@ const TYPEOF_IMAGE: Record<string, string> = {
   Proc: "function",
 };
 
-/**
- * Ruby enumerable/core method names whose port image is the JS array method,
- * applied whenever the call has an explicit receiver.
- */
-export const STDLIB_RENAME: Record<string, string> = {
+const STDLIB_RENAME: Record<string, string> = {
   collect: "map",
   collect_concat: "flatMap",
   flat_map: "flatMap",
@@ -31,16 +23,23 @@ export const STDLIB_RENAME: Record<string, string> = {
   "include?": "includes",
 };
 
-/**
- * Renames that only hold when a block is present — blockless `any?` on a
- * relation is the port's `isAny` query method, not `Array#some`.
- */
 const BLOCK_RENAME: Record<string, string> = {
   "any?": "some",
   "all?": "every",
   each: "forEach",
 };
 
+const SIMPLE_READS: ReadonlySet<string> = new Set([
+  "LocalVariableReadNode",
+  "InstanceVariableReadNode",
+]);
+
+/**
+ * The JS array-method spelling for a Ruby enumerable call, or undefined to
+ * keep the conventional name mapping. Some renames only hold when a block is
+ * present — blockless `any?` on a relation is the port's `isAny` query
+ * method, not `Array#some`.
+ */
 export function stdlibRename(name: string, hasBlock: boolean): string | undefined {
   if (Object.hasOwn(STDLIB_RENAME, name)) return STDLIB_RENAME[name];
   if (hasBlock && Object.hasOwn(BLOCK_RENAME, name)) return BLOCK_RENAME[name];
@@ -50,7 +49,10 @@ export function stdlibRename(name: string, hasBlock: boolean): string | undefine
 /**
  * Ruby stdlib idioms with a decided whole-expression JS image. Returns
  * undefined when the call is not one of them so `emitCall` continues with the
- * generic path.
+ * generic path. Symbols map to strings in trails, so `is_a?(Symbol)` shares
+ * String's typeof image. `Kernel#Array` maps to the wrap ternary
+ * (`v == null ? [] : Array.isArray(v) ? v : [v]`), which reads its argument
+ * three times — only side-effect-free simple reads take that image.
  */
 export function stdlibImage(n: PrismNode, e: Emitter): ts.Expression | undefined {
   const name = String(n.name);
@@ -112,8 +114,12 @@ export function stdlibImage(n: PrismNode, e: Emitter): ts.Expression | undefined
     }
   }
 
-  // Kernel#Array — nil becomes [], arrays pass through, everything else wraps.
-  if (name === "Array" && !hasRecv && argNodes.length === 1) {
+  if (
+    name === "Array" &&
+    !hasRecv &&
+    argNodes.length === 1 &&
+    SIMPLE_READS.has(argNodes[0].constructor.name)
+  ) {
     const arg = e.expr(argNodes[0]);
     return f.createConditionalExpression(
       f.createBinaryExpression(arg, ts.SyntaxKind.EqualsEqualsToken, f.createNull()),
@@ -124,12 +130,12 @@ export function stdlibImage(n: PrismNode, e: Emitter): ts.Expression | undefined
         f.createCallExpression(
           f.createPropertyAccessExpression(f.createIdentifier("Array"), "isArray"),
           undefined,
-          [arg],
+          [cloneSimpleRead(arg)],
         ),
         f.createToken(ts.SyntaxKind.QuestionToken),
-        arg,
+        cloneSimpleRead(arg),
         f.createToken(ts.SyntaxKind.ColonToken),
-        f.createArrayLiteralExpression([arg]),
+        f.createArrayLiteralExpression([cloneSimpleRead(arg)]),
       ),
     );
   }
@@ -141,6 +147,12 @@ export function stdlibImage(n: PrismNode, e: Emitter): ts.Expression | undefined
  * Statement-position `recv.each { |x| ... }` — the port writes these as
  * `for (const x of recv)`, so the emitted image follows.
  */
+function cloneSimpleRead(expr: ts.Expression): ts.Expression {
+  if (ts.isIdentifier(expr)) return f.createIdentifier(expr.text);
+  const prop = expr as ts.PropertyAccessExpression;
+  return f.createPropertyAccessExpression(f.createThis(), prop.name.text);
+}
+
 export function eachToForOf(n: PrismNode, e: Emitter): ts.Statement[] | null {
   if (String(n.name) !== "each" || n.receiver == null) return null;
   const block = n.block as PrismNode | undefined;
@@ -159,7 +171,6 @@ export function eachToForOf(n: PrismNode, e: Emitter): ts.Statement[] | null {
             params.map((p) => f.createBindingElement(undefined, undefined, p)),
           ),
         );
-  for (const p of params) e.declared.add(p);
   const prevLoop = e.inLoop;
   e.inLoop = true;
   const body = scopeAsyncArm(e.asyncBindings, () =>

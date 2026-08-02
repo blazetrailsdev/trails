@@ -134,6 +134,14 @@ export function skeleton(fn: ts.FunctionLikeDeclaration): string {
   return skeletonTokens(fn).join(" ");
 }
 
+/**
+ * Body skeleton as a token stream: control keywords plus normalized call and
+ * property reaches. Two folds beyond the literal AST shape: logical operators
+ * token as `if` between their operands, because Ruby's `a || b` and the port's
+ * `const x = a; if (!x) b` are the same conditional reach; and non-numeric
+ * element access tokens as `ref:get`, because `h[k]` and the port's
+ * `map.get(k)` are the same keyed read.
+ */
 export function skeletonTokens(fn: ts.FunctionLikeDeclaration): string[] {
   const tokens: string[] = [];
   const calleeNodes = new Set<ts.Node>();
@@ -153,9 +161,6 @@ export function skeletonTokens(fn: ts.FunctionLikeDeclaration): string[] {
         tokens.push("if");
         break;
       case ts.SyntaxKind.BinaryExpression: {
-        // `a || b` and the port's `const x = a; if (!x) b` are the same
-        // conditional reach — token the logical operator as `if` between its
-        // operands so the two spellings fold.
         const bin = node as ts.BinaryExpression;
         if (LOGICAL_OPS.has(bin.operatorToken.kind)) {
           walk(bin.left);
@@ -212,7 +217,6 @@ export function skeletonTokens(fn: ts.FunctionLikeDeclaration): string[] {
           const ordinal = ORDINALS[Number(idx.text)];
           tokens.push(ordinal ? `ref:${ordinal}` : `ref:at`);
         } else {
-          // Ruby's `h[k]` and the port's `map.get(k)` are the same keyed read.
           tokens.push("ref:get");
         }
         break;

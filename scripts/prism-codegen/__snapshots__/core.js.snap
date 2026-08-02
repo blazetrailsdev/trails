@@ -342,7 +342,7 @@ export function initializeDup(other) {
     return __PRISM_SUPER_OUTSIDE_CORPUS("Core#initialize_dup");
 }
 export function initAttributes(_) {
-    let attrs, key;
+    let attrs;
     attrs = this.attributes.deepDup();
     if (this.constructor.isCompositePrimaryKey()) {
         for (const key of this.primary_key) {

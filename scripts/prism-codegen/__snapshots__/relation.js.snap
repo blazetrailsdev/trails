@@ -345,7 +345,7 @@ export class Relation {
         return InsertAll.execute(this, attributes, { on_duplicate: on_duplicate, update_only: update_only, returning: returning, unique_by: unique_by, record_timestamps: record_timestamps });
     }
     async updateCounters(counters) {
-        let touch, updates, counter_name, value, attr, names, options, touch_updates;
+        let touch, updates, attr, names, options, touch_updates;
         touch = counters.delete("touch");
         updates = {};
         for (const [counter_name, value] of counters) {
@@ -485,7 +485,7 @@ export class Relation {
         return this.whereClause.toH(relation_table_name);
     }
     scopeForCreate() {
-        let hash, k, v;
+        let hash;
         hash = this.whereClause.toH(this.model.tableName(), { equality_only: true });
         if (!(this.createWithValue.length === 0)) {
             for (const [k, v] of this.createWithValue) {
@@ -540,7 +540,7 @@ export class Relation {
         return ActiveRecord.Associations.AliasTracker.create(this.model.connectionPool(), this.table.name(), joins, aliases);
     }
     preloadAssociations(records) {
-        let preload, scope, associations;
+        let preload, scope;
         preload = this.preloadValues;
         if (!this.isEagerLoading) {
             preload += this.includesValues;
@@ -616,7 +616,7 @@ export class Relation {
         return expr.expr();
     }
     execQueries(block) {
-        let rows, records, record;
+        let rows, records;
         return this.skipQueryCacheIfNecessary(async () => {
             rows = __PRISM_TODO("IfNode");
             records = this.instantiateRecords(rows, block);

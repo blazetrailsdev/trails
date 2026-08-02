@@ -43,7 +43,7 @@ export function instantiate(attributes, column_types = {}, block) {
     return this.instantiateInstanceOf(klass, attributes, column_types, block);
 }
 export function update(id = "all") {
-    let record, object;
+    let object;
     if (Array.isArray(id)) {
         if (id.isAny(ActiveRecord.Base)) {
             throw new ArgumentError("You are passing an array of ActiveRecord::Base instances to `update`. Please pass the ids of the objects by calling `pluck(:id)` or `map(&:id)`.");
@@ -65,7 +65,7 @@ export function update(id = "all") {
     }
 }
 export function updateBang(id = "all") {
-    let record, object;
+    let object;
     if (Array.isArray(id)) {
         if (id.isAny(ActiveRecord.Base)) {
             throw new ArgumentError("You are passing an array of ActiveRecord::Base instances to `update!`. Please pass the ids of the objects by calling `pluck(:id)` or `map(&:id)`.");
@@ -100,7 +100,7 @@ export function queryConstraintsList() {
     return this.query_constraints_list ||= this.isBaseClass() || this.primaryKey !== this.baseClass.primaryKey() ? __PRISM_TODO("IfNode") : this.baseClass.queryConstraintsList();
 }
 export function compositeQueryConstraintsList() {
-    return this.composite_query_constraints_list ||= this.queryConstraintsList() || (this.primaryKey == null ? [] : Array.isArray(this.primaryKey) ? this.primaryKey : [this.primaryKey]);
+    return this.composite_query_constraints_list ||= this.queryConstraintsList() || this.Array(this.primaryKey);
 }
 export function _insertRecord(connection, values, returning) {
     let primary_key, primary_key_value, im;
@@ -390,7 +390,6 @@ export function _deleteRow() {
     return this.constructor._deleteRecord(this._queryConstraintsHash());
 }
 export function _touchRow(attribute_names, time) {
-    let attr_name;
     time ||= this.currentTimeFromProperTimezone();
     for (const attr_name of attribute_names) {
         this._writeAttribute(attr_name, time);
@@ -429,7 +428,7 @@ export async function _updateRecord(attribute_names = this.attributeNames(), blo
     return affected_rows;
 }
 export function _createRecord(attribute_names = this.attributeNames(), block) {
-    let returning_columns, returning_values, column, value;
+    let returning_columns, returning_values;
     attribute_names = this.attributesForCreate(attribute_names);
     this.constructor.withConnection(connection => {
         returning_columns = this.constructor._returningColumnsForInsert(connection);

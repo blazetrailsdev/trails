@@ -80,6 +80,15 @@ describe("prism-codegen stdlib idiom mapping", () => {
     expect(code).toContain("v == null ? [] : Array.isArray(v) ? v : [v]");
   });
 
+  it("keeps Kernel#Array of a side-effectful argument off the multi-read ternary", async () => {
+    const { code } = await gen(`
+      def coerce
+        Array(build_list)
+      end
+    `);
+    expect(code).not.toContain("Array.isArray");
+  });
+
   it("renames enumerable methods to their JS array images", async () => {
     const { code } = await gen(`
       def pipeline(rows)
@@ -124,6 +133,7 @@ describe("prism-codegen stdlib idiom mapping", () => {
     expect(parseErrorCount).toBe(0);
     expect(code).toContain("for (const row of rows)");
     expect(code).toContain("this.handle(row)");
+    expect(code).not.toContain("let row");
   });
 
   it("destructures two-parameter each blocks in the for-of binding", async () => {
