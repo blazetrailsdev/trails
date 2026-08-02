@@ -38,7 +38,11 @@ describe("CollectionAssociation#find not-found path", () => {
     const proxy = internals(firm).clientsOfFirm;
     const clients = await proxy.load();
     expect(clients.length).toBeGreaterThan(0);
-    return { proxy, presentId: Number(internals(clients[0])._readAttribute("id")) };
+    return {
+      proxy,
+      presentId: Number(internals(clients[0])._readAttribute("id")),
+      presentIds: clients.map((c) => Number(internals(c)._readAttribute("id"))),
+    };
   }
 
   it("raises RecordNotFound with the scoped message when a single id misses", async () => {
@@ -65,6 +69,16 @@ describe("CollectionAssociation#find not-found path", () => {
 
     const found = (await proxy.find(String(presentId))) as Base;
     expect(Number(internals(found)._readAttribute("id"))).toBe(presentId);
+  });
+
+  it("flattens a nested array argument recursively, the way Ruby's Array#flatten does", async () => {
+    const { proxy, presentIds } = await loadedClientsOfFirm();
+    expect(presentIds.length).toBeGreaterThan(1);
+
+    const found = (await proxy.find([presentIds])) as Base[];
+    expect(found.map((r) => Number(internals(r)._readAttribute("id"))).sort()).toEqual(
+      [...presentIds].sort(),
+    );
   });
 
   it("raises RecordNotFound when no id is passed", async () => {
