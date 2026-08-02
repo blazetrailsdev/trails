@@ -376,6 +376,15 @@ export class DatabaseTasks {
     });
   }
 
+  /**
+   * @param version Exact-version *filter* — only the migration with this
+   *   version runs (`db:migrate:up` / `:down` semantics). Rails' `db:migrate`
+   *   rake task never passes it.
+   * @param options.targetVersion "Migrate up to here", the in-process stand-in
+   *   for Rails' `ENV["VERSION"]` that {@link targetVersion} reads. trails has
+   *   no env writer, so a CLI `--version` flag hands the target down through
+   *   this option instead of the `version` argument, which would filter.
+   */
   static async migrate(
     version?: number | string,
     {
@@ -383,12 +392,6 @@ export class DatabaseTasks {
       targetVersion,
     }: { skipInitialize?: boolean; targetVersion?: number | string | null } = {},
   ): Promise<void> {
-    // `targetVersion` is the in-process stand-in for Rails' `ENV["VERSION"]`:
-    // the rake task never passes an argument, so `target_version` reads the
-    // env. trails has no env writer (`getEnv` is read-only), so a CLI
-    // `--version` flag has to hand the target down explicitly. It must NOT
-    // travel as `version` — that argument is the exact-version *filter*
-    // (migrate:up semantics), not "migrate up to here".
     const raw = version ?? targetVersion ?? this.targetVersion();
     const effectiveVersion = typeof raw === "string" ? raw.trim() || null : raw;
     this.checkTargetVersion(effectiveVersion ?? undefined);

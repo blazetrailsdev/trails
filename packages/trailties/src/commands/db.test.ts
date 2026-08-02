@@ -1066,6 +1066,12 @@ export class CreatePosts extends Migration {
     }
   });
 
+  it("db migrate:up raises for an unknown version when no migrations exist", async () => {
+    await expect(runDb(["migrate:up", "--version=20260101000000"])).rejects.toThrow(
+      /No migration with version number 20260101000000/,
+    );
+  });
+
   it("db migrate --version migrates up to that version, not only that version", async () => {
     // Guards the DatabaseTasks.migrate seam: an explicit positional argument
     // there is an exact-version *filter* (migrate:up semantics), so --version

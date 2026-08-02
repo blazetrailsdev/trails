@@ -578,11 +578,11 @@ async function withMigrationTasksForDb(
     config: HashConfig;
   },
   operation: () => Promise<void>,
-  opts?: { afterPending?: (pending: number) => void },
+  opts?: { afterPending?: (pending: number) => void; runWhenEmpty?: boolean },
 ): Promise<void> {
   const mDirs = await migrationsDirsForConfig(ctx.name, ctx.raw);
   const migrations = await discoverMigrationsFromDirs(mDirs);
-  if (migrations.length === 0) {
+  if (migrations.length === 0 && !opts?.runWhenEmpty) {
     console.log(`${ctx.prefix}No migrations found.`);
     return;
   }
@@ -615,20 +615,9 @@ export function dbCommand(): Command {
       // to null so an empty VERSION="" doesn't fail BigInt parsing.
       const rawVersion = opts.version != null ? String(opts.version).trim() : env.VERSION?.trim();
       const targetVersion = rawVersion && rawVersion.length > 0 ? rawVersion : null;
-      // Rails' `db:migrate` is `DatabaseTasks.migrate_all` + `db:_dump`, and
-      // the per-database `db:migrate:<name>` is
-      // `with_temporary_pool_for_each { DatabaseTasks.migrate }` + `db:_dump:<name>`
-      // (`databases.rake:88-92`, `:118-126`). forEachDatabase is the
-      // with_temporary_pool_for_each analogue, so both shapes route through
-      // the per-config task here; that keeps the `[name] ` output prefix and
-      // the per-config dump migrate_all has no seam for.
       await forEachDatabase(opts, async (ctx) => {
         await withMigrationTasksForDb(
           ctx,
-          // targetVersion, not the positional argument: an explicit argument to
-          // DatabaseTasks.migrate is an exact-version filter (migrate:up
-          // semantics), whereas --version means "migrate up to this version",
-          // which is what Rails' ENV["VERSION"] does.
           () => DatabaseTasks.migrate(undefined, { targetVersion }),
           {
             afterPending: (pending) => {
@@ -773,7 +762,9 @@ export function dbCommand(): Command {
     .option("--database <name>", "Target a specific named database")
     .action(async (opts) => {
       await forEachDatabase(opts, async (ctx) => {
-        await withMigrationTasksForDb(ctx, () => DatabaseTasks.runMigration("up", opts.version));
+        await withMigrationTasksForDb(ctx, () => DatabaseTasks.runMigration("up", opts.version), {
+          runWhenEmpty: true,
+        });
       });
     });
 
@@ -784,7 +775,9 @@ export function dbCommand(): Command {
     .option("--database <name>", "Target a specific named database")
     .action(async (opts) => {
       await forEachDatabase(opts, async (ctx) => {
-        await withMigrationTasksForDb(ctx, () => DatabaseTasks.runMigration("down", opts.version));
+        await withMigrationTasksForDb(ctx, () => DatabaseTasks.runMigration("down", opts.version), {
+          runWhenEmpty: true,
+        });
       });
     });
 
