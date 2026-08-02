@@ -2700,9 +2700,6 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       this.driver = syncConn as SqliteConnection;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      // Mirrors Rails' `SQLite3Adapter.new_client` rescue (sqlite3_adapter.rb:38):
-      // a driver failure that means "no such database file" is raised as the typed
-      // NoDatabaseError right here, at the connect site.
       if (_isSqliteMissingDbError(e)) {
         throw new NoDatabaseError(`Unable to open database '${this._filename}': ${msg}`, {
           cause: e,
@@ -2747,9 +2744,6 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       this.driver = conn;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      // Mirrors Rails' `SQLite3Adapter.new_client` rescue (sqlite3_adapter.rb:38):
-      // a driver failure that means "no such database file" is raised as the typed
-      // NoDatabaseError right here, at the connect site.
       if (_isSqliteMissingDbError(e)) {
         throw new NoDatabaseError(`Unable to open database '${this._filename}': ${msg}`, {
           cause: e,
