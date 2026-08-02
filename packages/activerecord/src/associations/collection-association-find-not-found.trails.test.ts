@@ -1,5 +1,6 @@
 /**
- * `CollectionAssociation#find` not-found path. Rails keeps the decision in
+ * `CollectionAssociation#find` not-found path, reached the way application code
+ * reaches it — through `CollectionProxy#find`. Rails keeps the decision in
  * `find` (collection_association.rb:104-108): `find_by_scan` only scans and
  * returns, then `find` raises through
  * `scope.raise_record_not_found_exception!(args_flatten, result_size,
@@ -7,10 +8,11 @@
  * a `RecordNotFound` carrying the model name, the primary key, and the
  * association scope's conditions.
  *
- * The public `CollectionProxy#find` reimplements the scan rather than
- * delegating to the association (a separate divergence), so these cover the
- * association instance directly, the way
- * `collection-association-bigint-number-key-match.test.ts` does.
+ * `CollectionProxy#find` is a bare delegation (collection_proxy.rb:107-109), so
+ * driving the proxy drives the association body. These cases sit outside the
+ * ported Rails tests, which assert only that a `RecordNotFound` escapes — not
+ * the message payload — and cover neither the partial-miss count nor the
+ * `to_s`-shaped key comparison.
  */
 import { describe, it, expect } from "vitest";
 import { Base, RecordNotFound } from "../index.js";
@@ -20,8 +22,10 @@ import { Firm } from "../test-helpers/models/company.js";
 
 type RecordInternals = {
   _readAttribute(name: string): unknown;
-  _associationInstances: Map<string, { find(...args: unknown[]): Promise<Base | Base[] | null> }>;
-  clientsOfFirm: { load(): Promise<Base[]> };
+  clientsOfFirm: {
+    load(): Promise<Base[]>;
+    find(...args: unknown[]): Promise<Base | Base[]>;
+  };
 };
 
 const internals = (record: Base): RecordInternals => record as unknown as RecordInternals;
@@ -31,18 +35,16 @@ describe("CollectionAssociation#find not-found path", () => {
 
   async function loadedClientsOfFirm() {
     const firm = (await Firm.find(companies("first_firm").id)) as Base;
-    const clients = await internals(firm).clientsOfFirm.load();
+    const proxy = internals(firm).clientsOfFirm;
+    const clients = await proxy.load();
     expect(clients.length).toBeGreaterThan(0);
-    return {
-      assoc: internals(firm)._associationInstances.get("clientsOfFirm")!,
-      presentId: Number(internals(clients[0])._readAttribute("id")),
-    };
+    return { proxy, presentId: Number(internals(clients[0])._readAttribute("id")) };
   }
 
   it("raises RecordNotFound with the scoped message when a single id misses", async () => {
-    const { assoc } = await loadedClientsOfFirm();
+    const { proxy } = await loadedClientsOfFirm();
 
-    const error = await assoc.find(245324523).catch((e: unknown) => e);
+    const error = await proxy.find(245324523).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(RecordNotFound);
     const notFound = error as RecordNotFound;
     expect(notFound.model).toBe("Client");
@@ -51,24 +53,24 @@ describe("CollectionAssociation#find not-found path", () => {
   });
 
   it("raises RecordNotFound reporting found/expected counts when one of several ids misses", async () => {
-    const { assoc, presentId } = await loadedClientsOfFirm();
+    const { proxy, presentId } = await loadedClientsOfFirm();
 
-    const error = await assoc.find([presentId, 245324523]).catch((e: unknown) => e);
+    const error = await proxy.find([presentId, 245324523]).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(RecordNotFound);
     expect((error as RecordNotFound).message).toContain("(found 1 results, but was looking for 2)");
   });
 
   it("matches a numeric PK against a string id, the way Rails' to_s comparison does", async () => {
-    const { assoc, presentId } = await loadedClientsOfFirm();
+    const { proxy, presentId } = await loadedClientsOfFirm();
 
-    const found = (await assoc.find(String(presentId))) as Base;
+    const found = (await proxy.find(String(presentId))) as Base;
     expect(Number(internals(found)._readAttribute("id"))).toBe(presentId);
   });
 
   it("raises RecordNotFound when no id is passed", async () => {
-    const { assoc } = await loadedClientsOfFirm();
+    const { proxy } = await loadedClientsOfFirm();
 
-    const error = await assoc.find().catch((e: unknown) => e);
+    const error = await proxy.find().catch((e: unknown) => e);
     expect(error).toBeInstanceOf(RecordNotFound);
     expect((error as RecordNotFound).message).toBe("Couldn't find Client without an ID");
   });
