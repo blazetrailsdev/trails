@@ -2020,8 +2020,8 @@ export class AbstractAdapter implements Quoting {
   async dropEnum(_name: string): Promise<void> {}
 
   // No `createRange`/`dropRange` here on purpose. Rails stubs only the enum
-  // quartet on the abstract base (create_enum/drop_enum/rename_enum/
-  // rename_enum_value, abstract_adapter.rb:576-595) — there is no range-type
+  // helpers on the abstract base (create_enum/drop_enum/rename_enum/
+  // add_enum_value/rename_enum_value, abstract_adapter.rb:576-593) — there is no range-type
   // DDL anywhere in Rails, so a no-op base stub would be inventing an abstract
   // hook Rails never had. The trails-only range helpers live where the DDL is
   // actually emitted, PostgreSQL::SchemaStatements (postgresql/
