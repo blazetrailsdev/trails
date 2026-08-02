@@ -369,8 +369,8 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    * MySQL dialect overrides — backtick identifiers and integer bool
    * coercion. Matches Rails:
    *
-   * - `quote_column_name` / `quote_table_name` / `quote_identifier` — backticks
-   *   (`mysql/quoting.rb:48-53`).
+   * - `quote_column_name` / `quote_table_name` — backticks
+   *   (`mysql/quoting.rb:46-52`).
    * - `unquoted_true` / `unquoted_false` → `1` / `0`
    *   (`mysql/quoting.rb:72-77`).
    *
