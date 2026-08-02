@@ -650,38 +650,8 @@ export class SchemaStatements {
   async tableExists(tableName: string): Promise<boolean> {
     if (!isPresent(tableName)) return false;
     try {
-      // Rails' data_source_exists? embeds the table name via quote() — an escaped
-      // SQL string literal, not raw interpolation (data_source_sql, schema_statements.rb).
-      // A value containing quotes/operators is escaped to a literal that matches
-      // nothing and returns false instead of producing broken SQL.
-      const quoted = this.adapter.quote(tableName);
-      let values: unknown[];
-      switch (this.adapterName) {
-        case "sqlite":
-          values = await this.adapter.queryValues(
-            `SELECT name FROM sqlite_master WHERE type='table' AND name=${quoted}`,
-            "SCHEMA",
-          );
-          break;
-        case "postgres":
-          // Rails' PG data_source_sql scopes to ANY (current_schemas(false))
-          // (the active search_path), not a hardcoded 'public'.
-          values = await this.adapter.queryValues(
-            `SELECT 1 FROM information_schema.tables WHERE table_schema = ANY (current_schemas(false)) AND table_name = ${quoted} LIMIT 1`,
-            "SCHEMA",
-          );
-          break;
-        case "mysql":
-          values = await this.adapter.queryValues(
-            `SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ${quoted} LIMIT 1`,
-            "SCHEMA",
-          );
-          break;
-        default:
-          // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/schema_statements.rb:1890
-          throw new NotImplementedError("#data_source_sql is not implemented");
-      }
-      return values.length > 0;
+      const sql = this.adapter.dataSourceSql(tableName, { type: "BASE TABLE" });
+      return (await this.adapter.queryValues(sql, "SCHEMA")).length > 0;
     } catch (error) {
       if (!(error instanceof NotImplementedError)) throw error;
       return (await this.tables()).includes(String(tableName));
@@ -1382,59 +1352,13 @@ export class SchemaStatements {
   }
 
   async tables(): Promise<string[]> {
-    let values: unknown[];
-    switch (this.adapterName) {
-      case "sqlite":
-        values = await this.adapter.queryValues(
-          `SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name`,
-          "SCHEMA",
-        );
-        return values.map(String);
-      case "postgres":
-        // Mirror Rails #tables (data_source_sql type: "BASE TABLE" →
-        // relkind IN ('r','p')). pg_tables omits partitioned tables
-        // (relkind 'p') and hardcodes 'public'; pg_class scoped via
-        // current_schemas(false) honors the search_path like Rails. No
-        // ORDER BY — Rails' data_source_sql emits none.
-        values = await this.adapter.queryValues(
-          `SELECT c.relname AS name FROM pg_class c LEFT JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = ANY (current_schemas(false)) AND c.relkind IN ('r', 'p')`,
-          "SCHEMA",
-        );
-        return values.map(String);
-      case "mysql":
-        values = await this.adapter.queryValues(
-          `SELECT table_name AS name FROM information_schema.tables WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE' ORDER BY table_name`,
-          "SCHEMA",
-        );
-        return values.map(String);
-      default:
-        // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/schema_statements.rb:1890
-        throw new NotImplementedError("#tables is not implemented");
-    }
+    const sql = this.adapter.dataSourceSql(null, { type: "BASE TABLE" });
+    return (await this.adapter.queryValues(sql, "SCHEMA")).map(String);
   }
 
   async views(): Promise<string[]> {
-    let values: unknown[];
-    switch (this.adapterName) {
-      case "sqlite":
-        values = await this.adapter.queryValues(
-          `SELECT name FROM sqlite_master WHERE type='view' ORDER BY name`,
-          "SCHEMA",
-        );
-        return values.map(String);
-      case "postgres":
-        values = await this.adapter.queryValues(
-          `SELECT viewname AS name FROM pg_views WHERE schemaname = 'public' ORDER BY viewname`,
-          "SCHEMA",
-        );
-        return values.map(String);
-      case "mysql":
-        values = await this.adapter.queryValues(
-          `SELECT table_name AS name FROM information_schema.views WHERE table_schema = DATABASE() ORDER BY table_name`,
-          "SCHEMA",
-        );
-        return values.map(String);
-    }
+    const sql = this.adapter.dataSourceSql(null, { type: "VIEW" });
+    return (await this.adapter.queryValues(sql, "SCHEMA")).map(String);
   }
 
   async viewExists(viewName: string): Promise<boolean> {

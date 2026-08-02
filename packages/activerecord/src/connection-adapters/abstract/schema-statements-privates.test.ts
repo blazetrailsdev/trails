@@ -41,6 +41,12 @@ function makeStatements(
       binds,
       "SCHEMA",
     );
+  // The catalog probes go through data_source_sql; the stub answers with a
+  // simple catalog query unless a test installs its own.
+  adapter["dataSourceSql"] ??= (name?: string | null) =>
+    name == null
+      ? "SELECT name FROM catalog"
+      : `SELECT name FROM catalog WHERE name = '${String(name).replace(/'/g, "''")}'`;
   // Likewise for AbstractAdapter#queryValues: project the stub's object rows
   // onto their first column, as Rails' `query(...).map(&:first)` does.
   adapter["queryValues"] ??= async (sql: string, _name?: string | null, binds: unknown[] = []) => {
@@ -652,7 +658,12 @@ describe("tableExists NotImplementedError fallback", () => {
   });
 
   it("falls back to tables.include? when the data-source path is not implemented", async () => {
-    const ss = makeStatements({ adapterName: "fake" as any, quote: (v: string) => `'${v}'` });
+    const ss = makeStatements({
+      quote: (v: string) => `'${v}'`,
+      dataSourceSql: () => {
+        throw new NotImplementedError("#data_source_sql is not implemented");
+      },
+    });
     vi.spyOn(ss, "tables").mockResolvedValue(["posts", "comments"]);
 
     expect(await ss.tableExists("posts")).toBe(true);
