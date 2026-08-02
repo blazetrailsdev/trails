@@ -362,8 +362,9 @@ export class CollectionAssociation extends Association {
     const ids = (args as any[]).flat().filter((id) => id != null);
 
     if (this.reflection.options.inverseOf && this.isLoaded()) {
+      const model = this.scope().model;
       if (ids.length === 0) {
-        throw new Error(`Couldn't find ${this.klass.name} without an ID`);
+        throw new Error(`Couldn't find ${model.name} without an ID`);
       }
       return this.findByScan(ids);
     }
