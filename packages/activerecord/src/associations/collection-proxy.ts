@@ -1035,9 +1035,9 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // Rails intersects the *instance* `attribute_names` of both records
     // (collection_association.rb:340) — the actually-loaded keys, not the class
     // set — so a collection loaded under a `select` projection only refreshes
-    // the columns both rows actually carry. the instance
-    // `attributeNames()` reads `_attributes.keys()`; the class-level static of
-    // the same name would write columns absent from a partially-loaded dbRecord.
+    // the columns both rows actually carry. The instance
+    // `attributeNames()` reads `_attributes.keys()`; using the class-level
+    // static would write columns absent from a partially-loaded dbRecord.
     const dbNames = new Set(dbRecord.attributeNames());
     const changed = new Set(
       (memRecord as unknown as { changedAttributeNamesToSave: string[] })

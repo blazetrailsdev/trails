@@ -683,9 +683,6 @@ function classAttributeNames(this: AttributeNamesHost): string[] {
   return names;
 }
 
-// The class-level `attribute_names` lives on ClassMethods so it can coexist
-// with the instance method of the same name (Ruby scopes them separately;
-// a TS module has one name slot).
 export const ClassMethods = {
   attributeNames: classAttributeNames,
 };
