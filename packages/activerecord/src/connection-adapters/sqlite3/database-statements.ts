@@ -132,7 +132,11 @@ export async function internalBeginTransaction(
       );
     }
     if (this.isSharedCache && !this.isSharedCache()) {
-      throw new TransactionIsolationError(
+      // Rails raises a bare StandardError here, distinct from the
+      // TransactionIsolationError above (database_statements.rb:67-68).
+      // StandardError has no ported subclass — `Error` is its analogue.
+      // eslint-disable-next-line blazetrails/rails-error-parity
+      throw new Error(
         "You need to enable the shared-cache mode in SQLite mode before attempting to change the transaction isolation level",
       );
     }

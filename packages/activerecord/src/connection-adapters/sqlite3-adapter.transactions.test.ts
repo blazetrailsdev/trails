@@ -137,8 +137,10 @@ describe("SQLite3Adapter transaction control", () => {
       // better-sqlite3 cannot open a file:?cache=shared URI, so the full PRAGMA chain
       // (BEGIN → read PRAGMA → set PRAGMA ON → resetIsolationLevel restore) cannot be
       // integration-tested here. The guard itself is covered by this test.
-      await expect(adapter.beginIsolatedDbTransaction("read_uncommitted")).rejects.toBeInstanceOf(
-        TransactionIsolationError,
+      // Rails raises a bare StandardError for this branch, not
+      // TransactionIsolationError (database_statements.rb:68).
+      await expect(adapter.beginIsolatedDbTransaction("read_uncommitted")).rejects.toThrow(
+        "You need to enable the shared-cache mode",
       );
     });
   });

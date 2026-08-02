@@ -693,7 +693,9 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
         );
       }
       if (!this.isSharedCache()) {
-        throw new TransactionIsolationError(
+        // Rails raises a bare StandardError here, distinct from the
+        // TransactionIsolationError above (database_statements.rb:67-68).
+        throw new Error(
           "You need to enable the shared-cache mode in SQLite mode before attempting to change the transaction isolation level",
         );
       }
