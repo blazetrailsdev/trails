@@ -2934,10 +2934,6 @@ export class Migrator {
     return list.includes(stored);
   }
 
-  get internalMetadata(): InternalMetadata {
-    return this._internalMetadata;
-  }
-
   /**
    * @internal The shared helper of {@link checkEnvironment} and
    * {@link checkProtectedEnvironments}, which are `Tasks::DatabaseTasks`

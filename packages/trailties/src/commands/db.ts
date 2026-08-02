@@ -18,6 +18,7 @@ import { discoverMigrations } from "../migration-loader.js";
 import {
   DatabaseTasks,
   HashConfig,
+  InternalMetadata,
   Migrator,
   eachCurrentEnvironment,
 } from "@blazetrails/activerecord";
@@ -377,12 +378,14 @@ function createMigrator(
   raw?: RawConfig,
 ): Migrator {
   const envName = resolveEnv();
-  const internalMetadataEnabled =
-    raw == null || (raw as { useMetadataTable?: boolean }).useMetadataTable !== false;
   return new Migrator(adapter, migrations, {
     environment: envName,
-    internalMetadataEnabled,
+    internalMetadataEnabled: metadataTableEnabled(raw),
   });
+}
+
+function metadataTableEnabled(raw?: RawConfig): boolean {
+  return raw == null || (raw as { useMetadataTable?: boolean }).useMetadataTable !== false;
 }
 
 async function runMigrate(
@@ -722,12 +725,14 @@ export function dbCommand(): Command {
     .action(async (opts: DatabaseOpts) => {
       await forEachDatabase(opts, async ({ adapter, raw, prefix }) => {
         const envName = resolveEnv();
-        const migrator = createMigrator(adapter, [], raw);
-        if (!migrator.internalMetadata.enabled) {
+        const internalMetadata = new InternalMetadata(adapter, {
+          enabled: metadataTableEnabled(raw),
+        });
+        if (!internalMetadata.enabled) {
           const { EnvironmentStorageError } = await import("@blazetrails/activerecord");
           throw new EnvironmentStorageError();
         }
-        await migrator.internalMetadata.createTableAndSetFlags(envName);
+        await internalMetadata.createTableAndSetFlags(envName);
         console.log(`${prefix}Stamped schema with environment: ${envName}`);
       });
     });
