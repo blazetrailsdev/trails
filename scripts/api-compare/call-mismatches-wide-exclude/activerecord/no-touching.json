@@ -19,12 +19,5 @@
     "rubyName": "no_touching",
     "call": "apply_to",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "no-touching.ts",
-    "rubyName": "no_touching?",
-    "call": "applied_to?",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails no_touching.rb:53-55 calls `NoTouching.applied_to?(self.class)`; trails no-touching.ts:51+ isNoTouching reads the module-level `_noTouchingDepth` map directly."
   }
 ]
