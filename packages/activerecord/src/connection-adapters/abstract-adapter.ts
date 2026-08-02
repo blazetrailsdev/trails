@@ -783,7 +783,7 @@ export class AbstractAdapter implements Quoting {
   private _inUse = false;
   private _preparedStatements = false;
   private _schemaReflection: SchemaReflection | null = null;
-  private _boundSchemaCache: BoundSchemaReflection | null = null;
+  private _schemaCache: BoundSchemaReflection | null = null;
   private _idleSince = Date.now();
   protected _lastActivity = 0;
   protected _verified = false;
@@ -1499,7 +1499,7 @@ export class AbstractAdapter implements Quoting {
     // Same object the bound reflection reads: PoolConfig#schemaCache is backed
     // by the pool SchemaReflection's cache slot, and the lone-connection
     // reflection below owns the standalone-adapter one.
-    const reflection = this._poolConfigOrLoneReflection();
+    const reflection = this._poolSchemaReflection();
     if (!reflection.loadedCache) reflection.loadedCache = new SchemaCache();
     return reflection.loadedCache;
   }
@@ -1517,21 +1517,23 @@ export class AbstractAdapter implements Quoting {
   get schemaCache(): BoundSchemaReflection {
     const pool = this.pool as { schemaCache?: BoundSchemaReflection } | null;
     if (pool?.schemaCache instanceof BoundSchemaReflection) return pool.schemaCache;
-    this._boundSchemaCache ??= BoundSchemaReflection.forLoneConnection(
-      this._loneSchemaReflection(),
+    this._schemaCache ??= BoundSchemaReflection.forLoneConnection(
+      this._poolSchemaReflection(),
       this,
     );
-    return this._boundSchemaCache;
+    return this._schemaCache;
   }
 
-  /** @internal The reflection both schema-cache getters read through. */
-  private _poolConfigOrLoneReflection(): SchemaReflection {
-    const pool = this.pool as { poolConfig?: { schemaReflection: SchemaReflection } } | null;
-    return pool?.poolConfig?.schemaReflection ?? this._loneSchemaReflection();
-  }
-
-  /** @internal Rails' `@pool.schema_reflection` for a NullPool-backed adapter. */
-  private _loneSchemaReflection(): SchemaReflection {
+  /**
+   * @internal Rails' `@pool.schema_reflection` — ConnectionPool delegates to its
+   * PoolConfig and NullPool answers a bare `SchemaReflection.new(nil)`
+   * (connection_pool.rb:34-36). The fallback covers a mock that skipped the
+   * constructor and so carries no pool at all; Rails cannot get there because
+   * `initialize` always plants a NullPool.
+   */
+  private _poolSchemaReflection(): SchemaReflection {
+    const pool = this.pool as { schemaReflection?: SchemaReflection } | null;
+    if (pool?.schemaReflection) return pool.schemaReflection;
     this._schemaReflection ??= new SchemaReflection(null);
     return this._schemaReflection;
   }
