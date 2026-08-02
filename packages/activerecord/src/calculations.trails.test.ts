@@ -131,7 +131,7 @@ describe("lookupCastTypeFromJoinDependencies integration", () => {
       constructor: { name: string };
     } | null;
     expect(castType).toBeTruthy();
-    // The joined Topic's concrete datetime type (e.g. SQLiteDateTimeType), not
+    // The joined Topic's concrete datetime type (e.g. SQLite3DateTime), not
     // the default ValueType the base CalcAuthor returns for unknown columns.
     expect(castType?.constructor.name).not.toBe("ValueType");
   });

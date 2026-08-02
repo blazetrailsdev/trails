@@ -288,7 +288,7 @@ export const COLUMN_TYPE_MAP_MYSQL: Record<PrimitiveColumnSpec, string> = {
 // SQLite has type affinity rules but accepts native datetime/date/time/json
 // type names — they store as TEXT/BLOB under the hood while preserving the
 // declared type for schema reflection (so the type registry resolves to
-// SQLiteDateTimeType/DateType/TimeType/JsonType on load). datetime/date/time/
+// SQLite3DateTime/DateType/TimeType/JsonType on load). datetime/date/time/
 // json all now inherit the native names from COLUMN_TYPE_MAP_MYSQL; `binary`
 // inherits the BLOB mapping likewise.
 /** @internal */

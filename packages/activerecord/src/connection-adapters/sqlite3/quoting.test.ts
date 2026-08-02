@@ -4,7 +4,7 @@ import { BinaryData } from "@blazetrails/activemodel";
 import { Base } from "../../base.js";
 import { fixtures } from "../../test-fixtures.js";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
-import { type AbstractSQLite3Adapter, SQLiteDateTimeType } from "../sqlite3-adapter.js";
+import { type AbstractSQLite3Adapter, SQLite3DateTime } from "../sqlite3-adapter.js";
 import { Date as DateType } from "../../type/date.js";
 import { Time as TimeType } from "../../type/time.js";
 import {
@@ -371,8 +371,8 @@ describe("SQLite3::Quoting", () => {
       );
       const rows = await adapter.execute(`SELECT "ts" FROM "quoting_events" LIMIT 1`);
       const raw = rows[0].ts as string;
-      // SQLiteDateTimeType converts the offset-less UTC string → Temporal.Instant.
-      const cast = new SQLiteDateTimeType().cast(raw);
+      // SQLite3DateTime converts the offset-less UTC string → Temporal.Instant.
+      const cast = new SQLite3DateTime().cast(raw);
       expect(cast).toBeInstanceOf(Temporal.Instant);
       // Microsecond precision is preserved end-to-end.
       expect((cast as Temporal.Instant).epochNanoseconds).toBe(instant.epochNanoseconds);
@@ -383,7 +383,7 @@ describe("SQLite3::Quoting", () => {
       await adapter.executeMutation(`INSERT INTO "quoting_events" ("dt") VALUES (${quote(dt)})`);
       const rows = await adapter.execute(`SELECT "dt" FROM "quoting_events" LIMIT 1`);
       const raw = rows[0].dt as string;
-      const cast = new SQLiteDateTimeType().cast(raw) as Temporal.Instant;
+      const cast = new SQLite3DateTime().cast(raw) as Temporal.Instant;
       expect(cast).toBeInstanceOf(Temporal.Instant);
       const zdt = cast.toZonedDateTimeISO("UTC");
       expect(zdt.microsecond).toBe(654321 % 1000); // 321 µs

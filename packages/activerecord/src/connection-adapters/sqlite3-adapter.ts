@@ -143,7 +143,7 @@ import { SchemaDumper as Sqlite3SchemaDumper } from "./sqlite3/schema-dumper.js"
  * before it is a usable value. That is a Temporal-language gap with no upstream
  * class to converge onto.
  */
-export class SQLiteDateTimeType extends ARDateTimeType {
+export class SQLite3DateTime extends ARDateTimeType {
   override cast(value: unknown): DateTimeCastResult | null {
     const result = super.cast(value);
     if (result instanceof Temporal.PlainDateTime) {
@@ -2984,11 +2984,11 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     // precision-parsing factory. Registration order matters: /date/i and /time/i both
     // match "datetime", so datetime is registered last — reverse-registration lookup
     // matches it first (mirrors the base-map date/time/datetime ordering). better-sqlite3
-    // returns datetime columns as TEXT; SQLiteDateTimeType converts offset-less strings
+    // returns datetime columns as TEXT; SQLite3DateTime converts offset-less strings
     // to Temporal.Instant using the configured default_timezone.
     this.registerClassWithPrecision(m, /date/i, DateType);
     this.registerClassWithPrecision(m, /time/i, TimeType);
-    this.registerClassWithPrecision(m, /datetime/i, SQLiteDateTimeType);
+    this.registerClassWithPrecision(m, /datetime/i, SQLite3DateTime);
     m.aliasType(/timestamp/i, "datetime");
     m.registerType("blob", new BinaryType());
     m.registerType("binary", new BinaryType());
