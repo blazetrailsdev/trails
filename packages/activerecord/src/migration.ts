@@ -1696,6 +1696,21 @@ async function loadMigrationFrom(
  * lexicographic, so version 10 sorts after version 2. BigInt because a
  * timestamp version exceeds `Number.MAX_SAFE_INTEGER`.
  */
+/**
+ * Ruby's `String#to_i`: the leading signed integer prefix, or 0 when there is
+ * none — so `"123abc"` is 123 and a non-numeric legacy version sorts as 0
+ * rather than raising. BigInt keeps precision past `Number.MAX_SAFE_INTEGER`.
+ */
+function toInteger(value: string): bigint {
+  const match = value.match(/^\s*(-?\d+)/);
+  if (!match) return 0n;
+  try {
+    return BigInt(match[1]);
+  } catch {
+    return 0n;
+  }
+}
+
 function byVersion(a: MigrationProxy, b: MigrationProxy): number {
   const va = BigInt(a.version);
   const vb = BigInt(b.version);
@@ -1782,7 +1797,8 @@ export class MigrationContext {
     targetVersion?: number | string | null,
     block?: (m: MigrationProxy) => boolean,
   ): Promise<MigrationProxy[]> {
-    return this._runMigrator("up", targetVersion, block);
+    const selectedMigrations = block ? this.migrations.filter(block) : this.migrations;
+    return this._migrateWithMigrator(this._newMigrator("up", selectedMigrations, targetVersion));
   }
 
   /** @internal Mirrors: ActiveRecord::MigrationContext#down (`migration.rb:1258-1266`) */
@@ -1790,33 +1806,33 @@ export class MigrationContext {
     targetVersion?: number | string | null,
     block?: (m: MigrationProxy) => boolean,
   ): Promise<MigrationProxy[]> {
-    return this._runMigrator("down", targetVersion, block);
+    const selectedMigrations = block ? this.migrations.filter(block) : this.migrations;
+    return this._migrateWithMigrator(this._newMigrator("down", selectedMigrations, targetVersion));
   }
 
   /**
-   * @internal The shared body of {@link up} / {@link down}: Rails writes
-   * `Migrator.new(direction, selected_migrations, ...).migrate` at both sites
-   * (`migration.rb:1248-1266`). `Migrator#migrate` is
-   * `use_advisory_lock? ? with_advisory_lock { migrate_without_lock } :
-   * migrate_without_lock` (`migration.rb:1452-1458`); trails' `Migrator#migrate`
-   * still carries the MigrationContext-shaped `(targetVersion, block)`
-   * signature its ~10 remaining callers pass, so the lock/no-lock pair is spelled
-   * out here until `migrator-run-surface-caller-migration` reshapes it.
+   * @internal `Migrator#migrate` is `use_advisory_lock? ? with_advisory_lock
+   * { migrate_without_lock } : migrate_without_lock` (`migration.rb:1452-1458`).
+   * It is spelled out here because trails' `Migrator#migrate` still carries the
+   * MigrationContext-shaped `(targetVersion, block)` signature its remaining
+   * callers pass; `migrator-run-surface-caller-migration` collapses it.
    */
-  private async _runMigrator(
-    direction: "up" | "down",
-    targetVersion?: number | string | null,
-    block?: (m: MigrationProxy) => boolean,
-  ): Promise<MigrationProxy[]> {
-    const selected = block ? this.migrations.filter(block) : this.migrations;
-    const migrator = new Migrator(this.connection, selected, {
-      direction,
-      targetVersion: targetVersion ?? null,
-      internalMetadataEnabled: this._internalMetadata?.enabled,
-    });
+  private async _migrateWithMigrator(migrator: Migrator): Promise<MigrationProxy[]> {
     return migrator.isUseAdvisoryLock()
       ? migrator.withAdvisoryLock(() => migrator.migrateWithoutLock())
       : migrator.migrateWithoutLock();
+  }
+
+  private _newMigrator(
+    direction: "up" | "down",
+    migrations: MigrationProxy[],
+    targetVersion: number | string | null = null,
+  ): Migrator {
+    return new Migrator(this.connection, migrations, {
+      direction,
+      targetVersion,
+      internalMetadataEnabled: this._internalMetadata?.enabled,
+    });
   }
 
   /**
@@ -1843,11 +1859,7 @@ export class MigrationContext {
 
   /** @internal Mirrors: ActiveRecord::MigrationContext#run (`migration.rb:1268-1270`) */
   async run(direction: "up" | "down", targetVersion: number | string): Promise<string | undefined> {
-    const migrator = new Migrator(this.connection, this.migrations, {
-      direction,
-      targetVersion,
-      internalMetadataEnabled: this._internalMetadata?.enabled,
-    });
+    const migrator = this._newMigrator(direction, this.migrations, targetVersion);
     return migrator.isUseAdvisoryLock()
       ? migrator.withAdvisoryLock(() => migrator.runWithoutLock())
       : migrator.runWithoutLock();
@@ -1870,26 +1882,18 @@ export class MigrationContext {
   async migrationsStatus(): Promise<
     Array<{ status: "up" | "down"; version: string; name: string }>
   > {
-    // Rails' `db_list` is `schema_migration.normalized_versions`, and each file
-    // version goes through `normalize_migration_number` before matching
-    // (`migration.rb:1318-1328` / `schema_migration.rb:69-70`).
-    const dbList = new Set(
-      (await this.schemaMigration.allVersions()).map((v) =>
-        SchemaMigration.normalizeMigrationNumber(v),
-      ),
-    );
+    const dbList = new Set(await this.schemaMigration.normalizedVersions());
 
-    const fileList = this.migrations.map((m) => {
-      const version = SchemaMigration.normalizeMigrationNumber(m.version);
-      const isUp = dbList.delete(version);
-      return {
-        status: (isUp ? "up" : "down") as "up" | "down", // eslint-disable-line @typescript-eslint/no-unnecessary-type-assertion
-        version,
-        // Rails: `(name + scope).humanize` — the snake-case filename part
-        // concatenated with the scope suffix. Our proxy carries the camelized
-        // class name, so underscore it back before appending the scope.
-        name: humanize(underscore(m.name) + (m.scope ?? "")),
-      };
+    const fileList = this.migrationFiles().map((file) => {
+      const parsed = this.parseMigrationFilename(file);
+      if (!parsed) throw new IllegalMigrationNameError(file);
+      const [rawVersion, name, scope] = parsed;
+      if (this.isValidateTimestamp() && !this.isValidMigrationTimestamp(rawVersion)) {
+        throw new InvalidMigrationTimestampError(rawVersion, name);
+      }
+      const version = SchemaMigration.normalizeMigrationNumber(rawVersion);
+      const status = dbList.delete(version) ? ("up" as const) : ("down" as const);
+      return { status, version, name: humanize(name + scope) };
     });
 
     const noFileList = [...dbList].map((version) => ({
@@ -1898,22 +1902,9 @@ export class MigrationContext {
       name: "********** NO FILE **********",
     }));
 
-    // Rails sorts by `version.to_i`, which takes the leading signed integer
-    // prefix and yields 0 when there is none — so a legacy non-numeric row
-    // sorts as 0 rather than raising. BigInt keeps precision past
-    // MAX_SAFE_INTEGER.
-    const toBig = (v: string): bigint => {
-      const m = v.match(/^\s*(-?\d+)/);
-      if (!m) return 0n;
-      try {
-        return BigInt(m[1]);
-      } catch {
-        return 0n;
-      }
-    };
     return [...noFileList, ...fileList].sort((a, b) => {
-      const va = toBig(a.version);
-      const vb = toBig(b.version);
+      const va = toInteger(a.version);
+      const vb = toInteger(b.version);
       return va < vb ? -1 : va > vb ? 1 : 0;
     });
   }
@@ -1937,10 +1928,6 @@ export class MigrationContext {
 
   /** @internal Mirrors: ActiveRecord::MigrationContext#last_stored_environment (`migration.rb:1348-1357`) */
   async lastStoredEnvironment(): Promise<string | null> {
-    // Rails short-circuits on `internal_metadata.enabled?` before the
-    // `table_exists?` read, so a DB that opted out of metadata storage
-    // (`use_metadata_table: false`) reads as unstamped even when a stale
-    // ar_internal_metadata table survives from an earlier run.
     const internalMetadata = this.internalMetadata;
     if (!internalMetadata.enabled) return null;
     if ((await this.currentVersion()) === 0) return null;
@@ -2070,22 +2057,16 @@ export class MigrationContext {
    * the migrations that ran.
    */
   async move(direction: "up" | "down", steps: number): Promise<MigrationProxy[]> {
-    const migrator = new Migrator(this.connection, this.migrations, {
-      direction,
-      targetVersion: null,
-      internalMetadataEnabled: this._internalMetadata?.enabled,
-    });
+    const migrator = this._newMigrator(direction, this.migrations);
     const currentVersion = (await this.currentVersion()) ?? 0;
-    const current = await migrator.currentMigration();
-    if (currentVersion !== 0 && !current) {
-      throw new UnknownMigrationVersionError(String(currentVersion));
+    const currentMigration = await migrator.currentMigration();
+    if (currentVersion !== 0 && !currentMigration) {
+      throw new UnknownMigrationVersionError(currentVersion);
     }
-    // `migrator.migrations` is ascending for :up and descending for :down, so
-    // the direction decides which version `startIndex + steps` lands on.
-    const ordered = migrator.migrations;
+    const migrations = migrator.migrations;
     const startIndex =
-      currentVersion === 0 ? 0 : ordered.findIndex((m) => m.version === current!.version);
-    const finish = ordered[startIndex + steps];
+      currentVersion === 0 ? 0 : migrations.findIndex((m) => m === currentMigration);
+    const finish = migrations[startIndex + steps];
     const version = finish ? Number(finish.version) : 0;
     return direction === "up" ? this.up(version) : this.down(version);
   }
@@ -2693,22 +2674,10 @@ export class Migrator {
     }));
 
     // Rails sorts by `version.to_i` — non-numeric rows coerce to 0 rather
-    // than raising. Use BigInt for precision (versions can exceed
-    // MAX_SAFE_INTEGER) with a 0-fallback for non-numeric legacy rows.
-    // Mirror Ruby String#to_i: take the leading signed integer prefix and
-    // return 0 when none — strings like "123abc" sort as 123 (Rails parity).
-    const toBig = (v: string): bigint => {
-      const m = v.match(/^\s*(-?\d+)/);
-      if (!m) return 0n;
-      try {
-        return BigInt(m[1]);
-      } catch {
-        return 0n;
-      }
-    };
+    // than raising.
     return [...dbList, ...fileList].sort((a, b) => {
-      const va = toBig(a.version);
-      const vb = toBig(b.version);
+      const va = toInteger(a.version);
+      const vb = toInteger(b.version);
       return va < vb ? -1 : va > vb ? 1 : 0;
     });
   }
