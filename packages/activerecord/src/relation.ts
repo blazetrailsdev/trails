@@ -3341,13 +3341,9 @@ export class Relation<T extends Base> {
     // left-outer JD and folding it into the stash. This keeps the shape identical
     // to the subquery `from(relation)` path.
     //
-    // The emptiness checks below mirror buildJoinBuckets exactly: Rails' guard is
-    // `joins_values.empty?`, and `_namedInnerJoins` + `_joinValues` partition
-    // `joins_values` (an eager JoinDependency pushed by `_withEagerJoinDependency`
-    // is a named join value, so it is already covered — `_eagerLoadAssociations`
-    // must NOT be a term here, exactly as it must not arm `hasStashed` below).
-    // `_joinClauses` is trails-only compensation for raw join clauses living
-    // outside `joins_values`.
+    // The emptiness checks below are Rails' `joins_values.empty?`, which
+    // `_namedInnerJoins` + `_joinValues` partition; `_joinClauses` is trails-only
+    // compensation for raw join clauses living outside `joins_values`.
     //
     // Fires whenever left_outer_joins_values is non-empty (Rails' `unless
     // left_outer_joins_values.empty?`, query_methods.rb:1828), even when the
@@ -3362,9 +3358,8 @@ export class Relation<T extends Base> {
     const leftOuterIsNamed = pureLeftOuter && this._leftOuterJoinsValues.length > 0;
     if (this._leftOuterJoinsValues.length > 0 && !leftOuterIsNamed) {
       // query_methods.rb:1843: `stashed_left_joins.unshift` — unconditional, so
-      // `stashed_left_joins` is non-empty (Rails: truthy) on this branch even
-      // when the resolved association list is empty. That truthiness is what
-      // arms the raw-join routing below.
+      // `stashed_left_joins` is non-empty (Ruby: truthy) here even when the
+      // resolved association list is empty.
       leftStashed.unshift(
         QueryMethodBangs.constructJoinDependency.call(
           this as any,
@@ -3374,25 +3369,17 @@ export class Relation<T extends Base> {
       );
     }
 
-    // Mirror Rails build_join_buckets routing (query_methods.rb:1847-1863). The
-    // eager stash is the trailing `joins_values` JoinDependency whose base_klass
-    // is this model (query_methods.rb:1848-1850) — a cross-klass merged JD fails
-    // that test and stays in the stream for `select_named_joins`, so it does NOT
-    // arm the guard. When a stash exists, non-LeadingJoin nodes go to join_node
-    // (appended after the association joins); otherwise every node goes to
-    // leading_join (Rails' else branch) and leads them. The mere presence of
-    // named inner joins, eager-load associations or left-outer values does not
-    // arm it: named inner joins are still in `joins` at this point and only
-    // become a JoinDependency later (query_methods.rb:1865).
+    // query_methods.rb:1848-1850: the eager stash is the trailing `joins_values`
+    // JoinDependency whose base_klass is this model — a cross-klass merged JD
+    // fails that test and stays in the stream for `select_named_joins`.
     const lastJoinsValue = this._joinsValues[this._joinsValues.length - 1];
     const stashedEagerLoad =
       lastJoinsValue instanceof JoinDependency && lastJoinsValue.baseKlass === this._modelClass;
     const hasStashed = stashedEagerLoad || leftStashed.length > 0;
-    // Only the LEADING run of raw join values is routed by `hasStashed`
-    // (query_methods.rb:1855-1862, `while joins.first.is_a?(Arel::Nodes::Join)`);
-    // a raw join sitting BEHIND a named join falls through to
+    // query_methods.rb:1855-1862: only the LEADING run of Join nodes is routed by
+    // `hasStashed`; a raw join BEHIND a named join falls through to
     // `select_named_joins`, which buckets it as a join_node unconditionally
-    // (query_methods.rb:1866-1867). `_joinsValues` is the unified store, so it
+    // (query_methods.rb:1866-1867). Iterate the unified `_joinsValues`, which
     // preserves the raw-vs-named interleaving `_joinValues` alone cannot see.
     const toJoinNode = (v: string | Nodes.Join): Nodes.Join =>
       typeof v === "string" ? new Nodes.StringJoin(new Nodes.SqlLiteral(v.trim())) : v;

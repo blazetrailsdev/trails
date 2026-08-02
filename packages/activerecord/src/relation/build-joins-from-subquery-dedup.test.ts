@@ -87,13 +87,10 @@ describe("build_joins from(subquery) dedup", () => {
     );
   });
 
-  // The live half of the `build_joins` split (`_applyJoinsToManager`) armed its
-  // raw-join routing on the mere presence of named inner joins / eager-load
-  // associations / left-outer values, so an ordinary `joins("comments")` pushed a
-  // leading raw join into `join_node` and it trailed the association joins —
-  // while the subquery half (`buildJoinBuckets`, armed on Rails'
-  // `stashed_eager_load || stashed_left_joins`) led with it. Both halves now
-  // route identically.
+  // Rails arms the leading-raw-join routing on `stashed_eager_load ||
+  // stashed_left_joins` alone (query_methods.rb:1857) — a named inner join is
+  // still in `joins` at that point and does not arm it. Both halves of the
+  // `build_joins` split must therefore lead with the raw join here.
   it("routes a leading raw join the same way on the live path and the from-subquery path", () => {
     const q = (name: string) => escapeRegExp(quoteTableName(name));
     const leading = new RegExp(
