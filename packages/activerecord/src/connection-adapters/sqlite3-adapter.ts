@@ -2238,9 +2238,16 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   async removeCheckConstraint(
     tableName: string,
     expressionOrOptions?: string | { name?: string; ifExists?: boolean },
+    trailingOptions: { name?: string; ifExists?: boolean } = {},
   ): Promise<void> {
+    // Rails' `remove_check_constraint(table_name, expression = nil, **options)`
+    // splits into a positional expression plus keywords; TS callers spell the
+    // keyword-only form as arg 2 and the expression form as arg 2 + arg 3.
     const expression = typeof expressionOrOptions === "string" ? expressionOrOptions : undefined;
-    const options = typeof expressionOrOptions === "object" ? (expressionOrOptions ?? {}) : {};
+    const options =
+      typeof expressionOrOptions === "object"
+        ? { ...(expressionOrOptions ?? {}), ...trailingOptions }
+        : { ...trailingOptions };
 
     if (options.ifExists === true) {
       const probe: { name?: string } = {};
