@@ -14,6 +14,7 @@ import { Migrator } from "./index.js";
 import type { MigrationProxy } from "./migration.js";
 import { Migration, IllegalMigrationNameError } from "./migration.js";
 import { DefaultStrategy } from "./migration/default-strategy.js";
+import { ActiveRecord } from "./ar-config.js";
 import { Base } from "./base.js";
 import { SchemaMigration } from "./schema-migration.js";
 import { newRawTestAdapter } from "./test-adapter.js";
@@ -188,6 +189,20 @@ describe("Migration#createTable id option type", () => {
       const migration = new StrategyMigration();
       expect(migration.executionStrategy).toBeInstanceOf(DefaultStrategy);
       expect(migration.executionStrategy).toBe(migration.executionStrategy);
+    });
+
+    it("uses the class configured on ActiveRecord.migrationStrategy", () => {
+      class CustomStrategy extends DefaultStrategy {}
+      const previous = ActiveRecord.migrationStrategy;
+      ActiveRecord.migrationStrategy = CustomStrategy;
+      try {
+        const migration = new StrategyMigration();
+        const strategy = migration.executionStrategy as CustomStrategy;
+        expect(strategy).toBeInstanceOf(CustomStrategy);
+        expect(strategy.methodMissing("createTable")).toBe("hi mom!");
+      } finally {
+        ActiveRecord.migrationStrategy = previous;
+      }
     });
 
     it("forwards unknown calls through the strategy to the connection", async () => {
