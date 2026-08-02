@@ -218,13 +218,13 @@ describe("TimestampTest", () => {
 
   it("touching a no touching object", async () => {
     await Developer.noTouching(async () => {
-      expect(Developer.isTouchingSuppressed).toBe(true);
-      expect(Owner.isTouchingSuppressed).toBe(false);
+      expect(developer.isNoTouching()).toBe(true);
+      expect(owner.isNoTouching()).toBe(false);
       await developer.touch();
     });
 
-    expect(Developer.isTouchingSuppressed).toBe(false);
-    expect(Owner.isTouchingSuppressed).toBe(false);
+    expect(developer.isNoTouching()).toBe(false);
+    expect(owner.isNoTouching()).toBe(false);
     expect(developer.legacy_updated_at).toEqual(previouslyUpdatedAt);
   });
 
@@ -242,13 +242,13 @@ describe("TimestampTest", () => {
 
   it("global no touching", async () => {
     await Base.noTouching(async () => {
-      expect(Developer.isTouchingSuppressed).toBe(true);
-      expect(Owner.isTouchingSuppressed).toBe(true);
+      expect(developer.isNoTouching()).toBe(true);
+      expect(owner.isNoTouching()).toBe(true);
       await developer.touch();
     });
 
-    expect(Developer.isTouchingSuppressed).toBe(false);
-    expect(Owner.isTouchingSuppressed).toBe(false);
+    expect(developer.isNoTouching()).toBe(false);
+    expect(owner.isNoTouching()).toBe(false);
     expect(developer.legacy_updated_at).toEqual(previouslyUpdatedAt);
   });
 
@@ -256,11 +256,11 @@ describe("TimestampTest", () => {
     // JS is single-threaded; verify noTouching state is isolated to its block
     // (Rails verifies Thread-local isolation; JS has no threads but the same
     // temporal isolation applies to the async block).
-    expect(Developer.isTouchingSuppressed).toBe(false);
+    expect(developer.isNoTouching()).toBe(false);
     await Developer.noTouching(async () => {
-      expect(Developer.isTouchingSuppressed).toBe(true);
+      expect(developer.isNoTouching()).toBe(true);
     });
-    expect(Developer.isTouchingSuppressed).toBe(false);
+    expect(developer.isNoTouching()).toBe(false);
   });
 
   it("no touching with callbacks", async () => {

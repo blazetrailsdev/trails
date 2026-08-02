@@ -44,22 +44,22 @@ export function isAppliedTo(modelClass: typeof Base): boolean {
 }
 
 /**
- * Check if touching is suppressed for any model class.
+ * Returns true if the record's class has no_touching set, false otherwise.
  *
  * Mirrors: ActiveRecord::NoTouching#no_touching?
  */
-export function isNoTouching(): boolean {
-  return _noTouchingDepth.size > 0;
+export function isNoTouching(this: { constructor: unknown }): boolean {
+  return isAppliedTo(this.constructor as typeof Base);
 }
 
 /**
  * Mirrors: ActiveRecord::NoTouching#touch_later
  */
 export async function touchLater(
-  this: { noTouching?(): boolean; touch(...args: any[]): Promise<any> },
+  this: { isNoTouching?(): boolean; touch(...args: any[]): Promise<any> },
   ...args: any[]
 ): Promise<any> {
-  if (this.noTouching?.()) return;
+  if (this.isNoTouching?.()) return;
   return this.touch(...args);
 }
 

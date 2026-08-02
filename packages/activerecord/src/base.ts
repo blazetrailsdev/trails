@@ -227,10 +227,7 @@ import {
   canUseFastCacheVersion as _canUseFastCacheVersion,
   rawTimestampToCacheVersion as _rawTimestampToCacheVersion,
 } from "./integration.js";
-import {
-  noTouching as _noTouchingBlock,
-  isAppliedTo as _isNoTouchingApplied,
-} from "./no-touching.js";
+import { noTouching as _noTouchingBlock, isNoTouching as _isNoTouching } from "./no-touching.js";
 import { suppress as _suppressBlock, registry as _suppressorRegistry } from "./suppressor.js";
 import {
   inspect as _inspect,
@@ -1742,9 +1739,12 @@ export class Base extends Model {
     return _noTouchingBlock(this, fn);
   }
 
-  static get isTouchingSuppressed(): boolean {
-    return _isNoTouchingApplied(this);
-  }
+  /**
+   * Returns true if the record's class has noTouching set.
+   *
+   * Mirrors: ActiveRecord::NoTouching#no_touching?. Wired via include() below.
+   */
+  declare isNoTouching: () => boolean;
 
   // -- Sequence name --
   static _sequenceName: string | null = null;
@@ -4890,6 +4890,8 @@ include(Base, {
   isStrictLoadingNPlusOneOnly: _Core.isStrictLoadingNPlusOneOnly,
   isFrozen: _Core.isFrozen,
   freeze: _Core.freeze,
+  // NoTouching
+  isNoTouching: _isNoTouching,
   // Integration
   toParam: _toParam,
   cacheKey: _cacheKey,
