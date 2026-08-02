@@ -8,8 +8,11 @@
  * written by `pnpm api:compare --wide-calls`) and, for each matched TS
  * method, rewrites its JSDoc so that:
  *
- *   - every currently-missing Rails call carries one
- *     `@missingRailsCall <ruby_call> — <reason>` tag;
+ *   - every currently-missing Rails call WITH a curated baseline reason carries
+ *     one `@missingRailsCall <ruby_call> — <reason>` tag. A call whose reason is
+ *     still the seeded placeholder gets no tag: the placeholder suppresses
+ *     nothing, so minting it would only add inert prose to a source file while
+ *     the reason kept living in the baseline JSON (RFC 0083);
  *   - tags for now-satisfied calls are dropped (human-authored reasons are
  *     harvested to stdout, never destroyed unseen);
  *   - existing tags that still apply are kept byte-for-byte (idempotent:
@@ -92,9 +95,19 @@ export interface ReconcileResult {
   kept: TagEntry[];
   added: TagEntry[];
   dropped: TagEntry[];
+  /** Missing calls with no curated reason to migrate: no tag is minted for
+   *  them, so they stay in the baseline until a human writes the prose. */
+  skipped: string[];
 }
 
-/** Diff existing entries against the expected missing-call set. */
+/** Diff existing entries against the expected missing-call set.
+ *
+ *  A call whose baseline reason is still {@link DEFAULT_TAG_REASON} (or blank)
+ *  mints NO tag: a placeholder tag suppresses nothing (`justifies` rejects it),
+ *  so it would only add inert prose to a source file while the reason kept
+ *  living in the baseline JSON. The generator therefore only ever writes
+ *  load-bearing tags, and a tree whose deviations are all still baselined
+ *  reconciles to zero edits. */
 export function reconcile(
   existing: TagEntry[],
   expected: ReadonlySet<string>,
@@ -103,15 +116,19 @@ export function reconcile(
   const byCall = new Map(existing.map((e) => [e.call, e]));
   const kept: TagEntry[] = [];
   const added: TagEntry[] = [];
+  const skipped: string[] = [];
   for (const call of [...expected].sort()) {
     const have = byCall.get(call);
-    if (have) kept.push(have);
-    // A blank curated reason would emit a tag this tool's own parser rejects
-    // on the next run; the placeholder keeps the generated path round-trippable.
-    else added.push({ call, reason: reasonFor(call).trim() || DEFAULT_TAG_REASON, rawLines: [] });
+    if (have) {
+      kept.push(have);
+      continue;
+    }
+    const reason = reasonFor(call).trim();
+    if (!justifies(reason)) skipped.push(call);
+    else added.push({ call, reason, rawLines: [] });
   }
   const dropped = existing.filter((e) => !expected.has(e.call));
-  return { kept, added, dropped };
+  return { kept, added, dropped, skipped };
 }
 
 // Wrap a new tag entry to lines at ~80 cols with a two-space hang indent.
@@ -133,8 +150,19 @@ function renderEntry(e: TagEntry, indent: string): string[] {
   return lines;
 }
 
+const oneLineProse = (line: string): string =>
+  line
+    .replace(/^\s*\/\*\*\s?/, "")
+    .replace(/\s*\*\/\s*$/, "")
+    .trim();
+
 /** Rebuild a JSDoc comment from its non-tag lines plus reconciled entries.
- *  Returns null when nothing remains (comment should be removed entirely). */
+ *  Returns null when nothing remains (comment should be removed entirely).
+ *
+ *  A one-line `/** ... *\/` comment keeps its prose on the `/**` line, which
+ *  the `head`/`hasProse` split cannot see; with no entries it is returned
+ *  verbatim, so an ordinary doc comment on an untagged method is not deleted
+ *  as "tags-only". */
 export function renderJsdoc(rest: string[], entries: TagEntry[], indent: string): string | null {
   // Order entries by call name (code-unit order, matching the ratchet).
   const ordered = [...entries].sort((a, b) => (a.call < b.call ? -1 : a.call > b.call ? 1 : 0));
@@ -142,10 +170,12 @@ export function renderJsdoc(rest: string[], entries: TagEntry[], indent: string)
   if (body.length === 0 || !body[0].trimStart().startsWith("/**")) {
     body = [`${indent}/**`, `${indent} */`];
   }
+  if (ordered.length === 0 && body.length === 1) {
+    return oneLineProse(body[0]) === "" ? null : body[0];
+  }
   // Normalize a one-line `/** ... */` comment to block form when tags exist.
   if (ordered.length > 0 && body.length === 1) {
-    const one = body[0];
-    const inner = one.replace(/^\s*\/\*\*\s?/, "").replace(/\s*\*\/\s*$/, "");
+    const inner = oneLineProse(body[0]);
     body = [`${indent}/**`, ...(inner ? [`${indent} * ${inner}`] : []), `${indent} */`];
   }
   const closeIdx = body.findIndex((l) => l.trim().endsWith("*/"));
@@ -189,7 +219,7 @@ function firstCuratedReason(
 ): string {
   for (const rubyName of rubyNames) {
     const reason = reasonFor(rubyName, call);
-    if (reason !== DEFAULT_TAG_REASON) return reason;
+    if (justifies(reason.trim())) return reason;
   }
   return DEFAULT_TAG_REASON;
 }
@@ -214,12 +244,17 @@ export function reconcileFileText(
    *  host-class duplicates, prototype-patched methods, …) — reported, never
    *  silently dropped. */
   unmatched: string[];
+  /** Every missing call left untagged for want of a curated reason (see
+   *  `reconcile`), so a zero-edit run still says how much is waiting on human
+   *  prose. */
+  skipped: string[];
 } {
   const sf = ts.createSourceFile(fileName, text, ts.ScriptTarget.Latest, true);
   const edits: Edit[] = [];
   const harvested: { tsName: string; entry: TagEntry }[] = [];
   const tagged: { rubyName: string; call: string }[] = [];
   const seen = new Set<string>();
+  const skipped: string[] = [];
 
   const visit = (node: ts.Node): void => {
     let name: string | null = null;
@@ -269,6 +304,7 @@ export function reconcileFileText(
         const r = reconcile(entries, expected, (c) =>
           exp ? firstCuratedReason(exp.rubyNames, c, reasonFor) : DEFAULT_TAG_REASON,
         );
+        skipped.push(...r.skipped);
         if (exp) {
           for (const e of [...r.kept, ...r.added]) {
             if (!justifies(e.reason)) continue;
@@ -300,12 +336,12 @@ export function reconcileFileText(
   visit(sf);
 
   const unmatched = [...expectations.keys()].filter((n) => !seen.has(n)).sort();
-  if (edits.length === 0) return { text: null, harvested, tagged, unmatched };
+  if (edits.length === 0) return { text: null, harvested, tagged, unmatched, skipped };
   let out = text;
   for (const e of edits.sort((a, b) => b.start - a.start)) {
     out = out.slice(0, e.start) + e.text + out.slice(e.end);
   }
-  return { text: out, harvested, tagged, unmatched };
+  return { text: out, harvested, tagged, unmatched, skipped };
 }
 
 /** (tsFile → tsName → expectation) for one package: every call the artifact
@@ -372,6 +408,7 @@ async function main(argv: string[]): Promise<number> {
   const byFile = buildExpectations(artifact, pkg, onlyFile);
 
   let changed = 0;
+  let skipped = 0;
   const migrated = new Set<string>();
   const srcDir = packageSrcDir(pkg);
   for (const [tsFile, expectations] of [...byFile.entries()].sort()) {
@@ -397,7 +434,8 @@ async function main(argv: string[]): Promise<number> {
       console.error(`api:build: ${err instanceof Error ? err.message : String(err)}`);
       return 1;
     }
-    const { text: next, harvested, tagged, unmatched } = reconciled;
+    const { text: next, harvested, tagged, unmatched, skipped: fileSkipped } = reconciled;
+    skipped += fileSkipped.length;
     for (const t of tagged) migrated.add(keyOf({ package: pkg, tsFile, ...t }));
     for (const h of harvested) {
       console.log(`harvested (${tsFile} ${h.tsName} ${h.entry.call}): ${h.entry.reason}`);
@@ -420,6 +458,13 @@ async function main(argv: string[]): Promise<number> {
       `${path.relative(ROOT_DIR, WIDE_BASELINE_DIR)}/.`,
   );
   console.log(`api:build: ${changed} file(s) ${dryRun ? "would change" : "updated"} (${pkg}).`);
+  if (skipped > 0) {
+    console.log(
+      `api:build: ${skipped} missing call(s) left untagged — their baseline reason is still ` +
+        "the seeded placeholder. Write per-entry prose in " +
+        `${path.relative(ROOT_DIR, WIDE_BASELINE_DIR)}/ (or at the call site) to migrate them.`,
+    );
+  }
   return 0;
 }
 

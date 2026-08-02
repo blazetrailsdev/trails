@@ -205,14 +205,34 @@ On every run, for every **existing** matched method, `api:build`:
    below for why the sibling tag reads differently). No new parser dep
    either way.
 3. Diffs:
-   - **newly missing** (in artifact, not tagged): add a tag. Reason source
-     precedence: (a) the curated `reason` from the matching
+   - **newly missing** (in artifact, not tagged): add a tag **only when there
+     is a curated reason to migrate** — the `reason` from the matching
      `call-mismatches-wide-exclude/<pkg>/<tsFile>.json` row (and, for narrow
      entries, `call-mismatches-exclude.json`), keyed by
-     `(package, tsFile, rubyName, call)`; (b) otherwise the literal
-     `unported (api:build stub)` / wide `DEFAULT_REASON` placeholder. This is
-     the migration path: the first full run pulls every curated reason into
-     the JSDoc.
+     `(package, tsFile, rubyName, call)`, when it is neither blank nor the
+     seeded placeholder. This is the migration path: the first full run pulls
+     every curated reason into the JSDoc.
+
+     A call whose baseline reason is still the placeholder (the seeded RFC
+     0044/0047 default strings / `unported (api:build stub)`) gets **no tag**
+     (RFC 0083). A placeholder tag justifies nothing — `justifies()` rejects
+     it, and it must, since `api:build` would otherwise mint one per
+     still-missing call and a single run would move the whole ~3088-row wide
+     baseline into tags and zero the gate — so minting it only adds inert
+     prose to a source file while the reason keeps living in the baseline
+     JSON. The generator therefore only ever produces load-bearing tags, and
+     `api:build --package <pkg> --dry-run` reports zero files changed on a
+     tree whose deviations are all still baselined. The run reports the
+     skipped count so the waiting-on-prose backlog stays visible.
+
+     Rejected alternatives: an opt-in `--seed-placeholders` flag (keeps ~90
+     LOC of generator and its round-trip surface alive for a scratch-space
+     convenience an editor already provides — a human writing a cluster's
+     reasons types the tag with the prose, not the placeholder first); and
+     keeping the current behavior documented as scratch space (the edits are
+     indistinguishable in review from load-bearing ones, and every one of
+     them has to be reverted or rewritten by hand).
+
    - **now satisfied** (tagged, not in artifact): drop the tag. If its reason
      is a known placeholder (the seeded RFC 0044/0047 default strings or
      `unported (api:build stub)`), drop silently. If it is human-authored
@@ -223,6 +243,7 @@ On every run, for every **existing** matched method, `api:build`:
    - **unchanged**: keep the tag byte-for-byte (tags are emitted in the
      ratchet's `compareKeys` code-unit order so a re-run with no diff is a
      no-op — idempotency is "second run produces zero edits").
+
 4. **Never edits a method body.** The only mutations are JSDoc blocks and
    whole-method insertions. A method whose body is hand-written but whose
    JSDoc is stale gets only a JSDoc edit.
@@ -314,10 +335,9 @@ report). They therefore share:
     unjustified one would suppress drift with no argument for it.
   - `@missingRailsCall`: raised by `parseJsdoc` (`build.ts`), with the same
     `<tag> needs a reason: <file>:<line> — <what to write>` message shape. A
-    bare tag in the tree is necessarily **hand-authored**: the generator
-    always writes a reason — either the curated baseline row's prose or a
-    placeholder (`unported (api:build stub)` / the wide `DEFAULT_REASON`) —
-    so there is no generated bare tag to protect. Backfilling a hand-written
+    bare tag in the tree is necessarily **hand-authored**: the generator only
+    emits a tag when it has a curated baseline row's prose to carry, so there
+    is no generated bare tag to protect. Backfilling a hand-written
     bare tag with a placeholder would silently convert an unjustified
     allowlist entry into a blessed one, which is exactly the failure mode the
     sibling tag rejects.
@@ -344,12 +364,12 @@ report). They therefore share:
   textually identical to an ordinary doc comment on the inserted declaration;
   only the diff distinguishes them, so that one stays a review-time concern.
 
-  The placeholder path is unaffected: a generator-authored placeholder is a
-  non-empty reason, so it parses, round-trips byte-for-byte via `rawLines`,
-  and still drops without a harvest report when the call converges. Reason
-  precedence (3a) falls back to the placeholder if a curated baseline row's
-  `reason` is ever blank, so the generator can never write a tag its own
-  parser would reject on the next run.
+  Placeholder tags predating RFC 0083 are unaffected: a placeholder is a
+  non-empty reason, so it parses, is kept byte-for-byte via `rawLines` on a
+  re-run, and still drops without a harvest report when the call converges.
+  The generator can never write a tag its own parser would reject on the next
+  run, because a blank curated `reason` now means "no tag" rather than "tag
+  with a placeholder".
 
 Two things are deliberately **not** shared, and the difference is load-bearing:
 
