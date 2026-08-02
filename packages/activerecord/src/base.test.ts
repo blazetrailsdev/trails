@@ -625,7 +625,7 @@ describe("BasicsTest", () => {
     }
     Animal.tableName = "animals";
     expect(Animal.tableName).toBe("animals");
-    expect(Animal.hasAttributeDefinition("type")).toBe(true);
+    expect(Animal.hasAttribute("type")).toBe(true);
   });
 
   it("resetting column information doesn't remove attribute methods", () => {
@@ -634,7 +634,7 @@ describe("BasicsTest", () => {
         this.attribute("title", "string");
       }
     }
-    expect(Post.hasAttributeDefinition("title")).toBe(true);
+    expect(Post.hasAttribute("title")).toBe(true);
   });
 
   it("ignored columns don't prevent explicit declaration of attribute methods", () => {
@@ -644,8 +644,8 @@ describe("BasicsTest", () => {
         this.attribute("internal_flag", "boolean");
       }
     }
-    expect(Post.hasAttributeDefinition("title")).toBe(true);
-    expect(Post.hasAttributeDefinition("internal_flag")).toBe(true);
+    expect(Post.hasAttribute("title")).toBe(true);
+    expect(Post.hasAttribute("internal_flag")).toBe(true);
   });
 
   it("ignored columns not included in SELECT", async () => {
@@ -1878,8 +1878,8 @@ describe("BasicsTest", () => {
         this.attribute("name", "string");
       }
     }
-    expect(User.hasAttributeDefinition("name")).toBe(true);
-    expect(User.hasAttributeDefinition("nonexistent")).toBe(false);
+    expect(User.hasAttribute("name")).toBe(true);
+    expect(User.hasAttribute("nonexistent")).toBe(false);
   });
 
   it("no limit offset", () => {

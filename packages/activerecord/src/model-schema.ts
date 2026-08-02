@@ -1,7 +1,6 @@
 import type { Base } from "./base.js";
 import { Nodes, sql as arelSql } from "@blazetrails/arel";
 import { pluralize, underscore } from "@blazetrails/activesupport";
-import { resolveAliasNameIn } from "@blazetrails/activemodel";
 import {
   Attribute,
   AttributeSetBuilder,
@@ -286,19 +285,6 @@ export function columnNames(this: typeof Base): string[] {
     return frozen as string[];
   }
   return names;
-}
-
-/**
- * Check if a model class has a given attribute defined. Backs the Rails-named
- * public accessor `Base.hasAttribute` (Rails' `has_attribute?`, attribute_methods.rb).
- *
- * @internal
- */
-export function hasAttributeDefinition(this: typeof Base, name: string): boolean {
-  // Rails: `attr_name = attribute_aliases[attr_name] || attr_name`
-  // (attribute_methods.rb:256) before checking `attribute_types`.
-  const defs = this._attributeDefinitions;
-  return defs.has(resolveAliasNameIn(this as never, defs, String(name)));
 }
 
 /**
@@ -784,8 +770,14 @@ export function columns(this: SchemaHost): any[] {
   return this._columns;
 }
 
-/** @internal */
-export function attributeSetCoder(this: SchemaHost): AttributeSetCoder {
+/**
+ * Rails: `@yaml_encoder ||= ActiveModel::AttributeSet::YAMLEncoder.new(attribute_types)`
+ * (model_schema.rb:446). trails' coder is codec-agnostic (JSON by default) rather
+ * than YAML-only, but the accessor keeps the Rails name.
+ *
+ * @internal
+ */
+export function yamlEncoder(this: SchemaHost): AttributeSetCoder {
   return new AttributeSetCoder(typeRegistry);
 }
 
@@ -1560,7 +1552,6 @@ export async function tableExists(this: SchemaHost): Promise<boolean> {
 export const ClassMethods = {
   // Mirrors: ActiveRecord::ModelSchema::ClassMethods
   columnNames,
-  hasAttributeDefinition,
   columnsHash,
   contentColumns,
   createTable,
@@ -1573,18 +1564,13 @@ export const ClassMethods = {
   nextSequenceValue,
   attributesBuilder,
   columns,
-  attributeSetCoder,
+  yamlEncoder,
   columnForAttribute,
   symbolColumnToString,
   resetColumnInformation,
   _returningColumnsForInsert,
   loadSchemaFromAdapter,
 };
-
-/** @internal */
-function yamlEncoder(this: SchemaHost): AttributeSetCoder {
-  return attributeSetCoder.call(this);
-}
 
 /** @internal */
 function initializeLoadSchemaMonitor(this: SchemaHost): void {

@@ -182,7 +182,7 @@ describe("AttributeMethodsTest", () => {
 
   it("attribute_method? returns false if the table does not exist", async () => {
     class Ghost extends Base {}
-    expect(Ghost.hasAttributeDefinition("nonexistent")).toBe(false);
+    expect(Ghost.hasAttribute("nonexistent")).toBe(false);
   });
 
   it("typecast attribute from select to false", async () => {
@@ -242,8 +242,8 @@ describe("AttributeMethodsTest", () => {
         this.attribute("breed", "string");
       }
     }
-    expect(Dog.hasAttributeDefinition("name")).toBe(true);
-    expect(Dog.hasAttributeDefinition("breed")).toBe(true);
+    expect(Dog.hasAttribute("name")).toBe(true);
+    expect(Dog.hasAttribute("breed")).toBe(true);
   });
 
   function makeModel() {
