@@ -265,6 +265,16 @@ describe("Migrator trails extensions", () => {
     await expect(migrator.checkProtectedEnvironments()).resolves.toBeUndefined();
   });
 
+  it("CheckPending with a Migrator creates schema_migrations before reading it", async () => {
+    const schemaMigration = new SchemaMigration(adapter);
+    await schemaMigration.dropTable();
+    const migrator = new Migrator(adapter, [makeMigration("1", "M1")]);
+    const check = new CheckPending(async () => "ok", { migrator });
+
+    await expect(check.call({})).rejects.toThrow(PendingMigrationError);
+    expect(await schemaMigration.tableExists()).toBe(true);
+  });
+
   it("CheckPending with PendingMigrationConnection detects pending migrations", async () => {
     const conn = new PendingMigrationConnection({ adapter });
     const migrations = [makeMigration("1", "M1")];
@@ -578,15 +588,16 @@ describe("Migrator advisory lock wrapping", () => {
     expect(await migrator.migrated()).toEqual(new Set());
   });
 
-  it("open returns a fresh Migrator so repeated pending checks are not memoized", async () => {
+  it("loadMigrated re-reads schema_migrations so repeated pending checks are not memoized", async () => {
     const adapter = Base.connection;
     const schemaMigration = new SchemaMigration(adapter);
     await schemaMigration.createTable();
-    const context = new Migrator(adapter, [makeMigration("1", "M1")]);
+    const migrator = new Migrator(adapter, [makeMigration("1", "M1")]);
 
-    expect(await context.open().pendingMigrations()).toHaveLength(1);
+    expect(await migrator.pendingMigrations()).toHaveLength(1);
     await schemaMigration.recordVersion("1");
-    expect(await context.open().pendingMigrations()).toHaveLength(0);
+    await migrator.loadMigrated();
+    expect(await migrator.pendingMigrations()).toHaveLength(0);
   });
 });
 

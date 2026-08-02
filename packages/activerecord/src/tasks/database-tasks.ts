@@ -337,6 +337,33 @@ export class DatabaseTasks {
     return this._migrationsByConfig.get(this._migrationsKey(dbConfig)) ?? this._migrations;
   }
 
+  /**
+   * Rails reaches the run surface through `MigrationContext`
+   * (`migration.rb:1211`), whose `#migrations` reads `migrations_paths` off
+   * disk. trails registers migrations in memory per db_config, so the context
+   * answers that list instead — the same override Rails' own
+   * `migrator_class` test helper uses.
+   */
+  private static async _migrationContextFor(
+    adapter: import("../connection-adapters/abstract-adapter.js").AbstractAdapter,
+    dbConfig: DatabaseConfig,
+  ): Promise<import("../migration.js").MigrationContext> {
+    const { MigrationContext } = await import("../migration.js");
+    const { SchemaMigration } = await import("../schema-migration.js");
+    const { InternalMetadata } = await import("../internal-metadata.js");
+    const migrations = this._migrationsFor(dbConfig);
+    const paths = dbConfig.migrationsPaths;
+    return new (class extends MigrationContext {
+      override get migrations(): import("../migration.js").MigrationProxy[] {
+        return migrations;
+      }
+    })(
+      paths == null ? [] : Array.isArray(paths) ? paths : [paths],
+      new SchemaMigration(adapter),
+      new InternalMetadata(adapter, { enabled: dbConfig.useMetadataTable }),
+    );
+  }
+
   private static async _migratorFor(
     adapter: import("../connection-adapters/abstract-adapter.js").AbstractAdapter,
     dbConfig: DatabaseConfig,
@@ -614,10 +641,15 @@ export class DatabaseTasks {
     for (const config of configs) {
       try {
         await this.withTemporaryConnection(config, async (adapter) => {
-          const migrator = await this._migratorFor(adapter, config);
-          const current = migrator.currentEnvironment;
-          const stored = await migrator.lastStoredEnvironment();
-          if (stored && (await migrator.protectedEnvironment())) {
+          const context = await this._migrationContextFor(adapter, config);
+          // Rails reads `migration_context.current_environment`, i.e. the global
+          // `DEFAULT_ENV.call` (`database_tasks.rb:638`). trails compares against
+          // the config's own env instead — pinned by
+          // database-tasks-protected-environments-env.trails.test.ts, since
+          // `checkProtectedEnvironmentsBang` takes the environment explicitly.
+          const current = config.envName;
+          const stored = await context.lastStoredEnvironment();
+          if (stored && (await context.protectedEnvironment())) {
             throw new ProtectedEnvironmentError(stored);
           }
           if (stored && stored !== current) {
@@ -1144,8 +1176,8 @@ export class DatabaseTasks {
     const targetVersion = this.targetVersion();
     for (const config of this.configsFor(env)) {
       await this.withTemporaryPool(config, async (pool) => {
-        const migrator = await this._migratorFor(await pool.leaseConnection(), config);
-        const versionsToRun = await migrator.pendingMigrationVersions();
+        const context = await this._migrationContextFor(await pool.leaseConnection(), config);
+        const versionsToRun = await context.pendingMigrationVersions();
         for (const version of versionsToRun) {
           if (targetVersion !== null && targetVersion !== Number(version)) continue;
           const list = dbConfigsWithVersions.get(version) ?? [];

@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import { run } from "./cli.js";
-import { DatabaseTasks, DatabaseConfigurations, Migrator } from "@blazetrails/activerecord";
+import { DatabaseTasks, DatabaseConfigurations, MigrationContext } from "@blazetrails/activerecord";
 
 const FAKE_CONFIG = `
 const config = {
@@ -41,7 +41,7 @@ describe("DbVersionTest", () => {
       .fn()
       .mockImplementation(async (_config: unknown, fn: () => unknown) => fn());
     vi.spyOn(DatabaseTasks, "withTemporaryPool").mockImplementation(withTemporaryPoolFn);
-    vi.spyOn(Migrator, "discoverMigrations").mockReturnValue([]);
+    vi.spyOn(MigrationContext.prototype, "migrations", "get").mockReturnValue([]);
     DatabaseConfigurations.defaultEnv = "development";
   });
 

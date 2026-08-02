@@ -9,7 +9,7 @@ import { BigDecimal } from "@blazetrails/activesupport";
 import { Base, Migrator, RecordNotUnique, StatementInvalid } from "./index.js";
 import { SchemaMigration } from "./schema-migration.js";
 import type { MigrationProxy } from "./migration.js";
-import { ConcurrentMigrationError } from "./migration.js";
+import { ConcurrentMigrationError, MigrationContext } from "./migration.js";
 import { adapterType } from "./test-adapter.js";
 import { assertQueriesCount } from "./testing/query-assertions.js";
 import { quoteDefaultExpression } from "./connection-adapters/abstract/quoting.js";
@@ -683,7 +683,7 @@ describe("MigrationTest", () => {
     // Rails builds `MigrationContext.new(MIGRATIONS_ROOT + "/valid")` and runs
     // `migrator.up`, loading versioned migration files from a directory, then
     // asserts `Person` gained a `last_name` column. trails' filesystem
-    // equivalent is `Migrator.fromDir(dir, adapter)`, which discovers
+    // equivalent is `new Migrator(adapter, new MigrationContext([dir]).migrations)`, which discovers
     // `\d+_*.ts` files, imports each as a MigrationLike, and runs them in
     // version order.
     const adp = await freshAdapterWithPeople();
@@ -692,7 +692,7 @@ describe("MigrationTest", () => {
     const here = dirname(fileURLToPath(import.meta.url));
     const migrationsPath = join(here, "test-helpers", "migrations", "valid");
 
-    const migrator = Migrator.fromDir(migrationsPath, adp);
+    const migrator = new Migrator(adp, new MigrationContext([migrationsPath]).migrations);
     await migrator.up();
 
     // Point Person at the isolated migration DB only for the duration of the
@@ -715,19 +715,21 @@ describe("MigrationTest", () => {
 
   it("migration detection without schema migration table", async () => {
     const adapter = Base.connection;
-    const migrations: MigrationProxy[] = [
-      {
-        version: "1",
-        name: "First",
-        migration: () => anonymousMigration("First", "1"),
-      },
-    ];
-    const migrator = new Migrator(adapter, migrations);
+    const { fileURLToPath } = await import("node:url");
+    const { dirname, join } = await import("node:path");
+    const migrationsPath = join(
+      dirname(fileURLToPath(import.meta.url)),
+      "test-helpers",
+      "migrations",
+      "valid",
+    );
+    const schemaMigration = new SchemaMigration(adapter);
+    const migrator = new MigrationContext([migrationsPath], schemaMigration);
     try {
-      await migrator.schemaMigration.dropTable();
+      await schemaMigration.dropTable();
       expect(await migrator.needsMigration()).toBe(true);
     } finally {
-      await migrator.schemaMigration.createTable();
+      await schemaMigration.createTable();
     }
   });
 
@@ -2162,7 +2164,7 @@ describe("MigrationTest", () => {
           // (year 9999) is definitely > tomorrow.
           const dir = new URL("./test-helpers/migrations/future_timestamp", import.meta.url)
             .pathname;
-          expect(() => Migrator.fromPath(dir, Base.connection)).toThrow(
+          expect(() => new MigrationContext([dir]).migrations).toThrow(
             /Invalid timestamp 99991231235959 for migration file: future_timestamp_migration/,
           );
         } finally {

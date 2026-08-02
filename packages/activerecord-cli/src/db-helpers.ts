@@ -1,6 +1,6 @@
 import { join, resolve } from "path";
 import { getFsAsync } from "@blazetrails/activesupport";
-import { DatabaseTasks, DatabaseConfigurations, Migrator } from "@blazetrails/activerecord";
+import { DatabaseTasks, DatabaseConfigurations, MigrationContext } from "@blazetrails/activerecord";
 import { normalizeSqlitePaths } from "./environment.js";
 
 /**
@@ -32,7 +32,7 @@ export async function tryLoadModels(cwd: string): Promise<Record<string, unknown
 
 export function loadMigrations(cwd: string): import("@blazetrails/activerecord").MigrationProxy[] {
   const paths = DatabaseTasks.migrationsPaths.map((p) => resolve(join(cwd, p)));
-  const migrations = Migrator.discoverMigrations(paths);
+  const migrations = new MigrationContext(paths).migrations;
   DatabaseTasks.registerMigrations(migrations);
   return migrations;
 }

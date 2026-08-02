@@ -3,7 +3,12 @@ import { mkdtemp, mkdir, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import { run } from "./cli.js";
-import { Base, DatabaseTasks, DatabaseConfigurations, Migrator } from "@blazetrails/activerecord";
+import {
+  Base,
+  DatabaseTasks,
+  DatabaseConfigurations,
+  MigrationContext,
+} from "@blazetrails/activerecord";
 
 const FAKE_CONFIG = `
 const config = { development: { adapter: "sqlite3", database: ":memory:", pool: 1 } };
@@ -55,7 +60,7 @@ describe("DbMigrateTest", () => {
     vi.spyOn(DatabaseTasks, "rollback").mockImplementation(rollbackSpy);
     vi.spyOn(DatabaseTasks, "loadSchemaCurrent").mockImplementation(loadSchemaCurrentSpy);
     vi.spyOn(DatabaseTasks, "loadSeed").mockImplementation(loadSeedSpy);
-    vi.spyOn(Migrator, "discoverMigrations").mockReturnValue([]);
+    vi.spyOn(MigrationContext.prototype, "migrations", "get").mockReturnValue([]);
   });
 
   afterEach(() => {
@@ -85,8 +90,10 @@ describe("DbMigrateTest", () => {
     expect(DatabaseTasks.targetVersion()).toBeNull();
   });
 
-  it("db:migrate calls Migrator.discoverMigrations before migrate", async () => {
-    const discoverSpy = vi.spyOn(Migrator, "discoverMigrations").mockReturnValue([]);
+  it("db:migrate calls MigrationContext#migrations before migrate", async () => {
+    const discoverSpy = vi
+      .spyOn(MigrationContext.prototype, "migrations", "get")
+      .mockReturnValue([]);
     expect(await run(["db:migrate"], await makeFakeProject())).toBe(0);
     expect(discoverSpy).toHaveBeenCalled();
   });

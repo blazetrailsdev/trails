@@ -6,11 +6,13 @@ import {
   Migrator,
   DuplicateMigrationVersionError,
   UnknownMigrationVersionError,
+  MigrationContext,
 } from "./migration.js";
 import type { MigrationProxy } from "./migration.js";
 import { Base } from "./base.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { SchemaMigration } from "./schema-migration.js";
+import { InternalMetadata } from "./internal-metadata.js";
 import { fixtures } from "./test-fixtures.js";
 import { anonymousMigration } from "./test-helpers/anonymous-migration.js";
 
@@ -74,6 +76,22 @@ describe("MigratorTest", () => {
     return { calls, migrator: new Migrator(adapter, migrations) };
   }
 
+  // Rails' migrator_class(count) subclasses MigrationContext and overrides
+  // #migrations to return the sensor list, which is why its `.new("valid", ...)`
+  // path argument is never read. Same shape here.
+  function migrationContextClass(count: number): {
+    calls: Array<[string, number]>;
+    context: MigrationContext;
+  } {
+    const { calls, migrations } = sensors(count);
+    const context = new (class extends MigrationContext {
+      override get migrations(): MigrationProxy[] {
+        return migrations;
+      }
+    })([`${MIGRATIONS_ROOT}/valid`], new SchemaMigration(adapter), new InternalMetadata(adapter));
+    return { calls, context };
+  }
+
   async function seedVersions(...versions: Array<string | number>): Promise<SchemaMigration> {
     const sm = new SchemaMigration(adapter);
     await sm.createTable();
@@ -135,7 +153,7 @@ describe("MigratorTest", () => {
   });
 
   it("finds migrations", () => {
-    const migrations = Migrator.fromPath(`${MIGRATIONS_ROOT}/valid`, adapter);
+    const migrations = new MigrationContext([`${MIGRATIONS_ROOT}/valid`]).migrations;
 
     (
       [
@@ -150,7 +168,8 @@ describe("MigratorTest", () => {
   });
 
   it("finds migrations in subdirectories", () => {
-    const migrations = Migrator.fromPath(`${MIGRATIONS_ROOT}/valid_with_subdirectories`, adapter);
+    const migrations = new MigrationContext([`${MIGRATIONS_ROOT}/valid_with_subdirectories`])
+      .migrations;
 
     (
       [
@@ -169,7 +188,7 @@ describe("MigratorTest", () => {
       `${MIGRATIONS_ROOT}/valid_with_timestamps`,
       `${MIGRATIONS_ROOT}/to_copy_with_timestamps`,
     ];
-    const migrations = Migrator.discoverMigrations(directories);
+    const migrations = new MigrationContext(directories).migrations;
 
     (
       [
@@ -186,13 +205,13 @@ describe("MigratorTest", () => {
   });
 
   it("finds migrations in numbered directory", () => {
-    const migrations = Migrator.fromPath(`${MIGRATIONS_ROOT}/10_urban`, adapter);
+    const migrations = new MigrationContext([`${MIGRATIONS_ROOT}/10_urban`]).migrations;
     expect(migrations[0].version).toBe("9");
     expect(migrations[0].name).toBe("AddExpressions");
   });
 
   it("relative migrations", () => {
-    const list = Migrator.fromPath(`${MIGRATIONS_ROOT}/valid`, adapter);
+    const list = new MigrationContext([`${MIGRATIONS_ROOT}/valid`]).migrations;
     const migrationProxy = list.find((item) => item.name === "ValidPeopleHaveLastNames");
     expect(migrationProxy).toBeTruthy();
   });
@@ -211,7 +230,10 @@ describe("MigratorTest", () => {
     const path = `${MIGRATIONS_ROOT}/valid`;
     await seedVersions(2, 10);
 
-    const status = await new Migrator(adapter, Migrator.fromPath(path, adapter)).migrationsStatus();
+    const status = await new Migrator(
+      adapter,
+      new MigrationContext([path]).migrations,
+    ).migrationsStatus();
     expect(status).toEqual([
       { status: "down", version: "001", name: "Valid people have last names" },
       { status: "up", version: "002", name: "We need reminders" },
@@ -224,7 +246,10 @@ describe("MigratorTest", () => {
     const path = `${MIGRATIONS_ROOT}/old_and_new_versions`;
     await seedVersions(230, 231, 20210716122844, 20210716123013);
 
-    const status = await new Migrator(adapter, Migrator.fromPath(path, adapter)).migrationsStatus();
+    const status = await new Migrator(
+      adapter,
+      new MigrationContext([path]).migrations,
+    ).migrationsStatus();
     expect(status).toEqual([
       { status: "up", version: "230", name: "Add people hobby" },
       { status: "up", version: "231", name: "Add people last name" },
@@ -239,7 +264,10 @@ describe("MigratorTest", () => {
     // migration application which should not affect ordering in status.
     await seedVersions(230, 231, 20210716123013);
 
-    const status = await new Migrator(adapter, Migrator.fromPath(path, adapter)).migrationsStatus();
+    const status = await new Migrator(
+      adapter,
+      new MigrationContext([path]).migrations,
+    ).migrationsStatus();
     expect(status).toEqual([
       { status: "up", version: "230", name: "Add people hobby" },
       { status: "up", version: "231", name: "Add people last name" },
@@ -252,7 +280,10 @@ describe("MigratorTest", () => {
     const path = `${MIGRATIONS_ROOT}/valid_with_subdirectories`;
     await seedVersions(2, 10);
 
-    const status = await new Migrator(adapter, Migrator.fromPath(path, adapter)).migrationsStatus();
+    const status = await new Migrator(
+      adapter,
+      new MigrationContext([path]).migrations,
+    ).migrationsStatus();
     expect(status).toEqual([
       { status: "down", version: "001", name: "Valid people have last names" },
       { status: "up", version: "002", name: "We need reminders" },
@@ -267,7 +298,10 @@ describe("MigratorTest", () => {
     // as applied.
     await seedVersions(1, 2, 3);
 
-    const status = await new Migrator(adapter, Migrator.fromPath(path, adapter)).migrationsStatus();
+    const status = await new Migrator(
+      adapter,
+      new MigrationContext([path]).migrations,
+    ).migrationsStatus();
     expect(status).toEqual([
       { status: "up", version: "001", name: "Valid people have last names" },
       { status: "up", version: "002", name: "We need reminders" },
@@ -284,7 +318,7 @@ describe("MigratorTest", () => {
 
     const status = await new Migrator(
       adapter,
-      Migrator.discoverMigrations(paths),
+      new MigrationContext(paths).migrations,
     ).migrationsStatus();
     expect(status).toEqual([
       { status: "down", version: "20090101010101", name: "People have hobbies" },
@@ -546,7 +580,7 @@ describe("MigratorTest", () => {
   });
 
   it("migrator rollback", async () => {
-    const { migrator } = migratorClass(3);
+    const { context: migrator } = migrationContextClass(3);
 
     await migrator.migrate();
     expect(await migrator.currentVersion()).toBe(3);
@@ -575,7 +609,7 @@ describe("MigratorTest", () => {
   });
 
   it("migrator forward", async () => {
-    const { migrator } = migratorClass(3);
+    const { context: migrator } = migrationContextClass(3);
     await migrator.migrate(1);
     expect(await migrator.currentVersion()).toBe(1);
 
