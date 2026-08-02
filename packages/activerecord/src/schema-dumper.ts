@@ -25,7 +25,6 @@ import type {
   SchemaDumperMixinHost,
   Column,
 } from "./connection-adapters/abstract/schema-dumper.js";
-import type { IndexDefinitionRow } from "./connection-adapters/abstract/schema-definitions.js";
 import { SchemaMigration } from "./schema-migration.js";
 import { ActiveRecordError } from "./errors.js";
 import type { Base } from "./base.js";
@@ -92,13 +91,18 @@ export interface ColumnInfo {
 }
 
 /**
- * The dumper's view of an adapter index row: the adapter shape
- * (`IndexDefinitionRow`) plus the dialect-specific options the dumper emits.
- * `name` is widened to optional because `SchemaSource` implementations that
- * aren't adapters (e.g. a dump being re-read) may not carry one, and
- * `indexParts` already treats it as absent-able.
+ * The dumper's view of an adapter index row: the `IndexDefinition` fields the
+ * dumper reads plus the dialect-specific options it emits. `name` is optional
+ * because `SchemaSource` implementations that aren't adapters (e.g. a dump
+ * being re-read) may not carry one, and `indexParts` already treats it as
+ * absent-able.
  */
-export interface IndexInfo extends Omit<IndexDefinitionRow, "name"> {
+export interface IndexInfo {
+  table?: string;
+  columns: string | string[];
+  unique: boolean;
+  where?: string;
+  orders?: Record<string, string> | string;
   name?: string;
   /** Per-column max lengths (number for single-column, Record for multi). */
   lengths?: number | Record<string, number>;
