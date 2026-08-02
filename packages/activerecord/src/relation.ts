@@ -3735,7 +3735,9 @@ export class Relation<T extends Base> {
       disallowRawSqlBang(stringColumns, resolveColumnNameMatcher(this._conn()));
     }
 
-    const table = this._modelClass.arelTable;
+    // Rails arel_column reads the `table` attr_reader, so an aliased relation
+    // qualifies to the alias rather than the model's own arel_table.
+    const table = this.table;
     // Rails columns_hash.key? — qualify a bare known column to the base table.
     const knownColumns = new Set(this._modelClass.attributeNames());
     const isKnownColumn = (name: string): boolean => knownColumns.has(name);
@@ -5195,7 +5197,7 @@ export class Relation<T extends Base> {
     const hasLimit = this._limitValue !== null || this._offsetValue !== null;
     if (hasLimit && !this._eagerJoinDependencyIsLimitable(jd)) {
       const ids = limitedIds ?? this._buildEagerIdSubquery(jd, basePk);
-      rel = rel.where(this._modelClass.arelTable.get(basePk).in(ids as never));
+      rel = rel.where(this.table.get(basePk).in(ids as never));
       rel._limitValue = null;
       rel._offsetValue = null;
     }
@@ -5258,11 +5260,13 @@ export class Relation<T extends Base> {
     basePk: string,
     distinctSelectSql?: string,
   ): SelectManager {
-    const table = this._modelClass.arelTable;
-    const idSubquery =
-      distinctSelectSql !== undefined
-        ? table.project(new Nodes.SqlLiteral(distinctSelectSql))
-        : table.project(table.get(basePk));
+    const table = this.table;
+    // `table` may be a TableAlias (an aliased relation), which has no
+    // `project` — seed the manager from it instead, as Rails does by spawning
+    // the relation itself (`relation.reselect(values).distinct!`).
+    const idSubquery = new SelectManager(table).project(
+      distinctSelectSql !== undefined ? new Nodes.SqlLiteral(distinctSelectSql) : table.get(basePk),
+    );
     idSubquery.distinct();
     // This subquery is its own `build_joins` statement: fold the eager JD into
     // `stashedJoins` so it emits through the single `emitJoinPlan` port with one
@@ -5317,7 +5321,7 @@ export class Relation<T extends Base> {
    * SQL.
    */
   private _distinctSelectForLimitedIds(basePk: string): string {
-    const table = this._modelClass.arelTable;
+    const table = this.table;
     // Bind-free column ref — compile straight through the visitor (no bind
     // inlining needed) and hand the rendered text to the adapter's string
     // `columns_for_distinct`.
