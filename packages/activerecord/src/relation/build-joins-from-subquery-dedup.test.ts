@@ -27,6 +27,16 @@ import { quoteTableName, escapeRegExp } from "../support/quote-regex.js";
 describe("build_joins from(subquery) dedup", () => {
   fixtures([]);
 
+  // The FROM clause onward — the whole join sequence. Adapter-quoted (MySQL uses
+  // backticks), so a hardcoded `FROM "posts"` would miss there and slice to the
+  // string's tail, leaving the containment assertions vacuously true.
+  const fromClause = (sql: string): string => {
+    const marker = `FROM ${quoteTableName("posts")}`;
+    const at = sql.indexOf(marker);
+    expect(at).toBeGreaterThanOrEqual(0);
+    return sql.slice(at);
+  };
+
   it("emits a single INNER JOIN (no LEFT OUTER JOIN) through the from-subquery", () => {
     const sub = Post.joins("author").leftOuterJoins("author");
     const sql = (Post.from(sub, "posts") as unknown as { toSql(): string }).toSql();
@@ -68,7 +78,7 @@ describe("build_joins from(subquery) dedup", () => {
     // Base `comments` join + the merged cross-klass `post` JoinDependency.
     expect((liveSql.match(/LEFT OUTER JOIN/g) ?? []).length).toBe(2);
     // The whole FROM…joins structure of the live path is the subquery's inner query.
-    expect(subSql).toContain(liveSql.slice(liveSql.indexOf('FROM "posts"')));
+    expect(subSql).toContain(fromClause(liveSql));
   });
 
   // Rails arms build_join_buckets' raw-join routing on `stashed_eager_load ||
@@ -103,7 +113,7 @@ describe("build_joins from(subquery) dedup", () => {
       const liveSql = (build() as unknown as { toSql(): string }).toSql();
       const subSql = (Post.from(build(), "posts") as unknown as { toSql(): string }).toSql();
       expect(liveSql).toMatch(leading);
-      expect(subSql).toContain(liveSql.slice(liveSql.indexOf('FROM "posts"')));
+      expect(subSql).toContain(fromClause(liveSql));
     }
   });
 
@@ -164,7 +174,7 @@ describe("build_joins from(subquery) dedup", () => {
     const subSql = (Post.from(build(), "posts") as unknown as { toSql(): string }).toSql();
     // The eager live path projects `t0_r*` aliases, so compare from the FROM on:
     // the whole join sequence of the live query is the subquery's inner query.
-    const liveFrom = liveSql.slice(liveSql.indexOf('FROM "posts"'));
+    const liveFrom = fromClause(liveSql);
     expect(liveFrom).toContain("CROSS JOIN categories");
     expect(subSql).toContain(liveFrom);
   });
