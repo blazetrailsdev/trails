@@ -26,8 +26,8 @@ import { IsolatedExecutionState, Notifications } from "@blazetrails/activesuppor
 import type { EventPayload } from "@blazetrails/activesupport";
 import { ActiveRecord } from "../ar-config.js";
 import { Result, type ColumnTypes } from "../result.js";
-import { SchemaCache, SchemaReflection, BoundSchemaReflection } from "./schema-cache.js";
-import { NullPool, poolAbsent } from "./abstract/connection-pool.js";
+import { SchemaCache, SchemaReflection, BoundSchemaReflection, FakePool } from "./schema-cache.js";
+import { NullPool } from "./abstract/connection-pool.js";
 import { stripSqlComments } from "./sql-classification.js";
 import {
   TransactionManager,
@@ -1749,7 +1749,7 @@ export class AbstractAdapter implements Quoting {
     // so the no-pool branch expires a leased connection and otherwise no-ops
     // (matching NullPool#checkin).
     const pool = this.pool as { checkin?: (conn: unknown) => void } | null;
-    if (!poolAbsent(pool) && pool && typeof pool.checkin === "function") {
+    if (pool && !(pool instanceof NullPool) && typeof pool.checkin === "function") {
       pool.checkin(this);
     } else if (this._inUse) {
       this.expire();
@@ -2627,22 +2627,12 @@ export class AbstractAdapter implements Quoting {
     // A `TableAlias` relation may carry a `SqlLiteral` name (set-op / subquery
     // derived table); unwrap to the bare identifier for the schema-cache lookup.
     const tableName = relationName(attribute.relation.name);
-    let hash = await (this.schemaCache as any).columnsHash(this.pool, tableName);
-    if (!hash && poolAbsent(this.pool) && typeof (this as any).columns === "function") {
-      // Bare-adapter path (no pool): the null-pool guard in columnsHash blocks the
-      // DB fallback. Fetch directly so callers like caseSensitiveComparison can
-      // resolve collations even when the schema cache was cleared by model
-      // class creation (resetColumnInformation).
-      try {
-        const cols: import("./column.js").Column[] = await (this as any).columns(tableName);
-        if (cols?.length) {
-          this.schemaCache.setColumns(tableName, cols);
-          hash = this.schemaCache.getCachedColumnsHash(tableName);
-        }
-      } catch {
-        // no connection — return undefined below
-      }
-    }
+    // A standalone adapter's NullPool has no `schemaCache`, which is Rails'
+    // signal to bind the reflection to the connection itself
+    // (abstract_adapter.rb:298).
+    const pool =
+      this.pool == null || this.pool instanceof NullPool ? new FakePool(this) : this.pool;
+    const hash = await (this.schemaCache as any).columnsHash(pool, tableName);
     return hash?.[attribute.name];
   }
 

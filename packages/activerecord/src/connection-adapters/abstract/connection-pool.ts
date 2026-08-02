@@ -164,36 +164,6 @@ export class NullPool implements AbstractPool {
 }
 
 /**
- * True when `pool` is not a real, connection-owning pool — i.e. it is either
- * `null` or a {@link NullPool}. A standalone adapter (constructed outside a
- * pool) carries a NullPool by default, matching Rails' `@pool = NullPool.new`;
- * the schema-cache / bare-adapter fallbacks that historically keyed off
- * `pool == null` use this so a NullPool is treated the same as "no pool".
- *
- * @noRailsEquivalent CONVERGEABLE (story: converge-nullpool-protocol-retire-poolabsent-realpool).
- * Rails' `NullPool` answers the whole pool protocol, so
- * Ruby callers never ask whether a pool is real. See above.
- */
-export function poolAbsent(pool: unknown): boolean {
-  return pool == null || pool instanceof NullPool;
-}
-
-/**
- * Returns `pool` when it is a real, connection-owning pool, else `null` — the
- * NullPool-aware form of the historical `adapter.pool ?? fallback` idiom. Use
- * `realPool(adapter.pool) ?? adapter` where code previously wrote
- * `adapter.pool ?? adapter` to yield a schema-cache target that can actually
- * check out a connection.
- *
- * @noRailsEquivalent CONVERGEABLE (story: converge-nullpool-protocol-retire-poolabsent-realpool).
- * NullPool-aware form of `adapter.pool ?? fallback`;
- * unnecessary in Rails for the same reason as `poolAbsent`. See above.
- */
-export function realPool(pool: unknown): unknown | null {
-  return poolAbsent(pool) ? null : pool;
-}
-
-/**
  * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool::Lease
  */
 export class Lease {

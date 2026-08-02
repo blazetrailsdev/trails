@@ -8,8 +8,8 @@
 import { EachValidator, ArgumentError } from "@blazetrails/activemodel";
 import { isBlank } from "@blazetrails/activesupport";
 import { UnknownPrimaryKey } from "../errors.js";
+import { FakePool } from "../connection-adapters/schema-cache.js";
 import { threadedConnectionFor } from "../connection-handling.js";
-import { realPool } from "../connection-adapters/abstract/connection-pool.js";
 
 /**
  * Shared scope option validation — called eagerly from validatesUniqueness (declaration time)
@@ -348,11 +348,12 @@ async function isCoveredByUniqueIndex(
  * serve a stale, pre-index list and silently keep the optimization off after a
  * migration adds the covering index.
  *
- * The pool target must be `realPool(pool) ?? adapter`, NOT `pool ?? adapter`: a
- * directly assigned adapter carries a NullPool, which exposes neither
- * `withConnection` nor `indexes`, so the cache would introspect the NullPool and
- * quietly yield `[]` — leaving covered_by_unique_index? permanently false for
- * every such model.
+ * The pool target is a `FakePool` over the adapter we already hold — Rails'
+ * `BoundSchemaReflection.for_lone_connection` shape (schema_cache.rb:155).
+ * Passing `adapter.pool` directly would hand the cache the NullPool a directly
+ * assigned adapter carries, which exposes neither `withConnection` nor
+ * `indexes`, so the cache would introspect the NullPool and quietly yield `[]`
+ * — leaving covered_by_unique_index? permanently false for every such model.
  *
  * @internal
  */
@@ -370,7 +371,7 @@ async function tableIndexes(
 
   const cache = adapter.schemaCache;
   if (!cache || typeof cache.indexes !== "function") return [];
-  return (await cache.indexes(realPool(adapter.pool) ?? adapter, tableName)) as Index[];
+  return (await cache.indexes(new FakePool(adapter), tableName)) as Index[];
 }
 
 /**

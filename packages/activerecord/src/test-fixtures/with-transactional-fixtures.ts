@@ -7,7 +7,7 @@
 import { beforeEach, afterEach, type TaskContext } from "vitest";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
-import { realPool } from "../connection-adapters/abstract/connection-pool.js";
+import { NullPool } from "../connection-adapters/abstract/connection-pool.js";
 
 interface TxnHost {
   transactionManager: {
@@ -54,7 +54,7 @@ function tm(adapter: TransactionalFixturesAdapter): TxnHost["transactionManager"
  */
 async function eagerWarmSchemaCache(adapter: TransactionalFixturesAdapter): Promise<void> {
   const sc = adapter.schemaCache;
-  const pool = realPool(adapter.pool);
+  const pool = adapter.pool == null || adapter.pool instanceof NullPool ? null : adapter.pool;
   if (!sc || pool === null) return;
   try {
     await sc.addAll(pool);
@@ -81,7 +81,7 @@ async function reReflectTouchedTables(adapter: TransactionalFixturesAdapter): Pr
   if (!sc) return;
   const touched = sc.takeTouchedTables();
   if (touched.size === 0) return;
-  const pool = realPool(adapter.pool);
+  const pool = adapter.pool == null || adapter.pool instanceof NullPool ? null : adapter.pool;
   for (const table of touched) {
     // Drop the stale (post-DDL) entry first, then re-read the rolled-back
     // shape from the live DB. Raw adapters without a pool can't re-reflect

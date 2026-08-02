@@ -2,7 +2,6 @@ import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Nodes, Visitors } from "@blazetrails/arel";
 import { ArgumentError, SerializeCastValue } from "@blazetrails/activemodel";
 import { IndexDefinition } from "./connection-adapters/abstract/schema-definitions.js";
-import { realPool } from "./connection-adapters/abstract/connection-pool.js";
 import { ActiveRecordError, UnknownAttributeError } from "./errors.js";
 import type { Base } from "./base.js";
 
@@ -10,6 +9,7 @@ import { stiName, isFinderNeedsTypeCondition } from "./inheritance.js";
 import type { Relation } from "./relation.js";
 import type { AdapterName } from "./connection-adapters/abstract-adapter.js";
 import { Result } from "./result.js";
+import { FakePool } from "./connection-adapters/schema-cache.js";
 import { withPooledOrDirectConnection } from "./connection-handling.js";
 
 let _quoteSqlValue: ((v: unknown, dialect?: AdapterName) => string) | undefined;
@@ -528,7 +528,7 @@ export class InsertAll {
     } else {
       const cache = conn.schemaCache;
       if (!cache || typeof cache.indexes !== "function") return [];
-      indexes = await cache.indexes(realPool(conn.pool) ?? conn, tableName);
+      indexes = await cache.indexes(new FakePool(conn), tableName);
     }
     return indexes.filter((i: any) => i.unique);
   }
@@ -550,7 +550,7 @@ export class InsertAll {
     } else {
       const cache = conn.schemaCache;
       if (!cache || typeof cache.primaryKeys !== "function") return [];
-      pk = await cache.primaryKeys(realPool(conn.pool) ?? conn, tableName);
+      pk = await cache.primaryKeys(new FakePool(conn), tableName);
     }
     if (pk == null) return [];
     return Array.isArray(pk) ? pk : [pk];
