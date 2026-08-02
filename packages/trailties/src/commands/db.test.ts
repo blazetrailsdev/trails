@@ -1266,9 +1266,8 @@ export class CreatePosts extends Migration {
     }
   });
 
-  it("Migrator.checkProtectedEnvironments is read-only and a no-op on fresh DB", async () => {
-    const { Migrator, InternalMetadata, ProtectedEnvironmentError, Base } =
-      await import("@blazetrails/activerecord");
+  it("MigrationContext.protectedEnvironment is read-only and false on fresh DB", async () => {
+    const { MigrationContext, InternalMetadata, Base } = await import("@blazetrails/activerecord");
     const { BetterSQLite3Adapter } =
       await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
 
@@ -1277,26 +1276,22 @@ export class CreatePosts extends Migration {
     const previousProtected = Base.protectedEnvironments;
     Base.protectedEnvironments = ["production"];
     try {
-      const migrator = new Migrator(adapter, [], { environment: "production" });
-      // No environment stamped yet → no raise even though current env is
+      const internalMetadata = new InternalMetadata(adapter);
+      const context = new MigrationContext([], new SchemaMigration(adapter), internalMetadata);
+      // No environment stamped yet → false even though the current env is
       // in the protected list. Matches Rails' protected_environment? ==
       // nil semantics.
-      await expect(migrator.checkProtectedEnvironments()).resolves.toBeUndefined();
-      expect(await migrator.protectedEnvironment()).toBe(false);
+      expect(await context.protectedEnvironment()).toBe(false);
 
       // Verify no ar_internal_metadata was created by the check.
-      const internalMetadata = new InternalMetadata(adapter);
       expect(await internalMetadata.tableExists()).toBe(false);
 
-      // After stamping as production, both calls reflect the protected state.
+      // After stamping as production, the check reflects the protected state.
       await new SchemaMigration(adapter).createTable();
       await new SchemaMigration(adapter).createVersion("1");
       await internalMetadata.createTable();
       await internalMetadata.set("environment", "production");
-      expect(await migrator.protectedEnvironment()).toBe(true);
-      await expect(migrator.checkProtectedEnvironments()).rejects.toBeInstanceOf(
-        ProtectedEnvironmentError,
-      );
+      expect(await context.protectedEnvironment()).toBe(true);
     } finally {
       Base.protectedEnvironments = previousProtected;
       await adapter.close();
@@ -1331,7 +1326,8 @@ export class CreatePosts extends Migration {
   });
 
   it("Migrator with internalMetadataEnabled=false migrates without stamping", async () => {
-    const { Migration, Migrator } = await import("@blazetrails/activerecord");
+    const { Migration, Migrator, MigrationContext, InternalMetadata } =
+      await import("@blazetrails/activerecord");
     const { BetterSQLite3Adapter } =
       await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
 
@@ -1372,14 +1368,19 @@ export class CreatePosts extends Migration {
       expect(names).not.toContain("ar_internal_metadata");
 
       // lastStoredEnvironment short-circuits to null when disabled.
-      expect(await migrator.lastStoredEnvironment()).toBeNull();
+      const context = new MigrationContext(
+        [],
+        new SchemaMigration(adapter),
+        new InternalMetadata(adapter, { enabled: false }),
+      );
+      expect(await context.lastStoredEnvironment()).toBeNull();
     } finally {
       await adapter.close();
     }
   });
 
   it("lastStoredEnvironment returns null when metadata is disabled even if table exists", async () => {
-    const { Migrator, InternalMetadata } = await import("@blazetrails/activerecord");
+    const { MigrationContext, InternalMetadata } = await import("@blazetrails/activerecord");
     const { BetterSQLite3Adapter } =
       await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
 
@@ -1392,10 +1393,14 @@ export class CreatePosts extends Migration {
       await enabledMeta.createTable();
       await enabledMeta.set("environment", "production");
 
-      // Disabled Migrator should still report null (no stale read).
-      const migrator = new Migrator(adapter, [], { internalMetadataEnabled: false });
-      expect(await migrator.lastStoredEnvironment()).toBeNull();
-      expect(await migrator.protectedEnvironment()).toBe(false);
+      // Disabled context should still report null (no stale read).
+      const context = new MigrationContext(
+        [],
+        new SchemaMigration(adapter),
+        new InternalMetadata(adapter, { enabled: false }),
+      );
+      expect(await context.lastStoredEnvironment()).toBeNull();
+      expect(await context.protectedEnvironment()).toBe(false);
     } finally {
       await adapter.close();
     }

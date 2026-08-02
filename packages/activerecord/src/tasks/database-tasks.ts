@@ -599,8 +599,7 @@ export class DatabaseTasks {
     // Rails: `return if ENV["DISABLE_DATABASE_ENVIRONMENT_CHECK"]`.
     // In Ruby "" is truthy, so any *present* value bypasses. JS "" is
     // falsy, so we use a presence check to preserve Rails semantics.
-    const proc = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process;
-    if (proc?.env?.DISABLE_DATABASE_ENVIRONMENT_CHECK !== undefined) return;
+    if (getEnv("DISABLE_DATABASE_ENVIRONMENT_CHECK") !== undefined) return;
 
     const envName = this._normalizeEnv(environment);
     for (const config of this.configsFor(envName)) {
