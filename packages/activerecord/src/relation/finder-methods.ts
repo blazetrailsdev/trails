@@ -462,9 +462,6 @@ export async function performFirstBang(this: FinderRelation): Promise<any> {
 }
 
 function orderByPk(rel: FinderRelation, direction: "asc" | "desc"): any {
-  // Stands in for `ordered_relation` on the non-reversible-order arm of `last`,
-  // so the read uses the same bare `primary_key` delegate Rails reads there
-  // (finder_methods.rb:641) rather than the model receiver `_order_columns` uses.
   const pk = rel.primaryKey;
   if (Array.isArray(pk)) {
     return rel.order(...pk.map((col: string) => ({ [col]: direction })));
@@ -962,8 +959,6 @@ export async function findLast(rel: FinderRelation, limit?: number): Promise<any
 /** @internal */
 export function orderedRelation(rel: FinderRelation): any {
   const mc = rel.model as any;
-  // Rails reads the bare `primary_key` delegate here (finder_methods.rb:641);
-  // only `_order_columns` goes through the `model.primary_key` receiver.
   const pk = rel.primaryKey;
   const implicitOrder: string | null | undefined = mc?.implicitOrderColumn;
   const constraintsList: string[] | null = mc ? _queryConstraintsListFn.call(mc) : null;
