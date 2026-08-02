@@ -16,11 +16,66 @@ import { fixtures } from "../test-fixtures.js";
 import { anonymousMigration } from "../test-helpers/anonymous-migration.js";
 
 describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
-  it("raises an error when called with protected environment", async () => {
-    await expect(DatabaseTasks.checkProtectedEnvironmentsBang("production")).rejects.toThrow(
-      /production/,
-    );
-  });
+  // Rails: `if current_adapter?(:SQLite3Adapter) && !in_memory_db?`
+  // (database_tasks_test.rb:62).
+  it.skipIf(adapterType !== "sqlite" || inMemoryDb())(
+    "raises an error when called with protected environment",
+    async () => {
+      // Rails: test_raises_an_error_when_called_with_protected_environment —
+      // stamp the config's metadata with the current env, assert the guard
+      // passes, then protect that env and assert it raises.
+      const protectedEnvironments = Base.protectedEnvironments;
+      const currentEnv = DatabaseConfigurations.currentEnv();
+      const env = "arunit";
+      const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-protected-env-"));
+      const dbFile = path.join(tmp, "primary.sqlite3");
+      DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+        [env]: { primary: { adapter: "sqlite3", database: dbFile } },
+      });
+      DatabaseTasks.registerTask("sqlite", { create: async () => {} });
+
+      const { BetterSQLite3Adapter } =
+        await import("../connection-adapters/better-sqlite3-adapter.js");
+      const adapter = new BetterSQLite3Adapter(dbFile);
+      try {
+        await adapter.executeMutation(
+          "CREATE TABLE IF NOT EXISTS schema_migrations (version VARCHAR(255) PRIMARY KEY NOT NULL)",
+        );
+        await adapter.executeMutation("INSERT INTO schema_migrations (version) VALUES ('1')");
+        await adapter.executeMutation(
+          "CREATE TABLE IF NOT EXISTS ar_internal_metadata (key VARCHAR PRIMARY KEY NOT NULL, value VARCHAR, created_at DATETIME NOT NULL, updated_at DATETIME NOT NULL)",
+        );
+        await adapter.executeMutation(
+          `INSERT INTO ar_internal_metadata (key, value, created_at, updated_at) VALUES ('environment', '${currentEnv}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+        );
+      } finally {
+        await adapter.close();
+      }
+
+      try {
+        expect(protectedEnvironments).not.toContain(currentEnv);
+        // Assert no error
+        await DatabaseTasks.checkProtectedEnvironmentsBang(env);
+
+        Base.protectedEnvironments = [currentEnv];
+        await expect(DatabaseTasks.checkProtectedEnvironmentsBang(env)).rejects.toThrow(
+          ProtectedEnvironmentError,
+        );
+      } finally {
+        Base.protectedEnvironments = protectedEnvironments;
+        // Explicit teardown for the raw-created tables; the tmp dir goes too.
+        const cleanup = new BetterSQLite3Adapter(dbFile);
+
+        await cleanup.executeMutation("DROP TABLE IF EXISTS schema_migrations");
+
+        await cleanup.executeMutation("DROP TABLE IF EXISTS ar_internal_metadata");
+        await cleanup.close();
+        DatabaseTasks.databaseConfiguration = null;
+        DatabaseTasks.clearRegisteredTasks();
+        fs.rmSync(tmp, { recursive: true, force: true });
+      }
+    },
+  );
 
   it.skip("raises an error when called with protected environment which name is a symbol", () => {
     // PERMANENT-SKIP: Ruby-only (Symbol env names) — protected_environments
@@ -46,7 +101,7 @@ describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
       );
       await adapter.executeMutation("INSERT INTO schema_migrations (version) VALUES ('1')");
       // dbFile lives under a per-test tmpdir, not the shared worker database.
-      // eslint-disable-next-line blazetrails/require-table-teardown
+
       await adapter.executeMutation("DROP TABLE IF EXISTS ar_internal_metadata");
     } finally {
       await adapter.close();

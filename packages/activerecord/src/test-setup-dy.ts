@@ -107,6 +107,6 @@ await recordBootLaidTables(await Base.leaseConnection());
 const { provisionSecondDatabase } = await import("./support/setup-second-pool.js");
 await provisionSecondDatabase();
 
-// Clear DatabaseTasks global state so database-tasks.test.ts sees the null
-// invariant it expects (it tests checkProtectedEnvironmentsBang with no config).
+// Clear DatabaseTasks global state so database-tasks.test.ts starts from the
+// null invariant it expects and registers its own configurations per test.
 DatabaseTasks.databaseConfiguration = null;
