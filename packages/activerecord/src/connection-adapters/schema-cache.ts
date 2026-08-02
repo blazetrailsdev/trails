@@ -163,6 +163,10 @@ export class SchemaCache {
       );
     }
 
+    // Rails round-trips indexes through Psych, which restores real
+    // `IndexDefinition` objects; our JSON round-trip yields bare records, so a
+    // cache loaded from a dump carries the fields but not the derived methods.
+    // Deliberately left as-is here — rehydrating them is its own change.
     if (coder["indexes"] instanceof Map) {
       this._indexes = coder["indexes"] as Map<string, IndexDefinition[]>;
     } else if (coder["indexes"] && typeof coder["indexes"] === "object") {
