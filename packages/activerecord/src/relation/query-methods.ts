@@ -2130,7 +2130,6 @@ function flattenedOrderKeysForRawSqlCheck(orderArgs: unknown[]): (string | symbo
   return result;
 }
 
-/** Rails' `node.public_send(dir.downcase)` — asc/desc on the resolved order column. */
 function orderedNode(node: unknown, dir: unknown): unknown {
   return String(dir).toLowerCase() === "desc"
     ? new Nodes.Descending(node)
@@ -2161,7 +2160,6 @@ export function preprocessOrderArgs(this: QueryMethodsHost, orderArgs: unknown[]
         const key = typeof rawKey === "symbol" ? symbolToName(rawKey) : rawKey;
         const value = (arg as Record<PropertyKey, unknown>)[rawKey];
         if (isPlainObject(value)) {
-          // Nested hash: { table: { col: dir } } → order_column("table.col")
           for (const [field, dir] of Object.entries(value)) {
             mapped.push(orderedNode(orderColumn.call(this, [key, field].join(".")), dir));
           }
