@@ -82,21 +82,27 @@ export class MysqlSchemaStatements extends BaseSchemaStatements {
     return super.removeColumn(tableName, columnName, type, options);
   }
 
+  /** Mirrors: AbstractMysqlAdapter#drop_table */
   override async dropTable(
     ...args:
       | [string, ...string[]]
       | [string, ...string[], { ifExists?: boolean; force?: "cascade"; temporary?: boolean }]
   ): Promise<void> {
-    const last = args[args.length - 1];
-    const hasOpts = last !== null && last !== undefined && typeof last === "object";
-    const opts = (hasOpts ? last : {}) as { temporary?: boolean };
-    if (opts.temporary) {
-      return (this as unknown as { dropTable(...args: unknown[]): Promise<void> }).dropTable(
-        ...(args as unknown[]),
-      );
+    const [tableNames, options] = this._splitTableNamesAndOptions(args) as [
+      string[],
+      { ifExists?: boolean; force?: "cascade"; temporary?: boolean },
+    ];
+    if (tableNames.length === 0) {
+      throw new ArgumentError("dropTable requires at least one table name");
     }
-
-    return super.dropTable(...(args as any));
+    const temporary = options.temporary ? " TEMPORARY" : "";
+    const ifExists = options.ifExists ? " IF EXISTS" : "";
+    const cascade = options.force === "cascade" ? " CASCADE" : "";
+    for (const name of tableNames) {
+      this.schemaCache?.clearDataSourceCacheBang(this.pool, name);
+    }
+    const quoted = tableNames.map((n) => this.quoteTableName(n)).join(", ");
+    await this.execute(`DROP${temporary} TABLE${ifExists} ${quoted}${cascade}`);
   }
 }
 
