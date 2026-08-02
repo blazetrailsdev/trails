@@ -88,6 +88,8 @@ interface CalculationRelation {
   _isEmptyRelation(): boolean;
   _isDistinct: boolean;
   _groupColumns: string[];
+  /** Mirrors `Relation#order_values`; read by the count-column resolution. */
+  _orderClauses: unknown[];
   _whereClause: { isContradiction(): boolean };
   /** Mirrors `Relation#having_clause`; grouped calculations ride the relation's own arel. */
   havingClause: { isEmpty(): boolean; ast: Nodes.Node };
@@ -431,12 +433,13 @@ async function singleAggregate(
   fn: AggFn,
   column: string | Nodes.Node,
   coerceNumeric: boolean = true,
+  distinct: boolean | null = rel._isDistinct,
 ): Promise<unknown | null> {
   // Rails routes aggregates through apply_join_dependency when eager loading,
   // raising EagerLoadPolymorphicError for polymorphic specs (calculations.rb).
   rel._checkEagerLoadable();
   const table = rel._modelClass.arelTable;
-  const aggNode = buildAggNode(rel, fn, column, rel._isDistinct);
+  const aggNode = buildAggNode(rel, fn, column, distinct ?? false);
   const projection = aggNode.as("val");
   const manager = table.project(projection);
   // Rails routes sum/average/maximum/minimum through apply_join_dependency when
@@ -498,6 +501,7 @@ async function groupedAggregate(
   fn: AggFn,
   column: string | Nodes.Node,
   coerceNumeric: boolean = true,
+  distinct: boolean | null = rel._isDistinct,
 ): Promise<Map<unknown, unknown>> {
   rel._checkEagerLoadable();
   const table = rel._modelClass.arelTable;
@@ -525,7 +529,7 @@ async function groupedAggregate(
   // truncating for a long table name.
   const aliases =
     groupNodes.length === 1 ? ["group_key"] : groupNodes.map((_, i) => `group_key_${i}`);
-  const aggNode = buildAggNode(rel, fn, column, rel._isDistinct);
+  const aggNode = buildAggNode(rel, fn, column, distinct ?? false);
   const groupKeyAliases = groupNodes.map(
     (n, i) => new Nodes.As(n, new Nodes.SqlLiteral(aliases[i])),
   );
@@ -1211,10 +1215,9 @@ export async function performSum(
     return column && resolveColType(this, column) instanceof BigIntegerType ? 0n : 0;
   }
   if (!column) return 0;
-  if (this._groupColumns.length > 0) {
-    return groupedAggregate(this, "sum", column, true) as Promise<Map<unknown, number | bigint>>;
-  }
-  return ((await singleAggregate(this, "sum", column, true)) as number | bigint) ?? 0;
+  const sum = await performCalculation(this, "sum", column);
+  if (this._groupColumns.length > 0) return sum as Map<unknown, number | bigint>;
+  return (sum as number | bigint) ?? 0;
 }
 
 export async function performAverage(
@@ -1228,10 +1231,7 @@ export async function performAverage(
   // interval, etc.). Numeric averages still narrow to JS number at the
   // call site.
   if (isEmptyCalculationScope(this)) return this._groupColumns.length > 0 ? new Map() : null;
-  if (this._groupColumns.length > 0) {
-    return groupedAggregate(this, "average", column, true);
-  }
-  return singleAggregate(this, "average", column, true);
+  return performCalculation(this, "average", column);
 }
 
 export async function performMinimum(
@@ -1239,10 +1239,7 @@ export async function performMinimum(
   column: string | Nodes.Node,
 ): Promise<unknown | null | Map<unknown, unknown>> {
   if (isEmptyCalculationScope(this)) return this._groupColumns.length > 0 ? new Map() : null;
-  if (this._groupColumns.length > 0) {
-    return groupedAggregate(this, "minimum", column, false);
-  }
-  return singleAggregate(this, "minimum", column, false);
+  return performCalculation(this, "minimum", column);
 }
 
 export async function performMaximum(
@@ -1250,10 +1247,7 @@ export async function performMaximum(
   column: string | Nodes.Node,
 ): Promise<unknown | null | Map<unknown, unknown>> {
   if (isEmptyCalculationScope(this)) return this._groupColumns.length > 0 ? new Map() : null;
-  if (this._groupColumns.length > 0) {
-    return groupedAggregate(this, "maximum", column, false);
-  }
-  return singleAggregate(this, "maximum", column, false);
+  return performCalculation(this, "maximum", column);
 }
 
 /**
@@ -1406,20 +1400,65 @@ export function hasInclude(
   return false;
 }
 
+/**
+ * Narrows the resolved `column_name` to what `aggregate_column` accepts. Rails
+ * hands its own resolved value straight through (calculations.rb:414-423), so a
+ * composite `primary_key` reaches Arel as an array and emits broken SQL there
+ * too; the join here picks one spelling for that already-degenerate case rather
+ * than pretending trails supports it.
+ * @internal
+ */
+function aggregateTarget(columnName: string | string[] | Nodes.Node | null): string | Nodes.Node {
+  if (columnName == null) return "*";
+  return Array.isArray(columnName) ? columnName.join(",") : columnName;
+}
+
+/** @internal */
+function coercesNumeric(fn: AggFn): boolean {
+  return fn !== "minimum" && fn !== "maximum";
+}
+
 /** @internal */
 export function performCalculation(
   rel: CalculationRelation,
   operation: string,
-  columnName: string,
+  columnName: string | string[] | Nodes.Node | null,
 ): Promise<unknown> {
-  if ((rel as any)._groupColumns?.length > 0) {
-    return executeGroupedCalculation(rel, operation, columnName, false);
+  const op = operation.toLowerCase();
+
+  // Mirrors Rails `perform_calculation` (calculations.rb:434-458): resolve the
+  // effective `distinct` flag and count column before dispatching. `:all` is
+  // spelled "*"/"all" here (the JS analogue Rails' aggregate_column maps to
+  // Arel.star — calculations.rb:414-423).
+  let distinct: boolean | null = rel._isDistinct;
+  let column = columnName;
+  if (op === "count") {
+    column ??= selectForCount(rel);
+    if (column === "*" || column === "all") {
+      if (!distinct) {
+        if (rel._groupColumns.length === 0) distinct = isDistinctSelect(rel, selectForCount(rel));
+      } else if (
+        rel._groupColumns.length > 0 ||
+        (rel.selectValues.length === 0 && rel._orderClauses.length === 0)
+      ) {
+        column = rel.primaryKey;
+      }
+    } else if (isDistinctSelect(rel, column)) {
+      distinct = null;
+    }
   }
-  return executeSimpleCalculation(rel, operation, columnName, false);
+
+  if (rel._groupColumns.length > 0) {
+    return executeGroupedCalculation(rel, op, column, distinct);
+  }
+  return executeSimpleCalculation(rel, op, column, distinct);
 }
 
 /** @internal */
-export function isDistinctSelect(_rel: CalculationRelation, columnName: string): boolean {
+export function isDistinctSelect(
+  _rel: CalculationRelation,
+  columnName: string | string[] | Nodes.Node,
+): boolean {
   return typeof columnName === "string" && /\bDISTINCT[\s(]/i.test(columnName);
 }
 
@@ -1437,25 +1476,34 @@ export function operationOverAggregateColumn(
 export async function executeSimpleCalculation(
   rel: CalculationRelation,
   operation: string,
-  columnName: string,
-  distinct: boolean,
+  columnName: string | string[] | Nodes.Node | null,
+  distinct: boolean | null,
 ): Promise<unknown> {
   const fn = operation.toLowerCase() as AggFn;
-  return singleAggregate(rel, fn, columnName, true);
+  // DIVERGENCE (Rails calculations.rb:468-511): the ungrouped aggregate body —
+  // the count-subquery shortcut, the `unscope(:order).distinct!(false)` rebase,
+  // the select_all call and the type_cast_calculated_value fold — lives in the
+  // shared `singleAggregate` helper. The resolved `distinct` is threaded into
+  // it so it reaches `operation_over_aggregate_column` (calculations.rb:481)
+  // rather than being re-read off the relation.
+  return singleAggregate(rel, fn, aggregateTarget(columnName), coercesNumeric(fn), distinct);
 }
 
 /** @internal */
 export async function executeGroupedCalculation(
   rel: CalculationRelation,
   operation: string,
-  columnName: string,
-  distinct: boolean,
+  columnName: string | string[] | Nodes.Node | null,
+  distinct: boolean | null,
 ): Promise<Map<unknown, unknown>> {
   const fn = operation.toLowerCase() as AggFn;
-  // Build a GROUP BY aggregate query via Arel (delegates to the shared groupedAggregate helper).
-  const table = rel._modelClass.arelTable as Nodes.Node;
-  void table;
-  return groupedAggregate(rel, fn, columnName, false);
+  // DIVERGENCE (Rails calculations.rb:513-595): the grouped aggregate body —
+  // group-field uniq'ing, the belongs_to reflection, the column-alias tracker
+  // and the `association.klass.base_class.where(primary_key => key_ids)`
+  // key-record lookup — lives in the shared `groupedAggregate` helper. The
+  // resolved `distinct` is threaded into it so it reaches
+  // `operation_over_aggregate_column` (calculations.rb:538).
+  return groupedAggregate(rel, fn, aggregateTarget(columnName), coercesNumeric(fn), distinct);
 }
 
 /** @internal */

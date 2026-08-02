@@ -4664,29 +4664,11 @@ export class Relation<T extends Base> {
     const pk = this.primaryKey;
     const effectiveCursor = cursor ?? pk;
     const cursorArr = Array.isArray(effectiveCursor) ? effectiveCursor : [effectiveCursor];
-    _ensureValidOptionsForBatchingBang(cursorArr, start, finish, (order ?? "asc") as any);
-
-    // Mirrors Rails ensure_valid_options_for_batching!: when the cursor doesn't
-    // include all PK columns, require a full unique (non-partial) index.
-    const pkArr = Array.isArray(pk) ? pk : [pk];
-    const cursorIncludesPk = pkArr.every((k) => cursorArr.includes(k));
-    const ensureCursorUniqueness = async () => {
-      if (!cursorIncludesPk) {
-        const cache = self._modelClass.schemaCache();
-        const pool = self._modelClass.connectionPool();
-        const idxs = (await cache.indexes(pool, self.tableName)) as Array<{
-          unique: boolean;
-          where?: string | null;
-          columns: string[];
-        }>;
-        const hasUniqueIndex = idxs.some(
-          (idx) => idx.unique && !idx.where && idx.columns.every((c) => cursorArr.includes(c)),
-        );
-        if (!hasUniqueIndex) {
-          throw new Error(":cursor must include a primary key or other unique column(s)");
-        }
-      }
-    };
+    // `ensure_valid_options_for_batching!` reaches the schema cache, which is
+    // async here, so the validation runs when the enumerator is first pulled
+    // rather than at `in_batches` call time.
+    const ensureValidOptions = () =>
+      _ensureValidOptionsForBatchingBang(self, cursorArr, start, finish, (order ?? "asc") as any);
 
     if (this._orderClauses.length > 0) {
       this.actOnIgnoredOrder(errorOnIgnore);
@@ -4730,7 +4712,7 @@ export class Relation<T extends Base> {
       });
       return new BatchEnumerator(
         async function* () {
-          await ensureCursorUniqueness();
+          await ensureValidOptions();
           for (const batchRows of loadedBatches) {
             const batchRel = self._clone();
             batchRel._orderClauses = batchOrders.map(
@@ -4748,7 +4730,7 @@ export class Relation<T extends Base> {
 
     return new BatchEnumerator(
       async function* () {
-        await ensureCursorUniqueness();
+        await ensureValidOptions();
         const rel = self._clone();
         rel._orderClauses = batchOrders.map(([col, dir]) => [col, dir] as [string, "asc" | "desc"]);
 
@@ -7424,8 +7406,8 @@ export class Relation<T extends Base> {
     start: unknown,
     finish: unknown,
     order: "asc" | "desc" | ("asc" | "desc")[],
-  ): void {
-    _ensureValidOptionsForBatchingBang(cursor, start, finish, order);
+  ): Promise<void> {
+    return _ensureValidOptionsForBatchingBang(this, cursor, start, finish, order);
   }
 
   /** @internal */
