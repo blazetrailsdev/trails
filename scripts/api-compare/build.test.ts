@@ -98,6 +98,15 @@ describe("renderJsdoc", () => {
     const { rest } = parseJsdoc("/**\n * @missingRailsCall a — x\n */");
     expect(renderJsdoc(rest, [], "  ")).toBeNull();
   });
+
+  it("keeps a one-line doc comment verbatim when there are no entries", () => {
+    const one = "  /** Mirrors Rails' Dot#edge — push edge, run block, pop. */";
+    expect(renderJsdoc([one], [], "  ")).toBe(one);
+  });
+
+  it("returns null for an empty one-line comment with no entries", () => {
+    expect(renderJsdoc(["  /** */"], [], "  ")).toBeNull();
+  });
 });
 
 const FILE = [
@@ -136,8 +145,20 @@ describe("reconcileFileText", () => {
     const expectations = new Map([["bar", { rubyNames: ["bar"], calls: new Set(["save"]) }]]);
     const r = reconcileFileText("foo.ts", src, expectations, () => DEFAULT_TAG_REASON);
     expect(r.text).toBeNull();
-    expect(r.skipped).toBe(1);
+    expect(r.skipped).toEqual(["save"]);
     expect(r.tagged).toEqual([]);
+  });
+
+  it("never deletes a one-line doc comment on a method it mints no tag for", () => {
+    const src = [
+      "export class Foo {",
+      "  /** Mirrors Rails' Foo#bar. */",
+      "  bar(): void {}",
+      "}",
+    ].join("\n");
+    const expectations = new Map([["bar", { rubyNames: ["bar"], calls: new Set(["save"]) }]]);
+    const r = reconcileFileText("foo.ts", src, expectations, () => DEFAULT_TAG_REASON);
+    expect(r.text).toBeNull();
   });
 
   it("still harvests a human-authored reason when its call converges", () => {

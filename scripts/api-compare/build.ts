@@ -150,6 +150,12 @@ function renderEntry(e: TagEntry, indent: string): string[] {
   return lines;
 }
 
+const oneLineProse = (line: string): string =>
+  line
+    .replace(/^\s*\/\*\*\s?/, "")
+    .replace(/\s*\*\/\s*$/, "")
+    .trim();
+
 /** Rebuild a JSDoc comment from its non-tag lines plus reconciled entries.
  *  Returns null when nothing remains (comment should be removed entirely). */
 export function renderJsdoc(rest: string[], entries: TagEntry[], indent: string): string | null {
@@ -159,10 +165,16 @@ export function renderJsdoc(rest: string[], entries: TagEntry[], indent: string)
   if (body.length === 0 || !body[0].trimStart().startsWith("/**")) {
     body = [`${indent}/**`, `${indent} */`];
   }
+  // A one-line `/** ... */` comment keeps its prose on the `/**` line, where
+  // the `head`/`hasProse` split below cannot see it — returning it verbatim is
+  // what keeps an ordinary doc comment on an untagged method from being
+  // deleted as "tags-only".
+  if (ordered.length === 0 && body.length === 1) {
+    return oneLineProse(body[0]) === "" ? null : body[0];
+  }
   // Normalize a one-line `/** ... */` comment to block form when tags exist.
   if (ordered.length > 0 && body.length === 1) {
-    const one = body[0];
-    const inner = one.replace(/^\s*\/\*\*\s?/, "").replace(/\s*\*\/\s*$/, "");
+    const inner = oneLineProse(body[0]);
     body = [`${indent}/**`, ...(inner ? [`${indent} * ${inner}`] : []), `${indent} */`];
   }
   const closeIdx = body.findIndex((l) => l.trim().endsWith("*/"));
@@ -206,7 +218,7 @@ function firstCuratedReason(
 ): string {
   for (const rubyName of rubyNames) {
     const reason = reasonFor(rubyName, call);
-    if (reason !== DEFAULT_TAG_REASON) return reason;
+    if (justifies(reason.trim())) return reason;
   }
   return DEFAULT_TAG_REASON;
 }
@@ -231,17 +243,17 @@ export function reconcileFileText(
    *  host-class duplicates, prototype-patched methods, …) — reported, never
    *  silently dropped. */
   unmatched: string[];
-  /** Missing calls left untagged for want of a curated reason (see
-   *  `reconcile`) — counted so a zero-edit run still says how much is waiting
-   *  on human prose. */
-  skipped: number;
+  /** Every missing call left untagged for want of a curated reason (see
+   *  `reconcile`), so a zero-edit run still says how much is waiting on human
+   *  prose. */
+  skipped: string[];
 } {
   const sf = ts.createSourceFile(fileName, text, ts.ScriptTarget.Latest, true);
   const edits: Edit[] = [];
   const harvested: { tsName: string; entry: TagEntry }[] = [];
   const tagged: { rubyName: string; call: string }[] = [];
   const seen = new Set<string>();
-  let skipped = 0;
+  const skipped: string[] = [];
 
   const visit = (node: ts.Node): void => {
     let name: string | null = null;
@@ -291,7 +303,7 @@ export function reconcileFileText(
         const r = reconcile(entries, expected, (c) =>
           exp ? firstCuratedReason(exp.rubyNames, c, reasonFor) : DEFAULT_TAG_REASON,
         );
-        skipped += r.skipped.length;
+        skipped.push(...r.skipped);
         if (exp) {
           for (const e of [...r.kept, ...r.added]) {
             if (!justifies(e.reason)) continue;
@@ -422,7 +434,7 @@ async function main(argv: string[]): Promise<number> {
       return 1;
     }
     const { text: next, harvested, tagged, unmatched, skipped: fileSkipped } = reconciled;
-    skipped += fileSkipped;
+    skipped += fileSkipped.length;
     for (const t of tagged) migrated.add(keyOf({ package: pkg, tsFile, ...t }));
     for (const h of harvested) {
       console.log(`harvested (${tsFile} ${h.tsName} ${h.entry.call}): ${h.entry.reason}`);
