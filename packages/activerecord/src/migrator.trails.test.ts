@@ -231,6 +231,16 @@ describe("Migrator trails extensions", () => {
     await expect(migrator.checkProtectedEnvironments()).resolves.toBeUndefined();
   });
 
+  it("CheckPending with a Migrator creates schema_migrations before reading it", async () => {
+    const schemaMigration = new SchemaMigration(adapter);
+    await schemaMigration.dropTable();
+    const migrator = new Migrator(adapter, [makeMigration("1", "M1")]);
+    const check = new CheckPending(async () => "ok", { migrator });
+
+    await expect(check.call({})).rejects.toThrow(PendingMigrationError);
+    expect(await schemaMigration.tableExists()).toBe(true);
+  });
+
   it("CheckPending with PendingMigrationConnection detects pending migrations", async () => {
     const conn = new PendingMigrationConnection({ adapter });
     const migrations = [makeMigration("1", "M1")];

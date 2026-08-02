@@ -3013,7 +3013,15 @@ export class Migrator {
     return this._migratedVersions ?? this.loadMigrated();
   }
 
+  /**
+   * Rails' `initialize` creates both bookkeeping tables (`migration.rb:1429-1430`)
+   * before anything can read `migrated`, so `load_migrated` may assume
+   * schema_migrations exists. `_ensureSchemaTable` is trails' async stand-in for
+   * that constructor step (a constructor cannot await), so every entry point
+   * that reads versions has to await it — not just `pendingMigrations`.
+   */
   async loadMigrated(): Promise<Set<string>> {
+    await this._ensureSchemaTable();
     return (this._migratedVersions = await this._appliedVersions());
   }
 }
