@@ -13,6 +13,7 @@ import { BetterSQLite3Adapter } from "../better-sqlite3-adapter.js";
 import { AbstractAdapter } from "../abstract-adapter.js";
 import { ForeignKeyDefinition } from "./schema-definitions.js";
 import { fixtures } from "../../test-fixtures.js";
+import { NotImplementedError } from "../../errors.js";
 import { ambientConnection, withRocketTables } from "../../support/rocket-tables.js";
 import { adapterType } from "../../test-adapter.js";
 
@@ -299,15 +300,17 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
       }
     }
     const stub = new FkStub();
-    // foreignKeys base path returns [] when adapter has no override
-    const fks = await stub.foreignKeys("any_table");
-    expect(fks).toEqual([]);
+    // The base body raises (schema_statements.rb:1103) when the adapter has no
+    // override; a recursion regression would surface as a stack overflow instead.
+    await expect(stub.foreignKeys("any_table")).rejects.toThrow(
+      new NotImplementedError("foreign_keys is not implemented"),
+    );
     // removeForeignKey base path resolves the real constraint via
-    // foreign_key_for! (Rails-faithful); against a stub with no foreign keys it
-    // raises ArgumentError promptly rather than recursing into a stack overflow.
+    // foreign_key_for! (Rails-faithful), so it surfaces that same raise promptly
+    // rather than recursing into a stack overflow.
     await expect(
       stub.removeForeignKey("products", { name: "fk_products_user_id" }),
-    ).rejects.toThrow(/no foreign key/i);
+    ).rejects.toThrow(new NotImplementedError("foreign_keys is not implemented"));
   });
 
   it("adapter overrides that call super reach the base body without self-dispatching", async () => {
