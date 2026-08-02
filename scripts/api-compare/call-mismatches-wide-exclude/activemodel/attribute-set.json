@@ -9,13 +9,6 @@
   {
     "package": "activemodel",
     "tsFile": "attribute-set.ts",
-    "rubyName": "accessed",
-    "call": "select",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "attribute-set.ts",
     "rubyName": "cast_types",
     "call": "transform_values",
     "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails attribute_set.rb:24-26 uses `attributes.transform_values(&:type)`; trails attribute-set.ts:60-66 builds the record with a for-of loop over `this.attributes`."
@@ -32,13 +25,6 @@
     "tsFile": "attribute-set.ts",
     "rubyName": "keys",
     "call": "each_key",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "attribute-set.ts",
-    "rubyName": "keys",
-    "call": "select",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

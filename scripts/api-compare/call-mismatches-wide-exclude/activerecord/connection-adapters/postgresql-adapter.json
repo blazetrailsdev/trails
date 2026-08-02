@@ -65,13 +65,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "configure_connection",
-    "call": "stringify_keys",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
     "rubyName": "create_schema_dumper",
     "call": "create",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -82,13 +75,6 @@
     "rubyName": "dbconsole",
     "call": "database_cli",
     "reason": "Rails reads the cli name only to pass it to `find_cmd_and_exec` (postgresql_adapter.rb); that PTY exec is Ruby-only and unported, so our `dbconsole` returns the arg list and never needs the lookup."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "dbconsole",
-    "call": "filter_map",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -198,22 +184,8 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "get_oid_type",
-    "call": "default_value",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
     "rubyName": "has_default_function?",
     "call": "match?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "initialize",
-    "call": "compact",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -296,20 +268,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "reconfigure_connection_timezone",
-    "call": "stringify_keys",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "reconnect",
-    "call": "reset",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
     "rubyName": "release_advisory_lock",
     "call": "query_value",
     "reason": "Deliberate deviation (RFC 0072 converge-pg-session-and-transaction-exec-primitive-routing): mirror of get_advisory_lock — the unlock must target the same pinned session that took the lock, so it runs on the pinned raw client rather than through query_value."
@@ -375,13 +333,6 @@
     "tsFile": "connection-adapters/postgresql-adapter.ts",
     "rubyName": "translate_exception",
     "call": "match?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "translate_exception",
-    "call": "try",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

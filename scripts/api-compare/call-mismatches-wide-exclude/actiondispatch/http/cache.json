@@ -9,20 +9,6 @@
   {
     "package": "actiondispatch",
     "tsFile": "http/cache.ts",
-    "rubyName": "generate_strong_etag",
-    "call": "hexdigest",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/cache.ts",
-    "rubyName": "if_modified_since",
-    "call": "rfc2822",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/cache.ts",
     "rubyName": "weak_etag?",
     "call": "etag",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

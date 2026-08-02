@@ -5,19 +5,5 @@
     "rubyName": "comment",
     "call": "cache_query_log_tags",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "query-logs.ts",
-    "rubyName": "query_source_location",
-    "call": "clean_frame",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "query-logs.ts",
-    "rubyName": "tag_content",
-    "call": "filter_map",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }
 ]

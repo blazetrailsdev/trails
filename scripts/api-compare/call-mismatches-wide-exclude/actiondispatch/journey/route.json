@@ -9,20 +9,6 @@
   {
     "package": "actiondispatch",
     "tsFile": "journey/route.ts",
-    "rubyName": "score",
-    "call": "count",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "journey/route.ts",
-    "rubyName": "verb_matcher",
-    "call": "dasherize",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "journey/route.ts",
     "rubyName": "verb_matcher",
     "call": "fetch",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

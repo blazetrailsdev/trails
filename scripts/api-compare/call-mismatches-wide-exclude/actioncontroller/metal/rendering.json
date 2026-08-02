@@ -2,20 +2,6 @@
   {
     "package": "actioncontroller",
     "tsFile": "metal/rendering.ts",
-    "rubyName": "_normalize_options",
-    "call": "status_code",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/rendering.ts",
-    "rubyName": "process_action",
-    "call": "filter_map",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/rendering.ts",
     "rubyName": "render",
     "call": "response_body",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

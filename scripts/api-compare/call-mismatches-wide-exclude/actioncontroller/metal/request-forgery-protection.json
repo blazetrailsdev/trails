@@ -9,20 +9,6 @@
   {
     "package": "actioncontroller",
     "tsFile": "metal/request-forgery-protection.ts",
-    "rubyName": "compare_with_global_token",
-    "call": "fixed_length_secure_compare",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/request-forgery-protection.ts",
-    "rubyName": "compare_with_real_token",
-    "call": "fixed_length_secure_compare",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/request-forgery-protection.ts",
     "rubyName": "handle_unverified_request",
     "call": "build",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -30,57 +16,8 @@
   {
     "package": "actioncontroller",
     "tsFile": "metal/request-forgery-protection.ts",
-    "rubyName": "handle_unverified_request",
-    "call": "request",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/request-forgery-protection.ts",
     "rubyName": "mark_for_same_origin_verification!",
     "call": "get?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/request-forgery-protection.ts",
-    "rubyName": "non_xhr_javascript_response?",
-    "call": "match?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/request-forgery-protection.ts",
-    "rubyName": "normalize_action_path",
-    "call": "chomp",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/request-forgery-protection.ts",
-    "rubyName": "normalize_action_path",
-    "call": "parse",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/request-forgery-protection.ts",
-    "rubyName": "normalize_relative_action_path",
-    "call": "chomp",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/request-forgery-protection.ts",
-    "rubyName": "normalize_relative_action_path",
-    "call": "parse",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/request-forgery-protection.ts",
-    "rubyName": "normalize_relative_action_path",
-    "call": "request",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -95,20 +32,6 @@
     "tsFile": "metal/request-forgery-protection.ts",
     "rubyName": "reset_csrf_token",
     "call": "delete",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/request-forgery-protection.ts",
-    "rubyName": "valid_per_form_csrf_token?",
-    "call": "chomp",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/request-forgery-protection.ts",
-    "rubyName": "valid_per_form_csrf_token?",
-    "call": "fixed_length_secure_compare",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

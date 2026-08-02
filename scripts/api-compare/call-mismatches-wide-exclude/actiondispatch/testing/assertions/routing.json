@@ -3,13 +3,6 @@
     "package": "actiondispatch",
     "tsFile": "testing/assertions/routing.ts",
     "rubyName": "assert_generates",
-    "call": "empty?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "testing/assertions/routing.ts",
-    "rubyName": "assert_generates",
     "call": "parse",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -23,29 +16,8 @@
   {
     "package": "actiondispatch",
     "tsFile": "testing/assertions/routing.ts",
-    "rubyName": "create_routes",
-    "call": "extend",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "testing/assertions/routing.ts",
-    "rubyName": "create_routes",
-    "call": "include",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "testing/assertions/routing.ts",
     "rubyName": "recognized_request_for",
     "call": "create",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "testing/assertions/routing.ts",
-    "rubyName": "recognized_request_for",
-    "call": "empty?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -60,13 +32,6 @@
     "tsFile": "testing/assertions/routing.ts",
     "rubyName": "reset_routes",
     "call": "app",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails routing.rb has two overloads: 72-77 (integration: app.instance_variable_set + singleton_class.redefine_method) and 298-303 (functional: plain restore); trails routing.ts:270-277 ports the functional overload only — JS has no singleton classes, so the app/redefine_method arm has no analogue."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "testing/assertions/routing.ts",
-    "rubyName": "reset_routes",
-    "call": "redefine_method",
     "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails routing.rb has two overloads: 72-77 (integration: app.instance_variable_set + singleton_class.redefine_method) and 298-303 (functional: plain restore); trails routing.ts:270-277 ports the functional overload only — JS has no singleton classes, so the app/redefine_method arm has no analogue."
   }
 ]

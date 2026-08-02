@@ -37,22 +37,8 @@
   {
     "package": "activerecord",
     "tsFile": "database-configurations/connection-url-resolver.ts",
-    "rubyName": "query_hash",
-    "call": "symbolize_keys",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "database-configurations/connection-url-resolver.ts",
     "rubyName": "raw_config",
     "call": "merge",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "database-configurations/connection-url-resolver.ts",
-    "rubyName": "raw_config",
-    "call": "reverse_merge",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }
 ]

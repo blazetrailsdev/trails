@@ -65,13 +65,6 @@
   {
     "package": "activerecord",
     "tsFile": "encryption/encryptable-record.ts",
-    "rubyName": "global_previous_schemes_for",
-    "call": "filter_map",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "encryption/encryptable-record.ts",
     "rubyName": "has_encrypted_attributes?",
     "call": "encrypted_attributes",
     "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails encryptable_record.rb:204-206 reads `self.class.encrypted_attributes.present?`; trails encryptable-record.ts:165-167 reads `modelClass._encryptedAttributes?.size > 0`."
@@ -116,13 +109,6 @@
     "tsFile": "encryption/encryptable-record.ts",
     "rubyName": "validate_column_size",
     "call": "columns_hash",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "encryption/encryptable-record.ts",
-    "rubyName": "validate_encryption_allowed",
-    "call": "context",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }
 ]

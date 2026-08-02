@@ -17,13 +17,6 @@
     "package": "activerecord",
     "tsFile": "associations/join-dependency.ts",
     "rubyName": "instantiate",
-    "call": "delete_if",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/join-dependency.ts",
-    "rubyName": "instantiate",
     "call": "match?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -39,13 +32,6 @@
     "tsFile": "associations/join-dependency.ts",
     "rubyName": "walk",
     "call": "map",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/join-dependency.ts",
-    "rubyName": "walk",
-    "call": "partition",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }
 ]

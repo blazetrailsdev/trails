@@ -2,20 +2,6 @@
   {
     "package": "trailties",
     "tsFile": "paths.ts",
-    "rubyName": "children",
-    "call": "values_at",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "trailties",
-    "tsFile": "paths.ts",
-    "rubyName": "existent",
-    "call": "exist?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "trailties",
-    "tsFile": "paths.ts",
     "rubyName": "existent_directories",
     "call": "directory?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -26,12 +12,5 @@
     "rubyName": "expanded",
     "call": "directory?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "trailties",
-    "tsFile": "paths.ts",
-    "rubyName": "initialize",
-    "call": "eager_load!",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails paths.rb:119-130 dispatches option flags through bang methods (eager_load!/skip_eager_load! etc.); trails paths.ts:64-70 constructor assigns the corresponding booleans directly from options — the flag-bang indirection is inlined."
   }
 ]

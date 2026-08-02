@@ -52,13 +52,6 @@
     "package": "activerecord",
     "tsFile": "associations/has-one-through-association.ts",
     "rubyName": "stale_state",
-    "call": "filter_map",
-    "reason": "Rails ThroughAssociation#stale_state calls these; TS mirrors them in staleStateImpl (through-association.ts) which HasOneThroughAssociation#staleState delegates to (same pattern as HasManyThroughAssociation)."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/has-one-through-association.ts",
-    "rubyName": "stale_state",
     "call": "foreign_key",
     "reason": "Rails ThroughAssociation#stale_state calls these; TS mirrors them in staleStateImpl (through-association.ts) which HasOneThroughAssociation#staleState delegates to (same pattern as HasManyThroughAssociation)."
   },
@@ -67,13 +60,6 @@
     "tsFile": "associations/has-one-through-association.ts",
     "rubyName": "stale_state",
     "call": "owner",
-    "reason": "Rails ThroughAssociation#stale_state calls these; TS mirrors them in staleStateImpl (through-association.ts) which HasOneThroughAssociation#staleState delegates to (same pattern as HasManyThroughAssociation)."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/has-one-through-association.ts",
-    "rubyName": "stale_state",
-    "call": "presence",
     "reason": "Rails ThroughAssociation#stale_state calls these; TS mirrors them in staleStateImpl (through-association.ts) which HasOneThroughAssociation#staleState delegates to (same pattern as HasManyThroughAssociation)."
   },
   {

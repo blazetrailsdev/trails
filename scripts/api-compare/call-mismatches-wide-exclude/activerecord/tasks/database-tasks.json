@@ -24,13 +24,6 @@
     "package": "activerecord",
     "tsFile": "tasks/database-tasks.ts",
     "rubyName": "check_schema_file",
-    "call": "exist?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "tasks/database-tasks.ts",
-    "rubyName": "check_schema_file",
     "call": "root",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -149,13 +142,6 @@
   {
     "package": "activerecord",
     "tsFile": "tasks/database-tasks.ts",
-    "rubyName": "initialize_database",
-    "call": "exist?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "tasks/database-tasks.ts",
     "rubyName": "load_schema",
     "call": "load",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -248,21 +234,7 @@
     "package": "activerecord",
     "tsFile": "tasks/database-tasks.ts",
     "rubyName": "schema_sha1",
-    "call": "hexdigest",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "tasks/database-tasks.ts",
-    "rubyName": "schema_sha1",
     "call": "read",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "tasks/database-tasks.ts",
-    "rubyName": "schema_up_to_date?",
-    "call": "exist?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

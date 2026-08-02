@@ -9,13 +9,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-adapter.ts",
-    "rubyName": "cacheable_query",
-    "call": "compile",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-adapter.ts",
     "rubyName": "case_insensitive_comparison",
     "call": "can_perform_case_insensitive_comparison_for?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -86,13 +79,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-adapter.ts",
-    "rubyName": "expire",
-    "call": "context",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-adapter.ts",
     "rubyName": "initialize",
     "call": "build_statement_pool",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -115,20 +101,6 @@
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-adapter.ts",
     "rubyName": "initialize",
-    "call": "logger",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-adapter.ts",
-    "rubyName": "initialize",
-    "call": "symbolize_keys",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-adapter.ts",
-    "rubyName": "initialize",
     "call": "type_cast_config_to_boolean",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -142,22 +114,8 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-adapter.ts",
-    "rubyName": "lease",
-    "call": "context",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-adapter.ts",
     "rubyName": "log",
     "call": "instrument",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-adapter.ts",
-    "rubyName": "log",
-    "call": "presence",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -214,13 +172,6 @@
     "tsFile": "connection-adapters/abstract-adapter.ts",
     "rubyName": "select_value",
     "call": "single_value_from_rows",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-adapter.ts",
-    "rubyName": "steal!",
-    "call": "context",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

@@ -23,13 +23,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/schema-cache.ts",
-    "rubyName": "deep_deduplicate",
-    "call": "transform_values",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/schema-cache.ts",
     "rubyName": "derive_columns_hash_and_deduplicate_values",
     "call": "deep_deduplicate",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -37,29 +30,8 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/schema-cache.ts",
-    "rubyName": "derive_columns_hash_and_deduplicate_values",
-    "call": "transform_values",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/schema-cache.ts",
-    "rubyName": "open",
-    "call": "extname",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/schema-cache.ts",
     "rubyName": "open",
     "call": "new",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/schema-cache.ts",
-    "rubyName": "read",
-    "call": "extname",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
