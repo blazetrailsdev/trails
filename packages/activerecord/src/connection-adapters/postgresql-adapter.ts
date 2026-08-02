@@ -3656,8 +3656,6 @@ export class PostgreSQLAdapter
       FROM pg_extension
       JOIN pg_namespace n ON pg_extension.extnamespace = n.oid
     `;
-    // Rails re-reads current_schema per row (it is a query_value call inside the
-    // map block); one read up front is the same answer for a single result set.
     const currentSchema = await this.currentSchema();
     const result = await this.internalExecQuery(query, "SCHEMA", [], {
       allowRetry: true,
@@ -3689,20 +3687,15 @@ export class PostgreSQLAdapter
   }
 
   async enableExtension(name: string, _options?: Record<string, unknown>): Promise<void> {
-    // Rails: schema, name = name.to_s.split(".").values_at(-2, -1) — for a bare
-    // name values_at(-2) is nil, so only a dotted name carries a schema.
     const parts = String(name).split(".");
     const [schema, extName] = [parts.at(-2) ?? null, parts.at(-1)!];
     let sql = `CREATE EXTENSION IF NOT EXISTS "${extName}"`;
     if (schema) sql += ` SCHEMA ${schema}`;
     await this.internalExecQuery(sql);
-    // Mirrors Rails' `.tap { reload_type_map }`.
     await this.reloadTypeMap();
   }
 
   async disableExtension(name: string, options: { force?: "cascade" } = {}): Promise<void> {
-    // Extensions are global in PG — DROP uses only extname, so Rails discards
-    // the schema half of values_at(-2, -1).
     const parts = String(name).split(".");
     const extName = parts.at(-1)!;
     const cascade = options.force === "cascade" ? " CASCADE" : "";
