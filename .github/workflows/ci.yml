@@ -1513,10 +1513,10 @@ jobs:
           echo "::error title=Wide ratchet baseline drift::${{ github.sha }} left the committed wide call-mismatch baseline out of sync with a clean reseed. Run \`pnpm api:calls:wide:reseed\` and commit the result."
           git --no-pager diff --stat -- "$baseline" "$mark"
           git --no-pager diff -- "$baseline" "$mark"
-          # Publish the reseed as a single rolling maintenance PR so `main`
+          # Publishes the reseed as a single rolling maintenance PR so `main`
           # gets fixed without waiting on a human noticing the red run. The
-          # step still fails afterwards: the PR is the remedy, the failure is
-          # the signal, and a missed PR must not silently swallow the drift.
+          # step still fails afterwards: the PR is the remedy, the red run is
+          # the signal, and a missed PR must not swallow the drift.
           bash scripts/ci/open-wide-baseline-pr.sh
           exit 1
         env:
