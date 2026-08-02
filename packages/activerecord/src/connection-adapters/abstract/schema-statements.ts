@@ -795,12 +795,7 @@ export class SchemaStatements {
   async removeBelongsTo(
     tableName: string,
     refName: string,
-    options: {
-      polymorphic?: boolean;
-      foreignKey?: boolean | { toTable?: string; column?: string };
-      ifExists?: boolean;
-      ifNotExists?: boolean;
-    } = {},
+    options: RemoveReferenceOptions = {},
   ): Promise<void> {
     return this.removeReference(tableName, refName, options);
   }
