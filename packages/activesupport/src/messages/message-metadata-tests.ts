@@ -46,13 +46,23 @@ const DATA: readonly unknown[] = [
   ["a string", 123, { key: "value" }],
 ];
 
+const CustomSerializer: MessageSerializer = {
+  dump(value: unknown): string {
+    return `${JSON.stringify(value)}!`;
+  },
+
+  load(value: string): unknown {
+    return JSON.parse(value.replace(/!$/, ""));
+  },
+};
+
 /**
  * Rails' `SERIALIZERS`. `ActiveSupport::MessagePack` is excluded pending its
- * temporal packer (follow-up story). Rails lists `JSON`, `ActiveSupport::JSON`
- * and a `CustomSerializer` separately; trails' `:json` serializer is
- * `ActiveSupport::JSON`, so the JSON entries collapse into one.
+ * temporal packer (follow-up story). Rails lists `JSON` and
+ * `ActiveSupport::JSON` separately; trails' `:json` serializer is
+ * `ActiveSupport::JSON`, so those two entries collapse into one.
  */
-const SERIALIZERS: readonly Format[] = ["marshal", "json"];
+const SERIALIZERS: readonly (Format | MessageSerializer)[] = ["marshal", "json", CustomSerializer];
 
 export function eachScenario<T>(
   makeCodec: (serializer: Format | MessageSerializer) => T,
