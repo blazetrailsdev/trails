@@ -28,7 +28,7 @@ export const ARUNIT2_TABLES = ["colleges", "courses", "professors", "courses_pro
  * the canonical shape from an earlier run.
  */
 async function createOtherDogsTable(adapter: DatabaseAdapter): Promise<void> {
-  await adapter.schemaStatements().createTable("dogs", { force: true }, () => {});
+  await adapter.createTable("dogs", { force: true }, () => {});
 }
 
 /**

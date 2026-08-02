@@ -2367,7 +2367,7 @@ describeIfMysqlAdapter("BulkAlterTableMigrationsTest", () => {
       return (id as { autoIncrement?: boolean })?.autoIncrement === true;
     };
 
-    const ss = adapter.schemaStatements();
+    const ss = adapter;
     await ss.changeTable("delete_me", { bulk: true }, (t: any) => {
       t.change("id", "bigint", { autoIncrement: true });
     });

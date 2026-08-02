@@ -1059,7 +1059,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     itIfSupports("native_partitioning", "list partition options is dumped", async () => {
       const options = "PARTITION BY LIST (kind)";
-      await adapter.schemaStatements().createTable("trains", { id: false, options }, (t) => {
+      await adapter.createTable("trains", { id: false, options }, (t) => {
         t.string("name");
         t.string("kind");
       });
@@ -1070,7 +1070,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     itIfSupports("native_partitioning", "range partition options is dumped", async () => {
       const options = "PARTITION BY RANGE (created_at)";
-      await adapter.schemaStatements().createTable("trains", { id: false, options }, (t) => {
+      await adapter.createTable("trains", { id: false, options }, (t) => {
         t.string("name");
         t.datetime("created_at", { null: false });
       });
@@ -1080,33 +1080,33 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("inherited table options is dumped", async () => {
-      await adapter.schemaStatements().createTable("transportation_modes", (t) => {
+      await adapter.createTable("transportation_modes", (t) => {
         t.string("name");
         t.string("kind");
       });
       const options = "INHERITS (transportation_modes)";
-      await adapter.schemaStatements().createTable("trains", { options });
+      await adapter.createTable("trains", { options });
       const lines: string[] = [];
       await adapter.createSchemaDumper(adapter).dumpTable(lines, "trains");
       expect(lines.join("\n")).toContain(`options: "${options}"`);
     });
 
     it("multiple inherited table options is dumped", async () => {
-      await adapter.schemaStatements().createTable("vehicles", (t) => {
+      await adapter.createTable("vehicles", (t) => {
         t.string("name");
       });
-      await adapter.schemaStatements().createTable("transportation_modes", (t) => {
+      await adapter.createTable("transportation_modes", (t) => {
         t.string("kind");
       });
       const options = "INHERITS (transportation_modes, vehicles)";
-      await adapter.schemaStatements().createTable("trains", { options });
+      await adapter.createTable("trains", { options });
       const lines: string[] = [];
       await adapter.createSchemaDumper(adapter).dumpTable(lines, "trains");
       expect(lines.join("\n")).toContain(`options: "${options}"`);
     });
 
     it("no partition options are dumped", async () => {
-      await adapter.schemaStatements().createTable("trains", (t) => {
+      await adapter.createTable("trains", (t) => {
         t.string("name");
       });
       const lines: string[] = [];
@@ -1128,7 +1128,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(lines.join("\n")).toContain(`comment: "a test table"`);
       await adapter.exec(`DROP TABLE IF EXISTS commented_table`);
 
-      const ss = adapter.schemaStatements();
+      const ss = adapter;
       await ss.createTable("commented_table", { comment: "a test table" }, (t) => {
         t.string("name");
       });

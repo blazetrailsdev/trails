@@ -422,6 +422,26 @@ export interface AbstractAdapter {
     fnOrOptions?: ((t: Table) => void | Promise<void>) | { bulk?: boolean },
     fn?: (t: Table) => void | Promise<void>,
   ): Promise<void>;
+  /** @internal */
+  renameTableIndexes(
+    tableName: string,
+    newName: string,
+    options?: Record<string, unknown>,
+  ): Promise<void>;
+  /** @internal */
+  renameColumnIndexes(tableName: string, columnName: string, newColumnName: string): Promise<void>;
+  /** @internal */
+  stripTableNamePrefixAndSuffix(tableName: string): string;
+  /** @internal */
+  validateIndexLengthBang(tableName: string, newName: string, internal?: boolean): void;
+  /** @internal */
+  validateTableLengthBang(tableName: string): void;
+  /** @internal */
+  validateChangeColumnNullArgumentBang(value: unknown): void;
+  /** @internal */
+  extractNewDefaultValue(defaultOrChanges: unknown): unknown;
+  /** @internal */
+  extractNewCommentValue(commentOrChanges: unknown): unknown;
   tableAliasFor(tableName: string): string;
   // Provided by the DatabaseLimits mixin (included below); tableAliasFor
   // resolves it through here rather than a duplicate on SchemaStatements.
@@ -1471,18 +1491,6 @@ export class AbstractAdapter implements Quoting {
       if (includesBase || nameMatches) return entry.preventWrites;
     }
     return false;
-  }
-
-  /**
-   * @noRailsEquivalent CONVERGEABLE. Rails gains these bodies with `include SchemaStatements` on
-   *   the adapter, so there is no accessor to mirror; `include(AbstractAdapter, SchemaStatements)`
-   *   below is trails' equivalent and dispatch is plain prototype lookup + `super`, exactly as in
-   *   Ruby. That leaves this an identity function whose remaining job is typing the mixed-in
-   *   bodies at the call site. Story `delete-the-schema-statements-accessor` retires it and points
-   *   every caller at the adapter member directly.
-   */
-  schemaStatements(): SchemaStatements {
-    return this as unknown as SchemaStatements;
   }
 
   get schemaCache(): SchemaCache {

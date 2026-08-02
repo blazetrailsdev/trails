@@ -342,7 +342,7 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
     expect(stub.allSql.at(-1)).toMatch(/CHECK \(price > 0\)/);
   });
 
-  it("schemaStatements() is the adapter itself, so Migration#schema reaches adapter overrides", async () => {
+  it("the DDL bodies are the adapter's own, so a subclass override wins", async () => {
     class OverridingAdapter extends SqliteCapturingAdapter {
       renameColumnCalls = 0;
       async renameColumn(tableName: string, oldName: string, newName: string) {
@@ -351,8 +351,7 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
       }
     }
     const stub = new OverridingAdapter();
-    expect(stub.schemaStatements()).toBe(stub);
-    await stub.schemaStatements().renameColumn("widgets", "title", "name");
+    await stub.renameColumn("widgets", "title", "name");
     expect(stub.renameColumnCalls).toBe(1);
   });
 

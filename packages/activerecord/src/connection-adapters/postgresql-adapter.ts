@@ -4069,7 +4069,7 @@ export class PostgreSQLAdapter
   }
 
   async renameTable(oldName: string, newName: string): Promise<void> {
-    this.schemaStatements().validateTableLengthBang(newName);
+    this.validateTableLengthBang(newName);
     const [oldSchema, unqualifiedOld] = this.extractSchemaQualifiedName(oldName);
     const [, unqualifiedNew] = this.extractSchemaQualifiedName(newName);
     this.schemaCache.clearDataSourceCacheBang(this.pool, oldName);
@@ -4113,7 +4113,7 @@ export class PostgreSQLAdapter
         }
       }
     }
-    await this.schemaStatements().renameTableIndexes(oldName, newName);
+    await this.renameTableIndexes(oldName, newName);
   }
 
   async tables(): Promise<string[]> {

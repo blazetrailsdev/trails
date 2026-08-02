@@ -136,7 +136,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       for (const type of ["SPATIAL", "FULLTEXT", "UNIQUE"]) {
         const sqls = await captureSql(
           () =>
-            adapter.schemaStatements().createTable("people", { id: false }, (t) => {
+            adapter.createTable("people", { id: false }, (t) => {
               t.index(["last_name"], { type });
             }),
           { stub: adapter },
@@ -150,7 +150,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
 
       const sqls = await captureSql(
         () =>
-          adapter.schemaStatements().createTable("people", { id: false }, (t) => {
+          adapter.createTable("people", { id: false }, (t) => {
             t.index(["last_name"], { length: { last_name: 10 }, using: "btree" });
           }),
         { stub: adapter },
@@ -163,7 +163,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       for (const type of ["SPATIAL", "FULLTEXT", "UNIQUE"]) {
         const sqls = await captureSql(
           () =>
-            adapter.schemaStatements().changeTable("people", { bulk: true }, (t) => {
+            adapter.changeTable("people", { bulk: true }, (t) => {
               return t.index("last_name", { type });
             }),
           { stub: adapter },
@@ -175,7 +175,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
 
       const sqls = await captureSql(
         () =>
-          adapter.schemaStatements().changeTable("people", { bulk: true }, (t) => {
+          adapter.changeTable("people", { bulk: true }, (t) => {
             return t.index("last_name", { length: 10, using: "btree", algorithm: "copy" });
           }),
         { stub: adapter },
@@ -225,16 +225,15 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("add column", async () => {
-      const sqls = await captureSql(
-        () => adapter.schemaStatements().addColumn("people", "last_name", "string"),
-        { stub: adapter },
-      );
+      const sqls = await captureSql(() => adapter.addColumn("people", "last_name", "string"), {
+        stub: adapter,
+      });
       expect(sqls[0]).toBe("ALTER TABLE `people` ADD `last_name` varchar(255)");
     });
 
     it("add column with limit", async () => {
       const sqls = await captureSql(
-        () => adapter.schemaStatements().addColumn("people", "key", "string", { limit: 32 }),
+        () => adapter.addColumn("people", "key", "string", { limit: 32 }),
         { stub: adapter },
       );
       expect(sqls[0]).toBe("ALTER TABLE `people` ADD `key` varchar(32)");
@@ -253,7 +252,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("add timestamps", async () => {
-      const ss = adapter.schemaStatements();
+      const ss = adapter;
       try {
         await ss.createTable("delete_me", { force: true });
         await ss.addTimestamps("delete_me", { null: true });
@@ -264,7 +263,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       }
     });
     it("remove timestamps", async () => {
-      const ss = adapter.schemaStatements();
+      const ss = adapter;
       try {
         await ss.createTable("delete_me", { force: true }, (t) => {
           return t.timestamps({ null: true });
@@ -283,15 +282,13 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       const sqls = await captureSql(
         () =>
           // eslint-disable-next-line blazetrails/require-table-teardown -- stub mode intercepts execute, so `temp` is never created (no teardown needed); mirrors Rails ActiveSchemaTest
-          adapter
-            .schemaStatements()
-            .createTable(
-              "temp",
-              { temporary: true, as: "SELECT id, name, zip FROM a_really_complicated_query" },
-              (t) => {
-                t.index(["zip"]);
-              },
-            ),
+          adapter.createTable(
+            "temp",
+            { temporary: true, as: "SELECT id, name, zip FROM a_really_complicated_query" },
+            (t) => {
+              t.index(["zip"]);
+            },
+          ),
         { stub: adapter },
       );
       expect(sqls[0]).toMatch(

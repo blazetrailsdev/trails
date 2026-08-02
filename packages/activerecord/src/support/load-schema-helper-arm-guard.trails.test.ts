@@ -55,10 +55,10 @@ describe("load_schema arm-probe guard", () => {
   });
 
   // `createTable` is not the only interception that lays nothing: `runTable`
-  // reaches the database through the SchemaStatements companion, so a cover
-  // that stubs the members *it* goes through is just as unsafe, and just as
-  // invisible outside the PG lane.
-  for (const method of ["dropTable", "addIndex", "execute", "schemaStatements"]) {
+  // reaches the database through the adapter's mixed-in SchemaStatements
+  // bodies, so a cover that stubs the members *they* go through is just as
+  // unsafe, and just as invisible outside the PG lane.
+  for (const method of ["dropTable", "addIndex", "execute", "schemaCreation"]) {
     it(`rejects an adapter whose ${method} a proxy intercepts`, async () => {
       await withAdapter(async (adapter) => {
         const probe = new Proxy(adapter, {

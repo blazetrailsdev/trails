@@ -57,10 +57,9 @@ Associations.hasMany.call(Distinct, "values", { through: "groups" });
 
 fixtures({}, { useTransactionalTests: false });
 
-// `adapter.schemaStatements()` is optional on the adapter interface; fall back
-// to constructing one directly, mirroring schema-types.ts.
+// Rails' `include SchemaStatements` puts these bodies on the adapter itself.
 function schema(): SchemaStatements {
-  return Base.connection.schemaStatements?.() ?? new SchemaStatements(Base.connection);
+  return Base.connection as unknown as SchemaStatements;
 }
 
 const RESERVED_TABLES = ["values", "group", "distinct_select", "distinct", "select", "order"];
