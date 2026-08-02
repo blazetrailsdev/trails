@@ -87,16 +87,44 @@ describe("build_joins from(subquery) dedup", () => {
     );
   });
 
+  // The live half of the `build_joins` split (`_applyJoinsToManager`) armed its
+  // raw-join routing on the mere presence of named inner joins / eager-load
+  // associations / left-outer values, so an ordinary `joins("comments")` pushed a
+  // leading raw join into `join_node` and it trailed the association joins —
+  // while the subquery half (`buildJoinBuckets`, armed on Rails'
+  // `stashed_eager_load || stashed_left_joins`) led with it. Both halves now
+  // route identically.
+  it("routes a leading raw join the same way on the live path and the from-subquery path", () => {
+    const q = (name: string) => escapeRegExp(quoteTableName(name));
+    const leading = new RegExp(
+      `FROM ${q("posts")} CROSS JOIN categories INNER JOIN ${q("comments")}`,
+    );
+    for (const build of [
+      () => Post.joins("CROSS JOIN categories").joins("comments"),
+      () => Post.joins("CROSS JOIN categories").joins("comments").merge(Comment.joins("post")),
+    ]) {
+      const liveSql = (build() as unknown as { toSql(): string }).toSql();
+      const subSql = (Post.from(build(), "posts") as unknown as { toSql(): string }).toSql();
+      expect(liveSql).toMatch(leading);
+      expect(subSql).toContain(liveSql.slice(liveSql.indexOf('FROM "posts"')));
+    }
+  });
+
   // Rails only shifts the LEADING run of Arel Join nodes out of `joins`
   // (query_methods.rb:1855-1862); a Join node sitting BEHIND a named join falls
   // through to the `select_named_joins` block, which buckets it as a join_node
   // unconditionally (query_methods.rb:1866-1867) — so it is appended after the
   // association joins even when the leading-loop guard is off.
   it("appends a raw join that trails a named join instead of leading with it", () => {
-    const rel = Post.joins("comments").joins("CROSS JOIN categories");
-    const sql = (Post.from(rel, "posts") as unknown as { toSql(): string }).toSql();
+    const build = () => Post.joins("comments").joins("CROSS JOIN categories");
     const q = (name: string) => escapeRegExp(quoteTableName(name));
-    expect(sql).toMatch(new RegExp(`FROM ${q("posts")} INNER JOIN ${q("comments")}`));
-    expect(sql).toMatch(new RegExp(`INNER JOIN ${q("comments")}[^)]*CROSS JOIN categories`));
+    // Both halves of the split see the raw-vs-named interleaving, so both append.
+    for (const sql of [
+      (Post.from(build(), "posts") as unknown as { toSql(): string }).toSql(),
+      (build() as unknown as { toSql(): string }).toSql(),
+    ]) {
+      expect(sql).toMatch(new RegExp(`FROM ${q("posts")} INNER JOIN ${q("comments")}`));
+      expect(sql).toMatch(new RegExp(`INNER JOIN ${q("comments")}[^)]*CROSS JOIN categories`));
+    }
   });
 });

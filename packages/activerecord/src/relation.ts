@@ -3285,26 +3285,8 @@ export class Relation<T extends Base> {
     // `AliasTracker` and dedup via the JD `walk` fold — no separate eager
     // tracker, no table-name skip filter. The shared emitter handles raw join
     // clauses, the shared AliasTracker, and the left_outer/joins/eager dedup fold.
-    //
-    // Mirror Rails build_join_buckets routing (query_methods.rb:1856-1863):
-    // when stashed joins exist, non-LeadingJoin nodes go to join_node (appended
-    // after), LeadingJoin goes to leading_join (prepended before). Without
-    // stashed joins all nodes go to leading_join (Rails' else branch).
-    const hasStashed =
-      this._eagerLoadAssociations.length > 0 ||
-      this._leftOuterJoinsValues.length > 0 ||
-      this._namedInnerJoins.length > 0;
     const leadingJoins: Nodes.Join[] = [];
     const joinNodes: Nodes.Join[] = [];
-    for (const v of this._joinValues) {
-      const node: Nodes.Join =
-        typeof v === "string" ? new Nodes.StringJoin(new Nodes.SqlLiteral(v.trim())) : v;
-      if (!(node instanceof Nodes.LeadingJoin) && hasStashed) {
-        joinNodes.push(node);
-      } else {
-        leadingJoins.push(node);
-      }
-    }
     // Left_outer_joins_values resolved via JoinDependency. Exclude associations
     // already covered by _eagerLoadAssociations OR by includes promoted to eager
     // load (includes().references()) — both cause _buildEagerJoinManager to emit
@@ -3331,9 +3313,8 @@ export class Relation<T extends Base> {
     // Rails pushes the CTE join_node in the left-outer section (query_methods.rb:1832)
     // BEFORE the `joins_values` loop appends its nodes to the same bucket
     // (query_methods.rb:1852-1863), so `buckets[:join_node]` is
-    // `[...cteNodes, ...joinsValuesNodes]`. Here the `_joinValues` loop already
-    // ran and populated `joinNodes`, so collect the CTE nodes separately and
-    // `unshift` them to the front to preserve that Rails order.
+    // `[...cteNodes, ...joinsValuesNodes]`. This method runs the two sections in
+    // that same order, so the CTE nodes are simply pushed first.
     const cteOuterJoinNodes: Nodes.Join[] = [];
     const leftStashed: JoinDependency[] = [];
     const leftAssociations = _qm.selectNamedJoins.call(
@@ -3350,7 +3331,7 @@ export class Relation<T extends Base> {
         }
       },
     );
-    if (cteOuterJoinNodes.length > 0) joinNodes.unshift(...cteOuterJoinNodes);
+    joinNodes.push(...cteOuterJoinNodes);
     // Mirror Rails build_join_buckets' `if joins_values.empty?` short-circuit
     // (query_methods.rb:1838-1842), matching buildJoinBuckets' named_join /
     // early-return branch (query-methods.ts:2782-2789). When left-outer values
@@ -3360,18 +3341,75 @@ export class Relation<T extends Base> {
     // left-outer JD and folding it into the stash. This keeps the shape identical
     // to the subquery `from(relation)` path.
     //
-    // The four emptiness checks below mirror buildJoinBuckets exactly.
-    const pureLeftOuter =
-      this._eagerLoadAssociations.length === 0 &&
-      this._namedInnerJoins.length === 0 &&
-      this._joinValues.length === 0 &&
-      this._joinClauses.length === 0;
-    // Fire whenever left_outer_joins_values is non-empty (Rails' `unless
+    // The emptiness checks below mirror buildJoinBuckets exactly: Rails' guard is
+    // `joins_values.empty?`, and `_namedInnerJoins` + `_joinValues` partition
+    // `joins_values` (an eager JoinDependency pushed by `_withEagerJoinDependency`
+    // is a named join value, so it is already covered — `_eagerLoadAssociations`
+    // must NOT be a term here, exactly as it must not arm `hasStashed` below).
+    // `_joinClauses` is trails-only compensation for raw join clauses living
+    // outside `joins_values`.
+    //
+    // Fires whenever left_outer_joins_values is non-empty (Rails' `unless
     // left_outer_joins_values.empty?`, query_methods.rb:1828), even when the
     // resolved `leftAssociations` is empty — e.g. left_outer_joins_values held only
     // a CTE symbol, already routed into `joinNodes` above. Rails returns early there
     // too (`buckets[:named_join] = left_joins` with an empty `left_joins`); the
     // empty-named early return emits the same SQL as the stash-fold path.
+    const pureLeftOuter =
+      this._namedInnerJoins.length === 0 &&
+      this._joinValues.length === 0 &&
+      this._joinClauses.length === 0;
+    const leftOuterIsNamed = pureLeftOuter && this._leftOuterJoinsValues.length > 0;
+    if (this._leftOuterJoinsValues.length > 0 && !leftOuterIsNamed) {
+      // query_methods.rb:1843: `stashed_left_joins.unshift` — unconditional, so
+      // `stashed_left_joins` is non-empty (Rails: truthy) on this branch even
+      // when the resolved association list is empty. That truthiness is what
+      // arms the raw-join routing below.
+      leftStashed.unshift(
+        QueryMethodBangs.constructJoinDependency.call(
+          this as any,
+          leftAssociations as any,
+          Nodes.OuterJoin,
+        ),
+      );
+    }
+
+    // Mirror Rails build_join_buckets routing (query_methods.rb:1847-1863). The
+    // eager stash is the trailing `joins_values` JoinDependency whose base_klass
+    // is this model (query_methods.rb:1848-1850) — a cross-klass merged JD fails
+    // that test and stays in the stream for `select_named_joins`, so it does NOT
+    // arm the guard. When a stash exists, non-LeadingJoin nodes go to join_node
+    // (appended after the association joins); otherwise every node goes to
+    // leading_join (Rails' else branch) and leads them. The mere presence of
+    // named inner joins, eager-load associations or left-outer values does not
+    // arm it: named inner joins are still in `joins` at this point and only
+    // become a JoinDependency later (query_methods.rb:1865).
+    const lastJoinsValue = this._joinsValues[this._joinsValues.length - 1];
+    const stashedEagerLoad =
+      lastJoinsValue instanceof JoinDependency && lastJoinsValue.baseKlass === this._modelClass;
+    const hasStashed = stashedEagerLoad || leftStashed.length > 0;
+    // Only the LEADING run of raw join values is routed by `hasStashed`
+    // (query_methods.rb:1855-1862, `while joins.first.is_a?(Arel::Nodes::Join)`);
+    // a raw join sitting BEHIND a named join falls through to
+    // `select_named_joins`, which buckets it as a join_node unconditionally
+    // (query_methods.rb:1866-1867). `_joinsValues` is the unified store, so it
+    // preserves the raw-vs-named interleaving `_joinValues` alone cannot see.
+    const toJoinNode = (v: string | Nodes.Join): Nodes.Join =>
+      typeof v === "string" ? new Nodes.StringJoin(new Nodes.SqlLiteral(v.trim())) : v;
+    let leading = true;
+    for (const v of this._joinsValues) {
+      if (this._isNamedJoinValue(v)) {
+        leading = false;
+        continue;
+      }
+      const node = toJoinNode(v as string | Nodes.Join);
+      if (leading && (node instanceof Nodes.LeadingJoin || !hasStashed)) {
+        leadingJoins.push(node);
+      } else {
+        joinNodes.push(node);
+      }
+    }
+
     // Rails: `alias_tracker = alias_tracker(leading_joins + join_nodes, aliases)`
     // (query_methods.rb:1894) — the converged `Relation#aliasTracker`, built
     // once here (this method is the live-path half of the `build_joins` split)
@@ -3389,32 +3427,11 @@ export class Relation<T extends Base> {
       }
       return memoTracker;
     };
-    if (pureLeftOuter && this._leftOuterJoinsValues.length > 0) {
-      _qm.emitJoinPlan.call(this as any, manager, {
-        leadingJoins,
-        joinNodes,
-        stashedJoins: [...leftStashed],
-        namedJoins: leftAssociations as any,
-        aliases,
-        tracker,
-      });
-      return;
-    }
-    const leftOuterJd =
-      leftAssociations.length > 0
-        ? QueryMethodBangs.constructJoinDependency.call(
-            this as any,
-            leftAssociations as any,
-            Nodes.OuterJoin,
-          )
-        : null;
-    if (leftOuterJd) leftStashed.unshift(leftOuterJd);
-    const stashedJoins: JoinDependency[] = [...leftStashed];
     _qm.emitJoinPlan.call(this as any, manager, {
       leadingJoins,
       joinNodes,
-      stashedJoins,
-      namedJoins: [],
+      stashedJoins: [...leftStashed],
+      namedJoins: leftOuterIsNamed ? (leftAssociations as any) : [],
       aliases,
       tracker,
     });
