@@ -4818,28 +4818,33 @@ export interface PostgreSQLAdapter {
   dropEnum(name: string, options?: { ifExists?: boolean }): Promise<void>;
 
   /**
-   * @noRailsEquivalent CONVERGEABLE (story: delete-invented-pg-range-ddl-helpers).
-   * Rails has no range-type DDL helper anywhere — ranges are created with a raw
-   *   `execute("CREATE
-   *   TYPE … AS RANGE")`. trails adds `createRange`/`dropRange` following Rails' own type-DDL helpers
-   *   (create_enum/drop_enum/rename_enum, postgresql_adapter.rb:541-615), including their
-   *   `reload_type_map` epilogue; the implementation and the full justification live at the emitting
-   *   call site, connection-adapters/postgresql/schema-statements-class.ts. Deliberately
-   *   PostgreSQL-only: the no-op stubs that shadowed these on AbstractAdapter were deleted rather
-   *   than allowlisted, since Rails stubs only the enum quartet on the base.
+   * @noRailsEquivalent PERMANENT. Rails supports PostgreSQL range *column* types first-class but
+   *   ships no range-type DDL helper, because Ruby has `Range` as a core type: a Rails app that
+   *   wants a custom range creates it with a raw `execute("CREATE TYPE … AS RANGE")` and leans on
+   *   the language for the value side. JavaScript has no Range analogue, so trails cannot lean on
+   *   the language the same way — making range support first-class here requires the DDL step to
+   *   be explicit adapter surface rather than an incidental raw `execute`. That is a deliberate
+   *   trails feature, not unfinished porting, so it is permanent rather than convergeable.
+   *   `createRange`/`dropRange` are modelled on the shape of Rails' own type-DDL quartet
+   *   (`create_enum` postgresql_adapter.rb:541, `drop_enum` :571, `rename_enum`,
+   *   `rename_enum_value`, stubbed on the base at abstract_adapter.rb:576-580), including their
+   *   `reload_type_map` epilogue; the implementation lives at the emitting call site,
+   *   connection-adapters/postgresql/schema-statements-class.ts. Deliberately PostgreSQL-only: the
+   *   no-op stubs that shadowed these on AbstractAdapter were deleted rather than allowlisted,
+   *   since Rails stubs only the enum quartet on the base.
    */
   createRange(name: string, options: { subtype: string; subtypeDiff?: string }): Promise<void>;
 
   /**
-   * @noRailsEquivalent CONVERGEABLE (story: delete-invented-pg-range-ddl-helpers).
-   * Rails has no range-type DDL helper anywhere — ranges are created with a raw
-   *   `execute("CREATE
-   *   TYPE … AS RANGE")`. trails adds `createRange`/`dropRange` following Rails' own type-DDL helpers
-   *   (create_enum/drop_enum/rename_enum, postgresql_adapter.rb:541-615), including their
-   *   `reload_type_map` epilogue; the implementation and the full justification live at the emitting
-   *   call site, connection-adapters/postgresql/schema-statements-class.ts. Deliberately
-   *   PostgreSQL-only: the no-op stubs that shadowed these on AbstractAdapter were deleted rather
-   *   than allowlisted, since Rails stubs only the enum quartet on the base.
+   * @noRailsEquivalent PERMANENT. The teardown half of `createRange` — see that method for the full
+   *   reasoning: trails makes PostgreSQL range types first-class, and unlike Ruby (whose core
+   *   `Range` lets a Rails app get away with a raw `execute("CREATE TYPE … AS RANGE")`) JavaScript
+   *   has no Range analogue to lean on, so the DDL step is deliberate trails surface. Modelled on
+   *   Rails' type-DDL quartet (`create_enum` postgresql_adapter.rb:541, `drop_enum` :571,
+   *   `rename_enum`, `rename_enum_value`, stubbed on the base at abstract_adapter.rb:576-580),
+   *   including their `reload_type_map` epilogue. Deliberately PostgreSQL-only: the no-op stubs
+   *   that shadowed these on AbstractAdapter were deleted rather than allowlisted, since Rails
+   *   stubs only the enum quartet on the base.
    */
   dropRange(name: string, options?: { ifExists?: boolean }): Promise<void>;
 

@@ -1668,10 +1668,16 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
       parts.push(`SUBTYPE_DIFF = ${quoteQualifiedIdentifier(options.subtypeDiff, "subtypeDiff")}`);
     }
     await this.pg.exec(`CREATE TYPE ${qualifiedName} AS RANGE (${parts.join(", ")})`);
-    // createRange/dropRange are trails additions (Rails has no range-type DDL
-    // helper), but they follow the pattern of Rails' own type-DDL helpers
-    // (create_enum/drop_enum/rename_enum, postgresql_adapter.rb:541-615), which
-    // all `reload_type_map` after mutating the type universe. reloadTypeMap
+    // createRange/dropRange are deliberate, permanent trails surface, not
+    // unfinished porting: Rails supports PG range *column* types first-class but
+    // ships no range-type DDL helper because Ruby has a core `Range` to lean on,
+    // so a raw `execute("CREATE TYPE … AS RANGE")` suffices there. JavaScript has
+    // no Range analogue, so first-class range support in trails needs the DDL
+    // step to be explicit adapter surface. The shape is modelled on Rails' own
+    // type-DDL quartet (create_enum postgresql_adapter.rb:541, drop_enum :571,
+    // rename_enum, rename_enum_value; stubbed on the base at
+    // abstract_adapter.rb:576-580), which all `reload_type_map` after mutating
+    // the type universe. reloadTypeMap
     // also drops the prepared-statement name map, so a cached write-path plan
     // built against a prior incarnation of the type (drop + recreate reassigns
     // the OID) is re-prepared instead of raising
