@@ -655,30 +655,33 @@ export class SchemaStatements {
       // A value containing quotes/operators is escaped to a literal that matches
       // nothing and returns false instead of producing broken SQL.
       const quoted = this.adapter.quote(tableName);
-      let rows: Record<string, unknown>[];
+      let values: unknown[];
       switch (this.adapterName) {
         case "sqlite":
-          rows = await this.adapter.schemaQuery(
+          values = await this.adapter.queryValues(
             `SELECT name FROM sqlite_master WHERE type='table' AND name=${quoted}`,
+            "SCHEMA",
           );
           break;
         case "postgres":
           // Rails' PG data_source_sql scopes to ANY (current_schemas(false))
           // (the active search_path), not a hardcoded 'public'.
-          rows = await this.adapter.schemaQuery(
+          values = await this.adapter.queryValues(
             `SELECT 1 FROM information_schema.tables WHERE table_schema = ANY (current_schemas(false)) AND table_name = ${quoted} LIMIT 1`,
+            "SCHEMA",
           );
           break;
         case "mysql":
-          rows = await this.adapter.schemaQuery(
+          values = await this.adapter.queryValues(
             `SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ${quoted} LIMIT 1`,
+            "SCHEMA",
           );
           break;
         default:
           // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/schema_statements.rb:1890
           throw new NotImplementedError("#data_source_sql is not implemented");
       }
-      return rows.length > 0;
+      return values.length > 0;
     } catch (error) {
       if (!(error instanceof NotImplementedError)) throw error;
       return (await this.tables()).includes(String(tableName));
@@ -1379,28 +1382,31 @@ export class SchemaStatements {
   }
 
   async tables(): Promise<string[]> {
-    let rows: Record<string, unknown>[];
+    let values: unknown[];
     switch (this.adapterName) {
       case "sqlite":
-        rows = await this.adapter.schemaQuery(
+        values = await this.adapter.queryValues(
           `SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name`,
+          "SCHEMA",
         );
-        return (rows as any[]).map((r: any) => r.name);
+        return values.map(String);
       case "postgres":
         // Mirror Rails #tables (data_source_sql type: "BASE TABLE" →
         // relkind IN ('r','p')). pg_tables omits partitioned tables
         // (relkind 'p') and hardcodes 'public'; pg_class scoped via
         // current_schemas(false) honors the search_path like Rails. No
         // ORDER BY — Rails' data_source_sql emits none.
-        rows = await this.adapter.schemaQuery(
+        values = await this.adapter.queryValues(
           `SELECT c.relname AS name FROM pg_class c LEFT JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = ANY (current_schemas(false)) AND c.relkind IN ('r', 'p')`,
+          "SCHEMA",
         );
-        return (rows as any[]).map((r: any) => r.name);
+        return values.map(String);
       case "mysql":
-        rows = await this.adapter.schemaQuery(
+        values = await this.adapter.queryValues(
           `SELECT table_name AS name FROM information_schema.tables WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE' ORDER BY table_name`,
+          "SCHEMA",
         );
-        return (rows as any[]).map((r: any) => r.name ?? r.TABLE_NAME);
+        return values.map(String);
       default:
         // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/schema_statements.rb:1890
         throw new NotImplementedError("#tables is not implemented");
@@ -1408,23 +1414,26 @@ export class SchemaStatements {
   }
 
   async views(): Promise<string[]> {
-    let rows: Record<string, unknown>[];
+    let values: unknown[];
     switch (this.adapterName) {
       case "sqlite":
-        rows = await this.adapter.schemaQuery(
+        values = await this.adapter.queryValues(
           `SELECT name FROM sqlite_master WHERE type='view' ORDER BY name`,
+          "SCHEMA",
         );
-        return (rows as any[]).map((r: any) => r.name);
+        return values.map(String);
       case "postgres":
-        rows = await this.adapter.schemaQuery(
+        values = await this.adapter.queryValues(
           `SELECT viewname AS name FROM pg_views WHERE schemaname = 'public' ORDER BY viewname`,
+          "SCHEMA",
         );
-        return (rows as any[]).map((r: any) => r.name);
+        return values.map(String);
       case "mysql":
-        rows = await this.adapter.schemaQuery(
+        values = await this.adapter.queryValues(
           `SELECT table_name AS name FROM information_schema.views WHERE table_schema = DATABASE() ORDER BY table_name`,
+          "SCHEMA",
         );
-        return (rows as any[]).map((r: any) => r.name ?? r.TABLE_NAME);
+        return values.map(String);
     }
   }
 
@@ -1436,13 +1445,11 @@ export class SchemaStatements {
     //     views.include?(view_name.to_s)
     //
     // present? covers blank strings including whitespace-only.
-    // schemaQuery is trails' internal_exec_query(sql, "SCHEMA") — the "SCHEMA"
-    // name is what keeps the probe out of assertQueries counts.
+    // The "SCHEMA" name is what keeps the probe out of assertQueries counts.
     if (!isPresent(viewName)) return false;
     try {
       const sql = this.adapter.dataSourceSql(viewName, { type: "VIEW" });
-      const rows = await this.adapter.schemaQuery(sql);
-      return rows.length > 0;
+      return (await this.adapter.queryValues(sql, "SCHEMA")).length > 0;
     } catch (e) {
       if (e instanceof NotImplementedError) {
         return (await this.views()).includes(String(viewName));
@@ -1548,8 +1555,8 @@ export class SchemaStatements {
   async dataSources(): Promise<string[]> {
     try {
       const sql = this.adapter.dataSourceSql();
-      const rows = await this.adapter.schemaQuery(sql);
-      return rows.map((row) => String(Object.values(row)[0]));
+      const values = await this.adapter.queryValues(sql, "SCHEMA");
+      return values.map(String);
     } catch (error) {
       if (!(error instanceof NotImplementedError)) throw error;
       const t = await this.tables();
@@ -1562,8 +1569,7 @@ export class SchemaStatements {
     if (!isPresent(name)) return false;
     try {
       const sql = this.adapter.dataSourceSql(name);
-      const rows = await this.adapter.schemaQuery(sql);
-      return rows.length > 0;
+      return (await this.adapter.queryValues(sql, "SCHEMA")).length > 0;
     } catch (error) {
       if (!(error instanceof NotImplementedError)) throw error;
       return (await this.dataSources()).includes(String(name));

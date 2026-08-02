@@ -486,7 +486,11 @@ export async function query(
   name?: string | null,
   binds?: unknown[],
 ): Promise<unknown[][]> {
-  const result = await internalExecQuery.call(this, sql, name ?? "SQL", binds);
+  // Dispatch through the instance so an adapter's own internalExecQuery
+  // (SQLite's bind-aware / statement-pooling override) wins, as Ruby's
+  // virtual call does — the module-level fallback drops the override.
+  const run = (this.internalExecQuery ?? internalExecQuery).bind(this);
+  const result = await run(sql, name ?? "SQL", binds);
   return result.rows;
 }
 

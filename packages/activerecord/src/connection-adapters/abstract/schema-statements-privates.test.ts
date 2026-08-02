@@ -41,6 +41,16 @@ function makeStatements(
       binds,
       "SCHEMA",
     );
+  // Likewise for AbstractAdapter#queryValues (Rails' `query_values(sql,
+  // "SCHEMA")`), which the catalog probes read through: project the stub's
+  // object rows onto their first column the way Rails' `query(...).map(&:first)`
+  // does over array rows.
+  adapter["queryValues"] ??= async (sql: string, _name?: string | null, binds: unknown[] = []) => {
+    const rows = (await (
+      adapter["execute"] as (s: string, b?: unknown[], n?: string) => Promise<unknown>
+    )(sql, binds, "SCHEMA")) as Record<string, unknown>[];
+    return rows.map((row) => Object.values(row)[0]);
+  };
   return new Statements(adapter as never);
 }
 

@@ -11,6 +11,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import { AbstractSQLite3Adapter } from "../sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "../better-sqlite3-adapter.js";
 import { AbstractAdapter } from "../abstract-adapter.js";
+import { Result } from "../../result.js";
 import { ForeignKeyDefinition } from "./schema-definitions.js";
 import { fixtures } from "../../test-fixtures.js";
 import { NotImplementedError } from "../../errors.js";
@@ -67,6 +68,13 @@ class CapturingAdapter extends AbstractAdapter {
   }
   executeMutation(_sql: string) {
     return Promise.resolve(0);
+  }
+  // The catalog probes read through queryValues → query → internalExecQuery
+  // (Rails' query_values path), which never reaches `execute`.
+  override internalExecQuery(sql: string, _name?: string | null, binds?: unknown[]) {
+    this.lastSql = sql;
+    this.lastParams = binds ?? [];
+    return Promise.resolve(new Result([], []));
   }
 }
 
