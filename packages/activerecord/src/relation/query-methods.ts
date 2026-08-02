@@ -2955,11 +2955,10 @@ export function buildJoinBuckets(
  * stashed JoinDependencies to fold into the primary named/left JD. Both the
  * live SQL path (`_applyJoinsToManager`) and the `from(relation)` subquery path
  * (`buildJoins`) compute a plan and hand it to the shared emitter, so there is
- * one Rails `build_joins` port. The two callers differ only in how they fill
- * the plan (eager handling: the live path pre-emits eager JOINs via
- * `_buildEagerJoinManager` and excludes them here, while `buildJoins` folds
- * eager into `stashedJoins` via `buildJoinBuckets`) and in `aliases` (only the
- * subquery path threads a tracker in from `build_from`).
+ * one Rails `build_joins` port. Both fill the plan the same way for eager
+ * loading — the eager JoinDependency rides in `joins_values` (Rails
+ * `apply_join_dependency`) and is stashed from there — and differ only in
+ * `aliases` (only the subquery path threads a tracker in from `build_from`).
  *
  * @internal
  */

@@ -124,4 +124,48 @@ describe("build_joins from(subquery) dedup", () => {
       expect(sql).toMatch(new RegExp(`INNER JOIN ${q("comments")}[^)]*CROSS JOIN categories`));
     }
   });
+
+  // The live path folds the eager JoinDependency into `joins_values`
+  // (`apply_join_dependency`, finder_methods.rb:457-461) exactly as the subquery
+  // path does, so an association named in BOTH `joins` and `eager_load` dedups
+  // through the single `join_constraints` `walk` fold (join_dependency.rb:
+  // `walk(join_root, oj.join_root, …)` when `join_root.match?`) — there is no
+  // live-path exclusion filter deciding which value to drop before emission.
+  it("dedups an association named in both joins and eager_load", () => {
+    const liveSql = (
+      Post.joins("author").eagerLoad("author") as unknown as { toSql(): string }
+    ).toSql();
+    expect((liveSql.match(/INNER JOIN/g) ?? []).length).toBe(1);
+    expect(liveSql).not.toContain("LEFT OUTER JOIN");
+  });
+
+  // Rails walks each stashed JoinDependency against the SAME `join_root`
+  // (join_dependency.rb#join_constraints), so a second stash for an association
+  // the first stash already joined is `missing` again and emits a second,
+  // alias_tracker-aliased join — it is NOT deduped. With no named joins, both the
+  // left-outer JD and the eager stash walk an empty join_root, so
+  // `eager_load(:x).left_outer_joins(:x)` legitimately emits two joins.
+  it("emits the eager and left_outer joins separately when there is no named join to walk against", () => {
+    const liveSql = (
+      Post.eagerLoad("author").leftOuterJoins("author") as unknown as { toSql(): string }
+    ).toSql();
+    const q = (name: string) => escapeRegExp(quoteTableName(name));
+    expect((liveSql.match(/LEFT OUTER JOIN/g) ?? []).length).toBe(2);
+    expect(liveSql).toMatch(new RegExp(`LEFT OUTER JOIN ${q("authors")} ${q("authors_posts")}`));
+  });
+
+  // Live and `from(relation)` subquery paths must emit the same join sequence for
+  // an eager + left-outer + raw-join combination: one shared `build_joins` call
+  // with one AliasTracker on both halves.
+  it("emits the same joins for eager_load + left_outer_joins + a raw join on both paths", () => {
+    const build = () =>
+      Post.joins("CROSS JOIN categories").eagerLoad("author").leftOuterJoins("comments");
+    const liveSql = (build() as unknown as { toSql(): string }).toSql();
+    const subSql = (Post.from(build(), "posts") as unknown as { toSql(): string }).toSql();
+    // The eager live path projects `t0_r*` aliases, so compare from the FROM on:
+    // the whole join sequence of the live query is the subquery's inner query.
+    const liveFrom = liveSql.slice(liveSql.indexOf('FROM "posts"'));
+    expect(liveFrom).toContain("CROSS JOIN categories");
+    expect(subSql).toContain(liveFrom);
+  });
 });

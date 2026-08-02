@@ -2601,8 +2601,8 @@ export class Relation<T extends Base> {
    * (e.g. `Post.includes(:comments, :author).joins(:comments)` join-loads both,
    * with `author` as a deduped OUTER join). So once any include is also in
    * `joins(...)`, promote every include — mirroring `_includesToPromoteFromReferences`.
-   * `_buildEagerJoinManager` then skips re-emitting the eager OUTER JOIN for the
-   * intersecting tables (the named INNER JOIN already covers them).
+   * The eager JoinDependency then rides in `joins_values`, so the JD `walk` fold
+   * dedups the intersecting tables against the named INNER JOIN.
    */
   private _includesToPromoteFromJoins(): AssociationSpec[] {
     if (this._joinedIncludesValues().length === 0) return [];
@@ -3287,19 +3287,15 @@ export class Relation<T extends Base> {
     // clauses, the shared AliasTracker, and the left_outer/joins/eager dedup fold.
     const leadingJoins: Nodes.Join[] = [];
     const joinNodes: Nodes.Join[] = [];
-    // Left_outer_joins_values resolved via JoinDependency. Exclude associations
-    // already covered by _eagerLoadAssociations OR by includes promoted to eager
-    // load (includes().references()) — both cause _buildEagerJoinManager to emit
-    // LEFT OUTER JOINs, so re-emitting here would duplicate JOINs / raise
-    // ambiguous-column errors. (The subquery path folds eager as a stashed JD
-    // instead, so it has no equivalent filter.) When named INNER joins are also
-    // present the left-outer JD folds into the inner JD's join_constraints (Rails
-    // build_join_buckets: stashed_left_joins.unshift), deduping a both-ways
-    // association to a single INNER JOIN via `walk`.
+    // Left_outer_joins_values resolved via JoinDependency. When named INNER joins
+    // are also present the left-outer JD folds into the inner JD's
+    // join_constraints (Rails build_join_buckets: stashed_left_joins.unshift),
+    // deduping a both-ways association to a single INNER JOIN via `walk`. The
+    // eager JoinDependency rides in `joins_values` and is folded into the SAME
+    // `join_constraints` call, so an association named in BOTH `left_outer_joins`
+    // and `eager_load`/promoted `includes` dedups through that fold too — no
+    // exclusion filter, exactly as in Rails and in the subquery half.
     _qm.assertValidLeftOuterJoinsBang(this._leftOuterJoinsValues);
-    const promotedIncludes = this._includesToPromoteFromReferences();
-    const eagerCovered = new Set([...this._eagerLoadAssociations, ...promotedIncludes]);
-    const pendingLeftOuter = this._leftOuterJoinsValues.filter((v) => !eagerCovered.has(v));
     // Partition CTE-name symbols out of the left-outer values into LEFT OUTER
     // JOIN nodes, mirroring buildJoinBuckets' `select_named_joins` block
     // (query_methods.rb:1830-1836). Only true associations remain for the JD;
@@ -3319,7 +3315,7 @@ export class Relation<T extends Base> {
     const leftStashed: JoinDependency[] = [];
     const leftAssociations = _qm.selectNamedJoins.call(
       this as any,
-      pendingLeftOuter,
+      this._leftOuterJoinsValues,
       leftStashed,
       (left: unknown) => {
         if (left instanceof _qm.CTEJoin) {

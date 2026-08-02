@@ -317,10 +317,10 @@ describe("RelationTest", () => {
   });
 
   it("includes().references() + leftJoins(): no duplicate LEFT OUTER JOIN in SQL", () => {
-    // Regression: includes promoted to eager load via references() causes
-    // _buildEagerJoinManager to emit the LEFT OUTER JOIN. The pendingLeftOuter
-    // filter must exclude promoted includes so leftJoins(:assoc) doesn't emit
-    // a second JOIN for the same association.
+    // Regression: includes promoted to eager load via references() puts the eager
+    // JoinDependency in `joins_values`, and `leftJoins(:assoc)` constructs a
+    // left-outer JD for the same association. Both fold into one
+    // `join_constraints` call, so the JD `walk` dedups them to a single JOIN.
     class Author extends Base {
       static {
         this.tableName = "authors";
