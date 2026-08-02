@@ -264,6 +264,8 @@ export function raiseNotFoundSingle(
 
 interface FinderRelation {
   model: FinderRelation["_modelClass"];
+  /** Rails `delegate :primary_key, to: :model` (delegation.rb:106). */
+  primaryKey: string | string[];
   _modelClass: {
     name: string;
     primaryKey: string | string[];
@@ -314,7 +316,7 @@ function buildPkWhere(pk: string[], tuple: unknown[]): Record<string, unknown> {
 
 /** @internal */
 export async function performFind(this: FinderRelation, ...args: unknown[]): Promise<any> {
-  const pk = this._modelClass.primaryKey;
+  const pk = this.primaryKey;
   const modelName = this._modelClass.name;
   const normalized = normalizeFindArgs(modelName, pk, args);
   if (normalized.emptyArray) return [];
@@ -841,11 +843,11 @@ export function constructRelationForExists(rel: FinderRelation, conditions: unkn
     if (Object.keys(conditions).length > 0) relation = relation.where(conditions);
   } else {
     // Scalar → PK lookup (Rails' else branch: `where!(primary_key => conditions)`).
-    const pk = (rel as any)._modelClass.primaryKey;
+    const pk = rel.primaryKey;
     if (Array.isArray(pk)) {
       relation = relation.where(buildPkWhere(pk, conditions as unknown[]));
     } else {
-      relation = relation.where({ [pk as string]: conditions });
+      relation = relation.where({ [pk]: conditions });
     }
   }
   return relation;
@@ -853,7 +855,7 @@ export function constructRelationForExists(rel: FinderRelation, conditions: unkn
 
 /** @internal */
 export async function findWithIds(rel: FinderRelation, ids: unknown[]): Promise<any> {
-  const normalized = normalizeFindArgs(rel.model.name, rel.model.primaryKey, ids);
+  const normalized = normalizeFindArgs(rel.model.name, rel.primaryKey, ids);
   if (normalized.emptyArray) return [];
   if (normalized.wantArray) {
     return findSome(rel, normalized.ids);
@@ -863,7 +865,7 @@ export async function findWithIds(rel: FinderRelation, ids: unknown[]): Promise<
 
 /** @internal */
 export async function findOne(rel: FinderRelation, id: unknown): Promise<any> {
-  const pk = rel.model.primaryKey;
+  const pk = rel.primaryKey;
   const conditions = Array.isArray(pk) ? buildPkWhere(pk, id as unknown[]) : { [pk]: id };
   const record = await (rel as any).findBy(conditions);
   if (!record) {
@@ -877,7 +879,7 @@ export async function findOne(rel: FinderRelation, id: unknown): Promise<any> {
 export async function findSome(rel: FinderRelation, ids: unknown[]): Promise<any[]> {
   if (!hasOrder(rel)) return findSomeOrdered(rel, ids);
 
-  const pk = (rel as any)._modelClass.primaryKey as string;
+  const pk = rel.primaryKey as string;
   let relation = (rel as any).where({ [pk]: ids });
   // Rails: `relation = relation.select(table[primary_key]) unless select_values.empty?`
   if ((rel as any).selectValues.length > 0) {
