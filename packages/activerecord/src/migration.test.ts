@@ -187,7 +187,6 @@ function makeLockAdapter(opts: { acquires?: boolean; releases?: boolean } = {}):
     getAdvisoryLock: async (_id: number | bigint | string) => acquires,
     releaseAdvisoryLock: async (_id: number | bigint | string) => releases,
     currentDatabase: async () => "test_db",
-    isNoDatabaseError: () => false,
   } as unknown as DatabaseAdapter;
 }
 

@@ -2749,23 +2749,6 @@ export class PostgreSQLAdapter
     return pgReturningColumnValues(result);
   }
 
-  /**
-   * Returns true for raw pg errors that indicate the database doesn't exist (SQLSTATE 3D000).
-   *
-   * @noRailsEquivalent CONVERGEABLE (story: converge-no-database-error-to-connect-site).
-   * Rails recognizes the no-such-database condition inline at the connect site
-   *   and raises
-   *   `ActiveRecord::NoDatabaseError` there (postgresql_adapter.rb:63, sqlite3_adapter.rb:38,120) —
-   *   there is no named predicate to mirror. trails needs the predicate separated from raising
-   *   because `DatabaseTasks._isMissingDatabaseError` (tasks/database-tasks.ts) classifies an
-   *   already-raised raw driver error, after the adapter failed to construct. Identical shape on all
-   *   three: the base returns false, each concrete adapter overrides with its driver check.
-   */
-  isNoDatabaseError(error: unknown): boolean {
-    if (!error || typeof error !== "object") return false;
-    return (error as { code?: unknown }).code === "3D000";
-  }
-
   // Mirrors: PostgreSQLAdapter.new_client (postgresql_adapter.rb:57)
   // Connects a single pg.Client and translates connection errors into
   // the same ActiveRecord error hierarchy as Rails (ConnectionNotEstablished,

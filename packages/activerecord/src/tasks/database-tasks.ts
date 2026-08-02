@@ -1618,21 +1618,22 @@ export async function checkCurrentProtectedEnvironmentBang(
 
 /** @internal */
 export async function initializeDatabase(dbConfig: DatabaseConfig): Promise<boolean> {
-  return DatabaseTasks.withTemporaryConnection(dbConfig, async (adapter) => {
-    const { NoDatabaseError } = await import("../errors.js");
-    const { SchemaMigration } = await import("../schema-migration.js");
+  const { NoDatabaseError } = await import("../errors.js");
+  const { SchemaMigration } = await import("../schema-migration.js");
+  return DatabaseTasks.withTemporaryPool(dbConfig, async (pool) => {
     let alreadyInitialized = false;
-    try {
-      // Probe DB connectivity first — throws NoDatabaseError if the DB doesn't exist.
-      // tableExists() swallows all errors internally so can't detect a missing DB.
-      await adapter.execute("SELECT 1");
-      const sm = new SchemaMigration(adapter);
-      alreadyInitialized = await sm.tableExists();
-    } catch (error) {
-      if (error instanceof NoDatabaseError || _isMissingDatabaseError(error, adapter)) {
+    for (;;) {
+      try {
+        const adapter = await pool.leaseConnection();
+        // Probe DB connectivity first — throws NoDatabaseError if the DB doesn't exist.
+        // tableExists() swallows all errors internally so can't detect a missing DB.
+        await adapter.execute("SELECT 1");
+        const sm = new SchemaMigration(adapter);
+        alreadyInitialized = await sm.tableExists();
+        break;
+      } catch (error) {
+        if (!(error instanceof NoDatabaseError)) throw error;
         await DatabaseTasks.create(dbConfig);
-      } else {
-        throw error;
       }
     }
     if (!alreadyInitialized) {
@@ -1648,17 +1649,4 @@ export async function initializeDatabase(dbConfig: DatabaseConfig): Promise<bool
     }
     return !alreadyInitialized;
   });
-}
-
-// Defensive fallback for SQL-level errors that slip through pool proxies or
-// adapters that don't yet translate at connection time.
-function _isMissingDatabaseError(
-  error: unknown,
-  adapter?: import("../connection-adapters/abstract-adapter.js").AbstractAdapter,
-): boolean {
-  // Delegate to the adapter's per-driver check when available.
-  if (typeof adapter?.isNoDatabaseError === "function") return adapter.isNoDatabaseError(error);
-  // Legacy fallback: PostgreSQL SQLSTATE 3D000.
-  if (!error || typeof error !== "object") return false;
-  return (error as { code?: unknown }).code === "3D000";
 }
