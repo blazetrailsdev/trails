@@ -6,7 +6,7 @@ import { Association } from "./association.js";
 import { foreignKeyPresentFor, ownerForeignKeyColumns } from "./foreign-association.js";
 import { throughForeignKeyPresent } from "./through-association.js";
 import type { AssociationReflection } from "../reflection.js";
-import { RecordNotSaved, Rollback } from "../errors.js";
+import { RecordNotFound, RecordNotSaved, Rollback } from "../errors.js";
 import { CollectionIdsAssignmentError, CollectionPersistedAssignmentError } from "./errors.js";
 import { raiseNotFoundAll } from "../relation/finder-methods.js";
 import { normalizeAssociationKey } from "./key-normalization.js";
@@ -359,13 +359,30 @@ export class CollectionAssociation extends Association {
    * delegates to the association scope.
    */
   async find(...args: unknown[]): Promise<Base | Base[] | null> {
-    const ids = (args as any[]).flat().filter((id) => id != null);
+    const argsFlatten = args.flat();
+    const ids = argsFlatten.filter((id) => id != null);
 
     if (this.reflection.options.inverseOf && this.isLoaded()) {
-      if (ids.length === 0) {
-        throw new Error(`Couldn't find ${this.klass.name} without an ID`);
+      const model = this.scope().model;
+      if (argsFlatten.length === 0) {
+        throw new RecordNotFound(
+          `Couldn't find ${model.name} without an ID`,
+          model.name,
+          String(model.primaryKey),
+          args,
+        );
       }
-      return this.findByScan(ids);
+
+      // Rails keeps the not-found decision in `find`, not in the scan helper
+      // (collection_association.rb:104-111): `find_by_scan` only scans, and the
+      // miss is routed through the *scope's* `raise_record_not_found_exception!`
+      // so the message carries the association scope's conditions.
+      const result = this.findByScan(ids);
+      const resultSize = Array.isArray(result) ? result.length : result == null ? 0 : 1;
+      if (!result || resultSize !== argsFlatten.length) {
+        this.scope().raiseRecordNotFoundExceptionBang(argsFlatten, resultSize, argsFlatten.length);
+      }
+      return result;
     }
 
     const rel = this.scope();
@@ -1238,7 +1255,18 @@ export class CollectionAssociation extends Association {
     return merged;
   }
 
-  private findByScan(ids: unknown[]): Base | Base[] {
+  /**
+   * Mirrors: ActiveRecord::Associations::CollectionAssociation#find_by_scan —
+   * scans the loaded target and returns what it found (`null` for a single-id
+   * miss, a short array for a multi-id one). It never raises; `find` owns the
+   * not-found decision (collection_association.rb:521-532).
+   *
+   * Deviation: Rails' `expects_array` (a leading Array argument wraps the
+   * single-id result) isn't reproduced — `find` compacts and flattens before
+   * calling, so the scalar/array shape follows the id count, as it did before.
+   * @internal
+   */
+  private findByScan(ids: unknown[]): Base | Base[] | null {
     // Fold each key through `normalizeAssociationKey` before stringifying: an
     // in-memory target PK is a BigInt (int8 default under PG bigserial) while a
     // `find(id)` argument is a number, and a raw `JSON.stringify` of a BigInt
@@ -1256,25 +1284,13 @@ export class CollectionAssociation extends Association {
     const normalizedIds = ids.map(normalize);
 
     if (ids.length === 1) {
-      const found = this.target.find(
-        (r) => normalize(this.primaryKeyValue(r)) === normalizedIds[0],
+      return (
+        this.target.find((r) => normalize(this.primaryKeyValue(r)) === normalizedIds[0]) ?? null
       );
-      if (!found) {
-        throw new Error(`Couldn't find ${this.klass.name} with ID ${normalizedIds[0]}`);
-      }
-      return found;
     }
 
     const idSet = new Set(normalizedIds);
-    const found = this.target.filter((r) => idSet.has(normalize(this.primaryKeyValue(r))));
-    if (found.length !== ids.length) {
-      const foundSet = new Set(found.map((r) => normalize(this.primaryKeyValue(r))));
-      const missing = ids.filter((id) => !foundSet.has(normalize(id)));
-      throw new Error(
-        `Couldn't find all ${this.klass.name} with IDs (${missing.map(normalize).join(", ")})`,
-      );
-    }
-    return found;
+    return this.target.filter((r) => idSet.has(normalize(this.primaryKeyValue(r))));
   }
 }
 
