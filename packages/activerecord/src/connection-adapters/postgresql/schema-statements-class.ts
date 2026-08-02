@@ -151,7 +151,8 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
         const indexName = row[0] as string;
         const unique = row[1] as boolean;
         const indkey = toS(row[2])
-          .split(" ")
+          .split(/\s+/)
+          .filter((n) => n !== "")
           .map((n) => Number(n));
         const inddef = row[3] as string;
         const oid = Number(row[4]);
@@ -204,9 +205,8 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
         return new IndexDefinition(tableName, indexName, unique, columns, {
           orders,
           opclasses,
-          where: whereStr?.trim(),
+          where: whereStr,
           using,
-          // Mirrors Rails' `include_columns.presence` — an empty list → nil.
           include: includeColumns.length > 0 ? includeColumns : undefined,
           nullsNotDistinct: nullsNotDistinctStr ? true : undefined,
           // Mirrors Rails' `comment.presence` — blank (incl. whitespace-only) → nil.

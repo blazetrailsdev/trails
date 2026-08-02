@@ -261,8 +261,6 @@ describe("PostgreSQLSchemaStatements#changeTable", () => {
 describe("PostgreSQLSchemaStatements#indexes", () => {
   it("keeps the schema-qualified table name from the argument", async () => {
     const { adapter } = makeAdapter({
-      // Rails' `indexes` runs two positional `query` calls: the pg_index scan,
-      // then the attnum -> attname lookup behind columnNamesFromColumnNumbers.
       query: async (text) =>
         text.includes("pg_attribute")
           ? [[1, "name"]]
