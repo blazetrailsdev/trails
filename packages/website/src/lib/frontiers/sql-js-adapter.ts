@@ -54,9 +54,6 @@ export class SqlJsAdapter {
   quoteColumnName(name: string): string {
     return `"${name.replace(/"/g, '""')}"`;
   }
-  quoteColumnName(name: string): string {
-    return this.quoteColumnName(name);
-  }
   quoteTableName(name: string): string {
     return name
       .split(".")

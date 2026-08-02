@@ -53,7 +53,6 @@ interface PgSchemaAdapter {
   clearCacheBang(): void;
   quote(value: unknown): string;
   quoteColumnName(name: string): string;
-  quoteColumnName(name: string): string;
   quoteTableName(name: string): string;
   readonly logger: { warn?(message: string): void } | null;
   quoteLiteral(value: unknown): string;
