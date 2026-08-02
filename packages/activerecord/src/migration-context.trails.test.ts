@@ -5,6 +5,7 @@
 // `migrationsPaths` rather than delegating to Migrator.
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import {
+  Migration,
   MigrationContext,
   Migrator,
   InvalidMigrationTimestampError,
@@ -59,6 +60,25 @@ describe("MigrationContext", () => {
       "20100201010101",
       "20100301010101",
     ]);
+  });
+
+  it("migrations answers the registered list when the context was built with one", () => {
+    const registered = [
+      {
+        version: "20100101010101",
+        name: "Registered",
+        migration: async () => new (class extends Migration {})(),
+      },
+    ];
+    const context = new MigrationContext(
+      [`${MIGRATIONS_ROOT}/valid`],
+      undefined,
+      undefined,
+      registered,
+    );
+
+    expect(context.migrations).toBe(registered);
+    expect(Object.getPrototypeOf(context)).toBe(MigrationContext.prototype);
   });
 
   it("migrations raises for a migration timestamp in the future", () => {

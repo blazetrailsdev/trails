@@ -1718,6 +1718,7 @@ export class MigrationContext {
   readonly migrationsPaths: string[];
   private readonly _schemaMigration?: SchemaMigration;
   private readonly _internalMetadata?: InternalMetadata;
+  private readonly _registeredMigrations?: MigrationProxy[];
 
   /**
    * Rails defaults `schema_migration` / `internal_metadata` from
@@ -1725,15 +1726,31 @@ export class MigrationContext {
    * from here, so they stay optional. A context built without them still
    * answers the connectionless half — `migrationsPaths`, `migrations` and the
    * file discovery under it — which is all the CLI's bootstrap needs.
+   *
+   * DEVIATION — `registeredMigrations`: Rails only ever discovers migrations
+   * from `migrations_paths`, and overrides `#migrations` in one test helper
+   * (`migrator_class`, `test/cases/migrator_test.rb`). trails cannot discover
+   * every caller's migrations from disk: `DatabaseTasks.registerMigrations`
+   * takes an in-memory `MigrationProxy[]` (a migration written in TS may never
+   * be a file under a scanned path — the trailties CLI loads them through its
+   * own `migration-loader`), and the ~24 `Migrator` callers likewise hold a
+   * pre-built list. Those callers previously reached a context only by
+   * subclassing it, which is worse: it puts a Rails test-only override in
+   * production code and makes `MigrationContext` non-constructible by anything
+   * that does not own a subclass. Accepting the list as per-instance
+   * constructor state — exactly how `migrationsPaths` is held — keeps
+   * `#migrations` a single un-overridden reader with one source per instance.
    */
   constructor(
     migrationsPaths: string[],
     schemaMigration?: SchemaMigration,
     internalMetadata?: InternalMetadata,
+    registeredMigrations?: MigrationProxy[],
   ) {
     this.migrationsPaths = migrationsPaths;
     this._schemaMigration = schemaMigration;
     this._internalMetadata = internalMetadata;
+    this._registeredMigrations = registeredMigrations;
   }
 
   /** Mirrors: ActiveRecord::MigrationContext#schema_migration */
@@ -1966,9 +1983,12 @@ export class MigrationContext {
    * (`migration.rb:1303-1315`). Discovery reads *this context's*
    * `migrationsPaths`, which Rails keeps as per-instance constructor state
    * (`attr_reader :migrations_paths`), so two contexts built for two migration
-   * directories do not collide.
+   * directories do not collide. A context built with `registeredMigrations`
+   * answers that list instead of scanning — see the constructor for why trails
+   * carries a second source.
    */
   get migrations(): MigrationProxy[] {
+    if (this._registeredMigrations) return this._registeredMigrations;
     const migrations = this.migrationFiles().map((file) => {
       const parsed = this.parseMigrationFilename(file);
       if (!parsed) throw new IllegalMigrationNameError(file);

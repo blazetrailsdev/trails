@@ -341,8 +341,8 @@ export class DatabaseTasks {
    * Rails reaches the run surface through `MigrationContext`
    * (`migration.rb:1211`), whose `#migrations` reads `migrations_paths` off
    * disk. trails registers migrations in memory per db_config, so the context
-   * answers that list instead — the same override Rails' own
-   * `migrator_class` test helper uses.
+   * answers that list instead, passed as constructor state (see
+   * `MigrationContext`'s constructor for why the list is a second source).
    */
   private static async _migrationContextFor(
     adapter: import("../connection-adapters/abstract-adapter.js").AbstractAdapter,
@@ -353,14 +353,11 @@ export class DatabaseTasks {
     const { InternalMetadata } = await import("../internal-metadata.js");
     const migrations = this._migrationsFor(dbConfig);
     const paths = dbConfig.migrationsPaths;
-    return new (class extends MigrationContext {
-      override get migrations(): import("../migration.js").MigrationProxy[] {
-        return migrations;
-      }
-    })(
+    return new MigrationContext(
       paths == null ? [] : Array.isArray(paths) ? paths : [paths],
       new SchemaMigration(adapter),
       new InternalMetadata(adapter, { enabled: dbConfig.useMetadataTable }),
+      migrations,
     );
   }
 
