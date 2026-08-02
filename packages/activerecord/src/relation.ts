@@ -4671,17 +4671,6 @@ export class Relation<T extends Base> {
 
     const batchOrders = _buildBatchOrders(cursorArr, order as any);
 
-    // Mirrors Rails: when use_ranges is nil, auto-enable range mode for
-    // unconstrained single-cursor whole-table batching (no WHERE, no LIMIT,
-    // no OFFSET). Constrained queries keep the safe IN-list path.
-    const effectiveUseRanges =
-      useRanges ??
-      (!load &&
-        cursorArr.length === 1 &&
-        this._whereClause.predicates.length === 0 &&
-        this._limitValue === null &&
-        this._offsetValue === null);
-
     let remaining: number | null = null;
     let effectiveBatchSize = batchSize;
     if (this._limitValue !== null) {
@@ -4726,25 +4715,25 @@ export class Relation<T extends Base> {
     return new BatchEnumerator(
       async function* () {
         await ensureValidOptions();
-        const rel = self._clone();
-        rel._orderClauses = batchOrders.map(([col, dir]) => [col, dir] as [string, "asc" | "desc"]);
-
-        for await (const batchRows of _batchOnUnloadedRelation({
-          relation: rel,
-          start,
-          finish,
-          cursor: cursorArr,
-          order: (order ?? "asc") as any,
-          batchLimit: effectiveBatchSize,
-          load,
-          remaining,
-        })) {
+        for await (const { rows: batchRows, useRanges: batchUseRanges } of _batchOnUnloadedRelation(
+          {
+            relation: self,
+            start,
+            finish,
+            cursor: cursorArr,
+            order: (order ?? "asc") as any,
+            batchLimit: effectiveBatchSize,
+            load,
+            remaining,
+            useRanges,
+          },
+        )) {
           const batchRel = self._clone();
           batchRel._orderClauses = batchOrders.map(
             ([col, dir]) => [col, dir] as [string, "asc" | "desc"],
           );
           const tuples = batchRows.map((r) => cursorArr.map((c) => r.readAttribute(c)));
-          if (effectiveUseRanges && !load && cursorArr.length === 1 && tuples.length > 0) {
+          if (batchUseRanges && !load && cursorArr.length === 1 && tuples.length > 0) {
             // Range-mode: emit `col >= first AND col <= last` (reversed for desc)
             // instead of `col IN (...)`. Mirrors Rails apply_finish_limit path.
             const col = cursorArr[0];
@@ -7471,7 +7460,8 @@ export class Relation<T extends Base> {
     order: "asc" | "desc" | ("asc" | "desc")[];
     batchLimit: number;
     load?: boolean;
-  }): AsyncGenerator<T[]> {
+    useRanges?: boolean | null;
+  }): AsyncGenerator<{ rows: T[]; useRanges: boolean }> {
     return _batchOnUnloadedRelation({ relation: this, ...opts });
   }
 

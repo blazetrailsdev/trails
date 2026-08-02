@@ -229,15 +229,20 @@ export async function* batchOnUnloadedRelation(opts: {
   batchLimit: number;
   load?: boolean;
   remaining?: number | null;
-}): AsyncGenerator<any[]> {
+  useRanges?: boolean | null;
+}): AsyncGenerator<{ rows: any[]; useRanges: boolean }> {
   const { relation, cursor } = opts;
   let { batchLimit } = opts;
   let remaining: number | null | undefined = opts.remaining;
   const batchOrders = buildBatchOrders(cursor, opts.order as any);
+  const emptyScope = relation.toSql() === relation.model.unscoped().all().toSql();
+  const useRanges = (emptyScope && opts.useRanges !== false) || opts.useRanges === true;
+  const ordered = relation._clone();
+  ordered._orderClauses = batchOrders.map(([col, dir]) => [col, dir] as [string, "asc" | "desc"]);
   // Apply start/finish limits once on the base relation; advance cursor per
   // iteration — matching Rails' batch_condition(relation, ...) pattern where
   // `relation` is always the original scoped relation, not the previous batch.
-  let baseRelation = applyLimits(relation, cursor, opts.start, opts.finish, batchOrders).limit(
+  let baseRelation = applyLimits(ordered, cursor, opts.start, opts.finish, batchOrders).limit(
     batchLimit,
   );
   const cursorArr = Array.isArray(cursor) ? cursor : [cursor];
@@ -254,7 +259,7 @@ export async function* batchOnUnloadedRelation(opts: {
           );
     const rows = await (opts.load ? batchRelation : batchRelation.select(...cursorArr)).toArray();
     if (rows.length === 0) break;
-    yield rows;
+    yield { rows, useRanges };
     if (rows.length < batchLimit) break;
     if (remaining != null) {
       remaining -= rows.length;
