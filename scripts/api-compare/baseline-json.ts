@@ -27,10 +27,12 @@ export function serializeBaseline(value: unknown): string {
   return JSON.stringify(value, null, 2) + "\n";
 }
 
-// Recursively list *.json files under `dir` as absolute paths (empty if the
-// directory does not exist yet). Shared by every SPLIT baseline that mirrors the
-// source tree — the wide exclude entries and the wide unreviewed marks — so the
-// two trees are walked by one implementation and cannot drift apart.
+/**
+ * Recursively list *.json files under `dir` as absolute paths (empty if the
+ * directory does not exist yet). Shared by every SPLIT baseline that mirrors
+ * the source tree — the wide exclude entries and the wide unreviewed marks — so
+ * the two trees are walked by one implementation and cannot drift apart.
+ */
 export async function listJsonFiles(dir: string): Promise<string[]> {
   const out: string[] = [];
   let dirents;
@@ -48,9 +50,11 @@ export async function listJsonFiles(dir: string): Promise<string[]> {
   return out;
 }
 
-// Recursively remove empty subdirectories under `dir` (keeps `dir` itself), so
-// a split tree that lost its last file for a source leaves no empty chain
-// behind. Returns whether `dir` itself ended up empty.
+/**
+ * Recursively remove empty subdirectories under `dir` (keeps `dir` itself), so
+ * a split tree that lost its last file for a source leaves no empty chain
+ * behind. Returns whether `dir` itself ended up empty.
+ */
 export async function pruneEmptyDirs(dir: string): Promise<boolean> {
   let dirents;
   try {

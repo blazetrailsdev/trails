@@ -238,14 +238,16 @@ export function heldOutCounts(
   return held;
 }
 
-// Only-shrink, per file: a source's stored mark never rises, so a reseed that
-// adds unreviewed rows cannot buy headroom — in that file or any other. A
-// source absent from `counts` drops out entirely (its mark is now 0).
+/**
+ * Only-shrink, per file: a source's stored mark never rises, so a reseed that
+ * adds unreviewed rows cannot buy headroom — in that file or any other. A
+ * source that reached 0, or is absent from `counts` entirely, drops out of the
+ * result rather than carrying `{"max": 0}`.
+ */
 export function nextMarks(counts: MarkSet, marks: MarkSet): MarkSet {
   const next: MarkSet = new Map();
   for (const [rel, count] of counts) {
     const max = Math.min(count, marks.get(rel) ?? Number.POSITIVE_INFINITY);
-    // A source at 0 leaves the tree entirely rather than carrying `{"max": 0}`.
     if (max > 0) next.set(rel, max);
   }
   return next;
@@ -253,14 +255,14 @@ export function nextMarks(counts: MarkSet, marks: MarkSet): MarkSet {
 
 /**
  * Write the sharded mark under `dir`: one `{"max": N}` per source, deleting the
- * shards of sources that reached 0 (never leaving `{"max": 0}` behind) and
- * pruning the directories those deletions emptied.
+ * shards of sources that reached 0 and pruning the directories those deletions
+ * emptied. A non-positive entry is never written — `{"max": 0}` would be churn
+ * and a negative one would fail {@link parseMark} on the next read — so its
+ * file falls to the deletion pass instead.
  */
 export async function writeMarks(dir: string, marks: MarkSet): Promise<void> {
   const existing = new Set((await listJsonFiles(dir)).map((f) => path.relative(dir, f)));
   for (const [rel, max] of marks) {
-    // A source at or below 0 has no shard at all, so its file is left to the
-    // deletion pass below rather than written as `{"max": 0}`.
     if (max <= 0) continue;
     const dest = path.join(dir, rel);
     await fs.mkdir(path.dirname(dest), { recursive: true });
@@ -271,13 +273,14 @@ export async function writeMarks(dir: string, marks: MarkSet): Promise<void> {
   await pruneEmptyDirs(dir);
 }
 
-// Ties in either arm fall back to the shard path, so a listing of equal-sized
-// deltas is stable run to run.
 function compareFiles(a: MarkDelta, b: MarkDelta): number {
   return a.file < b.file ? -1 : a.file > b.file ? 1 : 0;
 }
 
-/** Sources whose unreviewed count sits ABOVE their own mark, worst overshoot first. */
+/**
+ * Sources whose unreviewed count sits ABOVE their own mark, worst overshoot
+ * first, ties broken by shard path so the listing is stable run to run.
+ */
 export function excessByPath(counts: MarkSet, marks: MarkSet): MarkDelta[] {
   const out: MarkDelta[] = [];
   for (const [file, count] of counts) {
