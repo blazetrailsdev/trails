@@ -8,7 +8,6 @@
 import { EachValidator, ArgumentError } from "@blazetrails/activemodel";
 import { isBlank } from "@blazetrails/activesupport";
 import { UnknownPrimaryKey } from "../errors.js";
-import { FakePool } from "../connection-adapters/schema-cache.js";
 import { threadedConnectionFor } from "../connection-handling.js";
 
 /**
@@ -342,19 +341,6 @@ async function isCoveredByUniqueIndex(
  * so this awaits; the lookup is cache-backed, so a warm cache costs no query
  * (the whole point of the optimization is to avoid one).
  *
- * Reads the raw `SchemaCache` rather than the Rails-shaped one-arg
- * `schemaCacheBound`: `addIndex` invalidates only the raw cache
- * (`adapter.schemaCache.clearDataSourceCacheBang`), so the bound reflection can
- * serve a stale, pre-index list and silently keep the optimization off after a
- * migration adds the covering index.
- *
- * The pool target is a `FakePool` over the adapter we already hold — Rails'
- * `BoundSchemaReflection.for_lone_connection` shape (schema_cache.rb:155).
- * Passing `adapter.pool` directly would hand the cache the NullPool a directly
- * assigned adapter carries, which exposes neither `withConnection` nor
- * `indexes`, so the cache would introspect the NullPool and quietly yield `[]`
- * — leaving covered_by_unique_index? permanently false for every such model.
- *
  * @internal
  */
 async function tableIndexes(
@@ -371,7 +357,7 @@ async function tableIndexes(
 
   const cache = adapter.schemaCache;
   if (!cache || typeof cache.indexes !== "function") return [];
-  return (await cache.indexes(new FakePool(adapter), tableName)) as Index[];
+  return (await cache.indexes(tableName)) as Index[];
 }
 
 /**

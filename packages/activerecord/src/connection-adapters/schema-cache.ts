@@ -881,6 +881,22 @@ export class SchemaReflection {
     return this._cache;
   }
 
+  /**
+   * @internal Companion setter for {@link loadedCache}: `PoolConfig#schemaCache`
+   * is backed by this slot so the pool's one raw SchemaCache is shared by every
+   * reader — the BoundSchemaReflection and the adapters' `internalSchemaCache`
+   * alike. Assigning drops any in-flight disk load so it can't overwrite the
+   * cache the caller just installed.
+   *
+   * @noRailsEquivalent CONVERGEABLE (story: retire-schema-cache-sync-and-ledger-shims).
+   * Rails' PoolConfig owns `@schema_cache` outright; trails routes the slot
+   * here so there is a single instance. See above.
+   */
+  set loadedCache(cache: SchemaCache | null) {
+    this._cache = cache;
+    this._cachePromise = null;
+  }
+
   async primaryKeys(
     pool: unknown,
     tableName: string,

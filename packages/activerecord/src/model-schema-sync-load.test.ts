@@ -10,7 +10,7 @@ class UuidType extends ValueType {
 
 function makeAdapter(columns: Record<string, unknown>): unknown {
   return {
-    schemaCache: {
+    internalSchemaCache: {
       isCached: () => true,
       getCachedColumnsHash: () => columns,
       dataSourceExists: async () => true,
@@ -371,7 +371,7 @@ describe("sync loadSchema / columnsHash", () => {
     expect(Post._attributeDefinitions.get("title")?.source).toBe("user");
   });
 
-  // A schemaCache that starts warm and tracks whether resetColumnInformation
+  // A internalSchemaCache that starts warm and tracks whether resetColumnInformation
   // cleared it.
   function makeResettableAdapter(cols: Record<string, unknown>) {
     let warm = true;
@@ -380,7 +380,7 @@ describe("sync loadSchema / columnsHash", () => {
       calls,
       isWarm: () => warm,
       adapter: {
-        schemaCache: {
+        internalSchemaCache: {
           isCached: () => warm,
           getCachedColumnsHash: () => (warm ? cols : undefined),
           dataSourceExists: async () => true,

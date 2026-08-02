@@ -29,10 +29,10 @@ describe("column_names sync virtual exclusion", () => {
     // model reflects the real DB columns. `columnsHash` populates the exact
     // `_columnsHash` that model-schema.ts reads and short-circuits when warm.
     const conn = Base.connection as unknown as {
-      schemaCache: { columnsHash(pool: unknown, table: string): Promise<unknown> };
+      internalSchemaCache: { columnsHash(pool: unknown, table: string): Promise<unknown> };
       pool: unknown;
     };
-    await conn.schemaCache.columnsHash(conn.pool, "posts");
+    await conn.internalSchemaCache.columnsHash(conn.pool, "posts");
   });
 
   it("excludes virtual attributes from a synchronous column_names on a cold model", () => {

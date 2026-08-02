@@ -120,7 +120,7 @@ describe("STI subclass attribute() registration", () => {
     }
 
     const adapter = {
-      schemaCache: {
+      internalSchemaCache: {
         dataSourceExists: async () => true,
         columnsHash: async () => ({ guid: { sqlType: "uuid" } }),
         getCachedColumnsHash: () => ({ guid: { sqlType: "uuid" } }),

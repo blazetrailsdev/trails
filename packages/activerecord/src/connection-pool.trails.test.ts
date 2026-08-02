@@ -451,31 +451,23 @@ describe("ConnectionPool schema cache", () => {
     expect(pool.schemaCache).toBe(pool.schemaCache);
   });
 
-  it("adapter.schemaCache reads the raw SchemaCache from poolConfig, not the bound reflection", async () => {
-    // Regression: Phase 11 made pool.schemaCache return a
-    // BoundSchemaReflection. AbstractAdapter#schemaCache previously
-    // reached into pool.schemaCache to store/share a raw SchemaCache
-    // instance — with the new getter that would (a) return a
-    // BoundSchemaReflection where .clear()/.setColumns() aren't
-    // defined and (b) throw on assignment (read-only getter). The
-    // fix routes the raw cache through pool.poolConfig.schemaCache,
-    // and this test locks that in.
-    //
+  it("adapter.internalSchemaCache reads the raw SchemaCache from poolConfig, not the bound reflection", async () => {
+    // Regression: `pool.schemaCache` — and now `adapter.schemaCache` too —
+    // returns a BoundSchemaReflection, on which .clear()/.setColumns() aren't
+    // defined. The raw SchemaCache the adapter memoizes incidental
+    // introspection into is reached through `internalSchemaCache`, routed via
+    // pool.poolConfig.schemaCache so every connection shares one instance.
     const { SchemaCache } = await import("./connection-adapters/schema-cache.js");
     const pool = makeAmbientPool();
     try {
       const cache = await pool.withConnection(
-        (conn) => (conn as unknown as { schemaCache: unknown }).schemaCache,
+        (conn) => (conn as unknown as { internalSchemaCache: unknown }).internalSchemaCache,
       );
-      // The key regression: adapter.schemaCache must be a plain
-      // SchemaCache, NOT the BoundSchemaReflection pool.schemaCache
-      // returns. Before the fix it would have picked up the bound
-      // reflection and failed on .clear()/.setColumns() etc.
       expect(cache).toBeInstanceOf(SchemaCache);
       expect(cache).not.toBe(pool.schemaCache);
       // Verify the raw cache is actually shared through PoolConfig —
-      // ConnectionPool.newConnection now sets conn.pool = this so
-      // AbstractAdapter.schemaCache can write into
+      // ConnectionPool.newConnection sets conn.pool = this so
+      // AbstractAdapter.internalSchemaCache can write into
       // pool.poolConfig.schemaCache and every connection sees the
       // same instance.
       expect(pool.poolConfig.schemaCache).toBe(cache);
@@ -555,7 +547,7 @@ describe("ConnectionPool schema cache", () => {
         expect(pool.schemaCache.isCached("more_testings")).toBe(true);
         // Adapter-visible raw cache (poolConfig.schemaCache) — after
         // lazy load the reflection's internal cache is propagated so
-        // adapter.schemaCache consumers see preloaded data without DB.
+        // adapter.internalSchemaCache consumers see preloaded data without DB.
         expect(pool.poolConfig.schemaCache).not.toBeNull();
         expect(pool.poolConfig.schemaCache!.isCached("more_testings")).toBe(true);
       } finally {

@@ -10,7 +10,7 @@ class UuidType extends ValueType {
 
 function makeAdapter(columns: Record<string, unknown>): unknown {
   return {
-    schemaCache: {
+    internalSchemaCache: {
       isCached: () => true,
       getCachedColumnsHash: () => columns,
       dataSourceExists: async () => true,

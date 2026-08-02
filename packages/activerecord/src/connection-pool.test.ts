@@ -427,8 +427,8 @@ it("pool sets connection schema cache", async () => {
   const conn2 = await pool.checkout();
   expect(conn1).not.toBe(conn2);
   // Both connections share the same raw SchemaCache instance via poolConfig.
-  const cache1 = (conn1 as unknown as { schemaCache: SchemaCache }).schemaCache;
-  const cache2 = (conn2 as unknown as { schemaCache: SchemaCache }).schemaCache;
+  const cache1 = (conn1 as unknown as { internalSchemaCache: SchemaCache }).internalSchemaCache;
+  const cache2 = (conn2 as unknown as { internalSchemaCache: SchemaCache }).internalSchemaCache;
   expect(cache1).toBeInstanceOf(SchemaCache);
   expect(cache1).toBe(cache2);
   pool.checkin(conn1);

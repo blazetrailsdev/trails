@@ -94,22 +94,24 @@ describe("withTransactionalFixtures (schema-cache invalidation)", () => {
 
   // Direct-adapter reads (`adapter.columns(...)`) bypass SchemaCache —
   // SQLite3Adapter#columns runs PRAGMA against the live DB. To actually
-  // exercise `schemaCache.clear()`, populate the cache directly via
+  // exercise `internalSchemaCache.clear()`, populate the cache directly via
   // `setColumns` (simulating how Model.loadSchema warms it in real
   // adapter use) and then assert `isColumnsHash` flips false
   // after rollback.
   it("warming the schema cache inside a test leaves it populated", async () => {
     await adapter.addColumn("cache_inval_users", "extra", "string");
     const cols = await adapter.columns("cache_inval_users");
-    adapter.schemaCache.setColumns("cache_inval_users", cols);
-    expect(adapter.schemaCache.isColumnsHash(adapter.pool, "cache_inval_users")).toBe(true);
+    adapter.internalSchemaCache.setColumns("cache_inval_users", cols);
+    expect(adapter.internalSchemaCache.isColumnsHash(adapter.pool, "cache_inval_users")).toBe(true);
   });
 
   it("next test sees an empty schema cache because afterEach cleared it", async () => {
-    // Without `schemaCache.clear()` in the helper, this would be true —
+    // Without `internalSchemaCache.clear()` in the helper, this would be true —
     // the cached hash from the previous test would still report the
     // rolled-back `extra` column.
-    expect(adapter.schemaCache.isColumnsHash(adapter.pool, "cache_inval_users")).toBe(false);
+    expect(adapter.internalSchemaCache.isColumnsHash(adapter.pool, "cache_inval_users")).toBe(
+      false,
+    );
   });
 });
 
@@ -166,19 +168,26 @@ describe("withTransactionalFixtures (per-table re-reflection preserves untouched
 
   it("touches one table via DDL while another stays warm", async () => {
     // Warm both entries (raw adapters don't auto-warm; mimic Model.loadSchema).
-    adapter.schemaCache.setColumns("pertable_touched", await adapter.columns("pertable_touched"));
-    adapter.schemaCache.setColumns(
+    adapter.internalSchemaCache.setColumns(
+      "pertable_touched",
+      await adapter.columns("pertable_touched"),
+    );
+    adapter.internalSchemaCache.setColumns(
       "pertable_untouched",
       await adapter.columns("pertable_untouched"),
     );
     // DDL on one table records it as touched.
     await adapter.addColumn("pertable_touched", "extra", "string");
-    expect(adapter.schemaCache.isColumnsHash(adapter.pool, "pertable_untouched")).toBe(true);
+    expect(adapter.internalSchemaCache.isColumnsHash(adapter.pool, "pertable_untouched")).toBe(
+      true,
+    );
   });
 
   it("next test: touched table re-reflected (cold), untouched entry survives", () => {
-    expect(adapter.schemaCache.isColumnsHash(adapter.pool, "pertable_touched")).toBe(false);
-    expect(adapter.schemaCache.isColumnsHash(adapter.pool, "pertable_untouched")).toBe(true);
+    expect(adapter.internalSchemaCache.isColumnsHash(adapter.pool, "pertable_touched")).toBe(false);
+    expect(adapter.internalSchemaCache.isColumnsHash(adapter.pool, "pertable_untouched")).toBe(
+      true,
+    );
   });
 });
 
@@ -201,12 +210,16 @@ describe("withTransactionalFixtures (invalidateSchemaCache: false)", () => {
 
   it("warming the schema cache leaves it populated", async () => {
     const cols = await adapter.columns("opt_out_cache_users");
-    adapter.schemaCache.setColumns("opt_out_cache_users", cols);
-    expect(adapter.schemaCache.isColumnsHash(adapter.pool, "opt_out_cache_users")).toBe(true);
+    adapter.internalSchemaCache.setColumns("opt_out_cache_users", cols);
+    expect(adapter.internalSchemaCache.isColumnsHash(adapter.pool, "opt_out_cache_users")).toBe(
+      true,
+    );
   });
 
   it("next test still sees the cached columns because the opt-out skipped clear()", () => {
-    expect(adapter.schemaCache.isColumnsHash(adapter.pool, "opt_out_cache_users")).toBe(true);
+    expect(adapter.internalSchemaCache.isColumnsHash(adapter.pool, "opt_out_cache_users")).toBe(
+      true,
+    );
   });
 });
 

@@ -287,7 +287,10 @@ describe("PrimaryKeysTest", () => {
     // Rails reflects the primary key lazily on first access; getPrimaryKeyAttr
     // reads only the already-warmed schema cache, so warm it for the no-PK join
     // table here (an explicit await stands in for Rails' implicit reflection).
-    await (Base.connection as any).schemaCache.primaryKeys(Base.connection, "developers_projects");
+    await (Base.connection as any).internalSchemaCache.primaryKeys(
+      Base.connection,
+      "developers_projects",
+    );
     expect(AnonDevelopersProjects.primaryKey).toBeNull();
   });
 

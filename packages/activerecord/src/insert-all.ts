@@ -9,7 +9,6 @@ import { stiName, isFinderNeedsTypeCondition } from "./inheritance.js";
 import type { Relation } from "./relation.js";
 import type { AdapterName } from "./connection-adapters/abstract-adapter.js";
 import { Result } from "./result.js";
-import { FakePool } from "./connection-adapters/schema-cache.js";
 import { withPooledOrDirectConnection } from "./connection-handling.js";
 
 let _quoteSqlValue: ((v: unknown, dialect?: AdapterName) => string) | undefined;
@@ -520,16 +519,9 @@ export class InsertAll {
    */
   private async uniqueIndexes(): Promise<unknown[]> {
     const conn = this.connection as any;
-    const bound = conn.schemaCacheBound;
-    const tableName = this.model.arelTable.name;
-    let indexes: unknown[];
-    if (bound && typeof bound.indexes === "function") {
-      indexes = await bound.indexes(tableName);
-    } else {
-      const cache = conn.schemaCache;
-      if (!cache || typeof cache.indexes !== "function") return [];
-      indexes = await cache.indexes(new FakePool(conn), tableName);
-    }
+    const cache = conn.schemaCache;
+    if (!cache || typeof cache.indexes !== "function") return [];
+    const indexes: unknown[] = await cache.indexes(this.model.arelTable.name);
     return indexes.filter((i: any) => i.unique);
   }
 
@@ -542,16 +534,9 @@ export class InsertAll {
    */
   private async dbPrimaryKeys(): Promise<string[]> {
     const conn = this.connection as any;
-    const tableName = this.model.arelTable.name;
-    let pk: string | string[] | null | undefined;
-    const bound = conn.schemaCacheBound;
-    if (bound && typeof bound.primaryKeys === "function") {
-      pk = await bound.primaryKeys(tableName);
-    } else {
-      const cache = conn.schemaCache;
-      if (!cache || typeof cache.primaryKeys !== "function") return [];
-      pk = await cache.primaryKeys(new FakePool(conn), tableName);
-    }
+    const cache = conn.schemaCache;
+    if (!cache || typeof cache.primaryKeys !== "function") return [];
+    const pk = await cache.primaryKeys(this.model.arelTable.name);
     if (pk == null) return [];
     return Array.isArray(pk) ? pk : [pk];
   }

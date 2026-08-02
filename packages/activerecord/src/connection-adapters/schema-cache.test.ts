@@ -712,7 +712,7 @@ describe("SchemaReflectionTest", () => {
 // mock adapter, and asserts the entry is gone afterwards.
 //
 // Tests marked .skip are BLOCKED on F2, which will inline
-// schemaCache.clearDataSourceCacheBang() at the missing DDL sites. Once F2
+// internalSchemaCache.clearDataSourceCacheBang() at the missing DDL sites. Once F2
 // lands these are unskipped — the skip rationale names the exact method where
 // the call must be added.
 //
@@ -725,7 +725,7 @@ class MockAdapter {
   quoteTableName = (n: string) => `"${n}"`;
   executeMutation = vi.fn().mockResolvedValue(0);
   execute = vi.fn().mockResolvedValue([]);
-  schemaCache: SchemaCache;
+  internalSchemaCache: SchemaCache;
   pool = {};
   quoteDefaultExpression = (_v: unknown) => "";
   supportsDatetimeWithPrecision = () => false;
@@ -733,7 +733,7 @@ class MockAdapter {
     new TableDefinition(n, { ...opts, adapterName: "sqlite" });
 
   constructor(cache: SchemaCache) {
-    this.schemaCache = cache;
+    this.internalSchemaCache = cache;
   }
 
   // SchemaStatements' bodies reach the adapter through `this.adapter`; on a
@@ -924,7 +924,7 @@ describe("SchemaCache DDL invalidation", () => {
   let adapter: AbstractAdapter;
 
   function warmCache(tableName: string) {
-    adapter.schemaCache.setColumns(tableName, [makeColumn("id", "integer")]);
+    adapter.internalSchemaCache.setColumns(tableName, [makeColumn("id", "integer")]);
   }
 
   beforeEach(async () => {
@@ -935,7 +935,7 @@ describe("SchemaCache DDL invalidation", () => {
       t.integer("count");
     });
     warmCache("things");
-    expect(adapter.schemaCache.isCached("things")).toBe(true);
+    expect(adapter.internalSchemaCache.isCached("things")).toBe(true);
   });
 
   afterEach(async () => {
@@ -945,29 +945,29 @@ describe("SchemaCache DDL invalidation", () => {
 
   it("dropTable clears cache before DROP TABLE", async () => {
     await adapter.dropTable("things");
-    expect(adapter.schemaCache.isCached("things")).toBe(false);
+    expect(adapter.internalSchemaCache.isCached("things")).toBe(false);
   });
 
   it("renameTable clears both old and new names before ALTER TABLE RENAME", async () => {
     warmCache("stuff"); // simulate stale cache for the destination name
-    expect(adapter.schemaCache.isCached("stuff")).toBe(true);
+    expect(adapter.internalSchemaCache.isCached("stuff")).toBe(true);
     await adapter.renameTable("things", "stuff");
-    expect(adapter.schemaCache.isCached("things")).toBe(false);
-    expect(adapter.schemaCache.isCached("stuff")).toBe(false);
+    expect(adapter.internalSchemaCache.isCached("things")).toBe(false);
+    expect(adapter.internalSchemaCache.isCached("stuff")).toBe(false);
   });
 
   it("renameColumn re-reflects the new column name through the warm cache", async () => {
     // Drop the fake beforeEach seed and warm the real reflection so columnsHash
     // mirrors the DB. The pool argument is the adapter itself: SchemaCache's
     // withConnection falls through to calling the column reader on it directly.
-    adapter.schemaCache.clearDataSourceCacheBang(adapter.pool, "things");
-    const before = await adapter.schemaCache.columnsHash(adapter, "things");
+    adapter.internalSchemaCache.clearDataSourceCacheBang(adapter.pool, "things");
+    const before = await adapter.internalSchemaCache.columnsHash(adapter, "things");
     expect(Object.keys(before!)).toContain("name");
 
     await adapter.renameColumn("things", "name", "title");
 
     // Without the clear in renameColumn this still reports the stale "name".
-    const after = await adapter.schemaCache.columnsHash(adapter, "things");
+    const after = await adapter.internalSchemaCache.columnsHash(adapter, "things");
     expect(Object.keys(after!)).toContain("title");
     expect(Object.keys(after!)).not.toContain("name");
   });

@@ -91,7 +91,7 @@ describe("TimeZoneConversionTest", () => {
       title: { sqlType: "string" },
     } as Record<string, unknown>;
     const adapter = {
-      schemaCache: {
+      internalSchemaCache: {
         dataSourceExists: async () => true,
         columnsHash: async () => cols,
         getCachedColumnsHash: () => cols,

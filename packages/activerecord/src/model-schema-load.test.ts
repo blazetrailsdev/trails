@@ -19,7 +19,7 @@ function makeAdapter(
 ): unknown {
   const hash = columns as unknown as Record<string, unknown>;
   return {
-    schemaCache: {
+    internalSchemaCache: {
       dataSourceExists: async () => true,
       columnsHash: async () => hash,
       getCachedColumnsHash: () => hash,
@@ -102,7 +102,7 @@ describe("loadSchemaFromAdapter", () => {
 
   it("is a no-op when data source does not exist (explicit false)", async () => {
     const adapter = {
-      schemaCache: {
+      internalSchemaCache: {
         dataSourceExists: async () => false,
         columnsHash: async () => ({ guid: { sqlType: "uuid" } }),
       },
@@ -117,7 +117,7 @@ describe("loadSchemaFromAdapter", () => {
 
   it("falls through when dataSourceExists returns undefined (probe not implemented)", async () => {
     const adapter = {
-      schemaCache: {
+      internalSchemaCache: {
         dataSourceExists: async () => undefined,
         columnsHash: async () => ({ guid: { sqlType: "uuid" } }),
       },
@@ -132,7 +132,7 @@ describe("loadSchemaFromAdapter", () => {
 
   it("falls back to ValueType when adapter has no cast type", async () => {
     const adapter = {
-      schemaCache: {
+      internalSchemaCache: {
         dataSourceExists: async () => true,
         columnsHash: async () => ({ mystery: { sqlType: "weird" } }),
       },
@@ -284,7 +284,7 @@ describe("loadSchemaFromAdapter integration details", () => {
       resolveColumns = r;
     });
     const firstAdapter = {
-      schemaCache: {
+      internalSchemaCache: {
         dataSourceExists: async () => true,
         columnsHash: () => columnsPromise,
       },

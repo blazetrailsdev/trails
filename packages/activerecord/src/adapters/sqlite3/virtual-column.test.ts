@@ -59,7 +59,7 @@ function columnFor(name: string): Column {
 }
 
 async function reloadColumnInformation(): Promise<void> {
-  adapter.schemaCache?.clear();
+  adapter.internalSchemaCache?.clear();
   VirtualColumn.resetColumnInformation();
   await VirtualColumn.loadSchema();
 }

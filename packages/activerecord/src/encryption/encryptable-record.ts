@@ -386,10 +386,12 @@ export class EncryptableRecord {
       const table: string | undefined = modelClass?.tableName;
       if (!table) return NOT_CACHED;
       const direct = modelClass._adapter as
-        | { schemaCache?: { getCachedColumnsHash?: (t: string) => any } }
+        | { internalSchemaCache?: { getCachedColumnsHash?: (t: string) => any } }
         | undefined;
       const cache =
-        direct?.schemaCache ?? modelClass.connectionPool?.()?.poolConfig?.schemaCache ?? undefined;
+        direct?.internalSchemaCache ??
+        modelClass.connectionPool?.()?.poolConfig?.schemaCache ??
+        undefined;
       if (typeof cache?.getCachedColumnsHash !== "function") return NOT_CACHED;
       const columns = cache.getCachedColumnsHash(table);
       const column = columns?.[name];

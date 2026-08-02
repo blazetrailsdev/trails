@@ -3707,7 +3707,7 @@ export class PostgreSQLAdapter
   }
 
   async renameIndex(tableName: string, oldName: string, newName: string): Promise<void> {
-    this.schemaCache?.clearDataSourceCacheBang(this.pool, tableName);
+    this.internalSchemaCache?.clearDataSourceCacheBang(this.pool, tableName);
     this.validateIndexLengthBang(tableName, newName);
     const [schema] = this.extractSchemaQualifiedName(tableName);
     const qualifier = schema ? `${this.quoteTableName(schema)}.` : "";
@@ -3798,8 +3798,8 @@ export class PostgreSQLAdapter
     this.validateTableLengthBang(newName);
     const [oldSchema, unqualifiedOld] = this.extractSchemaQualifiedName(oldName);
     const [, unqualifiedNew] = this.extractSchemaQualifiedName(newName);
-    this.schemaCache.clearDataSourceCacheBang(this.pool, oldName);
-    this.schemaCache.clearDataSourceCacheBang(this.pool, newName);
+    this.internalSchemaCache.clearDataSourceCacheBang(this.pool, oldName);
+    this.internalSchemaCache.clearDataSourceCacheBang(this.pool, newName);
     await this.execute(
       `ALTER TABLE ${this.quoteTableName(oldName)} RENAME TO ${this.quoteColumnName(unqualifiedNew)}`,
     );
@@ -3863,7 +3863,7 @@ export class PostgreSQLAdapter
     // `databaseVersion` synchronously and silently yield false on a cold
     // connection.
     await this.getDatabaseVersion();
-    this.schemaCache?.clearDataSourceCacheBang(this.pool, tableName);
+    this.internalSchemaCache?.clearDataSourceCacheBang(this.pool, tableName);
 
     const createIndex = (await this.buildCreateIndexDefinition(tableName, columns, options))!;
     await this.execute(await this.schemaCreation.accept(createIndex));

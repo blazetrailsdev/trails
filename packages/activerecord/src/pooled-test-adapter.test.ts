@@ -29,13 +29,13 @@ describe("createPooledTestAdapter (Phase B smoke)", () => {
     expect((adapter as unknown as { pool: unknown }).pool).toBe(pool);
   });
 
-  it("lazy-loads schemaCache.columns after CREATE TABLE", async () => {
+  it("lazy-loads internalSchemaCache.columns after CREATE TABLE", async () => {
     const { adapter, pool } = await createPooledTestAdapter();
     const tableName = "pooled_smoke_columns";
     try {
       await asExec(adapter).exec(`DROP TABLE IF EXISTS ${tableName}`);
       await asExec(adapter).exec(`CREATE TABLE ${tableName} (id INTEGER PRIMARY KEY, name TEXT)`);
-      const cache = adapter.schemaCache;
+      const cache = adapter.internalSchemaCache;
       expect(cache).toBeTruthy();
       const cols = await cache.columns(pool, tableName);
       expect(cols).toBeTruthy();
