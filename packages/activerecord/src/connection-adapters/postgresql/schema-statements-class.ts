@@ -163,8 +163,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
               pg_get_indexdef(ix.indexrelid) AS definition,
               ix.indoption AS options,
               ix.indisvalid AS is_valid,
-              obj_description(ix.indexrelid, 'pg_class') AS comment,
-              t.relname AS table_name
+              obj_description(ix.indexrelid, 'pg_class') AS comment
        FROM pg_class t
        JOIN pg_index ix ON t.oid = ix.indrelid
        JOIN pg_class i ON i.oid = ix.indexrelid
@@ -220,7 +219,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
       }
 
       return new IndexDefinition(
-        row.table_name as string,
+        tableName,
         row.index_name as string,
         row.is_unique as boolean,
         columns,

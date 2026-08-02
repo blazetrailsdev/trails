@@ -252,3 +252,26 @@ describe("PostgreSQLSchemaStatements#changeTable", () => {
     expect(yielded).toBeInstanceOf(PgTable);
   });
 });
+
+describe("PostgreSQLSchemaStatements#indexes", () => {
+  it("keeps the schema-qualified table name from the argument", async () => {
+    const { adapter } = makeAdapter({
+      schemaQuery: async () => [
+        {
+          index_name: "index_things_on_name",
+          is_unique: false,
+          using: "btree",
+          columns: ["name"],
+          has_expressions: false,
+          definition: "CREATE INDEX index_things_on_name ON my_schema.things USING btree (name)",
+          options: [0],
+          is_valid: true,
+          comment: null,
+        },
+      ],
+    });
+    const ss = withSchemaStatements(adapter);
+    const [index] = await ss.indexes("my_schema.things");
+    expect(index.table).toBe("my_schema.things");
+  });
+});
