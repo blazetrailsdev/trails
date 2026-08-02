@@ -1255,20 +1255,19 @@ export class CollectionAssociation extends Association {
   private findByScan(args: unknown[]): Base | Array<Base | undefined> | undefined {
     const expectsArray = Array.isArray(args[0]);
     const ids = args.flat().filter((id) => id != null);
-    // Fold each key through `normalizeAssociationKey` before stringifying: an
-    // in-memory target PK is a BigInt (int8 default under PG bigserial) while a
-    // `find(id)` argument is a number, and a raw `JSON.stringify` of a BigInt
-    // throws outright ("Do not know how to serialize a BigInt"). Normalizing
-    // both sides folds `1n` and `1` to the same key so the scan matches the way
-    // Ruby's width-agnostic `Integer ==` does. `normalize` runs over both the
-    // incoming `ids` and each target's `primaryKeyValue(r)`, which returns an
-    // *array* for a composite-PK klass (see `primaryKeyValue`) — hence the
-    // per-element map, so a composite key holding a BigInt doesn't re-introduce
-    // the `JSON.stringify` throw on the target side.
+    // Rails compares `args.flatten.compact.map(&:to_s)` against `r.id.to_s`
+    // (collection_association.rb:523,527), so both sides land in string shape
+    // and `find("1")` matches an Integer PK. Each key goes through
+    // `normalizeAssociationKey` first because an in-memory target PK is a
+    // BigInt (int8 under PG bigserial) while the `find(id)` argument is a
+    // number — folding `1n` to `1` before `String()` reproduces Ruby's
+    // width-agnostic `Integer#to_s`. `primaryKeyValue(r)` returns an *array*
+    // for a composite-PK klass (see `primaryKeyValue`), hence the per-element
+    // map on both sides.
     const normalize = (v: unknown) =>
-      JSON.stringify(
-        Array.isArray(v) ? v.map(normalizeAssociationKey) : normalizeAssociationKey(v),
-      );
+      Array.isArray(v)
+        ? v.map((k) => String(normalizeAssociationKey(k))).join(",")
+        : String(normalizeAssociationKey(v));
     const normalizedIds = [...new Set(ids.map(normalize))];
 
     if (normalizedIds.length === 1) {

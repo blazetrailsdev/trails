@@ -58,6 +58,13 @@ describe("CollectionAssociation#find not-found path", () => {
     expect((error as RecordNotFound).message).toContain("(found 1 results, but was looking for 2)");
   });
 
+  it("matches a numeric PK against a string id, the way Rails' to_s comparison does", async () => {
+    const { assoc, presentId } = await loadedClientsOfFirm();
+
+    const found = (await assoc.find(String(presentId))) as Base;
+    expect(Number(internals(found)._readAttribute("id"))).toBe(presentId);
+  });
+
   it("raises RecordNotFound when no id is passed", async () => {
     const { assoc } = await loadedClientsOfFirm();
 
