@@ -2,13 +2,6 @@
   {
     "package": "activemodel",
     "tsFile": "errors.ts",
-    "rubyName": "add",
-    "call": "append",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "errors.ts",
     "rubyName": "added?",
     "call": "normalize_arguments",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -16,36 +9,8 @@
   {
     "package": "activemodel",
     "tsFile": "errors.ts",
-    "rubyName": "copy!",
-    "call": "deep_dup",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "errors.ts",
-    "rubyName": "delete",
-    "call": "presence",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "errors.ts",
     "rubyName": "full_messages_for",
     "call": "where",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "errors.ts",
-    "rubyName": "group_by_attribute",
-    "call": "group_by",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "errors.ts",
-    "rubyName": "import",
-    "call": "append",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

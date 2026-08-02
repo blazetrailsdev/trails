@@ -2,34 +2,6 @@
   {
     "package": "actioncontroller",
     "tsFile": "metal/live.ts",
-    "rubyName": "abort",
-    "call": "clear",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails live.rb:220-225 calls `@buf.clear`; trails live.ts:117-119 empties the buffer with the JS-native `this._buf.length = 0` spelling."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/live.ts",
-    "rubyName": "abort",
-    "call": "synchronize",
-    "reason": "Ruby guards the body with Mutex#synchronize; trails is single-threaded and has no mutex, so the port has no analogue call. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/live.ts",
-    "rubyName": "before_committed",
-    "call": "request",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/live.ts",
-    "rubyName": "call_on_error",
-    "call": "call",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/live.ts",
     "rubyName": "live_thread_pool_executor",
     "call": "new",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -37,43 +9,8 @@
   {
     "package": "actioncontroller",
     "tsFile": "metal/live.ts",
-    "rubyName": "log_error",
-    "call": "join",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/live.ts",
     "rubyName": "perform_write",
     "call": "merge",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/live.ts",
-    "rubyName": "perform_write",
-    "call": "stringify_keys",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/live.ts",
-    "rubyName": "process",
-    "call": "clear",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/live.ts",
-    "rubyName": "process",
-    "call": "format",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/live.ts",
-    "rubyName": "process",
-    "call": "request",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -94,21 +31,7 @@
     "package": "actioncontroller",
     "tsFile": "metal/live.ts",
     "rubyName": "send_stream",
-    "call": "extname",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/live.ts",
-    "rubyName": "send_stream",
     "call": "instrument",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/live.ts",
-    "rubyName": "write",
-    "call": "encode",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }
 ]

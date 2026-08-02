@@ -10,21 +10,7 @@
     "package": "rack",
     "tsFile": "response.ts",
     "rubyName": "buffered_body!",
-    "call": "compact",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "rack",
-    "tsFile": "response.ts",
-    "rubyName": "buffered_body!",
     "call": "new",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "rack",
-    "tsFile": "response.ts",
-    "rubyName": "buffered_body!",
-    "call": "sum",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

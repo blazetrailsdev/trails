@@ -37,22 +37,8 @@
   {
     "package": "activemodel",
     "tsFile": "attribute-methods.ts",
-    "rubyName": "attribute_method_patterns_matching",
-    "call": "filter_map",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "attribute-methods.ts",
     "rubyName": "build_mangled_name",
     "call": "match?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "attribute-methods.ts",
-    "rubyName": "define_attribute_method",
-    "call": "clear",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -88,13 +74,6 @@
     "tsFile": "attribute-methods.ts",
     "rubyName": "define_proxy_call",
     "call": "define_call",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "attribute-methods.ts",
-    "rubyName": "generate_alias_attribute_methods",
-    "call": "clear",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

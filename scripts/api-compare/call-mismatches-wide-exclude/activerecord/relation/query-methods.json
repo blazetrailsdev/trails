@@ -38,13 +38,6 @@
     "package": "activerecord",
     "tsFile": "relation/query-methods.ts",
     "rubyName": "arel_column_aliases_from_hash",
-    "call": "as",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/query-methods.ts",
-    "rubyName": "arel_column_aliases_from_hash",
     "call": "quote_column_name",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -66,14 +59,14 @@
     "package": "activerecord",
     "tsFile": "relation/query-methods.ts",
     "rubyName": "associated",
-    "call": "joins!",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "call": "include?",
+    "reason": "Satisfied in `Relation#whereAssociated`, which is where Rails' `associations.each` body lives in this port: the already-joined guard (`query_methods.rb:91`) reads `joinsValues` / `leftOuterJoinsValues` and `includes` there, per-iteration, exactly as Rails does. Same split as the existing `joins!` / `not` entries for this method."
   },
   {
     "package": "activerecord",
     "tsFile": "relation/query-methods.ts",
     "rubyName": "associated",
-    "call": "not",
+    "call": "joins!",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -94,8 +87,8 @@
     "package": "activerecord",
     "tsFile": "relation/query-methods.ts",
     "rubyName": "associated",
-    "call": "include?",
-    "reason": "Satisfied in `Relation#whereAssociated`, which is where Rails' `associations.each` body lives in this port: the already-joined guard (`query_methods.rb:91`) reads `joinsValues` / `leftOuterJoinsValues` and `includes` there, per-iteration, exactly as Rails does. Same split as the existing `joins!` / `not` entries for this method."
+    "call": "not",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -137,13 +130,6 @@
     "tsFile": "relation/query-methods.ts",
     "rubyName": "build_bound_sql_literal",
     "call": "sql",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/query-methods.ts",
-    "rubyName": "build_cast_value",
-    "call": "default_value",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -298,13 +284,6 @@
     "tsFile": "relation/query-methods.ts",
     "rubyName": "build_with_join_node",
     "call": "table",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/query-methods.ts",
-    "rubyName": "column_references",
-    "call": "filter_map",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

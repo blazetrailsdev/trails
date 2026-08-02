@@ -66,11 +66,6 @@ export class InsertManager extends TreeManager {
    *   (Rails: `@ast.relation ||= fields.first.first.relation`)
    * - values pass through raw — no `Quoted` wrap (Rails preserves them
    *   for the dialect-specific value visitor to quote)
-   *
-   * @missingRailsCall first — Rails reaches the first column with
-   *   `fields.first.first.relation`; JS indexes instead (`fields[0]?.[0]`),
-   *   which is the analogue of `Array#first` and the form the rest of arel
-   *   uses. There is no `first` to call.
    */
   insert(fields: string | [Attribute | Node, unknown][] | null | undefined): this {
     if (fields == null) return this;

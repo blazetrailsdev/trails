@@ -16,13 +16,6 @@
   {
     "package": "actiondispatch",
     "tsFile": "testing/integration.ts",
-    "rubyName": "assert_redirected_to",
-    "call": "normalize_argument_to_redirection",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "testing/integration.ts",
     "rubyName": "assert_response",
     "call": "generate_response_message",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -38,21 +31,7 @@
     "package": "actiondispatch",
     "tsFile": "testing/integration.ts",
     "rubyName": "create_session",
-    "call": "include",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "testing/integration.ts",
-    "rubyName": "create_session",
     "call": "url_helpers",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "testing/integration.ts",
-    "rubyName": "file_fixture_upload",
-    "call": "exist?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -122,21 +101,7 @@
     "package": "actiondispatch",
     "tsFile": "testing/integration.ts",
     "rubyName": "url_options",
-    "call": "controller",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails integration.rb:140-150 reverse-merges controller.url_options and @app.routes.default_url_options into the memo; trails integration.ts:186-195 merges only defaults + host/protocol — the controller and app-routes merges are unported. Omission tracked in story actionpack-omissions-from-wide-verify."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "testing/integration.ts",
-    "rubyName": "url_options",
     "call": "default_url_options",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails integration.rb:140-150 reverse-merges controller.url_options and @app.routes.default_url_options into the memo; trails integration.ts:186-195 merges only defaults + host/protocol — the controller and app-routes merges are unported. Omission tracked in story actionpack-omissions-from-wide-verify."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "testing/integration.ts",
-    "rubyName": "url_options",
-    "call": "routes",
     "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails integration.rb:140-150 reverse-merges controller.url_options and @app.routes.default_url_options into the memo; trails integration.ts:186-195 merges only defaults + host/protocol — the controller and app-routes merges are unported. Omission tracked in story actionpack-omissions-from-wide-verify."
   }
 ]

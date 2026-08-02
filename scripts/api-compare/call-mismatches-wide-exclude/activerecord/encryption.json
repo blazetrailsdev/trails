@@ -2,13 +2,6 @@
   {
     "package": "activerecord",
     "tsFile": "encryption.ts",
-    "rubyName": "configure",
-    "call": "context",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "encryption.ts",
     "rubyName": "context",
     "call": "default_context",
     "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails contexts.rb:62-64 returns `current_custom_context || default_context`; trails encryption.ts:449-451 delegates to Contexts.context (encryption/context.ts), which performs the same custom-else-default read internally."

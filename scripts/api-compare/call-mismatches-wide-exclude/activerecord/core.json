@@ -114,20 +114,6 @@
   {
     "package": "activerecord",
     "tsFile": "core.ts",
-    "rubyName": "generated_association_methods",
-    "call": "private_constant",
-    "reason": "Rails hides the GeneratedAssociationMethods module constant; trails has no such constant to hide."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "core.ts",
-    "rubyName": "init_attributes",
-    "call": "deep_dup",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "core.ts",
     "rubyName": "preventing_writes?",
     "call": "any?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

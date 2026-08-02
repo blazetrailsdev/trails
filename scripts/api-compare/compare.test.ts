@@ -14,6 +14,7 @@ import {
   blazetrailsDepKeys,
   buildEntitiesByName,
   significantMissingCalls,
+  resolvePortedWithArgsSigs,
   jsEnumerableAliases,
   JS_ENUMERABLE_ALIASES,
   NEGATED_ALIASES,
@@ -73,6 +74,34 @@ describe("narrowCallsApplies", () => {
     for (const pkg of ["activerecord", "activesupport", "rack", "trailties"]) {
       expect(narrowCallsApplies(pkg, true)).toBe(true);
     }
+  });
+});
+
+describe("resolvePortedWithArgsSigs", () => {
+  const sig = (n: number) => Array.from({ length: n }, (_, i) => ({ name: `a${i}` }) as never);
+  const byFileName = new Map([
+    ["arel/nodes.ts", new Map([["first", [sig(0)]]])],
+    ["relation.ts", new Map([["first", [sig(1)]]])],
+  ]);
+  const byNameInPkg = new Map([["first", [sig(0), sig(1)]]]);
+
+  it("prefers the same file's signatures over the package pool", () => {
+    expect(resolvePortedWithArgsSigs(byFileName, byNameInPkg, "arel/nodes.ts", "first")).toEqual([
+      sig(0),
+    ]);
+  });
+
+  it("falls back to the package pool when the file does not define the name", () => {
+    expect(resolvePortedWithArgsSigs(byFileName, byNameInPkg, "other.ts", "first")).toEqual([
+      sig(0),
+      sig(1),
+    ]);
+  });
+
+  it("returns nothing for a name absent from the package (dep-only methods)", () => {
+    expect(resolvePortedWithArgsSigs(byFileName, byNameInPkg, "relation.ts", "presence")).toEqual(
+      [],
+    );
   });
 });
 

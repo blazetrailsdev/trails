@@ -17,13 +17,6 @@
     "package": "actiondispatch",
     "tsFile": "http/param-builder.ts",
     "rubyName": "store_nested_param",
-    "call": "last",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/param-builder.ts",
-    "rubyName": "store_nested_param",
     "call": "params_hash_has_key?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },

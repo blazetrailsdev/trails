@@ -24,21 +24,7 @@
     "package": "activerecord",
     "tsFile": "base.ts",
     "rubyName": "define_delegated_type_methods",
-    "call": "constantize",
-    "reason": "Equivalent (different path): base.ts's static is a thin delegator to delegated-type.ts's `defineDelegatedTypeMethods` (Rails reaches it via `include DelegatedType`), so the constantize call cannot be lexically present here. See converge-delegated-type-method-split."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "base.ts",
-    "rubyName": "define_delegated_type_methods",
     "call": "define_method",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "base.ts",
-    "rubyName": "define_delegated_type_methods",
-    "call": "inquiry",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -59,13 +45,6 @@
     "package": "activerecord",
     "tsFile": "base.ts",
     "rubyName": "define_delegated_type_methods",
-    "call": "singular",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "base.ts",
-    "rubyName": "define_delegated_type_methods",
     "call": "where",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -74,20 +53,6 @@
     "tsFile": "base.ts",
     "rubyName": "delegated_type",
     "call": "define_delegated_type_methods",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "base.ts",
-    "rubyName": "destroy",
-    "call": "destroy_row",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "base.ts",
-    "rubyName": "destroy",
-    "call": "readonly?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -114,13 +79,6 @@
   {
     "package": "activerecord",
     "tsFile": "base.ts",
-    "rubyName": "initialize",
-    "call": "deep_dup",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "base.ts",
     "rubyName": "no_touching?",
     "call": "applied_to?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -128,22 +86,8 @@
   {
     "package": "activerecord",
     "tsFile": "base.ts",
-    "rubyName": "saved_change_to_attribute",
-    "call": "change_to_attribute",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "base.ts",
     "rubyName": "signed_id",
     "call": "combine_signed_id_purposes",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "base.ts",
-    "rubyName": "to_param",
-    "call": "id",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

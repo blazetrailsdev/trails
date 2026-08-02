@@ -2,13 +2,6 @@
   {
     "package": "actioncontroller",
     "tsFile": "base.ts",
-    "rubyName": "_render_template",
-    "call": "render_body",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "base.ts",
     "rubyName": "allow_browser",
     "call": "instrument",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -18,13 +11,6 @@
     "tsFile": "base.ts",
     "rubyName": "allow_browser",
     "call": "require",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "base.ts",
-    "rubyName": "expires_in",
-    "call": "cache_control",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -44,29 +30,8 @@
   {
     "package": "actioncontroller",
     "tsFile": "base.ts",
-    "rubyName": "expires_now",
-    "call": "cache_control",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "base.ts",
-    "rubyName": "expires_now",
-    "call": "replace",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "base.ts",
     "rubyName": "form_authenticity_token",
     "call": "masked_authenticity_token",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "base.ts",
-    "rubyName": "fresh_when",
-    "call": "cache_control",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -102,20 +67,6 @@
     "tsFile": "base.ts",
     "rubyName": "process_action",
     "call": "append_info_to_payload",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "base.ts",
-    "rubyName": "process_action",
-    "call": "filter_map",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "base.ts",
-    "rubyName": "process_action",
-    "call": "formats",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -178,13 +129,6 @@
     "package": "actioncontroller",
     "tsFile": "base.ts",
     "rubyName": "redirect_to",
-    "call": "request",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "base.ts",
-    "rubyName": "redirect_to",
     "call": "response_body",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -240,13 +184,6 @@
   {
     "package": "actioncontroller",
     "tsFile": "base.ts",
-    "rubyName": "send_data",
-    "call": "send_file_headers!",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "base.ts",
     "rubyName": "send_file",
     "call": "instrument",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -254,22 +191,8 @@
   {
     "package": "actioncontroller",
     "tsFile": "base.ts",
-    "rubyName": "send_file",
-    "call": "send_file_headers!",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "base.ts",
     "rubyName": "stale?",
     "call": "fresh?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "base.ts",
-    "rubyName": "verify_authenticity_token",
-    "call": "logger",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -291,13 +214,6 @@
     "tsFile": "base.ts",
     "rubyName": "verify_authenticity_token",
     "call": "verified_request?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "base.ts",
-    "rubyName": "verify_authenticity_token",
-    "call": "warn",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }
 ]

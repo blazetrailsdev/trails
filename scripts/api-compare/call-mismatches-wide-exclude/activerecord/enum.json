@@ -3,13 +3,6 @@
     "package": "activerecord",
     "tsFile": "enum.ts",
     "rubyName": "_enum",
-    "call": "default_value",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "enum.ts",
-    "rubyName": "_enum",
     "call": "define_method",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -18,27 +11,6 @@
     "tsFile": "enum.ts",
     "rubyName": "_enum_methods_module",
     "call": "include",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "enum.ts",
-    "rubyName": "assert_valid_value",
-    "call": "has_value?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "enum.ts",
-    "rubyName": "cast",
-    "call": "has_value?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "enum.ts",
-    "rubyName": "cast",
-    "call": "key",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -53,13 +25,6 @@
     "tsFile": "enum.ts",
     "rubyName": "define_enum_methods",
     "call": "not",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "enum.ts",
-    "rubyName": "deserialize",
-    "call": "key",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -81,13 +46,6 @@
     "tsFile": "enum.ts",
     "rubyName": "detect_negative_enum_conditions!",
     "call": "logger",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "enum.ts",
-    "rubyName": "detect_negative_enum_conditions!",
-    "call": "warn",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

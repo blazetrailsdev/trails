@@ -72,13 +72,6 @@
   {
     "package": "actioncontroller",
     "tsFile": "metal/strong-parameters.ts",
-    "rubyName": "each_array_element",
-    "call": "filter_map",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/strong-parameters.ts",
     "rubyName": "each_pair",
     "call": "convert_hashes_to_parameters",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -156,13 +149,6 @@
   {
     "package": "actioncontroller",
     "tsFile": "metal/strong-parameters.ts",
-    "rubyName": "nested_attribute?",
-    "call": "match?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/strong-parameters.ts",
     "rubyName": "permit",
     "call": "permit_filters",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -172,27 +158,6 @@
     "tsFile": "metal/strong-parameters.ts",
     "rubyName": "permit!",
     "call": "each_pair",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/strong-parameters.ts",
-    "rubyName": "permit!",
-    "call": "flatten",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/strong-parameters.ts",
-    "rubyName": "permit!",
-    "call": "wrap",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/strong-parameters.ts",
-    "rubyName": "permit_array_of_hashes",
-    "call": "wrap",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -214,13 +179,6 @@
     "tsFile": "metal/strong-parameters.ts",
     "rubyName": "permit_filters",
     "call": "unpermitted_parameters!",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/strong-parameters.ts",
-    "rubyName": "permit_hash",
-    "call": "wrap",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -270,13 +228,6 @@
     "tsFile": "metal/strong-parameters.ts",
     "rubyName": "slice",
     "call": "new_instance_with_inherited_permitted_status",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/strong-parameters.ts",
-    "rubyName": "specify_numeric_keys?",
-    "call": "match?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

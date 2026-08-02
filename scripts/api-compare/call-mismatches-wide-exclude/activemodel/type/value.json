@@ -1,9 +1,0 @@
-[
-  {
-    "package": "activemodel",
-    "tsFile": "type/value.ts",
-    "rubyName": "initialize",
-    "call": "serialize_cast_value_compatible?",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails serialize_cast_value.rb:41-44 eagerly computes `serialize_cast_value_compatible?` in initialize as a warm-up; trails value.ts computes it lazily with per-class memoization in the static serializeCastValueCompatible (value.ts:168+) — the eager constructor call is a Ruby-only perf priming."
-  }
-]

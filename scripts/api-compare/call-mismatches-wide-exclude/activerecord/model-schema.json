@@ -2,29 +2,8 @@
   {
     "package": "activerecord",
     "tsFile": "model-schema.ts",
-    "rubyName": "_returning_columns_for_insert",
-    "call": "filter_map",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "model-schema.ts",
     "rubyName": "attributes_builder",
     "call": "except",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "model-schema.ts",
-    "rubyName": "column_defaults",
-    "call": "load_schema",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "model-schema.ts",
-    "rubyName": "column_for_attribute",
-    "call": "columns_hash",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

@@ -45,13 +45,6 @@
     "package": "actiondispatch",
     "tsFile": "routing/route-set.ts",
     "rubyName": "default_env",
-    "call": "chomp",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "routing/route-set.ts",
-    "rubyName": "default_env",
     "call": "full_url_for",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -65,43 +58,8 @@
   {
     "package": "actiondispatch",
     "tsFile": "routing/route-set.ts",
-    "rubyName": "eager_load!",
-    "call": "routes",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "routing/route-set.ts",
     "rubyName": "eval_block",
     "call": "default_scope",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "routing/route-set.ts",
-    "rubyName": "extra_keys",
-    "call": "last",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "routing/route-set.ts",
-    "rubyName": "full_url_for",
-    "call": "reverse_merge!",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "routing/route-set.ts",
-    "rubyName": "full_url_for",
-    "call": "symbolize_keys",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "routing/route-set.ts",
-    "rubyName": "generate_extras",
-    "call": "except",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -122,21 +80,7 @@
     "package": "actiondispatch",
     "tsFile": "routing/route-set.ts",
     "rubyName": "generate_url_helpers",
-    "call": "extend",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "routing/route-set.ts",
-    "rubyName": "generate_url_helpers",
     "call": "full_url_for",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "routing/route-set.ts",
-    "rubyName": "generate_url_helpers",
-    "call": "include",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -170,22 +114,8 @@
   {
     "package": "actiondispatch",
     "tsFile": "routing/route-set.ts",
-    "rubyName": "optimize_routes_generation?",
-    "call": "empty?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "routing/route-set.ts",
     "rubyName": "path_for",
     "call": "url_for",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "routing/route-set.ts",
-    "rubyName": "recognize_path",
-    "call": "env_for",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -207,27 +137,6 @@
     "tsFile": "routing/route-set.ts",
     "rubyName": "recognize_path",
     "call": "recognize_path_with_request",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "routing/route-set.ts",
-    "rubyName": "recognize_path_with_request",
-    "call": "camelize",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "routing/route-set.ts",
-    "rubyName": "recognize_path_with_request",
-    "call": "routes",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "routing/route-set.ts",
-    "rubyName": "recognize_path_with_request",
-    "call": "unescape",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

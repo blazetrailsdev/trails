@@ -37,20 +37,6 @@
   {
     "package": "activerecord",
     "tsFile": "database-configurations.ts",
-    "rubyName": "env_with_configs",
-    "call": "configurations",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "database-configurations.ts",
-    "rubyName": "find_db_config",
-    "call": "configurations",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "database-configurations.ts",
     "rubyName": "initialize",
     "call": "build_configs",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
