@@ -23,6 +23,7 @@ import {
   type ForeignKeyLookupOptions,
   type AddIndexOptions,
   type IdHashOptions,
+  type IndexDefinitionRow,
 } from "./connection-adapters/abstract/schema-definitions.js";
 import {
   type JoinTableOptions,
@@ -31,7 +32,6 @@ import {
   type CommentStatements,
   type EnumStatements,
   type ExtensionStatements,
-  type IndexDefinitionRow,
   type UniqueConstraintStatements,
 } from "./connection-adapters/abstract/schema-statements.js";
 import type { UniqueConstraintOptions } from "./connection-adapters/postgresql/schema-definitions.js";

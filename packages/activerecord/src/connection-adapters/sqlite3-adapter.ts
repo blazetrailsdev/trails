@@ -30,7 +30,6 @@ import {
   indexNameForRemoveFrom,
   indexExistsForRemoveFrom,
   canRemoveIndexByName,
-  type IndexDefinitionRow,
 } from "./abstract/schema-statements.js";
 import { captureUnwrappedExecute, dirtiesQueryCache } from "./abstract/query-cache.js";
 import { execInsertReturningReadback } from "./abstract/database-statements.js";
@@ -114,6 +113,7 @@ import {
   type ColumnOptions,
   type RemoveForeignKeyOptions,
   type ForeignKeyLookupOptions,
+  type IndexDefinitionRow,
 } from "./abstract/schema-definitions.js";
 import { Base } from "../base.js";
 import { Column } from "./column.js";

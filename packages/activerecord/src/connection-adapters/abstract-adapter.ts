@@ -75,7 +75,6 @@ import { include } from "@blazetrails/activesupport";
 import {
   SchemaStatements,
   type CommentOrChanges,
-  type IndexDefinitionRow,
   type JoinTableOptions,
 } from "./abstract/schema-statements.js";
 import { Savepoints as SavepointsMixin } from "./abstract/savepoints.js";
@@ -102,6 +101,7 @@ import type {
   IdHashOptions,
   AddReferenceOptions,
   RemoveReferenceOptions,
+  IndexDefinitionRow,
 } from "./abstract/schema-definitions.js";
 import type { SchemaCreation } from "./abstract/schema-creation.js";
 import type { Column } from "./column.js";

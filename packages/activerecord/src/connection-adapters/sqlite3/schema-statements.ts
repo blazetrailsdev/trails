@@ -10,13 +10,13 @@
 
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
-import type { CheckConstraintDefinition } from "../abstract/schema-definitions.js";
+import type {
+  CheckConstraintDefinition,
+  IndexDefinitionRow,
+} from "../abstract/schema-definitions.js";
 import { SqlTypeMetadata } from "../sql-type-metadata.js";
 import { SchemaCreation } from "./schema-creation.js";
-import {
-  SchemaStatements as AbstractSchemaStatements,
-  type IndexDefinitionRow,
-} from "../abstract/schema-statements.js";
+import { SchemaStatements as AbstractSchemaStatements } from "../abstract/schema-statements.js";
 import { SchemaDumper as AbstractSchemaDumper } from "../abstract/schema-dumper.js";
 import { SchemaDumper } from "./schema-dumper.js";
 import { Column } from "./column.js";

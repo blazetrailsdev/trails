@@ -28,6 +28,7 @@ import {
   type AddIndexOptions,
   type AddReferenceOptions,
   type RemoveReferenceOptions,
+  type IndexDefinitionRow,
   ReferenceDefinition,
   type ColumnType,
   type ColumnOptions,
@@ -181,24 +182,6 @@ export function indexExistsForRemoveFrom(
 }
 
 /** Options accepted by `createJoinTable`. Extends the `createTable` option set with join-specific keys. */
-/**
- * The row shape every adapter's `indexes()` returns — the subset of Rails'
- * `IndexDefinition` that callers can rely on across adapters. `columns` is a
- * string for expression indexes (the raw expression) and an array of column
- * names otherwise; `where` (partial-index predicate) and `orders` (per-column
- * sort directions, or a single direction for the whole index) are carried by
- * the SQLite/PostgreSQL/MySQL arms. Adapters may return richer rows (e.g.
- * PostgreSQL's `using`/`opclasses`); those stay assignable to this shape.
- */
-export interface IndexDefinitionRow {
-  table?: string;
-  name: string;
-  columns: string | string[];
-  unique: boolean;
-  where?: string;
-  orders?: Record<string, string> | string;
-}
-
 export type JoinTableOptions = {
   tableName?: string;
   columnOptions?: Record<string, unknown>;
