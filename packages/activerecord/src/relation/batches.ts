@@ -13,12 +13,13 @@ export class Batches {
 }
 
 /** @internal */
-export function ensureValidOptionsForBatchingBang(
+export async function ensureValidOptionsForBatchingBang(
+  relation: any,
   cursor: string | string[],
   start: unknown,
   finish: unknown,
   order: "asc" | "desc" | ("asc" | "desc")[],
-): void {
+): Promise<void> {
   const cursorArr = Array.isArray(cursor) ? cursor : [cursor];
   if (start !== undefined && start !== null) {
     const startArr = Array.isArray(start) ? start : [start];
@@ -32,6 +33,30 @@ export function ensureValidOptionsForBatchingBang(
       throw new Error(":finish must contain one value per cursor column");
     }
   }
+
+  // Rails batches.rb:316-324: when the cursor omits any primary-key column the
+  // batch order is only stable if some other full, non-partial unique index
+  // covers the cursor. `schema_cache.indexes` is async here, which is why the
+  // whole check (and so this method) is a promise.
+  const primaryKey = relation.primaryKey;
+  const pkArr = Array.isArray(primaryKey) ? primaryKey : [primaryKey];
+  if (pkArr.some((key) => !cursorArr.includes(key))) {
+    const model = relation.model;
+    const indexes = (await model
+      .schemaCache()
+      .indexes(model.connectionPool(), relation.tableName)) as Array<{
+      unique: boolean;
+      where?: string | null;
+      columns: string[];
+    }>;
+    const uniqueIndex = indexes.find(
+      (index) => index.unique && !index.where && index.columns.every((c) => cursorArr.includes(c)),
+    );
+    if (!uniqueIndex) {
+      throw new Error(":cursor must include a primary key or other unique column(s)");
+    }
+  }
+
   const orderArr = Array.isArray(order) ? order : [order];
   for (const o of orderArr) {
     if (o !== "asc" && o !== "desc") {
