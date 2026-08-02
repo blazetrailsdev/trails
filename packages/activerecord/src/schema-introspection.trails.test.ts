@@ -1,9 +1,8 @@
 // Trails-only unit tests for the trails-invented `introspect*` helpers
-// (introspectTables/Columns/Indexes/PrimaryKey) and their
-// SchemaStatements fallback path — no 1:1 Rails counterpart exists. The scratch
-// tables these create (`widgets`, `more_testings`) are real Rails migration-test
-// table names (primary_keys_test.rb / migration/compatibility_test.rb), not
-// freshly-invented ones, per the RFC 0048 fidelity contract.
+// (introspectTables/Columns/Indexes/PrimaryKey) — no 1:1 Rails counterpart
+// exists. The scratch tables these create (`widgets`) are real Rails
+// migration-test table names (primary_keys_test.rb), not freshly-invented
+// ones, per the RFC 0048 fidelity contract.
 import { describe, it, expect, afterEach } from "vitest";
 import { Base } from "./base.js";
 import { adapterType } from "./test-adapter.js";
@@ -15,26 +14,6 @@ import {
   introspectPrimaryKey,
 } from "./schema-introspection.js";
 
-/**
- * Return a proxy over `adapter` that hides the named methods so the
- * SchemaStatements fallback path inside `introspect*` runs. Keeping
- * the real adapter underneath means adapterName + execute()
- * work, so SchemaStatements' query dispatch can complete.
- */
-function withoutMethods<A extends object>(adapter: A, hidden: string[]): A {
-  const hiddenSet = new Set(hidden);
-  return new Proxy(adapter, {
-    get(target, prop, receiver) {
-      if (typeof prop === "string" && hiddenSet.has(prop)) return undefined;
-      return Reflect.get(target, prop, receiver);
-    },
-    has(target, prop) {
-      if (typeof prop === "string" && hiddenSet.has(prop)) return false;
-      return Reflect.has(target, prop);
-    },
-  });
-}
-
 // Ride the primary schema-loaded pool (`Base.connection`) instead of the
 // sidecar test pool.
 fixtures({}, { useTransactionalTests: false });
@@ -42,7 +21,7 @@ fixtures({}, { useTransactionalTests: false });
 // The tables these tests create leak into the shared
 // per-worker DB; drop them by name so they don't collide with sibling files.
 afterEach(async () => {
-  await Base.connection.dropTable("widgets", "more_testings", { ifExists: true });
+  await Base.connection.dropTable("widgets", { ifExists: true });
 });
 
 describe("introspectTables", () => {
@@ -59,20 +38,6 @@ describe("introspectTables", () => {
 
     expect(called).toBe(true);
     expect(tables).toEqual(["users", "posts"]);
-  });
-
-  it("falls back to SchemaStatements when the adapter doesn't implement tables()", async () => {
-    const realAdapter = Base.connection;
-    await realAdapter.createTable("widgets", {}, () => {});
-    await realAdapter.createTable("more_testings", {}, () => {});
-
-    // Strip `tables()` so introspectTables routes through SchemaStatements.
-    const stripped = withoutMethods(realAdapter, ["tables"]);
-
-    const tables = await introspectTables(stripped);
-
-    expect(tables).toContain("widgets");
-    expect(tables).toContain("more_testings");
   });
 });
 
@@ -91,22 +56,6 @@ describe("introspectColumns", () => {
 
     expect(calledWith).toBe("users");
     expect(cols).toBe(fakeCols);
-  });
-
-  it("falls back to SchemaStatements when the adapter doesn't implement columns()", async () => {
-    const realAdapter = Base.connection;
-    await realAdapter.createTable("widgets", {}, (t) => {
-      t.string("name");
-      t.integer("age");
-    });
-
-    // Strip `columns()` so introspectColumns routes through SchemaStatements.
-    const stripped = withoutMethods(realAdapter, ["columns"]);
-
-    const cols = await introspectColumns(stripped, "widgets");
-    const names = cols.map((c) => c.name).sort();
-
-    expect(names).toEqual(["age", "id", "name"]);
   });
 });
 
@@ -127,24 +76,9 @@ describe("introspectIndexes", () => {
     expect(idxs).toBe(fakeIndexes);
   });
 
-  it("falls back to SchemaStatements when the adapter doesn't implement indexes()", async () => {
-    const realAdapter = Base.connection;
-    await realAdapter.createTable("widgets", {}, (t) => {
-      t.string("name");
-    });
-    await realAdapter.addIndex("widgets", ["name"], { name: "idx_widgets_name" });
-
-    const stripped = withoutMethods(realAdapter, ["indexes"]);
-
-    const idxs = await introspectIndexes(stripped, "widgets");
-
-    expect(idxs.some((i) => i.name === "idx_widgets_name")).toBe(true);
-  });
-
-  // `orders` (per-column DESC) is recovered by all three fallback arms; `where`
-  // (partial-index predicate) only by adapters that support partial indexes
-  // (sqlite/postgres — MySQL has none).
-  it("surfaces where/orders carried by the fallback SchemaStatements.indexes()", async () => {
+  // `where` (partial-index predicate) is only reflected by adapters that
+  // support partial indexes (sqlite/postgres — MySQL has none).
+  it("surfaces where/orders carried by adapter.indexes()", async () => {
     const supportsPartial = adapterType === "sqlite" || adapterType === "postgres";
     const realAdapter = Base.connection;
     await realAdapter.createTable("widgets", {}, (t) => {
@@ -157,9 +91,7 @@ describe("introspectIndexes", () => {
       order: { name: "desc" },
     });
 
-    const stripped = withoutMethods(realAdapter, ["indexes"]);
-
-    const idxs = await introspectIndexes(stripped, "widgets");
+    const idxs = await introspectIndexes(realAdapter, "widgets");
     const idx = idxs.find((i) => i.name === "idx_widgets_name_partial");
 
     // `where` and `orders` are now statically visible on IntrospectedIndex,
@@ -180,12 +112,12 @@ describe("introspectIndexes", () => {
     expect(idx?.where).toBe(supportsPartial ? "active" : undefined);
   });
 
-  // The postgres fallback arm builds `columns` from a `pg_attribute` join that
-  // drops expression columns (attnum 0), so it must instead surface the raw
+  // The postgres indexes() implementation builds `columns` from a `pg_attribute` join
+  // that drops expression columns (attnum 0), so it must instead surface the raw
   // expression string parsed from pg_get_indexdef, mirroring the concrete
   // PostgreSQLSchemaStatements#indexes / Rails (schema_statements.rb:117).
   it.skipIf(adapterType !== "postgres")(
-    "surfaces expression-index columns from the fallback SchemaStatements.indexes()",
+    "surfaces expression-index columns from adapter.indexes()",
     async () => {
       const realAdapter = Base.connection;
       await realAdapter.createTable("widgets", {}, (t) => {
@@ -193,9 +125,7 @@ describe("introspectIndexes", () => {
       });
       await realAdapter.addIndex("widgets", "lower(name)", { name: "idx_widgets_lower_name" });
 
-      const stripped = withoutMethods(realAdapter, ["indexes"]);
-
-      const idxs = await introspectIndexes(stripped, "widgets");
+      const idxs = await introspectIndexes(realAdapter, "widgets");
       const idx = idxs.find((i) => i.name === "idx_widgets_lower_name");
 
       expect(idx?.columns).toBe("lower((name)::text)");
@@ -237,25 +167,5 @@ describe("introspectPrimaryKey", () => {
     } as unknown as Parameters<typeof introspectPrimaryKey>[0];
 
     expect(await introspectPrimaryKey(adapter, "t")).toEqual([]);
-  });
-
-  it("falls back to columns with primaryKey===true when adapter lacks primaryKey()", async () => {
-    const realAdapter = Base.connection;
-    await realAdapter.createTable("widgets", {}, (t) => {
-      t.string("name");
-    });
-
-    const stripped = withoutMethods(realAdapter, ["primaryKey"]);
-
-    const pk = await introspectPrimaryKey(stripped, "widgets");
-
-    // The fallback derives the key from columns whose reflected `primaryKey`
-    // flag is set. MySQL/MariaDB's columns() carries no per-column primary flag
-    // — matching Rails' MySQL::Column (abstract_mysql_adapter.rb /
-    // mysql/schema_statements.rb#new_column_from_field), which passes no primary
-    // argument and resolves the key solely via @connection.primary_key. So with
-    // primaryKey() stripped there is nothing to fall back to and the result is
-    // empty; sqlite/postgres, whose columns() flag the PK, yield ["id"].
-    expect(pk).toEqual(adapterType === "mysql" ? [] : ["id"]);
   });
 });

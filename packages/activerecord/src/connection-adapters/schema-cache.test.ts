@@ -5,6 +5,8 @@ import { SqlTypeMetadata } from "./sql-type-metadata.js";
 import { ActiveRecord } from "../ar-config.js";
 import { StatementInvalid } from "../errors.js";
 import { SchemaStatements } from "./abstract/schema-statements.js";
+import type { SchemaQuoter } from "./abstract/assert-schema-adapter.js";
+import { include } from "@blazetrails/activesupport";
 import { TableDefinition } from "./abstract/schema-definitions.js";
 import type { AbstractAdapter } from "./abstract-adapter.js";
 import { newRawTestAdapter } from "../test-adapter.js";
@@ -717,20 +719,31 @@ describe("SchemaReflectionTest", () => {
 // Tests that are NOT skipped already pass because the relevant adapter override
 // already calls clearDataSourceCacheBang (dropTable in all three adapters).
 
-function makeMockAdapter(cache: SchemaCache) {
-  return {
-    adapterName: "sqlite" as const,
-    quoteIdentifier: (n: string) => `"${n}"`,
-    quoteTableName: (n: string) => `"${n}"`,
-    executeMutation: vi.fn().mockResolvedValue(0),
-    execute: vi.fn().mockResolvedValue([]),
-    schemaCache: cache,
-    pool: {},
-    quoteDefaultExpression: (_v: unknown) => "",
-    supportsDatetimeWithPrecision: () => false,
-    createTableDefinition: (n: string, opts: Record<string, unknown>) =>
-      new TableDefinition(n, { ...opts, adapterName: "sqlite" }),
-  };
+class MockAdapter {
+  adapterName = "sqlite" as const;
+  quoteIdentifier = (n: string) => `"${n}"`;
+  quoteTableName = (n: string) => `"${n}"`;
+  executeMutation = vi.fn().mockResolvedValue(0);
+  execute = vi.fn().mockResolvedValue([]);
+  schemaCache: SchemaCache;
+  pool = {};
+  quoteDefaultExpression = (_v: unknown) => "";
+  supportsDatetimeWithPrecision = () => false;
+  createTableDefinition = (n: string, opts: Record<string, unknown>) =>
+    new TableDefinition(n, { ...opts, adapterName: "sqlite" });
+
+  constructor(cache: SchemaCache) {
+    this.schemaCache = cache;
+  }
+
+  // SchemaStatements' bodies reach the adapter through `this.adapter`; on a
+  // real adapter that self-reference is AbstractAdapter#adapter.
+  adapter = this as unknown as AbstractAdapter & SchemaQuoter;
+}
+include(MockAdapter, SchemaStatements);
+
+function makeMockAdapter(cache: SchemaCache): MockAdapter & SchemaStatements {
+  return new MockAdapter(cache) as MockAdapter & SchemaStatements;
 }
 
 describe("DDL cache-invalidation safety-net", () => {
@@ -751,10 +764,9 @@ describe("DDL cache-invalidation safety-net", () => {
       return [];
     });
 
-    const ss = new SchemaStatements(adapter as any);
     // The adapter is a mock: no DDL reaches a database.
     // eslint-disable-next-line blazetrails/require-table-teardown
-    await ss.dropTable("posts");
+    await adapter.dropTable("posts");
 
     expect(cache.isCached("posts")).toBe(false);
     expect(order).toEqual(["clear:posts", "sql"]);
@@ -777,8 +789,7 @@ describe("DDL cache-invalidation safety-net", () => {
       return [];
     });
 
-    const ss = new SchemaStatements(adapter as any);
-    await ss.dropJoinTable("accounts", "people");
+    await adapter.dropJoinTable("accounts", "people");
 
     expect(cache.isCached("accounts_people")).toBe(false);
     expect(order).toEqual(["clear:accounts_people", "sql"]);
@@ -790,8 +801,8 @@ describe("DDL cache-invalidation safety-net", () => {
     // Pre-seed new name too (could be stale from a previous run)
     cache.setColumns("articles", [makeColumn("id", "integer")]);
 
-    const ss = new SchemaStatements(makeMockAdapter(cache) as any);
-    await ss.renameTable("posts", "articles");
+    const adapter = makeMockAdapter(cache);
+    await adapter.renameTable("posts", "articles");
 
     expect(cache.isCached("posts")).toBe(false);
     expect(cache.isCached("articles")).toBe(false);
@@ -802,8 +813,8 @@ describe("DDL cache-invalidation safety-net", () => {
     // Stale entry from a prior create (e.g. after a test dropped the table)
     cache.setColumns("posts", [makeColumn("id", "integer")]);
 
-    const ss = new SchemaStatements(makeMockAdapter(cache) as any);
-    await ss.createTable("posts");
+    const adapter = makeMockAdapter(cache);
+    await adapter.createTable("posts");
 
     expect(cache.isCached("posts")).toBe(false);
   });
@@ -812,8 +823,8 @@ describe("DDL cache-invalidation safety-net", () => {
     const cache = new SchemaCache();
     cache.setColumns("posts", [makeColumn("id", "integer")]);
 
-    const ss = new SchemaStatements(makeMockAdapter(cache) as any);
-    await ss.addColumn("posts", "title", "string");
+    const adapter = makeMockAdapter(cache);
+    await adapter.addColumn("posts", "title", "string");
 
     expect(cache.isCached("posts")).toBe(false);
   });
@@ -822,8 +833,8 @@ describe("DDL cache-invalidation safety-net", () => {
     const cache = new SchemaCache();
     cache.setColumns("posts", [makeColumn("id", "integer"), makeColumn("title", "varchar")]);
 
-    const ss = new SchemaStatements(makeMockAdapter(cache) as any);
-    await ss.removeColumn("posts", "title");
+    const adapter = makeMockAdapter(cache);
+    await adapter.removeColumn("posts", "title");
 
     expect(cache.isCached("posts")).toBe(false);
   });
@@ -832,8 +843,8 @@ describe("DDL cache-invalidation safety-net", () => {
     const cache = new SchemaCache();
     cache.setColumns("posts", [makeColumn("id", "integer"), makeColumn("title", "varchar")]);
 
-    const ss = new SchemaStatements(makeMockAdapter(cache) as any);
-    await ss.addIndex("posts", ["title"]);
+    const adapter = makeMockAdapter(cache);
+    await adapter.addIndex("posts", ["title"]);
 
     expect(cache.isCached("posts")).toBe(false);
   });
@@ -842,8 +853,8 @@ describe("DDL cache-invalidation safety-net", () => {
     const cache = new SchemaCache();
     cache.setColumns("posts", [makeColumn("id", "integer"), makeColumn("title", "varchar")]);
 
-    const ss = new SchemaStatements(makeMockAdapter(cache) as any);
-    await ss.removeIndex("posts", { name: "index_posts_on_title" });
+    const adapter = makeMockAdapter(cache);
+    await adapter.removeIndex("posts", { name: "index_posts_on_title" });
 
     expect(cache.isCached("posts")).toBe(false);
   });
@@ -852,8 +863,8 @@ describe("DDL cache-invalidation safety-net", () => {
     const cache = new SchemaCache();
     cache.setColumns("posts", [makeColumn("id", "integer"), makeColumn("title", "varchar")]);
 
-    const ss = new SchemaStatements(makeMockAdapter(cache) as any);
-    await ss.changeColumn("posts", "title", "text");
+    const adapter = makeMockAdapter(cache);
+    await adapter.changeColumn("posts", "title", "text");
 
     expect(cache.isCached("posts")).toBe(false);
   });
@@ -875,8 +886,7 @@ describe("DDL cache-invalidation safety-net", () => {
       return [];
     });
 
-    const ss = new SchemaStatements(adapter as any);
-    await ss.renameColumn("posts", "title", "headline");
+    await adapter.renameColumn("posts", "title", "headline");
 
     expect(cache.isCached("posts")).toBe(false);
     expect(order).toEqual(["clear:posts", "sql"]);
@@ -899,11 +909,10 @@ describe("DDL cache-invalidation safety-net", () => {
       return [];
     });
 
-    const ss = new SchemaStatements(adapter as any);
-    vi.spyOn(ss, "indexes").mockResolvedValue([
+    vi.spyOn(adapter, "indexes").mockResolvedValue([
       { table: "posts", name: "index_posts_on_title", columns: ["title"], unique: false } as any,
     ]);
-    await ss.renameIndex("posts", "index_posts_on_title", "index_posts_on_headline");
+    await adapter.renameIndex("posts", "index_posts_on_title", "index_posts_on_headline");
 
     expect(cache.isCached("posts")).toBe(false);
     expect(order[0]).toBe("clear:posts");

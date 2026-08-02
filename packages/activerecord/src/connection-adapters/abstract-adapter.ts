@@ -220,6 +220,7 @@ export interface AbstractAdapter {
           primaryKey?: string | string[] | false;
           force?: boolean | "cascade";
           ifNotExists?: boolean;
+          default?: unknown;
           options?: string;
           comment?: string;
           charset?: string;
@@ -227,6 +228,8 @@ export interface AbstractAdapter {
           temporary?: boolean;
           as?: string;
           autoIncrement?: boolean;
+          limit?: number;
+          precision?: number;
         }
       | ((t: TableDefinition) => void),
     fn?: (t: TableDefinition) => void,

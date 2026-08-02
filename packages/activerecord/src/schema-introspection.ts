@@ -2,31 +2,18 @@
  * Shared adapter-introspection helpers used by schema dumpers.
  *
  * Adapter-introspection helpers used by `SchemaDumper` (DSL output —
- * `db/schema.ts`) and related tooling. Adapters prefer their own
- * `tables()` / `columns()` implementations when available and fall back
- * to the portable `SchemaStatements` queries otherwise. PostgreSQL and
- * SQLite adapters implement these with adapter-specific semantics
- * (e.g. PG respects the current `search_path`).
+ * `db/schema.ts`) and related tooling. Every adapter carries `tables()` /
+ * `columns()` / `indexes()` / `primaryKey()` from Rails'
+ * `include SchemaStatements`, so these call straight through; PostgreSQL and
+ * SQLite adapters override them with adapter-specific semantics (e.g. PG
+ * respects the current `search_path`).
  *
  * Keeping this in one module means future changes to introspection
  * semantics stay in one place.
  */
 
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
-import {
-  SchemaStatements,
-  assertSchemaAdapter,
-} from "./connection-adapters/abstract/schema-statements.js";
 import type { Column } from "./connection-adapters/column.js";
-
-type AdapterWithTables = { tables(): Promise<string[]> };
-type AdapterWithColumns = { columns(table: string): Promise<Column[]> };
-type AdapterWithIndexes = {
-  indexes(table: string): Promise<Array<{ name: string; columns: string[]; unique: boolean }>>;
-};
-type AdapterWithPrimaryKey = {
-  primaryKey(table: string): Promise<string | string[] | null>;
-};
 
 /** Minimal index descriptor shared by all adapters. */
 export interface IntrospectedIndex {
@@ -45,78 +32,34 @@ export interface IntrospectedIndex {
   orders?: Record<string, string> | string;
 }
 
-function hasTables(a: unknown): a is AdapterWithTables {
-  return typeof (a as AdapterWithTables).tables === "function";
-}
-function hasColumns(a: unknown): a is AdapterWithColumns {
-  return typeof (a as AdapterWithColumns).columns === "function";
-}
-function hasIndexes(a: unknown): a is AdapterWithIndexes {
-  return typeof (a as AdapterWithIndexes).indexes === "function";
-}
-function hasPrimaryKey(a: unknown): a is AdapterWithPrimaryKey {
-  return typeof (a as AdapterWithPrimaryKey).primaryKey === "function";
-}
-
-// Memoize `SchemaStatements` per-adapter so the fallback path doesn't
-// reinstantiate on every call (and per-table when `adapter.columns()`
-// is absent). WeakMap lets GC reclaim the helper when the adapter is
-// disposed.
-const SCHEMA_STATEMENTS = new WeakMap<object, SchemaStatements>();
-function schemaStatementsFor(adapter: DatabaseAdapter): SchemaStatements {
-  const key = adapter as unknown as object;
-  let s = SCHEMA_STATEMENTS.get(key);
-  if (!s) {
-    assertSchemaAdapter(adapter);
-    s = new SchemaStatements(adapter);
-    SCHEMA_STATEMENTS.set(key, s);
-  }
-  return s;
-}
-
-/**
- * Return the table names reported by the adapter. Uses
- * `adapter.tables()` when the adapter implements it, else falls back
- * to `new SchemaStatements(adapter).tables()` (memoized per adapter).
- */
+/** Return the table names reported by the adapter. */
 export async function introspectTables(adapter: DatabaseAdapter): Promise<string[]> {
-  if (hasTables(adapter)) return adapter.tables();
-  return schemaStatementsFor(adapter).tables();
+  return adapter.tables();
 }
 
-/**
- * Return the Column objects for `table`. Uses `adapter.columns()`
- * when implemented, else falls back to
- * `new SchemaStatements(adapter).columns(table)` (memoized per adapter
- * so a loop that dumps many tables reuses a single helper).
- */
+/** Return the Column objects for `table`. */
 export async function introspectColumns(
   adapter: DatabaseAdapter,
   table: string,
 ): Promise<Column[]> {
-  if (hasColumns(adapter)) return adapter.columns(table);
-  return schemaStatementsFor(adapter).columns(table);
+  return adapter.columns(table);
 }
 
 /**
- * Return index descriptors for `table`. Uses `adapter.indexes()` when
- * implemented (preferred — adapter-specific semantics like SQLite's
- * `origin === "c"` filter that excludes constraint-generated autoindexes
- * are applied), else falls back to `SchemaStatements.indexes()`.
+ * Return index descriptors for `table`. Adapter-specific semantics (like
+ * SQLite's `origin === "c"` filter that excludes constraint-generated
+ * autoindexes) are applied by the adapter's own override.
  */
 export async function introspectIndexes(
   adapter: DatabaseAdapter,
   table: string,
 ): Promise<IntrospectedIndex[]> {
-  if (hasIndexes(adapter)) return adapter.indexes(table) as Promise<IntrospectedIndex[]>;
-  return schemaStatementsFor(adapter).indexes(table);
+  return adapter.indexes(table) as Promise<IntrospectedIndex[]>;
 }
 
 /**
  * Return primary key column names for `table` in PK-position order (matching
- * Rails' `PRAGMA table_info` pk-field sort). Uses `adapter.primaryKey()` when
- * implemented, else derives from `columns()` filtered to primaryKey===true —
- * which preserves declaration order but loses composite PK position.
+ * Rails' `PRAGMA table_info` pk-field sort).
  *
  * Returns an empty array when the table has no primary key.
  */
@@ -124,12 +67,7 @@ export async function introspectPrimaryKey(
   adapter: DatabaseAdapter,
   table: string,
 ): Promise<string[]> {
-  if (hasPrimaryKey(adapter)) {
-    const pk = await adapter.primaryKey(table);
-    if (pk === null) return [];
-    return Array.isArray(pk) ? pk : [pk];
-  }
-  // Fallback: columns with primaryKey=true in declaration order.
-  const cols = await introspectColumns(adapter, table);
-  return cols.filter((c) => c.primaryKey).map((c) => c.name);
+  const pk = await adapter.primaryKey(table);
+  if (pk === null) return [];
+  return Array.isArray(pk) ? pk : [pk];
 }

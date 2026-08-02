@@ -5,7 +5,6 @@ import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll, vi } 
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { isValidUuid, normalizeUuid } from "../../connection-adapters/postgresql/oid/uuid.js";
 import { SchemaDumper } from "../../schema-dumper.js";
-import { SchemaStatements } from "../../connection-adapters/abstract/schema-statements.js";
 import { RecordNotFound } from "../../errors.js";
 import { itIfSupports } from "../../support/supports.js";
 import { fixtures } from "../../test-fixtures.js";
@@ -796,10 +795,9 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("createTable round-trips uuid PK default", async () => {
-      const ss = new SchemaStatements(adapter);
       await adapter.exec(`DROP TABLE IF EXISTS pg_uuids_rt`);
       try {
-        await ss.createTable("pg_uuids_rt", {
+        await adapter.createTable("pg_uuids_rt", {
           id: "uuid",
           default: () => "gen_random_uuid()",
           force: "cascade",

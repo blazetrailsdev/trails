@@ -20,8 +20,6 @@
  */
 
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
-import type { SchemaStatements } from "./connection-adapters/abstract/schema-statements.js";
-import { assertSchemaAdapter } from "./connection-adapters/abstract/assert-schema-adapter.js";
 import type * as SchemaIntrospectionModule from "./schema-introspection.js";
 import * as adapterDumper from "./connection-adapters/abstract/schema-dumper.js";
 import type {
@@ -247,7 +245,6 @@ class AdapterSchemaSource implements SchemaSource {
   get adapter(): DatabaseAdapter {
     return this._adapter;
   }
-  private _schema?: SchemaStatements;
 
   /** @internal */
   constructor(adapter: DatabaseAdapter) {
@@ -329,18 +326,7 @@ class AdapterSchemaSource implements SchemaSource {
       include?: string[];
       comment?: string;
     };
-    let raw: RichIdx[];
-    const adapterAny = this._adapter as unknown as { indexes?(t: string): Promise<unknown[]> };
-    if (typeof adapterAny.indexes === "function") {
-      raw = (await adapterAny.indexes(tableName)) as RichIdx[];
-    } else {
-      if (!this._schema) {
-        const mod = await import("./connection-adapters/abstract/schema-statements.js");
-        assertSchemaAdapter(this._adapter);
-        this._schema = new mod.SchemaStatements(this._adapter);
-      }
-      raw = (await this._schema.indexes(tableName)) as RichIdx[];
-    }
+    const raw = (await this._adapter.indexes(tableName)) as RichIdx[];
     return raw.map((idx) => ({
       columns: idx.columns,
       unique: idx.unique,
