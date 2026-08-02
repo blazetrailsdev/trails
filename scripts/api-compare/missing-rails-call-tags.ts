@@ -32,6 +32,18 @@ export const DEFAULT_REASON =
   "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; " +
   "bucket (b) equivalent or (c) noise pending per-cluster burndown review.";
 
+/**
+ * The narrow baseline's seeded `reason` — the RFC 0044 seed prose, stamped by
+ * `reseed()` in lint-call-mismatches.ts on a newly-flagged narrow call. It
+ * lives here, beside {@link DEFAULT_REASON}, so ONE predicate knows both seeds:
+ * a tag carrying it stands in for a reason exactly as the wide seed does, and
+ * `justifies()` rejecting only the wide one would let a narrow-seeded row
+ * suppress its wide flag — blessing a row nobody reviewed.
+ */
+export const NARROW_DEFAULT_REASON =
+  "Baseline (RFC 0044): pre-existing call-set flag inherited when the ratchet " +
+  "landed; pending per-cluster burndown review.";
+
 /** One parsed `@missingRailsCall` tag: the Ruby call name plus its raw lines
  *  (kept verbatim for idempotency) and the flattened reason text. */
 export interface TagEntry {
@@ -157,11 +169,13 @@ export function parseJsdoc(
 }
 
 /** True when a tag's reason argues the deviation, rather than standing in for
- *  one: real per-entry prose, not the {@link DEFAULT_REASON} seed. The single
- *  predicate behind both halves of the contract — a tag suppresses its flag if
- *  and only if its baseline row may be dropped. */
+ *  one: real per-entry prose, not the {@link DEFAULT_REASON} nor the
+ *  {@link NARROW_DEFAULT_REASON} seed. The single predicate behind both halves
+ *  of the contract — a tag suppresses its flag if and only if its baseline row
+ *  may be dropped — and it knows BOTH baselines' seeds, since a tag's prose is
+ *  migrated out of the narrow baseline as readily as the wide one. */
 export function justifies(reason: string): boolean {
-  return reason !== "" && reason !== DEFAULT_REASON;
+  return reason !== "" && reason !== DEFAULT_REASON && reason !== NARROW_DEFAULT_REASON;
 }
 
 /** The Ruby call names one JSDoc comment JUSTIFIES as deliberately not made,

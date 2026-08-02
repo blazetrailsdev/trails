@@ -7,6 +7,7 @@ import {
   renderJsdoc,
   buildExpectations,
 } from "./build.js";
+import { NARROW_DEFAULT_REASON } from "./missing-rails-call-tags.js";
 
 const reasonFor = () => DEFAULT_TAG_REASON;
 
@@ -316,6 +317,19 @@ describe("buildExpectations", () => {
     const expectations = new Map([["bar", { rubyNames: ["bar"], calls: new Set(["save"]) }]]);
     const { tagged } = reconcileFileText("foo.ts", FILE, expectations, () => DEFAULT_TAG_REASON);
     expect(tagged).toEqual([]);
+  });
+
+  it("mints no tag for a narrow-seeded row either, matching the wide policy", () => {
+    const expectations = new Map([["bar", { rubyNames: ["bar"], calls: new Set(["save"]) }]]);
+    const { text, tagged, skipped } = reconcileFileText(
+      "foo.ts",
+      FILE,
+      expectations,
+      () => NARROW_DEFAULT_REASON,
+    );
+    expect(tagged).toEqual([]);
+    expect(skipped).toEqual(["save"]);
+    expect(text ?? FILE).not.toContain("RFC 0044");
   });
 
   it("records every Ruby name that lands on one TS method", () => {

@@ -46,6 +46,7 @@ import {
 import { loadSplitBaseline, writeSplitBaseline } from "./lint-call-mismatches-wide.js";
 import {
   DEFAULT_REASON,
+  NARROW_DEFAULT_REASON,
   TAG,
   type TagEntry,
   justifies,
@@ -64,7 +65,13 @@ export type { JsdocOrigin, TagEntry } from "./missing-rails-call-tags.js";
 export const DEFAULT_TAG_REASON = DEFAULT_REASON;
 // Reasons treated as placeholders: dropping them on convergence needs no
 // harvest report.
-const PLACEHOLDER_REASONS = new Set([DEFAULT_TAG_REASON, "unported (api:build stub)"]);
+const PLACEHOLDER_REASONS = new Set([
+  DEFAULT_TAG_REASON,
+  // The narrow baseline's seed: a tag can only ever have carried it by being
+  // minted from a narrow row's prose, and it justifies nothing either.
+  NARROW_DEFAULT_REASON,
+  "unported (api:build stub)",
+]);
 
 export interface ArtifactMismatch {
   package: string;
