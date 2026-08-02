@@ -2254,11 +2254,6 @@ export class Migrator {
    *
    * Reads the direction and target version this Migrator was constructed with,
    * as Rails does with `@direction` / `@target_version`.
-   *
-   * The already-applied guards replicate the skip logic in Rails'
-   * `execute_migration_in_transaction` (migration.rb:1528-1530), which checks
-   * `migrated.include?(migration.version)` before running. Our `_runMigration`
-   * doesn't carry that check, so the guard lives here instead.
    */
   async runWithoutLock(): Promise<string | undefined> {
     // Rails' `Migrator#run` is only ever built with a target version; a nil one
@@ -2275,11 +2270,7 @@ export class Migrator {
     const proxy = this._migrations.find((m) => m.version === key);
     if (!proxy) throw new UnknownMigrationVersionError(targetVersion);
     await this.recordEnvironment();
-    const applied = await this.migrated();
-    if (this.isUp() && applied.has(key)) return undefined;
-    if (this.isDown() && !applied.has(key)) return undefined;
-    await this._runMigration(proxy, this._direction);
-    return proxy.version;
+    return this.executeMigrationInTransaction(proxy);
   }
 
   /** @internal Mirrors: ActiveRecord::Migrator#migrate_without_lock */
@@ -2348,9 +2339,20 @@ export class Migrator {
     return this._invalidTarget(this._targetVersion);
   }
 
-  /** @internal Mirrors: ActiveRecord::Migrator#execute_migration_in_transaction */
-  async executeMigrationInTransaction(proxy: MigrationProxy): Promise<void> {
+  /**
+   * @internal Mirrors: ActiveRecord::Migrator#execute_migration_in_transaction
+   *
+   * Rails' early returns yield nil; the version is returned only when the
+   * migration actually ran, which is what `run_without_lock` hands back to
+   * `MigrationContext#run`.
+   */
+  async executeMigrationInTransaction(proxy: MigrationProxy): Promise<string | undefined> {
+    const applied = await this.migrated();
+    if (this.isDown() && !applied.has(proxy.version)) return undefined;
+    if (this.isUp() && applied.has(proxy.version)) return undefined;
+
     await this._runMigration(proxy, this._direction);
+    return proxy.version;
   }
 
   /** @internal Mirrors: ActiveRecord::Migrator#target */

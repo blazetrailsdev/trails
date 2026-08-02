@@ -77,6 +77,40 @@ describe("Migrator trails extensions", () => {
     expect(env).toBe(envName(adapter));
   });
 
+  it("executeMigrationInTransaction skips migrations already in migrated", async () => {
+    const calls: Array<[string, number]> = [];
+    const proxy = makeMigration(
+      "1",
+      "M1",
+      async () => void calls.push(["up", 1]),
+      async () => void calls.push(["down", 1]),
+    );
+
+    // Called directly, so nothing has run `runnable()` / `_ensureSchemaTable()`
+    // for us — the guards read `migrated`, which needs the table present.
+    await new SchemaMigration(adapter).createTable();
+    await new InternalMetadata(adapter).createTable();
+
+    const up = new Migrator(adapter, [proxy]);
+    expect(await up.executeMigrationInTransaction(proxy)).toBe("1");
+    expect(calls).toEqual([["up", 1]]);
+
+    const again = new Migrator(adapter, [proxy]);
+    expect(await again.executeMigrationInTransaction(proxy)).toBeUndefined();
+    expect(calls).toEqual([["up", 1]]);
+
+    const down = new Migrator(adapter, [proxy], { direction: "down" });
+    expect(await down.executeMigrationInTransaction(proxy)).toBe("1");
+    expect(calls).toEqual([
+      ["up", 1],
+      ["down", 1],
+    ]);
+
+    const downAgain = new Migrator(adapter, [proxy], { direction: "down" });
+    expect(await downAgain.executeMigrationInTransaction(proxy)).toBeUndefined();
+    expect(calls).toHaveLength(2);
+  });
+
   it("up and down raise UnknownMigrationVersionError for an unknown target", async () => {
     // Rails routes both through a per-run Migrator whose migrate_without_lock
     // starts with `raise UnknownMigrationVersionError if invalid_target?`

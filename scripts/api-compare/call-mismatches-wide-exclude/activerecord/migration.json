@@ -310,13 +310,6 @@
   {
     "package": "activerecord",
     "tsFile": "migration.ts",
-    "rubyName": "run_without_lock",
-    "call": "execute_migration_in_transaction",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "migration.ts",
     "rubyName": "up_only",
     "call": "execute_block",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
