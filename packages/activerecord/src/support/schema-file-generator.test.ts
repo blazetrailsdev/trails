@@ -114,7 +114,7 @@ describe("generateSchemaFile", () => {
 
   it("keeps a single-column string custom PK as the array (non-serial) form", () => {
     expect(content).toContain('primaryKey: ["code"]');
-    // The string PK column is still emitted as a column (NOT NULL via composite path).
+    // The string PK column is still emitted as a column.
     expect(content).toContain('"code", "string"');
   });
 });

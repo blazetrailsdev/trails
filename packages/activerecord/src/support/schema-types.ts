@@ -114,10 +114,12 @@ export interface ForeignKeySpec {
 export interface WrappedTableSchema {
   columns: Record<string, ColumnSpec>;
   /**
-   * Table-level primary key. `string[]` builds a composite PK constraint
-   * over the listed columns (which are also marked NOT NULL, matching
-   * Rails semantics — SQLite otherwise lets NULLs slip through composite
-   * PKs). `false` builds the table without a PK. A single-string form is
+   * Table-level primary key. `string[]` builds a composite PK constraint over
+   * the listed columns and nothing else — Rails' `visit_PrimaryKeyDefinition`
+   * (`schema_creation.rb:79`) emits only `PRIMARY KEY (…)`, and schema.rb
+   * declares the columns bare (`cpk_books`, schema.rb:243-245), so nullability
+   * comes from the column's own declaration on every adapter. `false` builds
+   * the table without a PK. A single-string form is
    * intentionally not supported — pass `[name]` for a single-column
    * non-`id` primary key. Omit to keep the default auto-increment `id`.
    *
