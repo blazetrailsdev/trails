@@ -362,7 +362,9 @@ export class CollectionAssociation extends Association {
     const scope = this.scope();
 
     if (this.reflection.options.inverseOf && this.isLoaded()) {
-      const argsFlatten = (args as any[]).flat();
+      // Ruby's `Array#flatten` is recursive, so `find([[id]])` collapses to a
+      // single scannable id (collection_association.rb:96).
+      const argsFlatten = (args as any[]).flat(Infinity);
       const model = scope.model;
 
       if (argsFlatten.length === 0) {
@@ -1254,7 +1256,7 @@ export class CollectionAssociation extends Association {
 
   private findByScan(args: unknown[]): Base | Array<Base | undefined> | undefined {
     const expectsArray = Array.isArray(args[0]);
-    const ids = args.flat().filter((id) => id != null);
+    const ids = args.flat(Infinity).filter((id) => id != null);
     // Rails compares `args.flatten.compact.map(&:to_s)` against `r.id.to_s`
     // (collection_association.rb:523,527), so both sides land in string shape
     // and `find("1")` matches an Integer PK. Each key goes through
