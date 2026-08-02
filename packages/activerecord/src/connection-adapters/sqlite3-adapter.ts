@@ -3113,9 +3113,6 @@ function translateException(
   if (msg.includes("String or BLOB exceeded size limit")) {
     return new ValueTooLong(message, { sql, binds, connectionPool, cause: exception });
   }
-  if (_isSqliteMissingDbError(exception)) {
-    return new NoDatabaseError(message, { sql, binds, connectionPool, cause: exception });
-  }
   if (/called on a closed database/i.test(msg)) {
     return new ConnectionNotEstablished(message, { connectionPool, cause: exception });
   }
