@@ -56,7 +56,8 @@ const NON_EMITTING: ReadonlyMap<string, string> = new Map([
  * a member reached off the proxy is recorded and bound to a second recording
  * view, so the `this.<member>` calls the mixed-in body makes are recorded one
  * hop deep, while the calls that view then makes to the real adapter stay
- * unrecorded. That boundary — the one a cover can intercept — is the whole
+ * unrecorded. `this.adapter` — how a mixed-in body names the adapter, which is
+ * itself — is answered with the same view so that hop stays recorded. That boundary — the one a cover can intercept — is the whole
  * scope of this guard.
  *
  * `schemaCreation` is the one member the device cannot see through: the renderer
@@ -72,9 +73,6 @@ async function recordLayPath(): Promise<Set<string>> {
       get(target, prop, receiver) {
         if (typeof prop !== "string") return Reflect.get(target, prop, receiver);
         touched.add(prop);
-        // `SchemaStatements` bodies reach the adapter as `this.adapter`, which on
-        // a mixed-in body is the adapter itself. Answer it with this same view so
-        // the hop through it stays recorded.
         if (prop === "adapter") return self;
         const value = Reflect.get(target, prop, target) as unknown;
         return typeof value === "function"

@@ -327,8 +327,6 @@ export abstract class Migration {
     const conn = this.connection;
     if (!this._schema || this._schemaConn !== conn) {
       assertSchemaAdapter(conn);
-      // Rails has no separate schema object: `include SchemaStatements` puts the
-      // bodies on the adapter, so `schema` is the connection itself.
       this._schema = conn as unknown as SchemaStatements;
       this._schemaConn = conn;
     }
