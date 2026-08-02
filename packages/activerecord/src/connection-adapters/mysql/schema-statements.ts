@@ -30,7 +30,7 @@ import type { AddIndexOptions, SchemaStatementsLike } from "../abstract/schema-d
 export class MysqlSchemaStatements extends BaseSchemaStatements {
   private _mysqlSchemaCreation?: MysqlSchemaCreation;
   override get schemaCreation(): MysqlSchemaCreation {
-    return (this._mysqlSchemaCreation ??= new MysqlSchemaCreation(this.adapter));
+    return (this._mysqlSchemaCreation ??= new MysqlSchemaCreation(this));
   }
 
   /** Mirrors: MySQL::SchemaStatements#update_table_definition */
@@ -66,7 +66,7 @@ export class MysqlSchemaStatements extends BaseSchemaStatements {
       return;
     }
     const createDef = new CreateIndexDefinition(idx, false, algorithmClause);
-    await this.adapter.execute(await this.schemaCreation.accept(createDef));
+    await this.execute(await this.schemaCreation.accept(createDef));
   }
 
   /** Mirrors: MySQL::SchemaStatements#remove_column */
@@ -82,21 +82,27 @@ export class MysqlSchemaStatements extends BaseSchemaStatements {
     return super.removeColumn(tableName, columnName, type, options);
   }
 
+  /** Mirrors: AbstractMysqlAdapter#drop_table */
   override async dropTable(
     ...args:
       | [string, ...string[]]
       | [string, ...string[], { ifExists?: boolean; force?: "cascade"; temporary?: boolean }]
   ): Promise<void> {
-    const last = args[args.length - 1];
-    const hasOpts = last !== null && last !== undefined && typeof last === "object";
-    const opts = (hasOpts ? last : {}) as { temporary?: boolean };
-    if (opts.temporary) {
-      return (
-        this.adapter as unknown as { dropTable(...args: unknown[]): Promise<void> }
-      ).dropTable(...(args as unknown[]));
+    const [tableNames, options] = this._splitTableNamesAndOptions(args) as [
+      string[],
+      { ifExists?: boolean; force?: "cascade"; temporary?: boolean },
+    ];
+    if (tableNames.length === 0) {
+      throw new ArgumentError("dropTable requires at least one table name");
     }
-
-    return super.dropTable(...(args as any));
+    const temporary = options.temporary ? " TEMPORARY" : "";
+    const ifExists = options.ifExists ? " IF EXISTS" : "";
+    const cascade = options.force === "cascade" ? " CASCADE" : "";
+    for (const name of tableNames) {
+      this.schemaCache?.clearDataSourceCacheBang(this.pool, name);
+    }
+    const quoted = tableNames.map((n) => this.quoteTableName(n)).join(", ");
+    await this.execute(`DROP${temporary} TABLE${ifExists} ${quoted}${cascade}`);
   }
 }
 

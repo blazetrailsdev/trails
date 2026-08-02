@@ -98,7 +98,7 @@ interface PgSchemaAdapter {
 
 export class PostgreSQLSchemaStatements extends SchemaStatements {
   private get pg(): PgSchemaAdapter {
-    return this.adapter as unknown as PgSchemaAdapter;
+    return this as unknown as PgSchemaAdapter;
   }
 
   /** Mirrors: PostgreSQL::SchemaStatements#update_table_definition */
@@ -114,10 +114,10 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     const ifExists = options.ifExists ? " IF EXISTS" : "";
     const cascade = options.force === "cascade" ? " CASCADE" : "";
     for (const name of tableNames) {
-      this.adapter.schemaCache?.clearDataSourceCacheBang(this.adapter.pool, name);
+      this.schemaCache?.clearDataSourceCacheBang(this.pool, name);
     }
     const quoted = tableNames.map((n) => this._qt(n)).join(", ");
-    await this.adapter.execute(`DROP TABLE${ifExists} ${quoted}${cascade}`);
+    await this.execute(`DROP TABLE${ifExists} ${quoted}${cascade}`);
   }
 
   // ---------------------------------------------------------------------------
@@ -275,10 +275,8 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
   }
 
   quotedIncludeColumnsForIndex(columnNames: string | string[]): string {
-    if (typeof columnNames === "string") return this.adapter.quoteColumnName(columnNames);
-    const quotedColumns = new Map(
-      columnNames.map((name) => [name, this.adapter.quoteColumnName(name)]),
-    );
+    if (typeof columnNames === "string") return this.quoteColumnName(columnNames);
+    const quotedColumns = new Map(columnNames.map((name) => [name, this.quoteColumnName(name)]));
     return Array.from(this.addOptionsForIndexColumns(quotedColumns).values()).join(", ");
   }
 
@@ -507,12 +505,12 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
       await this.dropSchema(name, { ifExists: true });
     }
     const ifNotExists = options.ifNotExists ? " IF NOT EXISTS" : "";
-    await this.adapter.execute(`CREATE SCHEMA${ifNotExists} ${this.quoteSchemaName(name)}`);
+    await this.execute(`CREATE SCHEMA${ifNotExists} ${this.quoteSchemaName(name)}`);
   }
 
   async dropSchema(name: string, options: { ifExists?: boolean } = {}): Promise<void> {
     const ifExists = options.ifExists ? " IF EXISTS" : "";
-    await this.adapter.execute(`DROP SCHEMA${ifExists} ${this.quoteSchemaName(name)} CASCADE`);
+    await this.execute(`DROP SCHEMA${ifExists} ${this.quoteSchemaName(name)} CASCADE`);
   }
 
   async schemaExists(name: string): Promise<boolean> {
@@ -551,11 +549,11 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
       }
       optionString += ` CONNECTION LIMIT = ${limit}`;
     }
-    await this.adapter.execute(`CREATE DATABASE ${this.pg.quoteIdentifier(name)}${optionString}`);
+    await this.execute(`CREATE DATABASE ${this.pg.quoteIdentifier(name)}${optionString}`);
   }
 
   async dropDatabase(name: string): Promise<void> {
-    await this.adapter.execute(`DROP DATABASE IF EXISTS ${this.pg.quoteIdentifier(name)}`);
+    await this.execute(`DROP DATABASE IF EXISTS ${this.pg.quoteIdentifier(name)}`);
   }
 
   async recreateDatabase(name: string, options: CreateDatabaseOptions = {}): Promise<void> {
@@ -899,7 +897,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     const clause = await this.pg.schemaCreation.accept(changeColDef);
     // Route DDL through the public `execute` (not the raw `exec`) so the
     // dirties_query_cache wrapper clears the query cache on schema changes.
-    await this.adapter.execute(`ALTER TABLE ${this._qt(tableName)} ${clause}`);
+    await this.execute(`ALTER TABLE ${this._qt(tableName)} ${clause}`);
     if ("comment" in options) {
       await this.changeColumnComment(tableName, columnName, options.comment ?? null);
     }
@@ -936,8 +934,8 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     // Mirrors PostgreSQL::SchemaStatements#rename_column: clear the statement
     // cache, rename, then fix up index names that embed the column name.
     this.pg.clearCacheBang();
-    this.adapter.schemaCache?.clearDataSourceCacheBang(this.adapter.pool, tableName);
-    await this.adapter.execute(
+    this.schemaCache?.clearDataSourceCacheBang(this.pool, tableName);
+    await this.execute(
       `ALTER TABLE ${this._qt(tableName)} RENAME COLUMN ${this._qi(columnName)} TO ${this._qi(newColumnName)}`,
     );
     await this.renameColumnIndexes(tableName, columnName, newColumnName);
@@ -947,8 +945,8 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     this.validateIndexLengthBang(tableName, newName);
 
     const [schema] = this.pg.extractSchemaQualifiedName(tableName);
-    this.adapter.schemaCache?.clearDataSourceCacheBang(this.adapter.pool, tableName);
-    await this.adapter.execute(
+    this.schemaCache?.clearDataSourceCacheBang(this.pool, tableName);
+    await this.execute(
       `ALTER INDEX ${schema ? `${this._qt(schema)}.` : ""}${this._qi(oldName)} RENAME TO ${this._qt(newName)}`,
     );
   }
@@ -963,8 +961,8 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     // sees the new default rather than a stale (always-warm) entry. Safe to clear
     // first: buildChangeColumnDefaultDefinition's column lookup queries
     // pg_catalog directly, not the cache.
-    this.adapter.schemaCache?.clearDataSourceCacheBang(this.adapter.pool, tableName);
-    await this.adapter.execute(
+    this.schemaCache?.clearDataSourceCacheBang(this.pool, tableName);
+    await this.execute(
       `ALTER TABLE ${this._qt(tableName)} ${await this.changeColumnDefaultForAlter(tableName, columnName, defaultOrChanges)}`,
     );
   }
@@ -1021,13 +1019,13 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
       // Rails guards the pre-ALTER UPDATE with `if column` — skip it when the
       // column can't be found rather than quoting against an undefined column.
       if (col) {
-        const expr = await this.adapter.quoteDefaultExpression(defaultValue, col);
-        await this.adapter.execute(
+        const expr = await this.quoteDefaultExpression(defaultValue, col);
+        await this.execute(
           `UPDATE ${quotedTable} SET ${quotedCol} = ${expr} WHERE ${quotedCol} IS NULL`,
         );
       }
     }
-    await this.adapter.execute(
+    await this.execute(
       `ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedCol} ${nullable ? "DROP" : "SET"} NOT NULL`,
     );
   }
@@ -1042,8 +1040,8 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     // the COMMENT ON statement.
     this.pg.clearCacheBang();
     const comment = this.extractNewCommentValue(commentOrChanges) as string | null;
-    await this.adapter.execute(
-      `COMMENT ON COLUMN ${this.adapter.quoteTableName(tableName)}.${this.adapter.quoteColumnName(columnName)} IS ${this.pg.quote(comment)}`,
+    await this.execute(
+      `COMMENT ON COLUMN ${this.quoteTableName(tableName)}.${this.quoteColumnName(columnName)} IS ${this.pg.quote(comment)}`,
     );
   }
 
@@ -1054,9 +1052,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     // Mirrors PostgreSQL::SchemaStatements#change_table_comment.
     this.pg.clearCacheBang();
     const comment = this.extractNewCommentValue(commentOrChanges) as string | null;
-    await this.adapter.execute(
-      `COMMENT ON TABLE ${this._qt(tableName)} IS ${this.pg.quote(comment)}`,
-    );
+    await this.execute(`COMMENT ON TABLE ${this._qt(tableName)} IS ${this.pg.quote(comment)}`);
   }
 
   // ---------------------------------------------------------------------------
@@ -1067,7 +1063,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
   async validateConstraint(tableName: string, constraintName: string): Promise<void> {
     const at = this.pg.createAlterTable(tableName) as PgAlterTable;
     at.validateConstraint(constraintName);
-    await this.adapter.execute(await this.pg.schemaCreation.accept(at));
+    await this.execute(await this.pg.schemaCreation.accept(at));
   }
 
   async validateCheckConstraint(
@@ -1226,7 +1222,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     // (now converged): it applies table_name_prefix/suffix and re-runs
     // foreign_key_options idempotently (column/name already filled above).
     at.addForeignKey(toTable, fkOptions as Partial<AddForeignKeyOptions>);
-    await this.adapter.execute(await this.pg.schemaCreation.accept(at));
+    await this.execute(await this.pg.schemaCreation.accept(at));
   }
 
   override async checkConstraints(tableName: string): Promise<CheckConstraintDefinition[]> {
@@ -1275,7 +1271,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     const opts = this.exclusionConstraintOptions(tableName, expression, options);
     const at = this.pg.createAlterTable(tableName) as PgAlterTable;
     at.addExclusionConstraint(expression, opts);
-    await this.adapter.execute(await this.pg.schemaCreation.accept(at));
+    await this.execute(await this.pg.schemaCreation.accept(at));
   }
 
   async removeExclusionConstraint(
@@ -1413,7 +1409,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     const opts = this.uniqueConstraintOptions(tableName, columnName, options);
     const at = this.pg.createAlterTable(tableName) as PgAlterTable;
     at.addUniqueConstraint(columnName as string | string[], opts);
-    await this.adapter.execute(await this.pg.schemaCreation.accept(at));
+    await this.execute(await this.pg.schemaCreation.accept(at));
   }
 
   async removeUniqueConstraint(
@@ -1769,7 +1765,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
        FROM (
          SELECT indrelid, indkey, generate_subscripts(indkey, 1) idx
            FROM pg_index
-          WHERE indrelid = ${this.adapter.quote(this.adapter.quoteTableName(tableName))}::regclass
+          WHERE indrelid = ${this.quote(this.quoteTableName(tableName))}::regclass
             AND indisprimary
        ) i
        JOIN pg_attribute a
@@ -1917,10 +1913,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     if (!pk) return;
     if (seq) {
       const quotedSequence = this.pg.quoteTableName(`${seq.schema}.${seq.name}`);
-      await this.adapter.queryValue(
-        `SELECT setval(${this.pg.quote(quotedSequence)}, ${value})`,
-        "SCHEMA",
-      );
+      await this.queryValue(`SELECT setval(${this.pg.quote(quotedSequence)}, ${value})`, "SCHEMA");
     } else {
       this.pg.logger?.warn?.(`${tableName} has primary key ${pk} with no default sequence.`);
     }
@@ -1948,7 +1941,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     if (!pk || !sequence) return;
 
     const quotedSequence = this.pg.quoteTableName(sequence);
-    const maxPk = await this.adapter.queryValue(
+    const maxPk = await this.queryValue(
       `SELECT MAX(${this.pg.quoteColumnName(pk)}) FROM ${this.pg.quoteTableName(tableName)}`,
       "SCHEMA",
     );
@@ -1957,16 +1950,16 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
       const dbVersion = await this.pg.getDatabaseVersion();
       minvalue =
         dbVersion >= 100000
-          ? await this.adapter.queryValue(
+          ? await this.queryValue(
               `SELECT seqmin FROM pg_sequence WHERE seqrelid = ${this.pg.quote(quotedSequence)}::regclass`,
               "SCHEMA",
             )
-          : await this.adapter.queryValue(`SELECT min_value FROM ${quotedSequence}`, "SCHEMA");
+          : await this.queryValue(`SELECT min_value FROM ${quotedSequence}`, "SCHEMA");
     }
 
     // Ruby's `max_pk ? true : false` is a nil check — 0 is truthy in Ruby, so a
     // table whose max primary key is 0 must still emit `true`.
-    await this.adapter.queryValue(
+    await this.queryValue(
       `SELECT setval(${this.pg.quote(quotedSequence)}, ${maxPk ?? minvalue}, ${maxPk == null ? "false" : "true"})`,
       "SCHEMA",
     );

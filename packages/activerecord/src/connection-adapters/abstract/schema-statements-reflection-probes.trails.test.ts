@@ -7,9 +7,10 @@
  * through `execute`, which names the query "SQL" and inflated `assertQueries`
  * counts in any suite that straddled a reflection read.
  *
- * The concrete adapters override most of these, so the probes are exercised
- * against a bare `SchemaStatements` bound to the live connection — that is the
- * code path the abstract bodies actually own.
+ * The concrete adapters override most of these, so the probes are exercised by
+ * layering just the abstract bodies over the live connection — that is the code
+ * path the abstract bodies actually own, while everything they delegate to
+ * (`dataSourceSql`, `schemaQuery`) still resolves on the real adapter.
  */
 import { describe, it, expect } from "vitest";
 import { Base } from "../../index.js";
@@ -26,7 +27,19 @@ describe("SchemaStatements reflection probes", () => {
   }
 
   function statements(): SchemaStatements {
-    return new SchemaStatements(conn() as never);
+    const host = Object.create(conn()) as SchemaStatements;
+    const proto = Object.getOwnPropertyDescriptors(SchemaStatements.prototype);
+    for (const name of [
+      "tables",
+      "views",
+      "dataSources",
+      "dataSourceExists",
+      "columns",
+      "primaryKey",
+    ] as const) {
+      Object.defineProperty(host, name, proto[name]);
+    }
+    return host;
   }
 
   it("issues tables and views as SCHEMA queries", async () => {

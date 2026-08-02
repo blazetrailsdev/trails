@@ -11,11 +11,12 @@ import {
   type ColumnType,
 } from "./schema-definitions.js";
 import { AbstractAdapter } from "../abstract-adapter.js";
+import { NATIVE_DATABASE_TYPES_BY_ADAPTER } from "./native-database-types.js";
 import { NotImplementedError } from "../../errors.js";
 
 function makeStatements(
   adapterOverrides: Record<string, unknown> = {},
-  Statements: new (adapter: never) => SchemaStatements = SchemaStatements,
+  Statements: { prototype: SchemaStatements } = SchemaStatements,
 ) {
   const adapter: Record<string, unknown> = {
     adapterName: "sqlite" as const,
@@ -41,6 +42,9 @@ function makeStatements(
       binds,
       "SCHEMA",
     );
+  // Real hosts override AbstractAdapter#native_database_types (the abstract one
+  // is `{}`); the stub answers with SQLite's table so typeToSql resolves.
+  adapter["nativeDatabaseTypes"] ??= () => NATIVE_DATABASE_TYPES_BY_ADAPTER["sqlite"];
   // The catalog probes go through data_source_sql; the stub answers with a
   // simple catalog query unless a test installs its own.
   adapter["dataSourceSql"] ??= (name?: string | null) =>
@@ -55,7 +59,9 @@ function makeStatements(
     )(sql, binds, "SCHEMA")) as Record<string, unknown>[];
     return rows.map((row) => Object.values(row)[0]);
   };
-  return new Statements(adapter as never);
+  // The bodies under test are prototype methods mixed into the adapter, so
+  // give the stub adapter that prototype and call them the way production does.
+  return Object.setPrototypeOf(adapter, Statements.prototype) as SchemaStatements;
 }
 
 describe("SchemaStatements privates (PR 8)", () => {
@@ -232,10 +238,10 @@ describe("SchemaStatements privates (PR 8)", () => {
       new CheckConstraintDefinition("users", "age > 0", name),
     ]);
     await ss.addCheckConstraint("users", "age > 0", { ifNotExists: true });
-    expect((ss as any).adapter.execute).not.toHaveBeenCalled();
+    expect((ss as any).execute).not.toHaveBeenCalled();
 
     await ss.addCheckConstraint("users", "age > 0", {});
-    expect((ss as any).adapter.execute).toHaveBeenCalled();
+    expect((ss as any).execute).toHaveBeenCalled();
   });
 
   it("checkConstraintExists returns false when an explicit undefined name is supplied", async () => {
@@ -449,7 +455,7 @@ describe("SchemaStatements privates (PR 8)", () => {
       "fk_rails_composite",
     );
     vi.spyOn(ss, "foreignKeys").mockResolvedValue([fk]);
-    const executeMutation = (ss as any).adapter.executeMutation as ReturnType<typeof vi.fn>;
+    const executeMutation = (ss as any).executeMutation as ReturnType<typeof vi.fn>;
     executeMutation.mockClear();
 
     await ss.addForeignKey("astronauts", "rockets", {
