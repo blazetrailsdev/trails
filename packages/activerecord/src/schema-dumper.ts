@@ -25,6 +25,7 @@ import type {
   SchemaDumperMixinHost,
   Column,
 } from "./connection-adapters/abstract/schema-dumper.js";
+import type { IndexDefinitionRow } from "./connection-adapters/abstract/schema-definitions.js";
 import { SchemaMigration } from "./schema-migration.js";
 import { ActiveRecordError } from "./errors.js";
 import type { Base } from "./base.js";
@@ -90,19 +91,19 @@ export interface ColumnInfo {
   extra?: string | null;
 }
 
-export interface IndexInfo {
-  // A string for expression indexes (the raw expression), an array of column
-  // names otherwise — mirrors Rails' IndexDefinition#columns.
-  columns: string | string[];
-  unique: boolean;
+/**
+ * The dumper's view of an adapter index row: the adapter shape
+ * (`IndexDefinitionRow`) plus the dialect-specific options the dumper emits.
+ * `name` is widened to optional because `SchemaSource` implementations that
+ * aren't adapters (e.g. a dump being re-read) may not carry one, and
+ * `indexParts` already treats it as absent-able.
+ */
+export interface IndexInfo extends Omit<IndexDefinitionRow, "name"> {
   name?: string;
   /** Per-column max lengths (number for single-column, Record for multi). */
   lengths?: number | Record<string, number>;
-  /** Per-column sort order (e.g. "asc"/"desc"). */
-  orders?: string | Record<string, string>;
   /** Per-column operator class (Postgres). */
   opclasses?: string | Record<string, string>;
-  where?: string;
   using?: string;
   /** MySQL index access method (`"fulltext"` / `"spatial"`). */
   type?: string;
