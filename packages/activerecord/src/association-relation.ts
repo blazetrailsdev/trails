@@ -249,7 +249,7 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
     const theirs = Array.isArray(other) ? other : await other;
     if (ours.length !== theirs.length) return false;
     for (let i = 0; i < ours.length; i++) {
-      if (!ours[i].isEqual(theirs[i])) return false;
+      if (!ours[i].equals(theirs[i])) return false;
     }
     return true;
   }

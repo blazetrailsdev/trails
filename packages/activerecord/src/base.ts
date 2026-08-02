@@ -238,7 +238,8 @@ import {
 import {
   inspect as _inspect,
   attributeForInspect as _attributeForInspect,
-  isEqual as _isEqual,
+  equals as _equals,
+  compare as _compare,
   hash as _hash,
   isPresent as _isPresent,
   isBlank as _isBlank,
@@ -4442,7 +4443,14 @@ export class Base extends Model {
    *
    * Mirrors: ActiveRecord::Core#==
    */
-  declare isEqual: (other: unknown) => boolean;
+  declare equals: (other: unknown) => boolean;
+
+  /**
+   * Order two records by primary key.
+   *
+   * Mirrors: ActiveRecord::Core#<=>
+   */
+  declare compare: (other: unknown) => number | undefined;
 
   /**
    * Return a value that dedups records the way Ruby's `hash` + `eql?` do.
@@ -4570,10 +4578,6 @@ export class Base extends Model {
 
   declare isPresent: () => boolean;
   declare isBlank: () => boolean;
-
-  equals(other: unknown): boolean {
-    return this.isEqual(other);
-  }
 
   // Associations instance methods wired via include() below;
   // signatures declared on the merged `interface Base` at the bottom
@@ -4896,7 +4900,8 @@ include(Base, {
   inspect: _inspect,
   prettyPrint: _Core.prettyPrint,
   attributeForInspect: _attributeForInspect,
-  isEqual: _isEqual,
+  equals: _equals,
+  compare: _compare,
   hash: _hash,
   isPresent: _isPresent,
   isBlank: _isBlank,

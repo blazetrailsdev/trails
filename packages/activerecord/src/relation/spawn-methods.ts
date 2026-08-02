@@ -65,7 +65,7 @@ async function recordsIntersection(rel: any, other: readonly unknown[]): Promise
   // loads the same record twice still yields it once. filter() alone would keep
   // those duplicates, so track seen records and skip a repeat.
   const eq = (a: any, o: unknown): boolean =>
-    typeof a?.isEqual === "function" ? a.isEqual(o) : a === o;
+    typeof a?.equals === "function" ? a.equals(o) : a === o;
   const result: unknown[] = [];
   for (const r of records) {
     if (!other.some((o) => eq(r, o))) continue;

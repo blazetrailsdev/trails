@@ -17,7 +17,7 @@ export class Address {
     return this.city === otherAddress.city && this.country === otherAddress.country;
   }
 
-  isEqual(other: unknown): boolean {
+  equals(other: unknown): boolean {
     if (!(other instanceof Address)) return false;
     return (
       other.street === this.street && other.city === this.city && other.country === this.country
@@ -59,7 +59,7 @@ export class GpsLocation {
     return this.gpsLocation.split("x")[1] ?? "";
   }
 
-  isEqual(other: GpsLocation): boolean {
+  equals(other: GpsLocation): boolean {
     return this.latitude === other.latitude && this.longitude === other.longitude;
   }
 }

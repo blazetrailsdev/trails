@@ -27,6 +27,7 @@ import {
   AttributedDeveloper,
 } from "./test-helpers/models/developer.js";
 import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";
+import { Category } from "./test-helpers/models/category.js";
 import { Car } from "./test-helpers/models/car.js";
 import { Bulb } from "./test-helpers/models/bulb.js";
 import "./support/canonical-model-index.js";
@@ -91,7 +92,7 @@ describe("BasicsTest", () => {
     }
     const u1 = await User.create({ name: "a" });
     const u2 = await User.find(u1.id);
-    expect(u1.isEqual(u2)).toBe(true);
+    expect(u1.equals(u2)).toBe(true);
   });
 
   it("equality of new records", () => {
@@ -102,7 +103,7 @@ describe("BasicsTest", () => {
     }
     const u1 = new User({ name: "a" });
     const u2 = new User({ name: "a" });
-    expect(u1.isEqual(u2)).toBe(false);
+    expect(u1.equals(u2)).toBe(false);
   });
 
   it("all", async () => {
@@ -169,7 +170,7 @@ describe("BasicsTest", () => {
     }
     const u1 = new User({ name: "a" });
     const u2 = new User({ name: "a" });
-    expect(u1.isEqual(u2)).toBe(false);
+    expect(u1.equals(u2)).toBe(false);
   });
 
   it("distinct delegates to scoped", () => {
@@ -291,7 +292,7 @@ describe("BasicsTest", () => {
     const u1 = new User({ name: "a" });
     const u2 = new User({ name: "a" });
     // new records are not equal
-    expect(u1.isEqual(u2)).toBe(false);
+    expect(u1.equals(u2)).toBe(false);
   });
 
   it("create after initialize with block", async () => {
@@ -335,7 +336,7 @@ describe("BasicsTest", () => {
     }
     const u1 = await User.create({ name: "a" });
     const u2 = await User.find(u1.id);
-    expect(u1.isEqual(u2)).toBe(true);
+    expect(u1.equals(u2)).toBe(true);
   });
 
   it("failed comparison of unlike class records", () => {
@@ -351,7 +352,7 @@ describe("BasicsTest", () => {
     }
     const u = new User({ name: "a" });
     const p = new Post({ title: "a" });
-    expect(u.isEqual(p as any)).toBe(false);
+    expect(u.equals(p as any)).toBe(false);
   });
 
   it("table name guesses with inherited prefixes and suffixes", () => {
@@ -384,15 +385,11 @@ describe("BasicsTest", () => {
     const pk = Subscriber.columnsHash()[Subscriber.primaryKey as string];
     expect(pk.name, "nick should be primary key").toBe("nick");
   });
-  it("comparison with different objects", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const p = Post.new({ title: "a" }) as any;
-    expect(p).not.toEqual("a string");
-    expect(p).not.toEqual(null);
+  it("comparison with different objects", async () => {
+    const topic = await CanonicalTopic.create({});
+    const category = await Category.create({ name: "comparison" });
+    expect(topic.compare(category)).toBeUndefined();
+    expect(topic.equals(category)).toBe(false);
   });
 
   it("comparison with different objects in array", async () => {
@@ -2076,7 +2073,7 @@ describe("BasicsTest", () => {
     class B extends Base {}
     const a = new A();
     const b = new B();
-    expect(a.isEqual(b as any)).toBe(false);
+    expect(a.equals(b as any)).toBe(false);
   });
 
   it("dup with aggregate of same name as attribute", async () => {

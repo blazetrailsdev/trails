@@ -1341,7 +1341,7 @@ function diffHooks(assoc: CollectionAssociation): {
 
 /** @internal */
 export function includesRecord(records: Base[], record: Base): boolean {
-  return records.some((r) => (r as unknown as { isEqual(o: unknown): boolean }).isEqual(record));
+  return records.some((r) => (r as unknown as { equals(o: unknown): boolean }).equals(record));
 }
 
 /** @internal */
@@ -1444,7 +1444,7 @@ function finishReplaceOnTarget(
  * @internal
  */
 function indexInTarget(assoc: CollectionAssociation, record: Base): number {
-  return assoc.target.findIndex((r) => r === record || r.isEqual(record));
+  return assoc.target.findIndex((r) => r === record || r.equals(record));
 }
 
 /** @internal */

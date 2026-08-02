@@ -177,7 +177,7 @@ export type AssociationProxy<
  * order-sensitive. Used by `replace` for `other_array != original_target`.
  */
 function sameRecordList(a: Base[], b: Base[]): boolean {
-  return a.length === b.length && a.every((record, i) => record.isEqual(b[i]));
+  return a.length === b.length && a.every((record, i) => record.equals(b[i]));
 }
 
 /**
@@ -1654,7 +1654,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * @internal
    */
   private _indexInTarget(record: T): number {
-    return this._target.findIndex((r) => r === record || r.isEqual(record));
+    return this._target.findIndex((r) => r === record || r.equals(record));
   }
 
   /**

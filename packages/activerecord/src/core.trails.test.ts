@@ -7,6 +7,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
 import { fixtures } from "./test-fixtures.js";
 import { Topic } from "./test-helpers/models/topic.js";
+import { Reply } from "./test-helpers/models/reply.js";
 import { Base } from "./index.js";
 import { DatabaseConfigurations } from "./database-configurations.js";
 import { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapter.js";
@@ -176,5 +177,32 @@ describe("configurations is a single process-global registry", () => {
       "global_registry_env",
     );
     expect(resolved.database).toBe("db/global.sqlite3");
+  });
+});
+
+describe("compare", () => {
+  fixtures(["topics"]);
+
+  // Rails' `Core#<=>` is `to_key <=> other_object.to_key`; Ruby's nil result
+  // (incomparable) has no TS equivalent, so trails returns `undefined`.
+  it("orders same-class records by primary key and reports nil as undefined", async () => {
+    const first = await Topic.find(1);
+    const second = await Topic.find(3);
+
+    expect(first.compare(second)).toBe(-1);
+    expect(second.compare(first)).toBe(1);
+    expect(first.compare(first)).toBe(0);
+
+    // Two new records both have a nil to_key, which Ruby compares as 0.
+    expect(new Topic({ title: "a" }).compare(new Topic({ title: "b" }))).toBe(0);
+    // A persisted record against a new one is `nil <=> [1]` — incomparable.
+    expect(first.compare(new Topic({ title: "a" }))).toBeUndefined();
+    expect(first.compare("not a topic")).toBeUndefined();
+
+    // `is_a?(self.class)` is subclass-permissive in one direction only: a Reply
+    // is_a? Topic, but a Topic is not is_a? Reply.
+    const reply = await Reply.find(2);
+    expect(first.compare(reply)).toBe(-1);
+    expect(reply.compare(first)).toBeUndefined();
   });
 });

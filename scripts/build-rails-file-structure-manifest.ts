@@ -273,13 +273,14 @@ for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
       }
       // Standalone modules port to top-level functions, which have no
       // staticness — every entry stays bare regardless of whether Ruby declared
-      // it on the module or its singleton.
+      // it on the module or its singleton. Operator SPELLINGS still apply
+      // (`ActiveRecord::Core#==` → core.ts `equals`); only staticness is lost.
       for (const m of mergeBySourceLine(
         tagStatic(host.instanceMethods, false),
         tagStatic(host.classMethods, true),
       )) {
         const b = bucketFor(m.file ?? host.file, FUNCTIONS_KEY);
-        pushMethod(b.names, b.seen, m.name, false);
+        pushMethod(b.names, b.seen, m.name, false, operatorSpelling(host.fqn, m.name));
       }
     }
   };

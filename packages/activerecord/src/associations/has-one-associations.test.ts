@@ -859,10 +859,10 @@ describe("HasOneAssociationsTest", () => {
     const pirate = pirates("blackbeard") as any;
     const origShip = await readHasOne(pirate, "ship");
 
-    expect(origShip.isEqual(ships("black_pearl"))).toBe(true);
+    expect(origShip.equals(ships("black_pearl"))).toBe(true);
     const newShip = await pirate.createShip();
-    expect(newShip.isEqual(ships("black_pearl"))).toBe(false);
-    expect((await readHasOne(pirate, "ship")).isEqual(newShip)).toBe(true);
+    expect(newShip.equals(ships("black_pearl"))).toBe(false);
+    expect((await readHasOne(pirate, "ship")).equals(newShip)).toBe(true);
     expect(newShip.isNewRecord()).toBe(true);
     expect(await newShip.isInvalid()).toBe(true);
     expect(origShip.pirate_id).toBeNull();
@@ -913,7 +913,7 @@ describe("HasOneAssociationsTest", () => {
     }
     expect(error).toBeInstanceOf(RecordNotSaved);
 
-    expect((await readHasOne(pirate, "ship")).isEqual(ships("black_pearl"))).toBe(true);
+    expect((await readHasOne(pirate, "ship")).equals(ships("black_pearl"))).toBe(true);
     expect((await readHasOne(pirate, "ship")).pirate_id).toBe(pirate.id);
     expect(error.message).toBe(
       "Failed to remove the existing associated ship. " +
@@ -936,7 +936,7 @@ describe("HasOneAssociationsTest", () => {
 
     expect(error.message).toBe("Failed to save the new associated ship.");
     expect(error.record).toBe(newShip);
-    expect((await readHasOne(pirate, "ship")).isEqual(ships("black_pearl"))).toBe(true);
+    expect((await readHasOne(pirate, "ship")).equals(ships("black_pearl"))).toBe(true);
     expect((await readHasOne(pirate, "ship")).pirate_id).toBe(pirate.id);
     expect((await ships("black_pearl").reload()).pirate_id).toBe(pirate.id);
     expect(newShip.pirate_id).toBeNull();

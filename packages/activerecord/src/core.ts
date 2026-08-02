@@ -54,7 +54,10 @@ import { RangeError as ActiveModelRangeError } from "@blazetrails/activemodel";
 export interface Core {
   inspect(): string;
   attributeForInspect(attr: string): string;
-  isEqual(other: unknown): boolean;
+  equals(other: unknown): boolean;
+  freeze(): this;
+  isFrozen(): boolean;
+  compare(other: unknown): number | undefined;
   isPresent(): boolean;
   isBlank(): boolean;
   isReadonly(): boolean;
@@ -64,8 +67,6 @@ export interface Core {
   strictLoadingMode(): StrictLoadingMode;
   isStrictLoadingAll(): boolean;
   isStrictLoadingNPlusOneOnly(): boolean;
-  isFrozen(): boolean;
-  freeze(): this;
 }
 
 export { InspectionMask } from "./attribute-inspection.js";
@@ -158,7 +159,7 @@ export async function prettyPrint(
  *
  * Mirrors: ActiveRecord::Core#==
  */
-export function isEqual(this: CoreRecord, other: unknown): boolean {
+export function equals(this: CoreRecord, other: unknown): boolean {
   // Rails' Object#== identity check (`super`): same exact object.
   if (this === other) return true;
   if (other === null || other === undefined) return false;
@@ -181,7 +182,7 @@ const identityHashKeys = new WeakMap<object, symbol>();
 // Per-constructor identity tokens. Rails combines `self.class.hash` with the
 // id, so the class *object's* identity — not its name — participates in the
 // hash. Keying on `constructor.name` would collide two distinct model classes
-// that happen to share a JS name, whereas `isEqual` demands exact constructor
+// that happen to share a JS name, whereas `equals` demands exact constructor
 // identity; this WeakMap gives each constructor a stable, unique token.
 const constructorHashTokens = new WeakMap<object, number>();
 let nextConstructorToken = 0;
@@ -244,6 +245,71 @@ function primaryKeyValuesEqual(a: unknown, b: unknown): boolean {
 }
 
 /**
+ * Clone and freeze the attribute set. Subsequent writes to `_attributes`
+ * (e.g. `writeAttribute`, `writeFromUser`) raise. Associations remain
+ * accessible since they aren't stored in the attribute set. The clone
+ * step ensures records sharing an attribute reference (e.g. via
+ * `clone()` / `becomes`) aren't accidentally frozen together.
+ *
+ * Mirrors: ActiveRecord::Core#freeze — `@attributes = @attributes.clone.freeze; self` in Rails.
+ */
+export function freeze<T extends FrozenRecord>(this: T): T {
+  this._attributes = this._attributes.deepDup().freeze();
+  return this;
+}
+
+/**
+ * Returns true if this record's attribute set has been frozen.
+ *
+ * Mirrors: ActiveRecord::Core#frozen? — `@attributes.frozen?` in Rails.
+ */
+export function isFrozen(this: FrozenRecord): boolean {
+  return this._attributes.isFrozen();
+}
+
+/**
+ * Order two records by primary key, so arrays of records sort.
+ *
+ * Ruby's `to_key <=> other_object.to_key` is `Array#<=>` (element-wise, then
+ * by length) when both keys are present, and `nil <=> nil` (`0`) when neither
+ * record has one. A mixed nil/array pair — one persisted record, one new —
+ * compares as `nil`, spelled `undefined` here. The `else` arm is Ruby's
+ * `super` (`Object#<=>`): `0` for equal objects, `nil` otherwise.
+ *
+ * Mirrors: ActiveRecord::Core#<=>
+ */
+export function compare(this: CoreRecord, otherObject: unknown): number | undefined {
+  if (otherObject instanceof (this.constructor as new (...args: never[]) => unknown)) {
+    return compareKeys(
+      (this as unknown as ComparableRecord).toKey(),
+      (otherObject as ComparableRecord).toKey(),
+    );
+  }
+  return equals.call(this, otherObject) ? 0 : undefined;
+}
+
+interface ComparableRecord {
+  toKey(): unknown[] | null;
+}
+
+function compareKeys(a: unknown[] | null, b: unknown[] | null): number | undefined {
+  if (a === null || b === null) return a === null && b === null ? 0 : undefined;
+  for (let i = 0; i < Math.min(a.length, b.length); i++) {
+    const cmp = compareValues(a[i], b[i]);
+    if (cmp !== 0) return cmp;
+  }
+  return Math.sign(a.length - b.length);
+}
+
+function compareValues(a: unknown, b: unknown): number | undefined {
+  if (typeof a !== typeof b) return undefined;
+  if (typeof a === "number" || typeof a === "bigint" || typeof a === "string") {
+    return a === (b as typeof a) ? 0 : a < (b as typeof a) ? -1 : 1;
+  }
+  return a === b ? 0 : undefined;
+}
+
+/**
  * Check if this record is present (persisted and not destroyed).
  *
  * Mirrors: ActiveRecord::Core#present?
@@ -262,7 +328,7 @@ export function isBlank(this: CoreRecord): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// Readonly / strict-loading / freeze instance predicates and setters.
+// Readonly / strict-loading instance predicates and setters.
 // Mirrors the corresponding defs in activerecord/lib/active_record/core.rb.
 // ---------------------------------------------------------------------------
 
@@ -319,29 +385,6 @@ export function strictLoadingBang<T extends StrictLoadingFields>(
   }
   this._strictLoadingMode = mode;
   this._strictLoading = value;
-  return this;
-}
-
-/**
- * Returns true if this record's attribute set has been frozen.
- *
- * Mirrors: ActiveRecord::Core#frozen? — `@attributes.frozen?` in Rails.
- */
-export function isFrozen(this: FrozenRecord): boolean {
-  return this._attributes.isFrozen();
-}
-
-/**
- * Clone and freeze the attribute set. Subsequent writes to `_attributes`
- * (e.g. `writeAttribute`, `writeFromUser`) raise. Associations remain
- * accessible since they aren't stored in the attribute set. The clone
- * step ensures records sharing an attribute reference (e.g. via
- * `clone()` / `becomes`) aren't accidentally frozen together.
- *
- * Mirrors: ActiveRecord::Core#freeze — `@attributes = @attributes.clone.freeze; self` in Rails.
- */
-export function freeze<T extends FrozenRecord>(this: T): T {
-  this._attributes = this._attributes.deepDup().freeze();
   return this;
 }
 
