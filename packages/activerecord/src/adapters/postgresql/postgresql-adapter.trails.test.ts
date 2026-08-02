@@ -1381,10 +1381,7 @@ describe("PostgreSQLAdapter supports_* predicates (unit)", () => {
 });
 
 // Rails has no test for the `is_a?(Integer) && bit_length <= 63` guard in
-// postgresql_adapter.rb:459-471, so these are trails-only covers for it. The
-// session-identity half of advisory locks is pinned by
-// PostgresqlConnectionTest#"get and release advisory lock" in connection.test.ts:
-// pg_advisory_unlock only returns true on the session that took the lock.
+// postgresql_adapter.rb:459-471, so these are trails-only covers for it.
 describe("PostgreSQLAdapter advisory lock id guard (unit)", () => {
   const message = "PostgreSQL requires advisory lock ids to be a signed 64 bit integer";
 
