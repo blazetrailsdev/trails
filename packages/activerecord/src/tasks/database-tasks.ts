@@ -436,7 +436,7 @@ export class DatabaseTasks {
       // reflected schema so post-migration introspection re-reads the
       // freshly-migrated tables. Optional-chained so an adapter without a
       // schema cache is a no-op rather than a crash.
-      adapter.schemaCache?.clear();
+      adapter.schemaCache.clearBang();
     };
 
     try {
@@ -478,7 +478,7 @@ export class DatabaseTasks {
     const adapter = await pool.leaseConnection();
     const context = await this._migrationContextFor(adapter, pool.dbConfig);
     await context.run(direction, version);
-    adapter.schemaCache?.clear();
+    adapter.schemaCache.clearBang();
   }
 
   private static async _stepMigrations(
@@ -490,7 +490,7 @@ export class DatabaseTasks {
     const dbConfig = pool.dbConfig;
     const migrator = await this._migratorFor(adapter, dbConfig);
     await migrator[direction](steps);
-    adapter.schemaCache?.clear();
+    adapter.schemaCache.clearBang();
   }
 
   // Cached sync reference to Base, populated on the first _migrationAdapter() call.
@@ -699,22 +699,18 @@ export class DatabaseTasks {
    * `conn_or_pool.schema_cache.dump_to(filename)`. In Rails the pool-side
    * `schema_cache` is a `BoundSchemaReflection` whose `dump_to` allocates a
    * fresh `SchemaCache`, `add_all`s every data source through the pool, then
-   * writes it. Our adapter's `schemaCache` getter returns a plain
-   * `SchemaCache`, so replicate the BoundSchemaReflection semantics here:
-   * always dump from a freshly-populated cache instead of serializing
-   * whatever incidental entries the in-memory cache accumulated.
+   * writes it. Both our pool-side and adapter-side `schemaCache` getters
+   * return that reflection, so delegate to it; the fallback below replicates
+   * the same semantics for callers that hand over a bare `SchemaCache`.
    */
   static async dumpSchemaCache(connOrPool: unknown, filename: string): Promise<void> {
     // Rails: `conn_or_pool.schema_cache.dump_to(filename)`. On a real pool
     // `schema_cache` is a BoundSchemaReflection whose `dump_to` runs
-    // `add_all(pool)` + write. Honor that when the caller wires up such a
-    // reflection — delegate straight to it. Adapter.schemaCache exposes a
-    // plain SchemaCache with no bound pool (SchemaCache DOES define
-    // `addAll`, but it takes a pool arg that the adapter-level getter
-    // can't supply), so don't treat that as the self-populating
-    // reflection path; let the fresh-cache fallback below drive the
-    // populate+dump, which is what BoundSchemaReflection.dump_to does
-    // internally.
+    // `add_all(pool)` + write. Honor that when the caller hands over such a
+    // reflection — delegate straight to it. A bare `SchemaCache` also defines
+    // `dumpTo`, but its `addAll` takes a pool arg it can't supply itself, so
+    // that shape falls through to the fresh-cache path below, which is what
+    // BoundSchemaReflection.dump_to does internally.
     const reflection = (connOrPool as { schemaCache?: { dumpTo?: unknown; addAll?: unknown } })
       ?.schemaCache;
     if (
@@ -1099,7 +1095,7 @@ export class DatabaseTasks {
         await this.withTemporaryConnection(dbConfig, async (adapter) => {
           const migrator = await this._migratorFor(adapter, dbConfig);
           await migrator.migrate(version ?? null);
-          adapter.schemaCache?.clear();
+          adapter.schemaCache.clearBang();
         });
       }
     }

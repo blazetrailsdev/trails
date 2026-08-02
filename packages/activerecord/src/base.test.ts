@@ -681,7 +681,7 @@ describe("BasicsTest", () => {
     // columns then propagates that error. Already-loaded records are
     // unaffected — the data survives once the cache works again.
     const adapter = Topic.connection as any;
-    vi.spyOn(adapter, "schemaCache", "get").mockImplementation(() => {
+    vi.spyOn(adapter, "internalSchemaCache", "get").mockImplementation(() => {
       throw new Error("Some Error");
     });
     expect(() => (Topic as any).columnsHash()).toThrow("Some Error");
@@ -1515,9 +1515,9 @@ describe("BasicsTest", () => {
   // a cold cache synthesizing columns from declared attribute()s — RFC 0031.)
   it("clear cache!", async () => {
     const conn = Base.connection;
-    // `schemaCache` is typed optional on DatabaseAdapter, but AbstractAdapter's
+    // `internalSchemaCache` is typed optional on DatabaseAdapter, but AbstractAdapter's
     // getter always returns one for a connected adapter.
-    const cache = conn.schemaCache;
+    const cache = conn.internalSchemaCache;
     // preheat cache
     const c1 = await cache.columns(conn.pool, "posts");
     expect(cache.size).not.toBe(0);
@@ -1570,7 +1570,7 @@ describe("BasicsTest", () => {
   });
   it("ignored columns are not present in columns_hash", async () => {
     const conn = Base.connection;
-    const cacheColumns = await conn.schemaCache.columnsHash(
+    const cacheColumns = await conn.internalSchemaCache.columnsHash(
       conn.pool,
       CanonicalDeveloper.tableName,
     );

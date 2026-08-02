@@ -757,7 +757,10 @@ describe("UniquenessValidationWithIndexTest", () => {
     // Rails' `@connection.schema_cache.clear!` — the index list for `topics` must
     // go cold between tests so each test's freshly added index is reflected.
     const connection = Base.connection;
-    connection.schemaCache.clearDataSourceCacheBang(connection.pool ?? connection, "topics");
+    connection.internalSchemaCache.clearDataSourceCacheBang(
+      connection.pool ?? connection,
+      "topics",
+    );
     await Topic.deleteAll();
     await Event.deleteAll();
   });

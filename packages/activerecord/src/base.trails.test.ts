@@ -3,7 +3,7 @@
  *
  * These guard trails-internal behavior with no Rails counterpart in
  * base_test.rb: the quoteSqlValue SQL-literal helper, the _applyScopeAttributes
- * scoping mechanism, the UnknownPrimaryKey error message, and the schemaCache-less
+ * scoping mechanism, the UnknownPrimaryKey error message, and the internalSchemaCache-less
  * tableExists fallback.
  */
 import { describe, it, expect } from "vitest";
@@ -278,7 +278,7 @@ describe("instantiate override types for absent keys (trails)", () => {
 });
 
 describe("BasicsTest (trails)", () => {
-  it("tableExists returns true when adapter has no schemaCache", async () => {
+  it("tableExists returns true when adapter has no internalSchemaCache", async () => {
     class Ghost extends Base {
       static tableName = "ghosts_that_do_not_exist";
       static {
@@ -447,7 +447,7 @@ describe("ignored columns follow Rails' value-keyed attribute set (trails)", () 
     const first = Firm.columnsHash();
     expect(Firm.columnsHash()).toBe(first);
 
-    const cache = Company.connection.schemaCache as unknown as {
+    const cache = Company.connection.internalSchemaCache as unknown as {
       clearDataSourceCacheBang(conn: unknown, name: string): void;
       getCachedColumnsHash(name: string): unknown;
     };

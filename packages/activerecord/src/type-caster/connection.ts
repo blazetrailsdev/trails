@@ -37,11 +37,11 @@ export class Connection {
 
   private resolveColumn(attrName: string): unknown | undefined {
     // `@klass.schema_cache` (type_caster/connection.rb:17) reads the pool's cache
-    // without leasing a connection (connection_handling.rb:368-369); trails ports
-    // that as the sync, pool-backed `Base.schemaCache` (connection-handling.ts:576).
-    // Read it off the klass, not the adapter — `connection.schemaCache` is not
-    // guaranteed to be the same slot (model-schema.ts:731-755).
-    const schemaCache = this._klass?.schemaCache();
+    // without leasing a connection (connection_handling.rb:368-369). trails'
+    // `Base.schemaCache()` is that pool handle, but every read on it is async and
+    // this method is sync, so reach the raw cache the handle wraps
+    // (poolConfig.schemaCache) instead. Converging this waits on RFC 0023.
+    const schemaCache = this._klass?.connectionPool?.()?.poolConfig?.schemaCache;
     // Rails then gates on `schema_cache.data_source_exists?(table_name)` before
     // reading `columns_hash`. trails' `dataSourceExists` is async
     // (schema-cache.ts:211) and this method is sync, so the cached columns hash is

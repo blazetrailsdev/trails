@@ -117,7 +117,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     const ifExists = options.ifExists ? " IF EXISTS" : "";
     const cascade = options.force === "cascade" ? " CASCADE" : "";
     for (const name of tableNames) {
-      this.schemaCache?.clearDataSourceCacheBang(this.pool, name);
+      await this.schemaCache.clearDataSourceCacheBang(name);
     }
     const quoted = tableNames.map((n) => this._qt(n)).join(", ");
     await this.execute(`DROP TABLE${ifExists} ${quoted}${cascade}`);
@@ -908,7 +908,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     // Mirrors PostgreSQL::SchemaStatements#rename_column: clear the statement
     // cache, rename, then fix up index names that embed the column name.
     this.pg.clearCacheBang();
-    this.schemaCache?.clearDataSourceCacheBang(this.pool, tableName);
+    await this.schemaCache.clearDataSourceCacheBang(tableName);
     await this.execute(
       `ALTER TABLE ${this._qt(tableName)} RENAME COLUMN ${this._qi(columnName)} TO ${this._qi(newColumnName)}`,
     );
@@ -919,7 +919,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     this.validateIndexLengthBang(tableName, newName);
 
     const [schema] = this.pg.extractSchemaQualifiedName(tableName);
-    this.schemaCache?.clearDataSourceCacheBang(this.pool, tableName);
+    await this.schemaCache.clearDataSourceCacheBang(tableName);
     await this.execute(
       `ALTER INDEX ${schema ? `${this._qt(schema)}.` : ""}${this._qi(oldName)} RENAME TO ${this._qt(newName)}`,
     );
@@ -935,7 +935,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     // sees the new default rather than a stale (always-warm) entry. Safe to clear
     // first: buildChangeColumnDefaultDefinition's column lookup queries
     // pg_catalog directly, not the cache.
-    this.schemaCache?.clearDataSourceCacheBang(this.pool, tableName);
+    await this.schemaCache.clearDataSourceCacheBang(tableName);
     await this.execute(
       `ALTER TABLE ${this._qt(tableName)} ${await this.changeColumnDefaultForAlter(tableName, columnName, defaultOrChanges)}`,
     );

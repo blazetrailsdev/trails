@@ -612,8 +612,7 @@ export function connectionSpecificationName(this: typeof Base): string {
 }
 
 export function schemaCache(this: typeof Base) {
-  const pool = connectionPool.call(this);
-  return pool.poolConfig.schemaCache ?? (pool as any).schemaCache;
+  return connectionPool.call(this).schemaCache;
 }
 
 export function clearCacheBang(this: typeof Base): void {

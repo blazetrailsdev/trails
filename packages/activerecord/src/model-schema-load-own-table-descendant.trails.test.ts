@@ -11,7 +11,7 @@ function col(name: string): Cols[string] {
 
 function makeAdapter(tables: Record<string, Cols>, asked: string[]): unknown {
   return {
-    schemaCache: {
+    internalSchemaCache: {
       isCached: () => true,
       getCachedColumnsHash: (table: string) => {
         asked.push(table);

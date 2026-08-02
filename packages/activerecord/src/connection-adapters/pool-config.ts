@@ -25,7 +25,6 @@ export class PoolConfig {
   readonly shard: string;
   readonly dbConfig: DatabaseConfig;
   readonly adapterFactory?: () => DatabaseAdapter;
-  private _schemaCache: SchemaCache | null = null;
   private _pool: ConnectionPool | null = null;
   private _connectionDescriptor!: ConnectionDescriptor;
   private _schemaReflection: SchemaReflection | null = null;
@@ -240,12 +239,20 @@ export class PoolConfig {
     await Promise.all(drains);
   }
 
+  /**
+   * The raw `SchemaCache` shared by every connection in this pool. Backed by
+   * the SchemaReflection's own cache slot so the pool's BoundSchemaReflection
+   * (what `AbstractAdapter#schemaCache` returns) and the adapter-side
+   * `internalSchemaCache` — which DDL invalidates through
+   * `clearDataSourceCacheBang` — are one object. Two slots would let a
+   * reflection read serve entries a migration already invalidated.
+   */
   get schemaCache(): SchemaCache | null {
-    return this._schemaCache;
+    return this.schemaReflection.loadedCache;
   }
 
   set schemaCache(cache: SchemaCache | null) {
-    this._schemaCache = cache;
+    this.schemaReflection.loadedCache = cache;
   }
 
   get connectionSpecName(): string {
@@ -275,7 +282,7 @@ export class PoolConfig {
   }
 
   discard(): void {
-    this._schemaCache = null;
+    this.schemaCache = null;
   }
 }
 

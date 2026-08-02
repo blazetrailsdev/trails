@@ -53,7 +53,7 @@ function tm(adapter: TransactionalFixturesAdapter): TxnHost["transactionManager"
  * @internal
  */
 async function eagerWarmSchemaCache(adapter: TransactionalFixturesAdapter): Promise<void> {
-  const sc = adapter.schemaCache;
+  const sc = adapter.internalSchemaCache;
   const pool = adapter.pool == null || adapter.pool instanceof NullPool ? null : adapter.pool;
   if (!sc || pool === null) return;
   try {
@@ -77,7 +77,7 @@ async function eagerWarmSchemaCache(adapter: TransactionalFixturesAdapter): Prom
  * @internal
  */
 async function reReflectTouchedTables(adapter: TransactionalFixturesAdapter): Promise<void> {
-  const sc = adapter.schemaCache;
+  const sc = adapter.internalSchemaCache;
   if (!sc) return;
   const touched = sc.takeTouchedTables();
   if (touched.size === 0) return;
@@ -255,7 +255,7 @@ export function withTransactionalFixtures(
     }
     _txnOpenedForTest = true;
     // Open a recording window so teardown re-reflects only DDL-touched tables.
-    if (invalidateSchemaCache) adapter.schemaCache?.recordTouchedTables();
+    if (invalidateSchemaCache) adapter.internalSchemaCache?.recordTouchedTables();
     const pool = pooledAdapterPool(adapter);
     if (pool) {
       // Mirrors Rails test_fixtures.rb:177-184 pin/lease lifecycle:

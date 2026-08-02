@@ -30,6 +30,7 @@ function makeStatements(
     // fetchTypeMetadata dispatches through it as schema_statements.rb:1718 does.
     lookupCastType: (sqlType: string | null) => AbstractAdapter.TYPE_MAP.lookup(sqlType),
     config: {},
+    schemaCache: { clearDataSourceCacheBang: vi.fn().mockResolvedValue(undefined) },
     ...adapterOverrides,
   };
   // Real hosts inherit AbstractAdapter#schemaQuery, which is `execute` tagged

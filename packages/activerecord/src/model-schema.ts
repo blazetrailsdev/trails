@@ -320,7 +320,7 @@ export function columnsHash(this: typeof Base): Record<string, ColumnLike> {
   } catch {
     adapter = null;
   }
-  const cache = adapter?.schemaCache as
+  const cache = adapter?.internalSchemaCache as
     | {
         getCachedColumnsHash?: (t: string) => Record<string, ColumnLike> | undefined;
       }
@@ -362,7 +362,7 @@ export function columnsHash(this: typeof Base): Record<string, ColumnLike> {
   return result;
 }
 
-type DatabaseAdapterLike = { schemaCache?: unknown };
+type DatabaseAdapterLike = { internalSchemaCache?: unknown };
 
 /**
  * Connection-safe read of the cached column hash for `klass`'s table.
@@ -382,8 +382,8 @@ type DatabaseAdapterLike = { schemaCache?: unknown };
  * @internal
  */
 export function cachedColumnsHash(klass: typeof Base): Record<string, ColumnLike> {
-  const cachedFrom = (conn: { schemaCache?: unknown } | null | undefined) => {
-    const cache = conn?.schemaCache as
+  const cachedFrom = (conn: { internalSchemaCache?: unknown } | null | undefined) => {
+    const cache = conn?.internalSchemaCache as
       | { getCachedColumnsHash?: (t: string) => Record<string, ColumnLike> | undefined }
       | undefined;
     return cache?.getCachedColumnsHash?.(klass.tableName);
@@ -395,7 +395,9 @@ export function cachedColumnsHash(klass: typeof Base): Record<string, ColumnLike
   try {
     const hash =
       cachedFrom(threadedConnectionFor(klass)) ??
-      cachedFrom(connectionPool.call(klass).activeConnection as { schemaCache?: unknown } | null);
+      cachedFrom(
+        connectionPool.call(klass).activeConnection as { internalSchemaCache?: unknown } | null,
+      );
     if (hash) return hash;
   } catch {
     /* fall through */
@@ -565,10 +567,10 @@ export async function createTable(this: typeof Base): Promise<void> {
   // `clear_data_source_cache!`.
   (
     a as {
-      schemaCache?: { clearDataSourceCacheBang(pool: unknown, name: string): void };
+      internalSchemaCache?: { clearDataSourceCacheBang(pool: unknown, name: string): void };
       pool?: unknown;
     }
-  ).schemaCache?.clearDataSourceCacheBang((a as { pool?: unknown }).pool ?? null, table);
+  ).internalSchemaCache?.clearDataSourceCacheBang((a as { pool?: unknown }).pool ?? null, table);
 }
 
 // ---------------------------------------------------------------------------
@@ -824,7 +826,7 @@ function clearAdapterDataSourceCache(host: SchemaHost): void {
   // NOT the pool's BoundSchemaReflection (async, single-arg `(name)`); reaching
   // for that form here would clear a table named `null` and leave a floating
   // Promise. Both branches below resolve the raw cache, matching what the
-  // adapter's own `schemaCache` getter returns (abstract-adapter.ts).
+  // adapter's own `internalSchemaCache` getter returns (abstract-adapter.ts).
   type Cache = {
     clearDataSourceCacheBang?: (connection: unknown, name: string) => void;
   };
@@ -832,9 +834,9 @@ function clearAdapterDataSourceCache(host: SchemaHost): void {
   let table: string | undefined;
   try {
     table = (host as unknown as { tableName?: string }).tableName;
-    const direct = (host as unknown as { _adapter?: { schemaCache?: Cache } })._adapter;
-    if (direct?.schemaCache) {
-      cache = direct.schemaCache;
+    const direct = (host as unknown as { _adapter?: { internalSchemaCache?: Cache } })._adapter;
+    if (direct?.internalSchemaCache) {
+      cache = direct.internalSchemaCache;
     } else {
       // Pooled path: read the pool config's raw SchemaCache directly (the slot
       // the adapter getter shares), NOT `schemaCache()` whose fallback is the
@@ -1231,7 +1233,7 @@ export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
   }
   if (!startingAdapter) return;
   const adapterOwner = this;
-  const cache = startingAdapter.schemaCache;
+  const cache = startingAdapter.internalSchemaCache;
   if (!cache) return;
   const table = this.tableName;
   // Rails' `for_lone_connection` shape (schema_cache.rb:155): on
@@ -1282,9 +1284,9 @@ export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
  */
 function cachedColumnNames(host: SchemaHost): Set<string> | null {
   try {
-    const cached = reflectionAdapter(host)?.schemaCache?.getCachedColumnsHash?.(host.tableName) as
-      | Record<string, unknown>
-      | undefined;
+    const cached = reflectionAdapter(host)?.internalSchemaCache?.getCachedColumnsHash?.(
+      host.tableName,
+    ) as Record<string, unknown> | undefined;
     if (cached) return new Set(Object.keys(cached));
   } catch {
     return null;
@@ -1311,7 +1313,7 @@ async function reflectColumnNames(host: SchemaHost): Promise<Set<string> | null>
     // cold-cache writes reconcile query-free. Mirror loadSchemaFromCache's
     // FakePool handling so a lone-connection pool (SQLite :memory:, size 1)
     // doesn't deadlock on withConnection.
-    const cache = conn.schemaCache;
+    const cache = conn.internalSchemaCache;
     if (cache && typeof cache.columnsHash === "function") {
       const pool = new FakePool(conn);
       const hash = (await cache.columnsHash(pool, table)) as Record<string, unknown> | undefined;
@@ -1409,7 +1411,7 @@ function loadSchemaFromCacheSync(host: SchemaHost): boolean {
     adapter = undefined;
   }
   if (!adapter) return false;
-  const cache = adapter.schemaCache;
+  const cache = adapter.internalSchemaCache;
   if (!cache || typeof cache.getCachedColumnsHash !== "function") return false;
   const table = host.tableName;
   // Gate on `_columnsHash` (the map we read) rather than `isCached`/`_columns`,
@@ -1512,7 +1514,7 @@ export function cachedTableExists(this: SchemaHost): boolean | undefined {
   } catch {
     return undefined;
   }
-  const cache = conn?.schemaCache;
+  const cache = conn?.internalSchemaCache;
   if (!cache || typeof cache.getCachedDataSourceExists !== "function") return undefined;
   return cache.getCachedDataSourceExists(this.tableName);
 }
@@ -1521,7 +1523,7 @@ export async function tableExists(this: SchemaHost): Promise<boolean> {
   const conn = reflectionAdapter(this);
   const cache = conn.schemaCache;
   if (!cache || typeof cache.dataSourceExists !== "function") return true;
-  const exists = await cache.dataSourceExists(new FakePool(conn), this.tableName);
+  const exists = await cache.dataSourceExists(this.tableName);
   return exists !== false;
 }
 

@@ -737,8 +737,8 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   async renameTable(tableName: string, newName: string): Promise<void> {
     this.validateTableLengthBang(newName);
-    this.schemaCache.clearDataSourceCacheBang(this.pool, tableName);
-    this.schemaCache.clearDataSourceCacheBang(this.pool, newName);
+    await this.schemaCache.clearDataSourceCacheBang(tableName);
+    await this.schemaCache.clearDataSourceCacheBang(newName);
     await this._execMutation(
       `RENAME TABLE ${this.quoteTableName(tableName)} TO ${this.quoteTableName(newName)}`,
     );
@@ -746,7 +746,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   async renameIndex(tableName: string, oldName: string, newName: string): Promise<void> {
-    this.schemaCache?.clearDataSourceCacheBang(this.pool, tableName);
+    await this.schemaCache.clearDataSourceCacheBang(tableName);
     await this.getDatabaseVersion();
     this.validateIndexLengthBang(tableName, newName);
     if (!this.supportsRenameIndex()) {
@@ -806,7 +806,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     );
     // Clear before mutating (matching the other DDL methods) so a subsequent
     // columnsHash() read re-reflects the new default rather than a stale entry.
-    this.schemaCache?.clearDataSourceCacheBang(this.pool, tableName);
+    await this.schemaCache.clearDataSourceCacheBang(tableName);
     await this._execMutation(`ALTER TABLE ${this.quoteTableName(tableName)} ${fragment}`);
   }
 
@@ -961,7 +961,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     const fragment = await this.renameColumnForAlter(tableName, columnName, newColumnName);
     // Clear before mutating (matching the other DDL methods) so a subsequent
     // columnsHash() read re-reflects the renamed column rather than a stale entry.
-    this.schemaCache?.clearDataSourceCacheBang(this.pool, tableName);
+    await this.schemaCache.clearDataSourceCacheBang(tableName);
     await this._execMutation(`ALTER TABLE ${this.quoteTableName(tableName)} ${fragment}`);
     await this.renameColumnIndexes(tableName, columnName, newColumnName);
   }

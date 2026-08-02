@@ -789,7 +789,8 @@ export class AbstractAdapter implements Quoting {
   private _owner: string | null = null;
   private _inUse = false;
   private _preparedStatements = false;
-  private _schemaCache: SchemaCache | null = null;
+  private _schemaReflection: SchemaReflection | null = null;
+  private _schemaCache: BoundSchemaReflection | null = null;
   private _idleSince = Date.now();
   protected _lastActivity = 0;
   protected _verified = false;
@@ -1494,50 +1495,54 @@ export class AbstractAdapter implements Quoting {
     return false;
   }
 
-  get schemaCache(): SchemaCache {
-    // Phase 11 made `pool.schemaCache` return a BoundSchemaReflection
-    // (the Rails-shaped handle DatabaseTasks.dumpSchemaCache expects).
-    // The raw SchemaCache that AbstractAdapter caches incidental
-    // introspection into now lives on `pool.poolConfig.schemaCache`,
-    // matching Rails' PoolConfig @schema_cache slot. Share it so
-    // every connection in the pool hits the same cache, and fall
-    // back to a per-adapter slot when no pool is attached (tests,
-    // bare adapters).
-    const pool = this.pool as { poolConfig?: { schemaCache: SchemaCache | null } } | null;
-    const poolConfig = pool?.poolConfig;
-    if (poolConfig?.schemaCache) return poolConfig.schemaCache;
+  /**
+   * @internal The raw `SchemaCache` behind this connection's schema reflection.
+   * Rails has no adapter-level accessor for it — its `@schema_cache` slot holds
+   * the bound reflection (see {@link schemaCache}) — so this is the
+   * trails-internal name for the sync peeks and pool-arg-taking reads that our
+   * async `BoundSchemaReflection` can't serve.
+   */
+  get internalSchemaCache(): SchemaCache {
+    // Same object the bound reflection reads: PoolConfig#schemaCache is backed
+    // by the pool SchemaReflection's cache slot, and the lone-connection
+    // reflection below owns the standalone-adapter one.
+    const reflection = this._poolSchemaReflection();
+    if (!reflection.loadedCache) reflection.loadedCache = new SchemaCache();
+    return reflection.loadedCache;
+  }
 
-    if (!this._schemaCache) {
-      this._schemaCache = new SchemaCache();
-      if (poolConfig) poolConfig.schemaCache = this._schemaCache;
-    }
+  /**
+   * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#schema_cache
+   *
+   * Rails: `@pool.schema_cache || (@schema_cache ||=
+   * BoundSchemaReflection.for_lone_connection(@pool.schema_reflection, self))`.
+   * Pool-backed adapters reuse the pool's BoundSchemaReflection; standalone
+   * adapters (a NullPool, i.e. tests and bare adapters) wrap themselves as the
+   * pool so reflection methods that need a pool handle call back into this
+   * adapter.
+   */
+  get schemaCache(): BoundSchemaReflection {
+    const pool = this.pool as { schemaCache?: BoundSchemaReflection } | null;
+    if (pool?.schemaCache instanceof BoundSchemaReflection) return pool.schemaCache;
+    this._schemaCache ??= BoundSchemaReflection.forLoneConnection(
+      this._poolSchemaReflection(),
+      this,
+    );
     return this._schemaCache;
   }
 
   /**
-   * One-arg `indexes(tableName)` form of the schema cache. Pool-backed
-   * adapters reuse the pool's BoundSchemaReflection; standalone adapters
-   * (tests, bare adapters) wrap themselves as the pool so SchemaCache
-   * methods that need a pool handle can still call back into this adapter.
-   *
-   * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#schema_cache
-   *
-   * @noRailsEquivalent CONVERGEABLE (story: converge-schema-cache-getter-onto-bound-reflection).
-   * Rails' `AbstractAdapter#schema_cache` returns the pool's bound reflection
-   *   handle
-   *   (abstract_adapter.rb:298 → connection_pool.rb:285). trails' `schemaCache` getter returns the
-   *   raw `SchemaCache` the adapter memoizes incidental introspection into, so the Rails-shaped bound
-   *   handle needs a second name. The divergence is `schemaCache`'s return type, not this accessor;
-   *   until that is converged, `schemaCacheBound` is what `insertAll` and the uniqueness validator
-   *   read to get Rails' actual `schema_cache` semantics.
+   * @internal Rails' `@pool.schema_reflection` — ConnectionPool delegates to its
+   * PoolConfig and NullPool answers a bare `SchemaReflection.new(nil)`
+   * (connection_pool.rb:34-36). The fallback covers a mock that skipped the
+   * constructor and so carries no pool at all; Rails cannot get there because
+   * `initialize` always plants a NullPool.
    */
-  get schemaCacheBound(): BoundSchemaReflection {
-    const pool = this.pool as { schemaCache?: BoundSchemaReflection } | null;
-    if (pool?.schemaCache instanceof BoundSchemaReflection) return pool.schemaCache;
-    return BoundSchemaReflection.forLoneConnection(
-      new SchemaReflection(null, this.schemaCache),
-      this,
-    );
+  private _poolSchemaReflection(): SchemaReflection {
+    const pool = this.pool as { schemaReflection?: SchemaReflection } | null;
+    if (pool?.schemaReflection) return pool.schemaReflection;
+    this._schemaReflection ??= new SchemaReflection(null);
+    return this._schemaReflection;
   }
 
   checkIfWriteQuery(sql: string): void {
@@ -2634,7 +2639,7 @@ export class AbstractAdapter implements Quoting {
     // (abstract_adapter.rb:298).
     const pool =
       this.pool == null || this.pool instanceof NullPool ? new FakePool(this) : this.pool;
-    const hash = await (this.schemaCache as any).columnsHash(pool, tableName);
+    const hash = await (this.internalSchemaCache as any).columnsHash(pool, tableName);
     return hash?.[attribute.name];
   }
 

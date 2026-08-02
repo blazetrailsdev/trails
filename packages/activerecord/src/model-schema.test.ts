@@ -30,13 +30,13 @@ describe("virtual attribute reconciliation warms the schema cache", () => {
       }
     }
     const conn = Post.connection;
-    await conn.schemaCache.clearDataSourceCacheBang(conn.pool ?? conn, "posts");
-    expect(conn.schemaCache.getCachedColumnsHash("posts")).toBeUndefined();
+    await conn.internalSchemaCache.clearDataSourceCacheBang(conn.pool ?? conn, "posts");
+    expect(conn.internalSchemaCache.getCachedColumnsHash("posts")).toBeUndefined();
 
     await Post.create({ title: "hello", body: "b" });
 
     // reconcile reflected through the shared cache, so it is now warm
-    expect(conn.schemaCache.getCachedColumnsHash("posts")).toBeDefined();
+    expect(conn.internalSchemaCache.getCachedColumnsHash("posts")).toBeDefined();
   });
 
   it("warm-cache reconciliation invalidates a columnNames memo taken off the synthesized fallback", async () => {
@@ -49,7 +49,7 @@ describe("virtual attribute reconciliation warms the schema cache", () => {
       }
     }
     const conn = Post.connection;
-    await conn.schemaCache.clearDataSourceCacheBang(conn.pool ?? conn, "posts");
+    await conn.internalSchemaCache.clearDataSourceCacheBang(conn.pool ?? conn, "posts");
 
     // Cold cache: loadSchema's synthesized fallback sets `_schemaLoaded` from
     // the declared attributes, so this memoizes the synthesized list.
@@ -74,7 +74,7 @@ describe("virtual attribute reconciliation warms the schema cache", () => {
       }
     }
     const conn = Post.connection;
-    await conn.schemaCache.clearDataSourceCacheBang(conn.pool ?? conn, "posts");
+    await conn.internalSchemaCache.clearDataSourceCacheBang(conn.pool ?? conn, "posts");
 
     const post = await Post.create({ title: "first", body: "b" });
     post.title = "second";
