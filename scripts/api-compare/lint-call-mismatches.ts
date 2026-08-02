@@ -22,8 +22,17 @@
  * row), the stale check forces the baseline to shrink.
  *
  * Usage:
- *   pnpm tsx scripts/api-compare/lint-call-mismatches.ts          # gate (CI)
- *   pnpm tsx scripts/api-compare/lint-call-mismatches.ts --write  # reseed baseline
+ *   pnpm tsx scripts/api-compare/lint-call-mismatches.ts           # gate (CI)
+ *   pnpm tsx scripts/api-compare/lint-call-mismatches.ts --write   # reseed baseline
+ *   pnpm tsx scripts/api-compare/lint-call-mismatches.ts --no-regen # gate the artifact on disk
+ *
+ * A plain gating run (and a bare `--write`) first regenerates
+ * output/call-mismatches.json by shelling out to `pnpm api:compare`, sharing
+ * the wide gate's opt-out contract via gate-regen.ts (RFC 0083): `--no-regen`,
+ * API_COMPARE_SKIP_WIDE_REGEN=1, any CI value, or — for `--write` —
+ * API_COMPARE_FORCE. api:calls:reseed opts out with `--no-regen`, having just
+ * run the forced regeneration itself. The partial-scope determinism guard below runs
+ * unchanged either way.
  *
  * `--write` regenerates the baseline from the current artifact, preserving the
  * `reason` of entries that still flag and dropping stale rows. Run it after a
@@ -45,7 +54,7 @@
  *   2. reseed ONLY through the canonical path below, which force-rebuilds every
  *      cache first so the artifact can't be a warm-cache under-report:
  *
- *        pnpm api:calls:reseed  # API_COMPARE_FORCE=1 api:compare && this --write
+ *        pnpm api:calls:reseed  # API_COMPARE_FORCE=1 api:compare && this --write --no-regen
  *
  *   3. as a backstop, the artifact records the `packages` it compared and this
  *      script ABORTS (gate AND `--write`) unless that set covers every
@@ -65,6 +74,7 @@ import * as path from "path";
 import { fileURLToPath } from "url";
 import { OUTPUT_DIR, PACKAGES, ROOT_DIR } from "./config.js";
 import { reportNonCanonicalBaselines, serializeBaseline } from "./baseline-json.js";
+import { NO_REGEN_FLAG, regenerateArtifact, shouldRegenerate } from "./gate-regen.js";
 import { NARROW_DEFAULT_REASON as DEFAULT_REASON } from "./missing-rails-call-tags.js";
 
 const BASELINE_PATH = path.join(
@@ -343,7 +353,20 @@ async function runAsScript(): Promise<void> {
   const self = fileURLToPath(import.meta.url);
   const invoked = process.argv[1] ? path.resolve(process.argv[1]) : "";
   if (path.resolve(self) !== invoked) return;
-  const code = await main(process.argv.includes("--write"));
+  const argv = process.argv.slice(2);
+  if (shouldRegenerate(argv, process.env)) {
+    console.log("Regenerating output/call-mismatches.json (compare.ts)…");
+    try {
+      await regenerateArtifact(process.env);
+    } catch (e) {
+      console.error(
+        `\ncall-mismatches ratchet: could not regenerate the artifact: ${(e as Error).message}\n` +
+          `Re-run with ${NO_REGEN_FLAG} to gate against the artifact already on disk.\n`,
+      );
+      process.exit(2);
+    }
+  }
+  const code = await main(argv.includes("--write"));
   process.exit(code);
 }
 

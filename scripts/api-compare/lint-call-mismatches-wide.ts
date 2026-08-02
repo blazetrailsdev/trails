@@ -93,7 +93,6 @@
  * entry guard is the sole exception, matching lint-call-mismatches.ts), async fs.
  */
 
-import { spawn } from "child_process";
 import * as fs from "fs/promises";
 import * as path from "path";
 import { fileURLToPath } from "url";
@@ -111,6 +110,7 @@ import {
   type StaleTag,
 } from "./lint-call-mismatches.js";
 import { reportNonCanonicalBaselines, serializeBaseline } from "./baseline-json.js";
+import { NO_REGEN_FLAG, regenerateArtifact, shouldRegenerate } from "./gate-regen.js";
 import {
   loadMark,
   newlySeeded,
@@ -251,38 +251,6 @@ async function pruneEmptyDirs(dir: string): Promise<boolean> {
     }
   }
   return empty;
-}
-
-export const NO_REGEN_FLAG = "--no-regen";
-
-export const REGEN_SKIP_ARGS = [NO_REGEN_FLAG, "--report", "--unreviewed"];
-
-export const REGEN_SKIP_ENV = "API_COMPARE_SKIP_WIDE_REGEN";
-
-// A reseed regenerating a stale artifact is the same bug this PR fixes, one
-// severity worse: `--write` commits the stale population as the new baseline.
-// So `--write` regenerates too — except under API_COMPARE_FORCE, which is the
-// api:calls:wide:reseed script's own marker that it just ran the (forced)
-// regeneration itself.
-export function shouldRegenerate(argv: string[], env: Record<string, string | undefined>): boolean {
-  if (argv.some((a) => REGEN_SKIP_ARGS.includes(a))) return false;
-  if (argv.includes("--write") && env.API_COMPARE_FORCE) return false;
-  return !env.CI && env[REGEN_SKIP_ENV] !== "1";
-}
-
-export function regenerateArtifact(env: Record<string, string | undefined>): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const child = spawn("pnpm", ["api:compare", "--wide-calls"], {
-      cwd: ROOT_DIR,
-      env,
-      stdio: "inherit",
-    });
-    child.on("error", reject);
-    child.on("close", (code, signal) => {
-      if (code === 0) resolve();
-      else reject(new Error(`\`pnpm api:compare --wide-calls\` exited with ${signal ?? code}`));
-    });
-  });
 }
 
 async function loadArtifact(): Promise<Artifact> {
@@ -619,7 +587,7 @@ async function runAsScript(): Promise<void> {
     if (shouldRegenerate(argv, process.env)) {
       console.log("Regenerating output/call-mismatches-wide.json (compare.ts --wide-calls)…");
       try {
-        await regenerateArtifact(process.env);
+        await regenerateArtifact(process.env, ["--wide-calls"]);
       } catch (e) {
         console.error(
           `\nwide call-mismatches ratchet: could not regenerate the wide artifact: ${
