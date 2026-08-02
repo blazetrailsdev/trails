@@ -1403,6 +1403,14 @@ jobs:
       needs.changes.outputs.comparison_affected == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      # contents: write and pull-requests: write for the main-only wide
+      # ratchet reseed step, which pushes the reseed to a maintenance branch
+      # and opens/updates its PR. Declaring `permissions:` zeroes every
+      # unlisted scope, so contents must be listed even though it is part of
+      # the default token.
+      contents: write
+      pull-requests: write
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-pnpm
@@ -1505,7 +1513,14 @@ jobs:
           echo "::error title=Wide ratchet baseline drift::${{ github.sha }} left the committed wide call-mismatch baseline out of sync with a clean reseed. Run \`pnpm api:calls:wide:reseed\` and commit the result."
           git --no-pager diff --stat -- "$baseline" "$mark"
           git --no-pager diff -- "$baseline" "$mark"
+          # Publish the reseed as a single rolling maintenance PR so `main`
+          # gets fixed without waiting on a human noticing the red run. The
+          # step still fails afterwards: the PR is the remedy, the failure is
+          # the signal, and a missed PR must not silently swallow the drift.
+          bash scripts/ci/open-wide-baseline-pr.sh
           exit 1
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Wide call-mismatches ratchet
         # Gates the RFC 0047 wide artifact against the split call-mismatches-wide-exclude/ baseline dir.
         # Fails on a new wide mismatch, a stale baseline entry, or more
