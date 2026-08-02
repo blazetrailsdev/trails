@@ -21,7 +21,16 @@
  *     shrinks by the same rule; see missing-rails-call-tags.ts);
  *   - more entries still carrying the seeded {@link DEFAULT_REASON} than the
  *     committed high-water mark in call-mismatches-wide-unreviewed.json
- *     (RFC 0083 — see unreviewed-ratchet.ts for why that is a second ratchet).
+ *     (RFC 0083 — see unreviewed-ratchet.ts for why that is a second ratchet);
+ *   - a high-water mark left ABOVE what a clean reseed would write (RFC 0083 —
+ *     see unreviewed-ratchet.ts#markSlack). The other arms all pass on a
+ *     stale-HIGH mark, so drift used to surface only when the next story
+ *     reseeded and found its own before-value was never reproducible. It is a
+ *     GATE, not advisory: the mark only shrinks, so tightening is always safe,
+ *     and `pnpm api:calls:wide:reseed` fixes it in one command. Baseline ROW
+ *     drift needs no separate arm — a gating run regenerates the artifact
+ *     itself (see below), so a row set that a clean reseed would change already
+ *     fails as NEW or STALE entries.
  *
  * The population excludes calls the extractor marked `weakCalls` — a qualified
  * call whose receiver was, at every occurrence, a local variable or a literal
@@ -105,7 +114,9 @@ import {
   nextMark,
   renderExcess,
   droppedReviewed,
+  markSlack,
   renderDroppedReviewed,
+  renderSlack,
   renderWriteSummary,
   unreviewedEntries,
   writeMark,
@@ -497,12 +508,14 @@ async function main(write: boolean): Promise<number> {
   const mark = await loadMark(MARK_PATH);
   const overMark = unreviewed > mark;
   if (overMark) console.error(renderExcess(unreviewed, mark, path.relative(ROOT_DIR, MARK_PATH)));
+  const slack = markSlack(unreviewed, mark);
+  if (slack > 0) console.error(renderSlack(unreviewed, mark, path.relative(ROOT_DIR, MARK_PATH)));
 
   if (added.length === 0 && stale.length === 0 && staleTags.length === 0) {
-    if (overMark) return 1;
+    if (overMark || slack > 0) return 1;
     console.log(
       `wide call-mismatches ratchet: OK (${baseline.length} baselined, ` +
-        `${unreviewed} unreviewed <= mark ${mark})`,
+        `${unreviewed} unreviewed, mark ${mark} tight)`,
     );
     return 0;
   }

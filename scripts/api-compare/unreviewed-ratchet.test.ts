@@ -10,7 +10,9 @@ import {
   renderDroppedReviewed,
   nextMark,
   parseMark,
+  markSlack,
   renderExcess,
+  renderSlack,
   renderWriteSummary,
   unreviewedEntries,
   writeMark,
@@ -169,5 +171,30 @@ describe("droppedReviewed", () => {
     const msg = renderDroppedReviewed([entry("a", "verified: real divergence")]);
     expect(msg).toContain("1 reviewed entr(ies)");
     expect(msg).toContain("activerecord  relation.ts  load  a");
+  });
+});
+
+describe("markSlack", () => {
+  it("reports how far a stale-high mark sits above what a clean reseed would write", () => {
+    expect(markSlack(2787, 2837)).toBe(50);
+  });
+
+  it("is zero when the mark already matches the current count", () => {
+    expect(markSlack(2787, 2787)).toBe(0);
+  });
+
+  it("leaves a count above the mark to the excess arm", () => {
+    expect(markSlack(2840, 2837)).toBe(0);
+  });
+});
+
+describe("renderSlack", () => {
+  it("names both numbers, the slack, and the one-command fix", () => {
+    const msg = renderSlack(2787, 2837, "scripts/api-compare/mark.json");
+    expect(msg).toContain("STALE high-water mark");
+    expect(msg).toContain("2837");
+    expect(msg).toContain("2787");
+    expect(msg).toContain("50 of slack");
+    expect(msg).toContain("pnpm api:calls:wide:reseed");
   });
 });
