@@ -237,8 +237,7 @@ export async function* batchOnUnloadedRelation(opts: {
   const batchOrders = buildBatchOrders(cursor, opts.order as any);
   const emptyScope = relation.toSql() === relation.model.unscoped().all().toSql();
   const useRanges = (emptyScope && opts.useRanges !== false) || opts.useRanges === true;
-  const ordered = relation._clone();
-  ordered._orderClauses = batchOrders.map(([col, dir]) => [col, dir] as [string, "asc" | "desc"]);
+  const ordered = relation.reorder(Object.fromEntries(batchOrders));
   // Apply start/finish limits once on the base relation; advance cursor per
   // iteration — matching Rails' batch_condition(relation, ...) pattern where
   // `relation` is always the original scoped relation, not the previous batch.
