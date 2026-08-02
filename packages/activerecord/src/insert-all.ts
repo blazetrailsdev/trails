@@ -359,7 +359,10 @@ export class InsertAll {
 
   /** @internal Mirrors: ActiveRecord::InsertAll#unique_by_columns */
   private uniqueByColumns(): string[] {
-    return this.uniqueBy instanceof IndexDefinition ? this.uniqueBy.columns : [];
+    // Mirrors Rails' `Array(unique_by&.columns)` — an expression index keeps
+    // `columns` as a bare string, wrapped here into one element.
+    if (!(this.uniqueBy instanceof IndexDefinition)) return [];
+    return Array.isArray(this.uniqueBy.columns) ? this.uniqueBy.columns : [this.uniqueBy.columns];
   }
 
   /** @internal */

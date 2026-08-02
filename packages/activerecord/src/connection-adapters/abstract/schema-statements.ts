@@ -28,7 +28,6 @@ import {
   type AddIndexOptions,
   type AddReferenceOptions,
   type RemoveReferenceOptions,
-  type IndexDefinitionRow,
   ReferenceDefinition,
   type ColumnType,
   type ColumnOptions,
@@ -263,9 +262,13 @@ export interface SchemaNamespaceStatements {
 }
 
 /** @internal */
-function expandIndexOption<T>(opt: Record<string, T> | T, columns: string[]): Record<string, T> {
+function expandIndexOption<T>(
+  opt: Record<string, T> | T,
+  columns: string | string[],
+): Record<string, T> {
   if (typeof opt === "object" && opt !== null) return opt as Record<string, T>;
-  return Object.fromEntries(columns.map((c) => [c, opt])) as Record<string, T>;
+  const names = Array.isArray(columns) ? columns : [columns];
+  return Object.fromEntries(names.map((c) => [c, opt])) as Record<string, T>;
 }
 
 /**
@@ -1197,7 +1200,7 @@ export class SchemaStatements {
     }
   }
 
-  async indexes(tableName: string): Promise<IndexDefinitionRow[]> {
+  async indexes(tableName: string): Promise<IndexDefinition[]> {
     switch (this.adapterName as AdapterName) {
       case "sqlite":
         // Share the concrete SQLite3 introspection so this fallback arm
@@ -1255,15 +1258,10 @@ export class SchemaStatements {
               }
             }
           }
-          let orders: Record<string, string> | string | undefined;
-          const orderVals = Object.values(ordersMap);
-          if (orderVals.length > 0) {
-            orders =
-              columns.length === orderVals.length && new Set(orderVals).size === 1
-                ? orderVals[0]
-                : ordersMap;
-          }
-          return { name: row.name, columns, unique: row.unique === true, where, orders };
+          return new IndexDefinition(tableName, row.name, row.unique === true, columns, {
+            where,
+            orders: ordersMap,
+          });
         });
       }
       case "mysql": {
@@ -1291,14 +1289,14 @@ export class SchemaStatements {
           .map(([name, info]) => {
             info.seqs.sort((a, b) => a[0] - b[0]);
             const columns = info.seqs.map((s) => s[1]);
-            // Mirrors Rails' MySQL adapter: `orders[col] = :desc if Collation == "D"`,
-            // kept as a plain map (no concise-options collapse, unlike PostgreSQL).
+            // Mirrors Rails' MySQL adapter: `orders[col] = :desc if Collation == "D"`.
             const ordersMap: Record<string, string> = {};
             for (const [, column, collation] of info.seqs) {
               if (collation === "D") ordersMap[column] = "desc";
             }
-            const orders = Object.keys(ordersMap).length > 0 ? ordersMap : undefined;
-            return { name, columns, unique: info.unique, orders };
+            return new IndexDefinition(tableName, name, info.unique, columns, {
+              orders: ordersMap,
+            });
           });
       }
     }
@@ -2074,7 +2072,7 @@ export class SchemaStatements {
       return options.name;
     }
 
-    const checks: Array<(idx: IndexDefinitionRow) => boolean> = [];
+    const checks: Array<(idx: IndexDefinition) => boolean> = [];
     let columnNames: string[];
 
     if (!options.name && this.isExpressionColumnName(columnName ?? "")) {

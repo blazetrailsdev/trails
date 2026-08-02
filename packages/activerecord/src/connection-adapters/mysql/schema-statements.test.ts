@@ -447,8 +447,8 @@ describe("MySQL::SchemaStatements", () => {
       "pages",
     );
     expect(idx).toHaveLength(1);
-    expect(idx[0].lengths).toEqual({ title: 10 });
-    expect(idx[0].orders).toBeUndefined();
+    expect(idx[0].lengths).toBe(10);
+    expect(idx[0].orders).toEqual({});
   });
 
   it("indexes: surfaces desc orders when Collation is D", async () => {
@@ -465,8 +465,8 @@ describe("MySQL::SchemaStatements", () => {
       ]),
       "pages",
     );
-    expect(idx[0].orders).toEqual({ title: "desc" });
-    expect(idx[0].lengths).toBeUndefined();
+    expect(idx[0].orders).toBe("desc");
+    expect(idx[0].lengths).toEqual({});
   });
 
   it("indexes: surfaces desc orders for descending functional indexes", async () => {
@@ -488,8 +488,8 @@ describe("MySQL::SchemaStatements", () => {
     // into a single SQL string via add_options_for_index_columns, with the
     // DESC order baked inline and no separate orders/lengths Records.
     expect(idx[0].columns).toBe("(lower(`title`)) DESC");
-    expect(idx[0].orders).toBeUndefined();
-    expect(idx[0].lengths).toBeUndefined();
+    expect(idx[0].orders).toEqual({});
+    expect(idx[0].lengths).toEqual({});
   });
 
   it("indexes: collapses functional-index columns into a single SQL string", async () => {
@@ -519,8 +519,8 @@ describe("MySQL::SchemaStatements", () => {
     // Expression columns pass through their parenthesized form; plain columns
     // are quoted with prefix length and DESC order baked in.
     expect(idx[0].columns).toBe("(lower(`title`)), `position`(4) DESC");
-    expect(idx[0].orders).toBeUndefined();
-    expect(idx[0].lengths).toBeUndefined();
+    expect(idx[0].orders).toEqual({});
+    expect(idx[0].lengths).toEqual({});
   });
 
   it("indexes: omits functional-index order when sort order is unsupported", async () => {

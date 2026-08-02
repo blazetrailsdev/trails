@@ -101,7 +101,6 @@ import type {
   IdHashOptions,
   AddReferenceOptions,
   RemoveReferenceOptions,
-  IndexDefinitionRow,
 } from "./abstract/schema-definitions.js";
 import type { SchemaCreation } from "./abstract/schema-creation.js";
 import type { Column } from "./column.js";
@@ -392,7 +391,7 @@ export interface AbstractAdapter {
   dataSourceSql(name?: string | null, options?: { type?: string }): string;
   columns(tableName: string): Promise<Column[]>;
   primaryKey(tableName: string): Promise<string | string[] | null>;
-  indexes(tableName: string): Promise<IndexDefinitionRow[]>;
+  indexes(tableName: string): Promise<IndexDefinition[]>;
   foreignKeys(tableName: string): Promise<ForeignKeyDefinition[]>;
   foreignKeyExists(
     fromTable: string,
