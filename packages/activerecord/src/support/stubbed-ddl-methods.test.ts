@@ -44,6 +44,15 @@ const NON_EMITTING: ReadonlyMap<string, string> = new Map([
   ["databaseVersion", "version read behind the index sort-order predicates"],
   ["_databaseVersion", "memoized backing slot of the databaseVersion read"],
   ["_statementPool", "prepared-statement slot clearCacheBang resets, not a DDL emitter"],
+  ["_schemaCache", "memoized backing slot of the schemaCache read"],
+  ["_sqlite3SchemaCreation", "memoized backing slot of the schemaCreation renderer"],
+  ["quoteIdentifier", "renderer input — quotes a name into DDL the renderer is already building"],
+  ["quoteTableName", "renderer input — quotes a table name into DDL, emits nothing itself"],
+  ["quoteDefaultExpression", "renderer input — renders a column default, emits nothing itself"],
+  ["quotedColumnsForIndex", "renderer input — renders an index's column list"],
+  ["nativeDatabaseTypes", "renderer input — the type map typeToSql reads, a read not an emitter"],
+  ["supportsForeignKeys", "capability read — decides whether the renderer emits inline REFERENCES"],
+  ["_config", "connection-config read the renderer consults, not a DDL emitter"],
 ]);
 
 /**
@@ -57,13 +66,28 @@ const NON_EMITTING: ReadonlyMap<string, string> = new Map([
  * view, so the `this.<member>` calls the mixed-in body makes are recorded one
  * hop deep, while the calls that view then makes to the real adapter stay
  * unrecorded. `this.adapter` — how a mixed-in body names the adapter, which is
- * itself — is answered with the same view so that hop stays recorded. That boundary — the one a cover can intercept — is the whole
- * scope of this guard.
+ * itself — is answered with the same view so that hop stays recorded.
  *
- * `schemaCreation` is the one member the device cannot see through: the renderer
- * it returns is built off the real adapter, so its own quoting/type reads
- * (`quoteIdentifier`, `quoteDefaultExpression`, `nativeDatabaseTypes`, …) never
- * come back through the proxy. It stays in the guarded set for that reason.
+ * Getters are the second half of the boundary. A getter read off the view is
+ * evaluated with the view as receiver, not the real adapter, so whatever it
+ * builds off `this` keeps recording: `schemaCreation` hands back a renderer
+ * holding the view, and the renderer's own quoting and type reads
+ * (`quoteIdentifier`, `quoteDefaultExpression`, `nativeDatabaseTypes`, …) come
+ * back through the proxy and are pinned again. Getters that read a private
+ * field brand-check their receiver and throw on a proxy; those fall back to
+ * evaluating on the real adapter, unrecorded.
+ *
+ * Depth stops there, deliberately. Self-binding the recorded functions so that
+ * *every* hop inside an adapter method is recorded drags in the whole adapter
+ * internals — 44 further members (`_performQuery`, `materializeTransactions`,
+ * `verifiedBang`, `ensureConnected`, …), none of which is a surface a cover
+ * stubs, and exempting them one by one would turn NON_EMITTING into the blanket
+ * exemption its own staleness rule exists to prevent. The boundary this pins is
+ * the one a cover can actually intercept: the loader's calls into the adapter,
+ * the calls those bodies make back into it, and everything the renderer they
+ * build reads. Members reached deeper than that (`createTableDefinition`,
+ * `indexNameLength`, …) are not pinned; `schemaCreation` stays in the guarded
+ * set because stubbing it still removes the renderer wholesale.
  */
 async function recordLayPath(): Promise<Set<string>> {
   const real = new BetterSQLite3Adapter(":memory:") as unknown as AbstractAdapter;
@@ -74,7 +98,12 @@ async function recordLayPath(): Promise<Set<string>> {
         if (typeof prop !== "string") return Reflect.get(target, prop, receiver);
         touched.add(prop);
         if (prop === "adapter") return self;
-        const value = Reflect.get(target, prop, target) as unknown;
+        let value: unknown;
+        try {
+          value = Reflect.get(target, prop, self);
+        } catch {
+          value = Reflect.get(target, prop, target);
+        }
         return typeof value === "function"
           ? (value as (...a: unknown[]) => unknown).bind(inner)
           : value;
@@ -102,12 +131,12 @@ async function recordLayPath(): Promise<Set<string>> {
  *
  * SQLite is the lane here because it needs no server, and the lay path it walks
  * is the shared abstract one. The companions do override members (MySQL:
- * `addIndex`, `dropTable`; PostgreSQL: `dropTable`, `createTableDefinition` —
- * not an exhaustive list, check the class before relying on it), but none of
- * those overrides changes what this pins: `dropTable` is off the lay path for
- * every adapter (the canonical loader passes no `force:`), `createTableDefinition`
- * is exempt whichever adapter's override runs, and MySQL's `addIndex` reaches the
- * database through the same `adapter.execute` this records.
+ * `addIndex`, `dropTable`; PostgreSQL: `dropTable`, `schemaCreation` — not an
+ * exhaustive list, check the class before relying on it), but none of those
+ * overrides changes what this pins: `dropTable` is off the lay path for every
+ * adapter (the canonical loader passes no `force:`), MySQL's `addIndex` reaches
+ * the database through the same `adapter.execute` this records, and every
+ * adapter's `schemaCreation` renderer reads back through the same boundary.
  */
 describe("STUBBED_DDL_METHODS", () => {
   test("covers every adapter member the canonical lay path touches", async () => {
@@ -118,6 +147,9 @@ describe("STUBBED_DDL_METHODS", () => {
     expect(touched.has("execute")).toBe(true);
     expect(touched.has("createTable")).toBe(true);
     expect(touched.has("addIndex")).toBe(true);
+    // Floor: these come back only through the renderer boundary.
+    expect(touched.has("quoteTableName")).toBe(true);
+    expect(touched.has("nativeDatabaseTypes")).toBe(true);
 
     const unaccounted = [...touched]
       .filter((name) => !STUBBED_DDL_METHODS.includes(name) && !NON_EMITTING.has(name))
