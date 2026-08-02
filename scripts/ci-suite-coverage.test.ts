@@ -345,9 +345,6 @@ describe("CI runs every tooling test suite", () => {
     const wf = parseYaml(await readFile(CI_YML, "utf8"));
     const optIn = wf.jobs["guides-typecheck"].if.replace(/\s+/g, " ").trim();
 
-    // Without the ready flip in `on:` a PR reaches ready with no event left to
-    // start the deferred job. (Also asserted for the DB pair above; repeated
-    // here so removing that test can't silently unpin this one.)
     expect(wf.on.pull_request.types).toContain("ready_for_review");
 
     const deferred = wf.jobs.ci.steps[0].env.GUIDES_DRAFT_DEFERRED.replace(/\s+/g, " ");
@@ -359,9 +356,8 @@ describe("CI runs every tooling test suite", () => {
       expect(deferred).toContain(aggregateClause);
     }
 
-    // The gate that decides whether the job is relevant at all must survive
-    // alongside the deferral — dropping it would run the job on every draft-
-    // less PR regardless of whether anything it compiles changed.
+    // The relevance gate has to survive alongside the deferral, or the job
+    // runs on every non-draft PR whether or not its inputs changed.
     expect(optIn).toContain("needs.changes.outputs.guides_affected == 'true'");
   });
 

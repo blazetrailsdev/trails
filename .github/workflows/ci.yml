@@ -625,15 +625,11 @@ jobs:
           fi
           echo "No forbidden Claude attribution found in commit messages."
 
-  # Draft-deferred, same shape as the PG/MariaDB suites. This compiles the
-  # fenced TS blocks in packages/website/docs/guides/** against the public type
-  # surface — a documentation-drift merge gate, not review signal: a reviewer
-  # of a packages/**/src diff never acts on its result, and the fix (adjust the
-  # guide snippet) is identical at ready-for-review time. Its gate
-  # (GUIDES_PKGS_RE) spans every AR-adjacent package, so pre-ready it fired on
-  # nearly every source PR for ~40-80s of runner time nobody read.
-  # `ready_for_review` is in the workflow's `on:` types, so a PR can't reach
-  # ready without an event left to start this.
+  # Draft-deferred like the PG/MariaDB suites: this is a documentation-drift
+  # merge gate (guide snippets vs. the public type surface), not review signal,
+  # and GUIDES_PKGS_RE spans every AR-adjacent package so it fired on nearly
+  # every source PR. `ready_for_review` is in the workflow's `on:` types, so a
+  # PR can't reach ready with no event left to start it.
   guides-typecheck:
     name: Guides Code Type Check
     needs: changes
