@@ -21,8 +21,8 @@ import { metadataTableNames } from "./tasks/database-tasks.js";
 /**
  * One table worth of introspection data, sufficient for codegen.
  * Callers will assemble this by running introspectTables +
- * introspectPrimaryKey + introspectColumns + introspectForeignKeys
- * from schema-introspection.ts.
+ * introspectPrimaryKey + introspectColumns from
+ * schema-introspection.ts, plus the adapter's own `foreignKeys()`.
  */
 export interface IntrospectedTable {
   name: string;
