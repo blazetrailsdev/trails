@@ -17,7 +17,10 @@ import {
   NotImplementedError,
   RecordNotSaved,
   RecordNotUnique,
+  UnknownPrimaryKey,
 } from "./errors.js";
+import { tokenDefinitions } from "./token-for.js";
+import { InvalidSignature } from "@blazetrails/activesupport/message-verifier";
 import { ArgumentError, Attribute as ModelAttribute } from "@blazetrails/activemodel";
 import type { SerializeOptions } from "@blazetrails/activemodel";
 import { sanitizeForMassAssignment as sanitizeForbiddenAttributes } from "@blazetrails/activemodel";
@@ -6608,57 +6611,48 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::SignedId::RelationMethods#find_signed
    */
   async findSigned(token: string, options?: { purpose?: string }): Promise<T | null> {
-    return this.scoping(() =>
-      (this._modelClass as any).findSigned(token, options),
-    ) as Promise<T | null>;
+    return this.scoping(() => (this.model as any).findSigned(token, options)) as Promise<T | null>;
   }
 
   /**
    * Mirrors: ActiveRecord::SignedId::RelationMethods#find_signed!
    */
   async findSignedBang(token: string, options?: { purpose?: string }): Promise<T> {
-    return this.scoping(() =>
-      (this._modelClass as any).findSignedBang(token, options),
-    ) as Promise<T>;
+    return this.scoping(() => (this.model as any).findSignedBang(token, options)) as Promise<T>;
   }
 
   /**
    * Mirrors: ActiveRecord::TokenFor::RelationMethods#find_by_token_for
    */
   async findByTokenFor(purpose: string, token: string): Promise<T | null> {
-    return this.scoping(() =>
-      this._modelTokenForMethod("findByTokenFor")(purpose, token),
-    ) as Promise<T | null>;
+    const primaryKey = this.model.primaryKey as string | string[] | null;
+    if (!primaryKey || primaryKey.length === 0) throw new UnknownPrimaryKey(this.model);
+    const record = await tokenDefinitions(this.model)
+      .fetch(purpose)
+      .resolveToken(token, (id) => {
+        // Rails passes `model.primary_key => [id]`; with a composite key that
+        // hash key is the key array, which trails' findBy spells one column at
+        // a time.
+        if (Array.isArray(primaryKey)) {
+          if (!Array.isArray(id) || id.length !== primaryKey.length) return Promise.resolve(null);
+          return this.findBy(
+            Object.fromEntries(primaryKey.map((key, i) => [key, id[i]])),
+          ) as Promise<Base | null>;
+        }
+        return this.findBy({ [primaryKey]: [id] }) as Promise<Base | null>;
+      });
+    return record as T | null;
   }
 
   /**
    * Mirrors: ActiveRecord::TokenFor::RelationMethods#find_by_token_for!
    */
   async findByTokenForBang(purpose: string, token: string): Promise<T> {
-    return this.scoping(() =>
-      this._modelTokenForMethod("findByTokenForBang")(purpose, token),
-    ) as Promise<T>;
-  }
-
-  /**
-   * Resolve the model's class-level token-for finder. In Rails `TokenFor` is
-   * included in every AR model, so the finder always exists and raises
-   * `KeyError` via `token_definitions.fetch(purpose)` for an unknown purpose.
-   * Here the finder is only installed by `generatesTokenFor`; when no token
-   * purpose has ever been declared on the model (or an ancestor) it is absent,
-   * so raise the same unknown-purpose error rather than a cryptic
-   * `undefined is not a function`.
-   */
-  private _modelTokenForMethod(
-    name: "findByTokenFor" | "findByTokenForBang",
-  ): (purpose: string, token: string) => Promise<unknown> {
-    const fn = (this._modelClass as any)[name];
-    if (typeof fn !== "function") {
-      return (purpose: string) => {
-        throw new Error(`Unknown token purpose: ${purpose}`);
-      };
-    }
-    return fn.bind(this._modelClass);
+    const record = await tokenDefinitions(this.model)
+      .fetch(purpose)
+      .resolveToken(token, (id) => this.find(id) as Promise<Base>);
+    if (!record) throw new InvalidSignature();
+    return record as T;
   }
 
   // Memoized per timestamp column, matching Rails' @cache_keys / @cache_versions.
