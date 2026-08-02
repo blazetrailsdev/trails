@@ -388,15 +388,6 @@ function metadataTableEnabled(raw?: RawConfig): boolean {
   return raw == null || (raw as { useMetadataTable?: boolean }).useMetadataTable !== false;
 }
 
-/**
- * `db:environment:set` stamps the metadata table without running migrations —
- * Rails reads it off the connection pool there (`databases.rake:12-15`)
- * rather than going through a `Migrator`.
- */
-function internalMetadataFor(adapter: DatabaseAdapter, raw?: RawConfig): InternalMetadata {
-  return new InternalMetadata(adapter, { enabled: metadataTableEnabled(raw) });
-}
-
 async function runMigrate(
   adapter: DatabaseAdapter,
   raw: RawConfig,
@@ -734,7 +725,9 @@ export function dbCommand(): Command {
     .action(async (opts: DatabaseOpts) => {
       await forEachDatabase(opts, async ({ adapter, raw, prefix }) => {
         const envName = resolveEnv();
-        const internalMetadata = internalMetadataFor(adapter, raw);
+        const internalMetadata = new InternalMetadata(adapter, {
+          enabled: metadataTableEnabled(raw),
+        });
         if (!internalMetadata.enabled) {
           const { EnvironmentStorageError } = await import("@blazetrails/activerecord");
           throw new EnvironmentStorageError();
