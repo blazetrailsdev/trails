@@ -508,9 +508,6 @@ async function main(write: boolean): Promise<number> {
   const mark = await loadMark(MARK_PATH);
   const overMark = unreviewed > mark;
   if (overMark) console.error(renderExcess(unreviewed, mark, path.relative(ROOT_DIR, MARK_PATH)));
-  // Drift arm (RFC 0083): a mark left ABOVE what a clean reseed would write is
-  // invisible to the excess arm, and is exactly what makes the next story's
-  // measured before-value wrong. See unreviewed-ratchet.ts#markSlack.
   const slack = markSlack(unreviewed, mark);
   if (slack > 0) console.error(renderSlack(unreviewed, mark, path.relative(ROOT_DIR, MARK_PATH)));
 
@@ -518,7 +515,7 @@ async function main(write: boolean): Promise<number> {
     if (overMark || slack > 0) return 1;
     console.log(
       `wide call-mismatches ratchet: OK (${baseline.length} baselined, ` +
-        `${unreviewed} unreviewed <= mark ${mark})`,
+        `${unreviewed} unreviewed, mark ${mark} tight)`,
     );
     return 0;
   }
