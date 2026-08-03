@@ -1,7 +1,8 @@
 /** Mirrors: i18n/test/i18n_test.rb */
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ArgumentError, Disabled, InvalidLocale } from "./exceptions.js";
+import * as I18n from "./i18n.js";
 import {
   RESERVED_KEYS,
   availableLocales,
@@ -9,6 +10,7 @@ import {
   defaultLocale,
   defaultSeparator,
   enforceAvailableLocalesBang,
+  exceptionHandler,
   exists,
   interpolationKeys,
   locale,
@@ -41,6 +43,18 @@ describe("I18nTest", () => {
     backend.storeTranslations(locale, data);
   }
 
+  /**
+   * Mocha's `I18n.expects(:custom_exception_handler)`: defines the method on
+   * `I18n` for the duration of the test. A native module namespace is
+   * non-extensible; Vitest's transformed one is not, so the method installs on
+   * the same object `handleException` sends to.
+   */
+  function expectsCustomExceptionHandler(): ReturnType<typeof vi.fn> {
+    const customExceptionHandler = vi.fn();
+    (I18n as unknown as Record<string, unknown>).customExceptionHandler = customExceptionHandler;
+    return customExceptionHandler;
+  }
+
   beforeEach(() => {
     resetConfig();
     resetClassConfig();
@@ -53,9 +67,34 @@ describe("I18nTest", () => {
     storeTranslations("en", { true: "Yes", false: "No" });
   });
 
+  afterEach(() => {
+    delete (I18n as unknown as Record<string, unknown>).customExceptionHandler;
+  });
+
+  it("can set the exception_handler", () => {
+    const previousExceptionHandler = exceptionHandler();
+    try {
+      expect(() => setExceptionHandler(":customExceptionHandler")).not.toThrow();
+    } finally {
+      setExceptionHandler(previousExceptionHandler);
+    }
+  });
+
+  it("uses a custom exception handler set to I18n.exception_handler", () => {
+    const previousExceptionHandler = exceptionHandler();
+    try {
+      setExceptionHandler(":customExceptionHandler");
+      const customExceptionHandler = expectsCustomExceptionHandler();
+      translate("bogus");
+      expect(customExceptionHandler).toHaveBeenCalled();
+    } finally {
+      setExceptionHandler(previousExceptionHandler);
+    }
+  });
+
   it("uses a custom exception handler passed as an option", () => {
-    const customExceptionHandler = vi.fn();
-    translate("bogus", { exceptionHandler: customExceptionHandler });
+    const customExceptionHandler = expectsCustomExceptionHandler();
+    translate("bogus", { exceptionHandler: ":customExceptionHandler" });
     expect(customExceptionHandler).toHaveBeenCalled();
   });
 
@@ -416,18 +455,6 @@ describe("I18nTest", () => {
   it("I18n.enforce_available_locales config can be set to false", () => {
     config().enforceAvailableLocales = false;
     expect(config().enforceAvailableLocales).toBe(false);
-  });
-
-  it("can set the exception_handler", () => {
-    const customExceptionHandler = vi.fn();
-    expect(() => setExceptionHandler(customExceptionHandler)).not.toThrow();
-  });
-
-  it("uses a custom exception handler set to I18n.exception_handler", () => {
-    const customExceptionHandler = vi.fn();
-    setExceptionHandler(customExceptionHandler);
-    translate("bogus");
-    expect(customExceptionHandler).toHaveBeenCalled();
   });
 
   it("available_locales can be replaced at runtime", () => {

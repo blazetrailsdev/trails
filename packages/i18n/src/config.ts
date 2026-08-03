@@ -22,11 +22,15 @@ export interface Backend {
 }
 
 /**
- * Ruby's handler is a Proc or any object responding to `#call`; a JS function
- * carries `Function#call`, whose first argument is a receiver, so the two arms
- * stay distinct here and `handle_exception` dispatches on them.
+ * Ruby's handler is a Symbol naming a method on `I18n`, a Proc, or any object
+ * responding to `#call`; a JS function carries `Function#call`, whose first
+ * argument is a receiver, so the latter two arms stay distinct here and
+ * `handle_exception` dispatches on all three. The Symbol arm is a string that
+ * keeps its leading colon (`":customExceptionHandler"`), naming the member of
+ * the `I18n` module `send` reaches.
  */
 export type ExceptionHandlerLike =
+  | string
   | ((exception: Error, locale: Locale, key: TranslationKey, options: unknown) => unknown)
   | { call(exception: Error, locale: Locale, key: TranslationKey, options: unknown): unknown };
 
