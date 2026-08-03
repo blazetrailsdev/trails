@@ -19,6 +19,7 @@ import {
   IndexDefinition,
   ForeignKeyDefinition,
   CheckConstraintDefinition,
+  PrimaryKeyDefinition,
   TableDefinition,
 } from "./schema-definitions.js";
 import {
@@ -36,7 +37,8 @@ type Definition =
   | AddColumnDefinition
   | CreateIndexDefinition
   | ForeignKeyDefinition
-  | CheckConstraintDefinition;
+  | CheckConstraintDefinition
+  | PrimaryKeyDefinition;
 
 export class SchemaCreation {
   constructor(
@@ -123,6 +125,7 @@ export class SchemaCreation {
     if (o instanceof CreateIndexDefinition) return this.visitCreateIndexDefinition(o);
     if (o instanceof ForeignKeyDefinition) return this.visitForeignKeyDefinition(o);
     if (o instanceof CheckConstraintDefinition) return this.visitCheckConstraintDefinition(o);
+    if (o instanceof PrimaryKeyDefinition) return this.visitPrimaryKeyDefinition(o);
     throw new Error(`Unknown definition type: ${(o as any).constructor.name}`);
   }
 
@@ -141,9 +144,8 @@ export class SchemaCreation {
       statements.push(await visit());
     }
 
-    if (o.compositePrimaryKey && o.compositePrimaryKey.length > 0) {
-      statements.push(this.visitPrimaryKeyDefinition({ name: o.compositePrimaryKey }));
-    }
+    const primaryKeys = o.primaryKeys();
+    if (primaryKeys) statements.push(this.visitPrimaryKeyDefinition(primaryKeys));
 
     if (this.useForeignKeys()) {
       for (const fk of o.foreignKeys) {
@@ -442,7 +444,7 @@ export class SchemaCreation {
   }
 
   /** @internal */
-  protected visitPrimaryKeyDefinition(o: { name: string[] }): string {
+  protected visitPrimaryKeyDefinition(o: PrimaryKeyDefinition): string {
     return `PRIMARY KEY (${o.name.map((n) => this.adapter.quoteColumnName(n)).join(", ")})`;
   }
 

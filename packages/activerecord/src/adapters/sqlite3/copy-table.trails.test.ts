@@ -136,6 +136,14 @@ describeIfSqlite("SQLite3Adapter table-rebuild cluster", () => {
     expect(names).toContain("index_customers2_on_id");
   });
 
+  it("alterTable keeps a composite primary key through the rebuild", async () => {
+    await db.exec(
+      'CREATE TABLE "customers2" ("shop_id" integer NOT NULL, "id" integer NOT NULL, "name" TEXT, PRIMARY KEY ("shop_id", "id"))',
+    );
+    await db.removeColumn("customers2", "name");
+    expect(await db.primaryKey("customers2")).toEqual(["shop_id", "id"]);
+  });
+
   it("alterTable keeps the primary key of a lowercase integer-like declared type", async () => {
     await db.exec('CREATE TABLE "customers2" ("id" bigint PRIMARY KEY, "name" TEXT)');
     await db.removeColumn("customers2", "name");

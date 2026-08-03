@@ -2513,19 +2513,12 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     const { rename: _rename, ...createOptions } = options;
 
     let definition!: SQLite3TableDefinition;
-    await this.createTable(
-      to,
-      {
-        ...createOptions,
-        id: false,
-        ...(Array.isArray(fromPrimaryKey) ? { primaryKey: fromPrimaryKey } : {}),
-      },
-      (td) => {
-        definition = td as SQLite3TableDefinition;
-        this.copyTableColumns(definition, fromPrimaryKey, sourceColumns, rename);
-        block?.(definition);
-      },
-    );
+    await this.createTable(to, { ...createOptions, id: false }, (td) => {
+      definition = td as SQLite3TableDefinition;
+      if (Array.isArray(fromPrimaryKey)) definition.primaryKeys(fromPrimaryKey);
+      this.copyTableColumns(definition, fromPrimaryKey, sourceColumns, rename);
+      block?.(definition);
+    });
 
     await this.copyTableIndexes(from, to, rename);
     const columnsToCopy = definition.columns

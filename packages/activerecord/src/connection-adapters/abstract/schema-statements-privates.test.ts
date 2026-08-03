@@ -831,7 +831,7 @@ describe("buildCreateTableDefinition routing", () => {
 
     const td = ss.buildCreateTableDefinition("orders", { primaryKey: ["shopId", "id"] });
 
-    expect(td.compositePrimaryKey).toEqual(["shopId", "id"]);
+    expect(td.primaryKeys()?.name).toEqual(["shopId", "id"]);
     expect(pkColumn(td)).toBeUndefined();
   });
 

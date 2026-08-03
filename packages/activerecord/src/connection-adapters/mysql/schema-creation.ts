@@ -228,10 +228,8 @@ export class SchemaCreation extends AbstractSchemaCreation {
     for (const visit of o.columns.map((c) => () => this.visitColumnDefinition(c))) {
       statements.push(await visit());
     }
-    if (o.compositePrimaryKey && o.compositePrimaryKey.length > 0) {
-      const cols = o.compositePrimaryKey.map((k) => this.adapter.quoteColumnName(k)).join(", ");
-      statements.push(`PRIMARY KEY (${cols})`);
-    }
+    const primaryKeys = o.primaryKeys();
+    if (primaryKeys) statements.push(this.visitPrimaryKeyDefinition(primaryKeys));
     if (this.supportsIndexesInCreate()) {
       for (const idx of o.indexes) statements.push(this.visitIndexDefinition(idx, false));
     }
