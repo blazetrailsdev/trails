@@ -41,6 +41,11 @@ export function interpolate(string: string, values: unknown): string {
   return interpolateHash(string, values as Record<string, unknown>);
 }
 
+/**
+ * @missingRailsCall call — Ruby's `value.call(values)` on a `respond_to?(:call)`
+ * value is plain invocation in JS; `Function#call` there takes a receiver, not
+ * the argument list.
+ */
 export function interpolateHash(string: string, values: Record<string, unknown>): string {
   const pattern = unionPattern(config().interpolationPatterns);
   let interpolated = false;
