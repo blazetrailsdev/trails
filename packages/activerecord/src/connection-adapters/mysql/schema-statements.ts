@@ -9,7 +9,7 @@ import { presence } from "@blazetrails/activesupport";
 import { Version } from "../abstract-adapter.js";
 import { SqlTypeMetadata } from "../sql-type-metadata.js";
 import { TypeMetadata } from "./type-metadata.js";
-import { Table as MysqlTable } from "./schema-definitions.js";
+import { TableDefinition, Table as MysqlTable } from "./schema-definitions.js";
 import { Column } from "./column.js";
 import { SchemaStatements as BaseSchemaStatements } from "../abstract/schema-statements.js";
 import { SchemaCreation as MysqlSchemaCreation } from "./schema-creation.js";
@@ -20,6 +20,7 @@ import {
 } from "../abstract/schema-definitions.js";
 import { quoteColumnName, unquoteIdentifier } from "./quoting.js";
 import type { AddIndexOptions, SchemaStatementsLike } from "../abstract/schema-definitions.js";
+import type { VisitorHostAdapter } from "./schema-creation.js";
 
 /**
  * MySQL-specific SchemaStatements subclass. Extends the base `dropTable` to support
@@ -34,7 +35,9 @@ import type { AddIndexOptions, SchemaStatementsLike } from "../abstract/schema-d
 export class MysqlSchemaStatements extends BaseSchemaStatements {
   private _mysqlSchemaCreation?: MysqlSchemaCreation;
   override get schemaCreation(): MysqlSchemaCreation {
-    return (this._mysqlSchemaCreation ??= new MysqlSchemaCreation(this));
+    return (this._mysqlSchemaCreation ??= new MysqlSchemaCreation(
+      this as unknown as VisitorHostAdapter,
+    ));
   }
 
   /** Mirrors: MySQL::SchemaStatements#update_table_definition */
@@ -138,6 +141,18 @@ export function defaultRowFormat(
 /** @internal */
 export function validPrimaryKeyOptions(): string[] {
   return ["limit", "default", "precision", "unsigned", "autoIncrement"];
+}
+
+/**
+ * Mirrors: MySQL::SchemaStatements#create_table_definition
+ * @internal
+ */
+export function createTableDefinition(
+  this: VisitorHostAdapter,
+  name: string,
+  options: { id?: boolean | "uuid"; charset?: string | null; collation?: string | null } = {},
+): TableDefinition {
+  return new TableDefinition(name, { ...options, adapter: this });
 }
 
 /** @internal */

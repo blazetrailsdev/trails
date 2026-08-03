@@ -52,31 +52,29 @@ type MysqlTableDef = TableDefinition & { charset?: string; collation?: string };
  * Rails' `SchemaCreation#initialize(conn)` always receives the live adapter, so the quoting
  * half is required and dispatches polymorphically. */
 export interface VisitorHostAdapter extends SchemaQuoter {
-  supportsCheckConstraints?(): boolean;
-  supportsForeignKeys?(): boolean;
-  supportsIndexesInCreate?(): boolean;
+  supportsCheckConstraints(): boolean;
+  supportsForeignKeys(): boolean;
+  supportsIndexesInCreate(): boolean;
   /** Version-gated: MariaDB ≥ 10.8.1 / MySQL ≥ 8.0.1. Reads the cached version
    * synchronously and yields false when cold — warm via `getDatabaseVersion`. */
-  supportsIndexSortOrder?(): boolean;
-  isMariadb?(): boolean;
+  supportsIndexSortOrder(): boolean;
+  isMariadb(): boolean;
   quote(value: unknown): string;
 }
 
 export class SchemaCreation extends AbstractSchemaCreation {
-  /** @internal Adapter ref so `supports*` helpers mirror Rails' `@conn`-delegated flags. */
-  protected _hostAdapter: VisitorHostAdapter;
-  /** @internal Widened from the base `SchemaQuoter` to expose `quote` for `add_sql_comment!`. */
+  /** @internal Widened from the base `SchemaQuoter` to the full `@conn` surface: the
+   * `supports*` flags and `quote` for `add_sql_comment!`. */
   declare protected adapter: VisitorHostAdapter;
 
   constructor(host: VisitorHostAdapter) {
     super("mysql", host);
-    this._hostAdapter = host;
   }
 
   /** @internal Live MariaDB lookup — consults the host adapter every call so a late
    * `getFullVersion()` flip (lazy detection on first probe) is honored. */
   protected isMariadb(): boolean {
-    return this._hostAdapter.isMariadb?.() ?? false;
+    return this.adapter.isMariadb();
   }
 
   /** @internal Rails gates the index DESC/ASC suffix on `supports_index_sort_order?`
@@ -84,7 +82,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
    * flag. The base returns `adapterName !== "mysql"` (always false),
    * so this override is what makes MySQL honor the version gate. */
   protected override supportsIndexSortOrder(): boolean {
-    return this._hostAdapter.supportsIndexSortOrder?.() ?? true;
+    return this.adapter.supportsIndexSortOrder();
   }
 
   /** @internal */
@@ -191,24 +189,24 @@ export class SchemaCreation extends AbstractSchemaCreation {
 
   /** @internal Delegates to the adapter when wired (Rails: `@conn.supports_indexes_in_create?`). */
   protected supportsIndexesInCreate(): boolean {
-    return this._hostAdapter.supportsIndexesInCreate?.() ?? true;
+    return this.adapter.supportsIndexesInCreate();
   }
 
   /** @internal Mirrors Rails' `use_foreign_keys?` (`supports_foreign_keys? &&
    * foreign_keys_enabled?`). The enabled half reads `adapter._config.foreignKeys`, matching
    * `SchemaStatements#isForeignKeysEnabled`. */
   protected useForeignKeys(): boolean {
-    const supports = this._hostAdapter.supportsForeignKeys?.() ?? true;
+    const supports = this.adapter.supportsForeignKeys();
     // `_config` is protected on the real adapter, so read it via a narrow cast
     // (mirrors `SchemaStatements#isForeignKeysEnabled`).
-    const host = this._hostAdapter as { _config?: { foreignKeys?: boolean } } | undefined;
-    const enabled = host?._config?.foreignKeys !== false;
+    const host = this.adapter as { _config?: { foreignKeys?: boolean } };
+    const enabled = host._config?.foreignKeys !== false;
     return supports && enabled;
   }
 
   /** @internal Delegates to the adapter; honors MySQL 8.0.16+ / MariaDB 10.2.1+ version gating. */
   protected supportsCheckConstraints(): boolean {
-    return this._hostAdapter.supportsCheckConstraints?.() ?? true;
+    return this.adapter.supportsCheckConstraints();
   }
 
   /**
