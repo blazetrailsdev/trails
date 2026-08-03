@@ -74,7 +74,7 @@ describe("I18nExceptionsTest", () => {
   it("InvalidPluralizationData message contains count, data and missing key", () => {
     forceInvalidPluralizationData((exception) => {
       expect(exception.message).toContain("1");
-      expect(exception.message).toContain(`{other: "bar"}`);
+      expect(exception.message).toContain(`{:other=>"bar"}`);
       expect(exception.message).toContain("one");
     });
   });
@@ -90,7 +90,7 @@ describe("I18nExceptionsTest", () => {
   it("MissingInterpolationArgument message contains the missing and given arguments", () => {
     forceMissingInterpolationArgument((exception) => {
       expect(exception.message).toBe(
-        `missing interpolation argument :bar in "%{bar}" ({baz: "baz"} given)`,
+        `missing interpolation argument :bar in "%{bar}" ({:baz=>"baz"} given)`,
       );
     });
   });
