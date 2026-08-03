@@ -46,11 +46,11 @@ describe("AbstractMysqlAdapter#returnValueAfterInsert", () => {
   });
 });
 
-describe("AbstractMysqlAdapter#columnMethodNames", () => {
+describe("AbstractMysqlAdapter#_columnMethodNames", () => {
   it("appends MySQL ColumnMethods shorthands to the abstract list", async () => {
     const { AbstractMysqlAdapter } = await import("./abstract-mysql-adapter.js");
     const adapter = Object.create(AbstractMysqlAdapter.prototype);
-    const names = adapter.columnMethodNames();
+    const names = adapter._columnMethodNames();
     for (const name of [
       "tinyblob",
       "mediumblob",

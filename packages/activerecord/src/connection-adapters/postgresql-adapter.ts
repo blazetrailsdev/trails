@@ -2554,17 +2554,13 @@ export class PostgreSQLAdapter
   // exposed as `change_table` shorthands. Multi-word names use the camelCase form of
   // the trails TableDefinition method (e.g. `bit_varying` -> `bitVarying`).
   /**
-   * @noRailsEquivalent CONVERGEABLE (story: mark-column-method-names-internal).
-   * Rails spells this list as the `ColumnMethods` modules'
-   *   `define_column_methods` metaprogramming
-   *   (abstract/schema_definitions.rb:324 plus the per-adapter ColumnMethods modules), not as a
-   *   `def`, so the Ruby extractor records no counterpart. TypeScript has no `define_method`, so
-   *   trails reifies the list; each adapter appends to `super.columnMethodNames()` exactly where
-   *   Rails' adapter-specific ColumnMethods module extends the abstract one.
+   * @internal Reification of Rails' PostgreSQL `ColumnMethods` module, which extends the abstract
+   * `define_column_methods` list (abstract/schema_definitions.rb:324) rather than exposing public
+   * API.
    */
-  override columnMethodNames(): string[] {
+  override _columnMethodNames(): string[] {
     return [
-      ...super.columnMethodNames(),
+      ...super._columnMethodNames(),
       "bigserial",
       "bit",
       "bitVarying",
