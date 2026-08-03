@@ -1,7 +1,7 @@
 /**
  * Eager-load pluck / cache_version over a composite-PK collection association.
  *
- * `JoinDependency#addAssociation` used to bail for any composite source PK, so a
+ * `JoinDependency`'s join builder used to bail for any composite source PK, so a
  * composite-PK model's composite-FK collection (`CpkBook.hasMany("chapters",
  * { foreignKey: ["author_id", "book_id"] })`, `primaryKey = ["author_id", "id"]`)
  * fell out of the join tree and trails preloaded where Rails JOINs. That is now
@@ -59,15 +59,24 @@ describe("CpkBook eager pluck / cache_version over a composite-FK collection", (
   }
 
   it("eagerLoad('chapters') builds a composite FK↔PK tuple JOIN node", () => {
-    const jd = new JoinDependency(CpkBook as unknown as typeof Base);
-    jd.addAssociationSpec("chapters");
+    const jd = new JoinDependency(
+      CpkBook as unknown as typeof Base,
+      null,
+      "chapters",
+      Nodes.OuterJoin,
+    );
     const nodes = (jd as unknown as { nodes: { assocName: string }[] }).nodes;
     expect(nodes.map((n) => n.assocName)).toEqual(["chapters"]);
   });
 
   it("eagerLoad('order') builds a composite-FK belongsTo JOIN node", () => {
-    const jd = new JoinDependency(CpkBook as unknown as typeof Base);
-    const node = jd.addAssociation("order");
+    const jd = new JoinDependency(
+      CpkBook as unknown as typeof Base,
+      null,
+      "order",
+      Nodes.OuterJoin,
+    );
+    const node = jd.nodes.find((n) => n.assocName === "order");
     expect(node).not.toBeNull();
     const outerJoin = node!.arelJoin as Nodes.OuterJoin;
     const on = outerJoin.right as Nodes.On;
@@ -135,8 +144,12 @@ describe("CpkBook eager pluck / cache_version over a composite-FK collection", (
     // Both segments now JOIN: `chapters` keys the composite FK↔PK tuple, and the
     // inner `book` belongsTo keys `cpk_books.author_id = cpk_chapters.author_id
     // AND cpk_books.id = cpk_chapters.book_id`.
-    const jd = new JoinDependency(CpkBook as unknown as typeof Base);
-    jd.addAssociationSpec({ chapters: "book" });
+    const jd = new JoinDependency(
+      CpkBook as unknown as typeof Base,
+      null,
+      { chapters: "book" },
+      Nodes.OuterJoin,
+    );
     const nodes = (jd as unknown as { nodes: { assocName: string }[] }).nodes;
     expect(nodes.map((n) => n.assocName)).toEqual(["chapters", "chapters.book"]);
 

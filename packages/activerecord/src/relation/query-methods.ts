@@ -1664,7 +1664,7 @@ export function constructJoinDependency(
     this.model,
     this.table,
     associations,
-    joinType as typeof Nodes.InnerJoin | typeof Nodes.OuterJoin | undefined,
+    (joinType ?? null) as typeof Nodes.InnerJoin | typeof Nodes.OuterJoin | null,
   );
 }
 

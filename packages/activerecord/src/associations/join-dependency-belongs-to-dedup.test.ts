@@ -3,6 +3,7 @@ import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
 import { fixtures } from "../test-fixtures.js";
 import { JoinDependency } from "./join-dependency.js";
+import { Nodes } from "@blazetrails/arel";
 
 describe("JoinDependency cross-parent belongsTo dedup", () => {
   // Ride the canonical schema `fixtures({})` warms; the hydration rows below are
@@ -35,8 +36,7 @@ describe("JoinDependency cross-parent belongsTo dedup", () => {
   });
 
   it("shares a single author instance across posts with the same author", () => {
-    const jd = new JoinDependency(Post);
-    jd.addAssociation("author");
+    const jd = new JoinDependency(Post, null, "author", Nodes.OuterJoin);
 
     const rows = [
       jd.aliasedRow({
@@ -68,8 +68,7 @@ describe("JoinDependency cross-parent belongsTo dedup", () => {
   });
 
   it("creates distinct instances for different authors", () => {
-    const jd = new JoinDependency(Post);
-    jd.addAssociation("author");
+    const jd = new JoinDependency(Post, null, "author", Nodes.OuterJoin);
 
     const rows = [
       jd.aliasedRow({

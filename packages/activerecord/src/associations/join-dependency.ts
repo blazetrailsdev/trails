@@ -63,9 +63,6 @@ function reflectionChainKey(chain: readonly object[]): string {
   return key;
 }
 
-/** Options shape matching JoinDependency#addAssociation's options parameter. */
-type AddAssocOptions = { fromModel?: unknown; fromAlias?: string; parentAssocName?: string };
-
 /** Mirrors: ActiveRecord::Associations::JoinDependency::Aliases::Column (name, alias). */
 export interface AliasMap {
   column: string;
@@ -187,20 +184,29 @@ export class JoinDependency {
     { aliased: TableRef; effectiveName: string; terminated: boolean }
   > = new Map();
   /**
+   * When set, `build` degrades an un-joinable spec to preloading (pushing it
+   * here) instead of raising. See the constructor's deviation note.
+   * @internal
+   */
+  private _fallbackAssociations: AssociationSpec[] | undefined;
+  /**
    * Mirrors: ActiveRecord::Associations::JoinDependency#initialize
    * (join_dependency.rb:71) — `(base, table, associations, join_type)`.
    *
-   * Deviation: every argument after `baseModel` is optional. Rails builds the
-   * whole tree in `initialize` and never mutates it afterwards; trails also
-   * grows a JoinDependency incrementally (`addAssociation` /
-   * `addAssociationSpec`) from the relation paths that discover associations
-   * after construction, so the tree can legitimately start empty.
+   * Deviation: the trailing `fallbackAssociations` out-parameter. Rails JOINs
+   * every association it is handed, so `build` only ever raises; trails still
+   * has join capability gaps (composite keys, through associations it can't
+   * alias), and the eager-load paths degrade those specs to preloading instead
+   * of failing. Passing an array selects that lenient mode and collects the
+   * specs that were rolled back; omitting it raises, as Rails does. Either way
+   * the tree is built here and never mutated afterwards.
    */
   constructor(
     baseModel: typeof Base,
-    table?: TableRef,
-    associations?: AssociationSpec | AssociationSpec[] | null,
-    joinType?: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin,
+    table: TableRef | null,
+    associations: AssociationSpec | AssociationSpec[] | null,
+    joinType: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin | null,
+    fallbackAssociations?: AssociationSpec[],
   ) {
     this._baseModel = baseModel;
     const baseTable = table ?? (baseModel as any).arelTable;
@@ -211,57 +217,23 @@ export class JoinDependency {
     );
     this._joinRoot = new JoinBase(baseModel, baseTable);
     this._joinType = joinType ?? Nodes.OuterJoin;
-    if (associations != null) {
-      this._buildTree(JoinDependency.makeTree(associations));
-    }
-  }
+    this._fallbackAssociations = fallbackAssociations;
 
-  /**
-   * Add every association in a make_tree-style hash to the tree, passing parent
-   * context so each nested association attaches to its parent rather than being
-   * re-added from the root.
-   *
-   * Mirrors: ActiveRecord::Associations::JoinDependency#build
-   * (join_dependency.rb:228). Unlike the private `build` used by
-   * `validateEagerLoadSpec`, this one materializes the JOIN nodes.
-   * @internal
-   */
-  private _buildTree(tree: Record<PropertyKey, any>, parentContext?: AddAssocOptions): void {
-    for (const key of Reflect.ownKeys(tree)) {
-      const assocName = typeof key === "symbol" ? (key.description ?? String(key)) : String(key);
-      const node = this.addAssociation(assocName, parentContext);
-      if (!node) {
-        const fromModelClass = (parentContext?.fromModel as any) ?? this._baseModel;
-        const onModel = fromModelClass?.name ?? (this._baseModel as any).name ?? "model";
-        // Rails' JoinDependency#find_reflection raises ConfigurationError when the
-        // association does not exist on the model (join_dependency.rb). A null node
-        // for a *real* association is a join capability gap, which keeps the
-        // ArgumentError fallback below.
-        const exists = (fromModelClass?._associations ?? []).some((a: any) => a.name === assocName);
-        if (!exists) {
-          throw new ConfigurationError(
-            `Can't join '${onModel}' to association named '${assocName}'; perhaps you misspelled it?`,
-          );
-        }
-        const err = new Error(
-          `Association named '${assocName}' was not found on ${onModel}; perhaps you misspelled it?`,
-        );
-        err.name = "ArgumentError";
-        throw err;
+    const specs =
+      associations == null ? [] : Array.isArray(associations) ? associations : [associations];
+    for (const spec of specs) {
+      const tree = JoinDependency.makeTree(spec);
+      if (!fallbackAssociations) {
+        this.build(tree, baseModel, this._baseAlias, "");
+        continue;
       }
-      const children = tree[key];
-      if (children != null && Reflect.ownKeys(children).length > 0) {
-        this._buildTree(children, {
-          fromModel: node.baseKlass,
-          // effectiveSqlName is the name that actually appears in JOIN SQL (the
-          // real table name unless aliased due to collision). Using tableAlias
-          // here would generate ON clauses referencing e.g. "t1" when the JOIN
-          // SQL uses the real table name.
-          fromAlias: node.effectiveSqlName,
-          parentAssocName: parentContext
-            ? `${parentContext.parentAssocName}.${assocName}`
-            : assocName,
-        });
+      // Each top-level spec is all-or-nothing: a later segment proving
+      // un-joinable must not leave half a JOIN chain (and half an alias claim)
+      // behind for the caller that degrades the whole spec to preloading.
+      const snapshot = this._capture();
+      if (!this.build(tree, baseModel, this._baseAlias, "")) {
+        this._rollback(snapshot);
+        fallbackAssociations.push(spec);
       }
     }
   }
@@ -350,7 +322,13 @@ export class JoinDependency {
     return row;
   }
 
-  addAssociation(
+  /**
+   * Materialize one JOIN node under `options.fromModel`/`fromAlias`. Internal
+   * helper of the constructor's `build` walk — the tree is never grown after
+   * construction.
+   * @internal
+   */
+  private addAssociation(
     assocName: string,
     options?: {
       fromModel?: any;
@@ -554,59 +532,6 @@ export class JoinDependency {
   }
 
   /**
-   * Add a nested association path like "comments.author", joining each segment.
-   * Routes through the single make_tree-style build path (`addAssociationSpec`),
-   * then returns the leaf node for the path. Returns null if any segment is
-   * un-joinable (the whole path is rolled back, per `addAssociationSpec`).
-   */
-  addNestedAssociation(path: string): JoinPart | null {
-    if (!this.addAssociationSpec(path)) return null;
-    return this._findNodeByPath(path);
-  }
-
-  /**
-   * Add an arbitrary nested eager-load spec (string, dotted string, array, or
-   * hash like `{ author: "posts" }` / `{ author: ["posts", "comments"] }`).
-   * Shared prefixes are deduplicated against the existing tree, so passing
-   * specs that overlap reuses already-joined nodes instead of double-joining.
-   *
-   * All-or-nothing per call. Two distinct outcomes when a segment can't be
-   * JOINed (mirrors Rails JoinDependency#build, which raises for the former):
-   *   - **Raise-worthy** (polymorphic): `addAssociation` throws
-   *     `EagerLoadPolymorphicError`, which propagates out of this method
-   *     uncaught — eager-loading a polymorphic association is an error, not a
-   *     fallback.
-   *   - **Capability gap** (composite key, unjoinable through): the whole spec
-   *     is rolled back and `false` is returned so the caller degrades to
-   *     preloading.
-   *
-   * Mirrors: ActiveRecord::Associations::JoinDependency#build (recursive tree
-   * construction from the eager_load values hash).
-   */
-  addAssociationSpec(spec: AssociationSpec): boolean {
-    // Normalize the spec into a make_tree-style nested hash up front, then
-    // construct the tree from it in one walk (mirrors Rails building the whole
-    // tree once from `make_tree(associations)` rather than incrementally).
-    // Referenced-table aliasing is resolved lazily in `makeConstraints` from the
-    // `references` argument to `joinConstraints`, mirroring Rails' `@references`.
-    const tree = JoinDependency.makeTree(spec);
-    const snapshot = this._capture();
-    try {
-      if (!this._buildSpecTree(tree, this._baseModel, this._baseAlias, "")) {
-        this._rollback(snapshot);
-        return false;
-      }
-    } catch (e) {
-      // addAssociation mutates the tree/aliasTracker before the
-      // polymorphic check throws. Restore so the instance is left unchanged
-      // (all-or-nothing) before propagating EagerLoadPolymorphicError.
-      this._rollback(snapshot);
-      throw e;
-    }
-    return true;
-  }
-
-  /**
    * Rails-faithful eager-load validation: walk the spec tree and raise the same
    * errors `construct_join_dependency` does before any SQL is built —
    * `ConfigurationError` for a misspelled/unknown name (via `findReflection`,
@@ -617,24 +542,47 @@ export class JoinDependency {
    *
    * Used by the calculation/exists paths (`Relation#_checkEagerLoadable`), which
    * never build the real join tree but must still surface these errors. Unlike
-   * `addAssociationSpec` this only validates — it doesn't mutate the tree —
-   * so there's nothing to roll back.
+   * `build` this only validates — it doesn't mutate the tree — so there's
+   * nothing to roll back.
    *
    * Mirrors: ActiveRecord::Associations::JoinDependency#build.
    */
   validateEagerLoadSpec(spec: AssociationSpec): void {
-    this.build(JoinDependency.makeTree(spec), this._baseModel);
+    const walk = (associations: Record<PropertyKey, any>, baseKlass: typeof Base): void => {
+      if (!associations || typeof associations !== "object") return;
+      for (const key of Reflect.ownKeys(associations)) {
+        const name = typeof key === "symbol" ? (key.description ?? String(key)) : String(key);
+        const reflection = this.findReflection(baseKlass, name);
+        reflection.checkValidityBang?.();
+        reflection.checkEagerLoadableBang?.();
+        if (reflection.isPolymorphic?.()) {
+          throw new EagerLoadPolymorphicError(name);
+        }
+        walk(associations[key], reflection.klass);
+      }
+    };
+    walk(JoinDependency.makeTree(spec), this._baseModel);
   }
 
   /**
    * Build the join tree from a normalized make_tree-style hash (dotted strings
-   * already split into nested keys by `walkTree`). Each key becomes a
-   * JOIN via `_addOrReuse`; children recurse under the joined node's model and
-   * effective alias. Returns false on the first un-joinable segment so the
-   * caller can roll back and degrade to preloading.
+   * already split into nested keys by `walkTree`). Each key becomes a JOIN via
+   * `_addOrReuse`; children recurse under the joined node's model and effective
+   * alias — `effectiveSqlName` is the name that actually appears in the JOIN
+   * SQL (the real table name unless aliased due to a collision), so using
+   * `tableAlias` here would emit ON clauses referencing e.g. "t1" against SQL
+   * that names the real table.
+   *
+   * Called once per top-level spec, from the constructor. Returns false on the
+   * first un-joinable segment in lenient mode so the constructor can roll the
+   * spec back and hand it to the preloader; in Rails-faithful mode it raises
+   * instead.
+   *
+   * Mirrors: ActiveRecord::Associations::JoinDependency#build
+   * (join_dependency.rb:228).
    * @internal
    */
-  private _buildSpecTree(
+  private build(
     hash: Record<PropertyKey, any>,
     model: typeof Base,
     alias: string,
@@ -643,18 +591,43 @@ export class JoinDependency {
     for (const key of Reflect.ownKeys(hash)) {
       const name = typeof key === "symbol" ? (key.description ?? String(key)) : String(key);
       const node = this._addOrReuse(name, model, alias, parentPath);
-      if (!node) return false;
+      if (!node) {
+        if (this._fallbackAssociations) return false;
+        this._raiseUnjoinable(name, model);
+      }
       const child = hash[key];
       const childPath = parentPath ? `${parentPath}.${name}` : name;
       if (
         child != null &&
         Reflect.ownKeys(child).length > 0 &&
-        !this._buildSpecTree(child, node.baseKlass, node.effectiveSqlName, childPath)
+        !this.build(child, node.baseKlass, node.effectiveSqlName, childPath)
       ) {
         return false;
       }
     }
     return true;
+  }
+
+  /**
+   * Rails' JoinDependency#find_reflection raises ConfigurationError when the
+   * association does not exist on the model (join_dependency.rb). A null node
+   * for a *real* association is a trails join capability gap, which keeps the
+   * ArgumentError below.
+   * @internal
+   */
+  private _raiseUnjoinable(assocName: string, fromModelClass: any): never {
+    const onModel = fromModelClass?.name ?? (this._baseModel as any).name ?? "model";
+    const exists = (fromModelClass?._associations ?? []).some((a: any) => a.name === assocName);
+    if (!exists) {
+      throw new ConfigurationError(
+        `Can't join '${onModel}' to association named '${assocName}'; perhaps you misspelled it?`,
+      );
+    }
+    const err = new Error(
+      `Association named '${assocName}' was not found on ${onModel}; perhaps you misspelled it?`,
+    );
+    err.name = "ArgumentError";
+    throw err;
   }
 
   /**
@@ -1494,27 +1467,6 @@ export class JoinDependency {
       );
     }
     return reflection;
-  }
-
-  /**
-   * @internal
-   * Mirrors: ActiveRecord::Associations::JoinDependency#build
-   */
-  private build(associations: Record<PropertyKey, any>, baseKlass: typeof Base): JoinAssociation[] {
-    if (!associations || typeof associations !== "object") return [];
-    return Reflect.ownKeys(associations).map((key) => {
-      const right = associations[key];
-      const name = typeof key === "symbol" ? (key.description ?? String(key)) : String(key);
-      const reflection = this.findReflection(baseKlass, name);
-      reflection.checkValidityBang?.();
-      reflection.checkEagerLoadableBang?.();
-
-      if (reflection.isPolymorphic?.()) {
-        throw new EagerLoadPolymorphicError(name);
-      }
-
-      return new JoinAssociation(reflection, this.build(right, reflection.klass));
-    });
   }
 
   /**

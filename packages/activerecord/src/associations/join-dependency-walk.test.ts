@@ -60,10 +60,8 @@ describe("JoinDependency walk() deduplication", () => {
 
   it("deduplicates a matched has_many :through subtree across joinsToAdd", () => {
     // Matched `walk` branch: oj's provisional through-group dedups to the left's resolved chain.
-    const jd1 = new JoinDependency(Post);
-    jd1.addAssociation("commentLikes");
-    const jd2 = new JoinDependency(Post);
-    jd2.addAssociation("commentLikes");
+    const jd1 = new JoinDependency(Post, null, "commentLikes", Nodes.OuterJoin);
+    const jd2 = new JoinDependency(Post, null, "commentLikes", Nodes.OuterJoin);
 
     const joins = jd1.joinConstraints([jd2]);
     const tables = joins.map((j) => {
@@ -77,11 +75,9 @@ describe("JoinDependency walk() deduplication", () => {
   });
 
   it("deduplicates shared subtree when merging two JoinDependencies", () => {
-    const jd1 = new JoinDependency(Post);
-    jd1.addNestedAssociation("comments.author");
+    const jd1 = new JoinDependency(Post, null, "comments.author", Nodes.OuterJoin);
 
-    const jd2 = new JoinDependency(Post);
-    jd2.addNestedAssociation("comments.likes");
+    const jd2 = new JoinDependency(Post, null, "comments.likes", Nodes.OuterJoin);
 
     const joins = jd1.joinConstraints([jd2]);
 
@@ -98,8 +94,7 @@ describe("JoinDependency walk() deduplication", () => {
   });
 
   it("emits all joins when JoinDependencies share no subtree", () => {
-    const jd1 = new JoinDependency(Post);
-    jd1.addAssociation("comments");
+    const jd1 = new JoinDependency(Post, null, "comments", Nodes.OuterJoin);
 
     class Tag extends Base {
       static {
@@ -112,8 +107,7 @@ describe("JoinDependency walk() deduplication", () => {
     registerModel(Tag);
     Post.hasMany("tags", { className: "Tag" });
 
-    const jd2 = new JoinDependency(Post);
-    jd2.addAssociation("tags");
+    const jd2 = new JoinDependency(Post, null, "tags", Nodes.OuterJoin);
 
     const joins = jd1.joinConstraints([jd2]);
 
@@ -121,14 +115,11 @@ describe("JoinDependency walk() deduplication", () => {
   });
 
   it("does not duplicate shared intermediate join on second merge", () => {
-    const jd1 = new JoinDependency(Post);
-    jd1.addNestedAssociation("comments.author");
+    const jd1 = new JoinDependency(Post, null, "comments.author", Nodes.OuterJoin);
 
-    const jd2 = new JoinDependency(Post);
-    jd2.addNestedAssociation("comments.likes");
+    const jd2 = new JoinDependency(Post, null, "comments.likes", Nodes.OuterJoin);
 
-    const jd3 = new JoinDependency(Post);
-    jd3.addNestedAssociation("comments");
+    const jd3 = new JoinDependency(Post, null, "comments", Nodes.OuterJoin);
 
     const joins = jd1.joinConstraints([jd2, jd3]);
 
@@ -153,12 +144,9 @@ describe("JoinDependency walk() deduplication", () => {
     clearReflectionsCache(Post);
     Post.hasMany("reviews", { className: "Comment" });
 
-    const jd1 = new JoinDependency(Post);
-    jd1.addAssociation("comments");
-    jd1.addAssociation("reviews");
+    const jd1 = new JoinDependency(Post, null, ["comments", "reviews"], Nodes.OuterJoin);
 
-    const jd2 = new JoinDependency(Post);
-    jd2.addNestedAssociation("reviews.likes");
+    const jd2 = new JoinDependency(Post, null, "reviews.likes", Nodes.OuterJoin);
 
     const joins = jd1.joinConstraints([jd2]);
 
