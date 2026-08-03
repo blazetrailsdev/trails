@@ -58,16 +58,14 @@ export function normalizeKeys(
  * Mirrors: I18n.locale_available?. Returns true when the passed locale is in
  * the list of available locales.
  */
-export function localeAvailable(locale: Locale): boolean {
-  return config().availableLocalesSet.has(locale);
+export function localeAvailable(locale: Locale | null | undefined): boolean {
+  return config().availableLocalesSet.has(locale as Locale);
 }
 
 /** Mirrors: I18n.enforce_available_locales! */
 export function enforceAvailableLocales(locale: Locale | false | null | undefined): void {
   if (locale !== false && config().enforceAvailableLocales) {
-    if (locale === null || locale === undefined || !localeAvailable(locale)) {
-      throw new InvalidLocale(locale);
-    }
+    if (!localeAvailable(locale)) throw new InvalidLocale(locale);
   }
 }
 
