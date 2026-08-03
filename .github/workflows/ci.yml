@@ -175,6 +175,9 @@ jobs:
           # packages/activerecord/, is deliberately NOT on this gate — pulling
           # every AR PR into the leaf-package suites costs more than it catches;
           # the label-gated query-parity-trails job covers that direction.)
+          # NO packages/activerecord/ path feeds this gate. scripts/test-deps/
+          # imports AR source, so sqlite-tests (activerecord_affected) re-runs
+          # that suite as its own step — see the comment there.
           # The compare tooling's suites run in that same invocation and are
           # ALL in INFRA_CARVEOUT_RE, so without naming them here a change
           # confined to one of them would run none of its own tests.
@@ -877,6 +880,15 @@ jobs:
       # redundant double-run and keeps the CLI's subprocess tests out of this
       # large suite's worker scheduler (they otherwise starve its reporter RPC
       # / perturb fork scheduling — see trails-models-dump tests).
+      # scripts/test-deps/ holds the import-graph regression guards
+      # (adapter-graph-import-tdz, base-import-cycle) — both read
+      # packages/activerecord/src, but they are bundled into the unit-tests
+      # job, which is gated on unit_tests_affected and so never runs on an
+      # AR-only PR. That is how the `_arConfig` TDZ reached main red (#5647).
+      # Running them here, as a separate vitest invocation from the AR suite,
+      # keeps them in the `other` project: no AR setupFiles preload the adapter
+      # graph, which is what makes the entry order reproduce the crash.
+      - run: pnpm vitest run scripts/test-deps
       - run: pnpm vitest run packages/activerecord/
       - run: pnpm vitest run packages/activerecord-cli
 
