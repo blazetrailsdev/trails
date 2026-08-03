@@ -6,7 +6,9 @@
 
 /**
  * Ruby's `send(handler, ...)` in `handle_exception` dispatches on the `I18n`
- * module itself; this self-import is that receiver.
+ * module itself; this self-import is that receiver. A Symbol handler therefore
+ * names an export of this module, which is what `I18n.custom_exception_handler`
+ * is in the gem (i18n.rb:415-416).
  */
 import * as I18n from "./i18n.js";
 import type { Backend, ExceptionHandlerLike } from "./config.js";
