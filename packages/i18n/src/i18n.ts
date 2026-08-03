@@ -4,6 +4,11 @@
  * cache; both land with their own stories (RFC 0074).
  */
 
+/**
+ * Ruby's `send(handler, ...)` in `handle_exception` dispatches on the `I18n`
+ * module itself; this self-import is that receiver.
+ */
+import * as I18n from "./i18n.js";
 import type { Backend, ExceptionHandlerLike } from "./config.js";
 import { Config } from "./config.js";
 import { ArgumentError, Disabled, InvalidLocale, MissingTranslation } from "./exceptions.js";
@@ -357,12 +362,23 @@ function translateKey(
 
 /**
  * Any exceptions thrown in translate will be sent to the exception_handler
- * which can be a Proc or any other Object unless they're forced to be raised
- * or thrown (MissingTranslation).
+ * which can be a Symbol, a Proc or any other Object unless they're forced to
+ * be raised or thrown (MissingTranslation).
  *
- * @missingRailsCall send — Ruby's `Symbol` handler arm sends the handler name
- * to `I18n`; `config.exceptionHandler` is typed as a callable here, so the
- * name-of-a-method form has no representable value.
+ * If exception_handler is a Symbol then it will simply be sent to I18n as
+ * a method call. A Proc will simply be called. In any other case the
+ * method #call will be called on the exception_handler object.
+ *
+ * Examples:
+ *
+ *   I18n.setExceptionHandler("customExceptionHandler")
+ *   I18n.customExceptionHandler(exception, locale, key, options)  // will be called like this
+ *
+ *   I18n.setExceptionHandler((...args) => { ... })                // a lambda
+ *   I18n.exceptionHandler()(exception, locale, key, options)      // will be called like this
+ *
+ *   I18n.setExceptionHandler(new I18nExceptionHandler())          // an object
+ *   I18n.exceptionHandler().call(exception, locale, key, options) // will be called like this
  */
 function handleException(
   handling: "raise" | "throw" | false,
@@ -380,6 +396,14 @@ function handleException(
       const handler = truthy(options.exceptionHandler)
         ? (options.exceptionHandler as ExceptionHandlerLike)
         : config().exceptionHandler;
+      if (typeof handler === "string") {
+        return (I18n as unknown as Record<string, (...args: unknown[]) => unknown>)[handler](
+          exception,
+          locale,
+          key as TranslationKey,
+          options,
+        );
+      }
       return typeof handler === "function"
         ? handler(exception, locale, key as TranslationKey, options)
         : handler.call(exception, locale, key as TranslationKey, options);
