@@ -1,6 +1,18 @@
 import { deepMergeInPlace } from "./hash-utils.js";
+import { ordinal } from "./inflector.js";
 
-type TranslationValue = string | number | boolean | (string | null)[] | null | TranslationHash;
+/** A stored Proc entry, resolved with (key, options) at lookup time — i18n's
+ * `Backend::Base#resolve_entry` (i18n/lib/i18n/backend/base.rb:169-180). */
+type TranslationProc = (key: string, options: TranslateOptions) => TranslationValue;
+
+type TranslationValue =
+  | string
+  | number
+  | boolean
+  | (string | null)[]
+  | null
+  | TranslationProc
+  | TranslationHash;
 interface TranslationHash {
   [key: string]: TranslationValue;
 }
@@ -15,6 +27,15 @@ function dig(obj: TranslationHash, keys: string[]): TranslationValue | undefined
     if (current === undefined) return undefined;
   }
   return current;
+}
+
+function resolveEntry(
+  key: string,
+  value: TranslationValue | undefined,
+  options: TranslateOptions,
+): TranslationValue | undefined {
+  if (typeof value === "function") return resolveEntry(key, value(key, options), options);
+  return value;
 }
 
 const I18N_RESERVED_KEYS = new Set(["locale", "default", "raise", "scope", "separator"]);
@@ -310,13 +331,55 @@ class I18nModule {
           last_word_connector: ", and ",
         },
       },
+      // active_support/locale/en.rb — the Proc-valued half of the default
+      // English locale, which Rails loads alongside en.yml.
+      number: {
+        nth: {
+          ordinals: (_key, options) => {
+            const number = Number(options.number);
+            switch (number) {
+              case 1:
+                return "st";
+              case 2:
+                return "nd";
+              case 3:
+                return "rd";
+              case 4:
+              case 5:
+              case 6:
+              case 7:
+              case 8:
+              case 9:
+              case 10:
+              case 11:
+              case 12:
+              case 13:
+                return "th";
+            }
+            let numModulo = Math.abs(Math.trunc(number)) % 100;
+            if (numModulo > 13) numModulo %= 10;
+            switch (numModulo) {
+              case 1:
+                return "st";
+              case 2:
+                return "nd";
+              case 3:
+                return "rd";
+              default:
+                return "th";
+            }
+          },
+
+          ordinalized: (_key, options) => `${options.number}${ordinal(Number(options.number))}`,
+        },
+      },
     });
   }
 
   translate(key: string | symbol, options: TranslateOptions = {}): TranslationValue {
     const locale = options.locale ?? this.locale;
     const keyStr = this._scopedKey(symbolToString(key), options.scope);
-    const result = this.backend.lookup(locale, keyStr);
+    const result = resolveEntry(keyStr, this.backend.lookup(locale, keyStr), options);
     if (result !== undefined) return interpolate(this._pluralize(result, options.count), options);
     // `default` is a chain (i18n/lib/i18n/backend/base.rb:124-145): #default
     // wraps its subject with Array(), so a lone default is a one-entry chain.
@@ -338,7 +401,7 @@ class I18nModule {
       }
       const defaultKey = this._scopedKey(symbolToString(entry), options.scope);
       consideredKeys.push(defaultKey);
-      const found = this.backend.lookup(locale, defaultKey);
+      const found = resolveEntry(defaultKey, this.backend.lookup(locale, defaultKey), options);
       if (found !== undefined) return interpolate(this._pluralize(found, options.count), options);
     }
     // An explicit `default: nil` is a resolved nil fallback, not a miss: i18n

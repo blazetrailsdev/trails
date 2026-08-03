@@ -5,6 +5,7 @@
 
 import { Inflections } from "./inflector/inflections.js";
 import { NameError } from "./core-ext/name-error.js";
+import { I18n } from "./i18n.js";
 
 /** @internal */
 function applyInflections(word: string, rules: { rule: RegExp; replacement: string }[]): string {
@@ -342,25 +343,9 @@ export function parameterize(
 }
 
 export function ordinal(number: number): string {
-  const abs = Math.abs(number);
-  const mod100 = abs % 100;
-
-  if (mod100 === 11 || mod100 === 12 || mod100 === 13) {
-    return "th";
-  }
-
-  switch (abs % 10) {
-    case 1:
-      return "st";
-    case 2:
-      return "nd";
-    case 3:
-      return "rd";
-    default:
-      return "th";
-  }
+  return String(I18n.translate("number.nth.ordinals", { number }));
 }
 
 export function ordinalize(number: number): string {
-  return `${number}${ordinal(number)}`;
+  return String(I18n.translate("number.nth.ordinalized", { number }));
 }
