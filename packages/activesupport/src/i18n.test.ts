@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { I18n } from "./i18n.js";
 import { en } from "./locale/en.js";
 import { toSentence } from "./array-utils.js";
+import { TimeZone } from "./values/time-zone.js";
+import type { TimeWithZone } from "./time-with-zone.js";
 
 /** `I18n.reload!` plus the `en` locale Rails re-reads from its load path. */
 function reloadTranslations(): void {
@@ -14,12 +16,38 @@ function reloadTranslations(): void {
 I18n.setEnforceAvailableLocales(false);
 
 describe("I18nTest", () => {
+  let time: TimeWithZone;
+
   beforeEach(() => {
     reloadTranslations();
+    time = TimeZone.find("UTC").local(2008, 7, 2, 16, 47, 1);
   });
 
   afterEach(() => {
     reloadTranslations();
+  });
+
+  it("time zone localization with default format", () => {
+    const now = TimeZone.find("UTC").local(2000, 1, 1);
+    expect(I18n.localize(now)).toBe(now.strftime("%a, %d %b %Y %H:%M:%S %z"));
+  });
+
+  it("time localization should use default format", () => {
+    expect(I18n.localize(time)).toBe(time.strftime("%a, %d %b %Y %H:%M:%S %z"));
+  });
+
+  it("time localization with default format", () => {
+    expect(I18n.localize(time, { format: ":default" })).toBe(
+      time.strftime("%a, %d %b %Y %H:%M:%S %z"),
+    );
+  });
+
+  it("time localization with short format", () => {
+    expect(I18n.localize(time, { format: ":short" })).toBe(time.strftime("%d %b %H:%M"));
+  });
+
+  it("time localization with long format", () => {
+    expect(I18n.localize(time, { format: ":long" })).toBe(time.strftime("%B %d, %Y %H:%M"));
   });
 
   it("day names", () => {
