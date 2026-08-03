@@ -1144,13 +1144,6 @@ export const UNPORTED_FILES: UnportedFile[] = [
     reason: "Pre-1.0: optional backend mixin — composes several backends behind one lookup.",
   },
   {
-    pattern: "backend/fallbacks.rb",
-    package: "i18n",
-    reason:
-      "Pre-1.0: optional backend mixin — locale fallback chain, built on the " +
-      "equally out-of-scope locale/fallbacks.rb.",
-  },
-  {
     pattern: "backend/key_value.rb",
     package: "i18n",
     reason: "Pre-1.0: optional backend over a key-value store, keyed by Ruby-marshalled subtrees.",
@@ -1212,21 +1205,12 @@ export const UNPORTED_FILES: UnportedFile[] = [
       "concern with no trails consumer; Rails' own I18n usage never touches it.",
   },
   {
-    pattern: "locale/",
+    pattern: "locale/tag/rfc4646.rb",
     package: "i18n",
     reason:
-      "Pre-1.0: RFC 4646 locale-tag parsing and the fallback tag graph " +
-      "(`Locale::Tag::*`, `Locale::Fallbacks`). Only reachable through " +
-      "Backend::Fallbacks, which is itself out of pre-1.0 scope.",
-  },
-  {
-    pattern: "locale.rb",
-    package: "i18n",
-    reason:
-      "Pre-1.0: the `I18n::Locale` namespace's autoload shim — it declares " +
-      "nothing but `autoload :Fallbacks` / `autoload :Tag` for the `locale/` " +
-      "tree excluded above. Listed separately because the `locale/` pattern " +
-      "does not reach a file that sits beside the directory.",
+      "The alternative `Locale::Tag` implementation. `Tag.implementation` " +
+      "defaults to `Tag::Simple` in the gem and nothing selects this one, so " +
+      "the fallback chain never reaches it — story i18n-locale-tag-rfc4646.",
   },
   {
     pattern: "middleware.rb",
@@ -1256,8 +1240,8 @@ export const UNPORTED_FILES: UnportedFile[] = [
     package: "i18n",
     reason:
       "Pre-1.0: the `I18n::Tests` namespace's autoload shim for the `tests/` " +
-      "conformance mixins excluded above. Same beside-the-directory shape as " +
-      "`locale.rb`.",
+      "conformance mixins excluded above — a file that sits beside the " +
+      "directory the pattern above reaches.",
   },
 ];
 
