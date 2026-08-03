@@ -498,9 +498,8 @@ async function autosaveHasOne(record: Base, assoc: AssociationDefinition): Promi
   const inst = _loadedAssociation(record, assoc.name);
   const ctor = record.constructor as typeof Base;
   const reflection = (ctor as any)._reflectOnAssociation?.(assoc.name);
-  // Rails discriminates the through arms of `save_has_one_association` off the
-  // reflection (`reflection.through_reflection`, autosave_association.rb:489),
-  // not off the association object's shape.
+  // Rails `save_has_one_association` reads `reflection.through_reflection`
+  // (autosave_association.rb:489).
   const isThrough = !!reflection?.throughReflection;
 
   // Rails `save_has_one_association`'s `through_reflection` arm persists the
