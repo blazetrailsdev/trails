@@ -199,12 +199,13 @@ export abstract class Base {
         });
       }
       if (typeof subject === "function") {
-        const dateOrTime = options.object ?? object;
-        const rest = except(options, "object");
+        const dateOrTime =
+          options.object != null && options.object !== false ? options.object : object;
+        delete options.object;
         return this.resolve(
           locale,
           object,
-          (subject as (value: unknown, options: TranslateOptions) => unknown)(dateOrTime, rest),
+          (subject as (value: unknown, options: TranslateOptions) => unknown)(dateOrTime, options),
         );
       }
       return subject;
