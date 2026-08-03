@@ -21,6 +21,9 @@ class FakeBackend implements Backend {
   exists(): boolean {
     return false;
   }
+  localize(): unknown {
+    return null;
+  }
 }
 
 /**
