@@ -79,12 +79,12 @@ const ALTERNATE_PREFIX: Record<string, string> = { b: "0b", B: "0B", o: "0", x: 
  * conversions the interpolation pattern admits (`bBdiouxXeEfgGcps`, `p`
  * included) are
  * reimplemented here, along with the `-+ #0` flags, width and precision that
- * `sprintf` applies to them.
+ * `sprintf` applies to them. A spec outside that grammar raises `ArgumentError`
+ * with `sprintf`'s message, as Ruby's does for `%<num>,d`.
  */
 function sprintf(spec: string, value: unknown): string {
   const parsed = FORMAT_SPEC.exec(spec);
-  // Ruby's sprintf raises on a spec it cannot parse, e.g. `%<num>,d`.
-  if (!parsed) throw new ArgumentError(`malformed format string - %${spec}`);
+  if (!parsed) throw new ArgumentError(`malformed format string - %${spec.charAt(0)}`);
   const [, flags = "", width = "", precision, conversion = "s"] = parsed;
   const digits = precision === undefined ? 6 : Number(precision);
   const numeric = !"csp".includes(conversion);
