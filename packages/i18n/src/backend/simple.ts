@@ -40,10 +40,6 @@ export class Simple extends Base {
    * Stores translations for the given locale in memory. This uses a deep merge
    * for the translations hash, so existing translations will be overwritten by
    * new ones only at the deepest level of the hash.
-   *
-   * @missingRailsCall new — `Concurrent::Hash.new` guards concurrent loading
-   * across threads; JS is single-threaded, so the per-locale hash is a plain
-   * object literal.
    */
   override storeTranslations(
     locale: Locale,
@@ -87,11 +83,6 @@ export class Simple extends Base {
     super.eagerLoadBang();
   }
 
-  /**
-   * @missingRailsCall new — `Concurrent::Hash.new` with a MUTEX-synchronized
-   * default block guards concurrent loading across threads; JS is
-   * single-threaded, so the store is a plain object literal.
-   */
   translations({ doInit = false }: { doInit?: boolean } = {}): TranslationData {
     // To avoid returning empty translations, call `initTranslations`.
     if (doInit && !this.initialized()) this.initTranslations();
