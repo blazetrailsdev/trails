@@ -11,8 +11,6 @@ function reloadTranslations(): void {
   I18n.backend().storeTranslations("en", en);
 }
 
-/** Ruby's `Date::MONTHNAMES` / `Date::ABBR_MONTHNAMES`, which `strftime`'s
- * `%B` / `%b` render from. Both are 1-indexed with a leading `nil`. */
 const MONTHNAMES = [
   null,
   "January",
@@ -45,13 +43,12 @@ const ABBR_MONTHNAMES = [
 ];
 
 /**
- * Stands in for Ruby's `::Date`, which the setup builds with
- * `Date.parse("2008-7-2")`. `I18n::Backend::Base#localize` duck-types its
- * object (i18n/lib/i18n/backend/base.rb:78-92), and a `Date` answers
- * `strftime`, `wday` and `mon` but *not* `sec` — which is what routes the
- * format lookup to `date.formats` rather than `time.formats` (base.rb:82).
- * `TimeWithZone` answers `sec`, so it cannot stand in here. Mirrors the same
- * stand-in in i18n/src/backend/localization.test.ts.
+ * Stands in for Ruby's `::Date` (`Date.parse("2008-7-2")` in `setup`), which
+ * trails has no analogue of. `localize` duck-types its object
+ * (i18n/lib/i18n/backend/base.rb:78-92): `Date` answers `strftime`, `wday` and
+ * `mon` but not `sec`, which is what selects `date.formats` over
+ * `time.formats` (base.rb:82). Mirrors the stand-in in
+ * i18n/src/backend/localization.test.ts.
  */
 class RubyDate {
   readonly utc: Date;
