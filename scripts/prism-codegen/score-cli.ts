@@ -2,6 +2,9 @@ import * as fs from "fs/promises";
 import { readFileSync, existsSync } from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
+// The wide exclude tree is api-compare's baseline, so its walker stays there
+// rather than moving to a shared scripts/ module (as naming.ts/catalog.ts do).
+import { listJsonFiles } from "../api-compare/baseline-json.js";
 import { portMethodNames } from "./port-symbols.js";
 import { generateFromSource } from "./index.js";
 import { asyncMethodsForRailsFile, buildAsyncManifest } from "./async-source.js";
@@ -76,23 +79,6 @@ async function railsLibFiles(): Promise<{ path: string; source: string }[]> {
     }
   };
   await walk(root);
-  return out;
-}
-
-async function listJsonFiles(dir: string): Promise<string[]> {
-  const out: string[] = [];
-  let dirents;
-  try {
-    dirents = await fs.readdir(dir, { withFileTypes: true });
-  } catch (e) {
-    if ((e as NodeJS.ErrnoException).code === "ENOENT") return out;
-    throw e;
-  }
-  for (const d of dirents) {
-    const full = path.join(dir, d.name);
-    if (d.isDirectory()) out.push(...(await listJsonFiles(full)));
-    else if (d.name.endsWith(".json")) out.push(full);
-  }
   return out;
 }
 
