@@ -222,11 +222,11 @@ function setupTimeProcTranslations(): void {
       formats: {
         proc: (object: unknown, options: Record<string, unknown>) => inspectArgs([object], options),
       },
-      day_names: (_key: unknown, options: Record<string, unknown>) =>
+      day_names: (key: unknown, options: Record<string, unknown>) =>
         /^%A/.test(options.format as string)
           ? ["Воскресенье", "Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота"]
           : ["воскресенье", "понедельник", "вторник", "среда", "четверг", "пятница", "суббота"],
-      month_names: (_key: unknown, options: Record<string, unknown>) =>
+      month_names: (key: unknown, options: Record<string, unknown>) =>
         /(%d|%e)(\s*)?(%B)/.test(options.format as string)
           ? [
               null,
@@ -258,7 +258,7 @@ function setupTimeProcTranslations(): void {
               "Ноябрь",
               "Декабрь",
             ],
-      abbr_month_names: (_key: unknown, options: Record<string, unknown>) =>
+      abbr_month_names: (key: unknown, options: Record<string, unknown>) =>
         /(%d|%e)(\s*)(%b)/.test(options.format as string)
           ? [
               null,
