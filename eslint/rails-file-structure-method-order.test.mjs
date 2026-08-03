@@ -169,6 +169,12 @@ try {
         filename: mixinFile,
         code: `export const Math = {\n  alpha() {},\n  beta() {},\n  gamma() {},\n};\n`,
       },
+      // Duplicate key: the LAST definition wins at runtime, so a reorder would
+      // change which one that is. The literal is skipped.
+      {
+        filename: mixinFile,
+        code: `export const Math = {\n  gamma() {},\n  alpha() {},\n  gamma() {},\n};\n`,
+      },
       // Two object literals, one `functions` bucket — ambiguous, left alone.
       {
         filename: mixin2File,

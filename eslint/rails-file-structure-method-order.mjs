@@ -174,7 +174,6 @@ function memberName(node) {
   if (node.type === "FunctionDeclaration" || node.type === "TSDeclareFunction") {
     return node.id?.name ?? null;
   }
-  // Method of a mixin object literal (`export const Math = { add(…) {} }`).
   if (node.type === "Property") {
     return node.key?.type === "Identifier" && !node.computed ? node.key.name : null;
   }
@@ -215,12 +214,6 @@ function isOrderableClassMember(node) {
   return true;
 }
 
-// A Ruby module ported as a mixin OBJECT (CLAUDE.md "Module mixins" —
-// `export const Math = { add(…) {}, … }` in packages/arel/src/math.ts) is
-// neither a ClassBody nor a top-level FunctionDeclaration, so without this it
-// matched no container and its manifest bucket was silently dropped.
-// Only plain function-valued members are orderable; spreads, computed keys and
-// value properties are left alone.
 function isOrderableObjectMember(node) {
   if (node.type !== "Property") return false;
   if (node.computed || node.key?.type !== "Identifier") return false;
@@ -229,11 +222,17 @@ function isOrderableObjectMember(node) {
   );
 }
 
-// Top-level `const Name = { … }` / `export const Name = { … }` object literals,
-// as `{ name, members, declaredKeys }` candidates. Reordering properties of an
-// object literal is safe for the same reason class members are: the properties
-// are evaluated as one expression and nothing inside can observe their relative
-// declaration order.
+/**
+ * Top-level `const Name = { … }` / `export const Name = { … }` mixin object
+ * literals as orderable containers — the CLAUDE.md "Module mixins" port shape
+ * for a Ruby module of methods (`packages/arel/src/math.ts`), which is neither
+ * a ClassBody nor a FunctionDeclaration and so matched nothing before.
+ *
+ * Reordering properties is safe for the same reason class members are: the
+ * literal is one expression and nothing in it observes their relative order —
+ * EXCEPT under a duplicate key, where the last definition wins and a reorder
+ * would change which one that is. Such a literal is skipped.
+ */
 function collectObjectContainers(programNode) {
   const candidates = [];
   for (const stmt of programNode.body) {
@@ -249,10 +248,14 @@ function collectObjectContainers(programNode) {
       const members = d.init.properties.filter(isOrderableObjectMember);
       if (members.length < 2) continue;
       const declaredKeys = new Set();
+      let duplicate = false;
       for (const p of d.init.properties) {
         const n = memberName(p);
-        if (n) declaredKeys.add(n);
+        if (!n) continue;
+        if (declaredKeys.has(n) && p.kind === "init") duplicate = true;
+        declaredKeys.add(n);
       }
+      if (duplicate) continue;
       candidates.push({ name: d.id.name, members, declaredKeys });
     }
   }
@@ -498,12 +501,9 @@ const rule = {
             usedBucket.add(cand.name);
           }
         }
-        // Mixin object literals compete for the same buckets as class bodies:
-        // a `Foo::ClassMethods`-style mixin lands in `classes[Foo]`, while a
-        // standalone Ruby module lands in `functions` (see
-        // scripts/build-rails-file-structure-manifest.ts). Take an exact
-        // classes-bucket name match first; whatever is left is a candidate for
-        // the `functions` bucket below.
+        // A mixin object flattened from `Foo::ClassMethods` lands in
+        // `classes[Foo]`; a standalone Ruby module lands in `functions` (see
+        // scripts/build-rails-file-structure-manifest.ts), claimed below.
         const objectCandidates = collectObjectContainers(programNode);
         for (const cand of objectCandidates) {
           if (!usedBucket.has(cand.name) && (classOrders[cand.name]?.length ?? 0) > 0) {
@@ -551,10 +551,8 @@ const rule = {
           });
         }
 
-        // A mixin object literal takes the `functions` bucket when the file has
-        // no top-level function container to claim it and exactly ONE object
-        // literal is still unresolved — more than one is ambiguous, and guessing
-        // would impose an unrelated Rails order on the wrong object.
+        // Two unresolved literals competing for one `functions` bucket is
+        // ambiguous; guessing would impose an unrelated Rails order.
         const freeObjects = objectCandidates.filter((c) => !c.expectedOrder);
         if (!functionsConsumed && functionOrder.length > 0 && freeObjects.length === 1) {
           freeObjects[0].expectedOrder = functionOrder;
