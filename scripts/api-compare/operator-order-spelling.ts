@@ -27,6 +27,24 @@ import { OPERATORS } from "./conventions.js";
 // `rubyMethodToTs`'s multi-name shape: the rule filters to spellings actually
 // present in the container, so listing more than one is a safe no-op.
 export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> = {
+  // arel/math.rb:5-41 — the arithmetic/bitwise mixin. Every operator has a
+  // named counterpart on math.ts's `Math` mixin object, one per Ruby `def`:
+  // `*`:5 `+`:9 `-`:13 `/`:17 `&`:21 `|`:25 `^`:29 `<<`:33 `>>`:37 `~@`:41.
+  // math.ts ports the mixin as an object literal, which the ORDER rule (it
+  // reads top-level function declarations only) reports as a dropped bucket —
+  // the pin is what makes that drop visible rather than silent, so keep it.
+  "Arel::Math": {
+    "*": ["multiply"],
+    "+": ["add"],
+    "-": ["subtract"],
+    "/": ["divide"],
+    "&": ["bitwiseAnd"],
+    "|": ["bitwiseOr"],
+    "^": ["bitwiseXor"],
+    "<<": ["bitwiseShiftLeft"],
+    ">>": ["bitwiseShiftRight"],
+    "~@": ["bitwiseNot"],
+  },
   // arel/table.rb:82 `def [](name, table = self)` → table.ts `get`.
   "Arel::Table": { "[]": ["get"] },
   // active_model/errors.rb:229 `def [](attribute)` → errors.ts `get`.
