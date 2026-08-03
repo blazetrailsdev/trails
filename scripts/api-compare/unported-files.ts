@@ -1137,6 +1137,136 @@ export const UNPORTED_FILES: UnportedFile[] = [
       "Rails::TestUnit::Runner and invokes it with ARGV. vitest fills that role in " +
       "trails — no port intended.",
   },
+  // --- i18n: optional backend mixins composed on top of Simple ---
+  {
+    pattern: "backend/chain.rb",
+    package: "i18n",
+    reason: "Pre-1.0: optional backend mixin — composes several backends behind one lookup.",
+  },
+  {
+    pattern: "backend/fallbacks.rb",
+    package: "i18n",
+    reason:
+      "Pre-1.0: optional backend mixin — locale fallback chain, built on the " +
+      "equally out-of-scope locale/fallbacks.rb.",
+  },
+  {
+    pattern: "backend/key_value.rb",
+    package: "i18n",
+    reason: "Pre-1.0: optional backend over a key-value store, keyed by Ruby-marshalled subtrees.",
+  },
+  {
+    pattern: "backend/cache.rb",
+    package: "i18n",
+    reason: "Pre-1.0: optional backend mixin — caches lookups through ActiveSupport::Cache.",
+  },
+  {
+    pattern: "backend/cache_file.rb",
+    package: "i18n",
+    reason: "Pre-1.0: optional backend mixin — caches parsed translation files on disk.",
+  },
+  {
+    pattern: "backend/cascade.rb",
+    package: "i18n",
+    reason: "Pre-1.0: optional backend mixin — cascading key lookup (`foo.bar.baz` → `foo.baz`).",
+  },
+  {
+    pattern: "backend/interpolation_compiler.rb",
+    package: "i18n",
+    reason:
+      "Pre-1.0: optional backend mixin — compiles interpolations into Ruby " +
+      "procs via `eval`/`instance_eval`, which has no trails counterpart.",
+  },
+  {
+    pattern: "backend/lazy_loadable.rb",
+    package: "i18n",
+    reason: "Pre-1.0: optional backend mixin — defers translation-file loading until first lookup.",
+  },
+  {
+    pattern: "backend/memoize.rb",
+    package: "i18n",
+    reason: "Pre-1.0: optional backend mixin — memoizes lookups per locale.",
+  },
+  {
+    pattern: "backend/metadata.rb",
+    package: "i18n",
+    reason:
+      "Pre-1.0: optional backend mixin — attaches lookup metadata onto the " +
+      "translated String's singleton class. JS strings take no per-instance state.",
+  },
+  {
+    pattern: "backend/pluralization.rb",
+    package: "i18n",
+    reason:
+      "Pre-1.0: optional backend mixin — pluralization via per-locale rule procs in the data.",
+  },
+  {
+    pattern: "backend/transliterator.rb",
+    package: "i18n",
+    reason:
+      "Pre-1.0: ASCII transliteration driven by per-locale rule tables and " +
+      "`$KCODE`-era String packing. JS has `String.prototype.normalize` and " +
+      "no locale rule data is shipped; not in pre-1.0 scope.",
+  },
+  // --- i18n: gem surface trails has no counterpart for ---
+  {
+    // Deliberately broad: covers `gettext.rb`, `gettext/*` and the
+    // `backend/gettext.rb` mixin in one entry.
+    pattern: "gettext",
+    package: "i18n",
+    reason:
+      "Pre-1.0: gettext .po support — the catalogue parser, the `_`/`n_`/`s_` " +
+      "helpers, and the backend mixin that loads .po files. A Ruby toolchain " +
+      "concern with no trails consumer; Rails' own I18n usage never touches it.",
+  },
+  {
+    pattern: "locale/",
+    package: "i18n",
+    reason:
+      "Pre-1.0: RFC 4646 locale-tag parsing and the fallback tag graph " +
+      "(`Locale::Tag::*`, `Locale::Fallbacks`). Only reachable through " +
+      "Backend::Fallbacks, which is itself out of pre-1.0 scope.",
+  },
+  {
+    pattern: "locale.rb",
+    package: "i18n",
+    reason:
+      "Pre-1.0: the `I18n::Locale` namespace's autoload shim — it declares " +
+      "nothing but `autoload :Fallbacks` / `autoload :Tag` for the `locale/` " +
+      "tree excluded above. Listed separately because the `locale/` pattern " +
+      "does not reach a file that sits beside the directory.",
+  },
+  {
+    pattern: "middleware.rb",
+    package: "i18n",
+    reason:
+      "Rack middleware that resets `I18n.locale` after each request. trails " +
+      "has no Rack request lifecycle wiring for i18n yet; resetting is done " +
+      "explicitly by callers.",
+  },
+  {
+    pattern: "version.rb",
+    package: "i18n",
+    reason:
+      "Gem version constant. trails carries the version in package.json — no " +
+      "TS counterpart by design.",
+  },
+  {
+    pattern: "tests/",
+    package: "i18n",
+    reason:
+      "`lib/i18n/tests/*` are minitest mixins the gem ships so third-party " +
+      "backends can run its conformance suite. Test-support scaffolding, not " +
+      "library surface — trails' backend tests are vitest files instead.",
+  },
+  {
+    pattern: "tests.rb",
+    package: "i18n",
+    reason:
+      "Pre-1.0: the `I18n::Tests` namespace's autoload shim for the `tests/` " +
+      "conformance mixins excluded above. Same beside-the-directory shape as " +
+      "`locale.rb`.",
+  },
 ];
 
 export function isSourceUnported(file: string, pkg?: string): boolean {

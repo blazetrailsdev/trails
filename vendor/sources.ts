@@ -29,9 +29,9 @@ export interface PackageEntry {
    * Default true. Set to false to vendor the source (so test-compare or other
    * tooling can read it) without including it in the api-compare PACKAGES
    * derivation. Reserved for cases where the extractor can't yet handle a
-   * gem's idioms, or where no TS-side package dir exists yet to map onto
-   * (i18n today). Rack and globalid were wired into api-compare in wave 6
-   * (#1589).
+   * gem's idioms, or where no TS-side package dir exists yet to map onto.
+   * Rack and globalid were wired into api-compare in wave 6 (#1589), i18n
+   * once packages/i18n existed; today no source sets it.
    */
   compareApi?: boolean;
   /**
@@ -191,7 +191,6 @@ export const SOURCES: readonly UpstreamSource[] = [
         name: "i18n",
         libPath: "lib/i18n",
         testPath: "test",
-        compareApi: false,
         compareTests: false,
       },
     ],
