@@ -2042,6 +2042,40 @@ describe("extractFromProgram — @noRailsEquivalent JSDoc", () => {
     ).toBeUndefined();
   });
 
+  it("records interface property signatures alongside method signatures", () => {
+    const info = extractFromFiles("/p", {
+      "locator.ts": `
+        type Resolver = (id: unknown, scope: string) => unknown;
+
+        export interface LocatorModel {
+          name: string;
+          primaryKey?: string | string[];
+          locate: (id: unknown) => Promise<unknown>;
+          resolve: Resolver;
+          /** @noRailsEquivalent trails-only finder seam */
+          findGlobalId: (id: string) => Promise<unknown>;
+          find(id: unknown): Promise<unknown>;
+        }
+      `,
+    });
+    const iface = info.modules["locator.ts:LocatorModel"];
+    expect(iface.instanceMethods.map((m) => m.name).sort()).toEqual([
+      "find",
+      "findGlobalId",
+      "locate",
+      "name",
+      "primaryKey",
+      "resolve",
+    ]);
+    expect(iface.instanceMethods.find((m) => m.name === "locate")!.params).toHaveLength(1);
+    expect(iface.instanceMethods.find((m) => m.name === "resolve")!.params).toHaveLength(2);
+    expect(iface.instanceMethods.find((m) => m.name === "name")!.params).toEqual([]);
+    expect(iface.instanceMethods.find((m) => m.name === "findGlobalId")!.noRailsEquivalent).toBe(
+      "trails-only finder seam",
+    );
+    expect(iface.interfaceMembers).toContain("name");
+  });
+
   it("carries a tag through an interface's resolved extends members", () => {
     const info = extractFromFiles("/p", {
       "relation-base.ts": `

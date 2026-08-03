@@ -2116,6 +2116,41 @@ export function extractClass(
   };
 }
 
+/**
+ * Parameters of a property signature whose type has call signatures — the
+ * `find: (id) => T` spelling of `find(id): T`. Resolved through the checker so
+ * a property typed by an alias or a named function type reports the same arity
+ * as the method spelling. Non-callable properties have no parameters.
+ */
+function propertySignatureParams(
+  member: ts.PropertySignature,
+  checker: ts.TypeChecker,
+): ParamInfo[] {
+  if (!member.type) return [];
+  if (ts.isFunctionTypeNode(member.type)) return extractParameters(member.type.parameters);
+  try {
+    const signatures = checker.getTypeAtLocation(member.type).getCallSignatures();
+    const decl = signatures[0]?.declaration;
+    if (decl && ts.isFunctionLike(decl)) return extractParameters(decl.parameters);
+  } catch {
+    // Unresolvable type: fall back to no parameters, as for a plain property.
+  }
+  return [];
+}
+
+/**
+ * Extract an interface as a ClassInfo.
+ *
+ * Member rule: every method signature AND every property signature counts,
+ * callable or not. `find(id): T` and `find: (id) => T` are interchangeable in
+ * TypeScript, so recording only method signatures would make a member's
+ * visibility to api:compare / api:extra depend on the author's syntax choice.
+ * Non-callable properties count for the same reason class property
+ * declarations do (see extractClass) — a Rails attr_reader ports as a plain
+ * property, so skipping them would be its own divergence. A property whose
+ * type has call signatures carries that signature's parameters, so arity
+ * comparison sees the same thing for both spellings.
+ */
 function extractInterface(
   node: ts.InterfaceDeclaration,
   checker: ts.TypeChecker,
@@ -2186,6 +2221,16 @@ function extractInterface(
         name: memberName,
         visibility: "public",
         params: member.parameters ? extractParameters(member.parameters) : [],
+        line,
+        file,
+        ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
+      });
+    } else if (ts.isPropertySignature(member)) {
+      const noRailsEquivalent = noRailsEquivalentReason(member);
+      instanceMethods.push({
+        name: memberName,
+        visibility: "public",
+        params: propertySignatureParams(member, checker),
         line,
         file,
         ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
