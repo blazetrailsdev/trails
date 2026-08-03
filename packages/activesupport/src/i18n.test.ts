@@ -6,8 +6,8 @@ import { TimeZone } from "./values/time-zone.js";
 import type { TimeWithZone } from "./time-with-zone.js";
 
 /** `I18n.reload!` plus the `en` locale Rails re-reads from its load path. */
-function reloadTranslations(): void {
-  I18n.reloadBang();
+async function reloadTranslations(): Promise<void> {
+  await I18n.reloadBang();
   I18n.backend().storeTranslations("en", en);
 }
 
@@ -95,14 +95,14 @@ describe("I18nTest", () => {
   let date: RubyDate;
   let time: TimeWithZone;
 
-  beforeEach(() => {
-    reloadTranslations();
+  beforeEach(async () => {
+    await reloadTranslations();
     date = new RubyDate(2008, 7, 2);
     time = TimeZone.find("UTC").local(2008, 7, 2, 16, 47, 1);
   });
 
-  afterEach(() => {
-    reloadTranslations();
+  afterEach(async () => {
+    await reloadTranslations();
   });
 
   it("time zone localization with default format", () => {

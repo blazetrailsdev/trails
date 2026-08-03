@@ -500,7 +500,7 @@ describe("I18nTest", () => {
     t("foo", { locale: "klingon" });
   });
 
-  it("I18n.reload! reloads the set of locales that are enforced", () => {
+  it("I18n.reload! reloads the set of locales that are enforced", async () => {
     setBackend(new Simple());
 
     expect(availableLocales()).not.toContain("de");
@@ -515,7 +515,7 @@ describe("I18nTest", () => {
     expect(() => setDefaultLocale("de")).toThrow(InvalidLocale);
     expect(() => setLocale("de")).toThrow(InvalidLocale);
 
-    reloadBang();
+    await reloadBang();
 
     storeTranslations("en", { foo: "Foo in :en" });
     storeTranslations("de", { foo: "Foo in :de" });
