@@ -1,7 +1,7 @@
 {
   "ar-01": {
     "side": "diff",
-    "reason": "Datetime SQL serialization does not honour column precision: trails serializes Date binds with microsecond precision ('.677000'), Rails truncates to whole seconds when the DATETIME column has no precision spec (as in this fixture's bare `created_at DATETIME`). Rails: 'reviews.created_at > ''2026-04-19 00:46:48'''; trails: 'reviews.created_at > ''2026-04-19 00:46:48.677000'''. Flakes by frozen-at: PR #854 'closed' this gap because that run's frozen-at landed on a whole second. Real fix is in Date\u2192SQL serialization to drop fractional seconds for unscaled DATETIME columns."
+    "reason": "Datetime SQL serialization does not honour column precision: trails serializes Date binds with microsecond precision ('.677000'), Rails truncates to whole seconds when the DATETIME column has no precision spec (as in this fixture's bare `created_at DATETIME`). Rails: 'reviews.created_at > ''2026-04-19 00:46:48'''; trails: 'reviews.created_at > ''2026-04-19 00:46:48.677000'''. Flakes by frozen-at: PR #854 'closed' this gap because that run's frozen-at landed on a whole second. Real fix is in Date→SQL serialization to drop fractional seconds for unscaled DATETIME columns."
   },
   "ar-52": {
     "side": "diff",
@@ -11,73 +11,9 @@
     "side": "diff",
     "reason": "Same datetime-precision gap as ar-01/ar-52 (equality form): Order.where(created_at: Time.now) — rails truncates to whole seconds for the unprecisioned DATETIME column, trails keeps subsecond precision in both the bind and the inlined SQL. Flakes whenever the frozen-at is not on a whole second."
   },
-  "ar-134": {
-    "side": "trails-missing",
-    "reason": "joins() crashes on nested hash arguments: Rails resolves joins({books: :reviews}) to two INNER JOINs via the association graph; Trails accepts the object argument into _rawJoins and later attempts to use it as a join node during SQL generation, causing a runtime failure instead of producing a valid query. Root cause: Relation#joins does not handle object/hash arguments \u2014 they fall through to _rawJoins and fail when the SQL builder encounters a non-string join entry. Real fix: handle nested object/hash arguments in Relation#joins by resolving them through _resolveAssociationJoin and applying the resulting joins via _applyJoinsToManager."
-  },
-  "ar-137": {
-    "side": "diff",
-    "reason": "withRecursive union uses UNION instead of UNION ALL: Rails emits 'UNION ALL' between the anchor and recursive term of a recursive CTE; trails emits bare 'UNION'. Real fix: only the recursive term assembled by withRecursive should use UNION ALL; keep non-recursive with({ cte: [rel1, rel2] }) array handling on plain UNION \u2014 do not change shared resolveCteEntry behavior globally."
-  },
-  "ar-138": {
-    "side": "diff",
-    "reason": "HAVING clause is dropped when a relation is used as a WHERE IN subquery: Rails emits 'WHERE id IN (SELECT author_id FROM books GROUP BY author_id HAVING COUNT(*) >= 3)'; trails drops the HAVING and emits 'WHERE id IN (SELECT author_id FROM books GROUP BY author_id)'. Root cause: the WHERE IN subquery path goes through PredicateBuilder::RelationHandler (relation-handler.ts:16) which calls relation.toArel(); Relation#toArel() does not apply the inner relation's HAVING clause. Real fix: Relation#toArel() must preserve GROUP BY and HAVING when building the subquery SelectManager."
-  },
-  "ar-139": {
-    "side": "diff",
-    "reason": "joins(:assoc).where(assoc: {col: val}) uses inconsistent table naming between the JOIN and nested-hash predicate paths: trails resolves joins(:assoc) through _resolveAssociationJoin as an unaliased join on the base table name ('INNER JOIN \"authors\" ON \"authors\".\"id\" = ...'), but the nested-hash predicate path resolves the same association through TableMetadata.associatedTable and aliases it to the association key ('author'), producing WHERE \"author\".\"name\" against a query that only joined \"authors\". Real fix: make symbolic association joins and nested-hash predicate resolution share the same table name/alias strategy so both clauses reference the same table."
-  },
-  "ar-150": {
-    "side": "diff",
-    "reason": "where(assoc_name: relation) uses the literal key as the column name instead of resolving the FK: where({ author: relation }) produces WHERE \"books\".\"author\" IN (...) instead of WHERE \"books\".\"author_id\" IN (...). Rails resolves the association name to its foreign_key via the belongs_to definition; Trails uses the key directly as a column name. Real fix: the WHERE-condition path must check if the key matches an association name and substitute its foreign_key."
-  },
-  "ar-151": {
-    "side": "diff",
-    "reason": "annotate() comment is appended after ORDER BY instead of before it: Rails emits the /* comment */ between the WHERE clause and ORDER BY (e.g. WHERE ... /* comment */ ORDER BY ...); Trails appends it at the very end after ORDER BY (WHERE ... ORDER BY ... /* comment */). Real fix: the SQL-generation path in Relation#toSql must insert annotate comments before ORDER BY, matching Rails' Arel visitor output order."
-  },
-  "ar-152": {
-    "side": "diff",
-    "reason": "has_many with a default scope does not embed the scope condition in the JOIN ON clause: Rails resolves joins(:published_books) to INNER JOIN \"books\" ON \"books\".\"status\" = 'published' AND \"books\".\"author_id\" = ...; Trails emits only INNER JOIN \"books\" ON \"books\".\"author_id\" = ... (scope condition dropped). Real fix: _resolveAssociationJoin must apply the association's :scope condition to the JOIN ON predicate when building the join for a scoped has_many."
-  },
-  "ar-154": {
-    "side": "trails-missing",
-    "reason": "group() does not accept Arel node arguments: group(new Nodes.NamedFunction(...)) throws TypeError: col.trim is not a function because the group implementation calls .trim() on each argument assuming strings. Rails accepts any Arel::Node in group() and passes it to the GROUP BY clause via the Arel visitor. Real fix: the groupBang implementation must handle Arel node arguments by calling .toSql() (or passing them directly to the Arel manager) instead of treating them as strings."
-  },
-  "ar-155": {
-    "side": "trails-missing",
-    "reason": "Arel::Nodes::Case fluent builder is incomplete: Rails supports case.when(val).then(result) chaining; Trails' Case node has when() and else() but no then() method, so building a CASE WHEN ... THEN ... expression throws '(intermediate value).when(...).then is not a function'. Real fix: add then() to the Case node builder mirroring Rails' Arel::Nodes::Case#then."
-  },
-  "ar-157": {
-    "side": "trails-missing",
-    "reason": "Arel::Nodes::Union (and Intersect) lack an as() method: Rails' Arel nodes all inherit Node#as() which wraps the node in Arel::Nodes::As; Trails' base Node class does not implement as(), so calling union.as('alias') throws 'union.as is not a function'. Real fix: add as() to the Arel Node base class to produce an As node, mirroring Rails' Arel::Nodes::Node#as."
-  },
-  "ar-158": {
-    "side": "diff",
-    "reason": "Table alias from SelectManager#as is over-quoted in Arel JOIN ON: Rails emits the alias unquoted in ON conditions (sub.\"book_id\"); Trails quotes the alias as a table name (\"sub\".\"book_id\"). Real fix: the Arel visitor's visitAs or table-alias resolution must emit the alias name without double-quoting in ON clause references."
-  },
-  "ar-161": {
-    "side": "diff",
-    "reason": "ORDER BY string alias from a SELECT expression is over-qualified: order('pub_year') on a query with EXTRACT(...) AS pub_year produces ORDER BY \"books\".\"pub_year\" ASC instead of ORDER BY pub_year. Trails' string-order path qualifies any bare identifier with the model's table name. Real fix: _applyOrderToManager must pass string ORDER BY values verbatim (as Rails does) instead of qualifying unrecognised bare identifiers."
-  },
-  "ar-162": {
-    "side": "diff",
-    "reason": "ORDER BY aggregate alias is over-qualified: order('cnt DESC') produces ORDER BY \"books\".\"cnt\" DESC instead of ORDER BY cnt DESC. Same root as ar-161 \u2014 Trails' order-qualification path treats any bare identifier as a table column. Real fix: same as ar-161."
-  },
-  "ar-166": {
-    "side": "diff",
-    "reason": "ORDER BY SUM/aggregate alias over-qualified in group+having context: order('total DESC') produces ORDER BY \"books\".\"total\" DESC instead of ORDER BY total DESC. A SUM alias from a SELECT is not a real table column; same root cause as ar-161/162. Real fix: _applyOrderToManager must not qualify bare ORDER BY identifiers that are not resolvable as table columns."
-  },
-  "ar-167": {
-    "side": "diff",
-    "reason": "ORDER BY select alias over-qualified even when the alias is correctly listed in GROUP BY: order('avg_pages DESC') produces ORDER BY \"books\".\"avg_pages\" DESC instead of ORDER BY avg_pages DESC. GROUP BY correctly passes the comma-separated string through, but ORDER BY still qualifies the single-word alias. Same fix as ar-161/162/166."
-  },
   "ar-170": {
     "side": "diff",
-    "reason": "Float values in Range lose decimal precision: where({ rating: new Range(3.5, 5.0) }) produces BETWEEN 3.5 AND 5 instead of BETWEEN 3.5 AND 5.0. JavaScript numbers don't distinguish 5 from 5.0, so the SQL literal omits the decimal. Rails serializes Ruby Float 5.0 as '5.0'. Real fix: the SQL value serializer must emit floats with at least one decimal digit (e.g. 5 \u2192 5.0) to match Rails' Float#to_s behavior."
-  },
-  "ar-171": {
-    "side": "trails-missing",
-    "reason": "group(Arel.sql(...)) crashes: group(sql('DATE(created_at)')) throws 'col.trim is not a function' because groupBang stores Arel values in _groupColumns and groupColumnToArel later calls .trim() on each entry, assuming strings. Arel SqlLiteral (and NamedFunction, cf. ar-154) are not strings. Real fix: group/groupBang must handle Arel node arguments by passing them through to the Arel GROUP BY clause (or converting them appropriately) instead of letting non-strings reach string-only processing in groupColumnToArel."
+    "reason": "Float values in Range lose decimal precision: where({ rating: new Range(3.5, 5.0) }) produces BETWEEN 3.5 AND 5 instead of BETWEEN 3.5 AND 5.0. JavaScript numbers don't distinguish 5 from 5.0, so the SQL literal omits the decimal. Rails serializes Ruby Float 5.0 as '5.0'. Real fix: the SQL value serializer must emit floats with at least one decimal digit (e.g. 5 → 5.0) to match Rails' Float#to_s behavior."
   },
   "ar-173": {
     "side": "diff",
@@ -93,22 +29,6 @@
   },
   "ar-179": {
     "side": "diff",
-    "reason": "Float 0.0 loses its decimal point: where({ rating: 0.0 }) produces = 0 instead of = 0.0. JavaScript 0.0 === 0 so the decimal is dropped during SQL serialization. Rails serializes Ruby Float 0.0 as '0.0'. Same root as ar-173/174/176 \u2014 Real fix: SQL value serializer must emit floats with at least one decimal digit."
-  },
-  "ar-180": {
-    "side": "diff",
-    "reason": "ORDER BY Arel attribute alias over-qualified: select(col.as('p')).order('p DESC') produces ORDER BY \"books\".\"p\" DESC instead of ORDER BY p DESC. Single-char alias 'p' matches the bare-identifier regex and gets table-qualified. Same root as ar-161/162/166/167. Real fix: _applyOrderToManager must not qualify identifiers that are SELECT aliases rather than real table columns."
-  },
-  "ar-182": {
-    "side": "trails-missing",
-    "reason": "Arel Attribute#in() does not accept a Union node: where(col.in(union_node)) throws 'values.map is not a function' because the in() predicate method calls .map() on its argument, assuming an array or SelectManager, not an Arel Union node. Rails accepts any Arel::Node in not_in/in and passes it to the Arel visitor. Real fix: the in()/notIn() predicate implementation must handle Arel node arguments (Union, Intersect, etc.) by passing them through to the visitor instead of calling .map()."
-  },
-  "ar-183": {
-    "side": "trails-missing",
-    "reason": "Arel Case node fluent builder with integer .then() args: Case.new(col).when('active').then(1) throws '(intermediate value).when(...).then is not a function'. Same root as ar-155 \u2014 Case builder lacks then(). This fixture pins that the gap also manifests when .then() receives integer literals rather than string values. Real fix: same as ar-155 \u2014 add then() to the Case node builder."
-  },
-  "ar-184": {
-    "side": "diff",
-    "reason": "ORDER BY single-char aggregate alias over-qualified: order('n DESC') produces ORDER BY \"books\".\"n\" DESC instead of ORDER BY n DESC. Short alias 'n' is a bare identifier that _applyOrderToManager qualifies with the model's table name. Same root as ar-161/162/166/167/180. Confirms the fix must apply to all bare identifiers in ORDER BY string clauses, not just multi-character ones."
+    "reason": "Float 0.0 loses its decimal point: where({ rating: 0.0 }) produces = 0 instead of = 0.0. JavaScript 0.0 === 0 so the decimal is dropped during SQL serialization. Rails serializes Ruby Float 0.0 as '0.0'. Same root as ar-173/174/176 — Real fix: SQL value serializer must emit floats with at least one decimal digit."
   }
 }
