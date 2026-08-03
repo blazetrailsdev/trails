@@ -205,8 +205,10 @@ describe("TestNestedAttributesInGeneral", () => {
     await pirate.saveBang();
     expect(Number(await Ship.count())).toBe(before); // not persisted → rejected
 
-    // pirate is now persisted, so reject_empty_ships_on_create returns false
-    (pirate as any).shipAttributes = { name: "Red Pearl", _reject_me_if_new: true };
+    // pirate is now persisted, so reject_empty_ships_on_create returns false.
+    // The awaitable writer, because a persisted owner's unloaded has_one still
+    // owes Rails' leading `load_target` (has_one_association.rb:59).
+    await (pirate as any).setShipAttributes({ name: "Red Pearl", _reject_me_if_new: true });
     before = Number(await Ship.count());
     await pirate.saveBang();
     expect(Number(await Ship.count())).toBe(before + 1);
@@ -278,7 +280,9 @@ describe("TestNestedAttributesInGeneral", () => {
     const pirate = await Pirate.createBang({
       catchphrase: "Don' botharrr talkin' like one, savvy?",
     });
-    (pirate.association("ship") as any).build();
+    // `build` on a persisted owner's unloaded has_one returns Rails' leading
+    // `load_target` for the caller to await.
+    await (pirate.association("ship") as any).build();
     (pirate as any).shipAttributes = { name: "Ship 1", pirate_id: Number(pirate.id) + 1 };
     expect(Number((pirate.association("ship") as any).target.pirate_id)).toBe(Number(pirate.id));
     resetShipConfig();
@@ -407,7 +411,10 @@ describe("TestNestedAttributesOnAHasOneAssociation", () => {
     const { pirate, ship } = await setup();
     await ship.destroy();
     const p = await Pirate.find(pirate.id);
-    (p as any).shipAttributes = { name: "Davy Jones Gold Dagger" };
+    // The awaitable writer: a persisted owner's unloaded has_one owes Rails'
+    // leading `load_target` (has_one_association.rb:59) even when it finds
+    // nothing, which the synchronous setter cannot await.
+    await (p as any).setShipAttributes({ name: "Davy Jones Gold Dagger" });
     const target = (p.association("ship") as any).target as Ship;
     expect(target.isPersisted()).toBe(false);
     expect(target.name).toBe("Davy Jones Gold Dagger");
@@ -433,7 +440,9 @@ describe("TestNestedAttributesOnAHasOneAssociation", () => {
     const { pirate, ship } = await setup();
     const p = await Pirate.find(pirate.id);
     await shipOf(p);
-    (p as any).shipAttributes = { name: "Davy Jones Gold Dagger" };
+    // The awaitable writer: replacing a loaded record runs Rails'
+    // `remove_target!` (has_one_association.rb:69) inline at the assignment.
+    await (p as any).setShipAttributes({ name: "Davy Jones Gold Dagger" });
     const target = (p.association("ship") as any).target as Ship;
     expect(target.isPersisted()).toBe(false);
     expect(target.name).toBe("Davy Jones Gold Dagger");

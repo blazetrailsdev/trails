@@ -369,6 +369,36 @@ export class DeleteRestrictionError extends ActiveRecordError {
 }
 
 /**
+ * Thrown when a one-to-one `#{name}_attributes=` nested-attributes assignment
+ * would *displace* an existing associated record — build a replacement over a
+ * record the association already holds, or over one that only exists in the DB.
+ *
+ * The sibling of {@link HasOnePersistedAssignmentError}, for the same reason:
+ * Rails' `build_#{name}` → `set_new_record` → `replace(record, false)` runs
+ * `load_target` (has_one_association.rb:59) and `remove_target!` (:69) inline
+ * before `self.target = record` (:84), and neither the SELECT nor the
+ * nullify/destroy save can be awaited from a JS property setter. Deferring them
+ * to the owner's next `save()` is what RFC 0068 exists to kill, so the
+ * synchronous setter refuses and names the awaitable writer instead. Nested
+ * assignments that displace nothing — a fresh association, an `id`-matched
+ * update, a reused unsaved build — stay on the synchronous setter.
+ */
+export class NestedAttributesDisplacementError extends ActiveRecordError {
+  readonly association: string;
+
+  constructor(association: string) {
+    const cap = association.charAt(0).toUpperCase() + association.slice(1);
+    super(
+      `Cannot replace the existing \`${association}\` with \`${association}Attributes = ` +
+        `{...}\`: Rails removes the displaced record at assignment time, which ` +
+        `requires \`await\` in JS. Use \`await owner.set${cap}Attributes({...})\`.`,
+    );
+    this.name = "NestedAttributesDisplacementError";
+    this.association = association;
+  }
+}
+
+/**
  * Thrown when a `has_one` association is assigned with the native `=` setter
  * (or a mass-assignment key) on a *persisted* owner. This is a deliberate
  * trails-only deviation with no Rails counterpart: Rails'

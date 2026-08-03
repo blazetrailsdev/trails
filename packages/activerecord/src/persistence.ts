@@ -6,7 +6,7 @@
  */
 
 import { Temporal } from "@blazetrails/activesupport/temporal";
-import { singularize } from "@blazetrails/activesupport";
+import { camelize, singularize } from "@blazetrails/activesupport";
 import { reflectOnAllAssociations } from "./reflection.js";
 import type { Base } from "./base.js";
 import {
@@ -647,8 +647,12 @@ function assignUpdateAttribute(self: any, key: string, value: unknown): Promise<
     | { associationName: string }[]
     | undefined;
   if (configs?.some((c) => `${c.associationName}Attributes` === key)) {
-    self[key] = value;
-    return;
+    // The awaitable writer, for the same reason `#{singular}Ids` goes through
+    // `idsWriter` below: Rails' `#{name}_attributes=` runs `load_target` and
+    // `remove_target!` inline (has_one_association.rb:59-69), and `#update` is
+    // async, so it can await what the property setter refuses
+    // (`NestedAttributesDisplacementError`).
+    return self[`set${camelize(key, true)}`](value) as Promise<void>;
   }
   // Rails' #update → assign_attributes dispatches `id` through `public_send("id=")`,
   // which for a composite-PK model distributes the value across the key columns.

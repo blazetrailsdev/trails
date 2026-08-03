@@ -6,6 +6,7 @@ import {
   association as collectionProxyFor,
 } from "./associations.js";
 import { ActiveRecordError, UnknownAttributeError, RecordNotFound } from "./errors.js";
+import { NestedAttributesDisplacementError } from "./associations/errors.js";
 import { singularize, camelize, underscore, isBlank } from "@blazetrails/activesupport";
 import { Table, UpdateManager } from "@blazetrails/arel";
 import {
@@ -177,11 +178,10 @@ export function acceptsNestedAttributesFor(
       this: Base,
       options?: { validate?: boolean; touch?: boolean },
     ): Promise<boolean> {
-      // Finish the displaced-record removals a nested-attributes assignment
-      // started (Rails runs them inline inside `replace`), before the parent
-      // save's has_one autosave inserts the replacement — so the nullify lands
-      // first, as it does in Rails.
-      await awaitPendingDisplacedRemovals(this);
+      // Finish the reader load a nested-attributes assignment could not await
+      // (Rails' `send(association_name)` is synchronous), so the parent is never
+      // saved against a half-assigned graph.
+      await awaitPendingNestedReaderLoads(this);
       const result = await originalSave.call(this, options);
       if (!result) return false;
 
@@ -568,7 +568,7 @@ function generateAssociationWriter(
     (modelClass as any)._nestedAttributeSetterKeys = new Set<string>();
   }
   (modelClass as any)._nestedAttributeSetterKeys.add(attrName);
-  const assign: (record: Base, name: string, value: any) => void =
+  const assign: (record: Base, name: string, value: any, awaitable?: boolean) => unknown =
     type === "collection"
       ? assignNestedAttributesForCollectionAssociation
       : assignNestedAttributesForOneToOneAssociation;
@@ -580,22 +580,15 @@ function generateAssociationWriter(
   });
 
   // The awaitable counterpart of the Rails-named `#{name}_attributes=` setter.
-  // Rails' writer removes the displaced record inline and raises at the
-  // assignment expression; a JS property setter cannot await, so this is the
-  // surface that reproduces that timing (RFC 0068's `set#{Name}` sugar, applied
-  // to nested attributes). See `detachDisplacedAtAssignment` for the contract.
-  // Collections get it too, for one uniform awaitable writer per association. A
-  // collection assignment never queues a removal of its own, but the drain is
-  // NOT a no-op there: the pending list and the sticky failure are per-*owner*,
-  // so `await pirate.setBirdsAttributes(...)` rethrows an undrained
-  // `pirate.shipAttributes = ...` failure. That is the contract, not a leak —
-  // the failure poisons the owner instance (see `detachDisplacedAtAssignment`),
-  // and an awaitable write to a poisoned owner must not silently proceed toward
-  // a `save()` that would persist the two-row state.
+  // Rails' writer loads, removes the displaced record and installs the
+  // replacement inline, raising at the assignment expression; a JS property
+  // setter cannot await, so this is the surface that reproduces that timing
+  // (RFC 0068's `set#{Name}` sugar, applied to nested attributes) — and the one
+  // the synchronous setter names when it refuses a displacing assignment.
+  // Collections get it too, for one uniform awaitable writer per association.
   Object.defineProperty(modelClass.prototype, `set${camelize(attrName, true)}`, {
     async value(this: Base, value: any): Promise<void> {
-      assign(this, associationName, value);
-      await awaitPendingDisplacedRemovals(this);
+      await assign(this, associationName, value, true);
     },
     writable: true,
     configurable: true,
@@ -687,120 +680,80 @@ interface OneToOneAssociation {
   // Rails' `send(association_name)` — `SingularAssociation#reader`, which is
   // where trails raises strict-loading violations (singular-association.ts:210).
   readonly reader?: Base | null | Promise<Base | null>;
+  // Rails' leading `load_target` (has_one_association.rb:59) and its
+  // `remove_target!` (:69), plus the predicate that says whether either would do
+  // any work — see `detachDisplacedThenSetNewRecord`.
+  loadDisplacedForBuild?(): Promise<unknown> | null;
   detachDisplacedTarget?(): Promise<void>;
-  prepareDetachDisplacedForSyncBuild?(): (() => Promise<void>) | null;
+  displacementNeedsAwait?(): boolean;
 }
 
 /**
- * Start Rails' `remove_target!` for the record a nested-attributes `build`
- * displaced, at the moment of assignment.
+ * Rails' `HasOneAssociation#replace` tail, in Rails' order: `load_target`
+ * (has_one_association.rb:59) → `remove_target!` (:69) → `self.target = record`
+ * (:84).
  *
- * Rails runs the removal inline inside `HasOneAssociation#replace`
- * (has_one_association.rb:69) — the nested-attributes writer is a synchronous
- * property setter (`pirate.shipAttributes = {...}`), so it cannot `await` the
- * nullify save. It CAN issue it: `detachDisplacedTarget` is kicked off here,
- * inline at assignment exactly as in Rails — and, crucially, *before* the build
- * swaps the replacement into `assoc.target`, so the removal binds to the
- * displaced record with no parked state. Only its *completion* is deferred — to
- * the nested-attributes `save` wrapper, which drains the parked list before the
- * parent (and its autosaved new target) is persisted. That keeps
- * Rails' write ordering (displaced row nullified before the replacement is
- * inserted) and, like Rails, removes the displaced record even if the owner is
- * never saved.
- *
- * The rejection is captured rather than left floating: a never-drained removal
- * must not surface as an unhandled rejection, and a drained one must rethrow.
- *
- * ## The contract for a removal that fails
- *
- * Rails raises `RecordNotSaved` at the assignment expression itself, so the
- * failure is observable whether or not the owner is ever saved. A synchronous
- * property setter cannot do that, so trails splits the guarantee in two, and a
- * failure is **retained on the owner forever** rather than consumed by whoever
- * happens to drain first:
- *
- * - `await owner.set#{Name}Attributes({...})` — the awaitable nested-attributes
- *   writer (the analogue of RFC 0068's `set#{Name}`) assigns and then awaits the
- *   removal, so it raises at the assignment point exactly as Rails does. This is
- *   the sanctioned surface when the failure matters.
- * - `owner.#{name}Attributes = {...}` — the Rails-named synchronous setter still
- *   works, and its failure is *sticky*: {@link recordDisplacedRemovalFailure}
- *   parks the first error on the owner, and **every** subsequent drain
- *   (`save()`, an awaitable writer, another assignment's drain) rethrows it. An
- *   owner that is never saved therefore still carries the failure; nothing
- *   silently discards it.
- *
- * The sticky failure is deliberately terminal for that instance: the in-memory
- * replacement landed while the displaced row did not detach, so persisting the
- * owner would produce exactly the two-FK-matching-rows state RFC 0068 exists to
- * eliminate. Recovery is a fresh load of the owner, not a retry on the poisoned
- * instance.
+ * The record was already constructed by `build_record`
+ * (singular_association.rb:29-31), which is why the caller passes it in: Rails
+ * reaches `load_target` only from `set_new_record`, i.e. *after* the
+ * construction, so a build that raises queries nothing. Running the three steps
+ * forward means a raising `remove_target!` leaves the OLD record cached,
+ * exactly as Rails' `self.target = record` after the transaction block does.
  * @internal
  */
-function detachDisplacedAtAssignment(assoc: OneToOneAssociation): Promise<void> | null {
-  if (assoc.isLoaded?.() === false) return null;
-  if (!assoc.target) return null;
-  if (typeof assoc.detachDisplacedTarget !== "function") return null;
-  // Started BEFORE the build: `removeTargetBang` reads `this.target` on entry,
-  // before its first `await`, so the removal binds to the displaced record even
-  // though the synchronous build swaps in the replacement immediately after.
-  return assoc.detachDisplacedTarget();
+async function detachDisplacedThenSetNewRecord(
+  assoc: OneToOneAssociation,
+  built: Base | null,
+): Promise<void> {
+  await assoc.loadDisplacedForBuild?.();
+  await assoc.detachDisplacedTarget?.();
+  if (built) assoc.setNewRecord(built);
 }
 
 /**
- * Park an in-flight removal on the owner: capture its rejection so a
- * never-drained removal cannot surface as an unhandled rejection, and queue it
- * for the drain that rethrows. See {@link detachDisplacedAtAssignment} for the
- * full contract.
+ * Park the async re-entry of {@link assignNestedAttributesForOneToOneAssociation}
+ * on the owner: capture its rejection so a never-drained load cannot surface as
+ * an unhandled rejection, and queue it for the drain that rethrows.
+ *
+ * Rails reads the existing record with `send(association_name)`
+ * (nested_attributes.rb:434), a plain synchronous call; ours is a promise for an
+ * unloaded association, which the Rails-named setter cannot await. Unlike the
+ * displacement removal — which now refuses rather than defers
+ * ({@link NestedAttributesDisplacementError}) — this deferral is a *read*, so no
+ * DB state is in flight to race an interim insert.
  * @internal
  */
-function parkDisplacedRemoval(record: Base, removal: Promise<void>): void {
-  const settled = removal.then(
+function parkNestedReaderLoad(record: Base, load: Promise<void>): void {
+  const settled = load.then(
     () => null,
-    (error: unknown) => error ?? new Error("displaced record removal failed"),
+    (error: unknown) => error ?? new Error("nested attributes reader load failed"),
   );
-  const host = record as unknown as DisplacedRemovalHost;
-  (host._pendingDisplacedRemovals ??= []).push(settled);
+  const host = record as unknown as NestedReaderLoadHost;
+  (host._pendingNestedReaderLoads ??= []).push(settled);
 }
 
 /**
- * The owner-side state {@link detachDisplacedAtAssignment} parks: the in-flight
- * removals plus the sticky first failure among them.
+ * The owner-side state {@link parkNestedReaderLoad} parks.
  * @internal
  */
-interface DisplacedRemovalHost {
-  _pendingDisplacedRemovals?: Promise<unknown>[];
-  _displacedRemovalFailure?: unknown;
+interface NestedReaderLoadHost {
+  _pendingNestedReaderLoads?: Promise<unknown>[];
 }
 
 /**
- * Park a displacement-removal failure on the owner permanently. Draining
- * consumes the *promise*, never the error — see the contract on
- * {@link detachDisplacedAtAssignment}.
+ * Await the re-entries parked by {@link parkNestedReaderLoad}, rethrowing the
+ * first failure, so the owner is never saved against a half-assigned graph.
  * @internal
  */
-function recordDisplacedRemovalFailure(host: DisplacedRemovalHost, error: unknown): void {
-  host._displacedRemovalFailure ??= error;
-}
-
-/**
- * Await the removals started by `detachDisplacedAtAssignment`, rethrowing the
- * first failure — the deferred half of Rails' inline `remove_target!`. A failure
- * already parked by an earlier drain is rethrown before anything is awaited, so
- * it cannot be observed once and then forgotten.
- * @internal
- */
-async function awaitPendingDisplacedRemovals(record: Base): Promise<void> {
-  const host = record as unknown as DisplacedRemovalHost;
-  const pending = host._pendingDisplacedRemovals;
-  if (pending?.length) {
-    host._pendingDisplacedRemovals = [];
-    for (const settled of pending) {
-      const error = await settled;
-      if (error) recordDisplacedRemovalFailure(host, error);
-    }
+async function awaitPendingNestedReaderLoads(record: Base): Promise<void> {
+  const host = record as unknown as NestedReaderLoadHost;
+  const pending = host._pendingNestedReaderLoads;
+  if (!pending?.length) return;
+  host._pendingNestedReaderLoads = [];
+  for (const settled of pending) {
+    const error = await settled;
+    if (error) throw error;
   }
-  if (host._displacedRemovalFailure !== undefined) throw host._displacedRemovalFailure;
 }
 
 /** @internal */
@@ -847,7 +800,12 @@ export function assignNestedAttributesForOneToOneAssociation(
   record: Base,
   associationName: string,
   attributes: Record<string, unknown>,
-): void {
+  // Whether the caller can `await` the result: true for the awaitable
+  // `set#{Name}Attributes` writer, false for the Rails-named
+  // `#{name}_attributes=` property setter, which refuses the assignments that
+  // need I/O rather than deferring them (RFC 0068 Design §6).
+  awaitable = false,
+): Promise<void> | void {
   if (typeof attributes !== "object" || attributes === null || Array.isArray(attributes)) {
     throw new Error(
       `Hash expected for \`${associationName}\` attributes, got ${nestedTypeName(attributes)}`,
@@ -868,12 +826,16 @@ export function assignNestedAttributesForOneToOneAssociation(
   if ((hasId || updateOnly) && assoc.isLoaded?.() === false && "reader" in assoc) {
     const read = assoc.reader;
     if (read instanceof Promise) {
-      parkDisplacedRemoval(
-        record,
-        read.then(() =>
-          assignNestedAttributesForOneToOneAssociation(record, associationName, attributes),
+      const reentry = read.then(() =>
+        assignNestedAttributesForOneToOneAssociation(
+          record,
+          associationName,
+          attributes,
+          awaitable,
         ),
       );
+      if (awaitable) return reentry;
+      parkNestedReaderLoad(record, reentry);
       return;
     }
   }
@@ -928,35 +890,26 @@ export function assignNestedAttributesForOneToOneAssociation(
           );
         }
       } else {
-        // Rails' `build_#{name}` → `set_new_record` → `replace(record, false)`
-        // removes the displaced target inline (has_one_association.rb:69).
-        // Rails' `replace` opens with `load_target`, so an association that was
-        // never loaded still discovers the row in the DB and removes it. That
-        // SELECT is issued just AFTER the build, where Rails reaches
-        // `load_target` — from `set_new_record`, i.e. after `build_record` — so
-        // a build that raises queries nothing. Only its completion is deferred
-        // to the same drain; see
-        // `HasOneAssociation#prepareDetachDisplacedForSyncBuild`. The decision
-        // to issue it has to be taken here, before the build, because `build`
-        // marks the association loaded and so falsifies its `find_target?` gate.
-        const startUnloadedRemoval = assoc.prepareDetachDisplacedForSyncBuild?.() ?? null;
         // Rails' `SingularAssociation#build` is `build_record` then
         // `set_new_record` (singular_association.rb:29-31), and only the second
-        // reaches `remove_target!` (has_one_association.rb:59-69). `build`
-        // fuses the two, which would let a raising `build_record` (an invalid
-        // STI `type`, `SubclassNotFound`) detach a record Rails never touches,
-        // so run the two halves separately and keep the removal between them.
+        // reaches `load_target` / `remove_target!`
+        // (has_one_association.rb:59-69). Run the two halves separately and keep
+        // the displacement between them, so a raising `build_record` (an invalid
+        // STI `type`, `SubclassNotFound`) neither queries nor detaches a record
+        // Rails never touches.
         const built = assoc.buildRecord(assignable);
-        // `remove_target!` on the still-cached displaced record.
-        // `removeTargetBang` binds `this.target` on entry, before its first
-        // `await`, so `setNewRecord` below may swap in the replacement while
-        // the removal is in flight. See `detachDisplacedAtAssignment`.
-        const loadedRemoval = detachDisplacedAtAssignment(assoc);
-        // Rails' `self.target = record` (:84), in memory — the DB half is the
-        // two removals parked below.
+        if (assoc.displacementNeedsAwait?.() === true) {
+          // DB I/O Rails runs inline before `self.target = record` (:84) — a
+          // SELECT for a never-loaded association, then `remove_target!`'s
+          // nullify/destroy save. A property setter can neither await it nor
+          // defer it without reopening the order-undefined two-row window RFC
+          // 0068 exists to close, so it refuses and names the awaitable writer.
+          if (!awaitable) throw new NestedAttributesDisplacementError(associationName);
+          return detachDisplacedThenSetNewRecord(assoc, built);
+        }
+        // Nothing to displace: Rails' `self.target = record` (:84) is all that
+        // remains of `replace`, and it is in-memory work.
         if (built) assoc.setNewRecord(built);
-        if (startUnloadedRemoval) parkDisplacedRemoval(record, startUnloadedRemoval());
-        if (loadedRemoval) parkDisplacedRemoval(record, loadedRemoval);
       }
     }
   }

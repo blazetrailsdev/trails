@@ -7,25 +7,22 @@
  * (vendor/rails/activerecord/lib/active_record/associations/has_one_association.rb:95-115),
  * so `pirate.ship_attributes = {...}` surfaces the failure at the assignment
  * expression whether or not the owner is ever saved. A synchronous JS property
- * setter cannot raise on an async write, so trails splits that guarantee: the
- * awaitable `set#{Name}Attributes` writer raises at the assignment point, and the
- * synchronous setter's failure is parked on the owner permanently — every later
- * drain rethrows it, so an owner that is never saved never loses it.
+ * setter cannot raise on an async write — so it does not start one: the
+ * awaitable `set#{Name}Attributes` writer runs the load, the removal and the
+ * target install in Rails' order and raises at the assignment point, while the
+ * Rails-named setter refuses a displacing assignment up front
+ * (`NestedAttributesDisplacementError`) instead of parking a write that would
+ * fail later.
  *
  * No Rails test covers a *failing* displacement removal, hence a trails-only
  * guard rather than a mirrored test.
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { registerModel, type Base } from "./index.js";
+import { registerModel, NestedAttributesDisplacementError, type Base } from "./index.js";
 import { fixtures } from "./test-fixtures.js";
 import { Pirate } from "./test-helpers/models/pirate.js";
 import { Ship } from "./test-helpers/models/ship.js";
 import { Bird } from "./test-helpers/models/bird.js";
-
-interface RemovalHost {
-  _pendingDisplacedRemovals?: Promise<unknown>[];
-  _displacedRemovalFailure?: unknown;
-}
 
 /**
  * A pirate with a loaded, persisted ship whose displacement removal is rigged
@@ -43,22 +40,6 @@ async function pirateWithFailingRemoval(): Promise<Base> {
   const assoc = pirate.association("ship") as unknown as {
     detachDisplacedTarget: () => Promise<void>;
   };
-  assoc.detachDisplacedTarget = () => Promise.reject(new Error("removal exploded"));
-  return pirate;
-}
-
-async function pirateWithFailingUnloadedRemoval(): Promise<Base> {
-  const pirate = (await Pirate.create({ catchphrase: "Aye" })) as Base;
-  await Ship.create({
-    name: "Nights Dirty Lightning",
-    pirate_id: (pirate as unknown as { id: number }).id,
-  });
-
-  const assoc = pirate.association("ship") as unknown as {
-    detachDisplacedTarget: () => Promise<void>;
-    isLoaded(): boolean;
-  };
-  expect(assoc.isLoaded()).toBe(false);
   assoc.detachDisplacedTarget = () => Promise.reject(new Error("removal exploded"));
   return pirate;
 }
@@ -100,61 +81,52 @@ describe("nested-attributes displacement removal failure", () => {
     ).rejects.toThrow("removal exploded");
   });
 
-  it("keeps the failure on the owner once it has been raised", async () => {
+  it("leaves the displaced record cached when the removal fails", async () => {
     const pirate = await pirateWithFailingRemoval();
+    const displaced = pirate.association("ship").target;
 
-    (pirate as unknown as { shipAttributes: unknown }).shipAttributes = {
-      name: "Davy Jones Gold Dagger",
-    };
+    await expect(
+      (pirate as unknown as { setShipAttributes: (a: unknown) => Promise<void> }).setShipAttributes(
+        { name: "Davy Jones Gold Dagger" },
+      ),
+    ).rejects.toThrow("removal exploded");
 
-    // Every drain rethrows: the first observation does not consume the failure,
-    // so an owner saved (or re-assigned) later cannot silently succeed.
-    await expect(pirate.save()).rejects.toThrow("removal exploded");
-    await expect(pirate.save()).rejects.toThrow("removal exploded");
-    expect((pirate as unknown as RemovalHost)._displacedRemovalFailure).toBeInstanceOf(Error);
+    // Rails reaches `self.target = record` (:84) only after `remove_target!`
+    // (:69), so a raising removal leaves the OLD record cached — the ordering
+    // the retired target swap could not express.
+    expect(pirate.association("ship").target).toBe(displaced);
   });
 
-  it("surfaces the failure through an unrelated association's awaitable writer", async () => {
+  it("parks no removal for a synchronous displacing assignment to fail later", async () => {
     const pirate = await pirateWithFailingRemoval();
 
-    (pirate as unknown as { shipAttributes: unknown }).shipAttributes = {
-      name: "Davy Jones Gold Dagger",
-    };
+    // The setter refuses instead of starting a write it cannot await, so there
+    // is no deferred failure to surface at `save()` — and nothing that could
+    // become an unhandled rejection if the owner is never saved.
+    expect(() => {
+      (pirate as unknown as { shipAttributes: unknown }).shipAttributes = {
+        name: "Davy Jones Gold Dagger",
+      };
+    }).toThrow(NestedAttributesDisplacementError);
 
-    // The pending list and the sticky failure are per-owner, so the collection
-    // writer rethrows the has_one's failure even though the crew assignment
-    // itself succeeded: the owner instance is poisoned, and an awaitable write
-    // to it must not proceed toward a `save()` that would persist two rows.
+    await expect(pirate.save()).resolves.toBe(true);
+  });
+
+  it("leaves an unrelated association's awaitable writer unaffected", async () => {
+    const pirate = await pirateWithFailingRemoval();
+
+    expect(() => {
+      (pirate as unknown as { shipAttributes: unknown }).shipAttributes = {
+        name: "Davy Jones Gold Dagger",
+      };
+    }).toThrow(NestedAttributesDisplacementError);
+
+    // With no parked removal, there is no owner-wide sticky failure left for an
+    // unrelated writer to inherit: the refusal was terminal at its own call site.
     await expect(
       (
         pirate as unknown as { setBirdsAttributes: (a: unknown) => Promise<void> }
       ).setBirdsAttributes([{ name: "Posideons Killer" }]),
-    ).rejects.toThrow("removal exploded");
-  });
-
-  it("does not leave a floating rejection when the removal is never drained", async () => {
-    const pirate = await pirateWithFailingRemoval();
-
-    (pirate as unknown as { shipAttributes: unknown }).shipAttributes = {
-      name: "Davy Jones Gold Dagger",
-    };
-
-    // The captured promise resolves *to* the error rather than rejecting, so a
-    // never-drained removal cannot surface as an unhandled rejection.
-    const pending = (pirate as unknown as RemovalHost)._pendingDisplacedRemovals ?? [];
-    expect(pending).toHaveLength(1);
-    await expect(pending[0]).resolves.toBeInstanceOf(Error);
-  });
-
-  it("does not leave a floating rejection when an unloaded removal is never drained", async () => {
-    const pirate = await pirateWithFailingUnloadedRemoval();
-
-    (pirate as unknown as { shipAttributes: unknown }).shipAttributes = {
-      name: "Davy Jones Gold Dagger",
-    };
-
-    const pending = (pirate as unknown as RemovalHost)._pendingDisplacedRemovals ?? [];
-    expect(pending).toHaveLength(1);
-    await expect(pending[0]).resolves.toBeInstanceOf(Error);
+    ).resolves.toBeUndefined();
   });
 });

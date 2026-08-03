@@ -195,14 +195,15 @@ export class HasOneThroughAssociation extends HasOneAssociation {
 
   /**
    * No load and no removal, for the same reason as `loadDisplacedForBuild`
-   * above: a through `replace` has no `load_target`, so the nested-attributes
-   * writer must not issue a target SELECT (nor detach a displaced *end* record)
-   * for a has_one_through.
+   * above: a through `replace` has no `load_target`, so a nested-attributes
+   * build issues no target SELECT and detaches no displaced *end* record for a
+   * has_one_through — there is nothing for the synchronous writer to await, and
+   * so nothing for it to refuse.
    *
    * @internal
    */
-  protected override prepareDetachDisplacedForSyncBuild(): (() => Promise<void>) | null {
-    return null;
+  protected override displacementNeedsAwait(): boolean {
+    return false;
   }
 
   /**
