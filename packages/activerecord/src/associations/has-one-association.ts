@@ -300,8 +300,8 @@ export class HasOneAssociation extends SingularAssociation {
    * (has_one_association.rb:59-62): the guard is `return target unless
    * load_target || record`, and Ruby always evaluates the left operand, so
    * EVERY build queries for an existing target before deciding whether to
-   * displace it — a never-loaded association included. `needsTargetLoadForBuild`
-   * is Rails' `find_target?`, so the query runs exactly when Rails' would (a
+   * displace it — a never-loaded association included. `findTargetNeeded` is
+   * Rails' `find_target?`, so the query runs exactly when Rails' would (a
    * persisted / FK-present owner whose target isn't loaded), and returning it
    * here is what makes `association(name).build(...)` awaitable on that path.
    *
@@ -309,7 +309,7 @@ export class HasOneAssociation extends SingularAssociation {
    */
   protected override loadDisplacedForBuild(): Promise<unknown> | null {
     if (this.buildDisplacementOwnedByCaller) return null;
-    if (!this.needsTargetLoadForBuild()) return null;
+    if (!this.findTargetNeeded()) return null;
     return this.loadTargetForBuild();
   }
 
@@ -353,31 +353,9 @@ export class HasOneAssociation extends SingularAssociation {
   }
 
   /**
-   * Whether a `build#{name}` accessor call must first run Rails'
-   * `load_target` — mirrors `HasOneAssociation#set_new_record` →
-   * `replace(record, false)`, whose leading `load_target`
-   * (has_one_association.rb:59) materializes the current target before the
-   * freshly-built record displaces it. Both drivers of that load consult this
-   * gate — `SingularAssociation#build` via `loadDisplacedForBuild`, and the
-   * generated `build#{name}` accessor (builder/has-one.ts) — so the SELECT
-   * runs exactly when Rails' `find_target?` would: a persisted / FK-present
-   * owner whose target isn't loaded. `findTargetNeeded()` already returns
-   * false when the target is loaded (association.ts, `if (this.loaded) return
-   * false`), so it is the whole gate.
-   *
-   * `protected` because it is association-internal bookkeeping, not API
-   * surface. The generated accessor lives outside the class hierarchy and
-   * reaches it through its duck-typed handle.
-   *
-   * @internal
-   */
-  protected needsTargetLoadForBuild(): boolean {
-    return this.findTargetNeeded();
-  }
-
-  /**
-   * The load run before the new record is constructed, gated by
-   * `needsTargetLoadForBuild`. A direct-FK has_one loads its own target —
+   * The load run before the new record is constructed, gated by Rails'
+   * `find_target?` (`findTargetNeeded`). A direct-FK has_one loads its own
+   * target —
    * Rails' `set_new_record` → `replace(record, false)` runs `load_target`
    * (has_one_association.rb:59). A has_one_through overrides this: Rails'
    * `HasOneThroughAssociation#replace` has NO `load_target`; its
@@ -387,7 +365,7 @@ export class HasOneAssociation extends SingularAssociation {
    *
    * `protected`: association-internal bookkeeping, not API surface. The
    * generated `build#{name}` accessor reaches it through its duck-typed
-   * handle, as it does `needsTargetLoadForBuild`.
+   * handle, as it does `findTargetNeeded`.
    *
    * @internal
    */
@@ -460,7 +438,7 @@ export class HasOneAssociation extends SingularAssociation {
    * The record `create#{name}` displaces: Rails' `replace` opens with
    * `load_target` (has_one_association.rb:59), so `remove_target!` detaches a row
    * that only ever existed in the DB. Routed through `loadTargetForBuild` — gated
-   * by `needsTargetLoadForBuild` (Rails' `find_target?`) so the SELECT runs only
+   * by `findTargetNeeded` (Rails' `find_target?`) so the SELECT runs only
    * when Rails' would, and overridden by has_one_through to load the *through*
    * proxy, since Rails' through `replace` issues no target load.
    *
@@ -480,7 +458,7 @@ export class HasOneAssociation extends SingularAssociation {
    * @internal
    */
   private async loadDisplacedTargetForCreate(): Promise<unknown> {
-    if (!this.needsTargetLoadForBuild()) return null;
+    if (!this.findTargetNeeded()) return null;
     try {
       await this.loadTargetForBuild();
       return null;
@@ -545,7 +523,7 @@ export class HasOneAssociation extends SingularAssociation {
    * The synchronous writer (`pirate.shipAttributes = {...}`) cannot await the
    * SELECT, so it parks the promise on the owner and drains it in the `save`
    * wrapper exactly like `detachDisplacedTarget`'s. Null when Rails would issue
-   * no query at all (`find_target?`) or when the target is already loaded,
+   * no query at all (`findTargetNeeded`) or when the target is already loaded,
    * which keeps the writer synchronous on those paths.
    *
    * Returns a *thunk* rather than the promise: Rails reaches `load_target` from
@@ -576,7 +554,7 @@ export class HasOneAssociation extends SingularAssociation {
    */
   protected prepareDetachDisplacedForSyncBuild(): (() => Promise<void>) | null {
     if (this.loaded) return null;
-    if (!this.needsTargetLoadForBuild()) return null;
+    if (!this.findTargetNeeded()) return null;
     return () => this.findThenDetachDisplaced();
   }
 

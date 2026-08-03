@@ -79,7 +79,7 @@ export class HasOneThroughAssociation extends HasOneAssociation {
    * `HasOneAssociation` loads its own target for `build#{name}`, which for a
    * through would issue a `clubs` SELECT Rails never runs while skipping the
    * `memberships` SELECT it does. Override so the `build#{name}` accessor's
-   * pre-build load (gated by the inherited `needsTargetLoadForBuild`) reads
+   * pre-build load (gated by Rails' `find_target?`, `findTargetNeeded`) reads
    * the through proxy, then `constructThroughRecordInMemory` reconciles
    * against the now-loaded join row (update-existing / build-when-absent),
    * exactly as Rails' `create_through_record` does.
