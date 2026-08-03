@@ -32,78 +32,9 @@ describe("I18nExceptionsTest", () => {
     config().enforceAvailableLocales = false;
   });
 
-  /**
-   * Ports of the private helpers at i18n/test/i18n/exceptions_test.rb:80-108.
-   * Ruby's `block_given?` arm is the optional `block` parameter; with no block
-   * the rescued exception is re-raised.
-   *
-   * `forceInvalidLocale` and `forceMissingTranslationData` do not in fact
-   * raise, upstream either: `I18n.translate` resolves a nil `locale:` to
-   * `config.locale` (:en, since `Config#default_locale` is
-   * `@@default_locale ||= :en`), and a missing translation is thrown to the
-   * default `ExceptionHandler`, which returns the message rather than raising
-   * it. Their blocks therefore never run — including the two spelling the
-   * message lowercase, which `MissingTranslation#message` never produces. The
-   * message and accessor shapes those cases meant to pin are asserted directly
-   * in exceptions.trails.test.ts.
-   */
-  function forceInvalidLocale(block?: (exception: ArgumentError) => void): void {
-    try {
-      translate("foo", { locale: null });
-    } catch (e) {
-      if (!(e instanceof ArgumentError)) throw e;
-      if (block) block(e);
-      else throw e;
-    }
-  }
-
-  function forceMissingTranslationData(block?: (exception: ArgumentError) => void): void {
-    storeTranslations("de", { bar: null });
-    try {
-      translate("foo", { scope: "bar", locale: "de" });
-    } catch (e) {
-      if (!(e instanceof ArgumentError)) throw e;
-      if (block) block(e);
-      else throw e;
-    }
-  }
-
-  function forceInvalidPluralizationData(block?: (exception: ArgumentError) => void): void {
-    storeTranslations("de", { foo: { other: "bar" } });
-    try {
-      translate("foo", { count: 1, locale: "de" });
-    } catch (e) {
-      if (!(e instanceof ArgumentError)) throw e;
-      if (block) block(e);
-      else throw e;
-    }
-  }
-
-  function forceMissingInterpolationArgument(block?: (exception: ArgumentError) => void): void {
-    storeTranslations("de", { foo: "%{bar}" });
-    try {
-      translate("foo", { baz: "baz", locale: "de" });
-    } catch (e) {
-      if (!(e instanceof ArgumentError)) throw e;
-      if (block) block(e);
-      else throw e;
-    }
-  }
-
-  function forceReservedInterpolationKey(block?: (exception: ArgumentError) => void): void {
-    storeTranslations("de", { foo: "%{scope}" });
-    try {
-      translate("foo", { baz: "baz", locale: "de" });
-    } catch (e) {
-      if (!(e instanceof ArgumentError)) throw e;
-      if (block) block(e);
-      else throw e;
-    }
-  }
-
   it("invalid locale stores locale", () => {
     forceInvalidLocale((exception) => {
-      expect((exception as InvalidLocale).locale).toBeNull();
+      expect(exception.locale).toBeNull();
     });
   });
 
@@ -120,9 +51,9 @@ describe("I18nExceptionsTest", () => {
 
   it("MissingTranslationData exception stores locale, key and options", () => {
     forceMissingTranslationData((exception) => {
-      expect((exception as MissingTranslationData).locale).toBe("de");
-      expect((exception as MissingTranslationData).key).toBe("foo");
-      expect((exception as MissingTranslationData).options).toEqual({ scope: "bar" });
+      expect(exception.locale).toBe("de");
+      expect(exception.key).toBe("foo");
+      expect(exception.options).toEqual({ scope: "bar" });
     });
   });
 
@@ -134,9 +65,9 @@ describe("I18nExceptionsTest", () => {
 
   it("InvalidPluralizationData stores entry, count and key", () => {
     forceInvalidPluralizationData((exception) => {
-      expect((exception as InvalidPluralizationData).entry).toEqual({ other: "bar" });
-      expect((exception as InvalidPluralizationData).count).toBe(1);
-      expect((exception as InvalidPluralizationData).key).toBe("one");
+      expect(exception.entry).toEqual({ other: "bar" });
+      expect(exception.count).toBe(1);
+      expect(exception.key).toBe("one");
     });
   });
 
@@ -151,8 +82,8 @@ describe("I18nExceptionsTest", () => {
   it("MissingInterpolationArgument stores key and string", () => {
     expect(() => forceMissingInterpolationArgument()).toThrow(MissingInterpolationArgument);
     forceMissingInterpolationArgument((exception) => {
-      expect((exception as MissingInterpolationArgument).key).toBe("bar");
-      expect((exception as MissingInterpolationArgument).string).toBe("%{bar}");
+      expect(exception.key).toBe("bar");
+      expect(exception.string).toBe("%{bar}");
     });
   });
 
@@ -166,8 +97,8 @@ describe("I18nExceptionsTest", () => {
 
   it("ReservedInterpolationKey stores key and string", () => {
     forceReservedInterpolationKey((exception) => {
-      expect((exception as ReservedInterpolationKey).key).toBe("scope");
-      expect((exception as ReservedInterpolationKey).string).toBe("%{scope}");
+      expect(exception.key).toBe("scope");
+      expect(exception.string).toBe("%{scope}");
     });
   });
 
@@ -180,4 +111,65 @@ describe("I18nExceptionsTest", () => {
   it("MissingTranslationData#new can be initialized with just two arguments", () => {
     expect(new MissingTranslationData("en", "key")).toBeTruthy();
   });
+
+  /** Mirrors: the private helpers at i18n/test/i18n/exceptions_test.rb:80-108. */
+  function forceInvalidLocale(block?: (exception: InvalidLocale) => void): void {
+    try {
+      translate("foo", { locale: null });
+    } catch (e) {
+      if (!(e instanceof ArgumentError)) throw e;
+      if (block) block(e as InvalidLocale);
+      else throw e;
+    }
+  }
+
+  function forceMissingTranslationData(block?: (exception: MissingTranslationData) => void): void {
+    storeTranslations("de", { bar: null });
+    try {
+      translate("foo", { scope: "bar", locale: "de" });
+    } catch (e) {
+      if (!(e instanceof ArgumentError)) throw e;
+      if (block) block(e as MissingTranslationData);
+      else throw e;
+    }
+  }
+
+  function forceInvalidPluralizationData(
+    block?: (exception: InvalidPluralizationData) => void,
+  ): void {
+    storeTranslations("de", { foo: { other: "bar" } });
+    try {
+      translate("foo", { count: 1, locale: "de" });
+    } catch (e) {
+      if (!(e instanceof ArgumentError)) throw e;
+      if (block) block(e as InvalidPluralizationData);
+      else throw e;
+    }
+  }
+
+  function forceMissingInterpolationArgument(
+    block?: (exception: MissingInterpolationArgument) => void,
+  ): void {
+    storeTranslations("de", { foo: "%{bar}" });
+    try {
+      translate("foo", { baz: "baz", locale: "de" });
+    } catch (e) {
+      if (!(e instanceof ArgumentError)) throw e;
+      if (block) block(e as MissingInterpolationArgument);
+      else throw e;
+    }
+  }
+
+  function forceReservedInterpolationKey(
+    block?: (exception: ReservedInterpolationKey) => void,
+  ): void {
+    storeTranslations("de", { foo: "%{scope}" });
+    try {
+      translate("foo", { baz: "baz", locale: "de" });
+    } catch (e) {
+      if (!(e instanceof ArgumentError)) throw e;
+      if (block) block(e as ReservedInterpolationKey);
+      else throw e;
+    }
+  }
 });
