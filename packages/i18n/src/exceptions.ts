@@ -25,7 +25,6 @@ export function inspect(value: unknown): string {
   return String(value);
 }
 
-/** Ruby's `String#inspect` escapes (MRI `string.c`, `rb_str_inspect`). */
 const RUBY_ESCAPES: Record<string, string> = {
   "\n": "\\n",
   "\r": "\\r",
@@ -41,7 +40,8 @@ const RUBY_ESCAPES: Record<string, string> = {
  * Ruby `String#inspect` (MRI `string.c`, `rb_str_inspect`). `JSON.stringify`
  * is not a stand-in: Ruby renders ESC as `\e`, escapes `#` before `{`, `$` and
  * `@` so the result re-parses as the same string, prints printable non-ASCII
- * literally, and renders bytes that are not valid UTF-8 as `\xNN`.
+ * literally, and renders bytes that are not valid UTF-8 — here, a lone
+ * surrogate — as the `\xNN` bytes of their encoding.
  */
 function inspectString(value: string): string {
   const chars = Array.from(value);
@@ -58,8 +58,6 @@ function inspectString(value: string): string {
     } else if (code < 0x20 || code === 0x7f || (code >= 0x80 && code <= 0x9f)) {
       result += `\\u${code.toString(16).toUpperCase().padStart(4, "0")}`;
     } else if (code >= 0xd800 && code <= 0xdfff) {
-      // A lone surrogate is not valid UTF-8; Ruby inspects such a string byte
-      // by byte, so emit the three bytes its UTF-8 encoding would have had.
       for (const byte of [0xe0 | (code >> 12), 0x80 | ((code >> 6) & 0x3f), 0x80 | (code & 0x3f)]) {
         result += `\\x${byte.toString(16).toUpperCase()}`;
       }

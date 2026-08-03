@@ -124,7 +124,6 @@ describe("exceptions", () => {
   });
 
   it("inspects a String the way Ruby's String#inspect does", () => {
-    // Expectations taken from MRI: `ruby -e 'puts s.inspect'`.
     expect(inspect("foo")).toBe('"foo"');
     expect(inspect('he said "hi"')).toBe('"he said \\"hi\\""');
     expect(inspect("a\\b")).toBe('"a\\\\b"');
