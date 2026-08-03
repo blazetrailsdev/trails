@@ -27,7 +27,6 @@ import {
   UnknownAttributeError,
 } from "./errors.js";
 import {
-  hasMultiparameterKeys,
   extractMultiparameterCallstack,
   executeMultiparameterAssignment,
 } from "./multiparameter-attribute-assignment.js";
@@ -1049,12 +1048,58 @@ export function _reapplyNestedAttrSetters(
 }
 
 /**
- * Mirrors: ActiveRecord::AttributeAssignment#assign_attributes. Rails'
- * version lets setter exceptions propagate raw; ours additionally wraps
- * them in AttributeAssignmentError with the offending key/value for
- * debugging. (That wrapping is stricter than Rails but longstanding —
- * preserved by this extraction; revisiting the Rails-fidelity gap can
- * happen in a follow-up.)
+ * Mirrors Rails' `_assign_attribute` (ActiveModel
+ * attribute_assignment.rb:67-75): dispatch through the public setter when one
+ * exists (store accessors write to the store hash, not a standalone attribute
+ * slot). Falls back to writeAttribute for plain columns and unknown keys.
+ *
+ * Rails lets setter exceptions propagate raw; ours additionally wraps them in
+ * AttributeAssignmentError with the offending key/value for debugging. (That
+ * wrapping is stricter than Rails but longstanding.)
+ */
+function _assignAttribute(self: AttributeIO, key: string, value: unknown): void {
+  try {
+    if (
+      assignAssociationIfMatch(
+        self as { constructor?: unknown; association?: (name: string) => unknown },
+        key,
+        value,
+      )
+    ) {
+      // Routed to the association proxy writer (constructor-form collection /
+      // singular) — Rails reaches these through `public_send("#{k}=")` too.
+      return;
+    }
+    const setter = findPrototypeSetter(self, key);
+    if (setter) {
+      setter.call(self, value);
+    } else {
+      self.writeAttribute(key, value);
+    }
+  } catch (e) {
+    let repr: string;
+    try {
+      repr = JSON.stringify(value);
+    } catch {
+      repr = String(value);
+    }
+    throw new AttributeAssignmentError(
+      `error on assignment ${repr} to ${key} (${e instanceof Error ? e.message : String(e)})`,
+      e instanceof Error ? e : undefined,
+      key,
+    );
+  }
+}
+
+/**
+ * Mirrors: ActiveRecord::AttributeAssignment#_assign_attributes
+ * (attribute_assignment.rb:6-22), reached through
+ * ActiveModel's `assign_attributes` (:32-35).
+ *
+ * Rails buckets multiparameter keys AND Hash values out of the main loop and
+ * assigns the nested hashes only after the scalar pass (:21), so a nested
+ * writer's `reject_if` / the built record's callbacks observe an owner whose
+ * own attributes are already set. Nested runs before multiparameter (:21-22).
  */
 export function assignAttributes(this: AttributeIO, attrs: Record<string, unknown>): void {
   assertHashAttributes(attrs);
@@ -1064,77 +1109,49 @@ export function assignAttributes(this: AttributeIO, attrs: Record<string, unknow
   if (Object.keys(attrs).length === 0) return;
   attrs = sanitizeForMassAssignment(attrs);
 
-  if (hasMultiparameterKeys(attrs)) {
-    const { multiparams, regular } = extractMultiparameterCallstack(attrs);
-    // Assign regular attributes first (with existing error wrapping)
-    for (const [key, value] of Object.entries(regular)) {
-      try {
-        if (
-          assignAssociationIfMatch(
-            this as { constructor?: unknown; association?: (name: string) => unknown },
-            key,
-            value,
-          )
-        )
-          continue;
-        const setter = findPrototypeSetter(this, key);
-        if (setter) {
-          setter.call(this, value);
-        } else {
-          this.writeAttribute(key, value);
-        }
-      } catch (e) {
-        let repr: string;
-        try {
-          repr = JSON.stringify(value);
-        } catch {
-          repr = String(value);
-        }
-        throw new AttributeAssignmentError(
-          `error on assignment ${repr} to ${key} (${e instanceof Error ? e.message : String(e)})`,
-          e instanceof Error ? e : undefined,
-          key,
-        );
-      }
-    }
-    // Then assign multiparameter attributes (throws MultiparameterAssignmentErrors)
-    executeMultiparameterAssignment(this as any, multiparams);
-    return;
-  }
+  let multiParameterAttributes: Record<string, unknown> | null = null;
+  let nestedParameterAttributes: Record<string, unknown> | null = null;
 
   for (const [key, value] of Object.entries(attrs)) {
-    try {
-      if (
-        assignAssociationIfMatch(
-          this as { constructor?: unknown; association?: (name: string) => unknown },
-          key,
-          value,
-        )
-      )
-        continue;
-      // Mirrors Rails' _assign_attribute: dispatch through the public setter
-      // when one exists (store accessors write to the store hash, not a
-      // standalone attribute slot). Falls back to writeAttribute for plain
-      // columns and unknown keys.
-      const setter = findPrototypeSetter(this, key);
-      if (setter) {
-        setter.call(this, value);
-      } else {
-        this.writeAttribute(key, value);
-      }
-    } catch (e) {
-      let repr: string;
-      try {
-        repr = JSON.stringify(value);
-      } catch {
-        repr = String(value);
-      }
-      throw new AttributeAssignmentError(
-        `error on assignment ${repr} to ${key} (${e instanceof Error ? e.message : String(e)})`,
-        e instanceof Error ? e : undefined,
-        key,
-      );
+    if (key.includes("(")) {
+      (multiParameterAttributes ??= {})[key] = value;
+    } else if (isNestedParameterHash(value)) {
+      (nestedParameterAttributes ??= {})[key] = value;
+    } else {
+      _assignAttribute(this, key, value);
     }
+  }
+
+  if (nestedParameterAttributes) {
+    assignNestedParameterAttributes(this, nestedParameterAttributes);
+  }
+  if (multiParameterAttributes) {
+    // Rails' assign_multiparameter_attributes → extract/execute callstack.
+    executeMultiparameterAssignment(
+      this as any,
+      extractMultiparameterCallstack(multiParameterAttributes).multiparams,
+    );
+  }
+}
+
+/**
+ * Ruby `v.is_a?(Hash)`. A Date/Temporal/model value is `typeof "object"` in JS
+ * but is not a Hash in Ruby, so only plain objects may be deferred.
+ */
+function isNestedParameterHash(value: unknown): boolean {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  const proto = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
+}
+
+/**
+ * Mirrors: ActiveRecord::AttributeAssignment#assign_nested_parameter_attributes
+ * (attribute_assignment.rb:26-28) — assign any deferred nested attributes after
+ * the base attributes have been set.
+ */
+function assignNestedParameterAttributes(self: AttributeIO, pairs: Record<string, unknown>): void {
+  for (const [k, v] of Object.entries(pairs)) {
+    _assignAttribute(self, k, v);
   }
 }
 
