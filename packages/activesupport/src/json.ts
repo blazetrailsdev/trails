@@ -92,11 +92,13 @@ function asJsonValue(value: unknown, options: NormalizedOptions): unknown {
   return value;
 }
 
-// Rails' `Time#as_json` / `DateTime#as_json` / `Date#as_json`
-// (core_ext/object/json.rb:200-228). Our Time analogues are the Temporal types,
-// which have no `asJson` of their own, so the dispatch lives here. Without this
-// arm `JSON.stringify` falls through to `Temporal#toJSON`, which drops a zero
-// subsecond part and so ignores `Encoding.timePrecision` entirely.
+/**
+ * Rails' `Time#as_json` / `DateTime#as_json` / `Date#as_json`
+ * (core_ext/object/json.rb:200-228), dispatched over our Temporal analogues:
+ * `Instant`/`ZonedDateTime` for `Time`, `PlainDateTime` for the zoneless
+ * `DateTime` (whose `xmlschema` carries Ruby's default `+00:00` offset), and
+ * `PlainDate` for `Date`.
+ */
 function temporalAsJson(value: unknown): string | undefined {
   const digits =
     Encoding.timePrecision as Temporal.ToStringPrecisionOptions["fractionalSecondDigits"];
@@ -104,8 +106,6 @@ function temporalAsJson(value: unknown): string | undefined {
   if (value instanceof Temporal.Instant) {
     if (Encoding.useStandardJsonTimeFormat)
       return value.toString({ fractionalSecondDigits: digits });
-    // An Instant carries no local zone, so the non-standard form — Ruby's local
-    // `strftime` plus `formatted_offset(false)` — renders in UTC.
     return slashFormat(value.toZonedDateTimeISO("UTC"), "+0000");
   }
 
@@ -117,8 +117,6 @@ function temporalAsJson(value: unknown): string | undefined {
   }
 
   if (value instanceof Temporal.PlainDateTime) {
-    // Ruby's DateTime defaults to a +00:00 offset, which `xmlschema` emits;
-    // a zoneless PlainDateTime is its analogue, so spell that offset out.
     if (Encoding.useStandardJsonTimeFormat) {
       return `${value.toString({ fractionalSecondDigits: digits })}+00:00`;
     }
@@ -134,7 +132,6 @@ function temporalAsJson(value: unknown): string | undefined {
   return undefined;
 }
 
-// Ruby's `%Y/%m/%d %H:%M:%S` followed by a colon-less offset.
 function slashFormat(
   value: Temporal.ZonedDateTime | Temporal.PlainDateTime,
   offset: string,

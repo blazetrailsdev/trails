@@ -4,9 +4,6 @@ import { ActiveSupportJSON } from "../json.js";
 import { Temporal } from "../temporal.js";
 import { Encoding } from "./encoding.js";
 
-// trails-only coverage: Rails exercises the default `time_precision` (3) through
-// `Time#as_json`, a core_ext with no home in our port — the Temporal dispatch
-// lives in `ActiveSupportJSON.encode` instead, so pin its default here.
 describe("JSON Encoding default time precision (trails)", () => {
   it("encodes an Instant at the default precision of 3", () => {
     expect(Encoding.timePrecision).toBe(3);

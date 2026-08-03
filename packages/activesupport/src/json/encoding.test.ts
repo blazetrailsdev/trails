@@ -218,7 +218,6 @@ describe("TestJSONEncoding", () => {
   it("datetime to json with custom time precision", () => {
     withStandardJsonTimeFormat(true, () => {
       withTimePrecision(0, () => {
-        // Ruby's DateTime — zoneless, with a +00:00 offset — is PlainDateTime here.
         const datetime = Temporal.PlainDateTime.from("2000-01-01T00:00:00");
         expect(ActiveSupportJSON.encode(datetime)).toBe('"2000-01-01T00:00:00+00:00"');
       });
