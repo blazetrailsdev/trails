@@ -7,18 +7,6 @@
   },
   {
     "package": "activerecord",
-    "rubyFile": "connection_adapters/mysql/schema_statements.rb",
-    "rubyName": "row_format_dynamic_by_default?",
-    "reason": "Ruby reads `mariadb?` / `database_version` off the adapter; the TS port is a free function in the mixin module, called from AbstractMysqlAdapter with those two flags already resolved. Converging means giving the MySQL schema-statements module a host interface, which is the same work as the sibling `default_row_format` entry."
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "connection_adapters/mysql/schema_statements.rb",
-    "rubyName": "default_row_format",
-    "reason": "Rails memoizes `@default_row_format` from two `SHOW VARIABLES` queries (innodb_file_per_table / innodb_file_format). The TS port is a pure function fed both flags plus the version, so converging to zero-arg requires the async query + memo to move onto an adapter host first."
-  },
-  {
-    "package": "activerecord",
     "rubyFile": "database_configurations/url_config.rb",
     "rubyName": "build_url_hash",
     "reason": "Ruby reads `@url`, but the TS port must run BEFORE `super(...)` in the UrlConfig constructor — its result is merged into the configuration hash passed up to HashConfig, and `this` is unavailable before `super`. The url therefore has to be threaded in as a parameter."

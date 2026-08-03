@@ -656,9 +656,11 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
         `CREATE DATABASE ${this.quoteTableName(name)} DEFAULT CHARACTER SET ${this.quoteTableName(String(options.charset))}`,
       );
     } else if (
-      // "" → Version._parts=[NaN] → NaN comparisons fall through → 0 < 5.7.9 → false,
-      // so an uninitialized _databaseVersion correctly falls through to the error branch.
-      isRowFormatDynamicByDefault(this._mariadb, this._databaseVersion?.toString() ?? "")
+      // The null guard keeps an uninitialized version falling through to the error
+      // branch: `databaseVersion` throws once it is unset, and Rails only ever
+      // reaches this comparison on a connected adapter.
+      this._databaseVersion != null &&
+      isRowFormatDynamicByDefault.call(this)
     ) {
       await this._execMutation(
         `CREATE DATABASE ${this.quoteTableName(name)} DEFAULT CHARACTER SET \`utf8mb4\``,
