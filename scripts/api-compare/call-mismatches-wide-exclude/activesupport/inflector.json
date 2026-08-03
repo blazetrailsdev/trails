@@ -1,0 +1,30 @@
+[
+  {
+    "package": "activesupport",
+    "tsFile": "inflector.ts",
+    "rubyName": "ordinal",
+    "call": "translate",
+    "reason": "Divergence, not equivalence (story inflector-ordinal-via-i18n-translate): Rails' `ordinal` is `I18n.translate(\"number.nth.ordinals\", number:)`; trails hardcodes the English st/nd/rd/th rules because activesupport has no I18n backend yet. Surfaced by the inflector/methods.rb file-manifest fix, not by a code change."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "inflector.ts",
+    "rubyName": "ordinalize",
+    "call": "translate",
+    "reason": "Divergence, not equivalence (story inflector-ordinal-via-i18n-translate): reaches `translate` through `ordinal`, which trails hardcodes for English — see the `ordinal` entry above. Surfaced by the inflector/methods.rb file-manifest fix, not by a code change."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "inflector.ts",
+    "rubyName": "safe_constantize",
+    "call": "match?",
+    "reason": "Rails' `match?` here is in the `rescue LoadError` arm, matching the \"Unable to autoload constant\" message. trails has no Ruby autoload and `constantize` never raises LoadError, so the arm — and its `match?` — has no analogue."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "inflector.ts",
+    "rubyName": "underscore",
+    "call": "match?",
+    "reason": "Ruby `Regexp#match?` spells as `RegExp#test` in JS: `/[A-Z-]|::/.match?(word)` ports verbatim to `/[A-Z-]|::/.test(camelCasedWord)` (inflector.ts:71)."
+  }
+]

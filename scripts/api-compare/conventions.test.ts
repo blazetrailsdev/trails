@@ -5,6 +5,9 @@ import {
   rubyMethodToTsIgnoringSkip,
   SKIP_TS_MIRROR_IS_DRIFT,
   rubyFileToTs,
+  RUBY_FILE_TS_OVERRIDES,
+  hasRubyFileTsOverride,
+  rubyFileTsOverride,
   SKIP,
   SKIP_GROUPS,
   ARITY_OVERRIDE_GROUPS,
@@ -211,6 +214,39 @@ describe("rubyFileToTs", () => {
     // The alias is global, not per-package — any framework's railties/
     // subdir maps to trailties/ uniformly.
     expect(rubyFileToTs("railties/some_file.rb", "actiondispatch")).toBe("trailties/some-file.ts");
+  });
+
+  it("prefers an explicit per-package override over the kebab-case rule", () => {
+    // Rails splits the Inflector across inflector/methods.rb and the String
+    // delegators; trails ports both onto the one inflector.ts.
+    expect(rubyFileToTs("inflector/methods.rb", "activesupport")).toBe("inflector.ts");
+    expect(rubyFileToTs("core_ext/string/inflections.rb", "activesupport")).toBe("inflector.ts");
+  });
+
+  it("scopes overrides to their package", () => {
+    expect(rubyFileToTs("inflector/methods.rb", "activerecord")).toBe("inflector/methods.ts");
+    expect(rubyFileToTs("inflector/methods.rb")).toBe("inflector/methods.ts");
+  });
+});
+
+describe("RUBY_FILE_TS_OVERRIDES", () => {
+  it("keys every entry as <package>:<ruby path> and maps to a .ts file", () => {
+    for (const [key, value] of Object.entries(RUBY_FILE_TS_OVERRIDES)) {
+      expect(key).toMatch(/^[a-z-]+:.+\.rb$/);
+      expect(value).toMatch(/\.ts$/);
+    }
+  });
+
+  it("reports override membership only for the owning package", () => {
+    expect(hasRubyFileTsOverride("inflector/methods.rb", "activesupport")).toBe(true);
+    expect(hasRubyFileTsOverride("inflector/methods.rb", "activerecord")).toBe(false);
+    expect(hasRubyFileTsOverride("inflector/methods.rb")).toBe(false);
+    expect(hasRubyFileTsOverride("inflector/inflections.rb", "activesupport")).toBe(false);
+  });
+
+  it("returns the mapped TS file, or undefined when unmapped", () => {
+    expect(rubyFileTsOverride("inflector/methods.rb", "activesupport")).toBe("inflector.ts");
+    expect(rubyFileTsOverride("inflector/inflections.rb", "activesupport")).toBeUndefined();
   });
 });
 

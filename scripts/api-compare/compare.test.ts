@@ -28,6 +28,7 @@ import {
   reachedSameFileMethods,
   narrowCallsApplies,
   callTagKey,
+  splitOverriddenFileBuckets,
   staleCallTags,
   suppressTaggedCalls,
 } from "./compare.js";
@@ -1566,5 +1567,66 @@ describe("staleCallTags", () => {
     expect(staleCallTags(twoFiles, used)).toEqual([
       { tsFile: "core.ts", tsName: "load", call: "synchronize" },
     ]);
+  });
+});
+
+describe("splitOverriddenFileBuckets", () => {
+  function m(name: string, file: string): MethodInfo {
+    return { name, visibility: "public", params: [], file };
+  }
+  const inflector: ClassInfo = {
+    name: "Inflector",
+    file: "inflector/inflections.rb",
+    includes: ["Comparable"],
+    extends: [],
+    instanceMethods: [
+      m("inflections", "inflector/inflections.rb"),
+      m("deconstantize", "inflector/methods.rb"),
+      m("constantize", "inflector/methods.rb"),
+      m("transliterate", "inflector/transliterate.rb"),
+    ],
+    classMethods: [],
+  };
+
+  it("moves a mapped reopening file's methods into a bucket of their own", () => {
+    const out = splitOverriddenFileBuckets(
+      { fqn: "ActiveSupport::Inflector", info: inflector },
+      "activesupport",
+    );
+    expect(out.map((e) => e.info.file)).toEqual([
+      "inflector/inflections.rb",
+      "inflector/methods.rb",
+    ]);
+    expect(out[0].info.instanceMethods.map((im) => im.name)).toEqual([
+      "inflections",
+      "transliterate",
+    ]);
+    expect(out[1].info.instanceMethods.map((im) => im.name)).toEqual([
+      "deconstantize",
+      "constantize",
+    ]);
+  });
+
+  it("keeps the fqn but drops includes/extends on the split bucket", () => {
+    const out = splitOverriddenFileBuckets(
+      { fqn: "ActiveSupport::Inflector", info: inflector },
+      "activesupport",
+    );
+    expect(out[1].fqn).toBe("ActiveSupport::Inflector");
+    expect(out[1].info.includes).toEqual([]);
+    expect(out[0].info.includes).toEqual(["Comparable"]);
+  });
+
+  it("returns the entity untouched when no reopening file is mapped in this package", () => {
+    const entity = { fqn: "ActiveSupport::Inflector", info: inflector };
+    expect(splitOverriddenFileBuckets(entity, "activerecord")).toEqual([entity]);
+  });
+
+  it("does not split the entity's own home file", () => {
+    const entity = {
+      fqn: "ActiveSupport::Inflector",
+      info: { ...inflector, file: "inflector/methods.rb" },
+    };
+    expect(splitOverriddenFileBuckets(entity, "activesupport")).toEqual([entity]);
   });
 });

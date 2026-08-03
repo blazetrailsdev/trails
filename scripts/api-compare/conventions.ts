@@ -58,6 +58,38 @@ export const PATH_SEGMENT_ALIASES: Record<string, string> = {
 };
 
 /**
+ * Ruby files whose TS counterpart does NOT follow the kebab-case path rule,
+ * keyed by `<package>:<ruby path>`.
+ *
+ * An entry here does two things: it names the TS file the Ruby file's methods
+ * are measured against, and it makes the Ruby file own a comparison bucket even
+ * when Ruby reopens the class/module elsewhere. The second half matters —
+ * api:compare buckets an entity's whole method set under the ONE file that
+ * first defined a method on it, so a reopening file's methods are otherwise
+ * measured against the DEFINING file's TS counterpart and report missing
+ * forever no matter what is ported. `inflector/methods.rb` (folded into
+ * `inflector/inflections.rb`) and `core_ext/string/inflections.rb` (folded into
+ * `core_ext/object/blank.rb`, where `String` is first reopened) are both that
+ * shape; trails ports both onto the single `inflector.ts`.
+ */
+export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
+  "activesupport:inflector/methods.rb": "inflector.ts",
+  "activesupport:core_ext/string/inflections.rb": "inflector.ts",
+};
+
+/** The explicit TS mapping for `rubyFile` in `pkg`, or undefined when unmapped. */
+export function rubyFileTsOverride(rubyFile: string, pkg?: string): string | undefined {
+  if (pkg === undefined) return undefined;
+  const key = `${pkg}:${rubyFile}`;
+  return Object.hasOwn(RUBY_FILE_TS_OVERRIDES, key) ? RUBY_FILE_TS_OVERRIDES[key] : undefined;
+}
+
+/** True when `rubyFile` has an explicit TS mapping in this package. */
+export function hasRubyFileTsOverride(rubyFile: string, pkg?: string): boolean {
+  return rubyFileTsOverride(rubyFile, pkg) !== undefined;
+}
+
+/**
  * Ruby file path → expected TS file path (kebab-case, .ts extension).
  *
  * Uses `path.posix.*` so the mapping stays cross-platform stable —
@@ -65,7 +97,9 @@ export const PATH_SEGMENT_ALIASES: Record<string, string> = {
  * POSIX paths, and the default `path.join` would return backslashes
  * on Windows.
  */
-export function rubyFileToTs(rubyFile: string, _pkg?: string): string {
+export function rubyFileToTs(rubyFile: string, pkg?: string): string {
+  const override = rubyFileTsOverride(rubyFile, pkg);
+  if (override !== undefined) return override;
   const dir = path.posix.dirname(rubyFile);
   const base = path.posix.basename(rubyFile, ".rb");
   const aliasedBase = PATH_SEGMENT_ALIASES[base] ?? base;
