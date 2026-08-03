@@ -14,6 +14,54 @@ export type TranslationKey = string | number | boolean;
 
 export const EMPTY_HASH: Readonly<Record<string, never>> = Object.freeze({});
 
+/**
+ * The gem spells these as snake_case Symbols because they double as option
+ * keys; trails option keys are camelCase, so these follow suit.
+ * `reservedKeysPattern` still recognizes the snake_case spellings, since those
+ * are what appears inside translation data written for Ruby.
+ */
+export const RESERVED_KEYS: string[] = [
+  "cascade",
+  "deepInterpolation",
+  "skipInterpolation",
+  "default",
+  "exceptionHandler",
+  "fallback",
+  "fallbackInProgress",
+  "fallbackOriginalLocale",
+  "format",
+  "object",
+  "raise",
+  "resolve",
+  "scope",
+  "separator",
+  "throw",
+];
+
+function underscore(key: string): string {
+  return key.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
+}
+
+let reservedKeysPatternCache: RegExp | undefined;
+
+/**
+ * Mirrors: I18n.reserve_key. Reserved keys are used internally and can't also
+ * be used for interpolation.
+ */
+export function reserveKey(key: string): void {
+  RESERVED_KEYS.push(key);
+  reservedKeysPatternCache = undefined;
+}
+
+/** Mirrors: I18n.reserved_keys_pattern */
+export function reservedKeysPattern(): RegExp {
+  if (!reservedKeysPatternCache) {
+    const spellings = new Set(RESERVED_KEYS.flatMap((key) => [key, underscore(key)]));
+    reservedKeysPatternCache = new RegExp(`(?<!%)%\\{(${[...spellings].join("|")})\\}`);
+  }
+  return reservedKeysPatternCache;
+}
+
 let currentConfig: Config | undefined;
 
 /**
