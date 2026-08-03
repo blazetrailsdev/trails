@@ -488,7 +488,7 @@ export abstract class Base {
    * extensions.
    */
   protected async loadFile(filename: string): Promise<TranslationData> {
-    const type = extname(filename).replace(".", "").toLowerCase();
+    const type = extname(filename).replaceAll(".", "").toLowerCase();
     const loader = (this as unknown as Record<string, unknown>)[
       `load${type.charAt(0).toUpperCase()}${type.slice(1)}`
     ];
@@ -500,7 +500,7 @@ export abstract class Base {
       throw new InvalidLocaleData(filename, "expects it to return a hash, but does not");
     }
     for (const [locale, d] of Object.entries(data)) {
-      this.storeTranslations(locale, (d ?? {}) as TranslationData, {
+      this.storeTranslations(locale, (truthy(d) ? d : {}) as TranslationData, {
         skipSymbolizeKeys: keysSymbolized,
       });
     }
