@@ -53,6 +53,7 @@ export type TranslateOptions = { [key: string]: unknown };
 export type FileReader = (filename: string) => Promise<string>;
 
 let fileReader: FileReader | undefined;
+const fileContents = new Map<string, string>();
 
 /**
  * @noRailsEquivalent PERMANENT — the gem reads translation files with Ruby core —
@@ -65,13 +66,44 @@ export function registerFileReader(reader: FileReader): void {
   fileReader = reader;
 }
 
-function readFile(filename: string): Promise<string> {
+/**
+ * Reads every file in `I18n.load_path` into memory, so that the gem's loading
+ * chain — `load_translations` / `load_file` / `load_yml` / `load_json`, and
+ * `Simple#init_translations` above them — can stay synchronous exactly as the
+ * gem writes it.
+ *
+ * @noRailsEquivalent PERMANENT — the gem has no preload because Ruby reads
+ * files synchronously, so `init_translations` can read at its four lazy call
+ * sites (simple.rb:83-86). Here the read is a Promise and those sites are
+ * synchronous in Rails all the way up through `Error#message`,
+ * `Naming#human` and `NumberConverter#format`; making them async would push a
+ * deviation through five packages to remove one from this file. Awaiting the
+ * I/O once at boot keeps the async fs and leaves every ported body verbatim.
+ */
+export async function preloadTranslationFiles(...filenames: (string | string[])[]): Promise<void> {
+  const paths = filenames.length === 0 ? config().loadPath : filenames;
+  for (const filename of paths.flat()) {
+    fileContents.set(filename, await readTranslationFile(filename));
+  }
+}
+
+function readTranslationFile(filename: string): Promise<string> {
   if (!fileReader) {
     throw new Error(
       "I18n cannot read translation files: register a reader with registerFileReader().",
     );
   }
   return fileReader(filename);
+}
+
+function readFile(filename: string): string {
+  const contents = fileContents.get(filename);
+  if (contents === undefined) {
+    throw new Error(
+      `I18n cannot read ${filename}: reading translation files is async, so await I18n.preloadTranslationFiles() after setting I18n.load_path.`,
+    );
+  }
+  return contents;
 }
 
 /** Mirrors: Ruby's `File.extname`, down to the leading dot. */
@@ -142,36 +174,22 @@ export abstract class Base {
   transliterators?: Record<Locale, HashTransliterator | ProcTransliterator>;
 
   private eagerLoadedFlag = false;
-  /**
-   * Whether `I18n.load_path` has actually been read. The gem needs no such
-   * flag: `load_translations` is synchronous there, so a lazy-init call site
-   * can just run it. Here the read is async and has to happen up front, and
-   * `Simple#markInitialized` consults this to tell "nothing to load" apart
-   * from "not loaded yet".
-   */
-  protected loadPathRead = false;
 
   /**
    * Accepts a list of paths to translation files. Loads translations from YAML
    * files (*.yml) or JSON files (*.json). See #loadYml and #loadJson for
    * details. Ruby's optional block is the trailing argument here.
-   *
-   * A no-arg call records that `I18n.load_path` was read, but only once every
-   * file has loaded: a rejected preload must leave `Simple`'s lazy-init guard
-   * armed rather than let a later lookup initialize against partial data.
    */
-  async loadTranslations(...filenames: unknown[]): Promise<void> {
+  loadTranslations(...filenames: unknown[]): void {
     const block =
       typeof filenames[filenames.length - 1] === "function"
         ? (filenames.pop() as (filename: string, loadedTranslations: TranslationData) => void)
         : undefined;
-    const fromLoadPath = filenames.length === 0;
-    if (fromLoadPath) filenames = config().loadPath;
+    if (filenames.length === 0) filenames = config().loadPath;
     for (const filename of (filenames as (string | string[])[]).flat()) {
-      const loadedTranslations = await this.loadFile(filename);
+      const loadedTranslations = this.loadFile(filename);
       if (block) block(filename, loadedTranslations);
     }
-    if (fromLoadPath) this.loadPathRead = true;
   }
 
   /**
@@ -278,7 +296,6 @@ export abstract class Base {
   abstract availableLocales(): Locale[];
 
   reloadBang(): void {
-    this.loadPathRead = false;
     if (this.eagerLoaded()) this.eagerLoadBang();
   }
 
@@ -496,14 +513,14 @@ export abstract class Base {
    * existing translations. Raises I18n::UnknownFileType for all other file
    * extensions.
    */
-  protected async loadFile(filename: string): Promise<TranslationData> {
+  protected loadFile(filename: string): TranslationData {
     const type = extname(filename).replaceAll(".", "").toLowerCase();
     const loader = (this as unknown as Record<string, unknown>)[
       `load${type.charAt(0).toUpperCase()}${type.slice(1)}`
     ];
     if (typeof loader !== "function") throw new UnknownFileType(type, filename);
-    const [data, keysSymbolized] = await (
-      loader as (this: Base, filename: string) => Promise<[unknown, boolean]>
+    const [data, keysSymbolized] = (
+      loader as (this: Base, filename: string) => [unknown, boolean]
     ).call(this, filename);
     if (!isHash(data)) {
       throw new InvalidLocaleData(filename, "expects it to return a hash, but does not");
@@ -523,12 +540,12 @@ export abstract class Base {
    * `parseYaml` neither symbolizes nor freezes, so `keys_symbolized` is false.
    *
    * @missingRailsCall load_file — Ruby's `YAML.load_file` (base.rb:246) reads
-   * and parses in one call; JS has neither, so the read goes through the
-   * registered reader and the parse through `parseYaml`.
+   * and parses in one call; JS has neither, so the read is served from the
+   * preload (`preloadTranslationFiles`) and the parse goes through `parseYaml`.
    */
-  protected async loadYml(filename: string): Promise<[unknown, boolean]> {
+  protected loadYml(filename: string): [unknown, boolean] {
     try {
-      return [parseYaml(await readFile(filename)), false];
+      return [parseYaml(readFile(filename)), false];
     } catch (e) {
       throw new InvalidLocaleData(filename, inspectError(e));
     }
@@ -543,12 +560,12 @@ export abstract class Base {
    * (:load_file)` probe that neither symbolizes nor freezes exists here.
    *
    * @missingRailsCall load_file — Ruby's `JSON.load_file` (base.rb:262) reads
-   * and parses in one call; `JSON.parse` only parses, so the read goes through
-   * the registered reader.
+   * and parses in one call; `JSON.parse` only parses, so the read is served
+   * from the preload (`preloadTranslationFiles`).
    */
-  protected async loadJson(filename: string): Promise<[unknown, boolean]> {
+  protected loadJson(filename: string): [unknown, boolean] {
     try {
-      return [JSON.parse(await readFile(filename)), false];
+      return [JSON.parse(readFile(filename)), false];
     } catch (e) {
       throw new InvalidLocaleData(filename, inspectError(e));
     }

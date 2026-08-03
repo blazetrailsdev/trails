@@ -7,7 +7,7 @@ import { config, resetConfig, type TranslationKey } from "../i18n.js";
 import { resetClassConfig } from "../config.js";
 import { UnknownFileType } from "../exceptions.js";
 import { catchException } from "../throw-catch.js";
-import { registerFileReader, type TranslateOptions } from "./base.js";
+import { preloadTranslationFiles, registerFileReader, type TranslateOptions } from "./base.js";
 import type { TranslationData } from "../utils.js";
 
 /** Mirrors: `locales_dir` in i18n/test/test_helper.rb:44. */
@@ -18,10 +18,17 @@ function localesDir(): string {
 describe("I18nBackendSimpleTest", () => {
   let backend: Simple;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     resetConfig();
     resetClassConfig();
     registerFileReader((filename) => readFile(filename, "utf8"));
+    // The gem reads files synchronously inside `load_translations`; here the
+    // I/O is awaited up front so every ported body below stays synchronous.
+    await preloadTranslationFiles(
+      ["en.yml", "en.yaml", "en.json", "fr.yml", "invalid/empty.yml", "invalid/syntax.yml"].map(
+        (name) => `${localesDir()}/${name}`,
+      ),
+    );
     backend = new Simple();
     config().backend = backend;
     config().enforceAvailableLocales = false;
@@ -32,10 +39,10 @@ describe("I18nBackendSimpleTest", () => {
     target: Simple,
     name: "loadYml" | "loadJson",
     filename: string,
-  ): Promise<[unknown, boolean]> {
-    return (target as unknown as Record<typeof name, (f: string) => Promise<[unknown, boolean]>>)[
-      name
-    ](filename);
+  ): [unknown, boolean] {
+    return (target as unknown as Record<typeof name, (f: string) => [unknown, boolean]>)[name](
+      filename,
+    );
   }
 
   function storeTranslations(locale: string, data: TranslationData): unknown {
@@ -110,48 +117,46 @@ describe("I18nBackendSimpleTest", () => {
 
   // loading translations
 
-  it("simple load_translations: given an unknown file type it raises I18n::UnknownFileType", async () => {
-    await expect(backend.loadTranslations(`${localesDir()}/en.xml`)).rejects.toBeInstanceOf(
-      UnknownFileType,
-    );
+  it("simple load_translations: given an unknown file type it raises I18n::UnknownFileType", () => {
+    expect(() => backend.loadTranslations(`${localesDir()}/en.xml`)).toThrow(UnknownFileType);
   });
 
-  it("simple load_translations: given a YAML file name with yaml extension does not raise anything", async () => {
-    await expect(backend.loadTranslations(`${localesDir()}/en.yaml`)).resolves.toBeUndefined();
+  it("simple load_translations: given a YAML file name with yaml extension does not raise anything", () => {
+    expect(() => backend.loadTranslations(`${localesDir()}/en.yaml`)).not.toThrow();
   });
 
-  it("simple load_translations: given a JSON file name with yaml extension does not raise anything", async () => {
-    await expect(backend.loadTranslations(`${localesDir()}/en.json`)).resolves.toBeUndefined();
+  it("simple load_translations: given a JSON file name with yaml extension does not raise anything", () => {
+    expect(() => backend.loadTranslations(`${localesDir()}/en.json`)).not.toThrow();
   });
 
-  it("simple load_translations: given no argument, it uses I18n.load_path", async () => {
+  it("simple load_translations: given no argument, it uses I18n.load_path", () => {
     config().loadPath = [`${localesDir()}/en.yml`];
-    await backend.loadTranslations();
+    backend.loadTranslations();
     expect(translations()).toEqual({ en: { foo: { bar: "baz" } } });
   });
 
-  it("simple load_yml: loads data from a YAML file", async () => {
-    const [data] = await send(backend, "loadYml", `${localesDir()}/en.yml`);
+  it("simple load_yml: loads data from a YAML file", () => {
+    const [data] = send(backend, "loadYml", `${localesDir()}/en.yml`);
     expect(data).toEqual({ en: { foo: { bar: "baz" } } });
   });
 
-  it("simple load_json: loads data from a JSON file", async () => {
-    const [data] = await send(backend, "loadJson", `${localesDir()}/en.json`);
+  it("simple load_json: loads data from a JSON file", () => {
+    const [data] = send(backend, "loadJson", `${localesDir()}/en.json`);
     expect(data).toEqual({ en: { foo: { bar: "baz" } } });
   });
 
-  it("simple load_translations: loads data from known file formats", async () => {
+  it("simple load_translations: loads data from known file formats", () => {
     backend = new Simple();
     config().backend = backend;
-    await backend.loadTranslations(`${localesDir()}/fr.yml`, `${localesDir()}/en.yml`);
+    backend.loadTranslations(`${localesDir()}/fr.yml`, `${localesDir()}/en.yml`);
     const expected = { fr: { animal: { dog: "chien" } }, en: { foo: { bar: "baz" } } };
     expect(translations()).toEqual(expected);
   });
 
-  it("simple load_translations: given file names as array it does not raise anything", async () => {
-    await expect(
+  it("simple load_translations: given file names as array it does not raise anything", () => {
+    expect(() =>
       backend.loadTranslations([`${localesDir()}/fr.yml`, `${localesDir()}/en.yml`]),
-    ).resolves.toBeUndefined();
+    ).not.toThrow();
   });
 
   // storing translations
@@ -254,9 +259,9 @@ describe("I18nBackendSimpleTest", () => {
     expect(t("stars.special", { count: 20 })).toBe("20 special stars");
   });
 
-  it("returns localized string given missing pluralization data", async () => {
+  it("returns localized string given missing pluralization data", () => {
     config().loadPath = [`${localesDir()}/en.yml`];
-    await backend.loadTranslations();
+    backend.loadTranslations();
     expect(t("foo.bar", { count: 1 })).toBe("baz");
   });
 });
