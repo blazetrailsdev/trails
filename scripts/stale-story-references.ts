@@ -30,11 +30,6 @@ const CODE_FENCE = /^\s*(?:```|~~~)/;
 const SKIP_DIRS = new Set(["node_modules", "dist", ".git", "vendor", "__snapshots__"]);
 const SOURCE_ROOTS = ["packages", "scripts", "eslint"];
 
-// The trails tree only: `tasks/` is a checkout of the tasks repo (a symlink in
-// agent worktrees) whose story files legitimately cite landed stories as
-// dependencies and provenance, and `docs/activerecord/` is frozen by RFC 0011
-// Phase 4 — CI's `Docs ActiveRecord Freeze` job fails any PR that edits it, so
-// a finding there could not be resolved by correcting the prose.
 const MARKDOWN_SKIP_DIRS = new Set([...SKIP_DIRS, "tasks"]);
 const MARKDOWN_SKIP_TREES = [path.join("docs", "activerecord")];
 
@@ -46,6 +41,11 @@ export interface StoryReference {
   file: string;
   line: number;
   slug: string;
+}
+
+interface Block {
+  line: number;
+  text: string[];
 }
 
 /**
@@ -103,11 +103,6 @@ export function extractMarkdownStoryReferences(source: string, file: string): St
   return blockReferences(blocks, file);
 }
 
-interface Block {
-  line: number;
-  text: string[];
-}
-
 /**
  * The pending citations in each block: the promise is matched over the whole
  * block, and a `PROVENANCE_PHRASE` sentence is then vetoed per sentence.
@@ -151,10 +146,13 @@ export async function collectSourceFiles(
 }
 
 /**
- * Repo-relative `.md` paths under `dir`, minus the trees whose findings are not
- * ours to fix (see `MARKDOWN_SKIP_DIRS` / `MARKDOWN_SKIP_TREES`). `tasks/` is a
- * symlink in agent worktrees, so it is never walked as a directory anyway; the
- * name is excluded so a plain checkout behaves the same way.
+ * Repo-relative `.md` paths under `dir` — the trails tree only. `tasks/` is a
+ * checkout of the tasks repo (a symlink in agent worktrees, so it is never
+ * walked as a directory anyway; the name is excluded so a plain checkout
+ * behaves the same way) whose story files legitimately cite landed stories as
+ * dependencies and provenance. `docs/activerecord/` is frozen by RFC 0011 Phase
+ * 4 — CI's `Docs ActiveRecord Freeze` job fails any PR that edits it, so a
+ * finding there could not be resolved by correcting the prose.
  */
 export async function collectMarkdownFiles(
   root: string,
