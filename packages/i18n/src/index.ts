@@ -47,6 +47,7 @@ export {
   reloadBang,
   reserveKey,
   reservedKeysPattern,
+  setConfig,
   setAvailableLocales,
   setBackend,
   setDefaultLocale,

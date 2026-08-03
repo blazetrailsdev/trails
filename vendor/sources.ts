@@ -191,7 +191,6 @@ export const SOURCES: readonly UpstreamSource[] = [
         name: "i18n",
         libPath: "lib/i18n",
         testPath: "test",
-        compareTests: false,
       },
     ],
   },

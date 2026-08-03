@@ -3,19 +3,33 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ArgumentError, Disabled, InvalidLocale } from "./exceptions.js";
 import {
+  RESERVED_KEYS,
+  availableLocales,
   config,
   defaultLocale,
+  defaultSeparator,
+  enforceAvailableLocalesBang,
   exists,
   interpolationKeys,
   locale,
+  localeAvailable,
   localize,
+  normalizeKeys,
+  reloadBang,
+  reserveKey,
   resetConfig,
+  setConfig,
+  setAvailableLocales,
+  setBackend,
+  setDefaultLocale,
+  setDefaultSeparator,
   setExceptionHandler,
+  setLocale,
   t,
   translate,
   withLocale,
 } from "./i18n.js";
-import { resetClassConfig } from "./config.js";
+import { Config, resetClassConfig } from "./config.js";
 import { Simple } from "./backend/simple.js";
 import type { TranslationData } from "./utils.js";
 import type { TranslationKey } from "./i18n.js";
@@ -101,6 +115,10 @@ describe("I18nTest", () => {
 
   it("translate given an empty string as a key raises an I18n::ArgumentError", () => {
     expect(() => t("")).toThrow(ArgumentError);
+  });
+
+  it("translate given an empty symbol as a key raises an I18n::ArgumentError", () => {
+    expect(() => t(Symbol.for(""))).toThrow(ArgumentError);
   });
 
   it("translate given an array with empty string as a key raises an I18n::ArgumentError", () => {
@@ -248,5 +266,219 @@ describe("I18nTest", () => {
       }),
     ).toThrow(ArgumentError);
     expect(locale()).toBe(defaultLocale());
+  });
+
+  it("uses the simple backend by default", () => {
+    expect(config().backend).toBeInstanceOf(Simple);
+  });
+
+  it("can set the backend", () => {
+    const other = new Simple();
+    expect(() => setBackend(other)).not.toThrow();
+    expect(config().backend).toBe(other);
+  });
+
+  it("uses :en as a default_locale by default", () => {
+    expect(defaultLocale()).toBe("en");
+  });
+
+  it("can set the default locale", () => {
+    expect(() => setDefaultLocale("de")).not.toThrow();
+    expect(defaultLocale()).toBe("de");
+  });
+
+  it("raises an I18n::InvalidLocale exception when setting an unavailable default locale", () => {
+    config().enforceAvailableLocales = true;
+    expect(() => setDefaultLocale("klingon")).toThrow(InvalidLocale);
+  });
+
+  it("uses the default locale as a locale by default", () => {
+    expect(locale()).toBe(defaultLocale());
+  });
+
+  it("raises an I18n::InvalidLocale exception when setting an unavailable locale", () => {
+    config().enforceAvailableLocales = true;
+    expect(() => setLocale("klingon")).toThrow(InvalidLocale);
+  });
+
+  it("can set the configuration object", () => {
+    // Rails' second assertion reads the object back off
+    // `Thread.current.thread_variable_get(:i18n_config)`; trails keeps one
+    // process-wide config (see `config` in i18n.ts), so there is no
+    // thread-local copy to check.
+    const other = new Config();
+    setConfig(other);
+    expect(config()).toBe(other);
+  });
+
+  it("locale is not shared between configurations", () => {
+    const a = new Config();
+    const b = new Config();
+    a.locale = "fr";
+    b.locale = "es";
+    expect(a.locale).toBe("fr");
+    expect(b.locale).toBe("es");
+    expect(locale()).toBe("en");
+  });
+
+  it("other options are shared between configurations", () => {
+    const a = new Config();
+    const b = new Config();
+    a.defaultLocale = "fr";
+    b.defaultLocale = "es";
+    expect(a.defaultLocale).toBe("es");
+    expect(b.defaultLocale).toBe("es");
+    expect(defaultLocale()).toBe("es");
+  });
+
+  it("uses a dot as a default_separator by default", () => {
+    expect(defaultSeparator()).toBe(".");
+  });
+
+  it("can set the default_separator", () => {
+    expect(() => setDefaultSeparator("\u0001")).not.toThrow();
+  });
+
+  it("normalize_keys normalizes given locale, keys and scope to an array of single-key symbols", () => {
+    expect(normalizeKeys("en", "bar", "foo")).toEqual(["en", "foo", "bar"]);
+    expect(normalizeKeys("en", "baz.buz", "foo.bar")).toEqual(["en", "foo", "bar", "baz", "buz"]);
+    expect(normalizeKeys("en", ["baz", "buz"], ["foo", "bar"])).toEqual([
+      "en",
+      "foo",
+      "bar",
+      "baz",
+      "buz",
+    ]);
+  });
+
+  it("normalize_keys discards empty keys", () => {
+    expect(normalizeKeys("en", "baz..buz", "foo..bar")).toEqual(["en", "foo", "bar", "baz", "buz"]);
+    expect(normalizeKeys("en", "baz......buz", "foo......bar")).toEqual([
+      "en",
+      "foo",
+      "bar",
+      "baz",
+      "buz",
+    ]);
+    expect(normalizeKeys("en", ["baz", null, "", "buz"], ["foo", null, "", "bar"])).toEqual([
+      "en",
+      "foo",
+      "bar",
+      "baz",
+      "buz",
+    ]);
+  });
+
+  it("normalize_keys uses a given separator", () => {
+    expect(normalizeKeys("en", "baz|buz", "foo|bar", "|")).toEqual([
+      "en",
+      "foo",
+      "bar",
+      "baz",
+      "buz",
+    ]);
+  });
+
+  it("normalize_keys normalizes given locale with separator", () => {
+    expect(normalizeKeys("en.foo", "baz", "bar")).toEqual(["en", "foo", "bar", "baz"]);
+  });
+
+  it("available_locales_set should return a set", () => {
+    expect(config().availableLocalesSet).toBeInstanceOf(Set);
+    expect(config().availableLocalesSet.size).toBe(config().availableLocales.length);
+  });
+
+  it("I18n.locale_available? returns true when the passed locale is available", () => {
+    setAvailableLocales(["en", "de"]);
+    expect(localeAvailable("de")).toBe(true);
+  });
+
+  it("I18n.locale_available? returns true when the passed locale is a string and is available", () => {
+    setAvailableLocales(["en", "de"]);
+    expect(localeAvailable("de")).toBe(true);
+  });
+
+  it("I18n.locale_available? returns false when the passed locale is unavailable", () => {
+    expect(localeAvailable("klingon")).toBe(false);
+  });
+
+  it("I18n.enforce_available_locales! raises an I18n::InvalidLocale when the passed locale is unavailable", () => {
+    config().enforceAvailableLocales = true;
+    expect(() => enforceAvailableLocalesBang("klingon")).toThrow(InvalidLocale);
+  });
+
+  it("I18n.enforce_available_locales! does nothing when the passed locale is available", () => {
+    setAvailableLocales(["en", "de"]);
+    config().enforceAvailableLocales = true;
+    expect(() => enforceAvailableLocalesBang("en")).not.toThrow();
+  });
+
+  it("I18n.enforce_available_locales config can be set to false", () => {
+    config().enforceAvailableLocales = false;
+    expect(config().enforceAvailableLocales).toBe(false);
+  });
+
+  it("can set the exception_handler", () => {
+    const customExceptionHandler = vi.fn();
+    expect(() => setExceptionHandler(customExceptionHandler)).not.toThrow();
+  });
+
+  it("uses a custom exception handler set to I18n.exception_handler", () => {
+    const customExceptionHandler = vi.fn();
+    setExceptionHandler(customExceptionHandler);
+    translate("bogus");
+    expect(customExceptionHandler).toHaveBeenCalled();
+  });
+
+  it("available_locales can be replaced at runtime", () => {
+    config().enforceAvailableLocales = true;
+    expect(() => t("foo", { locale: "klingon" })).toThrow(InvalidLocale);
+    setAvailableLocales(["klingon"]);
+    t("foo", { locale: "klingon" });
+  });
+
+  it("I18n.reload! reloads the set of locales that are enforced", () => {
+    backend = new Simple();
+    setBackend(backend);
+
+    expect(availableLocales()).not.toContain("de");
+
+    config().enforceAvailableLocales = true;
+
+    expect(() => setDefaultLocale("de")).toThrow(InvalidLocale);
+    expect(() => setLocale("de")).toThrow(InvalidLocale);
+
+    storeTranslations("de", { foo: "Foo in :de" });
+
+    expect(() => setDefaultLocale("de")).toThrow(InvalidLocale);
+    expect(() => setLocale("de")).toThrow(InvalidLocale);
+
+    reloadBang();
+
+    storeTranslations("en", { foo: "Foo in :en" });
+    storeTranslations("de", { foo: "Foo in :de" });
+    storeTranslations("pl", { foo: "Foo in :pl" });
+
+    expect(availableLocales()).toContain("de");
+    expect(availableLocales()).toContain("en");
+    expect(availableLocales()).toContain("pl");
+
+    expect(() => {
+      setDefaultLocale("en");
+      setLocale("en");
+    }).not.toThrow();
+  });
+
+  it("can reserve a key", () => {
+    const originalKeys = [...RESERVED_KEYS];
+    try {
+      reserveKey("foo");
+      reserveKey("bar");
+
+      expect(RESERVED_KEYS).toContain("foo");
+      expect(RESERVED_KEYS).toContain("bar");
+    } finally {
+      RESERVED_KEYS.splice(0, RESERVED_KEYS.length, ...originalKeys);
+    }
   });
 });

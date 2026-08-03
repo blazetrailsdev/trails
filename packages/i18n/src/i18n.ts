@@ -76,6 +76,11 @@ export function config(): Config {
   return currentConfig;
 }
 
+/** Sets I18n configuration object. */
+export function setConfig(value: Config): void {
+  currentConfig = value;
+}
+
 /** @internal Test seam — drops the process-wide config so a case starts clean. */
 export function resetConfig(): void {
   currentConfig = undefined;

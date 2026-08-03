@@ -134,6 +134,16 @@ describe("rubyToConventionTs", () => {
     );
   });
 
+  it("strips the i18n gem's test/i18n directory, which mirrors its lib/i18n root", () => {
+    expect(rubyToConventionTs("i18n/exceptions_test.rb", "i18n")).toBe("exceptions.test.ts");
+    expect(rubyToConventionTs("i18n_test.rb", "i18n")).toBe("i18n.test.ts");
+    expect(rubyToConventionTs("backend/simple_test.rb", "i18n")).toBe("backend/simple.test.ts");
+    // Only scoped to the i18n package — activesupport has its own i18n/ tests.
+    expect(rubyToConventionTs("i18n/exceptions_test.rb", "activesupport")).toBe(
+      "i18n/exceptions.test.ts",
+    );
+  });
+
   it("leaves unaliased paths unchanged apart from kebab-casing", () => {
     expect(rubyToConventionTs("relation/where_test.rb", "activerecord")).toBe(
       "relation/where.test.ts",
