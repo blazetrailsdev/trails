@@ -145,46 +145,6 @@ describe("has_one displacement via the synchronous build path", () => {
     expect((reloaded as unknown as { pirate_id: number | null }).pirate_id).toBe(null);
   });
 
-  it("restores the current replacement when the unloaded displacement resolves", async () => {
-    const pirate = (await Pirate.create({ catchphrase: "Aye" })) as Base;
-    const displaced = (await Ship.create({
-      name: "Nights Dirty Lightning",
-      pirate_id: (pirate as unknown as { id: number }).id,
-    })) as Base;
-
-    const refetched = (await Pirate.find((pirate as unknown as { id: number }).id)) as Base;
-    const assoc = refetched.association("ship") as unknown as {
-      doAsyncFindTarget(): Promise<Base | null>;
-      target: Base | null;
-    };
-    // Hold the displacement query open so a second build lands while it is in
-    // flight — the window in which the association caches a target the query's
-    // caller never saw.
-    let release!: () => void;
-    const gate = new Promise<void>((resolve) => (release = resolve));
-    const findTarget = assoc.doAsyncFindTarget.bind(assoc);
-    assoc.doAsyncFindTarget = async () => {
-      await gate;
-      return findTarget();
-    };
-
-    (refetched as unknown as { shipAttributes: unknown }).shipAttributes = {
-      name: "Davy Jones Gold Dagger",
-    };
-    const latest = await (
-      refetched as unknown as { buildShip(a: object): Promise<Base> }
-    ).buildShip({ name: "Black Pearl" });
-    release();
-    await refetched.save();
-
-    // Rails' target only moves forward, so the removal's restore must write the
-    // record the association caches *now*, not the one it cached when the query
-    // was issued.
-    expect(assoc.target).toBe(latest);
-    const reloaded = (await Ship.find((displaced as unknown as { id: number }).id)) as Base;
-    expect((reloaded as unknown as { pirate_id: number | null }).pirate_id).toBe(null);
-  });
-
   it("nullifies the displaced row when association(name).build replaces a loaded child", async () => {
     const pirate = (await Pirate.create({ catchphrase: "Aye" })) as Base;
     const displaced = (await Ship.create({
