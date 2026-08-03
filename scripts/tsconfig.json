@@ -46,6 +46,9 @@
       "path": "../packages/did-you-mean"
     },
     {
+      "path": "../packages/i18n"
+    },
+    {
       "path": "../packages/html-sanitizer"
     },
     {
