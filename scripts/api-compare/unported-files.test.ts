@@ -1,6 +1,26 @@
+import { readdir } from "node:fs/promises";
+import { join, relative } from "node:path";
+
 import { describe, it, expect } from "vitest";
 
+import { resolvePath } from "../../vendor/sources.js";
 import { isSourceUnported, isTestFileUnported, UNPORTED_FILES } from "./unported-files.js";
+
+async function walkRb(dir: string): Promise<string[]> {
+  const out: string[] = [];
+  let entries;
+  try {
+    entries = await readdir(dir, { withFileTypes: true });
+  } catch {
+    return out;
+  }
+  for (const e of entries) {
+    const p = join(dir, e.name);
+    if (e.isDirectory()) out.push(...(await walkRb(p)));
+    else if (e.name.endsWith(".rb")) out.push(p);
+  }
+  return out;
+}
 
 describe("isSourceUnported package scoping", () => {
   it("matches an unscoped pattern across every package", () => {
@@ -16,44 +36,36 @@ describe("isSourceUnported package scoping", () => {
     expect(isSourceUnported("core_ext/name_error.rb", "activesupport")).toBe(false);
   });
 
-  it("excludes i18n's deferrable gem surface without touching its ported core", () => {
-    for (const f of [
-      "backend/chain.rb",
-      "backend/fallbacks.rb",
-      "backend/key_value.rb",
-      "backend/cache.rb",
-      "backend/cache_file.rb",
-      "backend/cascade.rb",
-      "backend/gettext.rb",
-      "backend/interpolation_compiler.rb",
-      "backend/lazy_loadable.rb",
-      "backend/memoize.rb",
-      "backend/metadata.rb",
-      "backend/pluralization.rb",
-      "backend/transliterator.rb",
-      "gettext.rb",
-      "gettext/helpers.rb",
-      "gettext/po_parser.rb",
-      "locale/fallbacks.rb",
-      "locale/tag/rfc4646.rb",
-      "middleware.rb",
-      "version.rb",
-      "tests/basics.rb",
-    ]) {
-      expect(isSourceUnported(f, "i18n"), f).toBe(true);
-    }
-    for (const f of [
+  it("accounts for every file in the vendored i18n lib tree", async () => {
+    // RFC 0074 enrollment invariant: each i18n source file is either measured
+    // by api:compare or excluded here with a reason — nothing falls through
+    // unnoticed. Walking the real tree (rather than pinning a hand-written
+    // list) is what catches a file sitting BESIDE an excluded directory:
+    // `locale/` does not reach `locale.rb`, nor `tests/` reach `tests.rb`.
+    const root = resolvePath("i18n");
+    const files = (await walkRb(root)).map((f) => relative(root, f));
+    // Vendor not populated (bare checkout) — nothing to check.
+    if (files.length === 0) return;
+
+    // `lib/i18n.rb` is scanned one level above libPath, hence the `../`.
+    const inScope = new Set([
       "../i18n.rb",
+      "backend.rb",
+      "backend/base.rb",
+      "backend/flatten.rb",
+      "backend/simple.rb",
       "config.rb",
       "exceptions.rb",
-      "backend/base.rb",
-      "backend/simple.rb",
-      "backend/flatten.rb",
       "interpolate/ruby.rb",
       "utils.rb",
-    ]) {
-      expect(isSourceUnported(f, "i18n"), f).toBe(false);
-    }
+    ]);
+    const unaccounted = ["../i18n.rb", ...files].filter(
+      (f) => !inScope.has(f) && !isSourceUnported(f, "i18n"),
+    );
+    expect(unaccounted).toEqual([]);
+
+    // The other direction: an exclusion must never swallow the ported core.
+    for (const f of inScope) expect(isSourceUnported(f, "i18n"), f).toBe(false);
   });
 
   it("keeps i18n's exclusions from leaking into other packages", () => {

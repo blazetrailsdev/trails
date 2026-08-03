@@ -1228,6 +1228,15 @@ export const UNPORTED_FILES: UnportedFile[] = [
       "Backend::Fallbacks, which is itself out of pre-1.0 scope.",
   },
   {
+    pattern: "locale.rb",
+    package: "i18n",
+    reason:
+      "Pre-1.0: the `I18n::Locale` namespace's autoload shim — it declares " +
+      "nothing but `autoload :Fallbacks` / `autoload :Tag` for the `locale/` " +
+      "tree excluded above. Listed separately because the `locale/` pattern " +
+      "does not reach a file that sits beside the directory.",
+  },
+  {
     pattern: "middleware.rb",
     package: "i18n",
     reason:
@@ -1249,6 +1258,14 @@ export const UNPORTED_FILES: UnportedFile[] = [
       "`lib/i18n/tests/*` are minitest mixins the gem ships so third-party " +
       "backends can run its conformance suite. Test-support scaffolding, not " +
       "library surface — trails' backend tests are vitest files instead.",
+  },
+  {
+    pattern: "tests.rb",
+    package: "i18n",
+    reason:
+      "Pre-1.0: the `I18n::Tests` namespace's autoload shim for the `tests/` " +
+      "conformance mixins excluded above. Same beside-the-directory shape as " +
+      "`locale.rb`.",
   },
 ];
 
