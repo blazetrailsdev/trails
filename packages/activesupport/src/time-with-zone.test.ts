@@ -82,6 +82,12 @@ describe("TimeWithZoneTest", () => {
     expect(twz.wday).toBe(1); // Monday
   });
 
+  it("returns mon (alias of month)", () => {
+    const twz = eastern.local(2024, 2, 1, 12, 0, 0);
+    expect(twz.mon).toBe(2);
+    expect(twz.mon).toBe(twz.month);
+  });
+
   it("returns yday (day of year)", () => {
     const twz = eastern.local(2024, 2, 1, 12, 0, 0);
     expect(twz.yday).toBe(32); // Jan has 31 days, so Feb 1 = 32
