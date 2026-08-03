@@ -2190,6 +2190,22 @@ function extractInterface(
         file,
         ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
       });
+    } else if (ts.isPropertySignature(member)) {
+      // `find(id): T` and `find: (id) => T` are interchangeable in TypeScript,
+      // so recording only method signatures would make visibility depend on the
+      // author's syntax choice. Non-callable properties count too, matching both
+      // the class path (`isPropertyDeclaration` above) and the extends-resolution
+      // path in this function — a Rails attr_reader ports as a plain property.
+      const noRailsEquivalent = noRailsEquivalentReason(member);
+      const fnType = member.type && (ts.isFunctionTypeNode(member.type) ? member.type : undefined);
+      instanceMethods.push({
+        name: memberName,
+        visibility: "public",
+        params: fnType ? extractParameters(fnType.parameters) : [],
+        line,
+        file,
+        ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
+      });
     }
   }
 
