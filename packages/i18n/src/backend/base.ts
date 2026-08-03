@@ -199,12 +199,15 @@ export abstract class Base {
         });
       }
       if (typeof subject === "function") {
-        const dateOrTime = options.object ?? object;
-        const rest = except(options, "object");
+        // `Hash#delete` strips `:object` from the hash the caller still holds,
+        // so later reads in the same `translate` call no longer see it.
+        const deleted = options.object;
+        delete options.object;
+        const dateOrTime = deleted != null && deleted !== false ? deleted : object;
         return this.resolve(
           locale,
           object,
-          (subject as (value: unknown, options: TranslateOptions) => unknown)(dateOrTime, rest),
+          (subject as (value: unknown, options: TranslateOptions) => unknown)(dateOrTime, options),
         );
       }
       return subject;

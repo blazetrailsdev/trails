@@ -68,6 +68,29 @@ describe("I18n::Backend::Base", () => {
     expect(translate("alias")).toBe("Target");
   });
 
+  it("deletes the object option from the options passed to a Proc entry", () => {
+    let seen: TranslateOptions | undefined;
+    const options: TranslateOptions = { object: "subject", other: 1 };
+    backend.storeTranslations("en", {
+      proc_entry: (value: unknown, opts: TranslateOptions) => {
+        seen = opts;
+        return value;
+      },
+    });
+
+    expect(translate("proc_entry", options)).toBe("subject");
+    expect(seen).not.toHaveProperty("object");
+    expect(options).not.toHaveProperty("object");
+  });
+
+  it("falls through to the object argument when the object option is false", () => {
+    backend.storeTranslations("en", {
+      proc_entry: (value: unknown) => value,
+    });
+
+    expect(translate("proc_entry", { object: false })).toBe("proc_entry");
+  });
+
   it("raises InvalidPluralizationData when the pluralization key is missing", () => {
     backend.storeTranslations("en", { stars: { one: "one star" } });
     expect(() => translate("stars", { count: 2 })).toThrow(InvalidPluralizationData);
