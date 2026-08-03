@@ -108,16 +108,27 @@ export class Simple extends Base {
    * Reading files is async here (`packages/i18n` imports nothing from `node:*`
    * and only does async fs), so this cannot run from the gem's synchronous
    * lazy-init call sites in `lookup` / `available_locales` / `translations` /
-   * `eager_load!`; those flip the flag alone via `markInitialized`. A host with
-   * a populated `I18n.load_path` awaits this once at boot instead.
+   * `eager_load!`. A host with a populated `I18n.load_path` awaits this once at
+   * boot; those four sites go through `markInitialized`, which refuses to mark
+   * a backend initialized while its load path is still unread rather than
+   * silently answering from an empty store.
    */
   protected async initTranslations(): Promise<void> {
     await this.loadTranslations();
-    this.markInitialized();
+    this.initializedFlag = true;
   }
 
-  /** @internal The synchronous half of `init_translations` — see there. */
+  /**
+   * @internal The synchronous half of `init_translations` — see there. With an
+   * empty `I18n.load_path` this is the whole of the gem's method, since
+   * `load_translations` then loads nothing.
+   */
   private markInitialized(): void {
+    if (config().loadPath.length > 0) {
+      throw new Error(
+        "I18n.load_path is set but was never read: reading translation files is async, so await backend.initTranslations() before the first lookup.",
+      );
+    }
     this.initializedFlag = true;
   }
 

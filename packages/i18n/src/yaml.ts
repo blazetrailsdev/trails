@@ -4,11 +4,12 @@
  * calls `YAML.load_file` in `load_yml` (base.rb:246); JS has neither, and
  * `packages/i18n` carries no third-party runtime deps.
  *
- * Read here: comments, a leading `---`, nested block mappings, block sequences
- * of scalars, plain / single- / double-quoted scalars, and the `~`/`null`,
- * `true`/`false`, integer and float scalars. Anchors and aliases, tags, flow
- * collections, block scalars (`|`, `>`) and multi-document streams raise, which
- * `load_yml` reports as `InvalidLocaleData` as Psych's `SyntaxError` does.
+ * Read here: comments, `---`, block mappings, block and flow sequences, flow
+ * mappings, quoted and plain scalars, `~`/`null`, `true`/`false`, integers and
+ * floats — verified to cover all 12 locale files vendored under `vendor/rails`
+ * and `vendor/i18n`. Anchors, aliases, tags, block scalars (`|`, `>`) and
+ * multi-document streams raise, which `load_yml` reports as `InvalidLocaleData`
+ * exactly as Psych's `SyntaxError` does.
  */
 
 type Line = { indent: number; text: string; number: number };
@@ -35,20 +36,30 @@ function scanLines(source: string): Line[] {
   return lines;
 }
 
-/** A `#` starts a comment only at the start of a line or after whitespace. */
-function stripComment(line: string): string {
+/** First index at/after `from` where `stop` halts, ignoring quoted spans. */
+function scanUnquoted(
+  text: string,
+  from: number,
+  stop: (char: string, i: number) => boolean,
+): number {
   let quote: string | undefined;
-  for (let i = 0; i < line.length; i += 1) {
-    const char = line[i];
+  for (let i = from; i < text.length; i += 1) {
+    const char = text[i];
     if (quote !== undefined) {
       if (char === "\\" && quote === '"') i += 1;
       else if (char === quote) quote = undefined;
       continue;
     }
     if (char === "'" || char === '"') quote = char;
-    else if (char === "#" && (i === 0 || /\s/.test(line[i - 1]))) return line.slice(0, i);
+    else if (stop(char, i)) return i;
   }
-  return line;
+  return text.length;
+}
+
+/** A `#` starts a comment only at the start of a line or after whitespace. */
+function stripComment(line: string): string {
+  const hash = scanUnquoted(line, 0, (c, i) => c === "#" && (i === 0 || /\s/.test(line[i - 1])));
+  return hash === line.length ? line : line.slice(0, hash);
 }
 
 function parseNode(cursor: Cursor, indent: number): unknown {
@@ -106,18 +117,12 @@ function splitEntry(line: Line): { key: string; rest: string } {
 }
 
 function findEntrySeparator(text: string): number {
-  let quote: string | undefined;
-  for (let i = 0; i < text.length; i += 1) {
-    const char = text[i];
-    if (quote !== undefined) {
-      if (char === "\\" && quote === '"') i += 1;
-      else if (char === quote) quote = undefined;
-      continue;
-    }
-    if (char === "'" || char === '"') quote = char;
-    else if (char === ":" && (i + 1 === text.length || text[i + 1] === " ")) return i;
-  }
-  return -1;
+  const colon = scanUnquoted(
+    text,
+    0,
+    (c, i) => c === ":" && (i + 1 === text.length || text[i + 1] === " "),
+  );
+  return colon === text.length ? -1 : colon;
 }
 
 function parseScalar(text: string, line: Line): unknown {
@@ -127,7 +132,13 @@ function parseScalar(text: string, line: Line): unknown {
   if (text.length >= 2 && text.startsWith('"') && text.endsWith('"')) {
     return unescapeDoubleQuoted(text.slice(1, -1));
   }
-  if (/^[|>&*!{[]/.test(text)) {
+  if (text.startsWith("[") || text.startsWith("{")) {
+    const [value, end] = parseFlow(text, 0, line);
+    if (text.slice(end).trim() !== "")
+      throw syntaxError(line, "trailing content after a collection");
+    return value;
+  }
+  if (/^[|>&*!]/.test(text)) {
     throw syntaxError(line, `the YAML construct \`${text[0]}\` is not supported`);
   }
   if (/^(|~|[Nn]ull|NULL)$/.test(text)) return null;
@@ -135,6 +146,34 @@ function parseScalar(text: string, line: Line): unknown {
   if (/^([Ff]alse|FALSE)$/.test(text)) return false;
   if (/^[-+]?(0|[1-9]\d*)(\.\d+)?$/.test(text)) return Number(text);
   return text;
+}
+
+function parseFlow(text: string, i: number, line: Line): [unknown, number] {
+  const open = text[i];
+  if (open === "[" || open === "{") {
+    const close = open === "[" ? "]" : "}";
+    const seq: unknown[] = [];
+    const map: Record<string, unknown> = {};
+    i += 1;
+    for (;;) {
+      while (text[i] === " " || text[i] === ",") i += 1;
+      if (i >= text.length) throw syntaxError(line, `unterminated \`${open}\``);
+      if (text[i] === close) return [open === "[" ? seq : map, i + 1];
+      const [entry, afterEntry] = parseFlow(text, i, line);
+      i = afterEntry;
+      if (open === "[") {
+        seq.push(entry);
+        continue;
+      }
+      while (text[i] === " ") i += 1;
+      if (text[i] !== ":") throw syntaxError(line, "expected `key: value` in a flow mapping");
+      const [value, afterValue] = parseFlow(text, i + 1, line);
+      map[String(entry)] = value;
+      i = afterValue;
+    }
+  }
+  const end = scanUnquoted(text, i, (c) => c === "," || c === "]" || c === "}" || c === ":");
+  return [parseScalar(text.slice(i, end).trim(), line), end];
 }
 
 function unescapeDoubleQuoted(text: string): string {

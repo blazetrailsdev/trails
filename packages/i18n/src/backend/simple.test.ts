@@ -25,7 +25,6 @@ describe("I18nBackendSimpleTest", () => {
     backend = new Simple();
     config().backend = backend;
     config().enforceAvailableLocales = false;
-    config().loadPath = [`${localesDir()}/en.yml`];
   });
 
   /** Stands in for Ruby's `send`, which the gem's tests use for these. */
@@ -126,6 +125,7 @@ describe("I18nBackendSimpleTest", () => {
   });
 
   it("simple load_translations: given no argument, it uses I18n.load_path", async () => {
+    config().loadPath = [`${localesDir()}/en.yml`];
     await backend.loadTranslations();
     expect(translations()).toEqual({ en: { foo: { bar: "baz" } } });
   });
@@ -255,7 +255,8 @@ describe("I18nBackendSimpleTest", () => {
   });
 
   it("returns localized string given missing pluralization data", async () => {
-    await backend.loadTranslations();
+    config().loadPath = [`${localesDir()}/en.yml`];
+    await (backend as unknown as { initTranslations(): Promise<void> }).initTranslations();
     expect(t("foo.bar", { count: 1 })).toBe("baz");
   });
 });

@@ -48,33 +48,42 @@ describe("I18n::Backend::Base file loading", () => {
     expect(yielded).toEqual([[fr, { fr: { animal: { dog: "chien" } } }]]);
   });
 
+  it("refuses a lazy lookup while I18n.load_path is unread", () => {
+    config().loadPath = [`${localesDir()}/en.yml`];
+    expect(() => backend.translate("en", "foo.bar")).toThrow(/await backend.initTranslations/);
+  });
+
   describe("the YAML subset", () => {
-    it("reads nested mappings, sequences and scalars", () => {
+    // The flow collections come from vendor/rails/activesupport/lib/
+    // active_support/locale/en.yml, which every other shape here also appears in.
+    it("reads the mappings, sequences and scalars Rails' locale files use", () => {
       const source =
-        "# a comment\nen:\n  day_names:\n    - Sunday\n    - Monday\n" +
+        "# a comment\nen:\n  day_names: [Sunday, Monday, Tuesday]\n" +
+        "  month_names: [~, January, February]\n  order:\n    - year\n    - month\n" +
         "  quoted: 'it''s here'  # trailing comment\n  escaped: \"a\\nb\"\n" +
-        "  blank:\n  nothing: ~\n  flag: true\n  count: 42\n  ratio: 1.5\n" +
+        "  blank:\n  flag: true\n  count: 42\n  ratio: 1.5\n" +
         "  padded: 01\n  hash_in_value: not#a#marker\n";
-      const en = {
-        day_names: ["Sunday", "Monday"],
-        quoted: "it's here",
-        escaped: "a\nb",
-        blank: null,
-        nothing: null,
-        flag: true,
-        count: 42,
-        ratio: 1.5,
-        padded: "01",
-        hash_in_value: "not#a#marker",
-      };
-      expect(parseYaml(source)).toEqual({ en });
+      expect(parseYaml(source)).toEqual({
+        en: {
+          day_names: ["Sunday", "Monday", "Tuesday"],
+          month_names: [null, "January", "February"],
+          order: ["year", "month"],
+          quoted: "it's here",
+          escaped: "a\nb",
+          blank: null,
+          flag: true,
+          count: 42,
+          ratio: 1.5,
+          padded: "01",
+          hash_in_value: "not#a#marker",
+        },
+      });
     });
 
     it("raises outside the supported subset", () => {
       expect(parseYaml("---\n# nothing here\n")).toBeNull();
       expect(() => parseYaml("en:\n foo: foo\n    bar:\n")).toThrow(/inconsistent indentation/);
       expect(() => parseYaml("en: &anchor\n")).toThrow(/not supported/);
-      expect(() => parseYaml("en: [a, b]\n")).toThrow(/not supported/);
       expect(() => parseYaml("en:\n  just a scalar\n")).toThrow(/expected a `key: value`/);
     });
   });
