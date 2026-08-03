@@ -2045,10 +2045,13 @@ describe("extractFromProgram — @noRailsEquivalent JSDoc", () => {
   it("records interface property signatures alongside method signatures", () => {
     const info = extractFromFiles("/p", {
       "locator.ts": `
+        type Resolver = (id: unknown, scope: string) => unknown;
+
         export interface LocatorModel {
           name: string;
           primaryKey?: string | string[];
           locate: (id: unknown) => Promise<unknown>;
+          resolve: Resolver;
           /** @noRailsEquivalent trails-only finder seam */
           findGlobalId: (id: string) => Promise<unknown>;
           find(id: unknown): Promise<unknown>;
@@ -2062,9 +2065,10 @@ describe("extractFromProgram — @noRailsEquivalent JSDoc", () => {
       "locate",
       "name",
       "primaryKey",
+      "resolve",
     ]);
-    // A function-typed property carries its arity, like the method spelling.
     expect(iface.instanceMethods.find((m) => m.name === "locate")!.params).toHaveLength(1);
+    expect(iface.instanceMethods.find((m) => m.name === "resolve")!.params).toHaveLength(2);
     expect(iface.instanceMethods.find((m) => m.name === "name")!.params).toEqual([]);
     expect(iface.instanceMethods.find((m) => m.name === "findGlobalId")!.noRailsEquivalent).toBe(
       "trails-only finder seam",
