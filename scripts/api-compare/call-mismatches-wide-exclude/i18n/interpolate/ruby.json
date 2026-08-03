@@ -1,0 +1,9 @@
+[
+  {
+    "package": "i18n",
+    "tsFile": "interpolate/ruby.ts",
+    "rubyName": "interpolate_hash",
+    "call": "call",
+    "reason": "i18n/interpolate/ruby.rb:43,45 invoke a Proc via `.call`; in JS a function value is invoked directly (`handler(key, values, string)`, `value(values)`) — `Function.prototype.call` would rebind `this` rather than mirror Ruby's Proc#call."
+  }
+]

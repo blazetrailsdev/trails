@@ -1,0 +1,16 @@
+[
+  {
+    "package": "i18n",
+    "tsFile": "backend/simple.ts",
+    "rubyName": "store_translations",
+    "call": "new",
+    "reason": "i18n/backend/simple.rb:43 `translations[locale] ||= Concurrent::Hash.new`: JS has no threads and no Concurrent::Hash, so the analogue is the `{}` literal (`translations[locale] ??= {}`), which is not a `new` expression."
+  },
+  {
+    "package": "i18n",
+    "tsFile": "backend/simple.ts",
+    "rubyName": "translations",
+    "call": "new",
+    "reason": "i18n/backend/simple.rb:74 `@translations ||= Concurrent::Hash.new { MUTEX.synchronize { ... } }`: the thread-safe default-block hash has no JS counterpart, so the store is initialised with the `{}` literal, which is not a `new` expression."
+  }
+]
