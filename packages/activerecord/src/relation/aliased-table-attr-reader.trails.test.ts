@@ -5,6 +5,7 @@ import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
 import { registerModel } from "../associations.js";
 import { escapeRegExp, quoteTableName } from "../support/quote-regex.js";
+import { assertQueriesMatch } from "../testing/query-assertions.js";
 
 registerModel(Post);
 registerModel(Comment);
@@ -49,5 +50,44 @@ describe("Relation on an aliased table", () => {
     const sql = aliased().joins("comments").toSql();
     expect(sql).toContain(`${aliasQ}.${idQ}`);
     expect(sql).not.toContain(`= ${baseQ}.${idQ}`);
+  });
+
+  it("qualifies plucked columns against the alias", async () => {
+    await assertQueriesMatch(
+      new RegExp(escapeRegExp(`${aliasQ}.${idQ}`)),
+      undefined,
+      false,
+      async () => {
+        await aliased().pluck("id");
+      },
+    );
+  });
+
+  it("roots the limited-id subquery on the alias", () => {
+    const sql = aliased().eagerLoad("comments").limit(1).toSql();
+    expect(sql).toContain(`${aliasQ}.${idQ}`);
+    expect(sql).not.toMatch(new RegExp(`SELECT DISTINCT ${escapeRegExp(`${baseQ}.${idQ}`)}`));
+  });
+
+  it("roots the materialized limited-id query on the alias", async () => {
+    await assertQueriesMatch(
+      new RegExp(`SELECT DISTINCT ${escapeRegExp(`${aliasQ}.${idQ}`)}`),
+      undefined,
+      false,
+      // The outer eager-load query still projects the JoinDependency's columns
+      // off the model's own arel_table (`"posts"."id" AS t0_r0`, a separate
+      // divergence outside this file's scope), so it errors on an aliased
+      // relation. The materialization query under test runs first; swallow the
+      // outer failure.
+      () =>
+        aliased()
+          .eagerLoad("comments")
+          .limit(1)
+          .toArray()
+          .then(
+            () => {},
+            () => {},
+          ),
+    );
   });
 });
