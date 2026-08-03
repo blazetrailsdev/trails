@@ -22,6 +22,8 @@ import {
   indexes,
   parseMysqlName,
 } from "./schema-statements.js";
+import type { RowFormatHost } from "./schema-statements.js";
+import { Version } from "../abstract-adapter.js";
 import { quote } from "./quoting.js";
 
 // Minimal ForeignKeysHost: foreignKeys() reads via schemaQuery, quotes the
@@ -39,28 +41,52 @@ function fkHost(rows: Record<string, unknown>[]) {
 // (`this.quote`); supply a minimal host carrying the MySQL `quote` standalone.
 const quoteHost = { quote };
 
+function rowFormatHost(isMariadb: boolean, version: string, probeResult = 0) {
+  const queries: string[] = [];
+  return {
+    isMariadb: () => isMariadb,
+    getDatabaseVersion: async () => new Version(version),
+    queryValue: async (sql: string) => {
+      queries.push(sql);
+      return probeResult;
+    },
+    queries,
+  } satisfies RowFormatHost & { queries: string[] };
+}
+
 describe("MySQL::SchemaStatements", () => {
-  it("isRowFormatDynamicByDefault: MariaDB >= 10.2.2 is true", () => {
-    expect(isRowFormatDynamicByDefault(true, "10.2.2")).toBe(true);
-    expect(isRowFormatDynamicByDefault(true, "10.10.0")).toBe(true); // numeric, not lexicographic
-    expect(isRowFormatDynamicByDefault(true, "10.2.2-MariaDB")).toBe(true); // suffix stripped
-    expect(isRowFormatDynamicByDefault(true, "10.2.1-MariaDB")).toBe(false);
-    expect(isRowFormatDynamicByDefault(true, "10.2.1")).toBe(false);
+  it("isRowFormatDynamicByDefault: MariaDB >= 10.2.2 is true", async () => {
+    expect(await isRowFormatDynamicByDefault.call(rowFormatHost(true, "10.2.2"))).toBe(true);
+    expect(await isRowFormatDynamicByDefault.call(rowFormatHost(true, "10.10.0"))).toBe(true);
+    expect(await isRowFormatDynamicByDefault.call(rowFormatHost(true, "10.2.1"))).toBe(false);
   });
 
-  it("isRowFormatDynamicByDefault: MySQL >= 5.7.9 is true", () => {
-    expect(isRowFormatDynamicByDefault(false, "5.7.9")).toBe(true);
-    expect(isRowFormatDynamicByDefault(false, "5.11.0")).toBe(true); // numeric: 11 > 7
-    expect(isRowFormatDynamicByDefault(false, "5.7.8")).toBe(false);
+  it("isRowFormatDynamicByDefault: MySQL >= 5.7.9 is true", async () => {
+    expect(await isRowFormatDynamicByDefault.call(rowFormatHost(false, "5.7.9"))).toBe(true);
+    expect(await isRowFormatDynamicByDefault.call(rowFormatHost(false, "5.11.0"))).toBe(true);
+    expect(await isRowFormatDynamicByDefault.call(rowFormatHost(false, "5.7.8"))).toBe(false);
   });
 
-  it("defaultRowFormat: null when dynamic by default", () => {
-    expect(defaultRowFormat(false, "8.0.0", true, true)).toBeNull();
+  it("defaultRowFormat: null when dynamic by default", async () => {
+    const host = rowFormatHost(false, "8.0.0", 1);
+    expect(await defaultRowFormat.call(host)).toBeNull();
+    expect(host.queries).toEqual([]);
   });
 
-  it("defaultRowFormat: ROW_FORMAT=DYNAMIC when innodb settings set", () => {
-    expect(defaultRowFormat(false, "5.6.0", true, true)).toBe("ROW_FORMAT=DYNAMIC");
-    expect(defaultRowFormat(false, "5.6.0", false, true)).toBeNull();
+  it("defaultRowFormat: ROW_FORMAT=DYNAMIC when innodb settings set", async () => {
+    expect(await defaultRowFormat.call(rowFormatHost(false, "5.6.0", 1))).toBe(
+      "ROW_FORMAT=DYNAMIC",
+    );
+    expect(await defaultRowFormat.call(rowFormatHost(false, "5.6.0", 0))).toBeNull();
+  });
+
+  it("defaultRowFormat: memoizes the innodb probe, including a null answer", async () => {
+    const host = rowFormatHost(false, "5.6.0", 0);
+    expect(await defaultRowFormat.call(host)).toBeNull();
+    expect(await defaultRowFormat.call(host)).toBeNull();
+    expect(host.queries).toEqual([
+      "SELECT @@innodb_file_per_table = 1 AND @@innodb_file_format = 'Barracuda'",
+    ]);
   });
 
   it("validPrimaryKeyOptions includes unsigned and autoIncrement", () => {

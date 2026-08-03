@@ -22,6 +22,9 @@ import { quoteColumnName, unquoteIdentifier } from "./quoting.js";
 import type { AddIndexOptions, SchemaStatementsLike } from "../abstract/schema-definitions.js";
 import type { VisitorHostAdapter } from "./schema-creation.js";
 
+type CreateTableArgs = Parameters<BaseSchemaStatements["createTable"]>;
+type CreateTableOptions = Extract<CreateTableArgs[1], { options?: string }>;
+
 /**
  * MySQL-specific SchemaStatements subclass. Extends the base `dropTable` to support
  * the `temporary: true` option, which emits `DROP TEMPORARY TABLE` — a MySQL/MariaDB
@@ -76,6 +79,30 @@ export class MysqlSchemaStatements extends BaseSchemaStatements {
     await this.execute(await this.schemaCreation.accept(createDef));
   }
 
+  /**
+   * Rails writes this as a defaulted keyword —
+   * `def create_table(table_name, options: default_row_format, **)` — so an
+   * explicit `options:` wins and an absent one triggers the (memoized) lookup.
+   *
+   * Mirrors: MySQL::SchemaStatements#create_table
+   */
+  override async createTable(
+    name: string,
+    optionsOrFn?: CreateTableArgs[1],
+    fn?: CreateTableArgs[2],
+  ): Promise<void> {
+    const definer = typeof optionsOrFn === "function" ? optionsOrFn : fn;
+    const options: CreateTableOptions =
+      typeof optionsOrFn === "function" || !optionsOrFn ? {} : optionsOrFn;
+    if (options.options === undefined) {
+      const rowFormat = await defaultRowFormat.call(this as unknown as RowFormatHost);
+      if (rowFormat != null) {
+        return super.createTable(name, { ...options, options: rowFormat }, definer);
+      }
+    }
+    return super.createTable(name, options, definer);
+  }
+
   /** Mirrors: MySQL::SchemaStatements#remove_column */
   override async removeColumn(
     tableName: string,
@@ -120,22 +147,41 @@ interface QuotedScopeHost {
   quote(value: unknown): string;
 }
 
-/** @internal */
-export function isRowFormatDynamicByDefault(isMariaDb: boolean, databaseVersion: string): boolean {
-  const v = new Version(databaseVersion.replace(/-.*$/, ""));
-  return isMariaDb ? v.gte("10.2.2") : v.gte("5.7.9");
+/**
+ * @internal Host surface for the row-format helpers. Rails reads `mariadb?` and
+ * `database_version` off the adapter and memoizes the InnoDB probe in the
+ * `@default_row_format` ivar, so the memo slot lives on the host instance too.
+ * `defined?(@default_row_format)` memoizes a nil answer too, which the `in` check
+ * on the slot reproduces.
+ */
+export interface RowFormatHost {
+  isMariadb(): boolean;
+  getDatabaseVersion(): Promise<Version>;
+  queryValue(sql: string, name?: string): Promise<unknown>;
+  _defaultRowFormat?: string | null;
 }
 
 /** @internal */
-export function defaultRowFormat(
-  isMariaDb: boolean,
-  databaseVersion: string,
-  innodbFilePerTable: boolean,
-  innodbFileFormatBarracuda: boolean,
-): string | null {
-  if (isRowFormatDynamicByDefault(isMariaDb, databaseVersion)) return null;
-  if (innodbFilePerTable && innodbFileFormatBarracuda) return "ROW_FORMAT=DYNAMIC";
-  return null;
+export async function isRowFormatDynamicByDefault(this: RowFormatHost): Promise<boolean> {
+  // Rails' `database_version` is `pool.server_version(self)`, which computes
+  // `get_database_version` lazily; the TS spelling of that laziness is awaiting
+  // `getDatabaseVersion()`, whose result the adapter memoizes.
+  const databaseVersion = await this.getDatabaseVersion();
+  return this.isMariadb() ? databaseVersion.gte("10.2.2") : databaseVersion.gte("5.7.9");
+}
+
+/** @internal */
+export async function defaultRowFormat(this: RowFormatHost): Promise<string | null> {
+  if (await isRowFormatDynamicByDefault.call(this)) return null;
+
+  if (!("_defaultRowFormat" in this)) {
+    const value = await this.queryValue(
+      "SELECT @@innodb_file_per_table = 1 AND @@innodb_file_format = 'Barracuda'",
+    );
+    this._defaultRowFormat = Number(value) === 1 ? "ROW_FORMAT=DYNAMIC" : null;
+  }
+
+  return this._defaultRowFormat ?? null;
 }
 
 /** @internal */
