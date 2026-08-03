@@ -782,7 +782,7 @@ export function extractFromProgram(
         const hasProtectedMod = hasModifier(decl, ts.SyntaxKind.ProtectedKeyword);
         const visibility: "public" | "private" | "protected" =
           isPrivateField || hasPrivateMod ? "private" : hasProtectedMod ? "protected" : "public";
-        const internal = visibility !== "public";
+        const internal = visibility !== "public" || hasInternalJsDocTag(decl);
         const line = decl.getSourceFile().getLineAndCharacterOfPosition(decl.getStart()).line + 1;
         const declFile = path.relative(srcDir, decl.getSourceFile().fileName).replace(/\\/g, "/");
         // Only a member DECLARED in this file carries its tag into the mixin
@@ -835,7 +835,10 @@ export function extractFromProgram(
           ...(ctorDeclFile !== undefined && ctorDeclFile !== relPath
             ? { declaredIn: ctorDeclFile }
             : {}),
-          ...(ctorVisibility !== "public" ? { internal: true } : {}),
+          ...(ctorVisibility !== "public" ||
+          (ctorDecl !== undefined && hasInternalJsDocTag(ctorDecl))
+            ? { internal: true }
+            : {}),
           ...(ctorReason !== undefined ? { noRailsEquivalent: ctorReason } : {}),
         });
       }
@@ -1961,7 +1964,7 @@ export function extractClass(
   for (const member of node.members) {
     const memberName = getMemberName(member);
     const visibility = memberVisibility(member);
-    const internal = visibility !== "public";
+    const internal = visibility !== "public" || hasInternalJsDocTag(member);
     const noRailsEquivalent = noRailsEquivalentReason(member);
     const memberMissingRailsCalls = missingRailsCallTags(member);
     const tagged = {

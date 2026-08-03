@@ -1491,6 +1491,64 @@ describe("extractFromProgram — @internal JSDoc on top-level functions", () => 
   });
 });
 
+describe("extractFromProgram — @internal JSDoc on class members", () => {
+  it("tags an @internal-tagged public method and leaves its untagged sibling public", () => {
+    const info = extractFromFiles("/p", {
+      "abstract-adapter.ts": `
+        export class AbstractAdapter {
+          /** @internal */
+          columnMethodNames(): string[] { return []; }
+
+          /** @internal */
+          static seamHook(): void {}
+
+          quoteTableName(name: string): string { return name; }
+        }
+      `,
+    });
+    const cls = info.classes["abstract-adapter.ts:AbstractAdapter"];
+    expect(cls.instanceMethods.find((m) => m.name === "columnMethodNames")!.internal).toBe(true);
+    expect(cls.classMethods.find((m) => m.name === "seamHook")!.internal).toBe(true);
+    expect(cls.instanceMethods.find((m) => m.name === "quoteTableName")!.internal).toBeUndefined();
+  });
+
+  it("tags an @internal-tagged member of a synthesized __mixin class", () => {
+    const info = extractFromFiles("/p", {
+      "attributes.ts": `
+        export function Attributes(Base: new () => object) {
+          class M extends Base {
+            /** @internal */
+            loadAttributes(): void {}
+            readAttribute(): void {}
+          }
+          return M;
+        }
+      `,
+    });
+    const mixin = info.modules["attributes.ts:Attributes__mixin"];
+    expect(mixin.instanceMethods.find((m) => m.name === "loadAttributes")!.internal).toBe(true);
+    expect(mixin.instanceMethods.find((m) => m.name === "readAttribute")!.internal).toBeUndefined();
+  });
+
+  it("tags an @internal-tagged constructor of a synthesized __mixin class", () => {
+    const info = extractFromFiles("/p", {
+      "attributes.ts": `
+        export function Attributes(Base: new (...a: any[]) => object) {
+          class M extends Base {
+            /** @internal */
+            constructor(...a: any[]) { super(...a); }
+          }
+          return M;
+        }
+      `,
+    });
+    const ctor = info.modules["attributes.ts:Attributes__mixin"].instanceMethods.find(
+      (m) => m.name === "constructor",
+    )!;
+    expect(ctor.internal).toBe(true);
+  });
+});
+
 describe("extractFromProgram — re-export attribution", () => {
   it("marks barrel clones with reExportedFrom and leaves local declarations bare", () => {
     const info = extractFromFiles("/p", {
@@ -1595,7 +1653,7 @@ describe("extractFromProgram — @noRailsEquivalent JSDoc", () => {
     const info = extractFromSource(`
       class Foo {
         /**
-         * Registry hook — public by design; @internal would be a lie.
+         * Registry hook — public by design; an internal tag would be a lie.
          *
          * @noRailsEquivalent trails-only model registry seam
          */
