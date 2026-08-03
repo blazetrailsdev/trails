@@ -371,7 +371,7 @@ function translateKey(
  *
  * Examples:
  *
- *   I18n.setExceptionHandler("customExceptionHandler")
+ *   I18n.setExceptionHandler(":customExceptionHandler")
  *   I18n.customExceptionHandler(exception, locale, key, options)  // will be called like this
  *
  *   I18n.setExceptionHandler((...args) => { ... })                // a lambda
@@ -396,17 +396,15 @@ function handleException(
       const handler = truthy(options.exceptionHandler)
         ? (options.exceptionHandler as ExceptionHandlerLike)
         : config().exceptionHandler;
-      if (typeof handler === "string") {
-        return (I18n as unknown as Record<string, (...args: unknown[]) => unknown>)[handler](
-          exception,
-          locale,
-          key as TranslationKey,
-          options,
-        );
+      if (typeof handler === "string" && handler.startsWith(":")) {
+        return (I18n as unknown as Record<string, (...args: unknown[]) => unknown>)[
+          handler.slice(1)
+        ](exception, locale, key as TranslationKey, options);
       }
-      return typeof handler === "function"
-        ? handler(exception, locale, key as TranslationKey, options)
-        : handler.call(exception, locale, key as TranslationKey, options);
+      const callable = handler as Exclude<ExceptionHandlerLike, string>;
+      return typeof callable === "function"
+        ? callable(exception, locale, key as TranslationKey, options)
+        : callable.call(exception, locale, key as TranslationKey, options);
     }
   }
 }

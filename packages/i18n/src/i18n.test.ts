@@ -43,20 +43,12 @@ describe("I18nTest", () => {
     backend.storeTranslations(locale, data);
   }
 
-  /**
-   * Mocha's `I18n.expects(:custom_exception_handler)` defines the method on the
-   * `I18n` singleton for the duration of the test; the module namespace is what
-   * `handleException` sends to, so this defines it there.
-   */
+  /** Mocha's `I18n.expects(:custom_exception_handler)`: defines the method on `I18n`. */
   function expectsCustomExceptionHandler(): ReturnType<typeof vi.fn> {
     const customExceptionHandler = vi.fn();
     (I18n as unknown as Record<string, unknown>).customExceptionHandler = customExceptionHandler;
     return customExceptionHandler;
   }
-
-  afterEach(() => {
-    delete (I18n as unknown as Record<string, unknown>).customExceptionHandler;
-  });
 
   beforeEach(() => {
     resetConfig();
@@ -70,10 +62,14 @@ describe("I18nTest", () => {
     storeTranslations("en", { true: "Yes", false: "No" });
   });
 
+  afterEach(() => {
+    delete (I18n as unknown as Record<string, unknown>).customExceptionHandler;
+  });
+
   it("can set the exception_handler", () => {
     const previousExceptionHandler = exceptionHandler();
     try {
-      expect(() => setExceptionHandler("customExceptionHandler")).not.toThrow();
+      expect(() => setExceptionHandler(":customExceptionHandler")).not.toThrow();
     } finally {
       setExceptionHandler(previousExceptionHandler);
     }
@@ -82,7 +78,7 @@ describe("I18nTest", () => {
   it("uses a custom exception handler set to I18n.exception_handler", () => {
     const previousExceptionHandler = exceptionHandler();
     try {
-      setExceptionHandler("customExceptionHandler");
+      setExceptionHandler(":customExceptionHandler");
       const customExceptionHandler = expectsCustomExceptionHandler();
       translate("bogus");
       expect(customExceptionHandler).toHaveBeenCalled();
@@ -93,7 +89,7 @@ describe("I18nTest", () => {
 
   it("uses a custom exception handler passed as an option", () => {
     const customExceptionHandler = expectsCustomExceptionHandler();
-    translate("bogus", { exceptionHandler: "customExceptionHandler" });
+    translate("bogus", { exceptionHandler: ":customExceptionHandler" });
     expect(customExceptionHandler).toHaveBeenCalled();
   });
 
