@@ -402,6 +402,9 @@ importers:
       '@blazetrails/html-sanitizer':
         specifier: workspace:*
         version: link:../../packages/html-sanitizer
+      '@blazetrails/i18n':
+        specifier: workspace:*
+        version: link:../../packages/i18n
       '@blazetrails/nokogiri':
         specifier: workspace:*
         version: link:../../packages/nokogiri
