@@ -170,7 +170,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    * `converge-adapter-active-predicate-to-async` (RFC 0072): it touches 7
    * `get active()` declarations and ~88 call sites.
    */
-   */
   async activeAsync(): Promise<boolean> {
     if (this._permanentlyClosed || this._isFakeConnection) {
       this._activeState = false;
