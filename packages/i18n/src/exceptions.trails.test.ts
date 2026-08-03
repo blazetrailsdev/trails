@@ -15,6 +15,7 @@ import {
 } from "./exceptions.js";
 import { resetClassConfig } from "./config.js";
 import { resetConfig } from "./i18n.js";
+import { Simple } from "./backend/simple.js";
 
 /**
  * Trails-only: the cases i18n/test/i18n/exceptions_test.rb drives through
@@ -49,6 +50,13 @@ describe("exceptions", () => {
     expect(exception.locale).toBeNull();
     expect(exception.message).toBe("nil is not a valid locale");
     expect(new InvalidLocale("klingon").message).toBe(":klingon is not a valid locale");
+  });
+
+  it("InvalidLocale is raised by Backend::Base#translate for a falsy locale", () => {
+    const backend = new Simple();
+    expect(() => backend.translate(null, "foo")).toThrow(InvalidLocale);
+    expect(() => backend.translate(null, "foo")).toThrow("nil is not a valid locale");
+    expect(() => backend.translate(false as unknown as null, "foo")).toThrow(InvalidLocale);
   });
 
   it("InvalidLocaleData stores the filename", () => {
