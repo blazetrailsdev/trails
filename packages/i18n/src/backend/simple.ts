@@ -40,10 +40,6 @@ export class Simple extends Base {
    * Stores translations for the given locale in memory. This uses a deep merge
    * for the translations hash, so existing translations will be overwritten by
    * new ones only at the deepest level of the hash.
-   *
-   * @missingRailsCall new — `Concurrent::Hash.new` guards concurrent loading
-   * across threads; JS is single-threaded, so the per-locale hash is a plain
-   * object literal.
    */
   override storeTranslations(
     locale: Locale,
@@ -87,16 +83,22 @@ export class Simple extends Base {
     super.eagerLoadBang();
   }
 
-  /**
-   * @missingRailsCall new — `Concurrent::Hash.new` with a MUTEX-synchronized
-   * default block guards concurrent loading across threads; JS is
-   * single-threaded, so the store is a plain object literal.
-   */
   translations({ doInit = false }: { doInit?: boolean } = {}): TranslationData {
     // To avoid returning empty translations, call `initTranslations`.
     if (doInit && !this.initialized()) this.initTranslations();
 
-    this.translationsStore ??= {};
+    // Ruby's default block writes `h[k] = Concurrent::Hash.new` on a missing-key
+    // read, and that is observable through the public reader — Rails asserts
+    // `translations[:fr] == {}` for a locale that was never stored
+    // (i18n/test/backend/simple_test.rb:154). A `get` trap is the only JS
+    // spelling of it; `in`, `Object.entries` and `Object.keys` stay untrapped,
+    // matching Ruby, where `has_key?` is false until the read vivifies the key.
+    this.translationsStore ??= new Proxy({} as TranslationData, {
+      get(h, k) {
+        if (typeof k === "string" && !(k in h)) h[k] = {};
+        return h[k as string];
+      },
+    });
     return this.translationsStore;
   }
 
