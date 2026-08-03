@@ -157,30 +157,45 @@ async function main(): Promise<void> {
     // vs the correct SQLite literal (1/0, empty lock). Their PASS status in CI
     // acts as the integration test for this visitor-wiring invariant.
 
-    // 3. Import query.ts. Fixtures end with `export default <relation>`
-    //    and typically `import { Book } from "./models.js"` (ESM convention
-    //    — the `.js` specifier resolves to the `models.ts` source via tsx)
-    //    to reference model classes — that side-effect-loads the models
-    //    module which registers the classes against the current
-    //    Base.adapter.
-    const queryUrl = pathToFileURL(join(fixtureDirAbs, "query.ts")).href;
-    const mod = (await import(queryUrl)) as { default: unknown };
-    const result = mod.default;
-
-    // 3b. Pre-warm the schema cache for all registered model classes so that
-    //     toSql() can emit column-aliased SQL for eager_load. Rails loads schema
-    //     synchronously; trails' schema cache is populated async from the DB on
-    //     first access. Without this step, JoinDependency sees an empty schema
-    //     cache and falls back to only the primary key.
-    for (const [name, klass] of modelRegistry) {
+    // 3. Import models.ts, then pre-warm the schema cache for every registered
+    //    model class. Rails loads schema lazily but *synchronously*, so
+    //    `Book.order(author_id: :asc)` at file scope already sees columns_hash;
+    //    trails' cache is populated async from the DB, so the warm-up has to
+    //    happen before query.ts runs. Fixtures build their relation eagerly at
+    //    module scope (`export default Book.order(...)`), and the relation
+    //    resolves column references at build time — warming only after the
+    //    import leaves `columnsHash()` empty for that build, which silently
+    //    drops table qualification (`"author_id"` instead of
+    //    `"books"."author_id"`) and, for eager_load, collapses JoinDependency's
+    //    column aliases down to the primary key.
+    const modelsUrl = pathToFileURL(join(fixtureDirAbs, "models.ts")).href;
+    const modelsMod = (await import(modelsUrl)) as Record<string, unknown>;
+    // Not every fixture calls registerModel(this), so the registry alone would
+    // silently skip those models' schemas — take the module's exported Base
+    // subclasses too and warm the union.
+    const toWarm = new Map<string, unknown>(modelRegistry as Iterable<[string, unknown]>);
+    for (const [name, exported] of Object.entries(modelsMod)) {
+      if (typeof exported === "function" && exported.prototype instanceof Base) {
+        toWarm.set(name, exported);
+      }
+    }
+    for (const [name, klass] of toWarm) {
       try {
-        await (klass as unknown as { loadSchema(): Promise<void> }).loadSchema();
+        await (klass as { loadSchema(): Promise<void> }).loadSchema();
       } catch (err) {
         process.stderr.write(
           `parity ar_dump: warning: schema pre-warm failed for ${name}: ${err instanceof Error ? err.message : String(err)}\n`,
         );
       }
     }
+
+    // 4. Import query.ts. Fixtures end with `export default <relation>`
+    //    and typically `import { Book } from "./models.js"` (ESM convention
+    //    — the `.js` specifier resolves to the `models.ts` source via tsx),
+    //    which Node dedupes to the module instance already loaded above.
+    const queryUrl = pathToFileURL(join(fixtureDirAbs, "query.ts")).href;
+    const mod = (await import(queryUrl)) as { default: unknown };
+    const result = mod.default;
 
     if (result === null || result === undefined) {
       throw new Error(`[${fixtureName}] query.ts default export is ${result}`);
@@ -191,7 +206,7 @@ async function main(): Promise<void> {
       );
     }
 
-    // 4. Extract SQL — two forms:
+    // 5. Extract SQL — two forms:
     //    a) Inlined: toSql() with all values embedded as literals.
     //    b) Parameterized: compileWithBinds extracts date values as bind
     //       params (? placeholders), matching the execution path Rails uses
@@ -288,7 +303,7 @@ async function main(): Promise<void> {
       }
     }
 
-    // 5. Write CanonicalQuery JSON
+    // 6. Write CanonicalQuery JSON
     const canonical: CanonicalQuery = {
       version: 1,
       fixture: fixtureName,
