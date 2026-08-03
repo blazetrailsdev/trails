@@ -3,6 +3,7 @@ import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
 import { fixtures } from "../test-fixtures.js";
 import { JoinDependency } from "./join-dependency.js";
+import { Nodes } from "@blazetrails/arel";
 
 describe("JoinDependency extra columns in instantiate", () => {
   // Ride the canonical schema `fixtures({})` warms; the hydration rows below are
@@ -35,8 +36,7 @@ describe("JoinDependency extra columns in instantiate", () => {
   });
 
   it("merges non-aliased columns into the parent record", () => {
-    const jd = new JoinDependency(Post);
-    jd.addAssociation("comments");
+    const jd = new JoinDependency(Post, null, "comments", Nodes.OuterJoin);
 
     const rows = [
       {
@@ -70,8 +70,7 @@ describe("JoinDependency extra columns in instantiate", () => {
   });
 
   it("does not assign extra columns to child records", () => {
-    const jd = new JoinDependency(Post);
-    jd.addAssociation("comments");
+    const jd = new JoinDependency(Post, null, "comments", Nodes.OuterJoin);
 
     const rows = [
       {
@@ -94,8 +93,7 @@ describe("JoinDependency extra columns in instantiate", () => {
   });
 
   it("works with no extra columns (no regression)", () => {
-    const jd = new JoinDependency(Post);
-    jd.addAssociation("comments");
+    const jd = new JoinDependency(Post, null, "comments", Nodes.OuterJoin);
 
     const rows = [
       jd.aliasedRow({ "": { id: 1, title: "Post" }, comments: { id: 10, post_id: 1, body: "Hi" } }),

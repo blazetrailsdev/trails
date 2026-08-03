@@ -3,6 +3,7 @@ import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
 import { fixtures } from "../test-fixtures.js";
 import { JoinDependency } from "./join-dependency.js";
+import { Nodes } from "@blazetrails/arel";
 
 // Row-level proof of the unified parent-key accessor (`_nodeKey`): a join that
 // multiplies rows — one parent repeated across children, or one child repeated
@@ -51,8 +52,7 @@ describe("JoinDependency dedupes duplicate join rows", () => {
   });
 
   it("collapses repeated child join rows to one instance for a single parent", () => {
-    const jd = new JoinDependency(Post);
-    jd.addAssociation("comments");
+    const jd = new JoinDependency(Post, null, "comments", Nodes.OuterJoin);
 
     // Same parent, same child, repeated join rows — must dedupe to one comment.
     const row = jd.aliasedRow({
@@ -70,8 +70,7 @@ describe("JoinDependency dedupes duplicate join rows", () => {
   });
 
   it("shares one child instance across distinct parents joined to the same record", () => {
-    const jd = new JoinDependency(Reader);
-    jd.addNestedAssociation("post.comments");
+    const jd = new JoinDependency(Reader, null, "post.comments", Nodes.OuterJoin);
 
     // Two distinct parents share one post which has one comment; the post and the
     // comment must each be a single shared instance, exactly deduped.

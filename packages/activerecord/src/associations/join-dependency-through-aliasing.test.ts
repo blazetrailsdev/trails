@@ -6,14 +6,20 @@
  * in use, falling back to a tN alias only on collision. Previously
  * `_addThroughAssociation` hard-coded `tN` aliases for both the through
  * and target tables regardless of collisions, diverging from the
- * single-step `addAssociation` path.
+ * single-step join path.
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
 import { Associations } from "../associations.js";
 import { JoinDependency } from "./join-dependency.js";
+import type { JoinPart } from "./join-dependency/join-part.js";
 import { Nodes, Table, tableRealName, tableSqlName, type TableRef } from "@blazetrails/arel";
+
+/** The tree node a JoinDependency built for a dotted association path. */
+function nodeAt(jd: JoinDependency, path: string): JoinPart {
+  return jd.nodes.find((n) => n.assocName === path)!;
+}
 
 describe("JoinDependency#_addThroughAssociation real-table-name reuse", () => {
   // Ride the boot-laid canonical `Base.connection` (single-pool test model)
@@ -60,14 +66,14 @@ describe("JoinDependency#_addThroughAssociation real-table-name reuse", () => {
   });
 
   it("uses real table names for through+target when no collision", () => {
-    const jd = new JoinDependency(JdtAuthor);
-    const node = jd.addAssociation("jdtComments");
+    const jd = new JoinDependency(JdtAuthor, null, "jdtComments", Nodes.OuterJoin);
+    const node = nodeAt(jd, "jdtComments");
     expect(node).not.toBeNull();
-    expect(node!.arelJoin).toBeInstanceOf(Nodes.OuterJoin);
-    expect(node!.effectiveSqlName).toBe("jdt_comments");
+    expect(node.arelJoin).toBeInstanceOf(Nodes.OuterJoin);
+    expect(node.effectiveSqlName).toBe("jdt_comments");
 
     // Target table uses real name (no alias)
-    const targetTable = (node!.arelJoin as Nodes.OuterJoin).left as Table;
+    const targetTable = (node.arelJoin as Nodes.OuterJoin).left as Table;
     expect(targetTable.name).toBe("jdt_comments");
     expect(targetTable.tableAlias).toBeNull();
 
@@ -81,22 +87,26 @@ describe("JoinDependency#_addThroughAssociation real-table-name reuse", () => {
   });
 
   it("uses the Rails alias_candidate when the target real name collides", () => {
-    const jd = new JoinDependency(JdtAuthor);
     Associations.hasMany.call(JdtAuthor, "directComments", {
       className: "JdtComment",
       foreignKey: "post_id",
     });
-    jd.addAssociation("directComments");
-    const node = jd.addAssociation("jdtComments");
+    const jd = new JoinDependency(
+      JdtAuthor,
+      null,
+      ["directComments", "jdtComments"],
+      Nodes.OuterJoin,
+    );
+    const node = nodeAt(jd, "jdtComments");
     expect(node).not.toBeNull();
 
     // Aliasing is deferred to emit: resolve against the shared AliasTracker.
     jd.joinConstraints([]);
     // Rails names the collision `{plural_name}_{owner_table}` (root link, no _join).
-    expect(node!.effectiveSqlName).toBe("jdt_comments_jdt_authors");
+    expect(node.effectiveSqlName).toBe("jdt_comments_jdt_authors");
 
     // Target aliased — Rails encodes this as a `TableAlias` over the real table.
-    const targetTable = (node!.arelJoin as Nodes.OuterJoin).left as TableRef;
+    const targetTable = (node.arelJoin as Nodes.OuterJoin).left as TableRef;
     expect(tableRealName(targetTable)).toBe("jdt_comments");
     expect(tableSqlName(targetTable)).toBe("jdt_comments_jdt_authors");
 
@@ -111,8 +121,8 @@ describe("JoinDependency#_addThroughAssociation real-table-name reuse", () => {
   });
 
   it("builds tree with through node as child of root and target as sibling", () => {
-    const jd = new JoinDependency(JdtAuthor);
-    const node = jd.addAssociation("jdtComments");
+    const jd = new JoinDependency(JdtAuthor, null, "jdtComments", Nodes.OuterJoin);
+    const node = nodeAt(jd, "jdtComments");
     expect(node).not.toBeNull();
 
     const root = jd.joinRoot;
@@ -206,8 +216,8 @@ describe("JoinDependency#_addThroughAssociation real-table-name reuse", () => {
       source: "taggedPosts",
     });
 
-    const jd = new JoinDependency(StjAuthor);
-    const node = jd.addAssociation("similarPosts");
+    const jd = new JoinDependency(StjAuthor, null, "similarPosts", Nodes.OuterJoin);
+    const node = nodeAt(jd, "similarPosts");
     expect(node).not.toBeNull();
 
     // Aliasing is deferred to emit: resolve the whole chain against the shared
@@ -241,8 +251,7 @@ describe("JoinDependency#_addThroughAssociation real-table-name reuse", () => {
     // `joinConstraints`/`makeConstraints`, so the through-target JoinAssociation
     // is reference-aliased identically to a direct join target — without
     // `_addThroughViaJoinAssociation` receiving `references` at build time.
-    const jd = new JoinDependency(JdtAuthor);
-    jd.addAssociation("jdtComments");
+    const jd = new JoinDependency(JdtAuthor, null, "jdtComments", Nodes.OuterJoin);
     const target = jd.nodes.find((n) => n.immediateAssocName === "jdtComments")!;
     expect(target.effectiveSqlName).toBe("jdt_comments");
 
@@ -302,9 +311,7 @@ describe("JoinDependency#_addThroughAssociation real-table-name reuse", () => {
       registerModel(m);
     }
 
-    const jd = new JoinDependency(MemAuthor);
-    jd.addAssociation("memComments");
-    jd.addAssociation("memRatings");
+    const jd = new JoinDependency(MemAuthor, null, ["memComments", "memRatings"], Nodes.OuterJoin);
     jd.joinConstraints([]);
 
     const effectiveNames = jd.nodes.map((n) => n.effectiveSqlName);
@@ -326,9 +333,9 @@ describe("JoinDependency#_addThroughAssociation real-table-name reuse", () => {
     // so the direct include populates the memo and the through path reuses that
     // ONE `jdt_posts` join instead of minting a second
     // `jdt_posts_jdt_authors_join` alias.
-    const jd = new JoinDependency(JdtAuthor);
-    const directNode = jd.addAssociation("jdtPosts");
-    const node = jd.addAssociation("jdtComments");
+    const jd = new JoinDependency(JdtAuthor, null, ["jdtPosts", "jdtComments"], Nodes.OuterJoin);
+    const directNode = nodeAt(jd, "jdtPosts");
+    const node = nodeAt(jd, "jdtComments");
     expect(node).not.toBeNull();
 
     // Aliasing is deferred to emit: resolve against the shared AliasTracker.
@@ -336,8 +343,8 @@ describe("JoinDependency#_addThroughAssociation real-table-name reuse", () => {
 
     // The direct include keeps the real `jdt_posts` name (first use) and owns
     // the one emitted join.
-    expect(directNode!.effectiveSqlName).toBe("jdt_posts");
-    const directTable = (directNode!.arelJoin as Nodes.OuterJoin).left as Table;
+    expect(directNode.effectiveSqlName).toBe("jdt_posts");
+    const directTable = (directNode.arelJoin as Nodes.OuterJoin).left as Table;
     expect(directTable.name).toBe("jdt_posts");
     expect(directTable.tableAlias).toBeNull();
 
@@ -352,7 +359,7 @@ describe("JoinDependency#_addThroughAssociation real-table-name reuse", () => {
     ).toBe(false);
 
     // Target uses real name (first use), keyed off the one shared `jdt_posts`.
-    const targetTable = (node!.arelJoin as Nodes.OuterJoin).left as Table;
+    const targetTable = (node.arelJoin as Nodes.OuterJoin).left as Table;
     expect(targetTable.name).toBe("jdt_comments");
     expect(targetTable.tableAlias).toBeNull();
   });

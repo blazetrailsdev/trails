@@ -8,7 +8,7 @@
  * connection, which has no Rails analog.
  */
 import { describe, it, expect } from "vitest";
-import { Table } from "@blazetrails/arel";
+import { Nodes, Table } from "@blazetrails/arel";
 import { JoinDependency } from "./join-dependency.js";
 import { AliasTracker } from "./alias-tracker.js";
 import { ConnectionNotDefined, ConnectionTimeoutError } from "../errors.js";
@@ -29,21 +29,21 @@ function trackerOf(jd: JoinDependency): AliasTracker {
 
 describe("JoinDependency AliasTracker seeding", () => {
   it("caps aliases at the base connection's tableAliasLength (256 on MySQL)", () => {
-    const jd = new JoinDependency(stubBaseModel(256));
+    const jd = new JoinDependency(stubBaseModel(256), null, null, Nodes.OuterJoin);
     const tracker = trackerOf(jd);
     tracker.aliasNameFor("posts"); // claim once so a repeat aliases + truncates
     expect(tracker.aliasNameFor("a".repeat(300))).toBe("a".repeat(256));
   });
 
   it("caps aliases at the base connection's tableAliasLength (63 on PostgreSQL)", () => {
-    const jd = new JoinDependency(stubBaseModel(63));
+    const jd = new JoinDependency(stubBaseModel(63), null, null, Nodes.OuterJoin);
     const tracker = trackerOf(jd);
     tracker.aliasNameFor("posts");
     expect(tracker.aliasNameFor("a".repeat(200))).toBe("a".repeat(63));
   });
 
   it("threads the connection length through the suffix-truncation branch (256 - 2)", () => {
-    const jd = new JoinDependency(stubBaseModel(256));
+    const jd = new JoinDependency(stubBaseModel(256), null, null, Nodes.OuterJoin);
     const tracker = trackerOf(jd);
     const candidate = "a".repeat(300);
     // First claim keeps the full 256-slice; the repeat aliases through
@@ -60,7 +60,7 @@ describe("JoinDependency AliasTracker seeding", () => {
         throw new ConnectionNotDefined("No connection pool for posts");
       },
     } as unknown as BaseModelArg;
-    const jd = new JoinDependency(noConnModel);
+    const jd = new JoinDependency(noConnModel, null, null, Nodes.OuterJoin);
     const tracker = trackerOf(jd);
     // maxIdentifierLength default is 64.
     expect(tracker.aliasNameFor("a".repeat(200))).toBe("a".repeat(64));
@@ -74,7 +74,9 @@ describe("JoinDependency AliasTracker seeding", () => {
         throw new Error("adapter blew up");
       },
     } as unknown as BaseModelArg;
-    expect(() => new JoinDependency(brokenModel)).toThrow("adapter blew up");
+    expect(() => new JoinDependency(brokenModel, null, null, Nodes.OuterJoin)).toThrow(
+      "adapter blew up",
+    );
   });
 
   it("propagates a connection error that is not a no-connection error", () => {
@@ -88,6 +90,8 @@ describe("JoinDependency AliasTracker seeding", () => {
         throw new ConnectionTimeoutError("could not obtain a connection");
       },
     } as unknown as BaseModelArg;
-    expect(() => new JoinDependency(timingOutModel)).toThrow(ConnectionTimeoutError);
+    expect(() => new JoinDependency(timingOutModel, null, null, Nodes.OuterJoin)).toThrow(
+      ConnectionTimeoutError,
+    );
   });
 });

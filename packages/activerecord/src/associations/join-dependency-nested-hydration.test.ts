@@ -3,6 +3,7 @@ import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
 import { fixtures } from "../test-fixtures.js";
 import { JoinDependency } from "./join-dependency.js";
+import { Nodes } from "@blazetrails/arel";
 
 describe("JoinDependency nested hydration", () => {
   // Ride the canonical schema `fixtures({})` warms; the hydration rows below are
@@ -36,8 +37,7 @@ describe("JoinDependency nested hydration", () => {
   });
 
   it("eager association loading grafts stashed associations to correct parent", () => {
-    const jd = new JoinDependency(Post);
-    jd.addNestedAssociation("comments.author");
+    const jd = new JoinDependency(Post, null, "comments.author", Nodes.OuterJoin);
 
     const rows = [
       jd.aliasedRow({
@@ -77,8 +77,7 @@ describe("JoinDependency nested hydration", () => {
   });
 
   it("eager association loading with cascaded two levels and one level", () => {
-    const jd = new JoinDependency(Post);
-    jd.addNestedAssociation("comments.author");
+    const jd = new JoinDependency(Post, null, "comments.author", Nodes.OuterJoin);
 
     const rows = [
       jd.aliasedRow({
@@ -102,8 +101,7 @@ describe("JoinDependency nested hydration", () => {
   });
 
   it("nested records are not readonly by default when no reflection scope marks readonly", () => {
-    const jd = new JoinDependency(Post);
-    jd.addNestedAssociation("comments");
+    const jd = new JoinDependency(Post, null, "comments", Nodes.OuterJoin);
     const rows = [
       jd.aliasedRow({
         "": { id: 1, title: "Post A" },
