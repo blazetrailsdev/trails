@@ -100,3 +100,17 @@ export function sql(rawSql: string): SqlLiteral {
  * Mirrors: Arel.star
  */
 export const star = new SqlLiteral("*");
+
+/**
+ * Arel.fetchAttribute() — yield the attribute nodes reachable from `value`.
+ *
+ * Mirrors: Arel.fetch_attribute (arel.rb:68)
+ *
+ * @internal
+ */
+export function fetchAttribute(value: unknown, block: (attr: Node) => unknown): unknown {
+  if (typeof value !== "string") {
+    return (value as Node).fetchAttribute(block);
+  }
+  return undefined;
+}

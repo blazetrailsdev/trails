@@ -9,7 +9,13 @@
  */
 
 import type { Base } from "../../base.js";
-import { Nodes, relationName, tableSqlName, type TableRef } from "@blazetrails/arel";
+import {
+  Nodes,
+  fetchAttribute,
+  relationName,
+  tableSqlName,
+  type TableRef,
+} from "@blazetrails/arel";
 import type { AbstractReflection } from "../../reflection.js";
 import { JoinPart } from "./join-part.js";
 import { aliasedArelTableForReflection, type AliasTracker } from "../alias-tracker.js";
@@ -271,7 +277,7 @@ export class JoinAssociation extends JoinPart {
 
 function nodeReferencesTable(node: Nodes.Node, tableName: string): boolean {
   let found = false;
-  node.fetchAttribute((attr: Nodes.Node) => {
+  fetchAttribute(node, (attr: Nodes.Node) => {
     if (attr instanceof Nodes.Attribute) {
       const rel = attr.relation;
       if (relationName(rel.tableAlias ?? rel.name) === tableName) {

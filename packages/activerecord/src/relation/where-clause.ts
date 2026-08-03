@@ -8,7 +8,7 @@
  * Mirrors: ActiveRecord::Relation::WhereClause
  */
 
-import { Nodes, relationName } from "@blazetrails/arel";
+import { Nodes, fetchAttribute, relationName } from "@blazetrails/arel";
 
 export class WhereClause {
   private _predicates: Nodes.Node[];
@@ -128,7 +128,7 @@ export class WhereClause {
   extractAttributes(): (string | Nodes.Attribute | Nodes.Node)[] {
     const attrs: (string | Nodes.Attribute | Nodes.Node)[] = [];
     for (const node of this.predicates) {
-      const attr = fetchAttribute(node);
+      const attr = extractAttribute(node);
       if (attr !== null) {
         attrs.push(attr);
         continue;
@@ -146,7 +146,7 @@ export class WhereClause {
   toH(tableName?: string, opts: { equalityOnly?: boolean } = {}): Record<string, unknown> {
     const result: Record<string, unknown> = {};
     for (const node of equalities(this.predicates, opts.equalityOnly ?? false)) {
-      const attr = fetchAttribute(node);
+      const attr = extractAttribute(node);
       if (attr === null) continue;
       if (tableName !== undefined && relationName(attr.relation.name) !== tableName) continue;
       result[attr.name] = extractNodeValue((node as any).right);
@@ -175,7 +175,7 @@ export class WhereClause {
       }
     }
     return this.predicates.filter((node) => {
-      const attr = fetchAttribute(node);
+      const attr = extractAttribute(node);
       if (attr === null) {
         // Mirrors Rails' `non_attrs.include?(node.left)` branch: drop a predicate
         // whose left expression matches one being merged in (last equality wins).
@@ -262,26 +262,6 @@ function predicationLeft(node: Nodes.Node): Nodes.Node | null {
   return null;
 }
 
-function fetchAttribute(node: Nodes.Node): Nodes.Attribute | null {
-  let found: Nodes.Attribute | null = null;
-  node.fetchAttribute?.((attr: Nodes.Node) => {
-    if (attr instanceof Nodes.Attribute) {
-      if (found !== null && !found.eql(attr)) {
-        // Multiple different attributes — return null like Rails
-        found = null;
-        return false;
-      }
-      found = attr;
-    }
-    return true;
-  });
-  if (found) return found;
-  if (node instanceof Nodes.Not) {
-    return fetchAttribute((node as any).expr);
-  }
-  return null;
-}
-
 /** @internal */
 function equalities(predicates: Nodes.Node[], equalityOnly: boolean): Nodes.Node[] {
   const result: Nodes.Node[] = [];
@@ -343,8 +323,7 @@ function wrapSqlLiteral(node: Nodes.SqlLiteral): Nodes.Node {
 /** @internal */
 function extractAttribute(node: Nodes.Node): Nodes.Attribute | null {
   let attrNode: Nodes.Attribute | null = null;
-  const fetcher = node as { fetchAttribute?: (cb: (a: Nodes.Node) => boolean) => void };
-  fetcher.fetchAttribute?.((attr: Nodes.Node) => {
+  fetchAttribute(node, (attr: Nodes.Node) => {
     if (!(attr instanceof Nodes.Attribute)) return true; // not an attribute — keep traversing
     if (attrNode !== null && !attrNode.eql(attr)) {
       attrNode = null;
