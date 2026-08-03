@@ -5755,11 +5755,9 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * Mirrors: ActiveRecord::QueryMethods#build_order — `order_values` already
-   * holds fully-resolved terms (preprocess_order_args ran at `order!` time), so
-   * this only drops blanks and hands them to the manager. The `_rawOrderClauses`
-   * prefix is the trails-side carrier for `inOrderOf`'s generated SQL, which
-   * Rails keeps inside order_values as an Arel CASE node.
+   * Mirrors: ActiveRecord::QueryMethods#build_order. `_rawOrderClauses` is the
+   * trails-side carrier for `inOrderOf`'s generated SQL, which Rails keeps
+   * inside order_values as an Arel CASE node.
    */
   private _applyOrderToManager(manager: SelectManager): void {
     for (const rawClause of this._rawOrderClauses) {

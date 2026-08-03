@@ -593,9 +593,9 @@ function reorderBang(this: QueryMethodsHost, ...args: OrderArg[]): any {
 // mirrors Rails' `self.order_values |= args` and reorderBang its `args.uniq!` —
 // both dedupe by value (query_methods.rb order!/reorder!).
 //
-// Ruby compares Arel nodes structurally (Arel::Nodes::Node#eql?), so build a
-// structural key rather than JSON-stringifying: an Attribute holds a back
-// reference to its Arel::Table, which JSON.stringify cannot serialize.
+// Ruby compares Arel nodes structurally (Arel::Nodes::Node#eql?), so the key is
+// structural: an Attribute holds a back reference to its Arel::Table, which
+// JSON.stringify cannot serialize.
 let orderClauseIdentity = 0;
 const orderClauseIdentities = new WeakMap<object, number>();
 
@@ -1598,8 +1598,6 @@ const VALID_DIRECTIONS = new Set(["asc", "desc"]);
 /** @internal */
 export function validateOrderArgs(this: QueryMethodsHost, args: unknown[]): void {
   for (const arg of args) {
-    // A Map stands in for Rails' Arel-node-keyed order hash; its values are
-    // directions and validate the same way.
     if (arg instanceof Map) {
       for (const [, value] of arg) {
         if (!VALID_DIRECTIONS.has(String(value).toLowerCase())) {
@@ -1966,8 +1964,8 @@ function buildOrderNode(clause: unknown): unknown {
 
 /** @internal */
 export function buildOrder(this: QueryMethodsHost, arel: any): void {
-  // Rails' `order_values.compact_blank`: an Arel::Nodes::SqlLiteral is a String
-  // subclass, so a blank one is blank? too and gets dropped along with nil and "".
+  // An Arel::Nodes::SqlLiteral is a String subclass in Ruby, so compact_blank
+  // drops a blank one along with nil and "".
   const orders = ((this as any)._orderClauses ?? [])
     .filter((o: unknown) => {
       if (o === null || o === undefined) return false;
