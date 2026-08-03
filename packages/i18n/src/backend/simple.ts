@@ -26,10 +26,6 @@ function isHash(value: unknown): value is TranslationData {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-/**
- * Ruby `result.is_a?(Symbol)` (simple.rb:104). A Ruby Symbol is a JS string
- * that keeps its leading colon (`":other.key"`).
- */
 function isSymbol(value: unknown): value is string {
   return typeof value === "string" && value.startsWith(":");
 }

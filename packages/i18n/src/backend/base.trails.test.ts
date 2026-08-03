@@ -35,8 +35,6 @@ describe("I18n::Backend::Base", () => {
   }
 
   it("raises ArgumentError given an empty String or Symbol key", () => {
-    // A Ruby Symbol key is a JS string (`normalize_keys` sends both through
-    // `to_sym`), so `:""` and `""` are the same value here.
     expect(() => translate("")).toThrow(ArgumentError);
   });
 
