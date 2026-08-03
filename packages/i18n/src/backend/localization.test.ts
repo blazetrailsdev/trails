@@ -74,8 +74,8 @@ class RubyTime extends RubyDate {
   }
 }
 
-function setupDateTranslations(backend: Simple): void {
-  backend.storeTranslations("de", {
+function setupDateTranslations(): void {
+  config().backend.storeTranslations("de", {
     date: {
       formats: {
         default: "%d.%m.%Y",
@@ -118,8 +118,8 @@ function setupDateTranslations(backend: Simple): void {
   });
 }
 
-function setupTimeTranslations(backend: Simple): void {
-  backend.storeTranslations("de", {
+function setupTimeTranslations(): void {
+  config().backend.storeTranslations("de", {
     time: {
       formats: {
         default: "%a, %d. %b %Y %H:%M:%S %z",
@@ -140,11 +140,10 @@ describe("I18nSimpleBackendApiTest", () => {
   beforeEach(() => {
     resetConfig();
     resetClassConfig();
-    const backend = new Simple();
-    config().backend = backend;
+    config().backend = new Simple();
     config().enforceAvailableLocales = false;
-    setupDateTranslations(backend);
-    setupTimeTranslations(backend);
+    setupDateTranslations();
+    setupTimeTranslations();
     date = new RubyDate(2008, 3, 1);
     time = new RubyTime(2008, 3, 1, 6, 0);
     otherTime = new RubyTime(2008, 3, 1, 18, 0);
