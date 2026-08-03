@@ -112,6 +112,12 @@ function enforceGateZero(results: { package: string; totalGateMismatch: number }
 // Helpers
 // ---------------------------------------------------------------------------
 
+/**
+ * Maps a Ruby test path to the TS test path our conventions put it at. The
+ * i18n gem's lib root is `lib/i18n` while its test root is `test`, so a test
+ * mirroring `lib/i18n/<x>.rb` sits at `test/i18n/<x>_test.rb`; that leading
+ * segment is dropped so both sides land on `packages/i18n/src/<x>`.
+ */
 export function rubyToConventionTs(rubyFile: string, pkg: string): string {
   if (pkg === "rack") {
     const dir = path.dirname(rubyFile);
@@ -121,9 +127,6 @@ export function rubyToConventionTs(rubyFile: string, pkg: string): string {
     return dir === "." ? tsFile : path.join(dir, tsFile);
   }
 
-  // The i18n gem's lib root is `lib/i18n` but its test root is `test`, so
-  // every test mirroring `lib/i18n/<x>.rb` sits at `test/i18n/<x>_test.rb`.
-  // Drop that leading segment so both sides land on `packages/i18n/src/<x>`.
   if (pkg === "i18n" && rubyFile.startsWith("i18n/")) {
     rubyFile = rubyFile.slice("i18n/".length);
   }
