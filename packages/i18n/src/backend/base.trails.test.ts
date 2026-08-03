@@ -36,7 +36,6 @@ describe("I18n::Backend::Base", () => {
 
   it("raises ArgumentError given an empty String or Symbol key", () => {
     expect(() => translate("")).toThrow(ArgumentError);
-    expect(() => backend.translate("en", Symbol.for(""))).toThrow(ArgumentError);
   });
 
   it("raises InvalidLocale given no locale", () => {
@@ -57,14 +56,12 @@ describe("I18n::Backend::Base", () => {
 
   it("walks an array of defaults and resolves the first hit", () => {
     backend.storeTranslations("en", { fallback: "Fallback" });
-    expect(translate("missing", { default: [Symbol.for("also_missing"), "Literal"] })).toBe(
-      "Literal",
-    );
-    expect(translate("missing", { default: [Symbol.for("fallback")] })).toBe("Fallback");
+    expect(translate("missing", { default: [":also_missing", "Literal"] })).toBe("Literal");
+    expect(translate("missing", { default: [":fallback"] })).toBe("Fallback");
   });
 
   it("resolves a Symbol entry through the configured backend", () => {
-    backend.storeTranslations("en", { target: "Target", alias: Symbol.for("target") });
+    backend.storeTranslations("en", { target: "Target", alias: ":target" });
     expect(translate("alias")).toBe("Target");
   });
 

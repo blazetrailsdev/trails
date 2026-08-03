@@ -8,9 +8,10 @@
  * contract.
  *
  * A Ruby Symbol value is a JS string that keeps its leading colon — `":short"`
- * is `:short` — which is the discriminator Ruby gets from the type. `default`
- * and `resolve` still spell theirs as real JS symbols; converging those two is
- * story `i18n-symbol-values-are-colon-strings`.
+ * is `:short` — which is the discriminator Ruby gets from the type, and is how
+ * the value already renders through `inspect`. That is the spelling `localize`,
+ * `default` and `resolve` all use for the `Symbol === x` arms of the gem
+ * (base.rb:84, base.rb:154).
  *
  * Not ported here: `load_rb` (it `eval`s Ruby source, which trails has none of
  * — see the `SCOPED_SKIP_GROUPS` entry in `scripts/api-compare/conventions.ts`).
@@ -132,10 +133,6 @@ function isHash(value: unknown): value is TranslationData {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function symbolName(subject: symbol): string {
-  return Symbol.keyFor(subject) ?? subject.description ?? "";
-}
-
 /**
  * Ruby `Symbol === x`. A Ruby Symbol is a JS string that keeps its leading
  * colon (`":short"`), which is the discriminator Ruby gets from the type.
@@ -209,12 +206,10 @@ export abstract class Base {
 
   translate(
     locale: Locale | null | undefined,
-    key: TranslationKey | symbol | null | undefined,
+    key: TranslationKey | null | undefined,
     options: TranslateOptions = EMPTY_HASH,
   ): unknown {
-    if (key === "" || (typeof key === "symbol" && symbolName(key) === "")) {
-      throw new ArgumentError();
-    }
+    if (key === "") throw new ArgumentError();
     if (!truthy(locale)) throw new InvalidLocale(locale);
     if (key == null && !("default" in options)) return null;
 
@@ -255,11 +250,7 @@ export abstract class Base {
     return entry;
   }
 
-  exists(
-    locale: Locale,
-    key: TranslationKey | symbol,
-    options: TranslateOptions = EMPTY_HASH,
-  ): boolean {
+  exists(locale: Locale, key: TranslationKey, options: TranslateOptions = EMPTY_HASH): boolean {
     return this.lookup(locale, key, options.scope) != null;
   }
 
@@ -315,7 +306,7 @@ export abstract class Base {
   /** The method which actually looks up for the translation in the store. */
   protected abstract lookup(
     locale: Locale,
-    key: TranslationKey | symbol,
+    key: TranslationKey,
     scope?: unknown,
     options?: TranslateOptions,
   ): unknown;
@@ -331,7 +322,7 @@ export abstract class Base {
    */
   protected default(
     locale: Locale,
-    object: TranslationKey | symbol | null | undefined,
+    object: TranslationKey | null | undefined,
     subject: unknown,
     options: TranslateOptions = EMPTY_HASH,
   ): unknown {
@@ -355,17 +346,17 @@ export abstract class Base {
    */
   protected resolve(
     locale: Locale,
-    object: TranslationKey | symbol | null | undefined,
+    object: TranslationKey | null | undefined,
     subject: unknown,
     options: TranslateOptions = EMPTY_HASH,
   ): unknown {
     if (options.resolve === false) return subject;
     const result = catchException(() => {
-      if (typeof subject === "symbol") {
+      if (isSymbol(subject)) {
         // The gem goes through `I18n.translate`, which — with `throw: true` —
         // hands a MissingTranslation straight back to this `catch`, exactly as
         // calling the backend does. The `I18n.t` facade is not ported yet.
-        return config().backend.translate(locale, symbolName(subject), {
+        return config().backend.translate(locale, subject.slice(1), {
           ...options,
           locale,
           throw: true,
@@ -389,7 +380,7 @@ export abstract class Base {
 
   protected resolveEntry(
     locale: Locale,
-    object: TranslationKey | symbol | null | undefined,
+    object: TranslationKey | null | undefined,
     subject: unknown,
     options: TranslateOptions = EMPTY_HASH,
   ): unknown {

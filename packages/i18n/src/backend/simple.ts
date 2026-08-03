@@ -26,6 +26,10 @@ function isHash(value: unknown): value is TranslationData {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function isSymbol(value: unknown): value is string {
+  return typeof value === "string" && value.startsWith(":");
+}
+
 export class Simple extends Base {
   private initializedFlag = false;
   private translationsStore: TranslationData | undefined;
@@ -115,13 +119,12 @@ export class Simple extends Base {
    */
   protected override lookup(
     locale: Locale,
-    key: TranslationKey | symbol,
+    key: TranslationKey,
     scope: unknown = [],
     options: TranslateOptions = EMPTY_HASH,
   ): unknown {
     if (!this.initialized()) this.initTranslations();
-    const name = typeof key === "symbol" ? (Symbol.keyFor(key) ?? key.description) : key;
-    const keys = normalizeKeys(locale, name, scope, options.separator as string | undefined);
+    const keys = normalizeKeys(locale, key, scope, options.separator as string | undefined);
 
     let result: unknown = this.translations();
     for (const rawKey of keys) {
@@ -131,7 +134,7 @@ export class Simple extends Base {
       const segment = String(rawKey);
       if (!(segment in result)) return null;
       result = result[segment];
-      if (typeof result === "symbol") {
+      if (isSymbol(result)) {
         result = this.resolveEntry(
           locale,
           segment,

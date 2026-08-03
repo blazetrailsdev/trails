@@ -155,7 +155,7 @@ describe("I18nTest", () => {
   });
 
   it("translate given an empty symbol as a key raises an I18n::ArgumentError", () => {
-    expect(() => t(Symbol.for(""))).toThrow(ArgumentError);
+    expect(() => t("")).toThrow(ArgumentError);
   });
 
   it("translate given an array with empty string as a key raises an I18n::ArgumentError", () => {

@@ -187,8 +187,12 @@ export function eagerLoadBang(): void {
   config().backend.eagerLoadBang();
 }
 
-/** A key accepted by `translate`: Ruby's Symbol arm is a real JS symbol. */
-export type TranslateKey = TranslationKey | symbol | null;
+/**
+ * A key accepted by `translate`. Ruby accepts a Symbol or a String and treats
+ * them the same — `normalize_keys` sends both through `to_sym` — so the JS
+ * spelling of both is the plain string.
+ */
+export type TranslateKey = TranslationKey | null;
 
 /**
  * Translates, pluralizes and interpolates a given key using a given locale,
