@@ -3,6 +3,7 @@ import { Base, registerModel } from "../index.js";
 import { Error as ActiveModelError, I18n } from "@blazetrails/activemodel";
 import { fixtures } from "../test-fixtures.js";
 import { seedAssociationCache } from "../support/seed-association-cache.js";
+import { resetI18n } from "../test-helpers/i18n.js";
 
 fixtures([]);
 // The canonical `topics` table is laid at boot by loadCanonicalSchema.
@@ -18,7 +19,7 @@ class FakeReply {
 describe("I18nValidationTest", () => {
   afterEach(() => {
     vi.restoreAllMocks();
-    I18n.reset();
+    resetI18n();
   });
 
   // Rails generates one test per COMMON_CASE via string interpolation; the
@@ -67,12 +68,12 @@ describe("I18nValidationTest", () => {
   });
 
   it("validates associated finds custom model key translation", async () => {
-    I18n.storeTranslations("en", {
+    I18n.backend().storeTranslations("en", {
       activerecord: {
         errors: { models: { topic: { attributes: { replies: { invalid: "custom message" } } } } },
       },
     });
-    I18n.storeTranslations("en", {
+    I18n.backend().storeTranslations("en", {
       activerecord: { errors: { messages: { invalid: "global message" } } },
     });
 
@@ -91,7 +92,7 @@ describe("I18nValidationTest", () => {
   });
 
   it("validates associated finds global default translation", async () => {
-    I18n.storeTranslations("en", {
+    I18n.backend().storeTranslations("en", {
       activerecord: { errors: { messages: { invalid: "global message" } } },
     });
 

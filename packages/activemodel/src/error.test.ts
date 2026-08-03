@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Errors, Model } from "./index.js";
 import { I18n } from "./i18n.js";
 import { Error as ModelError } from "./error.js";
+import { resetI18n } from "./test-helpers/i18n.js";
 
 describe("ErrorTest", () => {
   it("full_message uses default format", () => {
@@ -228,7 +229,7 @@ describe("ErrorTest", () => {
       }
     }
 
-    I18n.storeTranslations("en", {
+    I18n.backend().storeTranslations("en", {
       activemodel: {
         errors: {
           models: {
@@ -243,13 +244,16 @@ describe("ErrorTest", () => {
       const msg = ModelError.generateMessage("name", "blank", record);
       expect(msg).toBe("parent-level blank");
     } finally {
-      I18n.reset();
+      resetI18n();
     }
   });
 
   it("generateMessage falls back to activemodel scope for non-activemodel i18nScope", () => {
     class ARModel extends Model {
       static i18nScope = "activerecord";
+      static {
+        this.attribute("name", "string");
+      }
     }
     const record = new ARModel({}) as any;
     const msg = ModelError.generateMessage("name", "blank", record);
@@ -269,37 +273,33 @@ describe("ErrorTest", () => {
     expect(e.get("name")).toEqual(["is really not great"]);
   });
 
-  // P10: generateMessage merges object: base for %{object} interpolation
-  it("generateMessage interpolates %{object} with base record", () => {
-    I18n.storeTranslations("en", {
-      activemodel: { errors: { messages: { foo: "is %{object}" } } },
-    });
-    try {
-      const base = { toString: () => "BAR" } as any;
-      const msg = ModelError.generateMessage("name", "foo", base);
-      expect(msg).toBe("is BAR");
-    } finally {
-      I18n.reset();
-    }
-  });
-
-  // P10: generateMessage promotes identifier-shaped options.message to type
+  // P10: generateMessage promotes a Symbol-valued options.message to type.
+  // A Ruby Symbol keeps its leading colon as a string value (error.rb:65).
   it("generateMessage with identifier options.message routes through i18n as new type", () => {
     const e = new Errors(null);
-    e.add("name", "blank", { message: "tooShort" });
-    // "tooShort" is identifier-shaped but has no locale entry → falls back to raw key
-    expect(e.get("name")).toEqual(["tooShort"]);
+    e.add("name", "blank", { message: ":tooShort" });
+    // ":tooShort" becomes the type, and has no locale entry → the missing-translation message
+    expect(e.get("name")[0]).toContain("errors.messages.tooShort");
   });
 
   // Rails error.rb:51-55: strip array notation, then pass full dotted attribute
   // to human_attribute_name with `attribute.tr(".", "_").humanize` as the default —
   // so the prefix segment is preserved when no translation matches.
   it("fullMessage strips array notation from attribute", () => {
-    const e = new Errors(null);
-    e.add("items[0].name", "blank");
+    // Rails strips `[\d+]` only inside the `i18n_customize_full_message` branch
+    // (error.rb:22), which it enters only for a base whose class exposes
+    // `i18n_scope` — hence the Model base here.
+    ModelError.i18nCustomizeFullMessage = true;
+    class Person extends Model {}
+    const e = new Errors(new Person({}));
+    // A literal message: `generate_message` — and with it
+    // `read_attribute_for_validation`, which `send`s the attribute name — only
+    // runs for a Symbol type (error.rb:137), and `items[0].name` is no reader.
+    e.add("items[0].name", "can't be blank");
     const msg = e.fullMessages[0];
     expect(msg).toBe("Items name can't be blank");
     expect(msg).not.toContain("[0]");
+    ModelError.i18nCustomizeFullMessage = false;
   });
 
   it("fullMessage uses last segment of dotted attribute", () => {

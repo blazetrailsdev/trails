@@ -8,7 +8,8 @@
  * humanAttributeName, lookupAncestors) are on the Model constructor; we
  * express the contract here as an interface for the static side.
  */
-import { humanize } from "@blazetrails/activesupport";
+import { humanize, isPresent } from "@blazetrails/activesupport";
+import type { TranslateKey } from "@blazetrails/i18n";
 import { I18n } from "./i18n.js";
 import type { ModelName } from "./naming.js";
 
@@ -32,7 +33,7 @@ interface TranslationHost {
 }
 
 /** @internal Mirrors ActiveModel::Translation::MISSING_TRANSLATION */
-const MISSING_TRANSLATION = "\x00__MISSING_TRANSLATION__\x00";
+const MISSING_TRANSLATION = -(2 ** 60);
 
 let _raiseOnMissingTranslations = false;
 
@@ -64,71 +65,55 @@ export function lookupAncestors(
 export function humanAttributeName(
   this: TranslationHost,
   attribute: string,
-  options?: HumanAttributeNameOptions,
+  options: HumanAttributeNameOptions = {},
 ): string {
-  const scope = this.i18nScope;
-  const ancestors = this.lookupAncestors();
-  const raiseOnMissing = options?.raise ?? _raiseOnMissingTranslations;
+  let namespace = "";
+  let defaults: unknown[];
 
   if (attribute.includes(".")) {
     const lastDot = attribute.lastIndexOf(".");
-    const namespace = attribute.slice(0, lastDot).replace(/\./g, "/");
-    const tail = attribute.slice(lastDot + 1);
-    const key = tail.length > 0 ? `${namespace}.${tail}` : namespace;
-    const separator = tail.length > 0 ? "/" : ".";
+    namespace = attribute.slice(0, lastDot).replace(/\./g, "/");
+    attribute = attribute.slice(lastDot + 1);
 
-    const defaults: Array<{ key: string } | { message: string }> = ancestors.map((klass) => ({
-      key: `${scope}.attributes.${klass.modelName.i18nKey}${separator}${key}`,
-    }));
-    defaults.push({ key: `${scope}.attributes.${key}` });
-    defaults.push({ key: `attributes.${key}` });
-    // Rails line 76: always append `attributes.#{attribute}` (attribute = tail after rpartition)
-    defaults.push({ key: `attributes.${tail}` });
-    _appendUserDefaults(defaults, options?.default);
-    if (!raiseOnMissing) defaults.push({ message: MISSING_TRANSLATION });
-
-    const result = _callI18n(defaults, raiseOnMissing, options);
-    if (result === MISSING_TRANSLATION) {
-      return tail.length > 0 ? humanize(tail) : humanize(namespace);
+    let key: string;
+    let separator: string;
+    if (isPresent(attribute)) {
+      key = `${namespace}.${attribute}`;
+      separator = "/";
+    } else {
+      key = namespace;
+      separator = ".";
     }
-    return result;
+
+    defaults = this.lookupAncestors().map((klass) =>
+      // Ruby Symbol default = "look this key up"; the backend spells that arm as
+      // a real JS symbol (story `i18n-symbol-values-are-colon-strings`).
+      Symbol.for(`${this.i18nScope}.attributes.${klass.modelName.i18nKey}${separator}${key}`),
+    );
+    defaults.push(Symbol.for(`${this.i18nScope}.attributes.${key}`));
+    defaults.push(Symbol.for(`attributes.${key}`));
   } else {
-    const defaults: Array<{ key: string } | { message: string }> = ancestors.map((klass) => ({
-      key: `${scope}.attributes.${klass.modelName.i18nKey}.${attribute}`,
-    }));
-    defaults.push({ key: `attributes.${attribute}` });
-    _appendUserDefaults(defaults, options?.default);
-    if (!raiseOnMissing) defaults.push({ message: MISSING_TRANSLATION });
-
-    const result = _callI18n(defaults, raiseOnMissing, options);
-    if (result === MISSING_TRANSLATION) {
-      return humanize(attribute);
-    }
-    return result;
+    defaults = this.lookupAncestors().map((klass) =>
+      Symbol.for(`${this.i18nScope}.attributes.${klass.modelName.i18nKey}.${attribute}`),
+    );
   }
-}
 
-function _callI18n(
-  defaults: Array<{ key: string } | { message: string }>,
-  raiseOnMissing: boolean,
-  options?: HumanAttributeNameOptions,
-): string {
-  const [primary, ...rest] = defaults;
-  const primaryKey = "key" in primary ? primary.key : "";
-  const { default: _d, raise: _r, ...passthrough } = options ?? {};
-  // count: 1 is the Rails default for pluralization; caller-supplied count wins
-  return I18n.t(primaryKey, { count: 1, ...passthrough, raise: raiseOnMissing, defaults: rest });
-}
+  const raiseOnMissing = options.raise ?? _raiseOnMissingTranslations;
 
-function _appendUserDefaults(
-  defaults: Array<{ key: string } | { message: string }>,
-  userDefault?: string | string[],
-): void {
-  if (userDefault === undefined) return;
-  const items = Array.isArray(userDefault) ? userDefault : [userDefault];
-  for (const item of items) {
-    defaults.push({ message: item });
+  defaults.push(Symbol.for(`attributes.${attribute}`));
+  if (options.default != null) defaults.push(options.default);
+  if (!raiseOnMissing) defaults.push(MISSING_TRANSLATION);
+
+  let translation = I18n.translate(defaults.shift() as TranslateKey, {
+    count: 1,
+    raise: raiseOnMissing,
+    ...options,
+    default: defaults,
+  });
+  if (translation === MISSING_TRANSLATION) {
+    translation = isPresent(attribute) ? humanize(attribute) : humanize(namespace);
   }
+  return translation as string;
 }
 
 function _walkAncestors(

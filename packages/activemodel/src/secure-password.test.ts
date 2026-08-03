@@ -442,7 +442,7 @@ describe("SecurePasswordTest", () => {
     const u = new User({ name: "test" });
     (u as any).password = "a".repeat(73);
     await u.isValid();
-    expect(u.errors.where("password", "passwordTooLong").length).toBeGreaterThan(0);
+    expect(u.errors.where("password", "password_too_long").length).toBeGreaterThan(0);
   });
 
   it("password too long resolves to locale entry", async () => {

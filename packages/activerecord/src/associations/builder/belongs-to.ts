@@ -396,7 +396,7 @@ export class BelongsTo extends SingularAssociation {
       const condition: (record: any) => boolean = (record) =>
         railsRuns(record) && !foreignKeyPresent(record);
 
-      model.validatesPresenceOf(name, { message: "required", if: condition });
+      model.validatesPresenceOf(name, { message: ":required", if: condition });
 
       // The presence check above only fires when the FK is blank (Rails'
       // observable "must exist" for an unset association). When the FK IS
@@ -414,7 +414,7 @@ export class BelongsTo extends SingularAssociation {
             target = await record.association(name).loadTarget();
           }
           if (target == null) {
-            record.errors.add(name, "blank", { message: "required" });
+            record.errors.add(name, "blank", { message: ":required" });
           }
         },
         { if: (record: any) => railsRuns(record) && foreignKeyPresent(record) },

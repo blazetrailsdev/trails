@@ -63,6 +63,7 @@ import {
 } from "../test-helpers/models/cpk.js";
 import { CompositePrimaryKeyMismatchError } from "./errors.js";
 import { fixtures } from "../test-fixtures.js";
+import { resetI18n } from "../test-helpers/i18n.js";
 import {
   assertQueriesCount,
   assertNoQueries,
@@ -458,7 +459,7 @@ describe("HasOneAssociationsTest", () => {
   });
 
   it("restrict with error with locale", async () => {
-    I18n.storeTranslations("en", {
+    I18n.backend().storeTranslations("en", {
       activerecord: { attributes: { restricted_with_error_firm: { account: "firm account" } } },
     });
     try {
@@ -473,7 +474,7 @@ describe("HasOneAssociationsTest", () => {
       expect(await RestrictedWithErrorFirm.exists({ name: "restrict" })).toBe(true);
       expect(await readHasOne(firm, "account")).not.toBeNull();
     } finally {
-      I18n.reset();
+      resetI18n();
     }
   });
 

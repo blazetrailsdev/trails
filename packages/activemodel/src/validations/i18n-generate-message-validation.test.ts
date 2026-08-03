@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Model } from "../model.js";
-import { I18n } from "../i18n.js";
+import { resetI18n } from "../test-helpers/i18n.js";
 
 class Person extends Model {
   static {
@@ -12,7 +12,7 @@ class Person extends Model {
 
 describe("I18nGenerateMessageValidationTest", () => {
   beforeEach(() => {
-    I18n.reset();
+    resetI18n();
   });
 
   it("generate message inclusion with default message", () => {

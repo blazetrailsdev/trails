@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Model } from "./index.js";
 import { I18n } from "./i18n.js";
 import { raiseOnMissingTranslations } from "./translation.js";
+import { resetI18n } from "./test-helpers/i18n.js";
 
 describe("ActiveModelI18nTests", () => {
   it("translated model attributes", () => {
@@ -165,12 +166,12 @@ describe("ActiveModelI18nTests", () => {
 
 describe("P11 humanAttributeName — dotted attributes, options, ancestor walk", () => {
   beforeEach(() => {
-    I18n.reset();
+    resetI18n();
     raiseOnMissingTranslations(false);
   });
   afterEach(() => {
     raiseOnMissingTranslations(false);
-    I18n.reset();
+    resetI18n();
   });
 
   it("humanizes flat attribute with no locale entry", () => {
@@ -180,7 +181,7 @@ describe("P11 humanAttributeName — dotted attributes, options, ancestor walk",
 
   it("returns locale entry for a flat attribute", () => {
     class User extends Model {}
-    I18n.storeTranslations("en", {
+    I18n.backend().storeTranslations("en", {
       activemodel: { attributes: { user: { first_name: "Given Name" } } },
     });
     expect(User.humanAttributeName("first_name")).toBe("Given Name");
@@ -195,7 +196,7 @@ describe("P11 humanAttributeName — dotted attributes, options, ancestor walk",
     class User extends Model {}
     // Rails key: "activemodel.attributes.user/address.street"
     // I18n path: ["activemodel", "attributes", "user/address", "street"]
-    I18n.storeTranslations("en", {
+    I18n.backend().storeTranslations("en", {
       activemodel: { attributes: { "user/address": { street: "Street Address" } } },
     });
     expect(User.humanAttributeName("address.street")).toBe("Street Address");
@@ -213,7 +214,7 @@ describe("P11 humanAttributeName — dotted attributes, options, ancestor walk",
 
   it("does not throw with options.raise when a locale entry resolves", () => {
     class User extends Model {}
-    I18n.storeTranslations("en", {
+    I18n.backend().storeTranslations("en", {
       activemodel: { attributes: { user: { foo: "Foo" } } },
     });
     expect(User.humanAttributeName("foo", { raise: true })).toBe("Foo");
@@ -234,7 +235,7 @@ describe("P11 humanAttributeName — dotted attributes, options, ancestor walk",
   it("inherits humanAttributeName from parent class via ancestor walk", () => {
     class Parent extends Model {}
     class Child extends Parent {}
-    I18n.storeTranslations("en", {
+    I18n.backend().storeTranslations("en", {
       activemodel: { attributes: { parent: { foo: "Parent Foo" } } },
     });
     expect(Child.humanAttributeName("foo")).toBe("Parent Foo");
@@ -243,7 +244,7 @@ describe("P11 humanAttributeName — dotted attributes, options, ancestor walk",
   it("prefers subclass locale entry over parent", () => {
     class Parent extends Model {}
     class Child extends Parent {}
-    I18n.storeTranslations("en", {
+    I18n.backend().storeTranslations("en", {
       activemodel: {
         attributes: {
           parent: { foo: "Parent Foo" },
@@ -256,7 +257,7 @@ describe("P11 humanAttributeName — dotted attributes, options, ancestor walk",
 
   it("passes through interpolation options to I18n", () => {
     class User extends Model {}
-    I18n.storeTranslations("en", {
+    I18n.backend().storeTranslations("en", {
       activemodel: { attributes: { user: { items: "%{count} item(s)" } } },
     });
     expect(User.humanAttributeName("items", { count: 2 })).toBe("2 item(s)");

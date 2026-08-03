@@ -10,6 +10,7 @@ import {
 } from "./index.js";
 import { Error as ActiveModelError } from "./error.js";
 import type { ValidatableRecord } from "./validator.js";
+import { resetI18n } from "./test-helpers/i18n.js";
 
 describe("ErrorsTest", () => {
   // =========================================================================
@@ -239,7 +240,7 @@ describe("ErrorsTest", () => {
   describe("i18nCustomizeFullMessage", () => {
     afterEach(() => {
       ActiveModelError.i18nCustomizeFullMessage = false;
-      I18n.reset();
+      resetI18n();
     });
 
     it("falls back to default format when model-specific keys are missing", () => {
@@ -250,8 +251,10 @@ describe("ErrorsTest", () => {
 
     it("uses model-specific attribute format when present", () => {
       ActiveModelError.i18nCustomizeFullMessage = true;
-      class User {}
-      I18n.storeTranslations("en", {
+      // Rails consults `activemodel.errors.models.*` only when the base's class
+      // responds to `i18n_scope` (error.rb:25) — a bare class never does.
+      class User extends Model {}
+      I18n.backend().storeTranslations("en", {
         activemodel: {
           errors: {
             models: {
