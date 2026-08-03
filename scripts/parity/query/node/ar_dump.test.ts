@@ -79,6 +79,17 @@ describe("ar_dump.ts", () => {
     expect(json.frozenAt).toBe("2000-01-01T00:00:00.000Z");
   });
 
+  it("dumps ar-12 (User.order hash) with table-qualified columns", () => {
+    // ar-12's models.ts never calls registerModel, and its relation is built at
+    // module scope — so this fails with a bare "created_at" unless the schema
+    // warm-up covers unregistered exports AND runs before query.ts is imported.
+    const { code, stdout, stderr, json } = runDumpReadJson("ar-12");
+    expect(code, `stdout: ${stdout}\nstderr: ${stderr}`).toBe(0);
+    expect(json.sql).toBe(
+      'SELECT "users".* FROM "users" ORDER BY "users"."created_at" DESC LIMIT 10 OFFSET 20',
+    );
+  });
+
   it("exits 1 with a useful message on --frozen-at without a value", () => {
     // tmpdir() rather than a hard-coded /tmp path — portable on Windows
     // and in restricted CI sandboxes.

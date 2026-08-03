@@ -158,22 +158,12 @@ async function main(): Promise<void> {
     // vs the correct SQLite literal (1/0, empty lock). Their PASS status in CI
     // acts as the integration test for this visitor-wiring invariant.
 
-    // 3. Import models.ts, then pre-warm the schema cache for every registered
-    //    model class. Rails loads schema lazily but *synchronously*, so
-    //    `Book.order(author_id: :asc)` at file scope already sees columns_hash;
-    //    trails' cache is populated async from the DB, so the warm-up has to
-    //    happen before query.ts runs. Fixtures build their relation eagerly at
-    //    module scope (`export default Book.order(...)`), and the relation
-    //    resolves column references at build time — warming only after the
-    //    import leaves `columnsHash()` empty for that build, which silently
-    //    drops table qualification (`"author_id"` instead of
-    //    `"books"."author_id"`) and, for eager_load, collapses JoinDependency's
-    //    column aliases down to the primary key.
+    // 3. Warm every model's schema. This MUST precede the query.ts import:
+    //    fixtures build their relation at module scope and resolve column
+    //    references at build time, so a cold columnsHash() silently drops
+    //    table qualification. Locked by the ar-12 test in ar_dump.test.ts.
     const modelsUrl = pathToFileURL(join(fixtureDirAbs, "models.ts")).href;
     const modelsMod = (await import(modelsUrl)) as Record<string, unknown>;
-    // Not every fixture calls registerModel(this), so the registry alone would
-    // silently skip those models' schemas — take the module's exported Base
-    // subclasses too and warm the union.
     const toWarm = new Map<string, unknown>(modelRegistry as Iterable<[string, unknown]>);
     for (const [name, exported] of Object.entries(modelsMod)) {
       if (typeof exported === "function" && exported.prototype instanceof Base) {
