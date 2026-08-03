@@ -133,6 +133,14 @@ interface Localizable {
 
 export abstract class Base {
   private eagerLoadedFlag = false;
+  /**
+   * Whether `I18n.load_path` has actually been read. The gem needs no such
+   * flag: `load_translations` is synchronous there, so a lazy-init call site
+   * can just run it. Here the read is async and has to happen up front, and
+   * `Simple#markInitialized` consults this to tell "nothing to load" apart
+   * from "not loaded yet".
+   */
+  protected loadPathRead = false;
 
   /**
    * Accepts a list of paths to translation files. Loads translations from YAML
@@ -144,7 +152,10 @@ export abstract class Base {
       typeof filenames[filenames.length - 1] === "function"
         ? (filenames.pop() as (filename: string, loadedTranslations: TranslationData) => void)
         : undefined;
-    if (filenames.length === 0) filenames = config().loadPath;
+    if (filenames.length === 0) {
+      filenames = config().loadPath;
+      this.loadPathRead = true;
+    }
     for (const filename of (filenames as (string | string[])[]).flat()) {
       const loadedTranslations = await this.loadFile(filename);
       if (block) block(filename, loadedTranslations);
@@ -255,6 +266,7 @@ export abstract class Base {
   abstract availableLocales(): Locale[];
 
   reloadBang(): void {
+    this.loadPathRead = false;
     if (this.eagerLoaded()) this.eagerLoadBang();
   }
 

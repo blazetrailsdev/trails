@@ -50,7 +50,13 @@ describe("I18n::Backend::Base file loading", () => {
 
   it("refuses a lazy lookup while I18n.load_path is unread", () => {
     config().loadPath = [`${localesDir()}/en.yml`];
-    expect(() => backend.translate("en", "foo.bar")).toThrow(/await backend.initTranslations/);
+    expect(() => backend.translate("en", "foo.bar")).toThrow(/await backend.loadTranslations/);
+  });
+
+  it("serves lookups after an awaited preload of I18n.load_path", async () => {
+    config().loadPath = [`${localesDir()}/en.yml`];
+    await backend.loadTranslations();
+    expect(backend.translate("en", "foo.bar")).toBe("baz");
   });
 
   describe("the YAML subset", () => {

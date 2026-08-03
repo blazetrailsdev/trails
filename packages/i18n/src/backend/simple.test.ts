@@ -256,7 +256,7 @@ describe("I18nBackendSimpleTest", () => {
 
   it("returns localized string given missing pluralization data", async () => {
     config().loadPath = [`${localesDir()}/en.yml`];
-    await (backend as unknown as { initTranslations(): Promise<void> }).initTranslations();
+    await backend.loadTranslations();
     expect(t("foo.bar", { count: 1 })).toBe("baz");
   });
 });

@@ -124,9 +124,9 @@ export class Simple extends Base {
    * `load_translations` then loads nothing.
    */
   private markInitialized(): void {
-    if (config().loadPath.length > 0) {
+    if (config().loadPath.length > 0 && !this.loadPathRead) {
       throw new Error(
-        "I18n.load_path is set but was never read: reading translation files is async, so await backend.initTranslations() before the first lookup.",
+        "I18n.load_path is set but was never read: reading translation files is async, so await backend.loadTranslations() before the first lookup.",
       );
     }
     this.initializedFlag = true;
