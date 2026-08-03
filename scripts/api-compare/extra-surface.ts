@@ -831,13 +831,9 @@ function collectAllowedNames(
     for (const c of candidates) allowed.add(c);
   };
 
-  // Ruby-side walk: `incName` is a Ruby constant, so a duplicated short name
-  // (`SchemaStatements` under three adapter namespaces) is disambiguated by the
-  // enclosing namespace inside `resolveModuleName`, exactly as Ruby's own
-  // constant lookup does. It needs no declaring-file hint — that is the TS side's
-  // problem, where short names have no namespace to walk and the extractor
-  // records `superclassFile` / `extendsFiles` instead (compare.ts
-  // `resolveEntityByDeclaringFile`).
+  // Ruby-side walk: a duplicated short name is disambiguated by the enclosing
+  // namespace inside `resolveModuleName`, so this needs no declaring-file hint
+  // the way the TS sites do (compare.ts `resolveEntityByDeclaringFile`).
   const walkMixin = (incName: string, contextFqn: string): void => {
     const fqn = resolveModuleName(incName, contextFqn, moduleFqnByShort);
     if (visited.has(fqn)) return;

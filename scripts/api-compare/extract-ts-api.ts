@@ -535,7 +535,7 @@ export function extractFromProgram(
         if (!isExported(node)) return;
         const name = node.name.text;
         const modKey = `${relPath}:${name}`;
-        const extracted = extractInterface(node, checker, relPath);
+        const extracted = extractInterface(node, checker, relPath, srcDir);
         const existing = info.modules[modKey];
         if (existing) {
           // Merge declaration-merged interfaces (same name, same file)
@@ -545,6 +545,9 @@ export function extractFromProgram(
           }
           for (const e of extracted.extends) {
             if (!existing.extends.includes(e)) existing.extends.push(e);
+          }
+          if (extracted.extendsFiles) {
+            existing.extendsFiles = { ...extracted.extendsFiles, ...(existing.extendsFiles ?? {}) };
           }
           // A declaration-merged interface only needs the tag on ONE of its
           // declarations; without this the reason is lost whenever the tagged
@@ -1860,6 +1863,15 @@ export function resolveRelModule(fromRel: string, spec: string): string | null {
   return path.posix.normalize(path.posix.join(fromDir, withoutExt)) + ".ts";
 }
 
+/**
+ * Extract one exported class into a `ClassInfo`.
+ *
+ * `srcDir` is what lets the `extends` clause be recorded as a declaring file
+ * (`superclassFile`) and not just a bare short name — sibling adapter
+ * directories declare same-named classes, and a consumer given only the name
+ * has to guess. Omit it (tests compiling a single virtual file) and the
+ * superclass is still recorded by name, without the file.
+ */
 export function extractClass(
   node: ts.ClassDeclaration,
   checker: ts.TypeChecker,
@@ -1877,10 +1889,6 @@ export function extractClass(
         const expr = clause.types[0]?.expression;
         if (!expr) continue;
         superclass = expr.getText();
-        // Same rule as include()/extend() edges: the superclass is recorded by
-        // its bare short name, and sibling adapter directories declare classes
-        // that share one (`SchemaStatements`). Record where it was declared so
-        // the consumer doesn't have to guess from path proximity.
         if (srcDir !== undefined) {
           superclassFile = declaringFile(resolveDeclarationSymbol(checker, expr), srcDir);
         }
@@ -2071,10 +2079,12 @@ function extractInterface(
   node: ts.InterfaceDeclaration,
   checker: ts.TypeChecker,
   file: string,
+  srcDir?: string,
 ): ClassInfo {
   const name = node.name.text;
   const instanceMethods: MethodInfo[] = [];
   const extendsArr: string[] = [];
+  let extendsFiles: Record<string, string> | undefined;
 
   if (node.heritageClauses) {
     for (const clause of node.heritageClauses) {
@@ -2082,6 +2092,13 @@ function extractInterface(
         for (const type of clause.types) {
           const exprText = type.expression.getText();
           extendsArr.push(exprText);
+          if (srcDir !== undefined) {
+            const declFile = declaringFile(
+              resolveDeclarationSymbol(checker, type.expression),
+              srcDir,
+            );
+            if (declFile) extendsFiles = { ...(extendsFiles ?? {}), [exprText]: declFile };
+          }
 
           // Resolve mapped/generic types (e.g. Included<typeof X>) via
           // the type checker so their computed properties appear as methods.
@@ -2142,6 +2159,7 @@ function extractInterface(
     file,
     includes: [],
     extends: extendsArr,
+    ...(extendsFiles !== undefined ? { extendsFiles } : {}),
     instanceMethods,
     classMethods: [],
     isInterface: true,

@@ -968,6 +968,20 @@ describe("extractFromProgram — include() detection", () => {
     expect(cls.superclassFile).toBe("sqlite3/schema-statements.ts");
   });
 
+  it("records extendsFiles for an interface's extends clause", () => {
+    const info = extractFromFiles("/p", {
+      "abstract/quoting.ts": `export interface Quoting { quoteColumnName(n: string): string }`,
+      "sqlite3/quoting.ts": `export interface Quoting { quotedBinary(v: string): string }`,
+      "sqlite3/adapter.ts": `
+        import type { Quoting } from "./quoting.js";
+        export interface SQLite3Adapter extends Quoting {}
+      `,
+    });
+    const iface = info.modules["sqlite3/adapter.ts:SQLite3Adapter"];
+    expect(iface.extends).toContain("Quoting");
+    expect(iface.extendsFiles?.["Quoting"]).toBe("sqlite3/quoting.ts");
+  });
+
   it("omits superclassFile when the extends clause has no resolvable declaration", () => {
     // A mixin-factory call (`extends Mixin(Base)`) has no symbol to locate, and
     // a superclass imported from another package declares outside `srcDir`.
