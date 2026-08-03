@@ -89,11 +89,19 @@ ratchet is a separate CI step (`.github/workflows/ci.yml`, jobs "API comparison
 **not** run: `api:compare` runs only the narrow call ratchet. Because the wide
 step runs only in CI, a PR that passes every local check can still fail the
 `rails-comparison` job (this happened in #5027). `pnpm api:calls:wide` runs the
-wide lint locally, but it lints an artifact that
-`scripts/api-compare/compare.ts --wide-calls` must regenerate first — so run
-`pnpm api:compare --wide-calls` (or `API_COMPARE_FORCE=1 pnpm api:compare
---wide-calls` to bypass the cache) before it, or the lint checks a stale
-artifact.
+wide lint locally, and since RFC 0083 a plain gating run **regenerates
+`output/call-mismatches-wide.json` itself** before linting
+(`lint-call-mismatches-wide.ts:68-78`, via `run.sh` so the extraction manifests
+compare.ts reads are refreshed first) — so the bare command is enough. It opts
+out of that regeneration under `--no-regen`, `API_COMPARE_SKIP_WIDE_REGEN=1`, or
+any CI value, and only then does it gate whatever artifact is on disk. Reach for
+`API_COMPARE_FORCE=1 pnpm api:compare --wide-calls` beforehand when you need to
+bypass a warm cache (it under-reports vs CI), remembering that the narrow and
+wide artifacts are separate: `compare.ts` writes `call-mismatches.json` on a
+normal run and `call-mismatches-wide.json` only under `--wide-calls`
+(`compare.ts:2543`), so one compare run never refreshes both. The pre-PR
+checklist in [CLAUDE.md](CLAUDE.md) is the authoritative workflow; this section
+explains the machinery behind it.
 
 The wide baseline is **only-shrink**: it fails not just on a _new_ mismatch but
 on a _converged_ one. Fixing a real divergence makes the corresponding baseline
