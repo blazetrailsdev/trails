@@ -111,9 +111,11 @@ function temporalAsJson(value: unknown): string | undefined {
 
   if (value instanceof Temporal.ZonedDateTime) {
     if (Encoding.useStandardJsonTimeFormat) {
-      return value.toString({ fractionalSecondDigits: digits, timeZoneName: "never" });
+      const formatted = value.toString({ fractionalSecondDigits: digits, timeZoneName: "never" });
+      // `xmlschema` renders a zero offset as "Z" (formatted_offset(true, 'Z')).
+      return value.offsetNanoseconds === 0 ? `${formatted.slice(0, -6)}Z` : formatted;
     }
-    return slashFormat(value, value.offset.replace(":", ""));
+    return slashFormat(value, value.offset.replaceAll(":", ""));
   }
 
   if (value instanceof Temporal.PlainDateTime) {

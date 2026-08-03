@@ -451,7 +451,7 @@ export class TimeWithZone {
       base += frac;
     }
 
-    base += this.formattedOffset();
+    base += this.formattedOffset(true, "Z");
     return base;
   }
 
