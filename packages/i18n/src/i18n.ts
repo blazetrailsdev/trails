@@ -181,11 +181,16 @@ export function setEnforceAvailableLocales(value: boolean): void {
  * this one seam and awaited: `reload!` is the only method that becomes async,
  * and every ported body below it — including the four lazy call sites — stays
  * verbatim and synchronous.
+ *
+ * It precedes `backend.reload!` because that is not always lazy: `Base#reload!`
+ * re-runs `eager_load!` on an eager-loaded backend (base.rb:101), which reaches
+ * `init_translations` / `load_translations` during the reload itself
+ * (simple.rb:83, base.rb:14).
  */
 export async function reloadBang(): Promise<void> {
   config().clearAvailableLocalesSet();
-  config().backend.reloadBang();
   await reloadTranslationFiles();
+  config().backend.reloadBang();
 }
 
 /**

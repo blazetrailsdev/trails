@@ -78,6 +78,20 @@ describe("I18n::Backend::Base file loading", () => {
     expect(backend.translate("en", "foo.bar")).toBe("qux");
   });
 
+  it("re-reads I18n.load_path on reloadBang with an eager loaded backend", async () => {
+    let body = "en:\n  foo:\n    bar: baz\n";
+    registerFileReader(() => Promise.resolve(body));
+    config().loadPath = ["mutable.yml"];
+    await preloadTranslationFiles();
+    backend.eagerLoadBang();
+    expect(backend.translate("en", "foo.bar")).toBe("baz");
+
+    body = "en:\n  foo:\n    bar: qux\n";
+    await reloadBang();
+    expect(backend.initialized()).toBe(true);
+    expect(backend.translate("en", "foo.bar")).toBe("qux");
+  });
+
   it("leaves the lazy-init guard armed when the load path holds an invalid file", () => {
     config().loadPath = [`${localesDir()}/invalid/syntax.yml`];
     expect(() => backend.translate("en", "foo.bar")).toThrow(InvalidLocaleData);
