@@ -159,12 +159,10 @@ const fileHasMissingRailsCallTag = new WeakMap<ts.SourceFile, boolean>();
  * conventionally trail the description. Every other tag name after the reason
  * is prose that TypeScript mis-parsed — see `proseTagAfter`.
  *
- * Declared with the imports, above the `!isMainThread` block below, for the
- * same reason as `fileHasMissingRailsCallTag`: a worker thread runs the whole
- * extraction during module evaluation, so a `const` declared next to its
- * reader further down the file is still in its temporal dead zone when the
- * reader runs — a tag-order violation would abort the run with a
- * `ReferenceError` naming this constant instead of the intended diagnostic.
+ * Declared with the imports, above the `!isMainThread` block, for the same
+ * reason as `fileHasMissingRailsCallTag`: a worker runs the whole extraction
+ * during module evaluation, so a `const` declared next to its reader further
+ * down the file is still in its temporal dead zone when that reader runs.
  */
 const TAGS_ALLOWED_AFTER_NO_RAILS_EQUIVALENT = new Set([
   "param",
