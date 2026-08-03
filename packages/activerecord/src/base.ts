@@ -4399,11 +4399,6 @@ export class Base extends Model {
    * Compare two records for equality based on class and primary key.
    *
    * Mirrors: ActiveRecord::Core#==
-   *
-   * @noRailsEquivalent PERMANENT This is `def ==` at
-   * `vendor/rails/activerecord/lib/active_record/core.rb:631`. TS cannot name a
-   * method `==` and cannot overload the operator, so the ported body needs a
-   * spelled-out identifier; there is no `def is_equal` in Rails to match it.
    */
   declare equals: (other: unknown) => boolean;
 
