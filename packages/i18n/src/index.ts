@@ -4,7 +4,20 @@ export type {
   ExceptionHandlerLike,
   MissingInterpolationArgumentHandler,
 } from "./config.js";
-export * from "./exceptions.js";
+export {
+  ArgumentError,
+  Disabled,
+  ExceptionHandler,
+  InvalidLocale,
+  InvalidLocaleData,
+  InvalidPluralizationData,
+  MissingInterpolationArgument,
+  MissingTranslation,
+  MissingTranslationData,
+  ReservedInterpolationKey,
+  UnknownFileType,
+} from "./exceptions.js";
+export type { MissingTranslationOptions } from "./exceptions.js";
 export { DEFAULT_INTERPOLATION_PATTERNS } from "./interpolate/ruby.js";
 export {
   EMPTY_HASH,

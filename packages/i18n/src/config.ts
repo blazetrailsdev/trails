@@ -22,9 +22,11 @@ export type MissingInterpolationArgumentHandler = (
   string: string,
 ) => unknown;
 
-// Ruby's `@@`-scoped config lives on the class and is shared by every Config
-// instance (and subclass); module-level bindings are the JS equivalent. Only
-// `locale` is per-instance, exactly as in the gem.
+/**
+ * Ruby's `@@`-scoped config lives on the class and is shared by every `Config`
+ * instance (and subclass); these module-level bindings are the JS equivalent.
+ * Only `locale` is per-instance, exactly as in the gem.
+ */
 let backend: Backend | undefined;
 let defaultLocale: Locale | undefined;
 let availableLocales: Locale[] | undefined;
@@ -94,16 +96,16 @@ export class Config {
     return availableLocales ?? this.backend.availableLocales();
   }
 
-  set availableLocales(locales: Locale | Locale[] | null | undefined) {
-    const list = locales === null || locales === undefined ? [] : [locales].flat();
-    availableLocales = list.length === 0 ? undefined : list;
-    availableLocalesSet = undefined;
-  }
-
   /** Cached as a Set for faster available-locales enforce checks. */
   get availableLocalesSet(): Set<Locale> {
     availableLocalesSet ??= new Set(this.availableLocales);
     return availableLocalesSet;
+  }
+
+  set availableLocales(locales: Locale | Locale[] | null | undefined) {
+    const list = locales === null || locales === undefined ? [] : [locales].flat();
+    availableLocales = list.length === 0 ? undefined : list;
+    availableLocalesSet = undefined;
   }
 
   /** Returns true if the available locales have been initialized. */

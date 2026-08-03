@@ -28,11 +28,15 @@ function inspectSymbol(value: unknown): string {
   return typeof value === "string" ? `:${value}` : inspect(value);
 }
 
+/**
+ * Mirrors: I18n::ArgumentError, the root of every error in this file.
+ *
+ * `message` is passed straight through rather than defaulting to `""`, so
+ * `Error` installs no own `message` property when it is undefined — an own
+ * property would shadow `MissingTranslation`'s computed getter.
+ */
 export class ArgumentError extends Error {
   constructor(message?: string) {
-    // Passing `message` straight through (rather than defaulting to "") keeps
-    // `Error` from installing an own `message` property when it is undefined —
-    // an own property would shadow `MissingTranslation`'s computed getter.
     super(message);
     this.name = "ArgumentError";
   }
@@ -40,15 +44,14 @@ export class ArgumentError extends Error {
 
 export class Disabled extends ArgumentError {
   constructor(method: string) {
-    super(
-      `I18n.${method} is currently disabled, likely because your application is still in its loading phase.\n` +
-        `\n` +
-        `This method is meant to display text in the user locale, so calling it before the user locale has\n` +
-        `been set is likely to display text from the wrong locale to some users.\n` +
-        `\n` +
-        `If you have a legitimate reason to access i18n data outside of the user flow, you can do so by passing\n` +
-        `the desired locale explicitly with the \`locale\` argument, e.g. \`I18n.${method}(..., locale: :en)\`\n`,
-    );
+    super(`I18n.${method} is currently disabled, likely because your application is still in its loading phase.
+
+This method is meant to display text in the user locale, so calling it before the user locale has
+been set is likely to display text from the wrong locale to some users.
+
+If you have a legitimate reason to access i18n data outside of the user flow, you can do so by passing
+the desired locale explicitly with the \`locale\` argument, e.g. \`I18n.${method}(..., locale: :en)\`
+`);
     this.name = "Disabled";
   }
 }
@@ -84,13 +87,15 @@ const PERMITTED_KEYS = ["scope", "default"] as const;
 /**
  * Mirrors: I18n::MissingTranslation::Base. Ruby mixes this module into both
  * `MissingTranslation` and `MissingTranslationData`; here it is their shared
- * superclass, which puts the same methods on both.
+ * superclass, which puts the same methods on both. The constructor keeps only
+ * the permitted options, plus every Proc-valued entry (permitted or not) in
+ * its inspected form, as Ruby does.
  */
 export class Base extends ArgumentError {
   readonly locale: Locale;
   readonly key: TranslationKey;
   readonly options: MissingTranslationOptions;
-  private keysCache?: (string | number | boolean)[];
+  private keysCache?: TranslationKey[];
 
   constructor(locale: Locale, key: TranslationKey, options: MissingTranslationOptions = {}) {
     super();
@@ -102,13 +107,12 @@ export class Base extends ArgumentError {
     for (const permitted of PERMITTED_KEYS) {
       if (permitted in options) slice[permitted] = options[permitted];
     }
-    // Ruby copies Proc-valued entries in verbatim, permitted or not.
     for (const [k, v] of Object.entries(options)) {
       if (typeof v === "function") slice[k] = inspect(v);
     }
   }
 
-  keys(): (string | number | boolean)[] {
+  keys(): TranslationKey[] {
     if (!this.keysCache) {
       const keys = normalizeKeys(this.locale, this.key, this.options.scope);
       if (keys.length < 2) keys.push("no key");

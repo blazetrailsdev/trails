@@ -16,10 +16,12 @@ import {
 import { resetClassConfig } from "./config.js";
 import { resetConfig } from "./i18n.js";
 
-// Trails-only: i18n/test/i18n/exceptions_test.rb drives every message
-// assertion through `I18n.translate`, which is not ported yet (and whose
-// default ExceptionHandler swallows MissingTranslation, leaving those cases
-// vacuous upstream). These assert the ported classes directly.
+/**
+ * Trails-only: i18n/test/i18n/exceptions_test.rb drives every message assertion
+ * through `I18n.translate`, which is not ported yet (and whose default
+ * ExceptionHandler swallows MissingTranslation, leaving those cases vacuous
+ * upstream). These assert the ported classes directly.
+ */
 describe("exceptions", () => {
   beforeEach(() => {
     resetConfig();
@@ -125,15 +127,13 @@ describe("exceptions", () => {
     expect(exception.message).toBe(`reserved key :scope used in "%{scope}"`);
   });
 
-  it("ExceptionHandler returns the message for MissingTranslation and re-raises otherwise", () => {
+  it("ExceptionHandler returns the message for MissingTranslation and re-raises everything else, MissingTranslationData included", () => {
     const handler = new ExceptionHandler();
     const missing = new MissingTranslation("de", "foo");
     expect(handler.call(missing, "de", "foo", {})).toBe("Translation missing: de.foo");
 
     const other = new InvalidLocale("de");
     expect(() => handler.call(other, "de", "foo", {})).toThrow(other);
-    // MissingTranslationData is a sibling of MissingTranslation in Ruby, not a
-    // subclass, so the handler re-raises it.
     const data = new MissingTranslationData("de", "foo");
     expect(() => handler.call(data, "de", "foo", {})).toThrow(data);
   });
