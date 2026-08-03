@@ -401,6 +401,14 @@ export class ForeignKeyDefinition {
 }
 
 /**
+ * Mirrors: ActiveRecord::ConnectionAdapters::PrimaryKeyDefinition
+ * @internal
+ */
+export class PrimaryKeyDefinition {
+  constructor(readonly name: string[]) {}
+}
+
+/**
  * Mirrors: ActiveRecord::ConnectionAdapters::CheckConstraintDefinition
  */
 export class CheckConstraintDefinition {
@@ -973,7 +981,7 @@ export class TableDefinition {
   readonly as?: string;
   readonly options?: string;
   readonly comment?: string;
-  compositePrimaryKey?: string[];
+  private _primaryKeys?: PrimaryKeyDefinition;
   private _adapterName: "sqlite" | "postgres" | "mysql";
   protected _adapter: SchemaQuoter;
 
@@ -1057,21 +1065,16 @@ export class TableDefinition {
     }
 
     if (Array.isArray(pk)) {
-      // Rails stores this as `@primary_keys = PrimaryKeyDefinition.new(pk)`; trails
-      // carries a composite PK on the definition itself, and `primaryKeys` is a
-      // reader over the built columns rather than Rails' writer.
-      this.compositePrimaryKey = pk;
+      this.primaryKeys(pk);
     } else {
       this.primaryKey(pk, pkType, pkOptions);
     }
   }
 
-  primaryKeys(name?: string): string[] {
-    if (name) {
-      const col = this.columns.find((c) => c.name === name && c.options.primaryKey);
-      return col ? [col.name] : [];
-    }
-    return this.columns.filter((c) => c.options.primaryKey).map((c) => c.name);
+  /** @internal */
+  primaryKeys(name?: string[]): PrimaryKeyDefinition | undefined {
+    if (name) this._primaryKeys = new PrimaryKeyDefinition(name);
+    return this._primaryKeys;
   }
 
   /**
