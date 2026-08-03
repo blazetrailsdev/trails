@@ -360,13 +360,13 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
     // default timezone flipped to :local, executing a statement re-syncs the
     // connection's database_timezone from :utc to :local.
     await adapter.execute("SELECT 1");
-    expect(adapter.databaseTimezone).toBe("utc");
+    expect(adapter._databaseTimezone).toBe("utc");
     await withTimezoneConfig({ default: "local" }, async () => {
       await adapter.execute("SELECT 1");
-      expect(adapter.databaseTimezone).toBe("local");
+      expect(adapter._databaseTimezone).toBe("local");
     });
     await adapter.execute("SELECT 1");
-    expect(adapter.databaseTimezone).toBe("utc");
+    expect(adapter._databaseTimezone).toBe("utc");
   });
 
   it("warnings do not change returned value of exec update", async () => {

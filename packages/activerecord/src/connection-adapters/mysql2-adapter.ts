@@ -162,8 +162,16 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   /**
    * Async liveness probe — checks socket health via a real `ping` call on the
    * persistent connection, lazily establishing it if needed. Updates the cached
-   * `_activeState` so the sync `active` getter reflects the result. Mirrors
-   * Rails' `active?` which calls `mysql_ping` on the raw connection.
+   * `_activeState` so the sync `active` getter reflects the result.
+   *
+   * @noRailsEquivalent PERMANENT — this is the async half of Rails' `active?`
+   * (mysql2_adapter.rb:108), which pings the raw connection inline
+   * (`@raw_connection&.ping`) because the Ruby mysql2 driver is blocking. The
+   * node-mysql2 `ping()` returns a promise, so the ping cannot happen inside a
+   * sync predicate; trails splits `active?` into the sync `active` getter
+   * (Rails' `connected?` guard plus the cached liveness) and this awaitable
+   * probe. Rails has one method where trails needs two, so the second name has
+   * no counterpart to converge onto.
    */
   async activeAsync(): Promise<boolean> {
     if (this._permanentlyClosed || this._isFakeConnection) {
@@ -274,15 +282,17 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   private _statementPool: Mysql2StatementPool | null = null;
 
   /**
-   * The timezone applied to result rows for the most recent query. Mirrors
-   * the Ruby mysql2 driver's `query_options[:database_timezone]`, which
-   * Rails' `Mysql2Adapter#perform_query` re-syncs to
-   * `ActiveRecord.default_timezone` before each query so a runtime change to
-   * the global default takes effect on the next statement (no reconnect).
+   * The timezone applied to result rows for the most recent query. Rails-private
+   * (`_` prefix) because Rails exposes no reader for it: the value lives inside
+   * the Ruby driver as `@raw_connection.query_options[:database_timezone]`,
+   * which `Mysql2Adapter#configure_connection` assigns from `default_timezone`
+   * (mysql2_adapter.rb:160). node-mysql2 has no `query_options` hash, so trails
+   * holds the same state in a field — there is no Rails method name to map it
+   * onto, only a driver ivar.
    *
    * Updated by {@link _syncDatabaseTimezone} from the perform-query path.
    */
-  databaseTimezone: "utc" | "local" = "utc";
+  _databaseTimezone: "utc" | "local" = "utc";
 
   /**
    * Rows affected by the most recent write, recorded by {@link _performQuery}.
@@ -292,14 +302,14 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   _affectedRowsBeforeWarnings = 0;
 
   /**
-   * Refresh {@link databaseTimezone} from the global default. Called from
+   * Refresh {@link _databaseTimezone} from the global default. Called from
    * the perform-query path so a `withTimezoneConfig({ default: "local" })`
    * block is observable on the very next query — matching Rails'
    * `raw_connection.query_options[:database_timezone] = default_timezone`
    * line in `Mysql2Adapter#perform_query`.
    */
   private _syncDatabaseTimezone(): void {
-    this.databaseTimezone = ActiveRecord.defaultTimezone;
+    this._databaseTimezone = ActiveRecord.defaultTimezone;
   }
 
   protected override _onStatementLimitChanged(value: number): void {
@@ -1484,9 +1494,9 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
 
   async tableExists(name: string): Promise<boolean> {
     // Rails' table_exists?(nil) / "" returns false; a null/empty name has no
-    // schema to parse, so short-circuit before parseMysqlName (which trims).
+    // schema to parse, so short-circuit before mysqlParseName (which trims).
     if (!name) return false;
-    const { schema, table } = this.parseMysqlName(name);
+    const { schema, table } = mysqlParseName(name);
     // Use `schema_placeholder OR database()` via COALESCE so the same
     // query shape serves qualified + unqualified callers.
     const rows = await this.schemaQuery(
@@ -1507,7 +1517,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    * emits in `abstract_mysql_adapter#primary_keys`.
    */
   async primaryKey(tableName: string): Promise<string | string[] | null> {
-    const { schema, table } = this.parseMysqlName(tableName);
+    const { schema, table } = mysqlParseName(tableName);
     const rows = (await this.schemaQuery(
       `SELECT column_name AS name FROM information_schema.statistics
          WHERE index_name = 'PRIMARY'
@@ -1532,11 +1542,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       },
       tableName,
     );
-  }
-
-  /** Delegates to {@link mysqlParseName} in `mysql/schema-statements.ts`. */
-  parseMysqlName(name: string): { schema?: string; table: string } {
-    return mysqlParseName(name);
   }
 
   supportsAdvisoryLocks(): boolean {
@@ -1772,7 +1777,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     // database_timezone on the single raw connection. We have a single
     // persistent connection here too; mysql2's typeCast handles temporal
     // fields and results are returned as objects (not arrays).
-    // The database_timezone equivalent ({@link databaseTimezone}) is seeded
+    // The database_timezone equivalent ({@link _databaseTimezone}) is seeded
     // from the global default here and re-synced per-query in perform_query,
     // mirroring Rails' `query_options[:database_timezone] = default_timezone`.
     // This reseed is UNGATED: Rails reassigns database_timezone on every

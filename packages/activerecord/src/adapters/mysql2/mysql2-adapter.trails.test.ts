@@ -269,23 +269,23 @@ describeIfMysqlAdapter("Mysql2Adapter (trails extensions)", () => {
     // mirror only checks execute(); here we guard that every perform-query path
     // (execQuery / executeMutation / exec / explain) re-syncs the timezone too.
     await adapter.execute("SELECT 1");
-    expect(adapter.databaseTimezone).toBe("utc");
+    expect(adapter._databaseTimezone).toBe("utc");
     await withTimezoneConfig({ default: "local" }, async () => {
-      adapter.databaseTimezone = "utc";
+      adapter._databaseTimezone = "utc";
       await adapter.execQuery("SELECT 1");
-      expect(adapter.databaseTimezone).toBe("local");
-      adapter.databaseTimezone = "utc";
+      expect(adapter._databaseTimezone).toBe("local");
+      adapter._databaseTimezone = "utc";
       await adapter.executeMutation("DO 1");
-      expect(adapter.databaseTimezone).toBe("local");
-      adapter.databaseTimezone = "utc";
+      expect(adapter._databaseTimezone).toBe("local");
+      adapter._databaseTimezone = "utc";
       await adapter.exec("DO 1");
-      expect(adapter.databaseTimezone).toBe("local");
-      adapter.databaseTimezone = "utc";
+      expect(adapter._databaseTimezone).toBe("local");
+      adapter._databaseTimezone = "utc";
       await adapter.explain("SELECT 1");
-      expect(adapter.databaseTimezone).toBe("local");
+      expect(adapter._databaseTimezone).toBe("local");
     });
     await adapter.execute("SELECT 1");
-    expect(adapter.databaseTimezone).toBe("utc");
+    expect(adapter._databaseTimezone).toBe("utc");
   });
 
   it("configure connection seeds database timezone from default", async () => {
@@ -293,14 +293,14 @@ describeIfMysqlAdapter("Mysql2Adapter (trails extensions)", () => {
     // `@raw_connection.query_options[:database_timezone] = default_timezone`
     // up front. Asserts the seed lands immediately — the per-query re-sync
     // is covered by the mirror's timezone test.
-    adapter.databaseTimezone = "utc";
+    adapter._databaseTimezone = "utc";
     await withTimezoneConfig({ default: "local" }, async () => {
       await adapter.configureConnection();
-      expect(adapter.databaseTimezone).toBe("local");
+      expect(adapter._databaseTimezone).toBe("local");
     });
     await withTimezoneConfig({ default: "utc" }, async () => {
       await adapter.configureConnection();
-      expect(adapter.databaseTimezone).toBe("utc");
+      expect(adapter._databaseTimezone).toBe("utc");
     });
   });
 
