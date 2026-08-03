@@ -94,8 +94,8 @@ export class Chain extends Base {
   }
 
   override translate(
-    locale: Locale,
-    key: TranslationKey | symbol,
+    locale: Locale | null | undefined,
+    key: TranslationKey | symbol | null | undefined,
     defaultOptions: TranslateOptions = EMPTY_HASH,
   ): unknown {
     let namespace: TranslationData | null = null;
@@ -116,7 +116,7 @@ export class Chain extends Base {
     }
 
     if (truthy(namespace)) return namespace;
-    throwException(new MissingTranslation(locale, key as TranslationKey, options));
+    throwException(new MissingTranslation(locale as Locale, key as TranslationKey, options));
   }
 
   override exists(
