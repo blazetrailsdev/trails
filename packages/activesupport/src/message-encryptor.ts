@@ -1,6 +1,12 @@
 import { getCrypto } from "./crypto-adapter.js";
 import { Codec, type MessageSerializer } from "./messages/codec.js";
 import type { ExpectedMetadataOptions, MetadataOptions } from "./messages/metadata.js";
+import {
+  initializeRotator,
+  installRotator,
+  type OnRotation,
+  type RotatableOptions,
+} from "./messages/rotator.js";
 import { Thrown, type Format } from "./messages/serializer-with-fallback.js";
 
 export class InvalidMessage extends Error {
@@ -10,7 +16,7 @@ export class InvalidMessage extends Error {
   }
 }
 
-interface MessageEncryptorOptions {
+interface MessageEncryptorOptions extends RotatableOptions {
   cipher?: string;
   digest?: string;
   serializer?: Format | MessageSerializer;
@@ -19,6 +25,10 @@ interface MessageEncryptorOptions {
 
 export class MessageEncryptor extends Codec {
   static override defaultSerializer: Format | MessageSerializer = "json";
+
+  declare rotate: (...args: unknown[]) => this;
+  declare onRotation: (callback: OnRotation) => this;
+  declare fallBackTo: (fallback: this) => this;
 
   private secret: Buffer;
   private signSecret: Buffer;
@@ -59,6 +69,12 @@ export class MessageEncryptor extends Codec {
     } else {
       this.signSecret = this.secret;
     }
+
+    initializeRotator(
+      this,
+      signSecret === undefined ? [secret] : [secret, signSecret],
+      opts as Record<string, unknown>,
+    );
   }
 
   encryptAndSign(value: unknown, options: MetadataOptions = {}): string {
@@ -168,6 +184,8 @@ export class MessageEncryptor extends Codec {
     return 16;
   }
 }
+
+installRotator(MessageEncryptor);
 
 export namespace NullSerializer {
   export function dump(value: unknown): string {
