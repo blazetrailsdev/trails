@@ -2,7 +2,25 @@
 
 ## What this project is
 
-A TypeScript monorepo that mirrors the Ruby on Rails API. Class names, method names, and call signatures should match Rails as closely as TypeScript allows. Someone reading the Rails API docs should be able to use these packages with near-identical intent and naming.
+A TypeScript monorepo that mirrors the Ruby on Rails API. Someone reading the Rails API docs should be able to use these packages with near-identical intent and naming.
+
+## Fidelity is the standard
+
+This is a re-implementation of Rails, not a library inspired by it. When code has a Rails counterpart, it should be as close to the Ruby as TypeScript allows. The bar is **"would a Rails dev recognize this as the same method"**, not "does it pass the tests". Mirror:
+
+- **Names** — method, class, module, constant, and field names, translated by the rules in [docs/ruby-ts-conventions.md](../docs/ruby-ts-conventions.md).
+- **Locals and parameters** — a Rails local `stmt` stays `stmt`, not `statement`; `klass` stays `klass`. Same for parameter order and defaults.
+- **Control flow** — same branches, same order, same guards and early returns. Collapsing, reordering, or inverting them is a finding.
+- **Decomposition** — if Rails extracts a private helper, so should we, at the Rails name. One Rails method is one TS method.
+- **Member order within the file**, and the file layout itself.
+- **Errors** — same class, same message, same raise site.
+- **No extra abstraction** — no helper, wrapper, indirection layer, or "cleaner" rewrite Rails doesn't have. `pnpm api:extra` measures this; `@noRailsEquivalent <reason>` is the only sanctioned exception.
+
+Only a genuine TypeScript language shortcoming justifies a deviation, and only after the settled workaround is ruled out (`setX()` where a Ruby `x=` setter must be async, `include()`/`Included<>` and `this`-typed functions for Ruby `include`). "Cleaner in TS", "more idiomatic", and "the tests pass either way" are not language shortcomings.
+
+**Converge, never ratify.** An existing deviation — a `call-mismatches-*-exclude` baseline row, an `arity-exclude.json` entry, a `SKIP_GROUPS` name, a `@noRailsEquivalent` / `@missingRailsCall` tag, a story under `0023-surfaced-deviations` — is debt, not permission. It is never a reason to match the shape, extend it, or add a sibling row. A diff that _adds_ one is recording a new deviation: review its `reason` at least as hard as the code, and treat a seeded placeholder or a reason that only restates the code as a finding.
+
+The full standard, and the pre-PR gates that detect drift, are in [CLAUDE.md](../CLAUDE.md) — "Fidelity is the job" and "Before you open the PR".
 
 ## Project structure
 

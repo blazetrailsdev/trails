@@ -16,10 +16,13 @@ the `declare` / associations / enums / schema reference live in
   `isPersisted()`, `readAttribute()`, `writeAttribute()`) — not ad-hoc state.
   Handle composite primary keys (`primaryKey` can be `string | string[]`).
   Delegate to existing infrastructure; don't reimplement it.
-- **Ship behavior, not signatures.** Never commit a method that matches a
-  Rails API surface but returns null/undefined or only mutates in-memory
-  state when Rails hits the DB. A missing method is better than a misleading
-  one. `api:compare` coverage is a side effect of correct implementation.
+- **Ship behavior _and_ signatures.** Never commit a method that matches a
+  Rails API surface but returns null/undefined or only mutates in-memory state
+  when Rails hits the DB — a missing method is better than a misleading one.
+  The converse is equally true: correct behavior under a name, signature, or
+  structure Rails doesn't have is also a defect, because the next agent to port
+  a caller won't find it. `api:compare` coverage is a floor, not a goal; see
+  CLAUDE.md "Fidelity is the job" for the standard.
 - **Use the package ecosystem like Rails does.** In `activerecord`, build
   queries with `@blazetrails/arel` (Table, SelectManager, Nodes, Attribute) —
   never raw SQL strings. Use `@blazetrails/activemodel` for

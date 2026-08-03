@@ -6,6 +6,116 @@ measure progress — see [CONTRIBUTING.md](CONTRIBUTING.md). For project overvie
 package list, and the `declare` / associations / enums / schema reference, see
 [README.md](README.md).
 
+## Fidelity is the job
+
+trails is a re-implementation of Rails, not a library inspired by it. When a
+file has a Rails counterpart, write it as close to the Ruby as TypeScript
+allows. The bar is **"would a Rails dev recognize this as the same method"** —
+not "does it pass the tests."
+
+Mirror, method by method and line by line:
+
+- **Names.** Method, class, module, constant, and field names come from Rails,
+  translated by the rules in
+  [docs/ruby-ts-conventions.md](docs/ruby-ts-conventions.md) — that file is
+  generated from `scripts/api-compare/conventions.ts` and is what `api:compare`
+  actually matches on, so read it _before_ you pick a name, not after CI
+  disagrees. It also covers file paths (`PATH_SEGMENT_ALIASES`,
+  `RUBY_FILE_TS_OVERRIDES`). If your name isn't the one that table produces
+  from the Ruby name, you have a bug, not a preference.
+- **Locals and parameters.** A local or parameter keeps the Rails identifier,
+  camelCased — Ruby `stmt` is `stmt`, not `statement`; `klass` is `klass`, not
+  `modelClass`. Same for parameter _order_ and defaults. This is free fidelity
+  and it is most of what makes a body readable next to the Ruby.
+- **Control flow.** Same branches, in the same order, with the same guards and
+  early returns. Do not collapse two Rails branches into one, invert a guard,
+  reorder side-effect-free calls, or drop a check you believe is unreachable.
+- **Decomposition.** If Rails extracts a private helper, extract it, with the
+  Rails name. If Rails inlines something, inline it. One Rails method is one TS
+  method.
+- **No extra abstraction.** Do not add a helper, wrapper, indirection layer, or
+  "cleaner" rewrite that Rails does not have. Extra surface is measured —
+  `pnpm api:extra` reports every public TS name with no Ruby counterpart. If
+  you genuinely need one, declare it with a `@noRailsEquivalent <reason>` JSDoc
+  tag; that tag is the only sanctioned exception and the reason is reviewed.
+- **Errors.** Same error class, same message string, same raise site.
+
+**Only a genuine TypeScript language shortcoming can justify a deviation** —
+and even then, converge the shape as far as the language allows and keep the
+Rails name. There is almost always a way around:
+
+- Ruby `x=` that must be async → keep the Rails name in a `setX()` method
+  rather than renaming the concept (a TS `set` accessor can't be awaited).
+- Ruby `include SomeModule` → `include()` / `Included<>` from
+  `@blazetrails/activesupport`, or `this`-typed functions assigned to the class
+  (see "Module mixins" below), so the code still lives in the Rails file at the
+  Rails name.
+- Ruby kwargs, blocks, and `method_missing` each have a settled trails idiom.
+  Find it and use it; don't invent a new shape.
+
+"TypeScript can't do this" is a claim you have to actually try to disprove
+first. Deviation from Rails is almost always wrong; matching Rails is almost
+always right. Every deviation you do ship is justified **at the call site**,
+not in the PR body.
+
+### A documented deviation is debt, not permission
+
+Convergence is the goal. Every deviation register in this repo — the
+`call-mismatches-exclude` baselines, `arity-exclude.json`, `@noRailsEquivalent`,
+`@missingRailsCall`, `SKIP_GROUPS`, and every story under
+`0023-surfaced-deviations` — is a **burndown ledger**, not a settled decision. A
+row in one of them says "we know this is wrong and haven't fixed it yet." It is
+never a licence to leave it, to copy the pattern into new code, or to add a
+sibling row next to it.
+
+So:
+
+- **Finding an existing deviation next to your work is a reason to converge it,
+  not to match it.** If it's out of scope for your PR, file it
+  (`pnpm tasks new <rfc> <slug> --body-file <path>`) with the Rails `file:line`
+  you already have in front of you. Do not silently propagate the shape.
+- **A deviation-convergence story always converges.** Do not close one by
+  writing a better justification for the deviation, by broadening a baseline
+  reason, or by moving it to a different register. If it genuinely cannot
+  converge, `pnpm tasks block` it with the specific blocker — but that is rare,
+  and "it would be a bigger diff" is not one.
+- **Never widen an allowlist to cover new work.** Baselines are only-shrink by
+  construction; adding a row for code you are writing right now inverts the
+  entire mechanism.
+- **Only a genuine TypeScript language shortcoming is ratifiable**, and only
+  after you have tried the settled workaround above. "Cleaner in TS", "more
+  idiomatic", "the tests pass either way", and "this is how the rest of the file
+  does it" are not language shortcomings.
+
+### Ruby idioms that do not translate literally
+
+These are the recurring silent-divergence traps. Check each one whenever you
+port a body:
+
+- **Truthiness.** Ruby's `if x` is false only for `nil`/`false`. `Boolean(x)`
+  and `if (x)` are also false for `0`, `""`, and `NaN`. Port `if x` as
+  `x != null`, never as a bare truthiness test, unless you have checked the
+  value can't be `0`/`""`.
+- **`fetch` vs `??`.** `h.fetch(:k, default)` returns the _stored_ value
+  whenever the key exists — including a stored `nil` or `false`. `h.k ?? default`
+  substitutes the default for `null`/`undefined`. They differ, and Rails
+  relation readers depend on the difference.
+- **`present?` / `blank?` / `presence`.** Use the ActiveSupport analogues, not
+  `!!x` or `x?.length`. `" "` is blank in Ruby and truthy in JS.
+- **kwargs.** A TS default parameter swallows an explicitly-passed `undefined`,
+  so a caller forwarding an absent kwarg silently gets the default where Ruby
+  would have seen `nil`. Match Ruby's kwarg semantics explicitly when it matters.
+- **Predicates.** A Ruby predicate returns a value, not necessarily a boolean;
+  a value-returning predicate ported as a `boolean` breaks every call site that
+  used the value.
+- **Bang methods** raise; the non-bang form returns falsy. Port both arms.
+- **Symbols vs strings.** Where Rails accepts a Symbol _or_ a String, port both
+  arms — dropping the string arm is a common silent gap.
+
+If you find a new instance, file it against the best-fit active RFC, else
+`0023-surfaced-deviations`. RFC `0082-ruby-ts-idiom-conversion-classes` in the
+tasks repo enumerates these as convergence classes.
+
 ## Working in this repo
 
 - Do use worktrees for any changes; leave the default worktree for the user.
@@ -29,6 +139,15 @@ package list, and the `declare` / associations / enums / schema reference, see
   `file:line` instead of hand-grepping, run `pnpm rails:find <query>` — it
   reuses the test-compare / api-compare manifests and falls back to a scoped
   grep of `vendor/rails/activerecord/`, tagging each result with the mode.
+- Two reference tables answer "what do I call this?" without guessing, and both
+  are CI-verified current:
+  **[docs/ruby-ts-conventions.md](docs/ruby-ts-conventions.md)** for the
+  Ruby→TS name and file-path translations `api:compare` matches on (generated
+  from `scripts/api-compare/conventions.ts` — change the rule there, never
+  hand-edit the doc), and `SKIP_GROUPS` / `SCOPED_SKIP_GROUPS` in that same
+  source file for the members deliberately not mirrored, each with its reason.
+  If you think a Ruby name has no reasonable TS spelling, check `SKIP_GROUPS`
+  before inventing one.
 - Do NOT use subagents unless explicitly requested.
 - **AR work tracking lives in the `tasks` repo, not in docs.** Pick work via
   `pnpm tasks` (`ready` / `next-bundle` / `claim`) — never by hand-editing an
@@ -117,6 +236,56 @@ package list, and the `declare` / associations / enums / schema reference, see
   schema lacks, add it to the canonical schema — do not reach for a bespoke
   schema. (`defineSchema` is the retired trails invention being removed by RFC
   0059; don't reach for it in new tests.)
+
+## Before you open the PR
+
+Run these in order. All of them are fast next to a review round, and each one
+catches a class of drift a reviewer would otherwise spend a cycle on.
+
+1. **Size.**
+   `git diff --shortstat origin/main...HEAD -- ':!**/pnpm-lock.yaml' ':!**/__snapshots__/**' ':!**/*.md'`
+   — 500 LOC ceiling (see Conventions).
+2. **Did you touch a ported method body?** If yes, run the call-parity gates.
+   They detect the highest-frequency fidelity miss in this repo: a TS body that
+   omits a call the Rails body makes — a dropped delegation, an inlined helper,
+   an invented shortcut.
+
+   ```bash
+   API_COMPARE_FORCE=1 pnpm api:compare --wide-calls   # regenerate BOTH artifacts
+   pnpm api:calls                                      # narrow ratchet (RFC 0044)
+   pnpm api:calls:wide                                 # wide ratchet (RFC 0047)
+   ```
+
+   The regeneration is not optional: both lints read an artifact on disk, and
+   gating a stale one reports movement that never happened. A warm cache
+   under-reports, which is why the force flag is there.
+
+   **New mismatch?** The right fix is almost always to make the TS body call
+   what Rails calls. Baselining is the fallback, and it costs a reviewed
+   one-line `reason` — never leave the seeded placeholder (RFC 0083 ratchets the
+   count of unreviewed reasons; leaving placeholders reds the gate for whoever
+   comes next). A single justified omission can also carry a `@missingRailsCall`
+   JSDoc tag at the call site instead.
+
+   **Converged something?** The wide baseline is **only-shrink**: fixing a real
+   divergence makes its baseline row stale and turns the gate red. Delete that
+   one row by hand. Do **not** `--write`/reseed — a reseed reorders and re-emits
+   entries for untouched packages and produces an unreviewable diff.
+
+3. **Did you add any public TS name?** `pnpm api:extra --package <pkg>` — it
+   lists every public TS method, getter, class, and top-level function in a
+   Rails-matched file with no Ruby counterpart. Anything you added and can't
+   trace to a Ruby method is invented surface: delete it, fold it into the
+   ported method, or tag it `@noRailsEquivalent <reason>`. Do **not** reach for
+   a baseline allowlist to defer it. The tag is a receipt, not absolution — it
+   says "known extra surface, not yet removed", and someone will come back for
+   it.
+4. **Working in `arel` or `activemodel`?** `pnpm lint --fix` after step 2 —
+   `blazetrails/rails-file-structure-method-order` enforces Rails source order
+   for class members and top-level functions and is autofixable, but it needs
+   the manifest `pnpm api:compare` builds. Without a compare run it silently
+   passes everything, then fails in the `Rails API/Test Comparison` CI job.
+5. **`pnpm api:compare` / `pnpm test:compare`** deltas must be non-negative.
 
 ## Module mixins (Ruby `include` → TypeScript)
 
