@@ -1742,7 +1742,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // Box the DJAR so awaiting this helper doesn't unwrap it via
     // `Relation.then` (which resolves to the records array). Callers
     // read `.djar` off the resolved value.
-    const djar = DisableJoinsAssociationScope.INSTANCE.scope({
+    const djar = DisableJoinsAssociationScope.create().scope({
       owner: this._record,
       reflection: reflection as any,
       klass,

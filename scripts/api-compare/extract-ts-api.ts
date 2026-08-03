@@ -661,6 +661,7 @@ export function extractFromProgram(
           if (methods.length === 0) continue;
           const modKey = `${relPath}:${decl.name.text}`;
           if (info.modules[modKey] || info.classes[modKey]) continue;
+          const modReason = noRailsEquivalentReason(decl) ?? noRailsEquivalentReason(node);
           info.modules[modKey] = {
             name: decl.name.text,
             file: relPath,
@@ -668,6 +669,7 @@ export function extractFromProgram(
             extends: [],
             instanceMethods: methods,
             classMethods: [],
+            ...(modReason !== undefined ? { noRailsEquivalent: modReason } : {}),
           };
           fileHasClassOrModule = true;
         }

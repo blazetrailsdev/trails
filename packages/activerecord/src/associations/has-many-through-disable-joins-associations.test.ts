@@ -26,7 +26,7 @@ function djasScope(owner: Base, assocName: string): any {
   const reflection = (ctor as any)._reflectOnAssociation?.(assocName);
   if (!reflection) throw new Error(`No reflection found for ${assocName}`);
   const klass = reflection.klass;
-  return DisableJoinsAssociationScope.INSTANCE.scope({
+  return DisableJoinsAssociationScope.create().scope({
     owner,
     reflection,
     klass,

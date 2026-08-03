@@ -86,10 +86,6 @@ describe("DisableJoinsAssociationScope", () => {
     Notifications.unsubscribeAll();
   });
 
-  it("INSTANCE is a DisableJoinsAssociationScope", () => {
-    expect(DisableJoinsAssociationScope.INSTANCE).toBeInstanceOf(DisableJoinsAssociationScope);
-  });
-
   it("scope(association) returns a sync Relation loadable via toArray", async () => {
     const author = await DjsAuthor.create({ name: "A" });
     const post = await DjsPost.create({ djs_author_id: author.id, title: "p" });
@@ -97,7 +93,7 @@ describe("DisableJoinsAssociationScope", () => {
     await DjsComment.create({ djs_post_id: post.id, body: "c2" });
 
     const reflection = (DjsAuthor as any)._reflectOnAssociation("djsComments");
-    const built = DisableJoinsAssociationScope.INSTANCE.scope({
+    const built = DisableJoinsAssociationScope.create().scope({
       owner: author,
       reflection,
       klass: reflection.klass,
@@ -114,7 +110,7 @@ describe("DisableJoinsAssociationScope", () => {
     await DjsComment.create({ djs_post_id: post.id, body: "c1" });
 
     const reflection = (DjsAuthor as any)._reflectOnAssociation("djsComments");
-    const built = DisableJoinsAssociationScope.INSTANCE.scope({
+    const built = DisableJoinsAssociationScope.create().scope({
       owner: author,
       reflection,
       klass: reflection.klass,
@@ -144,7 +140,7 @@ describe("DisableJoinsAssociationScope", () => {
     await DjsComment.create({ djs_post_id: post.id, body: "exclude-me" });
 
     const reflection = (DjsAuthor as any)._reflectOnAssociation("djsComments");
-    const built = DisableJoinsAssociationScope.INSTANCE.scope({
+    const built = DisableJoinsAssociationScope.create().scope({
       owner: author,
       reflection,
       klass: reflection.klass,
@@ -172,7 +168,7 @@ describe("DisableJoinsAssociationScope", () => {
     await DjsComment.create({ djs_post_id: postA.id, body: "from-a" });
 
     const reflection = (DjsAuthor as any)._reflectOnAssociation("djsCommentsViaOrderedPosts");
-    const built = DisableJoinsAssociationScope.INSTANCE.scope({
+    const built = DisableJoinsAssociationScope.create().scope({
       owner: author,
       reflection,
       klass: reflection.klass,
@@ -190,7 +186,7 @@ describe("DisableJoinsAssociationScope", () => {
     await DjsComment.create({ djs_post_id: postA.id, body: "from-a" });
 
     const reflection = (DjsAuthor as any)._reflectOnAssociation("djsCommentsViaOrderedPosts");
-    const built = DisableJoinsAssociationScope.INSTANCE.scope({
+    const built = DisableJoinsAssociationScope.create().scope({
       owner: author,
       reflection,
       klass: reflection.klass,

@@ -1498,6 +1498,25 @@ describe("extractFromProgram — @noRailsEquivalent JSDoc", () => {
     expect(fns.find((f) => f.name === "hasMany")!.noRailsEquivalent).toBeUndefined();
   });
 
+  it("records the reason on a tagged object-literal module", () => {
+    const info = extractFromFiles("/p", {
+      "quoting.ts": `
+        /** @noRailsEquivalent PERMANENT adapter-free quoting crutch */
+        export const ABSTRACT_SCHEMA_QUOTER = {
+          quoteColumnName(name: string): string { return name; },
+        };
+
+        export const OTHER_QUOTER = {
+          quoteColumnName(name: string): string { return name; },
+        };
+      `,
+    });
+    expect(info.modules["quoting.ts:ABSTRACT_SCHEMA_QUOTER"].noRailsEquivalent).toBe(
+      "PERMANENT adapter-free quoting crutch",
+    );
+    expect(info.modules["quoting.ts:OTHER_QUOTER"].noRailsEquivalent).toBeUndefined();
+  });
+
   it("drops the reason on a renamed export of a tagged declaration", () => {
     const info = extractFromFiles("/p", {
       "routes-helpers.ts": `

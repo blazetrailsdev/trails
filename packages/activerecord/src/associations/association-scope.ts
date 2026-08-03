@@ -205,16 +205,19 @@ export class AssociationScope {
 
   /**
    * Entry point. Build the Relation that loads (or filters) the given
-   * association's records for its owner. Polymorphic via `this.INSTANCE`
-   * so a subclass with its own `static INSTANCE` (e.g.
-   * `DisableJoinsAssociationScope`) routes through that subclass'
-   * instance — matching Rails' `AssociationScope.scope(association)` /
-   * `INSTANCE` lookup chain.
+   * association's records for its owner.
+   *
+   * `INSTANCE` is read off `AssociationScope` rather than `this`: Ruby
+   * resolves the constant lexically, so `DisableJoinsAssociationScope.scope`
+   * (association.rb:303) reaches `AssociationScope::INSTANCE` too — a
+   * subclass never gets an INSTANCE of its own. The disable-joins path that
+   * does want subclass behaviour goes through
+   * `DisableJoinsAssociationScope.create` (association.rb:109).
    *
    * Mirrors: ActiveRecord::Associations::AssociationScope.scope
    */
-  static scope(this: typeof AssociationScope, association: AssociationScopeable): unknown {
-    return this.INSTANCE.scope(association);
+  static scope(association: AssociationScopeable): unknown {
+    return AssociationScope.INSTANCE.scope(association);
   }
 
   /**

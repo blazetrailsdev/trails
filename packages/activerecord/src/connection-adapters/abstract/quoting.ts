@@ -347,6 +347,13 @@ export function quoteDefaultExpression(
  * the abstract schema layer stays usable adapter-free rather than silently
  * routing through whatever dialect happens to import these freestanding
  * functions. Mirrors the `ABSTRACT_QUOTER` crutch in `sanitization.ts`.
+ *
+ * @noRailsEquivalent CONVERGEABLE (story:
+ * converge-schema-creation-adapter-free-construction). Rails never builds a
+ * schema visitor or definition without a connection — `SchemaCreation.new(conn)`
+ * (`abstract/schema_creation.rb:6`) and `TableDefinition#initialize`
+ * (`abstract/schema_definitions.rb:369`) both require one — so this fallback
+ * exists only to serve trails' adapter-free construction paths.
  */
 export const ABSTRACT_SCHEMA_QUOTER: SchemaQuoter = {
   quoteColumnName: quoteIdentifier,
