@@ -8,7 +8,7 @@ import type { Type } from "@blazetrails/activemodel";
 import type mysql from "mysql2/promise";
 import { NotImplementedError } from "../../errors.js";
 import { Result, type ColumnTypes } from "../../result.js";
-import { combineMultiStatements } from "../mysql/database-statements.js";
+import { combineMultiStatements, type MaxAllowedPacketHost } from "../mysql/database-statements.js";
 
 export interface DatabaseStatementsHost {
   execQuery(sql: string, name?: string | null, binds?: unknown[]): Promise<Result>;
@@ -158,11 +158,11 @@ export async function selectAll(
  * @internal
  */
 export async function executeBatch(
-  this: { execute(sql: string, name?: string | null): Promise<unknown> },
+  this: MaxAllowedPacketHost & { execute(sql: string, name?: string | null): Promise<unknown> },
   statements: string[],
   name?: string | null,
 ): Promise<void> {
-  for (const statement of combineMultiStatements(statements)) {
+  for (const statement of await combineMultiStatements.call(this, statements)) {
     await this.execute(statement, name);
   }
 }

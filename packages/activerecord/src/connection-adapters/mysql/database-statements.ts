@@ -115,28 +115,44 @@ export function returningColumnValues(
   return undefined;
 }
 
-/** @internal */
-export function combineMultiStatements(totalSql: string[]): string[] {
-  // Rails reads max_allowed_packet lazily from the server; we use the MySQL default (16 MiB).
-  // Full wiring (async server query) is deferred to the adapter layer.
-  const maxPacket = 16_777_216;
-  return totalSql.reduce<string[]>((chunks, sql) => {
-    const prev = chunks[chunks.length - 1];
-    if (isMaxAllowedPacketReached(sql, prev, maxPacket)) {
-      chunks.push(sql);
-    } else {
-      chunks[chunks.length - 1] = `${prev};\n${sql}`;
-    }
-    return chunks;
-  }, []);
+export interface MaxAllowedPacketHost {
+  showVariable?(name: string): Promise<string | null>;
+  /** Mirrors Rails' `@max_allowed_packet` memo. */
+  _maxAllowedPacket?: number;
+  /** @internal */
+  maxAllowedPacket?(): Promise<number>;
 }
 
 /** @internal */
-export function isMaxAllowedPacketReached(
+export async function combineMultiStatements(
+  this: MaxAllowedPacketHost | void,
+  totalSql: string[],
+): Promise<string[]> {
+  const host = this ?? undefined;
+  const chunks: string[] = [];
+  for (const sql of totalSql) {
+    const previousPacket = chunks[chunks.length - 1];
+    if (await isMaxAllowedPacketReached.call(host, sql, previousPacket)) {
+      chunks.push(sql);
+    } else {
+      chunks[chunks.length - 1] = `${previousPacket};\n${sql}`;
+    }
+  }
+  return chunks;
+}
+
+/** @internal */
+export async function isMaxAllowedPacketReached(
+  this: MaxAllowedPacketHost | void,
   currentPacket: string,
   previousPacket: string | undefined,
-  maxPacket: number,
-): boolean {
+): Promise<boolean> {
+  const host = this ?? undefined;
+  // Rails resolves `max_allowed_packet` on self; the receiver only carries it
+  // once the module is mixed in, so a bare host falls back to the free function.
+  const maxPacket = host?.maxAllowedPacket
+    ? await host.maxAllowedPacket()
+    : await maxAllowedPacket.call(host);
   const currentSize = Buffer.byteLength(currentPacket, "utf8");
   if (currentSize > maxPacket) {
     throw new Error(
@@ -148,14 +164,16 @@ export function isMaxAllowedPacketReached(
 }
 
 /** @internal */
-export async function maxAllowedPacket(
-  this: { showVariable?(name: string): Promise<string | null> } | void,
-): Promise<number> {
-  const raw = await (
-    this as { showVariable?(name: string): Promise<string | null> } | null
-  )?.showVariable?.("max_allowed_packet");
+export async function maxAllowedPacket(this: MaxAllowedPacketHost | void): Promise<number> {
+  const host = this ?? undefined;
+  if (host?._maxAllowedPacket !== undefined) return host._maxAllowedPacket;
+  const raw = await host?.showVariable?.("max_allowed_packet");
   const parsed = raw != null ? parseInt(raw, 10) : NaN;
-  return Number.isNaN(parsed) ? 16_777_216 : parsed;
+  // Rails needs no fallback: `show_variable` always answers on a live MySQL
+  // connection. The MySQL default stands in for a host without one.
+  const resolved = Number.isNaN(parsed) ? 16_777_216 : parsed;
+  if (host) host._maxAllowedPacket = resolved;
+  return resolved;
 }
 
 /**
