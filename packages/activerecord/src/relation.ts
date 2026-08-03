@@ -2686,41 +2686,6 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * Table names reachable from the relation's manual joins plus the base table,
-   * used by the pluck eager-degrade guard to tell a servable column from one
-   * reaching for an unjoinable fallback association. Mirrors the joined-table
-   * extraction in `referencesEagerLoadedTables` (Rails `build_joins([])`,
-   * relation.rb:1474-1488); kept as a sibling rather than a shared callee so the
-   * ported `references_eager_loaded_tables?` body retains its Arel/StringJoin
-   * usage for the api-compare dependency + call-set parity gates.
-   * @internal
-   */
-  private _joinedTableNames(): Set<string> {
-    const leftOuterTables = this._resolveAssocTables(this._leftOuterJoinsValues);
-    const namedInnerTables = this._resolveAssocTables(this._namedInnerJoins);
-    return new Set<string>([
-      ...this._joinClauses.map((j) => j.table.toLowerCase()),
-      ...leftOuterTables,
-      ...namedInnerTables,
-      ...this._joinValues.flatMap((v) => {
-        if (typeof v === "string") {
-          const join = new Nodes.StringJoin(new Nodes.SqlLiteral(v));
-          const sqlText = join.left instanceof Nodes.SqlLiteral ? join.left.value : v;
-          return this.tablesInString(sqlText);
-        }
-        if (v instanceof Nodes.StringJoin) {
-          const sqlText = v.left instanceof Nodes.SqlLiteral ? v.left.value : v.toSql();
-          return this.tablesInString(sqlText);
-        }
-        const leftName = (v.left as any)?.name;
-        if (typeof leftName === "string") return [leftName.toLowerCase()];
-        return this.tablesInString(v.toSql());
-      }),
-      String((this._modelClass as unknown as { tableName?: string }).tableName ?? "").toLowerCase(),
-    ]);
-  }
-
-  /**
    * Extracts table-like identifiers from a raw SQL string (e.g. a JOIN fragment).
    *
    * Mirrors: ActiveRecord::Relation#tables_in_string
@@ -2780,7 +2745,7 @@ export class Relation<T extends Base> {
 
     const jd = this._buildEagerJoinDependency(eagerAssociations);
 
-    // If no associations could be JOINed, fall back entirely to preload
+    // Nothing to JOIN (empty spec): load the base rows only.
     if (jd.nodes.length === 0) {
       const sql = this._toSql();
       // selectAll (not execute) so the adapter-reported column_types cast

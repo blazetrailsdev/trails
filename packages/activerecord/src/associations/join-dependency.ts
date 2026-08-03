@@ -351,8 +351,8 @@ export class JoinDependency {
     if (assocDef.type === "belongsTo") {
       // Rails raises for polymorphic eager loads — the join target table is
       // not known statically (join_dependency.rb#build). This is a dedicated
-      // error rather than the generic `build` raise the null returns below
-      // surface.
+      // error rather than the ConfigurationError `build` raises for the null
+      // returns below.
       if (assocDef.options.polymorphic) {
         throw new EagerLoadPolymorphicError(assocName);
       }
@@ -543,7 +543,10 @@ export class JoinDependency {
    * that names the real table.
    *
    * Called once per top-level spec, from the constructor. Like Rails, an
-   * association that can't be JOINed raises — there is no lenient mode.
+   * association that can't be JOINed raises `ConfigurationError` — either from
+   * `findReflection` (a name that doesn't resolve, Rails' `find_reflection`) or,
+   * with no Rails analogue, because the reflection resolved but trails still
+   * couldn't build the JOIN. There is no lenient mode.
    *
    * Mirrors: ActiveRecord::Associations::JoinDependency#build
    * (join_dependency.rb:228).
@@ -559,14 +562,9 @@ export class JoinDependency {
       const name = typeof key === "symbol" ? (key.description ?? String(key)) : String(key);
       const node = this._addOrReuse(name, model, alias, parentPath);
       if (!node) {
-        // Rails' `find_reflection` (join_dependency.rb:236) raises
-        // ConfigurationError for a name that doesn't resolve — the only case
-        // observed here. Getting past it means the reflection resolved but the
-        // JOIN still couldn't be built, which has no Rails analogue: surface it
-        // loudly rather than silently degrading the spec to a preload.
         this.findReflection(model, name);
-        throw new Error(
-          `Could not build a JOIN for association '${name}' on ${(model as any).name}`,
+        throw new ConfigurationError(
+          `Can't join '${(model as any).name}' to association named '${name}'`,
         );
       }
       const child = hash[key];
