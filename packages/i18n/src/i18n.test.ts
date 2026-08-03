@@ -43,10 +43,12 @@ describe("I18nTest", () => {
   /**
    * Rails also asserts the object is visible at
    * `Thread.current.thread_variable_get(:i18n_config)`; JS has no threads, so
-   * `config()` is a process singleton and only the round-trip arm ports.
+   * `config()` is a process singleton and only the round-trip arm ports. Rails
+   * assigns `self` — an arbitrary duck-typed object, not an `I18n::Config` —
+   * so the value below is cast rather than constructed.
    */
   it("can set the configuration object", () => {
-    const value = new Config();
+    const value = {} as Config;
     try {
       setConfig(value);
       expect(config()).toBe(value);
