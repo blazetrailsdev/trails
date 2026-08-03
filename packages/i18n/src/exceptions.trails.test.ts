@@ -12,6 +12,7 @@ import {
   MissingTranslationData,
   ReservedInterpolationKey,
   UnknownFileType,
+  inspect,
 } from "./exceptions.js";
 import { resetClassConfig } from "./config.js";
 import { resetConfig } from "./i18n.js";
@@ -120,5 +121,21 @@ describe("exceptions", () => {
     expect(() => handler.call(other, "de", "foo", {})).toThrow(other);
     const data = new MissingTranslationData("de", "foo");
     expect(() => handler.call(data, "de", "foo", {})).toThrow(data);
+  });
+
+  it("inspects a String the way Ruby's String#inspect does", () => {
+    // Expectations taken from MRI: `ruby -e 'puts s.inspect'`.
+    expect(inspect("foo")).toBe('"foo"');
+    expect(inspect('he said "hi"')).toBe('"he said \\"hi\\""');
+    expect(inspect("a\\b")).toBe('"a\\\\b"');
+    expect(inspect("a\x1b\tb")).toBe('"a\\e\\tb"');
+    expect(inspect("\x07\b\v\f\r\n")).toBe('"\\a\\b\\v\\f\\r\\n"');
+    expect(inspect("\x00\x1f\x7f\x85")).toBe('"\\u0000\\u001F\\u007F\\u0085"');
+    expect(inspect("#{x}")).toBe('"\\#{x}"');
+    expect(inspect("a#$g")).toBe('"a\\#$g"');
+    expect(inspect("a#@g")).toBe('"a\\#@g"');
+    expect(inspect("a#b")).toBe('"a#b"');
+    expect(inspect("café 😀")).toBe('"café 😀"');
+    expect(inspect("a\ud800b")).toBe('"a\\xED\\xA0\\x80b"');
   });
 });
