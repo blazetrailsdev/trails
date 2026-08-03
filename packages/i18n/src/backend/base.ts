@@ -199,11 +199,9 @@ export abstract class Base {
         });
       }
       if (typeof subject === "function") {
-        // `Hash#delete` strips `:object` from the hash the caller still holds,
-        // so later reads in the same `translate` call no longer see it.
-        const deleted = options.object;
+        const dateOrTime =
+          options.object != null && options.object !== false ? options.object : object;
         delete options.object;
-        const dateOrTime = deleted != null && deleted !== false ? deleted : object;
         return this.resolve(
           locale,
           object,
