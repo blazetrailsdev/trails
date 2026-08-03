@@ -30,9 +30,9 @@ function dig(obj: TranslationHash, keys: string[]): TranslationValue | undefined
 function resolveEntry(
   key: string,
   value: TranslationValue | undefined,
-  options: TranslateOptions,
+  options: TranslateOptions = {},
 ): TranslationValue | undefined {
-  if (typeof value === "function") return resolveEntry(key, value(key, options), options);
+  if (typeof value === "function") return resolveEntry(key, value(key, options));
   return value;
 }
 
