@@ -18,8 +18,15 @@ export interface RotateOptions extends Record<string, unknown> {
   secretGenerator?: SecretGenerator;
 }
 
+/**
+ * A codec key. Ruby salts are usually Symbols but any object works, and the
+ * coordinator stringifies only when it builds, so `rotate` blocks see the salt
+ * in its original form.
+ */
+export type Salt = string | symbol;
+
 /** Ruby's `rotate { |salt| ... }` block, which may return nil to skip a salt. */
-export type RotateBlock = (salt: string) => RotateOptions | null | undefined;
+export type RotateBlock = (salt: Salt) => RotateOptions | null | undefined;
 
 export interface BuildOptions extends Record<string, unknown> {
   secretGenerator: SecretGenerator;
@@ -38,14 +45,14 @@ export abstract class RotationCoordinator<C extends FallsBack<C>> {
   readonly #secretGenerator: SecretGenerator;
   #rotateOptions: (RotateOptions | RotateBlock)[] = [];
   #onRotation: OnRotation | null = null;
-  #codecs = new Map<string, C>();
+  #codecs = new Map<Salt, C>();
 
   constructor(secretGenerator?: SecretGenerator) {
     if (!secretGenerator) throw new ArgumentError("A secret generator block is required");
     this.#secretGenerator = secretGenerator;
   }
 
-  get(salt: string): C {
+  get(salt: Salt): C {
     let codec = this.#codecs.get(salt);
     if (!codec) {
       codec = this.buildWithRotations(salt);
@@ -54,7 +61,7 @@ export abstract class RotationCoordinator<C extends FallsBack<C>> {
     return codec;
   }
 
-  set(salt: string, codec: C): void {
+  set(salt: Salt, codec: C): void {
     this.#codecs.set(salt, codec);
   }
 
@@ -81,9 +88,10 @@ export abstract class RotationCoordinator<C extends FallsBack<C>> {
     return this;
   }
 
-  onRotation(callback: OnRotation): void {
+  onRotation(callback: OnRotation): OnRotation {
     this.changingConfigurationBang();
     this.#onRotation = callback;
+    return callback;
   }
 
   /** @internal */
@@ -92,7 +100,7 @@ export abstract class RotationCoordinator<C extends FallsBack<C>> {
       throw new RuntimeError(
         `Cannot change ${this.constructor.name} configuration after it has already been applied.\n\n` +
           "The configuration has been applied with the following salts:\n" +
-          `${[...this.#codecs.keys()].map((salt) => `- ${JSON.stringify(salt)}`).join("\n")}\n`,
+          `${[...this.#codecs.keys()].map((salt) => `- ${inspect(salt)}`).join("\n")}\n`,
       );
     }
   }
@@ -112,7 +120,7 @@ export abstract class RotationCoordinator<C extends FallsBack<C>> {
   }
 
   /** @internal */
-  protected buildWithRotations(salt: string): C {
+  protected buildWithRotations(salt: Salt): C {
     const evaluated = this.#rotateOptions.map((options) =>
       typeof options === "function" ? options(salt) : options,
     );
@@ -124,7 +132,7 @@ export abstract class RotationCoordinator<C extends FallsBack<C>> {
     const rotateOptions = uniq(compacted.map((options) => this.normalizeOptions(options)));
 
     if (rotateOptions.length === 0)
-      throw new RuntimeError(`No options have been configured for ${salt}`);
+      throw new RuntimeError(`No options have been configured for ${String(salt)}`);
 
     return rotateOptions
       .map((options) => this.build(String(salt), options))
@@ -133,6 +141,11 @@ export abstract class RotationCoordinator<C extends FallsBack<C>> {
 
   /** @internal */
   protected abstract build(salt: string, options: BuildOptions): C;
+}
+
+/** Ruby's `Symbol#inspect` / `String#inspect` over a salt. */
+function inspect(salt: Salt): string {
+  return typeof salt === "symbol" ? `:${salt.description ?? ""}` : JSON.stringify(salt);
 }
 
 /** Ruby's `Array#uniq` over option hashes, which compares them by value. */

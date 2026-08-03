@@ -78,11 +78,11 @@ export function rotationCoordinatorTests<C extends FallsBack<C>>(hooks: Coordina
 
   it("#rotate block receives salt in its original form", () => {
     const blockCoordinator = makeCoordinator().rotate((salt) => {
-      expect(salt).toEqual("salt");
+      expect(salt).toBe(Symbol.for("salt"));
       return {};
     });
 
-    blockCoordinator.get("salt");
+    blockCoordinator.get(Symbol.for("salt"));
   });
 
   it("#rotate raises when both a block and options are provided", () => {
