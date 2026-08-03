@@ -175,6 +175,10 @@ jobs:
           # packages/activerecord/, is deliberately NOT on this gate — pulling
           # every AR PR into the leaf-package suites costs more than it catches;
           # the label-gated query-parity-trails job covers that direction.)
+          # NO packages/activerecord/ path feeds this gate. The two suites here
+          # that import AR — scripts/test-deps/ and scripts/parity/query/node/ —
+          # are re-run by sqlite-tests (activerecord_affected) instead; see the
+          # comment there.
           # The compare tooling's suites run in that same invocation and are
           # ALL in INFRA_CARVEOUT_RE, so without naming them here a change
           # confined to one of them would run none of its own tests.
@@ -877,6 +881,14 @@ jobs:
       # redundant double-run and keeps the CLI's subprocess tests out of this
       # large suite's worker scheduler (they otherwise starve its reporter RPC
       # / perturb fork scheduling — see trails-models-dump tests).
+      # Both suites below import activerecord — scripts/test-deps from src,
+      # scripts/parity/query/node through the dump runners it spawns — yet ride
+      # the unit_tests_affected gate, which the AR tree is off. This is the only
+      # job that runs them on an AR-only PR. Separate invocation from the AR
+      # suite on purpose: it keeps them in the `other` vitest project, whose
+      # lack of AR setupFiles is what reproduces the TDZ entry order.
+      # (Guard: scripts/ci-suite-coverage.test.ts.)
+      - run: pnpm vitest run scripts/test-deps scripts/parity/query/node
       - run: pnpm vitest run packages/activerecord/
       - run: pnpm vitest run packages/activerecord-cli
 
