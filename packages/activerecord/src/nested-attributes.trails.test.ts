@@ -179,3 +179,44 @@ describe("nested attributes save wrapper argument forwarding (trails-only)", () 
     expect((await Pirate.find(readAttr(pirate, "id"))).catchphrase).toBe("");
   });
 });
+
+describe("nested attributes assignment ordering (trails-only)", () => {
+  fixtures({
+    pirates: [Pirate, {}],
+    ships: [Ship, {}],
+  });
+
+  // `_assign_attributes` (attribute_assignment.rb:6-22) buckets every
+  // Hash-valued key out of the main loop and assigns it only after the scalar
+  // pass (:21), so a nested writer's `reject_if` observes an owner whose own
+  // attributes are already set — even when the nested key sits first in the
+  // literal.
+  it("assigns nested parameter hashes after the base attributes", () => {
+    const config = (
+      Pirate as unknown as {
+        _nestedAttributeConfigs: {
+          associationName: string;
+          options: { rejectIf?: unknown };
+        }[];
+      }
+    )._nestedAttributeConfigs.find((c) => c.associationName === "ship")!;
+    const originalRejectIf = config.options.rejectIf;
+    const observed: unknown[] = [];
+    config.options.rejectIf = (_attrs: Record<string, unknown>, record: Base) => {
+      observed.push((record as Pirate).catchphrase);
+      return false;
+    };
+
+    try {
+      const pirate = new Pirate();
+      pirate.assignAttributes({
+        shipAttributes: { name: "The Black Rock" },
+        catchphrase: "Aye",
+      });
+    } finally {
+      config.options.rejectIf = originalRejectIf;
+    }
+
+    expect(observed).toEqual(["Aye"]);
+  });
+});
