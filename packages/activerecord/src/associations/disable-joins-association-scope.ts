@@ -95,9 +95,6 @@ function resolveJoinPrimaryKey(reflection: unknown, klass?: typeof Base): string
  * Mirrors: ActiveRecord::Associations::DisableJoinsAssociationScope
  */
 export class DisableJoinsAssociationScope extends AssociationScope {
-  static override readonly INSTANCE: DisableJoinsAssociationScope =
-    DisableJoinsAssociationScope.create();
-
   constructor(valueTransformation: ValueTransformation = (v) => v) {
     super(valueTransformation);
   }
@@ -378,5 +375,5 @@ function addConstraints(
 }
 
 setDjasScopeBuilder((assoc) =>
-  DisableJoinsAssociationScope.INSTANCE.scope(assoc as AssociationScopeable),
+  DisableJoinsAssociationScope.create().scope(assoc as AssociationScopeable),
 );

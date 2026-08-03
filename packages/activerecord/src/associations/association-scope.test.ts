@@ -609,14 +609,6 @@ describe("AssociationScope", () => {
     expect(sql).not.toMatch(/["`]id["`]\s*=/);
   });
 
-  it("static scope() routes through this.INSTANCE (subclass dispatch)", async () => {
-    const { DisableJoinsAssociationScope } = await import("./disable-joins-association-scope.js");
-    expect(DisableJoinsAssociationScope.INSTANCE).toBeInstanceOf(DisableJoinsAssociationScope);
-    // Subclass INSTANCE shadows the parent's so polymorphic
-    // this.INSTANCE in `static scope` resolves to the subclass instance.
-    expect(DisableJoinsAssociationScope.INSTANCE).not.toBe(AssociationScope.INSTANCE);
-  });
-
   it("through chain merges scope on the through reflection (chain.reverse_each)", () => {
     // Rails' add_constraints walks chain.reverse_each over each
     // reflection's constraints and merges WHERE/ORDER predicates from

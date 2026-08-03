@@ -8,8 +8,6 @@ import { ActiveRecord } from "../ar-config.js";
 export class Batches {
   static readonly ORDER_IGNORE_MESSAGE =
     "Scoped order is ignored, use :cursor with :order to configure custom order." as const;
-
-  static readonly DEFAULT_BATCH_SIZE = 1000;
 }
 
 /** @internal */

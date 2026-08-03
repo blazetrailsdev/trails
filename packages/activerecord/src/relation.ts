@@ -74,7 +74,6 @@ import {
 import * as _qm from "./relation/query-methods.js";
 import { seedJoinClauseAliases } from "./relation/merged-join-alias-tracker.js";
 import {
-  Batches,
   ensureValidOptionsForBatchingBang as _ensureValidOptionsForBatchingBang,
   applyLimits as _applyLimits,
   applyStartLimit as _applyStartLimit,
@@ -4567,7 +4566,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#find_in_batches
    */
   async *findInBatches({
-    batchSize = Batches.DEFAULT_BATCH_SIZE,
+    batchSize = 1000,
     start,
     finish,
     order,
@@ -4600,7 +4599,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#find_each
    */
   async *findEach({
-    batchSize = Batches.DEFAULT_BATCH_SIZE,
+    batchSize = 1000,
     start,
     finish,
     order,
@@ -4637,7 +4636,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Batches#in_batches
    */
   inBatches({
-    batchSize = Batches.DEFAULT_BATCH_SIZE,
+    batchSize = 1000,
     start,
     finish,
     order,

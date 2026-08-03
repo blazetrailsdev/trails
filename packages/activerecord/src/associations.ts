@@ -1282,7 +1282,7 @@ async function _buildDisableJoinsScopeRelation(
   // DJAS.scope() now returns a sync deferred-chain Relation — the
   // async chain walk runs on first toArray(). No more Promise<{relation}>
   // boxing to unwrap.
-  let rel: unknown = DisableJoinsAssociationScope.INSTANCE.scope({
+  let rel: unknown = DisableJoinsAssociationScope.create().scope({
     owner: record,
     reflection: reflection as never,
     klass,
