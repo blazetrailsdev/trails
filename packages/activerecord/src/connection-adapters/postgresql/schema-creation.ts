@@ -69,7 +69,7 @@ export function _pgGeneratedClause(
 export class SchemaCreation extends AbstractSchemaCreation {
   declare protected adapter: PgSchemaCreationHost;
 
-  constructor(adapter?: PgSchemaCreationHost) {
+  constructor(adapter: PgSchemaCreationHost) {
     super("postgres", adapter);
   }
 

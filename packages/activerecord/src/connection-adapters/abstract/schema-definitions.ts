@@ -1,4 +1,3 @@
-import { ABSTRACT_SCHEMA_QUOTER } from "./quoting.js";
 import type { SchemaQuoter } from "./assert-schema-adapter.js";
 import type { Column } from "../column.js";
 import { singularize, pluralize, getCrypto } from "@blazetrails/activesupport";
@@ -90,8 +89,9 @@ export type ReferentialAction = "cascade" | "nullify" | "restrict";
  * The adapter surface {@link TableDefinition.newForeignKeyDefinition} reads
  * beyond {@link SchemaQuoter}: the table_name_prefix/suffix (Rails reads these
  * off `ActiveRecord::Base`) and the converged `foreign_key_options` that fills
- * the default column and SHA256 `fk_rails_<hex>` name. All optional — the bare
- * ABSTRACT_SCHEMA_QUOTER path exposes none and falls back locally.
+ * the default column and SHA256 `fk_rails_<hex>` name. All optional — a
+ * bare-{@link SchemaQuoter} host (the MySQL schema quoter) exposes none and
+ * falls back locally.
  * @internal
  */
 export interface ForeignKeyOptionsAdapter {
@@ -983,7 +983,7 @@ export class TableDefinition {
       id?: boolean | ColumnType | IdHashOptions;
       primaryKey?: string | string[] | false;
       adapterName?: "sqlite" | "postgres" | "mysql";
-      adapter?: SchemaQuoter;
+      adapter: SchemaQuoter;
       temporary?: boolean;
       ifNotExists?: boolean;
       as?: string;
@@ -993,11 +993,11 @@ export class TableDefinition {
       collation?: string;
       default?: unknown;
       autoIncrement?: boolean;
-    } = {},
+    },
   ) {
     this.tableName = tableName;
     this._adapterName = tdOptions.adapterName ?? "sqlite";
-    this._adapter = tdOptions.adapter ?? ABSTRACT_SCHEMA_QUOTER;
+    this._adapter = tdOptions.adapter;
     // Composite primaryKey implies id: false — Rails requires this and emitting both
     // an auto-id column AND a composite PK constraint is invalid DDL.
     const hasCompositePk = Array.isArray(tdOptions.primaryKey) && tdOptions.primaryKey.length > 0;
@@ -1243,10 +1243,10 @@ export class TableDefinition {
 
   /**
    * Delegate to the adapter's `foreignKeyOptions` (which fills the default
-   * column and SHA256 `fk_rails_<hex>` name) when available. The bare
-   * ABSTRACT_SCHEMA_QUOTER path (used in unit tests that construct a
-   * TableDefinition directly) lacks it, so fall back to the same
-   * derivation as SchemaStatements#foreignKeyOptions / foreignKeyName.
+   * column and SHA256 `fk_rails_<hex>` name) when available. A
+   * bare-{@link SchemaQuoter} host (the MySQL schema quoter) lacks it, so fall
+   * back to the same derivation as SchemaStatements#foreignKeyOptions /
+   * foreignKeyName.
    * @internal
    */
   private _foreignKeyOptions(

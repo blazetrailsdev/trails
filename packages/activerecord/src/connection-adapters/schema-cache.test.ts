@@ -13,6 +13,7 @@ import { newRawTestAdapter } from "../test-adapter.js";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
+import { schemaConn } from "../support/schema-conn.js";
 
 function makeColumn(
   name: string,
@@ -730,7 +731,7 @@ class MockAdapter {
   quoteDefaultExpression = (_v: unknown) => "";
   supportsDatetimeWithPrecision = () => false;
   createTableDefinition = (n: string, opts: Record<string, unknown>) =>
-    new TableDefinition(n, { ...opts, adapterName: "sqlite" });
+    new TableDefinition(n, { adapter: schemaConn("sqlite"), ...opts, adapterName: "sqlite" });
 
   constructor(cache: SchemaCache) {
     this.schemaCache = BoundSchemaReflection.forLoneConnection(

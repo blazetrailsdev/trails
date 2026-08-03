@@ -14,7 +14,7 @@ import type { SchemaQuoter } from "../abstract/assert-schema-adapter.js";
 export class TableDefinition extends AbstractTableDefinition {
   constructor(
     tableName: string,
-    options: { id?: boolean | "uuid"; adapter?: SchemaQuoter; [key: string]: unknown } = {},
+    options: { id?: boolean | "uuid"; adapter: SchemaQuoter; [key: string]: unknown },
   ) {
     super(tableName, { ...options, adapterName: "sqlite" });
   }

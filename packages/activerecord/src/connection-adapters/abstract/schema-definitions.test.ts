@@ -7,6 +7,7 @@ import {
   Table,
 } from "./schema-definitions.js";
 import { SchemaCreation } from "./schema-creation.js";
+import { schemaConn } from "../../support/schema-conn.js";
 
 describe("IndexDefinition#concise_options", () => {
   it("keeps hash when values differ", () => {
@@ -131,7 +132,9 @@ describe("ForeignKeyDefinition#defined_for?", () => {
   it("slices out lookup keys the definition does not store", () => {
     // Mirrors `options = options.slice(*self.options.keys)`: a key the FK never
     // carried is dropped before the generic compare, so it is ignored.
-    const fkDef = new TableDefinition("astronauts").newForeignKeyDefinition("rockets");
+    const fkDef = new TableDefinition("astronauts", {
+      adapter: schemaConn("sqlite"),
+    }).newForeignKeyDefinition("rockets");
     // primaryKey/onDelete/onUpdate/deferrable were not passed, so they are not
     // stored — a lookup on them is sliced out and matches.
     expect(fkDef.isDefinedFor({ primaryKey: "wrong" })).toBe(true);
@@ -143,7 +146,9 @@ describe("ForeignKeyDefinition#defined_for?", () => {
     expect(fkDef.isDefinedFor({ column: "rocket_id" })).toBe(true);
     expect(fkDef.isDefinedFor({ column: "wrong_id" })).toBe(false);
     // An explicitly-set key is stored and compared.
-    const withPk = new TableDefinition("astronauts").newForeignKeyDefinition("rockets", {
+    const withPk = new TableDefinition("astronauts", {
+      adapter: schemaConn("sqlite"),
+    }).newForeignKeyDefinition("rockets", {
       primaryKey: "uuid",
     });
     expect(withPk.isDefinedFor({ primaryKey: "uuid" })).toBe(true);
@@ -190,7 +195,9 @@ describe("ForeignKeyDefinition#defined_for?", () => {
 
 describe("TableDefinition#new_foreign_key_definition", () => {
   it("defaults the name to fk_rails_<hex>, not fk_<table>_<column>", () => {
-    const fk = new TableDefinition("astronauts").newForeignKeyDefinition("rockets");
+    const fk = new TableDefinition("astronauts", {
+      adapter: schemaConn("sqlite"),
+    }).newForeignKeyDefinition("rockets");
     expect(fk.column).toBe("rocket_id");
     expect(fk.name).toMatch(/^fk_rails_[0-9a-f]{10}$/);
   });
@@ -210,7 +217,9 @@ describe("TableDefinition#new_foreign_key_definition", () => {
   it("maps a composite primaryKey array to a composite column array (bare-adapter fallback)", () => {
     // Mirrors foreign_key_options' array branch: each PK column gets its own
     // singularized foreign-key column.
-    const fk = new TableDefinition("astronauts").newForeignKeyDefinition("rockets", {
+    const fk = new TableDefinition("astronauts", {
+      adapter: schemaConn("sqlite"),
+    }).newForeignKeyDefinition("rockets", {
       primaryKey: ["tenant_id", "id"],
     });
     expect(fk.column).toEqual(["rocket_tenant_id", "rocket_id"]);
@@ -220,10 +229,13 @@ describe("TableDefinition#new_foreign_key_definition", () => {
     // Mirrors foreign_key_options' arity guard (schema_statements.rb:1258-1266):
     // a composite primaryKey must be matched by an equal-arity column.
     expect(() =>
-      new TableDefinition("astronauts").newForeignKeyDefinition("rockets", {
-        column: "rocket_id",
-        primaryKey: ["tenant_id", "id"],
-      }),
+      new TableDefinition("astronauts", { adapter: schemaConn("sqlite") }).newForeignKeyDefinition(
+        "rockets",
+        {
+          column: "rocket_id",
+          primaryKey: ["tenant_id", "id"],
+        },
+      ),
     ).toThrow(":column must reference all the :primary_key columns");
   });
 
@@ -243,7 +255,9 @@ describe("TableDefinition#new_foreign_key_definition", () => {
 
 describe("TableDefinition#new_check_constraint_definition", () => {
   it("defaults the name to chk_rails_<hex> (bare-adapter fallback)", () => {
-    const chk = new TableDefinition("products").newCheckConstraintDefinition("price > 0");
+    const chk = new TableDefinition("products", {
+      adapter: schemaConn("sqlite"),
+    }).newCheckConstraintDefinition("price > 0");
     expect(chk.name).toMatch(/^chk_rails_[0-9a-f]{10}$/);
     expect(chk.validate).toBe(true);
   });
@@ -286,14 +300,14 @@ describe("TableDefinition#new_check_constraint_definition", () => {
 describe("ReferenceDefinition helpers", () => {
   it("addTo adds id column by default", () => {
     const ref = new ReferenceDefinition("user", { index: false });
-    const td = new TableDefinition("posts", { id: false });
+    const td = new TableDefinition("posts", { adapter: schemaConn("sqlite"), id: false });
     ref.addTo(td);
     expect(td.columns.map((c) => c.name)).toContain("user_id");
   });
 
   it("addTo adds type column when polymorphic", () => {
     const ref = new ReferenceDefinition("taggable", { polymorphic: true, index: false });
-    const td = new TableDefinition("taggings", { id: false });
+    const td = new TableDefinition("taggings", { adapter: schemaConn("sqlite"), id: false });
     ref.addTo(td);
     const names = td.columns.map((c) => c.name);
     expect(names).toContain("taggable_id");
@@ -302,14 +316,14 @@ describe("ReferenceDefinition helpers", () => {
 
   it("addTo adds index with polymorphic name", () => {
     const ref = new ReferenceDefinition("taggable", { polymorphic: true });
-    const td = new TableDefinition("taggings", { id: false });
+    const td = new TableDefinition("taggings", { adapter: schemaConn("sqlite"), id: false });
     ref.addTo(td);
     expect(td.indexes[0].name).toBe("index_taggings_on_taggable");
   });
 
   it("addTo adds foreign key when foreignKey: true", () => {
     const ref = new ReferenceDefinition("user", { foreignKey: true, index: false });
-    const td = new TableDefinition("posts", { id: false });
+    const td = new TableDefinition("posts", { adapter: schemaConn("sqlite"), id: false });
     ref.addTo(td);
     expect(td.foreignKeys).toHaveLength(1);
     expect(td.foreignKeys[0].toTable).toBe("users");
@@ -320,7 +334,7 @@ describe("ReferenceDefinition helpers", () => {
       foreignKey: { toTable: "accounts" },
       index: false,
     });
-    const td = new TableDefinition("posts", { id: false });
+    const td = new TableDefinition("posts", { adapter: schemaConn("sqlite"), id: false });
     ref.addTo(td);
     expect(td.foreignKeys[0].toTable).toBe("accounts");
   });
@@ -333,7 +347,7 @@ describe("ReferenceDefinition helpers", () => {
 
   it("polymorphic columns are ordered type before id", () => {
     const ref = new ReferenceDefinition("taggable", { polymorphic: true, index: false });
-    const td = new TableDefinition("taggings", { id: false });
+    const td = new TableDefinition("taggings", { adapter: schemaConn("sqlite"), id: false });
     ref.addTo(td);
     expect(td.columns[0].name).toBe("taggable_type");
     expect(td.columns[1].name).toBe("taggable_id");
@@ -342,17 +356,17 @@ describe("ReferenceDefinition helpers", () => {
 
 describe("TableDefinition#toSql blank type guard", () => {
   it("throws a descriptive error for an empty custom type", async () => {
-    const td = new TableDefinition("t", { id: false });
+    const td = new TableDefinition("t", { adapter: schemaConn("sqlite"), id: false });
     td.column("bad", "" as any);
-    await expect(new SchemaCreation("sqlite").accept(td)).rejects.toThrow(
+    await expect(new SchemaCreation("sqlite", schemaConn("sqlite")).accept(td)).rejects.toThrow(
       /Column "bad" has an empty or blank type/,
     );
   });
 
   it("throws a descriptive error for a whitespace-only custom type", async () => {
-    const td = new TableDefinition("t", { id: false });
+    const td = new TableDefinition("t", { adapter: schemaConn("sqlite"), id: false });
     td.column("bad", "   " as any);
-    await expect(new SchemaCreation("sqlite").accept(td)).rejects.toThrow(
+    await expect(new SchemaCreation("sqlite", schemaConn("sqlite")).accept(td)).rejects.toThrow(
       /Column "bad" has an empty or blank type/,
     );
   });
@@ -360,13 +374,13 @@ describe("TableDefinition#toSql blank type guard", () => {
 
 describe("TableDefinition#raise_on_duplicate_column", () => {
   it("raises when adding a duplicate non-pk column", () => {
-    const td = new TableDefinition("t", { id: false });
+    const td = new TableDefinition("t", { adapter: schemaConn("sqlite"), id: false });
     td.string("name");
     expect(() => td.string("name")).toThrow("already defined column");
   });
 
   it("raises with pk-specific message for primary key columns", () => {
-    const td = new TableDefinition("t");
+    const td = new TableDefinition("t", { adapter: schemaConn("sqlite") });
     expect(() => td.column("id", "integer", { primaryKey: true })).toThrow(
       "redefine the primary key",
     );
@@ -375,12 +389,12 @@ describe("TableDefinition#raise_on_duplicate_column", () => {
 
 describe("TableDefinition#primary_key option", () => {
   it("treats primaryKey: false same as id: false", () => {
-    const td = new TableDefinition("t", { primaryKey: false });
+    const td = new TableDefinition("t", { adapter: schemaConn("sqlite"), primaryKey: false });
     expect(td.columns.find((c) => c.options.primaryKey)).toBeUndefined();
   });
 
   it("treats primaryKey: 'uuid' as a custom PK column name", () => {
-    const td = new TableDefinition("t", { primaryKey: "uuid" });
+    const td = new TableDefinition("t", { adapter: schemaConn("sqlite"), primaryKey: "uuid" });
     const pk = td.columns.find((c) => c.options.primaryKey);
     expect(pk?.name).toBe("uuid");
   });
@@ -388,7 +402,7 @@ describe("TableDefinition#primary_key option", () => {
 
 describe("TableDefinition#integer_like_primary_key?", () => {
   it("newColumnDefinition preserves integer pk type in base class", () => {
-    const td = new TableDefinition("t", { id: false });
+    const td = new TableDefinition("t", { adapter: schemaConn("sqlite"), id: false });
     const col = td.newColumnDefinition("id", "integer", { primaryKey: true });
     expect(col.type).toBe("integer");
   });
@@ -396,7 +410,7 @@ describe("TableDefinition#integer_like_primary_key?", () => {
 
 describe("TableDefinition#aliased_types", () => {
   it("maps timestamp to datetime", () => {
-    const td = new TableDefinition("t", { id: false });
+    const td = new TableDefinition("t", { adapter: schemaConn("sqlite"), id: false });
     td.column("ts", "timestamp");
     expect(td.columns[0].type).toBe("datetime");
   });

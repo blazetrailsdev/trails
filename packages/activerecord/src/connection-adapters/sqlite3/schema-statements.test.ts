@@ -15,11 +15,12 @@ import { SqlTypeMetadata } from "../sql-type-metadata.js";
 import { Column } from "./column.js";
 import { SchemaCreation } from "./schema-creation.js";
 import { SchemaDumper } from "./schema-dumper.js";
+import { schemaConn } from "../../support/schema-conn.js";
 
 describe("SQLite3::SchemaStatements", () => {
   describe("schemaCreation", () => {
     it("returns a SQLite3 SchemaCreation instance", () => {
-      expect(schemaCreation()).toBeInstanceOf(SchemaCreation);
+      expect(schemaCreation(schemaConn("sqlite"))).toBeInstanceOf(SchemaCreation);
     });
   });
 

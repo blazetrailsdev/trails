@@ -769,6 +769,9 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     } = {},
   ): string {
     const { limit, array, enumType } = options;
+    // Rails switches on `type.to_s`, so a nil type falls through to the
+    // abstract `type_to_sql`, whose own `type.to_s` renders it as "".
+    type = type ?? "";
     let sql: string;
     switch (type) {
       case "binary":

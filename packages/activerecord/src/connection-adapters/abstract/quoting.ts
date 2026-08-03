@@ -19,7 +19,6 @@ import { BigDecimal } from "@blazetrails/activesupport";
 import { Attribute as ModelAttribute, BinaryData, type Type } from "@blazetrails/activemodel";
 import type { TypeMap } from "../../type/type-map.js";
 import { NotImplementedError } from "../../errors.js";
-import type { SchemaQuoter } from "./assert-schema-adapter.js";
 import {
   formatInstantForSql,
   formatPlainDateTimeForSql,
@@ -67,8 +66,8 @@ type TemporalDateLike =
 /**
  * ANSI double-quote identifier quoter (`""`-escaped). Not a Rails-layer
  * method — Rails' abstract `Quoting` has no `quote_identifier`. This is the
- * SQL-92 fallback used only by {@link ABSTRACT_SCHEMA_QUOTER} when DDL is
- * rendered without a live adapter; every real adapter quotes through its own
+ * SQL-92 fallback used only by the `ABSTRACT_QUOTER` crutch in
+ * `sanitization.ts`; every real adapter quotes through its own
  * dialect-specific helper.
  *
  * @internal
@@ -247,7 +246,7 @@ export interface QuotingHost {
  *
  * Rails can call `lookup_cast_type` unconditionally because every host of this
  * module is an adapter. This standalone version is also bound to adapter-less
- * hosts (`ABSTRACT_SCHEMA_QUOTER`, the MySQL schema quoter) that have no type
+ * hosts (the MySQL schema quoter) that have no type
  * map, so it keeps the guard and hands back the raw sql_type for them; the
  * adapter method (`AbstractAdapter#lookupCastTypeFromColumn`) is the
  * unconditional one-liner.
@@ -319,8 +318,8 @@ export function quoteDefaultExpression(
   // Rails: `value = lookup_cast_type(column.sql_type).serialize(value)`
   // (abstract/quoting.rb:161). Rails dispatches `lookup_cast_type`
   // unconditionally; the optional call is for the adapter-free hosts this
-  // standalone version also serves (ABSTRACT_SCHEMA_QUOTER, the mysql schema
-  // quoter), which have no type map, so their values pass through unserialized.
+  // standalone version also serves (the mysql schema quoter), which has no type
+  // map, so its values pass through unserialized.
   let serialized: unknown = value;
   if (column != null) {
     const castType = this.lookupCastType?.(column.sqlType ?? null) as {
@@ -335,38 +334,9 @@ export function quoteDefaultExpression(
   // own dialect quoting, including the raw-view branches the abstract `quote`
   // deliberately lacks. Falling straight to the module `quote` here would bypass
   // the dialect entirely and raise `can't quote Uint8Array` on a binary default.
-  // Hosts without a `quote` (ABSTRACT_SCHEMA_QUOTER) keep the module helper.
+  // Hosts without a `quote` keep the module helper.
   return dispatchQuote(this, serialized);
 }
-
-/**
- * ANSI fallback quoter used only when a schema visitor or definition is built
- * without a live adapter (the standalone `schemaCreation()` convention helpers
- * and isolated unit tests). Every adapter-backed caller passes its own
- * `SchemaQuoter`, so this never quotes DDL for a real connection; it exists so
- * the abstract schema layer stays usable adapter-free rather than silently
- * routing through whatever dialect happens to import these freestanding
- * functions. Mirrors the `ABSTRACT_QUOTER` crutch in `sanitization.ts`.
- *
- * @noRailsEquivalent CONVERGEABLE (story:
- * converge-schema-creation-adapter-free-construction). Rails never builds a
- * schema visitor or definition without a connection — `SchemaCreation.new(conn)`
- * (`abstract/schema_creation.rb:6`) and `TableDefinition#initialize`
- * (`abstract/schema_definitions.rb:369`) both require one — so this fallback
- * exists only to serve trails' adapter-free construction paths.
- */
-export const ABSTRACT_SCHEMA_QUOTER: SchemaQuoter = {
-  quoteColumnName: quoteIdentifier,
-  // The adapter-free fallback renders schema-qualified names ANSI-style by
-  // quoting each dot-separated part. The public `quoteTableName` mirrors Rails
-  // (delegates to the throwing `quoteColumnName`), so it can't back this crutch.
-  quoteTableName: (name) =>
-    name
-      .split(".")
-      .map((part) => quoteIdentifier(part))
-      .join("."),
-  quoteDefaultExpression,
-};
 
 /**
  * Mirrors: ActiveRecord::ConnectionAdapters::Quoting#quoted_true

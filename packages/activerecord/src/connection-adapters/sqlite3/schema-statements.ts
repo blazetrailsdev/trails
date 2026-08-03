@@ -14,6 +14,7 @@ import type { CheckConstraintDefinition } from "../abstract/schema-definitions.j
 import { IndexDefinition } from "../abstract/schema-definitions.js";
 import { SqlTypeMetadata } from "../sql-type-metadata.js";
 import { SchemaCreation } from "./schema-creation.js";
+import type { SchemaQuoter } from "../abstract/assert-schema-adapter.js";
 import { SchemaStatements as AbstractSchemaStatements } from "../abstract/schema-statements.js";
 import { SchemaDumper as AbstractSchemaDumper } from "../abstract/schema-dumper.js";
 import { SchemaDumper } from "./schema-dumper.js";
@@ -192,8 +193,8 @@ export function createSchemaDumper(
   return SchemaDumper.create(source as Parameters<typeof SchemaDumper.create>[0], options);
 }
 
-export function schemaCreation(): SchemaCreation {
-  return new SchemaCreation("sqlite");
+export function schemaCreation(adapter: SchemaQuoter): SchemaCreation {
+  return new SchemaCreation("sqlite", adapter);
 }
 
 /** @internal */
