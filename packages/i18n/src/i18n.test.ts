@@ -35,17 +35,14 @@ import type { TranslationData } from "./utils.js";
 import type { TranslationKey } from "./i18n.js";
 
 describe("I18nTest", () => {
-  let backend: Simple;
-
   function storeTranslations(locale: string, data: TranslationData): void {
-    backend.storeTranslations(locale, data);
+    config().backend.storeTranslations(locale, data);
   }
 
   beforeEach(() => {
     resetConfig();
     resetClassConfig();
-    backend = new Simple();
-    config().backend = backend;
+    config().backend = new Simple();
     config().enforceAvailableLocales = false;
 
     storeTranslations("en", { currency: { format: { separator: ".", delimiter: "," } } });
@@ -60,20 +57,20 @@ describe("I18nTest", () => {
   });
 
   it("delegates translate calls to the backend", () => {
-    const spy = vi.spyOn(backend, "translate");
+    const spy = vi.spyOn(config().backend, "translate");
     translate("foo", { locale: "de" });
     expect(spy).toHaveBeenCalledWith("de", "foo", {});
   });
 
   it("delegates localize calls to the backend", () => {
     const spy = vi.fn();
-    (backend as unknown as { localize: unknown }).localize = spy;
+    config().backend.localize = spy;
     localize("whatever", { locale: "de" });
     expect(spy).toHaveBeenCalledWith("de", "whatever", ":default", {});
   });
 
   it("translate given no locale uses the current locale", () => {
-    const spy = vi.spyOn(backend, "translate");
+    const spy = vi.spyOn(config().backend, "translate");
     translate("foo");
     expect(spy).toHaveBeenCalledWith("en", "foo", {});
   });
@@ -438,8 +435,7 @@ describe("I18nTest", () => {
   });
 
   it("I18n.reload! reloads the set of locales that are enforced", () => {
-    backend = new Simple();
-    setBackend(backend);
+    setBackend(new Simple());
 
     expect(availableLocales()).not.toContain("de");
 

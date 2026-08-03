@@ -15,6 +15,9 @@ class FakeBackend implements Backend {
     this.reloaded += 1;
   }
   eagerLoadBang(): void {}
+  storeTranslations(): unknown {
+    return null;
+  }
   translate(): unknown {
     return null;
   }
