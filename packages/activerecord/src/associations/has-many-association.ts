@@ -598,7 +598,6 @@ export async function findTarget(
   }
 
   const rel = scope(record, assocName, options);
-  // Null-FK short-circuit (Rails' NullRelation fallback): nothing to load.
   if (rel === null) return [];
 
   // Set inverse_of on each loaded child. Resolve via the reflection so
@@ -685,8 +684,6 @@ export function scope(record: Base, assocName: string, options: AssociationOptio
   // (happens in tests that define associations via the lower-level API
   // without going through Reflection.create).
   const reflection = ctor._reflectOnAssociation?.(assocName);
-  // A through association with no registered reflection has no chain to build a
-  // JOIN from; the inline fallback below would emit a bogus direct-FK scope.
   if (options.through && !reflection) return null;
   // Null-FK short-circuit: read the SAME columns the eventual query
   // reads. For non-through, reflection.joinForeignKey is the owner-
