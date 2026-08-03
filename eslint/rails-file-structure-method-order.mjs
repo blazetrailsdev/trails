@@ -11,6 +11,8 @@
  * Scope per file:
  *   - Class instance + static methods (one container per ClassBody).
  *   - Top-level FunctionDeclaration (incl. `export function …`).
+ *   - Top-level mixin object literals (`export const Math = { add(…) {} }`),
+ *     the CLAUDE.md port shape for a Ruby module of methods.
  *
  * The manifest keys expected order per container: `classes[Name]` for
  * each class body (matched by the class's declared name) and `functions`
@@ -172,6 +174,10 @@ function memberName(node) {
   if (node.type === "FunctionDeclaration" || node.type === "TSDeclareFunction") {
     return node.id?.name ?? null;
   }
+  // Method of a mixin object literal (`export const Math = { add(…) {} }`).
+  if (node.type === "Property") {
+    return node.key?.type === "Identifier" && !node.computed ? node.key.name : null;
+  }
   if (
     node.type === "ExportNamedDeclaration" &&
     (node.declaration?.type === "FunctionDeclaration" ||
@@ -207,6 +213,50 @@ function isOrderableClassMember(node) {
   if (node.type !== "MethodDefinition") return false;
   if (node.key?.type !== "Identifier") return false;
   return true;
+}
+
+// A Ruby module ported as a mixin OBJECT (CLAUDE.md "Module mixins" —
+// `export const Math = { add(…) {}, … }` in packages/arel/src/math.ts) is
+// neither a ClassBody nor a top-level FunctionDeclaration, so without this it
+// matched no container and its manifest bucket was silently dropped.
+// Only plain function-valued members are orderable; spreads, computed keys and
+// value properties are left alone.
+function isOrderableObjectMember(node) {
+  if (node.type !== "Property") return false;
+  if (node.computed || node.key?.type !== "Identifier") return false;
+  return (
+    node.value?.type === "FunctionExpression" || node.value?.type === "ArrowFunctionExpression"
+  );
+}
+
+// Top-level `const Name = { … }` / `export const Name = { … }` object literals,
+// as `{ name, members, declaredKeys }` candidates. Reordering properties of an
+// object literal is safe for the same reason class members are: the properties
+// are evaluated as one expression and nothing inside can observe their relative
+// declaration order.
+function collectObjectContainers(programNode) {
+  const candidates = [];
+  for (const stmt of programNode.body) {
+    const decl =
+      stmt.type === "VariableDeclaration"
+        ? stmt
+        : stmt.type === "ExportNamedDeclaration" && stmt.declaration?.type === "VariableDeclaration"
+          ? stmt.declaration
+          : null;
+    if (!decl) continue;
+    for (const d of decl.declarations) {
+      if (d.id?.type !== "Identifier" || d.init?.type !== "ObjectExpression") continue;
+      const members = d.init.properties.filter(isOrderableObjectMember);
+      if (members.length < 2) continue;
+      const declaredKeys = new Set();
+      for (const p of d.init.properties) {
+        const n = memberName(p);
+        if (n) declaredKeys.add(n);
+      }
+      candidates.push({ name: d.id.name, members, declaredKeys });
+    }
+  }
+  return candidates;
 }
 
 function isOrderableTopLevel(node) {
@@ -448,6 +498,20 @@ const rule = {
             usedBucket.add(cand.name);
           }
         }
+        // Mixin object literals compete for the same buckets as class bodies:
+        // a `Foo::ClassMethods`-style mixin lands in `classes[Foo]`, while a
+        // standalone Ruby module lands in `functions` (see
+        // scripts/build-rails-file-structure-manifest.ts). Take an exact
+        // classes-bucket name match first; whatever is left is a candidate for
+        // the `functions` bucket below.
+        const objectCandidates = collectObjectContainers(programNode);
+        for (const cand of objectCandidates) {
+          if (!usedBucket.has(cand.name) && (classOrders[cand.name]?.length ?? 0) > 0) {
+            cand.expectedOrder = classOrders[cand.name];
+            usedBucket.add(cand.name);
+          }
+        }
+
         const unresolved = classCandidates.filter((c) => !c.expectedOrder);
         const freeBuckets = bucketKeys.filter((k) => !usedBucket.has(k));
         if (unresolved.length === 1 && freeBuckets.length === 1) {
@@ -476,7 +540,7 @@ const rule = {
         }
 
         const topLevel = programNode.body.filter(isOrderableTopLevel);
-        const functionsConsumed = topLevel.length >= 2 && functionOrder.length > 0;
+        let functionsConsumed = topLevel.length >= 2 && functionOrder.length > 0;
         if (functionsConsumed) {
           containers.push({
             container: programNode,
@@ -485,6 +549,25 @@ const rule = {
             // Top-level functions have no staticness; every name is "instance".
             declaredKeys: new Set(topLevel.map(memberName).filter(Boolean)),
           });
+        }
+
+        // A mixin object literal takes the `functions` bucket when the file has
+        // no top-level function container to claim it and exactly ONE object
+        // literal is still unresolved — more than one is ambiguous, and guessing
+        // would impose an unrelated Rails order on the wrong object.
+        const freeObjects = objectCandidates.filter((c) => !c.expectedOrder);
+        if (!functionsConsumed && functionOrder.length > 0 && freeObjects.length === 1) {
+          freeObjects[0].expectedOrder = functionOrder;
+          functionsConsumed = true;
+        }
+        for (const cand of objectCandidates) {
+          if (cand.expectedOrder) {
+            containers.push({
+              members: cand.members,
+              expectedOrder: cand.expectedOrder,
+              declaredKeys: cand.declaredKeys,
+            });
+          }
         }
 
         if (coverageReport) {

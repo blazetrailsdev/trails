@@ -30,14 +30,14 @@ import type { NodeOrValue } from "./nodes/binary.js";
  * a caller that cannot produce a `NodeOrValue` is a finding, not a widen.
  */
 export const Math = {
+  multiply(this: Node, other: NodeOrValue): Multiplication {
+    return new Multiplication(this, other);
+  },
   add(this: Node, other: NodeOrValue): Grouping {
     return new Grouping(new Addition(this, other));
   },
   subtract(this: Node, other: NodeOrValue): Grouping {
     return new Grouping(new Subtraction(this, other));
-  },
-  multiply(this: Node, other: NodeOrValue): Multiplication {
-    return new Multiplication(this, other);
   },
   divide(this: Node, other: NodeOrValue): Division {
     return new Division(this, other);

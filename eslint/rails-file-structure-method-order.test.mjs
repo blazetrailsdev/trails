@@ -34,6 +34,25 @@ const fixture = {
       classes: {},
       functions: ["alpha", "beta", "gamma"],
     },
+    // A Ruby module ported as a mixin OBJECT literal (`export const Math =
+    // { … }`, packages/arel/src/math.ts). Standalone modules bucket into
+    // `functions`, so the object literal claims that bucket.
+    "packages/arel/src/fixture-mixin.ts": {
+      classes: {},
+      functions: ["alpha", "beta", "gamma"],
+    },
+    // A mixin object whose name matches a CLASS bucket (the flattened
+    // `Foo::ClassMethods` shape) resolves by exact name, like a class body.
+    "packages/arel/src/fixture-mixinclass.ts": {
+      classes: { M: sharedClassOrder },
+      functions: [],
+    },
+    // Two unresolved object literals competing for one `functions` bucket →
+    // ambiguous, so neither is ordered.
+    "packages/arel/src/fixture-mixin2.ts": {
+      classes: {},
+      functions: ["alpha", "beta", "gamma"],
+    },
     "packages/arel/src/fixture-multi.ts": {
       classes: { Casted: ["before", "database"], Quoted: ["database", "before"] },
       functions: [],
@@ -102,6 +121,9 @@ process.on("exit", restoreManifest);
 const classFile = path.join(REPO_ROOT, "packages/arel/src/fixture-class.ts");
 const fnFile = path.join(REPO_ROOT, "packages/arel/src/fixture-fns.ts");
 const unlistedFile = path.join(REPO_ROOT, "packages/arel/src/fixture-unlisted.ts");
+const mixinFile = path.join(REPO_ROOT, "packages/arel/src/fixture-mixin.ts");
+const mixinClassFile = path.join(REPO_ROOT, "packages/arel/src/fixture-mixinclass.ts");
+const mixin2File = path.join(REPO_ROOT, "packages/arel/src/fixture-mixin2.ts");
 const multiFile = path.join(REPO_ROOT, "packages/arel/src/fixture-multi.ts");
 const renameFile = path.join(REPO_ROOT, "packages/arel/src/fixture-rename.ts");
 const ambiguousFile = path.join(REPO_ROOT, "packages/arel/src/fixture-ambiguous.ts");
@@ -141,6 +163,18 @@ try {
       {
         filename: fnFile,
         code: `export function alpha() {}\nexport function beta() {}\nexport function gamma() {}\n`,
+      },
+      // Mixin object literal already in expected order.
+      {
+        filename: mixinFile,
+        code: `export const Math = {\n  alpha() {},\n  beta() {},\n  gamma() {},\n};\n`,
+      },
+      // Two object literals, one `functions` bucket — ambiguous, left alone.
+      {
+        filename: mixin2File,
+        code:
+          `export const A = {\n  gamma() {},\n  alpha() {},\n};\n` +
+          `export const B = {\n  beta() {},\n  alpha() {},\n};\n`,
       },
       // Single member — nothing to reorder.
       {
@@ -267,6 +301,35 @@ try {
           `export function beta(x: number): number;\n` +
           `export function beta(x: any): any { return x; }\n` +
           `export function gamma(): void {}\n`,
+      },
+      // Mixin object literal out of order (packages/arel/src/math.ts). Its
+      // members are properties, not FunctionDeclarations, so before this the
+      // whole `functions` bucket was dropped and no order was enforced.
+      {
+        filename: mixinFile,
+        code:
+          `export const Math = {\n` +
+          `  gamma() {},\n` +
+          `  /** doc for alpha */\n` +
+          `  alpha() {},\n` +
+          `  beta() {},\n` +
+          `};\n`,
+        errors: [{ messageId: "outOfOrder" }],
+        output:
+          `export const Math = {\n` +
+          `  /** doc for alpha */\n` +
+          `  alpha() {},\n` +
+          `  beta() {},\n` +
+          `  gamma() {},\n` +
+          `};\n`,
+      },
+      // Mixin object matched to a CLASS bucket by exact name; a non-function
+      // property is not orderable and keeps its place.
+      {
+        filename: mixinClassFile,
+        code: `const M = {\n` + `  second() {},\n` + `  value: 1,\n` + `  first() {},\n` + `};\n`,
+        errors: [{ messageId: "outOfOrder" }],
+        output: `const M = {\n` + `  first() {},\n` + `  value: 1,\n` + `  second() {},\n` + `};\n`,
       },
       // Class methods out of order.
       {
