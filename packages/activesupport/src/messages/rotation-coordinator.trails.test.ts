@@ -29,6 +29,18 @@ describe("RotationCoordinator", () => {
     },
   });
 
+  it("stringifies a symbol salt before building", () => {
+    const salts: string[] = [];
+    const coordinator = new VerifierCoordinator((salt) => {
+      salts.push(salt);
+      return `secret for ${salt}`;
+    }).rotateDefaults();
+
+    coordinator.get(Symbol.for("salt"));
+
+    expect(salts).toEqual(["salt"]);
+  });
+
   it("requires a secret generator", () => {
     expect(() => new VerifierCoordinator()).toThrow("A secret generator block is required");
   });

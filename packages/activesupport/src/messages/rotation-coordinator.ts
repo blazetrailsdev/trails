@@ -1,5 +1,8 @@
 import { extractKeys, isPlainObject } from "../hash-utils.js";
 import type { OnRotation } from "./rotator.js";
+// The `messages/` ports raise through the Ruby builtins declared in
+// serializer-with-fallback.ts; activesupport has no separate errors module, and
+// hash-utils' ArgumentError is the core-ext hash extensions' own copy.
 import { ArgumentError, RuntimeError } from "./serializer-with-fallback.js";
 
 /**
@@ -95,7 +98,7 @@ export abstract class RotationCoordinator<C extends FallsBack<C>> {
   }
 
   /** @internal */
-  protected changingConfigurationBang(): void {
+  private changingConfigurationBang(): void {
     if (this.#codecs.size > 0) {
       throw new RuntimeError(
         `Cannot change ${this.constructor.name} configuration after it has already been applied.\n\n` +
@@ -106,7 +109,7 @@ export abstract class RotationCoordinator<C extends FallsBack<C>> {
   }
 
   /** @internal */
-  protected normalizeOptions(options: RotateOptions): BuildOptions {
+  private normalizeOptions(options: RotateOptions): BuildOptions {
     const normalized = { ...options } as Record<string, unknown>;
 
     normalized.secretGenerator ??= this.#secretGenerator;
@@ -120,7 +123,7 @@ export abstract class RotationCoordinator<C extends FallsBack<C>> {
   }
 
   /** @internal */
-  protected buildWithRotations(salt: Salt): C {
+  private buildWithRotations(salt: Salt): C {
     const evaluated = this.#rotateOptions.map((options) =>
       typeof options === "function" ? options(salt) : options,
     );
@@ -132,15 +135,20 @@ export abstract class RotationCoordinator<C extends FallsBack<C>> {
     const rotateOptions = uniq(compacted.map((options) => this.normalizeOptions(options)));
 
     if (rotateOptions.length === 0)
-      throw new RuntimeError(`No options have been configured for ${String(salt)}`);
+      throw new RuntimeError(`No options have been configured for ${saltToS(salt)}`);
 
     return rotateOptions
-      .map((options) => this.build(String(salt), options))
+      .map((options) => this.build(saltToS(salt), options))
       .reduce((codec, fallback) => codec.fallBackTo(fallback));
   }
 
   /** @internal */
   protected abstract build(salt: string, options: BuildOptions): C;
+}
+
+/** Ruby's `Symbol#to_s` / `String#to_s` over a salt. */
+function saltToS(salt: Salt): string {
+  return typeof salt === "symbol" ? (salt.description ?? "") : salt;
 }
 
 /** Ruby's `Symbol#inspect` / `String#inspect` over a salt. */
