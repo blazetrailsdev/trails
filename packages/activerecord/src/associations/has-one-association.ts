@@ -566,7 +566,8 @@ export class HasOneAssociation extends SingularAssociation {
     // `this.target` before its first `await` — so nothing can observe the
     // association caching the displaced record.
     //
-    // The accepted deviation is the *pair* of writes: Rails' target only ever
+    // The accepted deviation (RFC 0068 Design §6) is the *pair* of writes:
+    // Rails' target only ever
     // moves forward, because `load_target` runs before `self.target = record`
     // rather than after it. It cannot be removed while the Rails-named writer
     // is a synchronous property setter (`pirate.shipAttributes = {...}`) that
