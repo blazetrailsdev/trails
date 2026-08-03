@@ -226,6 +226,7 @@ describe("vendor/sources.ts", () => {
         "arel",
         "did-you-mean",
         "globalid",
+        "i18n",
         "rack",
         "trailties",
       ].sort(),
