@@ -149,11 +149,6 @@ describe("stale story references", () => {
     expect(stale.map((ref) => `${ref.file}:${ref.line} ${ref.slug}`)).toEqual([]);
   });
 
-  // `docs/activerecord/` is frozen (RFC 0011 Phase 4) and its stale citations
-  // have no legal fix, so they are reported rather than gated: this test
-  // records the inventory for the freeze cutover to consume and passes either
-  // way. It still asserts the population is non-empty, so the inventory cannot
-  // quietly stop covering the tree.
   it("inventories stale citations in the frozen tree without gating on them", async () => {
     const files = await collectFrozenMarkdownFiles(REPO_ROOT);
     expect(files).toContain(path.join("docs", "activerecord", "parity-verification.md"));

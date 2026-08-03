@@ -31,9 +31,6 @@ const SKIP_DIRS = new Set(["node_modules", "dist", ".git", "vendor", "__snapshot
 const SOURCE_ROOTS = ["packages", "scripts", "eslint"];
 
 const MARKDOWN_SKIP_DIRS = new Set([...SKIP_DIRS, "tasks"]);
-// Frozen by RFC 0011 Phase 4: CI's `Docs ActiveRecord Freeze` job fails any PR
-// that edits a file here, so a stale citation in this tree has no legal fix and
-// cannot be gated. It is scanned as an inventory instead.
 const FROZEN_MARKDOWN_TREES = [path.join("docs", "activerecord")];
 
 // Its test states a stale promise verbatim as a fixture, and the line-based
@@ -194,10 +191,11 @@ export async function collectFrozenMarkdownFiles(root: string): Promise<string[]
 }
 
 /**
- * Every pending citation in the frozen trees. This is an inventory, not a gate:
- * the prose cannot legally be edited, so a finding here is a note for the
- * freeze cutover rather than a failure. Kept out of `scanStoryReferences` so
- * the hard gate stays scoped to the editable tree.
+ * Every pending citation in the frozen trees — `docs/activerecord/`, frozen by
+ * RFC 0011 Phase 4, whose prose CI's `Docs ActiveRecord Freeze` job forbids
+ * editing. This is an inventory, not a gate: a finding here has no legal fix,
+ * so it is a note for the freeze cutover rather than a failure. Kept out of
+ * `scanStoryReferences` so the hard gate stays scoped to the editable tree.
  */
 export async function scanFrozenStoryReferences(repoRoot: string): Promise<StoryReference[]> {
   const refs: StoryReference[] = [];
