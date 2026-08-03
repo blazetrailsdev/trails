@@ -1961,7 +1961,10 @@ export function extractClass(
   for (const member of node.members) {
     const memberName = getMemberName(member);
     const visibility = memberVisibility(member);
-    const internal = visibility !== "public";
+    // A public class member can still be a wiring seam: `@internal` is the
+    // same marker exported functions, interface members and object-literal
+    // module members already honor, so it must not depend on declaration kind.
+    const internal = visibility !== "public" || hasInternalJsDocTag(member);
     const noRailsEquivalent = noRailsEquivalentReason(member);
     const memberMissingRailsCalls = missingRailsCallTags(member);
     const tagged = {
