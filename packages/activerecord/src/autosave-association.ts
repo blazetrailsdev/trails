@@ -318,7 +318,7 @@ export function validOptions(): string[] {
 // of the duck-type below is `HasOneThroughAssociation`, which still defines
 // both `persistReplace` (has-one-through-association.ts) and `_pendingReplace`.
 // Its marker is normally consumed during the save (`autosaveHasOne` ->
-// `persistThroughRecord`, Rails' `save_has_one_association` through arm), so by
+// `persistReplace` from Rails' `save_has_one_association` through arm), so by
 // post-commit it is usually null and the loop no-ops — this is deliberately
 // kept as its safety net for a marker that survives the save, not dead code.
 export async function flushPendingReplaces(record: Base): Promise<void> {
@@ -496,6 +496,12 @@ async function _insertCollectionRecordFallback(
 
 async function autosaveHasOne(record: Base, assoc: AssociationDefinition): Promise<boolean> {
   const inst = _loadedAssociation(record, assoc.name);
+  const ctor = record.constructor as typeof Base;
+  const reflection = (ctor as any)._reflectOnAssociation?.(assoc.name);
+  // Rails discriminates the through arms of `save_has_one_association` off the
+  // reflection (`reflection.through_reflection`, autosave_association.rb:489),
+  // not off the association object's shape.
+  const isThrough = !!reflection?.throughReflection;
 
   // Rails `save_has_one_association`'s `through_reflection` arm persists the
   // join side of a has_one *through* (build/update/destroy via
@@ -511,8 +517,8 @@ async function autosaveHasOne(record: Base, assoc: AssociationDefinition): Promi
   // body below — which, per Rails (autosave_association.rb:489), skips only the
   // foreign-key write for through, but still runs the end-record
   // `marked_for_destruction` and (autosave-gated) `record.save` arms.
-  if (typeof inst?.persistThroughRecord === "function") {
-    await inst.persistThroughRecord();
+  if (isThrough && typeof inst?.persistReplace === "function") {
+    await inst.persistReplace();
   }
 
   // A has_one *through* suppresses its through-proxy's independent autosave by
@@ -524,10 +530,10 @@ async function autosaveHasOne(record: Base, assoc: AssociationDefinition): Promi
   // would duplicate that row. A plain `HasOneAssociation` never sets
   // `_pendingReplace` itself (its displacement removal runs inline, via
   // `detachDisplacedTarget`), and the through association itself clears its marker
-  // inside `persistThroughRecord` above, so a truthy marker on an instance with
-  // no `persistThroughRecord` is unambiguously that suppression sentinel. Skip
+  // in the `persistReplace` above, so a truthy marker on a non-through
+  // association is unambiguously that suppression sentinel. Skip
   // the end-record persistence; the through owns the join row.
-  if (inst?._pendingReplace && typeof inst?.persistThroughRecord !== "function") {
+  if (inst?._pendingReplace && !isThrough) {
     return true;
   }
 
@@ -553,7 +559,7 @@ async function autosaveHasOne(record: Base, assoc: AssociationDefinition): Promi
   const autosave = assoc.options.autosave;
 
   // NOTE: the join side of a has_one *through* was already persisted above by
-  // `persistThroughRecord` (which consumes the association's `_pendingReplace`),
+  // `persistReplace` (which consumes the association's `_pendingReplace`),
   // so control falls through here to run the shared end-record arms — the FK
   // write is skipped for through further down (Rails autosave_association.rb:489)
   // while `marked_for_destruction`/`record.save` still apply.
@@ -586,8 +592,6 @@ async function autosaveHasOne(record: Base, assoc: AssociationDefinition): Promi
   // returned above), so a NEW child persists whether or not autosave is set.
   // Rails:485-486 — `primary_key = Array(compute_primary_key(reflection, self))`
   // then `primary_key_value = primary_key.map { _read_attribute(_1) }`.
-  const ctor = record.constructor as typeof Base;
-  const reflection = (ctor as any)._reflectOnAssociation?.(assoc.name);
   const pkSpec = reflection ? computePrimaryKey(reflection, record) : (ctor.primaryKey ?? "id");
   const pkArr: string[] = Array.isArray(pkSpec) ? pkSpec : [pkSpec];
   const pkForChangeCheck = pkArr.map((k) => record._readAttribute(k));
@@ -602,7 +606,7 @@ async function autosaveHasOne(record: Base, assoc: AssociationDefinition): Promi
     // Rails save_has_one_association:489 — `unless reflection.through_reflection`.
     // A has_one *through* never writes a foreign key onto the end record (its
     // owner-linkage lives on the join row, persisted above via
-    // `persistThroughRecord`); it also skips `set_inverse_instance`. Both are
+    // `persistReplace`); it also skips `set_inverse_instance`. Both are
     // guarded here, while the `record.save` arm below still runs for through
     // (gated by the same `(autosave && changed) || _record_changed?` condition),
     // so an `autosave: true` through re-saves a mutated end record.

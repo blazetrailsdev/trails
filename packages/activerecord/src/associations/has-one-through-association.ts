@@ -42,7 +42,8 @@ export class HasOneThroughAssociation extends HasOneAssociation {
    *     owner's first `save`. This marker carries that deferral.
    *   - **Sync `build`/`create` on a persisted owner** — the `!save` half of the
    *     same arm, reached from non-awaitable builders that cannot `await` the
-   *     join-row reconcile; `persistThroughRecord` drains it inside the save.
+   *     join-row reconcile; `autosaveHasOne` drains it via `persistReplace`
+   *     inside the save.
    *
    * It is NOT a deferral for assignment to a persisted owner: `writer` runs
    * `persistReplace` inline (clearing the marker before it returns), mirroring
@@ -84,6 +85,15 @@ export class HasOneThroughAssociation extends HasOneAssociation {
    * against the now-loaded join row (update-existing / build-when-absent),
    * exactly as Rails' `create_through_record` does.
    *
+   * Extra surface, deliberately left counted: the name exists only because the
+   * base `HasOneAssociation` splits Rails' inline `build_#{name}` target load
+   * into a public `loadTargetForBuild` hook. It cannot be `protected` while
+   * `associations/builder/has-one.ts` drives it from outside the class, and it
+   * converges when the BASE hook does — see the
+   * `extra-surface-has-one-base-build-hooks-classify` story. No
+   * `@noRailsEquivalent` tag, because convergeable surface belongs on the novel
+   * count, not in the allowed set.
+   *
    * @internal
    */
   override loadTargetForBuild(): Promise<unknown> {
@@ -103,6 +113,13 @@ export class HasOneThroughAssociation extends HasOneAssociation {
    * nullify/destroy the previously-associated end record. Override to a no-op so
    * the `build#{name}` / `create#{name}` accessors leave displacement to the
    * through's own `createThroughRecord` / `persistReplace`.
+   *
+   * Extra surface, deliberately left counted, for the same reason as
+   * `loadTargetForBuild` above: Rails has no `remove_target!` hook of this
+   * shape at all, and this override only neutralizes the base class's. It
+   * cannot be `protected` while `nested-attributes.ts` calls it from outside,
+   * and it disappears when the base hook converges — see the
+   * `extra-surface-has-one-base-build-hooks-classify` story.
    *
    * @internal
    */
@@ -433,34 +450,29 @@ export class HasOneThroughAssociation extends HasOneAssociation {
   /**
    * Persists ONLY the join-model side of the through — the deferred analog of
    * Rails' assignment-time `create_through_record`
-   * (has_one_through_association.rb:15-42): build/update/destroy the join row
-   * via `createThroughRecord`. It does NOT save the end record; that is the
-   * `record.save` arm of Rails' `save_has_one_association`
+   * (has_one_through_association.rb:15-42): runs `createThroughRecord`, which
+   * builds/updates/destroys the join row. It does NOT save the end record; that
+   * is the `record.save` arm of Rails' `save_has_one_association`
    * (autosave_association.rb:503), which `autosaveHasOne` runs separately after
    * calling this (skipping only the through's foreign-key write, per
    * autosave_association.rb:489).
    *
-   * `autosaveHasOne` calls this for every loaded through association during the
-   * owner's save, replacing the post-commit `flushPendingReplaces` deferral for
-   * the sync `build`/`create`-on-persisted-owner path: those queue
-   * `_pendingReplace` in `replace`/`constructThroughRecordInMemory` (no `await`
-   * is possible from the sync builder), and this flushes it inside the save. The
-   * awaitable `writer` already persists on assignment (clearing the marker), so
-   * this no-ops there; it also no-ops for a merely-cached target (no marker),
-   * matching Rails, which creates the join only on assignment.
-   */
-  async persistThroughRecord(): Promise<void> {
-    await this.persistReplace();
-  }
-
-  /**
-   * Mirrors: ActiveRecord::Associations::HasOneThroughAssociation — deferred DB flush.
+   * Reached two ways: the awaitable `writer` calls it inline on assignment to a
+   * persisted owner (immediate persist), and `autosaveHasOne` calls it for every
+   * loaded through association during the owner's save, which is what covers the
+   * sync `build`/`create`-on-persisted-owner path: those queue `_pendingReplace`
+   * in `replace`/`constructThroughRecordInMemory` and this flushes it inside the
+   * save. It no-ops when the marker is already consumed (an awaited `writer`) or
+   * absent (a merely-cached target), matching Rails, which creates the join only
+   * on assignment.
    *
-   * Runs `createThroughRecord`, which creates/updates/destroys the join-model
-   * record as needed. Reached two ways: the awaitable `writer` calls it inline
-   * on assignment to a persisted owner (immediate persist), and
-   * `persistThroughRecord` calls it from `autosaveHasOne` during the owner's
-   * save for the sync `build`/`create` path that could not `await`.
+   * @noRailsEquivalent PERMANENT Rails does this DB work inline inside
+   * `create_through_record`, reached from the SYNCHRONOUS `replace` /
+   * `build_#{name}` / `create_#{name}` entry points. In JS those entry points
+   * cannot `await`, so the DB half has to be a separately-callable method the
+   * async save path drains — a language-level split with no Ruby counterpart to
+   * name it after. Rails' own `create_through_record` is ported under that name
+   * (the in-memory half); this is the DB half it cannot inline.
    */
   async persistReplace(save = true): Promise<void> {
     const pending = this._pendingReplace;
