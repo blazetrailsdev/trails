@@ -13,8 +13,7 @@
  * story `i18n-symbol-values-are-colon-strings`.
  *
  * Not ported here: `load_rb` (it `eval`s Ruby source, which trails has none of
- * — see the `SCOPED_SKIP_GROUPS` entry in `scripts/api-compare/conventions.ts`),
- * and the `Transliterator` mixin.
+ * — see the `SCOPED_SKIP_GROUPS` entry in `scripts/api-compare/conventions.ts`).
  */
 
 import {
@@ -40,6 +39,11 @@ import {
 } from "../i18n.js";
 import { interpolate as interpolateString } from "../interpolate/ruby.js";
 import { throwException, catchException } from "../throw-catch.js";
+import {
+  transliterate,
+  type HashTransliterator,
+  type ProcTransliterator,
+} from "./transliterator.js";
 import { except, type TranslationData } from "../utils.js";
 import { parseYaml } from "../yaml.js";
 
@@ -132,6 +136,11 @@ interface Localizable {
 }
 
 export abstract class Base {
+  /** Mirrors: `include I18n::Backend::Transliterator` (base.rb:9). */
+  transliterate = transliterate;
+  /** @internal Ruby's `@transliterators` ivar, which has no public reader. */
+  transliterators?: Record<Locale, HashTransliterator | ProcTransliterator>;
+
   private eagerLoadedFlag = false;
   /**
    * Whether `I18n.load_path` has actually been read. The gem needs no such

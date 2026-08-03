@@ -29,6 +29,7 @@ import {
   setLocale,
   t,
   translate,
+  transliterate,
   withLocale,
 } from "./i18n.js";
 import { Config, resetClassConfig } from "./config.js";
@@ -302,6 +303,44 @@ describe("I18nTest", () => {
       }),
     ).toThrow(ArgumentError);
     expect(locale()).toBe(defaultLocale());
+  });
+
+  /**
+   * The gem stubs `I18n::Backend::Transliterator.get` to raise; ESM exports
+   * can't be stubbed in place, so these two store a rule that is neither a
+   * Proc nor a Hash, which is what makes `get` raise (transliterator.rb:26).
+   */
+  it("I18n.transliterate handles I18n::ArgumentError exception", () => {
+    storeTranslations("en", { i18n: { transliterate: { rule: "not a rule" } } });
+    const exceptionHandler = vi.fn(() => {
+      throw new ArgumentError();
+    });
+    setExceptionHandler(exceptionHandler);
+
+    expect(() => transliterate("ąćó")).toThrow(ArgumentError);
+    expect(exceptionHandler).toHaveBeenCalled();
+  });
+
+  it("I18n.transliterate raises I18n::ArgumentError exception", () => {
+    storeTranslations("en", { i18n: { transliterate: { rule: "not a rule" } } });
+    const exceptionHandler = vi.fn();
+    setExceptionHandler(exceptionHandler);
+
+    expect(() => transliterate("ąćó", { raise: true })).toThrow(ArgumentError);
+    expect(exceptionHandler).not.toHaveBeenCalled();
+  });
+
+  it("transliterate given an unavailable locale rases an I18n::InvalidLocale", () => {
+    try {
+      config().enforceAvailableLocales = true;
+      expect(() => transliterate("string", { locale: "klingon" })).toThrow(InvalidLocale);
+    } finally {
+      config().enforceAvailableLocales = false;
+    }
+  });
+
+  it("transliterate non-ASCII chars not in map with default replacement char", () => {
+    expect(transliterate("日本語")).toBe("???");
   });
 
   it("uses the simple backend by default", () => {

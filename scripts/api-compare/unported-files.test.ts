@@ -54,6 +54,7 @@ describe("isSourceUnported package scoping", () => {
       "backend/base.rb",
       "backend/flatten.rb",
       "backend/simple.rb",
+      "backend/transliterator.rb",
       "config.rb",
       "exceptions.rb",
       "interpolate/ruby.rb",

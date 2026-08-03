@@ -1200,14 +1200,6 @@ export const UNPORTED_FILES: UnportedFile[] = [
     reason:
       "Pre-1.0: optional backend mixin — pluralization via per-locale rule procs in the data.",
   },
-  {
-    pattern: "backend/transliterator.rb",
-    package: "i18n",
-    reason:
-      "Pre-1.0: ASCII transliteration driven by per-locale rule tables and " +
-      "`$KCODE`-era String packing. JS has `String.prototype.normalize` and " +
-      "no locale rule data is shipped; not in pre-1.0 scope.",
-  },
   // --- i18n: gem surface trails has no counterpart for ---
   {
     // Deliberately broad: covers `gettext.rb`, `gettext/*` and the
