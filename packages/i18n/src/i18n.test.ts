@@ -387,11 +387,6 @@ describe("I18nTest", () => {
     expect(localeAvailable("de")).toBe(true);
   });
 
-  it("I18n.locale_available? returns true when the passed locale is a string and is available", () => {
-    config().availableLocales = ["en", "de"];
-    expect(localeAvailable("de")).toBe(true);
-  });
-
   it("I18n.locale_available? returns false when the passed locale is unavailable", () => {
     expect(localeAvailable("klingon")).toBe(false);
   });
