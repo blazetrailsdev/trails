@@ -167,8 +167,8 @@ export async function maxAllowedPacket(this: MaxAllowedPacketHost | void): Promi
   if (host?._maxAllowedPacket !== undefined) return host._maxAllowedPacket;
   const raw = await host?.showVariable?.("max_allowed_packet");
   const parsed = raw != null ? parseInt(raw, 10) : NaN;
-  // Rails has no fallback — `show_variable` always answers on a live MySQL
-  // connection. The default stands in for hosts without one (e.g. unit tests).
+  // Rails needs no fallback: `show_variable` always answers on a live MySQL
+  // connection. The MySQL default stands in for a host without one.
   const resolved = Number.isNaN(parsed) ? 16_777_216 : parsed;
   if (host) host._maxAllowedPacket = resolved;
   return resolved;

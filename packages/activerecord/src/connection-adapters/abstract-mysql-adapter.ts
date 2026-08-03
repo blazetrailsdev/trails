@@ -1128,13 +1128,13 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     }
   }
 
+  declare _maxAllowedPacket?: number;
+
   /**
    * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::DatabaseStatements#max_allowed_packet
    * — `@max_allowed_packet ||= show_variable("max_allowed_packet")`.
+   * @internal
    */
-  declare _maxAllowedPacket?: number;
-
-  /** @internal */
   async maxAllowedPacket(): Promise<number> {
     return mysqlMaxAllowedPacket.call(this);
   }
