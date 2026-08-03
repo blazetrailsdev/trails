@@ -61,6 +61,8 @@ export interface EncryptedFileOptions {
 }
 
 export class EncryptedFile {
+  private static memoExpectedKeyLength?: number;
+
   readonly contentPath: string;
   readonly keyPath: string;
   readonly envKey: string;
@@ -86,7 +88,8 @@ export class EncryptedFile {
   }
 
   static expectedKeyLength(): number {
-    return this.generateKey().length;
+    this.memoExpectedKeyLength ??= this.generateKey().length;
+    return this.memoExpectedKeyLength;
   }
 
   async key(): Promise<string | null> {
