@@ -83,7 +83,8 @@ const ALTERNATE_PREFIX: Record<string, string> = { b: "0b", B: "0B", o: "0", x: 
  */
 function sprintf(spec: string, value: unknown): string {
   const parsed = FORMAT_SPEC.exec(spec);
-  if (!parsed) return String(value);
+  // Ruby's sprintf raises on a spec it cannot parse, e.g. `%<num>,d`.
+  if (!parsed) throw new ArgumentError(`malformed format string - %${spec}`);
   const [, flags = "", width = "", precision, conversion = "s"] = parsed;
   const digits = precision === undefined ? 6 : Number(precision);
   const numeric = !"csp".includes(conversion);
