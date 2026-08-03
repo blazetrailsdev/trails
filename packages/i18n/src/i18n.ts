@@ -242,7 +242,12 @@ export function exists(
   return config().backend.exists(locale as Locale, key as TranslationKey, options);
 }
 
-/** Localizes certain objects, such as dates and numbers to local formatting. */
+/**
+ * Localizes certain objects, such as dates and numbers to local formatting.
+ *
+ * `Backend#localize` lands with the `i18n-backend-localize` story; until then
+ * a backend that has not defined it fails here rather than silently no-op.
+ */
 export function localize(
   object: unknown,
   { locale = null, format = null, ...options }: TranslateOptions = EMPTY_HASH,
@@ -251,9 +256,7 @@ export function localize(
   if (locale === false) throw new Disabled("l");
   enforceAvailableLocalesBang(locale as Locale);
 
-  format ??= "default";
-  // `Backend#localize` lands with the `i18n-backend-localize` story; until then
-  // a backend that has not defined it fails here rather than silently no-op.
+  if (!truthy(format)) format = "default";
   return config().backend.localize!(locale as Locale, object, format, options);
 }
 
@@ -372,8 +375,9 @@ function handleException(
     case "throw":
       return throwException(exception);
     default: {
-      const handler =
-        (options.exceptionHandler as ExceptionHandlerLike) ?? config().exceptionHandler;
+      const handler = truthy(options.exceptionHandler)
+        ? (options.exceptionHandler as ExceptionHandlerLike)
+        : config().exceptionHandler;
       return typeof handler === "function"
         ? handler(exception, locale, key as TranslationKey, options)
         : handler.call(exception, locale, key as TranslationKey, options);
@@ -390,10 +394,13 @@ function slice(hash: TranslateOptions, ...keys: string[]): TranslateOptions {
   return result;
 }
 
+/**
+ * The `RegExp` below is Ruby's `Regexp.union(I18n.config.interpolation_patterns)`,
+ * and `matchAll` its `String#scan`, which on a pattern carrying groups yields
+ * one array of captures per match.
+ */
 function interpolationKeysFromTranslation(translation: unknown): unknown[] {
   if (typeof translation === "string") {
-    // Ruby's `Regexp.union(I18n.config.interpolation_patterns)`; `scan` on a
-    // pattern with groups yields one array of captures per match.
     const pattern = new RegExp(
       config()
         .interpolationPatterns.map((interpolationPattern) => `(?:${interpolationPattern.source})`)
