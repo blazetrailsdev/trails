@@ -3176,9 +3176,8 @@ export class Relation<T extends Base> {
    * over `eager_load_values | includes_values` and which raises (via
    * `construct_join_dependency` → `build`) for both misspelled names
    * (`ConfigurationError`) and polymorphic associations
-   * (`EagerLoadPolymorphicError`). Capability-gap specs that Rails joins fine
-   * (composite-key belongsTo, unjoinable through) do NOT raise — trails degrades
-   * them to preloading, so the calculation paths stay silent like `toArray`.
+   * (`EagerLoadPolymorphicError`). Building the JoinDependency and discarding it
+   * is the whole check — like Rails, the errors are a side effect of `build`.
    *
    * Skips entirely when the query bypasses the JoinDependency (CTEs, set ops,
    * FROM overrides, composite PK): there `toArray` degrades to preloading
@@ -3201,8 +3200,7 @@ export class Relation<T extends Base> {
       ...new Set([...this._eagerLoadAssociations, ...this._includesToPromoteFromReferences()]),
     ];
     if (specs.length === 0) return;
-    const jd = new JoinDependency(this._modelClass, this.table, null, Nodes.OuterJoin);
-    for (const spec of specs) jd.validateEagerLoadSpec(spec);
+    new JoinDependency(this._modelClass, this.table, specs, Nodes.OuterJoin);
   }
 
   /**

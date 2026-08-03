@@ -504,36 +504,6 @@ export class JoinDependency {
   }
 
   /**
-   * Rails-faithful eager-load validation: walk the spec tree and raise the same
-   * errors `construct_join_dependency` does before any SQL is built —
-   * `ConfigurationError` for a misspelled/unknown name (via `findReflection`,
-   * mirroring Rails `find_reflection`) and `EagerLoadPolymorphicError` for a
-   * polymorphic association.
-   *
-   * Used by the calculation/exists paths (`Relation#_checkEagerLoadable`), which
-   * never build the real join tree but must still surface these errors. Unlike
-   * `build` this only validates — it doesn't mutate the tree.
-   *
-   * Mirrors: ActiveRecord::Associations::JoinDependency#build.
-   */
-  validateEagerLoadSpec(spec: AssociationSpec): void {
-    const walk = (associations: Record<PropertyKey, any>, baseKlass: typeof Base): void => {
-      if (!associations || typeof associations !== "object") return;
-      for (const key of Reflect.ownKeys(associations)) {
-        const name = typeof key === "symbol" ? (key.description ?? String(key)) : String(key);
-        const reflection = this.findReflection(baseKlass, name);
-        reflection.checkValidityBang?.();
-        reflection.checkEagerLoadableBang?.();
-        if (reflection.isPolymorphic?.()) {
-          throw new EagerLoadPolymorphicError(name);
-        }
-        walk(associations[key], reflection.klass);
-      }
-    };
-    walk(JoinDependency.makeTree(spec), this._baseModel);
-  }
-
-  /**
    * Build the join tree from a normalized make_tree-style hash (dotted strings
    * already split into nested keys by `walkTree`). Each key becomes a JOIN via
    * `_addOrReuse`; children recurse under the joined node's model and effective
