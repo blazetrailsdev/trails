@@ -34,7 +34,7 @@ function unionPattern(patterns: readonly RegExp[]): RegExp {
  */
 export function interpolate(string: string, values: unknown): string {
   const reserved = reservedKeysPattern().exec(string);
-  if (reserved) throw new ReservedInterpolationKey(reserved[1], string);
+  if (reserved) throw new ReservedInterpolationKey(`:${reserved[1]}`, string);
   if (typeof values !== "object" || values === null || Array.isArray(values)) {
     throw new ArgumentError("Interpolation values must be a Hash.");
   }
@@ -56,10 +56,10 @@ export function interpolateHash(string: string, values: Record<string, unknown>)
       interpolated = true;
       if (match === "%%") return "%";
 
-      const key = braced ?? angled ?? match.replace(/[%{}]/g, "");
+      const key = `:${braced ?? angled ?? match.replace(/[%{}]/g, "")}`;
       let value =
-        key in values
-          ? values[key]
+        key.slice(1) in values
+          ? values[key.slice(1)]
           : config().missingInterpolationArgumentHandler(key, values, string);
       if (typeof value === "function") value = (value as (v: unknown) => unknown)(values);
       return format ? sprintf(format, value) : String(value);

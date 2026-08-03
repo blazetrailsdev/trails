@@ -82,7 +82,7 @@ describe("I18nExceptionsTest", () => {
   it("MissingInterpolationArgument stores key and string", () => {
     expect(() => forceMissingInterpolationArgument()).toThrow(MissingInterpolationArgument);
     forceMissingInterpolationArgument((exception) => {
-      expect(exception.key).toBe("bar");
+      expect(exception.key).toBe(":bar");
       expect(exception.string).toBe("%{bar}");
     });
   });
@@ -97,7 +97,7 @@ describe("I18nExceptionsTest", () => {
 
   it("ReservedInterpolationKey stores key and string", () => {
     forceReservedInterpolationKey((exception) => {
-      expect(exception.key).toBe("scope");
+      expect(exception.key).toBe(":scope");
       expect(exception.string).toBe("%{scope}");
     });
   });
