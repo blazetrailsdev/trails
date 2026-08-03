@@ -2745,19 +2745,6 @@ export class Relation<T extends Base> {
 
     const jd = this._buildEagerJoinDependency(eagerAssociations);
 
-    // Nothing to JOIN (empty spec): load the base rows only.
-    if (jd.nodes.length === 0) {
-      const sql = this._toSql();
-      // selectAll (not execute) so the adapter-reported column_types cast
-      // extra/computed select columns, matching the JOIN and plain load paths.
-      const result = await this._conn().selectAll(sql, "SQL", this._lastSelectBinds);
-      this._records = this._instrumentInstantiation(
-        result.toArray(),
-        result.columnTypes as Record<string, { deserialize(value: unknown): unknown }>,
-      );
-      return;
-    }
-
     // For collection (non-limitable) eager loads with a LIMIT/OFFSET, Rails
     // (distinct_relation_for_primary_key) runs a separate DISTINCT-pk query to
     // materialize the limited parent IDs, then re-queries with `pk IN (ids)`.
@@ -3581,13 +3568,6 @@ export class Relation<T extends Base> {
 
       const basePk = (this._modelClass as any).primaryKey ?? "id";
       const jd = this._buildEagerJoinDependency(eagerSpecs);
-
-      // Nothing was joined (empty spec): degrade entirely to the base relation
-      // (limit/offset preserved), mirroring _executeEagerLoad's
-      // jd.nodes.length === 0 path.
-      if (jd.nodes.length === 0) {
-        return rel.pluck(...columns);
-      }
 
       const hasLimitOrOffset = this._limitValue !== null || this._offsetValue !== null;
       if (hasLimitOrOffset && !this._applyJoinDependencyIsLimitable(eagerSpecs)) {
@@ -6583,12 +6563,7 @@ export class Relation<T extends Base> {
         const hasLimitOrOffset = this._limitValue !== null || (this._offsetValue ?? 0) > 0;
         const pk = (this._modelClass as { primaryKey?: string | string[] }).primaryKey ?? "id";
         const jd = this._buildEagerJoinDependency(eagerSpecs);
-        if (jd.nodes.length === 0) {
-          // Nothing was joined (empty spec): degrade entirely to the base
-          // relation (limit/offset preserved), mirroring _executeEagerLoad's
-          // jd.nodes.length === 0 path.
-          collection = rel;
-        } else if (
+        if (
           hasLimitOrOffset &&
           !this._applyJoinDependencyIsLimitable(eagerSpecs) &&
           !Array.isArray(pk)
