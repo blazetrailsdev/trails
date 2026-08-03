@@ -184,29 +184,14 @@ export class JoinDependency {
     { aliased: TableRef; effectiveName: string; terminated: boolean }
   > = new Map();
   /**
-   * When set, `build` degrades an un-joinable spec to preloading (pushing it
-   * here) instead of raising. See the constructor's deviation note.
-   * @internal
-   */
-  private _fallbackAssociations: AssociationSpec[] | undefined;
-  /**
    * Mirrors: ActiveRecord::Associations::JoinDependency#initialize
    * (join_dependency.rb:71) — `(base, table, associations, join_type)`.
-   *
-   * Deviation: the trailing `fallbackAssociations` out-parameter. Rails JOINs
-   * every association it is handed, so `build` only ever raises; trails still
-   * has join capability gaps (composite keys, through associations it can't
-   * alias), and the eager-load paths degrade those specs to preloading instead
-   * of failing. Passing an array selects that lenient mode and collects the
-   * specs that were rolled back; omitting it raises, as Rails does. Either way
-   * the tree is built here and never mutated afterwards.
    */
   constructor(
     baseModel: typeof Base,
     table: TableRef | null,
     associations: AssociationSpec | AssociationSpec[] | null,
     joinType: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin | null,
-    fallbackAssociations?: AssociationSpec[],
   ) {
     this._baseModel = baseModel;
     const baseTable = table ?? (baseModel as any).arelTable;
@@ -217,24 +202,11 @@ export class JoinDependency {
     );
     this._joinRoot = new JoinBase(baseModel, baseTable);
     this._joinType = joinType ?? Nodes.OuterJoin;
-    this._fallbackAssociations = fallbackAssociations;
 
     const specs =
       associations == null ? [] : Array.isArray(associations) ? associations : [associations];
     for (const spec of specs) {
-      const tree = JoinDependency.makeTree(spec);
-      if (!fallbackAssociations) {
-        this.build(tree, baseModel, this._baseAlias, "");
-        continue;
-      }
-      // Each top-level spec is all-or-nothing: a later segment proving
-      // un-joinable must not leave half a JOIN chain (and half an alias claim)
-      // behind for the caller that degrades the whole spec to preloading.
-      const snapshot = this._capture();
-      if (!this.build(tree, baseModel, this._baseAlias, "")) {
-        this._rollback(snapshot);
-        fallbackAssociations.push(spec);
-      }
+      this.build(JoinDependency.makeTree(spec), baseModel, this._baseAlias, "");
     }
   }
 
@@ -378,9 +350,9 @@ export class JoinDependency {
 
     if (assocDef.type === "belongsTo") {
       // Rails raises for polymorphic eager loads — the join target table is
-      // not known statically (join_dependency.rb#build). This is distinct from
-      // the capability-gap fallbacks below (CPK / unjoinable through), which
-      // return null so the caller degrades to preloading.
+      // not known statically (join_dependency.rb#build). This is a dedicated
+      // error rather than the generic `build` raise the null returns below
+      // surface.
       if (assocDef.options.polymorphic) {
         throw new EagerLoadPolymorphicError(assocName);
       }
@@ -536,14 +508,11 @@ export class JoinDependency {
    * errors `construct_join_dependency` does before any SQL is built —
    * `ConfigurationError` for a misspelled/unknown name (via `findReflection`,
    * mirroring Rails `find_reflection`) and `EagerLoadPolymorphicError` for a
-   * polymorphic association. Valid-but-unjoinable specs (composite-key
-   * belongsTo, through associations trails can't alias) do NOT raise — Rails
-   * joins them and trails degrades them to preloading separately.
+   * polymorphic association.
    *
    * Used by the calculation/exists paths (`Relation#_checkEagerLoadable`), which
    * never build the real join tree but must still surface these errors. Unlike
-   * `build` this only validates — it doesn't mutate the tree — so there's
-   * nothing to roll back.
+   * `build` this only validates — it doesn't mutate the tree.
    *
    * Mirrors: ActiveRecord::Associations::JoinDependency#build.
    */
@@ -573,10 +542,8 @@ export class JoinDependency {
    * `tableAlias` here would emit ON clauses referencing e.g. "t1" against SQL
    * that names the real table.
    *
-   * Called once per top-level spec, from the constructor. Returns false on the
-   * first un-joinable segment in lenient mode so the constructor can roll the
-   * spec back and hand it to the preloader; in Rails-faithful mode it raises
-   * instead.
+   * Called once per top-level spec, from the constructor. Like Rails, an
+   * association that can't be JOINed raises — there is no lenient mode.
    *
    * Mirrors: ActiveRecord::Associations::JoinDependency#build
    * (join_dependency.rb:228).
@@ -587,41 +554,27 @@ export class JoinDependency {
     model: typeof Base,
     alias: string,
     parentPath: string,
-  ): boolean {
+  ): void {
     for (const key of Reflect.ownKeys(hash)) {
       const name = typeof key === "symbol" ? (key.description ?? String(key)) : String(key);
       const node = this._addOrReuse(name, model, alias, parentPath);
       if (!node) {
-        if (this._fallbackAssociations) return false;
+        // Rails' `find_reflection` (join_dependency.rb:236) raises
+        // ConfigurationError for a name that doesn't resolve — the only case
+        // observed here. Getting past it means the reflection resolved but the
+        // JOIN still couldn't be built, which has no Rails analogue: surface it
+        // loudly rather than silently degrading the spec to a preload.
         this.findReflection(model, name);
-        this._raiseUnjoinable(name, model);
+        throw new Error(
+          `Could not build a JOIN for association '${name}' on ${(model as any).name}`,
+        );
       }
       const child = hash[key];
       const childPath = parentPath ? `${parentPath}.${name}` : name;
-      if (
-        child != null &&
-        Reflect.ownKeys(child).length > 0 &&
-        !this.build(child, node.baseKlass, node.effectiveSqlName, childPath)
-      ) {
-        return false;
+      if (child != null && Reflect.ownKeys(child).length > 0) {
+        this.build(child, node.baseKlass, node.effectiveSqlName, childPath);
       }
     }
-    return true;
-  }
-
-  /**
-   * A null node for an association `findReflection` resolved is a trails join
-   * capability gap (composite keys, unaliasable through) rather than Rails'
-   * misspelled-name case, which `find_reflection` has already raised on.
-   * @internal
-   */
-  private _raiseUnjoinable(assocName: string, fromModelClass: any): never {
-    const onModel = fromModelClass?.name ?? (this._baseModel as any).name ?? "model";
-    const err = new Error(
-      `Association named '${assocName}' was not found on ${onModel}; perhaps you misspelled it?`,
-    );
-    err.name = "ArgumentError";
-    throw err;
   }
 
   /**
@@ -659,43 +612,6 @@ export class JoinDependency {
       node = child;
     }
     return node;
-  }
-
-  /**
-   * Snapshot the alias bookkeeping + current tree nodes so an all-or-nothing
-   * spec build can be rolled back when a later segment proves un-joinable.
-   * @internal
-   */
-  private _capture(): {
-    nodes: Set<JoinPart>;
-    tracker: Map<string, number>;
-  } {
-    const nodes = new Set<JoinPart>();
-    this._joinRoot.each((p) => {
-      if (p !== this._joinRoot) nodes.add(p);
-    });
-    return {
-      nodes,
-      tracker: new Map(this._aliasTracker.aliases),
-    };
-  }
-
-  /** @internal */
-  private _rollback(snapshot: { nodes: Set<JoinPart>; tracker: Map<string, number> }): void {
-    const prune = (parent: JoinPart): void => {
-      for (let i = parent.children.length - 1; i >= 0; i--) {
-        const child = parent.children[i];
-        if (snapshot.nodes.has(child)) {
-          prune(child);
-        } else {
-          parent.children.splice(i, 1);
-        }
-      }
-    };
-    prune(this._joinRoot);
-    this._aliasesCache = undefined;
-    this._aliasTracker.aliases.clear();
-    for (const [k, v] of snapshot.tracker) this._aliasTracker.aliases.set(k, v);
   }
 
   private _buildSelectArelNodes(): Nodes.As[] {
@@ -1470,7 +1386,7 @@ export class JoinDependency {
    * column names and Arel table. Replaces the index-keyed `_aliases`/`_arelTablesByIndex`.
    *
    * Memoized like Rails' `@aliases ||=`; the cache is cleared on any tree
-   * mutation (`_insertTreeNode` / `_rollback`) so it can never go stale.
+   * mutation (`_insertTreeNode`) so it can never go stale.
    * @internal
    */
   private aliases(): Aliases {
