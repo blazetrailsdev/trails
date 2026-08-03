@@ -593,6 +593,7 @@ export class JoinDependency {
       const node = this._addOrReuse(name, model, alias, parentPath);
       if (!node) {
         if (this._fallbackAssociations) return false;
+        this.findReflection(model, name);
         this._raiseUnjoinable(name, model);
       }
       const child = hash[key];
@@ -609,20 +610,13 @@ export class JoinDependency {
   }
 
   /**
-   * Rails' JoinDependency#find_reflection raises ConfigurationError when the
-   * association does not exist on the model (join_dependency.rb). A null node
-   * for a *real* association is a trails join capability gap, which keeps the
-   * ArgumentError below.
+   * A null node for an association `findReflection` resolved is a trails join
+   * capability gap (composite keys, unaliasable through) rather than Rails'
+   * misspelled-name case, which `find_reflection` has already raised on.
    * @internal
    */
   private _raiseUnjoinable(assocName: string, fromModelClass: any): never {
     const onModel = fromModelClass?.name ?? (this._baseModel as any).name ?? "model";
-    const exists = (fromModelClass?._associations ?? []).some((a: any) => a.name === assocName);
-    if (!exists) {
-      throw new ConfigurationError(
-        `Can't join '${onModel}' to association named '${assocName}'; perhaps you misspelled it?`,
-      );
-    }
     const err = new Error(
       `Association named '${assocName}' was not found on ${onModel}; perhaps you misspelled it?`,
     );
