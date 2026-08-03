@@ -1,8 +1,6 @@
 import { deepMergeInPlace } from "./hash-utils.js";
 import { ordinal } from "./inflector.js";
 
-/** A stored Proc entry, resolved with (key, options) at lookup time — i18n's
- * `Backend::Base#resolve_entry` (i18n/lib/i18n/backend/base.rb:169-180). */
 type TranslationProc = (key: string, options: TranslateOptions) => TranslationValue;
 
 type TranslationValue =
@@ -331,8 +329,6 @@ class I18nModule {
           last_word_connector: ", and ",
         },
       },
-      // active_support/locale/en.rb — the Proc-valued half of the default
-      // English locale, which Rails loads alongside en.yml.
       number: {
         nth: {
           ordinals: (_key, options) => {
