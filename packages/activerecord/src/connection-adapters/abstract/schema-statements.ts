@@ -1488,21 +1488,13 @@ export class SchemaStatements {
 
     const ctdOptions = {
       ...tdOptions,
-      id: false,
+      ...pkOptions,
+      id,
+      primaryKey,
       adapterName: this.adapterName,
       adapter: this,
     };
-    const tableDefinition = this.createTableDefinition
-      ? this.createTableDefinition(tableName, ctdOptions)
-      : this.createTableDefinition(tableName, ctdOptions);
-    tableDefinition.setPrimaryKey(
-      tableName,
-      // A composite primaryKey overrides `id: false`: Rails' guard would skip it,
-      // but trails' callers spell a composite PK as `id: false, primaryKey: [...]`.
-      Array.isArray(primaryKey) ? true : id,
-      primaryKey,
-      pkOptions,
-    );
+    const tableDefinition = this.createTableDefinition(tableName, ctdOptions);
 
     if (fn) fn(tableDefinition);
 
