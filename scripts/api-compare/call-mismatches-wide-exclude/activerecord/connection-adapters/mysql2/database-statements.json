@@ -24,13 +24,6 @@
     "package": "activerecord",
     "tsFile": "connection-adapters/mysql2/database-statements.ts",
     "rubyName": "select_all",
-    "call": "prepared_statements",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/mysql2/database-statements.ts",
-    "rubyName": "select_all",
     "call": "unprepared_statement",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }

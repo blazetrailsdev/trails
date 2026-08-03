@@ -9,13 +9,6 @@
   {
     "package": "actiondispatch",
     "tsFile": "system-testing/driver.ts",
-    "rubyName": "browser_options",
-    "call": "options",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails driver.rb:51-53 merges `@browser.options` into @options and compacts; trails driver.ts:89-91 returns `{...this._options}` — trails has no selenium Browser object to merge, and JS object spread drops nothing (compact N/A). Browser-option merge gap tracked in story actionpack-omissions-from-wide-verify."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "system-testing/driver.ts",
     "rubyName": "initialize",
     "call": "delete",
     "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails driver.rb:10-25 pops the name with `@options.delete(:name)`; trails driver.ts:47-55 uses the JS `delete opts.name` operator on a spread copy."
