@@ -151,15 +151,15 @@ describe("I18nSimpleBackendApiTest", () => {
   });
 
   it("localize Date: given the short format it uses it", () => {
-    expect(l(date, { format: Symbol.for("short"), locale: "de" })).toBe("01. Mär");
+    expect(l(date, { format: ":short", locale: "de" })).toBe("01. Mär");
   });
 
   it("localize Date: given the long format it uses it", () => {
-    expect(l(date, { format: Symbol.for("long"), locale: "de" })).toBe("01. März 2008");
+    expect(l(date, { format: ":long", locale: "de" })).toBe("01. März 2008");
   });
 
   it("localize Date: given the default format it uses it", () => {
-    expect(l(date, { format: Symbol.for("default"), locale: "de" })).toBe("01.03.2008");
+    expect(l(date, { format: ":default", locale: "de" })).toBe("01.03.2008");
   });
 
   it("localize Date: given a day name format it returns the correct day name", () => {
@@ -235,24 +235,22 @@ describe("I18nSimpleBackendApiTest", () => {
   });
 
   it("localize Date: given a format is missing it raises I18n::MissingTranslationData", () => {
-    expect(() => l(date, { format: Symbol.for("missing") })).toThrow(MissingTranslationData);
+    expect(() => l(date, { format: ":missing" })).toThrow(MissingTranslationData);
   });
 
   it("localize Date: it does not alter the format string", () => {
-    expect(l(new RubyDate(2009, 2, 1), { format: Symbol.for("long"), locale: "de" })).toBe(
-      "01. Februar 2009",
-    );
-    expect(l(new RubyDate(2009, 10, 1), { format: Symbol.for("long"), locale: "de" })).toBe(
+    expect(l(new RubyDate(2009, 2, 1), { format: ":long", locale: "de" })).toBe("01. Februar 2009");
+    expect(l(new RubyDate(2009, 10, 1), { format: ":long", locale: "de" })).toBe(
       "01. Oktober 2009",
     );
   });
 
   it("localize Time: given the short format it uses it", () => {
-    expect(l(time, { format: Symbol.for("short"), locale: "de" })).toBe("01. Mär 06:00");
+    expect(l(time, { format: ":short", locale: "de" })).toBe("01. Mär 06:00");
   });
 
   it("localize Time: given the long format it uses it", () => {
-    expect(l(time, { format: Symbol.for("long"), locale: "de" })).toBe("01. März 2008 06:00");
+    expect(l(time, { format: ":long", locale: "de" })).toBe("01. März 2008 06:00");
   });
 
   it("localize Time: given a day name format it returns the correct day name", () => {
@@ -314,6 +312,6 @@ describe("I18nSimpleBackendApiTest", () => {
   });
 
   it("localize Time: given a format is missing it raises I18n::MissingTranslationData", () => {
-    expect(() => l(time, { format: Symbol.for("missing") })).toThrow(MissingTranslationData);
+    expect(() => l(time, { format: ":missing" })).toThrow(MissingTranslationData);
   });
 });

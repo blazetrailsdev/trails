@@ -253,7 +253,7 @@ export function localize(
   if (locale === false) throw new Disabled("l");
   enforceAvailableLocalesBang(locale as Locale);
 
-  if (!truthy(format)) format = Symbol.for("default");
+  if (!truthy(format)) format = ":default";
   return config().backend.localize(locale as Locale, object, format, options);
 }
 

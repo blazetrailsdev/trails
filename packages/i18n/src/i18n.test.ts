@@ -55,7 +55,7 @@ describe("I18nTest", () => {
     const spy = vi.fn();
     (backend as unknown as { localize: unknown }).localize = spy;
     localize("whatever", { locale: "de" });
-    expect(spy).toHaveBeenCalledWith("de", "whatever", Symbol.for("default"), {});
+    expect(spy).toHaveBeenCalledWith("de", "whatever", ":default", {});
   });
 
   it("translate given no locale uses the current locale", () => {

@@ -7,10 +7,10 @@
  * `available_locales`) are `abstract` here — TypeScript's form of the same
  * contract.
  *
- * Ruby Symbols appear in two value positions this file cares about: a `default`
- * that names another translation key, and a translation entry that redirects
- * to one. Since a JS string is the analogue of a Ruby String, those use real JS
- * symbols — `Symbol.for("some.key")` is the analogue of `:"some.key"`.
+ * A Ruby Symbol value is a JS string that keeps its leading colon — `":short"`
+ * is `:short` — which is the discriminator Ruby gets from the type. `default`
+ * and `resolve` still spell theirs as real JS symbols; converging those two is
+ * story `i18n-symbol-values-are-colon-strings`.
  *
  * Not ported here: `load_translations` / `load_file` / `load_rb` / `load_yml` /
  * `load_json` (file loading needs a YAML reader and async fs — its own story),
@@ -55,10 +55,18 @@ function symbolName(subject: symbol): string {
   return Symbol.keyFor(subject) ?? subject.description ?? "";
 }
 
+/**
+ * Ruby `Symbol === x`. A Ruby Symbol is a JS string that keeps its leading
+ * colon (`":short"`), which is the discriminator Ruby gets from the type.
+ */
+function isSymbol(value: unknown): value is string {
+  return typeof value === "string" && value.startsWith(":");
+}
+
 /** Ruby `#to_s`, for the values a format argument can hold. */
 function toS(subject: unknown): string {
   if (subject == null) return "";
-  return typeof subject === "symbol" ? symbolName(subject) : String(subject);
+  return isSymbol(subject) ? subject.slice(1) : String(subject);
 }
 
 /**
@@ -160,7 +168,7 @@ export abstract class Base {
   localize(
     locale: Locale,
     object: unknown,
-    format: unknown = Symbol.for("default"),
+    format: unknown = ":default",
     options: TranslateOptions = EMPTY_HASH,
   ): unknown {
     if (object == null && "default" in options) {
@@ -172,11 +180,11 @@ export abstract class Base {
       );
     }
 
-    if (typeof format === "symbol") {
+    if (isSymbol(format)) {
       const key = format;
       const type = respondTo(object, "sec") ? "time" : "date";
       options = { ...options, raise: true, object, locale };
-      format = t(`${type}.formats.${symbolName(key)}`, options);
+      format = t(`${type}.formats.${key.slice(1)}`, options);
     }
 
     format = this.translateLocalizationFormat(locale, object as Localizable, format, options);

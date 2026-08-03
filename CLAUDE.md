@@ -112,6 +112,16 @@ port a body:
 - **Bang methods** raise; the non-bang form returns falsy. Port both arms.
 - **Symbols vs strings.** Where Rails accepts a Symbol _or_ a String, port both
   arms — dropping the string arm is a common silent gap.
+- **A Ruby Symbol is a JS string, never a JS `Symbol`.** `:short` is `"short"`.
+  JS `Symbol` / `Symbol.for` is reserved for private keys and brands — using it
+  to model a Ruby Symbol value puts a type in the port that Rails devs don't
+  read as a Symbol and that no other package uses. Where a method's control
+  flow turns on `Symbol === x` (a Symbol meaning "look this up" against a
+  String meaning "use this literally" — `I18n::Backend::Base#localize`'s
+  `format`, a `:default` that names another key), keep the Symbol's leading
+  colon in the string: `":short"`, and `.slice(1)` for its name. The colon is
+  the discriminator Ruby gets from the type, and it is how the value already
+  renders through `inspect`.
 
 If you find a new instance, file it against the best-fit active RFC, else
 `0023-surfaced-deviations`. RFC `0082-ruby-ts-idiom-conversion-classes` in the
