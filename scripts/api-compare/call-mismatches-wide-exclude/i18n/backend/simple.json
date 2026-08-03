@@ -11,6 +11,6 @@
     "tsFile": "backend/simple.ts",
     "rubyName": "translations",
     "call": "new",
-    "reason": "i18n/backend/simple.rb:74 `@translations ||= Concurrent::Hash.new { MUTEX.synchronize { ... } }`: the thread-safe default-block hash has no JS counterpart, so the store is initialised with the `{}` literal, which is not a `new` expression."
+    "reason": "i18n/backend/simple.rb:74 `@translations ||= Concurrent::Hash.new { |h, k| MUTEX.synchronize { h[k] = Concurrent::Hash.new } }`: JS has no threads and no Hash class, so the store is initialised with the `{}` literal, which is not a `new` expression; the default block's auto-vivification is unobservable here because `store_translations` assigns the per-locale hash explicitly (simple.rb:43) and `lookup` guards every read with `has_key?` (simple.rb:99)."
   }
 ]
