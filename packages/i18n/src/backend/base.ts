@@ -69,7 +69,9 @@ export abstract class Base {
     key: TranslationKey | symbol | null | undefined,
     options: TranslateOptions = EMPTY_HASH,
   ): unknown {
-    if (key === "") throw new ArgumentError();
+    if (key === "" || (typeof key === "symbol" && symbolName(key) === "")) {
+      throw new ArgumentError();
+    }
     if (!truthy(locale)) throw new InvalidLocale(locale);
     if (key == null && !("default" in options)) return null;
 

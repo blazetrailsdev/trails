@@ -10,6 +10,7 @@ import { Simple } from "./simple.js";
 import { config, resetConfig } from "../i18n.js";
 import { resetClassConfig } from "../config.js";
 import {
+  ArgumentError,
   InvalidLocale,
   InvalidPluralizationData,
   MissingTranslation,
@@ -32,6 +33,11 @@ describe("I18n::Backend::Base", () => {
   function translate(key: string | null, options: TranslateOptions = {}): unknown {
     return backend.translate("en", key, options);
   }
+
+  it("raises ArgumentError given an empty String or Symbol key", () => {
+    expect(() => translate("")).toThrow(ArgumentError);
+    expect(() => backend.translate("en", Symbol.for(""))).toThrow(ArgumentError);
+  });
 
   it("raises InvalidLocale given no locale", () => {
     expect(() => backend.translate(null, "foo")).toThrow(InvalidLocale);

@@ -67,10 +67,13 @@ export function interpolateHash(string: string, values: Record<string, unknown>)
 const FORMAT_SPEC = /^([-+ #0]*)(\d*)(?:\.(\d+))?([a-zA-Z])$/;
 
 const RADIX: Record<string, number> = { b: 2, B: 2, o: 8, x: 16, X: 16 };
+const ALTERNATE_PREFIX: Record<string, string> = { b: "0b", B: "0B", o: "0", x: "0x", X: "0X" };
 
 /**
- * Mirrors Ruby's `sprintf("%#{spec}", value)` for the conversions the `%<>`
- * interpolation pattern admits (`bBdiouxXeEfgGcps`).
+ * Ruby hands `%<name>fmt` to `sprintf`; JS has no equivalent, so the
+ * conversions the interpolation pattern admits (`bBdiouxXeEfgGcps`) are
+ * reimplemented here, along with the `-+ #0` flags, width and precision that
+ * `sprintf` applies to them.
  */
 function sprintf(spec: string, value: unknown): string {
   const parsed = FORMAT_SPEC.exec(spec);
@@ -78,15 +81,24 @@ function sprintf(spec: string, value: unknown): string {
   const [, flags = "", width = "", precision, conversion = "s"] = parsed;
   const digits = precision === undefined ? 6 : Number(precision);
   const numeric = conversion !== "c" && conversion !== "s";
+  const alternate = flags.includes("#");
   const magnitude = Math.abs(Number(value));
 
   let body: string;
-  if (conversion in RADIX) body = Math.trunc(magnitude).toString(RADIX[conversion]);
-  else if ("diu".includes(conversion)) body = String(Math.round(magnitude));
-  else if (conversion === "e" || conversion === "E") body = magnitude.toExponential(digits);
-  else if (conversion === "f") body = magnitude.toFixed(digits);
-  else if (conversion === "g" || conversion === "G") body = String(magnitude);
-  else if (conversion === "c") {
+  if (conversion in RADIX) {
+    body = Math.trunc(magnitude).toString(RADIX[conversion]);
+    if (alternate) body = ALTERNATE_PREFIX[conversion] + body;
+  } else if ("diu".includes(conversion)) {
+    body = String(Math.round(magnitude));
+  } else if (conversion === "e" || conversion === "E") {
+    body = exponential(magnitude, digits);
+    if (alternate && digits === 0) body = body.replace("e", ".e");
+  } else if (conversion === "f") {
+    body = magnitude.toFixed(digits);
+    if (alternate && digits === 0) body += ".";
+  } else if (conversion === "g" || conversion === "G") {
+    body = generalFormat(magnitude, digits === 0 ? 1 : digits, alternate);
+  } else if (conversion === "c") {
     body = typeof value === "number" ? String.fromCodePoint(value) : String(value).charAt(0);
   } else {
     body = precision === undefined ? String(value) : String(value).slice(0, digits);
@@ -102,4 +114,25 @@ function sprintf(spec: string, value: unknown): string {
   if (flags.includes("-")) return (sign + body).padEnd(target);
   if (flags.includes("0") && numeric) return sign + body.padStart(target - sign.length, "0");
   return (sign + body).padStart(target);
+}
+
+/** Ruby pads the exponent to at least two digits; `toExponential` does not. */
+function exponential(magnitude: number, digits: number): string {
+  return magnitude.toExponential(digits).replace(/e([+-])(\d)$/, "e$10$2");
+}
+
+/**
+ * `%g`: fixed notation when the exponent sits in `[-4, precision)`, otherwise
+ * exponential; trailing zeros are dropped unless the `#` flag is set.
+ * `Number#toPrecision` picks a different cutover, so the choice is made here.
+ */
+function generalFormat(magnitude: number, digits: number, alternate: boolean): string {
+  const exponent = magnitude === 0 ? 0 : Math.floor(Math.log10(magnitude));
+  const body =
+    exponent < -4 || exponent >= digits
+      ? exponential(magnitude, digits - 1)
+      : magnitude.toFixed(Math.max(digits - 1 - exponent, 0));
+  if (alternate || !body.includes(".")) return body;
+  const [mantissa = "", suffix = ""] = body.split("e");
+  return mantissa.replace(/\.?0+$/, "") + (suffix ? `e${suffix}` : "");
 }
