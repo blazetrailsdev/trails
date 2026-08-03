@@ -299,20 +299,23 @@ describe("CI runs every tooling test suite", () => {
     expect(filter.run.length).toBeLessThan(20_500);
   });
 
-  // scripts/test-deps/ imports packages/activerecord/src (the adapter-graph
-  // TDZ guard enters the graph from outside the AR vitest project by design),
-  // but it is bundled into unit-tests, which is gated on unit_tests_affected —
-  // and packages/activerecord/ is deliberately off that gate for cost reasons.
-  // So the suite has to ALSO run from a job gated on activerecord_affected, or
-  // an AR-only PR reports green and the break lands on the next push to main.
+  // These two suites import activerecord — scripts/test-deps from src (the
+  // adapter-graph TDZ guard enters the graph from outside the AR vitest project
+  // by design), scripts/parity/query/node through the dump runners it spawns —
+  // but they are bundled into unit-tests, gated on unit_tests_affected, and
+  // packages/activerecord/ is deliberately off that gate for cost reasons. So
+  // each has to ALSO run from a job gated on activerecord_affected, or an
+  // AR-only PR reports green and the break lands on the next push to main.
   // That is how the `_arConfig` TDZ reached main red (#5647).
-  it("runs the scripts/test-deps import guards from an activerecord-gated job", async () => {
+  const AR_IMPORTING_SUITES = ["scripts/test-deps", "scripts/parity/query/node"];
+
+  it.each(AR_IMPORTING_SUITES)("runs %s from an activerecord-gated job", async (suite) => {
     const wf = parseYaml(await readFile(CI_YML, "utf8"));
     const jobs: { if?: string; steps?: { run?: string }[] }[] = Object.values(wf.jobs);
     const covering = jobs.filter(
       (job) =>
         String(job.if ?? "").includes("activerecord_affected") &&
-        job.steps?.some((step) => /vitest run[\s\S]*scripts\/test-deps/.test(step.run ?? "")),
+        job.steps?.some((step) => new RegExp(`vitest run[\\s\\S]*${suite}`).test(step.run ?? "")),
     );
     expect(covering.length).toBeGreaterThan(0);
   });
