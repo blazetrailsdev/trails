@@ -121,18 +121,8 @@ describe("CustomPropertiesTest", () => {
   });
 
   it("overloaded properties with limit", () => {
-    // Rails asserts the cast type carries the declared limit (50) vs the schema
-    // limit (255); trails never threads `limit` into the cast type, so assert
-    // retention on the reflected column instead. Known gap, tracked by RFC 0043
-    // thread-column-limit-into-cast-type (a dependent of this story).
-    expect(
-      (OverloadedType.columnsHash() as Record<string, { limit?: number }>)
-        .overloaded_string_with_limit.limit,
-    ).toBe(255);
-    expect(
-      (UnoverloadedType.columnsHash() as Record<string, { limit?: number }>)
-        .overloaded_string_with_limit.limit,
-    ).toBe(255);
+    expect(OverloadedType.typeForAttribute("overloaded_string_with_limit").limit).toBe(50);
+    expect(UnoverloadedType.typeForAttribute("overloaded_string_with_limit").limit).toBe(255);
   });
 
   it("overloaded default but keeping its own type", () => {

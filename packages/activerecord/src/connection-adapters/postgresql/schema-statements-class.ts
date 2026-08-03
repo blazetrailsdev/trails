@@ -1185,7 +1185,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     // schema_creation.accept(AlterTable + ForeignKeyDefinition). We replicate
     // that abstract body here (rather than delegating to our own `super`, which
     // would recurse through the self-delegation guard — tracked by
-    // abstract-add-foreign-key-converge-to-foreign-key-options). The PG
+    // pg-add-foreign-key-delegate-to-abstract-body). The PG
     // schema_creation (visitAlterTable/visitForeignKeyDefinition) emits the
     // deferrable / NOT VALID / action / schema-qualified-name decoration, so no
     // bespoke inline SQL is needed here.

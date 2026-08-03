@@ -504,7 +504,7 @@ export function connection(this: typeof Base): DatabaseAdapter {
     // establishes a first lease exactly as before, but WITHOUT the async
     // per-checkout verify/self-heal. That lost self-heal on the deprecated sync
     // path is the documented residual tracked by
-    // `connection-pool-pinned-sync-checkout-per-checkout-verify`; the async
+    // `converge-sync-connection-lease-per-checkout-verify`; the async
     // Rails-named path (`withConnection`/`leaseConnection`) keeps full parity.
     return pool.leaseConnectionSync();
   }

@@ -55,7 +55,7 @@ export abstract class Node {
    * `to_sql` is synchronous at all 600+ call sites, so this takes the sync
    * `engine.connection` lease. Same visitor and connection; it skips only the
    * async per-checkout verify, the residual tracked by
-   * `connection-pool-pinned-sync-checkout-per-checkout-verify`.
+   * `converge-sync-connection-lease-per-checkout-verify`.
    */
   toSql(engine: ArelEngine | null = _engine.current): string {
     if (!engine) {

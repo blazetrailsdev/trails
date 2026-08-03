@@ -15,7 +15,9 @@ import path from "node:path";
 const STORY_SLUG = /[a-z0-9]+(?:-[a-z0-9]+){2,}/g;
 
 const PENDING_PHRASE =
-  /converged by|converges (when|in|once)|will (be )?converge|deferred to|pending convergence|once .{0,40}lands|until .{0,60}lands|un-?skip once|when that story|fixed by/i;
+  /converged by|converges (when|in|once)|will (be )?converge|deferred to|pending convergence|once .{0,40}lands|until .{0,60}lands|un-?skip once|when that story|fixed by|tracked (by|to|in|here|separately)|known gap|TODO\(/i;
+
+const PROVENANCE_PHRASE = /regression for|\blanded\b|added by|introduced by|ported in/i;
 
 // Frontmatter `status:` of a story file, matched before any body prose.
 const STORY_STATUS = /^status:\s*"?([a-z-]+)"?\s*$/m;
@@ -38,10 +40,17 @@ export interface StoryReference {
 
 /**
  * Story slugs cited as still-pending in `source`'s comments. Contiguous comment
- * lines form one block, because a promise and its slug routinely sit on
- * different physical lines of the same JSDoc paragraph; the phrase and the slug
- * must then share a sentence, so a slug cited as provenance ("Regression for
- * X") is history rather than a promise and stays legal after the story lands.
+ * lines form one block, and the promise is matched over the whole block: a
+ * paragraph routinely states the gap in one sentence and names its story in the
+ * next ("… it falls back. Tracked by `X`."), which a sentence-scoped match
+ * misses entirely.
+ *
+ * A `PROVENANCE_PHRASE` sentence is then vetoed per sentence rather than per
+ * block, so a block that makes a promise does not drag its own history
+ * citations in with it: the match is block-scoped, the exemption stays
+ * sentence-scoped. That keeps "Regression for X" legal alongside a promise, and
+ * keeps a citation of the story that already landed ("`X` landed (#3874)
+ * without closing it") from reading as the promise it disclaims.
  */
 export function extractStoryReferences(source: string, file: string): StoryReference[] {
   const refs: StoryReference[] = [];
@@ -50,10 +59,13 @@ export function extractStoryReferences(source: string, file: string): StoryRefer
   let start = 0;
   const flush = (): void => {
     if (block.length === 0) return;
-    for (const sentence of block.join(" ").split(SENTENCE)) {
-      if (!PENDING_PHRASE.test(sentence)) continue;
-      for (const slug of new Set(sentence.match(STORY_SLUG) ?? [])) {
-        refs.push({ file, line: start, slug });
+    const text = block.join(" ");
+    if (PENDING_PHRASE.test(text)) {
+      for (const sentence of text.split(SENTENCE)) {
+        if (PROVENANCE_PHRASE.test(sentence)) continue;
+        for (const slug of new Set(sentence.match(STORY_SLUG) ?? [])) {
+          refs.push({ file, line: start, slug });
+        }
       }
     }
     block = [];
