@@ -213,6 +213,11 @@ export class TimeWithZone {
   }
 
   /** 1-12 */
+  get mon(): number {
+    return this._local().month;
+  }
+
+  /** 1-12 */
   get month(): number {
     return this._local().month;
   }

@@ -10,7 +10,7 @@ import { Response } from "../http/response.js";
 
 let publicPath: string;
 let app: PublicExceptions;
-let priorLocale: string;
+let priorLocale: string | false;
 
 beforeAll(() => {
   publicPath = mkdtempSync(path.join(tmpdir(), "public-exceptions-"));
@@ -18,13 +18,13 @@ beforeAll(() => {
   writeFileSync(path.join(publicPath, "404.html"), "<h1>404</h1>");
   writeFileSync(path.join(publicPath, "500.html"), "<h1>500</h1>");
   writeFileSync(path.join(publicPath, "404.en.html"), "<h1>404 en</h1>");
-  priorLocale = I18n.locale;
-  I18n.locale = "en";
+  priorLocale = I18n.locale();
+  I18n.setLocale("en");
   app = new PublicExceptions(publicPath);
 });
 
 afterAll(() => {
-  I18n.locale = priorLocale;
+  I18n.setLocale(priorLocale);
   rmSync(publicPath, { recursive: true, force: true });
 });
 

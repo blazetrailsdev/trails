@@ -1,9 +1,5 @@
-import {
-  I18n,
-  MissingTranslationData,
-  HtmlSafeTranslation,
-  htmlEscape,
-} from "@blazetrails/activesupport";
+import { MissingTranslationData } from "@blazetrails/i18n";
+import { I18n, HtmlSafeTranslation, htmlEscape } from "@blazetrails/activesupport";
 
 /**
  * Host shape `translate` / `localize` mix into. Trails' `Metal` provides
@@ -40,7 +36,7 @@ export function translate(
   // Rails: `t(nil, default: ...)` returns the default unchanged.
   if (key == null) {
     if (options.default !== undefined) return options.default;
-    return `Translation missing: ${I18n.locale}.`;
+    return `Translation missing: ${I18n.locale()}.`;
   }
 
   const isHtmlKey = HtmlSafeTranslation.isHtmlSafeTranslationKey(key);
@@ -96,9 +92,7 @@ export function translate(
     // raise, so we'd silently return the already-exhausted defaults
     // array instead of raising.
     if ((options as { raise?: boolean }).raise) {
-      const locale =
-        (passOptions as { locale?: string }).locale ??
-        (I18n as unknown as { locale: string }).locale;
+      const locale = (passOptions as { locale?: string }).locale ?? (I18n.locale() as string);
       throw new MissingTranslationData(locale, scopedKey);
     }
     return direct; // "Translation missing: ..." from the scoped lookup
@@ -127,13 +121,13 @@ export interface LocalizeOptions {
 /** Delegates to `I18n.localize`. */
 export function localize(
   this: TranslationHost,
-  object: Date,
+  object: unknown,
   options: LocalizeOptions = {},
 ): string {
-  return I18n.localize(object, options as Parameters<typeof I18n.localize>[1]);
+  return I18n.localize(object, options as Parameters<typeof I18n.localize>[1]) as string;
 }
 
 /** Rails alias `:l :localize`. */
-export function l(this: TranslationHost, object: Date, options: LocalizeOptions = {}): string {
-  return I18n.localize(object, options as Parameters<typeof I18n.localize>[1]);
+export function l(this: TranslationHost, object: unknown, options: LocalizeOptions = {}): string {
+  return I18n.localize(object, options as Parameters<typeof I18n.localize>[1]) as string;
 }

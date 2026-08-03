@@ -99,7 +99,9 @@ export class PublicExceptions {
   private renderHtml(status: number): RackResponse {
     // Sanitize locale before string-interpolating into a file path so a
     // misconfigured `I18n.locale` can never escape `publicPath`.
-    const locale = LOCALE_RE.test(I18n.locale) ? I18n.locale : null;
+    const currentLocale = I18n.locale();
+    const locale =
+      typeof currentLocale === "string" && LOCALE_RE.test(currentLocale) ? currentLocale : null;
     let file: string | null = locale
       ? getPath().join(this.publicPath, `${status}.${locale}.html`)
       : null;
