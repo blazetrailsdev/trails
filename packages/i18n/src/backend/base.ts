@@ -179,7 +179,7 @@ export abstract class Base {
       format = t(`${type}.formats.${symbolName(key)}`, options);
     }
 
-    format = this.translateLocalizationFormat(locale, object, format, options);
+    format = this.translateLocalizationFormat(locale, object as Localizable, format, options);
     return (object as Localizable).strftime(format as string);
   }
 
@@ -346,50 +346,52 @@ export abstract class Base {
 
   protected translateLocalizationFormat(
     locale: Locale,
-    object: unknown,
+    object: Localizable,
     format: unknown,
     _options: TranslateOptions,
   ): string {
-    const o = object as Localizable;
     try {
       return toS(format).replace(/%(|\^)[aAbBpP]/g, (match) => {
         switch (match) {
           case "%a":
-            return (tBang("date.abbr_day_names", { locale, format }) as string[])[o.wday];
+            return (tBang("date.abbr_day_names", { locale, format }) as string[])[object.wday];
           case "%^a":
             return (tBang("date.abbr_day_names", { locale, format }) as string[])[
-              o.wday
+              object.wday
             ].toUpperCase();
           case "%A":
-            return (tBang("date.day_names", { locale, format }) as string[])[o.wday];
+            return (tBang("date.day_names", { locale, format }) as string[])[object.wday];
           case "%^A":
-            return (tBang("date.day_names", { locale, format }) as string[])[o.wday].toUpperCase();
+            return (tBang("date.day_names", { locale, format }) as string[])[
+              object.wday
+            ].toUpperCase();
           case "%b":
-            return (tBang("date.abbr_month_names", { locale, format }) as string[])[o.mon];
+            return (tBang("date.abbr_month_names", { locale, format }) as string[])[object.mon];
           case "%^b":
             return (tBang("date.abbr_month_names", { locale, format }) as string[])[
-              o.mon
+              object.mon
             ].toUpperCase();
           case "%B":
-            return (tBang("date.month_names", { locale, format }) as string[])[o.mon];
+            return (tBang("date.month_names", { locale, format }) as string[])[object.mon];
           case "%^B":
-            return (tBang("date.month_names", { locale, format }) as string[])[o.mon].toUpperCase();
+            return (tBang("date.month_names", { locale, format }) as string[])[
+              object.mon
+            ].toUpperCase();
           case "%p":
             return (
-              tBang(`time.${(respondTo(object, "hour") ? o.hour! : 0) < 12 ? "am" : "pm"}`, {
+              tBang(`time.${(respondTo(object, "hour") ? object.hour! : 0) < 12 ? "am" : "pm"}`, {
                 locale,
                 format,
               }) as string
             ).toUpperCase();
           case "%P":
             return (
-              tBang(`time.${(respondTo(object, "hour") ? o.hour! : 0) < 12 ? "am" : "pm"}`, {
+              tBang(`time.${(respondTo(object, "hour") ? object.hour! : 0) < 12 ? "am" : "pm"}`, {
                 locale,
                 format,
               }) as string
             ).toLowerCase();
           default:
-            // Ruby's `case` falls through to nil, which gsub substitutes as "".
             return "";
         }
       });

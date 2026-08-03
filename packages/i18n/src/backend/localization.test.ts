@@ -132,7 +132,7 @@ function setupTimeTranslations(backend: Simple): void {
   });
 }
 
-describe("I18nBackendSimpleLocalizationTest", () => {
+describe("I18nSimpleBackendApiTest", () => {
   let date: RubyDate;
   let time: RubyTime;
   let otherTime: RubyTime;
