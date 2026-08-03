@@ -529,7 +529,7 @@ describe("CommandRecorder", () => {
   describe("change_table surfaces adapter ColumnMethods shorthands (serial/bigserial)", () => {
     // Mirrors Rails: the PG `ColumnMethods` mixin exposes `t.serial` /
     // `t.bigserial` (SERIAL/BIGSERIAL) inside change_table — shorthands the
-    // adapter advertises via columnMethodNames() beyond NATIVE_DATABASE_TYPES.
+    // adapter advertises via _columnMethodNames() beyond NATIVE_DATABASE_TYPES.
     const pgLike = pgDelegate;
 
     it("records addColumn for t.serial and t.bigserial (up adds)", async () => {
@@ -583,7 +583,7 @@ describe("CommandRecorder", () => {
   describe("change_table surfaces adapter ColumnMethods shorthands (MySQL unsigned/blob)", () => {
     // Mirrors Rails: the MySQL `ColumnMethods` mixin exposes `t.unsignedInteger`,
     // `t.mediumtext`, `t.longblob`, ... inside change_table — shorthands the
-    // adapter advertises via columnMethodNames() beyond NATIVE_DATABASE_TYPES.
+    // adapter advertises via _columnMethodNames() beyond NATIVE_DATABASE_TYPES.
     //
     // The proxy normalizes the camelCase method name back to the snake symbol
     // Rails' `define_column_methods` records (`unsignedInteger` ->

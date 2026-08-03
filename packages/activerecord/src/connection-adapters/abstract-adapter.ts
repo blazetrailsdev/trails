@@ -724,7 +724,7 @@ export const RAW_CONNECTION_DEPRECATION_MESSAGE =
  * The base `ColumnMethods` shorthands every adapter's `change_table` proxy
  * exposes, mirroring `abstract/schema_definitions.rb:324` (`define_column_methods`
  * plus the `:blob`/`:numeric` aliases). Adapter-specific names are appended in
- * each adapter's `columnMethodNames()` override.
+ * each adapter's `_columnMethodNames()` override.
  */
 export const ABSTRACT_COLUMN_METHOD_NAMES: readonly string[] = [
   "bigint",
@@ -1425,17 +1425,16 @@ export class AbstractAdapter implements Quoting {
    * `blob`/`numeric` aliases) — NOT `Object.keys(nativeDatabaseTypes())`, which
    * is only an approximation (it surfaces `primary_key` and omits `virtual`).
    * Adapters whose `ColumnMethods` list adds more (MySQL, PostgreSQL) override
-   * this and append their own names to `super.columnMethodNames()`.
+   * this and append their own names to `super._columnMethodNames()`.
    *
-   * @noRailsEquivalent CONVERGEABLE (story: mark-column-method-names-internal).
-   * Rails spells this list as the `ColumnMethods` modules'
-   *   `define_column_methods` metaprogramming
-   *   (abstract/schema_definitions.rb:324 plus the per-adapter ColumnMethods modules), not as a
-   *   `def`, so the Ruby extractor records no counterpart. TypeScript has no `define_method`, so
-   *   trails reifies the list; each adapter appends to `super.columnMethodNames()` exactly where
-   *   Rails' adapter-specific ColumnMethods module extends the abstract one.
+   * @internal Rails spells this list as the `ColumnMethods` modules'
+   * `define_column_methods` metaprogramming
+   * (abstract/schema_definitions.rb:324 plus the per-adapter ColumnMethods modules), not as public
+   * API. TypeScript has no `define_method`, so trails reifies the list; each adapter appends to
+   * `super._columnMethodNames()` exactly where Rails' adapter-specific ColumnMethods module extends
+   * the abstract one.
    */
-  columnMethodNames(): string[] {
+  _columnMethodNames(): string[] {
     return [...ABSTRACT_COLUMN_METHOD_NAMES];
   }
 

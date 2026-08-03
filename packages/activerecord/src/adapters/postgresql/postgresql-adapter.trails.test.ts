@@ -1308,10 +1308,10 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 });
 
-describe("PostgreSQLAdapter#columnMethodNames", () => {
+describe("PostgreSQLAdapter#_columnMethodNames", () => {
   it("appends PG ColumnMethods shorthands to the abstract list", () => {
     const adapter = Object.create(PostgreSQLAdapter.prototype) as PostgreSQLAdapter;
-    const names = adapter.columnMethodNames();
+    const names = adapter._columnMethodNames();
     for (const name of [
       "serial",
       "bigserial",

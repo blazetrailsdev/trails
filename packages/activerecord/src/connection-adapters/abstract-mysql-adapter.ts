@@ -576,17 +576,13 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   // `:blob` is in the Rails MySQL list too, but it's already surfaced via the
   // abstract `blob`/`binary` alias, so we don't repeat it here.
   /**
-   * @noRailsEquivalent CONVERGEABLE (story: mark-column-method-names-internal).
-   * Rails spells this list as the `ColumnMethods` modules'
-   *   `define_column_methods` metaprogramming
-   *   (abstract/schema_definitions.rb:324 plus the per-adapter ColumnMethods modules), not as a
-   *   `def`, so the Ruby extractor records no counterpart. TypeScript has no `define_method`, so
-   *   trails reifies the list; each adapter appends to `super.columnMethodNames()` exactly where
-   *   Rails' adapter-specific ColumnMethods module extends the abstract one.
+   * @internal Reification of Rails' MySQL `ColumnMethods` module, which extends the abstract
+   * `define_column_methods` list (abstract/schema_definitions.rb:324) rather than exposing public
+   * API.
    */
-  override columnMethodNames(): string[] {
+  override _columnMethodNames(): string[] {
     return [
-      ...super.columnMethodNames(),
+      ...super._columnMethodNames(),
       "tinyblob",
       "mediumblob",
       "longblob",

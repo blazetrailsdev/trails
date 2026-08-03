@@ -46,10 +46,10 @@ describe("AbstractAdapter#returnValueAfterInsert", () => {
   });
 });
 
-describe("AbstractAdapter#columnMethodNames", () => {
+describe("AbstractAdapter#_columnMethodNames", () => {
   it("mirrors the abstract ColumnMethods list (define_column_methods + blob/numeric aliases)", () => {
     const adapter = new TestAdapter();
-    expect(adapter.columnMethodNames()).toEqual([
+    expect(adapter._columnMethodNames()).toEqual([
       "bigint",
       "binary",
       "boolean",
@@ -71,7 +71,7 @@ describe("AbstractAdapter#columnMethodNames", () => {
 
   it("does not surface native-types-only `primary_key`", () => {
     const adapter = new TestAdapter();
-    expect(adapter.columnMethodNames()).not.toContain("primary_key");
+    expect(adapter._columnMethodNames()).not.toContain("primary_key");
   });
 });
 
