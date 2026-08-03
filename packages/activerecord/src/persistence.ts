@@ -1126,7 +1126,6 @@ export function assignAttributes(this: AttributeIO, attrs: Record<string, unknow
     assignNestedParameterAttributes(this, nestedParameterAttributes);
   }
   if (multiParameterAttributes) {
-    // Rails' assign_multiparameter_attributes → extract/execute callstack.
     executeMultiparameterAssignment(
       this as any,
       extractMultiparameterCallstack(multiParameterAttributes).multiparams,
