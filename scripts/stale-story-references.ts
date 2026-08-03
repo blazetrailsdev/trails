@@ -17,6 +17,9 @@ const STORY_SLUG = /[a-z0-9]+(?:-[a-z0-9]+){2,}/g;
 const PENDING_PHRASE =
   /converged by|converges (when|in|once)|will (be )?converge|deferred to|pending convergence|once .{0,40}lands|until .{0,60}lands|un-?skip once|when that story|fixed by/i;
 
+// Frontmatter `status:` of a story file, matched before any body prose.
+const STORY_STATUS = /^status:\s*"?([a-z-]+)"?\s*$/m;
+
 const COMMENT_LINE = /^\s*(?:\/\/|\/\*+|\*)(.*)$/;
 const SENTENCE = /(?<=[.;:)])\s+(?=[A-Z(`])|\.\s+/;
 
@@ -106,17 +109,50 @@ export async function scanStoryReferences(repoRoot: string): Promise<StoryRefere
 export interface IndexStory {
   id: string;
   status: string;
-  /**
-   * The story's own status. `status` is demoted to its RFC's when that RFC is
-   * closed, which would hide a landed story behind an RFC-level state.
-   */
-  raw_status?: string;
 }
 
 /**
- * The citations whose story has already landed. A slug the index doesn't know
- * is not a story reference at all (kebab file names, Rails option names), so it
- * is never a finding.
+ * Every story's own status, read from the frontmatter under
+ * `<tasksDir>/rfcs/*\/stories/*.md`. The tracked markdown is the source of
+ * truth: `index.json` is a gitignored cache, absent in a fresh checkout, and
+ * the status it serves is demoted to the RFC's whenever that RFC is closed —
+ * which would hide a landed story behind an RFC-level state. Throws when
+ * `tasksDir` holds no stories, so a missing tasks checkout reds this check
+ * rather than silently retiring it.
+ */
+export async function loadStories(tasksDir: string): Promise<IndexStory[]> {
+  const stories: IndexStory[] = [];
+  const rfcsDir = path.join(tasksDir, "rfcs");
+  let rfcs: string[];
+  try {
+    rfcs = await readdir(rfcsDir);
+  } catch {
+    throw new Error(`no tasks checkout at ${tasksDir} — cannot resolve story statuses`);
+  }
+  for (const rfc of rfcs) {
+    const dir = path.join(rfcsDir, rfc, "stories");
+    let entries: string[];
+    try {
+      entries = await readdir(dir);
+    } catch {
+      continue;
+    }
+    for (const entry of entries) {
+      if (!entry.endsWith(".md")) continue;
+      const status = STORY_STATUS.exec(await readFile(path.join(dir, entry), "utf8"))?.[1];
+      if (status) stories.push({ id: entry.slice(0, -3), status });
+    }
+  }
+  if (stories.length === 0) {
+    throw new Error(`no stories under ${rfcsDir} — cannot resolve story statuses`);
+  }
+  return stories;
+}
+
+/**
+ * The citations whose story has already landed. A slug no story claims is not a
+ * story reference at all (kebab file names, Rails option names), so it is never
+ * a finding.
  */
 export function staleStoryReferences(
   refs: readonly StoryReference[],
@@ -124,9 +160,7 @@ export function staleStoryReferences(
 ): StoryReference[] {
   const byId = new Map(stories.map((story) => [story.id, story]));
   return refs.filter((ref) => {
-    const story = byId.get(ref.slug);
-    if (!story) return false;
-    const status = story.raw_status ?? story.status;
+    const status = byId.get(ref.slug)?.status;
     return status === "done" || status === "closed";
   });
 }

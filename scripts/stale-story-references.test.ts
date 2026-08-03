@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   extractStoryReferences,
+  loadStories,
   scanStoryReferences,
   staleStoryReferences,
   type IndexStory,
@@ -21,10 +21,9 @@ const LANDED_PROMISE = `
 `;
 
 const STORIES: IndexStory[] = [
-  { id: "activesupport-json-encoding-time-precision", status: "done", raw_status: "done" },
-  { id: "converge-connection-pool-lifecycle-async", status: "ready", raw_status: "ready" },
-  // A done story under a closed RFC: `status` is demoted, `raw_status` is not.
-  { id: "cache-entry-remaining-methods", status: "closed", raw_status: "done" },
+  { id: "activesupport-json-encoding-time-precision", status: "done" },
+  { id: "converge-connection-pool-lifecycle-async", status: "ready" },
+  { id: "cache-entry-remaining-methods", status: "closed" },
 ];
 
 describe("stale story references", () => {
@@ -43,7 +42,7 @@ describe("stale story references", () => {
     expect(staleStoryReferences(refs, STORIES)).toEqual([]);
   });
 
-  it("reads the story's own status, not the one its RFC demotes it to", () => {
+  it("flags every landed status a story can carry", () => {
     const refs = extractStoryReferences(
       "// Remaining wiring is pending convergence by `cache-entry-remaining-methods`.\n",
       "coder.ts",
@@ -73,25 +72,26 @@ describe("stale story references", () => {
     ).toEqual([]);
   });
 
-  // The tasks repo is not checked out in CI, so the tree-wide gate is the
-  // pre-push signal here and in every agent worktree (start-worktree.sh
-  // symlinks `tasks/`). The unit cases above carry the CI signal.
-  const tasksIndex = path.join(resolveTasksDir(REPO_ROOT), "index.json");
-  const readIndex = async (): Promise<{ stories: IndexStory[] } | null> => {
-    try {
-      return JSON.parse(await readFile(tasksIndex, "utf8")) as { stories: IndexStory[] };
-    } catch {
-      return null;
-    }
-  };
-
-  it("no comment in the tree names a story that has already landed", async (ctx) => {
-    const index = await readIndex();
-    if (!index) {
-      ctx.skip(`no tasks index at ${tasksIndex}`);
-      return;
-    }
-    const stale = staleStoryReferences(await scanStoryReferences(REPO_ROOT), index.stories);
+  // The tasks repo is public and checked out into `tasks/` by the Unit Tests
+  // job, so this gate compares the tree against real story statuses there as
+  // well as in every agent worktree (start-worktree.sh symlinks the same path).
+  // loadStories throws rather than skipping when that checkout is missing.
+  it("no comment in the tree names a story that has already landed", async () => {
+    const stories = await loadStories(resolveTasksDir(REPO_ROOT));
+    const stale = staleStoryReferences(await scanStoryReferences(REPO_ROOT), stories);
     expect(stale.map((ref) => `${ref.file}:${ref.line} ${ref.slug}`)).toEqual([]);
+  });
+
+  it("reads each story's status from its own frontmatter", async () => {
+    const stories = await loadStories(resolveTasksDir(REPO_ROOT));
+    expect(
+      stories.find((story) => story.id === "activesupport-json-encoding-time-precision"),
+    ).toEqual({ id: "activesupport-json-encoding-time-precision", status: "done" });
+  });
+
+  it("refuses to pass without a tasks checkout", async () => {
+    await expect(loadStories(path.join(REPO_ROOT, "no-such-tasks"))).rejects.toThrow(
+      /cannot resolve story statuses/,
+    );
   });
 });

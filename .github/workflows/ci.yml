@@ -684,6 +684,14 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
+      # scripts/stale-story-references.test.ts compares story citations in
+      # comments against real story statuses; the story markdown is the source
+      # of truth and the check throws without it, so the (public) tasks repo is
+      # checked out where resolveTasksDir looks.
+      - uses: actions/checkout@v5
+        with:
+          repository: blazetrailsdev/tasks
+          path: tasks
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
       - uses: ./.github/actions/cache-build
