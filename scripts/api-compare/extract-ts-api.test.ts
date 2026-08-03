@@ -1489,8 +1489,10 @@ describe("extractFromProgram — @internal JSDoc on top-level functions", () => 
     expect(fns.find((f) => f.name === "performSecondBang")!.internal).toBe(true);
     expect(fns.find((f) => f.name === "secondBang")!.internal).toBeUndefined();
   });
+});
 
-  it("tags an @internal-tagged public class member and leaves its untagged sibling public", () => {
+describe("extractFromProgram — @internal JSDoc on class members", () => {
+  it("tags an @internal-tagged public method and leaves its untagged sibling public", () => {
     const info = extractFromFiles("/p", {
       "abstract-adapter.ts": `
         export class AbstractAdapter {
@@ -1508,6 +1510,42 @@ describe("extractFromProgram — @internal JSDoc on top-level functions", () => 
     expect(cls.instanceMethods.find((m) => m.name === "columnMethodNames")!.internal).toBe(true);
     expect(cls.classMethods.find((m) => m.name === "seamHook")!.internal).toBe(true);
     expect(cls.instanceMethods.find((m) => m.name === "quoteTableName")!.internal).toBeUndefined();
+  });
+
+  it("tags an @internal-tagged member of a synthesized __mixin class", () => {
+    const info = extractFromFiles("/p", {
+      "attributes.ts": `
+        export function Attributes(Base: new () => object) {
+          class M extends Base {
+            /** @internal */
+            loadAttributes(): void {}
+            readAttribute(): void {}
+          }
+          return M;
+        }
+      `,
+    });
+    const mixin = info.modules["attributes.ts:Attributes__mixin"];
+    expect(mixin.instanceMethods.find((m) => m.name === "loadAttributes")!.internal).toBe(true);
+    expect(mixin.instanceMethods.find((m) => m.name === "readAttribute")!.internal).toBeUndefined();
+  });
+
+  it("tags an @internal-tagged constructor of a synthesized __mixin class", () => {
+    const info = extractFromFiles("/p", {
+      "attributes.ts": `
+        export function Attributes(Base: new (...a: any[]) => object) {
+          class M extends Base {
+            /** @internal */
+            constructor(...a: any[]) { super(...a); }
+          }
+          return M;
+        }
+      `,
+    });
+    const ctor = info.modules["attributes.ts:Attributes__mixin"].instanceMethods.find(
+      (m) => m.name === "constructor",
+    )!;
+    expect(ctor.internal).toBe(true);
   });
 });
 
