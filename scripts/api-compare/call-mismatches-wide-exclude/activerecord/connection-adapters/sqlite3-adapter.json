@@ -16,36 +16,8 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/sqlite3-adapter.ts",
-    "rubyName": "change_column_null",
-    "call": "quote",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/sqlite3-adapter.ts",
     "rubyName": "check_all_foreign_keys_valid!",
     "call": "execute",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/sqlite3-adapter.ts",
-    "rubyName": "check_constraints",
-    "call": "map",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/sqlite3-adapter.ts",
-    "rubyName": "check_constraints",
-    "call": "query_value",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/sqlite3-adapter.ts",
-    "rubyName": "check_constraints",
-    "call": "quote",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -143,15 +115,8 @@
     "package": "activerecord",
     "tsFile": "connection-adapters/sqlite3-adapter.ts",
     "rubyName": "explain",
-    "call": "pp",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/sqlite3-adapter.ts",
-    "rubyName": "explain",
     "call": "to_sql",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Per-entry verified (RFC 0072 sqlite3 introspection cluster): Rails database_statements.rb:19 renders `to_sql(arel, binds)` because its `explain` takes an Arel node; every trails adapter's `explain` (sqlite3-adapter.ts, postgresql-adapter.ts, mysql2-adapter.ts) takes an already-rendered SQL string because relation.ts#explain calls `toSql()` before dispatching, so the render happens at the call site, not in the body."
   },
   {
     "package": "activerecord",
@@ -198,27 +163,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/sqlite3-adapter.ts",
-    "rubyName": "indexes",
-    "call": "internal_exec_query",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/sqlite3-adapter.ts",
-    "rubyName": "indexes",
-    "call": "query_value",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/sqlite3-adapter.ts",
-    "rubyName": "indexes",
-    "call": "quote",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/sqlite3-adapter.ts",
     "rubyName": "initialize",
     "call": "merge",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -256,7 +200,7 @@
     "tsFile": "connection-adapters/sqlite3-adapter.ts",
     "rubyName": "quote_string",
     "call": "quote",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Per-entry verified (RFC 0072 sqlite3 quoting cluster): Rails quoting.rb:66-68 delegates to the sqlite3 gem's C helper `::SQLite3::Database.quote`, which is exactly `'` -> `''`. There is no ported `SQLite3::Database` class (node:sqlite / better-sqlite3 expose no quote helper), so sqlite3-adapter.ts#quoteString spells that escape inline; it is the whole call's equivalent, not an omission."
   },
   {
     "package": "activerecord",
@@ -291,7 +235,7 @@
     "tsFile": "connection-adapters/sqlite3-adapter.ts",
     "rubyName": "returning_column_values",
     "call": "first",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Per-entry verified (RFC 0072 sqlite3 introspection cluster): Rails database_statements.rb:136 reads `result.rows.first`; Ruby Array#first has no JS method analogue, so the ported body (sqlite3/database-statements.ts#returningColumnValues, which the adapter method is the include resolution point for) spells it `result.rows[0]`."
   },
   {
     "package": "activerecord",
@@ -354,21 +298,7 @@
     "tsFile": "connection-adapters/sqlite3-adapter.ts",
     "rubyName": "virtual_table_exists?",
     "call": "any?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/sqlite3-adapter.ts",
-    "rubyName": "virtual_table_exists?",
-    "call": "data_source_sql",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/sqlite3-adapter.ts",
-    "rubyName": "virtual_table_exists?",
-    "call": "query_values",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Per-entry verified (RFC 0072 sqlite3 introspection cluster): Rails schema_statements.rb:88 ends the query_values probe with a block-less `.any?`; the port spells that emptiness test as `.length > 0` (JS arrays have no `any?`), same as the other `#any?` -> `.length > 0` entries in this baseline."
   },
   {
     "package": "activerecord",

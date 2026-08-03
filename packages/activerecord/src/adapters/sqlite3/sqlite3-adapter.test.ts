@@ -882,4 +882,17 @@ describeIfSqlite("SQLite3AdapterTest", () => {
       expect(await adapter.tableExists("ex")).toBe(true);
     });
   });
+
+  it("indexes logs", async () => {
+    await adapter.exec(
+      `CREATE TABLE "ex" ("id" INTEGER PRIMARY KEY AUTOINCREMENT, "number" INTEGER)`,
+    );
+    await assertLogged([[`PRAGMA index_list("ex")`, "SCHEMA", []]], async () => {
+      await adapter.indexes("ex");
+    });
+  });
+
+  it("no indexes", async () => {
+    expect(await adapter.indexes("items")).toEqual([]);
+  });
 });

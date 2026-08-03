@@ -4,18 +4,19 @@
  * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3::ExplainPrettyPrinter
  */
 
+export interface ExplainResult {
+  rows: Array<Array<unknown>>;
+}
+
 export class ExplainPrettyPrinter {
-  pp(result: Array<Record<string, unknown>>): string {
-    if (result.length === 0) return "";
-
-    const lines = result.map((row) => {
-      const selectid = row.selectid ?? row.id ?? "";
-      const order = row.order ?? row.parent ?? "";
-      const from = row.from ?? row.notused ?? "";
-      const detail = row.detail ?? "";
-      return `${selectid}|${order}|${from}|${detail}`;
-    });
-
-    return lines.join("\n");
+  /**
+   * Pretty prints the result of an EXPLAIN QUERY PLAN in a way that resembles
+   * the output of the SQLite shell:
+   *
+   *     0|0|0|SEARCH TABLE users USING INTEGER PRIMARY KEY (rowid=?) (~1 rows)
+   *     0|1|1|SCAN TABLE posts (~100000 rows)
+   */
+  pp(result: ExplainResult): string {
+    return result.rows.map((row) => row.join("|")).join("\n") + "\n";
   }
 }

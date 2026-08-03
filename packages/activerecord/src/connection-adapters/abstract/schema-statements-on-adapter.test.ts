@@ -106,6 +106,10 @@ class SqliteCapturingAdapter extends AbstractAdapter {
   executeMutation(_sql: string) {
     return Promise.resolve(0);
   }
+  override async internalExecQuery(sql: string) {
+    const rows = await this.execute(sql);
+    return Result.fromRowHashes(rows);
+  }
 }
 
 describe("SchemaStatements mixed into AbstractAdapter", () => {
@@ -148,20 +152,20 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
     expect(sqlite.allSql.at(-1)).toBe('PRAGMA "aux".index_list("widgets")');
   });
 
-  it("indexes() sqlite arm quotes the index name as an identifier in the index_info PRAGMA", async () => {
+  it("indexes() sqlite arm quotes the index name as a string literal in the index_info PRAGMA", async () => {
     // First call is index_list; surface one index whose name has a quote.
     const sqlite = new SqliteCapturingAdapter([{ name: 'idx"x', unique: 1 }]);
     await sqlite.indexes("things");
     // Converged with SQLite3Adapter: between index_list and index_info the
     // shared impl reads the index SQL (to recover WHERE/expression indexes),
-    // and index_info quotes the index name as an identifier (quoteColumnName),
-    // so embedded `"` is doubled.
+    // and index_info quotes the index name the way Rails does — `quote`, a
+    // string literal — so embedded `"` passes through unescaped.
     expect(sqlite.allSql).toEqual([
       'PRAGMA index_list("things")',
       `SELECT sql FROM sqlite_master WHERE name = 'idx"x' AND type = 'index' ` +
         `UNION ALL ` +
         `SELECT sql FROM sqlite_temp_master WHERE name = 'idx"x' AND type = 'index'`,
-      'PRAGMA index_info("idx""x")',
+      `PRAGMA index_info('idx"x')`,
     ]);
   });
 
@@ -175,7 +179,7 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
       `SELECT sql FROM "aux".sqlite_master WHERE name = 'idx_widgets_name' AND type = 'index' ` +
         `UNION ALL ` +
         `SELECT sql FROM sqlite_temp_master WHERE name = 'idx_widgets_name' AND type = 'index'`,
-      'PRAGMA "aux".index_info("idx_widgets_name")',
+      `PRAGMA "aux".index_info('idx_widgets_name')`,
     ]);
   });
 
