@@ -2,9 +2,8 @@ import * as fs from "fs/promises";
 import { readFileSync, existsSync } from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
-// The wide exclude tree is api-compare's baseline, so its walker comes from
-// api-compare too rather than being re-homed into a shared scripts/ module —
-// prism-codegen already imports that surface (see naming.ts, catalog.ts).
+// The wide exclude tree is api-compare's baseline, so its walker stays there
+// rather than moving to a shared scripts/ module (as naming.ts/catalog.ts do).
 import { listJsonFiles } from "../api-compare/baseline-json.js";
 import { portMethodNames } from "./port-symbols.js";
 import { generateFromSource } from "./index.js";
