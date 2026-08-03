@@ -14,7 +14,8 @@ on:
     #                         Opting in also gates the merge on it: the job is
     #                         in the `ci` aggregator's `needs:`.
     #   run-mysql-prepared  — the MYSQL_PREPARED_STATEMENTS AR suite (otherwise
-    #                         only main / the weekly sweep / workflow_dispatch).
+    #                         only the weekly sweep / workflow_dispatch — it
+    #                         does not run on pushes to main).
     #                         Opting in also gates the merge on it: the job is
     #                         in the `ci` aggregator's `needs:`.
     #   run-guides          — the Guides Code Type Check (otherwise only
