@@ -27,11 +27,7 @@
  * @internal
  */
 
-/**
- * The `_N` worker-isolation slot `support/config.ts`'s `applySlot` appends to
- * the primary database name (slot 1 gets none).
- */
-const SLOT_SUFFIX = /_\d+$/;
+import { splitRunDatabaseName } from "./run-token.js";
 
 /**
  * The config-derived `arunit` / `arunit2` database names for a primary
@@ -41,11 +37,18 @@ const SLOT_SUFFIX = /_\d+$/;
  * `arunit2` is spelled the way `expand_config` spells it — the primary name
  * plus a literal `"2"` (`test/support/config.rb:28`) — so at slot 1 (local
  * runs and every un-sharded lane) it is Rails' own `activerecord_unittest2`.
- * The `"2"` goes *before* the slot suffix rather than after it, which is the
+ * The `"2"` goes *before* the per-run suffix rather than after it, which is the
  * one unavoidable deviation: appending it to slot 3's
  * `activerecord_unittest_3` would yield `activerecord_unittest_32`, i.e. slot
  * 32's own database. Written this way slot 3 gets `activerecord_unittest2_3`,
  * which no slot can collide with, since primary names never carry the `2`.
+ *
+ * The per-run suffix is `_<runToken>_<slot>`, not just `_<slot>`: a stamped
+ * primary is `activerecord_unittest_<token>_<slot>`, so the `"2"` has to land
+ * ahead of the *token* — `activerecord_unittest2_<token>_<slot>`. Placing it
+ * after the token instead left `runTokenOfDatabase` reading the sibling's
+ * token as `<token>2`, which both hid it from its own run's teardown and
+ * exposed it to a concurrent run's stale sweep (`run-token.ts`).
  *
  * `arunit` is the primary database itself, as `expand_config` defaults it
  * (`activerecord_unittest`). Rails' only consumer of these two names — the
@@ -58,7 +61,6 @@ export function arunitDatabaseNames(primaryDatabase: string): {
   arunit: string;
   arunit2: string;
 } {
-  const slot = SLOT_SUFFIX.exec(primaryDatabase)?.[0] ?? "";
-  const base = slot === "" ? primaryDatabase : primaryDatabase.slice(0, -slot.length);
-  return { arunit: primaryDatabase, arunit2: `${base}2${slot}` };
+  const { base, suffix } = splitRunDatabaseName(primaryDatabase);
+  return { arunit: primaryDatabase, arunit2: `${base}2${suffix}` };
 }

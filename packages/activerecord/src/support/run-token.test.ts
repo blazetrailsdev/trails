@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { arunitDatabaseNames } from "./arunit2-config.js";
 import {
   STALE_DB_AGE_MS,
   mysqlAdvisoryLockName,
@@ -47,9 +48,7 @@ describe("slot database names", () => {
 
   it("reads the run token back off a stamped name", () => {
     expect(runTokenOfDatabase(BASE, "activerecord_unittest_rabc000001_2")).toBe("rabc000001");
-    expect(runTokenOfDatabase(BASE, "activerecord_unittest_rabc000001_2_arunit2")).toBe(
-      "rabc000001",
-    );
+    expect(runTokenOfDatabase(BASE, "activerecord_unittest2_rabc000001_2")).toBe("rabc000001");
     expect(runTokenOfDatabase(BASE, "activerecord_unittest_rabc000001_template")).toBe(
       "rabc000001",
     );
@@ -70,7 +69,7 @@ describe("drop targets", () => {
       "activerecord_unittest_2",
       slotDatabaseName(BASE, mine, 1),
       slotDatabaseName(BASE, mine, 2),
-      `${slotDatabaseName(BASE, mine, 2)}_arunit2`,
+      arunitDatabaseNames(slotDatabaseName(BASE, mine, 2)).arunit2,
       slotDatabaseName(BASE, theirs, 1),
       slotDatabaseName(BASE, theirs, 2),
       "postgres",
@@ -80,8 +79,36 @@ describe("drop targets", () => {
     expect(ownRunDatabases(BASE, mine, names)).toEqual([
       "activerecord_unittest_raaa000001_1",
       "activerecord_unittest_raaa000001_2",
-      "activerecord_unittest_raaa000001_2_arunit2",
+      "activerecord_unittest2_raaa000001_2",
     ]);
+  });
+
+  // The arunit2 sibling carries the run's token like every other database the
+  // run mints, but with a `2` on the base. An earlier spelling put the `2` on
+  // the token instead (`<base>_<token>2_<slot>`), so the sibling read as
+  // belonging to token `<token>2`: invisible to its own run's teardown, and
+  // droppable by a concurrent run's stale sweep once `<token>2` aged out.
+  it("keeps the arunit2 sibling of a slot database under its own run token", () => {
+    const mine = newRunToken();
+    const theirs = newRunToken();
+    for (let slot = 1; slot <= 40; slot++) {
+      const sibling = arunitDatabaseNames(slotDatabaseName(BASE, mine, slot)).arunit2;
+      expect(runTokenOfDatabase(BASE, sibling)).toBe(mine);
+      expect(ownRunDatabases(BASE, mine, [sibling])).toEqual([sibling]);
+      expect(ownRunDatabases(BASE, theirs, [sibling])).toEqual([]);
+      expect(staleRunDatabases(BASE, theirs, [sibling])).toEqual([]);
+    }
+  });
+
+  it("reads back exactly the token that minted the name", () => {
+    for (const token of [newRunToken(), `${newRunToken()}2`, "r2222222222"]) {
+      for (let slot = 1; slot <= 40; slot++) {
+        const slotDb = slotDatabaseName(BASE, token, slot);
+        for (const name of [slotDb, arunitDatabaseNames(slotDb).arunit2]) {
+          expect(runTokenOfDatabase(BASE, name)).toBe(token);
+        }
+      }
+    }
   });
 });
 
