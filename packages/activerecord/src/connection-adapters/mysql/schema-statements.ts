@@ -151,15 +151,14 @@ interface QuotedScopeHost {
  * @internal Host surface for the row-format helpers. Rails reads `mariadb?` and
  * `database_version` off the adapter and memoizes the InnoDB probe in the
  * `@default_row_format` ivar, so the memo slot lives on the host instance too.
- * `defined?(@default_row_format)` also memoizes a nil answer, which the separate
- * `_defaultRowFormatMemoized` flag reproduces (a null value alone can't).
+ * `defined?(@default_row_format)` memoizes a nil answer too, which the `in` check
+ * on the slot reproduces.
  */
 export interface RowFormatHost {
   isMariadb(): boolean;
   readonly databaseVersion: Version;
   queryValue(sql: string, name?: string): Promise<unknown>;
   _defaultRowFormat?: string | null;
-  _defaultRowFormatMemoized?: boolean;
 }
 
 /** @internal */
@@ -171,12 +170,11 @@ export function isRowFormatDynamicByDefault(this: RowFormatHost): boolean {
 export async function defaultRowFormat(this: RowFormatHost): Promise<string | null> {
   if (isRowFormatDynamicByDefault.call(this)) return null;
 
-  if (!this._defaultRowFormatMemoized) {
+  if (!("_defaultRowFormat" in this)) {
     const value = await this.queryValue(
       "SELECT @@innodb_file_per_table = 1 AND @@innodb_file_format = 'Barracuda'",
     );
     this._defaultRowFormat = Number(value) === 1 ? "ROW_FORMAT=DYNAMIC" : null;
-    this._defaultRowFormatMemoized = true;
   }
 
   return this._defaultRowFormat ?? null;

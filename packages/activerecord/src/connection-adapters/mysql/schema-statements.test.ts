@@ -41,9 +41,6 @@ function fkHost(rows: Record<string, unknown>[]) {
 // (`this.quote`); supply a minimal host carrying the MySQL `quote` standalone.
 const quoteHost = { quote };
 
-// The row-format helpers read `mariadb?` / `database_version` off the adapter and
-// probe InnoDB through queryValue; this host records the probes so the memo is
-// observable.
 function rowFormatHost(isMariadb: boolean, version: string, probeResult = 0) {
   const queries: string[] = [];
   return {
@@ -60,14 +57,12 @@ function rowFormatHost(isMariadb: boolean, version: string, probeResult = 0) {
 describe("MySQL::SchemaStatements", () => {
   it("isRowFormatDynamicByDefault: MariaDB >= 10.2.2 is true", () => {
     expect(isRowFormatDynamicByDefault.call(rowFormatHost(true, "10.2.2"))).toBe(true);
-    // numeric, not lexicographic
     expect(isRowFormatDynamicByDefault.call(rowFormatHost(true, "10.10.0"))).toBe(true);
     expect(isRowFormatDynamicByDefault.call(rowFormatHost(true, "10.2.1"))).toBe(false);
   });
 
   it("isRowFormatDynamicByDefault: MySQL >= 5.7.9 is true", () => {
     expect(isRowFormatDynamicByDefault.call(rowFormatHost(false, "5.7.9"))).toBe(true);
-    // numeric: 11 > 7
     expect(isRowFormatDynamicByDefault.call(rowFormatHost(false, "5.11.0"))).toBe(true);
     expect(isRowFormatDynamicByDefault.call(rowFormatHost(false, "5.7.8"))).toBe(false);
   });
@@ -75,7 +70,6 @@ describe("MySQL::SchemaStatements", () => {
   it("defaultRowFormat: null when dynamic by default", async () => {
     const host = rowFormatHost(false, "8.0.0", 1);
     expect(await defaultRowFormat.call(host)).toBeNull();
-    // Rails returns before the probe runs on a dynamic-by-default server.
     expect(host.queries).toEqual([]);
   });
 
