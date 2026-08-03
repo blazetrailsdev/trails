@@ -237,9 +237,7 @@ export class PostgreSQLAdapter
 
   override async active(): Promise<boolean> {
     // Rails' active? starts with `return false unless @raw_connection`
-    // (postgresql_adapter.rb) and then probes with `@raw_connection.query ";"`;
-    // trails still answers from handle state only — the probe half is tracked
-    // separately now that the predicate is awaitable.
+    // (postgresql_adapter.rb); the `query ";"` probe half is not ported yet.
     return this._rawConnection !== null && !this._closed && this._pgClientOptions != null;
   }
 
