@@ -25,7 +25,7 @@ describe("I18nFallbacksDefaultsTest", () => {
   it("defaults to an empty array if no default has been set manually", () => {
     setDefaultLocale("en-US");
     const fallbacks = new Fallbacks();
-    expect(fallbacks.defaults()).toEqual([]);
+    expect(fallbacks.defaults).toEqual([]);
   });
 
   it("documentation example #1 - does not use default locale in fallbacks - See Issues #413 & #415", () => {
@@ -50,14 +50,14 @@ describe("I18nFallbacksDefaultsTest", () => {
 
   it("defaults reflect a manually passed default locale if any", () => {
     const fallbacks = new Fallbacks("fi-FI");
-    expect(fallbacks.defaults()).toEqual(["fi-FI", "fi"]);
+    expect(fallbacks.defaults).toEqual(["fi-FI", "fi"]);
     setDefaultLocale("de-DE");
-    expect(fallbacks.defaults()).toEqual(["fi-FI", "fi"]);
+    expect(fallbacks.defaults).toEqual(["fi-FI", "fi"]);
   });
 
   it("defaults allows to set multiple defaults", () => {
     const fallbacks = new Fallbacks("fi-FI", "se-FI");
-    expect(fallbacks.defaults()).toEqual(["fi-FI", "fi", "se-FI", "se"]);
+    expect(fallbacks.defaults).toEqual(["fi-FI", "fi", "se-FI", "se"]);
   });
 });
 

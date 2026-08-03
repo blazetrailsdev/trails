@@ -73,7 +73,7 @@ export class Fallbacks extends Map<Locale, Locale[]> {
     this.defaultsStore = defaults.flatMap((default_) => this.compute(default_, false));
   }
 
-  defaults(): Locale[] {
+  get defaults(): Locale[] {
     return this.defaultsStore;
   }
 
@@ -135,7 +135,7 @@ export class Fallbacks extends Map<Locale, Locale[]> {
       }
     }
 
-    if (includeDefaults) result.push(...this.defaults());
+    if (includeDefaults) result.push(...this.defaults);
     return [...new Set(result)].filter((locale) => locale != null);
   }
 

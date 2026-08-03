@@ -2,9 +2,7 @@
  * Mirrors: i18n/lib/i18n/locale/tag.rb
  *
  * Ruby's `@@implementation` is class-level state on a module; the module-level
- * binding below is that store. The gem `autoload`s `Rfc4646` alongside
- * `Simple`; only `Simple` is ported so far, and it is the default
- * implementation.
+ * binding below is that store.
  */
 
 import { Simple } from "./tag/simple.js";

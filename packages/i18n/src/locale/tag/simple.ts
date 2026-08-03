@@ -36,7 +36,7 @@ export class Simple implements Parents {
     return this.tag;
   }
 
-  toS(): string {
+  toString(): string {
     return this.tag;
   }
 
