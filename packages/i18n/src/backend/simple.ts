@@ -10,7 +10,6 @@
  * JS has no threads, so the concurrent-hash machinery has nothing to guard.
  */
 
-import { registerDefaultBackend } from "../config.js";
 import {
   EMPTY_HASH,
   availableLocalesInitialized,
@@ -169,5 +168,3 @@ export class Simple extends Base {
     return result;
   }
 }
-
-registerDefaultBackend(() => new Simple());

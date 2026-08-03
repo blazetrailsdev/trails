@@ -1,34 +1,28 @@
 import { describe, it, expect, beforeEach } from "vitest";
 
-import { Config, registerDefaultBackend, resetClassConfig, type Backend } from "./config.js";
+import { Config, resetClassConfig } from "./config.js";
 import { ExceptionHandler, InvalidLocale, MissingInterpolationArgument } from "./exceptions.js";
 import { DEFAULT_INTERPOLATION_PATTERNS } from "./interpolate/ruby.js";
 import { resetConfig } from "./i18n.js";
+import { Base } from "./backend/base.js";
+import { Simple } from "./backend/simple.js";
 
-class FakeBackend implements Backend {
+class FakeBackend extends Base {
   reloaded = 0;
-  constructor(private locales: string[] = ["en"]) {}
+  constructor(private locales: string[] = ["en"]) {
+    super();
+  }
   storeTranslations(): unknown {
     return null;
   }
   availableLocales(): string[] {
     return this.locales;
   }
-  reloadBang(): void {
+  override reloadBang(): void {
     this.reloaded += 1;
   }
-  eagerLoadBang(): void {}
-  translate(): unknown {
+  protected lookup(): unknown {
     return null;
-  }
-  exists(): boolean {
-    return false;
-  }
-  localize(): unknown {
-    return null;
-  }
-  transliterate(): string {
-    return "";
   }
 }
 
@@ -43,7 +37,6 @@ describe("Config", () => {
     resetConfig();
     resetClassConfig();
     config = new Config();
-    registerDefaultBackend(() => new FakeBackend());
   });
 
   it("locale defaults to the default locale and is per-instance", () => {
@@ -68,16 +61,11 @@ describe("Config", () => {
     expect(new Config().defaultLocale).toBe("de");
   });
 
-  it("backend defaults to the registered default and is settable", () => {
-    expect(config.backend).toBeInstanceOf(FakeBackend);
+  it("backend defaults to Backend::Simple and is settable", () => {
+    expect(config.backend).toBeInstanceOf(Simple);
     const backend = new FakeBackend(["fr"]);
     config.backend = backend;
     expect(new Config().backend).toBe(backend);
-  });
-
-  it("backend raises when no default backend is registered", () => {
-    resetClassConfig();
-    expect(() => config.backend).toThrow(/no backend/);
   });
 
   it("availableLocales delegates to the backend until set", () => {

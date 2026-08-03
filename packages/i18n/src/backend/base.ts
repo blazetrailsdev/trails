@@ -59,7 +59,6 @@ let fileReader: FileReader | undefined;
  * `YAML.load_file` (base.rb:246) and `JSON.load_file` (base.rb:262). JS has no
  * filesystem in the language, and `packages/i18n` imports nothing from `node:*`
  * so it stays usable off a server, so the host registers the reader instead.
- * Mirrors the `registerDefaultBackend` seam in `config.ts`.
  */
 export function registerFileReader(reader: FileReader): void {
   fileReader = reader;
