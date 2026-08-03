@@ -34,8 +34,10 @@ import { Member } from "./test-helpers/models/member.js";
 import { Membership } from "./test-helpers/models/membership.js";
 import { Human } from "./test-helpers/models/human.js";
 import { Interest } from "./test-helpers/models/interest.js";
-import { buildHasManyRelation } from "./associations.js";
-import { findTarget as findHasManyTarget } from "./associations/has-many-association.js";
+import {
+  findTarget as findHasManyTarget,
+  scope as hasManyScope,
+} from "./associations/has-many-association.js";
 import "./test-helpers/models/ship.js";
 import "./test-helpers/models/bird.js";
 import "./test-helpers/models/treasure.js";
@@ -2452,8 +2454,8 @@ describe("AssociationsTest", () => {
     expect(children.map((c) => (c as any).title)).toEqual(["match"]);
   });
 
-  // `buildHasManyRelation` (the seeded scope behind CollectionProxy /
-  // `.toSql()` / counts) shares `computeHasManyWhere`, which must apply the
+  // The `scope()` seam (the relation behind CollectionProxy / `.toSql()` /
+  // counts, and the one `findTarget` runs) must apply the
   // same query_constraints widening: a polymorphic `as` scope on a
   // query_constraints owner keys on the composite `[blog_id, parent_id]` so a
   // cross-shard same-`parent_id` row is excluded from the relation itself,
@@ -2473,7 +2475,7 @@ describe("AssociationsTest", () => {
       parent_type: "ShardedBlogPost",
       title: "wrongShard",
     });
-    const rel = buildHasManyRelation(post, "freshChildren", {
+    const rel = hasManyScope(post, "freshChildren", {
       className: "ShardedBlogPost",
       as: "parent",
     });

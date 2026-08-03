@@ -1560,9 +1560,8 @@ export function _inlinePolymorphicKeys(
  * owner. Returns null if primary key values are missing (Rails'
  * NullRelation fallback). Pure — no Relation construction.
  *
- * Shared by `buildHasManyRelation` (which wraps it in `all().where(...)`)
- * and CollectionProxy's constructor (which seeds its own where-clause
- * via the same condition).
+ * Used by the callers that need the owner-scoping predicate itself rather than
+ * a built relation (the eager-load / preload seeds).
  *
  * @internal No Rails counterpart (`compute_has_many_where` is defined nowhere
  * in the Rails source). Rails never materializes the owner-scoping hash on its
@@ -1716,88 +1715,6 @@ export function computeHasManyWhere(
 }
 
 /**
- * Build the relation for a hasMany association without executing it.
- * Skips caching, strict loading, and inverse_of — used by countHasMany
- * so resetCounters works under strict loading.
- * Returns null if primary key values are missing.
- *
- * @internal No Rails counterpart (`build_has_many_relation` is defined nowhere
- * in the Rails source). Rails gets an unexecuted, side-effect-free relation for
- * free via `association.scope` — `Association#scope`
- * (`associations/association.rb:107`) into `AssociationScope#scope`
- * (`associations/association_scope.rb:21`). trails' `findTarget` fuses
- * relation building with caching/strict-loading/inverse_of, so the bypass has
- * to be spelled out as its own function until that fusion is undone.
- */
-export function buildHasManyRelation(
-  record: Base,
-  assocName: string,
-  options: AssociationOptions,
-): any | null {
-  const conditions = computeHasManyWhere(record, assocName, options);
-  if (conditions === null) return null;
-  const className = options.className ?? camelize(singularize(assocName));
-  const targetModel = resolveAssocClass(record, assocName, className);
-  // `scopeForAssociation` (not `all()`) so an enclosing `Model.where(...).scoping`
-  // block doesn't leak the class `current_scope` into association reads. Rails'
-  // association readers build from `scope_for_association`, which applies only
-  // default scopes (unless flagged `all_queries: true`), never `current_scope`.
-  let rel = _scopeForAssociation(targetModel).where(conditions);
-  rel = applyAssociationScope(rel, options.scope, record);
-  return rel;
-}
-
-/**
- * Build the JOIN-based AssociationScope relation for a through / HABTM
- * association without executing it — the exact relation `findTarget` runs to
- * materialize rows (`SELECT target.* FROM target INNER JOIN join_table ...`).
- *
- * Counting over this relation yields Rails' `scope.count(:all)`: a single
- * `COUNT(*)` over the JOIN that preserves join-row multiplicity (three
- * `developers_projects` rows for one project count as 3). This is distinct
- * from the proxy's `_buildThroughScope()`, which models the target as an
- * `id IN (SELECT source_fk ...)` subquery that structurally collapses
- * duplicate join rows to one row per id — wrong for a non-distinct `size`.
- *
- * Returns null when the owner FK is absent (unsaved owner / null PK), matching
- * the short-circuit in `findTarget`.
- *
- * @internal No Rails counterpart (`build_through_join_scope` is defined nowhere
- * in the Rails source), for the same reason as {@link buildHasManyRelation}: in
- * Rails this relation IS `association.scope`, and
- * `HasManyAssociation#count_records` (`associations/has_many_association.rb:80`)
- * just calls `scope.count(:all)` on it (`:84`). Named separately here only
- * because trails builds the JOIN form inside `findTarget` rather than in an
- * AssociationScope.
- */
-export function buildThroughJoinScope(
-  record: Base,
-  assocName: string,
-  options: AssociationOptions,
-): any | null {
-  const ctor = record.constructor as typeof Base;
-  const reflection = ctor._reflectOnAssociation?.(assocName);
-  if (!reflection) return null;
-  // Null-FK short-circuit on the owner-side column (chain.last's
-  // joinForeignKey — see `_ownerChainReflection`), mirroring findTarget.
-  const reflForOwnerFk = _ownerChainReflection(reflection);
-  const fkCols = Array.isArray(reflForOwnerFk.joinForeignKey)
-    ? reflForOwnerFk.joinForeignKey
-    : [reflForOwnerFk.joinForeignKey];
-  for (const col of fkCols) {
-    const v = record._readAttribute(col);
-    if (v === null || v === undefined) return null;
-  }
-  const className = options.className ?? camelize(singularize(assocName));
-  const targetModel = resolveAssocClass(record, assocName, className);
-  const built = _builtAssociationScope(record, assocName, reflection, targetModel);
-  const baseRelation = _scopeForAssociation(targetModel);
-  let rel = baseRelation.merge(built);
-  rel = applyAssociationScope(rel, options.scope, record, (reflection as any).scope);
-  return rel;
-}
-
-/**
  * Count associated records for a hasMany association using COUNT(*)
  * without loading records into memory. Bypasses strict loading checks
  * so resetCounters works on strict-loading models.
@@ -1808,16 +1725,16 @@ export function buildThroughJoinScope(
  * `HasManyAssociation#count_records` already exists as `countRecords`
  * (`associations/has-many-association.ts`) and is a *different* method (it
  * reads the counter cache and trims the target). This function exists only
- * because trails fuses relation building with caching/strict-loading inside
- * `loadHasMany`, the same deviation documented on its two callees
- * {@link buildHasManyRelation} and {@link buildThroughJoinScope}; it
- * disappears when that fusion is undone.
+ * because trails' loaders take the owner/name/options triple rather than an
+ * association instance, so there is no `association` to call `.scope` on; it
+ * is a thin wrapper over the Rails-named `scope` seam.
  */
 export async function countHasMany(
   record: Base,
   assocName: string,
   options: AssociationOptions,
 ): Promise<number> {
+  const { scope } = await import("./associations/has-many-association.js");
   if (options.through) {
     // COUNT(*) over the JOIN — matching Rails' scope.count(:all) — instead of
     // materializing rows just to read their length. Temporarily disable strict
@@ -1825,14 +1742,14 @@ export async function countHasMany(
     record._strictLoadingBypassCount++;
     try {
       // Preserve `HasManyThroughAssociation#findTarget`'s loud failure for a misconfigured through:
-      // buildThroughJoinScope returns null for a missing reflection, which would
-      // otherwise silently count as 0.
+      // `scope` returns null for a missing reflection, which would otherwise
+      // silently count as 0.
       const ctor = record.constructor as typeof Base;
       const throughRegistered = (ctor._associations ?? []).some((a) => a.name === options.through);
       if (!throughRegistered) {
         throw _hmtNotFound(ctor, assocName, options.through);
       }
-      const rel = buildThroughJoinScope(record, assocName, options);
+      const rel = scope(record, assocName, options);
       if (!rel) return 0;
       const result = await rel.count();
       if (typeof result !== "number") {
@@ -1846,7 +1763,7 @@ export async function countHasMany(
       record._strictLoadingBypassCount--;
     }
   }
-  const rel = buildHasManyRelation(record, assocName, options);
+  const rel = scope(record, assocName, options);
   if (!rel) return 0;
   const result = await rel.count();
   if (typeof result !== "number") {

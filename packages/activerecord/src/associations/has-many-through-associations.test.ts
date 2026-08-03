@@ -850,7 +850,7 @@ describe("HasManyThroughAssociationsTest", () => {
   // shapes. All three used to trip a `ConfigurationError` in the
   // single-column IN-subquery fallback (composite target FK / composite-PK
   // target / composite through-model PK); routing through
-  // `buildThroughJoinScope` builds Rails' chain-based composite scope
+  // the `scope()` seam builds Rails' chain-based composite scope
   // instead. The assertions read the generated JOIN SQL (adapter-agnostic
   // via quoteTableName) so they hold under SQLite / PG / MariaDB.
 
