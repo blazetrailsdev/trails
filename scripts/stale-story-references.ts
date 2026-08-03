@@ -5,7 +5,8 @@
 //
 // This module extracts those promises — a story slug sitting in the same
 // comment sentence as a forward-looking phrase — so a landed story with a
-// still-pending citation fails a test instead of a suite.
+// still-pending citation fails a test instead of a suite. Markdown prose names
+// landed stories the same way, so `.md` under the trails tree is scanned too.
 
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
@@ -24,9 +25,18 @@ const STORY_STATUS = /^status:\s*"?([a-z-]+)"?\s*$/m;
 
 const COMMENT_LINE = /^\s*(?:\/\/|\/\*+|\*)(.*)$/;
 const SENTENCE = /(?<=[.;:)])\s+(?=[A-Z(`])|\.\s+/;
+const CODE_FENCE = /^\s*(?:```|~~~)/;
 
 const SKIP_DIRS = new Set(["node_modules", "dist", ".git", "vendor", "__snapshots__"]);
 const SOURCE_ROOTS = ["packages", "scripts", "eslint"];
+
+// The trails tree only: `tasks/` is a checkout of the tasks repo (a symlink in
+// agent worktrees) whose story files legitimately cite landed stories as
+// dependencies and provenance, and `docs/activerecord/` is frozen by RFC 0011
+// Phase 4 — CI's `Docs ActiveRecord Freeze` job fails any PR that edits it, so
+// a finding there could not be resolved by correcting the prose.
+const MARKDOWN_SKIP_DIRS = new Set([...SKIP_DIRS, "tasks"]);
+const MARKDOWN_SKIP_TREES = [path.join("docs", "activerecord")];
 
 // Its test states a stale promise verbatim as a fixture, and the line-based
 // scan reads that template literal as a real comment.
@@ -53,33 +63,67 @@ export interface StoryReference {
  * without closing it") from reading as the promise it disclaims.
  */
 export function extractStoryReferences(source: string, file: string): StoryReference[] {
+  const blocks: Block[] = [];
+  let block: Block | undefined;
+  source.split("\n").forEach((line, i) => {
+    const match = COMMENT_LINE.exec(line);
+    if (!match) {
+      block = undefined;
+      return;
+    }
+    if (!block) blocks.push((block = { line: i + 1, text: [] }));
+    block.text.push(match[1].trim());
+  });
+  return blockReferences(blocks, file);
+}
+
+/**
+ * The same promises in markdown prose. Every line is prose, so a block is a
+ * paragraph — blank-line separated — rather than a run of comment lines, and
+ * fenced code is skipped so an example comment quoted in a fence is not read
+ * as a real promise.
+ */
+export function extractMarkdownStoryReferences(source: string, file: string): StoryReference[] {
+  const blocks: Block[] = [];
+  let block: Block | undefined;
+  let fenced = false;
+  source.split("\n").forEach((line, i) => {
+    if (CODE_FENCE.test(line)) {
+      fenced = !fenced;
+      block = undefined;
+      return;
+    }
+    if (fenced || line.trim() === "") {
+      block = undefined;
+      return;
+    }
+    if (!block) blocks.push((block = { line: i + 1, text: [] }));
+    block.text.push(line.trim());
+  });
+  return blockReferences(blocks, file);
+}
+
+interface Block {
+  line: number;
+  text: string[];
+}
+
+/**
+ * The pending citations in each block: the promise is matched over the whole
+ * block, and a `PROVENANCE_PHRASE` sentence is then vetoed per sentence.
+ */
+function blockReferences(blocks: readonly Block[], file: string): StoryReference[] {
   const refs: StoryReference[] = [];
-  const lines = source.split("\n");
-  let block: string[] = [];
-  let start = 0;
-  const flush = (): void => {
-    if (block.length === 0) return;
-    const text = block.join(" ");
-    if (PENDING_PHRASE.test(text)) {
-      for (const sentence of text.split(SENTENCE)) {
-        if (PROVENANCE_PHRASE.test(sentence)) continue;
-        for (const slug of new Set(sentence.match(STORY_SLUG) ?? [])) {
-          refs.push({ file, line: start, slug });
-        }
+  for (const block of blocks) {
+    const text = block.text.join(" ");
+    if (!PENDING_PHRASE.test(text)) continue;
+    for (const sentence of text.split(SENTENCE)) {
+      if (PROVENANCE_PHRASE.test(sentence)) continue;
+      for (const slug of new Set(sentence.match(STORY_SLUG) ?? [])) {
+        refs.push({ file, line: block.line, slug });
       }
     }
-    block = [];
-  };
-  lines.forEach((line, i) => {
-    const match = COMMENT_LINE.exec(line);
-    if (match) {
-      if (block.length === 0) start = i + 1;
-      block.push(match[1].trim());
-    } else {
-      flush();
-    }
-  });
-  flush();
+  }
   return refs;
 }
 
@@ -106,6 +150,36 @@ export async function collectSourceFiles(
   return acc;
 }
 
+/**
+ * Repo-relative `.md` paths under `dir`, minus the trees whose findings are not
+ * ours to fix (see `MARKDOWN_SKIP_DIRS` / `MARKDOWN_SKIP_TREES`). `tasks/` is a
+ * symlink in agent worktrees, so it is never walked as a directory anyway; the
+ * name is excluded so a plain checkout behaves the same way.
+ */
+export async function collectMarkdownFiles(
+  root: string,
+  dir = root,
+  acc: string[] = [],
+): Promise<string[]> {
+  let entries;
+  try {
+    entries = await readdir(dir, { withFileTypes: true });
+  } catch {
+    return acc;
+  }
+  for (const entry of entries) {
+    const abs = path.join(dir, entry.name);
+    const rel = path.relative(root, abs);
+    if (MARKDOWN_SKIP_TREES.includes(rel)) continue;
+    if (entry.isDirectory()) {
+      if (!MARKDOWN_SKIP_DIRS.has(entry.name)) await collectMarkdownFiles(root, abs, acc);
+    } else if (entry.name.endsWith(".md")) {
+      acc.push(rel);
+    }
+  }
+  return acc;
+}
+
 /** Every pending citation in the source roots this check covers. */
 export async function scanStoryReferences(repoRoot: string): Promise<StoryReference[]> {
   const refs: StoryReference[] = [];
@@ -114,6 +188,11 @@ export async function scanStoryReferences(repoRoot: string): Promise<StoryRefere
       if (SKIP_FILES.has(file)) continue;
       refs.push(...extractStoryReferences(await readFile(path.join(repoRoot, file), "utf8"), file));
     }
+  }
+  for (const file of await collectMarkdownFiles(repoRoot)) {
+    refs.push(
+      ...extractMarkdownStoryReferences(await readFile(path.join(repoRoot, file), "utf8"), file),
+    );
   }
   return refs;
 }
