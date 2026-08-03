@@ -285,10 +285,11 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    * The timezone applied to result rows for the most recent query. Rails-private
    * (`_` prefix) because Rails exposes no reader for it: the value lives inside
    * the Ruby driver as `@raw_connection.query_options[:database_timezone]`,
-   * which `Mysql2Adapter#configure_connection` assigns from `default_timezone`
-   * (mysql2_adapter.rb:160). node-mysql2 has no `query_options` hash, so trails
-   * holds the same state in a field — there is no Rails method name to map it
-   * onto, only a driver ivar.
+   * seeded by `Mysql2Adapter#configure_connection` (mysql2_adapter.rb:160) and
+   * re-synced to `default_timezone` on every statement by
+   * `Mysql2::DatabaseStatements#perform_query` (mysql2/database_statements.rb:49).
+   * node-mysql2 has no `query_options` hash, so trails holds the same state in a
+   * field — there is no Rails method name to map it onto, only a driver ivar.
    *
    * Updated by {@link _syncDatabaseTimezone} from the perform-query path.
    */
