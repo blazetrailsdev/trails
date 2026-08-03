@@ -2,7 +2,7 @@
  * Mirrors: i18n/lib/i18n/config.rb
  */
 
-import { enforceAvailableLocales, type Locale, type TranslationKey } from "./i18n.js";
+import { enforceAvailableLocalesBang, type Locale, type TranslationKey } from "./i18n.js";
 import { ExceptionHandler, MissingInterpolationArgument } from "./exceptions.js";
 import { DEFAULT_INTERPOLATION_PATTERNS } from "./interpolate/ruby.js";
 
@@ -10,12 +10,26 @@ import { DEFAULT_INTERPOLATION_PATTERNS } from "./interpolate/ruby.js";
 export interface Backend {
   availableLocales(): Locale[];
   reloadBang(): void;
+  eagerLoadBang(): void;
   translate(locale: Locale, key: unknown, options?: Record<string, unknown>): unknown;
+  exists(locale: Locale, key: TranslationKey, options?: Record<string, unknown>): boolean;
+  /** Optional until `Backend::Base#localize` lands (story `i18n-backend-localize`). */
+  localize?(
+    locale: Locale,
+    object: unknown,
+    format: unknown,
+    options?: Record<string, unknown>,
+  ): unknown;
 }
 
-export type ExceptionHandlerLike = {
-  call(exception: Error, locale: Locale, key: TranslationKey, options: unknown): unknown;
-};
+/**
+ * Ruby's handler is a Proc or any object responding to `#call`; a JS function
+ * carries `Function#call`, whose first argument is a receiver, so the two arms
+ * stay distinct here and `handle_exception` dispatches on them.
+ */
+export type ExceptionHandlerLike =
+  | ((exception: Error, locale: Locale, key: TranslationKey, options: unknown) => unknown)
+  | { call(exception: Error, locale: Locale, key: TranslationKey, options: unknown): unknown };
 
 export type MissingInterpolationArgumentHandler = (
   missingKey: string,
@@ -52,15 +66,15 @@ export function registerDefaultBackend(factory: () => Backend): void {
 }
 
 export class Config {
-  private localeValue?: Locale;
+  private localeValue?: Locale | false;
 
   /** Not global/thread-scoped like the rest; defaults to `defaultLocale`. */
-  get locale(): Locale {
+  get locale(): Locale | false {
     return this.localeValue ?? this.defaultLocale;
   }
 
-  set locale(locale: Locale) {
-    enforceAvailableLocales(locale);
+  set locale(locale: Locale | false) {
+    enforceAvailableLocalesBang(locale);
     this.localeValue = locale;
   }
 
@@ -88,7 +102,7 @@ export class Config {
   }
 
   set defaultLocale(locale: Locale) {
-    enforceAvailableLocales(locale);
+    enforceAvailableLocalesBang(locale);
     defaultLocale = locale;
   }
 

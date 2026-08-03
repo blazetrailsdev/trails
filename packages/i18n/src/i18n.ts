@@ -1,11 +1,14 @@
 /**
- * Mirrors: i18n/lib/i18n.rb — partially. Only the members `config.ts` and
- * `exceptions.ts` reach for are ported here; the translate/interpolate surface
- * lands with its own story (RFC 0074).
+ * Mirrors: i18n/lib/i18n.rb — partially. `transliterate` waits on the
+ * `Transliterator` mixin, and `new_double_nested_cache` on the normalize-key
+ * cache; both land with their own stories (RFC 0074).
  */
 
+import type { Backend, ExceptionHandlerLike } from "./config.js";
 import { Config } from "./config.js";
-import { InvalidLocale } from "./exceptions.js";
+import { ArgumentError, Disabled, InvalidLocale, MissingTranslation } from "./exceptions.js";
+import type { TranslateOptions } from "./backend/base.js";
+import { throwException, catchException } from "./throw-catch.js";
 
 /** Ruby models locales as Symbols; the JS analogue is a plain string. */
 export type Locale = string;
@@ -78,6 +81,199 @@ export function resetConfig(): void {
   currentConfig = undefined;
 }
 
+/**
+ * Write methods which delegate to the configuration object. Ruby generates a
+ * reader and a `name=` writer for each; a module-level binding can't carry a
+ * setter, so the writers take the sanctioned `set*` spelling.
+ */
+export function locale(): Locale | false {
+  return config().locale;
+}
+
+export function setLocale(value: Locale | false): void {
+  config().locale = value;
+}
+
+export function backend(): Backend {
+  return config().backend;
+}
+
+export function setBackend(value: Backend): void {
+  config().backend = value;
+}
+
+export function defaultLocale(): Locale {
+  return config().defaultLocale;
+}
+
+export function setDefaultLocale(value: Locale): void {
+  config().defaultLocale = value;
+}
+
+export function availableLocales(): Locale[] {
+  return config().availableLocales;
+}
+
+export function setAvailableLocales(value: Locale | Locale[] | null | undefined): void {
+  config().availableLocales = value;
+}
+
+export function defaultSeparator(): string {
+  return config().defaultSeparator;
+}
+
+export function setDefaultSeparator(value: string): void {
+  config().defaultSeparator = value;
+}
+
+export function exceptionHandler(): ExceptionHandlerLike {
+  return config().exceptionHandler;
+}
+
+export function setExceptionHandler(value: ExceptionHandlerLike): void {
+  config().exceptionHandler = value;
+}
+
+export function loadPath(): string[] {
+  return config().loadPath;
+}
+
+export function setLoadPath(value: string[]): void {
+  config().loadPath = value;
+}
+
+export function enforceAvailableLocales(): boolean {
+  return config().enforceAvailableLocales;
+}
+
+export function setEnforceAvailableLocales(value: boolean): void {
+  config().enforceAvailableLocales = value;
+}
+
+/**
+ * Tells the backend to reload translations. Used in situations like the
+ * Rails development environment. Backends can implement whatever strategy
+ * is useful.
+ */
+export function reloadBang(): void {
+  config().clearAvailableLocalesSet();
+  config().backend.reloadBang();
+}
+
+/**
+ * Tells the backend to load translations now. Used in situations like the
+ * Rails production environment. Backends can implement whatever strategy
+ * is useful.
+ */
+export function eagerLoadBang(): void {
+  config().backend.eagerLoadBang();
+}
+
+/** A key accepted by `translate`: Ruby's Symbol arm is a real JS symbol. */
+export type TranslateKey = TranslationKey | symbol | null;
+
+/**
+ * Translates, pluralizes and interpolates a given key using a given locale,
+ * scope, and default, as well as interpolation values.
+ *
+ * Ruby takes `throw:`, `raise:` and `locale:` as keyword arguments alongside
+ * `**options`; the destructured rest below is that split. `throw` can't be a
+ * binding name in JS, so the local reads `throwOption`.
+ */
+export function translate(
+  key: TranslateKey | TranslateKey[] = null,
+  {
+    throw: throwOption = false,
+    raise = false,
+    locale = null,
+    ...options
+  }: TranslateOptions = EMPTY_HASH,
+): unknown {
+  if (locale == null || locale === false) locale = config().locale;
+  if (locale === false) throw new Disabled("t");
+  enforceAvailableLocalesBang(locale as Locale);
+
+  const backend = config().backend;
+
+  if (Array.isArray(key)) {
+    return key.map((k) => translateKey(k, throwOption, raise, locale as Locale, backend, options));
+  } else {
+    return translateKey(key, throwOption, raise, locale as Locale, backend, options);
+  }
+}
+
+export const t = translate;
+
+/**
+ * Wrapper for `translate` that adds `raise: true`. With this option, if no
+ * translation is found, it will raise `I18n::MissingTranslationData`.
+ */
+export function translateBang(
+  key: TranslateKey | TranslateKey[],
+  options: TranslateOptions = EMPTY_HASH,
+): unknown {
+  return translate(key, { ...options, raise: true });
+}
+
+export const tBang = translateBang;
+
+/** Returns an array of interpolation keys for the given translation key. */
+export function interpolationKeys(key: unknown, options: TranslateOptions = EMPTY_HASH): string[] {
+  if (typeof key !== "string" || key.length === 0) throw new ArgumentError();
+
+  if (!exists(key, null, slice(options, "locale", "scope"))) return [];
+
+  const translation = translate(key, slice(options, "locale", "scope"));
+  return interpolationKeysFromTranslation(translation)
+    .flat(Infinity as 1)
+    .filter((value): value is string => value != null);
+}
+
+/** Returns true if a translation exists for a given key, otherwise returns false. */
+export function exists(
+  key: unknown,
+  _locale: Locale | false | null = null,
+  { locale = _locale, ...options }: TranslateOptions = EMPTY_HASH,
+): boolean {
+  if (locale == null || locale === false) locale = config().locale;
+  if (locale === false) throw new Disabled("exists?");
+  if ((typeof key === "string" && key.length === 0) || key == null) throw new ArgumentError();
+
+  return config().backend.exists(locale as Locale, key as TranslationKey, options);
+}
+
+/** Localizes certain objects, such as dates and numbers to local formatting. */
+export function localize(
+  object: unknown,
+  { locale = null, format = null, ...options }: TranslateOptions = EMPTY_HASH,
+): unknown {
+  if (locale == null || locale === false) locale = config().locale;
+  if (locale === false) throw new Disabled("l");
+  enforceAvailableLocalesBang(locale as Locale);
+
+  format ??= "default";
+  // `Backend#localize` lands with the `i18n-backend-localize` story; until then
+  // a backend that has not defined it fails here rather than silently no-op.
+  return config().backend.localize!(locale as Locale, object, format, options);
+}
+
+export const l = localize;
+
+/** Executes block with given I18n.locale set. */
+export function withLocale<T>(tmpLocale: Locale | false | null | undefined, block: () => T): T {
+  if (tmpLocale == null) {
+    return block();
+  } else {
+    const currentLocale = locale();
+    setLocale(tmpLocale);
+    try {
+      return block();
+    } finally {
+      setLocale(currentLocale);
+    }
+  }
+}
+
 function normalizeKey(key: unknown, separator: string): TranslationKey[] {
   if (Array.isArray(key)) return key.flatMap((k) => normalizeKey(k, separator));
   if (key === null || key === undefined) return [];
@@ -98,8 +294,12 @@ export function normalizeKeys(
   scope: unknown,
   separator?: string,
 ): TranslationKey[] {
-  const sep = separator ?? config().defaultSeparator;
-  return [...normalizeKey(locale, sep), ...normalizeKey(scope, sep), ...normalizeKey(key, sep)];
+  separator ??= defaultSeparator();
+  return [
+    ...normalizeKey(locale, separator),
+    ...normalizeKey(scope, separator),
+    ...normalizeKey(key, separator),
+  ];
 }
 
 /**
@@ -111,7 +311,7 @@ export function localeAvailable(locale: Locale | null | undefined): boolean {
 }
 
 /** Mirrors: I18n.enforce_available_locales! */
-export function enforceAvailableLocales(locale: Locale | false | null | undefined): void {
+export function enforceAvailableLocalesBang(locale: Locale | false | null | undefined): void {
   if (locale !== false && config().enforceAvailableLocales) {
     if (!localeAvailable(locale)) throw new InvalidLocale(locale);
   }
@@ -120,4 +320,90 @@ export function enforceAvailableLocales(locale: Locale | false | null | undefine
 /** Mirrors: I18n.available_locales_initialized? */
 export function availableLocalesInitialized(): boolean {
   return config().availableLocalesInitialized;
+}
+
+/** Ruby truthiness: everything but `nil` and `false`. */
+function truthy(value: unknown): boolean {
+  return value != null && value !== false;
+}
+
+function translateKey(
+  key: TranslateKey,
+  throwOption: unknown,
+  raise: unknown,
+  locale: Locale,
+  backend: Backend,
+  options: TranslateOptions,
+): unknown {
+  const result = catchException(() => backend.translate(locale, key, options));
+
+  if (result instanceof MissingTranslation) {
+    return handleException(
+      truthy(throwOption) ? "throw" : truthy(raise) ? "raise" : false,
+      result,
+      locale,
+      key,
+      options,
+    );
+  } else {
+    return result;
+  }
+}
+
+/**
+ * Any exceptions thrown in translate will be sent to the exception_handler
+ * which can be a Proc or any other Object unless they're forced to be raised
+ * or thrown (MissingTranslation).
+ *
+ * @missingRailsCall send — Ruby's `Symbol` handler arm sends the handler name
+ * to `I18n`; `config.exceptionHandler` is typed as a callable here, so the
+ * name-of-a-method form has no representable value.
+ */
+function handleException(
+  handling: "raise" | "throw" | false,
+  exception: MissingTranslation,
+  locale: Locale,
+  key: TranslateKey,
+  options: TranslateOptions,
+): unknown {
+  switch (handling) {
+    case "raise":
+      throw exception.toException();
+    case "throw":
+      return throwException(exception);
+    default: {
+      const handler =
+        (options.exceptionHandler as ExceptionHandlerLike) ?? config().exceptionHandler;
+      return typeof handler === "function"
+        ? handler(exception, locale, key as TranslationKey, options)
+        : handler.call(exception, locale, key as TranslationKey, options);
+    }
+  }
+}
+
+/** Ruby's `Hash#slice`. */
+function slice(hash: TranslateOptions, ...keys: string[]): TranslateOptions {
+  const result: TranslateOptions = {};
+  for (const key of keys) {
+    if (key in hash) result[key] = hash[key];
+  }
+  return result;
+}
+
+function interpolationKeysFromTranslation(translation: unknown): unknown[] {
+  if (typeof translation === "string") {
+    // Ruby's `Regexp.union(I18n.config.interpolation_patterns)`; `scan` on a
+    // pattern with groups yields one array of captures per match.
+    const pattern = new RegExp(
+      config()
+        .interpolationPatterns.map((interpolationPattern) => `(?:${interpolationPattern.source})`)
+        .join("|"),
+      "g",
+    );
+    return [...translation.matchAll(pattern)].map((match) => match.slice(1));
+  } else if (Array.isArray(translation)) {
+    return translation.map((element) => interpolationKeysFromTranslation(element));
+  } else {
+    return [];
+  }
 }

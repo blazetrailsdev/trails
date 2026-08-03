@@ -26,15 +26,42 @@ export {
 export {
   EMPTY_HASH,
   RESERVED_KEYS,
+  availableLocales,
   availableLocalesInitialized,
+  backend,
   config,
+  defaultLocale,
+  defaultSeparator,
+  eagerLoadBang,
   enforceAvailableLocales,
+  enforceAvailableLocalesBang,
+  exceptionHandler,
+  exists,
+  interpolationKeys,
+  l,
+  loadPath,
+  locale,
   localeAvailable,
+  localize,
   normalizeKeys,
+  reloadBang,
   reserveKey,
   reservedKeysPattern,
+  setAvailableLocales,
+  setBackend,
+  setDefaultLocale,
+  setDefaultSeparator,
+  setEnforceAvailableLocales,
+  setExceptionHandler,
+  setLoadPath,
+  setLocale,
+  t,
+  tBang,
+  translate,
+  translateBang,
+  withLocale,
 } from "./i18n.js";
-export type { Locale, TranslationKey } from "./i18n.js";
+export type { Locale, TranslateKey, TranslationKey } from "./i18n.js";
 export { Base } from "./backend/base.js";
 export type { TranslateOptions } from "./backend/base.js";
 export { Simple } from "./backend/simple.js";
