@@ -133,8 +133,17 @@ import { SchemaDumper as Sqlite3SchemaDumper } from "./sqlite3/schema-dumper.js"
  * Stored datetime strings are interpreted according to
  * ActiveRecord.default_timezone (defaulting to UTC), matching the timezone
  * selection used when formatting instants for SQLite.
+ *
+ * @noRailsEquivalent PERMANENT — Rails' `initialize_type_map`
+ * (sqlite3_adapter.rb:499-502) registers exactly one SQLite-specific type,
+ * `SQLite3Integer`; datetime columns fall through to `Type::DateTime`, because
+ * Ruby's `Time`/`DateTime` carry a zone and the sqlite3 gem's TEXT values parse
+ * straight into one. The JS analogue splits: `Temporal.PlainDateTime` (no zone)
+ * vs `Temporal.Instant`, so an offset-less TEXT datetime needs a zone applied
+ * before it is a usable value. That is a Temporal-language gap with no upstream
+ * class to converge onto.
  */
-export class SQLiteDateTimeType extends ARDateTimeType {
+export class SQLite3DateTime extends ARDateTimeType {
   override cast(value: unknown): DateTimeCastResult | null {
     const result = super.cast(value);
     if (result instanceof Temporal.PlainDateTime) {
@@ -1177,7 +1186,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
    * `sql_type` verbatim. trails' SQLite type map recovers the scalar hints off the
    * cast type at lookup time: limits via `register_class_with_limit`, temporal/
    * decimal precision via `register_class_with_precision`, and the 8-byte INTEGER
-   * default on `SQLite3IntegerType#_limit` (private) so the public `limit` stays
+   * default on `SQLite3Integer#_limit` (private) so the public `limit` stays
    * nil for bare integers — dumps stay bare and `c_int_1..8` keep their 1..8.
    *
    * `type` comes straight from `cast_type.type` (no base-name fallback). For an
@@ -2939,7 +2948,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   static override initializeTypeMap(m: TypeMap): void {
     super.initializeTypeMap(m);
 
-    const sqlite3Int = (limit?: number) => new SQLite3IntegerType({ limit });
+    const sqlite3Int = (limit?: number) => new SQLite3Integer({ limit });
     m.registerType("string", new StringType());
     m.registerType("text", new TextType());
     m.registerType("integer", sqlite3Int());
@@ -2963,11 +2972,11 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     // precision-parsing factory. Registration order matters: /date/i and /time/i both
     // match "datetime", so datetime is registered last — reverse-registration lookup
     // matches it first (mirrors the base-map date/time/datetime ordering). better-sqlite3
-    // returns datetime columns as TEXT; SQLiteDateTimeType converts offset-less strings
+    // returns datetime columns as TEXT; SQLite3DateTime converts offset-less strings
     // to Temporal.Instant using the configured default_timezone.
     this.registerClassWithPrecision(m, /date/i, DateType);
     this.registerClassWithPrecision(m, /time/i, TimeType);
-    this.registerClassWithPrecision(m, /datetime/i, SQLiteDateTimeType);
+    this.registerClassWithPrecision(m, /datetime/i, SQLite3DateTime);
     m.aliasType(/timestamp/i, "datetime");
     m.registerType("blob", new BinaryType());
     m.registerType("binary", new BinaryType());
@@ -2983,7 +2992,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     m.registerType(/int/i, undefined, (k) => sqlite3Int(this.extractLimit(k)));
     // Explicit "bigint" registered after /int/i so it takes priority on exact
     // matches. Like `/int/i`, it carries no explicit limit — the 8-byte default
-    // lives on `SQLite3IntegerType#_limit`, so the public `limit` stays nil and
+    // lives on `SQLite3Integer#_limit`, so the public `limit` stays nil and
     // reflected `bigint` columns dump bare (Rails resolves "bigint" via the same
     // `%r(int)i` → `SQLite3Integer` registration with a nil `limit`).
     m.registerType("bigint", sqlite3Int());
@@ -3002,7 +3011,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
  * `limit` reader nil), so `fetch_type_metadata` reflects a nil `limit` and
  * schema dumps stay bare for unlimited integers — mirror that split here.
  */
-export class SQLite3IntegerType extends IntegerType {
+export class SQLite3Integer extends IntegerType {
   protected override _limit(): number {
     return this.limit ?? 8;
   }

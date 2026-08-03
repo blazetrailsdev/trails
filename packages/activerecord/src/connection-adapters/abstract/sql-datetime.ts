@@ -18,7 +18,7 @@ import { ActiveRecord } from "../../ar-config.js";
 /**
  * Return the IANA timezone string for SQL datetime serialization/deserialization,
  * based on `ActiveRecord.default_timezone`. Shared by all instant formatters and
- * by `SQLiteDateTimeType#cast` so both directions always agree on the timezone.
+ * by `SQLite3DateTime#cast` so both directions always agree on the timezone.
  */
 export function defaultSqlTimezone(): string {
   return ActiveRecord.defaultTimezone === "utc" ? "UTC" : Temporal.Now.timeZoneId();
