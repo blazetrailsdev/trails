@@ -7,13 +7,14 @@
  * persisted nullify `target.save` at :108. A synchronous JS builder cannot
  * await that write, so `setNewRecord` performs only the in-memory half; every
  * caller that can displace a persisted record issues the DB half itself. The
- * `build#{Name}` / `create#{Name}` accessors use `detachDisplacedTarget`. For
- * `assoc.build()`, which nested attributes calls directly, the nested-attributes
- * writer calls the same method — starting the removal inline at
- * assignment and awaiting it in its `save` wrapper before the replacement is
- * inserted. A *direct* `record.association(name).build(...)` has no such
- * wrapper, so `HasOneAssociation#build` runs the removal itself and returns the
- * record wrapped in that promise for the caller to `await`.
+ * `build#{Name}` / `create#{Name}` accessors use `detachDisplacedTarget`. The
+ * nested-attributes writer calls the same method from its *awaitable* half
+ * (`await owner.set#{Name}Attributes({...})`), in Rails' order; the Rails-named
+ * synchronous setter refuses a displacing assignment outright
+ * (`NestedAttributesDisplacementError`) rather than deferring the write to the
+ * owner's next `save()`. A *direct* `record.association(name).build(...)` runs
+ * the removal itself and returns the record wrapped in that promise for the
+ * caller to `await`.
  *
  * Rails' own `test_should_replace_an_existing_record_if_there_is_no_id`
  * (nested_attributes_test.rb:288) asserts only in-memory state and never saves
@@ -21,7 +22,12 @@
  * guard rather than a change to the mirrored test.
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { registerModel, RecordNotSaved, type Base } from "../index.js";
+import {
+  registerModel,
+  NestedAttributesDisplacementError,
+  RecordNotSaved,
+  type Base,
+} from "../index.js";
 import { fixtures } from "../test-fixtures.js";
 import { Pirate } from "../test-helpers/models/pirate.js";
 import { Ship } from "../test-helpers/models/ship.js";
@@ -47,32 +53,78 @@ describe("has_one displacement via the synchronous build path", () => {
     // the case where Rails' `remove_target!` has a row to nullify.
     await (pirate as unknown as { ship: Promise<Base | null> }).ship;
 
-    (pirate as unknown as { shipAttributes: unknown }).shipAttributes = {
+    await (pirate as unknown as { setShipAttributes(a: object): Promise<void> }).setShipAttributes({
       name: "Davy Jones Gold Dagger",
-    };
-    await pirate.save();
+    });
 
     const reloaded = (await Ship.find((displaced as unknown as { id: number }).id)) as Base;
     expect((reloaded as unknown as { pirate_id: number | null }).pirate_id).toBe(null);
   });
 
-  it("nullifies the displaced row when nested attributes replace an unloaded child", async () => {
+  it("refuses a displacing assignment through the synchronous setter", async () => {
+    const pirate = (await Pirate.create({ catchphrase: "Aye" })) as Base;
+    const displaced = (await Ship.create({
+      name: "Nights Dirty Lightning",
+      pirate_id: (pirate as unknown as { id: number }).id,
+    })) as Base;
+    await (pirate as unknown as { ship: Promise<Base | null> }).ship;
+
+    // Rails' `replace` removes the displaced row inline at the assignment
+    // expression; a property setter can neither await that nor defer it without
+    // reopening the two-row window, so it raises and names the awaitable writer.
+    expect(() => {
+      (pirate as unknown as { shipAttributes: unknown }).shipAttributes = {
+        name: "Davy Jones Gold Dagger",
+      };
+    }).toThrow(NestedAttributesDisplacementError);
+
+    // Nothing partial landed: the displaced record is still cached and attached.
+    expect((pirate.association("ship").target as unknown as { id: number }).id).toBe(
+      (displaced as unknown as { id: number }).id,
+    );
+    const reloaded = (await Ship.find((displaced as unknown as { id: number }).id)) as Base;
+    expect((reloaded as unknown as { pirate_id: number | null }).pirate_id).toBe(
+      (pirate as unknown as { id: number }).id,
+    );
+  });
+
+  it("refuses a displacing assignment over an unloaded child through the synchronous setter", async () => {
     const pirate = (await Pirate.create({ catchphrase: "Aye" })) as Base;
     const displaced = (await Ship.create({
       name: "Nights Dirty Lightning",
       pirate_id: (pirate as unknown as { id: number }).id,
     })) as Base;
 
-    // Never load the association: Rails' `build_#{name}` runs `load_target`
-    // regardless, so the writer must discover and detach the row itself.
+    // Never loaded: Rails' `replace` guard is `return target unless load_target
+    // || record`, whose left operand always runs, so the assignment still owes a
+    // SELECT — which is exactly what the synchronous setter cannot await.
     const refetched = (await Pirate.find((pirate as unknown as { id: number }).id)) as Base;
-    (refetched as unknown as { shipAttributes: unknown }).shipAttributes = {
-      name: "Davy Jones Gold Dagger",
-    };
-    await refetched.save();
+    expect(() => {
+      (refetched as unknown as { shipAttributes: unknown }).shipAttributes = {
+        name: "Davy Jones Gold Dagger",
+      };
+    }).toThrow(NestedAttributesDisplacementError);
 
     const reloaded = (await Ship.find((displaced as unknown as { id: number }).id)) as Base;
-    expect((reloaded as unknown as { pirate_id: number | null }).pirate_id).toBe(null);
+    expect((reloaded as unknown as { pirate_id: number | null }).pirate_id).toBe(
+      (pirate as unknown as { id: number }).id,
+    );
+  });
+
+  it("keeps the synchronous setter working when the assignment displaces nothing", async () => {
+    const pirate = (await Pirate.create({ catchphrase: "Aye" })) as Base;
+    // A loaded, empty association owes no load and has nothing to remove, so
+    // Rails' `replace` reduces to `self.target = record` — in-memory work a
+    // property setter can do.
+    await (pirate as unknown as { ship: Promise<Base | null> }).ship;
+
+    (pirate as unknown as { shipAttributes: unknown }).shipAttributes = {
+      name: "Davy Jones Gold Dagger",
+    };
+    await pirate.save();
+
+    const ship = (await (pirate as unknown as { ship: Promise<Base | null> }).ship) as Base;
+    expect((ship as unknown as { name: string }).name).toBe("Davy Jones Gold Dagger");
   });
 
   it("awaits the unloaded displacement removal from the awaitable writer", async () => {
@@ -89,46 +141,6 @@ describe("has_one displacement via the synchronous build path", () => {
 
     // The awaitable writer drains the removal, so the row is detached before
     // the owner is ever saved — Rails' assignment-time timing.
-    const reloaded = (await Ship.find((displaced as unknown as { id: number }).id)) as Base;
-    expect((reloaded as unknown as { pirate_id: number | null }).pirate_id).toBe(null);
-  });
-
-  it("restores the current replacement when the unloaded displacement resolves", async () => {
-    const pirate = (await Pirate.create({ catchphrase: "Aye" })) as Base;
-    const displaced = (await Ship.create({
-      name: "Nights Dirty Lightning",
-      pirate_id: (pirate as unknown as { id: number }).id,
-    })) as Base;
-
-    const refetched = (await Pirate.find((pirate as unknown as { id: number }).id)) as Base;
-    const assoc = refetched.association("ship") as unknown as {
-      doAsyncFindTarget(): Promise<Base | null>;
-      target: Base | null;
-    };
-    // Hold the displacement query open so a second build lands while it is in
-    // flight — the window in which the association caches a target the query's
-    // caller never saw.
-    let release!: () => void;
-    const gate = new Promise<void>((resolve) => (release = resolve));
-    const findTarget = assoc.doAsyncFindTarget.bind(assoc);
-    assoc.doAsyncFindTarget = async () => {
-      await gate;
-      return findTarget();
-    };
-
-    (refetched as unknown as { shipAttributes: unknown }).shipAttributes = {
-      name: "Davy Jones Gold Dagger",
-    };
-    const latest = await (
-      refetched as unknown as { buildShip(a: object): Promise<Base> }
-    ).buildShip({ name: "Black Pearl" });
-    release();
-    await refetched.save();
-
-    // Rails' target only moves forward, so the removal's restore must write the
-    // record the association caches *now*, not the one it cached when the query
-    // was issued.
-    expect(assoc.target).toBe(latest);
     const reloaded = (await Ship.find((displaced as unknown as { id: number }).id)) as Base;
     expect((reloaded as unknown as { pirate_id: number | null }).pirate_id).toBe(null);
   });
@@ -204,8 +216,8 @@ describe("has_one displacement via the synchronous build path", () => {
     // because the production path has no reachable raise left to provoke —
     // `assertNestedAttributesAreKnown` pre-empts the unknown-attribute one, and
     // the post-`build_record` raises Rails *does* query before are unreachable
-    // here (see `prepareDetachDisplacedForSyncBuild`). It pins that the query is
-    // issued downstream of the construction, so a future raise added to
+    // here (the displacement raise sits after `build_record`). It pins that the
+    // query is issued downstream of the construction, so a future raise added to
     // `build_record` cannot regress the order.
     assoc.buildRecord = () => {
       throw new Error("build exploded");
@@ -218,11 +230,8 @@ describe("has_one displacement via the synchronous build path", () => {
     }).toThrow("build exploded");
 
     // Rails is `build_record(...)` then `set_new_record` → `load_target`, so a
-    // raising build leaves the row untouched and nothing parked to drain.
-    expect(
-      (refetched as unknown as { _pendingDisplacedRemovals?: unknown[] })
-        ._pendingDisplacedRemovals ?? [],
-    ).toHaveLength(0);
+    // raising build leaves the row untouched — the construction error surfaces,
+    // not the displacement refusal that would follow it.
     const reloaded = (await Ship.find((displaced as unknown as { id: number }).id)) as Base;
     expect((reloaded as unknown as { pirate_id: number | null }).pirate_id).toBe(
       (pirate as unknown as { id: number }).id,

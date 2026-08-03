@@ -148,6 +148,27 @@ describe("nested attributes save wrapper argument forwarding (trails-only)", () 
   // ordinary save), so it must be argument-transparent: dropping its options
   // silently re-enabled validations for every model that accepts nested
   // attributes.
+  // Rails buckets Hash-valued keys into `nested_parameter_attributes` and
+  // assigns them only after the scalar pass (attribute_assignment.rb:7-25), so
+  // `reject_if` sees the owner attributes the same `update` call assigned. A
+  // single-pass loop leaves that to hash key order.
+  it("assigns scalar attributes before nested ones within one update", async () => {
+    Pirate.acceptsNestedAttributesFor("ship", {
+      rejectIf: (_attrs, record) => cols(record).catchphrase !== "Aye",
+    });
+
+    const pirate = await Pirate.createBang({ catchphrase: "Arr" });
+    await pirate.update({
+      shipAttributes: { name: "Black Pearl" },
+      catchphrase: "Aye",
+    });
+
+    const ship = await Ship.where({ pirate_id: readAttr(pirate, "id") }).first();
+    expect(cols(ship as Base).name).toBe("Black Pearl");
+
+    Pirate.acceptsNestedAttributesFor("ship");
+  });
+
   it("forwards save options through the nested-attributes save wrapper", async () => {
     Pirate.acceptsNestedAttributesFor("ship");
 

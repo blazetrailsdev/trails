@@ -460,11 +460,10 @@ export class HasOneAssociation extends SingularAssociation {
    * record` (:84) is never reached when `remove_target!` raises (e.g. a failed
    * nullify save, has_one_association.rb:102-108).
    *
-   * The one synchronous caller — the nested-attributes property setter, which
-   * cannot await — starts the removal here and *then* builds. That is safe
-   * because `removeTargetBang` reads `this.target` on entry, before its first
-   * `await`: the build's swap lands in the same synchronous slice and cannot
-   * disturb the in-flight removal.
+   * There is no synchronous caller: the Rails-named `#{name}_attributes=`
+   * setter refuses a displacing assignment outright
+   * ({@link NestedAttributesDisplacementError}) rather than starting a removal
+   * it cannot await, so every caller here runs Rails' order intact.
    *
    * No `isPersisted` pre-screen: Rails' `remove_target!` gates on persistence
    * only inside its `:destroy` and nullify arms; the `:delete` arm calls
@@ -476,7 +475,7 @@ export class HasOneAssociation extends SingularAssociation {
    * surface — Rails' `remove_target!` is private too. The nested-attributes
    * writer lives outside the class hierarchy and reaches it through its
    * duck-typed `OneToOneAssociation` handle, exactly as it does the sibling
-   * `prepareDetachDisplacedForSyncBuild`.
+   * `displacementNeedsAwait`.
    *
    * @internal
    */
@@ -488,78 +487,30 @@ export class HasOneAssociation extends SingularAssociation {
   }
 
   /**
-   * The unloaded half of the nested-attributes writer's `remove_target!`.
+   * Whether a nested-attributes build over this association would reach DB I/O
+   * — the question the *synchronous* `#{name}_attributes=` setter has to answer
+   * before it starts, because it can await neither half of the `load_target`
+   * (has_one_association.rb:59) / `remove_target!` (:69) pair Rails runs inline.
    *
-   * Rails' `set_new_record` -> `replace(record, false)` opens with `load_target`
-   * (has_one_association.rb:59-62) on EVERY build, so a build over a *never
-   * loaded* has_one on a persisted owner still discovers the existing row and
-   * removes it. `detachDisplacedTarget` only covers what the caller already had
-   * in memory; this covers the row that only ever existed in the DB.
-   *
-   * The synchronous writer (`pirate.shipAttributes = {...}`) cannot await the
-   * SELECT, so it parks the promise on the owner and drains it in the `save`
-   * wrapper exactly like `detachDisplacedTarget`'s. Null when Rails would issue
-   * no query at all (`findTargetNeeded`) or when the target is already loaded,
-   * which keeps the writer synchronous on those paths.
-   *
-   * Returns a *thunk* rather than the promise: Rails reaches `load_target` from
-   * `set_new_record`, i.e. after `build_record`, so a build that raises issues
-   * no query. The gate (`find_target?`) stops being observable once
-   * `setNewRecord` marks the association loaded, so the writer takes the
-   * decision here, before `buildRecord`, and invokes the thunk after
-   * `setNewRecord`.
-   *
-   * The writer invokes the thunk only when `buildRecord` returns normally,
-   * which would suppress a query for a throw from the `set_new_record` half —
-   * Rails reaches everything past has_one_association.rb:62 with `load_target`
-   * already run. That half is unreachable on this path: `raise_on_type_mismatch!`
-   * (:60) is the sole pre-`load_target` raise and cannot fire for a record the
-   * association built from its own reflection, and the remainder is
-   * `setNewRecord`'s in-memory foreign-key/inverse writes.
+   * True on both displacing arms: an already-loaded record to remove, and an
+   * unloaded association whose `find_target?` (`findTargetNeeded`) says Rails
+   * would query for one — the guard is `return target unless load_target ||
+   * record`, and Ruby always evaluates the left operand, so a never-loaded
+   * has_one on a persisted owner still discovers (and removes) the row. False
+   * when the build displaces nothing, which keeps the synchronous setter
+   * working for every non-displacing assignment.
    *
    * `protected` because this is association-internal bookkeeping, not API
-   * surface. The writer lives outside the class hierarchy and reaches it
-   * through its duck-typed handle.
-   *
-   * The find deliberately goes through `doAsyncFindTarget` rather than
-   * `loadTargetForBuild`: by the time it resolves, the build has already
-   * installed the replacement as `this.target`, and `load_target`'s writeback
-   * would clobber it. We need only the displaced record, never the cache.
+   * surface. The nested-attributes writer lives outside the class hierarchy and
+   * reaches it through its duck-typed handle, as it does `detachDisplacedTarget`.
    *
    * @internal
    */
-  protected prepareDetachDisplacedForSyncBuild(): (() => Promise<void>) | null {
-    if (this.loaded) return null;
-    if (!this.findTargetNeeded()) return null;
-    return () => this.findThenDetachDisplaced();
-  }
-
-  private async findThenDetachDisplaced(): Promise<void> {
-    // The synchronous build installed the replacement while the find was in
-    // flight, so run Rails' `replace` tail in order only now: `load_target`
-    // (just awaited) → `remove_target!` → `self.target = record`. Both writes
-    // below sit in one synchronous slice — `removeTargetBang` reads
-    // `this.target` before its first `await` — so nothing can observe the
-    // association caching the displaced record.
-    //
-    // The accepted deviation (RFC 0068 Design §6) is the *pair* of writes:
-    // Rails' target only ever
-    // moves forward, because `load_target` runs before `self.target = record`
-    // rather than after it. It cannot be removed while the Rails-named writer
-    // is a synchronous property setter (`pirate.shipAttributes = {...}`) that
-    // must install the replacement before returning; the awaitable
-    // `setShipAttributes` needs no swap, and retiring the sync setter's
-    // displacement contract is what deletes this method. Read the replacement
-    // *after* the await so the restore writes back whatever the association
-    // caches now — a capture taken before the find would resurrect a target a
-    // later assignment has already superseded.
-    const displaced = await this.doAsyncFindTarget();
-    const replacement = this.target;
-    if (!displaced || sameRecord(displaced, replacement)) return;
-    this.target = displaced;
-    const removal = this.detachDisplacedTarget();
-    this.target = replacement;
-    await removal;
+  protected displacementNeedsAwait(): boolean {
+    if (!this.loaded) return this.findTargetNeeded();
+    const displaced = this.target;
+    if (!displaced) return false;
+    return (displaced as { isDestroyed?: () => boolean }).isDestroyed?.() !== true;
   }
 
   protected override async doAsyncFindTarget(): Promise<Base | null> {
@@ -642,8 +593,8 @@ export class HasOneAssociation extends SingularAssociation {
    * an `await` this synchronous method cannot issue, so every caller that can
    * displace a persisted record issues it itself — `detachDisplacedTarget` from
    * the `build#{name}` / `create#{name}` accessors (builder/has-one.ts,
-   * `_createRecord`), and the same method from the nested-attributes writer
-   * (nested-attributes.ts, `detachDisplacedAtAssignment`). Nothing is queued
+   * `_createRecord`), and the same method from the awaitable nested-attributes
+   * writer (nested-attributes.ts, `detachDisplacedThenSetNewRecord`). Nothing is queued
    * here: a queue drained at the owner's `save` would defer a write Rails makes
    * at assignment, and would double-remove records the awaiting callers have
    * already detached.
