@@ -1638,38 +1638,16 @@ export function noRailsEquivalentReason(node: ts.Node): string | undefined {
  * too would silently widen every such tag into a blanket. So a file with no
  * imports has no file-level form — it uses the per-declaration one.
  *
- * The prose runs to the next line-leading `@tag` or the end of the block, and
- * an empty reason is the same hard error it is on a declaration.
+ * The block is read through `noRailsEquivalentReason` — TypeScript binds a
+ * file's leading block to that first import, so the file-level form goes
+ * through the SAME parse as the declaration-level one and inherits both of its
+ * hard errors: an empty reason, and a reason truncated by a bare `@word` in its
+ * prose. A checked claim that could be silently cut short would be neither.
  */
 export function fileLevelNoRailsEquivalentReason(sourceFile: ts.SourceFile): string | undefined {
   const first = sourceFile.statements[0];
   if (first === undefined || !ts.isImportDeclaration(first)) return undefined;
-  const text = sourceFile.getFullText();
-  const ranges = ts.getLeadingCommentRanges(text, 0) ?? [];
-  const block = ranges.find(
-    (r) => r.kind === ts.SyntaxKind.MultiLineCommentTrivia && text.startsWith("/**", r.pos),
-  );
-  if (block === undefined) return undefined;
-  const lines = text
-    .slice(block.pos + 3, block.end - 2)
-    .split("\n")
-    .map((line) => line.replace(/^\s*\*?/, "").trim());
-  const start = lines.findIndex((line) => /^@noRailsEquivalent\b/.test(line));
-  if (start === -1) return undefined;
-  const prose = [lines[start].replace(/^@noRailsEquivalent\b/, "")];
-  for (const line of lines.slice(start + 1)) {
-    if (/^@\w/.test(line)) break;
-    prose.push(line);
-  }
-  const reason = prose.join(" ").replace(/\s+/g, " ").trim();
-  if (reason === "") {
-    const line = sourceFile.getLineAndCharacterOfPosition(block.pos).line + start + 1;
-    throw new Error(
-      `@noRailsEquivalent needs a reason: ${sourceFile.fileName}:${line} — ` +
-        "state why this file has no Rails counterpart.",
-    );
-  }
-  return reason;
+  return noRailsEquivalentReason(first);
 }
 
 /**

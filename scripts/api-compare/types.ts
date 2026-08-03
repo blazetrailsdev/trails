@@ -202,8 +202,8 @@ export interface PackageInfo {
    * tag, written in a JSDoc block at the very top of the file (above the
    * imports) rather than on any one declaration. It claims the whole file has
    * no Rails counterpart, so extra-surface.ts lets one reason cover every
-   * otherwise-novel name in it — see `collectFileTags` there, which also
-   * rejects the claim when the file DOES have a counterpart.
+   * otherwise-novel name in it — see `fileTagVerdict` there, which refuses the
+   * claim when the file DOES have a counterpart.
    */
   fileNoRailsEquivalent?: Record<string, string>;
 }

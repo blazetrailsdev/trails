@@ -1506,6 +1506,23 @@ describe("extractFromProgram — file-level @noRailsEquivalent JSDoc", () => {
     );
   });
 
+  it("rejects a file-level reason truncated by a bare @word in its prose", () => {
+    expect(() =>
+      extractFromFiles("/p", {
+        "libsql-adapter.ts": `
+          /**
+           * @noRailsEquivalent PERMANENT — trails binds each client in its own
+           * subclass, the way @deprecated APIs are kept apart.
+           */
+          import { SQLite3Adapter } from "./sqlite3-adapter.js";
+
+          export class LibSQLAdapter extends SQLite3Adapter {}
+        `,
+        "sqlite3-adapter.ts": `export class SQLite3Adapter {}`,
+      }),
+    ).toThrow(/truncated by a bare `@deprecated`/);
+  });
+
   it("ignores a tag written below the imports", () => {
     const info = extractFromFiles("/p", {
       "libsql-adapter.ts": `
