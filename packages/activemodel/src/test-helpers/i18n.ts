@@ -2,8 +2,9 @@
  * Rails test cases isolate translations with `I18n.backend = I18n::Backend::Simple.new`
  * and let `load_path` re-supply each framework's `en.yml` lazily (see
  * `reset_i18n_load_path` in activemodel/test/cases/validations/i18n_validation_test.rb).
- * `load_path` is not read back yet (story `i18n-backend-file-loading-localize`),
- * so re-storing Active Model's `en` here stands in for that re-read.
+ * Trails' framework locales are modules rather than load-path entries
+ * (`activemodel/src/i18n.ts`), so re-storing them here stands in for that
+ * re-read.
  */
 import { I18n } from "../i18n.js";
 import { en } from "../locale/en.js";

@@ -2,10 +2,9 @@
  * Mirrors: activemodel/lib/active_model/locale/en.yml.
  *
  * Rails appends this file to `I18n.load_path` from the `on_load(:i18n)` hook at
- * the bottom of `activemodel/lib/active_model.rb`. Translation-file loading is
- * not ported yet (story `i18n-backend-file-loading-localize`), so the data
- * lives here as a module and `i18n.ts` stores it into the backend directly —
- * the same shape `activesupport/src/locale/en.ts` uses.
+ * the bottom of `activemodel/lib/active_model.rb`. The data lives here as a
+ * module instead, and `i18n.ts` stores it into the backend directly — see the
+ * header there for why the load path can't carry it.
  */
 
 import type { TranslationData } from "@blazetrails/i18n";

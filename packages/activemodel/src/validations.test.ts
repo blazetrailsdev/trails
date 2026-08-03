@@ -2204,6 +2204,7 @@ describe("Errors enhancements", () => {
     class User extends Model {
       static {
         this.attribute("name", "string");
+        this.attribute("email", "string");
       }
     }
     const u = new User({});
@@ -2468,6 +2469,7 @@ describe("Errors#generateMessage", () => {
     class User extends Model {
       static {
         this.attribute("name", "string");
+        this.attribute("age", "integer");
       }
     }
     const u = new User({});

@@ -5,6 +5,11 @@ import { I18n } from "./i18n.js";
 /** The model instance that owns this error. Rails tests pass null for base-only errors. */
 type ModelBase = object | null;
 
+/** `ActiveModel::Validations#read_attribute_for_validation`, aliased to `send` in Rails. */
+interface ValidatableBase {
+  readAttributeForValidation(attribute: string): unknown;
+}
+
 /** Shape of a model class accessed for I18n/human-attribute lookups. */
 interface ModelClass {
   name?: string;
@@ -161,8 +166,15 @@ export class Error {
     }
 
     const baseClass = base?.constructor as ModelClass | undefined;
+    // error.rb:66. Rails aliases `read_attribute_for_validation` to `send`
+    // (validations.rb:436), so a base that does not define it — a plain object,
+    // which Ruby's base never is — is read as `send` would read it.
     const value =
-      base && attribute !== "base" ? (base as Record<string, unknown>)[attribute] : undefined;
+      attribute !== "base" && base != null
+        ? "readAttributeForValidation" in base
+          ? (base as ValidatableBase).readAttributeForValidation(attribute)
+          : (base as Record<string, unknown>)[attribute]
+        : undefined;
 
     options = {
       model: baseClass?.modelName?.human,

@@ -251,6 +251,9 @@ describe("ErrorTest", () => {
   it("generateMessage falls back to activemodel scope for non-activemodel i18nScope", () => {
     class ARModel extends Model {
       static i18nScope = "activerecord";
+      static {
+        this.attribute("name", "string");
+      }
     }
     const record = new ARModel({}) as any;
     const msg = ModelError.generateMessage("name", "blank", record);
@@ -289,7 +292,10 @@ describe("ErrorTest", () => {
     ModelError.i18nCustomizeFullMessage = true;
     class Person extends Model {}
     const e = new Errors(new Person({}));
-    e.add("items[0].name", "blank");
+    // A literal message: `generate_message` — and with it
+    // `read_attribute_for_validation`, which `send`s the attribute name — only
+    // runs for a Symbol type (error.rb:137), and `items[0].name` is no reader.
+    e.add("items[0].name", "can't be blank");
     const msg = e.fullMessages[0];
     expect(msg).toBe("Items name can't be blank");
     expect(msg).not.toContain("[0]");

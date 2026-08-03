@@ -3,11 +3,12 @@
  * `activemodel/lib/active_model.rb`, which appends Active Model's own `en`
  * locale to `I18n.load_path`.
  *
- * `load_path` is not read back yet — `Simple#initTranslations` only flips its
- * flag until the file loader lands (story
- * `i18n-backend-file-loading-localize`) — so the data goes into the backend
- * directly, exactly as `activesupport/src/i18n.ts` does. Move this to
- * `I18n.setLoadPath` when the loader lands.
+ * The load path is not used for it. `Simple#initTranslations` reads the path
+ * through the `FileReader` a host registers, and that read is async
+ * (`backend/simple.ts:116`), while these translations have to be in the backend
+ * by the time this module finishes importing — nothing awaits an import for a
+ * side effect. So the locale is a module and is stored directly, the shape
+ * `activesupport/src/i18n.ts` already uses.
  *
  * Importing `@blazetrails/activesupport`'s `I18n` (rather than
  * `@blazetrails/i18n` directly) mirrors `require "active_support/i18n"`: it
