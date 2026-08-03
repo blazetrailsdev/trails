@@ -315,28 +315,15 @@ export class JoinDependency {
     reflection.checkValidityBang?.();
     reflection.checkEagerLoadableBang?.();
 
-    // Every association registers its `_associations` entry and its reflection
-    // together (`Builder::Association#build`, the HABTM middle/public pair, and
-    // the HABTM join model), so a resolved reflection guarantees the entry.
-    const associations: any[] = modelClass._associations ?? [];
-    const assocDef = associations.find((a: any) => a.name === assocName)!;
-
     const sourceAlias = options?.fromAlias ?? this._baseAlias;
 
-    let isBelongsTo = false;
-    const assocType: "hasMany" | "hasOne" | "belongsTo" =
-      assocDef.type === "hasAndBelongsToMany" ? "hasMany" : assocDef.type;
-
-    if (assocDef.type === "belongsTo") {
-      // Rails raises for polymorphic eager loads — the join target table is
-      // not known statically (join_dependency.rb#build).
-      if (assocDef.options.polymorphic) {
-        throw new EagerLoadPolymorphicError(assocName);
-      }
-      isBelongsTo = true;
-    } else if (assocDef.options.through) {
+    // Rails raises for polymorphic eager loads — the join target table is not
+    // known statically (join_dependency.rb#build).
+    if (reflection.isPolymorphic?.()) {
+      throw new EagerLoadPolymorphicError(assocName);
+    }
+    if (reflection.isThroughReflection()) {
       return this._addThroughViaJoinAssociation(
-        assocDef,
         reflection,
         modelClass,
         sourceAlias,
@@ -344,9 +331,8 @@ export class JoinDependency {
       );
     }
 
-    // Rails resolves the join target off the reflection (`reflection.klass`),
-    // which honours `anonymous_class:` (the HABTM join model) and resolves a
-    // namespaced class name relative to the owner.
+    const assocType: "hasMany" | "hasOne" | "belongsTo" =
+      reflection.macro === "hasAndBelongsToMany" ? "hasMany" : reflection.macro;
     const targetModel: typeof Base = reflection.klass;
     const targetTable: string = (targetModel as any).tableName;
 
@@ -375,9 +361,6 @@ export class JoinDependency {
 
     const columns = getModelColumns(targetModel);
 
-    // The JOIN is built by the reflection-driven `JoinAssociation#joinConstraints`
-    // — the same path Rails takes — so a composite FK/PK gets its tuple ON clause
-    // from the reflection's join scope.
     const joinAssoc = new JoinAssociation(reflection);
     const joins = joinAssoc.joinConstraints(
       sourceArelTable,
@@ -1457,7 +1440,6 @@ export class JoinDependency {
   }
 
   private _addThroughViaJoinAssociation(
-    assocDef: any,
     reflection: any,
     modelClass: any,
     sourceAlias: string,
@@ -1524,7 +1506,7 @@ export class JoinDependency {
       parentModel: modelClass,
       parentTableName,
       chainTables: chainTables.map((c) => ({ tableName: c.tableName, model: c.model })),
-      targetImmediateName: assocDef.name,
+      targetImmediateName: reflection.name,
       nodes: new Array(chain.length),
       resolved: false,
     };
@@ -1540,8 +1522,8 @@ export class JoinDependency {
 
       if (isTarget) {
         const fullAssocName = parentAssocName
-          ? `${parentAssocName}.${assocDef.name}`
-          : assocDef.name;
+          ? `${parentAssocName}.${reflection.name}`
+          : reflection.name;
         const treePart = new JoinAssociation(reflection);
         treePart.tableIndex = entry.tableIndex;
         treePart.arelTable = entry.table;
@@ -1549,9 +1531,10 @@ export class JoinDependency {
         treePart.effectiveSqlName = entry.tableName;
         treePart.columns = columns;
         treePart.assocName = fullAssocName;
-        treePart.immediateAssocName = assocDef.name;
+        treePart.immediateAssocName = reflection.name;
         treePart.parentPath = parentAssocName ?? null;
-        treePart.assocType = assocDef.type === "hasAndBelongsToMany" ? "hasMany" : assocDef.type;
+        treePart.assocType =
+          reflection.macro === "hasAndBelongsToMany" ? "hasMany" : reflection.macro;
         treePart.arelJoin = arelJoin;
         treePart.nodeReflection = reflection;
         treePart.isThroughNode = false;
