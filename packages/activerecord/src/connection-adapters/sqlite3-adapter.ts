@@ -913,12 +913,20 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
    * Return the query execution plan.
    *
    * Runs through `internalExecQuery` (as Rails does) so the EXPLAIN
-   * itself is instrumented as a `sql.active_record` query. Binds are
-   * forwarded so a collected prepared-statement query with `?`
-   * placeholders EXPLAINs without SQLite complaining about missing
-   * parameter values. Options are accepted for
-   * signature parity with `Relation#explain` but ignored — SQLite
-   * has no equivalent to PG's `:analyze` / `:verbose` toggles.
+   * itself is instrumented as a `sql.active_record` query.
+   *
+   * Deviation: Rails hardcodes empty binds
+   * (`internal_exec_query(sql, "EXPLAIN", [])`,
+   * sqlite3/database_statements.rb:20) because `to_sql(arel, binds)` on an
+   * already-rendered String returns it with the `?` placeholders intact and
+   * the Ruby sqlite3 gem binds the missing parameters as NULL. better-sqlite3
+   * and node:sqlite instead raise `Too few parameter values were provided`, so
+   * the collected binds are forwarded rather than discarded. EXPLAIN QUERY PLAN
+   * does not evaluate the query, so the bound values never affect the plan.
+   *
+   * Options are accepted for signature parity with `Relation#explain` but
+   * ignored — SQLite has no equivalent to PG's `:analyze` / `:verbose`
+   * toggles.
    */
   async explain(
     sql: string,
@@ -927,7 +935,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   ): Promise<string> {
     const result = await this.internalExecQuery(`EXPLAIN QUERY PLAN ${sql}`, "EXPLAIN", binds);
     const printer = new ExplainPrettyPrinter();
-    return printer.pp(result.toArray());
+    return printer.pp(result);
   }
 
   /**
