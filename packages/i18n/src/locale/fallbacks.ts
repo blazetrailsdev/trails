@@ -62,9 +62,10 @@ export class Fallbacks extends Map<Locale, Locale[]> {
 
   constructor(...mappings: (Locale | Locale[] | FallbackMappings)[]) {
     super();
-    this.mapStore = {};
     const last = mappings[mappings.length - 1];
-    if (isMappings(last)) this.map(mappings.pop() as FallbackMappings);
+    if (typeof last === "object" && last !== null && !Array.isArray(last)) {
+      this.map(mappings.pop() as FallbackMappings);
+    }
     this.setDefaults(mappings.length === 0 ? [] : (mappings as (Locale | Locale[])[]));
   }
 
@@ -143,8 +144,4 @@ export class Fallbacks extends Map<Locale, Locale[]> {
     this.set(locale, value);
     return value;
   }
-}
-
-function isMappings(value: unknown): value is FallbackMappings {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

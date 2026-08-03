@@ -8,10 +8,14 @@
  * `fallbacks()` is a single module-level binding (see `fallbacks.ts`) and both
  * cases assert the single-threaded behaviour the rest of the file already
  * covers.
+ *
+ * `RegressionTestFor617` assigns a plain Ruby Hash as the fallbacks object,
+ * which quacks like one because it answers `[]`; a `Map` is the JS Hash, and
+ * its `get` is that `[]`.
  */
 
 import { beforeEach, describe, expect, it } from "vitest";
-import { Fallbacks, fallbacks, resetFallbacks, setFallbacks } from "./fallbacks.js";
+import { Fallbacks, fallbacks, setFallbacks } from "./fallbacks.js";
 import { Simple } from "./simple.js";
 import { config, exists, l, resetConfig, setLocale, t, type Locale } from "../i18n.js";
 import { resetClassConfig } from "../config.js";
@@ -63,7 +67,7 @@ class RubyTime extends RubyDate {
 function setup(): Backend {
   resetConfig();
   resetClassConfig();
-  resetFallbacks();
+  setFallbacks(null);
   config().enforceAvailableLocales = false;
   const backend = new Backend();
   config().backend = backend;
@@ -328,8 +332,6 @@ describe("RegressionTestFor617", () => {
   beforeEach(() => {
     backend = setup();
     config().enforceAvailableLocales = false;
-    // Ruby assigns a plain Hash, which answers `[]` and so quacks like a
-    // fallbacks object; a `Map` is the JS Hash, and its `get` is that `[]`.
     setFallbacks(
       new Map([
         ["en", ["en"]],
@@ -430,8 +432,6 @@ describe("I18nBackendOnFallbackHookTest", () => {
   class Backend extends Fallbacks(Simple) {
     fallbackCollector?: unknown[][];
 
-    // No `override`: the mixin keeps `onFallback` protected, as the gem keeps
-    // it private, so it is not part of the factory's declared return type.
     protected onFallback(...args: unknown[]): unknown {
       this.fallbackCollector ??= [];
       this.fallbackCollector.push(args);
@@ -444,7 +444,7 @@ describe("I18nBackendOnFallbackHookTest", () => {
   beforeEach(() => {
     resetConfig();
     resetClassConfig();
-    resetFallbacks();
+    setFallbacks(null);
     config().enforceAvailableLocales = false;
     backend = new Backend();
     config().backend = backend;

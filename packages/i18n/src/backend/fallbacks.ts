@@ -38,7 +38,7 @@ export interface FallbacksLike {
  * threads, so the module-level binding below is both, exactly as `I18n.config`
  * is in `i18n.ts`.
  */
-let fallbacksStore: FallbacksLike | undefined;
+let fallbacksStore: FallbacksLike | null | undefined;
 
 /** Returns the current fallbacks implementation. Defaults to `Locale::Fallbacks`. */
 export function fallbacks(): FallbacksLike {
@@ -50,26 +50,13 @@ export function fallbacks(): FallbacksLike {
  * Sets the current fallbacks implementation. Use this to set a different
  * fallbacks implementation.
  */
-export function setFallbacks(fallbacks: FallbacksLike | Locale[]): void {
+export function setFallbacks(fallbacks: FallbacksLike | Locale[] | null): void {
   fallbacksStore = Array.isArray(fallbacks) ? new LocaleFallbacks(...fallbacks) : fallbacks;
-}
-
-/** @internal Test seam — drops the process-wide fallbacks so a case starts clean. */
-export function resetFallbacks(): void {
-  fallbacksStore = undefined;
 }
 
 /** Ruby truthiness: only `nil` and `false` are falsy — `0` and `""` are not. */
 function truthy(value: unknown): boolean {
   return value !== undefined && value !== null && value !== false;
-}
-
-/**
- * Ruby's `options.fetch(:fallback, true)`, which hands back a stored `nil` or
- * `false` where `??` would substitute the default.
- */
-function fetchFallback(options: TranslateOptions): unknown {
-  return "fallback" in options ? options.fallback : true;
 }
 
 // TS requires exactly `any[]` here: a mixin base must be `new (...args: any[])`.
@@ -85,7 +72,7 @@ type BackendConstructor = abstract new (
  * `include`, which leaves every member of the including class in place.
  */
 export interface FallbacksMethods {
-  extractNonSymbolDefault(options: TranslateOptions): unknown;
+  extractNonSymbolDefaultBang(options: TranslateOptions): unknown;
 }
 
 export function Fallbacks<T extends BackendConstructor>(
@@ -107,15 +94,24 @@ export function Fallbacks<T extends BackendConstructor>(
      * The default option takes precedence over fallback locales only when
      * it's a Symbol. When the default contains a String, Proc or Hash
      * it is evaluated last after all the fallback locales have been tried.
+     *
+     * Ruby's `return result` inside `catch(:exception)` returns from this
+     * method, not from the block; the value therefore has to come back out of
+     * `catchException` and be told apart both from the thrown exception and
+     * from a nil result.
      */
     override translate(
       locale: Locale | null | undefined,
       key: TranslationKey | symbol | null | undefined,
       options: TranslateOptions = EMPTY_HASH,
     ): unknown {
-      if (!truthy(fetchFallback(options))) return super.translate(locale, key, options);
+      if (!truthy("fallback" in options ? options.fallback : true)) {
+        return super.translate(locale, key, options);
+      }
       if (truthy(options.fallbackInProgress)) return super.translate(locale, key, options);
-      const default_ = truthy(options.default) ? this.extractNonSymbolDefault(options) : undefined;
+      const default_ = truthy(options.default)
+        ? this.extractNonSymbolDefaultBang(options)
+        : undefined;
 
       const fallbackOptions = {
         ...options,
@@ -124,10 +120,6 @@ export function Fallbacks<T extends BackendConstructor>(
       };
       for (const fallback of fallbacks().get(locale as Locale)) {
         try {
-          // Ruby's `return result` returns from `translate`, not from the
-          // `catch(:exception)` block, so the value has to come back out of
-          // `catchException` and be told apart from the thrown exception and
-          // from a nil result.
           const result = catchException(() => {
             const result = super.translate(fallback, key, fallbackOptions);
             if (result != null) {
@@ -188,12 +180,13 @@ export function Fallbacks<T extends BackendConstructor>(
       return result instanceof MissingTranslation ? null : result;
     }
 
-    extractNonSymbolDefault(options: TranslateOptions): unknown {
+    /**
+     * A Ruby Symbol default is a real JS symbol here, which is what
+     * `Base#resolve` already dispatches on (base.rb:203); converging both onto
+     * the `":name"` spelling is story `i18n-symbol-values-are-colon-strings`.
+     */
+    extractNonSymbolDefaultBang(options: TranslateOptions): unknown {
       const defaults = [options.default].flat(Infinity as 1);
-      // A Ruby Symbol default is a real JS symbol here, which is what
-      // `Base#resolve` already dispatches on (base.rb:203); converging both
-      // onto the `":name"` spelling is story
-      // `i18n-symbol-values-are-colon-strings`.
       const firstNonSymbolDefault = defaults.find((default_) => typeof default_ !== "symbol");
       if (truthy(firstNonSymbolDefault)) {
         options.default = defaults.slice(0, defaults.indexOf(firstNonSymbolDefault));
@@ -206,7 +199,9 @@ export function Fallbacks<T extends BackendConstructor>(
       key: TranslationKey | symbol,
       options: TranslateOptions = EMPTY_HASH,
     ): boolean {
-      if (!truthy(fetchFallback(options))) return super.exists(locale, key, options);
+      if (!truthy("fallback" in options ? options.fallback : true)) {
+        return super.exists(locale, key, options);
+      }
       for (const fallback of fallbacks().get(locale)) {
         try {
           if (super.exists(fallback, key, options)) return true;

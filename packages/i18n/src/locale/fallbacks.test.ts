@@ -1,4 +1,10 @@
-/** Mirrors: i18n/test/locale/fallbacks_test.rb */
+/**
+ * Mirrors: i18n/test/locale/fallbacks_test.rb
+ *
+ * `#inspect` renders `self.class.name`, which in the gem carries Ruby's module
+ * nesting (`I18n::Locale::Fallbacks`); TypeScript has no nesting to render, so
+ * the constructor name is the whole name.
+ */
 
 import { beforeEach, describe, expect, it } from "vitest";
 import { Fallbacks } from "./fallbacks.js";
@@ -6,14 +12,15 @@ import { config, resetConfig, setDefaultLocale } from "../i18n.js";
 import { resetClassConfig } from "../config.js";
 import { Disabled } from "../exceptions.js";
 
+/** Mirrors: `I18n::TestCase#setup` (i18n/test/test_helper.rb:17-20). */
+function setup(): void {
+  resetConfig();
+  resetClassConfig();
+  config().enforceAvailableLocales = false;
+}
+
 describe("I18nFallbacksDefaultsTest", () => {
-  beforeEach(() => {
-    resetConfig();
-    resetClassConfig();
-    // Mirrors: `I18n.enforce_available_locales = false` in I18n::TestCase#setup
-    // (i18n/test/test_helper.rb:23).
-    config().enforceAvailableLocales = false;
-  });
+  beforeEach(setup);
 
   it("defaults to an empty array if no default has been set manually", () => {
     setDefaultLocale("en-US");
@@ -58,11 +65,7 @@ describe("I18nFallbacksComputationTest", () => {
   let fallbacks: Fallbacks;
 
   beforeEach(() => {
-    resetConfig();
-    resetClassConfig();
-    // Mirrors: `I18n.enforce_available_locales = false` in I18n::TestCase#setup
-    // (i18n/test/test_helper.rb:23).
-    config().enforceAvailableLocales = false;
+    setup();
     fallbacks = new Fallbacks("en-US");
   });
 
@@ -189,11 +192,7 @@ describe("I18nFallbacksHashCompatibilityTest", () => {
   let fallbacks: Fallbacks;
 
   beforeEach(() => {
-    resetConfig();
-    resetClassConfig();
-    // Mirrors: `I18n.enforce_available_locales = false` in I18n::TestCase#setup
-    // (i18n/test/test_helper.rb:23).
-    config().enforceAvailableLocales = false;
+    setup();
     fallbacks = new Fallbacks("en-US", { "de-AT": "de-DE" });
   });
 
@@ -209,9 +208,6 @@ describe("I18nFallbacksHashCompatibilityTest", () => {
     expect(new Fallbacks().empty()).toBe(true);
   });
 
-  // The gem renders `self.class.name`, which carries Ruby's module nesting
-  // (`I18n::Locale::Fallbacks`); TypeScript has no nesting to render, so the
-  // constructor name is the whole name.
   it("#inspect", () => {
     expect(fallbacks.inspect()).toBe(
       `#<Fallbacks @map={:"de-AT"=>[:"de-DE"]} @defaults=[:"en-US", :en]>`,

@@ -63,7 +63,7 @@ export type { Locale, TranslateKey, TranslationKey } from "./i18n.js";
 export { Base, registerFileReader, preloadTranslationFiles } from "./backend/base.js";
 export type { FileReader, TranslateOptions } from "./backend/base.js";
 export { Simple } from "./backend/simple.js";
-export { Fallbacks, fallbacks, setFallbacks, resetFallbacks } from "./backend/fallbacks.js";
+export { Fallbacks, fallbacks, setFallbacks } from "./backend/fallbacks.js";
 export type { FallbacksLike, FallbacksMethods } from "./backend/fallbacks.js";
 // `I18n::Locale::Fallbacks` and `I18n::Backend::Fallbacks` are two classes of
 // the same name; this barrel is flat, and the `Locale` namespace spelling is
