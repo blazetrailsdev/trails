@@ -18,7 +18,7 @@ export function inspect(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(inspect).join(", ")}]`;
   if (typeof value === "object") {
     const pairs = Object.entries(value as Record<string, unknown>).map(
-      ([k, v]) => `${k}: ${inspect(v)}`,
+      ([k, v]) => `${inspectSymbol(k)}=>${inspect(v)}`,
     );
     return `{${pairs.join(", ")}}`;
   }

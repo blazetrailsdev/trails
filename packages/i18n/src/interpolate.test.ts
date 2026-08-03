@@ -105,7 +105,7 @@ describe("I18nMissingInterpolationCustomHandlerTest", () => {
 
   it("String interpolation can use custom missing interpolation handler", () => {
     expect(I18n.interpolate("%{first} %{last}", { first: "Masao" })).toBe(
-      `Masao missing key is last, values are ${inspect({ first: "Masao" })}, given string is '%{first} %{last}'`,
+      `Masao missing key is last, values are {:first=>"Masao"}, given string is '%{first} %{last}'`,
     );
   });
 });
