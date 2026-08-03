@@ -64,10 +64,7 @@ export class HasOne extends SingularAssociation {
         // error surfaces as a rejected Promise instead, an unavoidable
         // consequence of awaiting `load_target` in JS (Rails' `replace` is
         // fully synchronous, so it raises inline regardless of persistence).
-        if (
-          typeof assoc.needsTargetLoadForBuild === "function" &&
-          assoc.needsTargetLoadForBuild()
-        ) {
+        if (typeof assoc.findTargetNeeded === "function" && assoc.findTargetNeeded()) {
           // `loadTargetForBuild` caches the direct-FK target for a plain
           // has_one, but a has_one_through overrides it to load the *through*
           // proxy — Rails' has_one_through `replace` runs no

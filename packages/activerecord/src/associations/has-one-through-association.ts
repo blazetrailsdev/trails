@@ -80,7 +80,7 @@ export class HasOneThroughAssociation extends HasOneAssociation {
    * `HasOneAssociation` loads its own target for `build#{name}`, which for a
    * through would issue a `clubs` SELECT Rails never runs while skipping the
    * `memberships` SELECT it does. Override so the `build#{name}` accessor's
-   * pre-build load (gated by the inherited `needsTargetLoadForBuild`) reads
+   * pre-build load (gated by Rails' `find_target?`, `findTargetNeeded`) reads
    * the through proxy, then `constructThroughRecordInMemory` reconciles
    * against the now-loaded join row (update-existing / build-when-absent),
    * exactly as Rails' `create_through_record` does.
@@ -96,7 +96,7 @@ export class HasOneThroughAssociation extends HasOneAssociation {
    *
    * @internal
    */
-  override loadTargetForBuild(): Promise<unknown> {
+  protected override loadTargetForBuild(): Promise<unknown> {
     const throughProxy = throughAssociation(this) as {
       loadTarget?: () => unknown;
     } | null;
@@ -123,7 +123,7 @@ export class HasOneThroughAssociation extends HasOneAssociation {
    *
    * @internal
    */
-  override async detachDisplacedTarget(): Promise<void> {
+  protected override async detachDisplacedTarget(): Promise<void> {
     // no-op — see JSDoc
   }
 
@@ -190,7 +190,9 @@ export class HasOneThroughAssociation extends HasOneAssociation {
    * from `create_through_record` (:15-19), which our `build#{name}` accessor
    * drives via `loadTargetForBuild`. Building through `association(name).build`
    * must not issue that join-model SELECT here, so return null and keep the
-   * synchronous return the through builders expect.
+   * synchronous return the through builders expect — Rails'
+   * `association(:club).build` is synchronous
+   * (has_one_through_associations_test.rb:60-70).
    *
    * @internal
    */
