@@ -40,8 +40,15 @@ export class HasOneAssociation extends SingularAssociation {
    *   name the awaitable replacement (`await owner.set#{Name}(x)`). See RFC
    *   0068-awaitable-has-one-setter ("Why 'loud' beats 'deferred'") for the
    *   ergonomic-tradeoff decision to deviate loudly from Rails' legal syntax.
+   *
+   * `protected`: the generated `#{name}=` property setter (builder/has-one.ts
+   * `defineWriters`) is the sole caller, and it reaches the association through
+   * a structural handle rather than the class type. The Rails-named surface is
+   * `writer` / `set#{Name}`.
+   *
+   * @internal
    */
-  syncWrite(record: Base | null): void {
+  protected syncWrite(record: Base | null): void {
     // Rails' `replace` raises a class mismatch as its very first statement
     // (has_one_association.rb:59-60), before any load/removal/persist — and so
     // before the persisted-owner deviation below. That guard is synchronous, so
@@ -350,32 +357,41 @@ export class HasOneAssociation extends SingularAssociation {
    * `load_target` — mirrors `HasOneAssociation#set_new_record` →
    * `replace(record, false)`, whose leading `load_target`
    * (has_one_association.rb:59) materializes the current target before the
-   * freshly-built record displaces it. The sync `build` / nested-attributes
-   * paths can't await, so the awaitable accessor (builder/has-one.ts) consults
-   * this and issues the SELECT only when a query would actually run
-   * (`find_target?`): a persisted / FK-present owner whose target isn't loaded.
-   * `findTargetNeeded()` already returns false when the target is loaded
-   * (association.ts, `if (this.loaded) return false`), so it is the whole gate.
+   * freshly-built record displaces it. Both drivers of that load consult this
+   * gate — `SingularAssociation#build` via `loadDisplacedForBuild`, and the
+   * generated `build#{name}` accessor (builder/has-one.ts) — so the SELECT
+   * runs exactly when Rails' `find_target?` would: a persisted / FK-present
+   * owner whose target isn't loaded. `findTargetNeeded()` already returns
+   * false when the target is loaded (association.ts, `if (this.loaded) return
+   * false`), so it is the whole gate.
+   *
+   * `protected` because it is association-internal bookkeeping, not API
+   * surface. The generated accessor lives outside the class hierarchy and
+   * reaches it through its duck-typed handle.
    *
    * @internal
    */
-  needsTargetLoadForBuild(): boolean {
+  protected needsTargetLoadForBuild(): boolean {
     return this.findTargetNeeded();
   }
 
   /**
-   * The load the `build#{name}` accessor awaits before constructing the new
-   * record. A direct-FK has_one loads its own target — Rails'
-   * `set_new_record` → `replace(record, false)` runs `load_target`
+   * The load run before the new record is constructed, gated by
+   * `needsTargetLoadForBuild`. A direct-FK has_one loads its own target —
+   * Rails' `set_new_record` → `replace(record, false)` runs `load_target`
    * (has_one_association.rb:59). A has_one_through overrides this: Rails'
    * `HasOneThroughAssociation#replace` has NO `load_target`; its
    * `create_through_record` loads the *through* proxy instead
    * (has_one_through_association.rb:15-19), so the through must issue the
    * join-model SELECT here, never a target SELECT.
    *
+   * `protected`: association-internal bookkeeping, not API surface. The
+   * generated `build#{name}` accessor reaches it through its duck-typed
+   * handle, as it does `needsTargetLoadForBuild`.
+   *
    * @internal
    */
-  loadTargetForBuild(): Promise<unknown> {
+  protected loadTargetForBuild(): Promise<unknown> {
     return this.loadTarget();
   }
 
@@ -502,9 +518,15 @@ export class HasOneAssociation extends SingularAssociation {
    * record destroyed and freezes it when the row does not exist
    * (persistence.rb:439-444). Let `removeTargetBang`'s arms make that call.
    *
+   * `protected` because this is association-internal bookkeeping, not API
+   * surface — Rails' `remove_target!` is private too. The nested-attributes
+   * writer lives outside the class hierarchy and reaches it through its
+   * duck-typed `OneToOneAssociation` handle, exactly as it does the sibling
+   * `prepareDetachDisplacedForSyncBuild`.
+   *
    * @internal
    */
-  async detachDisplacedTarget(): Promise<void> {
+  protected async detachDisplacedTarget(): Promise<void> {
     const displaced = this.target;
     if (!displaced) return;
     if ((displaced as { isDestroyed?: () => boolean }).isDestroyed?.()) return;

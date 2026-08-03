@@ -86,7 +86,7 @@ export class HasOneThroughAssociation extends HasOneAssociation {
    *
    * @internal
    */
-  override loadTargetForBuild(): Promise<unknown> {
+  protected override loadTargetForBuild(): Promise<unknown> {
     const throughProxy = throughAssociation(this) as {
       loadTarget?: () => unknown;
     } | null;
@@ -106,7 +106,7 @@ export class HasOneThroughAssociation extends HasOneAssociation {
    *
    * @internal
    */
-  override async detachDisplacedTarget(): Promise<void> {
+  protected override async detachDisplacedTarget(): Promise<void> {
     // no-op — see JSDoc
   }
 
@@ -173,7 +173,9 @@ export class HasOneThroughAssociation extends HasOneAssociation {
    * from `create_through_record` (:15-19), which our `build#{name}` accessor
    * drives via `loadTargetForBuild`. Building through `association(name).build`
    * must not issue that join-model SELECT here, so return null and keep the
-   * synchronous return the through builders expect.
+   * synchronous return the through builders expect — Rails'
+   * `association(:club).build` is synchronous
+   * (has_one_through_associations_test.rb:60-70).
    *
    * @internal
    */
