@@ -74,20 +74,15 @@ describe("Relation on an aliased table", () => {
       new RegExp(`SELECT DISTINCT ${escapeRegExp(`${aliasQ}.${idQ}`)}`),
       undefined,
       false,
-      // The outer eager-load query still projects the JoinDependency's columns
-      // off the model's own arel_table (`"posts"."id" AS t0_r0`, a separate
-      // divergence outside this file's scope), so it errors on an aliased
-      // relation. The materialization query under test runs first; swallow the
-      // outer failure.
-      () =>
-        aliased()
-          .eagerLoad("comments")
-          .limit(1)
-          .toArray()
-          .then(
-            () => {},
-            () => {},
-          ),
+      async () => {
+        await aliased().eagerLoad("comments").limit(1);
+      },
     );
+  });
+
+  it("projects the eager load's base columns off the alias", async () => {
+    const posts = await aliased().eagerLoad("comments").limit(1);
+    expect(posts.length).toBe(1);
+    expect(posts[0].id).toBeDefined();
   });
 });
