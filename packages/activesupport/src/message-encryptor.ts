@@ -28,8 +28,23 @@ interface MessageEncryptorOptions extends RotatableOptions {
   forceLegacyMetadataSerializer?: boolean;
 }
 
+const AUTH_TAG_LENGTH = 16;
+const SEPARATOR = "--";
+
 export class MessageEncryptor extends Codec {
   static override defaultSerializer: Format | MessageSerializer = "json";
+
+  static useAuthenticatedMessageEncryption = false;
+
+  static defaultCipher(): string {
+    return this.useAuthenticatedMessageEncryption ? "aes-256-gcm" : "aes-256-cbc";
+  }
+
+  /** Given a cipher, returns the key length of the cipher in bytes. */
+  static keyLen(cipher: string = this.defaultCipher()): number {
+    const match = cipher.match(/(\d+)/);
+    return match ? parseInt(match[1], 10) / 8 : 32;
+  }
 
   declare rotate: (...args: unknown[]) => this;
   declare onRotation: (callback: OnRotation) => this;
@@ -39,6 +54,9 @@ export class MessageEncryptor extends Codec {
   private signSecret: Buffer;
   private cipher: string;
   private digest: string;
+  private aeadMode: boolean;
+  private memoLengthOfEncodedIv?: number;
+  private memoLengthOfEncodedAuthTag?: number;
 
   constructor(
     secret: string | Buffer,
@@ -65,7 +83,8 @@ export class MessageEncryptor extends Codec {
       forceLegacyMetadataSerializer: opts.forceLegacyMetadataSerializer,
     });
 
-    this.cipher = opts.cipher ?? "aes-256-cbc";
+    this.cipher = opts.cipher ?? (this.constructor as typeof MessageEncryptor).defaultCipher();
+    this.aeadMode = this.newCipher().authenticated;
     this.digest = opts.digest ?? "sha1";
 
     this.secret = typeof secret === "string" ? Buffer.from(secret) : secret;
@@ -97,7 +116,8 @@ export class MessageEncryptor extends Codec {
 
   createMessage(value: unknown, options: MetadataOptions = {}): string {
     const encrypted = this.encrypt(this.serializeWithMetadata(value, options));
-    return `${encrypted}--${this.sign(encrypted)}`;
+    if (this.aeadMode) return encrypted;
+    return `${encrypted}${SEPARATOR}${this.sign(encrypted)}`;
   }
 
   readMessage(message: string, options: ExpectedMetadataOptions = {}): unknown {
@@ -105,60 +125,57 @@ export class MessageEncryptor extends Codec {
       throw new Thrown("invalid_message_format", "invalid message string");
     }
 
-    const lastDash = message.lastIndexOf("--");
-    if (lastDash === -1) {
-      throw new Thrown("invalid_message_format", "missing message digest");
-    }
+    let encrypted = message;
 
-    const encrypted = message.slice(0, lastDash);
-    const signature = message.slice(lastDash + 2);
+    if (!this.aeadMode) {
+      const lastDash = message.lastIndexOf(SEPARATOR);
+      if (lastDash === -1) {
+        throw new Thrown("invalid_message_format", "missing message digest");
+      }
 
-    if (!this.verify(encrypted, signature)) {
-      throw new Thrown("invalid_message_format", "mismatched digest");
+      encrypted = message.slice(0, lastDash);
+      const signature = message.slice(lastDash + SEPARATOR.length);
+
+      if (!this.verify(encrypted, signature)) {
+        throw new Thrown("invalid_message_format", "mismatched digest");
+      }
     }
 
     return this.deserializeWithMetadata(this.decrypt(encrypted), options);
   }
 
-  private encrypt(plaintext: string): string {
-    const keyLength = this.keyLength();
-    const key = this.secret.slice(0, keyLength);
-    const ivLength = this.ivLength();
-    const iv = getCrypto().randomBytes(ivLength);
+  private encrypt(data: string): string {
+    const spec = this.newCipher();
+    const key = this.secret.slice(0, spec.keyLen);
+    const iv = getCrypto().randomBytes(spec.ivLen);
 
     const cipher = getCrypto().createCipheriv(this.cipher, key, iv);
-    const encrypted = Buffer.concat([cipher.update(plaintext, "latin1"), cipher.final()]);
+    if (this.aeadMode) cipher.setAAD?.(Buffer.alloc(0));
 
-    const encryptedB64 = this.encode(encrypted);
-    const ivB64 = this.encode(iv);
+    const encryptedData = Buffer.concat([cipher.update(data, "latin1"), cipher.final()]);
 
-    return `${encryptedB64}--${ivB64}`;
+    const parts = [encryptedData, iv];
+    if (this.aeadMode) parts.push(cipher.getAuthTag!());
+
+    return this.joinParts(parts);
   }
 
-  private decrypt(encrypted: string): string {
-    const parts = encrypted.split("--");
-    if (parts.length !== 2) {
-      throw new Thrown("invalid_message_format", "invalid message format");
+  private decrypt(encryptedMessage: string): string {
+    const [encryptedData, iv, authTag] = this.extractParts(encryptedMessage);
+
+    if (this.aeadMode && authTag.length !== AUTH_TAG_LENGTH) {
+      throw new Thrown("invalid_message_format", "truncated auth_tag");
     }
 
-    const [encryptedB64, ivB64] = parts;
-
-    if (!encryptedB64 || !ivB64) {
-      throw new Thrown("invalid_message_format", "invalid message format");
-    }
-
-    const encryptedBuf = this.decode(encryptedB64);
-    const iv = this.decode(ivB64);
-
-    const keyLength = this.keyLength();
-    const key = this.secret.slice(0, keyLength);
+    const key = this.secret.slice(0, this.newCipher().keyLen);
 
     try {
       const decipher = getCrypto().createDecipheriv(this.cipher, key, iv);
-      const decrypted = Buffer.concat([decipher.update(encryptedBuf), decipher.final()]);
-      return decrypted.toString("latin1");
-    } catch {
-      throw new Thrown("invalid_message_format", "decryption failed");
+      if (this.aeadMode) decipher.setAuthTag?.(authTag);
+      const decryptedData = Buffer.concat([decipher.update(encryptedData), decipher.final()]);
+      return decryptedData.toString("latin1");
+    } catch (error) {
+      throw new Thrown("invalid_message_format", error);
     }
   }
 
@@ -178,16 +195,63 @@ export class MessageEncryptor extends Codec {
     }
   }
 
-  private keyLength(): number {
-    const match = this.cipher.match(/(\d+)/);
-    if (match) return parseInt(match[1], 10) / 8;
-    return 32;
+  private lengthAfterEncode(lengthBeforeEncode: number): number {
+    if (this.urlSafe) {
+      return Math.ceil((4 * lengthBeforeEncode) / 3);
+    } else {
+      return 4 * Math.ceil(lengthBeforeEncode / 3);
+    }
   }
 
-  private ivLength(): number {
-    const name = this.cipher.toLowerCase();
-    if (name.includes("gcm") || name.includes("ccm")) return 12;
-    return 16;
+  private lengthOfEncodedIv(): number {
+    this.memoLengthOfEncodedIv ??= this.lengthAfterEncode(this.newCipher().ivLen);
+    return this.memoLengthOfEncodedIv;
+  }
+
+  private lengthOfEncodedAuthTag(): number {
+    this.memoLengthOfEncodedAuthTag ??= this.lengthAfterEncode(AUTH_TAG_LENGTH);
+    return this.memoLengthOfEncodedAuthTag;
+  }
+
+  private joinParts(parts: Buffer[]): string {
+    return parts.map((part) => this.encode(part)).join(SEPARATOR);
+  }
+
+  private extractPart(encryptedMessage: string, rindex: number, length: number): string {
+    const index = rindex - length;
+
+    if (encryptedMessage.slice(index - SEPARATOR.length, index) === SEPARATOR) {
+      return encryptedMessage.slice(index, index + length);
+    } else {
+      throw new Thrown("invalid_message_format", "missing separator");
+    }
+  }
+
+  private extractParts(encryptedMessage: string): Buffer[] {
+    const parts: string[] = [];
+    let rindex = encryptedMessage.length;
+
+    if (this.aeadMode) {
+      parts.push(this.extractPart(encryptedMessage, rindex, this.lengthOfEncodedAuthTag()));
+      rindex -= SEPARATOR.length + this.lengthOfEncodedAuthTag();
+    }
+
+    parts.push(this.extractPart(encryptedMessage, rindex, this.lengthOfEncodedIv()));
+    rindex -= SEPARATOR.length + this.lengthOfEncodedIv();
+
+    parts.push(encryptedMessage.slice(0, rindex));
+
+    return parts.reverse().map((part) => this.decode(part));
+  }
+
+  /**
+   * Stands in for Ruby's `OpenSSL::Cipher.new(@cipher)`, which trails has no
+   * analogue for. Reports only the three properties Rails reads off it.
+   */
+  private newCipher(): { keyLen: number; ivLen: number; authenticated: boolean } {
+    const ctor = this.constructor as typeof MessageEncryptor;
+    const authenticated = /gcm|ccm/i.test(this.cipher);
+    return { keyLen: ctor.keyLen(this.cipher), ivLen: authenticated ? 12 : 16, authenticated };
   }
 }
 

@@ -2,9 +2,9 @@
   {
     "package": "activesupport",
     "tsFile": "message-encryptor.ts",
-    "rubyName": "initialize",
+    "rubyName": "key_len",
     "call": "new",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Rails' key_len is `OpenSSL::Cipher.new(cipher).key_len`; trails has no OpenSSL::Cipher binding, so keyLen derives the byte length from the cipher name instead of instantiating a cipher."
   },
   {
     "package": "activesupport",

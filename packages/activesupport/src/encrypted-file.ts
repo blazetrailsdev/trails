@@ -12,9 +12,11 @@
  *
  * - **Async API.** Rails is sync; the async surface is required for
  *   trailties' "async fs only" rule and for browser hosts without sync fs.
- * - **Default cipher = `aes-256-cbc`.** Rails uses `aes-128-gcm`. Our
- *   `MessageEncryptor` does not yet handle GCM auth tags; cipher will flip
- *   to `aes-128-gcm` in a follow-up that lands GCM support there.
+ * - **Default cipher = `aes-256-cbc`.** Rails uses `aes-128-gcm`.
+ *   `MessageEncryptor` handles GCM auth tags now, so the remaining blocker is
+ *   the migration: the cipher sets the key length, so flipping it invalidates
+ *   every existing key file. Story
+ *   `converge-encrypted-file-cipher-to-aes-128-gcm` (RFC 0072).
  * - **Default serializer = `NullSerializer`** (raw string in/out). Rails
  *   uses `Marshal`; we have no Marshal port. The higher-level
  *   `EncryptedConfiguration` parses contents itself.
@@ -27,9 +29,6 @@ import { MessageEncryptor, NullSerializer } from "./message-encryptor.js";
 import { env as processEnv } from "./process-adapter.js";
 
 const CIPHER = "aes-256-cbc";
-// Bytes of key material consumed by CIPHER. expectedKeyLength() reports the
-// hex-encoded length (2 chars per byte), matching Rails' generate_key.length.
-const KEY_BYTES = 32;
 
 export class MissingContentError extends Error {
   constructor(contentPath: string) {
@@ -64,6 +63,8 @@ export interface EncryptedFileOptions {
 }
 
 export class EncryptedFile {
+  private static memoExpectedKeyLength?: number;
+
   readonly contentPath: string;
   readonly keyPath: string;
   readonly envKey: string;
@@ -82,15 +83,15 @@ export class EncryptedFile {
   }
 
   static generateKey(): string {
-    // Rails: SecureRandom.hex(MessageEncryptor.key_len(CIPHER)).
-    // Sourced from cryptoAdapter so we never fall back to non-cryptographic
-    // randomness. In Node the adapter auto-registers synchronously; browser
-    // hosts must register a webcrypto adapter before calling generateKey().
-    return Buffer.from(getCrypto().randomBytes(KEY_BYTES)).toString("hex");
+    // Randomness is sourced from cryptoAdapter so we never fall back to a
+    // non-cryptographic RNG. In Node the adapter auto-registers synchronously;
+    // browser hosts must register a webcrypto adapter first.
+    return Buffer.from(getCrypto().randomBytes(MessageEncryptor.keyLen(CIPHER))).toString("hex");
   }
 
   static expectedKeyLength(): number {
-    return KEY_BYTES * 2;
+    this.memoExpectedKeyLength ??= this.generateKey().length;
+    return this.memoExpectedKeyLength;
   }
 
   async key(): Promise<string | null> {
