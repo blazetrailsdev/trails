@@ -9,6 +9,12 @@
  * module itself; this self-import is that receiver. A Symbol handler therefore
  * names an export of this module, which is what `I18n.custom_exception_handler`
  * is in the gem (i18n.rb:415-416).
+ *
+ * A Ruby module is open and a module namespace object is not: ECMA-262 makes it
+ * a non-extensible exotic object, so a handler method installed after load —
+ * Ruby's `module I18n; def self.custom_exception_handler` reopening, or mocha's
+ * `I18n.expects` — has no representable form outside a test transform. Every
+ * handler that names a real export dispatches exactly as the gem's does.
  */
 import * as I18n from "./i18n.js";
 import type { Backend, ExceptionHandlerLike } from "./config.js";

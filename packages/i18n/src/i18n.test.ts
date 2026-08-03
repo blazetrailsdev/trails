@@ -45,9 +45,9 @@ describe("I18nTest", () => {
 
   /**
    * Mocha's `I18n.expects(:custom_exception_handler)`: defines the method on
-   * `I18n` for the duration of the test. Vitest's module namespace is
-   * extensible, so the method installs on the same object `handleException`
-   * sends to.
+   * `I18n` for the duration of the test. A native module namespace is
+   * non-extensible; Vitest's transformed one is not, so the method installs on
+   * the same object `handleException` sends to.
    */
   function expectsCustomExceptionHandler(): ReturnType<typeof vi.fn> {
     const customExceptionHandler = vi.fn();
