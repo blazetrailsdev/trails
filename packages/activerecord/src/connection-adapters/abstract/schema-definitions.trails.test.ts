@@ -57,6 +57,7 @@ describe("CheckConstraintDefinition#export_name_on_schema_dump?", () => {
 describe("TableDefinition#remove_column", () => {
   const td = (): TableDefinition => {
     const t = new TableDefinition("astronauts", { adapter: schemaConn("sqlite") });
+    t.setPrimaryKey("astronauts", true);
     t.string("name");
     t.integer("rocket_id");
     return t;
@@ -169,7 +170,7 @@ describe("ReferenceDefinition#foreign_table_name", () => {
   it("targets the singular table when Base.pluralizeTableNames is false", () => {
     Base.pluralizeTableNames = false;
     const ref = new ReferenceDefinition("user", { foreignKey: true, index: false });
-    const td = new TableDefinition("posts", { adapter: schemaConn("sqlite"), id: false });
+    const td = new TableDefinition("posts", { adapter: schemaConn("sqlite") });
     ref.addTo(td);
     expect(td.foreignKeys[0].toTable).toBe("user");
   });
@@ -180,7 +181,7 @@ describe("ReferenceDefinition#foreign_table_name", () => {
       foreignKey: { toTable: "accounts" },
       index: false,
     });
-    const td = new TableDefinition("posts", { adapter: schemaConn("sqlite"), id: false });
+    const td = new TableDefinition("posts", { adapter: schemaConn("sqlite") });
     ref.addTo(td);
     expect(td.foreignKeys[0].toTable).toBe("accounts");
   });
@@ -188,7 +189,7 @@ describe("ReferenceDefinition#foreign_table_name", () => {
 
 describe("TableDefinition column methods", () => {
   it("defines one column per name, mirroring `names.each` in define_column_methods", () => {
-    const td = new TableDefinition("posts", { adapter: schemaConn("sqlite"), id: false });
+    const td = new TableDefinition("posts", { adapter: schemaConn("sqlite") });
     td.string("goat", "sheep", { limit: 40 });
 
     expect(td.columns.map((c) => c.name)).toEqual(["goat", "sheep"]);
@@ -196,14 +197,14 @@ describe("TableDefinition column methods", () => {
   });
 
   it("defines a single column when no options are passed", () => {
-    const td = new TableDefinition("posts", { adapter: schemaConn("sqlite"), id: false });
+    const td = new TableDefinition("posts", { adapter: schemaConn("sqlite") });
     td.integer("votes");
 
     expect(td.columns.map((c) => c.name)).toEqual(["votes"]);
   });
 
   it("raises when called with no column name", () => {
-    const td = new TableDefinition("posts", { adapter: schemaConn("sqlite"), id: false });
+    const td = new TableDefinition("posts", { adapter: schemaConn("sqlite") });
 
     expect(() => (td.timestamp as () => unknown)()).toThrow("Missing column name(s) for timestamp");
     expect(() => (td.string as (o: object) => unknown)({ limit: 40 })).toThrow(
@@ -214,7 +215,7 @@ describe("TableDefinition column methods", () => {
 
 describe("ColumnMethods#primary_key", () => {
   it("merges primary_key: true and honours the type argument on create_table", () => {
-    const td = new TableDefinition("posts", { adapter: schemaConn("sqlite"), id: false });
+    const td = new TableDefinition("posts", { adapter: schemaConn("sqlite") });
     td.primaryKey("id", "uuid", { default: "gen_random_uuid()" });
 
     expect(td.columns.map((c) => c.name)).toEqual(["id"]);
@@ -224,7 +225,7 @@ describe("ColumnMethods#primary_key", () => {
   });
 
   it("defaults the type to primary_key", () => {
-    const td = new TableDefinition("posts", { adapter: schemaConn("sqlite"), id: false });
+    const td = new TableDefinition("posts", { adapter: schemaConn("sqlite") });
     td.primaryKey("id");
 
     expect(td.columns[0].type).toBe("primary_key");

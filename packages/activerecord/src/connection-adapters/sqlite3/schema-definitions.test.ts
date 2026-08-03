@@ -12,7 +12,7 @@ describe("SQLite3::TableDefinition", () => {
   });
 
   it("returns primary_key for integer primary key columns (integerLikePrimaryKeyType)", () => {
-    const td = new TableDefinition("orders", { adapter: schemaConn("sqlite"), id: false });
+    const td = new TableDefinition("orders", { adapter: schemaConn("sqlite") });
     td.column("order_id", "integer", { primaryKey: true });
     expect(td.columns.find((c) => c.name === "order_id")!.type).toBe("primary_key");
   });
@@ -31,7 +31,7 @@ describe("SQLite3::TableDefinition", () => {
   });
 
   it("drops the type for a virtual column with no type option (Rails no-fallback)", async () => {
-    const td = new TableDefinition("articles", { adapter: schemaConn("sqlite"), id: false });
+    const td = new TableDefinition("articles", { adapter: schemaConn("sqlite") });
     td.column("full_name", "virtual" as any, { as: "a || b" } as any);
     const col = td.columns.find((c) => c.name === "full_name")!;
     expect(col.type).toBeUndefined();
@@ -42,7 +42,7 @@ describe("SQLite3::TableDefinition", () => {
   });
 
   it("emits GENERATED ALWAYS AS ... STORED via visitor", async () => {
-    const td = new TableDefinition("items", { adapter: schemaConn("sqlite"), id: false });
+    const td = new TableDefinition("items", { adapter: schemaConn("sqlite") });
     td.column("x", "integer");
     td.column("expr", "integer", { as: "x + 1", stored: true } as any);
     const sql = await new SchemaCreation("sqlite", (td as any)._adapter).accept(td);

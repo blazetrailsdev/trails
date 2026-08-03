@@ -1488,13 +1488,11 @@ export class SchemaStatements {
 
     const ctdOptions = {
       ...tdOptions,
-      ...pkOptions,
-      id,
-      primaryKey,
       adapterName: this.adapterName,
       adapter: this,
     };
     const tableDefinition = this.createTableDefinition(tableName, ctdOptions);
+    tableDefinition.setPrimaryKey(tableName, id, primaryKey, pkOptions);
 
     if (fn) fn(tableDefinition);
 
@@ -1955,16 +1953,7 @@ export class SchemaStatements {
   }
 
   validTableDefinitionOptions(): string[] {
-    return [
-      "temporary",
-      "ifNotExists",
-      "options",
-      "as",
-      "comment",
-      "charset",
-      "collation",
-      "primaryKey",
-    ];
+    return ["temporary", "ifNotExists", "options", "as", "comment", "charset", "collation"];
   }
 
   validColumnDefinitionOptions(): string[] {

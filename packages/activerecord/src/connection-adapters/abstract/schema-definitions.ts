@@ -988,8 +988,6 @@ export class TableDefinition {
   constructor(
     tableName: string,
     tdOptions: {
-      id?: boolean | ColumnType | IdHashOptions;
-      primaryKey?: string | string[] | false;
       adapterName?: "sqlite" | "postgres" | "mysql";
       adapter: SchemaQuoter;
       temporary?: boolean;
@@ -999,34 +997,16 @@ export class TableDefinition {
       comment?: string;
       charset?: string;
       collation?: string;
-      default?: unknown;
-      autoIncrement?: boolean;
-      limit?: number;
-      precision?: number;
-      unsigned?: boolean;
     },
   ) {
     this.tableName = tableName;
     this._adapterName = tdOptions.adapterName ?? "sqlite";
     this._adapter = tdOptions.adapter;
-    if (Array.isArray(tdOptions.primaryKey) && tdOptions.primaryKey.length === 0) {
-      throw new ArgumentError("primaryKey array must not be empty");
-    }
     this.temporary = tdOptions.temporary ?? false;
     this.ifNotExists = tdOptions.ifNotExists ?? false;
     this.as = tdOptions.as;
     this.options = tdOptions.options;
     this.comment = tdOptions.comment;
-    // Rails calls set_primary_key from build_create_table_definition
-    // (schema_statements.rb:335) rather than the constructor, because its
-    // TableDefinition#initialize takes no id/primary_key. trails' callers build
-    // definitions directly, so the single invocation lives here instead — the
-    // primary-key options travel alongside id/primaryKey in the same hash.
-    const pkOptions: Record<string, unknown> = {};
-    for (const key of ["limit", "default", "precision", "unsigned", "autoIncrement"] as const) {
-      if (tdOptions[key] !== undefined) pkOptions[key] = tdOptions[key];
-    }
-    this.setPrimaryKey(tableName, tdOptions.id ?? true, tdOptions.primaryKey, pkOptions);
   }
 
   setPrimaryKey(
@@ -1849,11 +1829,12 @@ export class Table {
 
   /** @internal */
   protected raiseOnIfExistOptions(options: Record<string, unknown>): void {
-    const key =
-      "ifExists" in options ? "ifExists" : "ifNotExists" in options ? "ifNotExists" : null;
-    if (key) {
-      const conditional = key === "ifExists" ? "if" : "unless";
-      const railsKey = key === "ifExists" ? "if_exists" : "if_not_exists";
+    const unrecognizedOption = Object.keys(options).find(
+      (key) => key === "ifExists" || key === "ifNotExists",
+    );
+    if (unrecognizedOption) {
+      const conditional = unrecognizedOption === "ifExists" ? "if" : "unless";
+      const railsKey = unrecognizedOption === "ifExists" ? "if_exists" : "if_not_exists";
       throw new ArgumentError(
         `Option ${railsKey} will be ignored. If you are calling an expression like\n` +
           `\`t.column(.., ${railsKey}: true)\` from inside a change_table block, try a\n` +
