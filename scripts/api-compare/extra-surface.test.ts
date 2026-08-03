@@ -2162,8 +2162,6 @@ describe("@noRailsEquivalent — extractor to report", () => {
     expect(report.packages[0].totalNovel).toBe(0);
   });
 
-  // The file-level form (RFC 0072): one reason at the top of a file no Rails
-  // file maps onto, in place of the same reason on every declaration in it.
   const DRIVER_ADAPTER = `
     /**
      * @noRailsEquivalent PERMANENT — Ruby binds exactly one SQLite driver, so
@@ -2208,14 +2206,28 @@ describe("@noRailsEquivalent — extractor to report", () => {
     const report = reportFor(railsWithout(), {
       "connection-adapters/libsql-replica-adapter.ts": DRIVER_ADAPTER,
     });
-    // Both the class DECLARATION name and its member are absorbed by the one
-    // reason — the six driver adapters used to repeat it per declaration.
     expect(report.packages[0].totalAllowlisted).toBe(2);
     expect(report.packages[0].totalNovel).toBe(0);
     expect(report.packages[0].extraFiles).toEqual([]);
     expect(report.tagged).toMatchObject({ total: 1, matched: 1, stale: [] });
     expect(report.fileTagRejections).toEqual([]);
     expect(report.tagged.classification.permanent).toBe(1);
+  });
+
+  it("covers top-level functions and the synthesized file module too", () => {
+    const report = reportFor(railsWithout(), {
+      "sqlite/libsql.ts": `
+        /** @noRailsEquivalent PERMANENT — a driver binding Rails has no file for. */
+        import type { SqliteDriver } from "../sqlite-adapter.js";
+
+        export function libsqlDriver(): SqliteDriver | undefined { return undefined; }
+        export function libsqlRemoteDriver(): SqliteDriver | undefined { return undefined; }
+      `,
+      "sqlite-adapter.ts": `export interface SqliteDriver { open(): void }`,
+    });
+    expect(report.packages[0].totalAllowlisted).toBe(3);
+    expect(report.packages[0].extraFiles.map((f) => f.tsFile)).not.toContain("sqlite/libsql.ts");
+    expect(report.fileTagRejections).toEqual([]);
   });
 
   it("fails a file-level reason that states no permanence claim", () => {
@@ -2231,9 +2243,7 @@ describe("@noRailsEquivalent — extractor to report", () => {
     );
   });
 
-  it("rejects a file-level tag when a name in the file scores as moved", () => {
-    // The postgresql/schema-statements-class.ts shape: no counterpart FILE, but
-    // the names exist in Rails elsewhere, so a rename may be owed.
+  it("rejects a file-level tag when a name in the file scores as moved (a rename may be owed)", () => {
     const report = reportFor(railsWithout([method("sync_replica")]), {
       "connection-adapters/libsql-replica-adapter.ts": DRIVER_ADAPTER,
     });
@@ -2245,7 +2255,6 @@ describe("@noRailsEquivalent — extractor to report", () => {
         movedNames: ["syncReplica"],
       },
     ]);
-    // Nothing is absorbed: the names stay counted, and the tag reads as stale.
     expect(report.packages[0].totalAllowlisted).toBe(0);
     expect(report.packages[0].extraFiles[0].extras.map((e) => [e.name, e.kind])).toEqual([
       ["LibSQLReplicaAdapter", "novel"],
@@ -2306,8 +2315,6 @@ describe("@noRailsEquivalent — extractor to report", () => {
         }
       `,
     });
-    // Every name is already justified per declaration, so the file-level tag
-    // absorbs nothing — it is a tag anyone can delete, i.e. stale.
     expect(report.fileTagRejections).toEqual([]);
     expect(report.tagged.stale.map((e) => [e.tsFile, e.fileLevel])).toEqual([
       ["connection-adapters/libsql-replica-adapter.ts", true],

@@ -1491,9 +1491,7 @@ describe("extractFromProgram — file-level @noRailsEquivalent JSDoc", () => {
     });
   });
 
-  it("leaves a declaration's own leading block as a declaration tag", () => {
-    // No imports, so the top block is what TypeScript binds to the class —
-    // reading it as file-level too would widen every such tag into a blanket.
+  it("leaves the leading block of an import-less file as its declaration's tag", () => {
     const info = extractFromFiles("/p", {
       "connection-pool.ts": `
         /** @noRailsEquivalent PERMANENT — Rails nests this class inside NullPool */
