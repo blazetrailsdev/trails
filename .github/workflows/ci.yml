@@ -880,14 +880,12 @@ jobs:
       # redundant double-run and keeps the CLI's subprocess tests out of this
       # large suite's worker scheduler (they otherwise starve its reporter RPC
       # / perturb fork scheduling — see trails-models-dump tests).
-      # scripts/test-deps/ holds the import-graph regression guards
-      # (adapter-graph-import-tdz, base-import-cycle) — both read
-      # packages/activerecord/src, but they are bundled into the unit-tests
-      # job, which is gated on unit_tests_affected and so never runs on an
-      # AR-only PR. That is how the `_arConfig` TDZ reached main red (#5647).
-      # Running them here, as a separate vitest invocation from the AR suite,
-      # keeps them in the `other` project: no AR setupFiles preload the adapter
-      # graph, which is what makes the entry order reproduce the crash.
+      # The scripts/test-deps import guards read packages/activerecord/src but
+      # ride the unit_tests_affected gate, which the AR tree is off — so this is
+      # the only job that runs them on an AR-only PR. Separate invocation from
+      # the AR suite on purpose: it keeps them in the `other` vitest project,
+      # whose lack of AR setupFiles is what reproduces the entry order.
+      # (Guard: scripts/ci-suite-coverage.test.ts.)
       - run: pnpm vitest run scripts/test-deps
       - run: pnpm vitest run packages/activerecord/
       - run: pnpm vitest run packages/activerecord-cli

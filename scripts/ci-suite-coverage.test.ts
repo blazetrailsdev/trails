@@ -299,6 +299,24 @@ describe("CI runs every tooling test suite", () => {
     expect(filter.run.length).toBeLessThan(20_500);
   });
 
+  // scripts/test-deps/ imports packages/activerecord/src (the adapter-graph
+  // TDZ guard enters the graph from outside the AR vitest project by design),
+  // but it is bundled into unit-tests, which is gated on unit_tests_affected —
+  // and packages/activerecord/ is deliberately off that gate for cost reasons.
+  // So the suite has to ALSO run from a job gated on activerecord_affected, or
+  // an AR-only PR reports green and the break lands on the next push to main.
+  // That is how the `_arConfig` TDZ reached main red (#5647).
+  it("runs the scripts/test-deps import guards from an activerecord-gated job", async () => {
+    const wf = parseYaml(await readFile(CI_YML, "utf8"));
+    const jobs: { if?: string; steps?: { run?: string }[] }[] = Object.values(wf.jobs);
+    const covering = jobs.filter(
+      (job) =>
+        String(job.if ?? "").includes("activerecord_affected") &&
+        job.steps?.some((step) => /vitest run[\s\S]*scripts\/test-deps/.test(step.run ?? "")),
+    );
+    expect(covering.length).toBeGreaterThan(0);
+  });
+
   it("keeps the draft deferral, its two jobs and the ci aggregate in agreement", async () => {
     const wf = parseYaml(await readFile(CI_YML, "utf8"));
     const gateOf = (job: string): string => wf.jobs[job].if.replace(/\s+/g, " ").trim();
