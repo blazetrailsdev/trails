@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { schemaConn } from "../../support/schema-conn.js";
 import {
   isRowFormatDynamicByDefault,
   defaultRowFormat,
@@ -70,7 +71,9 @@ describe("MySQL::SchemaStatements", () => {
   });
 
   it("createTableDefinition returns MySQL TableDefinition", () => {
-    expect(createTableDefinition("users").tableName).toBe("users");
+    expect(createTableDefinition.call(schemaConn("mysql") as never, "users").tableName).toBe(
+      "users",
+    );
   });
 
   it("defaultType: parses string/integer/function defaults", () => {

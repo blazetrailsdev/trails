@@ -20,6 +20,7 @@ import {
 } from "../abstract/schema-definitions.js";
 import { quoteColumnName, unquoteIdentifier } from "./quoting.js";
 import type { AddIndexOptions, SchemaStatementsLike } from "../abstract/schema-definitions.js";
+import type { VisitorHostAdapter } from "./schema-creation.js";
 
 /**
  * MySQL-specific SchemaStatements subclass. Extends the base `dropTable` to support
@@ -34,7 +35,9 @@ import type { AddIndexOptions, SchemaStatementsLike } from "../abstract/schema-d
 export class MysqlSchemaStatements extends BaseSchemaStatements {
   private _mysqlSchemaCreation?: MysqlSchemaCreation;
   override get schemaCreation(): MysqlSchemaCreation {
-    return (this._mysqlSchemaCreation ??= new MysqlSchemaCreation(this));
+    return (this._mysqlSchemaCreation ??= new MysqlSchemaCreation(
+      this as unknown as VisitorHostAdapter,
+    ));
   }
 
   /** Mirrors: MySQL::SchemaStatements#update_table_definition */
@@ -140,12 +143,16 @@ export function validPrimaryKeyOptions(): string[] {
   return ["limit", "default", "precision", "unsigned", "autoIncrement"];
 }
 
-/** @internal */
+/**
+ * Mirrors: MySQL::SchemaStatements#create_table_definition
+ * @internal
+ */
 export function createTableDefinition(
+  this: VisitorHostAdapter,
   name: string,
   options: { id?: boolean | "uuid"; charset?: string | null; collation?: string | null } = {},
 ): TableDefinition {
-  return new TableDefinition(name, options);
+  return new TableDefinition(name, { ...options, adapter: this });
 }
 
 /** @internal */

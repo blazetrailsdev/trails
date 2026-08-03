@@ -20,7 +20,7 @@ import {
   IndexDefinition,
   TableDefinition,
 } from "../abstract/schema-definitions.js";
-import { mysqlSchemaQuoter, type MysqlSchemaQuoter } from "./schema-quoter.js";
+import type { SchemaQuoter } from "../abstract/assert-schema-adapter.js";
 import {
   addOptionsForIndexColumns,
   integerToSql,
@@ -48,52 +48,41 @@ interface MysqlColumnOptions extends Record<string, unknown> {
 
 type MysqlTableDef = TableDefinition & { charset?: string; collation?: string };
 
-/** @internal Adapter surface consulted by the visitor's support flags and MariaDB branches. */
-export interface VisitorHostAdapter {
-  supportsCheckConstraints?(): boolean;
-  supportsForeignKeys?(): boolean;
-  supportsIndexesInCreate?(): boolean;
+/** @internal Adapter surface consulted by the visitor's support flags and MariaDB branches.
+ * Rails' `SchemaCreation#initialize(conn)` always receives the live adapter, so the quoting
+ * half is required and dispatches polymorphically. */
+export interface VisitorHostAdapter extends SchemaQuoter {
+  supportsCheckConstraints(): boolean;
+  supportsForeignKeys(): boolean;
+  supportsIndexesInCreate(): boolean;
   /** Version-gated: MariaDB ≥ 10.8.1 / MySQL ≥ 8.0.1. Reads the cached version
    * synchronously and yields false when cold — warm via `getDatabaseVersion`. */
-  supportsIndexSortOrder?(): boolean;
-  isMariadb?(): boolean;
-  /** Quoting surface consulted polymorphically by the visitor when the real adapter is
-   * threaded; absent on the host-less (unit-test) path, which falls back to the standalone
-   * MySQL helpers in {@link mysqlSchemaQuoter}. */
-  quoteColumnName?(name: string): string;
-  quoteTableName?(name: string): string;
-  quote?(value: unknown): string;
+  supportsIndexSortOrder(): boolean;
+  isMariadb(): boolean;
+  quote(value: unknown): string;
 }
 
 export class SchemaCreation extends AbstractSchemaCreation {
-  /** @internal Whether this is a MariaDB connection. */
-  protected _mariadb = false;
-  /** @internal Optional adapter ref so `supports*` helpers mirror Rails' `@conn`-delegated flags. */
-  protected _hostAdapter?: VisitorHostAdapter;
-  /** @internal Quoter dispatches through the host adapter when threaded (polymorphic),
-   * else the dialect's standalone helpers. Widened from the base `SchemaQuoter` to expose
-   * `quote` for `add_sql_comment!`. */
-  declare protected adapter: MysqlSchemaQuoter;
+  /** @internal Widened from the base `SchemaQuoter` to the full `@conn` surface: the
+   * `supports*` flags and `quote` for `add_sql_comment!`. */
+  declare protected adapter: VisitorHostAdapter;
 
-  constructor(host?: VisitorHostAdapter) {
-    super("mysql", mysqlSchemaQuoter(host));
-    this._hostAdapter = host;
+  constructor(host: VisitorHostAdapter) {
+    super("mysql", host);
   }
 
   /** @internal Live MariaDB lookup — consults the host adapter every call so a late
-   * `getFullVersion()` flip (lazy detection on first probe) is honored. Falls back to the
-   * `_mariadb` field so existing tests that set it directly continue to work. */
+   * `getFullVersion()` flip (lazy detection on first probe) is honored. */
   protected isMariadb(): boolean {
-    return this._hostAdapter?.isMariadb?.() ?? this._mariadb;
+    return this.adapter.isMariadb();
   }
 
   /** @internal Rails gates the index DESC/ASC suffix on `supports_index_sort_order?`
    * (MariaDB >= 10.8.1 / MySQL >= 8.0.1). Consult the threaded adapter's version-gated
-   * flag; on the host-less unit-test path default to supported so pure DDL fixtures
-   * still emit the suffix. The base returns `adapterName !== "mysql"` (always false),
+   * flag. The base returns `adapterName !== "mysql"` (always false),
    * so this override is what makes MySQL honor the version gate. */
   protected override supportsIndexSortOrder(): boolean {
-    return this._hostAdapter?.supportsIndexSortOrder?.() ?? true;
+    return this.adapter.supportsIndexSortOrder();
   }
 
   /** @internal */
@@ -200,24 +189,24 @@ export class SchemaCreation extends AbstractSchemaCreation {
 
   /** @internal Delegates to the adapter when wired (Rails: `@conn.supports_indexes_in_create?`). */
   protected supportsIndexesInCreate(): boolean {
-    return this._hostAdapter?.supportsIndexesInCreate?.() ?? true;
+    return this.adapter.supportsIndexesInCreate();
   }
 
   /** @internal Mirrors Rails' `use_foreign_keys?` (`supports_foreign_keys? &&
    * foreign_keys_enabled?`). The enabled half reads `adapter._config.foreignKeys`, matching
    * `SchemaStatements#isForeignKeysEnabled`. */
   protected useForeignKeys(): boolean {
-    const supports = this._hostAdapter?.supportsForeignKeys?.() ?? true;
+    const supports = this.adapter.supportsForeignKeys();
     // `_config` is protected on the real adapter, so read it via a narrow cast
     // (mirrors `SchemaStatements#isForeignKeysEnabled`).
-    const host = this._hostAdapter as { _config?: { foreignKeys?: boolean } } | undefined;
-    const enabled = host?._config?.foreignKeys !== false;
+    const host = this.adapter as { _config?: { foreignKeys?: boolean } };
+    const enabled = host._config?.foreignKeys !== false;
     return supports && enabled;
   }
 
   /** @internal Delegates to the adapter; honors MySQL 8.0.16+ / MariaDB 10.2.1+ version gating. */
   protected supportsCheckConstraints(): boolean {
-    return this._hostAdapter?.supportsCheckConstraints?.() ?? true;
+    return this.adapter.supportsCheckConstraints();
   }
 
   /**

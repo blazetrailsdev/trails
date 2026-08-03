@@ -318,8 +318,8 @@ export function quoteDefaultExpression(
   // Rails: `value = lookup_cast_type(column.sql_type).serialize(value)`
   // (abstract/quoting.rb:161). Rails dispatches `lookup_cast_type`
   // unconditionally; the optional call is for the adapter-free hosts this
-  // standalone version also serves (the mysql schema quoter), which has no type
-  // map, so its values pass through unserialized.
+  // standalone version also serves, which have no type map, so their values pass
+  // through unserialized.
   let serialized: unknown = value;
   if (column != null) {
     const castType = this.lookupCastType?.(column.sqlType ?? null) as {
@@ -330,8 +330,7 @@ export function quoteDefaultExpression(
     }
   }
   // Rails: `quote(value)` (abstract/quoting.rb:162) — self-dispatched, so a host
-  // that overrides `quote` (the mysql schema-quoter binds the dialect's) gets its
-  // own dialect quoting, including the raw-view branches the abstract `quote`
+  // that overrides `quote` gets its own dialect quoting, including the raw-view branches the abstract `quote`
   // deliberately lacks. Falling straight to the module `quote` here would bypass
   // the dialect entirely and raise `can't quote Uint8Array` on a binary default.
   // Hosts without a `quote` keep the module helper.

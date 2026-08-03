@@ -18,7 +18,6 @@ import type {
   PrimaryKeyType,
   SchemaStatementsLike,
 } from "../abstract/schema-definitions.js";
-import { mysqlSchemaQuoter } from "./schema-quoter.js";
 import { type VisitorHostAdapter } from "./schema-creation.js";
 import { deprecator } from "../../deprecator.js";
 import { ArgumentError } from "@blazetrails/activemodel";
@@ -83,15 +82,15 @@ export class TableDefinition extends AbstractTableDefinition {
       as?: string;
       options?: string;
       comment?: string;
-      adapter?: VisitorHostAdapter;
+      adapter: VisitorHostAdapter;
       adapterName?: "sqlite" | "postgres" | "mysql";
-    } = {},
+    },
   ) {
     const { adapter, adapterName: _ignoredAdapterName, charset, collation, ...rest } = options;
     super(tableName, {
       ...rest,
       adapterName: "mysql",
-      adapter: mysqlSchemaQuoter(adapter),
+      adapter,
     });
     this.charset = charset ?? undefined;
     this.collation = collation ?? undefined;
