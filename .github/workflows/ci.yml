@@ -1963,10 +1963,14 @@ jobs:
                   ;;
                 actionpack-tests)
                   # Actionpack test skip is legitimate when no actionpack-affecting paths changed.
-                  [ "$AP_AFFECTED" = "false" ] && continue
+                  if [ "$AP_AFFECTED" = "false" ]; then
+                    continue
+                  fi
                   ;;
                 trailties-tests)
-                  [ "$TRAILTIES_AFFECTED" = "false" ] && continue
+                  if [ "$TRAILTIES_AFFECTED" = "false" ]; then
+                    continue
+                  fi
                   ;;
                 leaf-tests)
                   # Consolidated rack/actionview/tse-compiler/dx-type job.
@@ -1981,7 +1985,9 @@ jobs:
                   fi
                   ;;
                 unit-tests)
-                  [ "$UNIT_TESTS_AFFECTED" = "false" ] && continue
+                  if [ "$UNIT_TESTS_AFFECTED" = "false" ]; then
+                    continue
+                  fi
                   ;;
                 guides-typecheck)
                   if [ "$GUIDES_AFFECTED" = "false" ] || \
@@ -1994,7 +2000,9 @@ jobs:
                   # (no packages/**, scripts/{api,test,fixtures,schema}-compare/**,
                   # comparison-consumed manifest builders, vendor/**, or
                   # cross-cutting infra — see COMPARISON_RE).
-                  [ "$COMPARISON_AFFECTED" = "false" ] && continue
+                  if [ "$COMPARISON_AFFECTED" = "false" ]; then
+                    continue
+                  fi
                   ;;
                 website)
                   # Legitimate skip when website_affected is false AND no
@@ -2018,7 +2026,9 @@ jobs:
                 schema-parity-rails|schema-parity-trails|schema-parity-diff|\
                 query-parity-frozen-at|query-parity-rails|query-parity-trails|query-parity-diff)
                   # Parity skip is legitimate when no parity gate is on.
-                  [ "$any_parity" = "false" ] && continue
+                  if [ "$any_parity" = "false" ]; then
+                    continue
+                  fi
                   ;;
               esac
               echo "Unexpectedly skipped job: $job (docs_only=$DOCS_ONLY ar_affected=$AR_AFFECTED ap_affected=$AP_AFFECTED av_affected=$AV_AFFECTED rack_affected=$RACK_AFFECTED trailties_affected=$TRAILTIES_AFFECTED trails_tsc_affected=$TRAILS_TSC_AFFECTED tse_compiler_affected=$TSE_COMPILER_AFFECTED unit_tests_affected=$UNIT_TESTS_AFFECTED guides_affected=$GUIDES_AFFECTED website_affected=$WEBSITE_AFFECTED comparison_affected=$COMPARISON_AFFECTED website_label=$WEBSITE_LABEL parity_sqlite=$PARITY_SQLITE parity_postgres=$PARITY_POSTGRES parity_mysql=$PARITY_MYSQL db_adapters_draft_deferred=$DB_ADAPTERS_DRAFT_DEFERRED guides_unlabelled=$GUIDES_UNLABELLED)"
