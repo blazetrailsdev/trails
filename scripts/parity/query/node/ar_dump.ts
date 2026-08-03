@@ -6,6 +6,7 @@
  *
  * Like scripts/parity/query/node/dump.ts but for ActiveRecord query
  * fixtures: applies schema.sql, calls Base.establishConnection(dbPath),
+ * dynamic-imports models.ts and warms each model's schema cache, then
  * dynamic-imports query.ts (which in turn imports the models module,
  * typically via an ESM specifier like `./models.js` even though the
  * source file is `models.ts` — this is the Node/ESM TypeScript
