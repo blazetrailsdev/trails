@@ -736,10 +736,6 @@ describe("InsertAllTest", () => {
       for (let i = 1; i <= 100 && !hasSubsecond; i++) {
         await Book.upsertAll([{ id: 101, name: `Out of the Silent Planet (Edition ${i})` }]);
         const ua = ((await Book.find(101)) as any).updated_at as Temporal.Instant | null;
-        // Rails asserts `updated_at.usec > 0` — microseconds within the second.
-        // Testing only whole milliseconds throws away three digits of the
-        // timestamp and flakes ~1 run in 1000 (CURRENT_TIMESTAMP is fixed for
-        // the whole transaction, so the retry loop cannot rescue it).
         if (ua) hasSubsecond = usec(ua) > 0;
       }
       expect(hasSubsecond).toBe(true);
