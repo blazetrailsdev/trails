@@ -1,25 +1,36 @@
-import { describe, expect, it } from "vitest";
+import { describe, it } from "vitest";
+
 import { MessageVerifier } from "../message-verifier.js";
-
-const DATA = [{ a_boolean: true, a_number: 123, a_string: "abc" }];
-
-function makeCodec(options: Record<string, unknown> = {}): MessageVerifier {
-  return new MessageVerifier("secret", options);
-}
-
-function assertRotate(current: Record<string, unknown>, ...old: Record<string, unknown>[]): void {
-  const currentCodec = makeCodec(current);
-
-  for (const oldOptions of old) {
-    currentCodec.rotate(oldOptions);
-    const oldMessage = makeCodec(oldOptions).generate(DATA);
-
-    expect(currentCodec.verified(oldMessage)).toEqual(DATA);
-  }
-}
+import { extractOptions } from "../hash-utils.js";
+import {
+  assertRotate,
+  messageRotatorTests,
+  type RotatorCodecHooks,
+} from "./message-rotator-tests.js";
 
 describe("MessageVerifierRotatorTest", () => {
+  const secret = (key: string): string => key;
+
+  const hooks: RotatorCodecHooks<MessageVerifier> = {
+    secret,
+
+    makeCodec(...args: unknown[]): MessageVerifier {
+      const [positional, options] = extractOptions(args);
+      return new MessageVerifier((positional[0] as string) ?? secret("secret"), options);
+    },
+
+    encode(data: unknown, verifier: MessageVerifier, options = {}): string {
+      return verifier.generate(data, options);
+    },
+
+    decode(message: string, verifier: MessageVerifier, options = {}): unknown {
+      return verifier.verified(message, options);
+    },
+  };
+
+  messageRotatorTests(hooks);
+
   it("rotate digest", () => {
-    assertRotate({ digest: "SHA256" }, { digest: "SHA1" }, { digest: "MD5" });
+    assertRotate(hooks, [{ digest: "SHA256" }], [[{ digest: "SHA1" }], [{ digest: "MD5" }]]);
   });
 });
