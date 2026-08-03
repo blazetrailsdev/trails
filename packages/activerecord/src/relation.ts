@@ -2787,7 +2787,7 @@ export class Relation<T extends Base> {
       return;
     }
 
-    const jd = new JoinDependency(this._modelClass);
+    const jd = new JoinDependency(this._modelClass, this.table);
     const fallbackAssocs = this._addEagerSpecsToJoinDependency(jd, eagerAssociations);
 
     // If no associations could be JOINed, fall back entirely to preload
@@ -3253,7 +3253,7 @@ export class Relation<T extends Base> {
       ...new Set([...this._eagerLoadAssociations, ...this._includesToPromoteFromReferences()]),
     ];
     if (specs.length === 0) return;
-    const jd = new JoinDependency(this._modelClass);
+    const jd = new JoinDependency(this._modelClass, this.table);
     for (const spec of specs) jd.validateEagerLoadSpec(spec);
   }
 
@@ -3634,7 +3634,7 @@ export class Relation<T extends Base> {
       rel._includesAssociations = [];
 
       const basePk = (this._modelClass as any).primaryKey ?? "id";
-      const jd = new JoinDependency(this._modelClass);
+      const jd = new JoinDependency(this._modelClass, this.table);
       const fallbackAssocs = this._addEagerSpecsToJoinDependency(jd, eagerSpecs);
       // Rails joins every eager spec; trails can't join capability-gap
       // reflections (composite-key collections, unjoinable through), so
@@ -3664,7 +3664,7 @@ export class Relation<T extends Base> {
         // tables through a JoinDependency (which handles every spec shape) so a
         // pluck column reaching a joined table of any shape is recognized as
         // servable rather than misclassified as an unjoinable fallback.
-        const joinedJd = new JoinDependency(this._modelClass);
+        const joinedJd = new JoinDependency(this._modelClass, this.table);
         for (const spec of [
           ...this._namedInnerJoins,
           ...this._leftOuterJoinsValues,
@@ -4863,7 +4863,7 @@ export class Relation<T extends Base> {
    */
   private _eagerReflectionsAreLimitable(specs: AssociationSpec[]): boolean {
     if (specs.length === 0) return true;
-    const jd = new JoinDependency(this._modelClass);
+    const jd = new JoinDependency(this._modelClass, this.table);
     for (const spec of specs) jd.addAssociationSpec(spec);
     return this.usingLimitableReflections(jd.reflections);
   }
@@ -4899,7 +4899,7 @@ export class Relation<T extends Base> {
   private _joinsReflectionsAreLimitable(): boolean {
     const specs = [...this._namedInnerJoins, ...this._leftOuterJoinsValues];
     if (specs.length === 0) return true;
-    const jd = new JoinDependency(this._modelClass);
+    const jd = new JoinDependency(this._modelClass, this.table);
     const mergedReflections: unknown[] = [];
     for (const spec of specs) {
       if (spec instanceof JoinDependency) {
@@ -4960,7 +4960,7 @@ export class Relation<T extends Base> {
    */
   _buildDeferredDistinctPkInlineSubquery(): SelectManager {
     const basePk = (this._modelClass as any).primaryKey ?? "id";
-    const jd = new JoinDependency(this._modelClass);
+    const jd = new JoinDependency(this._modelClass, this.table);
     this._addEagerSpecsToJoinDependency(jd, this._deferredDistinctPkEagerSpecs());
     return this._buildEagerIdSubquery(jd, basePk);
   }
@@ -4974,7 +4974,7 @@ export class Relation<T extends Base> {
    */
   async _materializeDistinctPkIds(): Promise<unknown[]> {
     const basePk = (this._modelClass as any).primaryKey ?? "id";
-    const jd = new JoinDependency(this._modelClass);
+    const jd = new JoinDependency(this._modelClass, this.table);
     this._addEagerSpecsToJoinDependency(jd, this._deferredDistinctPkEagerSpecs());
     if (jd.nodes.length === 0) return [];
     return this._withQueryConnection(() => this._materializeLimitedIds(jd, basePk));
@@ -5367,7 +5367,7 @@ export class Relation<T extends Base> {
 
     const basePk = (this._modelClass as any).primaryKey ?? "id";
 
-    const jd = new JoinDependency(this._modelClass);
+    const jd = new JoinDependency(this._modelClass, this.table);
     this._addEagerSpecsToJoinDependency(jd, allEager);
     if (jd.nodes.length === 0) return null;
 
@@ -6711,7 +6711,7 @@ export class Relation<T extends Base> {
         rel._includesAssociations = [];
         const hasLimitOrOffset = this._limitValue !== null || (this._offsetValue ?? 0) > 0;
         const pk = (this._modelClass as { primaryKey?: string | string[] }).primaryKey ?? "id";
-        const jd = new JoinDependency(this._modelClass);
+        const jd = new JoinDependency(this._modelClass, this.table);
         const fallbackAssocs = this._addEagerSpecsToJoinDependency(jd, eagerSpecs);
         // JOIN only the joinable remainder; capability-gap reflections
         // (composite-key collections, unjoinable through) come back as
