@@ -106,7 +106,9 @@ export class MessageEncryptor extends Codec {
   }
 
   createMessage(value: unknown, options: MetadataOptions = {}): string {
-    return this.signMessage(this.encrypt(this.serializeWithMetadata(value, options)));
+    const encrypted = this.encrypt(this.serializeWithMetadata(value, options));
+    if (this.aeadMode) return encrypted;
+    return `${encrypted}${SEPARATOR}${this.sign(encrypted)}`;
   }
 
   readMessage(message: string, options: ExpectedMetadataOptions = {}): unknown {
@@ -114,30 +116,23 @@ export class MessageEncryptor extends Codec {
       throw new Thrown("invalid_message_format", "invalid message string");
     }
 
-    return this.deserializeWithMetadata(this.decrypt(this.verifyMessage(message)), options);
-  }
+    let encrypted = message;
 
-  private signMessage(encrypted: string): string {
-    if (this.aeadMode) return encrypted;
-    return `${encrypted}${SEPARATOR}${this.sign(encrypted)}`;
-  }
+    if (!this.aeadMode) {
+      const lastDash = message.lastIndexOf(SEPARATOR);
+      if (lastDash === -1) {
+        throw new Thrown("invalid_message_format", "missing message digest");
+      }
 
-  private verifyMessage(message: string): string {
-    if (this.aeadMode) return message;
+      encrypted = message.slice(0, lastDash);
+      const signature = message.slice(lastDash + SEPARATOR.length);
 
-    const lastDash = message.lastIndexOf(SEPARATOR);
-    if (lastDash === -1) {
-      throw new Thrown("invalid_message_format", "missing message digest");
+      if (!this.verify(encrypted, signature)) {
+        throw new Thrown("invalid_message_format", "mismatched digest");
+      }
     }
 
-    const encrypted = message.slice(0, lastDash);
-    const signature = message.slice(lastDash + SEPARATOR.length);
-
-    if (!this.verify(encrypted, signature)) {
-      throw new Thrown("invalid_message_format", "mismatched digest");
-    }
-
-    return encrypted;
+    return this.deserializeWithMetadata(this.decrypt(encrypted), options);
   }
 
   private encrypt(plaintext: string): string {
@@ -166,8 +161,6 @@ export class MessageEncryptor extends Codec {
     const iv = this.decode(parts[1]);
     const authTag = this.aeadMode ? this.decode(parts[2]) : undefined;
 
-    // OpenSSL does not raise on a truncated auth_tag, which would let an
-    // attacker forge it — Rails checks the length itself.
     if (authTag && authTag.length !== AUTH_TAG_LENGTH) {
       throw new Thrown("invalid_message_format", "truncated auth_tag");
     }

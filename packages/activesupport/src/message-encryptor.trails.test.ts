@@ -1,10 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { InvalidMessage, MessageEncryptor } from "./message-encryptor.js";
 
-// Rails only exercises `default_cipher` /
-// `use_authenticated_message_encryption` through
-// MessageEncryptorRotatorTest, which needs `rotate` (unported). Cover the
-// class attribute directly until those tests land.
 describe("MessageEncryptor default cipher", () => {
   const secret = "a".repeat(32);
   const data = { some: "data" };
