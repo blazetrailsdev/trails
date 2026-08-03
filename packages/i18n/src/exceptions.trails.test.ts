@@ -15,12 +15,14 @@ import {
 } from "./exceptions.js";
 import { resetClassConfig } from "./config.js";
 import { resetConfig } from "./i18n.js";
+import { Simple } from "./backend/simple.js";
 
 /**
- * Trails-only: i18n/test/i18n/exceptions_test.rb drives every message assertion
- * through `I18n.translate`, which is not ported yet (and whose default
- * ExceptionHandler swallows MissingTranslation, leaving those cases vacuous
- * upstream). These assert the ported classes directly.
+ * Trails-only: the cases i18n/test/i18n/exceptions_test.rb drives through
+ * `I18n.translate` live in exceptions.test.ts. These have no Rails counterpart
+ * — they assert the ported classes directly, including the message and
+ * accessor shapes the upstream cases never reach because the default
+ * ExceptionHandler swallows MissingTranslation.
  */
 describe("exceptions", () => {
   beforeEach(() => {
@@ -48,6 +50,13 @@ describe("exceptions", () => {
     expect(exception.locale).toBeNull();
     expect(exception.message).toBe("nil is not a valid locale");
     expect(new InvalidLocale("klingon").message).toBe(":klingon is not a valid locale");
+  });
+
+  it("InvalidLocale is raised by Backend::Base#translate for a falsy locale", () => {
+    const backend = new Simple();
+    expect(() => backend.translate(null, "foo")).toThrow(InvalidLocale);
+    expect(() => backend.translate(null, "foo")).toThrow("nil is not a valid locale");
+    expect(() => backend.translate(false as unknown as null, "foo")).toThrow(InvalidLocale);
   });
 
   it("InvalidLocaleData stores the filename", () => {
@@ -100,31 +109,6 @@ describe("exceptions", () => {
     const converted = exception.toException();
     expect(converted).toBeInstanceOf(MissingTranslationData);
     expect(converted.message).toBe("Translation missing: de.bar.foo");
-  });
-
-  it("InvalidPluralizationData stores entry, count and key", () => {
-    const exception = new InvalidPluralizationData({ other: "bar" }, 1, "one");
-    expect(exception.entry).toEqual({ other: "bar" });
-    expect(exception.count).toBe(1);
-    expect(exception.key).toBe("one");
-    expect(exception.message).toBe(
-      `translation data {other: "bar"} can not be used with :count => 1. key 'one' is missing.`,
-    );
-  });
-
-  it("MissingInterpolationArgument message contains the missing and given arguments", () => {
-    const exception = new MissingInterpolationArgument("bar", { baz: "baz" }, "%{bar}");
-    expect(exception.key).toBe("bar");
-    expect(exception.string).toBe("%{bar}");
-    expect(exception.message).toBe(
-      `missing interpolation argument :bar in "%{bar}" ({baz: "baz"} given)`,
-    );
-  });
-
-  it("ReservedInterpolationKey message contains the reserved key", () => {
-    const exception = new ReservedInterpolationKey("scope", "%{scope}");
-    expect(exception.key).toBe("scope");
-    expect(exception.message).toBe(`reserved key :scope used in "%{scope}"`);
   });
 
   it("ExceptionHandler returns the message for MissingTranslation and re-raises everything else, MissingTranslationData included", () => {
