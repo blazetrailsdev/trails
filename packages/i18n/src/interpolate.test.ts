@@ -96,7 +96,7 @@ describe("I18nMissingInterpolationCustomHandlerTest", () => {
     resetClassConfig();
     oldHandler = config().missingInterpolationArgumentHandler;
     config().missingInterpolationArgumentHandler = (key, values, string) =>
-      `missing key is ${key}, values are ${inspect(values)}, given string is '${string}'`;
+      `missing key is ${key.slice(1)}, values are ${inspect(values)}, given string is '${string}'`;
   });
 
   afterEach(() => {

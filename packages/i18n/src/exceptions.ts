@@ -2,9 +2,12 @@
  * Mirrors: i18n/lib/i18n/exceptions.rb
  *
  * Ruby Symbols have no JS analogue, so every symbol-typed value here (locale,
- * translation key, interpolation key) is a plain string. Messages that embed
- * one through `#inspect` therefore render it the way Ruby renders a Symbol
- * (`:en`) via `inspectSymbol`; everything else goes through `inspect`.
+ * translation key, interpolation key) is a plain string. A Symbol whose
+ * message renders it through `#inspect` alongside a String keeps the leading
+ * colon in that string (`":bar"`), so `inspectSymbolOrString` can tell the two
+ * apart the way Ruby's types do; `inspect` itself stays Ruby's `Object#inspect`
+ * and quotes every String. Where the Symbol spelling is not carried,
+ * `inspectSymbol` puts the colon back.
  */
 
 import { EMPTY_HASH, normalizeKeys } from "./i18n.js";
@@ -27,6 +30,15 @@ export function inspect(value: unknown): string {
 
 function inspectSymbol(value: unknown): string {
   return typeof value === "string" ? `:${value}` : inspect(value);
+}
+
+/**
+ * `#inspect` for a value Rails types as `Symbol | String`, where the two
+ * render differently (`:bar` against `"key"`). The Symbol arm is the string
+ * carrying the Symbol's leading colon, which is what Ruby gets from the type.
+ */
+function inspectSymbolOrString(value: string): string {
+  return value.startsWith(":") ? value : inspect(value);
 }
 
 /**
@@ -188,7 +200,7 @@ export class MissingInterpolationArgument extends ArgumentError {
 
   constructor(key: string, values: Record<string, unknown>, string: string) {
     super(
-      `missing interpolation argument ${inspectSymbol(key)} in ${inspect(string)} (${inspect(values)} given)`,
+      `missing interpolation argument ${inspectSymbolOrString(key)} in ${inspect(string)} (${inspect(values)} given)`,
     );
     this.name = "MissingInterpolationArgument";
     this.key = key;
@@ -202,7 +214,7 @@ export class ReservedInterpolationKey extends ArgumentError {
   readonly string: string;
 
   constructor(key: string, string: string) {
-    super(`reserved key ${inspectSymbol(key)} used in ${inspect(string)}`);
+    super(`reserved key ${inspectSymbolOrString(key)} used in ${inspect(string)}`);
     this.name = "ReservedInterpolationKey";
     this.key = key;
     this.string = string;

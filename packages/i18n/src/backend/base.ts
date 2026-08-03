@@ -250,7 +250,7 @@ export abstract class Base {
         : this.interpolate(locale!, entry, values);
     } else if (typeof entry === "string") {
       const reserved = reservedKeysPattern().exec(entry);
-      if (reserved) throw new ReservedInterpolationKey(reserved[1], entry);
+      if (reserved) throw new ReservedInterpolationKey(`:${reserved[1]}`, entry);
     }
     return entry;
   }

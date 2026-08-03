@@ -1,16 +1,8 @@
 /**
  * Mirrors: i18n/test/backend/exceptions_test.rb
- *
- * The `MissingInterpolationArgument` case stays measured as missing rather
- * than faked: it passes the String `'key'` and expects `key.inspect` to render
- * `"key"` (i18n/lib/i18n/exceptions.rb:102), while the message renders every
- * key as a Symbol (`:key`) — which is what `i18n/test/i18n/exceptions_test.rb:59`
- * (ported in `../exceptions.trails.test.ts`) needs, since interpolation keys
- * reach it as bare strings rather than the colon-prefixed spelling. Converging
- * that representation is the `i18n-interpolation-key-symbol-spelling` story.
  */
 import { beforeEach, describe, expect, it } from "vitest";
-import { MissingTranslationData } from "../exceptions.js";
+import { MissingInterpolationArgument, MissingTranslationData } from "../exceptions.js";
 import { config, l, resetConfig, setBackend, t } from "../i18n.js";
 import { resetClassConfig } from "../config.js";
 import { catchException } from "../throw-catch.js";
@@ -59,5 +51,12 @@ describe("I18nBackendExceptionsTest", () => {
       exception = error;
     }
     expect(exception!.message).toBe("Translation missing: en.time.formats.foo");
+  });
+
+  it("exceptions: MissingInterpolationArgument message includes missing key, provided keys and full string", () => {
+    const exception = new MissingInterpolationArgument("key", { this: "was given" }, "string");
+    expect(exception.message).toBe(
+      `missing interpolation argument "key" in "string" ({this: "was given"} given)`,
+    );
   });
 });

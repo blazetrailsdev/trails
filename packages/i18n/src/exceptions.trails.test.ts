@@ -38,8 +38,8 @@ describe("exceptions", () => {
       new MissingTranslation("de", "foo"),
       new MissingTranslationData("de", "foo"),
       new InvalidPluralizationData({ other: "bar" }, 1, "one"),
-      new MissingInterpolationArgument("bar", { baz: "baz" }, "%{bar}"),
-      new ReservedInterpolationKey("scope", "%{scope}"),
+      new MissingInterpolationArgument(":bar", { baz: "baz" }, "%{bar}"),
+      new ReservedInterpolationKey(":scope", "%{scope}"),
       new UnknownFileType("xml", "en.xml"),
     ];
     for (const e of errors) expect(e).toBeInstanceOf(ArgumentError);
