@@ -61,7 +61,7 @@ export class Simple extends Base {
 
   /** Get available locales from the translations hash. */
   override availableLocales(): Locale[] {
-    if (!this.initialized()) this.initTranslations();
+    if (!this.initialized()) this.markInitialized();
     const locales: Locale[] = [];
     for (const [locale, data] of Object.entries(this.translations())) {
       const entries = isHash(data) ? Object.keys(data) : [];
@@ -79,13 +79,13 @@ export class Simple extends Base {
   }
 
   override eagerLoadBang(): void {
-    if (!this.initialized()) this.initTranslations();
+    if (!this.initialized()) this.markInitialized();
     super.eagerLoadBang();
   }
 
   translations({ doInit = false }: { doInit?: boolean } = {}): TranslationData {
     // To avoid returning empty translations, call `initTranslations`.
-    if (doInit && !this.initialized()) this.initTranslations();
+    if (doInit && !this.initialized()) this.markInitialized();
 
     // Ruby's default block writes `h[k] = Concurrent::Hash.new` on a missing-key
     // read, and that is observable through the public reader — Rails asserts
@@ -103,10 +103,32 @@ export class Simple extends Base {
   }
 
   /**
-   * The gem's `init_translations` calls `load_translations` first; file loading
-   * lands with its own story, so for now this only flips the flag.
+   * Loads `I18n.load_path` and marks the backend initialized.
+   *
+   * Reading files is async here (`packages/i18n` imports nothing from `node:*`
+   * and only does async fs), so this cannot run from the gem's synchronous
+   * lazy-init call sites in `lookup` / `available_locales` / `translations` /
+   * `eager_load!`. A host with a populated `I18n.load_path` awaits this once at
+   * boot; those four sites go through `markInitialized`, which refuses to mark
+   * a backend initialized while its load path is still unread rather than
+   * silently answering from an empty store.
    */
-  protected initTranslations(): void {
+  protected async initTranslations(): Promise<void> {
+    await this.loadTranslations();
+    this.initializedFlag = true;
+  }
+
+  /**
+   * @internal The synchronous half of `init_translations` — see there. With an
+   * empty `I18n.load_path` this is the whole of the gem's method, since
+   * `load_translations` then loads nothing.
+   */
+  private markInitialized(): void {
+    if (config().loadPath.length > 0 && !this.loadPathRead) {
+      throw new Error(
+        "I18n.load_path is set but was never read: reading translation files is async, so await backend.loadTranslations() before the first lookup.",
+      );
+    }
     this.initializedFlag = true;
   }
 
@@ -123,7 +145,7 @@ export class Simple extends Base {
     scope: unknown = [],
     options: TranslateOptions = EMPTY_HASH,
   ): unknown {
-    if (!this.initialized()) this.initTranslations();
+    if (!this.initialized()) this.markInitialized();
     const name = typeof key === "symbol" ? (Symbol.keyFor(key) ?? key.description) : key;
     const keys = normalizeKeys(locale, name, scope, options.separator as string | undefined);
 

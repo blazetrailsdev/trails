@@ -442,6 +442,18 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
     ],
     rubyFiles: ["config.rb"],
   },
+  {
+    reason:
+      "I18n::Backend::Base#load_rb (backend/base.rb:236-239) is " +
+      "`eval(IO.read(filename), binding, filename)` — it loads a translation " +
+      "file written in Ruby source. trails has no Ruby to eval, and a `.js` " +
+      "locale module loaded with dynamic `import()` would be new public " +
+      "surface the gem has no counterpart for, so the `.rb` arm of " +
+      "`load_file`'s extension dispatch is not ported at all. The `.yml` / " +
+      "`.yaml` / `.json` arms are.",
+    names: ["load_rb"],
+    rubyFiles: ["backend/base.rb"],
+  },
 ];
 
 /** Map of scoped-skip Ruby method name → the set of Ruby files it's skipped in. */
