@@ -14,5 +14,3 @@ import { I18n } from "@blazetrails/activemodel";
 import { en } from "./locale/en.js";
 
 I18n.backend().storeTranslations("en", en);
-
-export { I18n };

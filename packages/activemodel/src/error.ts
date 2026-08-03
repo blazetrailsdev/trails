@@ -1,4 +1,4 @@
-import { humanize, underscore, deepDup } from "@blazetrails/activesupport";
+import { humanize, deepDup } from "@blazetrails/activesupport";
 import { MissingTranslation, catchException, type TranslateKey } from "@blazetrails/i18n";
 import { I18n } from "./i18n.js";
 
@@ -33,20 +33,6 @@ const MESSAGE_OPTIONS = new Set<string>(["message"]);
 
 // Identifier pattern mirrors Ruby Symbol semantics: no spaces or punctuation.
 const IDENTIFIER_RE = /^[a-z][a-zA-Z0-9_]*$/;
-
-/**
- * Rails writes `base_class.lookup_ancestors.map { |klass| klass.model_name.i18n_key }`
- * inline at both i18n call sites; in TS every host also has to tolerate a class
- * that carries no `model_name` (`ActiveModel::Naming` is `include`d in Rails, so
- * `lookup_ancestors` can never return one), which is what the `underscore`
- * fallback covers.
- */
-function lookupAncestorI18nKeys(klass: ModelClass): string[] {
-  const ancestors = klass.lookupAncestors?.() ?? [klass];
-  return ancestors
-    .map((k) => k.modelName?.i18nKey ?? (k.name ? underscore(k.name) : undefined))
-    .filter((key): key is string => key != null);
-}
 
 /**
  * Value equality that matches Ruby `==` for the common option shapes:
@@ -111,20 +97,21 @@ export class Error {
       const namespace = parts.length > 0 ? parts.join("/") : undefined;
       const attributesScope = `${baseClass.i18nScope}.errors.models`;
 
-      // A Ruby Symbol default means "look this key up"; the backend's
-      // discriminator for that arm is a real JS symbol today (story
-      // `i18n-symbol-values-are-colon-strings` converges it to ":key").
+      // Ruby Symbol default = "look this key up"; the backend spells that arm as
+      // a real JS symbol (story `i18n-symbol-values-are-colon-strings`).
       if (namespace) {
-        defaults = lookupAncestorI18nKeys(baseClass).flatMap((i18nKey) => [
+        defaults = baseClass.lookupAncestors!().flatMap((klass) => [
           Symbol.for(
-            `${attributesScope}.${i18nKey}/${namespace}.attributes.${attributeName}.format`,
+            `${attributesScope}.${klass.modelName!.i18nKey}/${namespace}.attributes.${attributeName}.format`,
           ),
-          Symbol.for(`${attributesScope}.${i18nKey}/${namespace}.format`),
+          Symbol.for(`${attributesScope}.${klass.modelName!.i18nKey}/${namespace}.format`),
         ]);
       } else {
-        defaults = lookupAncestorI18nKeys(baseClass).flatMap((i18nKey) => [
-          Symbol.for(`${attributesScope}.${i18nKey}.attributes.${attributeName}.format`),
-          Symbol.for(`${attributesScope}.${i18nKey}.format`),
+        defaults = baseClass.lookupAncestors!().flatMap((klass) => [
+          Symbol.for(
+            `${attributesScope}.${klass.modelName!.i18nKey}.attributes.${attributeName}.format`,
+          ),
+          Symbol.for(`${attributesScope}.${klass.modelName!.i18nKey}.format`),
         ]);
       }
     } else {
@@ -164,11 +151,9 @@ export class Error {
       );
       if (typeof result === "string") return Error.interpolate(result, options);
     }
-    // Rails error.rb:65 `type = options.delete(:message) if options[:message].is_a?(Symbol)`.
-    // A Ruby Symbol value keeps its leading colon here (`message: ":too_short"`)
-    // — that colon is the discriminator Ruby gets from the type. A plain String
-    // stays in `options[:message]` and is picked up as the default below,
-    // exactly as in Rails.
+    // error.rb:65 `type = options.delete(:message) if options[:message].is_a?(Symbol)`:
+    // a Ruby Symbol keeps its leading colon, so a plain String stays in
+    // `options[:message]` and becomes the default below, exactly as in Rails.
     if (typeof msgOpt === "string" && msgOpt.startsWith(":")) {
       const { message: _msg, ...rest } = options;
       type = msgOpt.slice(1);
@@ -189,17 +174,16 @@ export class Error {
       ...options,
     };
 
-    // A Ruby Symbol default means "look this key up"; the backend's
-    // discriminator for that arm is a real JS symbol today (story
-    // `i18n-symbol-values-are-colon-strings` converges it to ":key").
     let defaults: unknown[];
     if (baseClass?.i18nScope != null) {
       const i18nScope = baseClass.i18nScope;
       attribute = attribute.replace(/\[\d+\]/g, "");
 
-      defaults = lookupAncestorI18nKeys(baseClass).flatMap((i18nKey) => [
-        Symbol.for(`${i18nScope}.errors.models.${i18nKey}.attributes.${attribute}.${type}`),
-        Symbol.for(`${i18nScope}.errors.models.${i18nKey}.${type}`),
+      defaults = baseClass.lookupAncestors!().flatMap((klass) => [
+        Symbol.for(
+          `${i18nScope}.errors.models.${klass.modelName!.i18nKey}.attributes.${attribute}.${type}`,
+        ),
+        Symbol.for(`${i18nScope}.errors.models.${klass.modelName!.i18nKey}.${type}`),
       ]);
       defaults.push(Symbol.for(`${i18nScope}.errors.messages.${type}`));
 

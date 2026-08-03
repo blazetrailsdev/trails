@@ -86,9 +86,8 @@ export function humanAttributeName(
     }
 
     defaults = this.lookupAncestors().map((klass) =>
-      // A Ruby Symbol default means "look this key up"; the backend's
-      // discriminator for that arm is a real JS symbol today (story
-      // `i18n-symbol-values-are-colon-strings` converges it to ":key").
+      // Ruby Symbol default = "look this key up"; the backend spells that arm as
+      // a real JS symbol (story `i18n-symbol-values-are-colon-strings`).
       Symbol.for(`${this.i18nScope}.attributes.${klass.modelName.i18nKey}${separator}${key}`),
     );
     defaults.push(Symbol.for(`${this.i18nScope}.attributes.${key}`));
@@ -102,7 +101,6 @@ export function humanAttributeName(
   const raiseOnMissing = options.raise ?? _raiseOnMissingTranslations;
 
   defaults.push(Symbol.for(`attributes.${attribute}`));
-  // Ruby `defaults << options[:default] if options[:default]` — nil/false only.
   if (options.default != null) defaults.push(options.default);
   if (!raiseOnMissing) defaults.push(MISSING_TRANSLATION);
 
