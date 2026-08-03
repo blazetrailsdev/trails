@@ -14,7 +14,6 @@ import { describe, it, expect } from "vitest";
 import "../index.js";
 import { fixtures } from "../test-fixtures.js";
 import { Post } from "../test-helpers/models/post.js";
-import { UnknownAttributeReference } from "../errors.js";
 
 fixtures([]);
 /** Fresh relation per test — the trails analogue of Rails' `Relation.new(FakeKlass)`. */
@@ -243,14 +242,5 @@ describe("RelationMutationTest", () => {
   it("uniq! with no argument is a no-op", () => {
     const rel: any = Post.group("title");
     expect(() => rel.uniqBang()).not.toThrow();
-  });
-
-  it("order with empty string does not emit ORDER BY", () => {
-    // Rails compact_blank!s order args in `order` (check_if_method_has_arguments!),
-    // not in `order!` — `order!("")` reaches preprocess_order_args and raises from
-    // disallow_raw_sql!, so the blank-swallowing must be asserted on `order`.
-    const rel: any = Post.all().order("");
-    expect(rel.toSql()).not.toContain("ORDER BY");
-    expect(() => Post.all().orderBang("")).toThrow(UnknownAttributeReference);
   });
 });

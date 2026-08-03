@@ -1835,9 +1835,13 @@ export function columnReferences(orderArgs: unknown[]): string[] {
         refs.push(relationName(expr.relation.name));
       }
     } else if (arg instanceof Map) {
-      for (const key of arg.keys()) {
-        if (key instanceof Nodes.Attribute) refs.push(relationName(key.relation.name));
-        else if (typeof key === "string" || typeof key === "symbol") {
+      // Rails' Hash arm extracts a table only from String/Symbol keys; an Arel
+      // key with a scalar direction falls through to nil, so `order(node => dir)`
+      // never promotes an includes to eager_load.
+      for (const [key, value] of arg) {
+        if (isPlainObject(value)) {
+          refs.push(String(key));
+        } else if (typeof key === "string" || typeof key === "symbol") {
           const t = extractTableNameFrom(typeof key === "symbol" ? symbolToName(key) : key);
           if (t) refs.push(t);
         }
@@ -1940,40 +1944,16 @@ export function preprocessOrderArgs(this: QueryMethodsHost, orderArgs: unknown[]
   orderArgs.push(...mapped);
 }
 
-function buildOrderNode(clause: unknown): unknown {
-  if (clause instanceof Nodes.Node) return clause;
-  if (typeof clause === "string") return new Nodes.SqlLiteral(clause);
-  if (typeof clause === "symbol") return new Nodes.SqlLiteral(symbolToName(clause));
-  if (Array.isArray(clause) && clause.length === 2) {
-    const [col, dir] = clause;
-    if (col instanceof Nodes.Node) {
-      return String(dir).toLowerCase() === "desc"
-        ? new Nodes.Descending(col)
-        : new Nodes.Ascending(col);
-    }
-    if (typeof col === "string" || typeof col === "symbol") {
-      const expr = new Nodes.SqlLiteral(typeof col === "symbol" ? symbolToName(col) : col);
-      return String(dir).toLowerCase() === "desc"
-        ? new Nodes.Descending(expr)
-        : new Nodes.Ascending(expr);
-    }
-    throw argumentError(`Unsupported order column type: ${Object.prototype.toString.call(col)}`);
-  }
-  throw argumentError(`Unsupported order clause type: ${Object.prototype.toString.call(clause)}`);
-}
-
 /** @internal */
 export function buildOrder(this: QueryMethodsHost, arel: any): void {
   // An Arel::Nodes::SqlLiteral is a String subclass in Ruby, so compact_blank
   // drops a blank one along with nil and "".
-  const orders = ((this as any)._orderClauses ?? [])
-    .filter((o: unknown) => {
-      if (o === null || o === undefined) return false;
-      if (typeof o === "string") return o.trim() !== "";
-      if (o instanceof Nodes.SqlLiteral) return String((o as any).value ?? "").trim() !== "";
-      return true;
-    })
-    .map(buildOrderNode);
+  const orders = ((this as any)._orderClauses ?? []).filter((o: unknown) => {
+    if (o === null || o === undefined) return false;
+    if (typeof o === "string") return o.trim() !== "";
+    if (o instanceof Nodes.SqlLiteral) return String((o as any).value ?? "").trim() !== "";
+    return true;
+  });
   if (orders.length > 0) arel.order?.(...orders);
 }
 
