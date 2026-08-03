@@ -10,12 +10,13 @@ import {
   locale,
   localize,
   resetConfig,
+  setConfig,
   setExceptionHandler,
   t,
   translate,
   withLocale,
 } from "./i18n.js";
-import { resetClassConfig } from "./config.js";
+import { Config, resetClassConfig } from "./config.js";
 import { Simple } from "./backend/simple.js";
 import type { TranslationData } from "./utils.js";
 import type { TranslationKey } from "./i18n.js";
@@ -37,6 +38,19 @@ describe("I18nTest", () => {
     storeTranslations("en", { currency: { format: { separator: ".", delimiter: "," } } });
     storeTranslations("nl", { currency: { format: { separator: ",", delimiter: "." } } });
     storeTranslations("en", { true: "Yes", false: "No" });
+  });
+
+  // Rails also asserts the object is visible at
+  // `Thread.current.thread_variable_get(:i18n_config)`; JS has no threads, so
+  // `config()` is a process singleton and only the round-trip arm ports.
+  it("can set the configuration object", () => {
+    const value = new Config();
+    try {
+      setConfig(value);
+      expect(config()).toBe(value);
+    } finally {
+      setConfig(new Config());
+    }
   });
 
   it("uses a custom exception handler passed as an option", () => {

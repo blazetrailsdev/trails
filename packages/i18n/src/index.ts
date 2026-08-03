@@ -49,6 +49,7 @@ export {
   reservedKeysPattern,
   setAvailableLocales,
   setBackend,
+  setConfig,
   setDefaultLocale,
   setDefaultSeparator,
   setEnforceAvailableLocales,
