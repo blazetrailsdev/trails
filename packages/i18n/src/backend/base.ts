@@ -146,20 +146,23 @@ export abstract class Base {
    * Accepts a list of paths to translation files. Loads translations from YAML
    * files (*.yml) or JSON files (*.json). See #loadYml and #loadJson for
    * details. Ruby's optional block is the trailing argument here.
+   *
+   * A no-arg call records that `I18n.load_path` was read, but only once every
+   * file has loaded: a rejected preload must leave `Simple`'s lazy-init guard
+   * armed rather than let a later lookup initialize against partial data.
    */
   async loadTranslations(...filenames: unknown[]): Promise<void> {
     const block =
       typeof filenames[filenames.length - 1] === "function"
         ? (filenames.pop() as (filename: string, loadedTranslations: TranslationData) => void)
         : undefined;
-    if (filenames.length === 0) {
-      filenames = config().loadPath;
-      this.loadPathRead = true;
-    }
+    const fromLoadPath = filenames.length === 0;
+    if (fromLoadPath) filenames = config().loadPath;
     for (const filename of (filenames as (string | string[])[]).flat()) {
       const loadedTranslations = await this.loadFile(filename);
       if (block) block(filename, loadedTranslations);
     }
+    if (fromLoadPath) this.loadPathRead = true;
   }
 
   /**

@@ -59,6 +59,13 @@ describe("I18n::Backend::Base file loading", () => {
     expect(backend.translate("en", "foo.bar")).toBe("baz");
   });
 
+  it("leaves the lazy-init guard armed when the preload rejects", async () => {
+    config().loadPath = [`${localesDir()}/invalid/syntax.yml`];
+    await expect(backend.loadTranslations()).rejects.toBeInstanceOf(InvalidLocaleData);
+    expect(() => backend.translate("en", "foo.bar")).toThrow(/await backend.loadTranslations/);
+    expect(backend.initialized()).toBe(false);
+  });
+
   describe("the YAML subset", () => {
     // The flow collections come from vendor/rails/activesupport/lib/
     // active_support/locale/en.yml, which every other shape here also appears in.
