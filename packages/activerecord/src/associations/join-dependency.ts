@@ -12,15 +12,9 @@
 
 import type { Base } from "../base.js";
 import type { AssociationSpec } from "../relation/query-methods.js";
-import {
-  underscore as _toUnderscore,
-  camelize as _camelize,
-  singularize as _singularize,
-} from "@blazetrails/activesupport";
 import { Table, Nodes, tableSqlName, type TableRef } from "@blazetrails/arel";
-import { modelRegistry, isAssociationCached } from "../associations.js";
+import { isAssociationCached } from "../associations.js";
 import { _reflectOnAssociation } from "../reflection.js";
-import { isStiSubclass } from "../inheritance.js";
 import { JoinBase } from "./join-dependency/join-base.js";
 import { JoinAssociation } from "./join-dependency/join-association.js";
 import { JoinPart } from "./join-dependency/join-part.js";
@@ -307,103 +301,43 @@ export class JoinDependency {
       fromAlias?: string;
       parentAssocName?: string;
     },
-  ): JoinPart | null {
+  ): JoinPart {
     const modelClass = options?.fromModel ?? this._baseModel;
-    const associations: any[] = modelClass._associations ?? [];
-    const assocDef = associations.find((a: any) => a.name === assocName);
-    if (!assocDef) return null;
 
-    // Rails' JoinDependency#find_reflection uses `_reflect_on_association`
-    // (raw `_reflections`), not the normalized lookup — so the auto-generated
-    // HABTM middle reflection (hidden behind its parent in
-    // `normalizedReflections`) is still joinable by its own name.
-    const reflection = _reflectOnAssociation(modelClass, assocName);
-    if (reflection) {
-      // Mirrors: ActiveRecord::Associations::JoinDependency#build
-      // (join_dependency.rb:230-231) — `check_validity!` before
-      // `check_eager_loadable!`. `check_validity!` raises
-      // CompositePrimaryKeyMismatchError for a composite PK/FK arity mismatch,
-      // so a mismatched composite collection surfaces that error here rather
-      // than the generic join-key arity error deeper in `joinConstraints`.
-      (reflection as any).checkValidityBang?.();
-      (reflection as any).checkEagerLoadableBang?.();
-    }
+    // Mirrors: ActiveRecord::Associations::JoinDependency#build
+    // (join_dependency.rb:229-231) — `find_reflection`, then `check_validity!`
+    // before `check_eager_loadable!`. `find_reflection` raises
+    // ConfigurationError for a name that doesn't resolve; `check_validity!`
+    // raises CompositePrimaryKeyMismatchError for a composite PK/FK arity
+    // mismatch, so a mismatched composite collection surfaces that error here
+    // rather than the generic join-key arity error deeper in `joinConstraints`.
+    const reflection = this.findReflection(modelClass, assocName);
+    reflection.checkValidityBang?.();
+    reflection.checkEagerLoadableBang?.();
 
     const sourceAlias = options?.fromAlias ?? this._baseAlias;
-    const sourcePk = modelClass.primaryKey ?? "id";
-    // A composite source PK is only usable when a reflection drives the join:
-    // `JoinAssociation#joinConstraints` builds the composite FK↔PK tuple ON
-    // clause (via the reflection's join scope). The inline (no-reflection)
-    // fallback below only emits single-column equality, so it still bails.
-    if (Array.isArray(sourcePk) && !reflection) return null;
+
+    // Rails raises for polymorphic eager loads — the join target table is not
+    // known statically (join_dependency.rb#build).
+    if (reflection.isPolymorphic?.()) {
+      throw new EagerLoadPolymorphicError(assocName);
+    }
+    if (reflection.isThroughReflection()) {
+      return this._addThroughViaJoinAssociation(
+        reflection,
+        modelClass,
+        sourceAlias,
+        options?.parentAssocName,
+      );
+    }
+
+    const assocType: "hasMany" | "hasOne" | "belongsTo" =
+      reflection.macro === "hasAndBelongsToMany" ? "hasMany" : reflection.macro;
+    const targetModel: typeof Base = reflection.klass;
+    const targetTable: string = (targetModel as any).tableName;
 
     const tableIndex = this._nextTableIndex();
     const tableAlias = `t${tableIndex}`;
-
-    let targetModel: typeof Base | undefined;
-    let targetTable: string;
-    let foreignKey: string;
-    let primaryKey: string;
-    let isBelongsTo = false;
-    const assocType: "hasMany" | "hasOne" | "belongsTo" =
-      assocDef.type === "hasAndBelongsToMany" ? "hasMany" : assocDef.type;
-
-    if (assocDef.type === "belongsTo") {
-      // Rails raises for polymorphic eager loads — the join target table is
-      // not known statically (join_dependency.rb#build). This is a dedicated
-      // error rather than the ConfigurationError `build` raises for the null
-      // returns below.
-      if (assocDef.options.polymorphic) {
-        throw new EagerLoadPolymorphicError(assocName);
-      }
-      foreignKey = assocDef.options.foreignKey ?? `${_toUnderscore(assocName)}_id`;
-      // A composite FK belongsTo JOIN is built by the reflection-driven
-      // `joinConstraints` (composite tuple ON clause). Only the inline fallback,
-      // which emits single-column equality, still bails on a composite key.
-      if (Array.isArray(foreignKey) && !reflection) return null;
-      const className = assocDef.options.className ?? _camelize(assocName);
-      targetModel = modelRegistry.get(className);
-      if (!targetModel) return null;
-      targetTable = (targetModel as any).tableName;
-      primaryKey = assocDef.options.primaryKey ?? (targetModel as any).primaryKey ?? "id";
-      if (Array.isArray(primaryKey) && !reflection) return null;
-      isBelongsTo = true;
-    } else if (
-      assocDef.type === "hasMany" ||
-      assocDef.type === "hasOne" ||
-      assocDef.type === "hasAndBelongsToMany"
-    ) {
-      if (assocDef.options.through) {
-        if (reflection && reflection.isThroughReflection()) {
-          const result = this._addThroughViaJoinAssociation(
-            assocDef,
-            reflection,
-            modelClass,
-            sourceAlias,
-            options?.parentAssocName,
-          );
-          if (result) return result;
-        }
-        return null;
-      }
-      const className =
-        assocDef.options.className ??
-        _camelize(assocDef.type === "hasMany" ? _singularize(assocName) : assocName);
-      targetModel = modelRegistry.get(className);
-      if (!targetModel) return null;
-      targetTable = (targetModel as any).tableName;
-      foreignKey = assocDef.options.as
-        ? (assocDef.options.foreignKey ?? `${_toUnderscore(assocDef.options.as)}_id`)
-        : (assocDef.options.foreignKey ?? `${_toUnderscore(modelClass.name)}_id`);
-      // A composite FK/PK collection JOIN is built by the reflection-driven
-      // `joinConstraints` (composite tuple ON clause). Only the inline fallback,
-      // which emits single-column equality, still bails on a composite key.
-      if (Array.isArray(foreignKey) && !reflection) return null;
-      primaryKey = assocDef.options.primaryKey ?? sourcePk;
-      if (Array.isArray(primaryKey) && !reflection) return null;
-    } else {
-      return null;
-    }
 
     // Aliasing is FULLY deferred to emit-time `makeConstraints`, mirroring Rails'
     // `make_constraints` BUILDING the ON against the alias `aliased_table_for`
@@ -413,78 +347,32 @@ export class JoinDependency {
     // collisions, free references) is resolved at emit and the ON REBUILT against
     // it — no name-rebind, so a self-join referencing the same table on both
     // sides is disentangled correctly.
-    const effectiveName = targetTable!;
+    const effectiveName = targetTable;
     this._aliasTracker.aliases.set(
-      targetTable!,
-      (this._aliasTracker.aliases.get(targetTable!) ?? 0) + 1,
+      targetTable,
+      (this._aliasTracker.aliases.get(targetTable) ?? 0) + 1,
     );
-    const targetArelTable = aliasedArelTableFor(targetModel as never, targetTable!);
+    const targetArelTable = aliasedArelTableFor(targetModel as never, targetTable);
     const sourceArelTable = aliasedArelTableFor(
       modelClass as never,
       modelClass.tableName,
       sourceAlias,
     );
 
-    // A has_many/has_one join keys off the target's foreign key against the
-    // source's primary key — the target model's own primary key is never used
-    // for the ON clause. A belongs_to join keys off `primaryKey`. A composite-PK
-    // target is still a valid join target: the reflection-driven
-    // `joinConstraints` builds the composite tuple ON clause. Only the inline
-    // fallback (single-column equality) must bail on a composite target PK.
-    if (isBelongsTo && !reflection) {
-      const targetModelPk = (targetModel as any).primaryKey ?? "id";
-      if (Array.isArray(targetModelPk)) return null;
-    }
-
     const columns = getModelColumns(targetModel);
 
-    // Build JOIN via JoinAssociation when reflection is available (mirrors Rails),
-    // falling back to inline predicate construction otherwise.
-    let arelJoin: Nodes.Join;
-    let scopeJoinSources: Nodes.Node[] = [];
-    if (reflection) {
-      const joinAssoc = new JoinAssociation(reflection);
-      const joins = joinAssoc.joinConstraints(
-        sourceArelTable,
-        modelClass,
-        this._joinType,
-        this._aliasTracker,
-        (_refl, _remaining) => [targetArelTable, false],
-      );
-      arelJoin = joins[0] as Nodes.Join;
-      scopeJoinSources = joinAssoc.joinSources;
-    } else {
-      let predicate: Nodes.Node;
-      if (isBelongsTo) {
-        predicate = targetArelTable.get(primaryKey!).eq(sourceArelTable.get(foreignKey!));
-      } else {
-        predicate = targetArelTable.get(foreignKey!).eq(sourceArelTable.get(primaryKey!));
-      }
-      if (!isBelongsTo && assocDef.options.as) {
-        const typeCol = `${_toUnderscore(assocDef.options.as)}_type`;
-        const typePred = targetArelTable.get(typeCol).eq(new Nodes.Quoted(modelClass.name));
-        predicate = new Nodes.And([predicate, typePred]);
-      }
-      if (assocDef.options.scope && typeof assocDef.options.scope === "function") {
-        const scopeRel = assocDef.options.scope((targetModel as any)._allForPreload());
-        if (scopeRel?._whereClause && !scopeRel._whereClause.isEmpty()) {
-          // Construction builds against the real table; the scope predicates from
-          // `klass.all()` reference the real target table too, so no rebind is
-          // needed here. Emit-time aliasing rebuilds the whole join against the
-          // resolved alias when the table collides.
-          const scopeAst: Nodes.Node = scopeRel._whereClause.ast;
-          predicate =
-            predicate instanceof Nodes.And
-              ? new Nodes.And([...predicate.children, scopeAst])
-              : new Nodes.And([predicate, scopeAst]);
-        }
-      }
-      predicate = this._addStiConstraintArel(predicate, targetModel, targetArelTable);
-      arelJoin = new this._joinType(targetArelTable, new Nodes.On(predicate));
-    }
+    const joinAssoc = new JoinAssociation(reflection);
+    const joins = joinAssoc.joinConstraints(
+      sourceArelTable,
+      modelClass,
+      this._joinType,
+      this._aliasTracker,
+      (_refl, _remaining) => [targetArelTable, false],
+    );
+    const arelJoin = joins[0] as Nodes.Join;
 
-    const treePart = reflection ? new JoinAssociation(reflection) : new JoinLeaf(targetModel);
-    treePart.scopeJoinSources = scopeJoinSources;
+    const treePart = new JoinAssociation(reflection);
+    treePart.scopeJoinSources = joinAssoc.joinSources;
     treePart.tableIndex = tableIndex;
     treePart.arelTable = targetArelTable;
     treePart.tableAlias = tableAlias;
@@ -497,7 +385,7 @@ export class JoinDependency {
     treePart.parentPath = options?.parentAssocName ?? null;
     treePart.assocType = assocType;
     treePart.arelJoin = arelJoin;
-    treePart.nodeReflection = reflection ?? null;
+    treePart.nodeReflection = reflection;
     treePart.isThroughNode = false;
     this._insertTreeNode(treePart);
     return treePart;
@@ -542,11 +430,10 @@ export class JoinDependency {
    * `tableAlias` here would emit ON clauses referencing e.g. "t1" against SQL
    * that names the real table.
    *
-   * Called once per top-level spec, from the constructor. Like Rails, an
-   * association that can't be JOINed raises `ConfigurationError` — either from
-   * `findReflection` (a name that doesn't resolve, Rails' `find_reflection`) or,
-   * with no Rails analogue, because the reflection resolved but trails still
-   * couldn't build the JOIN. There is no lenient mode.
+   * Called once per top-level spec, from the constructor. Like Rails, a name
+   * that doesn't resolve raises `ConfigurationError` from `findReflection`
+   * (Rails' `find_reflection`); every reflection that does resolve is JOINed.
+   * There is no lenient mode.
    *
    * Mirrors: ActiveRecord::Associations::JoinDependency#build
    * (join_dependency.rb:228).
@@ -561,12 +448,6 @@ export class JoinDependency {
     for (const key of Reflect.ownKeys(hash)) {
       const name = typeof key === "symbol" ? (key.description ?? String(key)) : String(key);
       const node = this._addOrReuse(name, model, alias, parentPath);
-      if (!node) {
-        this.findReflection(model, name);
-        throw new ConfigurationError(
-          `Can't join '${(model as any).name}' to association named '${name}'`,
-        );
-      }
       const child = hash[key];
       const childPath = parentPath ? `${parentPath}.${name}` : name;
       if (child != null && Reflect.ownKeys(child).length > 0) {
@@ -585,7 +466,7 @@ export class JoinDependency {
     fromModel: typeof Base,
     fromAlias: string,
     parentPath: string,
-  ): JoinPart | null {
+  ): JoinPart {
     const existing = this._findNodeByPath(parentPath ? `${parentPath}.${assocName}` : assocName);
     if (existing) return existing;
     return this.addAssociation(assocName, {
@@ -1130,23 +1011,6 @@ export class JoinDependency {
     }
   }
 
-  private _addStiConstraintArel(
-    predicate: Nodes.Node,
-    model: typeof Base,
-    arelTable: TableRef,
-  ): Nodes.Node {
-    const inheritanceCol = model.inheritanceColumn;
-    if (inheritanceCol && isStiSubclass(model)) {
-      const stiNames = [model.name, ...((model as any).descendants ?? []).map((d: any) => d.name)];
-      const quotedNames = stiNames.map((n: string) => new Nodes.Quoted(n));
-      const stiPred = arelTable.get(inheritanceCol).in(quotedNames);
-      return predicate instanceof Nodes.And
-        ? new Nodes.And([...predicate.children, stiPred])
-        : new Nodes.And([predicate, stiPred]);
-    }
-    return predicate;
-  }
-
   /**
    * Hydrate models from a flat result row set, mirroring Rails'
    * JoinDependency#instantiate body. `seen` is the identity-keyed
@@ -1576,14 +1440,16 @@ export class JoinDependency {
   }
 
   private _addThroughViaJoinAssociation(
-    assocDef: any,
     reflection: any,
     modelClass: any,
     sourceAlias: string,
     parentAssocName?: string,
-  ): JoinPart | null {
+  ): JoinPart {
+    // A through reflection's `chain` is `[self, *through_reflection.chain]`, so
+    // it always carries the target plus at least one through link, and
+    // `joinConstraints` emits one join per link — the walk below always reaches
+    // the target (chain index 0) and assigns `targetNode`.
     const chain = reflection.chain;
-    if (!chain || chain.length < 2) return null;
 
     const joinAssoc = new JoinAssociation(reflection);
     const sourceArelTable = aliasedArelTableFor(modelClass, modelClass.tableName, sourceAlias);
@@ -1634,15 +1500,13 @@ export class JoinDependency {
       },
     );
 
-    if (joins.length === 0) return null;
-
     // joins are in reversed-chain order: joins[i] ↔ chainTables[chain.length-1-i].
     const group: ThroughJoinGroup = {
       reflection,
       parentModel: modelClass,
       parentTableName,
       chainTables: chainTables.map((c) => ({ tableName: c.tableName, model: c.model })),
-      targetImmediateName: assocDef.name,
+      targetImmediateName: reflection.name,
       nodes: new Array(chain.length),
       resolved: false,
     };
@@ -1658,8 +1522,8 @@ export class JoinDependency {
 
       if (isTarget) {
         const fullAssocName = parentAssocName
-          ? `${parentAssocName}.${assocDef.name}`
-          : assocDef.name;
+          ? `${parentAssocName}.${reflection.name}`
+          : reflection.name;
         const treePart = new JoinAssociation(reflection);
         treePart.tableIndex = entry.tableIndex;
         treePart.arelTable = entry.table;
@@ -1667,9 +1531,10 @@ export class JoinDependency {
         treePart.effectiveSqlName = entry.tableName;
         treePart.columns = columns;
         treePart.assocName = fullAssocName;
-        treePart.immediateAssocName = assocDef.name;
+        treePart.immediateAssocName = reflection.name;
         treePart.parentPath = parentAssocName ?? null;
-        treePart.assocType = assocDef.type === "hasAndBelongsToMany" ? "hasMany" : assocDef.type;
+        treePart.assocType =
+          reflection.macro === "hasAndBelongsToMany" ? "hasMany" : reflection.macro;
         treePart.arelJoin = arelJoin;
         treePart.nodeReflection = reflection;
         treePart.isThroughNode = false;
@@ -1702,7 +1567,7 @@ export class JoinDependency {
       }
     }
 
-    return targetNode;
+    return targetNode!;
   }
 }
 
