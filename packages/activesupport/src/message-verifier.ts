@@ -11,7 +11,7 @@ import {
   type RotatableOptions,
 } from "./messages/rotator.js";
 import { prepend } from "./prepend.js";
-import { Thrown, type Format } from "./messages/serializer-with-fallback.js";
+import { ArgumentError, Thrown, type Format } from "./messages/serializer-with-fallback.js";
 
 export class InvalidSignature extends Error {
   constructor(message = "Invalid signature") {
@@ -44,6 +44,9 @@ export class MessageVerifier extends Codec {
   private digest: string;
 
   constructor(secret: string | Buffer, options: MessageVerifierOptions = {}) {
+    // Ruby's `unless secret` rejects only nil and false; an empty secret is
+    // truthy there, so this must not be a plain JS falsiness check.
+    if (secret == null) throw new ArgumentError("Secret should not be nil.");
     super({
       serializer: options.serializer,
       urlSafe: options.url_safe,
