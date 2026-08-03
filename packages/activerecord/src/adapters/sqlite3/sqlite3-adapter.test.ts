@@ -4,7 +4,7 @@
 import { it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
 import { itIfSupports } from "../../support/supports.js";
-import { AbstractSQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
+import { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "../../connection-adapters/better-sqlite3-adapter.js";
 import { Notifications } from "@blazetrails/activesupport";
 import type {
@@ -15,7 +15,7 @@ import type {
 } from "../../sqlite-adapter.js";
 import { assertLogged } from "./test-helper.js";
 
-let adapter: AbstractSQLite3Adapter;
+let adapter: SQLite3Adapter;
 
 beforeEach(() => {
   adapter = new BetterSQLite3Adapter(":memory:");
@@ -668,7 +668,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
 
   it("strict strings by default", async () => {
     // Default class config is false — new connections are non-strict.
-    expect(AbstractSQLite3Adapter.strictStringsByDefault).toBe(false);
+    expect(SQLite3Adapter.strictStringsByDefault).toBe(false);
     const conn = new BetterSQLite3Adapter(":memory:");
     expect(conn._strictStrings).toBe(false);
     // Rails: assert_nothing_raised { conn.add_index :testings, :non_existent }
@@ -679,7 +679,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     await conn.close();
 
     // Setting the class config propagates to new connections.
-    AbstractSQLite3Adapter.strictStringsByDefault = true;
+    SQLite3Adapter.strictStringsByDefault = true;
     try {
       const strict = new BetterSQLite3Adapter(":memory:");
       expect(strict._strictStrings).toBe(true);
@@ -689,7 +689,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
       ).rejects.toThrow(/no such column/i);
       await strict.close();
     } finally {
-      AbstractSQLite3Adapter.strictStringsByDefault = false;
+      SQLite3Adapter.strictStringsByDefault = false;
     }
   });
 
@@ -707,7 +707,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     }
 
     // Explicit strict: true also overrides the class config (still strict).
-    AbstractSQLite3Adapter.strictStringsByDefault = true;
+    SQLite3Adapter.strictStringsByDefault = true;
     try {
       const strict = new BetterSQLite3Adapter(":memory:", { strict: true });
       try {
@@ -720,7 +720,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
         await strict.close();
       }
     } finally {
-      AbstractSQLite3Adapter.strictStringsByDefault = false;
+      SQLite3Adapter.strictStringsByDefault = false;
     }
   });
 
@@ -737,7 +737,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     }
 
     // Explicit strict: false overrides strictStringsByDefault = true.
-    AbstractSQLite3Adapter.strictStringsByDefault = true;
+    SQLite3Adapter.strictStringsByDefault = true;
     try {
       const strict = new BetterSQLite3Adapter(":memory:", { strict: false });
       try {
@@ -746,7 +746,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
         await strict.close();
       }
     } finally {
-      AbstractSQLite3Adapter.strictStringsByDefault = false;
+      SQLite3Adapter.strictStringsByDefault = false;
     }
   });
 
@@ -789,8 +789,8 @@ describeIfSqlite("SQLite3AdapterTest", () => {
       },
     };
 
-    const originalDefault = AbstractSQLite3Adapter.strictStringsByDefault;
-    AbstractSQLite3Adapter.strictStringsByDefault = true;
+    const originalDefault = SQLite3Adapter.strictStringsByDefault;
+    SQLite3Adapter.strictStringsByDefault = true;
     try {
       const conn = new BetterSQLite3Adapter(":memory:", { driver: fakeDriver });
       try {
@@ -800,7 +800,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
         await conn.close();
       }
     } finally {
-      AbstractSQLite3Adapter.strictStringsByDefault = originalDefault;
+      SQLite3Adapter.strictStringsByDefault = originalDefault;
     }
 
     capture.config = null;

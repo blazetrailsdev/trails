@@ -74,8 +74,8 @@ import {
 import { AbstractAdapter, RAW_CONNECTION_DEPRECATION_MESSAGE } from "./abstract-adapter.js";
 import { deprecator } from "../deprecator.js";
 import { captureUnwrappedExecute, dirtiesQueryCache } from "./abstract/query-cache.js";
-import { PostgreSQLSchemaStatements } from "./postgresql/schema-statements-class.js";
-import type { SchemaStatements } from "./abstract/schema-statements.js";
+import { SchemaStatements } from "./postgresql/schema-statements-class.js";
+import type { SchemaStatements as AbstractSchemaStatements } from "./abstract/schema-statements.js";
 import type {
   JoinTableOptions,
   ValidateConstraintStatements,
@@ -3725,7 +3725,7 @@ export class PostgreSQLAdapter
 
   /**
    * The serial detection Rails inlines in `new_column_from_field`, extracted so
-   * PostgreSQLSchemaStatements#columns can share it: that path cannot delegate
+   * PostgreSQL::SchemaStatements#columns can share it: that path cannot delegate
    * to newColumnFromField because it batch-preloads the row OIDs and resolves
    * types through lookupCastTypeFromColumn, where fetchTypeMetadata would issue
    * a per-column pg_type query.
@@ -4842,7 +4842,7 @@ export interface PostgreSQLAdapter {
 
   recreateDatabase(name: string, options?: CreateDatabaseOptions): Promise<void>;
 
-  dropTable(...args: Parameters<SchemaStatements["dropTable"]>): Promise<void>;
+  dropTable(...args: Parameters<AbstractSchemaStatements["dropTable"]>): Promise<void>;
 
   currentDatabase(): Promise<string>;
 
@@ -5145,7 +5145,7 @@ captureUnwrappedExecute(PostgreSQLAdapter);
 dirtiesQueryCache(PostgreSQLAdapter, "execQuery", "execute");
 
 // Rails: `include PostgreSQL::SchemaStatements` (postgresql_adapter.rb:185).
-include(PostgreSQLAdapter, PostgreSQLSchemaStatements);
+include(PostgreSQLAdapter, SchemaStatements);
 
 // Mirrors `ActiveSupport.run_load_hooks(:active_record_postgresqladapter, self)`
 // at the bottom of Rails' postgresql_adapter.rb — lets railtie initializers

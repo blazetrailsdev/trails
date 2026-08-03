@@ -3,10 +3,10 @@ import "../../index.js";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
 import { Base } from "../../base.js";
 import { fixtures } from "../../test-fixtures.js";
-import type { AbstractSQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
+import type { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 import type { Column } from "../../connection-adapters/sqlite3/column.js";
 
-let adapter: AbstractSQLite3Adapter;
+let adapter: SQLite3Adapter;
 
 // TS-only regression coverage: Rails' alter_table rebuilds from columns(from)
 // and re-adds generated columns with as:/stored: (sqlite3_adapter.rb:623),
@@ -16,7 +16,7 @@ describeIfSqlite("SQLite3VirtualColumnTest trails extras", () => {
   fixtures([]);
 
   beforeEach(async () => {
-    adapter = (await Base.leaseConnection()) as unknown as AbstractSQLite3Adapter;
+    adapter = (await Base.leaseConnection()) as unknown as SQLite3Adapter;
     await adapter.dropTable("virtual_columns", { ifExists: true });
     await adapter.exec(
       `CREATE TABLE "virtual_columns" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "name" varchar, "upper_name" varchar GENERATED ALWAYS AS (UPPER(name)) STORED, "lower_name" varchar GENERATED ALWAYS AS (LOWER(name)) VIRTUAL, "column1" integer)`,

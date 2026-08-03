@@ -1229,7 +1229,7 @@ export class SchemaStatements {
         return rows.map((row: any) => {
           // Recover the partial-index WHERE predicate and per-column DESC
           // directions from the index definition, mirroring the concrete
-          // PostgreSQLSchemaStatements#indexes parsing.
+          // PostgreSQL::SchemaStatements#indexes parsing.
           const def = (row.definition as string) ?? "";
           const defMatch = def.match(
             / USING \w+? \((.+?)\)(?: INCLUDE \((.+?)\))?( NULLS NOT DISTINCT)?(?: WHERE (.+))?$/s,

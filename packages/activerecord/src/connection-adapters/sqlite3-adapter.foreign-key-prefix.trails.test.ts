@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import type { AbstractSQLite3Adapter } from "./sqlite3-adapter.js";
+import type { SQLite3Adapter } from "./sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "./better-sqlite3-adapter.js";
 import { Base } from "../base.js";
 
 describe("SQLite3Adapter addForeignKey under a table name prefix/suffix", () => {
-  let adapter: AbstractSQLite3Adapter;
+  let adapter: SQLite3Adapter;
 
   beforeEach(async () => {
     adapter = new BetterSQLite3Adapter(":memory:");
@@ -43,7 +43,7 @@ describe("SQLite3Adapter addForeignKey under a table name prefix/suffix", () => 
 });
 
 describe("SQLite3Adapter alterTable under a table name prefix/suffix", () => {
-  let adapter: AbstractSQLite3Adapter;
+  let adapter: SQLite3Adapter;
 
   beforeEach(async () => {
     adapter = new BetterSQLite3Adapter(":memory:");

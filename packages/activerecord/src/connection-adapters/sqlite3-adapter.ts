@@ -205,7 +205,7 @@ function _isSqliteMissingDbError(error: unknown): boolean {
   );
 }
 
-export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
+export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   override get adapterName(): AdapterName {
     return "sqlite";
   }
@@ -401,7 +401,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     } else {
       filename = filenameOrConfig;
     }
-    this._memoryDatabase = AbstractSQLite3Adapter._isMemoryFilename(filename);
+    this._memoryDatabase = SQLite3Adapter._isMemoryFilename(filename);
     // Mirrors the non-`:memory:`/non-`file:` branch of Rails'
     // `SQLite3Adapter#initialize`: expand the path and create its parent
     // directory before the driver opens the handle below.
@@ -411,7 +411,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     this._config = { ...options };
     this._filename = filename;
     this._readonly = options.readonly ?? false;
-    this._strict = options.strict ?? AbstractSQLite3Adapter.strictStringsByDefault;
+    this._strict = options.strict ?? SQLite3Adapter.strictStringsByDefault;
     (this._config as SQLite3AdapterOptions).strict = this._strict;
     // Rails: `SQLite3Adapter#default_prepared_statements` inherits the
     // abstract adapter's `true`. Mirror that default and let options
@@ -426,7 +426,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     // Sync-driver path resolves synchronously; the async path is flagged out
     // above and configured later via completeAsyncConnect. Fire-and-forget here.
     if (!this._asyncConnectPending) void this.configureConnection();
-    this._nativeTypeMap = AbstractSQLite3Adapter._buildTypeMap();
+    this._nativeTypeMap = SQLite3Adapter._buildTypeMap();
   }
 
   /**
@@ -1228,7 +1228,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   // INTEGER in SQLite can store up to 8 bytes; default _limit to 8 when none given.
   private static _buildTypeMap(): TypeMap {
     const map = new TypeMap();
-    AbstractSQLite3Adapter.initializeTypeMap(map);
+    SQLite3Adapter.initializeTypeMap(map);
     return map;
   }
 
@@ -1446,7 +1446,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
    */
   get encoding(): string {
     if (this._encoding !== null) return this._encoding;
-    return AbstractSQLite3Adapter.parseEncoding(this.driver?.pragma("encoding"));
+    return SQLite3Adapter.parseEncoding(this.driver?.pragma("encoding"));
   }
 
   private _encoding: string | null = null;
@@ -1512,9 +1512,9 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   }
 
   static newClient(
-    this: new (filename?: string, options?: SQLite3AdapterOptions) => AbstractSQLite3Adapter,
+    this: new (filename?: string, options?: SQLite3AdapterOptions) => SQLite3Adapter,
     config: { database?: string; readonly?: boolean },
-  ): AbstractSQLite3Adapter {
+  ): SQLite3Adapter {
     return new this(config.database ?? ":memory:", { readonly: config.readonly });
   }
 
@@ -2638,7 +2638,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   /** @internal */
   override buildStatementPool(): GenericStatementPool<SqliteStatement> {
     return new GenericStatementPool<SqliteStatement>(
-      AbstractSQLite3Adapter.typeCastConfigToInteger(this._statementLimit) as number,
+      SQLite3Adapter.typeCastConfigToInteger(this._statementLimit) as number,
     );
   }
 
@@ -2695,7 +2695,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       this._databaseVersion = new Version(vRow?.v ?? "0.0.0");
       // Pre-warm encoding too, so the sync `encoding` getter never touches the
       // driver directly (parity with _databaseVersion).
-      this._encoding = AbstractSQLite3Adapter.parseEncoding(syncConn.pragma("encoding"));
+      this._encoding = SQLite3Adapter.parseEncoding(syncConn.pragma("encoding"));
       this.driver = syncConn as SqliteConnection;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -2739,7 +2739,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       this._databaseVersion = new Version(vRow?.v ?? "0.0.0");
       // Memoize encoding while we can still await the async pragma, so the sync
       // `encoding` getter serves a cached value rather than a Promise.
-      this._encoding = AbstractSQLite3Adapter.parseEncoding(await conn.pragma("encoding"));
+      this._encoding = SQLite3Adapter.parseEncoding(await conn.pragma("encoding"));
       this.driver = conn;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -2813,10 +2813,10 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
    * has or can have.
    */
   static async openAsync(
-    this: new (filename?: string, options?: SQLite3AdapterOptions) => AbstractSQLite3Adapter,
+    this: new (filename?: string, options?: SQLite3AdapterOptions) => SQLite3Adapter,
     filename: string | ":memory:" = ":memory:",
     options: SQLite3AdapterOptions = {},
-  ): Promise<AbstractSQLite3Adapter> {
+  ): Promise<SQLite3Adapter> {
     const adapter = new this(filename, options);
     await adapter.completeAsyncConnect();
     return adapter;
@@ -2896,7 +2896,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       throw new ArgumentError("Cannot specify both timeout and retries arguments");
     }
     if (!isRubyTruthy(cfg.timeout)) return undefined;
-    const timeout = AbstractSQLite3Adapter.typeCastConfigToInteger(cfg.timeout);
+    const timeout = SQLite3Adapter.typeCastConfigToInteger(cfg.timeout);
     if (typeof timeout !== "number" || !Number.isInteger(timeout)) {
       throw new TypeError(`timeout must be integer, not ${String(timeout)}`);
     }
@@ -3123,7 +3123,7 @@ function translateException(
 // through the wired `execute`, as in Rails), and reads route through
 // `internalExecQuery` (never tripping the wrapper).
 dirtiesQueryCache(
-  AbstractSQLite3Adapter,
+  SQLite3Adapter,
   "execInsert",
   "rollbackDbTransaction",
   "rollbackToSavepoint",
@@ -3132,10 +3132,10 @@ dirtiesQueryCache(
 // Snapshot the unwrapped `execute` first: schema reflection routes through it
 // (via schemaQuery) so it never trips the dirtying wrapper, mirroring Rails'
 // `internal_exec_query`.
-captureUnwrappedExecute(AbstractSQLite3Adapter);
-dirtiesQueryCache(AbstractSQLite3Adapter, "execQuery", "execute");
+captureUnwrappedExecute(SQLite3Adapter);
+dirtiesQueryCache(SQLite3Adapter, "execQuery", "execute");
 
 // Mirrors `ActiveSupport.run_load_hooks(:active_record_sqlite3adapter, self)`
 // at the bottom of Rails' sqlite3_adapter.rb — lets railtie initializers
 // gate behavior on the sqlite3 adapter being loaded.
-runLoadHooks("active_record_sqlite3adapter", AbstractSQLite3Adapter);
+runLoadHooks("active_record_sqlite3adapter", SQLite3Adapter);

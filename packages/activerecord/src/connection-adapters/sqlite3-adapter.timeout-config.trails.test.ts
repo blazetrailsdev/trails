@@ -1,11 +1,11 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { AbstractSQLite3Adapter } from "./sqlite3-adapter.js";
+import { SQLite3Adapter } from "./sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "./better-sqlite3-adapter.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { deprecator } from "../deprecator.js";
 
 describe("SQLite3Adapter timeout config coercion", () => {
-  let adapter: AbstractSQLite3Adapter | undefined;
+  let adapter: SQLite3Adapter | undefined;
 
   afterEach(async () => {
     await adapter?.close();

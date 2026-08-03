@@ -68,7 +68,7 @@ function makeAdapter(options: FakeOptions = {}) {
 // migration/exclusion_constraint_test.rb and migration/unique_constraint_test.rb,
 // so drift in the identifier shape or digest slice fails here rather than
 // silently changing emitted DDL and dumped schema.
-describe("PostgreSQLSchemaStatements constraint name digests", () => {
+describe("SchemaStatements constraint name digests", () => {
   it("derives the exclusion constraint name Rails derives", () => {
     const ss = withSchemaStatements(makeAdapter().adapter);
     expect(
@@ -103,7 +103,7 @@ describe("PostgreSQLSchemaStatements constraint name digests", () => {
   });
 });
 
-describe("PostgreSQLSchemaStatements sequence helpers warn without a sequence", () => {
+describe("SchemaStatements sequence helpers warn without a sequence", () => {
   it("setPkSequenceBang warns when the table has a primary key but no sequence", async () => {
     const warn = vi.fn();
     const ss = withSchemaStatements(makeAdapter({ logger: { warn } }).adapter);
@@ -142,7 +142,7 @@ describe("PostgreSQLSchemaStatements sequence helpers warn without a sequence", 
 // Rails' index_name_exists? runs BOTH arguments through quoted_scope and
 // compares `i.relname = index[:name]` (schema_statements.rb:67-81), so a
 // schema-qualified index name matches on its bare identifier.
-describe("PostgreSQLSchemaStatements#indexNameExists", () => {
+describe("SchemaStatements#indexNameExists", () => {
   it("parses the index name through quotedScope rather than quoting it raw", async () => {
     const { adapter, sql } = makeAdapter({
       queryValue: async () => 1,
@@ -154,7 +154,7 @@ describe("PostgreSQLSchemaStatements#indexNameExists", () => {
   });
 });
 
-describe("PostgreSQLSchemaStatements#pkAndSequenceFor", () => {
+describe("SchemaStatements#pkAndSequenceFor", () => {
   it("falls back to the pg_attrdef query when the pg_depend lookup finds nothing", async () => {
     const { adapter, sql } = makeAdapter({
       query: async (text) =>
@@ -196,7 +196,7 @@ describe("PostgreSQLSchemaStatements#pkAndSequenceFor", () => {
   });
 });
 
-describe("PostgreSQLSchemaStatements#resetPkSequenceBang", () => {
+describe("SchemaStatements#resetPkSequenceBang", () => {
   // Ruby's `max_pk ? true : false` is a nil check; 0 is truthy in Ruby.
   it("emits setval(..., 0, true) when the max primary key is 0", async () => {
     const { adapter, sql } = makeAdapter({ queryValue: async () => 0 });
@@ -215,7 +215,7 @@ describe("PostgreSQLSchemaStatements#resetPkSequenceBang", () => {
   });
 });
 
-describe("PostgreSQLSchemaStatements sequenceNameFromParts identifier budget", () => {
+describe("SchemaStatements sequenceNameFromParts identifier budget", () => {
   it("truncates against the server's maxIdentifierLength, not a hardcoded 63", () => {
     const { adapter } = makeAdapter({ maxIdentifierLength: 31 });
     const ss = withSchemaStatements(adapter);
@@ -239,7 +239,7 @@ describe("PostgreSQLSchemaStatements sequenceNameFromParts identifier budget", (
   });
 });
 
-describe("PostgreSQLSchemaStatements#typeToSql enum validation", () => {
+describe("SchemaStatements#typeToSql enum validation", () => {
   it("resolves an enum column to its enum type", () => {
     const { adapter } = makeAdapter();
     const ss = withSchemaStatements(adapter);
@@ -255,7 +255,7 @@ describe("PostgreSQLSchemaStatements#typeToSql enum validation", () => {
   });
 });
 
-describe("PostgreSQLSchemaStatements#changeTable", () => {
+describe("SchemaStatements#changeTable", () => {
   it("yields the PostgreSQL Table subclass", async () => {
     const { adapter } = makeAdapter();
     const ss = withSchemaStatements(adapter);
@@ -267,7 +267,7 @@ describe("PostgreSQLSchemaStatements#changeTable", () => {
   });
 });
 
-describe("PostgreSQLSchemaStatements#indexes", () => {
+describe("SchemaStatements#indexes", () => {
   it("keeps the schema-qualified table name from the argument", async () => {
     const { adapter } = makeAdapter({
       query: async (text) =>

@@ -6,7 +6,7 @@ import {
   type TestDatabaseAdapter,
 } from "../test-adapter.js";
 import { Base } from "../base.js";
-import { AbstractSQLite3Adapter } from "../connection-adapters/sqlite3-adapter.js";
+import { SQLite3Adapter } from "../connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "../connection-adapters/better-sqlite3-adapter.js";
 import { NullTransaction } from "../connection-adapters/abstract/transaction.js";
 import { withTransactionalFixtures } from "./with-transactional-fixtures.js";
@@ -79,7 +79,7 @@ describe("withTransactionalFixtures", () => {
 // the DDL-touched tables after rollback (per-table, not a blanket clear) to
 // keep that in-memory reflection in sync with the rolled-back DB.
 describe("withTransactionalFixtures (schema-cache invalidation)", () => {
-  let adapter: AbstractSQLite3Adapter;
+  let adapter: SQLite3Adapter;
 
   beforeAll(async () => {
     adapter = new BetterSQLite3Adapter(":memory:");
@@ -121,7 +121,7 @@ describe("withTransactionalFixtures (schema-cache invalidation)", () => {
 // `transactionManager` lives on the adapter itself via AbstractAdapter, not
 // behind an `innerAdapter` wrapper.
 describe("withTransactionalFixtures (raw adapter)", () => {
-  let adapter: AbstractSQLite3Adapter;
+  let adapter: SQLite3Adapter;
   const exec = (sql: string) => adapter.exec(sql);
   const query = (sql: string) => adapter.execute(sql);
 
@@ -152,7 +152,7 @@ describe("withTransactionalFixtures (raw adapter)", () => {
 // shape), so a warmed entry for an untouched table survives into the next test
 // instead of being wiped by a blanket clear.
 describe("withTransactionalFixtures (per-table re-reflection preserves untouched entries)", () => {
-  let adapter: AbstractSQLite3Adapter;
+  let adapter: SQLite3Adapter;
 
   beforeAll(async () => {
     adapter = new BetterSQLite3Adapter(":memory:");
@@ -195,7 +195,7 @@ describe("withTransactionalFixtures (per-table re-reflection preserves untouched
 // re-reflection in afterEach. Cached column reflection survives across tests
 // — pay this cost only when the file does pure DML.
 describe("withTransactionalFixtures (invalidateSchemaCache: false)", () => {
-  let adapter: AbstractSQLite3Adapter;
+  let adapter: SQLite3Adapter;
 
   beforeAll(async () => {
     adapter = new BetterSQLite3Adapter(":memory:");

@@ -29,7 +29,7 @@ function makeFakeAdapter() {
   return { adapter, executed, clearedTables };
 }
 
-describe("PostgreSQLSchemaStatements#dropTable", () => {
+describe("SchemaStatements#dropTable", () => {
   it("emits a single DROP TABLE statement with all table names joined", async () => {
     const { adapter, executed } = makeFakeAdapter();
     const ss = withSchemaStatements(adapter);
@@ -93,7 +93,7 @@ function makeSchemaAdapter() {
   return { adapter, execed };
 }
 
-describe("PostgreSQLSchemaStatements#dropSchema", () => {
+describe("SchemaStatements#dropSchema", () => {
   it("always appends CASCADE", async () => {
     const { adapter, execed } = makeSchemaAdapter();
     const ss = withSchemaStatements(adapter);
@@ -109,7 +109,7 @@ describe("PostgreSQLSchemaStatements#dropSchema", () => {
   });
 });
 
-describe("PostgreSQLSchemaStatements#schemaSearchPath", () => {
+describe("SchemaStatements#schemaSearchPath", () => {
   it("memoizes the search path and only queries once", async () => {
     const { adapter } = makeSchemaAdapter();
     const ss = withSchemaStatements(adapter);
@@ -152,7 +152,7 @@ describe("PostgreSQLSchemaStatements#schemaSearchPath", () => {
   });
 });
 
-describe("PostgreSQLSchemaStatements#addForeignKey use_foreign_keys? guard", () => {
+describe("SchemaStatements#addForeignKey use_foreign_keys? guard", () => {
   it("is a no-op when the adapter does not support foreign keys (Rails super guard)", async () => {
     // Rails PG add_foreign_key is `assert_valid_deferrable(deferrable); super`,
     // and the abstract super begins with `return unless use_foreign_keys?`.

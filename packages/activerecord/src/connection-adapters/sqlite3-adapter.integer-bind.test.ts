@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { AbstractSQLite3Adapter } from "./sqlite3-adapter.js";
+import { SQLite3Adapter } from "./sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "./better-sqlite3-adapter.js";
 import { FloatType, DecimalType, IntegerType } from "@blazetrails/activemodel";
 import { QueryAttribute } from "../relation/query-attribute.js";
@@ -13,7 +13,7 @@ import { QueryAttribute } from "../relation/query-attribute.js";
 // as SQLITE_INTEGER (`LOWER(1) => '1'`). The adapter's type cast converts
 // integer-valued numbers to BigInt so they bind as SQLITE_INTEGER.
 describe("SQLite3Adapter integer bind serialization", () => {
-  let adapter: AbstractSQLite3Adapter;
+  let adapter: SQLite3Adapter;
   let tmpDir: string;
 
   beforeEach(() => {

@@ -166,6 +166,24 @@ if (!isMainThread && parentPort) {
 // extractPackage and posts the result back.
 const WORKER_BOOTSTRAP = path.join(SCRIPT_DIR, "extract-ts-api-worker.mjs");
 
+/**
+ * Record where an `include()`/`extend()` edge's module was declared, so a
+ * consumer resolving the bare short name is not left guessing between
+ * same-named modules in sibling adapter directories.
+ */
+function recordExtendsFile(
+  hostInfo: ClassInfo,
+  modName: string,
+  sym: ts.Symbol | undefined,
+  srcDir: string,
+): void {
+  const decl = sym?.valueDeclaration ?? sym?.declarations?.[0];
+  if (!decl) return;
+  const declFile = path.relative(srcDir, decl.getSourceFile().fileName).replace(/\\/g, "/");
+  if (declFile.startsWith("..")) return;
+  hostInfo.extendsFiles = { ...(hostInfo.extendsFiles ?? {}), [modName]: declFile };
+}
+
 function extractInWorker(pkgName: string, srcDir: string): Promise<WorkerOutput> {
   return new Promise((resolve, reject) => {
     const worker = new Worker(WORKER_BOOTSTRAP, {
@@ -1085,6 +1103,7 @@ export function extractFromProgram(
         // (a): class / interface / module — push name for later resolution.
         const modName = sym?.name ?? modArg.text;
         if (!hostInfo.extends.includes(modName)) hostInfo.extends.push(modName);
+        recordExtendsFile(hostInfo, modName, sym, srcDir);
       }
     });
   }
@@ -1200,6 +1219,7 @@ export function extractFromProgram(
 
         const modName = sym?.name ?? modArg.text;
         if (!hostInfo.extends.includes(modName)) hostInfo.extends.push(modName);
+        recordExtendsFile(hostInfo, modName, sym, srcDir);
       }
     });
   }

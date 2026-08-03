@@ -144,7 +144,7 @@ const postgresqlLoader: AdapterLoader = async () =>
 register("sqlite3", sqlite3Loader);
 register("node-sqlite", nodeSqliteLoader);
 // `expo-sqlite`'s driver only implements async `open()`. It's now openable via
-// the async construction path (`AbstractSQLite3Adapter.openAsync()` / the pool's
+// the async construction path (`SQLite3Adapter.openAsync()` / the pool's
 // async checkout, which awaits `completeAsyncConnect()` in `verifyBang`).
 register("expo-sqlite", expoSqliteLoader);
 register("libsql", libsqlLoader);

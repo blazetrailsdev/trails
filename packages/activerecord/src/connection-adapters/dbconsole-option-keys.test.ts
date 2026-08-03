@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { AbstractMysqlAdapter } from "./abstract-mysql-adapter.js";
-import { AbstractSQLite3Adapter } from "./sqlite3-adapter.js";
+import { SQLite3Adapter } from "./sqlite3-adapter.js";
 import { PostgreSQLAdapter } from "./postgresql-adapter.js";
 
 // The Rails `dbconsole` PTY exec is unported (see scripts/api-compare/
@@ -30,19 +30,19 @@ describe("AbstractMysqlAdapter.dbconsole option keys", () => {
   });
 });
 
-describe("AbstractSQLite3Adapter.dbconsole option keys", () => {
+describe("SQLite3Adapter.dbconsole option keys", () => {
   it("prepends -#{mode} and -header before the database path", () => {
     expect(
-      AbstractSQLite3Adapter.dbconsole({ database: "db.sqlite3" }, { mode: "html", header: true }),
+      SQLite3Adapter.dbconsole({ database: "db.sqlite3" }, { mode: "html", header: true }),
     ).toEqual(["-html", "-header", "db.sqlite3"]);
   });
 
   it("omits the flags when mode/header are absent", () => {
-    expect(AbstractSQLite3Adapter.dbconsole({ database: "db.sqlite3" })).toEqual(["db.sqlite3"]);
+    expect(SQLite3Adapter.dbconsole({ database: "db.sqlite3" })).toEqual(["db.sqlite3"]);
   });
 
   it("keeps a Ruby-truthy empty-string mode", () => {
-    expect(AbstractSQLite3Adapter.dbconsole({ database: "db.sqlite3" }, { mode: "" })).toEqual([
+    expect(SQLite3Adapter.dbconsole({ database: "db.sqlite3" }, { mode: "" })).toEqual([
       "-",
       "db.sqlite3",
     ]);

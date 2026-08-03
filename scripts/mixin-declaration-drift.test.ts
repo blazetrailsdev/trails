@@ -36,7 +36,7 @@ const PAIRS = [
   {
     label: "PostgreSQLAdapter / PostgreSQL::SchemaStatements",
     mixinFile: `${ADAPTERS}postgresql/schema-statements-class.ts`,
-    mixinClass: "PostgreSQLSchemaStatements",
+    mixinClass: "SchemaStatements",
     adapterFile: `${ADAPTERS}postgresql-adapter.ts`,
     adapterInterface: "PostgreSQLAdapter",
     witness: PostgreSQLAdapter,

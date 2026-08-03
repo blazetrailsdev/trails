@@ -1,7 +1,7 @@
 import { type Type, ValueType, ArgumentError } from "@blazetrails/activemodel";
 import { Nodes, Visitors } from "@blazetrails/arel";
 import { singularize, getCrypto } from "@blazetrails/activesupport";
-import { SchemaStatements } from "../abstract/schema-statements.js";
+import { SchemaStatements as AbstractSchemaStatements } from "../abstract/schema-statements.js";
 import {
   AlterTable,
   ChangeColumnDefinition,
@@ -99,7 +99,7 @@ function toS(value: unknown): string {
   return value == null ? "" : String(value);
 }
 
-export class PostgreSQLSchemaStatements extends SchemaStatements {
+export class SchemaStatements extends AbstractSchemaStatements {
   private get pg(): PgSchemaAdapter {
     return this as unknown as PgSchemaAdapter;
   }
@@ -109,7 +109,9 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     return new PgTable(tableName, (base ?? this) as SchemaStatementsConstraintLike);
   }
 
-  override async dropTable(...args: Parameters<SchemaStatements["dropTable"]>): Promise<void> {
+  override async dropTable(
+    ...args: Parameters<AbstractSchemaStatements["dropTable"]>
+  ): Promise<void> {
     const [tableNames, options] = this._splitTableNamesAndOptions(args);
     if (tableNames.length === 0) {
       throw new ArgumentError("dropTable requires at least one table name");

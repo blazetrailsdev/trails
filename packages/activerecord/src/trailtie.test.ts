@@ -3,7 +3,7 @@ import { Trailtie, loadDefaults, type ActiveRecordConfig } from "./trailtie.js";
 import { Base } from "./base.js";
 import { Railtie as BaseRailtie, resetLoadHooks, runLoadHooks } from "@blazetrails/activesupport";
 import { SchemaReflection } from "./connection-adapters/schema-cache.js";
-import { AbstractSQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
+import { SQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
 import { PostgreSQLAdapter } from "./connection-adapters/postgresql-adapter.js";
 import { Configurable as EncryptionConfigurable } from "./encryption/configurable.js";
 import { ExtendedDeterministicUniquenessValidator } from "./encryption/extended-deterministic-uniqueness-validator.js";
@@ -35,7 +35,7 @@ describe("RailtieTest", () => {
     savedTimeZoneAwareTypes = [...Base.timeZoneAwareTypes];
     savedUseSchemaCacheDump = SchemaReflection.useSchemaCacheDump;
     savedCheckSchemaCacheDumpVersion = SchemaReflection.checkSchemaCacheDumpVersion;
-    savedStrictStrings = AbstractSQLite3Adapter.strictStringsByDefault;
+    savedStrictStrings = SQLite3Adapter.strictStringsByDefault;
     savedDecodeDates = PostgreSQLAdapter.decodeDates;
     savedEncryptionSupportUnencryptedData = EncryptionConfigurable.config.supportUnencryptedData;
     savedPartialInserts = Base.partialInserts;
@@ -48,7 +48,7 @@ describe("RailtieTest", () => {
     resetLoadHooks();
     runLoadHooks("active_record", Base);
     runLoadHooks("active_record_postgresqladapter", PostgreSQLAdapter);
-    runLoadHooks("active_record_sqlite3adapter", AbstractSQLite3Adapter);
+    runLoadHooks("active_record_sqlite3adapter", SQLite3Adapter);
   });
 
   afterEach(() => {
@@ -59,7 +59,7 @@ describe("RailtieTest", () => {
     Base.timeZoneAwareTypes = savedTimeZoneAwareTypes;
     SchemaReflection.useSchemaCacheDump = savedUseSchemaCacheDump;
     SchemaReflection.checkSchemaCacheDumpVersion = savedCheckSchemaCacheDumpVersion;
-    AbstractSQLite3Adapter.strictStringsByDefault = savedStrictStrings;
+    SQLite3Adapter.strictStringsByDefault = savedStrictStrings;
     PostgreSQLAdapter.decodeDates = savedDecodeDates;
     EncryptionConfigurable.config.supportUnencryptedData = savedEncryptionSupportUnencryptedData;
     Base.partialInserts = savedPartialInserts;
@@ -127,7 +127,7 @@ describe("RailtieTest", () => {
     const cfg = Trailtie.config["activeRecord"] as ActiveRecordConfig;
     cfg.sqlite3AdapterStrictStringsByDefault = true;
     Trailtie.runInitializers();
-    expect(AbstractSQLite3Adapter.strictStringsByDefault).toBe(true);
+    expect(SQLite3Adapter.strictStringsByDefault).toBe(true);
   });
 
   it("runInitializers copies postgresql decode_dates flag onto PostgreSQLAdapter", () => {

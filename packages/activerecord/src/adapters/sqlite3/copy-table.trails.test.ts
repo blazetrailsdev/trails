@@ -3,7 +3,7 @@ import "../../index.js";
 import { Base } from "../../base.js";
 import { fixtures } from "../../test-fixtures.js";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
-import type { AbstractSQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
+import type { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 
 type Row = Record<string, unknown>;
 
@@ -24,8 +24,8 @@ interface TableRebuildInternals {
 fixtures([]);
 
 describeIfSqlite("SQLite3Adapter table-rebuild cluster", () => {
-  let db: AbstractSQLite3Adapter;
-  let leased: AbstractSQLite3Adapter | undefined;
+  let db: SQLite3Adapter;
+  let leased: SQLite3Adapter | undefined;
   const internals = (): TableRebuildInternals => db as unknown as TableRebuildInternals;
 
   const dropCopyTargets = async (): Promise<void> => {
@@ -35,7 +35,7 @@ describeIfSqlite("SQLite3Adapter table-rebuild cluster", () => {
   };
 
   beforeEach(async () => {
-    db = leased = Base.connection as AbstractSQLite3Adapter;
+    db = leased = Base.connection as SQLite3Adapter;
     await dropCopyTargets();
   });
 

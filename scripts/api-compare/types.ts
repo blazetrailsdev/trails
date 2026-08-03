@@ -120,7 +120,7 @@ export interface MethodInfo {
    * TS-side only (RFC 0083): the class/module this method forwards to when its
    * whole body is `return this.<accessor>().<sameName>(...)`. trails does not
    * mix a Rails module into its host class the way Ruby `include` does — the
-   * PostgreSQL schema-statements port lives in `PostgreSQLSchemaStatements` and
+   * PostgreSQL schema-statements port lives in `PostgreSQL::SchemaStatements` and
    * `PostgreSQLAdapter` reaches it through `this.pgSchemaStatements()`. The
    * target name is resolved from the accessor's RETURN TYPE via the checker,
    * never from filename proximity (sibling adapters would cross-credit each
@@ -136,6 +136,16 @@ export interface ClassInfo {
   reExportedFrom?: string;
   includes: string[];
   extends: string[];
+  /**
+   * TS-side only: for each `include()`/`extend()` edge recorded on `extends` by
+   * its bare short name, the src-relative file the symbol was declared in. Two
+   * different modules can share a short name (`SchemaStatements` exists under
+   * `connection-adapters/abstract/`, `postgresql/` and `sqlite3/`), and
+   * filename-proximity scoring cannot tell them apart from the host's path.
+   * Consumers resolving an edge should prefer the candidate whose `file`
+   * matches the entry here and fall back to proximity only when absent.
+   */
+  extendsFiles?: Record<string, string>;
   /**
    * TS-side only (RFC 0083): sorted union of every `MethodInfo.delegatesTo` on
    * this class — the accessor-forwarding counterpart of `includes`/`extends`,

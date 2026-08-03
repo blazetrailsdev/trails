@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { SqliteConnection, SqliteDriver } from "../sqlite-adapter.js";
-import type { AbstractSQLite3Adapter } from "../connection-adapters/sqlite3-adapter.js";
+import type { SQLite3Adapter } from "../connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "../connection-adapters/better-sqlite3-adapter.js";
 import { LibSQLAdapter } from "../connection-adapters/libsql-adapter.js";
 import { NodeSQLiteAdapter } from "../connection-adapters/node-sqlite-adapter.js";
@@ -56,7 +56,7 @@ describe.each(drivers)("SqliteStatement#reader — %s", (_name, driver, availabl
   });
 });
 
-const adapters: [string, () => AbstractSQLite3Adapter, boolean][] = [
+const adapters: [string, () => SQLite3Adapter, boolean][] = [
   ["better-sqlite3", () => new BetterSQLite3Adapter(":memory:"), true],
   ["libsql", () => new LibSQLAdapter(":memory:"), true],
   ["node-sqlite", () => new NodeSQLiteAdapter(":memory:"), isNodeSqliteAvailable],

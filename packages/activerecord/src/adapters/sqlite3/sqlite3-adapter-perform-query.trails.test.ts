@@ -10,11 +10,11 @@
 import { it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
 import { Base } from "../../base.js";
-import { AbstractSQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
+import { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "../../connection-adapters/better-sqlite3-adapter.js";
 import { ReadOnlyError } from "../../errors.js";
 
-let adapter: AbstractSQLite3Adapter;
+let adapter: SQLite3Adapter;
 
 beforeEach(async () => {
   adapter = new BetterSQLite3Adapter(":memory:");
@@ -108,7 +108,7 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
   // The guard itself lives in preprocess_query's check_if_write_query, so it
   // covers execute and executeMutation alike.
   it("errors when a write is routed through execute while preventing writes", async () => {
-    const connection = (await Base.leaseConnection()) as unknown as AbstractSQLite3Adapter;
+    const connection = (await Base.leaseConnection()) as unknown as SQLite3Adapter;
     await expect(
       Base.whilePreventingWrites(() =>
         connection.execute(`INSERT INTO subscribers(nick) VALUES ('pq')`),
@@ -117,7 +117,7 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
   });
 
   it("does not prevent a read routed through execute while preventing writes", async () => {
-    const connection = (await Base.leaseConnection()) as unknown as AbstractSQLite3Adapter;
+    const connection = (await Base.leaseConnection()) as unknown as SQLite3Adapter;
     await Base.whilePreventingWrites(async () => {
       await expect(
         connection.execute(`SELECT * FROM subscribers WHERE nick = 'pq'`),

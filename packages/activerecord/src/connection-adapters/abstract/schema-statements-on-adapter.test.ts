@@ -8,7 +8,7 @@
  * native) keep a throwaway `:memory:` adapter.
  */
 import { describe, it, expect, afterEach } from "vitest";
-import { AbstractSQLite3Adapter } from "../sqlite3-adapter.js";
+import { SQLite3Adapter } from "../sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "../better-sqlite3-adapter.js";
 import { AbstractAdapter } from "../abstract-adapter.js";
 import { Result } from "../../result.js";
@@ -20,7 +20,7 @@ import { adapterType } from "../../test-adapter.js";
 
 const guardsIfNotExists = adapterType !== "sqlite";
 
-let adapter: AbstractSQLite3Adapter | undefined;
+let adapter: SQLite3Adapter | undefined;
 
 afterEach(async () => {
   await adapter?.close();

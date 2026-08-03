@@ -1,7 +1,7 @@
 import type { SqliteDriver } from "../sqlite-adapter.js";
 import { ConfigurationError } from "../errors.js";
 import { libsqlReplicaDriver, type SyncableSqliteConnection } from "../sqlite/libsql.js";
-import { AbstractSQLite3Adapter } from "./sqlite3-adapter.js";
+import { SQLite3Adapter } from "./sqlite3-adapter.js";
 
 /**
  * SQLite adapter backed by the `libsql` client in **embedded-replica** mode:
@@ -16,7 +16,7 @@ import { AbstractSQLite3Adapter } from "./sqlite3-adapter.js";
  * adapter's `database`/filename argument.
  *
  * Construction is network-backed (initial sync), so it goes through the
- * async-open path (`AbstractSQLite3Adapter.openAsync()`). All SQLite dialect,
+ * async-open path (`SQLite3Adapter.openAsync()`). All SQLite dialect,
  * quoting, and schema logic lives in the abstract base; this subclass binds the
  * replica driver and adds the caller-driven {@link syncReplica} trigger.
  *
@@ -35,7 +35,7 @@ import { AbstractSQLite3Adapter } from "./sqlite3-adapter.js";
  * base and binds each client in its own thin subclass; there is nothing to
  * converge these names onto upstream.
  */
-export class LibSQLReplicaAdapter extends AbstractSQLite3Adapter {
+export class LibSQLReplicaAdapter extends SQLite3Adapter {
   protected override defaultSqliteDriver(): SqliteDriver {
     return libsqlReplicaDriver;
   }

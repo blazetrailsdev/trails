@@ -3,7 +3,7 @@ import { Notifications } from "@blazetrails/activesupport";
 import { Base } from "../base.js";
 import { fixtures } from "../test-fixtures.js";
 import { describeIfSqlite } from "../support/describe-if-sqlite.js";
-import type { AbstractSQLite3Adapter } from "./sqlite3-adapter.js";
+import type { SQLite3Adapter } from "./sqlite3-adapter.js";
 import { ActiveRecord } from "../ar-config.js";
 import type { QueryTransformer } from "../query-transformers.js";
 
@@ -15,11 +15,11 @@ fixtures([]);
 // payload — the Rails-faithful ordering where preprocess_query runs before
 // raw_execute's log block.
 describeIfSqlite("SQLite3Adapter queryTransformers wiring", () => {
-  let adapter: AbstractSQLite3Adapter;
+  let adapter: SQLite3Adapter;
   let savedTransformers: QueryTransformer[];
 
   beforeEach(() => {
-    adapter = Base.connection as AbstractSQLite3Adapter;
+    adapter = Base.connection as SQLite3Adapter;
     savedTransformers = ActiveRecord.queryTransformers.slice();
     ActiveRecord.queryTransformers.length = 0;
   });

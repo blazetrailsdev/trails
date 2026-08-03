@@ -78,7 +78,7 @@ function isRemoteLibsqlUrl(url: string): boolean {
  *   sqlite / sqlite3 / node-sqlite → sqlite
  *
  * SQLite client-library adapters share the `(filename, options)` constructor
- * shape (their subclasses inherit it from `AbstractSQLite3Adapter`), so they
+ * shape (their subclasses inherit it from `SQLite3Adapter`), so they
  * normalize to `sqlite` for argument building. This only affects
  * constructor-argument shape; class resolution still keys off the raw name.
  */

@@ -2,11 +2,11 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { AbstractSQLite3Adapter } from "./sqlite3-adapter.js";
+import { SQLite3Adapter } from "./sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "./better-sqlite3-adapter.js";
 
 describe("SQLite3Adapter schema introspection", () => {
-  let adapter: AbstractSQLite3Adapter;
+  let adapter: SQLite3Adapter;
   let tmpDir: string;
 
   beforeEach(() => {
