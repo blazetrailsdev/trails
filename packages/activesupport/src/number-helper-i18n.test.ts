@@ -15,8 +15,8 @@ import {
 I18n.setEnforceAvailableLocales(false);
 
 /** `I18n.reload!` plus the `en` locale Rails re-reads from its load path. */
-function reloadTranslations(): void {
-  I18n.reloadBang();
+async function reloadTranslations(): Promise<void> {
+  await I18n.reloadBang();
   I18n.backend().storeTranslations("en", en);
 }
 
@@ -79,13 +79,13 @@ function setupTranslations(): void {
 }
 
 describe("NumberHelperI18nTest", () => {
-  beforeEach(() => {
-    reloadTranslations();
+  beforeEach(async () => {
+    await reloadTranslations();
     setupTranslations();
   });
 
-  afterEach(() => {
-    reloadTranslations();
+  afterEach(async () => {
+    await reloadTranslations();
   });
 
   it("number to i18n currency", () => {

@@ -21,6 +21,7 @@ import type { Base } from "./backend/base.js";
 import { Config } from "./config.js";
 import { ArgumentError, Disabled, InvalidLocale, MissingTranslation } from "./exceptions.js";
 import type { TranslateOptions } from "./backend/base.js";
+import { reloadTranslationFiles } from "./backend/base.js";
 import { throwException, catchException } from "./throw-catch.js";
 
 /** Ruby models locales as Symbols; the JS analogue is a plain string. */
@@ -172,9 +173,18 @@ export function setEnforceAvailableLocales(value: boolean): void {
  * Tells the backend to reload translations. Used in situations like the
  * Rails development environment. Backends can implement whatever strategy
  * is useful.
+ *
+ * The gem's `reload!` is synchronous because `Simple#reload!` only clears
+ * `@initialized` / `@translations` (simple.rb:57-62) and the re-read of
+ * `I18n.load_path` happens later, inside the next lazy `init_translations`
+ * (simple.rb:83-86). Here that read is a Promise, so it is pulled forward to
+ * this one seam and awaited: `reload!` is the only method that becomes async,
+ * and every ported body below it — including the four lazy call sites — stays
+ * verbatim and synchronous.
  */
-export function reloadBang(): void {
+export async function reloadBang(): Promise<void> {
   config().clearAvailableLocalesSet();
+  await reloadTranslationFiles();
   config().backend.reloadBang();
 }
 

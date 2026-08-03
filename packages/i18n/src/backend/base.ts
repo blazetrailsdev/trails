@@ -78,18 +78,27 @@ export function registerFileReader(reader: FileReader): void {
  * `Naming#human` and `NumberConverter#format`; making them async would push a
  * deviation through five packages to remove one from this file. Awaiting the
  * I/O once at boot keeps the async fs and leaves every ported body verbatim.
- *
- * One behavioural consequence, and the only one: `I18n.reload!` re-parses these
- * bytes rather than re-reading the files, so it does not pick up an edit on
- * disk the way `reload!` does in the gem. Re-running this preload before
- * `I18n.reloadBang()` restores that; a synchronous re-read here is exactly what
- * the language does not allow.
  */
 export async function preloadTranslationFiles(...filenames: (string | string[])[]): Promise<void> {
   const paths = filenames.length === 0 ? config().loadPath : filenames;
   for (const filename of paths.flat()) {
     fileContents.set(filename, await readTranslationFile(filename));
   }
+}
+
+/**
+ * Drops the preloaded bytes and re-reads `I18n.load_path`, so that the
+ * `load_translations` the next lazy `init_translations` runs sees what is on
+ * disk now — which is what `YAML.load_file` (base.rb:246) does on every
+ * `I18n.reload!` in the gem. A host that never registered a reader has no
+ * files to re-read, and `I18n.reload!` there is only the in-memory clear.
+ *
+ * @internal
+ */
+export async function reloadTranslationFiles(): Promise<void> {
+  if (!fileReader) return;
+  fileContents.clear();
+  await preloadTranslationFiles();
 }
 
 function readTranslationFile(filename: string): Promise<string> {

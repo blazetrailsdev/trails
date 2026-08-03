@@ -6,7 +6,7 @@
 import { readFile } from "node:fs/promises";
 import { beforeEach, describe, expect, it } from "vitest";
 import { Simple } from "./simple.js";
-import { config, resetConfig } from "../i18n.js";
+import { config, reloadBang, resetConfig } from "../i18n.js";
 import { resetClassConfig } from "../config.js";
 import { InvalidLocaleData } from "../exceptions.js";
 import { preloadTranslationFiles, registerFileReader } from "./base.js";
@@ -66,7 +66,7 @@ describe("I18n::Backend::Base file loading", () => {
     expect(backend.initialized()).toBe(true);
   });
 
-  it("re-reads I18n.load_path when the preload is re-run before reloadBang", async () => {
+  it("re-reads I18n.load_path on reloadBang", async () => {
     let body = "en:\n  foo:\n    bar: baz\n";
     registerFileReader(() => Promise.resolve(body));
     config().loadPath = ["mutable.yml"];
@@ -74,8 +74,7 @@ describe("I18n::Backend::Base file loading", () => {
     expect(backend.translate("en", "foo.bar")).toBe("baz");
 
     body = "en:\n  foo:\n    bar: qux\n";
-    await preloadTranslationFiles();
-    backend.reloadBang();
+    await reloadBang();
     expect(backend.translate("en", "foo.bar")).toBe("qux");
   });
 
