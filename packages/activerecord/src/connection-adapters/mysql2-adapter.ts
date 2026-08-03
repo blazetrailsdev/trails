@@ -213,7 +213,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   // stash). A never-connected/fake/closed adapter skips the ping and flows
   // straight through the base logic, exactly as before.
   override async verifyBang(): Promise<void> {
-    if (this._client !== null && !this._permanentlyClosed && !this._isFakeConnection) {
+    if (this.isConnected()) {
       await this.activeAsync();
     }
     await super.verifyBang();
