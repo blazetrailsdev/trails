@@ -388,11 +388,6 @@ describe("TableDefinition#raise_on_duplicate_column", () => {
 });
 
 describe("TableDefinition#primary_key option", () => {
-  it("treats primaryKey: false same as id: false", () => {
-    const td = new TableDefinition("t", { adapter: schemaConn("sqlite"), primaryKey: false });
-    expect(td.columns.find((c) => c.options.primaryKey)).toBeUndefined();
-  });
-
   it("treats primaryKey: 'uuid' as a custom PK column name", () => {
     const td = new TableDefinition("t", { adapter: schemaConn("sqlite"), primaryKey: "uuid" });
     const pk = td.columns.find((c) => c.options.primaryKey);

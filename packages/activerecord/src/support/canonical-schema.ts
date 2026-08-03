@@ -275,10 +275,14 @@ export async function runTable(
 ): Promise<void> {
   const { name, meta, fn } = def;
   const createOpts: { id?: false; primaryKey?: string[] } = {};
-  if (meta.id === false || meta.serialPk !== undefined || meta.primaryKey !== undefined) {
+  // Rails spells a composite PK `create_table t, primary_key: [...]` with the
+  // default `id` — `id: false` would skip set_primary_key's `if id` guard
+  // entirely (schema_definitions.rb:395).
+  if (meta.primaryKey !== undefined) {
+    createOpts.primaryKey = meta.primaryKey;
+  } else if (meta.id === false || meta.serialPk !== undefined) {
     createOpts.id = false;
   }
-  if (meta.primaryKey !== undefined) createOpts.primaryKey = meta.primaryKey;
   let builder!: TableBuilder;
   await ss.createTable(name, createOpts, (t: TableDefinition) => {
     builder = new TableBuilder(t, adapter.adapterName, typeMap, meta.serialPk ?? null);

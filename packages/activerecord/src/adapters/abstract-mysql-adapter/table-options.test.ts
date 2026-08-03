@@ -84,7 +84,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         "mysql_table_options",
         {
           force: true,
-          id: false,
           primaryKey: ["id", "account_id"],
           charset: "utf8mb4",
           collation: "utf8mb4_bin",

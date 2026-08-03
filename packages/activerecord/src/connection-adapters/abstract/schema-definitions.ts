@@ -1001,38 +1001,32 @@ export class TableDefinition {
       collation?: string;
       default?: unknown;
       autoIncrement?: boolean;
+      limit?: number;
+      precision?: number;
+      unsigned?: boolean;
     },
   ) {
     this.tableName = tableName;
     this._adapterName = tdOptions.adapterName ?? "sqlite";
     this._adapter = tdOptions.adapter;
-    // Composite primaryKey implies id: false — Rails requires this and emitting both
-    // an auto-id column AND a composite PK constraint is invalid DDL.
-    const hasCompositePk = Array.isArray(tdOptions.primaryKey) && tdOptions.primaryKey.length > 0;
     if (Array.isArray(tdOptions.primaryKey) && tdOptions.primaryKey.length === 0) {
       throw new ArgumentError("primaryKey array must not be empty");
     }
-    // primaryKey: false ⇒ same as id: false (no auto-PK column).
-    // primaryKey: "custom_name" ⇒ keep auto-PK but rename the column.
-    const pkFalse = tdOptions.primaryKey === false;
-    const pkNameOverride =
-      typeof tdOptions.primaryKey === "string" ? tdOptions.primaryKey : undefined;
     this.temporary = tdOptions.temporary ?? false;
     this.ifNotExists = tdOptions.ifNotExists ?? false;
     this.as = tdOptions.as;
     this.options = tdOptions.options;
     this.comment = tdOptions.comment;
+    // Rails calls set_primary_key from build_create_table_definition
+    // (schema_statements.rb:335) rather than the constructor, because its
+    // TableDefinition#initialize takes no id/primary_key. trails' callers build
+    // definitions directly, so the single invocation lives here instead — the
+    // primary-key options travel alongside id/primaryKey in the same hash.
     const pkOptions: Record<string, unknown> = {};
-    if (tdOptions.default !== undefined) pkOptions.default = tdOptions.default;
-    if (tdOptions.autoIncrement !== undefined) pkOptions.autoIncrement = tdOptions.autoIncrement;
-    this.setPrimaryKey(
-      tableName,
-      // A composite primaryKey overrides `id: false`: Rails' guard would skip it,
-      // but trails' callers spell a composite PK as `id: false, primaryKey: [...]`.
-      hasCompositePk ? true : pkFalse ? false : (tdOptions.id ?? true),
-      hasCompositePk ? (tdOptions.primaryKey as string[]) : pkNameOverride,
-      pkOptions,
-    );
+    for (const key of ["limit", "default", "precision", "unsigned", "autoIncrement"] as const) {
+      if (tdOptions[key] !== undefined) pkOptions[key] = tdOptions[key];
+    }
+    this.setPrimaryKey(tableName, tdOptions.id ?? true, tdOptions.primaryKey, pkOptions);
   }
 
   setPrimaryKey(
@@ -1041,13 +1035,6 @@ export class TableDefinition {
     primaryKey?: string | string[] | false,
     options: Record<string, unknown> = {},
   ): void {
-    // Rails has no equivalent: its set_primary_key only ever runs on a fresh
-    // definition, while trails also re-runs it over a definition rebuilt from an
-    // existing table (SQLite's copy-table path), which already carries the old PK.
-    for (let i = this.columns.length - 1; i >= 0; i--) {
-      if (this.columns[i].options.primaryKey) this.columns.splice(i, 1);
-    }
-
     if (!id || this.as) return;
 
     // Rails' `primary_key || Base.get_primary_key(...)` — `||`, not `??`, so an

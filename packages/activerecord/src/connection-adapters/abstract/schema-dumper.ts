@@ -349,10 +349,8 @@ export function emitTableBody(
   // All values in tableOpts are pre-formatted TS-DSL text for formatColspec.
   const tableOpts: Record<string, unknown> = {};
   if (hasCompositePk) {
-    // Rails (Array case) emits only `primary_key: [...]`; the TS DSL also needs
-    // `id: false` so createTable doesn't auto-add an `id` column on round-trip.
+    // Rails (Array case) emits only `primary_key: [...]` — schema_dumper.rb:182.
     tableOpts["primaryKey"] = JSON.stringify(pkColumns.map((c) => c.name));
-    tableOpts["id"] = "false";
   } else if (!pkColumn) {
     tableOpts["id"] = "false";
   } else {

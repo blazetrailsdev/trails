@@ -355,7 +355,9 @@ describe("SchemaDumperAdapterTest", () => {
     const lines: string[] = [];
     await (dumper as any).table("t", lines);
     expect(lines[0]).toContain(`primaryKey: ["id","account_id"]`);
-    expect(lines[0]).toContain(`id: false`);
+    // Rails' Array case emits only `primary_key: [...]` (schema_dumper.rb:182);
+    // `id: false` would skip set_primary_key's guard on round-trip.
+    expect(lines[0]).not.toContain(`id: false`);
   });
 
   // Drop the real tables these adapter-backed tests create on the shared
