@@ -3,7 +3,6 @@ import {
   isRowFormatDynamicByDefault,
   defaultRowFormat,
   validPrimaryKeyOptions,
-  createTableDefinition,
   defaultType,
   newColumnFromField,
   fetchTypeMetadata,
@@ -67,10 +66,6 @@ describe("MySQL::SchemaStatements", () => {
     expect(opts).toContain("unsigned");
     expect(opts).toContain("autoIncrement");
     expect(opts).toContain("limit");
-  });
-
-  it("createTableDefinition returns MySQL TableDefinition", () => {
-    expect(createTableDefinition("users").tableName).toBe("users");
   });
 
   it("defaultType: parses string/integer/function defaults", () => {

@@ -9,7 +9,7 @@ import { presence } from "@blazetrails/activesupport";
 import { Version } from "../abstract-adapter.js";
 import { SqlTypeMetadata } from "../sql-type-metadata.js";
 import { TypeMetadata } from "./type-metadata.js";
-import { TableDefinition, Table as MysqlTable } from "./schema-definitions.js";
+import { Table as MysqlTable } from "./schema-definitions.js";
 import { Column } from "./column.js";
 import { SchemaStatements as BaseSchemaStatements } from "../abstract/schema-statements.js";
 import { SchemaCreation as MysqlSchemaCreation } from "./schema-creation.js";
@@ -138,14 +138,6 @@ export function defaultRowFormat(
 /** @internal */
 export function validPrimaryKeyOptions(): string[] {
   return ["limit", "default", "precision", "unsigned", "autoIncrement"];
-}
-
-/** @internal */
-export function createTableDefinition(
-  name: string,
-  options: { id?: boolean | "uuid"; charset?: string | null; collation?: string | null } = {},
-): TableDefinition {
-  return new TableDefinition(name, options);
 }
 
 /** @internal */

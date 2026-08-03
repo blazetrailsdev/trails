@@ -1,6 +1,7 @@
 import { BetterSQLite3Adapter } from "../connection-adapters/better-sqlite3-adapter.js";
 import { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
 import { Mysql2Adapter } from "../connection-adapters/mysql2-adapter.js";
+import { Version } from "../connection-adapters/abstract-adapter.js";
 import type { SchemaQuoter } from "../connection-adapters/abstract/assert-schema-adapter.js";
 
 export type SchemaConnName = "sqlite" | "postgres" | "mysql";
@@ -24,6 +25,13 @@ export function schemaConn(name: SchemaConnName): SchemaQuoter {
         : name === "postgres"
           ? new PostgreSQLAdapter("postgresql://localhost/trails_schema_conn")
           : new Mysql2Adapter("mysql://localhost/trails_schema_conn");
+    if (name === "mysql") {
+      // MySQL's `supports_check_constraints?` / `supports_index_sort_order?` are
+      // version-gated and read the cached version, which is cold on a connection that
+      // was never opened — leaving the visitor emitting the pre-8.0 DDL. Seed the
+      // version the CI server reports so the rendered SQL is a modern server's.
+      (conn as unknown as { _databaseVersion: Version })._databaseVersion = new Version("8.0.35");
+    }
     conns.set(name, conn);
   }
   return conn;

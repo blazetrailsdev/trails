@@ -952,7 +952,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
       opts["autoIncrement"] = (column as any).autoIncrement ?? false;
     }
 
-    const td = new MysqlTableDefinition(tableName, { id: false });
+    const td = new MysqlTableDefinition(tableName, { id: false, adapter: this });
     const colDef = td.newColumnDefinition(column.name, resolvedType as any, opts as any);
     return new ChangeColumnDefinition(colDef, column.name);
   }

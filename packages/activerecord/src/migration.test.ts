@@ -25,13 +25,11 @@ import { SchemaCreation as SQLite3SchemaCreation } from "./connection-adapters/s
 function emitTableSql(td: TableDefinition): Promise<string> {
   const adapterName = (td as any)._adapterName;
   const adapter = (td as any)._adapter;
-  // PG and SQLite visitors take a SchemaQuoter for identifier/default quoting, so
-  // thread the table definition's quoter through (matches the real adapter call sites
-  // and the production `*.toSql()` overrides). The MySQL visitor hardcodes its quoter
-  // and its constructor arg is a VisitorHostAdapter (isMariadb()/supports* flags), not a
-  // quoter — none of which these abstract-TableDefinition fixtures exercise.
+  // Every visitor takes its connection for identifier/default quoting (and, on MySQL,
+  // the `supports*` / isMariadb() flags), so thread the table definition's through —
+  // matching the real adapter call sites and the production `*.toSql()` overrides.
   if (adapterName === "postgres") return new PgSchemaCreation(adapter).accept(td);
-  if (adapterName === "mysql") return new MysqlSchemaCreation().accept(td);
+  if (adapterName === "mysql") return new MysqlSchemaCreation(adapter).accept(td);
   return new SQLite3SchemaCreation("sqlite", adapter).accept(td);
 }
 import { Person } from "./test-helpers/models/person.js";
