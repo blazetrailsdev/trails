@@ -27,17 +27,28 @@ interface MessageEncryptorOptions extends RotatableOptions {
   forceLegacyMetadataSerializer?: boolean;
 }
 
+const AUTH_TAG_LENGTH = 16;
+const SEPARATOR = "--";
+
 export class MessageEncryptor extends Codec {
   static override defaultSerializer: Format | MessageSerializer = "json";
+
+  static useAuthenticatedMessageEncryption = false;
+
+  static defaultCipher(): string {
+    return this.useAuthenticatedMessageEncryption ? "aes-256-gcm" : "aes-256-cbc";
+  }
 
   declare rotate: (...args: unknown[]) => this;
   declare onRotation: (callback: OnRotation) => this;
   declare fallBackTo: (fallback: this) => this;
 
+
   private secret: Buffer;
   private signSecret: Buffer;
   private cipher: string;
   private digest: string;
+  private aeadMode: boolean;
 
   constructor(
     secret: string | Buffer,
@@ -63,7 +74,8 @@ export class MessageEncryptor extends Codec {
       forceLegacyMetadataSerializer: opts.forceLegacyMetadataSerializer,
     });
 
-    this.cipher = opts.cipher ?? "aes-256-cbc";
+    this.cipher = opts.cipher ?? (this.constructor as typeof MessageEncryptor).defaultCipher();
+    this.aeadMode = /gcm|ccm/i.test(this.cipher);
     this.digest = opts.digest ?? "sha1";
 
     this.secret = typeof secret === "string" ? Buffer.from(secret) : secret;
@@ -94,8 +106,7 @@ export class MessageEncryptor extends Codec {
   }
 
   createMessage(value: unknown, options: MetadataOptions = {}): string {
-    const encrypted = this.encrypt(this.serializeWithMetadata(value, options));
-    return `${encrypted}--${this.sign(encrypted)}`;
+    return this.signMessage(this.encrypt(this.serializeWithMetadata(value, options)));
   }
 
   readMessage(message: string, options: ExpectedMetadataOptions = {}): unknown {
@@ -103,19 +114,30 @@ export class MessageEncryptor extends Codec {
       throw new Thrown("invalid_message_format", "invalid message string");
     }
 
-    const lastDash = message.lastIndexOf("--");
+    return this.deserializeWithMetadata(this.decrypt(this.verifyMessage(message)), options);
+  }
+
+  private signMessage(encrypted: string): string {
+    if (this.aeadMode) return encrypted;
+    return `${encrypted}${SEPARATOR}${this.sign(encrypted)}`;
+  }
+
+  private verifyMessage(message: string): string {
+    if (this.aeadMode) return message;
+
+    const lastDash = message.lastIndexOf(SEPARATOR);
     if (lastDash === -1) {
       throw new Thrown("invalid_message_format", "missing message digest");
     }
 
     const encrypted = message.slice(0, lastDash);
-    const signature = message.slice(lastDash + 2);
+    const signature = message.slice(lastDash + SEPARATOR.length);
 
     if (!this.verify(encrypted, signature)) {
       throw new Thrown("invalid_message_format", "mismatched digest");
     }
 
-    return this.deserializeWithMetadata(this.decrypt(encrypted), options);
+    return encrypted;
   }
 
   private encrypt(plaintext: string): string {
@@ -125,34 +147,37 @@ export class MessageEncryptor extends Codec {
     const iv = getCrypto().randomBytes(ivLength);
 
     const cipher = getCrypto().createCipheriv(this.cipher, key, iv);
+    if (this.aeadMode) cipher.setAAD?.(Buffer.alloc(0));
     const encrypted = Buffer.concat([cipher.update(plaintext, "latin1"), cipher.final()]);
 
-    const encryptedB64 = this.encode(encrypted);
-    const ivB64 = this.encode(iv);
+    const parts = [this.encode(encrypted), this.encode(iv)];
+    if (this.aeadMode) parts.push(this.encode(cipher.getAuthTag!()));
 
-    return `${encryptedB64}--${ivB64}`;
+    return parts.join(SEPARATOR);
   }
 
   private decrypt(encrypted: string): string {
-    const parts = encrypted.split("--");
-    if (parts.length !== 2) {
+    const parts = encrypted.split(SEPARATOR);
+    if (parts.length !== (this.aeadMode ? 3 : 2) || parts.some((part) => !part)) {
       throw new Thrown("invalid_message_format", "invalid message format");
     }
 
-    const [encryptedB64, ivB64] = parts;
+    const encryptedBuf = this.decode(parts[0]);
+    const iv = this.decode(parts[1]);
+    const authTag = this.aeadMode ? this.decode(parts[2]) : undefined;
 
-    if (!encryptedB64 || !ivB64) {
-      throw new Thrown("invalid_message_format", "invalid message format");
+    // OpenSSL does not raise on a truncated auth_tag, which would let an
+    // attacker forge it — Rails checks the length itself.
+    if (authTag && authTag.length !== AUTH_TAG_LENGTH) {
+      throw new Thrown("invalid_message_format", "truncated auth_tag");
     }
-
-    const encryptedBuf = this.decode(encryptedB64);
-    const iv = this.decode(ivB64);
 
     const keyLength = this.keyLength();
     const key = this.secret.slice(0, keyLength);
 
     try {
       const decipher = getCrypto().createDecipheriv(this.cipher, key, iv);
+      if (authTag) decipher.setAuthTag?.(authTag);
       const decrypted = Buffer.concat([decipher.update(encryptedBuf), decipher.final()]);
       return decrypted.toString("latin1");
     } catch {
