@@ -95,8 +95,6 @@ describe("I18nMissingInterpolationCustomHandlerTest", () => {
     resetConfig();
     resetClassConfig();
     oldHandler = config().missingInterpolationArgumentHandler;
-    // Ruby's `#{key}` calls `Symbol#to_s`, which drops the leading colon the
-    // Symbol spelling carries here.
     config().missingInterpolationArgumentHandler = (key, values, string) =>
       `missing key is ${key.slice(1)}, values are ${inspect(values)}, given string is '${string}'`;
   });
