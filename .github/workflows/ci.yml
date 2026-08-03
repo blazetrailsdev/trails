@@ -161,7 +161,7 @@ jobs:
           # dependency is activesupport.
           RACK_PKGS_RE='^packages/(rack|activesupport)/'
           # unit_tests_affected gates the bundled vitest run for the small
-          # leaf packages (arel/activemodel/activesupport) and the
+          # leaf packages (arel/activemodel/activesupport/i18n) and the
           # scripts/guides-typecheck self-test. Rack is excluded here — it
           # runs in the leaf-tests job.
           # scripts/tasks/ and scripts/guides-typecheck/ also ride on this gate
@@ -191,7 +191,7 @@ jobs:
           # eslint/no-raw-control-bytes.drift.test.mjs is a drift guard between
           # its byte set and the ESLint rule's, and scripts/ci/ is carved out
           # of the infra sweep (INFRA_CARVEOUT_RE).
-          UNIT_TESTS_PKGS_RE='^(packages/(arel|activemodel|activesupport)/|eslint/|scripts/(tasks|guides-typecheck|parity|api-compare|test-compare|fixtures-compare|test-deps|rails-find|sync-stats|prism-codegen)/|scripts/ci/check-control-bytes\.sh$|scripts/(strip-asany|rails-file-structure-mixins|ci-suite-coverage|deprecated-manifest-diff|mixin-declaration-drift|mysql-grant-namespaces)(\.test)?\.ts$|scripts/db-init/mysql/01-rails-user\.sql$|packages/activerecord-cli/src/__e2e__/|eslint\.config\.mjs$|vendor/(sources\.ts|sources\.lock\.json|sources\.test\.ts|fetch\.ts)$)'
+          UNIT_TESTS_PKGS_RE='^(packages/(arel|activemodel|activesupport|i18n)/|eslint/|scripts/(tasks|guides-typecheck|parity|api-compare|test-compare|fixtures-compare|test-deps|rails-find|sync-stats|prism-codegen)/|scripts/ci/check-control-bytes\.sh$|scripts/(strip-asany|rails-file-structure-mixins|ci-suite-coverage|deprecated-manifest-diff|mixin-declaration-drift|mysql-grant-namespaces)(\.test)?\.ts$|scripts/db-init/mysql/01-rails-user\.sql$|packages/activerecord-cli/src/__e2e__/|eslint\.config\.mjs$|vendor/(sources\.ts|sources\.lock\.json|sources\.test\.ts|fetch\.ts)$)'
           # guides_affected gates the Guides Code Type Check job, which
           # compiles fenced TS blocks in packages/website/docs/guides/**.
           # Today guides only import @blazetrails/activerecord,
@@ -699,6 +699,7 @@ jobs:
           packages/arel
           packages/activemodel
           packages/activesupport
+          packages/i18n
           scripts/guides-typecheck
           scripts/tasks
           scripts/api-compare
@@ -829,6 +830,7 @@ jobs:
           packages/activesupport
           packages/did-you-mean
           packages/globalid
+          packages/i18n
           packages/nokogiri
           packages/html-sanitizer
           packages/rack

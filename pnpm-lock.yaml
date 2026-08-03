@@ -261,6 +261,8 @@ importers:
         specifier: ^2.13.0
         version: 2.16.1
 
+  packages/i18n: {}
+
   packages/nokogiri:
     dependencies:
       libxml2-wasm:
