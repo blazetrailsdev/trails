@@ -83,7 +83,7 @@ interface ReferentialIntegrityHost extends ReferentialIntegritySqlHost {
 //
 // The `scopedTables` parameter has no Rails counterpart (the method is zero-arg
 // in every adapter); it is a tracked deviation pending convergence — see RFC
-// 0060 story `converge-referential-integrity-zero-arg-shape` (hoist the
+// 0023 story `converge-referential-integrity-scoped-tables-parameter` (hoist the
 // fixture-load flow to one block per set, matching Rails' insert_fixtures_set,
 // then drop the parameter).
 export async function disableReferentialIntegrity(

@@ -593,7 +593,9 @@ describe("PreloaderTest", () => {
     expect(loaded.length).toBe(Number(await Comment.where({ post_id: post.id }).count()));
   });
 
-  // TODO(store-full-sti-class-name): remove it.fails when that story fixes the gap.
+  // TODO(preload-hmt-with-conditions-remaining-sti-gap): remove it.fails when
+  // that story fixes the gap. `store-full-sti-class-name` landed (#3874)
+  // without closing it.
   it.fails("preload for hmt with conditions", async () => {
     const post = posts("welcome");
     await CategoryPost.create({

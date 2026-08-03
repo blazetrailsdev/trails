@@ -371,8 +371,8 @@ describe("BindParameterTest", () => {
       // in the relation layer, so the payload carries `[1]` rather than Attribute
       // objects — the `?? attr` fallback matches the primitive trails emits. (The
       // payload can't preserve Attribute objects without production changes; the
-      // stronger `binds are logged` assertion is deferred to RFC 0016 story
-      // `preserve-queryattribute-binds-in-notification-payload` for that reason.)
+      // stronger `binds are logged` assertion is deferred to RFC 0077 story
+      // `tosqlandbinds-preserve-attribute-binds` for that reason.)
       const message = subscriber.events.find((e) =>
         (e.payload.binds as any[])?.some((attr) => Number(attr?.value ?? attr) === 1),
       );

@@ -767,13 +767,6 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
 
   // Cases blocked on genuine trails PG/MySQL adapter divergences that the faithful
   // port surfaced (checked in verbatim; un-skip once the adapters converge):
-  //   - Connection-failure error classification + retryability
-  //     (RFC 0023 story adapter-connection-failure-error-classification): trails
-  //     maps a severed PG connection to ConnectionNotEstablished, not Rails'
-  //     ConnectionFailed (node-pg has no libpq layer to reproduce Rails' split),
-  //     which also makes it non-retryable. (The parallel mysql2 divergence — the
-  //     driver's "Can't add new command when connection is in closed state" going
-  //     untranslated — was fixed in #4935, which maps it to ConnectionFailed.)
   //   - No-bind unprepared SELECT does not materialize a pending lazy
   //     transaction on PG/MySQL (story thread-collector-preparable-for-
   //     statement-cache; see transactions.test.ts "unprepared statement
