@@ -148,6 +148,8 @@ export async function isMaxAllowedPacketReached(
   previousPacket: string | undefined,
 ): Promise<boolean> {
   const host = this ?? undefined;
+  // Rails resolves `max_allowed_packet` on self; the receiver only carries it
+  // once the module is mixed in, so a bare host falls back to the free function.
   const maxPacket = host?.maxAllowedPacket
     ? await host.maxAllowedPacket()
     : await maxAllowedPacket.call(host);
