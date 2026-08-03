@@ -6,10 +6,6 @@
  * loading is not ported yet (story `i18n-backend-file-loading-localize`), so
  * both live here as one module, keyed exactly as the two files are and stored
  * into the backend by `i18n.ts`.
- *
- * The `number.format` / `number.currency` / ... branch of en.yml is not here
- * yet: `NumberConverter::DEFAULTS` still carries those values in trails, so
- * storing them would change what the converters read.
  */
 
 import type { TranslationData } from "@blazetrails/i18n";
@@ -84,6 +80,85 @@ export const en: TranslationData = {
   },
 
   number: {
+    // Used in NumberHelper.number_to_delimited()
+    // These are also the defaults for 'currency', 'percentage', 'precision', and 'human'
+    format: {
+      separator: ".",
+      delimiter: ",",
+      precision: 3,
+      round_mode: "default",
+      significant: false,
+      strip_insignificant_zeros: false,
+    },
+
+    // Used in NumberHelper.number_to_currency()
+    currency: {
+      format: {
+        format: "%u%n",
+        negative_format: "-%u%n",
+        unit: "$",
+        separator: ".",
+        delimiter: ",",
+        precision: 2,
+        significant: false,
+        strip_insignificant_zeros: false,
+      },
+    },
+
+    // Used in NumberHelper.number_to_percentage()
+    percentage: {
+      format: {
+        delimiter: "",
+        format: "%n%",
+      },
+    },
+
+    // Used in NumberHelper.number_to_rounded()
+    precision: {
+      format: {
+        delimiter: "",
+      },
+    },
+
+    // Used in NumberHelper.number_to_human_size() and NumberHelper.number_to_human()
+    human: {
+      format: {
+        delimiter: "",
+        precision: 3,
+        significant: true,
+        strip_insignificant_zeros: true,
+      },
+      // Used in number_to_human_size()
+      storage_units: {
+        format: "%n %u",
+        units: {
+          byte: {
+            one: "Byte",
+            other: "Bytes",
+          },
+          kb: "KB",
+          mb: "MB",
+          gb: "GB",
+          tb: "TB",
+          pb: "PB",
+          eb: "EB",
+          zb: "ZB",
+        },
+      },
+      // Used in NumberHelper.number_to_human()
+      decimal_units: {
+        format: "%n %u",
+        units: {
+          unit: "",
+          thousand: "Thousand",
+          million: "Million",
+          billion: "Billion",
+          trillion: "Trillion",
+          quadrillion: "Quadrillion",
+        },
+      },
+    },
+
     nth: {
       ordinals: (_key: unknown, options: { number?: unknown }) => {
         const number = Number(options.number);
