@@ -132,6 +132,15 @@ export interface MethodInfo {
 export interface ClassInfo {
   name: string;
   superclass?: string;
+  /**
+   * TS-side only: the src-relative file `superclass` was declared in. Same
+   * problem `extendsFiles` solves for include/extend edges — the superclass is
+   * recorded by its bare short name, and sibling adapter directories declare
+   * same-named classes, which filename proximity cannot separate. Absent when
+   * the superclass resolves outside the package's `src` (a dep package, a
+   * mixin-factory call expression); consumers fall back to proximity then.
+   */
+  superclassFile?: string;
   file?: string;
   reExportedFrom?: string;
   includes: string[];

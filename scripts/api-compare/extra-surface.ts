@@ -831,6 +831,9 @@ function collectAllowedNames(
     for (const c of candidates) allowed.add(c);
   };
 
+  // Ruby-side walk: a duplicated short name is disambiguated by the enclosing
+  // namespace inside `resolveModuleName`, so this needs no declaring-file hint
+  // the way the TS sites do (compare.ts `resolveEntityByDeclaringFile`).
   const walkMixin = (incName: string, contextFqn: string): void => {
     const fqn = resolveModuleName(incName, contextFqn, moduleFqnByShort);
     if (visited.has(fqn)) return;

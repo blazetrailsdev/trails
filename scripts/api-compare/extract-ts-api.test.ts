@@ -951,6 +951,58 @@ describe("extractFromProgram — include() detection", () => {
     expect(host.extendsFiles?.["SchemaStatements"]).toBe("postgresql/schema-statements-class.ts");
   });
 
+  it("records the superclass's declaration file on superclassFile", () => {
+    // Same collision as extendsFiles, on the `extends` heritage clause: two
+    // classes named `SchemaStatements`, and the subclass's own path is no help
+    // in telling them apart.
+    const info = extractFromFiles("/p", {
+      "abstract/schema-statements.ts": `export class SchemaStatements { addColumn(): void {} }`,
+      "sqlite3/schema-statements.ts": `export class SchemaStatements { renameColumn(): void {} }`,
+      "sqlite3/adapter.ts": `
+        import { SchemaStatements } from "./schema-statements.js";
+        export class SQLite3Adapter extends SchemaStatements {}
+      `,
+    });
+    const cls = info.classes["sqlite3/adapter.ts:SQLite3Adapter"];
+    expect(cls.superclass).toBe("SchemaStatements");
+    expect(cls.superclassFile).toBe("sqlite3/schema-statements.ts");
+  });
+
+  it("records extendsFiles for an interface's extends clause", () => {
+    const info = extractFromFiles("/p", {
+      "abstract/quoting.ts": `export interface Quoting { quoteColumnName(n: string): string }`,
+      "sqlite3/quoting.ts": `export interface Quoting { quotedBinary(v: string): string }`,
+      "sqlite3/adapter.ts": `
+        import type { Quoting } from "./quoting.js";
+        export interface SQLite3Adapter extends Quoting {}
+      `,
+    });
+    const iface = info.modules["sqlite3/adapter.ts:SQLite3Adapter"];
+    expect(iface.extends).toContain("Quoting");
+    expect(iface.extendsFiles?.["Quoting"]).toBe("sqlite3/quoting.ts");
+  });
+
+  it("omits superclassFile when the extends clause has no resolvable declaration", () => {
+    // A mixin-factory call (`extends Mixin(Base)`) has no symbol to locate, and
+    // a superclass imported from another package declares outside `srcDir`.
+    // Both fall back to the proximity heuristic rather than recording a file.
+    const info = extractFromFiles("/p", {
+      "mixin.ts": `export function Mixin(b: any): any { return b; }`,
+      "base.ts": `export class Base {}`,
+      "derived.ts": `
+        import { Mixin } from "./mixin.js";
+        import { Base } from "./base.js";
+        export class Derived extends Mixin(Base) {}
+      `,
+      "external.ts": `
+        import { Model } from "@blazetrails/activemodel";
+        export class Record extends Model {}
+      `,
+    });
+    expect(info.classes["derived.ts:Derived"].superclassFile).toBeUndefined();
+    expect(info.classes["external.ts:Record"].superclassFile).toBeUndefined();
+  });
+
   it("follows import aliases (`Math as MathMixin`) to the original module name", () => {
     const info = extractFromFiles("/p", {
       "math.ts": `export const Math = { add() {} };`,

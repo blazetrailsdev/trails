@@ -203,11 +203,28 @@ function recordExtendsFile(
   sym: ts.Symbol | undefined,
   srcDir: string,
 ): void {
-  const decl = sym?.valueDeclaration ?? sym?.declarations?.[0];
-  if (!decl) return;
-  const declFile = path.relative(srcDir, decl.getSourceFile().fileName).replace(/\\/g, "/");
-  if (declFile.startsWith("..")) return;
+  const declFile = declaringFile(sym, srcDir);
+  if (!declFile) return;
   hostInfo.extendsFiles = { ...(hostInfo.extendsFiles ?? {}), [modName]: declFile };
+}
+
+/**
+ * src-relative file a symbol was declared in, POSIX-normalized so it can be
+ * compared against a manifest `ClassInfo.file`. Returns undefined for symbols
+ * declared outside `srcDir` (node_modules, other packages) — those can't be
+ * matched against this package's entities anyway.
+ */
+function declaringFile(sym: ts.Symbol | undefined, srcDir: string): string | undefined {
+  const decl = sym?.valueDeclaration ?? sym?.declarations?.[0];
+  if (!decl) return undefined;
+  const declFile = path.relative(srcDir, decl.getSourceFile().fileName).replace(/\\/g, "/");
+  if (declFile.startsWith("..")) return undefined;
+  return declFile;
+}
+
+function resolveDeclarationSymbol(checker: ts.TypeChecker, node: ts.Node): ts.Symbol | undefined {
+  const sym = checker.getSymbolAtLocation(node);
+  return sym && sym.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(sym) : sym;
 }
 
 function extractInWorker(pkgName: string, srcDir: string): Promise<WorkerOutput> {
@@ -534,7 +551,7 @@ export function extractFromProgram(
     ts.forEachChild(sourceFile, (node) => {
       if (ts.isClassDeclaration(node) && node.name) {
         if (!isExported(node)) return;
-        const classInfo = extractClass(node, checker, relPath);
+        const classInfo = extractClass(node, checker, relPath, srcDir);
         if (classInfo) {
           const classKey = `${relPath}:${classInfo.name}`;
           info.classes[classKey] = classInfo;
@@ -544,7 +561,7 @@ export function extractFromProgram(
         if (!isExported(node)) return;
         const name = node.name.text;
         const modKey = `${relPath}:${name}`;
-        const extracted = extractInterface(node, checker, relPath);
+        const extracted = extractInterface(node, checker, relPath, srcDir);
         const existing = info.modules[modKey];
         if (existing) {
           // Merge declaration-merged interfaces (same name, same file)
@@ -554,6 +571,9 @@ export function extractFromProgram(
           }
           for (const e of extracted.extends) {
             if (!existing.extends.includes(e)) existing.extends.push(e);
+          }
+          if (extracted.extendsFiles) {
+            existing.extendsFiles = { ...extracted.extendsFiles, ...(existing.extendsFiles ?? {}) };
           }
           // A declaration-merged interface only needs the tag on ONE of its
           // declarations; without this the reason is lost whenever the tagged
@@ -1848,19 +1868,35 @@ export function resolveRelModule(fromRel: string, spec: string): string | null {
   return path.posix.normalize(path.posix.join(fromDir, withoutExt)) + ".ts";
 }
 
+/**
+ * Extract one exported class into a `ClassInfo`.
+ *
+ * `srcDir` is what lets the `extends` clause be recorded as a declaring file
+ * (`superclassFile`) and not just a bare short name — sibling adapter
+ * directories declare same-named classes, and a consumer given only the name
+ * has to guess. Omit it (tests compiling a single virtual file) and the
+ * superclass is still recorded by name, without the file.
+ */
 export function extractClass(
   node: ts.ClassDeclaration,
   checker: ts.TypeChecker,
   file: string,
+  srcDir?: string,
 ): ClassInfo | null {
   const name = node.name?.text;
   if (!name) return null;
 
   let superclass: string | undefined;
+  let superclassFile: string | undefined;
   if (node.heritageClauses) {
     for (const clause of node.heritageClauses) {
       if (clause.token === ts.SyntaxKind.ExtendsKeyword) {
-        superclass = clause.types[0]?.expression.getText();
+        const expr = clause.types[0]?.expression;
+        if (!expr) continue;
+        superclass = expr.getText();
+        if (srcDir !== undefined) {
+          superclassFile = declaringFile(resolveDeclarationSymbol(checker, expr), srcDir);
+        }
       }
     }
   }
@@ -2033,6 +2069,7 @@ export function extractClass(
   return {
     name,
     superclass,
+    ...(superclassFile !== undefined ? { superclassFile } : {}),
     file,
     includes,
     extends: extendsArr,
@@ -2047,10 +2084,12 @@ function extractInterface(
   node: ts.InterfaceDeclaration,
   checker: ts.TypeChecker,
   file: string,
+  srcDir?: string,
 ): ClassInfo {
   const name = node.name.text;
   const instanceMethods: MethodInfo[] = [];
   const extendsArr: string[] = [];
+  let extendsFiles: Record<string, string> | undefined;
 
   if (node.heritageClauses) {
     for (const clause of node.heritageClauses) {
@@ -2058,6 +2097,13 @@ function extractInterface(
         for (const type of clause.types) {
           const exprText = type.expression.getText();
           extendsArr.push(exprText);
+          if (srcDir !== undefined) {
+            const declFile = declaringFile(
+              resolveDeclarationSymbol(checker, type.expression),
+              srcDir,
+            );
+            if (declFile) extendsFiles = { ...(extendsFiles ?? {}), [exprText]: declFile };
+          }
 
           // Resolve mapped/generic types (e.g. Included<typeof X>) via
           // the type checker so their computed properties appear as methods.
@@ -2118,6 +2164,7 @@ function extractInterface(
     file,
     includes: [],
     extends: extendsArr,
+    ...(extendsFiles !== undefined ? { extendsFiles } : {}),
     instanceMethods,
     classMethods: [],
     isInterface: true,

@@ -1028,6 +1028,14 @@ function nearestNamespaceMatch(
  * namespace walk — so dropping it moved no method counts. Same false-positive
  * shape PR #5344 removed from the includer graph, where 21 methods were
  * counting as implemented in files Ruby's lookup never reaches.
+ *
+ * This is the RUBY side, and it needs no declaring-file hint the way the TS
+ * superclass/mixin sites do (`resolveEntityByDeclaringFile`). A duplicated
+ * short name here is disambiguated by the enclosing namespace, which is
+ * exactly how Ruby itself binds it — `ConnectionAdapters::PostgreSQL::Quoting`
+ * beats `ConnectionAdapters::Quoting` for a context inside `PostgreSQL::`
+ * regardless of which `.rb` either lives in. The TS sites have no namespaces
+ * to walk, which is why they need the file.
  */
 export function resolveModuleName(
   incName: string,
@@ -1281,6 +1289,49 @@ export function buildEntitiesByName(pkg: string, ts: ApiManifest): Map<string, C
   for (const depKey of blazetrailsDepKeys(pkg)) addPkg(depKey);
 
   return map;
+}
+
+/**
+ * Pick the entity a superclass / include-edge short name refers to.
+ *
+ * TS records both by their BARE short name, and sibling adapter directories
+ * declare same-named entities (`SchemaStatements` lives under
+ * `connection-adapters/abstract/`, `postgresql/` and `sqlite3/`). The extractor
+ * therefore also records the file the name resolved to — `superclassFile` for
+ * an `extends` clause, `extendsFiles[name]` for an `include()`/`extend()` edge
+ * — and an exact match on it wins outright. `declFile` is absent only when the
+ * symbol resolved outside the package's `src` (a dep package, a mixin-factory
+ * call), and then we fall back to file-path proximity: most shared leading
+ * directory segments with the child, self excluded.
+ */
+export function resolveEntityByDeclaringFile(
+  candidates: ClassInfo[],
+  childFile: string,
+  declFile?: string,
+): ClassInfo | null {
+  if (candidates.length === 0) return null;
+  if (candidates.length === 1) return candidates[0];
+  if (declFile) {
+    const exact = candidates.find((c) => c.file === declFile);
+    if (exact) return exact;
+  }
+  const childParts = (childFile || "").split("/");
+  let best: ClassInfo | null = null;
+  let bestScore = -1;
+  for (const c of candidates) {
+    if (c.file === childFile) continue; // skip self
+    const parts = (c.file || "").split("/");
+    let shared = 0;
+    for (let i = 0; i < Math.min(childParts.length, parts.length); i++) {
+      if (childParts[i] === parts[i]) shared++;
+      else break;
+    }
+    if (shared > bestScore) {
+      bestScore = shared;
+      best = c;
+    }
+  }
+  return best ?? candidates[0];
 }
 
 export function main() {
@@ -1544,41 +1595,8 @@ export function main() {
 
       const entityKey = (e: ClassInfo) => `${e.file}:${e.name}`;
 
-      // When multiple entities share a name, pick the best parent by
-      // file path proximity (most shared directory segments).
-      const resolveParent = (
-        name: string,
-        childFile: string,
-        declFile?: string,
-      ): ClassInfo | null => {
-        const candidates = entitiesByName.get(name) || [];
-        if (candidates.length === 0) return null;
-        if (candidates.length === 1) return candidates[0];
-        // An include()/extend() edge knows the file its module was declared in;
-        // that beats filename proximity, which cannot separate same-named
-        // modules in sibling adapter directories.
-        if (declFile) {
-          const exact = candidates.find((c) => c.file === declFile);
-          if (exact) return exact;
-        }
-        const childParts = (childFile || "").split("/");
-        let best: ClassInfo | null = null;
-        let bestScore = -1;
-        for (const c of candidates) {
-          if (c.file === childFile) continue; // skip self
-          const parts = (c.file || "").split("/");
-          let shared = 0;
-          for (let i = 0; i < Math.min(childParts.length, parts.length); i++) {
-            if (childParts[i] === parts[i]) shared++;
-            else break;
-          }
-          if (shared > bestScore) {
-            bestScore = shared;
-            best = c;
-          }
-        }
-        return best ?? candidates[0];
-      };
+      const resolveParent = (name: string, childFile: string, declFile?: string) =>
+        resolveEntityByDeclaringFile(entitiesByName.get(name) || [], childFile, declFile);
 
       const inheritedCache = new Map<string, Set<string>>();
       const getInherited = (entity: ClassInfo, visited: Set<string>): Set<string> => {
@@ -1594,7 +1612,7 @@ export function main() {
         }
 
         if (entity.superclass) {
-          const parent = resolveParent(entity.superclass, entity.file || "");
+          const parent = resolveParent(entity.superclass, entity.file || "", entity.superclassFile);
           if (parent) {
             for (const m of getInherited(parent, visited)) methods.add(m);
           }
@@ -2246,30 +2264,8 @@ export function main() {
         tsByShort.set(cls.name, list);
       }
 
-      // Resolve the most likely parent class among duplicates by file-path
-      // proximity, mirroring the `resolveParent` heuristic above.
-      const resolveAncestor = (name: string, childFile: string): ClassInfo | null => {
-        const candidates = tsByShort.get(name) || [];
-        if (candidates.length === 0) return null;
-        if (candidates.length === 1) return candidates[0];
-        const childParts = (childFile || "").split("/");
-        let best: ClassInfo | null = null;
-        let bestScore = -1;
-        for (const c of candidates) {
-          if (c.file === childFile && c.name === name) continue;
-          const parts = (c.file || "").split("/");
-          let shared = 0;
-          for (let i = 0; i < Math.min(childParts.length, parts.length); i++) {
-            if (childParts[i] === parts[i]) shared++;
-            else break;
-          }
-          if (shared > bestScore) {
-            bestScore = shared;
-            best = c;
-          }
-        }
-        return best ?? candidates[0];
-      };
+      const resolveAncestor = (name: string, childFile: string, declFile?: string) =>
+        resolveEntityByDeclaringFile(tsByShort.get(name) || [], childFile, declFile);
 
       const ancestorChain = (cls: ClassInfo): string[] => {
         const chain: string[] = [];
@@ -2282,7 +2278,7 @@ export function main() {
           const key = `${cursor.file}::${name}`;
           if (seen.has(key)) break;
           seen.add(key);
-          cursor = resolveAncestor(name, cursor.file || "");
+          cursor = resolveAncestor(name, cursor.file || "", cursor.superclassFile);
         }
         return chain;
       };
