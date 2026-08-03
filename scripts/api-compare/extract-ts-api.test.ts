@@ -1516,6 +1516,80 @@ describe("extractFromProgram — re-export attribution", () => {
   });
 });
 
+function classOf(info: PackageInfo, name: string): ClassInfo {
+  return Object.values(info.classes).find((c) => c.name === name)!;
+}
+
+describe("extractFromProgram — file-level @noRailsEquivalent JSDoc", () => {
+  it("records a reason written above the imports against the file", () => {
+    const info = extractFromFiles("/p", {
+      "libsql-adapter.ts": `
+        /**
+         * SQLite adapter backed by the \`libsql\` client.
+         *
+         * @noRailsEquivalent PERMANENT — Ruby binds exactly one SQLite driver,
+         * so Rails has no class to map a per-driver subclass onto.
+         */
+        import { SQLite3Adapter } from "./sqlite3-adapter.js";
+
+        export class LibSQLAdapter extends SQLite3Adapter {}
+      `,
+      "sqlite3-adapter.ts": `export class SQLite3Adapter {}`,
+    });
+    expect(info.fileNoRailsEquivalent).toEqual({
+      "libsql-adapter.ts":
+        "PERMANENT — Ruby binds exactly one SQLite driver, so Rails has no class to " +
+        "map a per-driver subclass onto.",
+    });
+  });
+
+  it("leaves the leading block of an import-less file as its declaration's tag", () => {
+    const info = extractFromFiles("/p", {
+      "connection-pool.ts": `
+        /** @noRailsEquivalent PERMANENT — Rails nests this class inside NullPool */
+        export class NullConfig {}
+      `,
+    });
+    expect(info.fileNoRailsEquivalent).toEqual({});
+    expect(classOf(info, "NullConfig").noRailsEquivalent).toBe(
+      "PERMANENT — Rails nests this class inside NullPool",
+    );
+  });
+
+  it("rejects a file-level reason truncated by a bare @word in its prose", () => {
+    expect(() =>
+      extractFromFiles("/p", {
+        "libsql-adapter.ts": `
+          /**
+           * @noRailsEquivalent PERMANENT — trails binds each client in its own
+           * subclass, the way @deprecated APIs are kept apart.
+           */
+          import { SQLite3Adapter } from "./sqlite3-adapter.js";
+
+          export class LibSQLAdapter extends SQLite3Adapter {}
+        `,
+        "sqlite3-adapter.ts": `export class SQLite3Adapter {}`,
+      }),
+    ).toThrow(/truncated by a bare `@deprecated`/);
+  });
+
+  it("ignores a tag written below the imports", () => {
+    const info = extractFromFiles("/p", {
+      "libsql-adapter.ts": `
+        import { SQLite3Adapter } from "./sqlite3-adapter.js";
+
+        /** @noRailsEquivalent PERMANENT — bound to the class, not to the file */
+        export class LibSQLAdapter extends SQLite3Adapter {}
+      `,
+      "sqlite3-adapter.ts": `export class SQLite3Adapter {}`,
+    });
+    expect(info.fileNoRailsEquivalent).toEqual({});
+    expect(classOf(info, "LibSQLAdapter").noRailsEquivalent).toBe(
+      "PERMANENT — bound to the class, not to the file",
+    );
+  });
+});
+
 describe("extractFromProgram — @noRailsEquivalent JSDoc", () => {
   it("records the reason on a tagged class member and leaves its sibling bare", () => {
     const info = extractFromSource(`
