@@ -5,6 +5,11 @@
  * port of any gem file.
  */
 
+/**
+ * @noRailsEquivalent PERMANENT — Ruby's `throw`/`catch` is a language-level
+ * non-local exit with no JS counterpart, so the value Ruby throws has to travel
+ * as a carrier error.
+ */
 export class ThrownException extends Error {
   readonly value: unknown;
 
@@ -15,12 +20,20 @@ export class ThrownException extends Error {
   }
 }
 
-/** Mirrors Ruby's `throw(:exception, value)`. */
+/**
+ * Mirrors Ruby's `throw(:exception, value)`.
+ *
+ * @noRailsEquivalent PERMANENT — `throw` is a Ruby keyword, not a method.
+ */
 export function throwException(value: unknown): never {
   throw new ThrownException(value);
 }
 
-/** Mirrors Ruby's `catch(:exception) { ... }`. */
+/**
+ * Mirrors Ruby's `catch(:exception) { ... }`.
+ *
+ * @noRailsEquivalent PERMANENT — `catch` is a Ruby keyword, not a method.
+ */
 export function catchException<T>(block: () => T): T | unknown {
   try {
     return block();

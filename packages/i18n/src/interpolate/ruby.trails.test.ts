@@ -42,6 +42,15 @@ describe("I18n.interpolate", () => {
   it("formats %<> placeholders the way sprintf does", () => {
     const cases: [string, unknown, string][] = [
       ["%<v>#x", 255, "0xff"],
+      ["%<v>#x", 0, "0"],
+      ["%<v>#b", 0, "0"],
+      ["%<v>d", 1.9, "1"],
+      ["%<v>d", -1.9, "-1"],
+      ["%<v>i", -3.9, "-3"],
+      ["%<v>p", "abc", '"abc"'],
+      ["%<v>p", 123, "123"],
+      ["%<v>p", null, "nil"],
+      ["%<v>.3p", "abcdef", '"ab'],
       ["%<v>#o", 8, "010"],
       ["%<v>+d", 42, "+42"],
       ["%<v>08.2f", -3.14159, "-0003.14"],

@@ -126,13 +126,11 @@ export abstract class Base {
    */
   abstract availableLocales(): Locale[];
 
-  /** Mirrors: `reload!` */
-  reload(): void {
-    if (this.eagerLoaded()) this.eagerLoad();
+  reloadBang(): void {
+    if (this.eagerLoaded()) this.eagerLoadBang();
   }
 
-  /** Mirrors: `eager_load!` */
-  eagerLoad(): void {
+  eagerLoadBang(): void {
     this.eagerLoadedFlag = true;
   }
 

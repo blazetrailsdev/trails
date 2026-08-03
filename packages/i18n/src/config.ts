@@ -9,7 +9,7 @@ import { DEFAULT_INTERPOLATION_PATTERNS } from "./interpolate/ruby.js";
 /** The slice of a backend `Config` hands out. */
 export interface Backend {
   availableLocales(): Locale[];
-  reload(): void;
+  reloadBang(): void;
   translate(locale: Locale, key: unknown, options?: Record<string, unknown>): unknown;
 }
 
@@ -160,7 +160,7 @@ export class Config {
   set loadPath(value: string[]) {
     loadPath = value;
     availableLocalesSet = undefined;
-    this.backend.reload();
+    this.backend.reloadBang();
   }
 
   /** Whether to verify locales are in the available list. Defaults to true. */

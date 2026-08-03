@@ -20,11 +20,11 @@ export function deepMerge(
   otherHash: TranslationData,
   block?: (key: string, thisVal: unknown, otherVal: unknown) => unknown,
 ): TranslationData {
-  return deepMergeInPlace({ ...hash }, otherHash, block);
+  return deepMergeBang({ ...hash }, otherHash, block);
 }
 
 /** Mirrors: I18n::Utils.deep_merge! — mutates and returns `hash`. */
-export function deepMergeInPlace(
+export function deepMergeBang(
   hash: TranslationData,
   otherHash: TranslationData,
   block?: (key: string, thisVal: unknown, otherVal: unknown) => unknown,

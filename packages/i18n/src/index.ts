@@ -39,5 +39,5 @@ export { Base } from "./backend/base.js";
 export type { TranslateOptions } from "./backend/base.js";
 export { Simple } from "./backend/simple.js";
 export { ThrownException, catchException, throwException } from "./throw-catch.js";
-export { deepMerge, deepMergeInPlace, deepSymbolizeKeys, except } from "./utils.js";
+export { deepMerge, deepMergeBang, deepSymbolizeKeys, except } from "./utils.js";
 export type { TranslationData } from "./utils.js";

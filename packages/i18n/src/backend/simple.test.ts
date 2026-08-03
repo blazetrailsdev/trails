@@ -140,7 +140,7 @@ describe("I18nBackendSimpleTest", () => {
     storeTranslations("fr", data);
     expect(translations()["fr"]).toEqual({ foo: { bar: "barfr", baz: "bazfr" } });
 
-    backend.reload();
+    backend.reloadBang();
 
     backend.storeTranslations("fr", data, { skipSymbolizeKeys: true });
     // JS object keys are already strings, so the only observable difference is
@@ -153,24 +153,24 @@ describe("I18nBackendSimpleTest", () => {
 
   it("simple reload_translations: unloads translations", () => {
     storeTranslations("en", { foo: "bar" });
-    backend.reload();
+    backend.reloadBang();
     expect(translations()).toEqual({});
   });
 
   it("simple reload_translations: uninitializes the backend", () => {
-    backend.reload();
+    backend.reloadBang();
     expect(backend.initialized()).toBe(false);
   });
 
   it("simple eager_load!: loads the translations", () => {
     expect(backend.initialized()).toBe(false);
-    backend.eagerLoad();
+    backend.eagerLoadBang();
     expect(backend.initialized()).toBe(true);
   });
 
   it("simple reload!: reinitialize the backend if it was previously eager loaded", () => {
-    backend.eagerLoad();
-    backend.reload();
+    backend.eagerLoadBang();
+    backend.reloadBang();
     expect(backend.initialized()).toBe(true);
   });
 

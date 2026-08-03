@@ -11,7 +11,7 @@ class FakeBackend implements Backend {
   availableLocales(): string[] {
     return this.locales;
   }
-  reload(): void {
+  reloadBang(): void {
     this.reloaded += 1;
   }
   translate(): unknown {

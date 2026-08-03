@@ -6,7 +6,7 @@
  * groups in the same positions.
  */
 
-import { ArgumentError, ReservedInterpolationKey } from "../exceptions.js";
+import { ArgumentError, ReservedInterpolationKey, inspect } from "../exceptions.js";
 import { config, reservedKeysPattern } from "../i18n.js";
 
 export const DEFAULT_INTERPOLATION_PATTERNS: readonly RegExp[] = Object.freeze([
@@ -71,7 +71,8 @@ const ALTERNATE_PREFIX: Record<string, string> = { b: "0b", B: "0B", o: "0", x: 
 
 /**
  * Ruby hands `%<name>fmt` to `sprintf`; JS has no equivalent, so the
- * conversions the interpolation pattern admits (`bBdiouxXeEfgGcps`) are
+ * conversions the interpolation pattern admits (`bBdiouxXeEfgGcps`, `p`
+ * included) are
  * reimplemented here, along with the `-+ #0` flags, width and precision that
  * `sprintf` applies to them.
  */
@@ -80,16 +81,17 @@ function sprintf(spec: string, value: unknown): string {
   if (!parsed) return String(value);
   const [, flags = "", width = "", precision, conversion = "s"] = parsed;
   const digits = precision === undefined ? 6 : Number(precision);
-  const numeric = conversion !== "c" && conversion !== "s";
+  const numeric = !"csp".includes(conversion);
   const alternate = flags.includes("#");
   const magnitude = Math.abs(Number(value));
 
   let body: string;
   if (conversion in RADIX) {
     body = Math.trunc(magnitude).toString(RADIX[conversion]);
-    if (alternate) body = ALTERNATE_PREFIX[conversion] + body;
+    // Ruby omits the alternate-form prefix for zero.
+    if (alternate && Number(value) !== 0) body = ALTERNATE_PREFIX[conversion] + body;
   } else if ("diu".includes(conversion)) {
-    body = String(Math.round(magnitude));
+    body = String(Math.trunc(magnitude));
   } else if (conversion === "e" || conversion === "E") {
     body = exponential(magnitude, digits);
     if (alternate && digits === 0) body = body.replace("e", ".e");
@@ -101,7 +103,8 @@ function sprintf(spec: string, value: unknown): string {
   } else if (conversion === "c") {
     body = typeof value === "number" ? String.fromCodePoint(value) : String(value).charAt(0);
   } else {
-    body = precision === undefined ? String(value) : String(value).slice(0, digits);
+    body = conversion === "p" ? inspect(value) : String(value);
+    if (precision !== undefined) body = body.slice(0, digits);
   }
   if (conversion === conversion.toUpperCase() && numeric) body = body.toUpperCase();
 

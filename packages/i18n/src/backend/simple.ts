@@ -20,7 +20,7 @@ import {
   type Locale,
   type TranslationKey,
 } from "../i18n.js";
-import { deepMergeInPlace, deepSymbolizeKeys, except, type TranslationData } from "../utils.js";
+import { deepMergeBang, deepSymbolizeKeys, except, type TranslationData } from "../utils.js";
 import { Base, type TranslateOptions } from "./base.js";
 
 function isHash(value: unknown): value is TranslationData {
@@ -56,7 +56,7 @@ export class Simple extends Base {
     const translations = this.translations();
     translations[locale] ??= {};
     const payload = options.skipSymbolizeKeys ? data : deepSymbolizeKeys(data);
-    return deepMergeInPlace(translations[locale] as TranslationData, payload);
+    return deepMergeBang(translations[locale] as TranslationData, payload);
   }
 
   /** Get available locales from the translations hash. */
@@ -72,15 +72,15 @@ export class Simple extends Base {
   }
 
   /** Clean up translations hash and set initialized to false on reload. */
-  override reload(): void {
+  override reloadBang(): void {
     this.initializedFlag = false;
     this.translationsStore = undefined;
-    super.reload();
+    super.reloadBang();
   }
 
-  override eagerLoad(): void {
+  override eagerLoadBang(): void {
     if (!this.initialized()) this.initTranslations();
-    super.eagerLoad();
+    super.eagerLoadBang();
   }
 
   translations({ doInit = false }: { doInit?: boolean } = {}): TranslationData {

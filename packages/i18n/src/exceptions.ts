@@ -10,7 +10,8 @@
 import { EMPTY_HASH, normalizeKeys } from "./i18n.js";
 import type { Locale, TranslationKey } from "./i18n.js";
 
-function inspect(value: unknown): string {
+/** @internal Ruby `Object#inspect`, as far as the values reaching this file go. */
+export function inspect(value: unknown): string {
   if (value === null || value === undefined) return "nil";
   if (typeof value === "string") return JSON.stringify(value);
   if (typeof value === "function") return "#<Proc>";
