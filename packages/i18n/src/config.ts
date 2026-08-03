@@ -5,28 +5,8 @@
 import { enforceAvailableLocalesBang, type Locale, type TranslationKey } from "./i18n.js";
 import { ExceptionHandler, MissingInterpolationArgument } from "./exceptions.js";
 import { DEFAULT_INTERPOLATION_PATTERNS } from "./interpolate/ruby.js";
-import type { TranslationData } from "./utils.js";
-
-/** The slice of a backend `Config` hands out. */
-export interface Backend {
-  storeTranslations(
-    locale: Locale,
-    data: TranslationData,
-    options?: Record<string, unknown>,
-  ): unknown;
-  availableLocales(): Locale[];
-  reloadBang(): void;
-  eagerLoadBang(): void;
-  translate(locale: Locale, key: unknown, options?: Record<string, unknown>): unknown;
-  exists(locale: Locale, key: TranslationKey, options?: Record<string, unknown>): boolean;
-  localize(
-    locale: Locale,
-    object: unknown,
-    format: unknown,
-    options?: Record<string, unknown>,
-  ): unknown;
-  transliterate(locale: Locale, string: string, replacement?: string | null): string;
-}
+import type { Base } from "./backend/base.js";
+import { Simple } from "./backend/simple.js";
 
 /**
  * Ruby's handler is a Symbol naming a method on `I18n`, a Proc, or any object
@@ -52,7 +32,7 @@ export type MissingInterpolationArgumentHandler = (
  * instance (and subclass); these module-level bindings are the JS equivalent.
  * Only `locale` is per-instance, exactly as in the gem.
  */
-let backend: Backend | undefined;
+let backend: Base | undefined;
 let defaultLocale: Locale | undefined;
 let availableLocales: Locale[] | undefined;
 let availableLocalesSet: Set<Locale> | undefined;
@@ -62,18 +42,6 @@ let missingInterpolationArgumentHandler: MissingInterpolationArgumentHandler | u
 let loadPath: string[] | undefined;
 let enforceAvailableLocalesFlag = true;
 let interpolationPatterns: RegExp[] | undefined;
-
-let defaultBackendFactory: (() => Backend) | undefined;
-
-/**
- * Ruby's `Config#backend` defaults to `Backend::Simple.new`, resolved through
- * `autoload`. `backend/simple.ts` is not ported yet, so it registers itself
- * here when it lands; until then `config.backend` raises rather than handing
- * back a half-built default.
- */
-export function registerDefaultBackend(factory: () => Backend): void {
-  defaultBackendFactory = factory;
-}
 
 export class Config {
   private localeValue?: Locale | false;
@@ -89,19 +57,12 @@ export class Config {
   }
 
   /** Returns the current backend. Defaults to `Backend::Simple`. */
-  get backend(): Backend {
-    if (!backend) {
-      if (!defaultBackendFactory) {
-        throw new Error(
-          "I18n has no backend: set `I18n.config.backend`, or port I18n::Backend::Simple and register it with registerDefaultBackend().",
-        );
-      }
-      backend = defaultBackendFactory();
-    }
+  get backend(): Base {
+    backend ??= new Simple();
     return backend;
   }
 
-  set backend(value: Backend) {
+  set backend(value: Base) {
     backend = value;
   }
 
@@ -219,5 +180,4 @@ export function resetClassConfig(): void {
   loadPath = undefined;
   enforceAvailableLocalesFlag = true;
   interpolationPatterns = undefined;
-  defaultBackendFactory = undefined;
 }

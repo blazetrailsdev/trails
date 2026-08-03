@@ -1,9 +1,5 @@
-export { Config, registerDefaultBackend } from "./config.js";
-export type {
-  Backend,
-  ExceptionHandlerLike,
-  MissingInterpolationArgumentHandler,
-} from "./config.js";
+export { Config } from "./config.js";
+export type { ExceptionHandlerLike, MissingInterpolationArgumentHandler } from "./config.js";
 export {
   ArgumentError,
   Disabled,

@@ -16,7 +16,8 @@
  * handler that names a real export dispatches exactly as the gem's does.
  */
 import * as I18n from "./i18n.js";
-import type { Backend, ExceptionHandlerLike } from "./config.js";
+import type { ExceptionHandlerLike } from "./config.js";
+import type { Base } from "./backend/base.js";
 import { Config } from "./config.js";
 import { ArgumentError, Disabled, InvalidLocale, MissingTranslation } from "./exceptions.js";
 import type { TranslateOptions } from "./backend/base.js";
@@ -111,11 +112,11 @@ export function setLocale(value: Locale | false): void {
   config().locale = value;
 }
 
-export function backend(): Backend {
+export function backend(): Base {
   return config().backend;
 }
 
-export function setBackend(value: Backend): void {
+export function setBackend(value: Base): void {
   config().backend = value;
 }
 
@@ -384,7 +385,7 @@ function translateKey(
   throwOption: unknown,
   raise: unknown,
   locale: Locale,
-  backend: Backend,
+  backend: Base,
   options: TranslateOptions,
 ): unknown {
   const result = catchException(() => backend.translate(locale, key, options));
