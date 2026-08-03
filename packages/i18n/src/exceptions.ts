@@ -16,7 +16,7 @@ import type { Locale, TranslationKey } from "./i18n.js";
 /** @internal Ruby `Object#inspect`, as far as the values reaching this file go. */
 export function inspect(value: unknown): string {
   if (value === null || value === undefined) return "nil";
-  if (typeof value === "string") return JSON.stringify(value);
+  if (typeof value === "string") return inspectString(value);
   if (typeof value === "function") return "#<Proc>";
   if (Array.isArray(value)) return `[${value.map(inspect).join(", ")}]`;
   if (typeof value === "object") {
@@ -26,6 +26,49 @@ export function inspect(value: unknown): string {
     return `{${pairs.join(", ")}}`;
   }
   return String(value);
+}
+
+const RUBY_ESCAPES: Record<string, string> = {
+  "\n": "\\n",
+  "\r": "\\r",
+  "\t": "\\t",
+  "\f": "\\f",
+  "\v": "\\v",
+  "\b": "\\b",
+  "\x07": "\\a",
+  "\x1b": "\\e",
+};
+
+/**
+ * Ruby `String#inspect` (MRI `string.c`, `rb_str_inspect`). `JSON.stringify`
+ * is not a stand-in: Ruby renders ESC as `\e`, escapes `#` before `{`, `$` and
+ * `@` so the result re-parses as the same string, prints printable non-ASCII
+ * literally, and renders bytes that are not valid UTF-8 — here, a lone
+ * surrogate — as the `\xNN` bytes of their encoding.
+ */
+function inspectString(value: string): string {
+  const chars = Array.from(value);
+  let result = '"';
+  for (let i = 0; i < chars.length; i++) {
+    const char = chars[i];
+    const code = char.codePointAt(0)!;
+    if (char === '"' || char === "\\") {
+      result += `\\${char}`;
+    } else if (char === "#" && ["{", "$", "@"].includes(chars[i + 1] ?? "")) {
+      result += "\\#";
+    } else if (char in RUBY_ESCAPES) {
+      result += RUBY_ESCAPES[char];
+    } else if (code < 0x20 || code === 0x7f || (code >= 0x80 && code <= 0x9f)) {
+      result += `\\u${code.toString(16).toUpperCase().padStart(4, "0")}`;
+    } else if (code >= 0xd800 && code <= 0xdfff) {
+      for (const byte of [0xe0 | (code >> 12), 0x80 | ((code >> 6) & 0x3f), 0x80 | (code & 0x3f)]) {
+        result += `\\x${byte.toString(16).toUpperCase()}`;
+      }
+    } else {
+      result += char;
+    }
+  }
+  return `${result}"`;
 }
 
 function inspectSymbol(value: unknown): string {
