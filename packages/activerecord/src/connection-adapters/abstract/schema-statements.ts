@@ -1953,16 +1953,7 @@ export class SchemaStatements {
   }
 
   validTableDefinitionOptions(): string[] {
-    return [
-      "temporary",
-      "ifNotExists",
-      "options",
-      "as",
-      "comment",
-      "charset",
-      "collation",
-      "primaryKey",
-    ];
+    return ["temporary", "ifNotExists", "options", "as", "comment", "charset", "collation"];
   }
 
   validColumnDefinitionOptions(): string[] {
