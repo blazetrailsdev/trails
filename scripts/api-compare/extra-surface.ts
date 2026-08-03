@@ -304,8 +304,10 @@ export interface TaggedEntry {
 }
 
 /**
- * The `name` slot of a file-level tag's key. Not a legal TS identifier, so it
- * can never collide with a declaration's key in the shared key space.
+ * The `name` slot of a file-level tag's key. Not a legal TS identifier, so a
+ * file-level tag neither shadows nor is shadowed by a per-declaration one in
+ * the shared key space, and it counts as a written tag like any other — the
+ * permanence gate and the staleness gate both apply to it unchanged.
  */
 export const FILE_TAG_NAME = "*";
 
@@ -342,6 +344,9 @@ export interface FileTagRejection {
  * rename may be owed. Refusing on either signal is a hard failure naming the
  * file, never a silent no-op: a blanket that quietly stops applying would leave
  * the surface it was absorbing uncounted.
+ *
+ * `extras` is the FULL scored set, `--novel-only` notwithstanding: a moved name
+ * refutes the claim whether or not this run is reporting moved names.
  */
 export function fileTagVerdict(
   rubyFile: string | null,
@@ -471,10 +476,6 @@ export function collectTaggedEntries(ts: ApiManifest): TaggedEntry[] {
     for (const [file, fns] of Object.entries(tsPkg.fileFunctions ?? {})) {
       for (const fn of fns) pushMethod(pkg, file, fn);
     }
-    // File-level tags: one written reason per file, keyed on a name no
-    // declaration can occupy, so it neither shadows nor is shadowed by the
-    // per-declaration form. It counts as a written tag like any other — the
-    // permanence gate and the staleness gate both apply to it unchanged.
     for (const [file, reason] of Object.entries(tsPkg.fileNoRailsEquivalent ?? {})) {
       const entry: TaggedEntry = {
         package: pkg,
@@ -1257,11 +1258,7 @@ function buildPackageReport(
       scored.push({ name, kind });
     }
 
-    // The file-level form is judged on the FULL scored set, `--novel-only`
-    // notwithstanding: a moved name refutes the claim whether or not this run
-    // is reporting moved names.
-    const fileReason = fileTags[expectedTs];
-    if (fileReason !== undefined) {
+    if (fileTags[expectedTs] !== undefined) {
       const cause = fileTagVerdict(rubyFile, scored);
       if (cause === null) {
         if (scored.length > 0) {
@@ -1269,7 +1266,7 @@ function buildPackageReport(
           allowlistedCount += scored.length;
           scored.length = 0;
         }
-      } else {
+      } else if (!fileTagRejections.some((r) => r.package === pkg && r.tsFile === expectedTs)) {
         fileTagRejections.push({
           package: pkg,
           tsFile: expectedTs,

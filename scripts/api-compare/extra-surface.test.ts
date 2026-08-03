@@ -2218,6 +2218,19 @@ describe("@noRailsEquivalent — extractor to report", () => {
     expect(report.tagged.classification.permanent).toBe(1);
   });
 
+  it("fails a file-level reason that states no permanence claim", () => {
+    const report = reportFor(railsWithout(), {
+      "connection-adapters/libsql-replica-adapter.ts": DRIVER_ADAPTER.replace(
+        "PERMANENT — Ruby",
+        "Ruby",
+      ),
+    });
+    expect(report.tagged.classification.unclassified).toBe(1);
+    expect(gateUnclassified(report.tagged)).toContain(
+      "connection-adapters/libsql-replica-adapter.ts",
+    );
+  });
+
   it("rejects a file-level tag when a name in the file scores as moved", () => {
     // The postgresql/schema-statements-class.ts shape: no counterpart FILE, but
     // the names exist in Rails elsewhere, so a rename may be owed.
