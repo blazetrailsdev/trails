@@ -9,7 +9,7 @@ import { Simple } from "./simple.js";
 import { config, resetConfig } from "../i18n.js";
 import { resetClassConfig } from "../config.js";
 import { InvalidLocaleData } from "../exceptions.js";
-import { registerFileReader } from "./base.js";
+import { preloadTranslationFiles, registerFileReader } from "./base.js";
 import { parseYaml } from "../yaml.js";
 
 function localesDir(): string {
@@ -19,50 +19,69 @@ function localesDir(): string {
 describe("I18n::Backend::Base file loading", () => {
   let backend: Simple;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     resetConfig();
     resetClassConfig();
     registerFileReader((filename) => readFile(filename, "utf8"));
+    await preloadTranslationFiles(
+      ["en.yml", "fr.yml", "invalid/empty.yml", "invalid/syntax.yml"].map(
+        (name) => `${localesDir()}/${name}`,
+      ),
+    );
     backend = new Simple();
     config().backend = backend;
     config().enforceAvailableLocales = false;
   });
 
-  it("raises InvalidLocaleData given a YAML file that is empty", async () => {
-    await expect(
-      backend.loadTranslations(`${localesDir()}/invalid/empty.yml`),
-    ).rejects.toBeInstanceOf(InvalidLocaleData);
+  it("raises InvalidLocaleData given a YAML file that is empty", () => {
+    expect(() => backend.loadTranslations(`${localesDir()}/invalid/empty.yml`)).toThrow(
+      InvalidLocaleData,
+    );
   });
 
-  it("raises InvalidLocaleData naming the file given a YAML syntax error", async () => {
+  it("raises InvalidLocaleData naming the file given a YAML syntax error", () => {
     const filename = `${localesDir()}/invalid/syntax.yml`;
-    await expect(backend.loadTranslations(filename)).rejects.toThrow(
+    expect(() => backend.loadTranslations(filename)).toThrow(
       new RegExp(`^can not load translations from ${filename}: `),
     );
   });
 
-  it("yields each filename and its data to the block", async () => {
+  it("yields each filename and its data to the block", () => {
     const yielded: unknown[] = [];
     const fr = `${localesDir()}/fr.yml`;
-    await backend.loadTranslations(fr, (...args: unknown[]) => yielded.push(args));
+    backend.loadTranslations(fr, (...args: unknown[]) => yielded.push(args));
     expect(yielded).toEqual([[fr, { fr: { animal: { dog: "chien" } } }]]);
   });
 
   it("refuses a lazy lookup while I18n.load_path is unread", () => {
-    config().loadPath = [`${localesDir()}/en.yml`];
-    expect(() => backend.translate("en", "foo.bar")).toThrow(/await backend.loadTranslations/);
+    config().loadPath = [`${localesDir()}/never-preloaded.yml`];
+    expect(() => backend.translate("en", "foo.bar")).toThrow(
+      /await I18n.preloadTranslationFiles\(\)/,
+    );
   });
 
-  it("serves lookups after an awaited preload of I18n.load_path", async () => {
+  it("serves lookups after an awaited preload of I18n.load_path", () => {
     config().loadPath = [`${localesDir()}/en.yml`];
-    await backend.loadTranslations();
     expect(backend.translate("en", "foo.bar")).toBe("baz");
+    expect(backend.initialized()).toBe(true);
   });
 
-  it("leaves the lazy-init guard armed when the preload rejects", async () => {
+  it("re-reads I18n.load_path when the preload is re-run before reloadBang", async () => {
+    let body = "en:\n  foo:\n    bar: baz\n";
+    registerFileReader(() => Promise.resolve(body));
+    config().loadPath = ["mutable.yml"];
+    await preloadTranslationFiles();
+    expect(backend.translate("en", "foo.bar")).toBe("baz");
+
+    body = "en:\n  foo:\n    bar: qux\n";
+    await preloadTranslationFiles();
+    backend.reloadBang();
+    expect(backend.translate("en", "foo.bar")).toBe("qux");
+  });
+
+  it("leaves the lazy-init guard armed when the load path holds an invalid file", () => {
     config().loadPath = [`${localesDir()}/invalid/syntax.yml`];
-    await expect(backend.loadTranslations()).rejects.toBeInstanceOf(InvalidLocaleData);
-    expect(() => backend.translate("en", "foo.bar")).toThrow(/await backend.loadTranslations/);
+    expect(() => backend.translate("en", "foo.bar")).toThrow(InvalidLocaleData);
     expect(backend.initialized()).toBe(false);
   });
 
