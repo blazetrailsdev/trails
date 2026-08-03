@@ -24,6 +24,7 @@ interface MessageEncryptorOptions extends RotatableOptions {
   cipher?: string;
   digest?: string;
   serializer?: Format | MessageSerializer;
+  url_safe?: boolean;
   forceLegacyMetadataSerializer?: boolean;
 }
 
@@ -45,7 +46,7 @@ export class MessageEncryptor extends Codec {
     options?: MessageEncryptorOptions,
   ) {
     let signSecret: string | Buffer | undefined;
-    let opts: MessageEncryptorOptions = {};
+    let opts: MessageEncryptorOptions;
 
     if (
       signSecretOrOptions &&
@@ -53,13 +54,14 @@ export class MessageEncryptor extends Codec {
       !Buffer.isBuffer(signSecretOrOptions)
     ) {
       opts = signSecretOrOptions;
-    } else if (signSecretOrOptions !== undefined) {
+    } else {
       signSecret = signSecretOrOptions;
       opts = options ?? {};
     }
 
     super({
       serializer: opts.serializer,
+      urlSafe: opts.url_safe,
       forceLegacyMetadataSerializer: opts.forceLegacyMetadataSerializer,
     });
 
