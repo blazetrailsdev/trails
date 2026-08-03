@@ -17,11 +17,6 @@ const STORY_SLUG = /[a-z0-9]+(?:-[a-z0-9]+){2,}/g;
 const PENDING_PHRASE =
   /converged by|converges (when|in|once)|will (be )?converge|deferred to|pending convergence|once .{0,40}lands|until .{0,60}lands|un-?skip once|when that story|fixed by|tracked (by|to|in|here|separately)|known gap|TODO\(/i;
 
-// A slug in a sentence that reports history rather than a promise. The pending
-// phrase is matched over the whole comment block (below), so this is what keeps
-// "Regression for X" legal in a block whose *other* sentence makes a promise —
-// and what keeps a citation of the story that already landed ("`X` landed
-// (#3874) without closing it") from reading as the promise it disclaims.
 const PROVENANCE_PHRASE = /regression for|\blanded\b|added by|introduced by|ported in/i;
 
 // Frontmatter `status:` of a story file, matched before any body prose.
@@ -50,9 +45,12 @@ export interface StoryReference {
  * next ("… it falls back. Tracked by `X`."), which a sentence-scoped match
  * misses entirely.
  *
- * Provenance is then vetoed per sentence rather than per block, so a block that
- * makes a promise does not drag its own history citations in with it — the
- * match is block-scoped, the exemption stays sentence-scoped.
+ * A `PROVENANCE_PHRASE` sentence is then vetoed per sentence rather than per
+ * block, so a block that makes a promise does not drag its own history
+ * citations in with it: the match is block-scoped, the exemption stays
+ * sentence-scoped. That keeps "Regression for X" legal alongside a promise, and
+ * keeps a citation of the story that already landed ("`X` landed (#3874)
+ * without closing it") from reading as the promise it disclaims.
  */
 export function extractStoryReferences(source: string, file: string): StoryReference[] {
   const refs: StoryReference[] = [];
