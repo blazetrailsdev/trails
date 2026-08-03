@@ -63,8 +63,8 @@ export {
   withLocale,
 } from "./i18n.js";
 export type { Locale, TranslateKey, TranslationKey } from "./i18n.js";
-export { Base } from "./backend/base.js";
-export type { TranslateOptions } from "./backend/base.js";
+export { Base, registerFileReader } from "./backend/base.js";
+export type { FileReader, TranslateOptions } from "./backend/base.js";
 export { Simple } from "./backend/simple.js";
 export { ThrownException, catchException, throwException } from "./throw-catch.js";
 export { deepMerge, deepMergeBang, deepSymbolizeKeys, except } from "./utils.js";

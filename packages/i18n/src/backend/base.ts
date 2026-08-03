@@ -12,19 +12,21 @@
  * and `resolve` still spell theirs as real JS symbols; converging those two is
  * story `i18n-symbol-values-are-colon-strings`.
  *
- * Not ported here: `load_translations` / `load_file` / `load_rb` / `load_yml` /
- * `load_json` (file loading needs a YAML reader and async fs — its own story),
+ * Not ported here: `load_rb` (it `eval`s Ruby source, which trails has none of
+ * — see the `SCOPED_SKIP_GROUPS` entry in `scripts/api-compare/conventions.ts`),
  * and the `Transliterator` mixin.
  */
 
 import {
   ArgumentError,
   InvalidLocale,
+  InvalidLocaleData,
   InvalidPluralizationData,
   MissingTranslation,
   MissingTranslationData,
   ReservedInterpolationKey,
   inspect,
+  UnknownFileType,
 } from "../exceptions.js";
 import {
   EMPTY_HASH,
@@ -39,8 +41,46 @@ import {
 import { interpolate as interpolateString } from "../interpolate/ruby.js";
 import { throwException, catchException } from "../throw-catch.js";
 import { except, type TranslationData } from "../utils.js";
+import { parseYaml } from "../yaml.js";
 
 export type TranslateOptions = { [key: string]: unknown };
+
+/** Reads a translation file and hands back its contents. */
+export type FileReader = (filename: string) => Promise<string>;
+
+let fileReader: FileReader | undefined;
+
+/**
+ * @noRailsEquivalent PERMANENT — the gem reads translation files with Ruby core —
+ * `YAML.load_file` (base.rb:246) and `JSON.load_file` (base.rb:262). JS has no
+ * filesystem in the language, and `packages/i18n` imports nothing from `node:*`
+ * so it stays usable off a server, so the host registers the reader instead.
+ * Mirrors the `registerDefaultBackend` seam in `config.ts`.
+ */
+export function registerFileReader(reader: FileReader): void {
+  fileReader = reader;
+}
+
+function readFile(filename: string): Promise<string> {
+  if (!fileReader) {
+    throw new Error(
+      "I18n cannot read translation files: register a reader with registerFileReader().",
+    );
+  }
+  return fileReader(filename);
+}
+
+/** Mirrors: Ruby's `File.extname`, down to the leading dot. */
+function extname(filename: string): string {
+  const base = filename.slice(filename.lastIndexOf("/") + 1);
+  const dot = base.lastIndexOf(".");
+  return dot <= 0 ? "" : base.slice(dot);
+}
+
+/** Mirrors: Ruby's `Exception#inspect`, which the rescues in load_yml/load_json use. */
+function inspectError(e: unknown): string {
+  return e instanceof Error ? `#<${e.name}: ${e.message}>` : String(e);
+}
 
 /** Ruby truthiness: only `nil` and `false` are falsy — `0` and `""` are not. */
 function truthy(value: unknown): boolean {
@@ -93,6 +133,23 @@ interface Localizable {
 
 export abstract class Base {
   private eagerLoadedFlag = false;
+
+  /**
+   * Accepts a list of paths to translation files. Loads translations from YAML
+   * files (*.yml) or JSON files (*.json). See #loadYml and #loadJson for
+   * details. Ruby's optional block is the trailing argument here.
+   */
+  async loadTranslations(...filenames: unknown[]): Promise<void> {
+    const block =
+      typeof filenames[filenames.length - 1] === "function"
+        ? (filenames.pop() as (filename: string, loadedTranslations: TranslationData) => void)
+        : undefined;
+    if (filenames.length === 0) filenames = config().loadPath;
+    for (const filename of (filenames as (string | string[])[]).flat()) {
+      const loadedTranslations = await this.loadFile(filename);
+      if (block) block(filename, loadedTranslations);
+    }
+  }
 
   /**
    * This method receives a locale, a data hash and options for storing
@@ -406,6 +463,70 @@ export abstract class Base {
     } catch (e) {
       if (e instanceof MissingTranslationData) return e.message;
       throw e;
+    }
+  }
+
+  /**
+   * Loads a single translations file by delegating to #loadYml or #loadJson
+   * depending on the file extension and directly merges the data to the
+   * existing translations. Raises I18n::UnknownFileType for all other file
+   * extensions.
+   */
+  protected async loadFile(filename: string): Promise<TranslationData> {
+    const type = extname(filename).replace(".", "").toLowerCase();
+    const loader = (this as unknown as Record<string, unknown>)[
+      `load${type.charAt(0).toUpperCase()}${type.slice(1)}`
+    ];
+    if (typeof loader !== "function") throw new UnknownFileType(type, filename);
+    const [data, keysSymbolized] = await (
+      loader as (this: Base, filename: string) => Promise<[unknown, boolean]>
+    ).call(this, filename);
+    if (!isHash(data)) {
+      throw new InvalidLocaleData(filename, "expects it to return a hash, but does not");
+    }
+    for (const [locale, d] of Object.entries(data)) {
+      this.storeTranslations(locale, (d ?? {}) as TranslationData, {
+        skipSymbolizeKeys: keysSymbolized,
+      });
+    }
+    return data;
+  }
+
+  /**
+   * Loads a YAML translations file. The data must have locales as toplevel
+   * keys. Only the pre-Psych-4 arm of the gem's `YAML.respond_to?
+   * (:unsafe_load_file)` probe exists here — there is no Psych to probe, and
+   * `parseYaml` neither symbolizes nor freezes, so `keys_symbolized` is false.
+   *
+   * @missingRailsCall load_file — Ruby's `YAML.load_file` (base.rb:246) reads
+   * and parses in one call; JS has neither, so the read goes through the
+   * registered reader and the parse through `parseYaml`.
+   */
+  protected async loadYml(filename: string): Promise<[unknown, boolean]> {
+    try {
+      return [parseYaml(await readFile(filename)), false];
+    } catch (e) {
+      throw new InvalidLocaleData(filename, inspectError(e));
+    }
+  }
+
+  /** Mirrors: `alias_method :load_yaml, :load_yml` (base.rb:251). */
+  protected loadYaml = this.loadYml;
+
+  /**
+   * Loads a JSON translations file. The data must have locales as toplevel
+   * keys. As in #loadYml, only the arm of the gem's `JSON.respond_to?
+   * (:load_file)` probe that neither symbolizes nor freezes exists here.
+   *
+   * @missingRailsCall load_file — Ruby's `JSON.load_file` (base.rb:262) reads
+   * and parses in one call; `JSON.parse` only parses, so the read goes through
+   * the registered reader.
+   */
+  protected async loadJson(filename: string): Promise<[unknown, boolean]> {
+    try {
+      return [JSON.parse(await readFile(filename)), false];
+    } catch (e) {
+      throw new InvalidLocaleData(filename, inspectError(e));
     }
   }
 
