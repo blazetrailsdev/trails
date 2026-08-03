@@ -477,11 +477,6 @@ export class SchemaCache {
    * {@link takeTouchedTables} is called. Test-harness only.
    *
    * @internal
-   *
-   * @noRailsEquivalent CONVERGEABLE (story: retire-schema-cache-sync-and-ledger-shims).
-   * Test-harness ledger. Rails re-reflects from a live
-   * blocking connection at fixture teardown and needs no record of what was
-   * cleared.
    */
   recordTouchedTables(): void {
     this._touchedTables = new Set();
@@ -492,10 +487,6 @@ export class SchemaCache {
    * close the recording window. Test-harness only.
    *
    * @internal
-   *
-   * @noRailsEquivalent CONVERGEABLE (story: retire-schema-cache-sync-and-ledger-shims).
-   * Test-harness ledger, closing the window opened by
-   * `recordTouchedTables`. No Rails analogue, for the same reason.
    */
   takeTouchedTables(): Set<string> {
     const touched = this._touchedTables ?? new Set<string>();
@@ -561,11 +552,6 @@ export class SchemaCache {
    * Order-independent with {@link setColumns}: whichever lands second runs
    * {@link reconcilePrimaryKeyFlags}, so the authoritative key always wins over
    * a column-reflected flag.
-   *
-   * @noRailsEquivalent CONVERGEABLE (story: retire-schema-cache-test-only-sync-writers).
-   * Test-harness seeding, no production caller: Rails'
-   * tests let the blocking `add` / `primary_keys` warm the map, the trails
-   * ports run pool-less. See above.
    */
   setPrimaryKeys(tableName: string, pk: string | string[] | null): void {
     this._primaryKeys.set(tableName, pk);
@@ -622,11 +608,6 @@ export class SchemaCache {
    * the trails ports run pool-less and seed it through this writer instead.
    * Production warming goes through {@link setColumns} (which sets `true` for a
    * table whose columns just came back) or the async `dataSourceExists` query.
-   *
-   * @noRailsEquivalent CONVERGEABLE (story: retire-schema-cache-test-only-sync-writers).
-   * Test-harness seeding, no production caller: Rails'
-   * tests let the blocking `data_source_exists?` warm the map, the trails
-   * ports run pool-less. See above.
    */
   setDataSourceExists(tableName: string, exists: boolean): void {
     this._dataSourceExists.set(tableName, exists);
@@ -845,11 +826,6 @@ export class SchemaReflection {
    * this pairs the two so the eager-warm pool path has a single entry point
    * that also routes through the lone-connection `FakePool`. Don't grep Rails
    * for it.
-   *
-   * @noRailsEquivalent CONVERGEABLE (story: retire-schema-cache-sync-and-ledger-shims).
-   * trails-only composite of Rails'
-   * `SchemaReflection#load!` and `SchemaCache#add_all`; Rails has no
-   * `load_all!`. See above.
    */
   async loadAllBang(pool: unknown): Promise<this> {
     const cache = await this.cache(pool);
@@ -864,11 +840,6 @@ export class SchemaReflection {
    * so adapter-side consumers (AbstractAdapter.schemaCache) see the
    * preloaded data from a schema_cache.json without hitting the DB.
    * External callers should not mutate the returned cache.
-   *
-   * @noRailsEquivalent CONVERGEABLE (story: retire-schema-cache-sync-and-ledger-shims).
-   * Sync, non-loading peek. Rails' `SchemaReflection`
-   * needs none because every accessor can block on `cache(pool)`. See
-   * above.
    */
   get loadedCache(): SchemaCache | null {
     return this._cache;
@@ -880,10 +851,6 @@ export class SchemaReflection {
    * reader — the BoundSchemaReflection and the adapters' `internalSchemaCache`
    * alike. Assigning drops any in-flight disk load so it can't overwrite the
    * cache the caller just installed.
-   *
-   * @noRailsEquivalent CONVERGEABLE (story: retire-schema-cache-sync-and-ledger-shims).
-   * Rails' PoolConfig owns `@schema_cache` outright; trails routes the slot
-   * here so there is a single instance. See above.
    */
   set loadedCache(cache: SchemaCache | null) {
     this._cache = cache;
