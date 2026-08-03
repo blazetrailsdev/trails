@@ -4,6 +4,11 @@
  * The gem splits the code into a `Chain::Implementation` module so other
  * modules can be `include`d over it; TypeScript has no module reopening, so
  * `Chain` is a single class extending `Base`, exactly as `Simple` is.
+ *
+ * `translate` and `localize` each `return` from inside a `catch(:exception)`
+ * block (chain.rb:65, chain.rb:85), which in Ruby leaves the enclosing method;
+ * the one-shot carrier in those two bodies is that non-local exit, checked
+ * immediately after each backend so the control flow stays the gem's.
  */
 
 import { MissingTranslation } from "../exceptions.js";
@@ -97,8 +102,6 @@ export class Chain extends Base {
     let options = except(defaultOptions, "default");
 
     for (const backend of this.backends) {
-      // Ruby's `return` inside the `catch` block leaves `translate` itself; the
-      // carrier below is how that non-local exit spells out in JS.
       let returned: { value: unknown } | undefined;
       catchException(() => {
         if (backend === this.backends[this.backends.length - 1]) options = defaultOptions;

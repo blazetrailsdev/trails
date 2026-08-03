@@ -87,8 +87,6 @@ describe("I18nBackendChainTest", () => {
     expect(t(null, { default: "Fuh" })).toBe("Fuh");
     expect(t(null, { default: { zero: "Zero" }, count: 0 })).toBe("Zero");
     expect(t(null, { default: { zero: "Zero" } })).toEqual({ zero: "Zero" });
-    // `default` still spells a Ruby Symbol as a JS symbol in base.ts; converging
-    // that is story `i18n-symbol-values-are-colon-strings`.
     expect(t(null, { default: Symbol.for("foo") })).toBe("Foo");
   });
 
