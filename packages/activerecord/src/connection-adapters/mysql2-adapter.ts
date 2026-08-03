@@ -144,19 +144,14 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   // true by reconnectBang() and by successful activeAsync().
   private _activeState = true;
 
-  // Mirrors Rails' Mysql2Adapter#active? (mysql2_adapter.rb:108) whose first
-  // guard is `connected?` — `!(@raw_connection.nil? || @raw_connection.closed?)`.
-  // A never-connected adapter (`_client === null`) therefore reports inactive:
-  // trails connects lazily, so `_client` stands in for `@raw_connection`. The
-  // sync getter can't do the live `ping` half of Rails' active? (that's
-  // activeAsync); `_activeState` is the cached liveness that ping updates.
+  // Mirrors Rails' Mysql2Adapter#active? (mysql2_adapter.rb:108), whose body is
+  // `if connected? ... @raw_connection&.ping ... end || false` — it *calls*
+  // `connected?` rather than re-deriving the guard, so this delegates to
+  // `isConnected()` (trails' `connected?`) the same way. The sync getter can't
+  // do the live `ping` half of Rails' active? (that's activeAsync);
+  // `_activeState` is the cached liveness that ping updates.
   override get active(): boolean {
-    return (
-      this._client !== null &&
-      !this._permanentlyClosed &&
-      !this._isFakeConnection &&
-      this._activeState
-    );
+    return this.isConnected();
   }
 
   /**
