@@ -276,11 +276,11 @@ export function transliterate(
     ...options
   }: TranslateOptions = EMPTY_HASH,
 ): unknown {
-  if (locale == null || locale === false) locale = config().locale;
-  if (locale === false) throw new Disabled("transliterate");
-  enforceAvailableLocalesBang(locale as Locale);
-
   try {
+    if (locale == null || locale === false) locale = config().locale;
+    if (locale === false) throw new Disabled("transliterate");
+    enforceAvailableLocalesBang(locale as Locale);
+
     return config().backend.transliterate(locale as Locale, key, replacement as string | null);
   } catch (exception) {
     if (!(exception instanceof ArgumentError)) throw exception;
