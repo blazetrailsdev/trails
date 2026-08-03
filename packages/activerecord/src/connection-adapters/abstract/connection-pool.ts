@@ -252,11 +252,6 @@ export class ExecutorHooks {
    * at wire-up time to hand the pool a getter instead.
    *
    * @internal Wiring only; called exactly once, from `index.ts`.
-   *
-   * @noRailsEquivalent CONVERGEABLE (story: retire-connection-pool-async-resolution-shims).
-   * Wiring hook. Ruby resolves the `ActiveRecord::Base`
-   * constant at call time; a TS import here would be a module cycle. See
-   * above.
    */
   static setConnectionHandlerResolver(resolver: () => ConnectionHandlerLike | null): void {
     ExecutorHooks._getConnectionHandler = resolver;
@@ -651,11 +646,6 @@ export class ConnectionPool implements ReapablePool {
    * is tracked by `connection-pool-pinned-sync-checkout-per-checkout-verify`.
    *
    * @internal
-   *
-   * @noRailsEquivalent CONVERGEABLE (story: retire-connection-pool-async-resolution-shims).
-   * Sync lease for callers mirroring Rails' synchronous
-   * `lease_connection` that cannot await, since trails' `leaseConnection`
-   * had to become async. See above.
    */
   leaseConnectionSync(): DatabaseAdapter {
     const lease = this.connectionLease();
@@ -1047,10 +1037,6 @@ export class ConnectionPool implements ReapablePool {
    * discarded. Not a Rails counterpart — Rails' `discard!` is fully synchronous.
    *
    * @internal
-   *
-   * @noRailsEquivalent CONVERGEABLE (story: retire-connection-pool-async-resolution-shims).
-   * Rails' `discard!` is fully synchronous and has no
-   * async closes to hand back. See above.
    */
   discardBangDraining(): Array<Promise<void>> {
     return this._discardBang();
@@ -1238,11 +1224,6 @@ export class ConnectionPool implements ReapablePool {
    * nothing is in flight (the sync-driver case).
    *
    * @internal
-   *
-   * @noRailsEquivalent CONVERGEABLE (story: retire-connection-pool-async-resolution-shims).
-   * Ruby's `driver.close` is synchronous, so Rails'
-   * discard paths complete the close before returning and need no drain
-   * bookkeeping. See above.
    */
   async drainPendingCloses(): Promise<void> {
     await Promise.all(this._pendingCloseDrains);

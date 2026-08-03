@@ -2749,13 +2749,9 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   /**
    * Complete a deferred async connection. No-op when already connected
-   * synchronously. Invoked by `openAsync()` and `verifyBang()`. @internal
+   * synchronously. Invoked by `openAsync()` and `verifyBang()`.
    *
-   * @noRailsEquivalent PERMANENT — Rails' `connect` (sqlite3_adapter.rb:806)
-   * opens the handle synchronously inside `initialize`, so there is nothing
-   * left to finish afterwards. Drivers whose `open()` returns a Promise cannot
-   * be opened from a synchronous constructor or a synchronous pool checkout,
-   * so the deferred completion is a seam Ruby never needs.
+   * @internal
    */
   async completeAsyncConnect(): Promise<void> {
     if (!this._asyncConnectPending) return;

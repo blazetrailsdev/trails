@@ -1401,13 +1401,6 @@ export class Base extends Model {
    * a getter can't await without wrapping instances in a `Proxy`.
    *
    * @internal
-   * @noRailsEquivalent PERMANENT No `def ensure_schema_loaded` exists anywhere
-   * in Rails: Ruby reflects lazily and synchronously from `method_missing` /
-   * `define_attribute_methods` around
-   * `vendor/rails/activerecord/lib/active_record/model_schema.rb:534`
-   * (`def load_schema`), where the blocking DB round-trip is invisible to the
-   * caller. Every trails DB call is a promise, so the lazy hook has to be an
-   * awaitable named entry point on the query/persistence path.
    */
   static ensureSchemaLoaded(this: typeof Base): Promise<void> {
     // A model whose declared attributes are all virtual (e.g. Rails'
