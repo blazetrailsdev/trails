@@ -14,6 +14,9 @@ class FakeBackend implements Backend {
   reload(): void {
     this.reloaded += 1;
   }
+  translate(): unknown {
+    return null;
+  }
 }
 
 /**

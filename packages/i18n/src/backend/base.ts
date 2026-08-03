@@ -69,7 +69,7 @@ export abstract class Base {
     key: TranslationKey | symbol | null | undefined,
     options: TranslateOptions = EMPTY_HASH,
   ): unknown {
-    if (typeof key === "string" && key === "") throw new ArgumentError();
+    if (key === "") throw new ArgumentError();
     if (!truthy(locale)) throw new InvalidLocale(locale);
     if (key == null && !("default" in options)) return null;
 
@@ -191,8 +191,7 @@ export abstract class Base {
         // The gem goes through `I18n.translate`, which — with `throw: true` —
         // hands a MissingTranslation straight back to this `catch`, exactly as
         // calling the backend does. The `I18n.t` facade is not ported yet.
-        const backend = config().backend as unknown as Base;
-        return backend.translate(locale, symbolName(subject), {
+        return config().backend.translate(locale, symbolName(subject), {
           ...options,
           locale,
           throw: true,

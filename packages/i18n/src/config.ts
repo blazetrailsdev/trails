@@ -6,10 +6,11 @@ import { enforceAvailableLocales, type Locale, type TranslationKey } from "./i18
 import { ExceptionHandler, MissingInterpolationArgument } from "./exceptions.js";
 import { DEFAULT_INTERPOLATION_PATTERNS } from "./interpolate/ruby.js";
 
-/** The slice of a backend `Config` itself calls. */
+/** The slice of a backend `Config` hands out. */
 export interface Backend {
   availableLocales(): Locale[];
   reload(): void;
+  translate(locale: Locale, key: unknown, options?: Record<string, unknown>): unknown;
 }
 
 export type ExceptionHandlerLike = {
