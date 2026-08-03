@@ -64,10 +64,10 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         // must not land on the shared leased connection.
         const singleConn = new Mysql2Adapter({ uri: MYSQL_TEST_URL, connectionLimit: 1 });
         try {
-          expect(await singleConn.activeAsync()).toBe(true);
           await singleConn.execute("SET SESSION wait_timeout=1");
+          expect(await singleConn.active()).toBe(true);
           await new Promise((r) => setTimeout(r, 2000));
-          expect(await singleConn.activeAsync()).toBe(false);
+          expect(await singleConn.active()).toBe(false);
         } finally {
           await singleConn.close();
         }
@@ -81,15 +81,14 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       // execute() — and the provoked disconnect must not hit the leased one.
       const singleConn = new Mysql2Adapter({ uri: MYSQL_TEST_URL, connectionLimit: 1 });
       try {
-        expect(await singleConn.activeAsync()).toBe(true);
         await singleConn.execute("SET SESSION wait_timeout=1");
+        expect(await singleConn.active()).toBe(true);
         await new Promise((r) => setTimeout(r, 2000));
         // Rails' reconnect! is synchronous; trails' reconnectBang is async, so
-        // await it before reading the sync `active` getter — which now tracks
-        // real connection state (`_client !== null`), only re-established once
-        // reconnectBang's _ensureClient resolves.
+        // await it before probing `active()` — which only reports true once
+        // reconnectBang's _ensureClient has re-established the handle.
         await singleConn.reconnectBang();
-        expect(singleConn.active).toBe(true);
+        expect(await singleConn.active()).toBe(true);
         await expect(singleConn.execute("SELECT 1")).resolves.toBeDefined();
       } finally {
         await singleConn.close();
@@ -97,22 +96,20 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     }, 10_000);
     it("successful reconnection after timeout with verify", async () => {
       // Stays self-built: connectionLimit:1 so the session wait_timeout applies
-      // to the same connection that activeAsync() and verifyBang() will use, and
+      // to the same connection that active() and verifyBang() will use, and
       // the provoked server-side disconnect must not hit the leased one.
       const singleConn = new Mysql2Adapter({ uri: MYSQL_TEST_URL, connectionLimit: 1 });
       try {
-        expect(await singleConn.activeAsync()).toBe(true);
         await singleConn.execute("SET SESSION wait_timeout=1");
+        expect(await singleConn.active()).toBe(true);
         await new Promise((r) => setTimeout(r, 2000));
         // With connectionLimit:1 the pool has no spare slot to create a fresh
         // connection, so getConnection() returns the dead socket and ping() fails.
-        // activeAsync() sets _activeState = false, making active return false.
-        await singleConn.activeAsync();
+        expect(await singleConn.active()).toBe(false);
         // active is false → verifyBang calls reconnectBang(). Await it (async in
-        // trails, unlike Rails' synchronous verify!) before reading the sync
-        // `active` getter, which now reflects `_client !== null`.
+        // trails, unlike Rails' synchronous verify!) before probing again.
         await singleConn.verifyBang();
-        expect(singleConn.active).toBe(true);
+        expect(await singleConn.active()).toBe(true);
         await expect(singleConn.execute("SELECT 1")).resolves.toBeDefined();
       } finally {
         await singleConn.close();
@@ -134,9 +131,9 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       // establish one here before disconnecting — the sync `active` getter now
       // tracks real connection state (`_client !== null`) like Rails' active?.
       await adapter.execute("SELECT 1");
-      expect(adapter.active).toBe(true);
+      expect(await adapter.active()).toBe(true);
       adapter.disconnectBang();
-      expect(adapter.active).toBe(false);
+      expect(await adapter.active()).toBe(false);
     });
 
     it("active after discard", async () => {
@@ -146,9 +143,9 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
           connection?: { stream?: { destroy?: () => void } };
         }
       )?.connection?.stream;
-      expect(adapter.active).toBe(true);
+      expect(await adapter.active()).toBe(true);
       adapter.discardBang();
-      expect(adapter.active).toBe(false);
+      expect(await adapter.active()).toBe(false);
       // discardBang abandons the socket without closing it; free the fd.
       socket?.destroy?.();
     });
@@ -171,7 +168,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         // Rails' discard! must not communicate with the server: the abandoned
         // handle is dropped without an end()/close() that would shut the socket.
         expect(endSpy).not.toHaveBeenCalled();
-        expect(adapter.active).toBe(false);
+        expect(await adapter.active()).toBe(false);
       } finally {
         socket?.destroy?.();
       }

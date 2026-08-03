@@ -126,8 +126,8 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         expect(errors).toHaveLength(1);
         expect(errors[0]).toBeInstanceOf(Deadlocked);
 
-        expect(adapter.active).toBe(true);
-        expect(adapter2.active).toBe(true);
+        expect(await adapter.active()).toBe(true);
+        expect(await adapter2.active()).toBe(true);
       } finally {
         await adapter2.close();
       }

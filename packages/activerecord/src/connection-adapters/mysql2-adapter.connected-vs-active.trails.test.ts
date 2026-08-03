@@ -28,12 +28,10 @@ describe("Mysql2Adapter connected? vs active?", () => {
 
     await adapter.connectBang();
     expect(adapter.isConnected()).toBe(true);
-    expect(adapter.active).toBe(true);
 
-    expect(await adapter.activeAsync()).toBe(false);
+    expect(await adapter.active()).toBe(false);
 
     expect(adapter.isConnected()).toBe(true);
-    expect(adapter.active).toBe(false);
   });
 
   it("restores active on a successful ping", async () => {
@@ -42,13 +40,11 @@ describe("Mysql2Adapter connected? vs active?", () => {
     const adapter = new Mysql2Adapter({ host: "localhost" });
 
     await adapter.connectBang();
-    await adapter.activeAsync();
-    expect(adapter.active).toBe(false);
+    expect(await adapter.active()).toBe(false);
 
     fail = false;
-    expect(await adapter.activeAsync()).toBe(true);
+    expect(await adapter.active()).toBe(true);
     expect(adapter.isConnected()).toBe(true);
-    expect(adapter.active).toBe(true);
   });
 
   it("reports not connected when the raw handle is absent", async () => {
@@ -59,6 +55,6 @@ describe("Mysql2Adapter connected? vs active?", () => {
     await adapter.connectBang();
     adapter.disconnectBang();
     expect(adapter.isConnected()).toBe(false);
-    expect(adapter.active).toBe(false);
+    expect(await adapter.active()).toBe(false);
   });
 });

@@ -235,9 +235,9 @@ export class PostgreSQLAdapter
     return env;
   }
 
-  override get active(): boolean {
+  override async active(): Promise<boolean> {
     // Rails' active? starts with `return false unless @raw_connection`
-    // (postgresql_adapter.rb); the ping half can't run in a sync getter.
+    // (postgresql_adapter.rb); the `query ";"` probe half is not ported yet.
     return this._rawConnection !== null && !this._closed && this._pgClientOptions != null;
   }
 

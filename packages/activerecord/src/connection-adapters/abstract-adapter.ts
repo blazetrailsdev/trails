@@ -1101,7 +1101,7 @@ export class AbstractAdapter implements Quoting {
     this._preparedStatements = value && !ActiveRecord.disablePreparedStatements;
   }
 
-  get active(): boolean {
+  async active(): Promise<boolean> {
     return this._connection !== null;
   }
 
@@ -1322,7 +1322,7 @@ export class AbstractAdapter implements Quoting {
   }
 
   async verifyBang(): Promise<void> {
-    if (!this.active) {
+    if (!(await this.active())) {
       // Mirrors Rails' `verify!` (abstract_adapter.rb): an unconfigured raw
       // connection (opened by the pool but never run through
       // configure_connection) is promoted here rather than reconnected. If

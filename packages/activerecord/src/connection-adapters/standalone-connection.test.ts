@@ -35,13 +35,13 @@ describe("StandaloneConnectionTest", () => {
     // un-skip when that infrastructure lands.
   });
 
-  it("can throw away", () => {
+  it("can throw away", async () => {
     connection.throwAwayBang();
-    expect(connection.active).toBe(false);
+    expect(await connection.active()).toBe(false);
   });
 
   it("can close", async () => {
     await connection.close();
-    expect(connection.active).toBe(false);
+    expect(await connection.active()).toBe(false);
   });
 });
