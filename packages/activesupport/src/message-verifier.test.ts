@@ -117,12 +117,7 @@ describe("MessageVerifierTest", () => {
         foo: 123,
         bar: Temporal.Instant.from("2010-01-01T00:00:00Z"),
       });
-      // Rails' `exp` reads "2010-01-01T00:00:00.000Z": its JSON encoder emits
-      // times at `ActiveSupport::JSON::Encoding.time_precision` (3) digits.
-      // Trails' encoder has no `time_precision` knob and leans on
-      // `Temporal.Instant#toJSON`, which drops a zero subsecond part.
-      // Converged by the `activesupport-json-encoding-time-precision` story.
-      const exp = { foo: 123, bar: "2010-01-01T00:00:00Z" };
+      const exp = { foo: 123, bar: "2010-01-01T00:00:00.000Z" };
       expect(jsonVerifier.verified(message)).toEqual(exp);
       expect(jsonVerifier.verify(message)).toEqual(exp);
     } finally {
