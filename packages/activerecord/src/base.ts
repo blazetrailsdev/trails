@@ -1,4 +1,7 @@
 import { Temporal } from "@blazetrails/activesupport/temporal";
+// Registers Active Record's `en` locale — mirrors the `on_load(:i18n)` hook at
+// the bottom of `activerecord/lib/active_record.rb`.
+import "./i18n.js";
 import {
   Locator as _Locator,
   GlobalID as _GlobalIDCtor,

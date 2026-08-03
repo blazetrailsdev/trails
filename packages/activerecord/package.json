@@ -59,11 +59,12 @@
     "build": "tsc"
   },
   "dependencies": {
+    "@blazetrails/activemodel": "workspace:*",
     "@blazetrails/activesupport": "workspace:*",
     "@blazetrails/arel": "workspace:*",
-    "@blazetrails/activemodel": "workspace:*",
     "@blazetrails/did-you-mean": "workspace:*",
-    "@blazetrails/globalid": "workspace:*"
+    "@blazetrails/globalid": "workspace:*",
+    "@blazetrails/i18n": "workspace:*"
   },
   "peerDependencies": {
     "better-sqlite3": "^12.6.2",

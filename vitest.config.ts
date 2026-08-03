@@ -101,6 +101,10 @@ const _hostForkCap = Math.max(os.availableParallelism() - 1, 1);
 const TEST_FORKS = resolveForkCount(process.env, _hostForkCap);
 
 const alias = {
+  "@blazetrails/activemodel/locale/en": path.resolve(
+    __dirname,
+    "packages/activemodel/src/locale/en.ts",
+  ),
   "@blazetrails/activesupport/message-verifier": path.resolve(
     __dirname,
     "packages/activesupport/src/message-verifier.ts",

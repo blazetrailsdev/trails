@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Model, I18n } from "../index.js";
+import { resetI18n } from "../test-helpers/i18n.js";
 
 describe("ConfirmationValidationTest", () => {
   it("validates confirmation of with boolean attribute", async () => {
@@ -94,7 +95,7 @@ describe("ConfirmationValidationTest", () => {
   });
 
   it("title confirmation with i18n attribute", async () => {
-    I18n.storeTranslations("en", {
+    I18n.backend().storeTranslations("en", {
       activemodel: {
         attributes: {
           person: {
@@ -113,7 +114,7 @@ describe("ConfirmationValidationTest", () => {
     p._attributes.set("titleConfirmation", "We the Robots");
     expect(await p.isValid()).toBe(false);
     expect(p.errors.get("titleConfirmation")[0]).toBe("doesn't match Custom Title");
-    I18n.reset();
+    resetI18n();
   });
 
   it("setup! auto-defines confirmation attribute", async () => {

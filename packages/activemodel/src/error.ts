@@ -1,4 +1,5 @@
 import { humanize, underscore, deepDup } from "@blazetrails/activesupport";
+import { MissingTranslation, catchException, type TranslateKey } from "@blazetrails/i18n";
 import { I18n } from "./i18n.js";
 
 /** The model instance that owns this error. Rails tests pass null for base-only errors. */
@@ -8,8 +9,8 @@ type ModelBase = object | null;
 interface ModelClass {
   name?: string;
   i18nScope?: string;
-  modelName?: { i18nKey?: string };
-  humanAttributeName?: (attr: string, options?: { default?: string }) => string;
+  modelName?: { i18nKey?: string; human?: string };
+  humanAttributeName?: (attr: string, options?: { default?: string; base?: ModelBase }) => string;
   lookupAncestors?: () => ModelClass[];
 }
 
@@ -32,6 +33,20 @@ const MESSAGE_OPTIONS = new Set<string>(["message"]);
 
 // Identifier pattern mirrors Ruby Symbol semantics: no spaces or punctuation.
 const IDENTIFIER_RE = /^[a-z][a-zA-Z0-9_]*$/;
+
+/**
+ * Rails writes `base_class.lookup_ancestors.map { |klass| klass.model_name.i18n_key }`
+ * inline at both i18n call sites; in TS every host also has to tolerate a class
+ * that carries no `model_name` (`ActiveModel::Naming` is `include`d in Rails, so
+ * `lookup_ancestors` can never return one), which is what the `underscore`
+ * fallback covers.
+ */
+function lookupAncestorI18nKeys(klass: ModelClass): string[] {
+  const ancestors = klass.lookupAncestors?.() ?? [klass];
+  return ancestors
+    .map((k) => k.modelName?.i18nKey ?? (k.name ? underscore(k.name) : undefined))
+    .filter((key): key is string => key != null);
+}
 
 /**
  * Value equality that matches Ruby `==` for the common option shapes:
@@ -85,61 +100,50 @@ export class Error {
 
   static fullMessage(attribute: string, message: string, base: ModelBase): string {
     if (attribute === "base") return message;
-    const modelClass = base?.constructor as ModelClass | undefined;
-    const rawScope = modelClass?.i18nScope;
-    const i18nScope = typeof rawScope === "string" ? rawScope : "activemodel";
 
-    // Rails error.rb:22-46: strip array notation, split on dots for nested attrs.
-    const stripped = attribute.replace(/\[\d+\]/g, "");
-    const parts = stripped.split(".");
-    const attrName = parts[parts.length - 1];
-    const namespace = parts.length > 1 ? parts.slice(0, -1).join("/") : undefined;
+    const baseClass = base?.constructor as ModelClass | undefined;
 
-    // Rails error.rb:51-55: pass the full dotted attribute (post array-strip)
-    // to human_attribute_name with `default: attribute.remove(/\.base\z/).tr(".", "_").humanize`
-    // so nested-association keys like "reference.job_id" resolve via the
-    // nested translation path and fall back to "Reference job"; the `.base`
-    // trailing strip means "reference.base" defaults to "Reference".
-    const humanDefault = humanize(stripped.replace(/\.base$/, "").replace(/\./g, "_"));
-    const humanAttr = modelClass?.humanAttributeName
-      ? modelClass.humanAttributeName(stripped, { default: humanDefault })
-      : humanDefault;
+    let defaults: unknown[];
+    if (Error.i18nCustomizeFullMessage && baseClass?.i18nScope != null) {
+      attribute = attribute.replace(/\[\d+\]/g, "");
+      const parts = attribute.split(".");
+      const attributeName = parts.pop() as string;
+      const namespace = parts.length > 0 ? parts.join("/") : undefined;
+      const attributesScope = `${baseClass.i18nScope}.errors.models`;
 
-    let format: string;
-    if (Error.i18nCustomizeFullMessage) {
-      const modelKey =
-        (modelClass as ModelClass)?.modelName?.i18nKey ??
-        (modelClass?.name ? underscore(modelClass.name) : undefined);
-      const defaults: string[] = [];
-      if (modelKey) {
-        const nsPrefix = namespace ? `${modelKey}/${namespace}` : modelKey;
-        defaults.push(`${i18nScope}.errors.models.${nsPrefix}.attributes.${attrName}.format`);
-        defaults.push(`${i18nScope}.errors.models.${nsPrefix}.format`);
+      // A Ruby Symbol default means "look this key up"; the backend's
+      // discriminator for that arm is a real JS symbol today (story
+      // `i18n-symbol-values-are-colon-strings` converges it to ":key").
+      if (namespace) {
+        defaults = lookupAncestorI18nKeys(baseClass).flatMap((i18nKey) => [
+          Symbol.for(
+            `${attributesScope}.${i18nKey}/${namespace}.attributes.${attributeName}.format`,
+          ),
+          Symbol.for(`${attributesScope}.${i18nKey}/${namespace}.format`),
+        ]);
+      } else {
+        defaults = lookupAncestorI18nKeys(baseClass).flatMap((i18nKey) => [
+          Symbol.for(`${attributesScope}.${i18nKey}.attributes.${attributeName}.format`),
+          Symbol.for(`${attributesScope}.${i18nKey}.format`),
+        ]);
       }
-      defaults.push(`${i18nScope}.errors.format`);
-      if (i18nScope !== "activemodel") defaults.push("activemodel.errors.format");
-      defaults.push("errors.format");
-      const primaryKey = defaults[0];
-      const fallbackDefaults = defaults.slice(1).map((key) => ({ key }));
-      format = I18n.t(primaryKey, {
-        defaults: fallbackDefaults,
-        defaultValue: "%{attribute} %{message}",
-        attribute: humanAttr,
-        message,
-      });
     } else {
-      format = I18n.t(`${i18nScope}.errors.format`, {
-        defaults: [
-          ...(i18nScope !== "activemodel" ? [{ key: "activemodel.errors.format" }] : []),
-          { key: "errors.format" },
-        ],
-        defaultValue: "%{attribute} %{message}",
-        attribute: humanAttr,
-        message,
-      });
+      defaults = [];
     }
 
-    return format;
+    defaults.push(Symbol.for("errors.format"));
+    defaults.push("%{attribute} %{message}");
+
+    let attrName: string = humanize(attribute.replace(/\.base$/, "").replace(/\./g, "_"));
+    attrName = baseClass?.humanAttributeName
+      ? baseClass.humanAttributeName(attribute, { default: attrName, base })
+      : attrName;
+
+    return I18n.t(defaults.shift() as TranslateKey, {
+      default: defaults,
+      attribute: attrName,
+      message,
+    }) as string;
   }
 
   /**
@@ -160,66 +164,72 @@ export class Error {
       );
       if (typeof result === "string") return Error.interpolate(result, options);
     }
-    // Rails error.rb:65: identifier-shaped message: option is promoted to a new i18n type.
-    if (typeof msgOpt === "string" && IDENTIFIER_RE.test(msgOpt)) {
+    // Rails error.rb:65 `type = options.delete(:message) if options[:message].is_a?(Symbol)`.
+    // A Ruby Symbol value keeps its leading colon here (`message: ":too_short"`)
+    // — that colon is the discriminator Ruby gets from the type. A plain String
+    // stays in `options[:message]` and is picked up as the default below,
+    // exactly as in Rails.
+    if (typeof msgOpt === "string" && msgOpt.startsWith(":")) {
       const { message: _msg, ...rest } = options;
-      type = msgOpt;
+      type = msgOpt.slice(1);
       options = rest;
-    } else if (typeof msgOpt === "string") {
-      return Error.interpolate(msgOpt, options);
     }
 
-    const modelClass = base?.constructor as ModelClass | undefined;
-    const modelKey =
-      modelClass?.modelName?.i18nKey ??
-      (modelClass?.name ? underscore(modelClass.name) : undefined);
-    const humanAttr = modelClass?.humanAttributeName
-      ? modelClass.humanAttributeName(attribute)
-      : humanize(attribute);
+    const baseClass = base?.constructor as ModelClass | undefined;
+    const value =
+      base && attribute !== "base" ? (base as Record<string, unknown>)[attribute] : undefined;
 
-    const i18nOptions: Record<string, unknown> = {
-      model: modelKey,
-      attribute: humanAttr,
-      value:
-        base && attribute !== "base" ? (base as Record<string, unknown>)[attribute] : undefined,
+    options = {
+      model: baseClass?.modelName?.human,
+      attribute: baseClass?.humanAttributeName
+        ? baseClass.humanAttributeName(attribute, { base })
+        : humanize(attribute),
+      value,
       object: base,
       ...options,
     };
 
-    const rawScope2 = modelClass?.i18nScope;
-    const i18nScope = typeof rawScope2 === "string" ? rawScope2 : "activemodel";
-    const ancestors: string[] = [];
-    if (typeof modelClass?.lookupAncestors === "function") {
-      for (const klass of modelClass.lookupAncestors()) {
-        const key = klass.modelName?.i18nKey ?? (klass.name ? underscore(klass.name) : undefined);
-        if (key) ancestors.push(key);
+    // A Ruby Symbol default means "look this key up"; the backend's
+    // discriminator for that arm is a real JS symbol today (story
+    // `i18n-symbol-values-are-colon-strings` converges it to ":key").
+    let defaults: unknown[];
+    if (baseClass?.i18nScope != null) {
+      const i18nScope = baseClass.i18nScope;
+      attribute = attribute.replace(/\[\d+\]/g, "");
+
+      defaults = lookupAncestorI18nKeys(baseClass).flatMap((i18nKey) => [
+        Symbol.for(`${i18nScope}.errors.models.${i18nKey}.attributes.${attribute}.${type}`),
+        Symbol.for(`${i18nScope}.errors.models.${i18nKey}.${type}`),
+      ]);
+      defaults.push(Symbol.for(`${i18nScope}.errors.messages.${type}`));
+
+      if (options.message == null) {
+        const translation = catchException(() =>
+          I18n.translate(defaults[0] as TranslateKey, {
+            ...options,
+            default: defaults.slice(1),
+            throw: true,
+          }),
+        );
+        if (!(translation instanceof MissingTranslation) && translation != null) {
+          return translation as string;
+        }
       }
-    } else if (modelKey) {
-      ancestors.push(modelKey);
+    } else {
+      defaults = [];
     }
 
-    const defaults: Array<{ key: string } | { message: string }> = [];
-    for (const ancestorKey of ancestors) {
-      defaults.push({
-        key: `${i18nScope}.errors.models.${ancestorKey}.attributes.${attribute}.${type}`,
-      });
-      defaults.push({ key: `${i18nScope}.errors.models.${ancestorKey}.${type}` });
-    }
-    defaults.push({ key: `${i18nScope}.errors.messages.${type}` });
-    if (i18nScope !== "activemodel") {
-      defaults.push({ key: `activemodel.errors.messages.${type}` });
-    }
-    defaults.push({ key: `errors.attributes.${attribute}.${type}` });
-    defaults.push({ key: `errors.messages.${type}` });
+    defaults.push(Symbol.for(`errors.attributes.${attribute}.${type}`));
+    defaults.push(Symbol.for(`errors.messages.${type}`));
 
-    const first = defaults[0];
-    const primaryKey = first && "key" in first ? first.key : `${i18nScope}.errors.messages.${type}`;
+    const key = defaults.shift();
+    if (options.message != null) {
+      defaults = [options.message];
+      delete options.message;
+    }
+    options.default = defaults;
 
-    return I18n.t(primaryKey, {
-      ...i18nOptions,
-      defaults: defaults.slice(1),
-      defaultValue: type,
-    });
+    return I18n.translate(key as TranslateKey, options) as string;
   }
 
   constructor(

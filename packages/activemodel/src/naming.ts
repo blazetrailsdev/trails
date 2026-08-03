@@ -64,6 +64,9 @@ export namespace Naming {
 }
 import { I18n } from "./i18n.js";
 
+/** @internal Mirrors ActiveModel::Name::MISSING_TRANSLATION */
+const MISSING_TRANSLATION = -(2 ** 60);
+
 export interface ModelLike {
   readonly name: string;
   i18nScope?: string;
@@ -333,16 +336,20 @@ export class ModelName {
     const i18nScope = this._i18nScope();
     if (i18nKeys.length === 0 || i18nScope.length === 0) return this._humanFallback;
 
-    const [primaryKey, ...restKeys] = i18nKeys;
-    const scopePrefix = i18nScope.join(".");
-    const fullKey = `${scopePrefix}.${primaryKey}`;
+    const [key, ...defaults] = i18nKeys as unknown[];
+    // A Ruby Symbol default means "look this key up" — the backend's
+    // discriminator for that arm is a real JS symbol today (story
+    // `i18n-symbol-values-are-colon-strings` converges it to ":key").
+    const defaultChain: unknown[] = defaults.map((k) => Symbol.for(k as string));
+    defaultChain.push(MISSING_TRANSLATION);
 
-    const defaults: Array<{ key: string } | { message: string }> = restKeys.map((k) => ({
-      key: `${scopePrefix}.${k}`,
-    }));
-    defaults.push({ message: this._humanFallback });
-
-    return I18n.t(fullKey, { defaults });
+    let translation = I18n.translate(Symbol.for(key as string), {
+      scope: i18nScope,
+      count: 1,
+      default: defaultChain,
+    });
+    if (translation === MISSING_TRANSLATION) translation = this._humanFallback;
+    return translation as string;
   }
 
   /**

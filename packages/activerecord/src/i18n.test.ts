@@ -2,10 +2,11 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { Base } from "./index.js";
 import { I18n } from "@blazetrails/activemodel";
 import { fixtures } from "./test-fixtures.js";
+import { resetI18n } from "./test-helpers/i18n.js";
 
 fixtures([]);
 beforeEach(() => {
-  I18n.reset();
+  resetI18n();
 });
 describe("ActiveRecordI18nTests", () => {
   it("translated model attributes", () => {
@@ -15,7 +16,7 @@ describe("ActiveRecordI18nTests", () => {
       }
     }
 
-    I18n.storeTranslations("en", {
+    I18n.backend().storeTranslations("en", {
       activerecord: { attributes: { topic: { title: "topic title attribute" } } },
     });
 
@@ -29,7 +30,7 @@ describe("ActiveRecordI18nTests", () => {
       }
     }
 
-    I18n.storeTranslations("en", {
+    I18n.backend().storeTranslations("en", {
       activerecord: { attributes: { topic: { title: "topic title attribute" } } },
     });
 
@@ -44,7 +45,7 @@ describe("ActiveRecordI18nTests", () => {
     }
     class Reply extends Topic {}
 
-    I18n.storeTranslations("en", {
+    I18n.backend().storeTranslations("en", {
       activerecord: { attributes: { reply: { title: "reply title attribute" } } },
     });
 
@@ -59,7 +60,7 @@ describe("ActiveRecordI18nTests", () => {
     }
     class Reply extends Topic {}
 
-    I18n.storeTranslations("en", {
+    I18n.backend().storeTranslations("en", {
       activerecord: { attributes: { topic: { title: "topic title attribute" } } },
     });
 
@@ -73,7 +74,7 @@ describe("ActiveRecordI18nTests", () => {
       }
     }
 
-    I18n.storeTranslations("en", {
+    I18n.backend().storeTranslations("en", {
       activerecord: { models: { topic: "topic model" } },
     });
 
@@ -88,7 +89,7 @@ describe("ActiveRecordI18nTests", () => {
     }
     class Reply extends Topic {}
 
-    I18n.storeTranslations("en", {
+    I18n.backend().storeTranslations("en", {
       activerecord: { models: { reply: "reply model" } },
     });
 
@@ -103,7 +104,7 @@ describe("ActiveRecordI18nTests", () => {
     }
     class Reply extends Topic {}
 
-    I18n.storeTranslations("en", {
+    I18n.backend().storeTranslations("en", {
       activerecord: { models: { topic: "topic model" } },
     });
 

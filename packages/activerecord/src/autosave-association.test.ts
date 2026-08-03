@@ -50,6 +50,7 @@ import {
 } from "./autosave-association.js";
 import { fixtures } from "./test-fixtures.js";
 import { assertNoQueries } from "./testing/query-assertions.js";
+import { resetI18n } from "./test-helpers/i18n.js";
 
 function cacheAssoc(record: Base, name: string, value: unknown) {
   record.association(name).setTarget(value as any);
@@ -2320,7 +2321,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
   it("indexed errors should be properly translated", async () => {
     const oldCustomize = ModelError.i18nCustomizeFullMessage;
     ModelError.i18nCustomizeFullMessage = true;
-    I18n.storeTranslations("en", {
+    I18n.backend().storeTranslations("en", {
       activerecord: {
         errors: {
           models: {
@@ -2374,11 +2375,11 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
       expect(p.errors.fullMessages).toEqual(["should be favorite", "can't be blank"]);
     } finally {
       ModelError.i18nCustomizeFullMessage = oldCustomize;
-      I18n.reset();
+      resetI18n();
     }
   });
   it("indexed errors on base attribute should be properly translated", async () => {
-    I18n.storeTranslations("en", {
+    I18n.backend().storeTranslations("en", {
       activerecord: {
         attributes: {
           base_errors_person: { reference: "Super reference" },
@@ -2434,7 +2435,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
         "Reference job can't be blank",
       ]);
     } finally {
-      I18n.reset();
+      resetI18n();
     }
   });
   it("errors details should be indexed when global flag is set", async () => {

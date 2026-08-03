@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Model } from "./index.js";
+import { resetI18n } from "./test-helpers/i18n.js";
 
 describe("ValidationsTest", () => {
   // =========================================================================
@@ -328,7 +329,9 @@ describe("ValidationsTest", () => {
         if (!valid) return false;
         const name = this.readAttribute("name") as string;
         if (UniqueUser.existingNames.has(name)) {
-          this.errors.add("name", "taken");
+          // `errors.messages.taken` ships in activerecord's en.yml, not
+          // activemodel's — an Active Model-only case has to supply the literal.
+          this.errors.add("name", "has already been taken");
           return false;
         }
         UniqueUser.existingNames.add(name);
@@ -744,14 +747,18 @@ describe("ValidationsTest", () => {
         return this.data[attribute];
       }
     }
+    // Rails' case passes the literal "gotcha" (validations_test.rb:113); trails
+    // has no Symbol type, so `Error#message` promotes identifier-shaped Strings
+    // to an i18n type (error.ts `IDENTIFIER_RE`) — a multi-word literal stays a
+    // literal, which is what this case is actually about.
     Person.validatesEach(["name"], (record, attr, value) => {
-      if (!value) record.errors.add(attr, "gotcha");
+      if (!value) record.errors.add(attr, "is gotcha");
     });
     const p = new Person({ name: "ignored" });
     p.data = { name: "" };
     await p.isValid();
     // The empty value comes from `data`, proving the override drove the read.
-    expect(p.errors.get("name")).toContain("gotcha");
+    expect(p.errors.get("name")).toContain("is gotcha");
   });
 
   it("validates an undeclared getter via the send default", async () => {
@@ -766,14 +773,14 @@ describe("ValidationsTest", () => {
       }
     }
     Person.validatesEach(["fullName"], (record, attr, value) => {
-      if (!value) record.errors.add(attr, "gotcha");
+      if (!value) record.errors.add(attr, "is gotcha");
     });
     const present = new Person({ first: "Al" });
     await present.isValid();
-    expect(present.errors.get("fullName")).not.toContain("gotcha");
+    expect(present.errors.get("fullName")).not.toContain("is gotcha");
     const blank = new Person({ first: "" });
     await blank.isValid();
-    expect(blank.errors.get("fullName")).toContain("gotcha");
+    expect(blank.errors.get("fullName")).toContain("is gotcha");
   });
 
   it("read_attribute_for_validation returns undefined for a present reader that returns undefined", () => {
@@ -1205,7 +1212,7 @@ describe("ValidationsTest", () => {
 
     it("ValidationError message picks up per-scope override", async () => {
       const { I18n } = await import("./i18n.js");
-      I18n.storeTranslations("en", {
+      I18n.backend().storeTranslations("en", {
         activemodel: {
           errors: {
             messages: { model_invalid: "Nope: %{errors}" },
@@ -1215,7 +1222,7 @@ describe("ValidationsTest", () => {
       try {
         await expect(new Topic({}).validateBang()).rejects.toThrow(/^Nope: /);
       } finally {
-        I18n.reset();
+        resetI18n();
       }
     });
 

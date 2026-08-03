@@ -146,7 +146,7 @@ export function hasSecurePassword(
 
       if (pwd !== null && pwd !== undefined) {
         if (textEncoder.encode(pwd).length > 72) {
-          record.errors.add(attribute, "passwordTooLong", { count: 72 });
+          record.errors.add(attribute, "password_too_long", { count: 72 });
         }
 
         const humanAttr = modelClass.humanAttributeName

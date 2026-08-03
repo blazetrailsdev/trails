@@ -1,10 +1,19 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, afterEach, beforeEach } from "vitest";
+import { Error as ModelError } from "../error.js";
 import { Model } from "../model.js";
 import { I18n } from "../i18n.js";
+import { resetI18n } from "../test-helpers/i18n.js";
 
 describe("I18nValidationTest", () => {
+  // Rails' setup/teardown pair
+  // (activemodel/test/cases/validations/i18n_validation_test.rb:11-28).
+  const originalI18nCustomizeFullMessage = ModelError.i18nCustomizeFullMessage;
   beforeEach(() => {
-    I18n.reset();
+    resetI18n();
+    ModelError.i18nCustomizeFullMessage = true;
+  });
+  afterEach(() => {
+    ModelError.i18nCustomizeFullMessage = originalI18nCustomizeFullMessage;
   });
 
   it("full message encoding", () => {
@@ -21,7 +30,7 @@ describe("I18nValidationTest", () => {
   });
 
   it("errors full messages translates human attribute name for model attributes", () => {
-    I18n.storeTranslations("en", {
+    I18n.backend().storeTranslations("en", {
       activemodel: {
         attributes: {
           person: {
@@ -41,21 +50,20 @@ describe("I18nValidationTest", () => {
   });
 
   it("errors full messages uses format", () => {
-    I18n.storeTranslations("en", {
-      activemodel: {
-        errors: {
-          format: "%{attribute}: %{message}",
-        },
-      },
-    });
+    I18n.backend().storeTranslations("en", { errors: { format: "Field %{attribute} %{message}" } });
     class Person extends Model {
       static {
         this.attribute("name", "string");
       }
     }
     const p = new Person({});
-    p.errors.add("name", "blank");
-    expect(p.errors.fullMessages).toContain("Name: can't be blank");
+    p.errors.add("name", "empty");
+    // Rails asserts ["Field Name empty"]: `add(:name, "empty")` passes a String,
+    // which stays a literal message. Trails has no Symbol type, so `Error#message`
+    // promotes identifier-shaped Strings to a type (error.ts `IDENTIFIER_RE`) and
+    // "empty" resolves through `errors.messages.empty`. The format under test —
+    // `errors.format` — is asserted either way.
+    expect(p.errors.fullMessages).toEqual(["Field Name can't be empty"]);
   });
 
   it("errors full messages doesnt use attribute format without config", () => {
@@ -81,75 +89,93 @@ describe("I18nValidationTest", () => {
   });
 
   it("errors full messages uses attribute format", () => {
-    I18n.storeTranslations("en", {
+    ModelError.i18nCustomizeFullMessage = true;
+
+    I18n.backend().storeTranslations("en", {
       activemodel: {
-        errors: {
-          format: "%{attribute} - %{message}",
-        },
+        errors: { models: { person: { attributes: { name: { format: "%{message}" } } } } },
       },
     });
+
     class Person extends Model {
       static {
         this.attribute("name", "string");
+        this.attribute("name_test", "string");
       }
     }
-    const p = new Person({});
-    p.errors.add("name", "blank");
-    expect(p.errors.fullMessages).toContain("Name - can't be blank");
+    const person = new Person({});
+    expect(person.errors.fullMessage("name", "cannot be blank")).toBe("cannot be blank");
+    expect(person.errors.fullMessage("name_test", "cannot be blank")).toBe(
+      "Name test cannot be blank",
+    );
   });
 
   it("errors full messages uses model format", () => {
-    I18n.storeTranslations("en", {
-      activemodel: {
-        errors: {
-          format: "%{attribute} -- %{message}",
-        },
-      },
+    ModelError.i18nCustomizeFullMessage = true;
+
+    I18n.backend().storeTranslations("en", {
+      activemodel: { errors: { models: { person: { format: "%{message}" } } } },
     });
+
     class Person extends Model {
       static {
         this.attribute("name", "string");
+        this.attribute("name_test", "string");
       }
     }
-    const p = new Person({});
-    p.errors.add("name", "blank");
-    expect(p.errors.fullMessages).toContain("Name -- can't be blank");
+    const person = new Person({});
+    expect(person.errors.fullMessage("name", "cannot be blank")).toBe("cannot be blank");
+    expect(person.errors.fullMessage("name_test", "cannot be blank")).toBe("cannot be blank");
   });
 
   it("errors full messages uses deeply nested model attributes format", () => {
-    I18n.storeTranslations("en", {
+    ModelError.i18nCustomizeFullMessage = true;
+
+    I18n.backend().storeTranslations("en", {
       activemodel: {
         errors: {
-          format: "%{attribute} => %{message}",
+          models: {
+            "person/contacts/addresses": { attributes: { street: { format: "%{message}" } } },
+          },
         },
       },
     });
+
     class Person extends Model {
       static {
         this.attribute("name", "string");
       }
     }
-    const p = new Person({});
-    p.errors.add("name", "blank");
-    expect(p.errors.fullMessages).toContain("Name => can't be blank");
+    const person = new Person({});
+    expect(person.errors.fullMessage("contacts/addresses.street", "cannot be blank")).toBe(
+      "cannot be blank",
+    );
+    expect(person.errors.fullMessage("contacts/addresses.country", "cannot be blank")).toBe(
+      "Contacts/addresses country cannot be blank",
+    );
   });
 
   it("errors full messages uses deeply nested model model format", () => {
-    I18n.storeTranslations("en", {
+    ModelError.i18nCustomizeFullMessage = true;
+
+    I18n.backend().storeTranslations("en", {
       activemodel: {
-        errors: {
-          format: "%{attribute} | %{message}",
-        },
+        errors: { models: { "person/contacts/addresses": { format: "%{message}" } } },
       },
     });
+
     class Person extends Model {
       static {
         this.attribute("name", "string");
       }
     }
-    const p = new Person({});
-    p.errors.add("name", "blank");
-    expect(p.errors.fullMessages).toContain("Name | can't be blank");
+    const person = new Person({});
+    expect(person.errors.fullMessage("contacts/addresses.street", "cannot be blank")).toBe(
+      "cannot be blank",
+    );
+    expect(person.errors.fullMessage("contacts/addresses.country", "cannot be blank")).toBe(
+      "cannot be blank",
+    );
   });
 
   it("errors full messages with indexed deeply nested attributes and attributes format", () => {
@@ -175,7 +201,7 @@ describe("I18nValidationTest", () => {
   });
 
   it("errors full messages with indexed deeply nested attributes and i18n attribute name", () => {
-    I18n.storeTranslations("en", {
+    I18n.backend().storeTranslations("en", {
       activemodel: {
         attributes: {
           person: {
@@ -398,7 +424,7 @@ describe("I18nValidationTest", () => {
   });
 
   it("finds custom model key translation when", async () => {
-    I18n.storeTranslations("en", {
+    I18n.backend().storeTranslations("en", {
       activemodel: {
         errors: {
           models: {
@@ -425,7 +451,7 @@ describe("I18nValidationTest", () => {
   });
 
   it("finds custom model key translation with interpolation when", async () => {
-    I18n.storeTranslations("en", {
+    I18n.backend().storeTranslations("en", {
       activemodel: {
         errors: {
           models: {
@@ -464,7 +490,7 @@ describe("I18nValidationTest", () => {
   });
 
   it("validations with message symbol must translate", () => {
-    I18n.storeTranslations("en", {
+    I18n.backend().storeTranslations("en", {
       activemodel: {
         errors: {
           messages: {
@@ -484,7 +510,7 @@ describe("I18nValidationTest", () => {
   });
 
   it("validates with message symbol must translate per attribute", async () => {
-    I18n.storeTranslations("en", {
+    I18n.backend().storeTranslations("en", {
       activemodel: {
         errors: {
           models: {
@@ -511,7 +537,7 @@ describe("I18nValidationTest", () => {
   });
 
   it("validates with message symbol must translate per model", async () => {
-    I18n.storeTranslations("en", {
+    I18n.backend().storeTranslations("en", {
       activemodel: {
         errors: {
           models: {
