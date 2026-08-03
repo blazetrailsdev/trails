@@ -9,7 +9,10 @@ vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 fixtures({});
 
 describe("I18nGenerateMessageValidationTest", () => {
-  // activerecord/test/cases/validations/i18n_generate_message_validation_test.rb:7-9
+  /**
+   * Mirrors: activerecord/test/cases/validations/i18n_generate_message_validation_test.rb:7-9
+   * — `class Backend < I18n::Backend::Simple; include I18n::Backend::Fallbacks; end`.
+   */
   class Backend extends I18n.Fallbacks(I18n.Simple) {}
 
   beforeEach(() => {

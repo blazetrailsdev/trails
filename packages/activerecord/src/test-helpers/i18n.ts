@@ -2,13 +2,17 @@
  * Active Record's arm of the same load-path stand-in Active Model's
  * `test-helpers/i18n.ts` documents: a fresh backend plus the `en.yml` data
  * Rails' `I18n.load_path` would re-read.
+ *
+ * It also carries `activerecord/test/cases/helper.rb:35` — "Disable available
+ * locale checks to avoid warnings running the test suite." The gem memoizes
+ * `available_locales_set` (i18n/lib/i18n/config.rb:50-54) and clears it on
+ * neither `store_translations` nor `backend=`, so without this a locale a case
+ * stores after the first check never becomes visible to `with_locale`.
  */
 import { I18n } from "@blazetrails/activemodel";
 import { en as activemodelEn } from "@blazetrails/activemodel/locale/en";
 import { en } from "../locale/en.js";
 
-// Disable available locale checks to avoid warnings running the test suite.
-// activerecord/test/cases/helper.rb:35
 I18n.setEnforceAvailableLocales(false);
 
 /**
