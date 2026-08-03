@@ -2312,7 +2312,7 @@ describe("@noRailsEquivalent — extractor to report", () => {
     expect(report.tagged.stale.map((e) => [e.tsFile, e.fileLevel])).toEqual([
       ["connection-adapters/libsql-replica-adapter.ts", true],
     ]);
-    expect(gateStale(report.tagged)).toContain("file-level tag");
+    expect(gateStale(report.tagged)).toContain("(file-level tag)");
   });
 });
 

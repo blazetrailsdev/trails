@@ -296,9 +296,9 @@ export interface TaggedEntry {
   inherited?: boolean;
   /**
    * True when the entry is a FILE-level tag (`name` is `FILE_TAG_NAME`): one
-   * reason written at the top of a file that no Rails file maps onto, covering
-   * every otherwise-extra name in it. See `fileTagVerdict` for the two claims
-   * it is NOT allowed to make.
+   * reason at the top of a file that no Rails file maps onto, covering every
+   * otherwise-extra name in it. See `fileTagVerdict` for the claims it may not
+   * make.
    */
   fileLevel?: boolean;
 }
@@ -475,17 +475,10 @@ export function collectTaggedEntries(ts: ApiManifest): TaggedEntry[] {
       for (const fn of fns) pushMethod(pkg, file, fn);
     }
     for (const [file, reason] of Object.entries(tsPkg.fileNoRailsEquivalent ?? {})) {
-      const entry: TaggedEntry = {
-        package: pkg,
-        tsFile: file,
-        name: FILE_TAG_NAME,
-        reason,
-        fileLevel: true,
-      };
-      const key = allowKeyOf(entry);
-      if (seen.has(key)) continue;
-      seen.add(key);
-      out.push(entry);
+      const entry: TaggedEntry = { package: pkg, tsFile: file, name: FILE_TAG_NAME, reason };
+      if (seen.has(allowKeyOf(entry))) continue;
+      seen.add(allowKeyOf(entry));
+      out.push({ ...entry, fileLevel: true });
     }
   }
   return out;
@@ -1624,10 +1617,7 @@ export function gateStale(tagged: TaggedSummary): string | null {
     "(misplaced) port that belongs in its Rails-layout file. Delete the tag " +
     "next to the code:\n" +
     tagged.stale
-      .map(
-        (e) =>
-          `  - ${e.package}  ${e.tsFile}  ${e.fileLevel ? "(file-level tag — nothing left to cover)" : e.name}`,
-      )
+      .map((e) => `  - ${e.package}  ${e.tsFile}  ${e.fileLevel ? "(file-level tag)" : e.name}`)
       .join("\n") +
     "\n"
   );
