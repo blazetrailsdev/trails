@@ -12,11 +12,6 @@
  *
  * - **Async API.** Rails is sync; the async surface is required for
  *   trailties' "async fs only" rule and for browser hosts without sync fs.
- * - **Default cipher = `aes-256-cbc`.** Rails uses `aes-128-gcm`.
- *   `MessageEncryptor` handles GCM auth tags now, so the remaining blocker is
- *   the migration: the cipher sets the key length, so flipping it invalidates
- *   every existing key file. Story
- *   `converge-encrypted-file-cipher-to-aes-128-gcm` (RFC 0072).
  * - **Default serializer = `NullSerializer`** (raw string in/out). Rails
  *   uses `Marshal`; we have no Marshal port. The higher-level
  *   `EncryptedConfiguration` parses contents itself.
@@ -28,7 +23,7 @@ import { getFsAsync, getPathAsync } from "./fs-adapter.js";
 import { MessageEncryptor, NullSerializer } from "./message-encryptor.js";
 import { env as processEnv } from "./process-adapter.js";
 
-const CIPHER = "aes-256-cbc";
+const CIPHER = "aes-128-gcm";
 
 export class MissingContentError extends Error {
   constructor(contentPath: string) {
