@@ -16,6 +16,53 @@ describe("isSourceUnported package scoping", () => {
     expect(isSourceUnported("core_ext/name_error.rb", "activesupport")).toBe(false);
   });
 
+  it("excludes i18n's deferrable gem surface without touching its ported core", () => {
+    for (const f of [
+      "backend/chain.rb",
+      "backend/fallbacks.rb",
+      "backend/key_value.rb",
+      "backend/cache.rb",
+      "backend/cache_file.rb",
+      "backend/cascade.rb",
+      "backend/gettext.rb",
+      "backend/interpolation_compiler.rb",
+      "backend/lazy_loadable.rb",
+      "backend/memoize.rb",
+      "backend/metadata.rb",
+      "backend/pluralization.rb",
+      "backend/transliterator.rb",
+      "gettext.rb",
+      "gettext/helpers.rb",
+      "gettext/po_parser.rb",
+      "locale/fallbacks.rb",
+      "locale/tag/rfc4646.rb",
+      "middleware.rb",
+      "version.rb",
+      "tests/basics.rb",
+    ]) {
+      expect(isSourceUnported(f, "i18n"), f).toBe(true);
+    }
+    for (const f of [
+      "../i18n.rb",
+      "config.rb",
+      "exceptions.rb",
+      "backend/base.rb",
+      "backend/simple.rb",
+      "backend/flatten.rb",
+      "interpolate/ruby.rb",
+      "utils.rb",
+    ]) {
+      expect(isSourceUnported(f, "i18n"), f).toBe(false);
+    }
+  });
+
+  it("keeps i18n's exclusions from leaking into other packages", () => {
+    // `middleware.rb`, `version.rb` and `gettext` all appear in other gems.
+    expect(isSourceUnported("middleware.rb", "actiondispatch")).toBe(false);
+    expect(isSourceUnported("version.rb", "activesupport")).toBe(false);
+    expect(isSourceUnported("gettext.rb", "activesupport")).toBe(false);
+  });
+
   it("treats an absent pkg argument as 'any package' to preserve legacy callers", () => {
     expect(isSourceUnported("core_ext/name_error.rb")).toBe(true);
   });

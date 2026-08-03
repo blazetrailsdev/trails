@@ -61,7 +61,7 @@ describe("vendor/sources.ts", () => {
     ]);
   });
 
-  it("declares the i18n source, vendored-only until packages/i18n exists", () => {
+  it("declares the i18n source, enrolled in api-compare but not test-compare", () => {
     const i18n = SOURCES.find((s) => s.name === "i18n");
     expect(i18n).toBeDefined();
     expect(i18n!.origin).toEqual({
@@ -74,12 +74,12 @@ describe("vendor/sources.ts", () => {
         name: "i18n",
         libPath: "lib/i18n",
         testPath: "test",
-        compareApi: false,
         compareTests: false,
       },
     ]);
-    expect(apiComparePackages()).not.toContain("i18n");
-    expect(Object.keys(libPathsManifest())).not.toContain("i18n");
+    expect(apiComparePackages()).toContain("i18n");
+    expect(Object.keys(libPathsManifest())).toContain("i18n");
+    // test-compare stays off until the gem's minitest suite is wired up.
     expect(Object.keys(testPathsManifest())).not.toContain("i18n");
     expect(resolvePath("i18n").endsWith("vendor/i18n/lib/i18n")).toBe(true);
     expect(resolvePath("i18n", "test").endsWith("vendor/i18n/test")).toBe(true);
@@ -196,6 +196,7 @@ describe("vendor/sources.ts", () => {
         "arel",
         "did-you-mean",
         "globalid",
+        "i18n",
         "rack",
         "trailties",
       ].sort(),

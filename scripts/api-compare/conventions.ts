@@ -75,6 +75,16 @@ export const PATH_SEGMENT_ALIASES: Record<string, string> = {
 export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
   "activesupport:inflector/methods.rb": "inflector.ts",
   "activesupport:core_ext/string/inflections.rb": "inflector.ts",
+  // The i18n gem's umbrella file (`lib/i18n.rb`, scanned one level above
+  // libPath) is where `I18n::Base` itself is defined, so unlike Rails'
+  // umbrella files it owns real surface. trails ports it to `src/i18n.ts`;
+  // without this the default rule would expect `../i18n.ts`, outside src.
+  "i18n:../i18n.rb": "i18n.ts",
+  // `interpolate/ruby.rb` reopens `module I18n`, which `backend/cache.rb`
+  // defines first — so without an entry here its `interpolate` /
+  // `interpolate_hash` are measured against `backend/cache.ts` and, since
+  // cache.rb is unported, drop out of accounting entirely.
+  "i18n:interpolate/ruby.rb": "interpolate/ruby.ts",
 };
 
 /** The explicit TS mapping for `rubyFile` in `pkg`, or undefined when unmapped. */

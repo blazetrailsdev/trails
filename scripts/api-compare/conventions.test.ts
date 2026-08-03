@@ -232,7 +232,7 @@ describe("rubyFileToTs", () => {
 describe("RUBY_FILE_TS_OVERRIDES", () => {
   it("keys every entry as <package>:<ruby path> and maps to a .ts file", () => {
     for (const [key, value] of Object.entries(RUBY_FILE_TS_OVERRIDES)) {
-      expect(key).toMatch(/^[a-z-]+:.+\.rb$/);
+      expect(key).toMatch(/^[a-z0-9-]+:.+\.rb$/);
       expect(value).toMatch(/\.ts$/);
     }
   });
@@ -247,6 +247,15 @@ describe("RUBY_FILE_TS_OVERRIDES", () => {
   it("returns the mapped TS file, or undefined when unmapped", () => {
     expect(rubyFileTsOverride("inflector/methods.rb", "activesupport")).toBe("inflector.ts");
     expect(rubyFileTsOverride("inflector/inflections.rb", "activesupport")).toBeUndefined();
+  });
+
+  it("maps i18n's umbrella and interpolate files into packages/i18n/src", () => {
+    // `lib/i18n.rb` is scanned one level above libPath, so the default rule
+    // would place it at `../i18n.ts`, outside src. `interpolate/ruby.rb`
+    // reopens `module I18n` — whose bucket `backend/cache.rb` owns — so
+    // without an override its methods are measured against an unported file.
+    expect(rubyFileToTs("../i18n.rb", "i18n")).toBe("i18n.ts");
+    expect(rubyFileToTs("interpolate/ruby.rb", "i18n")).toBe("interpolate/ruby.ts");
   });
 });
 
