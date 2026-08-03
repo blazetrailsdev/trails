@@ -1596,7 +1596,8 @@ export function gateFileTagRejections(rejections: readonly FileTagRejection[]): 
     r.cause === "counterpart-file"
       ? `  - ${r.package}  ${r.tsFile} — Rails counterpart file ${r.rubyFile}`
       : `  - ${r.package}  ${r.tsFile} — ${r.movedNames?.length ?? 0} moved name(s): ` +
-        (r.movedNames ?? []).slice(0, 8).join(", "),
+        (r.movedNames ?? []).slice(0, 8).join(", ") +
+        ((r.movedNames?.length ?? 0) > 8 ? ", …" : ""),
   );
   return (
     `\nextra-surface: ${rejections.length} file-level @noRailsEquivalent tag(s) claim a ` +
