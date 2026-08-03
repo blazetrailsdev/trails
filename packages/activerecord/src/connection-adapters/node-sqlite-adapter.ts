@@ -3,10 +3,9 @@
  * (`gem "sqlite3"`, sqlite3_adapter.rb:14), so Rails declares a single
  * `SQLite3Adapter` (sqlite3_adapter.rb:30) and has no class to map a
  * per-driver subclass onto. The JS ecosystem has several interchangeable
- * SQLite clients, so trails keeps the sqlite3_adapter.rb port on the shared
- * base and binds each client in its own thin subclass; there is nothing to
- * converge these names onto upstream. Written file-level: every name this
- * file declares belongs to that one driver binding.
+ * clients, so trails keeps the sqlite3_adapter.rb port on the shared base and
+ * binds each client in its own thin subclass — every name this file declares
+ * belongs to that one binding, and none has anything to converge onto.
  */
 import type { SqliteDriver } from "../sqlite-adapter.js";
 import { nodeSqliteDriver } from "../sqlite/node-sqlite.js";
