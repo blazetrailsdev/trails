@@ -1,13 +1,11 @@
 import { getApp } from "./config.js";
 import { GID, validateApp, type GidComponents } from "./uri/gid.js";
-import { Locator, type LocateOptions, type LocatorModel } from "./locator.js";
+// TYPE-ONLY on purpose: a runtime edge from here back into the
+// global-id ↔ signed-global-id ↔ locator cycle would evaluate
+// `class SignedGlobalID extends GlobalID` while `GlobalID` is still in TDZ.
+// `find` therefore reaches Locator through a dynamic import.
+import type { LocateOptions, LocatorModel } from "./locator.js";
 import { constantize } from "@blazetrails/activesupport";
-// LAZY-IMPORT CYCLE: global-id ↔ signed-global-id ↔ locator. Safe because
-// every cross-module reference below happens inside a method body (runtime),
-// not at class-body init time. Do NOT add module-level `const X = SignedGlobalID.foo`
-// or similar — native ESM throws ReferenceError (TDZ) for an uninitialized
-// imported binding accessed during the initial circular evaluation.
-import { SignedGlobalID } from "./signed-global-id.js";
 
 /**
  * @internal Mirrors Ruby's `model <= GlobalID` — matches the identity
@@ -42,14 +40,11 @@ export class GlobalID {
   readonly uri: string;
   private readonly _components: GidComponents;
 
-  /**
-   * Rails' `GlobalID#initialize` stores the `URI::GID` and delegates
-   * app/model_name/model_id/params/to_s to it; we snapshot its components
-   * instead, so every entry point goes through a parsed GID.
-   */
-  private constructor(gid: GID) {
-    this.uri = gid.toString();
-    this._components = gid.deconstructKeys();
+  /** Mirrors: GlobalID#initialize(gid, options) */
+  constructor(gid: string | GID, _options: GlobalIDOptions = {}) {
+    const parsed = gid instanceof GID ? gid : GID.parse(gid);
+    this.uri = parsed.toString();
+    this._components = parsed.deconstructKeys();
   }
 
   get app(): string {
@@ -65,34 +60,46 @@ export class GlobalID {
     return this._components.params;
   }
 
-  /** Mirrors: GlobalID.create */
-  static create(model: GlobalIDModel, options: GlobalIDOptions = {}): GlobalID {
-    const app = options.app ?? getApp();
+  /**
+   * Mirrors: GlobalID.create — the `this` constructor type carries Ruby's
+   * polymorphic `new`, so `SignedGlobalID.create` runs this body and hands
+   * back a SignedGlobalID.
+   */
+  static create<T extends GlobalID, O extends GlobalIDOptions>(
+    this: new (gid: string | GID, options?: O) => T,
+    model: GlobalIDModel,
+    options?: O,
+  ): T {
+    const opts: GlobalIDOptions = options ?? {};
+    const app = opts.app ?? getApp();
     if (!app) {
       throw new Error(
         "An app is required to create a GlobalID. Pass the :app option or set the default GlobalID.app via setApp().",
       );
     }
-    const { app: _a, verifier: _v, for: _f, ...rest } = options as Record<string, unknown>;
+    // Rails: `options.except(:app, :verifier, :for)` — every other key,
+    // including SignedGlobalID's expiration options, becomes a URI param.
+    const { app: _a, verifier: _v, for: _f, ...rest } = opts;
     const filteredParams: Record<string, string> = {};
     for (const [k, v] of Object.entries(rest)) {
       if (v != null) filteredParams[k] = String(v);
     }
     const modelName = model.constructor.name;
     const params = Object.keys(filteredParams).length ? filteredParams : null;
-    return new GlobalID(GID.build({ app, modelName, modelId: model.id, params }));
+    return new this(GID.build({ app, modelName, modelId: model.id, params }), options);
   }
 
   /** Mirrors: GlobalID.parse — falls back to base64-decoded form. */
-  static parse(gid: string | GlobalID, _options: GlobalIDOptions = {}): GlobalID | null {
-    if (gid instanceof GlobalID) return gid;
+  static parse(gid: string | GlobalID, options: GlobalIDOptions = {}): GlobalID | null {
+    if (gid instanceof this) return gid;
+    const str = String(gid);
     try {
-      return new GlobalID(GID.parse(gid));
+      return new this(GID.parse(str), options);
     } catch {
       try {
-        const b64 = gid.replace(/-/g, "+").replace(/_/g, "/");
+        const b64 = str.replace(/-/g, "+").replace(/_/g, "/");
         const decoded = atob(b64 + "=".repeat((4 - (b64.length % 4)) % 4));
-        return new GlobalID(GID.parse(decoded));
+        return new this(GID.parse(decoded), options);
       } catch {
         return null;
       }
@@ -108,14 +115,19 @@ export class GlobalID {
     return this.uri;
   }
 
-  /** Mirrors: GlobalID#as_json — `JSON.stringify(gid)` produces `"gid://..."`. */
+  /**
+   * Mirrors: GlobalID#as_json — `JSON.stringify(gid)` produces `"gid://..."`.
+   * Rails' `as_json` calls `to_s`, so a SignedGlobalID serializes to its
+   * signed token rather than the bare URI; route through `toString()` to
+   * keep that polymorphism.
+   */
   toJSON(): string {
-    return this.uri;
+    return this.toString();
   }
 
   /** @internal */
   [Symbol.toPrimitive](_hint: string): string {
-    return this.uri;
+    return this.toString();
   }
 
   /** Mirrors: GlobalID#== */
@@ -131,13 +143,12 @@ export class GlobalID {
   /**
    * Mirrors: GlobalID#model_class — `model_name.constantize`. Raises if the
    * resolved class is GlobalID / SignedGlobalID (Rails has the same guard
-   * against recursive `model_class` lookup).
+   * against recursive `model_class` lookup); `SignedGlobalID < GlobalID`, so
+   * the single `model <= GlobalID` check covers both.
    */
   get modelClass(): LocatorModel {
     const klass = constantize(this.modelName) as LocatorModel;
-    // Rails' `if model <= GlobalID` covers SGID too because SGID < GID in
-    // Ruby. In TS they're peers, so both branches are needed.
-    if (isOrExtends(klass, GlobalID) || isOrExtends(klass, SignedGlobalID)) {
+    if (isOrExtends(klass, GlobalID)) {
       throw new Error("GlobalID and SignedGlobalID cannot be used as model_class.");
     }
     return klass;
@@ -148,7 +159,8 @@ export class GlobalID {
    *
    * Mirrors: GlobalID#find — delegates to `Locator.locate(self, options)`.
    */
-  find(options?: LocateOptions): Promise<unknown | null> {
+  async find(options?: LocateOptions): Promise<unknown | null> {
+    const { Locator } = await import("./locator.js");
     return Locator.locate(this, options);
   }
 }
