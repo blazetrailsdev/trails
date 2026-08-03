@@ -1,6 +1,16 @@
 import { getCrypto } from "./crypto-adapter.js";
 import { Codec, type MessageSerializer } from "./messages/codec.js";
 import type { ExpectedMetadataOptions, MetadataOptions } from "./messages/metadata.js";
+import {
+  fallBackTo,
+  initialize as initializeRotator,
+  onRotation,
+  readMessage as readMessageWithRotations,
+  rotate,
+  type OnRotation,
+  type RotatableOptions,
+} from "./messages/rotator.js";
+import { prepend } from "./prepend.js";
 import { Thrown, type Format } from "./messages/serializer-with-fallback.js";
 
 export class InvalidSignature extends Error {
@@ -10,7 +20,7 @@ export class InvalidSignature extends Error {
   }
 }
 
-interface MessageVerifierOptions {
+interface MessageVerifierOptions extends RotatableOptions {
   digest?: string;
   serializer?: Format | MessageSerializer;
   url_safe?: boolean;
@@ -26,6 +36,10 @@ const SEPARATOR = "--";
 export class MessageVerifier extends Codec {
   static override defaultSerializer: Format | MessageSerializer = "json";
 
+  declare rotate: (...args: unknown[]) => this;
+  declare onRotation: (callback: OnRotation) => this;
+  declare fallBackTo: (fallback: this) => this;
+
   private secret: string | Buffer;
   private digest: string;
 
@@ -37,6 +51,7 @@ export class MessageVerifier extends Codec {
     });
     this.secret = secret;
     this.digest = options.digest ?? "sha1";
+    initializeRotator(this, [secret], options as Record<string, unknown>);
   }
 
   generate(value: unknown, options: GenerateOptions = {}): string {
@@ -126,3 +141,6 @@ export class MessageVerifier extends Codec {
     }
   }
 }
+
+Object.assign(MessageVerifier.prototype, { rotate, onRotation, fallBackTo });
+prepend(MessageVerifier.prototype, { readMessage: readMessageWithRotations });
