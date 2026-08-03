@@ -274,28 +274,6 @@ export class HasOneAssociation extends SingularAssociation {
   }
 
   /**
-   * Set by the one caller that owns Rails' leading `load_target` and the
-   * `remove_target!` that follows it itself: `buildThroughProxyRecord`
-   * (has-one-through-association.ts), which rebuilds a has_one_through's join
-   * record on the through proxy — itself a has_one association. Rails'
-   * `create_through_record` (has_one_through_association.rb:15-40), not
-   * `SingularAssociation#build`, owns that join row's displacement, so the
-   * proxy's own build must neither re-run the load nor start a second,
-   * concurrent removal of the same row — and must stay synchronous.
-   *
-   * The nested-attributes writer does NOT use this: it runs `buildRecord` and
-   * `setNewRecord` separately so the removal can sit between them, and so never
-   * enters `build`.
-   *
-   * `protected` because it is association-internal bookkeeping, not API surface;
-   * the through helper reaches it through its duck-typed handle on the proxy
-   * (it lives outside the class hierarchy).
-   *
-   * @internal
-   */
-  protected buildDisplacementOwnedByCaller = false;
-
-  /**
    * Rails' `set_new_record` → `replace(record, false)` opens with `load_target`
    * (has_one_association.rb:59-62): the guard is `return target unless
    * load_target || record`, and Ruby always evaluates the left operand, so
@@ -308,7 +286,6 @@ export class HasOneAssociation extends SingularAssociation {
    * @internal
    */
   protected override loadDisplacedForBuild(): Promise<unknown> | null {
-    if (this.buildDisplacementOwnedByCaller) return null;
     if (!this.findTargetNeeded()) return null;
     return this.loadTargetForBuild();
   }
@@ -331,7 +308,6 @@ export class HasOneAssociation extends SingularAssociation {
    * @internal
    */
   protected override detachDisplacedOnBuild(record: Base | null): Promise<void> | null {
-    if (this.buildDisplacementOwnedByCaller) return null;
     const displaced = this.loaded ? this.target : null;
     if (!displaced || sameRecord(displaced, record)) return null;
     // Only the nullify arm may skip an unpersisted displaced record. Rails gates
