@@ -85,9 +85,12 @@ describe("stale story references", () => {
     }
   };
 
-  it("no comment in the tree names a story that has already landed", async () => {
+  it("no comment in the tree names a story that has already landed", async (ctx) => {
     const index = await readIndex();
-    if (!index) return;
+    if (!index) {
+      ctx.skip(`no tasks index at ${tasksIndex}`);
+      return;
+    }
     const stale = staleStoryReferences(await scanStoryReferences(REPO_ROOT), index.stories);
     expect(stale.map((ref) => `${ref.file}:${ref.line} ${ref.slug}`)).toEqual([]);
   });

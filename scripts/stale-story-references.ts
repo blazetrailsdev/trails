@@ -10,13 +10,10 @@
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 
-// A story id: three or more kebab segments. Two-segment names collide with
-// ordinary prose ("has-one", "type-map") far too often to be worth matching.
+// Three or more kebab segments: two-segment names collide with ordinary prose
+// ("has-one", "type-map") far too often to be worth matching.
 const STORY_SLUG = /[a-z0-9]+(?:-[a-z0-9]+){2,}/g;
 
-// Phrasings that promise future convergence. A slug cited as provenance
-// ("Regression for X", "story: X") is history, not a promise, and stays legal
-// after the story lands.
 const PENDING_PHRASE =
   /converged by|converges (when|in|once)|will (be )?converge|deferred to|pending convergence|once .{0,40}lands|until .{0,60}lands|un-?skip once|when that story|fixed by/i;
 
@@ -26,9 +23,8 @@ const SENTENCE = /(?<=[.;:)])\s+(?=[A-Z(`])|\.\s+/;
 const SKIP_DIRS = new Set(["node_modules", "dist", ".git", "vendor", "__snapshots__"]);
 const SOURCE_ROOTS = ["packages", "scripts", "eslint"];
 
-// This check's own test states a stale promise verbatim as its fixture; the
-// scan is line-based, so the fixture inside a template literal reads as a real
-// comment.
+// Its test states a stale promise verbatim as a fixture, and the line-based
+// scan reads that template literal as a real comment.
 const SKIP_FILES = new Set([path.join("scripts", "stale-story-references.test.ts")]);
 
 export interface StoryReference {
@@ -37,8 +33,13 @@ export interface StoryReference {
   slug: string;
 }
 
-// Contiguous comment lines form one block: a promise and its slug routinely sit
-// on different physical lines of the same JSDoc paragraph.
+/**
+ * Story slugs cited as still-pending in `source`'s comments. Contiguous comment
+ * lines form one block, because a promise and its slug routinely sit on
+ * different physical lines of the same JSDoc paragraph; the phrase and the slug
+ * must then share a sentence, so a slug cited as provenance ("Regression for
+ * X") is history rather than a promise and stays legal after the story lands.
+ */
 export function extractStoryReferences(source: string, file: string): StoryReference[] {
   const refs: StoryReference[] = [];
   const lines = source.split("\n");
@@ -67,7 +68,12 @@ export function extractStoryReferences(source: string, file: string): StoryRefer
   return refs;
 }
 
-export async function collectSourceFiles(root: string, dir = root, acc: string[] = []) {
+/** Repo-relative `.ts`/`.mjs` paths under `dir`. */
+export async function collectSourceFiles(
+  root: string,
+  dir = root,
+  acc: string[] = [],
+): Promise<string[]> {
   let entries;
   try {
     entries = await readdir(dir, { withFileTypes: true });
@@ -85,6 +91,7 @@ export async function collectSourceFiles(root: string, dir = root, acc: string[]
   return acc;
 }
 
+/** Every pending citation in the source roots this check covers. */
 export async function scanStoryReferences(repoRoot: string): Promise<StoryReference[]> {
   const refs: StoryReference[] = [];
   for (const root of SOURCE_ROOTS) {
@@ -99,13 +106,18 @@ export async function scanStoryReferences(repoRoot: string): Promise<StoryRefere
 export interface IndexStory {
   id: string;
   status: string;
-  // The story's own status; `status` is demoted to its RFC's when the RFC is
-  // closed, which would hide a landed story behind an rfc-level state.
+  /**
+   * The story's own status. `status` is demoted to its RFC's when that RFC is
+   * closed, which would hide a landed story behind an RFC-level state.
+   */
   raw_status?: string;
 }
 
-// A slug the index doesn't know is not a story reference at all (kebab file
-// names, CSS-ish identifiers, Rails option names), so it is never a finding.
+/**
+ * The citations whose story has already landed. A slug the index doesn't know
+ * is not a story reference at all (kebab file names, Rails option names), so it
+ * is never a finding.
+ */
 export function staleStoryReferences(
   refs: readonly StoryReference[],
   stories: readonly IndexStory[],
