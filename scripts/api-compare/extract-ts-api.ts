@@ -177,11 +177,28 @@ function recordExtendsFile(
   sym: ts.Symbol | undefined,
   srcDir: string,
 ): void {
-  const decl = sym?.valueDeclaration ?? sym?.declarations?.[0];
-  if (!decl) return;
-  const declFile = path.relative(srcDir, decl.getSourceFile().fileName).replace(/\\/g, "/");
-  if (declFile.startsWith("..")) return;
+  const declFile = declaringFile(sym, srcDir);
+  if (!declFile) return;
   hostInfo.extendsFiles = { ...(hostInfo.extendsFiles ?? {}), [modName]: declFile };
+}
+
+/**
+ * src-relative file a symbol was declared in, POSIX-normalized so it can be
+ * compared against a manifest `ClassInfo.file`. Returns undefined for symbols
+ * declared outside `srcDir` (node_modules, other packages) — those can't be
+ * matched against this package's entities anyway.
+ */
+function declaringFile(sym: ts.Symbol | undefined, srcDir: string): string | undefined {
+  const decl = sym?.valueDeclaration ?? sym?.declarations?.[0];
+  if (!decl) return undefined;
+  const declFile = path.relative(srcDir, decl.getSourceFile().fileName).replace(/\\/g, "/");
+  if (declFile.startsWith("..")) return undefined;
+  return declFile;
+}
+
+function resolveDeclarationSymbol(checker: ts.TypeChecker, node: ts.Node): ts.Symbol | undefined {
+  const sym = checker.getSymbolAtLocation(node);
+  return sym && sym.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(sym) : sym;
 }
 
 function extractInWorker(pkgName: string, srcDir: string): Promise<WorkerOutput> {
@@ -508,7 +525,7 @@ export function extractFromProgram(
     ts.forEachChild(sourceFile, (node) => {
       if (ts.isClassDeclaration(node) && node.name) {
         if (!isExported(node)) return;
-        const classInfo = extractClass(node, checker, relPath);
+        const classInfo = extractClass(node, checker, relPath, srcDir);
         if (classInfo) {
           const classKey = `${relPath}:${classInfo.name}`;
           info.classes[classKey] = classInfo;
@@ -1847,15 +1864,26 @@ export function extractClass(
   node: ts.ClassDeclaration,
   checker: ts.TypeChecker,
   file: string,
+  srcDir?: string,
 ): ClassInfo | null {
   const name = node.name?.text;
   if (!name) return null;
 
   let superclass: string | undefined;
+  let superclassFile: string | undefined;
   if (node.heritageClauses) {
     for (const clause of node.heritageClauses) {
       if (clause.token === ts.SyntaxKind.ExtendsKeyword) {
-        superclass = clause.types[0]?.expression.getText();
+        const expr = clause.types[0]?.expression;
+        if (!expr) continue;
+        superclass = expr.getText();
+        // Same rule as include()/extend() edges: the superclass is recorded by
+        // its bare short name, and sibling adapter directories declare classes
+        // that share one (`SchemaStatements`). Record where it was declared so
+        // the consumer doesn't have to guess from path proximity.
+        if (srcDir !== undefined) {
+          superclassFile = declaringFile(resolveDeclarationSymbol(checker, expr), srcDir);
+        }
       }
     }
   }
@@ -2028,6 +2056,7 @@ export function extractClass(
   return {
     name,
     superclass,
+    ...(superclassFile !== undefined ? { superclassFile } : {}),
     file,
     includes,
     extends: extendsArr,

@@ -13,6 +13,7 @@ import {
   MISPLACED_MIN_HITS,
   blazetrailsDepKeys,
   buildEntitiesByName,
+  resolveEntityByDeclaringFile,
   significantMissingCalls,
   resolvePortedWithArgsSigs,
   jsEnumerableAliases,
@@ -1078,7 +1079,99 @@ describe("flattenIncludedMethodInfos", () => {
   });
 });
 
+describe("resolveEntityByDeclaringFile", () => {
+  const entity = (file: string, name = "SchemaStatements"): ClassInfo => ({
+    name,
+    file,
+    includes: [],
+    extends: [],
+    instanceMethods: [],
+    classMethods: [],
+  });
+
+  it("returns the sole candidate without consulting the declaring file", () => {
+    const only = entity("connection-adapters/abstract/schema-statements.ts");
+    expect(resolveEntityByDeclaringFile([only], "connection-adapters/sqlite3/adapter.ts")).toBe(
+      only,
+    );
+  });
+
+  it("returns null when nothing shares the short name", () => {
+    expect(resolveEntityByDeclaringFile([], "a.ts", "b.ts")).toBeNull();
+  });
+
+  it("prefers the candidate whose file the extends clause resolved to", () => {
+    // Proximity alone picks the sibling under `postgresql/`; the recorded
+    // declaring file says the `extends` actually bound the abstract one.
+    const abstract = entity("connection-adapters/abstract/schema-statements.ts");
+    const postgresql = entity("connection-adapters/postgresql/schema-statements.ts");
+    expect(
+      resolveEntityByDeclaringFile(
+        [abstract, postgresql],
+        "connection-adapters/postgresql/adapter.ts",
+        "connection-adapters/abstract/schema-statements.ts",
+      ),
+    ).toBe(abstract);
+  });
+
+  it("falls back to path proximity when no declaring file was recorded", () => {
+    const abstract = entity("connection-adapters/abstract/schema-statements.ts");
+    const sqlite3 = entity("connection-adapters/sqlite3/schema-statements.ts");
+    expect(
+      resolveEntityByDeclaringFile([abstract, sqlite3], "connection-adapters/sqlite3/adapter.ts"),
+    ).toBe(sqlite3);
+  });
+
+  it("falls back to path proximity when the declaring file matches no candidate", () => {
+    const abstract = entity("connection-adapters/abstract/schema-statements.ts");
+    const sqlite3 = entity("connection-adapters/sqlite3/schema-statements.ts");
+    expect(
+      resolveEntityByDeclaringFile(
+        [abstract, sqlite3],
+        "connection-adapters/sqlite3/adapter.ts",
+        "some/other/package/schema-statements.ts",
+      ),
+    ).toBe(sqlite3);
+  });
+
+  it("skips the child's own file when scoring proximity", () => {
+    // A class and its same-named parent can't share a file, so a candidate at
+    // the child's path is the child itself — picking it would loop.
+    const self = entity("connection-adapters/sqlite3/adapter.ts");
+    const parent = entity("connection-adapters/abstract/adapter.ts");
+    expect(
+      resolveEntityByDeclaringFile([self, parent], "connection-adapters/sqlite3/adapter.ts"),
+    ).toBe(parent);
+  });
+});
+
 describe("resolveModuleName", () => {
+  it("disambiguates a duplicated short name by namespace, needing no declaring file", () => {
+    // The Ruby-side counterpart of `resolveEntityByDeclaringFile`: same
+    // `SchemaStatements` collision across sibling adapters, resolved by the
+    // enclosing namespace the way Ruby's own constant lookup does. This is why
+    // the include-graph walks (`buildModuleIncluderFqns`,
+    // `flattenIncludedMethodInfos`, extra-surface's `walkMixin`) don't take a
+    // declaring-file hint.
+    const byShort = new Map([
+      [
+        "SchemaStatements",
+        [
+          "AR::ConnectionAdapters::SchemaStatements",
+          "AR::ConnectionAdapters::PostgreSQL::SchemaStatements",
+          "AR::ConnectionAdapters::SQLite3::SchemaStatements",
+        ],
+      ],
+    ]);
+    expect(
+      resolveModuleName(
+        "SchemaStatements",
+        "AR::ConnectionAdapters::SQLite3::SQLite3Adapter",
+        byShort,
+      ),
+    ).toEqual("AR::ConnectionAdapters::SQLite3::SchemaStatements");
+  });
+
   it("returns the single candidate unchanged", () => {
     const byShort = new Map([["Quoting", ["AR::ConnectionAdapters::Quoting"]]]);
     expect(
