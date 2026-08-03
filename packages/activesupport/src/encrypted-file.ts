@@ -27,9 +27,6 @@ import { MessageEncryptor, NullSerializer } from "./message-encryptor.js";
 import { env as processEnv } from "./process-adapter.js";
 
 const CIPHER = "aes-256-cbc";
-// Bytes of key material consumed by CIPHER. expectedKeyLength() reports the
-// hex-encoded length (2 chars per byte), matching Rails' generate_key.length.
-const KEY_BYTES = 32;
 
 export class MissingContentError extends Error {
   constructor(contentPath: string) {
@@ -82,15 +79,14 @@ export class EncryptedFile {
   }
 
   static generateKey(): string {
-    // Rails: SecureRandom.hex(MessageEncryptor.key_len(CIPHER)).
-    // Sourced from cryptoAdapter so we never fall back to non-cryptographic
-    // randomness. In Node the adapter auto-registers synchronously; browser
-    // hosts must register a webcrypto adapter before calling generateKey().
-    return Buffer.from(getCrypto().randomBytes(KEY_BYTES)).toString("hex");
+    // Randomness is sourced from cryptoAdapter so we never fall back to a
+    // non-cryptographic RNG. In Node the adapter auto-registers synchronously;
+    // browser hosts must register a webcrypto adapter first.
+    return Buffer.from(getCrypto().randomBytes(MessageEncryptor.keyLen(CIPHER))).toString("hex");
   }
 
   static expectedKeyLength(): number {
-    return KEY_BYTES * 2;
+    return this.generateKey().length;
   }
 
   async key(): Promise<string | null> {
