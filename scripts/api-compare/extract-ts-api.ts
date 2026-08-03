@@ -153,6 +153,32 @@ interface WorkerOutput {
 }
 const fileHasMissingRailsCallTag = new WeakMap<ts.SourceFile, boolean>();
 
+/**
+ * Tags a deliberate JSDoc block may legitimately carry *after*
+ * `@noRailsEquivalent`: the structural ones that document the signature and
+ * conventionally trail the description. Every other tag name after the reason
+ * is prose that TypeScript mis-parsed — see `proseTagAfter`.
+ *
+ * Declared with the imports, above the `!isMainThread` block, for the same
+ * reason as `fileHasMissingRailsCallTag`: a worker runs the whole extraction
+ * during module evaluation, so a `const` declared next to its reader further
+ * down the file is still in its temporal dead zone when that reader runs.
+ */
+const TAGS_ALLOWED_AFTER_NO_RAILS_EQUIVALENT = new Set([
+  "param",
+  "returns",
+  "return",
+  "throws",
+  "example",
+  "see",
+  "template",
+  "typeParam",
+  "yields",
+  "defaultValue",
+  "remarks",
+  "deprecated",
+]);
+
 if (!isMainThread && parentPort) {
   const { package: pkgName, srcDir } = workerData as WorkerInput;
   const out: WorkerOutput = extractPackage(pkgName, srcDir);
@@ -1588,27 +1614,6 @@ export function noRailsEquivalentReason(node: ts.Node): string | undefined {
   }
   return undefined;
 }
-
-/**
- * Tags a deliberate JSDoc block may legitimately carry *after*
- * `@noRailsEquivalent`: the structural ones that document the signature and
- * conventionally trail the description. Every other tag name after the reason
- * is prose that TypeScript mis-parsed — see `proseTagAfter`.
- */
-const TAGS_ALLOWED_AFTER_NO_RAILS_EQUIVALENT = new Set([
-  "param",
-  "returns",
-  "return",
-  "throws",
-  "example",
-  "see",
-  "template",
-  "typeParam",
-  "yields",
-  "defaultValue",
-  "remarks",
-  "deprecated",
-]);
 
 /**
  * The first JSDoc tag that follows `tag` in the same comment and is a bare

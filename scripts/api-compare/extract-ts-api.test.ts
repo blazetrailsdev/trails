@@ -2010,6 +2010,31 @@ describe("extractFromProgram — @noRailsEquivalent JSDoc", () => {
     ).toThrow(/truncated by a bare `@internal`.*move it above `@noRailsEquivalent`/s);
   });
 
+  it("reports the offending interface member instead of crashing on the tag order", () => {
+    expect(() =>
+      extractFromFiles("/p", {
+        "seams.ts": `
+          export interface Quoting {
+            /**
+             * @noRailsEquivalent wiring seam; the member is real Rails-facing
+             * @internal is the wrong tool here because callers depend on it.
+             */
+            quoteBound(): string;
+          }
+        `,
+      }),
+    ).toThrow(/truncated by a bare `@internal`.*seams\.ts/s);
+  });
+
+  it("initializes TAGS_ALLOWED_AFTER_NO_RAILS_EQUIVALENT before the worker dispatch", () => {
+    const src = fs.readFileSync(path.join(import.meta.dirname, "extract-ts-api.ts"), "utf8");
+    const constAt = src.indexOf("const TAGS_ALLOWED_AFTER_NO_RAILS_EQUIVALENT");
+    const dispatchAt = src.indexOf("if (!isMainThread && parentPort)");
+    expect(constAt).toBeGreaterThan(-1);
+    expect(dispatchAt).toBeGreaterThan(-1);
+    expect(constAt).toBeLessThan(dispatchAt);
+  });
+
   it("accepts a deliberate @internal placed above @noRailsEquivalent", () => {
     const foo = extractFromSource(`
       class Foo {
