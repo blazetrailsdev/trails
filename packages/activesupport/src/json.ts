@@ -7,6 +7,9 @@
  * since the behavior is equivalent for all standard types.
  */
 
+import { Temporal } from "./temporal.js";
+import { Encoding } from "./json/encoding.js";
+
 /**
  * Serialization options threaded through `as_json` — only the subset Rails'
  * `ActiveSupport::JSON.encode(value, options)` forwards to collections. `only`
@@ -43,6 +46,9 @@ function asJsonValue(value: unknown, options: NormalizedOptions): unknown {
 
   const asJson = (value as { asJson?: (o?: unknown) => unknown }).asJson;
   if (typeof asJson === "function") return asJson.call(value, options);
+
+  const temporal = temporalAsJson(value);
+  if (temporal !== undefined) return temporal;
 
   if (Array.isArray(value)) return value.map((v) => asJsonValue(v, options));
 
@@ -84,6 +90,62 @@ function asJsonValue(value: unknown, options: NormalizedOptions): unknown {
   }
 
   return value;
+}
+
+/**
+ * Rails' `Time#as_json` / `DateTime#as_json` / `Date#as_json`
+ * (core_ext/object/json.rb:200-228), dispatched over our Temporal analogues:
+ * `Instant`/`ZonedDateTime` for `Time`, `PlainDateTime` for the zoneless
+ * `DateTime` (whose `xmlschema` carries Ruby's default `+00:00` offset), and
+ * `PlainDate` for `Date`.
+ */
+function temporalAsJson(value: unknown): string | undefined {
+  const digits =
+    Encoding.timePrecision as Temporal.ToStringPrecisionOptions["fractionalSecondDigits"];
+
+  if (value instanceof Temporal.Instant) {
+    if (Encoding.useStandardJsonTimeFormat)
+      return value.toString({ fractionalSecondDigits: digits });
+    return slashFormat(value.toZonedDateTimeISO("UTC"), "+0000");
+  }
+
+  if (value instanceof Temporal.ZonedDateTime) {
+    if (Encoding.useStandardJsonTimeFormat) {
+      const formatted = value.toString({ fractionalSecondDigits: digits, timeZoneName: "never" });
+      // `xmlschema` renders a zero offset as "Z" (formatted_offset(true, 'Z')).
+      return value.offsetNanoseconds === 0 ? `${formatted.slice(0, -6)}Z` : formatted;
+    }
+    return slashFormat(value, value.offset.replaceAll(":", ""));
+  }
+
+  if (value instanceof Temporal.PlainDateTime) {
+    if (Encoding.useStandardJsonTimeFormat) {
+      return `${value.toString({ fractionalSecondDigits: digits })}+00:00`;
+    }
+    return slashFormat(value, "+0000");
+  }
+
+  if (value instanceof Temporal.PlainDate) {
+    return Encoding.useStandardJsonTimeFormat
+      ? value.toString()
+      : `${value.year}/${pad2(value.month)}/${pad2(value.day)}`;
+  }
+
+  return undefined;
+}
+
+function slashFormat(
+  value: Temporal.ZonedDateTime | Temporal.PlainDateTime,
+  offset: string,
+): string {
+  return (
+    `${value.year}/${pad2(value.month)}/${pad2(value.day)} ` +
+    `${pad2(value.hour)}:${pad2(value.minute)}:${pad2(value.second)} ${offset}`
+  );
+}
+
+function pad2(value: number): string {
+  return String(value).padStart(2, "0");
 }
 
 // A Hash-shaped object: a bare object literal (`Object.prototype` or null

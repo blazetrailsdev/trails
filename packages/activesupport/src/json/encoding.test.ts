@@ -1,6 +1,31 @@
 import { describe, it, expect } from "vitest";
 
 import { slice, except } from "../hash-utils.js";
+import { ActiveSupportJSON } from "../json.js";
+import { Temporal } from "../temporal.js";
+import { TimeWithZone } from "../time-with-zone.js";
+import { TimeZone } from "../values/time-zone.js";
+import { Encoding } from "./encoding.js";
+
+function withStandardJsonTimeFormat(value: boolean, block: () => void): void {
+  const old = Encoding.useStandardJsonTimeFormat;
+  Encoding.useStandardJsonTimeFormat = value;
+  try {
+    block();
+  } finally {
+    Encoding.useStandardJsonTimeFormat = old;
+  }
+}
+
+function withTimePrecision(value: number, block: () => void): void {
+  const old = Encoding.timePrecision;
+  Encoding.timePrecision = value;
+  try {
+    block();
+  } finally {
+    Encoding.timePrecision = old;
+  }
+}
 
 describe("TestJSONEncoding", () => {
   it.skip("process status");
@@ -155,23 +180,50 @@ describe("TestJSONEncoding", () => {
   it.skip("json gem dump by passing active support encoder");
   it.skip("json gem generate by passing active support encoder");
   it.skip("json gem pretty generate by passing active support encoder");
-  it.skip("twz to json with use standard json time format config set to false");
-  it.skip("twz to json with use standard json time format config set to true");
-  it.skip("twz to json with custom time precision");
+  it("twz to json with use standard json time format config set to false", () => {
+    withStandardJsonTimeFormat(false, () => {
+      const zone = TimeZone.find("Eastern Time (US & Canada)");
+      const time = new TimeWithZone(Temporal.Instant.from("2000-01-01T00:00:00Z"), zone);
+      expect(ActiveSupportJSON.encode(time)).toBe('"1999/12/31 19:00:00 -0500"');
+    });
+  });
+
+  it("twz to json with use standard json time format config set to true", () => {
+    withStandardJsonTimeFormat(true, () => {
+      const zone = TimeZone.find("Eastern Time (US & Canada)");
+      const time = new TimeWithZone(Temporal.Instant.from("2000-01-01T00:00:00Z"), zone);
+      expect(ActiveSupportJSON.encode(time)).toBe('"1999-12-31T19:00:00.000-05:00"');
+    });
+  });
+
+  it("twz to json with custom time precision", () => {
+    withStandardJsonTimeFormat(true, () => {
+      withTimePrecision(0, () => {
+        const zone = TimeZone.find("Eastern Time (US & Canada)");
+        const time = new TimeWithZone(Temporal.Instant.from("2000-01-01T00:00:00Z"), zone);
+        expect(ActiveSupportJSON.encode(time)).toBe('"1999-12-31T19:00:00-05:00"');
+      });
+    });
+  });
+
   it("time to json with custom time precision", () => {
-    // toISOString always includes milliseconds; verify standard format
-    const d = new Date("2023-01-15T10:30:00.123Z");
-    const json = JSON.stringify(d);
-    expect(json).toContain("2023-01-15");
-    expect(json).toContain("10:30:00");
+    withStandardJsonTimeFormat(true, () => {
+      withTimePrecision(0, () => {
+        const time = Temporal.Instant.from("2000-01-01T00:00:00Z");
+        expect(ActiveSupportJSON.encode(time)).toBe('"2000-01-01T00:00:00Z"');
+      });
+    });
   });
+
   it("datetime to json with custom time precision", () => {
-    const d = new Date("2023-06-01T12:00:00.456Z");
-    const isoStr = d.toISOString();
-    // Custom precision: strip milliseconds
-    const noMs = isoStr.replace(/\.\d{3}Z$/, "Z");
-    expect(noMs).toBe("2023-06-01T12:00:00Z");
+    withStandardJsonTimeFormat(true, () => {
+      withTimePrecision(0, () => {
+        const datetime = Temporal.PlainDateTime.from("2000-01-01T00:00:00");
+        expect(ActiveSupportJSON.encode(datetime)).toBe('"2000-01-01T00:00:00+00:00"');
+      });
+    });
   });
+
   it.skip("twz to json when wrapping a date time");
 
   it("exception to json", () => {

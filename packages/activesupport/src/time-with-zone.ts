@@ -10,6 +10,7 @@ import { Duration } from "./duration.js";
 import { currentTime } from "./time-travel.js";
 import { getZone } from "./time-zone-config.js";
 import { Temporal, instantFrom } from "./temporal.js";
+import { Encoding } from "./json/encoding.js";
 
 /**
  * Options for the change() method.
@@ -450,7 +451,7 @@ export class TimeWithZone {
       base += frac;
     }
 
-    base += this.formattedOffset();
+    base += this.formattedOffset(true, "Z");
     return base;
   }
 
@@ -525,7 +526,15 @@ export class TimeWithZone {
 
   /** JSON representation — ISO 8601 in UTC */
   asJson(): string {
-    return this.xmlschema(3);
+    if (Encoding.useStandardJsonTimeFormat) {
+      return this.xmlschema(Encoding.timePrecision);
+    }
+    const l = this._local();
+    return (
+      `${l.year}/${pad2(l.month)}/${pad2(l.day)} ` +
+      `${pad2(l.hour)}:${pad2(l.minute)}:${pad2(l.second)} ` +
+      `${this.formattedOffset(false)}`
+    );
   }
 
   toJSON(): string {
