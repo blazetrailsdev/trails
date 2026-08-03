@@ -646,10 +646,28 @@ export function scope(record: Base, assocName: string, options: AssociationOptio
   const foreignKey: string | string[] =
     foreignKeyColumns.length === 1 ? foreignKeyColumns[0] : foreignKeyColumns;
 
-  // Polymorphic `:as` requires a scalar FK. A composite FK is always
-  // rejected. A composite owner PK collapses to "id" when present
-  // (matching Rails' join_id_for); otherwise reject.
-  if (options.as) {
+  // Route through AssociationScope when we have a reflection registered.
+  // AssociationScope handles scalar, composite, polymorphic `:as`, and
+  // STI in a single path matching Rails' `AssociationScope.scope`.
+  // Inline fallback only when the reflection hasn't been registered
+  // (happens in tests that define associations via the lower-level API
+  // without going through Reflection.create).
+  const reflection = ctor._reflectOnAssociation?.(assocName);
+  if (options.through && !reflection) return null;
+
+  // Polymorphic `:as` normally takes a scalar FK, which a composite owner PK
+  // collapses into via "id" (matching Rails' join_id_for). Rails does permit an
+  // explicit composite FK zipping against a composite owner PK of the same
+  // length (Cpk::Post `has_many :comments, as: :commentable`), so that shape
+  // builds through AssociationScope; every other composite pairing is rejected.
+  // The inline fallback below cannot express the zip, so it stays rejected
+  // there.
+  const zipsAgainstCompositePk =
+    !!reflection &&
+    Array.isArray(foreignKey) &&
+    Array.isArray(primaryKey) &&
+    primaryKey.length === foreignKey.length;
+  if (options.as && !zipsAgainstCompositePk) {
     if (Array.isArray(foreignKey)) {
       // Route through the reflection's canonical checkValidityBang (Rails'
       // single raise site) so the error carries the Rails-faithful message;
@@ -677,14 +695,6 @@ export function scope(record: Base, assocName: string, options: AssociationOptio
       });
     }
   }
-  // Route through AssociationScope when we have a reflection registered.
-  // AssociationScope handles scalar, composite, polymorphic `:as`, and
-  // STI in a single path matching Rails' `AssociationScope.scope`.
-  // Inline fallback only when the reflection hasn't been registered
-  // (happens in tests that define associations via the lower-level API
-  // without going through Reflection.create).
-  const reflection = ctor._reflectOnAssociation?.(assocName);
-  if (options.through && !reflection) return null;
   // Null-FK short-circuit: read the SAME columns the eventual query
   // reads. For non-through, reflection.joinForeignKey is the owner-
   // side activeRecordPrimaryKey for hasMany. For through reflections the
