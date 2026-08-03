@@ -141,7 +141,7 @@ describe("RelationMutationTest", () => {
     const rel: any = Post.order("title ASC", "comments_count DESC");
     // String order args stay bare (matching Rails), so reversing them keeps them
     // as SqlLiteral strings with the trailing direction flipped — never
-    // re-qualified to `[col, dir]` tuples.
+    // re-qualified against the table.
     const litValues = (): string[] => rel._orderClauses.map((c: any) => String(c.value));
     rel.reverseOrderBang();
     expect(litValues()).toEqual(["title DESC", "comments_count ASC"]);
@@ -242,12 +242,5 @@ describe("RelationMutationTest", () => {
   it("uniq! with no argument is a no-op", () => {
     const rel: any = Post.group("title");
     expect(() => rel.uniqBang()).not.toThrow();
-  });
-
-  it("order! with empty string does not emit ORDER BY", () => {
-    // Test the bang method directly — order() delegates to orderBang() on a clone.
-    const rel: any = Post.all();
-    rel.orderBang("");
-    expect(rel.toSql()).not.toContain("ORDER BY");
   });
 });

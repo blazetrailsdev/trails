@@ -204,9 +204,6 @@ export class Merger {
       const m = bareColumn(clause);
       return m ? asNode(m[1], m[2] ?? "asc") : clause;
     }
-    if (Array.isArray(clause) && typeof clause[0] === "string" && !clause[0].includes(".")) {
-      return asNode(clause[0], String(clause[1] ?? "asc"));
-    }
     return clause;
   }
 

@@ -497,7 +497,11 @@ describe("RelationTest", () => {
   });
 
   it("reverse arel assoc order with function", async () => {
-    const topicsRel = Topic.order({ [arelSql("lower(title)").toSql()]: "asc" }).reverseOrder();
+    // Rails: `Topic.order(Arel.sql("lower(title)") => :asc)`. JS object keys
+    // can't be Arel nodes, so a Map is the faithful analog of a node-keyed
+    // order hash — preprocessOrderArgs sends the direction to the node itself
+    // rather than resolving it as a column name.
+    const topicsRel = Topic.order(new Map([[arelSql("lower(title)"), "asc"]])).reverseOrder();
     expect((await topicsRel.first())!.title).toBe(topics("third").title);
   });
 

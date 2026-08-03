@@ -169,7 +169,7 @@ interface QueryMethodsHost {
   /** Rails `delegate :primary_key, to: :model` (delegation.rb:106). */
   primaryKey: string | string[];
   _whereClause: WhereClause;
-  _orderClauses: Array<string | [string, "asc" | "desc"] | Nodes.Node>;
+  _orderClauses: Array<string | Nodes.Node>;
   _rawOrderClauses: string[];
   _reordering: boolean | undefined;
   _limitValue: number | null;
@@ -572,204 +572,57 @@ function regroupBang(
   return this;
 }
 
-/**
- * Resolve one entry of a node-keyed order Map into a stored order clause.
- * Arel node keys become Ascending/Descending nodes (preserving identity for
- * reverseOrder); string keys become validated `[col, dir]` tuples.
- * @internal
- */
-function orderHashEntry(
-  host: QueryMethodsHost,
-  key: unknown,
-  dir: unknown,
-): Nodes.Node | [string, "asc" | "desc"] {
-  if (!/^(asc|desc)$/i.test(String(dir))) {
-    throw argumentError(
-      `Direction "${dir}" is invalid. Valid directions are: [:asc, :desc, :ASC, :DESC, "asc", "desc", "ASC", "DESC"]`,
-    );
-  }
-  const direction = String(dir).toLowerCase() as "asc" | "desc";
-  if (key instanceof Nodes.Node) {
-    return direction === "desc" ? (key as any).desc() : (key as any).asc();
-  }
-  disallowRawSqlBang([String(key)], resolveOrderMatcher(host.model));
-  return [String(key), direction];
-}
-
-// Expand an order hash into clauses. Flat `{ col: "asc" }` yields
-// `["col", "asc"]`; nested `{ table: { col: "asc" } }` mirrors Rails'
-// preprocess_order_args, expanding to a `table.col` qualified order.
-function expandOrderHash(
-  host: QueryMethodsHost,
-  arg: Record<string, unknown>,
-): Array<Nodes.Node | [string, "asc" | "desc"]> {
-  const clauses: Array<Nodes.Node | [string, "asc" | "desc"]> = [];
-  for (const [key, value] of Object.entries(arg)) {
-    if (value !== null && typeof value === "object" && !(value instanceof Nodes.Node)) {
-      for (const [col, dir] of Object.entries(value as Record<string, unknown>)) {
-        clauses.push(orderHashEntry(host, `${key}.${col}`, dir));
-      }
-    } else {
-      clauses.push(orderHashEntry(host, key, value));
-    }
-  }
-  return clauses;
-}
-
 function orderBang(this: QueryMethodsHost, ...args: OrderArg[]): any {
-  // Mirrors Rails' preprocess_order_args adding column_references to
-  // references_values, so `includes(:author).order("authors.name")` (or the
-  // hash/Arel forms) promotes the include to eager_load.
-  const refs = columnReferences(args as unknown[]);
-  if (refs.length > 0) referencesBang.call(this, ...refs);
-  let i = 0;
-  while (i < args.length) {
-    const arg = args[i];
-    if (Array.isArray(arg)) {
-      const [first, ...rest] = arg as unknown[];
-      if (first instanceof Nodes.Node) {
-        // Bind array: [Arel.sql("col = ?"), bind1, ...] — Arel bypasses check.
-        // Store as a SqlLiteral so _applyOrderToManager emits it verbatim.
-        const rawSql = (first as any).value ?? connectionFor(this._modelClass).toSql(first);
-        const interpolated =
-          rest.length > 0 ? this._modelClass.sanitizeSqlArray(rawSql, ...rest) : rawSql;
-        if (interpolated.trim() !== "")
-          this._orderClauses.push(new Nodes.SqlLiteral(String(interpolated)));
-      } else {
-        // Plain string array: all elements must be strings; validate each immediately.
-        if (!(arg as unknown[]).every((e) => typeof e === "string")) {
-          throw argumentError("Order arguments passed as an array must contain only strings");
-        }
-        disallowRawSqlBang(arg as string[], resolveOrderMatcher(this.model));
-        for (const elem of arg as string[]) {
-          if (elem.trim() !== "") this._orderClauses.push(elem);
-        }
-      }
-    } else if (arg instanceof Map) {
-      // Hash form with Arel node keys: order(arelTable.get("id") => "desc").
-      // JS object keys can't be Arel nodes, so a Map is the faithful analog of
-      // Rails' `order(node => :desc)`.
-      for (const [key, dir] of arg) {
-        this._orderClauses.push(orderHashEntry(this, key, dir));
-      }
-    } else if (arg instanceof Nodes.Node) {
-      // Preserve the Arel node identity (Ascending/Descending/Attribute/...) so
-      // reverseOrderBang can flip it via .reverse()/.desc(), mirroring Rails'
-      // reverse_sql_order. _applyOrderToManager emits the node directly. Skip blank
-      // SQL literals — Rails build_order's compact_blank drops them (SqlLiteral is
-      // a blank? String subclass).
-      const blankLiteral =
-        arg instanceof Nodes.SqlLiteral && String((arg as any).value ?? "").trim() === "";
-      if (!blankLiteral) this._orderClauses.push(arg);
-    } else if (typeof arg === "symbol") {
-      // Rails qualifies a Symbol order arg (`order(:name)` → `"table"."name"
-      // ASC`), unlike a string, which stays bare. Store as a `[col, "asc"]`
-      // tuple so `_applyOrderToManager` routes it through column resolution.
-      const name = symbolToName(arg);
-      disallowRawSqlBang([name], resolveOrderMatcher(this.model));
-      this._orderClauses.push([name, "asc"]);
-    } else if (typeof arg === "string") {
-      // Rails maps each String order arg through unchanged (preprocess_order_args'
-      // `else` branch) and compact_blanks blank strings away. A string never pairs
-      // with a following "asc"/"desc" arg nor qualifies — it stays a bare
-      // SqlLiteral (see _applyOrderToManager). Validate immediately, mirroring
-      // Rails raising on order("invalid") at call time.
-      if (arg.trim() !== "") {
-        disallowRawSqlBang([arg], resolveOrderMatcher(this.model));
-        this._orderClauses.push(arg);
-      }
-    } else if (arg !== null && typeof arg === "object") {
-      // Hash form { col: "asc"|"desc" } — and nested { table: { col: "asc" } },
-      // which Rails expands to a `table.col dir` qualified order.
-      for (const clause of expandOrderHash(this, arg as Record<string, unknown>)) {
-        this._orderClauses.push(clause);
-      }
-    } else {
-      const argType = arg === null ? "null" : typeof arg;
-      throw argumentError(`Unsupported order argument: ${argType}`);
-    }
-    i++;
-  }
-  // Mirror Rails' `self.order_values |= args`: union dedupes repeated terms.
-  this._orderClauses = dedupeOrderClauses(this._orderClauses);
+  if (args.length > 0) preprocessOrderArgs.call(this, args as unknown[]);
+  // Mirrors Rails' `self.order_values |= args`: union dedupes repeated terms.
+  this._orderClauses = dedupeOrderClauses([
+    ...this._orderClauses,
+    ...(args as unknown[]),
+  ]) as typeof this._orderClauses;
   return this;
 }
 
 function reorderBang(this: QueryMethodsHost, ...args: OrderArg[]): any {
-  this._orderClauses = [];
+  preprocessOrderArgs.call(this, args as unknown[]);
   this._rawOrderClauses = [];
   this._reordering = true;
-  const refs = columnReferences(args as unknown[]);
-  if (refs.length > 0) referencesBang.call(this, ...refs);
-  let i = 0;
-  while (i < args.length) {
-    const arg = args[i];
-    if (Array.isArray(arg)) {
-      const [first, ...rest] = arg as unknown[];
-      if (first instanceof Nodes.Node) {
-        const rawSql = (first as any).value ?? connectionFor(this._modelClass).toSql(first);
-        const interpolated =
-          rest.length > 0 ? this._modelClass.sanitizeSqlArray(rawSql, ...rest) : rawSql;
-        if (interpolated.trim() !== "")
-          this._orderClauses.push(new Nodes.SqlLiteral(String(interpolated)));
-      } else {
-        if (!(arg as unknown[]).every((e) => typeof e === "string")) {
-          throw argumentError("Order arguments passed as an array must contain only strings");
-        }
-        disallowRawSqlBang(arg as string[], resolveOrderMatcher(this.model));
-        for (const elem of arg as string[]) {
-          if (elem.trim() !== "") this._orderClauses.push(elem);
-        }
-      }
-    } else if (arg instanceof Map) {
-      for (const [key, dir] of arg) {
-        this._orderClauses.push(orderHashEntry(this, key, dir));
-      }
-    } else if (arg instanceof Nodes.Node) {
-      // Preserve the Arel node identity (Ascending/Descending/Attribute/...) so
-      // reverseOrderBang can flip it via .reverse()/.desc(), mirroring Rails'
-      // reverse_sql_order. _applyOrderToManager emits the node directly. Skip blank
-      // SQL literals — Rails build_order's compact_blank drops them (SqlLiteral is
-      // a blank? String subclass).
-      const blankLiteral =
-        arg instanceof Nodes.SqlLiteral && String((arg as any).value ?? "").trim() === "";
-      if (!blankLiteral) this._orderClauses.push(arg);
-    } else if (typeof arg === "symbol") {
-      // Rails qualifies a Symbol order arg (`order(:name)` → `"table"."name"
-      // ASC`), unlike a string, which stays bare. Store as a `[col, "asc"]`
-      // tuple so `_applyOrderToManager` routes it through column resolution.
-      const name = symbolToName(arg);
-      disallowRawSqlBang([name], resolveOrderMatcher(this.model));
-      this._orderClauses.push([name, "asc"]);
-    } else if (typeof arg === "string") {
-      // Each String order arg maps through unchanged and stays bare (see the
-      // orderBang string branch); blanks are compact_blank'd away. No pairing
-      // with a following "asc"/"desc" arg, no qualification.
-      if (arg.trim() !== "") {
-        disallowRawSqlBang([arg], resolveOrderMatcher(this.model));
-        this._orderClauses.push(arg);
-      }
-    } else if (arg !== null && typeof arg === "object") {
-      for (const clause of expandOrderHash(this, arg as Record<string, unknown>)) {
-        this._orderClauses.push(clause);
-      }
-    } else {
-      const argType = arg === null ? "null" : typeof arg;
-      throw argumentError(`Unsupported order argument: ${argType}`);
-    }
-    i++;
-  }
-  this._orderClauses = dedupeOrderClauses(this._orderClauses);
+  this._orderClauses = dedupeOrderClauses(args as unknown[]) as typeof this._orderClauses;
   return this;
 }
-
 // Remove duplicate order terms while preserving first-seen order. orderBang
 // mirrors Rails' `self.order_values |= args` and reorderBang its `args.uniq!` —
 // both dedupe by value (query_methods.rb order!/reorder!).
+//
+// Ruby compares Arel nodes structurally (Arel::Nodes::Node#eql?), so the key is
+// structural: an Attribute holds a back reference to its Arel::Table, which
+// JSON.stringify cannot serialize.
+let orderClauseIdentity = 0;
+const orderClauseIdentities = new WeakMap<object, number>();
+
+function orderClauseKey(clause: unknown): string {
+  if (typeof clause === "string") return `s:${clause}`;
+  if (clause instanceof Nodes.SqlLiteral) return `s:${String((clause as any).value ?? "")}`;
+  if (clause instanceof Nodes.Attribute) {
+    return `a:${relationName((clause as any).relation?.name)}.${(clause as any).name}`;
+  }
+  if (clause instanceof Nodes.Node && "expr" in (clause as any)) {
+    return `${clause.constructor.name}(${orderClauseKey((clause as any).expr)})`;
+  }
+  if (clause !== null && typeof clause === "object") {
+    let id = orderClauseIdentities.get(clause);
+    if (id === undefined) {
+      id = ++orderClauseIdentity;
+      orderClauseIdentities.set(clause, id);
+    }
+    return `o:${id}`;
+  }
+  return `v:${String(clause)}`;
+}
+
 function dedupeOrderClauses<T>(clauses: T[]): T[] {
   const seen = new Set<string>();
   return clauses.filter((c) => {
-    const key = JSON.stringify(c);
+    const key = orderClauseKey(c);
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -1499,7 +1352,7 @@ function reverseOrderBang(this: QueryMethodsHost): any {
   // substitute here: it reports a key-less object as blank, but Ruby's blank? is
   // false for an Arel node (it has no #empty?), so routing clauses through it
   // would drop every Ordering. Only nil/blank-string clauses are blank in this
-  // list; nodes and [col, dir] tuples never are.
+  // list; Arel nodes never are.
   const clauses = this._orderClauses.filter(
     (clause) => clause != null && !(typeof clause === "string" && /^\s*$/.test(clause)),
   );
@@ -1538,19 +1391,14 @@ function reverseOrderBang(this: QueryMethodsHost): any {
       if (typeof (clause as any).desc === "function") return (clause as any).desc();
       return clause;
     }
-    if (typeof clause === "string") {
-      // A string order arg stays a bare SqlLiteral (see _applyOrderToManager),
-      // so reversing it mirrors Rails' reverse_sql_order String branch: split on
-      // comma and flip each term's trailing ASC↔DESC (appending DESC when
-      // unmarked), keeping the result a bare SqlLiteral rather than re-qualifying
-      // it to a `[col, dir]` tuple. reverseSqlOrder runs isDoesNotSupportReverse
-      // (the faithful port of does_not_support_reverse?), so unbalanced-paren
-      // sections and "nulls first/last" still raise.
-      const reversed = reverseSqlOrder.call(this, [clause]) as string[];
-      return new Nodes.SqlLiteral(reversed.join(", "));
-    }
-    const [col, dir] = clause;
-    return [col, dir === "asc" ? "desc" : "asc"] as [string, "asc" | "desc"];
+    // A string order arg stays bare (Rails leaves String args unchanged in
+    // order_values), so reversing it mirrors reverse_sql_order's String branch:
+    // split on comma and flip each term's trailing ASC↔DESC (appending DESC when
+    // unmarked). reverseSqlOrder runs isDoesNotSupportReverse (the faithful port
+    // of does_not_support_reverse?), so unbalanced-paren sections and
+    // "nulls first/last" still raise.
+    const reversed = reverseSqlOrder.call(this, [clause]) as string[];
+    return new Nodes.SqlLiteral(reversed.join(", "));
   });
   return this;
 }
@@ -1740,20 +1588,9 @@ export function flattenedArgs(args: unknown[]): unknown[] {
 export function flattenedOrderArgs(args: unknown[]): unknown[] {
   // order/reorder mirror Rails' `args.flatten!` (query_methods.rb:659/755) so a
   // nested blank array like `order([nil])` collapses and compact_blanks away.
-  // The one exception is trails' bind-array form `[Arel.sql("x = ?"), ...binds]`
-  // — an array led by an Arel node — which orderBang consumes structurally to
-  // interpolate the binds; flattening it would split the SQL from its binds.
-  const out: unknown[] = [];
-  for (const e of args) {
-    if (Array.isArray(e) && !(e[0] instanceof Nodes.Node)) {
-      out.push(...flattenedOrderArgs(e));
-    } else {
-      // A bind-array (Arel-node-led) or scalar is pushed as one element; using a
-      // loop (not flatMap) keeps the preserved bind-array from being spread.
-      out.push(e);
-    }
-  }
-  return out;
+  // A bind array `[Arel.sql("x = ?"), ...binds]` has already been collapsed into
+  // one SqlLiteral by sanitize_order_arguments, which runs first.
+  return args.flatMap((e) => (Array.isArray(e) ? flattenedOrderArgs(e) : e));
 }
 
 const VALID_DIRECTIONS = new Set(["asc", "desc"]);
@@ -1761,6 +1598,16 @@ const VALID_DIRECTIONS = new Set(["asc", "desc"]);
 /** @internal */
 export function validateOrderArgs(this: QueryMethodsHost, args: unknown[]): void {
   for (const arg of args) {
+    if (arg instanceof Map) {
+      for (const [, value] of arg) {
+        if (!VALID_DIRECTIONS.has(String(value).toLowerCase())) {
+          throw argumentError(
+            `Direction "${value}" is invalid. Valid directions are: [:asc, :desc, :ASC, :DESC, "asc", "desc", "ASC", "DESC"]`,
+          );
+        }
+      }
+      continue;
+    }
     if (!isPlainObject(arg)) continue;
     for (const [, value] of Object.entries(arg)) {
       if (isPlainObject(value)) {
@@ -1987,6 +1834,18 @@ export function columnReferences(orderArgs: unknown[]): string[] {
       if (expr instanceof Nodes.Attribute) {
         refs.push(relationName(expr.relation.name));
       }
+    } else if (arg instanceof Map) {
+      // Rails' Hash arm extracts a table only from String/Symbol keys; an Arel
+      // key with a scalar direction falls through to nil, so `order(node => dir)`
+      // never promotes an includes to eager_load.
+      for (const [key, value] of arg) {
+        if (isPlainObject(value)) {
+          refs.push(String(key));
+        } else if (typeof key === "string" || typeof key === "symbol") {
+          const t = extractTableNameFrom(typeof key === "symbol" ? symbolToName(key) : key);
+          if (t) refs.push(t);
+        }
+      }
     } else if (isPlainObject(arg)) {
       for (const [key, value] of Object.entries(arg)) {
         if (isPlainObject(value)) {
@@ -2016,6 +1875,10 @@ function flattenedOrderKeysForRawSqlCheck(orderArgs: unknown[]): (string | symbo
       result.push(arg);
     } else if (arg instanceof Nodes.Node) {
       // Arel nodes (SqlLiteral, Attribute, Ordering, …) are pre-sanitized; skip them.
+    } else if (arg instanceof Map) {
+      for (const key of arg.keys()) {
+        if (typeof key === "string" || typeof key === "symbol") result.push(key);
+      }
     } else if (isPlainObject(arg)) {
       for (const [key, value] of Object.entries(arg)) {
         result.push(key);
@@ -2046,11 +1909,21 @@ export function preprocessOrderArgs(this: QueryMethodsHost, orderArgs: unknown[]
     const existing: string[] = (this as any)._referencesValues ?? [];
     (this as any)._referencesValues = [...new Set([...existing, ...refs])];
   }
-  // Rails maps Symbol args to Ascending nodes and Hash args to directional nodes.
   const mapped: unknown[] = [];
   for (const arg of orderArgs) {
     if (typeof arg === "symbol") {
       mapped.push(new Nodes.Ascending(orderColumn.call(this, symbolToName(arg))));
+    } else if (arg instanceof Map) {
+      // JS object keys can't be Arel nodes, so a Map is the analogue of Rails'
+      // `order(node => :desc)` — the `when Arel::Nodes::Node` branch, which
+      // sends the direction to the key itself instead of resolving it.
+      for (const [key, value] of arg) {
+        mapped.push(
+          key instanceof Nodes.Node
+            ? orderedNode(key, value)
+            : orderedNode(orderColumn.call(this, String(key)), value),
+        );
+      }
     } else if (isPlainObject(arg)) {
       for (const rawKey of Reflect.ownKeys(arg)) {
         const key = typeof rawKey === "symbol" ? symbolToName(rawKey) : rawKey;
@@ -2071,33 +1944,16 @@ export function preprocessOrderArgs(this: QueryMethodsHost, orderArgs: unknown[]
   orderArgs.push(...mapped);
 }
 
-function buildOrderNode(clause: unknown): unknown {
-  if (clause instanceof Nodes.Node) return clause;
-  if (typeof clause === "string") return new Nodes.SqlLiteral(clause);
-  if (typeof clause === "symbol") return new Nodes.SqlLiteral(symbolToName(clause));
-  if (Array.isArray(clause) && clause.length === 2) {
-    const [col, dir] = clause;
-    if (col instanceof Nodes.Node) {
-      return String(dir).toLowerCase() === "desc"
-        ? new Nodes.Descending(col)
-        : new Nodes.Ascending(col);
-    }
-    if (typeof col === "string" || typeof col === "symbol") {
-      const expr = new Nodes.SqlLiteral(typeof col === "symbol" ? symbolToName(col) : col);
-      return String(dir).toLowerCase() === "desc"
-        ? new Nodes.Descending(expr)
-        : new Nodes.Ascending(expr);
-    }
-    throw argumentError(`Unsupported order column type: ${Object.prototype.toString.call(col)}`);
-  }
-  throw argumentError(`Unsupported order clause type: ${Object.prototype.toString.call(clause)}`);
-}
-
 /** @internal */
 export function buildOrder(this: QueryMethodsHost, arel: any): void {
-  const orders = ((this as any)._orderClauses ?? [])
-    .filter((o: unknown) => o !== null && o !== undefined && o !== "")
-    .map(buildOrderNode);
+  // An Arel::Nodes::SqlLiteral is a String subclass in Ruby, so compact_blank
+  // drops a blank one along with nil and "".
+  const orders = ((this as any)._orderClauses ?? []).filter((o: unknown) => {
+    if (o === null || o === undefined) return false;
+    if (typeof o === "string") return o.trim() !== "";
+    if (o instanceof Nodes.SqlLiteral) return String((o as any).value ?? "").trim() !== "";
+    return true;
+  });
   if (orders.length > 0) arel.order?.(...orders);
 }
 
