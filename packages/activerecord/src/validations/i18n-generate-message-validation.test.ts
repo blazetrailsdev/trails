@@ -1,4 +1,4 @@
-import { describe, it, expect, afterAll, afterEach, vi } from "vitest";
+import { describe, it, expect, afterAll, beforeEach, vi } from "vitest";
 import { Base } from "../index.js";
 import { I18n } from "@blazetrails/activemodel";
 import { RecordInvalid } from "../validations.js";
@@ -9,8 +9,11 @@ vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 fixtures({});
 
 describe("I18nGenerateMessageValidationTest", () => {
-  afterEach(() => {
-    resetI18n();
+  // activerecord/test/cases/validations/i18n_generate_message_validation_test.rb:7-9
+  class Backend extends I18n.Fallbacks(I18n.Simple) {}
+
+  beforeEach(() => {
+    resetI18n(new Backend());
   });
   afterAll(() => {
     vi.unstubAllEnvs();
@@ -69,7 +72,7 @@ describe("I18nGenerateMessageValidationTest", () => {
   });
 
   it("RecordInvalid exception translation falls back to the :errors namespace", () => {
-    resetI18nEmpty();
+    resetI18nEmpty(new Backend());
     I18n.backend().storeTranslations("en", {
       errors: { messages: { record_invalid: "fallback message" } },
     });
@@ -79,7 +82,7 @@ describe("I18nGenerateMessageValidationTest", () => {
   });
 
   it("translation for 'taken' can be overridden", () => {
-    resetI18nEmpty();
+    resetI18nEmpty(new Backend());
     I18n.backend().storeTranslations("en", {
       errors: { attributes: { title: { taken: "Custom taken message" } } },
     });
@@ -90,7 +93,7 @@ describe("I18nGenerateMessageValidationTest", () => {
   });
 
   it("translation for 'taken' can be overridden in activerecord scope", () => {
-    resetI18nEmpty();
+    resetI18nEmpty(new Backend());
     I18n.backend().storeTranslations("en", {
       activerecord: { errors: { messages: { taken: "Custom taken message" } } },
     });
@@ -101,7 +104,7 @@ describe("I18nGenerateMessageValidationTest", () => {
   });
 
   it("translation for 'taken' can be overridden in activerecord model scope", () => {
-    resetI18nEmpty();
+    resetI18nEmpty(new Backend());
     I18n.backend().storeTranslations("en", {
       activerecord: { errors: { models: { topic: { taken: "Custom taken message" } } } },
     });
@@ -112,7 +115,7 @@ describe("I18nGenerateMessageValidationTest", () => {
   });
 
   it("translation for 'taken' can be overridden in activerecord attributes scope", () => {
-    resetI18nEmpty();
+    resetI18nEmpty(new Backend());
     I18n.backend().storeTranslations("en", {
       activerecord: {
         errors: { models: { topic: { attributes: { title: { taken: "Custom taken message" } } } } },
@@ -124,14 +127,8 @@ describe("I18nGenerateMessageValidationTest", () => {
     );
   });
 
-  // Rails' case builds its backend as `class Backend < I18n::Backend::Simple;
-  // include I18n::Backend::Fallbacks; end`
-  // (activerecord/test/cases/validations/i18n_generate_message_validation_test.rb:7-9).
-  // `i18n/backend/fallbacks.rb` has no port yet — story `i18n-backend-fallbacks`
-  // — so there is no locale chain for "en-US" to walk up. Unskip with that story;
-  // nothing else about this case changes.
-  it.skip("activerecord attributes scope falls back to parent locale before it falls back to the :errors namespace", () => {
-    resetI18nEmpty();
+  it("activerecord attributes scope falls back to parent locale before it falls back to the :errors namespace", () => {
+    resetI18nEmpty(new Backend());
     I18n.backend().storeTranslations("en", {
       activerecord: {
         errors: { models: { topic: { attributes: { title: { taken: "custom en message" } } } } },
