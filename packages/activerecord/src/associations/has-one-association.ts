@@ -565,8 +565,20 @@ export class HasOneAssociation extends SingularAssociation {
     // below sit in one synchronous slice — `removeTargetBang` reads
     // `this.target` before its first `await` — so nothing can observe the
     // association caching the displaced record.
-    const replacement = this.target;
+    //
+    // The accepted deviation (RFC 0068 Design §6) is the *pair* of writes:
+    // Rails' target only ever
+    // moves forward, because `load_target` runs before `self.target = record`
+    // rather than after it. It cannot be removed while the Rails-named writer
+    // is a synchronous property setter (`pirate.shipAttributes = {...}`) that
+    // must install the replacement before returning; the awaitable
+    // `setShipAttributes` needs no swap, and retiring the sync setter's
+    // displacement contract is what deletes this method. Read the replacement
+    // *after* the await so the restore writes back whatever the association
+    // caches now — a capture taken before the find would resurrect a target a
+    // later assignment has already superseded.
     const displaced = await this.doAsyncFindTarget();
+    const replacement = this.target;
     if (!displaced || sameRecord(displaced, replacement)) return;
     this.target = displaced;
     const removal = this.detachDisplacedTarget();
