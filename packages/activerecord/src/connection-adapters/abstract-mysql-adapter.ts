@@ -12,6 +12,7 @@ import { inspectExplainOption } from "./abstract/database-statements.js";
 import type { ExplainOption } from "./abstract/database-statements.js";
 import {
   isWriteQuery as mysqlIsWriteQuery,
+  maxAllowedPacket as mysqlMaxAllowedPacket,
   returningColumnValues as mysqlReturningColumnValues,
 } from "./mysql/database-statements.js";
 import { Result } from "../result.js";
@@ -1125,6 +1126,17 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
       if (e instanceof StatementInvalid) return null;
       throw e;
     }
+  }
+
+  /**
+   * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::DatabaseStatements#max_allowed_packet
+   * — `@max_allowed_packet ||= show_variable("max_allowed_packet")`.
+   */
+  declare _maxAllowedPacket?: number;
+
+  /** @internal */
+  async maxAllowedPacket(): Promise<number> {
+    return mysqlMaxAllowedPacket.call(this);
   }
 
   async primaryKeys(tableName: string): Promise<string[]> {
