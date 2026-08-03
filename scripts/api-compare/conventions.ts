@@ -75,16 +75,11 @@ export const PATH_SEGMENT_ALIASES: Record<string, string> = {
 export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
   "activesupport:inflector/methods.rb": "inflector.ts",
   "activesupport:core_ext/string/inflections.rb": "inflector.ts",
-  // Same reopening shape, one level worse: `core_ext/integer/inflections.rb` is
-  // where Ruby first reopens `class Integer`, so its bucket owns the whole
-  // Integer core_ext surface — `ordinalize`/`ordinal` from this file, plus
-  // `multiple_of?` (multiple.rb) and `months`/`years` (time.rb). trails spreads
-  // those across `inflector.ts` and `duration.ts`, so no single implementation
-  // file is the home; the package barrel is. Left to the misplaced-file
-  // heuristic the bucket resolved to `index.ts` only by luck and lost it the
-  // moment a 4-hit rival (`time-with-zone.ts`, which has its own
-  // `month`/`months`/`year`/`years`) tied the barrel and tripped the separation
-  // threshold.
+  // Same reopening shape: this file reopens `class Integer` first, so its
+  // bucket owns all of Integer's core_ext surface — `ordinalize`/`ordinal` here
+  // plus `multiple_of?` (multiple.rb) and `months`/`years` (time.rb). trails
+  // splits those across `inflector.ts` and `duration.ts`, so the barrel is the
+  // only file that holds the whole bucket.
   "activesupport:core_ext/integer/inflections.rb": "index.ts",
   // The i18n gem's umbrella file (`lib/i18n.rb`, scanned one level above
   // libPath) is where `I18n::Base` itself is defined, so unlike Rails'
