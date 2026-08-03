@@ -18,6 +18,7 @@ import {
   reloadBang,
   reserveKey,
   resetConfig,
+  setConfig,
   setAvailableLocales,
   setBackend,
   setDefaultLocale,
@@ -298,6 +299,16 @@ describe("I18nTest", () => {
   it("raises an I18n::InvalidLocale exception when setting an unavailable locale", () => {
     config().enforceAvailableLocales = true;
     expect(() => setLocale("klingon")).toThrow(InvalidLocale);
+  });
+
+  it("can set the configuration object", () => {
+    // Rails' second assertion reads the object back off
+    // `Thread.current.thread_variable_get(:i18n_config)`; trails keeps one
+    // process-wide config (see `config` in i18n.ts), so there is no
+    // thread-local copy to check.
+    const other = new Config();
+    setConfig(other);
+    expect(config()).toBe(other);
   });
 
   it("locale is not shared between configurations", () => {
