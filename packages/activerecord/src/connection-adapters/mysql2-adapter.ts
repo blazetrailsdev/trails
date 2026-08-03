@@ -149,9 +149,10 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   // `connected?` rather than re-deriving the guard, so this delegates to
   // `isConnected()` (trails' `connected?`) the same way. The sync getter can't
   // do the live `ping` half of Rails' active? (that's activeAsync);
-  // `_activeState` is the cached liveness that ping updates.
+  // `_activeState` is the cached liveness that ping updates, and it is the
+  // second term here rather than inside `connected?`.
   override get active(): boolean {
-    return this.isConnected();
+    return this.isConnected() && this._activeState;
   }
 
   /**
@@ -159,14 +160,15 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    * persistent connection, lazily establishing it if needed. Updates the cached
    * `_activeState` so the sync `active` getter reflects the result.
    *
-   * @noRailsEquivalent PERMANENT — this is the async half of Rails' `active?`
+   * @noRailsEquivalent CONVERGEABLE — this is the async half of Rails' `active?`
    * (mysql2_adapter.rb:108), which pings the raw connection inline
    * (`@raw_connection&.ping`) because the Ruby mysql2 driver is blocking. The
    * node-mysql2 `ping()` returns a promise, so the ping cannot happen inside a
-   * sync predicate; trails splits `active?` into the sync `active` getter
-   * (Rails' `connected?` guard plus the cached liveness) and this awaitable
-   * probe. Rails has one method where trails needs two, so the second name has
-   * no counterpart to converge onto.
+   * sync predicate. Folding this back onto the Rails name `active` — accepting
+   * `Promise<boolean>` as the documented divergence, per the ConnectionPool
+   * `*Async`-twin precedent — is scoped as
+   * `converge-adapter-active-predicate-to-async` (RFC 0072): it touches 7
+   * `get active()` declarations and ~88 call sites.
    */
   async activeAsync(): Promise<boolean> {
     if (this._permanentlyClosed || this._isFakeConnection) {
@@ -188,16 +190,12 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   // @raw_connection.closed?)` (mysql2_adapter.rb:104). `_client` is trails'
   // `@raw_connection`, so a never-connected / disconnected adapter (`_client
   // === null`) reports NOT connected. This also matches the base adapter's
-  // `isConnected()` (`_connection !== null`) and keeps `active ⟹ isConnected`,
-  // the invariant Rails guarantees by checking `connected?` first inside
-  // `active?`.
+  // `isConnected()` (`_connection !== null`). The cached ping result
+  // (`_activeState`) is deliberately NOT a term here: Rails' `connected?` asks
+  // only about the handle, and `active?` is `connected?` PLUS a live ping — so a
+  // failed ping leaves `connected?` true while `active?` goes false.
   override isConnected(): boolean {
-    return (
-      this._client !== null &&
-      !this._permanentlyClosed &&
-      !this._isFakeConnection &&
-      this._activeState
-    );
+    return this._client !== null && !this._permanentlyClosed && !this._isFakeConnection;
   }
 
   // Mirrors Rails' `verify!` (abstract_adapter.rb:759), which decides whether to
@@ -214,7 +212,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   // stash). A never-connected/fake/closed adapter skips the ping and flows
   // straight through the base logic, exactly as before.
   override async verifyBang(): Promise<void> {
-    if (this._client !== null && !this._permanentlyClosed && !this._isFakeConnection) {
+    if (this.isConnected()) {
       await this.activeAsync();
     }
     await super.verifyBang();
