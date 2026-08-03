@@ -85,14 +85,10 @@ export class HasOneThroughAssociation extends HasOneAssociation {
    * against the now-loaded join row (update-existing / build-when-absent),
    * exactly as Rails' `create_through_record` does.
    *
-   * Extra surface, deliberately left counted: the name exists only because the
-   * base `HasOneAssociation` splits Rails' inline `build_#{name}` target load
-   * into a public `loadTargetForBuild` hook. It cannot be `protected` while
-   * `associations/builder/has-one.ts` drives it from outside the class, and it
-   * converges when the BASE hook does — see the
-   * `extra-surface-has-one-base-build-hooks-classify` story. No
-   * `@noRailsEquivalent` tag, because convergeable surface belongs on the novel
-   * count, not in the allowed set.
+   * The name exists only because the base `HasOneAssociation` splits Rails'
+   * inline `build_#{name}` target load into a `loadTargetForBuild` hook; both
+   * the base hook and this override are `protected` (#5946), so neither counts
+   * as public extra surface.
    *
    * @internal
    */
@@ -114,12 +110,9 @@ export class HasOneThroughAssociation extends HasOneAssociation {
    * the `build#{name}` / `create#{name}` accessors leave displacement to the
    * through's own `createThroughRecord` / `persistReplace`.
    *
-   * Extra surface, deliberately left counted, for the same reason as
-   * `loadTargetForBuild` above: Rails has no `remove_target!` hook of this
-   * shape at all, and this override only neutralizes the base class's. It
-   * cannot be `protected` while `nested-attributes.ts` calls it from outside,
-   * and it disappears when the base hook converges — see the
-   * `extra-surface-has-one-base-build-hooks-classify` story.
+   * Same shape as `loadTargetForBuild` above: Rails has no `remove_target!`
+   * hook of this kind at all, and this override only neutralizes the base
+   * class's. `protected` on both since #5946.
    *
    * @internal
    */
