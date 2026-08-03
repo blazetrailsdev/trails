@@ -1,8 +1,13 @@
 export type RotationKind = "signed" | "encrypted";
 
 export class RotationConfiguration {
-  readonly signed: unknown[][] = [];
-  readonly encrypted: unknown[][] = [];
+  readonly signed: unknown[][];
+  readonly encrypted: unknown[][];
+
+  constructor() {
+    this.signed = [];
+    this.encrypted = [];
+  }
 
   /**
    * Ruby collects trailing keyword arguments into an options hash and appends

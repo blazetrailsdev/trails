@@ -2,11 +2,15 @@ import { getCrypto } from "./crypto-adapter.js";
 import { Codec, type MessageSerializer } from "./messages/codec.js";
 import type { ExpectedMetadataOptions, MetadataOptions } from "./messages/metadata.js";
 import {
-  initializeRotator,
-  installRotator,
+  fallBackTo,
+  initialize as initializeRotator,
+  onRotation,
+  readMessage as readMessageWithRotations,
+  rotate,
   type OnRotation,
   type RotatableOptions,
 } from "./messages/rotator.js";
+import { prepend } from "./prepend.js";
 import { Thrown, type Format } from "./messages/serializer-with-fallback.js";
 
 export class InvalidSignature extends Error {
@@ -138,4 +142,5 @@ export class MessageVerifier extends Codec {
   }
 }
 
-installRotator(MessageVerifier);
+Object.assign(MessageVerifier.prototype, { rotate, onRotation, fallBackTo });
+prepend(MessageVerifier.prototype, { readMessage: readMessageWithRotations });

@@ -2,11 +2,15 @@ import { getCrypto } from "./crypto-adapter.js";
 import { Codec, type MessageSerializer } from "./messages/codec.js";
 import type { ExpectedMetadataOptions, MetadataOptions } from "./messages/metadata.js";
 import {
-  initializeRotator,
-  installRotator,
+  fallBackTo,
+  initialize as initializeRotator,
+  onRotation,
+  readMessage as readMessageWithRotations,
+  rotate,
   type OnRotation,
   type RotatableOptions,
 } from "./messages/rotator.js";
+import { prepend } from "./prepend.js";
 import { Thrown, type Format } from "./messages/serializer-with-fallback.js";
 
 export class InvalidMessage extends Error {
@@ -185,7 +189,8 @@ export class MessageEncryptor extends Codec {
   }
 }
 
-installRotator(MessageEncryptor);
+Object.assign(MessageEncryptor.prototype, { rotate, onRotation, fallBackTo });
+prepend(MessageEncryptor.prototype, { readMessage: readMessageWithRotations });
 
 export namespace NullSerializer {
   export function dump(value: unknown): string {

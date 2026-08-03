@@ -1,4 +1,3 @@
-import { prepend } from "../prepend.js";
 import { Thrown } from "./serializer-with-fallback.js";
 
 export type OnRotation = () => void;
@@ -35,7 +34,7 @@ function stateOf(host: object): RotatorState {
  * prepended module cannot wrap a TypeScript constructor, so each rotatable
  * class calls this from its own constructor instead.
  */
-export function initializeRotator(
+export function initialize(
   host: object,
   args: unknown[],
   options: Record<string, unknown> = {},
@@ -58,6 +57,7 @@ export function fallBackTo<T extends object>(this: T, fallback: Rotatable): T {
   return this;
 }
 
+/** @internal */
 function buildRotation<T extends object>(this: T, args: unknown[]): Rotatable {
   const state = stateOf(this);
   const trailing = args.length > 0 && isPlainOptions(args[args.length - 1]);
@@ -80,6 +80,7 @@ function isPlainOptions(value: unknown): value is Record<string, unknown> {
   );
 }
 
+/** @internal */
 function catchRotationError<T>(block: () => T): { value?: T; error?: Thrown } {
   try {
     return { value: block() };
@@ -95,40 +96,33 @@ function catchRotationError<T>(block: () => T): { value?: T; error?: Thrown } {
 }
 
 /**
- * Ruby's `prepend Messages::Rotator` — installs `rotate` / `on_rotation` /
- * `fall_back_to` and wraps `read_message` so rotations are tried in turn.
+ * Ruby's `Messages::Rotator#read_message`. Shaped for `prepend()`, so the
+ * wrapped implementation arrives as `super_`.
  */
-export function installRotator(klass: { prototype: object }): void {
-  Object.assign(klass.prototype, { rotate, onRotation, fallBackTo });
+export function readMessage(
+  this: object,
+  super_: (...superArgs: unknown[]) => unknown,
+  message: string,
+  options: Record<string, unknown> = {},
+): unknown {
+  const state = stateOf(this);
+  const { onRotation: perCall, ...rest } = options as RotatableOptions & Record<string, unknown>;
+  const callback = perCall === undefined ? state.onRotation : perCall;
 
-  prepend(klass.prototype, {
-    readMessage(
-      this: object,
-      super_: (...superArgs: unknown[]) => unknown,
-      message: string,
-      options: Record<string, unknown> = {},
-    ): unknown {
-      const state = stateOf(this);
-      const { onRotation: perCall, ...rest } = options as RotatableOptions &
-        Record<string, unknown>;
-      const callback = perCall === undefined ? state.onRotation : perCall;
+  if (state.rotations.length === 0) {
+    return super_.call(this, message, rest);
+  }
 
-      if (state.rotations.length === 0) {
-        return super_.call(this, message, rest);
-      }
+  const first = catchRotationError(() => super_.call(this, message, rest));
+  if (!first.error) return first.value;
 
-      const first = catchRotationError(() => super_.call(this, message, rest));
-      if (!first.error) return first.value;
+  for (const rotation of state.rotations) {
+    const rotated = catchRotationError(() => rotation.readMessage(message, rest));
+    if (!rotated.error) {
+      callback?.();
+      return rotated.value;
+    }
+  }
 
-      for (const rotation of state.rotations) {
-        const rotated = catchRotationError(() => rotation.readMessage(message, rest));
-        if (!rotated.error) {
-          callback?.();
-          return rotated.value;
-        }
-      }
-
-      throw first.error;
-    },
-  });
+  throw first.error;
 }
