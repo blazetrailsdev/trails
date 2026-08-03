@@ -30,11 +30,9 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   // arel/math.rb:5-41 — the arithmetic/bitwise mixin. Every operator has a
   // named counterpart on math.ts's `Math` mixin object, one per Ruby `def`:
   // `*`:5 `+`:9 `-`:13 `/`:17 `&`:21 `|`:25 `^`:29 `<<`:33 `>>`:37 `~@`:41.
-  // The spellings are verified, but math.ts ports the mixin as an object
-  // literal (`export const Math = {…}`), and the ORDER rule only reads
-  // top-level function declarations — so the bucket is reported as dropped
-  // until the rule learns to consume mixin objects. The pin is still the
-  // right data: it is what makes that drop visible instead of silent.
+  // math.ts ports the mixin as an object literal, which the ORDER rule (it
+  // reads top-level function declarations only) reports as a dropped bucket —
+  // the pin is what makes that drop visible rather than silent, so keep it.
   "Arel::Math": {
     "*": ["multiply"],
     "+": ["add"],

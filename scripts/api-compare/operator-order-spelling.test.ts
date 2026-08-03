@@ -57,10 +57,6 @@ describe("operatorSpelling", () => {
   });
 
   it("leaves module operators with no TS counterpart unmapped", () => {
-    // attribute_methods.rb:415/428, relation/delegation.rb:101 and
-    // core_ext/range/compare_range.rb:16 have no TS member in the container
-    // their bucket maps to, so they stay unmapped rather than being pinned to
-    // a spelling that does not exist (a pin would be dead weight).
     expect(operatorSpelling("ActiveRecord::AttributeMethods", "[]")).toBeUndefined();
     expect(operatorSpelling("ActiveRecord::AttributeMethods", "[]=")).toBeUndefined();
     expect(operatorSpelling("ActiveRecord::Delegation", "[]")).toBeUndefined();
