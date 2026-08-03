@@ -1,11 +1,9 @@
 import { getApp } from "./config.js";
 import { GID, validateApp, type GidComponents } from "./uri/gid.js";
-// TYPE-ONLY on purpose: `global-id` must stay a leaf of the
-// global-id ↔ signed-global-id ↔ locator cycle. `class SignedGlobalID extends
-// GlobalID` reads the `GlobalID` binding at class-body evaluation time, so any
-// runtime edge out of this module that loops back here would evaluate
-// signed-global-id while `GlobalID` is still in TDZ (native ESM throws
-// ReferenceError). `find` therefore reaches Locator through a dynamic import.
+// TYPE-ONLY on purpose: a runtime edge from here back into the
+// global-id ↔ signed-global-id ↔ locator cycle would evaluate
+// `class SignedGlobalID extends GlobalID` while `GlobalID` is still in TDZ.
+// `find` therefore reaches Locator through a dynamic import.
 import type { LocateOptions, LocatorModel } from "./locator.js";
 import { constantize } from "@blazetrails/activesupport";
 
@@ -38,20 +36,9 @@ export interface GlobalIDOptions {
   [key: string]: unknown;
 }
 
-/**
- * @internal Constructor shape behind the `new this(...)` in `create` / `parse`,
- * mirroring Ruby's polymorphic `new`: `SignedGlobalID.create` runs the
- * inherited `GlobalID.create` body and gets a SignedGlobalID back.
- */
-export type GlobalIDConstructor<T extends GlobalID, O extends GlobalIDOptions> = new (
-  gid: string | GID,
-  options?: O,
-) => T;
-
 export class GlobalID {
   readonly uri: string;
-  /** @internal Snapshot of the parsed `URI::GID`; Rails delegates to `@uri`. */
-  protected readonly _components: GidComponents;
+  private readonly _components: GidComponents;
 
   /** Mirrors: GlobalID#initialize(gid, options) */
   constructor(gid: string | GID, _options: GlobalIDOptions = {}) {
@@ -73,9 +60,13 @@ export class GlobalID {
     return this._components.params;
   }
 
-  /** Mirrors: GlobalID.create */
+  /**
+   * Mirrors: GlobalID.create — the `this` constructor type carries Ruby's
+   * polymorphic `new`, so `SignedGlobalID.create` runs this body and hands
+   * back a SignedGlobalID.
+   */
   static create<T extends GlobalID, O extends GlobalIDOptions>(
-    this: GlobalIDConstructor<T, O>,
+    this: new (gid: string | GID, options?: O) => T,
     model: GlobalIDModel,
     options?: O,
   ): T {
@@ -87,7 +78,7 @@ export class GlobalID {
       );
     }
     // Rails: `options.except(:app, :verifier, :for)` — every other key,
-    // including SignedGlobalID's :expires_in / :expires_at, becomes a URI param.
+    // including SignedGlobalID's expiration options, becomes a URI param.
     const { app: _a, verifier: _v, for: _f, ...rest } = opts;
     const filteredParams: Record<string, string> = {};
     for (const [k, v] of Object.entries(rest)) {
