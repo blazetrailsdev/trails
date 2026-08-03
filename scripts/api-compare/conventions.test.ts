@@ -249,6 +249,10 @@ describe("RUBY_FILE_TS_OVERRIDES", () => {
     expect(rubyFileTsOverride("inflector/inflections.rb", "activesupport")).toBeUndefined();
   });
 
+  it("pins the Integer core_ext bucket to the package barrel", () => {
+    expect(rubyFileTsOverride("core_ext/integer/inflections.rb", "activesupport")).toBe("index.ts");
+  });
+
   it("maps i18n's umbrella and interpolate files into packages/i18n/src", () => {
     // `lib/i18n.rb` is scanned one level above libPath, so the default rule
     // would place it at `../i18n.ts`, outside src. `interpolate/ruby.rb`
