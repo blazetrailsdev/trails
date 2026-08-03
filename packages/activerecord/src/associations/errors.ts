@@ -382,6 +382,12 @@ export class DeleteRestrictionError extends ActiveRecordError {
  * synchronous setter refuses and names the awaitable writer instead. Nested
  * assignments that displace nothing — a fresh association, an `id`-matched
  * update, a reused unsaved build — stay on the synchronous setter.
+ *
+ * @noRailsEquivalent Rails has no such error because `ship_attributes=` does
+ * the displacement inline; a JS property setter's value expression cannot be
+ * awaited by any caller syntax, so the write is unimplementable there and the
+ * refusal is the honest port. Sibling of `HasOnePersistedAssignmentError` /
+ * `CollectionPersistedAssignmentError` (RFC 0068 Design §2, §6).
  */
 export class NestedAttributesDisplacementError extends ActiveRecordError {
   readonly association: string;
