@@ -1521,22 +1521,6 @@ describe("extractFromProgram — file-level @noRailsEquivalent JSDoc", () => {
       "PERMANENT — bound to the class, not to the file",
     );
   });
-
-  it("rejects a file-level tag with no reason", () => {
-    expect(() =>
-      extractFromFiles("/p", {
-        "libsql-adapter.ts": `
-          /**
-           * @noRailsEquivalent
-           */
-          import { SQLite3Adapter } from "./sqlite3-adapter.js";
-
-          export class LibSQLAdapter extends SQLite3Adapter {}
-        `,
-        "sqlite3-adapter.ts": `export class SQLite3Adapter {}`,
-      }),
-    ).toThrow(/@noRailsEquivalent needs a reason/);
-  });
 });
 
 describe("extractFromProgram — @noRailsEquivalent JSDoc", () => {

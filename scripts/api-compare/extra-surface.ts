@@ -331,9 +331,7 @@ export interface FileTagRejection {
  * A file-level tag is a blanket by construction, so it is confined to the one
  * population where a blanket is sound: files no `.rb` maps onto AND whose extra
  * names appear nowhere in Rails-land. Member inheritance from a tagged CLASS is
- * refused for the same reason (see `collectTaggedEntries`) — a tagged container
- * usually has members that DO have Ruby counterparts, so inheriting there would
- * mask real drift.
+ * refused for the same reason (see `collectTaggedEntries`).
  *
  * `postgresql/schema-statements-class.ts` is the counterexample that fixes the
  * shape of this check: it has no counterpart `.rb`, yet its
@@ -341,9 +339,9 @@ export interface FileTagRejection {
  * `PostgreSQL::SchemaStatements` and ~80 of its names score `moved`. "No
  * counterpart FILE" is not the claim "no counterpart NAME", and `moved` — the
  * name exists in Rails, just in another `.rb` — is exactly the marker that a
- * rename may be owed. Refusing on either signal is a hard failure naming the
- * file, never a silent no-op: a blanket that quietly stops applying would leave
- * the surface it was absorbing uncounted.
+ * rename may be owed. Refusing is a hard failure naming the file, never a
+ * silent no-op: a blanket that quietly stopped applying would leave the surface
+ * it was absorbing uncounted.
  *
  * `extras` is the FULL scored set, `--novel-only` notwithstanding: a moved name
  * refutes the claim whether or not this run is reporting moved names.
@@ -1602,11 +1600,9 @@ export function gateFileTagRejections(rejections: readonly FileTagRejection[]): 
   );
   return (
     `\nextra-surface: ${rejections.length} file-level @noRailsEquivalent tag(s) claim a ` +
-    "file has no Rails counterpart, but the report finds one. A file-level tag is a " +
-    "blanket, so it is confined to files no `.rb` maps onto whose extra names appear " +
-    "nowhere in Rails-land; a `moved` name means the name DOES exist in Rails, just in " +
-    "another file — a rename may be owed, and the blanket would hide it. Tag the names " +
-    "individually, or converge them:\n" +
+    "file has no Rails counterpart, but the report finds one. A `moved` name means the " +
+    "name DOES exist in Rails, just in another file — a rename may be owed, and the " +
+    "blanket would hide it. Tag the names individually, or converge them:\n" +
     lines.join("\n") +
     "\n"
   );
