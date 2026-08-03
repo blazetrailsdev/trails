@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  collectMarkdownFiles,
+  extractMarkdownStoryReferences,
   extractStoryReferences,
   loadStories,
   scanStoryReferences,
@@ -104,11 +106,42 @@ describe("stale story references", () => {
     ).toEqual([]);
   });
 
+  it("flags a pending citation in markdown prose", () => {
+    const refs = extractMarkdownStoryReferences(
+      "Trails drops the subsecond part; the encoder is converged by\n`activesupport-json-encoding-time-precision`.\n",
+      "docs/activesupport.md",
+    );
+    expect(staleStoryReferences(refs, STORIES)).toHaveLength(1);
+  });
+
+  it("ends a markdown block at a blank line", () => {
+    const refs = extractMarkdownStoryReferences(
+      "The encoder is converged by a later phase.\n\n`activesupport-json-encoding-time-precision` is the story id.\n",
+      "docs/activesupport.md",
+    );
+    expect(refs).toEqual([]);
+  });
+
+  it("ignores a promise quoted inside a fenced code block", () => {
+    const refs = extractMarkdownStoryReferences(
+      "Example:\n\n```ts\n// Converged by `cache-entry-remaining-methods`.\n```\n",
+      "docs/index.md",
+    );
+    expect(refs).toEqual([]);
+  });
+
+  it("scans no markdown outside the trails tree", async () => {
+    const files = await collectMarkdownFiles(REPO_ROOT);
+    expect(files).toContain(path.join("docs", "index.md"));
+    expect(files.filter((file) => file.startsWith(`tasks${path.sep}`))).toEqual([]);
+    expect(files.filter((file) => file.startsWith(path.join("docs", "activerecord")))).toEqual([]);
+  });
+
   // The tasks repo is public and checked out into `tasks/` by the Unit Tests
   // job, so this gate compares the tree against real story statuses there as
   // well as in every agent worktree (start-worktree.sh symlinks the same path).
   // loadStories throws rather than skipping when that checkout is missing.
-  it("no comment in the tree names a story that has already landed", async () => {
+  it("no comment or markdown paragraph in the tree names a story that has already landed", async () => {
     const stories = await loadStories(resolveTasksDir(REPO_ROOT));
     const stale = staleStoryReferences(await scanStoryReferences(REPO_ROOT), stories);
     expect(stale.map((ref) => `${ref.file}:${ref.line} ${ref.slug}`)).toEqual([]);

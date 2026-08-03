@@ -279,8 +279,9 @@ catches a class of drift a reviewer would otherwise spend a cycle on.
 
    **Converged something?** The wide baseline is **only-shrink**: fixing a real
    divergence makes its baseline row stale and turns the gate red. Delete that
-   one row by hand. Do **not** `--write`/reseed — a reseed reorders and re-emits
-   entries for untouched packages and produces an unreviewable diff.
+   one row by hand. Do **not** `--write`/reseed — a reseed rewrites the whole
+   exclude tree and buries the one row you meant to retire in an unreviewable
+   diff.
 
 3. **Did you add any public TS name?** `pnpm api:extra --package <pkg>` — it
    lists every public TS method, getter, class, and top-level function in a

@@ -110,9 +110,12 @@ entry stale and turns the gate red — e.g. #5027 added the `String` arm to
 and made the baselined "omits quote_column_name" entry stale. **The fix is to
 delete the now-stale entry from the `call-mismatches-wide-exclude/` baseline,
 NOT to `--write`/reseed.** Reseeding (`pnpm api:calls:wide:reseed` /
-`lint-call-mismatches-wide.ts --write`) reorders and re-emits entries for
-untouched packages, producing an unreviewable diff — this churn hazard is
-tracked in the `wide-calls-exclude-reseed-reorders-untouched-packages` story.
+`lint-call-mismatches-wide.ts --write`) rewrites the whole
+`call-mismatches-wide-exclude/` tree, so it buries the one entry you meant to
+retire in a diff nobody can review; the hand deletion is the whole change. (The
+cross-package reordering that used to make this worse is fixed — #5183 pinned
+emission to the code-unit `compareKeys` order, so a reseed now leaves untouched
+packages byte-identical.)
 
 Any PR that converges a visitor or method body toward Rails can trip this, so
 run the wide ratchet locally whenever you change a ported method body.
