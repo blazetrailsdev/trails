@@ -7,7 +7,7 @@
  * (`:en`) via `inspectSymbol`; everything else goes through `inspect`.
  */
 
-import { normalizeKeys } from "./i18n.js";
+import { EMPTY_HASH, normalizeKeys } from "./i18n.js";
 import type { Locale, TranslationKey } from "./i18n.js";
 
 function inspect(value: unknown): string {
@@ -97,7 +97,11 @@ export class Base extends ArgumentError {
   readonly options: MissingTranslationOptions;
   private keysCache?: TranslationKey[];
 
-  constructor(locale: Locale, key: TranslationKey, options: MissingTranslationOptions = {}) {
+  constructor(
+    locale: Locale,
+    key: TranslationKey,
+    options: MissingTranslationOptions = EMPTY_HASH,
+  ) {
     super();
     this.name = "MissingTranslation";
     this.locale = locale;
@@ -150,7 +154,11 @@ export class MissingTranslation extends Base {
 }
 
 export class MissingTranslationData extends Base {
-  constructor(locale: Locale, key: TranslationKey, options: MissingTranslationOptions = {}) {
+  constructor(
+    locale: Locale,
+    key: TranslationKey,
+    options: MissingTranslationOptions = EMPTY_HASH,
+  ) {
     super(locale, key, options);
     this.name = "MissingTranslationData";
   }
