@@ -188,8 +188,7 @@ async function killConnectionFromServer(
 // optimistic and only reflects an adapter-initiated disconnect
 // (postgresql-adapter.ts:2523 documents that it cannot run this async ping), so
 // the remote-disconnect cases drive the probe directly here. The raw ping has
-// no adapter-state side effects (unlike `activeAsync()`), matching Rails'
-// pure `active?` check.
+// no adapter-state side effects, matching Rails' pure `active?` check.
 async function activePredicate(conn: DatabaseAdapter): Promise<boolean> {
   if (adapterType === "postgres") {
     const raw = (
@@ -218,7 +217,7 @@ async function activePredicate(conn: DatabaseAdapter): Promise<boolean> {
     }
   }
   // SQLite (not reached: remote-disconnect cases are gated on remoteSupported).
-  return conn.active;
+  return conn.active();
 }
 
 // Faithful port of Rails' AdapterTest (adapter_test.rb). Rides the canonical
@@ -789,14 +788,14 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
 
   let connection: DatabaseAdapter;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     connection = Base.connection;
-    expect(connection.active).toBe(true);
+    expect(await connection.active()).toBe(true);
   });
 
   afterEach(async () => {
     await connection.reconnectBang();
-    expect(connection.active).toBe(true);
+    expect(await connection.active()).toBe(true);
     expect(connection.isTransactionOpen()).toBe(false);
     expect(await rawTransactionOpen(connection)).toBe(false);
   });
@@ -817,7 +816,7 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
     connection.disconnectBang();
     expect(await activePredicate(connection)).toBe(false);
     await connection.reconnectBang();
-    expect(connection.active).toBe(true);
+    expect(await connection.active()).toBe(true);
   });
 
   it("materialized transaction state is reset after a reconnect", async () => {
@@ -887,13 +886,13 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
   it.skipIf(!remoteSupported)("verify! restores after remote disconnection", async () => {
     await remoteDisconnect(connection);
     await connection.verifyBang();
-    expect(connection.active).toBe(true);
+    expect(await connection.active()).toBe(true);
   });
 
   it.skipIf(!remoteSupported)("reconnect! restores after remote disconnection", async () => {
     await remoteDisconnect(connection);
     await connection.reconnectBang();
-    expect(connection.active).toBe(true);
+    expect(await connection.active()).toBe(true);
   });
 
   it.skipIf(!remoteSupported)(
@@ -915,7 +914,7 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
       // querying.
       await Post.deleteAll();
 
-      expect(connection.active).toBe(true);
+      expect(await connection.active()).toBe(true);
     },
   );
 
@@ -953,7 +952,7 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
 
       await Post.deleteAll();
 
-      expect(connection.active).toBe(true);
+      expect(await connection.active()).toBe(true);
     },
   );
 
@@ -969,7 +968,7 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
       ).rejects.toBeInstanceOf(ConnectionFailed);
 
       expect(await Post.first()).toBeTruthy(); // Verifying causes a reconnect and the query succeeds
-      expect(connection.active).toBe(true);
+      expect(await connection.active()).toBe(true);
     },
   );
 
@@ -981,12 +980,12 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
       await remoteDisconnect(connection);
 
       expect(await Post.first()).toBeTruthy();
-      expect(connection.active).toBe(true);
+      expect(await connection.active()).toBe(true);
 
       await remoteDisconnect(connection);
 
       expect(await Post.where({ id: [1, 2] }).first()).toBeTruthy();
-      expect(connection.active).toBe(true);
+      expect(await connection.active()).toBe(true);
     },
   );
 
@@ -998,12 +997,12 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
       await remoteDisconnect(connection);
 
       expect(await Post.find(1)).toBeTruthy();
-      expect(connection.active).toBe(true);
+      expect(await connection.active()).toBe(true);
 
       await remoteDisconnect(connection);
 
       expect(await Post.findBy({ title: "Welcome to the weblog" })).toBeTruthy();
-      expect(connection.active).toBe(true);
+      expect(await connection.active()).toBe(true);
     },
   );
 
@@ -1054,13 +1053,13 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
     await Post.transaction(async () => {
       await Post.count();
     });
-    expect(connection.active).toBe(true);
+    expect(await connection.active()).toBe(true);
   });
 
   // Runs on every remote-capable adapter (PG + MySQL/MariaDB). #4935 closed the
   // two MySQL divergences that used to gate this to PG: (1) Mysql2Adapter now
   // overrides `verifyBang` to probe with a real `active?`-style ping
-  // (`activeAsync`) so it detects the server-side kill and reconnects, and
+  // (`active()`) so it detects the server-side kill and reconnects, and
   // (2) `isMysql2ConnectionError` now maps the mysql2 driver's "Can't add new
   // command when connection is in closed state" to `ConnectionFailed`.
   it.skipIf(!remoteSupported)(

@@ -6,14 +6,14 @@ import { ConnectionNotDefined } from "./errors.js";
 class TestRecord extends Base {}
 
 describe("TestUnconnectedAdapter", () => {
-  let underlying: { active: boolean };
+  let underlying: { active(): Promise<boolean> };
   // Rails' `remove_connection` hands back the db_config the pool was opened
   // from, and teardown re-establishes it — the ambient `arunit` connection is
   // never named or rebuilt by hand here.
   let connectionName: DatabaseConfig | undefined;
 
   beforeEach(async () => {
-    underlying = (await Base.leaseConnection()) as unknown as { active: boolean };
+    underlying = (await Base.leaseConnection()) as unknown as { active(): Promise<boolean> };
     connectionName = Base.removeConnection();
   });
 
@@ -35,7 +35,7 @@ describe("TestUnconnectedAdapter", () => {
     expect((err as ConnectionNotDefined).message).toBe("No database connection defined.");
   });
 
-  it("underlying adapter no longer active", () => {
-    expect(underlying.active).toBe(false);
+  it("underlying adapter no longer active", async () => {
+    expect(await underlying.active()).toBe(false);
   });
 });

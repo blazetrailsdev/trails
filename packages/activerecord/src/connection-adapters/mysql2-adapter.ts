@@ -139,49 +139,19 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     m.registerType(/^set/i, Type.lookup("string", { adapter: "mysql" }));
   }
 
-  // Cached liveness state — true until a failure is observed (ping fail,
-  // disconnect, permanent close). Set false by disconnectBang(); restored to
-  // true by reconnectBang() and by successful activeAsync().
-  private _activeState = true;
-
   // Mirrors Rails' Mysql2Adapter#active? (mysql2_adapter.rb:108), whose body is
   // `if connected? ... @raw_connection&.ping ... end || false` — it *calls*
   // `connected?` rather than re-deriving the guard, so this delegates to
-  // `isConnected()` (trails' `connected?`) the same way. The sync getter can't
-  // do the live `ping` half of Rails' active? (that's activeAsync);
-  // `_activeState` is the cached liveness that ping updates, and it is the
-  // second term here rather than inside `connected?`.
-  override get active(): boolean {
-    return this.isConnected() && this._activeState;
-  }
-
-  /**
-   * Async liveness probe — checks socket health via a real `ping` call on the
-   * persistent connection, lazily establishing it if needed. Updates the cached
-   * `_activeState` so the sync `active` getter reflects the result.
-   *
-   * @noRailsEquivalent CONVERGEABLE — this is the async half of Rails' `active?`
-   * (mysql2_adapter.rb:108), which pings the raw connection inline
-   * (`@raw_connection&.ping`) because the Ruby mysql2 driver is blocking. The
-   * node-mysql2 `ping()` returns a promise, so the ping cannot happen inside a
-   * sync predicate. Folding this back onto the Rails name `active` — accepting
-   * `Promise<boolean>` as the documented divergence, per the ConnectionPool
-   * `*Async`-twin precedent — is scoped as
-   * `converge-adapter-active-predicate-to-async` (RFC 0072): it touches 7
-   * `get active()` declarations and ~88 call sites.
-   */
-  async activeAsync(): Promise<boolean> {
-    if (this._permanentlyClosed || this._isFakeConnection) {
-      this._activeState = false;
-      return false;
-    }
+  // `isConnected()` (trails' `connected?`) the same way. node-mysql2's `ping()`
+  // returns a promise, which is why the predicate is awaitable here where
+  // Rails' is not.
+  override async active(): Promise<boolean> {
+    if (!this.isConnected()) return false;
     try {
       const conn = await this._ensureClient();
       await conn.ping();
-      this._activeState = true;
       return true;
     } catch {
-      this._activeState = false;
       return false;
     }
   }
@@ -190,32 +160,12 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   // @raw_connection.closed?)` (mysql2_adapter.rb:104). `_client` is trails'
   // `@raw_connection`, so a never-connected / disconnected adapter (`_client
   // === null`) reports NOT connected. This also matches the base adapter's
-  // `isConnected()` (`_connection !== null`). The cached ping result
-  // (`_activeState`) is deliberately NOT a term here: Rails' `connected?` asks
-  // only about the handle, and `active?` is `connected?` PLUS a live ping — so a
-  // failed ping leaves `connected?` true while `active?` goes false.
+  // `isConnected()` (`_connection !== null`). The ping result is deliberately
+  // NOT a term here: Rails' `connected?` asks only about the handle, and
+  // `active?` is `connected?` PLUS a live ping — so a failed ping leaves
+  // `connected?` true while `active?` goes false.
   override isConnected(): boolean {
     return this._client !== null && !this._permanentlyClosed && !this._isFakeConnection;
-  }
-
-  // Mirrors Rails' `verify!` (abstract_adapter.rb:759), which decides whether to
-  // reconnect by calling `active?` — a real `mysql_ping` on the raw connection.
-  // trails' sync `active` getter is optimistic (it reports the cached
-  // `_activeState`, unchanged by a remote disconnect the adapter hasn't yet
-  // observed), so the inherited base `verifyBang` — which gates on that sync
-  // getter — would no-op on a socket the server has already severed
-  // (`wait_timeout`, server-side `KILL`). Probe with the async ping first
-  // (`activeAsync`, the analogue of Rails' `active?`) so the cached state
-  // reflects reality, then delegate to the inherited flow: base `verifyBang`
-  // now sees `active === false` and drives `reconnectBang({ restoreTransactions:
-  // true })` (or the `_unconfiguredConnection` promotion for the fake-connection
-  // stash). A never-connected/fake/closed adapter skips the ping and flows
-  // straight through the base logic, exactly as before.
-  override async verifyBang(): Promise<void> {
-    if (this.isConnected()) {
-      await this.activeAsync();
-    }
-    await super.verifyBang();
   }
 
   // Single persistent connection — mirrors Rails' @raw_connection. Unified onto
@@ -460,7 +410,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       this._acceptDeprecatedRawConnection(config, deprecatedConfig);
       this._poolConfig = { flags: ["FOUND_ROWS"] };
       this._isFakeConnection = true;
-      this._activeState = false;
       return;
     }
     // Mirrors abstract_adapter.rb:135 — a config hash must be the only argument.
@@ -608,7 +557,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     // constructor path: `new Mysql2Adapter(fake_conn, logger, nil, config)`).
     if (fake) {
       this._isFakeConnection = true;
-      this._activeState = false;
     }
     // Connection is created lazily on first _ensureClient() call.
   }
@@ -820,7 +768,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         // on every withRawConnection call.
         this._client = conn;
         this._statementPool = null;
-        this._activeState = true;
         // Configure the freshly-opened socket exactly as Rails does on every
         // fresh connect (attempt_configure_connection via connect!/reconnect!).
         // trails' connectBang opens the raw socket directly (bypassing verify!),
@@ -848,7 +795,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       },
       (err) => {
         if (this._connectingPromiseGen === gen) this._connectingPromise = null;
-        this._activeState = false;
         // Mirrors Rails' Mysql2Adapter#connect: `rescue ConnectionNotEstablished
         // => ex; raise ex.set_pool(@pool)`. Attach the originating pool (a
         // NullPool for a standalone adapter) so `error.connection_pool` is set
@@ -1597,7 +1543,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    */
   override async reconnect(): Promise<void> {
     if (this._permanentlyClosed) throw new Error("Mysql2Adapter: client is permanently closed");
-    this._activeState = false;
     this._connectGeneration++;
     // Mirror Rails' private `Mysql2Adapter#reconnect` (mysql2_adapter.rb:150):
     // `@raw_connection&.close; @raw_connection = nil; connect`. Crucially it does
@@ -1609,7 +1554,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     // here — only the raw-handle teardown. `_closeRawHandle` ends the live
     // socket then nulls `_client`, which nulls the unified base `_connection`.
     this._closeRawHandle();
-    this._activeState = true;
     // Re-establish the connection eagerly and PROPAGATE any connect failure —
     // Rails' private `reconnect` calls `connect` synchronously, so a dead socket
     // raises out of `reconnect!` (mysql2_adapter.rb:150 → :144). Awaiting here
@@ -1626,7 +1570,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    * Mirrors Rails' `Mysql2Adapter#disconnect!`.
    */
   override disconnectBang(): void {
-    this._activeState = false;
     // Advance generation — _ensureClient() will bypass the stale
     // _connectingPromise (gen mismatch) and start a fresh attempt, while
     // close() can still await the old promise for clean teardown.
@@ -1673,7 +1616,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    * `client.end()`, which would actively close it.
    */
   override discardBang(): void {
-    this._activeState = false;
     // If a connect is in flight, record its generation so that when it
     // resolves into the gen-mismatch branch it abandons the socket instead
     // of end()ing it (Rails discard! must not communicate with the server).
@@ -1759,7 +1701,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       throw new Error(
         this._permanentlyClosed
           ? "Mysql2Adapter: connection is permanently closed"
-          : "Mysql2Adapter: connection not yet established — call execute() or await activeAsync() first",
+          : "Mysql2Adapter: connection not yet established — call execute() or await active() first",
       );
     }
     return this._client;

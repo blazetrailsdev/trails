@@ -1342,7 +1342,7 @@ describe.skipIf(inMemoryDb())("TransactionTest", () => {
       throw new Rollback();
     });
 
-    expect(connection.active).toBe(false);
+    expect(await connection.active()).toBe(false);
     expect(pool.connections.includes(connection)).toBe(false);
   });
 
@@ -1389,7 +1389,7 @@ describe.skipIf(inMemoryDb())("TransactionTest", () => {
       }),
     ).rejects.toThrow("rollback failed");
 
-    expect(connection.active).toBe(false);
+    expect(await connection.active()).toBe(false);
     expect(pool.connections.includes(connection)).toBe(false);
     expect((await topic.reload()).title).toBe("The Fifth Topic of the day");
   });
@@ -1404,7 +1404,7 @@ describe.skipIf(inMemoryDb())("TransactionTest", () => {
 
     await expect(Topic.transaction(async () => {})).rejects.toThrow("begin failed");
 
-    expect(connection.active).toBe(false);
+    expect(await connection.active()).toBe(false);
     expect(pool.connections.includes(connection)).toBe(false);
   });
 

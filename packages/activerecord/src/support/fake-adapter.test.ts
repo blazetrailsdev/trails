@@ -43,7 +43,7 @@ describe("FakeActiveRecordAdapter", () => {
   it("data_source_exists? and active? are always true", async () => {
     const adapter = new FakeActiveRecordAdapter();
     expect(await adapter.dataSourceExists()).toBe(true);
-    expect(adapter.active).toBe(true);
+    expect(await adapter.active()).toBe(true);
   });
 
   it("shares the synthetic column list across instances", () => {

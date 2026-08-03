@@ -618,7 +618,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
       await this.update("SET FOREIGN_KEY_CHECKS = 0");
       await fn();
     } finally {
-      if (this.active) await this.update(`SET FOREIGN_KEY_CHECKS = ${old}`);
+      if (await this.active()) await this.update(`SET FOREIGN_KEY_CHECKS = ${old}`);
     }
   }
 

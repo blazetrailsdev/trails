@@ -54,7 +54,7 @@ export class FakeActiveRecordAdapter extends AbstractAdapter {
     return true;
   }
 
-  get active(): boolean {
+  async active(): Promise<boolean> {
     return true;
   }
 

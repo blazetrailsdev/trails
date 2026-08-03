@@ -41,7 +41,7 @@ class LifecycleTestAdapter extends AbstractAdapter {
     this._connected = false;
   }
 
-  override get active(): boolean {
+  override async active(): Promise<boolean> {
     return this._connected;
   }
 

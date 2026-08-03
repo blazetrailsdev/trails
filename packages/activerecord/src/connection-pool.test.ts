@@ -67,7 +67,7 @@ class TransactionAwareTestAdapter extends AbstractAdapter implements DatabaseAda
   // active and verify! returns without reconnecting). Backed by a mutable
   // field so a test can simulate the connection dying mid-session.
   activeFlag = true;
-  override get active(): boolean {
+  override async active(): Promise<boolean> {
     return this.activeFlag;
   }
   readonly inTransaction = false;
@@ -562,7 +562,7 @@ it("subsequent pinned checkout verifies and reconnects a connection that died mi
   expect(again).toBe(conn);
   expect(verify).toHaveBeenCalledTimes(2);
   expect(reconnect).toHaveBeenCalledWith({ restoreTransactions: true });
-  expect(again.active).toBe(true);
+  expect(await again.active()).toBe(true);
 
   verify.mockRestore();
   reconnect.mockRestore();

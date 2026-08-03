@@ -301,7 +301,7 @@ export type TransactionConnection = DatabaseAdapter & {
   supportsLazyTransactions?(): boolean;
   supportsRestartDbTransaction?(): boolean;
   addTransactionRecord?(record: unknown): void;
-  active?: boolean;
+  active?(): boolean | Promise<boolean>;
   currentTransaction?(): Transaction | NullTransaction;
   throwAwayBang?(): void;
 };
@@ -819,7 +819,7 @@ export class SavepointTransaction extends Transaction {
   override async rollback(): Promise<void> {
     if (!this.state.isInvalidated()) {
       const conn = this.connection;
-      if (this.isMaterialized() && conn.active !== false) {
+      if (this.isMaterialized() && (await conn.active?.()) !== false) {
         await conn.rollbackToSavepoint(this.savepointName);
       }
     }

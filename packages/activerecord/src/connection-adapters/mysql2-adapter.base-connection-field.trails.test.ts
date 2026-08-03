@@ -37,7 +37,7 @@ describe("Mysql2Adapter base _connection field", () => {
     await adapter.connectBang();
     expect(connectionOf(adapter)).not.toBeNull();
     expect(adapter.isConnected()).toBe(true);
-    expect(adapter.active).toBe(true);
+    expect(await adapter.active()).toBe(true);
   });
 
   it("nulls _connection on disconnectBang and repopulates it on the next connect", async () => {

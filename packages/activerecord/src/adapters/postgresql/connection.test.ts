@@ -267,10 +267,10 @@ describeIfPg("PostgresqlConnectionTest", () => {
     await a.execute("SELECT 1");
     const conn = a._rawConnectionForTest();
     try {
-      expect(a.active).toBe(true);
+      expect(await a.active()).toBe(true);
       expect(a.isConnected()).toBe(true);
       a.disconnectBang();
-      expect(a.active).toBe(false);
+      expect(await a.active()).toBe(false);
       expect(a.isConnected()).toBe(false);
     } finally {
       // disconnectBang fires conn.end() fire-and-forget; await it here
@@ -290,9 +290,9 @@ describeIfPg("PostgresqlConnectionTest", () => {
     const socket = (conn as unknown as { connection?: { stream?: { destroy?: () => void } } })
       ?.connection?.stream;
     try {
-      expect(a.active).toBe(true);
+      expect(await a.active()).toBe(true);
       a.discardBang();
-      expect(a.active).toBe(false);
+      expect(await a.active()).toBe(false);
       expect(a.isConnected()).toBe(false);
       // Rails' discard! abandons the fd WITHOUT closing it (socket_io.reopen
       // (IO::NULL)); it must never communicate with the server. end() would
@@ -307,7 +307,7 @@ describeIfPg("PostgresqlConnectionTest", () => {
     const a = new PostgreSQLAdapter(PG_TEST_URL);
     try {
       await a.reconnect();
-      expect(a.active).toBe(true);
+      expect(await a.active()).toBe(true);
       const rows = await a.execute("SELECT 1 AS n");
       expect(rows[0]?.n).toBe(1);
     } finally {
@@ -319,9 +319,9 @@ describeIfPg("PostgresqlConnectionTest", () => {
     const a = new PostgreSQLAdapter(PG_TEST_URL);
     try {
       a.disconnectBang();
-      expect(a.active).toBe(false);
+      expect(await a.active()).toBe(false);
       await a.reconnect();
-      expect(a.active).toBe(true);
+      expect(await a.active()).toBe(true);
       const rows = await a.execute("SELECT 2 AS n");
       expect(rows[0]?.n).toBe(2);
     } finally {

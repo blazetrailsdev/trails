@@ -1101,7 +1101,11 @@ export class AbstractAdapter implements Quoting {
     this._preparedStatements = value && !ActiveRecord.disablePreparedStatements;
   }
 
-  get active(): boolean {
+  // Mirrors Rails' `active?` (abstract_adapter.rb). A method rather than a
+  // getter: PG/MySQL override it with a live probe (`query ";"` / `ping`) that
+  // can only be awaited, and a getter returning a Promise would let
+  // `if (adapter.active)` silently pass on every call site.
+  async active(): Promise<boolean> {
     return this._connection !== null;
   }
 
@@ -1322,7 +1326,7 @@ export class AbstractAdapter implements Quoting {
   }
 
   async verifyBang(): Promise<void> {
-    if (!this.active) {
+    if (!(await this.active())) {
       // Mirrors Rails' `verify!` (abstract_adapter.rb): an unconfigured raw
       // connection (opened by the pool but never run through
       // configure_connection) is promoted here rather than reconnected. If

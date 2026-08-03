@@ -285,7 +285,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    * the handle is fully torn down. Sync drivers (better-sqlite3) leave this null.
    */
   private _closingDriver: Promise<void> | null = null;
-  override get active(): boolean {
+  override async active(): Promise<boolean> {
     return this.driver?.isOpen() ?? false;
   }
   /**
@@ -1404,7 +1404,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    * @internal
    */
   override async reconnect(): Promise<void> {
-    if (this.active) {
+    if (await this.active()) {
       // Mirrors `@raw_connection.rollback rescue nil` — a ROLLBACK with no
       // active transaction raises, which we swallow like Rails does.
       try {
