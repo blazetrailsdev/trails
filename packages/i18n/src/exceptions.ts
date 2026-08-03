@@ -2,11 +2,12 @@
  * Mirrors: i18n/lib/i18n/exceptions.rb
  *
  * Ruby Symbols have no JS analogue, so every symbol-typed value here (locale,
- * translation key, interpolation key) is a plain string. A value whose Ruby
- * type is what a message's `#inspect` turns on keeps the Symbol's leading
- * colon in that string (`":bar"`), so `inspect` renders it as Ruby does and
- * the String arm — `"bar"` — stays reachable. Where the Symbol spelling is not
- * carried, `inspectSymbol` puts the colon back.
+ * translation key, interpolation key) is a plain string. A Symbol whose
+ * message renders it through `#inspect` alongside a String keeps the leading
+ * colon in that string (`":bar"`), so `inspectSymbolOrString` can tell the two
+ * apart the way Ruby's types do; `inspect` itself stays Ruby's `Object#inspect`
+ * and quotes every String. Where the Symbol spelling is not carried,
+ * `inspectSymbol` puts the colon back.
  */
 
 import { EMPTY_HASH, normalizeKeys } from "./i18n.js";
@@ -15,7 +16,7 @@ import type { Locale, TranslationKey } from "./i18n.js";
 /** @internal Ruby `Object#inspect`, as far as the values reaching this file go. */
 export function inspect(value: unknown): string {
   if (value === null || value === undefined) return "nil";
-  if (typeof value === "string") return value.startsWith(":") ? value : JSON.stringify(value);
+  if (typeof value === "string") return JSON.stringify(value);
   if (typeof value === "function") return "#<Proc>";
   if (Array.isArray(value)) return `[${value.map(inspect).join(", ")}]`;
   if (typeof value === "object") {
@@ -29,6 +30,15 @@ export function inspect(value: unknown): string {
 
 function inspectSymbol(value: unknown): string {
   return typeof value === "string" ? `:${value}` : inspect(value);
+}
+
+/**
+ * `#inspect` for a value Rails types as `Symbol | String`, where the two
+ * render differently (`:bar` against `"key"`). The Symbol arm is the string
+ * carrying the Symbol's leading colon, which is what Ruby gets from the type.
+ */
+function inspectSymbolOrString(value: string): string {
+  return value.startsWith(":") ? value : inspect(value);
 }
 
 /**
@@ -190,7 +200,7 @@ export class MissingInterpolationArgument extends ArgumentError {
 
   constructor(key: string, values: Record<string, unknown>, string: string) {
     super(
-      `missing interpolation argument ${inspect(key)} in ${inspect(string)} (${inspect(values)} given)`,
+      `missing interpolation argument ${inspectSymbolOrString(key)} in ${inspect(string)} (${inspect(values)} given)`,
     );
     this.name = "MissingInterpolationArgument";
     this.key = key;
@@ -204,7 +214,7 @@ export class ReservedInterpolationKey extends ArgumentError {
   readonly string: string;
 
   constructor(key: string, string: string) {
-    super(`reserved key ${inspect(key)} used in ${inspect(string)}`);
+    super(`reserved key ${inspectSymbolOrString(key)} used in ${inspect(string)}`);
     this.name = "ReservedInterpolationKey";
     this.key = key;
     this.string = string;
