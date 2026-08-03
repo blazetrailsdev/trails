@@ -313,351 +313,103 @@ function scopeForCreate(assoc: SingularAssociation): Record<string, unknown> {
 }
 
 /**
- * Load a belongs_to association's target.
+ * belongs_to's cached-target read. Unlike has_one it validates `inverse_of`
+ * even on a cached hit, and honors `stale_target?` so a reassigned foreign key
+ * re-queries.
  *
- * Mirrors: ActiveRecord::Associations::SingularAssociation#find_target
- * (`singular_association.rb:47`), as specialized for belongs_to by
- * `BelongsToAssociation#find_target?` (`belongs_to_association.rb:124`) —
- * the reachability gate is `_findTargetReachable(..., "belongsTo")` below.
- *
- * It lives here rather than in `belongs-to-association.ts` because
- * `belongs_to_association.rb` defines no `find_target` of its own: Rails
- * inherits the singular one and specializes only the `find_target?` predicate.
- * Putting the loader under the belongs_to file would name a method Rails does
- * not declare there.
+ * Rails has no counterpart: it caches the target on the association instance,
+ * so `find_target` is only ever reached on a miss.
  *
  * @internal
  */
-async function _findBelongsToTarget(
+function _belongsToCachedHit(
   record: Base,
   assocName: string,
   options: AssociationOptions,
-): Promise<Base | null> {
-  // Rails runs `reflection.check_validity!` in `Association#initialize`
-  // (now mirrored in the `Association` constructor via
-  // `validateReflectionValidity`), so a recursive/missing `inverse_of` already
-  // surfaced at first access. No load-path recursion shim is needed here.
-
-  // Check cached (inverse_of) first, then preloaded.
-  // Even for cached/preloaded hits, wire inverseOf so the parent's association
-  // cache points back to this child instance (mirrors Rails behavior).
-  // For non-polymorphic associations, validate inverseOf before checking whether
-  // the value is null: an invalid name must throw even when the cached value is
-  // null (e.g. preloader stored null for a missing row), consistent with the
-  // cache-miss path that validates before the FK/null short-circuit.
-  // Read the loaded target off the singular holder (Rails' @target), with the
-  // legacy mirror + preload fallback for direct-loader calls on undeclared
-  // names. A loaded-nil target (null) is distinguished from "not loaded".
+): { hit: boolean; value: Base | null } {
   const loaded = _loadedSingularTarget(record, assocName);
-  if (loaded) {
-    const cached = loaded.value;
-    if (options.inverseOf && !options.polymorphic) {
-      // Resolve target class from instance if available, otherwise from options.
-      const targetModel =
-        (cached?.constructor as typeof Base | undefined) ??
-        resolveAssocClass(record, assocName, options.className ?? camelize(assocName));
-      validateInverseOf(targetModel, assocName, options.inverseOf);
-    }
-    if (cached) {
-      // Honor staleness (Rails' `stale_target?`): if the owner's FK changed so
-      // it no longer points at the cached target, the cache is stale — fall
-      // through to re-query. `_cacheSingularTarget` routes singular inverse
-      // writes through `inversedFrom` (→ `replace_keys` → `loadedBang`), so the
-      // holder's `isStaleTarget()` snapshot is now authoritative.
-      const holder = record._associationInstances.get(assocName) as
-        | { isStaleTarget?: () => boolean }
-        | undefined;
-      const stale = typeof holder?.isStaleTarget === "function" && holder.isStaleTarget();
-      if (!stale) {
-        const inverseName = _resolveInverseName(
-          record.constructor as typeof Base,
-          assocName,
-          options,
-        );
-        if (inverseName) _wireInverseAssociation(record, cached, inverseName);
-        return cached;
-      }
-    } else {
-      return cached;
-    }
-  }
+  if (!loaded) return { hit: false, value: null };
+  const cached = loaded.value;
 
-  // Strict loading check: this is a lazy load. Gated by `find_target?` — a
-  // new-record owner without the FK present never reaches `find_target` and so
-  // never raises (it falls through to the null-FK short-circuit below).
-  if (
-    _violatesStrictLoading(record, options) &&
-    _findTargetReachable(record, assocName, options, "belongsTo")
-  ) {
-    strictLoadingViolationBang(record, assocName, {
-      polymorphic: options.polymorphic,
-      className: options.className,
-    });
-  }
-
-  const ctor = record.constructor as typeof Base;
-  const reflection = ctor._reflectOnAssociation?.(assocName);
-  if (!reflection) throw new AssociationNotFoundError(record, assocName);
-
-  // Polymorphic: use the _type column to determine the target model
-  let targetModel: typeof Base;
-  if (options.polymorphic) {
-    const typeCol = options.foreignType ?? `${underscore(assocName)}_type`;
-    const typeName = record._readAttribute(typeCol) as string | null;
-    if (!typeName) return null;
-    // Rails resolves a polymorphic belongs_to's target via the owner class's
-    // polymorphic_class_for, which honors store_full_class_name and (when off)
-    // namespace-relative compute_type — not a bare global registry lookup.
-    targetModel = ctor.polymorphicClassFor(typeName);
-  } else {
-    const className = options.className ?? camelize(assocName);
-    targetModel = resolveAssocClass(record, assocName, className);
-  }
-
+  // Validate inverseOf before the null check: an invalid name must throw even
+  // when the cached value is null (e.g. the preloader stored null for a missing
+  // row), consistent with the cache-miss path.
   if (options.inverseOf && !options.polymorphic) {
+    const targetModel =
+      (cached?.constructor as typeof Base | undefined) ??
+      resolveAssocClass(record, assocName, options.className ?? camelize(assocName));
     validateInverseOf(targetModel, assocName, options.inverseOf);
   }
+  if (!cached) return { hit: true, value: null };
 
-  // For polymorphic belongsTo, AssociationScope receives the
-  // runtime-resolved klass; the reflection's own joinPrimaryKey
-  // returns associationPrimaryKey (target's PK) and joinForeignKey
-  // returns the owner-side FK, so the WHERE shape is identical to
-  // the non-polymorphic case.
-  // Null-FK short-circuit: avoid a query when owner's FK column is null.
-  // The check must read the SAME columns the eventual query uses —
-  // reflection.joinForeignKey. Reading from a different column would
-  // silently return null while a real query would have found the row (or
-  // vice versa).
-  const fkColsForCheck = Array.isArray(reflection.joinForeignKey)
-    ? reflection.joinForeignKey
-    : [reflection.joinForeignKey];
-  for (const fk of fkColsForCheck) {
-    const v = record._readAttribute(fk);
-    if (v === null || v === undefined) return null;
-  }
-  // The staleness key mirrors Rails' `stale_state`: the FK column(s), plus the
-  // `foreign_type` for a polymorphic belongs_to
-  // (belongs_to_polymorphic_association.rb:43-46), so a reassignment that keeps
-  // the same id but changes the target class is still detected below.
-  const staleCols = options.polymorphic
-    ? [...fkColsForCheck, options.foreignType ?? `${underscore(assocName)}_type`]
-    : fkColsForCheck;
-  const staleSnapshot = staleCols.map((col) => record._readAttribute(col));
-
-  let result: Base | null;
-  if (!_skipSingularStatementCache(reflection, targetModel, options)) {
-    // Statement-cache path (Rails `Association#find_target` via
-    // `reflection.association_scope_cache` / `sc.execute(binds, c)`).
-    result = await _loadSingularViaStatementCache(record, assocName, reflection, targetModel);
-  } else {
-    const built = _builtAssociationScope(record, assocName, reflection, targetModel);
-    const baseRelation = _scopeForAssociation(targetModel);
-    let rel = baseRelation.merge(built);
-    rel = applyAssociationScope(rel, options.scope, record, reflection.scope);
-    // Rails' normal singular-load path (`Association#find_target` via the
-    // statement cache) returns an array and calls `Array#first` — no ORDER BY
-    // in SQL. `take` (unordered LIMIT 1) is the closest equivalent; `first`
-    // would route through `ordered_relation` and add a spurious ORDER BY. See
-    // has_one_associations_test `test_has_one_does_not_use_order_by`.
-    result = await rel.take();
+  // `_cacheSingularTarget` routes singular inverse writes through
+  // `inversedFrom` (→ `replace_keys` → `loadedBang`), so the holder's
+  // `isStaleTarget()` snapshot is authoritative.
+  const holder = record._associationInstances.get(assocName) as
+    | { isStaleTarget?: () => boolean }
+    | undefined;
+  if (typeof holder?.isStaleTarget === "function" && holder.isStaleTarget()) {
+    return { hit: false, value: null };
   }
 
-  // Rails' `find_target` is synchronous, so it never observes the owner's
-  // foreign key change mid-load. Our loader awaits DB I/O: an in-flight reader
-  // query (e.g. `node.parent` accessed but never awaited) can still be pending
-  // when the caller synchronously reassigns the association
-  // (`node.parent = other`) with a new FK. Once RFC 0063 made `save` genuinely
-  // await the validation chain, that window widened enough for the stale query
-  // to resolve mid-save and `syncToAssociationInstance` clobber the
-  // freshly-assigned holder target with the old record — dropping the FK change
-  // from `previousChanges`. If the owner's stale key moved off the snapshot we
-  // queried, the fetched record is stale: leave the holder's newer target
-  // intact and return it instead of the stale row.
-  const fkMovedDuringLoad = staleCols.some(
-    (col, i) => record._readAttribute(col) !== staleSnapshot[i],
-  );
-  if (fkMovedDuringLoad) {
-    const holder = record._associationInstances.get(assocName) as
-      | { isLoaded?: () => boolean; target?: Base | null }
-      | undefined;
-    if (holder?.isLoaded?.()) return holder.target ?? null;
-  }
-
-  // Set inverse_of: store reference back to the owner. Resolve via the
-  // reflection so automatic_inverse_of also wires the parent — mirrors
-  // ActiveRecord::Associations::Association#set_inverse_instance.
-  if (result) {
-    const inverseName = _resolveInverseName(ctor, assocName, options);
-    if (inverseName) _wireInverseAssociation(record, result, inverseName);
-  }
-
-  syncToAssociationInstance(record, assocName, result);
-  return result;
+  const inverseName = _resolveInverseName(record.constructor as typeof Base, assocName, options);
+  if (inverseName) _wireInverseAssociation(record, cached, inverseName);
+  return { hit: true, value: cached };
 }
 
 /**
- * The has_one arm of `findTarget`.
+ * has_one's polymorphic `:as` key guard: a composite FK is always rejected, and
+ * a composite owner PK collapses to "id" when present (matching Rails'
+ * `join_id_for`); otherwise it is rejected too.
  *
  * @internal
  */
-async function _findHasOneTarget(
+function _validateHasOnePolymorphicKeys(
   record: Base,
   assocName: string,
   options: AssociationOptions,
-): Promise<Base | null> {
-  if (options.through) {
-    validateThroughReflection(record.constructor as typeof Base, assocName);
-  }
-  // Read the loaded target off the singular holder (Rails' @target), with the
-  // legacy mirror + preload fallback for direct-loader calls on undeclared names.
-  const loaded = _loadedSingularTarget(record, assocName);
-  if (loaded) {
-    return loaded.value;
-  }
-
-  // Strict loading check. Gated by `find_target?`: a new-record owner without
-  // the FK present never reaches `find_target` and so never raises.
-  if (
-    _violatesStrictLoading(record, options) &&
-    _findTargetReachable(record, assocName, options, "foreign")
-  ) {
-    strictLoadingViolationBang(record, assocName, { className: options.className });
-  }
-
-  // Handle has_one :through. Same routing rules as findTarget —
-  // route through AssociationScope's JOIN-based path for the simple
-  // shape; everything else falls back to the 2-step `HasOneThroughAssociation#findTarget`.
-  if (options.through) {
-    const ctorEarly = record.constructor as typeof Base;
-    const reflEarly = ctorEarly._reflectOnAssociation?.(assocName);
-    if (_canRouteThroughViaDisableJoinsAssociationScope(reflEarly, options)) {
-      return _loadSingularThroughViaDisableJoinsScope(record, reflEarly, options);
-    }
-    if (!_routeThroughViaAssociationScope(record, reflEarly, options)) {
-      const { findTarget } = await import("./has-one-through-association.js");
-      return findTarget(record, assocName, options);
-    }
-    // Fall through into the AssociationScope path below.
-  }
-
+): void {
+  if (!options.as) return;
   const ctor = record.constructor as typeof Base;
-  const reflection = ctor._reflectOnAssociation?.(assocName);
-  if (!reflection) throw new AssociationNotFoundError(record, assocName);
-
-  const className = options.className ?? camelize(assocName);
   const primaryKey = options.primaryKey ?? ctor.primaryKey;
-
-  const targetModel = resolveAssocClass(record, assocName, className);
-
-  if (options.inverseOf) {
-    validateInverseOf(targetModel, assocName, options.inverseOf);
-  }
-
   const foreignKeyColumns = ownerForeignKeyColumns(ctor, assocName, { ...options, primaryKey });
   const foreignKey: string | string[] =
     foreignKeyColumns.length === 1 ? foreignKeyColumns[0] : foreignKeyColumns;
-
-  // Polymorphic `:as` requires a scalar FK. A composite FK is always
-  // rejected. A composite owner PK collapses to "id" when present
-  // (matching Rails' join_id_for); otherwise reject.
-  if (options.as) {
-    if (Array.isArray(foreignKey)) {
-      // Route through the reflection's canonical checkValidityBang (Rails'
-      // single raise site) so the error carries the Rails-faithful message;
-      // a no-op for polymorphic `:as` (Rails permits no composite key there).
-      routeThroughCheckValidity(ctor, assocName);
-      throw new CompositePrimaryKeyMismatchError({
-        activeRecord: ctor.name,
-        name: assocName,
-        primaryKey,
-        foreignKey,
-      });
-    }
-    if (Array.isArray(primaryKey) && !primaryKey.includes("id")) {
-      // Route through the reflection's canonical checkValidityBang (Rails'
-      // single raise site) so the error carries the Rails-faithful message;
-      // a no-op for polymorphic `:as` (Rails permits no composite key there).
-      routeThroughCheckValidity(ctor, assocName);
-      throw new CompositePrimaryKeyMismatchError({
-        activeRecord: ctor.name,
-        name: assocName,
-        primaryKey,
-        foreignKey,
-      });
-    }
+  if (!Array.isArray(foreignKey) && !(Array.isArray(primaryKey) && !primaryKey.includes("id"))) {
+    return;
   }
-  // Route through AssociationScope (handles scalar, composite, :as, STI
-  // in a single Rails-faithful path). reflection.isCollection() === false
-  // for hasOne, so AssociationScope.scope adds limit(1) automatically.
-  // Null-PK short-circuit: read the SAME columns the eventual query
-  // reads. For non-through, reflection.joinForeignKey is the owner-
-  // side activeRecordPrimaryKey for hasOne. For through reflections the
-  // owner-side column is on `_ownerChainReflection` (chain.last).
-  const reflForOwnerFk = _ownerChainReflection(reflection);
-  const pkCheckCols = reflForOwnerFk
-    ? Array.isArray(reflForOwnerFk.joinForeignKey)
-      ? reflForOwnerFk.joinForeignKey
-      : [reflForOwnerFk.joinForeignKey]
-    : Array.isArray(primaryKey)
-      ? primaryKey
-      : [primaryKey];
-  for (const pk of pkCheckCols) {
-    const v = record._readAttribute(pk);
-    if (v === null || v === undefined) return null;
-  }
-
-  let result: Base | null;
-  if (!_skipSingularStatementCache(reflection, targetModel, options)) {
-    // Statement-cache path (Rails `Association#find_target` via
-    // `reflection.association_scope_cache` / `sc.execute(binds, c)`).
-    result = await _loadSingularViaStatementCache(record, assocName, reflection, targetModel);
-  } else {
-    const built = _builtAssociationScope(record, assocName, reflection, targetModel);
-    const baseRelation = _scopeForAssociation(targetModel);
-    let rel = baseRelation.merge(built);
-    rel = applyAssociationScope(rel, options.scope, record, reflection.scope);
-    // Unordered LIMIT 1: Rails' singular load returns an array and calls
-    // `Array#first`, emitting no ORDER BY. `take` matches; `first` would add one.
-    result = await rel.take();
-  }
-
-  // Set inverse_of: store reference back to the owner. Resolve via the
-  // reflection so automatic_inverse_of also wires the parent.
-  if (result) {
-    const inverseName = _resolveInverseName(ctor, assocName, options);
-    if (inverseName) _wireInverseAssociation(record, result, inverseName);
-  }
-
-  syncToAssociationInstance(record, assocName, result);
-  return result;
+  // Route through the reflection's canonical checkValidityBang (Rails' single
+  // raise site) so the error carries the Rails-faithful message; it is a no-op
+  // for polymorphic `:as`, which Rails never allows a composite key on.
+  routeThroughCheckValidity(ctor, assocName);
+  throw new CompositePrimaryKeyMismatchError({
+    activeRecord: ctor.name,
+    name: assocName,
+    primaryKey,
+    foreignKey,
+  });
 }
 
 /**
  * Loads a singular association's target.
  *
  * Mirrors: ActiveRecord::Associations::SingularAssociation#find_target
- * (`singular_association.rb:47`). Like Rails, which builds an `Association`
- * from a validated reflection (`association.rb:41-45`), an association name the
- * model never declared raises `AssociationNotFoundError` (`associations.rb:56`)
- * before any load runs.
+ * (`singular_association.rb:47`), which delegates the query itself to
+ * `Association#find_target` (`association.rb`) and takes `Array#first` of the
+ * loaded rows. Like Rails, which builds an `Association` from a validated
+ * reflection (`association.rb:41-45`), a name the model never declared raises
+ * `AssociationNotFoundError` (`associations.rb:56`) before any load runs.
  *
- * DEVIATION: Rails' `find_target(async: false)` takes no macro parameter and
- * has no dispatcher layer — it is the loader body itself, and
- * `BelongsToAssociation` overrides only the `find_target?` predicate
- * (`belongs_to_association.rb:124-126`), never `find_target`. One Rails body
- * serves both macros because the difference lives entirely in the `scope` the
- * reflection builds.
+ * One body serves belongs_to and has_one, as in Rails, because the macro
+ * difference lives in the scope the reflection builds — `_builtAssociationScope`
+ * below is reached identically for both. `BelongsToAssociation` overrides only
+ * the `find_target?` predicate (`belongs_to_association.rb:124-126`), never
+ * `find_target`, which is why there is no belongs_to override here either.
  *
- * trails' two loaders arrived as separate engine functions and have not
- * converged, so `macro` stands in for the receiver class Rails dispatches on.
- * It is required rather than defaulted because both loaders are also called
- * for association names with no registered reflection, where `options` alone
- * cannot tell a belongs_to from a has_one and a default would silently
- * mis-dispatch.
- *
- * Collapsing the two arms into one Rails-shaped body — dropping this
- * parameter — is story `converge-singular-find-target-dispatcher`
- * (RFC 0072).
+ * The macro-conditional steps are the ones Rails has no counterpart for: the
+ * cached-target read (trails caches on the owner, Rails on the association
+ * instance) and the has_one `:through` routing. They are named helpers rather
+ * than inline branches so this body keeps the shape of Rails'.
  *
  * @internal
  */
@@ -665,9 +417,146 @@ export async function findTarget(
   record: Base,
   assocName: string,
   options: AssociationOptions,
-  macro: "belongsTo" | "hasOne",
 ): Promise<Base | null> {
-  return macro === "belongsTo"
-    ? _findBelongsToTarget(record, assocName, options)
-    : _findHasOneTarget(record, assocName, options);
+  const ctor = record.constructor as typeof Base;
+  const reflection = ctor._reflectOnAssociation?.(assocName);
+  if (!reflection) throw new AssociationNotFoundError(record, assocName);
+  const isBelongsTo = reflection.macro === "belongsTo";
+
+  if (options.through) {
+    validateThroughReflection(ctor, assocName);
+  }
+
+  // Rails runs `reflection.check_validity!` in `Association#initialize`
+  // (mirrored in the `Association` constructor via
+  // `validateReflectionValidity`), so a recursive/missing `inverse_of` has
+  // already surfaced by now — no load-path recursion shim is needed.
+  if (isBelongsTo) {
+    const cached = _belongsToCachedHit(record, assocName, options);
+    if (cached.hit) return cached.value;
+  } else {
+    const loaded = _loadedSingularTarget(record, assocName);
+    if (loaded) return loaded.value;
+  }
+
+  // Rails `Association#find_target`'s first statement. Gated by `find_target?`:
+  // a new-record owner without the key present never reaches `find_target` and
+  // so never raises.
+  if (
+    _violatesStrictLoading(record, options) &&
+    _findTargetReachable(record, assocName, options, isBelongsTo ? "belongsTo" : "foreign")
+  ) {
+    strictLoadingViolationBang(record, assocName, {
+      polymorphic: isBelongsTo ? options.polymorphic : undefined,
+      className: options.className,
+    });
+  }
+
+  // has_one :through. Rails expresses `:through` inside the scope chain; trails
+  // still routes the shapes AssociationScope cannot build through the two-step
+  // `HasOneThroughAssociation#findTarget`.
+  if (!isBelongsTo && options.through) {
+    if (_canRouteThroughViaDisableJoinsAssociationScope(reflection, options)) {
+      return _loadSingularThroughViaDisableJoinsScope(record, reflection, options);
+    }
+    if (!_routeThroughViaAssociationScope(record, reflection, options)) {
+      const { findTarget: findThroughTarget } = await import("./has-one-through-association.js");
+      return findThroughTarget(record, assocName, options);
+    }
+    // Otherwise fall through to the scope path below.
+  }
+
+  let targetModel: typeof Base;
+  if (isBelongsTo && options.polymorphic) {
+    const typeCol = options.foreignType ?? `${underscore(assocName)}_type`;
+    const typeName = record._readAttribute(typeCol) as string | null;
+    if (!typeName) return null;
+    // Rails resolves a polymorphic belongs_to via the owner class's
+    // polymorphic_class_for, honoring store_full_class_name and (when off)
+    // namespace-relative compute_type — not a bare global registry lookup.
+    targetModel = ctor.polymorphicClassFor(typeName);
+  } else {
+    targetModel = resolveAssocClass(record, assocName, options.className ?? camelize(assocName));
+  }
+
+  if (options.inverseOf && !(isBelongsTo && options.polymorphic)) {
+    validateInverseOf(targetModel, assocName, options.inverseOf);
+  }
+
+  if (!isBelongsTo) {
+    _validateHasOnePolymorphicKeys(record, assocName, options);
+  }
+
+  // Null-key short-circuit: read the SAME columns the eventual query reads, or
+  // a mismatch silently returns null where a real query would have found the
+  // row. That is `joinForeignKey` on the owner-side chain reflection for both
+  // macros — the owner's FK for belongs_to, its activeRecordPrimaryKey for
+  // has_one.
+  const ownerSideReflection = _ownerChainReflection(reflection) ?? reflection;
+  const keyColsForCheck = Array.isArray(ownerSideReflection.joinForeignKey)
+    ? ownerSideReflection.joinForeignKey
+    : [ownerSideReflection.joinForeignKey];
+  for (const col of keyColsForCheck) {
+    const v = record._readAttribute(col);
+    if (v === null || v === undefined) return null;
+  }
+
+  // The staleness key mirrors Rails' `stale_state`: the FK column(s), plus
+  // `foreign_type` for a polymorphic belongs_to
+  // (belongs_to_polymorphic_association.rb:43-46), so a reassignment keeping the
+  // same id but changing the target class is still detected after the await.
+  const staleCols =
+    isBelongsTo && options.polymorphic
+      ? [...keyColsForCheck, options.foreignType ?? `${underscore(assocName)}_type`]
+      : keyColsForCheck;
+  const staleSnapshot: unknown[] = isBelongsTo
+    ? staleCols.map((col: string) => record._readAttribute(col))
+    : [];
+
+  let result: Base | null;
+  if (!_skipSingularStatementCache(reflection, targetModel, options)) {
+    // Rails `Association#find_target` via `reflection.association_scope_cache`
+    // / `sc.execute(binds, c)`.
+    result = await _loadSingularViaStatementCache(record, assocName, reflection, targetModel);
+  } else {
+    // Rails' `scope.to_a` arm: AssociationScope builds the macro-specific WHERE
+    // (scalar, composite, `:as`, STI, polymorphic) for both macros, and adds
+    // LIMIT 1 because `reflection.isCollection()` is false.
+    const built = _builtAssociationScope(record, assocName, reflection, targetModel);
+    const baseRelation = _scopeForAssociation(targetModel);
+    let rel = baseRelation.merge(built);
+    rel = applyAssociationScope(rel, options.scope, record, reflection.scope);
+    // Rails returns the array and calls `Array#first` — no ORDER BY in SQL.
+    // `take` (unordered LIMIT 1) matches; `first` would route through
+    // `ordered_relation` and add one. See has_one_associations_test
+    // `test_has_one_does_not_use_order_by`.
+    result = await rel.take();
+  }
+
+  // Rails' `find_target` is synchronous and never observes the owner's foreign
+  // key changing mid-load. Ours awaits DB I/O: an in-flight reader query (e.g.
+  // `node.parent` accessed but never awaited) can still be pending when the
+  // caller reassigns the association with a new FK. Once RFC 0063 made `save`
+  // genuinely await the validation chain, that window widened enough for the
+  // stale query to resolve mid-save and clobber the freshly-assigned holder
+  // target, dropping the FK change from `previousChanges`.
+  if (
+    isBelongsTo &&
+    staleCols.some((col: string, i: number) => record._readAttribute(col) !== staleSnapshot[i])
+  ) {
+    const holder = record._associationInstances.get(assocName) as
+      | { isLoaded?: () => boolean; target?: Base | null }
+      | undefined;
+    if (holder?.isLoaded?.()) return holder.target ?? null;
+  }
+
+  // Mirrors `Association#set_inverse_instance`: resolve via the reflection so
+  // automatic_inverse_of wires the parent too.
+  if (result) {
+    const inverseName = _resolveInverseName(ctor, assocName, options);
+    if (inverseName) _wireInverseAssociation(record, result, inverseName);
+  }
+
+  syncToAssociationInstance(record, assocName, result);
+  return result;
 }

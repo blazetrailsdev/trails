@@ -127,13 +127,13 @@ describe("Association scope cache", () => {
 
     const spy = vi.spyOn(StatementCache, "create");
 
-    const r1 = await findTarget(p1, "author", opts, "belongsTo");
+    const r1 = await findTarget(p1, "author", opts);
     expect((r1 as any)?.id).toBe(authors("david").id);
     const afterFirst = spy.mock.calls.length;
     expect(afterFirst).toBe(1);
 
     // Second owner's load reuses the cached statement — no recompile.
-    const r2 = await findTarget(p2, "author", opts, "belongsTo");
+    const r2 = await findTarget(p2, "author", opts);
     expect((r2 as any)?.id).toBe(authors("bob").id);
     expect(spy.mock.calls.length).toBe(afterFirst);
   });
@@ -183,14 +183,14 @@ describe("Association scope cache — through singular loads", () => {
 
     const spy = vi.spyOn(StatementCache, "create");
 
-    const c1 = await findTarget(groucho, "club", { through: "currentMembership" }, "hasOne");
+    const c1 = await findTarget(groucho, "club", { through: "currentMembership" });
     expect((c1 as any)?.id).toBe(clubs("boring_club").id);
     const afterFirst = spy.mock.calls.length;
     expect(afterFirst).toBe(1);
 
     // Second owner's load reuses the compiled statement — no recompile — and
     // still resolves through its OWN current membership.
-    const c2 = await findTarget(blarpy, "club", { through: "currentMembership" }, "hasOne");
+    const c2 = await findTarget(blarpy, "club", { through: "currentMembership" });
     expect((c2 as any)?.id).toBe(clubs("outrageous_club").id);
     expect(spy.mock.calls.length).toBe(afterFirst);
   });

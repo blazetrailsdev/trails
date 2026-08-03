@@ -874,15 +874,10 @@ describe("PreloaderTest", () => {
     expect(fav.association("author").target.name).toBe("Mary");
     expect(fav.association("favoriteAuthor").target.name).toBe("Bob");
     spy.mockClear();
-    const reloadedAuthor = (await findTarget(
-      fav,
-      "author",
-      {
-        inverseOf: "authorFavorites",
-      },
-      "belongsTo",
-    )) as any;
-    const reloadedFavorite = (await findTarget(fav, "favoriteAuthor", {}, "belongsTo")) as any;
+    const reloadedAuthor = (await findTarget(fav, "author", {
+      inverseOf: "authorFavorites",
+    })) as any;
+    const reloadedFavorite = (await findTarget(fav, "favoriteAuthor", {})) as any;
     expect(reloadedAuthor.name).toBe("Mary");
     expect(reloadedFavorite.name).toBe("Bob");
     expect(spy).not.toHaveBeenCalled();
@@ -1038,7 +1033,7 @@ describe("PreloaderTest", () => {
     const maryPost = posts("misc_by_mary");
     const mary = authors("mary");
 
-    const loadedBob = await findTarget(bobPost, "author", {}, "belongsTo");
+    const loadedBob = await findTarget(bobPost, "author", {});
     expect(bobPost.association("author").isLoaded()).toBe(true);
     expect(maryPost.association("author").isLoaded()).toBe(false);
 
@@ -1224,7 +1219,7 @@ describe("PreloaderTest", () => {
   it("preload loaded belongs to association with composite foreign key", async () => {
     const comment = shardedComments("great_comment_blog_post_one");
 
-    await findTarget(comment, "blogPost", { className: "ShardedBlogPost" }, "belongsTo");
+    await findTarget(comment, "blogPost", { className: "ShardedBlogPost" });
 
     const sqls = await captureSql(async () => {
       await new Preloader({ records: [comment], associations: ["blogPost"] }).call();
@@ -1661,6 +1656,7 @@ describe("AssociationsTest", () => {
   let CpkOrder: typeof Base;
   let CpkBook: typeof Base;
   let CpkOrderAgreement: typeof Base;
+  let CpkOrderWithPrimaryKeyAssociatedBook: typeof Base;
   let CpkCar: typeof Base;
   let CpkCarReview: typeof Base;
   let Person: typeof Base;
@@ -1707,6 +1703,7 @@ describe("AssociationsTest", () => {
     CpkOrder = cpkMod.CpkOrder as never;
     CpkBook = cpkMod.CpkBook as never;
     CpkOrderAgreement = cpkMod.CpkOrderAgreement as never;
+    CpkOrderWithPrimaryKeyAssociatedBook = cpkMod.CpkOrderWithPrimaryKeyAssociatedBook as never;
     CpkCar = cpkMod.CpkCar as never;
     CpkCarReview = cpkMod.CpkCarReview as never;
     Person = (await import("./test-helpers/models/person.js")).Person as never;
@@ -1739,6 +1736,7 @@ describe("AssociationsTest", () => {
     registerModel("CpkOrder", CpkOrder);
     registerModel("CpkBook", CpkBook);
     registerModel("CpkOrderAgreement", CpkOrderAgreement);
+    registerModel("CpkOrderWithPrimaryKeyAssociatedBook", CpkOrderWithPrimaryKeyAssociatedBook);
     registerModel("CpkCar", CpkCar);
     registerModel("CpkCarReview", CpkCarReview);
     registerModel("Person", Person);
@@ -2399,6 +2397,25 @@ describe("AssociationsTest", () => {
     });
     expect(agreements).toHaveLength(2);
     expect(agreements.map((a) => (a as any).signature).sort()).toEqual(["abc", "def"]);
+  });
+
+  // Rails only ever loads a singular association from a reflection
+  // (association.rb:41-45), and declares both composite-key has_one shapes on
+  // Cpk::Order (cpk/order.rb:14, 45), so the composite-FK and
+  // scalar-FK-on-a-composite-PK owner key derivations are covered through real
+  // reflections.
+  it("has one loads through a declared reflection with a composite foreign key", async () => {
+    const order = await CpkOrder.create({ shop_id: 1 });
+    const [shopId, orderId] = order.id as [number, number];
+    await CpkBook.create({ id: [1, 90001], shop_id: shopId, order_id: orderId, title: "Only" });
+    expect((await (order as any).loadHasOne("book"))?.title).toBe("Only");
+  });
+
+  it("has one loads through a declared reflection with a scalar foreign key on a composite primary key owner", async () => {
+    const order = await CpkOrderWithPrimaryKeyAssociatedBook.create({ shop_id: 1 });
+    const [, orderId] = order.id as [number, number];
+    await CpkBook.create({ id: [1, 90002], order_id: orderId, title: "Only" });
+    expect((await (order as any).loadHasOne("book"))?.title).toBe("Only");
   });
 
   // The inline (no-reflection) fallback must build from
