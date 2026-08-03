@@ -337,6 +337,42 @@ describe("CI runs every tooling test suite", () => {
     }
   });
 
+  // guides-typecheck is off on PRs unless labelled, so its skip is the norm
+  // rather than the exception: a too-narrow aggregate clause wedges EVERY
+  // unlabelled PR on "unexpectedly skipped", and a too-wide one swallows a
+  // genuine failure on the labelled runs and on main. Job and aggregate are
+  // written at opposite polarity, so each clause is pinned on both sides.
+  it("keeps the guides-typecheck label opt-in and the ci aggregate in agreement", async () => {
+    const wf = parseYaml(await readFile(CI_YML, "utf8"));
+    const optIn = wf.jobs["guides-typecheck"].if.replace(/\s+/g, " ").trim();
+    const unlabelled = wf.jobs.ci.steps[0].env.GUIDES_UNLABELLED.replace(/\s+/g, " ");
+
+    for (const [jobClause, aggregateClause] of [
+      ["github.event_name != 'pull_request'", "github.event_name == 'pull_request'"],
+      [
+        "contains(github.event.pull_request.labels.*.name, 'run-guides')",
+        "!contains(github.event.pull_request.labels.*.name, 'run-guides')",
+      ],
+    ]) {
+      expect(optIn).toContain(jobClause);
+      expect(unlabelled).toContain(aggregateClause);
+    }
+
+    // `labeled` is what starts the run when the label goes on an open PR;
+    // without it the opt-in needs a fresh push to take effect.
+    expect(wf.on.pull_request.types).toContain("labeled");
+
+    // The relevance gate has to survive alongside the opt-in, or a labelled PR
+    // runs the job whether or not anything it compiles changed.
+    expect(optIn).toContain("needs.changes.outputs.guides_affected == 'true'");
+
+    // main / the Monday sweep / workflow_dispatch are the standing coverage
+    // that replaces the per-PR run — `changes` forces guides_affected true on
+    // all three, so the schedule trigger must stay for drift to be caught.
+    expect(Object.keys(wf.on)).toContain("schedule");
+    expect(wf.on.push.branches).toContain("main");
+  });
+
   it("keeps comparison_affected off for website-only changes", async () => {
     const runGate = await gateRunner(await readFile(CI_YML, "utf8"));
     expect((await runGate("packages/website/src/app.ts")).comparison_affected).toBe("false");
