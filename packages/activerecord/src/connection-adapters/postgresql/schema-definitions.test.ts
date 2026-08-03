@@ -498,9 +498,6 @@ describe("TableDefinition#toSql", () => {
   });
 });
 
-// Quoting a DEFAULT resolves the column's cast type through the server
-// (`lookup_cast_type`'s regtype query), so this one needs a live connection
-// where the rest of the file only renders SQL.
 describeIfPg("TableDefinition#toSql default quoting", () => {
   let conn: PostgreSQLAdapter;
 

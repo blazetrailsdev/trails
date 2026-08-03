@@ -20,7 +20,7 @@ import { schemaConn } from "../../support/schema-conn.js";
 describe("SQLite3::SchemaStatements", () => {
   describe("schemaCreation", () => {
     it("returns a SQLite3 SchemaCreation instance", () => {
-      expect(schemaCreation(schemaConn("sqlite"))).toBeInstanceOf(SchemaCreation);
+      expect(schemaCreation.call(schemaConn("sqlite"))).toBeInstanceOf(SchemaCreation);
     });
   });
 

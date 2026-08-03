@@ -193,8 +193,8 @@ export function createSchemaDumper(
   return SchemaDumper.create(source as Parameters<typeof SchemaDumper.create>[0], options);
 }
 
-export function schemaCreation(adapter: SchemaQuoter): SchemaCreation {
-  return new SchemaCreation("sqlite", adapter);
+export function schemaCreation(this: SchemaQuoter): SchemaCreation {
+  return new SchemaCreation("sqlite", this);
 }
 
 /** @internal */
