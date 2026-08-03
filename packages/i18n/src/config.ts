@@ -9,15 +9,14 @@ import type { TranslationData } from "./utils.js";
 
 /** The slice of a backend `Config` hands out. */
 export interface Backend {
-  storeTranslations(locale: Locale, data: Record<string, unknown>, options?: unknown): unknown;
-  availableLocales(): Locale[];
-  reloadBang(): void;
-  eagerLoadBang(): void;
   storeTranslations(
     locale: Locale,
     data: TranslationData,
     options?: Record<string, unknown>,
   ): unknown;
+  availableLocales(): Locale[];
+  reloadBang(): void;
+  eagerLoadBang(): void;
   translate(locale: Locale, key: unknown, options?: Record<string, unknown>): unknown;
   exists(locale: Locale, key: TranslationKey, options?: Record<string, unknown>): boolean;
   localize(
