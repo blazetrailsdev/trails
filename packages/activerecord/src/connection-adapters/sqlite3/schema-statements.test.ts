@@ -33,24 +33,24 @@ describe("SQLite3::SchemaStatements", () => {
   describe("virtualTableExists", () => {
     it("returns true when a matching virtual table row is found", async () => {
       const fakeAdapter = {
-        execute: vi.fn().mockResolvedValue([{ name: "virtual_tab" }]),
+        queryValues: vi.fn().mockResolvedValue(["virtual_tab"]),
       } as any;
       expect(await virtualTableExists(fakeAdapter, "virtual_tab")).toBe(true);
     });
 
     it("returns false when no matching row is found", async () => {
       const fakeAdapter = {
-        execute: vi.fn().mockResolvedValue([]),
+        queryValues: vi.fn().mockResolvedValue([]),
       } as any;
       expect(await virtualTableExists(fakeAdapter, "no_such_table")).toBe(false);
     });
 
-    it("queries sqlite_temp_master for temp schema tables", async () => {
-      const fakeAdapter = { execute: vi.fn().mockResolvedValue([]) } as any;
-      await virtualTableExists(fakeAdapter, "temp.my_vtab");
-      expect(fakeAdapter.execute).toHaveBeenCalledWith(
-        expect.stringContaining("sqlite_temp_master"),
-        expect.anything(),
+    it("scopes the data_source_sql probe to VIRTUAL TABLE under the SCHEMA name", async () => {
+      const fakeAdapter = { queryValues: vi.fn().mockResolvedValue([]) } as any;
+      await virtualTableExists(fakeAdapter, "my_vtab");
+      expect(fakeAdapter.queryValues).toHaveBeenCalledWith(
+        dataSourceSql("my_vtab", "VIRTUAL TABLE"),
+        "SCHEMA",
       );
     });
   });

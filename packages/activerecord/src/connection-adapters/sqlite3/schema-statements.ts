@@ -18,7 +18,7 @@ import { SchemaStatements as AbstractSchemaStatements } from "../abstract/schema
 import { SchemaDumper as AbstractSchemaDumper } from "../abstract/schema-dumper.js";
 import { SchemaDumper } from "./schema-dumper.js";
 import { Column } from "./column.js";
-import { quoteColumnName, quoteString as quoteStringLiteral } from "./quoting.js";
+import { quoteColumnName } from "./quoting.js";
 
 interface SQLite3SchemaAdapter extends DatabaseAdapter {
   addForeignKey(
@@ -109,9 +109,12 @@ export async function indexes(
 ): Promise<IndexDefinition[]> {
   const { schema, bare } = splitTableName(tableName);
   const pragmaPrefix = schema ? `${quoteColumnName(schema)}.` : "";
-  const rows = (await adapter.schemaQuery(
-    `PRAGMA ${pragmaPrefix}index_list(${quoteColumnName(bare)})`,
-  )) as Array<{ name: string; unique: number; origin: string }>;
+  const rows = (
+    await adapter.internalExecQuery(
+      `PRAGMA ${pragmaPrefix}index_list(${quoteColumnName(bare)})`,
+      "SCHEMA",
+    )
+  ).toArray() as Array<{ name: string; unique: number; origin: string }>;
   const sqliteMaster = schema ? `${quoteColumnName(schema)}.sqlite_master` : "sqlite_master";
   const result: IndexDefinition[] = [];
   for (const idx of rows) {
@@ -122,12 +125,12 @@ export async function indexes(
     // Locate the index SQL across the main/attached schema and the temp
     // schema (temp-table indexes live only in sqlite_temp_master), so their
     // WHERE clauses are not silently dropped.
-    const idxSqlRows = (await adapter.schemaQuery(
-      `SELECT sql FROM ${sqliteMaster} WHERE name = ${quoteStringLiteral(idx.name)} AND type = 'index' ` +
+    const indexSql = (await adapter.queryValue(
+      `SELECT sql FROM ${sqliteMaster} WHERE name = ${adapter.quote(idx.name)} AND type = 'index' ` +
         `UNION ALL ` +
-        `SELECT sql FROM sqlite_temp_master WHERE name = ${quoteStringLiteral(idx.name)} AND type = 'index'`,
-    )) as Array<{ sql: string | null }>;
-    const indexSql = idxSqlRows[0]?.sql ?? null;
+        `SELECT sql FROM sqlite_temp_master WHERE name = ${adapter.quote(idx.name)} AND type = 'index'`,
+      "SCHEMA",
+    )) as string | null;
     const match = indexSql ? INDEX_ON_REGEX.exec(indexSql) : null;
     const expressions = match?.groups?.expressions;
     let where = match?.groups?.where;
@@ -135,9 +138,12 @@ export async function indexes(
 
     // index_info takes the bare index name; the schema qualifier, if any,
     // comes before the PRAGMA keyword — same shape as above.
-    const cols = (await adapter.schemaQuery(
-      `PRAGMA ${pragmaPrefix}index_info(${quoteColumnName(idx.name)})`,
-    )) as Array<{ name: string | null; seqno: number }>;
+    const cols = (
+      await adapter.internalExecQuery(
+        `PRAGMA ${pragmaPrefix}index_info(${adapter.quote(idx.name)})`,
+        "SCHEMA",
+      )
+    ).toArray() as Array<{ name: string | null; seqno: number }>;
     const columnNames = cols.sort((a, b) => a.seqno - b.seqno).map((c) => c.name);
 
     const orders: Record<string, string> = {};
@@ -167,28 +173,16 @@ function splitTableName(tableName: string): { schema: string; bare: string } {
     : { schema: tableName.slice(0, dot), bare: tableName.slice(dot + 1) };
 }
 
-function resolveMasterTable(
-  adapter: DatabaseAdapter,
-  tableName: string,
-): { masterTable: string; name: string } {
-  const dotIdx = tableName.lastIndexOf(".");
-  if (dotIdx === -1) return { masterTable: "sqlite_master", name: tableName };
-  const schema = tableName.slice(0, dotIdx);
-  const name = tableName.slice(dotIdx + 1);
-  if (schema === "temp") return { masterTable: "sqlite_temp_master", name };
-  return { masterTable: `${adapter.quoteColumnName(schema)}.sqlite_master`, name };
-}
-
+/**
+ * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3::SchemaStatements#virtual_table_exists?
+ */
 export async function virtualTableExists(
   adapter: DatabaseAdapter,
   tableName: string,
 ): Promise<boolean> {
-  const { masterTable, name } = resolveMasterTable(adapter, tableName);
-  const rows = await adapter.execute(
-    `SELECT name FROM ${masterTable} WHERE type = 'table' AND name = ? AND sql LIKE '%VIRTUAL%'`,
-    [name],
+  return (
+    (await adapter.queryValues(dataSourceSql(tableName, "VIRTUAL TABLE"), "SCHEMA")).length > 0
   );
-  return rows.length > 0;
 }
 
 export function createSchemaDumper(

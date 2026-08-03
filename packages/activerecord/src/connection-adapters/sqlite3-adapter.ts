@@ -19,6 +19,7 @@ import {
   type NativeDatabaseTypes,
 } from "./abstract/native-database-types.js";
 import { TableDefinition as SQLite3TableDefinition } from "./sqlite3/schema-definitions.js";
+import { ExplainPrettyPrinter } from "./sqlite3/explain-pretty-printer.js";
 import {
   assertValidDeferrable,
   dataSourceSql as sqliteDataSourceSql,
@@ -924,10 +925,8 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     _options: ExplainOption[] = [],
   ): Promise<string> {
     const result = await this.internalExecQuery(`EXPLAIN QUERY PLAN ${sql}`, "EXPLAIN", binds);
-    return result
-      .toArray()
-      .map((r) => `${r.id}|${r.parent}|${r.notused}|${r.detail}`)
-      .join("\n");
+    const printer = new ExplainPrettyPrinter();
+    return printer.pp(result.toArray());
   }
 
   /**
@@ -1581,11 +1580,9 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
 
   // Mirrors: ActiveRecord::ConnectionAdapters::SQLite3::SchemaStatements#virtual_table_exists?
   async virtualTableExists(tableName: string): Promise<boolean> {
-    const rows = await this.schemaQuery(
-      `SELECT name FROM pragma_table_list WHERE schema <> 'temp' AND type = 'virtual' AND name = ?`,
-      [tableName],
+    return (
+      (await this.queryValues(sqliteDataSourceSql(tableName, "VIRTUAL TABLE"), "SCHEMA")).length > 0
     );
-    return rows.length > 0;
   }
 
   // Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter#virtual_tables
@@ -2130,18 +2127,22 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
    * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3::SchemaStatements#check_constraints
    */
   async checkConstraints(tableName: string): Promise<CheckConstraintDefinition[]> {
-    const row = await this._getCreateTableSql(tableName);
-    if (!row) return [];
+    const tableSql = (await this.queryValue(
+      `SELECT sql FROM sqlite_master WHERE name = ${this.quote(tableName)} AND type = 'table' ` +
+        `UNION ALL ` +
+        `SELECT sql FROM sqlite_temp_master WHERE name = ${this.quote(tableName)} AND type = 'table'`,
+      "SCHEMA",
+    )) as string | null;
 
-    const results: CheckConstraintDefinition[] = [];
+    // Rails' scan regex names the constraint with a bare `\w+`; SQLite also
+    // accepts a double-quoted identifier there, so the quoted form is a second
+    // alternative rather than a replacement.
     const regex =
       /CONSTRAINT\s+(?:"((?:[^"]|"")*)"|(\w+))\s+CHECK\s*\(((?:[^()]|\((?:[^()]|\([^()]*\))*\))*)\)/gi;
-    let match: RegExpExecArray | null;
-    while ((match = regex.exec(row)) !== null) {
+    return [...String(tableSql ?? "").matchAll(regex)].map((match) => {
       const name = match[1] ? match[1].replace(/""/g, '"') : match[2];
-      results.push(new CheckConstraintDefinition(tableName, match[3].trim(), name));
-    }
-    return results;
+      return new CheckConstraintDefinition(tableName, match[3].trim(), name);
+    });
   }
 
   /**
