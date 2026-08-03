@@ -2686,41 +2686,6 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * Table names reachable from the relation's manual joins plus the base table,
-   * used by the pluck eager-degrade guard to tell a servable column from one
-   * reaching for an unjoinable fallback association. Mirrors the joined-table
-   * extraction in `referencesEagerLoadedTables` (Rails `build_joins([])`,
-   * relation.rb:1474-1488); kept as a sibling rather than a shared callee so the
-   * ported `references_eager_loaded_tables?` body retains its Arel/StringJoin
-   * usage for the api-compare dependency + call-set parity gates.
-   * @internal
-   */
-  private _joinedTableNames(): Set<string> {
-    const leftOuterTables = this._resolveAssocTables(this._leftOuterJoinsValues);
-    const namedInnerTables = this._resolveAssocTables(this._namedInnerJoins);
-    return new Set<string>([
-      ...this._joinClauses.map((j) => j.table.toLowerCase()),
-      ...leftOuterTables,
-      ...namedInnerTables,
-      ...this._joinValues.flatMap((v) => {
-        if (typeof v === "string") {
-          const join = new Nodes.StringJoin(new Nodes.SqlLiteral(v));
-          const sqlText = join.left instanceof Nodes.SqlLiteral ? join.left.value : v;
-          return this.tablesInString(sqlText);
-        }
-        if (v instanceof Nodes.StringJoin) {
-          const sqlText = v.left instanceof Nodes.SqlLiteral ? v.left.value : v.toSql();
-          return this.tablesInString(sqlText);
-        }
-        const leftName = (v.left as any)?.name;
-        if (typeof leftName === "string") return [leftName.toLowerCase()];
-        return this.tablesInString(v.toSql());
-      }),
-      String((this._modelClass as unknown as { tableName?: string }).tableName ?? "").toLowerCase(),
-    ]);
-  }
-
-  /**
    * Extracts table-like identifiers from a raw SQL string (e.g. a JOIN fragment).
    *
    * Mirrors: ActiveRecord::Relation#tables_in_string
@@ -2747,10 +2712,8 @@ export class Relation<T extends Base> {
    * Builds the eager-load JoinDependency in one shot, mirroring Rails'
    * `construct_join_dependency(eager_load_values, ...)` — nested hashes and
    * dotted paths become recursive JOINs. Polymorphic specs raise
-   * `EagerLoadPolymorphicError` out of the constructor (matching Rails), so
-   * they never reach the fallback list. Capability-gap specs (composite key,
-   * unjoinable through) are rolled back into `fallbackAssocs` for preload
-   * fallback — a trails deviation Rails has no need for.
+   * `EagerLoadPolymorphicError` out of the constructor (matching Rails), and an
+   * association that can't be JOINed raises rather than degrading to a preload.
    *
    * Alias resolution and `references` re-aliasing (`authors AS author`) are
    * deferred to emit-time: the eager JD is folded into the single
@@ -2760,19 +2723,8 @@ export class Relation<T extends Base> {
    * filter to compute.
    * @internal
    */
-  private _buildEagerJoinDependency(specs: AssociationSpec[]): {
-    jd: JoinDependency;
-    fallbackAssocs: AssociationSpec[];
-  } {
-    const fallbackAssocs: AssociationSpec[] = [];
-    const jd = new JoinDependency(
-      this._modelClass,
-      this.table,
-      specs,
-      Nodes.OuterJoin,
-      fallbackAssocs,
-    );
-    return { jd, fallbackAssocs };
+  private _buildEagerJoinDependency(specs: AssociationSpec[]): JoinDependency {
+    return new JoinDependency(this._modelClass, this.table, specs, Nodes.OuterJoin);
   }
 
   private async _executeEagerLoad(eagerAssocs?: AssociationSpec[]): Promise<void> {
@@ -2791,9 +2743,9 @@ export class Relation<T extends Base> {
       return;
     }
 
-    const { jd, fallbackAssocs } = this._buildEagerJoinDependency(eagerAssociations);
+    const jd = this._buildEagerJoinDependency(eagerAssociations);
 
-    // If no associations could be JOINed, fall back entirely to preload
+    // Nothing to JOIN (empty spec): load the base rows only.
     if (jd.nodes.length === 0) {
       const sql = this._toSql();
       // selectAll (not execute) so the adapter-reported column_types cast
@@ -2803,9 +2755,6 @@ export class Relation<T extends Base> {
         result.toArray(),
         result.columnTypes as Record<string, { deserialize(value: unknown): unknown }>,
       );
-      if (fallbackAssocs.length > 0) {
-        await this.preloadAssociations(this._records, fallbackAssocs);
-      }
       return;
     }
 
@@ -2895,14 +2844,10 @@ export class Relation<T extends Base> {
     // the block otherwise runs). The bypass / degrade-to-preload sub-paths above
     // already instantiate through `_instrumentInstantiation`, so firing here only
     // — not in `_toArrayInner` — keeps the block once-per-record like Rails'
-    // `instantiate_records(rows, &block)`. Runs before the residual preload below
-    // (and the `_toArrayInner` preload), matching Rails' ordering.
+    // `instantiate_records(rows, &block)`. Runs before the `_toArrayInner`
+    // preload, matching Rails' ordering.
     const block = this._instantiateBlock;
     if (block) for (const record of this._records) block(record);
-
-    if (fallbackAssocs.length > 0 && this._records.length > 0) {
-      await this.preloadAssociations(this._records, fallbackAssocs);
-    }
   }
 
   /**
@@ -3637,66 +3582,17 @@ export class Relation<T extends Base> {
       rel._includesAssociations = [];
 
       const basePk = (this._modelClass as any).primaryKey ?? "id";
-      const { jd, fallbackAssocs } = this._buildEagerJoinDependency(eagerSpecs);
-      // Rails joins every eager spec; trails can't join capability-gap
-      // reflections (composite-key collections, unjoinable through), so
-      // `_buildEagerJoinDependency` returns them as `fallbackAssocs` to
-      // preload. JOIN only the joinable remainder — replaying the full
-      // `eagerSpecs` through `leftOuterJoins` would re-enter JoinDependency
-      // construction and throw for the unjoinable spec. pluck reads columns only
-      // from the base and joined tables, so the preloaded fallbacks contribute
-      // nothing and are simply omitted (no preload needed).
-      const joinableSpecs = eagerSpecs.filter((s) => !fallbackAssocs.includes(s));
+      const jd = this._buildEagerJoinDependency(eagerSpecs);
 
-      // A pluck column may reference a degraded (unjoinable) association's own
-      // table (e.g. `pluck("cpk_chapters.title")`). Rails JOINs that table;
-      // trails cannot (composite-key capability gap), and silently preloading it
-      // would emit SQL against an unjoined table. The degraded query can only
-      // project the base table, the relation's manual joins, and the joinable
-      // eager specs' tables, so treat a column referencing any OTHER table as
-      // reaching for an unjoinable fallback — covering nested hash/array
-      // fallback shapes that `_resolveAssocTables` (string-spec only) can't
-      // resolve directly. Route those back through the full-spec join, which
-      // raises the explicit capability-gap error rather than degrade into
-      // broken SQL.
-      if (fallbackAssocs.length > 0) {
-        const safeTables = this._joinedTableNames();
-        // `_joinedTableNames` / `_resolveAssocTables` only resolve string specs.
-        // Resolve hash/array manual-join and joinable-eager specs to their
-        // tables through a JoinDependency (which handles every spec shape) so a
-        // pluck column reaching a joined table of any shape is recognized as
-        // servable rather than misclassified as an unjoinable fallback.
-        const namedSpecs: AssociationSpec[] = [];
-        for (const spec of [
-          ...this._namedInnerJoins,
-          ...this._leftOuterJoinsValues,
-          ...joinableSpecs,
-        ]) {
-          if (spec instanceof JoinDependency) {
-            for (const node of spec.nodes) safeTables.add(node.tableName.toLowerCase());
-            continue;
-          }
-          namedSpecs.push(spec);
-        }
-        const { jd: joinedJd } = this._buildEagerJoinDependency(namedSpecs);
-        for (const node of joinedJd.nodes) safeTables.add(node.tableName.toLowerCase());
-        const referencesUnservableTable = columns.some((c) => {
-          const text = typeof c === "string" ? c : c instanceof Nodes.SqlLiteral ? c.value : "";
-          return this.tablesInString(text).some((t) => !safeTables.has(t));
-        });
-        if (referencesUnservableTable) {
-          return rel.leftOuterJoins(eagerSpecs).pluck(...columns);
-        }
-      }
-
-      // No spec is joinable: degrade entirely to the base relation (limit/offset
-      // preserved), mirroring _executeEagerLoad's jd.nodes.length === 0 fallback.
+      // Nothing was joined (empty spec): degrade entirely to the base relation
+      // (limit/offset preserved), mirroring _executeEagerLoad's
+      // jd.nodes.length === 0 path.
       if (jd.nodes.length === 0) {
         return rel.pluck(...columns);
       }
 
       const hasLimitOrOffset = this._limitValue !== null || this._offsetValue !== null;
-      if (hasLimitOrOffset && !this._applyJoinDependencyIsLimitable(joinableSpecs)) {
+      if (hasLimitOrOffset && !this._applyJoinDependencyIsLimitable(eagerSpecs)) {
         // A composite base PK can't be materialized here — `_materializeLimitedIds`
         // (Rails' zip/transpose over `Array(primary_key)`) has no composite
         // support, so it would emit a wrong single-column `"col1,col2"` predicate.
@@ -3711,14 +3607,14 @@ export class Relation<T extends Base> {
         // limit/offset. Limiting the joined rows directly would be wrong under
         // fan-out (it limits associated rows, not parents).
         const limitedIds = await this._materializeLimitedIds(jd, basePk);
-        const limited = rel.leftOuterJoins(joinableSpecs).where({
+        const limited = rel.leftOuterJoins(eagerSpecs).where({
           [basePk]: limitedIds,
         });
         limited._limitValue = null;
         limited._offsetValue = null;
         return limited.pluck(...columns);
       }
-      return rel.leftOuterJoins(joinableSpecs).pluck(...columns);
+      return rel.leftOuterJoins(eagerSpecs).pluck(...columns);
     }
 
     // Reflect the schema before casting results so the model's attribute
@@ -4866,7 +4762,7 @@ export class Relation<T extends Base> {
    */
   private _eagerReflectionsAreLimitable(specs: AssociationSpec[]): boolean {
     if (specs.length === 0) return true;
-    const { jd } = this._buildEagerJoinDependency(specs);
+    const jd = this._buildEagerJoinDependency(specs);
     return this.usingLimitableReflections(jd.reflections);
   }
 
@@ -4910,7 +4806,7 @@ export class Relation<T extends Base> {
       }
       namedSpecs.push(spec);
     }
-    const { jd } = this._buildEagerJoinDependency(namedSpecs);
+    const jd = this._buildEagerJoinDependency(namedSpecs);
     return this.usingLimitableReflections([...jd.reflections, ...mergedReflections] as never);
   }
 
@@ -4963,7 +4859,7 @@ export class Relation<T extends Base> {
    */
   _buildDeferredDistinctPkInlineSubquery(): SelectManager {
     const basePk = (this._modelClass as any).primaryKey ?? "id";
-    const { jd } = this._buildEagerJoinDependency(this._deferredDistinctPkEagerSpecs());
+    const jd = this._buildEagerJoinDependency(this._deferredDistinctPkEagerSpecs());
     return this._buildEagerIdSubquery(jd, basePk);
   }
 
@@ -4976,7 +4872,7 @@ export class Relation<T extends Base> {
    */
   async _materializeDistinctPkIds(): Promise<unknown[]> {
     const basePk = (this._modelClass as any).primaryKey ?? "id";
-    const { jd } = this._buildEagerJoinDependency(this._deferredDistinctPkEagerSpecs());
+    const jd = this._buildEagerJoinDependency(this._deferredDistinctPkEagerSpecs());
     if (jd.nodes.length === 0) return [];
     return this._withQueryConnection(() => this._materializeLimitedIds(jd, basePk));
   }
@@ -5368,7 +5264,7 @@ export class Relation<T extends Base> {
 
     const basePk = (this._modelClass as any).primaryKey ?? "id";
 
-    const { jd } = this._buildEagerJoinDependency(allEager);
+    const jd = this._buildEagerJoinDependency(allEager);
     if (jd.nodes.length === 0) return null;
 
     const eagerRelation = this._applyEagerJoinDependency(jd, basePk);
@@ -6688,21 +6584,15 @@ export class Relation<T extends Base> {
         rel._includesAssociations = [];
         const hasLimitOrOffset = this._limitValue !== null || (this._offsetValue ?? 0) > 0;
         const pk = (this._modelClass as { primaryKey?: string | string[] }).primaryKey ?? "id";
-        const { jd, fallbackAssocs } = this._buildEagerJoinDependency(eagerSpecs);
-        // JOIN only the joinable remainder; capability-gap reflections
-        // (composite-key collections, unjoinable through) come back as
-        // `fallbackAssocs` and would throw if replayed through `leftOuterJoins`.
-        // cache_version reads size/timestamp from the base + joined tables, so
-        // the preloaded fallbacks contribute nothing and are simply omitted.
-        const joinableSpecs = eagerSpecs.filter((s) => !fallbackAssocs.includes(s));
+        const jd = this._buildEagerJoinDependency(eagerSpecs);
         if (jd.nodes.length === 0) {
-          // No spec is joinable: degrade entirely to the base relation
-          // (limit/offset preserved), mirroring _executeEagerLoad's
-          // jd.nodes.length === 0 preload fallback.
+          // Nothing was joined (empty spec): degrade entirely to the base
+          // relation (limit/offset preserved), mirroring _executeEagerLoad's
+          // jd.nodes.length === 0 path.
           collection = rel;
         } else if (
           hasLimitOrOffset &&
-          !this._applyJoinDependencyIsLimitable(joinableSpecs) &&
+          !this._applyJoinDependencyIsLimitable(eagerSpecs) &&
           !Array.isArray(pk)
         ) {
           // Rails' distinct_relation_for_primary_key (finder_methods.rb:463):
@@ -6715,16 +6605,16 @@ export class Relation<T extends Base> {
           // unsupported combination as an explicit NotImplementedError rather
           // than emitting a wrong single-column `"col1,col2"` predicate.
           const limitedIds = await this._materializeLimitedIds(jd, pk);
-          collection = rel.leftOuterJoins(joinableSpecs).where({ [pk]: limitedIds });
+          collection = rel.leftOuterJoins(eagerSpecs).where({ [pk]: limitedIds });
           collection._limitValue = null;
           collection._offsetValue = null;
-        } else if (hasLimitOrOffset && !this._applyJoinDependencyIsLimitable(joinableSpecs)) {
+        } else if (hasLimitOrOffset && !this._applyJoinDependencyIsLimitable(eagerSpecs)) {
           // Composite-PK, non-limitable eager limit/offset: unsupported here —
           // surfaces NotImplementedError rather than a wrong predicate. Tracked
           // by 0023-surfaced-deviations/composite-pk-distinct-relation-materialization.
           collection = this.applyJoinDependency();
         } else {
-          collection = rel.leftOuterJoins(joinableSpecs);
+          collection = rel.leftOuterJoins(eagerSpecs);
         }
       }
       const tsColumn = this.table.get(timestampColumn);

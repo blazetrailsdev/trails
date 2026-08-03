@@ -1,9 +1,8 @@
 /**
  * Covers JoinDependency#build — the recursive tree construction the constructor
  * runs, which routes nested eager_load specs (hashes, dotted strings, arrays)
- * into the JOIN tree instead of degrading them to preload. Verifies
- * shared-prefix deduplication and all-or-nothing rollback on unjoinable
- * segments (the latter a trails-only fallback lane; Rails raises).
+ * into the JOIN tree. Verifies shared-prefix deduplication and that an
+ * unresolvable segment raises, as Rails' `find_reflection` does.
  *
  * Mirrors: ActiveRecord::Associations::JoinDependency#build (recursive tree
  * construction from the eager_load values hash).
@@ -62,40 +61,37 @@ describe("JoinDependency#build", () => {
 
   const paths = (jd: JoinDependency) => jd.nodes.map((n) => n.assocName).sort();
 
-  /** Build the way the eager-load paths do: un-joinable specs land in `fallback`. */
-  const buildEager = (spec: AssociationSpec | AssociationSpec[]) => {
-    const fallback: AssociationSpec[] = [];
-    const jd = new JoinDependency(Post, null, spec, Nodes.OuterJoin, fallback);
-    return { jd, fallback };
-  };
+  /** Build the way the eager-load paths do — Rails' four-argument constructor. */
+  const buildEager = (spec: AssociationSpec | AssociationSpec[]) =>
+    new JoinDependency(Post, null, spec, Nodes.OuterJoin);
 
   it("joins a nested hash spec instead of falling back to preload", () => {
-    const { jd, fallback } = buildEager({ comments: "author" });
-    expect(fallback).toEqual([]);
-    expect(paths(jd)).toEqual(["comments", "comments.author"]);
+    expect(paths(buildEager({ comments: "author" }))).toEqual(["comments", "comments.author"]);
   });
 
   it("joins a dotted-string spec", () => {
-    const { jd, fallback } = buildEager("comments.author");
-    expect(fallback).toEqual([]);
-    expect(paths(jd)).toEqual(["comments", "comments.author"]);
+    expect(paths(buildEager("comments.author"))).toEqual(["comments", "comments.author"]);
   });
 
   it("deduplicates shared prefixes across hash array values", () => {
-    const { jd, fallback } = buildEager({ comments: ["author", "tags"] });
-    expect(fallback).toEqual([]);
-    expect(paths(jd)).toEqual(["comments", "comments.author", "comments.tags"]);
+    expect(paths(buildEager({ comments: ["author", "tags"] }))).toEqual([
+      "comments",
+      "comments.author",
+      "comments.tags",
+    ]);
   });
 
   it("deduplicates shared prefixes across separate spec calls", () => {
-    const { jd } = buildEager(["comments.author", "comments.tags"]);
-    expect(paths(jd)).toEqual(["comments", "comments.author", "comments.tags"]);
+    expect(paths(buildEager(["comments.author", "comments.tags"]))).toEqual([
+      "comments",
+      "comments.author",
+      "comments.tags",
+    ]);
   });
 
-  it("rolls back the whole spec when a segment can't be joined", () => {
-    const spec = { comments: "nonExisting" };
-    const { jd, fallback } = buildEager(spec);
-    expect(fallback).toEqual([spec]);
-    expect(jd.nodes).toHaveLength(0);
+  it("raises when a segment can't be joined", () => {
+    expect(() => buildEager({ comments: "nonExisting" })).toThrow(
+      /Can't join 'Comment' to association named 'nonExisting'; perhaps you misspelled it\?/,
+    );
   });
 });
