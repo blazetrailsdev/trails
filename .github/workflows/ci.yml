@@ -1351,19 +1351,23 @@ jobs:
         env:
           MYSQL_TEST_URL: mysql://rails@localhost:3306/activerecord_unittest
 
-  # A second full pass over the AR suite, so not on every PR: it runs on `main`,
-  # on the Monday sweep, on `workflow_dispatch`, and on a PR labelled
-  # `run-mysql-prepared`. It is in the `ci` aggregator's `needs:`, so whenever it
-  # does run a failure blocks the merge. Unsharded (hence the wider timeout):
-  # off the per-PR critical path, one runner is the cheaper trade.
+  # A second full pass over the AR suite, so off the per-PR/per-merge critical
+  # path entirely: it runs on the Monday sweep, on `workflow_dispatch`, and on a
+  # PR labelled `run-mysql-prepared` — never on a push to `main`, never on an
+  # unlabelled PR. It is in the `ci` aggregator's `needs:`, so whenever it does
+  # run a failure blocks the merge; when it legitimately doesn't run the
+  # aggregator treats the skip as "not required here". Unsharded (hence the
+  # wider timeout): off the critical path, one runner is the cheaper trade.
   maria-prepared-tests:
     name: Active Record MariaDB Tests (prepared statements)
     needs: changes
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
       needs.changes.outputs.activerecord_affected == 'true' &&
-      (github.event_name != 'pull_request' ||
-       contains(github.event.pull_request.labels.*.name, 'run-mysql-prepared'))
+      (github.event_name == 'schedule' ||
+       github.event_name == 'workflow_dispatch' ||
+       (github.event_name == 'pull_request' &&
+        contains(github.event.pull_request.labels.*.name, 'run-mysql-prepared')))
     runs-on: ubuntu-latest
     timeout-minutes: 30
     services:
@@ -1900,7 +1904,10 @@ jobs:
           PARITY_POSTGRES: ${{ needs.changes.outputs.parity_postgres }}
           PARITY_MYSQL: ${{ needs.changes.outputs.parity_mysql }}
           SQLITE_MEM_UNLABELLED: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'run-sqlite-mem') }}
-          MYSQL_PREPARED_UNLABELLED: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'run-mysql-prepared') }}
+          # True whenever the prepared lane is not required for this event:
+          # every event except the Monday sweep / manual dispatch, and PRs that
+          # don't carry the `run-mysql-prepared` label. Mirrors the job's `if:`.
+          MYSQL_PREPARED_NOT_REQUIRED: ${{ github.event_name != 'schedule' && github.event_name != 'workflow_dispatch' && !(github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'run-mysql-prepared')) }}
           DB_ADAPTERS_DRAFT_DEFERRED: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft && needs.changes.outputs.db_adapter_affected != 'true' && !contains(github.event.pull_request.labels.*.name, 'run-db-adapters') }}
           GUIDES_UNLABELLED: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'run-guides') }}
         run: |
@@ -1966,7 +1973,7 @@ jobs:
                   ;;
                 maria-prepared-tests)
                   if [ "$AR_AFFECTED" = "false" ] || \
-                     [ "$MYSQL_PREPARED_UNLABELLED" = "true" ]; then
+                     [ "$MYSQL_PREPARED_NOT_REQUIRED" = "true" ]; then
                     continue
                   fi
                   ;;
