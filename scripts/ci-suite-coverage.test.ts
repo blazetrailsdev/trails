@@ -287,6 +287,77 @@ describe("CI runs every tooling test suite", () => {
     expect(runs.filter((f) => gate.test(`vendor/${f}`))).toEqual([]);
   });
 
+  // packages/i18n is a leaf: package.json declares no workspace dependencies
+  // and nothing imports @blazetrails/i18n yet, so an i18n-only PR must run the
+  // unit-tests job and nothing else. The intended dependency direction, for
+  // whoever edits these gates next:
+  //
+  // - Downstream (i18n -> its consumers) is allowed, and REQUIRED once real.
+  //   When i18n-consolidate-activesupport-shim and
+  //   i18n-consolidate-activemodel-activerecord-shims point activesupport /
+  //   activemodel / activerecord at @blazetrails/i18n at runtime, `i18n` must
+  //   be added to every gate that then consumes it (AR_PKGS_RE, AP_PKGS_RE,
+  //   AV_PKGS_RE, TRAILTIES_PKGS_RE, RACK_PKGS_RE — the same membership
+  //   activesupport already has). Those stories own that edit and own relaxing
+  //   this test: landing the consumption without widening the gates has to
+  //   fail here rather than ship an untested edge.
+  // - Upstream (consumers -> i18n) is never automatic. An activesupport /
+  //   activemodel / activerecord change must not be SPECIFIED as running the
+  //   i18n suite. activesupport PRs do run it today only because they share
+  //   UNIT_TESTS_PKGS_RE and one vitest invocation with i18n — an incidental
+  //   consequence of the leaf bundle, not a dependency claim, and deliberately
+  //   not asserted here so a later split of i18n into its own gate is free to
+  //   drop it.
+  it("fires only unit_tests_affected for i18n-only changes", async () => {
+    const yml = await readFile(CI_YML, "utf8");
+    const runGate = await gateRunner(yml);
+
+    const paths = [
+      "packages/i18n/src/config.ts",
+      "packages/i18n/src/exceptions.ts",
+      "packages/i18n/src/i18n.ts",
+      "packages/i18n/src/interpolate/ruby.ts",
+    ];
+    const dependentGates = [
+      "activerecord_affected",
+      "actionpack_affected",
+      "actionview_affected",
+      "trailties_affected",
+      "rack_affected",
+      "db_adapter_affected",
+      "trails_tsc_affected",
+      "tse_compiler_affected",
+      "guides_affected",
+    ];
+
+    const fired = await Promise.all(paths.map(runGate));
+    const ungated = paths.filter((_f, i) => fired[i].unit_tests_affected !== "true");
+    expect(ungated).toEqual([]);
+
+    const fannedOut = paths.flatMap((f, i) =>
+      dependentGates.filter((gate) => fired[i][gate] !== "false").map((gate) => `${f} -> ${gate}`),
+    );
+    expect(fannedOut).toEqual([]);
+
+    // Structural form of the same claim, so a failure names the gate that grew
+    // the membership rather than only the path that fanned out.
+    const dependentRegexes = [
+      "AR_PKGS_RE",
+      "AP_PKGS_RE",
+      "AV_PKGS_RE",
+      "TRAILTIES_PKGS_RE",
+      "RACK_PKGS_RE",
+    ];
+    expect(
+      dependentRegexes.filter((name) => gateRegex(yml, name).test("packages/i18n/src/config.ts")),
+    ).toEqual([]);
+
+    // Anchor probe: every path above starts at position 0, so none of them can
+    // catch an alternation whose `^` covers only its first branch.
+    const unitGate = gateRegex(yml, "UNIT_TESTS_PKGS_RE");
+    expect(paths.filter((f) => unitGate.test(`vendor/${f}`))).toEqual([]);
+  });
+
   // GitHub compiles each `run:` block as one template expression and rejects
   // anything over 21,000 characters. Crossing it fails the WHOLE workflow at
   // startup: zero jobs, no checks on the PR, and — because the `on:` filters
