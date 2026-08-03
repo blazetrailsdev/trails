@@ -101,7 +101,7 @@ describe("Arel::Nodes.build_quoted", () => {
   // rb:760's `add_bind(o.value)` land the same payload), but the AST shape does
   // not, for callers that inspect the node.
   //
-  // Tracked by story `arel-build-quoted-passes-model-attribute-unwrapped`,
+  // Tracked by story `converge-arel-build-quoted-model-attribute-unwrapped`,
   // which owns the convergence to Rails' unwrapped shape. This test pins
   // today's shape so that change is visible in the diff — it records the
   // deviation, it does not endorse it.

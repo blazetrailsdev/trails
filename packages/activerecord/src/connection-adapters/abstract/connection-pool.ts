@@ -648,7 +648,7 @@ export class ConnectionPool implements ReapablePool {
    * `leaseConnection`. NOT part of the Rails surface — do not use on
    * production/query paths; those go through async `leaseConnection` /
    * `withConnection`. The lost self-heal on the deprecated `.connection` getter
-   * is tracked by `connection-pool-pinned-sync-checkout-per-checkout-verify`.
+   * is tracked by `converge-sync-connection-lease-per-checkout-verify`.
    *
    * @internal
    *
@@ -1689,7 +1689,7 @@ function checkoutForExclusiveAccess(pool: Pool, checkoutTimeout: number): Databa
     // tests). The sweep only reaches here when connections are busy, so
     // acquisition raises `ConnectionTimeoutError` (converted below).
     // (Lifecycle-path async convergence is tracked by
-    // `converge-connection-pool-lifecycle-async`.)
+    // `converge-connection-pool-lifecycle-exclusive-access-async`.)
     return pool._acquireConnection();
   } catch (err) {
     if (err instanceof ConnectionTimeoutError) {

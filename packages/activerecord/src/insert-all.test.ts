@@ -8,12 +8,8 @@
  * Test names mirror the Ruby method names verbatim (minus the `test_` prefix,
  * underscores rendered as spaces) so scripts/test-compare can match them.
  *
- * Many Rails tests here depend on features trails has not ported yet — they are
- * left `it.skip` with a BLOCKED tag and tracked by RFC 0030 follow-up stories:
- *   - insert_all/upsert_all returning an ActiveRecord::Result (RETURNING
- *     extraction) — d2-insert-all-returning-result
- *   - SQL logging assertions, db-warnings, has_many_through guards,
- *     partitioned indexes, Speedometer no-DB-key — d2-insert-all-canonical-models
+ * The remaining `it.skipIf` guards are adapter conditionals mirroring Rails'
+ * own `current_adapter?` / `supports_*` gates, not unported features.
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { UnknownAttributeError, RecordNotUnique } from "./errors.js";

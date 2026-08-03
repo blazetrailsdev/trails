@@ -20,7 +20,7 @@
  *   - A limit/offset over the joined collection needs the composite-PK
  *     `distinct_relation_for_primary_key` materialization, which trails can't do
  *     yet — it surfaces an explicit NotImplementedError
- *     (0023-surfaced-deviations/composite-pk-distinct-relation-materialization).
+ *     (0023-surfaced-deviations/converge-composite-pk-distinct-relation-materialization).
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base } from "../index.js";
@@ -129,7 +129,7 @@ describe("CpkBook eager pluck / cache_version over a composite-FK collection", (
     // (distinct_relation_for_primary_key) before joining; trails has no
     // composite-PK materialization yet, so it surfaces the explicit error
     // rather than emitting a wrong single-column predicate. Tracked by
-    // 0023-surfaced-deviations/composite-pk-distinct-relation-materialization.
+    // 0023-surfaced-deviations/converge-composite-pk-distinct-relation-materialization.
     await expect(
       CpkBook.eagerLoad("chapters")
         .order("cpk_books.author_id", "cpk_books.id")

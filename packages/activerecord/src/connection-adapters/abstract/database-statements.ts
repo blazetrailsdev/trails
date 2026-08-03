@@ -2157,7 +2157,7 @@ export function combineMultiStatements(totalSql: string[]): string {
  * effectively false and the guard can never fire. Wiring it before then would
  * be dead code that fakes a feature we don't have. Tracked to land alongside
  * the `load_async` port — see story
- * `wire-tablenotspecified-async-error-throw-sites` (RFC 0023).
+ * `wire-asynchronous-query-inside-transaction-error-with-load-async` (RFC 0023).
  * @internal
  */
 export async function select(

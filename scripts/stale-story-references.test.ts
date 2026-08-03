@@ -50,6 +50,38 @@ describe("stale story references", () => {
     expect(staleStoryReferences(refs, STORIES)).toHaveLength(1);
   });
 
+  it("flags a promise whose slug sits in a later sentence than its phrase", () => {
+    const refs = extractStoryReferences(
+      "// Until the connection is threaded into `create` it falls back to the\n" +
+        "// owner's pool. Tracked by `cache-entry-remaining-methods`.\n",
+      "association-scope.ts",
+    );
+    expect(staleStoryReferences(refs, STORIES)).toHaveLength(1);
+  });
+
+  it("flags the tracked-by family and a TODO tag", () => {
+    for (const comment of [
+      "// Known gap, tracked to `cache-entry-remaining-methods`.\n",
+      "// This is tracked separately in `cache-entry-remaining-methods`.\n",
+      "// TODO(cache-entry-remaining-methods): drop the shim.\n",
+    ]) {
+      expect(staleStoryReferences(extractStoryReferences(comment, "x.ts"), STORIES)).toHaveLength(
+        1,
+      );
+    }
+  });
+
+  it("ignores a landed-story citation in a block that promises a different story", () => {
+    const refs = extractStoryReferences(
+      "// TODO(converge-connection-pool-lifecycle-async): remove it.fails when\n" +
+        "// that story fixes the gap. `cache-entry-remaining-methods` landed\n" +
+        "// (#3874) without closing it.\n",
+      "associations.test.ts",
+    );
+    expect(refs.map((ref) => ref.slug)).toEqual(["converge-connection-pool-lifecycle-async"]);
+    expect(staleStoryReferences(refs, STORIES)).toEqual([]);
+  });
+
   it("ignores a slug cited as provenance rather than as a promise", () => {
     const refs = extractStoryReferences(
       "// Regression for `activesupport-json-encoding-time-precision`: the encoder\n// emits three subsecond digits.\n",

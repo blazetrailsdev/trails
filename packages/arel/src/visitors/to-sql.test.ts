@@ -610,7 +610,7 @@ describe("the to_sql visitor", () => {
         // duck-typed (`value.respond_to?(:unboundable?) && value.unboundable?`,
         // to_sql.rb:905-907) and a Float answers it false, so Rails reaches
         // visit_Float and raises. Tracked by story
-        // arel-unboundable-sign-duck-types-like-rails; converging it is out of
+        // converge-arel-unboundable-sign-duck-typing; converging it is out of
         // scope here (it also changes Quoted(INFINITY), which Rails renders as
         // `= Infinity`).
         const v = new Visitors.ToSql(testConnection);

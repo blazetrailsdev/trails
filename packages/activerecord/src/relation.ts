@@ -3596,7 +3596,7 @@ export class Relation<T extends Base> {
         // support, so it would emit a wrong single-column `"col1,col2"` predicate.
         // Surface the same explicit NotImplementedError the cache_version path
         // raises for this shape (tracked by
-        // 0023-surfaced-deviations/composite-pk-distinct-relation-materialization).
+        // 0023-surfaced-deviations/converge-composite-pk-distinct-relation-materialization).
         if (Array.isArray(basePk)) this.applyJoinDependency();
         // Rails apply_join_dependency, for a limit/offset over a collection
         // reflection, replaces the relation via distinct_relation_for_primary_key
@@ -4728,7 +4728,7 @@ export class Relation<T extends Base> {
     // pure-SQL approximation (DISTINCT+LIMIT subquery) diverges from Rails'
     // materialized-ID shape and ordered-distinct handling — so rather than
     // claim parity we reject this combination explicitly. Tracked by the
-    // `relation-handler-distinct-pk-materialization` continuation story.
+    // `converge-relation-subquery-distinct-pk-materialization` continuation story.
     const hasLimitOrOffset = this._limitValue !== null || this._offsetValue !== null;
     const isLimitable =
       this.usingLimitableReflections(joinDependency.reflections as never) &&
@@ -6609,7 +6609,7 @@ export class Relation<T extends Base> {
         } else if (hasLimitOrOffset && !this._applyJoinDependencyIsLimitable(eagerSpecs)) {
           // Composite-PK, non-limitable eager limit/offset: unsupported here —
           // surfaces NotImplementedError rather than a wrong predicate. Tracked
-          // by 0023-surfaced-deviations/composite-pk-distinct-relation-materialization.
+          // by 0023-surfaced-deviations/converge-composite-pk-distinct-relation-materialization.
           collection = this.applyJoinDependency();
         } else {
           collection = rel.leftOuterJoins(eagerSpecs);
