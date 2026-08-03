@@ -1,30 +1,11 @@
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { Temporal } from "@blazetrails/activesupport/temporal";
-import { getApp } from "./config.js";
-import { GID, type GidComponents } from "./uri/gid.js";
-// LAZY-IMPORT CYCLE: signed-global-id ↔ global-id ↔ locator. The `GlobalID`
-// and `isOrExtends` runtime values are only referenced inside method bodies
-// below; don't promote those references to module level — native ESM throws
-// ReferenceError (TDZ) for an uninitialized imported binding accessed during
-// the initial circular evaluation.
-import { GlobalID, isOrExtends, type GlobalIDModel } from "./global-id.js";
-import { type LocatorModel } from "./locator.js";
-import { constantize } from "@blazetrails/activesupport";
+import { GID } from "./uri/gid.js";
+import { GlobalID, type GlobalIDModel, type GlobalIDOptions } from "./global-id.js";
 
 export type { GlobalIDModel };
 
 const DEFAULT_PURPOSE = "default";
-
-/**
- * Option keys that are NOT forwarded as GID URI params.
- * Mirrors GlobalID.create's `options.except(:app, :verifier, :for)` plus
- * the SGID-specific expiration options. Any other key — including
- * `purpose` — flows through to URI params, matching Rails: SGID does
- * not reserve `purpose` as an option, only as the internal `purpose`
- * attr set via pick_purpose(:for).
- * @internal
- */
-const KNOWN_SGID_KEYS = new Set(["app", "for", "expiresIn", "expiresAt", "verifier"]);
 
 /** Monotonic counter for stable inspect() ids; mirrors Ruby's object_id. @internal */
 let _nextObjectId = 0;
@@ -33,8 +14,7 @@ let _nextObjectId = 0;
 let _classVerifier: MessageVerifier | undefined;
 let _classExpiresIn: number | null | undefined;
 
-export interface SignedGlobalIDOptions {
-  app?: string;
+export interface SignedGlobalIDOptions extends GlobalIDOptions {
   /** Rails-canonical purpose option (`options.fetch :for, DEFAULT_PURPOSE`). */
   for?: string | null;
   /** Number of seconds until expiration. `null` explicitly disables expiration (Rails: `expires_in: nil`). */
@@ -47,20 +27,7 @@ export interface SignedGlobalIDOptions {
   [key: string]: unknown;
 }
 
-/**
- * Options accepted by the {@link SignedGlobalID} constructor — a narrower
- * slice of {@link SignedGlobalIDOptions} holding only the knobs that affect
- * verification and the SGID instance fields, since the constructor takes a
- * pre-built URI and can't embed `app` or arbitrary extra URI params.
- */
-export interface SignedGlobalIDInitOptions {
-  for?: string | null;
-  expiresIn?: number | null;
-  expiresAt?: Temporal.Instant | null;
-  verifier?: MessageVerifier;
-}
-
-export interface ParseOptions {
+export interface ParseOptions extends GlobalIDOptions {
   /** Rails-canonical purpose option (`options.fetch :for, DEFAULT_PURPOSE`). */
   for?: string | null;
   /** Optional — falls back to `SignedGlobalID.verifier` when omitted. */
@@ -77,79 +44,26 @@ interface SgidPayload {
   expires_at: string | null;
 }
 
-export class SignedGlobalID {
-  /**
-   * The raw GID URI string, e.g. `gid://MyApp/User/1`
-   *
-   * @noRailsEquivalent CONVERGEABLE (story: globalid-sgid-inherits-globalid).
-   * Inherited from GlobalID in Ruby (`attr_reader :uri`);
-   * re-declared because the TS classes are peers, not a hierarchy. See the
-   * `create` entry for this file.
-   */
-  readonly uri: string;
+export class SignedGlobalID extends GlobalID {
   readonly purpose: string | null;
   readonly expiresAt: Temporal.Instant | undefined;
 
   private readonly verifier: MessageVerifier;
   private _cached: string | undefined;
-  private readonly _components: GidComponents;
   /** Stable per-instance hex id used by inspect(). Rails uses object_id. */
   private readonly _objectId: string;
 
   /**
-   * Mirrors: SignedGlobalID#initialize(gid, options) — the URI-first entry
-   * point the Rails test `new accepts a :for` exercises. Use
-   * {@link SignedGlobalID.create} for the model-first form. Only
-   * verifier/purpose/expiration are read; `app` and extra URI params can't
-   * be threaded into an already-built URI string.
+   * Mirrors: SignedGlobalID#initialize(gid, options) — `super` parses the GID
+   * (Rails' URI::GID.parse, which raises on a malformed URI), then the
+   * verifier/purpose/expiration are picked off the same options hash.
    */
-  constructor(uri: string, options: SignedGlobalIDInitOptions = {}) {
-    // Rails' SignedGlobalID#initialize delegates to URI::GID.parse, which
-    // raises on malformed URIs. Match that invariant here so callers get
-    // an early error rather than deferred failures from modelId/modelName
-    // getters reading garbage components.
-    this._components = GID.parse(uri).deconstructKeys();
-    this.uri = uri;
+  constructor(gid: string | GID, options: SignedGlobalIDOptions = {}) {
+    super(gid, options);
     this.verifier = SignedGlobalID.pickVerifier(options);
     this.purpose = SignedGlobalID.pickPurpose(options);
     this.expiresAt = pickExpiration(options);
     this._objectId = (_nextObjectId++).toString(16).padStart(12, "0");
-  }
-
-  /**
-   * Create a SignedGlobalID for a model instance.
-   *
-   * Mirrors: GlobalID.create
-   *
-   * @noRailsEquivalent CONVERGEABLE (story: globalid-sgid-inherits-globalid).
-   * Rails' `SignedGlobalID < GlobalID` inherits
-   * `GlobalID.create` (polymorphic `new`). In TS the two are peer classes —
-   * SignedGlobalID's fields (verifier/purpose/expiresAt) come from options its
-   * base has no notion of — so `create` is re-declared here. Unifying them
-   * under real inheritance is tracked by the globalid-sgid-inherits-globalid
-   * story.
-   */
-  static create(model: GlobalIDModel, options: SignedGlobalIDOptions = {}): SignedGlobalID {
-    const app = options.app ?? getApp();
-    if (!app) {
-      throw new Error(
-        "An app is required to create a SignedGlobalID. Pass the :app option or call setApp() from @blazetrails/globalid.",
-      );
-    }
-    const modelName = model.constructor.name;
-    // Rails: arbitrary options beyond the known SGID keys become GID URI params.
-    const filteredParams: Record<string, string> = {};
-    for (const [k, v] of Object.entries(options)) {
-      if (!KNOWN_SGID_KEYS.has(k) && v != null) filteredParams[k] = String(v);
-    }
-    const gid = GID.build({
-      app,
-      modelName,
-      modelId: model.id,
-      params: Object.keys(filteredParams).length ? filteredParams : null,
-    });
-
-    return new SignedGlobalID(gid.toString(), options);
   }
 
   /**
@@ -168,7 +82,7 @@ export class SignedGlobalID {
     if (verified === null) return null;
     // The token's own expiry wins over any class-level default: an explicit
     // null tells pickExpiration "no expiration" (Rails: `expires_at: nil`).
-    return new SignedGlobalID(verified.uri, { ...options, expiresAt: verified.expiresAt ?? null });
+    return new this(verified.uri, { ...options, expiresAt: verified.expiresAt ?? null });
   }
 
   // ─── Class-level config (Rails: attr_accessor :verifier, :expires_in) ─────
@@ -293,62 +207,6 @@ export class SignedGlobalID {
 
   toParam(): string {
     return this.toString();
-  }
-
-  /**
-   * Mirrors: GlobalID#model_id
-   *
-   * @noRailsEquivalent CONVERGEABLE (story: globalid-sgid-inherits-globalid).
-   * Inherited from GlobalID in Ruby (`delegate :model_id, to: :uri`);
-   * re-declared because the TS classes are peers, not a hierarchy. See the
-   * `create` entry for this file.
-   */
-  get modelId(): string | string[] {
-    return this._components.modelId;
-  }
-
-  /**
-   * Mirrors: GlobalID#model_name
-   *
-   * @noRailsEquivalent CONVERGEABLE (story: globalid-sgid-inherits-globalid).
-   * Inherited from GlobalID in Ruby (`delegate :model_name, to: :uri`);
-   * re-declared because the TS classes are peers, not a hierarchy. See the
-   * `create` entry for this file.
-   */
-  get modelName(): string {
-    return this._components.modelName;
-  }
-
-  /**
-   * Mirrors: GlobalID#params
-   *
-   * @noRailsEquivalent CONVERGEABLE (story: globalid-sgid-inherits-globalid).
-   * Inherited from GlobalID in Ruby (`delegate :params, to: :uri`);
-   * re-declared because the TS classes are peers, not a hierarchy. See the
-   * `create` entry for this file.
-   */
-  get params(): Record<string, string> {
-    return this._components.params;
-  }
-
-  /**
-   * Mirrors: GlobalID#model_class
-   *
-   * In Ruby SGID inherits the `model <= GlobalID` guard from GID; in TS
-   * the peer class repeats it so a misregistered constant can't slip
-   * either identity through.
-   *
-   * @noRailsEquivalent CONVERGEABLE (story: globalid-sgid-inherits-globalid).
-   * Inherited from GlobalID in Ruby; re-declared because the
-   * TS classes are peers, not a hierarchy. See the `create` entry for this
-   * file.
-   */
-  get modelClass(): LocatorModel {
-    const klass = constantize(this.modelName) as LocatorModel;
-    if (isOrExtends(klass, GlobalID) || isOrExtends(klass, SignedGlobalID)) {
-      throw new Error("GlobalID and SignedGlobalID cannot be used as model_class.");
-    }
-    return klass;
   }
 
   /**

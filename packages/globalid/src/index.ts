@@ -7,11 +7,7 @@ export { SignedGlobalID, ExpiredMessage } from "./signed-global-id.js";
 export { Verifier } from "./verifier.js";
 /** @internal */
 export { _resetSignedGlobalIDClassConfig } from "./signed-global-id.js";
-export type {
-  SignedGlobalIDOptions,
-  ParseOptions,
-  SignedGlobalIDInitOptions,
-} from "./signed-global-id.js";
+export type { SignedGlobalIDOptions, ParseOptions } from "./signed-global-id.js";
 export { validateApp, GID, MissingModelIdError, InvalidModelIdError } from "./uri/gid.js";
 export type { GidComponents } from "./uri/gid.js";
 export { Locator, BaseLocator, UnscopedLocator, BlockLocator } from "./locator.js";
