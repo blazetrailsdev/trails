@@ -1,6 +1,6 @@
 /**
- * The gem covers `I18n.interpolate` through `test/i18n_test.rb`, which the
- * facade story ports. What is pinned here is the `%<name>fmt` branch: Ruby
+ * The gem covers `I18n.interpolate` through `test/i18n/interpolate_test.rb`, which
+ * `interpolate.test.ts` now ports. What is pinned here is the `%<name>fmt` branch: Ruby
  * delegates it to `sprintf`, JS has no such builtin, so every expectation below
  * is the literal output of the matching `sprintf` call in Ruby.
  */
@@ -9,18 +9,12 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { interpolate } from "./ruby.js";
 import { resetConfig } from "../i18n.js";
 import { resetClassConfig } from "../config.js";
-import { MissingInterpolationArgument, ReservedInterpolationKey } from "../exceptions.js";
+import { ReservedInterpolationKey } from "../exceptions.js";
 
 describe("I18n.interpolate", () => {
   beforeEach(() => {
     resetConfig();
     resetClassConfig();
-  });
-
-  it("interpolates %{} placeholders", () => {
-    expect(interpolate("file %{file} opened by %%{user}", { file: "test.txt" })).toBe(
-      "file test.txt opened by %{user}",
-    );
   });
 
   it("calls a callable value with the values hash", () => {
@@ -29,10 +23,6 @@ describe("I18n.interpolate", () => {
       name: (v: { gender: string }) => (v.gender === "m" ? "Mr" : "Mrs"),
     };
     expect(interpolate("%{name}", values)).toBe("Mrs");
-  });
-
-  it("raises MissingInterpolationArgument for an absent key", () => {
-    expect(() => interpolate("%{name}", {})).toThrow(MissingInterpolationArgument);
   });
 
   it("raises ReservedInterpolationKey for a reserved key", () => {
