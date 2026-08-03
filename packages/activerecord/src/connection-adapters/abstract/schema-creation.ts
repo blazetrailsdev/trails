@@ -21,7 +21,6 @@ import {
   CheckConstraintDefinition,
   TableDefinition,
 } from "./schema-definitions.js";
-import { ABSTRACT_SCHEMA_QUOTER } from "./quoting.js";
 import {
   NATIVE_DATABASE_TYPES_BY_ADAPTER,
   type NativeDatabaseType,
@@ -40,15 +39,11 @@ type Definition =
   | CheckConstraintDefinition;
 
 export class SchemaCreation {
-  /** Quoter used for identifier/table/default-expression quoting. */
-  protected adapter: SchemaQuoter;
-
   constructor(
     protected adapterName: "sqlite" | "postgres" | "mysql",
-    adapter?: SchemaQuoter,
-  ) {
-    this.adapter = adapter ?? ABSTRACT_SCHEMA_QUOTER;
-  }
+    /** Quoter used for identifier/table/default-expression quoting. */
+    protected adapter: SchemaQuoter,
+  ) {}
 
   protected supportsPartialIndex(): boolean {
     return this.adapterName !== "mysql";

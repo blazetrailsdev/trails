@@ -769,6 +769,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     } = {},
   ): string {
     const { limit, array, enumType } = options;
+    type = type ?? "";
     let sql: string;
     switch (type) {
       case "binary":

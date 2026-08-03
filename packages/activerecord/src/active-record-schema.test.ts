@@ -11,6 +11,7 @@ import { adapterType } from "./test-adapter.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { itIfSupports } from "./support/supports.js";
 import { fixtures } from "./test-fixtures.js";
+import { schemaConn } from "./support/schema-conn.js";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -113,7 +114,7 @@ describe("ActiveRecordSchemaTest", () => {
 
   it("schema raises an error for invalid column type", () => {
     // TableDefinition doesn't have a method for an invalid type; calling a nonexistent method should throw
-    const td = new TableDefinition("test_invalid");
+    const td = new TableDefinition("test_invalid", { adapter: schemaConn("sqlite") });
     expect(() => (td as any).unknownType("col")).toThrow();
   });
 
@@ -148,7 +149,7 @@ describe("ActiveRecordSchemaTest", () => {
 
   it.skipIf(adapterType !== "postgres")("timestamps with and without zones", async () => {
     // TableDefinition timestamps creates created_at and updated_at as datetime
-    const td = new TableDefinition("tz_test");
+    const td = new TableDefinition("tz_test", { adapter: schemaConn("sqlite") });
     td.timestamps();
     const colNames = td.columns.map((c) => c.name);
     expect(colNames).toContain("created_at");
@@ -158,7 +159,7 @@ describe("ActiveRecordSchemaTest", () => {
   });
 
   it("timestamps with implicit default on create table", async () => {
-    const td = new TableDefinition("ts_default");
+    const td = new TableDefinition("ts_default", { adapter: schemaConn("sqlite") });
     td.timestamps();
     const createdAt = td.columns.find((c) => c.name === "created_at");
     // timestamps sets null: false by default
@@ -166,7 +167,7 @@ describe("ActiveRecordSchemaTest", () => {
   });
 
   it("timestamps with custom options on create table", async () => {
-    const td = new TableDefinition("ts_custom");
+    const td = new TableDefinition("ts_custom", { adapter: schemaConn("sqlite") });
     td.timestamps({ null: true, precision: 6 });
     const createdAt = td.columns.find((c) => c.name === "created_at");
     const updatedAt = td.columns.find((c) => c.name === "updated_at");

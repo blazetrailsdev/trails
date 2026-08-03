@@ -206,8 +206,8 @@ export class TableDefinition extends AbstractTableDefinition {
       temporary?: boolean;
       ifNotExists?: boolean;
       as?: string;
-      adapter?: SchemaQuoter;
-    } = {},
+      adapter: SchemaQuoter;
+    },
   ) {
     super(tableName, { ...options, adapterName: "postgres" });
     this.unlogged = options.unlogged ?? false;
