@@ -615,12 +615,33 @@ async function assignUpdateAttributes(self: any, attrs: Record<string, unknown>)
   if (isMassAssignmentEmpty(attrs)) return;
   const sanitized = sanitizeForMassAssignment(attrs);
   assertLockingColumnNotExplicitly(self, sanitized);
+  // Rails buckets every Hash-valued key into `nested_parameter_attributes` and
+  // runs `assign_nested_parameter_attributes` only after the scalar pass
+  // (attribute_assignment.rb:7-22) — "Assign any deferred nested attributes
+  // after the base attributes have been set" (:25). So a nested writer's
+  // `reject_if`, the built record's callbacks, and the association's
+  // `initialize_attributes` all observe an owner whose own attributes are
+  // already assigned. `assign_nested_parameter_attributes` then assigns them in
+  // order, one at a time (:27).
+  let nestedParameterAttributes: [string, unknown][] | undefined;
   const pending: Promise<void>[] = [];
   for (const [key, value] of Object.entries(sanitized)) {
+    if (
+      typeof value === "object" &&
+      value !== null &&
+      !Array.isArray(value) &&
+      (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null)
+    ) {
+      (nestedParameterAttributes ??= []).push([key, value]);
+      continue;
+    }
     const p = assignUpdateAttribute(self, key, value);
     if (p) pending.push(p);
   }
   if (pending.length) await Promise.all(pending);
+  for (const [key, value] of nestedParameterAttributes ?? []) {
+    await assignUpdateAttribute(self, key, value);
+  }
 }
 
 function collectionWriterPromise(
