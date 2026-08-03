@@ -197,6 +197,15 @@ export interface PackageInfo {
   modules: Record<string, ClassInfo>;
   fileFunctions?: Record<string, MethodInfo[]>;
   fileConstants?: Record<string, Record<string, LiteralValue>>; // file → NAME → literal value
+  /**
+   * TS-side only: file → reason prose of a FILE-level `@noRailsEquivalent`
+   * tag, written in a JSDoc block at the very top of the file (above the
+   * imports) rather than on any one declaration. It claims the whole file has
+   * no Rails counterpart, so extra-surface.ts lets one reason cover every
+   * otherwise-novel name in it — see `collectFileTags` there, which also
+   * rejects the claim when the file DOES have a counterpart.
+   */
+  fileNoRailsEquivalent?: Record<string, string>;
 }
 
 export interface ApiManifest {

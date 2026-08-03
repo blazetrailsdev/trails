@@ -49,7 +49,9 @@
  *      its members do — the declaration name is scored surface (step 3), so
  *      such a tag matches and goes stale like any other. On an `interface` the
  *      declaration tag additionally covers every member — see
- *      `collectTaggedEntries`.
+ *      `collectTaggedEntries`. A FILE-level tag (a leading JSDoc block above
+ *      the imports) covers every extra in its file, but only where the blanket
+ *      is sound — see `fileTagVerdict`.
  *   6. Classify each written tag's permanence claim — see `classifyReason`.
  *      Advisory only: the count of tags that never state one is reported so a
  *      batch of new tags is visible, but it does not affect the exit code.
@@ -292,6 +294,62 @@ export interface TaggedEntry {
    * flag as extra is not a stale tag anyone can delete.
    */
   inherited?: boolean;
+  /**
+   * True when the entry is a FILE-level tag (`name` is `FILE_TAG_NAME`): one
+   * reason written at the top of a file that no Rails file maps onto, covering
+   * every otherwise-extra name in it. See `fileTagVerdict` for the two claims
+   * it is NOT allowed to make.
+   */
+  fileLevel?: boolean;
+}
+
+/**
+ * The `name` slot of a file-level tag's key. Not a legal TS identifier, so it
+ * can never collide with a declaration's key in the shared key space.
+ */
+export const FILE_TAG_NAME = "*";
+
+/** Why a file-level tag was refused — see `fileTagVerdict`. */
+export type FileTagRejectionCause = "counterpart-file" | "moved-names";
+
+export interface FileTagRejection {
+  package: string;
+  tsFile: string;
+  cause: FileTagRejectionCause;
+  /** The Rails file that maps onto this TS file (`counterpart-file` only). */
+  rubyFile?: string;
+  /** The names scoring `moved` (`moved-names` only). */
+  movedNames?: string[];
+}
+
+/**
+ * Whether a file-level tag may absorb this file's extras, and why not when it
+ * may not.
+ *
+ * A file-level tag is a blanket by construction, so it is confined to the one
+ * population where a blanket is sound: files no `.rb` maps onto AND whose extra
+ * names appear nowhere in Rails-land. Member inheritance from a tagged CLASS is
+ * refused for the same reason (see `collectTaggedEntries`) — a tagged container
+ * usually has members that DO have Ruby counterparts, so inheriting there would
+ * mask real drift.
+ *
+ * `postgresql/schema-statements-class.ts` is the counterexample that fixes the
+ * shape of this check: it has no counterpart `.rb`, yet its
+ * `PostgreSQLSchemaStatements` is a renamed port of
+ * `PostgreSQL::SchemaStatements` and ~80 of its names score `moved`. "No
+ * counterpart FILE" is not the claim "no counterpart NAME", and `moved` — the
+ * name exists in Rails, just in another `.rb` — is exactly the marker that a
+ * rename may be owed. Refusing on either signal is a hard failure naming the
+ * file, never a silent no-op: a blanket that quietly stops applying would leave
+ * the surface it was absorbing uncounted.
+ */
+export function fileTagVerdict(
+  rubyFile: string | null,
+  extras: readonly ExtraName[],
+): FileTagRejectionCause | null {
+  if (rubyFile !== null) return "counterpart-file";
+  if (extras.some((e) => e.kind === "moved")) return "moved-names";
+  return null;
 }
 
 /**
@@ -413,6 +471,23 @@ export function collectTaggedEntries(ts: ApiManifest): TaggedEntry[] {
     for (const [file, fns] of Object.entries(tsPkg.fileFunctions ?? {})) {
       for (const fn of fns) pushMethod(pkg, file, fn);
     }
+    // File-level tags: one written reason per file, keyed on a name no
+    // declaration can occupy, so it neither shadows nor is shadowed by the
+    // per-declaration form. It counts as a written tag like any other — the
+    // permanence gate and the staleness gate both apply to it unchanged.
+    for (const [file, reason] of Object.entries(tsPkg.fileNoRailsEquivalent ?? {})) {
+      const entry: TaggedEntry = {
+        package: pkg,
+        tsFile: file,
+        name: FILE_TAG_NAME,
+        reason,
+        fileLevel: true,
+      };
+      const key = allowKeyOf(entry);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(entry);
+    }
   }
   return out;
 }
@@ -497,6 +572,8 @@ interface Report {
   topN: ExtraFile[];
   /** `@noRailsEquivalent` tags found in the TS manifest. */
   tagged: TaggedSummary;
+  /** File-level tags whose claim the report refuted — see `fileTagVerdict`. */
+  fileTagRejections: FileTagRejection[];
 }
 
 const HELP = `extra-surface — TS files with public API exceeding their Rails counterpart
@@ -531,6 +608,12 @@ Reasoned exceptions: an extra is allowed by tagging its TS declaration
 novel/moved counts and reported as an "Allowed" total; a tag on a name that no
 longer flags is STALE and fails the run. A reason opening with PERMANENT or
 CONVERGEABLE states its permanence claim; a tag stating neither fails the run.
+
+A whole file with no Rails counterpart can carry ONE reason instead: write
+\`@noRailsEquivalent <reason>\` in a JSDoc block at the top of the file, above the
+imports. It covers every otherwise-extra name in that file. The claim is checked,
+not trusted — if a Rails file maps onto it, or any name in it scores as moved
+(the name exists in Rails, just elsewhere), the tag is refused and the run fails.
 
 Requires: pnpm api:compare must have run first to produce
   scripts/api-compare/output/{rails-api.json,ts-api.json}.
@@ -1040,6 +1123,7 @@ function buildPackageReport(
   novelOnly: boolean,
   tagKeys: Set<string>,
   matchedTagKeys: Set<string>,
+  fileTagRejections: FileTagRejection[],
 ): PackageTotals {
   const rubyPkg = ruby.packages[pkg];
   const tsPkg = ts.packages[pkg];
@@ -1100,6 +1184,7 @@ function buildPackageReport(
     pushTo(tsModulesByFile, m.file, m);
   }
   const tsFileFunctions = tsPkg.fileFunctions ?? {};
+  const fileTags = tsPkg.fileNoRailsEquivalent ?? {};
 
   // A Ruby file can declare file-level constants and no class/module at all
   // (rails/engine/commands.rb:3-9 is `Rails::Command::…` constants only), so it
@@ -1149,9 +1234,7 @@ function buildPackageReport(
             Object.keys(rubyPkg.fileConstants?.[rubyFile] ?? {}),
           );
 
-    const extras: ExtraName[] = [];
-    let novelCount = 0;
-    let movedCount = 0;
+    const scored: ExtraName[] = [];
     let allowlistedCount = 0;
     let interfaceExemptCount = 0;
     for (const name of tsNames) {
@@ -1171,9 +1254,39 @@ function buildPackageReport(
         interfaceExemptCount++;
         continue;
       }
-      if (novelOnly && kind !== "novel") continue;
-      extras.push({ name, kind });
-      if (kind === "novel") novelCount++;
+      scored.push({ name, kind });
+    }
+
+    // The file-level form is judged on the FULL scored set, `--novel-only`
+    // notwithstanding: a moved name refutes the claim whether or not this run
+    // is reporting moved names.
+    const fileReason = fileTags[expectedTs];
+    if (fileReason !== undefined) {
+      const cause = fileTagVerdict(rubyFile, scored);
+      if (cause === null) {
+        if (scored.length > 0) {
+          matchedTagKeys.add(allowKeyOf({ package: pkg, tsFile: expectedTs, name: FILE_TAG_NAME }));
+          allowlistedCount += scored.length;
+          scored.length = 0;
+        }
+      } else {
+        fileTagRejections.push({
+          package: pkg,
+          tsFile: expectedTs,
+          cause,
+          ...(rubyFile !== null ? { rubyFile } : {}),
+          ...(cause === "moved-names"
+            ? { movedNames: scored.filter((e) => e.kind === "moved").map((e) => e.name) }
+            : {}),
+        });
+      }
+    }
+
+    const extras = novelOnly ? scored.filter((e) => e.kind === "novel") : scored;
+    let novelCount = 0;
+    let movedCount = 0;
+    for (const e of extras) {
+      if (e.kind === "novel") novelCount++;
       else movedCount++;
     }
     result.totalAllowlisted += allowlistedCount;
@@ -1401,6 +1514,7 @@ export function buildReport(
     buildCrossPackageModules(ruby);
 
   const packages: PackageTotals[] = [];
+  const fileTagRejections: FileTagRejection[] = [];
   const scannedPkgs = new Set<string>();
   for (const pkg of Object.keys(ruby.packages)) {
     if (opts.filterPkg && pkg !== opts.filterPkg) continue;
@@ -1418,6 +1532,7 @@ export function buildReport(
         opts.novelOnly,
         tagKeys,
         matchedTagKeys,
+        fileTagRejections,
       ),
     );
   }
@@ -1468,7 +1583,36 @@ export function buildReport(
     packages,
     topN: allExtras.slice(0, opts.topN),
     tagged: taggedSummary,
+    fileTagRejections,
   };
+}
+
+/**
+ * The file-level claim gate: a `@noRailsEquivalent` written at the top of a
+ * file the report can see a Rails counterpart for. Separate from `gateStale`
+ * (which the same tag also trips, having absorbed nothing) because the fix is
+ * different: a stale tag is deleted, a refuted one is the signal that the file
+ * needs per-name reasons — or renames — instead of a blanket.
+ * Returns the failure message, or `null` when the run passes.
+ */
+export function gateFileTagRejections(rejections: readonly FileTagRejection[]): string | null {
+  if (rejections.length === 0) return null;
+  const lines = rejections.map((r) =>
+    r.cause === "counterpart-file"
+      ? `  - ${r.package}  ${r.tsFile} — Rails counterpart file ${r.rubyFile}`
+      : `  - ${r.package}  ${r.tsFile} — ${r.movedNames?.length ?? 0} moved name(s): ` +
+        (r.movedNames ?? []).slice(0, 8).join(", "),
+  );
+  return (
+    `\nextra-surface: ${rejections.length} file-level @noRailsEquivalent tag(s) claim a ` +
+    "file has no Rails counterpart, but the report finds one. A file-level tag is a " +
+    "blanket, so it is confined to files no `.rb` maps onto whose extra names appear " +
+    "nowhere in Rails-land; a `moved` name means the name DOES exist in Rails, just in " +
+    "another file — a rename may be owed, and the blanket would hide it. Tag the names " +
+    "individually, or converge them:\n" +
+    lines.join("\n") +
+    "\n"
+  );
 }
 
 /**
@@ -1485,7 +1629,12 @@ export function gateStale(tagged: TaggedSummary): string | null {
     "the reason and was parsed as a real JSDoc tag, or the tag covers a moved " +
     "(misplaced) port that belongs in its Rails-layout file. Delete the tag " +
     "next to the code:\n" +
-    tagged.stale.map((e) => `  - ${e.package}  ${e.tsFile}  ${e.name}`).join("\n") +
+    tagged.stale
+      .map(
+        (e) =>
+          `  - ${e.package}  ${e.tsFile}  ${e.fileLevel ? "(file-level tag — nothing left to cover)" : e.name}`,
+      )
+      .join("\n") +
     "\n"
   );
 }
@@ -1564,6 +1713,8 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   }
   const unclassifiedMessage = gateUnclassified(report.tagged);
   if (unclassifiedMessage) failures.push(unclassifiedMessage);
+  const rejectedMessage = gateFileTagRejections(report.fileTagRejections);
+  if (rejectedMessage) failures.push(rejectedMessage);
 
   if (failures.length === 0) return;
   for (const failure of failures) console.error(failure);

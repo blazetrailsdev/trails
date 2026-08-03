@@ -12,6 +12,7 @@ import {
   printClassificationBlock,
   gateUnclassified,
   gateStale,
+  gateFileTagRejections,
 } from "./extra-surface.js";
 import type { TaggedEntry, TaggedSummary } from "./extra-surface.js";
 import { extractFromProgram } from "./extract-ts-api.js";
@@ -2159,6 +2160,146 @@ describe("@noRailsEquivalent — extractor to report", () => {
     expect(report.tagged).toMatchObject({ total: 1, matched: 1, inheritedMatched: 0, stale: [] });
     expect(report.packages[0].totalAllowlisted).toBe(1);
     expect(report.packages[0].totalNovel).toBe(0);
+  });
+
+  // The file-level form (RFC 0072): one reason at the top of a file no Rails
+  // file maps onto, in place of the same reason on every declaration in it.
+  const DRIVER_ADAPTER = `
+    /**
+     * @noRailsEquivalent PERMANENT — Ruby binds exactly one SQLite driver, so
+     * Rails has no class to map a per-driver subclass onto.
+     */
+    import { SQLite3Adapter } from "./sqlite3-adapter.js";
+
+    export class LibSQLReplicaAdapter extends SQLite3Adapter {
+      syncReplica(): void {}
+    }
+  `;
+
+  /** Rails declares `base.rb` only, so nothing maps onto the adapter file. */
+  function railsWithout(extraInstance: MethodInfo[] = []): ApiManifest {
+    return {
+      source: "ruby",
+      generatedAt: "",
+      packages: {
+        activerecord: {
+          classes: {
+            "ActiveRecord::Base": rubyClass({
+              name: "Base",
+              file: "base.rb",
+              instance: [method("foo"), ...extraInstance],
+            }),
+          },
+          modules: {},
+        },
+      },
+    };
+  }
+
+  function reportFor(ruby: ApiManifest, files: Record<string, string>) {
+    return buildReport(
+      ruby,
+      { source: "typescript", generatedAt: "", packages: { activerecord: extract(files) } },
+      { filterPkg: null, excludeGlobs: [], novelOnly: false, topN: 50 },
+    );
+  }
+
+  it("covers every name in a file with no Rails counterpart from one file-level tag", () => {
+    const report = reportFor(railsWithout(), {
+      "connection-adapters/libsql-replica-adapter.ts": DRIVER_ADAPTER,
+    });
+    // Both the class DECLARATION name and its member are absorbed by the one
+    // reason — the six driver adapters used to repeat it per declaration.
+    expect(report.packages[0].totalAllowlisted).toBe(2);
+    expect(report.packages[0].totalNovel).toBe(0);
+    expect(report.packages[0].extraFiles).toEqual([]);
+    expect(report.tagged).toMatchObject({ total: 1, matched: 1, stale: [] });
+    expect(report.fileTagRejections).toEqual([]);
+    expect(report.tagged.classification.permanent).toBe(1);
+  });
+
+  it("rejects a file-level tag when a name in the file scores as moved", () => {
+    // The postgresql/schema-statements-class.ts shape: no counterpart FILE, but
+    // the names exist in Rails elsewhere, so a rename may be owed.
+    const report = reportFor(railsWithout([method("sync_replica")]), {
+      "connection-adapters/libsql-replica-adapter.ts": DRIVER_ADAPTER,
+    });
+    expect(report.fileTagRejections).toEqual([
+      {
+        package: "activerecord",
+        tsFile: "connection-adapters/libsql-replica-adapter.ts",
+        cause: "moved-names",
+        movedNames: ["syncReplica"],
+      },
+    ]);
+    // Nothing is absorbed: the names stay counted, and the tag reads as stale.
+    expect(report.packages[0].totalAllowlisted).toBe(0);
+    expect(report.packages[0].extraFiles[0].extras.map((e) => [e.name, e.kind])).toEqual([
+      ["LibSQLReplicaAdapter", "novel"],
+      ["syncReplica", "moved"],
+    ]);
+    expect(report.tagged.stale.map((e) => e.tsFile)).toEqual([
+      "connection-adapters/libsql-replica-adapter.ts",
+    ]);
+    expect(gateFileTagRejections(report.fileTagRejections)).toContain("moved name(s)");
+  });
+
+  it("rejects a file-level tag when a Rails file maps onto the file", () => {
+    const ruby = railsWithout();
+    ruby.packages.activerecord.classes["ActiveRecord::ConnectionAdapters::SQLite3Adapter"] =
+      rubyClass({
+        name: "SQLite3Adapter",
+        file: "connection_adapters/sqlite3_adapter.rb",
+        instance: [method("supports_ddl_transactions?")],
+      });
+    const report = reportFor(ruby, {
+      "connection-adapters/sqlite3-adapter.ts": `
+        /**
+         * @noRailsEquivalent PERMANENT — claims a counterpart-free file, wrongly.
+         */
+        import { AbstractAdapter } from "./abstract-adapter.js";
+
+        export class SQLite3Adapter extends AbstractAdapter {
+          reconnect(): void {}
+        }
+      `,
+    });
+    expect(report.fileTagRejections).toEqual([
+      {
+        package: "activerecord",
+        tsFile: "connection-adapters/sqlite3-adapter.ts",
+        cause: "counterpart-file",
+        rubyFile: "connection_adapters/sqlite3_adapter.rb",
+      },
+    ]);
+    expect(report.packages[0].totalAllowlisted).toBe(0);
+    expect(gateFileTagRejections(report.fileTagRejections)).toContain(
+      "connection_adapters/sqlite3_adapter.rb",
+    );
+  });
+
+  it("reports a file-level tag with nothing left to cover as stale", () => {
+    const report = reportFor(railsWithout(), {
+      "connection-adapters/libsql-replica-adapter.ts": `
+        /**
+         * @noRailsEquivalent PERMANENT — nothing in this file is public.
+         */
+        import { SQLite3Adapter } from "./sqlite3-adapter.js";
+
+        /** @noRailsEquivalent PERMANENT — the declaration, tagged itself. */
+        export class LibSQLReplicaAdapter extends SQLite3Adapter {
+          /** @noRailsEquivalent PERMANENT — the one member, tagged itself. */
+          syncReplica(): void {}
+        }
+      `,
+    });
+    // Every name is already justified per declaration, so the file-level tag
+    // absorbs nothing — it is a tag anyone can delete, i.e. stale.
+    expect(report.fileTagRejections).toEqual([]);
+    expect(report.tagged.stale.map((e) => [e.tsFile, e.fileLevel])).toEqual([
+      ["connection-adapters/libsql-replica-adapter.ts", true],
+    ]);
+    expect(gateStale(report.tagged)).toContain("file-level tag");
   });
 });
 

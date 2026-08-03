@@ -502,11 +502,13 @@ export function extractFromProgram(
   // files reach it through the container's own imports even though the entry
   // list already skipped them — filter here too or the de-overlap is a no-op.
   const excludePrefixes = excludeDirs.map((dir) => dir.replace(/\\/g, "/") + "/");
-  const info: PackageInfo & Required<Pick<PackageInfo, "fileFunctions" | "fileConstants">> = {
+  const info: PackageInfo &
+    Required<Pick<PackageInfo, "fileFunctions" | "fileConstants" | "fileNoRailsEquivalent">> = {
     classes: {},
     modules: {},
     fileFunctions: {},
     fileConstants: {},
+    fileNoRailsEquivalent: {},
   };
   const pendingReExports: PendingReExport[] = [];
   const checker = program.getTypeChecker();
@@ -929,6 +931,9 @@ export function extractFromProgram(
 
     const fileConstants = extractFileConstants(sourceFile);
     if (Object.keys(fileConstants).length > 0) info.fileConstants[relPath] = fileConstants;
+
+    const fileReason = fileLevelNoRailsEquivalentReason(sourceFile);
+    if (fileReason !== undefined) info.fileNoRailsEquivalent[relPath] = fileReason;
 
     // If a file has exported functions but no class/interface/namespace,
     // also create a module entry from the file name for backward compat.
@@ -1613,6 +1618,58 @@ export function noRailsEquivalentReason(node: ts.Node): string | undefined {
     return reason;
   }
   return undefined;
+}
+
+/**
+ * Reason prose of a FILE-level `@noRailsEquivalent` tag, or undefined when the
+ * file carries none.
+ *
+ * The declaration-level tag answers "this NAME has no Rails counterpart". Some
+ * whole files are in that position — `better-sqlite3-adapter.ts` exists because
+ * the JS ecosystem has several interchangeable SQLite clients where Ruby binds
+ * one gem — and writing the same reason on every declaration in them is pure
+ * repetition (RFC 0072). The file-level form states it once.
+ *
+ * It is read from the first JSDoc block in the file, and only when that block
+ * sits above the IMPORTS — the one placement where it documents the file rather
+ * than a declaration. A block at the top of a file whose first statement is a
+ * declaration is that declaration's own doc block (TypeScript binds it there,
+ * and `noRailsEquivalentReason` already reads it); treating it as file-level
+ * too would silently widen every such tag into a blanket. So a file with no
+ * imports has no file-level form — it uses the per-declaration one.
+ *
+ * The prose runs to the next line-leading `@tag` or the end of the block, and
+ * an empty reason is the same hard error it is on a declaration.
+ */
+export function fileLevelNoRailsEquivalentReason(sourceFile: ts.SourceFile): string | undefined {
+  const first = sourceFile.statements[0];
+  if (first === undefined || !ts.isImportDeclaration(first)) return undefined;
+  const text = sourceFile.getFullText();
+  const ranges = ts.getLeadingCommentRanges(text, 0) ?? [];
+  const block = ranges.find(
+    (r) => r.kind === ts.SyntaxKind.MultiLineCommentTrivia && text.startsWith("/**", r.pos),
+  );
+  if (block === undefined) return undefined;
+  const lines = text
+    .slice(block.pos + 3, block.end - 2)
+    .split("\n")
+    .map((line) => line.replace(/^\s*\*?/, "").trim());
+  const start = lines.findIndex((line) => /^@noRailsEquivalent\b/.test(line));
+  if (start === -1) return undefined;
+  const prose = [lines[start].replace(/^@noRailsEquivalent\b/, "")];
+  for (const line of lines.slice(start + 1)) {
+    if (/^@\w/.test(line)) break;
+    prose.push(line);
+  }
+  const reason = prose.join(" ").replace(/\s+/g, " ").trim();
+  if (reason === "") {
+    const line = sourceFile.getLineAndCharacterOfPosition(block.pos).line + start + 1;
+    throw new Error(
+      `@noRailsEquivalent needs a reason: ${sourceFile.fileName}:${line} — ` +
+        "state why this file has no Rails counterpart.",
+    );
+  }
+  return reason;
 }
 
 /**
