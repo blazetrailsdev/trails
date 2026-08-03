@@ -156,19 +156,23 @@ interface QuotedScopeHost {
  */
 export interface RowFormatHost {
   isMariadb(): boolean;
-  readonly databaseVersion: Version;
+  getDatabaseVersion(): Promise<Version>;
   queryValue(sql: string, name?: string): Promise<unknown>;
   _defaultRowFormat?: string | null;
 }
 
 /** @internal */
-export function isRowFormatDynamicByDefault(this: RowFormatHost): boolean {
-  return this.isMariadb() ? this.databaseVersion.gte("10.2.2") : this.databaseVersion.gte("5.7.9");
+export async function isRowFormatDynamicByDefault(this: RowFormatHost): Promise<boolean> {
+  // Rails' `database_version` is `pool.server_version(self)`, which computes
+  // `get_database_version` lazily; the TS spelling of that laziness is awaiting
+  // `getDatabaseVersion()`, whose result the adapter memoizes.
+  const databaseVersion = await this.getDatabaseVersion();
+  return this.isMariadb() ? databaseVersion.gte("10.2.2") : databaseVersion.gte("5.7.9");
 }
 
 /** @internal */
 export async function defaultRowFormat(this: RowFormatHost): Promise<string | null> {
-  if (isRowFormatDynamicByDefault.call(this)) return null;
+  if (await isRowFormatDynamicByDefault.call(this)) return null;
 
   if (!("_defaultRowFormat" in this)) {
     const value = await this.queryValue(

@@ -45,7 +45,7 @@ function rowFormatHost(isMariadb: boolean, version: string, probeResult = 0) {
   const queries: string[] = [];
   return {
     isMariadb: () => isMariadb,
-    databaseVersion: new Version(version),
+    getDatabaseVersion: async () => new Version(version),
     queryValue: async (sql: string) => {
       queries.push(sql);
       return probeResult;
@@ -55,16 +55,16 @@ function rowFormatHost(isMariadb: boolean, version: string, probeResult = 0) {
 }
 
 describe("MySQL::SchemaStatements", () => {
-  it("isRowFormatDynamicByDefault: MariaDB >= 10.2.2 is true", () => {
-    expect(isRowFormatDynamicByDefault.call(rowFormatHost(true, "10.2.2"))).toBe(true);
-    expect(isRowFormatDynamicByDefault.call(rowFormatHost(true, "10.10.0"))).toBe(true);
-    expect(isRowFormatDynamicByDefault.call(rowFormatHost(true, "10.2.1"))).toBe(false);
+  it("isRowFormatDynamicByDefault: MariaDB >= 10.2.2 is true", async () => {
+    expect(await isRowFormatDynamicByDefault.call(rowFormatHost(true, "10.2.2"))).toBe(true);
+    expect(await isRowFormatDynamicByDefault.call(rowFormatHost(true, "10.10.0"))).toBe(true);
+    expect(await isRowFormatDynamicByDefault.call(rowFormatHost(true, "10.2.1"))).toBe(false);
   });
 
-  it("isRowFormatDynamicByDefault: MySQL >= 5.7.9 is true", () => {
-    expect(isRowFormatDynamicByDefault.call(rowFormatHost(false, "5.7.9"))).toBe(true);
-    expect(isRowFormatDynamicByDefault.call(rowFormatHost(false, "5.11.0"))).toBe(true);
-    expect(isRowFormatDynamicByDefault.call(rowFormatHost(false, "5.7.8"))).toBe(false);
+  it("isRowFormatDynamicByDefault: MySQL >= 5.7.9 is true", async () => {
+    expect(await isRowFormatDynamicByDefault.call(rowFormatHost(false, "5.7.9"))).toBe(true);
+    expect(await isRowFormatDynamicByDefault.call(rowFormatHost(false, "5.11.0"))).toBe(true);
+    expect(await isRowFormatDynamicByDefault.call(rowFormatHost(false, "5.7.8"))).toBe(false);
   });
 
   it("defaultRowFormat: null when dynamic by default", async () => {

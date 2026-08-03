@@ -655,13 +655,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
       await this._execMutation(
         `CREATE DATABASE ${this.quoteTableName(name)} DEFAULT CHARACTER SET ${this.quoteTableName(String(options.charset))}`,
       );
-    } else if (
-      // Deviation: the null guard keeps an unwarmed version falling through to the
-      // error branch, since `databaseVersion` throws when it is unset. Rails only
-      // reaches this comparison on a connected adapter, where it is always warm.
-      this._databaseVersion != null &&
-      isRowFormatDynamicByDefault.call(this)
-    ) {
+    } else if (await isRowFormatDynamicByDefault.call(this)) {
       await this._execMutation(
         `CREATE DATABASE ${this.quoteTableName(name)} DEFAULT CHARACTER SET \`utf8mb4\``,
       );
