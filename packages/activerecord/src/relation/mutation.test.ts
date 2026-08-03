@@ -14,6 +14,7 @@ import { describe, it, expect } from "vitest";
 import "../index.js";
 import { fixtures } from "../test-fixtures.js";
 import { Post } from "../test-helpers/models/post.js";
+import { UnknownAttributeReference } from "../errors.js";
 
 fixtures([]);
 /** Fresh relation per test — the trails analogue of Rails' `Relation.new(FakeKlass)`. */
@@ -141,7 +142,7 @@ describe("RelationMutationTest", () => {
     const rel: any = Post.order("title ASC", "comments_count DESC");
     // String order args stay bare (matching Rails), so reversing them keeps them
     // as SqlLiteral strings with the trailing direction flipped — never
-    // re-qualified to `[col, dir]` tuples.
+    // re-qualified against the table.
     const litValues = (): string[] => rel._orderClauses.map((c: any) => String(c.value));
     rel.reverseOrderBang();
     expect(litValues()).toEqual(["title DESC", "comments_count ASC"]);
@@ -244,10 +245,12 @@ describe("RelationMutationTest", () => {
     expect(() => rel.uniqBang()).not.toThrow();
   });
 
-  it("order! with empty string does not emit ORDER BY", () => {
-    // Test the bang method directly — order() delegates to orderBang() on a clone.
-    const rel: any = Post.all();
-    rel.orderBang("");
+  it("order with empty string does not emit ORDER BY", () => {
+    // Rails compact_blank!s order args in `order` (check_if_method_has_arguments!),
+    // not in `order!` — `order!("")` reaches preprocess_order_args and raises from
+    // disallow_raw_sql!, so the blank-swallowing must be asserted on `order`.
+    const rel: any = Post.all().order("");
     expect(rel.toSql()).not.toContain("ORDER BY");
+    expect(() => Post.all().orderBang("")).toThrow(UnknownAttributeReference);
   });
 });

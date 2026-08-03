@@ -361,7 +361,7 @@ export class Relation<T extends Base> {
   private _modelClass: typeof Base;
   /** @internal */
   _whereClause: WhereClause = WhereClause.empty();
-  private _orderClauses: Array<string | [string, "asc" | "desc"] | Nodes.Node> = [];
+  private _orderClauses: Array<string | Nodes.Node> = [];
   private _rawOrderClauses: string[] = [];
   // Tri-state (Rails `@values.fetch(:reordering, nil)`): `undefined` = unset,
   // distinct from an explicit `false`. Mirrors `_isStrictLoading` below.
@@ -4258,7 +4258,7 @@ export class Relation<T extends Base> {
    * directly (like Rails), so no on-read normalization or fresh allocation is
    * needed.
    */
-  get orderValues(): Array<string | [string, "asc" | "desc"] | Nodes.Node> {
+  get orderValues(): Array<string | Nodes.Node> {
     return this._orderClauses;
   }
 
@@ -4698,8 +4698,8 @@ export class Relation<T extends Base> {
           await ensureValidOptions();
           for (const batchRows of loadedBatches) {
             const batchRel = self._clone();
-            batchRel._orderClauses = batchOrders.map(
-              ([col, dir]) => [col, dir] as [string, "asc" | "desc"],
+            batchRel._orderClauses = batchOrders.map(([col, dir]) =>
+              dir === "desc" ? self.table.get(col).desc() : self.table.get(col).asc(),
             );
             (batchRel as any)._records = batchRows;
             (batchRel as any)._loaded = true;
@@ -4728,8 +4728,8 @@ export class Relation<T extends Base> {
           },
         )) {
           const batchRel = self._clone();
-          batchRel._orderClauses = batchOrders.map(
-            ([col, dir]) => [col, dir] as [string, "asc" | "desc"],
+          batchRel._orderClauses = batchOrders.map(([col, dir]) =>
+            dir === "desc" ? self.table.get(col).desc() : self.table.get(col).asc(),
           );
           const tuples = batchRows.map((r) => cursorArr.map((c) => r.readAttribute(c)));
           if (batchUseRanges && !load && cursorArr.length === 1 && tuples.length > 0) {
@@ -5261,7 +5261,7 @@ export class Relation<T extends Base> {
     // relation `_applyEagerJoinDependency` yields.
     this._withEagerJoinDependency(jd)._applyJoinsToManager(idSubquery);
     this._applyWheresToManager(idSubquery, table);
-    this._applyOrderToManager(idSubquery, table);
+    this._applyOrderToManager(idSubquery);
     if (this._limitValue !== null) idSubquery.take(this._limitValue);
     if (this._offsetValue !== null) idSubquery.skip(this._offsetValue);
     return idSubquery;
@@ -5401,7 +5401,7 @@ export class Relation<T extends Base> {
     this._applyJoinsToManager(manager, aliases);
 
     this._applyWheresToManager(manager, table);
-    this._applyOrderToManager(manager, table);
+    this._applyOrderToManager(manager);
 
     if (this._isDistinct) manager.distinct();
     if (this._limitValue !== null) manager.take(this._limitValue);
@@ -5653,13 +5653,15 @@ export class Relation<T extends Base> {
       return;
     }
     // `orderArgs` runs Rails' order/reorder normalization: raise-on-blank, then
-    // `flatten!` + `compact_blank!` (query_methods.rb:656-660/752-756) — except a
-    // trails bind-array `[Arel.sql("x = ?"), ...binds]` is preserved so orderBang
-    // can interpolate it. So `order([nil])` / `reorder([{}])` flatten then compact
-    // to empty (no-op), matching Rails, instead of reaching orderBang as arrays.
+    // the `sanitize_order_arguments(args)` block, then `flatten!` +
+    // `compact_blank!` (query_methods.rb:656-660/752-756). Sanitizing first is
+    // what collapses a bind array `[Arel.sql("x = ?"), ...binds]` into a single
+    // interpolated SqlLiteral, so the subsequent flatten can't scatter its binds.
+    // `order([nil])` / `reorder([{}])` flatten then compact to empty (no-op).
     if (options?.orderArgs) {
       raiseIfBlank();
-      const flat = _qm.flattenedOrderArgs(args).filter((a) => !_qm.isBlankArgument(a));
+      const sanitized = _qm.sanitizeOrderArguments.call(this as any, args);
+      const flat = _qm.flattenedOrderArgs(sanitized).filter((a) => !_qm.isBlankArgument(a));
       args.length = 0;
       args.push(...flat);
       return;
@@ -5752,41 +5754,18 @@ export class Relation<T extends Base> {
     return `"${name.replace(/"/g, '""')}"`;
   }
 
-  private _applyOrderToManager(manager: SelectManager, table: Table): void {
-    // Raw order clauses (from inOrderOf)
+  /**
+   * Mirrors: ActiveRecord::QueryMethods#build_order — `order_values` already
+   * holds fully-resolved terms (preprocess_order_args ran at `order!` time), so
+   * this only drops blanks and hands them to the manager. The `_rawOrderClauses`
+   * prefix is the trails-side carrier for `inOrderOf`'s generated SQL, which
+   * Rails keeps inside order_values as an Arel CASE node.
+   */
+  private _applyOrderToManager(manager: SelectManager): void {
     for (const rawClause of this._rawOrderClauses) {
       manager.order(new Nodes.SqlLiteral(rawClause));
     }
-    for (const clause of this._orderClauses) {
-      if (clause instanceof Nodes.Node) {
-        // Arel order nodes (Ascending/Descending/Attribute/...) preserved by
-        // orderBang — emit directly so identity survives to the SQL manager.
-        manager.order(clause);
-        continue;
-      }
-      if (typeof clause === "string") {
-        // Rails leaves a string order arg bare: `order("name ASC")` /
-        // `order("name")` pass through as an unquoted `Arel::Nodes::SqlLiteral`,
-        // never qualified to the table or column-quoted. Only Symbol and Hash
-        // order args route through column resolution (the tuple branch below).
-        // See Relation#preprocess_order_args (query_methods.rb): the `else`
-        // branch returns the string unchanged.
-        manager.order(new Nodes.SqlLiteral(clause.trim()));
-      } else if (Array.isArray(clause)) {
-        const [col, dir] = clause;
-        // Function expressions, quoted identifiers, and dotted names must be
-        // emitted as raw SQL — table.get() would double-quote them incorrectly.
-        if (/[()"`]|::/.test(col) || /^[\w$]+(\.[\w$]+)+$/.test(col)) {
-          const lit = new Nodes.SqlLiteral(col);
-          manager.order(dir === "desc" ? new Nodes.Descending(lit) : new Nodes.Ascending(lit));
-        } else if (!this._fromClause.isEmpty() && !this._isKnownColumn(col)) {
-          const lit = this.orderColumn(col) as Nodes.Node;
-          manager.order(dir === "desc" ? new Nodes.Descending(lit) : new Nodes.Ascending(lit));
-        } else {
-          manager.order(dir === "desc" ? table.get(col).desc() : table.get(col).asc());
-        }
-      }
-    }
+    this.buildOrder(manager);
   }
 
   private _qualifiedCol(table: Table, key: string): { tbl: string; col: string } {

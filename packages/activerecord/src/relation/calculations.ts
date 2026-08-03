@@ -100,7 +100,7 @@ interface CalculationRelation {
   /** @internal Rails `apply_join_dependency`; see Relation. */
   applyJoinDependency(eagerLoading?: boolean): CalculationRelation;
   _applyWheresToManager(manager: any, table: any): void;
-  _applyOrderToManager(manager: any, table: any): void;
+  _applyOrderToManager(manager: any): void;
   _buildFromNode(): Nodes.Node | string | undefined;
   _checkEagerLoadable(): void;
   toArray(): Promise<any[]>;
@@ -548,7 +548,7 @@ async function groupedAggregate(
   // Rails `execute_grouped_calculation` runs `select_all` on the relation's own
   // arel, which retains order_values — without the ORDER BY, LIMIT/OFFSET pick
   // arbitrary groups on PG/MySQL.
-  rel._applyOrderToManager(manager, table);
+  rel._applyOrderToManager(manager);
 
   if (rel._limitValue !== null) manager.take(rel._limitValue);
   if (rel._offsetValue !== null) manager.skip(rel._offsetValue);
@@ -686,7 +686,7 @@ async function groupedCompositeAssoc(
   // runs `select_all` on the relation's own arel, so order_values ride along
   // for composite FKs too. Without the ORDER BY, LIMIT/OFFSET pick arbitrary
   // groups on PG/MySQL.
-  rel._applyOrderToManager(manager, table);
+  rel._applyOrderToManager(manager);
 
   if (rel._limitValue !== null) manager.take(rel._limitValue);
   if (rel._offsetValue !== null) manager.skip(rel._offsetValue);
@@ -831,7 +831,7 @@ export async function performCount(
           // the relation's `order_values` so the LIMIT/OFFSET selects a
           // deterministic, Rails-ordered top-n set of primary keys before the
           // re-count — otherwise an arbitrary limited id set can diverge.
-          this._applyOrderToManager(idSubquery, table);
+          this._applyOrderToManager(idSubquery);
           // Rails builds the DISTINCT select via `columns_for_distinct(pk,
           // order_values)`: PG/MySQL reject `SELECT DISTINCT id ... ORDER BY
           // <non-selected>`, so those adapters prepend the (aliased) order
@@ -927,7 +927,7 @@ export async function performCount(
             idSubquery.distinct();
             eagerJoined()._applyJoinsToManager(idSubquery);
             this._applyWheresToManager(idSubquery, table);
-            this._applyOrderToManager(idSubquery, table);
+            this._applyOrderToManager(idSubquery);
             // Rails `distinct_relation_for_primary_key` builds the DISTINCT
             // select via `columns_for_distinct(primary_key_columns,
             // order_values)`: PG/MySQL reject `SELECT DISTINCT id ... ORDER BY
