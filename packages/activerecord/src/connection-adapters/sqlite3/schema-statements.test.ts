@@ -1,6 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
 import {
-  schemaCreation,
   createSchemaDumper,
   virtualTableExists,
   _extractValueFromDefault,
@@ -13,17 +12,9 @@ import {
 } from "./schema-statements.js";
 import { SqlTypeMetadata } from "../sql-type-metadata.js";
 import { Column } from "./column.js";
-import { SchemaCreation } from "./schema-creation.js";
 import { SchemaDumper } from "./schema-dumper.js";
-import { schemaConn } from "../../support/schema-conn.js";
 
 describe("SQLite3::SchemaStatements", () => {
-  describe("schemaCreation", () => {
-    it("returns a SQLite3 SchemaCreation instance", () => {
-      expect(schemaCreation.call(schemaConn("sqlite"))).toBeInstanceOf(SchemaCreation);
-    });
-  });
-
   describe("createSchemaDumper", () => {
     it("returns a SchemaDumper instance", () => {
       const fakeAdapter = { adapterName: "sqlite" } as any;
