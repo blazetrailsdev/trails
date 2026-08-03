@@ -17,10 +17,11 @@
  * the same name from it.
  *
  * Naming: `<base>_<runToken>_<slot>` for a slot database, plus
- * `<base>_<runToken>_template` for the PG clone template, and whatever a suite
- * appends to a slot name (`_arunit2`, via `arunit2-config.ts`). Every database
- * a run creates therefore starts with `<base>_<runToken>_`, which is what makes
- * "drop only my own" expressible as a prefix test.
+ * `<base>_<runToken>_template` for the PG clone template, and the `arunit2`
+ * sibling of a slot database, `<base>2_<runToken>_<slot>` (via
+ * `arunit2-config.ts`). Every database a run creates therefore starts with
+ * `<base>_<runToken>_` or `<base>2_<runToken>_`, which is what makes "drop only
+ * my own" expressible as a prefix test.
  *
  * Hard rules (RFC 0023): no `node:*` imports, no `process.*`, async fs only —
  * none of which this module needs.
@@ -89,9 +90,32 @@ export function slotDatabaseName(base: string, runToken: string, slot: number): 
   return `${runDatabasePrefix(base, runToken)}${slot}`;
 }
 
-/** The run token a database name carries, or `null` if it carries none. */
+/**
+ * Splits a database name into the part a run derives its names from and the
+ * `_<runToken>_<slot>` suffix a run appends to it (either half may be absent:
+ * an unstamped name carries no token, and a name may carry no slot).
+ *
+ * `arunit2-config.ts` needs this to place its literal `"2"` on the base rather
+ * than inside the suffix — `<base>2_<token>_<slot>` — so the token stays a
+ * whole segment. Appending the `"2"` to the token instead made
+ * `runTokenOfDatabase` read a sibling's token as `<token>2`: not this run's
+ * token (so teardown leaked it), and a plausible *foreign* token (so a
+ * concurrent run's stale sweep could DROP it while it was live).
+ */
+export function splitRunDatabaseName(name: string): { base: string; suffix: string } {
+  const suffix = new RegExp(`(_${TOKEN_PATTERN})?(_\\d+)?$`).exec(name)?.[0] ?? "";
+  return { base: suffix === "" ? name : name.slice(0, -suffix.length), suffix };
+}
+
+/**
+ * The run token a database name carries, or `null` if it carries none.
+ *
+ * The optional `2` is the `arunit2` sibling's marker (`arunit2-config.ts`): it
+ * sits on the base, ahead of the token, so the capture is the minting run's
+ * token whether or not it is there.
+ */
 export function runTokenOfDatabase(base: string, name: string): string | null {
-  const match = new RegExp(`^${escapeRegExp(base)}_(${TOKEN_PATTERN})_`).exec(name);
+  const match = new RegExp(`^${escapeRegExp(base)}2?_(${TOKEN_PATTERN})_`).exec(name);
   return match?.[1] ?? null;
 }
 

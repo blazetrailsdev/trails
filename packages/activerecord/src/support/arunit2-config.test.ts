@@ -18,4 +18,14 @@ describe("arunit2-config", () => {
       "activerecord_unittest2_32",
     );
   });
+
+  it("keeps the run token whole when the primary database is stamped", () => {
+    expect(arunitDatabaseNames("activerecord_unittest_rabc000001_3")).toEqual({
+      arunit: "activerecord_unittest_rabc000001_3",
+      arunit2: "activerecord_unittest2_rabc000001_3",
+    });
+    expect(arunitDatabaseNames("activerecord_unittest_rabc000001_32").arunit2).toBe(
+      "activerecord_unittest2_rabc000001_32",
+    );
+  });
 });
