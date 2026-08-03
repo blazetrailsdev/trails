@@ -9,7 +9,6 @@ import type { TranslationData } from "./utils.js";
 
 /** The slice of a backend `Config` hands out. */
 export interface Backend {
-  storeTranslations(locale: Locale, data: Record<string, unknown>, options?: unknown): unknown;
   availableLocales(): Locale[];
   reloadBang(): void;
   eagerLoadBang(): void;
