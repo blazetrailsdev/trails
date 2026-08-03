@@ -2,10 +2,12 @@ import { describe, it, expect } from "vitest";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  collectFrozenMarkdownFiles,
   collectMarkdownFiles,
   extractMarkdownStoryReferences,
   extractStoryReferences,
   loadStories,
+  scanFrozenStoryReferences,
   scanStoryReferences,
   staleStoryReferences,
   type IndexStory,
@@ -145,6 +147,20 @@ describe("stale story references", () => {
     const stories = await loadStories(resolveTasksDir(REPO_ROOT));
     const stale = staleStoryReferences(await scanStoryReferences(REPO_ROOT), stories);
     expect(stale.map((ref) => `${ref.file}:${ref.line} ${ref.slug}`)).toEqual([]);
+  });
+
+  it("inventories stale citations in the frozen tree without gating on them", async () => {
+    const files = await collectFrozenMarkdownFiles(REPO_ROOT);
+    expect(files).toContain(path.join("docs", "activerecord", "parity-verification.md"));
+    const stories = await loadStories(resolveTasksDir(REPO_ROOT));
+    const stale = staleStoryReferences(await scanFrozenStoryReferences(REPO_ROOT), stories);
+    if (stale.length > 0) {
+      console.warn(
+        `frozen-tree stale story citations (not gated):\n${stale
+          .map((ref) => `  ${ref.file}:${ref.line} ${ref.slug}`)
+          .join("\n")}`,
+      );
+    }
   });
 
   it("reads each story's status from its own frontmatter", async () => {
