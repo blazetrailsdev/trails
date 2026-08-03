@@ -96,7 +96,18 @@ export class Simple extends Base {
     // To avoid returning empty translations, call `initTranslations`.
     if (doInit && !this.initialized()) this.initTranslations();
 
-    this.translationsStore ??= {};
+    // Ruby's default block writes `h[k] = Concurrent::Hash.new` on a missing-key
+    // read, and that is observable through the public reader — Rails asserts
+    // `translations[:fr] == {}` for a locale that was never stored
+    // (i18n/test/backend/simple_test.rb:154). A `get` trap is the only JS
+    // spelling of it; `in`, `Object.entries` and `Object.keys` stay untrapped,
+    // matching Ruby, where `has_key?` is false until the read vivifies the key.
+    this.translationsStore ??= new Proxy({} as TranslationData, {
+      get(h, k) {
+        if (typeof k === "string" && !(k in h)) h[k] = {};
+        return h[k as string];
+      },
+    });
     return this.translationsStore;
   }
 

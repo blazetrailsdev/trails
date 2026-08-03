@@ -113,9 +113,7 @@ describe("I18nBackendSimpleTest", () => {
       config().availableLocales = ["en", "es"];
       storeTranslations("fr", { foo: { bar: "barfr", baz: "bazfr" } });
       storeTranslations("es", { foo: { bar: "bares", baz: "bazes" } });
-      // Ruby's Concurrent::Hash default block hands back `{}` for the missing
-      // `:fr` key; a plain JS object has nothing there.
-      expect(translations()["fr"]).toBeUndefined();
+      expect(translations()["fr"]).toEqual({});
       expect(translations()["es"]).toEqual({ foo: { bar: "bares", baz: "bazes" } });
     } finally {
       config().enforceAvailableLocales = false;
