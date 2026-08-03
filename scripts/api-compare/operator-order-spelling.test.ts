@@ -43,6 +43,31 @@ describe("operatorSpelling", () => {
     expect(operatorSpelling("ActiveRecord::Result", "[]")).toEqual(["at"]);
   });
 
+  it("resolves every Arel::Math operator to its named mixin spelling", () => {
+    expect(operatorSpelling("Arel::Math", "*")).toEqual(["multiply"]);
+    expect(operatorSpelling("Arel::Math", "+")).toEqual(["add"]);
+    expect(operatorSpelling("Arel::Math", "-")).toEqual(["subtract"]);
+    expect(operatorSpelling("Arel::Math", "/")).toEqual(["divide"]);
+    expect(operatorSpelling("Arel::Math", "&")).toEqual(["bitwiseAnd"]);
+    expect(operatorSpelling("Arel::Math", "|")).toEqual(["bitwiseOr"]);
+    expect(operatorSpelling("Arel::Math", "^")).toEqual(["bitwiseXor"]);
+    expect(operatorSpelling("Arel::Math", "<<")).toEqual(["bitwiseShiftLeft"]);
+    expect(operatorSpelling("Arel::Math", ">>")).toEqual(["bitwiseShiftRight"]);
+    expect(operatorSpelling("Arel::Math", "~@")).toEqual(["bitwiseNot"]);
+  });
+
+  it("leaves module operators with no TS counterpart unmapped", () => {
+    // attribute_methods.rb:415/428, relation/delegation.rb:101 and
+    // core_ext/range/compare_range.rb:16 have no TS member in the container
+    // their bucket maps to, so they stay unmapped rather than being pinned to
+    // a spelling that does not exist (a pin would be dead weight).
+    expect(operatorSpelling("ActiveRecord::AttributeMethods", "[]")).toBeUndefined();
+    expect(operatorSpelling("ActiveRecord::AttributeMethods", "[]=")).toBeUndefined();
+    expect(operatorSpelling("ActiveRecord::Delegation", "[]")).toBeUndefined();
+    expect(operatorSpelling("ActiveRecord::Delegation", "+")).toBeUndefined();
+    expect(operatorSpelling("ActiveSupport::CompareWithRange", "===")).toBeUndefined();
+  });
+
   it("returns undefined for an unlisted class (stays unmapped)", () => {
     expect(operatorSpelling("Arel::Nodes::Casted", "[]")).toBeUndefined();
     expect(operatorSpelling("Arel::Table", "==")).toBeUndefined();
