@@ -272,7 +272,7 @@ describe("JoinDependency Arel node construction", () => {
   it("respects joinType constructor arg (InnerJoin)", () => {
     Associations.hasMany.call(Owner, "assets", { className: "Asset", foreignKey: "owner_id" });
 
-    const jd = new JoinDependency(Owner, Nodes.InnerJoin);
+    const jd = new JoinDependency(Owner, undefined, undefined, Nodes.InnerJoin);
     const node = jd.addAssociation("assets");
     expect(node).not.toBeNull();
     expect(node!.arelJoin).toBeInstanceOf(Nodes.InnerJoin);

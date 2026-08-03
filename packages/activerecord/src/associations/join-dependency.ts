@@ -63,6 +63,9 @@ function reflectionChainKey(chain: readonly object[]): string {
   return key;
 }
 
+/** Options shape matching JoinDependency#addAssociation's options parameter. */
+type AddAssocOptions = { fromModel?: unknown; fromAlias?: string; parentAssocName?: string };
+
 /** Mirrors: ActiveRecord::Associations::JoinDependency::Aliases::Column (name, alias). */
 export interface AliasMap {
   column: string;
@@ -183,10 +186,21 @@ export class JoinDependency {
     string,
     { aliased: TableRef; effectiveName: string; terminated: boolean }
   > = new Map();
+  /**
+   * Mirrors: ActiveRecord::Associations::JoinDependency#initialize
+   * (join_dependency.rb:71) — `(base, table, associations, join_type)`.
+   *
+   * Deviation: every argument after `baseModel` is optional. Rails builds the
+   * whole tree in `initialize` and never mutates it afterwards; trails also
+   * grows a JoinDependency incrementally (`addAssociation` /
+   * `addAssociationSpec`) from the relation paths that discover associations
+   * after construction, so the tree can legitimately start empty.
+   */
   constructor(
     baseModel: typeof Base,
-    joinType?: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin,
     table?: TableRef,
+    associations?: AssociationSpec | AssociationSpec[] | null,
+    joinType?: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin,
   ) {
     this._baseModel = baseModel;
     const baseTable = table ?? (baseModel as any).arelTable;
@@ -197,6 +211,59 @@ export class JoinDependency {
     );
     this._joinRoot = new JoinBase(baseModel, baseTable);
     this._joinType = joinType ?? Nodes.OuterJoin;
+    if (associations != null) {
+      this._buildTree(JoinDependency.makeTree(associations));
+    }
+  }
+
+  /**
+   * Add every association in a make_tree-style hash to the tree, passing parent
+   * context so each nested association attaches to its parent rather than being
+   * re-added from the root.
+   *
+   * Mirrors: ActiveRecord::Associations::JoinDependency#build
+   * (join_dependency.rb:228). Unlike the private `build` used by
+   * `validateEagerLoadSpec`, this one materializes the JOIN nodes.
+   * @internal
+   */
+  private _buildTree(tree: Record<PropertyKey, any>, parentContext?: AddAssocOptions): void {
+    for (const key of Reflect.ownKeys(tree)) {
+      const assocName = typeof key === "symbol" ? (key.description ?? String(key)) : String(key);
+      const node = this.addAssociation(assocName, parentContext);
+      if (!node) {
+        const fromModelClass = (parentContext?.fromModel as any) ?? this._baseModel;
+        const onModel = fromModelClass?.name ?? (this._baseModel as any).name ?? "model";
+        // Rails' JoinDependency#find_reflection raises ConfigurationError when the
+        // association does not exist on the model (join_dependency.rb). A null node
+        // for a *real* association is a join capability gap, which keeps the
+        // ArgumentError fallback below.
+        const exists = (fromModelClass?._associations ?? []).some((a: any) => a.name === assocName);
+        if (!exists) {
+          throw new ConfigurationError(
+            `Can't join '${onModel}' to association named '${assocName}'; perhaps you misspelled it?`,
+          );
+        }
+        const err = new Error(
+          `Association named '${assocName}' was not found on ${onModel}; perhaps you misspelled it?`,
+        );
+        err.name = "ArgumentError";
+        throw err;
+      }
+      const children = tree[key];
+      if (children != null && Reflect.ownKeys(children).length > 0) {
+        this._buildTree(children, {
+          fromModel: node.baseKlass,
+          // effectiveSqlName is the name that actually appears in JOIN SQL (the
+          // real table name unless aliased due to collision). Using tableAlias
+          // here would generate ON clauses referencing e.g. "t1" when the JOIN
+          // SQL uses the real table name.
+          fromAlias: node.effectiveSqlName,
+          parentAssocName: parentContext
+            ? `${parentContext.parentAssocName}.${assocName}`
+            : assocName,
+        });
+      }
+    }
   }
 
   /**
@@ -1171,6 +1238,14 @@ export class JoinDependency {
         if (!hash[key]) hash[key] = Object.create(null);
         if (value != null) JoinDependency.walkTree(value, hash[key]);
       }
+    } else {
+      let desc: string;
+      try {
+        desc = JSON.stringify(associations) ?? String(associations);
+      } catch {
+        desc = `${typeof associations}`;
+      }
+      throw new ConfigurationError(`Invalid association spec: ${desc}`);
     }
   }
 
