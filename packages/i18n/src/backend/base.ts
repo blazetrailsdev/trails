@@ -93,7 +93,11 @@ export async function preloadTranslationFiles(...filenames: (string | string[])[
  * `I18n.reload!` in the gem. A host that never registered a reader has no
  * files to re-read, and `I18n.reload!` there is only the in-memory clear.
  *
- * @internal
+ * @noRailsEquivalent PERMANENT — the counterpart of `preloadTranslationFiles`
+ * above: the gem's re-read is a synchronous `YAML.load_file` inside
+ * `init_translations`, and the four call sites that reach it are synchronous in
+ * Rails all the way up. Awaiting the re-read at `I18n.reload!` — the one seam
+ * the gem also treats as a whole-backend reset — is what the language leaves.
  */
 export async function reloadTranslationFiles(): Promise<void> {
   if (!fileReader) return;

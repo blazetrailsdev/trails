@@ -184,8 +184,8 @@ export function setEnforceAvailableLocales(value: boolean): void {
  */
 export async function reloadBang(): Promise<void> {
   config().clearAvailableLocalesSet();
-  await reloadTranslationFiles();
   config().backend.reloadBang();
+  await reloadTranslationFiles();
 }
 
 /**
