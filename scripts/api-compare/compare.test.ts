@@ -1481,10 +1481,6 @@ describe("splitOverriddenFileBuckets", () => {
   function m(name: string, file: string): MethodInfo {
     return { name, visibility: "public", params: [], file };
   }
-  // ActiveSupport::Inflector's shape: the extractor stamps the entity with the
-  // file that defined its FIRST method (inflector/inflections.rb), so every
-  // method Ruby adds when it reopens the module in inflector/methods.rb carries
-  // its own file but would otherwise be measured against inflections.ts.
   const inflector: ClassInfo = {
     name: "Inflector",
     file: "inflector/inflections.rb",
@@ -1523,16 +1519,13 @@ describe("splitOverriddenFileBuckets", () => {
       { fqn: "ActiveSupport::Inflector", info: inflector },
       "activesupport",
     );
-    // The include-flattened surface belongs to the home bucket only —
-    // duplicating it would report Comparable's methods missing twice.
     expect(out[1].fqn).toBe("ActiveSupport::Inflector");
     expect(out[1].info.includes).toEqual([]);
     expect(out[0].info.includes).toEqual(["Comparable"]);
   });
 
-  it("returns the entity untouched when no reopening file is mapped", () => {
+  it("returns the entity untouched when no reopening file is mapped in this package", () => {
     const entity = { fqn: "ActiveSupport::Inflector", info: inflector };
-    // Same entity, different package: the override table is package-scoped.
     expect(splitOverriddenFileBuckets(entity, "activerecord")).toEqual([entity]);
   });
 

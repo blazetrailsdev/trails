@@ -77,9 +77,16 @@ export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
   "activesupport:core_ext/string/inflections.rb": "inflector.ts",
 };
 
+/** The explicit TS mapping for `rubyFile` in `pkg`, or undefined when unmapped. */
+export function rubyFileTsOverride(rubyFile: string, pkg?: string): string | undefined {
+  if (pkg === undefined) return undefined;
+  const key = `${pkg}:${rubyFile}`;
+  return Object.hasOwn(RUBY_FILE_TS_OVERRIDES, key) ? RUBY_FILE_TS_OVERRIDES[key] : undefined;
+}
+
 /** True when `rubyFile` has an explicit TS mapping in this package. */
 export function hasRubyFileTsOverride(rubyFile: string, pkg?: string): boolean {
-  return pkg !== undefined && `${pkg}:${rubyFile}` in RUBY_FILE_TS_OVERRIDES;
+  return rubyFileTsOverride(rubyFile, pkg) !== undefined;
 }
 
 /**
@@ -91,8 +98,8 @@ export function hasRubyFileTsOverride(rubyFile: string, pkg?: string): boolean {
  * on Windows.
  */
 export function rubyFileToTs(rubyFile: string, pkg?: string): string {
-  const override = pkg !== undefined ? RUBY_FILE_TS_OVERRIDES[`${pkg}:${rubyFile}`] : undefined;
-  if (override) return override;
+  const override = rubyFileTsOverride(rubyFile, pkg);
+  if (override !== undefined) return override;
   const dir = path.posix.dirname(rubyFile);
   const base = path.posix.basename(rubyFile, ".rb");
   const aliasedBase = PATH_SEGMENT_ALIASES[base] ?? base;

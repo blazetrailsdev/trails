@@ -7,6 +7,7 @@ import {
   rubyFileToTs,
   RUBY_FILE_TS_OVERRIDES,
   hasRubyFileTsOverride,
+  rubyFileTsOverride,
   SKIP,
   SKIP_GROUPS,
   ARITY_OVERRIDE_GROUPS,
@@ -241,6 +242,11 @@ describe("RUBY_FILE_TS_OVERRIDES", () => {
     expect(hasRubyFileTsOverride("inflector/methods.rb", "activerecord")).toBe(false);
     expect(hasRubyFileTsOverride("inflector/methods.rb")).toBe(false);
     expect(hasRubyFileTsOverride("inflector/inflections.rb", "activesupport")).toBe(false);
+  });
+
+  it("returns the mapped TS file, or undefined when unmapped", () => {
+    expect(rubyFileTsOverride("inflector/methods.rb", "activesupport")).toBe("inflector.ts");
+    expect(rubyFileTsOverride("inflector/inflections.rb", "activesupport")).toBeUndefined();
   });
 });
 

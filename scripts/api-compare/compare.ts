@@ -1113,59 +1113,6 @@ export function buildModuleIncluderFqns(
  * `resolveModuleName`): `AbstractAdapter` including `"Quoting"` resolves
  * only to `ConnectionAdapters::Quoting`, not to adapter-specific siblings.
  */
-/**
- * Split an entity's methods out of its home-file bucket for every reopening
- * file that carries an explicit TS mapping (RUBY_FILE_TS_OVERRIDES).
- *
- * Ruby reopens a class/module across many files, but the extractor stamps ONE
- * `file` on the entity — where its first method was defined — so by default
- * every later file's methods are measured against that file's TS counterpart.
- * For `ActiveSupport::Inflector` that means `inflector/methods.rb`'s 20 methods
- * are looked for in `inflector/inflections.ts` and reported missing forever.
- * A mapped file gets its own bucket instead, holding only the methods it
- * defines. Splits carry no `includes`/`extends`: the include-flattened methods
- * belong to the home bucket, not to every file the entity is reopened in.
- */
-export function splitOverriddenFileBuckets(
-  entity: { fqn: string; info: ClassInfo },
-  pkg: string,
-): { fqn: string; info: ClassInfo }[] {
-  const home = entity.info.file || "unknown.rb";
-  const allMethods = [...entity.info.instanceMethods, ...entity.info.classMethods];
-  const splitFiles = new Set(
-    allMethods
-      .map((m) => m.file)
-      .filter((f): f is string => f !== undefined && f !== home && hasRubyFileTsOverride(f, pkg)),
-  );
-  if (splitFiles.size === 0) return [entity];
-
-  const inSplit = (m: MethodInfo) => m.file !== undefined && splitFiles.has(m.file);
-  const out: { fqn: string; info: ClassInfo }[] = [
-    {
-      fqn: entity.fqn,
-      info: {
-        ...entity.info,
-        instanceMethods: entity.info.instanceMethods.filter((m) => !inSplit(m)),
-        classMethods: entity.info.classMethods.filter((m) => !inSplit(m)),
-      },
-    },
-  ];
-  for (const file of splitFiles) {
-    out.push({
-      fqn: entity.fqn,
-      info: {
-        ...entity.info,
-        file,
-        includes: [],
-        extends: [],
-        instanceMethods: entity.info.instanceMethods.filter((m) => m.file === file),
-        classMethods: entity.info.classMethods.filter((m) => m.file === file),
-      },
-    });
-  }
-  return out;
-}
-
 export function flattenIncludedMethodInfos(
   entity: ClassInfo,
   entityFqn: string,
@@ -1197,6 +1144,62 @@ export function flattenIncludedMethodInfos(
   for (const inc of entity.includes ?? []) walk(inc, false, entityFqn);
   for (const ext of entity.extends ?? []) walk(ext, true, entityFqn);
   return { instance, klass };
+}
+
+/** A Ruby class or module, paired with the fully-qualified name it was found under. */
+export interface RubyEntity {
+  fqn: string;
+  info: ClassInfo;
+}
+
+/**
+ * Split an entity's methods out of its home-file bucket for every reopening
+ * file that carries an explicit TS mapping (RUBY_FILE_TS_OVERRIDES).
+ *
+ * Ruby reopens a class/module across many files, but the extractor stamps ONE
+ * `file` on the entity — where its first method was defined — so by default
+ * every later file's methods are measured against that file's TS counterpart.
+ * For `ActiveSupport::Inflector` that means `inflector/methods.rb`'s 20 methods
+ * are looked for in `inflector/inflections.ts` and reported missing forever.
+ * A mapped file gets its own bucket instead, holding only the methods it
+ * defines. Splits carry no `includes`/`extends`: the include-flattened methods
+ * belong to the home bucket, not to every file the entity is reopened in.
+ */
+export function splitOverriddenFileBuckets(entity: RubyEntity, pkg: string): RubyEntity[] {
+  const home = entity.info.file || "unknown.rb";
+  const allMethods = [...entity.info.instanceMethods, ...entity.info.classMethods];
+  const splitFiles = new Set(
+    allMethods
+      .map((m) => m.file)
+      .filter((f): f is string => f !== undefined && f !== home && hasRubyFileTsOverride(f, pkg)),
+  );
+  if (splitFiles.size === 0) return [entity];
+
+  const inSplit = (m: MethodInfo) => m.file !== undefined && splitFiles.has(m.file);
+  const out: RubyEntity[] = [
+    {
+      fqn: entity.fqn,
+      info: {
+        ...entity.info,
+        instanceMethods: entity.info.instanceMethods.filter((m) => !inSplit(m)),
+        classMethods: entity.info.classMethods.filter((m) => !inSplit(m)),
+      },
+    },
+  ];
+  for (const file of splitFiles) {
+    out.push({
+      fqn: entity.fqn,
+      info: {
+        ...entity.info,
+        file,
+        includes: [],
+        extends: [],
+        instanceMethods: entity.info.instanceMethods.filter((m) => m.file === file),
+        classMethods: entity.info.classMethods.filter((m) => m.file === file),
+      },
+    });
+  }
+  return out;
 }
 
 /**
@@ -1682,10 +1685,7 @@ export function main() {
     }
 
     // Collect all Ruby classes and modules with their methods
-    const allRuby: {
-      fqn: string;
-      info: ClassInfo;
-    }[] = [];
+    const allRuby: RubyEntity[] = [];
 
     // Skip nested classes that share a file with a shorter-named parent.
     // e.g., Preloader::Association::LoaderQuery in preloader/association.rb
