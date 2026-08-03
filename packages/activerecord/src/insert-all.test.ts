@@ -88,6 +88,11 @@ function getYear(val: unknown): number {
   return 0;
 }
 
+/** Ruby `Time#usec` — microseconds within the second. */
+function usec(instant: Temporal.Instant): number {
+  return Number((instant.epochNanoseconds % 1_000_000_000n) / 1000n);
+}
+
 async function withRecordTimestamps(
   model: typeof Base,
   value: boolean,
@@ -731,7 +736,11 @@ describe("InsertAllTest", () => {
       for (let i = 1; i <= 100 && !hasSubsecond; i++) {
         await Book.upsertAll([{ id: 101, name: `Out of the Silent Planet (Edition ${i})` }]);
         const ua = ((await Book.find(101)) as any).updated_at as Temporal.Instant | null;
-        if (ua) hasSubsecond = ua.epochMilliseconds % 1000 !== 0;
+        // Rails asserts `updated_at.usec > 0` — microseconds within the second.
+        // Testing only whole milliseconds throws away three digits of the
+        // timestamp and flakes ~1 run in 1000 (CURRENT_TIMESTAMP is fixed for
+        // the whole transaction, so the retry loop cannot rescue it).
+        if (ua) hasSubsecond = usec(ua) > 0;
       }
       expect(hasSubsecond).toBe(true);
     },
@@ -867,7 +876,7 @@ describe("InsertAllTest", () => {
         for (let i = 1; i <= 100 && !hasSubsecond; i++) {
           await Ship.upsertAll([{ id: 200 + i, name: "Boaty" }]);
           const ca = ((await Ship.find(200 + i)) as any).created_at as Temporal.Instant | null;
-          if (ca) hasSubsecond = ca.epochMilliseconds % 1000 !== 0;
+          if (ca) hasSubsecond = usec(ca) > 0;
         }
       });
       expect(hasSubsecond).toBe(true);
