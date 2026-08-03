@@ -8,6 +8,9 @@ import { resetConfig } from "./i18n.js";
 class FakeBackend implements Backend {
   reloaded = 0;
   constructor(private locales: string[] = ["en"]) {}
+  storeTranslations(): unknown {
+    return null;
+  }
   availableLocales(): string[] {
     return this.locales;
   }

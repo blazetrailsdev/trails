@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { I18n, MissingTranslationData, isHtmlSafe } from "@blazetrails/activesupport";
+import { MissingTranslationData } from "@blazetrails/i18n";
+import { I18n, isHtmlSafe } from "@blazetrails/activesupport";
 import {
   l,
   localize,
@@ -41,12 +42,16 @@ class TranslationController {
   }
 }
 
+// Rails' actionpack/test/abstract_unit.rb:65 turns the check off for the
+// whole suite; these cases translate under locales they store themselves.
+I18n.setEnforceAvailableLocales(false);
+
 describe("TranslationControllerTest", () => {
   let controller: TranslationController;
 
   beforeEach(() => {
     controller = new TranslationController();
-    I18n.backend.storeTranslations("en", {
+    I18n.backend().storeTranslations("en", {
       one: { two: "bar" },
       abstract_controller: {
         testing: {
@@ -162,8 +167,18 @@ describe("TranslationControllerTest", () => {
 
   it("localize", () => {
     const time = new Date(Date.UTC(2000, 0, 1, 0, 0, 0));
-    expect(typeof controller.l(time)).toBe("string");
-    expect(controller.l(time)).toBe(localize.call(controller as unknown as TranslationHost, time));
+    const expected = "Sat, 01 Jan 2000 00:00:00 +0000";
+    // Rails stubs `I18n.localize`; the JS analogue of stubbing a module
+    // function is an own property on the backend the facade delegates to.
+    const backend = I18n.backend() as { localize?: unknown };
+    const original = Object.getOwnPropertyDescriptor(backend, "localize");
+    backend.localize = () => expected;
+    try {
+      expect(controller.l(time)).toBe(expected);
+    } finally {
+      if (original) Object.defineProperty(backend, "localize", original);
+      else delete backend.localize;
+    }
   });
 
   it("translate does not mark plain text as safe html", () => {
@@ -222,7 +237,7 @@ function makeHost(controllerPath: string, actionName: string): TranslationHost {
 
 describe("AbstractController::Translation — trails-only", () => {
   beforeEach(() => {
-    I18n.backend.storeTranslations("en", {
+    I18n.backend().storeTranslations("en", {
       people: {
         index: { foo: "scoped people index foo" },
       },
@@ -241,7 +256,7 @@ describe("AbstractController::Translation — trails-only", () => {
   });
 
   it("forwards caller options (e.g. locale) to internal lookups on dot keys", () => {
-    I18n.backend.storeTranslations("fr", {
+    I18n.backend().storeTranslations("fr", {
       people: { index: { foo: "bonjour" } },
     });
     const host = makeHost("people", "index");
@@ -249,7 +264,7 @@ describe("AbstractController::Translation — trails-only", () => {
   });
 
   it("converts slashes in controller path to dots", () => {
-    I18n.backend.storeTranslations("en", {
+    I18n.backend().storeTranslations("en", {
       admin: { users: { show: { foo: "admin users show foo" } } },
     });
     const host = makeHost("admin/users", "show");

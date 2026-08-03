@@ -133,6 +133,9 @@ importers:
       '@blazetrails/did-you-mean':
         specifier: workspace:*
         version: link:../did-you-mean
+      '@blazetrails/i18n':
+        specifier: workspace:*
+        version: link:../i18n
       '@blazetrails/nokogiri':
         specifier: workspace:*
         version: link:../nokogiri
@@ -220,6 +223,9 @@ importers:
 
   packages/activesupport:
     dependencies:
+      '@blazetrails/i18n':
+        specifier: workspace:*
+        version: link:../i18n
       '@js-temporal/polyfill':
         specifier: ^0.5.1
         version: 0.5.1

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { I18n } from "./i18n.js";
+import { en } from "./locale/en.js";
 import {
   numberToCurrency,
   numberToRounded,
@@ -9,8 +10,18 @@ import {
   numberToHuman,
 } from "./number-helper.js";
 
+// Rails' activesupport/test/abstract_unit.rb:35 turns the check off for the
+// whole suite; these cases translate under locales they store themselves.
+I18n.setEnforceAvailableLocales(false);
+
+/** `I18n.reload!` plus the `en` locale Rails re-reads from its load path. */
+function reloadTranslations(): void {
+  I18n.reloadBang();
+  I18n.backend().storeTranslations("en", en);
+}
+
 function setupTranslations(): void {
-  I18n.backend.storeTranslations("ts", {
+  I18n.backend().storeTranslations("ts", {
     number: {
       format: {
         precision: 3,
@@ -64,19 +75,17 @@ function setupTranslations(): void {
     },
   });
 
-  I18n.backend.storeTranslations("empty", {});
+  I18n.backend().storeTranslations("empty", {});
 }
 
 describe("NumberHelperI18nTest", () => {
   beforeEach(() => {
-    I18n.backend.reload();
-    I18n.loadDefaults();
+    reloadTranslations();
     setupTranslations();
   });
 
   afterEach(() => {
-    I18n.backend.reload();
-    I18n.loadDefaults();
+    reloadTranslations();
   });
 
   it("number to i18n currency", () => {
@@ -91,7 +100,7 @@ describe("NumberHelperI18nTest", () => {
   });
 
   it("locale default format has precedence over helper defaults", () => {
-    I18n.backend.storeTranslations("ts", {
+    I18n.backend().storeTranslations("ts", {
       number: { format: { separator: ";" } },
     });
 
@@ -99,7 +108,7 @@ describe("NumberHelperI18nTest", () => {
   });
 
   it("number to currency without currency negative format", () => {
-    I18n.backend.storeTranslations("no_negative_format", {
+    I18n.backend().storeTranslations("no_negative_format", {
       number: {
         currency: { format: { unit: "@", format: "%n %u" } },
       },

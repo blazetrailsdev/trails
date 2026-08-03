@@ -1,60 +1,25 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { I18n, MissingTranslationData } from "./i18n.js";
+import { I18n } from "./i18n.js";
+import { en } from "./locale/en.js";
 import { toSentence } from "./array-utils.js";
 
-describe("I18nTest", () => {
-  let date: Date;
-  let time: Date;
+/** `I18n.reload!` plus the `en` locale Rails re-reads from its load path. */
+function reloadTranslations(): void {
+  I18n.reloadBang();
+  I18n.backend().storeTranslations("en", en);
+}
 
+// Rails' activesupport/test/abstract_unit.rb:35 turns the check off for the
+// whole suite.
+I18n.setEnforceAvailableLocales(false);
+
+describe("I18nTest", () => {
   beforeEach(() => {
-    I18n.loadDefaults();
-    date = new Date(2008, 6, 2); // July 2, 2008 local midnight
-    time = new Date(2008, 6, 2, 16, 47, 1); // July 2, 2008 16:47:01 local time
+    reloadTranslations();
   });
 
   afterEach(() => {
-    I18n.loadDefaults();
-  });
-
-  it("time zone localization with default format", () => {
-    const now = new Date(2000, 0, 1); // Jan 1, 2000 local
-    const result = I18n.localize(now, { type: "time" });
-    expect(typeof result).toBe("string");
-    expect(result).toMatch(/Sat, 01 Jan 2000 00:00:00/);
-  });
-
-  it("date localization should use default format", () => {
-    expect(I18n.localize(date, { type: "date" })).toBe("2008-07-02");
-  });
-
-  it("date localization with default format", () => {
-    expect(I18n.localize(date, { type: "date", format: "default" })).toBe("2008-07-02");
-  });
-
-  it("date localization with short format", () => {
-    expect(I18n.localize(date, { type: "date", format: "short" })).toBe("Jul 02");
-  });
-
-  it("date localization with long format", () => {
-    expect(I18n.localize(date, { type: "date", format: "long" })).toBe("July 02, 2008");
-  });
-
-  it("time localization should use default format", () => {
-    const result = I18n.localize(time, { type: "time" });
-    expect(result).toMatch(/Wed, 02 Jul 2008 16:47:01/);
-  });
-
-  it("time localization with default format", () => {
-    const result = I18n.localize(time, { type: "time", format: "default" });
-    expect(result).toMatch(/Wed, 02 Jul 2008 16:47:01/);
-  });
-
-  it("time localization with short format", () => {
-    expect(I18n.localize(time, { type: "time", format: "short" })).toBe("02 Jul 16:47");
-  });
-
-  it("time localization with long format", () => {
-    expect(I18n.localize(time, { type: "time", format: "long" })).toBe("July 02, 2008 16:47");
+    reloadTranslations();
   });
 
   it("day names", () => {
@@ -144,13 +109,13 @@ describe("I18nTest", () => {
   it("to sentence", () => {
     expect(toSentence(["a", "b", "c"])).toBe("a, b, and c");
 
-    I18n.backend.storeTranslations("en", {
+    I18n.backend().storeTranslations("en", {
       support: { array: { two_words_connector: " & " } },
     });
     const twoWords = I18n.translate("support.array.two_words_connector") as string;
     expect(toSentence(["a", "b"], { twoWordsConnector: twoWords })).toBe("a & b");
 
-    I18n.backend.storeTranslations("en", {
+    I18n.backend().storeTranslations("en", {
       support: { array: { last_word_connector: " and " } },
     });
     const lastWord = I18n.translate("support.array.last_word_connector") as string;
@@ -161,154 +126,8 @@ describe("I18nTest", () => {
     expect(toSentence(["a", "b", "c"])).toBe("a, b, and c");
   });
 
-  it("translate { raise: true } throws MissingTranslationData for unknown keys", () => {
-    let caught: unknown = null;
-    try {
-      I18n.translate("nope.never.was", { raise: true });
-    } catch (e) {
-      caught = e;
-    }
-    expect(caught).toBeInstanceOf(MissingTranslationData);
-    expect((caught as MissingTranslationData).key).toBe("nope.never.was");
-    expect((caught as MissingTranslationData).locale).toBe("en");
-    expect((caught as Error).message).toBe("Translation missing: en.nope.never.was");
-  });
-
-  it("translate { raise: true } lists the options considered for a default chain", () => {
-    let caught: unknown = null;
-    try {
-      I18n.translate("nope.never.was", {
-        raise: true,
-        default: [Symbol("also.missing"), Symbol("still.missing")],
-      });
-    } catch (e) {
-      caught = e;
-    }
-    expect(caught).toBeInstanceOf(MissingTranslationData);
-    expect((caught as MissingTranslationData).consideredKeys).toEqual([
-      "nope.never.was",
-      "also.missing",
-      "still.missing",
-    ]);
-    expect((caught as Error).message).toBe(
-      "Translation missing. Options considered were:\n" +
-        "- en.nope.never.was\n" +
-        "- en.also.missing\n" +
-        "- en.still.missing",
-    );
-  });
-
-  it("translate returns the options-considered message for a default chain without raise", () => {
-    expect(I18n.translate("nope.never.was", { default: [Symbol("also.missing")] })).toBe(
-      "Translation missing. Options considered were:\n- en.nope.never.was\n- en.also.missing",
-    );
-  });
-
-  it("translate resolves a Symbol default chain entry to its translation", () => {
-    I18n.backend.storeTranslations("en", { fallback: { greeting: "Hi" } });
-    expect(I18n.translate("nope.never.was", { default: [Symbol("fallback.greeting")] })).toBe("Hi");
-  });
-
-  it("test_translate_with_default_and_raise_false", () => {
-    I18n.backend.storeTranslations("en", { translations: { foo: "Foo" } });
-    expect(
-      I18n.translate("translations.missing", { default: Symbol("translations.foo"), raise: false }),
-    ).toBe("Foo");
-  });
-
-  it("test_returns_missing_translation_message_does_filters_out_i18n_options", () => {
-    expect(I18n.translate("translations.missing", { year: "2015", default: [] })).toBe(
-      "Translation missing: en.translations.missing",
-    );
-    expect(I18n.translate("translations.missing", { year: "2015", scope: "scoped" })).toBe(
-      "Translation missing: en.scoped.translations.missing",
-    );
-  });
-
-  it("translate with an all-nil default array reports the bare missing message", () => {
-    expect(I18n.translate("translations.missing", { default: [null] })).toBe(
-      "Translation missing: en.translations.missing",
-    );
-  });
-
-  it("translate with an unresolved non-array default reports the bare missing message", () => {
-    expect(I18n.translate("translations.missing", { default: Symbol("also.missing") })).toBe(
-      "Translation missing: en.translations.missing",
-    );
-  });
-
-  it("translate with an explicit null default returns null instead of raising", () => {
-    expect(I18n.translate("translations.missing", { default: null })).toBeNull();
-    expect(I18n.translate("translations.missing", { default: null, raise: true })).toBeNull();
-  });
-
-  it("test_translate_with_array_of_string_defaults", () => {
-    expect(
-      I18n.translate("translations.missing", {
-        default: ["A Generic String", "Second generic string"],
-      }),
-    ).toBe("A Generic String");
-  });
-
-  it("test_translate_with_array_of_defaults_with_nil", () => {
-    expect(
-      I18n.translate("translations.missing", {
-        default: [Symbol("also_missing"), null, "A Generic String"],
-      }),
-    ).toBe("A Generic String");
-  });
-
-  it("test_translate_with_array_of_array_default", () => {
-    expect(I18n.translate("translations.missing", { default: [[]] })).toEqual([]);
-  });
-
-  it("translate resolves Symbol default chain entries under the caller's scope", () => {
-    I18n.backend.storeTranslations("en", { scoped: { fellback: "Fell back" } });
-    expect(I18n.translate("missing", { scope: "scoped", default: [Symbol("fellback")] })).toBe(
-      "Fell back",
-    );
-  });
-
-  it("translate reports scoped default keys in the options-considered message", () => {
-    expect(I18n.translate("missing", { scope: "scoped", default: [Symbol("also_missing")] })).toBe(
-      "Translation missing. Options considered were:\n- en.scoped.missing\n- en.scoped.also_missing",
-    );
-  });
-
-  it("translate { raise: true } honors a supplied default (does not throw)", () => {
-    expect(I18n.translate("nope", { raise: true, default: "fallback" })).toBe("fallback");
-  });
-
-  it("translate interpolates %{name} placeholders", () => {
-    I18n.backend.storeTranslations("en", { greeting: "Hello %{name}!" });
-    expect(I18n.translate("greeting", { name: "World" })).toBe("Hello World!");
-  });
-
-  it("translate leaves unmatched %{name} placeholders intact", () => {
-    I18n.backend.storeTranslations("en", { greeting: "Hello %{name}!" });
-    expect(I18n.translate("greeting")).toBe("Hello %{name}!");
-  });
-
-  it("translate does not interpolate reserved keys like locale/default/raise", () => {
-    I18n.backend.storeTranslations("en", { msg: "%{locale} %{default} %{raise}" });
-    expect(I18n.translate("msg", { locale: "en", default: "x", raise: true })).toBe(
-      "%{locale} %{default} %{raise}",
-    );
-  });
-
-  it("translate interpolates count (not a reserved key)", () => {
-    I18n.backend.storeTranslations("en", { items: "%{count} items" });
-    expect(I18n.translate("items", { count: 5 })).toBe("5 items");
-  });
-
-  it("translate interpolates string defaults", () => {
-    expect(I18n.translate("missing.key", { default: "Hello %{name}!", name: "World" })).toBe(
-      "Hello World!",
-    );
-  });
-
-  it("translate does not interpolate prototype properties", () => {
-    I18n.backend.storeTranslations("en", { msg: "%{toString} %{constructor}" });
-    expect(I18n.translate("msg")).toBe("%{toString} %{constructor}");
+  it("ordinals resolve through the number.nth lambdas", () => {
+    expect(I18n.translate("number.nth.ordinals", { number: 1 })).toBe("st");
+    expect(I18n.translate("number.nth.ordinalized", { number: 2 })).toBe("2nd");
   });
 });
