@@ -49,7 +49,6 @@ export class MessageEncryptor extends Codec {
   declare onRotation: (callback: OnRotation) => this;
   declare fallBackTo: (fallback: this) => this;
 
-
   private secret: Buffer;
   private signSecret: Buffer;
   private cipher: string;
