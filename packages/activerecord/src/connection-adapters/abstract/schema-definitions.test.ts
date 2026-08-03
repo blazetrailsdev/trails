@@ -300,14 +300,14 @@ describe("TableDefinition#new_check_constraint_definition", () => {
 describe("ReferenceDefinition helpers", () => {
   it("addTo adds id column by default", () => {
     const ref = new ReferenceDefinition("user", { index: false });
-    const td = new TableDefinition("posts", { adapter: schemaConn("sqlite"), id: false });
+    const td = new TableDefinition("posts", { adapter: schemaConn("sqlite") });
     ref.addTo(td);
     expect(td.columns.map((c) => c.name)).toContain("user_id");
   });
 
   it("addTo adds type column when polymorphic", () => {
     const ref = new ReferenceDefinition("taggable", { polymorphic: true, index: false });
-    const td = new TableDefinition("taggings", { adapter: schemaConn("sqlite"), id: false });
+    const td = new TableDefinition("taggings", { adapter: schemaConn("sqlite") });
     ref.addTo(td);
     const names = td.columns.map((c) => c.name);
     expect(names).toContain("taggable_id");
@@ -316,14 +316,14 @@ describe("ReferenceDefinition helpers", () => {
 
   it("addTo adds index with polymorphic name", () => {
     const ref = new ReferenceDefinition("taggable", { polymorphic: true });
-    const td = new TableDefinition("taggings", { adapter: schemaConn("sqlite"), id: false });
+    const td = new TableDefinition("taggings", { adapter: schemaConn("sqlite") });
     ref.addTo(td);
     expect(td.indexes[0].name).toBe("index_taggings_on_taggable");
   });
 
   it("addTo adds foreign key when foreignKey: true", () => {
     const ref = new ReferenceDefinition("user", { foreignKey: true, index: false });
-    const td = new TableDefinition("posts", { adapter: schemaConn("sqlite"), id: false });
+    const td = new TableDefinition("posts", { adapter: schemaConn("sqlite") });
     ref.addTo(td);
     expect(td.foreignKeys).toHaveLength(1);
     expect(td.foreignKeys[0].toTable).toBe("users");
@@ -334,7 +334,7 @@ describe("ReferenceDefinition helpers", () => {
       foreignKey: { toTable: "accounts" },
       index: false,
     });
-    const td = new TableDefinition("posts", { adapter: schemaConn("sqlite"), id: false });
+    const td = new TableDefinition("posts", { adapter: schemaConn("sqlite") });
     ref.addTo(td);
     expect(td.foreignKeys[0].toTable).toBe("accounts");
   });
@@ -347,7 +347,7 @@ describe("ReferenceDefinition helpers", () => {
 
   it("polymorphic columns are ordered type before id", () => {
     const ref = new ReferenceDefinition("taggable", { polymorphic: true, index: false });
-    const td = new TableDefinition("taggings", { adapter: schemaConn("sqlite"), id: false });
+    const td = new TableDefinition("taggings", { adapter: schemaConn("sqlite") });
     ref.addTo(td);
     expect(td.columns[0].name).toBe("taggable_type");
     expect(td.columns[1].name).toBe("taggable_id");
@@ -356,7 +356,7 @@ describe("ReferenceDefinition helpers", () => {
 
 describe("TableDefinition#toSql blank type guard", () => {
   it("throws a descriptive error for an empty custom type", async () => {
-    const td = new TableDefinition("t", { adapter: schemaConn("sqlite"), id: false });
+    const td = new TableDefinition("t", { adapter: schemaConn("sqlite") });
     td.column("bad", "" as any);
     await expect(new SchemaCreation("sqlite", schemaConn("sqlite")).accept(td)).rejects.toThrow(
       /Column "bad" has an empty or blank type/,
@@ -364,7 +364,7 @@ describe("TableDefinition#toSql blank type guard", () => {
   });
 
   it("throws a descriptive error for a whitespace-only custom type", async () => {
-    const td = new TableDefinition("t", { adapter: schemaConn("sqlite"), id: false });
+    const td = new TableDefinition("t", { adapter: schemaConn("sqlite") });
     td.column("bad", "   " as any);
     await expect(new SchemaCreation("sqlite", schemaConn("sqlite")).accept(td)).rejects.toThrow(
       /Column "bad" has an empty or blank type/,
@@ -374,13 +374,14 @@ describe("TableDefinition#toSql blank type guard", () => {
 
 describe("TableDefinition#raise_on_duplicate_column", () => {
   it("raises when adding a duplicate non-pk column", () => {
-    const td = new TableDefinition("t", { adapter: schemaConn("sqlite"), id: false });
+    const td = new TableDefinition("t", { adapter: schemaConn("sqlite") });
     td.string("name");
     expect(() => td.string("name")).toThrow("already defined column");
   });
 
   it("raises with pk-specific message for primary key columns", () => {
     const td = new TableDefinition("t", { adapter: schemaConn("sqlite") });
+    td.setPrimaryKey("t", true);
     expect(() => td.column("id", "integer", { primaryKey: true })).toThrow(
       "redefine the primary key",
     );
@@ -389,7 +390,8 @@ describe("TableDefinition#raise_on_duplicate_column", () => {
 
 describe("TableDefinition#primary_key option", () => {
   it("treats primaryKey: 'uuid' as a custom PK column name", () => {
-    const td = new TableDefinition("t", { adapter: schemaConn("sqlite"), primaryKey: "uuid" });
+    const td = new TableDefinition("t", { adapter: schemaConn("sqlite") });
+    td.setPrimaryKey("t", true, "uuid");
     const pk = td.columns.find((c) => c.options.primaryKey);
     expect(pk?.name).toBe("uuid");
   });
@@ -397,7 +399,7 @@ describe("TableDefinition#primary_key option", () => {
 
 describe("TableDefinition#integer_like_primary_key?", () => {
   it("newColumnDefinition preserves integer pk type in base class", () => {
-    const td = new TableDefinition("t", { adapter: schemaConn("sqlite"), id: false });
+    const td = new TableDefinition("t", { adapter: schemaConn("sqlite") });
     const col = td.newColumnDefinition("id", "integer", { primaryKey: true });
     expect(col.type).toBe("integer");
   });
@@ -405,7 +407,7 @@ describe("TableDefinition#integer_like_primary_key?", () => {
 
 describe("TableDefinition#aliased_types", () => {
   it("maps timestamp to datetime", () => {
-    const td = new TableDefinition("t", { adapter: schemaConn("sqlite"), id: false });
+    const td = new TableDefinition("t", { adapter: schemaConn("sqlite") });
     td.column("ts", "timestamp");
     expect(td.columns[0].type).toBe("datetime");
   });
@@ -488,11 +490,8 @@ describe("TableDefinition id hash form", () => {
   };
 
   it("extracts type and merges remaining keys as pk column options", () => {
-    const td = new TableDefinition("t", {
-      id: { type: "string", collation: "utf8mb4_bin" },
-      adapterName: "mysql",
-      adapter: mysqlAdapter,
-    });
+    const td = new TableDefinition("t", { adapterName: "mysql", adapter: mysqlAdapter });
+    td.setPrimaryKey("t", { type: "string", collation: "utf8mb4_bin" });
     const id = td.columns.find((c) => c.name === "id")!;
     expect(id.type).toBe("string");
     expect(id.options.collation).toBe("utf8mb4_bin");
@@ -500,22 +499,17 @@ describe("TableDefinition id hash form", () => {
   });
 
   it("defaults type to primary_key when hash omits type", () => {
-    const td = new TableDefinition("t", {
-      id: { collation: "utf8mb4_bin" },
-      adapterName: "mysql",
-      adapter: mysqlAdapter,
-    });
+    const td = new TableDefinition("t", { adapterName: "mysql", adapter: mysqlAdapter });
+    td.setPrimaryKey("t", { collation: "utf8mb4_bin" });
     const id = td.columns.find((c) => c.name === "id")!;
     expect(id.type).toBe("primary_key");
     expect(id.options.collation).toBe("utf8mb4_bin");
   });
 
   it("outer default is merged first, hash content overrides", () => {
-    const td = new TableDefinition("t", {
-      id: { type: "string", default: "generated" },
+    const td = new TableDefinition("t", { adapterName: "mysql", adapter: mysqlAdapter });
+    td.setPrimaryKey("t", { type: "string", default: "generated" }, undefined, {
       default: "outer",
-      adapterName: "mysql",
-      adapter: mysqlAdapter,
     });
     const id = td.columns.find((c) => c.name === "id")!;
     expect(id.options.default).toBe("generated");

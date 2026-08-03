@@ -1488,13 +1488,11 @@ export class SchemaStatements {
 
     const ctdOptions = {
       ...tdOptions,
-      ...pkOptions,
-      id,
-      primaryKey,
       adapterName: this.adapterName,
       adapter: this,
     };
     const tableDefinition = this.createTableDefinition(tableName, ctdOptions);
+    tableDefinition.setPrimaryKey(tableName, id, primaryKey, pkOptions);
 
     if (fn) fn(tableDefinition);
 
