@@ -152,7 +152,7 @@ describe("TransactionTest", () => {
         supportsLazyTransactions: () => false,
         supportsRestartDbTransaction: () => false,
         addTransactionRecord: vi.fn(),
-        active: true,
+        active: () => true,
       };
       const tm = new TransactionManager(conn as never);
       await expect(
@@ -184,7 +184,7 @@ describe("TransactionTest", () => {
         supportsLazyTransactions: () => false,
         supportsRestartDbTransaction: () => false,
         addTransactionRecord: vi.fn(),
-        active: true,
+        active: () => true,
       };
       const tm = new TransactionManager(conn as never);
       // Force inner frame to SavepointTransaction (not
