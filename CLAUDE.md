@@ -94,8 +94,9 @@ port a body:
 
 - **Truthiness.** Ruby's `if x` is false only for `nil`/`false`. `Boolean(x)`
   and `if (x)` are also false for `0`, `""`, and `NaN`. Port `if x` as
-  `x != null`, never as a bare truthiness test, unless you have checked the
-  value can't be `0`/`""`.
+  `x != null && x !== false` — or just `x != null` once you have checked the
+  value can't be a boolean — never as a bare truthiness test unless you have
+  checked it can't be `0`/`""` either.
 - **`fetch` vs `??`.** `h.fetch(:k, default)` returns the _stored_ value
   whenever the key exists — including a stored `nil` or `false`. `h.k ?? default`
   substitutes the default for `null`/`undefined`. They differ, and Rails
@@ -251,14 +252,23 @@ catches a class of drift a reviewer would otherwise spend a cycle on.
    an invented shortcut.
 
    ```bash
-   API_COMPARE_FORCE=1 pnpm api:compare --wide-calls   # regenerate BOTH artifacts
-   pnpm api:calls                                      # narrow ratchet (RFC 0044)
-   pnpm api:calls:wide                                 # wide ratchet (RFC 0047)
+   pnpm api:calls        # narrow ratchet (RFC 0044)
+   pnpm api:calls:wide   # wide ratchet (RFC 0047)
    ```
 
-   The regeneration is not optional: both lints read an artifact on disk, and
-   gating a stale one reports movement that never happened. A warm cache
-   under-reports, which is why the force flag is there.
+   Each lint reads an artifact on disk and regenerates its own first, so a
+   plain gating run is enough — gating a stale artifact reports movement that
+   never happened, which is how a sibling PR's deleted method surfaces as a
+   STALE row on a branch that never touched it. The two artifacts are
+   **separate**: `compare.ts` writes `call-mismatches.json` on a normal run and
+   `call-mismatches-wide.json` only under `--wide-calls`, so one compare run
+   never refreshes both. If you need to force past a warm cache (it
+   under-reports vs CI), do it per artifact:
+
+   ```bash
+   API_COMPARE_FORCE=1 pnpm api:compare                # narrow
+   API_COMPARE_FORCE=1 pnpm api:compare --wide-calls   # wide
+   ```
 
    **New mismatch?** The right fix is almost always to make the TS body call
    what Rails calls. Baselining is the fallback, and it costs a reviewed
