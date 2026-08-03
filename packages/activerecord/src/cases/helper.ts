@@ -11,6 +11,7 @@
 // non-test consumers.
 import "../sqlite/better-sqlite3.js";
 import { Base } from "../base.js";
+import { I18n } from "@blazetrails/activemodel";
 import { getZone, setZone, resetZone, isZoneExplicit } from "@blazetrails/activesupport";
 import { DelegateCache } from "../relation/delegation.js";
 import { ActiveRecord } from "../ar-config.js";
@@ -34,6 +35,13 @@ registerFakeAdapter();
 // caught. Production keeps the Rails default of `true` (delegation.rb:25); only
 // the test harness flips it.
 DelegateCache.delegateBaseMethods = false;
+
+// Mirror Rails activerecord/test/cases/helper.rb:35 — disable available locale
+// checks to avoid warnings running the test suite. The gem memoizes
+// `available_locales_set` (i18n/lib/i18n/config.rb:50-54) and clears it on
+// neither `store_translations` nor `backend=`, so without this a locale a case
+// stores after the first check never becomes visible to `with_locale`.
+I18n.setEnforceAvailableLocales(false);
 
 // Mirror Rails activerecord/test/cases/helper.rb:40
 Base.automaticallyInvertPluralAssociations = true;
