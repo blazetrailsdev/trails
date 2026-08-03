@@ -784,13 +784,14 @@ export async function findTarget(
  * query here would both duplicate that load and make this synchronous
  * reconstruction return a promise.
  *
+ * Rails' `SingularAssociation#build` is `build_record` then `set_new_record`
+ * (singular_association.rb:29-31), and only the second reaches `load_target` /
+ * `remove_target!` (has_one_association.rb:59-69). Running the two halves
+ * separately gets the in-memory result without either.
+ *
  * @internal
  */
 function buildThroughProxyRecord(throughProxy: any, attrs: Record<string, unknown>): void {
-  throughProxy.buildDisplacementOwnedByCaller = true;
-  try {
-    throughProxy.build?.(attrs);
-  } finally {
-    throughProxy.buildDisplacementOwnedByCaller = false;
-  }
+  const record = throughProxy.buildRecord?.(attrs);
+  if (record) throughProxy.setNewRecord?.(record);
 }
