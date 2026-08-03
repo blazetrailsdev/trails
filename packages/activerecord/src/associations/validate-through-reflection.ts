@@ -119,8 +119,11 @@ export function validateReflectionValidity(modelClass: typeof Base, assocName: s
  * `CompositePrimaryKeyMismatchError` derived from the *real* reflection's
  * `active_record_primary_key` / `association_primary_key` — the Rails-faithful
  * message — rather than from the trails-computed join keys at the call site.
- * (For polymorphic associations `checkValidityBang` is a no-op, since Rails
- * never permits a composite key there; the caller's minimal guard then fires.)
+ * (For polymorphic associations `checkValidityBang` is a no-op — Rails' check
+ * opens with `!polymorphic?` (reflection.rb:618), so it never shape-checks a
+ * polymorphic reflection and therefore permits any composite pairing. A caller
+ * holding a resolvable polymorphic reflection must not raise its own mismatch
+ * afterwards; only the genuine no-reflection fallbacks keep a local guard.)
  *
  * Returns normally only when no reflection can be resolved (the genuine
  * no-reflection fallback paths — lower-level test helpers that define

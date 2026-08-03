@@ -655,25 +655,19 @@ export function scope(record: Base, assocName: string, options: AssociationOptio
   const reflection = ctor._reflectOnAssociation?.(assocName);
   if (options.through && !reflection) return null;
 
-  // Polymorphic `:as` normally takes a scalar FK, which a composite owner PK
-  // collapses into via "id" (matching Rails' join_id_for). Rails does permit an
-  // explicit composite FK zipping against a composite owner PK of the same
-  // length (Cpk::Post `has_many :comments, as: :commentable`), so that shape
-  // builds through AssociationScope; every other composite pairing is rejected.
-  // The inline fallback below cannot express the zip, so it stays rejected
-  // there.
-  const zipsAgainstCompositePk =
-    !!reflection &&
-    Array.isArray(foreignKey) &&
-    Array.isArray(primaryKey) &&
-    primaryKey.length === foreignKey.length;
-  if (options.as && !zipsAgainstCompositePk) {
+  // Rails validates composite-key shape at exactly one site,
+  // `AssociationReflection#check_validity!` (reflection.rb:618), and that check
+  // opens with `!polymorphic? && ...` — a polymorphic reflection is never
+  // shape-checked at all, whatever its FK/PK lengths. `checkValidityBang`
+  // (reflection.ts) already ports that faithfully, so a reflection-backed `:as`
+  // association must reach AssociationScope unguarded. The guards below are the
+  // inline fallback's alone: with no reflection there is no canonical check to
+  // consult, and an unzippable FK/PK pairing would otherwise read
+  // `readAttribute(undefined)` into broken SQL. That fallback-only strictness is
+  // a trails limitation, not Rails behavior.
+  if (options.as && !reflection) {
     if (Array.isArray(foreignKey)) {
-      // Route through the reflection's canonical checkValidityBang (Rails'
-      // single raise site) so the error carries the Rails-faithful message;
-      // a no-op for polymorphic `:as` (Rails permits no composite key there).
       routeThroughCheckValidity(ctor, assocName);
-      // No reflection resolvable — minimal trails-only fallback guard.
       throw new CompositePrimaryKeyMismatchError({
         activeRecord: ctor.name,
         name: assocName,
@@ -682,11 +676,7 @@ export function scope(record: Base, assocName: string, options: AssociationOptio
       });
     }
     if (Array.isArray(primaryKey) && !primaryKey.includes("id")) {
-      // Route through the reflection's canonical checkValidityBang (Rails'
-      // single raise site) so the error carries the Rails-faithful message;
-      // a no-op for polymorphic `:as` (Rails permits no composite key there).
       routeThroughCheckValidity(ctor, assocName);
-      // No reflection resolvable — minimal trails-only fallback guard.
       throw new CompositePrimaryKeyMismatchError({
         activeRecord: ctor.name,
         name: assocName,
