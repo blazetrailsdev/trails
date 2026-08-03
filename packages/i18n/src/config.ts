@@ -26,6 +26,7 @@ export interface Backend {
     format: unknown,
     options?: Record<string, unknown>,
   ): unknown;
+  transliterate(locale: Locale, string: string, replacement?: string | null): string;
 }
 
 /**

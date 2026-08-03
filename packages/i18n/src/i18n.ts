@@ -1,7 +1,6 @@
 /**
- * Mirrors: i18n/lib/i18n.rb — partially. `transliterate` waits on the
- * `Transliterator` mixin, and `new_double_nested_cache` on the normalize-key
- * cache; both land with their own stories (RFC 0074).
+ * Mirrors: i18n/lib/i18n.rb — partially. `new_double_nested_cache` waits on the
+ * normalize-key cache; it lands with its own story (RFC 0074).
  */
 
 /**
@@ -261,6 +260,41 @@ export function exists(
 }
 
 /**
+ * Transliterates UTF-8 characters to ASCII.
+ *
+ * Ruby takes `throw:`, `raise:`, `locale:` and `replacement:` as keyword
+ * arguments alongside `**options`; the destructured rest below is that split.
+ * `throw` can't be a binding name in JS, so the local reads `throwOption`.
+ */
+export function transliterate(
+  key: string,
+  {
+    throw: throwOption = false,
+    raise = false,
+    locale = null,
+    replacement = null,
+    ...options
+  }: TranslateOptions = EMPTY_HASH,
+): unknown {
+  if (locale == null || locale === false) locale = config().locale;
+  if (locale === false) throw new Disabled("transliterate");
+  enforceAvailableLocalesBang(locale as Locale);
+
+  try {
+    return config().backend.transliterate(locale as Locale, key, replacement as string | null);
+  } catch (exception) {
+    if (!(exception instanceof ArgumentError)) throw exception;
+    return handleException(
+      truthy(throwOption) ? "throw" : truthy(raise) ? "raise" : false,
+      exception,
+      locale as Locale,
+      key,
+      options,
+    );
+  }
+}
+
+/**
  * Localizes certain objects, such as dates and numbers to local formatting.
  */
 export function localize(
@@ -390,14 +424,14 @@ function translateKey(
  */
 function handleException(
   handling: "raise" | "throw" | false,
-  exception: MissingTranslation,
+  exception: MissingTranslation | ArgumentError,
   locale: Locale,
   key: TranslateKey,
   options: TranslateOptions,
 ): unknown {
   switch (handling) {
     case "raise":
-      throw exception.toException();
+      throw exception instanceof MissingTranslation ? exception.toException() : exception;
     case "throw":
       return throwException(exception);
     default: {

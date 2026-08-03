@@ -60,6 +60,7 @@ export {
   tBang,
   translate,
   translateBang,
+  transliterate,
   withLocale,
 } from "./i18n.js";
 export type { Locale, TranslateKey, TranslationKey } from "./i18n.js";

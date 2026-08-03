@@ -30,6 +30,9 @@ class FakeBackend implements Backend {
   localize(): unknown {
     return null;
   }
+  transliterate(): string {
+    return "";
+  }
 }
 
 /**
