@@ -21,6 +21,7 @@ function getPackageTestFiles(): Record<string, string[]> {
     "trailties",
     "globalid",
     "did-you-mean",
+    "i18n",
   ];
   const packageAliases: Record<string, string> = {};
   const result: Record<string, string[]> = {};

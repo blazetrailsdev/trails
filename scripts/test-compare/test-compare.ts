@@ -121,6 +121,13 @@ export function rubyToConventionTs(rubyFile: string, pkg: string): string {
     return dir === "." ? tsFile : path.join(dir, tsFile);
   }
 
+  // The i18n gem's lib root is `lib/i18n` but its test root is `test`, so
+  // every test mirroring `lib/i18n/<x>.rb` sits at `test/i18n/<x>_test.rb`.
+  // Drop that leading segment so both sides land on `packages/i18n/src/<x>`.
+  if (pkg === "i18n" && rubyFile.startsWith("i18n/")) {
+    rubyFile = rubyFile.slice("i18n/".length);
+  }
+
   const dir = path.dirname(rubyFile);
   const rawBase = path.basename(rubyFile, ".rb").replace(/_test$/, "");
   // Trails renames `railtie`/`railties` path segments to `trailtie`/`trailties`
@@ -1246,6 +1253,7 @@ function extractRelativeTsPath(fullPath: string, pkg: string): string {
     trailties: "packages/trailties/src/",
     globalid: "packages/globalid/src/",
     "did-you-mean": "packages/did-you-mean/src/",
+    i18n: "packages/i18n/src/",
   };
 
   const prefix = pkgDirs[pkg];

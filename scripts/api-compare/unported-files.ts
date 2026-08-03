@@ -1140,11 +1140,13 @@ export const UNPORTED_FILES: UnportedFile[] = [
   // --- i18n: optional backend mixins composed on top of Simple ---
   {
     pattern: "backend/chain.rb",
+    testFile: "chain_test.rb",
     package: "i18n",
     reason: "Pre-1.0: optional backend mixin — composes several backends behind one lookup.",
   },
   {
     pattern: "backend/fallbacks.rb",
+    testFile: "fallbacks_test.rb",
     package: "i18n",
     reason:
       "Pre-1.0: optional backend mixin — locale fallback chain, built on the " +
@@ -1152,26 +1154,31 @@ export const UNPORTED_FILES: UnportedFile[] = [
   },
   {
     pattern: "backend/key_value.rb",
+    testFile: "key_value_test.rb",
     package: "i18n",
     reason: "Pre-1.0: optional backend over a key-value store, keyed by Ruby-marshalled subtrees.",
   },
   {
     pattern: "backend/cache.rb",
+    testFile: "cache_test.rb",
     package: "i18n",
     reason: "Pre-1.0: optional backend mixin — caches lookups through ActiveSupport::Cache.",
   },
   {
     pattern: "backend/cache_file.rb",
+    testFile: "cache_file_test.rb",
     package: "i18n",
     reason: "Pre-1.0: optional backend mixin — caches parsed translation files on disk.",
   },
   {
     pattern: "backend/cascade.rb",
+    testFile: "cascade_test.rb",
     package: "i18n",
     reason: "Pre-1.0: optional backend mixin — cascading key lookup (`foo.bar.baz` → `foo.baz`).",
   },
   {
     pattern: "backend/interpolation_compiler.rb",
+    testFile: "interpolation_compiler_test.rb",
     package: "i18n",
     reason:
       "Pre-1.0: optional backend mixin — compiles interpolations into Ruby " +
@@ -1179,16 +1186,19 @@ export const UNPORTED_FILES: UnportedFile[] = [
   },
   {
     pattern: "backend/lazy_loadable.rb",
+    testFile: "lazy_loadable_test.rb",
     package: "i18n",
     reason: "Pre-1.0: optional backend mixin — defers translation-file loading until first lookup.",
   },
   {
     pattern: "backend/memoize.rb",
+    testFile: "memoize_test.rb",
     package: "i18n",
     reason: "Pre-1.0: optional backend mixin — memoizes lookups per locale.",
   },
   {
     pattern: "backend/metadata.rb",
+    testFile: "metadata_test.rb",
     package: "i18n",
     reason:
       "Pre-1.0: optional backend mixin — attaches lookup metadata onto the " +
@@ -1196,23 +1206,52 @@ export const UNPORTED_FILES: UnportedFile[] = [
   },
   {
     pattern: "backend/pluralization.rb",
+    testFile: "pluralization_test.rb",
     package: "i18n",
     reason:
       "Pre-1.0: optional backend mixin — pluralization via per-locale rule procs in the data.",
   },
   {
     pattern: "backend/transliterator.rb",
+    testFile: "transliterator_test.rb",
     package: "i18n",
     reason:
       "Pre-1.0: ASCII transliteration driven by per-locale rule tables and " +
       "`$KCODE`-era String packing. JS has `String.prototype.normalize` and " +
       "no locale rule data is shipped; not in pre-1.0 scope.",
   },
+  {
+    testFile: "pluralization_fallback_test.rb",
+    package: "i18n",
+    reason:
+      "Pre-1.0: exercises Backend::Pluralization stacked on Backend::Fallbacks — " +
+      "both mixins are excluded above, so the combination has no trails counterpart.",
+  },
+  {
+    testFile: "pluralization_scope_test.rb",
+    package: "i18n",
+    reason:
+      "Pre-1.0: scoped pluralization rules, i.e. Backend::Pluralization data " +
+      "lookup — the mixin is excluded above.",
+  },
+  {
+    testFile: "api/",
+    package: "i18n",
+    reason:
+      "The `test/api/*` suites are shells: each one picks a backend and includes " +
+      "the `I18n::Tests::*` conformance mixins, which are themselves excluded " +
+      "(`tests/` below) as minitest scaffolding rather than library surface. " +
+      "trails' equivalent coverage lives in the per-backend vitest files. " +
+      "`api/override_test.rb` is excluded with them: it reopens `I18n.dup` and " +
+      "`extend`s modules over `translate`, Ruby singleton-class semantics with " +
+      "no JS analogue.",
+  },
   // --- i18n: gem surface trails has no counterpart for ---
   {
     // Deliberately broad: covers `gettext.rb`, `gettext/*` and the
     // `backend/gettext.rb` mixin in one entry.
     pattern: "gettext",
+    testFile: "gettext",
     package: "i18n",
     reason:
       "Pre-1.0: gettext .po support — the catalogue parser, the `_`/`n_`/`s_` " +
@@ -1221,6 +1260,7 @@ export const UNPORTED_FILES: UnportedFile[] = [
   },
   {
     pattern: "locale/",
+    testFile: "locale/",
     package: "i18n",
     reason:
       "Pre-1.0: RFC 4646 locale-tag parsing and the fallback tag graph " +
@@ -1238,6 +1278,7 @@ export const UNPORTED_FILES: UnportedFile[] = [
   },
   {
     pattern: "middleware.rb",
+    testFile: "middleware_test.rb",
     package: "i18n",
     reason:
       "Rack middleware that resets `I18n.locale` after each request. trails " +
