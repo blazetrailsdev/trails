@@ -330,6 +330,9 @@ export function withLocale<T>(tmpLocale: Locale | false | null | undefined, bloc
 function normalizeKey(key: unknown, separator: string): TranslationKey[] {
   if (Array.isArray(key)) return key.flatMap((k) => normalizeKey(k, separator));
   if (key === null || key === undefined) return [];
+  // Ruby's `key.to_s` on a Symbol is its name; `String(symbol)` is
+  // `"Symbol(name)"`, which would reach the `Translation missing` message.
+  if (typeof key === "symbol") key = Symbol.keyFor(key) ?? key.description;
   const keys = String(key)
     .split(separator)
     .filter((k) => k !== "");
