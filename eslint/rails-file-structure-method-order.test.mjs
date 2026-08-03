@@ -175,6 +175,12 @@ try {
         filename: mixinFile,
         code: `export const Math = {\n  gamma() {},\n  alpha() {},\n  gamma() {},\n};\n`,
       },
+      // A spread can define the same keys, so moving a member across it flips
+      // which definition wins. The literal is skipped.
+      {
+        filename: mixinFile,
+        code: `export const Math = {\n  gamma() {},\n  ...base,\n  alpha() {},\n};\n`,
+      },
       // Two object literals, one `functions` bucket — ambiguous, left alone.
       {
         filename: mixin2File,
@@ -328,6 +334,20 @@ try {
           `  beta() {},\n` +
           `  gamma() {},\n` +
           `};\n`,
+      },
+      // Top-level functions and an object literal both compete for the single
+      // `functions` bucket: the functions take it and the literal is left as-is.
+      {
+        filename: fnFile,
+        code:
+          `export function gamma() {}\n` +
+          `export function alpha() {}\n` +
+          `export const M = {\n  gamma() {},\n  alpha() {},\n};\n`,
+        errors: [{ messageId: "outOfOrder" }],
+        output:
+          `export function alpha() {}\n` +
+          `export function gamma() {}\n` +
+          `export const M = {\n  gamma() {},\n  alpha() {},\n};\n`,
       },
       // Mixin object matched to a CLASS bucket by exact name; a non-function
       // property is not orderable and keeps its place.

@@ -230,8 +230,10 @@ function isOrderableObjectMember(node) {
  *
  * Reordering properties is safe for the same reason class members are: the
  * literal is one expression and nothing in it observes their relative order —
- * EXCEPT under a duplicate key, where the last definition wins and a reorder
- * would change which one that is. Such a literal is skipped.
+ * except where a later definition OVERRIDES an earlier one, which a reorder
+ * would invert. Two shapes do that, and both skip the literal: a duplicate
+ * key, and a spread (`{ foo() {}, ...base, bar() {} }`, where moving a member
+ * across the spread flips whether it or `base`'s same-named key wins).
  */
 function collectObjectContainers(programNode) {
   const candidates = [];
@@ -245,6 +247,7 @@ function collectObjectContainers(programNode) {
     if (!decl) continue;
     for (const d of decl.declarations) {
       if (d.id?.type !== "Identifier" || d.init?.type !== "ObjectExpression") continue;
+      if (d.init.properties.some((p) => p.type === "SpreadElement")) continue;
       const members = d.init.properties.filter(isOrderableObjectMember);
       if (members.length < 2) continue;
       const declaredKeys = new Set();
@@ -551,8 +554,12 @@ const rule = {
           });
         }
 
-        // Two unresolved literals competing for one `functions` bucket is
-        // ambiguous; guessing would impose an unrelated Rails order.
+        // The `functions` bucket has ONE claimant. Top-level functions take it
+        // when the file has them — they are the primary port shape for a Ruby
+        // module, and an object literal alongside them is as likely to be an
+        // unrelated const table as a mixin. A literal claims it only when it is
+        // the sole candidate: two competing literals are ambiguous, and guessing
+        // would impose an unrelated Rails order on the wrong one.
         const freeObjects = objectCandidates.filter((c) => !c.expectedOrder);
         if (!functionsConsumed && functionOrder.length > 0 && freeObjects.length === 1) {
           freeObjects[0].expectedOrder = functionOrder;
