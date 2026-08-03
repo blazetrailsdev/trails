@@ -3523,7 +3523,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     const ctor = this._record.constructor as typeof Base;
     // Rails' scope IS the JOIN-based AssociationScope relation: delegate to it
     // for every shape it can route, composite keys included. The chain-based
-    // the seam emits the full composite ON clause, so composite
+    // `scope()` seam emits the full composite ON clause, so composite
     // owner PK, composite target PK, composite belongsTo-source FK, and
     // composite through-model PK all build correctly here — the single-column
     // IN-subquery fallback below can't express those tuple matches and would
