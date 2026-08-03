@@ -187,7 +187,7 @@ export class Error {
       ]);
       defaults.push(Symbol.for(`${i18nScope}.errors.messages.${type}`));
 
-      if (options.message == null) {
+      if (options.message == null || options.message === false) {
         const translation = catchException(() =>
           I18n.translate(defaults[0] as TranslateKey, {
             ...options,
@@ -207,7 +207,7 @@ export class Error {
     defaults.push(Symbol.for(`errors.messages.${type}`));
 
     const key = defaults.shift();
-    if (options.message != null) {
+    if (options.message != null && options.message !== false) {
       defaults = [options.message];
       delete options.message;
     }
