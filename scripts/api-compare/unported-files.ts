@@ -1235,16 +1235,64 @@ export const UNPORTED_FILES: UnportedFile[] = [
       "lookup — the mixin is excluded above.",
   },
   {
-    testFile: "api/",
+    testFile: "api/all_features_test.rb",
     package: "i18n",
     reason:
-      "The `test/api/*` suites are shells: each one picks a backend and includes " +
-      "the `I18n::Tests::*` conformance mixins, which are themselves excluded " +
-      "(`tests/` below) as minitest scaffolding rather than library surface. " +
-      "trails' equivalent coverage lives in the per-backend vitest files. " +
-      "`api/override_test.rb` is excluded with them: it reopens `I18n.dup` and " +
-      "`extend`s modules over `translate`, Ruby singleton-class semantics with " +
-      "no JS analogue.",
+      "Stacks every optional backend mixin (Cascade, Chain, Fallbacks, Memoize, " +
+      "Pluralization, …) onto Simple at once; each mixin is excluded above, so " +
+      "the composition has nothing to run against. `api/simple_test.rb` is NOT " +
+      "excluded — the Simple backend is ported and its API suite is compared.",
+  },
+  {
+    testFile: "api/override_test.rb",
+    package: "i18n",
+    reason:
+      "Reopens `I18n.dup` and `extend`s modules over `translate` to check that a " +
+      "host app can override the facade. Ruby singleton-class semantics with no " +
+      "JS analogue — a TS module's exported function can't be swapped per-copy.",
+  },
+  {
+    testFile: "i18n_test.rb",
+    className: "I18nTest",
+    tests: ["exposes its VERSION constant"],
+    reason:
+      "Asserts the `I18n::VERSION` constant, whose `version.rb` is excluded above " +
+      "— trails carries the version in package.json.",
+  },
+  {
+    testFile: "i18n_test.rb",
+    className: "I18nTest",
+    tests: [
+      "sets the current locale to Thread.current",
+      "I18n.locale is preserved in Fiber context",
+    ],
+    reason:
+      "Both assert the config lives in a Thread/Fiber-local " +
+      "(`Thread.current.thread_variable_get(:i18n_config)`, i18n/lib/i18n/config.rb). " +
+      "JS is single-threaded and trails' `I18n.config` is a process singleton, so " +
+      "there is no per-thread copy to observe.",
+  },
+  {
+    testFile: "i18n_test.rb",
+    className: "I18nTest",
+    tests: ["default_locale= doesn't ignore junk", "locale= doesn't ignore junk"],
+    reason:
+      "Assert `NoMethodError` from Ruby calling `#to_sym` on a Class object " +
+      "(i18n/lib/i18n/config.rb `locale=`). Locales are strings in TS with no " +
+      "symbolization step, so there is no junk-coercion failure to raise.",
+  },
+  {
+    testFile: "i18n_test.rb",
+    className: "I18nTest",
+    tests: [
+      "I18n.transliterate handles I18n::ArgumentError exception",
+      "I18n.transliterate raises I18n::ArgumentError exception",
+      "transliterate given an unavailable locale rases an I18n::InvalidLocale",
+      "transliterate non-ASCII chars not in map with default replacement char",
+    ],
+    reason:
+      "Facade cases for `I18n.transliterate`, whose `backend/transliterator.rb` is " +
+      "excluded above.",
   },
   // --- i18n: gem surface trails has no counterpart for ---
   {
