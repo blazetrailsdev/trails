@@ -14,6 +14,10 @@
       "types": "./dist/message-verifier.d.ts",
       "default": "./dist/message-verifier.js"
     },
+    "./message-verifiers": {
+      "types": "./dist/message-verifiers.d.ts",
+      "default": "./dist/message-verifiers.js"
+    },
     "./message-encryptor": {
       "types": "./dist/message-encryptor.d.ts",
       "default": "./dist/message-encryptor.js"
