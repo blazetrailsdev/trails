@@ -244,9 +244,6 @@ export function exists(
 
 /**
  * Localizes certain objects, such as dates and numbers to local formatting.
- *
- * `Backend#localize` lands with the `i18n-backend-localize` story; until then
- * a backend that has not defined it fails here rather than silently no-op.
  */
 export function localize(
   object: unknown,
@@ -256,8 +253,8 @@ export function localize(
   if (locale === false) throw new Disabled("l");
   enforceAvailableLocalesBang(locale as Locale);
 
-  if (!truthy(format)) format = "default";
-  return config().backend.localize!(locale as Locale, object, format, options);
+  if (!truthy(format)) format = Symbol.for("default");
+  return config().backend.localize(locale as Locale, object, format, options);
 }
 
 export const l = localize;

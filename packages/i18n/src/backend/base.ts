@@ -14,7 +14,7 @@
  *
  * Not ported here: `load_translations` / `load_file` / `load_rb` / `load_yml` /
  * `load_json` (file loading needs a YAML reader and async fs — its own story),
- * `localize` / `translate_localization_format`, and the `Transliterator` mixin.
+ * and the `Transliterator` mixin.
  */
 
 import {
@@ -22,13 +22,17 @@ import {
   InvalidLocale,
   InvalidPluralizationData,
   MissingTranslation,
+  MissingTranslationData,
   ReservedInterpolationKey,
+  inspect,
 } from "../exceptions.js";
 import {
   EMPTY_HASH,
   RESERVED_KEYS,
   config,
   reservedKeysPattern,
+  t,
+  tBang,
   type Locale,
   type TranslationKey,
 } from "../i18n.js";
@@ -49,6 +53,34 @@ function isHash(value: unknown): value is TranslationData {
 
 function symbolName(subject: symbol): string {
   return Symbol.keyFor(subject) ?? subject.description ?? "";
+}
+
+/** Ruby `#to_s`, for the values a format argument can hold. */
+function toS(subject: unknown): string {
+  if (subject == null) return "";
+  return typeof subject === "symbol" ? symbolName(subject) : String(subject);
+}
+
+/**
+ * Ruby `respond_to?`. A Ruby reader that returns a value is a property or a
+ * getter in JS, not a function, so membership — not callability — is the test.
+ */
+function respondTo(object: unknown, name: string): boolean {
+  return (
+    object != null && (typeof object === "object" || typeof object === "function") && name in object
+  );
+}
+
+/**
+ * The duck type `localize` accepts: the gem asks the object for `strftime`,
+ * `wday`, `mon`, `hour` and `sec` and nothing else.
+ */
+interface Localizable {
+  strftime(format: string): string;
+  wday: number;
+  mon: number;
+  hour?: number;
+  sec?: number;
 }
 
 export abstract class Base {
@@ -118,6 +150,37 @@ export abstract class Base {
     options: TranslateOptions = EMPTY_HASH,
   ): boolean {
     return this.lookup(locale, key, options.scope) != null;
+  }
+
+  /**
+   * Acts the same as `strftime`, but uses a localized version of the format
+   * string. Takes a key from the date/time formats translations as a format
+   * argument (*e.g.*, `short` in `date.formats`).
+   */
+  localize(
+    locale: Locale,
+    object: unknown,
+    format: unknown = Symbol.for("default"),
+    options: TranslateOptions = EMPTY_HASH,
+  ): unknown {
+    if (object == null && "default" in options) {
+      return options.default;
+    }
+    if (!respondTo(object, "strftime")) {
+      throw new ArgumentError(
+        `Object must be a Date, DateTime or Time object. ${inspect(object)} given.`,
+      );
+    }
+
+    if (typeof format === "symbol") {
+      const key = format;
+      const type = respondTo(object, "sec") ? "time" : "date";
+      options = { ...options, raise: true, object, locale };
+      format = t(`${type}.formats.${symbolName(key)}`, options);
+    }
+
+    format = this.translateLocalizationFormat(locale, object, format, options);
+    return (object as Localizable).strftime(format as string);
   }
 
   /**
@@ -279,6 +342,61 @@ export abstract class Base {
       return result;
     }
     return data;
+  }
+
+  protected translateLocalizationFormat(
+    locale: Locale,
+    object: unknown,
+    format: unknown,
+    _options: TranslateOptions,
+  ): string {
+    const o = object as Localizable;
+    try {
+      return toS(format).replace(/%(|\^)[aAbBpP]/g, (match) => {
+        switch (match) {
+          case "%a":
+            return (tBang("date.abbr_day_names", { locale, format }) as string[])[o.wday];
+          case "%^a":
+            return (tBang("date.abbr_day_names", { locale, format }) as string[])[
+              o.wday
+            ].toUpperCase();
+          case "%A":
+            return (tBang("date.day_names", { locale, format }) as string[])[o.wday];
+          case "%^A":
+            return (tBang("date.day_names", { locale, format }) as string[])[o.wday].toUpperCase();
+          case "%b":
+            return (tBang("date.abbr_month_names", { locale, format }) as string[])[o.mon];
+          case "%^b":
+            return (tBang("date.abbr_month_names", { locale, format }) as string[])[
+              o.mon
+            ].toUpperCase();
+          case "%B":
+            return (tBang("date.month_names", { locale, format }) as string[])[o.mon];
+          case "%^B":
+            return (tBang("date.month_names", { locale, format }) as string[])[o.mon].toUpperCase();
+          case "%p":
+            return (
+              tBang(`time.${(respondTo(object, "hour") ? o.hour! : 0) < 12 ? "am" : "pm"}`, {
+                locale,
+                format,
+              }) as string
+            ).toUpperCase();
+          case "%P":
+            return (
+              tBang(`time.${(respondTo(object, "hour") ? o.hour! : 0) < 12 ? "am" : "pm"}`, {
+                locale,
+                format,
+              }) as string
+            ).toLowerCase();
+          default:
+            // Ruby's `case` falls through to nil, which gsub substitutes as "".
+            return "";
+        }
+      });
+    } catch (e) {
+      if (e instanceof MissingTranslationData) return e.message;
+      throw e;
+    }
   }
 
   protected pluralizationKey(entry: TranslationData, count: unknown): string {

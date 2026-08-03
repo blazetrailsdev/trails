@@ -13,8 +13,7 @@ export interface Backend {
   eagerLoadBang(): void;
   translate(locale: Locale, key: unknown, options?: Record<string, unknown>): unknown;
   exists(locale: Locale, key: TranslationKey, options?: Record<string, unknown>): boolean;
-  /** Optional until `Backend::Base#localize` lands (story `i18n-backend-localize`). */
-  localize?(
+  localize(
     locale: Locale,
     object: unknown,
     format: unknown,
