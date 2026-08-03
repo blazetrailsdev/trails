@@ -26,6 +26,7 @@ import {
   extractValueFromDefault as sqliteExtractValueFromDefault,
   indexes as sqliteIndexes,
   newColumnFromField,
+  virtualTableExists as sqliteVirtualTableExists,
 } from "./sqlite3/schema-statements.js";
 import {
   indexNameForRemoveFrom,
@@ -1580,9 +1581,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
 
   // Mirrors: ActiveRecord::ConnectionAdapters::SQLite3::SchemaStatements#virtual_table_exists?
   async virtualTableExists(tableName: string): Promise<boolean> {
-    return (
-      (await this.queryValues(sqliteDataSourceSql(tableName, "VIRTUAL TABLE"), "SCHEMA")).length > 0
-    );
+    return sqliteVirtualTableExists(this, tableName);
   }
 
   // Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter#virtual_tables

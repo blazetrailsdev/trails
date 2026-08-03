@@ -130,7 +130,7 @@ export async function indexes(
         `UNION ALL ` +
         `SELECT sql FROM sqlite_temp_master WHERE name = ${adapter.quote(idx.name)} AND type = 'index'`,
       "SCHEMA",
-    )) as string | null;
+    )) as string | null | undefined;
     const match = indexSql ? INDEX_ON_REGEX.exec(indexSql) : null;
     const expressions = match?.groups?.expressions;
     let where = match?.groups?.where;

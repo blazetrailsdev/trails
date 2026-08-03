@@ -106,9 +106,6 @@ class SqliteCapturingAdapter extends AbstractAdapter {
   executeMutation(_sql: string) {
     return Promise.resolve(0);
   }
-  // The sqlite introspection arms run their probes through Rails'
-  // `internal_exec_query(sql, "SCHEMA")` primitive (and `query_value` on top of
-  // it), so the stub records from there as well as from `execute`.
   override async internalExecQuery(sql: string) {
     const rows = await this.execute(sql);
     return Result.fromRowHashes(rows);
