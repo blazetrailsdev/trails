@@ -1137,13 +1137,7 @@ export const UNPORTED_FILES: UnportedFile[] = [
       "Rails::TestUnit::Runner and invokes it with ARGV. vitest fills that role in " +
       "trails — no port intended.",
   },
-  // --- i18n: optional backend mixins layered on top of Simple ---
-  // The gem ships Simple as the only backend Rails boots with; everything
-  // else here is opt-in behavior a host application composes in
-  // (`I18n.backend = Chain.new(...)`, `Simple.include(Fallbacks)`, …).
-  // trails ports Base + Simple + the facade; these stay out of pre-1.0
-  // scope and are excluded per-file so the i18n parity number reflects
-  // the surface we committed to.
+  // --- i18n: optional backend mixins composed on top of Simple ---
   {
     pattern: "backend/chain.rb",
     package: "i18n",
@@ -1175,11 +1169,6 @@ export const UNPORTED_FILES: UnportedFile[] = [
     pattern: "backend/cascade.rb",
     package: "i18n",
     reason: "Pre-1.0: optional backend mixin — cascading key lookup (`foo.bar.baz` → `foo.baz`).",
-  },
-  {
-    pattern: "backend/gettext.rb",
-    package: "i18n",
-    reason: "Pre-1.0: optional backend mixin — loads gettext .po catalogues.",
   },
   {
     pattern: "backend/interpolation_compiler.rb",
@@ -1219,13 +1208,16 @@ export const UNPORTED_FILES: UnportedFile[] = [
       "`$KCODE`-era String packing. JS has `String.prototype.normalize` and " +
       "no locale rule data is shipped; not in pre-1.0 scope.",
   },
+  // --- i18n: gem surface trails has no counterpart for ---
   {
+    // Deliberately broad: covers `gettext.rb`, `gettext/*` and the
+    // `backend/gettext.rb` mixin in one entry.
     pattern: "gettext",
     package: "i18n",
     reason:
-      "Pre-1.0: gettext .po support (parser + `_`/`n_`/`s_` helpers). A Ruby " +
-      "toolchain concern with no trails consumer — Rails' own I18n usage never " +
-      "touches it.",
+      "Pre-1.0: gettext .po support — the catalogue parser, the `_`/`n_`/`s_` " +
+      "helpers, and the backend mixin that loads .po files. A Ruby toolchain " +
+      "concern with no trails consumer; Rails' own I18n usage never touches it.",
   },
   {
     pattern: "locale/",
