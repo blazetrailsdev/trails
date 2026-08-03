@@ -127,6 +127,9 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   // result.rb:58 `def ==(other)` / :80 `def [](column)` → result.ts `IndexedRow#equals`
   // / `IndexedRow#get`.
   "ActiveRecord::Result::IndexedRow": { "==": ["equals"], "[]": ["get"] },
+  // messages/rotation_coordinator.rb:18 `def [](salt)` / :22 `def []=(salt, codec)`
+  // → messages/rotation-coordinator.ts `get` / `set`.
+  "ActiveSupport::Messages::RotationCoordinator": { "[]": ["get"], "[]=": ["set"] },
 };
 
 // `fqn#operator` keys this process has actually resolved. A key that is never
