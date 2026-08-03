@@ -86,14 +86,10 @@ import { HasManyThroughAssociationNotFoundError } from "./associations/errors.js
 import {
   AssociationNotFoundError,
   InverseOfAssociationNotFoundError,
-  CompositePrimaryKeyMismatchError,
 } from "./associations/errors.js";
 import { AssociationScope, invokeScopeLambda } from "./associations/association-scope.js";
 import type { Association as AssociationInstance } from "./associations/association.js";
-import {
-  validateThroughReflection,
-  routeThroughCheckValidity,
-} from "./associations/validate-through-reflection.js";
+import { validateThroughReflection } from "./associations/validate-through-reflection.js";
 import { joinTableName as joinHabtmTableNames } from "./migration/join-table.js";
 export { joinTableName as joinHabtmTableNames } from "./migration/join-table.js";
 import {
@@ -106,7 +102,7 @@ import {
   registerConstant,
   unregisterConstant,
 } from "@blazetrails/activesupport";
-import { registerSubclass, polymorphicName } from "./inheritance.js";
+import { registerSubclass } from "./inheritance.js";
 import { flushPendingCounterCacheColumns } from "./counter-cache.js";
 import { BelongsTo as BelongsToBuilder } from "./associations/builder/belongs-to.js";
 import { HasOne as HasOneBuilder } from "./associations/builder/has-one.js";
@@ -1556,248 +1552,6 @@ export function _inlinePolymorphicKeys(
 }
 
 /**
- * Compute the WHERE condition hash that scopes a hasMany relation to its
- * owner. Returns null if primary key values are missing (Rails'
- * NullRelation fallback). Pure — no Relation construction.
- *
- * Shared by `buildHasManyRelation` (which wraps it in `all().where(...)`)
- * and CollectionProxy's constructor (which seeds its own where-clause
- * via the same condition).
- *
- * @internal No Rails counterpart (`compute_has_many_where` is defined nowhere
- * in the Rails source). Rails never materializes the owner-scoping hash on its
- * own: `AssociationScope#add_constraints`
- * (`associations/association_scope.rb:124`) writes the predicate straight onto
- * the relation being built. This is a trails-only factoring so the two
- * construction sites can't drift.
- */
-export function computeHasManyWhere(
-  record: Base,
-  assocName: string,
-  options: AssociationOptions,
-): Record<string, unknown> | null {
-  const ctor = record.constructor as typeof Base;
-  let primaryKey = options.primaryKey ?? ctor.primaryKey;
-
-  if (options.as) {
-    const foreignKey = options.foreignKey ?? `${underscore(options.as)}_id`;
-    if (Array.isArray(foreignKey)) {
-      // Rails permits an explicit composite FK on a polymorphic `:as`
-      // association when it zips against the owner's composite PK (e.g.
-      // Cpk::Post has_many :comments, as: :commentable,
-      // foreign_key: [:commentable_title, :commentable_author]).
-      if (Array.isArray(primaryKey) && primaryKey.length === foreignKey.length) {
-        const typeCol = `${underscore(options.as)}_type`;
-        const conditions: Record<string, unknown> = { [typeCol]: polymorphicName(ctor) };
-        for (let i = 0; i < foreignKey.length; i++) {
-          const pkValue = record._readAttribute(primaryKey[i]);
-          if (pkValue === null || pkValue === undefined) return null;
-          conditions[foreignKey[i]] = pkValue;
-        }
-        return conditions;
-      }
-      // Route through the reflection's canonical checkValidityBang (Rails'
-      // single raise site) so the error carries the Rails-faithful message;
-      // a no-op for polymorphic `:as` (Rails permits no composite key there).
-      routeThroughCheckValidity(ctor, assocName);
-      // No reflection resolvable — minimal trails-only fallback guard.
-      throw new CompositePrimaryKeyMismatchError({
-        activeRecord: ctor.name,
-        name: assocName,
-        primaryKey,
-        foreignKey,
-      });
-    }
-    // Collapse CPK to "id" when present (matching Rails' join_id_for).
-    // CPK without "id" cannot map to a scalar <as>_id column.
-    if (Array.isArray(primaryKey) && !primaryKey.includes("id")) {
-      // Route through the reflection's canonical checkValidityBang (Rails'
-      // single raise site) so the error carries the Rails-faithful message;
-      // a no-op for polymorphic `:as` (Rails permits no composite key there).
-      routeThroughCheckValidity(ctor, assocName);
-      // No reflection resolvable — minimal trails-only fallback guard.
-      throw new CompositePrimaryKeyMismatchError({
-        activeRecord: ctor.name,
-        name: assocName,
-        primaryKey,
-        foreignKey,
-      });
-    }
-    const typeCol = `${underscore(options.as)}_type`;
-    // Same query_constraints widening as the inline findTarget/loadHasOne
-    // polymorphic fallback: a query_constraints owner keys on the composite
-    // `[shardKey, ${as}_id]` against the query_constraints list, not the
-    // scalar `id` alone (which would leak cross-shard rows).
-    const { fkCols, ownerKeyCols } = _inlinePolymorphicKeys(ctor, options, primaryKey, foreignKey);
-    const conditions: Record<string, unknown> = { [typeCol]: polymorphicName(ctor) };
-    for (let i = 0; i < fkCols.length; i++) {
-      const pkValue = record._readAttribute(ownerKeyCols[i]);
-      if (pkValue === null || pkValue === undefined) return null;
-      conditions[fkCols[i]] = pkValue;
-    }
-    return conditions;
-  }
-
-  // Prefer the reflection's foreign key, which is derived from the class that
-  // *declared* the association (`reflection.active_record`), not the owner
-  // instance's class. For an STI subclass owner (e.g. a `SpecialPost` row whose
-  // `has_many :special_comments` is declared on `Post`) the column is still
-  // `post_id`, not `special_post_id`. Mirrors Rails using `reflection.foreign_key`.
-  const reflection = (ctor as any)._reflectOnAssociation?.(assocName);
-  const reflectionFk = reflection?.foreignKey;
-  const foreignKey =
-    options.foreignKey ??
-    reflectionFk ??
-    (options.queryConstraints
-      ? options.queryConstraints
-      : Array.isArray(primaryKey)
-        ? primaryKey.map((col: string) => `${underscore(ctor.name)}_${col}`)
-        : `${underscore(ctor.name)}_id`);
-
-  if (Array.isArray(foreignKey)) {
-    // A composite FK derived from the owner's query_constraints (e.g.
-    // Sharded::BlogPost `[blog_id, id]`) is keyed against those constraint
-    // columns, not the owner's scalar `id`. Defer to the reflection's
-    // `activeRecordPrimaryKey` — the single resolver the join/preload paths
-    // already use (Rails `reflection.active_record_primary_key`).
-    if (!Array.isArray(primaryKey) && Array.isArray(reflection?.activeRecordPrimaryKey)) {
-      primaryKey = reflection.activeRecordPrimaryKey;
-    }
-    // Composite FK requires a composite PK of matching length — otherwise
-    // we'd silently readAttribute(undefined) and produce a bogus/empty
-    // scope. Existing loaders throw CompositePrimaryKeyMismatchError; do
-    // the same here so CollectionProxy construction fails loudly.
-    if (!Array.isArray(primaryKey) || primaryKey.length !== foreignKey.length) {
-      // Route through the reflection's canonical checkValidityBang (Rails'
-      // single raise site) so the error carries the Rails-faithful message;
-      // a no-op for polymorphic `:as` (Rails permits no composite key there).
-      routeThroughCheckValidity(ctor, assocName);
-      // No reflection resolvable — minimal trails-only fallback guard.
-      throw new CompositePrimaryKeyMismatchError({
-        activeRecord: ctor.name,
-        name: assocName,
-        primaryKey,
-        foreignKey,
-      });
-    }
-    const conditions: Record<string, unknown> = {};
-    for (let i = 0; i < foreignKey.length; i++) {
-      const pkVal = record._readAttribute(primaryKey[i]);
-      if (pkVal === null || pkVal === undefined) return null;
-      conditions[foreignKey[i]] = pkVal;
-    }
-    return conditions;
-  }
-
-  // Scalar FK against a composite-PK owner collapses to the "id" component,
-  // matching `reflection.active_record_primary_key` (reflection.rb) — the same
-  // resolver findTarget's AssociationScope path uses. A composite PK lacking
-  // "id" can't map to a scalar FK, so that remains a mismatch.
-  if (Array.isArray(primaryKey)) {
-    const inferred = reflection?.activeRecordPrimaryKey;
-    if (typeof inferred === "string") {
-      primaryKey = inferred;
-    } else {
-      // Route through the reflection's canonical checkValidityBang (Rails'
-      // single raise site) so the error carries the Rails-faithful message.
-      routeThroughCheckValidity(ctor, assocName);
-      // No reflection resolvable — minimal trails-only fallback guard.
-      throw new CompositePrimaryKeyMismatchError({
-        activeRecord: ctor.name,
-        name: assocName,
-        primaryKey,
-        foreignKey,
-      });
-    }
-  }
-  const pkValue = record._readAttribute(primaryKey);
-  if (pkValue === null || pkValue === undefined) return null;
-  return { [foreignKey]: pkValue };
-}
-
-/**
- * Build the relation for a hasMany association without executing it.
- * Skips caching, strict loading, and inverse_of — used by countHasMany
- * so resetCounters works under strict loading.
- * Returns null if primary key values are missing.
- *
- * @internal No Rails counterpart (`build_has_many_relation` is defined nowhere
- * in the Rails source). Rails gets an unexecuted, side-effect-free relation for
- * free via `association.scope` — `Association#scope`
- * (`associations/association.rb:107`) into `AssociationScope#scope`
- * (`associations/association_scope.rb:21`). trails' `findTarget` fuses
- * relation building with caching/strict-loading/inverse_of, so the bypass has
- * to be spelled out as its own function until that fusion is undone.
- */
-export function buildHasManyRelation(
-  record: Base,
-  assocName: string,
-  options: AssociationOptions,
-): any | null {
-  const conditions = computeHasManyWhere(record, assocName, options);
-  if (conditions === null) return null;
-  const className = options.className ?? camelize(singularize(assocName));
-  const targetModel = resolveAssocClass(record, assocName, className);
-  // `scopeForAssociation` (not `all()`) so an enclosing `Model.where(...).scoping`
-  // block doesn't leak the class `current_scope` into association reads. Rails'
-  // association readers build from `scope_for_association`, which applies only
-  // default scopes (unless flagged `all_queries: true`), never `current_scope`.
-  let rel = _scopeForAssociation(targetModel).where(conditions);
-  rel = applyAssociationScope(rel, options.scope, record);
-  return rel;
-}
-
-/**
- * Build the JOIN-based AssociationScope relation for a through / HABTM
- * association without executing it — the exact relation `findTarget` runs to
- * materialize rows (`SELECT target.* FROM target INNER JOIN join_table ...`).
- *
- * Counting over this relation yields Rails' `scope.count(:all)`: a single
- * `COUNT(*)` over the JOIN that preserves join-row multiplicity (three
- * `developers_projects` rows for one project count as 3). This is distinct
- * from the proxy's `_buildThroughScope()`, which models the target as an
- * `id IN (SELECT source_fk ...)` subquery that structurally collapses
- * duplicate join rows to one row per id — wrong for a non-distinct `size`.
- *
- * Returns null when the owner FK is absent (unsaved owner / null PK), matching
- * the short-circuit in `findTarget`.
- *
- * @internal No Rails counterpart (`build_through_join_scope` is defined nowhere
- * in the Rails source), for the same reason as {@link buildHasManyRelation}: in
- * Rails this relation IS `association.scope`, and
- * `HasManyAssociation#count_records` (`associations/has_many_association.rb:80`)
- * just calls `scope.count(:all)` on it (`:84`). Named separately here only
- * because trails builds the JOIN form inside `findTarget` rather than in an
- * AssociationScope.
- */
-export function buildThroughJoinScope(
-  record: Base,
-  assocName: string,
-  options: AssociationOptions,
-): any | null {
-  const ctor = record.constructor as typeof Base;
-  const reflection = ctor._reflectOnAssociation?.(assocName);
-  if (!reflection) return null;
-  // Null-FK short-circuit on the owner-side column (chain.last's
-  // joinForeignKey — see `_ownerChainReflection`), mirroring findTarget.
-  const reflForOwnerFk = _ownerChainReflection(reflection);
-  const fkCols = Array.isArray(reflForOwnerFk.joinForeignKey)
-    ? reflForOwnerFk.joinForeignKey
-    : [reflForOwnerFk.joinForeignKey];
-  for (const col of fkCols) {
-    const v = record._readAttribute(col);
-    if (v === null || v === undefined) return null;
-  }
-  const className = options.className ?? camelize(singularize(assocName));
-  const targetModel = resolveAssocClass(record, assocName, className);
-  const built = _builtAssociationScope(record, assocName, reflection, targetModel);
-  const baseRelation = _scopeForAssociation(targetModel);
-  let rel = baseRelation.merge(built);
-  rel = applyAssociationScope(rel, options.scope, record, (reflection as any).scope);
-  return rel;
-}
-
-/**
  * Count associated records for a hasMany association using COUNT(*)
  * without loading records into memory. Bypasses strict loading checks
  * so resetCounters works on strict-loading models.
@@ -1808,16 +1562,16 @@ export function buildThroughJoinScope(
  * `HasManyAssociation#count_records` already exists as `countRecords`
  * (`associations/has-many-association.ts`) and is a *different* method (it
  * reads the counter cache and trims the target). This function exists only
- * because trails fuses relation building with caching/strict-loading inside
- * `loadHasMany`, the same deviation documented on its two callees
- * {@link buildHasManyRelation} and {@link buildThroughJoinScope}; it
- * disappears when that fusion is undone.
+ * because trails' loaders take the owner/name/options triple rather than an
+ * association instance, so there is no `association` to call `.scope` on; it
+ * is a thin wrapper over the Rails-named `scope` seam.
  */
 export async function countHasMany(
   record: Base,
   assocName: string,
   options: AssociationOptions,
 ): Promise<number> {
+  const { scope } = await import("./associations/has-many-association.js");
   if (options.through) {
     // COUNT(*) over the JOIN — matching Rails' scope.count(:all) — instead of
     // materializing rows just to read their length. Temporarily disable strict
@@ -1825,14 +1579,14 @@ export async function countHasMany(
     record._strictLoadingBypassCount++;
     try {
       // Preserve `HasManyThroughAssociation#findTarget`'s loud failure for a misconfigured through:
-      // buildThroughJoinScope returns null for a missing reflection, which would
-      // otherwise silently count as 0.
+      // `scope` returns null for a missing reflection, which would otherwise
+      // silently count as 0.
       const ctor = record.constructor as typeof Base;
       const throughRegistered = (ctor._associations ?? []).some((a) => a.name === options.through);
       if (!throughRegistered) {
         throw _hmtNotFound(ctor, assocName, options.through);
       }
-      const rel = buildThroughJoinScope(record, assocName, options);
+      const rel = scope(record, assocName, options);
       if (!rel) return 0;
       const result = await rel.count();
       if (typeof result !== "number") {
@@ -1846,7 +1600,7 @@ export async function countHasMany(
       record._strictLoadingBypassCount--;
     }
   }
-  const rel = buildHasManyRelation(record, assocName, options);
+  const rel = scope(record, assocName, options);
   if (!rel) return 0;
   const result = await rel.count();
   if (typeof result !== "number") {

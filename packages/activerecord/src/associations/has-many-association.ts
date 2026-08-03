@@ -588,29 +588,86 @@ export async function findTarget(
   }
 
   const ctor = record.constructor as typeof Base;
+  if (options.inverseOf) {
+    const className = options.className ?? camelize(singularize(assocName));
+    validateInverseOf(
+      resolveAssocClass(record, assocName, className),
+      assocName,
+      options.inverseOf,
+    );
+  }
+
+  const rel = scope(record, assocName, options);
+  if (rel === null) return [];
+
+  // Set inverse_of on each loaded child. Resolve via the reflection so
+  // automatic_inverse_of also wires each child's parent reference.
+  // Mirrors HasManyAssociation#set_inverse_instance. Wiring runs inside the
+  // instantiation block (Rails' `find_target` yields `set_inverse_instance`
+  // per record) so it lands BEFORE the child's find/initialize callbacks.
+  const inverseName = _resolveInverseName(ctor, assocName, options);
+  if (inverseName) {
+    rel._instantiateBlock = (child: Base) => {
+      _wireInverseAssociation(record, child, inverseName);
+    };
+  }
+  const results: Base[] = await rel.toArray();
+
+  syncToAssociationInstance(record, assocName, results);
+  return results;
+}
+
+/**
+ * Build the has_many association's relation without executing it.
+ *
+ * Mirrors: ActiveRecord::Associations::Association#scope (association.rb:107) —
+ * `target_scope.merge!(association_scope)`, where `association_scope` is
+ * `AssociationScope.scope(self)`. `findTarget` runs this relation rather than
+ * rebuilding it, and the non-executing callers (CollectionProxy's seed and
+ * `scope()`, `countHasMany`) reach the same relation through here.
+ *
+ * Returns null when the owner-side key values are absent (unsaved owner / null
+ * PK), which Rails expresses as the NullRelation fallback.
+ *
+ * Takes the owner/name/options triple rather than an association instance for
+ * the same reason `findTarget` does — the CollectionProxy and the
+ * through-association loaders reach it without one.
+ *
+ * @internal
+ */
+export function scope(record: Base, assocName: string, options: AssociationOptions): any | null {
+  const ctor = record.constructor as typeof Base;
   const className = options.className ?? camelize(singularize(assocName));
   const primaryKey = options.primaryKey ?? ctor.primaryKey;
 
   const targetModel = resolveAssocClass(record, assocName, className);
 
-  if (options.inverseOf) {
-    validateInverseOf(targetModel, assocName, options.inverseOf);
-  }
-
   const foreignKeyColumns = ownerForeignKeyColumns(ctor, assocName, { ...options, primaryKey });
   const foreignKey: string | string[] =
     foreignKeyColumns.length === 1 ? foreignKeyColumns[0] : foreignKeyColumns;
 
-  // Polymorphic `:as` requires a scalar FK. A composite FK is always
-  // rejected. A composite owner PK collapses to "id" when present
-  // (matching Rails' join_id_for); otherwise reject.
-  if (options.as) {
+  // Route through AssociationScope when we have a reflection registered.
+  // AssociationScope handles scalar, composite, polymorphic `:as`, and
+  // STI in a single path matching Rails' `AssociationScope.scope`.
+  // Inline fallback only when the reflection hasn't been registered
+  // (happens in tests that define associations via the lower-level API
+  // without going through Reflection.create).
+  const reflection = ctor._reflectOnAssociation?.(assocName);
+  if (options.through && !reflection) return null;
+
+  // Rails validates composite-key shape at exactly one site,
+  // `AssociationReflection#check_validity!` (reflection.rb:618), and that check
+  // opens with `!polymorphic? && ...` — a polymorphic reflection is never
+  // shape-checked at all, whatever its FK/PK lengths. `checkValidityBang`
+  // (reflection.ts) already ports that faithfully, so a reflection-backed `:as`
+  // association must reach AssociationScope unguarded. The guards below are the
+  // inline fallback's alone: with no reflection there is no canonical check to
+  // consult, and an unzippable FK/PK pairing would otherwise read
+  // `readAttribute(undefined)` into broken SQL. That fallback-only strictness is
+  // a trails limitation, not Rails behavior.
+  if (options.as && !reflection) {
     if (Array.isArray(foreignKey)) {
-      // Route through the reflection's canonical checkValidityBang (Rails'
-      // single raise site) so the error carries the Rails-faithful message;
-      // a no-op for polymorphic `:as` (Rails permits no composite key there).
       routeThroughCheckValidity(ctor, assocName);
-      // No reflection resolvable — minimal trails-only fallback guard.
       throw new CompositePrimaryKeyMismatchError({
         activeRecord: ctor.name,
         name: assocName,
@@ -619,11 +676,7 @@ export async function findTarget(
       });
     }
     if (Array.isArray(primaryKey) && !primaryKey.includes("id")) {
-      // Route through the reflection's canonical checkValidityBang (Rails'
-      // single raise site) so the error carries the Rails-faithful message;
-      // a no-op for polymorphic `:as` (Rails permits no composite key there).
       routeThroughCheckValidity(ctor, assocName);
-      // No reflection resolvable — minimal trails-only fallback guard.
       throw new CompositePrimaryKeyMismatchError({
         activeRecord: ctor.name,
         name: assocName,
@@ -632,13 +685,6 @@ export async function findTarget(
       });
     }
   }
-  // Route through AssociationScope when we have a reflection registered.
-  // AssociationScope handles scalar, composite, polymorphic `:as`, and
-  // STI in a single path matching Rails' `AssociationScope.scope`.
-  // Inline fallback only when the reflection hasn't been registered
-  // (happens in tests that define associations via the lower-level API
-  // without going through Reflection.create).
-  const reflection = ctor._reflectOnAssociation?.(assocName);
   // Null-FK short-circuit: read the SAME columns the eventual query
   // reads. For non-through, reflection.joinForeignKey is the owner-
   // side activeRecordPrimaryKey for hasMany. For through reflections the
@@ -653,7 +699,7 @@ export async function findTarget(
       : [primaryKey];
   for (const pk of fkCheckPks) {
     const v = record._readAttribute(pk);
-    if (v === null || v === undefined) return [];
+    if (v === null || v === undefined) return null;
   }
 
   let rel: any;
@@ -715,19 +761,5 @@ export async function findTarget(
     }
     rel = applyAssociationScope(rel, options.scope, record);
   }
-  // Set inverse_of on each loaded child. Resolve via the reflection so
-  // automatic_inverse_of also wires each child's parent reference.
-  // Mirrors HasManyAssociation#set_inverse_instance. Wiring runs inside the
-  // instantiation block (Rails' `find_target` yields `set_inverse_instance`
-  // per record) so it lands BEFORE the child's find/initialize callbacks.
-  const inverseName = _resolveInverseName(ctor, assocName, options);
-  if (inverseName) {
-    rel._instantiateBlock = (child: Base) => {
-      _wireInverseAssociation(record, child, inverseName);
-    };
-  }
-  const results: Base[] = await rel.toArray();
-
-  syncToAssociationInstance(record, assocName, results);
-  return results;
+  return rel;
 }

@@ -62,8 +62,6 @@ import {
   association,
   autoloadModel,
   resolveAssocClass,
-  buildHasManyRelation,
-  buildThroughJoinScope,
   _routeThroughViaAssociationScope,
   ownerHasUnresolvedThroughKey,
   _setCollectionInverseInstance,
@@ -78,6 +76,7 @@ import {
 import {
   countRecords,
   findTarget,
+  scope as hasManyScope,
   setDifference,
   setIntersection,
 } from "./has-many-association.js";
@@ -597,8 +596,8 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // (`cp.toSql()`, `cp.where(...)`, `cp.toArray()`) scope to the owner
     // — matches Rails, where CollectionProxy IS the scoped Relation.
     //
-    // Non-through path delegates to `buildHasManyRelation()` (same
-    // helper used by `scope()`, `countHasMany()`, eager loaders) so CP
+    // Non-through path delegates to the `scope()` seam (the same relation
+    // `findTarget` runs, and what `countHasMany()` counts) so CP
     // gets identical semantics: the relation starts from
     // `targetModel.all()` (default scope applied), is scope-proxied
     // (so `options.scope` callbacks can call named scopes / generated
@@ -643,14 +642,14 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         this._seededNoneNewOwner = true;
       }
     } else {
-      // Build via `buildHasManyRelation` so CP's inherited Relation
+      // Build via the `scope()` seam so CP's inherited Relation
       // state matches `scope()` / direct Relation callers: default
       // scope from `targetModel.all()` is applied, the relation is
       // scope-proxied (so `options.scope` can call named scopes /
       // generated methods on it), and composite-PK validation runs.
       // Then `_copyStateFrom` onto `this`. Missing owner PK →
       // `_isNone = true` (Rails' NullRelation fallback).
-      // `buildHasManyRelation` derives the foreign key, which can raise a
+      // `scope()` derives the foreign key, which can raise a
       // `ArgumentError` when the owner's `query_constraints` make the FK
       // underivable. Rails defers that error to load time (the FK is computed
       // lazily inside `load_target`'s scope build), so catch it here, seed a
@@ -659,7 +658,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       // surface eagerly — they are not part of Rails' lazy-FK contract.
       let seedRel: Relation<T> | null;
       try {
-        seedRel = buildHasManyRelation(record, assocName, assocDef.options) as Relation<T> | null;
+        seedRel = hasManyScope(record, assocName, assocDef.options) as Relation<T> | null;
       } catch (err) {
         if (err instanceof ArgumentError) {
           this._deferredFkError = err;
@@ -3469,7 +3468,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       return this._wrapAsAssociationRelation(this._buildThroughScope());
     }
 
-    const rel = buildHasManyRelation(this._record, this._assocName, this._assocDef.options);
+    const rel = hasManyScope(this._record, this._assocName, this._assocDef.options);
     if (rel === null) {
       const targetModel = this.model;
       let emptyRel = (targetModel as any).all();
@@ -3482,7 +3481,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   /**
-   * Promote a plain Relation produced by `buildHasManyRelation` /
+   * Promote a plain Relation produced by the `scope()` seam /
    * `_buildThroughScope` into an AssociationRelation bound to this proxy.
    * Matching Rails' CollectionAssociation#scope — writes on the returned
    * relation (build / create / create!) route back through the owning
@@ -3510,7 +3509,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // with `reflection.extensions`. Without this, an extension method
     // (`posts(:welcome).comments.find_most_recent`) is lost the moment the
     // proxy delegates a named scope through `scope()` (`comments.not_again`),
-    // since the scope is built off `buildHasManyRelation`, not cloned off the
+    // since the scope is built off the `scope()` seam, not cloned off the
     // proxy that carries `_extending`.
     const ext = this._assocDef.options.extend;
     if (ext) {
@@ -3524,7 +3523,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     const ctor = this._record.constructor as typeof Base;
     // Rails' scope IS the JOIN-based AssociationScope relation: delegate to it
     // for every shape it can route, composite keys included. The chain-based
-    // `buildThroughJoinScope` emits the full composite ON clause, so composite
+    // `scope()` seam emits the full composite ON clause, so composite
     // owner PK, composite target PK, composite belongsTo-source FK, and
     // composite through-model PK all build correctly here — the single-column
     // IN-subquery fallback below can't express those tuple matches and would
@@ -3533,7 +3532,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // that fallback, where the composite guards remain as a loud backstop.
     const refl = (ctor as any)._reflectOnAssociation?.(this._assocName);
     if (refl && _routeThroughViaAssociationScope(this._record, refl, this._assocDef.options)) {
-      const joinRel = buildThroughJoinScope(this._record, this._assocName, this._assocDef.options);
+      const joinRel = hasManyScope(this._record, this._assocName, this._assocDef.options);
       return joinRel ?? (this.model as any).all().none(); // null FK → empty, as below
     }
     // Below is the single-column IN-subquery fallback, reached only for shapes
@@ -3647,11 +3646,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         // single-column IN-subquery can't express the tuple match, so route
         // through the JOIN-based AssociationScope, which builds the composite ON
         // clause. Falls back to a null scope only when the owner FK is absent.
-        const joinRel = buildThroughJoinScope(
-          this._record,
-          this._assocName,
-          this._assocDef.options,
-        );
+        const joinRel = hasManyScope(this._record, this._assocName, this._assocDef.options);
         return joinRel ?? (targetModel as any).all().none();
       }
       // When the source reflection specifies a primaryKey option (e.g.
