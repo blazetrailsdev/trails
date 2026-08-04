@@ -278,8 +278,8 @@ export function makeEncryptedAuthor(adapter: DatabaseAdapter) {
 }
 
 export function makeEncryptedBookWithCustomCompressor(adapter: DatabaseAdapter) {
-  // Delegates actual compression to the configured compressor (zlib) so the compressed
-  // output IS smaller and the path is exercised. inflate adds "[compressed] "
+  // Delegates actual compression to the configured compressor (zlib) so the
+  // compressed output IS smaller and the path is exercised. inflate adds "[compressed] "
   // prefix so tests can assert the custom compressor was actually called —
   // mirrors Rails' EncryptedBookWithCustomCompressor fixture.
   const customCompressor: Compressor = {

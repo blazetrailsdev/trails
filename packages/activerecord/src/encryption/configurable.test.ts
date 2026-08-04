@@ -168,7 +168,7 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
     }
   });
 
-  it("excludedFromFilterParameters excludes specific attributes while others are still filtered", () => {
+  it("excludeFromFilterParameters excludes specific attributes while others are still filtered", () => {
     Configurable.config.excludedFromFilterParameters = ["secret_token"];
 
     const filterParameters: string[] = [];
