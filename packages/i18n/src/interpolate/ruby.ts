@@ -87,9 +87,10 @@ const ALTERNATE_PREFIX: Record<string, string> = { b: "0b", B: "0B", o: "0", x: 
  * `ruby.trails.test.ts`, including the forms that are easy to miss: an integer
  * precision as a minimum digit count, the `..` two's-complement form of a
  * negative `%b`/`%o`/`%x`, and `Integer()`/`Float()` raising on an argument
- * that does not convert. What is NOT covered is anything the interpolation
- * pattern cannot deliver here: argument indexes (`%1$d`), `*` widths, and the
- * conversions outside `[bBdiouxXeEfgGcps]`.
+ * that does not convert, booleans and other objects among them. What is NOT
+ * covered is anything the interpolation pattern cannot deliver here: argument
+ * indexes (`%1$d`), `*` widths, and the conversions outside
+ * `[bBdiouxXeEfgGcps]`.
  */
 function sprintf(spec: string, value: unknown): string {
   const parsed = FORMAT_SPEC.exec(spec);
@@ -149,16 +150,34 @@ function sprintf(spec: string, value: unknown): string {
 
 /**
  * Ruby applies `Integer()` / `Float()` to a numeric conversion's argument, so a
- * value that does not convert raises rather than formatting as `NaN`.
+ * value that does not convert raises rather than formatting as `NaN`. Only a
+ * Numeric or a String converts: `nil`, `true`/`false` and any other object
+ * raise `TypeError` naming what was given, and a String that does not parse
+ * raises `ArgumentError`.
+ *
+ * The `TypeError` is JS's own rather than a ported class because Ruby's is
+ * `Kernel`'s, and the gem raises none of its own here — `sprintf` is a builtin.
+ * `ArgumentError` is ported because `interpolate` already raises it (ruby.rb:8).
  */
 function numericArgument(value: unknown, integer: boolean): number {
   const kind = integer ? "Integer" : "Float";
   if (value == null) throw new TypeError(`can't convert nil into ${kind}`);
+  if (typeof value === "boolean") throw new TypeError(`can't convert ${value} into ${kind}`);
+  if (typeof value !== "number" && typeof value !== "string") {
+    throw new TypeError(`can't convert ${rubyClassName(value)} into ${kind}`);
+  }
   const number = Number(typeof value === "string" ? value.trim() : value);
   if (Number.isNaN(number) || (typeof value === "string" && value.trim() === "")) {
     throw new ArgumentError(`invalid value for ${kind}(): ${inspect(value)}`);
   }
   return number;
+}
+
+/** The Ruby class name `Integer()` / `Float()` name in their TypeError. */
+function rubyClassName(value: unknown): string {
+  if (Array.isArray(value)) return "Array";
+  const name = (value as object).constructor?.name;
+  return name === undefined || name === "Object" ? "Hash" : name;
 }
 
 /**

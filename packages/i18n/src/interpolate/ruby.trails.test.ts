@@ -162,6 +162,10 @@ describe("sprintf conformance", () => {
     expect(() => interpolate("%<v>x", { v: "abc" })).toThrow('invalid value for Integer(): "abc"');
     expect(() => interpolate("%<v>f", { v: "abc" })).toThrow('invalid value for Float(): "abc"');
     expect(() => interpolate("%<v>d", { v: null })).toThrow("can't convert nil into Integer");
+    expect(() => interpolate("%<v>d", { v: true })).toThrow("can't convert true into Integer");
+    expect(() => interpolate("%<v>f", { v: false })).toThrow("can't convert false into Float");
+    expect(() => interpolate("%<v>d", { v: [1] })).toThrow("can't convert Array into Integer");
+    expect(() => interpolate("%<v>f", { v: {} })).toThrow("can't convert Hash into Float");
   });
 
   it("raises ArgumentError given a spec outside the grammar", () => {
