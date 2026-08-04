@@ -6,9 +6,8 @@ import { RotationCoordinator, type BuildOptions } from "./rotation-coordinator.j
 
 /**
  * `RotationCoordinator` is abstract and Rails covers it only through
- * `MessageVerifiers` / `MessageEncryptors`, neither of which is ported yet.
- * This stands in for `MessageVerifiers` so the base class and the shared
- * `RotationCoordinatorTests` module are exercised until it lands.
+ * `MessageVerifiers` / `MessageEncryptors`. This stands in for them so the
+ * base class itself is exercised directly.
  */
 class VerifierCoordinator extends RotationCoordinator<MessageVerifier> {
   protected build(salt: string, options: BuildOptions): MessageVerifier {
