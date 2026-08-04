@@ -1,21 +1,11 @@
 /**
- * Active Record's arm of the same load-path stand-in Active Model's
- * `test-helpers/i18n.ts` documents: a fresh backend plus the `en.yml` data
- * Rails' `I18n.load_path` would re-read.
+ * Active Record's arm of `activemodel/src/test-helpers/i18n.ts`: a fresh
+ * backend, with `I18n.load_path` re-supplying the framework locales.
  */
 import { I18n } from "@blazetrails/activemodel";
-import { en as activemodelEn } from "@blazetrails/activemodel/locale/en";
-import { en } from "../locale/en.js";
+import "../i18n.js";
 
-/**
- * A fresh backend carrying the framework locales, as Rails' load path supplies
- * them. `backend` is the `I18n.backend = ...` half of the stand-in: Rails test
- * cases that need a mixin over `Simple` declare their own backend class and
- * assign an instance of it (activerecord/test/cases/validations/
- * i18n_generate_message_validation_test.rb:14).
- */
-export function resetI18n(backend: I18n.Base = new I18n.Simple()): void {
-  I18n.setBackend(backend);
-  I18n.backend().storeTranslations("en", activemodelEn);
-  I18n.backend().storeTranslations("en", en);
+/** A fresh backend; Rails' load path re-supplies the framework locales. */
+export function resetI18n(): void {
+  I18n.setBackend(new I18n.Simple());
 }

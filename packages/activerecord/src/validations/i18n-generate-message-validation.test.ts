@@ -3,7 +3,7 @@ import { Base } from "../index.js";
 import { I18n } from "@blazetrails/activemodel";
 import { RecordInvalid } from "../validations.js";
 import { fixtures } from "../test-fixtures.js";
-import { resetI18n } from "../test-helpers/i18n.js";
+import "../i18n.js";
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 fixtures({});
@@ -18,22 +18,23 @@ describe("I18nGenerateMessageValidationTest", () => {
   /**
    * Mirrors: activerecord/test/cases/validations/i18n_generate_message_validation_test.rb:17-25
    * — snapshots the load path and backend, clears/replaces both, yields, and
-   * restores both in `ensure`. Trails' framework locales are modules rather
-   * than load-path entries, so a fresh backend is the whole of
-   * `I18n.load_path.clear` plus `I18n.backend = Backend.new`.
+   * restores both in `ensure`.
    */
   function resetI18nLoadPath(fn: () => void): void {
+    const oldLoadPath = [...I18n.loadPath()];
     const oldBackend = I18n.backend();
+    I18n.loadPath().length = 0;
     I18n.setBackend(new Backend());
     try {
       fn();
     } finally {
+      I18n.loadPath().splice(0, I18n.loadPath().length, ...oldLoadPath);
       I18n.setBackend(oldBackend);
     }
   }
 
   beforeEach(() => {
-    resetI18n(new Backend());
+    I18n.setBackend(new Backend());
   });
   afterAll(() => {
     vi.unstubAllEnvs();

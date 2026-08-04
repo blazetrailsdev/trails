@@ -186,6 +186,12 @@ const MIRROR_CANDIDATE_OVERRIDES: Record<string, string[]> = {
   to_ary: ["toArray"],
   "==": ["equals"],
   "<=>": ["compare"],
+  // `WhereClause#+` / `#-` / `#|` (relation/where_clause.rb:14, :18, :22) —
+  // named `plus` / `minus` / `union`, the spellings OPERATOR_SPELLING_BY_FQN
+  // pins for that class.
+  "+": ["plus"],
+  "-": ["minus"],
+  "|": ["union"],
   initialize_copy: ["clone", "dup"],
   initialize_dup: ["dup"],
   initialize_clone: ["clone"],

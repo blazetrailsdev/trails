@@ -3,8 +3,8 @@
  *
  * Rails appends this file to `I18n.load_path` from the `on_load(:i18n)` hook at
  * the bottom of `activemodel/lib/active_model.rb`. The data lives here as a
- * module instead, and `i18n.ts` stores it into the backend directly — see the
- * header there for why the load path can't carry it.
+ * module instead, which `i18n.ts` registers before appending its path to
+ * `I18n.load_path`.
  */
 
 import type { TranslationData } from "@blazetrails/i18n";

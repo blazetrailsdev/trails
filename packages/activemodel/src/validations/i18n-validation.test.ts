@@ -50,7 +50,17 @@ describe("I18nValidationTest", () => {
   });
 
   it("errors full messages uses format", () => {
-    I18n.backend().storeTranslations("en", { errors: { format: "Field %{attribute} %{message}" } });
+    // Rails clears `I18n.load_path` in setup (i18n_validation_test.rb:12), so a
+    // stored `errors.format` is not overwritten by the framework `en.yml` the
+    // backend loads lazily. Only this case collides with the file data, so the
+    // clear is local to it; `errors.messages.empty` is stored back because the
+    // trails deviation below resolves the message through the backend.
+    const oldLoadPath = [...I18n.loadPath()];
+    I18n.loadPath().length = 0;
+    I18n.setBackend(new I18n.Simple());
+    I18n.backend().storeTranslations("en", {
+      errors: { format: "Field %{attribute} %{message}", messages: { empty: "can't be empty" } },
+    });
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -64,6 +74,7 @@ describe("I18nValidationTest", () => {
     // "empty" resolves through `errors.messages.empty`. The format under test —
     // `errors.format` — is asserted either way.
     expect(p.errors.fullMessages).toEqual(["Field Name can't be empty"]);
+    I18n.loadPath().splice(0, I18n.loadPath().length, ...oldLoadPath);
   });
 
   it("errors full messages doesnt use attribute format without config", () => {

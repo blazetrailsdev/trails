@@ -6,11 +6,12 @@
  * The hook lives in a file of its own — rather than in `index.ts`, which is
  * where the rest of `active_record.rb` lands — because `base.ts` has to import
  * it for its side effect: a model file that never loads the package index still
- * has to be able to translate its error messages. Why the load path does not
- * carry the data: see the header in `activemodel/src/i18n.ts`.
+ * has to be able to translate its error messages.
  */
 
 import { I18n } from "@blazetrails/activemodel";
 import { en } from "./locale/en.js";
 
-I18n.backend().storeTranslations("en", en);
+const enPath = new URL("./locale/en.js", import.meta.url).pathname;
+I18n.registerLocaleModule(enPath, { en });
+I18n.loadPath().push(enPath);

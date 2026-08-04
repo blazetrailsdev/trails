@@ -79,6 +79,16 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   "ActiveRecord::Reflection::MacroReflection": { "==": ["equals"] },
   // relation/from_clause.rb:21 `def ==(other)` → relation/from-clause.ts `equals`.
   "ActiveRecord::Relation::FromClause": { "==": ["equals"] },
+  // relation/where_clause.rb:14 `def +(other)` / :18 `def -(other)` / :22
+  // `def |(other)` / :75 `def ==(other)` → relation/where-clause.ts `plus` /
+  // `minus` / `union` / `equals`. `|` keeps the `union` spelling the class
+  // already used for Ruby `Array#|`.
+  "ActiveRecord::Relation::WhereClause": {
+    "+": ["plus"],
+    "-": ["minus"],
+    "|": ["union"],
+    "==": ["equals"],
+  },
   // connection_adapters/mysql/type_metadata.rb:18 `def ==(other)` →
   // connection-adapters/mysql/type-metadata.ts `equals`.
   "ActiveRecord::ConnectionAdapters::MySQL::TypeMetadata": { "==": ["equals"] },
