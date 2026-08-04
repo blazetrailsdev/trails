@@ -6,7 +6,7 @@
 import { readFile } from "node:fs/promises";
 import { beforeEach, describe, expect, it } from "vitest";
 import { Simple } from "./simple.js";
-import { config, reloadBang, resetConfig } from "../i18n.js";
+import { config, eagerLoadBang, reloadBang, resetConfig } from "../i18n.js";
 import { resetClassConfig } from "../config.js";
 import { InvalidLocaleData, UnknownFileType } from "../exceptions.js";
 import { preloadTranslationFiles, registerFileReader, registerLocaleModule } from "./base.js";
@@ -100,6 +100,34 @@ describe("I18n::Backend::Base file loading", () => {
     body = "en:\n  foo:\n    bar: qux\n";
     await reloadBang();
     expect(backend.initialized()).toBe(true);
+    expect(backend.translate("en", "foo.bar")).toBe("qux");
+  });
+
+  it("reads I18n.load_path once per reload, and not again on eagerLoadBang", async () => {
+    let reads = 0;
+    registerFileReader(() => {
+      reads += 1;
+      return Promise.resolve("en:\n  foo:\n    bar: baz\n");
+    });
+    await config().setLoadPath(["mutable.yml"]);
+    reads = 0;
+
+    await eagerLoadBang();
+    expect(reads).toBe(0);
+
+    await reloadBang();
+    expect(reads).toBe(1);
+  });
+
+  it("serves the mutated file on an eagerLoadBang that follows a reloadBang", async () => {
+    let body = "en:\n  foo:\n    bar: baz\n";
+    registerFileReader(() => Promise.resolve(body));
+    await config().setLoadPath(["mutable.yml"]);
+    expect(backend.translate("en", "foo.bar")).toBe("baz");
+
+    body = "en:\n  foo:\n    bar: qux\n";
+    await reloadBang();
+    await eagerLoadBang();
     expect(backend.translate("en", "foo.bar")).toBe("qux");
   });
 
