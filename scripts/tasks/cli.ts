@@ -1347,15 +1347,19 @@ export interface StoryTarget {
   file: string;
 }
 
-// Resolve ids to story files. `"all"` (claim, release, and every single-id verb)
-// aborts the whole command on an unknown id — an atomic verb must write nothing
-// when part of its input is bogus. `"each"` (done, in-progress) drops the
-// unknown ids and proceeds with the rest, so one bad id in a bundle doesn't
-// strand the others behind a merged PR; it still exits 1 when nothing resolves.
+// Resolve ids to story files, ignoring repeats (a duplicated id would otherwise
+// stage and report the same story twice). `"all"` (claim, release, and every
+// single-id verb) aborts the whole command on an unknown id — an atomic verb
+// must write nothing when part of its input is bogus. `"each"` (done,
+// in-progress) drops the unknown ids and proceeds with the rest, so one bad id
+// in a bundle doesn't strand the others behind a merged PR; it still exits 1
+// when nothing resolves, restoring the generated index files loadIndex() may
+// have dirtied (as storyFilePath does on its own not-found exit).
 function storyTargets(index: Index, ids: string[], mode: "all" | "each"): StoryTarget[] {
-  if (mode === "all") return ids.map((id) => ({ id, file: storyFilePath(index, id) }));
+  const unique = [...new Set(ids)];
+  if (mode === "all") return unique.map((id) => ({ id, file: storyFilePath(index, id) }));
   const targets: StoryTarget[] = [];
-  for (const id of ids) {
+  for (const id of unique) {
     const entry = index.stories.find((s) => s.id === id);
     if (!entry) {
       console.error(`error: story "${id}" not found in index — skipping`);
@@ -1364,10 +1368,8 @@ function storyTargets(index: Index, ids: string[], mode: "all" | "each"): StoryT
     targets.push({ id, file: join(TASKS_DIR, entry.file_path) });
   }
   if (targets.length === 0) {
-    // loadIndex() may have rebuilt and so dirtied the generated index files;
-    // restore them before this error exit (matches storyFilePath).
     restoreGeneratedFiles(TASKS_DIR);
-    console.error(`error: no known stories among: ${ids.join(", ")}`);
+    console.error(`error: no known stories among: ${unique.join(", ")}`);
     process.exit(1);
   }
   return targets;
@@ -1457,13 +1459,16 @@ export function claimBatch(
 // post-pull state before ANY write, and a single taken id refuses the lot.
 function claim(ids: string[], assignee: string): void {
   const list = ids.join(", ");
+  let held: string[] = [];
   flip(ids, `claim: ${list}`, `lost claim race on ${list} — pick another story`, 3, (targets) => {
+    held = targets.map((t) => t.id);
     const batch = claimBatch(
       targets.map((t) => ({ id: t.id, text: readFileSync(t.file, "utf8") })),
       assignee,
     );
     if (batch.taken.length > 0) {
-      console.error(`error: ${batch.taken.join(", ")} is already claimed`);
+      const verb = batch.taken.length > 1 ? "are" : "is";
+      console.error(`error: ${batch.taken.join(", ")} ${verb} already claimed`);
       throw new MutatorEarlyExit(2);
     }
     const available = targets.filter((t) => batch.available.includes(t.id));
@@ -1479,7 +1484,7 @@ function claim(ids: string[], assignee: string): void {
       // push never landed and the claim is still null or held by someone else.)
       // This runs inside commitAndPush's lock; throw the early-exit sentinel
       // (not process.exit, which would skip the lock's `finally` and leak it).
-      for (const id of ids) console.log(`claimed ${id} as ${assignee}`);
+      for (const id of held) console.log(`claimed ${id} as ${assignee}`);
       throw new MutatorEarlyExit(0);
     }
     const now = new Date().toISOString().replace(/\.\d+Z$/, "Z");
@@ -1492,7 +1497,7 @@ function claim(ids: string[], assignee: string): void {
     }
     return available.map((s) => s.file);
   });
-  for (const id of ids) console.log(`claimed ${id} as ${assignee}`);
+  for (const id of held) console.log(`claimed ${id} as ${assignee}`);
 }
 
 const RETRY_MSG = (id: string) => `failed to update ${id} after retry — pull manually and retry`;
@@ -1506,36 +1511,41 @@ export function trackingSkip(fileText: string, status: StoryStatus, pr: number):
   return statusOf(fileText) === status && prOf(fileText) === pr;
 }
 
-// Shared body of `in-progress` and `done`: both stamp status + pr on each id
-// independently (best-effort), reporting one outcome line per story.
+// Shared body of `in-progress` and `done`. Both are best-effort per id: each
+// story is stamped independently and reported on its own line, so an id already
+// carrying this exact status+pr is skipped rather than aborting the rest — a
+// half-marked bundle behind a merged PR is the failure this exists to prevent.
+// Outcomes are recorded (and reset) inside the mutator, which commitAndPush may
+// re-run after a lost race, and printed once it has landed.
 function markTracking(ids: string[], status: "in-progress" | "done", pr: number): void {
   const list = ids.join(", ");
+  let outcomes: { id: string; skipped: boolean }[] = [];
   flip(
     ids,
     `${status}: ${list} #${pr}`,
     RETRY_MSG(list),
     4,
     (targets) => {
+      outcomes = [];
       const written: string[] = [];
       for (const { id, file } of targets) {
-        if (trackingSkip(readFileSync(file, "utf8"), status, pr)) {
-          console.log(`${id} already ${status} #${pr} — skipping`);
-          continue;
-        }
+        const skipped = trackingSkip(readFileSync(file, "utf8"), status, pr);
+        outcomes.push({ id, skipped });
+        if (skipped) continue;
         editFrontmatter(file, { status, pr: String(pr) });
         written.push(file);
       }
       if (written.length === 0) {
-        // Every id was already in the target state; there is nothing to commit
-        // and `git commit` would error "nothing to commit". Bail cleanly (the
-        // sentinel, not process.exit, so commitAndPush releases its lock).
+        for (const o of outcomes) console.log(`${o.id} already ${status} #${pr}`);
         throw new MutatorEarlyExit(0);
       }
       return written;
     },
     "each",
   );
-  for (const id of ids) console.log(`marked ${id} ${status} #${pr}`);
+  for (const o of outcomes) {
+    console.log(o.skipped ? `${o.id} already ${status} #${pr}` : `marked ${o.id} ${status} #${pr}`);
+  }
 }
 
 function inProgress(ids: string[], pr: number): void {
@@ -1552,8 +1562,10 @@ function done(ids: string[], pr: number): void {
 // `STATUS_TRANSITIONS.claimed` is empty, so `status-set` refuses it.
 function release(ids: string[]): void {
   const list = ids.join(", ");
+  let outcomes: { id: string; from: string | null }[] = [];
   flip(ids, `release: ${list}`, RETRY_MSG(list), 4, (targets) => {
     const states = targets.map((t) => ({ ...t, from: statusOf(readFileSync(t.file, "utf8")) }));
+    outcomes = states.map((s) => ({ id: s.id, from: s.from }));
     const illegal = states.filter((s) => releaseError(s.from) !== null);
     if (illegal.length > 0) {
       for (const s of illegal) console.error(`error: ${releaseError(s.from)} for ${s.id}`);
@@ -1567,7 +1579,9 @@ function release(ids: string[]): void {
     for (const s of claimed) editFrontmatter(s.file, RELEASE_EDITS);
     return claimed.map((s) => s.file);
   });
-  for (const id of ids) console.log(`released ${id}`);
+  for (const o of outcomes) {
+    console.log(o.from === "claimed" ? `released ${o.id}` : `${o.id} already ready`);
+  }
 }
 
 // Pure guard for `release`, unit-testable without a git repo. Returns null when
@@ -3404,8 +3418,6 @@ function main(): void {
         checkCheckboxesDone(splitFrontmatter(storyFilePath(index, id)).body, flags.force === true);
       }
       done(ids, pr);
-      // One PR carries the whole bundle, so the estimate it is measured against
-      // is the sum of the stories marked done by this call.
       const estLoc = ids.reduce<number | null>((sum, id) => {
         const est = index.stories.find((s) => s.id === id)?.est_loc ?? null;
         return est === null ? sum : (sum ?? 0) + est;
