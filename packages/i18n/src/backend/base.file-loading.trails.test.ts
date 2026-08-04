@@ -1,6 +1,9 @@
 /**
- * The `InvalidLocaleData` arms of `load_yml` / `load_file` and the YAML subset
- * the reader accepts — the gem gets these from Psych, so they are pinned here.
+ * The `InvalidLocaleData` arms of `load_yml` / `load_file`, and the Psych input
+ * surface `load_yml` accepts by handing the file straight to a YAML parser
+ * (base.rb:261-270) — pinned here because the gem gets both from Psych, so
+ * anchors, aliases, tags, block scalars and mapping entries inside a block
+ * sequence all load rather than raising.
  */
 
 import { readFile } from "node:fs/promises";
@@ -10,7 +13,6 @@ import { config, eagerLoadBang, reloadBang, resetConfig } from "../i18n.js";
 import { resetClassConfig } from "../config.js";
 import { InvalidLocaleData, UnknownFileType } from "../exceptions.js";
 import { preloadTranslationFiles, registerFileReader, registerLocaleModule } from "./base.js";
-import { parseYaml } from "../yaml.js";
 
 function localesDir(): string {
   return new URL("../test-data/locales", import.meta.url).pathname;
@@ -24,7 +26,7 @@ describe("I18n::Backend::Base file loading", () => {
     resetClassConfig();
     registerFileReader((filename) => readFile(filename, "utf8"));
     await preloadTranslationFiles(
-      ["en.yml", "fr.yml", "invalid/empty.yml", "invalid/syntax.yml"].map(
+      ["en.yml", "fr.yml", "psych.yml", "invalid/empty.yml", "invalid/syntax.yml"].map(
         (name) => `${localesDir()}/${name}`,
       ),
     );
@@ -174,38 +176,12 @@ describe("I18n::Backend::Base file loading", () => {
     });
   });
 
-  describe("the YAML subset", () => {
-    // The flow collections come from vendor/rails/activesupport/lib/
-    // active_support/locale/en.yml, which every other shape here also appears in.
-    it("reads the mappings, sequences and scalars Rails' locale files use", () => {
-      const source =
-        "# a comment\nen:\n  day_names: [Sunday, Monday, Tuesday]\n" +
-        "  month_names: [~, January, February]\n  order:\n    - year\n    - month\n" +
-        "  quoted: 'it''s here'  # trailing comment\n  escaped: \"a\\nb\"\n" +
-        "  blank:\n  flag: true\n  count: 42\n  ratio: 1.5\n" +
-        "  padded: 01\n  hash_in_value: not#a#marker\n";
-      expect(parseYaml(source)).toEqual({
-        en: {
-          day_names: ["Sunday", "Monday", "Tuesday"],
-          month_names: [null, "January", "February"],
-          order: ["year", "month"],
-          quoted: "it's here",
-          escaped: "a\nb",
-          blank: null,
-          flag: true,
-          count: 42,
-          ratio: 1.5,
-          padded: "01",
-          hash_in_value: "not#a#marker",
-        },
-      });
-    });
-
-    it("raises outside the supported subset", () => {
-      expect(parseYaml("---\n# nothing here\n")).toBeNull();
-      expect(() => parseYaml("en:\n foo: foo\n    bar:\n")).toThrow(/inconsistent indentation/);
-      expect(() => parseYaml("en: &anchor\n")).toThrow(/not supported/);
-      expect(() => parseYaml("en:\n  just a scalar\n")).toThrow(/expected a `key: value`/);
-    });
+  it("loads the constructs Psych accepts beyond plain block mappings", () => {
+    backend.loadTranslations(`${localesDir()}/psych.yml`);
+    expect(backend.translate("en", "greeting")).toBe("Hello");
+    expect(backend.translate("en", "aliased")).toBe("Hello");
+    expect(backend.translate("en", "farewell")).toBe("Bye\nnow");
+    expect(backend.translate("en", "entries")).toEqual([{ key: "value" }]);
+    expect(backend.translate("en", "tagged")).toBe("42");
   });
 });

@@ -24,5 +24,8 @@
   },
   "dependencies": {
     "@js-temporal/polyfill": "^0.5.1"
+  },
+  "optionalDependencies": {
+    "yaml": "^2.8.3"
   }
 }

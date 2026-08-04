@@ -1728,7 +1728,11 @@ export class Date {
    * later one overwrites what `parse_time` put there, and each `subx`es the text
    * it matched out of the one String they share so the next one reads only the
    * leftover. The ported ones do both: they take that Hash, and answer the
-   * edited string rather than editing it in place. `:_comp` starts out as `comp`
+   * edited string rather than editing it in place. Each call is gated on the
+   * character classes its own pattern needs (`HAVE_ELEM_P`, `date_parse.c:2133`,
+   * over `check_class`, `date_parse.c:2111-2130`), tested against the live
+   * string rather than the argument, since every sub-parser before it has been
+   * editing it (`date_parse.c:2186-2229`). `:_comp` starts out as `comp`
    * (`date_parse.c:2172`) and only ever turns false, so an absent one is `comp`,
    * and the year is completed only within `0..99` (`date_parse.c:2267-2287`).
    */
@@ -1740,17 +1744,18 @@ export class Date {
     if (/[a-z]/i.test(str) && /\d/.test(str)) {
       rest = parseEu(str, hash) ?? parseUs(str, hash);
     }
-    rest ??=
-      parseIso(str, hash) ??
-      parseJis(str, hash) ??
-      parseVms(str, hash) ??
-      parseSla(str, hash) ??
-      parseDot(str, hash) ??
-      parseIso2(str, hash) ??
-      parseYear(str, hash) ??
-      parseMon(str, hash) ??
-      parseMday(str, hash) ??
-      parseDdd(str, hash);
+    if (rest === null && /\d/.test(str) && str.includes("-")) rest = parseIso(str, hash);
+    if (rest === null && /\d/.test(str) && str.includes(".")) rest = parseJis(str, hash);
+    if (rest === null && /[a-z]/i.test(str) && /\d/.test(str) && str.includes("-")) {
+      rest = parseVms(str, hash);
+    }
+    if (rest === null && /\d/.test(str) && str.includes("/")) rest = parseSla(str, hash);
+    if (rest === null && /\d/.test(str) && str.includes(".")) rest = parseDot(str, hash);
+    if (rest === null && /\d/.test(str)) rest = parseIso2(str, hash);
+    if (rest === null && /\d/.test(str)) rest = parseYear(str, hash);
+    if (rest === null && /[a-z]/i.test(str)) rest = parseMon(str, hash);
+    if (rest === null && /\d/.test(str)) rest = parseMday(str, hash);
+    if (rest === null && /\d/.test(str)) rest = parseDdd(str, hash);
     if (rest !== null) str = rest;
     if (/[a-z]/i.test(str)) str = parseBc(str, hash) ?? str;
     if (/\d/.test(str)) parseFrag(str, hash);

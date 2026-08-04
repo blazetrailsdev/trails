@@ -46,7 +46,6 @@ import {
 } from "./transliterator.js";
 import { except, type TranslationData } from "../utils.js";
 import { tr } from "./flatten.js";
-import { parseYaml } from "../yaml.js";
 
 export type TranslateOptions = { [key: string]: unknown };
 
@@ -54,6 +53,7 @@ export type TranslateOptions = { [key: string]: unknown };
 export type FileReader = (filename: string) => Promise<string>;
 
 let fileReader: FileReader | undefined;
+let yamlParse: ((source: string) => unknown) | undefined;
 const fileContents = new Map<string, string>();
 const localeModules = new Map<string, unknown>();
 
@@ -96,8 +96,26 @@ export function registerLocaleModule(filename: string, translations: unknown): v
  * `Naming#human` and `NumberConverter#format`; making them async would push a
  * deviation through five packages to remove one from this file. Awaiting the
  * I/O once at boot keeps the async fs and leaves every ported body verbatim.
+ *
+ * It resolves the `yaml` package on the same seam and for the same reason.
+ * `base.rb:3` `require 'yaml'` is synchronous and unconditional, but `yaml` is
+ * an `optionalDependency` here rather than stdlib, and a module-scope
+ * `import "yaml"` would put that resolution in `@blazetrails/i18n`'s root graph
+ * — an eager ESM link-time edge failing `import "@blazetrails/i18n"` outright
+ * for a consumer that never reads a locale file. Awaiting it here keeps the
+ * miss local to the callers that actually load translations, and keeps
+ * `load_yml` synchronous the way `YAML.load_file` is. A top-level `await` would
+ * do neither: it does not build to the `iife` or `cjs` bundles this package
+ * ships through.
  */
 export async function preloadTranslationFiles(...filenames: (string | string[])[]): Promise<void> {
+  yamlParse ??= (
+    await import("yaml").catch(() => {
+      throw new Error(
+        "I18n cannot read YAML locale files without the `yaml` package. Install it with `npm install yaml`.",
+      );
+    })
+  ).parse;
   const paths = filenames.length === 0 ? config().loadPath : filenames;
   for (const filename of paths.flat()) {
     fileContents.set(filename, await readTranslationFile(filename));
@@ -139,6 +157,15 @@ function readLocaleModule(filename: string): unknown {
     );
   }
   return localeModules.get(filename);
+}
+
+function readYaml(source: string): unknown {
+  if (!yamlParse) {
+    throw new Error(
+      "I18n cannot parse YAML: resolving the `yaml` package is async, so await I18n.preloadTranslationFiles() before loading a .yml file.",
+    );
+  }
+  return yamlParse(source);
 }
 
 function readFile(filename: string): string {
@@ -622,15 +649,23 @@ export abstract class Base {
    * Loads a YAML translations file. The data must have locales as toplevel
    * keys. Only the pre-Psych-4 arm of the gem's `YAML.respond_to?
    * (:unsafe_load_file)` probe exists here — there is no Psych to probe, and
-   * `parseYaml` neither symbolizes nor freezes, so `keys_symbolized` is false.
+   * `yaml`'s `parse` neither symbolizes nor freezes, so `keys_symbolized` is
+   * false.
    *
-   * @missingRailsCall load_file — Ruby's `YAML.load_file` (base.rb:246) reads
-   * and parses in one call; JS has neither, so the read is served from the
-   * preload (`preloadTranslationFiles`) and the parse goes through `parseYaml`.
+   * The npm `yaml` package stands in for Psych, resolved on the
+   * `preloadTranslationFiles` seam rather than imported at module scope, so a
+   * consumer who never loads a locale file can still import this package —
+   * see that function. It is resolved directly rather than through
+   * `@blazetrails/activesupport/yaml`: the workspace edge runs
+   * activesupport -> i18n, so consuming that re-export would invert it.
+   *
+   * @missingRailsCall load_file — Ruby's `YAML.load_file` (base.rb:265) reads
+   * and parses in one call; the npm `yaml` package only parses, so the read is
+   * served from the preload (`preloadTranslationFiles`).
    */
   protected loadYml(filename: string): [unknown, boolean] {
     try {
-      return [parseYaml(readFile(filename)), false];
+      return [readYaml(readFile(filename)), false];
     } catch (e) {
       throw new InvalidLocaleData(filename, inspectError(e));
     }
