@@ -12,7 +12,10 @@
  * keeps the bodies in the `Simple` class itself and spells `include Base` as
  * the prototype copy below — the class body still wins over `Base`, and a
  * mixin over `Simple` (`Fallbacks(Simple)`) still sits above these bodies with
- * `super` reaching them, which is the seam `extends Base` collapsed.
+ * `super` reaching them, which is the seam `extends Base` collapsed. The two
+ * `super` calls below are `Base.prototype.<m>.call(this)` for the same reason
+ * Ruby resolves them to `Base`: a mixin included into `Simple` sits above
+ * `Implementation`, never between it and `Base`.
  *
  * There is likewise no `MUTEX` — JS has no threads, so the concurrent-hash
  * machinery has nothing to guard.
@@ -98,9 +101,6 @@ export class Simple {
   reloadBang(): void {
     this.initializedFlag = false;
     this.translationsStore = undefined;
-    // Ruby's `super` from `Implementation` resolves to `Base`, the next
-    // ancestor — a mixin included into `Simple` sits above `Implementation`,
-    // never between it and `Base`.
     Base.prototype.reloadBang.call(this);
   }
 
