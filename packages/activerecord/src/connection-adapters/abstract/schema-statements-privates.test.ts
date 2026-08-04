@@ -10,6 +10,7 @@ import {
   TableDefinition,
   type ColumnType,
 } from "./schema-definitions.js";
+import { TableDefinition as MysqlTableDefinition } from "../mysql/schema-definitions.js";
 import { AbstractAdapter } from "../abstract-adapter.js";
 import { NATIVE_DATABASE_TYPES_BY_ADAPTER } from "./native-database-types.js";
 import { NotImplementedError } from "../../errors.js";
@@ -824,6 +825,8 @@ describe("buildCreateTableDefinition routing", () => {
     const abstract = makeStatements();
     const mysql = makeStatements({
       validPrimaryKeyOptions: () => ["limit", "unsigned", "autoIncrement"],
+      createTableDefinition: (name: string, options: Record<string, unknown>) =>
+        new MysqlTableDefinition(name, options as any),
     });
 
     expect(

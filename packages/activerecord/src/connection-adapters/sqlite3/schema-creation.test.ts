@@ -1,10 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { SchemaCreation } from "./schema-creation.js";
-import {
-  ForeignKeyDefinition,
-  TableDefinition,
-  CreateIndexDefinition,
-} from "../abstract/schema-definitions.js";
+import { ForeignKeyDefinition, CreateIndexDefinition } from "../abstract/schema-definitions.js";
+import { TableDefinition } from "./schema-definitions.js";
 import { schemaConn } from "../../support/schema-conn.js";
 
 describe("SQLite3::SchemaCreation", () => {

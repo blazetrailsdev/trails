@@ -246,3 +246,26 @@ describe("IndexDefinition concise options", () => {
     expect(index.lengths).toBe(10);
   });
 });
+
+describe("TableDefinition#create_column_definition", () => {
+  const td = () =>
+    new TableDefinition("articles", { adapter: schemaConn("sqlite"), adapterName: "sqlite" });
+
+  it("raises on a column option outside valid_column_definition_options", () => {
+    expect(() => td().column("title", "string", { preccision: true } as never)).toThrow(
+      "Unknown key: :preccision. Valid keys are: :limit, :precision, :scale, :default, :null, :collation, :comment, :primaryKey, :ifExists, :ifNotExists",
+    );
+  });
+
+  it("skips the check when _skipValidateOptions is set", () => {
+    expect(() =>
+      td().column("title", "string", { preccision: true, _skipValidateOptions: true } as never),
+    ).not.toThrow();
+  });
+
+  it("excepts _usesLegacyReferenceIndexName from the checked keys", () => {
+    expect(() =>
+      td().column("title", "string", { _usesLegacyReferenceIndexName: true } as never),
+    ).not.toThrow();
+  });
+});

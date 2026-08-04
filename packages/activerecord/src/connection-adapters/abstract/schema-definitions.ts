@@ -1,6 +1,6 @@
 import type { SchemaQuoter } from "./assert-schema-adapter.js";
 import type { Column } from "../column.js";
-import { singularize, pluralize, getCrypto } from "@blazetrails/activesupport";
+import { singularize, pluralize, getCrypto, assertValidKeys } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { SchemaDumper } from "../../schema-dumper.js";
 import {
@@ -516,6 +516,8 @@ export interface ColumnOptions {
   type?: ColumnType;
   as?: string;
   stored?: boolean;
+  _usesLegacyReferenceIndexName?: boolean;
+  _skipValidateOptions?: boolean;
 }
 
 /**
@@ -1139,6 +1141,11 @@ export class TableDefinition {
     type: ColumnType,
     options: ColumnOptions,
   ): ColumnDefinition {
+    if (!options._skipValidateOptions) {
+      const { _usesLegacyReferenceIndexName: _u, _skipValidateOptions: _s, ...rest } = options;
+      assertValidKeys(rest, this.validColumnDefinitionOptions());
+    }
+
     return new ColumnDefinition(name, type, options);
   }
 
