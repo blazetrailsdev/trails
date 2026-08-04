@@ -233,6 +233,8 @@ const alias = {
   "@blazetrails/globalid": path.resolve(__dirname, "packages/globalid/src/index.ts"),
   "@blazetrails/trails-tsc": path.resolve(__dirname, "packages/trails-tsc/src/index.ts"),
   "@blazetrails/did-you-mean": path.resolve(__dirname, "packages/did-you-mean/src/index.ts"),
+  "@blazetrails/i18n/date": path.resolve(__dirname, "packages/i18n/src/date.ts"),
+  "@blazetrails/i18n/time": path.resolve(__dirname, "packages/i18n/src/time.ts"),
   "@blazetrails/i18n": path.resolve(__dirname, "packages/i18n/src/index.ts"),
   "@blazetrails/nokogiri": path.resolve(__dirname, "packages/nokogiri/src/index.ts"),
 };
