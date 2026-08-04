@@ -39,6 +39,8 @@ import {
   checkCheckboxesDone,
   checkPrNotOpen,
   claimState,
+  claimBatch,
+  findStoryFile,
   prLocDelta,
   uncheckedCheckboxes,
   commitAndPush,
@@ -83,6 +85,10 @@ import {
   isDepResolved,
   statusEdits,
   statusOf,
+  prOf,
+  trackingSkip,
+  releaseError,
+  RELEASE_EDITS,
   statusTransitionError,
   STORY_STATUSES,
   stringFlag,
@@ -760,6 +766,138 @@ describe("claimState (idempotent re-claim discriminator)", () => {
   });
 });
 
+describe("findStoryFile (lenient id resolution)", () => {
+  it("resolves a known id to its file path", () => {
+    const idx = index([story({ id: "a", file_path: "rfcs/0005-gaps/stories/a.md" })]);
+    expect(findStoryFile(idx, "a")).toMatch(/rfcs\/0005-gaps\/stories\/a\.md$/);
+  });
+
+  // The per-id-resilient verbs (`done`, `in-progress`) must be able to report an
+  // unknown id and keep going: resolving it strictly would exit the process and
+  // abort the whole bundle, leaving the known ids unmarked behind a merged PR.
+  it("returns null for an unknown id instead of exiting", () => {
+    const idx = index([story({ id: "a" })]);
+    expect(findStoryFile(idx, "nope")).toBeNull();
+  });
+});
+
+describe("claimBatch (multi-id claim partitioning)", () => {
+  const unclaimed = `---\nstatus: ready\nclaim: null\nassignee: null\n---\n`;
+  const mine = `---\nstatus: claimed\nclaim: "2026-01-01T00:00:00Z"\nassignee: "dean"\n---\n`;
+  const theirs = `---\nstatus: claimed\nclaim: "2026-01-01T00:00:00Z"\nassignee: "alice"\n---\n`;
+
+  it("partitions a whole batch of unclaimed stories as available", () => {
+    const batch = claimBatch(
+      [
+        { id: "a", text: unclaimed },
+        { id: "b", text: unclaimed },
+        { id: "c", text: unclaimed },
+      ],
+      "dean",
+    );
+    expect(batch).toEqual({ available: ["a", "b", "c"], owned: [], taken: [] });
+  });
+
+  // Atomicity: the caller refuses the ENTIRE batch when `taken` is non-empty, so
+  // a bundle that loses the race on one story never leaves the others claimed
+  // with no worker behind them (invisible to `ready` AND to the merge sweep).
+  it("reports the taken ids so one lost race refuses the whole batch", () => {
+    const batch = claimBatch(
+      [
+        { id: "a", text: unclaimed },
+        { id: "b", text: theirs },
+        { id: "c", text: unclaimed },
+      ],
+      "dean",
+    );
+    expect(batch.taken).toEqual(["b"]);
+    expect(batch.available).toEqual(["a", "c"]);
+  });
+
+  it("separates ids this assignee already holds (idempotent re-claim)", () => {
+    const batch = claimBatch(
+      [
+        { id: "a", text: mine },
+        { id: "b", text: unclaimed },
+      ],
+      "dean",
+    );
+    expect(batch).toEqual({ available: ["b"], owned: ["a"], taken: [] });
+  });
+});
+
+describe("trackingSkip (per-id resilience for done / in-progress)", () => {
+  it("skips an id already marked done for this exact PR", () => {
+    expect(trackingSkip(`---\nstatus: done\npr: 42\n---\n`, "done", 42)).toBe(true);
+  });
+
+  it("re-marks an id recorded against a different PR", () => {
+    expect(trackingSkip(`---\nstatus: done\npr: 41\n---\n`, "done", 42)).toBe(false);
+  });
+
+  it("marks an id that is still in-progress", () => {
+    expect(trackingSkip(`---\nstatus: in-progress\npr: 42\n---\n`, "done", 42)).toBe(false);
+  });
+
+  it("marks an id with no pr recorded", () => {
+    expect(trackingSkip(`---\nstatus: claimed\npr: null\n---\n`, "done", 42)).toBe(false);
+  });
+});
+
+describe("prOf", () => {
+  it("reads a numeric pr from frontmatter", () => {
+    expect(prOf(`---\nstatus: done\npr: 6062\n---\n`)).toBe(6062);
+  });
+
+  it("returns null for an unset pr", () => {
+    expect(prOf(`---\nstatus: ready\npr: null\n---\n`)).toBeNull();
+  });
+
+  it("ignores a `pr:` line in the Markdown body", () => {
+    expect(prOf(`---\nstatus: ready\n---\npr: 99 in the prose\n`)).toBeNull();
+  });
+});
+
+describe("releaseError (claimed → ready inverse of claim)", () => {
+  it("allows releasing a claimed story", () => {
+    expect(releaseError("claimed")).toBeNull();
+  });
+
+  it("treats an already-ready story as a clean no-op", () => {
+    expect(releaseError("ready")).toBeNull();
+  });
+
+  it("refuses a story with work behind it", () => {
+    expect(releaseError("in-progress")).toMatch(/only a claimed story can be released/);
+    expect(releaseError("done")).toMatch(/only a claimed story can be released/);
+  });
+
+  it("refuses an unreadable status", () => {
+    expect(releaseError(null)).toBe("cannot read current status");
+  });
+});
+
+describe("release round-trips a claim", () => {
+  it("returns a claimed story to the unclaimed ready shape", () => {
+    const dir = mkdtempSync(join(tmpdir(), "tasks-test-"));
+    const file = join(dir, "s.md");
+    writeFileSync(file, `---\nstatus: ready\nclaim: null\nassignee: null\n---\nbody\n`);
+    editFrontmatter(file, {
+      status: "claimed",
+      claim: `"2026-01-01T00:00:00Z"`,
+      assignee: `"dean"`,
+    });
+    expect(claimState(readFileSync(file, "utf8"), "alice")).toBe("taken");
+
+    editFrontmatter(file, RELEASE_EDITS);
+    const out = readFileSync(file, "utf8");
+    expect(statusOf(out)).toBe("ready");
+    // Any non-null claim reads as taken, so both keys must clear or the readied
+    // story would be unclaimable by the next agent.
+    expect(claimState(out, "alice")).toBe("available");
+  });
+});
+
 describe("statusOf", () => {
   it("reads the status scalar from frontmatter", () => {
     expect(statusOf(`---\nstatus: draft\npriority: 30\n---\nbody\n`)).toBe("draft");
@@ -1265,6 +1403,32 @@ describe("commitAndPush (git mutation flow)", () => {
       "diff-tree",
       "push",
     ]);
+  });
+
+  // A variadic verb (`claim a b c`) mutates N story files in ONE commit under
+  // ONE lock — the whole point of the multi-id verbs, since the tasks lock
+  // serializes every agent on the machine, not just the caller.
+  it("stages every file of a multi-id mutation in one add, one commit, one push", () => {
+    const { seen } = setup();
+    const added: string[][] = [];
+    execFileSyncMock.mockImplementation((_file, args) => {
+      const label = args && args.length >= 3 ? args[2] : "";
+      if (label === "symbolic-ref") return "main" as never;
+      seen.push(label);
+      if (label === "add") added.push((args ?? []).slice(3));
+      if (label === "diff-tree") return "story.md" as never;
+      return "" as never;
+    });
+    commitAndPush({
+      message: "claim: a, b, c",
+      fileToStage: ["/t/a.md", "/t/b.md", "/t/c.md"],
+      mutator: () => {},
+      raceMessage: "shouldn't be reached",
+      raceExitCode: 3,
+    });
+    expect(added).toEqual([["/t/a.md", "/t/b.md", "/t/c.md"]]);
+    expect(seen.filter((l) => l === "commit").length).toBe(1);
+    expect(seen.filter((l) => l === "push").length).toBe(1);
   });
 
   // Regression: a concurrent `reset --hard` in the shared canonical checkout
