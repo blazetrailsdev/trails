@@ -98,14 +98,6 @@ function inspectSymbolOrString(value: string): string {
 }
 
 /**
- * Ruby `Symbol#to_s`, which drops the leading colon our Symbol spelling
- * carries. A String arm is returned as it stands, as Ruby's `to_s` does.
- */
-function toS(value: TranslationKey): TranslationKey {
-  return typeof value === "string" && value.startsWith(":") ? value.slice(1) : value;
-}
-
-/**
  * Mirrors: I18n::ArgumentError, the root of every error in this file.
  *
  * `message` is passed straight through rather than defaulting to `""`, so
@@ -230,7 +222,7 @@ export class Base extends ArgumentError {
   }
 
   normalizedOption(key: TranslationKey): string {
-    return normalizeKeys(this.locale, toS(key), this.options.scope).join(".");
+    return normalizeKeys(this.locale, key, this.options.scope).join(".");
   }
 
   override toString(): string {

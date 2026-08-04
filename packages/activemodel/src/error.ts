@@ -2,14 +2,6 @@ import { humanize, deepDup } from "@blazetrails/activesupport";
 import { MissingTranslation, catchException, type TranslateKey } from "@blazetrails/i18n";
 import { I18n } from "./i18n.js";
 
-/**
- * Ruby `Symbol#to_s`, which drops the leading colon the Symbol spelling of a
- * default carries when that default is taken as the translate key.
- */
-function toS(value: unknown): unknown {
-  return typeof value === "string" && value.startsWith(":") ? value.slice(1) : value;
-}
-
 /** The model instance that owns this error. Rails tests pass null for base-only errors. */
 type ModelBase = object | null;
 
@@ -133,7 +125,7 @@ export class Error {
       ? baseClass.humanAttributeName(attribute, { default: attrName, base })
       : attrName;
 
-    return I18n.t(toS(defaults.shift()) as TranslateKey, {
+    return I18n.t(defaults.shift() as TranslateKey, {
       default: defaults,
       attribute: attrName,
       message,
@@ -201,7 +193,7 @@ export class Error {
 
       if (options.message == null || options.message === false) {
         const translation = catchException(() =>
-          I18n.translate(toS(defaults[0]) as TranslateKey, {
+          I18n.translate(defaults[0] as TranslateKey, {
             ...options,
             default: defaults.slice(1),
             throw: true,
@@ -218,7 +210,7 @@ export class Error {
     defaults.push(`:errors.attributes.${attribute}.${type}`);
     defaults.push(`:errors.messages.${type}`);
 
-    const key = toS(defaults.shift());
+    const key = defaults.shift();
     if (options.message != null && options.message !== false) {
       defaults = [options.message];
       delete options.message;

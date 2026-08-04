@@ -102,7 +102,7 @@ export function humanAttributeName(
   if (options.default != null) defaults.push(options.default);
   if (!raiseOnMissing) defaults.push(MISSING_TRANSLATION);
 
-  let translation = I18n.translate(toS(defaults.shift()) as TranslateKey, {
+  let translation = I18n.translate(defaults.shift() as TranslateKey, {
     count: 1,
     raise: raiseOnMissing,
     ...options,
@@ -112,14 +112,6 @@ export function humanAttributeName(
     translation = isPresent(attribute) ? humanize(attribute) : humanize(namespace);
   }
   return translation as string;
-}
-
-/**
- * Ruby `Symbol#to_s`, which drops the leading colon the Symbol spelling of a
- * default carries when that default is taken as the translate key.
- */
-function toS(value: unknown): unknown {
-  return typeof value === "string" && value.startsWith(":") ? value.slice(1) : value;
 }
 
 function _walkAncestors(

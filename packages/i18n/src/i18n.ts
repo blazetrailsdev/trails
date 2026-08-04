@@ -371,7 +371,11 @@ function normalizeKey(key: unknown, separator: string): TranslationKey[] {
     } else if (key === null || key === undefined) {
       normalized = [];
     } else {
-      const keys = String(key)
+      // Ruby's `key.to_s`. A Symbol is spelled here as a colon-prefixed
+      // string, and `Symbol#to_s` drops that colon — this is the one place
+      // Rails converts a Symbol key to its name, so callers that pull a
+      // `":errors.format"` default out of a chain pass it through as it is.
+      const keys = (typeof key === "string" && key.startsWith(":") ? key.slice(1) : String(key))
         .split(separator)
         .filter((k) => k !== "");
       normalized = keys.map((k) => {
