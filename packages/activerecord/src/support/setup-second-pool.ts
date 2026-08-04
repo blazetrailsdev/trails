@@ -64,8 +64,7 @@ export async function provisionSecondDatabase(): Promise<void> {
 /**
  * Prepares the two-database split `MultipleDbTest` asserts over. Both pools are
  * already open, so this readies only the tables: the arunit2 ones are rebuilt so
- * rows a sibling suite left behind cannot reach `College.count`, and `entrants`
- * is rebuilt on the primary for the same reason.
+ * rows a sibling suite left behind cannot reach `College.count`.
  *
  * The primary database never carries the arunit2 tables — the canonical schema
  * skips them (`schema.rb:1444-1460` creates them through the second connection)
@@ -80,10 +79,8 @@ async function setupSecondPool(): Promise<void> {
   registerModel(Entrant);
   registerModel(Professor);
   const arunit2 = await ARUnit2Model.leaseConnection();
-  const primary = await Base.leaseConnection();
 
   await rebuildCanonicalTables(arunit2, ARUNIT2_TABLES);
-  await rebuildCanonicalTables(primary, ["entrants"]);
 }
 
 /**

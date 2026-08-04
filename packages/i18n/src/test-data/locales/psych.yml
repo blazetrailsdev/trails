@@ -1,0 +1,9 @@
+en:
+  greeting: &hi Hello
+  aliased: *hi
+  farewell: |-
+    Bye
+    now
+  entries:
+    - key: value
+  tagged: !!str 42

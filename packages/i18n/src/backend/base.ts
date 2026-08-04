@@ -46,7 +46,7 @@ import {
 } from "./transliterator.js";
 import { except, type TranslationData } from "../utils.js";
 import { tr } from "./flatten.js";
-import { parseYaml } from "../yaml.js";
+import { parse as yamlParse } from "../yaml.js";
 
 export type TranslateOptions = { [key: string]: unknown };
 
@@ -622,15 +622,16 @@ export abstract class Base {
    * Loads a YAML translations file. The data must have locales as toplevel
    * keys. Only the pre-Psych-4 arm of the gem's `YAML.respond_to?
    * (:unsafe_load_file)` probe exists here — there is no Psych to probe, and
-   * `parseYaml` neither symbolizes nor freezes, so `keys_symbolized` is false.
+   * `yaml`'s `parse` neither symbolizes nor freezes, so `keys_symbolized` is
+   * false.
    *
-   * @missingRailsCall load_file — Ruby's `YAML.load_file` (base.rb:246) reads
-   * and parses in one call; JS has neither, so the read is served from the
-   * preload (`preloadTranslationFiles`) and the parse goes through `parseYaml`.
+   * @missingRailsCall load_file — Ruby's `YAML.load_file` (base.rb:265) reads
+   * and parses in one call; the npm `yaml` package only parses, so the read is
+   * served from the preload (`preloadTranslationFiles`).
    */
   protected loadYml(filename: string): [unknown, boolean] {
     try {
-      return [parseYaml(readFile(filename)), false];
+      return [yamlParse(readFile(filename)), false];
     } catch (e) {
       throw new InvalidLocaleData(filename, inspectError(e));
     }
