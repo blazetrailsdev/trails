@@ -1,7 +1,8 @@
 // Literal parameter-default + constant comparison for api:compare (advisory —
 // never changes parity). Diffs a default/constant's literal *value* after
 // normalization absorbing cross-language noise (numeric underscores,
-// symbol→string, nil↔null/undefined, escapes); a non-literal is uncomparable.
+// symbol→string in either spelling, nil↔null/undefined, escapes); a non-literal
+// is uncomparable.
 
 import type { LiteralValue, ParamInfo } from "./types.js";
 import { snakeToCamel } from "./conventions.js";
@@ -54,6 +55,13 @@ export function compareLiteral(ruby: LiteralValue, ts: LiteralValue): LiteralVer
   const t = normalizeLiteral(ts);
   if (r === null || t === null) return "skip";
   if ((r === "nil") !== (t === "nil")) return "skip";
+  // A Ruby Symbol is a JS string, and CLAUDE.md ("Symbols vs strings") keeps the
+  // leading colon where a method's control flow turns on Symbol-vs-String
+  // (`I18n::Backend::Base#localize`'s `format = :default` → `":default"`).
+  // Nothing in the manifest says which arm a given default is, so both spellings
+  // of `:x` — `"x"` and `":x"` — are the same value to the comparator.
+  if (ruby.kind === "symbol" && t === `str::${canonString(String(ruby.value ?? ""))}`)
+    return "match";
   return r === t ? "match" : "mismatch";
 }
 
@@ -61,8 +69,9 @@ export function compareLiteral(ruby: LiteralValue, ts: LiteralValue): LiteralVer
 export function displayLiteral(lit: LiteralValue): string {
   switch (lit.kind) {
     case "string":
-    case "symbol":
       return JSON.stringify(lit.value ?? "");
+    case "symbol":
+      return `:${lit.value ?? ""}`;
     case "nil":
       return "nil";
     case "array":
