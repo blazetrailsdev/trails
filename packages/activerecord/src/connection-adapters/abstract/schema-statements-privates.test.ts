@@ -817,8 +817,6 @@ describe("buildCreateTableDefinition routing", () => {
     });
 
     expect(createTableDefinition.mock.calls[0]?.[1]).toMatchObject({ _skipValidateOptions: true });
-    // Rails' `extract!` deletes what it returns, so the second extraction never
-    // sees the key (schema_statements.rb:334-335).
     expect(pkColumn(td)?.options).not.toHaveProperty("_skipValidateOptions");
   });
 
