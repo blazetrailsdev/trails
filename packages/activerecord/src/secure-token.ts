@@ -37,8 +37,6 @@ export function hasSecureToken(
   attribute: string = "token",
   options?: { length?: number; on?: "create" | "initialize" },
 ): void {
-  const modelClass = this;
-
   const tokenLength = options?.length ?? MINIMUM_TOKEN_LENGTH;
   if (tokenLength < MINIMUM_TOKEN_LENGTH) {
     throw new MinimumLengthError(
@@ -46,24 +44,33 @@ export function hasSecureToken(
     );
   }
 
-  // Mirrors Rails:
-  //   set_callback on, on == :initialize ? :after : :before do
-  //     if new_record? && !query_attribute(attribute)
-  //       send("#{attribute}=", generate_unique_secure_token(length:))
-  //     end
-  //   end
-  // Routing the assignment through the property setter (rather than
-  // `_attributes.set`) lets a subclass that overrides `attribute=` observe the
-  // generated value, exactly as Rails' `send("#{attribute}=", …)` does.
+  // `define_method("regenerate_#{attribute}")` (secure_token.rb:49). The body is
+  // `update!`, a validated save with callbacks and a timestamp bump, and it
+  // returns that result rather than the token, as Rails' last expression does.
+  const methodName =
+    attribute === "token"
+      ? "regenerateToken"
+      : `regenerate${attribute.charAt(0).toUpperCase() + attribute.slice(1).replace(/_([a-z])/g, (_, c) => c.toUpperCase())}`;
+
+  Object.defineProperty(this.prototype, methodName, {
+    value: function (this: Base): Promise<true | undefined> {
+      return this.updateBang({
+        [attribute]: (this.constructor as typeof Base).generateUniqueSecureToken(tokenLength),
+      });
+    },
+    writable: true,
+    configurable: true,
+  });
+
+  // `set_callback on, on == :initialize ? :after : :before` (secure_token.rb:50).
+  // The assignment goes through the property setter, not `_attributes.set`, so an
+  // overridden `attribute=` observes the generated value as `send("#{attribute}=")` does.
   //
-  // Default `on` is "create" to match the ActiveRecord *framework* default —
-  // `vendor/rails/activerecord/lib/active_record.rb:461` sets
-  // `self.generate_secure_token_on = :create`. The `:initialize` value
-  // documented on `has_secure_token` is the railtie/`load_defaults` value
-  // (railtie.rb:40 also sets `:create` at the framework level), which is only
-  // applied in a booted app — not in the AR test suite. Rails' own
-  // SecureTokenTest therefore runs against `:create` (its tests `save` before
-  // asserting the token), which is exactly what these ports do.
+  // `on` defaults to "create" because that is the framework default
+  // (active_record.rb:461 `self.generate_secure_token_on = :create`); the
+  // `:initialize` value documented on `has_secure_token` is the railtie
+  // (`load_defaults`) value, which only applies in a booted app, so Rails' own
+  // SecureTokenTest runs against `:create` too.
   const generateIfBlank = (record: any): void => {
     if (record.isNewRecord() && !record.queryAttribute(attribute)) {
       record[attribute] = (record.constructor as typeof Base).generateUniqueSecureToken(
@@ -72,30 +79,10 @@ export function hasSecureToken(
     }
   };
   if (options?.on === "initialize") {
-    modelClass.afterInitialize(generateIfBlank);
+    this.afterInitialize(generateIfBlank);
   } else {
-    modelClass.beforeCreate(generateIfBlank);
+    this.beforeCreate(generateIfBlank);
   }
-
-  // Instance method to regenerate the token
-  const methodName =
-    attribute === "token"
-      ? "regenerateToken"
-      : `regenerate${attribute.charAt(0).toUpperCase() + attribute.slice(1).replace(/_([a-z])/g, (_, c) => c.toUpperCase())}`;
-
-  Object.defineProperty(modelClass.prototype, methodName, {
-    value: function (this: Base): Promise<true | undefined> {
-      const newToken = (this.constructor as typeof Base).generateUniqueSecureToken(tokenLength);
-      // Mirrors Rails: `update! attribute => generate_unique_secure_token(...)`
-      // (secure_token.rb:53) — a full validated save with callbacks and a
-      // timestamp bump, not a direct-SQL `update_column` that bypasses them.
-      // The method returns the `update!` result (Rails' last expression), not
-      // the token value, so callers see the same `true`/raise contract.
-      return this.updateBang({ [attribute]: newToken });
-    },
-    writable: true,
-    configurable: true,
-  });
 }
 
 /**
