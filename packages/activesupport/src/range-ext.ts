@@ -1,9 +1,11 @@
 /**
- * Range utility functions mirroring ActiveSupport's Range extensions.
+ * The `Range` data triple, plus the core `Range` methods Ruby provides and
+ * Rails' `core_ext/range/*` files reopen. Those Rails files are ported
+ * one-for-one under `core-ext/range/`.
  *
- * @boundary-file: Date-aware range comparators (`overlap`, `cover`, `each`)
- *   coerce `Date` ↔ epoch number for ordering since Rails' `Range#include?`
- *   accepts any `<=>`-comparable value. Temporal-typed ranges live elsewhere.
+ * @boundary-file: the Date-aware comparators here coerce `Date` ↔ epoch number
+ *   for ordering since Rails' `Range#include?` accepts any `<=>`-comparable
+ *   value. Temporal-typed ranges live elsewhere.
  */
 
 /**
@@ -25,32 +27,6 @@ export interface Range<T> {
 export function makeRange<T>(begin: T | null, end: T | null, excludeEnd = false): Range<T> {
   return { begin, end, excludeEnd };
 }
-
-/**
- * overlap? — returns true if two ranges overlap.
- * Mirrors ActiveSupport Range#overlap?
- */
-export function overlap<T extends number | Date>(a: Range<T>, b: Range<T>): boolean {
-  const toNum = (v: T): number => (v instanceof Date ? v.getTime() : v);
-
-  // a starts after b ends
-  if (a.begin !== null && b.end !== null) {
-    const aBegin = toNum(a.begin);
-    const bEnd = toNum(b.end);
-    if (b.excludeEnd ? aBegin >= bEnd : aBegin > bEnd) return false;
-  }
-
-  // b starts after a ends
-  if (b.begin !== null && a.end !== null) {
-    const bBegin = toNum(b.begin);
-    const aEnd = toNum(a.end);
-    if (a.excludeEnd ? bBegin >= aEnd : bBegin > aEnd) return false;
-  }
-
-  return true;
-}
-
-export const overlaps = overlap; // alias
 
 /**
  * cover? — returns true if a numeric/date range covers a scalar value
@@ -219,36 +195,4 @@ export function rangeIncludesStringValue(range: Range<string>, value: string): b
     }
   }
   return false;
-}
-
-/**
- * toFs — format a range as a string.
- */
-export function rangeToFs<T>(range: Range<T>, format?: string): string {
-  const fmtBegin = range.begin !== null ? String(range.begin) : "";
-  const fmtEnd = range.end !== null ? String(range.end) : "";
-  const sep = range.excludeEnd ? "..." : "..";
-  return `${fmtBegin}${sep}${fmtEnd}`;
-}
-
-/**
- * step — iterate over a numeric range with a step value.
- */
-export function* rangeStep(range: Range<number>, step: number): Generator<number> {
-  if (range.begin === null) throw new Error("Cannot step over beginless range");
-  let current = range.begin;
-  while (true) {
-    if (range.end !== null) {
-      if (range.excludeEnd ? current >= range.end : current > range.end) break;
-    }
-    yield current;
-    current += step;
-  }
-}
-
-/**
- * each — iterate over a numeric range.
- */
-export function* rangeEach(range: Range<number>): Generator<number> {
-  yield* rangeStep(range, 1);
 }
