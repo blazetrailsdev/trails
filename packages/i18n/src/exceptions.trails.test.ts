@@ -12,6 +12,7 @@ import {
   MissingTranslationData,
   ReservedInterpolationKey,
   UnknownFileType,
+  UnsupportedMethod,
   inspect,
 } from "./exceptions.js";
 import { resetClassConfig } from "./config.js";
@@ -42,6 +43,7 @@ describe("exceptions", () => {
       new MissingInterpolationArgument(":bar", { baz: "baz" }, "%{bar}"),
       new ReservedInterpolationKey(":scope", "%{scope}"),
       new UnknownFileType("xml", "en.xml"),
+      new UnsupportedMethod("available_locales", Simple, "Chain#available_locales"),
     ];
     for (const e of errors) expect(e).toBeInstanceOf(ArgumentError);
   });
@@ -71,6 +73,16 @@ describe("exceptions", () => {
     expect(exception.type).toBe("xml");
     expect(exception.message).toBe(
       "can not load translations from en.xml, the file type xml is not known",
+    );
+  });
+
+  it("UnsupportedMethod stores method, backendKlass and msg", () => {
+    const exception = new UnsupportedMethod("available_locales", Simple, "Please implement it.");
+    expect(exception.method).toBe("available_locales");
+    expect(exception.backendKlass).toBe(Simple);
+    expect(exception.msg).toBe("Please implement it.");
+    expect(exception.message).toBe(
+      "Simple does not support the #available_locales method. Please implement it.",
     );
   });
 

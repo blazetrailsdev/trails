@@ -1301,6 +1301,15 @@ export const UNPORTED_FILES: UnportedFile[] = [
       "storage of this shape nor Fibers, so there is nothing to assert.",
   },
   {
+    testFile: "backend/transliterator_test.rb",
+    tests: ["default transliterator raises errors for invalid UTF-8"],
+    reason:
+      'Feeds `"a\\x92b"`, whose bytes are not valid UTF-8, and relies on Ruby\'s regexp ' +
+      "engine raising `ArgumentError: invalid byte sequence` (transliterator.rb:96). A JS " +
+      "string is UTF-16 code units with no invalid-byte state to reach, so no input makes " +
+      "the ported `transliterate` raise.",
+  },
+  {
     pattern: "tests/",
     package: "i18n",
     reason:

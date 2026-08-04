@@ -77,6 +77,7 @@ export interface StrftimeSubject {
   min: number;
   sec: number;
   zone: string;
+  zoneOffset: string;
 }
 
 /**
@@ -94,8 +95,9 @@ export interface StrftimeSubject {
  *
  * Only the directives the i18n format strings and the conformance mixins use
  * are recognised; Ruby leaves an unknown directive in place, and so does this.
- * `%z` is fixed at `+0000` because trails models only the UTC these classes are
- * built in; `%Z` varies, so it comes off the subject.
+ * `%z` and `%Z` both come off the subject: `::Date` has no zone of its own and
+ * answers UTC, while a `::Time` built through the public constructor is in the
+ * local zone and answers its real offset and abbreviation.
  */
 export function strftime(subject: StrftimeSubject, format: string): string {
   const tokens: Record<string, () => string> = {
@@ -117,7 +119,7 @@ export function strftime(subject: StrftimeSubject, format: string): string {
     p: () => (subject.hour < 12 ? "AM" : "PM"),
     P: () => (subject.hour < 12 ? "am" : "pm"),
     x: () => `${pad2(subject.mon)}/${pad2(subject.day)}/${pad2(subject.year % 100)}`,
-    z: () => "+0000",
+    z: () => subject.zoneOffset,
     Z: () => subject.zone,
     "%": () => "%",
   };
@@ -404,6 +406,7 @@ export class Date {
         min: 0,
         sec: 0,
         zone: "+00:00",
+        zoneOffset: "+0000",
       },
       format,
     );
@@ -458,6 +461,7 @@ export class DateTime extends Date {
         min: this.min,
         sec: this.sec,
         zone: this.zone,
+        zoneOffset: "+0000",
       },
       format,
     );

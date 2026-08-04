@@ -52,6 +52,7 @@ describe("isSourceUnported package scoping", () => {
       "../i18n.rb",
       "backend.rb",
       "backend/base.rb",
+      "backend/fallbacks.rb",
       "backend/flatten.rb",
       "backend/key_value.rb",
       "backend/simple.rb",
@@ -59,6 +60,11 @@ describe("isSourceUnported package scoping", () => {
       "config.rb",
       "exceptions.rb",
       "interpolate/ruby.rb",
+      "locale.rb",
+      "locale/fallbacks.rb",
+      "locale/tag.rb",
+      "locale/tag/parents.rb",
+      "locale/tag/simple.rb",
       "utils.rb",
     ]);
     const unaccounted = ["../i18n.rb", ...files].filter(
