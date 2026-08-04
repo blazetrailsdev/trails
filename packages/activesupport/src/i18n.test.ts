@@ -154,23 +154,30 @@ describe("I18nTest", () => {
   });
 
   it("to sentence", () => {
-    expect(toSentence(["a", "b", "c"])).toBe("a, b, and c");
-
-    I18n.backend().storeTranslations("en", {
-      support: { array: { two_words_connector: " & " } },
-    });
-    const twoWords = I18n.translate("support.array.two_words_connector") as string;
-    expect(toSentence(["a", "b"], { twoWordsConnector: twoWords })).toBe("a & b");
-
-    I18n.backend().storeTranslations("en", {
-      support: { array: { last_word_connector: " and " } },
-    });
-    const lastWord = I18n.translate("support.array.last_word_connector") as string;
-    expect(toSentence(["a", "b", "c"], { lastWordConnector: lastWord })).toBe("a, b and c");
+    const defaultTwoWordsConnector = I18n.translate("support.array.two_words_connector");
+    const defaultLastWordConnector = I18n.translate("support.array.last_word_connector");
+    try {
+      expect(toSentence(["a", "b", "c"])).toBe("a, b, and c");
+      I18n.backend().storeTranslations("en", {
+        support: { array: { two_words_connector: " & " } },
+      });
+      expect(toSentence(["a", "b"])).toBe("a & b");
+      I18n.backend().storeTranslations("en", {
+        support: { array: { last_word_connector: " and " } },
+      });
+      expect(toSentence(["a", "b", "c"])).toBe("a, b and c");
+    } finally {
+      I18n.backend().storeTranslations("en", {
+        support: { array: { two_words_connector: defaultTwoWordsConnector } },
+      });
+      I18n.backend().storeTranslations("en", {
+        support: { array: { last_word_connector: defaultLastWordConnector } },
+      });
+    }
   });
 
   it("to sentence with empty i18n store", () => {
-    expect(toSentence(["a", "b", "c"])).toBe("a, b, and c");
+    expect(toSentence(["a", "b", "c"], { locale: "empty" })).toBe("a, b, and c");
   });
 
   it("ordinals resolve through the number.nth lambdas", () => {
