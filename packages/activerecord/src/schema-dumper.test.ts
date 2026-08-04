@@ -376,28 +376,37 @@ describe("SchemaDumperTest", () => {
   });
 
   it("dump schema information with empty versions", async () => {
-    const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
-    const { SchemaMigration } = await import("./schema-migration.js");
-    const adapter = Base.connection;
-    const sm = new SchemaMigration(adapter);
-    await sm.createTable();
-    await sm.deleteAllVersions();
-    const result = await TopLevelDumper.dumpWithVersion(adapter);
-    expect(result).toContain("Schema version: 0");
+    const schemaMigration = Base.connectionPool().schemaMigration;
+    await schemaMigration.createTable();
+    await schemaMigration.deleteAllVersions();
+    // Rails' `dump_schema_information` returns nil for an empty
+    // `schema_migrations`; minitest's `assert_no_match` passes on nil, so
+    // normalize before matching rather than asserting on the null.
+    const schemaInfo = (await Base.connection.dumpSchemaInformation!()) ?? "";
+    expect(schemaInfo).not.toMatch(/INSERT INTO/);
   });
 
   it("dump schema information outputs lexically reverse ordered versions regardless of database order", async () => {
-    const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
-    const { SchemaMigration } = await import("./schema-migration.js");
-    const adapter = Base.connection;
-    const sm = new SchemaMigration(adapter);
-    await sm.createTable();
-    await sm.deleteAllVersions();
-    await sm.recordVersion("20240301000000");
-    await sm.recordVersion("20240101000000");
-    await sm.recordVersion("20240201000000");
-    const result = await TopLevelDumper.dumpWithVersion(adapter);
-    expect(result).toContain("Schema version: 20240301000000");
+    const schemaMigration = Base.connectionPool().schemaMigration;
+    await schemaMigration.createTable();
+    await schemaMigration.deleteAllVersions();
+    const versions = ["20100101010101", "20100201010101", "20100301010101"];
+    for (const v of [...versions].sort(() => Math.random() - 0.5)) {
+      await schemaMigration.createVersion(v);
+    }
+
+    try {
+      const schemaInfo = await Base.connection.dumpSchemaInformation!();
+      const expected = [
+        `INSERT INTO ${Base.connection.quoteTableName("schema_migrations")} (version) VALUES`,
+        "('20100301010101'),",
+        "('20100201010101'),",
+        "('20100101010101');",
+      ].join("\n");
+      expect(schemaInfo).toEqual(expected);
+    } finally {
+      await schemaMigration.deleteAllVersions();
+    }
   });
 
   it("schema dump include migration version", async () => {
