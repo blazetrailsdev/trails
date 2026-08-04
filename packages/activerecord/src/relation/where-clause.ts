@@ -53,13 +53,6 @@ export class WhereClause {
     return new WhereClause(subtractNodes(this.predicates, other.predicates));
   }
 
-  merge(other: WhereClause): WhereClause {
-    // Rails: remove predicates from self that conflict with other's attributes,
-    // then union with other's predicates (other wins on conflict)
-    const filtered = this.exceptPredicates(other.extractAttributes());
-    return new WhereClause(unionNodes(filtered, other.predicates));
-  }
-
   /**
    * Mirrors: where_clause.rb:22 `def |(other)` — Ruby `Array#|`, which dedups
    * identical predicates and keeps distinct ones. Named `union` after the Ruby
@@ -68,6 +61,13 @@ export class WhereClause {
    */
   union(other: WhereClause): WhereClause {
     return new WhereClause(unionNodes(this.predicates, other.predicates));
+  }
+
+  merge(other: WhereClause): WhereClause {
+    // Rails: remove predicates from self that conflict with other's attributes,
+    // then union with other's predicates (other wins on conflict)
+    const filtered = this.exceptPredicates(other.extractAttributes());
+    return new WhereClause(unionNodes(filtered, other.predicates));
   }
 
   invert(): WhereClause {

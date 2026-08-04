@@ -8,11 +8,14 @@ describe("I18nValidationTest", () => {
   // Rails' setup/teardown pair
   // (activemodel/test/cases/validations/i18n_validation_test.rb:11-28).
   const originalI18nCustomizeFullMessage = ModelError.i18nCustomizeFullMessage;
+  let oldLoadPath: string[];
   beforeEach(() => {
+    oldLoadPath = [...I18n.loadPath()];
     resetI18n();
     ModelError.i18nCustomizeFullMessage = true;
   });
   afterEach(() => {
+    I18n.loadPath().splice(0, I18n.loadPath().length, ...oldLoadPath);
     ModelError.i18nCustomizeFullMessage = originalI18nCustomizeFullMessage;
   });
 
@@ -51,10 +54,10 @@ describe("I18nValidationTest", () => {
 
   it("errors full messages uses format", () => {
     // Rails clears `I18n.load_path` in setup (i18n_validation_test.rb:12) so the
-    // framework `en.yml` cannot overwrite the stored `errors.format`. Only this
-    // case collides with the file data, and `errors.messages.empty` is stored
-    // back because the trails deviation below resolves through the backend.
-    const oldLoadPath = [...I18n.loadPath()];
+    // framework `en.yml` cannot overwrite the stored `errors.format`; the
+    // teardown above restores it. Only this case collides with the file data,
+    // and `errors.messages.empty` is stored back because the trails deviation
+    // below resolves through the backend.
     I18n.loadPath().length = 0;
     I18n.setBackend(new I18n.Simple());
     I18n.backend().storeTranslations("en", {
@@ -73,7 +76,6 @@ describe("I18nValidationTest", () => {
     // "empty" resolves through `errors.messages.empty`. The format under test —
     // `errors.format` — is asserted either way.
     expect(p.errors.fullMessages).toEqual(["Field Name can't be empty"]);
-    I18n.loadPath().splice(0, I18n.loadPath().length, ...oldLoadPath);
   });
 
   it("errors full messages doesnt use attribute format without config", () => {
