@@ -3,9 +3,10 @@
  *
  * Ruby mixes `Base` into a backend with `include`; the JS equivalent is an
  * abstract class that concrete backends extend, which keeps the file layout of
- * the gem. The `NotImplementedError` members (`store_translations`, `lookup`,
- * `available_locales`) are `abstract` here — TypeScript's form of the same
- * contract.
+ * the gem. `store_translations` and `available_locales` are `abstract` here —
+ * TypeScript's form of the same contract. `lookup` keeps the gem's raising
+ * body (base.rb:116-118) because `Chain` includes `Base` without defining one,
+ * and an `abstract` member would force it to.
  *
  * A Ruby Symbol value is a JS string that keeps its leading colon — `":short"`
  * is `:short` — which is the discriminator Ruby gets from the type, and is how
@@ -135,6 +136,14 @@ function extname(filename: string): string {
 /** Mirrors: Ruby's `Exception#inspect`, which the rescues in load_yml/load_json use. */
 function inspectError(e: unknown): string {
   return e instanceof Error ? `#<${e.name}: ${e.message}>` : String(e);
+}
+
+/** Mirrors: Ruby's core `NotImplementedError`, which base.rb raises. */
+class NotImplementedError extends Error {
+  constructor() {
+    super("NotImplementedError");
+    this.name = "NotImplementedError";
+  }
 }
 
 /** Ruby truthiness: only `nil` and `false` are falsy — `0` and `""` are not. */
@@ -317,12 +326,14 @@ export abstract class Base {
   }
 
   /** The method which actually looks up for the translation in the store. */
-  protected abstract lookup(
-    locale: Locale,
-    key: TranslationKey,
-    scope?: unknown,
-    options?: TranslateOptions,
-  ): unknown;
+  protected lookup(
+    _locale: Locale,
+    _key: TranslationKey,
+    _scope: unknown = [],
+    _options: TranslateOptions = EMPTY_HASH,
+  ): unknown {
+    throw new NotImplementedError();
+  }
 
   protected subtrees(): boolean {
     return true;

@@ -62,6 +62,7 @@ export {
 export type { Locale, TranslateKey, TranslationKey } from "./i18n.js";
 export { Base, registerFileReader, preloadTranslationFiles } from "./backend/base.js";
 export type { FileReader, TranslateOptions } from "./backend/base.js";
+export { Chain } from "./backend/chain.js";
 export { Simple } from "./backend/simple.js";
 export { Fallbacks, fallbacks, setFallbacks } from "./backend/fallbacks.js";
 export type { FallbacksLike, FallbacksMethods } from "./backend/fallbacks.js";

@@ -56,13 +56,10 @@ export class RecordInvalid extends ActiveRecordError {
     let message: string;
     if (record) {
       const errors = (record.errors?.fullMessages as string[] | undefined)?.join(", ") ?? "";
-      message = I18n.t(
-        Symbol.for(`${record.constructor.i18nScope}.errors.messages.record_invalid`),
-        {
-          errors,
-          default: Symbol.for("errors.messages.record_invalid"),
-        },
-      ) as string;
+      message = I18n.t(`${record.constructor.i18nScope}.errors.messages.record_invalid`, {
+        errors,
+        default: ":errors.messages.record_invalid",
+      }) as string;
     } else {
       message = "Record invalid";
     }

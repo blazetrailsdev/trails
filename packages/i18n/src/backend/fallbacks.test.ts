@@ -110,9 +110,9 @@ describe("I18nBackendFallbacksTranslateTest", () => {
   });
 
   it("keeps the count option when defaulting to a different key", () => {
-    expect(
-      t("non_existent", { default: Symbol.for("interpolate_count"), count: 10, value: 5 }),
-    ).toBe("Interpolate 5 10");
+    expect(t("non_existent", { default: ":interpolate_count", count: 10, value: 5 })).toBe(
+      "Interpolate 5 10",
+    );
   });
 
   it("returns the :de translation for a missing :'de-DE' when :default is a String", () => {
@@ -121,11 +121,11 @@ describe("I18nBackendFallbacksTranslateTest", () => {
   });
 
   it("returns the :de translation for a missing :'de-DE' when defaults is a Symbol (which exists in :en)", () => {
-    expect(t("bar", { locale: "de-DE", default: [Symbol.for("buz")] })).toBe("Bar in :de");
+    expect(t("bar", { locale: "de-DE", default: [":buz"] })).toBe("Bar in :de");
   });
 
   it("returns the :'de-DE' default :baz translation for a missing :'de-DE' (which exists in :de)", () => {
-    expect(t("bar", { locale: "de-DE", default: [Symbol.for("baz")] })).toBe("Baz in :de-DE");
+    expect(t("bar", { locale: "de-DE", default: [":baz"] })).toBe("Baz in :de-DE");
   });
 
   it("returns the :de translation for a missing :'de-DE' when :default is a Proc", () => {
@@ -150,7 +150,7 @@ describe("I18nBackendFallbacksTranslateTest", () => {
       "- de-DE.missing_baz",
     ].join("\n");
 
-    expect(t("missing_bar", { locale: "de-DE", default: [Symbol.for("missing_baz")] })).toBe(
+    expect(t("missing_bar", { locale: "de-DE", default: [":missing_baz"] })).toBe(
       translationMissingMessage,
     );
   });
@@ -162,7 +162,7 @@ describe("I18nBackendFallbacksTranslateTest", () => {
   });
 
   it("returns the :'de-DE' default :baz translation for a missing :'de-DE' when defaults contains Symbol", () => {
-    expect(t("missing_foo", { locale: "de-DE", default: [Symbol.for("baz"), "Default Bar"] })).toBe(
+    expect(t("missing_foo", { locale: "de-DE", default: [":baz", "Default Bar"] })).toBe(
       "Baz in :de-DE",
     );
   });
@@ -171,13 +171,13 @@ describe("I18nBackendFallbacksTranslateTest", () => {
     expect(
       t("missing_foo", {
         locale: "de-DE",
-        default: [Symbol.for("missing_bar"), "Default Bar", Symbol.for("baz")],
+        default: [":missing_bar", "Default Bar", ":baz"],
       }),
     ).toBe("Default Bar");
     expect(
       t("missing_foo", {
         locale: "de-DE",
-        default: [Symbol.for("missing_bar"), () => "Default Bar", Symbol.for("baz")],
+        default: [":missing_bar", () => "Default Bar", ":baz"],
       }),
     ).toBe("Default Bar");
   });
@@ -186,7 +186,7 @@ describe("I18nBackendFallbacksTranslateTest", () => {
     expect(
       t("missing_foo", {
         locale: "de-DE",
-        default: [Symbol.for("missing_bar"), { other: "Default %{count} Bars" }, "Default Bar"],
+        default: [":missing_bar", { other: "Default %{count} Bars" }, "Default Bar"],
         count: 6,
       }),
     ).toBe("Default 6 Bars");
@@ -219,7 +219,7 @@ describe("I18nBackendFallbacksTranslateTest", () => {
       expect(
         t("model.attrs.foo", {
           locale: "pt-BR",
-          default: [Symbol.for("attrs.foo"), "Foo"],
+          default: [":attrs.foo", "Foo"],
         }),
       ).toBe("Foo");
     } finally {
@@ -303,14 +303,14 @@ describe("I18nBackendFallbacksSymbolResolveRestartsLookupAtOriginalLocale", () =
         gregorian: {
           months: {
             format: {
-              abbreviated: Symbol.for("calendars.gregorian.months.format.wide"),
+              abbreviated: ":calendars.gregorian.months.format.wide",
               wide: {
                 1: "M01",
                 // Other months omitted for brevity
               },
             },
             "stand-alone": {
-              abbreviated: Symbol.for("calendars.gregorian.months.format.abbreviated"),
+              abbreviated: ":calendars.gregorian.months.format.abbreviated",
             },
           },
         },
@@ -351,7 +351,7 @@ describe("RegressionTestFor617", () => {
   });
 
   it("model scope resolution", () => {
-    const defaults = [Symbol.for("product"), "Ticket"];
+    const defaults = [":product", "Ticket"];
     const options = { scope: ["activerecord", "models"], count: 1, default: defaults };
     expect(t("product/ticket", options)).toBe("Ticket");
   });

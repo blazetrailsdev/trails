@@ -40,12 +40,12 @@ describe("Backend::Fallbacks over the ActiveRecord error-message scopes", () => 
       `activerecord.errors.messages.${type}`,
     ];
     const translation = catchException(() =>
-      t(scoped[0], { default: scoped.slice(1).map((key) => Symbol.for(key)), throw: true }),
+      t(scoped[0], { default: scoped.slice(1).map((key) => `:${key}`), throw: true }),
     );
     if (!(translation instanceof MissingTranslation) && translation != null) return translation;
 
     const defaults = [`errors.attributes.${attribute}.${type}`, `errors.messages.${type}`];
-    return t(defaults[0], { default: defaults.slice(1).map((key) => Symbol.for(key)) });
+    return t(defaults[0], { default: defaults.slice(1).map((key) => `:${key}`) });
   }
 
   beforeEach(() => {

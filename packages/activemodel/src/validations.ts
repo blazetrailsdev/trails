@@ -199,9 +199,9 @@ export class ValidationError<TModel extends ModelWithErrors = ModelWithErrors>
     // `i18nScope` as a scope when the class actually exposes a string.
     const rawScope = (model as { constructor?: { i18nScope?: unknown } }).constructor?.i18nScope;
     const scope = typeof rawScope === "string" ? rawScope : "activemodel";
-    const message = I18n.t(Symbol.for(`${scope}.errors.messages.model_invalid`), {
+    const message = I18n.t(`${scope}.errors.messages.model_invalid`, {
       errors,
-      default: Symbol.for("errors.messages.model_invalid"),
+      default: ":errors.messages.model_invalid",
     }) as string;
     super(message);
     this.name = "ValidationError";
