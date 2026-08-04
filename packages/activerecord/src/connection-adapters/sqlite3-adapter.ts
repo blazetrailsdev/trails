@@ -26,6 +26,7 @@ import {
   extractValueFromDefault as sqliteExtractValueFromDefault,
   indexes as sqliteIndexes,
   newColumnFromField,
+  validTableDefinitionOptions as sqliteValidTableDefinitionOptions,
   virtualTableExists as sqliteVirtualTableExists,
 } from "./sqlite3/schema-statements.js";
 import {
@@ -2134,6 +2135,15 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   async indexes(tableName: string): Promise<IndexDefinition[]> {
     return sqliteIndexes(this, tableName);
+  }
+
+  /**
+   * Mirrors: SQLite3::SchemaStatements#valid_table_definition_options
+   *
+   * @internal
+   */
+  validTableDefinitionOptions(): string[] {
+    return sqliteValidTableDefinitionOptions.call(this);
   }
 
   // --- FK / Check constraint operations (SQLite requires table rebuild) ---

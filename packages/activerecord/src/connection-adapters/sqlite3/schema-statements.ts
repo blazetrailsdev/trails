@@ -192,8 +192,8 @@ export function createSchemaDumper(
 }
 
 /** @internal */
-function validTableDefinitionOptions(): string[] {
-  return ["rename"];
+export function validTableDefinitionOptions(this: DatabaseAdapter): string[] {
+  return [...AbstractSchemaStatements.prototype.validTableDefinitionOptions.call(this), "rename"];
 }
 
 /** @internal */

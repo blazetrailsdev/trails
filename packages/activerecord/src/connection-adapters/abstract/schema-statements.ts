@@ -42,7 +42,14 @@ import type { SchemaQuoter } from "./assert-schema-adapter.js";
 import { Column } from "../column.js";
 import { SqlTypeMetadata } from "../sql-type-metadata.js";
 import { deduplicate } from "../deduplicable.js";
-import { singularize, pluralize, getCrypto, isPresent, presence } from "@blazetrails/activesupport";
+import {
+  singularize,
+  pluralize,
+  getCrypto,
+  isPresent,
+  presence,
+  assertValidKeys,
+} from "@blazetrails/activesupport";
 import { SchemaDumper } from "./schema-dumper.js";
 import { rubyInspect } from "../../relation/ruby-inspect.js";
 import { Utils as PgUtils } from "../postgresql/utils.js";
@@ -398,6 +405,13 @@ export class SchemaStatements {
       options = optionsOrFn;
       definer = fn;
     }
+
+    // Rails takes `id:`, `primary_key:` and `force:` as their own kwargs, so
+    // they never reach `validate_create_table_options!(options)`
+    // (schema_statements.rb:307). We bundle every kwarg into one object, so
+    // they are split back out here before validating.
+    const { id: _id, primaryKey: _primaryKey, force: _force, ...validatedOptions } = options;
+    this.validateCreateTableOptionsBang(validatedOptions);
 
     if (name.length > 64) {
       throw new Error(`Table name '${name}' is too long; the limit is 64 characters`);
@@ -2173,15 +2187,10 @@ export class SchemaStatements {
   validateCreateTableOptionsBang(options: Record<string, unknown>): void {
     if (options._skipValidateOptions) return;
     const { _usesLegacyTableName: _l, _skipValidateOptions: _s, ...rest } = options;
-    const valid = new Set([
+    assertValidKeys(rest, [
       ...this.validTableDefinitionOptions(),
       ...this.validPrimaryKeyOptions(),
     ]);
-    for (const key of Object.keys(rest)) {
-      if (!valid.has(key)) {
-        throw new ArgumentError(`Unknown key: ${key}. Valid keys are: ${[...valid].join(", ")}`);
-      }
-    }
   }
 
   /**
