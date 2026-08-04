@@ -67,14 +67,16 @@ describe("I18n::Backend::Base file loading", () => {
   });
 
   it("refuses a lazy lookup while I18n.load_path is unread", () => {
-    config().loadPath = [`${localesDir()}/never-preloaded.yml`];
+    // In-place, the way the gem documents it (config.rb:125) — an assignment
+    // goes through `load_path=`, which reloads the backend and so reads.
+    config().loadPath.push(`${localesDir()}/never-preloaded.yml`);
     expect(() => backend.translate("en", "foo.bar")).toThrow(
       /await I18n.preloadTranslationFiles\(\)/,
     );
   });
 
-  it("serves lookups after an awaited preload of I18n.load_path", () => {
-    config().loadPath = [`${localesDir()}/en.yml`];
+  it("serves lookups after an awaited preload of I18n.load_path", async () => {
+    await config().setLoadPath([`${localesDir()}/en.yml`]);
     expect(backend.translate("en", "foo.bar")).toBe("baz");
     expect(backend.initialized()).toBe(true);
   });
@@ -82,8 +84,7 @@ describe("I18n::Backend::Base file loading", () => {
   it("re-reads I18n.load_path on reloadBang", async () => {
     let body = "en:\n  foo:\n    bar: baz\n";
     registerFileReader(() => Promise.resolve(body));
-    config().loadPath = ["mutable.yml"];
-    await preloadTranslationFiles();
+    await config().setLoadPath(["mutable.yml"]);
     expect(backend.translate("en", "foo.bar")).toBe("baz");
 
     body = "en:\n  foo:\n    bar: qux\n";
@@ -94,9 +95,8 @@ describe("I18n::Backend::Base file loading", () => {
   it("re-reads I18n.load_path on reloadBang with an eager loaded backend", async () => {
     let body = "en:\n  foo:\n    bar: baz\n";
     registerFileReader(() => Promise.resolve(body));
-    config().loadPath = ["mutable.yml"];
-    await preloadTranslationFiles();
-    backend.eagerLoadBang();
+    await config().setLoadPath(["mutable.yml"]);
+    await backend.eagerLoadBang();
     expect(backend.translate("en", "foo.bar")).toBe("baz");
 
     body = "en:\n  foo:\n    bar: qux\n";
@@ -105,8 +105,8 @@ describe("I18n::Backend::Base file loading", () => {
     expect(backend.translate("en", "foo.bar")).toBe("qux");
   });
 
-  it("leaves the lazy-init guard armed when the load path holds an invalid file", () => {
-    config().loadPath = [`${localesDir()}/invalid/syntax.yml`];
+  it("leaves the lazy-init guard armed when the load path holds an invalid file", async () => {
+    await config().setLoadPath([`${localesDir()}/invalid/syntax.yml`]);
     expect(() => backend.translate("en", "foo.bar")).toThrow(InvalidLocaleData);
     expect(backend.initialized()).toBe(false);
   });

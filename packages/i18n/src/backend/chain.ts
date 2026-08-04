@@ -86,12 +86,12 @@ export class Chain {
     return true;
   }
 
-  reloadBang(): void {
-    for (const backend of this.backends) backend.reloadBang();
+  async reloadBang(): Promise<void> {
+    for (const backend of this.backends) await backend.reloadBang();
   }
 
-  eagerLoadBang(): void {
-    for (const backend of this.backends) backend.eagerLoadBang();
+  async eagerLoadBang(): Promise<void> {
+    for (const backend of this.backends) await backend.eagerLoadBang();
   }
 
   storeTranslations(

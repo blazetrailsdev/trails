@@ -135,6 +135,19 @@ function defaultCheckConstraintName(tableName: string, expression: string): stri
  * Mirrors: ActiveRecord::ConnectionAdapters::ColumnDefinition
  */
 export class ColumnDefinition {
+  static readonly OPTION_NAMES = [
+    "limit",
+    "precision",
+    "scale",
+    "default",
+    "null",
+    "collation",
+    "comment",
+    "primaryKey",
+    "ifExists",
+    "ifNotExists",
+  ];
+
   sqlType?: string;
   // PostgreSQL only: physical storage type ("timestamp" / "timestamptz") for
   // datetime-family columns, recorded at creation time so the schema dumper
@@ -1121,18 +1134,11 @@ export class TableDefinition {
 
   /** @internal */
   protected validColumnDefinitionOptions(): string[] {
-    return [
-      "limit",
-      "precision",
-      "scale",
-      "default",
-      "null",
-      "collation",
-      "comment",
-      "primaryKey",
-      "ifExists",
-      "ifNotExists",
-    ];
+    const conn = this._adapter as Partial<{ validColumnDefinitionOptions(): string[] }>;
+    // A bare-{@link SchemaQuoter} host (the MySQL schema quoter) is not a
+    // connection and has no reader; the adapter's answer is
+    // `ColumnDefinition::OPTION_NAMES` (schema_statements.rb:1584-1586).
+    return conn.validColumnDefinitionOptions?.() ?? ColumnDefinition.OPTION_NAMES;
   }
 
   /** @internal */

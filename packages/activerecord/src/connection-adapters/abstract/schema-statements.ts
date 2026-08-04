@@ -19,6 +19,7 @@ import {
   AlterTable,
   IndexDefinition,
   AddColumnDefinition,
+  ColumnDefinition,
   ChangeColumnDefaultDefinition,
   CreateIndexDefinition,
   ForeignKeyDefinition,
@@ -1979,18 +1980,7 @@ export class SchemaStatements {
   }
 
   validColumnDefinitionOptions(): string[] {
-    return [
-      "limit",
-      "precision",
-      "scale",
-      "default",
-      "null",
-      "collation",
-      "comment",
-      "primaryKey",
-      "ifExists",
-      "ifNotExists",
-    ];
+    return ColumnDefinition.OPTION_NAMES;
   }
 
   validPrimaryKeyOptions(): string[] {

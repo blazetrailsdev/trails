@@ -159,10 +159,18 @@ export class Config {
     return loadPath;
   }
 
-  set loadPath(value: string[]) {
+  /**
+   * Sets the load path instance. Custom implementations are expected to behave
+   * like a Ruby Array.
+   *
+   * Mirrors `load_path=` (config.rb:132-136); it is a method rather than a
+   * `set` accessor because `backend.reload!` is async here and a TS `set`
+   * accessor cannot be awaited.
+   */
+  async setLoadPath(value: string[]): Promise<void> {
     loadPath = value;
     availableLocalesSet = undefined;
-    this.backend.reloadBang();
+    await this.backend.reloadBang();
   }
 
   /** Whether to verify locales are in the available list. Defaults to true. */
