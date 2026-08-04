@@ -319,7 +319,7 @@ describe("ReferenceDefinition helpers", () => {
     const ref = new ReferenceDefinition("taggable", { polymorphic: true });
     const td = new TableDefinition("taggings", { adapter: schemaConn("sqlite") });
     ref.addTo(td);
-    expect(td.indexes[0].name).toBe("index_taggings_on_taggable");
+    expect(td.indexes[0][1].name).toBe("index_taggings_on_taggable");
   });
 
   it("addTo adds foreign key when foreignKey: true", () => {

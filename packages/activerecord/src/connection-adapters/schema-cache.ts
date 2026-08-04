@@ -350,10 +350,10 @@ export class SchemaCache {
    * `_columns` — so a cold table falls through to the async `columnsHash` path
    * rather than silently reporting an empty schema.
    *
-   * @noRailsEquivalent CONVERGEABLE (story: retire-schema-cache-sync-and-ledger-shims).
-   * Rails' only accessor, `columns_hash(pool, table)`,
-   * may block on a checkout; these callers are Rails-sync and cannot await.
-   * See above.
+   * @internal Reflection plumbing behind the sync `columnsHash` accessors, not a
+   * Rails surface. It disappears once those accessors can block on a checkout
+   * the way `columns_hash(pool, table)` does — blocked on RFC 0073 (the
+   * permanent connection-checkout flip), not on anything TypeScript forbids.
    */
   getCachedColumnsHash(tableName: string): Record<string, Column> | undefined {
     return this._columnsHash.get(tableName);
@@ -365,9 +365,10 @@ export class SchemaCache {
    * only seeds `true` for tables it saw — an unchecked absent table is not
    * `false` here until `dataSourceExists` misses on it).
    *
-   * @noRailsEquivalent CONVERGEABLE (story: retire-schema-cache-sync-and-ledger-shims).
-   * Rails' `data_source_exists?(pool, name)` blocks on
-   * the query; `cachedTableExists` is sync and cannot await. See above.
+   * @internal Reflection plumbing behind the sync `cachedTableExists`, not a
+   * Rails surface. It disappears once that caller can block the way
+   * `data_source_exists?(pool, name)` does — blocked on RFC 0073 (the permanent
+   * connection-checkout flip).
    */
   getCachedDataSourceExists(name: string): boolean | undefined {
     return this._dataSourceExists.get(name);
@@ -410,9 +411,10 @@ export class SchemaCache {
    * behavior change beyond surfacing custom keys. Falling through keeps this a
    * strictly additive read: a table that resolved "id" before still does.
    *
-   * @noRailsEquivalent CONVERGEABLE (story: retire-schema-cache-sync-and-ledger-shims).
-   * Rails' `primary_keys(pool, table)` blocks on the
-   * query; `Model.primaryKey` is sync and cannot await. See above.
+   * @internal Reflection plumbing behind the sync `Model.primaryKey`, not a
+   * Rails surface. It disappears once that accessor can block the way
+   * `primary_keys(pool, table)` does — blocked on RFC 0073 (the permanent
+   * connection-checkout flip).
    */
   getCachedPrimaryKeys(tableName: string): string | string[] | null | undefined {
     if (this._primaryKeys.has(tableName)) return this._primaryKeys.get(tableName);
@@ -519,10 +521,10 @@ export class SchemaCache {
    * demonstrably exists — which is what lets the sync readers above answer
    * without a query.
    *
-   * @noRailsEquivalent CONVERGEABLE (story: retire-schema-cache-sync-and-ledger-shims).
-   * Rails populates only via `add(pool, table_name)`,
-   * which issues the introspection queries itself; trails needs a sync writer
-   * to back its sync, query-free readers. See above.
+   * @internal The write half of the sync readers above — same lifetime as they
+   * have: once they can block on a checkout, every population path is
+   * `add(pool, tableName)` again. Blocked on RFC 0073 (the permanent
+   * connection-checkout flip).
    */
   setColumns(tableName: string, cols: Column[]): void {
     this.reconcilePrimaryKeyFlags(tableName, cols);
@@ -776,11 +778,12 @@ export class SchemaReflection {
    * (Rails' `clear_data_source_cache!`) regardless of this flag — the next
    * load re-reflects it.
    *
-   * @noRailsEquivalent CONVERGEABLE (story: retire-schema-cache-sync-and-ledger-shims).
-   * Opt-in eager DB warming. Rails has only
-   * `lazily_load_schema_cache` (a committed dump) because its sync
-   * accessors can fall back on blocking reflection; trails' cannot. See
-   * above.
+   * @noRailsEquivalent CONVERGEABLE (story:
+   * retire-schema-cache-sync-readers-after-checkout-flip) — blocked on RFC 0073,
+   * the permanent connection-checkout flip. Rails has only
+   * `lazily_load_schema_cache` (a committed dump) because its sync accessors
+   * fall back on blocking reflection; trails' cannot until the flip lands, at
+   * which point this flag has nothing left to buy and goes away with it.
    */
   static eagerLoadSchemaCache = false;
 

@@ -131,7 +131,7 @@ describe("MySQL::SchemaCreation", () => {
   });
 
   it("indexInCreate generates inline index with provided name", async () => {
-    const sql = (sc as any).indexInCreate("users", "email", { name: "my_idx" });
+    const sql = await (sc as any).indexInCreate("users", "email", { name: "my_idx" });
     expect(sql).toContain("`my_idx`");
     expect(sql).toContain("`email`");
   });

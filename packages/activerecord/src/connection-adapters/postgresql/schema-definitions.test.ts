@@ -257,7 +257,7 @@ describe("PostgreSQL::TableDefinition column methods", () => {
       (td as unknown as Record<string, (...args: unknown[]) => void>)[method]("a", "b", {
         index: true,
       });
-      expect(td.indexes.map((i) => i.columns)).toEqual([["a"], ["b"]]);
+      expect(td.indexes.map(([columnName]) => columnName)).toEqual([["a"], ["b"]]);
       expect(td.columns.every((c) => !("index" in c.options))).toBe(true);
     }
   });

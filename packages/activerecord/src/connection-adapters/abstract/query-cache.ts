@@ -205,28 +205,25 @@ export interface QueryCacheHost extends DatabaseStatementsHost {
 export class ConnectionPoolConfiguration {
   private _threadQueryCaches = new QueryCacheRegistry();
   private _queryCacheMaxSize: number | null;
-  private _queryCacheDisabled: boolean;
   private _queryCacheVersion = { value: 0 };
   private _pinnedCount = 0;
 
-  constructor(queryCacheConfig?: number | false | null | string) {
-    // Mirrors Rails' `@query_cache_max_size = case db_config&.query_cache`
+  constructor(queryCache?: unknown) {
+    // Mirrors Rails' `@query_cache_max_size = case query_cache = db_config&.query_cache`
     // (`query_cache.rb:120-129`): `0`/`false` → nil, an Integer → itself, `nil`
-    // → DEFAULT_SIZE, and — since the case has no String branch — any string
-    // (e.g. "unlimited", or a `?query_cache=42` URL that stays the string "42")
-    // falls through to nil (unbounded). A nil max size is NOT what marks a pool
-    // disabled — that gate is `db_config&.query_cache == false`.
-    this._queryCacheDisabled = queryCacheConfig === false;
-    if (
-      queryCacheConfig === 0 ||
-      queryCacheConfig === false ||
-      typeof queryCacheConfig === "string"
-    ) {
+    // → DEFAULT_SIZE, and — since the case has no other branch — anything else
+    // (`true`, or a string such as "unlimited" or a `?query_cache=42` URL value
+    // that stays the string "42") falls through to nil, i.e. unbounded. A nil
+    // max size is NOT what marks a pool disabled — that gate is
+    // `db_config&.query_cache == false`, asked inline by `QueryCache.run`.
+    if (queryCache === 0 || queryCache === false) {
       this._queryCacheMaxSize = null;
-    } else if (typeof queryCacheConfig === "number") {
-      this._queryCacheMaxSize = queryCacheConfig;
-    } else {
+    } else if (typeof queryCache === "number") {
+      this._queryCacheMaxSize = queryCache;
+    } else if (queryCache == null) {
       this._queryCacheMaxSize = DEFAULT_MAX_SIZE;
+    } else {
+      this._queryCacheMaxSize = null;
     }
     ACTIVE_CACHE_CONFIGS.add(new WeakRef(this));
   }
@@ -281,17 +278,6 @@ export class ConnectionPoolConfiguration {
     const qc = this.queryCache;
     qc.enabled = true;
     qc.dirties = true;
-  }
-
-  /**
-   * Whether this pool's query cache is disabled by configuration
-   * (`db_config.query_cache == false`). Gates strictly on the config value, not
-   * on the max size being nil — Rails' `QueryCache.run` skips a pool with
-   * `next if pool.db_config&.query_cache == false`, and both `false` and
-   * `"unlimited"` leave the max size nil.
-   */
-  get queryCacheDisabled(): boolean {
-    return this._queryCacheDisabled;
   }
 
   disableQueryCacheBang(): void {

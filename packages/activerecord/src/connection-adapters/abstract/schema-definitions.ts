@@ -988,7 +988,12 @@ export class AlterTable {
 export class TableDefinition {
   readonly tableName: string;
   readonly columns: ColumnDefinition[] = [];
-  readonly indexes: IndexDefinition[] = [];
+  /**
+   * Rails stores the caller's options untouched — `indexes << [column_name,
+   * options]` (schema_definitions.rb:518) — and validates/normalizes them once,
+   * downstream in `add_index_options` (schema_statements.rb:1476).
+   */
+  readonly indexes: Array<[string | string[], AddIndexOptions]> = [];
   readonly foreignKeys: ForeignKeyDefinition[] = [];
   readonly checkConstraints: CheckConstraintDefinition[] = [];
   readonly temporary: boolean;
@@ -1488,50 +1493,8 @@ export class TableDefinition {
     return this.references(name, options);
   }
 
-  /**
-   * Rails stores the options untouched (`indexes << [column_name, options]`)
-   * and asserts them later, in `add_index_options` (schema_statements.rb:1477).
-   * This port builds the IndexDefinition here, which is where an unknown key
-   * would otherwise be dropped, so the assert has to happen here too — filed as
-   * `converge-table-definition-index-deferred-options` (RFC 0051).
-   */
-  index(columns: string[], options: AddIndexOptions = {}): this {
-    const {
-      name: _n,
-      ifNotExists: _i,
-      internal: _int,
-      ...rest
-    } = options as AddIndexOptions & { internal?: boolean };
-    assertValidKeys(rest, [
-      "unique",
-      "length",
-      "order",
-      "opclass",
-      "where",
-      "type",
-      "using",
-      "comment",
-      "algorithm",
-      "include",
-      "nullsNotDistinct",
-    ]);
-
-    const name = options.name ?? `index_${this.tableName}_on_${columns.join("_and_")}`;
-    this.indexes.push(
-      new IndexDefinition(this.tableName, name, options.unique ?? false, columns, {
-        where: options.where,
-        orders: options.order,
-        lengths: options.length,
-        opclasses: options.opclass,
-        type: options.type,
-        using: options.using,
-        include: options.include,
-        nullsNotDistinct: options.nullsNotDistinct,
-        comment: options.comment,
-        algorithm: options.algorithm,
-        ifNotExists: options.ifNotExists,
-      }),
-    );
+  index(columnName: string | string[], options: AddIndexOptions = {}): this {
+    this.indexes.push([columnName, options]);
     return this;
   }
 }
