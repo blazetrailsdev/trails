@@ -172,6 +172,7 @@ interface DateParts {
   sec?: number;
   secFraction?: number;
   zone?: string;
+  offset?: number | null;
   _comp?: boolean;
   _bc?: boolean;
 }
@@ -207,6 +208,306 @@ function digitSpan(str: string, s: number, e: number): number {
   let i = 0;
   while (s + i < e && isdigit(str[s + i])) i++;
   return i;
+}
+
+/**
+ * @internal `zonetab.list` (`date-3.4.1/ext/date/zonetab.list`), the gperf
+ * input `zonetab()` is generated from: the abbreviations, the military single
+ * letters and the Windows-style full names, each with its offset in seconds,
+ * as `name,offset` pairs in the order the list file gives them.
+ */
+const ZONETAB_LIST =
+  "ut,0;gmt,0;est,-18000;edt,-14400;cst,-21600;cdt,-18000;mst,-25200;mdt,-21600;pst,-28800;" +
+  "pdt,-25200;a,3600;b,7200;c,10800;d,14400;e,18000;f,21600;g,25200;h,28800;i,32400;k,36000;" +
+  "l,39600;m,43200;n,-3600;o,-7200;p,-10800;q,-14400;r,-18000;s,-21600;t,-25200;u,-28800;" +
+  "v,-32400;w,-36000;x,-39600;y,-43200;z,0;utc,0;wet,0;at,-7200;brst,-7200;ndt,-5400;art,-10800;" +
+  "adt,-10800;brt,-10800;clst,-10800;nst,-9000;ast,-14400;clt,-14400;akdt,-28800;ydt,-28800;" +
+  "akst,-32400;hadt,-32400;hdt,-32400;yst,-32400;ahst,-36000;cat,7200;hast,-36000;hst,-36000;" +
+  "nt,-39600;idlw,-43200;bst,3600;cet,3600;fwt,3600;met,3600;mewt,3600;mez,3600;swt,3600;" +
+  "wat,3600;west,3600;cest,7200;eet,7200;fst,7200;mest,7200;mesz,7200;sast,7200;sst,-39600;" +
+  "bt,10800;eat,10800;eest,10800;msk,10800;msd,14400;zp4,14400;zp5,18000;ist,19800;zp6,21600;" +
+  "wast,7200;cct,23400;sgt,28800;wadt,28800;jst,32400;kst,32400;east,-21600;gst,36000;" +
+  "eadt,39600;idle,43200;nzst,43200;nzt,43200;nzdt,46800;afghanistan,16200;alaskan,-32400;" +
+  "arab,10800;arabian,14400;arabic,10800;atlantic,-14400;aus central,34200;aus eastern,36000;" +
+  "azores,-3600;canada central,-21600;cape verde,-3600;caucasus,14400;cen. australia,34200;" +
+  "central america,-21600;central asia,21600;central europe,3600;central european,3600;" +
+  "central pacific,39600;central,-21600;china,28800;dateline,-43200;e. africa,10800;" +
+  "e. australia,36000;e. europe,7200;e. south america,-10800;eastern,-18000;egypt,7200;" +
+  "ekaterinburg,18000;fiji,43200;fle,7200;greenland,-10800;greenwich,0;gtb,7200;hawaiian,-36000;" +
+  "india,19800;iran,12600;jerusalem,7200;korea,32400;mexico,-21600;mid-atlantic,-7200;" +
+  "mountain,-25200;myanmar,23400;n. central asia,21600;nepal,20700;new zealand,43200;" +
+  "newfoundland,-12600;north asia east,28800;north asia,25200;pacific sa,-14400;pacific,-28800;" +
+  "romance,3600;russian,10800;sa eastern,-10800;sa pacific,-18000;sa western,-14400;" +
+  "samoa,-39600;se asia,25200;malay peninsula,28800;south africa,7200;sri lanka,21600;" +
+  "taipei,28800;tasmania,36000;tokyo,32400;tonga,46800;us eastern,-18000;us mountain,-25200;" +
+  "vladivostok,36000;w. australia,28800;w. central africa,3600;w. europe,3600;west asia,18000;" +
+  "west pacific,36000;yakutsk,32400;acdt,37800;acst,34200;act,-18000;acwst,31500;aedt,39600;" +
+  "aest,36000;aft,16200;almt,21600;anast,43200;anat,43200;aoe,-43200;aqtt,18000;awdt,32400;" +
+  "awst,28800;azost,0;azot,-3600;azst,18000;azt,14400;bnt,28800;bot,-14400;btt,21600;cast,28800;" +
+  "chadt,49500;chast,45900;chost,32400;chot,28800;chst,36000;chut,36000;cidst,-14400;" +
+  "cist,-18000;ckt,-36000;cot,-18000;cvt,-3600;cxt,25200;davt,25200;ddut,36000;easst,-18000;" +
+  "ect,-18000;egst,0;egt,-3600;fet,10800;fjst,46800;fjt,43200;fkst,-10800;fkt,-14400;fnt,-7200;" +
+  "galt,-21600;gamt,-32400;get,14400;gft,-10800;gilt,43200;gyt,-14400;hkt,28800;hovst,28800;" +
+  "hovt,25200;ict,25200;idt,10800;iot,21600;irdt,16200;irkst,32400;irkt,28800;irst,12600;" +
+  "kgt,21600;kost,39600;krast,28800;krat,25200;kuyt,14400;lhdt,39600;lhst,37800;lint,50400;" +
+  "magst,43200;magt,39600;mart,-30600;mawt,18000;mht,43200;mmt,23400;mut,14400;mvt,18000;" +
+  "myt,28800;nct,39600;nfdt,43200;nft,39600;novst,25200;novt,25200;npt,20700;nrt,43200;" +
+  "nut,-39600;omsst,25200;omst,21600;orat,18000;pet,-18000;petst,43200;pett,43200;pgt,36000;" +
+  "phot,46800;pht,28800;pkt,18000;pmdt,-7200;pmst,-10800;pont,39600;pwt,32400;pyst,-10800;" +
+  "qyzt,21600;ret,14400;rott,-10800;sakt,39600;samt,14400;sbt,39600;sct,14400;sret,39600;" +
+  "srt,-10800;syot,10800;taht,-36000;tft,18000;tjt,18000;tkt,46800;tlt,32400;tmt,18000;" +
+  "tost,50400;tot,46800;trt,10800;tvt,43200;ulast,32400;ulat,28800;uyst,-7200;uyt,-10800;" +
+  "uzt,18000;vet,-14400;vlast,39600;vlat,36000;vost,21600;vut,39600;wakt,43200;warst,-10800;" +
+  "wft,43200;wgst,-3600;wgt,-7200;wib,25200;wit,32400;wita,28800;wt,0;yakst,36000;yakt,32400;" +
+  "yapt,36000;yekst,21600;yekt,18000";
+
+/** @internal `zonetab.h` `MAX_WORD_LENGTH`: the longest key in `zonetab.list`. */
+const MAX_WORD_LENGTH = 17;
+
+const ZONETAB = new Map(
+  ZONETAB_LIST.split(";").map((e) => {
+    const i = e.indexOf(",");
+    return [e.slice(0, i), Number(e.slice(i + 1))] as const;
+  }),
+);
+
+/**
+ * @internal `zonetab.h` `zonetab`, the gperf lookup. gperf is run with
+ * `GPERF_DOWNCASE` and `gperf_case_strncmp`, so the name matches case-blind.
+ */
+function zonetab(str: string, len: number): number | undefined {
+  return ZONETAB.get(str.slice(0, len).toLowerCase());
+}
+
+/** @internal C `isspace` over the ASCII whitespace `date_parse.c` sees. */
+function isspace(c: string | undefined): boolean {
+  return c === " " || (c !== undefined && c >= "\t" && c <= "\r");
+}
+
+/** @internal `date_parse.c` `issign` (`date_parse.c:23`). */
+function issign(c: string | undefined): boolean {
+  return c === "-" || c === "+";
+}
+
+/**
+ * @internal C `strtoul` base 10, answering the value and the index one past
+ * the digits it read, which is `date_zone_to_diff`'s `p`.
+ */
+function strtoul(s: string, i: number): [number, number] {
+  let v = 0;
+
+  while (isspace(s[i])) i++;
+  while (s[i] >= "0" && s[i] <= "9") {
+    v = v * 10 + Number(s[i]);
+    i++;
+  }
+  return [v, i];
+}
+
+/**
+ * @internal `ruby_scan_digits`, which reads at most `len` digits and answers
+ * both the value and how many digits it took.
+ */
+function rubyScanDigits(s: string, start: number, len: number): [number, number] {
+  let v = 0;
+  let n = 0;
+
+  while (n < len && s[start + n] >= "0" && s[start + n] <= "9") {
+    v = v * 10 + Number(s[start + n]);
+    n++;
+  }
+  return [v, n];
+}
+
+/**
+ * @internal `date_parse.c` `str_end_with_word` (`date_parse.c:369-377`): the
+ * length of `w` plus the whitespace before it, when the first `l` characters
+ * of `s` end with that whitespace-separated word.
+ */
+function strEndWithWord(s: string, l: number, w: string): number {
+  let n = w.length;
+
+  if (l <= n || !isspace(s[l - n - 1])) return 0;
+  if (s.slice(l - n, l).toLowerCase() !== w) return 0;
+  do ++n;
+  while (l > n && isspace(s[l - n - 1]));
+  return n;
+}
+
+/**
+ * @internal `date_parse.c` `shrunk_size` (`date_parse.c:379-395`): the length
+ * the first `l` characters of `s` would have with every whitespace run
+ * collapsed to one space, or `0` when that is no shorter than `l`.
+ */
+function shrunkSize(s: string, l: number): number {
+  let ni = 0;
+  let sp = false;
+
+  for (let i = 0; i < l; ++i) {
+    if (!isspace(s[i])) {
+      if (sp) ni++;
+      sp = false;
+      ni++;
+    } else {
+      sp = true;
+    }
+  }
+  return ni < l ? ni : 0;
+}
+
+/**
+ * @internal `date_parse.c` `shrink_space` (`date_parse.c:397-413`). C writes
+ * into a caller buffer and answers the length; the shrunk string carries both.
+ */
+function shrinkSpace(s: string, l: number): string {
+  let d = "";
+  let sp = false;
+
+  for (let i = 0; i < l; ++i) {
+    if (!isspace(s[i])) {
+      if (sp) d += " ";
+      sp = false;
+      d += s[i];
+    } else {
+      sp = true;
+    }
+  }
+  return d;
+}
+
+/**
+ * @internal `date_parse.c` `date_zone_to_diff` (`date_parse.c:415-559`): the
+ * `:offset` in seconds a `:zone` names. A trailing `standard`, `daylight` or
+ * `dst` word comes off first (and `daylight`/`dst` add an hour), then the
+ * whitespace-shrunk remainder is looked up in `zonetab`, and only failing that
+ * is it read as a numeric offset — `+09:00`, `+0930`, `+9`, `+9.5`, optionally
+ * behind a `gmt`/`utc` prefix. `null` is Ruby's `nil`: not a zone it knows.
+ *
+ * Ruby answers a Rational for a fractional-hour offset of more than two
+ * decimal places (`date_parse.c:522-528`); TypeScript has no Rational, so the
+ * division is a `number` there.
+ */
+function dateZoneToDiff(str: string): number | null {
+  let offset: number | null = null;
+  let l = str.length;
+  let s = str;
+
+  {
+    let dst = false;
+    let w: number;
+
+    if ((w = strEndWithWord(s, l, "time")) > 0) {
+      const wtime = w;
+      l -= w;
+      if ((w = strEndWithWord(s, l, "standard")) > 0) {
+        l -= w;
+      } else if ((w = strEndWithWord(s, l, "daylight")) > 0) {
+        l -= w;
+        dst = true;
+      } else {
+        l += wtime;
+      }
+    } else if ((w = strEndWithWord(s, l, "dst")) > 0) {
+      l -= w;
+      dst = true;
+    }
+
+    {
+      let zn = s;
+      let sl = shrunkSize(s, l);
+      let z: number | undefined;
+
+      if (sl <= 0) {
+        sl = l;
+      } else if (sl <= MAX_WORD_LENGTH) {
+        zn = shrinkSpace(s, l);
+        sl = zn.length;
+      }
+
+      if (sl > 0 && sl <= MAX_WORD_LENGTH) {
+        z = zonetab(zn, sl);
+      }
+
+      if (z !== undefined) {
+        let d = z;
+        if (dst) d += 3600;
+        offset = d;
+        return offset;
+      }
+    }
+
+    {
+      let p: number;
+      let sign: boolean;
+      let hour: number;
+      let min = 0;
+      let sec = 0;
+
+      if (
+        l > 3 &&
+        (s.slice(0, 3).toLowerCase() === "gmt" || s.slice(0, 3).toLowerCase() === "utc")
+      ) {
+        s = s.slice(3);
+        l -= 3;
+      }
+      if (issign(s[0])) {
+        sign = s[0] === "-";
+        s = s.slice(1);
+        l--;
+
+        const outOfRange = (v: number, min: number, max: number): boolean => v < min || max < v;
+
+        [hour, p] = strtoul(s, 0);
+        if (s[p] === ":") {
+          if (outOfRange(hour, 0, 23)) return null;
+          [min, p] = strtoul(s, p + 1);
+          if (outOfRange(min, 0, 59)) return null;
+          if (s[p] === ":") {
+            [sec] = strtoul(s, p + 1);
+            if (outOfRange(sec, 0, 59)) return null;
+          }
+        } else if (s[p] === "," || s[p] === ".") {
+          /* fractional hour */
+          let n: number;
+          /* no over precision for offset; 10**-7 hour = 0.36
+           * milliseconds should be enough. */
+          const maxDigits = 7;
+
+          if (outOfRange(hour, 0, 23)) return null;
+
+          n = l - ++p;
+          if (n > maxDigits) n = maxDigits;
+          [sec, n] = rubyScanDigits(s, p, n);
+          if ((p += n) < l && s[p] >= (sec % 2 === 0 ? "6" : "5") && s[p] <= "9") {
+            /* round half to even */
+            sec++;
+          }
+          sec *= 36;
+          if (sign) {
+            hour = -hour;
+            sec = -sec;
+          }
+          if (n <= 2) {
+            /* HH.nn or HH.n */
+            if (n === 1) sec *= 10;
+            offset = sec + hour * 3600;
+          } else {
+            const denom = 10 ** (n - 2);
+            offset = sec / denom + hour * 3600;
+          }
+          return offset;
+        } else if (l > 2) {
+          if (l >= 1) [hour] = rubyScanDigits(s, 0, 2 - (l % 2));
+          if (l >= 3) [min] = rubyScanDigits(s, 2 - (l % 2), 2);
+          if (l >= 5) [sec] = rubyScanDigits(s, 4 - (l % 2), 2);
+        }
+        sec += min * 60 + hour * 3600;
+        if (sign) sec = -sec;
+        offset = sec;
+      }
+    }
+  }
+  return offset;
 }
 
 /**
@@ -800,7 +1101,7 @@ function parseDddCb(m: RegExpExecArray, hash: DateParts): number {
   const s2 = m[2];
   const s3 = m[3];
   const s4 = m[4];
-  const s5 = m[5];
+  let s5 = m[5];
 
   const cs2 = s2;
   const l2 = s2.length;
@@ -930,15 +1231,28 @@ function parseDddCb(m: RegExpExecArray, hash: DateParts): number {
   }
   if (s5 !== undefined) {
     const cs5 = s5;
-    const l5 = s5.length;
+    let l5 = s5.length;
 
     hash.zone = s5;
 
     if (cs5[0] === "[") {
-      const zone = cs5.slice(1, l5 - 1);
-      const i = zone.indexOf(":");
+      const s1 = 1;
+      let s2: number;
+      let zone: string;
 
-      hash.zone = i === -1 ? zone : zone.slice(i + 1);
+      l5 -= 2;
+      s2 = cs5.slice(s1, s1 + l5).indexOf(":");
+      if (s2 !== -1) {
+        s2 = s1 + s2 + 1;
+        zone = s5.slice(s2, s2 + (l5 - (s2 - s1)));
+        s5 = s5.slice(s1, s1 + (s2 - s1));
+      } else {
+        zone = s5.slice(s1, s1 + l5);
+        if (cs5[s1] >= "0" && cs5[s1] <= "9") s5 = "+" + zone;
+        else s5 = zone;
+      }
+      hash.zone = zone;
+      hash.offset = dateZoneToDiff(s5);
     }
   }
 
@@ -1149,12 +1463,6 @@ export class Date {
    * @missingRailsCall `parse_frag` (`date_parse.c:2021-2052`) is not ported:
    * its pattern is anchored to the whole string, so it reads the leftover
    * Ruby's `subx` leaves behind, which the ported sub-parsers do not produce.
-   * Neither is `date_zone_to_diff` (`date_parse.c:416-559`), so the `:offset`
-   * a `:zone` also sets is missing
-   * from both of its call sites — the tail of `date__parse` itself
-   * (`date_parse.c:2290-2294`) and the bracketed zone of `parse_ddd_cb`
-   * (`date_parse.c:1934-1960`). It reads a zone-name table `::Date` has no use
-   * for: every field it fills is a time of day, which `Date.parse` discards.
    */
   static _parse(str: string, comp = true): DateParts | null {
     const hash: DateParts = {};
@@ -1190,6 +1498,10 @@ export class Date {
       if (parts.year !== undefined && parts.year >= 0 && parts.year <= 99) {
         parts.year = compYear69(parts.year);
       }
+    }
+    {
+      const zone = parts.zone;
+      if (zone !== undefined && parts.offset == null) parts.offset = dateZoneToDiff(zone);
     }
     delete parts._comp;
     return parts;

@@ -176,6 +176,36 @@ describe("Date", () => {
     expect(RubyDate.parse("080702", false).year).toBe(8);
   });
 
+  it("answers the offset a zone names, as date_zone_to_diff does", () => {
+    for (const [zone, offset] of [
+      ["+09:00", 32400],
+      ["gmt+9", 32400],
+      ["utc-4", -14400],
+      ["-09:30", -34200],
+      ["+0930", 34200],
+      ["+9", 32400],
+      ["+9.5", 34200],
+      ["+9.555", 34398],
+      ["JST", 32400],
+      ["Z", 0],
+      ["IST", 19800],
+      ["Pacific Standard Time", -28800],
+      ["JST dst", 36000],
+      ["jst standard time", 32400],
+      ["nosuchzone", null],
+      ["+24:00", null],
+      ["+9:99", null],
+    ] as const) {
+      expect(RubyDate._parse(`2008-07-02 10:30:00 ${zone}`)?.offset).toBe(offset);
+    }
+  });
+
+  it("answers the offset of a bracketed zone, as parse_ddd_cb does", () => {
+    expect(RubyDate._parse("20080702[+9:JST]")).toMatchObject({ zone: "JST", offset: 32400 });
+    expect(RubyDate._parse("20080702[9:JST]")).toMatchObject({ zone: "JST", offset: 32400 });
+    expect(RubyDate._parse("20080702[9]")).toMatchObject({ zone: "9", offset: 32400 });
+  });
+
   it("raises on an unparseable string", () => {
     expect(() => RubyDate.parse("not a date")).toThrow(ArgumentError);
     expect(() => RubyDate.parse("not a date")).toThrow("invalid date");
