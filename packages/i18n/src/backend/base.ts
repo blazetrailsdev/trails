@@ -47,6 +47,7 @@ import {
   type ProcTransliterator,
 } from "./transliterator.js";
 import { except, type TranslationData } from "../utils.js";
+import { tr } from "./flatten.js";
 import { parseYaml } from "../yaml.js";
 
 export type TranslateOptions = { [key: string]: unknown };
@@ -146,6 +147,19 @@ class NotImplementedError extends Error {
   }
 }
 
+/**
+ * Ruby `x.nil?`, which — unlike JS `x == null` — is an ordinary method an
+ * object may override. `I18n::Backend::KeyValue::SubtreeProxy` does exactly
+ * that (key_value.rb:178-180), and the four `entry.nil?` tests in `translate`
+ * below are what make its lazy, still-unfetched form behave as a miss.
+ */
+function isNil(value: unknown): boolean {
+  if (value == null) return true;
+  if (typeof value !== "object") return false;
+  const nil = (value as { nil?: unknown }).nil;
+  return typeof nil === "function" && (nil as () => boolean).call(value) === true;
+}
+
 /** Ruby truthiness: only `nil` and `false` are falsy — `0` and `""` are not. */
 function truthy(value: unknown): boolean {
   return value !== undefined && value !== null && value !== false;
@@ -238,7 +252,7 @@ export abstract class Base {
     let entry: unknown =
       key == null ? null : (this.lookup(locale!, key, options.scope, options) ?? null);
 
-    if (entry == null && "default" in options) {
+    if (isNil(entry) && "default" in options) {
       entry = this.default(locale!, key, options.default, options);
     } else {
       entry = this.resolveEntry(locale!, key, entry, options);
@@ -246,7 +260,7 @@ export abstract class Base {
 
     const count = options.count;
 
-    if (entry == null && (this.subtrees() || !truthy(count))) {
+    if (isNil(entry) && (this.subtrees() || !truthy(count))) {
       if (("default" in options && options.default != null) || !("default" in options)) {
         throwException(new MissingTranslation(locale!, key as TranslationKey, options));
       }
@@ -254,7 +268,7 @@ export abstract class Base {
 
     if (truthy(count)) entry = this.pluralize(locale!, entry, count);
 
-    if (entry == null && !this.subtrees()) {
+    if (isNil(entry) && !this.subtrees()) {
       throwException(new MissingTranslation(locale!, key as TranslationKey, options));
     }
 
@@ -534,7 +548,7 @@ export abstract class Base {
    * extensions.
    */
   protected loadFile(filename: string): TranslationData {
-    const type = extname(filename).replaceAll(".", "").toLowerCase();
+    const type = tr(extname(filename), ".", "").toLowerCase();
     const loader = (this as unknown as Record<string, unknown>)[
       `load${type.charAt(0).toUpperCase()}${type.slice(1)}`
     ];

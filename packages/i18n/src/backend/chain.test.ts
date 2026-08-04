@@ -1,13 +1,15 @@
 /**
  * Mirrors: i18n/test/backend/chain_test.rb
  *
- * Not ported: `I18nBackendChainWithKeyValueTest`, which the gem itself guards
- * with `if I18n::TestCase.key_value?` — it needs the `I18n::Backend::KeyValue`
- * backend, which trails has not ported.
+ * The gem guards `I18nBackendChainWithKeyValueTest` with
+ * `if I18n::TestCase.key_value?`, which asks whether ActiveSupport is loaded —
+ * the gem needs it for `ActiveSupport::JSON` (key_value.rb:20). JS has `JSON`
+ * in the language, so there is nothing to probe and the cases always run.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Chain } from "./chain.js";
+import { KeyValue, type Store } from "./key-value.js";
 import { Simple } from "./simple.js";
 import { config, resetConfig, t } from "../i18n.js";
 import { resetClassConfig } from "../config.js";
@@ -180,5 +182,42 @@ describe("I18nBackendChainTest", () => {
       },
     };
     expect(send(chain, "translations")).toEqual(expected);
+  });
+});
+
+describe("I18nBackendChainWithKeyValueTest", () => {
+  beforeEach(() => {
+    resetConfig();
+    resetClassConfig();
+    config().enforceAvailableLocales = false;
+  });
+
+  function setupBackend(subtrees = true): void {
+    const first = new KeyValue(new Map<string, string>() as Store, subtrees);
+    first.storeTranslations("en", { plural_1: { one: "%{count}" } });
+
+    const second = new Simple();
+    second.storeTranslations("en", { plural_2: { one: "one" } });
+    config().backend = new Chain(first, second);
+  }
+
+  it("subtrees enabled: looks up pluralization translations from the first chained backend", () => {
+    setupBackend();
+    expect(t("plural_1", { count: 1 })).toBe("1");
+  });
+
+  it("subtrees disabled: looks up pluralization translations from the first chained backend", () => {
+    setupBackend(false);
+    expect(t("plural_1", { count: 1 })).toBe("1");
+  });
+
+  it("subtrees enabled: looks up translations from the second chained backend", () => {
+    setupBackend();
+    expect(t("plural_2", { count: 1 })).toBe("one");
+  });
+
+  it("subtrees disabled: looks up translations from the second chained backend", () => {
+    setupBackend(false);
+    expect(t("plural_2", { count: 1 })).toBe("one");
   });
 });

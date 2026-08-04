@@ -59,7 +59,7 @@ export const RESERVED_KEYS: string[] = [
  * default block (`{ |h, k| h[k] = Concurrent::Map.new }`) has no `Map`
  * equivalent, so the outer read installs the inner map at the call site.
  */
-export function newDoubleNestedCache(): Map<string, Map<unknown, TranslationKey[]>> {
+export function newDoubleNestedCache<K = unknown, V = TranslationKey[]>(): Map<string, Map<K, V>> {
   return new Map();
 }
 
