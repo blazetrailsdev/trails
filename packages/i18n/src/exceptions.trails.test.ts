@@ -137,4 +137,16 @@ describe("exceptions", () => {
     expect(inspect("café 😀")).toBe('"café 😀"');
     expect(inspect("a\ud800b")).toBe('"a\\xED\\xA0\\x80b"');
   });
+
+  it("inspects a non-printable code point the way Ruby's String#inspect does", () => {
+    expect(inspect("͸")).toBe('"\\u0378"');
+    expect(inspect("퟿")).toBe('"\\uD7FF"');
+    expect(inspect("￾")).toBe('"\\uFFFE"');
+    expect(inspect("  ")).toBe('"\\u2028\\u2029"');
+    expect(inspect("\u{10ffff}")).toBe('"\\u{10FFFF}"');
+    expect(inspect("​")).toBe('"​"');
+    expect(inspect("­")).toBe('"­"');
+    expect(inspect("")).toBe('""');
+    expect(inspect(" ᠎")).toBe('" ᠎"');
+  });
 });

@@ -40,6 +40,16 @@ const RUBY_ESCAPES: Record<string, string> = {
 };
 
 /**
+ * MRI escapes every code point `rb_enc_isprint` rejects, which is wider than
+ * the C0/DEL/C1 controls: unassigned code points (`"͸".inspect` =>
+ * `"\\u0378"`), noncharacters (`"￾"`) and the line and paragraph
+ * separators all render escaped. `\p{Cf}` does not — soft hyphen, ZWSP and
+ * U+1D173 all print literally — and neither does private use (`\p{Co}`) or
+ * `\p{Zs}`. Surrogates are `\p{Cs}` but take the invalid-byte arm below.
+ */
+const NONPRINTABLE = /^[\p{Cc}\p{Cn}\p{Zl}\p{Zp}]$/u;
+
+/**
  * Ruby `String#inspect` (MRI `string.c`, `rb_str_inspect`). `JSON.stringify`
  * is not a stand-in: Ruby renders ESC as `\e`, escapes `#` before `{`, `$` and
  * `@` so the result re-parses as the same string, prints printable non-ASCII
@@ -58,8 +68,11 @@ function inspectString(value: string): string {
       result += "\\#";
     } else if (char in RUBY_ESCAPES) {
       result += RUBY_ESCAPES[char];
-    } else if (code < 0x20 || code === 0x7f || (code >= 0x80 && code <= 0x9f)) {
-      result += `\\u${code.toString(16).toUpperCase().padStart(4, "0")}`;
+    } else if (NONPRINTABLE.test(char)) {
+      result +=
+        code <= 0xffff
+          ? `\\u${code.toString(16).toUpperCase().padStart(4, "0")}`
+          : `\\u{${code.toString(16).toUpperCase()}}`;
     } else if (code >= 0xd800 && code <= 0xdfff) {
       for (const byte of [0xe0 | (code >> 12), 0x80 | ((code >> 6) & 0x3f), 0x80 | (code & 0x3f)]) {
         result += `\\x${byte.toString(16).toUpperCase()}`;
