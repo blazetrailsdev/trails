@@ -1480,11 +1480,14 @@ export class TableDefinition {
     return this.references(name, options);
   }
 
+  /**
+   * Rails stores the options untouched (`indexes << [column_name, options]`)
+   * and asserts them later, in `add_index_options` (schema_statements.rb:1477).
+   * This port builds the IndexDefinition here, which is where an unknown key
+   * would otherwise be dropped, so the assert has to happen here too — filed as
+   * `converge-table-definition-index-deferred-options` (RFC 0051).
+   */
   index(columns: string[], options: AddIndexOptions = {}): this {
-    // Rails stores the options untouched (`indexes << [column_name, options]`)
-    // and asserts them later, in `add_index_options` (schema_statements.rb:1477).
-    // This port builds the IndexDefinition here, which is where an unknown key
-    // would otherwise be dropped, so the assert has to happen here too.
     const {
       name: _n,
       ifNotExists: _i,

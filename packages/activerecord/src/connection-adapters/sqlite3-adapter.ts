@@ -1684,9 +1684,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       });
       return;
     }
-    // Rails' SQLite3Adapter#add_column falls through to `super`
-    // (sqlite3_adapter.rb:338-347), which is where the column options are
-    // validated and the ADD COLUMN clause is built by the schema creation.
     await super.addColumn(tableName, columnName, type as ColumnType, options as ColumnOptions);
   }
 

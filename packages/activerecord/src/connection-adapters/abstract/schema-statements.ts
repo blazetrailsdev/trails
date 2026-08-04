@@ -1822,6 +1822,10 @@ export class SchemaStatements {
     return new Table(tableName, (base ?? this) as SchemaStatements);
   }
 
+  /**
+   * Rails takes `name`, `if_not_exists` and `internal` as their own kwargs, so
+   * they are out of the asserted set (schema_statements.rb:1476-1477).
+   */
   async addIndexOptions(
     tableName: string,
     columnName: string | string[],
@@ -1837,8 +1841,6 @@ export class SchemaStatements {
       [key: string]: unknown;
     } = {},
   ): Promise<[IndexDefinition, string | undefined, boolean]> {
-    // Rails takes `name`, `if_not_exists` and `internal` as their own kwargs, so
-    // they are out of the asserted set (schema_statements.rb:1476-1477).
     const { name: _n, ifNotExists: _i, internal: _int, ...rest } = options;
     assertValidKeys(rest, [
       "unique",
