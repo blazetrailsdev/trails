@@ -202,11 +202,12 @@ function monNum(str: string): number {
  *
  * A signed year is never completable (`date_parse.c:172-181`, `:250-251`), so
  * `"-08-07-02"` is year -8 rather than 1992.
+ *
+ * Each token is read from its first sign or digit (`date_parse.c:167-169`,
+ * `:204-206`, `:226-228`), so the apostrophe `parse_vms` captures is skipped —
+ * and, being outside the digit span, does not count towards the width either.
  */
 function s3e(y: string | null, m: string, d: string | null): DateParts {
-  // `date_parse.c:167-169`, `:204-206`, `:226-228`: each token is read from its
-  // first sign or digit, so the apostrophe `parse_vms` captures is skipped —
-  // and, being outside the digit span, does not count towards the width either.
   if (y !== null) y = y.replace(/^'/, "");
   if (d !== null) d = d.replace(/^'/, "");
   if (y === null && d !== null && d.length > 2) {
@@ -947,8 +948,11 @@ export class Date {
    * and only ever turns false, so an absent one is `comp`, and the year is
    * completed only within `0..99` (`date_parse.c:2267-2287`).
    *
-   * @missingRailsCall `date_zone_to_diff` (`date_parse.c:416-559`) is not
-   * ported, so the `:offset` a `:zone` also sets is missing
+   * @missingRailsCall `parse_frag` (`date_parse.c:2021-2052`) is not ported:
+   * its pattern is anchored to the whole string, so it reads the leftover
+   * Ruby's `subx` leaves behind, which the ported sub-parsers do not produce.
+   * Neither is `date_zone_to_diff` (`date_parse.c:416-559`), so the `:offset`
+   * a `:zone` also sets is missing
    * from both of its call sites — the tail of `date__parse` itself
    * (`date_parse.c:2290-2294`) and the bracketed zone of `parse_ddd_cb`
    * (`date_parse.c:1934-1960`). It reads a zone-name table `::Date` has no use
