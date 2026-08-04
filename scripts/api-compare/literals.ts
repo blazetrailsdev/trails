@@ -49,17 +49,18 @@ export type LiteralVerdict = "match" | "mismatch" | "skip";
 /** Compare two literals. "skip" when either side is non-literal (`expr`), or
  *  when exactly one side is `nil`: Rails uses `nil` as a sentinel and computes
  *  the committed value in the body (`validate_each(..., precision: nil)`), so it
- *  has no value to compare. `nil`↔`nil` (incl. TS undefined/null) still matches. */
+ *  has no value to compare. `nil`↔`nil` (incl. TS undefined/null) still matches.
+ *
+ *  A Ruby Symbol is a JS string, and CLAUDE.md ("Symbols vs strings") keeps the
+ *  leading colon where a method's control flow turns on Symbol-vs-String —
+ *  `I18n::Backend::Base#localize`'s `format = :default` ports as `":default"`.
+ *  Nothing in the manifest says which arm a given default is, so both spellings
+ *  of `:x` — `"x"` and `":x"` — are the same value here. */
 export function compareLiteral(ruby: LiteralValue, ts: LiteralValue): LiteralVerdict {
   const r = normalizeLiteral(ruby);
   const t = normalizeLiteral(ts);
   if (r === null || t === null) return "skip";
   if ((r === "nil") !== (t === "nil")) return "skip";
-  // A Ruby Symbol is a JS string, and CLAUDE.md ("Symbols vs strings") keeps the
-  // leading colon where a method's control flow turns on Symbol-vs-String
-  // (`I18n::Backend::Base#localize`'s `format = :default` → `":default"`).
-  // Nothing in the manifest says which arm a given default is, so both spellings
-  // of `:x` — `"x"` and `":x"` — are the same value to the comparator.
   if (ruby.kind === "symbol" && t === `str::${canonString(String(ruby.value ?? ""))}`)
     return "match";
   return r === t ? "match" : "mismatch";
