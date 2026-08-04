@@ -41,6 +41,9 @@ describe("operatorSpelling", () => {
     expect(operatorSpelling(pool, "[]")).toEqual(["get"]);
     expect(operatorSpelling(pool, "[]=")).toEqual(["set"]);
     expect(operatorSpelling("ActiveRecord::Result", "[]")).toEqual(["at"]);
+    const attributeMethods = "ActiveRecord::AttributeMethods";
+    expect(operatorSpelling(attributeMethods, "[]")).toEqual(["get"]);
+    expect(operatorSpelling(attributeMethods, "[]=")).toEqual(["set"]);
   });
 
   it("resolves every Arel::Math operator to its named mixin spelling", () => {
@@ -57,8 +60,6 @@ describe("operatorSpelling", () => {
   });
 
   it("leaves module operators with no TS counterpart unmapped", () => {
-    expect(operatorSpelling("ActiveRecord::AttributeMethods", "[]")).toBeUndefined();
-    expect(operatorSpelling("ActiveRecord::AttributeMethods", "[]=")).toBeUndefined();
     expect(operatorSpelling("ActiveRecord::Delegation", "[]")).toBeUndefined();
     expect(operatorSpelling("ActiveRecord::Delegation", "+")).toBeUndefined();
     expect(operatorSpelling("ActiveSupport::CompareWithRange", "===")).toBeUndefined();
