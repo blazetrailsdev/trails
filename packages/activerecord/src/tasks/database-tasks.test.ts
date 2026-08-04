@@ -218,17 +218,12 @@ describe("DatabaseTasksRegisterTask", () => {
 describe("DatabaseTasksDumpSchemaCacheTest", () => {
   fixtures([]);
 
-  let originalSchema: string | undefined;
   let originalDbDir: string;
 
   beforeEach(() => {
-    originalSchema = process.env.SCHEMA;
     originalDbDir = DatabaseTasks.dbDir;
-    delete process.env.SCHEMA;
   });
   afterEach(() => {
-    if (originalSchema === undefined) delete process.env.SCHEMA;
-    else process.env.SCHEMA = originalSchema;
     DatabaseTasks.dbDir = originalDbDir;
   });
 
@@ -257,25 +252,43 @@ describe("DatabaseTasksDumpSchemaCacheTest", () => {
       fs.rmSync(tmp, { recursive: true, force: true });
     }
   });
+  // Rails asserts `schema_cache.yml`; trails' HashConfig#defaultSchemaCachePath
+  // writes `.json` because dumpSchemaCache produces JSON, not YAML.
   it("cache dump default filename", () => {
-    expect(DatabaseTasks.dumpSchemaFilename()).toBe("db/schema.ts");
+    const config = new HashConfig("development", "primary", {});
+
+    DatabaseTasks.dbDir = "db";
+    expect(DatabaseTasks.cacheDumpFilename(config)).toBe("db/schema_cache.json");
   });
   it("cache dump default filename with custom db dir", () => {
-    DatabaseTasks.dbDir = "custom_db";
-    expect(DatabaseTasks.dumpSchemaFilename()).toBe("custom_db/schema.ts");
+    const config = new HashConfig("development", "primary", {});
+
+    DatabaseTasks.dbDir = "my_db";
+    expect(DatabaseTasks.cacheDumpFilename(config)).toBe("my_db/schema_cache.json");
   });
   it("cache dump alternate filename", () => {
-    process.env.SCHEMA = "alt_schema.rb";
-    expect(DatabaseTasks.dumpSchemaFilename()).toBe("alt_schema.rb");
+    const config = new HashConfig("development", "alternate", {});
+
+    DatabaseTasks.dbDir = "db";
+    expect(DatabaseTasks.cacheDumpFilename(config)).toBe("db/alternate_schema_cache.json");
   });
   it("cache dump filename with path from db config", () => {
-    const config = new HashConfig("development", "alternate", {});
-    expect(DatabaseTasks.dumpSchemaFilename(config)).toBe("db/alternate_schema.ts");
+    const config = new HashConfig("development", "primary", {
+      schemaCachePath: "tmp/something.yml",
+    });
+
+    DatabaseTasks.dbDir = "db";
+    expect(DatabaseTasks.cacheDumpFilename(config)).toBe("tmp/something.yml");
   });
   it("cache dump filename with path from the argument has precedence", () => {
-    process.env.SCHEMA = "override.rb";
-    const config = new HashConfig("development", "primary", {});
-    expect(DatabaseTasks.dumpSchemaFilename(config)).toBe("override.rb");
+    const config = new HashConfig("development", "primary", {
+      schemaCachePath: "tmp/something.yml",
+    });
+
+    DatabaseTasks.dbDir = "db";
+    expect(DatabaseTasks.cacheDumpFilename(config, { schemaCachePath: "tmp/another.yml" })).toBe(
+      "tmp/another.yml",
+    );
   });
 });
 

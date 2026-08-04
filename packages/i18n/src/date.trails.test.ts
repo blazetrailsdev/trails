@@ -5,7 +5,7 @@
 
 import { Temporal } from "@js-temporal/polyfill";
 import { describe, it, expect, vi } from "vitest";
-import { ArgumentError, Date as RubyDate, DateTime as RubyDateTime } from "./date.js";
+import { ArgumentError, Date as RubyDate, DateTime as RubyDateTime, Rational } from "./date.js";
 import { Time as RubyTime } from "./time.js";
 
 describe("Date", () => {
@@ -190,6 +190,30 @@ describe("Date", () => {
     expect(RubyDate.parse("080702").year).toBe(2008);
     expect(RubyDate.parse("690702").year).toBe(1969);
     expect(RubyDate.parse("080702", false).year).toBe(8);
+  });
+
+  it("sets :wday from the day name it strips, as parse_day_cb does", () => {
+    expect(RubyDate._parse("Wed, 2 Jul 2008")).toEqual({ wday: 3, year: 2008, mon: 7, mday: 2 });
+    expect(RubyDate._parse("Wednesday, July 2, 2008")).toEqual({
+      wday: 3,
+      year: 2008,
+      mon: 7,
+      mday: 2,
+    });
+    expect(RubyDate._parse("sat 2008-07-02")).toEqual({ wday: 6, year: 2008, mon: 7, mday: 2 });
+    expect(RubyDate._parse("Wed")).toEqual({ wday: 3 });
+  });
+
+  it("answers a Rational offset for a fraction past two places, as date_zone_to_diff does", () => {
+    for (const [zone, s] of [
+      ["+9.5555", "171999/5"],
+      ["-9.5555", "-171999/5"],
+      ["+9.12345678", "102638889/3125"],
+    ] as const) {
+      const offset = RubyDate._parse(`2008-07-02 10:30:00 ${zone}`)?.offset;
+      expect(offset).toBeInstanceOf(Rational);
+      expect(String(offset)).toBe(s);
+    }
   });
 
   it("answers the offset a zone names, as date_zone_to_diff does", () => {
