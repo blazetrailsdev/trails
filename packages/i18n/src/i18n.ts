@@ -339,7 +339,9 @@ export function withLocale<T>(tmpLocale: Locale | false | null | undefined, bloc
 function normalizeKey(key: unknown, separator: string): TranslationKey[] {
   if (Array.isArray(key)) return key.flatMap((k) => normalizeKey(k, separator));
   if (key === null || key === undefined) return [];
-  if (typeof key === "symbol") key = Symbol.keyFor(key) ?? key.description;
+  // Ruby `key.to_s`, where a Symbol key is a JS string carrying its leading
+  // colon (`":other.key"`) and `to_s` drops it.
+  if (typeof key === "string" && key.startsWith(":")) key = key.slice(1);
   const keys = String(key)
     .split(separator)
     .filter((k) => k !== "");

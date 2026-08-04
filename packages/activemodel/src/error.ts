@@ -1,5 +1,5 @@
 import { humanize, deepDup } from "@blazetrails/activesupport";
-import { MissingTranslation, catchException, type TranslateKey } from "@blazetrails/i18n";
+import { MissingTranslation, catchException } from "@blazetrails/i18n";
 import { I18n } from "./i18n.js";
 
 /** The model instance that owns this error. Rails tests pass null for base-only errors. */
@@ -102,28 +102,22 @@ export class Error {
       const namespace = parts.length > 0 ? parts.join("/") : undefined;
       const attributesScope = `${baseClass.i18nScope}.errors.models`;
 
-      // Ruby Symbol default = "look this key up"; the backend spells that arm as
-      // a real JS symbol (story `i18n-symbol-values-are-colon-strings`).
       if (namespace) {
         defaults = baseClass.lookupAncestors!().flatMap((klass) => [
-          Symbol.for(
-            `${attributesScope}.${klass.modelName!.i18nKey}/${namespace}.attributes.${attributeName}.format`,
-          ),
-          Symbol.for(`${attributesScope}.${klass.modelName!.i18nKey}/${namespace}.format`),
+          `:${attributesScope}.${klass.modelName!.i18nKey}/${namespace}.attributes.${attributeName}.format`,
+          `:${attributesScope}.${klass.modelName!.i18nKey}/${namespace}.format`,
         ]);
       } else {
         defaults = baseClass.lookupAncestors!().flatMap((klass) => [
-          Symbol.for(
-            `${attributesScope}.${klass.modelName!.i18nKey}.attributes.${attributeName}.format`,
-          ),
-          Symbol.for(`${attributesScope}.${klass.modelName!.i18nKey}.format`),
+          `:${attributesScope}.${klass.modelName!.i18nKey}.attributes.${attributeName}.format`,
+          `:${attributesScope}.${klass.modelName!.i18nKey}.format`,
         ]);
       }
     } else {
       defaults = [];
     }
 
-    defaults.push(Symbol.for("errors.format"));
+    defaults.push(":errors.format");
     defaults.push("%{attribute} %{message}");
 
     let attrName: string = humanize(attribute.replace(/\.base$/, "").replace(/\./g, "_"));
@@ -131,7 +125,7 @@ export class Error {
       ? baseClass.humanAttributeName(attribute, { default: attrName, base })
       : attrName;
 
-    return I18n.t(defaults.shift() as TranslateKey, {
+    return I18n.t((defaults.shift() as string).slice(1), {
       default: defaults,
       attribute: attrName,
       message,
@@ -192,16 +186,14 @@ export class Error {
       attribute = attribute.replace(/\[\d+\]/g, "");
 
       defaults = baseClass.lookupAncestors!().flatMap((klass) => [
-        Symbol.for(
-          `${i18nScope}.errors.models.${klass.modelName!.i18nKey}.attributes.${attribute}.${type}`,
-        ),
-        Symbol.for(`${i18nScope}.errors.models.${klass.modelName!.i18nKey}.${type}`),
+        `:${i18nScope}.errors.models.${klass.modelName!.i18nKey}.attributes.${attribute}.${type}`,
+        `:${i18nScope}.errors.models.${klass.modelName!.i18nKey}.${type}`,
       ]);
-      defaults.push(Symbol.for(`${i18nScope}.errors.messages.${type}`));
+      defaults.push(`:${i18nScope}.errors.messages.${type}`);
 
       if (options.message == null || options.message === false) {
         const translation = catchException(() =>
-          I18n.translate(defaults[0] as TranslateKey, {
+          I18n.translate((defaults[0] as string).slice(1), {
             ...options,
             default: defaults.slice(1),
             throw: true,
@@ -215,17 +207,17 @@ export class Error {
       defaults = [];
     }
 
-    defaults.push(Symbol.for(`errors.attributes.${attribute}.${type}`));
-    defaults.push(Symbol.for(`errors.messages.${type}`));
+    defaults.push(`:errors.attributes.${attribute}.${type}`);
+    defaults.push(`:errors.messages.${type}`);
 
-    const key = defaults.shift();
+    const key = (defaults.shift() as string).slice(1);
     if (options.message != null && options.message !== false) {
       defaults = [options.message];
       delete options.message;
     }
     options.default = defaults;
 
-    return I18n.translate(key as TranslateKey, options) as string;
+    return I18n.translate(key, options) as string;
   }
 
   constructor(

@@ -9,7 +9,6 @@
  * express the contract here as an interface for the static side.
  */
 import { humanize, isPresent } from "@blazetrails/activesupport";
-import type { TranslateKey } from "@blazetrails/i18n";
 import { I18n } from "./i18n.js";
 import type { ModelName } from "./naming.js";
 
@@ -85,26 +84,24 @@ export function humanAttributeName(
       separator = ".";
     }
 
-    defaults = this.lookupAncestors().map((klass) =>
-      // Ruby Symbol default = "look this key up"; the backend spells that arm as
-      // a real JS symbol (story `i18n-symbol-values-are-colon-strings`).
-      Symbol.for(`${this.i18nScope}.attributes.${klass.modelName.i18nKey}${separator}${key}`),
+    defaults = this.lookupAncestors().map(
+      (klass) => `:${this.i18nScope}.attributes.${klass.modelName.i18nKey}${separator}${key}`,
     );
-    defaults.push(Symbol.for(`${this.i18nScope}.attributes.${key}`));
-    defaults.push(Symbol.for(`attributes.${key}`));
+    defaults.push(`:${this.i18nScope}.attributes.${key}`);
+    defaults.push(`:attributes.${key}`);
   } else {
-    defaults = this.lookupAncestors().map((klass) =>
-      Symbol.for(`${this.i18nScope}.attributes.${klass.modelName.i18nKey}.${attribute}`),
+    defaults = this.lookupAncestors().map(
+      (klass) => `:${this.i18nScope}.attributes.${klass.modelName.i18nKey}.${attribute}`,
     );
   }
 
   const raiseOnMissing = options.raise ?? _raiseOnMissingTranslations;
 
-  defaults.push(Symbol.for(`attributes.${attribute}`));
+  defaults.push(`:attributes.${attribute}`);
   if (options.default != null) defaults.push(options.default);
   if (!raiseOnMissing) defaults.push(MISSING_TRANSLATION);
 
-  let translation = I18n.translate(defaults.shift() as TranslateKey, {
+  let translation = I18n.translate((defaults.shift() as string).slice(1), {
     count: 1,
     raise: raiseOnMissing,
     ...options,
