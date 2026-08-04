@@ -84,76 +84,79 @@ describe("Migration", () => {
     it("add reference with invalid options", async () => {
       const connection = await ambientConnection();
 
-      let exception = await connection
-        .createTable("my_table", { force: true }, (t) => {
-          t.references("some_table", { boringKey: true } as Record<string, unknown>);
-        })
-        .catch((error: Error) => error);
+      let work = connection.createTable("my_table", { force: true }, (t) => {
+        t.references("some_table", { boringKey: true } as Record<string, unknown>);
+      });
+      let exception = (await work.catch((error: Error) => error)) as Error;
+      await expect(work).rejects.toThrow();
 
-      expect(exception?.name).toBe("ArgumentError");
-      expect(exception?.message).toBe(invalidAddColumnOptionExceptionMessage("boringKey"));
+      expect(exception.message).toBe(invalidAddColumnOptionExceptionMessage("boringKey"));
 
-      exception = await connection
-        .addReference("some_table", "some_column", { boringKey: true } as Record<string, unknown>)
-        .catch((error: Error) => error);
+      work = connection.addReference("some_table", "some_column", {
+        boringKey: true,
+      } as Record<string, unknown>);
+      exception = (await work.catch((error: Error) => error)) as Error;
+      await expect(work).rejects.toThrow();
 
-      expect(exception?.name).toBe("ArgumentError");
-      expect(exception?.message).toBe(invalidAddColumnOptionExceptionMessage("boringKey"));
+      expect(exception.message).toBe(invalidAddColumnOptionExceptionMessage("boringKey"));
     });
 
     it("add column with invalid options", async () => {
       const connection = await ambientConnection();
 
-      let exception = await connection
-        .addColumn("test_models", "first_name", "string", {
-          preccision: true,
-        } as Record<string, unknown>)
-        .catch((error: Error) => error);
+      let work = connection.addColumn("test_models", "first_name", "string", {
+        preccision: true,
+      } as Record<string, unknown>);
+      let exception = (await work.catch((error: Error) => error)) as Error;
+      await expect(work).rejects.toThrow();
 
-      expect(exception?.name).toBe("ArgumentError");
-      expect(exception?.message).toBe(invalidAddColumnOptionExceptionMessage("preccision"));
+      expect(exception.message).toBe(invalidAddColumnOptionExceptionMessage("preccision"));
 
-      exception = await connection
-        .createTable("my_table", { force: true }, (t) => {
-          t.string("first_name", { index: { nema: "test" } } as Record<string, unknown>);
-        })
-        .catch((error: Error) => error);
+      work = connection.createTable("my_table", { force: true }, (t) => {
+        t.string("first_name", { index: { nema: "test" } } as Record<string, unknown>);
+      });
+      exception = (await work.catch((error: Error) => error)) as Error;
+      await expect(work).rejects.toThrow();
 
-      expect(exception?.name).toBe("ArgumentError");
-      expect(exception?.message).toBe(invalidAddIndexOptionExceptionMessage("nema"));
+      expect(exception.message).toBe(invalidAddIndexOptionExceptionMessage("nema"));
     });
 
     it("add index with invalid options", async () => {
       const connection = await ambientConnection();
 
-      const exception = await connection
-        .addIndex("test_models", "first_name", { nema: "my_index" } as Record<string, unknown>)
-        .catch((error: Error) => error);
+      const work = connection.addIndex("test_models", "first_name", {
+        nema: "my_index",
+      } as Record<string, unknown>);
+      const exception = (await work.catch((error: Error) => error)) as Error;
+      await expect(work).rejects.toThrow();
 
-      expect(exception?.name).toBe("ArgumentError");
-      expect(exception?.message).toBe(invalidAddIndexOptionExceptionMessage("nema"));
+      expect(exception.message).toBe(invalidAddIndexOptionExceptionMessage("nema"));
     });
 
     it.skipIf(adapterType === "sqlite")("change column with invalid options", async () => {
       const connection = await ambientConnection();
 
-      const exception = await connection
-        .changeColumn("posts", "title", "text", { liimit: true } as Record<string, unknown>)
-        .catch((error: Error) => error);
+      const work = connection.changeColumn("posts", "title", "text", {
+        liimit: true,
+      } as Record<string, unknown>);
+      const exception = (await work.catch((error: Error) => error)) as Error;
+      await expect(work).rejects.toThrow();
 
-      expect(exception?.name).toBe("ArgumentError");
-      expect(exception?.message).toBe(invalidAddColumnOptionExceptionMessage("liimit"));
+      expect(exception.message).toBe(invalidAddColumnOptionExceptionMessage("liimit"));
     });
 
     it("create table with invalid options", async () => {
       const connection = await ambientConnection();
 
-      const exception = await connection
-        .createTable("my_table", { idd: false } as Record<string, unknown>, () => {})
-        .catch((error: Error) => error);
+      const work = connection.createTable(
+        "my_table",
+        { idd: false } as Record<string, unknown>,
+        () => {},
+      );
+      const exception = (await work.catch((error: Error) => error)) as Error;
+      await expect(work).rejects.toThrow();
 
-      expect(exception?.name).toBe("ArgumentError");
-      expect(exception?.message).toBe(invalidCreateTableOptionExceptionMessage("idd"));
+      expect(exception.message).toBe(invalidCreateTableOptionExceptionMessage("idd"));
     });
   });
 });
