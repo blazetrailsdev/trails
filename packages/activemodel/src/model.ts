@@ -1668,7 +1668,7 @@ export class Model {
 
   // -- Attribute access --
 
-  readAttribute(name: string): unknown {
+  readAttribute(name: string, block?: (name: string) => unknown): unknown {
     // Rails resolves alias_attribute names in `read_attribute`
     // (attribute_aliases[name] || name, read.rb:31-34); `_read_attribute`
     // skips it. Resolved against the loaded attribute set so the trails
@@ -1678,7 +1678,7 @@ export class Model {
       return null;
     }
     this._accessedFields.add(resolved);
-    return this._attributes.fetchValue(resolved) ?? null;
+    return this._attributes.fetchValue(resolved, block) ?? null;
   }
 
   /**

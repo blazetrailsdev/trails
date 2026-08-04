@@ -9,12 +9,14 @@ export type { ModelWithErrors } from "./validations.js";
 export { Validator, EachValidator, BlockValidator, shouldValidate } from "./validator.js";
 export {
   MissingAttributeError,
+  missingAttribute,
   AttributeMethodPattern,
   resolveAliasName,
   resolveAliasNameIn,
   AttrNames,
   defineDirtyAttributeMethods,
 } from "./attribute-methods.js";
+export type { InstanceHost } from "./attribute-methods.js";
 export { ForbiddenAttributesError } from "./forbidden-attributes-protection.js";
 export {
   assignAttributes,

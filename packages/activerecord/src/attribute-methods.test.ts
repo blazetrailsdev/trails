@@ -310,19 +310,24 @@ describe("AttributeMethodsTest", () => {
     const result = await Post.select("title").first();
     // Mirrors: computer[:developer] → assert_raises MissingAttributeError.
     // Rails `[]` reads via `_read_attribute(attr) { |n| missing_attribute(n) }`;
-    // trails has no `[]` operator, so its equivalent is the generated
-    // per-attribute getter, which supplies the same raising block.
+    // The generated per-attribute getter supplies the same raising block.
     // `legacy_comments_count` is a real canonical `posts` column that wasn't in
     // the SELECT, so reading it raises.
     expect(() => (result as any).legacy_comments_count).toThrow(
       "missing attribute 'legacy_comments_count'",
     );
+    // Same read through `[]` itself (attribute_methods.rb:415).
+    expect(() => (result as any).get("legacy_comments_count")).toThrow(
+      "missing attribute 'legacy_comments_count'",
+    );
     // Mirrors: assert_nothing_raised { computer[:extendedWarranty] }
     // (block-less `read_attribute` never raises; a selected column reads back).
     expect(result?.readAttribute("title")).toBe("sel_test");
+    expect((result as any).get("title")).toBe("sel_test");
     // Mirrors: assert_nothing_raised { computer[:no_column_exists] } — an unknown
     // name returns nil even through the raising getter/`[]` block.
     expect(result?.readAttribute("no_column_exists")).toBeNull();
+    expect((result as any).get("no_column_exists")).toBeNull();
   });
   it("user-defined time attribute predicate", async () => {
     const { Post } = makeModel();
@@ -806,12 +811,18 @@ describe("AttributeMethodsTest", () => {
     const t = new Topic({});
     t.writeAttribute("title", "Written");
     expect(t.readAttribute("title")).toBe("Written");
+
+    // Mirrors: topic[:title] = "Still another topic: part 2"
+    t.set("title", "Written: part 2");
+    expect(t.title).toBe("Written: part 2");
   });
 
   it("read_attribute", async () => {
     const Topic = makeTopic();
     const t = new Topic({ title: "Read" });
     expect(t.readAttribute("title")).toBe("Read");
+    // Mirrors: assert_equal "Don't change the topic", topic["title"]
+    expect(t.get("title")).toBe("Read");
   });
 
   it("read_attribute when false", async () => {
@@ -1321,6 +1332,9 @@ describe("AttributeMethodsTest", () => {
     expect(t.readAttribute("title")).toBe("known");
     // Mirrors: topic[:no_column_exists] = "Hello!" → assert_raises MissingAttributeError
     expect(() => t.writeAttribute("no_column_exists", "Hello!")).toThrow(
+      "can't write unknown attribute `no_column_exists`",
+    );
+    expect(() => t.set("no_column_exists", "Hello!")).toThrow(
       "can't write unknown attribute `no_column_exists`",
     );
   });
