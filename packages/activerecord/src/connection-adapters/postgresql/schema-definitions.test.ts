@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach, beforeAll, afterAll } from "vitest";
 import { SchemaDumper } from "../../schema-dumper.js";
+import { ColumnDefinition } from "../abstract/schema-definitions.js";
 import {
   ExclusionConstraintDefinition,
   UniqueConstraintDefinition,
@@ -477,6 +478,7 @@ describe("TableDefinition#toSql", () => {
       quoteTableName: (s: string) => `"${s}"`,
       quoteDefaultExpression: (v: unknown) => ` DEFAULT ${String(v)}`,
       typeToSql: (type: string) => type, // returns lowercase verbatim (mirrors PG native types)
+      validColumnDefinitionOptions: () => ColumnDefinition.OPTION_NAMES,
     };
     const td = new TableDefinition("widgets", { adapter: stubAdapter as any });
     td.cidr("net");

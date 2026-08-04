@@ -1132,13 +1132,16 @@ export class TableDefinition {
     if (index !== -1) this.columns.splice(index, 1);
   }
 
-  /** @internal */
+  /**
+   * The cast covers a typing gap only: `SchemaStatements` is mixed into the
+   * adapters at runtime, so the reader answering `ColumnDefinition::OPTION_NAMES`
+   * (schema_statements.rb:1584-1586) is not on the static {@link SchemaQuoter}
+   * surface `_adapter` is declared with.
+   * @internal
+   */
   protected validColumnDefinitionOptions(): string[] {
-    const conn = this._adapter as Partial<{ validColumnDefinitionOptions(): string[] }>;
-    // A bare-{@link SchemaQuoter} host (the MySQL schema quoter) is not a
-    // connection and has no reader; the adapter's answer is
-    // `ColumnDefinition::OPTION_NAMES` (schema_statements.rb:1584-1586).
-    return conn.validColumnDefinitionOptions?.() ?? ColumnDefinition.OPTION_NAMES;
+    const conn = this._adapter as unknown as { validColumnDefinitionOptions(): string[] };
+    return conn.validColumnDefinitionOptions();
   }
 
   /** @internal */

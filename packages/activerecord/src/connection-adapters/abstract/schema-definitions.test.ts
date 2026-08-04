@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  ColumnDefinition,
   IndexDefinition,
   ForeignKeyDefinition,
   ReferenceDefinition,
@@ -487,6 +488,7 @@ describe("TableDefinition id hash form", () => {
     quoteColumnName: (s: string) => `\`${s}\``,
     quoteTableName: (s: string) => `\`${s}\``,
     quoteDefaultExpression: (_v: unknown) => "",
+    validColumnDefinitionOptions: () => ColumnDefinition.OPTION_NAMES,
   };
 
   it("extracts type and merges remaining keys as pk column options", () => {

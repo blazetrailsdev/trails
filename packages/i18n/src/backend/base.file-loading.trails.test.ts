@@ -67,8 +67,6 @@ describe("I18n::Backend::Base file loading", () => {
   });
 
   it("refuses a lazy lookup while I18n.load_path is unread", () => {
-    // In-place, the way the gem documents it (config.rb:125) — an assignment
-    // goes through `load_path=`, which reloads the backend and so reads.
     config().loadPath.push(`${localesDir()}/never-preloaded.yml`);
     expect(() => backend.translate("en", "foo.bar")).toThrow(
       /await I18n.preloadTranslationFiles\(\)/,
