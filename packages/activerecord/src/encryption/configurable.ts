@@ -58,10 +58,11 @@ export class Configurable {
     [key: string]: unknown;
   }): void {
     const config = this.config;
-    if (options.primaryKey !== undefined) config.primaryKey = options.primaryKey;
-    if (options.deterministicKey !== undefined) config.deterministicKey = options.deterministicKey;
-    if (options.keyDerivationSalt !== undefined)
-      config.keyDerivationSalt = options.keyDerivationSalt;
+    // configurable.rb:21-23 assigns all three unconditionally, so a `configure`
+    // call that omits one clears the credential it had rather than keeping it.
+    config.primaryKey = options.primaryKey;
+    config.deterministicKey = options.deterministicKey;
+    config.keyDerivationSalt = options.keyDerivationSalt;
 
     const properties: Record<string, unknown> = { ...options };
     // Set the default for this property here instead of in +Config#set_defaults+ as this needs
