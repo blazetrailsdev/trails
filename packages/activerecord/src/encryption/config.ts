@@ -4,6 +4,8 @@
  * Mirrors: ActiveRecord::Encryption::Config
  */
 
+import { presence } from "@blazetrails/activesupport";
+
 import { ConfigError } from "./errors.js";
 import type { SchemeOptions } from "./scheme.js";
 
@@ -43,6 +45,25 @@ export class Config {
     for (const props of schemes) {
       this.addPreviousScheme(props);
     }
+  }
+
+  /**
+   * The stored `keyDerivationSalt`, or `undefined` when it is blank — Rails'
+   * `has_key_derivation_salt?` returns `.presence`, not a boolean
+   * (encryption/config.rb:35-39).
+   */
+  hasKeyDerivationSalt(): string | undefined {
+    return presence(this.keyDerivationSalt);
+  }
+
+  /** Rails `has_primary_key?` (encryption/config.rb:35-39). */
+  hasPrimaryKey(): string | string[] | undefined {
+    return presence(this.primaryKey);
+  }
+
+  /** Rails `has_deterministic_key?` (encryption/config.rb:35-39). */
+  hasDeterministicKey(): string | undefined {
+    return presence(this.deterministicKey);
   }
 
   get(key: string): unknown {

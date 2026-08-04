@@ -65,9 +65,9 @@ export function globalPreviousSchemesFor(scheme: Scheme): Scheme[] {
   // Mirrors Rails' support_sha1_for_non_deterministic_encryption= setter:
   // builds the SHA1 DerivedSecretKeyProvider lazily here (not in Config) to
   // avoid a config → key-generator → configurable → config circular import.
-  if (config.supportSha1ForNonDeterministicEncryption && config.primaryKey) {
+  if (config.supportSha1ForNonDeterministicEncryption && config.hasPrimaryKey()) {
     allSchemeOptions.push({
-      keyProvider: getSha1KeyProvider(config.primaryKey, config.keyDerivationSalt),
+      keyProvider: getSha1KeyProvider(config.primaryKey!, config.keyDerivationSalt),
     });
   }
 

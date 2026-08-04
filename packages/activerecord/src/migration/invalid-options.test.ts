@@ -1,13 +1,50 @@
 /**
  * Port of `ActiveRecord::Migration::InvalidOptionsTest`
  * (vendor/rails/activerecord/test/cases/migration/invalid_options_test.rb).
- *
- * Only the `create_table` arm is ported here; the `add_column`,
- * `add_reference` and `add_index` arms land with their own convergence.
  */
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { ambientConnection } from "../support/rocket-tables.js";
 import { currentAdapter } from "../support/adapter-helper.js";
+import { adapterType } from "../test-adapter.js";
+
+function invalidAddColumnOptionExceptionMessage(key: string): string {
+  const defaultKeys = [
+    ":limit",
+    ":precision",
+    ":scale",
+    ":default",
+    ":null",
+    ":collation",
+    ":comment",
+    ":primaryKey",
+    ":ifExists",
+    ":ifNotExists",
+  ];
+
+  if (currentAdapter("Mysql2Adapter", "TrilogyAdapter")) {
+    defaultKeys.push(
+      ":autoIncrement",
+      ":charset",
+      ":as",
+      ":size",
+      ":unsigned",
+      ":first",
+      ":after",
+      ":type",
+      ":stored",
+    );
+  } else if (currentAdapter("PostgreSQLAdapter")) {
+    defaultKeys.push(":array", ":using", ":castAs", ":as", ":type", ":enumType", ":stored");
+  } else if (currentAdapter("SQLite3Adapter")) {
+    defaultKeys.push(":as", ":type", ":stored");
+  }
+
+  return `Unknown key: :${key}. Valid keys are: ${defaultKeys.join(", ")}`;
+}
+
+function invalidAddIndexOptionExceptionMessage(key: string): string {
+  return `Unknown key: :${key}. Valid keys are: :unique, :length, :order, :opclass, :where, :type, :using, :comment, :algorithm, :include, :nullsNotDistinct`;
+}
 
 function invalidCreateTableOptionExceptionMessage(key: string): string {
   const tableKeys = [
@@ -30,28 +67,105 @@ function invalidCreateTableOptionExceptionMessage(key: string): string {
   return `Unknown key: :${key}. Valid keys are: ${[...tableKeys, ...primaryKeys].join(", ")}`;
 }
 
+/** The `assert_raises(ArgumentError)` of the Rails arms, as a rejection. */
+async function assertRaisesArgumentError(work: Promise<unknown>): Promise<Error> {
+  let exception: Error | undefined;
+  await expect(
+    work.catch((error: Error) => {
+      exception = error;
+      throw error;
+    }),
+  ).rejects.toThrow();
+  expect(exception?.name).toBe("ArgumentError");
+  return exception!;
+}
+
 describe("Migration", () => {
+  beforeEach(async () => {
+    const connection = await ambientConnection();
+    await connection.createTable("test_models", { force: true }, (t) => {
+      t.timestamps({ null: true });
+    });
+  });
+
   afterEach(async () => {
     const connection = await ambientConnection();
-    await connection.dropTable("my_table", { ifExists: true });
+    await connection.dropTable("my_table", "test_models", { ifExists: true });
   });
 
   describe("InvalidOptionsTest", () => {
+    it("add reference with invalid options", async () => {
+      const connection = await ambientConnection();
+
+      let exception = await assertRaisesArgumentError(
+        connection.createTable("my_table", { force: true }, (t) => {
+          t.references("some_table", { boringKey: true } as Record<string, unknown>);
+        }),
+      );
+
+      expect(exception.message).toBe(invalidAddColumnOptionExceptionMessage("boringKey"));
+
+      exception = await assertRaisesArgumentError(
+        connection.addReference("some_table", "some_column", {
+          boringKey: true,
+        } as Record<string, unknown>),
+      );
+
+      expect(exception.message).toBe(invalidAddColumnOptionExceptionMessage("boringKey"));
+    });
+
+    it("add column with invalid options", async () => {
+      const connection = await ambientConnection();
+
+      let exception = await assertRaisesArgumentError(
+        connection.addColumn("test_models", "first_name", "string", {
+          preccision: true,
+        } as Record<string, unknown>),
+      );
+
+      expect(exception.message).toBe(invalidAddColumnOptionExceptionMessage("preccision"));
+
+      exception = await assertRaisesArgumentError(
+        connection.createTable("my_table", { force: true }, (t) => {
+          t.string("first_name", { index: { nema: "test" } } as Record<string, unknown>);
+        }),
+      );
+
+      expect(exception.message).toBe(invalidAddIndexOptionExceptionMessage("nema"));
+    });
+
+    it("add index with invalid options", async () => {
+      const connection = await ambientConnection();
+
+      const exception = await assertRaisesArgumentError(
+        connection.addIndex("test_models", "first_name", {
+          nema: "my_index",
+        } as Record<string, unknown>),
+      );
+
+      expect(exception.message).toBe(invalidAddIndexOptionExceptionMessage("nema"));
+    });
+
+    it.skipIf(adapterType === "sqlite")("change column with invalid options", async () => {
+      const connection = await ambientConnection();
+
+      const exception = await assertRaisesArgumentError(
+        connection.changeColumn("posts", "title", "text", {
+          liimit: true,
+        } as Record<string, unknown>),
+      );
+
+      expect(exception.message).toBe(invalidAddColumnOptionExceptionMessage("liimit"));
+    });
+
     it("create table with invalid options", async () => {
       const connection = await ambientConnection();
 
-      let exception: Error | undefined;
-      await expect(
-        connection
-          .createTable("my_table", { idd: false } as Record<string, unknown>, () => {})
-          .catch((error: Error) => {
-            exception = error;
-            throw error;
-          }),
-      ).rejects.toThrow();
+      const exception = await assertRaisesArgumentError(
+        connection.createTable("my_table", { idd: false } as Record<string, unknown>, () => {}),
+      );
 
-      expect(exception?.name).toBe("ArgumentError");
-      expect(exception?.message).toBe(invalidCreateTableOptionExceptionMessage("idd"));
+      expect(exception.message).toBe(invalidCreateTableOptionExceptionMessage("idd"));
     });
   });
 });

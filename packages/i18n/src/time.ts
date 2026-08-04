@@ -115,6 +115,35 @@ const ZONE_ABBREVIATIONS: Record<string, readonly [string] | readonly [string, s
 };
 
 /**
+ * `timeZoneId` with any tzdata link name resolved to the zone `Intl` treats as
+ * primary — `Intl` and `Temporal` disagree on which spelling that is (ICU
+ * answers `Asia/Calcutta` for `Asia/Kolkata` and `Europe/Kiev` for
+ * `Europe/Kyiv`, while `Temporal` keeps whatever it was given), so this is only
+ * a stable join key when both sides of a lookup go through it.
+ */
+function primaryZoneId(timeZoneId: string): string {
+  return new Intl.DateTimeFormat("en-US", { timeZone: timeZoneId }).resolvedOptions().timeZone;
+}
+
+let abbreviationsByPrimaryZoneId: Map<string, readonly [string] | readonly [string, string]>;
+
+/**
+ * `ZONE_ABBREVIATIONS[timeZoneId]`, also answering for the zone's tzdata link
+ * names: a host whose local zone is reported as `Asia/Calcutta` rather than
+ * `Asia/Kolkata` is the same zone and gets the same `"IST"`.
+ */
+function zoneAbbreviations(
+  timeZoneId: string,
+): readonly [string] | readonly [string, string] | undefined {
+  const abbreviations = ZONE_ABBREVIATIONS[timeZoneId];
+  if (abbreviations !== undefined) return abbreviations;
+  abbreviationsByPrimaryZoneId ??= new Map(
+    Object.entries(ZONE_ABBREVIATIONS).map(([id, entry]) => [primaryZoneId(id), entry]),
+  );
+  return abbreviationsByPrimaryZoneId.get(primaryZoneId(timeZoneId));
+}
+
+/**
  * The abbreviation tzdata gives `zoned`'s zone at `zoned`'s instant, which is
  * what MRI's `Time#zone` and `%Z` answer. Zones outside `ZONE_ABBREVIATIONS`
  * either have an English abbreviation `Intl` knows (`"EST"`) or carry tzdata's
@@ -122,7 +151,7 @@ const ZONE_ABBREVIATIONS: Record<string, readonly [string] | readonly [string, s
  * neither of them `Intl`'s `"GMT+4"`.
  */
 function tzdataAbbreviation(zoned: Temporal.ZonedDateTime): string {
-  const abbreviations = ZONE_ABBREVIATIONS[zoned.timeZoneId];
+  const abbreviations = zoneAbbreviations(zoned.timeZoneId);
   if (abbreviations !== undefined) {
     if (abbreviations.length === 1) return abbreviations[0];
     const january = Number(zoned.with({ month: 1, day: 1 }).offsetNanoseconds);

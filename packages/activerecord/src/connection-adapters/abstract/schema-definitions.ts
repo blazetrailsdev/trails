@@ -1146,6 +1146,7 @@ export class TableDefinition {
       assertValidKeys(rest, this.validColumnDefinitionOptions());
     }
 
+
     return new ColumnDefinition(name, type, options);
   }
 
@@ -1480,6 +1481,30 @@ export class TableDefinition {
   }
 
   index(columns: string[], options: AddIndexOptions = {}): this {
+    // Rails stores the options untouched (`indexes << [column_name, options]`)
+    // and asserts them later, in `add_index_options` (schema_statements.rb:1477).
+    // This port builds the IndexDefinition here, which is where an unknown key
+    // would otherwise be dropped, so the assert has to happen here too.
+    const {
+      name: _n,
+      ifNotExists: _i,
+      internal: _int,
+      ...rest
+    } = options as AddIndexOptions & { internal?: boolean };
+    assertValidKeys(rest, [
+      "unique",
+      "length",
+      "order",
+      "opclass",
+      "where",
+      "type",
+      "using",
+      "comment",
+      "algorithm",
+      "include",
+      "nullsNotDistinct",
+    ]);
+
     const name = options.name ?? `index_${this.tableName}_on_${columns.join("_and_")}`;
     this.indexes.push(
       new IndexDefinition(this.tableName, name, options.unique ?? false, columns, {

@@ -105,6 +105,14 @@ describe("Time", () => {
       expect(new Time(2008, 7, 1, 6, 0, 0).zone).toBe("IST");
     });
 
+    it("Time#zone answers the abbreviation through a tzdata link name", () => {
+      inZone("Asia/Calcutta");
+      expect(new Time(2008, 3, 1, 6, 0, 0).zone).toBe("IST");
+      inZone("Australia/Canberra");
+      expect(new Time(2008, 1, 1, 6, 0, 0).zone).toBe("AEDT");
+      expect(new Time(2008, 7, 1, 6, 0, 0).zone).toBe("AEST");
+    });
+
     it("Time#zone spells an untabulated zone's abbreviation as tzdata does", () => {
       inZone("Asia/Dubai");
       expect(new Time(2008, 3, 1, 6, 0, 0).zone).toBe("+04");
