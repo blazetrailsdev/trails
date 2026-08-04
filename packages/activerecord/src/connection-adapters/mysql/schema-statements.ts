@@ -138,6 +138,15 @@ export class MysqlSchemaStatements extends BaseSchemaStatements {
     const quoted = tableNames.map((n) => this.quoteTableName(n)).join(", ");
     await this.execute(`DROP${temporary} TABLE${ifExists} ${quoted}${cascade}`);
   }
+
+  /**
+   * Mirrors: MySQL::SchemaStatements#valid_primary_key_options
+   *
+   * @internal
+   */
+  override validPrimaryKeyOptions(): string[] {
+    return [...super.validPrimaryKeyOptions(), "unsigned", "autoIncrement"];
+  }
 }
 
 /** @internal Host surface for the introspection-scope helpers: quoting dispatches
@@ -182,11 +191,6 @@ export async function defaultRowFormat(this: RowFormatHost): Promise<string | nu
   }
 
   return this._defaultRowFormat ?? null;
-}
-
-/** @internal */
-export function validPrimaryKeyOptions(): string[] {
-  return ["limit", "default", "precision", "unsigned", "autoIncrement"];
 }
 
 /**

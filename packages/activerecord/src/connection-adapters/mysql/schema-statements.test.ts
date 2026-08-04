@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
+import { MysqlSchemaStatements } from "./schema-statements.js";
 import { schemaConn } from "../../support/schema-conn.js";
 import {
   isRowFormatDynamicByDefault,
   defaultRowFormat,
-  validPrimaryKeyOptions,
   createTableDefinition,
   defaultType,
   newColumnFromField,
@@ -90,7 +90,9 @@ describe("MySQL::SchemaStatements", () => {
   });
 
   it("validPrimaryKeyOptions includes unsigned and autoIncrement", () => {
-    const opts = validPrimaryKeyOptions();
+    const opts = MysqlSchemaStatements.prototype.validPrimaryKeyOptions.call(
+      Object.create(MysqlSchemaStatements.prototype) as MysqlSchemaStatements,
+    );
     expect(opts).toContain("unsigned");
     expect(opts).toContain("autoIncrement");
     expect(opts).toContain("limit");
