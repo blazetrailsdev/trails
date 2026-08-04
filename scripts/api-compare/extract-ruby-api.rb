@@ -171,6 +171,47 @@ def ident_name(node)
   nil
 end
 
+# Names a body tests against the Symbol class — `Symbol === format`,
+# `format.is_a?(Symbol)`, `format.kind_of?(Symbol)`. A Symbol default on such a
+# param is a discriminator: the Symbol branch is control flow the port has to
+# keep, so its TS spelling must carry the leading colon (CLAUDE.md, "Symbols vs
+# strings"). See I18n::Backend::Base#localize, i18n/lib/i18n/backend/base.rb:83.
+def symbol_discriminated_names(node, names = [])
+  return names unless node.is_a?(Array)
+  if node[0] == :binary && node[2] == :=== && const_name(node[1]) == "Symbol"
+    nm = node[3].is_a?(Array) && node[3][0] == :var_ref ? ident_name(node[3][1]) : nil
+    names << nm if nm
+  end
+  if node[0] == :method_add_arg
+    call = node[1]
+    meth = call.is_a?(Array) && call[0] == :call ? ident_name(call[3]) : nil
+    if %w[is_a? kind_of?].include?(meth) && arg_const_names(node[2]).include?("Symbol")
+      recv = call[1]
+      nm = recv.is_a?(Array) && recv[0] == :var_ref ? ident_name(recv[1]) : nil
+      names << nm if nm
+    end
+  end
+  node.each { |child| symbol_discriminated_names(child, names) }
+  names
+end
+
+def mark_symbol_discriminated(params, body)
+  names = symbol_discriminated_names(body)
+  return if names.empty?
+  params.each { |p| p[:symbolDiscriminated] = true if names.include?(p[:name]) }
+end
+
+def const_name(node)
+  return nil unless node.is_a?(Array)
+  return node[1] if node[0] == :@const
+  node[0] == :var_ref ? const_name(node[1]) : nil
+end
+
+def arg_const_names(args)
+  return [] unless args.is_a?(Array)
+  args.flat_map { |child| child.is_a?(Array) ? [const_name(child)] + arg_const_names(child) : [] }.compact
+end
+
 # Normalized body digest for source-hash pinning (RFC 0025). Hashes the def
 # BODY sexp only (not the surrounding class), with scanner-token positions
 # stripped, so the digest is insensitive to indentation, blank lines, and
@@ -590,6 +631,7 @@ class ApiExtractor
     return unless target
 
     body = node[3]
+    mark_symbol_discriminated(params, body)
     dep_info = detect_deps(body)
     calls, weak_calls = collect_method_calls(body)
 
@@ -643,6 +685,7 @@ class ApiExtractor
     return unless target
 
     body = node[5]
+    mark_symbol_discriminated(params, body)
     dep_info = detect_deps(body)
     calls, weak_calls = collect_method_calls(body)
 

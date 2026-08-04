@@ -1,7 +1,8 @@
 // Literal parameter-default + constant comparison for api:compare (advisory —
 // never changes parity). Diffs a default/constant's literal *value* after
 // normalization absorbing cross-language noise (numeric underscores,
-// symbol→string, nil↔null/undefined, escapes); a non-literal is uncomparable.
+// symbol→string in either spelling, nil↔null/undefined, escapes); a non-literal
+// is uncomparable.
 
 import type { LiteralValue, ParamInfo } from "./types.js";
 import { snakeToCamel } from "./conventions.js";
@@ -48,12 +49,29 @@ export type LiteralVerdict = "match" | "mismatch" | "skip";
 /** Compare two literals. "skip" when either side is non-literal (`expr`), or
  *  when exactly one side is `nil`: Rails uses `nil` as a sentinel and computes
  *  the committed value in the body (`validate_each(..., precision: nil)`), so it
- *  has no value to compare. `nil`↔`nil` (incl. TS undefined/null) still matches. */
-export function compareLiteral(ruby: LiteralValue, ts: LiteralValue): LiteralVerdict {
+ *  has no value to compare. `nil`↔`nil` (incl. TS undefined/null) still matches.
+ *
+ *  A Ruby Symbol is a JS string, and CLAUDE.md ("Symbols vs strings") keeps the
+ *  leading colon only where a method's control flow turns on Symbol-vs-String.
+ *  `symbolDiscriminated` carries that distinction from the Ruby body: when the
+ *  body branches on `Symbol === x` (`I18n::Backend::Base#localize`,
+ *  i18n/lib/i18n/backend/base.rb:83) only `":x"` matches, and a bare `"x"` — a
+ *  port that bypassed the branch — is a mismatch. Elsewhere a Symbol is just a
+ *  name (`timestamp_column = :updated_at`) and the bare spelling is correct. */
+export function compareLiteral(
+  ruby: LiteralValue,
+  ts: LiteralValue,
+  symbolDiscriminated = false,
+): LiteralVerdict {
   const r = normalizeLiteral(ruby);
   const t = normalizeLiteral(ts);
   if (r === null || t === null) return "skip";
   if ((r === "nil") !== (t === "nil")) return "skip";
+  if (ruby.kind === "symbol") {
+    const colon = `str::${canonString(String(ruby.value ?? ""))}`;
+    if (symbolDiscriminated) return t === colon ? "match" : "mismatch";
+    return t === colon || t === r ? "match" : "mismatch";
+  }
   return r === t ? "match" : "mismatch";
 }
 
@@ -61,8 +79,9 @@ export function compareLiteral(ruby: LiteralValue, ts: LiteralValue): LiteralVer
 export function displayLiteral(lit: LiteralValue): string {
   switch (lit.kind) {
     case "string":
-    case "symbol":
       return JSON.stringify(lit.value ?? "");
+    case "symbol":
+      return `:${lit.value ?? ""}`;
     case "nil":
       return "nil";
     case "array":
@@ -99,7 +118,7 @@ export function compareDefaults(
     if (!rp.literal) continue;
     const tl = tsByName.get(snakeToCamel(rp.name)) ?? tsByName.get(rp.name);
     if (!tl) continue;
-    const verdict = compareLiteral(rp.literal, tl);
+    const verdict = compareLiteral(rp.literal, tl, rp.symbolDiscriminated);
     if (verdict === "skip") {
       result.skipped++;
       continue;

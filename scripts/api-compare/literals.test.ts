@@ -29,10 +29,39 @@ describe("compareLiteral", () => {
     );
   });
 
-  it("matches a Ruby symbol against a TS string of the same value", () => {
-    expect(compareLiteral({ kind: "symbol", value: "asc" }, { kind: "string", value: "asc" })).toBe(
-      "match",
-    );
+  it("matches a Ruby symbol against a TS string carrying its leading colon", () => {
+    expect(
+      compareLiteral({ kind: "symbol", value: "default" }, { kind: "string", value: ":default" }),
+    ).toBe("match");
+  });
+
+  it("matches a Ruby symbol against a bare TS string of the same value", () => {
+    expect(
+      compareLiteral({ kind: "symbol", value: "default" }, { kind: "string", value: "default" }),
+    ).toBe("match");
+  });
+
+  it("flags a Ruby symbol against a TS string naming a different value", () => {
+    expect(
+      compareLiteral({ kind: "symbol", value: "default" }, { kind: "string", value: ":short" }),
+    ).toBe("mismatch");
+  });
+
+  it("matches a Symbol-discriminated default only against the colon-prefixed string", () => {
+    expect(
+      compareLiteral(
+        { kind: "symbol", value: "default" },
+        { kind: "string", value: ":default" },
+        true,
+      ),
+    ).toBe("match");
+    expect(
+      compareLiteral(
+        { kind: "symbol", value: "default" },
+        { kind: "string", value: "default" },
+        true,
+      ),
+    ).toBe("mismatch");
   });
 
   it("treats nil as equal to both null and undefined (TS undefined → nil)", () => {
@@ -93,7 +122,17 @@ describe("compareDefaults", () => {
       [ruby("order", { kind: "symbol", value: "asc" })],
       [[tsp("order", { kind: "string", value: "desc" })]],
     );
-    expect(res.mismatches).toEqual([{ name: "order", rubyValue: '"asc"', tsValue: '"desc"' }]);
+    expect(res.mismatches).toEqual([{ name: "order", rubyValue: ":asc", tsValue: '"desc"' }]);
+  });
+
+  it("flags a Symbol-discriminated default ported as a bare string", () => {
+    const res = compareDefaults(
+      [{ ...ruby("format", { kind: "symbol", value: "default" }), symbolDiscriminated: true }],
+      [[tsp("format", { kind: "string", value: "default" })]],
+    );
+    expect(res.mismatches).toEqual([
+      { name: "format", rubyValue: ":default", tsValue: '"default"' },
+    ]);
   });
 
   it("excludes a non-literal default (skipped, not mismatched)", () => {
