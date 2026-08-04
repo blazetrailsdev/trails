@@ -57,6 +57,10 @@ export function inGroupsOf<T>(
 /**
  * Convert an array to a sentence string.
  * `["a", "b", "c"]` → `"a, b, and c"`
+ *
+ * Ruby's `default_connectors.merge!(options)` overrides on key presence; a TS
+ * caller forwarding an absent option passes `undefined`, which must not
+ * override, so the merge skips `undefined` values.
  */
 export function toSentence(
   array: string[],
@@ -80,8 +84,6 @@ export function toSentence(
     Object.assign(defaultConnectors, camelizeI18nKeys(i18nConnectors));
   }
   for (const [k, v] of Object.entries(options)) {
-    // Ruby's `merge!(options)` overrides on key presence; a TS caller forwarding
-    // an absent option passes `undefined`, which must not override.
     if (v !== undefined) defaultConnectors[k] = v as string;
   }
   const { wordsConnector, twoWordsConnector, lastWordConnector } = defaultConnectors;
