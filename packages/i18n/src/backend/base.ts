@@ -163,7 +163,7 @@ function isSymbol(value: unknown): value is string {
   return typeof value === "string" && value.startsWith(":");
 }
 
-/** Ruby `#to_s`, for the values a format argument can hold. */
+/** Ruby `#to_s` (i18n gem `lib/i18n.rb:447`), for the values a format argument can hold. */
 function toS(subject: unknown): string {
   if (subject == null) return "";
   return isSymbol(subject) ? subject.slice(1) : String(subject);
