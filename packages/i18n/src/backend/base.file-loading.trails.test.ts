@@ -33,17 +33,17 @@ describe("I18n::Backend::Base file loading", () => {
     config().enforceAvailableLocales = false;
   });
 
-  it("load_yaml delegates to a subclass override of load_yml", () => {
+  it("load_yaml takes a filename and keeps the load_yml entry it aliased", () => {
     class Overriding extends Simple {
-      protected override loadYml(filename: string): [unknown, boolean] {
-        return [{ en: { overridden: filename } }, false];
+      protected override loadYml(_filename: string): [unknown, boolean] {
+        return [{ en: { overridden: true } }, false];
       }
     }
     const filename = `${localesDir()}/en.yml`;
     const overriding = new Overriding() as unknown as {
       loadYaml(f: string): [unknown, boolean];
     };
-    expect(overriding.loadYaml(filename)).toEqual([{ en: { overridden: filename } }, false]);
+    expect(overriding.loadYaml(filename)).toEqual([{ en: { foo: { bar: "baz" } } }, false]);
   });
 
   it("raises InvalidLocaleData given a YAML file that is empty", () => {
