@@ -31,9 +31,6 @@ function invalidCreateTableOptionExceptionMessage(key: string): string {
 }
 
 describe("Migration", () => {
-  // Rails leaves no teardown here — the raise means `my_table` is never
-  // created — but a leaked table would collide with sibling files under
-  // parallel forks, so drop it defensively.
   afterEach(async () => {
     const connection = await ambientConnection();
     await connection.dropTable("my_table", { ifExists: true });
@@ -43,12 +40,15 @@ describe("Migration", () => {
     it("create table with invalid options", async () => {
       const connection = await ambientConnection();
 
-      const exception = await connection
-        .createTable("my_table", { idd: false } as Record<string, unknown>, () => {})
-        .then(
-          () => null,
-          (error: Error) => error,
-        );
+      let exception: Error | undefined;
+      await expect(
+        connection
+          .createTable("my_table", { idd: false } as Record<string, unknown>, () => {})
+          .catch((error: Error) => {
+            exception = error;
+            throw error;
+          }),
+      ).rejects.toThrow();
 
       expect(exception?.name).toBe("ArgumentError");
       expect(exception?.message).toBe(invalidCreateTableOptionExceptionMessage("idd"));

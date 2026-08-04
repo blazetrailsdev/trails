@@ -145,7 +145,7 @@ export class MysqlSchemaStatements extends BaseSchemaStatements {
    * @internal
    */
   override validPrimaryKeyOptions(): string[] {
-    return validPrimaryKeyOptions.call(this);
+    return [...super.validPrimaryKeyOptions(), "unsigned", "autoIncrement"];
   }
 }
 
@@ -191,15 +191,6 @@ export async function defaultRowFormat(this: RowFormatHost): Promise<string | nu
   }
 
   return this._defaultRowFormat ?? null;
-}
-
-/** @internal */
-export function validPrimaryKeyOptions(this: unknown): string[] {
-  return [
-    ...BaseSchemaStatements.prototype.validPrimaryKeyOptions.call(this),
-    "unsigned",
-    "autoIncrement",
-  ];
 }
 
 /**
