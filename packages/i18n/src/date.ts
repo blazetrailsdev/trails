@@ -742,7 +742,7 @@ function parseDayCb(m: RegExpExecArray, hash: DateParts): number {
  * the string — but it is one Ruby records, as `:wday`.
  */
 function parseDay(str: string, hash: DateParts): string {
-  const m = new RegExp(`\\b(${ABBR_DAYS})[^-\\d\\s]*`, "i").exec(str);
+  const m = new RegExp(`\\b(${ABBR_DAYS})[^-/\\d\\s]*`, "i").exec(str);
   if (m === null) return str;
   parseDayCb(m, hash);
   return subx(str, m);
