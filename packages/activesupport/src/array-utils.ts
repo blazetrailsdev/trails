@@ -2,6 +2,7 @@
  * Array utilities mirroring Rails ActiveSupport array extensions.
  */
 
+import { assertValidKeys } from "./hash-utils.js";
 import { I18n } from "./i18n.js";
 
 /**
@@ -71,6 +72,8 @@ export function toSentence(
     locale?: string | false;
   } = {},
 ): string {
+  assertValidKeys(options, ["wordsConnector", "twoWordsConnector", "lastWordConnector", "locale"]);
+
   const defaultConnectors: Record<string, string> = {
     wordsConnector: ", ",
     twoWordsConnector: " and ",
