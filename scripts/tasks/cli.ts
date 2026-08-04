@@ -1074,7 +1074,9 @@ export function extractMarkdownlintViolations(stderr: string): string[] {
 // retry) only after two consecutive lost races.
 export function commitAndPush(opts: {
   message: string;
-  fileToStage: string;
+  // One path, or several when a variadic verb (`claim a b c`) mutates N story
+  // files in the single commit this call produces.
+  fileToStage: string | string[];
   mutator: () => void;
   raceMessage: string;
   raceExitCode: number;
@@ -1221,7 +1223,12 @@ export function commitAndPush(opts: {
         // ends up with two dirs for one RFC. When it repaired anything the
         // mutation's own path may have moved, so stage everything.
         const reconciled = reconcileDuplicateRfcDirs(cwd);
-        git(["add", reconciled ? "-A" : opts.fileToStage], { cwd });
+        const toStage = reconciled
+          ? ["-A"]
+          : Array.isArray(opts.fileToStage)
+            ? opts.fileToStage
+            : [opts.fileToStage];
+        git(["add", ...toStage], { cwd });
         // RFCS_NO_AUTOPUSH: the tasks repo's .husky/post-commit hook otherwise
         // pushes `main` after this commit, racing the explicit push below (and,
         // back when the CLI still hard-reset the checkout on reads, occasionally
@@ -1332,24 +1339,62 @@ export function commitAndPush(opts: {
   if (earlyExit) process.exit(earlyExit.code);
 }
 
+// A story id paired with the file the index resolved it to. The variadic
+// status verbs carry the id alongside the path so per-id outcome lines can name
+// the story without a second index lookup.
+export interface StoryTarget {
+  id: string;
+  file: string;
+}
+
+// Resolve ids to story files. `"all"` (claim, release, and every single-id verb)
+// aborts the whole command on an unknown id — an atomic verb must write nothing
+// when part of its input is bogus. `"each"` (done, in-progress) drops the
+// unknown ids and proceeds with the rest, so one bad id in a bundle doesn't
+// strand the others behind a merged PR; it still exits 1 when nothing resolves.
+function storyTargets(index: Index, ids: string[], mode: "all" | "each"): StoryTarget[] {
+  if (mode === "all") return ids.map((id) => ({ id, file: storyFilePath(index, id) }));
+  const targets: StoryTarget[] = [];
+  for (const id of ids) {
+    const entry = index.stories.find((s) => s.id === id);
+    if (!entry) {
+      console.error(`error: story "${id}" not found in index — skipping`);
+      continue;
+    }
+    targets.push({ id, file: join(TASKS_DIR, entry.file_path) });
+  }
+  if (targets.length === 0) {
+    // loadIndex() may have rebuilt and so dirtied the generated index files;
+    // restore them before this error exit (matches storyFilePath).
+    restoreGeneratedFiles(TASKS_DIR);
+    console.error(`error: no known stories among: ${ids.join(", ")}`);
+    process.exit(1);
+  }
+  return targets;
+}
+
 // All mutations enter via `flip`. The order — `inGitTasks()` then
 // `loadIndex()` — matters: if `$TASKS_DIR` is missing or not a git repo,
 // the friendly error from `inGitTasks` fires before `loadIndex` would try
 // to `execFileSync` the tasks-side build script in a non-repo directory.
-// `mutate` receives the resolved file path so command implementations
-// don't repeat the lookup.
+// `mutate` receives the resolved targets so command implementations don't
+// repeat the lookup. It sees ALL of them at once (not one call per id) so an
+// atomic verb can validate the whole batch against the post-pull state before
+// writing anything, and returns the files it actually wrote — only those get
+// their `updated` stamped, so a skipped id contributes no diff.
 function flip(
-  id: string,
+  ids: string[],
   message: string,
   raceMessage: string,
   raceExitCode: number,
-  mutate: (file: string) => void,
+  mutate: (targets: StoryTarget[]) => string[] | void,
+  mode: "all" | "each" = "all",
 ): void {
   inGitTasks();
-  const file = storyFilePath(loadIndex(), id);
+  const targets = storyTargets(loadIndex(), ids, mode);
   commitAndPush({
     message,
-    fileToStage: file,
+    fileToStage: targets.map((t) => t.file),
     raceMessage,
     raceExitCode,
     // Per-worktree checkout: HEAD:main pushes the mutation regardless of
@@ -1358,8 +1403,8 @@ function flip(
     // stale content to origin/main.
     pushRefspec: TASKS_DIR_IS_SYMLINK ? "HEAD:main" : "main",
     mutator: () => {
-      mutate(file);
-      editFrontmatter(file, { updated: today() });
+      const written = mutate(targets) ?? targets.map((t) => t.file);
+      for (const file of written) editFrontmatter(file, { updated: today() });
     },
   });
 }
@@ -1387,11 +1432,42 @@ export function claimState(fileText: string, assignee: string): "available" | "o
   return held === assignee ? "owned" : "taken";
 }
 
-function claim(id: string, assignee: string): void {
-  flip(id, `claim: ${id}`, `lost claim race on ${id} — pick another story`, 3, (file) => {
-    const fm = readFileSync(file, "utf8");
-    const state = claimState(fm, assignee);
-    if (state === "owned") {
+// Partitions a whole `claim` batch by claimState, so the atomicity decision is
+// made once over all ids before any write. Pure (no I/O) and exported so the
+// partial-failure rule — one taken id refuses the entire batch — is unit-
+// testable without a git repo.
+export function claimBatch(
+  texts: { id: string; text: string }[],
+  assignee: string,
+): { available: string[]; owned: string[]; taken: string[] } {
+  const available: string[] = [];
+  const owned: string[] = [];
+  const taken: string[] = [];
+  for (const { id, text } of texts) {
+    const state = claimState(text, assignee);
+    (state === "available" ? available : state === "owned" ? owned : taken).push(id);
+  }
+  return { available, owned, taken };
+}
+
+// `claim` is all-or-nothing across its ids: a bundle worker that claims 3 of 5
+// stories and then aborts leaves the other 2 `claimed` with nobody behind them
+// — invisible to `ready` (not ready) and to the merge sweep (no PR), i.e.
+// silently dropped from the backlog. So the whole batch is validated against the
+// post-pull state before ANY write, and a single taken id refuses the lot.
+function claim(ids: string[], assignee: string): void {
+  const list = ids.join(", ");
+  flip(ids, `claim: ${list}`, `lost claim race on ${list} — pick another story`, 3, (targets) => {
+    const batch = claimBatch(
+      targets.map((t) => ({ id: t.id, text: readFileSync(t.file, "utf8") })),
+      assignee,
+    );
+    if (batch.taken.length > 0) {
+      console.error(`error: ${batch.taken.join(", ")} is already claimed`);
+      throw new MutatorEarlyExit(2);
+    }
+    const available = targets.filter((t) => batch.available.includes(t.id));
+    if (available.length === 0) {
       // Idempotent re-claim. `claim` is run more than once for the same story
       // across separate invocations — e.g. a prior `claim` pushed the claim to
       // main but then errored client-side (commitAndPush exits 1 on a non-race
@@ -1403,42 +1479,123 @@ function claim(id: string, assignee: string): void {
       // push never landed and the claim is still null or held by someone else.)
       // This runs inside commitAndPush's lock; throw the early-exit sentinel
       // (not process.exit, which would skip the lock's `finally` and leak it).
-      console.log(`claimed ${id} as ${assignee}`);
+      for (const id of ids) console.log(`claimed ${id} as ${assignee}`);
       throw new MutatorEarlyExit(0);
     }
-    if (state === "taken") {
-      console.error(`error: ${id} is already claimed`);
-      throw new MutatorEarlyExit(2);
-    }
     const now = new Date().toISOString().replace(/\.\d+Z$/, "Z");
-    editFrontmatter(file, {
-      status: "claimed",
-      claim: JSON.stringify(now),
-      assignee: JSON.stringify(assignee),
-    });
+    for (const s of available) {
+      editFrontmatter(s.file, {
+        status: "claimed",
+        claim: JSON.stringify(now),
+        assignee: JSON.stringify(assignee),
+      });
+    }
+    return available.map((s) => s.file);
   });
-  console.log(`claimed ${id} as ${assignee}`);
+  for (const id of ids) console.log(`claimed ${id} as ${assignee}`);
 }
 
 const RETRY_MSG = (id: string) => `failed to update ${id} after retry — pull manually and retry`;
 
-function inProgress(id: string, pr: number): void {
-  flip(id, `in-progress: ${id} #${pr}`, RETRY_MSG(id), 4, (file) =>
-    editFrontmatter(file, { status: "in-progress", pr: String(pr) }),
-  );
-  console.log(`marked ${id} in-progress #${pr}`);
+// Decides, per id, whether a `done`/`in-progress` flip has anything to write.
+// Pure so the per-id resilience branch is unit-testable without a git repo:
+// re-marking a story that already carries this exact status+pr is a skip, not a
+// failure — a bundle whose PR merged mid-way must be completable by re-running
+// the same command, and one already-done id must not abort the rest.
+export function trackingSkip(fileText: string, status: StoryStatus, pr: number): boolean {
+  return statusOf(fileText) === status && prOf(fileText) === pr;
 }
 
-function done(id: string, pr: number): void {
-  flip(id, `done: ${id} #${pr}`, RETRY_MSG(id), 4, (file) =>
-    editFrontmatter(file, { status: "done", pr: String(pr) }),
+// Shared body of `in-progress` and `done`: both stamp status + pr on each id
+// independently (best-effort), reporting one outcome line per story.
+function markTracking(ids: string[], status: "in-progress" | "done", pr: number): void {
+  const list = ids.join(", ");
+  flip(
+    ids,
+    `${status}: ${list} #${pr}`,
+    RETRY_MSG(list),
+    4,
+    (targets) => {
+      const written: string[] = [];
+      for (const { id, file } of targets) {
+        if (trackingSkip(readFileSync(file, "utf8"), status, pr)) {
+          console.log(`${id} already ${status} #${pr} — skipping`);
+          continue;
+        }
+        editFrontmatter(file, { status, pr: String(pr) });
+        written.push(file);
+      }
+      if (written.length === 0) {
+        // Every id was already in the target state; there is nothing to commit
+        // and `git commit` would error "nothing to commit". Bail cleanly (the
+        // sentinel, not process.exit, so commitAndPush releases its lock).
+        throw new MutatorEarlyExit(0);
+      }
+      return written;
+    },
+    "each",
   );
-  console.log(`marked ${id} done #${pr}`);
+  for (const id of ids) console.log(`marked ${id} ${status} #${pr}`);
 }
+
+function inProgress(ids: string[], pr: number): void {
+  markTracking(ids, "in-progress", pr);
+}
+
+function done(ids: string[], pr: number): void {
+  markTracking(ids, "done", pr);
+}
+
+// The inverse of `claim`: hand claimed stories back to the ready queue. Without
+// it, recovering a stranded claim (a worker that died between claims, or lost
+// the race partway through a bundle) meant hand-editing frontmatter —
+// `STATUS_TRANSITIONS.claimed` is empty, so `status-set` refuses it.
+function release(ids: string[]): void {
+  const list = ids.join(", ");
+  flip(ids, `release: ${list}`, RETRY_MSG(list), 4, (targets) => {
+    const states = targets.map((t) => ({ ...t, from: statusOf(readFileSync(t.file, "utf8")) }));
+    const illegal = states.filter((s) => releaseError(s.from) !== null);
+    if (illegal.length > 0) {
+      for (const s of illegal) console.error(`error: ${releaseError(s.from)} for ${s.id}`);
+      throw new MutatorEarlyExit(2);
+    }
+    const claimed = states.filter((s) => s.from === "claimed");
+    if (claimed.length === 0) {
+      for (const s of states) console.log(`${s.id} already ready`);
+      throw new MutatorEarlyExit(0);
+    }
+    for (const s of claimed) editFrontmatter(s.file, RELEASE_EDITS);
+    return claimed.map((s) => s.file);
+  });
+  for (const id of ids) console.log(`released ${id}`);
+}
+
+// Pure guard for `release`, unit-testable without a git repo. Returns null when
+// the id is releasable — `claimed` (the real move) or `ready` (already there,
+// handled by the caller as a clean no-op) — else a rejection reason. An
+// in-progress/done story has a PR behind it, so releasing it would orphan work.
+export function releaseError(from: string | null): string | null {
+  if (from === null) return `cannot read current status`;
+  if (from === "claimed" || from === "ready") return null;
+  return `only a claimed story can be released (status ${from})`;
+}
+
+// Frontmatter edits `release` stamps: back to the ready queue with the claim
+// cleared. `claimState` reads any non-null `claim` as taken, so both keys must
+// go or the readied story would be unclaimable. `pr` is untouched — a claimed
+// story has none.
+export const RELEASE_EDITS: Record<string, string> = {
+  status: "ready",
+  claim: "null",
+  assignee: "null",
+};
 
 function block(id: string, reason: string): void {
-  flip(id, `block: ${id} — ${reason}`, RETRY_MSG(id), 4, (file) =>
-    editFrontmatter(file, { status: "blocked", "blocked-by": JSON.stringify(reason) }),
+  flip([id], `block: ${id} — ${reason}`, RETRY_MSG(id), 4, (targets) =>
+    editFrontmatter(targets[0].file, {
+      status: "blocked",
+      "blocked-by": JSON.stringify(reason),
+    }),
   );
   console.log(`blocked ${id}: ${reason}`);
 }
@@ -1477,7 +1634,8 @@ export function closeEdits(reason: string): Record<string, string> {
 // mutator (post-`git pull`) so a story a concurrent agent just closed (or
 // completed) is never clobbered.
 function close(id: string, reason: string): void {
-  flip(id, `close: ${id} — ${reason}`, RETRY_MSG(id), 4, (file) => {
+  flip([id], `close: ${id} — ${reason}`, RETRY_MSG(id), 4, (targets) => {
+    const file = targets[0].file;
     const from = statusOf(readFileSync(file, "utf8"));
     if (from === "closed") {
       // A concurrent agent already closed it; the pull brought that back.
@@ -1517,7 +1675,8 @@ function setPriority(id: string, priority: number | null): void {
     return;
   }
   const message = priority === null ? `priority clear: ${id}` : `priority ${priority}: ${id}`;
-  flip(id, message, RETRY_MSG(id), 4, (file) => {
+  flip([id], message, RETRY_MSG(id), 4, (targets) => {
+    const file = targets[0].file;
     if (priority === null) removeFrontmatterKey(file, "priority");
     else editFrontmatter(file, { priority: String(priority) });
   });
@@ -1571,6 +1730,20 @@ export function statusOf(fileText: string): string | null {
     return null;
   }
   return typeof fm.status === "string" ? fm.status : null;
+}
+
+// Reads the `pr:` scalar from a story file's frontmatter (null when unset or
+// non-numeric), with the same YAML semantics as statusOf. Used by the
+// done/in-progress skip check to tell "already marked for THIS pr" (a re-run of
+// the same command) from "marked for a different pr" (a real update).
+export function prOf(fileText: string): number | null {
+  let fm: Record<string, unknown>;
+  try {
+    fm = (parseYaml(frontmatterBlock(fileText)) ?? {}) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+  return typeof fm.pr === "number" ? fm.pr : null;
 }
 
 // Pure transition check, unit-testable without a git repo. Returns null when the
@@ -1637,7 +1810,8 @@ function setStatus(id: string, target: StoryStatus): void {
     console.error(`error: ${preError} for ${id}`);
     process.exit(2);
   }
-  flip(id, `status ${target}: ${id}`, RETRY_MSG(id), 4, (file) => {
+  flip([id], `status ${target}: ${id}`, RETRY_MSG(id), 4, (targets) => {
+    const file = targets[0].file;
     const fresh = statusOf(readFileSync(file, "utf8"));
     if (fresh === target) {
       // Concurrent agent already landed this exact move; the pull brought it
@@ -1952,7 +2126,9 @@ function setDeps(id: string, kind: "deps" | "deps-rfc", csv: string): void {
   }
 
   const cmd = kind === "deps" ? "set-deps" : "set-deps-rfc";
-  flip(id, `${cmd}: ${id}`, RETRY_MSG(id), 4, (file) => setFrontmatterList(file, kind, items));
+  flip([id], `${cmd}: ${id}`, RETRY_MSG(id), 4, (targets) =>
+    setFrontmatterList(targets[0].file, kind, items),
+  );
   console.log(`set ${id} ${kind} = [${items.join(", ")}]`);
 }
 
@@ -3199,30 +3375,42 @@ function main(): void {
       );
       break;
     case "claim": {
-      const id = pos[0];
+      const ids = pos;
       const assignee = stringFlag(flags, "assignee");
-      if (!id) usage();
-      claim(id, assignee ?? id);
+      if (ids.length === 0) usage();
+      claim(ids, assignee ?? ids[0]);
+      break;
+    }
+    case "release": {
+      const ids = pos;
+      if (ids.length === 0) usage();
+      release(ids);
       break;
     }
     case "in-progress": {
-      const id = pos[0];
+      const ids = pos;
       const pr = numberFlag(flags, "pr");
-      if (!id || pr === null) usage();
-      inProgress(id, pr);
+      if (ids.length === 0 || pr === null) usage();
+      inProgress(ids, pr);
       break;
     }
     case "done": {
-      const id = pos[0];
+      const ids = pos;
       const pr = numberFlag(flags, "pr");
-      if (!id || pr === null) usage();
+      if (ids.length === 0 || pr === null) usage();
       if (!flags.force) checkPrNotOpen(pr);
       const index = loadIndex();
-      const file = storyFilePath(index, id);
-      checkCheckboxesDone(splitFrontmatter(file).body, flags.force === true);
-      done(id, pr);
-      const entry = index.stories.find((s) => s.id === id);
-      const delta = prLocDelta(pr, entry?.est_loc ?? null);
+      for (const id of ids) {
+        checkCheckboxesDone(splitFrontmatter(storyFilePath(index, id)).body, flags.force === true);
+      }
+      done(ids, pr);
+      // One PR carries the whole bundle, so the estimate it is measured against
+      // is the sum of the stories marked done by this call.
+      const estLoc = ids.reduce<number | null>((sum, id) => {
+        const est = index.stories.find((s) => s.id === id)?.est_loc ?? null;
+        return est === null ? sum : (sum ?? 0) + est;
+      }, null);
+      const delta = prLocDelta(pr, estLoc);
       if (delta) console.log(delta);
       break;
     }
@@ -3386,9 +3574,10 @@ function usage(): never {
   show <id>
   status
 
-  claim <id> [--assignee <name>]
-  in-progress <id> --pr <N>
-  done <id> --pr <N> [--force]
+  claim <id...> [--assignee <name>]            (all-or-nothing across ids: one commit, one lock)
+  release <id...>                              (claimed → ready, clearing the claim; the inverse of claim)
+  in-progress <id...> --pr <N>
+  done <id...> --pr <N> [--force]
   block <id> --reason "<text>"
   close <id> --reason "<text>"                 (terminally close a non-done story: superseded/abandoned/won't-do)
   refine <id> [--pr <N>] [--dir <tasks worktree>] [--force]
