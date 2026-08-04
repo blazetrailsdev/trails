@@ -100,15 +100,15 @@ export class Simple {
   }
 
   /** Clean up translations hash and set initialized to false on reload. */
-  reloadBang(): void {
+  async reloadBang(): Promise<void> {
     this.initializedFlag = false;
     this.translationsStore = undefined;
-    Base.prototype.reloadBang.call(this);
+    await Base.prototype.reloadBang.call(this);
   }
 
-  eagerLoadBang(): void {
+  async eagerLoadBang(): Promise<void> {
     if (!this.initialized()) this.initTranslations();
-    Base.prototype.eagerLoadBang.call(this);
+    await Base.prototype.eagerLoadBang.call(this);
   }
 
   translations({ doInit = false }: { doInit?: boolean } = {}): TranslationData {

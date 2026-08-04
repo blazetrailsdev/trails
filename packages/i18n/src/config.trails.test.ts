@@ -18,7 +18,7 @@ class FakeBackend extends Base {
   availableLocales(): string[] {
     return this.locales;
   }
-  override reloadBang(): void {
+  override async reloadBang(): Promise<void> {
     this.reloaded += 1;
   }
   protected lookup(): unknown {
@@ -116,7 +116,7 @@ describe("Config", () => {
     expect(config.missingInterpolationArgumentHandler("bar", {}, "%{bar}")).toBe("bar is missing");
   });
 
-  it("loadPath defaults to an empty array and reloads the backend when assigned", () => {
+  it("loadPath defaults to an empty array and reloads the backend when assigned", async () => {
     expect(config.loadPath).toEqual([]);
     config.loadPath.push("a.yml");
     expect(new Config().loadPath).toEqual(["a.yml"]);
@@ -124,7 +124,7 @@ describe("Config", () => {
     const backend = new FakeBackend();
     config.backend = backend;
     config.availableLocales = ["en"];
-    config.loadPath = ["b.yml"];
+    await config.setLoadPath(["b.yml"]);
     expect(backend.reloaded).toBe(1);
     expect(config.availableLocalesInitialized).toBe(true);
     expect(config.availableLocalesSet.has("en")).toBe(true);

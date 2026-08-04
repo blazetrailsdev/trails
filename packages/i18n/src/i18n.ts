@@ -166,8 +166,8 @@ export function loadPath(): string[] {
   return config().loadPath;
 }
 
-export function setLoadPath(value: string[]): void {
-  config().loadPath = value;
+export async function setLoadPath(value: string[]): Promise<void> {
+  await config().setLoadPath(value);
 }
 
 export function enforceAvailableLocales(): boolean {
@@ -183,32 +183,29 @@ export function setEnforceAvailableLocales(value: boolean): void {
  * Rails development environment. Backends can implement whatever strategy
  * is useful.
  *
- * The gem's `reload!` is synchronous because `Simple#reload!` only clears
- * `@initialized` / `@translations` (simple.rb:57-62) and the re-read of
- * `I18n.load_path` happens later, inside the next lazy `init_translations`
- * (simple.rb:83-86). Here that read is a Promise, so it is pulled forward to
- * this one seam and awaited: `reload!` is the only method that becomes async,
- * and every ported body below it — including the four lazy call sites — stays
- * verbatim and synchronous.
- *
- * It precedes `backend.reload!` because that is not always lazy: `Base#reload!`
- * re-runs `eager_load!` on an eager-loaded backend (base.rb:101), which reaches
- * `init_translations` / `load_translations` during the reload itself
- * (simple.rb:83, base.rb:14).
+ * Async because the re-read of `I18n.load_path` that the gem does lazily inside
+ * `init_translations` (simple.rb:83-86, base.rb:246) is a Promise here, and so
+ * sits inside `Backend::Base#reload!` (base.rb:101-103). The four lazy call
+ * sites below it stay verbatim and synchronous.
  */
 export async function reloadBang(): Promise<void> {
   config().clearAvailableLocalesSet();
-  await reloadTranslationFiles();
-  config().backend.reloadBang();
+  await config().backend.reloadBang();
 }
 
 /**
  * Tells the backend to load translations now. Used in situations like the
  * Rails production environment. Backends can implement whatever strategy
  * is useful.
+ *
+ * The re-read of `I18n.load_path` precedes it for the reason given on
+ * `reload!` above: `eager_load!` reaches `init_translations` /
+ * `load_translations` (simple.rb:64, base.rb:14) straight away, so it does the
+ * same async init the boot preload does rather than depending on one.
  */
-export function eagerLoadBang(): void {
-  config().backend.eagerLoadBang();
+export async function eagerLoadBang(): Promise<void> {
+  await reloadTranslationFiles();
+  await config().backend.eagerLoadBang();
 }
 
 /**

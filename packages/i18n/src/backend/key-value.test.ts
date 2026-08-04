@@ -113,9 +113,9 @@ describe("I18nBackendKeyValueTest", () => {
     expect(() => t("foo", { raise: true } as TranslateOptions)).toThrow(MissingTranslationData);
   });
 
-  it("initialized? checks that a store is available", () => {
+  it("initialized? checks that a store is available", async () => {
     setupBackend();
-    backend.reloadBang();
+    await backend.reloadBang();
     expect(backend.initialized()).toBe(true);
   });
 

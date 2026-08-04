@@ -139,22 +139,22 @@ describe("I18nBackendChainTest", () => {
     expect((config().backend as Chain).initialized()).toBe(true);
   });
 
-  it("store should call initialize on all backends and return false if one not initialized", () => {
-    first.reloadBang();
+  it("store should call initialize on all backends and return false if one not initialized", async () => {
+    await first.reloadBang();
     send(second, "initTranslations");
     expect((config().backend as Chain).initialized()).toBe(false);
   });
 
-  it("should reload all backends", () => {
+  it("should reload all backends", async () => {
     send(first, "initTranslations");
     send(second, "initTranslations");
-    config().backend.reloadBang();
+    await config().backend.reloadBang();
     expect(first.initialized()).toBe(false);
     expect(second.initialized()).toBe(false);
   });
 
-  it("should eager load all backends", () => {
-    config().backend.eagerLoadBang();
+  it("should eager load all backends", async () => {
+    await config().backend.eagerLoadBang();
     expect(first.initialized()).toBe(true);
     expect(second.initialized()).toBe(true);
   });

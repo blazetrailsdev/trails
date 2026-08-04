@@ -140,8 +140,8 @@ describe("I18nBackendSimpleTest", () => {
     expect(() => backend.loadTranslations(`${localesDir()}/en.js`)).not.toThrow();
   });
 
-  it("simple load_translations: given no argument, it uses I18n.load_path", () => {
-    config().loadPath = [`${localesDir()}/en.yml`];
+  it("simple load_translations: given no argument, it uses I18n.load_path", async () => {
+    await config().setLoadPath([`${localesDir()}/en.yml`]);
     backend.loadTranslations();
     expect(translations()).toEqual({ en: { foo: { bar: "baz" } } });
   });
@@ -218,13 +218,13 @@ describe("I18nBackendSimpleTest", () => {
     expect(t(1)).toBe("foo");
   });
 
-  it("simple store_translations: store translations doesn't deep symbolize keys if skip_symbolize_keys is true", () => {
+  it("simple store_translations: store translations doesn't deep symbolize keys if skip_symbolize_keys is true", async () => {
     const data = { foo: { bar: "barfr", baz: "bazfr" } };
 
     storeTranslations("fr", data);
     expect(translations()["fr"]).toEqual({ foo: { bar: "barfr", baz: "bazfr" } });
 
-    backend.reloadBang();
+    await backend.reloadBang();
 
     backend.storeTranslations("fr", data, { skipSymbolizeKeys: true });
     // JS object keys are already strings, so the only observable difference is
@@ -235,26 +235,26 @@ describe("I18nBackendSimpleTest", () => {
 
   // reloading translations
 
-  it("simple reload_translations: unloads translations", () => {
+  it("simple reload_translations: unloads translations", async () => {
     storeTranslations("en", { foo: "bar" });
-    backend.reloadBang();
+    await backend.reloadBang();
     expect(translations()).toEqual({});
   });
 
-  it("simple reload_translations: uninitializes the backend", () => {
-    backend.reloadBang();
+  it("simple reload_translations: uninitializes the backend", async () => {
+    await backend.reloadBang();
     expect(backend.initialized()).toBe(false);
   });
 
-  it("simple eager_load!: loads the translations", () => {
+  it("simple eager_load!: loads the translations", async () => {
     expect(backend.initialized()).toBe(false);
-    backend.eagerLoadBang();
+    await backend.eagerLoadBang();
     expect(backend.initialized()).toBe(true);
   });
 
-  it("simple reload!: reinitialize the backend if it was previously eager loaded", () => {
-    backend.eagerLoadBang();
-    backend.reloadBang();
+  it("simple reload!: reinitialize the backend if it was previously eager loaded", async () => {
+    await backend.eagerLoadBang();
+    await backend.reloadBang();
     expect(backend.initialized()).toBe(true);
   });
 
@@ -275,8 +275,8 @@ describe("I18nBackendSimpleTest", () => {
     expect(t("stars.special", { count: 20 })).toBe("20 special stars");
   });
 
-  it("returns localized string given missing pluralization data", () => {
-    config().loadPath = [`${localesDir()}/en.yml`];
+  it("returns localized string given missing pluralization data", async () => {
+    await config().setLoadPath([`${localesDir()}/en.yml`]);
     backend.loadTranslations();
     expect(t("foo.bar", { count: 1 })).toBe("baz");
   });

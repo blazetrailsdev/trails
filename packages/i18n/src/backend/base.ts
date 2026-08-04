@@ -113,8 +113,8 @@ export async function preloadTranslationFiles(...filenames: (string | string[])[
  * @noRailsEquivalent PERMANENT — the counterpart of `preloadTranslationFiles`
  * above: the gem's re-read is a synchronous `YAML.load_file` inside
  * `init_translations`, and the four call sites that reach it are synchronous in
- * Rails all the way up. Awaiting the re-read at `I18n.reload!` — the one seam
- * the gem also treats as a whole-backend reset — is what the language leaves.
+ * Rails all the way up. Awaiting the re-read at the reload seams — the ones the
+ * gem also treats as a whole-backend reset — is what the language leaves.
  */
 export async function reloadTranslationFiles(): Promise<void> {
   if (!fileReader) return;
@@ -361,11 +361,19 @@ export abstract class Base {
     throw new NotImplementedError();
   }
 
-  reloadBang(): void {
-    if (this.eagerLoaded()) this.eagerLoadBang();
+  /**
+   * The re-read of `I18n.load_path` precedes the gem's body because in the gem
+   * it happens later, inside the next lazy `init_translations` (simple.rb:83-86)
+   * — a synchronous `YAML.load_file` (base.rb:246). Here that read is a Promise,
+   * so it is pulled forward to this seam, where one read serves both the lazy
+   * arm and the `eager_load!` the guard below may run during the reload itself.
+   */
+  async reloadBang(): Promise<void> {
+    await reloadTranslationFiles();
+    if (this.eagerLoaded()) await this.eagerLoadBang();
   }
 
-  eagerLoadBang(): void {
+  async eagerLoadBang(): Promise<void> {
     this.eagerLoadedFlag = true;
   }
 

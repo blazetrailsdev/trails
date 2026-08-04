@@ -135,6 +135,19 @@ function defaultCheckConstraintName(tableName: string, expression: string): stri
  * Mirrors: ActiveRecord::ConnectionAdapters::ColumnDefinition
  */
 export class ColumnDefinition {
+  static readonly OPTION_NAMES = [
+    "limit",
+    "precision",
+    "scale",
+    "default",
+    "null",
+    "collation",
+    "comment",
+    "primaryKey",
+    "ifExists",
+    "ifNotExists",
+  ];
+
   sqlType?: string;
   // PostgreSQL only: physical storage type ("timestamp" / "timestamptz") for
   // datetime-family columns, recorded at creation time so the schema dumper
@@ -1119,20 +1132,16 @@ export class TableDefinition {
     if (index !== -1) this.columns.splice(index, 1);
   }
 
-  /** @internal */
+  /**
+   * The cast covers a typing gap only: `SchemaStatements` is mixed into the
+   * adapters at runtime, so the reader answering `ColumnDefinition::OPTION_NAMES`
+   * (schema_statements.rb:1584-1586) is not on the static {@link SchemaQuoter}
+   * surface `_adapter` is declared with.
+   * @internal
+   */
   protected validColumnDefinitionOptions(): string[] {
-    return [
-      "limit",
-      "precision",
-      "scale",
-      "default",
-      "null",
-      "collation",
-      "comment",
-      "primaryKey",
-      "ifExists",
-      "ifNotExists",
-    ];
+    const conn = this._adapter as unknown as { validColumnDefinitionOptions(): string[] };
+    return conn.validColumnDefinitionOptions();
   }
 
   /** @internal */
