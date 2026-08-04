@@ -58,6 +58,47 @@ describe("Date", () => {
     expect([partial.year, partial.mon, partial.day]).toEqual([2008, 7, 1]);
   });
 
+  it("reads a bare two-digit run as the day of this month, as parse_ddd does", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2008-08-04T12:00:00Z"));
+    try {
+      const date = RubyDate.parse("02");
+      expect([date.year, date.mon, date.day]).toEqual([2008, 8, 2]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("reads a three-digit run as this year's day of the year, as parse_ddd does", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2008-08-04T12:00:00Z"));
+    try {
+      const date = RubyDate.parse("102");
+      expect([date.year, date.mon, date.day]).toEqual([2008, 4, 11]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("reads a five-digit run as a two-digit year and a day of the year", () => {
+    const date = RubyDate.parse("20080");
+    expect([date.year, date.mon, date.day]).toEqual([2020, 3, 20]);
+  });
+
+  it("reads a seven-digit run as a four-digit year and a day of the year", () => {
+    const date = RubyDate.parse("2008070");
+    expect([date.year, date.mon, date.day]).toEqual([2008, 3, 10]);
+    expect(() => RubyDate.parse("2007366")).toThrow("invalid date");
+  });
+
+  it("takes the time of day out of the string first, as parse_time does", () => {
+    const date = RubyDate.parse("2008070 10:30");
+    expect([date.year, date.mon, date.day]).toEqual([2008, 3, 10]);
+    // A fraction after a narrow run is a time of day, not a date.
+    expect(() => RubyDate.parse("07.2008")).toThrow("invalid date");
+    expect(() => RubyDate.parse("10:30")).toThrow("invalid date");
+  });
+
   it("leaves a signed year uncompleted, as date_parse.c does", () => {
     expect(RubyDate.parse("-08-07-02").year).toBe(-8);
     expect(RubyDate.parse("+08-07-02").year).toBe(8);
