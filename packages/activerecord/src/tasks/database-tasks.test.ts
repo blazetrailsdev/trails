@@ -252,8 +252,6 @@ describe("DatabaseTasksDumpSchemaCacheTest", () => {
       fs.rmSync(tmp, { recursive: true, force: true });
     }
   });
-  // Rails asserts `schema_cache.yml`; trails' HashConfig#defaultSchemaCachePath
-  // writes `.json` because dumpSchemaCache produces JSON, not YAML.
   it("cache dump default filename", () => {
     const config = new HashConfig("development", "primary", {});
 

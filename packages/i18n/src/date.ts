@@ -390,7 +390,7 @@ function iGcd(x: number, y: number): number {
     x = y;
     y = t;
   }
-  return x === 0 ? 1 : x;
+  return x;
 }
 
 /**
