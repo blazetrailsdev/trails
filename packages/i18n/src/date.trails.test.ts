@@ -213,6 +213,8 @@ describe("Date", () => {
         expect([str, `${date.year}-08-0${date.day}`]).toEqual([str, expected]);
       }
       expect(() => RubyDate.parse("wed 2008")).toThrow("invalid date");
+      expect(() => RubyDate.parse("wed 10:00:00")).toThrow("invalid date");
+      expect(() => RubyDate.parse("sunday 10:00:00")).toThrow("invalid date");
     } finally {
       vi.useRealTimers();
     }
