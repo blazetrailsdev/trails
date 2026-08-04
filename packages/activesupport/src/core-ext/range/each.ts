@@ -13,13 +13,10 @@ import { TimeWithZone } from "../../time-with-zone.js";
 
 /**
  * Ruby's `super` at each.rb:9,14 — core `Range#each` / `Range#step`, which JS
- * has no `Range` class to inherit from.
+ * has no `Range` class to inherit from. Reached only through the two guarded
+ * entry points below, which have already raised on a beginless range.
  */
 function* enumerate(range: Range<number | TimeWithZone>, n: number): Generator<number> {
-  // Ruby core `Range#each` on a beginless range; activesupport has no ported
-  // TypeError, so this mirrors the message Ruby raises.
-  // eslint-disable-next-line blazetrails/rails-error-parity
-  if (range.begin === null) throw new TypeError("can't iterate from NilClass");
   let current = range.begin as number;
   while (true) {
     if (range.end !== null) {
@@ -42,12 +39,24 @@ export function* step(range: Range<number | TimeWithZone>, n: number = 1): Gener
 }
 
 /**
- * @internal Rails-private helper (each.rb:18).
+ * Ruby's core `Range#first`, which `ensureIterationAllowed` calls for its
+ * receiver's class — and which raises before that check on a beginless range.
+ */
+function first(range: Range<number | TimeWithZone>): number | TimeWithZone {
+  if (range.begin === null) {
+    // eslint-disable-next-line blazetrails/rails-error-parity
+    throw new RangeError("cannot get the first element of beginless range");
+  }
+  return range.begin;
+}
+
+/**
+ * @internal Rails-private helper (each.rb:18). `first.class` is spelled out
+ * because the guard fires only for `TimeWithZone`, whose Ruby name is not
+ * recoverable from the TS class.
  */
 function ensureIterationAllowed(range: Range<number | TimeWithZone>): void {
-  // Ruby's `first` is the range's begin. The guard only fires for
-  // `TimeWithZone`, so `first.class` is always that class' Ruby name.
-  if (range.begin instanceof TimeWithZone) {
+  if (first(range) instanceof TimeWithZone) {
     // eslint-disable-next-line blazetrails/rails-error-parity
     throw new TypeError("can't iterate from ActiveSupport::TimeWithZone");
   }

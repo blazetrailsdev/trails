@@ -14,6 +14,21 @@ import type { Range } from "../../range-ext.js";
 // boundary: Date endpoints, as in range-ext.ts
 const toNum = <T extends number | Date>(v: T): number => (v instanceof Date ? v.getTime() : v);
 
+/** Ruby's `b == e` on two endpoints, which for `Date` is a value comparison. */
+function eq<T extends number | Date>(b: T | null, e: T | null): boolean {
+  if (b === null || e === null) return b === e;
+  return toNum(b) === toNum(e);
+}
+
+/**
+ * Ruby's `value.is_a?(::Range)` (overlap.rb:9). trails' `Range` is a plain
+ * object, so the type test is structural, as in `compare-range.ts`.
+ */
+function isRange<T extends number | Date>(value: Range<T>): boolean {
+  // boundary: Date endpoints, as in range-ext.ts
+  return typeof value === "object" && value !== null && !(value instanceof Date);
+}
+
 /** Ruby's private `Range#_empty_range?` (overlap.rb:31). */
 function _isEmptyRange<T extends number | Date>(b: T | null, e: T | null, excl: boolean): boolean {
   if (b === null || e === null) return false;
@@ -26,12 +41,11 @@ function _isEmptyRange<T extends number | Date>(b: T | null, e: T | null, excl: 
  * Compare two ranges and see if they overlap each other
  *  (1..5).overlap?(4..6) # => true
  *  (1..5).overlap?(7..9) # => false
- *
- * @missingRailsCall raise — Ruby guards `other.is_a? Range` with a `TypeError`
- * (overlap.rb:9); `other` is statically a `Range<T>` here, so there is no
- * non-Range value to reject.
  */
 export function overlap<T extends number | Date>(range: Range<T>, other: Range<T>): boolean {
+  // eslint-disable-next-line blazetrails/rails-error-parity
+  if (!isRange(other)) throw new TypeError();
+
   const selfBegin = range.begin;
   const otherEnd = other.end;
   const otherExcl = other.excludeEnd;
@@ -43,13 +57,7 @@ export function overlap<T extends number | Date>(range: Range<T>, other: Range<T
   const selfExcl = range.excludeEnd;
 
   if (_isEmptyRange(otherBegin, selfEnd, selfExcl)) return false;
-  // Ruby's `==` on the endpoints; `toNum` keeps two equal `Date`s equal, which
-  // `===` on the objects would not.
-  if (selfBegin === null || otherBegin === null) {
-    if (selfBegin === otherBegin) return true;
-  } else if (toNum(selfBegin) === toNum(otherBegin)) {
-    return true;
-  }
+  if (eq(selfBegin, otherBegin)) return true;
 
   if (_isEmptyRange(selfBegin, selfEnd, selfExcl)) return false;
   if (_isEmptyRange(otherBegin, otherEnd, otherExcl)) return false;
