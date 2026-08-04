@@ -371,7 +371,7 @@ function normalizeKey(key: unknown, separator: string): TranslationKey[] {
     } else if (key === null || key === undefined) {
       normalized = [];
     } else {
-      const keys = String(key)
+      const keys = (typeof key === "string" && key.startsWith(":") ? key.slice(1) : String(key))
         .split(separator)
         .filter((k) => k !== "");
       normalized = keys.map((k) => {
