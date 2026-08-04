@@ -198,6 +198,37 @@ describe("Date", () => {
     expect([long.year, long.mon, long.day]).toEqual([2020, 12, 28]);
   });
 
+  it("resolves a day of the week against today, as rt_complete_frags' wday entry does", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-04T12:00:00Z"));
+    try {
+      for (const [str, expected] of [
+        ["sunday", "2026-08-02"],
+        ["monday", "2026-08-03"],
+        ["wednesday", "2026-08-05"],
+        ["sat", "2026-08-08"],
+        ["wed 10:00", "2026-08-05"],
+      ] as const) {
+        const date = RubyDate.parse(str);
+        expect([str, `${date.year}-08-0${date.day}`]).toEqual([str, expected]);
+      }
+      expect(() => RubyDate.parse("wed 2008")).toThrow("invalid date");
+      expect(() => RubyDate.parse("wed 10:00:00")).toThrow("invalid date");
+      expect(() => RubyDate.parse("sunday 10:00:00")).toThrow("invalid date");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("falls back to wday in the commercial arm, as rt__valid_date_frags_p does", () => {
+    const sun = RubyDate.parse("2001-W05 sun");
+    expect([sun.year, sun.mon, sun.day]).toEqual([2001, 2, 4]);
+    const wed = RubyDate.parse("2001-W05 wed");
+    expect([wed.year, wed.mon, wed.day]).toEqual([2001, 1, 31]);
+    const cwday = RubyDate.parse("2001-W05-6 sun");
+    expect([cwday.year, cwday.mon, cwday.day]).toEqual([2001, 2, 3]);
+  });
+
   it("negates the year of a BC date, as parse_bc does", () => {
     expect(RubyDate.parse("4004-01-02 BC").year).toBe(-4003);
     expect(RubyDate.parse("feb 3 4004 b.c.e.").year).toBe(-4003);

@@ -165,6 +165,7 @@ const ABBR_DAYS = "sun|mon|tue|wed|thu|fri|sat";
  * answers `{... :offset => nil}` there.
  */
 interface DateParts {
+  jd?: number;
   year?: number;
   mon?: number;
   mday?: number;
@@ -185,9 +186,10 @@ interface DateParts {
 
 /**
  * @internal The date and time elements of `rt_complete_frags`' table
- * (`date_core.c:3878-3892`) this shim carries.
+ * (`date_core.c:3884-3968`) this shim carries.
  */
 type DateFrag =
+  | "jd"
   | "year"
   | "mon"
   | "mday"
@@ -195,6 +197,7 @@ type DateFrag =
   | "cwyear"
   | "cweek"
   | "cwday"
+  | "wday"
   | "hour"
   | "min"
   | "sec";
@@ -1555,23 +1558,27 @@ function parseFrag(str: string, hash: DateParts): string | null {
  * `activesupport/test/core_ext/string_ext_test.rb:775` — and `"102".to_date` is
  * this year's 102nd day.
  *
- * Only the `:time`, `:ordinal`, `:civil` and `:commercial` entries of that
- * table are carried: the rest are the Julian-day, `:wday` and week-numbered
- * dates, whose fields (`:jd`, `:wday`, `:wnum0`, `:wnum1`) no sub-parser
- * ported here can produce. `:time` names no date, so it has no completion
- * branch in Ruby either, and the string goes on to raise.
+ * The three `:wnum0`/`:wnum1` entries of that table are not carried: no
+ * sub-parser ported here sets `:wnum0` or `:wnum1`, and their completion
+ * branches read a week number off `Date.today` that Ruby's `::Date` has no
+ * reader for. `:time` names no date, so it has no completion branch here
+ * either — Ruby's only fills a `:jd` for `DateTime` — and the string goes on
+ * to raise.
  */
 function completeFrags(parts: DateParts): void {
-  const tab: [string, DateFrag[]][] = [
+  const tab: [string | null, DateFrag[]][] = [
     ["time", ["hour", "min", "sec"]],
+    [null, ["jd"]],
     ["ordinal", ["year", "yday", "hour", "min", "sec"]],
     ["civil", ["year", "mon", "mday", "hour", "min", "sec"]],
     ["commercial", ["cwyear", "cweek", "cwday", "hour", "min", "sec"]],
+    ["wday", ["wday", "hour", "min", "sec"]],
+    [null, ["cwyear", "cweek", "wday", "hour", "min", "sec"]],
   ];
 
   let g: boolean;
   let e = 0;
-  let k = "";
+  let k: string | null = null;
   let a: DateFrag[] = [];
   {
     let eno = 0;
@@ -1596,7 +1603,7 @@ function completeFrags(parts: DateParts): void {
     }
   }
 
-  if (g && a.length - e) {
+  if (g && k !== null && a.length - e) {
     const d = Temporal.Now.plainDateISO();
     const today: Partial<Record<DateFrag, number>> = {
       year: d.year,
@@ -1625,8 +1632,38 @@ function completeFrags(parts: DateParts): void {
       }
       parts.cweek ??= 1;
       parts.cwday ??= 1;
+    } else if (k === "wday") {
+      parts.jd = jdOf(d.subtract({ days: d.dayOfWeek % 7 }).add({ days: parts.wday as number }));
     }
   }
+}
+
+/**
+ * @internal `date_core.c`'s `UNIX_EPOCH_IN_CJD` (`date_core.c:192`), the
+ * chronological Julian day number of 1970-01-01, which is the anchor
+ * `date__parse` itself converts a `Time` to a `:jd` on (`date_core.c:3864`).
+ */
+const UNIX_EPOCH_IN_CJD = 2440588;
+
+/** @internal 1970-01-01, the day {@link UNIX_EPOCH_IN_CJD} numbers. */
+const UNIX_EPOCH = new Temporal.PlainDate(1970, 1, 1);
+
+/**
+ * @internal Ruby `Date#jd` (`date_core.c` `d_lite_jd`, `date_core.c:5249`), the
+ * reader `rt_complete_frags`' `:wday` branch takes its `:jd` off. `Temporal` has
+ * no Julian day, so the number is the day count from the Unix epoch Ruby
+ * anchors its own `Time`-to-`:jd` conversion on.
+ */
+function jdOf(d: Temporal.PlainDate): number {
+  return UNIX_EPOCH_IN_CJD + d.since(UNIX_EPOCH).days;
+}
+
+/**
+ * @internal Ruby `Date.jd(jd)` (`date_core.c` `date_s_jd`,
+ * `date_core.c:3358`), the inverse of {@link jdOf}.
+ */
+function jdToCivil(jd: number): Temporal.PlainDate {
+  return UNIX_EPOCH.add({ days: jd - UNIX_EPOCH_IN_CJD });
 }
 
 /**
@@ -1681,29 +1718,44 @@ export class Date {
    * civil one, and the commercial date — a `:cwyear`, a `:cweek` and a
    * `:cwday`, which is what `"2001-W05-6"` names — after both. A string that
    * named only a time of day answers none of them and raises. The
-   * out-of-range week Ruby rejects in `c_valid_commercial_p` is rejected here
-   * by round-tripping the built date's own week date.
+   * out-of-range week or day Ruby rejects in `c_valid_commercial_p`
+   * (`date_core.c:792-810`) is rejected here by round-tripping the built date's
+   * own week date. That arm reads `:cwday` and falls back to a `:wday` whose
+   * `0` it maps to `7`, which is how `"2001-W05 sun"` names the Sunday of that
+   * ISO week. A `:jd` — which `rt_complete_frags` writes for a string that
+   * named only a day of the week — answers before all of them.
    */
   static parse(str: string, comp = true): Date {
     const parts = Date._parse(str, comp);
     completeFrags(parts);
     let d: Temporal.PlainDate | null = null;
     try {
-      if (parts.yday !== undefined && parts.year !== undefined && parts.yday >= 1) {
+      if (parts.jd !== undefined) {
+        d = jdToCivil(parts.jd);
+      } else if (parts.yday !== undefined && parts.year !== undefined && parts.yday >= 1) {
         d = new Temporal.PlainDate(parts.year, 1, 1).add({ days: parts.yday - 1 });
         if (d.year !== parts.year) d = null;
       } else if (parts.mon !== undefined && parts.mday !== undefined) {
         d = new Temporal.PlainDate(parts.year as number, parts.mon, parts.mday);
-      } else if (
-        parts.cwday !== undefined &&
-        parts.cweek !== undefined &&
-        parts.cwyear !== undefined
-      ) {
-        const jan4 = new Temporal.PlainDate(parts.cwyear, 1, 4);
-        d = jan4
-          .subtract({ days: jan4.dayOfWeek - 1 })
-          .add({ days: (parts.cweek - 1) * 7 + (parts.cwday - 1) });
-        if (d.yearOfWeek !== parts.cwyear || d.weekOfYear !== parts.cweek) d = null;
+      } else {
+        let cwday = parts.cwday;
+        if (cwday === undefined) {
+          cwday = parts.wday;
+          if (cwday !== undefined) if (cwday === 0) cwday = 7;
+        }
+        if (cwday !== undefined && parts.cweek !== undefined && parts.cwyear !== undefined) {
+          const jan4 = new Temporal.PlainDate(parts.cwyear, 1, 4);
+          d = jan4
+            .subtract({ days: jan4.dayOfWeek - 1 })
+            .add({ days: (parts.cweek - 1) * 7 + (cwday - 1) });
+          if (
+            d.yearOfWeek !== parts.cwyear ||
+            d.weekOfYear !== parts.cweek ||
+            d.dayOfWeek !== cwday
+          ) {
+            d = null;
+          }
+        }
       }
     } catch {
       d = null;
