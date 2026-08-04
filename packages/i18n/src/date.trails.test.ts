@@ -4,7 +4,7 @@
  */
 
 import { Temporal } from "@js-temporal/polyfill";
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { ArgumentError, Date as RubyDate, DateTime as RubyDateTime } from "./date.js";
 import { Time as RubyTime } from "./time.js";
 
@@ -45,9 +45,15 @@ describe("Date", () => {
   });
 
   it('completes a fragment from today, as "Feb 3rd".to_date does', () => {
-    const today = Temporal.Now.plainDateISO();
-    const date = RubyDate.parse("Feb 3rd");
-    expect([date.year, date.mon, date.day]).toEqual([today.year, 2, 3]);
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2008-08-04T12:00:00Z"));
+    try {
+      expect(Temporal.Now.plainDateISO("UTC").year).toBe(2008);
+      const date = RubyDate.parse("Feb 3rd");
+      expect([date.year, date.mon, date.day]).toEqual([2008, 2, 3]);
+    } finally {
+      vi.useRealTimers();
+    }
     const partial = RubyDate.parse("2008/07");
     expect([partial.year, partial.mon, partial.day]).toEqual([2008, 7, 1]);
   });
