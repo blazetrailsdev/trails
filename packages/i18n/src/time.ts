@@ -11,21 +11,20 @@ import { Temporal } from "@js-temporal/polyfill";
 import { ArgumentError, strftime } from "./date.js";
 
 /**
- * The `utc_offset` argument MRI's `Time.new` accepts, resolved to something
- * `Temporal` takes: `"UTC"`, an offset — `"+09"`, `"+0900"`, `"+09:00"` or a
- * number of seconds east of UTC, which is the form Rails passes
+ * The `utc_offset` argument MRI's `Time.new` accepts: `"UTC"`, an offset —
+ * `"+09"`, `"+0900"`, `"+09:00"`, `"+09:00:30"` or a number of seconds east of
+ * UTC, which is the form Rails passes
  * (`activesupport/lib/active_support/core_ext/string/conversions.rb:28`,
  * `core_ext/time/calculations.rb:172-175`) — or one of the military zone
  * letters (`A`..`I` = +1..+9, `K`..`M` = +10..+12, `N`..`Y` = -1..-12, and
- * `Z`, which MRI treats as UTC itself rather than as a zero offset). Anything else raises with MRI's message; an IANA name like
- * `"America/New_York"` is not a `Time.new` zone, it is what a `TimeZone`
- * object wraps.
+ * `Z`, which MRI treats as UTC itself rather than as a zero offset). Anything
+ * else raises with MRI's message; an IANA name like `"America/New_York"` is
+ * not a `Time.new` zone, it is what a `TimeZone` object wraps.
  *
  * The answer is `"UTC"` — the one zone `Time.new` names — or the offset in
- * seconds east of UTC, which is how the receiver carries it. MRI takes a
- * sub-minute offset (`"+09:00:30"` is `32430`), so the offset is a number
- * trails owns rather than a `Temporal` offset time zone, which is
- * minute-precision.
+ * seconds east of UTC, which is how the receiver carries it: a number trails
+ * owns, so that MRI's sub-minute offsets are representable where a `Temporal`
+ * offset time zone (minute-precision) cannot hold them.
  */
 function utcOffsetArgument(zone: string | number): "UTC" | number {
   if (typeof zone === "number") {
