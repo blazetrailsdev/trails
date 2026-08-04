@@ -21,47 +21,11 @@ import { config, exists, l, resetConfig, setLocale, t, type Locale } from "../i1
 import { resetClassConfig } from "../config.js";
 import { MissingTranslationData } from "../exceptions.js";
 import { Fallbacks as LocaleFallbacks } from "../locale/fallbacks.js";
+import { Date } from "../date.js";
+import { Time } from "../time.js";
 import type { TranslationData } from "../utils.js";
 
 class Backend extends Fallbacks(Simple) {}
-
-/**
- * Stands in for Ruby's `::Date` — `localize` duck-types its object, so what a
- * test needs is `strftime`, `wday` and `mon`. `translate_localization_format`
- * substitutes every directive these cases use before `strftime` sees the
- * format, so the format comes back verbatim; `localization.test.ts` carries the
- * fuller stand-in.
- */
-class RubyDate {
-  readonly utc: Date;
-
-  constructor(year: number, month: number, day: number) {
-    this.utc = new Date(Date.UTC(year, month - 1, day));
-  }
-
-  get wday(): number {
-    return this.utc.getUTCDay();
-  }
-
-  get mon(): number {
-    return this.utc.getUTCMonth() + 1;
-  }
-
-  strftime(format: string): string {
-    return format;
-  }
-}
-
-/** Ruby's `::Time` answers `hour` and `sec`, which routes to `time.formats`. */
-class RubyTime extends RubyDate {
-  get hour(): number {
-    return this.utc.getUTCHours();
-  }
-
-  get sec(): number {
-    return this.utc.getUTCSeconds();
-  }
-}
 
 /** Mirrors: `I18n::TestCase#setup` (i18n/test/test_helper.rb:20-26). */
 function setup(): Backend {
@@ -245,7 +209,7 @@ describe("I18nBackendFallbacksLocalizeTestWithDefaultLocale", () => {
   });
 
   it("falls back to default locale - Issue #534", () => {
-    expect(l(new RubyTime(2010, 1, 3), { format: ":fallback", locale: "un-supported" })).toBe(
+    expect(l(Time.utc(2010, 1, 3), { format: ":fallback", locale: "un-supported" })).toBe(
       "en fallback",
     );
   });
@@ -367,19 +331,19 @@ describe("I18nBackendFallbacksLocalizeTest", () => {
   });
 
   it("still uses an existing format as usual", () => {
-    expect(l(new RubyDate(2010, 1, 3), { format: ":en", locale: "en" })).toBe("en");
+    expect(l(new Date(2010, 1, 3), { format: ":en", locale: "en" })).toBe("en");
   });
 
   it("looks up and uses a fallback locale's format for a key missing in the given locale", () => {
-    expect(l(new RubyDate(2010, 1, 3), { format: ":de", locale: "de-DE" })).toBe("de");
+    expect(l(new Date(2010, 1, 3), { format: ":de", locale: "de-DE" })).toBe("de");
   });
 
   it("still uses an existing day name translation as usual", () => {
-    expect(l(new RubyDate(2010, 1, 3), { format: "%A", locale: "en" })).toBe("Sunday");
+    expect(l(new Date(2010, 1, 3), { format: "%A", locale: "en" })).toBe("Sunday");
   });
 
   it("uses a fallback locale's translation for a key missing in the given locale", () => {
-    expect(l(new RubyDate(2010, 1, 3), { format: "%A", locale: "de-DE" })).toBe("Sunday");
+    expect(l(new Date(2010, 1, 3), { format: "%A", locale: "de-DE" })).toBe("Sunday");
   });
 });
 
