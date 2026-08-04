@@ -5,8 +5,8 @@
  * This is the singular-holder counterpart to the has_many guard (#5038). The
  * mechanism is shared and holder-agnostic: `setTarget` refuses the race, and a
  * loader's own writeback is exempt because it runs while
- * `Association#_loaderWritebackSuppressed` is set (armed in each singular
- * association's `doAsyncFindTarget`, mirroring `CollectionAssociation`).
+ * `Association#_loaderWritebackSuppressed` is set (armed in
+ * `SingularAssociation#findTarget`, mirroring `CollectionAssociation`).
  *
  * Rails has no analogue because `Association#find_target`
  * (activerecord/lib/active_record/associations/association.rb:248) is
@@ -76,8 +76,8 @@ describe("has_one mid-flight reassignment", () => {
   });
 
   it("replacing a has_one :through target mid-load raises", async () => {
-    // HasOneThroughAssociation inherits doAsyncFindTarget from
-    // HasOneAssociation, so it must inherit the guard with it.
+    // HasOneThroughAssociation inherits findTarget through HasOneAssociation
+    // from SingularAssociation, so it must inherit the guard with it.
     const member = (await Member.first()) as Member;
     const other = (await Club.first()) as Club;
 
@@ -122,9 +122,10 @@ describe("polymorphic belongs_to mid-flight reassignment", () => {
   fixtures(["taggings", "posts"]);
 
   it("replacing a polymorphic target mid-load raises", async () => {
-    // `BelongsToPolymorphicAssociation` overrides `doAsyncFindTarget`, so it
-    // must arm the same guard its parent does — otherwise the polymorphic
-    // subclass stays silently clobberable while plain belongs_to raises.
+    // `BelongsToPolymorphicAssociation` inherits `findTarget` through
+    // `BelongsToAssociation` from `SingularAssociation`, so it must inherit the
+    // same guard — otherwise the polymorphic subclass stays silently
+    // clobberable while plain belongs_to raises.
     const tagging = (await Tagging.first()) as Tagging;
     const other = (await Post.first()) as Post;
 
