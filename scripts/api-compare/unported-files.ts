@@ -1224,9 +1224,6 @@ export const UNPORTED_FILES: UnportedFile[] = [
       "Suite for the deferred `backend/pluralization.rb` looked up under a scope.",
   },
   // --- i18n: api/ suites that install a deferred backend ---
-  // Each is one "make sure we use <X>" case asserting `I18n.backend.class`;
-  // the rest of the file is the shared `I18n::Tests::*` modules re-run against
-  // that backend. With the backend deferred there is nothing to install.
   {
     testFile: "api/all_features_test.rb",
     package: "i18n",
@@ -1268,12 +1265,11 @@ export const UNPORTED_FILES: UnportedFile[] = [
       "concern with no trails consumer; Rails' own I18n usage never touches it.",
   },
   {
-    // Lives at test/i18n/, outside the `gettext/` prefix above.
     testFile: "gettext_plural_keys_test.rb",
     package: "i18n",
     reason:
-      "Pre-1.0: gettext .po support — exercises `I18n::Gettext.plural_keys`, " +
-      "part of the deferred gettext surface.",
+      "Pre-1.0: gettext .po support — exercises `I18n::Gettext.plural_keys`. " +
+      "Sits at test/i18n/, outside the `gettext/` prefix above.",
   },
   {
     pattern: "locale/tag/rfc4646.rb",
