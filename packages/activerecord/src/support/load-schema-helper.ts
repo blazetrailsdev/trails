@@ -347,8 +347,8 @@ async function loadPostgresqlSpecificSchema(adapter: PostgreSQLAdapter): Promise
 async function loadMysql2SpecificSchema(adapter: AbstractMysqlAdapter): Promise<void> {
   await adapter.getDatabaseVersion();
   const supportsDefaultExpression = adapter.isMariadb()
-    ? adapter.databaseVersion.gte("10.2.1")
-    : adapter.databaseVersion.gte("8.0.13");
+    ? adapter.databaseVersion.compare("10.2.1") >= 0
+    : adapter.databaseVersion.compare("8.0.13") >= 0;
 
   await adapter.createTable("datetime_defaults", { force: true }, (t) => {
     t.datetime("modified_datetime", { precision: null, default: () => "CURRENT_TIMESTAMP" });

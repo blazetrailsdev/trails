@@ -76,7 +76,7 @@ describe("Lint::Tests", () => {
   });
 
   describe("testModelNaming", () => {
-    const goodName = { human: "Foo", singular: "foo", plural: "foos" };
+    const goodName = { human: () => "Foo", singular: "foo", plural: "foos" };
 
     it("passes when instance.modelName === constructor.modelName", () => {
       const fixture = { modelName: goodName, constructor: { modelName: goodName } };

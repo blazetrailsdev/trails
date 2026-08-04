@@ -15,7 +15,7 @@ import { assertQueriesCount } from "../testing/query-assertions.js";
 import { adapterSupports } from "../support/supports.js";
 
 const mariaDbRejectsUniqueColumnDrop =
-  adapterType === "mysql" && isMariaDb && serverVersion?.gte("10.2.8") === true;
+  adapterType === "mysql" && isMariaDb && (serverVersion?.compare("10.2.8") ?? -1) >= 0;
 
 const indexesSurvivingColumnDrop =
   adapterType === "postgres" ? [] : ["index_test_models_on_hat_style_and_hat_size"];

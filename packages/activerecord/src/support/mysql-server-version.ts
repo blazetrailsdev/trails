@@ -53,7 +53,7 @@ export const serverVersion = _serverVersion;
  * never MariaDB. Lets adapter tests gate on hint support the way the Rails
  * suite wraps `OptimizerHintsTest` in `if supports_optimizer_hints?`.
  */
-export const supportsOptimizerHints = !mariaDb && _serverVersion?.gte("5.7.7") === true;
+export const supportsOptimizerHints = !mariaDb && (_serverVersion?.compare("5.7.7") ?? -1) >= 0;
 
 /**
  * Mirrors `supports_default_expression?` (adapter_helper.rb:23) for MySQL: an
@@ -62,8 +62,8 @@ export const supportsOptimizerHints = !mariaDb && _serverVersion?.gte("5.7.7") =
  * exactly as Rails' mysql2_specific_schema.rb does.
  */
 export const supportsDefaultExpression = mariaDb
-  ? _serverVersion?.gte("10.2.1") === true
-  : _serverVersion?.gte("8.0.13") === true;
+  ? (_serverVersion?.compare("10.2.1") ?? -1) >= 0
+  : (_serverVersion?.compare("8.0.13") ?? -1) >= 0;
 
 /**
  * Mirrors AbstractMysqlAdapter#supports_expression_index?
@@ -72,7 +72,7 @@ export const supportsDefaultExpression = mariaDb
  * the answer into a static adapterType table — the mysql lane may be MySQL 8
  * (true) or the MariaDB CI stand-in (false).
  */
-export const supportsExpressionIndex = !mariaDb && _serverVersion?.gte("8.0.13") === true;
+export const supportsExpressionIndex = !mariaDb && (_serverVersion?.compare("8.0.13") ?? -1) >= 0;
 
 /**
  * Mirrors AbstractMysqlAdapter#supports_rename_index?
@@ -82,23 +82,24 @@ export const supportsExpressionIndex = !mariaDb && _serverVersion?.gte("8.0.13")
  * without hiding the supported MySQL path behind a blanket adapter skip.
  */
 export const supportsRenameIndex = mariaDb
-  ? _serverVersion?.gte("10.5.2") === true
-  : _serverVersion?.gte("5.7.6") === true;
+  ? (_serverVersion?.compare("10.5.2") ?? -1) >= 0
+  : (_serverVersion?.compare("5.7.6") ?? -1) >= 0;
 
 /** Mirrors Mysql2Adapter#supports_json? (mysql2_adapter.rb:70): MySQL ≥ 5.7.8; never MariaDB. */
-export const supportsJson = !mariaDb && _serverVersion?.gte("5.7.8") === true;
+export const supportsJson = !mariaDb && (_serverVersion?.compare("5.7.8") ?? -1) >= 0;
 
 /**
  * Mirrors AbstractMysqlAdapter#supports_insert_returning?
  * (abstract_mysql_adapter.rb:173): MariaDB ≥ 10.5.0 only; never MySQL.
  */
-export const supportsInsertReturning = mariaDb && _serverVersion?.gte("10.5.0") === true;
+export const supportsInsertReturning = mariaDb && (_serverVersion?.compare("10.5.0") ?? -1) >= 0;
 
 /**
  * Mirrors `supports_text_column_with_default?` (adapter_helper.rb:42) for the
  * MySQL family: MariaDB ≥ 10.2.1 only.
  */
-export const supportsTextColumnWithDefault = mariaDb && _serverVersion?.gte("10.2.1") === true;
+export const supportsTextColumnWithDefault =
+  mariaDb && (_serverVersion?.compare("10.2.1") ?? -1) >= 0;
 
 /**
  * Mirrors `supports_non_unique_constraint_name?` (adapter_helper.rb:33) for the
@@ -111,8 +112,8 @@ export const supportsNonUniqueConstraintName = mariaDb;
  * MySQL family: MariaDB ≥ 10.3.13, MySQL ≥ 8.0.19.
  */
 export const supportsSqlStandardDropConstraint = mariaDb
-  ? _serverVersion?.gte("10.3.13") === true
-  : _serverVersion?.gte("8.0.19") === true;
+  ? (_serverVersion?.compare("10.3.13") ?? -1) >= 0
+  : (_serverVersion?.compare("8.0.19") ?? -1) >= 0;
 
 /**
  * Mirrors AbstractMysqlAdapter#supports_check_constraints?
@@ -120,6 +121,6 @@ export const supportsSqlStandardDropConstraint = mariaDb
  * pre-10.3 series from 10.2.22 (10.3.0–10.3.9 is excluded).
  */
 export const supportsCheckConstraints = mariaDb
-  ? _serverVersion?.gte("10.3.10") === true ||
-    (_serverVersion?.lt("10.3") === true && _serverVersion?.gte("10.2.22") === true)
-  : _serverVersion?.gte("8.0.16") === true;
+  ? (_serverVersion?.compare("10.3.10") ?? -1) >= 0 ||
+    ((_serverVersion?.compare("10.3") ?? 0) < 0 && (_serverVersion?.compare("10.2.22") ?? -1) >= 0)
+  : (_serverVersion?.compare("8.0.16") ?? -1) >= 0;

@@ -57,7 +57,7 @@ describe("NamingTest", () => {
 
   it("human", () => {
     const name = new ModelName("Post");
-    expect(name.human).toBe("Post");
+    expect(name.human()).toBe("Post");
   });
 
   it("uncountable", () => {
@@ -190,7 +190,7 @@ describe("NamingWithNamespacedModelInSharedNamespaceTest", () => {
   });
 
   it("human", () => {
-    expect(new ModelName("Post", opts).human).toBe("Post");
+    expect(new ModelName("Post", opts).human()).toBe("Post");
   });
 
   it("route key", () => {
@@ -225,7 +225,7 @@ describe("NamingWithSuppliedModelNameTest", () => {
   });
   it("human", () => {
     const name = new ModelName("Article");
-    expect(name.human).toBe("Article");
+    expect(name.human()).toBe("Article");
   });
   it("route key", () => {
     const name = new ModelName("Article");
@@ -272,7 +272,7 @@ describe("NamingUsingRelativeModelNameTest", () => {
     expect(new ModelName("Post", opts).collection).toBe("blog/posts");
   });
   it("human", () => {
-    expect(new ModelName("Post", opts).human).toBe("Post");
+    expect(new ModelName("Post", opts).human()).toBe("Post");
   });
   it("route key", () => {
     expect(new ModelName("Post", opts).routeKey).toBe("posts");
@@ -295,7 +295,7 @@ describe("NamingWithNamespacedModelInIsolatedNamespaceTest", () => {
     expect(new ModelName("Post", opts).singular).toBe("blog_post");
   });
   it("human", () => {
-    expect(new ModelName("Post", opts).human).toBe("Post");
+    expect(new ModelName("Post", opts).human()).toBe("Post");
   });
   it("plural", () => {
     expect(new ModelName("Post", opts).plural).toBe("blog_posts");

@@ -1,6 +1,6 @@
 import type { SchemaQuoter } from "./assert-schema-adapter.js";
 import type { Column } from "../column.js";
-import { singularize, pluralize, getCrypto, assertValidKeys } from "@blazetrails/activesupport";
+import { singularize, pluralize, assertValidKeys } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { SchemaDumper } from "../../schema-dumper.js";
 import {
@@ -88,10 +88,8 @@ export type ReferentialAction = "cascade" | "nullify" | "restrict";
 /**
  * The adapter surface {@link TableDefinition.newForeignKeyDefinition} reads
  * beyond {@link SchemaQuoter}: the table_name_prefix/suffix (Rails reads these
- * off `ActiveRecord::Base`) and the converged `foreign_key_options` that fills
- * the default column and SHA256 `fk_rails_<hex>` name. All optional — a
- * bare-{@link SchemaQuoter} host (the MySQL schema quoter) exposes none and
- * falls back locally.
+ * off `ActiveRecord::Base`) and `foreign_key_options` that fills the default
+ * column and SHA256 `fk_rails_<hex>` name.
  * @internal
  */
 export interface ForeignKeyOptionsAdapter {
@@ -120,16 +118,19 @@ export interface CheckConstraintOptionsAdapter {
 }
 
 /**
- * Mirrors Rails' check_constraint_name default. Used only as the fallback for a
- * bare quoter that carries no `checkConstraintOptions`.
- *
+ * The `@conn` surface `TableDefinition` reads (schema_definitions.rb:575-591:
+ * `foreign_key_options`, `check_constraint_options`,
+ * `valid_column_definition_options`), plus the quoting subset schema emission
+ * needs. In Rails `@conn` is the adapter itself, with `SchemaStatements` mixed
+ * in, so every one of these is always there.
  * @internal
  */
-function defaultCheckConstraintName(tableName: string, expression: string): string {
-  const identifier = `${tableName}_${expression}_chk`;
-  const hex = getCrypto().createHash("sha256").update(identifier).digest("hex").slice(0, 10);
-  return `chk_rails_${hex}`;
-}
+export type TableDefinitionConn = SchemaQuoter &
+  ForeignKeyOptionsAdapter &
+  CheckConstraintOptionsAdapter & {
+    /** @internal */
+    validColumnDefinitionOptions(): string[];
+  };
 
 /**
  * Mirrors: ActiveRecord::ConnectionAdapters::ColumnDefinition
@@ -1003,13 +1004,13 @@ export class TableDefinition {
   readonly comment?: string;
   private _primaryKeys?: PrimaryKeyDefinition;
   private _adapterName: "sqlite" | "postgres" | "mysql";
-  protected _adapter: SchemaQuoter;
+  protected _adapter: TableDefinitionConn;
 
   constructor(
     tableName: string,
     tdOptions: {
       adapterName?: "sqlite" | "postgres" | "mysql";
-      adapter: SchemaQuoter;
+      adapter: TableDefinitionConn;
       temporary?: boolean;
       ifNotExists?: boolean;
       as?: string;
@@ -1137,16 +1138,9 @@ export class TableDefinition {
     if (index !== -1) this.columns.splice(index, 1);
   }
 
-  /**
-   * The cast covers a typing gap only: `SchemaStatements` is mixed into the
-   * adapters at runtime, so the reader answering `ColumnDefinition::OPTION_NAMES`
-   * (schema_statements.rb:1584-1586) is not on the static {@link SchemaQuoter}
-   * surface `_adapter` is declared with.
-   * @internal
-   */
+  /** @internal */
   protected validColumnDefinitionOptions(): string[] {
-    const conn = this._adapter as unknown as { validColumnDefinitionOptions(): string[] };
-    return conn.validColumnDefinitionOptions();
+    return this._adapter.validColumnDefinitionOptions();
   }
 
   /** @internal */
@@ -1203,18 +1197,18 @@ export class TableDefinition {
     return this;
   }
 
+  /**
+   * Mirrors: ActiveRecord::ConnectionAdapters::TableDefinition#new_foreign_key_definition
+   * (schema_definitions.rb:575-581).
+   */
   newForeignKeyDefinition(
     toTable: string,
     options: Partial<AddForeignKeyOptions> = {},
   ): ForeignKeyDefinition {
-    // Mirrors Rails' TableDefinition#new_foreign_key_definition: apply
-    // table_name_prefix/suffix to to_table, then route the column/name defaults
-    // through the adapter's foreign_key_options (SHA256 `fk_rails_<hex>` name).
-    const adapter = this._adapter as Partial<ForeignKeyOptionsAdapter>;
-    const prefix = adapter.tableNamePrefix ?? globalTableNamePrefix();
-    const suffix = adapter.tableNameSuffix ?? globalTableNameSuffix();
+    const prefix = this._adapter.tableNamePrefix ?? globalTableNamePrefix();
+    const suffix = this._adapter.tableNameSuffix ?? globalTableNameSuffix();
     const prefixedToTable = `${prefix}${toTable}${suffix}`;
-    const opts = this._foreignKeyOptions(prefixedToTable, options);
+    const opts = this._adapter.foreignKeyOptions(this.tableName, prefixedToTable, { ...options });
     return new ForeignKeyDefinition(
       this.tableName,
       prefixedToTable,
@@ -1232,65 +1226,18 @@ export class TableDefinition {
     );
   }
 
-  /**
-   * Delegate to the adapter's `foreignKeyOptions` (which fills the default
-   * column and SHA256 `fk_rails_<hex>` name) when available. A
-   * bare-{@link SchemaQuoter} host (the MySQL schema quoter) lacks it, so fall
-   * back to the same derivation as SchemaStatements#foreignKeyOptions /
-   * foreignKeyName.
-   * @internal
-   */
-  private _foreignKeyOptions(
-    toTable: string,
-    options: Partial<AddForeignKeyOptions>,
-  ): Record<string, unknown> {
-    const adapter = this._adapter as Partial<ForeignKeyOptionsAdapter>;
-    if (typeof adapter.foreignKeyOptions === "function") {
-      return adapter.foreignKeyOptions(this.tableName, toTable, { ...options });
-    }
-    const result: Record<string, unknown> = { ...options };
-    // Mirror foreign_key_column_for: strip table_name_prefix/suffix (and the
-    // trails schema-qualifier) before singularizing, so a prefixed to_table
-    // still yields the bare `<singular>_<pk>` default column.
-    const columnFor = (pk: string): string => {
-      const prefix = adapter.tableNamePrefix ?? globalTableNamePrefix();
-      const suffix = adapter.tableNameSuffix ?? globalTableNameSuffix();
-      let base = toTable.replace(/^.*\./, "");
-      if (prefix || suffix) {
-        const stripped = base.match(new RegExp(`^${prefix}(.+)${suffix}$`));
-        if (stripped) base = stripped[1];
-      }
-      return `${singularize(base)}_${pk}`;
-    };
-    if (!result.column) {
-      // Mirror foreign_key_options: a composite primary_key array maps each PK
-      // column to its own foreign-key column; the scalar branch always derives
-      // from the literal "id" (schema_statements.rb:1246-1267).
-      result.column = Array.isArray(result.primaryKey)
-        ? (result.primaryKey as string[]).map((pk) => columnFor(pk))
-        : columnFor("id");
-    }
-    if (!result.name) {
-      const cols = Array.isArray(result.column) ? result.column : [result.column];
-      const identifier = `${this.tableName}_${cols.join("_and_")}_fk`;
-      const hex = getCrypto().createHash("sha256").update(identifier).digest("hex").slice(0, 10);
-      result.name = `fk_rails_${hex}`;
-    }
-    assertCompositeForeignKeyArity(toTable, result.column, result.primaryKey);
-    return result;
-  }
-
   newCheckConstraintDefinition(
     expression: string,
     options: { name?: string; validate?: boolean } = {},
   ): CheckConstraintDefinition {
-    const conn = this._adapter as Partial<CheckConstraintOptionsAdapter>;
-    const resolved = (conn.checkConstraintOptions?.(this.tableName, expression, options) ??
-      options) as { name?: string; validate?: boolean };
+    const resolved = this._adapter.checkConstraintOptions(this.tableName, expression, options) as {
+      name?: string;
+      validate?: boolean;
+    };
     return new CheckConstraintDefinition(
       this.tableName,
       expression,
-      resolved.name ?? defaultCheckConstraintName(this.tableName, expression),
+      resolved.name as string,
       resolved.validate ?? true,
     );
   }

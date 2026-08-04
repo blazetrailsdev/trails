@@ -336,9 +336,8 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   });
 
   it("encryption schemes are resolved when used, not when declared", async () => {
-    // Declare the model BEFORE configuring supportSha1ForNonDeterministicEncryption.
-    // Global previous schemes must be resolved lazily (at previousTypes access time),
-    // not eagerly at encrypts() call time — mirrors Rails' lazy previous_schemes behavior.
+    // Declares the model BEFORE configure, as the Rails test does: the scheme
+    // must resolve at previousTypes access time, not at encrypts() call time.
     const adp = await freshAdapter();
     const Post = class extends Base {
       static {
@@ -350,11 +349,14 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     } as any;
     Post.encrypts("title");
 
-    configureEncryption({ primaryKey: "the primary key", keyDerivationSalt: "the salt" });
-    Configurable.config.supportSha1ForNonDeterministicEncryption = true;
+    Configurable.configure({
+      primaryKey: "the primary key",
+      deterministicKey: "the deterministic key",
+      keyDerivationSalt: "the salt",
+      supportSha1ForNonDeterministicEncryption: true,
+    });
 
     const type = Post.typeForAttribute("title");
-    // One lazy-resolved global previous scheme (the SHA1 key provider).
     expect(type.previousTypes).toHaveLength(1);
   });
 
@@ -625,8 +627,8 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
       primaryKey: "the primary key",
       deterministicKey: "the deterministic key",
       keyDerivationSalt: "the salt",
+      supportSha1ForNonDeterministicEncryption: true,
     });
-    Configurable.config.supportSha1ForNonDeterministicEncryption = true;
 
     const { KeyGenerator } = await import("./key-generator.js");
     const { DerivedSecretKeyProvider } = await import("./derived-secret-key-provider.js");

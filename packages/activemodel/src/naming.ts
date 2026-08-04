@@ -63,6 +63,7 @@ export namespace Naming {
   }
 }
 import { I18n } from "./i18n.js";
+import type { TranslateOptions } from "@blazetrails/i18n";
 
 /** @internal Mirrors ActiveModel::Name::MISSING_TRANSLATION */
 const MISSING_TRANSLATION = -(2 ** 60);
@@ -329,7 +330,7 @@ export class ModelName {
     this.singularRouteKey = singularize(this.routeKey);
   }
 
-  get human(): string {
+  human(options: TranslateOptions = {}): string {
     if (!this._klass) return this._humanFallback;
 
     const i18nKeys = this.i18nKeys();
@@ -338,11 +339,13 @@ export class ModelName {
 
     const [key, ...defaults] = i18nKeys as unknown[];
     const defaultChain: unknown[] = defaults.map((k) => `:${k as string}`);
+    if (options.default != null && options.default !== false) defaultChain.push(options.default);
     defaultChain.push(MISSING_TRANSLATION);
 
     let translation = I18n.translate(key as string, {
       scope: i18nScope,
       count: 1,
+      ...options,
       default: defaultChain,
     });
     if (translation === MISSING_TRANSLATION) translation = this._humanFallback;

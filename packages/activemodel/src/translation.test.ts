@@ -148,6 +148,23 @@ describe("ActiveModelI18nTests", () => {
     expect(opts).toEqual({});
   });
 
+  it("translated model with default value when missing translation", () => {
+    class Person extends Model {}
+    expect(Person.modelName.human({ default: "dude" })).toBe("dude");
+  });
+
+  it("translated model with default key when missing both translations", () => {
+    class Person extends Model {}
+    expect(Person.modelName.human({ default: ":this_key_does_not_exist" })).toBe("Person");
+  });
+
+  it("human does not modify options", () => {
+    class Person extends Model {}
+    const options = { default: "person model" };
+    Person.modelName.human(options);
+    expect(options).toEqual({ default: "person model" });
+  });
+
   it("raise on missing translations", () => {
     // humanAttributeName always returns a default, never raises
     expect(Model.humanAttributeName("missing_field")).toBe("Missing field");

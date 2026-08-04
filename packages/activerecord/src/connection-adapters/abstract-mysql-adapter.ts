@@ -442,15 +442,15 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   supportsIndexSortOrder(): boolean {
     // Rails: `mariadb? ? database_version >= "10.8.1" : database_version >= "8.0.1"`
     // (abstract_mysql_adapter.rb#supports_index_sort_order?).
-    if (this._mariadb) return this._databaseVersion?.gte("10.8.1") === true;
-    return this._databaseVersion?.gte("8.0.1") === true;
+    if (this._mariadb) return (this._databaseVersion?.compare("10.8.1") ?? -1) >= 0;
+    return (this._databaseVersion?.compare("8.0.1") ?? -1) >= 0;
   }
 
   supportsExpressionIndex(): boolean {
     // Mirror Rails `!mariadb? && database_version >= "8.0.13"`
     // (abstract_mysql_adapter.rb:104) — MariaDB is excluded.
     if (this._mariadb) return false;
-    return this._databaseVersion?.gte("8.0.13") === true;
+    return (this._databaseVersion?.compare("8.0.13") ?? -1) >= 0;
   }
 
   supportsTransactionIsolation(): boolean {
@@ -480,9 +480,12 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
       // excluded, which a single `>= 10.2.22` would wrongly admit.
       const version = this._databaseVersion;
       if (!version) return false;
-      return version.gte("10.3.10") || (version.lt("10.3") && version.gte("10.2.22"));
+      return (
+        version.compare("10.3.10") >= 0 ||
+        (version.compare("10.3") < 0 && version.compare("10.2.22") >= 0)
+      );
     }
-    return this._databaseVersion?.gte("8.0.16") === true;
+    return (this._databaseVersion?.compare("8.0.16") ?? -1) >= 0;
   }
 
   supportsViews(): boolean {
@@ -499,12 +502,12 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   supportsOptimizerHints(): boolean {
     if (this._mariadb) return false;
-    return this._databaseVersion?.gte("5.7.7") === true;
+    return (this._databaseVersion?.compare("5.7.7") ?? -1) >= 0;
   }
 
   supportsCommonTableExpressions(): boolean {
-    if (this._mariadb) return this._databaseVersion?.gte("10.2.1") === true;
-    return this._databaseVersion?.gte("8.0") === true;
+    if (this._mariadb) return (this._databaseVersion?.compare("10.2.1") ?? -1) >= 0;
+    return (this._databaseVersion?.compare("8.0") ?? -1) >= 0;
   }
 
   supportsAdvisoryLocks(): boolean {
@@ -520,7 +523,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   supportsInsertReturning(): boolean {
-    if (this._mariadb) return this._databaseVersion?.gte("10.5.0") === true;
+    if (this._mariadb) return (this._databaseVersion?.compare("10.5.0") ?? -1) >= 0;
     return false;
   }
 
@@ -552,7 +555,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     // (mysql2_adapter.rb:70 / trilogy_adapter.rb:95) — MariaDB JSON is a
     // LONGTEXT alias, so Rails reports it unsupported.
     if (this._mariadb) return false;
-    return this._databaseVersion?.gte("5.7.8") === true;
+    return (this._databaseVersion?.compare("5.7.8") ?? -1) >= 0;
   }
 
   supportsComments(): boolean {
@@ -1255,7 +1258,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   // rather than raise a false positive — a query-issuing sync port isn't possible.
   override checkVersion(): void {
     const version = this._databaseVersion;
-    if (version && version.lt("5.6.4")) {
+    if (version && version.compare("5.6.4") < 0) {
       throw new DatabaseVersionError(
         `Your version of MySQL (${version}) is too old. Active Record supports MySQL >= 5.6.4.`,
       );
@@ -1441,7 +1444,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::DatabaseStatements#analyze_without_explain?
    */
   protected analyzeWithoutExplain(): boolean {
-    return this._mariadb && this._databaseVersion?.gte("10.1.0") === true;
+    return this._mariadb && (this._databaseVersion?.compare("10.1.0") ?? -1) >= 0;
   }
 
   /**
@@ -1722,19 +1725,19 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   /** @internal */
   supportsInsertRawAliasSyntax(): boolean {
     if (this._mariadb) return false;
-    return this._databaseVersion?.gte("8.0.19") === true;
+    return (this._databaseVersion?.compare("8.0.19") ?? -1) >= 0;
   }
 
   /** @internal */
   supportsRenameIndex(): boolean {
-    if (this._mariadb) return this._databaseVersion?.gte("10.5.2") === true;
-    return this._databaseVersion?.gte("5.7.6") === true;
+    if (this._mariadb) return (this._databaseVersion?.compare("10.5.2") ?? -1) >= 0;
+    return (this._databaseVersion?.compare("5.7.6") ?? -1) >= 0;
   }
 
   /** @internal */
   supportsRenameColumn(): boolean {
-    if (this._mariadb) return this._databaseVersion?.gte("10.5.2") === true;
-    return this._databaseVersion?.gte("8.0.3") === true;
+    if (this._mariadb) return (this._databaseVersion?.compare("10.5.2") ?? -1) >= 0;
+    return (this._databaseVersion?.compare("8.0.3") ?? -1) >= 0;
   }
 
   /**

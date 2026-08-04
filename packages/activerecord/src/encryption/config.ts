@@ -9,6 +9,8 @@ import { deflateSync, inflateSync } from "zlib";
 import { presence } from "@blazetrails/activesupport";
 
 import { Configuration } from "./errors.js";
+import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
+import { KeyGenerator } from "./key-generator.js";
 import type { SchemeOptions } from "./scheme.js";
 
 /**
@@ -50,7 +52,6 @@ export class Config {
   addToFilterParameters: boolean = true;
   excludedFromFilterParameters: string[] = [];
   previousSchemes: SchemeOptions[] = [];
-  supportSha1ForNonDeterministicEncryption: boolean = false;
   extendQueries: boolean = false;
   hashDigestClass: string = "SHA1";
   compressor: Compressor = Zlib;
@@ -63,6 +64,24 @@ export class Config {
   set previous(schemes: SchemeOptions[]) {
     for (const props of schemes) {
       this.addPreviousScheme(props);
+    }
+  }
+
+  /**
+   * Rails `support_sha1_for_non_deterministic_encryption=`
+   * (encryption/config.rb:28-33) is a writer with behavior and no reader: a
+   * truthy value with a primary key configured installs a previous scheme
+   * whose key provider derives from a SHA1 key generator. A TS `set` accessor
+   * would do, but the trails idiom for a Ruby `x=` that is not stored state is
+   * a `setX` method, and this one takes no reader alongside it.
+   */
+  setSupportSha1ForNonDeterministicEncryption(value: boolean): void {
+    if (value && this.hasPrimaryKey()) {
+      const sha1KeyGenerator = new KeyGenerator("SHA1");
+      const sha1KeyProvider = new DerivedSecretKeyProvider(this.primaryKey, {
+        keyGenerator: sha1KeyGenerator,
+      });
+      this.addPreviousScheme({ keyProvider: sha1KeyProvider });
     }
   }
 

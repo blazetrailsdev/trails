@@ -12,6 +12,7 @@ import type {
   ColumnType,
   AddColumnDefinition,
   AddIndexOptions,
+  TableDefinitionConn,
 } from "../abstract/schema-definitions.js";
 import {
   assertSafeMysqlIdentifier,
@@ -21,7 +22,6 @@ import {
   IndexDefinition,
   TableDefinition,
 } from "../abstract/schema-definitions.js";
-import type { SchemaQuoter } from "../abstract/assert-schema-adapter.js";
 import {
   addOptionsForIndexColumns,
   integerToSql,
@@ -52,7 +52,7 @@ type MysqlTableDef = TableDefinition & { charset?: string; collation?: string };
 /** @internal Adapter surface consulted by the visitor's support flags and MariaDB branches.
  * Rails' `SchemaCreation#initialize(conn)` always receives the live adapter, so the quoting
  * half is required and dispatches polymorphically. */
-export interface VisitorHostAdapter extends SchemaQuoter {
+export interface VisitorHostAdapter extends TableDefinitionConn {
   supportsCheckConstraints(): boolean;
   supportsForeignKeys(): boolean;
   supportsIndexesInCreate(): boolean;

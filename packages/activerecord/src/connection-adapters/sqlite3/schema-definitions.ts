@@ -9,12 +9,12 @@ import {
   ColumnDefinition,
 } from "../abstract/schema-definitions.js";
 import type { ColumnOptions, ColumnType } from "../abstract/schema-definitions.js";
-import type { SchemaQuoter } from "../abstract/assert-schema-adapter.js";
+import type { TableDefinitionConn } from "../abstract/schema-definitions.js";
 
 export class TableDefinition extends AbstractTableDefinition {
   constructor(
     tableName: string,
-    options: { id?: boolean | "uuid"; adapter: SchemaQuoter; [key: string]: unknown },
+    options: { id?: boolean | "uuid"; adapter: TableDefinitionConn; [key: string]: unknown },
   ) {
     super(tableName, { ...options, adapterName: "sqlite" });
   }

@@ -2,11 +2,11 @@ import { BetterSQLite3Adapter } from "../connection-adapters/better-sqlite3-adap
 import { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
 import { Mysql2Adapter } from "../connection-adapters/mysql2-adapter.js";
 import { Version } from "../connection-adapters/abstract-adapter.js";
-import type { SchemaQuoter } from "../connection-adapters/abstract/assert-schema-adapter.js";
+import type { TableDefinitionConn } from "../connection-adapters/abstract/schema-definitions.js";
 
 export type SchemaConnName = "sqlite" | "postgres" | "mysql";
 
-const conns = new Map<SchemaConnName, SchemaQuoter>();
+const conns = new Map<SchemaConnName, TableDefinitionConn>();
 
 /**
  * The `conn` argument for DDL-rendering unit tests. Rails' `SchemaCreation.new`
@@ -19,7 +19,7 @@ const conns = new Map<SchemaConnName, SchemaQuoter>();
  * read the cached version, which is cold on a connection that was never opened, so
  * that adapter is seeded with a modern server version.
  */
-export function schemaConn(name: SchemaConnName): SchemaQuoter {
+export function schemaConn(name: SchemaConnName): TableDefinitionConn {
   let conn = conns.get(name);
   if (!conn) {
     conn =
