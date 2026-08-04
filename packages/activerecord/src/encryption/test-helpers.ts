@@ -94,6 +94,9 @@ export function configureEncryption(
   // Mirrors Rails' encryption test helper which unconditionally prepends EncryptedFixtures:
   // `class ActiveRecord::Fixture; prepend ActiveRecord::Encryption::EncryptedFixtures; end`
   Configurable.config.encryptFixtures = overrides.encryptFixtures ?? true;
+  // helper.rb:141 — `ActiveRecord::Encryption.config.previous_schemes.clear` in
+  // EncryptionTestCase#setup, which runs after the boot-time `configure`.
+  Configurable.config.previousSchemes.length = 0;
 }
 
 export const AUTHOR_NAME_LIMIT = 100;

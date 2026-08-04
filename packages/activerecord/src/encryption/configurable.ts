@@ -63,7 +63,12 @@ export class Configurable {
     if (options.keyDerivationSalt !== undefined)
       config.keyDerivationSalt = options.keyDerivationSalt;
 
-    for (const [key, value] of Object.entries(options)) {
+    const properties: Record<string, unknown> = { ...options };
+    // Set the default for this property here instead of in +Config#set_defaults+ as this needs
+    // to happen *after* the keys have been set.
+    properties.supportSha1ForNonDeterministicEncryption ??= true;
+
+    for (const [key, value] of Object.entries(properties)) {
       if (key === "primaryKey" || key === "deterministicKey" || key === "keyDerivationSalt") {
         continue;
       }
