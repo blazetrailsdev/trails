@@ -1,7 +1,9 @@
 /**
  * The `InvalidLocaleData` arms of `load_yml` / `load_file`, and the Psych input
  * surface `load_yml` accepts by handing the file straight to a YAML parser
- * (base.rb:261-270) — pinned here because the gem gets both from Psych.
+ * (base.rb:261-270) — pinned here because the gem gets both from Psych, so
+ * anchors, aliases, tags, block scalars and mapping entries inside a block
+ * sequence all load rather than raising.
  */
 
 import { readFile } from "node:fs/promises";
@@ -146,9 +148,6 @@ describe("I18n::Backend::Base file loading", () => {
     });
   });
 
-  // Rails runs no parser of its own: `load_yml` hands the file to Psych
-  // (base.rb:261-270), so anchors, aliases, tags, block scalars and mapping
-  // entries inside a block sequence all load rather than raising.
   it("loads the constructs Psych accepts beyond plain block mappings", () => {
     backend.loadTranslations(`${localesDir()}/psych.yml`);
     expect(backend.translate("en", "greeting")).toBe("Hello");
