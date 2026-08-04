@@ -247,18 +247,23 @@ function parseDot(str: string): DateParts | null {
 /**
  * @internal `date_parse.c` `parse_ddd`: an all-digit run, read by its width.
  *
- * @missingRailsCall The two- and three-digit widths (a bare `:mday`, and the
- * `:yday` of `"102"`) are not read. They are only reachable once `parse_time`
- * has taken the time-of-day text out of the string, and `parse_time` is not
- * ported — without it trails would read the minutes of `"07.2008"`, which Ruby
- * rejects, as a day of the month. Raising is the safe side of that gap.
+ * The 10-, 12- and 14-digit widths are the 8-digit date with a time of day
+ * after it (`date_parse.c:1815-1853`), and `::Date` discards that time, so they
+ * take the same branch.
+ *
+ * @missingRailsCall The widths that name no month — `2` (a bare `:mday`), and
+ * `3`, `5` and `7` (a `:yday`) — are not read. They are only reachable once
+ * `parse_time` has taken the time-of-day text out of the string, and
+ * `parse_time` is not ported: without it trails would read the minutes of
+ * `"07.2008"`, which Ruby rejects, as a day of the month. Raising is the safe
+ * side of that gap.
  */
 function parseDdd(str: string): DateParts | null {
   const m = /([-+]?)(\d{4,14})/.exec(str);
   if (!m) return null;
   const sign = m[1] === "-" ? "-" : "";
   const digits = m[2];
-  if (digits.length === 8) {
+  if (digits.length === 8 || digits.length === 10 || digits.length === 12 || digits.length === 14) {
     return s3e(sign + digits.slice(0, 4), digits.slice(4, 6), digits.slice(6, 8));
   }
   if (digits.length === 6) {
