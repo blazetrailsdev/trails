@@ -74,6 +74,13 @@ describe("Date", () => {
     expect(() => RubyDate.parse("not a date")).toThrow("invalid date");
   });
 
+  it("raises Date::Error, which subclasses ArgumentError as it does in Ruby", () => {
+    expect(() => RubyDate.parse("not a date")).toThrow(RubyDate.Error);
+    expect(() => RubyDate.parse("2008-02-30")).toThrow(RubyDate.Error);
+    expect(() => RubyDate.parse("not a date")).toThrow(ArgumentError);
+    expect(new RubyDate.Error("invalid date").name).toBe("Date::Error");
+  });
+
   it("counts wday from Sunday, as Ruby does", () => {
     expect(RubyDate.parse("2008-07-02").wday).toBe(3);
     expect(RubyDate.parse("2008-07-06").wday).toBe(0);
