@@ -91,11 +91,13 @@ describe("Date", () => {
     expect(() => RubyDate.parse("2007366")).toThrow("invalid date");
   });
 
+  it("reads a narrow run followed by a fraction as a time of day, not a date", () => {
+    expect(() => RubyDate.parse("07.2008")).toThrow("invalid date");
+  });
+
   it("takes the time of day out of the string first, as parse_time does", () => {
     const date = RubyDate.parse("2008070 10:30");
     expect([date.year, date.mon, date.day]).toEqual([2008, 3, 10]);
-    // A fraction after a narrow run is a time of day, not a date.
-    expect(() => RubyDate.parse("07.2008")).toThrow("invalid date");
     expect(() => RubyDate.parse("10:30")).toThrow("invalid date");
   });
 

@@ -234,7 +234,7 @@ function parseDay(str: string): string {
 const NUMBER = "(?<!\\d)\\d";
 
 /**
- * @internal `date_parse.c` `parse_time2_cb`: the hour/minute/second of the time
+ * @internal `date_parse.c` `parse_time2_cb` (`date_parse.c:613-653`): the hour/minute/second of the time
  * text `parse_time` matched, with `p`/`pm` moving the hour into the afternoon.
  */
 function parseTime2Cb(m: RegExpExecArray, hash: DateParts): number {
@@ -258,7 +258,7 @@ function parseTime2Cb(m: RegExpExecArray, hash: DateParts): number {
 }
 
 /**
- * @internal `date_parse.c` `parse_time_cb`: the zone comes off the second group
+ * @internal `date_parse.c` `parse_time_cb` (`date_parse.c:656-686`): the zone comes off the second group
  * of `parse_time`'s match, and the time text itself is re-matched field by
  * field.
  */
@@ -285,12 +285,15 @@ function parseTimeCb(m: RegExpExecArray, hash: DateParts): number {
 }
 
 /**
- * @internal `date_parse.c` `parse_time`: the time of day and its zone. It runs
- * before every date sub-parser and, like all of them, replaces the text it
- * matched with a space (`date_parse.c` `subx`) — so `"07.2008"` reaches
- * `parse_ddd` whole while `"2008070 10:30"` reaches it as its date alone. That
- * removal is what lets `parse_ddd` read a bare two- or three-digit run as a
- * date rather than as minutes.
+ * @internal `date_parse.c` `parse_time` (`date_parse.c:689-733`): the time of
+ * day and its zone. It runs before every date sub-parser and, like all of them,
+ * replaces the text it matched with a space (`date_parse.c` `subx`) — so
+ * `"07.2008"` reaches `parse_ddd` whole while `"2008070 10:30"` reaches it as
+ * its date alone. That removal is what lets `parse_ddd` read a bare two- or
+ * three-digit run as a date rather than as minutes.
+ *
+ * Ruby edits the one String every sub-parser shares; a JS string is immutable,
+ * so the edited string is answered instead, as `parse_day` above already does.
  *
  * Ruby turns `IGNORECASE` back off around the two alphabetic zone spellings
  * (`(?-i:…)`); the groups it guards are character classes that already span
@@ -384,8 +387,7 @@ function n2i(s: string, f: number, w: number): number {
  * fraction, and names no date at all — while the same widths on their own are a
  * `:mday` (2), a `:yday` (3), or a year and a `:yday` (5 and 7).
  */
-function parseDddCb(m: RegExpExecArray): DateParts {
-  const hash: DateParts = {};
+function parseDddCb(m: RegExpExecArray, hash: DateParts): number {
   const s1 = m[1];
   const s2 = m[2];
   const s3 = m[3];
@@ -522,7 +524,7 @@ function parseDddCb(m: RegExpExecArray): DateParts {
     hash.zone = s5;
   }
 
-  return hash;
+  return 1;
 }
 
 /**
@@ -554,7 +556,9 @@ function parseDdd(str: string): DateParts | null {
     "i",
   ).exec(str);
   if (m === null) return null;
-  return parseDddCb(m);
+  const hash: DateParts = {};
+  parseDddCb(m, hash);
+  return hash;
 }
 
 /**
@@ -675,29 +679,29 @@ export class Date {
    *
    * `comp` completes a two-digit year, which is why `"080702"` is 2008 here
    * and 0008 through Rails' `::Date.parse(self, false)`.
+   *
+   * `rt__valid_date_frags_p` (`date_core.c:4185-4220`) tries the ordinal date
+   * — a `:year` and a `:yday`, which is what `"2008070"` names — before the
+   * civil one, and a string that named only a time of day answers neither and
+   * raises.
    */
   static parse(str: string, comp = true): Date {
     const parts = Date._parse(str, comp);
     if (!parts) throw new DateError("invalid date");
     completeFrags(parts);
+    let d: Temporal.PlainDate | null = null;
     try {
-      // `rt__valid_date_frags_p` tries the civil date first and the ordinal one
-      // after it (`date_core.c:4128-4149`); a string that named only a time of
-      // day answers neither and raises here.
-      if (parts.mon !== undefined && parts.mday !== undefined) {
-        return new Date(parts.year as number, parts.mon, parts.mday);
+      if (parts.yday !== undefined && parts.year !== undefined && parts.yday >= 1) {
+        d = new Temporal.PlainDate(parts.year, 1, 1).add({ days: parts.yday - 1 });
+        if (d.year !== parts.year) d = null;
+      } else if (parts.mon !== undefined && parts.mday !== undefined) {
+        d = new Temporal.PlainDate(parts.year as number, parts.mon, parts.mday);
       }
-      if (parts.yday !== undefined) {
-        const d = new Temporal.PlainDate(parts.year as number, 1, 1).add({
-          days: parts.yday - 1,
-        });
-        if (parts.yday < 1 || d.year !== parts.year) throw new ArgumentError("invalid date");
-        return new Date(d.year, d.month, d.day);
-      }
-      throw new ArgumentError("invalid date");
     } catch {
-      throw new DateError("invalid date");
+      d = null;
     }
+    if (d === null) throw new DateError("invalid date");
+    return new Date(d.year, d.month, d.day);
   }
 
   /**
@@ -707,6 +711,13 @@ export class Date {
    * Ruby answers a Hash of whatever fields it found, which is why a fragment
    * such as `"Feb 3rd"` comes back without a `:year`; `null` is the Hash no
    * sub-parser filled at all.
+   *
+   * Ruby's sub-parsers all `set_hash` into the one Hash it built up front, so a
+   * later one overwrites what `parse_time` put there; the ported sub-parsers
+   * answer their fields instead, and merging them over `parse_time`'s is that
+   * same last-writer-wins. `:_comp` starts out as `comp` (`date_parse.c:2172`)
+   * and only ever turns false, so an absent one is `comp`, and the year is
+   * completed only within `0..99` (`date_parse.c:2267-2287`).
    *
    * @missingRailsCall `parse_jis`, `parse_vms`, `parse_iso2`, `parse_year`,
    * `parse_mon`, `parse_mday` and `parse_bc` are not ported: they read a
@@ -722,12 +733,7 @@ export class Date {
     }
     parts ??= parseIso(str) ?? parseSla(str) ?? parseDot(str) ?? parseDdd(str);
     if (parts === null && Object.keys(hash).length === 0) return null;
-    // Ruby's sub-parsers all `set_hash` into the one Hash, so a later one
-    // overwrites what `parse_time` put there.
     parts = Object.assign(hash, parts);
-    // `_comp` starts out as `comp` (`date_parse.c:2172`) and only ever turns
-    // false, so an absent one is `comp`; Ruby completes the year in place, and
-    // only within `0..99` (`date_parse.c:2268-2287`).
     if (comp && parts._comp !== false && parts.year !== undefined) {
       if (parts.year >= 0 && parts.year <= 99) parts.year = compYear69(parts.year);
     }
