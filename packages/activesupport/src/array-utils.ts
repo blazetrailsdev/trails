@@ -2,6 +2,28 @@
  * Array utilities mirroring Rails ActiveSupport array extensions.
  */
 
+import { assertValidKeys } from "./hash-utils.js";
+import { I18n } from "./i18n.js";
+
+/**
+ * `support.array` is stored under Ruby's snake_case keys, but the options
+ * `toSentence` merges them into are camelCase. Same shape as
+ * `number-helper/number-converter.ts`'s own key map.
+ */
+const I18N_KEY_MAP: Record<string, string> = {
+  words_connector: "wordsConnector",
+  two_words_connector: "twoWordsConnector",
+  last_word_connector: "lastWordConnector",
+};
+
+function camelizeI18nKeys(obj: Record<string, string>): Record<string, string> {
+  const result: Record<string, string> = {};
+  for (const [k, v] of Object.entries(obj)) {
+    result[I18N_KEY_MAP[k] ?? k] = v;
+  }
+  return result;
+}
+
 /**
  * Wraps a value in an array. `null`/`undefined` → `[]`, arrays pass through,
  * scalars become `[value]`.
@@ -36,6 +58,10 @@ export function inGroupsOf<T>(
 /**
  * Convert an array to a sentence string.
  * `["a", "b", "c"]` → `"a, b, and c"`
+ *
+ * Ruby's `default_connectors.merge!(options)` overrides on key presence; a TS
+ * caller forwarding an absent option passes `undefined`, which must not
+ * override, so the merge skips `undefined` values.
  */
 export function toSentence(
   array: string[],
@@ -43,13 +69,27 @@ export function toSentence(
     wordsConnector?: string;
     twoWordsConnector?: string;
     lastWordConnector?: string;
+    locale?: string | false;
   } = {},
 ): string {
-  const {
-    wordsConnector = ", ",
-    twoWordsConnector = " and ",
-    lastWordConnector = ", and ",
-  } = options;
+  assertValidKeys(options, ["wordsConnector", "twoWordsConnector", "lastWordConnector", "locale"]);
+
+  const defaultConnectors: Record<string, string> = {
+    wordsConnector: ", ",
+    twoWordsConnector: " and ",
+    lastWordConnector: ", and ",
+  };
+  if (options.locale !== false) {
+    const i18nConnectors = I18n.translate("support.array", {
+      locale: options.locale ?? null,
+      default: {},
+    }) as Record<string, string>;
+    Object.assign(defaultConnectors, camelizeI18nKeys(i18nConnectors));
+  }
+  for (const [k, v] of Object.entries(options)) {
+    if (v !== undefined) defaultConnectors[k] = v as string;
+  }
+  const { wordsConnector, twoWordsConnector, lastWordConnector } = defaultConnectors;
 
   if (array.length === 0) return "";
   if (array.length === 1) return array[0];

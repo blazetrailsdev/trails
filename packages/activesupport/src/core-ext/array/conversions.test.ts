@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 
 import { toSentence } from "../../array-utils.js";
+import { ArgumentError } from "../../hash-utils.js";
 
 describe("ToSentenceTest", () => {
   it("plain array to sentence", () => {
@@ -49,8 +50,11 @@ describe("ToSentenceTest", () => {
   });
 
   it("with invalid options", () => {
-    // Unknown options are ignored
-    expect(toSentence(["a", "b", "c"], {})).toBe("a, b, and c");
+    expect(() => toSentence(["one", "two"], { passing: "invalid option" } as never)).toThrowError(
+      new ArgumentError(
+        "Unknown key: :passing. Valid keys are: :wordsConnector, :twoWordsConnector, :lastWordConnector, :locale",
+      ),
+    );
   });
 
   it("always returns string", () => {
