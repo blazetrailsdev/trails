@@ -164,12 +164,16 @@ interface DateParts {
   mon?: number;
   mday?: number;
   yday?: number;
+  cwyear?: number;
+  cweek?: number;
+  cwday?: number;
   hour?: number;
   min?: number;
   sec?: number;
   secFraction?: number;
   zone?: string;
   _comp?: boolean;
+  _bc?: boolean;
 }
 
 /**
@@ -188,37 +192,160 @@ function monNum(str: string): number {
   return ABBR_MONTH_NAMES.findIndex((m) => m.toLowerCase() === str.slice(0, 3).toLowerCase()) + 1;
 }
 
+/** @internal `date_parse.c` `issign` (`date_parse.c:63`). */
+function issign(c: string): boolean {
+  return c === "-" || c === "+";
+}
+
+/** @internal `date_parse.c` `isdigit`, the C library's. */
+function isdigit(c: string): boolean {
+  return c >= "0" && c <= "9";
+}
+
+/** @internal `date_parse.c` `digit_span` (`date_parse.c:71-78`): the run of digits at `s`. */
+function digitSpan(str: string, s: number, e: number): number {
+  let i = 0;
+  while (s + i < e && isdigit(str[s + i])) i++;
+  return i;
+}
+
 /**
- * @internal `date_parse.c` `s3e`, which decides which of a match's numeric
- * tokens is the year: a token of more than two digits is one, a shorter one is
- * a month or a day. That is why `"01/01/2012".to_date` is 1 Jan 2012 while
- * `"12/13/2012".to_date` raises
- * (activesupport/lib/active_support/core_ext/string/conversions.rb:38-41), and
- * why `"07/08"` names no year at all.
+ * @internal `date_parse.c` `s3e` (`date_parse.c:80-253`), which decides which of
+ * a match's tokens is the year: a token of more than two characters is one, and
+ * so is a token an apostrophe marks (`:99-157`). That is why
+ * `"01/01/2012".to_date` is 1 Jan 2012 while `"12/13/2012".to_date` raises
+ * (activesupport/lib/active_support/core_ext/string/conversions.rb:38-41), why
+ * `"07/08"` names no year at all, and why `"'01-FEB-3"` is 3 February 2001
+ * where `"3-FEB-2001"` is the same date the other way round.
  *
- * A signed year is never completable (`date_parse.c:172-181`, `:250-251`), so
+ * Each of the three is then read from its first sign or digit (`:159-192`,
+ * `:197-221`, `:223-247`), so the apostrophe never reaches the number. A signed
+ * year, and one of more than two digits, is not completable (`:167-181`), so
  * `"-08-07-02"` is year -8 rather than 1992.
+ *
+ * `bc` is the era `parse_eu` and `parse_us` read out of the string itself
+ * (`:194-195`), and sets the same `:_bc` `parse_bc` does.
+ *
+ * Ruby's `m` is a Ruby object that `f_to_s` makes a String (`:86-87`); the
+ * ported callers pass the String directly.
  */
-function s3e(y: string | null, m: string, d: string | null): DateParts {
-  if (y === null && d !== null && d.length > 2) {
-    y = d;
-    d = null;
+function s3e(y: string | null, m: string | null, d: string | null, bc: boolean): DateParts {
+  const hash: DateParts = {};
+  let c: boolean | null = null;
+
+  if (y !== null && m !== null && d === null) {
+    const oy = y;
+    const om = m;
+    const od = d;
+
+    y = od;
+    m = oy;
+    d = om;
   }
-  if (y !== null && d === null) {
-    if (y.replace(/^[-+]/, "").length > 2) return { year: Number(y), mon: Number(m), _comp: false };
-    if (m.length > 2) return { year: Number(m), mon: Number(y), _comp: false };
-    return { mon: Number(y), mday: Number(m) };
+
+  if (y === null) {
+    if (d !== null && d.length > 2) {
+      y = d;
+      d = null;
+    }
+    if (d !== null && d.length > 0 && d[0] === "'") {
+      y = d;
+      d = null;
+    }
   }
-  if (y === null) return { mon: Number(m), mday: Number(d) };
-  if (y.replace(/^[-+]/, "").length < 3 && d !== null && d.length > 2) {
-    [y, d] = [d, y];
+
+  if (y !== null) {
+    let s = 0;
+    let ep = y.length;
+    const end = y.length;
+
+    while (s < ep && !issign(y[s]) && !isdigit(y[s])) s++;
+    if (s < ep) {
+      const bp = s;
+      if (issign(y[s])) s++;
+      const l = digitSpan(y, s, ep);
+      ep = s + l;
+      if (ep < end) {
+        const od = y.slice(bp, ep);
+
+        y = d;
+        d = od;
+      }
+    }
   }
-  return {
-    year: Number(y),
-    mon: Number(m),
-    mday: Number(d),
-    _comp: /^\d{1,2}$/.test(y),
-  };
+
+  if (m !== null) {
+    if (m[0] === "'" || m.length > 2) {
+      const oy = y;
+      const om = m;
+      const od = d;
+
+      y = om;
+      m = od;
+      d = oy;
+    }
+  }
+
+  if (d !== null) {
+    if (d[0] === "'" || d.length > 2) {
+      const oy = y;
+      const od = d;
+
+      y = od;
+      d = oy;
+    }
+  }
+
+  if (y !== null) {
+    let s = 0;
+    let ep = y.length;
+    let sign = false;
+
+    while (s < ep && !issign(y[s]) && !isdigit(y[s])) s++;
+    if (s < ep) {
+      const bp = s;
+      if (issign(y[s])) {
+        s++;
+        sign = true;
+      }
+      if (sign) c = false;
+      const l = digitSpan(y, s, ep);
+      ep = s + l;
+      if (l > 2) c = false;
+      hash.year = Number(y.slice(bp, ep));
+    }
+  }
+
+  if (bc) hash._bc = true;
+
+  if (m !== null) {
+    let s = 0;
+    let ep = m.length;
+
+    while (s < ep && !isdigit(m[s])) s++;
+    if (s < ep) {
+      const bp = s;
+      const l = digitSpan(m, s, ep);
+      ep = s + l;
+      hash.mon = Number(m.slice(bp, ep));
+    }
+  }
+
+  if (d !== null) {
+    let s = 0;
+    let ep = d.length;
+
+    while (s < ep && !isdigit(d[s])) s++;
+    if (s < ep) {
+      const bp = s;
+      const l = digitSpan(d, s, ep);
+      ep = s + l;
+      hash.mday = Number(d.slice(bp, ep));
+    }
+  }
+
+  if (c !== null) hash._comp = c;
+  return hash;
 }
 
 /** @internal `date_parse.c` `parse_day`: a leading day name is not a date field. */
@@ -339,40 +466,321 @@ function parseTime(str: string, hash: DateParts): string {
   return rest;
 }
 
-/** @internal `date_parse.c` `parse_eu`: `2nd July 2008`, `2 Jul 2008`, `3 Feb`. */
-function parseEu(str: string): DateParts | null {
-  const m = new RegExp(
-    `'?(\\d+)[^-\\d\\s]*[-,.\\s]*(${ABBR_MONTHS})[^-\\d\\s]*(?:[,.\\s]+'?([-+]?\\d+)|[-,.\\s]*'?(\\d+))?`,
-    "i",
-  ).exec(str);
-  return m ? s3e(m[3] ?? m[4] ?? null, String(monNum(m[2])), m[1]) : null;
+/**
+ * @internal `date_parse.c` `BEGIN_ERA` / `END_ERA` (`date_parse.c:736-737`): the
+ * era spelling `parse_eu` and `parse_us` take is a word of its own, and `"b.c."`
+ * ends in the dot that would otherwise end the word.
+ */
+const BEGIN_ERA = "\\b";
+const END_ERA = "(?!(?<!\\.)[a-z])";
+
+/**
+ * @internal `date_parse.c` `parse_eu_cb` (`date_parse.c:836-868`): the day, the
+ * month, the era and the year, in the order `parse_eu` matches them.
+ */
+function parseEuCb(m: RegExpExecArray, hash: DateParts): number {
+  const d = m[1];
+  let mon: string | number = m[2];
+  const b = m[3];
+  const y = m[4];
+
+  mon = monNum(mon);
+
+  Object.assign(
+    hash,
+    s3e(y ?? null, String(mon), d, b !== undefined && (b[0] === "B" || b[0] === "b")),
+  );
+  return 1;
 }
 
-/** @internal `date_parse.c` `parse_us`: `Jul 2 2008`, `July 2nd, 2008`, `Feb 2008`. */
-function parseUs(str: string): DateParts | null {
+/** @internal `date_parse.c` `parse_eu` (`date_parse.c:869-916`): `2nd July 2008`, `2 Jul 2008`, `3 Feb`. */
+function parseEu(str: string): DateParts | null {
   const m = new RegExp(
-    `\\b(${ABBR_MONTHS})[^-\\d\\s]*[-,.\\s]+'?(\\d+)[^-\\d\\s]*(?:[,.\\s]+'?([-+]?\\d+)|[-,.\\s]*'?(\\d+))?`,
+    `('?${NUMBER}+)[^-\\d\\s]*` +
+      "\\s*" +
+      `(${ABBR_MONTHS})[^-\\d\\s']*` +
+      "(?:" +
+      "\\s*" +
+      "(?:" +
+      BEGIN_ERA +
+      "(c(?:e|\\.e\\.)|b(?:ce|\\.c\\.e\\.)|a(?:d|\\.d\\.)|b(?:c|\\.c\\.))" +
+      END_ERA +
+      ")?" +
+      "\\s*" +
+      "('?-?\\d+(?:(?:st|nd|rd|th)\\b)?)" +
+      ")?",
     "i",
   ).exec(str);
-  return m ? s3e(m[3] ?? m[4] ?? null, String(monNum(m[1])), m[2]) : null;
+  if (m === null) return null;
+  const hash: DateParts = {};
+  parseEuCb(m, hash);
+  return hash;
+}
+
+/**
+ * @internal `date_parse.c` `parse_us_cb` (`date_parse.c:917-950`): the same four
+ * tokens, with the month first.
+ */
+function parseUsCb(m: RegExpExecArray, hash: DateParts): number {
+  let mon: string | number = m[1];
+  const d = m[2];
+
+  const b = m[3];
+  const y = m[4];
+
+  mon = monNum(mon);
+
+  Object.assign(
+    hash,
+    s3e(y ?? null, String(mon), d, b !== undefined && (b[0] === "B" || b[0] === "b")),
+  );
+  return 1;
+}
+
+/**
+ * @internal `date_parse.c` `parse_us` (`date_parse.c:951-996`): `Jul 2 2008`,
+ * `July 2nd, 2008`, `Feb 2008`.
+ *
+ * Ruby writes the two runs before the year possessively (`\s*+,?\s*+`); JS has
+ * no possessive quantifier, and the greedy spelling matches the same language
+ * here because neither the era nor the year can begin with a space or a comma.
+ */
+function parseUs(str: string): DateParts | null {
+  const m = new RegExp(
+    `\\b(${ABBR_MONTHS})[^-\\d\\s']*` +
+      "\\s*" +
+      "('?\\d+)[^-\\d\\s']*" +
+      "(?:" +
+      "\\s*,?" +
+      "\\s*" +
+      "(c(?:e|\\.e\\.)|b(?:ce|\\.c\\.e\\.)|a(?:d|\\.d\\.)|b(?:c|\\.c\\.))?" +
+      "\\s*" +
+      "('?-?\\d+)" +
+      ")?",
+    "i",
+  ).exec(str);
+  if (m === null) return null;
+  const hash: DateParts = {};
+  parseUsCb(m, hash);
+  return hash;
 }
 
 /** @internal `date_parse.c` `parse_iso`: `2008-07-02`, and the unpadded `2008-7-2`. */
 function parseIso(str: string): DateParts | null {
   const m = /([-+]?\d+)-(\d+)-(-?\d+)/.exec(str);
-  return m ? s3e(m[1], m[2], m[3]) : null;
+  return m ? s3e(m[1], m[2], m[3], false) : null;
+}
+
+/**
+ * @internal `date_parse.c` `parse_iso21` (`date_parse.c:1035-1070`): the
+ * commercial week date, `"2001-W05-6"` and the yearless `"-W061"`.
+ */
+function parseIso21(str: string): DateParts | null {
+  const m = /\b(\d{2}|\d{4})?-?w(\d{2})(?:-?(\d))?\b/i.exec(str);
+  if (m === null) return null;
+  const hash: DateParts = {};
+  const y = m[1];
+  const w = m[2];
+  const d = m[3];
+
+  if (y !== undefined) hash.cwyear = Number(y);
+  hash.cweek = Number(w);
+  if (d !== undefined) hash.cwday = Number(d);
+
+  return hash;
+}
+
+/** @internal `date_parse.c` `parse_iso22` (`date_parse.c:1073-1099`): `"-W-6"`, a commercial day alone. */
+function parseIso22(str: string): DateParts | null {
+  const m = /-w-(\d)\b/i.exec(str);
+  return m ? { cwday: Number(m[1]) } : null;
+}
+
+/** @internal `date_parse.c` `parse_iso23` (`date_parse.c:1103-1134`): `"--02-03"`, and `"---03"`. */
+function parseIso23(str: string): DateParts | null {
+  const m = /--(\d{2})?-(\d{2})\b/.exec(str);
+  if (m === null) return null;
+  const hash: DateParts = {};
+  const mon = m[1];
+  const d = m[2];
+
+  if (mon !== undefined) hash.mon = Number(mon);
+  hash.mday = Number(d);
+
+  return hash;
+}
+
+/** @internal `date_parse.c` `parse_iso24` (`date_parse.c:1138-1169`): the unseparated `"--0203"`. */
+function parseIso24(str: string): DateParts | null {
+  const m = /--(\d{2})(\d{2})?\b/.exec(str);
+  if (m === null) return null;
+  const hash: DateParts = {};
+  const mon = m[1];
+  const d = m[2];
+
+  hash.mon = Number(mon);
+  if (d !== undefined) hash.mday = Number(d);
+
+  return hash;
+}
+
+/**
+ * @internal `date_parse.c` `parse_iso25` (`date_parse.c:1173-1219`): the ordinal
+ * date `"2001-034"`. `pat0` declines the run that is a second fraction
+ * (`"1.2001-034"`), which `parse_ddd` reads instead.
+ */
+function parseIso25(str: string): DateParts | null {
+  const pat0 = /[,.](\d{2}|\d{4})-\d{3}\b/;
+  const pat = /\b(\d{2}|\d{4})-(\d{3})\b/;
+
+  if (pat0.exec(str) !== null) return null;
+  const m = pat.exec(str);
+  return m ? { year: Number(m[1]), yday: Number(m[2]) } : null;
+}
+
+/** @internal `date_parse.c` `parse_iso26` (`date_parse.c:1223-1265`): the yearless ordinal date `"-034"`. */
+function parseIso26(str: string): DateParts | null {
+  const pat0 = /\d-\d{3}\b/;
+  const pat = /\b-(\d{3})\b/;
+
+  if (pat0.exec(str) !== null) return null;
+  const m = pat.exec(str);
+  return m ? { yday: Number(m[1]) } : null;
+}
+
+/**
+ * @internal `date_parse.c` `parse_iso2` (`date_parse.c:1269-1287`): the ISO
+ * spellings `parse_iso` does not take.
+ */
+function parseIso2(str: string): DateParts | null {
+  return (
+    parseIso21(str) ??
+    parseIso22(str) ??
+    parseIso23(str) ??
+    parseIso24(str) ??
+    parseIso25(str) ??
+    parseIso26(str)
+  );
+}
+
+/**
+ * @internal `date_parse.c` `JISX0301_ERA_INITIALS` (`date_parse.c:1290`): the
+ * initials of the Japanese eras `parse_jis` takes.
+ */
+const JISX0301_ERA_INITIALS = "mtshr";
+
+/** @internal `date_parse.c` `gengo` (`date_parse.c:1293-1307`): the year an era counts from. */
+function gengo(c: string): number {
+  let e: number;
+
+  switch (c) {
+    case "M":
+    case "m":
+      e = 1867;
+      break;
+    case "T":
+    case "t":
+      e = 1911;
+      break;
+    case "S":
+    case "s":
+      e = 1925;
+      break;
+    case "H":
+    case "h":
+      e = 1988;
+      break;
+    case "R":
+    case "r":
+      e = 2018;
+      break;
+    default:
+      e = 0;
+      break;
+  }
+  return e;
+}
+
+/**
+ * @internal `date_parse.c` `parse_jis` (`date_parse.c:1309-1346`): the JIS X
+ * 0301 date, `"H13.02.03"` — Heisei 13, which is 2001.
+ */
+function parseJis(str: string): DateParts | null {
+  const m = new RegExp(`\\b([${JISX0301_ERA_INITIALS}])(\\d+)\\.(\\d+)\\.(\\d+)`, "i").exec(str);
+  if (m === null) return null;
+  const e = m[1];
+  const y = m[2];
+  const mon = m[3];
+  const d = m[4];
+
+  const ep = gengo(e[0]);
+
+  return { year: Number(y) + ep, mon: Number(mon), mday: Number(d) };
+}
+
+/** @internal `date_parse.c` `parse_vms11` (`date_parse.c:1349-1388`): `"3-FEB-2001"`. */
+function parseVms11(str: string): DateParts | null {
+  const m = new RegExp(`('?-?${NUMBER}+)-(${ABBR_MONTHS})[^-/.]*-('?-?\\d+)`, "i").exec(str);
+  if (m === null) return null;
+  const d = m[1];
+  let mon = m[2];
+  const y = m[3];
+
+  mon = String(monNum(mon));
+
+  return s3e(y, mon, d, false);
+}
+
+/** @internal `date_parse.c` `parse_vms12` (`date_parse.c:1391-1431`): `"FEB-3-2001"`, and `"FEB-3"`. */
+function parseVms12(str: string): DateParts | null {
+  const m = new RegExp(`\\b(${ABBR_MONTHS})[^-/.]*-('?-?\\d+)(?:-('?-?\\d+))?`, "i").exec(str);
+  if (m === null) return null;
+  let mon = m[1];
+  const d = m[2];
+  const y = m[3];
+
+  mon = String(monNum(mon));
+
+  return s3e(y ?? null, mon, d, false);
+}
+
+/** @internal `date_parse.c` `parse_vms` (`date_parse.c:1433-1444`): the VMS date, either way round. */
+function parseVms(str: string): DateParts | null {
+  return parseVms11(str) ?? parseVms12(str);
 }
 
 /** @internal `date_parse.c` `parse_sla`: `2012/12/13`, `01/01/2012`, `2008/07`. */
 function parseSla(str: string): DateParts | null {
   const m = /([-+]?\d+)\/\s*(\d+)(?:\D\s*(-?\d+))?/.exec(str);
-  return m ? s3e(m[1], m[2], m[3] ?? null) : null;
+  return m ? s3e(m[1], m[2], m[3] ?? null, false) : null;
 }
 
 /** @internal `date_parse.c` `parse_dot`: `2012.12.13`, `01.01.2012`. */
 function parseDot(str: string): DateParts | null {
   const m = /([-+]?\d+)\.\s*(\d+)\.\s*(-?\d+)/.exec(str);
-  return m ? s3e(m[1], m[2], m[3]) : null;
+  return m ? s3e(m[1], m[2], m[3], false) : null;
+}
+
+/** @internal `date_parse.c` `parse_year` (`date_parse.c:1662-1688`): the year alone, `"'01"`. */
+function parseYear(str: string): DateParts | null {
+  const m = /'(\d+)\b/.exec(str);
+  return m ? { year: Number(m[1]) } : null;
+}
+
+/** @internal `date_parse.c` `parse_mon` (`date_parse.c:1692-1718`): the month alone, `"Feb"`. */
+function parseMon(str: string): DateParts | null {
+  const m = new RegExp(`\\b(${ABBR_MONTHS})\\S*`, "i").exec(str);
+  return m ? { mon: monNum(m[1]) } : null;
+}
+
+/**
+ * @internal `date_parse.c` `parse_mday` (`date_parse.c:1722-1748`): the day of
+ * the month alone, `"3rd"`. It sits directly above `parse_ddd`, so an ordinal
+ * suffix is what tells the two apart.
+ */
+function parseMday(str: string): DateParts | null {
+  const m = new RegExp(`(${NUMBER}+)(st|nd|rd|th)\\b`, "i").exec(str);
+  return m ? { mday: Number(m[1]) } : null;
 }
 
 /** @internal `date_parse.c` `n2i`: the `w` digits of `s` from `f`, as a number. */
@@ -569,6 +977,18 @@ function parseDdd(str: string): DateParts | null {
 }
 
 /**
+ * @internal `date_parse.c` `parse_bc` (`date_parse.c:2003-2019`): the era
+ * suffix. It runs after whichever date sub-parser matched and only records
+ * `:_bc`; the tail of `date__parse` is what negates the year.
+ */
+function parseBc(str: string, hash: DateParts): number {
+  const m = /\b(bc\b|bce\b|b\.c\.|b\.c\.e\.)/i.exec(str);
+  if (m === null) return 0;
+  hash._bc = true;
+  return 1;
+}
+
+/**
  * @internal `date_core.c` `rt_complete_frags` (`date_core.c:3878-4036`), which
  * decides what kind of date the fields name — the entry of its table with the
  * most of them present wins, ties going to the earliest — and then fills the
@@ -726,10 +1146,11 @@ export class Date {
    * and only ever turns false, so an absent one is `comp`, and the year is
    * completed only within `0..99` (`date_parse.c:2267-2287`).
    *
-   * @missingRailsCall `parse_jis`, `parse_vms`, `parse_iso2`, `parse_year`,
-   * `parse_mon`, `parse_mday` and `parse_bc` are not ported: they read a
-   * calendar Rails never round-trips. Neither is `date_zone_to_diff`
-   * (`date_parse.c:416-559`), so the `:offset` a `:zone` also sets is missing
+   * @missingRailsCall `parse_frag` (`date_parse.c:2021-2052`) is not ported:
+   * its pattern is anchored to the whole string, so it reads the leftover
+   * Ruby's `subx` leaves behind, which the ported sub-parsers do not produce.
+   * Neither is `date_zone_to_diff` (`date_parse.c:416-559`), so the `:offset`
+   * a `:zone` also sets is missing
    * from both of its call sites — the tail of `date__parse` itself
    * (`date_parse.c:2290-2294`) and the bracketed zone of `parse_ddd_cb`
    * (`date_parse.c:1934-1960`). It reads a zone-name table `::Date` has no use
@@ -743,11 +1164,32 @@ export class Date {
     if (/[a-z]/i.test(str)) {
       parts = parseEu(str) ?? parseUs(str);
     }
-    parts ??= parseIso(str) ?? parseSla(str) ?? parseDot(str) ?? parseDdd(str);
+    parts ??=
+      parseIso(str) ??
+      parseJis(str) ??
+      parseVms(str) ??
+      parseSla(str) ??
+      parseDot(str) ??
+      parseIso2(str) ??
+      parseYear(str) ??
+      parseMon(str) ??
+      parseMday(str) ??
+      parseDdd(str);
     if (parts === null && Object.keys(hash).length === 0) return null;
     parts = Object.assign(hash, parts);
-    if (comp && parts._comp !== false && parts.year !== undefined) {
-      if (parts.year >= 0 && parts.year <= 99) parts.year = compYear69(parts.year);
+    parseBc(str, parts);
+    if (parts._bc) {
+      if (parts.cwyear !== undefined) parts.cwyear = -parts.cwyear + 1;
+      if (parts.year !== undefined) parts.year = -parts.year + 1;
+    }
+    delete parts._bc;
+    if (comp && parts._comp !== false) {
+      if (parts.cwyear !== undefined && parts.cwyear >= 0 && parts.cwyear <= 99) {
+        parts.cwyear = compYear69(parts.cwyear);
+      }
+      if (parts.year !== undefined && parts.year >= 0 && parts.year <= 99) {
+        parts.year = compYear69(parts.year);
+      }
     }
     delete parts._comp;
     return parts;
