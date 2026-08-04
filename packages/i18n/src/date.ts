@@ -1541,7 +1541,8 @@ export class Date {
     str = parseDay(str);
     str = parseTime(str, hash);
     let rest: string | null = null;
-    if (/[a-z]/i.test(str)) {
+    if (/[a-z]/i.test(str) && /\d/.test(str)) {
+      // date_parse.c:2180 — HAVE_ELEM_P(HAVE_ALPHA | HAVE_DIGIT)
       rest = parseEu(str, hash) ?? parseUs(str, hash);
     }
     rest ??=

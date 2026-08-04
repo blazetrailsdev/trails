@@ -32,6 +32,7 @@ import {
   config,
   reservedKeysPattern,
   t,
+  translate,
   tBang,
   type Locale,
   type TranslationKey,
@@ -433,10 +434,7 @@ export abstract class Base {
     if (options.resolve === false) return subject;
     const result = catchException(() => {
       if (isSymbol(subject)) {
-        // The gem goes through `I18n.translate`, which — with `throw: true` —
-        // hands a MissingTranslation straight back to this `catch`, exactly as
-        // calling the backend does. The `I18n.t` facade is not ported yet.
-        return config().backend.translate(locale, subject, {
+        return translate(subject, {
           ...options,
           locale,
           throw: true,

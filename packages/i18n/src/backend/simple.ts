@@ -44,6 +44,13 @@ function isSymbol(value: unknown): value is string {
 }
 
 /**
+ * Property reads JS makes on any object that Ruby's `Hash#[]` never sees, so the
+ * default block below must not vivify them: `JSON.stringify` probes `toJSON`,
+ * `await` probes `then`, and a Ruby locale hash grows neither key.
+ */
+const NON_LOCALE_READS = new Set(["toJSON", "then", "inspect", "constructor"]);
+
+/**
  * Ruby `include Base` (simple.rb:22) as a type: the merged interface gives
  * `Simple` every member `Base` declares, without an `extends` clause the gem
  * does not have. The runtime half of the same `include` is the prototype copy
@@ -81,6 +88,10 @@ export class Simple {
     ) {
       return data;
     }
+    // simple.rb:42 `locale = locale.to_sym`. A trails `Locale` *is* the
+    // Symbol's name (locale/tag/simple.ts:35), so the String `"en"` and a
+    // `":en"`-spelled Symbol have to key the one bucket, as `:en` does in the gem.
+    locale = isSymbol(locale) ? locale.slice(1) : String(locale);
     const translations = this.translations();
     translations[locale] ??= {};
     const payload = options.skipSymbolizeKeys ? data : deepSymbolizeKeys(data);
@@ -123,7 +134,7 @@ export class Simple {
     // matching Ruby, where `has_key?` is false until the read vivifies the key.
     this.translationsStore ??= new Proxy({} as TranslationData, {
       get(h, k) {
-        if (typeof k === "string" && !(k in h)) h[k] = {};
+        if (typeof k === "string" && !NON_LOCALE_READS.has(k) && !(k in h)) h[k] = {};
         return h[k as string];
       },
     });

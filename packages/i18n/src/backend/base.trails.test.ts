@@ -129,6 +129,17 @@ describe("I18n::Backend::Base", () => {
     expect(backend.exists("en", "missing")).toBe(false);
   });
 
+  it("resolves a Symbol default through I18n.translate, so its guards run", () => {
+    backend.storeTranslations("en", { foo: "bar" });
+    config().availableLocales = ["en"];
+    config().enforceAvailableLocales = true;
+
+    // base.rb:150-156 — the gem's `I18n.translate` reaches
+    // `enforce_available_locales!` (i18n.rb:218); calling the backend directly
+    // skipped it.
+    expect(() => backend.translate("de", "missing", { default: ":foo" })).toThrow(InvalidLocale);
+  });
+
   it("availableLocales skips locales holding only i18n metadata", () => {
     backend.storeTranslations("en", { foo: "bar" });
     backend.storeTranslations("de", { i18n: { transliterate: {} } });
