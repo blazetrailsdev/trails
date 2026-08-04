@@ -7,9 +7,11 @@ import { describe, it, expect } from "vitest";
 import { ArgumentError, Date as RubyDate } from "./date.js";
 
 describe("Date", () => {
-  it("parses a y-m-d string", () => {
-    const date = RubyDate.parse("2008-07-02");
-    expect([date.year, date.mon, date.day]).toEqual([2008, 7, 2]);
+  it("parses a y-m-d string, padded or not", () => {
+    for (const str of ["2008-07-02", "2008-7-2"]) {
+      const date = RubyDate.parse(str);
+      expect([date.year, date.mon, date.day]).toEqual([2008, 7, 2]);
+    }
   });
 
   it("raises on an unparseable string", () => {

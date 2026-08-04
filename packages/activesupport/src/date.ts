@@ -73,7 +73,13 @@ export class Date {
     this.#plain = new Temporal.PlainDate(year, month, day);
   }
 
-  /** Ruby `Date.parse`, narrowed to the ISO-ish `y-m-d` the callers use. */
+  /**
+   * Ruby `Date.parse`, narrowed to the `y-m-d` the callers use. The month and
+   * day are unpadded-tolerant because Ruby's is — `String#to_date` delegates
+   * straight to `::Date.parse`
+   * (activesupport/lib/active_support/core_ext/string/conversions.rb:47-48),
+   * and `i18n_test.rb:9` passes `"2008-7-2"`.
+   */
   static parse(str: string): Date {
     const match = /^(-?\d{4,})-(\d{1,2})-(\d{1,2})$/.exec(str);
     // Ruby raises `Date::Error`, a subclass of `ArgumentError` that a nested

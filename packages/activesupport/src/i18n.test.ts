@@ -22,7 +22,7 @@ describe("I18nTest", () => {
 
   beforeEach(async () => {
     await reloadTranslations();
-    date = RubyDate.parse("2008-07-02");
+    date = RubyDate.parse("2008-7-2");
     time = TimeZone.find("UTC").local(2008, 7, 2, 16, 47, 1);
   });
 
