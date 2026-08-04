@@ -238,13 +238,14 @@ importers:
       tinyglobby:
         specifier: ^0.2.16
         version: 0.2.16
-      yaml:
-        specifier: ^2.8.3
-        version: 2.8.3
     devDependencies:
       '@blazetrails/nokogiri':
         specifier: workspace:*
         version: link:../nokogiri
+    optionalDependencies:
+      yaml:
+        specifier: ^2.8.3
+        version: 2.8.3
 
   packages/arel:
     dependencies:
