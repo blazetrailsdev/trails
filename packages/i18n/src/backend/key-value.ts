@@ -16,6 +16,11 @@
  * `get` / `set` / `keys` are those three, which is the same reading
  * `fallbacks.test.ts` already gives a Hash passed as a collaborator.
  *
+ * `reduce` carries a seed because JS has no `inject` — an empty array is a
+ * `TypeError` rather than Ruby's `nil`. Seeding with `undefined` restores
+ * `inject`'s answer, so an empty store still raises where Ruby raises, inside
+ * `deep_symbolize_keys` (i18n/lib/i18n/utils.rb:34), and not a call earlier.
+ *
  * Not ported on `SubtreeProxy`: `is_a?`, `kind_of?`, `instance_of?`, `nil?`
  * and `inspect` are Ruby core object protocol (see "Skipped methods" in
  * docs/ruby-ts-conventions.md). `nil?` still has a body here because the
@@ -172,8 +177,11 @@ export class KeyValue extends Base {
         .reverse()
         .reduce<unknown>((value, key) => ({ [key]: value }), mainValue) as TranslationData;
     });
-    const injected = nested.reduce((hash, elem) => deepMergeBang(hash, elem));
-    return (this.translationsStore = deepSymbolizeKeys(injected));
+    const injected = nested.reduce<TranslationData | undefined>(
+      (hash, elem) => (hash === undefined ? elem : deepMergeBang(hash, elem)),
+      undefined,
+    );
+    return (this.translationsStore = deepSymbolizeKeys(injected!));
   }
 
   protected initTranslations(): void {
