@@ -101,6 +101,22 @@ describe("Date", () => {
     expect(() => RubyDate.parse("10:30")).toThrow("invalid date");
   });
 
+  it("reads the leftover digits as the missing mday or hour, as parse_frag does", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2008-08-04T12:00:00Z"));
+    try {
+      for (const str of ["11pm 5", "5 11pm"]) {
+        expect(RubyDate._parse(str)).toEqual({ hour: 23, mday: 5 });
+        const date = RubyDate.parse(str);
+        expect([date.year, date.mon, date.day]).toEqual([2008, 8, 5]);
+      }
+      expect(RubyDate._parse("11pm")).toEqual({ hour: 23 });
+      expect(RubyDate._parse("3rd 5 bc")).toEqual({ mday: 3, hour: 5 });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("reads the one-fragment strings parse_year, parse_mon and parse_mday take", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2008-08-04T12:00:00Z"));
