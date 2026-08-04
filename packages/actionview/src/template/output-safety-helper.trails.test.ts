@@ -1,24 +1,22 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { I18n } from "@blazetrails/activesupport";
 
 import { toSentence } from "../helpers/output-safety-helper.js";
 
-/**
- * `I18n.reload!` would drop the `en` locale Active Support stores at import
- * time (it is not on `I18n.load_path` yet — see activesupport/src/i18n.ts), so
- * these restore `support.array` to its `locale/en.yml` values instead.
- */
-const EN_ARRAY_CONNECTORS = {
-  words_connector: ", ",
-  two_words_connector: " and ",
-  last_word_connector: ", and ",
-};
-
 I18n.setEnforceAvailableLocales(false);
 
 describe("OutputSafetyHelperI18nTest", () => {
+  // `store_translations` does not initialize (simple.rb:35-45), so a store that
+  // lands before the first lookup is deep-merged *under* `locale/en.yml` when
+  // `#lookup` finally runs `init_translations` (simple.rb:81-84, 92). Rails'
+  // own connector test reads a default first for the same reason
+  // (activesupport/test/i18n_test.rb:91).
+  beforeEach(() => {
+    I18n.translate("support.array.words_connector");
+  });
+
   afterEach(() => {
-    I18n.backend().storeTranslations("en", { support: { array: EN_ARRAY_CONNECTORS } });
+    I18n.reloadBang();
   });
 
   it("to_sentence uses the support.array connectors from I18n", () => {
