@@ -60,8 +60,6 @@ describe("isSourceUnported package scoping", () => {
       "config.rb",
       "exceptions.rb",
       "interpolate/ruby.rb",
-      // `locale.rb` is a pure `autoload` namespace, so it carries no methods
-      // for api:compare to count — `locale.ts` re-exports the same two members.
       "locale.rb",
       "locale/fallbacks.rb",
       "locale/tag.rb",
