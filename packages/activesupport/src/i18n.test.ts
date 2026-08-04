@@ -3,88 +3,13 @@ import { I18n } from "./i18n.js";
 import { en } from "./locale/en.js";
 import { toSentence } from "./array-utils.js";
 import { TimeZone } from "./values/time-zone.js";
+import { Date as RubyDate } from "./date.js";
 import type { TimeWithZone } from "./time-with-zone.js";
 
 /** `I18n.reload!` plus the `en` locale Rails re-reads from its load path. */
 async function reloadTranslations(): Promise<void> {
   await I18n.reloadBang();
   I18n.backend().storeTranslations("en", en);
-}
-
-const MONTHNAMES = [
-  null,
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-];
-const ABBR_MONTHNAMES = [
-  null,
-  "Jan",
-  "Feb",
-  "Mar",
-  "Apr",
-  "May",
-  "Jun",
-  "Jul",
-  "Aug",
-  "Sep",
-  "Oct",
-  "Nov",
-  "Dec",
-];
-
-/**
- * Stands in for Ruby's `::Date` (`Date.parse("2008-7-2")` in `setup`), which
- * trails has no analogue of. `localize` duck-types its object
- * (i18n/lib/i18n/backend/base.rb:78-92): `Date` answers `strftime`, `wday` and
- * `mon` but not `sec`, which is what selects `date.formats` over
- * `time.formats` (base.rb:82). Mirrors the stand-in in
- * i18n/src/backend/localization.test.ts.
- */
-class RubyDate {
-  readonly utc: Date;
-
-  constructor(year: number, month: number, day: number) {
-    this.utc = new Date(Date.UTC(year, month - 1, day));
-  }
-
-  get wday(): number {
-    return this.utc.getUTCDay();
-  }
-
-  get mon(): number {
-    return this.utc.getUTCMonth() + 1;
-  }
-
-  strftime(format: string): string {
-    return format.replace(/%([A-Za-z%])/g, (match, directive: string) => {
-      switch (directive) {
-        case "Y":
-          return String(this.utc.getUTCFullYear());
-        case "m":
-          return String(this.mon).padStart(2, "0");
-        case "d":
-          return String(this.utc.getUTCDate()).padStart(2, "0");
-        case "b":
-          return ABBR_MONTHNAMES[this.mon]!;
-        case "B":
-          return MONTHNAMES[this.mon]!;
-        case "%":
-          return "%";
-        default:
-          return match;
-      }
-    });
-  }
 }
 
 // Rails' activesupport/test/abstract_unit.rb:35 turns the check off for the
@@ -97,7 +22,7 @@ describe("I18nTest", () => {
 
   beforeEach(async () => {
     await reloadTranslations();
-    date = new RubyDate(2008, 7, 2);
+    date = RubyDate.parse("2008-07-02");
     time = TimeZone.find("UTC").local(2008, 7, 2, 16, 47, 1);
   });
 
