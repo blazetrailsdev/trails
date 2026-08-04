@@ -41,6 +41,12 @@ describe("Date", () => {
     expect(() => RubyDate.parse("12/13/2012")).toThrow("invalid date");
   });
 
+  it("completes a two-digit year unless comp is false, as Ruby does", () => {
+    expect(RubyDate.parse("080702").year).toBe(2008);
+    expect(RubyDate.parse("690702").year).toBe(1969);
+    expect(RubyDate.parse("080702", false).year).toBe(8);
+  });
+
   it("raises on an unparseable string", () => {
     expect(() => RubyDate.parse("not a date")).toThrow(ArgumentError);
     expect(() => RubyDate.parse("not a date")).toThrow("invalid date");

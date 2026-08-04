@@ -147,11 +147,21 @@ export class ArgumentError extends Error {
 const ABBR_MONTHS = "jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec";
 const ABBR_DAYS = "sun|mon|tue|wed|thu|fri|sat";
 
-/** @internal The `:year`/`:mon`/`:mday` of the Hash `Date._parse` answers. */
+/**
+ * @internal The `:year`/`:mon`/`:mday` of the Hash `Date._parse` answers, plus
+ * the `:_comp` `date_parse.c` sets when the year token was short enough to
+ * complete and deletes again before answering.
+ */
 interface DateParts {
   year: number;
   mon: number;
   mday: number;
+  _comp?: boolean;
+}
+
+/** @internal `date_parse.c` `comp_year69`: `69` is 1969, `68` is 2068. */
+function compYear69(y: number): number {
+  return y >= 69 ? y + 1900 : y + 2000;
 }
 
 /** @internal `date_parse.c` `mon_num`: an abbreviation, or the head of a full name. */
@@ -171,7 +181,12 @@ function s3e(y: string | null, m: string, d: string | null): DateParts | null {
     [y, d] = [d, y];
   }
   if (y === null || d === null) return null;
-  return { year: Number(y), mon: Number(m), mday: Number(d) };
+  return {
+    year: Number(y),
+    mon: Number(m),
+    mday: Number(d),
+    _comp: y.replace(/^[-+]/, "").length < 3,
+  };
 }
 
 /** @internal `date_parse.c` `parse_day`: a leading day name is not a date field. */
@@ -185,7 +200,14 @@ function parseEu(str: string): DateParts | null {
     `'?(\\d+)[^-\\d\\s]*[-,.\\s]*(${ABBR_MONTHS})[^-\\d\\s]*[-,.\\s]*'?(-?\\d+)`,
     "i",
   ).exec(str);
-  return m ? { year: Number(m[3]), mon: monNum(m[2]), mday: Number(m[1]) } : null;
+  return m
+    ? {
+        year: Number(m[3]),
+        mon: monNum(m[2]),
+        mday: Number(m[1]),
+        _comp: m[3].replace(/^-/, "").length < 3,
+      }
+    : null;
 }
 
 /** @internal `date_parse.c` `parse_us`: `Jul 2 2008`, `July 2nd, 2008`. */
@@ -194,7 +216,14 @@ function parseUs(str: string): DateParts | null {
     `\\b(${ABBR_MONTHS})[^-\\d\\s]*[-,.\\s]+'?(\\d+)[^-\\d\\s]*[-,.\\s]*'?(-?\\d+)`,
     "i",
   ).exec(str);
-  return m ? { year: Number(m[3]), mon: monNum(m[1]), mday: Number(m[2]) } : null;
+  return m
+    ? {
+        year: Number(m[3]),
+        mon: monNum(m[1]),
+        mday: Number(m[2]),
+        _comp: m[3].replace(/^-/, "").length < 3,
+      }
+    : null;
 }
 
 /** @internal `date_parse.c` `parse_iso`: `2008-07-02`, and the unpadded `2008-7-2`. */
@@ -260,15 +289,11 @@ export class Date {
    * `"2012-12-13"` — reaches here, and `activesupport/test/i18n_test.rb:9`
    * passes the unpadded `"2008-7-2"`.
    *
-   * `comp` is not taken: Rails only ever calls `::Date.parse(self, false)`, and
-   * `comp` governs nothing but two-digit-year completion, which `false` turns
-   * off — so the one behaviour trails needs is the default here.
-   *
-   * @missingRailsCall `Date._parse` is not a separate member here; its
-   * sub-parsers are the module-private functions below.
+   * `comp` completes a two-digit year, which is why `"080702"` is 2008 here
+   * and 0008 through Rails' `::Date.parse(self, false)`.
    */
-  static parse(str: string): Date {
-    const parts = Date._parse(str);
+  static parse(str: string, comp = true): Date {
+    const parts = Date._parse(str, comp);
     // Ruby raises `Date::Error`, a subclass of `ArgumentError` that a nested
     // TS class cannot spell; the superclass is what callers rescue.
     if (!parts) throw new ArgumentError("invalid date");
@@ -293,13 +318,17 @@ export class Date {
    * round-trips, or a fragment that leaves `Date.parse` raising for want of a
    * `:year`.
    */
-  static _parse(str: string): DateParts | null {
+  static _parse(str: string, comp = true): DateParts | null {
     str = parseDay(str);
+    let parts: DateParts | null = null;
     if (/[a-z]/i.test(str)) {
-      const parts = parseEu(str) ?? parseUs(str);
-      if (parts) return parts;
+      parts = parseEu(str) ?? parseUs(str);
     }
-    return parseIso(str) ?? parseSla(str) ?? parseDot(str) ?? parseDdd(str);
+    parts ??= parseIso(str) ?? parseSla(str) ?? parseDot(str) ?? parseDdd(str);
+    if (parts === null) return null;
+    if (comp && parts._comp === true) parts.year = compYear69(parts.year);
+    delete parts._comp;
+    return parts;
   }
 
   get year(): number {
