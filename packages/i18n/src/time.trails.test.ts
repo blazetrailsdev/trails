@@ -47,9 +47,9 @@ describe("Time", () => {
 
   it("Time.new takes a sub-minute offset, as MRI does", () => {
     expect(new Time(2008, 3, 1, 6, 0, 0, "+09:00:30").utcOffset).toBe(32430);
+    expect(new Time(2008, 3, 1, 6, 0, 0, "+090030").utcOffset).toBe(32430);
     expect(new Time(2008, 3, 1, 6, 0, 0, 32430).utcOffset).toBe(32430);
     expect(new Time(2008, 3, 1, 6, 0, 0, -32430).utcOffset).toBe(-32430);
-    // `%z` is `±HHMM`, so MRI drops the seconds there.
     expect(new Time(2008, 3, 1, 6, 0, 0, "+09:00:30").strftime("%z")).toBe("+0900");
     expect(new Time(2008, 3, 1, 6, 0, 0, -32430).strftime("%z")).toBe("-0900");
   });

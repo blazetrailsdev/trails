@@ -37,9 +37,11 @@ function utcOffsetArgument(zone: string | number): "UTC" | number {
   // `"Z"` is the military letter for UTC, and MRI treats it as `Time.utc`
   // does — `zone` answers `"UTC"`, not `nil` as an offset-built time does.
   if (zone === "UTC" || zone === "Z") return "UTC";
-  const offset = /^([+-])(\d{2})(?::?(\d{2})(?::?(\d{2}))?)?$/.exec(zone);
+  const offset = /^([+-])(\d{2})(?::(\d{2})(?::(\d{2}))?|(\d{2})(\d{2})?)?$/.exec(zone);
   if (offset) {
-    const [, sign, hour, min = "00", sec = "00"] = offset;
+    const [, sign, hour, colonMin, colonSec, compactMin, compactSec] = offset;
+    const min = colonMin ?? compactMin ?? "00";
+    const sec = colonSec ?? compactSec ?? "00";
     const seconds = Number(hour) * 3600 + Number(min) * 60 + Number(sec);
     if (seconds >= 86400) throw new ArgumentError("utc_offset out of range");
     return sign === "-" ? -seconds : seconds;
@@ -159,7 +161,6 @@ export class Time {
 
   strftime(format: string): string {
     // `%z` is `±HHMM` — neither `Time#zone` nor `Temporal`'s extended `±HH:MM`.
-    // MRI truncates a sub-minute offset there; `utc_offset` keeps the seconds.
     const minutes = Math.floor(Math.abs(this.utcOffset) / 60);
     const zoneOffset = `${this.utcOffset < 0 ? "-" : "+"}${pad2(Math.floor(minutes / 60))}${pad2(minutes % 60)}`;
     return strftime(
