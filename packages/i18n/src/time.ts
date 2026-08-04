@@ -24,9 +24,11 @@ export class Time {
     return new Time(year, month, day, hour, min, sec);
   }
 
-  // Private because Ruby's `Time.new` builds a *local* time, and trails models
-  // only the UTC one `Time.utc` returns — a public constructor here would read
-  // as `Time.new` and quietly mean something else.
+  /**
+   * Private because Ruby's `Time.new` builds a *local* time, and trails models
+   * only the UTC one `Time.utc` returns — a public constructor here would read
+   * as `Time.new` and quietly mean something else.
+   */
   private constructor(
     year: number,
     month: number,
@@ -71,6 +73,10 @@ export class Time {
     return this.#plain.second;
   }
 
+  get yday(): number {
+    return this.#plain.dayOfYear;
+  }
+
   /** `Time.utc(...).strftime('%Z')` is `"UTC"`, not an offset. */
   get zone(): string {
     return "UTC";
@@ -83,7 +89,7 @@ export class Time {
         mon: this.mon,
         day: this.day,
         wday: this.wday,
-        yday: this.#plain.dayOfYear,
+        yday: this.yday,
         hour: this.hour,
         min: this.min,
         sec: this.sec,

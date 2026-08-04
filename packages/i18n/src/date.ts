@@ -79,6 +79,8 @@ export interface StrftimeSubject {
  * formatter, so trails has one implementation rather than a copy per class.
  * Only the directives the i18n format strings and the conformance mixins use
  * are recognised; Ruby leaves an unknown directive in place, and so does this.
+ * `%z` is fixed at `+0000` because trails models only the UTC these classes are
+ * built in; `%Z` varies, so it comes off the subject.
  */
 export function strftime(subject: StrftimeSubject, format: string): string {
   const tokens: Record<string, () => string> = {
@@ -100,7 +102,6 @@ export function strftime(subject: StrftimeSubject, format: string): string {
     p: () => (subject.hour < 12 ? "AM" : "PM"),
     P: () => (subject.hour < 12 ? "am" : "pm"),
     x: () => `${pad2(subject.mon)}/${pad2(subject.day)}/${pad2(subject.year % 100)}`,
-    // trails only models UTC, which is the zone every caller of these builds in.
     z: () => "+0000",
     Z: () => subject.zone,
     "%": () => "%",
@@ -131,11 +132,11 @@ export class ArgumentError extends Error {
  */
 export class Date {
   /** @internal Ruby's `::Date` value, which has no public reader. */
-  protected readonly plain: Temporal.PlainDate;
+  readonly #plain: Temporal.PlainDate;
 
   /** Ruby `Date.new(year, month, day)`. */
   constructor(year: number, month: number, day: number) {
-    this.plain = new Temporal.PlainDate(year, month, day);
+    this.#plain = new Temporal.PlainDate(year, month, day);
   }
 
   /**
@@ -154,31 +155,35 @@ export class Date {
   }
 
   get year(): number {
-    return this.plain.year;
+    return this.#plain.year;
   }
 
   get mon(): number {
-    return this.plain.month;
+    return this.#plain.month;
   }
 
   get month(): number {
-    return this.plain.month;
+    return this.#plain.month;
   }
 
   get day(): number {
-    return this.plain.day;
+    return this.#plain.day;
   }
 
   /** Ruby counts Sunday as 0; `Temporal.PlainDate#dayOfWeek` counts Monday as 1. */
   get wday(): number {
-    return this.plain.dayOfWeek % 7;
+    return this.#plain.dayOfWeek % 7;
   }
 
-  /** `::Date#strftime('%Z')` answers the UTC offset, not a zone abbreviation. */
-  get zone(): string {
-    return "+00:00";
+  get yday(): number {
+    return this.#plain.dayOfYear;
   }
 
+  /**
+   * `Date#strftime('%Z')` answers the UTC offset. Ruby's `::Date` has no `zone`
+   * reader of its own — only `::DateTime` and `::Time` do — so the value is
+   * passed to the formatter rather than exposed as a member.
+   */
   strftime(format: string): string {
     return strftime(
       {
@@ -186,11 +191,11 @@ export class Date {
         mon: this.mon,
         day: this.day,
         wday: this.wday,
-        yday: this.plain.dayOfYear,
+        yday: this.yday,
         hour: 0,
         min: 0,
         sec: 0,
-        zone: this.zone,
+        zone: "+00:00",
       },
       format,
     );
@@ -228,6 +233,11 @@ export class DateTime extends Date {
     return this.#sec;
   }
 
+  /** `DateTime#zone` is the UTC offset, where `Time#zone` is `"UTC"`. */
+  get zone(): string {
+    return "+00:00";
+  }
+
   override strftime(format: string): string {
     return strftime(
       {
@@ -235,7 +245,7 @@ export class DateTime extends Date {
         mon: this.mon,
         day: this.day,
         wday: this.wday,
-        yday: this.plain.dayOfYear,
+        yday: this.yday,
         hour: this.hour,
         min: this.min,
         sec: this.sec,
