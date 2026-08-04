@@ -358,9 +358,9 @@ export function withLocale<T>(tmpLocale: Locale | false | null | undefined, bloc
 const normalizedKeyCache = newDoubleNestedCache();
 
 /**
- * Ruby's `key.to_s` on a Symbol is its name; `String(symbol)` is
- * `"Symbol(name)"`, which would otherwise reach the `Translation missing`
- * message through `MissingTranslation#keys`.
+ * Ruby's `key.to_s.split(separator)` (i18n gem `lib/i18n.rb:447`). Callers
+ * apply `Symbol#to_s` themselves, so a Symbol-shaped `":name"` key never
+ * reaches here.
  */
 function normalizeKey(key: unknown, separator: string): TranslationKey[] {
   let bySeparator = normalizedKeyCache.get(separator);
@@ -376,7 +376,6 @@ function normalizeKey(key: unknown, separator: string): TranslationKey[] {
     } else if (key === null || key === undefined) {
       normalized = [];
     } else {
-      if (typeof key === "symbol") key = Symbol.keyFor(key) ?? key.description;
       const keys = String(key)
         .split(separator)
         .filter((k) => k !== "");
