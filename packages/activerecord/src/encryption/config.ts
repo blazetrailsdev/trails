@@ -12,14 +12,17 @@ import { Configuration } from "./errors.js";
 import type { SchemeOptions } from "./scheme.js";
 
 /**
- * The `deflate`/`inflate` pair a compressor answers (encryption/encryptor.rb:24).
- * Ruby duck-types it, so `config.rb` names no such type; it is a type alias
- * rather than a declared surface for that reason.
+ * The `deflate`/`inflate` pair a compressor answers.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby duck-types the compressor — "it must respond to
+ * +deflate+ and +inflate+" (encryption/encryptor.rb:22-24) — so no Rails file
+ * declares this shape or these two members. TypeScript has to write it down
+ * for `Config#compressor`, `Encryptor` and `Scheme` to name the same type.
  */
-export type Compressor = {
+export interface Compressor {
   deflate(data: string): Buffer | Uint8Array;
   inflate(data: Buffer | Uint8Array): string;
-};
+}
 
 /**
  * Ruby's `Zlib`, the module `set_defaults` assigns to `compressor`
