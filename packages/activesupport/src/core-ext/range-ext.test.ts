@@ -2,16 +2,13 @@ import { describe, it, expect } from "vitest";
 
 import { Temporal } from "../temporal.js";
 
-import {
-  makeRange,
-  rangeIncludesValue,
-  rangeIncludesStringValue,
-  stringSucc,
-} from "../range-ext.js";
+import { hours } from "../duration.js";
+import { makeRange, rangeIncludesValue, rangeIncludesStringValue } from "../range-ext.js";
 import { instantFromDate } from "../testing/temporal-helpers.js";
 import { TimeWithZone } from "../time-with-zone.js";
 import { TimeZone } from "../values/time-zone.js";
 import { caseEquals, isInclude } from "./range/compare-range.js";
+import { succ } from "./string/succ.js";
 import { toFs, toFormattedS } from "./range/conversions.js";
 import { each, step } from "./range/each.js";
 import { overlap, overlaps } from "./range/overlap.js";
@@ -214,7 +211,7 @@ describe("RangeTest", () => {
       instantFromDate(new Date(Date.UTC(2006, 10, 28, 10, 30))),
       TimeZone.find("Eastern Time (US & Canada)"),
     );
-    expect(() => [...each(makeRange(twz, twz))]).toThrow(TypeError);
+    expect(() => [...each(makeRange(twz.minus(hours(1)), twz))]).toThrow(TypeError);
   });
 
   it("step on time with zone", () => {
@@ -222,7 +219,7 @@ describe("RangeTest", () => {
       instantFromDate(new Date(Date.UTC(2006, 10, 28, 10, 30))),
       TimeZone.find("Eastern Time (US & Canada)"),
     );
-    expect(() => [...step(makeRange(twz, twz), 1)]).toThrow(TypeError);
+    expect(() => [...step(makeRange(twz.minus(hours(1)), twz), 1)]).toThrow(TypeError);
   });
   it.skip("cover on time with zone");
   it.skip("case equals on time with zone");
@@ -266,24 +263,24 @@ describe("RangeTest", () => {
 
   it("string succ carries within character classes", () => {
     // Mirrors Ruby String#succ.
-    expect(stringSucc("abcd")).toBe("abce");
-    expect(stringSucc("az")).toBe("ba");
-    expect(stringSucc("zz")).toBe("aaa");
-    expect(stringSucc("Zz")).toBe("AAa");
-    expect(stringSucc("99")).toBe("100");
-    expect(stringSucc("a9")).toBe("b0");
-    expect(stringSucc("1.9")).toBe("2.0");
-    expect(stringSucc("<<")).toBe("<=");
+    expect(succ("abcd")).toBe("abce");
+    expect(succ("az")).toBe("ba");
+    expect(succ("zz")).toBe("aaa");
+    expect(succ("Zz")).toBe("AAa");
+    expect(succ("99")).toBe("100");
+    expect(succ("a9")).toBe("b0");
+    expect(succ("1.9")).toBe("2.0");
+    expect(succ("<<")).toBe("<=");
     // Carry stops at a non-alnum gap into a different class.
-    expect(stringSucc("z.9")).toBe("z.10");
-    expect(stringSucc("a.z")).toBe("b.a");
+    expect(succ("z.9")).toBe("z.10");
+    expect(succ("a.z")).toBe("b.a");
     // Astral (non-alnum) chars succ as whole code points, not UTF-16 units.
-    expect(stringSucc("\u{1F600}")).toBe("\u{1F601}");
+    expect(succ("\u{1F600}")).toBe("\u{1F601}");
     // Wrapping is per UTF-8 encoded width (`enc_succ_char` NEIGHBOR_WRAPPED).
     const points = (str: string) => Array.from(str, (c) => c.codePointAt(0));
-    expect(points(stringSucc("\u{10FFFF}"))).toEqual([0x1, 0x10000]);
-    expect(points(stringSucc("\u{FFFF}"))).toEqual([0x1, 0x800]);
-    expect(points(stringSucc("\u{07FF}"))).toEqual([0x1, 0x80]);
+    expect(points(succ("\u{10FFFF}"))).toEqual([0x1, 0x10000]);
+    expect(points(succ("\u{FFFF}"))).toEqual([0x1, 0x800]);
+    expect(points(succ("\u{07FF}"))).toEqual([0x1, 0x80]);
   });
 
   it("date time with step", () => {
