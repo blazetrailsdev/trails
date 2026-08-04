@@ -123,6 +123,18 @@ describe("Date", () => {
     }
   });
 
+  it("reads an apostrophized VMS year as the year, as s3e does", () => {
+    for (const str of ["'01-FEB-3", "3-FEB-'01"]) {
+      const date = RubyDate.parse(str);
+      expect([str, date.year, date.mon, date.day]).toEqual([str, 2001, 2, 3]);
+    }
+  });
+
+  it("reads the era parse_eu and parse_us match, not only the trailing one", () => {
+    expect(RubyDate.parse("july 4 1776 b.c.").year).toBe(-1775);
+    expect(RubyDate.parse("1 jan 2008 ad").year).toBe(2008);
+  });
+
   it("reads a JIS X 0301 date, as parse_jis does", () => {
     const heisei = RubyDate.parse("H13.02.03");
     expect([heisei.year, heisei.mon, heisei.day]).toEqual([2001, 2, 3]);
