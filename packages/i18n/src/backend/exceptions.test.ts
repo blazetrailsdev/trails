@@ -56,7 +56,7 @@ describe("I18nBackendExceptionsTest", () => {
   it("exceptions: MissingInterpolationArgument message includes missing key, provided keys and full string", () => {
     const exception = new MissingInterpolationArgument("key", { this: "was given" }, "string");
     expect(exception.message).toBe(
-      `missing interpolation argument "key" in "string" ({this: "was given"} given)`,
+      `missing interpolation argument "key" in "string" ({:this=>"was given"} given)`,
     );
   });
 });

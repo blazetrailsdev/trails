@@ -337,12 +337,10 @@ export class ModelName {
     if (i18nKeys.length === 0 || i18nScope.length === 0) return this._humanFallback;
 
     const [key, ...defaults] = i18nKeys as unknown[];
-    // Ruby Symbol default = "look this key up"; the backend spells that arm as
-    // a real JS symbol (story `i18n-symbol-values-are-colon-strings`).
-    const defaultChain: unknown[] = defaults.map((k) => Symbol.for(k as string));
+    const defaultChain: unknown[] = defaults.map((k) => `:${k as string}`);
     defaultChain.push(MISSING_TRANSLATION);
 
-    let translation = I18n.translate(Symbol.for(key as string), {
+    let translation = I18n.translate(key as string, {
       scope: i18nScope,
       count: 1,
       default: defaultChain,

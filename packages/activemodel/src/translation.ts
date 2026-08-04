@@ -13,6 +13,13 @@ import type { TranslateKey } from "@blazetrails/i18n";
 import { I18n } from "./i18n.js";
 import type { ModelName } from "./naming.js";
 
+export function raiseOnMissingTranslations(value?: boolean): boolean {
+  if (value !== undefined) {
+    _raiseOnMissingTranslations = value;
+  }
+  return _raiseOnMissingTranslations;
+}
+
 export interface TranslationClassMethods {
   readonly i18nScope: string;
   lookupAncestors(): Array<{ new (...args: never[]): unknown; modelName: ModelName }>;
@@ -36,13 +43,6 @@ interface TranslationHost {
 const MISSING_TRANSLATION = -(2 ** 60);
 
 let _raiseOnMissingTranslations = false;
-
-export function raiseOnMissingTranslations(value?: boolean): boolean {
-  if (value !== undefined) {
-    _raiseOnMissingTranslations = value;
-  }
-  return _raiseOnMissingTranslations;
-}
 
 /**
  * Walk the class prototype chain collecting constructors that expose a
@@ -85,26 +85,24 @@ export function humanAttributeName(
       separator = ".";
     }
 
-    defaults = this.lookupAncestors().map((klass) =>
-      // Ruby Symbol default = "look this key up"; the backend spells that arm as
-      // a real JS symbol (story `i18n-symbol-values-are-colon-strings`).
-      Symbol.for(`${this.i18nScope}.attributes.${klass.modelName.i18nKey}${separator}${key}`),
+    defaults = this.lookupAncestors().map(
+      (klass) => `:${this.i18nScope}.attributes.${klass.modelName.i18nKey}${separator}${key}`,
     );
-    defaults.push(Symbol.for(`${this.i18nScope}.attributes.${key}`));
-    defaults.push(Symbol.for(`attributes.${key}`));
+    defaults.push(`:${this.i18nScope}.attributes.${key}`);
+    defaults.push(`:attributes.${key}`);
   } else {
-    defaults = this.lookupAncestors().map((klass) =>
-      Symbol.for(`${this.i18nScope}.attributes.${klass.modelName.i18nKey}.${attribute}`),
+    defaults = this.lookupAncestors().map(
+      (klass) => `:${this.i18nScope}.attributes.${klass.modelName.i18nKey}.${attribute}`,
     );
   }
 
   const raiseOnMissing = options.raise ?? _raiseOnMissingTranslations;
 
-  defaults.push(Symbol.for(`attributes.${attribute}`));
+  defaults.push(`:attributes.${attribute}`);
   if (options.default != null) defaults.push(options.default);
   if (!raiseOnMissing) defaults.push(MISSING_TRANSLATION);
 
-  let translation = I18n.translate(defaults.shift() as TranslateKey, {
+  let translation = I18n.translate(toS(defaults.shift()) as TranslateKey, {
     count: 1,
     raise: raiseOnMissing,
     ...options,
@@ -114,6 +112,14 @@ export function humanAttributeName(
     translation = isPresent(attribute) ? humanize(attribute) : humanize(namespace);
   }
   return translation as string;
+}
+
+/**
+ * Ruby `Symbol#to_s`, which drops the leading colon the Symbol spelling of a
+ * default carries when that default is taken as the translate key.
+ */
+function toS(value: unknown): unknown {
+  return typeof value === "string" && value.startsWith(":") ? value.slice(1) : value;
 }
 
 function _walkAncestors(

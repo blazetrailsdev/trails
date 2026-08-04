@@ -25,6 +25,14 @@ import { catchException, throwException } from "../throw-catch.js";
 import type { Base, TranslateOptions } from "./base.js";
 
 /**
+ * Ruby `Symbol === x`. A Ruby Symbol is a JS string that keeps its leading
+ * colon (`":short"`), which is the discriminator Ruby gets from the type.
+ */
+function isSymbol(value: unknown): value is string {
+  return typeof value === "string" && value.startsWith(":");
+}
+
+/**
  * Anything that answers the gem's `I18n.fallbacks[locale]` — the gem's own
  * `I18n::Locale::Fallbacks`, or the duck type Issue #536 allows.
  */
@@ -102,7 +110,7 @@ export function Fallbacks<T extends BackendConstructor>(
      */
     override translate(
       locale: Locale | null | undefined,
-      key: TranslationKey | symbol | null | undefined,
+      key: TranslationKey | null | undefined,
       options: TranslateOptions = EMPTY_HASH,
     ): unknown {
       if (!truthy("fallback" in options ? options.fallback : true)) {
@@ -147,7 +155,7 @@ export function Fallbacks<T extends BackendConstructor>(
 
     protected override resolveEntry(
       locale: Locale,
-      object: TranslationKey | symbol | null | undefined,
+      object: TranslationKey | null | undefined,
       subject: unknown,
       options: TranslateOptions = EMPTY_HASH,
     ): unknown {
@@ -155,8 +163,8 @@ export function Fallbacks<T extends BackendConstructor>(
       const result = catchException(() => {
         if ("fallbackInProgress" in options) delete options.fallbackInProgress;
 
-        if (typeof subject === "symbol") {
-          return t(subject, {
+        if (isSymbol(subject)) {
+          return t(subject.slice(1), {
             ...options,
             locale: options.fallbackOriginalLocale as Locale,
             throw: true,
@@ -180,14 +188,9 @@ export function Fallbacks<T extends BackendConstructor>(
       return result instanceof MissingTranslation ? null : result;
     }
 
-    /**
-     * A Ruby Symbol default is a real JS symbol here, which is what
-     * `Base#resolve` already dispatches on (base.rb:203); converging both onto
-     * the `":name"` spelling is story `i18n-symbol-values-are-colon-strings`.
-     */
     extractNonSymbolDefaultBang(options: TranslateOptions): unknown {
       const defaults = [options.default].flat(Infinity as 1);
-      const firstNonSymbolDefault = defaults.find((default_) => typeof default_ !== "symbol");
+      const firstNonSymbolDefault = defaults.find((default_) => !isSymbol(default_));
       if (truthy(firstNonSymbolDefault)) {
         options.default = defaults.slice(0, defaults.indexOf(firstNonSymbolDefault));
       }
@@ -196,7 +199,7 @@ export function Fallbacks<T extends BackendConstructor>(
 
     override exists(
       locale: Locale,
-      key: TranslationKey | symbol,
+      key: TranslationKey,
       options: TranslateOptions = EMPTY_HASH,
     ): boolean {
       if (!truthy("fallback" in options ? options.fallback : true)) {
@@ -218,7 +221,7 @@ export function Fallbacks<T extends BackendConstructor>(
     protected onFallback(
       _originalLocale: Locale,
       _fallbackLocale: Locale,
-      _key: TranslationKey | symbol | null | undefined,
+      _key: TranslationKey | null | undefined,
       _options: TranslateOptions,
     ): unknown {
       return null;
