@@ -7,7 +7,13 @@ import { config, resetConfig, type TranslationKey } from "../i18n.js";
 import { resetClassConfig } from "../config.js";
 import { UnknownFileType } from "../exceptions.js";
 import { catchException } from "../throw-catch.js";
-import { preloadTranslationFiles, registerFileReader, type TranslateOptions } from "./base.js";
+import {
+  preloadTranslationFiles,
+  registerFileReader,
+  registerLocaleModule,
+  type TranslateOptions,
+} from "./base.js";
+import { en } from "../test-data/locales/en.js";
 import type { TranslationData } from "../utils.js";
 
 /** Mirrors: `locales_dir` in i18n/test/test_helper.rb:44. */
@@ -29,6 +35,7 @@ describe("I18nBackendSimpleTest", () => {
         (name) => `${localesDir()}/${name}`,
       ),
     );
+    registerLocaleModule(`${localesDir()}/en.js`, { en });
     backend = new Simple();
     config().backend = backend;
     config().enforceAvailableLocales = false;
@@ -37,7 +44,7 @@ describe("I18nBackendSimpleTest", () => {
   /** Stands in for Ruby's `send`, which the gem's tests use for these. */
   function send(
     target: Simple,
-    name: "loadYml" | "loadJson",
+    name: "loadJs" | "loadYml" | "loadJson",
     filename: string,
   ): [unknown, boolean] {
     return (target as unknown as Record<typeof name, (f: string) => [unknown, boolean]>)[name](
@@ -129,10 +136,19 @@ describe("I18nBackendSimpleTest", () => {
     expect(() => backend.loadTranslations(`${localesDir()}/en.json`)).not.toThrow();
   });
 
+  it("simple load_translations: given a Ruby file name it does not raise anything", () => {
+    expect(() => backend.loadTranslations(`${localesDir()}/en.js`)).not.toThrow();
+  });
+
   it("simple load_translations: given no argument, it uses I18n.load_path", () => {
     config().loadPath = [`${localesDir()}/en.yml`];
     backend.loadTranslations();
     expect(translations()).toEqual({ en: { foo: { bar: "baz" } } });
+  });
+
+  it("simple load_rb: loads data from a Ruby file", () => {
+    const [data] = send(backend, "loadJs", `${localesDir()}/en.js`);
+    expect(data).toEqual({ en: { fuh: { bah: "bas" } } });
   });
 
   it("simple load_yml: loads data from a YAML file", () => {
@@ -148,14 +164,14 @@ describe("I18nBackendSimpleTest", () => {
   it("simple load_translations: loads data from known file formats", () => {
     backend = new Simple();
     config().backend = backend;
-    backend.loadTranslations(`${localesDir()}/fr.yml`, `${localesDir()}/en.yml`);
-    const expected = { fr: { animal: { dog: "chien" } }, en: { foo: { bar: "baz" } } };
+    backend.loadTranslations(`${localesDir()}/en.js`, `${localesDir()}/en.yml`);
+    const expected = { en: { fuh: { bah: "bas" }, foo: { bar: "baz" } } };
     expect(translations()).toEqual(expected);
   });
 
   it("simple load_translations: given file names as array it does not raise anything", () => {
     expect(() =>
-      backend.loadTranslations([`${localesDir()}/fr.yml`, `${localesDir()}/en.yml`]),
+      backend.loadTranslations([`${localesDir()}/en.js`, `${localesDir()}/en.yml`]),
     ).not.toThrow();
   });
 
