@@ -78,7 +78,7 @@ describe("ActiveRecordI18nTests", () => {
       activerecord: { models: { topic: "topic model" } },
     });
 
-    expect(Topic.modelName.human).toBe("topic model");
+    expect(Topic.modelName.human()).toBe("topic model");
   });
 
   it("translated model names with sti", () => {
@@ -93,7 +93,7 @@ describe("ActiveRecordI18nTests", () => {
       activerecord: { models: { reply: "reply model" } },
     });
 
-    expect(Reply.modelName.human).toBe("reply model");
+    expect(Reply.modelName.human()).toBe("reply model");
   });
 
   it("translated model names with sti fallback", () => {
@@ -108,6 +108,6 @@ describe("ActiveRecordI18nTests", () => {
       activerecord: { models: { topic: "topic model" } },
     });
 
-    expect(Reply.modelName.human).toBe("topic model");
+    expect(Reply.modelName.human()).toBe("topic model");
   });
 });

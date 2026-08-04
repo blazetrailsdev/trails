@@ -14,7 +14,7 @@ type LiveConnection = {
 } & Record<string, unknown>;
 
 function mysqlAtLeast(connection: LiveConnection, version: string): boolean {
-  return (connection.databaseVersion as Version).gte(version);
+  return (connection.databaseVersion as Version).compare(version) >= 0;
 }
 
 function adapterHelperSupport(feature: string, connection: LiveConnection): boolean | undefined {

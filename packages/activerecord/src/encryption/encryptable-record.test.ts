@@ -350,8 +350,12 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     } as any;
     Post.encrypts("title");
 
-    configureEncryption({ primaryKey: "the primary key", keyDerivationSalt: "the salt" });
-    Configurable.config.supportSha1ForNonDeterministicEncryption = true;
+    Configurable.configure({
+      primaryKey: "the primary key",
+      deterministicKey: "the deterministic key",
+      keyDerivationSalt: "the salt",
+      supportSha1ForNonDeterministicEncryption: true,
+    });
 
     const type = Post.typeForAttribute("title");
     // One lazy-resolved global previous scheme (the SHA1 key provider).
@@ -625,8 +629,8 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
       primaryKey: "the primary key",
       deterministicKey: "the deterministic key",
       keyDerivationSalt: "the salt",
+      supportSha1ForNonDeterministicEncryption: true,
     });
-    Configurable.config.supportSha1ForNonDeterministicEncryption = true;
 
     const { KeyGenerator } = await import("./key-generator.js");
     const { DerivedSecretKeyProvider } = await import("./derived-secret-key-provider.js");

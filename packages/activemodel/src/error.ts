@@ -14,7 +14,7 @@ interface ValidatableBase {
 interface ModelClass {
   name?: string;
   i18nScope?: string;
-  modelName?: { i18nKey?: string; human?: string };
+  modelName?: { i18nKey?: string; human?: () => string };
   humanAttributeName?: (attr: string, options?: { default?: string; base?: ModelBase }) => string;
   lookupAncestors?: () => ModelClass[];
 }
@@ -163,7 +163,7 @@ export class Error {
         : undefined;
 
     options = {
-      model: baseClass?.modelName?.human,
+      model: baseClass?.modelName?.human?.(),
       attribute: baseClass?.humanAttributeName
         ? baseClass.humanAttributeName(attribute, { base })
         : humanize(attribute),

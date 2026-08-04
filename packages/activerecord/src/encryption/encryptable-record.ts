@@ -9,45 +9,7 @@ import { Configuration as ConfigurationError } from "./errors.js";
 import { LengthValidator, type Type } from "@blazetrails/activemodel";
 import { EncryptedAttributeType, setGlobalPreviousSchemesFn } from "./encrypted-attribute-type.js";
 import { Configurable } from "./configurable.js";
-import { KeyGenerator } from "./key-generator.js";
-import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
 import { encryptionHooks } from "../encryption-hooks.js";
-
-// Memoized SHA1 key provider: PBKDF2 is expensive (65536 iterations), so
-// reuse the same provider as long as primaryKey and keyDerivationSalt haven't
-// changed. Cleared by the onConfigure hook below so config rotation invalidates it.
-let _sha1ProviderCache:
-  | {
-      primaryKey: string | string[];
-      keyDerivationSalt: string | undefined;
-      provider: DerivedSecretKeyProvider;
-    }
-  | undefined;
-
-// Clear the SHA1 provider cache whenever configure() is called so the new
-// primary key / key derivation salt is picked up on the next encrypt call.
-Configurable.onConfigure(() => {
-  _sha1ProviderCache = undefined;
-});
-
-function getSha1KeyProvider(
-  primaryKey: string | string[],
-  keyDerivationSalt: string | undefined,
-): DerivedSecretKeyProvider {
-  const cacheKey = JSON.stringify(primaryKey);
-  if (
-    _sha1ProviderCache &&
-    JSON.stringify(_sha1ProviderCache.primaryKey) === cacheKey &&
-    _sha1ProviderCache.keyDerivationSalt === keyDerivationSalt
-  ) {
-    return _sha1ProviderCache.provider;
-  }
-  const provider = new DerivedSecretKeyProvider(primaryKey, {
-    keyGenerator: new KeyGenerator("SHA1"),
-  });
-  _sha1ProviderCache = { primaryKey, keyDerivationSalt, provider };
-  return provider;
-}
 
 /**
  * Mirrors Rails' EncryptableRecord#global_previous_schemes_for.
@@ -61,15 +23,6 @@ function getSha1KeyProvider(
 export function globalPreviousSchemesFor(scheme: Scheme): Scheme[] {
   const config = Configurable.config;
   const allSchemeOptions: SchemeOptions[] = [...config.previousSchemes];
-
-  // Mirrors Rails' support_sha1_for_non_deterministic_encryption= setter:
-  // builds the SHA1 DerivedSecretKeyProvider lazily here (not in Config) to
-  // avoid a config → key-generator → configurable → config circular import.
-  if (config.supportSha1ForNonDeterministicEncryption && config.hasPrimaryKey()) {
-    allSchemeOptions.push({
-      keyProvider: getSha1KeyProvider(config.primaryKey, config.hasKeyDerivationSalt()),
-    });
-  }
 
   return allSchemeOptions
     .map((opts) => new Scheme(opts))

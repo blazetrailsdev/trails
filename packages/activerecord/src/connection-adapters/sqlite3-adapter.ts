@@ -1252,7 +1252,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   supportsExpressionIndex(): boolean {
-    return this.databaseVersion.gte("3.9.0");
+    return this.databaseVersion.compare("3.9.0") >= 0;
   }
 
   override supportsForeignKeys(): boolean {
@@ -1276,11 +1276,11 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   override supportsCommonTableExpressions(): boolean {
-    return this.databaseVersion.gte("3.8.3");
+    return this.databaseVersion.compare("3.8.3") >= 0;
   }
 
   supportsInsertReturning(): boolean {
-    return this.databaseVersion.gte("3.35.0");
+    return this.databaseVersion.compare("3.35.0") >= 0;
   }
 
   /** Mirrors: SQLite3::DatabaseStatements#returning_column_values — the full
@@ -1316,7 +1316,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   supportsInsertOnConflict(): boolean {
-    return this.databaseVersion.gte("3.24.0");
+    return this.databaseVersion.compare("3.24.0") >= 0;
   }
 
   override supportsInsertOnDuplicateSkip(): boolean {
@@ -1336,7 +1336,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   override supportsVirtualColumns(): boolean {
-    return this.databaseVersion.gte("3.31.0");
+    return this.databaseVersion.compare("3.31.0") >= 0;
   }
 
   override supportsIndexSortOrder(): boolean {
@@ -1476,7 +1476,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   override checkVersion(): void {
-    if (this.databaseVersion.lt("3.8.0")) {
+    if (this.databaseVersion.compare("3.8.0") < 0) {
       throw new Error(
         `Your version of SQLite (${this.databaseVersion}) is too old. Active Record supports SQLite >= 3.8.`,
       );

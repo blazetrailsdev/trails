@@ -167,34 +167,20 @@ export class Version {
   }
 
   /**
-   * Rails' Version `include Comparable` and defines only `<=>`; `>=` / `<`
-   * come from Comparable itself, so there is no `def gte` to mirror
-   * (abstract_adapter.rb:243-259). `gte`/`lt` are the TS spelling of those two
-   * Comparable operators — the only ones any caller uses — over the same
-   * dotted-part comparison `<=>` performs.
-   *
-   * @noRailsEquivalent CONVERGEABLE (story: port-version-compare-and-retire-gte-lt).
-   * Rails' `AbstractAdapter::Version` does `include Comparable` and defines only
-   *   `<=>`
-   *   (abstract_adapter.rb:243-259); `>=` and `<` come from Comparable, so there is no `def gte` for
-   *   the extractor to match. `gte`/`lt` are the TS spelling of those two Comparable operators over
-   *   the same dotted-part comparison `<=>` performs. Justified at the declaration. The non-Rails
-   *   part-readers on the same class (`major`/`minor`/`patch`) were deleted rather than allowlisted —
-   *   they had no callers.
+   * Mirrors Rails' `<=>` (abstract_adapter.rb:252-254): `@version <=>
+   * version_string.split(".").map(&:to_i)`. Ruby's `Array#<=>` compares
+   * element by element and falls back to length, which is what the loop and
+   * the trailing length comparison spell out here. Rails' `>=` / `<` come
+   * from `include Comparable`; TS has no operator overloading, so call sites
+   * spell them `compare(...) >= 0` / `compare(...) < 0`.
    */
-  gte(other: Version | string): boolean {
-    const otherVersion = typeof other === "string" ? new Version(other) : other;
-    for (let i = 0; i < Math.max(this._parts.length, otherVersion._parts.length); i++) {
-      const a = this._parts[i] ?? 0;
-      const b = otherVersion._parts[i] ?? 0;
-      if (a > b) return true;
-      if (a < b) return false;
+  compare(versionString: string): number {
+    const other = versionString.split(".").map(Number);
+    for (let i = 0; i < Math.min(this._parts.length, other.length); i++) {
+      if (this._parts[i] > other[i]) return 1;
+      if (this._parts[i] < other[i]) return -1;
     }
-    return true;
-  }
-
-  lt(other: Version | string): boolean {
-    return !this.gte(other);
+    return this._parts.length === other.length ? 0 : this._parts.length > other.length ? 1 : -1;
   }
 }
 
@@ -399,6 +385,15 @@ export interface AbstractAdapter {
     options?: Omit<ForeignKeyLookupOptions, "toTable">,
   ): Promise<boolean>;
   addForeignKey(fromTable: string, toTable: string, options?: AddForeignKeyOptions): Promise<void>;
+  /**
+   * Mirrors: ActiveRecord::ConnectionAdapters::SchemaStatements#foreign_key_options
+   * @internal
+   */
+  foreignKeyOptions(
+    fromTable: string,
+    toTable: string,
+    options?: Record<string, unknown>,
+  ): Record<string, unknown>;
   isUseForeignKeys(): boolean;
   removeForeignKey(
     fromTable: string,
@@ -427,6 +422,15 @@ export interface AbstractAdapter {
     options?: { name?: string; validate?: boolean; ifNotExists?: boolean; [key: string]: unknown },
   ): Promise<void>;
   checkConstraints(tableName: string): Promise<CheckConstraintDefinition[]>;
+  /**
+   * Mirrors: ActiveRecord::ConnectionAdapters::SchemaStatements#check_constraint_options
+   * @internal
+   */
+  checkConstraintOptions(
+    tableName: string,
+    expression: string,
+    options?: Record<string, unknown>,
+  ): Record<string, unknown>;
   checkConstraintExists(
     tableName: string,
     options: { name?: string; expression?: string },
@@ -442,6 +446,11 @@ export interface AbstractAdapter {
     options?: { name?: string; ifExists?: boolean },
   ): Promise<void>;
   removeConstraint(tableName: string, constraintName: string): Promise<void>;
+  /**
+   * Mirrors: ActiveRecord::ConnectionAdapters::SchemaStatements#valid_column_definition_options
+   * @internal
+   */
+  validColumnDefinitionOptions(): string[];
   updateTableDefinition(tableName: string, base?: unknown): Table;
   assumeMigratedUptoVersion(version: number | string): Promise<void>;
   createJoinTable(

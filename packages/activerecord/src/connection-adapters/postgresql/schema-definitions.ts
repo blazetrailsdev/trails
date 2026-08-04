@@ -23,7 +23,7 @@ import type {
   ColumnType,
   SchemaStatementsLike,
 } from "../abstract/schema-definitions.js";
-import type { SchemaQuoter } from "../abstract/assert-schema-adapter.js";
+import type { TableDefinitionConn } from "../abstract/schema-definitions.js";
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace PostgreSQL {
@@ -206,7 +206,7 @@ export class TableDefinition extends AbstractTableDefinition {
       temporary?: boolean;
       ifNotExists?: boolean;
       as?: string;
-      adapter: SchemaQuoter;
+      adapter: TableDefinitionConn;
     },
   ) {
     super(tableName, { ...options, adapterName: "postgres" });

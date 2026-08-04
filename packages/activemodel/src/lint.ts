@@ -130,15 +130,15 @@ export namespace Tests {
   }
 
   type ModelNamingHost = {
-    modelName: { human: string; singular: string; plural: string };
-    constructor: { modelName?: { human: string; singular: string; plural: string } };
+    modelName: { human: () => string; singular: string; plural: string };
+    constructor: { modelName?: { human: () => string; singular: string; plural: string } };
   };
   export function testModelNaming(model: ModelNamingHost): void {
     const classModelName = model.constructor.modelName;
     if (!classModelName) {
       throw new MinitestAssertion("model.constructor.modelName must be defined");
     }
-    if (typeof classModelName.human !== "string") {
+    if (typeof classModelName.human() !== "string") {
       throw new MinitestAssertion("modelName.human must return a string");
     }
     if (typeof classModelName.singular !== "string") {

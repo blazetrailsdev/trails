@@ -93,7 +93,7 @@ interface AutoIncrementColumnHost {
 export function isAnalyzeWithoutExplain(this: BuildExplainClauseHost | void): boolean {
   const host = this as BuildExplainClauseHost | null;
   if (!host?.isMariadb?.()) return false;
-  return host.getDatabaseVersion?.().gte("10.1.0") === true;
+  return (host.getDatabaseVersion?.().compare("10.1.0") ?? -1) >= 0;
 }
 
 /** @internal */

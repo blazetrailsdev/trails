@@ -18,7 +18,9 @@ import {
 // Probed at module load so the conditional can sit on it.skipIf instead of
 // inside the test body (which the lint rule forbids).
 const skipNoTableOptions =
-  isMariaDb || mysqlVersion === "" || new Version(mysqlVersion.replace(/-.*$/, "")).gte("5.7.22");
+  isMariaDb ||
+  mysqlVersion === "" ||
+  new Version(mysqlVersion.replace(/-.*$/, "")).compare("5.7.22") >= 0;
 
 const dumpTable = (adapter: Mysql2Adapter, tableName: string) =>
   SchemaDumper.dumpTableSchema(adapter as unknown as SchemaSource, tableName);

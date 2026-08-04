@@ -176,7 +176,9 @@ export async function isRowFormatDynamicByDefault(this: RowFormatHost): Promise<
   // `get_database_version` lazily; the TS spelling of that laziness is awaiting
   // `getDatabaseVersion()`, whose result the adapter memoizes.
   const databaseVersion = await this.getDatabaseVersion();
-  return this.isMariadb() ? databaseVersion.gte("10.2.2") : databaseVersion.gte("5.7.9");
+  return this.isMariadb()
+    ? databaseVersion.compare("10.2.2") >= 0
+    : databaseVersion.compare("5.7.9") >= 0;
 }
 
 /** @internal */
