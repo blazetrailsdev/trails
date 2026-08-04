@@ -1500,7 +1500,6 @@ export class Date {
    */
   static parse(str: string, comp = true): Date {
     const parts = Date._parse(str, comp);
-    if (!parts) throw new DateError("invalid date");
     completeFrags(parts);
     let d: Temporal.PlainDate | null = null;
     try {
@@ -1522,8 +1521,12 @@ export class Date {
    * `date__parse`), which runs its sub-parsers in a fixed order and stops at
    * the first that matches: the alphabetic pair first, then the numeric ones.
    * Ruby answers a Hash of whatever fields it found, which is why a fragment
-   * such as `"Feb 3rd"` comes back without a `:year`; `null` is the Hash no
-   * sub-parser filled at all.
+   * such as `"Feb 3rd"` comes back without a `:year`, and a string no
+   * sub-parser matched at all comes back as the empty Hash `date__parse`
+   * built up front (`date_parse.c:2166-2294`) rather than as a distinguished
+   * value: `Date._parse("not a date")` is `{}`. `Date.parse` raises on it the
+   * way `rt__valid_date_frags_p` (`date_core.c:4185-4220`) does, by finding no
+   * buildable combination of fields.
    *
    * Ruby's sub-parsers all `set_hash` into the one Hash it built up front, so a
    * later one overwrites what `parse_time` put there, and each `subx`es the text
@@ -1533,7 +1536,7 @@ export class Date {
    * (`date_parse.c:2172`) and only ever turns false, so an absent one is `comp`,
    * and the year is completed only within `0..99` (`date_parse.c:2267-2287`).
    */
-  static _parse(str: string, comp = true): DateParts | null {
+  static _parse(str: string, comp = true): DateParts {
     const hash: DateParts = {};
     str = parseDay(str);
     str = parseTime(str, hash);
@@ -1552,7 +1555,6 @@ export class Date {
       parseMon(str, hash) ??
       parseMday(str, hash) ??
       parseDdd(str, hash);
-    if (rest === null && Object.keys(hash).length === 0) return null;
     if (rest !== null) str = rest;
     if (/[a-z]/i.test(str)) str = parseBc(str, hash) ?? str;
     if (/\d/.test(str)) parseFrag(str, hash);

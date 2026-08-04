@@ -4,10 +4,40 @@
  * Mirrors: ActiveRecord::Encryption::Config
  */
 
+import { deflateSync, inflateSync } from "zlib";
+
 import { presence } from "@blazetrails/activesupport";
 
 import { Configuration } from "./errors.js";
 import type { SchemeOptions } from "./scheme.js";
+
+/**
+ * The `deflate`/`inflate` pair a compressor answers.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby duck-types the compressor — "it must respond to
+ * +deflate+ and +inflate+" (encryption/encryptor.rb:22-24) — so no Rails file
+ * declares this shape or these two members. TypeScript has to write it down
+ * for `Config#compressor`, `Encryptor` and `Scheme` to name the same type.
+ */
+export interface Compressor {
+  deflate(data: string): Buffer | Uint8Array;
+  inflate(data: Buffer | Uint8Array): string;
+}
+
+/**
+ * Ruby's `Zlib`, the module `set_defaults` assigns to `compressor`
+ * (encryption/config.rb:59). It is a stdlib constant there, so it is not part
+ * of this file's surface; here it is the module-local object that answers the
+ * same `deflate`/`inflate` pair.
+ */
+const Zlib: Compressor = {
+  deflate(data: string): Buffer {
+    return deflateSync(Buffer.from(data, "utf-8"));
+  },
+  inflate(data: Buffer | Uint8Array): string {
+    return inflateSync(data).toString("utf-8");
+  },
+};
 
 export class Config {
   private _primaryKey?: string | string[];
@@ -18,21 +48,16 @@ export class Config {
   encryptFixtures: boolean = false;
   validateColumnSize: boolean = true;
   addToFilterParameters: boolean = true;
-  excludeFromFilterParameters: string[] = [];
+  excludedFromFilterParameters: string[] = [];
   previousSchemes: SchemeOptions[] = [];
   supportSha1ForNonDeterministicEncryption: boolean = false;
   extendQueries: boolean = false;
   hashDigestClass: string = "SHA1";
-  keyProviderClass?: string;
-  compressor: Compressor = defaultCompressor;
+  compressor: Compressor = Zlib;
   forcedEncodingForDeterministicEncryption: string = "UTF-8";
 
   constructor() {
     this.setDefaults();
-  }
-
-  get excludedFromFilterParameters(): string[] {
-    return this.excludeFromFilterParameters;
   }
 
   set previous(schemes: SchemeOptions[]) {
@@ -111,11 +136,11 @@ export class Config {
     this.encryptFixtures = false;
     this.validateColumnSize = true;
     this.addToFilterParameters = true;
-    this.excludeFromFilterParameters = [];
+    this.excludedFromFilterParameters = [];
     this.previousSchemes = [];
     this.forcedEncodingForDeterministicEncryption = "UTF-8";
     this.hashDigestClass = "SHA1";
-    this.compressor = defaultCompressor;
+    this.compressor = Zlib;
     this.extendQueries = false;
   }
 
@@ -124,19 +149,3 @@ export class Config {
     this.previousSchemes.push(properties);
   }
 }
-
-export interface Compressor {
-  deflate(data: string): Buffer | Uint8Array;
-  inflate(data: Buffer | Uint8Array): string;
-}
-
-import { deflateSync, inflateSync } from "zlib";
-
-export const defaultCompressor: Compressor = {
-  deflate(data: string): Buffer {
-    return deflateSync(Buffer.from(data, "utf-8"));
-  },
-  inflate(data: Buffer | Uint8Array): string {
-    return inflateSync(data).toString("utf-8");
-  },
-};

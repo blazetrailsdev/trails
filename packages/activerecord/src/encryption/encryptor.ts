@@ -15,7 +15,6 @@ import {
 } from "./default-key-provider-cache.js";
 import { Base, ConfigError, DecryptionError, Encoding, ForbiddenClass } from "./errors.js";
 import type { Compressor } from "./config.js";
-import { defaultCompressor } from "./config.js";
 import { normalizeEncoding, replaceUnencodable } from "./encoding-helpers.js";
 
 // Mirrors: ActiveRecord::Encryption::Encryptor::THRESHOLD_TO_JUSTIFY_COMPRESSION
@@ -54,7 +53,7 @@ export class Encryptor {
 
   constructor(options?: { compress?: boolean; compressor?: Compressor }) {
     this._compress = options?.compress ?? true;
-    this._compressor = options?.compressor ?? defaultCompressor;
+    this._compressor = options?.compressor ?? Configurable.config.compressor;
   }
 
   encrypt(

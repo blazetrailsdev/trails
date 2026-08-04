@@ -227,6 +227,12 @@ describe("Date", () => {
     expect(() => RubyDate.parse("not a date")).toThrow("invalid date");
   });
 
+  it("answers an empty Hash for a string no sub-parser matched", () => {
+    expect(RubyDate._parse("not a date")).toEqual({});
+    expect(RubyDate._parse("1 BCE")).toEqual({});
+    expect(() => RubyDate.parse("1 BCE")).toThrow("invalid date");
+  });
+
   it("raises Date::Error, which subclasses ArgumentError as it does in Ruby", () => {
     expect(() => RubyDate.parse("not a date")).toThrow(RubyDate.Error);
     expect(() => RubyDate.parse("2008-02-30")).toThrow(RubyDate.Error);

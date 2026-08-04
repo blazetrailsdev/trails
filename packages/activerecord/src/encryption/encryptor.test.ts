@@ -8,7 +8,6 @@ import { DecryptionError, ForbiddenClass, Encryption as EncryptionError } from "
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
 import { MessageSerializer } from "./message-serializer.js";
 import { Message } from "./message.js";
-import { defaultCompressor } from "./config.js";
 import * as crypto from "crypto";
 
 function generateKey(): string {
@@ -193,11 +192,11 @@ describe("ActiveRecord::Encryption::EncryptorTest", () => {
     const spyCompressor = {
       deflate(data: string) {
         deflated = true;
-        return defaultCompressor.deflate(data);
+        return Configurable.config.compressor.deflate(data);
       },
       inflate(data: Buffer) {
         inflated = true;
-        return defaultCompressor.inflate(data);
+        return Configurable.config.compressor.inflate(data);
       },
     };
     const enc = new Encryptor({ compress: true, compressor: spyCompressor });

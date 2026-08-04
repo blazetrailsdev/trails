@@ -13,7 +13,7 @@ import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/
 
 export { Base };
 import { Configurable } from "./configurable.js";
-import { defaultCompressor, type Compressor } from "./config.js";
+import { type Compressor } from "./config.js";
 import { Contexts } from "./contexts.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
 import { clearDefaultKeyProviderCache, type Scheme } from "./scheme.js";
@@ -278,16 +278,16 @@ export function makeEncryptedAuthor(adapter: DatabaseAdapter) {
 }
 
 export function makeEncryptedBookWithCustomCompressor(adapter: DatabaseAdapter) {
-  // Delegates actual compression to defaultCompressor (zlib) so the compressed
-  // output IS smaller and the path is exercised. inflate adds "[compressed] "
+  // Delegates actual compression to the configured compressor (zlib) so the
+  // compressed output IS smaller and the path is exercised. inflate adds "[compressed] "
   // prefix so tests can assert the custom compressor was actually called —
   // mirrors Rails' EncryptedBookWithCustomCompressor fixture.
   const customCompressor: Compressor = {
     deflate(data: string): Buffer | Uint8Array {
-      return defaultCompressor.deflate(data);
+      return Configurable.config.compressor.deflate(data);
     },
     inflate(data: Buffer | Uint8Array): string {
-      return "[compressed] " + defaultCompressor.inflate(data);
+      return "[compressed] " + Configurable.config.compressor.inflate(data);
     },
   };
   return class EncryptedBookWithCustomCompressor extends Base {

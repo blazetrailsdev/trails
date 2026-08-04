@@ -59,7 +59,7 @@ export class AutoFilteredParameters {
 
   /** @internal */
   private isExcludedFromFilterParameters(filterParameter: string): boolean {
-    return Configurable.config.excludeFromFilterParameters.some(
+    return Configurable.config.excludedFromFilterParameters.some(
       (excluded) => excluded === filterParameter,
     );
   }
