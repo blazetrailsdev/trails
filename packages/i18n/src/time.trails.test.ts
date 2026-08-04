@@ -40,7 +40,9 @@ describe("Time", () => {
   it("Time.new takes a military zone letter", () => {
     expect(new Time(2008, 3, 1, 6, 0, 0, "K").utcOffset).toBe(10 * 3600);
     expect(new Time(2008, 3, 1, 6, 0, 0, "Y").utcOffset).toBe(-12 * 3600);
-    expect(new Time(2008, 3, 1, 6, 0, 0, "Z").utcOffset).toBe(0);
+    expect(new Time(2008, 3, 1, 6, 0, 0, "K").strftime("%z %Z")).toBe("+1000 ");
+    // MRI treats `"Z"` as UTC itself, so it keeps a zone where an offset does not.
+    expect(new Time(2008, 3, 1, 6, 0, 0, "Z").strftime("%z %Z")).toBe("+0000 UTC");
   });
 
   it("Time.new rejects a zone name", () => {

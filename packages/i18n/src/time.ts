@@ -16,8 +16,8 @@ import { ArgumentError, strftime } from "./date.js";
  * number of seconds east of UTC, which is the form Rails passes
  * (`activesupport/lib/active_support/core_ext/string/conversions.rb:28`,
  * `core_ext/time/calculations.rb:172-175`) — or one of the military zone
- * letters (`A`..`I` = +1..+9, `K`..`M` = +10..+12, `N`..`Y` = -1..-12,
- * `Z` = UTC). Anything else raises with MRI's message; an IANA name like
+ * letters (`A`..`I` = +1..+9, `K`..`M` = +10..+12, `N`..`Y` = -1..-12, and
+ * `Z`, which MRI treats as UTC itself rather than as a zero offset). Anything else raises with MRI's message; an IANA name like
  * `"America/New_York"` is not a `Time.new` zone, it is what a `TimeZone`
  * object wraps.
  *
@@ -33,15 +33,17 @@ function utcOffsetArgument(zone: string | number): string {
     const minutes = Math.abs(zone) / 60;
     return `${sign}${pad2(Math.floor(minutes / 60))}:${pad2(minutes % 60)}`;
   }
-  if (zone === "UTC") return zone;
+  // `"Z"` is the military letter for UTC, and MRI treats it as `Time.utc`
+  // does — `zone` answers `"UTC"`, not `nil` as an offset-built time does.
+  if (zone === "UTC" || zone === "Z") return "UTC";
   if (/^[+-]\d{2}(:?\d{2})?$/.test(zone)) return zone;
   if (/^[+-]\d{2}:\d{2}:\d{2}$/.test(zone)) {
     if (!zone.endsWith(":00")) throw new ArgumentError("utc_offset out of range");
     return zone.slice(0, 6);
   }
-  if (/^[A-IK-Z]$/.test(zone)) {
+  if (/^[A-IK-Y]$/.test(zone)) {
     const code = zone.charCodeAt(0);
-    const hours = zone === "Z" ? 0 : code <= 73 ? code - 64 : code <= 77 ? code - 65 : 77 - code;
+    const hours = code <= 73 ? code - 64 : code <= 77 ? code - 65 : 77 - code;
     const sign = hours < 0 ? "-" : "+";
     return `${sign}${pad2(Math.abs(hours))}:00`;
   }
