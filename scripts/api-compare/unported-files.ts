@@ -1139,11 +1139,6 @@ export const UNPORTED_FILES: UnportedFile[] = [
   },
   // --- i18n: optional backend mixins composed on top of Simple ---
   {
-    pattern: "backend/chain.rb",
-    package: "i18n",
-    reason: "Pre-1.0: optional backend mixin — composes several backends behind one lookup.",
-  },
-  {
     pattern: "backend/cache.rb",
     testFile: "backend/cache_test.rb",
     package: "i18n",
