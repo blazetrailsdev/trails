@@ -10,6 +10,7 @@ import {
   TableDefinition,
   type ColumnType,
 } from "./schema-definitions.js";
+import { TableDefinition as MysqlTableDefinition } from "../mysql/schema-definitions.js";
 import { AbstractAdapter } from "../abstract-adapter.js";
 import { NATIVE_DATABASE_TYPES_BY_ADAPTER } from "./native-database-types.js";
 import { NotImplementedError } from "../../errors.js";
@@ -803,6 +804,39 @@ describe("buildCreateTableDefinition routing", () => {
     expect(td.ifNotExists).toBe(true);
     expect(td.comment).toBe("a table");
     expect(td.options).toBe("ENGINE=InnoDB");
+  });
+
+  it("extracts _skipValidateOptions into the table definition options", () => {
+    const createTableDefinition = vi.fn(
+      (name: string, options: Record<string, unknown>) => new TableDefinition(name, options as any),
+    );
+    const ss = makeStatements({ createTableDefinition });
+
+    const td = ss.buildCreateTableDefinition("users", {
+      id: "integer",
+      _skipValidateOptions: true,
+    });
+
+    expect(createTableDefinition.mock.calls[0]?.[1]).toMatchObject({ _skipValidateOptions: true });
+    expect(pkColumn(td)?.options).not.toHaveProperty("_skipValidateOptions");
+  });
+
+  it("carries autoIncrement to the primary key only where valid_primary_key_options lists it", () => {
+    const abstract = makeStatements();
+    const mysql = makeStatements({
+      validPrimaryKeyOptions: () => ["limit", "unsigned", "autoIncrement"],
+      createTableDefinition: (name: string, options: Record<string, unknown>) =>
+        new MysqlTableDefinition(name, options as any),
+    });
+
+    expect(
+      pkColumn(abstract.buildCreateTableDefinition("users", { id: "integer", autoIncrement: true }))
+        ?.options,
+    ).not.toHaveProperty("autoIncrement");
+    expect(
+      pkColumn(mysql.buildCreateTableDefinition("users", { id: "integer", autoIncrement: true }))
+        ?.options,
+    ).toMatchObject({ autoIncrement: true });
   });
 
   it("expands the hash form of id onto the primary key column", () => {

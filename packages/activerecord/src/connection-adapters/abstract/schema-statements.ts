@@ -1491,13 +1491,21 @@ export class SchemaStatements {
     fn?: (td: TableDefinition) => void,
   ): TableDefinition {
     const { id = true, primaryKey, force: _force, ...rest } = options;
+    // Rails uses `options.extract!`, which *deletes* what it returns — so
+    // `_skipValidateOptions` only ever reaches the first extraction.
     const tdOptions: Record<string, unknown> = {};
-    for (const key of this.validTableDefinitionOptions()) {
-      if (rest[key] !== undefined) tdOptions[key] = rest[key];
+    for (const key of [...this.validTableDefinitionOptions(), "_skipValidateOptions"]) {
+      if (key in rest) {
+        tdOptions[key] = rest[key];
+        delete rest[key];
+      }
     }
     const pkOptions: Record<string, unknown> = {};
-    for (const key of this.validPrimaryKeyOptions()) {
-      if (rest[key] !== undefined) pkOptions[key] = rest[key];
+    for (const key of [...this.validPrimaryKeyOptions(), "_skipValidateOptions"]) {
+      if (key in rest) {
+        pkOptions[key] = rest[key];
+        delete rest[key];
+      }
     }
 
     const ctdOptions = {
