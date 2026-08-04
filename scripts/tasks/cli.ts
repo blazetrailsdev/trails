@@ -700,9 +700,17 @@ function assertCleanWorktree(cwd: string | undefined): void {
   process.exit(1);
 }
 
-function storyFilePath(index: Index, id: string): string {
+// Path of a story file, or null when the id is unknown. The lenient half of
+// storyFilePath, for the callers that must keep going past an unresolvable id
+// (the `each` verbs) instead of exiting.
+export function findStoryFile(index: Index, id: string): string | null {
   const entry = index.stories.find((s) => s.id === id);
-  if (!entry) {
+  return entry ? join(TASKS_DIR, entry.file_path) : null;
+}
+
+function storyFilePath(index: Index, id: string): string {
+  const file = findStoryFile(index, id);
+  if (file === null) {
     // loadIndex() (run by the caller before this) may have rebuilt and so
     // dirtied the generated index files; restore them before this error exit so
     // the tasks checkout isn't left dirty (matches rfcFilePath).
@@ -710,7 +718,7 @@ function storyFilePath(index: Index, id: string): string {
     console.error(`error: story "${id}" not found in index`);
     process.exit(1);
   }
-  return join(TASKS_DIR, entry.file_path);
+  return file;
 }
 
 // Canonical frontmatter key order, mirrors buildStoryContent. Used by
@@ -1347,8 +1355,7 @@ export interface StoryTarget {
   file: string;
 }
 
-// Resolve ids to story files, ignoring repeats (a duplicated id would otherwise
-// stage and report the same story twice). `"all"` (claim, release, and every
+// Resolve ids to story files, ignoring repeats. `"all"` (claim, release, and every
 // single-id verb) aborts the whole command on an unknown id — an atomic verb
 // must write nothing when part of its input is bogus. `"each"` (done,
 // in-progress) drops the unknown ids and proceeds with the rest, so one bad id
@@ -1360,12 +1367,12 @@ function storyTargets(index: Index, ids: string[], mode: "all" | "each"): StoryT
   if (mode === "all") return unique.map((id) => ({ id, file: storyFilePath(index, id) }));
   const targets: StoryTarget[] = [];
   for (const id of unique) {
-    const entry = index.stories.find((s) => s.id === id);
-    if (!entry) {
+    const file = findStoryFile(index, id);
+    if (file === null) {
       console.error(`error: story "${id}" not found in index — skipping`);
       continue;
     }
-    targets.push({ id, file: join(TASKS_DIR, entry.file_path) });
+    targets.push({ id, file });
   }
   if (targets.length === 0) {
     restoreGeneratedFiles(TASKS_DIR);
@@ -3389,33 +3396,37 @@ function main(): void {
       );
       break;
     case "claim": {
-      const ids = pos;
+      const ids = [...new Set(pos)];
       const assignee = stringFlag(flags, "assignee");
       if (ids.length === 0) usage();
       claim(ids, assignee ?? ids[0]);
       break;
     }
     case "release": {
-      const ids = pos;
+      const ids = [...new Set(pos)];
       if (ids.length === 0) usage();
       release(ids);
       break;
     }
     case "in-progress": {
-      const ids = pos;
+      const ids = [...new Set(pos)];
       const pr = numberFlag(flags, "pr");
       if (ids.length === 0 || pr === null) usage();
       inProgress(ids, pr);
       break;
     }
     case "done": {
-      const ids = pos;
+      const ids = [...new Set(pos)];
       const pr = numberFlag(flags, "pr");
       if (ids.length === 0 || pr === null) usage();
       if (!flags.force) checkPrNotOpen(pr);
       const index = loadIndex();
+      // Unknown ids are reported and skipped by the `each` resolution inside
+      // done(); resolving them strictly here would abort the whole bundle.
       for (const id of ids) {
-        checkCheckboxesDone(splitFrontmatter(storyFilePath(index, id)).body, flags.force === true);
+        const file = findStoryFile(index, id);
+        if (file === null) continue;
+        checkCheckboxesDone(splitFrontmatter(file).body, flags.force === true);
       }
       done(ids, pr);
       const estLoc = ids.reduce<number | null>((sum, id) => {

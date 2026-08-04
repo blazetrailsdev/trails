@@ -40,6 +40,7 @@ import {
   checkPrNotOpen,
   claimState,
   claimBatch,
+  findStoryFile,
   prLocDelta,
   uncheckedCheckboxes,
   commitAndPush,
@@ -762,6 +763,21 @@ describe("claimState (idempotent re-claim discriminator)", () => {
       `---\nstatus: claimed\nclaim: "2026-01-01T00:00:00Z"\nassignee: "alice"\n---\n` +
       `assignee: "dean"\n`;
     expect(claimState(fm, "dean")).toBe("taken");
+  });
+});
+
+describe("findStoryFile (lenient id resolution)", () => {
+  it("resolves a known id to its file path", () => {
+    const idx = index([story({ id: "a", file_path: "rfcs/0005-gaps/stories/a.md" })]);
+    expect(findStoryFile(idx, "a")).toMatch(/rfcs\/0005-gaps\/stories\/a\.md$/);
+  });
+
+  // The per-id-resilient verbs (`done`, `in-progress`) must be able to report an
+  // unknown id and keep going: resolving it strictly would exit the process and
+  // abort the whole bundle, leaving the known ids unmarked behind a merged PR.
+  it("returns null for an unknown id instead of exiting", () => {
+    const idx = index([story({ id: "a" })]);
+    expect(findStoryFile(idx, "nope")).toBeNull();
   });
 });
 
