@@ -278,10 +278,12 @@ describe("I18nTest", () => {
   });
 
   it("localize given an unavailable locale rases an I18n::InvalidLocale", () => {
-    config().enforceAvailableLocales = true;
-    // Ruby's `Time.now`: `enforce_available_locales!` (i18n.rb:335) raises
-    // before the object is asked for anything, so a `strftime` duck is enough.
-    expect(() => localize({ strftime: () => "" }, { locale: "klingon" })).toThrow(InvalidLocale);
+    try {
+      config().enforceAvailableLocales = true;
+      expect(() => localize({ strftime: () => "" }, { locale: "klingon" })).toThrow(InvalidLocale);
+    } finally {
+      config().enforceAvailableLocales = false;
+    }
   });
 
   it("localize raises Disabled if locale is false", () => {
@@ -382,7 +384,6 @@ describe("I18nTest", () => {
   });
 
   it("default_locale= doesn't ignore junk", () => {
-    // Ruby passes `Class`; any non-Symbol/String receiver has no `to_sym`.
     expect(() => setDefaultLocale(Config as unknown as string)).toThrow(NoMethodError);
   });
 

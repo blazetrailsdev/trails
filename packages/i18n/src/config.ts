@@ -56,12 +56,13 @@ export class Config {
     return this.localeValue ?? this.defaultLocale;
   }
 
+  /**
+   * Sets the current locale. Ruby's `locale && locale.to_sym`: a Symbol is a
+   * plain string here, so `to_sym` is the identity for one; anything else has
+   * no `to_sym` and raises.
+   */
   set locale(locale: Locale | false) {
     enforceAvailableLocalesBang(locale);
-    // Ruby's `locale && locale.to_sym`: a Symbol is a plain string here, so
-    // `to_sym` is the identity for one (and `&&` short-circuits on
-    // `nil`/`false`); anything else has no `to_sym` and raises, which is why
-    // assigning junk is not silently ignored.
     if (locale != null && locale !== false && typeof locale !== "string") {
       throw new NoMethodError(`undefined method 'to_sym' for ${inspect(locale)}`);
     }
@@ -84,13 +85,10 @@ export class Config {
     return defaultLocale;
   }
 
+  /** Sets the default locale; `to_sym` as in `locale=` above. */
   set defaultLocale(locale: Locale) {
     enforceAvailableLocalesBang(locale);
-    // Ruby's `locale && locale.to_sym`: a Symbol is a plain string here, so
-    // `to_sym` is the identity for one (and `&&` short-circuits on
-    // `nil`/`false`); anything else has no `to_sym` and raises, which is why
-    // assigning junk is not silently ignored.
-    if (locale != null && (locale as Locale | false) !== false && typeof locale !== "string") {
+    if (locale != null && (locale as unknown) !== false && typeof locale !== "string") {
       throw new NoMethodError(`undefined method 'to_sym' for ${inspect(locale)}`);
     }
     defaultLocale = locale;
