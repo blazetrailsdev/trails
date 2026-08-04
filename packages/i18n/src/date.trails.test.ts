@@ -3,6 +3,7 @@
  * These cover the members `I18n::Backend::Base#localize` duck-types.
  */
 
+import { Temporal } from "@js-temporal/polyfill";
 import { describe, it, expect } from "vitest";
 import { ArgumentError, Date as RubyDate, DateTime as RubyDateTime } from "./date.js";
 import { Time as RubyTime } from "./time.js";
@@ -39,6 +40,19 @@ describe("Date", () => {
     const date = RubyDate.parse("01/01/2012");
     expect([date.year, date.mon, date.day]).toEqual([2012, 1, 1]);
     expect(() => RubyDate.parse("12/13/2012")).toThrow("invalid date");
+  });
+
+  it('completes a fragment from today, as "Feb 3rd".to_date does', () => {
+    const today = Temporal.Now.plainDateISO();
+    const date = RubyDate.parse("Feb 3rd");
+    expect([date.year, date.mon, date.day]).toEqual([today.year, 2, 3]);
+    const partial = RubyDate.parse("2008/07");
+    expect([partial.year, partial.mon, partial.day]).toEqual([2008, 7, 1]);
+  });
+
+  it("leaves a signed year uncompleted, as date_parse.c does", () => {
+    expect(RubyDate.parse("-08-07-02").year).toBe(-8);
+    expect(RubyDate.parse("+08-07-02").year).toBe(8);
   });
 
   it("completes a two-digit year unless comp is false, as Ruby does", () => {
