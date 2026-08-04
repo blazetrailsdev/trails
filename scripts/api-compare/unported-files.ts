@@ -1144,17 +1144,6 @@ export const UNPORTED_FILES: UnportedFile[] = [
     reason: "Pre-1.0: optional backend mixin — composes several backends behind one lookup.",
   },
   {
-    pattern: "backend/key_value.rb",
-    testFile: "backend/key_value_test.rb",
-    package: "i18n",
-    reason: "Pre-1.0: optional backend over a key-value store, keyed by Ruby-marshalled subtrees.",
-  },
-  {
-    testFile: "api/key_value_test.rb",
-    package: "i18n",
-    reason: "Pre-1.0: optional backend over a key-value store, keyed by Ruby-marshalled subtrees.",
-  },
-  {
     pattern: "backend/cache.rb",
     testFile: "backend/cache_test.rb",
     package: "i18n",
@@ -1171,14 +1160,6 @@ export const UNPORTED_FILES: UnportedFile[] = [
     testFile: "backend/cascade_test.rb",
     package: "i18n",
     reason: "Pre-1.0: optional backend mixin — cascading key lookup (`foo.bar.baz` → `foo.baz`).",
-  },
-  {
-    pattern: "backend/flatten.rb",
-    package: "i18n",
-    reason:
-      "Pre-1.0: optional backend mixin — key-flattening helpers used only by the " +
-      "deferred `key_value.rb`, `cache_file.rb` and `memoize.rb` backends; " +
-      "`Simple` does not include it.",
   },
   {
     pattern: "backend/interpolation_compiler.rb",
