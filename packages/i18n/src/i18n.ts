@@ -390,9 +390,9 @@ export function normalizeKeys(
   locale: Locale | null | undefined,
   key: unknown,
   scope: unknown,
-  separator?: string,
+  separator?: string | false | null,
 ): TranslationKey[] {
-  separator ??= defaultSeparator();
+  if (separator == null || separator === false) separator = defaultSeparator();
   return [
     ...normalizeKey(locale, separator),
     ...normalizeKey(scope, separator),
