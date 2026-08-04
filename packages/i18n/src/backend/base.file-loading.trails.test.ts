@@ -116,12 +116,12 @@ describe("I18n::Backend::Base file loading", () => {
   describe("the locale-module registry", () => {
     it("serves a registered module without reaching import()", () => {
       registerLocaleModule("bundled/registered.js", { en: { bundled: { greeting: "hi" } } });
-      config().loadPath = ["bundled/registered.js"];
+      config().loadPath.push("bundled/registered.js");
       expect(backend.translate("en", "bundled.greeting")).toBe("hi");
     });
 
     it("refuses a module the load path names but nothing registered", () => {
-      config().loadPath = ["bundled/unregistered.js"];
+      config().loadPath.push("bundled/unregistered.js");
       expect(() => backend.translate("en", "bundled.greeting")).toThrow(
         /register it with I18n.registerLocaleModule\(\)/,
       );
@@ -141,7 +141,7 @@ describe("I18n::Backend::Base file loading", () => {
         en: Record<string, unknown>;
       };
       registerLocaleModule(`${localesDir()}/en.js`, { en });
-      config().loadPath = [`${localesDir()}/en.js`];
+      config().loadPath.push(`${localesDir()}/en.js`);
       expect(backend.translate("en", "fuh.bah")).toBe("bas");
     });
   });
