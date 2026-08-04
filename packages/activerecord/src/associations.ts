@@ -3,6 +3,9 @@ import type { Relation } from "./relation.js";
 import { SpellChecker } from "@blazetrails/did-you-mean";
 import type { CollectionProxy, AssociationProxy } from "./associations/collection-proxy.js";
 import { _CollectionProxyCtor } from "./associations/collection-proxy-slot.js";
+import "./associations/collection-proxy.js";
+import "./association-relation.js";
+import "./associations/disable-joins-association-scope.js";
 import { hasDefaultScopeOverride } from "./scoping/default.js";
 import {
   delegateArrayMethod,
@@ -19,65 +22,6 @@ import { qualifiedName } from "./inheritance.js";
 // callers don't need to import the slot module directly.
 export { _setCollectionProxyCtor } from "./associations/collection-proxy-slot.js";
 
-/**
- * Eagerly initializes the association modules needed for the
- * constructor-slot registration cycle used by `association()` and
- * `CollectionProxy`. Delegates to `initializeAssociations()`.
- *
- * **Rails parity note:** Rails' `Associations.eager_load!` uses Ruby's
- * `ActiveSupport::Autoload` to force-load `BelongsToAssociation`,
- * `HasManyAssociation`, `Preloader`, `JoinDependency`, `AssociationScope`,
- * etc. In TypeScript/ESM there is no `autoload` — those modules are
- * already statically imported throughout the codebase and therefore
- * always present. The only genuinely lazy initialization in our port is
- * the `CollectionProxy` constructor-slot, which this method resolves.
- *
- * Mirrors: ActiveRecord::Associations.eager_load!
- */
-export async function eagerLoadBang(): Promise<void> {
-  await initializeAssociations();
-}
-
-/**
- * Explicit initialization hook for subpath consumers.
- *
- * The package entry (`@blazetrails/activerecord`) loads
- * CollectionProxy eagerly so `association()` works out of the box.
- * Consumers who deep-import `@blazetrails/activerecord/associations`
- * without touching the entry won't trigger that registration; calling
- * `await initializeAssociations()` once before `association()` is the
- * supported alternative.
- *
- * Uses a dynamic `import()` so it doesn't participate in the static
- * dependency cycle (associations → CP → Relation → Base →
- * associations) that forced the late-binding in the first place.
- *
- * @noRailsEquivalent CONVERGEABLE (story: retire-initialize-associations-module-cycle-hook).
- * trails-only ESM module-cycle escape hatch with no Rails
- * analogue: `initialize_associations` is defined nowhere in the Rails source
- * (verified by grep over vendor/rails). The associations -> CollectionProxy ->
- * Relation -> Base -> associations cycle forces CollectionProxy registration to
- * be late-bound; the package entry does it eagerly, and this is the supported
- * explicit hook for consumers who deep-import
- * `@blazetrails/activerecord/associations` without touching the entry. Ruby's
- * require/autoload resolves such cycles at load time, so there is nothing to
- * port. Public by intent (a documented consumer hook), so marking it internal
- * would be inaccurate.
- */
-export async function initializeAssociations(): Promise<void> {
-  // Load all late-binding slots. `association-relation.js` imports
-  // `collection-proxy.js` for the late-bind ctor setter, so importing
-  // AR first also registers CP transitively; we still import CP
-  // explicitly as a belt-and-suspenders guarantee. DJAS registers its
-  // scope builder via the same slot pattern (_scope-slots.ts) so it is
-  // TDZ-safe here — all static imports are resolved by the time this
-  // function is called.
-  await Promise.all([
-    import("./associations/collection-proxy.js"),
-    import("./association-relation.js"),
-    import("./associations/disable-joins-association-scope.js"),
-  ]);
-}
 import { ConfigurationError } from "./errors.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { strictLoadingViolationBang } from "./core.js";
@@ -114,6 +58,18 @@ import type { AssociationReflection } from "./reflection.js";
 import { hasQueryConstraints, queryConstraintsList } from "./persistence.js";
 import { foreignKeyPresentFor } from "./associations/foreign-association.js";
 import { throughForeignKeyPresent } from "./associations/through-association.js";
+
+/**
+ * **Rails parity note:** Rails' `Associations.eager_load!` uses Ruby's
+ * `ActiveSupport::Autoload` to force-load `BelongsToAssociation`,
+ * `HasManyAssociation`, `Preloader`, `JoinDependency`, `AssociationScope`,
+ * etc. In TypeScript/ESM there is no `autoload` — every one of those modules
+ * is statically imported (the side-effect imports at the top of this file
+ * cover the late-binding slots), so they are always present already.
+ *
+ * Mirrors: ActiveRecord::Associations.eager_load!
+ */
+export async function eagerLoadBang(): Promise<void> {}
 
 /**
  * One `before_add`/`after_add`/`before_remove`/`after_remove` entry. Mirrors
@@ -1836,8 +1792,8 @@ export function association<T extends Base = Base>(
       "CollectionProxy not registered. Either import '@blazetrails/activerecord' " +
         "once (the package entry loads CollectionProxy eagerly), or, if you are " +
         "using subpath imports such as '@blazetrails/activerecord/associations' or " +
-        "'@blazetrails/activerecord/base', call `await initializeAssociations()` " +
-        "(exported from '@blazetrails/activerecord/associations') before the first " +
+        "'@blazetrails/activerecord/base', import " +
+        "'@blazetrails/activerecord/associations' before the first " +
         "`association()` call.",
     );
   }

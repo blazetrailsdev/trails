@@ -23,11 +23,9 @@ import { CpkOrder, CpkOrderAgreement } from "../test-helpers/models/cpk.js";
 import { Category } from "../test-helpers/models/category.js";
 import { Categorization } from "../test-helpers/models/categorization.js";
 import { StaleObjectError } from "../errors.js";
-import { initializeAssociations, registerModel } from "../associations.js";
+import { registerModel } from "../associations.js";
 
-beforeAll(async () => {
-  await initializeAssociations();
-});
+beforeAll(async () => {});
 
 for (const klass of [
   Author,

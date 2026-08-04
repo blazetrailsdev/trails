@@ -514,13 +514,12 @@ export {
   overlaps,
   rangeIncludesValue,
   rangeIncludesStringValue,
-  rangeIncludesRange,
-  cover,
   rangeToFs,
   rangeStep,
   rangeEach,
 } from "./range-ext.js";
 export type { Range as RangeExt } from "./range-ext.js";
+export { caseEquals, isInclude } from "./core-ext/range/compare-range.js";
 
 export { I18n } from "./i18n.js";
 export { Scalar } from "./duration.js";

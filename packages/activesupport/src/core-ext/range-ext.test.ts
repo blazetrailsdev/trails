@@ -6,13 +6,12 @@ import {
   overlaps,
   rangeIncludesValue,
   rangeIncludesStringValue,
-  rangeIncludesRange,
-  cover,
   rangeToFs,
   rangeStep,
   rangeEach,
   stringSucc,
 } from "../range-ext.js";
+import { caseEquals, isInclude } from "./range/compare-range.js";
 
 describe("RangeTest", () => {
   it("to fs from dates", () => {
@@ -88,105 +87,107 @@ describe("RangeTest", () => {
   });
 
   it("should include identical inclusive", () => {
-    expect(rangeIncludesRange(makeRange(1, 10), makeRange(1, 10))).toBe(true);
+    expect(isInclude(makeRange(1, 10), makeRange(1, 10))).toBe(true);
   });
 
   it("should include identical exclusive", () => {
-    expect(rangeIncludesRange(makeRange(1, 10, true), makeRange(1, 10, true))).toBe(true);
+    expect(isInclude(makeRange(1, 10, true), makeRange(1, 10, true))).toBe(true);
   });
 
   it("should include other with exclusive end", () => {
-    expect(rangeIncludesRange(makeRange(1, 10), makeRange(1, 10, true))).toBe(true);
+    expect(isInclude(makeRange(1, 10), makeRange(1, 11, true))).toBe(true);
   });
 
   it("include returns false for backwards", () => {
-    expect(rangeIncludesValue(makeRange(5, 10), 3)).toBe(false);
+    expect(isInclude(makeRange(1, 10), makeRange(5, 3))).toBe(false);
   });
 
   it("include returns false for empty exclusive end", () => {
-    expect(rangeIncludesValue(makeRange(1, 1, true), 1)).toBe(false);
+    expect(isInclude(makeRange(1, 5), makeRange(3, 3, true))).toBe(false);
   });
 
   it("include with endless range", () => {
-    expect(rangeIncludesValue(makeRange(1, null), 1000)).toBe(true);
+    expect(isInclude(makeRange(1, null), 2)).toBe(true);
   });
 
   it("should include range with endless range", () => {
-    expect(rangeIncludesRange(makeRange(1, null), makeRange(5, 10))).toBe(true);
+    expect(isInclude(makeRange(1, null), makeRange(2, 4))).toBe(true);
   });
 
   it("should not include range with endless range", () => {
-    expect(rangeIncludesRange(makeRange(1, 10), makeRange(5, null))).toBe(false);
+    expect(isInclude(makeRange(1, null), makeRange(0, 4))).toBe(false);
   });
 
   it("include with beginless range", () => {
-    expect(rangeIncludesValue(makeRange(null, 10), -100)).toBe(true);
+    expect(isInclude(makeRange(null, 2), 1)).toBe(true);
   });
 
   it("should include range with beginless range", () => {
-    expect(rangeIncludesRange(makeRange(null, 10), makeRange(null, 5))).toBe(true);
+    expect(isInclude(makeRange(null, 2), makeRange(-1, 1))).toBe(true);
   });
 
   it("should not include range with beginless range", () => {
-    expect(rangeIncludesRange(makeRange(5, 10), makeRange(null, 8))).toBe(false);
+    expect(isInclude(makeRange(null, 2), makeRange(-1, 3))).toBe(false);
   });
 
   it("should compare identical inclusive", () => {
-    expect(rangeIncludesRange(makeRange(1, 10), makeRange(1, 10))).toBe(true);
+    expect(caseEquals(makeRange(1, 10), makeRange(1, 10))).toBe(true);
   });
 
   it("should compare identical exclusive", () => {
-    expect(rangeIncludesRange(makeRange(1, 10, true), makeRange(1, 10, true))).toBe(true);
+    expect(caseEquals(makeRange(1, 10, true), makeRange(1, 10, true))).toBe(true);
   });
 
   it("should compare other with exclusive end", () => {
-    expect(rangeIncludesRange(makeRange(1, 10), makeRange(1, 9, true))).toBe(true);
+    expect(caseEquals(makeRange(1, 10), makeRange(1, 11, true))).toBe(true);
   });
 
   it("compare returns false for backwards", () => {
-    expect(rangeIncludesRange(makeRange(5, 10), makeRange(1, 10))).toBe(false);
+    expect(caseEquals(makeRange(1, 10), makeRange(5, 3))).toBe(false);
   });
 
   it("compare returns false for empty exclusive end", () => {
-    expect(rangeIncludesValue(makeRange(1, 1, true), 1)).toBe(false);
+    expect(caseEquals(makeRange(1, 5), makeRange(3, 3, true))).toBe(false);
   });
 
   it("should compare range with endless range", () => {
-    expect(rangeIncludesRange(makeRange(1, null), makeRange(5, 15))).toBe(true);
+    expect(caseEquals(makeRange(1, null), makeRange(2, 4))).toBe(true);
   });
 
   it("should not compare range with endless range", () => {
-    expect(rangeIncludesRange(makeRange(1, 10), makeRange(5, null))).toBe(false);
+    expect(caseEquals(makeRange(1, null), makeRange(0, 4))).toBe(false);
   });
 
   it("should compare range with beginless range", () => {
-    expect(rangeIncludesRange(makeRange(null, 10), makeRange(null, 5))).toBe(true);
+    expect(caseEquals(makeRange(null, 2), makeRange(-1, 1))).toBe(true);
   });
 
   it("should not compare range with beginless range", () => {
-    expect(rangeIncludesRange(makeRange(5, 10), makeRange(null, 8))).toBe(false);
+    expect(caseEquals(makeRange(null, 2), makeRange(-1, 3))).toBe(false);
   });
 
   it("exclusive end should not include identical with inclusive end", () => {
-    expect(rangeIncludesRange(makeRange(1, 10, true), makeRange(1, 10))).toBe(false);
+    expect(isInclude(makeRange(1, 10, true), makeRange(1, 10))).toBe(false);
   });
 
   it("should not include overlapping first", () => {
-    expect(rangeIncludesRange(makeRange(5, 10), makeRange(3, 8))).toBe(false);
+    expect(isInclude(makeRange(2, 8), makeRange(1, 3))).toBe(false);
   });
 
   it("should not include overlapping last", () => {
-    expect(rangeIncludesRange(makeRange(1, 8), makeRange(5, 10))).toBe(false);
+    expect(isInclude(makeRange(2, 8), makeRange(5, 9))).toBe(false);
   });
 
   it("should include identical exclusive with floats", () => {
-    expect(rangeIncludesRange(makeRange(1.0, 10.0, true), makeRange(1.0, 10.0, true))).toBe(true);
+    expect(isInclude(makeRange(1.0, 10.0, true), makeRange(1.0, 10.0, true))).toBe(true);
   });
 
   it("cover is not override", () => {
-    expect(cover(makeRange(1, 10), makeRange(3, 7))).toBe(true);
+    // Rails: `range.method(:include?) != range.method(:cover?)`. trails' native
+    // `cover?` is `rangeIncludesValue`, which `isInclude` delegates to rather
+    // than aliasing.
+    expect(isInclude).not.toBe(rangeIncludesValue);
   });
-
   it("overlap on time", () => {
     const t1 = new Date("2023-01-01"),
       t2 = new Date("2023-06-01");

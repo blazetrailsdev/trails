@@ -319,7 +319,7 @@ export class Association {
       const djas = getDjasScopeBuilder();
       if (!djas)
         throw new Error(
-          "DisableJoinsAssociationScope not initialized — call initializeAssociations() before using disable_joins associations",
+          "DisableJoinsAssociationScope not initialized — import '@blazetrails/activerecord/associations' before using disable_joins associations",
         );
       return djas({ owner: this.owner, reflection: richReflection, klass });
     }
@@ -370,7 +370,7 @@ export class Association {
         const djas = getDjasScopeBuilder();
         if (!djas)
           throw new Error(
-            "DisableJoinsAssociationScope not initialized — call initializeAssociations() before using disable_joins associations",
+            "DisableJoinsAssociationScope not initialized — import '@blazetrails/activerecord/associations' before using disable_joins associations",
           );
         this._cachedScope = djas({ owner: this.owner, reflection: richReflection, klass });
       } else {

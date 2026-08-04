@@ -1,4 +1,4 @@
-import { getCrypto } from "@blazetrails/activesupport";
+import { secureRandomBase58 } from "@blazetrails/activesupport/key-generator";
 import type { Base } from "./base.js";
 
 /**
@@ -14,18 +14,11 @@ export class MinimumLengthError extends Error {
   }
 }
 
-/**
- * Generate a unique random token.
- *
- * Mirrors: SecureRandom.base58(24) used by has_secure_token
- */
-function generateToken(length: number = 24): string {
-  const bytes = getCrypto().randomBytes(length);
-  // Base36 encoding (0-9, a-z) for URL-safe tokens
-  return Array.from(bytes)
-    .map((b) => b.toString(36).padStart(2, "0").slice(-2))
-    .join("")
-    .slice(0, length);
+const MINIMUM_TOKEN_LENGTH = 24;
+
+/** `ActiveRecord::SecureToken::ClassMethods` (secure_token.rb:11). */
+interface ClassMethods {
+  generateUniqueSecureToken(length?: number): string;
 }
 
 /**
@@ -40,13 +33,22 @@ function generateToken(length: number = 24): string {
  * Generates a unique token before create if the attribute is blank.
  * Adds a `regenerateToken()` (or `regenerateAuthToken()`) instance method.
  */
-const MINIMUM_TOKEN_LENGTH = 24;
-
 export function hasSecureToken(
   modelClass: typeof Base,
   attribute: string = "token",
   options?: { length?: number; on?: "create" | "initialize" },
 ): void {
+  // Rails reaches `generate_unique_secure_token` through `self.class` because
+  // `SecureToken::ClassMethods` is included on `Base` (secure_token.rb:11).
+  // trails keeps this module behind the `/secure-token` subpath — it needs
+  // crypto, which `index.ts` cannot pull in (index.ts:280) — so the class
+  // method is installed here instead. `in` (not `hasOwnProperty`) so a model
+  // that already overrides it, at any point in the chain, is never clobbered.
+  if (!("generateUniqueSecureToken" in modelClass)) {
+    (modelClass as typeof Base & ClassMethods).generateUniqueSecureToken =
+      generateUniqueSecureToken;
+  }
+
   const tokenLength = options?.length ?? MINIMUM_TOKEN_LENGTH;
   if (tokenLength < MINIMUM_TOKEN_LENGTH) {
     throw new MinimumLengthError(
@@ -74,7 +76,9 @@ export function hasSecureToken(
   // asserting the token), which is exactly what these ports do.
   const generateIfBlank = (record: any): void => {
     if (record.isNewRecord() && !record.queryAttribute(attribute)) {
-      record[attribute] = generateToken(tokenLength);
+      record[attribute] = (
+        record.constructor as typeof Base & ClassMethods
+      ).generateUniqueSecureToken(tokenLength);
     }
   };
   if (options?.on === "initialize") {
@@ -91,7 +95,9 @@ export function hasSecureToken(
 
   Object.defineProperty(modelClass.prototype, methodName, {
     value: function (this: Base): Promise<true | undefined> {
-      const newToken = generateToken(tokenLength);
+      const newToken = (this.constructor as typeof Base & ClassMethods).generateUniqueSecureToken(
+        tokenLength,
+      );
       // Mirrors Rails: `update! attribute => generate_unique_secure_token(...)`
       // (secure_token.rb:53) — a full validated save with callbacks and a
       // timestamp bump, not a direct-SQL `update_column` that bypasses them.
@@ -106,7 +112,8 @@ export function hasSecureToken(
 
 /**
  * Mirrors: ActiveRecord::SecureToken::ClassMethods#generate_unique_secure_token
+ * (secure_token.rb:57).
  */
-export function generateUniqueSecureToken(length: number = 24): string {
-  return generateToken(length);
+export function generateUniqueSecureToken(length: number = MINIMUM_TOKEN_LENGTH): string {
+  return secureRandomBase58(length);
 }

@@ -10,11 +10,8 @@ import { fixtures } from "../test-fixtures.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Post } from "../test-helpers/models/post.js";
 import { Topic } from "../test-helpers/models/topic.js";
-import { initializeAssociations } from "../associations.js";
 
-beforeAll(async () => {
-  await initializeAssociations();
-});
+beforeAll(async () => {});
 
 type Mutator = (sql: string, ...rest: unknown[]) => unknown;
 

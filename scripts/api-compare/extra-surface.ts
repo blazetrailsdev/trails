@@ -186,6 +186,10 @@ const MIRROR_CANDIDATE_OVERRIDES: Record<string, string[]> = {
   to_ary: ["toArray"],
   "==": ["equals"],
   "<=>": ["compare"],
+  // `CompareWithRange#===` (core_ext/range/compare_range.rb:16) — named
+  // `caseEquals`, the spelling OPERATOR_SPELLING_BY_FQN pins for that module
+  // and the only class in the port that defines `===`.
+  "===": ["caseEquals"],
   // `WhereClause#+` / `#-` / `#|` (relation/where_clause.rb:14, :18, :22) —
   // named `plus` / `minus` / `union`, the spellings OPERATOR_SPELLING_BY_FQN
   // pins for that class.

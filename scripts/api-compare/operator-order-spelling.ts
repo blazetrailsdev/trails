@@ -143,6 +143,10 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   // messages/rotation_coordinator.rb:18 `def [](salt)` / :22 `def []=(salt, codec)`
   // → messages/rotation-coordinator.ts `get` / `set`.
   "ActiveSupport::Messages::RotationCoordinator": { "[]": ["get"], "[]=": ["set"] },
+  // core_ext/range/compare_range.rb:16 `def ===(value)` →
+  // core-ext/range/compare-range.ts `caseEquals` (the `include?` sibling at :42
+  // maps through `rubyMethodToTs` as `isInclude` and needs no pin).
+  "ActiveSupport::CompareWithRange": { "===": ["caseEquals"] },
 };
 
 // `fqn#operator` keys this process has actually resolved. A key that is never
