@@ -32,18 +32,19 @@ interface ClassMethods {
  *
  * Generates a unique token before create if the attribute is blank.
  * Adds a `regenerateToken()` (or `regenerateAuthToken()`) instance method.
+ *
+ * Rails reaches `generate_unique_secure_token` through `self.class` because
+ * `SecureToken::ClassMethods` is included on `Base` (secure_token.rb:11).
+ * trails keeps this module behind the `/secure-token` subpath — it needs
+ * crypto, which `index.ts` cannot pull in (index.ts:280) — so the class method
+ * is installed from here instead, guarded by `in` (not `hasOwnProperty`) so a
+ * model that already overrides it, anywhere in the chain, is never clobbered.
  */
 export function hasSecureToken(
   modelClass: typeof Base,
   attribute: string = "token",
   options?: { length?: number; on?: "create" | "initialize" },
 ): void {
-  // Rails reaches `generate_unique_secure_token` through `self.class` because
-  // `SecureToken::ClassMethods` is included on `Base` (secure_token.rb:11).
-  // trails keeps this module behind the `/secure-token` subpath — it needs
-  // crypto, which `index.ts` cannot pull in (index.ts:280) — so the class
-  // method is installed here instead. `in` (not `hasOwnProperty`) so a model
-  // that already overrides it, at any point in the chain, is never clobbered.
   if (!("generateUniqueSecureToken" in modelClass)) {
     (modelClass as typeof Base & ClassMethods).generateUniqueSecureToken =
       generateUniqueSecureToken;

@@ -7,7 +7,10 @@ import { type Range, rangeIncludesValue } from "../../range-ext.js";
  * JS has no `Range` class to reopen — trails carries the begin/end/exclusive
  * triple as data (`range-ext.ts`) — so the two prepended methods take the
  * receiver as their first parameter and `super` is `rangeIncludesValue`, the
- * native `Range#===` / `Range#include?` behaviour.
+ * native endpoint comparison. Ruby's native `Range#include?` iterates for
+ * non-numeric endpoints; that arm is `rangeIncludesStringValue` (range-ext.ts)
+ * and is outside these signatures, which take the numeric/`Date` endpoints the
+ * range-vs-range comparison is defined over.
  *
  * @boundary-file: endpoints are compared as `number` (JS `Date` coerced to
  *   epoch millis), exactly as `range-ext.ts`'s sibling comparators do — Ruby
