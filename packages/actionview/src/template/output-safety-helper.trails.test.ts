@@ -44,4 +44,18 @@ describe("OutputSafetyHelperI18nTest", () => {
 
     expect(toSentence(["one", "two"], { twoWordsConnector: " - " }).toString()).toBe("one - two");
   });
+
+  it("to_sentence skips the I18n lookup for locale: false", () => {
+    I18n.backend().storeTranslations("en", {
+      support: { array: { two_words_connector: " y " } },
+    });
+
+    expect(toSentence(["one", "two"], { locale: false }).toString()).toBe("one and two");
+  });
+
+  it("to_sentence rejects unknown options", () => {
+    expect(() => toSentence(["one", "two"], { passing: "invalid option" } as never)).toThrowError(
+      "Unknown key: :passing. Valid keys are: :wordsConnector, :twoWordsConnector, :lastWordConnector, :locale",
+    );
+  });
 });
