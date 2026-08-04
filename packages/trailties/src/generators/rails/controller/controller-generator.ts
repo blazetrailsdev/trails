@@ -1,4 +1,5 @@
-import { GeneratorBase, type GeneratorOptions, dasherize, underscore } from "../../base.js";
+import { GeneratorBase, type GeneratorOptions, dasherize } from "../../base.js";
+import { underscore } from "@blazetrails/activesupport";
 import {
   actionMethod,
   controllerPathHelpers,

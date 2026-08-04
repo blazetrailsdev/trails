@@ -7,6 +7,7 @@ import {
   methodInMode,
   tsShouldIncludeInIndex,
   flattenIncludedMethodInfos,
+  mixinMethodCreditedToOwnFile,
   resolveModuleName,
   buildModuleIncluderFqns,
   dedupeRubyMethodInto,
@@ -1675,5 +1676,61 @@ describe("splitOverriddenFileBuckets", () => {
       info: { ...inflector, file: "inflector/methods.rb" },
     };
     expect(splitOverriddenFileBuckets(entity, "activesupport")).toEqual([entity]);
+  });
+});
+
+describe("mixinMethodCreditedToOwnFile", () => {
+  const encryptableTs = new Set(["encryptedAttributes", "encrypts", "schemeFor"]);
+  const tsMethodsByFile = new Map([["encryption/encryptable-record.ts", encryptableTs]]);
+  const hasBucket = (f: string) => f === "encryption/encryptable_record.rb";
+
+  it("credits a flattened mixin method to the file mirroring the mixin's own", () => {
+    expect(
+      mixinMethodCreditedToOwnFile(
+        { rubyName: "scheme_for", mixinFile: "encryption/encryptable_record.rb" },
+        "base.rb",
+        "activerecord",
+        hasBucket,
+        tsMethodsByFile,
+      ),
+    ).toEqual({ tsName: "schemeFor", tsFile: "encryption/encryptable-record.ts" });
+  });
+
+  it("does not credit a method the host declares itself", () => {
+    expect(
+      mixinMethodCreditedToOwnFile(
+        { rubyName: "scheme_for" },
+        "base.rb",
+        "activerecord",
+        hasBucket,
+        tsMethodsByFile,
+      ),
+    ).toBeNull();
+  });
+
+  it("does not credit a mixin method that is unported in the mixin's own file", () => {
+    expect(
+      mixinMethodCreditedToOwnFile(
+        { rubyName: "encrypt_attribute", mixinFile: "encryption/encryptable_record.rb" },
+        "base.rb",
+        "activerecord",
+        hasBucket,
+        tsMethodsByFile,
+      ),
+    ).toBeNull();
+  });
+
+  it("does not credit when the mixin's own Ruby file has no bucket of its own", () => {
+    // Nothing measures the mixin's file, so crediting there would drop the
+    // expectation entirely instead of moving it.
+    expect(
+      mixinMethodCreditedToOwnFile(
+        { rubyName: "scheme_for", mixinFile: "encryption/encryptable_record.rb" },
+        "base.rb",
+        "activerecord",
+        () => false,
+        tsMethodsByFile,
+      ),
+    ).toBeNull();
   });
 });

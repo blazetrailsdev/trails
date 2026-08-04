@@ -1,14 +1,6 @@
-import {
-  GeneratorBase,
-  GeneratorOptions,
-  classify,
-  dasherize,
-  tableize,
-  underscore,
-  ColumnType,
-} from "./base.js";
+import { GeneratorBase, GeneratorOptions, classify, dasherize, ColumnType } from "./base.js";
 import { MigrationGenerator } from "./migration-generator.js";
-import { singularize } from "@blazetrails/activesupport";
+import { singularize, tableize, underscore } from "@blazetrails/activesupport";
 
 interface ModelOptions {
   migration?: boolean;

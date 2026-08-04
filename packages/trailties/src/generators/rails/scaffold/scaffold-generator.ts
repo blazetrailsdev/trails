@@ -4,9 +4,8 @@ import {
   classify,
   dasherize,
   parseColumns,
-  tableize,
-  underscore,
 } from "../../base.js";
+import { tableize, underscore } from "@blazetrails/activesupport";
 import { ModelGenerator } from "../../model-generator.js";
 import { tsBody, tsMethod, type Method } from "../../../template-builder/index.js";
 import { emitControllerClass } from "../controller/controller-paths.js";

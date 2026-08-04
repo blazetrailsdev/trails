@@ -1490,6 +1490,40 @@ describe("buildReport — declaration names", () => {
     const report = run(ruby, tsWith(["Foo", "Elsewhere"]));
     expect(report.packages[0].extraFiles[0].extras).toEqual([{ name: "Elsewhere", kind: "moved" }]);
   });
+
+  // Rails' filename and its module's name are not always the same word:
+  // `core_ext/range/compare_range.rb` declares `ActiveSupport::CompareWithRange`.
+  // The extractor synthesizes the file-level container from the FILENAME, so it
+  // is named `CompareRange` — a name nobody wrote, which must not score.
+  it("allows the synthesized file container when the Ruby module's name differs from its file", () => {
+    const synthesized: ApiManifest = {
+      source: "typescript",
+      generatedAt: "",
+      packages: {
+        activemodel: {
+          classes: {},
+          modules: {
+            "foo.ts:NotFoo": {
+              name: "NotFoo",
+              file: "foo.ts",
+              includes: [],
+              extends: [],
+              instanceMethods: [],
+              classMethods: [],
+              synthesizedFileModule: true,
+            },
+          },
+        },
+      },
+    };
+    const report = run(ruby, synthesized);
+    expect(report.packages[0].extraFiles).toEqual([]);
+  });
+
+  it("still scores a hand-written declaration name the Ruby file does not declare", () => {
+    const report = run(ruby, tsWith(["NotFoo"]));
+    expect(report.packages[0].extraFiles[0].extras).toEqual([{ name: "NotFoo", kind: "novel" }]);
+  });
 });
 
 describe("buildReport — interface declaration names", () => {
