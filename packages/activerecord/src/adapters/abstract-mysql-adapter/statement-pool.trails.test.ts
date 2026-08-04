@@ -67,8 +67,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("statementLimit = 0 disables named prepared statements", async () => {
-      // statement_limit is read from the config hash, so a limit of 0 needs its
-      // own adapter rather than a mid-session mutation of the leased one.
       const adapter = new Mysql2Adapter({ uri: MYSQL_TEST_URL, statementLimit: 0 });
       await adapter.beginDbTransaction();
       try {
@@ -136,15 +134,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     // Self-built by construction: these assert what the constructor rejects.
-    it("rejects invalid statementLimit at construction time", () => {
-      expect(() => new Mysql2Adapter({ uri: MYSQL_TEST_URL, statementLimit: -1 })).toThrow(
-        RangeError,
-      );
-      expect(() => new Mysql2Adapter({ uri: MYSQL_TEST_URL, statementLimit: 1.5 })).toThrow(
-        RangeError,
-      );
-    });
-
     it("rejects non-boolean preparedStatements at construction time and via assignment", async () => {
       // Mirror coverage to PG's statement-pool tests — without an
       // explicit guard test the runtime TypeError could regress

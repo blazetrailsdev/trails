@@ -500,12 +500,16 @@ export class PostgreSQLAdapter
     message?: string;
     code?: string;
   }> = [];
-  // Rails reads `@config[:statement_limit]` inline when it builds the
-  // StatementPool (postgresql_adapter.rb:1056) and never exposes it. trails'
-  // constructor destructures the adapter-level database.yml keys out of the
-  // config hash, so the value is held here for `buildStatementPool` and
-  // `_shouldPrepare`'s pool-limit check.
-  /** @internal */
+  /**
+   * `database.yml`'s `statement_limit`, which Rails reads as
+   * `@config[:statement_limit]` inline at StatementPool construction
+   * (postgresql_adapter.rb:1056) and never exposes. trails' constructor
+   * destructures the adapter-level keys out of the config hash, so the value is
+   * held here — read by `buildStatementPool` and `_shouldPrepare`'s pool-limit
+   * check.
+   *
+   * @internal
+   */
   private _statementLimit = 1000;
 
   constructor(config: string | (pg.PoolConfig & PostgreSQLAdapterOptions));
@@ -616,14 +620,7 @@ export class PostgreSQLAdapter
       variables,
       ...pgConfig
     } = config as pg.PoolConfig & PostgreSQLAdapterOptions;
-    if (statementLimit !== undefined) {
-      if (!Number.isInteger(statementLimit) || statementLimit < 0) {
-        throw new RangeError(
-          `statementLimit must be a finite non-negative integer; got ${String(statementLimit)}`,
-        );
-      }
-      this._statementLimit = statementLimit;
-    }
+    if (statementLimit !== undefined) this._statementLimit = statementLimit;
     if (preparedStatements !== undefined) this.preparedStatements = preparedStatements;
     if (advisoryLocks !== undefined) {
       this._advisoryLocksEnabled =

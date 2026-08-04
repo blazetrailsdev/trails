@@ -147,8 +147,6 @@ export class Error {
       type = msgOpt;
       options = rest;
     }
-    // `type` is a Ruby Symbol, i.e. a colon-prefixed string; the i18n keys
-    // below are built from its name.
     const typeName = type.slice(1);
 
     const baseClass = base?.constructor as ModelClass | undefined;

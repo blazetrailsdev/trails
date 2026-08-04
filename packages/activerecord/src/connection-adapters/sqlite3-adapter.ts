@@ -314,12 +314,16 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   private _nativeTypeMap: TypeMap;
   private _memoryDatabase: boolean;
   private _filename: string;
-  // Rails reads `@config[:statement_limit]` inline when it builds the
-  // StatementPool (sqlite3_adapter.rb:803) and never exposes it. trails'
-  // constructor destructures the adapter-level database.yml keys out of the
-  // config hash, so the value is held here for `buildStatementPool` — and must
-  // be declared before `_statementPool` so the field initializer reads it.
-  /** @internal */
+  /**
+   * `database.yml`'s `statement_limit`, which Rails reads as
+   * `@config[:statement_limit]` inline at StatementPool construction
+   * (sqlite3_adapter.rb:803) and never exposes. trails' constructor
+   * destructures the adapter-level keys out of the config hash, so the value is
+   * held here — read by `buildStatementPool`, and declared before
+   * `_statementPool` so that field's initializer sees it.
+   *
+   * @internal
+   */
   private _statementLimit = 1000;
   private _statementPool = this.buildStatementPool();
 
@@ -397,13 +401,10 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     // Apply adapter-level options FIRST so invalid values fail before
     // the native driver opens a file handle that would otherwise leak.
     if (options.statementLimit !== undefined) {
-      if (!Number.isInteger(options.statementLimit) || options.statementLimit < 0) {
-        throw new RangeError(
-          `statementLimit must be a finite non-negative integer; got ${String(options.statementLimit)}`,
-        );
-      }
       this._statementLimit = options.statementLimit;
-      this._statementPool.setMaxSize(this._statementLimit);
+      this._statementPool.setMaxSize(
+        SQLite3Adapter.typeCastConfigToInteger(this._statementLimit) as number,
+      );
     }
     this.connect();
     // Async-only drivers (e.g. expo-sqlite) can't open in a sync constructor;

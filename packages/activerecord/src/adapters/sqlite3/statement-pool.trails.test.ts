@@ -31,11 +31,6 @@ describeIfSqlite("SQLite3StatementPoolTest", () => {
     expect(adapter.preparedStatements).toBe(false);
   });
 
-  it("rejects invalid statementLimit at construction time", () => {
-    expect(() => new BetterSQLite3Adapter(":memory:", { statementLimit: -1 })).toThrow(RangeError);
-    expect(() => new BetterSQLite3Adapter(":memory:", { statementLimit: 1.5 })).toThrow(RangeError);
-  });
-
   it("rejects non-boolean preparedStatements at construction time and via assignment", () => {
     expect(
       () =>

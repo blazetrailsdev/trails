@@ -462,14 +462,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       _fakeConnection: fake,
       ...mysqlConfig
     } = config as mysql.PoolOptions & MysqlAdapterOptions;
-    if (statementLimit !== undefined) {
-      if (!Number.isInteger(statementLimit) || statementLimit < 0) {
-        throw new RangeError(
-          `statementLimit must be a finite non-negative integer; got ${String(statementLimit)}`,
-        );
-      }
-      this._statementLimit = statementLimit;
-    }
+    if (statementLimit !== undefined) this._statementLimit = statementLimit;
     if (preparedStatements !== undefined) this.preparedStatements = preparedStatements;
     if (advisoryLocks !== undefined) {
       this._advisoryLocksEnabled = Mysql2Adapter.typeCastConfigToBoolean(advisoryLocks) !== false;

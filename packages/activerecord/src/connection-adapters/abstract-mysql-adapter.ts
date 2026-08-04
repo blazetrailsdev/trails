@@ -254,12 +254,16 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   protected _mariadb = false;
   protected _databaseVersion: Version | null = null;
-  // Rails reads `@config[:statement_limit]` inline when it builds the
-  // StatementPool (abstract_mysql_adapter.rb:975) and never exposes it.
-  // trails' constructors destructure the adapter-level database.yml keys out
-  // of the config hash, so the value is held here for `buildStatementPool`
-  // and, in Mysql2Adapter, `_getStmtPool` / `_shouldPrepare`.
-  /** @internal */
+  /**
+   * `database.yml`'s `statement_limit`, which Rails reads as
+   * `@config[:statement_limit]` inline at StatementPool construction
+   * (abstract_mysql_adapter.rb:975) and never exposes. trails' constructors
+   * destructure the adapter-level keys out of the config hash, so the value is
+   * held here — read by `buildStatementPool` and, in Mysql2Adapter, by
+   * `_getStmtPool` / `_shouldPrepare`.
+   *
+   * @internal
+   */
   protected _statementLimit = 1000;
 
   get adapterName(): AdapterName {

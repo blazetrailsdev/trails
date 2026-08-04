@@ -144,15 +144,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       await configured.close();
     });
 
-    it("rejects invalid statementLimit at construction time", () => {
-      expect(
-        () => new PostgreSQLAdapter({ connectionString: PG_TEST_URL, statementLimit: -1 }),
-      ).toThrow(RangeError);
-      expect(
-        () => new PostgreSQLAdapter({ connectionString: PG_TEST_URL, statementLimit: 1.5 }),
-      ).toThrow(RangeError);
-    });
-
     it("rejects non-boolean preparedStatements at construction time and via assignment", async () => {
       // Construction-time validation routes preparedStatements through
       // the setter, so a non-boolean (string, number, etc.) hits the
