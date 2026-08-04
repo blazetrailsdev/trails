@@ -12,7 +12,9 @@
  * the trails mixin idiom — `this`-typed functions from `flatten.ts` assigned to
  * the class. The one `super` below is `Base.prototype.pluralize.call(this)` for
  * the reason Ruby resolves it to `Base` too — a module included into `KeyValue`
- * sits above `Implementation`, never between it and `Base`.
+ * sits above `Implementation`, never between it and `Base`. `pluralize` is
+ * protected, which TS only lets a `KeyValue` reach through another `KeyValue`,
+ * so `Base.prototype` is cast to what `include Base` already made it.
  *
  * `I18n::JSON` is `Oj` or `ActiveSupport::JSON` depending on what is
  * installed (key_value.rb:7-22); JS has `JSON` in the language, and its
@@ -240,8 +242,6 @@ export class KeyValue {
 
   protected pluralize(locale: Locale, entry: unknown, count: unknown): unknown {
     if (this.subtrees()) {
-      // `pluralize` is protected, which TS only lets a `KeyValue` reach through
-      // another `KeyValue`; the cast says what `include Base` already made true.
       return (Base.prototype as KeyValue).pluralize.call(this, locale, entry, count);
     } else {
       if (!isHash(entry)) return entry;
