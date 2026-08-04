@@ -2,8 +2,8 @@
  * Mirrors: i18n/test/locale/fallbacks_test.rb
  *
  * `#inspect` renders `self.class.name`, which in the gem carries Ruby's module
- * nesting (`I18n::Locale::Fallbacks`); TypeScript has no nesting to render, so
- * the constructor name is the whole name.
+ * nesting (`I18n::Locale::Fallbacks`); the class declares that name over
+ * `Function.name`, so `this.constructor.name` renders the gem's string.
  */
 
 import { beforeEach, describe, expect, it } from "vitest";
@@ -210,7 +210,7 @@ describe("I18nFallbacksHashCompatibilityTest", () => {
 
   it("#inspect", () => {
     expect(fallbacks.inspect()).toBe(
-      `#<Fallbacks @map={:"de-AT"=>[:"de-DE"]} @defaults=[:"en-US", :en]>`,
+      `#<I18n::Locale::Fallbacks @map={:"de-AT"=>[:"de-DE"]} @defaults=[:"en-US", :en]>`,
     );
   });
 });

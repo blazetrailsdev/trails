@@ -18,7 +18,6 @@ import type { Base } from "./backend/base.js";
 import { Config } from "./config.js";
 import { ArgumentError, Disabled, InvalidLocale, MissingTranslation } from "./exceptions.js";
 import type { TranslateOptions } from "./backend/base.js";
-import { reloadTranslationFiles } from "./backend/base.js";
 import { throwException, catchException } from "./throw-catch.js";
 
 /** Ruby models locales as Symbols; the JS analogue is a plain string. */
@@ -198,13 +197,14 @@ export async function reloadBang(): Promise<void> {
  * Rails production environment. Backends can implement whatever strategy
  * is useful.
  *
- * The re-read of `I18n.load_path` precedes it for the reason given on
- * `reload!` above: `eager_load!` reaches `init_translations` /
- * `load_translations` (simple.rb:64, base.rb:14) straight away, so it does the
- * same async init the boot preload does rather than depending on one.
+ * Async because `Backend::Base#eager_load!` is: it runs under
+ * `Backend::Base#reload!`'s re-read (base.rb:101-103), which is a Promise here.
+ * The bytes it initializes from are the ones already in memory — from the boot
+ * preload, or from that `reload!` — so `eager_load!` reads nothing of its own,
+ * as the gem's does not either: `Simple#eager_load!` reaches `init_translations`
+ * (simple.rb:64), which loads only while the backend is uninitialized.
  */
 export async function eagerLoadBang(): Promise<void> {
-  await reloadTranslationFiles();
   await config().backend.eagerLoadBang();
 }
 

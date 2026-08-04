@@ -724,16 +724,31 @@ function s3e(
  * replaces the text it matched with a space, so a later one reads only what no
  * earlier one took. That leftover is what `parse_frag` is anchored to.
  *
- * Ruby edits the one String they all share (`f_aset2`); a JS string is
- * immutable, so the edited string is answered instead, as `parse_day` below
- * already does. Ruby's `subx` also runs the match and dispatches to the
- * sub-parser's `_cb`; most of the ported sub-parsers inlined their `_cb`, so
- * they hold their own match and this takes it — story
- * `i18n-date-subx-cb-decomposition` extracts those `_cb`s and gives `subx`
- * `date_parse.c:319`'s full parameter list.
+ * Ruby edits the one String they all share (`f_aset2`) and answers whether it
+ * matched; a JS string is immutable, so the edited string is answered instead,
+ * and `null` stands for C's `0`.
+ *
+ * `SUBS(s, p, c)` (`date_parse.c:340-343`) is `subx(s, asp_string(), p, hash,
+ * c)`, so every sub-parser below is that one line over its pattern and its
+ * `_cb`.
  */
-function subx(str: string, m: RegExpExecArray): string {
-  return str.slice(0, m.index) + " " + str.slice(m.index + m[0].length);
+function subx(
+  str: string,
+  rep: string,
+  pat: RegExp,
+  hash: DateParts,
+  cb: (m: RegExpExecArray, hash: DateParts) => number,
+): string | null {
+  const m = pat.exec(str);
+
+  if (m === null) return null;
+
+  const be = m.index;
+  const en = m.index + m[0].length;
+  const rest = str.slice(0, be) + rep + str.slice(en);
+  cb(m, hash);
+
+  return rest;
 }
 
 /**
@@ -751,11 +766,9 @@ function parseDayCb(m: RegExpExecArray, hash: DateParts): number {
  * not a date field the rest of the sub-parsers should see, so it comes out of
  * the string — but it is one Ruby records, as `:wday`.
  */
-function parseDay(str: string, hash: DateParts): string {
-  const m = new RegExp(`\\b(${ABBR_DAYS})[^-/\\d\\s]*`, "i").exec(str);
-  if (m === null) return str;
-  parseDayCb(m, hash);
-  return subx(str, m);
+function parseDay(str: string, hash: DateParts): string | null {
+  const pat = new RegExp(`\\b(${ABBR_DAYS})[^-/\\d\\s]*`, "i");
+  return subx(str, " ", pat, hash, parseDayCb);
 }
 
 /**
@@ -831,7 +844,7 @@ function parseTimeCb(m: RegExpExecArray, hash: DateParts): number {
  * (`(?-i:…)`); the groups it guards are character classes that already span
  * both cases, so the ported pattern is the same language without the flag.
  */
-function parseTime(str: string, hash: DateParts): string {
+function parseTime(str: string, hash: DateParts): string | null {
   const patSource =
     "(" +
     NUMBER +
@@ -864,11 +877,7 @@ function parseTime(str: string, hash: DateParts): string {
     ")" +
     ")?";
 
-  const m = new RegExp(patSource, "i").exec(str);
-  if (m === null) return str;
-  const rest = subx(str, m);
-  parseTimeCb(m, hash);
-  return rest;
+  return subx(str, " ", new RegExp(patSource, "i"), hash, parseTimeCb);
 }
 
 /**
@@ -897,7 +906,7 @@ function parseEuCb(m: RegExpExecArray, hash: DateParts): number {
 
 /** @internal `date_parse.c` `parse_eu` (`date_parse.c:869-916`): `2nd July 2008`, `2 Jul 2008`, `3 Feb`. */
 function parseEu(str: string, hash: DateParts): string | null {
-  const m = new RegExp(
+  const pat = new RegExp(
     `('?${NUMBER}+)[^-\\d\\s]*` +
       "\\s*" +
       `(${ABBR_MONTHS})[^-\\d\\s']*` +
@@ -912,10 +921,9 @@ function parseEu(str: string, hash: DateParts): string | null {
       "('?-?\\d+(?:(?:st|nd|rd|th)\\b)?)" +
       ")?",
     "i",
-  ).exec(str);
-  if (m === null) return null;
-  parseEuCb(m, hash);
-  return subx(str, m);
+  );
+
+  return subx(str, " ", pat, hash, parseEuCb);
 }
 
 /**
@@ -944,7 +952,7 @@ function parseUsCb(m: RegExpExecArray, hash: DateParts): number {
  * here because neither the era nor the year can begin with a space or a comma.
  */
 function parseUs(str: string, hash: DateParts): string | null {
-  const m = new RegExp(
+  const pat = new RegExp(
     `\\b(${ABBR_MONTHS})[^-\\d\\s']*` +
       "\\s*" +
       "('?\\d+)[^-\\d\\s']*" +
@@ -956,27 +964,33 @@ function parseUs(str: string, hash: DateParts): string | null {
       "('?-?\\d+)" +
       ")?",
     "i",
-  ).exec(str);
-  if (m === null) return null;
-  parseUsCb(m, hash);
-  return subx(str, m);
+  );
+
+  return subx(str, " ", pat, hash, parseUsCb);
+}
+
+/** @internal `date_parse.c` `parse_iso_cb` (`date_parse.c:997-1013`). */
+function parseIsoCb(m: RegExpExecArray, hash: DateParts): number {
+  const y = m[1];
+  const mon = m[2];
+  const d = m[3];
+
+  s3e(hash, y, mon, d, false);
+  return 1;
 }
 
 /** @internal `date_parse.c` `parse_iso`: `2008-07-02`, and the unpadded `2008-7-2`. */
 function parseIso(str: string, hash: DateParts): string | null {
-  const m = /([-+]?\d+)-(\d+)-(-?\d+)/.exec(str);
-  if (m === null) return null;
-  s3e(hash, m[1], m[2], m[3], false);
-  return subx(str, m);
+  const pat = /([-+]?\d+)-(\d+)-(-?\d+)/;
+
+  return subx(str, " ", pat, hash, parseIsoCb);
 }
 
 /**
- * @internal `date_parse.c` `parse_iso21` (`date_parse.c:1035-1070`): the
- * commercial week date, `"2001-W05-6"` and the yearless `"-W061"`.
+ * @internal `date_parse.c` `parse_iso21_cb` (`date_parse.c:1035-1051`): the
+ * commercial week date's year, week and day.
  */
-function parseIso21(str: string, hash: DateParts): string | null {
-  const m = /\b(\d{2}|\d{4})?-?w(\d{2})(?:-?(\d))?\b/i.exec(str);
-  if (m === null) return null;
+function parseIso21Cb(m: RegExpExecArray, hash: DateParts): number {
   const y = m[1];
   const w = m[2];
   const d = m[3];
@@ -985,45 +999,83 @@ function parseIso21(str: string, hash: DateParts): string | null {
   hash.cweek = Number(w);
   if (d !== undefined) hash.cwday = Number(d);
 
-  return subx(str, m);
+  return 1;
 }
 
-/** @internal `date_parse.c` `parse_iso22` (`date_parse.c:1073-1099`): `"-W-6"`, a commercial day alone. */
+/**
+ * @internal `date_parse.c` `parse_iso21` (`date_parse.c:1053-1071`): the
+ * commercial week date, `"2001-W05-6"` and the yearless `"-W061"`.
+ */
+function parseIso21(str: string, hash: DateParts): string | null {
+  const pat = /\b(\d{2}|\d{4})?-?w(\d{2})(?:-?(\d))?\b/i;
+
+  return subx(str, " ", pat, hash, parseIso21Cb);
+}
+
+/** @internal `date_parse.c` `parse_iso22_cb` (`date_parse.c:1073-1081`). */
+function parseIso22Cb(m: RegExpExecArray, hash: DateParts): number {
+  const d = m[1];
+
+  hash.cwday = Number(d);
+  return 1;
+}
+
+/** @internal `date_parse.c` `parse_iso22` (`date_parse.c:1083-1101`): `"-W-6"`, a commercial day alone. */
 function parseIso22(str: string, hash: DateParts): string | null {
-  const m = /-w-(\d)\b/i.exec(str);
-  if (m === null) return null;
-  hash.cwday = Number(m[1]);
-  return subx(str, m);
+  const pat = /-w-(\d)\b/i;
+
+  return subx(str, " ", pat, hash, parseIso22Cb);
 }
 
-/** @internal `date_parse.c` `parse_iso23` (`date_parse.c:1103-1134`): `"--02-03"`, and `"---03"`. */
-function parseIso23(str: string, hash: DateParts): string | null {
-  const m = /--(\d{2})?-(\d{2})\b/.exec(str);
-  if (m === null) return null;
+/** @internal `date_parse.c` `parse_iso23_cb` (`date_parse.c:1103-1116`). */
+function parseIso23Cb(m: RegExpExecArray, hash: DateParts): number {
   const mon = m[1];
   const d = m[2];
 
   if (mon !== undefined) hash.mon = Number(mon);
   hash.mday = Number(d);
 
-  return subx(str, m);
+  return 1;
 }
 
-/** @internal `date_parse.c` `parse_iso24` (`date_parse.c:1138-1169`): the unseparated `"--0203"`. */
-function parseIso24(str: string, hash: DateParts): string | null {
-  const m = /--(\d{2})(\d{2})?\b/.exec(str);
-  if (m === null) return null;
+/** @internal `date_parse.c` `parse_iso23` (`date_parse.c:1118-1136`): `"--02-03"`, and `"---03"`. */
+function parseIso23(str: string, hash: DateParts): string | null {
+  const pat = /--(\d{2})?-(\d{2})\b/;
+
+  return subx(str, " ", pat, hash, parseIso23Cb);
+}
+
+/** @internal `date_parse.c` `parse_iso24_cb` (`date_parse.c:1138-1151`). */
+function parseIso24Cb(m: RegExpExecArray, hash: DateParts): number {
   const mon = m[1];
   const d = m[2];
 
   hash.mon = Number(mon);
   if (d !== undefined) hash.mday = Number(d);
 
-  return subx(str, m);
+  return 1;
+}
+
+/** @internal `date_parse.c` `parse_iso24` (`date_parse.c:1153-1171`): the unseparated `"--0203"`. */
+function parseIso24(str: string, hash: DateParts): string | null {
+  const pat = /--(\d{2})(\d{2})?\b/;
+
+  return subx(str, " ", pat, hash, parseIso24Cb);
+}
+
+/** @internal `date_parse.c` `parse_iso25_cb` (`date_parse.c:1173-1185`). */
+function parseIso25Cb(m: RegExpExecArray, hash: DateParts): number {
+  const y = m[1];
+  const d = m[2];
+
+  hash.year = Number(y);
+  hash.yday = Number(d);
+
+  return 1;
 }
 
 /**
- * @internal `date_parse.c` `parse_iso25` (`date_parse.c:1173-1219`): the ordinal
+ * @internal `date_parse.c` `parse_iso25` (`date_parse.c:1187-1221`): the ordinal
  * date `"2001-034"`. `pat0` declines the run that is a second fraction
  * (`"1.2001-034"`), which `parse_ddd` reads instead.
  */
@@ -1032,23 +1084,27 @@ function parseIso25(str: string, hash: DateParts): string | null {
   const pat = /\b(\d{2}|\d{4})-(\d{3})\b/;
 
   if (pat0.exec(str) !== null) return null;
-  const m = pat.exec(str);
-  if (m === null) return null;
-  hash.year = Number(m[1]);
-  hash.yday = Number(m[2]);
-  return subx(str, m);
+
+  return subx(str, " ", pat, hash, parseIso25Cb);
 }
 
-/** @internal `date_parse.c` `parse_iso26` (`date_parse.c:1223-1265`): the yearless ordinal date `"-034"`. */
+/** @internal `date_parse.c` `parse_iso26_cb` (`date_parse.c:1223-1231`). */
+function parseIso26Cb(m: RegExpExecArray, hash: DateParts): number {
+  const d = m[1];
+
+  hash.yday = Number(d);
+
+  return 1;
+}
+
+/** @internal `date_parse.c` `parse_iso26` (`date_parse.c:1233-1267`): the yearless ordinal date `"-034"`. */
 function parseIso26(str: string, hash: DateParts): string | null {
   const pat0 = /\d-\d{3}\b/;
   const pat = /\b-(\d{3})\b/;
 
   if (pat0.exec(str) !== null) return null;
-  const m = pat.exec(str);
-  if (m === null) return null;
-  hash.yday = Number(m[1]);
-  return subx(str, m);
+
+  return subx(str, " ", pat, hash, parseIso26Cb);
 }
 
 /**
@@ -1104,13 +1160,8 @@ function gengo(c: string): number {
   return e;
 }
 
-/**
- * @internal `date_parse.c` `parse_jis` (`date_parse.c:1309-1346`): the JIS X
- * 0301 date, `"H13.02.03"` — Heisei 13, which is 2001.
- */
-function parseJis(str: string, hash: DateParts): string | null {
-  const m = new RegExp(`\\b([${JISX0301_ERA_INITIALS}])(\\d+)\\.(\\d+)\\.(\\d+)`, "i").exec(str);
-  if (m === null) return null;
+/** @internal `date_parse.c` `parse_jis_cb` (`date_parse.c:1309-1327`). */
+function parseJisCb(m: RegExpExecArray, hash: DateParts): number {
   const e = m[1];
   const y = m[2];
   const mon = m[3];
@@ -1122,35 +1173,55 @@ function parseJis(str: string, hash: DateParts): string | null {
   hash.mon = Number(mon);
   hash.mday = Number(d);
 
-  return subx(str, m);
+  return 1;
 }
 
-/** @internal `date_parse.c` `parse_vms11` (`date_parse.c:1349-1388`): `"3-FEB-2001"`. */
-function parseVms11(str: string, hash: DateParts): string | null {
-  const m = new RegExp(`('?-?${NUMBER}+)-(${ABBR_MONTHS})[^-/.]*-('?-?\\d+)`, "i").exec(str);
-  if (m === null) return null;
+/**
+ * @internal `date_parse.c` `parse_jis` (`date_parse.c:1329-1347`): the JIS X
+ * 0301 date, `"H13.02.03"` — Heisei 13, which is 2001.
+ */
+function parseJis(str: string, hash: DateParts): string | null {
+  const pat = new RegExp(`\\b([${JISX0301_ERA_INITIALS}])(\\d+)\\.(\\d+)\\.(\\d+)`, "i");
+
+  return subx(str, " ", pat, hash, parseJisCb);
+}
+
+/** @internal `date_parse.c` `parse_vms11_cb` (`date_parse.c:1349-1367`). */
+function parseVms11Cb(m: RegExpExecArray, hash: DateParts): number {
   const d = m[1];
-  let mon = m[2];
+  let mon: string | number = m[2];
   const y = m[3];
 
-  mon = String(monNum(mon));
+  mon = monNum(mon);
 
-  s3e(hash, y, mon, d, false);
-  return subx(str, m);
+  s3e(hash, y, String(mon), d, false);
+  return 1;
 }
 
-/** @internal `date_parse.c` `parse_vms12` (`date_parse.c:1391-1431`): `"FEB-3-2001"`, and `"FEB-3"`. */
-function parseVms12(str: string, hash: DateParts): string | null {
-  const m = new RegExp(`\\b(${ABBR_MONTHS})[^-/.]*-('?-?\\d+)(?:-('?-?\\d+))?`, "i").exec(str);
-  if (m === null) return null;
-  let mon = m[1];
+/** @internal `date_parse.c` `parse_vms11` (`date_parse.c:1369-1389`): `"3-FEB-2001"`. */
+function parseVms11(str: string, hash: DateParts): string | null {
+  const pat = new RegExp(`('?-?${NUMBER}+)-(${ABBR_MONTHS})[^-/.]*-('?-?\\d+)`, "i");
+
+  return subx(str, " ", pat, hash, parseVms11Cb);
+}
+
+/** @internal `date_parse.c` `parse_vms12_cb` (`date_parse.c:1391-1409`). */
+function parseVms12Cb(m: RegExpExecArray, hash: DateParts): number {
+  let mon: string | number = m[1];
   const d = m[2];
   const y = m[3];
 
-  mon = String(monNum(mon));
+  mon = monNum(mon);
 
-  s3e(hash, y ?? null, mon, d, false);
-  return subx(str, m);
+  s3e(hash, y ?? null, String(mon), d, false);
+  return 1;
+}
+
+/** @internal `date_parse.c` `parse_vms12` (`date_parse.c:1411-1431`): `"FEB-3-2001"`, and `"FEB-3"`. */
+function parseVms12(str: string, hash: DateParts): string | null {
+  const pat = new RegExp(`\\b(${ABBR_MONTHS})[^-/.]*-('?-?\\d+)(?:-('?-?\\d+))?`, "i");
+
+  return subx(str, " ", pat, hash, parseVms12Cb);
 }
 
 /** @internal `date_parse.c` `parse_vms` (`date_parse.c:1433-1444`): the VMS date, either way round. */
@@ -1158,48 +1229,87 @@ function parseVms(str: string, hash: DateParts): string | null {
   return parseVms11(str, hash) ?? parseVms12(str, hash);
 }
 
+/** @internal `date_parse.c` `parse_sla_cb` (`date_parse.c:1446-1462`). */
+function parseSlaCb(m: RegExpExecArray, hash: DateParts): number {
+  const y = m[1];
+  const mon = m[2];
+  const d = m[3];
+
+  s3e(hash, y, mon, d ?? null, false);
+  return 1;
+}
+
 /** @internal `date_parse.c` `parse_sla`: `2012/12/13`, `01/01/2012`, `2008/07`. */
 function parseSla(str: string, hash: DateParts): string | null {
-  const m = /([-+]?\d+)\/\s*(\d+)(?:\D\s*(-?\d+))?/.exec(str);
-  if (m === null) return null;
-  s3e(hash, m[1], m[2], m[3] ?? null, false);
-  return subx(str, m);
+  const pat = /([-+]?\d+)\/\s*(\d+)(?:\D\s*(-?\d+))?/;
+
+  return subx(str, " ", pat, hash, parseSlaCb);
+}
+
+/** @internal `date_parse.c` `parse_dot_cb` (`date_parse.c:1554-1570`). */
+function parseDotCb(m: RegExpExecArray, hash: DateParts): number {
+  const y = m[1];
+  const mon = m[2];
+  const d = m[3];
+
+  s3e(hash, y, mon, d, false);
+  return 1;
 }
 
 /** @internal `date_parse.c` `parse_dot`: `2012.12.13`, `01.01.2012`. */
 function parseDot(str: string, hash: DateParts): string | null {
-  const m = /([-+]?\d+)\.\s*(\d+)\.\s*(-?\d+)/.exec(str);
-  if (m === null) return null;
-  s3e(hash, m[1], m[2], m[3], false);
-  return subx(str, m);
+  const pat = /([-+]?\d+)\.\s*(\d+)\.\s*(-?\d+)/;
+
+  return subx(str, " ", pat, hash, parseDotCb);
 }
 
-/** @internal `date_parse.c` `parse_year` (`date_parse.c:1662-1688`): the year alone, `"'01"`. */
+/** @internal `date_parse.c` `parse_year_cb` (`date_parse.c:1662-1670`). */
+function parseYearCb(m: RegExpExecArray, hash: DateParts): number {
+  const y = m[1];
+
+  hash.year = Number(y);
+  return 1;
+}
+
+/** @internal `date_parse.c` `parse_year` (`date_parse.c:1672-1690`): the year alone, `"'01"`. */
 function parseYear(str: string, hash: DateParts): string | null {
-  const m = /'(\d+)\b/.exec(str);
-  if (m === null) return null;
-  hash.year = Number(m[1]);
-  return subx(str, m);
+  const pat = /'(\d+)\b/;
+
+  return subx(str, " ", pat, hash, parseYearCb);
 }
 
-/** @internal `date_parse.c` `parse_mon` (`date_parse.c:1692-1718`): the month alone, `"Feb"`. */
+/** @internal `date_parse.c` `parse_mon_cb` (`date_parse.c:1692-1700`). */
+function parseMonCb(m: RegExpExecArray, hash: DateParts): number {
+  const mon = m[1];
+
+  hash.mon = monNum(mon);
+  return 1;
+}
+
+/** @internal `date_parse.c` `parse_mon` (`date_parse.c:1702-1720`): the month alone, `"Feb"`. */
 function parseMon(str: string, hash: DateParts): string | null {
-  const m = new RegExp(`\\b(${ABBR_MONTHS})\\S*`, "i").exec(str);
-  if (m === null) return null;
-  hash.mon = monNum(m[1]);
-  return subx(str, m);
+  const pat = new RegExp(`\\b(${ABBR_MONTHS})\\S*`, "i");
+
+  return subx(str, " ", pat, hash, parseMonCb);
+}
+
+/** @internal `date_parse.c` `parse_mday_cb` (`date_parse.c:1722-1730`). */
+function parseMdayCb(m: RegExpExecArray, hash: DateParts): number {
+  const d = m[1];
+
+  hash.mday = Number(d);
+  return 1;
 }
 
 /**
- * @internal `date_parse.c` `parse_mday` (`date_parse.c:1722-1748`): the day of
+ * @internal `date_parse.c` `parse_mday` (`date_parse.c:1732-1750`): the day of
  * the month alone, `"3rd"`. It sits directly above `parse_ddd`, so an ordinal
  * suffix is what tells the two apart.
  */
 function parseMday(str: string, hash: DateParts): string | null {
-  const m = new RegExp(`(${NUMBER}+)(st|nd|rd|th)\\b`, "i").exec(str);
-  if (m === null) return null;
-  hash.mday = Number(m[1]);
-  return subx(str, m);
+  const pat = new RegExp(`(${NUMBER}+)(st|nd|rd|th)\\b`, "i");
+
+  return subx(str, " ", pat, hash, parseMdayCb);
 }
 
 /** @internal `date_parse.c` `n2i`: the `w` digits of `s` from `f`, as a number. */
@@ -1382,7 +1492,7 @@ function parseDddCb(m: RegExpExecArray, hash: DateParts): number {
  * itself, plus the time and zone that can follow it.
  */
 function parseDdd(str: string, hash: DateParts): string | null {
-  const m = new RegExp(
+  const pat = new RegExp(
     `([-+]?)(${NUMBER}{2,14})` +
       "(?:" +
       "\\s*" +
@@ -1401,14 +1511,19 @@ function parseDdd(str: string, hash: DateParts): string | null {
       ")" +
       ")?",
     "i",
-  ).exec(str);
-  if (m === null) return null;
-  parseDddCb(m, hash);
-  return subx(str, m);
+  );
+
+  return subx(str, " ", pat, hash, parseDddCb);
+}
+
+/** @internal `date_parse.c` `parse_bc_cb` (`date_parse.c:2003-2008`). */
+function parseBcCb(_m: RegExpExecArray, hash: DateParts): number {
+  hash._bc = true;
+  return 1;
 }
 
 /**
- * @internal `date_parse.c` `parse_bc` (`date_parse.c:2003-2019`): the era
+ * @internal `date_parse.c` `parse_bc` (`date_parse.c:2010-2019`): the era
  * suffix. It runs after whichever date sub-parser matched and only records
  * `:_bc`; the tail of `date__parse` is what negates the year. It is a `SUBS`
  * like every sub-parser above, and `parse_frag` runs on what it leaves — so
@@ -1416,10 +1531,9 @@ function parseDdd(str: string, hash: DateParts): string | null {
  * the anchored pattern reads the `5`.
  */
 function parseBc(str: string, hash: DateParts): string | null {
-  const m = /\b(bc\b|bce\b|b\.c\.|b\.c\.e\.)/i.exec(str);
-  if (m === null) return null;
-  hash._bc = true;
-  return subx(str, m);
+  const pat = /\b(bc\b|bce\b|b\.c\.|b\.c\.e\.)/i;
+
+  return subx(str, " ", pat, hash, parseBcCb);
 }
 
 /**
@@ -1452,10 +1566,9 @@ function parseFragCb(m: RegExpExecArray, hash: DateParts): number {
  * own `subx` answers is what no one reads — Ruby's caller drops it too.
  */
 function parseFrag(str: string, hash: DateParts): string | null {
-  const m = /^\s*(\d{1,2})\s*$/.exec(str);
-  if (m === null) return null;
-  parseFragCb(m, hash);
-  return subx(str, m);
+  const pat = /^\s*(\d{1,2})\s*$/;
+
+  return subx(str, " ", pat, hash, parseFragCb);
 }
 
 /**
@@ -1647,8 +1760,8 @@ export class Date {
    */
   static _parse(str: string, comp = true): DateParts {
     const hash: DateParts = {};
-    str = parseDay(str, hash);
-    str = parseTime(str, hash);
+    str = parseDay(str, hash) ?? str;
+    str = parseTime(str, hash) ?? str;
     let rest: string | null = null;
     if (/[a-z]/i.test(str) && /\d/.test(str)) {
       rest = parseEu(str, hash) ?? parseUs(str, hash);

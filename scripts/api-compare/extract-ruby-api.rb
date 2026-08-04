@@ -305,6 +305,19 @@ DEPENDENCY_PATTERNS = {
   },
 }
 
+# Packages whose umbrella file (`<libPath>.rb`) defines real methods rather than
+# only requires, autoloads and module-level config, and so must be walked in
+# full instead of harvested for singleton config alone.
+#
+# `vendor/i18n/lib/i18n.rb` is where `I18n::Base` — the gem's whole public
+# facade — is actually defined: 19 `def`s plus 3 aliases. The config-only scan
+# sees only the aliases, so the ported facade is measured against a denominator
+# of 3. Rails' umbrella files stay on the config-only path: `active_record.rb`
+# and its siblings are autoload manifests whose only method bodies are
+# `def self.` boot helpers no trails file ports, and walking them attributes
+# those to the umbrella module's junk-drawer entity file as false-missing.
+UMBRELLA_FULL_SCAN_PACKAGES = %w[i18n].to_set
+
 # ---- AST walker ----
 
 class ApiExtractor
@@ -389,8 +402,11 @@ class ApiExtractor
   # against those statics instead of leaking into the umbrella module's
   # entity-file bucket (the junk-drawer `deprecator.rb`). Must run AFTER the
   # package's own files so the `<Module>::Base` class already exists in `@classes`.
-  def scan_umbrella_file(filepath, package_root)
-    @scanning_umbrella = true
+  #
+  # `full:` walks the umbrella exactly as any other file instead, for the
+  # packages in UMBRELLA_FULL_SCAN_PACKAGES whose umbrella defines real methods.
+  def scan_umbrella_file(filepath, package_root, full: false)
+    @scanning_umbrella = !full
     process_file(filepath, package_root)
   ensure
     @scanning_umbrella = false
@@ -2490,7 +2506,11 @@ def run
     # config and attribute it to `<Module>::Base`. Done last so that Base class
     # already exists. See ApiExtractor#scan_umbrella_file.
     umbrella_file = "#{pkg_dir.sub(%r{/\z}, '')}.rb"
-    extractor.scan_umbrella_file(umbrella_file, pkg_dir) if File.file?(umbrella_file)
+    if File.file?(umbrella_file)
+      extractor.scan_umbrella_file(
+        umbrella_file, pkg_dir, full: UMBRELLA_FULL_SCAN_PACKAGES.include?(pkg_name)
+      )
+    end
 
     # Drop define_method entries a literal `def` in the same bucket supersedes.
     extractor.dedupe_define_methods!

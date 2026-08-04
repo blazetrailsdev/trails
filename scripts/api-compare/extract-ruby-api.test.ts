@@ -689,7 +689,11 @@ describe("Ruby extractor umbrella module-config scanning", () => {
   // Lay out a package libPath with a `base.rb` and a sibling umbrella file
   // one level above it, scan the package then the umbrella, and return the
   // ActiveRecord::Base / ActiveRecord entries.
-  function scanWithUmbrella(baseSrc: string, umbrellaSrc: string): Record<string, ClassEntry> {
+  function scanWithUmbrella(
+    baseSrc: string,
+    umbrellaSrc: string,
+    full = false,
+  ): Record<string, ClassEntry> {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "umbrella-rb-"));
     try {
       const libPath = path.join(root, "active_record");
@@ -701,7 +705,7 @@ describe("Ruby extractor umbrella module-config scanning", () => {
         require "json"
         ex = ApiExtractor.new
         ex.process_file(File.join(${JSON.stringify(libPath)}, "base.rb"), ${JSON.stringify(libPath)})
-        ex.scan_umbrella_file(File.join(${JSON.stringify(root)}, "active_record.rb"), ${JSON.stringify(libPath)})
+        ex.scan_umbrella_file(File.join(${JSON.stringify(root)}, "active_record.rb"), ${JSON.stringify(libPath)}, full: ${full})
         out = {}
         (ex.classes.merge(ex.modules)).each do |fqn, info|
           out[fqn] = { classMethods: info[:classMethods], instanceMethods: info[:instanceMethods], file: info[:file] }
@@ -717,7 +721,7 @@ describe("Ruby extractor umbrella module-config scanning", () => {
 
   interface ClassEntry {
     classMethods: { name: string; umbrellaConfig?: boolean }[];
-    instanceMethods: { name: string }[];
+    instanceMethods: { name: string; visibility: string }[];
     file: string;
   }
 
@@ -814,6 +818,60 @@ describe("Ruby extractor umbrella module-config scanning", () => {
     const mod = out["ActiveSupport"];
     const names = mod ? [...mod.classMethods, ...mod.instanceMethods].map((m) => m.name) : [];
     expect(names).not.toContain("error_reporter");
+  });
+
+  // `vendor/i18n/lib/i18n.rb` is not an autoload manifest: it is where
+  // `I18n::Base`, the gem's whole public facade, is defined. The config-only
+  // scan above sees only its three aliases, so the ported facade is measured
+  // against a denominator of 3. UMBRELLA_FULL_SCAN_PACKAGES opts such a package
+  // into a full walk.
+  it("extracts the method definitions of an umbrella file scanned in full", () => {
+    const out = scanWithUmbrella(
+      BASE_SRC,
+      `
+      module ActiveRecord
+        module Facade
+          def translate(key, **options); end
+          alias :t :translate
+
+          private
+
+          def translate_key(key); end
+        end
+
+        def self.reserve_key(key); end
+
+        extend Facade
+      end
+    `,
+      true,
+    );
+    const facade = out["ActiveRecord::Facade"];
+    expect(facade.instanceMethods.map((m) => m.name)).toEqual(["translate", "t", "translate_key"]);
+    expect(facade.instanceMethods.map((m) => m.visibility)).toEqual([
+      "public",
+      "public",
+      "private",
+    ]);
+    expect(facade.file).toBe("../active_record.rb");
+    expect(out["ActiveRecord"].classMethods.map((m) => m.name)).toContain("reserve_key");
+  });
+
+  it("keeps a config-only umbrella scan free of those definitions", () => {
+    const out = scanWithUmbrella(
+      BASE_SRC,
+      `
+      module ActiveRecord
+        module Facade
+          def translate(key, **options); end
+        end
+
+        def self.reserve_key(key); end
+      end
+    `,
+    );
+    expect(out["ActiveRecord::Facade"].instanceMethods).toEqual([]);
+    expect(out["ActiveRecord"].classMethods).toEqual([]);
   });
 });
 

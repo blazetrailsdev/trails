@@ -57,6 +57,15 @@ function inspectLocales(locales: Locale[]): string {
 }
 
 export class Fallbacks extends Map<Locale, Locale[]> {
+  /**
+   * Ruby's `Class#name` carries the module nesting the class was defined in, so
+   * `self.class.name` renders `I18n::Locale::Fallbacks` rather than the bare
+   * constant. A TS class has no nesting to read, so it declares the Ruby name
+   * over `Function.name` — `this.constructor.name` is then the same string
+   * Ruby's is, and any sibling ported class carries its own the same way.
+   */
+  static override name = "I18n::Locale::Fallbacks";
+
   private mapStore: Record<Locale, Locale[]> = {};
   private defaultsStore: Locale[] = [];
 
