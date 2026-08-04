@@ -843,20 +843,10 @@ export function extractFromProgram(
         });
       }
 
-      // The type-driven walk above sees only what the factory's RETURN TYPE
-      // exposes, so a member the inner class declares `protected` — Ruby's
-      // `private def on_fallback` (i18n/backend/fallbacks.rb:113) — never
-      // reaches it, and a public one it does see carries the base class's
-      // declaration site rather than this file's. Walk the class the factory
-      // returns directly and let its own members win, so every body written in
-      // this file is attributed to this file.
       for (const own of factoryClassMembers(node, checker, relPath, srcDir)) {
         const at = mixinMethods.findIndex(
           (m) => m.name === own.name && !!m.isStatic === !!own.isStatic,
         );
-        // Overlay rather than replace: the type-driven entry carries fields the
-        // declaration walk does not produce (option keys off the resolved
-        // signature), and the declaration carries the rest.
         if (at === -1) mixinMethods.push(own);
         else mixinMethods[at] = { ...mixinMethods[at], ...own, declaredIn: undefined };
       }

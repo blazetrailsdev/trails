@@ -50,8 +50,6 @@ describe("Backend::Simple", () => {
     backend.storeTranslations("en", { foo: { bar: "baz" } });
 
     expect(JSON.stringify(backend.translations())).toBe('{"en":{"foo":{"bar":"baz"}}}');
-    // simple.rb:93-95 — a missing *locale* read still assigns, as Ruby's
-    // default block does.
     expect(backend.translations()["fr"]).toEqual({});
     expect(Object.keys(backend.translations())).toEqual(["en", "fr"]);
   });

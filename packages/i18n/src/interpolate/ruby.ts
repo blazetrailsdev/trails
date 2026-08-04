@@ -102,15 +102,10 @@ function sprintf(spec: string, value: unknown): string {
   const number = numeric ? numericArgument(value, integer) : 0;
   const magnitude = Math.abs(number);
 
-  // A negative radix conversion with no sign flag is Ruby's infinite
-  // two's-complement form, which has no sign and does its own padding.
   if (conversion in RADIX && number < 0 && !flags.includes("+") && !flags.includes(" ")) {
     return twosComplement(Math.trunc(number), conversion, flags, width, precision);
   }
 
-  // Ruby omits the alternate-form prefix for zero. Octal's prefix is a leading
-  // digit, so a precision pads over it (`%#.5o` of 42 is `00052`); the others
-  // sit outside the padded digits (`%#.5x` of 42 is `0x0002a`).
   const prefix = alternate && number !== 0 ? (ALTERNATE_PREFIX[conversion] ?? "") : "";
 
   let body: string;
@@ -133,8 +128,6 @@ function sprintf(spec: string, value: unknown): string {
     body = conversion === "p" ? inspect(value) : String(value);
     if (precision !== undefined) body = body.slice(0, digits);
   }
-  // On an integer conversion the precision is a MINIMUM DIGIT COUNT, not a
-  // truncation — and `%.0d` of zero is the empty string.
   if (integer && precision !== undefined) {
     body = digits === 0 && Math.trunc(magnitude) === 0 ? "" : body.padStart(digits, "0");
   }
@@ -148,7 +141,6 @@ function sprintf(spec: string, value: unknown): string {
 
   const target = Number(width || 0);
   if (flags.includes("-")) return (sign + body).padEnd(target);
-  // A precision on an integer conversion cancels the `0` flag, as it does in C.
   if (flags.includes("0") && numeric && !(integer && precision !== undefined)) {
     return sign + body.padStart(target - sign.length, "0");
   }
@@ -184,7 +176,6 @@ function twosComplement(
 ): string {
   const radix = RADIX[conversion];
   const top = (radix - 1).toString(radix);
-  // The leading `..7` already carries octal's alternate-form prefix.
   const prefix = flags.includes("#") && conversion !== "o" ? ALTERNATE_PREFIX[conversion] : "";
   const target = Number(width || 0);
   const zeroPad = flags.includes("0") && !flags.includes("-");
@@ -193,10 +184,6 @@ function twosComplement(
     zeroPad ? target - prefix.length - 2 : 0,
   );
 
-  // The digits are the value itself in `places` two's-complement places, and
-  // Ruby writes the shortest run whose leading digit is already the repeating
-  // one — `-42` is `1010110` in binary, not the shorter `10` that only two
-  // places would wrap to.
   let digits: string;
   for (let places = 1; ; places++) {
     const modulus = radix ** places;

@@ -134,9 +134,6 @@ describe("I18n::Backend::Base", () => {
     config().availableLocales = ["en"];
     config().enforceAvailableLocales = true;
 
-    // base.rb:150-156 — the gem's `I18n.translate` reaches
-    // `enforce_available_locales!` (i18n.rb:218); calling the backend directly
-    // skipped it.
     expect(() => backend.translate("de", "missing", { default: ":foo" })).toThrow(InvalidLocale);
   });
 

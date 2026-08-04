@@ -88,9 +88,6 @@ export class Simple {
     ) {
       return data;
     }
-    // simple.rb:42 `locale = locale.to_sym`. A trails `Locale` *is* the
-    // Symbol's name (locale/tag/simple.ts:35), so the String `"en"` and a
-    // `":en"`-spelled Symbol have to key the one bucket, as `:en` does in the gem.
     locale = isSymbol(locale) ? locale.slice(1) : String(locale);
     const translations = this.translations();
     translations[locale] ??= {};
