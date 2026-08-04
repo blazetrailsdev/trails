@@ -186,7 +186,17 @@ interface DateParts {
  * @internal The date and time elements of `rt_complete_frags`' table
  * (`date_core.c:3878-3892`) this shim carries.
  */
-type DateFrag = "year" | "mon" | "mday" | "yday" | "hour" | "min" | "sec";
+type DateFrag =
+  | "year"
+  | "mon"
+  | "mday"
+  | "yday"
+  | "cwyear"
+  | "cweek"
+  | "cwday"
+  | "hour"
+  | "min"
+  | "sec";
 
 /** @internal `date_parse.c` `comp_year69`: `69` is 1969, `68` is 2068. */
 function compYear69(y: number): number {
@@ -1384,16 +1394,18 @@ function parseFrag(str: string, hash: DateParts): string | null {
  * `activesupport/test/core_ext/string_ext_test.rb:775` — and `"102".to_date` is
  * this year's 102nd day.
  *
- * Only the `:time`, `:ordinal` and `:civil` entries of that table are carried:
- * the rest are the Julian-day, commercial and week-numbered dates, none of
- * which any sub-parser ported here can produce. `:time` names no date, so it
- * has no completion branch in Ruby either, and the string goes on to raise.
+ * Only the `:time`, `:ordinal`, `:civil` and `:commercial` entries of that
+ * table are carried: the rest are the Julian-day, `:wday` and week-numbered
+ * dates, whose fields (`:jd`, `:wday`, `:wnum0`, `:wnum1`) no sub-parser
+ * ported here can produce. `:time` names no date, so it has no completion
+ * branch in Ruby either, and the string goes on to raise.
  */
 function completeFrags(parts: DateParts): void {
   const tab: [string, DateFrag[]][] = [
     ["time", ["hour", "min", "sec"]],
     ["ordinal", ["year", "yday", "hour", "min", "sec"]],
     ["civil", ["year", "mon", "mday", "hour", "min", "sec"]],
+    ["commercial", ["cwyear", "cweek", "cwday", "hour", "min", "sec"]],
   ];
 
   let g: boolean;
@@ -1430,6 +1442,9 @@ function completeFrags(parts: DateParts): void {
       mon: d.month,
       mday: d.day,
       yday: d.dayOfYear,
+      cwyear: d.yearOfWeek ?? undefined,
+      cweek: d.weekOfYear ?? undefined,
+      cwday: d.dayOfWeek,
     };
 
     if (k === "ordinal") {
@@ -1442,6 +1457,13 @@ function completeFrags(parts: DateParts): void {
       }
       parts.mon ??= 1;
       parts.mday ??= 1;
+    } else if (k === "commercial") {
+      for (const el of a) {
+        if (parts[el] !== undefined) break;
+        parts[el] = today[el];
+      }
+      parts.cweek ??= 1;
+      parts.cwday ??= 1;
     }
   }
 }
@@ -1495,8 +1517,11 @@ export class Date {
    *
    * `rt__valid_date_frags_p` (`date_core.c:4185-4220`) tries the ordinal date
    * — a `:year` and a `:yday`, which is what `"2008070"` names — before the
-   * civil one, and a string that named only a time of day answers neither and
-   * raises.
+   * civil one, and the commercial date — a `:cwyear`, a `:cweek` and a
+   * `:cwday`, which is what `"2001-W05-6"` names — after both. A string that
+   * named only a time of day answers none of them and raises. The
+   * out-of-range week Ruby rejects in `c_valid_commercial_p` is rejected here
+   * by round-tripping the built date's own week date.
    */
   static parse(str: string, comp = true): Date {
     const parts = Date._parse(str, comp);
@@ -1508,6 +1533,16 @@ export class Date {
         if (d.year !== parts.year) d = null;
       } else if (parts.mon !== undefined && parts.mday !== undefined) {
         d = new Temporal.PlainDate(parts.year as number, parts.mon, parts.mday);
+      } else if (
+        parts.cwday !== undefined &&
+        parts.cweek !== undefined &&
+        parts.cwyear !== undefined
+      ) {
+        const jan4 = new Temporal.PlainDate(parts.cwyear, 1, 4);
+        d = jan4
+          .subtract({ days: jan4.dayOfWeek - 1 })
+          .add({ days: (parts.cweek - 1) * 7 + (parts.cwday - 1) });
+        if (d.yearOfWeek !== parts.cwyear || d.weekOfYear !== parts.cweek) d = null;
       }
     } catch {
       d = null;

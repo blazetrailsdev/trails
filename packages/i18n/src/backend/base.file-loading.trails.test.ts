@@ -8,8 +8,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { Simple } from "./simple.js";
 import { config, reloadBang, resetConfig } from "../i18n.js";
 import { resetClassConfig } from "../config.js";
-import { InvalidLocaleData } from "../exceptions.js";
-import { preloadTranslationFiles, registerFileReader } from "./base.js";
+import { InvalidLocaleData, UnknownFileType } from "../exceptions.js";
+import { preloadTranslationFiles, registerFileReader, registerLocaleModule } from "./base.js";
 import { parseYaml } from "../yaml.js";
 
 function localesDir(): string {
@@ -107,6 +107,43 @@ describe("I18n::Backend::Base file loading", () => {
     await config().setLoadPath([`${localesDir()}/invalid/syntax.yml`]);
     expect(() => backend.translate("en", "foo.bar")).toThrow(InvalidLocaleData);
     expect(backend.initialized()).toBe(false);
+  });
+
+  // `registerLocaleModule` / `loadJs` stand in for the gem's `load_rb`
+  // (base.rb:254-256, dispatched by `load_file`'s extension arms at :240-247).
+  // Every test here names its own `bundled/*` entry: the registry is a module
+  // singleton with no reset, so a shared name would leak into its siblings.
+  describe("the locale-module registry", () => {
+    it("serves a registered module without reaching import()", () => {
+      registerLocaleModule("bundled/registered.js", { en: { bundled: { greeting: "hi" } } });
+      config().loadPath.push("bundled/registered.js");
+      expect(backend.translate("en", "bundled.greeting")).toBe("hi");
+    });
+
+    it("refuses a module the load path names but nothing registered", () => {
+      config().loadPath.push("bundled/unregistered.js");
+      expect(() => backend.translate("en", "bundled.greeting")).toThrow(
+        /register it with I18n.registerLocaleModule\(\)/,
+      );
+      expect(() => backend.translate("en", "bundled.greeting")).not.toThrow(UnknownFileType);
+    });
+
+    it("raises InvalidLocaleData given a module whose export is not a hash", () => {
+      registerLocaleModule("bundled/non-hash.js", "en:\n  bundled:\n    greeting: hi\n");
+      expect(() => backend.loadTranslations("bundled/non-hash.js")).toThrow(InvalidLocaleData);
+      expect(() => backend.loadTranslations("bundled/non-hash.js")).toThrow(
+        "expects it to return a hash, but does not",
+      );
+    });
+
+    it("loads a module the host imported off disk under its emitted .js name", async () => {
+      const { en } = (await import("../test-data/locales/en.js")) as {
+        en: Record<string, unknown>;
+      };
+      registerLocaleModule(`${localesDir()}/en.js`, { en });
+      config().loadPath.push(`${localesDir()}/en.js`);
+      expect(backend.translate("en", "fuh.bah")).toBe("bas");
+    });
   });
 
   describe("the YAML subset", () => {

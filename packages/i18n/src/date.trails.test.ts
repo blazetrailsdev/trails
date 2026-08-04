@@ -174,6 +174,30 @@ describe("Date", () => {
     expect(RubyDate._parse("2001-W05-6")).toEqual({ cwyear: 2001, cweek: 5, cwday: 6 });
   });
 
+  it("builds a week date from the commercial entry of rt_complete_frags' table", () => {
+    const full = RubyDate.parse("2001-W05-6");
+    expect([full.year, full.mon, full.day]).toEqual([2001, 2, 3]);
+    const comp = RubyDate.parse("01-W05-6");
+    expect([comp.year, comp.mon, comp.day]).toEqual([2001, 2, 3]);
+    const week = RubyDate.parse("2001-W05");
+    expect([week.year, week.mon, week.day]).toEqual([2001, 1, 29]);
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2008-08-04T12:00:00Z"));
+    try {
+      const today = RubyDate.parse("-W061");
+      expect([today.year, today.mon, today.day]).toEqual([2008, 2, 4]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("rejects a week outside the year, as c_valid_commercial_p does", () => {
+    expect(() => RubyDate.parse("2001-W54-1")).toThrow("invalid date");
+    expect(() => RubyDate.parse("2001-W00-1")).toThrow("invalid date");
+    const long = RubyDate.parse("2020-W53-1");
+    expect([long.year, long.mon, long.day]).toEqual([2020, 12, 28]);
+  });
+
   it("negates the year of a BC date, as parse_bc does", () => {
     expect(RubyDate.parse("4004-01-02 BC").year).toBe(-4003);
     expect(RubyDate.parse("feb 3 4004 b.c.e.").year).toBe(-4003);
