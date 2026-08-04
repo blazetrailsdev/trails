@@ -389,13 +389,13 @@ export class SchemaCreation extends AbstractSchemaCreation {
   }
 
   /** @internal */
-  protected async indexInCreate(
+  protected override async indexInCreate(
     tableName: string,
     columnName: string | string[],
     options: AddIndexOptions = {},
   ): Promise<string> {
     const [index] = await this.adapter.addIndexOptions(tableName, columnName, options);
-    return this.visitIndexDefinition(index, false);
+    return this.accept(index);
   }
 
   /** @internal */

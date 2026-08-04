@@ -16,39 +16,28 @@ export class MinimumLengthError extends Error {
 
 const MINIMUM_TOKEN_LENGTH = 24;
 
-/** `ActiveRecord::SecureToken::ClassMethods` (secure_token.rb:11). */
-interface ClassMethods {
-  generateUniqueSecureToken(length?: number): string;
-}
-
 /**
  * Add secure token generation to a model attribute.
  *
  * Mirrors: ActiveRecord::SecureToken.has_secure_token
  *
  * Usage:
- *   hasSecureToken(User, 'auth_token')
- *   hasSecureToken(User)  // defaults to 'token'
+ *   User.hasSecureToken('auth_token')
+ *   User.hasSecureToken()  // defaults to 'token'
  *
  * Generates a unique token before create if the attribute is blank.
  * Adds a `regenerateToken()` (or `regenerateAuthToken()`) instance method.
  *
  * Rails reaches `generate_unique_secure_token` through `self.class` because
- * `SecureToken::ClassMethods` is included on `Base` (secure_token.rb:11).
- * trails keeps this module behind the `/secure-token` subpath — it needs
- * crypto, which `index.ts` cannot pull in (index.ts:280) — so the class method
- * is installed from here instead, guarded by `in` (not `hasOwnProperty`) so a
- * model that already overrides it, anywhere in the chain, is never clobbered.
+ * `SecureToken::ClassMethods` is included on `Base` (secure_token.rb:11); both
+ * members are assigned onto `Base` the same way (base.ts).
  */
 export function hasSecureToken(
-  modelClass: typeof Base,
+  this: typeof Base,
   attribute: string = "token",
   options?: { length?: number; on?: "create" | "initialize" },
 ): void {
-  if (!("generateUniqueSecureToken" in modelClass)) {
-    (modelClass as typeof Base & ClassMethods).generateUniqueSecureToken =
-      generateUniqueSecureToken;
-  }
+  const modelClass = this;
 
   const tokenLength = options?.length ?? MINIMUM_TOKEN_LENGTH;
   if (tokenLength < MINIMUM_TOKEN_LENGTH) {
@@ -77,9 +66,9 @@ export function hasSecureToken(
   // asserting the token), which is exactly what these ports do.
   const generateIfBlank = (record: any): void => {
     if (record.isNewRecord() && !record.queryAttribute(attribute)) {
-      record[attribute] = (
-        record.constructor as typeof Base & ClassMethods
-      ).generateUniqueSecureToken(tokenLength);
+      record[attribute] = (record.constructor as typeof Base).generateUniqueSecureToken(
+        tokenLength,
+      );
     }
   };
   if (options?.on === "initialize") {
@@ -96,9 +85,7 @@ export function hasSecureToken(
 
   Object.defineProperty(modelClass.prototype, methodName, {
     value: function (this: Base): Promise<true | undefined> {
-      const newToken = (this.constructor as typeof Base & ClassMethods).generateUniqueSecureToken(
-        tokenLength,
-      );
+      const newToken = (this.constructor as typeof Base).generateUniqueSecureToken(tokenLength);
       // Mirrors Rails: `update! attribute => generate_unique_secure_token(...)`
       // (secure_token.rb:53) — a full validated save with callbacks and a
       // timestamp bump, not a direct-SQL `update_column` that bypasses them.

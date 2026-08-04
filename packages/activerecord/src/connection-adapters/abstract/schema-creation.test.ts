@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { SchemaCreation } from "./schema-creation.js";
-import { CreateIndexDefinition, IndexDefinition } from "./schema-definitions.js";
+import { CreateIndexDefinition, IndexDefinition, TableDefinition } from "./schema-definitions.js";
 import { schemaConn } from "../../support/schema-conn.js";
 
 describe("SchemaCreation#typeToSql blank type guard", () => {
@@ -43,6 +43,45 @@ describe("SchemaCreation drop-constraint visitors", () => {
   it("visit_DropCheckConstraint emits DROP CONSTRAINT with a quoted name", () => {
     const sc = new SchemaCreation("postgres", schemaConn("postgres")) as any;
     expect(sc.visitDropCheckConstraint("chk_rails_abc")).toBe('DROP CONSTRAINT "chk_rails_abc"');
+  });
+});
+
+describe("SchemaCreation#visit_TableDefinition inline indexes", () => {
+  class IndexesInCreate extends SchemaCreation {
+    protected override supportsIndexesInCreate(): boolean {
+      return true;
+    }
+
+    protected override async indexInCreate(
+      tableName: string,
+      columnName: string | string[],
+    ): Promise<string> {
+      return `INDEX index_${tableName}_on_${String(columnName)} (${String(columnName)})`;
+    }
+  }
+
+  it("emits index_in_create for each index when supports_indexes_in_create? is true", async () => {
+    const td = new TableDefinition("users", {
+      adapter: schemaConn("sqlite"),
+      adapterName: "sqlite",
+    });
+    td.string("email");
+    td.index("email");
+
+    const sql = await new IndexesInCreate("sqlite", schemaConn("sqlite")).accept(td);
+    expect(sql).toContain("INDEX index_users_on_email (email)");
+  });
+
+  it("emits no inline index when supports_indexes_in_create? is false", async () => {
+    const td = new TableDefinition("users", {
+      adapter: schemaConn("sqlite"),
+      adapterName: "sqlite",
+    });
+    td.string("email");
+    td.index("email");
+
+    const sql = await new SchemaCreation("sqlite", schemaConn("sqlite")).accept(td);
+    expect(sql).not.toContain("INDEX");
   });
 });
 

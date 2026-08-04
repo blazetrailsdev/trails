@@ -1,13 +1,11 @@
 /**
  * TS-only cover for `has_secure_token`'s dispatch through
- * `self.class.generate_unique_secure_token` (secure_token.rb:51,54). Rails gets
- * the override point for free from `ClassMethods`; trails installs the class
- * method from `hasSecureToken`, so the routing needs its own test.
+ * `self.class.generate_unique_secure_token` (secure_token.rb:51,54) — a model
+ * override has to win over the `ClassMethods` member `Base` carries.
  */
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 
 import { Base } from "./index.js";
-import { hasSecureToken } from "./secure-token.js";
 import { fixtures } from "./test-fixtures.js";
 
 describe("SecureTokenTest", () => {
@@ -22,7 +20,7 @@ describe("SecureTokenTest", () => {
 
   beforeAll(async () => {
     await OverridingUser.loadSchema();
-    hasSecureToken(OverridingUser, "token");
+    OverridingUser.hasSecureToken("token");
   });
 
   interface TokenRecord {
@@ -33,6 +31,10 @@ describe("SecureTokenTest", () => {
   let user: OverridingUser;
   beforeEach(() => {
     user = new OverridingUser();
+  });
+
+  it("generate_unique_secure_token is a class method on every model", () => {
+    expect(Base.generateUniqueSecureToken(24)).toHaveLength(24);
   });
 
   it("an overridden generate_unique_secure_token is used on create", async () => {

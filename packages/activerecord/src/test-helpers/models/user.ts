@@ -7,7 +7,6 @@ import type { Room } from "./room.js";
 // vendor/rails/activerecord/test/models/user.rb
 import { Base } from "../../base.js";
 import { hasSecurePassword } from "../../secure-password.js";
-import { hasSecureToken } from "../../secure-token.js";
 import { Notification } from "./notification.js";
 
 export class User extends Base {
@@ -54,8 +53,8 @@ export class User extends Base {
 
 hasSecurePassword(User, { validations: false });
 hasSecurePassword(User, "recovery_password", { validations: false });
-hasSecureToken(User);
-hasSecureToken(User, "auth_token", { length: 36 });
+User.hasSecureToken();
+User.hasSecureToken("auth_token", { length: 36 });
 
 export class UserWithNotification extends User {
   declare loadHasOne: ((name: "room") => Promise<Room | null>) &

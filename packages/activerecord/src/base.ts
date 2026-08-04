@@ -325,6 +325,10 @@ import {
 import * as _AttributeAssignment from "./attribute-assignment.js";
 import * as _NestedAttributes from "./nested-attributes.js";
 import {
+  hasSecureToken as _hasSecureToken,
+  generateUniqueSecureToken as _generateUniqueSecureToken,
+} from "./secure-token.js";
+import {
   store as _storeFunction,
   storeAccessor as _storeAccessorFunction,
   registerSerializeFn as _registerSerializeFn,
@@ -1822,6 +1826,12 @@ export class Base extends Model {
   ): void {
     _NestedAttributes.acceptsNestedAttributesFor(this, associationName, options);
   }
+
+  /** Mirrors: ActiveRecord::SecureToken::ClassMethods#has_secure_token (secure_token.rb:38). */
+  static hasSecureToken = _hasSecureToken;
+
+  /** Mirrors: ActiveRecord::SecureToken::ClassMethods#generate_unique_secure_token (secure_token.rb:57). */
+  static generateUniqueSecureToken = _generateUniqueSecureToken;
 
   /** Mirrors: ActiveRecord.verbose_query_logs, verbose_query_logs= */
   static get verboseQueryLogs(): boolean {
