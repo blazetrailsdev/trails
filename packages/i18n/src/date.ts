@@ -172,12 +172,13 @@ interface DateParts {
   cwyear?: number;
   cweek?: number;
   cwday?: number;
+  wday?: number;
   hour?: number;
   min?: number;
   sec?: number;
   secFraction?: number;
   zone?: string;
-  offset?: number | null;
+  offset?: number | Rational | null;
   _comp?: boolean;
   _bc?: boolean;
 }
@@ -206,6 +207,11 @@ function compYear69(y: number): number {
 /** @internal `date_parse.c` `mon_num`: an abbreviation, or the head of a full name. */
 function monNum(str: string): number {
   return ABBR_MONTH_NAMES.findIndex((m) => m.toLowerCase() === str.slice(0, 3).toLowerCase()) + 1;
+}
+
+/** @internal `date_parse.c` `day_num` (`date_parse.c:561-571`): the `ABBR_DAYS` index of a day name. */
+function dayNum(str: string): number {
+  return ABBR_DAY_NAMES.findIndex((d) => d.toLowerCase() === str.slice(0, 3).toLowerCase());
 }
 
 /** @internal `date_parse.c` `issign` (`date_parse.c:63`). */
@@ -385,6 +391,56 @@ function shrinkSpace(s: string, l: number): string {
   return d;
 }
 
+/** @internal `rational.c` `i_gcd`, the greatest common divisor a Rational reduces by. */
+function iGcd(x: number, y: number): number {
+  if (x < 0) x = -x;
+  if (y < 0) y = -y;
+  while (y !== 0) {
+    const t = x % y;
+    x = y;
+    y = t;
+  }
+  return x;
+}
+
+/**
+ * Ruby's `Rational` (`rational.c`), as much of it as `date_zone_to_diff`'s
+ * fractional-hour offset needs: `rb_rational_new` canonicalizes to lowest terms
+ * (`rational.c` `nurat_s_canonicalize_internal`), `+` adds an Integer
+ * (`rational.c` `nurat_add`), and `numerator`/`denominator` read the parts back
+ * out. A Rational never becomes an Integer on its own in Ruby — the caller asks
+ * whether the denominator is one and takes the numerator itself.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core, like the `::Date` below it. Rails
+ * defines no Rational; it inherits Ruby's, and `Date._parse` answers one for a
+ * fractional-hour `:offset`, so trails needs the value type to answer the same.
+ */
+export class Rational {
+  /** `rational.c` `nurat_numerator` (`Rational#numerator`).
+   * @noRailsEquivalent PERMANENT — Ruby core, part of the Rational above. */
+  readonly numerator: number;
+
+  /** `rational.c` `nurat_denominator` (`Rational#denominator`).
+   * @noRailsEquivalent PERMANENT — Ruby core, part of the Rational above. */
+  readonly denominator: number;
+
+  constructor(num: number, den: number) {
+    const g = iGcd(num, den);
+    this.numerator = num / g;
+    this.denominator = den / g;
+  }
+
+  /** `rational.c` `nurat_add` (`Rational#+`), for the Integer addend this port needs. */
+  add(other: number): Rational {
+    return new Rational(this.numerator + other * this.denominator, this.denominator);
+  }
+
+  /** `rational.c` `nurat_to_s` (`Rational#to_s`). */
+  toString(): string {
+    return `${this.numerator}/${this.denominator}`;
+  }
+}
+
 /**
  * @internal `date_parse.c` `date_zone_to_diff` (`date_parse.c:415-559`): the
  * `:offset` in seconds a `:zone` names. A trailing `standard`, `daylight` or
@@ -397,12 +453,12 @@ function shrinkSpace(s: string, l: number): string {
  * (`date_parse.c:514-517`) and its round-half-to-even on the eighth
  * (`date_parse.c:519-522`), where the comparison character is `'5' + !(sec & 1)`.
  *
- * Ruby answers a Rational for a fractional-hour offset of more than two
- * decimal places (`date_parse.c:522-528`); TypeScript has no Rational, so the
- * division is a `number` there.
+ * A fractional-hour offset of more than two decimal places is a `Rational`
+ * (`date_parse.c:523-528`), and only an integer once its denominator reduces to
+ * one — `+9.5555` is `(171999/5)` where `+9.555` is `34398`.
  */
-function dateZoneToDiff(str: string): number | null {
-  let offset: number | null = null;
+function dateZoneToDiff(str: string): number | Rational | null {
+  let offset: number | Rational | null = null;
   let l = str.length;
   let s = str;
 
@@ -502,7 +558,8 @@ function dateZoneToDiff(str: string): number | null {
             offset = sec + hour * 3600;
           } else {
             const denom = 10 ** (n - 2);
-            offset = sec / denom + hour * 3600;
+            const rat = new Rational(sec, denom).add(hour * 3600);
+            offset = rat.denominator === 1 ? rat.numerator : rat;
           }
           return offset;
         } else if (l > 2) {
@@ -679,9 +736,26 @@ function subx(str: string, m: RegExpExecArray): string {
   return str.slice(0, m.index) + " " + str.slice(m.index + m[0].length);
 }
 
-/** @internal `date_parse.c` `parse_day`: a leading day name is not a date field. */
-function parseDay(str: string): string {
-  return str.replace(new RegExp(`\\b(${ABBR_DAYS})[^-\\d\\s]*`, "i"), " ");
+/**
+ * @internal `date_parse.c` `parse_day_cb` (`date_parse.c:583-592`): the day name
+ * a date string carries is a field of its own, even though `Date.parse` never
+ * reads it back.
+ */
+function parseDayCb(m: RegExpExecArray, hash: DateParts): number {
+  hash.wday = dayNum(m[1]);
+  return 1;
+}
+
+/**
+ * @internal `date_parse.c` `parse_day` (`date_parse.c:594-604`): a day name is
+ * not a date field the rest of the sub-parsers should see, so it comes out of
+ * the string — but it is one Ruby records, as `:wday`.
+ */
+function parseDay(str: string, hash: DateParts): string {
+  const m = new RegExp(`\\b(${ABBR_DAYS})[^-/\\d\\s]*`, "i").exec(str);
+  if (m === null) return str;
+  parseDayCb(m, hash);
+  return subx(str, m);
 }
 
 /**
@@ -1573,7 +1647,7 @@ export class Date {
    */
   static _parse(str: string, comp = true): DateParts {
     const hash: DateParts = {};
-    str = parseDay(str);
+    str = parseDay(str, hash);
     str = parseTime(str, hash);
     let rest: string | null = null;
     if (/[a-z]/i.test(str)) {
