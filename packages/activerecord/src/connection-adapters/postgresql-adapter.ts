@@ -500,41 +500,13 @@ export class PostgreSQLAdapter
     message?: string;
     code?: string;
   }> = [];
-  // Rails' `statement_limit` database.yml key — max prepared
-  // statements cached per session before LRU eviction (default 1000).
+  // Rails reads `@config[:statement_limit]` inline when it builds the
+  // StatementPool (postgresql_adapter.rb:1056) and never exposes it. trails'
+  // constructor destructures the adapter-level database.yml keys out of the
+  // config hash, so the value is held here for `buildStatementPool` and
+  // `_shouldPrepare`'s pool-limit check.
+  /** @internal */
   private _statementLimit = 1000;
-
-  /**
-   * Maximum prepared statements cached per connection.
-   *
-   * Mirrors: `database.yml`'s `statement_limit` — read by Rails as
-   * `config[:statement_limit]` in PostgreSQLAdapter#initialize.
-   *
-   * @noRailsEquivalent CONVERGEABLE (story: retire-public-statement-limit-accessor).
-   * `statement_limit` is a `database.yml` config key Rails reads as
-   *   `config[:statement_limit]` in
-   *   each adapter's `initialize` (abstract_mysql_adapter.rb, postgresql_adapter.rb,
-   *   sqlite3_adapter.rb) — a config option, never a Ruby `def`, so there is nothing for the
-   *   extractor to match. trails exposes the same setting as a validated accessor on the adapter,
-   *   identically on all three.
-   */
-  get statementLimit(): number {
-    return this._statementLimit;
-  }
-
-  set statementLimit(value: number) {
-    if (!Number.isInteger(value) || value < 0) {
-      throw new RangeError(
-        `statementLimit must be a finite non-negative integer; got ${String(value)}`,
-      );
-    }
-    this._statementLimit = value;
-    // Resize the single StatementPool immediately so a mid-session
-    // change is visible. Rails reads `statement_limit` once at pool
-    // construction; we mirror that for new pools and propagate setter
-    // changes to the live pool.
-    this._statementPool?.setMaxSize(value);
-  }
 
   constructor(config: string | (pg.PoolConfig & PostgreSQLAdapterOptions));
   /**
@@ -644,7 +616,14 @@ export class PostgreSQLAdapter
       variables,
       ...pgConfig
     } = config as pg.PoolConfig & PostgreSQLAdapterOptions;
-    if (statementLimit !== undefined) this.statementLimit = statementLimit;
+    if (statementLimit !== undefined) {
+      if (!Number.isInteger(statementLimit) || statementLimit < 0) {
+        throw new RangeError(
+          `statementLimit must be a finite non-negative integer; got ${String(statementLimit)}`,
+        );
+      }
+      this._statementLimit = statementLimit;
+    }
     if (preparedStatements !== undefined) this.preparedStatements = preparedStatements;
     if (advisoryLocks !== undefined) {
       this._advisoryLocksEnabled =

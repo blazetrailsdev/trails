@@ -36,9 +36,6 @@ const CALLBACKS_OPTIONS = new Set<string>([
 ]);
 const MESSAGE_OPTIONS = new Set<string>(["message"]);
 
-// Identifier pattern mirrors Ruby Symbol semantics: no spaces or punctuation.
-const IDENTIFIER_RE = /^[a-z][a-zA-Z0-9_]*$/;
-
 /**
  * Value equality that matches Ruby `==` for the common option shapes:
  * primitives (identity), arrays (elementwise), and plain objects (key-set +
@@ -147,9 +144,12 @@ export class Error {
     // `options[:message]` and becomes the default below, exactly as in Rails.
     if (typeof msgOpt === "string" && msgOpt.startsWith(":")) {
       const { message: _msg, ...rest } = options;
-      type = msgOpt.slice(1);
+      type = msgOpt;
       options = rest;
     }
+    // `type` is a Ruby Symbol, i.e. a colon-prefixed string; the i18n keys
+    // below are built from its name.
+    const typeName = type.slice(1);
 
     const baseClass = base?.constructor as ModelClass | undefined;
     // error.rb:66. Rails aliases `read_attribute_for_validation` to `send`
@@ -178,10 +178,10 @@ export class Error {
       attribute = attribute.replace(/\[\d+\]/g, "");
 
       defaults = baseClass.lookupAncestors!().flatMap((klass) => [
-        `:${i18nScope}.errors.models.${klass.modelName!.i18nKey}.attributes.${attribute}.${type}`,
-        `:${i18nScope}.errors.models.${klass.modelName!.i18nKey}.${type}`,
+        `:${i18nScope}.errors.models.${klass.modelName!.i18nKey}.attributes.${attribute}.${typeName}`,
+        `:${i18nScope}.errors.models.${klass.modelName!.i18nKey}.${typeName}`,
       ]);
-      defaults.push(`:${i18nScope}.errors.messages.${type}`);
+      defaults.push(`:${i18nScope}.errors.messages.${typeName}`);
 
       if (options.message == null || options.message === false) {
         const translation = catchException(() =>
@@ -199,8 +199,8 @@ export class Error {
       defaults = [];
     }
 
-    defaults.push(`:errors.attributes.${attribute}.${type}`);
-    defaults.push(`:errors.messages.${type}`);
+    defaults.push(`:errors.attributes.${attribute}.${typeName}`);
+    defaults.push(`:errors.messages.${typeName}`);
 
     const key = defaults.shift();
     if (options.message != null && options.message !== false) {
@@ -215,7 +215,7 @@ export class Error {
   constructor(
     base: ModelBase,
     attribute: string,
-    type: string = "invalid",
+    type: string = ":invalid",
     options: Record<string, unknown> = {},
     rawType?: string,
   ) {
@@ -228,14 +228,14 @@ export class Error {
     // original error's key even when the surface `type` has been renamed.
     // `rawType` defaults to `type` for the common case where they match.
     this.rawType = rawType ?? type;
-    this.type = type || "invalid";
+    this.type = type || ":invalid";
     this.options = options;
   }
 
   get message(): string {
     // Rails error.rb:136-141: dispatch on raw_type shape — Symbol → generate_message, else → literal.
-    // TS has no Symbol type; identifier-shaped strings (no spaces/punctuation) are the equivalent.
-    if (IDENTIFIER_RE.test(this.rawType)) {
+    // A Ruby Symbol reaches us as a colon-prefixed string (`":blank"`), which is the discriminator.
+    if (this.rawType.startsWith(":")) {
       const opts: Record<string, unknown> = {};
       for (const [k, v] of Object.entries(this.options)) {
         if (!CALLBACKS_OPTIONS.has(k)) opts[k] = v;

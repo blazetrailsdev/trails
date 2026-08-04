@@ -414,7 +414,7 @@ export class BelongsTo extends SingularAssociation {
             target = await record.association(name).loadTarget();
           }
           if (target == null) {
-            record.errors.add(name, "blank", { message: ":required" });
+            record.errors.add(name, ":blank", { message: ":required" });
           }
         },
         { if: (record: any) => railsRuns(record) && foreignKeyPresent(record) },

@@ -43,7 +43,7 @@ export class ConfirmationValidator extends EachValidator {
       const humanAttr = modelClass?.humanAttributeName
         ? modelClass.humanAttributeName(attribute)
         : humanize(attribute);
-      record.errors.add(confirmationAttr, "confirmation", {
+      record.errors.add(confirmationAttr, ":confirmation", {
         ...this.filteredErrorOptions(["caseSensitive"]),
         attribute: humanAttr,
       });

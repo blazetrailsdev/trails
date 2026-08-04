@@ -45,7 +45,7 @@ export class AssociatedValidator extends EachValidator {
     }
     if (anyInvalid) {
       const { attributes: _, ...errorOpts } = this.options;
-      record.errors.add(attribute, "invalid", { ...errorOpts, value });
+      record.errors.add(attribute, ":invalid", { ...errorOpts, value });
     }
   }
 }

@@ -930,7 +930,7 @@ describe("Callbacks (extended)", () => {
       }
       validateCustom() {
         if (this.readAttribute("value") === 0) {
-          this.errors.add("value", "invalid", { message: "cannot be zero" });
+          this.errors.add("value", ":invalid", { message: "cannot be zero" });
         }
       }
     }

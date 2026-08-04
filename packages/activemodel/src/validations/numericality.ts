@@ -60,7 +60,7 @@ export class NumericalityValidator extends EachValidator {
     // EachValidator#validate) is always :not_a_number. The default is to reject
     // nil — matching `test_default_validates_numericality_of`.
     if (value === null || value === undefined) {
-      record.errors.add(attribute, "not_a_number", this.filteredOptions(value));
+      record.errors.add(attribute, ":not_a_number", this.filteredOptions(value));
       return;
     }
     // A cast/raw decimal is a BigDecimal (Numeric in Rails — Kernel.Float
@@ -70,7 +70,7 @@ export class NumericalityValidator extends EachValidator {
     if (this.options.allowBlank && isBlank(value)) return;
 
     if (!this.isNumber(value, precision, scale)) {
-      record.errors.add(attribute, "not_a_number", this.filteredOptions(value));
+      record.errors.add(attribute, ":not_a_number", this.filteredOptions(value));
       return;
     }
 
@@ -80,7 +80,7 @@ export class NumericalityValidator extends EachValidator {
     // raw options[:only_integer] read, so a Proc / method-name option
     // is honored per-record.
     if (this.isAllowOnlyInteger(record) && !this.isInteger(value)) {
-      record.errors.add(attribute, "not_an_integer", this.filteredOptions(value));
+      record.errors.add(attribute, ":not_an_integer", this.filteredOptions(value));
       return;
     }
 
@@ -100,7 +100,7 @@ export class NumericalityValidator extends EachValidator {
       scale,
     );
     if (gt !== undefined && !(num > gt)) {
-      record.errors.add(attribute, "greater_than", withCount(gt));
+      record.errors.add(attribute, ":greater_than", withCount(gt));
     }
     const gte = this.resolveNumeric(
       this.options.greaterThanOrEqualTo as NumericValue | undefined,
@@ -109,7 +109,7 @@ export class NumericalityValidator extends EachValidator {
       scale,
     );
     if (gte !== undefined && !(num >= gte)) {
-      record.errors.add(attribute, "greater_than_or_equal_to", withCount(gte));
+      record.errors.add(attribute, ":greater_than_or_equal_to", withCount(gte));
     }
     const lt = this.resolveNumeric(
       this.options.lessThan as NumericValue | undefined,
@@ -118,7 +118,7 @@ export class NumericalityValidator extends EachValidator {
       scale,
     );
     if (lt !== undefined && !(num < lt)) {
-      record.errors.add(attribute, "less_than", withCount(lt));
+      record.errors.add(attribute, ":less_than", withCount(lt));
     }
     const lte = this.resolveNumeric(
       this.options.lessThanOrEqualTo as NumericValue | undefined,
@@ -127,7 +127,7 @@ export class NumericalityValidator extends EachValidator {
       scale,
     );
     if (lte !== undefined && !(num <= lte)) {
-      record.errors.add(attribute, "less_than_or_equal_to", withCount(lte));
+      record.errors.add(attribute, ":less_than_or_equal_to", withCount(lte));
     }
     const eq = this.resolveNumeric(
       this.options.equalTo as NumericValue | undefined,
@@ -136,7 +136,7 @@ export class NumericalityValidator extends EachValidator {
       scale,
     );
     if (eq !== undefined && num !== eq) {
-      record.errors.add(attribute, "equal_to", withCount(eq));
+      record.errors.add(attribute, ":equal_to", withCount(eq));
     }
     const ot = this.resolveNumeric(
       this.options.otherThan as NumericValue | undefined,
@@ -145,19 +145,19 @@ export class NumericalityValidator extends EachValidator {
       scale,
     );
     if (ot !== undefined && num === ot) {
-      record.errors.add(attribute, "other_than", withCount(ot));
+      record.errors.add(attribute, ":other_than", withCount(ot));
     }
     if (this.options.in !== undefined) {
       const [min, max] = this.options.in as [number, number];
       if (num < min || num > max) {
-        record.errors.add(attribute, "in", withCount(`${min}..${max}`));
+        record.errors.add(attribute, ":in", withCount(`${min}..${max}`));
       }
     }
     if (this.options.odd && Math.trunc(num) % 2 === 0) {
-      record.errors.add(attribute, "odd", this.filteredOptions(value));
+      record.errors.add(attribute, ":odd", this.filteredOptions(value));
     }
     if (this.options.even && Math.trunc(num) % 2 !== 0) {
-      record.errors.add(attribute, "even", this.filteredOptions(value));
+      record.errors.add(attribute, ":even", this.filteredOptions(value));
     }
   }
 

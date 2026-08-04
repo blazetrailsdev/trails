@@ -18,14 +18,14 @@ describe("ErrorsTest", () => {
   // =========================================================================
   it("add creates an error object and returns it", () => {
     const e = new Errors(null);
-    e.add("name", "blank");
+    e.add("name", ":blank");
     expect(e.get("name")).toContain("can't be blank");
   });
 
   it("size calculates the number of error messages", () => {
     const e = new Errors(null);
-    e.add("name", "blank");
-    e.add("age", "not_a_number");
+    e.add("name", ":blank");
+    e.add("age", ":not_a_number");
     expect(e.count).toBe(2);
     expect(e.size).toBe(2);
   });
@@ -34,14 +34,14 @@ describe("ErrorsTest", () => {
     const e = new Errors(null);
     expect(e.empty).toBe(true);
     expect(e.any).toBe(false);
-    e.add("name", "blank");
+    e.add("name", ":blank");
     expect(e.empty).toBe(false);
     expect(e.any).toBe(true);
   });
 
   it("clear errors", () => {
     const e = new Errors(null);
-    e.add("name", "blank");
+    e.add("name", ":blank");
     e.clear();
     expect(e.count).toBe(0);
     expect(e.empty).toBe(true);
@@ -49,39 +49,39 @@ describe("ErrorsTest", () => {
 
   it("where filters by attribute and type", () => {
     const e = new Errors(null);
-    e.add("name", "blank");
-    e.add("name", "too_short");
-    e.add("age", "blank");
+    e.add("name", ":blank");
+    e.add("name", ":too_short");
+    e.add("age", ":blank");
     expect(e.where("name").length).toBe(2);
-    expect(e.where("name", "blank").length).toBe(1);
+    expect(e.where("name", ":blank").length).toBe(1);
     expect(e.where("age").length).toBe(1);
   });
 
   it("attribute_names returns the error attributes", () => {
     const e = new Errors(null);
-    e.add("name", "blank");
-    e.add("name", "too_short");
-    e.add("age", "blank");
+    e.add("name", ":blank");
+    e.add("name", ":too_short");
+    e.add("age", ":blank");
     expect(e.attributeNames).toEqual(["name", "age"]);
   });
 
   it("details returns added error detail", () => {
     const e = new Errors(null);
-    e.add("name", "blank");
+    e.add("name", ":blank");
     expect(e.details.size).toBe(1);
     expect(e.details.get("name")).toHaveLength(1);
-    expect(e.details.get("name")![0].error).toBe("blank");
+    expect(e.details.get("name")![0].error).toBe(":blank");
   });
 
   it("custom message overrides default", () => {
     const e = new Errors(null);
-    e.add("name", "blank", { message: "is required" });
+    e.add("name", ":blank", { message: "is required" });
     expect(e.get("name")).toContain("is required");
   });
 
   it("message interpolation with %{count}", () => {
     const e = new Errors(null);
-    e.add("name", "too_short", { count: 3 });
+    e.add("name", ":too_short", { count: 3 });
     // Default message is "is too short" — doesn't have %{count} by default
     // but the mechanism should work for messages that do
     expect(e.get("name").length).toBe(1);
@@ -92,19 +92,19 @@ describe("ErrorsTest", () => {
   // =========================================================================
   it("first", () => {
     const errors = new Errors({});
-    errors.add("name", "blank");
-    errors.add("age", "invalid");
+    errors.add("name", ":blank");
+    errors.add("age", ":invalid");
     expect(errors.objects[0].attribute).toBe("name");
   });
 
   it("dup", () => {
     const errors = new Errors({});
-    errors.add("name", "blank");
+    errors.add("name", ":blank");
     const dup = new Errors({});
     dup.copy(errors);
     expect(dup.count).toBe(1);
     // Modifying dup should not affect original
-    dup.add("age", "invalid");
+    dup.add("age", ":invalid");
     expect(errors.count).toBe(1);
     expect(dup.count).toBe(2);
   });
@@ -117,7 +117,7 @@ describe("ErrorsTest", () => {
 
   it("no key", () => {
     const errors = new Errors({});
-    errors.add("name", "blank");
+    errors.add("name", ":blank");
     expect(errors.isKey("age")).toBe(false);
   });
 
@@ -134,45 +134,45 @@ describe("ErrorsTest", () => {
 
   it("error access is indifferent", () => {
     const errors = new Errors({});
-    errors.add("name", "blank");
+    errors.add("name", ":blank");
     expect(errors.get("name")).toEqual(["can't be blank"]);
     expect(errors.on("name")).toEqual(["can't be blank"]);
   });
 
   it("add, with type as nil", () => {
     const errors = new Errors({});
-    errors.add("name", "invalid");
+    errors.add("name", ":invalid");
     expect(errors.get("name")).toEqual(["is invalid"]);
   });
 
   it("add an error message on a specific attribute with a defined type", () => {
     const errors = new Errors({});
-    errors.add("name", "blank");
-    expect(errors.where("name", "blank").length).toBe(1);
+    errors.add("name", ":blank");
+    expect(errors.where("name", ":blank").length).toBe(1);
   });
 
   it("add, with type as Proc, which evaluates to String", () => {
     const errors = new Errors({});
-    errors.add("name", "invalid", { message: (_record: any) => "cannot be empty" });
+    errors.add("name", ":invalid", { message: (_record: any) => "cannot be empty" });
     expect(errors.get("name")).toEqual(["cannot be empty"]);
   });
 
   it("initialize options[:message] as Proc, which evaluates to String", () => {
     const errors = new Errors({});
-    errors.add("name", "invalid", { message: () => "proc message" });
+    errors.add("name", ":invalid", { message: () => "proc message" });
     expect(errors.get("name")).toEqual(["proc message"]);
   });
 
   it("added? when attribute was added through a collection", () => {
     const errors = new Errors({});
-    errors.add("name", "blank");
-    expect(errors.added("name", "blank")).toBe(true);
+    errors.add("name", ":blank");
+    expect(errors.added("name", ":blank")).toBe(true);
   });
 
   it("added? returns true when string attribute is used with a symbol message", () => {
     const errors = new Errors({});
-    errors.add("name", "blank");
-    expect(errors.added("name", "blank")).toBe(true);
+    errors.add("name", ":blank");
+    expect(errors.added("name", ":blank")).toBe(true);
   });
 
   it("of_kind? returns false when checking for an error, but not providing message argument", () => {
@@ -183,14 +183,14 @@ describe("ErrorsTest", () => {
 
   it("of_kind? returns true when string attribute is used with a symbol message", () => {
     const errors = new Errors({});
-    errors.add("name", "blank");
-    expect(errors.ofKind("name", "blank")).toBe(true);
+    errors.add("name", ":blank");
+    expect(errors.ofKind("name", ":blank")).toBe(true);
   });
 
   it("to_hash returns a hash without default proc", () => {
     const errors = new Errors({});
-    errors.add("name", "blank");
-    errors.add("name", "invalid");
+    errors.add("name", ":blank");
+    errors.add("name", ":invalid");
     const hash = errors.toHash();
     expect(hash.get("name")).toEqual(["can't be blank", "is invalid"]);
     // Accessing a non-existent key should be undefined
@@ -199,7 +199,7 @@ describe("ErrorsTest", () => {
 
   it("as_json returns a hash without default proc", () => {
     const errors = new Errors({});
-    errors.add("name", "blank");
+    errors.add("name", ":blank");
     const json = errors.asJson();
     expect(json).toEqual({ name: ["can't be blank"] });
     expect(json.age).toBeUndefined();
@@ -207,15 +207,15 @@ describe("ErrorsTest", () => {
 
   it("as_json with :full_messages option creates a json formatted representation of the errors containing complete messages", () => {
     const errors = new Errors({});
-    errors.add("name", "blank");
-    errors.add("age", "invalid");
+    errors.add("name", ":blank");
+    errors.add("age", ":invalid");
     // fullMessages style
     expect(errors.fullMessages).toEqual(["Name can't be blank", "Age is invalid"]);
   });
 
   it("merge does not import errors when merging with self", () => {
     const errors = new Errors({});
-    errors.add("name", "blank");
+    errors.add("name", ":blank");
     errors.merge(errors);
     expect(errors.count).toBe(1);
   });
@@ -274,7 +274,7 @@ describe("ErrorsTest", () => {
 
   it("inspect", () => {
     const errors = new Errors({});
-    errors.add("name", "blank");
+    errors.add("name", ":blank");
     const str = errors.inspect();
     expect(str).toContain("ActiveModel::Errors");
     expect(str).toContain("name");
@@ -283,9 +283,9 @@ describe("ErrorsTest", () => {
 
   it("delete removes errors for attribute", () => {
     const errors = new Errors({});
-    errors.add("name", "blank");
-    errors.add("name", "invalid");
-    errors.add("age", "invalid");
+    errors.add("name", ":blank");
+    errors.add("name", ":invalid");
+    errors.add("age", ":invalid");
     const removed = errors.delete("name");
     expect(removed!.length).toBe(2);
     expect(errors.count).toBe(1);
@@ -293,8 +293,8 @@ describe("ErrorsTest", () => {
 
   it("each iterates over all errors", () => {
     const errors = new Errors({});
-    errors.add("name", "blank");
-    errors.add("age", "invalid");
+    errors.add("name", ":blank");
+    errors.add("age", ":invalid");
     const collected: string[] = [];
     errors.each((e) => collected.push(e.attribute));
     expect(collected).toEqual(["name", "age"]);
@@ -302,9 +302,9 @@ describe("ErrorsTest", () => {
 
   it("group_by_attribute groups errors", () => {
     const errors = new Errors({});
-    errors.add("name", "blank");
-    errors.add("name", "invalid");
-    errors.add("age", "invalid");
+    errors.add("name", ":blank");
+    errors.add("name", ":invalid");
+    errors.add("age", ":invalid");
     const grouped = errors.groupByAttribute();
     expect(grouped["name"].length).toBe(2);
     expect(grouped["age"].length).toBe(1);
@@ -312,20 +312,20 @@ describe("ErrorsTest", () => {
 
   it("messages_for returns messages for an attribute", () => {
     const errors = new Errors({});
-    errors.add("name", "blank");
-    errors.add("name", "invalid");
+    errors.add("name", ":blank");
+    errors.add("name", ":invalid");
     expect(errors.messagesFor("name")).toEqual(["can't be blank", "is invalid"]);
   });
 
   it("full_messages_for returns full messages for an attribute", () => {
     const errors = new Errors({});
-    errors.add("name", "blank");
+    errors.add("name", ":blank");
     expect(errors.fullMessagesFor("name")).toEqual(["Name can't be blank"]);
   });
 
   it("import imports an error from another Errors instance", () => {
     const errors1 = new Errors({});
-    errors1.add("name", "blank");
+    errors1.add("name", ":blank");
     const errors2 = new Errors({});
     errors2.import(errors1.objects[0]);
     expect(errors2.count).toBe(1);
@@ -334,7 +334,7 @@ describe("ErrorsTest", () => {
 
   it("import with attribute override", () => {
     const errors1 = new Errors({});
-    errors1.add("name", "blank");
+    errors1.add("name", ":blank");
     const errors2 = new Errors({});
     errors2.import(errors1.objects[0], { attribute: "title" });
     expect(errors2.get("title")).toEqual(["can't be blank"]);
@@ -342,26 +342,26 @@ describe("ErrorsTest", () => {
 
   it("add, type being Proc, which evaluates to Symbol", () => {
     const errors = new Errors({});
-    errors.add("name", "invalid");
+    errors.add("name", ":invalid");
     expect(errors.get("name")).toEqual(["is invalid"]);
   });
 
   it("add, with options[:message] as Proc, which evaluates to String, where type is nil", () => {
     const errors = new Errors({});
-    errors.add("name", "invalid", { message: "custom" });
+    errors.add("name", ":invalid", { message: "custom" });
     expect(errors.get("name")).toEqual(["custom"]);
   });
 
   it("errors are compatible with YAML dumped from Rails 6.x", () => {
     const errors = new Errors({});
-    errors.add("name", "blank");
+    errors.add("name", ":blank");
     expect(errors.fullMessages).toEqual(["Name can't be blank"]);
   });
 
   it("delete", () => {
     const e = new Errors(null);
-    e.add("name", "blank");
-    e.add("name", "too_short");
+    e.add("name", ":blank");
+    e.add("name", ":too_short");
     const removed = e.delete("name");
     expect(removed!.length).toBe(2);
     expect(e.count).toBe(0);
@@ -369,7 +369,7 @@ describe("ErrorsTest", () => {
 
   it("include?", () => {
     const e = new Errors(null);
-    e.add("name", "blank");
+    e.add("name", ":blank");
     expect(e.include("name")).toBe(true);
     expect(e.include("age")).toBe(false);
   });
@@ -377,33 +377,33 @@ describe("ErrorsTest", () => {
   it("any?", () => {
     const e = new Errors(null);
     expect(e.any).toBe(false);
-    e.add("name", "blank");
+    e.add("name", ":blank");
     expect(e.any).toBe(true);
   });
 
   it("has key?", () => {
     const e = new Errors(null);
-    e.add("name", "blank");
+    e.add("name", ":blank");
     expect(e.include("name")).toBe(true);
   });
 
   it("has no key", () => {
     const e = new Errors(null);
-    e.add("name", "blank");
+    e.add("name", ":blank");
     expect(e.include("age")).toBe(false);
   });
 
   it("clear errors", () => {
     const e = new Errors(null);
-    e.add("name", "blank");
+    e.add("name", ":blank");
     e.clear();
     expect(e.empty).toBe(true);
   });
 
   it("attribute_names returns the error attributes", () => {
     const e = new Errors(null);
-    e.add("name", "blank");
-    e.add("age", "not_a_number");
+    e.add("name", ":blank");
+    e.add("age", ":not_a_number");
     expect(e.attributeNames).toEqual(["name", "age"]);
   });
 
@@ -418,7 +418,7 @@ describe("ErrorsTest", () => {
     expect(e.empty).toBe(true);
     expect(e.any).toBe(false);
     expect(e.include("name")).toBe(false);
-    e.add("name", "blank");
+    e.add("name", ":blank");
     expect(e.empty).toBe(false);
     expect(e.any).toBe(true);
     expect(e.include("name")).toBe(true);
@@ -432,100 +432,100 @@ describe("ErrorsTest", () => {
 
   it("add creates an error object and returns it", () => {
     const e = new Errors(null);
-    e.add("name", "blank");
+    e.add("name", ":blank");
     expect(e.count).toBe(1);
     expect(e.get("name")).toContain("can't be blank");
   });
 
   it("add, with type as String", () => {
     const e = new Errors(null);
-    e.add("name", "blank");
+    e.add("name", ":blank");
     expect(e.get("name")).toContain("can't be blank");
   });
 
   it("added? detects indifferent if a specific error was added to the object", () => {
     const e = new Errors(null);
-    e.add("name", "blank");
-    expect(e.added("name", "blank")).toBe(true);
-    expect(e.added("name", "invalid")).toBe(false);
+    e.add("name", ":blank");
+    expect(e.added("name", ":blank")).toBe(true);
+    expect(e.added("name", ":invalid")).toBe(false);
   });
 
   it("added? matches the given message when several errors are present for the same attribute", () => {
     const e = new Errors(null);
-    e.add("name", "blank");
-    e.add("name", "too_short");
-    expect(e.added("name", "blank")).toBe(true);
-    expect(e.added("name", "too_short")).toBe(true);
+    e.add("name", ":blank");
+    e.add("name", ":too_short");
+    expect(e.added("name", ":blank")).toBe(true);
+    expect(e.added("name", ":too_short")).toBe(true);
   });
 
   it("added? returns false when no errors are present", () => {
     const e = new Errors(null);
-    expect(e.added("name", "blank")).toBe(false);
+    expect(e.added("name", ":blank")).toBe(false);
   });
 
   it("added? returns false when checking a nonexisting error and other errors are present for the given attribute", () => {
     const e = new Errors(null);
-    e.add("name", "blank");
-    expect(e.added("name", "too_short")).toBe(false);
+    e.add("name", ":blank");
+    expect(e.added("name", ":too_short")).toBe(false);
   });
 
   it("of_kind? returns false when no errors are present", () => {
     const e = new Errors(null);
-    expect(e.ofKind("name", "blank")).toBe(false);
+    expect(e.ofKind("name", ":blank")).toBe(false);
   });
 
   it("of_kind? matches the given message when several errors are present for the same attribute", () => {
     const e = new Errors(null);
-    e.add("name", "blank");
-    e.add("name", "too_short");
-    expect(e.ofKind("name", "blank")).toBe(true);
-    expect(e.ofKind("name", "too_short")).toBe(true);
+    e.add("name", ":blank");
+    e.add("name", ":too_short");
+    expect(e.ofKind("name", ":blank")).toBe(true);
+    expect(e.ofKind("name", ":too_short")).toBe(true);
   });
 
   it("of_kind? defaults message to :invalid", () => {
     const e = new Errors(null);
-    e.add("name", "blank");
+    e.add("name", ":blank");
     expect(e.ofKind("name")).toBe(true);
     expect(e.ofKind("age")).toBe(false);
   });
 
   it("of_kind? detects indifferent if a specific error was added to the object", () => {
     const e = new Errors(null);
-    e.add("name", "blank");
-    expect(e.ofKind("name", "blank")).toBe(true);
-    expect(e.ofKind("name", "invalid")).toBe(false);
+    e.add("name", ":blank");
+    expect(e.ofKind("name", ":blank")).toBe(true);
+    expect(e.ofKind("name", ":invalid")).toBe(false);
   });
 
   it("of_kind? returns false when checking a nonexisting error and other errors are present for the given attribute", () => {
     const e = new Errors(null);
-    e.add("name", "blank");
-    expect(e.ofKind("name", "too_short")).toBe(false);
+    e.add("name", ":blank");
+    expect(e.ofKind("name", ":too_short")).toBe(false);
   });
 
   it("of_kind? returns false when checking for an error by symbol and a different error with same message is present", () => {
     const e = new Errors(null);
-    e.add("name", "blank");
-    expect(e.ofKind("name", "present")).toBe(false);
+    e.add("name", ":blank");
+    expect(e.ofKind("name", ":present")).toBe(false);
   });
 
   it("size calculates the number of error messages", () => {
     const e = new Errors(null);
-    e.add("name", "blank");
-    e.add("age", "not_a_number");
+    e.add("name", ":blank");
+    e.add("age", ":not_a_number");
     expect(e.size).toBe(2);
   });
 
   it("count calculates the number of error messages", () => {
     const e = new Errors(null);
-    e.add("name", "blank");
-    e.add("name", "too_short");
+    e.add("name", ":blank");
+    e.add("name", ":too_short");
     expect(e.count).toBe(2);
   });
 
   it("to_a returns the list of errors with complete messages containing the attribute names", () => {
     const e = new Errors(null);
-    e.add("name", "blank");
-    e.add("age", "not_a_number");
+    e.add("name", ":blank");
+    e.add("age", ":not_a_number");
     const arr = e.toArray();
     expect(arr).toContain("Name can't be blank");
     expect(arr).toContain("Age is not a number");
@@ -533,9 +533,9 @@ describe("ErrorsTest", () => {
 
   it("to_hash returns the error messages hash", () => {
     const e = new Errors(null);
-    e.add("name", "blank");
-    e.add("name", "too_short");
-    e.add("age", "not_a_number");
+    e.add("name", ":blank");
+    e.add("name", ":too_short");
+    e.add("age", ":not_a_number");
     const hash = e.toHash();
     expect(hash.get("name")!.length).toBe(2);
     expect(hash.get("age")!.length).toBe(1);
@@ -543,24 +543,24 @@ describe("ErrorsTest", () => {
 
   it("full_messages creates a list of error messages with the attribute name included", () => {
     const e = new Errors(null);
-    e.add("name", "blank");
-    e.add("age", "not_a_number");
+    e.add("name", ":blank");
+    e.add("age", ":not_a_number");
     expect(e.fullMessages).toContain("Name can't be blank");
     expect(e.fullMessages).toContain("Age is not a number");
   });
 
   it("full_messages_for contains all the error messages for the given attribute indifferent", () => {
     const e = new Errors(null);
-    e.add("name", "blank");
-    e.add("name", "too_short");
-    e.add("age", "not_a_number");
+    e.add("name", ":blank");
+    e.add("name", ":too_short");
+    e.add("age", ":not_a_number");
     expect(e.fullMessagesFor("name").length).toBe(2);
   });
 
   it("full_messages_for does not contain error messages from other attributes", () => {
     const e = new Errors(null);
-    e.add("name", "blank");
-    e.add("age", "not_a_number");
+    e.add("name", ":blank");
+    e.add("age", ":not_a_number");
     const nameMessages = e.fullMessagesFor("name");
     expect(nameMessages.length).toBe(1);
     expect(nameMessages[0]).toContain("Name");
@@ -568,7 +568,7 @@ describe("ErrorsTest", () => {
 
   it("full_messages_for returns an empty list in case there are no errors for the given attribute", () => {
     const e = new Errors(null);
-    e.add("name", "blank");
+    e.add("name", ":blank");
     expect(e.fullMessagesFor("age")).toEqual([]);
   });
 
@@ -584,36 +584,36 @@ describe("ErrorsTest", () => {
 
   it("as_json creates a json formatted representation of the errors hash", () => {
     const e = new Errors(null);
-    e.add("name", "blank");
-    e.add("name", "too_short");
+    e.add("name", ":blank");
+    e.add("name", ":too_short");
     const json = e.asJson();
     expect(json["name"].length).toBe(2);
   });
 
   it("details returns added error detail with custom option", () => {
     const e = new Errors(null);
-    e.add("name", "blank", { message: "custom" });
-    expect(e.details.get("name")![0].error).toBe("blank");
+    e.add("name", ":blank", { message: "custom" });
+    expect(e.details.get("name")![0].error).toBe(":blank");
   });
 
   it("details do not include message option", () => {
     const e = new Errors(null);
-    e.add("name", "blank");
-    expect(e.details.get("name")![0].error).toBe("blank");
+    e.add("name", ":blank");
+    expect(e.details.get("name")![0].error).toBe(":blank");
     expect(e.details.get("name")![0].message).toBeUndefined();
   });
 
   it("details retains original type as error", () => {
     const e = new Errors(null);
-    e.add("name", "too_short", { count: 3 });
-    expect(e.details.get("name")![0].error).toBe("too_short");
+    e.add("name", ":too_short", { count: 3 });
+    expect(e.details.get("name")![0].error).toBe(":too_short");
   });
 
   it("group_by_attribute", () => {
     const e = new Errors(null);
-    e.add("name", "blank");
-    e.add("name", "too_short");
-    e.add("age", "not_a_number");
+    e.add("name", ":blank");
+    e.add("name", ":too_short");
+    e.add("age", ":not_a_number");
     const grouped = e.groupByAttribute();
     expect(grouped.name.length).toBe(2);
     expect(grouped.age.length).toBe(1);
@@ -627,8 +627,8 @@ describe("ErrorsTest", () => {
 
   it("delete removes details on given attribute", () => {
     const e = new Errors(null);
-    e.add("name", "blank");
-    e.add("age", "not_a_number");
+    e.add("name", ":blank");
+    e.add("age", ":not_a_number");
     e.delete("name");
     expect(e.count).toBe(1);
     expect(e.include("name")).toBe(false);
@@ -636,15 +636,15 @@ describe("ErrorsTest", () => {
 
   it("delete returns the deleted messages", () => {
     const e = new Errors(null);
-    e.add("name", "blank");
-    e.add("name", "too_short");
+    e.add("name", ":blank");
+    e.add("name", ":too_short");
     const removed = e.delete("name");
     expect(removed!.length).toBe(2);
   });
 
   it("clear removes details", () => {
     const e = new Errors(null);
-    e.add("name", "blank");
+    e.add("name", ":blank");
     e.clear();
     expect(e.details.size).toBe(0);
   });
@@ -657,7 +657,7 @@ describe("ErrorsTest", () => {
   it("copy errors", () => {
     const e1 = new Errors(null);
     const e2 = new Errors(null);
-    e1.add("name", "blank");
+    e1.add("name", ":blank");
     e2.copy(e1);
     expect(e2.count).toBe(1);
     expect(e2.get("name")).toContain("can't be blank");
@@ -667,8 +667,8 @@ describe("ErrorsTest", () => {
     // Rails errors.rb:138 — `@errors = other.errors.deep_dup`.
     const e1 = new Errors(null);
     const e2 = new Errors(null);
-    e2.add("name", "blank");
-    e1.add("age", "invalid");
+    e2.add("name", ":blank");
+    e1.add("age", ":invalid");
     e2.copyBang(e1);
     expect(e2.count).toBe(1);
     expect(e2.attributeNames).toEqual(["age"]);
@@ -680,7 +680,7 @@ describe("ErrorsTest", () => {
     // so mutating the source after copy would leak into the target.
     const source = new Errors({});
     const nested = { range: { min: 1, max: 5 } };
-    source.add("age", "out_of_range", nested);
+    source.add("age", ":out_of_range", nested);
     const target = new Errors({});
     target.copyBang(source);
     (source.objects[0].options.range as { min: number }).min = 999;
@@ -691,7 +691,7 @@ describe("ErrorsTest", () => {
     // Rails `deep_dup` preserves dynamic class; a NestedError dup is still
     // a NestedError with its innerError reachable.
     const source = new Errors({});
-    source.add("age", "invalid");
+    source.add("age", ":invalid");
     const wrapper = new Errors({});
     wrapper.mergeBang(source); // imports as NestedError
     const target = new Errors({});
@@ -704,17 +704,17 @@ describe("ErrorsTest", () => {
     // where/delete/added?/import accept **options and filter on them.
     it("where filters by options subset match", () => {
       const errors = new Errors({});
-      errors.add("age", "too_short", { count: 3 });
-      errors.add("age", "too_short", { count: 5 });
-      expect(errors.where("age", "too_short", { count: 3 })).toHaveLength(1);
-      expect(errors.where("age", "too_short", { count: 7 })).toHaveLength(0);
+      errors.add("age", ":too_short", { count: 3 });
+      errors.add("age", ":too_short", { count: 5 });
+      expect(errors.where("age", ":too_short", { count: 3 })).toHaveLength(1);
+      expect(errors.where("age", ":too_short", { count: 7 })).toHaveLength(0);
     });
 
     it("delete filters by options subset match", () => {
       const errors = new Errors({});
-      errors.add("age", "too_short", { count: 3 });
-      errors.add("age", "too_short", { count: 5 });
-      const removed = errors.delete("age", "too_short", { count: 3 });
+      errors.add("age", ":too_short", { count: 3 });
+      errors.add("age", ":too_short", { count: 5 });
+      const removed = errors.delete("age", ":too_short", { count: 3 });
       expect(removed).toHaveLength(1);
       expect(errors.count).toBe(1);
       expect(errors.objects[0].options.count).toBe(5);
@@ -723,34 +723,34 @@ describe("ErrorsTest", () => {
     it("added? distinguishes between option values", () => {
       // Rails behavior: different option values are different errors.
       const errors = new Errors({});
-      errors.add("age", "too_short", { count: 3 });
-      expect(errors.added("age", "too_short", { count: 3 })).toBe(true);
-      expect(errors.added("age", "too_short", { count: 5 })).toBe(false);
+      errors.add("age", ":too_short", { count: 3 });
+      expect(errors.added("age", ":too_short", { count: 3 })).toBe(true);
+      expect(errors.added("age", ":too_short", { count: 5 })).toBe(false);
     });
 
     it("where matches structurally-equal array options (not just by reference)", () => {
       // Rails `Array#==` is elementwise; option values like
       // `in: [1,2,3]` must match a differently-allocated `[1,2,3]`.
       const errors = new Errors({});
-      errors.add("role", "inclusion", { in: [1, 2, 3] });
-      expect(errors.where("role", "inclusion", { in: [1, 2, 3] })).toHaveLength(1);
-      expect(errors.where("role", "inclusion", { in: [1, 2] })).toHaveLength(0);
+      errors.add("role", ":inclusion", { in: [1, 2, 3] });
+      expect(errors.where("role", ":inclusion", { in: [1, 2, 3] })).toHaveLength(1);
+      expect(errors.where("role", ":inclusion", { in: [1, 2] })).toHaveLength(0);
     });
 
     it("matches RegExp option values by source + flags, not reference", () => {
       const errors = new Errors({});
-      errors.add("email", "invalid", { with: /^\w+@\w+$/i });
-      expect(errors.where("email", "invalid", { with: /^\w+@\w+$/i })).toHaveLength(1);
+      errors.add("email", ":invalid", { with: /^\w+@\w+$/i });
+      expect(errors.where("email", ":invalid", { with: /^\w+@\w+$/i })).toHaveLength(1);
       // Different source or different flags must not match.
-      expect(errors.where("email", "invalid", { with: /^\w+@\w+$/g })).toHaveLength(0);
-      expect(errors.where("email", "invalid", { with: /other/i })).toHaveLength(0);
+      expect(errors.where("email", ":invalid", { with: /^\w+@\w+$/g })).toHaveLength(0);
+      expect(errors.where("email", ":invalid", { with: /other/i })).toHaveLength(0);
     });
 
     it("added? matches structurally-equal nested object options", () => {
       const errors = new Errors({});
-      errors.add("age", "out_of_range", { range: { min: 1, max: 5 } });
-      expect(errors.added("age", "out_of_range", { range: { min: 1, max: 5 } })).toBe(true);
-      expect(errors.added("age", "out_of_range", { range: { min: 1, max: 9 } })).toBe(false);
+      errors.add("age", ":out_of_range", { range: { min: 1, max: 5 } });
+      expect(errors.added("age", ":out_of_range", { range: { min: 1, max: 5 } })).toBe(true);
+      expect(errors.added("age", ":out_of_range", { range: { min: 1, max: 9 } })).toBe(false);
     });
 
     it("import accepts :attribute and :type override (rawType stays on inner)", () => {
@@ -758,13 +758,13 @@ describe("ErrorsTest", () => {
       // @type is the override, @raw_type is inner's. Message generation
       // uses raw_type so the inner error's i18n key is still resolvable.
       const source = new Errors({});
-      source.add("name", "invalid");
+      source.add("name", ":invalid");
       const target = new Errors({});
       target.import(source.objects[0], { attribute: "title", type: "wrong" });
       const imported = target.objects[0];
       expect(imported.attribute).toBe("title");
       expect(imported.type).toBe("wrong");
-      expect(imported.rawType).toBe("invalid");
+      expect(imported.rawType).toBe(":invalid");
 
       // copy!/dupWithBase must preserve the {attribute, type, rawType} split.
       const copy = new Errors({});
@@ -772,7 +772,7 @@ describe("ErrorsTest", () => {
       const round = copy.objects[0];
       expect(round.attribute).toBe("title");
       expect(round.type).toBe("wrong");
-      expect(round.rawType).toBe("invalid");
+      expect(round.rawType).toBe(":invalid");
     });
   });
 
@@ -780,7 +780,7 @@ describe("ErrorsTest", () => {
     // Rails `deep_dup` on a NestedError recurses into `@inner_error`, so the
     // duplicated wrapper's inner error is independent of the source's.
     const source = new Errors({});
-    source.add("age", "out_of_range", { range: { min: 1 } });
+    source.add("age", ":out_of_range", { range: { min: 1 } });
     const wrapper = new Errors({});
     wrapper.mergeBang(source);
     const target = new Errors({});
@@ -801,7 +801,7 @@ describe("ErrorsTest", () => {
     const base1 = { tag: "one" };
     const base2 = { tag: "two" };
     const e1 = new Errors(base1);
-    e1.add("name", "blank");
+    e1.add("name", ":blank");
     const e2 = new Errors(base2);
     e2.copyBang(e1);
     expect(e2.objects[0].base).toBe(base2);
@@ -812,7 +812,7 @@ describe("ErrorsTest", () => {
   it("merge errors", () => {
     const e1 = new Errors(null);
     const e2 = new Errors(null);
-    e1.add("name", "blank");
+    e1.add("name", ":blank");
     e2.merge(e1);
     expect(e2.count).toBe(1);
   });
@@ -821,9 +821,9 @@ describe("ErrorsTest", () => {
     // Rails errors.rb:174-180 — `other.errors.each { import(error) }`;
     // `import` wraps as NestedError (errors.rb:160).
     const e1 = new Errors({});
-    e1.add("name", "blank");
+    e1.add("name", ":blank");
     const e2 = new Errors({});
-    e2.add("age", "invalid");
+    e2.add("age", ":invalid");
     e2.mergeBang(e1);
     expect(e2.count).toBe(2);
     const imported = e2.objects.find((e) => e.attribute === "name")!;
@@ -832,18 +832,18 @@ describe("ErrorsTest", () => {
 
   it("objects returns the backing error array", () => {
     const errors = new Errors(null);
-    errors.add("name", "blank");
+    errors.add("name", ":blank");
     expect(errors.objects).toHaveLength(1);
     expect(errors.objects[0].attribute).toBe("name");
   });
 
   it("uniq! removes duplicates with identical attribute/type/options", () => {
     const errors = new Errors({});
-    errors.add("name", "blank");
-    errors.add("name", "blank");
-    errors.add("age", "too_short", { count: 2 });
-    errors.add("age", "too_short", { count: 2 });
-    errors.add("age", "too_short", { count: 3 });
+    errors.add("name", ":blank");
+    errors.add("name", ":blank");
+    errors.add("age", ":too_short", { count: 2 });
+    errors.add("age", ":too_short", { count: 2 });
+    errors.add("age", ":too_short", { count: 3 });
     errors.uniqBang();
     expect(errors.count).toBe(3);
     expect(errors.objects.filter((e) => e.attribute === "age")).toHaveLength(2);
@@ -851,8 +851,8 @@ describe("ErrorsTest", () => {
 
   it("each when arity is negative", () => {
     const e = new Errors(null);
-    e.add("name", "blank");
-    e.add("age", "not_a_number");
+    e.add("name", ":blank");
+    e.add("age", ":not_a_number");
     const collected: string[] = [];
     e.each((err) => collected.push(err.attribute));
     expect(collected).toEqual(["name", "age"]);
@@ -865,7 +865,7 @@ describe("ErrorsTest", () => {
 
   it("on() is an alias for get()", () => {
     const e = new Errors(null);
-    e.add("name", "blank");
+    e.add("name", ":blank");
     expect(e.on("name")).toEqual(e.get("name"));
     expect(e.on("name")).toContain("can't be blank");
   });
@@ -877,7 +877,7 @@ describe("ErrorsTest", () => {
 
   it("dup duplicates details", () => {
     const errors = new Errors({});
-    errors.add("name", "blank");
+    errors.add("name", ":blank");
     const details1 = errors.details;
     const details2 = errors.details;
     expect(details1.get("name")).toEqual(details2.get("name"));
@@ -886,7 +886,7 @@ describe("ErrorsTest", () => {
 
   it("errors are marshalable", () => {
     const errors = new Errors({});
-    errors.add("name", "blank");
+    errors.add("name", ":blank");
     const json = JSON.stringify(errors.asJson());
     const parsed = JSON.parse(json);
     expect(parsed).toEqual({ name: ["can't be blank"] });
@@ -897,8 +897,8 @@ describe("ErrorsTest", () => {
     // queried without; strict_match strips CALLBACKS_OPTIONS from the
     // error's own options so they don't block the match.
     const errors = new Errors({});
-    errors.add("name", "too_long", { if: () => true });
-    expect(errors.added("name", "too_long")).toBe(true);
+    errors.add("name", ":too_long", { if: () => true });
+    expect(errors.added("name", ":too_long")).toBe(true);
   });
 
   it("added? ignores message option", () => {
@@ -906,27 +906,27 @@ describe("ErrorsTest", () => {
     // queried without; MESSAGE_OPTIONS are stripped from the error's
     // own options for strict_match purposes.
     const errors = new Errors({});
-    errors.add("name", "too_long", { message: () => "foo" } as Record<string, unknown>);
-    expect(errors.added("name", "too_long")).toBe(true);
+    errors.add("name", ":too_long", { message: () => "foo" } as Record<string, unknown>);
+    expect(errors.added("name", ":too_long")).toBe(true);
   });
 
   it("added? handles proc messages", () => {
     const errors = new Errors({});
-    errors.add("name", "blank", { message: () => "custom" } as any);
-    expect(errors.added("name", "blank")).toBe(true);
+    errors.add("name", ":blank", { message: () => "custom" } as any);
+    expect(errors.added("name", ":blank")).toBe(true);
   });
 
   it("of_kind? handles proc messages", () => {
     const errors = new Errors({});
-    errors.add("name", "blank", { message: () => "custom" } as any);
-    expect(errors.ofKind("name", "blank")).toBe(true);
+    errors.add("name", ":blank", { message: () => "custom" } as any);
+    expect(errors.ofKind("name", ":blank")).toBe(true);
   });
 
   it("of_kind? ignores options", () => {
     const errors = new Errors({});
-    errors.add("name", "blank");
-    expect(errors.ofKind("name", "blank")).toBe(true);
-    expect(errors.ofKind("name", "invalid")).toBe(false);
+    errors.add("name", ":blank");
+    expect(errors.ofKind("name", ":blank")).toBe(true);
+    expect(errors.ofKind("name", ":invalid")).toBe(false);
   });
 
   it("added? defaults message to :invalid", () => {
@@ -936,16 +936,16 @@ describe("ErrorsTest", () => {
       }
     }
     const u = new User({});
-    u.errors.add("name", "blank");
-    expect(u.errors.added("name", "blank")).toBe(true);
-    expect(u.errors.added("name", "invalid")).toBe(false);
+    u.errors.add("name", ":blank");
+    expect(u.errors.added("name", ":blank")).toBe(true);
+    expect(u.errors.added("name", ":invalid")).toBe(false);
   });
 
   it("attribute_names only returns unique attribute names", () => {
     const e = new Errors(null);
-    e.add("name", "blank");
-    e.add("name", "too_short");
-    e.add("age", "invalid");
+    e.add("name", ":blank");
+    e.add("name", ":too_short");
+    e.add("age", ":invalid");
     expect(e.attributeNames).toEqual(["name", "age"]);
     // Should not have duplicates
     expect(e.attributeNames.length).toBe(2);
@@ -953,50 +953,50 @@ describe("ErrorsTest", () => {
 
   it("add, with type as symbol", () => {
     const e = new Errors(null);
-    e.add("name", "blank");
-    expect(e.details.get("name")![0].error).toBe("blank");
+    e.add("name", ":blank");
+    expect(e.details.get("name")![0].error).toBe(":blank");
     expect(e.get("name")).toContain("can't be blank");
   });
 
   it("added? handles symbol message", () => {
     const e = new Errors(null);
-    e.add("name", "blank");
-    expect(e.added("name", "blank")).toBe(true);
-    expect(e.added("name", "invalid")).toBe(false);
+    e.add("name", ":blank");
+    expect(e.added("name", ":blank")).toBe(true);
+    expect(e.added("name", ":invalid")).toBe(false);
   });
 
   it("added? returns false when checking for an error, but not providing message argument", () => {
     const e = new Errors(null);
-    e.add("name", "blank");
+    e.add("name", ":blank");
     // When checking with default type "invalid", should return false since we added "blank"
     expect(e.added("name")).toBe(false);
   });
 
   it("added? returns false when checking for an error with an incorrect or missing option", () => {
     const e = new Errors(null);
-    e.add("name", "blank");
-    expect(e.added("name", "too_short")).toBe(false);
-    expect(e.added("age", "blank")).toBe(false);
+    e.add("name", ":blank");
+    expect(e.added("name", ":too_short")).toBe(false);
+    expect(e.added("age", ":blank")).toBe(false);
   });
 
   it("added? returns false when checking for an error by symbol and a different error with same message is present", () => {
     const e = new Errors(null);
-    e.add("name", "blank");
+    e.add("name", ":blank");
     // Even if the rendered message might be similar, type must match
-    expect(e.added("name", "present")).toBe(false);
+    expect(e.added("name", ":present")).toBe(false);
   });
 
   it("of_kind? handles symbol message", () => {
     const e = new Errors(null);
-    e.add("name", "blank");
-    expect(e.ofKind("name", "blank")).toBe(true);
-    expect(e.ofKind("name", "invalid")).toBe(false);
+    e.add("name", ":blank");
+    expect(e.ofKind("name", ":blank")).toBe(true);
+    expect(e.ofKind("name", ":invalid")).toBe(false);
   });
 
   it("generate_message works without i18n_scope", () => {
     const e = new Errors(null);
-    expect(e.generateMessage("name", "blank")).toBe("can't be blank");
-    expect(e.generateMessage("name", "invalid")).toBe("is invalid");
+    expect(e.generateMessage("name", ":blank")).toBe("can't be blank");
+    expect(e.generateMessage("name", ":invalid")).toBe("is invalid");
   });
 
   it("full_messages doesn't require the base object to respond to `:errors", () => {
@@ -1008,7 +1008,7 @@ describe("ErrorsTest", () => {
       },
     };
     const errors = new Errors(base);
-    errors.add("name", "invalid", { message: "bar" });
+    errors.add("name", ":invalid", { message: "bar" });
     expect(errors.fullMessages).toEqual(["foo bar"]);
   });
 
@@ -1018,16 +1018,16 @@ describe("ErrorsTest", () => {
     // the collection iterable.
     it("add returns the new Error object", () => {
       const errors = new Errors({});
-      const err = errors.add("name", "blank");
+      const err = errors.add("name", ":blank");
       expect(err).toBeInstanceOf(ActiveModelError);
       expect(err.attribute).toBe("name");
-      expect(err.type).toBe("blank");
+      expect(err.type).toBe(":blank");
       expect(errors.objects[0]).toBe(err);
     });
 
     it("add with strict: true raises StrictValidationFailed", () => {
       const errors = new Errors({});
-      expect(() => errors.add("name", "blank", { strict: true })).toThrow(StrictValidationFailed);
+      expect(() => errors.add("name", ":blank", { strict: true })).toThrow(StrictValidationFailed);
       // Strict raise must NOT append the error to the collection.
       expect(errors.count).toBe(0);
     });
@@ -1035,14 +1035,14 @@ describe("ErrorsTest", () => {
     it("add with strict: CustomErrorClass raises that class", () => {
       class NameIsInvalid extends globalThis.Error {}
       const errors = new Errors({});
-      expect(() => errors.add("name", "blank", { strict: NameIsInvalid })).toThrow(NameIsInvalid);
+      expect(() => errors.add("name", ":blank", { strict: NameIsInvalid })).toThrow(NameIsInvalid);
       expect(errors.count).toBe(0);
     });
 
     it("is iterable via for..of", () => {
       const errors = new Errors({});
-      errors.add("name", "blank");
-      errors.add("age", "invalid");
+      errors.add("name", ":blank");
+      errors.add("age", ":invalid");
       const collected: string[] = [];
       for (const e of errors) {
         collected.push(e.attribute);
@@ -1052,8 +1052,8 @@ describe("ErrorsTest", () => {
 
     it("supports spread and Array.from", () => {
       const errors = new Errors({});
-      errors.add("name", "blank");
-      errors.add("age", "invalid");
+      errors.add("name", ":blank");
+      errors.add("age", ":invalid");
       expect([...errors]).toHaveLength(2);
       expect(Array.from(errors, (e) => e.attribute)).toEqual(["name", "age"]);
     });
@@ -1065,8 +1065,8 @@ describe("ErrorsTest", () => {
 
   it("delete returns array of removed errors when present", () => {
     const e = new Errors(null);
-    e.add("name", "blank");
-    e.add("name", "too_short");
+    e.add("name", ":blank");
+    e.add("name", ":too_short");
     const removed = e.delete("name");
     expect(removed).not.toBeNull();
     expect(removed!.length).toBe(2);
@@ -1095,9 +1095,9 @@ describe("ErrorsTest", () => {
 
   it("details shape strips reserved option keys", () => {
     const e = new Errors(null);
-    e.add("name", "blank", { custom: "x", message: "override" });
+    e.add("name", ":blank", { custom: "x", message: "override" });
     const detail = e.details.get("name")![0];
-    expect(detail.error).toBe("blank");
+    expect(detail.error).toBe(":blank");
     expect(detail.custom).toBe("x");
     expect(detail.message).toBeUndefined();
   });
@@ -1111,7 +1111,7 @@ describe("ErrorsTest", () => {
 
   it("toHash(true) returns full messages", () => {
     const e = new Errors(null);
-    e.add("name", "blank");
+    e.add("name", ":blank");
     const full = e.toHash(true);
     expect(full.get("name")![0]).toContain("Name");
     expect(full.get("name")![0]).toContain("can't be blank");
@@ -1119,44 +1119,44 @@ describe("ErrorsTest", () => {
 
   it("toHash() with no arg returns short messages", () => {
     const e = new Errors(null);
-    e.add("name", "blank");
+    e.add("name", ":blank");
     const short = e.toHash();
     expect(short.get("name")![0]).toBe("can't be blank");
   });
 
   it("added returns true for exact type match", () => {
     const e = new Errors(null);
-    e.add("name", "blank");
-    expect(e.added("name", "blank")).toBe(true);
+    e.add("name", ":blank");
+    expect(e.added("name", ":blank")).toBe(true);
   });
 
   it("added returns true for full message string (string branch)", () => {
     const e = new Errors(null);
-    e.add("name", "blank");
+    e.add("name", ":blank");
     expect(e.added("name", "can't be blank")).toBe(true);
   });
 
   it("added returns false for nonexistent type or message", () => {
     const e = new Errors(null);
-    e.add("name", "blank");
+    e.add("name", ":blank");
     expect(e.added("name", "nonexistent type xyz")).toBe(false);
   });
 
   it("ofKind returns true for exact type match", () => {
     const e = new Errors(null);
-    e.add("name", "blank");
-    expect(e.ofKind("name", "blank")).toBe(true);
+    e.add("name", ":blank");
+    expect(e.ofKind("name", ":blank")).toBe(true);
   });
 
   it("ofKind returns true for full message string (string branch)", () => {
     const e = new Errors(null);
-    e.add("name", "blank");
+    e.add("name", ":blank");
     expect(e.ofKind("name", "can't be blank")).toBe(true);
   });
 
   it("ofKind returns false for nonexistent type or message", () => {
     const e = new Errors(null);
-    e.add("name", "blank");
+    e.add("name", ":blank");
     expect(e.ofKind("name", "nonexistent type xyz")).toBe(false);
   });
 });
@@ -1182,7 +1182,7 @@ describe("Errors<TBase> type parameter", () => {
 
   it("add() message callback receives TBase | null", () => {
     const e = new Errors<User>({ name: "Alice", age: 30 });
-    e.add("name", "invalid", {
+    e.add("name", ":invalid", {
       message: (record) => {
         expectTypeOf(record).toEqualTypeOf<User | null>();
         return "bad";
@@ -1192,7 +1192,7 @@ describe("Errors<TBase> type parameter", () => {
 
   it("add() message callback receives TBase | null and options (two-arg form)", () => {
     const e = new Errors<User>({ name: "Alice", age: 30 });
-    e.add("name", "invalid", {
+    e.add("name", ":invalid", {
       message: (record, opts) => {
         expectTypeOf(record).toEqualTypeOf<User | null>();
         expectTypeOf(opts).toEqualTypeOf<Record<string, unknown>>();

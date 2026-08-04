@@ -96,7 +96,7 @@ export class HasManyAssociation extends CollectionAssociation {
             humanAttributeName(attr: string): string;
           };
           const record = ctor.humanAttributeName(this.reflection.name).toLowerCase();
-          owner.errors.add("base", "invalid", {
+          owner.errors.add("base", ":invalid", {
             message: `Cannot delete record because dependent ${record} exist`,
           });
           return false;

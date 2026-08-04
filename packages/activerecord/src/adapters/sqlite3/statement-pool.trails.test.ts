@@ -23,7 +23,7 @@ describeIfSqlite("SQLite3StatementPoolTest", () => {
 
   it("reads statementLimit from the options hash", () => {
     const adapter = track(new BetterSQLite3Adapter(":memory:", { statementLimit: 7 }));
-    expect(adapter.statementLimit).toBe(7);
+    expect(adapter.buildStatementPool().maxSize).toBe(7);
   });
 
   it("reads preparedStatements from the options hash", () => {

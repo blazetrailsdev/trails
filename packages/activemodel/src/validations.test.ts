@@ -420,7 +420,7 @@ describe("ValidationsTest", () => {
     class Person extends Model {
       static {
         this.validate((record: any) => {
-          record.errors.add("base", "invalid", { message: "Model is invalid" });
+          record.errors.add("base", ":invalid", { message: "Model is invalid" });
         });
       }
     }
@@ -447,7 +447,7 @@ describe("ValidationsTest", () => {
         this.attribute("discount", "integer");
         this.validatesEach(["price", "discount"], (record, attr, value) => {
           if (typeof value === "number" && value < 0) {
-            record.errors.add(attr, "invalid", { message: "must be non-negative" });
+            record.errors.add(attr, ":invalid", { message: "must be non-negative" });
           }
         });
       }
@@ -463,7 +463,7 @@ describe("ValidationsTest", () => {
         this.attribute("name", "string");
         this.validate((record: any) => {
           if (record.readAttribute("name") === "INVALID") {
-            record.errors.add("name", "invalid");
+            record.errors.add("name", ":invalid");
           }
         });
       }
@@ -478,7 +478,7 @@ describe("ValidationsTest", () => {
         this.attribute("name", "string");
         this.validate(function (record: any) {
           if (!record.readAttribute("name")) {
-            record.errors.add("name", "blank");
+            record.errors.add("name", ":blank");
           }
         });
       }
@@ -640,7 +640,7 @@ describe("ValidationsTest", () => {
       static {
         this.attribute("name", "string");
         this.validate((record: any) => {
-          record.errors.add("base", "invalid", { message: "Model is invalid" });
+          record.errors.add("base", ":invalid", { message: "Model is invalid" });
         });
       }
     }
@@ -747,18 +747,14 @@ describe("ValidationsTest", () => {
         return this.data[attribute];
       }
     }
-    // Rails' case passes the literal "gotcha" (validations_test.rb:113); trails
-    // has no Symbol type, so `Error#message` promotes identifier-shaped Strings
-    // to an i18n type (error.ts `IDENTIFIER_RE`) — a multi-word literal stays a
-    // literal, which is what this case is actually about.
     Person.validatesEach(["name"], (record, attr, value) => {
-      if (!value) record.errors.add(attr, "is gotcha");
+      if (!value) record.errors.add(attr, "gotcha");
     });
     const p = new Person({ name: "ignored" });
     p.data = { name: "" };
     await p.isValid();
     // The empty value comes from `data`, proving the override drove the read.
-    expect(p.errors.get("name")).toContain("is gotcha");
+    expect(p.errors.get("name")).toContain("gotcha");
   });
 
   it("validates an undeclared getter via the send default", async () => {
@@ -773,14 +769,14 @@ describe("ValidationsTest", () => {
       }
     }
     Person.validatesEach(["fullName"], (record, attr, value) => {
-      if (!value) record.errors.add(attr, "is gotcha");
+      if (!value) record.errors.add(attr, "gotcha");
     });
     const present = new Person({ first: "Al" });
     await present.isValid();
-    expect(present.errors.get("fullName")).not.toContain("is gotcha");
+    expect(present.errors.get("fullName")).not.toContain("gotcha");
     const blank = new Person({ first: "" });
     await blank.isValid();
-    expect(blank.errors.get("fullName")).toContain("is gotcha");
+    expect(blank.errors.get("fullName")).toContain("gotcha");
   });
 
   it("read_attribute_for_validation returns undefined for a present reader that returns undefined", () => {
@@ -939,7 +935,7 @@ describe("ValidationsTest", () => {
         this.attribute("name", "string");
         this.validate(function (record: any) {
           if (record.readAttribute("name") === "invalid") {
-            record.errors.add("name", "invalid", { message: "is not allowed" });
+            record.errors.add("name", ":invalid", { message: "is not allowed" });
           }
         });
       }
@@ -1030,7 +1026,7 @@ describe("ValidationsTest", () => {
       }
     }
     Topic.validate((t: any) => {
-      if (!t.readAttribute("title")) t.errors.add("title", "blank");
+      if (!t.readAttribute("title")) t.errors.add("title", ":blank");
     });
     const topic = new Topic({});
     expect(topic.errors.empty).toBe(true);
@@ -1423,7 +1419,7 @@ describe("validatesEach", () => {
         this.attribute("discount", "integer");
         this.validatesEach(["price", "discount"], (record, attr, value) => {
           if (typeof value === "number" && value < 0) {
-            record.errors.add(attr, "invalid", { message: "must be non-negative" });
+            record.errors.add(attr, ":invalid", { message: "must be non-negative" });
           }
         });
       }
@@ -1450,7 +1446,7 @@ describe("validatesEach", () => {
           ["price", "discount"],
           (record, attr, value) => {
             if (typeof value === "number" && value < 0) {
-              record.errors.add(attr, "invalid", { message: "must be non-negative" });
+              record.errors.add(attr, ":invalid", { message: "must be non-negative" });
             }
           },
           {
@@ -1474,7 +1470,7 @@ describe("validatesWith", () => {
       validate(record: any) {
         const val = record.readAttribute("count");
         if (typeof val === "number" && val % 2 !== 0) {
-          record.errors.add("count", "invalid", { message: "must be even" });
+          record.errors.add("count", ":invalid", { message: "must be even" });
         }
       }
     }
@@ -1503,7 +1499,7 @@ describe("validatesWith", () => {
       validate(record: any) {
         const val = record.readAttribute("score");
         if (typeof val === "number" && val < this.threshold) {
-          record.errors.add("score", "invalid", {
+          record.errors.add("score", ":invalid", {
             message: `must be at least ${this.threshold}`,
           });
         }
@@ -1528,7 +1524,7 @@ describe("validatesWith", () => {
   it("supports conditional options", async () => {
     class AlwaysInvalidValidator {
       validate(record: any) {
-        record.errors.add("base", "invalid", { message: "always invalid" });
+        record.errors.add("base", ":invalid", { message: "always invalid" });
       }
     }
 
@@ -1935,7 +1931,7 @@ describe("Validations", () => {
           this.validate(function (record: any) {
             const val = record.readAttribute("value");
             if (val !== null && (val as number) % 2 !== 0) {
-              record.errors.add("value", "even", { message: "must be even" });
+              record.errors.add("value", ":even", { message: "must be even" });
             }
           });
         }
@@ -1976,7 +1972,7 @@ describe("Validations", () => {
     class Base extends Model {
       static {
         this.validate((record: any) => {
-          record.errors.add("base", "invalid", { message: "is broken" });
+          record.errors.add("base", ":invalid", { message: "is broken" });
         });
       }
     }
@@ -2060,8 +2056,8 @@ describe("errors.ofKind()", () => {
     }
     const u = new User({});
     await u.isValid();
-    expect(u.errors.ofKind("name", "blank")).toBe(true);
-    expect(u.errors.ofKind("name", "invalid")).toBe(false);
+    expect(u.errors.ofKind("name", ":blank")).toBe(true);
+    expect(u.errors.ofKind("name", ":invalid")).toBe(false);
     // Without a type arg, ofKind checks for any error on the attribute.
     expect(u.errors.ofKind("name")).toBe(true);
     expect(u.errors.ofKind("other")).toBe(false);
@@ -2150,9 +2146,9 @@ describe("Errors enhancements", () => {
       }
     }
     const u = new User({});
-    u.errors.add("name", "blank");
-    u.errors.add("name", "too_short");
-    u.errors.add("email", "blank");
+    u.errors.add("name", ":blank");
+    u.errors.add("name", ":too_short");
+    u.errors.add("email", ":blank");
     const removed = u.errors.delete("name");
     expect(removed!.length).toBe(2);
     expect(u.errors.count).toBe(1);
@@ -2165,9 +2161,9 @@ describe("Errors enhancements", () => {
       }
     }
     const u = new User({});
-    u.errors.add("name", "blank");
-    u.errors.add("name", "too_short");
-    const removed = u.errors.delete("name", "blank");
+    u.errors.add("name", ":blank");
+    u.errors.add("name", ":too_short");
+    const removed = u.errors.delete("name", ":blank");
     expect(removed!.length).toBe(1);
     expect(u.errors.count).toBe(1);
   });
@@ -2179,11 +2175,11 @@ describe("Errors enhancements", () => {
       }
     }
     const u = new User({});
-    u.errors.add("name", "blank");
-    u.errors.add("email", "invalid");
+    u.errors.add("name", ":blank");
+    u.errors.add("email", ":invalid");
     const collected: string[] = [];
     u.errors.each((e) => collected.push(`${e.attribute}:${e.type}`));
-    expect(collected).toEqual(["name:blank", "email:invalid"]);
+    expect(collected).toEqual(["name::blank", "email::invalid"]);
   });
 
   it("merge errors", () => {
@@ -2194,7 +2190,7 @@ describe("Errors enhancements", () => {
     }
     const u1 = new User({});
     const u2 = new User({});
-    u1.errors.add("name", "blank");
+    u1.errors.add("name", ":blank");
     u2.errors.merge(u1.errors);
     expect(u2.errors.count).toBe(1);
     expect(u2.errors.get("name")).toEqual(["can't be blank"]);
@@ -2208,9 +2204,9 @@ describe("Errors enhancements", () => {
       }
     }
     const u = new User({});
-    u.errors.add("name", "blank");
-    u.errors.add("name", "too_short");
-    u.errors.add("email", "invalid");
+    u.errors.add("name", ":blank");
+    u.errors.add("name", ":too_short");
+    u.errors.add("email", ":invalid");
     const hash = u.errors.toHash();
     expect(hash.get("name")!.length).toBe(2);
     expect(hash.get("email")!.length).toBe(1);
@@ -2223,7 +2219,7 @@ describe("Errors enhancements", () => {
       }
     }
     const u = new User({});
-    u.errors.add("name", "blank");
+    u.errors.add("name", ":blank");
     expect(u.errors.include("name")).toBe(true);
     expect(u.errors.include("email")).toBe(false);
   });
@@ -2235,7 +2231,7 @@ describe("Errors enhancements", () => {
       }
     }
     const u = new User({});
-    u.errors.add("name", "blank");
+    u.errors.add("name", ":blank");
     expect(u.errors.messages.get("name")).toEqual(["can't be blank"]);
   });
 
@@ -2461,8 +2457,8 @@ describe("Errors#generateMessage", () => {
       }
     }
     const u = new User({});
-    expect(u.errors.generateMessage("name", "blank")).toBe("can't be blank");
-    expect(u.errors.generateMessage("name", "invalid")).toBe("is invalid");
+    expect(u.errors.generateMessage("name", ":blank")).toBe("can't be blank");
+    expect(u.errors.generateMessage("name", ":invalid")).toBe("is invalid");
   });
 
   it("substitutes options into message", () => {
@@ -2473,7 +2469,7 @@ describe("Errors#generateMessage", () => {
       }
     }
     const u = new User({});
-    expect(u.errors.generateMessage("age", "greater_than", { count: 0 })).toBe(
+    expect(u.errors.generateMessage("age", ":greater_than", { count: 0 })).toBe(
       "must be greater than 0",
     );
   });

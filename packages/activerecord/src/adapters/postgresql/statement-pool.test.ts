@@ -47,20 +47,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
     });
 
-    it("statementLimit config resizes the active pool", async () => {
-      await adapter.beginDbTransaction();
-      try {
-        await adapter.execute("SELECT $1::int", [1]);
-        await adapter.execute("SELECT $1::text", ["a"]);
-        const pool = adapter._statementPoolForTest()!;
-        expect(pool.length).toBe(2);
-        adapter.statementLimit = 1;
-        expect(pool.length).toBe(1);
-      } finally {
-        await adapter.rollback();
-      }
-    });
-
     it("executeMutation caches the plan for INSERT (reuses on repeat)", async () => {
       await adapter.exec(
         `CREATE TABLE IF NOT EXISTS "sp_exec_mut" ("id" SERIAL PRIMARY KEY, "name" TEXT)`,
@@ -144,7 +130,8 @@ describeIfPg("PostgreSQLAdapter", () => {
         connectionString: PG_TEST_URL,
         statementLimit: 7,
       });
-      expect(configured.statementLimit).toBe(7);
+      await configured.execute("SELECT $1::int", [1]);
+      expect(configured._statementPoolForTest()!.maxSize).toBe(7);
       await configured.close();
     });
 

@@ -314,8 +314,12 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   private _nativeTypeMap: TypeMap;
   private _memoryDatabase: boolean;
   private _filename: string;
-  // _statementLimit must be declared before _statementPool so buildStatementPool()
-  // reads the correct default when the field initializer runs.
+  // Rails reads `@config[:statement_limit]` inline when it builds the
+  // StatementPool (sqlite3_adapter.rb:803) and never exposes it. trails'
+  // constructor destructures the adapter-level database.yml keys out of the
+  // config hash, so the value is held here for `buildStatementPool` — and must
+  // be declared before `_statementPool` so the field initializer reads it.
+  /** @internal */
   private _statementLimit = 1000;
   private _statementPool = this.buildStatementPool();
 
@@ -340,34 +344,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    */
   get _strictStrings(): boolean {
     return this._strict;
-  }
-
-  /**
-   * Maximum prepared statements cached on the single SQLite connection.
-   *
-   * Mirrors: `database.yml`'s `statement_limit` — read by Rails as
-   * `config[:statement_limit]` in `SQLite3Adapter#initialize`.
-   *
-   * @noRailsEquivalent CONVERGEABLE (story: retire-public-statement-limit-accessor).
-   * `statement_limit` is a `database.yml` config key Rails reads as
-   *   `config[:statement_limit]` in
-   *   each adapter's `initialize` (abstract_mysql_adapter.rb, postgresql_adapter.rb,
-   *   sqlite3_adapter.rb) — a config option, never a Ruby `def`, so there is nothing for the
-   *   extractor to match. trails exposes the same setting as a validated accessor on the adapter,
-   *   identically on all three.
-   */
-  get statementLimit(): number {
-    return this._statementLimit;
-  }
-
-  set statementLimit(value: number) {
-    if (!Number.isInteger(value) || value < 0) {
-      throw new RangeError(
-        `statementLimit must be a finite non-negative integer; got ${String(value)}`,
-      );
-    }
-    this._statementLimit = value;
-    this._statementPool.setMaxSize(value);
   }
 
   /**
@@ -420,7 +396,15 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     this.preparedStatements = options.preparedStatements ?? true;
     // Apply adapter-level options FIRST so invalid values fail before
     // the native driver opens a file handle that would otherwise leak.
-    if (options.statementLimit !== undefined) this.statementLimit = options.statementLimit;
+    if (options.statementLimit !== undefined) {
+      if (!Number.isInteger(options.statementLimit) || options.statementLimit < 0) {
+        throw new RangeError(
+          `statementLimit must be a finite non-negative integer; got ${String(options.statementLimit)}`,
+        );
+      }
+      this._statementLimit = options.statementLimit;
+      this._statementPool.setMaxSize(this._statementLimit);
+    }
     this.connect();
     // Async-only drivers (e.g. expo-sqlite) can't open in a sync constructor;
     // connect() flags them for the async path instead. See completeAsyncConnect.

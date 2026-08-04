@@ -41,7 +41,7 @@ export class ExclusionValidator extends EachValidator {
 
   validateEach(record: ValidatableRecord, attribute: string, value: unknown): void {
     if (this.isInclude(record, value)) {
-      record.errors.add(attribute, "exclusion", exceptInWithinMergeValue(this.options, value));
+      record.errors.add(attribute, ":exclusion", exceptInWithinMergeValue(this.options, value));
     }
   }
 
