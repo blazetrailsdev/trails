@@ -52,17 +52,26 @@ export type LiteralVerdict = "match" | "mismatch" | "skip";
  *  has no value to compare. `nil`↔`nil` (incl. TS undefined/null) still matches.
  *
  *  A Ruby Symbol is a JS string, and CLAUDE.md ("Symbols vs strings") keeps the
- *  leading colon where a method's control flow turns on Symbol-vs-String —
- *  `I18n::Backend::Base#localize`'s `format = :default` ports as `":default"`.
- *  Nothing in the manifest says which arm a given default is, so both spellings
- *  of `:x` — `"x"` and `":x"` — are the same value here. */
-export function compareLiteral(ruby: LiteralValue, ts: LiteralValue): LiteralVerdict {
+ *  leading colon only where a method's control flow turns on Symbol-vs-String.
+ *  `symbolDiscriminated` carries that distinction from the Ruby body: when the
+ *  body branches on `Symbol === x` (`I18n::Backend::Base#localize`,
+ *  i18n/lib/i18n/backend/base.rb:83) only `":x"` matches, and a bare `"x"` — a
+ *  port that bypassed the branch — is a mismatch. Elsewhere a Symbol is just a
+ *  name (`timestamp_column = :updated_at`) and the bare spelling is correct. */
+export function compareLiteral(
+  ruby: LiteralValue,
+  ts: LiteralValue,
+  symbolDiscriminated = false,
+): LiteralVerdict {
   const r = normalizeLiteral(ruby);
   const t = normalizeLiteral(ts);
   if (r === null || t === null) return "skip";
   if ((r === "nil") !== (t === "nil")) return "skip";
-  if (ruby.kind === "symbol" && t === `str::${canonString(String(ruby.value ?? ""))}`)
-    return "match";
+  if (ruby.kind === "symbol") {
+    const colon = `str::${canonString(String(ruby.value ?? ""))}`;
+    if (symbolDiscriminated) return t === colon ? "match" : "mismatch";
+    return t === colon || t === r ? "match" : "mismatch";
+  }
   return r === t ? "match" : "mismatch";
 }
 
@@ -109,7 +118,7 @@ export function compareDefaults(
     if (!rp.literal) continue;
     const tl = tsByName.get(snakeToCamel(rp.name)) ?? tsByName.get(rp.name);
     if (!tl) continue;
-    const verdict = compareLiteral(rp.literal, tl);
+    const verdict = compareLiteral(rp.literal, tl, rp.symbolDiscriminated);
     if (verdict === "skip") {
       result.skipped++;
       continue;

@@ -47,6 +47,23 @@ describe("compareLiteral", () => {
     ).toBe("mismatch");
   });
 
+  it("matches a Symbol-discriminated default only against the colon-prefixed string", () => {
+    expect(
+      compareLiteral(
+        { kind: "symbol", value: "default" },
+        { kind: "string", value: ":default" },
+        true,
+      ),
+    ).toBe("match");
+    expect(
+      compareLiteral(
+        { kind: "symbol", value: "default" },
+        { kind: "string", value: "default" },
+        true,
+      ),
+    ).toBe("mismatch");
+  });
+
   it("treats nil as equal to both null and undefined (TS undefined → nil)", () => {
     expect(compareLiteral({ kind: "nil" }, { kind: "nil" })).toBe("match");
   });
@@ -106,6 +123,16 @@ describe("compareDefaults", () => {
       [[tsp("order", { kind: "string", value: "desc" })]],
     );
     expect(res.mismatches).toEqual([{ name: "order", rubyValue: ":asc", tsValue: '"desc"' }]);
+  });
+
+  it("flags a Symbol-discriminated default ported as a bare string", () => {
+    const res = compareDefaults(
+      [{ ...ruby("format", { kind: "symbol", value: "default" }), symbolDiscriminated: true }],
+      [[tsp("format", { kind: "string", value: "default" })]],
+    );
+    expect(res.mismatches).toEqual([
+      { name: "format", rubyValue: ":default", tsValue: '"default"' },
+    ]);
   });
 
   it("excludes a non-literal default (skipped, not mismatched)", () => {

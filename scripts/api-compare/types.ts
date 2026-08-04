@@ -15,6 +15,10 @@ export interface ParamInfo {
   kind: "required" | "optional" | "rest" | "keyword" | "keyword_rest" | "block";
   default?: string;
   literal?: LiteralValue; // default value, when present; compared by literals.ts
+  /** Ruby side only: the body tests this param against `Symbol` (`Symbol === x`,
+   *  `x.is_a?(Symbol)`), so a Symbol default on it is a branch discriminator and
+   *  the TS spelling must keep the leading colon. See literals.ts. */
+  symbolDiscriminated?: boolean;
   /**
    * TS-side declared type text (e.g. `"Base"`), when available — lets a
    * consumer recognize a leading receiver/host param on standalone mixin
