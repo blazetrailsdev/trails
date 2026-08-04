@@ -26,6 +26,17 @@ describe("Time", () => {
     expect(time.strftime("%Y-%m-%d %H:%M:%S %z %Z")).toBe("2008-03-01 06:00:00 -0500 ");
   });
 
+  it("Time.new takes an offset in seconds, as Rails passes", () => {
+    expect(new Time(2008, 3, 1, 6, 0, 0, 3600).utcOffset).toBe(3600);
+    expect(new Time(2008, 3, 1, 6, 0, 0, 0).strftime("%z %Z")).toBe("+0000 ");
+    expect(new Time(2008, 3, 1, 6, 0, 0, -19800).strftime("%z")).toBe("-0530");
+  });
+
+  it("Time.new takes the compact and hour-only offset spellings", () => {
+    expect(new Time(2008, 3, 1, 6, 0, 0, "+0930").strftime("%z")).toBe("+0930");
+    expect(new Time(2008, 3, 1, 6, 0, 0, "+09").strftime("%z")).toBe("+0900");
+  });
+
   it("Time.new takes a military zone letter", () => {
     expect(new Time(2008, 3, 1, 6, 0, 0, "K").utcOffset).toBe(10 * 3600);
     expect(new Time(2008, 3, 1, 6, 0, 0, "Y").utcOffset).toBe(-12 * 3600);

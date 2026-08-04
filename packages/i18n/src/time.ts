@@ -12,21 +12,44 @@ import { ArgumentError, strftime } from "./date.js";
 
 /**
  * The `utc_offset` argument MRI's `Time.new` accepts, resolved to something
- * `Temporal` takes: `"UTC"`, an offset, or one of the military zone letters
- * (`A`..`I` = +1..+9, `K`..`M` = +10..+12, `N`..`Y` = -1..-12, `Z` = UTC).
- * Anything else raises, with MRI's message — an IANA name like
+ * `Temporal` takes: `"UTC"`, an offset — `"+09"`, `"+0900"`, `"+09:00"` or a
+ * number of seconds east of UTC, which is the form Rails passes
+ * (`activesupport/lib/active_support/core_ext/string/conversions.rb:28`,
+ * `core_ext/time/calculations.rb:172-175`) — or one of the military zone
+ * letters (`A`..`I` = +1..+9, `K`..`M` = +10..+12, `N`..`Y` = -1..-12,
+ * `Z` = UTC). Anything else raises with MRI's message; an IANA name like
  * `"America/New_York"` is not a `Time.new` zone, it is what a `TimeZone`
  * object wraps.
+ *
+ * MRI also takes a sub-minute offset. `Temporal` has no way to express one —
+ * an offset time zone is minute-precision — so that one spelling raises here
+ * where MRI accepts it. Rails never builds one: its offsets come from zone
+ * tables and `Date._parse`, both of which are whole minutes.
  */
-function utcOffsetArgument(zone: string): string {
-  if (zone === "UTC" || /^[+-]\d{2}:\d{2}(:\d{2})?$/.test(zone)) return zone;
+function utcOffsetArgument(zone: string | number): string {
+  if (typeof zone === "number") {
+    if (zone % 60 !== 0) throw new ArgumentError("utc_offset out of range");
+    const sign = zone < 0 ? "-" : "+";
+    const minutes = Math.abs(zone) / 60;
+    return `${sign}${pad2(Math.floor(minutes / 60))}:${pad2(minutes % 60)}`;
+  }
+  if (zone === "UTC") return zone;
+  if (/^[+-]\d{2}(:?\d{2})?$/.test(zone)) return zone;
+  if (/^[+-]\d{2}:\d{2}:\d{2}$/.test(zone)) {
+    if (!zone.endsWith(":00")) throw new ArgumentError("utc_offset out of range");
+    return zone.slice(0, 6);
+  }
   if (/^[A-IK-Z]$/.test(zone)) {
     const code = zone.charCodeAt(0);
     const hours = zone === "Z" ? 0 : code <= 73 ? code - 64 : code <= 77 ? code - 65 : 77 - code;
     const sign = hours < 0 ? "-" : "+";
-    return `${sign}${String(Math.abs(hours)).padStart(2, "0")}:00`;
+    return `${sign}${pad2(Math.abs(hours))}:00`;
   }
   throw new ArgumentError('"+HH:MM", "-HH:MM", "UTC" or "A".."I","K".."Z" expected for utc_offset');
+}
+
+function pad2(n: number): string {
+  return String(n).padStart(2, "0");
 }
 
 /**
@@ -48,7 +71,7 @@ export class Time {
   /**
    * Ruby `Time.new(year, month, day, hour = 0, min = 0, sec = 0, zone = nil)`,
    * which builds a time in the *local* zone unless `zone` gives an offset.
-   * `Time.utc` is the UTC entry point, as in Ruby, and `zone` takes only the
+   * `Time.utc` is the UTC entry point, as in Ruby, and `zone` takes the
    * spellings MRI's `utc_offset` argument takes — see `utcOffsetArgument`.
    */
   constructor(
@@ -58,7 +81,7 @@ export class Time {
     hour = 0,
     min = 0,
     sec = 0,
-    zone: string | null = null,
+    zone: string | number | null = null,
   ) {
     this.#plain = new Temporal.PlainDateTime(year, month, day, hour, min, sec);
     this.#zoned = this.#plain.toZonedDateTime(
@@ -124,6 +147,9 @@ export class Time {
   }
 
   strftime(format: string): string {
+    // `%z` is `±HHMM` — neither `Time#zone` nor `Temporal`'s extended `±HH:MM`.
+    const minutes = Math.abs(this.utcOffset) / 60;
+    const zoneOffset = `${this.utcOffset < 0 ? "-" : "+"}${pad2(Math.floor(minutes / 60))}${pad2(minutes % 60)}`;
     return strftime(
       {
         year: this.year,
@@ -135,7 +161,7 @@ export class Time {
         min: this.min,
         sec: this.sec,
         zone: this.zone ?? "",
-        zoneOffset: this.#zoned.offset.replace(":", ""),
+        zoneOffset,
       },
       format,
     );
