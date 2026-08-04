@@ -29,9 +29,9 @@ export class Time {
   /**
    * Ruby `Time.new(year, month, day, hour = 0, min = 0, sec = 0, zone = nil)`,
    * which builds a time in the *local* zone unless `zone` names another one.
-   * `Time.utc` is the UTC entry point, as in Ruby. Ruby's `zone` argument also
-   * accepts an offset spelling (`"+09:00"`); here it is the IANA identifier
-   * `Temporal` resolves.
+   * `Time.utc` is the UTC entry point, as in Ruby. `zone` takes the spellings
+   * Ruby's does — an offset (`"+09:00"`) or a zone name — because `Temporal`
+   * resolves both.
    */
   constructor(
     year: number,
@@ -86,9 +86,11 @@ export class Time {
   /**
    * `Time#zone` is the zone's abbreviation — `"UTC"` for a `Time.utc`, `"PDT"`
    * for a local summer time — not an offset, which is what `::DateTime#zone`
-   * answers instead.
+   * answers instead. A time built from an offset rather than a zone has no
+   * abbreviation to answer and Ruby returns `nil`; `%Z` then prints the offset.
    */
-  get zone(): string {
+  get zone(): string | null {
+    if (/^[+-]\d{2}:?\d{2}$/.test(this.#zoned.timeZoneId)) return null;
     const parts = new Intl.DateTimeFormat("en-US", {
       timeZone: this.#zoned.timeZoneId,
       timeZoneName: "short",
@@ -112,7 +114,7 @@ export class Time {
         hour: this.hour,
         min: this.min,
         sec: this.sec,
-        zone: this.zone,
+        zone: this.zone ?? this.#zoned.offset,
         zoneOffset: this.#zoned.offset.replace(":", ""),
       },
       format,

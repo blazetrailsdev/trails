@@ -23,6 +23,15 @@ describe("Time", () => {
     expect(time.strftime("%Y-%m-%d %H:%M:%S %z %Z")).toBe("2008-03-01 06:00:00 -0500 EST");
   });
 
+  it("Time.new accepts Ruby's offset spelling for the zone", () => {
+    const time = new Time(2008, 3, 1, 6, 0, 0, "+09:00");
+    expect(time.utcOffset).toBe(9 * 3600);
+    // Ruby answers no abbreviation for an offset-built time, and prints the
+    // offset for `%Z`.
+    expect(time.zone).toBeNull();
+    expect(time.strftime("%z %Z")).toBe("+0900 +09:00");
+  });
+
   it("Time.new defaults to the local zone", () => {
     const time = new Time(2008, 3, 1, 6, 0, 0);
     const local = new Temporal.PlainDateTime(2008, 3, 1, 6, 0, 0).toZonedDateTime(

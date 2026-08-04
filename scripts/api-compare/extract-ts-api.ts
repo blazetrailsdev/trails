@@ -2182,14 +2182,6 @@ function extractInterface(
             const resolved = checker.getTypeAtLocation(type);
             for (const prop of resolved.getProperties()) {
               const propName = prop.getName();
-              // `getProperties()` returns protected and private members too.
-              // The copy synthesized below carries no modifier of its own, so
-              // its visibility and `internal` flag have to come off the
-              // declaration it resolves to, as the `__mixin` case above does —
-              // hardcoding "public" here counts a protected member as this
-              // file's public surface, which Ruby's `include` does not do
-              // either, and leaves it demanding a `@noRailsEquivalent` reason
-              // its own declaration is too private to be asked for.
               const propDecl = prop.declarations?.[0];
               const propFlags = propDecl !== undefined ? ts.getCombinedModifierFlags(propDecl) : 0;
               const propVisibility =
@@ -2205,7 +2197,10 @@ function extractInterface(
                 // Unlike the `__mixin` and inherited-interface-property cases
                 // elsewhere, these entries carry no `declaredIn`, so
                 // `collectTsFileNames` counts them as THIS file's surface —
-                // they need the resolved declaration's tag to be justifiable.
+                // they need the resolved declaration's tag, visibility and
+                // `@internal` flag to be scored the way that declaration is.
+                // `getProperties()` returns protected and private members, and
+                // the copy pushed below carries no modifier of its own.
                 const noRailsEquivalent = noRailsEquivalentOfSymbol(prop, checker);
                 instanceMethods.push({
                   name: propName,
