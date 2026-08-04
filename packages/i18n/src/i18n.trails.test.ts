@@ -53,3 +53,25 @@ describe("I18n.normalizeKeys memoization", () => {
     expect(normalizeKeys(null, "foo.bar", null, false)).toEqual(["foo", "bar"]);
   });
 });
+
+/**
+ * Trails-only: the gem gets this from `Symbol#to_s` in `normalize_key`
+ * (i18n.rb:447), so it has no case of its own. Our Symbol spelling is a
+ * colon-prefixed string, and this is the one place that colon is dropped.
+ */
+describe("I18n.normalizeKeys on a Symbol key", () => {
+  beforeEach(() => {
+    resetConfig();
+    resetClassConfig();
+  });
+
+  it("drops the leading colon of a Symbol key, scope and locale", () => {
+    expect(normalizeKeys(null, ":errors.format", null)).toEqual(["errors", "format"]);
+    expect(normalizeKeys(null, "format", ":errors")).toEqual(["errors", "format"]);
+    expect(normalizeKeys(":en" as never, "format", null)).toEqual(["en", "format"]);
+  });
+
+  it("drops the leading colon of each Symbol in an Array key", () => {
+    expect(normalizeKeys(null, [":errors", "format"], null)).toEqual(["errors", "format"]);
+  });
+});
