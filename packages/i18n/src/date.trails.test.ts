@@ -101,6 +101,58 @@ describe("Date", () => {
     expect(() => RubyDate.parse("10:30")).toThrow("invalid date");
   });
 
+  it("reads the one-fragment strings parse_year, parse_mon and parse_mday take", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2008-08-04T12:00:00Z"));
+    try {
+      const mday = RubyDate.parse("3rd");
+      expect([mday.year, mday.mon, mday.day]).toEqual([2008, 8, 3]);
+      const mon = RubyDate.parse("Feb");
+      expect([mon.year, mon.mon, mon.day]).toEqual([2008, 2, 1]);
+    } finally {
+      vi.useRealTimers();
+    }
+    const year = RubyDate.parse("'01");
+    expect([year.year, year.mon, year.day]).toEqual([2001, 1, 1]);
+  });
+
+  it("reads the VMS date either way round, as parse_vms does", () => {
+    for (const str of ["3-FEB-2001", "FEB-3-2001"]) {
+      const date = RubyDate.parse(str);
+      expect([str, date.year, date.mon, date.day]).toEqual([str, 2001, 2, 3]);
+    }
+  });
+
+  it("reads a JIS X 0301 date, as parse_jis does", () => {
+    const heisei = RubyDate.parse("H13.02.03");
+    expect([heisei.year, heisei.mon, heisei.day]).toEqual([2001, 2, 3]);
+    const meiji = RubyDate.parse("M6.5.4");
+    expect([meiji.year, meiji.mon, meiji.day]).toEqual([1873, 5, 4]);
+  });
+
+  it("reads the ISO spellings parse_iso does not take, as parse_iso2 does", () => {
+    const ordinal = RubyDate.parse("2001-034");
+    expect([ordinal.year, ordinal.mon, ordinal.day]).toEqual([2001, 2, 3]);
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2008-08-04T12:00:00Z"));
+    try {
+      for (const str of ["--0203", "--02-03"]) {
+        const date = RubyDate.parse(str);
+        expect([str, date.year, date.mon, date.day]).toEqual([str, 2008, 2, 3]);
+      }
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(RubyDate._parse("2001-W05-6")).toEqual({ cwyear: 2001, cweek: 5, cwday: 6 });
+  });
+
+  it("negates the year of a BC date, as parse_bc does", () => {
+    expect(RubyDate.parse("4004-01-02 BC").year).toBe(-4003);
+    expect(RubyDate.parse("feb 3 4004 b.c.e.").year).toBe(-4003);
+    expect(RubyDate.parse("70-1-2 BC").year).toBe(-69);
+    expect(() => RubyDate.parse("4004 BC")).toThrow("invalid date");
+  });
+
   it("leaves a signed year uncompleted, as date_parse.c does", () => {
     expect(RubyDate.parse("-08-07-02").year).toBe(-8);
     expect(RubyDate.parse("+08-07-02").year).toBe(8);

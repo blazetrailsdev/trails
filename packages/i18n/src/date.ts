@@ -164,12 +164,16 @@ interface DateParts {
   mon?: number;
   mday?: number;
   yday?: number;
+  cwyear?: number;
+  cweek?: number;
+  cwday?: number;
   hour?: number;
   min?: number;
   sec?: number;
   secFraction?: number;
   zone?: string;
   _comp?: boolean;
+  _bc?: boolean;
 }
 
 /**
@@ -200,6 +204,11 @@ function monNum(str: string): number {
  * `"-08-07-02"` is year -8 rather than 1992.
  */
 function s3e(y: string | null, m: string, d: string | null): DateParts {
+  // `date_parse.c:167-169`, `:204-206`, `:226-228`: each token is read from its
+  // first sign or digit, so the apostrophe `parse_vms` captures is skipped —
+  // and, being outside the digit span, does not count towards the width either.
+  if (y !== null) y = y.replace(/^'/, "");
+  if (d !== null) d = d.replace(/^'/, "");
   if (y === null && d !== null && d.length > 2) {
     y = d;
     d = null;
@@ -363,6 +372,184 @@ function parseIso(str: string): DateParts | null {
   return m ? s3e(m[1], m[2], m[3]) : null;
 }
 
+/**
+ * @internal `date_parse.c` `parse_iso21` (`date_parse.c:1035-1070`): the
+ * commercial week date, `"2001-W05-6"` and the yearless `"-W061"`.
+ */
+function parseIso21(str: string): DateParts | null {
+  const m = /\b(\d{2}|\d{4})?-?w(\d{2})(?:-?(\d))?\b/i.exec(str);
+  if (m === null) return null;
+  const hash: DateParts = {};
+  const y = m[1];
+  const w = m[2];
+  const d = m[3];
+
+  if (y !== undefined) hash.cwyear = Number(y);
+  hash.cweek = Number(w);
+  if (d !== undefined) hash.cwday = Number(d);
+
+  return hash;
+}
+
+/** @internal `date_parse.c` `parse_iso22` (`date_parse.c:1073-1099`): `"-W-6"`, a commercial day alone. */
+function parseIso22(str: string): DateParts | null {
+  const m = /-w-(\d)\b/i.exec(str);
+  return m ? { cwday: Number(m[1]) } : null;
+}
+
+/** @internal `date_parse.c` `parse_iso23` (`date_parse.c:1103-1134`): `"--02-03"`, and `"---03"`. */
+function parseIso23(str: string): DateParts | null {
+  const m = /--(\d{2})?-(\d{2})\b/.exec(str);
+  if (m === null) return null;
+  const hash: DateParts = {};
+  const mon = m[1];
+  const d = m[2];
+
+  if (mon !== undefined) hash.mon = Number(mon);
+  hash.mday = Number(d);
+
+  return hash;
+}
+
+/** @internal `date_parse.c` `parse_iso24` (`date_parse.c:1138-1169`): the unseparated `"--0203"`. */
+function parseIso24(str: string): DateParts | null {
+  const m = /--(\d{2})(\d{2})?\b/.exec(str);
+  if (m === null) return null;
+  const hash: DateParts = {};
+  const mon = m[1];
+  const d = m[2];
+
+  hash.mon = Number(mon);
+  if (d !== undefined) hash.mday = Number(d);
+
+  return hash;
+}
+
+/**
+ * @internal `date_parse.c` `parse_iso25` (`date_parse.c:1173-1219`): the ordinal
+ * date `"2001-034"`. `pat0` declines the run that is a second fraction
+ * (`"1.2001-034"`), which `parse_ddd` reads instead.
+ */
+function parseIso25(str: string): DateParts | null {
+  const pat0 = /[,.](\d{2}|\d{4})-\d{3}\b/;
+  const pat = /\b(\d{2}|\d{4})-(\d{3})\b/;
+
+  if (pat0.exec(str) !== null) return null;
+  const m = pat.exec(str);
+  return m ? { year: Number(m[1]), yday: Number(m[2]) } : null;
+}
+
+/** @internal `date_parse.c` `parse_iso26` (`date_parse.c:1223-1265`): the yearless ordinal date `"-034"`. */
+function parseIso26(str: string): DateParts | null {
+  const pat0 = /\d-\d{3}\b/;
+  const pat = /\b-(\d{3})\b/;
+
+  if (pat0.exec(str) !== null) return null;
+  const m = pat.exec(str);
+  return m ? { yday: Number(m[1]) } : null;
+}
+
+/**
+ * @internal `date_parse.c` `parse_iso2` (`date_parse.c:1269-1287`): the ISO
+ * spellings `parse_iso` does not take.
+ */
+function parseIso2(str: string): DateParts | null {
+  return (
+    parseIso21(str) ??
+    parseIso22(str) ??
+    parseIso23(str) ??
+    parseIso24(str) ??
+    parseIso25(str) ??
+    parseIso26(str)
+  );
+}
+
+/**
+ * @internal `date_parse.c` `JISX0301_ERA_INITIALS` (`date_parse.c:1290`): the
+ * initials of the Japanese eras `parse_jis` takes.
+ */
+const JISX0301_ERA_INITIALS = "mtshr";
+
+/** @internal `date_parse.c` `gengo` (`date_parse.c:1293-1307`): the year an era counts from. */
+function gengo(c: string): number {
+  let e: number;
+
+  switch (c) {
+    case "M":
+    case "m":
+      e = 1867;
+      break;
+    case "T":
+    case "t":
+      e = 1911;
+      break;
+    case "S":
+    case "s":
+      e = 1925;
+      break;
+    case "H":
+    case "h":
+      e = 1988;
+      break;
+    case "R":
+    case "r":
+      e = 2018;
+      break;
+    default:
+      e = 0;
+      break;
+  }
+  return e;
+}
+
+/**
+ * @internal `date_parse.c` `parse_jis` (`date_parse.c:1309-1346`): the JIS X
+ * 0301 date, `"H13.02.03"` — Heisei 13, which is 2001.
+ */
+function parseJis(str: string): DateParts | null {
+  const m = new RegExp(`\\b([${JISX0301_ERA_INITIALS}])(\\d+)\\.(\\d+)\\.(\\d+)`, "i").exec(str);
+  if (m === null) return null;
+  const e = m[1];
+  const y = m[2];
+  const mon = m[3];
+  const d = m[4];
+
+  const ep = gengo(e[0]);
+
+  return { year: Number(y) + ep, mon: Number(mon), mday: Number(d) };
+}
+
+/** @internal `date_parse.c` `parse_vms11` (`date_parse.c:1349-1388`): `"3-FEB-2001"`. */
+function parseVms11(str: string): DateParts | null {
+  const m = new RegExp(`('?-?${NUMBER}+)-(${ABBR_MONTHS})[^-/.]*-('?-?\\d+)`, "i").exec(str);
+  if (m === null) return null;
+  const d = m[1];
+  let mon = m[2];
+  const y = m[3];
+
+  mon = String(monNum(mon));
+
+  return s3e(y, mon, d);
+}
+
+/** @internal `date_parse.c` `parse_vms12` (`date_parse.c:1391-1431`): `"FEB-3-2001"`, and `"FEB-3"`. */
+function parseVms12(str: string): DateParts | null {
+  const m = new RegExp(`\\b(${ABBR_MONTHS})[^-/.]*-('?-?\\d+)(?:-('?-?\\d+))?`, "i").exec(str);
+  if (m === null) return null;
+  let mon = m[1];
+  const d = m[2];
+  const y = m[3];
+
+  mon = String(monNum(mon));
+
+  return s3e(y ?? null, mon, d);
+}
+
+/** @internal `date_parse.c` `parse_vms` (`date_parse.c:1433-1444`): the VMS date, either way round. */
+function parseVms(str: string): DateParts | null {
+  return parseVms11(str) ?? parseVms12(str);
+}
+
 /** @internal `date_parse.c` `parse_sla`: `2012/12/13`, `01/01/2012`, `2008/07`. */
 function parseSla(str: string): DateParts | null {
   const m = /([-+]?\d+)\/\s*(\d+)(?:\D\s*(-?\d+))?/.exec(str);
@@ -373,6 +560,28 @@ function parseSla(str: string): DateParts | null {
 function parseDot(str: string): DateParts | null {
   const m = /([-+]?\d+)\.\s*(\d+)\.\s*(-?\d+)/.exec(str);
   return m ? s3e(m[1], m[2], m[3]) : null;
+}
+
+/** @internal `date_parse.c` `parse_year` (`date_parse.c:1662-1688`): the year alone, `"'01"`. */
+function parseYear(str: string): DateParts | null {
+  const m = /'(\d+)\b/.exec(str);
+  return m ? { year: Number(m[1]) } : null;
+}
+
+/** @internal `date_parse.c` `parse_mon` (`date_parse.c:1692-1718`): the month alone, `"Feb"`. */
+function parseMon(str: string): DateParts | null {
+  const m = new RegExp(`\\b(${ABBR_MONTHS})\\S*`, "i").exec(str);
+  return m ? { mon: monNum(m[1]) } : null;
+}
+
+/**
+ * @internal `date_parse.c` `parse_mday` (`date_parse.c:1722-1748`): the day of
+ * the month alone, `"3rd"`. It sits directly above `parse_ddd`, so an ordinal
+ * suffix is what tells the two apart.
+ */
+function parseMday(str: string): DateParts | null {
+  const m = new RegExp(`(${NUMBER}+)(st|nd|rd|th)\\b`, "i").exec(str);
+  return m ? { mday: Number(m[1]) } : null;
 }
 
 /** @internal `date_parse.c` `n2i`: the `w` digits of `s` from `f`, as a number. */
@@ -569,6 +778,18 @@ function parseDdd(str: string): DateParts | null {
 }
 
 /**
+ * @internal `date_parse.c` `parse_bc` (`date_parse.c:2003-2019`): the era
+ * suffix. It runs after whichever date sub-parser matched and only records
+ * `:_bc`; the tail of `date__parse` is what negates the year.
+ */
+function parseBc(str: string, hash: DateParts): number {
+  const m = /\b(bc\b|bce\b|b\.c\.|b\.c\.e\.)/i.exec(str);
+  if (m === null) return 0;
+  hash._bc = true;
+  return 1;
+}
+
+/**
  * @internal `date_core.c` `rt_complete_frags` (`date_core.c:3878-4036`), which
  * decides what kind of date the fields name — the entry of its table with the
  * most of them present wins, ties going to the earliest — and then fills the
@@ -726,10 +947,8 @@ export class Date {
    * and only ever turns false, so an absent one is `comp`, and the year is
    * completed only within `0..99` (`date_parse.c:2267-2287`).
    *
-   * @missingRailsCall `parse_jis`, `parse_vms`, `parse_iso2`, `parse_year`,
-   * `parse_mon`, `parse_mday` and `parse_bc` are not ported: they read a
-   * calendar Rails never round-trips. Neither is `date_zone_to_diff`
-   * (`date_parse.c:416-559`), so the `:offset` a `:zone` also sets is missing
+   * @missingRailsCall `date_zone_to_diff` (`date_parse.c:416-559`) is not
+   * ported, so the `:offset` a `:zone` also sets is missing
    * from both of its call sites — the tail of `date__parse` itself
    * (`date_parse.c:2290-2294`) and the bracketed zone of `parse_ddd_cb`
    * (`date_parse.c:1934-1960`). It reads a zone-name table `::Date` has no use
@@ -743,11 +962,32 @@ export class Date {
     if (/[a-z]/i.test(str)) {
       parts = parseEu(str) ?? parseUs(str);
     }
-    parts ??= parseIso(str) ?? parseSla(str) ?? parseDot(str) ?? parseDdd(str);
+    parts ??=
+      parseIso(str) ??
+      parseJis(str) ??
+      parseVms(str) ??
+      parseSla(str) ??
+      parseDot(str) ??
+      parseIso2(str) ??
+      parseYear(str) ??
+      parseMon(str) ??
+      parseMday(str) ??
+      parseDdd(str);
     if (parts === null && Object.keys(hash).length === 0) return null;
     parts = Object.assign(hash, parts);
-    if (comp && parts._comp !== false && parts.year !== undefined) {
-      if (parts.year >= 0 && parts.year <= 99) parts.year = compYear69(parts.year);
+    parseBc(str, parts);
+    if (parts._bc) {
+      if (parts.cwyear !== undefined) parts.cwyear = -parts.cwyear + 1;
+      if (parts.year !== undefined) parts.year = -parts.year + 1;
+    }
+    delete parts._bc;
+    if (comp && parts._comp !== false) {
+      if (parts.cwyear !== undefined && parts.cwyear >= 0 && parts.cwyear <= 99) {
+        parts.cwyear = compYear69(parts.cwyear);
+      }
+      if (parts.year !== undefined && parts.year >= 0 && parts.year <= 99) {
+        parts.year = compYear69(parts.year);
+      }
     }
     delete parts._comp;
     return parts;
