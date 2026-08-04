@@ -61,7 +61,12 @@ export {
   withLocale,
 } from "./i18n.js";
 export type { Locale, TranslateKey, TranslationKey } from "./i18n.js";
-export { Base, registerFileReader, preloadTranslationFiles } from "./backend/base.js";
+export {
+  Base,
+  registerFileReader,
+  registerLocaleModule,
+  preloadTranslationFiles,
+} from "./backend/base.js";
 export type { FileReader, TranslateOptions } from "./backend/base.js";
 export { Chain } from "./backend/chain.js";
 export { Simple } from "./backend/simple.js";

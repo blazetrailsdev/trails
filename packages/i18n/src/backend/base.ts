@@ -13,9 +13,6 @@
  * the value already renders through `inspect`. That is the spelling `localize`,
  * `default` and `resolve` all use for the `Symbol === x` arms of the gem
  * (base.rb:84, base.rb:154).
- *
- * Not ported here: `load_rb` (it `eval`s Ruby source, which trails has none of
- * — see the `SCOPED_SKIP_GROUPS` entry in `scripts/api-compare/conventions.ts`).
  */
 
 import {
@@ -56,6 +53,7 @@ export type FileReader = (filename: string) => Promise<string>;
 
 let fileReader: FileReader | undefined;
 const fileContents = new Map<string, string>();
+const localeModules = new Map<string, unknown>();
 
 /**
  * @noRailsEquivalent PERMANENT — the gem reads translation files with Ruby core —
@@ -81,6 +79,22 @@ export function registerFileReader(reader: FileReader): void {
  * deviation through five packages to remove one from this file. Awaiting the
  * I/O once at boot keeps the async fs and leaves every ported body verbatim.
  */
+/**
+ * Registers an already-imported JavaScript locale module under the load-path
+ * entry that names it, so that `load_rb`'s port can evaluate it synchronously.
+ *
+ * @noRailsEquivalent PERMANENT — `load_rb` (base.rb:254) is
+ * `eval(IO.read(filename), binding, filename)`: Ruby evaluates a source file
+ * synchronously, wherever it sits. JS evaluates one with `import()`, which is a
+ * Promise, and the four lazy `init_translations` call sites (simple.rb:83-86)
+ * are synchronous in Rails all the way up. A host that puts a `.js` file on the
+ * load path has already imported it, so it hands the module over here — the
+ * module counterpart of `preloadTranslationFiles` below.
+ */
+export function registerLocaleModule(filename: string, translations: unknown): void {
+  localeModules.set(filename, translations);
+}
+
 export async function preloadTranslationFiles(...filenames: (string | string[])[]): Promise<void> {
   const paths = filenames.length === 0 ? config().loadPath : filenames;
   for (const filename of paths.flat()) {
@@ -114,6 +128,15 @@ function readTranslationFile(filename: string): Promise<string> {
     );
   }
   return fileReader(filename);
+}
+
+function readLocaleModule(filename: string): unknown {
+  if (!localeModules.has(filename)) {
+    throw new Error(
+      `I18n cannot evaluate ${filename}: importing a module is async, so register it with I18n.registerLocaleModule() before putting it on I18n.load_path.`,
+    );
+  }
+  return localeModules.get(filename);
 }
 
 function readFile(filename: string): string {
@@ -200,9 +223,9 @@ export abstract class Base {
   private eagerLoadedFlag = false;
 
   /**
-   * Accepts a list of paths to translation files. Loads translations from YAML
-   * files (*.yml) or JSON files (*.json). See #loadYml and #loadJson for
-   * details. Ruby's optional block is the trailing argument here.
+   * Accepts a list of paths to translation files. Loads translations from
+   * plain JavaScript (*.js), YAML files (*.yml), or JSON files (*.json). See
+   * #loadJs, #loadYml, and #loadJson for details. Ruby's optional block is the trailing argument here.
    */
   loadTranslations(...filenames: unknown[]): void {
     const block =
@@ -528,7 +551,7 @@ export abstract class Base {
   }
 
   /**
-   * Loads a single translations file by delegating to #loadYml or #loadJson
+   * Loads a single translations file by delegating to #loadJs or #loadYml
    * depending on the file extension and directly merges the data to the
    * existing translations. Raises I18n::UnknownFileType for all other file
    * extensions.
@@ -551,6 +574,16 @@ export abstract class Base {
       });
     }
     return data;
+  }
+
+  /**
+   * Loads a plain JavaScript translations file. Evaluating the file must yield
+   * translation data with locales as toplevel keys — the gem `eval`s Ruby
+   * source for that hash, and a JS module's exports are the same hash.
+   */
+  protected loadJs(filename: string): [unknown, boolean] {
+    const translations = readLocaleModule(filename);
+    return [translations, false];
   }
 
   /**

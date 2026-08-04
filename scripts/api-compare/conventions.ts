@@ -19,6 +19,11 @@ import * as path from "path";
  */
 const TOKEN_RENAMES: Record<string, string> = {
   erb: "tse",
+  // A Ruby source file is a TypeScript one: I18n::Backend::Base#load_rb
+  // (i18n/lib/i18n/backend/base.rb:254) loads a translation file written in
+  // Ruby, and its port loads one written in JS, dispatched off the `.js`
+  // extension by `load_file`.
+  rb: "js",
   ERB: "TSE",
   Erb: "Tse",
 };
@@ -441,18 +446,6 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       "connect",
     ],
     rubyFiles: ["config.rb"],
-  },
-  {
-    reason:
-      "I18n::Backend::Base#load_rb (backend/base.rb:236-239) is " +
-      "`eval(IO.read(filename), binding, filename)` — it loads a translation " +
-      "file written in Ruby source. trails has no Ruby to eval, and a `.js` " +
-      "locale module loaded with dynamic `import()` would be new public " +
-      "surface the gem has no counterpart for, so the `.rb` arm of " +
-      "`load_file`'s extension dispatch is not ported at all. The `.yml` / " +
-      "`.yaml` / `.json` arms are.",
-    names: ["load_rb"],
-    rubyFiles: ["backend/base.rb"],
   },
 ];
 
