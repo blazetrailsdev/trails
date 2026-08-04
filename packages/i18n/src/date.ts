@@ -383,6 +383,10 @@ function shrinkSpace(s: string, l: number): string {
  * is it read as a numeric offset — `+09:00`, `+0930`, `+9`, `+9.5`, optionally
  * behind a `gmt`/`utc` prefix. `null` is Ruby's `nil`: not a zone it knows.
  *
+ * The fractional-hour branch keeps C's `maxDigits` cap of seven decimal places
+ * (`date_parse.c:514-517`) and its round-half-to-even on the eighth
+ * (`date_parse.c:519-522`), where the comparison character is `'5' + !(sec & 1)`.
+ *
  * Ruby answers a Rational for a fractional-hour offset of more than two
  * decimal places (`date_parse.c:522-528`); TypeScript has no Rational, so the
  * division is a `number` there.
@@ -467,10 +471,7 @@ function dateZoneToDiff(str: string): number | null {
             if (outOfRange(sec, 0, 59)) return null;
           }
         } else if (s[p] === "," || s[p] === ".") {
-          /* fractional hour */
           let n: number;
-          /* no over precision for offset; 10**-7 hour = 0.36
-           * milliseconds should be enough. */
           const maxDigits = 7;
 
           if (outOfRange(hour, 0, 23)) return null;
@@ -479,7 +480,6 @@ function dateZoneToDiff(str: string): number | null {
           if (n > maxDigits) n = maxDigits;
           [sec, n] = rubyScanDigits(s, p, n);
           if ((p += n) < l && s[p] >= (sec % 2 === 0 ? "6" : "5") && s[p] <= "9") {
-            /* round half to even */
             sec++;
           }
           sec *= 36;
@@ -488,7 +488,6 @@ function dateZoneToDiff(str: string): number | null {
             sec = -sec;
           }
           if (n <= 2) {
-            /* HH.nn or HH.n */
             if (n === 1) sec *= 10;
             offset = sec + hour * 3600;
           } else {
