@@ -884,6 +884,8 @@ describe("AttributeMethodsTest", () => {
     const topic = new Topic({ title: "a" });
     Object.defineProperty(topic, "title", { get: () => "b" });
     expect(topic.readAttribute("title")).toBe("a");
+    // Mirrors: assert_equal "a", topic[:title]
+    expect((topic as any).get("title")).toBe("a");
   });
 
   it("non-attribute read and write", async () => {
@@ -1010,7 +1012,14 @@ describe("AttributeMethodsTest", () => {
       }
     }
     const t = Topic.new({ title: "read-test" }) as any;
-    expect(t.readAttribute("title")).toBe("read-test");
+    const superReadAttribute = t.readAttribute.bind(t);
+    t.readAttribute = (attrName: string, block?: (name: string) => unknown) =>
+      String(superReadAttribute(attrName, block)).toUpperCase();
+
+    expect(t.readAttribute("title")).toBe("READ-TEST");
+    // Mirrors: assert_equal "STOP CHANGING THE TOPIC", topic["title"] — `[]`
+    // dispatches read_attribute, so the override reaches bracket reads too.
+    expect(t.get("title")).toBe("READ-TEST");
   });
 
   it("attribute_method?", async () => {

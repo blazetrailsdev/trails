@@ -720,11 +720,7 @@ export function readAttribute(
  *   end
  */
 export function get(this: InstanceMethodHost, attrName: string): unknown {
-  // `read_attribute` here is AR's (read.rb:31-34) — the `readAttribute` above.
-  // Base's own `readAttribute` is still ActiveModel's, which short-circuits an
-  // unselected column to nil before the block can run, so calling the AR port
-  // directly is what preserves the missing_attribute raise.
-  return readAttribute.call(this, attrName, (n) =>
+  return this.readAttribute(attrName, (n) =>
     missingAttribute.call(this as unknown as AttributeMethodsInstanceHost, n),
   );
 }
