@@ -124,7 +124,7 @@ export class Simple extends Base {
     options: TranslateOptions = EMPTY_HASH,
   ): unknown {
     if (!this.initialized()) this.initTranslations();
-    const keys = normalizeKeys(locale, key, scope, options.separator as string | undefined);
+    const keys = normalizeKeys(locale, key, scope, options.separator as string | false | undefined);
 
     let result: unknown = this.translations();
     for (const rawKey of keys) {

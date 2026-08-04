@@ -48,4 +48,8 @@ describe("I18n.normalizeKeys memoization", () => {
     expect(normalizeKeys(null, "foo.bar", null, ".")).toEqual(["foo", "bar"]);
     expect(normalizeKeys(null, "foo.bar", null, "|")).toEqual(["foo.bar"]);
   });
+
+  it("falls back to the default separator when passed false", () => {
+    expect(normalizeKeys(null, "foo.bar", null, false)).toEqual(["foo", "bar"]);
+  });
 });
