@@ -221,7 +221,7 @@ export class Time {
   }
 
   /**
-   * `Time#zone` is the zone's abbreviation — `"UTC"` for a `Time.utc`, `"PDT"`
+   * `Time#zone` is the zone's tzdata abbreviation — `"UTC"` for a `Time.utc`, `"PDT"`
    * for a local summer time — not an offset, which is what `::DateTime#zone`
    * answers instead. A time built from an offset rather than a zone has no
    * abbreviation to answer and Ruby returns `nil`, which `%Z` prints as "".

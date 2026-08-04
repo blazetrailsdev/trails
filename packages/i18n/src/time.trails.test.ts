@@ -100,8 +100,6 @@ describe("Time", () => {
       inZone("Australia/Adelaide");
       expect(new Time(2008, 1, 1, 6, 0, 0).zone).toBe("ACDT");
       expect(new Time(2008, 7, 1, 6, 0, 0).zone).toBe("ACST");
-      // Dublin's summer time is its *standard* time in tzdata, so an
-      // is-it-DST flag would answer these two backwards.
       inZone("Europe/Dublin");
       expect(new Time(2008, 1, 1, 6, 0, 0).zone).toBe("GMT");
       expect(new Time(2008, 7, 1, 6, 0, 0).zone).toBe("IST");
