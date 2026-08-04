@@ -1,4 +1,5 @@
 import { I18n } from "../i18n.js";
+import { camelize } from "../inflector.js";
 
 export type NumberFormatOptions = object;
 
@@ -58,20 +59,6 @@ const DEFAULTS: Record<string, Record<string, unknown>> = {
     },
   },
 };
-
-const I18N_KEY_MAP: Record<string, string> = {
-  round_mode: "roundMode",
-  strip_insignificant_zeros: "stripInsignificantZeros",
-  negative_format: "negativeFormat",
-};
-
-function camelizeI18nKeys(obj: Record<string, unknown>): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(obj)) {
-    result[I18N_KEY_MAP[k] ?? k] = v;
-  }
-  return result;
-}
 
 export abstract class NumberConverter<TOptions extends NumberFormatOptions = NumberFormatOptions> {
   protected number: unknown;
@@ -138,16 +125,20 @@ export abstract class NumberConverter<TOptions extends NumberFormatOptions = Num
   protected i18nFormatOptions(): Record<string, unknown> {
     const locale = (this.opts as Record<string, unknown>).locale as string | undefined;
     const raw = I18n.translate("number.format", { locale, default: {} });
-    const options =
-      typeof raw === "object" && raw !== null && !Array.isArray(raw)
-        ? camelizeI18nKeys({ ...(raw as Record<string, unknown>) })
-        : {};
+    const options: Record<string, unknown> = {};
+    if (typeof raw === "object" && raw !== null && !Array.isArray(raw)) {
+      for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+        options[camelize(k, "lower")] = v;
+      }
+    }
 
     const ns = (this.constructor as typeof NumberConverter).namespace;
     if (ns) {
       const nsRaw = I18n.translate(`number.${ns}.format`, { locale, default: {} });
       if (typeof nsRaw === "object" && nsRaw !== null && !Array.isArray(nsRaw)) {
-        Object.assign(options, camelizeI18nKeys({ ...(nsRaw as Record<string, unknown>) }));
+        for (const [k, v] of Object.entries(nsRaw as Record<string, unknown>)) {
+          options[camelize(k, "lower")] = v;
+        }
       }
     }
     return options;

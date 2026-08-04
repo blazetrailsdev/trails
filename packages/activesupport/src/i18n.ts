@@ -20,6 +20,14 @@
  * `.json` arms of the same dispatch.
  *
  * `run_load_hooks(:i18n)` and `i18n/backend/fallbacks` have no port yet.
+ *
+ * Locale payloads keep Ruby's snake_case keys (that is what the `.yml` files
+ * and `storeTranslations` callers carry), while the option hashes Rails merges
+ * them into are camelCase here. Where a Rails body merges a translation
+ * straight into options — `Array#to_sentence`, `to_sentence` in
+ * `output_safety_helper.rb`, `NumberConverter#i18n_format_options` — camelize
+ * the keys at the lookup boundary with `camelize(key, "lower")` from
+ * `inflector.ts`. Do not introduce a per-file snake_case→camelCase key map.
  */
 
 import * as I18n from "@blazetrails/i18n";
