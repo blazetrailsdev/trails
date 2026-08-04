@@ -289,11 +289,6 @@ function isspace(c: string | undefined): boolean {
   return c === " " || (c !== undefined && c >= "\t" && c <= "\r");
 }
 
-/** @internal `date_parse.c` `issign` (`date_parse.c:23`). */
-function issign(c: string | undefined): boolean {
-  return c === "-" || c === "+";
-}
-
 /**
  * @internal C `strtoul` base 10, answering the value and the index one past
  * the digits it read, which is `date_zone_to_diff`'s `p`.
@@ -302,7 +297,7 @@ function strtoul(s: string, i: number): [number, number] {
   let v = 0;
 
   while (isspace(s[i])) i++;
-  while (s[i] >= "0" && s[i] <= "9") {
+  while (isdigit(s[i])) {
     v = v * 10 + Number(s[i]);
     i++;
   }
@@ -317,7 +312,7 @@ function rubyScanDigits(s: string, start: number, len: number): [number, number]
   let v = 0;
   let n = 0;
 
-  while (n < len && s[start + n] >= "0" && s[start + n] <= "9") {
+  while (n < len && isdigit(s[start + n])) {
     v = v * 10 + Number(s[start + n]);
     n++;
   }
@@ -1252,7 +1247,7 @@ function parseDddCb(m: RegExpExecArray, hash: DateParts): number {
         s5 = s5.slice(s1, s1 + (s2 - s1));
       } else {
         zone = s5.slice(s1, s1 + l5);
-        if (cs5[s1] >= "0" && cs5[s1] <= "9") s5 = "+" + zone;
+        if (isdigit(cs5[s1])) s5 = "+" + zone;
         else s5 = zone;
       }
       hash.zone = zone;
