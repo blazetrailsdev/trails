@@ -529,8 +529,13 @@ function dateZoneToDiff(str: string): number | null {
  * Ruby's `m` is a Ruby object that `f_to_s` makes a String (`:86-87`); the
  * ported callers pass the String directly.
  */
-function s3e(y: string | null, m: string | null, d: string | null, bc: boolean): DateParts {
-  const hash: DateParts = {};
+function s3e(
+  hash: DateParts,
+  y: string | null,
+  m: string | null,
+  d: string | null,
+  bc: boolean,
+): void {
   let c: boolean | null = null;
 
   if (y !== null && m !== null && d === null) {
@@ -645,7 +650,6 @@ function s3e(y: string | null, m: string | null, d: string | null, bc: boolean):
   }
 
   if (c !== null) hash._comp = c;
-  return hash;
 }
 
 /**
@@ -655,8 +659,11 @@ function s3e(y: string | null, m: string | null, d: string | null, bc: boolean):
  *
  * Ruby edits the one String they all share (`f_aset2`); a JS string is
  * immutable, so the edited string is answered instead, as `parse_day` below
- * already does. Ruby's `subx` runs the match itself and hands it to a callback;
- * the ported sub-parsers hold their own match, so it takes that.
+ * already does. Ruby's `subx` also runs the match and dispatches to the
+ * sub-parser's `_cb`; most of the ported sub-parsers inlined their `_cb`, so
+ * they hold their own match and this takes it — story
+ * `i18n-date-subx-cb-decomposition` extracts those `_cb`s and gives `subx`
+ * `date_parse.c:319`'s full parameter list.
  */
 function subx(str: string, m: RegExpExecArray): string {
   return str.slice(0, m.index) + " " + str.slice(m.index + m[0].length);
@@ -800,10 +807,7 @@ function parseEuCb(m: RegExpExecArray, hash: DateParts): number {
 
   mon = monNum(mon);
 
-  Object.assign(
-    hash,
-    s3e(y ?? null, String(mon), d, b !== undefined && (b[0] === "B" || b[0] === "b")),
-  );
+  s3e(hash, y ?? null, String(mon), d, b !== undefined && (b[0] === "B" || b[0] === "b"));
   return 1;
 }
 
@@ -843,10 +847,7 @@ function parseUsCb(m: RegExpExecArray, hash: DateParts): number {
 
   mon = monNum(mon);
 
-  Object.assign(
-    hash,
-    s3e(y ?? null, String(mon), d, b !== undefined && (b[0] === "B" || b[0] === "b")),
-  );
+  s3e(hash, y ?? null, String(mon), d, b !== undefined && (b[0] === "B" || b[0] === "b"));
   return 1;
 }
 
@@ -881,7 +882,7 @@ function parseUs(str: string, hash: DateParts): string | null {
 function parseIso(str: string, hash: DateParts): string | null {
   const m = /([-+]?\d+)-(\d+)-(-?\d+)/.exec(str);
   if (m === null) return null;
-  Object.assign(hash, s3e(m[1], m[2], m[3], false));
+  s3e(hash, m[1], m[2], m[3], false);
   return subx(str, m);
 }
 
@@ -1050,7 +1051,7 @@ function parseVms11(str: string, hash: DateParts): string | null {
 
   mon = String(monNum(mon));
 
-  Object.assign(hash, s3e(y, mon, d, false));
+  s3e(hash, y, mon, d, false);
   return subx(str, m);
 }
 
@@ -1064,7 +1065,7 @@ function parseVms12(str: string, hash: DateParts): string | null {
 
   mon = String(monNum(mon));
 
-  Object.assign(hash, s3e(y ?? null, mon, d, false));
+  s3e(hash, y ?? null, mon, d, false);
   return subx(str, m);
 }
 
@@ -1077,7 +1078,7 @@ function parseVms(str: string, hash: DateParts): string | null {
 function parseSla(str: string, hash: DateParts): string | null {
   const m = /([-+]?\d+)\/\s*(\d+)(?:\D\s*(-?\d+))?/.exec(str);
   if (m === null) return null;
-  Object.assign(hash, s3e(m[1], m[2], m[3] ?? null, false));
+  s3e(hash, m[1], m[2], m[3] ?? null, false);
   return subx(str, m);
 }
 
@@ -1085,7 +1086,7 @@ function parseSla(str: string, hash: DateParts): string | null {
 function parseDot(str: string, hash: DateParts): string | null {
   const m = /([-+]?\d+)\.\s*(\d+)\.\s*(-?\d+)/.exec(str);
   if (m === null) return null;
-  Object.assign(hash, s3e(m[1], m[2], m[3], false));
+  s3e(hash, m[1], m[2], m[3], false);
   return subx(str, m);
 }
 
@@ -1547,28 +1548,27 @@ export class Date {
       parseDdd(str, hash);
     if (rest === null && Object.keys(hash).length === 0) return null;
     if (rest !== null) str = rest;
-    const parts = hash;
-    if (/[a-z]/i.test(str)) parseBc(str, parts);
-    if (/\d/.test(str)) parseFrag(str, parts);
-    if (parts._bc) {
-      if (parts.cwyear !== undefined) parts.cwyear = -parts.cwyear + 1;
-      if (parts.year !== undefined) parts.year = -parts.year + 1;
+    if (/[a-z]/i.test(str)) parseBc(str, hash);
+    if (/\d/.test(str)) parseFrag(str, hash);
+    if (hash._bc) {
+      if (hash.cwyear !== undefined) hash.cwyear = -hash.cwyear + 1;
+      if (hash.year !== undefined) hash.year = -hash.year + 1;
     }
-    delete parts._bc;
-    if (comp && parts._comp !== false) {
-      if (parts.cwyear !== undefined && parts.cwyear >= 0 && parts.cwyear <= 99) {
-        parts.cwyear = compYear69(parts.cwyear);
+    delete hash._bc;
+    if (comp && hash._comp !== false) {
+      if (hash.cwyear !== undefined && hash.cwyear >= 0 && hash.cwyear <= 99) {
+        hash.cwyear = compYear69(hash.cwyear);
       }
-      if (parts.year !== undefined && parts.year >= 0 && parts.year <= 99) {
-        parts.year = compYear69(parts.year);
+      if (hash.year !== undefined && hash.year >= 0 && hash.year <= 99) {
+        hash.year = compYear69(hash.year);
       }
     }
     {
-      const zone = parts.zone;
-      if (zone !== undefined && parts.offset == null) parts.offset = dateZoneToDiff(zone);
+      const zone = hash.zone;
+      if (zone !== undefined && hash.offset == null) hash.offset = dateZoneToDiff(zone);
     }
-    delete parts._comp;
-    return parts;
+    delete hash._comp;
+    return hash;
   }
 
   get year(): number {
