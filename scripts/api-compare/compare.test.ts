@@ -652,8 +652,6 @@ describe("primaryClassesPerFile", () => {
   });
 
   it("keeps a ruby-only class out of the inheritance selection", () => {
-    // key_value.rb declares `I18n::JSON` (:8) and `I18n::Backend::KeyValue`
-    // (:68). The two-segment shim used to win, leaving KeyValue unchecked.
     const { inheritance } = primaryClassesPerFile({
       "I18n::JSON": cls("backend/key_value.rb"),
       "I18n::Backend::KeyValue": cls("backend/key_value.rb"),
@@ -663,8 +661,6 @@ describe("primaryClassesPerFile", () => {
   });
 
   it("keeps the ruby-only class as the folding parent", () => {
-    // Folding is lexical: promoting KeyValue here would make SubtreeProxy a
-    // nested class of the file's parent and drop its methods.
     const { folding } = primaryClassesPerFile({
       "I18n::JSON": cls("backend/key_value.rb"),
       "I18n::Backend::KeyValue": cls("backend/key_value.rb"),
