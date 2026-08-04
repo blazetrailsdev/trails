@@ -119,6 +119,22 @@ export class ArgumentError extends Error {
   }
 }
 
+/**
+ * Mirror of Ruby's `NoMethodError`, raised where the gem sends a method to a
+ * receiver that does not respond to it — `locale.to_sym` in `Config#locale=`
+ * and `Config#default_locale=` (i18n/lib/i18n/config.rb:17, :37), which is
+ * what makes junk assignment fail rather than be ignored.
+ *
+ * @noRailsEquivalent PERMANENT — a Ruby core class the gem raises but does not
+ * define; JS has no `NoMethodError`, so the port has to carry one.
+ */
+export class NoMethodError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "NoMethodError";
+  }
+}
+
 export class Disabled extends ArgumentError {
   constructor(method: string) {
     super(`I18n.${method} is currently disabled, likely because your application is still in its loading phase.

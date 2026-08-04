@@ -3,7 +3,12 @@
  */
 
 import { enforceAvailableLocalesBang, type Locale, type TranslationKey } from "./i18n.js";
-import { ExceptionHandler, MissingInterpolationArgument } from "./exceptions.js";
+import {
+  ExceptionHandler,
+  MissingInterpolationArgument,
+  NoMethodError,
+  inspect,
+} from "./exceptions.js";
 import { DEFAULT_INTERPOLATION_PATTERNS } from "./interpolate/ruby.js";
 import type { Base } from "./backend/base.js";
 import { Simple } from "./backend/simple.js";
@@ -51,8 +56,16 @@ export class Config {
     return this.localeValue ?? this.defaultLocale;
   }
 
+  /**
+   * Sets the current locale. Ruby's `locale && locale.to_sym`: a Symbol is a
+   * plain string here, so `to_sym` is the identity for one; anything else has
+   * no `to_sym` and raises.
+   */
   set locale(locale: Locale | false) {
     enforceAvailableLocalesBang(locale);
+    if (locale != null && locale !== false && typeof locale !== "string") {
+      throw new NoMethodError(`undefined method 'to_sym' for ${inspect(locale)}`);
+    }
     this.localeValue = locale;
   }
 
@@ -72,8 +85,12 @@ export class Config {
     return defaultLocale;
   }
 
+  /** Sets the default locale; `to_sym` as in `locale=` above. */
   set defaultLocale(locale: Locale) {
     enforceAvailableLocalesBang(locale);
+    if (locale != null && (locale as unknown) !== false && typeof locale !== "string") {
+      throw new NoMethodError(`undefined method 'to_sym' for ${inspect(locale)}`);
+    }
     defaultLocale = locale;
   }
 
