@@ -1146,7 +1146,6 @@ export class TableDefinition {
       assertValidKeys(rest, this.validColumnDefinitionOptions());
     }
 
-
     return new ColumnDefinition(name, type, options);
   }
 
