@@ -87,7 +87,7 @@ describe("I18nBackendChainTest", () => {
     expect(t(null, { default: "Fuh" })).toBe("Fuh");
     expect(t(null, { default: { zero: "Zero" }, count: 0 })).toBe("Zero");
     expect(t(null, { default: { zero: "Zero" } })).toEqual({ zero: "Zero" });
-    expect(t(null, { default: Symbol.for("foo") })).toBe("Foo");
+    expect(t(null, { default: ":foo" })).toBe("Foo");
   });
 
   it("default is returned if translation is missing", () => {
@@ -127,12 +127,8 @@ describe("I18nBackendChainTest", () => {
 
   it("store_translations options are not dropped while transferring to backend", () => {
     const storeTranslations = vi.spyOn(first, "storeTranslations");
-    config().backend.storeTranslations("foo", { bar: Symbol.for("baz") }, { option: "persists" });
-    expect(storeTranslations).toHaveBeenCalledWith(
-      "foo",
-      { bar: Symbol.for("baz") },
-      { option: "persists" },
-    );
+    config().backend.storeTranslations("foo", { bar: ":baz" }, { option: "persists" });
+    expect(storeTranslations).toHaveBeenCalledWith("foo", { bar: ":baz" }, { option: "persists" });
   });
 
   it("store should call initialize on all backends and return true if all initialized", () => {

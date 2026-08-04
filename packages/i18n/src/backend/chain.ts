@@ -95,7 +95,7 @@ export class Chain extends Base {
 
   override translate(
     locale: Locale | null | undefined,
-    key: TranslationKey | symbol | null | undefined,
+    key: TranslationKey | null | undefined,
     defaultOptions: TranslateOptions = EMPTY_HASH,
   ): unknown {
     let namespace: TranslationData | null = null;
@@ -121,7 +121,7 @@ export class Chain extends Base {
 
   override exists(
     locale: Locale,
-    key: TranslationKey | symbol,
+    key: TranslationKey,
     options: TranslateOptions = EMPTY_HASH,
   ): boolean {
     return this.backends.some((backend) => backend.exists(locale, key, options));
