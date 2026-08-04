@@ -6,7 +6,7 @@
  */
 
 import { Temporal } from "@js-temporal/polyfill";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { ArgumentError } from "./date.js";
 import { Time } from "./time.js";
 
@@ -79,5 +79,37 @@ describe("Time", () => {
     );
     expect(time.utcOffset).toBe(Number(local.offsetNanoseconds) / 1_000_000_000);
     expect(time.strftime("%z")).toBe(local.offset.replace(":", ""));
+  });
+
+  describe("in a local zone `Intl` has no abbreviation for", () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    function inZone(timeZoneId: string): void {
+      vi.spyOn(Temporal.Now, "timeZoneId").mockReturnValue(timeZoneId);
+    }
+
+    it("Time#zone answers the tzdata abbreviation, not Intl's short name", () => {
+      inZone("Asia/Kolkata");
+      expect(new Time(2008, 3, 1, 6, 0, 0).zone).toBe("IST");
+      expect(new Time(2008, 3, 1, 6, 0, 0).strftime("%z %Z")).toBe("+0530 IST");
+    });
+
+    it("Time#zone answers the standard or the summer abbreviation by offset", () => {
+      inZone("Australia/Adelaide");
+      expect(new Time(2008, 1, 1, 6, 0, 0).zone).toBe("ACDT");
+      expect(new Time(2008, 7, 1, 6, 0, 0).zone).toBe("ACST");
+      inZone("Europe/Dublin");
+      expect(new Time(2008, 1, 1, 6, 0, 0).zone).toBe("GMT");
+      expect(new Time(2008, 7, 1, 6, 0, 0).zone).toBe("IST");
+    });
+
+    it("Time#zone spells an untabulated zone's abbreviation as tzdata does", () => {
+      inZone("Asia/Dubai");
+      expect(new Time(2008, 3, 1, 6, 0, 0).zone).toBe("+04");
+      inZone("Asia/Kathmandu");
+      expect(new Time(2008, 3, 1, 6, 0, 0).zone).toBe("+0545");
+    });
   });
 });

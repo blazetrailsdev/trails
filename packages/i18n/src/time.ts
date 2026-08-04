@@ -66,6 +66,82 @@ function pad2(n: number): string {
 }
 
 /**
+ * The tzdata abbreviations MRI's `Time#zone` answers, for the zones `Intl`
+ * cannot supply them for: an `en-US` `timeZoneName: "short"` is an
+ * abbreviation only where English has one (`"EST"`, `"PDT"`, `"HST"`) and a
+ * `"GMT+5:30"` string everywhere else, where MRI answers `"IST"`.
+ *
+ * Each entry is the zone's standard abbreviation, then its summer one where
+ * the zone has a second — picked by offset rather than by a DST flag, so
+ * `Europe/Dublin`'s negative DST (standard `"IST"` in summer, `"GMT"` in
+ * winter) falls out the same way as every other zone's. Zones whose tzdata
+ * abbreviation is the numeric `"+04"` form need no entry: `tzdataAbbreviation`
+ * spells those from the offset.
+ */
+const ZONE_ABBREVIATIONS: Record<string, readonly [string] | readonly [string, string]> = {
+  "Africa/Cairo": ["EET", "EEST"],
+  "Africa/Harare": ["CAT"],
+  "Africa/Johannesburg": ["SAST"],
+  "Africa/Lagos": ["WAT"],
+  "Africa/Nairobi": ["EAT"],
+  "America/St_Johns": ["NST", "NDT"],
+  "Asia/Hong_Kong": ["HKT"],
+  "Asia/Jakarta": ["WIB"],
+  "Asia/Jayapura": ["WIT"],
+  "Asia/Jerusalem": ["IST", "IDT"],
+  "Asia/Karachi": ["PKT"],
+  "Asia/Kolkata": ["IST"],
+  "Asia/Makassar": ["WITA"],
+  "Asia/Manila": ["PST"],
+  "Asia/Seoul": ["KST"],
+  "Asia/Shanghai": ["CST"],
+  "Asia/Taipei": ["CST"],
+  "Asia/Tokyo": ["JST"],
+  "Asia/Yangon": ["MMT"],
+  "Australia/Adelaide": ["ACST", "ACDT"],
+  "Australia/Brisbane": ["AEST"],
+  "Australia/Darwin": ["ACST"],
+  "Australia/Perth": ["AWST"],
+  "Australia/Sydney": ["AEST", "AEDT"],
+  "Europe/Athens": ["EET", "EEST"],
+  "Europe/Berlin": ["CET", "CEST"],
+  "Europe/Dublin": ["GMT", "IST"],
+  "Europe/Lisbon": ["WET", "WEST"],
+  "Europe/London": ["GMT", "BST"],
+  "Europe/Moscow": ["MSK"],
+  "Europe/Paris": ["CET", "CEST"],
+  "Pacific/Auckland": ["NZST", "NZDT"],
+  "Pacific/Guam": ["ChST"],
+};
+
+/**
+ * The abbreviation tzdata gives `zoned`'s zone at `zoned`'s instant, which is
+ * what MRI's `Time#zone` and `%Z` answer. Zones outside `ZONE_ABBREVIATIONS`
+ * either have an English abbreviation `Intl` knows (`"EST"`) or carry tzdata's
+ * numeric abbreviation, which is the offset spelled `"+04"` / `"+0545"` —
+ * neither of them `Intl`'s `"GMT+4"`.
+ */
+function tzdataAbbreviation(zoned: Temporal.ZonedDateTime): string {
+  const abbreviations = ZONE_ABBREVIATIONS[zoned.timeZoneId];
+  if (abbreviations !== undefined) {
+    if (abbreviations.length === 1) return abbreviations[0];
+    const january = Number(zoned.with({ month: 1, day: 1 }).offsetNanoseconds);
+    const july = Number(zoned.with({ month: 7, day: 1 }).offsetNanoseconds);
+    return Number(zoned.offsetNanoseconds) > Math.min(january, july)
+      ? abbreviations[1]
+      : abbreviations[0];
+  }
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: zoned.timeZoneId,
+    timeZoneName: "short",
+  }).formatToParts(new globalThis.Date(zoned.epochMilliseconds));
+  const short = parts.find((part) => part.type === "timeZoneName")!.value;
+  if (short === "GMT" || !short.startsWith("GMT")) return short;
+  const offset = zoned.offset;
+  return offset.endsWith(":00") ? offset.slice(0, 3) : offset.replace(":", "");
+}
+
+/**
  * @noRailsEquivalent PERMANENT — Ruby core `::Time`. Rails never defines the
  * class, only reopens it in `core_ext/time/*.rb`, so there is no Rails
  * counterpart for a port to converge on. trails carries only the members a
@@ -145,20 +221,14 @@ export class Time {
   }
 
   /**
-   * `Time#zone` is the zone's abbreviation — `"UTC"` for a `Time.utc`, `"PDT"`
+   * `Time#zone` is the zone's tzdata abbreviation — `"UTC"` for a `Time.utc`, `"PDT"`
    * for a local summer time — not an offset, which is what `::DateTime#zone`
    * answers instead. A time built from an offset rather than a zone has no
    * abbreviation to answer and Ruby returns `nil`, which `%Z` prints as "".
    */
   get zone(): string | null {
     if (this.#timeZoneId == null) return null;
-    const parts = new Intl.DateTimeFormat("en-US", {
-      timeZone: this.#timeZoneId,
-      timeZoneName: "short",
-    }).formatToParts(
-      new globalThis.Date(this.#plain.toZonedDateTime(this.#timeZoneId).epochMilliseconds),
-    );
-    return parts.find((part) => part.type === "timeZoneName")!.value;
+    return tzdataAbbreviation(this.#plain.toZonedDateTime(this.#timeZoneId));
   }
 
   /** Ruby `Time#utc_offset`, the receiver's offset from UTC in seconds. */
