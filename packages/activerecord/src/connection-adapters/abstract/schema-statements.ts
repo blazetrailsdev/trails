@@ -1822,6 +1822,10 @@ export class SchemaStatements {
     return new Table(tableName, (base ?? this) as SchemaStatements);
   }
 
+  /**
+   * Rails takes `name`, `if_not_exists` and `internal` as their own kwargs, so
+   * they are out of the asserted set (schema_statements.rb:1476-1477).
+   */
   async addIndexOptions(
     tableName: string,
     columnName: string | string[],
@@ -1837,6 +1841,21 @@ export class SchemaStatements {
       [key: string]: unknown;
     } = {},
   ): Promise<[IndexDefinition, string | undefined, boolean]> {
+    const { name: _n, ifNotExists: _i, internal: _int, ...rest } = options;
+    assertValidKeys(rest, [
+      "unique",
+      "length",
+      "order",
+      "opclass",
+      "where",
+      "type",
+      "using",
+      "comment",
+      "algorithm",
+      "include",
+      "nullsNotDistinct",
+    ]);
+
     // Mirrors Rails: a String column with non-word chars (e.g. "remind_at, place_id"
     // or "(data->'foo')") is an expression — kept verbatim as the index columns,
     // with the index name derived from its `\w+` runs joined by "_".

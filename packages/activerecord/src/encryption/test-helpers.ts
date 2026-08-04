@@ -49,9 +49,9 @@ interface ConfigSnapshot {
 export function snapshotEncryptionConfig(): ConfigSnapshot {
   const c = Configurable.config;
   return {
-    primaryKey: c.primaryKey,
-    deterministicKey: c.deterministicKey,
-    keyDerivationSalt: c.keyDerivationSalt,
+    primaryKey: c.hasPrimaryKey(),
+    deterministicKey: c.hasDeterministicKey(),
+    keyDerivationSalt: c.hasKeyDerivationSalt(),
     supportUnencryptedData: c.supportUnencryptedData,
     encryptFixtures: c.encryptFixtures,
     previousSchemes: [...c.previousSchemes],

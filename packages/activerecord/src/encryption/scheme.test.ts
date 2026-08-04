@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Scheme } from "./scheme.js";
-import { ConfigError } from "./errors.js";
+import { ConfigError, Configuration } from "./errors.js";
 import { Configurable } from "./configurable.js";
 import { getEncryptionContext } from "./context.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
@@ -66,12 +66,12 @@ describe("ActiveRecord::Encryption::SchemeTest", () => {
     }
   });
 
-  it("keyProvider raises ConfigError when deterministic: true but config.deterministicKey is not set", () => {
+  it("keyProvider raises Configuration when deterministic: true but config.deterministicKey is not set", () => {
     const originalKey = Configurable.config.deterministicKey;
     Configurable.config.deterministicKey = undefined;
     try {
       const scheme = new Scheme({ deterministic: true });
-      expect(() => scheme.keyProvider).toThrow(ConfigError);
+      expect(() => scheme.keyProvider).toThrow(Configuration);
     } finally {
       Configurable.config.deterministicKey = originalKey;
     }

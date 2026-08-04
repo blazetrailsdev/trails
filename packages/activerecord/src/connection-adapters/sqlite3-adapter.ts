@@ -1684,26 +1684,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       });
       return;
     }
-    if (options?.ifNotExists === true && (await this.columnExists(tableName, columnName))) {
-      return;
-    }
-    const generatedAs = typeof options?.as === "string" ? options.as : null;
-    const sqlType = this._baseColumnType(type, options);
-    let sql = `ALTER TABLE ${quoteTableName(tableName)} ADD COLUMN ${quoteColumnName(columnName)} ${sqlType}`;
-    if (options?.collation) sql += ` COLLATE ${quoteColumnName(String(options.collation))}`;
-    if (generatedAs !== null) {
-      sql += ` GENERATED ALWAYS AS (${generatedAs}) ${options?.stored ? "STORED" : "VIRTUAL"}`;
-    }
-    if (options?.null === false) sql += " NOT NULL";
-    if (options?.default !== undefined) {
-      sql += ` DEFAULT ${this.quoteDefault(this.serializeDefaultForColumn(options.default, sqlType))}`;
-    }
-    // Invalidate the cached reflection for this table, matching the abstract
-    // SchemaStatements#addColumn (which clears before mutating). Without this
-    // the SQLite override would leave a stale columns entry after an
-    // `ALTER TABLE … ADD COLUMN`.
-    await this.schemaCache.clearDataSourceCacheBang(tableName);
-    await this.execute(sql);
+    await super.addColumn(tableName, columnName, type as ColumnType, options as ColumnOptions);
   }
 
   async removeColumn(tableName: string, columnName: string, _type?: string): Promise<void> {

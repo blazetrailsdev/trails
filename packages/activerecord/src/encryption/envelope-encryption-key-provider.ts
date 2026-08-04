@@ -73,7 +73,7 @@ export class EnvelopeEncryptionKeyProvider {
   private primaryKeyProvider(): KeyProvider {
     if (this._primaryKeyProviderOverride) return this._primaryKeyProviderOverride;
     this._primaryKeyProviderCache ??= new DerivedSecretKeyProvider(
-      Configurable.config.get("primaryKey") as string,
+      Configurable.config.primaryKey as string,
     );
     return this._primaryKeyProviderCache;
   }

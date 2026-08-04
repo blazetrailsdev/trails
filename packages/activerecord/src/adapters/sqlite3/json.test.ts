@@ -26,7 +26,7 @@ describeIfSqlite("SQLite3JSONTest", () => {
     //   t.json "payload", default: {}
     //   t.json "settings"
     await adapter.createTable("json_data_type", {}, (t: any) => {
-      t.json("payload", { default: "{}" });
+      t.json("payload", { default: {} });
       t.json("settings");
     });
   });
@@ -45,9 +45,7 @@ describeIfSqlite("SQLite3JSONTest", () => {
 
   it("test_default", async () => {
     const defaultVal = { users: "read", posts: ["read", "write"] };
-    await adapter.addColumn("json_data_type", "permissions", "json", {
-      default: JSON.stringify(defaultVal),
-    });
+    await adapter.addColumn("json_data_type", "permissions", "json", { default: defaultVal });
     await JsonDataType.loadSchema();
 
     expect(JsonDataType.columnDefaults["permissions"]).toEqual(defaultVal);

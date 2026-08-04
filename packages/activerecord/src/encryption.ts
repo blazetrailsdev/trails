@@ -156,9 +156,11 @@ function buildScheme(options: EncryptsOptions): Scheme {
   // Scheme._defaultKeyProvider() returns undefined and Encryptor raises
   // "No encryption key provided" at serialize/deserialize time — still more
   // informative than silently storing AR_ENC:base64 data.
-  const { primaryKey, deterministicKey, keyDerivationSalt } = Configurable.config;
+  const config = Configurable.config;
   const hasConfiguredKeys =
-    primaryKey !== undefined || deterministicKey !== undefined || keyDerivationSalt !== undefined;
+    config.hasPrimaryKey() !== undefined ||
+    config.hasDeterministicKey() !== undefined ||
+    config.hasKeyDerivationSalt() !== undefined;
 
   const coreOpts: SchemeOptions = encryptor
     ? { ...schemeOptions, encryptor: new LegacyEncryptorShim(encryptor) }
