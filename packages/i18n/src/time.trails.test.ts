@@ -52,11 +52,20 @@ describe("Time", () => {
     expect(new Time(2008, 3, 1, 6, 0, 0, -32430).utcOffset).toBe(-32430);
     expect(new Time(2008, 3, 1, 6, 0, 0, "+09:00:30").strftime("%z")).toBe("+0900");
     expect(new Time(2008, 3, 1, 6, 0, 0, -32430).strftime("%z")).toBe("-0900");
+    expect(new Time(2008, 3, 1, 6, 0, 0, 32430.5).utcOffset).toBe(32430.5);
   });
 
   it("Time.new rejects an out-of-range offset", () => {
     expect(() => new Time(2008, 3, 1, 6, 0, 0, 86400)).toThrow(ArgumentError);
+    expect(() => new Time(2008, 3, 1, 6, 0, 0, -86400)).toThrow(ArgumentError);
+    expect(new Time(2008, 3, 1, 6, 0, 0, 86399).utcOffset).toBe(86399);
     expect(() => new Time(2008, 3, 1, 6, 0, 0, "+24:00:00")).toThrow(ArgumentError);
+  });
+
+  it("Time.new rejects a minute past 59 as a malformed offset", () => {
+    expect(() => new Time(2008, 3, 1, 6, 0, 0, "+00:60:00")).toThrow(/expected for utc_offset/);
+    expect(() => new Time(2008, 3, 1, 6, 0, 0, "+006000")).toThrow(/expected for utc_offset/);
+    expect(new Time(2008, 3, 1, 6, 0, 0, "+00:00:99").utcOffset).toBe(99);
   });
 
   it("Time.new rejects a zone name", () => {

@@ -25,10 +25,16 @@ import { ArgumentError, strftime } from "./date.js";
  * seconds east of UTC, which is how the receiver carries it: a number trails
  * owns, so that MRI's sub-minute offsets are representable where a `Temporal`
  * offset time zone (minute-precision) cannot hold them.
+ *
+ * MRI rejects a minute past 59 as a malformed spelling — `"+00:60:00"` gets the
+ * `expected for utc_offset` message, not `"utc_offset out of range"` — while a
+ * second past 59 it takes (`"+00:00:99"` is `99`), bounded only by the total
+ * `86400`. A numeric offset needs no whole-second bound either: MRI takes a
+ * `Float`/`Rational` and answers it back from `utc_offset`.
  */
 function utcOffsetArgument(zone: string | number): "UTC" | number {
   if (typeof zone === "number") {
-    if (!Number.isInteger(zone) || Math.abs(zone) >= 86400) {
+    if (!Number.isFinite(zone) || Math.abs(zone) >= 86400) {
       throw new ArgumentError("utc_offset out of range");
     }
     return zone;
@@ -41,9 +47,11 @@ function utcOffsetArgument(zone: string | number): "UTC" | number {
     const [, sign, hour, colonMin, colonSec, compactMin, compactSec] = offset;
     const min = colonMin ?? compactMin ?? "00";
     const sec = colonSec ?? compactSec ?? "00";
-    const seconds = Number(hour) * 3600 + Number(min) * 60 + Number(sec);
-    if (seconds >= 86400) throw new ArgumentError("utc_offset out of range");
-    return sign === "-" ? -seconds : seconds;
+    if (Number(min) < 60) {
+      const seconds = Number(hour) * 3600 + Number(min) * 60 + Number(sec);
+      if (seconds >= 86400) throw new ArgumentError("utc_offset out of range");
+      return sign === "-" ? -seconds : seconds;
+    }
   }
   if (/^[A-IK-Y]$/.test(zone)) {
     const code = zone.charCodeAt(0);
