@@ -4,10 +4,18 @@
  * A simple backend that reads translations from an in-memory hash. Relies on
  * the Base backend.
  *
- * The gem splits the code into a `Simple::Implementation` module so other
- * modules can be `include`d over it; TypeScript has no module reopening, so
- * `Simple` is a single class extending `Base`. There is likewise no `MUTEX` —
- * JS has no threads, so the concurrent-hash machinery has nothing to guard.
+ * The gem's `Simple` has no superclass: it splits the code into a
+ * `Simple::Implementation` module that `include Base` (simple.rb:20-22) and
+ * `include Implementation`s it back (simple.rb:107), so that a later
+ * `Simple.include(Pluralization)` lands *between* the two and its `super`
+ * reaches `Implementation`. TypeScript has no module reopening, so this file
+ * keeps the bodies in the `Simple` class itself and spells `include Base` as
+ * the prototype copy below — the class body still wins over `Base`, and a
+ * mixin over `Simple` (`Fallbacks(Simple)`) still sits above these bodies with
+ * `super` reaching them, which is the seam `extends Base` collapsed.
+ *
+ * There is likewise no `MUTEX` — JS has no threads, so the concurrent-hash
+ * machinery has nothing to guard.
  */
 
 import {
@@ -30,7 +38,19 @@ function isSymbol(value: unknown): value is string {
   return typeof value === "string" && value.startsWith(":");
 }
 
-export class Simple extends Base {
+/**
+ * Ruby `include Base` (simple.rb:22) as a type: the merged interface gives
+ * `Simple` every member `Base` declares, without an `extends` clause the gem
+ * does not have. The runtime half of the same `include` is the prototype copy
+ * at the bottom of this file; a TS interface has no `protected`, so `Base`'s
+ * protected members widen on the merged type, where the copy leaves them
+ * exactly where the gem has them.
+ */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- the merge is the point: it is `include Base` on the type side.
+export interface Simple extends Base {}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
+export class Simple {
   private initializedFlag = false;
   private translationsStore: TranslationData | undefined;
 
@@ -44,7 +64,7 @@ export class Simple extends Base {
    * for the translations hash, so existing translations will be overwritten by
    * new ones only at the deepest level of the hash.
    */
-  override storeTranslations(
+  storeTranslations(
     locale: Locale,
     data: TranslationData,
     options: TranslateOptions = EMPTY_HASH,
@@ -63,7 +83,7 @@ export class Simple extends Base {
   }
 
   /** Get available locales from the translations hash. */
-  override availableLocales(): Locale[] {
+  availableLocales(): Locale[] {
     if (!this.initialized()) this.initTranslations();
     const locales: Locale[] = [];
     for (const [locale, data] of Object.entries(this.translations())) {
@@ -75,15 +95,18 @@ export class Simple extends Base {
   }
 
   /** Clean up translations hash and set initialized to false on reload. */
-  override reloadBang(): void {
+  reloadBang(): void {
     this.initializedFlag = false;
     this.translationsStore = undefined;
-    super.reloadBang();
+    // Ruby's `super` from `Implementation` resolves to `Base`, the next
+    // ancestor — a mixin included into `Simple` sits above `Implementation`,
+    // never between it and `Base`.
+    Base.prototype.reloadBang.call(this);
   }
 
-  override eagerLoadBang(): void {
+  eagerLoadBang(): void {
     if (!this.initialized()) this.initTranslations();
-    super.eagerLoadBang();
+    Base.prototype.eagerLoadBang.call(this);
   }
 
   translations({ doInit = false }: { doInit?: boolean } = {}): TranslationData {
@@ -117,7 +140,7 @@ export class Simple extends Base {
    * keys, i.e. `currency.format` is regarded the same as `["currency",
    * "format"]`.
    */
-  protected override lookup(
+  protected lookup(
     locale: Locale,
     key: TranslationKey,
     scope: unknown = [],
@@ -144,5 +167,24 @@ export class Simple extends Base {
       }
     }
     return result;
+  }
+}
+
+/**
+ * Ruby `include Base` (simple.rb:22). `include` copies a module's instance
+ * methods into the ancestry *below* the class body, so a key the class body
+ * already defines is never replaced — the `hasOwnProperty` guard below. Some of
+ * `Base`'s members are TS class fields (`transliterate`, `loadYaml`), which
+ * only exist on an instance, so an instance is the second source read.
+ */
+for (const source of [Base.prototype, new (Base as unknown as new () => Base)()]) {
+  for (const key of Object.getOwnPropertyNames(source)) {
+    if (key === "constructor") continue;
+    if (Object.prototype.hasOwnProperty.call(Simple.prototype, key)) continue;
+    Object.defineProperty(
+      Simple.prototype,
+      key,
+      Object.getOwnPropertyDescriptor(source, key) as PropertyDescriptor,
+    );
   }
 }

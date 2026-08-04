@@ -598,6 +598,9 @@ export abstract class Base {
    * Loads a plain JavaScript translations file. Evaluating the file must yield
    * translation data with locales as toplevel keys — the gem `eval`s Ruby
    * source for that hash, and a JS module's exports are the same hash.
+   *
+   * @noRailsEquivalent PERMANENT — the JS analogue of the gem's `load_rb`
+   * (base.rb:254-257) — there is no Ruby source to `eval` here.
    */
   protected loadJs(filename: string): [unknown, boolean] {
     const translations = readLocaleModule(filename);
