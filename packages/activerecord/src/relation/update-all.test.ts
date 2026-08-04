@@ -3,7 +3,7 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  * Mirrors: activerecord/test/cases/relation/update_all_test.rb
  */
-import { describe, it, expect, vi, afterEach, beforeAll } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
 import { ArgumentError } from "@blazetrails/activemodel";
@@ -24,8 +24,6 @@ import { Category } from "../test-helpers/models/category.js";
 import { Categorization } from "../test-helpers/models/categorization.js";
 import { StaleObjectError } from "../errors.js";
 import { registerModel } from "../associations.js";
-
-beforeAll(async () => {});
 
 for (const klass of [
   Author,
