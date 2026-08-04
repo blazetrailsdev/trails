@@ -3,7 +3,8 @@
  * These cover the members `I18n::Backend::Base#localize` duck-types.
  */
 
-import { describe, it, expect } from "vitest";
+import { Temporal } from "@js-temporal/polyfill";
+import { describe, it, expect, vi } from "vitest";
 import { ArgumentError, Date as RubyDate, DateTime as RubyDateTime } from "./date.js";
 import { Time as RubyTime } from "./time.js";
 
@@ -13,6 +14,59 @@ describe("Date", () => {
       const date = RubyDate.parse(str);
       expect([date.year, date.mon, date.day]).toEqual([2008, 7, 2]);
     }
+  });
+
+  it("parses the spellings ::Date.parse takes, one per date_parse.c sub-parser", () => {
+    for (const str of [
+      "2008-07-02",
+      "2008/07/02",
+      "2008.07.02",
+      "20080702",
+      "Jul 2 2008",
+      "July 2nd, 2008",
+      "2 Jul 2008",
+      "2nd July 2008",
+      "2-Jul-2008",
+      "Wed, 2 Jul 2008",
+      "Wednesday, July 2, 2008",
+      "2008-07-02T10:30:00",
+      "2008070210",
+      "20080702123456",
+    ]) {
+      const date = RubyDate.parse(str);
+      expect([str, date.year, date.mon, date.day]).toEqual([str, 2008, 7, 2]);
+    }
+  });
+
+  it("reads a two-digit head with a four-digit tail as d/m/y, as s3e does", () => {
+    const date = RubyDate.parse("01/01/2012");
+    expect([date.year, date.mon, date.day]).toEqual([2012, 1, 1]);
+    expect(() => RubyDate.parse("12/13/2012")).toThrow("invalid date");
+  });
+
+  it('completes a fragment from today, as "Feb 3rd".to_date does', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2008-08-04T12:00:00Z"));
+    try {
+      expect(Temporal.Now.plainDateISO("UTC").year).toBe(2008);
+      const date = RubyDate.parse("Feb 3rd");
+      expect([date.year, date.mon, date.day]).toEqual([2008, 2, 3]);
+    } finally {
+      vi.useRealTimers();
+    }
+    const partial = RubyDate.parse("2008/07");
+    expect([partial.year, partial.mon, partial.day]).toEqual([2008, 7, 1]);
+  });
+
+  it("leaves a signed year uncompleted, as date_parse.c does", () => {
+    expect(RubyDate.parse("-08-07-02").year).toBe(-8);
+    expect(RubyDate.parse("+08-07-02").year).toBe(8);
+  });
+
+  it("completes a two-digit year unless comp is false, as Ruby does", () => {
+    expect(RubyDate.parse("080702").year).toBe(2008);
+    expect(RubyDate.parse("690702").year).toBe(1969);
+    expect(RubyDate.parse("080702", false).year).toBe(8);
   });
 
   it("raises on an unparseable string", () => {
