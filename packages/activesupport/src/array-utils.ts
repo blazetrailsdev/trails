@@ -4,25 +4,7 @@
 
 import { assertValidKeys } from "./hash-utils.js";
 import { I18n } from "./i18n.js";
-
-/**
- * `support.array` is stored under Ruby's snake_case keys, but the options
- * `toSentence` merges them into are camelCase. Same shape as
- * `number-helper/number-converter.ts`'s own key map.
- */
-const I18N_KEY_MAP: Record<string, string> = {
-  words_connector: "wordsConnector",
-  two_words_connector: "twoWordsConnector",
-  last_word_connector: "lastWordConnector",
-};
-
-function camelizeI18nKeys(obj: Record<string, string>): Record<string, string> {
-  const result: Record<string, string> = {};
-  for (const [k, v] of Object.entries(obj)) {
-    result[I18N_KEY_MAP[k] ?? k] = v;
-  }
-  return result;
-}
+import { camelize } from "./inflector.js";
 
 /**
  * Wraps a value in an array. `null`/`undefined` → `[]`, arrays pass through,
@@ -84,7 +66,12 @@ export function toSentence(
       locale: options.locale ?? null,
       default: {},
     }) as Record<string, string>;
-    Object.assign(defaultConnectors, camelizeI18nKeys(i18nConnectors));
+    // Rails merges the payload straight in (conversions.rb:70) because the
+    // store keys and the option keys are the same symbols; ours are snake_case
+    // in the store and camelCase in the options, so camelize at the boundary.
+    for (const [k, v] of Object.entries(i18nConnectors)) {
+      defaultConnectors[camelize(k, "lower")] = v;
+    }
   }
   for (const [k, v] of Object.entries(options)) {
     if (v !== undefined) defaultConnectors[k] = v as string;

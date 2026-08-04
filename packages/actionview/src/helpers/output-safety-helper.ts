@@ -1,6 +1,7 @@
 import {
   I18n,
   assertValidKeys,
+  camelize,
   SafeBuffer,
   htmlEscape,
   htmlEscapeOnce as _htmlEscapeOnce,
@@ -82,16 +83,6 @@ function flatten(arr: unknown[]): unknown[] {
   return result;
 }
 
-/**
- * `support.array` is stored under Ruby's snake_case keys, but the options
- * `toSentence` merges them into are camelCase.
- */
-const I18N_KEY_MAP: Record<string, string> = {
-  words_connector: "wordsConnector",
-  two_words_connector: "twoWordsConnector",
-  last_word_connector: "lastWordConnector",
-};
-
 export interface ToSentenceOptions {
   wordsConnector?: string | SafeBuffer | null;
   twoWordsConnector?: string | SafeBuffer | null;
@@ -120,8 +111,12 @@ export function toSentence(array: unknown[], options: ToSentenceOptions = {}): S
     locale: options.locale ?? null,
     default: {},
   }) as Record<string, string>;
+  // Rails merges the payload straight in (output_safety_helper.rb:51) because
+  // the store keys and the option keys are the same symbols; ours are
+  // snake_case in the store and camelCase in the options, so camelize at the
+  // boundary.
   for (const [k, v] of Object.entries(i18nConnectors)) {
-    defaultConnectors[I18N_KEY_MAP[k] ?? k] = v;
+    defaultConnectors[camelize(k, "lower")] = v;
   }
   // Ruby's `default_connectors.merge!(options)` overrides on key presence; a TS
   // caller forwarding an absent option passes `undefined`, which must not
