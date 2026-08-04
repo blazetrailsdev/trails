@@ -159,11 +159,6 @@ function monNum(str: string): number {
   return ABBR_MONTH_NAMES.findIndex((m) => m.toLowerCase() === str.slice(0, 3).toLowerCase()) + 1;
 }
 
-/** @internal Ruby writes a `'`-prefixed number for a literal (uncompleted) year. */
-function num(str: string): number {
-  return Number(str.replace(/^'/, ""));
-}
-
 /**
  * @internal `date_parse.c` `s3e`: the three fields of a `y-m-d`-shaped match
  * are not always in that order — a two-digit head with a four-digit tail is
@@ -172,11 +167,11 @@ function num(str: string): number {
  * (activesupport/lib/active_support/core_ext/string/conversions.rb:38-41).
  */
 function s3e(y: string | null, m: string, d: string | null): DateParts | null {
-  if (y !== null && d !== null && y.replace(/^[-+']/, "").length < 3 && d.length > 2) {
+  if (y !== null && d !== null && y.replace(/^[-+]/, "").length < 3 && d.length > 2) {
     [y, d] = [d, y];
   }
   if (y === null || d === null) return null;
-  return { year: num(y), mon: num(m), mday: num(d) };
+  return { year: Number(y), mon: Number(m), mday: Number(d) };
 }
 
 /** @internal `date_parse.c` `parse_day`: a leading day name is not a date field. */
@@ -187,19 +182,19 @@ function parseDay(str: string): string {
 /** @internal `date_parse.c` `parse_eu`: `2nd July 2008`, `2 Jul 2008`, `2-Jul-2008`. */
 function parseEu(str: string): DateParts | null {
   const m = new RegExp(
-    `'?(\\d+)[^-\\d\\s]*[-,.\\s]*(${ABBR_MONTHS})[^-\\d\\s]*[-,.\\s]*('?-?\\d+)`,
+    `'?(\\d+)[^-\\d\\s]*[-,.\\s]*(${ABBR_MONTHS})[^-\\d\\s]*[-,.\\s]*'?(-?\\d+)`,
     "i",
   ).exec(str);
-  return m ? { year: num(m[3]), mon: monNum(m[2]), mday: num(m[1]) } : null;
+  return m ? { year: Number(m[3]), mon: monNum(m[2]), mday: Number(m[1]) } : null;
 }
 
 /** @internal `date_parse.c` `parse_us`: `Jul 2 2008`, `July 2nd, 2008`. */
 function parseUs(str: string): DateParts | null {
   const m = new RegExp(
-    `\\b(${ABBR_MONTHS})[^-\\d\\s]*[-,.\\s]+'?(\\d+)[^-\\d\\s]*[-,.\\s]*('?-?\\d+)`,
+    `\\b(${ABBR_MONTHS})[^-\\d\\s]*[-,.\\s]+'?(\\d+)[^-\\d\\s]*[-,.\\s]*'?(-?\\d+)`,
     "i",
   ).exec(str);
-  return m ? { year: num(m[3]), mon: monNum(m[1]), mday: num(m[2]) } : null;
+  return m ? { year: Number(m[3]), mon: monNum(m[1]), mday: Number(m[2]) } : null;
 }
 
 /** @internal `date_parse.c` `parse_iso`: `2008-07-02`, and the unpadded `2008-7-2`. */
@@ -240,24 +235,6 @@ function parseDdd(str: string): DateParts | null {
 }
 
 /**
- * @internal `date_parse.c` `date__parse`, which runs its sub-parsers in a fixed
- * order and stops at the first that matches. The alphabetic pair goes first,
- * then the numeric ones.
- *
- * @missingRailsCall `parse_time`, `parse_jis`, `parse_vms`, `parse_iso2`,
- * `parse_year`, `parse_mon`, `parse_mday` and `parse_bc` are not ported: they
- * read a time of day (which `::Date` discards), a calendar Rails never round-
- * trips, or a fragment that leaves `Date.parse` raising for want of a `:year`.
- */
-function _parse(str: string): DateParts | null {
-  str = parseDay(str);
-  if (/[a-z]/i.test(str)) {
-    return parseEu(str) ?? parseUs(str);
-  }
-  return parseIso(str) ?? parseSla(str) ?? parseDot(str) ?? parseDdd(str);
-}
-
-/**
  * @noRailsEquivalent PERMANENT — Ruby stdlib `::Date`. Rails never defines the
  * class, only reopens it, so there is no Rails counterpart for a port to
  * converge on; JS has no stdlib equivalent either (`Temporal.PlainDate` answers
@@ -291,7 +268,7 @@ export class Date {
    * sub-parsers are the module-private functions below.
    */
   static parse(str: string): Date {
-    const parts = _parse(str);
+    const parts = Date._parse(str);
     // Ruby raises `Date::Error`, a subclass of `ArgumentError` that a nested
     // TS class cannot spell; the superclass is what callers rescue.
     if (!parts) throw new ArgumentError("invalid date");
@@ -300,6 +277,29 @@ export class Date {
     } catch {
       throw new ArgumentError("invalid date");
     }
+  }
+
+  /**
+   * Ruby `Date._parse(str, comp = true)` (ruby/date, `date_parse.c`
+   * `date__parse`), which runs its sub-parsers in a fixed order and stops at
+   * the first that matches: the alphabetic pair first, then the numeric ones.
+   * Ruby answers a Hash of whatever fields it found; the fields trails reads
+   * are `:year`, `:mon` and `:mday`, so a match that leaves any of them unset
+   * is `null` here.
+   *
+   * @missingRailsCall `parse_time`, `parse_jis`, `parse_vms`, `parse_iso2`,
+   * `parse_year`, `parse_mon`, `parse_mday` and `parse_bc` are not ported: they
+   * read a time of day (which `::Date` discards), a calendar Rails never
+   * round-trips, or a fragment that leaves `Date.parse` raising for want of a
+   * `:year`.
+   */
+  static _parse(str: string): DateParts | null {
+    str = parseDay(str);
+    if (/[a-z]/i.test(str)) {
+      const parts = parseEu(str) ?? parseUs(str);
+      if (parts) return parts;
+    }
+    return parseIso(str) ?? parseSla(str) ?? parseDot(str) ?? parseDdd(str);
   }
 
   get year(): number {

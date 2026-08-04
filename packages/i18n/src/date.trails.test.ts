@@ -27,6 +27,8 @@ describe("Date", () => {
       "2nd July 2008",
       "2-Jul-2008",
       "Wed, 2 Jul 2008",
+      "Wednesday, July 2, 2008",
+      "2008-07-02T10:30:00",
     ]) {
       const date = RubyDate.parse(str);
       expect([str, date.year, date.mon, date.day]).toEqual([str, 2008, 7, 2]);
