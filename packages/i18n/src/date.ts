@@ -295,6 +295,18 @@ function completeFrags(parts: DateParts): void {
 }
 
 /**
+ * @internal Ruby `Date::Error`, the `ArgumentError` subclass ruby/date defines
+ * under `::Date` (`date_core.c` `eDateError` / `Init_date_core`). It is reached
+ * as `Date.Error`; this binding only exists so the class body can name it.
+ */
+class DateError extends ArgumentError {
+  constructor(message: string) {
+    super(message);
+    this.name = "Date::Error";
+  }
+}
+
+/**
  * @noRailsEquivalent PERMANENT — Ruby stdlib `::Date`. Rails never defines the
  * class, only reopens it, so there is no Rails counterpart for a port to
  * converge on; JS has no stdlib equivalent either (`Temporal.PlainDate` answers
@@ -302,6 +314,12 @@ function completeFrags(parts: DateParts): void {
  * only the members a caller duck-types.
  */
 export class Date {
+  /**
+   * Ruby `Date::Error` (ruby/date, `date_core.c` `Init_date_core`), raised by
+   * `Date.parse` and a subclass of `ArgumentError`.
+   */
+  static Error = DateError;
+
   /** @internal Ruby's `::Date` value, which has no public reader. */
   readonly #plain: Temporal.PlainDate;
 
@@ -325,14 +343,12 @@ export class Date {
    */
   static parse(str: string, comp = true): Date {
     const parts = Date._parse(str, comp);
-    // Ruby raises `Date::Error`, a subclass of `ArgumentError` that a nested
-    // TS class cannot spell; the superclass is what callers rescue.
-    if (!parts) throw new ArgumentError("invalid date");
+    if (!parts) throw new DateError("invalid date");
     completeFrags(parts);
     try {
       return new Date(parts.year as number, parts.mon as number, parts.mday as number);
     } catch {
-      throw new ArgumentError("invalid date");
+      throw new DateError("invalid date");
     }
   }
 
