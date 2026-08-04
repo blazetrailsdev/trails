@@ -141,12 +141,12 @@ export function hasSecurePassword(
       const digest = record.readAttribute(digestAttr);
 
       if (isBlank(digest) && (pwd === undefined || pwd === null)) {
-        record.errors.add(attribute, "blank");
+        record.errors.add(attribute, ":blank");
       }
 
       if (pwd !== null && pwd !== undefined) {
         if (textEncoder.encode(pwd).length > 72) {
-          record.errors.add(attribute, "password_too_long", { count: 72 });
+          record.errors.add(attribute, ":password_too_long", { count: 72 });
         }
 
         const humanAttr = modelClass.humanAttributeName
@@ -154,7 +154,7 @@ export function hasSecurePassword(
           : humanize(attribute);
         const confirmation = record.readAttribute(confirmationAttr);
         if (confirmation !== undefined && confirmation !== null && pwd !== confirmation) {
-          record.errors.add(attribute, "confirmation", { attribute: humanAttr });
+          record.errors.add(attribute, ":confirmation", { attribute: humanAttr });
         }
       }
 
@@ -165,7 +165,7 @@ export function hasSecurePassword(
         // Error fires when digestWas is blank OR doesn't match challenge.
         const digestWas = record.attributeWas(digestAttr) as string | null | undefined;
         if (!digestWas || !bcrypt.compareSync(challenge, digestWas)) {
-          record.errors.add(challengeAttr, "invalid");
+          record.errors.add(challengeAttr, ":invalid");
         }
       }
     });

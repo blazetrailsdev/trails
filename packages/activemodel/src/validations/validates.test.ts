@@ -174,7 +174,7 @@ describe("ValidatesTest", () => {
     class MyValidator {
       validate(record: any) {
         if (!record.readAttribute("name")) {
-          record.errors.add("name", "blank", { message: "must be present" });
+          record.errors.add("name", ":blank", { message: "must be present" });
         }
       }
     }
@@ -194,7 +194,7 @@ describe("ValidatesTest", () => {
       NameValidator: class {
         validate(record: any) {
           if (!record.readAttribute("name")) {
-            record.errors.add("name", "blank", { message: "is required" });
+            record.errors.add("name", ":blank", { message: "is required" });
           }
         }
       },
@@ -275,7 +275,7 @@ describe("ValidatesTest", () => {
       validate(record: any) {
         const val = record.readAttribute("name");
         if (typeof val === "string" && val.length < this.min) {
-          record.errors.add("name", "too_short", { message: "is too short" });
+          record.errors.add("name", ":too_short", { message: "is too short" });
         }
       }
     }

@@ -230,7 +230,7 @@ export class UniquenessValidator extends EachValidator {
 
     const exists = await relation.exists();
     if (exists) {
-      record.errors.add(attribute, "taken", errorOpts);
+      record.errors.add(attribute, ":taken", errorOpts);
     }
   }
 }

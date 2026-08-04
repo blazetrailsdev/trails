@@ -87,7 +87,7 @@ export function recordError(
     if (key !== name) rest[key] = this.options[key];
   }
   rest.value = value;
-  record.errors.add(attribute, "invalid", rest);
+  record.errors.add(attribute, ":invalid", rest);
 }
 
 /**

@@ -41,7 +41,7 @@ describe("I18nValidationTest", () => {
     await topic.save();
     void topic.errors.messages;
     // Rails' assert_called_with asserts exactly one call with these args.
-    expect(spy).toHaveBeenCalledWith("title", "taken", topic, { value: "unique!" });
+    expect(spy).toHaveBeenCalledWith("title", ":taken", topic, { value: "unique!" });
     expect(spy).toHaveBeenCalledTimes(1);
   });
 
@@ -63,7 +63,7 @@ describe("I18nValidationTest", () => {
     await topic.isValid();
     void topic.errors.messages;
     // Rails' assert_called_with asserts exactly one call with these args.
-    expect(spy).toHaveBeenCalledWith("replies", "invalid", topic, { value: replies });
+    expect(spy).toHaveBeenCalledWith("replies", ":invalid", topic, { value: replies });
     expect(spy).toHaveBeenCalledTimes(1);
   });
 

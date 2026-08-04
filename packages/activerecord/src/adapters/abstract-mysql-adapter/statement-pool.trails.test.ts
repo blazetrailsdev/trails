@@ -16,22 +16,19 @@ import {
 describeIfMysqlAdapter("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
   let originalPreparedStatements: boolean;
-  let originalStatementLimit: number;
   beforeEach(async () => {
     adapter = await leaseMysqlAdapter();
     originalPreparedStatements = adapter.preparedStatements;
-    originalStatementLimit = adapter.statementLimit;
     adapter.disconnectBang();
     adapter.preparedStatements = true;
   });
   afterEach(() => {
-    // preparedStatements/statementLimit are adapter-wide settings and the
-    // statement pool itself is per-connection state, both of which now outlive
-    // a single test on the shared leased connection. Restore the settings and
-    // drop the pool (disconnectBang is reconnectable — the next query
-    // re-establishes) so each test starts from the clean slate it asserts on.
+    // preparedStatements is an adapter-wide setting and the statement pool
+    // itself is per-connection state, both of which now outlive a single test
+    // on the shared leased connection. Restore the setting and drop the pool
+    // (disconnectBang is reconnectable — the next query re-establishes) so each
+    // test starts from the clean slate it asserts on.
     adapter.preparedStatements = originalPreparedStatements;
-    adapter.statementLimit = originalStatementLimit;
     adapter.disconnectBang();
   });
 
@@ -69,22 +66,8 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       }
     });
 
-    it("statementLimit config resizes the active pool", async () => {
-      await adapter.beginDbTransaction();
-      try {
-        await adapter.execute("SELECT ? AS n", [1]);
-        await adapter.execute("SELECT ? AS s", ["a"]);
-        const pool = adapter._statementPoolForTest()!;
-        expect(pool.length).toBe(2);
-        adapter.statementLimit = 1;
-        expect(pool.length).toBe(1);
-      } finally {
-        await adapter.rollback();
-      }
-    });
-
     it("statementLimit = 0 disables named prepared statements", async () => {
-      adapter.statementLimit = 0;
+      const adapter = new Mysql2Adapter({ uri: MYSQL_TEST_URL, statementLimit: 0 });
       await adapter.beginDbTransaction();
       try {
         // Query still runs — just via `conn.query` (text protocol)
@@ -97,6 +80,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         expect(adapter._statementPoolForTest()).toBeUndefined();
       } finally {
         await adapter.rollback();
+        await adapter.close();
       }
     });
 
@@ -134,7 +118,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       // Stays self-built: reading a differently configured statementLimit off
       // the config hash is the assertion.
       const configured = new Mysql2Adapter({ uri: MYSQL_TEST_URL, statementLimit: 7 });
-      expect(configured.statementLimit).toBe(7);
+      expect(configured.buildStatementPool().maxSize).toBe(7);
       await configured.close();
     });
 
@@ -150,15 +134,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     // Self-built by construction: these assert what the constructor rejects.
-    it("rejects invalid statementLimit at construction time", () => {
-      expect(() => new Mysql2Adapter({ uri: MYSQL_TEST_URL, statementLimit: -1 })).toThrow(
-        RangeError,
-      );
-      expect(() => new Mysql2Adapter({ uri: MYSQL_TEST_URL, statementLimit: 1.5 })).toThrow(
-        RangeError,
-      );
-    });
-
     it("rejects non-boolean preparedStatements at construction time and via assignment", async () => {
       // Mirror coverage to PG's statement-pool tests — without an
       // explicit guard test the runtime TypeError could regress

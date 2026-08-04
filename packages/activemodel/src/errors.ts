@@ -242,7 +242,9 @@ export class Errors<TBase extends object = object> {
    */
   add(
     attribute: string,
-    type: string | ((record: TBase | null, options: Record<string, unknown>) => string) = "invalid",
+    type:
+      | string
+      | ((record: TBase | null, options: Record<string, unknown>) => string) = ":invalid",
     options?: {
       message?: string | ((record: TBase | null, options: Record<string, unknown>) => string);
     } & Record<string, unknown>,
@@ -265,12 +267,13 @@ export class Errors<TBase extends object = object> {
    * Returns `true` if an error with this exact attribute/type/options has
    * been added. Mirrors Rails `Errors#added?`
    * (activemodel/lib/active_model/errors.rb:372-388) Symbol-vs-String dispatch:
-   * if `type` looks like an i18n key (no spaces → Symbol-like), use strict match;
-   * otherwise treat it as a full message string and check `messagesFor`.
+   * a Ruby Symbol reaches us as a colon-prefixed string, so `":blank"` takes the
+   * strict-match branch and a bare String is a full message checked against
+   * `messagesFor`.
    */
-  added(attribute: string, type: string = "invalid", options?: Record<string, unknown>): boolean {
-    if (!type.includes(" ")) {
-      // Symbol-like branch: strict attribute/type/options match.
+  added(attribute: string, type: string = ":invalid", options?: Record<string, unknown>): boolean {
+    if (type.startsWith(":")) {
+      // Symbol branch: strict attribute/type/options match.
       return this._errors.some((e) => e.strictMatch(attribute, type, options));
     }
     // String branch: full-message lookup (Rails else clause in added?).
@@ -279,16 +282,16 @@ export class Errors<TBase extends object = object> {
 
   /**
    * Returns `true` if an error of the given type exists on `attribute`.
-   * Mirrors Rails `errors.rb:395-403` Symbol-vs-String dispatch:
-   * if `type` looks like an i18n key (no spaces → Symbol-like), use `where`;
-   * otherwise treat it as a full message string and check `messagesFor`.
+   * Mirrors Rails `errors.rb:395-403` Symbol-vs-String dispatch: a Ruby Symbol
+   * reaches us as a colon-prefixed string, so `":blank"` goes through `where`
+   * and a bare String is a full message checked against `messagesFor`.
    */
   ofKind(attribute: string, type?: string): boolean {
     if (type === undefined) {
       return this._errors.some((e) => e.attribute === attribute);
     }
-    if (!type.includes(" ")) {
-      // Symbol-like: check for errors of this exact type.
+    if (type.startsWith(":")) {
+      // Symbol branch: check for errors of this exact type.
       return this.where(attribute, type).length > 0;
     }
     // String branch: full-message lookup (Rails else clause).
@@ -313,7 +316,7 @@ export class Errors<TBase extends object = object> {
 
   generateMessage(
     attribute: string,
-    type: string = "invalid",
+    type: string = ":invalid",
     options?: Record<string, unknown>,
   ): string {
     return ActiveModelError.generateMessage(attribute, type, this._base, options);

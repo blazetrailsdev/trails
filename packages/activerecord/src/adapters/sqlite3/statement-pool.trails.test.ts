@@ -23,17 +23,12 @@ describeIfSqlite("SQLite3StatementPoolTest", () => {
 
   it("reads statementLimit from the options hash", () => {
     const adapter = track(new BetterSQLite3Adapter(":memory:", { statementLimit: 7 }));
-    expect(adapter.statementLimit).toBe(7);
+    expect(adapter.buildStatementPool().maxSize).toBe(7);
   });
 
   it("reads preparedStatements from the options hash", () => {
     const adapter = track(new BetterSQLite3Adapter(":memory:", { preparedStatements: false }));
     expect(adapter.preparedStatements).toBe(false);
-  });
-
-  it("rejects invalid statementLimit at construction time", () => {
-    expect(() => new BetterSQLite3Adapter(":memory:", { statementLimit: -1 })).toThrow(RangeError);
-    expect(() => new BetterSQLite3Adapter(":memory:", { statementLimit: 1.5 })).toThrow(RangeError);
   });
 
   it("rejects non-boolean preparedStatements at construction time and via assignment", () => {

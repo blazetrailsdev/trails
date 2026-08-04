@@ -256,10 +256,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     this._databaseTimezone = ActiveRecord.defaultTimezone;
   }
 
-  protected override _onStatementLimitChanged(value: number): void {
-    this._statementPool?.setMaxSize(value);
-  }
-
   /**
    * Mirrors `Mysql2Adapter#translate_exception`. Promotes a driver-level
    * read-timeout (a node-mysql2 error with no MySQL errno) to
@@ -466,7 +462,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       _fakeConnection: fake,
       ...mysqlConfig
     } = config as mysql.PoolOptions & MysqlAdapterOptions;
-    if (statementLimit !== undefined) this.statementLimit = statementLimit;
+    if (statementLimit !== undefined) this._statementLimit = statementLimit;
     if (preparedStatements !== undefined) this.preparedStatements = preparedStatements;
     if (advisoryLocks !== undefined) {
       this._advisoryLocksEnabled = Mysql2Adapter.typeCastConfigToBoolean(advisoryLocks) !== false;

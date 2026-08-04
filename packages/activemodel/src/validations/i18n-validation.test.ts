@@ -26,7 +26,7 @@ describe("I18nValidationTest", () => {
       }
     }
     const p = new Person({});
-    p.errors.add("name", "blank");
+    p.errors.add("name", ":blank");
     const msg = p.errors.fullMessages[0];
     expect(typeof msg).toBe("string");
     expect(msg).toBe("Name can't be blank");
@@ -48,20 +48,18 @@ describe("I18nValidationTest", () => {
       }
     }
     const p = new Person({});
-    p.errors.add("name", "blank");
+    p.errors.add("name", ":blank");
     expect(p.errors.fullMessages).toContain("Person Name can't be blank");
   });
 
   it("errors full messages uses format", () => {
     // Rails clears `I18n.load_path` in setup (i18n_validation_test.rb:12) so the
     // framework `en.yml` cannot overwrite the stored `errors.format`; the
-    // teardown above restores it. Only this case collides with the file data,
-    // and `errors.messages.empty` is stored back because the trails deviation
-    // below resolves through the backend.
+    // teardown above restores it.
     I18n.loadPath().length = 0;
     I18n.setBackend(new I18n.Simple());
     I18n.backend().storeTranslations("en", {
-      errors: { format: "Field %{attribute} %{message}", messages: { empty: "can't be empty" } },
+      errors: { format: "Field %{attribute} %{message}" },
     });
     class Person extends Model {
       static {
@@ -70,12 +68,7 @@ describe("I18nValidationTest", () => {
     }
     const p = new Person({});
     p.errors.add("name", "empty");
-    // Rails asserts ["Field Name empty"]: `add(:name, "empty")` passes a String,
-    // which stays a literal message. Trails has no Symbol type, so `Error#message`
-    // promotes identifier-shaped Strings to a type (error.ts `IDENTIFIER_RE`) and
-    // "empty" resolves through `errors.messages.empty`. The format under test —
-    // `errors.format` — is asserted either way.
-    expect(p.errors.fullMessages).toEqual(["Field Name can't be empty"]);
+    expect(p.errors.fullMessages).toEqual(["Field Name empty"]);
   });
 
   it("errors full messages doesnt use attribute format without config", () => {
@@ -85,7 +78,7 @@ describe("I18nValidationTest", () => {
       }
     }
     const p = new Person({});
-    p.errors.add("name", "blank");
+    p.errors.add("name", ":blank");
     expect(p.errors.fullMessages).toContain("Name can't be blank");
   });
 
@@ -96,7 +89,7 @@ describe("I18nValidationTest", () => {
       }
     }
     const p = new Person({});
-    p.errors.add("name", "blank");
+    p.errors.add("name", ":blank");
     expect(p.errors.fullMessagesFor("name")).toContain("Name can't be blank");
   });
 
@@ -197,7 +190,7 @@ describe("I18nValidationTest", () => {
       }
     }
     const p = new Person({});
-    p.errors.add("name", "blank");
+    p.errors.add("name", ":blank");
     expect(p.errors.fullMessages[0]).toMatch(/Name/);
   });
 
@@ -208,7 +201,7 @@ describe("I18nValidationTest", () => {
       }
     }
     const p = new Person({});
-    p.errors.add("name", "blank");
+    p.errors.add("name", ":blank");
     expect(p.errors.fullMessages.length).toBe(1);
   });
 
@@ -228,7 +221,7 @@ describe("I18nValidationTest", () => {
       }
     }
     const p = new Person({});
-    p.errors.add("name", "blank");
+    p.errors.add("name", ":blank");
     expect(p.errors.fullMessages).toContain("Custom Name can't be blank");
   });
 
@@ -239,7 +232,7 @@ describe("I18nValidationTest", () => {
       }
     }
     const p = new Person({});
-    p.errors.add("name", "blank");
+    p.errors.add("name", ":blank");
     expect(p.errors.fullMessages).toContain("Name can't be blank");
   });
 
@@ -250,7 +243,7 @@ describe("I18nValidationTest", () => {
       }
     }
     const p = new Person({});
-    p.errors.add("first_name", "blank");
+    p.errors.add("first_name", ":blank");
     expect(p.errors.fullMessages).toContain("First name can't be blank");
   });
 
@@ -517,7 +510,7 @@ describe("I18nValidationTest", () => {
       }
     }
     const p = new Person({});
-    p.errors.add("name", "custom_blank");
+    p.errors.add("name", ":custom_blank");
     expect(p.errors.get("name")).toContain("must not be empty");
   });
 

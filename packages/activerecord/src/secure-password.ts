@@ -218,7 +218,7 @@ export function hasSecurePassword(
       // hashing defers to beforeSave, so we also check the in-flight raw password
       // to avoid false :blank errors before the first save.
       if (!record._readAttribute(digestAttr) && !rawPasswordNotEmpty) {
-        record.errors.add(attribute, "blank");
+        record.errors.add(attribute, ":blank");
       }
 
       // Confirmation: mirrors `validates_confirmation_of attribute, allow_blank: true`
@@ -231,7 +231,7 @@ export function hasSecurePassword(
       ) {
         // Rails keys the error to the underscored `#{attribute}_confirmation`
         // so humanAttributeName and i18n lookups work correctly.
-        record.errors.add(`${attribute}_confirmation`, "confirmation", {
+        record.errors.add(`${attribute}_confirmation`, ":confirmation", {
           attribute: attrLabel,
         });
       }
@@ -251,7 +251,7 @@ export function hasSecurePassword(
           !verifyPassword(String(challenge), digestWas)
         ) {
           // Rails keys to `#{attribute}_challenge` (snake_case) for i18n parity.
-          record.errors.add(`${attribute}_challenge`, "invalid");
+          record.errors.add(`${attribute}_challenge`, ":invalid");
         }
       }
     });

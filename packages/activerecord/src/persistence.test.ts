@@ -908,12 +908,12 @@ describe("PersistenceTest", () => {
       }
     }
     const admin = new AdminUser();
-    admin.errors.add("token", "invalid");
+    admin.errors.add("token", ":invalid");
     const child = admin.becomes(ChildUser);
     expect(child.errors.attributeNames).toEqual(["token"]);
     let raised = false;
     try {
-      child.errors.add("foo", "invalid");
+      child.errors.add("foo", ":invalid");
     } catch {
       raised = true;
     }

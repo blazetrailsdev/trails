@@ -43,7 +43,7 @@ describe("SQLite3Adapter hash-only constructor", () => {
   it("threads adapter options from the config hash", () => {
     adapter = new BetterSQLite3Adapter({ database: ":memory:", strict: true, statementLimit: 7 });
     expect(adapter._strictStrings).toBe(true);
-    expect(adapter.statementLimit).toBe(7);
+    expect(adapter.buildStatementPool().maxSize).toBe(7);
   });
 
   it("raises ArgumentError when the config hash has no database", () => {
