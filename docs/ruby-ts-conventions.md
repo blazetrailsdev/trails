@@ -120,6 +120,15 @@ a genuine gap:
 - `module ARTest` opens in config.rb and is reopened in connection.rb, so the Ruby extractor records one ARTest entity filed under config.rb and every ARTest method buckets there. Two populations end up in that bucket, neither of which is a gap. (1) `connection_name` / `test_configuration_hashes` / `connect` (connection.rb) and `expand_config` (config.rb) ARE ported — all four in packages/activerecord/src/support/connection.ts, next to the CONNECTIONS entries they name and expand. They miss only because the bucket's expected TS file is config.ts; export status is not why — in the default full-surface run the TS extractor records file-local functions too, so the non-exported `expandConfig` (connection.ts:269) is as visible to api:compare as the three exported ones, and exporting it would not match it. (Under --public-only the two sides drop it symmetrically: Ruby's `expand_config` is itself private, under config.rb's `private` at :13, so neither side offers it.) Moving it into config.ts is the only thing that would match it, and that is what cannot happen: it is typed on `NamedConnection` and `ARUNIT_ENTRY_NAMES`, both declared in connection.ts, which already imports from config.ts — so the move would CREATE an import cycle, and dragging those declarations along would relocate the `connections:` vocabulary out of the file mirroring connection.rb. (2) `config` / `config_file` / `read_config` are the memoized read of test/config.yml; trails ships no config.yml — the `connections:` hash is expressed directly as the CONNECTIONS table in connection.ts and the sub-setting readers in config.ts — so there is no file to locate, copy from config.example.yml, or parse. Scoped to config.rb, the only Ruby file in the tree that defines these names.
   - `config`, `config_file`, `read_config`, `expand_config`, `connection_name`, `test_configuration_hashes`, `connect` (only in: `config.rb`)
 
+## Ruby-only classes
+
+api:compare expects no TS counterpart for these Ruby classes at all — neither
+their methods nor their place in the inheritance chain. Each one only papers
+over a gap in the Ruby standard library that JavaScript does not have:
+
+- `I18n::JSON`
+  - `i18n/lib/i18n/backend/key_value.rb:7-22` defines `I18n::JSON` at load time as whichever JSON library is installed — `:11`/`:14` wrap `Oj` in `encode`/`decode` when the gem is present, and `:19`-`:21` falls back to `JSON = ActiveSupport::JSON`. It is a library-selection shim, not behavior: JavaScript has `JSON` in the language, and its `stringify`/`parse` are that `encode`/`decode`, which is what `KeyValue` calls directly (`packages/i18n/src/backend/key-value.ts`). Mirroring it would mean adding a trails class whose whole body forwards to a global the language already provides.
+
 ## Arity overrides
 
 The advisory arity check (arity.ts) suppresses these Ruby methods — their

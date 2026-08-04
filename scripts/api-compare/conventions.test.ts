@@ -12,7 +12,9 @@ import {
   SKIP_GROUPS,
   ARITY_OVERRIDE_GROUPS,
   isArityOverridden,
+  RUBY_ONLY_CLASSES,
   SCOPED_SKIP_GROUPS,
+  isRubyOnlyClass,
   isScopedSkip,
   ALREADY_PREDICATE_PREFIXES,
   explainConventions,
@@ -280,6 +282,20 @@ describe("SKIP_GROUPS", () => {
     for (const name of SKIP) {
       expect(rubyMethodToTs(name)).toBeNull();
     }
+  });
+});
+
+describe("RUBY_ONLY_CLASSES", () => {
+  it("requires a fully-qualified name and a non-empty reason per entry", () => {
+    for (const c of RUBY_ONLY_CLASSES) {
+      expect(c.fqn).toContain("::");
+      expect(c.reason.trim().length).toBeGreaterThan(0);
+    }
+  });
+
+  it("recognises only the listed classes", () => {
+    for (const c of RUBY_ONLY_CLASSES) expect(isRubyOnlyClass(c.fqn)).toBe(true);
+    expect(isRubyOnlyClass("I18n::Backend::KeyValue")).toBe(false);
   });
 });
 
