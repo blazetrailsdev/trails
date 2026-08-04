@@ -392,7 +392,6 @@ export function normalizeKeys(
   scope: unknown,
   separator?: string | false | null,
 ): TranslationKey[] {
-  // Ruby's `separator ||= I18n.default_separator` also defaults on `false`.
   if (separator == null || separator === false) separator = defaultSeparator();
   return [
     ...normalizeKey(locale, separator),
