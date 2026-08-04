@@ -483,15 +483,15 @@ export const RUBY_ONLY_CLASSES: RubyOnlyClass[] = [
   {
     fqn: "I18n::JSON",
     reason:
-      "i18n/lib/i18n/backend/key_value.rb:7-22 defines `I18n::JSON` at load " +
-      "time as whichever JSON library is installed — `Oj` wrapped in " +
-      "`encode`/`decode` when the gem is present, else `JSON = " +
-      "ActiveSupport::JSON`. It is a library-selection shim, not behavior: " +
-      "JavaScript has `JSON` in the language, and its `stringify`/`parse` " +
-      "*are* that `encode`/`decode`, which is what `KeyValue` calls directly " +
-      "(packages/i18n/src/backend/key-value.ts). Mirroring it would mean " +
-      "adding a trails class whose whole body forwards to a global the " +
-      "language already provides.",
+      "`i18n/lib/i18n/backend/key_value.rb:7-22` defines `I18n::JSON` at load " +
+      "time as whichever JSON library is installed — `:11`/`:14` wrap `Oj` in " +
+      "`encode`/`decode` when the gem is present, and `:19`-`:21` falls back " +
+      "to `JSON = ActiveSupport::JSON`. It is a library-selection shim, not " +
+      "behavior: JavaScript has `JSON` in the language, and its " +
+      "`stringify`/`parse` are that `encode`/`decode`, which is what " +
+      "`KeyValue` calls directly (`packages/i18n/src/backend/key-value.ts`). " +
+      "Mirroring it would mean adding a trails class whose whole body " +
+      "forwards to a global the language already provides.",
   },
 ];
 
