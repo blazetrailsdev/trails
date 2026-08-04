@@ -1164,6 +1164,14 @@ export const UNPORTED_FILES: UnportedFile[] = [
     reason: "Pre-1.0: optional backend mixin — cascading key lookup (`foo.bar.baz` → `foo.baz`).",
   },
   {
+    pattern: "backend/flatten.rb",
+    package: "i18n",
+    reason:
+      "Pre-1.0: optional backend mixin — key-flattening helpers used only by the " +
+      "deferred `key_value.rb`, `cache_file.rb` and `memoize.rb` backends; " +
+      "`Simple` does not include it.",
+  },
+  {
     pattern: "backend/interpolation_compiler.rb",
     package: "i18n",
     reason:
