@@ -61,6 +61,11 @@ function pad2(n: number): string {
  * `Time#strftime` reads off its receiver. It is not the public surface of
  * either class — `Date` deliberately answers no `hour`/`sec` — so each caller
  * builds one for the call.
+ *
+ * @noRailsEquivalent PERMANENT — the argument shape of `strftime` below, exported only
+ * because TypeScript has no module-private visibility that still reaches
+ * `./time.ts`. Not part of the shim's API: nothing outside `date.ts` and
+ * `time.ts` constructs one.
  */
 export interface StrftimeSubject {
   year: number;
@@ -77,6 +82,16 @@ export interface StrftimeSubject {
 /**
  * @internal Ruby routes `Date#strftime` and `Time#strftime` through the same C
  * formatter, so trails has one implementation rather than a copy per class.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby exposes `strftime` only as a method on `Date`,
+ * `DateTime` and `Time`, and so does this shim — `I18n::Backend::Base#localize`
+ * calls `object.strftime(format)` and nothing else
+ * (i18n/lib/i18n/backend/base.rb:91-92). This free function is the shared
+ * implementation those three methods delegate to, exported solely because
+ * `./time.ts` is a separate module and TypeScript has no visibility between
+ * "module-private" and "exported". Callers use `Date#strftime` /
+ * `DateTime#strftime` / `Time#strftime`, never this.
+ *
  * Only the directives the i18n format strings and the conformance mixins use
  * are recognised; Ruby leaves an unknown directive in place, and so does this.
  * `%z` is fixed at `+0000` because trails models only the UTC these classes are
