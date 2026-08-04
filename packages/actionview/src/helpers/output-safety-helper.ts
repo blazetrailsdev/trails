@@ -1,4 +1,6 @@
 import {
+  I18n,
+  assertValidKeys,
   SafeBuffer,
   htmlEscape,
   htmlEscapeOnce as _htmlEscapeOnce,
@@ -80,11 +82,21 @@ function flatten(arr: unknown[]): unknown[] {
   return result;
 }
 
+/**
+ * `support.array` is stored under Ruby's snake_case keys, but the options
+ * `toSentence` merges them into are camelCase.
+ */
+const I18N_KEY_MAP: Record<string, string> = {
+  words_connector: "wordsConnector",
+  two_words_connector: "twoWordsConnector",
+  last_word_connector: "lastWordConnector",
+};
+
 export interface ToSentenceOptions {
   wordsConnector?: string | SafeBuffer | null;
   twoWordsConnector?: string | SafeBuffer | null;
   lastWordConnector?: string | SafeBuffer | null;
-  locale?: string;
+  locale?: string | false;
 }
 
 /**
@@ -92,24 +104,39 @@ export interface ToSentenceOptions {
  * HTML-safe-aware version of Array#to_sentence.
  */
 export function toSentence(array: unknown[], options: ToSentenceOptions = {}): SafeBuffer {
-  const defaultConnectors = {
+  assertValidKeys(options as Record<string, unknown>, [
+    "wordsConnector",
+    "twoWordsConnector",
+    "lastWordConnector",
+    "locale",
+  ]);
+
+  const defaultConnectors: Record<string, string | SafeBuffer | null> = {
     wordsConnector: ", ",
     twoWordsConnector: " and ",
     lastWordConnector: ", and ",
   };
-
-  const wordsConnector =
-    options.wordsConnector !== undefined
-      ? options.wordsConnector
-      : defaultConnectors.wordsConnector;
-  const twoWordsConnector =
-    options.twoWordsConnector !== undefined
-      ? options.twoWordsConnector
-      : defaultConnectors.twoWordsConnector;
-  const lastWordConnector =
-    options.lastWordConnector !== undefined
-      ? options.lastWordConnector
-      : defaultConnectors.lastWordConnector;
+  // `output_safety_helper.rb:50` guards only on `defined?(I18n)`, but its
+  // ActiveSupport twin also skips the lookup for `locale: false`
+  // (core_ext/array/conversions.rb:68) and this is the html_safe-aware version
+  // of that method; `I18n.translate` would otherwise read `false` as "no locale
+  // given" and fall back to `I18n.locale` (i18n.ts:238).
+  if (options.locale !== false) {
+    const i18nConnectors = I18n.translate("support.array", {
+      locale: options.locale ?? null,
+      default: {},
+    }) as Record<string, string>;
+    for (const [k, v] of Object.entries(i18nConnectors)) {
+      defaultConnectors[I18N_KEY_MAP[k] ?? k] = v;
+    }
+  }
+  // Ruby's `default_connectors.merge!(options)` overrides on key presence; a TS
+  // caller forwarding an absent option passes `undefined`, which must not
+  // override, so the merge skips `undefined` values.
+  for (const [k, v] of Object.entries(options)) {
+    if (v !== undefined) defaultConnectors[k] = v as string | SafeBuffer | null;
+  }
+  const { wordsConnector, twoWordsConnector, lastWordConnector } = defaultConnectors;
 
   switch (array.length) {
     case 0:
