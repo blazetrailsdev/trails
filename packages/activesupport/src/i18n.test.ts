@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { I18n } from "./i18n.js";
 import { toSentence } from "./array-utils.js";
 import { TimeZone } from "./values/time-zone.js";
-import { Date as RubyDate } from "./date.js";
+import { Date as RubyDate } from "@blazetrails/i18n/date";
 import type { TimeWithZone } from "./time-with-zone.js";
 
 // Rails' activesupport/test/abstract_unit.rb:35 turns the check off for the

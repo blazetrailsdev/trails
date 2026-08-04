@@ -11,109 +11,8 @@ import { Simple } from "./simple.js";
 import { config, l, resetConfig } from "../i18n.js";
 import { resetClassConfig } from "../config.js";
 import { ArgumentError, MissingTranslationData, inspect } from "../exceptions.js";
-
-/**
- * Stands in for Ruby's `::Date` — `localize` duck-types its object, so what a
- * test needs is `strftime`, `wday` and `mon`. The directives below are the
- * ones the gem's format strings use. `%a`/`%A`/`%b`/`%B`/`%p`/`%P` never reach
- * here through `localize`, since `translate_localization_format` substitutes
- * them first — but the Procs mixin's `inspect_args` calls `strftime` directly,
- * so `%a` and `%b` still answer the English names Ruby's core `strftime` gives.
- */
-class RubyDate {
-  readonly utc: Date;
-
-  constructor(year: number, month: number, day: number, hour = 0, min = 0, sec = 0) {
-    this.utc = new Date(Date.UTC(year, month - 1, day, hour, min, sec));
-  }
-
-  get wday(): number {
-    return this.utc.getUTCDay();
-  }
-
-  get mon(): number {
-    return this.utc.getUTCMonth() + 1;
-  }
-
-  /** What `%Z` answers: `::Date` and `::DateTime` give the UTC offset. */
-  get zone(): string {
-    return "+00:00";
-  }
-
-  strftime(format: string): string {
-    const pad = (value: number, width = 2) => String(value).padStart(width, "0");
-    return format.replace(/%(-?)([A-Za-z%])/g, (match, dash: string, directive: string) => {
-      switch (directive) {
-        case "d":
-          return dash ? String(this.utc.getUTCDate()) : pad(this.utc.getUTCDate());
-        case "m":
-          return dash ? String(this.mon) : pad(this.mon);
-        case "Y":
-          return String(this.utc.getUTCFullYear());
-        case "H":
-          return pad(this.utc.getUTCHours());
-        case "M":
-          return pad(this.utc.getUTCMinutes());
-        case "S":
-          return pad(this.utc.getUTCSeconds());
-        case "z":
-          return "+0000";
-        case "Z":
-          return this.zone;
-        case "a":
-          return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][this.wday];
-        case "b":
-          return [
-            "Jan",
-            "Feb",
-            "Mar",
-            "Apr",
-            "May",
-            "Jun",
-            "Jul",
-            "Aug",
-            "Sep",
-            "Oct",
-            "Nov",
-            "Dec",
-          ][this.mon - 1];
-        case "x":
-          return `${pad(this.mon)}/${pad(this.utc.getUTCDate())}/${pad(
-            this.utc.getUTCFullYear() % 100,
-          )}`;
-        case "%":
-          return "%";
-        default:
-          return match;
-      }
-    });
-  }
-}
-
-/** Ruby's `::Time` answers `hour` and `sec`, which is what routes a format
- * lookup to `time.formats` and picks the meridian. */
-class RubyTime extends RubyDate {
-  get hour(): number {
-    return this.utc.getUTCHours();
-  }
-
-  get sec(): number {
-    return this.utc.getUTCSeconds();
-  }
-
-  /** `Time.utc(...).strftime('%Z')` is `"UTC"`, not an offset. */
-  override get zone(): string {
-    return "UTC";
-  }
-}
-
-/** Ruby's `::DateTime` — a `::Date` that answers `hour` and `sec` too, so it
- * routes to `time.formats` like `::Time` does but keeps `::Date`'s `%Z`. */
-class RubyDateTime extends RubyTime {
-  override get zone(): string {
-    return "+00:00";
-  }
-}
+import { Date as RubyDate, DateTime as RubyDateTime } from "../date.js";
+import { Time as RubyTime } from "../time.js";
 
 function setupDateTranslations(): void {
   config().backend.storeTranslations("de", {
@@ -195,7 +94,7 @@ function setupDatetimeTranslations(): void {
 function inspectArgs(args: unknown[], kwargs: Record<string, unknown>): string {
   args.push(kwargs);
   args = args.map((arg) => {
-    if (arg instanceof RubyTime) {
+    if (arg instanceof RubyTime || arg instanceof RubyDateTime) {
       return arg.strftime("%a, %d %b %Y %H:%M:%S %Z").replace("+0000", "+00:00");
     }
     if (arg instanceof RubyDate) {
@@ -309,8 +208,8 @@ describe("I18nSimpleBackendApiTest", () => {
     setupDateTranslations();
     setupTimeTranslations();
     date = new RubyDate(2008, 3, 1);
-    time = new RubyTime(2008, 3, 1, 6, 0);
-    otherTime = new RubyTime(2008, 3, 1, 18, 0);
+    time = RubyTime.utc(2008, 3, 1, 6, 0);
+    otherTime = RubyTime.utc(2008, 3, 1, 18, 0);
     setupDatetimeTranslations();
     datetime = new RubyDateTime(2008, 3, 1, 6);
     otherDatetime = new RubyDateTime(2008, 3, 1, 18);
@@ -452,7 +351,7 @@ describe("I18nSimpleBackendApiTest", () => {
   });
 
   it("localize Time: given a date format with the month name upcased it returns the correct value", () => {
-    expect(l(new RubyTime(2008, 2, 1, 6, 0), { format: "%-d. %^B %Y", locale: "de" })).toBe(
+    expect(l(RubyTime.utc(2008, 2, 1, 6, 0), { format: "%-d. %^B %Y", locale: "de" })).toBe(
       "1. FEBRUAR 2008",
     );
   });
@@ -559,21 +458,21 @@ describe("I18nSimpleBackendApiTest", () => {
 
   it("localize: using day names from lambdas", () => {
     setupTimeProcTranslations();
-    const time = new RubyTime(2008, 3, 1, 6, 0);
+    const time = RubyTime.utc(2008, 3, 1, 6, 0);
     expect(l(time, { format: "%A, %d %B", locale: "ru" })).toMatch(/Суббота/);
     expect(l(time, { format: "%d %B (%A)", locale: "ru" })).toMatch(/суббота/);
   });
 
   it("localize: using month names from lambdas", () => {
     setupTimeProcTranslations();
-    const time = new RubyTime(2008, 3, 1, 6, 0);
+    const time = RubyTime.utc(2008, 3, 1, 6, 0);
     expect(l(time, { format: "%d %B %Y", locale: "ru" })).toMatch(/марта/);
     expect(l(time, { format: "%B %Y", locale: "ru" })).toMatch(/Март /);
   });
 
   it("localize: using abbreviated day names from lambdas", () => {
     setupTimeProcTranslations();
-    const time = new RubyTime(2008, 3, 1, 6, 0);
+    const time = RubyTime.utc(2008, 3, 1, 6, 0);
     expect(l(time, { format: "%d %b %Y", locale: "ru" })).toMatch(/марта/);
     expect(l(time, { format: "%b %Y", locale: "ru" })).toMatch(/март /);
   });
@@ -610,13 +509,13 @@ describe("I18nSimpleBackendApiTest", () => {
 
   it("localize Time: given a format that resolves to a Proc it calls the Proc with the object", () => {
     setupTimeProcTranslations();
-    const time = new RubyTime(2008, 3, 1, 6, 0);
+    const time = RubyTime.utc(2008, 3, 1, 6, 0);
     expect(l(time, { format: ":proc", locale: "ru" })).toBe(inspectArgs([time], {}));
   });
 
   it("localize Time: given a format that resolves to a Proc it calls the Proc with the object and extra options", () => {
     setupTimeProcTranslations();
-    const time = new RubyTime(2008, 3, 1, 6, 0);
+    const time = RubyTime.utc(2008, 3, 1, 6, 0);
     const options = { foo: "foo" };
     expect(l(time, { ...options, format: ":proc", locale: "ru" })).toBe(
       inspectArgs([time], options),

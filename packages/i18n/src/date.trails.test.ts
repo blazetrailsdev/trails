@@ -4,7 +4,8 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { ArgumentError, Date as RubyDate } from "./date.js";
+import { ArgumentError, Date as RubyDate, DateTime as RubyDateTime } from "./date.js";
+import { Time as RubyTime } from "./time.js";
 
 describe("Date", () => {
   it("parses a y-m-d string, padded or not", () => {
@@ -42,5 +43,32 @@ describe("Date", () => {
     const date = RubyDate.parse("2008-07-02");
     expect(date.strftime("%-m/%-d")).toBe("7/2");
     expect(date.strftime("%Q")).toBe("%Q");
+  });
+});
+
+describe("DateTime", () => {
+  it("answers sec and hour, so localize resolves it against time.formats", () => {
+    const datetime = new RubyDateTime(2008, 3, 1, 6);
+    expect("sec" in datetime).toBe(true);
+    expect("hour" in datetime).toBe(true);
+  });
+
+  it("formats %Z as the UTC offset, as ::DateTime does", () => {
+    expect(new RubyDateTime(2008, 3, 1, 6).strftime("%a, %d %b %Y %H:%M:%S %Z")).toBe(
+      "Sat, 01 Mar 2008 06:00:00 +00:00",
+    );
+  });
+});
+
+describe("Time", () => {
+  it("formats %Z as UTC, where ::DateTime gives the offset", () => {
+    expect(RubyTime.utc(2008, 3, 1, 6, 0).strftime("%a, %d %b %Y %H:%M:%S %Z")).toBe(
+      "Sat, 01 Mar 2008 06:00:00 UTC",
+    );
+  });
+
+  it("picks the meridian off the hour", () => {
+    expect(RubyTime.utc(2008, 3, 1, 6, 0).strftime("%p%P")).toBe("AMam");
+    expect(RubyTime.utc(2008, 3, 1, 18, 0).strftime("%p%P")).toBe("PMpm");
   });
 });
