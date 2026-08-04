@@ -10,6 +10,7 @@
  */
 import { describe, it, expect } from "vitest";
 import {
+  delegateArrayMethod,
   generateRelationMethod,
   relationClassFor,
   associationRelationClassFor,
@@ -208,5 +209,31 @@ describe("name delegate — property-reader typing invariant", () => {
     const rel = Comment.all();
     const name: typeof rel.name = "Comment";
     expect(name).toBe("Comment");
+  });
+});
+
+describe("delegated records operators without an Array.prototype counterpart", () => {
+  const records = () => ["a", "b", "c"];
+
+  // delegation.rb:101 delegates `[]`, `&`, `|`, `+`, `-` to `records`. `[]` and
+  // `+` land on `Array.prototype` (`at`/`slice`, `concat`); `&`, `|` and `-`
+  // have no `Array.prototype` counterpart and are delegated under Ruby's own
+  // alias names for them (`Array#intersection` / `#union` / `#difference`),
+  // with Ruby's set semantics: `&` and `|` de-duplicate, `-` does not.
+  it("delegates the records operators Array.prototype cannot spell", () => {
+    const dup = () => ["a", "b", "b", "c"];
+    expect(delegateArrayMethod("intersection", dup)!(["b", "c", "d"])).toEqual(["b", "c"]);
+    expect(delegateArrayMethod("union", dup)!(["c", "d"])).toEqual(["a", "b", "c", "d"]);
+    expect(delegateArrayMethod("difference", dup)!(["c"])).toEqual(["a", "b", "b"]);
+    expect(delegateArrayMethod("at", records)!(1)).toBe("b");
+    expect(delegateArrayMethod("concat", records)!(["d"])).toEqual(["a", "b", "c", "d"]);
+  });
+
+  it("compares records with Core#== rather than object identity", () => {
+    const equals = (other: unknown): boolean => (other as { id?: number })?.id === 1;
+    const post = { equals, id: 1 };
+    const same = { equals, id: 1 };
+    expect(delegateArrayMethod("intersection", () => [post])!([same])).toEqual([post]);
+    expect(delegateArrayMethod("difference", () => [post])!([same])).toEqual([]);
   });
 });

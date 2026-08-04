@@ -272,27 +272,6 @@ describe("DelegationTest", () => {
       expect(delegateArrayMethod("join", records)!(",")).toBe("a,b,c");
     });
 
-    // delegation.rb:101 delegates `[]`, `&`, `|`, `+`, `-` to `records`. `[]` and
-    // `+` land on `Array.prototype` (`at`/`slice`, `concat`); `&`, `|` and `-`
-    // have no `Array.prototype` counterpart and are delegated under Ruby's own
-    // alias names for them (`Array#intersection` / `#union` / `#difference`),
-    // with Ruby's set semantics: `&` and `|` de-duplicate, `-` does not.
-    it("delegates the records operators Array.prototype cannot spell", () => {
-      const dup = () => ["a", "b", "b", "c"];
-      expect(delegateArrayMethod("intersection", dup)!(["b", "c", "d"])).toEqual(["b", "c"]);
-      expect(delegateArrayMethod("union", dup)!(["c", "d"])).toEqual(["a", "b", "c", "d"]);
-      expect(delegateArrayMethod("difference", dup)!(["c"])).toEqual(["a", "b", "b"]);
-      expect(delegateArrayMethod("at", records)!(1)).toBe("b");
-      expect(delegateArrayMethod("concat", records)!(["d"])).toEqual(["a", "b", "c", "d"]);
-    });
-
-    it("compares records with Core#== rather than object identity", () => {
-      const post = { equals: (other: any) => other?.id === 1, id: 1 };
-      const same = { equals: (other: any) => other?.id === 1, id: 1 };
-      expect(delegateArrayMethod("intersection", () => [post])!([same])).toEqual([post]);
-      expect(delegateArrayMethod("difference", () => [post])!([same])).toEqual([]);
-    });
-
     it("does not delegate JS-only Array methods absent from Rails", () => {
       // These raise NoMethodError in Rails; returning undefined lets the proxy
       // fall through so the call is rejected rather than silently succeeding.

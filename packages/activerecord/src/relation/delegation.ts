@@ -590,6 +590,28 @@ export function name(): string {
  * intentionally excluded so they raise like Rails rather than silently
  * succeeding.
  */
+const DELEGATED_ARRAY_METHODS = new Set<string>([
+  // curated delegate-to-records list (delegation.rb) → JS equivalents
+  "forEach", // each
+  "join",
+  "reverse",
+  "slice", // slice / []
+  "at", // []
+  "indexOf", // index
+  "lastIndexOf", // rindex
+  "concat", // +
+  // Enumerable methods (`Relation` includes Enumerable) with JS analogues
+  "map", // map / collect
+  "filter", // select
+  "find", // detect
+  "some", // any?
+  "every", // all?
+  "includes", // include?
+  "reduce", // inject / reduce
+  "sort",
+  "flatMap", // flat_map
+]);
+
 /**
  * `Array#&`, `Array#|` and `Array#-` — three of the five operators
  * delegation.rb:101 sends to `records` (`[]`, `&`, `|`, `+`, `-`). `[]` and
@@ -632,28 +654,6 @@ function uniqRecords(records: unknown[]): unknown[] {
   for (const record of records) if (!includesRecord(uniq, record)) uniq.push(record);
   return uniq;
 }
-
-const DELEGATED_ARRAY_METHODS = new Set<string>([
-  // curated delegate-to-records list (delegation.rb) → JS equivalents
-  "forEach", // each
-  "join",
-  "reverse",
-  "slice", // slice / []
-  "at", // []
-  "indexOf", // index
-  "lastIndexOf", // rindex
-  "concat", // +
-  // Enumerable methods (`Relation` includes Enumerable) with JS analogues
-  "map", // map / collect
-  "filter", // select
-  "find", // detect
-  "some", // any?
-  "every", // all?
-  "includes", // include?
-  "reduce", // inject / reduce
-  "sort",
-  "flatMap", // flat_map
-]);
 
 /**
  * Array-method delegation — mirrors Rails' `delegate ... to: :records`
