@@ -69,6 +69,9 @@ export {
 } from "./backend/base.js";
 export type { FileReader, TranslateOptions } from "./backend/base.js";
 export { Chain } from "./backend/chain.js";
+export { FLATTEN_SEPARATOR, Flatten, SEPARATOR_ESCAPE_CHAR } from "./backend/flatten.js";
+export { KeyValue, SubtreeProxy } from "./backend/key-value.js";
+export type { Store } from "./backend/key-value.js";
 export { Simple } from "./backend/simple.js";
 export { Fallbacks, fallbacks, setFallbacks } from "./backend/fallbacks.js";
 export type { FallbacksLike, FallbacksMethods } from "./backend/fallbacks.js";
