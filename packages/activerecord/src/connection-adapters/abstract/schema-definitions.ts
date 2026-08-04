@@ -1197,14 +1197,14 @@ export class TableDefinition {
     return this;
   }
 
+  /**
+   * Mirrors: ActiveRecord::ConnectionAdapters::TableDefinition#new_foreign_key_definition
+   * (schema_definitions.rb:575-581).
+   */
   newForeignKeyDefinition(
     toTable: string,
     options: Partial<AddForeignKeyOptions> = {},
   ): ForeignKeyDefinition {
-    // Mirrors Rails' TableDefinition#new_foreign_key_definition
-    // (schema_definitions.rb:575-581): apply table_name_prefix/suffix to
-    // to_table, then delegate the column/name defaults to
-    // `@conn.foreign_key_options`.
     const prefix = this._adapter.tableNamePrefix ?? globalTableNamePrefix();
     const suffix = this._adapter.tableNameSuffix ?? globalTableNameSuffix();
     const prefixedToTable = `${prefix}${toTable}${suffix}`;

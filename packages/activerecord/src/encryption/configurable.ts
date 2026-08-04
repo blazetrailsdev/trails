@@ -68,10 +68,6 @@ export class Configurable {
         continue;
       }
       if (value === undefined) continue;
-      // Rails' `configure` does `config.public_send("#{name}=", value)`
-      // (configurable.rb:24-26), which reaches writers that are behavior
-      // rather than stored state — `support_sha1_for_non_deterministic_encryption=`
-      // (config.rb:28). Those are spelled `setX` here.
       const writer = `set${key[0].toUpperCase()}${key.slice(1)}`;
       if (typeof (config as unknown as Record<string, unknown>)[writer] === "function") {
         (config as unknown as Record<string, (v: unknown) => void>)[writer](value);
