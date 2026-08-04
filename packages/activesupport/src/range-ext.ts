@@ -221,47 +221,6 @@ export function rangeIncludesStringValue(range: Range<string>, value: string): b
   return false;
 }
 
-export function rangeIncludesRange<T extends number | Date>(
-  outer: Range<T>,
-  inner: Range<T>,
-): boolean {
-  const toNum = (v: T): number => (v instanceof Date ? v.getTime() : v);
-
-  // inner begin must be within outer
-  if (inner.begin !== null) {
-    if (!rangeIncludesValue(outer, inner.begin)) return false;
-  } else if (outer.begin !== null) {
-    return false; // inner is beginless but outer is not
-  }
-
-  // inner end must be within outer
-  if (inner.end !== null) {
-    const innerEnd = toNum(inner.end);
-    if (outer.end !== null) {
-      const outerEnd = toNum(outer.end);
-      if (inner.excludeEnd && !outer.excludeEnd) {
-        // exclusive inner end: check innerEnd <= outerEnd
-        if (innerEnd > outerEnd) return false;
-      } else if (!inner.excludeEnd && outer.excludeEnd) {
-        // inclusive inner end, exclusive outer end: innerEnd must be < outerEnd
-        if (innerEnd >= outerEnd) return false;
-      } else {
-        if (innerEnd > outerEnd) return false;
-      }
-    }
-    // if outer is endless, inner.end is always within
-  } else if (outer.end !== null) {
-    return false; // inner is endless but outer is not
-  }
-
-  return true;
-}
-
-/**
- * cover? — whether a range covers another range (same as rangeIncludesRange for numeric ranges).
- */
-export const cover = rangeIncludesRange;
-
 /**
  * toFs — format a range as a string.
  */

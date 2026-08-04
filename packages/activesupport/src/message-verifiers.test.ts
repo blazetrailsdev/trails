@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import type { MessageVerifier } from "./message-verifier.js";
 import { MessageVerifiers } from "./message-verifiers.js";
+import { rotationCoordinatorTests } from "./messages/rotation-coordinator-tests.js";
 import type { SecretGenerator } from "./messages/rotation-coordinator.js";
 
 describe("MessageVerifiersTest", () => {
@@ -23,6 +24,8 @@ describe("MessageVerifiersTest", () => {
   beforeEach(() => {
     coordinator = makeCoordinator().rotateDefaults();
   });
+
+  rotationCoordinatorTests<MessageVerifier>({ makeCoordinator, roundtrip });
 
   it("can override secret generator", () => {
     const secretGenerator: SecretGenerator = (salt) => `${salt}!`;

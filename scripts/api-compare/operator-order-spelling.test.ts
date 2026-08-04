@@ -62,7 +62,10 @@ describe("operatorSpelling", () => {
   it("leaves module operators with no TS counterpart unmapped", () => {
     expect(operatorSpelling("ActiveRecord::Delegation", "[]")).toBeUndefined();
     expect(operatorSpelling("ActiveRecord::Delegation", "+")).toBeUndefined();
-    expect(operatorSpelling("ActiveSupport::CompareWithRange", "===")).toBeUndefined();
+  });
+
+  it("resolves CompareWithRange's === to the compare-range.ts spelling", () => {
+    expect(operatorSpelling("ActiveSupport::CompareWithRange", "===")).toEqual(["caseEquals"]);
   });
 
   it("returns undefined for an unlisted class (stays unmapped)", () => {

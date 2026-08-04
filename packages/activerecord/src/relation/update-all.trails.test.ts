@@ -3,18 +3,13 @@
  * (relation.rb:1381-1393): update_all values are cast by the column type and
  * bound, never inline-quoted.
  */
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Nodes } from "@blazetrails/arel";
 import { fixtures } from "../test-fixtures.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Post } from "../test-helpers/models/post.js";
 import { Topic } from "../test-helpers/models/topic.js";
-import { initializeAssociations } from "../associations.js";
-
-beforeAll(async () => {
-  await initializeAssociations();
-});
 
 type Mutator = (sql: string, ...rest: unknown[]) => unknown;
 

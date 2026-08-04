@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { InvalidMessage, MessageEncryptor } from "./message-encryptor.js";
 import { MessageEncryptors } from "./message-encryptors.js";
+import { rotationCoordinatorTests } from "./messages/rotation-coordinator-tests.js";
 import type { SecretGenerator } from "./messages/rotation-coordinator.js";
 
 /** Rails' `"".ljust(secret_length, salt)`. */
@@ -35,6 +36,8 @@ describe("MessageEncryptorsTest", () => {
   beforeEach(() => {
     coordinator = makeCoordinator().rotateDefaults();
   });
+
+  rotationCoordinatorTests<MessageEncryptor>({ makeCoordinator, roundtrip });
 
   it("can override secret generator", () => {
     const secretGenerator: SecretGenerator = (salt, { secretLength }) =>
