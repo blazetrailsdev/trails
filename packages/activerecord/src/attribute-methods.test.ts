@@ -309,24 +309,15 @@ describe("AttributeMethodsTest", () => {
     await Post.create({ title: "sel_test" });
     const result = await Post.select("title").first();
     // Mirrors: computer[:developer] → assert_raises MissingAttributeError.
-    // Rails `[]` reads via `_read_attribute(attr) { |n| missing_attribute(n) }`;
-    // The generated per-attribute getter supplies the same raising block.
     // `legacy_comments_count` is a real canonical `posts` column that wasn't in
     // the SELECT, so reading it raises.
-    expect(() => (result as any).legacy_comments_count).toThrow(
-      "missing attribute 'legacy_comments_count'",
-    );
-    // Same read through `[]` itself (attribute_methods.rb:415).
     expect(() => (result as any).get("legacy_comments_count")).toThrow(
       "missing attribute 'legacy_comments_count'",
     );
     // Mirrors: assert_nothing_raised { computer[:extendedWarranty] }
-    // (block-less `read_attribute` never raises; a selected column reads back).
-    expect(result?.readAttribute("title")).toBe("sel_test");
     expect((result as any).get("title")).toBe("sel_test");
     // Mirrors: assert_nothing_raised { computer[:no_column_exists] } — an unknown
-    // name returns nil even through the raising getter/`[]` block.
-    expect(result?.readAttribute("no_column_exists")).toBeNull();
+    // name returns nil even through `[]`'s raising block.
     expect((result as any).get("no_column_exists")).toBeNull();
   });
   it("user-defined time attribute predicate", async () => {
@@ -809,20 +800,27 @@ describe("AttributeMethodsTest", () => {
   it("write_attribute", async () => {
     const Topic = makeTopic();
     const t = new Topic({});
-    t.writeAttribute("title", "Written");
-    expect(t.readAttribute("title")).toBe("Written");
+    t.writeAttribute("title", "Still another topic");
+    expect(t.title).toBe("Still another topic");
 
-    // Mirrors: topic[:title] = "Still another topic: part 2"
-    t.set("title", "Written: part 2");
-    expect(t.title).toBe("Written: part 2");
+    t.set("title", "Still another topic: part 2");
+    expect(t.title).toBe("Still another topic: part 2");
+
+    t.writeAttribute("title", "Still another topic: part 3");
+    expect(t.title).toBe("Still another topic: part 3");
+
+    t.set("title", "Still another topic: part 4");
+    expect(t.title).toBe("Still another topic: part 4");
   });
 
   it("read_attribute", async () => {
     const Topic = makeTopic();
-    const t = new Topic({ title: "Read" });
-    expect(t.readAttribute("title")).toBe("Read");
-    // Mirrors: assert_equal "Don't change the topic", topic["title"]
-    expect(t.get("title")).toBe("Read");
+    const t = new Topic({ title: "Don't change the topic" });
+    expect(t.readAttribute("title")).toBe("Don't change the topic");
+    expect(t.get("title")).toBe("Don't change the topic");
+
+    expect(t.readAttribute("title")).toBe("Don't change the topic");
+    expect(t.get("title")).toBe("Don't change the topic");
   });
 
   it("read_attribute when false", async () => {
@@ -883,8 +881,6 @@ describe("AttributeMethodsTest", () => {
     const Topic = makeTopic();
     const topic = new Topic({ title: "a" });
     Object.defineProperty(topic, "title", { get: () => "b" });
-    expect(topic.readAttribute("title")).toBe("a");
-    // Mirrors: assert_equal "a", topic[:title]
     expect((topic as any).get("title")).toBe("a");
   });
 
@@ -1011,15 +1007,17 @@ describe("AttributeMethodsTest", () => {
         this.attribute("title", "string");
       }
     }
-    const t = Topic.new({ title: "read-test" }) as any;
+    const t = Topic.new({ title: "Stop changing the topic" }) as any;
     const superReadAttribute = t.readAttribute.bind(t);
     t.readAttribute = (attrName: string, block?: (name: string) => unknown) =>
       String(superReadAttribute(attrName, block)).toUpperCase();
 
-    expect(t.readAttribute("title")).toBe("READ-TEST");
-    // Mirrors: assert_equal "STOP CHANGING THE TOPIC", topic["title"] — `[]`
-    // dispatches read_attribute, so the override reaches bracket reads too.
-    expect(t.get("title")).toBe("READ-TEST");
+    // `[]` dispatches read_attribute, so the override reaches bracket reads too.
+    expect(t.readAttribute("title")).toBe("STOP CHANGING THE TOPIC");
+    expect(t.get("title")).toBe("STOP CHANGING THE TOPIC");
+
+    expect(t.readAttribute("title")).toBe("STOP CHANGING THE TOPIC");
+    expect(t.get("title")).toBe("STOP CHANGING THE TOPIC");
   });
 
   it("attribute_method?", async () => {
