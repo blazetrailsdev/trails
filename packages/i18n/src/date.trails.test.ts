@@ -111,6 +111,7 @@ describe("Date", () => {
         expect([date.year, date.mon, date.day]).toEqual([2008, 8, 5]);
       }
       expect(RubyDate._parse("11pm")).toEqual({ hour: 23 });
+      expect(RubyDate._parse("3rd 5 bc")).toEqual({ mday: 3, hour: 5 });
     } finally {
       vi.useRealTimers();
     }

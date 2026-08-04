@@ -1326,13 +1326,16 @@ function parseDdd(str: string, hash: DateParts): string | null {
 /**
  * @internal `date_parse.c` `parse_bc` (`date_parse.c:2003-2019`): the era
  * suffix. It runs after whichever date sub-parser matched and only records
- * `:_bc`; the tail of `date__parse` is what negates the year.
+ * `:_bc`; the tail of `date__parse` is what negates the year. It is a `SUBS`
+ * like every sub-parser above, and `parse_frag` runs on what it leaves — so
+ * `"3rd 5 bc"` is the 3rd at 5 o'clock, the era gone from the string before
+ * the anchored pattern reads the `5`.
  */
-function parseBc(str: string, hash: DateParts): number {
+function parseBc(str: string, hash: DateParts): string | null {
   const m = /\b(bc\b|bce\b|b\.c\.|b\.c\.e\.)/i.exec(str);
-  if (m === null) return 0;
+  if (m === null) return null;
   hash._bc = true;
-  return 1;
+  return subx(str, m);
 }
 
 /**
@@ -1548,7 +1551,7 @@ export class Date {
       parseDdd(str, hash);
     if (rest === null && Object.keys(hash).length === 0) return null;
     if (rest !== null) str = rest;
-    if (/[a-z]/i.test(str)) parseBc(str, hash);
+    if (/[a-z]/i.test(str)) str = parseBc(str, hash) ?? str;
     if (/\d/.test(str)) parseFrag(str, hash);
     if (hash._bc) {
       if (hash.cwyear !== undefined) hash.cwyear = -hash.cwyear + 1;
