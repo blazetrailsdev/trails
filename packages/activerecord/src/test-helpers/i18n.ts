@@ -15,12 +15,7 @@ import { en } from "../locale/en.js";
  * i18n_generate_message_validation_test.rb:14).
  */
 export function resetI18n(backend: I18n.Base = new I18n.Simple()): void {
-  resetI18nEmpty(backend);
+  I18n.setBackend(backend);
   I18n.backend().storeTranslations("en", activemodelEn);
   I18n.backend().storeTranslations("en", en);
-}
-
-/** A fresh backend with no framework locales — Rails' `I18n.load_path.clear`. */
-export function resetI18nEmpty(backend: I18n.Base = new I18n.Simple()): void {
-  I18n.setBackend(backend);
 }
