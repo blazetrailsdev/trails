@@ -622,8 +622,10 @@ export abstract class Base {
     }
   }
 
-  /** Mirrors: `alias_method :load_yaml, :load_yml` (base.rb:251). */
-  protected loadYaml = this.loadYml;
+  /** Mirrors: `alias_method :load_yaml, :load_yml` (base.rb:272). */
+  protected loadYaml(filename: string): [unknown, boolean] {
+    return this.loadYml(filename);
+  }
 
   /**
    * Loads a JSON translations file. The data must have locales as toplevel
