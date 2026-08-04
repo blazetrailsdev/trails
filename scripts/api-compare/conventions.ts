@@ -30,7 +30,7 @@ const TOKEN_RENAMES: Record<string, string> = {
 
 function applyTokenRenames(snake: string): string {
   return snake.replace(
-    /(^|_)(erb|ERB|Erb)(?=_|$)/g,
+    /(^|_)(erb|ERB|Erb|rb)(?=_|$)/g,
     (_m, pre, tok: string) => pre + TOKEN_RENAMES[tok],
   );
 }

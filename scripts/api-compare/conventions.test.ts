@@ -73,6 +73,15 @@ describe("snakeToCamel", () => {
     expect(snakeToCamel("visit_Erb_Node")).toBe("visitTseNode");
   });
 
+  it("renames `rb` token to `js` (a Ruby source file is a JS one)", () => {
+    // I18n::Backend::Base#load_rb evaluates a locale file written as executable
+    // source in the host language; its port loads a `.js` locale module, so
+    // `load_rb` has to resolve to `loadJs` for api:compare to match it.
+    expect(snakeToCamel("load_rb")).toBe("loadJs");
+    expect(snakeToCamel("rb")).toBe("js");
+    expect(snakeToCamel("rb_handler")).toBe("jsHandler");
+  });
+
   it("does NOT rename `erb` when it appears as a substring of another token", () => {
     // Guard: only standalone snake-case segments should be substituted,
     // not embedded substrings like `verb`, `verbatim`, `superb`, `reverb`.
@@ -80,6 +89,8 @@ describe("snakeToCamel", () => {
     expect(snakeToCamel("verbatim_copy")).toBe("verbatimCopy");
     expect(snakeToCamel("http_verb")).toBe("httpVerb");
     expect(snakeToCamel("superb_thing")).toBe("superbThing");
+    // `erb` must keep winning the alternation over the shorter `rb`.
+    expect(snakeToCamel("compile_erb")).toBe("compileTse");
   });
 });
 
