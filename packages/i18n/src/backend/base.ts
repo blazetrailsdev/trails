@@ -319,6 +319,13 @@ export abstract class Base {
    * Acts the same as `strftime`, but uses a localized version of the format
    * string. Takes a key from the date/time formats translations as a format
    * argument (*e.g.*, `short` in `date.formats`).
+   *
+   * The Symbol `format` arm builds its lookup key the way the gem does, with
+   * `:"#{type}.formats.#{key}"`. Interpolating a Ruby Symbol yields its name,
+   * which for a `":short"`-spelled Symbol is `.slice(1)` — the interpolation
+   * itself, not a pre-strip of a value passed on to `translate`. The key that
+   * results is a Symbol, so it keeps its own leading colon and `normalizeKey`
+   * is still the only place a colon is dropped from a value in flight.
    */
   localize(
     locale: Locale,
