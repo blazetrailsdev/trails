@@ -3,10 +3,10 @@
  *
  * Ruby mixes `Base` into a backend with `include`; the JS equivalent is an
  * abstract class that concrete backends extend, which keeps the file layout of
- * the gem. `store_translations` and `available_locales` are `abstract` here —
- * TypeScript's form of the same contract. `lookup` keeps the gem's raising
- * body (base.rb:116-118) because `Chain` includes `Base` without defining one,
- * and an `abstract` member would force it to.
+ * the gem. `store_translations` (base.rb:24-26), `available_locales`
+ * (base.rb:97-99) and `lookup` (base.rb:116-118) keep the gem's raising bodies
+ * rather than being `abstract`: Ruby lets a partial backend exist and fail at
+ * call time, and `Chain` includes `Base` without defining a `lookup` at all.
  *
  * A Ruby Symbol value is a JS string that keeps its leading colon — `":short"`
  * is `:short` — which is the discriminator Ruby gets from the type, and is how
@@ -220,11 +220,13 @@ export abstract class Base {
    * This method receives a locale, a data hash and options for storing
    * translations. Should be implemented.
    */
-  abstract storeTranslations(
-    locale: Locale,
-    data: TranslationData,
-    options?: TranslateOptions,
-  ): unknown;
+  storeTranslations(
+    _locale: Locale,
+    _data: TranslationData,
+    _options: TranslateOptions = EMPTY_HASH,
+  ): unknown {
+    throw new NotImplementedError();
+  }
 
   translate(
     locale: Locale | null | undefined,
@@ -311,7 +313,9 @@ export abstract class Base {
    * Returns an array of locales for which translations are available ignoring
    * the reserved translation meta data key `i18n`.
    */
-  abstract availableLocales(): Locale[];
+  availableLocales(): Locale[] {
+    throw new NotImplementedError();
+  }
 
   reloadBang(): void {
     if (this.eagerLoaded()) this.eagerLoadBang();
