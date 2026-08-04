@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { I18n } from "./i18n.js";
-import { en } from "./locale/en.js";
 import {
   numberToCurrency,
   numberToRounded,
@@ -13,12 +12,6 @@ import {
 // Rails' activesupport/test/abstract_unit.rb:35 turns the check off for the
 // whole suite; these cases translate under locales they store themselves.
 I18n.setEnforceAvailableLocales(false);
-
-/** `I18n.reload!` plus the `en` locale Rails re-reads from its load path. */
-async function reloadTranslations(): Promise<void> {
-  await I18n.reloadBang();
-  I18n.backend().storeTranslations("en", en);
-}
 
 function setupTranslations(): void {
   I18n.backend().storeTranslations("ts", {
@@ -80,12 +73,12 @@ function setupTranslations(): void {
 
 describe("NumberHelperI18nTest", () => {
   beforeEach(async () => {
-    await reloadTranslations();
+    await I18n.reloadBang();
     setupTranslations();
   });
 
   afterEach(async () => {
-    await reloadTranslations();
+    await I18n.reloadBang();
   });
 
   it("number to i18n currency", () => {
