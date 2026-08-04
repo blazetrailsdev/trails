@@ -319,6 +319,13 @@ export abstract class Base {
    * Acts the same as `strftime`, but uses a localized version of the format
    * string. Takes a key from the date/time formats translations as a format
    * argument (*e.g.*, `short` in `date.formats`).
+   *
+   * The Symbol `format` arm builds its lookup key the way the gem does, with
+   * `:"#{type}.formats.#{key}"`. Interpolating a Ruby Symbol yields its name,
+   * which for a `":short"`-spelled Symbol is `.slice(1)` — the interpolation
+   * itself, not a pre-strip of a value passed on to `translate`. The key that
+   * results is a Symbol, so it keeps its own leading colon and `normalizeKey`
+   * is still the only place a colon is dropped from a value in flight.
    */
   localize(
     locale: Locale,
@@ -339,7 +346,7 @@ export abstract class Base {
       const key = format;
       const type = respondTo(object, "sec") ? "time" : "date";
       options = { ...options, raise: true, object, locale };
-      format = t(`${type}.formats.${key.slice(1)}`, options);
+      format = t(`:${type}.formats.${key.slice(1)}`, options);
     }
 
     format = this.translateLocalizationFormat(locale, object as Localizable, format, options);
@@ -421,7 +428,7 @@ export abstract class Base {
         // The gem goes through `I18n.translate`, which — with `throw: true` —
         // hands a MissingTranslation straight back to this `catch`, exactly as
         // calling the backend does. The `I18n.t` facade is not ported yet.
-        return config().backend.translate(locale, subject.slice(1), {
+        return config().backend.translate(locale, subject, {
           ...options,
           locale,
           throw: true,
