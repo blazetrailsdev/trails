@@ -386,6 +386,9 @@ importers:
       vitest:
         specifier: ^3.2.4
         version: 3.2.4(@types/node@25.3.5)(jiti@2.6.1)(jsdom@29.0.1)(lightningcss@1.32.0)(terser@5.47.1)(tsx@4.21.0)(yaml@2.8.3)
+      yaml:
+        specifier: ^2.8.3
+        version: 2.8.3
 
   scripts/guides-typecheck:
     dependencies:
