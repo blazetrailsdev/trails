@@ -103,7 +103,7 @@ export class Chain {
   }
 
   availableLocales(): Locale[] {
-    return [...new Set(this.backends.flatMap((backend) => backend.availableLocales()))];
+    return [...new Set(this.backends.map((backend) => backend.availableLocales()).flat())];
   }
 
   translate(
