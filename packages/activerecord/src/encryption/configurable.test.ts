@@ -17,7 +17,7 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
       keyDerivationSalt: c.keyDerivationSalt,
       previousSchemes: [...c.previousSchemes],
       addToFilterParameters: c.addToFilterParameters,
-      excludeFromFilterParameters: [...c.excludeFromFilterParameters],
+      excludedFromFilterParameters: [...c.excludedFromFilterParameters],
     };
   }
 
@@ -32,7 +32,7 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
     c.keyDerivationSalt = savedConfig.keyDerivationSalt;
     c.previousSchemes = savedConfig.previousSchemes;
     c.addToFilterParameters = savedConfig.addToFilterParameters;
-    c.excludeFromFilterParameters = savedConfig.excludeFromFilterParameters;
+    c.excludedFromFilterParameters = savedConfig.excludedFromFilterParameters;
     Contexts.resetDefaultContext();
   });
 
@@ -134,7 +134,7 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
   });
 
   it("exclude the installation of autofiltered params", () => {
-    Configurable.config.excludeFromFilterParameters = ["catchphrase"];
+    Configurable.config.excludedFromFilterParameters = ["catchphrase"];
 
     const filterParameters: string[] = [];
     const autoFilteredParameters = new AutoFilteredParameters(filterParameters);
@@ -151,7 +151,7 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
       expect(filterParameters).toEqual([]);
     } finally {
       dispose();
-      Configurable.config.excludeFromFilterParameters = [];
+      Configurable.config.excludedFromFilterParameters = [];
     }
   });
 
@@ -168,8 +168,8 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
     }
   });
 
-  it("excludeFromFilterParameters excludes specific attributes while others are still filtered", () => {
-    Configurable.config.excludeFromFilterParameters = ["secret_token"];
+  it("excludedFromFilterParameters excludes specific attributes while others are still filtered", () => {
+    Configurable.config.excludedFromFilterParameters = ["secret_token"];
 
     const filterParameters: string[] = [];
     const autoFilteredParameters = new AutoFilteredParameters(filterParameters);
