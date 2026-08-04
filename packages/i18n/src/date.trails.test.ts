@@ -191,6 +191,13 @@ describe("Date", () => {
     }
   });
 
+  it("rejects a week outside the year, as c_valid_commercial_p does", () => {
+    expect(() => RubyDate.parse("2001-W54-1")).toThrow("invalid date");
+    expect(() => RubyDate.parse("2001-W00-1")).toThrow("invalid date");
+    const long = RubyDate.parse("2020-W53-1");
+    expect([long.year, long.mon, long.day]).toEqual([2020, 12, 28]);
+  });
+
   it("negates the year of a BC date, as parse_bc does", () => {
     expect(RubyDate.parse("4004-01-02 BC").year).toBe(-4003);
     expect(RubyDate.parse("feb 3 4004 b.c.e.").year).toBe(-4003);
