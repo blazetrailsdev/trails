@@ -67,20 +67,6 @@ export function registerFileReader(reader: FileReader): void {
 }
 
 /**
- * Reads every file in `I18n.load_path` into memory, so that the gem's loading
- * chain — `load_translations` / `load_file` / `load_yml` / `load_json`, and
- * `Simple#init_translations` above them — can stay synchronous exactly as the
- * gem writes it.
- *
- * @noRailsEquivalent PERMANENT — the gem has no preload because Ruby reads
- * files synchronously, so `init_translations` can read at its four lazy call
- * sites (simple.rb:83-86). Here the read is a Promise and those sites are
- * synchronous in Rails all the way up through `Error#message`,
- * `Naming#human` and `NumberConverter#format`; making them async would push a
- * deviation through five packages to remove one from this file. Awaiting the
- * I/O once at boot keeps the async fs and leaves every ported body verbatim.
- */
-/**
  * Registers an already-imported JavaScript locale module under the load-path
  * entry that names it, so that `load_rb`'s port can evaluate it synchronously.
  *
@@ -96,6 +82,20 @@ export function registerLocaleModule(filename: string, translations: unknown): v
   localeModules.set(filename, translations);
 }
 
+/**
+ * Reads every file in `I18n.load_path` into memory, so that the gem's loading
+ * chain — `load_translations` / `load_file` / `load_yml` / `load_json`, and
+ * `Simple#init_translations` above them — can stay synchronous exactly as the
+ * gem writes it.
+ *
+ * @noRailsEquivalent PERMANENT — the gem has no preload because Ruby reads
+ * files synchronously, so `init_translations` can read at its four lazy call
+ * sites (simple.rb:83-86). Here the read is a Promise and those sites are
+ * synchronous in Rails all the way up through `Error#message`,
+ * `Naming#human` and `NumberConverter#format`; making them async would push a
+ * deviation through five packages to remove one from this file. Awaiting the
+ * I/O once at boot keeps the async fs and leaves every ported body verbatim.
+ */
 export async function preloadTranslationFiles(...filenames: (string | string[])[]): Promise<void> {
   const paths = filenames.length === 0 ? config().loadPath : filenames;
   for (const filename of paths.flat()) {
