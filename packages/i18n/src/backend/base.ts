@@ -339,7 +339,9 @@ export abstract class Base {
       const key = format;
       const type = respondTo(object, "sec") ? "time" : "date";
       options = { ...options, raise: true, object, locale };
-      format = t(`${type}.formats.${key.slice(1)}`, options);
+      // `:"#{type}.formats.#{key}"` — interpolating a Symbol yields its name,
+      // and the built key is itself a Symbol, so it keeps the leading colon.
+      format = t(`:${type}.formats.${key.slice(1)}`, options);
     }
 
     format = this.translateLocalizationFormat(locale, object as Localizable, format, options);
@@ -421,7 +423,7 @@ export abstract class Base {
         // The gem goes through `I18n.translate`, which — with `throw: true` —
         // hands a MissingTranslation straight back to this `catch`, exactly as
         // calling the backend does. The `I18n.t` facade is not ported yet.
-        return config().backend.translate(locale, subject.slice(1), {
+        return config().backend.translate(locale, subject, {
           ...options,
           locale,
           throw: true,
