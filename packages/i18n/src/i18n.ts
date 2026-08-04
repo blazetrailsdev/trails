@@ -363,8 +363,7 @@ function normalizeKey(key: unknown, separator: string): TranslationKey[] {
     bySeparator = new Map();
     normalizedKeyCache.set(separator, bySeparator);
   }
-  const cacheKey = key;
-  let normalized = bySeparator.get(cacheKey);
+  let normalized = bySeparator.get(key);
   if (normalized === undefined) {
     if (Array.isArray(key)) {
       normalized = key.flatMap((k) => normalizeKey(k, separator));
@@ -381,7 +380,7 @@ function normalizeKey(key: unknown, separator: string): TranslationKey[] {
         return k;
       });
     }
-    bySeparator.set(cacheKey, normalized);
+    bySeparator.set(key, normalized);
   }
   return normalized;
 }
