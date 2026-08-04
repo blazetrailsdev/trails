@@ -81,11 +81,7 @@ interface PgSchemaAdapter {
     name?: string;
   }): Type;
   reloadTypeMap(): Promise<void>;
-  _serialFromDefaultFunction(
-    tableName: string,
-    columnName: string,
-    defaultFunction: string | null,
-  ): boolean;
+  newColumnFromField(tableName: string, field: unknown[], definitions: unknown): Promise<Column>;
   extractValueFromDefault(defaultExpr: string | null): unknown;
   extractDefaultFunction(defaultValue: unknown, defaultExpr: string | null): string | null;
   nativeDatabaseTypes(): Record<string, string | { name?: string; limit?: number }>;
@@ -663,58 +659,35 @@ export class SchemaStatements extends AbstractSchemaStatements {
       }
     }
 
-    return rows.map((r) => {
-      const sqlType = r.type as string;
-      const oid = Number(r.oid);
-      const fmod = Number(r.fmod);
-      // All OIDs are now registered (or warned as unknown) by the batch
-      // load above. lookupCastTypeFromColumn mirrors Rails' fetch_type_metadata
-      // after get_oid_type has pre-populated the map.
-      const castType = this.pg.lookupCastTypeFromColumn({ oid, fmod, sqlType });
-      const rawDefault = (r.default as string | null) ?? null;
-      const identity = (r.identity as string | null) || null;
-      const attgenerated = (r.attgenerated as string | null) || null;
-      // Mirrors Rails new_column_from_field: generated columns store the
-      // generation expression as defaultFunction; regular columns split into
-      // literal default vs. default function (nextval, CURRENT_TIMESTAMP, etc.).
-      // The raw literal is stored verbatim (Rails' extract_value_from_default);
-      // deserialization is deferred to Attribute.from_database, so
-      // *_before_type_cast for a column default returns the raw String.
-      const defaultValue = this.pg.extractValueFromDefault(rawDefault);
-      const defaultFunction = attgenerated
-        ? rawDefault
-        : this.pg.extractDefaultFunction(defaultValue, rawDefault);
-      const isSerial = this.pg._serialFromDefaultFunction(
-        tableName,
-        r.name as string,
-        defaultFunction,
-      );
-
-      return new Column(
-        r.name as string,
-        defaultValue,
-        {
-          sqlType,
-          type: castType.type(),
-          oid,
-          fmod,
-          limit: castType.limit ?? null,
-          precision: castType.precision ?? null,
-          scale: castType.scale ?? null,
-        },
-        !(r.notnull as boolean),
-        {
-          defaultFunction: defaultFunction ?? undefined,
-          primaryKey: r.is_primary as boolean,
-          serial: isSerial,
-          array: sqlType.endsWith("[]"),
-          identity,
-          generated: attgenerated,
-          collation: (r.collation as string | null) ?? undefined,
-          comment: (r.col_comment as string | null) ?? null,
-        },
-      );
-    });
+    // Mirrors Rails' SchemaStatements#columns (abstract/schema_statements.rb:107):
+    // `definitions.map { |field| new_column_from_field(table_name, field, definitions) }`.
+    // The rows arrive named rather than positional, so rebuild Rails'
+    // `column_definitions` field tuple (postgresql/schema_statements.rb:967) in
+    // its order before delegating. The batch preload above leaves every OID
+    // registered, so the `fetch_type_metadata` → `get_oid_type` hop inside
+    // `newColumnFromField` is a pure type-map read and issues no pg_type query.
+    const columns: Column[] = [];
+    for (const r of rows) {
+      const field = [
+        r.name,
+        r.type,
+        r.default,
+        r.notnull,
+        r.oid,
+        r.fmod,
+        r.collation,
+        r.col_comment,
+        r.identity,
+        r.attgenerated,
+        // 11th element, past Rails' ten: trails' `column_definitions` also
+        // selects `indisprimary`, which the schema dumper reads back off the
+        // Column (`resolvePrimaryKeyColumns`, schema-dumper.ts:833). Rails' PG
+        // dumper asks `primary_key(table)` instead and so never needs it.
+        r.is_primary,
+      ];
+      columns.push(await this.pg.newColumnFromField(tableName, field, rows));
+    }
+    return columns;
   }
 
   async columnNamesFromColumnNumbers(tableOid: number, columnNumbers: number[]): Promise<string[]> {

@@ -260,6 +260,34 @@ export class SingularAssociation extends Association {
     return attrs;
   }
 
+  /**
+   * Mirrors: ActiveRecord::Associations::SingularAssociation#find_target
+   * (singular_association.rb:47) — the singular target load, reading owner and
+   * reflection off `this` exactly as Rails does. belongs_to and has_one both
+   * inherit it: Rails defines `find_target` only here, on `Association`
+   * (association.rb:248) and on `HasManyThroughAssociation`
+   * (has_many_through_association.rb:225).
+   *
+   * The query itself lives in the functional loader below, which the reader
+   * sugar and the through loaders reach without an association instance; that
+   * owner/name/options triple is a trails-only calling convention, not Rails
+   * surface.
+   */
+  protected override async findTarget(): Promise<Base | null> {
+    // The loader's tail writeback lands in this holder mid-await, so a target
+    // replaced while the query is in flight would be silently clobbered:
+    // suppress the loader's own writeback and let `setTarget` refuse the race.
+    // #4919 already guards a mid-load *FK* change for belongs_to; this also
+    // covers a same-FK reassignment that leaves the FK put, which the
+    // stale-key check cannot see. See `Association#_loaderWritebackSuppressed`.
+    this._loaderWritebackSuppressed++;
+    try {
+      return await findTarget(this.owner, this.reflection.name, this.reflection.options);
+    } finally {
+      this._loaderWritebackSuppressed--;
+    }
+  }
+
   protected override async _createRecord(
     attributes?: Record<string, unknown>,
     shouldRaise = false,

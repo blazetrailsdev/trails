@@ -39,6 +39,34 @@ export class HasManyThroughAssociation extends HasManyAssociation {
   }
 
   /**
+   * Mirrors: ActiveRecord::Associations::HasManyThroughAssociation#find_target
+   * (has_many_through_association.rb:225) — reads owner and reflection off
+   * `this`, exactly as Rails does, and delegates the query itself to
+   * `HasManyAssociation#findTarget` (Rails' `super`). Rails' `disable_joins`
+   * arm is handled inside that loader, which routes the disable-joins shape
+   * through `_loadThroughViaDisableJoinsScope`.
+   */
+  protected override async findTarget(): Promise<Base[]> {
+    if (!this.targetReflectionHasAssociatedRecord()) return [];
+    return super.findTarget();
+  }
+
+  /**
+   * Mirrors: HasManyThroughAssociation#target_reflection_has_associated_record?
+   * (has_many_through_association.rb:121).
+   */
+  protected targetReflectionHasAssociatedRecord(): boolean {
+    const associations: AssociationDefinition[] =
+      (this.owner.constructor as typeof Base)._associations ?? [];
+    const throughAssoc = associations.find((a) => a.name === this.reflection.options.through);
+    // A missing through reflection is Rails' `check_validity!` failure, not
+    // this predicate's: leave it to the loader below, which raises
+    // HasManyThroughAssociationNotFoundError with the Rails message.
+    if (!throughAssoc) return true;
+    return targetReflectionHasAssociatedRecord(this.owner, throughAssoc);
+  }
+
+  /**
    * The through model owns the transaction — the join-row writes are what has
    * to be atomic, not the target model's.
    *
