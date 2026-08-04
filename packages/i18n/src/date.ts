@@ -521,18 +521,25 @@ function parseDddCb(m: RegExpExecArray, hash: DateParts): number {
     hash.secFraction = Number(s4) / 10 ** l4;
   }
   if (s5 !== undefined) {
+    const cs5 = s5;
+    const l5 = s5.length;
+
     hash.zone = s5;
+
+    if (cs5[0] === "[") {
+      const zone = cs5.slice(1, l5 - 1);
+      const i = zone.indexOf(":");
+
+      hash.zone = i === -1 ? zone : zone.slice(i + 1);
+    }
   }
 
   return 1;
 }
 
 /**
- * @internal `date_parse.c` `parse_ddd` (`date_parse.c:1969-2002`): the digit run
+ * @internal `date_parse.c` `parse_ddd` (`date_parse.c:1968-2002`): the digit run
  * itself, plus the time and zone that can follow it.
- *
- * @missingRailsCall The `:offset` a bracketed zone (`"[+9:JST]"`) also sets is
- * not read: `date_zone_to_diff` is not ported, and `::Date` discards the zone.
  */
 function parseDdd(str: string): DateParts | null {
   const m = new RegExp(
@@ -721,7 +728,12 @@ export class Date {
    *
    * @missingRailsCall `parse_jis`, `parse_vms`, `parse_iso2`, `parse_year`,
    * `parse_mon`, `parse_mday` and `parse_bc` are not ported: they read a
-   * calendar Rails never round-trips.
+   * calendar Rails never round-trips. Neither is `date_zone_to_diff`
+   * (`date_parse.c:416-559`), so the `:offset` a `:zone` also sets is missing
+   * from both of its call sites — the tail of `date__parse` itself
+   * (`date_parse.c:2290-2294`) and the bracketed zone of `parse_ddd_cb`
+   * (`date_parse.c:1934-1960`). It reads a zone-name table `::Date` has no use
+   * for: every field it fills is a time of day, which `Date.parse` discards.
    */
   static _parse(str: string, comp = true): DateParts | null {
     const hash: DateParts = {};
