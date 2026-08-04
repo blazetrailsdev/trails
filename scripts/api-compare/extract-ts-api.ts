@@ -2182,6 +2182,22 @@ function extractInterface(
             const resolved = checker.getTypeAtLocation(type);
             for (const prop of resolved.getProperties()) {
               const propName = prop.getName();
+              // `getProperties()` returns protected and private members too.
+              // The copy synthesized below carries no modifier of its own, so
+              // its visibility and `internal` flag have to come off the
+              // declaration it resolves to, as the `__mixin` case above does —
+              // hardcoding "public" here counts a protected member as this
+              // file's public surface, which Ruby's `include` does not do
+              // either, and leaves it demanding a `@noRailsEquivalent` reason
+              // its own declaration is too private to be asked for.
+              const propDecl = prop.declarations?.[0];
+              const propFlags = propDecl !== undefined ? ts.getCombinedModifierFlags(propDecl) : 0;
+              const propVisibility =
+                propFlags & ts.ModifierFlags.Private
+                  ? "private"
+                  : propFlags & ts.ModifierFlags.Protected
+                    ? "protected"
+                    : "public";
               // Keep _-prefixed properties — Rails has public methods like _reflect_on_association
               const propType = checker.getTypeOfSymbolAtLocation(prop, type);
               const signatures = propType.getCallSignatures();
@@ -2193,10 +2209,14 @@ function extractInterface(
                 const noRailsEquivalent = noRailsEquivalentOfSymbol(prop, checker);
                 instanceMethods.push({
                   name: propName,
-                  visibility: "public",
+                  visibility: propVisibility,
                   params: [],
                   line: 0,
                   file,
+                  ...(propVisibility !== "public" ||
+                  (propDecl !== undefined && hasInternalJsDocTag(propDecl))
+                    ? { internal: true }
+                    : {}),
                   ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
                 });
               }

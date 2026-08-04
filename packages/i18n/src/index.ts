@@ -12,6 +12,7 @@ export {
   MissingTranslationData,
   ReservedInterpolationKey,
   UnknownFileType,
+  UnsupportedMethod,
 } from "./exceptions.js";
 export type { MissingTranslationOptions } from "./exceptions.js";
 export {

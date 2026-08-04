@@ -1,8 +1,8 @@
 /**
  * Mirrors: i18n/test/backend/transliterator_test.rb
  *
- * `default transliterator raises errors for invalid UTF-8` stays measured as
- * missing rather than faked: it feeds `"a\x92b"`, a String whose bytes are not
+ * `default transliterator raises errors for invalid UTF-8` is excluded in
+ * `scripts/api-compare/unported-files.ts` rather than faked: it feeds `"a\x92b"`, a String whose bytes are not
  * valid UTF-8, and relies on Ruby's regexp engine raising
  * `ArgumentError: invalid byte sequence` (transliterator.rb:96). A JS string is
  * a sequence of UTF-16 code units with no invalid-byte state to reach, so there

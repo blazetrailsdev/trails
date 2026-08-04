@@ -306,6 +306,29 @@ export class UnknownFileType extends ArgumentError {
 }
 
 /**
+ * Mirrors: I18n::UnsupportedMethod (i18n/lib/i18n/exceptions.rb:122-130).
+ *
+ * `backend_klass` is interpolated into the message, which for a Ruby Class is
+ * `Class#to_s` — its name. A JS class is a function, whose default string
+ * conversion is its whole source text, so the name is taken off `.name`.
+ */
+type BackendKlass = (abstract new (...args: never[]) => unknown) & { name: string };
+
+export class UnsupportedMethod extends ArgumentError {
+  readonly method: string;
+  readonly backendKlass: BackendKlass;
+  readonly msg: string;
+
+  constructor(method: string, backendKlass: BackendKlass, msg: string) {
+    super(`${backendKlass.name} does not support the #${method} method. ${msg}`);
+    this.name = "UnsupportedMethod";
+    this.method = method;
+    this.backendKlass = backendKlass;
+    this.msg = msg;
+  }
+}
+
+/**
  * Mirrors: I18n::ExceptionHandler. Returns the message for a missing
  * translation and re-raises anything else.
  */
