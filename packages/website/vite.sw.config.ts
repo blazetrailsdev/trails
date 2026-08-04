@@ -32,6 +32,7 @@ export default defineConfig({
       // sqlite drivers (@blazetrails/activerecord/sqlite/<name>) are handled by
       // the generic activerecord subpath alias below — the src/sqlite/ dir
       // matches the specifier, so no special case is needed.
+      pkgAlias("@blazetrails/activesupport/yaml", "src/stubs/yaml-stub.ts"),
       {
         find: /^@blazetrails\/activesupport\/(.+)$/,
         replacement: path.resolve(__dirname, "../activesupport/src/$1.ts"),
