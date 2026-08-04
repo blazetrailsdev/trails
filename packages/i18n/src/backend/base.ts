@@ -46,7 +46,7 @@ import {
 } from "./transliterator.js";
 import { except, type TranslationData } from "../utils.js";
 import { tr } from "./flatten.js";
-import { parse as yamlParse } from "../yaml.js";
+import { parse as yamlParse } from "yaml";
 
 export type TranslateOptions = { [key: string]: unknown };
 
@@ -624,6 +624,17 @@ export abstract class Base {
    * (:unsafe_load_file)` probe exists here — there is no Psych to probe, and
    * `yaml`'s `parse` neither symbolizes nor freezes, so `keys_symbolized` is
    * false.
+   *
+   * The npm `yaml` package stands in for Psych, imported at the top of this
+   * file the way `base.rb:3` `require 'yaml'` does, and imported
+   * directly rather than through `@blazetrails/activesupport/yaml` — the
+   * workspace edge runs activesupport -> i18n, so consuming that re-export
+   * would invert it. `ActiveSupport::ConfigurationFile`
+   * (`activesupport/src/configuration-file.ts:2`) imports it the same way.
+   * It is an `optionalDependency` only in the packaging sense pnpm means:
+   * installed by default, and a consumer who deliberately omits it gets a
+   * resolver error on `import "@blazetrails/i18n"`, since `require 'yaml'` is
+   * unconditional in Ruby too and every `load_file` path can reach here.
    *
    * @missingRailsCall load_file — Ruby's `YAML.load_file` (base.rb:265) reads
    * and parses in one call; the npm `yaml` package only parses, so the read is
