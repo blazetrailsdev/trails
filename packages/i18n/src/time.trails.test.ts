@@ -45,6 +45,20 @@ describe("Time", () => {
     expect(new Time(2008, 3, 1, 6, 0, 0, "Z").strftime("%z %Z")).toBe("+0000 UTC");
   });
 
+  it("Time.new takes a sub-minute offset, as MRI does", () => {
+    expect(new Time(2008, 3, 1, 6, 0, 0, "+09:00:30").utcOffset).toBe(32430);
+    expect(new Time(2008, 3, 1, 6, 0, 0, 32430).utcOffset).toBe(32430);
+    expect(new Time(2008, 3, 1, 6, 0, 0, -32430).utcOffset).toBe(-32430);
+    // `%z` is `±HHMM`, so MRI drops the seconds there.
+    expect(new Time(2008, 3, 1, 6, 0, 0, "+09:00:30").strftime("%z")).toBe("+0900");
+    expect(new Time(2008, 3, 1, 6, 0, 0, -32430).strftime("%z")).toBe("-0900");
+  });
+
+  it("Time.new rejects an out-of-range offset", () => {
+    expect(() => new Time(2008, 3, 1, 6, 0, 0, 86400)).toThrow(ArgumentError);
+    expect(() => new Time(2008, 3, 1, 6, 0, 0, "+24:00:00")).toThrow(ArgumentError);
+  });
+
   it("Time.new rejects a zone name", () => {
     expect(() => new Time(2008, 3, 1, 6, 0, 0, "America/New_York")).toThrow(ArgumentError);
   });
