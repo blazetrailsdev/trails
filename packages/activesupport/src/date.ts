@@ -66,10 +66,11 @@ export class ArgumentError extends Error {
  * only the members a caller duck-types.
  */
 export class Date {
-  readonly plain: Temporal.PlainDate;
+  readonly #plain: Temporal.PlainDate;
 
-  constructor(plain: Temporal.PlainDate) {
-    this.plain = plain;
+  /** Ruby `Date.new(year, month, day)`. */
+  constructor(year: number, month: number, day: number) {
+    this.#plain = new Temporal.PlainDate(year, month, day);
   }
 
   /** Ruby `Date.parse`, narrowed to the ISO-ish `y-m-d` the callers use. */
@@ -78,28 +79,28 @@ export class Date {
     // Ruby raises `Date::Error`, a subclass of `ArgumentError` that a nested
     // TS class cannot spell; the superclass is what callers rescue.
     if (!match) throw new ArgumentError("invalid date");
-    return new Date(new Temporal.PlainDate(Number(match[1]), Number(match[2]), Number(match[3])));
+    return new Date(Number(match[1]), Number(match[2]), Number(match[3]));
   }
 
   get year(): number {
-    return this.plain.year;
+    return this.#plain.year;
   }
 
   get mon(): number {
-    return this.plain.month;
+    return this.#plain.month;
   }
 
   get month(): number {
-    return this.plain.month;
+    return this.#plain.month;
   }
 
   get day(): number {
-    return this.plain.day;
+    return this.#plain.day;
   }
 
   /** Ruby counts Sunday as 0; `Temporal.PlainDate#dayOfWeek` counts Monday as 1. */
   get wday(): number {
-    return this.plain.dayOfWeek % 7;
+    return this.#plain.dayOfWeek % 7;
   }
 
   strftime(format: string): string {
@@ -109,7 +110,7 @@ export class Date {
       m: () => pad2(this.mon),
       d: () => pad2(this.day),
       e: () => String(this.day).padStart(2, " "),
-      j: () => String(this.plain.dayOfYear).padStart(3, "0"),
+      j: () => String(this.#plain.dayOfYear).padStart(3, "0"),
       F: () => `${this.year}-${pad2(this.mon)}-${pad2(this.day)}`,
       A: () => DAY_NAMES[this.wday],
       a: () => ABBR_DAY_NAMES[this.wday],
