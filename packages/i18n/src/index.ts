@@ -39,6 +39,7 @@ export {
   locale,
   localeAvailable,
   localize,
+  newDoubleNestedCache,
   normalizeKeys,
   reloadBang,
   reserveKey,

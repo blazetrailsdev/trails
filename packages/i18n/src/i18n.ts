@@ -1,7 +1,4 @@
-/**
- * Mirrors: i18n/lib/i18n.rb — partially. `new_double_nested_cache` waits on the
- * normalize-key cache; it lands with its own story (RFC 0074).
- */
+/** Mirrors: i18n/lib/i18n.rb */
 
 /**
  * Ruby's `send(handler, ...)` in `handle_exception` dispatches on the `I18n`
@@ -55,6 +52,17 @@ export const RESERVED_KEYS: string[] = [
   "throw",
 ];
 
+/**
+ * Mirrors: I18n.new_double_nested_cache (i18n.rb:38-40). Ruby uses
+ * `Concurrent::Map`; the JS analogue is a plain `Map` of `Map`s, since the
+ * process-wide config singleton already stands in for `Thread.current`. Ruby's
+ * default block (`{ |h, k| h[k] = Concurrent::Map.new }`) has no `Map`
+ * equivalent, so the outer read installs the inner map at the call site.
+ */
+export function newDoubleNestedCache(): Map<string, Map<unknown, TranslationKey[]>> {
+  return new Map();
+}
+
 function underscore(key: string): string {
   return key.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
 }
@@ -98,6 +106,7 @@ export function setConfig(value: Config): void {
 /** @internal Test seam — drops the process-wide config so a case starts clean. */
 export function resetConfig(): void {
   currentConfig = undefined;
+  normalizedKeyCache.clear();
 }
 
 /**
@@ -346,24 +355,41 @@ export function withLocale<T>(tmpLocale: Locale | false | null | undefined, bloc
   }
 }
 
+const normalizedKeyCache = newDoubleNestedCache();
+
 /**
  * Ruby's `key.to_s` on a Symbol is its name; `String(symbol)` is
  * `"Symbol(name)"`, which would otherwise reach the `Translation missing`
  * message through `MissingTranslation#keys`.
  */
 function normalizeKey(key: unknown, separator: string): TranslationKey[] {
-  if (Array.isArray(key)) return key.flatMap((k) => normalizeKey(k, separator));
-  if (key === null || key === undefined) return [];
-  if (typeof key === "symbol") key = Symbol.keyFor(key) ?? key.description;
-  const keys = String(key)
-    .split(separator)
-    .filter((k) => k !== "");
-  return keys.map((k) => {
-    if (/^[-+]?([1-9]\d*|0)$/.test(k)) return Number(k);
-    if (k === "true") return true;
-    if (k === "false") return false;
-    return k;
-  });
+  let bySeparator = normalizedKeyCache.get(separator);
+  if (bySeparator === undefined) {
+    bySeparator = new Map();
+    normalizedKeyCache.set(separator, bySeparator);
+  }
+  const cacheKey = key;
+  let normalized = bySeparator.get(cacheKey);
+  if (normalized === undefined) {
+    if (Array.isArray(key)) {
+      normalized = key.flatMap((k) => normalizeKey(k, separator));
+    } else if (key === null || key === undefined) {
+      normalized = [];
+    } else {
+      if (typeof key === "symbol") key = Symbol.keyFor(key) ?? key.description;
+      const keys = String(key)
+        .split(separator)
+        .filter((k) => k !== "");
+      normalized = keys.map((k) => {
+        if (/^[-+]?([1-9]\d*|0)$/.test(k)) return Number(k);
+        if (k === "true") return true;
+        if (k === "false") return false;
+        return k;
+      });
+    }
+    bySeparator.set(cacheKey, normalized);
+  }
+  return normalized;
 }
 
 export function normalizeKeys(

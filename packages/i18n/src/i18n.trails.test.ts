@@ -1,11 +1,13 @@
 /**
  * Trails-only: `translate!` has no case of its own in i18n_test.rb — the gem
- * covers `raise: true` through the backend tests.
+ * covers `raise: true` through the backend tests. Same for the
+ * `@@normalized_key_cache` memoization (i18n.rb:439-442), which the gem never
+ * asserts on directly.
  */
 
 import { beforeEach, describe, expect, it } from "vitest";
 import { MissingTranslationData } from "./exceptions.js";
-import { config, resetConfig, translateBang } from "./i18n.js";
+import { config, newDoubleNestedCache, normalizeKeys, resetConfig, translateBang } from "./i18n.js";
 import { resetClassConfig } from "./config.js";
 import { Simple } from "./backend/simple.js";
 
@@ -19,5 +21,31 @@ describe("I18n.translateBang", () => {
 
   it("raises MissingTranslationData for a bogus key", () => {
     expect(() => translateBang("bogus")).toThrow(MissingTranslationData);
+  });
+});
+
+describe("I18n.newDoubleNestedCache", () => {
+  it("returns an empty map whose values are maps", () => {
+    const cache = newDoubleNestedCache();
+    expect(cache.size).toBe(0);
+    cache.set(".", new Map([["foo", ["foo"]]]));
+    expect(cache.get(".")?.get("foo")).toEqual(["foo"]);
+  });
+});
+
+describe("I18n.normalizeKeys memoization", () => {
+  beforeEach(() => {
+    resetConfig();
+    resetClassConfig();
+  });
+
+  it("does not let a caller mutating its result corrupt the cached segments", () => {
+    normalizeKeys(null, "foo.bar", null).push("baz");
+    expect(normalizeKeys(null, "foo.bar", null)).toEqual(["foo", "bar"]);
+  });
+
+  it("keys the cache by separator", () => {
+    expect(normalizeKeys(null, "foo.bar", null, ".")).toEqual(["foo", "bar"]);
+    expect(normalizeKeys(null, "foo.bar", null, "|")).toEqual(["foo.bar"]);
   });
 });
