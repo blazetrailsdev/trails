@@ -368,14 +368,12 @@ function normalizeKey(key: unknown, separator: string): TranslationKey[] {
     bySeparator = new Map();
     normalizedKeyCache.set(separator, bySeparator);
   }
-  // Ruby's Hash keys by `eql?`, so an Array key memoizes across calls; JS `Map`
-  // keys by identity, so a fresh `["foo", "bar"]` could only ever miss and grow
-  // the cache without bound. The elements still memoize through the recursion.
-  if (Array.isArray(key)) return key.flatMap((k) => normalizeKey(k, separator));
   const cacheKey = key;
   let normalized = bySeparator.get(cacheKey);
   if (normalized === undefined) {
-    if (key === null || key === undefined) {
+    if (Array.isArray(key)) {
+      normalized = key.flatMap((k) => normalizeKey(k, separator));
+    } else if (key === null || key === undefined) {
       normalized = [];
     } else {
       if (typeof key === "symbol") key = Symbol.keyFor(key) ?? key.description;
