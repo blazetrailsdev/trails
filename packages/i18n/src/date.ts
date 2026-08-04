@@ -1363,12 +1363,15 @@ function parseFragCb(m: RegExpExecArray, hash: DateParts): number {
  * @internal `date_parse.c` `parse_frag` (`date_parse.c:2044-2052`): its pattern
  * is anchored to the whole string, so it matches only once every earlier
  * sub-parser's `subx` has emptied the string of everything it took.
+ *
+ * It is the last thing `date__parse` runs on the string, so the leftover its
+ * own `subx` answers is what no one reads — Ruby's caller drops it too.
  */
-function parseFrag(str: string, hash: DateParts): number {
+function parseFrag(str: string, hash: DateParts): string | null {
   const m = /^\s*(\d{1,2})\s*$/.exec(str);
-  if (m === null) return 0;
+  if (m === null) return null;
   parseFragCb(m, hash);
-  return 1;
+  return subx(str, m);
 }
 
 /**
