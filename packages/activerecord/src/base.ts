@@ -1827,12 +1827,6 @@ export class Base extends Model {
     _NestedAttributes.acceptsNestedAttributesFor(this, associationName, options);
   }
 
-  /** Mirrors: ActiveRecord::SecureToken::ClassMethods#has_secure_token (secure_token.rb:38). */
-  static hasSecureToken = _hasSecureToken;
-
-  /** Mirrors: ActiveRecord::SecureToken::ClassMethods#generate_unique_secure_token (secure_token.rb:57). */
-  static generateUniqueSecureToken = _generateUniqueSecureToken;
-
   /** Mirrors: ActiveRecord.verbose_query_logs, verbose_query_logs= */
   static get verboseQueryLogs(): boolean {
     return _getVerboseQueryLogs();
@@ -2112,6 +2106,12 @@ export class Base extends Model {
       suffix: options?.suffix,
     });
   }
+
+  /** Mirrors: ActiveRecord::SecureToken::ClassMethods#has_secure_token (secure_token.rb:38). */
+  static hasSecureToken = _hasSecureToken;
+
+  /** Mirrors: ActiveRecord::SecureToken::ClassMethods#generate_unique_secure_token (secure_token.rb:57). */
+  static generateUniqueSecureToken = _generateUniqueSecureToken;
 
   // The fallback coder used by `serialize` when no explicit coder is given
   // (`coder ||= default_column_serializer`). Subclasses inherit via JS
