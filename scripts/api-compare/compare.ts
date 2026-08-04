@@ -932,6 +932,45 @@ export function resolveTsClassForRuby(
   return resolved;
 }
 
+/**
+ * The two per-file "which class is this file about?" selections, both by
+ * shortest fqn but over different populations:
+ *
+ *   - `folding`: every class. Used to skip nested classes that share a file
+ *     with a shorter-named parent — `Preloader::Association::LoaderQuery` in
+ *     preloader/association.rb is an implementation detail whose methods
+ *     shouldn't inflate the parent's count. This is a purely lexical
+ *     question, so a RUBY_ONLY_CLASSES entry still counts as a parent here.
+ *   - `inheritance`: RUBY_ONLY_CLASSES excluded. A shim we deliberately do
+ *     not port must not become the one class a file contributes to the
+ *     inheritance check, or the real class in the file is never checked at
+ *     all — `I18n::JSON` (key_value.rb:8, two segments) otherwise wins over
+ *     `I18n::Backend::KeyValue` (:68, three) and key_value.rb contributes
+ *     nothing.
+ *
+ * Kept as two maps rather than one: reusing the inheritance selection for
+ * folding would promote `KeyValue` to lexical parent and swallow
+ * `KeyValue::SubtreeProxy` (key_value.rb:154), which has its own TS class
+ * and its own measured methods.
+ */
+export function primaryClassesPerFile(classes: Record<string, ClassInfo>): {
+  folding: Map<string, string>;
+  inheritance: Map<string, string>;
+} {
+  const folding = new Map<string, string>();
+  const inheritance = new Map<string, string>();
+  const shorter = (fqn: string, existing: string | undefined) =>
+    !existing || fqn.split("::").length < existing.split("::").length;
+
+  for (const [fqn, cls] of Object.entries(classes)) {
+    if (!cls.file) continue;
+    if (shorter(fqn, folding.get(cls.file))) folding.set(cls.file, fqn);
+    if (isRubyOnlyClass(fqn)) continue;
+    if (shorter(fqn, inheritance.get(cls.file))) inheritance.set(cls.file, fqn);
+  }
+  return { folding, inheritance };
+}
+
 export function superclassesMatch(
   rubySuper: string | null,
   tsChain: string[],
@@ -1707,18 +1746,8 @@ export function main() {
     // Collect all Ruby classes and modules with their methods
     const allRuby: RubyEntity[] = [];
 
-    // Skip nested classes that share a file with a shorter-named parent.
-    // e.g., Preloader::Association::LoaderQuery in preloader/association.rb
-    // is an implementation detail — its methods shouldn't inflate the parent's count.
-    const primaryClassPerFile = new Map<string, string>();
-    for (const [fqn, info] of Object.entries(rubyPkg.classes)) {
-      const cls = info as unknown as ClassInfo;
-      if (!cls.file) continue;
-      const existing = primaryClassPerFile.get(cls.file);
-      if (!existing || fqn.split("::").length < existing.split("::").length) {
-        primaryClassPerFile.set(cls.file, fqn);
-      }
-    }
+    const { folding: primaryClassPerFile, inheritance: inheritanceClassPerFile } =
+      primaryClassesPerFile(rubyPkg.classes as unknown as Record<string, ClassInfo>);
 
     for (const [fqn, info] of Object.entries(rubyPkg.classes)) {
       const cls = info as unknown as ClassInfo;
@@ -2348,8 +2377,7 @@ export function main() {
 
       for (const { fqn, info } of allRuby) {
         if (!info.file || isSourceUnported(info.file, pkg)) continue;
-        if (primaryClassPerFile.get(info.file) !== fqn) continue;
-        if (isRubyOnlyClass(fqn)) continue;
+        if (inheritanceClassPerFile.get(info.file) !== fqn) continue;
         // `allRuby` mixes classes and modules; modules don't carry superclass.
         if (!(fqn in rubyPkg.classes)) continue;
 

@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   nameMatches,
   superclassesMatch,
+  primaryClassesPerFile,
   resolveTsClassForRuby,
   methodInMode,
   tsShouldIncludeInIndex,
@@ -628,6 +629,56 @@ describe("nameMatches", () => {
       expect(nameMatches("Foo", "FooBar")).toBe(false);
       expect(nameMatches("Foo", "BarFoo")).toBe(false);
     });
+  });
+});
+
+describe("primaryClassesPerFile", () => {
+  const cls = (file: string): ClassInfo => ({
+    name: "x",
+    file,
+    includes: [],
+    extends: [],
+    instanceMethods: [],
+    classMethods: [],
+  });
+
+  it("picks the shortest fqn in the file for both selections", () => {
+    const { folding, inheritance } = primaryClassesPerFile({
+      "A::B": cls("a.rb"),
+      "A::B::C": cls("a.rb"),
+    });
+    expect(folding.get("a.rb")).toBe("A::B");
+    expect(inheritance.get("a.rb")).toBe("A::B");
+  });
+
+  it("keeps a ruby-only class out of the inheritance selection", () => {
+    // key_value.rb declares `I18n::JSON` (:8) and `I18n::Backend::KeyValue`
+    // (:68). The two-segment shim used to win, leaving KeyValue unchecked.
+    const { inheritance } = primaryClassesPerFile({
+      "I18n::JSON": cls("backend/key_value.rb"),
+      "I18n::Backend::KeyValue": cls("backend/key_value.rb"),
+      "I18n::Backend::KeyValue::SubtreeProxy": cls("backend/key_value.rb"),
+    });
+    expect(inheritance.get("backend/key_value.rb")).toBe("I18n::Backend::KeyValue");
+  });
+
+  it("keeps the ruby-only class as the folding parent", () => {
+    // Folding is lexical: promoting KeyValue here would make SubtreeProxy a
+    // nested class of the file's parent and drop its methods.
+    const { folding } = primaryClassesPerFile({
+      "I18n::JSON": cls("backend/key_value.rb"),
+      "I18n::Backend::KeyValue": cls("backend/key_value.rb"),
+      "I18n::Backend::KeyValue::SubtreeProxy": cls("backend/key_value.rb"),
+    });
+    expect(folding.get("backend/key_value.rb")).toBe("I18n::JSON");
+  });
+
+  it("ignores classes with no file", () => {
+    const { folding, inheritance } = primaryClassesPerFile({
+      "A::B": { ...cls(""), file: undefined },
+    });
+    expect(folding.size).toBe(0);
+    expect(inheritance.size).toBe(0);
   });
 });
 
