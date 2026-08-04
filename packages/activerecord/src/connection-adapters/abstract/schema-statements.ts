@@ -1496,7 +1496,7 @@ export class SchemaStatements {
       if (rest[key] !== undefined) tdOptions[key] = rest[key];
     }
     const pkOptions: Record<string, unknown> = {};
-    for (const key of [...this.validPrimaryKeyOptions(), "autoIncrement"]) {
+    for (const key of this.validPrimaryKeyOptions()) {
       if (rest[key] !== undefined) pkOptions[key] = rest[key];
     }
 
