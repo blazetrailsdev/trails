@@ -43,18 +43,31 @@ export class WhereClause {
     return this.predicates.length > 0;
   }
 
+  /** Mirrors: where_clause.rb:14 `def +(other)` — Ruby `Array#+`, a plain concatenation. */
+  plus(other: WhereClause): WhereClause {
+    return new WhereClause([...this.predicates, ...other.predicates]);
+  }
+
+  /** Mirrors: where_clause.rb:18 `def -(other)` — Ruby `Array#-`. */
+  minus(other: WhereClause): WhereClause {
+    return new WhereClause(subtractNodes(this.predicates, other.predicates));
+  }
+
+  /**
+   * Mirrors: where_clause.rb:22 `def |(other)` — Ruby `Array#|`, which dedups
+   * identical predicates and keeps distinct ones. Named `union` after the Ruby
+   * operator's name (`Array#|` is "union"), the spelling
+   * `operator-order-spelling.ts` pins for this class.
+   */
+  union(other: WhereClause): WhereClause {
+    return new WhereClause(unionNodes(this.predicates, other.predicates));
+  }
+
   merge(other: WhereClause): WhereClause {
     // Rails: remove predicates from self that conflict with other's attributes,
     // then union with other's predicates (other wins on conflict)
     const filtered = this.exceptPredicates(other.extractAttributes());
     return new WhereClause(unionNodes(filtered, other.predicates));
-  }
-
-  // Rails WhereClause#| — array union of predicates (dedups identical
-  // predicates, keeps distinct ones). Used by Relation#and! which ANDs both
-  // clauses' conditions together rather than letting one win on conflict.
-  union(other: WhereClause): WhereClause {
-    return new WhereClause(unionNodes(this.predicates, other.predicates));
   }
 
   invert(): WhereClause {
@@ -78,36 +91,41 @@ export class WhereClause {
   }
 
   or(other: WhereClause): WhereClause {
-    const selfPreds = this.predicates;
-    const otherPreds = other.predicates;
+    const leftClause = this.minus(other);
+    const common = this.minus(leftClause);
+    const rightClause = other.minus(common);
 
-    const leftOnly = subtractNodes(selfPreds, otherPreds);
-    const common = subtractNodes(selfPreds, leftOnly);
-    const rightOnly = subtractNodes(otherPreds, common);
+    if (leftClause.isEmpty() || rightClause.isEmpty()) {
+      return common;
+    } else {
+      let left: Nodes.Node = leftClause.ast;
+      if (left instanceof Nodes.Grouping && left.expr instanceof Nodes.Node) left = left.expr;
 
-    if (leftOnly.length === 0 || rightOnly.length === 0) {
-      return new WhereClause([...common]);
+      let right: Nodes.Node = rightClause.ast;
+      if (right instanceof Nodes.Grouping && right.expr instanceof Nodes.Node) right = right.expr;
+
+      const orClause =
+        left instanceof Nodes.Or
+          ? new Nodes.Or([...left.children, right])
+          : new Nodes.Or([left, right]);
+
+      common.predicates.push(new Nodes.Grouping(orClause));
+      return common;
     }
-
-    let leftAst: Nodes.Node = leftOnly.length === 1 ? leftOnly[0] : new Nodes.And(leftOnly);
-    if (leftAst instanceof Nodes.Grouping && leftAst.expr instanceof Nodes.Node)
-      leftAst = leftAst.expr;
-
-    let rightAst: Nodes.Node = rightOnly.length === 1 ? rightOnly[0] : new Nodes.And(rightOnly);
-    if (rightAst instanceof Nodes.Grouping && rightAst.expr instanceof Nodes.Node)
-      rightAst = rightAst.expr;
-
-    const orNode =
-      leftAst instanceof Nodes.Or
-        ? new Nodes.Or([...leftAst.children, rightAst])
-        : new Nodes.Or([leftAst, rightAst]);
-
-    return new WhereClause([...common, new Nodes.Grouping(orNode)]);
   }
 
   get ast(): Nodes.Node {
     const wrapped = this.predicatesWithWrappedSqlLiterals();
     return wrapped.length === 1 ? wrapped[0] : new Nodes.And(wrapped);
+  }
+
+  /** Mirrors: where_clause.rb:75 `def ==(other)`, aliased `eql?`. */
+  equals(other: unknown): boolean {
+    return (
+      other instanceof WhereClause &&
+      this.predicates.length === other.predicates.length &&
+      this.predicates.every((predicate, i) => predicate.eql(other.predicates[i]))
+    );
   }
 
   isContradiction(): boolean {

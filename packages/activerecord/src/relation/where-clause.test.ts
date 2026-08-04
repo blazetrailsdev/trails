@@ -16,17 +16,6 @@ function bindParam(value: unknown): Nodes.BindParam {
   return new Nodes.BindParam(value);
 }
 
-function concat(a: WhereClause, b: WhereClause): WhereClause {
-  return new WhereClause([...a.predicates, ...b.predicates]);
-}
-
-function eql(a: WhereClause, b: WhereClause): boolean {
-  return (
-    a.predicates.length === b.predicates.length &&
-    a.predicates.every((p, i) => p.eql(b.predicates[i]))
-  );
-}
-
 describe("ActiveRecord::Relation", () => {
   // `to_sql` compiles through `Table.engine`'s connection (arel/nodes/node.rb:148-153),
   // so these Arel assertions need a connection, as Rails' do via helper.rb.
@@ -40,21 +29,21 @@ describe("ActiveRecord::Relation", () => {
         t.get("id").eq(bindParam(1)),
         t.get("name").eq(bindParam("Sean")),
       ]);
-      expect(eql(concat(firstClause, secondClause), combined)).toBe(true);
+      expect(firstClause.plus(secondClause).equals(combined)).toBe(true);
     });
 
     it("+ is associative, but not commutative", () => {
       const a = new WhereClause([new Nodes.SqlLiteral("a")]);
       const b = new WhereClause([new Nodes.SqlLiteral("b")]);
       const c = new WhereClause([new Nodes.SqlLiteral("c")]);
-      expect(eql(concat(a, concat(b, c)), concat(concat(a, b), c))).toBe(true);
-      expect(eql(concat(a, b), concat(b, a))).toBe(false);
+      expect(a.plus(b.plus(c)).equals(a.plus(b).plus(c))).toBe(true);
+      expect(a.plus(b).equals(b.plus(a))).toBe(false);
     });
 
     it("an empty where clause is the identity value for +", () => {
       const t = table();
       const clause = new WhereClause([t.get("id").eq(bindParam(1))]);
-      expect(eql(concat(clause, WhereClause.empty()), clause)).toBe(true);
+      expect(clause.plus(WhereClause.empty()).equals(clause)).toBe(true);
     });
 
     it("merge combines two where clauses", () => {
@@ -62,7 +51,7 @@ describe("ActiveRecord::Relation", () => {
       const a = new WhereClause([t.get("id").eq(1)]);
       const b = new WhereClause([t.get("name").eq("Sean")]);
       const expected = new WhereClause([t.get("id").eq(1), t.get("name").eq("Sean")]);
-      expect(eql(a.merge(b), expected)).toBe(true);
+      expect(a.merge(b).equals(expected)).toBe(true);
     });
 
     it("merge keeps the right side, when two equality clauses reference the same column", () => {
@@ -70,7 +59,7 @@ describe("ActiveRecord::Relation", () => {
       const a = new WhereClause([t.get("id").eq(1), t.get("name").eq("Sean")]);
       const b = new WhereClause([t.get("name").eq("Jim")]);
       const expected = new WhereClause([t.get("id").eq(1), t.get("name").eq("Jim")]);
-      expect(eql(a.merge(b), expected)).toBe(true);
+      expect(a.merge(b).equals(expected)).toBe(true);
     });
 
     it("merge removes bind parameters matching overlapping equality clauses", () => {
@@ -84,7 +73,7 @@ describe("ActiveRecord::Relation", () => {
         t.get("id").eq(bindParam(1)),
         t.get("name").eq(bindParam("Jim")),
       ]);
-      expect(eql(a.merge(b), expected)).toBe(true);
+      expect(a.merge(b).equals(expected)).toBe(true);
     });
 
     it("merge allows for columns with the same name from different tables", () => {
@@ -96,7 +85,7 @@ describe("ActiveRecord::Relation", () => {
         t2.get("id").eq(bindParam(2)),
         t.get("id").eq(bindParam(3)),
       ]);
-      expect(eql(a.merge(b), expected)).toBe(true);
+      expect(a.merge(b).equals(expected)).toBe(true);
     });
 
     it("a clause knows if it is empty", () => {
@@ -141,7 +130,7 @@ describe("ActiveRecord::Relation", () => {
           ]),
         ),
       ]);
-      expect(eql(original.invert(), expected)).toBe(true);
+      expect(original.invert().equals(expected)).toBe(true);
     });
 
     it("except removes binary predicates referencing a given column", () => {
@@ -152,7 +141,7 @@ describe("ActiveRecord::Relation", () => {
         t.get("age").gteq(bindParam(30)),
       ]);
       const expected = new WhereClause([t.get("age").gteq(bindParam(30))]);
-      expect(eql(whereClause.except("id", "name"), expected)).toBe(true);
+      expect(whereClause.except("id", "name").equals(expected)).toBe(true);
     });
 
     it("except jumps over unhandled binds (like with OR) correctly", () => {
@@ -170,14 +159,14 @@ describe("ActiveRecord::Relation", () => {
         wcs[6].or(wcs[7]),
         wcs[8],
         wcs[9],
-      ].reduce((acc, c) => concat(acc, c), wcs[0]);
+      ].reduce((acc, c) => acc.plus(c), wcs[0]);
       // wcs[0] + wcs[2].or(wcs[3]) + wcs[5] + wcs[6].or(wcs[7]) + wcs[9]
       const expected = [wcs[2].or(wcs[3]), wcs[5], wcs[6].or(wcs[7]), wcs[9]].reduce(
-        (acc, c) => concat(acc, c),
+        (acc, c) => acc.plus(c),
         wcs[0],
       );
       const actual = wc.except("id1", "id2", "id4", "id7", "id8");
-      expect(eql(actual, expected)).toBe(true);
+      expect(actual.equals(expected)).toBe(true);
     });
 
     it("ast groups its predicates with AND", () => {
@@ -241,7 +230,7 @@ describe("ActiveRecord::Relation", () => {
       const orClause = new WhereClause([t.get("name").eq(bindParam("Sean"))]).or(
         new WhereClause([t.get("hair_color").eq(bindParam("black"))]),
       );
-      expect(eql(a.or(b), concat(common, orClause))).toBe(true);
+      expect(a.or(b).equals(common.plus(orClause))).toBe(true);
     });
 
     it("or can detect identical or as being a common condition", () => {
@@ -249,12 +238,12 @@ describe("ActiveRecord::Relation", () => {
       const commonOr = new WhereClause([t.get("name").eq(bindParam("Sean"))]).or(
         new WhereClause([t.get("hair_color").eq(bindParam("black"))]),
       );
-      const a = concat(commonOr, new WhereClause([t.get("id").eq(bindParam(1))]));
-      const b = concat(commonOr, new WhereClause([t.get("foo").eq(bindParam("bar"))]));
+      const a = commonOr.plus(new WhereClause([t.get("id").eq(bindParam(1))]));
+      const b = commonOr.plus(new WhereClause([t.get("foo").eq(bindParam("bar"))]));
       const newOr = new WhereClause([t.get("id").eq(bindParam(1))]).or(
         new WhereClause([t.get("foo").eq(bindParam("bar"))]),
       );
-      expect(eql(a.or(b), concat(commonOr, newOr))).toBe(true);
+      expect(a.or(b).equals(commonOr.plus(newOr))).toBe(true);
     });
 
     it("or will use only common conditions if one side only has common conditions", () => {
@@ -263,12 +252,11 @@ describe("ActiveRecord::Relation", () => {
         t.get("id").eq(bindParam(1)),
         new Nodes.SqlLiteral("foo = bar"),
       ]);
-      const commonWithExtra = concat(
-        onlyCommon,
+      const commonWithExtra = onlyCommon.plus(
         new WhereClause([t.get("extra").eq(bindParam("pluto"))]),
       );
-      expect(eql(onlyCommon.or(commonWithExtra), onlyCommon)).toBe(true);
-      expect(eql(commonWithExtra.or(onlyCommon), onlyCommon)).toBe(true);
+      expect(onlyCommon.or(commonWithExtra).equals(onlyCommon)).toBe(true);
+      expect(commonWithExtra.or(onlyCommon).equals(onlyCommon)).toBe(true);
     });
 
     it("supports hash equality", () => {
@@ -277,8 +265,8 @@ describe("ActiveRecord::Relation", () => {
       const a1 = new WhereClause([new Nodes.SqlLiteral("a")]);
       const a2 = new WhereClause([new Nodes.SqlLiteral("a")]);
       const b = new WhereClause([new Nodes.SqlLiteral("b")]);
-      expect(eql(a1, a2)).toBe(true);
-      expect(eql(a1, b)).toBe(false);
+      expect(a1.equals(a2)).toBe(true);
+      expect(a1.equals(b)).toBe(false);
     });
   });
 });
