@@ -465,6 +465,44 @@ export function isScopedSkip(rubyName: string, rubyFile: string): boolean {
 }
 
 /**
+ * A Ruby class that exists only to paper over a gap in the Ruby standard
+ * library that JavaScript has no gap in — so there is no TS class to mirror
+ * and no TS method to name. Unlike {@link SKIP_GROUPS}, this is class-level:
+ * both the method comparison and the inheritance check consult it, so the
+ * class is neither expected as a superclass host nor scored for its members.
+ *
+ * This is deliberately narrow. A class trails simply has not ported yet is a
+ * gap and belongs in `unported-files.ts` (whole file) or stays reported.
+ */
+export interface RubyOnlyClass {
+  fqn: string;
+  reason: string;
+}
+
+export const RUBY_ONLY_CLASSES: RubyOnlyClass[] = [
+  {
+    fqn: "I18n::JSON",
+    reason:
+      "i18n/lib/i18n/backend/key_value.rb:7-22 defines `I18n::JSON` at load " +
+      "time as whichever JSON library is installed — `Oj` wrapped in " +
+      "`encode`/`decode` when the gem is present, else `JSON = " +
+      "ActiveSupport::JSON`. It is a library-selection shim, not behavior: " +
+      "JavaScript has `JSON` in the language, and its `stringify`/`parse` " +
+      "*are* that `encode`/`decode`, which is what `KeyValue` calls directly " +
+      "(packages/i18n/src/backend/key-value.ts). Mirroring it would mean " +
+      "adding a trails class whose whole body forwards to a global the " +
+      "language already provides.",
+  },
+];
+
+const RUBY_ONLY_CLASS_FQNS = new Set(RUBY_ONLY_CLASSES.map((c) => c.fqn));
+
+/** True when `fqn` names a {@link RUBY_ONLY_CLASSES} entry. */
+export function isRubyOnlyClass(fqn: string): boolean {
+  return RUBY_ONLY_CLASS_FQNS.has(fqn);
+}
+
+/**
  * A group of Ruby method names whose arity is *intentionally* allowed to diverge
  * from the TS port. Like {@link SkipGroup} but scoped: `rubyFiles` restricts the
  * override to the Ruby source files (path relative to the package lib root, as
@@ -818,6 +856,10 @@ export function explainConventions(): string {
     return `- ${g.reason}\n  - ${names}`;
   }).join("\n");
 
+  const rubyOnlyClassSections = RUBY_ONLY_CLASSES.map(
+    (c) => `- \`${c.fqn}\`\n  - ${c.reason}`,
+  ).join("\n");
+
   const arityOverrideSections = ARITY_OVERRIDE_GROUPS.map((g) => {
     const names = g.names.map((n) => `\`${n}\``).join(", ");
     return `- ${g.reason}\n  - ${names}`;
@@ -918,6 +960,14 @@ have a real TS surface elsewhere, so the skip is file-scoped to avoid silencing
 a genuine gap:
 
 ${scopedSkipSections}
+
+## Ruby-only classes
+
+api:compare expects no TS counterpart for these Ruby classes at all — neither
+their methods nor their place in the inheritance chain. Each one only papers
+over a gap in the Ruby standard library that JavaScript does not have:
+
+${rubyOnlyClassSections}
 
 ## Arity overrides
 

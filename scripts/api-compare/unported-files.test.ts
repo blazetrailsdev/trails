@@ -52,12 +52,21 @@ describe("isSourceUnported package scoping", () => {
       "../i18n.rb",
       "backend.rb",
       "backend/base.rb",
+      "backend/fallbacks.rb",
       "backend/flatten.rb",
+      "backend/key_value.rb",
       "backend/simple.rb",
       "backend/transliterator.rb",
       "config.rb",
       "exceptions.rb",
       "interpolate/ruby.rb",
+      // `locale.rb` is nothing but `autoload`s, so api:compare's file count
+      // never reaches it — but `locale.ts` is its port, so it is accounted for.
+      "locale.rb",
+      "locale/fallbacks.rb",
+      "locale/tag.rb",
+      "locale/tag/parents.rb",
+      "locale/tag/simple.rb",
       "utils.rb",
     ]);
     const unaccounted = ["../i18n.rb", ...files].filter(

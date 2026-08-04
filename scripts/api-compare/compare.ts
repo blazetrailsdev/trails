@@ -85,6 +85,7 @@ import { SpellChecker } from "../../packages/did-you-mean/src/spell-checker.js";
 import {
   hasRubyFileTsOverride,
   isArityOverridden,
+  isRubyOnlyClass,
   isScopedSkip,
   rubyFileToTs,
   rubyMethodToTs,
@@ -1228,6 +1229,7 @@ export function dedupeRubyMethodInto(
   rubyFile?: string,
 ): void {
   if (rubyMethodToTs(rm.name) === null) return;
+  if (isRubyOnlyClass(itemFqn)) return;
   if (rubyFile !== undefined && isScopedSkip(rm.name, rubyFile)) return;
   const key = rm.name;
   if (!seen.has(key)) {
@@ -2347,6 +2349,9 @@ export function main() {
       for (const { fqn, info } of allRuby) {
         if (!info.file || isSourceUnported(info.file, pkg)) continue;
         if (primaryClassPerFile.get(info.file) !== fqn) continue;
+        // A Ruby-only class has no TS class to inherit anything: mirroring it
+        // is not a gap the port can close (see RUBY_ONLY_CLASSES).
+        if (isRubyOnlyClass(fqn)) continue;
         // `allRuby` mixes classes and modules; modules don't carry superclass.
         if (!(fqn in rubyPkg.classes)) continue;
 
