@@ -3,7 +3,12 @@
  */
 
 import { enforceAvailableLocalesBang, type Locale, type TranslationKey } from "./i18n.js";
-import { ExceptionHandler, MissingInterpolationArgument } from "./exceptions.js";
+import {
+  ExceptionHandler,
+  MissingInterpolationArgument,
+  NoMethodError,
+  inspect,
+} from "./exceptions.js";
 import { DEFAULT_INTERPOLATION_PATTERNS } from "./interpolate/ruby.js";
 import type { Base } from "./backend/base.js";
 import { Simple } from "./backend/simple.js";
@@ -53,6 +58,13 @@ export class Config {
 
   set locale(locale: Locale | false) {
     enforceAvailableLocalesBang(locale);
+    // Ruby's `locale && locale.to_sym`: a Symbol is a plain string here, so
+    // `to_sym` is the identity for one (and `&&` short-circuits on
+    // `nil`/`false`); anything else has no `to_sym` and raises, which is why
+    // assigning junk is not silently ignored.
+    if (locale != null && locale !== false && typeof locale !== "string") {
+      throw new NoMethodError(`undefined method 'to_sym' for ${inspect(locale)}`);
+    }
     this.localeValue = locale;
   }
 
@@ -74,6 +86,13 @@ export class Config {
 
   set defaultLocale(locale: Locale) {
     enforceAvailableLocalesBang(locale);
+    // Ruby's `locale && locale.to_sym`: a Symbol is a plain string here, so
+    // `to_sym` is the identity for one (and `&&` short-circuits on
+    // `nil`/`false`); anything else has no `to_sym` and raises, which is why
+    // assigning junk is not silently ignored.
+    if (locale != null && (locale as Locale | false) !== false && typeof locale !== "string") {
+      throw new NoMethodError(`undefined method 'to_sym' for ${inspect(locale)}`);
+    }
     defaultLocale = locale;
   }
 

@@ -1,7 +1,7 @@
 /** Mirrors: i18n/test/i18n_test.rb */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ArgumentError, Disabled, InvalidLocale } from "./exceptions.js";
+import { ArgumentError, Disabled, InvalidLocale, NoMethodError } from "./exceptions.js";
 import * as I18n from "./i18n.js";
 import {
   RESERVED_KEYS,
@@ -265,6 +265,25 @@ describe("I18nTest", () => {
     });
   });
 
+  it("localize given nil raises an I18n::ArgumentError", () => {
+    expect(() => localize(null)).toThrow(ArgumentError);
+  });
+
+  it("localize given nil and default returns default", () => {
+    expect(localize(null, { default: null })).toBe(null);
+  });
+
+  it("localize given an Object raises an I18n::ArgumentError", () => {
+    expect(() => localize({})).toThrow(ArgumentError);
+  });
+
+  it("localize given an unavailable locale rases an I18n::InvalidLocale", () => {
+    config().enforceAvailableLocales = true;
+    // Ruby's `Time.now`: `enforce_available_locales!` (i18n.rb:335) raises
+    // before the object is asked for anything, so a `strftime` duck is enough.
+    expect(() => localize({ strftime: () => "" }, { locale: "klingon" })).toThrow(InvalidLocale);
+  });
+
   it("localize raises Disabled if locale is false", () => {
     withLocale(false, () => {
       expect(() => localize(null)).toThrow(Disabled);
@@ -362,6 +381,11 @@ describe("I18nTest", () => {
     expect(defaultLocale()).toBe("de");
   });
 
+  it("default_locale= doesn't ignore junk", () => {
+    // Ruby passes `Class`; any non-Symbol/String receiver has no `to_sym`.
+    expect(() => setDefaultLocale(Config as unknown as string)).toThrow(NoMethodError);
+  });
+
   it("raises an I18n::InvalidLocale exception when setting an unavailable default locale", () => {
     config().enforceAvailableLocales = true;
     expect(() => setDefaultLocale("klingon")).toThrow(InvalidLocale);
@@ -369,6 +393,10 @@ describe("I18nTest", () => {
 
   it("uses the default locale as a locale by default", () => {
     expect(locale()).toBe(defaultLocale());
+  });
+
+  it("locale= doesn't ignore junk", () => {
+    expect(() => setLocale(Config as unknown as string)).toThrow(NoMethodError);
   });
 
   it("raises an I18n::InvalidLocale exception when setting an unavailable locale", () => {
