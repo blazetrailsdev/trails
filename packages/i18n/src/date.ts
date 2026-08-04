@@ -139,6 +139,125 @@ export class ArgumentError extends Error {
 }
 
 /**
+ * @internal The alternations `date_parse.c` builds its patterns from
+ * (ruby/date, `date_parse.c` `ABBR_MONTHS` / `ABBR_DAYS`). Ruby matches the
+ * abbreviation and lets the rest of the name run off the end of the token, so
+ * `"Jul"`, `"July"` and `"JULY"` all land on the same month.
+ */
+const ABBR_MONTHS = "jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec";
+const ABBR_DAYS = "sun|mon|tue|wed|thu|fri|sat";
+
+/** @internal The `:year`/`:mon`/`:mday` of the Hash `Date._parse` answers. */
+interface DateParts {
+  year: number;
+  mon: number;
+  mday: number;
+}
+
+/** @internal `date_parse.c` `mon_num`: an abbreviation, or the head of a full name. */
+function monNum(str: string): number {
+  return ABBR_MONTH_NAMES.findIndex((m) => m.toLowerCase() === str.slice(0, 3).toLowerCase()) + 1;
+}
+
+/** @internal Ruby writes a `'`-prefixed number for a literal (uncompleted) year. */
+function num(str: string): number {
+  return Number(str.replace(/^'/, ""));
+}
+
+/**
+ * @internal `date_parse.c` `s3e`: the three fields of a `y-m-d`-shaped match
+ * are not always in that order — a two-digit head with a four-digit tail is
+ * `d/m/y`, which is why `"01/01/2012".to_date` is 1 Jan 2012 while
+ * `"12/13/2012".to_date` raises
+ * (activesupport/lib/active_support/core_ext/string/conversions.rb:38-41).
+ */
+function s3e(y: string | null, m: string, d: string | null): DateParts | null {
+  if (y !== null && d !== null && y.replace(/^[-+']/, "").length < 3 && d.length > 2) {
+    [y, d] = [d, y];
+  }
+  if (y === null || d === null) return null;
+  return { year: num(y), mon: num(m), mday: num(d) };
+}
+
+/** @internal `date_parse.c` `parse_day`: a leading day name is not a date field. */
+function parseDay(str: string): string {
+  return str.replace(new RegExp(`\\b(${ABBR_DAYS})[^-\\d\\s]*`, "i"), " ");
+}
+
+/** @internal `date_parse.c` `parse_eu`: `2nd July 2008`, `2 Jul 2008`, `2-Jul-2008`. */
+function parseEu(str: string): DateParts | null {
+  const m = new RegExp(
+    `'?(\\d+)[^-\\d\\s]*[-,.\\s]*(${ABBR_MONTHS})[^-\\d\\s]*[-,.\\s]*('?-?\\d+)`,
+    "i",
+  ).exec(str);
+  return m ? { year: num(m[3]), mon: monNum(m[2]), mday: num(m[1]) } : null;
+}
+
+/** @internal `date_parse.c` `parse_us`: `Jul 2 2008`, `July 2nd, 2008`. */
+function parseUs(str: string): DateParts | null {
+  const m = new RegExp(
+    `\\b(${ABBR_MONTHS})[^-\\d\\s]*[-,.\\s]+'?(\\d+)[^-\\d\\s]*[-,.\\s]*('?-?\\d+)`,
+    "i",
+  ).exec(str);
+  return m ? { year: num(m[3]), mon: monNum(m[1]), mday: num(m[2]) } : null;
+}
+
+/** @internal `date_parse.c` `parse_iso`: `2008-07-02`, and the unpadded `2008-7-2`. */
+function parseIso(str: string): DateParts | null {
+  const m = /([-+]?\d+)-(\d+)-(-?\d+)/.exec(str);
+  return m ? s3e(m[1], m[2], m[3]) : null;
+}
+
+/** @internal `date_parse.c` `parse_sla`: `2012/12/13`, `01/01/2012`. */
+function parseSla(str: string): DateParts | null {
+  const m = /([-+]?\d+)\/\s*(\d+)(?:\D\s*(-?\d+))?/.exec(str);
+  return m ? s3e(m[1], m[2], m[3] ?? null) : null;
+}
+
+/** @internal `date_parse.c` `parse_dot`: `2012.12.13`, `01.01.2012`. */
+function parseDot(str: string): DateParts | null {
+  const m = /([-+]?\d+)\.\s*(\d+)\.\s*(-?\d+)/.exec(str);
+  return m ? s3e(m[1], m[2], m[3]) : null;
+}
+
+/**
+ * @internal `date_parse.c` `parse_ddd`: an all-digit run. Only the widths that
+ * carry a whole date are taken — the shorter ones Ruby reads as `mmdd`, `ddd`
+ * or `dd` leave `:year` unset, and `Date.parse` raises on those anyway.
+ */
+function parseDdd(str: string): DateParts | null {
+  const m = /([-+]?)(\d{2,14})/.exec(str);
+  if (!m) return null;
+  const sign = m[1] === "-" ? "-" : "";
+  const digits = m[2];
+  if (digits.length === 8) {
+    return s3e(sign + digits.slice(0, 4), digits.slice(4, 6), digits.slice(6, 8));
+  }
+  if (digits.length === 6) {
+    return s3e(sign + digits.slice(0, 2), digits.slice(2, 4), digits.slice(4, 6));
+  }
+  return null;
+}
+
+/**
+ * @internal `date_parse.c` `date__parse`, which runs its sub-parsers in a fixed
+ * order and stops at the first that matches. The alphabetic pair goes first,
+ * then the numeric ones.
+ *
+ * @missingRailsCall `parse_time`, `parse_jis`, `parse_vms`, `parse_iso2`,
+ * `parse_year`, `parse_mon`, `parse_mday` and `parse_bc` are not ported: they
+ * read a time of day (which `::Date` discards), a calendar Rails never round-
+ * trips, or a fragment that leaves `Date.parse` raising for want of a `:year`.
+ */
+function _parse(str: string): DateParts | null {
+  str = parseDay(str);
+  if (/[a-z]/i.test(str)) {
+    return parseEu(str) ?? parseUs(str);
+  }
+  return parseIso(str) ?? parseSla(str) ?? parseDot(str) ?? parseDdd(str);
+}
+
+/**
  * @noRailsEquivalent PERMANENT — Ruby stdlib `::Date`. Rails never defines the
  * class, only reopens it, so there is no Rails counterpart for a port to
  * converge on; JS has no stdlib equivalent either (`Temporal.PlainDate` answers
@@ -155,18 +274,32 @@ export class Date {
   }
 
   /**
-   * Ruby `Date.parse`, narrowed to the `y-m-d` the callers use. The month and
-   * day are unpadded-tolerant because Ruby's is — `String#to_date` delegates
-   * straight to `::Date.parse`
+   * Ruby `Date.parse(str, comp = true)`, which runs `Date._parse` and then
+   * builds the date from the `:year`/`:mon`/`:mday` it found (ruby/date,
+   * `date_core.c` `date_s_parse` → `date__parse` in `date_parse.c`).
+   * `String#to_date` delegates straight to it
    * (activesupport/lib/active_support/core_ext/string/conversions.rb:47-48),
-   * and `i18n_test.rb:9` passes `"2008-7-2"`.
+   * so every spelling its doc example lists — `"1-1-2012"`, `"01/01/2012"`,
+   * `"2012-12-13"` — reaches here, and `activesupport/test/i18n_test.rb:9`
+   * passes the unpadded `"2008-7-2"`.
+   *
+   * `comp` is not taken: Rails only ever calls `::Date.parse(self, false)`, and
+   * `comp` governs nothing but two-digit-year completion, which `false` turns
+   * off — so the one behaviour trails needs is the default here.
+   *
+   * @missingRailsCall `Date._parse` is not a separate member here; its
+   * sub-parsers are the module-private functions below.
    */
   static parse(str: string): Date {
-    const match = /^(-?\d{4,})-(\d{1,2})-(\d{1,2})$/.exec(str);
+    const parts = _parse(str);
     // Ruby raises `Date::Error`, a subclass of `ArgumentError` that a nested
     // TS class cannot spell; the superclass is what callers rescue.
-    if (!match) throw new ArgumentError("invalid date");
-    return new Date(Number(match[1]), Number(match[2]), Number(match[3]));
+    if (!parts) throw new ArgumentError("invalid date");
+    try {
+      return new Date(parts.year, parts.mon, parts.mday);
+    } catch {
+      throw new ArgumentError("invalid date");
+    }
   }
 
   get year(): number {

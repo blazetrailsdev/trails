@@ -15,6 +15,30 @@ describe("Date", () => {
     }
   });
 
+  it("parses the spellings ::Date.parse takes, one per date_parse.c sub-parser", () => {
+    for (const str of [
+      "2008-07-02",
+      "2008/07/02",
+      "2008.07.02",
+      "20080702",
+      "Jul 2 2008",
+      "July 2nd, 2008",
+      "2 Jul 2008",
+      "2nd July 2008",
+      "2-Jul-2008",
+      "Wed, 2 Jul 2008",
+    ]) {
+      const date = RubyDate.parse(str);
+      expect([str, date.year, date.mon, date.day]).toEqual([str, 2008, 7, 2]);
+    }
+  });
+
+  it("reads a two-digit head with a four-digit tail as d/m/y, as s3e does", () => {
+    const date = RubyDate.parse("01/01/2012");
+    expect([date.year, date.mon, date.day]).toEqual([2012, 1, 1]);
+    expect(() => RubyDate.parse("12/13/2012")).toThrow("invalid date");
+  });
+
   it("raises on an unparseable string", () => {
     expect(() => RubyDate.parse("not a date")).toThrow(ArgumentError);
     expect(() => RubyDate.parse("not a date")).toThrow("invalid date");
