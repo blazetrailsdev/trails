@@ -203,6 +203,8 @@ import {
   attributeNamesForPartialInserts as _attributeNamesForPartialInserts,
   idBeforeTypeCast as _idBeforeTypeCast,
   isSavedChanges as _isSavedChanges,
+  get as _get,
+  set as _set,
 } from "./attribute-methods.js";
 import { normalizedAttributes as _normalizedAttributes } from "./normalization.js";
 import {
@@ -4115,7 +4117,11 @@ export class Base extends Model {
   declare accessedFields: () => string[];
   declare queryAttribute: (name: string) => boolean;
   declare _queryAttribute: (name: string) => boolean;
-  declare readAttribute: (name: string) => unknown;
+  declare readAttribute: (name: string, block?: (name: string) => unknown) => unknown;
+  /** Mirrors: ActiveRecord::AttributeMethods#[] (attribute_methods.rb:415) */
+  declare get: (attrName: string) => unknown;
+  /** Mirrors: ActiveRecord::AttributeMethods#[]= (attribute_methods.rb:428) */
+  declare set: (attrName: string, value: unknown) => void;
   /** @internal */
   declare _readAttribute: (name: string) => unknown;
   declare _writeAttribute: (name: string, value: unknown) => void;
@@ -4894,6 +4900,8 @@ include(Base, {
   attributePresent: _attributePresent,
   accessedFields: _accessedFields,
   queryAttribute: _queryAttribute,
+  get: _get,
+  set: _set,
   _queryAttribute: _queryAttributeFn,
   _readAttribute: _readAttributeFn,
   _writeAttribute: ReadonlyAttributes._writeAttribute,

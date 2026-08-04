@@ -108,6 +108,9 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   // connection_adapters/postgresql/utils.rb:30 `def ==(o)` →
   // connection-adapters/postgresql/utils.ts `Name#equals`.
   "ActiveRecord::ConnectionAdapters::PostgreSQL::Name": { "==": ["equals"] },
+  // attribute_methods.rb:415 `def [](attr_name)` / :428 `def []=(attr_name, value)`
+  // → attribute-methods.ts `get` / `set`.
+  "ActiveRecord::AttributeMethods": { "[]": ["get"], "[]=": ["set"] },
   // connection_adapters/statement_pool.rb:23 `def [](key)` / :31 `def []=(sql, stmt)`
   // → connection-adapters/statement-pool.ts `get` / `set`.
   "ActiveRecord::ConnectionAdapters::StatementPool": { "[]": ["get"], "[]=": ["set"] },

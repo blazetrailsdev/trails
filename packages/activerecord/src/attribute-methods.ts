@@ -4,7 +4,12 @@
  * Mirrors: ActiveRecord::AttributeMethods
  */
 import { isBlank } from "@blazetrails/activesupport";
-import { MissingAttributeError, resolveAliasNameIn } from "@blazetrails/activemodel";
+import {
+  MissingAttributeError,
+  missingAttribute,
+  resolveAliasNameIn,
+  type InstanceHost as AttributeMethodsInstanceHost,
+} from "@blazetrails/activemodel";
 import { formatForInspect as _formatForInspect } from "./attribute-inspection.js";
 import {
   attributeForInspect as _attrForInspect,
@@ -62,8 +67,10 @@ interface InstanceMethodHost {
   };
   _primaryKey?: string | string[];
   id?: unknown;
+  readAttribute(name: string, block?: (name: string) => unknown): unknown;
+  writeAttribute(name: string, value: unknown): void;
   /** @internal */
-  _readAttribute(name: string): unknown;
+  _readAttribute(name: string, block?: (name: string) => unknown): unknown;
   _writeAttribute(name: string, value: unknown): void;
 }
 
@@ -697,8 +704,36 @@ export function attributeForInspect(this: InstanceMethodHost, attr: string): str
 }
 
 /** Mirrors: ActiveRecord::AttributeMethods#read_attribute (read.rb:31-34) */
-export function readAttribute(this: InstanceMethodHost, name: string): unknown {
-  return this._readAttribute(recordAliasName(this, name));
+export function readAttribute(
+  this: InstanceMethodHost,
+  name: string,
+  block?: (name: string) => unknown,
+): unknown {
+  return this._readAttribute(recordAliasName(this, name), block);
+}
+
+/**
+ * Mirrors: ActiveRecord::AttributeMethods#[] (attribute_methods.rb:415-417)
+ *
+ *   def [](attr_name)
+ *     read_attribute(attr_name) { |n| missing_attribute(n, caller) }
+ *   end
+ */
+export function get(this: InstanceMethodHost, attrName: string): unknown {
+  return this.readAttribute(attrName, (n) =>
+    missingAttribute.call(this as unknown as AttributeMethodsInstanceHost, n),
+  );
+}
+
+/**
+ * Mirrors: ActiveRecord::AttributeMethods#[]= (attribute_methods.rb:428-430)
+ *
+ *   def []=(attr_name, value)
+ *     write_attribute(attr_name, value)
+ *   end
+ */
+export function set(this: InstanceMethodHost, attrName: string, value: unknown): void {
+  this.writeAttribute(attrName, value);
 }
 
 /** Mirrors: ActiveRecord::AttributeMethods#write_attribute (write.rb:31-34) */

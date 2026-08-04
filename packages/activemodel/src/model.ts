@@ -1668,17 +1668,14 @@ export class Model {
 
   // -- Attribute access --
 
-  readAttribute(name: string): unknown {
+  readAttribute(name: string, block?: (name: string) => unknown): unknown {
     // Rails resolves alias_attribute names in `read_attribute`
     // (attribute_aliases[name] || name, read.rb:31-34); `_read_attribute`
     // skips it. Resolved against the loaded attribute set so the trails
     // camelCase-key bridge cannot displace a name the record already owns.
     const resolved = resolveAliasNameIn(this.constructor as typeof Model, this._attributes, name);
-    if (!this._attributes.has(resolved)) {
-      return null;
-    }
-    this._accessedFields.add(resolved);
-    return this._attributes.fetchValue(resolved) ?? null;
+    if (this._attributes.has(resolved)) this._accessedFields.add(resolved);
+    return this._attributes.fetchValue(resolved, block) ?? null;
   }
 
   /**
