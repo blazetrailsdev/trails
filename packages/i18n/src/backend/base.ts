@@ -622,8 +622,15 @@ export abstract class Base {
     }
   }
 
-  /** Mirrors: `alias_method :load_yaml, :load_yml` (base.rb:251). */
-  protected loadYaml = this.loadYml;
+  /**
+   * Mirrors: `alias_method :load_yaml, :load_yml` (base.rb:272). The call goes
+   * through `Base.prototype` rather than `this` because `alias_method` copies
+   * the method entry as it stands here, so a subclass override of `loadYml` is
+   * not observed by the alias.
+   */
+  protected loadYaml(filename: string): [unknown, boolean] {
+    return Base.prototype.loadYml.call(this, filename);
+  }
 
   /**
    * Loads a JSON translations file. The data must have locales as toplevel
