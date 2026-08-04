@@ -1650,7 +1650,7 @@ export class Date {
     str = parseDay(str, hash);
     str = parseTime(str, hash);
     let rest: string | null = null;
-    if (/[a-z]/i.test(str)) {
+    if (/[a-z]/i.test(str) && /\d/.test(str)) {
       rest = parseEu(str, hash) ?? parseUs(str, hash);
     }
     rest ??=

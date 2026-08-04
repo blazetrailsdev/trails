@@ -843,6 +843,14 @@ export function extractFromProgram(
         });
       }
 
+      for (const own of factoryClassMembers(node, checker, relPath, srcDir)) {
+        const at = mixinMethods.findIndex(
+          (m) => m.name === own.name && !!m.isStatic === !!own.isStatic,
+        );
+        if (at === -1) mixinMethods.push(own);
+        else mixinMethods[at] = { ...mixinMethods[at], ...own, declaredIn: undefined };
+      }
+
       if (mixinMethods.length > 0) {
         info.modules[mixinKey] = {
           name: `${node.name.text}__mixin`,
@@ -1766,6 +1774,36 @@ function isInternalCallableRef(expr: ts.Expression, checker: ts.TypeChecker): bo
  * Used both for `export const Mod = { ... }` module discovery and for
  * resolving inline / property-access mod args to `include(Host, Mod)`.
  */
+/**
+ * The members of the class a mixin factory returns —
+ * `export function Fallbacks(Superclass) { abstract class Fallbacks extends
+ * Superclass { ... } return Fallbacks; }`
+ * (packages/i18n/src/backend/fallbacks.ts, the port of Ruby's
+ * `include I18n::Backend::Fallbacks`).
+ *
+ * The class is a local declaration inside the function body, so the top-level
+ * walker never sees it, and the factory's declared return type hides whatever
+ * the class marks `protected`. Reading the declaration recovers both, with
+ * `extractClass` so member shape (arity, visibility, calls, JSDoc tags) matches
+ * every other class in the manifest.
+ */
+export function factoryClassMembers(
+  fn: ts.FunctionDeclaration,
+  checker: ts.TypeChecker,
+  file: string,
+  srcDir?: string,
+): MethodInfo[] {
+  if (!fn.body) return [];
+  const out: MethodInfo[] = [];
+  for (const stmt of fn.body.statements) {
+    if (!ts.isClassDeclaration(stmt) || !stmt.name) continue;
+    const info = extractClass(stmt, checker, file, srcDir);
+    if (!info) continue;
+    out.push(...info.instanceMethods, ...info.classMethods);
+  }
+  return out;
+}
+
 export function harvestObjectLiteralMethods(
   obj: ts.ObjectLiteralExpression,
   checker: ts.TypeChecker,

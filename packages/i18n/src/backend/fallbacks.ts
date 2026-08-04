@@ -19,7 +19,7 @@
  */
 
 import { MissingTranslation, InvalidLocale } from "../exceptions.js";
-import { EMPTY_HASH, t, type Locale, type TranslationKey } from "../i18n.js";
+import { EMPTY_HASH, translate, type Locale, type TranslationKey } from "../i18n.js";
 import { Fallbacks as LocaleFallbacks } from "../locale/fallbacks.js";
 import { catchException, throwException } from "../throw-catch.js";
 import type { Base, TranslateOptions } from "./base.js";
@@ -164,7 +164,7 @@ export function Fallbacks<T extends BackendConstructor>(
         if ("fallbackInProgress" in options) delete options.fallbackInProgress;
 
         if (isSymbol(subject)) {
-          return t(subject.slice(1), {
+          return translate(subject, {
             ...options,
             locale: options.fallbackOriginalLocale as Locale,
             throw: true,

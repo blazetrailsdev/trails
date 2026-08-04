@@ -1924,6 +1924,26 @@ describe("extractFromProgram — @noRailsEquivalent JSDoc", () => {
     expect(mixin.instanceMethods.find((m) => m.name === "attributes")!.params).toEqual([]);
   });
 
+  it("records a protected member the factory's return type hides", () => {
+    const info = extractFromFiles("/p", {
+      "fallbacks.ts": `
+        interface Methods { translate(locale: string): unknown; }
+        export function Fallbacks(Base: new () => object): (new () => Methods) {
+          class F extends Base {
+            translate(locale: string): unknown { return locale; }
+            protected onFallback(locale: string): void {}
+          }
+          return F as never;
+        }
+      `,
+    });
+    const mixin = info.modules["fallbacks.ts:Fallbacks__mixin"];
+    const onFallback = mixin.instanceMethods.find((m) => m.name === "onFallback")!;
+    expect(onFallback.visibility).toBe("protected");
+    expect(onFallback.file).toBe("fallbacks.ts");
+    expect(mixin.instanceMethods.find((m) => m.name === "translate")!.declaredIn).toBeUndefined();
+  });
+
   it("extracts parameters onto a foreign synthesized __mixin member", () => {
     const info = extractFromFiles("/p", {
       "base.ts": `

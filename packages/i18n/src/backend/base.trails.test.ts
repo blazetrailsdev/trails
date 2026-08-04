@@ -129,6 +129,14 @@ describe("I18n::Backend::Base", () => {
     expect(backend.exists("en", "missing")).toBe(false);
   });
 
+  it("resolves a Symbol default through I18n.translate, so its guards run", () => {
+    backend.storeTranslations("en", { foo: "bar" });
+    config().availableLocales = ["en"];
+    config().enforceAvailableLocales = true;
+
+    expect(() => backend.translate("de", "missing", { default: ":foo" })).toThrow(InvalidLocale);
+  });
+
   it("availableLocales skips locales holding only i18n metadata", () => {
     backend.storeTranslations("en", { foo: "bar" });
     backend.storeTranslations("de", { i18n: { transliterate: {} } });

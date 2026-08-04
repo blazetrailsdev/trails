@@ -188,6 +188,11 @@ describe("I18nBackendSimpleTest", () => {
     expect(translations()).toEqual({ en: { foo: { bar: "bar", baz: "baz" } } });
   });
 
+  it("simple store_translations: converts the given locale to a Symbol", () => {
+    storeTranslations("en", { foo: "bar" });
+    expect(translations()).toEqual({ en: { foo: "bar" } });
+  });
+
   it("simple store_translations: converts keys to Symbols", () => {
     storeTranslations("en", { foo: { bar: "bar", baz: "baz" } });
     expect(translations()).toEqual({ en: { foo: { bar: "bar", baz: "baz" } } });

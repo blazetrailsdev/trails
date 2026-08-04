@@ -142,14 +142,6 @@ export class Error {
     options: Record<string, unknown> = {},
   ): string {
     const msgOpt = options.message;
-    // Proc/lambda message: call with (base, options) and return result.
-    if (typeof msgOpt === "function") {
-      const result = (msgOpt as (b: ModelBase, o: Record<string, unknown>) => unknown)(
-        base,
-        options,
-      );
-      if (typeof result === "string") return Error.interpolate(result, options);
-    }
     // error.rb:65 `type = options.delete(:message) if options[:message].is_a?(Symbol)`:
     // a Ruby Symbol keeps its leading colon, so a plain String stays in
     // `options[:message]` and becomes the default below, exactly as in Rails.
@@ -368,11 +360,5 @@ export class Error {
       optionsStr = "{...}";
     }
     return `#<ActiveModel::Error attribute=${this.attribute}, type=${this.type}, options=${optionsStr}>`;
-  }
-
-  static interpolate(msg: string, options: Record<string, unknown>): string {
-    return msg.replace(/%\{(\w+)\}/g, (_, key) => {
-      return options[key] !== undefined ? String(options[key]) : `%{${key}}`;
-    });
   }
 }

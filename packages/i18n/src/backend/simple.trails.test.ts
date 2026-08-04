@@ -36,4 +36,21 @@ describe("Backend::Simple", () => {
     expect(seen).toEqual(["en"]);
     expect(backend.translate("en", "foo")).toBe("bar");
   });
+
+  it("stores a Symbol-spelled locale in the same bucket as its String form", () => {
+    const backend = new Simple();
+    backend.storeTranslations(":en", { foo: "bar" });
+    backend.storeTranslations("en", { baz: "baz" });
+
+    expect(backend.translations()).toEqual({ en: { foo: "bar", baz: "baz" } });
+  });
+
+  it("does not vivify a locale for the property reads JSON.stringify makes", () => {
+    const backend = new Simple();
+    backend.storeTranslations("en", { foo: { bar: "baz" } });
+
+    expect(JSON.stringify(backend.translations())).toBe('{"en":{"foo":{"bar":"baz"}}}');
+    expect(backend.translations()["fr"]).toEqual({});
+    expect(Object.keys(backend.translations())).toEqual(["en", "fr"]);
+  });
 });
