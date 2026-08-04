@@ -53,10 +53,12 @@ function isSymbol(value: unknown): value is string {
 
 /**
  * The methods `SubtreeProxy` answers itself; every other property read is a
- * store lookup, which is what Ruby gets for free from `[]` being a method and
- * `@master_key` / `@store` / `@subtree` being ivars rather than methods.
+ * store lookup, which is what Ruby gets for free from `[]` being a method
+ * while `@master_key` / `@store` / `@subtree` are ivars. Those three keep the
+ * Rails names as `#private` fields, which — unlike ordinary ones — are not
+ * properties at all, so no translation key can collide with them.
  */
-const SUBTREE_PROXY_METHODS = new Set(["get", "hasKey", "nil", "inspect"]);
+const SUBTREE_PROXY_METHODS = new Set(["get", "hasKey", "nil"]);
 
 /**
  * This is a basic backend for key value stores. It receives on
@@ -126,11 +128,9 @@ export class KeyValue extends Base {
     options: TranslateOptions = EMPTY_HASH,
   ): unknown {
     const escape = "escape" in options ? options.escape : true;
-    for (const [flatKey, entry] of Object.entries(
-      this.flattenTranslations(locale, data, escape as boolean, this.subtreesFlag),
-    )) {
-      const key = `${locale}.${flatKey}`;
-      let value = entry;
+    const flattened = this.flattenTranslations(locale, data, escape as boolean, this.subtreesFlag);
+    for (let [key, value] of Object.entries(flattened)) {
+      key = `${locale}.${key}`;
 
       if (isHash(value)) {
         let oldValue: unknown;
@@ -146,15 +146,17 @@ export class KeyValue extends Base {
 
       if (!isSymbol(value)) this.store!.set(key, JSON.stringify(value));
     }
-    return undefined;
+    return flattened;
   }
 
   override availableLocales(): Locale[] {
-    const locales = [...this.store!.keys()].map((k) => {
+    let locales: (Locale | null)[] = [...this.store!.keys()].map((k) => {
       const index = k.indexOf(".");
       return index === -1 ? null : k.slice(0, index);
     });
-    return [...new Set(locales.filter((k) => k != null))];
+    locales = [...new Set(locales)];
+    locales = locales.filter((k) => k != null);
+    return locales as Locale[];
   }
 
   /**
@@ -193,8 +195,8 @@ export class KeyValue extends Base {
     scope: unknown = [],
     options: TranslateOptions = EMPTY_HASH,
   ): unknown {
-    const flatKey = this.normalizeFlatKeys(locale, key, scope, options.separator as string);
-    const stored = this.store!.get(`${locale}.${flatKey}`);
+    key = this.normalizeFlatKeys(locale, key, scope, options.separator as string);
+    const stored = this.store!.get(`${locale}.${key}`);
     const value: unknown = stored != null ? JSON.parse(stored) : stored;
 
     if (isHash(value)) {
@@ -202,7 +204,7 @@ export class KeyValue extends Base {
     } else if (value != null) {
       return value;
     } else if (!this.subtreesFlag) {
-      return new SubtreeProxy(`${locale}.${flatKey}`, this.store!);
+      return new SubtreeProxy(`${locale}.${key}`, this.store!);
     }
     return undefined;
   }
@@ -219,20 +221,18 @@ export class KeyValue extends Base {
 }
 
 export class SubtreeProxy {
-  private masterKey: string;
-  private storeRef: Store;
-  private subtree: TranslationData | null;
+  #masterKey: string;
+  #store: Store;
+  #subtree: TranslationData | null;
 
   constructor(masterKey: string, store: Store) {
-    this.masterKey = masterKey;
-    this.storeRef = store;
-    this.subtree = null;
+    this.#masterKey = masterKey;
+    this.#store = store;
+    this.#subtree = null;
     return new Proxy(this, {
       get: (target, prop) => {
         if (typeof prop === "string" && !SUBTREE_PROXY_METHODS.has(prop)) return target.get(prop);
         const value: unknown = Reflect.get(target, prop);
-        // The methods must see the target, not the proxy, or every `this.x`
-        // inside them would come back out through this trap as a store lookup.
         return typeof value === "function" ? value.bind(target) : value;
       },
       has: (target, prop) =>
@@ -244,17 +244,17 @@ export class SubtreeProxy {
 
   /** Mirrors: `has_key?` */
   hasKey(key: string): boolean {
-    return (this.subtree != null && key in this.subtree) || this.get(key) != null;
+    return (this.#subtree != null && key in this.#subtree) || this.get(key) != null;
   }
 
   /** Mirrors: `[]` */
   get(key: string): unknown {
     let value: unknown;
-    if (this.subtree == null || (value = this.subtree[key]) == null) {
-      value = this.storeRef.get(`${this.masterKey}.${key}`);
+    if (this.#subtree == null || (value = this.#subtree[key]) == null) {
+      value = this.#store.get(`${this.#masterKey}.${key}`);
       if (value != null) {
         value = JSON.parse(value as string);
-        (this.subtree ??= {})[key] = value;
+        (this.#subtree ??= {})[key] = value;
       }
     }
     return value;
@@ -262,6 +262,6 @@ export class SubtreeProxy {
 
   /** Mirrors: `nil?` */
   nil(): boolean {
-    return this.subtree == null;
+    return this.#subtree == null;
   }
 }

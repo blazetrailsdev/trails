@@ -22,6 +22,12 @@ export const FLATTEN_SEPARATOR = ".";
 /** @internal The shape `Flatten`'s instance methods need of their host. */
 export interface FlattenHost {
   links(): Map<string, Map<string, string>>;
+  flattenKeys(
+    hash: TranslationData,
+    escape: boolean,
+    prevKey?: string | null,
+    block?: (currKey: string, value: unknown) => void,
+  ): void;
   storeLink(locale: string, key: string, link: unknown): void;
   resolveLink(locale: string, key: string): string;
   findLink(locale: string, key: string): [string, string] | null;
@@ -108,10 +114,12 @@ export function normalizeFlatKeys(
   return this.resolveLink(locale, flatKey);
 }
 
-/** Store flattened links. */
+/**
+ * Store flattened links. Ruby memoizes into an `@links` ivar; TypeScript has
+ * no ivars, so the slot is a field on the host rather than a member of the
+ * `Flatten` contract above.
+ */
 export function links(this: FlattenHost): Map<string, Map<string, string>> {
-  // Ruby's `@links` ivar; TypeScript has no ivars, so the memo slot is a field
-  // on the host rather than a member of the `Flatten` contract above.
   const host = this as FlattenHost & { linksCache?: Map<string, Map<string, string>> };
   return (host.linksCache ??= newDoubleNestedCache<string, string>());
 }
@@ -134,7 +142,7 @@ export function flattenKeys(
     if (escape) key = this.escapeDefaultSeparator(key);
     const currKey = [prevKey, key].filter((k) => k != null).join(FLATTEN_SEPARATOR);
     block!(currKey, value);
-    if (isHash(value)) flattenKeys.call(this, value, escape, currKey, block);
+    if (isHash(value)) this.flattenKeys(value, escape, currKey, block);
   }
 }
 
@@ -154,7 +162,7 @@ export function flattenTranslations(
   subtree: boolean,
 ): TranslationData {
   const hash: TranslationData = {};
-  flattenKeys.call(this, data, escape, null, (key, value) => {
+  this.flattenKeys(data, escape, null, (key, value) => {
     if (isHash(value)) {
       if (subtree) hash[key] = value;
     } else {

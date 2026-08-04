@@ -8,6 +8,10 @@
  *
  * The store the gem passes is a Ruby Hash (`{}`); a `Map` is the JS Hash, and
  * its `get` / `set` / `keys` are the `[]` / `[]=` / `keys` the backend asks for.
+ *
+ * "store_translations supports numeric keys" asserts `I18n.t('1')`, `I18n.t(1)`
+ * and `I18n.t(:'1')`; a Ruby Symbol key is a JS string, so the third is the
+ * same call as the first.
  */
 
 import { beforeEach, describe, expect, it } from "vitest";
@@ -90,8 +94,6 @@ describe("I18nBackendKeyValueTest", () => {
     storeTranslations("en", { 1: "foo" });
     expect(t("1")).toBe("foo");
     expect(t(1 as unknown as TranslateKey)).toBe("foo");
-    // The gem's third assertion is `I18n.t(:'1')`; a Ruby Symbol key is a JS
-    // string, so it is the same call as the first one.
   });
 
   it("store_translations handle subtrees by default", () => {
