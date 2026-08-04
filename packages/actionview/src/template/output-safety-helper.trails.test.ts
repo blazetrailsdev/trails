@@ -45,12 +45,16 @@ describe("OutputSafetyHelperI18nTest", () => {
     expect(toSentence(["one", "two"], { twoWordsConnector: " - " }).toString()).toBe("one - two");
   });
 
-  it("to_sentence skips the I18n lookup for locale: false", () => {
+  // Unlike Array#to_sentence (core_ext/array/conversions.rb:68), the
+  // html_safe-aware helper has no `locale: false` guard
+  // (output_safety_helper.rb:50), and `I18n.translate` reads `false` as
+  // "no locale given" and falls back to `I18n.locale` (i18n.ts:238).
+  it("to_sentence looks the connectors up under I18n.locale for locale: false", () => {
     I18n.backend().storeTranslations("en", {
       support: { array: { two_words_connector: " y " } },
     });
 
-    expect(toSentence(["one", "two"], { locale: false }).toString()).toBe("one and two");
+    expect(toSentence(["one", "two"], { locale: false }).toString()).toBe("one y two");
   });
 
   it("to_sentence rejects unknown options", () => {
