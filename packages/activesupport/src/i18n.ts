@@ -6,9 +6,18 @@
  * (active_support/i18n.rb:16-17) and `Simple#init_translations` reads the path
  * back on first use and after every `I18n.reload!`
  * (i18n/lib/i18n/backend/simple.rb:83-86). The two locale files are one module
- * here, so there is one entry rather than two, and it is handed to
- * `registerLocaleModule` first because evaluating a JS module is async where
- * Ruby's `eval` in `load_rb` is not.
+ * here, so there is one entry rather than two.
+ *
+ * Rails' two lines are bare appends because `load_rb` reads and evaluates the
+ * named file itself (base.rb:254). Its port cannot: `load_file` and
+ * `load_translations` are synchronous (base.rb:240, :14 — and so is every
+ * `init_translations` call site above them, simple.rb:83-86), while the only
+ * way JS evaluates a module is `import()`, which is a Promise. Awaiting it here
+ * is not open either — a top-level await in this file cannot be transformed to
+ * CJS, which breaks every `tsx`-run script that imports Active Support. So the
+ * module this file has already imported is handed over first, the same way the
+ * host already registers a reader and preloads the bytes for the `.yml` and
+ * `.json` arms of the same dispatch.
  *
  * `run_load_hooks(:i18n)` and `i18n/backend/fallbacks` have no port yet.
  */
