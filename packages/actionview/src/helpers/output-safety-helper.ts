@@ -116,19 +116,12 @@ export function toSentence(array: unknown[], options: ToSentenceOptions = {}): S
     twoWordsConnector: " and ",
     lastWordConnector: ", and ",
   };
-  // `output_safety_helper.rb:50` guards only on `defined?(I18n)`, but its
-  // ActiveSupport twin also skips the lookup for `locale: false`
-  // (core_ext/array/conversions.rb:68) and this is the html_safe-aware version
-  // of that method; `I18n.translate` would otherwise read `false` as "no locale
-  // given" and fall back to `I18n.locale` (i18n.ts:238).
-  if (options.locale !== false) {
-    const i18nConnectors = I18n.translate("support.array", {
-      locale: options.locale ?? null,
-      default: {},
-    }) as Record<string, string>;
-    for (const [k, v] of Object.entries(i18nConnectors)) {
-      defaultConnectors[I18N_KEY_MAP[k] ?? k] = v;
-    }
+  const i18nConnectors = I18n.translate("support.array", {
+    locale: options.locale ?? null,
+    default: {},
+  }) as Record<string, string>;
+  for (const [k, v] of Object.entries(i18nConnectors)) {
+    defaultConnectors[I18N_KEY_MAP[k] ?? k] = v;
   }
   // Ruby's `default_connectors.merge!(options)` overrides on key presence; a TS
   // caller forwarding an absent option passes `undefined`, which must not
