@@ -52,12 +52,21 @@ describe("isSourceUnported package scoping", () => {
       "../i18n.rb",
       "backend.rb",
       "backend/base.rb",
+      "backend/fallbacks.rb",
       "backend/flatten.rb",
+      "backend/key_value.rb",
       "backend/simple.rb",
       "backend/transliterator.rb",
       "config.rb",
       "exceptions.rb",
       "interpolate/ruby.rb",
+      // `locale.rb` is a pure `autoload` namespace, so it carries no methods
+      // for api:compare to count — `locale.ts` re-exports the same two members.
+      "locale.rb",
+      "locale/fallbacks.rb",
+      "locale/tag.rb",
+      "locale/tag/parents.rb",
+      "locale/tag/simple.rb",
       "utils.rb",
     ]);
     const unaccounted = ["../i18n.rb", ...files].filter(
