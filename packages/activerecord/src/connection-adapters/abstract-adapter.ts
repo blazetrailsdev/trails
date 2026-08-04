@@ -689,6 +689,11 @@ export interface AbstractAdapter {
   explain?(arel: unknown, binds?: unknown[], options?: ExplainOption[]): Promise<string>;
 
   /**
+   * Mirrors: ActiveRecord::ConnectionAdapters::SchemaStatements#dump_schema_information
+   */
+  dumpSchemaInformation?(): Promise<string | null>;
+
+  /**
    * Mirrors: ActiveRecord::ConnectionAdapters::SchemaStatements#create_table_definition
    *
    * @internal
