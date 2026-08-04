@@ -190,16 +190,20 @@ tasks repo enumerates these as convergence classes.
 - [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
 - Tests live next to source files as `*.test.ts`.
 - Prefer small, focused modules.
-- **PR size ceiling: 500 LOC** (additions + deletions, excluding lockfiles,
-  snapshots, and generated parity fixtures; docs-only changes — `.md` files,
-  READMEs, RFC/story prose — are exempt). Check before opening with
+- **PR size ceiling: the LOC number stated in your task prompt's "Hard rules"
+  block** — that block is the single source of truth (btwhooks fills it from
+  `PR_MAX_LOC`, so the number can be retuned without editing this file). Working
+  without such a prompt? Keep the PR small and ask before opening a big one.
+  Counted as additions + deletions, excluding lockfiles, snapshots, and
+  generated parity fixtures; docs-only changes — `.md` files, READMEs, RFC/story
+  prose — are exempt. Check before opening with
   `git diff --shortstat origin/main...HEAD -- ':!**/pnpm-lock.yaml' ':!**/__snapshots__/**' ':!**/*.md'`
   (`.md` files are excluded because docs-only changes are exempt; subtract them
   manually if your PR mixes code and docs).
-  Tests and fixtures count. The historical 20-method rule is a soft guide;
-  500 LOC is the hard one — review-cycle data shows PRs ≥400 LOC need 4–6
-  rounds minimum and ≥700 LOC need 13+, so 500 sits just above the 400-LOC
-  inflection and well below the 700-LOC danger zone. **Do NOT fan out into
+  Tests and fixtures count. The historical 20-method rule is a soft guide; the
+  prompt's LOC ceiling is the hard one — review-cycle data shows PRs ≥400 LOC
+  need 4–6 rounds minimum and ≥700 LOC need 13+, which is the band the ceiling
+  is tuned within. **Do NOT fan out into
   sibling PRs yourself.** Keep each PR scoped to the single story you claimed;
   ship the portion that fits and register the rest as new stories. If the work
   is larger than one PR, or you discover additional work that belongs in a
@@ -255,7 +259,8 @@ catches a class of drift a reviewer would otherwise spend a cycle on.
 
 1. **Size.**
    `git diff --shortstat origin/main...HEAD -- ':!**/pnpm-lock.yaml' ':!**/__snapshots__/**' ':!**/*.md'`
-   — 500 LOC ceiling (see Conventions).
+   — compare against the LOC ceiling in your prompt's "Hard rules" block (see
+   Conventions).
 2. **Did you touch a ported method body?** If yes, run the call-parity gates.
    They detect the highest-frequency fidelity miss in this repo: a TS body that
    omits a call the Rails body makes — a dropped delegation, an inlined helper,
