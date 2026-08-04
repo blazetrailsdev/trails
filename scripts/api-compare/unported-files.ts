@@ -1145,6 +1145,12 @@ export const UNPORTED_FILES: UnportedFile[] = [
   },
   {
     pattern: "backend/key_value.rb",
+    testFile: "backend/key_value_test.rb",
+    package: "i18n",
+    reason: "Pre-1.0: optional backend over a key-value store, keyed by Ruby-marshalled subtrees.",
+  },
+  {
+    testFile: "api/key_value_test.rb",
     package: "i18n",
     reason: "Pre-1.0: optional backend over a key-value store, keyed by Ruby-marshalled subtrees.",
   },
