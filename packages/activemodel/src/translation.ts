@@ -9,6 +9,7 @@
  * express the contract here as an interface for the static side.
  */
 import { humanize, isPresent } from "@blazetrails/activesupport";
+import type { TranslateKey } from "@blazetrails/i18n";
 import { I18n } from "./i18n.js";
 import type { ModelName } from "./naming.js";
 
@@ -101,7 +102,7 @@ export function humanAttributeName(
   if (options.default != null) defaults.push(options.default);
   if (!raiseOnMissing) defaults.push(MISSING_TRANSLATION);
 
-  let translation = I18n.translate((defaults.shift() as string).slice(1), {
+  let translation = I18n.translate(defaults.shift() as TranslateKey, {
     count: 1,
     raise: raiseOnMissing,
     ...options,

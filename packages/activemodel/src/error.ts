@@ -1,5 +1,5 @@
 import { humanize, deepDup } from "@blazetrails/activesupport";
-import { MissingTranslation, catchException } from "@blazetrails/i18n";
+import { MissingTranslation, catchException, type TranslateKey } from "@blazetrails/i18n";
 import { I18n } from "./i18n.js";
 
 /** The model instance that owns this error. Rails tests pass null for base-only errors. */
@@ -125,7 +125,7 @@ export class Error {
       ? baseClass.humanAttributeName(attribute, { default: attrName, base })
       : attrName;
 
-    return I18n.t((defaults.shift() as string).slice(1), {
+    return I18n.t(defaults.shift() as TranslateKey, {
       default: defaults,
       attribute: attrName,
       message,
@@ -193,7 +193,7 @@ export class Error {
 
       if (options.message == null || options.message === false) {
         const translation = catchException(() =>
-          I18n.translate((defaults[0] as string).slice(1), {
+          I18n.translate(defaults[0] as TranslateKey, {
             ...options,
             default: defaults.slice(1),
             throw: true,
@@ -210,14 +210,14 @@ export class Error {
     defaults.push(`:errors.attributes.${attribute}.${type}`);
     defaults.push(`:errors.messages.${type}`);
 
-    const key = (defaults.shift() as string).slice(1);
+    const key = defaults.shift();
     if (options.message != null && options.message !== false) {
       defaults = [options.message];
       delete options.message;
     }
     options.default = defaults;
 
-    return I18n.translate(key, options) as string;
+    return I18n.translate(key as TranslateKey, options) as string;
   }
 
   constructor(
