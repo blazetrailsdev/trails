@@ -1,9 +1,13 @@
 /**
  * Mirrors: i18n/lib/i18n/backend/chain.rb
  *
- * The gem splits the code into a `Chain::Implementation` module so other
- * modules can be `include`d over it; TypeScript has no module reopening, so
- * `Chain` is a single class extending `Base`, exactly as `Simple` is.
+ * The gem's `Chain` has no superclass: it splits the code into a
+ * `Chain::Implementation` module that `include Base` (chain.rb:21-23) and
+ * `include Implementation`s it back (chain.rb:127), so a module included over
+ * `Chain` lands *between* the two. TypeScript has no module reopening, so this
+ * file keeps the bodies in the `Chain` class itself and spells `include Base`
+ * as the prototype copy at the bottom, exactly as `simple.ts` does. The class
+ * body still wins over `Base`, as Ruby's `include` does.
  *
  * `translate` and `localize` each `return` from inside a `catch(:exception)`
  * block (chain.rb:65, chain.rb:85), which in Ruby leaves the enclosing method;
@@ -39,6 +43,15 @@ interface ChainedBackend extends Base {
 }
 
 /**
+ * Ruby `include Base` (chain.rb:22) as a type: the merged interface gives
+ * `Chain` every member `Base` declares, without an `extends` clause the gem
+ * does not have. The runtime half of the same `include` is the prototype copy
+ * at the bottom of this file.
+ */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- the merge is the point: it is `include Base` on the type side.
+export interface Chain extends Base {}
+
+/**
  * Backend that chains multiple other backends and checks each of them when
  * a translation needs to be looked up. This is useful when you want to use
  * standard translations with a Simple backend but store custom application
@@ -57,11 +70,11 @@ interface ChainedBackend extends Base {
  * Fallback translations using the `default` option are only used by the last
  * backend of a chain.
  */
-export class Chain extends Base {
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
+export class Chain {
   backends: Base[];
 
   constructor(...backends: Base[]) {
-    super();
     this.backends = backends;
   }
 
@@ -73,15 +86,15 @@ export class Chain extends Base {
     return true;
   }
 
-  override reloadBang(): void {
+  reloadBang(): void {
     for (const backend of this.backends) backend.reloadBang();
   }
 
-  override eagerLoadBang(): void {
+  eagerLoadBang(): void {
     for (const backend of this.backends) backend.eagerLoadBang();
   }
 
-  override storeTranslations(
+  storeTranslations(
     locale: Locale,
     data: TranslationData,
     options: TranslateOptions = EMPTY_HASH,
@@ -89,11 +102,11 @@ export class Chain extends Base {
     return this.backends[0].storeTranslations(locale, data, options);
   }
 
-  override availableLocales(): Locale[] {
+  availableLocales(): Locale[] {
     return [...new Set(this.backends.flatMap((backend) => backend.availableLocales()))];
   }
 
-  override translate(
+  translate(
     locale: Locale | null | undefined,
     key: TranslationKey | null | undefined,
     defaultOptions: TranslateOptions = EMPTY_HASH,
@@ -119,15 +132,11 @@ export class Chain extends Base {
     throwException(new MissingTranslation(locale as Locale, key as TranslationKey, options));
   }
 
-  override exists(
-    locale: Locale,
-    key: TranslationKey,
-    options: TranslateOptions = EMPTY_HASH,
-  ): boolean {
+  exists(locale: Locale, key: TranslationKey, options: TranslateOptions = EMPTY_HASH): boolean {
     return this.backends.some((backend) => backend.exists(locale, key, options));
   }
 
-  override localize(
+  localize(
     locale: Locale,
     object: unknown,
     format: unknown = ":default",
@@ -179,5 +188,24 @@ export class Chain extends Base {
       copy[k] = isHash(valueFromOther) && isHash(v) ? this._deepMerge(valueFromOther, v) : v;
     }
     return copy;
+  }
+}
+
+/**
+ * Ruby `include Base` (chain.rb:22). `include` copies a module's instance
+ * methods into the ancestry *below* the class body, so a key the class body
+ * already defines is never replaced — the `hasOwnProperty` guard below. Some of
+ * `Base`'s members are TS class fields (`transliterate`, `loadYaml`), which
+ * only exist on an instance, so an instance is the second source read.
+ */
+for (const source of [Base.prototype, new (Base as unknown as new () => Base)()]) {
+  for (const key of Object.getOwnPropertyNames(source)) {
+    if (key === "constructor") continue;
+    if (Object.prototype.hasOwnProperty.call(Chain.prototype, key)) continue;
+    Object.defineProperty(
+      Chain.prototype,
+      key,
+      Object.getOwnPropertyDescriptor(source, key) as PropertyDescriptor,
+    );
   }
 }
