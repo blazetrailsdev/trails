@@ -1,11 +1,20 @@
 /**
  * Mirrors: i18n/lib/i18n/backend/key_value.rb
  *
- * The gem splits the code into a `KeyValue::Implementation` module so other
- * modules can be `include`d over it; TypeScript has no module reopening, so
- * `KeyValue` is a single class extending `Base`, exactly as `Simple` is. The
- * `include Flatten` is the trails mixin idiom — `this`-typed functions from
- * `flatten.ts` assigned to the class.
+ * The gem's `KeyValue` has no superclass: it splits the code into a
+ * `KeyValue::Implementation` module that `include Base, Flatten`
+ * (key_value.rb:69-73) and `include Implementation`s it back
+ * (key_value.rb:201), so a module included over `KeyValue` lands *between* the
+ * two. TypeScript has no module reopening, so this file keeps the bodies in the
+ * `KeyValue` class itself and spells `include Base` as the prototype copy at
+ * the bottom, exactly as `simple.ts` does; the class body still wins over
+ * `Base`, as Ruby's `include` does. The `Flatten` arm of the same `include` is
+ * the trails mixin idiom — `this`-typed functions from `flatten.ts` assigned to
+ * the class. The one `super` below is `Base.prototype.pluralize.call(this)` for
+ * the reason Ruby resolves it to `Base` too — a module included into `KeyValue`
+ * sits above `Implementation`, never between it and `Base`. `pluralize` is
+ * protected, which TS only lets a `KeyValue` reach through another `KeyValue`,
+ * so `Base.prototype` is cast to what `include Base` already made it.
  *
  * `I18n::JSON` is `Oj` or `ActiveSupport::JSON` depending on what is
  * installed (key_value.rb:7-22); JS has `JSON` in the language, and its
@@ -66,6 +75,15 @@ function isSymbol(value: unknown): value is string {
 const SUBTREE_PROXY_METHODS = new Set(["get", "hasKey", "nil"]);
 
 /**
+ * Ruby `include Base` (key_value.rb:73) as a type: the merged interface gives
+ * `KeyValue` every member `Base` declares, without an `extends` clause the gem
+ * does not have. The runtime half of the same `include` is the prototype copy
+ * at the bottom of this file.
+ */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- the merge is the point: it is `include Base` on the type side.
+export interface KeyValue extends Base {}
+
+/**
  * This is a basic backend for key value stores. It receives on
  * initialization the store, which should respond to three methods:
  *
@@ -96,7 +114,8 @@ const SUBTREE_PROXY_METHODS = new Set(["get", "hasKey", "nil"]);
  * (`new KeyValue(store, false)`), which is useful when a KeyValue backend is
  * chained to a Simple backend.
  */
-export class KeyValue extends Base {
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
+export class KeyValue {
   store: Store | null;
   private subtreesFlag: boolean;
 
@@ -117,7 +136,6 @@ export class KeyValue extends Base {
   translationsStore?: TranslationData;
 
   constructor(store: Store | null, subtrees = true) {
-    super();
     this.store = store;
     this.subtreesFlag = subtrees;
   }
@@ -127,7 +145,7 @@ export class KeyValue extends Base {
     return this.store != null;
   }
 
-  override storeTranslations(
+  storeTranslations(
     locale: Locale,
     data: TranslationData,
     options: TranslateOptions = EMPTY_HASH,
@@ -154,7 +172,7 @@ export class KeyValue extends Base {
     return flattened;
   }
 
-  override availableLocales(): Locale[] {
+  availableLocales(): Locale[] {
     let locales: (Locale | null)[] = [...this.store!.keys()].map((k) => {
       const index = k.indexOf(".");
       return index === -1 ? null : k.slice(0, index);
@@ -193,11 +211,11 @@ export class KeyValue extends Base {
   }
 
   /** Mirrors: `subtrees?` */
-  protected override subtrees(): boolean {
+  protected subtrees(): boolean {
     return this.subtreesFlag;
   }
 
-  protected override lookup(
+  protected lookup(
     locale: Locale,
     key: TranslationKey,
     scope: unknown = [],
@@ -222,14 +240,33 @@ export class KeyValue extends Base {
     return undefined;
   }
 
-  protected override pluralize(locale: Locale, entry: unknown, count: unknown): unknown {
+  protected pluralize(locale: Locale, entry: unknown, count: unknown): unknown {
     if (this.subtrees()) {
-      return super.pluralize(locale, entry, count);
+      return (Base.prototype as KeyValue).pluralize.call(this, locale, entry, count);
     } else {
       if (!isHash(entry)) return entry;
       const key = this.pluralizationKey(entry, count);
       return entry[key];
     }
+  }
+}
+
+/**
+ * Ruby `include Base` (key_value.rb:73). `include` copies a module's instance
+ * methods into the ancestry *below* the class body, so a key the class body
+ * already defines is never replaced — the `hasOwnProperty` guard below. Some of
+ * `Base`'s members are TS class fields (`transliterate`, `loadYaml`), which
+ * only exist on an instance, so an instance is the second source read.
+ */
+for (const source of [Base.prototype, new (Base as unknown as new () => Base)()]) {
+  for (const key of Object.getOwnPropertyNames(source)) {
+    if (key === "constructor") continue;
+    if (Object.prototype.hasOwnProperty.call(KeyValue.prototype, key)) continue;
+    Object.defineProperty(
+      KeyValue.prototype,
+      key,
+      Object.getOwnPropertyDescriptor(source, key) as PropertyDescriptor,
+    );
   }
 }
 
