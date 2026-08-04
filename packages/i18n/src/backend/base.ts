@@ -339,8 +339,6 @@ export abstract class Base {
       const key = format;
       const type = respondTo(object, "sec") ? "time" : "date";
       options = { ...options, raise: true, object, locale };
-      // `:"#{type}.formats.#{key}"` — interpolating a Symbol yields its name,
-      // and the built key is itself a Symbol, so it keeps the leading colon.
       format = t(`:${type}.formats.${key.slice(1)}`, options);
     }
 
