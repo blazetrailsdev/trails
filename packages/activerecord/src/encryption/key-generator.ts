@@ -48,7 +48,7 @@ export class KeyGenerator {
 
   /** @internal */
   private keyDerivationSalt(): string {
-    return Configurable.config.get("keyDerivationSalt") as string;
+    return Configurable.config.keyDerivationSalt;
   }
 
   /** @internal */

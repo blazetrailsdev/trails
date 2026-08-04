@@ -163,7 +163,9 @@ export class Encryptor {
   private defaultKeyProvider(): KeyProviderLike | undefined {
     const ctxKp = Configurable.keyProvider as KeyProviderLike | undefined;
     if (ctxKp) return ctxKp;
-    const { primaryKey, keyDerivationSalt, hashDigestClass } = Configurable.config;
+    const primaryKey = Configurable.config.hasPrimaryKey();
+    const keyDerivationSalt = Configurable.config.hasKeyDerivationSalt();
+    const { hashDigestClass } = Configurable.config;
     if (primaryKey == null) {
       clearDefaultKeyProviderCache();
       return undefined;

@@ -67,7 +67,7 @@ export function globalPreviousSchemesFor(scheme: Scheme): Scheme[] {
   // avoid a config → key-generator → configurable → config circular import.
   if (config.supportSha1ForNonDeterministicEncryption && config.hasPrimaryKey()) {
     allSchemeOptions.push({
-      keyProvider: getSha1KeyProvider(config.primaryKey!, config.keyDerivationSalt),
+      keyProvider: getSha1KeyProvider(config.primaryKey, config.hasKeyDerivationSalt()),
     });
   }
 

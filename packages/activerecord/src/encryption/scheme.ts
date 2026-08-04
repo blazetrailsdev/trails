@@ -149,19 +149,20 @@ export class Scheme {
   private defaultKeyProvider(): unknown {
     const ctxKp = Configurable.keyProvider;
     if (ctxKp != null) return ctxKp;
-    if (Configurable.config.primaryKey == null) {
+    const primaryKey = Configurable.config.hasPrimaryKey();
+    if (primaryKey == null) {
       clearDefaultKeyProviderCache();
       return undefined;
     }
-    const primaryKey = Configurable.config.primaryKey;
-    const { keyDerivationSalt, hashDigestClass } = Configurable.config;
+    const keyDerivationSalt = Configurable.config.hasKeyDerivationSalt();
+    const { hashDigestClass } = Configurable.config;
     return getOrCreateDefaultKeyProvider(primaryKey, keyDerivationSalt, hashDigestClass);
   }
 
   /** @internal */
   private deterministicKeyProvider(): DeterministicKeyProvider | undefined {
     if (this.deterministic) {
-      const deterministicKey = Configurable.config.get("deterministicKey") as string;
+      const deterministicKey = Configurable.config.deterministicKey;
       this._cachedDeterministicKeyProvider ??= new DeterministicKeyProvider(deterministicKey);
       return this._cachedDeterministicKeyProvider;
     }
