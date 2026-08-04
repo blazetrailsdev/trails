@@ -158,6 +158,11 @@ const ABBR_DAYS = "sun|mon|tue|wed|thu|fri|sat";
  * what `parse_time` and the seconds branches of `parse_ddd_cb` set: `::Date`
  * throws the time away, but `rt_complete_frags` counts the fields present to
  * decide which kind of date the string named, so they have to be recorded.
+ *
+ * `:offset` is `date_zone_to_diff`'s answer for `:zone`, and it is `null`
+ * rather than absent when the zone is one Ruby does not know: `date__parse`
+ * sets the key from a `nil` return (`date_parse.c:2290-2294`), and Ruby's Hash
+ * answers `{... :offset => nil}` there.
  */
 interface DateParts {
   year?: number;
