@@ -640,7 +640,7 @@ export class Relation<T extends Base> {
     // of those columns before re-adding them.
     const newClause = rel.buildWhereClause(conditions) as WhereClause;
     rel._whereClause = rel._whereClause.except(...newClause.extractAttributes());
-    rel._whereClause.predicates.push(...newClause.predicates);
+    rel._whereClause = rel._whereClause.plus(newClause);
     return rel;
   }
 
@@ -846,7 +846,7 @@ export class Relation<T extends Base> {
         // in place (`IN` → `NOT IN`, `Grouping(Or)` → `NOT (...)`), while a flat
         // multi-predicate single tuple ANDs then negates → `NOT (c1 = ? AND
         // c2 = ?)` — the same shape as inverting the hash-key `where.not`.
-        rel._whereClause.predicates.push(...new WhereClause(nodes).invert().predicates);
+        rel._whereClause = rel._whereClause.plus(new WhereClause(nodes).invert());
       }
       return rel;
     }
@@ -860,7 +860,7 @@ export class Relation<T extends Base> {
         throw argumentError("Relation#whereNot: unsupported argument (empty array)");
       }
       const clause = rel.buildWhereClause(conditions) as WhereClause;
-      rel._whereClause.predicates.push(...clause.invert().predicates);
+      rel._whereClause = rel._whereClause.plus(clause.invert());
       return rel;
     }
     // Mirrors Rails WhereChain#not → `build_where_clause(opts).invert`
@@ -871,7 +871,7 @@ export class Relation<T extends Base> {
     // assembled clause: 1 predicate → node.invert() (`!=`, `IS NOT NULL`,
     // `NOT IN`, ...), 2+ predicates → NOT(p1 AND p2 AND ...).
     const clause = rel.buildWhereClause(conditions) as WhereClause;
-    rel._whereClause.predicates.push(...clause.invert().predicates);
+    rel._whereClause = rel._whereClause.plus(clause.invert());
     return rel;
   }
 

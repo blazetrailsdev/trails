@@ -940,7 +940,7 @@ export function buildWhereClause(
 function whereBang(this: QueryMethodsHost, opts: any, ...rest: unknown[]): any {
   if (opts == null) return this;
   const clause = buildWhereClause.call(this, opts, rest);
-  this._whereClause.predicates.push(...clause.predicates);
+  this._whereClause = this._whereClause.plus(clause);
   return this;
 }
 

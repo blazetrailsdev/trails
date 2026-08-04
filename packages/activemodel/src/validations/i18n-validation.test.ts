@@ -50,11 +50,10 @@ describe("I18nValidationTest", () => {
   });
 
   it("errors full messages uses format", () => {
-    // Rails clears `I18n.load_path` in setup (i18n_validation_test.rb:12), so a
-    // stored `errors.format` is not overwritten by the framework `en.yml` the
-    // backend loads lazily. Only this case collides with the file data, so the
-    // clear is local to it; `errors.messages.empty` is stored back because the
-    // trails deviation below resolves the message through the backend.
+    // Rails clears `I18n.load_path` in setup (i18n_validation_test.rb:12) so the
+    // framework `en.yml` cannot overwrite the stored `errors.format`. Only this
+    // case collides with the file data, and `errors.messages.empty` is stored
+    // back because the trails deviation below resolves through the backend.
     const oldLoadPath = [...I18n.loadPath()];
     I18n.loadPath().length = 0;
     I18n.setBackend(new I18n.Simple());
