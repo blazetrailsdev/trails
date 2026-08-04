@@ -5,7 +5,7 @@
  */
 
 import { getCrypto } from "@blazetrails/activesupport";
-import { ConfigError, DecryptionError, EncryptedContentIntegrity } from "../errors.js";
+import { Configuration, Decryption, EncryptedContentIntegrity } from "../errors.js";
 import { Message } from "../message.js";
 
 const KEY_LENGTH = 32;
@@ -77,7 +77,7 @@ export class Aes256Gcm {
       Buffer.from(cipher.final()),
     ]);
     if (!cipher.getAuthTag) {
-      throw new ConfigError("Crypto adapter does not support GCM auth tags (getAuthTag)");
+      throw new Configuration("Crypto adapter does not support GCM auth tags (getAuthTag)");
     }
     const authTag = Buffer.from(cipher.getAuthTag());
 
@@ -118,7 +118,7 @@ export class Aes256Gcm {
         authTagLength: AUTH_TAG_LENGTH,
       });
       if (!decipher.setAuthTag) {
-        throw new ConfigError("Crypto adapter does not support GCM auth tags (setAuthTag)");
+        throw new Configuration("Crypto adapter does not support GCM auth tags (setAuthTag)");
       }
       decipher.setAuthTag(authTagBuf);
       return Buffer.concat([
@@ -126,16 +126,16 @@ export class Aes256Gcm {
         Buffer.from(decipher.final()),
       ]);
     } catch (e) {
-      if (e instanceof ConfigError) throw e;
+      if (e instanceof Configuration) throw e;
       // Wrong key or corrupted ciphertext — a decryption failure, retried per-key.
-      throw new DecryptionError("The provided key could not decrypt the data");
+      throw new Decryption("The provided key could not decrypt the data");
     }
   }
 
   private _validateKeyLength(key: string): void {
     const keyBuf = Buffer.from(key, "base64");
     if (keyBuf.length < KEY_LENGTH) {
-      throw new ConfigError(
+      throw new Configuration(
         `The provided key has length ${keyBuf.length} but must be at least ${KEY_LENGTH} bytes`,
       );
     }

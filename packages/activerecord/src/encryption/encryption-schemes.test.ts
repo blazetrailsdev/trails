@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 import { Scheme } from "./scheme.js";
 import { Configurable } from "./configurable.js";
-import { Decryption as DecryptionError } from "./errors.js";
+import { Decryption } from "./errors.js";
 import type { EncryptorLike } from "./encryptor.js";
 import { EncryptableRecord } from "./encryptable-record.js";
 import type { SchemeOptions } from "./scheme.js";
@@ -33,7 +33,7 @@ class TestEncryptor implements EncryptorLike {
     for (const [clear, cipher] of Object.entries(this.map)) {
       if (cipher === encryptedText) return clear;
     }
-    throw new DecryptionError(`Couldn't find a match for ${encryptedText}`);
+    throw new Decryption(`Couldn't find a match for ${encryptedText}`);
   }
 
   isEncrypted(text: string): boolean {
@@ -98,7 +98,7 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
   it("when defining previous encryption schemes, you still get Decryption errors when using invalid clear values", async () => {
     Configurable.config.supportUnencryptedData = false;
     // Configure a previous scheme — the test verifies that even with previous
-    // schemes, an unencrypted plaintext raises DecryptionError.
+    // schemes, an unencrypted plaintext raises Decryption.
     Configurable.config.previous = [
       { keyProvider: makeKeyProvider("prev-key-for-decryption-error-32b!") },
     ] as SchemeOptions[];
@@ -106,7 +106,7 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
     new Author();
     const author = await withoutEncryption(() => Author.create({ name: "unencrypted author" }));
     const reloaded = await Author.find(author.id);
-    expect(() => reloaded.name).toThrow(DecryptionError);
+    expect(() => reloaded.name).toThrow(Decryption);
   });
 
   it("use a custom encryptor", async () => {
@@ -255,7 +255,7 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
       prev2Scheme,
     ]);
 
-    expect(() => type.deserialize("some invalid ciphertext")).toThrow(DecryptionError);
+    expect(() => type.deserialize("some invalid ciphertext")).toThrow(Decryption);
   });
 
   it("deterministic encryption is fixed by default: it will always use the oldest scheme to encrypt data", () => {
@@ -294,7 +294,7 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
     const type = modelClass._attributeDefinitions.get("name")?.type as EncryptedAttributeType;
     expect(type.previousTypes).toHaveLength(1);
     expect(type.deserialize("cipher_nondet")).toBe("STEPHEN KING");
-    expect(() => type.deserialize("cipher_det")).toThrow(DecryptionError);
+    expect(() => type.deserialize("cipher_det")).toThrow(Decryption);
   });
 
   it("deterministic encryption will use the newest encryption scheme to encrypt data when setting it to { fixed: false }", () => {
@@ -410,7 +410,7 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
     // Only the deterministic global previous scheme is wired in.
     expect(type.previousTypes).toHaveLength(1);
     expect(type.deserialize("cipher_det")).toBe("STEPHEN KING");
-    expect(() => type.deserialize("cipher_nondet")).toThrow(DecryptionError);
+    expect(() => type.deserialize("cipher_nondet")).toThrow(Decryption);
   });
 });
 

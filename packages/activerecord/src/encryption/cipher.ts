@@ -6,7 +6,7 @@
  */
 
 import { Aes256Gcm as AesGcmCipher } from "./cipher/aes256-gcm.js";
-import { DecryptionError } from "./errors.js";
+import { Decryption } from "./errors.js";
 import { Message } from "./message.js";
 
 export class Cipher {
@@ -32,18 +32,18 @@ export class Cipher {
 
   /** @internal */
   private tryToDecryptWithEach(encryptedMessage: Message, { keys }: { keys: string[] }): Buffer {
-    if (keys.length === 0) throw new DecryptionError("No decryption keys provided");
+    if (keys.length === 0) throw new Decryption("No decryption keys provided");
     let lastError: unknown;
     for (let i = 0; i < keys.length; i++) {
       try {
         return this.cipherFor(keys[i]).decrypt(encryptedMessage);
       } catch (e) {
-        if (!(e instanceof DecryptionError)) throw e; // integrity/config errors propagate immediately
+        if (!(e instanceof Decryption)) throw e; // integrity/config errors propagate immediately
         lastError = e;
       }
     }
     const msg = lastError instanceof Error ? lastError.message : String(lastError);
-    throw new DecryptionError(msg);
+    throw new Decryption(msg);
   }
 
   /** @internal */

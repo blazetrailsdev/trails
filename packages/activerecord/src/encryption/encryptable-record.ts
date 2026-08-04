@@ -21,13 +21,9 @@ import { encryptionHooks } from "../encryption-hooks.js";
  * @internal
  */
 export function globalPreviousSchemesFor(scheme: Scheme): Scheme[] {
-  const config = Configurable.config;
-  const allSchemeOptions: SchemeOptions[] = [...config.previousSchemes];
-
-  return allSchemeOptions
-    .map((opts) => new Scheme(opts))
-    .filter((prev) => scheme.isCompatibleWith(prev))
-    .map((prev) => scheme.merge(prev));
+  return Configurable.config.previousSchemes
+    .filter((previousScheme) => scheme.isCompatibleWith(previousScheme))
+    .map((previousScheme) => scheme.merge(previousScheme));
 }
 
 /**

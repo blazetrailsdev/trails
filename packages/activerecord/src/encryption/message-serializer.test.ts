@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { MessageSerializer } from "./message-serializer.js";
 import { Message } from "./message.js";
-import { DecryptionError, ForbiddenClass } from "./errors.js";
+import { Decryption, ForbiddenClass } from "./errors.js";
 
 describe("ActiveRecord::Encryption::MessageSerializerTest", () => {
   it("serializes messages", () => {
@@ -47,17 +47,17 @@ describe("ActiveRecord::Encryption::MessageSerializerTest", () => {
 
   it("detects random JSON data and raises a decryption error", () => {
     const serializer = new MessageSerializer();
-    expect(() => serializer.load("[1,2,3]")).toThrow(DecryptionError);
+    expect(() => serializer.load("[1,2,3]")).toThrow(Decryption);
   });
 
   it("detects random JSON hashes and raises a decryption error", () => {
     const serializer = new MessageSerializer();
-    expect(() => serializer.load('{"foo":"bar"}')).toThrow(DecryptionError);
+    expect(() => serializer.load('{"foo":"bar"}')).toThrow(Decryption);
   });
 
   it("detects JSON hashes with a 'p' key that is not encoded in base64", () => {
     const serializer = new MessageSerializer();
-    expect(() => serializer.load('{"p":"aGVsbG8$","h":{}}')).toThrow(DecryptionError);
+    expect(() => serializer.load('{"p":"aGVsbG8$","h":{}}')).toThrow(Decryption);
   });
 
   it("raises a TypeError when trying to deserialize other data types", () => {
@@ -99,6 +99,6 @@ describe("ActiveRecord::Encryption::MessageSerializerTest", () => {
         nested2: { p: Buffer.from("inner2").toString("base64"), h: {} },
       },
     });
-    expect(() => serializer.load(data)).toThrow(DecryptionError);
+    expect(() => serializer.load(data)).toThrow(Decryption);
   });
 });

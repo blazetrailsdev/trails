@@ -91,6 +91,19 @@ describe("Date", () => {
     expect(() => RubyDate.parse("2007366")).toThrow("invalid date");
   });
 
+  it("raises when no combination of frags is there, as rt__valid_date_frags_p answers nil", () => {
+    for (const str of ["10:30", "not a date"]) {
+      const parts = RubyDate._parse(str);
+      expect([str, parts.jd, parts.year, parts.cwyear]).toEqual([
+        str,
+        undefined,
+        undefined,
+        undefined,
+      ]);
+      expect(() => RubyDate.parse(str)).toThrow("invalid date");
+    }
+  });
+
   it("reads a narrow run followed by a fraction as a time of day, not a date", () => {
     expect(() => RubyDate.parse("07.2008")).toThrow("invalid date");
   });

@@ -5,11 +5,7 @@ import type { EncryptorLike } from "./encryptor.js";
 import type { WrappedType } from "./wrapped-type.js";
 import { getEncryptionContext } from "./context.js";
 import { Configurable } from "./configurable.js";
-import {
-  Encoding as EncodingError,
-  Decryption as DecryptionError,
-  Base as BaseEncryptionError,
-} from "./errors.js";
+import { Encoding as EncodingError, Decryption, Base } from "./errors.js";
 import { isRubyTruthy } from "../ruby-truthy.js";
 import { NullEncryptor } from "./null-encryptor.js";
 import {
@@ -263,7 +259,7 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
         return this.encryptor.decrypt(ciphertext, this.decryptionOptions());
       });
     } catch (error) {
-      if (!(error instanceof BaseEncryptionError)) throw error;
+      if (!(error instanceof Base)) throw error;
       if (this._effectivePreviousSchemes().length === 0)
         return this.handleDeserializeError(error, value);
       return this.tryToDeserializeWithPreviousEncryptedTypes(value);
@@ -281,7 +277,7 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
       try {
         return prev[i].deserialize(value);
       } catch (error) {
-        if (!(error instanceof BaseEncryptionError)) throw error;
+        if (!(error instanceof Base)) throw error;
         if (i === prev.length - 1) return this.handleDeserializeError(error, value);
       }
     }
@@ -289,8 +285,8 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
   }
 
   /** @internal */
-  private handleDeserializeError(error: BaseEncryptionError, value: unknown): unknown {
-    if (error instanceof DecryptionError && this.supportUnencryptedData) return value;
+  private handleDeserializeError(error: Base, value: unknown): unknown {
+    if (error instanceof Decryption && this.supportUnencryptedData) return value;
     throw error;
   }
 

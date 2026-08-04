@@ -2,20 +2,6 @@
   {
     "package": "activerecord",
     "tsFile": "relation/batches.ts",
-    "rubyName": "act_on_ignored_order",
-    "call": "logger",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/batches.ts",
-    "rubyName": "act_on_ignored_order",
-    "call": "model",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/batches.ts",
     "rubyName": "batch_on_unloaded_relation",
     "call": "any?",
     "reason": "Rails' `values.flatten.any?(nil)` guard raises ArgumentError when a custom select clause omits a cursor column; that nil-cursor check is not ported yet and is tracked separately from the empty_scope/use_ranges convergence."

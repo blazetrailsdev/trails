@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Aes256Gcm as Cipher } from "./aes256-gcm.js";
 import { MessageSerializer } from "../message-serializer.js";
 import { Message } from "../message.js";
-import { DecryptionError, EncryptedContentIntegrity } from "../errors.js";
+import { Decryption, EncryptedContentIntegrity } from "../errors.js";
 import * as crypto from "crypto";
 import { inspect } from "util";
 
@@ -121,7 +121,7 @@ describe("ActiveRecord::Encryption::Aes256GcmTest", () => {
     // here is a genuine decryption failure (wrong key), which Cipher#tryToDecryptWithEach
     // retries against the next key — it must NOT surface as EncryptedContentIntegrity.
     const message = new Cipher(generateKey()).encrypt("hello world");
-    expect(() => new Cipher(generateKey()).decrypt(message)).toThrow(DecryptionError);
+    expect(() => new Cipher(generateKey()).decrypt(message)).toThrow(Decryption);
   });
 
   it("inspect_does not show secrets", () => {

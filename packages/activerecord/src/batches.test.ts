@@ -3,8 +3,9 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  * Mirrors: activerecord/test/cases/batches_test.rb
  */
-import { describe, it, expect } from "vitest";
-import { Relation } from "./index.js";
+import { describe, it, expect, vi } from "vitest";
+import { Relation, Base } from "./index.js";
+import { Batches } from "./relation/batches.js";
 import { ActiveRecord } from "./ar-config.js";
 import { fixtures } from "./test-fixtures.js";
 import { assertQueriesCount, assertQueriesMatch } from "./testing/query-assertions.js";
@@ -138,12 +139,25 @@ describe("EachTest", () => {
   });
 
   it("warn if order scope is set", async () => {
-    for await (const _post of Post.order("title").findEach({})) {
+    const previousLogger = Base.logger;
+    Base.logger = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    try {
+      for await (const _post of Post.order("title").findEach({})) {
+      }
+      expect(Base.logger.warn).toHaveBeenCalledWith(Batches.ORDER_IGNORE_MESSAGE);
+    } finally {
+      Base.logger = previousLogger;
     }
   });
 
   it("logger not required", async () => {
-    for await (const _post of Post.order("legacy_comments_count DESC").findEach({})) {
+    const previousLogger = Base.logger;
+    Base.logger = null;
+    try {
+      for await (const _post of Post.order("legacy_comments_count DESC").findEach({})) {
+      }
+    } finally {
+      Base.logger = previousLogger;
     }
   });
 

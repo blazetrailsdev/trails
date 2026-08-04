@@ -1,7 +1,9 @@
 import { Config } from "./config.js";
 import { Contexts } from "./contexts.js";
 import { Cipher } from "./cipher.js";
+import { clearDefaultKeyProviderCache } from "./default-key-provider-cache.js";
 import type { EncryptorLike } from "./encryptor.js";
+import type { SchemeOptions } from "./scheme.js";
 
 type DeclarationListener = (klass: any, name: string) => void;
 
@@ -54,7 +56,7 @@ export class Configurable {
     primaryKey?: string | string[];
     deterministicKey?: string;
     keyDerivationSalt?: string;
-    previous?: Config["previousSchemes"];
+    previous?: SchemeOptions[];
     [key: string]: unknown;
   }): void {
     const config = this.config;
@@ -122,3 +124,8 @@ export class Configurable {
     }
   }
 }
+
+// Registered here, not in default-key-provider-cache.ts: Config constructs a
+// Scheme (config.rb:65-67), so a Configurable import there closes an import
+// cycle through config.ts that runs before this class is defined.
+Configurable.onConfigure(clearDefaultKeyProviderCache);
