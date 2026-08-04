@@ -269,16 +269,6 @@ export interface SchemaNamespaceStatements {
   createSchema(name: string, options?: { force?: boolean; ifNotExists?: boolean }): Promise<void>;
 }
 
-/** @internal */
-function expandIndexOption<T>(
-  opt: Record<string, T> | T,
-  columns: string | string[],
-): Record<string, T> {
-  if (typeof opt === "object" && opt !== null) return opt as Record<string, T>;
-  const names = Array.isArray(columns) ? columns : [columns];
-  return Object.fromEntries(names.map((c) => [c, opt])) as Record<string, T>;
-}
-
 /**
  * The pool surface the schema_migrations statements reach for. Rails calls
  * `pool.schema_migration` / `pool.migration_context` unguarded
@@ -450,24 +440,10 @@ export class SchemaStatements {
     await this.execute(await this.schemaCreation.accept(td));
 
     if (!this.supportsIndexesInCreate?.()) {
-      for (const idx of td.indexes) {
-        await this.addIndex(name, idx.columns, {
-          unique: idx.unique,
-          name: idx.name,
-          where: idx.where,
-          order: expandIndexOption(idx.orders, idx.columns),
-          using: idx.using,
-          type: idx.type,
-          comment: idx.comment,
-          length: expandIndexOption(idx.lengths, idx.columns),
-          opclass: expandIndexOption(idx.opclasses, idx.columns),
-          include: idx.include,
-          nullsNotDistinct: idx.nullsNotDistinct,
-          algorithm: idx.algorithm,
-          // Rails overrides any per-index `if_not_exists:` with the table
-          // definition's, since it splats `**index_options` first.
-          ifNotExists: td.ifNotExists,
-        });
+      for (const [columnName, indexOptions] of td.indexes) {
+        // Rails overrides any per-index `if_not_exists:` with the table
+        // definition's, since it splats `**index_options` first.
+        await this.addIndex(name, columnName, { ...indexOptions, ifNotExists: td.ifNotExists });
       }
     }
 

@@ -305,10 +305,11 @@ export class ConnectionPool implements ReapablePool {
    * defaults to a resolved promise for pools whose adapterFactory is
    * supplied directly.
    *
-   * @noRailsEquivalent CONVERGEABLE (story: retire-connection-pool-async-resolution-shims).
-   * Rails' `require` is synchronous, so
-   * `establish_connection` returns with the adapter class resolvable;
-   * trails resolves adapters via dynamic `import()`. See above.
+   * @internal Adapter-loading plumbing, not a Rails surface: Rails' `require` is
+   * synchronous, so `establish_connection` returns with the adapter class
+   * already resolvable. Retiring this field is part of the pool async/sync
+   * surface convergence (it disappears once adapter resolution no longer
+   * straddles a sync entry point), not a permanent exception.
    */
   adapterReady: Promise<unknown> = Promise.resolve();
 
@@ -352,9 +353,7 @@ export class ConnectionPool implements ReapablePool {
     this.checkoutTimeout = this.dbConfig.checkoutTimeout;
     this._idleTimeout = this.dbConfig.idleTimeout;
     this._available = new ConnectionLeasingQueue();
-    this._cacheConfig = new ConnectionPoolConfiguration(
-      normalizeQueryCacheConfig(this.dbConfig.queryCache),
-    );
+    this._cacheConfig = new ConnectionPoolConfiguration(this.dbConfig.queryCache);
 
     this.reaper = new Reaper(this, this.dbConfig.reapingFrequency ?? 0);
     this.reaper.run();
@@ -538,34 +537,6 @@ export class ConnectionPool implements ReapablePool {
 
   get dirtiesQueryCache(): boolean {
     return this._cacheConfig.dirtiesQueryCache;
-  }
-
-  /**
-   * True when this pool's query cache is disabled *by configuration*, rather
-   * than merely not enabled right now.
-   *
-   * Rails has no such reader: `ActiveRecord::QueryCache.run` asks inline with
-   * `next if pool.db_config&.query_cache == false`
-   * (`active_record/query_cache.rb:39` — the top-level file, not
-   * `connection_adapters/abstract/query_cache.rb`, whose `db_config&.query_cache`
-   * at `:122` is a different case-statement computing the cache max size).
-   *
-   * Deliberately *not* converged to that literal comparison. `dbConfig.queryCache`
-   * is still readable, but trails' public config type additionally accepts the
-   * `"enabled"` / `"disabled"` string aliases that Rails never sees as raw
-   * values, and `normalizeQueryCacheConfig` maps `"disabled"` → `false`. Asking
-   * Rails' `dbConfig.queryCache === false` directly would therefore stop
-   * skipping a pool configured `queryCache: "disabled"`. The predicate has to be
-   * asked of the *normalized* value, which is what this getter delegates to.
-   * Consumed by `QueryCache.run`'s skip guard in query-cache.ts.
-   *
-   * @noRailsEquivalent CONVERGEABLE (story: retire-connection-pool-async-resolution-shims).
-   * Rails asks `pool.db_config&.query_cache == false`
-   * inline; trails' config also accepts a "disabled" alias, so the
-   * predicate must read the normalized value. See above.
-   */
-  get queryCacheDisabled(): boolean {
-    return this._cacheConfig.queryCacheDisabled;
   }
 
   enableQueryCache<T>(fn: () => T | Promise<T>): Promise<T> {
@@ -1493,26 +1464,6 @@ export class ConnectionPool implements ReapablePool {
     }
     return this._leases.get(String(executionContextId()));
   }
-}
-
-/**
- * Map `DatabaseConfig#queryCache` to the shape ConnectionPoolConfiguration
- * expects. Rails' initializer case-matches on `0/false/Integer/nil`; trails'
- * public config type additionally documents the "enabled"/"disabled" string
- * aliases, which Rails would never see as raw values. Only those two are
- * translated ("disabled" → `false`, "enabled" → the `nil`/default branch);
- * every other string is passed through untouched. Rails' `case
- * db_config&.query_cache` has NO String branch, so any surviving string (e.g.
- * `"unlimited"`, or a URL like `?query_cache=42` that stays the string `"42"`)
- * falls through to a `nil` (unbounded) max size — NOT DEFAULT_SIZE — and, unlike
- * `false`, does NOT mark the pool disabled (`db_config.query_cache == false`).
- */
-function normalizeQueryCacheConfig(raw: unknown): number | false | null | string {
-  if (raw === "disabled" || raw === false) return false;
-  if (raw === "enabled" || raw === true || raw == null) return null;
-  if (typeof raw === "number") return raw;
-  if (typeof raw === "string") return raw;
-  return null;
 }
 
 function isTransactionAware(conn: DatabaseAdapter): conn is TransactionAwareConnection {

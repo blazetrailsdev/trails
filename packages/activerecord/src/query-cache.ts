@@ -28,7 +28,9 @@ export { QueryCacheStore };
  */
 export interface QueryCacheRunTarget {
   readonly queryCacheEnabled: boolean;
-  readonly queryCacheDisabled?: boolean;
+  /** Rails asks `pool.db_config&.query_cache == false` (`query_cache.rb:39`). The
+   * connection-level `QueryCache` mixin has no `db_config`, hence optional. */
+  readonly dbConfig?: { readonly queryCache?: unknown } | null;
   enableQueryCacheBang(): void;
 }
 
@@ -64,7 +66,7 @@ export class QueryCache {
   static run<T extends QueryCacheRunTarget>(targets: T[]): T[] {
     const notAlreadyEnabled = targets.filter((target) => !target.queryCacheEnabled);
     for (const target of notAlreadyEnabled) {
-      if (target.queryCacheDisabled) continue;
+      if (target.dbConfig?.queryCache === false) continue;
       target.enableQueryCacheBang();
     }
     return notAlreadyEnabled;

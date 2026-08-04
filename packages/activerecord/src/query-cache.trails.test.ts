@@ -145,15 +145,12 @@ describe("cacheNotificationInfo payload (trails)", () => {
 describe("run returns not-already-enabled targets for complete (trails)", () => {
   class FakeTarget {
     queryCacheEnabled = false;
-    disabled: boolean;
+    dbConfig: { queryCache?: unknown };
     enabledCount = 0;
     disabledCount = 0;
     clearedCount = 0;
     constructor(disabledByConfig = false) {
-      this.disabled = disabledByConfig;
-    }
-    get queryCacheDisabled(): boolean {
-      return this.disabled;
+      this.dbConfig = { queryCache: disabledByConfig ? false : undefined };
     }
     enableQueryCacheBang(): void {
       this.enabledCount++;

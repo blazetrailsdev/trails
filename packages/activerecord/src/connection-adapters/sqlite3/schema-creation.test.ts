@@ -1,6 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { SchemaCreation } from "./schema-creation.js";
-import { ForeignKeyDefinition, CreateIndexDefinition } from "../abstract/schema-definitions.js";
+import {
+  ForeignKeyDefinition,
+  CreateIndexDefinition,
+  IndexDefinition,
+} from "../abstract/schema-definitions.js";
 import { TableDefinition } from "./schema-definitions.js";
 import { schemaConn } from "../../support/schema-conn.js";
 
@@ -33,12 +37,10 @@ describe("SQLite3::SchemaCreation", () => {
   });
 
   it("omits USING clause from CREATE INDEX (no index-using support)", async () => {
-    const td = new TableDefinition("articles", {
-      adapter: schemaConn("sqlite"),
-      adapterName: "sqlite",
+    const index = new IndexDefinition("articles", "index_articles_on_title", false, ["title"], {
+      using: "btree",
     });
-    td.index(["title"], { using: "btree" });
-    expect(await sc.accept(new CreateIndexDefinition(td.indexes[0]))).not.toContain("USING");
+    expect(await sc.accept(new CreateIndexDefinition(index))).not.toContain("USING");
   });
 
   it("appends COLLATE clause when collation option is set", async () => {

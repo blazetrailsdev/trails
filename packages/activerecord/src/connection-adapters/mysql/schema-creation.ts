@@ -11,6 +11,7 @@ import type {
   AddColumnOptions,
   ColumnType,
   AddColumnDefinition,
+  AddIndexOptions,
 } from "../abstract/schema-definitions.js";
 import {
   assertSafeMysqlIdentifier,
@@ -60,6 +61,13 @@ export interface VisitorHostAdapter extends SchemaQuoter {
   supportsIndexSortOrder(): boolean;
   isMariadb(): boolean;
   quote(value: unknown): string;
+  /** Rails' `index_in_create` builds the IndexDefinition through `@conn.add_index_options`
+   * (mysql/schema_creation.rb:99). */
+  addIndexOptions(
+    tableName: string,
+    columnName: string | string[],
+    options?: AddIndexOptions,
+  ): Promise<[IndexDefinition, string | undefined, boolean]>;
 }
 
 export class SchemaCreation extends AbstractSchemaCreation {
@@ -231,7 +239,9 @@ export class SchemaCreation extends AbstractSchemaCreation {
     const primaryKeys = o.primaryKeys();
     if (primaryKeys) statements.push(this.visitPrimaryKeyDefinition(primaryKeys));
     if (this.supportsIndexesInCreate()) {
-      for (const idx of o.indexes) statements.push(this.visitIndexDefinition(idx, false));
+      for (const [columnName, options] of o.indexes) {
+        statements.push(await this.indexInCreate(o.tableName, columnName, options));
+      }
     }
     if (this.useForeignKeys()) {
       for (const fk of o.foreignKeys) statements.push(this.visitForeignKeyDefinition(fk));
@@ -379,19 +389,12 @@ export class SchemaCreation extends AbstractSchemaCreation {
   }
 
   /** @internal */
-  protected indexInCreate(
+  protected async indexInCreate(
     tableName: string,
     columnName: string | string[],
-    options: Record<string, unknown> = {},
-  ): string {
-    const cols = Array.isArray(columnName) ? columnName : [columnName];
-    const name =
-      (options.name as string | undefined) ?? `index_${tableName}_on_${cols.join("_and_")}`;
-    const index = new IndexDefinition(tableName, name, !!options.unique, cols, {
-      using: options.using as string | undefined,
-      comment: options.comment as string | undefined,
-      type: options.type as string | undefined,
-    });
+    options: AddIndexOptions = {},
+  ): Promise<string> {
+    const [index] = await this.adapter.addIndexOptions(tableName, columnName, options);
     return this.visitIndexDefinition(index, false);
   }
 
