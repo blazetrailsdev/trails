@@ -7,6 +7,7 @@
 
 import { Temporal } from "@js-temporal/polyfill";
 import { describe, expect, it } from "vitest";
+import { ArgumentError } from "./date.js";
 import { Time } from "./time.js";
 
 describe("Time", () => {
@@ -16,20 +17,23 @@ describe("Time", () => {
     expect(time.strftime("%Y-%m-%d %H:%M:%S %z %Z")).toBe("2008-03-01 06:00:00 +0000 UTC");
   });
 
-  it("Time.new builds a time in the named zone", () => {
-    const time = new Time(2008, 3, 1, 6, 0, 0, "America/New_York");
+  it("Time.new builds a time at the given offset", () => {
+    const time = new Time(2008, 3, 1, 6, 0, 0, "-05:00");
     expect(time.hour).toBe(6);
     expect(time.utcOffset).toBe(-5 * 3600);
-    expect(time.strftime("%Y-%m-%d %H:%M:%S %z %Z")).toBe("2008-03-01 06:00:00 -0500 EST");
+    // MRI answers no abbreviation for an offset-built time, so `%Z` is empty.
+    expect(time.zone).toBeNull();
+    expect(time.strftime("%Y-%m-%d %H:%M:%S %z %Z")).toBe("2008-03-01 06:00:00 -0500 ");
   });
 
-  it("Time.new accepts Ruby's offset spelling for the zone", () => {
-    const time = new Time(2008, 3, 1, 6, 0, 0, "+09:00");
-    expect(time.utcOffset).toBe(9 * 3600);
-    // Ruby answers no abbreviation for an offset-built time, and prints the
-    // offset for `%Z`.
-    expect(time.zone).toBeNull();
-    expect(time.strftime("%z %Z")).toBe("+0900 +09:00");
+  it("Time.new takes a military zone letter", () => {
+    expect(new Time(2008, 3, 1, 6, 0, 0, "K").utcOffset).toBe(10 * 3600);
+    expect(new Time(2008, 3, 1, 6, 0, 0, "Y").utcOffset).toBe(-12 * 3600);
+    expect(new Time(2008, 3, 1, 6, 0, 0, "Z").utcOffset).toBe(0);
+  });
+
+  it("Time.new rejects a zone name", () => {
+    expect(() => new Time(2008, 3, 1, 6, 0, 0, "America/New_York")).toThrow(ArgumentError);
   });
 
   it("Time.new defaults to the local zone", () => {

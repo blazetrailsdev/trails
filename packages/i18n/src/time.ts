@@ -8,7 +8,26 @@
  */
 
 import { Temporal } from "@js-temporal/polyfill";
-import { strftime } from "./date.js";
+import { ArgumentError, strftime } from "./date.js";
+
+/**
+ * The `utc_offset` argument MRI's `Time.new` accepts, resolved to something
+ * `Temporal` takes: `"UTC"`, an offset, or one of the military zone letters
+ * (`A`..`I` = +1..+9, `K`..`M` = +10..+12, `N`..`Y` = -1..-12, `Z` = UTC).
+ * Anything else raises, with MRI's message — an IANA name like
+ * `"America/New_York"` is not a `Time.new` zone, it is what a `TimeZone`
+ * object wraps.
+ */
+function utcOffsetArgument(zone: string): string {
+  if (zone === "UTC" || /^[+-]\d{2}:\d{2}(:\d{2})?$/.test(zone)) return zone;
+  if (/^[A-IK-Z]$/.test(zone)) {
+    const code = zone.charCodeAt(0);
+    const hours = zone === "Z" ? 0 : code <= 73 ? code - 64 : code <= 77 ? code - 65 : 77 - code;
+    const sign = hours < 0 ? "-" : "+";
+    return `${sign}${String(Math.abs(hours)).padStart(2, "0")}:00`;
+  }
+  throw new ArgumentError('"+HH:MM", "-HH:MM", "UTC" or "A".."I","K".."Z" expected for utc_offset');
+}
 
 /**
  * @noRailsEquivalent PERMANENT — Ruby core `::Time`. Rails never defines the
@@ -28,10 +47,9 @@ export class Time {
 
   /**
    * Ruby `Time.new(year, month, day, hour = 0, min = 0, sec = 0, zone = nil)`,
-   * which builds a time in the *local* zone unless `zone` names another one.
-   * `Time.utc` is the UTC entry point, as in Ruby. `zone` takes the spellings
-   * Ruby's does — an offset (`"+09:00"`) or a zone name — because `Temporal`
-   * resolves both.
+   * which builds a time in the *local* zone unless `zone` gives an offset.
+   * `Time.utc` is the UTC entry point, as in Ruby, and `zone` takes only the
+   * spellings MRI's `utc_offset` argument takes — see `utcOffsetArgument`.
    */
   constructor(
     year: number,
@@ -43,7 +61,9 @@ export class Time {
     zone: string | null = null,
   ) {
     this.#plain = new Temporal.PlainDateTime(year, month, day, hour, min, sec);
-    this.#zoned = this.#plain.toZonedDateTime(zone ?? Temporal.Now.timeZoneId());
+    this.#zoned = this.#plain.toZonedDateTime(
+      zone == null ? Temporal.Now.timeZoneId() : utcOffsetArgument(zone),
+    );
   }
 
   get year(): number {
@@ -87,7 +107,7 @@ export class Time {
    * `Time#zone` is the zone's abbreviation — `"UTC"` for a `Time.utc`, `"PDT"`
    * for a local summer time — not an offset, which is what `::DateTime#zone`
    * answers instead. A time built from an offset rather than a zone has no
-   * abbreviation to answer and Ruby returns `nil`; `%Z` then prints the offset.
+   * abbreviation to answer and Ruby returns `nil`, which `%Z` prints as "".
    */
   get zone(): string | null {
     if (/^[+-]\d{2}:?\d{2}$/.test(this.#zoned.timeZoneId)) return null;
@@ -114,7 +134,7 @@ export class Time {
         hour: this.hour,
         min: this.min,
         sec: this.sec,
-        zone: this.zone ?? this.#zoned.offset,
+        zone: this.zone ?? "",
         zoneOffset: this.#zoned.offset.replace(":", ""),
       },
       format,
