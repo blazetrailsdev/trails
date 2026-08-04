@@ -805,6 +805,39 @@ describe("buildCreateTableDefinition routing", () => {
     expect(td.options).toBe("ENGINE=InnoDB");
   });
 
+  it("extracts _skipValidateOptions into the table definition options", () => {
+    const createTableDefinition = vi.fn(
+      (name: string, options: Record<string, unknown>) => new TableDefinition(name, options as any),
+    );
+    const ss = makeStatements({ createTableDefinition });
+
+    const td = ss.buildCreateTableDefinition("users", {
+      id: "integer",
+      _skipValidateOptions: true,
+    });
+
+    expect(createTableDefinition.mock.calls[0]?.[1]).toMatchObject({ _skipValidateOptions: true });
+    // Rails' `extract!` deletes what it returns, so the second extraction never
+    // sees the key (schema_statements.rb:334-335).
+    expect(pkColumn(td)?.options).not.toHaveProperty("_skipValidateOptions");
+  });
+
+  it("carries autoIncrement to the primary key only where valid_primary_key_options lists it", () => {
+    const abstract = makeStatements();
+    const mysql = makeStatements({
+      validPrimaryKeyOptions: () => ["limit", "unsigned", "autoIncrement"],
+    });
+
+    expect(
+      pkColumn(abstract.buildCreateTableDefinition("users", { id: "integer", autoIncrement: true }))
+        ?.options,
+    ).not.toHaveProperty("autoIncrement");
+    expect(
+      pkColumn(mysql.buildCreateTableDefinition("users", { id: "integer", autoIncrement: true }))
+        ?.options,
+    ).toMatchObject({ autoIncrement: true });
+  });
+
   it("expands the hash form of id onto the primary key column", () => {
     const ss = makeStatements();
 
