@@ -1150,16 +1150,19 @@ export const UNPORTED_FILES: UnportedFile[] = [
   },
   {
     pattern: "backend/cache.rb",
+    testFile: "backend/cache_test.rb",
     package: "i18n",
     reason: "Pre-1.0: optional backend mixin — caches lookups through ActiveSupport::Cache.",
   },
   {
     pattern: "backend/cache_file.rb",
+    testFile: "backend/cache_file_test.rb",
     package: "i18n",
     reason: "Pre-1.0: optional backend mixin — caches parsed translation files on disk.",
   },
   {
     pattern: "backend/cascade.rb",
+    testFile: "backend/cascade_test.rb",
     package: "i18n",
     reason: "Pre-1.0: optional backend mixin — cascading key lookup (`foo.bar.baz` → `foo.baz`).",
   },
@@ -1173,6 +1176,7 @@ export const UNPORTED_FILES: UnportedFile[] = [
   },
   {
     pattern: "backend/interpolation_compiler.rb",
+    testFile: "backend/interpolation_compiler_test.rb",
     package: "i18n",
     reason:
       "Pre-1.0: optional backend mixin — compiles interpolations into Ruby " +
@@ -1180,16 +1184,19 @@ export const UNPORTED_FILES: UnportedFile[] = [
   },
   {
     pattern: "backend/lazy_loadable.rb",
+    testFile: "backend/lazy_loadable_test.rb",
     package: "i18n",
     reason: "Pre-1.0: optional backend mixin — defers translation-file loading until first lookup.",
   },
   {
     pattern: "backend/memoize.rb",
+    testFile: "backend/memoize_test.rb",
     package: "i18n",
     reason: "Pre-1.0: optional backend mixin — memoizes lookups per locale.",
   },
   {
     pattern: "backend/metadata.rb",
+    testFile: "backend/metadata_test.rb",
     package: "i18n",
     reason:
       "Pre-1.0: optional backend mixin — attaches lookup metadata onto the " +
@@ -1197,6 +1204,53 @@ export const UNPORTED_FILES: UnportedFile[] = [
   },
   {
     pattern: "backend/pluralization.rb",
+    testFile: "backend/pluralization_test.rb",
+    package: "i18n",
+    reason:
+      "Pre-1.0: optional backend mixin — pluralization via per-locale rule procs in the data.",
+  },
+  {
+    testFile: "backend/pluralization_fallback_test.rb",
+    package: "i18n",
+    reason:
+      "Pre-1.0: optional backend mixin — pluralization via per-locale rule procs in the data. " +
+      "Suite for the deferred `backend/pluralization.rb` composed with Fallbacks.",
+  },
+  {
+    testFile: "backend/pluralization_scope_test.rb",
+    package: "i18n",
+    reason:
+      "Pre-1.0: optional backend mixin — pluralization via per-locale rule procs in the data. " +
+      "Suite for the deferred `backend/pluralization.rb` looked up under a scope.",
+  },
+  // --- i18n: api/ suites that install a deferred backend ---
+  // Each is one "make sure we use <X>" case asserting `I18n.backend.class`;
+  // the rest of the file is the shared `I18n::Tests::*` modules re-run against
+  // that backend. With the backend deferred there is nothing to install.
+  {
+    testFile: "api/all_features_test.rb",
+    package: "i18n",
+    reason:
+      "Pre-1.0: optional backend mixins — a Chain of every deferred mixin " +
+      "(Cascade, Memoize, Metadata, Pluralization, Fallbacks) at once.",
+  },
+  {
+    testFile: "api/cascade_test.rb",
+    package: "i18n",
+    reason: "Pre-1.0: optional backend mixin — cascading key lookup (`foo.bar.baz` → `foo.baz`).",
+  },
+  {
+    testFile: "api/lazy_loadable_test.rb",
+    package: "i18n",
+    reason: "Pre-1.0: optional backend mixin — defers translation-file loading until first lookup.",
+  },
+  {
+    testFile: "api/memoize_test.rb",
+    package: "i18n",
+    reason: "Pre-1.0: optional backend mixin — memoizes lookups per locale.",
+  },
+  {
+    testFile: "api/pluralization_test.rb",
     package: "i18n",
     reason:
       "Pre-1.0: optional backend mixin — pluralization via per-locale rule procs in the data.",
@@ -1206,11 +1260,20 @@ export const UNPORTED_FILES: UnportedFile[] = [
     // Deliberately broad: covers `gettext.rb`, `gettext/*` and the
     // `backend/gettext.rb` mixin in one entry.
     pattern: "gettext",
+    testFile: "gettext/",
     package: "i18n",
     reason:
       "Pre-1.0: gettext .po support — the catalogue parser, the `_`/`n_`/`s_` " +
       "helpers, and the backend mixin that loads .po files. A Ruby toolchain " +
       "concern with no trails consumer; Rails' own I18n usage never touches it.",
+  },
+  {
+    // Lives at test/i18n/, outside the `gettext/` prefix above.
+    testFile: "gettext_plural_keys_test.rb",
+    package: "i18n",
+    reason:
+      "Pre-1.0: gettext .po support — exercises `I18n::Gettext.plural_keys`, " +
+      "part of the deferred gettext surface.",
   },
   {
     pattern: "locale/tag/rfc4646.rb",
@@ -1222,6 +1285,7 @@ export const UNPORTED_FILES: UnportedFile[] = [
   },
   {
     pattern: "middleware.rb",
+    testFile: "i18n/middleware_test.rb",
     package: "i18n",
     reason:
       "Rack middleware that resets `I18n.locale` after each request. trails " +
