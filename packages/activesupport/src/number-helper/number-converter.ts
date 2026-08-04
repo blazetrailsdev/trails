@@ -125,9 +125,6 @@ export abstract class NumberConverter<TOptions extends NumberFormatOptions = Num
   protected i18nFormatOptions(): Record<string, unknown> {
     const locale = (this.opts as Record<string, unknown>).locale as string | undefined;
     const raw = I18n.translate("number.format", { locale, default: {} });
-    // Rails merges the payload straight in (number_converter.rb:157) because the
-    // store keys and the option keys are the same symbols; ours are snake_case
-    // in the store and camelCase in the options, so camelize at the boundary.
     const options: Record<string, unknown> = {};
     if (typeof raw === "object" && raw !== null && !Array.isArray(raw)) {
       for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {

@@ -66,9 +66,6 @@ export function toSentence(
       locale: options.locale ?? null,
       default: {},
     }) as Record<string, string>;
-    // Rails merges the payload straight in (conversions.rb:70) because the
-    // store keys and the option keys are the same symbols; ours are snake_case
-    // in the store and camelCase in the options, so camelize at the boundary.
     for (const [k, v] of Object.entries(i18nConnectors)) {
       defaultConnectors[camelize(k, "lower")] = v;
     }

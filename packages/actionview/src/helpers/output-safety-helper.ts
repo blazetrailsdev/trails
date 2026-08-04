@@ -111,10 +111,6 @@ export function toSentence(array: unknown[], options: ToSentenceOptions = {}): S
     locale: options.locale ?? null,
     default: {},
   }) as Record<string, string>;
-  // Rails merges the payload straight in (output_safety_helper.rb:51) because
-  // the store keys and the option keys are the same symbols; ours are
-  // snake_case in the store and camelCase in the options, so camelize at the
-  // boundary.
   for (const [k, v] of Object.entries(i18nConnectors)) {
     defaultConnectors[camelize(k, "lower")] = v;
   }
