@@ -70,18 +70,21 @@ export class Flatten {
    * normalize_keys the flatten way. This method is significantly faster
    * and creates way less objects than the one at I18n.normalize_keys.
    * It also handles escaping the translation keys.
+   *
+   * Ruby's `separator ||= I18n.default_separator` defaults on `false` as well
+   * as `nil`, which is why the guard below is not a `??=`.
    */
   static normalizeFlatKeys(
     _locale: string,
     key: unknown,
     scope: unknown,
-    separator: string | null | undefined,
+    separator: string | false | null | undefined,
   ): string {
     let keys: unknown[] = [scope, key];
     keys = keys.flat(Infinity);
     keys = keys.filter((k) => k != null);
 
-    separator ??= defaultSeparator();
+    if (separator == null || separator === false) separator = defaultSeparator();
 
     if (separator !== FLATTEN_SEPARATOR) {
       const fromStr = `${FLATTEN_SEPARATOR}${separator}`;
@@ -108,7 +111,7 @@ export function normalizeFlatKeys(
   locale: string,
   key: unknown,
   scope: unknown,
-  separator: string | null | undefined,
+  separator: string | false | null | undefined,
 ): string {
   const flatKey = Flatten.normalizeFlatKeys(locale, key, scope, separator);
   return this.resolveLink(locale, flatKey);

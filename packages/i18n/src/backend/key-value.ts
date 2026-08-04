@@ -203,7 +203,12 @@ export class KeyValue extends Base {
     scope: unknown = [],
     options: TranslateOptions = EMPTY_HASH,
   ): unknown {
-    key = this.normalizeFlatKeys(locale, key, scope, options.separator as string);
+    key = this.normalizeFlatKeys(
+      locale,
+      key,
+      scope,
+      options.separator as string | false | undefined,
+    );
     const stored = this.store!.get(`${locale}.${key}`);
     const value: unknown = stored != null ? JSON.parse(stored) : stored;
 
