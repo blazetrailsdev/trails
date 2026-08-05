@@ -134,6 +134,246 @@ function gateRegex(yml: string, name: string): RegExp {
 }
 
 /**
+ * Gate reference for the `changes` job's `- id: filter` step.
+ *
+ * The rationale for every `*_RE` in that step lives here rather than beside it:
+ * the step is a single inline `run:` script under a hard GitHub Actions size
+ * limit, crossing it fails the WHOLE workflow at startup — zero jobs, no checks
+ * reported, no run created — and a comment costs exactly as many bytes as code.
+ * This file already executes that gate block verbatim (see `gateRunner`), so it
+ * is where the prose stays honest.
+ *
+ * Each entry is headed by the shell variable or line it documents.
+ *
+ *
+ *  base/head fallback + INFRA_RE
+ *  First push to a branch has a zero-SHA base; force-push may
+ *  rewrite history out from under us. In either case we can't
+ *  reliably compute a diff — fall back to running the full matrix.
+ *  activerecord_affected gates the three AR test jobs (sqlite,
+ *  postgres, mariadb). True when changes touch activerecord, its
+ *  runtime deps (arel/activemodel/activesupport/globalid), or any
+ *  cross-cutting file (lockfile, root tsconfig, vitest config,
+ *  shared scripts, this workflow). Push to main / schedule /
+ *  workflow_dispatch always force true. Pattern mirrors the
+ *  AR-touching set in scripts/parity/run.ts.
+ *  Cross-cutting paths force every per-package gate true. Anything
+ *  here affects all packages: workspace topology, root tooling
+ *  config, shared scripts, this workflow, composite actions.
+ *  The blanket `scripts/` below also sweeps up subtrees that are NOT
+ *  cross-cutting; INFRA_CARVEOUT_RE strips them back out — keep the
+ *  two in sync. Every carved subtree must still be named in the gate
+ *  of whichever job runs its tests, or a change confined to it runs
+ *  nothing; scripts/ci-suite-coverage.test.ts enforces that pairing.
+ *
+ *  AR_PKGS_RE
+ *  AR workspace deps: arel/activemodel/activesupport/globalid/
+ *  did-you-mean (per packages/activerecord/package.json). Also
+ *  consumes @blazetrails/trails-tsc at runtime via the tsc-wrapper
+ *  CLI + type-virtualization modules (see packages/activerecord/src/
+ *  tsc-wrapper, schema-columns-dump.test.ts), so trails-tsc changes
+ *  can fail AR vitest suites — include it in the gate.
+ *  activerecord-cli E2E suites run in the three AR DB jobs (its tests
+ *  exercise the CLI against real DBs), so cli source changes must also
+ *  flip activerecord_affected.
+ *
+ *  DB_ADAPTER_RE
+ *  db_adapter_affected gates nothing on its own: it is the opt-in that
+ *  runs the PG/MariaDB suites while a PR is still a draft, so a false
+ *  negative costs a later signal, never coverage. `abstract/` and
+ *  sql-classification.ts are in scope because that substrate breaks
+ *  one backend without naming it (the latter carries the PG cursor
+ *  statements in its read-only allowlist).
+ *
+ *  AP_PKGS_RE
+ *  actionpack_affected gates actionpack-tests. True for actionpack +
+ *  its runtime deps (actionview/activemodel/activesupport/rack/did-you-mean).
+ *
+ *  AV_PKGS_RE
+ *  actionview_affected gates the actionview step of leaf-tests.
+ *  ActionView's only
+ *  workspace dependency is activesupport (see actionview/package.json).
+ *
+ *  TRAILTIES_PKGS_RE
+ *  trailties_affected gates trailties-tests. Trailties consumes
+ *  actionpack/actionview/activerecord/rack/activesupport, so any of
+ *  their workspace upstreams also flips this on.
+ *
+ *  TRAILS_TSC_PKGS_RE
+ *  trails_tsc_affected gates the virtualized DX type tests, the
+ *  blocking trails-tsc-tests job, and trails-tsc-coverage.
+ *  Workspace consumers of @blazetrails/trails-tsc today: activerecord
+ *  (tsc-wrapper + type-virtualization) and scripts/guides-typecheck;
+ *  AR consumption is the reason trails-tsc is also in AR_PKGS_RE.
+ *
+ *  TSE_COMPILER_PKGS_RE
+ *  tse_compiler_affected gates the tse-compiler step of leaf-tests.
+ *  The package has
+ *  no workspace dependencies today (no activesupport import), so
+ *  the gate matches the package path only.
+ *
+ *  RACK_PKGS_RE
+ *  rack_affected gates the rack step of leaf-tests (split out of
+ *  unit-tests so a rack-only PR doesn't drag in
+ *  arel/activemodel/activesupport tests). Rack's only workspace
+ *  dependency is activesupport.
+ *
+ *  UNIT_TESTS_PKGS_RE
+ *  unit_tests_affected gates the bundled vitest run for the small
+ *  leaf packages (arel/activemodel/activesupport/i18n) and the
+ *  scripts/guides-typecheck self-test. Rack is excluded here — it
+ *  runs in the leaf-tests job.
+ *  scripts/tasks/ and scripts/guides-typecheck/ also ride on this gate
+ *  since they're bundled into the same vitest invocation as the leaf
+ *  packages (ci.yml:604) — and both are carved out of the infra sweep
+ *  (INFRA_CARVEOUT_RE), so this clause is what keeps their self-tests
+ *  running on a subtree-only change.
+ *  scripts/parity/ rides on it too: the query-runner integration tests
+ *  spawn dump.ts/ar_dump.ts against the fixtures, so a change to either
+ *  the runners or the fixtures has to re-run them. (Their other input,
+ *  packages/activerecord/, is deliberately NOT on this gate — pulling
+ *  every AR PR into the leaf-package suites costs more than it catches;
+ *  the label-gated query-parity-trails job covers that direction.)
+ *  NO packages/activerecord/ path feeds this gate. The two suites here
+ *  that import AR — scripts/test-deps/ and scripts/parity/query/node/ —
+ *  are re-run by sqlite-tests (activerecord_affected) instead; see the
+ *  comment there.
+ *  The compare tooling's suites run in that same invocation and are
+ *  ALL in INFRA_CARVEOUT_RE, so without naming them here a change
+ *  confined to one of them would run none of its own tests.
+ *  schema-compare/ is deliberately absent — its suite parses the real
+ *  vendored schema.rb, so it runs in rails-comparison (COMPARISON_RE).
+ *  eslint/ rides on it because the custom rules' own RuleTester suites
+ *  are in the same invocation: without this clause a PR that only
+ *  touches a rule or its test would skip the only job that runs them.
+ *  eslint.config.mjs is named separately (it is not under eslint/):
+ *  eslint/rails-private-jsdoc.config.test.mjs is a drift guard between
+ *  it and eslint/rails-private-jsdoc.config.mjs, so an isolated change
+ *  to the root config must still run the guard.
+ *  scripts/ci/check-control-bytes.sh is named for the same reason:
+ *  eslint/no-raw-control-bytes.drift.test.mjs is a drift guard between
+ *  its byte set and the ESLint rule's, and scripts/ci/ is carved out
+ *  of the infra sweep (INFRA_CARVEOUT_RE).
+ *
+ *  GUIDES_PKGS_RE
+ *  guides_affected gates the Guides Code Type Check job, which
+ *  compiles fenced TS blocks in packages/website/docs/guides/**.
+ *  Today guides only import @blazetrails/activerecord,
+ *  @blazetrails/activemodel, and @blazetrails/activesupport — plus
+ *  AR's transitive type deps. Confirmed via:
+ *  grep -rhE "from ['\"]@blazetrails/[a-z-]+" packages/website/docs/guides
+ *  scripts/guides-typecheck/ is the job's own implementation and is
+ *  carved out of the infra sweep (INFRA_CARVEOUT_RE), so it must be
+ *  named here or a checker-only change would stop running the checker.
+ *
+ *  WEBSITE_PKGS_RE
+ *  website_affected gates the Website build (SvelteKit + typedoc +
+ *  VitePress). Scoped narrowly to packages/website/ — package-source
+ *  changes alone don't trigger it. To run the site build on a PR
+ *  that touches package sources, apply the `website` label (or the
+ *  `release` label, which always runs it). The job is also
+ *  exercised post-merge by push-to-main.
+ *
+ *  COMPARISON_RE
+ *  comparison_affected gates the Rails API/Test Comparison job. That
+ *  job is only meaningful when Rails-port package source, the compare
+ *  tooling (scripts/{api,test,fixtures,schema}-compare/ and the Rails
+ *  manifest builders), or the vendored
+ *  upstream Ruby sources changed — plus cross-cutting infra (INFRA_RE)
+ *  below. A scripts/tasks-only, website-only, or other tooling-only
+ *  change can't move any comparison output, so it skips.
+ *  packages/website/ is EXCLUDED: it's the SvelteKit docs site, never
+ *  one of apiComparePackages() (vendor/sources.ts), so the comparison
+ *  never scans it — set_gate's exclusion argument drops it before
+ *  the COMPARISON_RE `^packages/` clause is applied.
+ *  NOTE: scripts/api-compare/conventions.ts regenerates
+ *  docs/ruby-ts-conventions.md (checked by api:conventions --check in
+ *  the job); the scripts/api-compare/ clause keeps that drift check
+ *  gated on. As with the package gates, infra_files (which carves out
+ *  the single-consumer scripts/ subtrees) feeds the INFRA_RE half of
+ *  the OR.
+ *  docs/ruby-ts-conventions.md is ALSO matched directly: it's the
+ *  generated artifact the conventions check guards, and the docs_only
+ *  logic above (`:234`) deliberately keeps a hand-edit of it
+ *  non-docs-only so the drift check still runs. Mirror that here — a
+ *  PR that edits ONLY that file matches neither INFRA_RE nor the
+ *  package/vendor clauses, so without this it would skip the very
+ *  check the docs_only exception was built to preserve.
+ *  eslint/rails-deprecated-methods.json is matched directly for the
+ *  same reason as ruby-ts-conventions.md: it is the generated artifact
+ *  the `--check-deprecated` step guards, and `eslint/` appears in
+ *  neither INFRA_RE nor the package/vendor clauses. Without this, the
+ *  one change shape the guard exists to catch — a commit that ONLY
+ *  drops manifest entries — would skip rails-comparison entirely and
+ *  never run the recompute.
+ *  schema-compare/ (the Schema comparison step, ci.yml:1272) and the
+ *  two Rails manifest builders + their shared mixin resolver (the
+ *  privates/file-structure steps, ci.yml:1279/1293) are named
+ *  explicitly: all are carved out of the infra sweep
+ *  (INFRA_CARVEOUT_RE), so this clause is the only thing that still
+ *  runs rails-comparison on a change confined to them.
+ *
+ *  elif ! files
+ *  Triple-dot: diff against the merge-base of $base and $head, not
+ *  against the current tip of the base branch. Using `$base $head`
+ *  would also include every commit merged to main since this branch
+ *  diverged, inflating the changed-files list with unrelated paths
+ *  and triggering gates that shouldn't fire.
+ *
+ *  if echo "$files" | grep -qE '^(\.prettierrc\.json|\.prettierignore|package\.json)$'; then
+ *  Prettier file list for the Prettier job. A change to Prettier's
+ *  config or its version pin reformats the whole tree, so fall back
+ *  to `__ALL__` (check everything) in that case — there is no other
+ *  full-tree check to catch the resulting drift. Otherwise emit the
+ *  changed files, excluding deletions (--diff-filter=ACMR keeps
+ *  added/copied/modified/renamed) since Prettier can't format a path
+ *  that no longer exists. If that diff somehow fails, fall back to
+ *  `__ALL__` rather than silently skipping the check.
+ *
+ *  if [ -z "$files" ]; then
+ *  docs_only: any line NOT under `docs/`, `examples/`, and not the
+ *  top-level `README.md` flips the switch. README is markdown-only
+ *  and only ever runs through prettier; `examples/` are standalone
+ *  apps not built, type-checked, or tested by any CI job (the root
+ *  `tsc --build` doesn't reference them and they have no `test`
+ *  script) — so neither needs the full matrix.
+ *
+ *  Exception: docs/ruby-ts-conventions.md is GENERATED from
+ *  conventions.ts and guarded by `api:conventions --check` in the
+ *  rails-comparison job. Treat a change to it as non-docs-only so a
+ *  hand-edit (ignoring the file's do-not-edit banner) still runs the
+ *  drift check instead of short-circuiting to a green docs-only run.
+ *
+ *  case "${{ github.event_name }}" in
+ *  On push to main / schedule / workflow_dispatch force every
+ *  package gate true. Downstream jobs still honor docs_only, so a
+ *  docs-only push to main still short-circuits the matrix.
+ *
+ *  infra_files
+ *  Drop the single-consumer scripts/ subtrees (see
+ *  INFRA_CARVEOUT_RE above) from the infra sweep so a change
+ *  confined to them doesn't trip INFRA_RE's blanket `scripts/`
+ *  and force every package gate true (the whole Rails matrix).
+ *  Per-package gates below still see the full $files list, so
+ *  each carved subtree still flips its own consuming job's gate
+ *  via that gate's regex.
+ *
+ *  case "${{ github.event_name }}" in
+ *  Website label opt-in. The Website job otherwise gates only on
+ *  packages/website/ paths, so PRs that need a site preview (or
+ *  release PRs that must build the production site) can apply the
+ *  `website` or `release` label to force the job on.
+ *
+ *  case "${{ github.event_name }}" in
+ *  Per-adapter parity gates. Each suite is expensive (~15-20 CI
+ *  minutes across 7 jobs), so plain PRs skip all parity. Run on:
+ *  - push to main / schedule / workflow_dispatch → all adapters
+ *  - PRs carrying a per-adapter label → only that adapter
+ *  `any(.[]; ...)` guards against the `.[].name == "..."` bug where
+ *  jq -e bases exit status on the last element of a stream.
+ */
+
+/**
  * Runs the `changes` job's own gate block — the `*_RE` definitions plus the
  * `infra_files`/`set_gate` region lifted verbatim out of ci.yml — over a
  * changed-file list, under the same `set -euo pipefail` the job uses. Modelling

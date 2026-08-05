@@ -72,8 +72,15 @@ import {
   CreateIndexDefinition,
   IndexDefinition,
 } from "./abstract/schema-definitions.js";
-import type { ColumnOptions, RemoveForeignKeyOptions } from "./abstract/schema-definitions.js";
-import { TableDefinition as MysqlTableDefinition } from "./mysql/schema-definitions.js";
+import type {
+  AddIndexOptions,
+  ColumnOptions,
+  RemoveForeignKeyOptions,
+} from "./abstract/schema-definitions.js";
+import {
+  TableDefinition as MysqlTableDefinition,
+  Table as MysqlTable,
+} from "./mysql/schema-definitions.js";
 import {
   dataSourceSql as mysqlDataSourceSql,
   extractForeignKeyAction as mysqlExtractForeignKeyAction,
@@ -163,6 +170,8 @@ const ER_CLIENT_INTERACTION_TIMEOUT = 4031;
 
 // eslint-disable-next-line no-control-regex
 const QUOTE_STRING_RE = /['\\\x00\n\r\x1a]/g;
+type CreateTableArgs = Parameters<MysqlSchemaStatements["createTable"]>;
+
 const QUOTE_STRING_MAP: Record<string, string> = {
   "'": "\\'",
   "\\": "\\\\",
@@ -172,6 +181,7 @@ const QUOTE_STRING_MAP: Record<string, string> = {
   "\x1a": "\\Z",
 };
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class AbstractMysqlAdapter extends AbstractAdapter {
   /**
    * Return Column objects for a table. Mirrors Rails'
@@ -2077,6 +2087,46 @@ export class StatementPool extends ConnectionStatementPool<MysqlPreparedStatemen
     return `a${++this._counter}`;
   }
 }
+
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging */
+/**
+ * The `MySQL::SchemaStatements` surface `include()` installs below
+ * (abstract_mysql_adapter.rb:19). Declaration-merged so callers see the mixin's
+ * signatures instead of falling through to `AbstractAdapter`'s; kept in step
+ * with the mixin by `scripts/mixin-declaration-drift.ts`. @internal
+ */
+export interface AbstractMysqlAdapter {
+  updateTableDefinition(tableName: string, base?: unknown): MysqlTable;
+
+  addIndex(
+    tableName: string,
+    columnName: string | string[],
+    options?: AddIndexOptions,
+  ): Promise<void>;
+
+  createTable(
+    name: string,
+    optionsOrFn?: CreateTableArgs[1],
+    fn?: CreateTableArgs[2],
+  ): Promise<void>;
+
+  removeColumn(
+    tableName: string,
+    columnName: string,
+    type?: string,
+    options?: { ifExists?: boolean },
+  ): Promise<void>;
+
+  dropTable(
+    ...args:
+      | [string, ...string[]]
+      | [string, ...string[], { ifExists?: boolean; force?: "cascade"; temporary?: boolean }]
+  ): Promise<void>;
+
+  /** @internal */
+  validPrimaryKeyOptions(): string[];
+}
+/* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
 
 // Rails: `include MySQL::SchemaStatements` (abstract_mysql_adapter.rb:19).
 include(AbstractMysqlAdapter, MysqlSchemaStatements);
