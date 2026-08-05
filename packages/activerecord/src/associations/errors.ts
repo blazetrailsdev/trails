@@ -432,9 +432,11 @@ export class HasOnePersistedAssignmentError extends ActiveRecordError {
 }
 
 /**
- * Thrown when a collection association (`has_many` / HABTM) is assigned with
- * the native `=` setter — `owner.items = [...]`, `owner.itemIds = [...]`, or a
- * mass-assignment key — on a *persisted* owner. The collection analogue of
+ * Thrown when a collection association (`has_many` / HABTM) is assigned by
+ * mass assignment — `owner.assignAttributes({ items: [...] })`, `new Owner({
+ * items: [...] })` — on a *persisted* owner. (RFC 0087 §1 removed the native
+ * `=` setter that also raised this; the mass-assignment arm is retired by that
+ * RFC's `retire-sync-association-mass-assignment-arms`.) The collection analogue of
  * {@link HasOnePersistedAssignmentError}, and a deliberate trails-only
  * deviation with no Rails counterpart: Rails'
  * `CollectionAssociation#replace` diffs against the loaded target and runs the
@@ -450,7 +452,7 @@ export class CollectionPersistedAssignmentError extends ActiveRecordError {
 
   constructor(association: string) {
     super(
-      `Cannot assign collection association \`${association}\` with \`=\` on a ` +
+      `Cannot assign collection association \`${association}\` by mass assignment on a ` +
         `persisted record: Rails replaces the collection at assignment time, ` +
         `which requires \`await\` in JS. Use \`await owner.${association}.replace([...])\` ` +
         `(or \`.concat(...)\` / \`.destroy(...)\`).`,
@@ -461,30 +463,31 @@ export class CollectionPersistedAssignmentError extends ActiveRecordError {
 }
 
 /**
- * Thrown when a collection association's ids are assigned with the native
- * `#{singular}Ids=` setter — `owner.itemIds = [...]` or the matching
- * mass-assignment key — on *either* owner arm.
+ * Thrown when a collection association's ids are assigned by mass assignment —
+ * `owner.assignAttributes({ itemIds: [...] })`, `new Owner({ itemIds: [...] })`
+ * — on *either* owner arm.
  *
  * The ids writer is stricter than {@link CollectionPersistedAssignmentError}'s
  * record writer, which only throws for a persisted owner: Rails' `ids_writer`
  * (collection_association.rb:61-83) *resolves the ids to records with a query*
  * before it replaces, so even the new-record arm — where the replace itself is
- * pure in-memory work — needs I/O the sync setter cannot await. Returning that
- * promise from the setter made a bad id (`raise_record_not_found_exception!`)
- * surface as an unhandled rejection rather than a catchable throw, and let an
- * immediate `save()` race the in-flight resolution. See RFC
+ * pure in-memory work — needs I/O mass assignment cannot await. Returning that
+ * promise for the caller to discard made a bad id
+ * (`raise_record_not_found_exception!`) surface as an unhandled rejection
+ * rather than a catchable throw, and let an immediate `save()` race the
+ * in-flight resolution. See RFC
  * 0068-awaitable-has-one-setter ("Why 'loud' beats 'deferred'").
  */
 export class CollectionIdsAssignmentError extends ActiveRecordError {
   readonly association: string;
 
   constructor(association: string) {
-    // The setter that raised, derived here rather than passed in so the
-    // message can never name a key that differs from the installed writer
-    // (builder/collection-association.ts singularizes the same way).
+    // The key that raised, derived here rather than passed in so the message
+    // can never name a key that differs from the one mass assignment matched
+    // (attribute-assignment.ts singularizes the same way).
     const idsName = `${singularize(association)}Ids`;
     super(
-      `Cannot assign collection association \`${association}\` ids with \`=\`: ` +
+      `Cannot assign collection association \`${association}\` ids by mass assignment: ` +
         `Rails resolves the ids with a query and replaces the collection at ` +
         `assignment time, which requires \`await\` in JS. Use ` +
         `\`await owner.update({ ${idsName}: [...] })\` (or ` +

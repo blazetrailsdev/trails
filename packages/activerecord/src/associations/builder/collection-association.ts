@@ -153,39 +153,15 @@ export class CollectionAssociation extends Association {
     }
   }
 
-  static override defineWriters(mixin: object, name: string): void {
-    if (!mixin || typeof mixin !== "object") return;
-    // Skip `super.defineWriters` for the main name: the base installs a setter
-    // calling the association's `writer`, which for collections is now
-    // awaitable (it persists inline on a persisted owner). A JS property
-    // setter cannot `await`, so route to `syncWrite` — in-memory replace on
-    // an unpersisted owner, `CollectionPersistedAssignmentError` on a
-    // persisted one, whose message names the awaitable replacement
-    // (`await owner.#{name}.replace([...])`). RFC 0068.
-    const nameDescriptor = Object.getOwnPropertyDescriptor(mixin, name);
-    if (!nameDescriptor || nameDescriptor.configurable) {
-      Object.defineProperty(mixin, name, {
-        get: nameDescriptor?.get,
-        set(this: AssociationInstanceHost, records: unknown) {
-          (this.association(name) as any).syncWrite(records);
-        },
-        configurable: true,
-      });
-    }
-    const idsName = `${singularize(name)}Ids`;
-    const existing = Object.getOwnPropertyDescriptor(mixin, idsName);
-    if (existing && !existing.configurable) return;
-    Object.defineProperty(mixin, idsName, {
-      get: existing?.get,
-      // The ids setter throws on BOTH owner arms (`CollectionIdsAssignmentError`):
-      // Rails' `ids_writer` resolves the ids with a query even for a new record,
-      // so there is no arm a sync setter can serve. Returning the promise here
-      // instead made a bad id an unhandled rejection and raced an immediate
-      // `save()`. RFC 0068.
-      set(this: AssociationInstanceHost, ids: unknown) {
-        (this.association(name) as any).syncIdsWrite(ids);
-      },
-      configurable: true,
-    });
-  }
+  // Rails' `Builder::CollectionAssociation.define_writers`
+  // (builder/collection_association.rb:67-74) calls `super` — which defines
+  // `#{name}=` — and adds `#{name.singularize}_ids=`. Both of Rails' writers
+  // do DB I/O at assignment time: `writer` runs `replace`'s diffed
+  // deletes+inserts in a transaction (collection_association.rb:46-48, :242),
+  // and `ids_writer` resolves the ids with a query first
+  // (collection_association.rb:61-83). A JS property setter cannot `await`, so
+  // neither is expressible as one. The awaitable ports carry the Rails names
+  // on the association itself — `association(name).writer` / `replace` /
+  // `idsWriter` — and are the only collection-mutation surface (RFC 0087 §1).
+  static override defineWriters(_mixin: object, _name: string): void {}
 }

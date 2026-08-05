@@ -458,9 +458,7 @@ describe("PrimaryKeyWithAutoIncrementTest", () => {
 
   it("primary key with integer", async () => {
     // Rails: id: :integer → SERIAL on PG; INTEGER on MySQL/SQLite.
-    // Our adapter does not map integer id to SERIAL on PG (integerLikePrimaryKeyType
-    // not overridden); use "serial" directly so the column auto-increments on PG.
-    const type = adapterType === "postgres" ? "serial" : "integer";
+    const type = "integer";
     await (Base.connection as any).createTable("auto_increments", {
       id: { type },
       force: true,
@@ -470,7 +468,7 @@ describe("PrimaryKeyWithAutoIncrementTest", () => {
 
   it("primary key with bigint", async () => {
     // Rails: id: :bigint → BIGSERIAL on PG; BIGINT AUTO_INCREMENT on MySQL.
-    const type = adapterType === "postgres" ? "bigserial" : "bigint";
+    const type = "bigint";
     await (Base.connection as any).createTable("auto_increments", {
       id: { type },
       force: true,

@@ -175,17 +175,15 @@ export class CollectionAssociation extends Association {
   }
 
   /**
-   * The `#{singular}Ids=` analogue of {@link syncWrite} — and, unlike it,
-   * a throw on BOTH owner arms.
+   * The `#{singular}Ids` analogue of {@link syncWrite}, reached from
+   * mass assignment (`new Author({ postIds })`, `assignAttributes`) — and,
+   * unlike it, a throw on BOTH owner arms.
    *
    * `syncWrite`'s unpersisted arm is faithful because Rails does no I/O for a
    * new-record owner either. `ids_writer` has no such arm: it resolves the ids
    * to records with a query before replacing
    * (collection_association.rb:61-83), so the new-record path is DB I/O too.
-   * The sync setter used to return that promise for it to discard, which made
-   * a bad id (`raiseNotFoundAll`) an unhandled rejection instead of a
-   * catchable throw and let an immediate `save()` read the target before the
-   * in-flight replace landed. Awaitable surfaces exist for both arms —
+   * Awaitable surfaces exist for both arms —
    * `await owner.update({ itemIds: [...] })` (persistence.ts routes collection
    * keys through `idsWriter`) and `await owner.association(name).idsWriter()`
    * — so this throws loudly and names them. RFC 0068.

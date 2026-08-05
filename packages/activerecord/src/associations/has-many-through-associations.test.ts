@@ -748,7 +748,9 @@ describe("HasManyThroughAssociationsTest", () => {
     const post = new Post({ title: "Hello", body: "world" });
     const person = new Person({ first_name: "Sean" });
 
-    (post as any).people = [person];
+    // Rails: `post.people = [person]`. RFC 0087 §1 removed the sync `=`
+    // setter; `writer` is the awaitable port of the same Rails writer.
+    await (post as any).association("people").writer([person]);
     await post.save();
 
     expect(post.id).toBeTruthy();

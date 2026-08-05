@@ -275,6 +275,22 @@ export class TableDefinition extends AbstractTableDefinition {
     return fallback;
   }
 
+  /**
+   * @internal
+   * Mirrors: PostgreSQL::TableDefinition#integer_like_primary_key_type
+   * (postgresql/schema_definitions.rb:293-299)
+   */
+  protected override integerLikePrimaryKeyType(
+    type: ColumnType,
+    options: ColumnOptions,
+  ): ColumnType {
+    if (type === "bigint" || options.limit === 8) {
+      return "bigserial";
+    } else {
+      return "serial";
+    }
+  }
+
   /** @internal */
   protected override validColumnDefinitionOptions(): string[] {
     return [
@@ -850,13 +866,5 @@ function aliasedTypes(name: any, fallback: any): never {
   // @nie disposition=port-real rails=activerecord/lib/active_record/connection_adapters/postgresql/schema_definitions.rb:289 cluster=pg-long-tail
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::PostgreSQL::TableDefinition#aliased_types is not implemented",
-  );
-}
-
-/** @internal */
-function integerLikePrimaryKeyType(type: any, options: any): never {
-  // @nie disposition=port-real rails=activerecord/lib/active_record/connection_adapters/postgresql/schema_definitions.rb:293 cluster=pg-long-tail
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQL::TableDefinition#integer_like_primary_key_type is not implemented",
   );
 }
