@@ -1880,7 +1880,8 @@ function validGregorianP(y: number, m: number, d: number): [rm: number, rd: numb
  * answers a non-zero style — `-/+oo` — whenever the calendar reform cannot
  * possibly bite: an infinite `sg`, a year too large for a fixnum, or a year
  * outside `REFORM_BEGIN_YEAR .. REFORM_END_YEAR`. Ruby's fixnum bound is a JS
- * safe integer here.
+ * safe integer here, and its `positive_inf`/`negative_inf` are the two
+ * infinities `JULIAN` and `GREGORIAN` already name (`date_core.c:188-189`).
  */
 function guessStyle(y: number, sg: number): number {
   let style = 0;
@@ -1888,10 +1889,8 @@ function guessStyle(y: number, sg: number): number {
   if (!Number.isFinite(sg)) style = sg;
   else if (!Number.isSafeInteger(y)) style = y > 0 ? GREGORIAN : JULIAN;
   else {
-    const iy = y;
-
-    if (iy < REFORM_BEGIN_YEAR) style = JULIAN;
-    else if (iy > REFORM_END_YEAR) style = GREGORIAN;
+    if (y < REFORM_BEGIN_YEAR) style = JULIAN;
+    else if (y > REFORM_END_YEAR) style = GREGORIAN;
   }
   return style;
 }
