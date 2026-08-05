@@ -578,11 +578,10 @@ export class SchemaStatements {
       opts = { ...columnOrOptions, ...options };
     }
 
-    // Rails: `return if options[:if_exists] && !index_exists?(...)` — only an
-    // explicit `ifExists` short-circuits a missing index.
-    // (schema_statements.rb:967) — `index_exists?` handles the name-only case
-    // itself: `Index#defined_for?` (schema_definitions.rb:54) reads
-    // `options[:column]` when no columns are given and matches on `name` alone.
+    // Rails: `return if options[:if_exists] && !index_exists?(table_name,
+    // column_name, **options)` (schema_statements.rb:967) — one probe, because
+    // `Index#defined_for?` (schema_definitions.rb:54) reads `options[:column]`
+    // when no columns are given and then matches on `name` alone.
     if (opts.ifExists && !(await this.indexExists(tableName, columnName, opts))) return;
 
     await this.schemaCache.clearDataSourceCacheBang(tableName);

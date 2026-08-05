@@ -154,7 +154,8 @@ export const UNPORTED_FILES: UnportedFile[] = [
     reason:
       "Ruby `method_missing` magic that synthesizes `find_by_<attr>` / `find_or_*_by_<attr>` " +
       "at call time. No TS analog — Proxy-based dispatch can't infer attribute lists at " +
-      "compile time, and `findBy({ ... })` already covers the use case idiomatically.",
+      "compile time, and `findBy({ ... })` already covers the use case idiomatically. " +
+      "`respond_to_missing?` alone is ported, in dynamic-matchers.ts.",
   },
   {
     pattern: "railties/controller_runtime.rb",
