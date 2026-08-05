@@ -8,7 +8,7 @@
  *
  *   - `SKIP` / `SCOPED_SKIP_GROUPS` (conventions.ts) — Ruby methods api:compare
  *     never expects a TS counterpart for, i.e. an expected `missing`.
- *   - `call-mismatches-exclude.json` + the split `call-mismatches-wide-exclude/`
+ *   - the split `call-mismatches-wide-exclude/` tree
  *     tree — Ruby body calls whose absence from the TS body is reviewed and
  *     accepted, i.e. an expected skeleton `divergent`.
  *
@@ -30,7 +30,7 @@ import {
 import { methodName } from "./naming.js";
 import { normalizeName } from "./score.js";
 
-/** One entry of `call-mismatches-exclude.json` / the wide exclude tree. */
+/** One entry of the wide exclude tree. */
 export interface ExcludeEntry {
   package: string;
   tsFile: string;

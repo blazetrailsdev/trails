@@ -2,7 +2,7 @@
  * Per-row sign-off for the codegen convergence guard (RFC 0086).
  *
  * catalog.ts explains a divergence only when EVERY differing skeleton token is
- * an individually excluded call (`call-mismatches-exclude.json` and the wide
+ * an individually excluded call (the wide
  * tree are keyed at the call grain). Most real divergences differ by several
  * tokens at once — a dropped `if` plus two renamed calls — so a reviewer who
  * has confirmed a whole method's divergence as equivalent has no way to record

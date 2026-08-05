@@ -1,9 +1,8 @@
 /**
- * Shared pre-gate artifact regeneration for the call-mismatch ratchets
+ * Pre-gate artifact regeneration for the wide call-mismatch ratchet
  * (RFC 0083).
  *
- * Both the narrow (`lint-call-mismatches.ts`) and wide
- * (`lint-call-mismatches-wide.ts`) gates read an artifact `compare.ts` wrote.
+ * `lint-call-mismatches-wide.ts` gates an artifact `compare.ts` wrote.
  * Gating whatever is on disk is what makes a sibling PR's deleted TS method
  * surface as `STALE baseline entr(ies)` on a branch that never touched it, and
  * the fix was always "re-extract, then re-run" — so a local run does the
@@ -11,9 +10,8 @@
  * rather than compare.ts so the extraction manifests compare.ts reads are
  * refreshed first.
  *
- * One opt-out contract serves both gates: `--no-regen`,
- * API_COMPARE_SKIP_WIDE_REGEN=1, or any CI value — CI runs the extraction step
- * separately and must not pay for it twice.
+ * The opt-out contract: `--no-regen`, API_COMPARE_SKIP_WIDE_REGEN=1, or any CI
+ * value — CI runs the extraction step separately and must not pay for it twice.
  *
  * Hard rules: no node:* imports, no process.* (callers pass their own env),
  * async only.
@@ -41,11 +39,12 @@ export function shouldRegenerate(argv: string[], env: Record<string, string | un
   return !env.CI && env[REGEN_SKIP_ENV] !== "1";
 }
 
-// `extraArgs` is the compare scope: [] for the narrow artifact,
-// ["--wide-calls"] for the wide one.
+// `extraArgs` is the compare scope. It defaults to the wide artifact's, the
+// only one compare.ts writes: a plain `pnpm api:compare` computes no call sets
+// at all, so passing [] would regenerate nothing the gate can read.
 export function regenerateArtifact(
   env: Record<string, string | undefined>,
-  extraArgs: string[] = [],
+  extraArgs: string[] = ["--wide-calls"],
 ): Promise<void> {
   const args = ["api:compare", ...extraArgs];
   return new Promise((resolve, reject) => {

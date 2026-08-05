@@ -60,7 +60,7 @@
 import * as fs from "fs/promises";
 import * as path from "path";
 import { listJsonFiles, pruneEmptyDirs, serializeBaseline } from "./baseline-json.js";
-import { keyOf, type CallMismatchKey, type ExcludeEntry } from "./lint-call-mismatches.js";
+import { keyOf, type CallMismatchKey, type ExcludeEntry } from "./call-mismatch-baseline.js";
 
 export interface UnreviewedMark {
   max: number;

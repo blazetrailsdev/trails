@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "fs/promises";
 import * as os from "os";
 import * as path from "path";
-import type { ExcludeEntry } from "./lint-call-mismatches.js";
+import type { ExcludeEntry } from "./call-mismatch-baseline.js";
 import {
   droppedReviewed,
   droppedSeeded,

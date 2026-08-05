@@ -6,11 +6,10 @@ import {
   findDuplicateKeys,
   flattenArtifact,
   keyOf,
-  loadBaseline,
   missingScope,
   reseed,
   type ExcludeEntry,
-} from "./lint-call-mismatches.js";
+} from "./call-mismatch-baseline.js";
 
 describe("callOf", () => {
   it("extracts the Ruby call name before the arrow", () => {
@@ -100,17 +99,6 @@ describe("findDuplicateKeys", () => {
         { package: "ar", tsFile: "a.ts", rubyName: "foo", call: "save", reason: "dup" },
       ]),
     ).toEqual(["ar a.ts foo save"]);
-  });
-});
-
-describe("committed baseline", () => {
-  it("is well-formed: no duplicate keys, every entry has a package and reason", async () => {
-    const committed = await loadBaseline();
-    expect(findDuplicateKeys(committed)).toEqual([]);
-    for (const e of committed) {
-      expect(e.package.trim().length).toBeGreaterThan(0);
-      expect(e.reason.trim().length).toBeGreaterThan(0);
-    }
   });
 });
 

@@ -2,13 +2,15 @@
 /**
  * Ratcheting gate for the WIDE call-set parity dimension (RFC 0047).
  *
- * This is the wide sibling of lint-call-mismatches.ts. The narrow gate ratchets
- * output/call-mismatches.json, produced over the curated SIGNIFICANT_CALLS
- * allowlist (RFC 0044). This one ratchets output/call-mismatches-wide.json,
- * produced when compare.ts runs with `--wide-calls` / `API_COMPARE_WIDE_CALLS=1`
- * (WIDE_SIGNIFICANT_CALLS — every ported call name except `super`). The two
- * artifacts and baselines are entirely separate, so widening the population
- * never perturbs the narrow 0044 gate.
+ * Ratchets output/call-mismatches-wide.json, produced when compare.ts runs with
+ * `--wide-calls` / `API_COMPARE_WIDE_CALLS=1` (WIDE_SIGNIFICANT_CALLS — every
+ * ported call name except `super` and the WIDE_NO_JS_CALL_FORM names).
+ *
+ * This is the only call-set gate. RFC 0084 folded in the narrow RFC 0044 gate,
+ * which ratcheted a second artifact over a curated SIGNIFICANT_CALLS allowlist:
+ * this population strictly subsumed it, so the narrow gate cost a duplicate
+ * artifact, a second CI step and a two-artifact `API_COMPARE_FORCE` trap for no
+ * signal not already here. Its reviewed reasons live in this baseline.
  *
  * Same only-shrink contract: a committed baseline lists the currently-known
  * wide mismatches keyed by `package + tsFile + rubyName + call`, each with a
@@ -49,7 +51,7 @@
  * that mirrors the source tree, one JSON file per `tsFile`, at
  * `<dir>/<package>/<tsFile with .ts→.json>`. Each file is a JSON array of
  * exactly that source file's entries, sorted by the code-unit `compareKeys`
- * order (see lint-call-mismatches.ts) so a reseed rewrites only the files whose
+ * order (see call-mismatch-baseline.ts) so a reseed rewrites only the files whose
  * entries actually changed. This makes the merge-conflict
  * boundary match the unit of work: an agent converging relation.ts only touches
  * activerecord/relation.json, not a shared 47k-line monolith. The loader globs
@@ -96,7 +98,7 @@
  * are counted, and `--show-dropped-seeded` lists the seeded keys too.
  *
  * Hard rules: no node:* imports, no process.* in the library surface (the CLI
- * entry guard is the sole exception, matching lint-call-mismatches.ts), async fs.
+ * entry guard is the sole exception, matching lint-arity-excludes.ts), async fs.
  */
 
 import * as fs from "fs/promises";
@@ -114,7 +116,7 @@ import {
   missingScope,
   reseed,
   type StaleTag,
-} from "./lint-call-mismatches.js";
+} from "./call-mismatch-baseline.js";
 import {
   listJsonFiles,
   pruneEmptyDirs,
@@ -170,7 +172,7 @@ export function relPathFor(k: CallMismatchKey): string {
   return path.join(k.package, k.tsFile.replace(/\.ts$/, ".json"));
 }
 // Gates the full-surface wide artifact only — privates are advisory-only
-// throughout the compare tooling (mirrors lint-call-mismatches.ts).
+// throughout the compare tooling.
 const ARTIFACT_PATH = path.join(OUTPUT_DIR, "call-mismatches-wide.json");
 
 // Committed high-water marks for the unreviewed-reason counter (RFC 0083),
@@ -197,7 +199,8 @@ export async function loadSplitBaseline(dir: string): Promise<ExcludeEntry[]> {
   return sortKeys(merged);
 }
 
-async function loadBaseline(): Promise<ExcludeEntry[]> {
+/** The committed wide baseline, merged across its split files. @internal */
+export async function loadBaseline(): Promise<ExcludeEntry[]> {
   return loadSplitBaseline(BASELINE_DIR);
 }
 
@@ -243,7 +246,7 @@ async function loadArtifact(): Promise<Artifact> {
 }
 
 // Emission order for every baseline file (and every console listing): the
-// shared code-unit `compareKeys` order documented in lint-call-mismatches.ts.
+// shared code-unit `compareKeys` order documented in call-mismatch-baseline.ts.
 function sortKeys<T extends CallMismatchKey>(entries: T[]): T[] {
   return [...entries].sort(compareKeys);
 }
@@ -409,7 +412,7 @@ async function main(write: boolean, showSeededKeys: boolean): Promise<number> {
   }
 
   // Determinism guard (RFC 0044): same partial-scope coverage check as the
-  // narrow gate (see lint-call-mismatches.ts header).
+  // shared machinery (see call-mismatch-baseline.ts header).
   const absent = missingScope(artifact);
   if (absent.length > 0) {
     console.error(

@@ -1482,12 +1482,6 @@ jobs:
         run: pnpm exec tsx scripts/api-compare/extract-ts-api.ts && pnpm exec tsx scripts/api-compare/compare.ts
       - name: API comparison (privates)
         run: pnpm exec tsx scripts/api-compare/compare.ts --privates
-      - name: Call-mismatches ratchet
-        # Gates the advisory call-set parity artifact (output/call-mismatches.json,
-        # written by the API comparison step above) against the committed
-        # baseline. Fails on a new mismatch or a stale baseline entry; reseed
-        # with `pnpm tsx scripts/api-compare/lint-call-mismatches.ts --write`.
-        run: pnpm exec tsx scripts/api-compare/lint-call-mismatches.ts
       - name: Arity excludes gate
         # Fails on a malformed or STALE entry in
         # scripts/api-compare/arity-exclude.json (the reasoned suppression file
@@ -1518,9 +1512,10 @@ jobs:
         # `pnpm tsx scripts/api-compare/body-pins.ts --pin <ruby-file>`.
         run: pnpm exec tsx scripts/api-compare/lint-body-pins.ts
       - name: API comparison (wide calls)
-        # Regenerates the SEPARATE wide call-set artifact
-        # (output/call-mismatches-wide.json) over WIDE_SIGNIFICANT_CALLS (all
-        # ported names except `super`). Distinct file from the narrow run above.
+        # Writes the call-set artifact (output/call-mismatches-wide.json) over
+        # WIDE_SIGNIFICANT_CALLS (all ported names except `super` and the
+        # WIDE_NO_JS_CALL_FORM names). `--wide-calls` is what computes the call
+        # sets at all — the plain runs above write no call artifact.
         run: pnpm exec tsx scripts/api-compare/compare.ts --wide-calls
       - name: Wide call-mismatches ratchet
         # Gates the RFC 0047 wide artifact against the split call-mismatches-wide-exclude/ baseline dir.

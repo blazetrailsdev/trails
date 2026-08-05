@@ -28,7 +28,6 @@ import {
   isDelegatingWrapper,
   effectiveTsCalls,
   reachedSameFileMethods,
-  narrowCallsApplies,
   callTagKey,
   splitOverriddenFileBuckets,
   staleCallTags,
@@ -65,21 +64,6 @@ function makeManifest(
   }
   return result;
 }
-
-describe("narrowCallsApplies", () => {
-  it("applies the narrow 0044 gate only to activerecord", () => {
-    expect(narrowCallsApplies("activerecord", false)).toBe(true);
-    for (const pkg of ["activesupport", "rack", "trailties", "actioncontroller"]) {
-      expect(narrowCallsApplies(pkg, false)).toBe(false);
-    }
-  });
-
-  it("admits every package under the wide RFC 0047 gate", () => {
-    for (const pkg of ["activerecord", "activesupport", "rack", "trailties"]) {
-      expect(narrowCallsApplies(pkg, true)).toBe(true);
-    }
-  });
-});
 
 describe("resolvePortedWithArgsSigs", () => {
   const sig = (n: number): ParamInfo[] =>
@@ -256,15 +240,14 @@ describe("significantMissingCalls", () => {
     }
   });
 
-  it("drops inert-receiver call names in wide runs only", () => {
+  it("drops inert-receiver call names", () => {
     // RFC 0083: `xs.first` / `opts.fetch` say nothing about the port, so the
-    // wide gate drops them; the narrow 0044 population must not move.
+    // gate drops them.
     const calls = ["first", "fetch", "save"];
     const weak = ["first", "fetch"];
-    expect(dropWeakCalls(calls, weak, true)).toEqual(["save"]);
-    expect(dropWeakCalls(calls, weak, false)).toEqual(calls);
-    expect(dropWeakCalls(calls, undefined, true)).toEqual(calls);
-    expect(dropWeakCalls(undefined, weak, true)).toEqual([]);
+    expect(dropWeakCalls(calls, weak)).toEqual(["save"]);
+    expect(dropWeakCalls(calls, undefined)).toEqual(calls);
+    expect(dropWeakCalls(undefined, weak)).toEqual([]);
   });
 
   it("suppresses key?/has_key? — an options-hash port tests membership with `in`", () => {

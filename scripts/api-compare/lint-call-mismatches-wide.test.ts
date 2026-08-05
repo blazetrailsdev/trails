@@ -3,12 +3,13 @@ import * as fs from "fs/promises";
 import * as os from "os";
 import * as path from "path";
 import { fileURLToPath } from "url";
-import { findDuplicateKeys, keyOf, type ExcludeEntry } from "./lint-call-mismatches.js";
+import { findDuplicateKeys, keyOf, type ExcludeEntry } from "./call-mismatch-baseline.js";
 import { excessByPath, loadMarks, unreviewedCounts } from "./unreviewed-ratchet.js";
 import {
   DEFAULT_REASON,
   bucketFor,
   indexTsMembers,
+  loadBaseline,
   loadSplitBaseline,
   parseTop,
   relPathFor,
@@ -374,5 +375,16 @@ describe("the committed per-file unreviewed marks", () => {
   it("key every shard to a source the baseline still has entries for", async () => {
     const { counts, marks } = await load();
     expect([...marks.keys()].filter((rel) => !counts.has(rel))).toEqual([]);
+  });
+});
+
+describe("committed baseline", () => {
+  it("is well-formed: no duplicate keys, every entry has a package and reason", async () => {
+    const committed = await loadBaseline();
+    expect(findDuplicateKeys(committed)).toEqual([]);
+    for (const e of committed) {
+      expect(e.package.trim().length).toBeGreaterThan(0);
+      expect(e.reason.trim().length).toBeGreaterThan(0);
+    }
   });
 });

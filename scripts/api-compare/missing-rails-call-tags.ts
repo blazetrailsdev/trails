@@ -34,7 +34,7 @@ export const DEFAULT_REASON =
 
 /**
  * The narrow baseline's seeded `reason` — the RFC 0044 seed prose, stamped by
- * `reseed()` in lint-call-mismatches.ts on a newly-flagged narrow call. It
+ * `reseed()` in call-mismatch-baseline.ts on a newly-flagged call. It
  * lives here, beside {@link DEFAULT_REASON}, so ONE predicate knows both seeds:
  * a tag carrying it stands in for a reason exactly as the wide seed does, and
  * `justifies()` rejecting only the wide one would let a narrow-seeded row

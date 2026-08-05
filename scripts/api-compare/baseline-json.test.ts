@@ -105,7 +105,6 @@ describe("committed api-compare baselines", () => {
   it("are all written in canonical form", async () => {
     const files = [
       ...(await jsonFilesUnder(path.join(HERE, "call-mismatches-wide-exclude"))),
-      path.join(HERE, "call-mismatches-exclude.json"),
       path.join(HERE, "body-pins.json"),
       path.join(HERE, "arity-exclude.json"),
       ...(await jsonFilesUnder(path.join(HERE, "call-mismatches-wide-unreviewed"))),

@@ -49,7 +49,7 @@
  * (Run `pnpm api:compare` first so output/body-hashes.json is fresh.)
  *
  * Hard rules: no node:* imports, no process.* in the library surface (the CLI
- * entry guard is the sole exception, matching lint-call-mismatches.ts), async
+ * entry guard is the sole exception, matching lint-call-mismatches-wide.ts), async
  * fs only, no third-party runtime deps.
  */
 
@@ -164,7 +164,7 @@ export function findDuplicateKeys(pins: BodyPin[]): string[] {
  * collation is locale- and ICU-version-dependent and treats punctuation as
  * secondary, so keys differing only in `!`/`_`/`?` sort differently depending
  * on who runs `--pin-all`, emitting symmetric +/- manifest churn with no
- * content change. (Same fix as `compareKeys` in lint-call-mismatches.ts, which
+ * content change. (Same fix as `compareKeys` in call-mismatch-baseline.ts, which
  * cannot be reused directly: body-pins keys on `rubyFile`, not `tsFile`/call.)
  * `keyOf` is unique per pin (findDuplicateKeys enforces it), so no tie-break
  * is needed.
