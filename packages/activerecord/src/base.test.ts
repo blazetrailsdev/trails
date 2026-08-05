@@ -40,8 +40,10 @@ vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 // ==========================================================================
 describe("BasicsTest", () => {
   fixtures([]);
-  afterEach(() => {
+  const cleanupConnections: Array<() => unknown> = [];
+  afterEach(async () => {
     vi.restoreAllMocks();
+    while (cleanupConnections.length > 0) await cleanupConnections.pop()!();
   });
 
   it("table name based on model name", () => {
@@ -1324,6 +1326,7 @@ describe("BasicsTest", () => {
       await Default.establishConnection(
         newConfig as Parameters<typeof Default.establishConnection>[0],
       );
+      cleanupConnections.push(() => Default.removeConnection());
 
       const d = new Default();
       const fd = d.readAttribute("fixed_date") as Temporal.PlainDate;
@@ -1356,6 +1359,7 @@ describe("BasicsTest", () => {
       await Default.establishConnection(
         newConfig as Parameters<typeof Default.establishConnection>[0],
       );
+      cleanupConnections.push(() => Default.removeConnection());
 
       const d = new Default();
       const fd = d.readAttribute("fixed_date") as Temporal.PlainDate;

@@ -17,7 +17,10 @@ describe("ShardsKeysTest", () => {
   let prevDefaultEnv: string;
   let prevCurrent: unknown;
 
+  let baselinePools: Set<unknown>;
+
   beforeEach(() => {
+    baselinePools = new Set(Base.connectionHandler.connectionPoolList("all"));
     prevConfigs = Base.configurations();
     prevDefaultEnv = DatabaseConfigurations.defaultEnv;
     prevCurrent = (DatabaseConfigurations as any).current;
@@ -45,6 +48,13 @@ describe("ShardsKeysTest", () => {
 
   afterEach(async () => {
     await Base.connectionHandler.clearAllConnectionsBang();
+    for (const pool of Base.connectionHandler.connectionPoolList("all")) {
+      if (baselinePools.has(pool)) continue;
+      Base.connectionHandler.removeConnectionPool(String(pool.connectionDescriptor.name), {
+        role: pool.role,
+        shard: pool.shard,
+      });
+    }
     Base.configurations(prevConfigs);
     DatabaseConfigurations.defaultEnv = prevDefaultEnv;
     (DatabaseConfigurations as any).current = prevCurrent;

@@ -385,6 +385,7 @@ it("connection notification is called", async () => {
     expect(payloads[0].role).toBe("writing");
   } finally {
     Notifications.unsubscribe(sub);
+    Base.connectionHandler.removeConnectionPool(ConnectionTestModel.name);
     await Base.connectionHandler.clearAllConnectionsBang();
   }
 });
@@ -405,6 +406,7 @@ it("connection notification is called for shard", async () => {
     expect(payloads[0].role).toBe("writing");
   } finally {
     Notifications.unsubscribe(sub);
+    Base.connectionHandler.removeConnectionPool(ConnectionTestModel.name);
     await Base.connectionHandler.clearAllConnectionsBang();
   }
 });

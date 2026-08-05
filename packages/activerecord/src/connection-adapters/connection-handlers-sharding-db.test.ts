@@ -37,12 +37,22 @@ let dbDir: string;
 const dbPath = (basename: string) => path.join(dbDir, basename);
 
 describe("ConnectionHandlersShardingDbTest", () => {
+  let baselinePools: Set<unknown>;
+
   beforeEach(async () => {
     dbDir = await mkdtemp(path.join(os.tmpdir(), "trails-sharding-db-"));
+    baselinePools = new Set(Base.connectionHandler.connectionPoolList("all"));
   });
 
   afterEach(async () => {
     await Base.connectionHandler.clearAllConnectionsBang();
+    for (const pool of Base.connectionHandler.connectionPoolList("all")) {
+      if (baselinePools.has(pool)) continue;
+      Base.connectionHandler.removeConnectionPool(String(pool.connectionDescriptor.name), {
+        role: pool.role,
+        shard: pool.shard,
+      });
+    }
     await rm(dbDir, { recursive: true, force: true });
     (Base as any)._shardKeys = undefined;
     (Base as any)._defaultShard = undefined;

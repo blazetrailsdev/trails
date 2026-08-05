@@ -50,6 +50,14 @@
  * connection implicitly, naming no accessor. No file in this tree has that
  * shape — the canonical-schema files all ride `fixtures()` — and closing it
  * needs receiver-level knowledge the textual scan does not have.
+ *
+ * The seed grew by one once `stripCommentsAndStrings` became a scanner. The
+ * regex chain it replaced ran one pass per quote kind, so a quote of one kind
+ * inside a literal of another paired with the next one anywhere in the file and
+ * deleted everything between — the apostrophe in a template's `` `Couldn't find
+ * a match` `` swallowed the rest of `encryption-schemes.test.ts`, taking its
+ * unmatched parens with it and desynchronising the depth below. That file was
+ * always an offender; it was hidden, not clean.
  */
 
 import { readdir, readFile } from "node:fs/promises";
@@ -82,19 +90,86 @@ export const WRITE_PATTERNS = [".create(", ".insert", ".update(", "INSERT INTO",
 /**
  * Strip block comments, line comments, and string literals so a commented-out
  * `.create(` — or a `fixtures(` named in prose — doesn't change the verdict.
- * Template literals are emptied rather than dropped so an interpolated
- * `INSERT INTO` inside raw SQL still counts as the write it is; the literal is
- * replaced by its own contents minus the backticks.
+ * Newlines survive every strip, so a reported line number still names the line
+ * it was read from.
+ *
+ * A template literal keeps its raw text — an interpolated `INSERT INTO` inside
+ * raw SQL still counts as the write it is — but its parentheses are blanked,
+ * because raw text is not code and a `(` in an `it.each` table cell would
+ * otherwise desynchronise the paren depth {@link rowWritesAtItScope} tracks
+ * scope with. Its `${…}` interpolations ARE code and are left alone. The
+ * delimiting backticks survive for the outermost literal, which is what lets
+ * `rowWritesAtItScope` see where a tagged-template table ends; a literal nested
+ * inside an interpolation is blanked so the two cannot be confused.
  */
 export function stripCommentsAndStrings(src: string): string {
-  return src
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/\/\/.*$/gm, "")
-    .replace(/'(?:\\.|[^'\\])*'/g, "''")
-    .replace(/"(?:\\.|[^"\\])*"/g, '""');
+  const stack: { kind: "template" | "interp"; braces: number }[] = [];
+  const inRawText = (): boolean => stack[stack.length - 1]?.kind === "template";
+  const nested = (): boolean => stack.some((frame) => frame.kind === "template");
+  let out = "";
+
+  for (let i = 0; i < src.length; i++) {
+    const ch = src[i];
+
+    if (inRawText()) {
+      if (ch === "\\") {
+        out += src[i + 1] === "\n" ? " \n" : "  ";
+        i++;
+      } else if (ch === "`") {
+        stack.pop();
+        out += nested() ? " " : "`";
+      } else if (ch === "$" && src[i + 1] === "{") {
+        stack.push({ kind: "interp", braces: 0 });
+        out += "  ";
+        i++;
+      } else {
+        out += ch === "(" || ch === ")" ? " " : ch;
+      }
+      continue;
+    }
+
+    if (ch === "/" && src[i + 1] === "*") {
+      const end = src.indexOf("*/", i + 2);
+      const body = end === -1 ? src.slice(i) : src.slice(i, end + 2);
+      out += body.replace(/[^\n]/g, " ");
+      i += body.length - 1;
+      continue;
+    }
+    if (ch === "/" && src[i + 1] === "/") {
+      const end = src.indexOf("\n", i);
+      const body = end === -1 ? src.slice(i) : src.slice(i, end);
+      out += " ".repeat(body.length);
+      i += body.length - 1;
+      continue;
+    }
+    if (ch === "'" || ch === '"') {
+      let j = i + 1;
+      while (j < src.length && src[j] !== ch) j += src[j] === "\\" ? 2 : 1;
+      out += ch + ch;
+      i = j;
+      continue;
+    }
+    if (ch === "`") {
+      out += nested() ? " " : "`";
+      stack.push({ kind: "template", braces: 0 });
+      continue;
+    }
+    if (ch === "{" && stack.length > 0) stack[stack.length - 1].braces++;
+    if (ch === "}" && stack[stack.length - 1]?.kind === "interp") {
+      const frame = stack[stack.length - 1];
+      if (frame.braces === 0) {
+        stack.pop();
+        out += " ";
+        continue;
+      }
+      frame.braces--;
+    }
+    out += ch;
+  }
+  return out;
 }
 
-const IT_CALL = /(?:^|[^.\w])(?:it|test)((?:\.\w+)*)\s*\(/g;
+const IT_CALL = /(?:^|[^.\w])(?:it|test)((?:\.\w+)*)\s*[(`]/g;
 
 export interface RowWrite {
   line: number;
@@ -116,12 +191,9 @@ export interface RowWrite {
  * The table form `it.each([...])("name", fn)` puts the body in a SECOND call,
  * so the `it.each(` paren closes before the body starts. That paren is tracked
  * separately and, when it closes, the scope push is deferred to the `(` that
- * opens the body call.
- *
- * Known gap: the tagged-template table form (`` it.each`…`("name", fn) ``) is
- * not recognized — template literals survive `stripCommentsAndStrings`, so the
- * parens inside a table cell would be read as code. No file in this tree uses
- * it.
+ * opens the body call. The tagged-template table form
+ * (`` it.each`…`("name", fn) ``) is the same shape with a template in place of
+ * the array, so the same deferral runs off the template's closing backtick.
  */
 export function rowWritesAtItScope(src: string): RowWrite[] {
   const stripped = stripCommentsAndStrings(src);
@@ -130,6 +202,8 @@ export function rowWritesAtItScope(src: string): RowWrite[] {
   const eachParens: number[] = [];
   let bodyCallPending = false;
   let parenDepth = 0;
+  let inTemplate = false;
+  let taggedTemplate = false;
 
   const lines = stripped.split("\n");
   for (let i = 0; i < lines.length; i++) {
@@ -137,14 +211,29 @@ export function rowWritesAtItScope(src: string): RowWrite[] {
 
     const itColumns = new Set<number>();
     const eachColumns = new Set<number>();
+    const tagColumns = new Set<number>();
     IT_CALL.lastIndex = 0;
     for (let m = IT_CALL.exec(line); m !== null; m = IT_CALL.exec(line)) {
       const column = m.index + m[0].length - 1;
-      (m[1].split(".").includes("each") ? eachColumns : itColumns).add(column);
+      if (line[column] === "`") tagColumns.add(column);
+      else (m[1].split(".").includes("each") ? eachColumns : itColumns).add(column);
     }
 
     for (let c = 0; c < line.length; c++) {
       const ch = line[c];
+      if (ch === "`") {
+        if (inTemplate) {
+          inTemplate = false;
+          if (taggedTemplate) {
+            taggedTemplate = false;
+            bodyCallPending = true;
+            continue;
+          }
+        } else {
+          inTemplate = true;
+          taggedTemplate = tagColumns.has(c);
+        }
+      }
       if (ch === "(") {
         parenDepth++;
         if (eachColumns.has(c)) eachParens.push(parenDepth);

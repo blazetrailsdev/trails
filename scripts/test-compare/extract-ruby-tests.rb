@@ -607,7 +607,7 @@ class TestExtractor
   # whether the body runs when the condition is true (`if` → true, `unless` → false).
   def gate_from_run_condition(cond, positive)
     acc = { adapter_syms: [], neg_adapter_syms: [], features: [], neg_features: [], guards: [],
-            has_or: false, has_and: false }
+            or_true: false, or_false: false }
     scan_run_condition(cond, acc)
 
     # A NEGATED feature predicate only decomposes when the RUN condition is a pure
@@ -617,11 +617,15 @@ class TestExtractor
     # Elsewhere the run-on set isn't that intersection, so the polarity-blind
     # lumping stays.
     #
-    # `has_or` is textual, so it only answers that question on the run-when-true
-    # path. On the `unless` path the run condition is the NEGATION of the source
-    # condition, and De Morgan turns its `&&` into a disjunction (`unless A && B`
-    # runs on `!A || B`) that `has_or` never sees — hence `has_and`.
-    run_has_or = positive ? acc[:has_or] : (acc[:has_and] || acc[:has_or])
+    # `scan_run_condition` records each boolean in RUN space at its own negation
+    # parity: `or_true` is "the source condition is a disjunction", `or_false`
+    # is "its negation is" — which is what the `unless` path runs on (`unless
+    # A && B` runs on `!A || B`). The `unless` path keeps `or_true` in the union
+    # as well: `unless A || B` runs on the conjunction `!A && !B`, but treating
+    # it as a disjunction only withholds a decomposition, and holding the two
+    # paths' outcomes fixed for un-negated shapes is what keeps this change to
+    # the negated-boolean shapes it is about.
+    run_has_or = positive ? acc[:or_true] : (acc[:or_false] || acc[:or_true])
     split = !run_has_or
     # Feature polarity is read against the RUN condition: on the `unless` path a
     # textually-negated predicate is the one the test RUNS on (`skip if
@@ -666,8 +670,8 @@ class TestExtractor
     # negated-adapter branch below uses.
     mixed = !adapters.empty? &&
             (!acc[:guards].empty? ||
-             (any_feature && (acc[:has_or] || !positive)) ||
-             (acc[:has_or] && !neg_adapters.empty?))
+             (any_feature && (acc[:or_true] || !positive)) ||
+             (acc[:or_true] && !neg_adapters.empty?))
     if !adapters.empty? && !mixed
       gate[:adapters] = positive ? adapters : (ALL_ADAPTERS - adapters)
     end
@@ -677,7 +681,7 @@ class TestExtractor
     # runs on every adapter that supports the feature, minus SQLite. We can only
     # emit it on the run-when-true (`if`) path; under `unless` the negation turns
     # the conjunction into a disjunction that isn't expressible as one adapter set.
-    if positive && !neg_adapters.empty? && !acc[:has_or]
+    if positive && !neg_adapters.empty? && !run_has_or
       base = gate[:adapters] || ALL_ADAPTERS
       gate[:adapters] = base - neg_adapters
     end
@@ -707,13 +711,27 @@ class TestExtractor
       scan_run_condition(node[2], acc, !negated)
       return
     end
-    # `||`/`or` anywhere makes the run-on adapter set a disjunction; record it so
-    # a negated-adapter exclusion isn't unsoundly emitted from a compound.
-    acc[:has_or] = true if node[0] == :binary && (node[2] == :"||" || node[2] == :or)
-    # `&&`/`and` becomes a disjunction once the condition is negated, which is
-    # exactly what the `unless` path runs on; recorded so the polarity split can
-    # tell a pure run-condition conjunction from `!(A && B)`.
-    acc[:has_and] = true if node[0] == :binary && (node[2] == :"&&" || node[2] == :and)
+    # A disjunction makes the run-on adapter set a union; record it so a
+    # negated-adapter exclusion isn't unsoundly emitted from a compound. Which
+    # operator a node contributes is read in RUN space, not source space: an
+    # enclosing `!` De Morgans it, so `!(A && B)` is a disjunction and
+    # `!(A || B)` is a conjunction. `negated` is the same parity the adapter and
+    # feature predicates below already read, so a boolean nested under a `!` is
+    # no longer counted as the operator its token spells.
+    if node[0] == :binary
+      or_op = node[2] == :"||" || node[2] == :or
+      and_op = node[2] == :"&&" || node[2] == :and
+      if or_op || and_op
+        # The operator this node presents when the SOURCE condition is true.
+        eff_or = negated ? and_op : or_op
+        # ...and when it is false, which is what the `unless` path runs on.
+        if eff_or
+          acc[:or_true] = true
+        else
+          acc[:or_false] = true
+        end
+      end
+    end
     name = call_ident_name(node)
     if name
       # Once a predicate is identified, stop: recursing into its own receiver/args

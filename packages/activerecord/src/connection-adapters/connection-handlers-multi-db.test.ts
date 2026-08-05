@@ -136,6 +136,8 @@ describe("ConnectionHandlersMultiDbTest", () => {
     });
 
     expect((await relation.first())!.readAttribute("connection_role")).toBe("reading");
+    await SecondaryBase.removeConnection();
+    Base.connectionHandler.removeConnectionPool("SecondaryBase", { role: "secondary" });
   });
 
   it("establish connection using 3 levels config", () => {
