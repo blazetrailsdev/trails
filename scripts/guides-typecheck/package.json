@@ -10,6 +10,7 @@
     "@blazetrails/activerecord-cli": "workspace:*",
     "@blazetrails/activesupport": "workspace:*",
     "@blazetrails/arel": "workspace:*",
+    "@blazetrails/date": "workspace:*",
     "@blazetrails/rack": "workspace:*",
     "@blazetrails/actionpack": "workspace:*",
     "@blazetrails/actionview": "workspace:*",

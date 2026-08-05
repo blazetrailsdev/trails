@@ -426,6 +426,9 @@ importers:
       '@blazetrails/arel':
         specifier: workspace:*
         version: link:../../packages/arel
+      '@blazetrails/date':
+        specifier: workspace:*
+        version: link:../../packages/date
       '@blazetrails/did-you-mean':
         specifier: workspace:*
         version: link:../../packages/did-you-mean
