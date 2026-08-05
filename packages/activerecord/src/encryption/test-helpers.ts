@@ -18,14 +18,14 @@ import { Contexts } from "./contexts.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
 import { clearDefaultKeyProviderCache, type Scheme } from "./scheme.js";
 import { withEncryptionContext, withoutEncryption } from "./context.js";
-import { DecryptionError, EncryptionError } from "./errors.js";
+import { Decryption, Encryption } from "./errors.js";
 import { BinaryData } from "@blazetrails/activemodel";
 // Side-effect: registers encryptionHooks so Base.encrypts() is wired up.
 import "../encryption.js";
 import type { Encryptor } from "../encryption.js";
 import { MessagePackMessageSerializer } from "./message-pack-message-serializer.js";
 
-export { withEncryptionContext, withoutEncryption, DecryptionError, EncryptionError };
+export { withEncryptionContext, withoutEncryption, Decryption, Encryption };
 
 // ─── Test key material ────────────────────────────────────────────────────────
 
@@ -305,7 +305,7 @@ export function makeEncryptedBookWithCustomCompressor(adapter: DatabaseAdapter) 
 
 const _failingEncryptor: Encryptor = {
   encrypt(_value: string): string {
-    throw new EncryptionError("deliberate encryption failure");
+    throw new Encryption("deliberate encryption failure");
   },
   decrypt(ciphertext: string): string {
     return ciphertext;

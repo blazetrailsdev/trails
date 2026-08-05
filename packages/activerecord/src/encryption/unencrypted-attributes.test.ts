@@ -10,7 +10,7 @@ import {
 import { fixtures } from "../test-fixtures.js";
 import type { EncryptedPost as EncryptedPostType } from "../test-helpers/models/post-encrypted.js";
 import { Configurable } from "./configurable.js";
-import { Decryption as DecryptionError } from "./errors.js";
+import { Decryption } from "./errors.js";
 
 // EncryptedPost's `body` key provider (MutableDerivedSecretKeyProvider) derives
 // its key eagerly at class-initialization, so encryption config must be set
@@ -58,6 +58,6 @@ describe("ActiveRecord::Encryption::UnencryptedAttributesTest", () => {
       EncryptedPost.create({ title: "The Starfleet is here!", body: "take cover!" }),
     );
 
-    expect(() => post.title).toThrow(DecryptionError);
+    expect(() => post.title).toThrow(Decryption);
   });
 });

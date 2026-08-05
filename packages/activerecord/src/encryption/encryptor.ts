@@ -13,7 +13,7 @@ import {
   getOrCreateDefaultKeyProvider,
   clearDefaultKeyProviderCache,
 } from "./default-key-provider-cache.js";
-import { Base, ConfigError, DecryptionError, Encoding, ForbiddenClass } from "./errors.js";
+import { Base, Configuration, Decryption, Encoding, ForbiddenClass } from "./errors.js";
 import type { Compressor } from "./config.js";
 import { normalizeEncoding, replaceUnencodable } from "./encoding-helpers.js";
 
@@ -61,7 +61,7 @@ export class Encryptor {
     options?: { keyProvider?: KeyProviderLike; key?: string; deterministic?: boolean },
   ): string {
     if (options?.keyProvider && options.key !== undefined) {
-      throw new ConfigError("key and keyProvider can't be used simultaneously");
+      throw new Configuration("key and keyProvider can't be used simultaneously");
     }
     this.validatePayloadType(clearText);
     const text = options?.deterministic ? this.forceEncodingIfNeeded(clearText) : clearText;
@@ -75,7 +75,7 @@ export class Encryptor {
       (options?.key !== undefined
         ? { encryptionKey: () => ({ secret: options.key! }), decryptionKeys: () => [] }
         : this.defaultKeyProvider());
-    if (!keyProvider) throw new ConfigError("No encryption key provided");
+    if (!keyProvider) throw new Configuration("No encryption key provided");
     return this.serializeMessage(
       this.buildEncryptedMessage(text, keyProvider, { deterministic: options?.deterministic }),
     );
@@ -92,10 +92,10 @@ export class Encryptor {
     },
   ): string {
     if (options?.keyProvider && options.key !== undefined) {
-      throw new DecryptionError("key and keyProvider can't be used simultaneously");
+      throw new Decryption("key and keyProvider can't be used simultaneously");
     }
     if (typeof encryptedText !== "string") {
-      throw new DecryptionError(
+      throw new Decryption(
         `The encryptor can only decrypt string values (${typeof encryptedText})`,
       );
     }
@@ -111,24 +111,24 @@ export class Encryptor {
       keys = [options.key];
     } else {
       const kp = this.defaultKeyProvider();
-      if (!kp) throw new DecryptionError("No decryption key provided");
+      if (!kp) throw new Decryption("No decryption key provided");
       keys = kp.decryptionKeys(message).map((k) => k.secret);
     }
-    if (keys.length === 0) throw new DecryptionError("No decryption key provided");
+    if (keys.length === 0) throw new Decryption("No decryption key provided");
 
     let decrypted: Buffer;
     try {
       decrypted = this.cipher().decrypt(message, { ...options?.cipherOptions, key: keys });
     } catch (e) {
       if (e instanceof Base) throw e;
-      throw new DecryptionError(e instanceof Error ? e.message : String(e));
+      throw new Decryption(e instanceof Error ? e.message : String(e));
     }
 
     try {
       return this.uncompressIfNeeded(decrypted, message.headers.get("c") === true);
     } catch (e) {
       if (e instanceof Base) throw e;
-      throw new DecryptionError(e instanceof Error ? e.message : String(e));
+      throw new Decryption(e instanceof Error ? e.message : String(e));
     }
   }
 
@@ -214,7 +214,7 @@ export class Encryptor {
   ): Message {
     const encKeyObj = keyProvider.encryptionKey();
     const key = encKeyObj.secret;
-    if (key == null) throw new ConfigError("No encryption key provided");
+    if (key == null) throw new Configuration("No encryption key provided");
 
     const [cipherInput, compressed] = this.compressIfWorthIt(clearText);
     const message = this.cipher().encrypt(cipherInput, { key, ...cipherOptions });

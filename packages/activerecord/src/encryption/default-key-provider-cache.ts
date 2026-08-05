@@ -4,7 +4,6 @@
  * (primaryKey, salt, digest) tuple.
  */
 
-import { Configurable } from "./configurable.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
 
 let _entry: DerivedSecretKeyProvider | undefined;
@@ -42,6 +41,3 @@ export function clearDefaultKeyProviderCache(): void {
   _entry = undefined;
   _sig = undefined;
 }
-
-// Single onConfigure hook covers all consumers (Scheme, Encryptor).
-Configurable.onConfigure(clearDefaultKeyProviderCache);

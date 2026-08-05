@@ -4,7 +4,7 @@ import { Encryptor } from "./encryptor.js";
 import { Configurable } from "./configurable.js";
 import { Contexts } from "./contexts.js";
 import { clearDefaultKeyProviderCache } from "./default-key-provider-cache.js";
-import { DecryptionError, ForbiddenClass, Encryption as EncryptionError } from "./errors.js";
+import { Decryption, ForbiddenClass, Encryption } from "./errors.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
 import { MessageSerializer } from "./message-serializer.js";
 import { Message } from "./message.js";
@@ -25,12 +25,12 @@ describe("ActiveRecord::Encryption::EncryptorTest", () => {
 
   it("trying to decrypt something else than a string will raise a Decryption error", () => {
     const enc = new Encryptor();
-    expect(() => enc.decrypt(42 as any, { key: generateKey() })).toThrow(DecryptionError);
+    expect(() => enc.decrypt(42 as any, { key: generateKey() })).toThrow(Decryption);
   });
 
   it("decrypt an invalid string will raise a Decryption error", () => {
     const enc = new Encryptor();
-    expect(() => enc.decrypt("not-encrypted", { key: generateKey() })).toThrow(DecryptionError);
+    expect(() => enc.decrypt("not-encrypted", { key: generateKey() })).toThrow(Decryption);
   });
 
   it("decrypt an encrypted text with an invalid key will raise a Decryption error", () => {
@@ -38,7 +38,7 @@ describe("ActiveRecord::Encryption::EncryptorTest", () => {
     const key = generateKey();
     const wrongKey = generateKey();
     const encrypted = enc.encrypt("hello", { key });
-    expect(() => enc.decrypt(encrypted, { key: wrongKey })).toThrow(DecryptionError);
+    expect(() => enc.decrypt(encrypted, { key: wrongKey })).toThrow(Decryption);
   });
 
   it("if an encryption error happens when encrypting an encrypted text it should raise", () => {
@@ -48,9 +48,9 @@ describe("ActiveRecord::Encryption::EncryptorTest", () => {
     // missing key material — encryption is configured suite-wide now).
     const keyProvider = new DerivedSecretKeyProvider("some key");
     vi.spyOn(keyProvider, "encryptionKey").mockImplementation(() => {
-      throw new EncryptionError("boom");
+      throw new Encryption("boom");
     });
-    expect(() => enc.encrypt("Some text to encrypt", { keyProvider })).toThrow(EncryptionError);
+    expect(() => enc.encrypt("Some text to encrypt", { keyProvider })).toThrow(Encryption);
   });
 
   it("content is compressed", () => {

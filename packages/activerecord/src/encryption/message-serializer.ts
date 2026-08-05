@@ -6,7 +6,7 @@
 
 import { Message } from "./message.js";
 import { Properties } from "./properties.js";
-import { DecryptionError, ForbiddenClass } from "./errors.js";
+import { Decryption, ForbiddenClass } from "./errors.js";
 
 export interface MessageSerializerLike {
   dump(message: Message): string;
@@ -30,7 +30,7 @@ export class MessageSerializer implements MessageSerializerLike {
     try {
       data = JSON.parse(serialized);
     } catch {
-      throw new DecryptionError("Failed to deserialize encrypted message");
+      throw new Decryption("Failed to deserialize encrypted message");
     }
     return this.parseMessage(data, 1);
   }
@@ -57,7 +57,7 @@ export class MessageSerializer implements MessageSerializerLike {
       if (value instanceof Message) {
         nestedCount++;
         if (nestedCount > 1) {
-          throw new DecryptionError("Messages can only have one nested message in their headers");
+          throw new Decryption("Messages can only have one nested message in their headers");
         }
       }
       message.headers.set(key, value);
@@ -68,14 +68,14 @@ export class MessageSerializer implements MessageSerializerLike {
   /** @internal */
   private validateMessageDataFormat(data: unknown, level: number): void {
     if (level > 2) {
-      throw new DecryptionError("More than one level of hash nesting in headers is not supported");
+      throw new Decryption("More than one level of hash nesting in headers is not supported");
     }
     if (typeof data !== "object" || data === null || Array.isArray(data)) {
-      throw new DecryptionError("Invalid data format: hash without payload");
+      throw new Decryption("Invalid data format: hash without payload");
     }
     const d = data as Record<string, unknown>;
     if (!("p" in d) || typeof d["p"] !== "string") {
-      throw new DecryptionError("Invalid data format: hash without payload");
+      throw new Decryption("Invalid data format: hash without payload");
     }
     if (
       "h" in d &&
@@ -83,7 +83,7 @@ export class MessageSerializer implements MessageSerializerLike {
       d["h"] !== undefined &&
       (typeof d["h"] !== "object" || Array.isArray(d["h"]))
     ) {
-      throw new DecryptionError("Invalid data format: headers must be an object");
+      throw new Decryption("Invalid data format: headers must be an object");
     }
   }
 
@@ -146,7 +146,7 @@ export class MessageSerializer implements MessageSerializerLike {
         const reencoded = buf.toString("base64").replace(/=+$/, "");
         const normalized = value.replace(/=+$/, "");
         if (normalized !== reencoded) {
-          throw new DecryptionError("Invalid base64 encoding");
+          throw new Decryption("Invalid base64 encoding");
         }
         // Mirrors Rails' Base64.strict_decode64 (returns an ASCII-8BIT String):
         // return the raw decoded bytes as a Buffer, so cipher payload/iv/at keep
@@ -154,8 +154,8 @@ export class MessageSerializer implements MessageSerializerLike {
         // via `.toString("utf-8")`. latin1 here would mojibake non-ASCII text.
         return buf;
       } catch (e) {
-        if (e instanceof DecryptionError) throw e;
-        throw new DecryptionError("Invalid base64 encoding");
+        if (e instanceof Decryption) throw e;
+        throw new Decryption("Invalid base64 encoding");
       }
     }
     return value;

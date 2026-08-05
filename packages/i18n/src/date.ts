@@ -1667,6 +1667,66 @@ function jdToCivil(jd: number): Temporal.PlainDate {
 }
 
 /**
+ * @internal Ruby `rt__valid_date_frags_p` (ruby/date, `date_core.c:4185-4220`):
+ * the frags a sub-parser found, completed by `rt_complete_frags`, become a date
+ * only through a fixed sequence of combinations, each tried in turn — the
+ * `:jd`, then the ordinal (`:year` + `:yday`), then the civil
+ * (`:year` + `:mon` + `:mday`), then the commercial one. A combination whose
+ * frags are present but do not name a real date does not end the search: Ruby's
+ * `valid_*_p` answers `nil` and the next combination is tried. When none is
+ * buildable Ruby answers `nil` — `"Feb 3rd"` parsed with no completion has no
+ * `:year` at all — and `d_new_by_frags` (`date_core.c:4260-4271`) is what turns
+ * that `nil` into `Date::Error, "invalid date"`.
+ *
+ * Ruby's `valid_ordinal_p` / `valid_civil_p` / `valid_commercial_p` answer a
+ * Julian day or `nil`; `Temporal.PlainDate` raises instead, so an out-of-range
+ * day arrives here as a throw where Ruby reads a `nil`.
+ *
+ * The two week-numbered blocks C tries last (`:wnum0` / `:wnum1`,
+ * `date_core.c:4240-4276`) are not carried: no sub-parser ported here sets
+ * either key, so they can never be the combination that wins.
+ */
+function rtValidDateFragsP(parts: DateParts): Temporal.PlainDate | null {
+  if (parts.jd !== undefined) {
+    return jdToCivil(parts.jd);
+  }
+  if (parts.yday !== undefined && parts.year !== undefined && parts.yday >= 1) {
+    try {
+      const d = new Temporal.PlainDate(parts.year, 1, 1).add({ days: parts.yday - 1 });
+      if (d.year === parts.year) return d;
+    } catch {
+      // `valid_ordinal_p`'s `nil`.
+    }
+  }
+  if (parts.mday !== undefined && parts.mon !== undefined && parts.year !== undefined) {
+    try {
+      return new Temporal.PlainDate(parts.year, parts.mon, parts.mday);
+    } catch {
+      // `valid_civil_p`'s `nil`.
+    }
+  }
+  let cwday = parts.cwday;
+  if (cwday === undefined) {
+    cwday = parts.wday;
+    if (cwday !== undefined) if (cwday === 0) cwday = 7;
+  }
+  if (cwday !== undefined && parts.cweek !== undefined && parts.cwyear !== undefined) {
+    try {
+      const jan4 = new Temporal.PlainDate(parts.cwyear, 1, 4);
+      const d = jan4
+        .subtract({ days: jan4.dayOfWeek - 1 })
+        .add({ days: (parts.cweek - 1) * 7 + (cwday - 1) });
+      if (d.yearOfWeek === parts.cwyear && d.weekOfYear === parts.cweek && d.dayOfWeek === cwday) {
+        return d;
+      }
+    } catch {
+      // `valid_commercial_p`'s `nil`.
+    }
+  }
+  return null;
+}
+
+/**
  * @internal Ruby `Date::Error`, the `ArgumentError` subclass ruby/date defines
  * under `::Date` (`date_core.c` `eDateError` / `Init_date_core`). It is reached
  * as `Date.Error`; this binding only exists so the class body can name it.
@@ -1728,38 +1788,7 @@ export class Date {
   static parse(str: string, comp = true): Date {
     const parts = Date._parse(str, comp);
     completeFrags(parts);
-    let d: Temporal.PlainDate | null = null;
-    try {
-      if (parts.jd !== undefined) {
-        d = jdToCivil(parts.jd);
-      } else if (parts.yday !== undefined && parts.year !== undefined && parts.yday >= 1) {
-        d = new Temporal.PlainDate(parts.year, 1, 1).add({ days: parts.yday - 1 });
-        if (d.year !== parts.year) d = null;
-      } else if (parts.mon !== undefined && parts.mday !== undefined) {
-        d = new Temporal.PlainDate(parts.year as number, parts.mon, parts.mday);
-      } else {
-        let cwday = parts.cwday;
-        if (cwday === undefined) {
-          cwday = parts.wday;
-          if (cwday !== undefined) if (cwday === 0) cwday = 7;
-        }
-        if (cwday !== undefined && parts.cweek !== undefined && parts.cwyear !== undefined) {
-          const jan4 = new Temporal.PlainDate(parts.cwyear, 1, 4);
-          d = jan4
-            .subtract({ days: jan4.dayOfWeek - 1 })
-            .add({ days: (parts.cweek - 1) * 7 + (cwday - 1) });
-          if (
-            d.yearOfWeek !== parts.cwyear ||
-            d.weekOfYear !== parts.cweek ||
-            d.dayOfWeek !== cwday
-          ) {
-            d = null;
-          }
-        }
-      }
-    } catch {
-      d = null;
-    }
+    const d = rtValidDateFragsP(parts);
     if (d === null) throw new DateError("invalid date");
     return new Date(d.year, d.month, d.day);
   }

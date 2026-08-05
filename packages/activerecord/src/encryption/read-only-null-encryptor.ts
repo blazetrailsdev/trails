@@ -4,11 +4,11 @@
  * Mirrors: ActiveRecord::Encryption::ReadOnlyNullEncryptor
  */
 
-import { EncryptionError } from "./errors.js";
+import { Encryption } from "./errors.js";
 
 export class ReadOnlyNullEncryptor {
   encrypt(_clearText: string, _options?: Record<string, unknown>): never {
-    throw new EncryptionError("The ReadOnlyNullEncryptor does not support encryption");
+    throw new Encryption("The ReadOnlyNullEncryptor does not support encryption");
   }
 
   decrypt(encryptedText: string, _options?: Record<string, unknown>): string {

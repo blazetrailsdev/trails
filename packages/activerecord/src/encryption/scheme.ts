@@ -5,7 +5,7 @@
  */
 
 import { Encryptor, type EncryptorLike } from "./encryptor.js";
-import { ConfigError } from "./errors.js";
+import { Configuration } from "./errors.js";
 import type { Compressor } from "./config.js";
 import type { MessageSerializerLike } from "./message-serializer.js";
 import { Configurable } from "./configurable.js";
@@ -172,19 +172,19 @@ export class Scheme {
   /** @internal */
   private validateConfigBang(): void {
     if (this.ignoreCase && !this.deterministic) {
-      throw new ConfigError("ignoreCase requires deterministic encryption");
+      throw new Configuration("ignoreCase requires deterministic encryption");
     }
     if (this.downcase && !this.deterministic) {
-      throw new ConfigError("downcase requires deterministic encryption");
+      throw new Configuration("downcase requires deterministic encryption");
     }
     if (this._keyProviderParam != null && this.key != null) {
-      throw new ConfigError("key and keyProvider can't be used simultaneously");
+      throw new Configuration("key and keyProvider can't be used simultaneously");
     }
     if (this._opts.compress === false && this._opts.compressor !== undefined) {
-      throw new ConfigError("compressor can't be used with compress: false");
+      throw new Configuration("compressor can't be used with compress: false");
     }
     if (this._opts.compressor !== undefined && this._opts.encryptor !== undefined) {
-      throw new ConfigError("compressor can't be used with encryptor");
+      throw new Configuration("compressor can't be used with encryptor");
     }
   }
 }

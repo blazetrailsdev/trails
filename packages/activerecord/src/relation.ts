@@ -7264,7 +7264,7 @@ export class Relation<T extends Base> {
 
   /** @internal */
   private actOnIgnoredOrder(errorOnIgnore: boolean | undefined): void {
-    _actOnIgnoredOrder(errorOnIgnore);
+    _actOnIgnoredOrder(this, errorOnIgnore);
   }
 
   /** @internal */

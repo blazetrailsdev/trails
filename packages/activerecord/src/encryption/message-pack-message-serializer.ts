@@ -14,7 +14,7 @@
 import { MessagePack, MessagePackError } from "@blazetrails/activesupport/message-pack";
 import { Message } from "./message.js";
 import { Properties } from "./properties.js";
-import { DecryptionError, ForbiddenClass } from "./errors.js";
+import { Decryption, ForbiddenClass } from "./errors.js";
 import type { MessageSerializerLike } from "./message-serializer.js";
 
 export class MessagePackMessageSerializer implements MessageSerializerLike {
@@ -35,8 +35,7 @@ export class MessagePackMessageSerializer implements MessageSerializerLike {
     } catch (e) {
       // ActiveSupport::MessagePack raises MessagePackError on a missing/wrong
       // signature or malformed bytes — both mean an undecodable message.
-      if (e instanceof MessagePackError)
-        throw new DecryptionError("Failed to load MessagePack message");
+      if (e instanceof MessagePackError) throw new Decryption("Failed to load MessagePack message");
       throw e;
     }
     return this.hashToMessage(data, 1);
@@ -77,7 +76,7 @@ export class MessagePackMessageSerializer implements MessageSerializerLike {
       if (value instanceof Message) {
         nestedCount++;
         if (nestedCount > 1) {
-          throw new DecryptionError("Messages can only have one nested message in their headers");
+          throw new Decryption("Messages can only have one nested message in their headers");
         }
       }
       message.headers.set(key, value);
@@ -88,14 +87,14 @@ export class MessagePackMessageSerializer implements MessageSerializerLike {
   /** @internal */
   private validateMessageDataFormat(data: unknown, level: number): void {
     if (level > 2) {
-      throw new DecryptionError("More than one level of hash nesting in headers is not supported");
+      throw new Decryption("More than one level of hash nesting in headers is not supported");
     }
     if (typeof data !== "object" || data === null || Array.isArray(data) || Buffer.isBuffer(data)) {
-      throw new DecryptionError("Invalid data format: hash without payload");
+      throw new Decryption("Invalid data format: hash without payload");
     }
     const d = data as Record<string, unknown>;
     if (!("p" in d)) {
-      throw new DecryptionError("Invalid data format: hash without payload");
+      throw new Decryption("Invalid data format: hash without payload");
     }
     if (
       "h" in d &&
@@ -103,7 +102,7 @@ export class MessagePackMessageSerializer implements MessageSerializerLike {
       d["h"] !== undefined &&
       (typeof d["h"] !== "object" || Array.isArray(d["h"]) || Buffer.isBuffer(d["h"]))
     ) {
-      throw new DecryptionError("Invalid data format: headers must be an object");
+      throw new Decryption("Invalid data format: headers must be an object");
     }
   }
 

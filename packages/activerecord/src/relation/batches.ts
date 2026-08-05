@@ -147,10 +147,12 @@ export function buildBatchOrders(
 }
 
 /** @internal */
-export function actOnIgnoredOrder(errorOnIgnore: boolean | undefined): void {
+export function actOnIgnoredOrder(relation: any, errorOnIgnore: boolean | undefined): void {
   const raise = errorOnIgnore !== undefined ? errorOnIgnore : ActiveRecord.errorOnIgnoredOrder;
   if (raise) {
     throw new Error(Batches.ORDER_IGNORE_MESSAGE);
+  } else if (relation.model.logger) {
+    relation.model.logger.warn(Batches.ORDER_IGNORE_MESSAGE);
   }
 }
 

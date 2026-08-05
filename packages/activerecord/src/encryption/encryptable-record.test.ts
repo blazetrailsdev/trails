@@ -19,8 +19,8 @@ import {
   ciphertextFor,
   withEncryptionContext,
   withoutEncryption,
-  DecryptionError,
-  EncryptionError,
+  Decryption,
+  Encryption,
   AUTHOR_NAME_LIMIT,
   Base,
 } from "./test-helpers.js";
@@ -91,7 +91,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
           return reloaded.title;
         },
       ),
-    ).rejects.toThrow(DecryptionError);
+    ).rejects.toThrow(Decryption);
   });
 
   it("swapping key_providers via with_encryption_context", async () => {
@@ -111,7 +111,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
         const r = await Post.find(post1.id);
         return r.title;
       }),
-    ).rejects.toThrow(DecryptionError);
+    ).rejects.toThrow(Decryption);
 
     const title1 = await withEncryptionContext({ keyProvider: keyProvider1 }, async () => {
       const r = await Post.find(post1.id);
@@ -277,7 +277,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
         const reloaded = await Author.find(author.id);
         return reloaded.name;
       })(),
-    ).rejects.toThrow(DecryptionError);
+    ).rejects.toThrow(Decryption);
   });
 
   it("by default, it's case sensitive", async () => {
@@ -437,7 +437,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     const Book = makeBookThatWillFailToEncryptName(await freshAdapter());
     new Book();
     const countBefore = await Book.count();
-    await expect(Book.create({ name: "Dune" })).rejects.toThrow(EncryptionError);
+    await expect(Book.create({ name: "Dune" })).rejects.toThrow(Encryption);
     expect(await Book.count()).toBe(countBefore);
   });
 
