@@ -108,16 +108,10 @@ describe("reseed", () => {
       { package: "ar", tsFile: "a.ts", rubyName: "foo", call: "save" },
       { package: "ar", tsFile: "c.ts", rubyName: "baz", call: "update" },
     ];
-    const next = reseed(current, baseline);
+    const next = reseed(current, baseline, "seeded");
     expect(next).toEqual([
       { package: "ar", tsFile: "a.ts", rubyName: "foo", call: "save", reason: "known" },
-      {
-        package: "ar",
-        tsFile: "c.ts",
-        rubyName: "baz",
-        call: "update",
-        reason: expect.stringContaining("Baseline (RFC 0044)"),
-      },
+      { package: "ar", tsFile: "c.ts", rubyName: "baz", call: "update", reason: "seeded" },
     ]);
   });
 

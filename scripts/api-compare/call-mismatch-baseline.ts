@@ -53,7 +53,6 @@
  */
 
 import { PACKAGES } from "./config.js";
-import { NARROW_DEFAULT_REASON as DEFAULT_REASON } from "./missing-rails-call-tags.js";
 
 // One flagged Ruby body call on a matched pair. The artifact groups several
 // `missing` calls under one (package, rubyName, tsFile) record; the baseline is
@@ -178,12 +177,15 @@ function sortEntries<T extends CallMismatchKey>(entries: T[]): T[] {
 }
 
 // Rebuild the baseline from the live artifact: keep each still-flagging call,
-// reusing a prior reason when present, defaulting new ones. Dropped rows are the
-// stale entries the gate would otherwise reject.
+// reusing a prior reason when present, seeding new ones with `defaultReason`.
+// Dropped rows are the stale entries the gate would otherwise reject.
+//
+// `defaultReason` is required: this module is gate-neutral, so the seed string
+// belongs to whichever gate is reseeding rather than to the shared machinery.
 export function reseed(
   current: CallMismatchKey[],
   baseline: ExcludeEntry[],
-  defaultReason: string = DEFAULT_REASON,
+  defaultReason: string,
 ): ExcludeEntry[] {
   const reasons = new Map(baseline.map((e) => [keyOf(e), e.reason]));
   // Collapse to one entry per key: the artifact can carry several `missing`
