@@ -903,7 +903,7 @@ export class DatabaseTasks {
       await this._appendSchemaInformation(filename);
       return;
     }
-    const { SchemaDumper } = await import("../schema-dumper.js");
+    const { SchemaDumper } = await import("../connection-adapters/abstract/schema-dumper.js");
     const adapter = await this._migrationAdapter();
     const fs = getFs();
     const path = getPath();

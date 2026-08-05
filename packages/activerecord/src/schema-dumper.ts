@@ -5,26 +5,22 @@
  * Mirrors: ActiveRecord::SchemaDumper
  * (activerecord/lib/active_record/schema_dumper.rb).
  *
- * This file carries the full dumper machinery (header, table walk,
- * column/index emission, default normalization). Rails splits the
- * same logic across two classes — the base here in schema_dumper.rb
- * and a `ConnectionAdapters::SchemaDumper` subclass at
- * connection_adapters/abstract/schema_dumper.rb that adds adapter-
- * specific column-spec helpers. TypeScript can't `extends` the subclass
- * back onto this base without an ESM temporal-dead-zone cycle, so we
- * keep a single dumper class here and mix the subclass's column-spec
- * helpers in as `this`-typed functions (CLAUDE.md "Module mixins"),
- * whose bodies live at connection-adapters/abstract/schema-dumper.ts
- * to preserve the api:compare file layout. Construction is fully
- * synchronous and needs no other module to have loaded the adapter layer.
+ * This file carries the base dumper machinery (header, table walk,
+ * column/index emission, default normalization), as Rails does. The
+ * adapter-specific column-spec helpers live on the
+ * `ConnectionAdapters::SchemaDumper` subclass at
+ * connection_adapters/abstract/schema_dumper.rb, ported at
+ * connection-adapters/abstract/schema-dumper.ts.
+ *
+ * The class is `abstract` and declares that half `protected abstract`,
+ * implementing none of it — Ruby's base likewise defines no `column_spec`
+ * and makes `new` a private class method. That keeps this module free of
+ * any import of the adapter module, which is what lets the adapter module
+ * `extends` this one without an ESM temporal-dead-zone cycle.
  */
 
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
-import * as adapterDumper from "./connection-adapters/abstract/schema-dumper.js";
-import type {
-  SchemaDumperMixinHost,
-  Column,
-} from "./connection-adapters/abstract/schema-dumper.js";
+import type { Column } from "./connection-adapters/abstract/schema-dumper.js";
 import { SchemaMigration } from "./schema-migration.js";
 import { ActiveRecordError } from "./errors.js";
 import type { Base } from "./base.js";
@@ -351,8 +347,7 @@ export function statelessTest(pattern: RegExp, value: string): boolean {
  * Generates the schema DSL string from a SchemaSource. Mirrors
  * Rails' base `ActiveRecord::SchemaDumper` class.
  */
-export class SchemaDumper {
-  static readonly DEFAULT_DATETIME_PRECISION = 6;
+export abstract class SchemaDumper {
   static ignoreTables: (string | RegExp)[] = [];
   /** @internal Mirrors Rails' `SchemaDumper.fk_ignore_pattern`. */
   static fkIgnorePattern: RegExp = /^fk_rails_[0-9a-f]{10}$/;
@@ -431,23 +426,24 @@ export class SchemaDumper {
   }
 
   /**
-   * Factory matching Rails' `SchemaDumper.create(connection, options)`.
-   * `this` is the concrete subclass, so calling `.create(...)` on an
-   * adapter subclass (`PostgreSQL::SchemaDumper.create`) returns that
-   * subclass.
-   *
-   * Mirrors: ActiveRecord::ConnectionAdapters::SchemaDumper.create
+   * The `new` gate. Rails' base declares `private_class_method :new`
+   * (schema_dumper.rb:11) and publishes no factory — `create(connection, options)`
+   * exists only on `ConnectionAdapters::SchemaDumper`
+   * (connection_adapters/abstract/schema_dumper.rb:8-10), which overrides this and
+   * is the only construction path that has the `column_spec` half. `this` is the
+   * concrete subclass, so `.create(...)` on a dialect subclass returns that subclass.
    */
-  static create<T extends typeof SchemaDumper>(
+  protected static create<T extends typeof SchemaDumper>(
     this: T,
     source: SchemaSource,
     options: Record<string, unknown> = {},
   ): InstanceType<T> {
-    // Single dumper class: the `emitTable`/`columnSpec` dispatch is mixed onto
-    // this prototype (see the wrappers below), so a bare-base construction is
-    // fully self-contained. `this` is the concrete subclass, so calling
-    // `.create(...)` on a dialect subclass returns that subclass.
-    return new this(source, options) as InstanceType<T>;
+    // The base is abstract (Ruby: no `column_spec`, and `private_class_method :new`),
+    // so the construction has to be typed through the concrete `this`.
+    return new (this as unknown as new (
+      source: SchemaSource,
+      options: Record<string, unknown>,
+    ) => InstanceType<T>)(source, options);
   }
 
   /**
@@ -860,138 +856,75 @@ export class SchemaDumper {
     return reordered;
   }
 
-  // Column-spec dispatch mixed in from the `ConnectionAdapters::SchemaDumper`
-  // layer (connection-adapters/abstract/schema-dumper.ts). The bodies live there
-  // to keep the api:compare file mapping; these thin `protected` wrappers put
-  // them on this single class's prototype (so dialect subclasses' `super`/
-  // `override` resolve normally) without a cyclic `extends`. Each wrapper passes
-  // `this` through `_mixinHost` because the mixed-in helpers reach members this
-  // class declares `protected` (a free function can't see those through `this`).
-
   /**
-   * The same instance, typed as the public host view the mixin helpers expect.
-   * Only a type reinterpretation — dynamic dispatch through `this` (dialect
-   * overrides of schemaType, schemaLimit, …) is preserved.
+   * The column-spec half of the dumper, defined only by the adapter subclass
+   * `ConnectionAdapters::SchemaDumper` (abstract/schema_dumper.rb:13-101) — as in
+   * Rails, where this base's `table` calls a private `column_spec` it never defines.
    * @internal
    */
-  private get _mixinHost(): SchemaDumperMixinHost {
-    return this as unknown as SchemaDumperMixinHost;
-  }
+  protected abstract validType(type: string | null | undefined): boolean;
 
   /** @internal */
-  protected validType(type: string | null | undefined): boolean {
-    return adapterDumper.validType.call(this._mixinHost, type);
-  }
-
-  /** @internal */
-  protected emitTable(
+  protected abstract emitTable(
     lines: string[],
     tableName: string,
     columns: ColumnInfo[],
     indexes: IndexInfo[],
-    adapterTableOpts: Record<string, unknown> = {},
-    inlineConstraints: string[] = [],
-  ): void {
-    return adapterDumper.emitTable.call(
-      this._mixinHost,
-      lines,
-      tableName,
-      columns,
-      indexes,
-      adapterTableOpts,
-      inlineConstraints,
-    );
-  }
+    adapterTableOpts?: Record<string, unknown>,
+    inlineConstraints?: string[],
+  ): void;
 
   /** @internal */
-  protected emitTableBody(
+  protected abstract emitTableBody(
     lines: string[],
     tableName: string,
     columns: ColumnInfo[],
     indexes: IndexInfo[],
-    adapterTableOpts: Record<string, unknown> = {},
-    inlineConstraints: string[] = [],
-  ): void {
-    return adapterDumper.emitTableBody.call(
-      this._mixinHost,
-      lines,
-      tableName,
-      columns,
-      indexes,
-      adapterTableOpts,
-      inlineConstraints,
-    );
-  }
+    adapterTableOpts?: Record<string, unknown>,
+    inlineConstraints?: string[],
+  ): void;
 
   /** @internal */
-  protected columnSpec(column: Column): [string, Record<string, unknown>] {
-    return adapterDumper.columnSpec.call(this._mixinHost, column);
-  }
+  protected abstract columnSpec(column: Column): [string, Record<string, unknown>];
 
   /** @internal */
-  protected columnSpecForPrimaryKey(column: Column): Record<string, unknown> {
-    return adapterDumper.columnSpecForPrimaryKey.call(this._mixinHost, column);
-  }
+  protected abstract columnSpecForPrimaryKey(column: Column): Record<string, unknown>;
 
   /** @internal */
-  protected prepareColumnOptions(column: Column): Record<string, unknown> {
-    return adapterDumper.prepareColumnOptions.call(this._mixinHost, column);
-  }
+  protected abstract prepareColumnOptions(column: Column): Record<string, unknown>;
 
   /** @internal */
-  protected isDefaultPrimaryKey(column: Column): boolean {
-    return adapterDumper.isDefaultPrimaryKey.call(this._mixinHost, column);
-  }
+  protected abstract isDefaultPrimaryKey(column: Column): boolean;
 
   /** @internal */
-  protected isExplicitPrimaryKeyDefault(column: Column): boolean {
-    return adapterDumper.isExplicitPrimaryKeyDefault.call(this._mixinHost, column);
-  }
+  protected abstract isExplicitPrimaryKeyDefault(column: Column): boolean;
 
   /** @internal */
-  protected schemaTypeWithVirtual(column: Column): string {
-    return adapterDumper.schemaTypeWithVirtual.call(this._mixinHost, column);
-  }
+  protected abstract schemaTypeWithVirtual(column: Column): string;
 
   /** @internal */
-  protected schemaType(column: Column): string {
-    return adapterDumper.schemaType.call(this._mixinHost, column);
-  }
+  protected abstract schemaType(column: Column): string;
 
   /** @internal */
-  protected isBigint(column: Column): boolean {
-    return adapterDumper.isBigint.call(this._mixinHost, column);
-  }
+  protected abstract isBigint(column: Column): boolean;
 
   /** @internal */
-  protected schemaLimit(column: Column): string | undefined {
-    return adapterDumper.schemaLimit.call(this._mixinHost, column);
-  }
+  protected abstract schemaLimit(column: Column): string | undefined;
 
   /** @internal */
-  protected schemaPrecision(column: Column): string | undefined {
-    return adapterDumper.schemaPrecision.call(this._mixinHost, column);
-  }
+  protected abstract schemaPrecision(column: Column): string | undefined;
 
   /** @internal */
-  protected schemaScale(column: Column): string | undefined {
-    return adapterDumper.schemaScale.call(this._mixinHost, column);
-  }
+  protected abstract schemaScale(column: Column): string | undefined;
 
   /** @internal */
-  protected schemaDefault(column: Column): string | undefined {
-    return adapterDumper.schemaDefault.call(this._mixinHost, column);
-  }
+  protected abstract schemaDefault(column: Column): string | undefined;
 
   /** @internal */
-  protected schemaExpression(column: Column): string | undefined {
-    return adapterDumper.schemaExpression.call(this._mixinHost, column);
-  }
+  protected abstract schemaExpression(column: Column): string | undefined;
 
   /** @internal */
-  protected schemaCollation(column: Column): string | undefined {
-    return adapterDumper.schemaCollation.call(this._mixinHost, column);
-  }
+  protected abstract schemaCollation(column: Column): string | undefined;
 
   /** @internal */
   indexParts(index: IndexInfo): string[] {

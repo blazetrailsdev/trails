@@ -12,7 +12,8 @@ import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/a
 
 describe("SchemaDumper trails-only cases", () => {
   it("schema dump emits defaultFunction as arrow for non-PK columns", async () => {
-    const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
+    const { SchemaDumper: TopLevelDumper } =
+      await import("./connection-adapters/abstract/schema-dumper.js");
     const source = {
       tables: () => ["gen_defaults"],
       columns: () => [
@@ -29,7 +30,8 @@ describe("SchemaDumper trails-only cases", () => {
   });
 
   it("schema dump round-trips PG range/network/bit-varying types via DSL helpers", async () => {
-    const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
+    const { SchemaDumper: TopLevelDumper } =
+      await import("./connection-adapters/abstract/schema-dumper.js");
     const source = {
       tables: () => ["dsl_types"],
       columns: () => [
@@ -76,7 +78,8 @@ describe("SchemaDumper trails-only cases", () => {
   });
 
   it("schema dump round-trips timestamptz/uuid/interval/oid without misclassifying as enum", async () => {
-    const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
+    const { SchemaDumper: TopLevelDumper } =
+      await import("./connection-adapters/abstract/schema-dumper.js");
     const source = {
       tables: () => ["non_helper_types"],
       columns: () => [
@@ -103,7 +106,8 @@ describe("SchemaDumper trails-only cases", () => {
   });
 
   it("indexParts emits include for covering indexes", async () => {
-    const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
+    const { SchemaDumper: TopLevelDumper } =
+      await import("./connection-adapters/abstract/schema-dumper.js");
     const emptySource = { tables: () => [], columns: () => [], indexes: () => [] };
     const dumper = new (TopLevelDumper as any)(emptySource);
     const parts = dumper.indexParts({ columns: ["a"], unique: false, include: ["b", "c"] });
@@ -111,7 +115,8 @@ describe("SchemaDumper trails-only cases", () => {
   });
 
   it("indexParts emits NULLS FIRST/LAST order strings verbatim", async () => {
-    const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
+    const { SchemaDumper: TopLevelDumper } =
+      await import("./connection-adapters/abstract/schema-dumper.js");
     const emptySource = { tables: () => [], columns: () => [], indexes: () => [] };
     const dumper = new (TopLevelDumper as any)(emptySource);
     const parts = dumper.indexParts({
@@ -123,7 +128,8 @@ describe("SchemaDumper trails-only cases", () => {
   });
 
   it("indexParts collapses uniform multi-column orders to a scalar", async () => {
-    const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
+    const { SchemaDumper: TopLevelDumper } =
+      await import("./connection-adapters/abstract/schema-dumper.js");
     const emptySource = { tables: () => [], columns: () => [], indexes: () => [] };
     const dumper = new (TopLevelDumper as any)(emptySource);
     const parts = dumper.indexParts({
@@ -135,7 +141,8 @@ describe("SchemaDumper trails-only cases", () => {
   });
 
   it("indexParts keeps mixed multi-column orders as a map", async () => {
-    const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
+    const { SchemaDumper: TopLevelDumper } =
+      await import("./connection-adapters/abstract/schema-dumper.js");
     const emptySource = { tables: () => [], columns: () => [], indexes: () => [] };
     const dumper = new (TopLevelDumper as any)(emptySource);
     const parts = dumper.indexParts({
@@ -147,7 +154,8 @@ describe("SchemaDumper trails-only cases", () => {
   });
 
   it("indexParts collapses uniform multi-column opclasses to a scalar", async () => {
-    const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
+    const { SchemaDumper: TopLevelDumper } =
+      await import("./connection-adapters/abstract/schema-dumper.js");
     const emptySource = { tables: () => [], columns: () => [], indexes: () => [] };
     const dumper = new (TopLevelDumper as any)(emptySource);
     const parts = dumper.indexParts({
@@ -213,7 +221,8 @@ describe("SchemaDumperAdapterTest", () => {
   });
 
   it("dumps schema from adapter introspection", async () => {
-    const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
+    const { SchemaDumper: TopLevelDumper } =
+      await import("./connection-adapters/abstract/schema-dumper.js");
     await adapter.createTable("horses", {}, (t) => {
       t.string("title", { null: false });
       t.text("body");
@@ -225,7 +234,8 @@ describe("SchemaDumperAdapterTest", () => {
   });
 
   it("dumps schema with indexes from adapter", async () => {
-    const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
+    const { SchemaDumper: TopLevelDumper } =
+      await import("./connection-adapters/abstract/schema-dumper.js");
     await adapter.createTable("testings", {}, (t) => {
       t.integer("post_id");
     });
@@ -236,7 +246,8 @@ describe("SchemaDumperAdapterTest", () => {
   });
 
   it("adapter-backed dump emits precision: null for datetime column without precision", async () => {
-    const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
+    const { SchemaDumper: TopLevelDumper } =
+      await import("./connection-adapters/abstract/schema-dumper.js");
     await adapter.createTable("octopi", {}, (t) => {
       t.datetime("happened_at", { precision: null });
     });
@@ -249,7 +260,8 @@ describe("SchemaDumperAdapterTest", () => {
     // dsl/raw type carried by AdapterSchemaSource. A live introspected column's
     // limit must survive the round-trip on the adapter path (not just the
     // in-memory schema-statements path).
-    const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
+    const { SchemaDumper: TopLevelDumper } =
+      await import("./connection-adapters/abstract/schema-dumper.js");
     await adapter.createTable("barcodes", {}, (t) => {
       t.string("code", { limit: 10 });
     });
@@ -258,7 +270,8 @@ describe("SchemaDumperAdapterTest", () => {
   });
 
   it("skips internal tables when dumping from adapter", async () => {
-    const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
+    const { SchemaDumper: TopLevelDumper } =
+      await import("./connection-adapters/abstract/schema-dumper.js");
     const { SchemaMigration } = await import("./schema-migration.js");
     const { InternalMetadata } = await import("./internal-metadata.js");
     await new SchemaMigration(adapter).createTable();
@@ -273,7 +286,8 @@ describe("SchemaDumperAdapterTest", () => {
   }, 60000);
 
   it("dumpWithVersion defaults to 0 when no versions recorded", async () => {
-    const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
+    const { SchemaDumper: TopLevelDumper } =
+      await import("./connection-adapters/abstract/schema-dumper.js");
     const { SchemaMigration } = await import("./schema-migration.js");
     const sm = new SchemaMigration(adapter);
     await sm.createTable();
@@ -283,7 +297,8 @@ describe("SchemaDumperAdapterTest", () => {
   }, 60000);
 
   it("dumpWithVersion includes latest migration version", async () => {
-    const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
+    const { SchemaDumper: TopLevelDumper } =
+      await import("./connection-adapters/abstract/schema-dumper.js");
     const { SchemaMigration } = await import("./schema-migration.js");
     const sm = new SchemaMigration(adapter);
     await sm.createTable();
@@ -342,7 +357,8 @@ describe("SchemaDumperAdapterTest", () => {
   });
 
   it("emitTable emits primaryKey array for composite primary keys", async () => {
-    const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
+    const { SchemaDumper: TopLevelDumper } =
+      await import("./connection-adapters/abstract/schema-dumper.js");
     const source = {
       tables: () => ["t"],
       columns: () => [
@@ -376,7 +392,8 @@ describe("SchemaDumperAdapterTest", () => {
 
 describe("SchemaDumper async header ordering", () => {
   it("schemas → extensions → types appear in that order when all three are async", async () => {
-    const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
+    const { SchemaDumper: TopLevelDumper } =
+      await import("./connection-adapters/abstract/schema-dumper.js");
     const log: string[] = [];
     class OrderedDumper extends TopLevelDumper {
       protected override async schemas(lines: string[]): Promise<void> {

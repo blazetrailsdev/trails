@@ -6,7 +6,7 @@
 import { describe, it, expect, vi, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { Base } from "./index.js";
-import { SchemaDumper } from "./schema-dumper.js";
+import { SchemaDumper } from "./connection-adapters/abstract/schema-dumper.js";
 import type { SchemaSource } from "./schema-dumper.js";
 import { NotNullViolation } from "./errors.js";
 import { adapterType } from "./test-adapter.js";

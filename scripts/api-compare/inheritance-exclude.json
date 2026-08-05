@@ -1,8 +1,1 @@
-[
-  {
-    "package": "activerecord",
-    "rubyFile": "connection_adapters/abstract/schema_dumper.rb",
-    "rubyFqn": "ActiveRecord::ConnectionAdapters::SchemaDumper",
-    "reason": "Rails declares `class SchemaDumper < SchemaDumper` (connection_adapters/abstract/schema_dumper.rb:5) — the adapter layer subclasses ActiveRecord::SchemaDumper, whose `table` calls the private `column_spec` only the subclass defines. A static TS `extends` across the two modules is an ESM temporal-dead-zone cycle (base imports the subclass's members, subclass extends the base), so trails ships one class: the adapter-layer members are `this`-typed mixin functions the base assigns onto its own prototype, and connection-adapters/abstract/schema-dumper.ts re-exports the base class. That keeps bare-base construction working with no cyclic import; the price is that the TS class has no ancestor chain."
-  }
-]
+[]

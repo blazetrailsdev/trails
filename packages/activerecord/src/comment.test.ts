@@ -8,7 +8,7 @@ import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/a
 import { adapterType } from "./test-adapter.js";
 import { fixtures } from "./test-fixtures.js";
 import { itIfSupports } from "./support/supports.js";
-import { SchemaDumper } from "./schema-dumper.js";
+import { SchemaDumper } from "./connection-adapters/abstract/schema-dumper.js";
 
 describe("CommentTest", () => {
   // Ride the boot-laid `Base.connection` (single-pool test model) rather than a
