@@ -46,9 +46,9 @@ import {
 } from "../errors.js";
 import { sql as arelSql, Nodes, Visitors } from "@blazetrails/arel";
 import { StatementPool as ConnectionStatementPool } from "./statement-pool.js";
-import {
+import type {
   SchemaCreation as MysqlSchemaCreation,
-  type MysqlAddColumnOptions,
+  MysqlAddColumnOptions,
 } from "./mysql/schema-creation.js";
 import {
   quote as mysqlQuote,
@@ -278,19 +278,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   get adapterName(): AdapterName {
     return "mysql";
-  }
-
-  private _mysqlSchemaCreation?: MysqlSchemaCreation;
-  /**
-   * MySQL-specific SchemaCreation so that DDL methods mixed in from
-   * SchemaStatements (e.g. `addColumn`) emit `CHARACTER SET` / `COLLATE`
-   * clauses. Overrides the abstract SchemaStatements getter which would
-   * otherwise create a bare `abstract/schema-creation` instance lacking
-   * MySQL-specific column-option handling.
-   * @internal
-   */
-  get schemaCreation(): MysqlSchemaCreation {
-    return (this._mysqlSchemaCreation ??= new MysqlSchemaCreation(this));
   }
 
   // Rails maps MySQL::SchemaStatements#table_alias_length (256, not the
@@ -2096,6 +2083,15 @@ export class StatementPool extends ConnectionStatementPool<MysqlPreparedStatemen
  * with the mixin by `scripts/mixin-declaration-drift.ts`. @internal
  */
 export interface AbstractMysqlAdapter {
+  /**
+   * MySQL-specific SchemaCreation so that DDL methods mixed in from
+   * SchemaStatements (e.g. `addColumn`) emit `CHARACTER SET` / `COLLATE`
+   * clauses. Rails declares it on `MySQL::SchemaStatements`
+   * (mysql/schema_statements.rb:139), not on the adapter, so it arrives here
+   * through `include(AbstractMysqlAdapter, MysqlSchemaStatements)`.
+   */
+  readonly schemaCreation: MysqlSchemaCreation;
+
   updateTableDefinition(tableName: string, base?: unknown): MysqlTable;
 
   addIndex(

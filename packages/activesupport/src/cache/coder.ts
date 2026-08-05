@@ -29,6 +29,7 @@
 // needs escaping (see ARRAY_ESCAPE below).
 // entry.ts imports `coder` from here; `LazyEntry` extends `Entry` lazily (see
 // lazyEntryClass) so this cyclic import is never dereferenced at module-eval.
+import { Temporal } from "../temporal.js";
 import { Entry } from "./entry.js";
 import { DeserializationError } from "./deserialization-error.js";
 
@@ -36,6 +37,7 @@ const PREFIX = "~#";
 const UNDEF = "~#u";
 const BIGINT = "~#b";
 const DATE = "~#d";
+const INSTANT = "~#i";
 const NUMBER = "~#n";
 const ARRAY_ESCAPE = "~#a";
 
@@ -61,6 +63,10 @@ function encode(value: unknown): unknown {
   // boundary: cache values are arbitrary JS objects; a real JS Date must be
   // preserved with full fidelity, so we tag it explicitly here.
   if (value instanceof Date) return [DATE, value.getTime()];
+
+  // boundary: Ruby Marshal round-trips a Time, and `Temporal.Instant` is the
+  // trails analogue, so it is tagged for the same reason a JS Date is.
+  if (value instanceof Temporal.Instant) return [INSTANT, value.toString()];
 
   if (Array.isArray(value)) {
     const encoded = value.map(encode);
@@ -90,6 +96,8 @@ function decode(node: unknown): unknown {
         case DATE:
           // boundary: restoring the JS Date tagged on the way out.
           return new Date(node[1] as number);
+        case INSTANT:
+          return Temporal.Instant.from(node[1] as string);
         case NUMBER: {
           const v = node[1] as string;
           return v === "NaN" ? NaN : v === "Infinity" ? Infinity : -Infinity;
@@ -111,7 +119,7 @@ function decode(node: unknown): unknown {
 /**
  * The trails Marshal-equivalent cache serializer. Mirrors the `dump`/`load`
  * surface of Rails' `Cache::Coder` while preserving JS type fidelity (Date,
- * undefined, bigint, NaN/±Infinity) that plain JSON would lose.
+ * `Temporal.Instant`, undefined, bigint, NaN/±Infinity) that plain JSON would lose.
  *
  * @internal
  */

@@ -180,6 +180,34 @@ export const SOURCES: readonly UpstreamSource[] = [
     ],
   },
   {
+    name: "date",
+    origin: {
+      type: "git",
+      url: "https://github.com/ruby/date.git",
+      ref: "v3.4.1",
+    },
+    packages: [
+      {
+        // The date port (packages/i18n/src/date.ts today) cites
+        // `ext/date/date_core.c` / `ext/date/date_parse.c` by line
+        // throughout, so the C sources have to be readable in-tree.
+        // `libPath: "lib"` covers `lib/date.rb` — the Ruby-visible surface
+        // api-compare would extract once it is enrolled.
+        name: "date",
+        libPath: "lib",
+        testPath: "test/date",
+        // Vendored-only for now: the gem's surface is implemented in C, so
+        // the Ruby extractor sees almost nothing until RFC
+        // 0088-date-gem-port's `date-package-scaffold`,
+        // `date-api-compare-enrollment` and `date-test-compare-enrollment`
+        // stories land `packages/date` and flip these on. Same
+        // shipped-interim pattern RFC 0074 used for i18n.
+        compareApi: false,
+        compareTests: false,
+      },
+    ],
+  },
+  {
     name: "i18n",
     origin: {
       type: "git",

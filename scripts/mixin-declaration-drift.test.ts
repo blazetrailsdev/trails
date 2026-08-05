@@ -103,6 +103,39 @@ describe("mixin declaration drift", () => {
     expect(requiredInterfaceMethodNames("adapter.ts", source, "Adapter")).toEqual(["addIndex"]);
   });
 
+  it("compares a mixin getter against the interface property that restates it", () => {
+    const mixinSource = [
+      "export class Mixin {",
+      "  get schemaCreation(): SchemaCreation {",
+      "    return new SchemaCreation(this);",
+      "  }",
+      "}",
+    ].join("\n");
+    const interfaceSource = [
+      "export interface Adapter {",
+      "  readonly schemaCreation: SchemaCreation;",
+      "}",
+    ].join("\n");
+    const mixin = mixinSignatures("mixin.ts", mixinSource, "Mixin");
+    const declared = interfaceSignatures("adapter.ts", interfaceSource, "Adapter");
+    expect(mixin).toEqual([{ name: "schemaCreation", signature: ": SchemaCreation" }]);
+    expect(findDrift(mixin, declared)).toEqual([]);
+    expect(requiredInterfaceMethodNames("adapter.ts", interfaceSource, "Adapter")).toEqual([
+      "schemaCreation",
+    ]);
+  });
+
+  it("reports a getter the interface restates with a stale type", () => {
+    const mixinSource = "export class Mixin {\n  get schemaCreation(): SchemaCreation {}\n}";
+    const interfaceSource = "export interface Adapter {\n  readonly schemaCreation: unknown;\n}";
+    expect(
+      findDrift(
+        mixinSignatures("mixin.ts", mixinSource, "Mixin"),
+        interfaceSignatures("adapter.ts", interfaceSource, "Adapter"),
+      ),
+    ).toEqual([{ name: "schemaCreation", mixin: ": SchemaCreation", declared: ": unknown" }]);
+  });
+
   it("reports a mixin signature the interface no longer matches", () => {
     const mixin: SignatureEntry[] = [{ name: "addIndex", signature: "(name: string): void" }];
     const stale: SignatureEntry[] = [{ name: "addIndex", signature: "(name: number): void" }];

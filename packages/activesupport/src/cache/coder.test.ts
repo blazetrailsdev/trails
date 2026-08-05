@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { coder } from "./coder.js";
+import { Temporal } from "../temporal.js";
 
 // Fidelity guarantees of the trails Marshal-equivalent serializer: the cases
 // where plain JSON would lose or mangle a value. These are not Rails tests —
@@ -14,6 +15,13 @@ describe("cache coder fidelity", () => {
     const result = roundtrip(date) as Date;
     expect(result).toBeInstanceOf(Date);
     expect(result.getTime()).toBe(date.getTime());
+  });
+
+  it("preserves Temporal.Instant instances", () => {
+    const instant = Temporal.Instant.from("2004-01-01T00:00:00Z");
+    const result = roundtrip(instant) as Temporal.Instant;
+    expect(result).toBeInstanceOf(Temporal.Instant);
+    expect(result.equals(instant)).toBe(true);
   });
 
   it("preserves undefined distinct from null", () => {
