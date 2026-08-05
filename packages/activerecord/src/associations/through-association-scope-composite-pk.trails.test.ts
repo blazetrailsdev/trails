@@ -44,7 +44,7 @@ CpkOrder.hasMany("tagsWithMixedCondition", {
 });
 
 interface ThroughScopeProbe {
-  _buildThroughScope(): { toSql(): string };
+  throughScope(): { toSql(): string };
 }
 
 describe("Preloader::ThroughAssociation#through_scope composite-PK through", () => {
@@ -64,7 +64,7 @@ describe("Preloader::ThroughAssociation#through_scope composite-PK through", () 
   it("JOINs the source and copies a mixed through+source predicate onto the composite-PK through query", () => {
     const order = cpkOrders("cpk_groceries_order_1");
     const loader = throughLoader([order], "tagsWithMixedCondition");
-    const sql = (loader as unknown as ThroughScopeProbe)._buildThroughScope().toSql();
+    const sql = (loader as unknown as ThroughScopeProbe).throughScope().toSql();
     // The whole mixed predicate rides the through query (both column references
     // are the verbatim raw-SQL string, adapter-quoting-independent), and the
     // source is eager-JOINed so `cpk_tags.name` resolves alongside it — one query.

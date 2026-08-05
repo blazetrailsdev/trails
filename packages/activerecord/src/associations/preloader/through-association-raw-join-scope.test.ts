@@ -88,9 +88,7 @@ describe("Preloader::ThroughAssociation#through_scope raw-join handling", () => 
     // through query then raises ConfigurationError because the raw string is
     // treated as an association name that Club has no reflection for.
     expect(() =>
-      (loader as unknown as { _buildThroughScope: () => { toSql: () => string } })
-        ._buildThroughScope()
-        .toSql(),
+      (loader as unknown as { throughScope: () => { toSql: () => string } }).throughScope().toSql(),
     ).toThrow(ConfigurationError);
   });
 

@@ -96,7 +96,7 @@ type HasOneHost = {
 });
 
 // Nested through (through reflection `club` is itself a has_one-through, so
-// `_reflectionScope` is the flattened chain scope) whose has_ONE target's own
+// `reflectionScope` is the flattened chain scope) whose has_ONE target's own
 // scope reaches `categorizations` via a RAW join + `.where`. Exercises the
 // "join" branch's flattened raw-join handling for a has_one nested through.
 (Member as unknown as HasOneHost).hasOne("rawCategoryOfClub", {
@@ -122,8 +122,8 @@ describe("Preloader::ThroughAssociation#through_scope nested raw-join handling",
   }
 
   function buildSql(loader: ThroughAssociation): string {
-    return (loader as unknown as { _buildThroughScope: () => { toSql: () => string } })
-      ._buildThroughScope()
+    return (loader as unknown as { throughScope: () => { toSql: () => string } })
+      .throughScope()
       .toSql();
   }
 

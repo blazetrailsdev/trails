@@ -2524,9 +2524,8 @@ export class Date {
    * naming the same Julian day under a different reform start.
    *
    * `dup_obj_with_new_start` dups the receiver, so a `DateTime` keeps its class
-   * and its time of day; this answers a `Date`, because `DateTime` carries no
-   * `start` to dup yet. Story
-   * `0074-i18n-parity/datetime-new-start-preserves-the-receiver`.
+   * and its time of day; `DateTime` overrides this to rebuild itself, since a
+   * TS class cannot dup through its superclass's constructor.
    */
   newStart(start: number = DEFAULT_SG): Date {
     return Date.jd(this.#jd, start);
@@ -2592,9 +2591,22 @@ export class DateTime extends Date {
   readonly #min: number;
   readonly #sec: number;
 
-  /** Ruby `DateTime.new(year, month, day, hour = 0, minute = 0, second = 0)`. */
-  constructor(year: number, month: number, day: number, hour = 0, minute = 0, second = 0) {
-    super(year, month, day);
+  /**
+   * Ruby `DateTime.new(y, m, d, h = 0, min = 0, s = 0, offset = 0, start =
+   * Date::ITALY)` (ruby/date, `date_core.c` `datetime_s_new`). `offset` is the
+   * one argument omitted — `DateTime#zone` is fixed at `"+00:00"` — so `start`
+   * takes its place rather than trailing a hole.
+   */
+  constructor(
+    year: number,
+    month: number,
+    day: number,
+    hour = 0,
+    minute = 0,
+    second = 0,
+    start: number = DEFAULT_SG,
+  ) {
+    super(year, month, day, start);
     this.#hour = hour;
     this.#min = minute;
     this.#sec = second;
@@ -2615,6 +2627,19 @@ export class DateTime extends Date {
   /** `DateTime#zone` is the UTC offset, where `Time#zone` is `"UTC"`. */
   get zone(): string {
     return "+00:00";
+  }
+
+  /**
+   * Ruby inherits `new_start` from `Date`, whose `dup_obj_with_new_start`
+   * (ruby/date, `date_core.c:5802-5812`) dups the *receiver*, so a `DateTime`
+   * keeps its class and its hour/min/sec. A TS subclass cannot be dup'd through
+   * `Date`'s constructor, so the receiver is rebuilt here. `#italy` /
+   * `#england` / `#julian` / `#gregorian` route through here, as `d_lite_italy`
+   * and friends route through `dup_obj_with_new_start`.
+   */
+  override newStart(start: number = DEFAULT_SG): DateTime {
+    const d = super.newStart(start);
+    return new DateTime(d.year, d.mon, d.day, this.#hour, this.#min, this.#sec, start);
   }
 
   override strftime(format: string): string {

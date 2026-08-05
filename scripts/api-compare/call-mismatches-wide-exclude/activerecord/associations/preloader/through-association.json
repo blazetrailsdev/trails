@@ -2,34 +2,6 @@
   {
     "package": "activerecord",
     "tsFile": "associations/preloader/through-association.ts",
-    "rubyName": "future_classes",
-    "call": "map",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/preloader/through-association.ts",
-    "rubyName": "future_classes",
-    "call": "source_preloaders",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/preloader/through-association.ts",
-    "rubyName": "future_classes",
-    "call": "source_reflection",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/preloader/through-association.ts",
-    "rubyName": "future_classes",
-    "call": "through_preloaders",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/preloader/through-association.ts",
     "rubyName": "records_by_owner",
     "call": "any?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -44,50 +16,8 @@
   {
     "package": "activerecord",
     "tsFile": "associations/preloader/through-association.ts",
-    "rubyName": "records_by_owner",
-    "call": "preload_index",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/preloader/through-association.ts",
-    "rubyName": "records_by_owner",
-    "call": "source_records_by_owner",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/preloader/through-association.ts",
-    "rubyName": "records_by_owner",
-    "call": "through_records_by_owner",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/preloader/through-association.ts",
-    "rubyName": "records_by_owner",
-    "call": "through_reflection",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/preloader/through-association.ts",
-    "rubyName": "runnable_loaders",
-    "call": "data_available?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/preloader/through-association.ts",
-    "rubyName": "runnable_loaders",
-    "call": "source_preloaders",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/preloader/through-association.ts",
-    "rubyName": "runnable_loaders",
-    "call": "through_preloaders",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "rubyName": "source_preloaders",
+    "call": "scope",
+    "reason": "Deliberate: the source Preloader is handed a scope derived from `reflectionScope`/`preloadScope` rather than `scope`, because `throughScope` may already have eager-loaded the source (see the block comment at the call site)."
   }
 ]
