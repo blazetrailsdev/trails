@@ -449,6 +449,10 @@ export class ConnectionPool implements ReapablePool {
       const pool = this;
       this._adapterProxy = new Proxy({} as DatabaseAdapter, {
         get(_target, prop) {
+          // A data property on every real adapter, not a method: answering a
+          // `withConnection` dispatcher here would hand callers a function
+          // where `abstract_adapter.rb:153`'s `@pool` is expected.
+          if (prop === "pool") return pool;
           if (prop === "adapterName")
             return (
               (pool.activeConnection ?? pool.connections[0])?.adapterName ??

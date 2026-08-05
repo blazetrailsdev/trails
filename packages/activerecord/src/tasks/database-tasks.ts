@@ -361,7 +361,7 @@ export class DatabaseTasks {
     })(
       paths == null ? [] : Array.isArray(paths) ? paths : [paths],
       new SchemaMigration(adapter),
-      new InternalMetadata(adapter, { enabled: dbConfig.useMetadataTable }),
+      new InternalMetadata(adapter),
     );
   }
 
@@ -372,7 +372,6 @@ export class DatabaseTasks {
     const { Migrator } = await import("../migration.js");
     return new Migrator(adapter, this._migrationsFor(dbConfig), {
       environment: dbConfig.envName,
-      internalMetadataEnabled: dbConfig.useMetadataTable,
     });
   }
 
@@ -1593,14 +1592,24 @@ export async function checkCurrentProtectedEnvironmentBang(
 ): Promise<void> {
   const { NoDatabaseError } = await import("../errors.js");
   const { EnvironmentMismatchError } = await import("../migration.js");
+  // Deviation: Rails uses `with_temporary_pool { |pool| pool.migration_context }`
+  // and rescues inside the block (`database_tasks.rb:635-636`, `:648-649`).
+  // `ConnectionPool#migrationContext` builds its collaborators over the pool's
+  // adapter proxy, which routes the synchronous `toSql` those queries need
+  // through `withConnection` and hands them a Promise instead of SQL; and
+  // `withTemporaryConnection` leases eagerly, so `NoDatabaseError` can surface
+  // from the lease. Both converge in
+  // `check-current-protected-environment-pool-migration-context-blocked-on-adapter-proxy`.
   try {
     await DatabaseTasks.withTemporaryConnection(dbConfig, async (adapter) => {
-      const context = await DatabaseTasks._migrationContextFor(adapter, dbConfig);
-      const current = context.currentEnvironment;
-      const stored = await context.lastStoredEnvironment();
-      if (stored && (await context.protectedEnvironment())) {
-        throw new ProtectedEnvironmentError(stored);
+      const migrationContext = await DatabaseTasks._migrationContextFor(adapter, dbConfig);
+      const current = migrationContext.currentEnvironment;
+      const stored = await migrationContext.lastStoredEnvironment();
+
+      if (await migrationContext.protectedEnvironment()) {
+        throw new ProtectedEnvironmentError(stored!);
       }
+
       if (stored && stored !== current) {
         throw new EnvironmentMismatchError(current, stored);
       }

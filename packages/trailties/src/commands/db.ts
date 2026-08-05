@@ -375,17 +375,11 @@ interface RunOptions {
 function createMigrator(
   adapter: DatabaseAdapter,
   migrations: Awaited<ReturnType<typeof discoverMigrations>>,
-  raw?: RawConfig,
 ): Migrator {
   const envName = resolveEnv();
   return new Migrator(adapter, migrations, {
     environment: envName,
-    internalMetadataEnabled: metadataTableEnabled(raw),
   });
-}
-
-function metadataTableEnabled(raw?: RawConfig): boolean {
-  return raw == null || (raw as { useMetadataTable?: boolean }).useMetadataTable !== false;
 }
 
 async function runMigrate(
@@ -400,7 +394,7 @@ async function runMigrate(
     return;
   }
 
-  const migrator = createMigrator(adapter, migrations, raw);
+  const migrator = createMigrator(adapter, migrations);
   await migrator.migrate(targetVersion ?? null);
 
   const pending = await migrator.pendingMigrations();
@@ -600,7 +594,6 @@ async function withMigrationTasksForDb(
   if (opts?.afterPending) {
     const migrator = new Migrator(ctx.adapter, migrations, {
       environment: ctx.config.envName,
-      internalMetadataEnabled: ctx.config.useMetadataTable,
     });
     opts.afterPending((await migrator.pendingMigrations()).length);
   }
@@ -659,7 +652,6 @@ async function runMigrateAll(targetVersion: string | null): Promise<void> {
           const migrations = migrationsFor.get(name) ?? [];
           const migrator = new Migrator(await pool.leaseConnection(), migrations, {
             environment: hashConfig.envName,
-            internalMetadataEnabled: hashConfig.useMetadataTable,
           });
           const pending = await migrator.pendingMigrations();
           if (pending.length === 0) console.log(`${prefix}All migrations are up to date.`);
@@ -743,8 +735,8 @@ export function dbCommand(): Command {
     .description("Print the current schema version")
     .option("--database <name>", "Target a specific named database")
     .action(async (opts: DatabaseOpts) => {
-      await forEachDatabase(opts, async ({ adapter, prefix, raw: dbRaw }) => {
-        const migrator = createMigrator(adapter, [], dbRaw);
+      await forEachDatabase(opts, async ({ adapter, prefix }) => {
+        const migrator = createMigrator(adapter, []);
         const version = await migrator.currentVersionReadOnly();
         console.log(`${prefix}Current version: ${version}`);
       });
@@ -755,11 +747,9 @@ export function dbCommand(): Command {
     .description("Stamp the schema with the current environment name")
     .option("--database <name>", "Target a specific named database")
     .action(async (opts: DatabaseOpts) => {
-      await forEachDatabase(opts, async ({ adapter, raw, prefix }) => {
+      await forEachDatabase(opts, async ({ adapter, prefix }) => {
         const envName = resolveEnv();
-        const internalMetadata = new InternalMetadata(adapter, {
-          enabled: metadataTableEnabled(raw),
-        });
+        const internalMetadata = new InternalMetadata(adapter);
         if (!internalMetadata.enabled) {
           const { EnvironmentStorageError } = await import("@blazetrails/activerecord");
           throw new EnvironmentStorageError();
@@ -801,7 +791,7 @@ export function dbCommand(): Command {
         const mDirs = await migrationsDirsForConfig(name, raw);
         const migrations = await discoverMigrationsFromDirs(mDirs);
         if (migrations.length === 0) return;
-        const migrator = createMigrator(adapter, migrations, raw);
+        const migrator = createMigrator(adapter, migrations);
         // Use the read-only pending check so running this in a
         // production-health-check context (e.g. before deploying) doesn't
         // silently create schema_migrations / ar_internal_metadata.
@@ -1011,7 +1001,7 @@ export function dbCommand(): Command {
           return;
         }
 
-        const migrator = createMigrator(adapter, migrations, raw);
+        const migrator = createMigrator(adapter, migrations);
         const statuses = await migrator.migrationsStatus();
 
         console.log("");

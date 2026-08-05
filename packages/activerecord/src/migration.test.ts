@@ -1121,22 +1121,38 @@ describe("MigrationTest", () => {
     const adapter = Base.connection;
     const { InternalMetadata } = await import("./internal-metadata.js");
 
-    const im = new InternalMetadata(adapter, { enabled: false });
+    // migration_test.rb:727-730 — drop the table, then swap
+    // `use_metadata_table: false` into the pool's db_config configuration_hash.
+    const im = new InternalMetadata(adapter);
+    await im.dropTable();
+
+    const { _setConfigurationHash } = await import("./database-configurations/database-config.js");
+    type Cfg = import("./database-configurations/database-config.js").DatabaseConfig;
+    const dbConfig = (adapter.pool as { dbConfig: Cfg }).dbConfig;
+    const originalConfig = dbConfig.configuration;
+    _setConfigurationHash(dbConfig, { ...originalConfig, useMetadataTable: false });
+
     expect(im.enabled).toBe(false);
+    expect(await im.tableExists()).toBe(false);
 
     const proxy: MigrationProxy = {
       version: "1",
       name: "TestMigration",
       migration: () => anonymousMigration("TestMigration", "1"),
     };
-    const migrator = new Migrator(adapter, [proxy], { internalMetadataEnabled: false });
-    await migrator.up();
+    const migrator = new Migrator(adapter, [proxy]);
+    try {
+      await migrator.up();
 
-    // im.get() short-circuits to null when disabled, so use a catalog query to
-    // verify the table was physically not created (catalog tables always exist,
-    // so this doesn't trigger the test-adapter's auto-schema).
-    const rows = await adapter.execute(internalMetadataExistsSql(adapterType));
-    expect(Number(rows[0]?.cnt ?? 0)).toBe(0);
+      // im.get() short-circuits to null when disabled, so use a catalog query to
+      // verify the table was physically not created (catalog tables always exist,
+      // so this doesn't trigger the test-adapter's auto-schema).
+      const rows = await adapter.execute(internalMetadataExistsSql(adapterType));
+      expect(Number(rows[0]?.cnt ?? 0)).toBe(0);
+    } finally {
+      _setConfigurationHash(dbConfig, originalConfig);
+      await im.createTable();
+    }
   });
 
   it("inserting a new entry into internal metadata", async () => {
