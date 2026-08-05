@@ -1355,7 +1355,13 @@ export class CreatePosts extends Migration {
 
   // internal_metadata.rb:35-36 — `enabled?` is `@pool.db_config.use_metadata_table?`.
   function disableMetadataTable(adapter: unknown): void {
-    (adapter as { pool: unknown }).pool = { dbConfig: { useMetadataTable: false } };
+    // Override the pool's db_config rather than replacing the pool: Rails'
+    // @pool is always a pool object (abstract_adapter.rb:153), and the rest of
+    // the adapter reads schema_reflection off it during the migration.
+    Object.defineProperty((adapter as { pool: object }).pool, "dbConfig", {
+      value: { useMetadataTable: false },
+      configurable: true,
+    });
   }
 
   it("InternalMetadata with enabled=false refuses set writes with EnvironmentStorageError", async () => {

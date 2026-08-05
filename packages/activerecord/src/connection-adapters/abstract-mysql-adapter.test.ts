@@ -8,6 +8,7 @@ import {
 import { parseTableOptions } from "./abstract-mysql-adapter.js";
 import { SchemaCreation as MysqlSchemaCreation } from "./mysql/schema-creation.js";
 import { quote as mysqlQuote } from "./mysql/quoting.js";
+import { NullPool } from "./abstract/connection-pool.js";
 
 function makeColumn(opts: { autoIncrement?: boolean; defaultFunction?: string | null } = {}) {
   return new Column("id", null, { sqlType: "bigint" }, false, {
@@ -290,7 +291,7 @@ describe("AbstractMysqlAdapter#renameColumn wiring", () => {
     const { AbstractMysqlAdapter } = await import("./abstract-mysql-adapter.js");
     const adapter = Object.create(AbstractMysqlAdapter.prototype);
     const events: string[] = [];
-    adapter.pool = {};
+    adapter.pool = new NullPool();
     adapter.supportsRenameColumn = () => true;
     adapter.getDatabaseVersion = async () => {};
     adapter.quoteColumnName = (s: string) => `\`${s}\``;
@@ -550,6 +551,9 @@ function makeChangeColumnTextColumn(opts: { null_?: boolean; default_?: unknown 
 async function makeMinimalMysqlAdapter(overrides: Record<string, unknown> = {}) {
   const { AbstractMysqlAdapter } = await import("./abstract-mysql-adapter.js");
   const adapter = Object.create(AbstractMysqlAdapter.prototype);
+  // Object.create skips the constructor, which is what plants Rails' NullPool
+  // (abstract_adapter.rb:153); every adapter carries one.
+  adapter.pool = new NullPool();
   adapter.quoteColumnName = (s: string) => `\`${s}\``;
   adapter.quoteTableName = (s: string) => `\`${s}\``;
   adapter.quote = mysqlQuote;
