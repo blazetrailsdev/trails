@@ -154,11 +154,13 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
     return this.castType.type();
   }
 
-  // Rails memoizes on `support_unencrypted_data?` (encrypted_attribute_type.rb:56-59)
-  // because a scheme's `previous_schemes` is frozen at `encrypts` declaration time
-  // (encryptable_record.rb:73). trails resolves the global previous schemes lazily
-  // instead — see _effectivePreviousSchemes — so the result is not immutable and a
-  // memo would pin a pre-`configure` answer. Recompute, as the Ruby body would.
+  /**
+   * Rails memoizes on `support_unencrypted_data?` (encrypted_attribute_type.rb:56-59)
+   * because a scheme's `previous_schemes` is frozen at `encrypts` declaration time
+   * (encryptable_record.rb:73). trails resolves the global previous schemes lazily
+   * instead — see `_effectivePreviousSchemes` — so the result is not immutable and
+   * a memo would pin a pre-`configure` answer. Recompute, as the Ruby body does.
+   */
   get previousTypes(): EncryptedAttributeType[] {
     return this.buildPreviousTypesFor(this.previousSchemesIncludingCleanText());
   }
@@ -271,7 +273,7 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
 
   /** @internal */
   private isSerializeWithOldest(): boolean {
-    return this.scheme.isFixed() && this.previousTypesWithoutCleanText().length > 0;
+    return this.isFixed() && this.previousTypesWithoutCleanText().length > 0;
   }
 
   /** @internal */

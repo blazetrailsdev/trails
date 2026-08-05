@@ -259,9 +259,11 @@ export interface AbstractAdapter {
     allowNull: boolean,
     defaultValue?: unknown,
   ): Promise<void>;
-  // Rails' `add_columns(table_name, *column_names, type:, **options)`
-  // (schema_statements.rb:643): the trailing hash carries `type` plus the
-  // per-column options, so it is the last vararg, not a per-column record.
+  /**
+   * Rails' `add_columns(table_name, *column_names, type:, **options)`
+   * (schema_statements.rb:643) — the trailing hash carries `type` plus the
+   * per-column options, so it is the last vararg, not a per-column record.
+   */
   addColumns(
     tableName: string,
     ...args: [...string[], { type: ColumnType } & ColumnOptions]
