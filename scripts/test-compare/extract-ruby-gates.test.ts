@@ -296,6 +296,29 @@ describe("Ruby extractor gate detection", () => {
     expect(g["unless compound"]).toEqual({ guards: ["no_insert_returning"], source: ["class"] });
   });
 
+  it("reads a boolean nested under a negation in run space", () => {
+    const g = rubyGates({
+      "cases/bar_test.rb": `
+        def test_not_pg_and_feature; end if !(current_adapter?(:PostgreSQLAdapter) && supports_insert_returning?)
+        def test_unless_not_pg_or_feature; end unless !(current_adapter?(:PostgreSQLAdapter) || supports_insert_returning?)
+      `,
+    });
+    // `if !(A && feature)` runs on `!A || !feature` — a disjunction, even though
+    // the only operator in the source text is `&&`. Reading the token alone made
+    // it a pure conjunction and emitted the exclusion `ALL - postgresql`, which
+    // is wrong: the test also runs on PostgreSQL without the feature.
+    expect(g["not pg and feature"]).toEqual({
+      features: ["insert_returning"],
+      source: ["class"],
+    });
+    // `unless !(A || feature)` runs on `A || feature` — the same union, reached
+    // from the other path.
+    expect(g["unless not pg or feature"]).toEqual({
+      guards: ["no_insert_returning"],
+      source: ["class"],
+    });
+  });
+
   it("intersects a positive adapter with a negated adapter in a pure conjunction", () => {
     const g = rubyGates({
       "cases/bar_test.rb": `

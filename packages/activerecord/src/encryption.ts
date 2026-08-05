@@ -24,7 +24,11 @@ import { Scheme, type SchemeOptions } from "./encryption/scheme.js";
 import type { EncryptorLike } from "./encryption/encryptor.js";
 import { Aes256Gcm as AesGcmCipher } from "./encryption/cipher/aes256-gcm.js";
 export { Cipher } from "./encryption/cipher.js";
-import { EncryptableRecord, encryptedTypeOf } from "./encryption/encryptable-record.js";
+import {
+  EncryptableRecord,
+  encryptedTypeOf,
+  globalPreviousSchemesFor,
+} from "./encryption/encryptable-record.js";
 import { Configurable } from "./encryption/configurable.js";
 import { Contexts } from "./encryption/contexts.js";
 import { getEncryptionContext, type Context } from "./encryption/context.js";
@@ -137,6 +141,12 @@ export interface EncryptsOptions extends Omit<SchemeOptions, "encryptor"> {
   encryptor?: Encryptor;
 }
 
+/**
+ * `Base.encrypts`' variant of `EncryptableRecord#scheme_for`, carrying the
+ * legacy `{ encrypt, decrypt }` shim and the defaultEncryptor fallback. It owes
+ * `scheme_for`'s one-shot `previous_schemes` assignment
+ * (encryptable_record.rb:70-76): globals first, then the declared ones.
+ */
 function buildScheme(options: EncryptsOptions): Scheme {
   const { encryptor, previousSchemes: localPrevious = [], ...schemeOptions } = options;
 
@@ -168,11 +178,9 @@ function buildScheme(options: EncryptsOptions): Scheme {
       ? schemeOptions
       : { encryptor: new LegacyEncryptorShim(defaultEncryptor) };
 
-  // Only pass locally-declared previous schemes — global ones are resolved lazily
-  // in EncryptedAttributeType at serialize/deserialize time.
-  return localPrevious.length > 0
-    ? new Scheme({ ...coreOpts, previousSchemes: localPrevious })
-    : new Scheme(coreOpts);
+  const scheme = new Scheme(coreOpts);
+  scheme.previousSchemes = [...globalPreviousSchemesFor(scheme), ...localPrevious];
+  return scheme;
 }
 
 interface PendingEncryption {
@@ -205,14 +213,13 @@ export function encrypts(klass: any, ...args: Array<string | EncryptsOptions>): 
     }
   }
 
-  const scheme = buildScheme(options);
   // Drop the legacy `encryptor` field so the remaining shape is assignable to
   // SchemeOptions — the scheme is already built, so `encryptAttribute` only
   // reads `options.ignoreCase` from here.
   const { encryptor: _encryptor, ...schemeOptions } = options;
 
   for (const name of names) {
-    EncryptableRecord.encryptAttribute(klass, name, schemeOptions, scheme);
+    EncryptableRecord.encryptAttribute(klass, name, schemeOptions, () => buildScheme(options));
   }
 }
 

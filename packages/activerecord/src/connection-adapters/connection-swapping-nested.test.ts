@@ -62,7 +62,10 @@ describe("ConnectionSwappingNestedTest", () => {
     ...extra,
   });
 
+  let baselinePools: Set<unknown>;
+
   beforeEach(async () => {
+    baselinePools = new Set(Base.connectionHandler.connectionPoolList("all"));
     const fs = await asyncFs();
     const path = await getPathAsync();
     const os = await getOsAsync();
@@ -83,6 +86,13 @@ describe("ConnectionSwappingNestedTest", () => {
 
   afterEach(async () => {
     await Base.connectionHandler.clearAllConnectionsBang();
+    for (const pool of Base.connectionHandler.connectionPoolList("all")) {
+      if (baselinePools.has(pool)) continue;
+      Base.connectionHandler.removeConnectionPool(String(pool.connectionDescriptor.name), {
+        role: pool.role,
+        shard: pool.shard,
+      });
+    }
     Base.configurations(prevConfigs);
     DatabaseConfigurations.defaultEnv = prevDefaultEnv;
     (DatabaseConfigurations as any).current = prevCurrent;

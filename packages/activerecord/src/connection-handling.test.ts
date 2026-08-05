@@ -552,13 +552,13 @@ describe("ConnectionHandlingTest", () => {
 
     const priorCurrent = (DatabaseConfigurations as any).current;
     const priorConfigs = Base.configurations();
+    class WorkerModel extends Base {}
     try {
       const url = new UrlConfig(env, "primary", "sqlite3:db/foo.sqlite3");
       url._database = "db/foo-2.sqlite3"; // mimic worker-suffix mutation
       const inMemory = new DatabaseConfigurations([url]);
 
       Base.configurations(inMemory);
-      class WorkerModel extends Base {}
 
       await WorkerModel.establishConnection();
       // The connection pool's resolved dbConfig must point at the
@@ -573,6 +573,7 @@ describe("ConnectionHandlingTest", () => {
         await import("./connection-adapters/better-sqlite3-adapter.js");
       expect(Klass).toBe(BetterSQLite3Adapter);
     } finally {
+      await WorkerModel.removeConnection();
       Base.configurations(priorConfigs);
       (DatabaseConfigurations as any).current = priorCurrent;
     }
@@ -844,6 +845,7 @@ describe("resolveConfigForConnection / connectsTo with unset configurations", ()
       SecondaryAbstract.connectsTo({ database: { writing: "primary" } });
       expect((SecondaryAbstract as any)._connectionSpecificationName).toBe("SecondaryAbstract");
     } finally {
+      await SecondaryAbstract.removeConnection();
       __resetPrimaryAbstractClass();
       if (priorConfigs) Base.configurations(priorConfigs);
     }

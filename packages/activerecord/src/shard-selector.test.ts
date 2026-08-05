@@ -7,6 +7,7 @@ import { ambientPoolConfiguration } from "./test-adapter.js";
 describe("ShardSelectorTest", () => {
   afterEach(async () => {
     await Base.connectionHandler.clearAllConnectionsBang();
+    Base.connectionHandler.removeConnectionPool("Base", { shard: "shard_one" });
   });
 
   function setupShards() {

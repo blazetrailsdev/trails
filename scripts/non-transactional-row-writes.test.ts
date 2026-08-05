@@ -202,6 +202,43 @@ describe("non-transactional row writes", () => {
     expect(isOffender(src)).toBe(false);
   });
 
+  it("catches a write in an it.each tagged-template table body", () => {
+    const src = [
+      'describe("x", () => {',
+      "  const adapter = Base.connection;",
+      "",
+      "  it.each`",
+      "    name      | count",
+      '    ${"Dune"} | ${1}',
+      '  `("writes $name", async ({ name }) => {',
+      "    await Book.create({ name });",
+      "  });",
+      "});",
+      "",
+    ].join("\n");
+    expect(rowWritesAtItScope(src).map((w) => w.pattern)).toEqual([".create("]);
+    expect(isOffender(src)).toBe(true);
+  });
+
+  it("does not shift paren depth for parens inside a template literal", () => {
+    const src = [
+      'describe("x", () => {',
+      "  it.each`",
+      "    name",
+      "    ${String(1)} )))",
+      '  `("reads $name", async () => {',
+      "    expect(await Book.count()).toBe(0);",
+      "  });",
+      "",
+      '  it("writes", async () => {',
+      '    await Book.create({ name: "Dune" });',
+      "  });",
+      "});",
+      "",
+    ].join("\n");
+    expect(rowWritesAtItScope(src).map((w) => w.line)).toEqual([10]);
+  });
+
   it("does not grow past the seeded ratchet", async () => {
     const offenders = await findOffenders(path.join(REPO_ROOT, TEST_ROOT));
     const relative = offenders.map((file) => path.relative(REPO_ROOT, file));

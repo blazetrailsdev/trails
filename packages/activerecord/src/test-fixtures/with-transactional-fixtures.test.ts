@@ -69,6 +69,7 @@ describe("withTransactionalFixtures", () => {
     await Promise.resolve();
     await Promise.resolve();
     expect((pool as unknown as { _fixturePin: unknown })._fixturePin).not.toBeNull();
+    Base.connectionHandler.removeConnectionPool("MidTestPool");
   });
 
   it("nested user transaction becomes a savepoint and still rolls back at teardown", async () => {

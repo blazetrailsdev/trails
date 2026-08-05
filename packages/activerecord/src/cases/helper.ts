@@ -10,6 +10,7 @@
 // in activerecord/index.ts) to keep better-sqlite3 a true optional peer for
 // non-test consumers.
 import "../sqlite/better-sqlite3.js";
+import { afterAll, beforeAll, expect } from "vitest";
 import { Base } from "../base.js";
 import { I18n } from "@blazetrails/activemodel";
 import { getZone, setZone, resetZone, isZoneExplicit } from "@blazetrails/activesupport";
@@ -75,6 +76,51 @@ EncryptionConfigurable.configure({
 // railtie does in a real app (railtie.rb:349-355).
 EncryptionConfigurable.config.extendQueries = true;
 installExtendedQueriesIfConfigured();
+
+/**
+ * Rails' `ActiveRecord::TestCase` tears its connections down per case, so a
+ * pool cannot outlive the file that established it. trails' connection handler
+ * is module-level state shared by every test file in a vitest worker, and since
+ * PR #6109 `setup_transactional_fixtures` pins every writing pool up front
+ * (test_fixtures.rb:175-180) — and `pin_connection!` eagerly `verify!`s the
+ * connection (connection_pool.rb:335). So a pool one file leaves behind is
+ * opened for real by the next file that pins, and fails THAT file, on the lanes
+ * whose server actually rejects the config: `NoDatabaseError` on PostgreSQL,
+ * `ER_DBACCESS_DENIED_ERROR` on MariaDB. Naming the pools by connection
+ * descriptor and counting them per file fails the culprit instead of the victim.
+ *
+ * The baseline is taken once the file's module body has run, so a connection a
+ * file establishes at module scope — and keeps for its whole run — is its own.
+ */
+function writingPoolCensus(): Map<string, number> {
+  const census = new Map<string, number>();
+  for (const pool of Base.connectionHandler.connectionPoolList("writing")) {
+    const name = String(pool.connectionDescriptor?.name);
+    census.set(name, (census.get(name) ?? 0) + 1);
+  }
+  return census;
+}
+
+let baselineWritingPools = new Map<string, number>();
+
+beforeAll(() => {
+  baselineWritingPools = writingPoolCensus();
+});
+
+afterAll(() => {
+  const leaked: string[] = [];
+  for (const [name, count] of writingPoolCensus()) {
+    const before = baselineWritingPools.get(name) ?? 0;
+    if (count > before) leaked.push(before === 0 ? name : `${name} (${before} -> ${count})`);
+  }
+  expect(
+    leaked,
+    "This file left connection pool(s) in the writing list. Remove them in " +
+      "teardown (removeConnection() / connectionHandler.removeConnectionPool(name)): " +
+      "the next file to run in this worker pins and verifies every writing pool, " +
+      "and fails on yours instead of on this one.",
+  ).toEqual([]);
+});
 
 /**
  * Rails declares `module InTimeZone` inside this very file —

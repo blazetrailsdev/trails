@@ -2,7 +2,7 @@ import { Scheme, type SchemeOptions } from "./scheme.js";
 import { getEncryptionContext, withoutEncryption as _withoutEncryption } from "./context.js";
 import { Configuration as ConfigurationError } from "./errors.js";
 import { LengthValidator, type Type } from "@blazetrails/activemodel";
-import { EncryptedAttributeType, setGlobalPreviousSchemesFn } from "./encrypted-attribute-type.js";
+import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 import { Configurable } from "./configurable.js";
 import { encryptionHooks } from "../encryption-hooks.js";
 
@@ -22,24 +22,38 @@ export function globalPreviousSchemesFor(scheme: Scheme): Scheme[] {
 }
 
 /**
- * Mirrors Rails' EncryptableRecord#scheme_for.
- * Builds the scheme with only locally-declared previousSchemes; global previous
- * schemes are resolved lazily in EncryptedAttributeType at serialize/deserialize
- * time so that configure() calls after encrypts() are picked up automatically.
+ * Mirrors Rails' EncryptableRecord#scheme_for (encryptable_record.rb:70-76):
+ * the scheme is built from the declared options alone, then `previousSchemes`
+ * is assigned in one shot, globals first. Assigning it here — rather than
+ * resolving globals at type-read time — is what makes it frozen by
+ * construction, which is what lets EncryptedAttributeType memoize.
  *
  * @internal
  */
 function schemeFor(options: SchemeOptions): Scheme {
-  const { previousSchemes: localPrevious = [], ...rest } = options;
-  return localPrevious.length > 0
-    ? new Scheme({ ...rest, previousSchemes: localPrevious })
-    : new Scheme(rest);
+  const { previousSchemes: previous = [], ...rest } = options;
+  const scheme = new Scheme(rest);
+  scheme.previousSchemes = [...globalPreviousSchemesFor(scheme), ...previous];
+  return scheme;
 }
 
-// Register the global-previous-schemes provider into EncryptedAttributeType.
-// Called at module load time — always runs before any EncryptedAttributeType
-// accesses previousTypes because this module is loaded via encryption.ts first.
-setGlobalPreviousSchemesFn(globalPreviousSchemesFor);
+/**
+ * One `encrypts` declaration's bookkeeping, read back off `_pendingEncryptions`
+ * by `fixtures.ts` and `applyPendingEncryptions`.
+ *
+ * `scheme` is a getter, and unmemoized, because Rails calls `scheme_for` inside
+ * the `decorate_attributes` block (encryptable_record.rb:85-95): the scheme is
+ * built when the attribute type is resolved, and rebuilt on every replay, not
+ * when `encrypts` is called. That is what lets a `configure` between the two
+ * contribute its global previous schemes — "encryption schemes are resolved when
+ * used, not when declared" (encryptable_record_test.rb:388). A memo here would
+ * pin the pre-`configure` answer, the way the retired `_globalPreviousSchemesFn`
+ * injection point did one level up.
+ */
+interface PendingEncryption {
+  name: string;
+  readonly scheme: Scheme;
+}
 
 const ORIGINAL_ATTRIBUTE_PREFIX = "original_";
 
@@ -161,7 +175,7 @@ export class EncryptableRecord {
     modelClass: any,
     name: string,
     options: SchemeOptions = {},
-    prebuiltScheme?: Scheme,
+    buildScheme?: () => Scheme,
   ): void {
     // Own-property guard mirrors Rails' `class_attribute` semantics — a subclass
     // encrypting a new attribute must not mutate the parent's (or a sibling's) Set.
@@ -171,10 +185,12 @@ export class EncryptableRecord {
     modelClass._encryptedAttributes.add(name);
     delete modelClass._deterministicEncryptedAttributes;
 
-    // Build the per-attribute scheme (mirrors Rails scheme_for) unless the caller
-    // supplied one. Each attribute gets its own scheme so per-attribute options
-    // (deterministic, downcase, previousSchemes) don't leak across declarations.
-    const scheme = prebuiltScheme ?? schemeFor(options);
+    const pending: PendingEncryption = {
+      name,
+      get scheme(): Scheme {
+        return buildScheme ? buildScheme() : schemeFor(options);
+      },
+    };
 
     if (typeof modelClass.decorateAttributes === "function") {
       // Durable path (real model classes): push the durable PendingDecorator NOW,
@@ -186,14 +202,14 @@ export class EncryptableRecord {
       // time, so it needs no re-push after schema reflection. The
       // `_pendingEncryptions` buffer remains only for validator re-runs +
       // frozen-validator install on rebuild (applyPendingEncryptions).
-      this.registerPendingEncryption(modelClass, name, scheme);
-      this.pushEncryptionDecorator(modelClass, name, scheme);
+      this.registerPendingEncryption(modelClass, pending);
+      this.pushEncryptionDecorator(modelClass, name, pending);
       encryptionHooks.applyPendingEncryptions(modelClass);
     } else {
       // Immediate path (plain-object callers without decoration machinery, e.g.
       // direct `EncryptableRecord.encrypts` tests): register the encrypted type
       // synchronously so it's readable right after the call.
-      this.registerEncryptedType(modelClass, name, scheme);
+      this.registerEncryptedType(modelClass, name, pending.scheme);
     }
 
     if (Configurable.config.validateColumnSize) {
@@ -217,11 +233,11 @@ export class EncryptableRecord {
    * is kept in each entry for `encryptFixtureRows` (define-fixtures.ts).
    * @internal
    */
-  static registerPendingEncryption(modelClass: any, name: string, scheme: Scheme): void {
+  static registerPendingEncryption(modelClass: any, pending: PendingEncryption): void {
     if (!Object.prototype.hasOwnProperty.call(modelClass, "_pendingEncryptions")) {
       modelClass._pendingEncryptions = [...(modelClass._pendingEncryptions ?? [])];
     }
-    modelClass._pendingEncryptions.push({ name, scheme });
+    modelClass._pendingEncryptions.push(pending);
   }
 
   /**
@@ -239,7 +255,7 @@ export class EncryptableRecord {
    * DB default without any re-push.
    * @internal
    */
-  static pushEncryptionDecorator(modelClass: any, name: string, scheme: Scheme): void {
+  static pushEncryptionDecorator(modelClass: any, name: string, pending: PendingEncryption): void {
     modelClass.decorateAttributes([name], (attrName: string, castType: Type, host?: unknown) => {
       // Idempotence guard for the eager immediate-apply pass (a fresh-seed
       // replay applies each queued decorator once, but `decorateAttributes`
@@ -247,7 +263,7 @@ export class EncryptableRecord {
       if (castType instanceof EncryptedAttributeType) return null as unknown as Type;
       const target = host ?? modelClass;
       return new EncryptedAttributeType({
-        scheme,
+        scheme: pending.scheme,
         castType,
         default: this.columnDefaultFor(
           target,
@@ -390,8 +406,13 @@ export class EncryptableRecord {
     // namespace isn't loaded (pure-direct unit tests, which never serialize).
     // encryptAttribute's durable branch buffers this in _pendingEncryptions so
     // the original column rides the same replay-safe machinery as its source.
-    const originalScheme = encryptionHooks.buildScheme?.({}) as Scheme | undefined;
-    this.encryptAttribute(modelClass, originalName, {}, originalScheme);
+    const buildOriginalScheme = encryptionHooks.buildScheme;
+    this.encryptAttribute(
+      modelClass,
+      originalName,
+      {},
+      buildOriginalScheme && (() => buildOriginalScheme({}) as Scheme),
+    );
     this.overrideAccessorsToPreserveOriginal(modelClass, name, originalName);
   }
 
