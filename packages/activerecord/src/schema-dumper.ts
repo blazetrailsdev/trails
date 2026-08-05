@@ -5,18 +5,18 @@
  * Mirrors: ActiveRecord::SchemaDumper
  * (activerecord/lib/active_record/schema_dumper.rb).
  *
- * This file carries the full dumper machinery (header, table walk,
- * column/index emission, default normalization). Rails splits the
- * same logic across two classes — the base here in schema_dumper.rb
- * and a `ConnectionAdapters::SchemaDumper` subclass at
- * connection_adapters/abstract/schema_dumper.rb that adds adapter-
- * specific column-spec helpers. TypeScript can't `extends` the subclass
- * back onto this base without an ESM temporal-dead-zone cycle, so we
- * keep a single dumper class here and mix the subclass's column-spec
- * helpers in as `this`-typed functions (CLAUDE.md "Module mixins"),
- * whose bodies live at connection-adapters/abstract/schema-dumper.ts
- * to preserve the api:compare file layout. Construction is fully
- * synchronous and needs no other module to have loaded the adapter layer.
+ * This file carries the base dumper machinery (header, table walk,
+ * column/index emission, default normalization), as Rails does. The
+ * adapter-specific column-spec helpers live on the
+ * `ConnectionAdapters::SchemaDumper` subclass at
+ * connection_adapters/abstract/schema_dumper.rb, ported at
+ * connection-adapters/abstract/schema-dumper.ts.
+ *
+ * The class is `abstract` and declares that half `protected abstract`,
+ * implementing none of it — Ruby's base likewise defines no `column_spec`
+ * and makes `new` a private class method. That keeps this module free of
+ * any import of the adapter module, which is what lets the adapter module
+ * `extends` this one without an ESM temporal-dead-zone cycle.
  */
 
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
