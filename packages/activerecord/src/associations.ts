@@ -1126,10 +1126,10 @@ export async function _loadSingularViaStatementCache(
   targetModel: typeof Base,
 ): Promise<Base | null> {
   // Materialize the Association instance (as `_builtAssociationScope` does on
-  // the take() path) so the post-load `syncToAssociationInstance` finds a
-  // holder to `setTarget`/`loadedBang` — otherwise the cached target is never
-  // marked loaded and every read re-queries. Only the "not registered" case is
-  // swallowed; real construction bugs must surface.
+  // the take() path) for its `targetScope()` — see `baseScope` below, which
+  // needs it to carry a through association's join-model STI condition. Only
+  // the "not registered" case is swallowed; real construction bugs must
+  // surface.
   let instance: { targetScope?: () => unknown } | undefined;
   const assocFn = (record as { association?: (n: string) => unknown }).association;
   if (typeof assocFn === "function") {
