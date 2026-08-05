@@ -8,6 +8,7 @@ import {
   parseInheritanceExcludes,
   type InheritanceExcludeEntry,
 } from "./inheritance-exclude.js";
+import { missingScope, reportStale } from "./lint-inheritance-excludes.js";
 
 const entry: InheritanceExcludeEntry = {
   package: "activerecord",
@@ -56,6 +57,18 @@ describe("findStaleInheritanceExcludes", () => {
 
   it("reports nothing when the entry was applied", () => {
     expect(findStaleInheritanceExcludes([entry], [inheritanceExcludeKeyOf(entry)])).toEqual([]);
+  });
+});
+
+describe("lint-inheritance-excludes", () => {
+  it("reports a partial-scope artifact rather than calling every exclude stale", () => {
+    expect(
+      missingScope({ results: [{ package: "activerecord" }] }, ["activerecord", "i18n"]),
+    ).toEqual(["i18n"]);
+  });
+
+  it("names the stale entry in the failure message", () => {
+    expect(reportStale([entry])).toContain(inheritanceExcludeKeyOf(entry));
   });
 });
 
