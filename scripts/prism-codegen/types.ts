@@ -47,9 +47,9 @@ export interface Emitter {
   inClass: boolean;
   inSingleton: boolean;
   /**
-   * The class name `self` resolves to, set while emitting a class body's macro
-   * statements after the class declaration. `null` inside a method body, where
-   * `self` is the receiver and `this` is the faithful rendering.
+   * The class name `self` resolves to while a class body's macro statements are
+   * emitted after the declaration. `null` inside a method body, where `self` is
+   * the receiver and `this` is the faithful rendering.
    */
   selfName: string | null;
   readonly asyncMethods: ReadonlySet<string>;

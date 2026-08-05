@@ -460,9 +460,9 @@ function isEmittableTarget(t: PrismNode): boolean {
   }
 }
 /**
- * Ruby's `self`. Inside a method body that is the receiver, which TypeScript
- * spells `this`; in a class body it is the class itself, and a class-body macro
- * statement is emitted after the declaration where `this` no longer names it.
+ * Ruby's `self`: the receiver inside a method body, which TypeScript spells
+ * `this`, and the class itself in a class body, whose macro statements are
+ * emitted after the declaration where `this` no longer names it.
  */
 function selfOf(e: Emitter): ts.Expression {
   return e.selfName ? f.createIdentifier(e.selfName) : f.createThis();

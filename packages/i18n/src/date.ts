@@ -1681,26 +1681,16 @@ function jdOf(d: Temporal.PlainDate): number {
   return UNIX_EPOCH_IN_CJD + d.since(UNIX_EPOCH).days;
 }
 
-/**
- * @internal `date_core.c`'s `ITALY` (`date_core.c:186`), the Julian day of
- * 1582-10-15, the first day of the Gregorian calendar in Italy and ruby/date's
- * `DEFAULT_SG` (`date_core.c:190`).
- */
+/** @internal `date_core.c:186`, the Julian day of 1582-10-15. */
 const ITALY = 2299161;
 
-/** @internal `date_core.c`'s `ENGLAND` (`date_core.c:187`), the Julian day of 1752-09-14. */
+/** @internal `date_core.c:187`, the Julian day of 1752-09-14. */
 const ENGLAND = 2361222;
 
-/**
- * @internal `date_core.c`'s `JULIAN` (`date_core.c:188`), the proleptic Julian
- * calendar: a reform day that never arrives.
- */
+/** @internal `date_core.c:188`, the proleptic Julian calendar: a reform day that never arrives. */
 const JULIAN = Infinity;
 
-/**
- * @internal `date_core.c`'s `GREGORIAN` (`date_core.c:189`), the proleptic
- * Gregorian calendar: a reform day already past.
- */
+/** @internal `date_core.c:189`, the proleptic Gregorian calendar: a reform day already past. */
 const GREGORIAN = -Infinity;
 
 /** @internal `date_core.c`'s `DEFAULT_SG` (`date_core.c:190`). */
@@ -1718,13 +1708,13 @@ function mod(n: number, d: number): number {
 
 /**
  * @internal `date_core.c` `c_civil_to_jd` (`date_core.c:502-524`), the Julian
- * day of the civil date `y`-`m`-`d` under the calendar-reform start `sg`: the
- * Gregorian arithmetic, with the Gregorian century correction `b` taken back
- * off again for a day that falls before the reform and so is a Julian one.
+ * day of `y`-`m`-`d` under the calendar-reform start `sg`: the Gregorian
+ * arithmetic, with the century correction `b` taken back off again for a day
+ * before the reform, which is a Julian one.
  *
  * Ruby's `*ns` out-param — which side of the reform the day landed on — has no
- * counterpart here, because this port's {@link Date} carries no `sg`/`ns` state
- * of its own to answer `Date#julian?` off.
+ * counterpart here: this port's {@link Date} carries no `sg`/`ns` state of its
+ * own to answer `Date#julian?` off.
  */
 function cCivilToJd(y: number, m: number, d: number, sg: number): number {
   if (m <= 2) {
@@ -1740,8 +1730,8 @@ function cCivilToJd(y: number, m: number, d: number, sg: number): number {
 
 /**
  * @internal `date_core.c` `c_jd_to_civil` (`date_core.c:526-555`), the inverse
- * of {@link cCivilToJd}: the Gregorian century correction is applied only to a
- * Julian day at or after the reform.
+ * of {@link cCivilToJd}: the century correction applies only at or after the
+ * reform.
  */
 function cJdToCivil(jd: number, sg: number): [ry: number, rm: number, rdom: number] {
   let a: number;
@@ -1770,9 +1760,8 @@ function cJdToCivil(jd: number, sg: number): [ry: number, rm: number, rdom: numb
 /**
  * @internal `date_core.c` `c_find_fdoy` (`date_core.c:455-465`), the Julian day
  * of the first day of year `y`, or `null` when there is none. It does not
- * assume 1 January exists: the reform deletes real days — 1582-10-05..14 under
- * `Date::ITALY` — so it scans January for the first date `c_valid_civil_p`
- * accepts.
+ * assume 1 January exists — the reform deletes real days, 1582-10-05..14 under
+ * `Date::ITALY` — so it scans January for the first `c_valid_civil_p` accepts.
  */
 function cFindFdoy(y: number, sg: number): number | null {
   for (let d = 1; d < 31; d++) {
@@ -1785,9 +1774,8 @@ function cFindFdoy(y: number, sg: number): number | null {
 /**
  * @internal `date_core.c` `c_valid_civil_p` (`date_core.c:766-790`), which
  * rebuilds the date and rejects it if the round-trip does not name the same
- * `y`/`m`/`d` back — which is how a day the reform deleted is rejected.
- *
- * Its negative-`m`/`d` normalization is not carried, for the reason
+ * `y`/`m`/`d` back — which is how a day the reform deleted is rejected. Its
+ * negative-`m`/`d` normalization is not carried, for the reason
  * {@link rtValidOrdinalP} gives.
  */
 function cValidCivilP(y: number, m: number, d: number, sg: number): number | null {
@@ -1798,10 +1786,7 @@ function cValidCivilP(y: number, m: number, d: number, sg: number): number | nul
   return rjd;
 }
 
-/**
- * @internal `date_core.c` `c_ordinal_to_jd` (`date_core.c:556-564`), the Julian
- * day of the `d`th day of year `y`.
- */
+/** @internal `date_core.c` `c_ordinal_to_jd` (`date_core.c:556-564`), the `d`th day of year `y`. */
 function cOrdinalToJd(y: number, d: number, sg: number): number | null {
   const rjd = cFindFdoy(y, sg);
   if (rjd === null) return null;
@@ -1818,9 +1803,8 @@ function cJdToOrdinal(jd: number, sg: number): [ry: number, rd: number] | null {
 
 /**
  * @internal `date_core.c` `c_valid_ordinal_p` (`date_core.c:674-695`), the
- * round-trip rejection of {@link cValidCivilP} over an ordinal date.
- *
- * Its negative-`d` normalization is not carried, for the reason
+ * round-trip rejection of {@link cValidCivilP} over an ordinal date. Its
+ * negative-`d` normalization is not carried, for the reason
  * {@link rtValidOrdinalP} gives.
  */
 function cValidOrdinalP(y: number, d: number, sg: number): number | null {
@@ -1833,9 +1817,9 @@ function cValidOrdinalP(y: number, d: number, sg: number): number | null {
 
 /**
  * @internal `date_core.c` `c_commercial_to_jd` (`date_core.c:576-589`), the
- * Julian day of the `d`th day of the `w`th ISO week of commercial year `y`,
- * `d` running `1`..`7` from Monday: the year's first day floored back to the
- * Monday on or before it, then `w` weeks and `d` days on.
+ * `d`th day of the `w`th ISO week of commercial year `y`, `d` running `1`..`7`
+ * from Monday: the year's first day floored back to the Monday on or before it,
+ * then `w` weeks and `d` days on.
  */
 function cCommercialToJd(y: number, w: number, d: number, sg: number): number | null {
   let rjd2 = cFindFdoy(y, sg);
@@ -1844,10 +1828,7 @@ function cCommercialToJd(y: number, w: number, d: number, sg: number): number | 
   return rjd2 - mod(rjd2 - 1 + 1, 7) + 7 * (w - 1) + (d - 1);
 }
 
-/**
- * @internal `date_core.c` `c_jd_to_commercial` (`date_core.c:590-609`), the
- * inverse of {@link cCommercialToJd}.
- */
+/** @internal `date_core.c` `c_jd_to_commercial` (`date_core.c:590-609`), the inverse of {@link cCommercialToJd}. */
 function cJdToCommercial(jd: number, sg: number): [ry: number, rw: number, rd: number] | null {
   const a = cJdToCivil(jd - 3, sg)[0];
   let ry: number;
@@ -1945,8 +1926,8 @@ function cValidWeeknumP(y: number, w: number, d: number, f: number, sg: number):
 
 /**
  * @internal `date_core.c` `rt__valid_jd_p` (`date_core.c:4119-4123`), which
- * answers the Julian day back: every integer names a day, so there is nothing
- * for the calendar-reform start to reject.
+ * answers the Julian day back: every integer names a day, so the
+ * calendar-reform start has nothing to reject.
  */
 function rtValidJdP(jd: number, _sg: number): number {
   return jd;

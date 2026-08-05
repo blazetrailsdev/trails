@@ -59,10 +59,9 @@ function topLevel(body: PrismNode | null, e: Emitter): ts.Statement[] {
 }
 /**
  * A class body's `def`s become class members; everything else — the macro
- * statements a Rails class body is mostly made of, `include Persistence` and
- * its kind — becomes a statement emitted after the declaration, with `self`
- * bound to the class, which is how the port wires modules at its composition
- * points.
+ * statements a Rails class body is mostly made of — becomes a statement emitted
+ * after the declaration with `self` bound to the class, which is how the port
+ * wires modules at its composition points.
  */
 function classBody(
   body: PrismNode | null,
@@ -136,9 +135,8 @@ function isConstantish(n: PrismNode | null): boolean {
   );
 }
 /**
- * One class-body macro statement, emitted with `self` bound to the class and
- * outside the class context so a nested `def` is not swallowed by
- * {@link emitDef}'s in-class guard.
+ * One class-body macro statement, emitted outside the class context so a nested
+ * `def` is not swallowed by {@link emitDef}'s in-class guard.
  */
 function macroStmt(n: PrismNode, e: Emitter, className: string): ts.Statement[] | null {
   const prevSelf = e.selfName;
