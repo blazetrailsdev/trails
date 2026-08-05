@@ -3,7 +3,7 @@
  * These cover the members `I18n::Backend::Base#localize` duck-types.
  */
 
-import { Temporal } from "@blazetrails/date";
+import { Temporal } from "@js-temporal/polyfill";
 import { describe, it, expect, vi } from "vitest";
 import {
   ArgumentError,

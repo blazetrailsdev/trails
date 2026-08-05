@@ -3,11 +3,11 @@
  * `./date.ts`. It answers `hour`/`min`/`sec` where `::Date` does not, which is
  * what routes `I18n::Backend::Base#localize` to `time.formats` rather than
  * `date.formats` (i18n/lib/i18n/backend/base.rb:105-115, ported at
- * `./backend/base.ts:245-271`), and `%Z` answers the zone's abbreviation
+ * `packages/i18n/src/backend/base.ts:245-271`), and `%Z` answers the zone's abbreviation
  * (`"UTC"` for a `Time.utc`) rather than `::Date`'s offset spelling.
  */
 
-import { Temporal } from "@blazetrails/date";
+import { Temporal } from "@js-temporal/polyfill";
 import { ArgumentError, strftime } from "./date.js";
 
 /**

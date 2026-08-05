@@ -21,8 +21,8 @@ import { config, exists, l, resetConfig, setLocale, t, type Locale } from "../i1
 import { resetClassConfig } from "../config.js";
 import { MissingTranslationData } from "../exceptions.js";
 import { Fallbacks as LocaleFallbacks } from "../locale/fallbacks.js";
-import { Date } from "../date.js";
-import { Time } from "../time.js";
+import { Date } from "@blazetrails/date";
+import { Time } from "@blazetrails/date";
 import type { TranslationData } from "../utils.js";
 
 class Backend extends Fallbacks(Simple) {}

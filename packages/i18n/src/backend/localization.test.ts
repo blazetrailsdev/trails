@@ -11,8 +11,8 @@ import { Simple } from "./simple.js";
 import { config, l, resetConfig } from "../i18n.js";
 import { resetClassConfig } from "../config.js";
 import { ArgumentError, MissingTranslationData, inspect } from "../exceptions.js";
-import { Date as RubyDate, DateTime as RubyDateTime } from "../date.js";
-import { Time as RubyTime } from "../time.js";
+import { Date as RubyDate, DateTime as RubyDateTime } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
 
 function setupDateTranslations(): void {
   config().backend.storeTranslations("de", {
