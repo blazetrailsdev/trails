@@ -2077,13 +2077,13 @@ export class StatementPool extends ConnectionStatementPool<MysqlPreparedStatemen
   }
 }
 
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging */
 /**
  * The `MySQL::SchemaStatements` surface `include()` installs below
  * (abstract_mysql_adapter.rb:19). Declaration-merged so callers see the mixin's
  * signatures instead of falling through to `AbstractAdapter`'s; kept in step
  * with the mixin by `scripts/mixin-declaration-drift.ts`. @internal
  */
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface AbstractMysqlAdapter {
   updateTableDefinition(tableName: string, base?: unknown): MysqlTable;
 
@@ -2115,6 +2115,7 @@ export interface AbstractMysqlAdapter {
   /** @internal */
   validPrimaryKeyOptions(): string[];
 }
+/* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
 
 // Rails: `include MySQL::SchemaStatements` (abstract_mysql_adapter.rb:19).
 include(AbstractMysqlAdapter, MysqlSchemaStatements);
