@@ -686,18 +686,13 @@ interface _PendingAssociationAttr {
  * collection associations? A `*Ids` key naming no collection association
  * (a genuine column, say) is left on the attribute path.
  */
-function _isCollectionIdsKey(
-  ctor: typeof Base | undefined,
-  defs: _AssociationDefLike[],
-  key: string,
-): boolean {
+function _isCollectionIdsKey(defs: _AssociationDefLike[], key: string): boolean {
   if (!key.endsWith("Ids")) return false;
-  const named = defs.some(
+  return defs.some(
     (a) =>
       (a.type === "hasMany" || a.type === "hasAndBelongsToMany") &&
       `${_singularize(a.name)}Ids` === key,
   );
-  return named;
 }
 
 /**
@@ -728,7 +723,7 @@ function _extractAssociationAttrs(
   for (const k of Object.keys(attrs)) {
     if (defs.find((a) => a.name === k)) {
       (assocs ??= []).push({ name: k, value: attrs[k] });
-    } else if (_isCollectionIdsKey(ctor, defs, k)) {
+    } else if (_isCollectionIdsKey(defs, k)) {
       (assocs ??= []).push({ name: k, value: attrs[k] });
     }
   }
