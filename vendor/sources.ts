@@ -188,20 +188,20 @@ export const SOURCES: readonly UpstreamSource[] = [
     },
     packages: [
       {
-        // TS-side workspace dir is `packages/corelib/src`; the date port
-        // (packages/i18n/src/date.ts today) cites
+        // The date port (packages/i18n/src/date.ts today) cites
         // `ext/date/date_core.c` / `ext/date/date_parse.c` by line
         // throughout, so the C sources have to be readable in-tree.
         // `libPath: "lib"` covers `lib/date.rb` — the Ruby-visible surface
         // api-compare would extract once it is enrolled.
-        name: "corelib",
+        name: "date",
         libPath: "lib",
         testPath: "test/date",
         // Vendored-only for now: the gem's surface is implemented in C, so
-        // the Ruby extractor sees almost nothing until the enrollment
-        // stories of RFC 0088-corelib-package wire up `packages/corelib`
-        // and flip these on. Same shipped-interim pattern RFC 0074 used
-        // for i18n.
+        // the Ruby extractor sees almost nothing until RFC
+        // 0088-date-gem-port's `date-package-scaffold`,
+        // `date-api-compare-enrollment` and `date-test-compare-enrollment`
+        // stories land `packages/date` and flip these on. Same
+        // shipped-interim pattern RFC 0074 used for i18n.
         compareApi: false,
         compareTests: false,
       },

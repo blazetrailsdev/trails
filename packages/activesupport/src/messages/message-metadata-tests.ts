@@ -34,19 +34,44 @@ export function freezeTime(
 }
 
 /**
- * Rails' `DATA`. Rails' second and third entries also carry a
- * `Time.local(2004)`, which survives its `:message_pack` and `Marshal` arms as
- * a Time and its `JSON` arms only because Ruby's `Time#<=>` coerces a String
- * operand through `to_datetime <=> other`
- * (core_ext/time/calculations.rb:329-343). trails' `:marshal` format is backed
- * by `cache/coder.ts`, which flattens a `Temporal.Instant` to `{}`, so the
- * temporal entries stay out until that roundtrips (follow-up story
- * `metadata-data-set-carries-a-time`).
+ * Ruby's `Time#<=>` coerces a non-Time operand through `to_datetime <=> other`
+ * (activesupport/lib/active_support/core_ext/time/calculations.rb:329-343), so
+ * `Time.local(2004) == "2004-01-01 00:00:00 -0500"` is true and Rails'
+ * `assert_equal data, ...` holds over {@link DATA} even under the serializers
+ * that decode the time back as a string. JS equality has no such coercion, so
+ * the two spellings `ActiveSupport::JSON` can render an instant in —
+ * `xmlschema` and the `use_standard_json_time_format = false` slash format
+ * (json.ts `temporalAsJson`) — are compared the same way here.
  */
+expect.addEqualityTesters([
+  function (a: unknown, b: unknown): boolean | undefined {
+    const [instant, other] =
+      a instanceof Temporal.Instant
+        ? [a, b]
+        : b instanceof Temporal.Instant
+          ? [b, a]
+          : [null, null];
+    if (instant === null || typeof other !== "string") return undefined;
+    const slash = other.match(/^(\d+)\/(\d\d)\/(\d\d) (\d\d:\d\d:\d\d) ([+-]\d\d)(\d\d)$/);
+    const iso = slash
+      ? `${slash[1]}-${slash[2]}-${slash[3]}T${slash[4]}${slash[5]}:${slash[6]}`
+      : other;
+    try {
+      return Temporal.Instant.from(iso).equals(instant);
+    } catch {
+      return false;
+    }
+  },
+]);
+
+/** Rails' `Time.local(2004)`. */
+const A_TIME = Temporal.Instant.from("2004-01-01T00:00:00Z");
+
+/** Rails' `DATA`. */
 const DATA: readonly unknown[] = [
   "a string",
-  { a_number: 123, an_object: { key: "value" } },
-  ["a string", 123, { key: "value" }],
+  { a_number: 123, a_time: A_TIME, an_object: { key: "value" } },
+  ["a string", 123, A_TIME, { key: "value" }],
 ];
 
 const CustomSerializer: MessageSerializer = {
