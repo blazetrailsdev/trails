@@ -38,7 +38,7 @@
  * (SIGNIFICANT_CALLS). It is ratcheted by lint-call-mismatches.ts
  * against the split call-mismatches-exclude/ baseline directory (one file
  * per source) — see RFC 0047. RFC 0084 folded the narrow RFC 0044 gate (a
- * curated SIGNIFICANT_CALLS allowlist over a second artifact) into this one,
+ * curated significant-call allowlist over a second artifact) into this one,
  * whose population strictly subsumed it.
  *
  * Source-hash pinning (RFC 0025): every name-matched pair's normalized Rails
