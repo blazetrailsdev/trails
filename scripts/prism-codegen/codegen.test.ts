@@ -68,6 +68,18 @@ describe("prism-codegen", () => {
     expect(code).not.toContain("Widget.protected");
   });
 
+  it("leaves a class-body constant built with Array#+ unemitted", async () => {
+    const { code } = await generateFromSource(`
+      class Widget
+        MULTI = [:a]
+        SINGLE = [:b]
+        VALUE_METHODS = MULTI + SINGLE
+      end
+    `);
+    expect(code).toContain("const MULTI =");
+    expect(code).not.toContain("VALUE_METHODS");
+  });
+
   it("translates class/def shape and method-name conventions", async () => {
     const { code } = await generateFromSource(`
       class Widget < Base

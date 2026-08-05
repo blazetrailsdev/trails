@@ -110,15 +110,31 @@ function classBody(
  * only looks like a port: `alias :new_name :old_name`, whose handler is written
  * for a method body where the old name reads as a local and would emit a
  * module-scope `const` bound to an undefined identifier — code that parses and
- * then throws on load — and the visibility keywords, which declare the default
- * visibility of the `def`s that follow and have no statement to be.
+ * then throws on load; the visibility keywords, which declare the default
+ * visibility of the `def`s that follow and have no statement to be; and `+` on
+ * a constant, which is `Array#+` in every class-body use and which `INFIX`
+ * images as JS `+`, coercing both arrays to strings. Tracked as
+ * `codegen-array-infix-plus`.
  */
 function unportedMacro(n: PrismNode): boolean {
   const kind = n.constructor.name;
   if (kind === "AliasMethodNode") return true;
-  return kind === "CallNode" && n.receiver == null && VISIBILITY_MACROS.has(String(n.name));
+  if (kind === "CallNode" && n.receiver == null && VISIBILITY_MACROS.has(String(n.name)))
+    return true;
+  if (kind === "CallNode" && String(n.name) === "+" && isConstantish(n.receiver as PrismNode))
+    return true;
+  return n.compactChildNodes().some(unportedMacro);
 }
 const VISIBILITY_MACROS = new Set(["private", "protected", "public", "module_function"]);
+/** Whether a `+` receiver reads a constant, and so carries no numeric evidence. */
+function isConstantish(n: PrismNode | null): boolean {
+  const kind = n?.constructor.name;
+  return (
+    kind === "ConstantReadNode" ||
+    kind === "ConstantPathNode" ||
+    (kind === "CallNode" && String(n?.name) === "+")
+  );
+}
 /**
  * One class-body macro statement, emitted with `self` bound to the class and
  * outside the class context so a nested `def` is not swallowed by
