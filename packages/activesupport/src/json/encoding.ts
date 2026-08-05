@@ -47,11 +47,21 @@ export class JSONGemEncoder {
    * that traversal, so gating it on a non-empty options hash would skip the
    * `asJson` calls — and the raises they exist to surface, e.g. `Type#asJson` —
    * for the common no-options encode.
+   *
+   * Deviation: Ruby's `@options.fetch(:escape_html_entities, ...)`
+   * (encoding.rb:63) returns the *stored* value whenever the key is present —
+   * including a stored nil, which `??` would replace with the default — and JS
+   * has no `Hash#fetch`, so the presence check is an `in` guard and the branch
+   * follows Ruby truthiness (nil and false only).
    */
   encode(value: unknown): string {
     let json = this.stringify(this.jsonify(value));
 
-    if (this.options.escapeHtmlEntities ?? Encoding.escapeHtmlEntitiesInJson) {
+    const escapeHtmlEntities =
+      "escapeHtmlEntities" in this.options
+        ? this.options.escapeHtmlEntities
+        : Encoding.escapeHtmlEntitiesInJson;
+    if (escapeHtmlEntities != null && escapeHtmlEntities !== false) {
       json = json.replaceAll(">", "\\u003e");
       json = json.replaceAll("<", "\\u003c");
       json = json.replaceAll("&", "\\u0026");
