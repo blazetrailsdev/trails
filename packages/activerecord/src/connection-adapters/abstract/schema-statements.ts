@@ -295,19 +295,7 @@ interface SchemaMigrationPool {
  * way Rails' module does. This merged interface gives those calls the adapter's
  * type. @internal
  */
-export interface SchemaStatements
-  extends
-    Omit<
-      DatabaseAdapter,
-      | "addColumns"
-      | "currentDatabase"
-      | "createEnum"
-      | "dropEnum"
-      | "renameEnum"
-      | "addEnumValue"
-      | "renameEnumValue"
-    >,
-    SchemaQuoter {}
+export interface SchemaStatements extends DatabaseAdapter, SchemaQuoter {}
 
 export class SchemaStatements {
   /* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */

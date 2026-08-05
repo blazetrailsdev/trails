@@ -3,7 +3,7 @@ import { Serialized } from "../type/serialized.js";
 import { Scheme } from "./scheme.js";
 import type { EncryptorLike } from "./encryptor.js";
 import type { WrappedType } from "./wrapped-type.js";
-import { getDefaultContext, getEncryptionContext } from "./context.js";
+import { getEncryptionContext } from "./context.js";
 import { Configurable } from "./configurable.js";
 import { Encoding, Decryption, Base } from "./errors.js";
 import { isRubyTruthy } from "../ruby-truthy.js";
@@ -16,29 +16,10 @@ import {
 // Injectable provider for global previous schemes — set by encryptable-record.ts
 // to avoid the circular import cycle (encryptable-record → encrypted-attribute-type → encryptable-record).
 let _globalPreviousSchemesFn: ((scheme: Scheme) => Scheme[]) | null = null;
-let _globalPreviousVersion = 0;
 
 /** @internal */
 export function setGlobalPreviousSchemesFn(fn: (scheme: Scheme) => Scheme[]): void {
   _globalPreviousSchemesFn = fn;
-  _globalPreviousVersion++;
-}
-
-let _lastDefaultContext: unknown = getDefaultContext();
-
-/**
- * @internal Rails recomputes `previous_types` on every call; the memos below
- * stand in for that, so their generation must turn over whenever config does.
- * `configure` ends in `reset_default_context` (configurable.rb:30), so the
- * default context's identity is the config generation.
- */
-function globalPreviousGeneration(): number {
-  const defaultContext = getDefaultContext();
-  if (defaultContext !== _lastDefaultContext) {
-    _lastDefaultContext = defaultContext;
-    _globalPreviousVersion++;
-  }
-  return _globalPreviousVersion;
 }
 
 /**
@@ -55,12 +36,6 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
   private _previousType: boolean;
   private _default?: unknown;
   private _encryptor: EncryptorLike;
-  private _previousTypesMemo?: EncryptedAttributeType[];
-  private _previousTypesMemoKey?: string;
-  private _effectivePrevMemo?: Scheme[];
-  private _effectivePrevVersion = -1;
-  private _serializeWithOldestMemo?: boolean;
-  private _serializeWithOldestVersion = -1;
 
   constructor(options: {
     scheme: Scheme;
@@ -179,15 +154,15 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
     return this.castType.type();
   }
 
+  /**
+   * Rails memoizes on `support_unencrypted_data?` (encrypted_attribute_type.rb:56-59)
+   * because a scheme's `previous_schemes` is frozen at `encrypts` declaration time
+   * (encryptable_record.rb:73). trails resolves the global previous schemes lazily
+   * instead — see `_effectivePreviousSchemes` — so the result is not immutable and
+   * a memo would pin a pre-`configure` answer. Recompute, as the Ruby body does.
+   */
   get previousTypes(): EncryptedAttributeType[] {
-    const key = `${this.supportUnencryptedData}:${globalPreviousGeneration()}`;
-    if (!this._previousTypesMemo || this._previousTypesMemoKey !== key) {
-      this._previousTypesMemo = this.buildPreviousTypesFor(
-        this.previousSchemesIncludingCleanText(),
-      );
-      this._previousTypesMemoKey = key;
-    }
-    return this._previousTypesMemo;
+    return this.buildPreviousTypesFor(this.previousSchemesIncludingCleanText());
   }
 
   get supportUnencryptedData(): boolean {
@@ -203,13 +178,8 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
     // Previous types are already derived from global+local schemes at the
     // top-level — don't re-expand globals or we get infinite recursion.
     if (this._previousType) return this.scheme.previousSchemes ?? [];
-    const generation = globalPreviousGeneration();
-    if (this._effectivePrevVersion !== generation) {
-      const global = _globalPreviousSchemesFn ? _globalPreviousSchemesFn(this.scheme) : [];
-      this._effectivePrevMemo = [...global, ...(this.scheme.previousSchemes ?? [])];
-      this._effectivePrevVersion = generation;
-    }
-    return this._effectivePrevMemo!;
+    const global = _globalPreviousSchemesFn ? _globalPreviousSchemesFn(this.scheme) : [];
+    return [...global, ...(this.scheme.previousSchemes ?? [])];
   }
 
   /** @internal */
@@ -271,7 +241,7 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
       });
     } catch (error) {
       if (!(error instanceof Base)) throw error;
-      if (this._effectivePreviousSchemes().length === 0)
+      if (this.previousTypesWithoutCleanText().length === 0)
         return this.handleDeserializeError(error, value);
       return this.tryToDeserializeWithPreviousEncryptedTypes(value);
     }
@@ -303,13 +273,7 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
 
   /** @internal */
   private isSerializeWithOldest(): boolean {
-    const generation = globalPreviousGeneration();
-    if (this._serializeWithOldestVersion !== generation) {
-      this._serializeWithOldestMemo =
-        this.scheme.isFixed() && this._effectivePreviousSchemes().length > 0;
-      this._serializeWithOldestVersion = generation;
-    }
-    return this._serializeWithOldestMemo!;
+    return this.isFixed() && this.previousTypesWithoutCleanText().length > 0;
   }
 
   /** @internal */

@@ -261,29 +261,29 @@ catches a class of drift a reviewer would otherwise spend a cycle on.
    `git diff --shortstat origin/main...HEAD -- ':!**/pnpm-lock.yaml' ':!**/__snapshots__/**' ':!**/*.md'`
    — compare against the LOC ceiling in your prompt's "Hard rules" block (see
    Conventions).
-2. **Did you touch a ported method body?** If yes, run the call-parity gates.
-   They detect the highest-frequency fidelity miss in this repo: a TS body that
+2. **Did you touch a ported method body?** If yes, run the call-parity gate.
+   It detects the highest-frequency fidelity miss in this repo: a TS body that
    omits a call the Rails body makes — a dropped delegation, an inlined helper,
    an invented shortcut.
 
    ```bash
-   pnpm api:calls        # narrow ratchet (RFC 0044)
-   pnpm api:calls:wide   # wide ratchet (RFC 0047)
+   pnpm api:calls:wide   # the call-set ratchet (RFC 0047)
    ```
 
-   Each lint reads an artifact on disk and regenerates its own first, so a
-   plain gating run is enough — gating a stale artifact reports movement that
-   never happened, which is how a sibling PR's deleted method surfaces as a
-   STALE row on a branch that never touched it. The two artifacts are
-   **separate**: `compare.ts` writes `call-mismatches.json` on a normal run and
-   `call-mismatches-wide.json` only under `--wide-calls`, so one compare run
-   never refreshes both. If you need to force past a warm cache (it
-   under-reports vs CI), do it per artifact:
+   The lint reads an artifact on disk and regenerates it first, so a plain
+   gating run is enough — gating a stale artifact reports movement that never
+   happened, which is how a sibling PR's deleted method surfaces as a STALE row
+   on a branch that never touched it. `compare.ts` writes
+   `call-mismatches-wide.json` only under `--wide-calls`, so if you need to
+   force past a warm cache (it under-reports vs CI):
 
    ```bash
-   API_COMPARE_FORCE=1 pnpm api:compare                # narrow
-   API_COMPARE_FORCE=1 pnpm api:compare --wide-calls   # wide
+   API_COMPARE_FORCE=1 pnpm api:compare --wide-calls
    ```
+
+   (RFC 0084 folded the narrow RFC 0044 ratchet — `pnpm api:calls`, over a
+   second `call-mismatches.json` artifact — into this one, whose population
+   subsumed it. There is one artifact and one baseline now.)
 
    **New mismatch?** The right fix is almost always to make the TS body call
    what Rails calls. Baselining is the fallback, and it costs a reviewed

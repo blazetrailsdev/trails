@@ -83,10 +83,10 @@ merged cleanly, the second copy unreachable — needs a human reading the diff.
 Primary signals: `pnpm run api:compare` (use `--package <name>` for one
 package) and `pnpm run test:compare`.
 
-**Before pushing, also run `pnpm api:calls:wide`** — the _wide_ call-mismatch
+**Before pushing, also run `pnpm api:calls:wide`** — the call-mismatch
 ratchet is a separate CI step (`.github/workflows/ci.yml`, jobs "API comparison
 (wide calls)" + "Wide call-mismatches ratchet") that `pnpm api:compare` does
-**not** run: `api:compare` runs only the narrow call ratchet. Because the wide
+**not** run. Because that
 step runs only in CI, a PR that passes every local check can still fail the
 `rails-comparison` job (this happened in #5027). `pnpm api:calls:wide` runs the
 wide lint locally, and since RFC 0083 a plain gating run **regenerates
@@ -96,10 +96,11 @@ compare.ts reads are refreshed first) — so the bare command is enough. It opts
 out of that regeneration under `--no-regen`, `API_COMPARE_SKIP_WIDE_REGEN=1`, or
 any CI value, and only then does it gate whatever artifact is on disk. Reach for
 `API_COMPARE_FORCE=1 pnpm api:compare --wide-calls` beforehand when you need to
-bypass a warm cache (it under-reports vs CI), remembering that the narrow and
-wide artifacts are separate: `compare.ts` writes `call-mismatches.json` on a
-normal run and `call-mismatches-wide.json` only under `--wide-calls`
-(`compare.ts:2543`), so one compare run never refreshes both. The pre-PR
+bypass a warm cache (it under-reports vs CI): `compare.ts` computes the call
+sets, and writes `call-mismatches-wide.json`, only under `--wide-calls`, so a
+plain `pnpm api:compare` refreshes nothing this gate reads. (RFC 0084 folded the
+narrow RFC 0044 ratchet into this one and deleted its separate artifact,
+baseline and CI step.) The pre-PR
 checklist in [CLAUDE.md](CLAUDE.md) is the authoritative workflow; this section
 explains the machinery behind it.
 

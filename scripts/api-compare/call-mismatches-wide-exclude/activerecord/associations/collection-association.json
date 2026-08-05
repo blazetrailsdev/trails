@@ -74,7 +74,7 @@
     "tsFile": "associations/collection-association.ts",
     "rubyName": "replace",
     "call": "transaction",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Confirmed equivalent (RFC 0044, transaction-wrapping-cluster): trails splits Rails' synchronous `CollectionAssociation#replace` (which wraps `replace_records` in `transaction` for a persisted owner — collection_association.rb:251) into a sync `replace` that records `_pendingReplace` plus an async `persistReplace`. The persisted-owner diff/save runs inside `transaction(this, ...)` in `persistReplace` (collection-association.ts:437), not literally inside `replace`, so the call-set extractor — which scopes to the Ruby-named `replace` body — flags it. The atomic wrap is present; false positive, no omission."
   },
   {
     "package": "activerecord",

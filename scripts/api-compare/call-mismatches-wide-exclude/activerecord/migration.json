@@ -67,7 +67,7 @@
     "tsFile": "migration.ts",
     "rubyName": "ddl_transaction",
     "call": "transaction",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Confirmed equivalent (RFC 0044, transaction-wrapping-cluster): Rails' `Migrator#ddl_transaction` calls `connection.transaction(&block)` when `use_transaction?` (migration.rb:1584-1590). trails' `ddlTransaction` delegates to `_ddlTransaction`, which on the same `_useTransaction` guard wraps the migration body in an explicit `beginTransaction()` + `commit()`/`rollback()` boundary (migration.ts:3325-3347), skipping the wrap when the adapter is already in a transaction. The atomic wrap is present via begin/commit primitives, not the `transaction` closure helper, and lives in the `_ddlTransaction` delegate rather than the Ruby-named `ddlTransaction` body — false positive, no omission."
   },
   {
     "package": "activerecord",

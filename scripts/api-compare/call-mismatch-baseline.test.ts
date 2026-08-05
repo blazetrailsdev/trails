@@ -6,11 +6,10 @@ import {
   findDuplicateKeys,
   flattenArtifact,
   keyOf,
-  loadBaseline,
   missingScope,
   reseed,
   type ExcludeEntry,
-} from "./lint-call-mismatches.js";
+} from "./call-mismatch-baseline.js";
 
 describe("callOf", () => {
   it("extracts the Ruby call name before the arrow", () => {
@@ -103,33 +102,16 @@ describe("findDuplicateKeys", () => {
   });
 });
 
-describe("committed baseline", () => {
-  it("is well-formed: no duplicate keys, every entry has a package and reason", async () => {
-    const committed = await loadBaseline();
-    expect(findDuplicateKeys(committed)).toEqual([]);
-    for (const e of committed) {
-      expect(e.package.trim().length).toBeGreaterThan(0);
-      expect(e.reason.trim().length).toBeGreaterThan(0);
-    }
-  });
-});
-
 describe("reseed", () => {
   it("preserves reasons for surviving entries and drops stale ones", () => {
     const current = [
       { package: "ar", tsFile: "a.ts", rubyName: "foo", call: "save" },
       { package: "ar", tsFile: "c.ts", rubyName: "baz", call: "update" },
     ];
-    const next = reseed(current, baseline);
+    const next = reseed(current, baseline, "seeded");
     expect(next).toEqual([
       { package: "ar", tsFile: "a.ts", rubyName: "foo", call: "save", reason: "known" },
-      {
-        package: "ar",
-        tsFile: "c.ts",
-        rubyName: "baz",
-        call: "update",
-        reason: expect.stringContaining("Baseline (RFC 0044)"),
-      },
+      { package: "ar", tsFile: "c.ts", rubyName: "baz", call: "update", reason: "seeded" },
     ]);
   });
 

@@ -20,7 +20,7 @@
  *   - a tag with no reason fails the run (see the empty-reason contract in
  *     docs/infrastructure/api-build-stub-generation-plan.md);
  *   - reasons for newly-added tags migrate from the committed baselines
- *     (call-mismatches-wide-exclude/, call-mismatches-exclude.json);
+ *     (call-mismatches-wide-exclude/);
  *   - the unreviewed high-water marks of the sources whose baseline rows were
  *     dropped are lowered in step, so a migration never leaves the wide gate's
  *     slack arm red pending a whole-repo reseed (RFC 0083).
@@ -31,7 +31,7 @@
  *   pnpm api:build --package <pkg> [--file <tsFile>] [--dry-run]
  *
  * Hard rules: no node:* imports, no process.* in the library surface (the CLI
- * entry guard is the sole exception, matching lint-call-mismatches.ts).
+ * entry guard is the sole exception, matching lint-call-mismatches-wide.ts).
  */
 
 import * as fs from "fs/promises";
@@ -39,13 +39,7 @@ import * as path from "path";
 import * as ts from "typescript";
 import { fileURLToPath } from "url";
 import { OUTPUT_DIR, ROOT_DIR, packageSrcDir } from "./config.js";
-import {
-  type ExcludeEntry,
-  callOf,
-  keyOf,
-  loadBaseline as loadNarrowBaseline,
-  missingScope,
-} from "./lint-call-mismatches.js";
+import { type ExcludeEntry, callOf, keyOf, missingScope } from "./call-mismatch-baseline.js";
 import {
   MARK_DIR,
   loadSplitBaseline,
@@ -460,10 +454,8 @@ async function main(argv: string[]): Promise<number> {
   }
 
   const wideBaseline = await loadSplitBaseline(WIDE_BASELINE_DIR);
-  const narrowBaseline = await loadNarrowBaseline();
   const reasons = new Map<string, string>();
-  // Narrow reasons are the more curated (RFC 0044 hand-triage); they win.
-  for (const e of [...wideBaseline, ...narrowBaseline] as ExcludeEntry[]) {
+  for (const e of wideBaseline) {
     reasons.set(keyOf(e), e.reason);
   }
 
