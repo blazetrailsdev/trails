@@ -685,15 +685,12 @@ function assignUpdateAttribute(self: any, key: string, value: unknown): Promise<
   }
   const collectionWrite = collectionWriterPromise(self, key, value);
   if (collectionWrite) return collectionWrite;
-  // The awaitable has_one writer, for the same reason as `#{name}_attributes=`
-  // above: Rails' `#{name}=` removes the displaced record and saves the new one
-  // inline (has_one_association.rb:59-84), and RFC 0087 §1 removed the property
-  // setter that used to catch this key on the prototype walk below. `#update` is
-  // async, so it awaits what the property setter could not.
-  const hasOne = (
+  // Rails' `#{name}=` removes the displaced record and saves the new one inline
+  // (has_one_association.rb:59-84); `#update` is async, so it awaits that writer.
+  const isHasOne = (
     self.constructor?._associations as { name: string; type: string }[] | undefined
-  )?.find((a) => a.type === "hasOne" && a.name === key);
-  if (hasOne) {
+  )?.some((a) => a.type === "hasOne" && a.name === key);
+  if (isHasOne) {
     const result: unknown = self.association(key).writer(value);
     return result instanceof Promise ? result : undefined;
   }

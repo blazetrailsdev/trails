@@ -1727,7 +1727,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    * `getDatabaseVersion()` only after a subclass has wired this.
    * @internal
    */
-  async getFullVersion(): Promise<string> {
+  async getFullVersion(): Promise<string | null> {
     throw new Error(`${this.constructor.name} must implement getFullVersion()`);
   }
 
