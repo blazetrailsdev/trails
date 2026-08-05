@@ -137,7 +137,14 @@ export function _selectBang(...fields) {
     this.selectValues = union(this.selectValues, fields);
     return this;
 }
-__PRISM_TODO("DefNode");
+function _with(...args, block) {
+    if (block !== undefined) {
+        throw new ArgumentError("ActiveRecord::Relation#with does not accept a block");
+    }
+    this.checkIfMethodHasArgumentsBang(this.__callee__, args);
+    return this.spawn.withBang(...args);
+}
+export { _with as with };
 export function withBang(...args) {
     args = this.processWithArgs(args);
     this.withValues = union(this.withValues, args);

@@ -1,7 +1,7 @@
 import ts from "typescript";
 import type { Emitter, PrismNode } from "../types.js";
 import type { Registry } from "../registry.js";
-import { methodName, isJsIdentName, isBindableIdent } from "../naming.js";
+import { methodName, isJsIdentName, isBindableIdent, FORWARDED_ARGS } from "../naming.js";
 const f = ts.factory;
 export function registerStructure(r: Registry): void {
   r.onStmt("ProgramNode", (n, e) => {
@@ -165,21 +165,37 @@ function emitDef(n: PrismNode, e: Emitter): ts.Statement[] | null {
     return null;
   }
   const name = methodName(String(n.name));
-  if (!isBindableIdent(name)) return null;
+  if (!isJsIdentName(name)) return null;
+  // A Rails method whose JS name is a reserved word (`delete` in
+  // persistence.rb) cannot be a function *declaration* name, but it can still
+  // be an export name — string/identifier export specifiers are unreserved.
+  // Declare it under an underscore-prefixed local and re-export it at the
+  // Rails name.
+  const reserved = !isBindableIdent(name);
+  const localName = reserved ? `_${name}` : name;
   const { params, body, isAsync } = defParts(n, e, name);
   if (!params) return null;
+  const decl = f.createFunctionDeclaration(
+    [
+      ...(reserved ? [] : [f.createToken(ts.SyntaxKind.ExportKeyword)]),
+      ...(isAsync ? [f.createToken(ts.SyntaxKind.AsyncKeyword)] : []),
+    ],
+    undefined,
+    localName,
+    undefined,
+    params,
+    undefined,
+    body,
+  );
+  if (!reserved) return [decl];
   return [
-    f.createFunctionDeclaration(
-      [
-        f.createToken(ts.SyntaxKind.ExportKeyword),
-        ...(isAsync ? [f.createToken(ts.SyntaxKind.AsyncKeyword)] : []),
-      ],
+    decl,
+    f.createExportDeclaration(
       undefined,
-      name,
-      undefined,
-      params,
-      undefined,
-      body,
+      false,
+      f.createNamedExports([
+        f.createExportSpecifier(false, f.createIdentifier(localName), f.createIdentifier(name)),
+      ]),
     ),
   ];
 }
@@ -330,6 +346,18 @@ function emitParams(params: PrismNode | undefined, e: Emitter): ts.ParameterDecl
       f.createParameterDeclaration(undefined, f.createToken(ts.SyntaxKind.DotDotDotToken), rn),
     );
     declare(rn);
+  }
+  const forwarding = params.keywordRest as PrismNode | null;
+  if (forwarding && forwarding.constructor.name === "ForwardingParameterNode") {
+    out.push(
+      f.createParameterDeclaration(
+        undefined,
+        f.createToken(ts.SyntaxKind.DotDotDotToken),
+        FORWARDED_ARGS,
+      ),
+    );
+    declare(FORWARDED_ARGS);
+    return out;
   }
   const kw = (params.keywords as PrismNode[]) ?? [];
   if (kw.length || params.keywordRest) {

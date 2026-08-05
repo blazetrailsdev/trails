@@ -1,7 +1,7 @@
 import ts from "typescript";
 import { rubyStr, type Emitter, type PrismNode } from "../types.js";
 import type { Registry } from "../registry.js";
-import { methodName, isJsIdentName, isBindableIdent } from "../naming.js";
+import { methodName, isJsIdentName, isBindableIdent, FORWARDED_ARGS } from "../naming.js";
 import { clearAsyncProvenance } from "../await-policy.js";
 import { normalizeModuleName, OUTSIDE_CORPUS, type SuperResolution } from "../linearization.js";
 const f = ts.factory;
@@ -21,6 +21,8 @@ const COMPOUND_HELPER: Record<string, string> = {
 };
 export function registerMisc(r: Registry): void {
   r.on("SplatNode", (n, e) => f.createSpreadElement(e.expr((n.expression as PrismNode) ?? null)));
+  // `bar(...)` inside a `def foo(...)`: spread the rest parameter emitParams laid down.
+  r.on("ForwardingArgumentsNode", () => f.createSpreadElement(f.createIdentifier(FORWARDED_ARGS)));
   r.onManyStmt(["ForwardingSuperNode", "SuperNode"], (n, e, isLast) => {
     if (e.inClass || isLast) return null;
     if (resolveSuper(e)?.kind === "resolved") return null;

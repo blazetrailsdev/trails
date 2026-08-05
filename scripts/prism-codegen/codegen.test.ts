@@ -96,6 +96,20 @@ describe("prism-codegen", () => {
     expect(code).toContain("this.saved = true");
     expect(code).toContain("if (!this.isValid)");
   });
+  it("emits a reserved-name def under an alias export", async () => {
+    const { code, coverage } = await generateFromSource(`def delete(id); id; end`);
+    expect(code).toContain("function _delete(id)");
+    expect(code).toContain("export { _delete as delete }");
+    expect(code).not.toContain("__PRISM_TODO(");
+    expect(coverage.counts.get("DefNode")?.passthrough ?? 0).toBe(0);
+  });
+  it("emits forwarding params and forwarding arguments as a rest/spread pair", async () => {
+    const { code, coverage } = await generateFromSource(`def foo(...); bar(...); end`);
+    expect(code).toContain("foo(...args)");
+    expect(code).toContain("bar(...args)");
+    expect(code).not.toContain("__PRISM_TODO(");
+    expect(coverage.counts.get("DefNode")?.passthrough ?? 0).toBe(0);
+  });
   it("records handled vs. passthrough coverage per node kind", async () => {
     const { coverage } = await generateFromSource(`def f(a); a + 1; end`);
     const s = summarizeCoverage(coverage);

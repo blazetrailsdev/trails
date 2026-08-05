@@ -203,7 +203,15 @@ export function save({ ...options } = {}, block) {
 export function saveBang({ ...options } = {}, block) {
     return this.createOrUpdate({ ...options }, block) || (() => { throw new RecordNotSaved("Failed to save the record", this); })();
 }
-__PRISM_TODO("DefNode");
+function _delete() {
+    if (this.isPersisted) {
+        this._deleteRow();
+    }
+    this.destroyed = true;
+    this.previously_new_record = false;
+    return this.freeze;
+}
+export { _delete as delete };
 export async function destroy() {
     if (this.isReadonly) {
         this._raiseReadonlyRecordError();
