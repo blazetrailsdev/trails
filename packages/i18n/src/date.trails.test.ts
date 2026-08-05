@@ -508,6 +508,16 @@ describe("Date", () => {
     expect(RubyDate.jd(2299160).yday).toBe(277);
   });
 
+  it("pads the year to four digits the way date_strftime's %Y does", () => {
+    expect(new RubyDate(1, 1, 1).toS()).toBe("0001-01-01");
+    expect(new RubyDate(99, 12, 31).toS()).toBe("0099-12-31");
+    expect(new RubyDate(999, 6, 15).toS()).toBe("0999-06-15");
+    expect(new RubyDate(-1, 1, 1).toS()).toBe("-0001-01-01");
+    expect(new RubyDate(-12345, 1, 1).toS()).toBe("-12345-01-01");
+    expect(new RubyDate(12345, 1, 1).toS()).toBe("12345-01-01");
+    expect(new RubyDate(1, 1, 1).strftime("%F")).toBe("0001-01-01");
+  });
+
   it("carries the start the date was resolved under, rather than defaulting it to ITALY", () => {
     expect(RubyDate.parse("1582-10-10", true, RubyDate.GREGORIAN).start).toBe(RubyDate.GREGORIAN);
     expect(RubyDate.parse("1582-10-10", true, RubyDate.GREGORIAN).toS()).toBe("1582-10-10");

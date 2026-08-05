@@ -164,21 +164,13 @@ export class EncryptableRecord {
    * (via encryption.ts#encrypts) and direct callers route through here, mirroring
    * Rails' single `encrypt_attribute`.
    *
-   * `buildScheme` lets `Base.encrypts` supply encryption.ts#buildScheme (which
-   * adapts the legacy `{ encrypt, decrypt }` shim and supplies a defaultEncryptor
-   * fallback) in place of `schemeFor`, which direct callers get by omitting it.
-   * It is a function, not a scheme, because Rails calls `scheme_for` inside the
-   * `decorate_attributes` block (encryptable_record.rb:85-88) — see
-   * `PendingEncryption`.
+   * The scheme is built by `schemeFor` — Rails' one `scheme_for` — inside the
+   * `PendingEncryption` getter, because Rails calls `scheme_for` inside the
+   * `decorate_attributes` block (encryptable_record.rb:85-88).
    *
    * @internal
    */
-  static encryptAttribute(
-    modelClass: any,
-    name: string,
-    options: SchemeOptions = {},
-    buildScheme?: () => Scheme,
-  ): void {
+  static encryptAttribute(modelClass: any, name: string, options: SchemeOptions = {}): void {
     // Own-property guard mirrors Rails' `class_attribute` semantics — a subclass
     // encrypting a new attribute must not mutate the parent's (or a sibling's) Set.
     if (!Object.prototype.hasOwnProperty.call(modelClass, "_encryptedAttributes")) {
@@ -190,7 +182,7 @@ export class EncryptableRecord {
     const pending: PendingEncryption = {
       name,
       get scheme(): Scheme {
-        return buildScheme ? buildScheme() : schemeFor(options);
+        return schemeFor(options);
       },
     };
 
@@ -401,20 +393,9 @@ export class EncryptableRecord {
 
     // Declare original_<name> with a default scheme, mirroring Rails' bare
     // `encrypts original_attribute_name` (encryptable_record.rb:105 — no kwargs).
-    // Build it through the shared buildScheme so the legacy encryptor shim +
-    // defaultEncryptor fallback apply exactly as they do for the primary
-    // attribute (a bare schemeFor({}) would raise "No encryption key provided"
-    // when no keys are configured). Falls back to schemeFor when the encryption
-    // namespace isn't loaded (pure-direct unit tests, which never serialize).
     // encryptAttribute's durable branch buffers this in _pendingEncryptions so
     // the original column rides the same replay-safe machinery as its source.
-    const buildOriginalScheme = encryptionHooks.buildScheme;
-    this.encryptAttribute(
-      modelClass,
-      originalName,
-      {},
-      buildOriginalScheme && (() => buildOriginalScheme({}) as Scheme),
-    );
+    this.encryptAttribute(modelClass, originalName, {});
     this.overrideAccessorsToPreserveOriginal(modelClass, name, originalName);
   }
 

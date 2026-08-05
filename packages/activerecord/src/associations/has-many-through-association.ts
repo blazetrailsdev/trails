@@ -1,6 +1,6 @@
 import type { Base } from "../base.js";
 import type { AssociationDefinition, AssociationOptions } from "../associations.js";
-import { findTarget as findSingularTarget } from "./singular-association.js";
+import { association } from "./instance-methods.js";
 import { HasManyAssociation, findTarget as findHasManyTarget } from "./has-many-association.js";
 import {
   HasManyThroughCantAssociateThroughHasOneOrManyReflection,
@@ -1161,10 +1161,10 @@ export async function findTarget(
       throughRecords = await findHasManyTarget(record, throughAssoc.name, throughAssoc.options);
     }
   } else if (throughAssoc.type === "hasOne") {
-    const one = await findSingularTarget(record, throughAssoc.name, throughAssoc.options);
+    const one = (await association.call(record, throughAssoc.name).loadTarget()) as Base | null;
     throughRecords = one ? [one] : [];
   } else if (throughAssoc.type === "belongsTo") {
-    const one = await findSingularTarget(record, throughAssoc.name, throughAssoc.options);
+    const one = (await association.call(record, throughAssoc.name).loadTarget()) as Base | null;
     throughRecords = one ? [one] : [];
   } else {
     throughRecords = [];

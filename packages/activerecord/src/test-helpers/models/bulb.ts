@@ -4,7 +4,7 @@ import type { Car } from "./car.js";
 // vendor/rails/activerecord/test/models/bulb.rb
 import { Base } from "../../base.js";
 import { association } from "../../associations.js";
-import { findTarget } from "../../associations/singular-association.js";
+import { association as associationInstance } from "../../associations/instance-methods.js";
 
 export class Bulb extends Base {
   declare car: Car | null;
@@ -36,7 +36,7 @@ export class Bulb extends Base {
     });
     this.afterCreate(async (record: Bulb) => {
       record.countAfterCreate = await Bulb.unscoped(async () => {
-        const car = await findTarget(record, "car", {});
+        const car = (await associationInstance.call(record, "car").loadTarget()) as Car | null;
         return car ? await association(car, "bulbs").count() : undefined;
       });
     });

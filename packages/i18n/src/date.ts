@@ -57,6 +57,17 @@ function pad2(n: number): string {
 }
 
 /**
+ * @internal `date_strftime.c`'s `%Y` arm: `FMT('0', 0 <= y ? 4 : 5, "ld", y)`
+ * (ruby/date, `date_strftime.c:236-247`), so a non-negative year pads to four
+ * digits and a negative one pads to five columns counting the sign — `-0001`,
+ * not `-1`. `Date#to_s` is `strftimev("%Y-%m-%d")` (`date_core.c:6967-6970`),
+ * which is why a pre-1000 date renders as `0001-01-01`.
+ */
+function padYear(year: number): string {
+  return year < 0 ? `-${String(-year).padStart(4, "0")}` : String(year).padStart(4, "0");
+}
+
+/**
  * @internal The fields the one C `strftime(3)` behind both `Date#strftime` and
  * `Time#strftime` reads off its receiver. It is not the public surface of
  * either class — `Date` deliberately answers no `hour`/`sec` — so each caller
@@ -101,13 +112,13 @@ export interface StrftimeSubject {
  */
 export function strftime(subject: StrftimeSubject, format: string): string {
   const tokens: Record<string, () => string> = {
-    Y: () => String(subject.year),
+    Y: () => padYear(subject.year),
     y: () => pad2(subject.year % 100),
     m: () => pad2(subject.mon),
     d: () => pad2(subject.day),
     e: () => String(subject.day).padStart(2, " "),
     j: () => String(subject.yday).padStart(3, "0"),
-    F: () => `${subject.year}-${pad2(subject.mon)}-${pad2(subject.day)}`,
+    F: () => `${padYear(subject.year)}-${pad2(subject.mon)}-${pad2(subject.day)}`,
     A: () => DAY_NAMES[subject.wday],
     a: () => ABBR_DAY_NAMES[subject.wday],
     B: () => MONTH_NAMES[subject.mon - 1],

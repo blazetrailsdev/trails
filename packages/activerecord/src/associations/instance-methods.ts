@@ -7,7 +7,6 @@
  */
 
 import type { Base } from "../base.js";
-import { findTarget } from "./singular-association.js";
 import { Association as AssociationInstance } from "./association.js";
 import { BelongsToAssociation } from "./belongs-to-association.js";
 import { BelongsToPolymorphicAssociation } from "./belongs-to-polymorphic-association.js";
@@ -157,17 +156,17 @@ export function association(this: Base, name: string): AssociationInstance {
  * preloaded value if present; otherwise runs a query. Not a forced
  * reload — use `record.reload()` for that.
  *
- * Mirrors Rails' `ActiveRecord::Associations::Preloader::Branch` /
- * `BelongsToAssociation` which are the belongs_to-specific preload paths.
+ * Rails spells this entry point `record.association(name).load_target`, and
+ * that is what it delegates to: the cache read, the staleness guard and the
+ * writeback all live in `load_target` (association.rb:190), with
+ * `SingularAssociation#find_target` (singular_association.rb:47-55) the pure
+ * query underneath.
  */
 export async function loadBelongsTo(this: Base, name: string): Promise<Base | null> {
-  const assocDef = assertSingularAssociation.call(this, name, "belongsTo");
+  assertSingularAssociation.call(this, name, "belongsTo");
   const result = await bypassStrictLoading.call(this, () =>
-    findTarget(this, name, (assocDef.options ?? {}) as any),
+    association.call(this, name).loadTarget(),
   );
-  // Loader writeback: this is the tail of this function's own query, not a
-  // caller replacing the target. See Association#_setTargetFromLoader.
-  association.call(this, name)._setTargetFromLoader(result as any);
   return result as Base | null;
 }
 
@@ -176,16 +175,14 @@ export async function loadBelongsTo(this: Base, name: string): Promise<Base | nu
  * preloaded value if present; otherwise runs a query. Not a forced
  * reload — use `record.reload()` for that.
  *
- * Mirrors Rails' `HasOneAssociation` preload path.
+ * Reaches the target through `association(name).load_target` for the reasons
+ * given on `loadBelongsTo`.
  */
 export async function loadHasOne(this: Base, name: string): Promise<Base | null> {
-  const assocDef = assertSingularAssociation.call(this, name, "hasOne");
+  assertSingularAssociation.call(this, name, "hasOne");
   const result = await bypassStrictLoading.call(this, () =>
-    findTarget(this, name, (assocDef.options ?? {}) as any),
+    association.call(this, name).loadTarget(),
   );
-  // Loader writeback: this is the tail of this function's own query, not a
-  // caller replacing the target. See Association#_setTargetFromLoader.
-  association.call(this, name)._setTargetFromLoader(result as any);
   return result as Base | null;
 }
 

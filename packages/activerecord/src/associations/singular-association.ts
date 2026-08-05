@@ -8,7 +8,6 @@ import {
   _ownerChainReflection,
   _routeThroughViaAssociationScope,
   _loadSingularViaStatementCache,
-  _loadedSingularTarget,
   _resolveInverseName,
   _scopeForAssociation,
   _skipSingularStatementCache,
@@ -341,51 +340,6 @@ function scopeForCreate(assoc: SingularAssociation): Record<string, unknown> {
 }
 
 /**
- * belongs_to's cached-target read. Unlike has_one it validates `inverse_of`
- * even on a cached hit, and honors `stale_target?` so a reassigned foreign key
- * re-queries.
- *
- * Rails has no counterpart: it caches the target on the association instance,
- * so `find_target` is only ever reached on a miss.
- *
- * @internal
- */
-function _belongsToCachedHit(
-  record: Base,
-  assocName: string,
-  options: AssociationOptions,
-): { hit: boolean; value: Base | null } {
-  const loaded = _loadedSingularTarget(record, assocName);
-  if (!loaded) return { hit: false, value: null };
-  const cached = loaded.value;
-
-  // Validate inverseOf before the null check: an invalid name must throw even
-  // when the cached value is null (e.g. the preloader stored null for a missing
-  // row), consistent with the cache-miss path.
-  if (options.inverseOf && !options.polymorphic) {
-    const targetModel =
-      (cached?.constructor as typeof Base | undefined) ??
-      resolveAssocClass(record, assocName, options.className ?? camelize(assocName));
-    validateInverseOf(targetModel, assocName, options.inverseOf);
-  }
-  if (!cached) return { hit: true, value: null };
-
-  // `_cacheSingularTarget` routes singular inverse writes through
-  // `inversedFrom` (→ `replace_keys` → `loadedBang`), so the holder's
-  // `isStaleTarget()` snapshot is authoritative.
-  const holder = record._associationInstances.get(assocName) as
-    | { isStaleTarget?: () => boolean }
-    | undefined;
-  if (typeof holder?.isStaleTarget === "function" && holder.isStaleTarget()) {
-    return { hit: false, value: null };
-  }
-
-  const inverseName = _resolveInverseName(record.constructor as typeof Base, assocName, options);
-  if (inverseName) _wireInverseAssociation(record, cached, inverseName);
-  return { hit: true, value: cached };
-}
-
-/**
  * has_one's polymorphic `:as` key guard: a composite FK is always rejected, and
  * a composite owner PK collapses to "id" when present (matching Rails'
  * `join_id_for`); otherwise it is rejected too.
@@ -434,10 +388,16 @@ function _validateHasOnePolymorphicKeys(
  * the `find_target?` predicate (`belongs_to_association.rb:124-126`), never
  * `find_target`, which is why there is no belongs_to override here either.
  *
- * The macro-conditional steps are the ones Rails has no counterpart for: the
- * cached-target read (trails caches on the owner, Rails on the association
- * instance) and the has_one `:through` routing. They are named helpers rather
- * than inline branches so this body keeps the shape of Rails'.
+ * It reads no cache: `find_target` is a pure query, and the cached read lives
+ * one level up in `Association#loadTarget` → `doFindTarget`, mirroring
+ * `load_target`'s `(@stale_state && stale_target?) || find_target?` guard
+ * (`association.rb:190`). `reflection.check_validity!` has likewise already run
+ * in `Association#initialize` (`association.rb:41-45`), so a recursive or
+ * missing `inverse_of` has surfaced before this body.
+ *
+ * The one macro-conditional step Rails has no counterpart for is the has_one
+ * `:through` routing. It is a named helper rather than an inline branch so this
+ * body keeps the shape of Rails'.
  *
  * @internal
  */
@@ -453,18 +413,6 @@ export async function findTarget(
 
   if (options.through) {
     validateThroughReflection(ctor, assocName);
-  }
-
-  // Rails runs `reflection.check_validity!` in `Association#initialize`
-  // (mirrored in the `Association` constructor via
-  // `validateReflectionValidity`), so a recursive/missing `inverse_of` has
-  // already surfaced by now — no load-path recursion shim is needed.
-  if (isBelongsTo) {
-    const cached = _belongsToCachedHit(record, assocName, options);
-    if (cached.hit) return cached.value;
-  } else {
-    const loaded = _loadedSingularTarget(record, assocName);
-    if (loaded) return loaded.value;
   }
 
   // Rails `Association#find_target`'s first statement. Gated by `find_target?`:
