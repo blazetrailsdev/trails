@@ -93,13 +93,11 @@ export class PostgreSQLDatabaseTasks {
       await this.establishConnection(this.publicSchemaConfig());
     }
     const conn = await this.connection();
-    const sql = `CREATE DATABASE "${this.escapeIdent(dbName)}" ENCODING '${this.escapeSingle(encoding)}'`;
     try {
-      await conn.executeMutation(sql);
+      await conn.createDatabase(dbName, { ...this.configurationHash, encoding });
     } catch (error) {
       if (isPGDuplicateDatabaseError(error)) {
         throw new DatabaseAlreadyExists(`Database '${dbName}' already exists`, {
-          sql,
           cause: error,
         });
       }
@@ -116,9 +114,7 @@ export class PostgreSQLDatabaseTasks {
   async drop(): Promise<void> {
     await this.establishConnection(this.publicSchemaConfig());
     const conn = await this.connection();
-    await conn.executeMutation(
-      `DROP DATABASE IF EXISTS "${this.escapeIdent(this.requireDatabaseName())}"`,
-    );
+    await conn.dropDatabase(this.requireDatabaseName());
   }
 
   async charset(): Promise<string> {
@@ -349,14 +345,6 @@ export class PostgreSQLDatabaseTasks {
     const name = this.dbConfig.database ?? this.urlParts.database;
     if (!name) throw new Error("PostgreSQL configuration missing 'database'");
     return name;
-  }
-
-  private escapeIdent(value: string): string {
-    return value.replace(/"/g, '""');
-  }
-
-  private escapeSingle(value: string): string {
-    return value.replace(/'/g, "''");
   }
 
   /** @internal */

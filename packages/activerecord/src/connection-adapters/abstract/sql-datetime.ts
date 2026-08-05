@@ -10,6 +10,17 @@
  * surface.
  *
  * @internal
+ *
+ * @noRailsEquivalent PERMANENT — Ruby has `Time`, `Date` and `DateTime` in the
+ * core library, so a Rails adapter formats a datetime for SQL by calling
+ * `value.to_fs(:db)` / `strftime` on the value itself and `quoted_date`
+ * (abstract/quoting.rb:193-197) is the only method the layer needs. JS has no
+ * such type: trails carries Temporal, whose four value shapes (`Instant`,
+ * `PlainDateTime`, `PlainDate`, `PlainTime`) each need their own formatter,
+ * per adapter dialect. Every name here is one arm of that expansion — Ruby
+ * writes none of them because `strftime` covers all of it — and the one method
+ * Rails does declare, `quotedDate`, stays in `abstract/quoting.ts` at its Rails
+ * address and calls into this file.
  */
 
 import { Temporal } from "@blazetrails/activesupport/temporal";

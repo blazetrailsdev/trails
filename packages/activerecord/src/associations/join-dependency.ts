@@ -261,34 +261,6 @@ export class JoinDependency {
   }
 
   /**
-   * @internal
-   * Build a hydration row from a `{path: {column: value}}` spec, mapping each
-   * column to its `t{n}_r{n}` alias via the live `Aliases` map so tests never
-   * hardcode a column offset (which silently misaligns when the canonical
-   * `schema.rb` column order changes). `path` is the dotted association path
-   * ("" / omitted = join root); columns not in the alias map (extra SELECT
-   * columns) can be spread onto the returned row by the caller.
-   */
-  aliasedRow(spec: Record<string, Record<string, unknown>>): Record<string, unknown> {
-    const aliases = this.aliases();
-    const row: Record<string, unknown> = {};
-    for (const [path, columns] of Object.entries(spec)) {
-      const node = this._findNodeByPath(path || null);
-      if (!node) {
-        throw new Error(`JoinDependency.aliasedRow: no join node at path "${path}"`);
-      }
-      for (const [column, value] of Object.entries(columns)) {
-        const alias = aliases.columnAlias(node, column);
-        if (!alias) {
-          throw new Error(`JoinDependency.aliasedRow: no alias for "${path}".${column}`);
-        }
-        row[alias] = value;
-      }
-    }
-    return row;
-  }
-
-  /**
    * Materialize one JOIN node under `options.fromModel`/`fromAlias`. Internal
    * helper of the constructor's `build` walk — the tree is never grown after
    * construction.

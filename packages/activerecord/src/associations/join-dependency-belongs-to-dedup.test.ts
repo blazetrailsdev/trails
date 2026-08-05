@@ -1,13 +1,14 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
+import { aliasedRow } from "../support/join-dependency-aliased-row.js";
 import { fixtures } from "../test-fixtures.js";
 import { JoinDependency } from "./join-dependency.js";
 import { Nodes } from "@blazetrails/arel";
 
 describe("JoinDependency cross-parent belongsTo dedup", () => {
   // Ride the canonical schema `fixtures({})` warms; the hydration rows below are
-  // built by column name via `jd.aliasedRow`, so no bespoke schema is declared
+  // built by column name via `aliasedRow`, so no bespoke schema is declared
   // and no `tN_rN` offsets are hardcoded.
   fixtures({});
 
@@ -39,15 +40,15 @@ describe("JoinDependency cross-parent belongsTo dedup", () => {
     const jd = new JoinDependency(Post, null, "author", Nodes.OuterJoin);
 
     const rows = [
-      jd.aliasedRow({
+      aliasedRow(jd, {
         "": { id: 1, author_id: 42, title: "Post A" },
         author: { id: 42, name: "Alice" },
       }),
-      jd.aliasedRow({
+      aliasedRow(jd, {
         "": { id: 2, author_id: 42, title: "Post B" },
         author: { id: 42, name: "Alice" },
       }),
-      jd.aliasedRow({
+      aliasedRow(jd, {
         "": { id: 3, author_id: 42, title: "Post C" },
         author: { id: 42, name: "Alice" },
       }),
@@ -71,11 +72,11 @@ describe("JoinDependency cross-parent belongsTo dedup", () => {
     const jd = new JoinDependency(Post, null, "author", Nodes.OuterJoin);
 
     const rows = [
-      jd.aliasedRow({
+      aliasedRow(jd, {
         "": { id: 1, author_id: 42, title: "Post A" },
         author: { id: 42, name: "Alice" },
       }),
-      jd.aliasedRow({
+      aliasedRow(jd, {
         "": { id: 2, author_id: 99, title: "Post B" },
         author: { id: 99, name: "Bob" },
       }),

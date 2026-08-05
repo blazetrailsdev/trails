@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
+import { aliasedRow } from "../support/join-dependency-aliased-row.js";
 import { fixtures } from "../test-fixtures.js";
 import { JoinDependency } from "./join-dependency.js";
 import { Nodes } from "@blazetrails/arel";
@@ -15,7 +16,7 @@ import { Nodes } from "@blazetrails/arel";
 // is the only thing under test.
 describe("JoinDependency dedupes duplicate join rows", () => {
   // Ride the canonical schema `fixtures({})` warms; the hydration rows below are
-  // built by column name via `jd.aliasedRow`, so no bespoke schema is declared
+  // built by column name via `aliasedRow`, so no bespoke schema is declared
   // and no `tN_rN` offsets are hardcoded.
   fixtures({});
 
@@ -55,7 +56,7 @@ describe("JoinDependency dedupes duplicate join rows", () => {
     const jd = new JoinDependency(Post, null, "comments", Nodes.OuterJoin);
 
     // Same parent, same child, repeated join rows — must dedupe to one comment.
-    const row = jd.aliasedRow({
+    const row = aliasedRow(jd, {
       "": { id: 1, title: "foo" },
       comments: { id: 10, post_id: 1, body: "hmm" },
     });
@@ -75,12 +76,12 @@ describe("JoinDependency dedupes duplicate join rows", () => {
     // Two distinct parents share one post which has one comment; the post and the
     // comment must each be a single shared instance, exactly deduped.
     const rows = [
-      jd.aliasedRow({
+      aliasedRow(jd, {
         "": { id: 1, post_id: 5 },
         post: { id: 5, title: "foo" },
         "post.comments": { id: 10, post_id: 5, body: "lol" },
       }),
-      jd.aliasedRow({
+      aliasedRow(jd, {
         "": { id: 2, post_id: 5 },
         post: { id: 5, title: "foo" },
         "post.comments": { id: 10, post_id: 5, body: "lol" },
