@@ -8,6 +8,7 @@ import {
   isOffender,
   loadRatchet,
   RATCHET_PATH,
+  reachesSharedConnection,
   rowWritesAtItScope,
   TEST_ROOT,
 } from "./non-transactional-row-writes.js";
@@ -96,6 +97,8 @@ describe("non-transactional row writes", () => {
 
   it("catches a write in a brace-less arrow body", () => {
     const src = `describe("x", () => {
+  const adapter = Base.connection;
+
   it("writes", async () => Book.create({ name: "Dune" }));
 });
 `;
@@ -129,6 +132,8 @@ describe("non-transactional row writes", () => {
 
   it("catches a write in an it.each table body", () => {
     const src = `describe("x", () => {
+  const adapter = Base.connection;
+
   it.each([{ name: "Dune" }, { name: "Emma" }])("writes %s", async (row) => {
     await Book.create({ name: row.name });
   });
@@ -162,6 +167,39 @@ describe("non-transactional row writes", () => {
 });
 `;
     expect(rowWritesAtItScope(src).map((w) => w.pattern)).toEqual([".create("]);
+  });
+
+  it("clears a file whose writes never reach the shared connection", () => {
+    const src = `describe("x", () => {
+  let adapter: PostgreSQLAdapter;
+  beforeEach(async () => {
+    adapter = new PostgreSQLAdapter(PG_TEST_URL);
+  });
+  afterEach(async () => {
+    await adapter.close();
+  });
+
+  it("inserts", async () => {
+    await adapter.execute(\`INSERT INTO books (name) VALUES ('Dune')\`);
+  });
+});
+`;
+    expect(rowWritesAtItScope(src).map((w) => w.pattern)).toEqual(["INSERT INTO"]);
+    expect(reachesSharedConnection(src)).toBe(false);
+    expect(isOffender(src)).toBe(false);
+  });
+
+  it("clears a file wired by setupAdapterSuite", () => {
+    const src = `describe("x", () => {
+  const suite = setupAdapterSuite({ factory: () => new BetterSQLite3Adapter(":memory:") });
+
+  it("inserts", async () => {
+    await Base.connection.execute(\`INSERT INTO widgets (id) VALUES (1)\`);
+  });
+});
+`;
+    expect(hasTransactionalWiring(src)).toBe(true);
+    expect(isOffender(src)).toBe(false);
   });
 
   it("does not grow past the seeded ratchet", async () => {

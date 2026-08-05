@@ -24,6 +24,32 @@
  * The population is large and most of it is legitimate — files that clean up in
  * `afterEach`, or write to a table nothing else reads — so this is a ratchet
  * seeded from the tree, not a suite-reddening gate: the count may not grow.
+ *
+ * ## What the ratchet holds a file to
+ *
+ * A row only outlives its test if it was written over a connection some other
+ * file also uses — the canonical per-worker connection. So the population is
+ * files that (a) write rows at `it()` scope, (b) have no transactional wrap,
+ * AND (c) reach that shared connection (`SHARED_CONNECTION_ACCESSORS`).
+ *
+ * Clause (c) is what retires the two classes the wrap-convergence pass could
+ * not touch, because a wrap is not what they were missing:
+ *
+ * - **Throwaway per-test adapters** — the `adapters/*` cluster constructs its
+ *   own adapter in `beforeEach` (`new BetterSQLite3Adapter(":memory:")`,
+ *   `new PostgreSQLAdapter(PG_TEST_URL)` + per-test DDL) and closes it in
+ *   `afterEach`. Rows cannot survive a database that is discarded, and a
+ *   BEGIN/ROLLBACK around it would protect nothing.
+ * - **Detector false positives** — `WRITE_PATTERNS` is deliberately textual and
+ *   matches calls that write no row at all: `AliasTracker.create`,
+ *   `SchemaDumper.create`, `Object.create`, `DatabaseTasks.create(config)`, a
+ *   GCM cipher's `.update(...)`. None of those files touch the shared
+ *   connection either.
+ *
+ * Known gap: a model-level write (`Book.create(...)`) that reaches the shared
+ * connection implicitly, naming no accessor. No file in this tree has that
+ * shape — the canonical-schema files all ride `fixtures()` — and closing it
+ * needs receiver-level knowledge the textual scan does not have.
  */
 
 import { readdir, readFile } from "node:fs/promises";
@@ -44,6 +70,7 @@ export const TRANSACTIONAL_WIRING = [
   "fixtures(",
   "useTransactionalTests(",
   "withTransactionalFixtures(",
+  "setupAdapterSuite(",
 ];
 
 /**
@@ -150,8 +177,27 @@ export function hasTransactionalWiring(src: string): boolean {
   return TRANSACTIONAL_WIRING.some((call) => stripped.includes(call));
 }
 
+/**
+ * The ways a test file reaches the canonical per-worker connection — the only
+ * connection a leaked row can be read back over by a sibling file. A file that
+ * names none of these either owns its adapter for the length of one test or is
+ * not talking to a database at all.
+ */
+export const SHARED_CONNECTION_ACCESSORS = [
+  "Base.connection",
+  "leaseConnection",
+  "ambientConnection",
+  "freshAdapter",
+];
+
+export function reachesSharedConnection(src: string): boolean {
+  const stripped = stripCommentsAndStrings(src);
+  return SHARED_CONNECTION_ACCESSORS.some((accessor) => stripped.includes(accessor));
+}
+
 export function isOffender(src: string): boolean {
   if (hasTransactionalWiring(src)) return false;
+  if (!reachesSharedConnection(src)) return false;
   return rowWritesAtItScope(src).length > 0;
 }
 
