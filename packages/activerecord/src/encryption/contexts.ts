@@ -1,7 +1,6 @@
 import {
   withEncryptionContext as _withCtx,
   withoutEncryption as _withoutEnc,
-  protectingEncryptedData as _protecting,
   getEncryptionContext,
   getDefaultContext,
   setDefaultContext as _setDefaultContext,
@@ -9,6 +8,7 @@ import {
   resetDefaultContext as _resetDefaultContext,
   type Context,
 } from "./context.js";
+import { EncryptingOnlyEncryptor } from "./encrypting-only-encryptor.js";
 
 /**
  * Class-based API for managing encryption contexts. Delegates to the
@@ -30,7 +30,7 @@ export class Contexts {
   }
 
   static protectingEncryptedData<T>(fn: () => T): T {
-    return _protecting(fn);
+    return _withCtx({ encryptor: new EncryptingOnlyEncryptor(), frozenEncryption: true }, fn);
   }
 
   static get currentCustomContext(): Context | null {

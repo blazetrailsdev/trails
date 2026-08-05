@@ -24,6 +24,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
+import { parseForESLint } from "@typescript-eslint/parser";
 import { writeJsonManifest } from "./api-compare/write-json-manifest.js";
 // @ts-expect-error — .mjs rule module has no type declarations.
 import { macroOfCall, siteKey, repoRel } from "../eslint/no-standalone-associations.mjs";
@@ -50,16 +51,8 @@ function collectTsFiles(dir: string, out: string[]): void {
 }
 
 async function main(): Promise<void> {
-  const { parser } = (await import("typescript-eslint")) as unknown as {
-    parser: {
-      parseForESLint(
-        code: string,
-        options: { ecmaVersion: number; sourceType: string },
-      ): { ast: unknown };
-    };
-  };
   const parse = (code: string) =>
-    parser.parseForESLint(code, { ecmaVersion: 2022, sourceType: "module" }).ast;
+    parseForESLint(code, { ecmaVersion: 2022, sourceType: "module" }).ast;
 
   const files: string[] = [];
   for (const pkg of fs.readdirSync(path.join(ROOT, "packages"))) {
@@ -78,7 +71,7 @@ async function main(): Promise<void> {
     } catch {
       continue; // skip unparseable files
     }
-    walk(ast as AstNode, (node) => {
+    walk(ast as unknown as AstNode, (node) => {
       if (node.type !== "CallExpression") return;
       const macro = macroOfCall(node.callee);
       if (macro === null) return;

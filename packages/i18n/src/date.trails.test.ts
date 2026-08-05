@@ -500,6 +500,43 @@ describe("Date", () => {
     expect(RubyDate.parse("2008070").strftime("%Y-%m-%d")).toBe("2008-03-10");
     expect(RubyDate.parse("2001-W05-6").strftime("%Y-%m-%d")).toBe("2001-02-03");
   });
+
+  // Every expectation below is `ruby 3.3.11 -rdate` output.
+  it("names the day either side of the reform off a Julian day", () => {
+    expect(RubyDate.jd(2299160).toS()).toBe("1582-10-04");
+    expect(RubyDate.jd(2299161).toS()).toBe("1582-10-15");
+    expect(RubyDate.jd(2299160).yday).toBe(277);
+  });
+
+  it("carries the start the date was resolved under, rather than defaulting it to ITALY", () => {
+    expect(RubyDate.parse("1582-10-10", true, RubyDate.GREGORIAN).start).toBe(RubyDate.GREGORIAN);
+    expect(RubyDate.parse("1582-10-10", true, RubyDate.GREGORIAN).toS()).toBe("1582-10-10");
+    expect(new RubyDate(2001, 2, 3, RubyDate.ENGLAND).start).toBe(2361222);
+    // 1500 is not a leap year in the proleptic Gregorian calendar Temporal uses.
+    expect(RubyDate.parse("1500-02-29", true, RubyDate.JULIAN).toS()).toBe("1500-02-29");
+    expect(RubyDate.parse("1500-02-29", true, RubyDate.JULIAN).start).toBe(RubyDate.JULIAN);
+  });
+
+  it("answers julian? off the start, and the infinite starts off their own sign", () => {
+    expect(RubyDate.jd(2299160).isJulian()).toBe(true);
+    expect(RubyDate.jd(2299160).isGregorian()).toBe(false);
+    expect(RubyDate.jd(2299161).isJulian()).toBe(false);
+    expect(new RubyDate(2000, 2, 3).isJulian()).toBe(false);
+    expect(new RubyDate(2000, 2, 3).julian().isJulian()).toBe(true);
+    expect(new RubyDate(2000, 2, 3).gregorian().isJulian()).toBe(false);
+  });
+
+  it("re-reads the same Julian day under a new start", () => {
+    expect(new RubyDate(2000, 2, 3).newStart(RubyDate.JULIAN).toS()).toBe("2000-01-21");
+    expect(new RubyDate(2001, 2, 3).england().start).toBe(2361222);
+    expect(new RubyDate(2001, 2, 3).italy().start).toBe(RubyDate.ITALY);
+    expect(new RubyDate(2001, 2, 3).gregorian().start).toBe(RubyDate.GREGORIAN);
+  });
+
+  it("raises Date::Error on a civil date the reform deleted", () => {
+    expect(() => new RubyDate(1582, 10, 10)).toThrow(RubyDate.Error);
+    expect(new RubyDate(1582, 10, 10, RubyDate.GREGORIAN).toS()).toBe("1582-10-10");
+  });
 });
 
 describe("DateTime", () => {
