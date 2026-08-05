@@ -94,6 +94,29 @@ describe("non-transactional row writes", () => {
     expect(rowWritesAtItScope(src)).toEqual([]);
   });
 
+  it("catches a write in a brace-less arrow body", () => {
+    const src = `describe("x", () => {
+  it("writes", async () => Book.create({ name: "Dune" }));
+});
+`;
+    expect(rowWritesAtItScope(src).map((w) => w.pattern)).toEqual([".create("]);
+    expect(isOffender(src)).toBe(true);
+  });
+
+  it("does not mistake a brace before the arrow for the test body", () => {
+    const src = `describe("x", () => {
+  it("reads", async ({ adapter }) => {
+    expect(await Book.count()).toBe(0);
+  });
+
+  beforeEach(async () => {
+    await Book.create({ name: "Dune" });
+  });
+});
+`;
+    expect(rowWritesAtItScope(src)).toEqual([]);
+  });
+
   it("catches a raw INSERT INTO in a template literal", () => {
     const src = `describe("x", () => {
   it("inserts", async () => {

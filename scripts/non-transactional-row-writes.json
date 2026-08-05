@@ -36,7 +36,6 @@
   "packages/activerecord/src/invertible-migration.test.ts",
   "packages/activerecord/src/migration/columns.test.ts",
   "packages/activerecord/src/migration/rename-table.test.ts",
-  "packages/activerecord/src/pooled-test-adapter.test.ts",
   "packages/activerecord/src/support/drop-all-tables.test.ts",
   "packages/activerecord/src/support/handler-resolved-adapter.test.ts",
   "packages/activerecord/src/support/setup-adapter-suite.test.ts",

@@ -67,7 +67,7 @@ export function stripCommentsAndStrings(src: string): string {
     .replace(/"(?:\\.|[^"\\])*"/g, '""');
 }
 
-const IT_CALL = /(?:^|[^.\w])(?:it|test)(?:\.\w+)*\s*\(/;
+const IT_CALL = /(?:^|[^.\w])(?:it|test)(?:\.\w+)*\s*\(/g;
 
 export interface RowWrite {
   line: number;
@@ -78,35 +78,49 @@ export interface RowWrite {
  * The row writes this source performs at `it()` scope. Writes in `beforeEach` /
  * `beforeAll` / module scope are not reported: those are setup, and the files
  * that do them own their own teardown by construction.
+ *
+ * Scope is tracked by the `it(` call's own parentheses rather than by the
+ * braces of its callback. A braced body and a brace-less arrow body
+ * (`it("x", () => Book.create(...))`) both live inside those parentheses, so
+ * both are covered, and a `{` that opens something else on the `it(` line — a
+ * destructuring pattern, an inline options object — can no longer be mistaken
+ * for the body and swallow everything up to its match.
+ *
+ * Known gap: `it.each([...])("name", fn)` puts the body in a second call, so
+ * its writes are not attributed. That shape is rare in this tree and the gate
+ * is a human-reviewed ratchet, not a hard gate.
  */
 export function rowWritesAtItScope(src: string): RowWrite[] {
   const stripped = stripCommentsAndStrings(src);
   const writes: RowWrite[] = [];
-  const itDepths: number[] = [];
-  let depth = 0;
-  let pendingIt = false;
+  const itParens: number[] = [];
+  let parenDepth = 0;
 
   const lines = stripped.split("\n");
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    if (IT_CALL.test(line)) pendingIt = true;
 
-    if (itDepths.length > 0) {
-      for (const pattern of WRITE_PATTERNS) {
-        if (line.includes(pattern)) writes.push({ line: i + 1, pattern });
-      }
+    const itColumns = new Set<number>();
+    IT_CALL.lastIndex = 0;
+    for (let m = IT_CALL.exec(line); m !== null; m = IT_CALL.exec(line)) {
+      itColumns.add(m.index + m[0].length - 1);
     }
 
-    for (const ch of line) {
-      if (ch === "{") {
-        depth++;
-        if (pendingIt) {
-          itDepths.push(depth);
-          pendingIt = false;
-        }
-      } else if (ch === "}") {
-        if (itDepths[itDepths.length - 1] === depth) itDepths.pop();
-        depth--;
+    for (let c = 0; c < line.length; c++) {
+      const ch = line[c];
+      if (ch === "(") {
+        parenDepth++;
+        if (itColumns.has(c)) itParens.push(parenDepth);
+        continue;
+      }
+      if (ch === ")") {
+        if (itParens[itParens.length - 1] === parenDepth) itParens.pop();
+        parenDepth--;
+        continue;
+      }
+      if (itParens.length === 0) continue;
+      for (const pattern of WRITE_PATTERNS) {
+        if (line.startsWith(pattern, c)) writes.push({ line: i + 1, pattern });
       }
     }
   }
