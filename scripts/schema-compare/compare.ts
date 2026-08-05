@@ -481,9 +481,8 @@ const COMPARED_INDEX_KEYS = [
 
 /**
  * The comparable shape of an `IndexSpec`: its columns plus every option that
- * reaches the DDL, including the `adapters` gate — an index one side lays on
- * every adapter and the other gates to MySQL is a real divergence, not a
- * spelling difference.
+ * reaches the DDL, including the `adapters` gate — an index one side lays
+ * everywhere and the other gates to MySQL is a real divergence.
  */
 export function describeIndex(spec: IndexSpec): string {
   const columns = Array.isArray(spec.columns) ? spec.columns.join(",") : spec.columns;

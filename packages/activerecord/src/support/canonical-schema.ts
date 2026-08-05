@@ -2195,10 +2195,9 @@ export async function canonicalRegistrySchema(): Promise<Schema> {
         columns[name] = specFromColumnCall(type, options);
       },
       foreignKey: (toTable: string, opts: Partial<AddForeignKeyOptions> = {}) => {
-        // A composite `column:`/`primary_key:` collapses to its comma-joined
-        // spelling: `ForeignKeySpec` is single-column (as is every canonical
-        // `t.foreignKey` today), and joining keeps a composite comparable
-        // rather than silently dropping it.
+        // `ForeignKeySpec` is single-column (as is every canonical
+        // `t.foreignKey` today), so a composite collapses to its comma-joined
+        // spelling rather than being dropped.
         const join = (v: string | string[] | undefined): string | undefined =>
           Array.isArray(v) ? v.join(",") : v;
         const fk: ForeignKeySpec = { toTable, column: join(opts.column) ?? `${toTable}_id` };

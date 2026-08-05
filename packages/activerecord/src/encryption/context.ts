@@ -23,13 +23,11 @@ export function setEncryptingOnlyEncryptorFactory(factory: () => unknown): void 
 }
 
 /**
- * @internal Rails `Context::PROPERTIES` (context.rb:13), reachable as a
- * hoisted function declaration so `configurable.ts` can read the names at
- * module-eval time. The two modules form a cycle, and whichever of them
- * evaluates second sees the other's `class`/`const` bindings in TDZ; a
- * function declaration is initialized at instantiation, so it stays callable
- * from inside the cycle. Same workaround as setEncryptingOnlyEncryptorFactory
- * above. Read it as `Context.PROPERTIES`.
+ * @internal Rails `Context::PROPERTIES` (context.rb:13) as a hoisted function
+ * so `configurable.ts` can read the names at module-eval time: the two modules
+ * form a cycle, and whichever evaluates second sees the other's `class`/`const`
+ * bindings in TDZ, while a function declaration is initialized at
+ * instantiation. Read it as `Context.PROPERTIES`.
  */
 export function contextProperties(): string[] {
   return [
