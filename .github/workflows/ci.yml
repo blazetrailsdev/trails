@@ -1572,12 +1572,11 @@ jobs:
         # methods. Regenerate with `pnpm rails-privates:manifest`.
         run: pnpm exec tsx scripts/build-rails-privates-manifest.ts --check-deprecated
       - name: ESLint exclude baselines up to date
-        # Both baselines are generated grandfather lists that only ever shrink
-        # as sites convert. Nothing read them back, so they drifted ~200 rows
-        # loose on main before this guard: a ratchet grandfathering sites that
-        # no longer exist stops catching what it was installed to catch.
-        # Regenerate with `pnpm tsx scripts/generate-standalone-associations-exclude.ts`
-        # and `pnpm fixture-baseline:refresh`.
+        # Both baselines are generated grandfather lists that only shrink as
+        # sites convert. Nothing read them back, so they drifted ~200 rows loose
+        # on main before this guard. Regenerate with
+        # `pnpm tsx scripts/generate-standalone-associations-exclude.ts` and
+        # `pnpm fixture-baseline:refresh`.
         run: |
           set -euo pipefail
           pnpm exec tsx scripts/generate-standalone-associations-exclude.ts

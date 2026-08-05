@@ -157,9 +157,7 @@ describe("non-transactional row writes", () => {
     const src = `describe("x", () => {
   test.each([1, 2])(
     "writes %i",
-    async (n) => {
-      await Book.create({ name: String(n) });
-    },
+    async (n) => await Book.create({ name: String(n) }),
   );
 });
 `;
