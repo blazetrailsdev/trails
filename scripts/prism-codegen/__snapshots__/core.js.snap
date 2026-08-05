@@ -365,7 +365,7 @@ export function hash() {
     let id;
     id = this.id();
     if (this.isPrimaryKeyValuesPresent()) {
-        return __PRISM_TODO("CallNode");
+        return this.constructor.hash() ^ id.hash();
     }
     else {
         return __PRISM_SUPER_OUTSIDE_CORPUS("Core#hash");

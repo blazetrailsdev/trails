@@ -101,7 +101,7 @@ export class ModelName {
   /** I18n key in path form — `"blog/post"`. */
   readonly i18nKey: string;
 
-  private _humanFallback: string;
+  private _human: string;
   private _klass: ModelLike | null;
 
   get cacheKey(): string {
@@ -301,7 +301,7 @@ export class ModelName {
     const uncountable = this.plural === this.singular;
     // Rails `@element = underscore(demodulize(@name))` — bare name only.
     this.element = bareUnderscored;
-    this._humanFallback = humanize(this.element);
+    this._human = humanize(this.element);
     // Rails `@collection = tableize(@name)` — path form, last segment
     // pluralized. Derive the last segment from `this.plural` (rather than
     // pluralizing the bare name independently) so any uncountable decision
@@ -331,11 +331,9 @@ export class ModelName {
   }
 
   human(options: TranslateOptions = {}): string {
-    if (!this._klass) return this._humanFallback;
-
     const i18nKeys = this.i18nKeys();
-    const i18nScope = this._i18nScope();
-    if (i18nKeys.length === 0 || i18nScope.length === 0) return this._humanFallback;
+    const i18nScope = this.i18nScope();
+    if (i18nKeys.length === 0 || i18nScope.length === 0) return this._human;
 
     const [key, ...defaults] = i18nKeys as unknown[];
     const defaultChain: unknown[] = defaults.map((k) => `:${k as string}`);
@@ -348,7 +346,7 @@ export class ModelName {
       ...options,
       default: defaultChain,
     });
-    if (translation === MISSING_TRANSLATION) translation = this._humanFallback;
+    if (translation === MISSING_TRANSLATION) translation = this._human;
     return translation as string;
   }
 
@@ -371,19 +369,27 @@ export class ModelName {
    */
   i18nKeys(): string[] {
     if (this._cachedI18nKeys) return this._cachedI18nKeys;
-    let keys: string[];
-    if (!this._klass) {
-      keys = [];
-    } else if (typeof this._klass.lookupAncestors === "function") {
-      keys = this._klass.lookupAncestors().map((k) => {
-        if (k.modelName) return k.modelName.i18nKey;
-        return underscore(k.name);
-      });
-    } else {
-      keys = [this.i18nKey];
-    }
+    const keys =
+      typeof this._klass?.lookupAncestors === "function"
+        ? this._klass.lookupAncestors().map((k) => {
+            if (k.modelName) return k.modelName.i18nKey;
+            return underscore(k.name);
+          })
+        : [];
     this._cachedI18nKeys = keys;
     return keys;
+  }
+
+  /**
+   * Mirrors Rails `i18n_scope` (activemodel/lib/active_model/naming.rb:228-230).
+   * `respond_to?(:i18n_scope)` is a `typeof` check because the trails
+   * counterpart is a property, not a method.
+   *
+   * @internal Rails-private helper.
+   */
+  private i18nScope(): string[] {
+    const klassScope = this._klass?.i18nScope;
+    return typeof klassScope === "string" ? [klassScope, "models"] : [];
   }
 
   // Uncountable lookup delegates to `@blazetrails/activesupport`'s
@@ -407,23 +413,16 @@ export class ModelName {
     Inflections.instance("en").uncountable(word);
   }
 
+  private _cachedI18nKeys?: string[];
+
   private static _qualified(mn: ModelName): string {
     // `name` is already the full `::`-qualified constant path, so it doubles as
     // the single-string sort key Rails' `String#<=>` compares.
     return mn.name;
   }
 
-  private _cachedI18nKeys?: string[];
-
   /** JSON.stringify hook — delegates to `asJson`. */
   toJSON(): string {
     return this.asJson();
-  }
-
-  private _i18nScope(): string[] {
-    if (!this._klass) return [];
-    const klassScope = this._klass.i18nScope;
-    const scope = typeof klassScope === "string" ? klassScope : "activemodel";
-    return [scope, "models"];
   }
 }

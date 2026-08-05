@@ -538,37 +538,12 @@ export class SchemaCache {
   }
 
   /**
-   * Sync counterpart of {@link setColumns} for the authoritative primary key.
-   * Rails has no sync writer here either — `add(pool, table_name)` runs the
-   * `primary_keys` query itself behind `pool.with_connection`.
-   *
-   * @internal Test-harness seeding only — it has no production caller. It
-   * exists because the ported `SchemaCache` tests (`test_clearing`,
-   * `test_marshal_dump_and_load`, `test_clear_data_source_cache`, and the
-   * primary-key-reconciliation cases) drive a pool-less `SchemaCache`, where
-   * Rails' tests drive a live `@cache` bound to a real connection and let
-   * `add` / `primary_keys` warm the map for them. Production warms
-   * `_primaryKeys` through the async `primaryKeys` query instead, which is
-   * what {@link getCachedPrimaryKeys} then reads back synchronously.
-   *
-   * Order-independent with {@link setColumns}: whichever lands second runs
-   * {@link reconcilePrimaryKeyFlags}, so the authoritative key always wins over
-   * a column-reflected flag.
-   */
-  setPrimaryKeys(tableName: string, pk: string | string[] | null): void {
-    this._primaryKeys.set(tableName, pk);
-    const cols = this._columns.get(tableName);
-    if (cols) this.reconcilePrimaryKeyFlags(tableName, cols);
-  }
-
-  /**
    * Clear per-column `primaryKey` flags that the authoritative `_primaryKeys`
    * cache contradicts. This is a general safety net for any adapter whose
    * `columns()` could over-report a primary flag, reconciled query-free against
    * `_primaryKeys` (which `add()` warms via the authoritative
-   * `SHOW KEYS ... 'PRIMARY'` / key_column_usage query before `columns()`).
-   * Called from both `setColumns` and `setPrimaryKeys` so the correction is
-   * independent of which warms first.
+   * `SHOW KEYS ... 'PRIMARY'` / key_column_usage query before `columns()`, so
+   * by the time `setColumns` runs the key is already authoritative).
    *
    * Historically this cleared MySQL/MariaDB's "promoted unique" false positive:
    * they report `column_key = 'PRI'` for a UNIQUE-NOT-NULL index when a table has
@@ -594,25 +569,6 @@ export class SchemaCache {
         (col as { primaryKey: boolean }).primaryKey = false;
       }
     }
-  }
-
-  /**
-   * Sync writer for the data-source-existence map, completing the
-   * {@link setColumns} / {@link setPrimaryKeys} trio. Rails populates this only
-   * as a side effect of `data_source_exists?(pool, name)`, which blocks on the
-   * query.
-   *
-   * @internal Test-harness seeding only — like {@link setPrimaryKeys} it has no
-   * production caller. Rails' `SchemaCache` tests (`test_data_source_exist`,
-   * `#columns_hash? is not populated by #data_source_exists?`,
-   * `schema_cache_test.rb:324`, `:347`) drive a live `@cache` bound to a real
-   * connection, so the blocking `data_source_exists?` warms the map for them;
-   * the trails ports run pool-less and seed it through this writer instead.
-   * Production warming goes through {@link setColumns} (which sets `true` for a
-   * table whose columns just came back) or the async `dataSourceExists` query.
-   */
-  setDataSourceExists(tableName: string, exists: boolean): void {
-    this._dataSourceExists.set(tableName, exists);
   }
 
   async addAll(pool: unknown): Promise<void> {

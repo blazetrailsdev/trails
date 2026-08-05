@@ -26,6 +26,14 @@ const INFIX: Record<string, ts.BinaryOperator> = {
   "*": ts.SyntaxKind.AsteriskToken,
   "/": ts.SyntaxKind.SlashToken,
   "%": ts.SyntaxKind.PercentToken,
+  "**": ts.SyntaxKind.AsteriskAsteriskToken,
+  "^": ts.SyntaxKind.CaretToken,
+};
+/** Operators imaged as a runtime helper: no JS counterpart, or three families. */
+export const INFIX_HELPER: Record<string, string> = {
+  "<=>": "cmp",
+  "|": "union",
+  "&": "intersection",
 };
 export function registerExpressions(r: Registry): void {
   r.on("CallNode", (n, e) => emitCall(n, e));
@@ -156,12 +164,12 @@ function emitCall(n: PrismNode, e: Emitter): ts.Expression | null {
   const hasRecv = n.receiver != null;
   const block = n.block as PrismNode | undefined;
 
-  if (name === "[]" && hasRecv) {
-    if (argNodes.length !== 1) return null;
+  if (name === "[]" && hasRecv && argNodes.length > 0) {
+    if (argNodes.length > 1) return helperCall("idxGet", [n.receiver as PrismNode, ...argNodes], e);
     return f.createElementAccessExpression(e.expr(n.receiver as PrismNode), e.expr(argNodes[0]));
   }
-  if (name === "[]=" && hasRecv) {
-    if (argNodes.length !== 2) return null;
+  if (name === "[]=" && hasRecv && argNodes.length > 1) {
+    if (argNodes.length > 2) return helperCall("idxSet", [n.receiver as PrismNode, ...argNodes], e);
     return f.createAssignment(
       f.createElementAccessExpression(e.expr(n.receiver as PrismNode), e.expr(argNodes[0])),
       e.expr(argNodes[1]),
@@ -180,6 +188,9 @@ function emitCall(n: PrismNode, e: Emitter): ts.Expression | null {
       undefined,
       [e.expr(argNodes[0])],
     );
+  }
+  if (hasRecv && INFIX_HELPER[name] && argNodes.length === 1) {
+    return helperCall(INFIX_HELPER[name], [n.receiver as PrismNode, argNodes[0]], e);
   }
   if (hasRecv && INFIX[name] && argNodes.length === 1) {
     return f.createBinaryExpression(
@@ -248,14 +259,20 @@ function emitCall(n: PrismNode, e: Emitter): ts.Expression | null {
   if (hasRecv || selfCall ? !isJsIdentName(jsName) : !isBindableIdent(jsName)) return null;
   let blockParams: string[] | null = null;
   let symToProc: string | null = null;
+  let symToProcOp: string | null = null;
   if (block) {
     const blockKind = block.constructor.name;
     if (blockKind === "BlockArgumentNode") {
       const inner = block.expression as PrismNode | null;
       if (inner?.constructor.name === "SymbolNode") {
-        const sym = methodName(rubyStr(inner.unescaped));
-        if (!isJsIdentName(sym)) return null;
-        symToProc = sym;
+        const raw = rubyStr(inner.unescaped);
+        if (INFIX[raw] || INFIX_HELPER[raw]) {
+          symToProcOp = raw;
+        } else {
+          const sym = methodName(raw);
+          if (!isJsIdentName(sym)) return null;
+          symToProc = sym;
+        }
       }
     } else if (blockKind === "BlockNode") {
       blockParams = blockParamNames(block.parameters as PrismNode | undefined);
@@ -268,7 +285,9 @@ function emitCall(n: PrismNode, e: Emitter): ts.Expression | null {
   const recv = hasRecv ? e.expr(n.receiver as PrismNode) : undefined;
   const callArgs = argExprs(n.arguments_ as PrismNode, e);
   if (block) {
-    if (symToProc) {
+    if (symToProcOp) {
+      callArgs.push(operatorArrow(symToProcOp, e));
+    } else if (symToProc) {
       callArgs.push(symToProcArrow(symToProc));
     } else if (block.constructor.name === "BlockArgumentNode") {
       callArgs.push(e.expr(block.expression as PrismNode));
@@ -321,6 +340,32 @@ function trackAsyncProvenance(n: PrismNode, e: Emitter): void {
   } else {
     e.asyncBindings.delete(key);
   }
+}
+/** `&:+` and friends — the two-argument arrow that applies the operator. */
+function operatorArrow(rubyOp: string, e: Emitter): ts.ArrowFunction {
+  const a = f.createIdentifier("a");
+  const b = f.createIdentifier("b");
+  const helper = INFIX_HELPER[rubyOp];
+  if (helper) e.helpers.add(helper);
+  const body = helper
+    ? f.createCallExpression(f.createIdentifier(helper), undefined, [a, b])
+    : f.createBinaryExpression(a, INFIX[rubyOp], b);
+  return f.createArrowFunction(
+    undefined,
+    undefined,
+    ["a", "b"].map((p) => f.createParameterDeclaration(undefined, undefined, p)),
+    undefined,
+    undefined,
+    body,
+  );
+}
+function helperCall(helper: string, args: PrismNode[], e: Emitter): ts.CallExpression {
+  e.helpers.add(helper);
+  return f.createCallExpression(
+    f.createIdentifier(helper),
+    undefined,
+    args.map((a) => e.expr(a)),
+  );
 }
 function symToProcArrow(prop: string): ts.ArrowFunction {
   return f.createArrowFunction(
