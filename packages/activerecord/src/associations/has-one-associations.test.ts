@@ -762,7 +762,7 @@ describe("HasOneAssociationsTest", () => {
   it("create before save", async () => {
     const firm = new Firm({ name: "GlobalMegaCorp" });
     const account = await Account.create({ credit_limit: 1000 });
-    (firm as any).account = account;
+    await (firm as any).setAccount(account);
     await (firm as any).save();
     expect((await readHasOne(firm, "account")).id).toBe(account.id);
   });
@@ -1033,7 +1033,7 @@ describe("HasOneAssociationsTest", () => {
     });
 
     await assertNoQueries(false, async () => {
-      (new Firm() as any).account = account2;
+      await (new Firm() as any).setAccount(account2);
     });
   });
 
@@ -1074,7 +1074,7 @@ describe("HasOneAssociationsTest", () => {
     const post = await Post.create({ id: 1234, title: "Some title", body: "Some content" });
     const author = new Author({ id: 33, name: "Hank Moody" });
 
-    (author as any).post = post;
+    await (author as any).setPost(post);
     await (author as any).save();
     await author.reload();
 

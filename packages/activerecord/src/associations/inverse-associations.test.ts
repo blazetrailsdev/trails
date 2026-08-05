@@ -1139,7 +1139,7 @@ describe("InversePolymorphicBelongsToTests", () => {
   it("inversed instance should not be reloaded after stale state changed", async () => {
     const newHuman = new Human();
     const face = new Face();
-    (newHuman as any).face = face;
+    await (newHuman as any).setFace(face);
     const oldInversedHuman = (face as any).human;
     await (newHuman as any).saveBang();
     const newInversedHuman = (face as any).human;

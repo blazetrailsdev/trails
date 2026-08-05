@@ -2226,8 +2226,15 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    */
   async removeCheckConstraint(
     tableName: string,
-    expressionOrOptions?: string | { name?: string; ifExists?: boolean },
-    trailingOptions: { name?: string; ifExists?: boolean } = {},
+    expressionOrOptions?:
+      | string
+      | { name?: string; expression?: string; validate?: boolean; ifExists?: boolean },
+    trailingOptions: {
+      name?: string;
+      expression?: string;
+      validate?: boolean;
+      ifExists?: boolean;
+    } = {},
   ): Promise<void> {
     // Rails' `remove_check_constraint(table_name, expression = nil, **options)`
     // splits into a positional expression plus keywords; TS callers spell the
@@ -2238,16 +2245,16 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
         ? { ...(expressionOrOptions ?? {}), ...trailingOptions }
         : { ...trailingOptions };
 
-    if (options.ifExists === true) {
-      const probe: { name?: string } = {};
-      if (options.name !== undefined) probe.name = options.name;
-      if (!(await this.checkConstraintExists(tableName, probe))) return;
-    }
+    // `if_exists:` is a kwarg in Rails (sqlite3/schema_statements.rb:113), so
+    // it is part of neither `**options` the probe gets nor the lookup's.
+    const { ifExists, ...lookupOptions } = options;
+
+    if (ifExists === true && !(await this.checkConstraintExists(tableName, lookupOptions))) return;
 
     const checkConstraints = await this.checkConstraints(tableName);
-    const lookup: { name?: string; expression?: string } = { expression };
-    if (options.name !== undefined) lookup.name = options.name;
-    const chkNameToDelete = (await this.checkConstraintForBang(tableName, lookup)).name;
+    const chkNameToDelete = (
+      await this.checkConstraintForBang(tableName, { expression, ...lookupOptions })
+    ).name;
     const remainingChecks = checkConstraints.filter((chk) => chk.name !== chkNameToDelete);
     await this.alterTable(tableName, await this.foreignKeys(tableName), remainingChecks);
   }

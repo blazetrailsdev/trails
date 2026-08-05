@@ -85,9 +85,8 @@ describe("HasOneThroughSetterTrails", () => {
     const rowCount = async () => Number(await CurrentMembership.count());
     const before = await rowCount();
 
-    // A new owner takes Rails' `through_proxy.build` arm (:36-37), which needs
-    // no `await` — the plain property setter is the faithful surface here.
-    member.club = club;
+    // A new owner takes Rails' `through_proxy.build` arm (:36-37).
+    await (member as unknown as AwaitableClubSetter).setClub(club);
 
     // Built in memory and readable immediately, but NOT yet in the DB.
     expect(member.club).toBe(club);

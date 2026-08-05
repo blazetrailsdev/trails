@@ -580,14 +580,10 @@ export class SchemaStatements {
 
     // Rails: `return if options[:if_exists] && !index_exists?(...)` — only an
     // explicit `ifExists` short-circuits a missing index.
-    if (opts.ifExists) {
-      const colSpec = columnName ?? opts.column;
-      const present =
-        colSpec != null
-          ? await this.indexExists(tableName, colSpec, opts)
-          : opts.name != null && (await this.indexNameExists(tableName, opts.name));
-      if (!present) return;
-    }
+    // (schema_statements.rb:967) — `index_exists?` handles the name-only case
+    // itself: `Index#defined_for?` (schema_definitions.rb:54) reads
+    // `options[:column]` when no columns are given and matches on `name` alone.
+    if (opts.ifExists && !(await this.indexExists(tableName, columnName, opts))) return;
 
     await this.schemaCache.clearDataSourceCacheBang(tableName);
     // Rails resolves the concrete index name via `index_name_for_remove`, which
@@ -900,15 +896,18 @@ export class SchemaStatements {
 
   async removeCheckConstraint(
     tableName: string,
-    expressionOrOptions?: string | { name?: string; ifExists?: boolean },
-    options: { name?: string; ifExists?: boolean } = {},
+    expressionOrOptions?:
+      | string
+      | { name?: string; expression?: string; validate?: boolean; ifExists?: boolean },
+    options: { name?: string; expression?: string; validate?: boolean; ifExists?: boolean } = {},
   ): Promise<void> {
-    // Mirrors Rails remove_check_constraint(table, expression = nil, **options):
-    // resolve the live constraint via check_constraint_for! (by :name, else the
-    // hash of the expression) and drop it by its real name — mirroring how
-    // removeForeignKey resolves via foreignKeyForBang. No name is derived-and-dropped.
+    // Mirrors Rails remove_check_constraint(table_name, expression = nil,
+    // if_exists: false, **options) (schema_statements.rb:1324-1335): the
+    // if_exists probe runs on the options alone, then check_constraint_for!
+    // resolves the live constraint with the expression *and* the options, and
+    // it is dropped by its real name.
     let expression: string | undefined;
-    let opts: { name?: string; ifExists?: boolean };
+    let opts: { name?: string; expression?: string; validate?: boolean; ifExists?: boolean };
     if (typeof expressionOrOptions === "string") {
       expression = expressionOrOptions;
       opts = { ...options };
@@ -916,17 +915,13 @@ export class SchemaStatements {
       expression = undefined;
       opts = { ...(expressionOrOptions ?? {}), ...options };
     }
-    // Only pass `name` when present: checkConstraintFor derives one from the
-    // expression, and an explicit `name: undefined` would clobber it.
-    const lookup: { name?: string; expression?: string } = { expression };
-    if (opts.name !== undefined) lookup.name = opts.name;
-    const chk = await this.checkConstraintFor(tableName, lookup);
-    if (!chk) {
-      if (opts.ifExists === true) return;
-      throw new ArgumentError(
-        `Table '${tableName}' has no check constraint for ${expression ?? JSON.stringify(opts)}`,
-      );
-    }
+    // `if_exists:` is a kwarg in Rails, so it is not part of the `**options`
+    // either lookup receives.
+    const { ifExists, ...lookupOptions } = opts;
+
+    if (ifExists === true && !(await this.checkConstraintExists(tableName, lookupOptions))) return;
+
+    const chk = await this.checkConstraintForBang(tableName, { expression, ...lookupOptions });
     // Rails: at = create_alter_table table_name; at.drop_check_constraint chk.name;
     //        execute schema_creation.accept(at)
     // Route through AlterTable so adapters emit dialect-specific DROP syntax
@@ -1651,7 +1646,7 @@ export class SchemaStatements {
 
   async checkConstraintExists(
     tableName: string,
-    options: { name?: string; expression?: string },
+    options: { name?: string; expression?: string; validate?: boolean },
   ): Promise<boolean> {
     if (!options.name && !options.expression) {
       throw new ArgumentError("At least one of :name or :expression must be supplied");
@@ -2332,7 +2327,7 @@ export class SchemaStatements {
   /** @internal */
   async checkConstraintFor(
     tableName: string,
-    options: { name?: string; expression?: string } = {},
+    options: { name?: string; expression?: string; validate?: boolean } = {},
   ): Promise<CheckConstraintDefinition | undefined> {
     const adapter = this as any;
     if (
@@ -2349,7 +2344,7 @@ export class SchemaStatements {
   /** @internal */
   async checkConstraintForBang(
     tableName: string,
-    options: { name?: string; expression?: string } = {},
+    options: { name?: string; expression?: string; validate?: boolean } = {},
   ): Promise<CheckConstraintDefinition> {
     const chk = await this.checkConstraintFor(tableName, options);
     if (!chk) {

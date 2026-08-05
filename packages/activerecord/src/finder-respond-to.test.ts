@@ -20,7 +20,7 @@ describe("FinderRespondToTest", () => {
   it("should preserve normal respond to behavior on base", () => {
     expect(typeof Base.create).toBe("function");
     expect(typeof Base.find).toBe("function");
-    expect(Base.respondToMissingFinder("findBySomething")).toBe(false);
+    expect(Base.respondToMissing("findBySomething")).toBe(false);
   });
 
   it("should preserve normal respond to behavior and respond to newly added method", () => {
@@ -28,12 +28,12 @@ describe("FinderRespondToTest", () => {
     // then `assert_respond_to Topic, :method_added_for_finder_respond_to_test`. Rails'
     // dynamic-finder hook is `match && match.valid? || super` (dynamic_matchers.rb),
     // so respond_to of a non-finder method must fall through to normal lookup, not be
-    // masked. Our `respondToMissingFinder` is that hook: it must defer (return false)
+    // masked. Our `respondToMissing` is that hook: it must defer (return false)
     // on a non-`findBy` name while the method is still found by normal lookup — this
     // assertion fails if the finder responder ever claims an ordinary method.
     // (Topic is recreated per test, so no cleanup is needed where Rails uses `ensure`.)
     (Topic as unknown as Record<string, unknown>).methodAddedForFinderRespondToTest = () => {};
-    expect(Topic.respondToMissingFinder("methodAddedForFinderRespondToTest")).toBe(false);
+    expect(Topic.respondToMissing("methodAddedForFinderRespondToTest")).toBe(false);
     expect(
       typeof (Topic as unknown as Record<string, unknown>).methodAddedForFinderRespondToTest,
     ).toBe("function");
@@ -45,7 +45,7 @@ describe("FinderRespondToTest", () => {
   });
 
   it("should respond to find by one attribute before caching", () => {
-    expect(Topic.respondToMissingFinder("findByTitle")).toBe(true);
+    expect(Topic.respondToMissing("findByTitle")).toBe(true);
   });
 
   it("should respond to find by with bang", async () => {
@@ -63,16 +63,16 @@ describe("FinderRespondToTest", () => {
 
   it("should respond to find all by an aliased attribute", () => {
     Topic.aliasAttribute("heading", "title");
-    expect(Topic.respondToMissingFinder("findByHeading")).toBe(true);
+    expect(Topic.respondToMissing("findByHeading")).toBe(true);
   });
 
   it("should not respond to find by one missing attribute", () => {
-    expect(Topic.respondToMissingFinder("findByNonexistent")).toBe(false);
+    expect(Topic.respondToMissing("findByNonexistent")).toBe(false);
   });
 
   it("should not respond to find by invalid method syntax", () => {
-    expect(Topic.respondToMissingFinder("")).toBe(false);
-    expect(Topic.respondToMissingFinder("not_a_finder")).toBe(false);
-    expect(Topic.respondToMissingFinder("findBy")).toBe(false);
+    expect(Topic.respondToMissing("")).toBe(false);
+    expect(Topic.respondToMissing("not_a_finder")).toBe(false);
+    expect(Topic.respondToMissing("findBy")).toBe(false);
   });
 });

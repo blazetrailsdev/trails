@@ -436,17 +436,19 @@ export interface AbstractAdapter {
   ): Record<string, unknown>;
   checkConstraintExists(
     tableName: string,
-    options: { name?: string; expression?: string },
+    options: { name?: string; expression?: string; validate?: boolean },
   ): Promise<boolean>;
   /** @internal */
   checkConstraintForBang(
     tableName: string,
-    options?: { name?: string; expression?: string },
+    options?: { name?: string; expression?: string; validate?: boolean },
   ): Promise<CheckConstraintDefinition>;
   removeCheckConstraint(
     tableName: string,
-    expressionOrOptions?: string | { name?: string; ifExists?: boolean },
-    options?: { name?: string; ifExists?: boolean },
+    expressionOrOptions?:
+      | string
+      | { name?: string; expression?: string; validate?: boolean; ifExists?: boolean },
+    options?: { name?: string; expression?: string; validate?: boolean; ifExists?: boolean },
   ): Promise<void>;
   removeConstraint(tableName: string, constraintName: string): Promise<void>;
   /**

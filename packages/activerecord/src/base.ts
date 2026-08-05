@@ -343,6 +343,7 @@ import {
   storeAccessorForMethod as _storeAccessorForMethod,
 } from "./store.js";
 import { serialize as _serializeAttribute } from "./serialize.js";
+import { respondToMissing } from "./dynamic-matchers.js";
 import { YAMLColumn as _YAMLColumn } from "./coders/yaml-column.js";
 
 // Break store→serialize→json→store circular dep by injecting serialize into store at init.
@@ -2337,28 +2338,8 @@ export class Base extends Model {
     ...rest: unknown[]
   ) => Promise<InstanceType<T>>;
 
-  /**
-   * Check if a dynamic finder method name is valid.
-   *
-   * Mirrors: ActiveRecord::Base.respond_to_missing?
-   */
-  static respondToMissingFinder(methodName: string): boolean {
-    if (!methodName.startsWith("findBy")) return false;
-    const attrPart = methodName.slice(6); // remove "findBy"
-    if (!attrPart) return false;
-    // Convert camelCase suffix to snake_case: TitleAndAuthorName → title_and_author_name
-    const snakePart = attrPart
-      .replace(/^./, (c) => c.toLowerCase())
-      .replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
-    // Split on "_and_" like Rails' DynamicFinder#attribute_names
-    const attrNames = snakePart.split("_and_");
-    const aliases = (this as any)._attributeAliases as Record<string, string> | undefined;
-    // Rails: resolve each name through attribute_aliases, then validate against columns_hash
-    return attrNames.every((name) => {
-      const resolved = aliases?.[name] ?? name;
-      return this._attributeDefinitions.has(resolved);
-    });
-  }
+  /** Mirrors `include DynamicMatchers` (base.rb) — see dynamic-matchers.ts. */
+  static respondToMissing = respondToMissing;
 
   /**
    * Find the sole record matching conditions.
