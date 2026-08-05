@@ -68,6 +68,7 @@ export class CTEJoin {
         this.name = name;
     }
 }
+CTEJoin.attrReader("name");
 const FROZEN_EMPTY_ARRAY = [].freeze();
 const FROZEN_EMPTY_HASH = {}.freeze();
 for (const name of Relation.VALUE_METHODS) {

@@ -38,7 +38,7 @@ export function registerStructure(r: Registry): void {
     const prevModule = e.currentModule;
     e.inClass = true;
     e.currentModule = prevModule ? `${prevModule}::${name}` : name;
-    const members = classMembers((n.body as PrismNode) ?? null, e);
+    const { members, macros } = classBody((n.body as PrismNode) ?? null, e, name);
     e.inClass = prev;
     e.currentModule = prevModule;
     return [
@@ -49,6 +49,7 @@ export function registerStructure(r: Registry): void {
         heritage,
         members,
       ),
+      ...macros,
     ];
   });
   r.onStmt("DefNode", (n, e) => emitDef(n, e));
@@ -56,16 +57,30 @@ export function registerStructure(r: Registry): void {
 function topLevel(body: PrismNode | null, e: Emitter): ts.Statement[] {
   return e.stmts(body, false);
 }
-function classMembers(body: PrismNode | null, e: Emitter): ts.ClassElement[] {
-  if (!body) return [];
+/**
+ * A class body's `def`s become class members; everything else — the macro
+ * statements a Rails class body is mostly made of — becomes a statement emitted
+ * after the declaration with `self` bound to the class, which is how the port
+ * wires modules at its composition points.
+ */
+function classBody(
+  body: PrismNode | null,
+  e: Emitter,
+  className: string,
+): {
+  members: ts.ClassElement[];
+  macros: ts.Statement[];
+} {
+  const members: ts.ClassElement[] = [];
+  const macros: ts.Statement[] = [];
+  if (!body) return { members, macros };
   const kids = body.constructor?.name === "StatementsNode" ? body.compactChildNodes() : [body];
   if (body.constructor?.name === "StatementsNode") e.coverage.record("StatementsNode", true);
-  const out: ts.ClassElement[] = [];
   for (const k of kids) {
     const kind = k.constructor.name;
     if (kind === "DefNode") {
       const m = defAsMember(k, e);
-      if (m) out.push(m);
+      if (m) members.push(m);
       else recordSubtreePassthrough(k, e);
     } else if (
       kind === "SingletonClassNode" &&
@@ -74,13 +89,72 @@ function classMembers(body: PrismNode | null, e: Emitter): ts.ClassElement[] {
       e.coverage.record("SingletonClassNode", true);
       const prev = e.inSingleton;
       e.inSingleton = true;
-      out.push(...classMembers((k.body as PrismNode) ?? null, e));
+      const inner = classBody((k.body as PrismNode) ?? null, e, className);
       e.inSingleton = prev;
-    } else {
+      members.push(...inner.members);
+      macros.push(...inner.macros);
+    } else if (unportedMacro(k)) {
       recordSubtreePassthrough(k, e);
+    } else {
+      const stmts = macroStmt(k, e, className);
+      if (stmts) macros.push(...stmts);
+      else recordSubtreePassthrough(k, e);
     }
   }
-  return out;
+  return { members, macros };
+}
+/**
+ * Class-body macros with no faithful image yet, kept out of the emitted output
+ * — and so out of the clean denominator — rather than emitted as something that
+ * only looks like a port: `alias :new_name :old_name`, whose handler is written
+ * for a method body where the old name reads as a local and would emit a
+ * module-scope `const` bound to an undefined identifier — code that parses and
+ * then throws on load; the visibility keywords, which declare the default
+ * visibility of the `def`s that follow and have no statement to be; and `+` on
+ * a constant, which is `Array#+` in every class-body use and which `INFIX`
+ * images as JS `+`, coercing both arrays to strings (`codegen-array-infix-plus`).
+ *
+ * A nested `class`/`module` is excluded for a different reason: it is a
+ * declaration rather than a macro, and the conformance scorer keys a generated
+ * def by its bare short name under the enclosing Rails file, so emitting
+ * `Relation::StrictLoadingScope.strict_loading_value` reports a phantom
+ * divergence against `Relation#strict_loading_value`. Tracked as
+ * `codegen-nested-class-declarations`.
+ */
+function unportedMacro(n: PrismNode): boolean {
+  const kind = n.constructor.name;
+  if (kind === "AliasMethodNode" || kind === "ClassNode" || kind === "ModuleNode") return true;
+  if (kind === "CallNode" && n.receiver == null && VISIBILITY_MACROS.has(String(n.name)))
+    return true;
+  if (kind === "CallNode" && String(n.name) === "+" && isConstantish(n.receiver as PrismNode))
+    return true;
+  return n.compactChildNodes().some(unportedMacro);
+}
+const VISIBILITY_MACROS = new Set(["private", "protected", "public", "module_function"]);
+/** Whether a `+` receiver reads a constant, and so carries no numeric evidence. */
+function isConstantish(n: PrismNode | null): boolean {
+  const kind = n?.constructor.name;
+  return (
+    kind === "ConstantReadNode" ||
+    kind === "ConstantPathNode" ||
+    (kind === "CallNode" && String(n?.name) === "+")
+  );
+}
+/**
+ * One class-body macro statement, emitted outside the class context so a nested
+ * `def` is not swallowed by {@link emitDef}'s in-class guard.
+ */
+function macroStmt(n: PrismNode, e: Emitter, className: string): ts.Statement[] | null {
+  const prevSelf = e.selfName;
+  const prevClass = e.inClass;
+  e.selfName = className;
+  e.inClass = false;
+  try {
+    return e.stmt(n, false);
+  } finally {
+    e.selfName = prevSelf;
+    e.inClass = prevClass;
+  }
 }
 function recordSubtreePassthrough(n: PrismNode, e: Emitter): void {
   e.coverage.record(n.constructor.name, false);

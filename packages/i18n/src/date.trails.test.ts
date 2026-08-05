@@ -405,6 +405,38 @@ describe("Date", () => {
     expect(date.strftime("%-m/%-d")).toBe("7/2");
     expect(date.strftime("%Q")).toBe("%Q");
   });
+
+  it("rejects a day the calendar reform deleted, under the default start", () => {
+    expect(() => RubyDate.parse("1582-10-10")).toThrow("invalid date");
+    expect(RubyDate.parse("1582-10-04").strftime("%Y-%m-%d")).toBe("1582-10-04");
+    expect(RubyDate.parse("1582-10-15").strftime("%Y-%m-%d")).toBe("1582-10-15");
+  });
+
+  it("takes the reform start as its third argument", () => {
+    expect(RubyDate.parse("1582-10-10", true, RubyDate.GREGORIAN).strftime("%Y-%m-%d")).toBe(
+      "1582-10-10",
+    );
+    expect(RubyDate.parse("1582-10-14", true, RubyDate.JULIAN).strftime("%Y-%m-%d")).toBe(
+      "1582-10-14",
+    );
+    expect(() => RubyDate.parse("1752-09-05", true, RubyDate.ENGLAND)).toThrow("invalid date");
+    expect(RubyDate.parse("1752-09-05", true, RubyDate.ITALY).strftime("%Y-%m-%d")).toBe(
+      "1752-09-05",
+    );
+  });
+
+  it("finds the first day of a year the reform truncated, rather than assuming 1 January", () => {
+    expect(RubyDate.commercial(1582, 41, 1).strftime("%Y-%m-%d")).toBe("1582-10-18");
+    expect(RubyDate.commercial(1582, 41, 1, RubyDate.GREGORIAN).strftime("%Y-%m-%d")).toBe(
+      "1582-10-11",
+    );
+    expect(RubyDate.commercial(2001, -1, -1).strftime("%Y-%m-%d")).toBe("2001-12-30");
+  });
+
+  it("resolves the ordinal and week-date arms across the reform", () => {
+    expect(RubyDate.parse("2008070").strftime("%Y-%m-%d")).toBe("2008-03-10");
+    expect(RubyDate.parse("2001-W05-6").strftime("%Y-%m-%d")).toBe("2001-02-03");
+  });
 });
 
 describe("DateTime", () => {
