@@ -132,6 +132,42 @@ let fixtureConnectionPools: ConnectionPool[] | null = null;
 let fixtureScopeDepth = 0;
 
 /**
+ * Pin the pool a fixture set is about to seed through, if the running test has
+ * not pinned it already.
+ *
+ * Rails needs no such call. It pins every writing pool in
+ * `setup_transactional_fixtures` itself (`test_fixtures.rb:175-180`), and
+ * discovers later ones from the `!connection.active_record` subscriber
+ * (`:182-200`) — which trails now installs below. What is still missing is the
+ * literal setup line: pinning `connectionPoolList("writing")` wholesale breaks
+ * `base_test.rb`'s `connection in utc time`, where a mid-test
+ * `establishConnection` disconnects the pinned pool and teardown then unpins a
+ * pool with no pin. Rails survives that because `disconnect!`/`discard!` leave
+ * `@pinned_connection` alone — it is cleared only in `initialize`
+ * (`connection_pool.rb:267`) and `unpin_connection!` (`:347`) — where
+ * `ConnectionPool#_disconnect`/`#_discard` null `_fixturePin`
+ * (`connection-pool.ts:975`, `:1040`). Until that diverges back, seeding is the
+ * discovery point for pools established before setup.
+ *
+ * A no-op outside a transactional test, and for an adapter with no pool of its
+ * own (the raw-adapter cluster suites seed through the connection the wrapper
+ * already opened a transaction on).
+ *
+ * @noRailsEquivalent CONVERGEABLE — see above; blocked on the `_fixturePin`
+ * divergence in `ConnectionPool#_disconnect`/`#_discard`, tracked by RFC 0064
+ * `pin-writing-pool-list-in-setup-transactional-fixtures`.
+ */
+export async function pinFixtureConnectionPool(
+  adapter: TransactionalFixturesAdapter,
+): Promise<void> {
+  if (fixtureConnectionPools === null) return;
+  const pool = pooledAdapterPool(adapter);
+  if (pool === null || fixtureConnectionPools.includes(pool)) return;
+  fixtureConnectionPools.push(pool);
+  await pinConnectionPool(pool);
+}
+
+/**
  * The pools whose `pinConnectionBang` actually resolved, and therefore the only
  * ones teardown may unpin. Rails needs no such split: its push and its
  * pin/lease are one synchronous step (`test_fixtures.rb:176-180`, `:192-196`),
@@ -315,20 +351,7 @@ export function withTransactionalFixtures(
       // won't find the pin set in beforeEach.
       if (fixtureConnectionPools === null) fixtureConnectionPools = [];
       fixtureScopeDepth++;
-      // Mirrors test_fixtures.rb:175-180:
-      //   @fixture_connection_pools = ActiveRecord::Base.connection_handler
-      //     .connection_pool_list(:writing)
-      //   @fixture_connection_pools.each { |pool| pool.pin_connection!(...); pool.lease_connection }
-      // Every writing pool, not just this adapter's: a fixture set on the
-      // arunit2 secondary seeds through its own model's pool, and an unpinned
-      // one commits its rows. This is what retired `pinFixtureConnectionPool`,
-      // which pinned the same pools later, from the seeding site.
-      const writingPools = [pool, ...Base.connectionHandler.connectionPoolList("writing")];
-      for (const p of writingPools) {
-        if (fixtureConnectionPools.includes(p)) continue;
-        fixtureConnectionPools.push(p);
-        await pinConnectionPool(p);
-      }
+      await pinFixtureConnectionPool(adapter);
     } else {
       // Non-pooled path — preserved verbatim. Mirrors Rails
       // ConnectionPool#pin_connection! body.
