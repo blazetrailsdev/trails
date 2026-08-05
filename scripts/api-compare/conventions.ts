@@ -710,7 +710,7 @@ const ALREADY_PREDICATE_RE = new RegExp(`^(${ALREADY_PREDICATE_PREFIXES.join("|"
  * spelling rather than either camel form. `include?` ports to `.includes()`,
  * so without this the only candidates are `isInclude` / `include` — neither of
  * which exists on a JS string or array, and every such port had to be
- * hand-excluded from the wide call ratchet.
+ * hand-excluded from the call ratchet.
  *
  * The extra name is appended as a LAST candidate, so ports that already spell
  * `isInclude()` (CollectionAssociation, Clusivity) keep matching exactly as

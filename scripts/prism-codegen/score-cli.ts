@@ -84,7 +84,7 @@ async function railsLibFiles(): Promise<{ path: string; source: string }[]> {
 
 // The deviation catalog's call half: every file of the split wide exclude tree.
 async function loadExcludes(): Promise<ExcludeEntry[]> {
-  const files = await listJsonFiles(path.join(API_COMPARE, "call-mismatches-wide-exclude"));
+  const files = await listJsonFiles(path.join(API_COMPARE, "call-mismatches-exclude"));
   const out: ExcludeEntry[] = [];
   for (const file of files) {
     let source;

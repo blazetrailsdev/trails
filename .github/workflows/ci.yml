@@ -1326,21 +1326,21 @@ jobs:
         # or when a pin no longer resolves. Re-pin after re-verifying with
         # `pnpm tsx scripts/api-compare/body-pins.ts --pin <ruby-file>`.
         run: pnpm exec tsx scripts/api-compare/lint-body-pins.ts
-      - name: API comparison (wide calls)
-        # Writes the call-set artifact (output/call-mismatches-wide.json) over
-        # WIDE_SIGNIFICANT_CALLS (all ported names except `super` and the
-        # WIDE_NO_JS_CALL_FORM names). `--wide-calls` is what computes the call
+      - name: API comparison (calls)
+        # Writes the call-set artifact (output/call-mismatches.json) over
+        # SIGNIFICANT_CALLS (all ported names except `super` and the
+        # NO_JS_CALL_FORM names). `--calls` is what computes the call
         # sets at all — the plain runs above write no call artifact.
-        run: pnpm exec tsx scripts/api-compare/compare.ts --wide-calls
-      - name: Wide call-mismatches ratchet
-        # Gates the RFC 0047 wide artifact against the split call-mismatches-wide-exclude/ baseline dir.
-        # Fails on a new wide mismatch, a stale baseline entry, or more
+        run: pnpm exec tsx scripts/api-compare/compare.ts --calls
+      - name: Call-mismatches ratchet
+        # Gates the RFC 0047 call-set artifact against the split call-mismatches-exclude/ baseline dir.
+        # Fails on a new mismatch, a stale baseline entry, or more
         # still-unreviewed (seeded-default-reason) entries in one source file
         # than that file's committed high-water mark under
-        # call-mismatches-wide-unreviewed/; reseed with
-        # `pnpm tsx scripts/api-compare/lint-call-mismatches-wide.ts --write`.
-        run: pnpm exec tsx scripts/api-compare/lint-call-mismatches-wide.ts
-      - name: Wide ratchet baseline reseed drift
+        # call-mismatches-unreviewed/; reseed with
+        # `pnpm tsx scripts/api-compare/lint-call-mismatches.ts --write`.
+        run: pnpm exec tsx scripts/api-compare/lint-call-mismatches.ts
+      - name: Ratchet baseline reseed drift
         # RFC 0083. The ratchet above only READS the committed baseline, so a
         # change that converges or seeds rows passes it and still leaves the
         # baseline stale. Runs on every event, `pull_request` included, so the
@@ -1355,18 +1355,18 @@ jobs:
         # artifact.
         run: |
           set -euo pipefail
-          pnpm exec tsx scripts/api-compare/lint-call-mismatches-wide.ts --write
-          baseline='scripts/api-compare/call-mismatches-wide-exclude'
-          mark='scripts/api-compare/call-mismatches-wide-unreviewed'
+          pnpm exec tsx scripts/api-compare/lint-call-mismatches.ts --write
+          baseline='scripts/api-compare/call-mismatches-exclude'
+          mark='scripts/api-compare/call-mismatches-unreviewed'
           # A reseed can add a baseline file for a package/file that had none.
           # Untracked paths are invisible to `git diff`, so record them as
           # intent-to-add first or the drift check silently passes.
           git add --intent-to-add -- "$baseline" "$mark"
           if git diff --quiet -- "$baseline" "$mark"; then
-            echo "Wide ratchet baseline is in sync with a clean reseed."
+            echo "Ratchet baseline is in sync with a clean reseed."
             exit 0
           fi
-          echo "::error title=Wide ratchet baseline drift::This branch leaves the committed wide call-mismatch baseline out of sync with a clean reseed. Prefer the reviewable fix shown in the diff below — delete the stale \`call-mismatches-wide-exclude/\` entries your change converged, and give any newly seeded rows a real reason. \`pnpm api:calls:wide:reseed\` produces the same end state mechanically, at the cost of reordering untouched packages (see CONTRIBUTING.md)."
+          echo "::error title=Ratchet baseline drift::This branch leaves the committed call-mismatch baseline out of sync with a clean reseed. Prefer the reviewable fix shown in the diff below — delete the stale \`call-mismatches-exclude/\` entries your change converged, and give any newly seeded rows a real reason. \`pnpm api:calls:reseed\` produces the same end state mechanically, at the cost of reordering untouched packages (see CONTRIBUTING.md)."
           git --no-pager diff --stat -- "$baseline" "$mark"
           git --no-pager diff -- "$baseline" "$mark"
           exit 1

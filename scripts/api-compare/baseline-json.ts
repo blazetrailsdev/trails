@@ -1,7 +1,7 @@
 /**
  * The one canonical on-disk form for the hand-editable JSON baselines the
  * api-compare gates own (the split
- * call-mismatches-wide-exclude/ tree, body-pins.json): 2-space
+ * call-mismatches-exclude/ tree, body-pins.json): 2-space
  * `JSON.stringify` plus a trailing newline, with non-ASCII written LITERALLY
  * as UTF-8 — never as `\uXXXX` escapes.
  *
@@ -30,7 +30,7 @@ export function serializeBaseline(value: unknown): string {
 /**
  * Recursively list *.json files under `dir` as absolute paths (empty if the
  * directory does not exist yet). Shared by every SPLIT baseline that mirrors
- * the source tree — the wide exclude entries and the wide unreviewed marks — so
+ * the source tree — the exclude entries and the unreviewed marks — so
  * the two trees are walked by one implementation and cannot drift apart.
  */
 export async function listJsonFiles(dir: string): Promise<string[]> {

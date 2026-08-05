@@ -104,10 +104,10 @@ describe("committed api-compare baselines", () => {
 
   it("are all written in canonical form", async () => {
     const files = [
-      ...(await jsonFilesUnder(path.join(HERE, "call-mismatches-wide-exclude"))),
+      ...(await jsonFilesUnder(path.join(HERE, "call-mismatches-exclude"))),
       path.join(HERE, "body-pins.json"),
       path.join(HERE, "arity-exclude.json"),
-      ...(await jsonFilesUnder(path.join(HERE, "call-mismatches-wide-unreviewed"))),
+      ...(await jsonFilesUnder(path.join(HERE, "call-mismatches-unreviewed"))),
     ];
     expect(await findNonCanonicalBaselines(files)).toEqual([]);
   });

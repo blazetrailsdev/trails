@@ -267,23 +267,23 @@ catches a class of drift a reviewer would otherwise spend a cycle on.
    an invented shortcut.
 
    ```bash
-   pnpm api:calls:wide   # the call-set ratchet (RFC 0047)
+   pnpm api:calls   # the call-set ratchet (RFC 0047)
    ```
 
    The lint reads an artifact on disk and regenerates it first, so a plain
    gating run is enough — gating a stale artifact reports movement that never
    happened, which is how a sibling PR's deleted method surfaces as a STALE row
    on a branch that never touched it. `compare.ts` writes
-   `call-mismatches-wide.json` only under `--wide-calls`, so if you need to
+   `call-mismatches.json` only under `--calls`, so if you need to
    force past a warm cache (it under-reports vs CI):
 
    ```bash
-   API_COMPARE_FORCE=1 pnpm api:compare --wide-calls
+   API_COMPARE_FORCE=1 pnpm api:compare --calls
    ```
 
-   (RFC 0084 folded the narrow RFC 0044 ratchet — `pnpm api:calls`, over a
-   second `call-mismatches.json` artifact — into this one, whose population
-   subsumed it. There is one artifact and one baseline now.)
+   (RFC 0084 folded the narrow RFC 0044 ratchet — a second gate over its own
+   artifact — into this one, whose population subsumed it. There is one
+   artifact and one baseline now, and since the rename one `api:calls` script.)
 
    **New mismatch?** The right fix is almost always to make the TS body call
    what Rails calls. Baselining is the fallback, and it costs a reviewed
@@ -295,7 +295,7 @@ catches a class of drift a reviewer would otherwise spend a cycle on.
    [CONTRIBUTING.md](CONTRIBUTING.md#row-count-is-the-debt-metric-the-unreviewed-count-is-not)). A single justified omission can also carry a `@missingRailsCall`
    JSDoc tag at the call site instead.
 
-   **Converged something?** The wide baseline is **only-shrink**: fixing a real
+   **Converged something?** The baseline is **only-shrink**: fixing a real
    divergence makes its baseline row stale and turns the gate red. Delete that
    one row by hand. Do **not** `--write`/reseed — a reseed rewrites the whole
    exclude tree and buries the one row you meant to retire in an unreviewable

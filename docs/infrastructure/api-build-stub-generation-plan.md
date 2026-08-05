@@ -6,7 +6,7 @@ Status: proposal (design only, no implementation in this PR).
 
 Call-set parity data lives in two places, neither of which is at the method:
 
-- the wide baseline, `scripts/api-compare/call-mismatches-wide-exclude/<pkg>/<tsFile .ts→.json>`
+- the wide baseline, `scripts/api-compare/call-mismatches-exclude/<pkg>/<tsFile .ts→.json>`
   — one `{ package, tsFile, rubyName, call, reason }` row per known-missing
   call, curated `reason` prose accreted by the RFC 0044/0047 burndowns;
 - the narrow baseline, `scripts/api-compare/call-mismatches-exclude.json`
@@ -50,7 +50,7 @@ Invariants:
 - A from-scratch stub carries one tag per expected Rails call, i.e. the full
   `calls` list of the Ruby method from `rails-api.json` (`MethodInfo.calls`),
   filtered through the same noise gates the wide lint uses
-  (`significantMissingCalls` with `WIDE_SIGNIFICANT_CALLS`) so the block
+  (`significantMissingCalls` with `SIGNIFICANT_CALLS`) so the block
   matches what the ratchet will actually demand.
 
 ### Examples
@@ -63,7 +63,7 @@ reset(): this { ... }
 ```
 
 Partially-matched existing method after reconcile (reason migrated from
-`call-mismatches-wide-exclude/activerecord/base.json`):
+`call-mismatches-exclude/activerecord/base.json`):
 
 ```ts
 /**
@@ -140,9 +140,9 @@ a body whose only statement is the annotated throw is mechanically
 recognizable and reported in its own "stubbed" column, not "matched").
 
 **Ratchet interaction.** A stub is a newly name-matched pair whose body makes
-none of its expected calls, so on the next `--wide-calls` run every one of
+none of its expected calls, so on the next `--calls` run every one of
 its tags surfaces as a NEW wide mismatch — which would turn
-`api:calls:wide` red. This is handled, not accidental: the stub's
+`api:calls` red. This is handled, not accidental: the stub's
 `@missingRailsCall` tags flow straight into `--emit-baselines`, so the same
 PR that adds the stub also adds the matching baseline rows (the ratchet has
 always permitted curated additions; only unexplained ones fail). The
@@ -194,8 +194,8 @@ On every run, for every **existing** matched method, `api:build`:
 
 1. Computes the current wide missing-call set for the pair — reusing the
    pipeline verbatim: `extract-ts-api` call sets + `significantMissingCalls`
-   with `WIDE_SIGNIFICANT_CALLS` (i.e. exactly what
-   `compare.ts --wide-calls` writes to `output/call-mismatches-wide.json`).
+   with `SIGNIFICANT_CALLS` (i.e. exactly what
+   `compare.ts --calls` writes to `output/call-mismatches.json`).
    `api:build` does not re-derive; it reads the artifact and fails if stale
    or partial-scope, using the same `missingScope` guard as the lints.
 2. Parses the method's existing `@missingRailsCall` tags — `parseJsdoc`'s
@@ -207,7 +207,7 @@ On every run, for every **existing** matched method, `api:build`:
 3. Diffs:
    - **newly missing** (in artifact, not tagged): add a tag **only when there
      is a curated reason to migrate** — the `reason` from the matching
-     `call-mismatches-wide-exclude/<pkg>/<tsFile>.json` row (and, for narrow
+     `call-mismatches-exclude/<pkg>/<tsFile>.json` row (and, for narrow
      entries, `call-mismatches-exclude.json`), keyed by
      `(package, tsFile, rubyName, call)`, when it is neither blank nor the
      seeded placeholder. This is the migration path: the first full run pulls
@@ -298,8 +298,8 @@ design.
 ```
 
 The two tags answer the same question — "this method diverges from Rails; is
-that known, and why?" — for two different gates (`api:calls` /
-`api:calls:wide` missing-call ratchets vs the `api:extra` extra-surface
+that known, and why?" — for two different gates (the `api:calls`
+missing-call ratchet vs the `api:extra` extra-surface
 report). They therefore share:
 
 - **Placement** — leading JSDoc on the declaration (class/module member,
@@ -581,7 +581,7 @@ Three options for the exclude JSON after migration:
    introduces the tag — too much blast radius for one step.
 3. **JSDoc authoritative; the JSON baselines become generated artifacts**
    derived from the tags (recommended). `api:build --emit-baselines` walks
-   the tags and writes `call-mismatches-wide-exclude/` and
+   the tags and writes `call-mismatches-exclude/` and
    `call-mismatches-exclude.json` in the existing schema and `compareKeys`
    order. Routing between the two needs no tag-side marker: the narrow
    population is a strict subset of the wide one, so a tag emits a narrow
@@ -612,7 +612,7 @@ Reused as-is (no forks, no reimplementation):
 - `extract-ts-api.ts` — TS surface + per-method call sets (and its worker
   pool + shared cache).
 - `compare.ts` matching (`missingMethods`, `moves`, include-chain
-  resolution) and `significantMissingCalls` + `WIDE_SIGNIFICANT_CALLS`.
+  resolution) and `significantMissingCalls` + `SIGNIFICANT_CALLS`.
 - `conventions.ts` (`rubyMethodToTs`, `rubyFileToTs`) for every name/path.
 - `source-order.ts` `mergeBySourceLine` + the
   `rails-file-structure-method-order` manifest/ESLint autofix for placement.

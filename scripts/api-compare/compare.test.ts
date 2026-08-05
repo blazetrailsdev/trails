@@ -22,9 +22,9 @@ import {
   JS_ENUMERABLE_ALIASES,
   NEGATED_ALIASES,
   partitionNegatedCalls,
-  WIDE_SIGNIFICANT_CALLS,
+  SIGNIFICANT_CALLS,
   dropWeakCalls,
-  WIDE_NO_JS_CALL_FORM,
+  NO_JS_CALL_FORM,
   isDelegatingWrapper,
   effectiveTsCalls,
   reachedSameFileMethods,
@@ -198,7 +198,7 @@ describe("significantMissingCalls", () => {
   });
 
   it("wide significant predicate admits every call name except super", () => {
-    // RFC 0047 WIDE_SIGNIFICANT_CALLS shape: `{ has: k => k !== "super" }`.
+    // RFC 0047 SIGNIFICANT_CALLS shape: `{ has: k => k !== "super" }`.
     const wide = { has: (k: string) => k !== "super" };
     const missing = significantMissingCalls(
       "update",
@@ -216,16 +216,16 @@ describe("significantMissingCalls", () => {
   it("wide predicate suppresses calls whose faithful JS port emits no call", () => {
     // These port to non-call constructs (template literal, for-of, index,
     // property access, truthiness), so no alias can ever match — suppressing
-    // them keeps the wide ratchet from baselining them forever.
-    for (const call of WIDE_NO_JS_CALL_FORM) {
-      expect(WIDE_SIGNIFICANT_CALLS.has(call)).toBe(false);
+    // them keeps the ratchet from baselining them forever.
+    for (const call of NO_JS_CALL_FORM) {
+      expect(SIGNIFICANT_CALLS.has(call)).toBe(false);
     }
-    expect(WIDE_SIGNIFICANT_CALLS.has("super")).toBe(false);
+    expect(SIGNIFICANT_CALLS.has("super")).toBe(false);
     // Names with a real JS call form must stay significant — suppressing them
     // would hide a genuinely dropped call. `size`/`empty?`/`first`/`last` look
     // like plain Array/property idioms but on a Relation receiver are real
     // query-triggering methods (count/exists?/performFirst/performLast), so the
-    // wide gate must keep watching them.
+    // gate must keep watching them.
     for (const call of [
       "delete",
       "merge",
@@ -236,7 +236,7 @@ describe("significantMissingCalls", () => {
       "first",
       "last",
     ]) {
-      expect(WIDE_SIGNIFICANT_CALLS.has(call)).toBe(true);
+      expect(SIGNIFICANT_CALLS.has(call)).toBe(true);
     }
   });
 
@@ -260,7 +260,7 @@ describe("significantMissingCalls", () => {
       new Set(),
       () => true,
       map,
-      WIDE_SIGNIFICANT_CALLS,
+      SIGNIFICANT_CALLS,
     );
     expect(missing).toEqual([]);
   });
@@ -332,7 +332,7 @@ describe("significantMissingCalls", () => {
         tsCalls,
         () => true,
         map,
-        WIDE_SIGNIFICANT_CALLS,
+        SIGNIFICANT_CALLS,
       );
       expect(missing).toEqual(["unquote_identifier → unquoteIdentifier"]);
     });
@@ -391,7 +391,7 @@ describe("significantMissingCalls", () => {
         tsCalls,
         () => true,
         map,
-        WIDE_SIGNIFICANT_CALLS,
+        SIGNIFICANT_CALLS,
       );
       expect(missing).toEqual([]);
     });
@@ -406,7 +406,7 @@ describe("significantMissingCalls", () => {
         tsCalls,
         () => true,
         map,
-        WIDE_SIGNIFICANT_CALLS,
+        SIGNIFICANT_CALLS,
       );
       expect(missing).toEqual(["unquote_identifier → unquoteIdentifier"]);
     });
@@ -421,7 +421,7 @@ describe("significantMissingCalls", () => {
       new Set(),
       () => true,
       map,
-      WIDE_SIGNIFICANT_CALLS,
+      SIGNIFICANT_CALLS,
     );
     expect(missing).toEqual([]);
   });

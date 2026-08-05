@@ -4,7 +4,7 @@
  *
  * `parseJsdoc` (build.ts) already rejects a bare or whitespace-only tag, but
  * its only caller is `api:build`: an opt-in developer command with no CI job,
- * which also needs the wide call-mismatch artifact and rewrites source files.
+ * which also needs the call-mismatch artifact and rewrites source files.
  * This lint runs that same check over every JSDoc block under
  * `packages/<pkg>/src` — read-only and artifact-free — so the tag is gated
  * like its sibling `@noRailsEquivalent` (validated by `noRailsEquivalentReason`

@@ -8,7 +8,7 @@
  *
  *   - `SKIP` / `SCOPED_SKIP_GROUPS` (conventions.ts) — Ruby methods api:compare
  *     never expects a TS counterpart for, i.e. an expected `missing`.
- *   - the split `call-mismatches-wide-exclude/` tree
+ *   - the split `call-mismatches-exclude/` tree
  *     tree — Ruby body calls whose absence from the TS body is reviewed and
  *     accepted, i.e. an expected skeleton `divergent`.
  *

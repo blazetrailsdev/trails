@@ -199,7 +199,7 @@ describe("body call capture", () => {
   });
 
   it("marks a call made in a negated position with the ! prefix", () => {
-    // The faithful port of ActiveSupport's `exclude?` (`!include?`); the wide
+    // The faithful port of ActiveSupport's `exclude?` (`!include?`); the
     // call ratchet requires the marker before crediting a negating alias.
     const cls = extractFromSource(
       `class Foo {

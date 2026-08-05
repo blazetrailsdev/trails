@@ -12,7 +12,7 @@
  *
  * Unpinned matched pairs are NOT a failure — pinning is opt-in (see
  * body-pins.ts for the lifecycle). This gate only enforces that the pins that
- * DO exist resolve and match, so it mirrors lint-call-mismatches-wide.ts minus the
+ * DO exist resolve and match, so it mirrors lint-call-mismatches.ts minus the
  * only-shrink ratchet (pins grow, they don't shrink).
  *
  * Usage:

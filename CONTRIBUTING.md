@@ -83,48 +83,48 @@ merged cleanly, the second copy unreachable — needs a human reading the diff.
 Primary signals: `pnpm run api:compare` (use `--package <name>` for one
 package) and `pnpm run test:compare`.
 
-**Before pushing, also run `pnpm api:calls:wide`** — the call-mismatch
+**Before pushing, also run `pnpm api:calls`** — the call-mismatch
 ratchet is a separate CI step (`.github/workflows/ci.yml`, jobs "API comparison
-(wide calls)" + "Wide call-mismatches ratchet") that `pnpm api:compare` does
+(calls)" + "Call-mismatches ratchet") that `pnpm api:compare` does
 **not** run. Because that
 step runs only in CI, a PR that passes every local check can still fail the
-`rails-comparison` job (this happened in #5027). `pnpm api:calls:wide` runs the
-wide lint locally, and since RFC 0083 a plain gating run **regenerates
-`output/call-mismatches-wide.json` itself** before linting
-(`lint-call-mismatches-wide.ts:68-78`, via `run.sh` so the extraction manifests
+`rails-comparison` job (this happened in #5027). `pnpm api:calls` runs the
+lint locally, and since RFC 0083 a plain gating run **regenerates
+`output/call-mismatches.json` itself** before linting
+(`lint-call-mismatches.ts:68-78`, via `run.sh` so the extraction manifests
 compare.ts reads are refreshed first) — so the bare command is enough. It opts
-out of that regeneration under `--no-regen`, `API_COMPARE_SKIP_WIDE_REGEN=1`, or
+out of that regeneration under `--no-regen`, `API_COMPARE_SKIP_REGEN=1`, or
 any CI value, and only then does it gate whatever artifact is on disk. Reach for
-`API_COMPARE_FORCE=1 pnpm api:compare --wide-calls` beforehand when you need to
+`API_COMPARE_FORCE=1 pnpm api:compare --calls` beforehand when you need to
 bypass a warm cache (it under-reports vs CI): `compare.ts` computes the call
-sets, and writes `call-mismatches-wide.json`, only under `--wide-calls`, so a
+sets, and writes `call-mismatches.json`, only under `--calls`, so a
 plain `pnpm api:compare` refreshes nothing this gate reads. (RFC 0084 folded the
 narrow RFC 0044 ratchet into this one and deleted its separate artifact,
 baseline and CI step.) The pre-PR
 checklist in [CLAUDE.md](CLAUDE.md) is the authoritative workflow; this section
 explains the machinery behind it.
 
-The wide baseline is **only-shrink**: it fails not just on a _new_ mismatch but
+The baseline is **only-shrink**: it fails not just on a _new_ mismatch but
 on a _converged_ one. Fixing a real divergence makes the corresponding baseline
 entry stale and turns the gate red — e.g. #5027 added the `String` arm to
 `visit_Arel_Nodes_Over`, which started genuinely calling `quote_column_name`
 and made the baselined "omits quote_column_name" entry stale. **The fix is to
-delete the now-stale entry from the `call-mismatches-wide-exclude/` baseline,
-NOT to `--write`/reseed.** Reseeding (`pnpm api:calls:wide:reseed` /
-`lint-call-mismatches-wide.ts --write`) rewrites the whole
-`call-mismatches-wide-exclude/` tree, so it buries the one entry you meant to
+delete the now-stale entry from the `call-mismatches-exclude/` baseline,
+NOT to `--write`/reseed.** Reseeding (`pnpm api:calls:reseed` /
+`lint-call-mismatches.ts --write`) rewrites the whole
+`call-mismatches-exclude/` tree, so it buries the one entry you meant to
 retire in a diff nobody can review; the hand deletion is the whole change. (The
 cross-package reordering that used to make this worse is fixed — #5183 pinned
 emission to the code-unit `compareKeys` order, so a reseed now leaves untouched
 packages byte-identical.)
 
 Any PR that converges a visitor or method body toward Rails can trip this, so
-run the wide ratchet locally whenever you change a ported method body.
+run the ratchet locally whenever you change a ported method body.
 
 The same gate carries a **second only-shrink counter** (RFC 0083): the number
 of baseline entries whose `reason` is still the verbatim seed string, held
 against the high-water mark committed in
-`scripts/api-compare/call-mismatches-wide-unreviewed.json`. Replacing a seeded
+`scripts/api-compare/call-mismatches-unreviewed.json`. Replacing a seeded
 placeholder with a real one-line reason lowers the count — that is how review
 progress registers even when no entry converges. `--write` lowers the mark and
 never raises it, and it holds out rows the reseed itself seeded — so reseeding
@@ -137,12 +137,12 @@ hand-edited baseline that adds one seeded row while reviewing one old row
 leaves the count unchanged and passes. The guarantee is therefore that
 **unreviewed debt never grows** — not that every individual new entry is forced
 to carry a real reason (writing one is still the rule, enforced by whoever
-reviews the baseline diff). `pnpm api:calls:wide:unreviewed` prints the count
+reviews the baseline diff). `pnpm api:calls:unreviewed` prints the count
 and the mark.
 
 #### Row count is the debt metric; the unreviewed count is not
 
-Decision (RFC 0084): the debt this campaign burns down is the wide baseline's
+Decision (RFC 0084): the debt this campaign burns down is the baseline's
 **row count**. The unreviewed-reason count is a review-hygiene signal, not a
 debt metric, and is not tracked as one.
 
@@ -172,9 +172,9 @@ sharding are all untouched — every one of them has a paid-for incident behind
 it (#4020, #5869), and the unreviewed marks in particular still stop the count
 from _growing_. What changes is what we ask reviewers to spend cycles on.
 
-Decision (this story): the wide lint is deliberately **kept out of
+Decision (this story): the call-mismatch lint is deliberately **kept out of
 `pnpm api:compare`** and documented here instead. Folding it in would make the
-common narrow run pay for the wide-artifact regeneration on every invocation,
+common narrow run pay for the call-artifact regeneration on every invocation,
 and the two ratchets gate different artifacts against different baselines; a
 combined `api:gates` wrapper was considered and declined as premature — the doc
 pointer above is the intended fix.
@@ -196,7 +196,7 @@ pnpm test:assertions:ratchet:reseed   # lower the mark after convergence
 
 The high-water mark is `scripts/test-compare/assertion-mismatch-mark.json`: one
 entry per package, three counters each. CI runs the gate in the
-`rails-comparison` job ("Assertion-mismatch ratchet"). Like the wide-call
+`rails-comparison` job ("Assertion-mismatch ratchet"). Like the call-mismatch
 unreviewed counter, the arm is **aggregate** — the guarantee is "assertion-level
 debt never grows", not that every remaining mismatch has been reviewed.
 Converging one test while porting another that asserts less is a neutral trade

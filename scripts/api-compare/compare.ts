@@ -13,7 +13,7 @@
  * Usage:
  *   npx tsx scripts/api-compare/compare.ts \
  *     [--package activerecord] [--missing] [--files] [--incomplete] \
- *     [--inheritance] [--arity] [--public-only | --privates-only] [--wide-calls]
+ *     [--inheritance] [--arity] [--public-only | --privates-only] [--calls]
  *
  * The default reports the full surface (public + private). `--public-only`
  * drops Rails-private/internal methods on both sides for a contract-only
@@ -31,12 +31,12 @@
  * one-line-summarized and always written to its own artifact, none affecting
  * the parity %: option-keys (output/options-key-mismatches.json), literal
  * defaults/constants (output/literal-mismatches.json), and — under
- * `--wide-calls` (or `API_COMPARE_WIDE_CALLS=1`) — call-set parity
- * (output/call-mismatches-wide.json). The last is a coarse body-fidelity
+ * `--calls` (or `API_COMPARE_CALLS=1`) — call-set parity
+ * (output/call-mismatches.json). The last is a coarse body-fidelity
  * signal: Ruby body calls absent from the matched TS body's call-set, admitting
- * every ported call name except `super` and the WIDE_NO_JS_CALL_FORM names
- * (WIDE_SIGNIFICANT_CALLS). It is ratcheted by lint-call-mismatches-wide.ts
- * against the split call-mismatches-wide-exclude/ baseline directory (one file
+ * every ported call name except `super` and the NO_JS_CALL_FORM names
+ * (SIGNIFICANT_CALLS). It is ratcheted by lint-call-mismatches.ts
+ * against the split call-mismatches-exclude/ baseline directory (one file
  * per source) — see RFC 0047. RFC 0084 folded the narrow RFC 0044 gate (a
  * curated SIGNIFICANT_CALLS allowlist over a second artifact) into this one,
  * whose population strictly subsumed it.
@@ -136,13 +136,13 @@ import {
 // /\A[a-z]/, so e.g. `_run_save_callbacks` can never match — the
 // non-underscore `run_callbacks` path covers callback dispatch instead.
 
-// The WIDE significant set (RFC 0047): admits EVERY ported Ruby call name as
+// The significant set (RFC 0047): admits EVERY ported Ruby call name as
 // significant, except `super` (which the module-mixin port structurally drops —
-// see the comment above). Computed under `--wide-calls` /
-// `API_COMPARE_WIDE_CALLS=1`, this is a membership predicate rather than an
+// see the comment above). Computed under `--calls` /
+// `API_COMPARE_CALLS=1`, this is a membership predicate rather than an
 // allowlist, so `checkCalls` flags every name-matched omission, writing
-// call-mismatches-wide.json — gated by its own ratcheting baseline (the split
-// call-mismatches-wide-exclude/ dir + lint-call-mismatches-wide.ts). The population
+// call-mismatches.json — gated by its own ratcheting baseline (the split
+// call-mismatches-exclude/ dir + lint-call-mismatches.ts). The population
 // is ~72% Enumerable/Object/accessor noise (bucket c) plus confirmed equivalents
 // (bucket b); the baseline seeds large and shrinks as the per-cluster convergence
 // stories land. The existing noise-suppression gates inside significantMissingCalls
@@ -152,10 +152,10 @@ import {
 // Ruby calls whose FAITHFUL JS port emits no call at all — the receiver is
 // consumed by a native language construct (a template literal, a for-of loop, a
 // truthiness test, the `in` operator). No entry in JS_ENUMERABLE_ALIASES can match
-// one of these in a faithful port, because there is no callee to record: the wide
+// one of these in a faithful port, because there is no callee to record: the
 // gate would baseline every occurrence forever, diluting its signal exactly the way
-// `super` is excluded for (see WIDE_SIGNIFICANT_CALLS below). These are
-// therefore suppressed from the wide significant set (RFC 0025). Each name is
+// `super` is excluded for (see SIGNIFICANT_CALLS below). These are
+// therefore suppressed from the significant set (RFC 0025). Each name is
 // justified by the non-call construct it becomes.
 //
 // A name qualifies either because NO JS call form exists (`to_s`, `each`), or
@@ -177,10 +177,10 @@ import {
 // as `performFirst`/`performLast`). A single global set has no receiver-type
 // distinction, so suppressing them would make a TS port that rewrites a relation
 // `.first`/`.size` into indexing a preloaded array (dropping the query trigger)
-// permanently invisible to the wide gate — exactly the fidelity gap it exists to
+// permanently invisible to the gate — exactly the fidelity gap it exists to
 // catch. Same reason `delete` (Map#delete), `merge`, `fetch` — all real JS call
 // forms — stay in.
-export const WIDE_NO_JS_CALL_FORM = new Set([
+export const NO_JS_CALL_FORM = new Set([
   "to_s", // template literal / implicit String() coercion — `${x}`
   "each", // for...of loop — no .forEach callee
   "present?", // truthiness (`x != null && x !== ""`)
@@ -190,12 +190,12 @@ export const WIDE_NO_JS_CALL_FORM = new Set([
   "has_key?", // ditto
 ]);
 
-// The WIDE significant set (RFC 0047): admits EVERY ported Ruby call name as
+// The significant set (RFC 0047): admits EVERY ported Ruby call name as
 // significant, except `super` (which the module-mixin port structurally drops —
-// see the comment at the top of this section) and the WIDE_NO_JS_CALL_FORM names
+// see the comment at the top of this section) and the NO_JS_CALL_FORM names
 // (whose faithful port is a non-call construct, so no alias can ever match).
-export const WIDE_SIGNIFICANT_CALLS: { has(value: string): boolean } = {
-  has: (value) => value !== "super" && !WIDE_NO_JS_CALL_FORM.has(value),
+export const SIGNIFICANT_CALLS: { has(value: string): boolean } = {
+  has: (value) => value !== "super" && !NO_JS_CALL_FORM.has(value),
 };
 
 /**
@@ -226,7 +226,7 @@ export { JS_ENUMERABLE_ALIASES, jsEnumerableAliases, NEGATED_ALIASES, partitionN
  * Three gates keep it high-signal (a GENERAL missing-call diff is ~72% noise —
  * Ruby Enumerable/Object idioms that translate to native JS and collide with
  * ported names):
- *   1. only calls in `significant` (WIDE_SIGNIFICANT_CALLS);
+ *   1. only calls in `significant` (SIGNIFICANT_CALLS);
  *   2. only calls whose mapped TS candidate is a ported method that TAKES
  *      arguments somewhere (`isPortedWithArgs`) — excludes zero-arg attribute
  *      readers, which Ruby records as calls but TS accesses as `this.x`;
@@ -240,7 +240,7 @@ export function significantMissingCalls(
   tsCalls: Set<string>,
   isPortedWithArgs: (tsName: string) => boolean,
   mapCall: (rubyCall: string) => string[] | null = rubyMethodToTs,
-  significant: { has(value: string): boolean } = WIDE_SIGNIFICANT_CALLS,
+  significant: { has(value: string): boolean } = SIGNIFICANT_CALLS,
   aliasCall: (rubyCall: string) => string[] = jsEnumerableAliases,
   negatedTsCalls: Set<string> = new Set(),
 ): string[] {
@@ -317,10 +317,10 @@ const DELEGATION_MAX_CALLS = 3;
  * Whether a matched TS body is a pure delegating wrapper — `return
  * this.pgSchemaStatements().indexes(tableName)` — rather than the port itself.
  *
- * This exists because of how Ruby `include` attribution lands in the wide gate.
+ * This exists because of how Ruby `include` attribution lands in the gate.
  * A Rails module mixed into a class (`PostgreSQL::SchemaStatements` into
  * `PostgreSQLAdapter`) has its methods attributed to the INCLUDING class's file
- * (postgresql_adapter.rb), so the wide gate name-matches them against
+ * (postgresql_adapter.rb), so the gate name-matches them against
  * postgresql-adapter.ts. But trails ports those bodies into a sibling collaborator
  * (postgresql/schema-statements-class.ts) whose filename has no Rails counterpart,
  * so it is never itself paired; the adapter only keeps a one-line delegation. The
@@ -352,7 +352,7 @@ export function isDelegatingWrapper(tsName: string, tsCalls: Set<string>): boole
  * stops before that leaf's callees.
  *
  * Three is deliberate, not the largest defensible value. Sweeping this constant
- * over the whole wide artifact (RFC 0083) shows the closure saturating at depth
+ * over the whole artifact (RFC 0083) shows the closure saturating at depth
  * 8: 3693 rows at 0, 3332 at 1, 3276 at 2, 3251 at 3, 3243 at 4, 3236 at 5 and
  * 6, 3230 at 8, and 12 and 40 identical to 8. The mean effective call-set per
  * body saturates on the same schedule — 2.35 (depth 0) → 6.77 (depth 3) → 9.00
@@ -1490,12 +1490,12 @@ export function main() {
   const mode: CompareMode = privatesOnly ? "private" : publicOnly ? "public" : "all";
   const methodMatchesMode = (m: MethodInfo): boolean => methodInMode(m, mode);
 
-  // Opt-in WIDE calls knob (RFC 0047): widen the calls-check `significant` set to
-  // all ported names except `super`, writing the separate call-mismatches-wide
-  // artifact gated by lint-call-mismatches-wide.ts. The narrow 0044 artifact is
-  // not written in a wide run (and vice-versa), so the two ratchets never collide.
-  const wideCalls = args.includes("--wide-calls") || process.env.API_COMPARE_WIDE_CALLS === "1";
-  const callsSignificant = WIDE_SIGNIFICANT_CALLS;
+  // Opt-in calls knob (RFC 0047): widen the calls-check `significant` set to
+  // all ported names except `super`, writing the separate call-mismatches
+  // artifact gated by lint-call-mismatches.ts. The narrow 0044 artifact is
+  // not written in a calls run (and vice-versa), so the two ratchets never collide.
+  const callsGate = args.includes("--calls") || process.env.API_COMPARE_CALLS === "1";
+  const callsSignificant = SIGNIFICANT_CALLS;
 
   const rubyPath = path.join(OUTPUT_DIR, "rails-api.json");
   const tsPath = path.join(OUTPUT_DIR, "ts-api.json");
@@ -1953,7 +1953,7 @@ export function main() {
       // First-sighting Ruby body call-set per name (advisory calls-parity check).
       const rubyCallsByName = new Map<string, string[]>();
       // Same first-sighting keying: the inert-receiver subset of that call-set
-      // (RFC 0083), subtracted in wide runs only.
+      // (RFC 0083), subtracted in calls runs only.
       const rubyWeakCallsByName = new Map<string, string[]>();
       // First-sighting Ruby body digest per name (source-hash pinning, RFC 0025).
       const rubyBodyDigestByName = new Map<string, string>();
@@ -2024,9 +2024,9 @@ export function main() {
       // signal — never affects the parity %. Lossy: legitimate restructuring
       // (extracted helper, inlined call) shows up here, so it's advisory.
       const checkCalls = (rubyName: string, tsName: string, tsFile: string) => {
-        // The call set is computed only under `--wide-calls`, the mode that
-        // writes and gates the wide artifact (see the artifact write below).
-        if (!wideCalls) return;
+        // The call set is computed only under `--calls`, the mode that
+        // writes and gates the artifact (see the artifact write below).
+        if (!callsGate) return;
         const rubyCalls = dropWeakCalls(
           rubyCallsByName.get(rubyName),
           rubyWeakCallsByName.get(rubyName),
@@ -2587,11 +2587,11 @@ export function main() {
     ),
   );
 
-  if (wideCalls) {
+  if (callsGate) {
     // Advisory calls-parity artifact (RFC 0047), flat across packages. Written
-    // only under `--wide-calls`, the mode that computes the call sets at all —
+    // only under `--calls`, the mode that computes the call sets at all —
     // a plain run would otherwise overwrite it with an empty result.
-    const callsPath = path.join(OUTPUT_DIR, `call-mismatches-wide${modeSuffix}.json`);
+    const callsPath = path.join(OUTPUT_DIR, `call-mismatches${modeSuffix}.json`);
     const callsFlat = results.flatMap((r) =>
       r.calls.mismatches.map((m) => ({ package: r.package, ...m })),
     );
@@ -2608,7 +2608,7 @@ export function main() {
           generatedAt: new Date().toISOString(),
           note: "Advisory. Ruby body calls (to other ported methods) absent from the matched TS body's call-set. Coarse body-fidelity signal; legitimate restructuring shows up here.",
           // The set of packages this run actually compared (sorted). The
-          // ratchet (lint-call-mismatches-wide.ts) reads it to reject a
+          // ratchet (lint-call-mismatches.ts) reads it to reject a
           // partial-scope artifact — fewer packages than CI, e.g. a `--package`-filtered run or an
           // unfetched vendor source — before it can reseed or gate. See that
           // script's header for the full determinism story.
@@ -2886,8 +2886,8 @@ function printReport(
   }
   if (grandCallsCompared > 0) {
     console.log(
-      `  Calls (advisory, WIDE): ${grandCallsCompared} matched pairs checked, ` +
-        `${grandCallsMismatched} omit a ported-method call Rails makes — see output/call-mismatches-wide.json`,
+      `  Calls (advisory): ${grandCallsCompared} matched pairs checked, ` +
+        `${grandCallsMismatched} omit a ported-method call Rails makes — see output/call-mismatches.json`,
     );
   }
   console.log(`${"=".repeat(100)}\n`);

@@ -2521,7 +2521,7 @@ function isAssignmentWriteTarget(access: ts.PropertyAccessExpression): boolean {
 
 // Whether an expression is the operand of a logical negation — `!xs.includes(y)`,
 // `!(set.has(k))`. Ruby's negating Enumerable idioms (`none?`, `exclude?`) port to
-// a negated JS call, and the wide call ratchet must tell that from the inverted
+// a negated JS call, and the call ratchet must tell that from the inverted
 // condition (see NEGATED_CALL_PREFIX). Two shapes are deliberately NOT negations:
 // `!a && b.has(x)` (the `!` binds to `a`), and `!!x`, which is a truthiness cast.
 function isNegatedOperand(expr: ts.Node): boolean {
@@ -2653,7 +2653,7 @@ function delegatedHelper(body: ts.Node | undefined): string | undefined {
  * Name- or path-based alternatives are unsound here: they would credit
  * `abstract-mysql-adapter.ts` with calls made in
  * `postgresql/schema-statements-class.ts` (sibling implementations of one
- * interface), which is exactly the per-adapter fidelity gap the wide gate
+ * interface), which is exactly the per-adapter fidelity gap the gate
  * exists to catch. The resolved type must actually declare `name`, so an
  * accessor whose type the checker cannot resolve records no edge.
  */

@@ -303,7 +303,7 @@ function tally<T>(values: T[], key: (value: T) => string): [string, number][] {
 async function main(): Promise<void> {
   const api = JSON.parse(await fs.readFile(path.join(OUTPUT_DIR, "ts-api.json"), "utf8")) as TsApi;
   const artifact = JSON.parse(
-    await fs.readFile(path.join(OUTPUT_DIR, "call-mismatches-wide.json"), "utf8"),
+    await fs.readFile(path.join(OUTPUT_DIR, "call-mismatches.json"), "utf8"),
   ) as { mismatches: Mismatch[] };
 
   const indexes = new Map<string, PackageIndex>();
