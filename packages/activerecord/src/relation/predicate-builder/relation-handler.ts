@@ -67,7 +67,7 @@ export class RelationHandler {
       return value;
     }
 
-    const model = value._modelClass;
+    const model = value._model;
     const pk = model?.primaryKey ?? "id";
     if (Array.isArray(pk)) {
       // Rails interpolates `model.primary_key` directly, so the composite array

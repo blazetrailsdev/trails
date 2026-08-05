@@ -106,7 +106,7 @@ export class PolymorphicArrayValue {
   /** @internal */
   private klass(value: unknown): unknown {
     if (typeof value !== "object" || value === null) return null;
-    if ("_modelClass" in value && "toArel" in value) return (value as any)._modelClass;
+    if ("_model" in value && "toArel" in value) return (value as any)._model;
     return (value as any).constructor ?? null;
   }
 
@@ -114,12 +114,12 @@ export class PolymorphicArrayValue {
   private convertToId(value: unknown): unknown {
     if (value === null || value === undefined) return null;
     if (typeof value === "object" && value !== null) {
-      if ("_modelClass" in value && "toArel" in value) {
+      if ("_model" in value && "toArel" in value) {
         // Select the table-qualified primary key so the subquery's projection
         // stays unambiguous once its arel carries joins (build_arel
         // convergence) — matching RelationHandler's `arel_table[primary_key]`.
         const pk = this.primaryKey(value);
-        const arelTable = (value as any)._modelClass?.arelTable;
+        const arelTable = (value as any)._model?.arelTable;
         return (value as any).select(arelTable && !Array.isArray(pk) ? arelTable.get(pk) : pk);
       }
       const pk = this.primaryKey(value);

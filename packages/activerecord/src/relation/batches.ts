@@ -116,7 +116,7 @@ export function batchCondition(
 ): any {
   const cursorArr = Array.isArray(cursor) ? cursor : [cursor];
   const valArr = Array.isArray(values) ? values : [values];
-  const table = relation._modelClass.arelTable;
+  const table = relation._model.arelTable;
 
   // Build lexicographic WHERE matching Rails' cursor_positions.reverse_each logic:
   // Single column: col OP val

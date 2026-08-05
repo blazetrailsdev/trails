@@ -2353,7 +2353,7 @@ export class Base extends Model {
       // class's own relation — which carries the STI `type_condition` — and
       // merge the inherited scope into it, rather than cloning the parent's
       // type-unconstrained relation.
-      if (scope._modelClass === this) {
+      if (scope._model === this) {
         return scope._clone();
       }
       return this._buildUnscopedRelation().merge(scope);

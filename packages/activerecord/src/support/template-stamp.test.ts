@@ -23,6 +23,7 @@ import { InternalMetadata } from "../internal-metadata.js";
 import {
   canonicalSchemaStamp,
   canonicalSchemaUpToDate,
+  adapterSpecificTables,
   stampCanonicalSchema,
 } from "./canonical-schema-stamp.js";
 import { resetTestTables } from "./drop-all-tables.js";
@@ -65,6 +66,52 @@ describe.skipIf(!runToken)("boot fast path stamp", () => {
     await loadAdapterSpecificSchema(connection);
     await stampCanonicalSchema(connection);
     expect(await canonicalSchemaUpToDate(await Base.leaseConnection())).toBe(true);
+  });
+});
+
+describe.skipIf(!runToken)("adapter-specific tables snapshot", () => {
+  it("records the carried-forward set, not what the live database happens to hold", async () => {
+    // The fast path skips the adapter-specific arm when the snapshot is intact,
+    // so the snapshot must not shrink to whatever a test file left behind. A
+    // re-stamp that took a fresh snapshot here would drop `defaults` from the
+    // recorded set for every later file, with nothing left to re-lay it.
+    const connection = await Base.leaseConnection();
+    const before = await adapterSpecificTables(connection);
+    expect(before, "boot must have recorded a snapshot").not.toBeNull();
+    expect(before).toContain("defaults");
+
+    await connection.dropTable("defaults", { ifExists: true });
+    try {
+      await stampCanonicalSchema(connection, undefined, before!);
+      expect(await adapterSpecificTables(connection)).toContain("defaults");
+    } finally {
+      await loadAdapterSpecificSchema(connection);
+      await stampCanonicalSchema(connection, undefined, before!);
+    }
+  });
+});
+
+describe.skipIf(!runToken)("snapshot width backstop", () => {
+  it("survives a snapshot wider than the value column", async () => {
+    // `ar_internal_metadata.value` is `t.string` (internal_metadata.rb:85-93),
+    // which MySQL alone renders `varchar(255)` (abstract_mysql_adapter.rb:33);
+    // PG and SQLite impose no limit (postgresql_adapter.rb:136,
+    // sqlite3_adapter.rb:71). Widening the column would diverge from Rails, so
+    // MySQL degrades to a re-lay instead — and must not raise ValueTooLong.
+    const connection = await Base.leaseConnection();
+    const before = await adapterSpecificTables(connection);
+    const oversized = Array.from({ length: 200 }, (_, i) => `padding_table_${i}`);
+    try {
+      await stampCanonicalSchema(connection, undefined, oversized);
+      const stored = await adapterSpecificTables(connection);
+      if (connection.adapterName === "mysql") {
+        expect(stored).toBeNull();
+      } else {
+        expect(stored).toEqual(oversized.slice().sort());
+      }
+    } finally {
+      await stampCanonicalSchema(connection, undefined, before ?? undefined);
+    }
   });
 });
 

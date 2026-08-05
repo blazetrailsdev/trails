@@ -2133,25 +2133,24 @@ export class Migrator {
    * constructor cannot await, so they are ensured here before the reload can
    * query them.
    *
-   * Mirrors: ActiveRecord::Migrator#with_advisory_lock
+   * @internal Mirrors: ActiveRecord::Migrator#with_advisory_lock
    */
-  private async _withAdvisoryLock<T>(fn: () => Promise<T>): Promise<T> {
-    const adapter = this._adapter;
+  async withAdvisoryLock<T>(fn: () => Promise<T>): Promise<T> {
     if (
-      !adapter.supportsAdvisoryLocks?.() ||
-      !adapter.getAdvisoryLock ||
-      !adapter.releaseAdvisoryLock
+      !this.connection.supportsAdvisoryLocks?.() ||
+      !this.connection.getAdvisoryLock ||
+      !this.connection.releaseAdvisoryLock
     ) {
       return fn();
     }
-    if (typeof adapter.currentDatabase !== "function") {
+    if (typeof this.connection.currentDatabase !== "function") {
       throw new Error(
-        `${adapter.constructor.name} must implement currentDatabase() to support advisory-locked migrations`,
+        `${this.connection.constructor.name} must implement currentDatabase() to support advisory-locked migrations`,
       );
     }
     const lockId = await this.generateMigratorAdvisoryLockId();
-    const locked = await adapter.getAdvisoryLock(lockId);
-    if (!locked) {
+    const gotLock = await this.connection.getAdvisoryLock(lockId);
+    if (!gotLock) {
       throw new ConcurrentMigrationError();
     }
     await this._ensureSchemaTable();
@@ -2171,7 +2170,7 @@ export class Migrator {
     // Rails: `release_advisory_lock(...) or raise` (migration.rb:1608-1612).
     let released: boolean | undefined;
     try {
-      released = await adapter.releaseAdvisoryLock(lockId);
+      released = await this.connection.releaseAdvisoryLock(lockId);
     } catch (releaseErr) {
       if (fnError !== _sentinel) throw fnError;
       throw releaseErr;
@@ -2247,7 +2246,7 @@ export class Migrator {
       this._runOptions("up", targetVersion ?? null),
     );
     try {
-      return await migrator._withAdvisoryLock(() => migrator.migrateWithoutLock());
+      return await migrator.withAdvisoryLock(() => migrator.migrateWithoutLock());
     } finally {
       this._invalidateMigrated();
     }
@@ -2270,7 +2269,7 @@ export class Migrator {
       this._runOptions("down", targetVersion ?? null),
     );
     try {
-      return await migrator._withAdvisoryLock(() => migrator.migrateWithoutLock());
+      return await migrator.withAdvisoryLock(() => migrator.migrateWithoutLock());
     } finally {
       this._invalidateMigrated();
     }
@@ -2286,7 +2285,7 @@ export class Migrator {
       throw new Error(`Invalid steps: ${steps}. Must be a non-negative integer.`);
     }
     let rolledBack: MigrationProxy[] = [];
-    await this._withAdvisoryLock(async () => {
+    await this.withAdvisoryLock(async () => {
       await this._ensureSchemaTable();
       const applied = await this.migrated();
       const appliedMigrations = this._migrations.filter((m) => applied.has(m.version)).reverse();
@@ -2309,7 +2308,7 @@ export class Migrator {
     if (!Number.isInteger(steps) || steps < 0) {
       throw new Error(`Invalid steps: ${steps}. Must be a non-negative integer.`);
     }
-    await this._withAdvisoryLock(async () => {
+    await this.withAdvisoryLock(async () => {
       const pending = await this.pendingMigrations();
       const toRun = pending.slice(0, steps);
 
@@ -2468,44 +2467,29 @@ export class Migrator {
     }
   }
 
-  /** @internal Mirrors: ActiveRecord::Migrator#ddl_transaction */
-  async ddlTransaction(migration: Migration, fn: () => Promise<void>): Promise<void> {
-    return this._ddlTransaction(migration, fn);
-  }
-
-  /** @internal Mirrors: ActiveRecord::Migrator#use_transaction? */
-  isUseTransaction(migration: Migration): boolean {
-    return this._useTransaction(migration);
-  }
-
   /**
    * @internal Mirrors: ActiveRecord::Migrator#use_advisory_lock?
    *
    * Rails gates solely on `connection.advisory_locks_enabled?`
    * (`supports_advisory_locks? && @advisory_locks_enabled`), mirrored here by
    * `isAdvisoryLocksEnabled()`. The `currentDatabase` requirement is enforced at
-   * the point it's actually needed — `_withAdvisoryLock` /
+   * the point it's actually needed — `withAdvisoryLock` /
    * `generateMigratorAdvisoryLockId`, which throw if an advisory-lock-capable
    * adapter can't supply the DB name — rather than silently skipping the lock
    * here (which Rails never does).
    */
   isUseAdvisoryLock(): boolean {
-    return !!this._adapter.isAdvisoryLocksEnabled?.();
-  }
-
-  /** @internal Mirrors: ActiveRecord::Migrator#with_advisory_lock */
-  async withAdvisoryLock<T>(fn: () => Promise<T>): Promise<T> {
-    return this._withAdvisoryLock(fn);
+    return !!this.connection.isAdvisoryLocksEnabled?.();
   }
 
   /** @internal Mirrors: ActiveRecord::Migrator#generate_migrator_advisory_lock_id */
   async generateMigratorAdvisoryLockId(): Promise<bigint> {
-    if (typeof this._adapter.currentDatabase !== "function") {
+    if (typeof this.connection.currentDatabase !== "function") {
       throw new Error(
-        `${this._adapter.constructor.name} must implement currentDatabase() to support advisory-locked migrations`,
+        `${this.connection.constructor.name} must implement currentDatabase() to support advisory-locked migrations`,
       );
     }
-    const dbName = await this._adapter.currentDatabase();
+    const dbName = await this.connection.currentDatabase();
     if (!dbName) {
       // currentDatabase() returned empty — adapter bug (MySQL stub returns "").
       // Fall back to the salt; file a fix for the adapter.
@@ -2751,7 +2735,7 @@ export class Migrator {
       this._runOptions(direction, targetVersion),
     );
     try {
-      return await migrator._withAdvisoryLock(() => migrator.runWithoutLock());
+      return await migrator.withAdvisoryLock(() => migrator.runWithoutLock());
     } finally {
       this._invalidateMigrated();
     }
@@ -2766,7 +2750,7 @@ export class Migrator {
     try {
       const loaded = (migration = await proxy.migration());
       loaded.connection = this._adapter;
-      await this._ddlTransaction(loaded, async () => {
+      await this.ddlTransaction(loaded, async () => {
         await loaded.migrate(direction);
         await this.recordVersionStateAfterMigrating(proxy.version, direction);
       });
@@ -2775,7 +2759,7 @@ export class Migrator {
       // Rails re-resolves the proxy here (`migration.rb:1540` → `use_transaction?`
       // → `MigrationProxy#disable_ddl_transaction`), so a migration that failed to
       // load raises again from inside the rescue and escapes unwrapped.
-      const useTx = this._useTransaction(migration ?? (await proxy.migration()));
+      const useTx = this.isUseTransaction(migration ?? (await proxy.migration()));
       // Ruby's `#{e}` interpolates Exception#to_s — the bare message, without
       // the `Error: ` prefix JS String(e) would add.
       const msg = `An error has occurred, ${useTx ? "this and " : ""}all later migrations canceled:\n\n${e instanceof Error ? e.message : e}`;
@@ -2795,23 +2779,25 @@ export class Migrator {
    *         yield
    *       end
    *     end
+   *
+   * @internal
    */
-  private async _ddlTransaction(migration: Migration, fn: () => Promise<void>): Promise<void> {
-    if (this._useTransaction(migration)) {
+  async ddlTransaction(migration: Migration, fn: () => Promise<void>): Promise<void> {
+    if (this.isUseTransaction(migration)) {
       // Skip wrapping if the adapter is already in a transaction
       // (e.g. a caller wrapped the entire migrate in a transaction).
       // Starting a nested BEGIN would error on adapters that issue
       // raw BEGIN (vs savepoints).
-      if (this._adapter.inTransaction) {
+      if (this.connection.inTransaction) {
         await fn();
       } else {
-        await this._adapter.beginTransaction();
+        await this.connection.beginTransaction();
         try {
           await fn();
-          await this._adapter.commit();
+          await this.connection.commit();
         } catch (e) {
           try {
-            await this._adapter.rollback();
+            await this.connection.rollback();
           } catch {
             // Swallow rollback errors so the original migration
             // error isn't masked.
@@ -2827,13 +2813,15 @@ export class Migrator {
   /**
    * Mirrors Rails' `Migrator#use_transaction?`:
    * `!migration.disable_ddl_transaction && connection.supports_ddl_transactions?`
+   *
+   * @internal
    */
-  private _useTransaction(migration: Migration): boolean {
+  isUseTransaction(migration: Migration): boolean {
     if (migration.disableDdlTransaction) return false;
     // Check adapter support via the DatabaseAdapter interface.
     // SQLite returns true, PG returns true, MySQL returns false.
     // Absent (undefined) defaults to false.
-    return this._adapter.supportsDdlTransactions?.() ?? false;
+    return this.connection.supportsDdlTransactions?.() ?? false;
   }
 
   /** @internal Mirrors: ActiveRecord::Migrator#current_migration (`migration.rb:1439-1441`) */

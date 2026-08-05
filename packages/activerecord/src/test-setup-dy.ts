@@ -44,7 +44,7 @@ const ownsDatabase =
 const { recordBootLaidTables, dropAllTables, purgeToCanonicalTables } =
   await import("./support/drop-all-tables.js");
 const { loadSchema, loadAdapterSpecificSchema } = await import("./support/load-schema-helper.js");
-const { canonicalSchemaUpToDate, stampCanonicalSchema } =
+const { canonicalSchemaUpToDate, stampCanonicalSchema, adapterSpecificTables } =
   await import("./support/canonical-schema-stamp.js");
 const { recordBootOutcome } = await import("./support/boot-outcome.js");
 
@@ -53,22 +53,30 @@ if (await canonicalSchemaUpToDate(await Base.leaseConnection())) {
   // every non-empty canonical table and drops everything else, so a
   // `DatabaseTasks.truncateTables` here emptied the same tables a second time.
   //
-  // Only the canonical arm is skipped here — those tables are already laid, and
-  // now empty. The adapter-specific arm is re-run as on the full path: its
-  // tables are `force: true` throughout, and a worker recycled onto a database
-  // an earlier worker's tests ran against finds them dropped —
-  // `purgeToCanonicalTables` drops every table outside the canonical half, and
-  // the arm below re-lays the adapter-specific ones it took with it.
+  // The adapter-specific arm is skipped when the stamp's snapshot of what it
+  // laid is still intact on the database: the purge protects those tables by
+  // name and truncates them rather than dropping them, so there is nothing to
+  // re-lay. The snapshot is read first because the purge drops
+  // `ar_internal_metadata` with the other bookkeeping tables.
+  //
+  // A table missing from the database puts this boot back on the old behaviour
+  // — the arm re-lays the adapter-specific half — which is what a test file
+  // that drops one (`support/drop-all-tables.test.ts`) relies on. The snapshot
+  // is carried forward rather than re-taken for the same reason: re-taking it
+  // here would record the shrunken set as authoritative.
   const conn = await Base.leaseConnection();
-  await purgeToCanonicalTables(conn);
-  await loadAdapterSpecificSchema(conn);
+  const laid = await adapterSpecificTables(conn);
+  await purgeToCanonicalTables(conn, laid ?? []);
+  const present = new Set(await conn.tables());
+  const intact = laid !== null && laid.every((name) => present.has(name));
+  if (!intact) await loadAdapterSpecificSchema(conn);
   // Re-stamp: the purge drops `ar_internal_metadata` along with the
   // other bookkeeping tables, so the stamp this boot consumed is gone. What is
   // left behind is the same state the full-load arm below stamps — canonical
   // plus adapter-specific, laid and empty — so the next worker recycled onto
   // this database is entitled to the same fast path. Without this the stamp is
   // single-use per database and every recycle pays the full purge+reload.
-  await stampCanonicalSchema(conn);
+  await stampCanonicalSchema(conn, undefined, intact ? laid : undefined);
   await recordBootOutcome("fastPath", await canonicalSchemaUpToDate(conn));
 } else {
   // `DatabaseTasks.purge` re-establishes Base's pool on the recreated database,

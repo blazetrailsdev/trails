@@ -19,7 +19,7 @@ import { underscore, pluralize } from "@blazetrails/activesupport";
 import type { AliasTracker } from "../associations/alias-tracker.js";
 
 interface MergedJoinAliasHost {
-  _modelClass: {
+  _model: {
     tableName: string;
   };
   _joinClauses: Array<{ table: string; assoc?: string }>;
@@ -30,7 +30,7 @@ interface MergedJoinAliasHost {
  * association/merged join onto the same table is detected as a collision.
  */
 export function seedJoinClauseAliases(host: MergedJoinAliasHost, tracker: AliasTracker): void {
-  const ownerTable = host._modelClass.tableName;
+  const ownerTable = host._model.tableName;
   for (const c of host._joinClauses) {
     if (c.assoc) {
       // Association where-join (whereAssociated / associated): mirror the

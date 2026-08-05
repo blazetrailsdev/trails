@@ -632,14 +632,12 @@ export class Author extends Base {
 
     this.hasMany("postsWithSignature", {
       scope: (q: any, record: any) =>
-        q.where(q._modelClass.arelTable.get("title").matches(`%by ${record.name.toLowerCase()}%`)),
+        q.where(q.model.arelTable.get("title").matches(`%by ${record.name.toLowerCase()}%`)),
       className: "Post",
     });
     this.hasMany("postsMentioningAuthor", {
       scope: (q: any, record: any) =>
-        q.where(
-          q._modelClass.arelTable.get("body").matches(`%${record?.name?.toLowerCase() ?? ""}%`),
-        ),
+        q.where(q.model.arelTable.get("body").matches(`%${record?.name?.toLowerCase() ?? ""}%`)),
       className: "Post",
     });
     this.hasMany("commentsOnPostsMentioningAuthor", {
@@ -648,7 +646,7 @@ export class Author extends Base {
     });
     this.hasMany("commentsMentioningAuthor", {
       scope: (q: any, record: any) =>
-        q.where(q._modelClass.arelTable.get("body").matches(`%${record.name.toLowerCase()}%`)),
+        q.where(q.model.arelTable.get("body").matches(`%${record.name.toLowerCase()}%`)),
       through: "posts",
       source: "comments",
     });

@@ -560,9 +560,7 @@ export class PredicateBuilder {
   }
 
   private isRelation(value: unknown): boolean {
-    return (
-      typeof value === "object" && value !== null && "_modelClass" in value && "toArel" in value
-    );
+    return typeof value === "object" && value !== null && "_model" in value && "toArel" in value;
   }
 
   private convertDotNotationToHash(attributes: Record<string, unknown>): Record<string, unknown> {

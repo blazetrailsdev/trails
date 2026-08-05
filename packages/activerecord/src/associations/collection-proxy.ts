@@ -2509,9 +2509,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
           // (persistence.rb:234). Single-column: `where({col: ids})`; composite:
           // `where(cols, tuples)` (OR-of-AND) to avoid the cartesian-product that
           // `AND col1 IN (...) AND col2 IN (...)` would produce.
-          const queryCols = compositeQueryConstraintsList.call(
-            (this as any)._modelClass as typeof Base,
-          );
+          const queryCols = compositeQueryConstraintsList.call((this as any)._model as typeof Base);
           const readCol = (r: Base, col: string) => (r as any)._readAttribute(col);
           let scope = this.scope();
           if (queryCols.length === 1) {

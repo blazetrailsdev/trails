@@ -31,8 +31,8 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
    */
   _association: CollectionProxy<T> | Association;
 
-  constructor(modelClass: typeof Base, association: CollectionProxy<T> | Association) {
-    super(modelClass);
+  constructor(klass: typeof Base, association: CollectionProxy<T> | Association) {
+    super(klass);
     this._association = association;
   }
 

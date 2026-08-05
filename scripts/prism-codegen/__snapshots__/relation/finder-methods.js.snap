@@ -8,12 +8,7 @@ require("active_support/core_ext/string/filters");
 // module FinderMethods
 // module ActiveRecord
 const ONE_AS_ONE = "1 AS one";
-export async function find(...args, block) {
-    if (block !== undefined) {
-        return __PRISM_SUPER_OUTSIDE_CORPUS("FinderMethods#find");
-    }
-    return await this.findWithIds(...args);
-}
+__PRISM_TODO("DefNode");
 export function findBy(arg, ...args) {
     return this.where(arg, ...args).take();
 }

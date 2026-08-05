@@ -193,7 +193,7 @@ export class Post extends Base {
     this.scope("containingTheLetterA", (q: any) => q.where("body LIKE '%a%'"));
     this.scope("titledWithAnApostrophe", (q: any) => q.where("title LIKE '%''%'"));
     this.scope("rankedByComments", (q: any) =>
-      q.order(q._modelClass.arelTable.get("commentsCount").desc()),
+      q.order(q.model.arelTable.get("commentsCount").desc()),
     );
     this.scope("orderedByPostId", (q: any) => q.order("posts.post_id ASC"));
     this.scope("limitBy", (q: any, l: number) => q.limit(l));
@@ -215,9 +215,7 @@ export class Post extends Base {
     this.scope("withComments", (q: any) => q.preload("comments"));
     this.scope("withTags", (q: any) => q.preload("taggings"));
     this.scope("withTagsCte", (q: any) =>
-      q
-        .with({ posts_with_tags: q._modelClass.where("tags_count > 0") })
-        .from("posts_with_tags AS posts"),
+      q.with({ posts_with_tags: q.model.where("tags_count > 0") }).from("posts_with_tags AS posts"),
     );
     this.scope("taggedWith", (q: any, id: number) =>
       q.joins("taggings").where({ taggings: { tag_id: id } }),
@@ -849,10 +847,8 @@ export class SpecialPostWithDefaultScope extends Base {
     this.inheritanceColumn = "disabled";
     this._tableName = "posts";
     this.defaultScope((q: any) => q.where({ id: [1, 5, 6] }));
-    this.scope("unscopedAll", (q: any) => q._modelClass.unscoped(() => q._modelClass.all()));
-    this.scope("authorless", (q: any) =>
-      q._modelClass.unscoped(() => q._modelClass.where({ author_id: 0 })),
-    );
+    this.scope("unscopedAll", (q: any) => q.model.unscoped(() => q.model.all()));
+    this.scope("authorless", (q: any) => q.model.unscoped(() => q.model.where({ author_id: 0 })));
   }
 }
 

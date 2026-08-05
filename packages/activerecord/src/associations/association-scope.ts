@@ -1016,7 +1016,7 @@ export class AssociationScope {
       _leftOuterJoinsValues?: unknown[];
       _includesAssociations?: unknown[];
       _eagerLoadAssociations?: unknown[];
-      _modelClass?: typeof Base;
+      _model?: typeof Base;
     };
     const refs = item._referencesValues ?? [];
     if (refs.length === 0) return;
@@ -1026,9 +1026,9 @@ export class AssociationScope {
       _joinClauses: unknown[];
       _namedInnerJoins: unknown[];
       _leftOuterJoinsValues: unknown[];
-      _modelClass?: typeof Base;
+      _model?: typeof Base;
     };
-    const sameKlass = item._modelClass !== undefined && item._modelClass === target._modelClass;
+    const sameKlass = item._model !== undefined && item._model === target._model;
     // item.only(:joins, :left_outer_joins) — carry raw SQL / Arel join nodes
     // straight across, then union named association joins (same-klass) or build
     // cross-klass JoinDependencies (Merger#merge_joins / #merge_outer_joins).

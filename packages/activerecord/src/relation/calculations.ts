@@ -61,10 +61,10 @@ interface CalculationConnection {
 }
 
 interface CalculationRelation {
-  model: CalculationRelation["_modelClass"];
+  model: CalculationRelation["_model"];
   /** Rails `delegate :primary_key, to: :model` (delegation.rb:106). */
   primaryKey: string | string[];
-  _modelClass: {
+  _model: {
     arelTable: any;
     primaryKey: string | string[];
     name: string;
@@ -76,7 +76,7 @@ interface CalculationRelation {
   /**
    * The connection threaded by the enclosing `withQueryConnection` wrap, else
    * the model's `.connection`. Mirrors `Relation#_conn`; reading it instead of
-   * `_modelClass.connection` keeps internal reads off the deprecated getter.
+   * `_model.connection` keeps internal reads off the deprecated getter.
    * @internal
    */
   _conn(): CalculationConnection;
@@ -261,10 +261,10 @@ function buildAggNode(
   // columns_hash, unlike Rails), so qualify it there; anything else is a joined
   // or expression column and stays unqualified raw SQL — exactly what
   // MIN(written_on) over a joined table needs.
-  const pk = rel._modelClass.primaryKey;
+  const pk = rel._model.primaryKey;
   const pks = Array.isArray(pk) ? pk : [pk];
   const node = arelColumn.call(rel as never, column, (field: string) =>
-    pks.includes(field) ? rel._modelClass.arelTable.get(field) : new Nodes.SqlLiteral(field),
+    pks.includes(field) ? rel._model.arelTable.get(field) : new Nodes.SqlLiteral(field),
   ) as Nodes.Node & {
     count(distinct: boolean): Nodes.Node;
     sum(): Nodes.Node;
@@ -402,7 +402,7 @@ function applyFromToManager(rel: CalculationRelation, manager: any): void {
 function isBigintColumn(rel: CalculationRelation, fn: AggFn, column: string | Nodes.Node): boolean {
   if (fn === "count" || fn === "average" || column === "*") return false;
   if (column instanceof Nodes.Node) return false;
-  const table = rel._modelClass.arelTable as {
+  const table = rel._model.arelTable as {
     typeForAttribute?(col: string): unknown;
   };
   return table.typeForAttribute?.(column) instanceof BigIntegerType;
@@ -438,7 +438,7 @@ async function singleAggregate(
   // Rails routes aggregates through apply_join_dependency when eager loading,
   // raising EagerLoadPolymorphicError for polymorphic specs (calculations.rb).
   rel._checkEagerLoadable();
-  const table = rel._modelClass.arelTable;
+  const table = rel._model.arelTable;
   const aggNode = buildAggNode(rel, fn, column, distinct ?? false);
   const projection = aggNode.as("val");
   const manager = table.project(projection);
@@ -504,7 +504,7 @@ async function groupedAggregate(
   distinct: boolean | null = rel._isDistinct,
 ): Promise<Map<unknown, unknown>> {
   rel._checkEagerLoadable();
-  const table = rel._modelClass.arelTable;
+  const table = rel._model.arelTable;
   // Rails `execute_grouped_calculation` (calculations.rb:515-522) keeps EVERY
   // group field, uniq'ing only when there is more than one. A belongs_to
   // reflection is attempted from a LONE field, which then expands to that
@@ -630,7 +630,7 @@ function qualifiedGroupFieldForModel(rel: CalculationRelation, field: unknown): 
   const dot = field.indexOf(".");
   if (dot === -1) return field;
   const [table, column] = [field.slice(0, dot), field.slice(dot + 1)];
-  return table === (rel._modelClass as { tableName?: string }).tableName ? column : null;
+  return table === (rel._model as { tableName?: string }).tableName ? column : null;
 }
 
 /**
@@ -664,7 +664,7 @@ async function groupedCompositeAssoc(
   column: string | Nodes.Node,
   coerceNumeric: boolean,
 ): Promise<Map<unknown, unknown>> {
-  const table = rel._modelClass.arelTable;
+  const table = rel._model.arelTable;
   const fkCols = association.foreignKey as string[];
   const aliases = fkCols.map((_, i) => `group_key_${i}`);
   const groupNodes = fkCols.map((c) => groupColumnToArel(c, table));
@@ -811,7 +811,7 @@ export async function performCount(
     if (eagerJoined() !== this) {
       const pk = this.model.primaryKey;
       if (!Array.isArray(pk)) {
-        const table = this._modelClass.arelTable;
+        const table = this._model.arelTable;
         if (this._limitValue !== null || this._offsetValue !== null) {
           // Rails finder_methods.rb apply_join_dependency: with a limit/offset on an
           // eager-loaded count, Rails does NOT nest the limit inside the count. It first
@@ -911,7 +911,7 @@ export async function performCount(
         // subquery (mirroring the non-eager composite path). The eager JD folds
         // through the shared `build_joins` port so one `AliasTracker` spans the
         // manual joins AND the eager JD.
-        const table = this._modelClass.arelTable;
+        const table = this._model.arelTable;
         if (column != null && column !== "*") {
           if (this._limitValue !== null || this._offsetValue !== null) {
             // Rails `apply_join_dependency` (finder_methods.rb:463-478) routes an
@@ -1030,7 +1030,7 @@ export async function performCount(
   // builder qualified the conditions with. `Table#project` seeds a SelectManager
   // FROM the table; a table ALIAS (Nodes.TableAlias) is a bare AST node without
   // that helper, so seed the manager directly via `new SelectManager(node)`.
-  const baseTable = this._modelClass.arelTable;
+  const baseTable = this._model.arelTable;
   const table = (this as unknown as { table?: typeof baseTable }).table ?? baseTable;
   const project = (...projections: unknown[]): SelectManager => {
     if (table instanceof Table) return table.project(...(projections as never[]));
@@ -1083,7 +1083,7 @@ export async function performCount(
     } else if (this._isDistinct) {
       // DISTINCT + count(*): project PK with DISTINCT to deduplicate rows.
       // Use table.get(c) so PK refs are qualified (unambiguous with joins).
-      const pk = (this._modelClass as any).primaryKey ?? "id";
+      const pk = (this._model as any).primaryKey ?? "id";
       if (Array.isArray(pk)) {
         innerManager = project(...pk.map((c: string) => innerTable.get(c)));
       } else {
@@ -1279,7 +1279,7 @@ function inQueryConnection<A extends unknown[], R>(
   fn: (this: CalculationRelation, ...args: A) => Promise<R>,
 ): (this: CalculationRelation, ...args: A) => Promise<R> {
   return function (this: CalculationRelation, ...args: A): Promise<R> {
-    const modelClass = (this as { _modelClass?: unknown })._modelClass as typeof Base;
+    const modelClass = (this as { _model?: unknown })._model as typeof Base;
     return withQueryConnection(modelClass, async () => {
       // Resolve any deferred distinct-PK subquery markers to a literal id list
       // before the calculation compiles its where clause, so count/sum/avg/min/
@@ -1355,7 +1355,7 @@ export function aggregateColumn(
   columnName: string | Nodes.Node,
 ): unknown {
   if (columnName instanceof Nodes.Node) return columnName;
-  const table = rel._modelClass.arelTable;
+  const table = rel._model.arelTable;
   if (columnName === "*" || columnName === "1") {
     return table.sql ? table.sql(columnName) : columnName;
   }
@@ -1364,7 +1364,7 @@ export function aggregateColumn(
   // through the join dependencies onto the joined table, and the primary key
   // falls back to the base table (our test models omit the implicit PK from
   // columns_hash). Anything else passes through as raw SQL.
-  const pk = rel._modelClass.primaryKey;
+  const pk = rel._model.primaryKey;
   const pks = Array.isArray(pk) ? pk : [pk];
   return arelColumn.call(rel as never, columnName, (field: string) =>
     pks.includes(field) ? table.get(field) : new Nodes.SqlLiteral(field),
@@ -1593,7 +1593,7 @@ function pluckCastType(
  * Returns null when the model has no such attribute.
  */
 function pluckCastTypeForKnownColumn(
-  model: CalculationRelation["_modelClass"],
+  model: CalculationRelation["_model"],
   name: string,
 ): ColumnType | null {
   if (!model._attributeDefinitions?.has(name)) return null;

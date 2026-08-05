@@ -61,6 +61,8 @@ const RESERVED = new Set([
   "public",
   "await",
 ]);
+/** Parameter name a Ruby `def x(...)` / `bar(...)` forwarding pair travels under. */
+export const FORWARDED_ARGS = "args";
 export function isJsIdentName(s: string): boolean {
   return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(s);
 }

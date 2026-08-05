@@ -358,7 +358,7 @@ export class Relation<T extends Base> {
    */
   static _railsClassName = "ActiveRecord::Relation";
 
-  private _modelClass: typeof Base;
+  private _model: typeof Base;
   /** @internal */
   _whereClause: WhereClause = WhereClause.empty();
   private _orderClauses: Array<string | Nodes.Node> = [];
@@ -503,7 +503,7 @@ export class Relation<T extends Base> {
   private _table: Table | null = null;
 
   constructor(
-    modelClass: typeof Base,
+    model: typeof Base,
     // Rails `Relation.create(model, table:)` stores any supplied table object as
     // `@table`, including an aliased table (`arel_table.alias(...)`). Accept the
     // Arel `TableAlias` node directly so callers don't need to cast; the build
@@ -512,7 +512,7 @@ export class Relation<T extends Base> {
     table?: Table | Nodes.TableAlias,
     predicateBuilder?: PredicateBuilder,
   ) {
-    this._modelClass = modelClass;
+    this._model = model;
     if (table) {
       this._table = table as Table;
     }
@@ -712,7 +712,7 @@ export class Relation<T extends Base> {
     options: Record<string, unknown>;
     associationPrimaryKey: string | string[];
   } {
-    const modelClass = this._modelClass as any;
+    const modelClass = this._model as any;
     const reflection = modelClass._reflectOnAssociation?.(assocName);
     if (!reflection) {
       throw argumentError(
@@ -1379,7 +1379,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#unscoped — delegates to klass.unscoped.
    */
   unscoped(): Relation<T> {
-    return this._modelClass.unscoped() as unknown as Relation<T>;
+    return this._model.unscoped() as unknown as Relation<T>;
   }
 
   // merge and spawn are mixed in from spawn-methods.ts
@@ -1739,7 +1739,7 @@ export class Relation<T extends Base> {
    * @internal
    */
   private _isAssociationName(name: string): boolean {
-    const modelClass = this._modelClass as any;
+    const modelClass = this._model as any;
     return (modelClass._associations ?? []).some((a: any) => a.name === name);
   }
 
@@ -1751,7 +1751,7 @@ export class Relation<T extends Base> {
    * table(s) plus the final target).
    */
   private _resolveAssociationJoin(name: string): JoinClauseSpec | JoinClauseSpec[] | null {
-    const modelClass = this._modelClass as any;
+    const modelClass = this._model as any;
     const associations: any[] = modelClass._associations ?? [];
     const assocDef = associations.find((a: any) => a.name === name);
     if (!assocDef) return null;
@@ -2184,12 +2184,12 @@ export class Relation<T extends Base> {
     // relation's `scope_for_create` (which may be empty, e.g. `unscoped`)
     // rather than the class-level default scope. Set current_scope across the
     // construction so the constructor's seeding honors the relation's scope.
-    const modelClass = this._modelClass as any;
+    const modelClass = this._model as any;
     const prev = ScopeRegistry.currentScope(modelClass);
     ScopeRegistry.setCurrentScope(modelClass, this as any);
     let record: T;
     try {
-      record = new this._modelClass(attrs) as T;
+      record = new this._model(attrs) as T;
     } finally {
       ScopeRegistry.setCurrentScope(modelClass, prev);
     }
@@ -2355,7 +2355,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#structurally_compatible?
    */
   structurallyCompatible(other: Relation<T>): boolean {
-    if (this._modelClass !== other._modelClass) return false;
+    if (this._model !== other._model) return false;
     return areStructurallyCompatible(this, other);
   }
 
@@ -2471,9 +2471,7 @@ export class Relation<T extends Base> {
   private async _toArrayInner(): Promise<T[]> {
     // Lazily reflect the schema before issuing the query so consumers
     // don't have to call loadSchema explicitly. Idempotent and cheap.
-    await (
-      this._modelClass as unknown as { ensureSchemaLoaded(): Promise<void> }
-    ).ensureSchemaLoaded();
+    await (this._model as unknown as { ensureSchemaLoaded(): Promise<void> }).ensureSchemaLoaded();
 
     // Rails materializes a `distinct_relation_for_primary_key` subquery value
     // (an eager-loading relation with limit/offset over a collection reflection)
@@ -2679,7 +2677,7 @@ export class Relation<T extends Base> {
         if (typeof leftName === "string") return [leftName.toLowerCase()];
         return this.tablesInString(v.toSql());
       }),
-      String((this._modelClass as unknown as { tableName?: string }).tableName ?? "").toLowerCase(),
+      String((this._model as unknown as { tableName?: string }).tableName ?? "").toLowerCase(),
     ]);
 
     return this._referencesValues.some((ref) => !joinedTables.has(ref.toLowerCase()));
@@ -2724,12 +2722,12 @@ export class Relation<T extends Base> {
    * @internal
    */
   private _buildEagerJoinDependency(specs: AssociationSpec[]): JoinDependency {
-    return new JoinDependency(this._modelClass, this.table, specs, Nodes.OuterJoin);
+    return new JoinDependency(this._model, this.table, specs, Nodes.OuterJoin);
   }
 
   private async _executeEagerLoad(eagerAssocs?: AssociationSpec[]): Promise<void> {
     const eagerAssociations = eagerAssocs ?? this._eagerLoadAssociations;
-    const basePk = (this._modelClass as any).primaryKey ?? "id";
+    const basePk = (this._model as any).primaryKey ?? "id";
     if (this._eagerLoadBypassesJoinDependency()) {
       const sql = this._toSql();
       const result = await this._conn().selectAll(sql, "Eager Load", this._lastSelectBinds, {
@@ -2780,7 +2778,7 @@ export class Relation<T extends Base> {
     // name — the STI base, not the queried subclass.
     const eagerPayload = {
       record_count: rows.length,
-      class_name: this._modelClass.baseClass.name,
+      class_name: this._model.baseClass.name,
     };
     const { parents, associations, parentKeys } = Notifications.instrument(
       "instantiation.active_record",
@@ -2794,7 +2792,7 @@ export class Relation<T extends Base> {
     );
 
     const inverseMap = new Map<string, string | undefined>();
-    const modelAssocs: any[] = (this._modelClass as any)._associations ?? [];
+    const modelAssocs: any[] = (this._model as any)._associations ?? [];
     for (const assoc of modelAssocs) {
       inverseMap.set(assoc.name, assoc.options?.inverseOf);
     }
@@ -3134,7 +3132,7 @@ export class Relation<T extends Base> {
    * @internal
    */
   private _eagerLoadBypassesJoinDependency(): boolean {
-    const basePk = (this._modelClass as any).primaryKey ?? "id";
+    const basePk = (this._model as any).primaryKey ?? "id";
     // A composite-PK base IS eager-JOINable: `JoinDependency.instantiateFromRows`
     // dedups parents by the composite key. The one composite-PK path trails can't
     // emit is the limited-ids subquery (`_materializeLimitedIds` /
@@ -3187,7 +3185,7 @@ export class Relation<T extends Base> {
       ...new Set([...this._eagerLoadAssociations, ...this._includesToPromoteFromReferences()]),
     ];
     if (specs.length === 0) return;
-    new JoinDependency(this._modelClass, this.table, specs, Nodes.OuterJoin);
+    new JoinDependency(this._model, this.table, specs, Nodes.OuterJoin);
   }
 
   /**
@@ -3304,7 +3302,7 @@ export class Relation<T extends Base> {
     // fails that test and stays in the stream for `select_named_joins`.
     const lastJoinsValue = this._joinsValues[this._joinsValues.length - 1];
     const stashedEagerLoad =
-      lastJoinsValue instanceof JoinDependency && lastJoinsValue.baseKlass === this._modelClass;
+      lastJoinsValue instanceof JoinDependency && lastJoinsValue.baseKlass === this._model;
     const hasStashed = stashedEagerLoad || leftStashed.length > 0;
     // query_methods.rb:1855-1862: only the LEADING run of Join nodes is routed by
     // `hasStashed`; a raw join BEHIND a named join falls through to
@@ -3566,7 +3564,7 @@ export class Relation<T extends Base> {
       rel._eagerLoadAssociations = [];
       rel._includesAssociations = [];
 
-      const basePk = (this._modelClass as any).primaryKey ?? "id";
+      const basePk = (this._model as any).primaryKey ?? "id";
       const jd = this._buildEagerJoinDependency(eagerSpecs);
 
       const hasLimitOrOffset = this._limitValue !== null || this._offsetValue !== null;
@@ -3599,9 +3597,7 @@ export class Relation<T extends Base> {
     // types are available — Rails' type_cast_pluck_values reads
     // model.attribute_types, which runs load_schema first. pluck issues a
     // raw query (no toArray()), so it must trigger the load itself.
-    await (
-      this._modelClass as unknown as { ensureSchemaLoaded(): Promise<void> }
-    ).ensureSchemaLoaded();
+    await (this._model as unknown as { ensureSchemaLoaded(): Promise<void> }).ensureSchemaLoaded();
 
     // Mirrors Rails' disallow_raw_sql! check on pluck arguments.
     // Uses the broader column_name_matcher (allows functions like UPPER(col))
@@ -3613,7 +3609,7 @@ export class Relation<T extends Base> {
 
     const table = this.table;
     // Rails columns_hash.key? — qualify a bare known column to the base table.
-    const knownColumns = new Set(this._modelClass.attributeNames());
+    const knownColumns = new Set(this._model.attributeNames());
     const isKnownColumn = (name: string): boolean => knownColumns.has(name);
     const projections = columns.map((c) => {
       if (c instanceof Nodes.SqlLiteral) {
@@ -3925,7 +3921,7 @@ export class Relation<T extends Base> {
     if (existing) return existing;
     // Same scope_for_create precedence as findOrCreateBy: scope attrs
     // first, createWith overrides, caller's conditions + extra win.
-    return new (this._modelClass as any)({
+    return new (this._model as any)({
       ...this.scopeForCreate(),
       ...conditions,
       ...extra,
@@ -3949,9 +3945,9 @@ export class Relation<T extends Base> {
     // before the retry; `.lock` + `find_by!` so the concurrent winner
     // is materialized + row-locked inside the caller's txn.
     try {
-      const result = await this._modelClass.transaction(
+      const result = await this._model.transaction(
         () =>
-          this._modelClass.create({
+          this._model.create({
             ...this.scopeForCreate(),
             ...conditions,
             ...extra,
@@ -3965,9 +3961,7 @@ export class Relation<T extends Base> {
         // failed to persist — which doesn't exist here, since the inner
         // create rolled back. Leave record undefined rather than passing
         // the Relation.
-        throw new RecordNotSaved(
-          `${this._modelClass.name}.createOrFindBy rolled back before persist`,
-        );
+        throw new RecordNotSaved(`${this._model.name}.createOrFindBy rolled back before persist`);
       }
       return result;
     } catch (e) {
@@ -4013,7 +4007,7 @@ export class Relation<T extends Base> {
   async firstOrInitialize(extra?: Record<string, unknown>): Promise<T> {
     const records = await this.limit(1);
     if (records.length > 0) return records[0];
-    return new (this._modelClass as any)({ ...this.scopeForCreate(), ...extra }) as T;
+    return new (this._model as any)({ ...this.scopeForCreate(), ...extra }) as T;
   }
 
   /**
@@ -4836,7 +4830,7 @@ export class Relation<T extends Base> {
    * @internal
    */
   _buildDeferredDistinctPkInlineSubquery(): SelectManager {
-    const basePk = (this._modelClass as any).primaryKey ?? "id";
+    const basePk = (this._model as any).primaryKey ?? "id";
     const jd = this._buildEagerJoinDependency(this._deferredDistinctPkEagerSpecs());
     return this._buildEagerIdSubquery(jd, basePk);
   }
@@ -4849,7 +4843,7 @@ export class Relation<T extends Base> {
    * @internal
    */
   async _materializeDistinctPkIds(): Promise<unknown[]> {
-    const basePk = (this._modelClass as any).primaryKey ?? "id";
+    const basePk = (this._model as any).primaryKey ?? "id";
     const jd = this._buildEagerJoinDependency(this._deferredDistinctPkEagerSpecs());
     if (jd.nodes.length === 0) return [];
     return this._withQueryConnection(() => this._materializeLimitedIds(jd, basePk));
@@ -5003,10 +4997,10 @@ export class Relation<T extends Base> {
     columnTypes?: Record<string, { deserialize(value: unknown): unknown }>,
   ): T[] {
     if (rows.length === 0) return [];
-    const payload = { record_count: rows.length, class_name: this._modelClass.name };
+    const payload = { record_count: rows.length, class_name: this._model.name };
     const block = this._instantiateBlock;
     return Notifications.instrument("instantiation.active_record", payload, () =>
-      rows.map((row) => this._modelClass._instantiate(row, block as never, columnTypes) as T),
+      rows.map((row) => this._model._instantiate(row, block as never, columnTypes) as T),
     );
   }
 
@@ -5240,7 +5234,7 @@ export class Relation<T extends Base> {
     ];
     if (allEager.length === 0) return null;
 
-    const basePk = (this._modelClass as any).primaryKey ?? "id";
+    const basePk = (this._model as any).primaryKey ?? "id";
 
     const jd = this._buildEagerJoinDependency(allEager);
     if (jd.nodes.length === 0) return null;
@@ -5326,7 +5320,7 @@ export class Relation<T extends Base> {
 
   /** Run an internal read query inside `with_connection`; see {@link withQueryConnection}. */
   private _withQueryConnection<R>(run: () => Promise<R>): Promise<R> {
-    return withQueryConnection(this._modelClass as unknown as typeof Base, run);
+    return withQueryConnection(this._model as unknown as typeof Base, run);
   }
 
   /**
@@ -5341,7 +5335,7 @@ export class Relation<T extends Base> {
    * @internal
    */
   private _conn(): DatabaseAdapter {
-    return threadedConnectionFor(this._modelClass) ?? this._modelClass.connection;
+    return threadedConnectionFor(this._model) ?? this._model.connection;
   }
 
   /** Resolve the connection through {@link _conn}, returning null for HABTM join models with no established connection. */
@@ -5596,8 +5590,8 @@ export class Relation<T extends Base> {
   // may not yet contain `id` (before schema reflection), but it must still be
   // table-qualified to avoid ambiguous-column errors on joined relations.
   private _isKnownColumn(col: string): boolean {
-    if (this._modelClass._attributeDefinitions.has(col)) return true;
-    const pk = this._modelClass.primaryKey;
+    if (this._model._attributeDefinitions.has(col)) return true;
+    const pk = this._model.primaryKey;
     return Array.isArray(pk) ? pk.includes(col) : pk === col;
   }
 
@@ -5922,7 +5916,7 @@ export class Relation<T extends Base> {
       // `updates[attr.name] = _increment_attribute(attr, value)` (relation.rb:930).
       // resolveAliasedColumn bridges a counter cache on an aliased column to the
       // real column (Rails resolves it inside Arel::Table#[]).
-      const attr = this.table.get(resolveAliasedColumn(this._modelClass, counterName));
+      const attr = this.table.get(resolveAliasedColumn(this._model, counterName));
       updates[attr.name] = this._incrementAttribute(attr, value);
     }
 
@@ -6038,7 +6032,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#table
    */
   get table(): Table {
-    return this._table ?? this._modelClass.arelTable;
+    return this._table ?? this._model.arelTable;
   }
 
   /**
@@ -6047,14 +6041,14 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#model
    */
   get model(): typeof Base {
-    return this._modelClass;
+    return this._model;
   }
 
   /**
    * Alias for {@link model} — mirrors `alias :klass :model` (relation.rb:73).
    */
   get klass(): typeof Base {
-    return this._modelClass;
+    return this._model;
   }
 
   /**
@@ -6280,7 +6274,7 @@ export class Relation<T extends Base> {
    *  @internal */
   private _whereMatchesUnscopedBaseline(): boolean {
     if (this._whereClause.isEmpty()) return true;
-    const klass = this._modelClass as any;
+    const klass = this._model as any;
     // Only a finder-type-condition class has a non-empty unscoped baseline; for
     // anything else a non-empty WHERE means a real, non-empty scope.
     if (!klass.isFinderNeedsTypeCondition?.()) return false;
@@ -6561,7 +6555,7 @@ export class Relation<T extends Base> {
         rel._eagerLoadAssociations = [];
         rel._includesAssociations = [];
         const hasLimitOrOffset = this._limitValue !== null || (this._offsetValue ?? 0) > 0;
-        const pk = (this._modelClass as { primaryKey?: string | string[] }).primaryKey ?? "id";
+        const pk = (this._model as { primaryKey?: string | string[] }).primaryKey ?? "id";
         const jd = this._buildEagerJoinDependency(eagerSpecs);
         if (
           hasLimitOrOffset &&
@@ -6708,8 +6702,8 @@ export class Relation<T extends Base> {
     // so cloned relations keep the prototype that carries generated relation
     // methods — otherwise `.where(...).someClassMethod()` would spawn a bare
     // shared `Relation` and lose the real-method resolution.
-    const ctor = relationClassFor(this._modelClass as unknown as typeof Base);
-    return new ctor(this._modelClass) as Relation<T>;
+    const ctor = relationClassFor(this._model as unknown as typeof Base);
+    return new ctor(this._model) as Relation<T>;
   }
 
   /**

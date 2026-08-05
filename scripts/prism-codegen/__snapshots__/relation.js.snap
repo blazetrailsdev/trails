@@ -152,36 +152,6 @@ export class Relation {
             return !this.isExists();
         }
     }
-    isNone(...args, block) {
-        if (this.none) {
-            return true;
-        }
-        if (args.isPresent() || block !== undefined) {
-            return super(...arguments);
-        }
-        return this.isEmpty;
-    }
-    isAny(...args, block) {
-        if (this.none) {
-            return false;
-        }
-        if (args.isPresent() || block !== undefined) {
-            return super(...arguments);
-        }
-        return !this.isEmpty;
-    }
-    isOne(...args, block) {
-        if (this.none) {
-            return false;
-        }
-        if (args.isPresent() || block !== undefined) {
-            return super(...arguments);
-        }
-        if (this.isLoaded) {
-            return this.records.isOne();
-        }
-        return this.limitedCount() === 1;
-    }
     isMany(block) {
         if (this.none) {
             return false;
@@ -282,6 +252,17 @@ export class Relation {
             return this._scoping(this, registry, all_queries, block);
         }
     }
+    _execScope(...args) {
+        let registry;
+        try {
+            this.delegate_to_model = true;
+            registry = this.model.scopeRegistry();
+            return this._scoping(null, registry, () => this.instanceExec(...args) || this);
+        }
+        finally {
+            this.delegate_to_model = false;
+        }
+    }
     updateAll(updates) {
         let attr, values, arel, group_values_arel_columns, having_clause_ast, key, stmt;
         if (updates.isBlank()) {
@@ -366,9 +347,6 @@ export class Relation {
             }
         }
         return await this.updateAll(updates);
-    }
-    async touchAll(...names, { time = null } = {}) {
-        return await this.updateAll(this.model.touchAttributesWithTime(...names, { time: time }));
     }
     destroyAll() {
         return this.records.forEach(x => x.destroy()).tap(() => this.reset());

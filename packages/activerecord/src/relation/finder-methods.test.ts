@@ -350,7 +350,7 @@ function makeFindSomeRel(
   opts: { limit?: number; offset?: number; ordered?: boolean } = {},
 ): any {
   return {
-    _modelClass: postModelStub,
+    _model: postModelStub,
     model: postModelStub,
     table: postModelStub.arelTable,
     primaryKey: postModelStub.primaryKey,
@@ -406,7 +406,7 @@ describe("findSome — narrows to pk column when select_values non-empty (ordere
   it("calls .select(pk) when the relation has select values", async () => {
     let selectedCol: string | undefined;
     const rel: any = {
-      _modelClass: postModelStub,
+      _model: postModelStub,
       model: postModelStub,
       table: postModelStub.arelTable,
       primaryKey: postModelStub.primaryKey,
@@ -454,7 +454,7 @@ function makeFindSomeOrderedRel(
   opts: { limit?: number; offset?: number } = {},
 ): any {
   return {
-    _modelClass: postModelStub,
+    _model: postModelStub,
     model: postModelStub,
     table: postModelStub.arelTable,
     primaryKey: postModelStub.primaryKey,
@@ -592,7 +592,7 @@ function makeRelForOrder(mc: {
   implicitOrderColumn?: string | null;
   _queryConstraintsList?: string[] | null;
 }): any {
-  return { _modelClass: mc, model: mc, primaryKey: mc.primaryKey };
+  return { _model: mc, model: mc, primaryKey: mc.primaryKey };
 }
 
 describe("_orderColumns — Rails _order_columns precedence", () => {
@@ -635,7 +635,7 @@ describe("_orderColumns — Rails _order_columns precedence", () => {
 describe("finder not-found message fidelity", () => {
   it("test_find_one_message_on_primary_key", async () => {
     const rel: any = {
-      _modelClass: carModelStub,
+      _model: carModelStub,
       model: carModelStub,
       primaryKey: carModelStub.primaryKey,
       raiseRecordNotFoundExceptionBang,
@@ -657,7 +657,7 @@ describe("finder not-found message fidelity", () => {
 
   it("test_find_some_message_with_custom_primary_key", async () => {
     const rel: any = {
-      _modelClass: mercedesModelStub,
+      _model: mercedesModelStub,
       model: mercedesModelStub,
       primaryKey: mercedesModelStub.primaryKey,
       _limitValue: null,

@@ -122,17 +122,7 @@ export function referencesBang(...table_names) {
     this.referencesValues = union(this.referencesValues, table_names);
     return this;
 }
-export function select(...fields, block) {
-    if (block !== undefined) {
-        if (fields.isAny()) {
-            throw new ArgumentError("`select' with block doesn't take arguments.");
-        }
-        return __PRISM_SUPER_OUTSIDE_CORPUS("QueryMethods#select");
-    }
-    this.checkIfMethodHasArgumentsBang(this.__callee__, fields, "Call `select' with at least one field.");
-    fields = this.processSelectArgs(fields);
-    return this.spawn._selectBang(...fields);
-}
+__PRISM_TODO("DefNode");
 export function _selectBang(...fields) {
     this.selectValues = union(this.selectValues, fields);
     return this;
@@ -441,25 +431,8 @@ export function distinctBang(value = true) {
     this.distinctValue = value;
     return this;
 }
-export function extending(...modules, block) {
-    if (modules.isAny() || block) {
-        return this.spawn.extendingBang(...modules, block);
-    }
-    else {
-        return this;
-    }
-}
-export function extendingBang(...modules, block) {
-    if (block) {
-        modules.push(new Module());
-    }
-    modules.flattenBang();
-    this.extendingValues += modules;
-    if (this.extendingValues.isAny()) {
-        this.extend(...this.extendingValues);
-    }
-    return this;
-}
+__PRISM_TODO("DefNode");
+__PRISM_TODO("DefNode");
 export function optimizerHints(...args) {
     this.checkIfMethodHasArgumentsBang(this.__callee__, args);
     return this.spawn.optimizerHintsBang(...args);

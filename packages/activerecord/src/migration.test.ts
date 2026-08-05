@@ -178,18 +178,6 @@ function internalMetadataExistsSql(kind: typeof adapterType): string {
   return byAdapter[kind];
 }
 
-/** Build a minimal mock adapter that participates in advisory lock negotiation. */
-function makeLockAdapter(opts: { acquires?: boolean; releases?: boolean } = {}): DatabaseAdapter {
-  const { acquires = true, releases = true } = opts;
-  return {
-    adapterName: "sqlite" as const,
-    supportsAdvisoryLocks: () => true,
-    getAdvisoryLock: async (_id: number | bigint | string) => acquires,
-    releaseAdvisoryLock: async (_id: number | bigint | string) => releases,
-    currentDatabase: async () => "test_db",
-  } as unknown as DatabaseAdapter;
-}
-
 // ==========================================================================
 // MigrationTest
 // ==========================================================================
@@ -1415,9 +1403,14 @@ describe("MigrationTest", () => {
           async () => {},
         ),
     };
-    const lockAdapter = makeLockAdapter({ acquires: false });
-    const migrator = new Migrator(lockAdapter, [proxy]);
-    await expect(migrator.migrate()).rejects.toThrow(ConcurrentMigrationError);
+    const adapter = Base.connection;
+    const getSpy = vi.spyOn(adapter as any, "getAdvisoryLock").mockResolvedValue(false);
+    try {
+      const migrator = new Migrator(adapter, [proxy]);
+      await expect(migrator.migrate()).rejects.toThrow(ConcurrentMigrationError);
+    } finally {
+      getSpy.mockRestore();
+    }
     expect(ran).toEqual([]);
   });
 
@@ -1436,9 +1429,14 @@ describe("MigrationTest", () => {
           async () => {},
         ),
     };
-    const lockAdapter = makeLockAdapter({ acquires: false });
-    const migrator = new Migrator(lockAdapter, [proxy]);
-    await expect(migrator.run("up", 100)).rejects.toThrow(ConcurrentMigrationError);
+    const adapter = Base.connection;
+    const getSpy = vi.spyOn(adapter as any, "getAdvisoryLock").mockResolvedValue(false);
+    try {
+      const migrator = new Migrator(adapter, [proxy]);
+      await expect(migrator.run("up", 100)).rejects.toThrow(ConcurrentMigrationError);
+    } finally {
+      getSpy.mockRestore();
+    }
     expect(ran).toEqual([]);
   });
 
