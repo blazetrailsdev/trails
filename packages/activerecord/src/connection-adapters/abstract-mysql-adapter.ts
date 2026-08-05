@@ -395,12 +395,14 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    * adapter and reaches it from the abstract class by duck typing; TS needs a
    * declared member, so the single definition lives here. Sync like Rails,
    * because `database_version` is the memo `configureConnection` warms.
+   *
+   * Deviation: `Version#fullVersionString` is nullable in trails — a Version
+   * built from a bare numeric string carries none — where Rails always sets it
+   * from `get_full_version`, so the `?? ""` stands in for a field Rails cannot
+   * observe as nil.
    * @internal
    */
   fullVersion(): string {
-    // `Version#fullVersionString` is nullable in trails (a hand-built Version
-    // carries only the numeric string), where Rails always sets it from
-    // get_full_version.
     return this.databaseVersion.fullVersionString ?? "";
   }
 
