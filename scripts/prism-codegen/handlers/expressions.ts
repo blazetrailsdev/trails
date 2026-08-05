@@ -167,22 +167,16 @@ function emitCall(n: PrismNode, e: Emitter): ts.Expression | null {
   const hasRecv = n.receiver != null;
   const block = n.block as PrismNode | undefined;
 
-  if (name === "[]" && hasRecv) {
-    if (argNodes.length === 0) return null;
-    if (argNodes.length === 1) {
-      return f.createElementAccessExpression(e.expr(n.receiver as PrismNode), e.expr(argNodes[0]));
-    }
-    return helperCall("idxGet", [n.receiver as PrismNode, ...argNodes], e);
+  if (name === "[]" && hasRecv && argNodes.length > 0) {
+    if (argNodes.length > 1) return helperCall("idxGet", [n.receiver as PrismNode, ...argNodes], e);
+    return f.createElementAccessExpression(e.expr(n.receiver as PrismNode), e.expr(argNodes[0]));
   }
-  if (name === "[]=" && hasRecv) {
-    if (argNodes.length < 2) return null;
-    if (argNodes.length === 2) {
-      return f.createAssignment(
-        f.createElementAccessExpression(e.expr(n.receiver as PrismNode), e.expr(argNodes[0])),
-        e.expr(argNodes[1]),
-      );
-    }
-    return helperCall("idxSet", [n.receiver as PrismNode, ...argNodes], e);
+  if (name === "[]=" && hasRecv && argNodes.length > 1) {
+    if (argNodes.length > 2) return helperCall("idxSet", [n.receiver as PrismNode, ...argNodes], e);
+    return f.createAssignment(
+      f.createElementAccessExpression(e.expr(n.receiver as PrismNode), e.expr(argNodes[0])),
+      e.expr(argNodes[1]),
+    );
   }
   if (name === "!" && hasRecv) return f.createLogicalNot(e.expr(n.receiver as PrismNode));
   if (name === "-@" && hasRecv) {
