@@ -333,9 +333,9 @@ describe("Date", () => {
   });
 
   it("skips rt_rewrite_frags and rt_complete_frags for a civil date, as d_new_by_frags does", () => {
-    expect(ymd(dNewByFrags({ year: 2008, mon: 7, mday: 2, seconds: 1000000000 }, RubyDate.ITALY))).toBe(
-      "2008-07-02",
-    );
+    expect(
+      ymd(dNewByFrags({ year: 2008, mon: 7, mday: 2, seconds: 1000000000 }, RubyDate.ITALY)),
+    ).toBe("2008-07-02");
   });
 
   it("negates the year of a BC date, as parse_bc does", () => {
