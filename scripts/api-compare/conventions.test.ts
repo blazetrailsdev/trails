@@ -82,6 +82,28 @@ describe("snakeToCamel", () => {
     expect(snakeToCamel("rb_handler")).toBe("jsHandler");
   });
 
+  it("renames an `ERB` token that ends at a CamelCase boundary, not just `_`", () => {
+    // Ruby class names arrive as one unsplit segment (`ERBUtilTest`), so a
+    // rename that only ended at `_` or end-of-name left them spelled `ERB`
+    // while `erb_util` became `tseUtil`. The token ends at the next capital
+    // too, so a constant fragment carries the rename.
+    expect(snakeToCamel("ERBUtilTest")).toBe("TSEUtilTest");
+    expect(snakeToCamel("ErbTracker")).toBe("TseTracker");
+    expect(snakeToCamel("erbHandler")).toBe("tseHandler");
+    expect(snakeToCamel("visit_ERBUtil")).toBe("visitTSEUtil");
+  });
+
+  it("does NOT rename a CamelCase word that merely starts with `erb`", () => {
+    // The `[A-Z]` lookahead widened where a token may END; it did not widen
+    // where one may START. `Herbert` fails on the `H` before `erb`, and
+    // `VerbMatcher` on the `V` — both would be renamed by a bare substring
+    // rule.
+    expect(snakeToCamel("Herbert")).toBe("Herbert");
+    expect(snakeToCamel("VerbMatcher")).toBe("VerbMatcher");
+    expect(snakeToCamel("http_VerbList")).toBe("httpVerbList");
+    expect(snakeToCamel("SuperbThing")).toBe("SuperbThing");
+  });
+
   it("does NOT rename `erb` when it appears as a substring of another token", () => {
     // Guard: only standalone snake-case segments should be substituted,
     // not embedded substrings like `verb`, `verbatim`, `superb`, `reverb`.
