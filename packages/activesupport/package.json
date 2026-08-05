@@ -30,6 +30,10 @@
       "types": "./dist/digest.d.ts",
       "default": "./dist/digest.js"
     },
+    "./secure-compare-rotator": {
+      "types": "./dist/secure-compare-rotator.d.ts",
+      "default": "./dist/secure-compare-rotator.js"
+    },
     "./security-utils": {
       "types": "./dist/security-utils.d.ts",
       "default": "./dist/security-utils.js"

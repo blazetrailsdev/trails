@@ -2212,12 +2212,8 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     expression: string,
     options: { name?: string; validate?: boolean } = {},
   ): Promise<void> {
-    if (options.validate === false) {
-      throw new Error("validate: false is only supported on PostgreSQL");
-    }
-    const { name } = options;
     await this.alterTable(tableName, undefined, undefined, undefined, (definition) => {
-      definition.checkConstraint(expression, { name });
+      definition.checkConstraint(expression, options);
     });
   }
 
