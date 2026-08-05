@@ -1737,27 +1737,17 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   /**
-   * Mirrors: Mysql2Adapter#get_full_version (mysql2_adapter.rb:168-170) —
-   * `any_raw_connection.server_info[:version]`. No memo: `database_version` is
-   * the only memo in the Rails chain.
+   * Mirrors: Mysql2Adapter#get_full_version (mysql2_adapter.rb:168-170). No
+   * memo and no side effects: `database_version` is the only memo in the Rails
+   * chain. Rails reads `any_raw_connection.server_info[:version]`; node-mysql2
+   * exposes no `server_info`, so the banner comes from `SELECT VERSION()` —
+   * the same string the server reports there.
    * @internal
    */
   async getFullVersion(): Promise<string> {
     const conn = await this.getConn();
     const [[row]] = (await conn.query("SELECT VERSION() AS v")) as [Array<{ v: string }>, unknown];
     return row?.v ?? "0.0.0";
-  }
-
-  /**
-   * Mirrors: Mysql2Adapter#full_version (mysql2_adapter.rb:164-166) —
-   * `database_version.full_version_string`. Rails' reader is sync because
-   * `database_version` is memoized by `configure_connection`; here the fetch is
-   * awaited, and the banner comes off the `Version` rather than a second field.
-   * @internal
-   */
-  async fullVersion(): Promise<string> {
-    const databaseVersion = await this.getDatabaseVersion();
-    return databaseVersion.fullVersionString ?? "0.0.0";
   }
 
   /** @internal */

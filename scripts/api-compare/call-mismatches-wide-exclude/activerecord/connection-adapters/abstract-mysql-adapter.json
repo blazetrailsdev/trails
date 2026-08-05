@@ -151,7 +151,7 @@
     "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
     "rubyName": "mariadb?",
     "call": "match?",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails abstract_mysql_adapter.rb:92-94 runs `/mariadb/i.match?(full_version)` live; trails isMariadb (abstract-mysql-adapter.ts:422-424) returns the `_mariadb` flag computed once at connect by the same regex (mysql2-adapter.ts:1864)."
+    "reason": "Per-entry verified: Rails abstract_mysql_adapter.rb:92-94 runs `/mariadb/i.match?(full_version)`; trails isMariadb runs the same regex over the same `fullVersion()` reader, spelled `RegExp#test` because TS has no `Regexp#match?`."
   },
   {
     "package": "activerecord",

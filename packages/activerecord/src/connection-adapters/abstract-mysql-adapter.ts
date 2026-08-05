@@ -379,13 +379,23 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   /**
+   * Mirrors: Mysql2Adapter#full_version (mysql2_adapter.rb:164-166) —
+   * `database_version.full_version_string`. Rails defines this per concrete
+   * adapter and reaches it from the abstract class by duck typing; TS needs a
+   * declared member, so the single definition lives here. Sync like Rails,
+   * because `database_version` is the memo `configureConnection` warms.
+   * @internal
+   */
+  fullVersion(): string {
+    return this._databaseVersion?.fullVersionString ?? "";
+  }
+
+  /**
    * Mirrors: AbstractMysqlAdapter#mariadb? (abstract_mysql_adapter.rb:92-94) —
-   * `/mariadb/i.match?(full_version)`. Rails' `full_version` reads
-   * `database_version.full_version_string`, memoized by `configure_connection`;
-   * we read the same memo synchronously off `_databaseVersion`.
+   * `/mariadb/i.match?(full_version)`.
    */
   isMariadb(): boolean {
-    return /mariadb/i.test(this._databaseVersion?.fullVersionString ?? "");
+    return /mariadb/i.test(this.fullVersion());
   }
 
   /**
@@ -1725,12 +1735,11 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   /**
-   * Parse the server version from the full version string and return it.
-   * Caches the result in `_databaseVersion` so the sync `databaseVersion` getter
-   * works after this method has been awaited once.
-   *
-   * Mirrors: AbstractMysqlAdapter#get_database_version — calls get_full_version,
-   * strips MariaDB prefix via version_string, returns Version.
+   * Mirrors: AbstractMysqlAdapter#get_database_version
+   * (abstract_mysql_adapter.rb:86-90). The leading memo guard stands in for
+   * Rails' `AbstractAdapter#database_version` (`pool.server_version(self)`),
+   * which trails' pool does not cache — without it every `databaseVersion` read
+   * would re-query. It also backs the sync `databaseVersion` getter.
    */
   override async getDatabaseVersion(): Promise<Version> {
     if (this._databaseVersion) return this._databaseVersion;
