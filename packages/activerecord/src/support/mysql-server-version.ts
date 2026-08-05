@@ -41,7 +41,7 @@ export const mysqlVersion = mysqlVersionStr;
 // AbstractMysqlAdapter#version_string does (strips the MariaDB 5.5.5- prefix).
 function parseMysqlVersion(full: string): Version | null {
   const m = full.match(/^(?:5\.5\.5-)?(\d+\.\d+\.\d+)/);
-  return m ? new Version(m[1]) : null;
+  return m ? new Version(m[1], full) : null;
 }
 const _serverVersion = parseMysqlVersion(mysqlVersionStr);
 

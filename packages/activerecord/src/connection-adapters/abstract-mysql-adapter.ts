@@ -382,15 +382,10 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    * adapter and reaches it from the abstract class by duck typing; TS needs a
    * declared member, so the single definition lives here. Sync like Rails,
    * because `database_version` is the memo `configureConnection` warms.
-   *
-   * Deviation: `Version#fullVersionString` is nullable in trails — a Version
-   * built from a bare numeric string carries none — where Rails always sets it
-   * from `get_full_version`, so the `?? ""` stands in for a field Rails cannot
-   * observe as nil.
    * @internal
    */
-  fullVersion(): string {
-    return this.databaseVersion.fullVersionString ?? "";
+  fullVersion(): string | null {
+    return this.databaseVersion.fullVersionString;
   }
 
   /**
@@ -398,7 +393,10 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    * `/mariadb/i.match?(full_version)`.
    */
   isMariadb(): boolean {
-    return /mariadb/i.test(this.fullVersion());
+    // Ruby's `Regexp#match?` accepts nil and answers false; `RegExp#test`
+    // stringifies null to "null", so the nil arm is spelled out.
+    const fullVersion = this.fullVersion();
+    return fullVersion != null && /mariadb/i.test(fullVersion);
   }
 
   /**

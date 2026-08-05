@@ -1782,6 +1782,15 @@ const monthtab: readonly (readonly number[])[] = [
   [0, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31],
 ];
 
+/**
+ * @internal `date_core.c` `yeartab` (`date_core.c:1805-1808`), the number of
+ * days before each month indexed by leapness then month.
+ */
+const yeartab: readonly (readonly number[])[] = [
+  [0, 0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334],
+  [0, 0, 31, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335],
+];
+
 /** @internal `date_core.c`'s `DIV` macro (`date_core.c:168-170`), floored division. */
 function div(n: number, d: number): number {
   return Math.floor(n / d);
@@ -1861,6 +1870,11 @@ function cFindFdoy(y: number, sg: number): [rjd: number, ns: number] | null {
   return null;
 }
 
+/** @internal `date_core.c` `c_julian_leap_p` (`date_core.c:702-706`). */
+function cJulianLeapP(y: number): boolean {
+  return mod(y, 4) === 0;
+}
+
 /** @internal `date_core.c` `c_gregorian_leap_p` (`date_core.c:708-712`). */
 function cGregorianLeapP(y: number): boolean {
   return (mod(y, 4) === 0 && y % 100 !== 0) || mod(y, 400) === 0;
@@ -1869,6 +1883,16 @@ function cGregorianLeapP(y: number): boolean {
 /** @internal `date_core.c` `c_gregorian_last_day_of_month` (`date_core.c:721-726`). */
 function cGregorianLastDayOfMonth(y: number, m: number): number {
   return monthtab[cGregorianLeapP(y) ? 1 : 0][m];
+}
+
+/** @internal `date_core.c` `c_julian_to_yday` (`date_core.c:1810-1815`). */
+function cJulianToYday(y: number, m: number, d: number): number {
+  return yeartab[cJulianLeapP(y) ? 1 : 0][m] + d;
+}
+
+/** @internal `date_core.c` `c_gregorian_to_yday` (`date_core.c:1817-1822`). */
+function cGregorianToYday(y: number, m: number, d: number): number {
+  return yeartab[cGregorianLeapP(y) ? 1 : 0][m] + d;
 }
 
 /**
@@ -2423,6 +2447,20 @@ export class Date {
     return this.#jd;
   }
 
+  /** @internal ruby/date's `m_proleptic_julian_p` (`date_core.c:1710-1719`). */
+  #mProlepticJulianP(): boolean {
+    const sg = this.#sg;
+    if (!Number.isFinite(sg) && sg > 0) return true;
+    return false;
+  }
+
+  /** @internal ruby/date's `m_proleptic_gregorian_p` (`date_core.c:1721-1730`). */
+  #mProlepticGregorianP(): boolean {
+    const sg = this.#sg;
+    if (!Number.isFinite(sg) && sg < 0) return true;
+    return false;
+  }
+
   /** @internal ruby/date's `m_year` (`date_core.c:1732-1743`). */
   #mYear(): number {
     this.#getSCivil();
@@ -2439,6 +2477,23 @@ export class Date {
   #mMday(): number {
     this.#getSCivil();
     return this.#mday;
+  }
+
+  /**
+   * @internal ruby/date's `m_yday` (`date_core.c:1824-1839`). The two leading
+   * arms read the day of the year off the civil fields, so only the reform
+   * window falls through to `c_jd_to_ordinal`. `sg` is `m_virtual_sg`, which
+   * for a `SimpleDateData` with `nth == 0` — the only kind this port builds —
+   * is `m_sg`, i.e. `#sg` (`date_core.c:1119-1141`).
+   */
+  #mYday(): number {
+    const jd = this.#mJd();
+    const sg = this.#sg;
+
+    if (this.#mProlepticGregorianP() || jd - sg > 366)
+      return cGregorianToYday(this.#mYear(), this.#mMon(), this.#mMday());
+    if (this.#mProlepticJulianP()) return cJulianToYday(this.#mYear(), this.#mMon(), this.#mMday());
+    return cJdToOrdinal(jd, sg)![1];
   }
 
   /**
@@ -2588,7 +2643,7 @@ export class Date {
   }
 
   get yday(): number {
-    return cJdToOrdinal(this.#mJd(), this.#sg)![1];
+    return this.#mYday();
   }
 
   /**

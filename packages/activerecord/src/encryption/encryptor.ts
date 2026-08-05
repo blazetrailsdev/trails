@@ -5,12 +5,11 @@
  */
 
 import { Message } from "./message.js";
-import type { Cipher } from "./cipher.js";
 import type { Properties } from "./properties.js";
 import type { MessageSerializerLike } from "./message-serializer.js";
-import { getEncryptionContext } from "./context.js";
 import { Base, Configuration, Decryption, Encoding, ForbiddenClass } from "./errors.js";
-import { getSharedConfig, type Compressor } from "./config.js";
+import { type Compressor } from "./config.js";
+import { _Configurable } from "./configurable-slot.js";
 import { normalizeEncoding, replaceUnencodable } from "./encoding-helpers.js";
 
 // Mirrors: ActiveRecord::Encryption::Encryptor::THRESHOLD_TO_JUSTIFY_COMPRESSION
@@ -120,7 +119,8 @@ export class Encryptor {
 
   constructor(options?: { compress?: boolean; compressor?: Compressor }) {
     this._compress = options?.compress ?? true;
-    this._compressor = options?.compressor ?? getSharedConfig().compressor;
+    const Configurable = _Configurable!;
+    this._compressor = options?.compressor ?? Configurable.config.compressor;
   }
 
   encrypt(
@@ -214,7 +214,8 @@ export class Encryptor {
 
   /** @internal */
   private cipher() {
-    return getEncryptionContext().cipher as Cipher;
+    const Configurable = _Configurable!;
+    return Configurable.cipher;
   }
 
   get compressor(): Compressor {
@@ -227,7 +228,8 @@ export class Encryptor {
 
   /** @internal */
   private defaultKeyProvider(): KeyProviderLike | undefined {
-    return getEncryptionContext().keyProvider as KeyProviderLike | undefined;
+    const Configurable = _Configurable!;
+    return Configurable.keyProvider as KeyProviderLike | undefined;
   }
 
   /** @internal */
@@ -259,7 +261,8 @@ export class Encryptor {
 
   /** @internal */
   private serializer(): MessageSerializerLike {
-    return getEncryptionContext().messageSerializer as MessageSerializerLike;
+    const Configurable = _Configurable!;
+    return Configurable.messageSerializer as MessageSerializerLike;
   }
 
   /** @internal */
@@ -326,6 +329,7 @@ export class Encryptor {
 
   /** @internal */
   private forcedEncodingForDeterministicEncryption(): string {
-    return getSharedConfig().forcedEncodingForDeterministicEncryption;
+    const Configurable = _Configurable!;
+    return Configurable.config.forcedEncodingForDeterministicEncryption;
   }
 }
