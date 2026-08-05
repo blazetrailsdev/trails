@@ -115,9 +115,8 @@ async function fetchSource(
   console.log(`[${source.name}] cloning ${source.origin.url}@${source.origin.ref}...`);
   mkdirSync(VENDOR_DIR, { recursive: true });
   if (SHA_REF.test(source.origin.ref)) {
-    // A bare commit SHA is not a ref `git clone --branch` accepts. Sources with
-    // no version tags (ruby/spec) are pinned by SHA instead, which needs the
-    // init/fetch form.
+    // A bare commit SHA is not a ref `git clone --branch` accepts; sources with
+    // no version tags (ruby/spec) need the init/fetch form.
     mkdirSync(dest, { recursive: true });
     await git(["init", "--quiet"], dest);
     await git(["remote", "add", "origin", source.origin.url], dest);

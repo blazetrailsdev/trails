@@ -2592,11 +2592,10 @@ export class DateTime extends Date {
   readonly #sec: number;
 
   /**
-   * Ruby `DateTime.new(y = -4712, m = 1, d = 1, h = 0, min = 0, s = 0, offset = 0,
-   * start = Date::ITALY)` (ruby/date, `date_core.c` `datetime_s_new`). `offset`
-   * is the one argument the port omits: `DateTime#zone` is fixed at `"+00:00"`
-   * here, so there is no offset to carry, and `start` takes its place at the
-   * end rather than being spelled at position 8 with a hole in front of it.
+   * Ruby `DateTime.new(y, m, d, h = 0, min = 0, s = 0, offset = 0, start =
+   * Date::ITALY)` (ruby/date, `date_core.c` `datetime_s_new`). `offset` is the
+   * one argument omitted — `DateTime#zone` is fixed at `"+00:00"` — so `start`
+   * takes its place rather than trailing a hole.
    */
   constructor(
     year: number,
@@ -2631,15 +2630,12 @@ export class DateTime extends Date {
   }
 
   /**
-   * Ruby inherits `new_start` from `Date`; `dup_obj_with_new_start`
-   * (ruby/date, `date_core.c:5802-5812`) dups the *receiver* and rewrites its
-   * `sg`, so a `DateTime` answers a `DateTime` and keeps its hour/min/sec.
-   * A TS subclass cannot be dup'd through `Date`'s constructor, so the receiver
-   * is rebuilt here instead — the same civil date `Date#new_start` names under
-   * the new start, carrying this receiver's time of day.
-   *
-   * `#italy` / `#england` / `#julian` / `#gregorian` route through here, as
-   * `d_lite_italy` and friends route through `dup_obj_with_new_start`.
+   * Ruby inherits `new_start` from `Date`, whose `dup_obj_with_new_start`
+   * (ruby/date, `date_core.c:5802-5812`) dups the *receiver*, so a `DateTime`
+   * keeps its class and its hour/min/sec. A TS subclass cannot be dup'd through
+   * `Date`'s constructor, so the receiver is rebuilt here. `#italy` /
+   * `#england` / `#julian` / `#gregorian` route through here, as `d_lite_italy`
+   * and friends route through `dup_obj_with_new_start`.
    */
   override newStart(start: number = DEFAULT_SG): DateTime {
     const d = super.newStart(start);

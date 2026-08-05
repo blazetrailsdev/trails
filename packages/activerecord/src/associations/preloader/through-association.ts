@@ -8,11 +8,9 @@ import { pluralize, singularize } from "@blazetrails/activesupport";
 type AssociationLikeReflection = AssociationReflection | ThroughReflection;
 
 /**
- * `reduce(:merge)` over the loaders' `records_by_owner`. Rails' reader forces
- * `load_records` (preloader/association.rb:148-151); ours is async and these
- * merges are read from synchronous callers, so the forcing is hoisted to
- * `recordsByOwner` and the reduce answers `undefined` — never a partial merge a
- * caller could memoize — as soon as one loader has yet to load.
+ * `reduce(:merge)`. Rails' `records_by_owner` forces `load_records`
+ * (preloader/association.rb:148-151); ours is async, so the forcing is hoisted to
+ * `recordsByOwner` and this answers `undefined` while a loader has yet to load.
  */
 function merge(
   acc: Map<Base, Base[]> | undefined,
