@@ -38,9 +38,6 @@ export function delegate(
 
         let target: Base | null = null;
         if (assocDef.type === "belongsTo" || assocDef.type === "hasOne") {
-          // Rails' `delegate ... to: :association` reads the association the
-          // ordinary way; `association(name).load_target` (association.rb:190)
-          // is that path, cache read and staleness guard included.
           target = (await association.call(this, assocName).loadTarget()) as Base | null;
         }
 

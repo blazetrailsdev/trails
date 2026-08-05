@@ -156,15 +156,14 @@ export function association(this: Base, name: string): AssociationInstance {
  * preloaded value if present; otherwise runs a query. Not a forced
  * reload — use `record.reload()` for that.
  *
- * Mirrors Rails' `ActiveRecord::Associations::Preloader::Branch` /
- * `BelongsToAssociation` which are the belongs_to-specific preload paths.
+ * Rails spells this entry point `record.association(name).load_target`, and
+ * that is what it delegates to: the cache read, the staleness guard and the
+ * writeback all live in `load_target` (association.rb:190), with
+ * `SingularAssociation#find_target` (singular_association.rb:47-55) the pure
+ * query underneath.
  */
 export async function loadBelongsTo(this: Base, name: string): Promise<Base | null> {
   assertSingularAssociation.call(this, name, "belongsTo");
-  // Rails' equivalent of this entry point is `record.association(name)
-  // .load_target`: the cache read, the staleness guard and the writeback all
-  // live in `load_target` (association.rb:190), and `find_target` is a pure
-  // query underneath it.
   const result = await bypassStrictLoading.call(this, () =>
     association.call(this, name).loadTarget(),
   );
@@ -176,11 +175,11 @@ export async function loadBelongsTo(this: Base, name: string): Promise<Base | nu
  * preloaded value if present; otherwise runs a query. Not a forced
  * reload — use `record.reload()` for that.
  *
- * Mirrors Rails' `HasOneAssociation` preload path.
+ * Reaches the target through `association(name).load_target` for the reasons
+ * given on `loadBelongsTo`.
  */
 export async function loadHasOne(this: Base, name: string): Promise<Base | null> {
   assertSingularAssociation.call(this, name, "hasOne");
-  // See `loadBelongsTo`: `association(name).load_target` is Rails' entry point.
   const result = await bypassStrictLoading.call(this, () =>
     association.call(this, name).loadTarget(),
   );

@@ -2,7 +2,7 @@ import type { AssociationProxy } from "./collection-proxy.js";
 import { describe, it, expect } from "vitest";
 import { Base, registerModel, registerSubclass } from "../index.js";
 import { Associations } from "../associations.js";
-import { association as associationInstance } from "./instance-methods.js";
+import { loadSingularTarget } from "../test-helpers/load-singular-target.js";
 import { findTarget } from "./has-many-association.js";
 import { AssociationScope, ReflectionProxy } from "./association-scope.js";
 import { fixtures } from "../test-fixtures.js";
@@ -17,19 +17,6 @@ import { Member } from "../test-helpers/models/member.js";
 import { Membership, CurrentMembership } from "../test-helpers/models/membership.js";
 import { Club } from "../test-helpers/models/club.js";
 import { MemberDetail } from "../test-helpers/models/member-detail.js";
-
-/**
- * Rails' entry point for reading a singular association is
- * `record.association(name).load_target` (association.rb:190) — the cached
- * read and the staleness guard live there, and `find_target`
- * (singular_association.rb:47-55) is a pure query underneath it.
- */
-async function loadSingularTarget(record: Base, name: string): Promise<Base | null> {
-  // `async` so `check_validity!`, which Rails runs in `Association#initialize`
-  // (association.rb:41-45) and trails runs when the holder is built, surfaces
-  // as a rejection like every other load failure.
-  return associationInstance.call(record, name).loadTarget() as Promise<Base | null>;
-}
 
 describe("AssociationScope", () => {
   fixtures([]);

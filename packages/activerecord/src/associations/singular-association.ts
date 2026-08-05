@@ -388,6 +388,13 @@ function _validateHasOnePolymorphicKeys(
  * the `find_target?` predicate (`belongs_to_association.rb:124-126`), never
  * `find_target`, which is why there is no belongs_to override here either.
  *
+ * It reads no cache: `find_target` is a pure query, and the cached read lives
+ * one level up in `Association#loadTarget` → `doFindTarget`, mirroring
+ * `load_target`'s `(@stale_state && stale_target?) || find_target?` guard
+ * (`association.rb:190`). `reflection.check_validity!` has likewise already run
+ * in `Association#initialize` (`association.rb:41-45`), so a recursive or
+ * missing `inverse_of` has surfaced before this body.
+ *
  * The one macro-conditional step Rails has no counterpart for is the has_one
  * `:through` routing. It is a named helper rather than an inline branch so this
  * body keeps the shape of Rails'.
@@ -407,17 +414,6 @@ export async function findTarget(
   if (options.through) {
     validateThroughReflection(ctor, assocName);
   }
-
-  // Rails runs `reflection.check_validity!` in `Association#initialize`
-  // (mirrored in the `Association` constructor via
-  // `validateReflectionValidity`), so a recursive/missing `inverse_of` has
-  // already surfaced by now — no load-path recursion shim is needed.
-  //
-  // No cached-target read here: `find_target` (singular_association.rb:47-55)
-  // is a pure query. The cache is consulted one level up, in
-  // `Association#loadTarget` → `doFindTarget`, mirroring
-  // `load_target`'s `(@stale_state && stale_target?) || find_target?` guard
-  // (association.rb:190); every caller reaches this body through it.
 
   // Rails `Association#find_target`'s first statement. Gated by `find_target?`:
   // a new-record owner without the key present never reaches `find_target` and

@@ -57,9 +57,6 @@ export class Scheme {
     this.previousSchemes = options.previousSchemes ?? [];
 
     if (options.encryptor) {
-      // The option also accepts the simple `{ encrypt, decrypt }` pair
-      // `Base.encrypts` takes; fill in the two members it may omit here, where
-      // the option is read, rather than in a second scheme builder.
       const encryptor = options.encryptor;
       this._encryptor =
         typeof encryptor.isEncrypted === "function" && typeof encryptor.isBinary === "function"

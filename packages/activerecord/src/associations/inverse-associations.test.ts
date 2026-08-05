@@ -2,7 +2,7 @@
  * Mirrors Rails activerecord/test/cases/associations/inverse_associations_test.rb
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { association as associationInstance } from "./instance-methods.js";
+import { loadSingularTarget } from "../test-helpers/load-singular-target.js";
 import {
   Base,
   association,
@@ -40,19 +40,6 @@ import { SpecialContract } from "../test-helpers/models/contract.js";
 import { Book } from "../test-helpers/models/book.js";
 import { Subscription } from "../test-helpers/models/subscription.js";
 import { Subscriber } from "../test-helpers/models/subscriber.js";
-
-/**
- * Rails' entry point for reading a singular association is
- * `record.association(name).load_target` (association.rb:190) — the cached
- * read and the staleness guard live there, and `find_target`
- * (singular_association.rb:47-55) is a pure query underneath it.
- */
-async function loadSingularTarget(record: Base, name: string): Promise<Base | null> {
-  // `async` so `check_validity!`, which Rails runs in `Association#initialize`
-  // (association.rb:41-45) and trails runs when the holder is built, surfaces
-  // as a rejection like every other load failure.
-  return associationInstance.call(record, name).loadTarget() as Promise<Base | null>;
-}
 
 /**
  * Rails' `with_has_many_inversing(model = ActiveRecord::Base)` toggles
