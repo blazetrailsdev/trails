@@ -628,12 +628,16 @@ describe("MigrationTest", () => {
     );
   });
 
-  // Rails builds `MigrationContext.new(migrations_path)` and lets it default
-  // `schema_migration` / `internal_metadata` off the connection pool
-  // (migration.rb:1214-1218). trails' MigrationContext has no pool to reach
-  // from, so both are passed explicitly; everything else — the on-disk
-  // `MIGRATIONS_ROOT + "/valid"` migrations, run through `up` and reversed
-  // through `down` — is Rails' body.
+  // Rails builds `MigrationContext.new(migrations_path)` here and lets it
+  // default `schema_migration` / `internal_metadata` off the connection pool
+  // (migration.rb:1214-1218) — that default is the only thing separating this
+  // case from `migrator versions`, which passes both explicitly
+  // (migration_test.rb:107). trails' MigrationContext takes an adapter, not a
+  // pool, so it has nothing to default from and both cases must pass them; the
+  // two bodies are therefore identical until story
+  // 0051/migration-context-collaborators-need-a-pool lands the pool-defaulted
+  // constructor, at which point this one drops its arguments and the
+  // distinction Rails is testing comes back.
   it("migration context with default schema migration", async () => {
     const migrationsPath = `${MIGRATIONS_ROOT}/valid`;
     const adapter = Base.connection;
