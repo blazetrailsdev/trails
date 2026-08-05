@@ -1,5 +1,6 @@
 import { Config } from "./config.js";
 import { Contexts } from "./contexts.js";
+import { Context } from "./context.js";
 import { Cipher } from "./cipher.js";
 import type { EncryptorLike } from "./encryptor.js";
 import type { SchemeOptions } from "./scheme.js";
@@ -59,7 +60,11 @@ export class Configurable {
    * so a call that omits one *clears* the credential it had rather than keeping
    * it. Callers that want the previous value pass it explicitly.
    *
-   * It ends in `reset_default_context`, which is the only key-provider
+   * The remaining properties are applied twice, as Rails applies them: once to
+   * `config` (configurable.rb:29-31), then again to the freshly-reset default
+   * `Context` (configurable.rb:35-37), which is how a `Context`-only property —
+   * `encryptor`, `cipher`, `frozenEncryption` — reaches the context at all.
+   * The `reset_default_context` between them is also the only key-provider
    * invalidation Rails has: `Context` memoizes its default key provider
    * (context.rb:25-27), so a fresh `Context` is a fresh provider.
    */
@@ -97,6 +102,15 @@ export class Configurable {
 
     _defaultCipher = null;
     Contexts.resetDefaultContext();
+
+    for (const [key, value] of Object.entries(properties)) {
+      if (key === "primaryKey" || key === "deterministicKey" || key === "keyDerivationSalt") {
+        continue;
+      }
+      if (value === undefined) continue;
+      if (!Context.PROPERTIES.includes(key)) continue;
+      (Contexts.context as Record<string, unknown>)[key] = value;
+    }
   }
 
   static onEncryptedAttributeDeclared(callback: (klass: any, name: string) => void): () => void {

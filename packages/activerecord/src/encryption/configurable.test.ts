@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Configurable } from "./configurable.js";
 import { Contexts } from "./contexts.js";
+import { NullEncryptor } from "./null-encryptor.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
 import { EncryptableRecord } from "./encryptable-record.js";
 import { AutoFilteredParameters } from "./auto-filtered-parameters.js";
@@ -149,6 +150,15 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
     const before = Contexts.defaultContext;
     Configurable.configure({ primaryKey: "test-key", keyDerivationSalt: "the salt" });
     expect(Contexts.defaultContext).not.toBe(before);
+  });
+
+  it("configure applies Context-only properties to the reset default context", () => {
+    // configurable.rb:35-37 — the second `properties.each`, over `context`
+    // rather than `config`. `encryptor` is a Context::PROPERTIES member
+    // (context.rb:13) with no Config counterpart, so only that loop can set it.
+    const encryptor = new NullEncryptor();
+    Configurable.configure({ primaryKey: "test-key", keyDerivationSalt: "the salt", encryptor });
+    expect(Contexts.context.encryptor).toBe(encryptor);
   });
 
   it("excludeFromFilterParameters excludes specific attributes while others are still filtered", () => {

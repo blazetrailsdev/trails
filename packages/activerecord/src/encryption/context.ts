@@ -29,6 +29,20 @@ export function setEncryptingOnlyEncryptorFactory(factory: () => unknown): void 
  * Mirrors: ActiveRecord::Encryption::Context
  */
 export class Context {
+  /**
+   * Rails `Context::PROPERTIES` (context.rb:13), the names `attr_accessor`
+   * defines on a Context. `Configurable.configure` tests against it for the
+   * `respond_to?("#{name}=")` guard Rails uses (configurable.rb:35-37).
+   */
+  static readonly PROPERTIES = [
+    "keyProvider",
+    "keyGenerator",
+    "cipher",
+    "messageSerializer",
+    "encryptor",
+    "frozenEncryption",
+  ];
+
   private _keyProvider?: unknown;
   keyGenerator?: unknown;
   cipher?: unknown;
