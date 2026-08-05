@@ -10,6 +10,11 @@ import * as path from "path";
  *
  * `erb` → `tse`: trails uses a `.tse` (Trails Server Embedded) template
  * extension in place of Rails' `.erb` — see docs/actionview-100-percent.md.
+ * There is no `erb` anywhere in trails: the rename fires on an underscore
+ * boundary AND on a CamelCase one, so a constant fragment carries it too
+ * (`ERBUtilTest` → `TSEUtilTest`) rather than only `erb_util` → `tseUtil`.
+ * `verb` / `superb` / `Herb` are untouched — the token still has to start at
+ * the identifier or just after an underscore.
  *
  * Applied to every identifier that flows through `snakeToCamel` —
  * currently Ruby method names (via `rubyMethodToTs`) and constant
@@ -30,7 +35,7 @@ const TOKEN_RENAMES: Record<string, string> = {
 
 function applyTokenRenames(snake: string): string {
   return snake.replace(
-    /(^|_)(erb|ERB|Erb|rb)(?=_|$)/g,
+    /(^|_)(erb|ERB|Erb|rb)(?=_|$|[A-Z])/g,
     (_m, pre, tok: string) => pre + TOKEN_RENAMES[tok],
   );
 }
@@ -932,7 +937,11 @@ ${operatorList}
 ## Token renames
 
 Applied to every identifier before camelization (and the equivalent applies to
-file paths):
+file paths). A token is renamed when it starts the identifier or follows an
+underscore, and ends at an underscore, the end, or the next capital — so
+\`ERBUtilTest\` is \`TSEUtilTest\` and \`erb_util\` is \`tseUtil\`, while
+\`verb_name\` and \`Herbert\` are left alone. There is no \`erb\` anywhere in
+trails:
 
 | Ruby token | trails token |
 | ---------- | ------------ |

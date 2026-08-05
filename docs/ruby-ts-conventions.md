@@ -59,7 +59,11 @@ methods like `get()`/`set()` as the surrounding code does):
 ## Token renames
 
 Applied to every identifier before camelization (and the equivalent applies to
-file paths):
+file paths). A token is renamed when it starts the identifier or follows an
+underscore, and ends at an underscore, the end, or the next capital — so
+`ERBUtilTest` is `TSEUtilTest` and `erb_util` is `tseUtil`, while
+`verb_name` and `Herbert` are left alone. There is no `erb` anywhere in
+trails:
 
 | Ruby token | trails token |
 | ---------- | ------------ |

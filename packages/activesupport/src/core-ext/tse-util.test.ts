@@ -6,7 +6,7 @@ function tokenize(source: string): [string, string][] {
   return erbTokenize(source);
 }
 
-describe("ERBUtilTest", () => {
+describe("TSEUtilTest", () => {
   it("template output", () => {
     const source = "Posts: <%= @post.length %>";
     const actualTokens = tokenize(source);
