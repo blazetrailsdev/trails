@@ -133,7 +133,22 @@ export function computeType(type_name) {
     }
 }
 export function setBaseClass() {
-    return this.base_class = __PRISM_TODO("IfNode");
+    return this.base_class = (() => {
+        if (this === Base) {
+            return this;
+        }
+        else {
+            if (!(this < Base)) {
+                throw new ActiveRecordError(`${this.name} doesn't belong in a hierarchy descending from ActiveRecord`);
+            }
+            if (this.superclass === Base || this.superclass.isAbstractClass()) {
+                return this;
+            }
+            else {
+                return this.superclass.baseClass();
+            }
+        }
+    })();
 }
 __PRISM_TODO("CallNode");
 export function inherited(subclass) {

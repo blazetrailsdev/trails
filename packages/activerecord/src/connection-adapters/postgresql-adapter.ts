@@ -4179,34 +4179,19 @@ export class PostgreSQLAdapter
     field: unknown[],
     _definitions: unknown,
   ): Promise<Column> {
-    // `isPrimary` is an 11th field element past Rails' ten — trails'
-    // `column_definitions` also selects `indisprimary` for the schema dumper.
-    // See the tuple built in PostgreSQL::SchemaStatements#columns.
-    const [
-      columnName,
-      type,
-      default_,
-      notnull,
-      oid,
-      fmod,
-      collation,
-      comment,
-      identity,
-      gen,
-      isPrimary,
-    ] = field as [
-      string,
-      string,
-      string | null,
-      boolean,
-      number,
-      number,
-      string | null,
-      string | null,
-      string | null,
-      string | null,
-      boolean | undefined,
-    ];
+    const [columnName, type, default_, notnull, oid, fmod, collation, comment, identity, gen] =
+      field as [
+        string,
+        string,
+        string | null,
+        boolean,
+        number,
+        number,
+        string | null,
+        string | null,
+        string | null,
+        string | null,
+      ];
     const typeMetadata = await this.fetchTypeMetadata(columnName, type, Number(oid), Number(fmod));
     // The literal stays a raw String: deserialization is deferred to
     // Attribute.from_database so *_before_type_cast reads back the raw default.
@@ -4243,7 +4228,6 @@ export class PostgreSQLAdapter
         defaultFunction: defaultFunction ?? undefined,
         collation: collation ?? undefined,
         comment: comment || null,
-        primaryKey: isPrimary ?? false,
         serial,
         array: type.endsWith("[]"),
         identity: identity || null,

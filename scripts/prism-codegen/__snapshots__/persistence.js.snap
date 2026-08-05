@@ -99,7 +99,11 @@ export function hasQueryConstraints() {
     return this.has_query_constraints;
 }
 export function queryConstraintsList() {
-    return this.query_constraints_list ||= this.isBaseClass() || this.primaryKey !== this.baseClass.primaryKey() ? __PRISM_TODO("IfNode") : this.baseClass.queryConstraintsList();
+    return this.query_constraints_list ||= this.isBaseClass() || this.primaryKey !== this.baseClass.primaryKey() ? (() => {
+        if (Array.isArray(this.primaryKey)) {
+            return this.primaryKey;
+        }
+    })() : this.baseClass.queryConstraintsList();
 }
 export function compositeQueryConstraintsList() {
     return this.composite_query_constraints_list ||= this.queryConstraintsList() || this.Array(this.primaryKey);

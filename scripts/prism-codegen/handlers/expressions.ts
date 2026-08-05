@@ -82,10 +82,28 @@ export function registerExpressions(r: Registry): void {
     ),
   );
   r.on("MultiWriteNode", (n, e) => {
-    if (n.rest || !((n.lefts as PrismNode[]) ?? []).every(isEmittableTarget)) return null;
+    if (!((n.lefts as PrismNode[]) ?? []).every(isEmittableTarget)) return null;
+    const rest = n.rest as PrismNode | null;
+    let restTarget: PrismNode | undefined;
+    if (rest) {
+      if (((n.rights as PrismNode[]) ?? []).length > 0) return null;
+      if (rest.constructor.name !== "SplatNode") return null;
+      restTarget = rest.expression as PrismNode | undefined;
+      if (!restTarget || !isEmittableTarget(restTarget)) return null;
+    }
     for (const l of (n.lefts as PrismNode[]) ?? []) clearAsyncProvenance(l, e.asyncBindings);
-    const lefts = ((n.lefts as PrismNode[]) ?? []).map((l) => e.expr(l));
-    return f.createAssignment(f.createArrayLiteralExpression(lefts), e.expr(n.value as PrismNode));
+    if (restTarget) clearAsyncProvenance(restTarget, e.asyncBindings);
+    const elements: ts.Expression[] = ((n.lefts as PrismNode[]) ?? []).map((l) => e.expr(l));
+    if (restTarget) elements.push(f.createSpreadElement(e.expr(restTarget)));
+    return f.createAssignment(
+      f.createArrayLiteralExpression(elements),
+      e.expr(n.value as PrismNode),
+    );
+  });
+  r.on("LambdaNode", (n, e) => {
+    const params = blockParamNames(n.parameters as PrismNode | undefined);
+    if (!params) return null;
+    return blockToArrow(n, params, e);
   });
   r.on("LocalVariableOrWriteNode", (n, e) => {
     if (!isBindableIdent(String(n.name))) return null;
@@ -419,7 +437,7 @@ function asyncModifiers(body: ts.Node): ts.Modifier[] | undefined {
   return containsAwait(body) ? [f.createToken(ts.SyntaxKind.AsyncKeyword)] : undefined;
 }
 
-function containsAwait(node: ts.Node): boolean {
+export function containsAwait(node: ts.Node): boolean {
   let found = false;
   const visit = (child: ts.Node): void => {
     if (found) return;

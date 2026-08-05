@@ -338,9 +338,13 @@ computes at runtime:
    no `end`, so its "body" would run forward to the next same-indent `end` and
    merge unrelated methods. The vendored Rails corpus has zero such defs today,
    so this is a latent gap rather than a live one.
-4. **Ruby stdlib idioms pass through untranslated.** `attributes.collect { }`,
+4. **A mid-splat multi-assign has no JS image.** `a, *b = x` emits
+   `[a, ...b] = x`, but `a, *b, c = x` declines: a JS array-binding rest element
+   must be the last element, so the trailing targets after the splat cannot be
+   expressed. Ruby's own destructuring assigns them from the tail of the value.
+5. **Ruby stdlib idioms pass through untranslated.** `attributes.collect { }`,
    `arr.first`, `Array(x)`, `raise` — emitted verbatim; no runtime shim.
-5. **Metaprogramming is opaque.** `define_method`, `method_missing`, `send`,
+6. **Metaprogramming is opaque.** `define_method`, `method_missing`, `send`,
    `class_eval` string-eval have no deterministic JS image and are left as-is.
 
 The correct framing: this is a **first-draft scaffolder** that eliminates the

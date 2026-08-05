@@ -613,7 +613,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
               pg_catalog.format_type(a.atttypid, a.atttypmod) AS type,
               pg_get_expr(d.adbin, d.adrelid) AS "default",
               a.attnotnull AS notnull,
-              (i.indisprimary IS TRUE) AS is_primary,
               a.atttypid AS oid,
               a.atttypmod AS fmod,
               a.attidentity AS identity,
@@ -624,10 +623,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
        JOIN pg_class t ON t.oid = a.attrelid
        JOIN pg_namespace n ON n.oid = t.relnamespace
        LEFT JOIN pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum
-       LEFT JOIN pg_index i
-         ON i.indrelid = a.attrelid
-        AND i.indisprimary
-        AND a.attnum = ANY(i.indkey)
        LEFT JOIN pg_type pt ON a.atttypid = pt.oid
        LEFT JOIN pg_collation col ON a.attcollation = col.oid AND a.attcollation <> pt.typcollation
        LEFT JOIN pg_description pgd
@@ -679,11 +674,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
         r.col_comment,
         r.identity,
         r.attgenerated,
-        // 11th element, past Rails' ten: trails' `column_definitions` also
-        // selects `indisprimary`, which the schema dumper reads back off the
-        // Column (`resolvePrimaryKeyColumns`, schema-dumper.ts:833). Rails' PG
-        // dumper asks `primary_key(table)` instead and so never needs it.
-        r.is_primary,
       ];
       columns.push(await this.pg.newColumnFromField(tableName, field, rows));
     }

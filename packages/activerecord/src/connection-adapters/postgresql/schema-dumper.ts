@@ -17,6 +17,25 @@ export class SchemaDumper extends AbstractSchemaDumper {
   // fetching the same constraint lists twice per table.
   private _cachedExclConstraints: ExclusionConstraintDefinition[] | undefined;
   private _cachedUniqConstraints: UniqueConstraintDefinition[] | undefined;
+  /**
+   * Rails' PG dumper never reads a per-column `primary_key` flag — it asks
+   * `@connection.primary_key(table)` (`postgresql/schema_statements.rb:15`), and
+   * `column_definitions` (`postgresql_adapter.rb:1034`) selects ten fields, none
+   * of them `indisprimary`. `primaryKeyOrderCache[tableName]` already holds that
+   * authoritative list (populated by `table()` via `adapter.primaryKeys`), so
+   * resolve from it rather than from a flag PG columns don't carry.
+   * @internal
+   */
+  protected override resolvePrimaryKeyColumns(
+    tableName: string,
+    columns: ColumnInfo[],
+  ): ColumnInfo[] {
+    const order = this.primaryKeyOrderCache[tableName];
+    if (order === undefined) return super.resolvePrimaryKeyColumns(tableName, columns);
+    const byName = new Map(columns.map((c) => [c.name, c]));
+    return order.map((name) => byName.get(name)).filter((c): c is ColumnInfo => c !== undefined);
+  }
+
   /** @internal */
   protected override prepareColumnOptions(column: ColumnInfo): Record<string, unknown> {
     const spec = super.prepareColumnOptions(column as any);

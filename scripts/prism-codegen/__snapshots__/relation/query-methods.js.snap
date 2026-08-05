@@ -539,7 +539,7 @@ export function buildWhereClause(opts, rest = []) {
     let parts, key, references;
     opts = this.sanitizeForbiddenAttributes(opts);
     if (Array.isArray(opts)) {
-        __PRISM_TODO("MultiWriteNode");
+        [opts, ...rest] = opts;
     }
     if (caseEq(String, opts)) {
         if (rest.length === 0) {
@@ -638,6 +638,7 @@ export function buildNamedBoundSqlLiteral(statement, values) {
         return new Arel.Nodes.BoundSqlLiteral(`(${statement})`, null, bound_values);
     }
     catch (error) {
+        const error = e;
         throw new ActiveRecord.PreparedStatementInvalid(error.message());
     }
 }
@@ -674,6 +675,7 @@ export function buildBoundSqlLiteral(statement, values) {
         return new Arel.Nodes.BoundSqlLiteral(`(${statement})`, bound_values, null);
     }
     catch (error) {
+        const error = e;
         throw new ActiveRecord.PreparedStatementInvalid(error.message());
     }
 }

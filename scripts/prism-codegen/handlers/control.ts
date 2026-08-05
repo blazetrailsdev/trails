@@ -4,6 +4,7 @@ import type { Registry } from "../registry.js";
 import type { AsyncArm } from "../await-policy.js";
 import { isRaiseThrow, mergeAsyncArms, raiseArguments, scopeAsyncArm } from "../await-policy.js";
 import { eachToForOf } from "./stdlib.js";
+import { containsAwait } from "./expressions.js";
 const f = ts.factory;
 export function registerControl(r: Registry): void {
   r.onStmt("IfNode", (n, e, isLast) => [ifStmt(n, e, isLast, false)]);
@@ -12,7 +13,7 @@ export function registerControl(r: Registry): void {
     const neg = n.constructor.name === "UnlessNode";
     const consNode = singleStmtNode(n.statements as PrismNode | null);
     const altNode = elseSingleStmtNode(n);
-    if (!consNode || !altNode) return null;
+    if (!consNode || !altNode) return conditionalIife(n, e, neg);
     let cond = e.expr(n.predicate as PrismNode);
     if (neg) cond = f.createLogicalNot(cond);
     const consArm = scopeAsyncArm(e.asyncBindings, () => e.expr(consNode), consNode, e.inLoop);
@@ -58,7 +59,6 @@ export function registerControl(r: Registry): void {
   });
   r.onStmt("BeginNode", (n, e, isLast) => {
     const rescue = n.rescueClause as PrismNode | undefined;
-    if (rescue?.subsequent) return null;
     const ensure = n.ensureClause as PrismNode | undefined;
     if (!rescue && !ensure) return e.stmts((n.statements as PrismNode) ?? null, isLast);
     const tryArm = scopeAsyncArm(
@@ -68,18 +68,14 @@ export function registerControl(r: Registry): void {
       e.inLoop,
     );
     let catchClause: ts.CatchClause | undefined;
-    let catchArm: AsyncArm<ts.Block> | undefined;
+    let catchArms: AsyncArm<ts.Block>[] = [];
     if (rescue) {
-      const ref = rescue.reference ? String((rescue.reference as PrismNode).name) : "e";
-      catchArm = scopeAsyncArm(
-        e.asyncBindings,
-        () => f.createBlock(e.stmts((rescue.statements as PrismNode) ?? null, isLast), true),
-        (rescue.statements as PrismNode) ?? null,
-        e.inLoop,
-      );
-      catchClause = f.createCatchClause(f.createVariableDeclaration(ref), catchArm.value);
+      const built = rescueToCatch(rescue, e, isLast);
+      if (!built) return null;
+      catchClause = built.clause;
+      catchArms = built.arms;
     }
-    mergeAsyncArms(e.asyncBindings, catchArm ? [tryArm, catchArm] : [tryArm], true);
+    mergeAsyncArms(e.asyncBindings, [tryArm, ...catchArms], true);
     const finallyBlock = ensure
       ? f.createBlock(e.stmts((ensure.statements as PrismNode) ?? null, false), true)
       : undefined;
@@ -189,4 +185,120 @@ function elseSingleStmtNode(n: PrismNode): PrismNode | null {
   const sub = (n.subsequent ?? n.elseClause) as PrismNode | null;
   if (!sub || sub.constructor.name !== "ElseNode") return null;
   return singleStmtNode(sub.statements as PrismNode | null);
+}
+
+/**
+ * Ruby's chained `rescue A; …; rescue B; …` narrows on the exception class,
+ * which JS has no syntax for: one `catch` binds every exception. Dispatch the
+ * clauses inside the catch with the same `caseEq` test `case/when` uses, and
+ * rethrow when none matches so an unhandled class still propagates. A bare
+ * `rescue` (no exception list) is the catch-all and closes the chain. Each
+ * clause aliases its own exception variable to the single catch binding rather
+ * than renaming reads inside the body. A lone `rescue` keeps the plain
+ * `catch (e)` shape it has always emitted: the dispatch exists for the chain,
+ * and adding a class test to the single-clause form is a separate change.
+ */
+function rescueToCatch(
+  rescue: PrismNode,
+  e: Emitter,
+  isLast: boolean,
+): { clause: ts.CatchClause; arms: AsyncArm<ts.Block>[] } | null {
+  const clauses: PrismNode[] = [];
+  for (let r: PrismNode | undefined = rescue; r; r = r.subsequent as PrismNode | undefined) {
+    clauses.push(r);
+  }
+  const caught = "e";
+  const arms: AsyncArm<ts.Block>[] = [];
+  const blocks: ts.Block[] = [];
+  for (const clause of clauses) {
+    const ref = clause.reference ? String((clause.reference as PrismNode).name) : undefined;
+    const arm = scopeAsyncArm(
+      e.asyncBindings,
+      () => {
+        const body = e.stmts((clause.statements as PrismNode) ?? null, isLast);
+        const alias =
+          ref && ref !== caught
+            ? [
+                f.createVariableStatement(
+                  undefined,
+                  f.createVariableDeclarationList(
+                    [f.createVariableDeclaration(ref, undefined, undefined, catchRead(caught))],
+                    ts.NodeFlags.Const,
+                  ),
+                ),
+              ]
+            : [];
+        return f.createBlock([...alias, ...body], true);
+      },
+      (clause.statements as PrismNode) ?? null,
+      e.inLoop,
+    );
+    arms.push(arm);
+    blocks.push(arm.value);
+  }
+  if (clauses.length === 1) {
+    const ref = clauses[0].reference ? String((clauses[0].reference as PrismNode).name) : caught;
+    return {
+      clause: f.createCatchClause(f.createVariableDeclaration(ref), arms[0].value),
+      arms,
+    };
+  }
+  let out: ts.Statement = f.createThrowStatement(catchRead(caught));
+  for (let i = clauses.length - 1; i >= 0; i--) {
+    const exceptions = (clauses[i].exceptions as PrismNode[]) ?? [];
+    if (exceptions.length === 0) {
+      out = blocks[i];
+      continue;
+    }
+    e.helpers.add("caseEq");
+    const tests: ts.Expression[] = exceptions.map((x) =>
+      f.createCallExpression(f.createIdentifier("caseEq"), undefined, [
+        e.expr(x),
+        catchRead(caught),
+      ]),
+    );
+    out = f.createIfStatement(
+      tests.reduce((a, b) => f.createLogicalOr(a, b)),
+      blocks[i],
+      out,
+    );
+  }
+  return {
+    clause: f.createCatchClause(f.createVariableDeclaration(caught), f.createBlock([out], true)),
+    arms,
+  };
+}
+function catchRead(name: string): ts.Expression {
+  return f.createIdentifier(name);
+}
+/**
+ * `(() => { … })()` around the statement form of an `if`/`unless` whose
+ * branches are too big for a conditional expression. `e.stmts(…, true)`
+ * returns the branch's last value, so the arrow yields what Ruby's expression
+ * would have.
+ */
+function conditionalIife(n: PrismNode, e: Emitter, negate: boolean): ts.Expression | null {
+  const sub = (n.subsequent ?? n.elseClause) as PrismNode | null;
+  if (sub && sub.constructor.name !== "ElseNode" && sub.constructor.name !== "IfNode") return null;
+  const prevLoop = e.inLoop;
+  e.inLoop = false;
+  const arm = scopeAsyncArm(e.asyncBindings, () => ifStmt(n, e, true, negate));
+  e.inLoop = prevLoop;
+  mergeAsyncArms(e.asyncBindings, [arm], false);
+  const body = f.createBlock([arm.value], true);
+  const call = f.createCallExpression(
+    f.createParenthesizedExpression(
+      f.createArrowFunction(
+        containsAwait(body) ? [f.createToken(ts.SyntaxKind.AsyncKeyword)] : undefined,
+        undefined,
+        [],
+        undefined,
+        undefined,
+        body,
+      ),
+    ),
+    undefined,
+    [],
+  );
+  return containsAwait(body) ? f.createAwaitExpression(call) : call;
 }

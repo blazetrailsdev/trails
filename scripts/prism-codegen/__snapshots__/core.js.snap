@@ -23,6 +23,7 @@ included(() => {
             return this._destroyAssociationAsyncJob;
         }
         catch (error) {
+            const error = e;
             throw new NameError(`Unable to load destroy_association_async_job: ${error.message()}`);
         }
     }

@@ -364,8 +364,19 @@ export function lookupCastTypeFromJoinDependencies(name, join_dependencies = thi
     return null;
 }
 export function typeCastPluckValues(result, columns) {
-    let cast_types;
-    cast_types = __PRISM_TODO("IfNode");
+    let cast_types, join_dependencies, name;
+    cast_types = (() => {
+        if (result.columns().size() !== columns.size()) {
+            return this.model.attributeTypes();
+        }
+        else {
+            join_dependencies = null;
+            return columns.map().withIndex((column, i) => column.try("type_caster") || this.model.attributeTypes().fetch(name = result.columns()[i], () => {
+                join_dependencies ||= this.buildJoinDependencies();
+                return this.lookupCastTypeFromJoinDependencies(name, join_dependencies) || result.columnTypes()[i] || Type.defaultValue();
+            }));
+        }
+    })();
     return result.castValues(cast_types);
 }
 export function typeCastCalculatedValue(value, operation, type) {
