@@ -194,48 +194,6 @@ export const SOURCES: readonly UpstreamSource[] = [
       },
     ],
   },
-  {
-    // ruby/spec — the behavior anchor for corelib members with no portable Ruby
-    // source to mirror: `Module#include` / `#prepend` are interpreter internals
-    // (`eval.c`, `class.c`), `Range#include?` and `String#succ` are C
-    // (`range_include_internal`, `rb_str_succ`). ruby/spec ships no version
-    // tags, so `ref` is a dated SHA (2026-07-15); a branch name would silently
-    // re-point the anchor.
-    name: "ruby_spec",
-    origin: {
-      type: "git",
-      url: "https://github.com/ruby/spec.git",
-      ref: "87b1631992bd00cf0c4934474766d54dad088191",
-    },
-    packages: [
-      // `compareApi: false` is PERMANENT on every entry below, not a flag a
-      // later story flips: there is no Ruby method list to compare a TS surface
-      // against, only behavior — this source enrolls in test-compare only, once
-      // `corelib-test-compare-enrollment` turns `compareTests` on. libPath and
-      // testPath are the same dir: in ruby/spec the specs *are* the source.
-      {
-        name: "ruby-spec-module",
-        libPath: "core/module",
-        testPath: "core/module",
-        compareApi: false,
-        compareTests: false,
-      },
-      {
-        name: "ruby-spec-range",
-        libPath: "core/range",
-        testPath: "core/range",
-        compareApi: false,
-        compareTests: false,
-      },
-      {
-        name: "ruby-spec-string",
-        libPath: "core/string",
-        testPath: "core/string",
-        compareApi: false,
-        compareTests: false,
-      },
-    ],
-  },
 ];
 
 /**

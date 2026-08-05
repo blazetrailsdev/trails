@@ -84,25 +84,6 @@ describe("vendor/sources.ts", () => {
     expect(vendoredRoot("i18n").endsWith("vendor/i18n")).toBe(true);
   });
 
-  it("declares the ruby_spec source, scoped and enrolled in neither compare today", () => {
-    const spec = SOURCES.find((s) => s.name === "ruby_spec");
-    expect(spec).toBeDefined();
-    expect(spec!.origin.url).toBe("https://github.com/ruby/spec.git");
-    expect(spec!.origin.ref).toMatch(/^[0-9a-f]{40}$/);
-    expect(spec!.packages.map((p) => p.libPath)).toEqual([
-      "core/module",
-      "core/range",
-      "core/string",
-    ]);
-    expect(spec!.packages.every((p) => p.compareApi === false)).toBe(true);
-    expect(spec!.packages.every((p) => p.compareTests === false)).toBe(true);
-    for (const pkg of spec!.packages) {
-      expect(apiComparePackages()).not.toContain(pkg.name);
-      expect(Object.keys(testPathsManifest())).not.toContain(pkg.name);
-    }
-    expect(resolvePath("ruby-spec-string").endsWith("vendor/ruby_spec/core/string")).toBe(true);
-  });
-
   it("vendor/sources.lock.json has an entry for every source (commit invariant)", async () => {
     // Catches the failure mode "added to sources.ts, forgot pnpm vendor:fetch":
     // the committed lockfile would be missing the new source's SHA, leaving

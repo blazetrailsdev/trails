@@ -32,9 +32,6 @@ const VENDOR_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(VENDOR_DIR, "..");
 const LOCKFILE_PATH = join(VENDOR_DIR, "sources.lock.json");
 
-/** A source pinned to a bare commit SHA rather than a tag or branch. */
-const SHA_REF = /^[0-9a-f]{40}$/;
-
 interface LockEntry {
   ref: string;
   sha: string;
@@ -114,24 +111,14 @@ async function fetchSource(
 
   console.log(`[${source.name}] cloning ${source.origin.url}@${source.origin.ref}...`);
   mkdirSync(VENDOR_DIR, { recursive: true });
-  if (SHA_REF.test(source.origin.ref)) {
-    // A bare commit SHA is not a ref `git clone --branch` accepts; sources with
-    // no version tags (ruby/spec) need the init/fetch form.
-    mkdirSync(dest, { recursive: true });
-    await git(["init", "--quiet"], dest);
-    await git(["remote", "add", "origin", source.origin.url], dest);
-    await git(["fetch", "--depth=1", "origin", source.origin.ref], dest);
-    await git(["checkout", "--quiet", "FETCH_HEAD"], dest);
-  } else {
-    await execFileAsync("git", [
-      "clone",
-      "--depth=1",
-      "--branch",
-      source.origin.ref,
-      source.origin.url,
-      dest,
-    ]);
-  }
+  await execFileAsync("git", [
+    "clone",
+    "--depth=1",
+    "--branch",
+    source.origin.ref,
+    source.origin.url,
+    dest,
+  ]);
   const sha = await git(["rev-parse", "HEAD"], dest);
 
   if (lockEntry && lockEntry.sha !== sha) {
