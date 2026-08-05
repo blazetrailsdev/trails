@@ -225,7 +225,6 @@
   "active_record/relation/finder_methods.rb::findLast::divergent",
   "active_record/relation/finder_methods.rb::findNth::divergent",
   "active_record/relation/finder_methods.rb::findNthFromLast::divergent",
-  "active_record/relation/finder_methods.rb::findNthWithLimit::divergent",
   "active_record/relation/finder_methods.rb::findSome::divergent",
   "active_record/relation/finder_methods.rb::findSomeOrdered::divergent",
   "active_record/relation/finder_methods.rb::findTake::divergent",

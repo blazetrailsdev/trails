@@ -33,5 +33,10 @@
     "rubyFile": "active_record/persistence.rb",
     "name": "isPreviouslyNewRecord",
     "reason": "Ruby reads the ivar `@previously_new_record`; the port reads the `_previouslyNewRecord` field. Same single read — the whole divergence is the ivar spelling."
+  },
+  {
+    "rubyFile": "active_record/relation/finder_methods.rb",
+    "name": "findNthWithLimit",
+    "reason": "Spelling-only. Rails' `records[index, limit]` (finder_methods.rb) generates as `idxGet(records, index, limit)` because codegen cannot know the receiver is an Array; the port writes the same slice as `records.slice(...)`. The only other differing token is Ruby's `offset.zero?`, which the port spells as a numeric comparison. Every remaining token matches in order."
   }
 ]
