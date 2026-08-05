@@ -7,7 +7,7 @@
  * (`"UTC"` for a `Time.utc`) rather than `::Date`'s offset spelling.
  */
 
-import { Temporal } from "@js-temporal/polyfill";
+import { Temporal } from "@blazetrails/date";
 import { ArgumentError, strftime } from "./date.js";
 
 /**

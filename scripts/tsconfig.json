@@ -43,6 +43,9 @@
       "path": "../packages/globalid"
     },
     {
+      "path": "../packages/date"
+    },
+    {
       "path": "../packages/did-you-mean"
     },
     {

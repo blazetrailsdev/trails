@@ -232,12 +232,12 @@ importers:
 
   packages/activesupport:
     dependencies:
+      '@blazetrails/date':
+        specifier: workspace:*
+        version: link:../date
       '@blazetrails/i18n':
         specifier: workspace:*
         version: link:../i18n
-      '@js-temporal/polyfill':
-        specifier: ^0.5.1
-        version: 0.5.1
       tinyglobby:
         specifier: ^0.2.16
         version: 0.2.16
@@ -259,6 +259,12 @@ importers:
         specifier: workspace:*
         version: link:../activesupport
 
+  packages/date:
+    dependencies:
+      '@js-temporal/polyfill':
+        specifier: ^0.5.1
+        version: 0.5.1
+
   packages/did-you-mean: {}
 
   packages/globalid:
@@ -279,9 +285,9 @@ importers:
 
   packages/i18n:
     dependencies:
-      '@js-temporal/polyfill':
-        specifier: ^0.5.1
-        version: 0.5.1
+      '@blazetrails/date':
+        specifier: workspace:*
+        version: link:../date
     optionalDependencies:
       yaml:
         specifier: ^2.8.3

@@ -88,9 +88,15 @@ export class Association {
    *  collection proxy that it can hydrate from this instance's target. */
   _loadedViaAsync = false;
   /**
-   * Nonzero while THIS holder is itself driving a loader through `findTarget`,
-   * so the loader's own `setTarget` writeback into this holder must be skipped — the driving caller assigns the result
-   * itself the moment its `await` resumes.
+   * Nonzero while THIS holder is itself driving a loader through `findTarget`.
+   *
+   * Two jobs, and only the second is still live for singular associations:
+   * `syncToAssociationInstance` skips the loader's own writeback into this
+   * holder (still load-bearing for `CollectionAssociation`, whose loader tail
+   * writes back), and `raiseIfLoadInFlight` refuses a caller's replacement that
+   * lands inside the load window. The singular loader's tail writeback is gone
+   * (`singular_association.rb:47-55` ends at `scope.first`), so there the flag
+   * is retained purely for the raise.
    *
    * Rails needs no such flag: `Association#find_target`
    * (association.rb:248) is synchronous, so nothing can touch the holder
@@ -556,13 +562,27 @@ export class Association {
    * record. Rails inlines this in `load_target` / `async_load_target`
    * (association.rb:189, :198); the split exists only because the assignment
    * is shared by both call sites above.
+   *
+   * The `staleStateBeforeLoad` re-check is a trails-only guard with no Rails
+   * counterpart, and it is here because this is the one writeback site. Rails'
+   * `find_target` (association.rb:248) is synchronous, so the owner's stale
+   * state cannot move between issuing the query and storing the row. Ours
+   * awaits DB I/O: an in-flight reader (`node.parent` accessed but never
+   * awaited) can still be pending when the caller reassigns the association
+   * with a new FK, and once RFC 0063 made `save` genuinely await the validation
+   * chain that window widened enough for the stale query to resolve mid-save
+   * and clobber the freshly-assigned target, dropping the FK change from
+   * `previousChanges`. Keeping it here rather than in the query body leaves
+   * staleness decided in one place, next to `loadTarget`'s guard.
    */
   private async _findTarget(): Promise<void> {
+    const staleStateBeforeLoad = this.staleState();
     const result = await this.findTarget();
     if (result !== undefined) {
       // Rails applies set_strict_loading per record in find_target's DB
       // execute block — only freshly loaded records, never cached ones.
       if (result !== null) this.setStrictLoading(result as Base);
+      if (this.loaded && this.staleState() !== staleStateBeforeLoad) return;
       // Deliberately a direct assignment, not `setTarget`: this is the loader
       // storing what it just fetched, not a caller replacing the target, so it
       // must not trip `setTarget`'s in-flight guard.

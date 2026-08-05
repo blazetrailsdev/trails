@@ -15,7 +15,6 @@ import {
   _wireInverseAssociation,
   applyAssociationScope,
   resolveAssocClass,
-  syncToAssociationInstance,
   validateInverseOf,
 } from "../associations.js";
 import { Association } from "./association.js";
@@ -271,14 +270,14 @@ export class SingularAssociation extends Association {
    * sugar and the through loaders reach without an association instance; that
    * owner/name/options triple is a trails-only calling convention, not Rails
    * surface.
+   *
+   * `_loaderWritebackSuppressed` is armed for the raise, not for a writeback:
+   * the loader body writes nothing back, so what the flag buys here is
+   * `setTarget` refusing a replacement that lands mid-query rather than losing
+   * it silently. `Association#_findTarget` handles the complementary case the
+   * raise cannot see — a bare FK change that never touches the holder.
    */
   protected override async findTarget(): Promise<Base | null> {
-    // The loader's tail writeback lands in this holder mid-await, so a target
-    // replaced while the query is in flight would be silently clobbered:
-    // suppress the loader's own writeback and let `setTarget` refuse the race.
-    // #4919 already guards a mid-load *FK* change for belongs_to; this also
-    // covers a same-FK reassignment that leaves the FK put, which the
-    // stale-key check cannot see. See `Association#_loaderWritebackSuppressed`.
     this._loaderWritebackSuppressed++;
     try {
       return await findTarget(this.owner, this.reflection.name, this.reflection.options);
@@ -388,7 +387,9 @@ function _validateHasOnePolymorphicKeys(
  * the `find_target?` predicate (`belongs_to_association.rb:124-126`), never
  * `find_target`, which is why there is no belongs_to override here either.
  *
- * It reads no cache: `find_target` is a pure query, and the cached read lives
+ * It neither reads nor writes the association: Rails' body opens at the scope
+ * and ends at `scope.first` (`singular_association.rb:47-55`), returning the
+ * record. The cached read lives
  * one level up in `Association#loadTarget` → `doFindTarget`, mirroring
  * `load_target`'s `(@stale_state && stale_target?) || find_target?` guard
  * (`association.rb:190`). `reflection.check_validity!` has likewise already run
@@ -477,18 +478,6 @@ export async function findTarget(
     if (v === null || v === undefined) return null;
   }
 
-  // The staleness key mirrors Rails' `stale_state`: the FK column(s), plus
-  // `foreign_type` for a polymorphic belongs_to
-  // (belongs_to_polymorphic_association.rb:43-46), so a reassignment keeping the
-  // same id but changing the target class is still detected after the await.
-  const staleCols =
-    isBelongsTo && options.polymorphic
-      ? [...keyColsForCheck, options.foreignType ?? `${underscore(assocName)}_type`]
-      : keyColsForCheck;
-  const staleSnapshot: unknown[] = isBelongsTo
-    ? staleCols.map((col: string) => record._readAttribute(col))
-    : [];
-
   let result: Base | null;
   if (!_skipSingularStatementCache(reflection, targetModel, options)) {
     // Rails `Association#find_target` via `reflection.association_scope_cache`
@@ -509,23 +498,6 @@ export async function findTarget(
     result = await rel.take();
   }
 
-  // Rails' `find_target` is synchronous and never observes the owner's foreign
-  // key changing mid-load. Ours awaits DB I/O: an in-flight reader query (e.g.
-  // `node.parent` accessed but never awaited) can still be pending when the
-  // caller reassigns the association with a new FK. Once RFC 0063 made `save`
-  // genuinely await the validation chain, that window widened enough for the
-  // stale query to resolve mid-save and clobber the freshly-assigned holder
-  // target, dropping the FK change from `previousChanges`.
-  if (
-    isBelongsTo &&
-    staleCols.some((col: string, i: number) => record._readAttribute(col) !== staleSnapshot[i])
-  ) {
-    const holder = record._associationInstances.get(assocName) as
-      | { isLoaded?: () => boolean; target?: Base | null }
-      | undefined;
-    if (holder?.isLoaded?.()) return holder.target ?? null;
-  }
-
   // Mirrors `Association#set_inverse_instance`: resolve via the reflection so
   // automatic_inverse_of wires the parent too.
   if (result) {
@@ -533,6 +505,5 @@ export async function findTarget(
     if (inverseName) _wireInverseAssociation(record, result, inverseName);
   }
 
-  syncToAssociationInstance(record, assocName, result);
   return result;
 }
