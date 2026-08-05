@@ -502,11 +502,24 @@ export function describeForeignKey(spec: ForeignKeySpec): string {
   return parts.join(" ");
 }
 
-/** A table's primary-key declaration, `"default"` when it keeps Rails' `id`. */
-function describePrimaryKey(table: TableSchema): string {
-  const primaryKey = isWrappedSchema(table) ? table.primaryKey : undefined;
-  if (primaryKey === undefined) return "default";
-  return primaryKey === false ? "none" : `(${primaryKey.join(",")})`;
+/** A table's declarations beside its columns, defaulted for the legacy shape. */
+function extrasOf(table: TableSchema): {
+  primaryKey: string;
+  indexes: IndexSpec[];
+  foreignKeys: ForeignKeySpec[];
+} {
+  const wrapped = isWrappedSchema(table) ? table : undefined;
+  const primaryKey = wrapped?.primaryKey;
+  return {
+    primaryKey:
+      primaryKey === undefined
+        ? "default"
+        : primaryKey === false
+          ? "none"
+          : `(${primaryKey.join(",")})`,
+    indexes: wrapped?.indexes ?? [],
+    foreignKeys: wrapped?.foreignKeys ?? [],
+  };
 }
 
 /**
@@ -521,30 +534,27 @@ function compareTableExtras(
   inTestSchema: TableSchema,
   inRegistry: TableSchema,
 ): string[] {
+  const testSchema = extrasOf(inTestSchema);
+  const registry = extrasOf(inRegistry);
   const divergences: string[] = [];
-  const testSchemaPk = describePrimaryKey(inTestSchema);
-  const registryPk = describePrimaryKey(inRegistry);
-  if (testSchemaPk !== registryPk) {
+  if (testSchema.primaryKey !== registry.primaryKey) {
     divergences.push(
-      `${table} — primary key: ${TEST_SCHEMA_LABEL} ${testSchemaPk}, ${REGISTRY_LABEL} ${registryPk}`,
+      `${table} — primary key: ${TEST_SCHEMA_LABEL} ${testSchema.primaryKey}, ` +
+        `${REGISTRY_LABEL} ${registry.primaryKey}`,
     );
   }
   divergences.push(
     ...compareDescribed(
       table,
       "index",
-      (isWrappedSchema(inTestSchema) ? (inTestSchema.indexes ?? []) : []).map(describeIndex),
-      (isWrappedSchema(inRegistry) ? (inRegistry.indexes ?? []) : []).map(describeIndex),
+      testSchema.indexes.map(describeIndex),
+      registry.indexes.map(describeIndex),
     ),
-  );
-  divergences.push(
     ...compareDescribed(
       table,
       "foreign key",
-      (isWrappedSchema(inTestSchema) ? (inTestSchema.foreignKeys ?? []) : []).map(
-        describeForeignKey,
-      ),
-      (isWrappedSchema(inRegistry) ? (inRegistry.foreignKeys ?? []) : []).map(describeForeignKey),
+      testSchema.foreignKeys.map(describeForeignKey),
+      registry.foreignKeys.map(describeForeignKey),
     ),
   );
   return divergences;
