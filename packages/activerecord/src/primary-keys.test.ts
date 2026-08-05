@@ -3,7 +3,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
 import { Base, registerModel } from "./index.js";
-import { SchemaDumper } from "./schema-dumper.js";
+import { SchemaDumper } from "./connection-adapters/abstract/schema-dumper.js";
 import { MissingAttributeError } from "@blazetrails/activemodel";
 import { adapterType } from "./test-adapter.js";
 import { fixtures } from "./test-fixtures.js";

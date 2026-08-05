@@ -1,12 +1,11 @@
-import { SchemaDumper } from "../schema-dumper.js";
+// Dump through the adapter-layer dumper — Rails' only construction path is
+// `connection.create_schema_dumper`, i.e. `ConnectionAdapters::SchemaDumper.create`
+// (connection_adapters/abstract/schema_dumper.rb:8-10), the subclass that defines
+// `column_spec`. The base class is still where `ignoreTables` lives, and static
+// inheritance means the value this helper sets there is what the instance reads.
+import { SchemaDumper as BaseSchemaDumper } from "../schema-dumper.js";
 import type { SchemaSource } from "../schema-dumper.js";
-// Load the adapter-layer dumper so `SchemaDumper.create` resolves the
-// ConnectionAdapters subclass (the single `column_spec` emitter) for the plain
-// `SchemaSource`s this helper dumps — mirroring Rails, whose dump factory is the
-// adapter-layer `ConnectionAdapters::SchemaDumper.create`. `SchemaDumper` above
-// stays the base class so its `ignoreTables` static is the one this helper
-// saves/restores. The import registers the subclass as a side effect.
-import "../connection-adapters/abstract/schema-dumper.js";
+import { SchemaDumper } from "../connection-adapters/abstract/schema-dumper.js";
 
 /**
  * Test-only schema-dump helpers. Mirrors Rails'
@@ -36,7 +35,7 @@ export const FULL_DUMP_TIMEOUT_MS = 30_000;
  * as Rails' connection (it enumerates the data sources) and as the dump target.
  */
 export async function dumpTableSchema(source: SchemaSource, ...tables: string[]): Promise<string> {
-  const oldIgnoreTables = SchemaDumper.ignoreTables;
+  const oldIgnoreTables = BaseSchemaDumper.ignoreTables;
   // Rails: `connection.data_sources - tables` (tables + views). Prefer the
   // adapter's `dataSources()` so views are also ignored; fall back to `tables()`
   // for a bare `SchemaSource` that only enumerates base tables.
@@ -44,11 +43,11 @@ export async function dumpTableSchema(source: SchemaSource, ...tables: string[])
   const dataSources = enumerated.dataSources
     ? await enumerated.dataSources()
     : await source.tables();
-  SchemaDumper.ignoreTables = dataSources.filter((name) => !tables.includes(name));
+  BaseSchemaDumper.ignoreTables = dataSources.filter((name) => !tables.includes(name));
   try {
     return await SchemaDumper.dump(source);
   } finally {
-    SchemaDumper.ignoreTables = oldIgnoreTables;
+    BaseSchemaDumper.ignoreTables = oldIgnoreTables;
   }
 }
 
@@ -61,11 +60,11 @@ export async function dumpAllTableSchema(
   source: SchemaSource,
   ignoreTables: (string | RegExp)[] = [],
 ): Promise<string> {
-  const oldIgnoreTables = SchemaDumper.ignoreTables;
-  SchemaDumper.ignoreTables = ignoreTables;
+  const oldIgnoreTables = BaseSchemaDumper.ignoreTables;
+  BaseSchemaDumper.ignoreTables = ignoreTables;
   try {
     return await SchemaDumper.dump(source);
   } finally {
-    SchemaDumper.ignoreTables = oldIgnoreTables;
+    BaseSchemaDumper.ignoreTables = oldIgnoreTables;
   }
 }

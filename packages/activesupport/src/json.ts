@@ -61,6 +61,12 @@ export namespace ActiveSupportJSON {
   }
 
   /**
+   * Mirrors `alias_method :dump, :encode` (json/encoding.rb:43) — the same
+   * method under a second name, not a second implementation.
+   */
+  export const dump = encode;
+
+  /**
    * Ruby's JSON parser — what `ActiveSupport::JSON.decode` delegates to — skips
    * block and line comments anywhere whitespace is allowed, while `JSON.parse`
    * rejects them. The retry runs only after a parse failure, so valid documents
