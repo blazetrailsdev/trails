@@ -47,18 +47,14 @@ export function cmp(left: unknown, right: unknown): number | null {
  */
 export function union(left: unknown, right: unknown): unknown {
   if (typeof left === "number" && typeof right === "number") return left | right;
-  if (typeof left === "boolean" || typeof right === "boolean") {
-    return Boolean(left) || Boolean(right);
-  }
+  if (typeof left === "boolean" || typeof right === "boolean") return Boolean(left || right);
   return [...new Set([...(left as unknown[]), ...(right as unknown[])])];
 }
 
 /** Ruby `&` — set intersection on Array, bitwise-and / logical-and otherwise. */
 export function intersection(left: unknown, right: unknown): unknown {
   if (typeof left === "number" && typeof right === "number") return left & right;
-  if (typeof left === "boolean" || typeof right === "boolean") {
-    return Boolean(left) && Boolean(right);
-  }
+  if (typeof left === "boolean" || typeof right === "boolean") return Boolean(left && right);
   const other = new Set(right as unknown[]);
   return [...new Set(left as unknown[])].filter((v) => other.has(v));
 }

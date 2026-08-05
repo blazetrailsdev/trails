@@ -30,9 +30,8 @@ function makeColumn(
 }
 
 /**
- * Warm a cache the way Rails' SchemaCache tests do — through the blocking
- * `add(pool, table_name)`, which runs `primary_keys` before `columns` so the
- * authoritative key always reconciles the reflected column flags.
+ * Warm a cache as Rails' SchemaCache tests do — through the blocking
+ * `add(pool, table_name)`, which runs `primary_keys` before `columns`.
  */
 async function warm(
   cache: SchemaCache,

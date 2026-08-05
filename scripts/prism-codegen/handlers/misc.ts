@@ -12,7 +12,6 @@ const COMPOUND: Record<string, ts.BinaryOperator> = {
   "/": ts.SyntaxKind.SlashEqualsToken,
   "%": ts.SyntaxKind.PercentEqualsToken,
   "**": ts.SyntaxKind.AsteriskAsteriskEqualsToken,
-  ">>": ts.SyntaxKind.GreaterThanGreaterThanEqualsToken,
   "^": ts.SyntaxKind.CaretEqualsToken,
 };
 /** Compound operators with no JS assignment token — read through, write back. */

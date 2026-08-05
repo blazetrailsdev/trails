@@ -27,7 +27,6 @@ const INFIX: Record<string, ts.BinaryOperator> = {
   "/": ts.SyntaxKind.SlashToken,
   "%": ts.SyntaxKind.PercentToken,
   "**": ts.SyntaxKind.AsteriskAsteriskToken,
-  ">>": ts.SyntaxKind.GreaterThanGreaterThanToken,
   "^": ts.SyntaxKind.CaretToken,
 };
 /**
