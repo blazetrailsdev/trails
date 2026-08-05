@@ -5,12 +5,12 @@
  */
 
 import { Message } from "./message.js";
+import type { Cipher } from "./cipher.js";
 import type { Properties } from "./properties.js";
 import type { MessageSerializerLike } from "./message-serializer.js";
 import { getEncryptionContext } from "./context.js";
-import { Configurable } from "./configurable.js";
 import { Base, Configuration, Decryption, Encoding, ForbiddenClass } from "./errors.js";
-import type { Compressor } from "./config.js";
+import { getSharedConfig, type Compressor } from "./config.js";
 import { normalizeEncoding, replaceUnencodable } from "./encoding-helpers.js";
 
 // Mirrors: ActiveRecord::Encryption::Encryptor::THRESHOLD_TO_JUSTIFY_COMPRESSION
@@ -48,7 +48,7 @@ export class Encryptor {
 
   constructor(options?: { compress?: boolean; compressor?: Compressor }) {
     this._compress = options?.compress ?? true;
-    this._compressor = options?.compressor ?? Configurable.config.compressor;
+    this._compressor = options?.compressor ?? getSharedConfig().compressor;
   }
 
   encrypt(
@@ -142,7 +142,7 @@ export class Encryptor {
 
   /** @internal */
   private cipher() {
-    return Configurable.cipher;
+    return getEncryptionContext().cipher as Cipher;
   }
 
   get compressor(): Compressor {
@@ -155,7 +155,7 @@ export class Encryptor {
 
   /** @internal */
   private defaultKeyProvider(): KeyProviderLike | undefined {
-    return Configurable.keyProvider as KeyProviderLike | undefined;
+    return getEncryptionContext().keyProvider as KeyProviderLike | undefined;
   }
 
   /** @internal */
@@ -254,6 +254,6 @@ export class Encryptor {
 
   /** @internal */
   private forcedEncodingForDeterministicEncryption(): string {
-    return Configurable.config.forcedEncodingForDeterministicEncryption;
+    return getSharedConfig().forcedEncodingForDeterministicEncryption;
   }
 }

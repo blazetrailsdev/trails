@@ -537,6 +537,47 @@ describe("Date", () => {
     expect(() => new RubyDate(1582, 10, 10)).toThrow(RubyDate.Error);
     expect(new RubyDate(1582, 10, 10, RubyDate.GREGORIAN).toS()).toBe("1582-10-10");
   });
+  const civilOrError = (
+    year: number,
+    month: number,
+    day: number,
+    start: number,
+  ): [number, number, number] | "E" => {
+    try {
+      const date = new RubyDate(year, month, day, start);
+      return [date.year, date.mon, date.day];
+    } catch {
+      return "E";
+    }
+  };
+
+  it("takes date_initialize's valid_civil_p arm at or before REFORM_END_YEAR", () => {
+    expect(civilOrError(1581, 12, 31, RubyDate.ITALY)).toEqual([1581, 12, 31]);
+    expect(civilOrError(1500, 2, 29, RubyDate.ITALY)).toEqual([1500, 2, 29]);
+    expect(civilOrError(1582, 10, 10, RubyDate.ITALY)).toBe("E");
+    expect(civilOrError(1582, 10, 15, RubyDate.ITALY)).toEqual([1582, 10, 15]);
+    expect(civilOrError(1752, 9, 3, RubyDate.ENGLAND)).toBe("E");
+    expect(civilOrError(1930, 12, 31, RubyDate.ITALY)).toEqual([1930, 12, 31]);
+    expect(civilOrError(1900, 2, 29, RubyDate.ITALY)).toBe("E");
+  });
+
+  it("takes date_initialize's valid_gregorian_p arm past REFORM_END_YEAR", () => {
+    expect(civilOrError(1931, 1, 1, RubyDate.ITALY)).toEqual([1931, 1, 1]);
+    expect(civilOrError(2000, 2, 29, RubyDate.ITALY)).toEqual([2000, 2, 29]);
+    expect(civilOrError(2100, 2, 29, RubyDate.ITALY)).toBe("E");
+    expect(civilOrError(2100, 2, 28, RubyDate.ITALY)).toEqual([2100, 2, 28]);
+    expect(civilOrError(2001, 2, 29, RubyDate.ITALY)).toBe("E");
+    expect(civilOrError(2001, -1, -1, RubyDate.ITALY)).toEqual([2001, 12, 31]);
+    expect(civilOrError(2001, 13, 1, RubyDate.ITALY)).toBe("E");
+  });
+
+  it("takes date_initialize's guess_style arm under an infinite start", () => {
+    expect(civilOrError(2001, 1, 1, RubyDate.JULIAN)).toEqual([2001, 1, 1]);
+    expect(civilOrError(1, 1, 1, RubyDate.JULIAN)).toEqual([1, 1, 1]);
+    expect(civilOrError(1, 1, 1, RubyDate.GREGORIAN)).toEqual([1, 1, 1]);
+    expect(civilOrError(1500, 2, 29, RubyDate.GREGORIAN)).toBe("E");
+    expect(civilOrError(-4712, 1, 1, RubyDate.GREGORIAN)).toEqual([-4712, 1, 1]);
+  });
 });
 
 describe("DateTime", () => {
