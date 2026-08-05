@@ -194,6 +194,52 @@ export const SOURCES: readonly UpstreamSource[] = [
       },
     ],
   },
+  {
+    // ruby/spec — the behavior anchor for the corelib members that have no
+    // portable Ruby source to mirror. `Module#include` / `Module#prepend` are
+    // interpreter internals (`eval.c`, `class.c`); `Range#include?` and
+    // `String#succ` are C (`range.c` `range_include_internal`, `string.c`
+    // `rb_str_succ`). There is no method-by-method port to compare, so the spec
+    // suite is what pins their behavior.
+    //
+    // ruby/spec ships no version tags, so `ref` is a dated SHA (2026-07-15) —
+    // a moving branch name would silently re-point the anchor.
+    name: "ruby_spec",
+    origin: {
+      type: "git",
+      url: "https://github.com/ruby/spec.git",
+      ref: "87b1631992bd00cf0c4934474766d54dad088191",
+    },
+    packages: [
+      // `compareApi: false` is PERMANENT on every entry below, not a flag a
+      // later story flips: there is no Ruby method list to compare a TS surface
+      // against, only behavior. This source enrolls in test-compare only.
+      // `compareTests` is false until `corelib-test-compare-enrollment` turns
+      // it on. libPath and testPath are the same dir because in ruby/spec the
+      // specs *are* the source.
+      {
+        name: "ruby-spec-module",
+        libPath: "core/module",
+        testPath: "core/module",
+        compareApi: false,
+        compareTests: false,
+      },
+      {
+        name: "ruby-spec-range",
+        libPath: "core/range",
+        testPath: "core/range",
+        compareApi: false,
+        compareTests: false,
+      },
+      {
+        name: "ruby-spec-string",
+        libPath: "core/string",
+        testPath: "core/string",
+        compareApi: false,
+        compareTests: false,
+      },
+    ],
+  },
 ];
 
 /**

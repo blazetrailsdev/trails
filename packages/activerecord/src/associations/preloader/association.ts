@@ -1,5 +1,4 @@
 import type { Base } from "../../base.js";
-import type { Table } from "@blazetrails/arel";
 import type { AssociationReflection, ThroughReflection } from "../../reflection.js";
 import { ConnectionNotDefined } from "../../errors.js";
 import { _wireInverseAssociation } from "../../associations.js";
@@ -23,9 +22,9 @@ export class Association {
   /** @internal */
   readonly reflection: AssociationLikeReflection;
   /** @internal */
-  protected _preloadScope: any;
+  protected preloadScope: any;
   /** @internal */
-  protected _reflectionScope: any;
+  protected reflectionScope: any;
   private _associate: boolean;
   private _model: typeof Base | null;
   private _run: boolean;
@@ -47,8 +46,8 @@ export class Association {
     this.klass = klass;
     this.owners = this._uniqueOwners(owners);
     this.reflection = reflection;
-    this._preloadScope = preloadScope ?? null;
-    this._reflectionScope = reflectionScope ?? null;
+    this.preloadScope = preloadScope ?? null;
+    this.reflectionScope = reflectionScope ?? null;
     this._associate = associateByDefault || preloadScope == null;
     this._model = owners.length > 0 ? (owners[0].constructor as typeof Base) : null;
     this._run = false;
@@ -204,8 +203,8 @@ export class Association {
 
   associateRecordsFromUnscoped(unscopedRecords: Base[] | undefined): void {
     if (!unscopedRecords || unscopedRecords.length === 0) return;
-    if (this._reflectionScope != null) return;
-    if (this._preloadScope != null) return;
+    if (this.reflectionScope != null) return;
+    if (this.preloadScope != null) return;
     if ((this.reflection as any).isCollection?.()) return;
 
     for (const record of unscopedRecords) {
@@ -346,18 +345,18 @@ export class Association {
 
     // Merge reflection scope: use the pre-computed scope from Branch if available,
     // otherwise apply the raw scope function directly
-    if (this._reflectionScope != null) {
-      scope = scope.merge(this._reflectionScope);
+    if (this.reflectionScope != null) {
+      scope = scope.merge(this.reflectionScope);
     } else if (this.reflection.scope) {
       const scopeResult = this.reflection.scope(scope);
       if (scopeResult) scope = scopeResult;
     }
 
-    if (this._preloadScope && !this._preloadScope.isEmptyScope) {
-      scope = scope.merge(this._preloadScope);
+    if (this.preloadScope && !this.preloadScope.isEmptyScope) {
+      scope = scope.merge(this.preloadScope);
     }
 
-    return this._cascadeStrictLoading(scope);
+    return this.cascadeStrictLoading(scope);
   }
 
   /**
@@ -366,8 +365,8 @@ export class Association {
    * Mirrors: ActiveRecord::Associations::Preloader::Association#cascade_strict_loading
    * @internal
    */
-  protected _cascadeStrictLoading(scope: any): any {
-    return this._preloadScope?.isStrictLoading ? (scope.strictLoading?.() ?? scope) : scope;
+  protected cascadeStrictLoading(scope: any): any {
+    return this.preloadScope?.isStrictLoading ? (scope.strictLoading?.() ?? scope) : scope;
   }
 
   private _uniqueOwners(owners: Base[]): Base[] {
@@ -557,11 +556,6 @@ function reflection(assoc: Association): unknown {
 }
 
 /** @internal */
-function preloadScope(assoc: Association): unknown {
-  return (assoc as any)._preloadScope;
-}
-
-/** @internal */
 function model(assoc: Association): unknown {
   return (assoc as any)._model;
 }
@@ -611,20 +605,6 @@ function ownerKeyType(assoc: Association): string | null {
 }
 
 /** @internal */
-function reflectionScope(assoc: Association): unknown {
-  // Rails: reflection.join_scopes(klass.arel_table, klass.predicate_builder, klass).inject(&:merge!)
-  // Our implementation memoizes this as _reflectionScope; the arel_table is accessed internally.
-  const table: Table | undefined = (assoc as any)._model?.arelTable;
-  void table; // used by Rails to build scopes; our preloader memoizes the result
-  return (assoc as any)._reflectionScope;
-}
-
-/** @internal */
 function buildScope(assoc: Association): unknown {
   return (assoc as any)._buildScope();
-}
-
-/** @internal */
-function cascadeStrictLoading(assoc: Association, scope: unknown): unknown {
-  return (assoc as any)._cascadeStrictLoading(scope);
 }

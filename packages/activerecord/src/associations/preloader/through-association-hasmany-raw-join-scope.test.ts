@@ -85,9 +85,7 @@ describe("Preloader::ThroughAssociation#through_scope has_many raw-join handling
     const groucho = members("groucho");
     const loader = throughLoader([groucho], "rawClubs");
     expect(() =>
-      (loader as unknown as { _buildThroughScope: () => { toSql: () => string } })
-        ._buildThroughScope()
-        .toSql(),
+      (loader as unknown as { throughScope: () => { toSql: () => string } }).throughScope().toSql(),
     ).toThrow(ConfigurationError);
   });
 

@@ -124,7 +124,7 @@ describe("Preloader::ThroughAssociation#through_scope", () => {
   it("carries annotate from the through reflection scope onto the through query", async () => {
     const david = authors("david");
     const loader = throughLoader([david], "annotatedComments");
-    const scope = (loader as any)._buildThroughScope();
+    const scope = (loader as any).throughScope();
     expect(scope.toSql()).toContain("preload-through");
 
     const [row] = await Author.where({ id: david.id }).preload("annotatedComments");
@@ -139,7 +139,7 @@ describe("Preloader::ThroughAssociation#through_scope", () => {
     // comments), whose JoinDependency dedups the middle records by PK — so the
     // source condition rides the through query with the source JOIN, resolving
     // in one query rather than being deferred to the source stage.
-    const scope = (loader as any)._buildThroughScope();
+    const scope = (loader as any).throughScope();
     const sql = scope.toSql();
     expect(sql).toContain("first comment");
     expect(sql).toMatch(/JOIN .*comments/);
@@ -148,7 +148,7 @@ describe("Preloader::ThroughAssociation#through_scope", () => {
   it("copies a through-table condition onto the through query for a collection source", () => {
     const david = authors("david");
     const loader = throughLoader([david], "commentsWithThroughCondition");
-    const scope = (loader as any)._buildThroughScope();
+    const scope = (loader as any).throughScope();
     const sql = scope.toSql();
     // The through-table predicate constrains the intermediate (posts) rows.
     expect(sql).toContain("Welcome to the weblog");
@@ -157,7 +157,7 @@ describe("Preloader::ThroughAssociation#through_scope", () => {
   it("copies a raw-SQL through-table condition onto the through query for a collection source", () => {
     const david = authors("david");
     const loader = throughLoader([david], "commentsWithRawThroughCondition");
-    const scope = (loader as any)._buildThroughScope();
+    const scope = (loader as any).throughScope();
     // Raw through-table predicate rides the through query (Rails' full
     // where_clause assignment), not the source query where `posts` is unjoined.
     expect(scope.toSql()).toContain("posts.title");
@@ -166,7 +166,7 @@ describe("Preloader::ThroughAssociation#through_scope", () => {
   it("does not copy a mixed through+source predicate onto the through query", () => {
     const david = authors("david");
     const loader = throughLoader([david], "commentsWithMixedCondition");
-    const scope = (loader as any)._buildThroughScope();
+    const scope = (loader as any).throughScope();
     // The predicate references both `posts` (through) and `comments` (source) in
     // one node. Rails copies the full where_clause and JOINs the source, so both
     // tables are available on the through query and the whole predicate resolves
@@ -210,7 +210,7 @@ describe("Preloader::ThroughAssociation#through_scope", () => {
     const david = authors("david");
 
     const loader = throughLoader([david], "annotatedComments", Comment.all().strictLoading());
-    const scope = (loader as any)._buildThroughScope();
+    const scope = (loader as any).throughScope();
     expect(scope.isStrictLoading).toBe(true);
   });
 });

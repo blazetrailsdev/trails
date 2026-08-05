@@ -8,23 +8,18 @@ import { pluralize, singularize } from "@blazetrails/activesupport";
 type AssociationLikeReflection = AssociationReflection | ThroughReflection;
 
 /**
- * `loaders.map(&:records_by_owner).reduce(:merge)`. Rails' `records_by_owner`
- * reader forces `load_records` (preloader/association.rb:148-151); ours is
- * async and these merges are read from synchronous callers, so the forcing is
- * hoisted to `recordsByOwner` and this returns `undefined` — never a partial
- * merge that a caller could memoize — if any loader has yet to load.
- * @internal
+ * `reduce(:merge)` over the loaders' `records_by_owner`. Rails' reader forces
+ * `load_records` (preloader/association.rb:148-151); ours is async and these
+ * merges are read from synchronous callers, so the forcing is hoisted to
+ * `recordsByOwner` and the reduce answers `undefined` — never a partial merge a
+ * caller could memoize — as soon as one loader has yet to load.
  */
-function mergeRecordsByOwner(loaders: Association[]): Map<Base, Base[]> | undefined {
-  const merged = new Map<Base, Base[]>();
-  for (const loader of loaders) {
-    const map = (loader as any)._recordsByOwner as Map<Base, Base[]> | undefined;
-    if (map === undefined) return undefined;
-    for (const [owner, records] of map) {
-      merged.set(owner, records);
-    }
-  }
-  return merged;
+function merge(
+  acc: Map<Base, Base[]> | undefined,
+  recordsByOwner: Map<Base, Base[]> | undefined,
+): Map<Base, Base[]> | undefined {
+  if (acc === undefined || recordsByOwner === undefined) return undefined;
+  return new Map([...acc, ...recordsByOwner]);
 }
 
 /**
@@ -55,7 +50,7 @@ export class ThroughAssociation extends Association {
 
   get preloadedRecords(): Base[] {
     if (this._throughPreloadedRecords !== undefined) return this._throughPreloadedRecords;
-    this._throughPreloadedRecords = this._getSourcePreloaders().flatMap((l) => l.preloadedRecords);
+    this._throughPreloadedRecords = this.sourcePreloaders().flatMap((l) => l.preloadedRecords);
     return this._throughPreloadedRecords;
   }
 
@@ -89,13 +84,13 @@ export class ThroughAssociation extends Association {
     // which cannot await — so the forcing happens here, on the one path that
     // can. Through loaders first: `source_preloaders` is derived from the
     // middle records they produce.
-    await Promise.all(this._getThroughPreloaders().map((l) => l.recordsByOwner()));
-    await Promise.all(this._getSourcePreloaders().map((l) => l.recordsByOwner()));
+    await Promise.all(this.throughPreloaders().map((l) => l.recordsByOwner()));
+    await Promise.all(this.sourcePreloaders().map((l) => l.recordsByOwner()));
 
-    const throughRecordsByOwner = this._getThroughRecordsByOwner();
-    const sourceRecordsByOwner = this._getSourceRecordsByOwner();
+    const throughRecordsByOwner = this.throughRecordsByOwner();
+    const sourceRecordsByOwner = this.sourceRecordsByOwner();
 
-    const throughRefl = this._throughReflection;
+    const throughRefl = this.throughReflection;
     const firstOwner = this.owners[0] as any;
     const throughLoadedOnFirst =
       throughRefl != null &&
@@ -119,7 +114,7 @@ export class ThroughAssociation extends Association {
       if (throughLoadedOnFirst) {
         const sourceType = (this.reflection as any).options?.sourceType;
         const foreignType =
-          (this.reflection as any).foreignType ?? (this._sourceReflection as any)?.foreignType;
+          (this.reflection as any).foreignType ?? (this.sourceReflection as any)?.foreignType;
         if (sourceType && foreignType) {
           throughRecords = throughRecords.filter(
             (record) => (record as any)._readAttribute(foreignType) === sourceType,
@@ -132,7 +127,7 @@ export class ThroughAssociation extends Association {
 
       // Preserve scope ordering via preload index
       if (this.scope?.orderValues?.length > 0) {
-        const index = this._getPreloadIndex();
+        const index = this.preloadIndex();
         records.sort((a, b) => (index.get(a) ?? 0) - (index.get(b) ?? 0));
       }
 
@@ -154,13 +149,13 @@ export class ThroughAssociation extends Association {
   }
 
   runnableLoaders(): Association[] {
-    if (this._dataAvailable()) {
+    if (this.dataAvailable()) {
       return [this];
     }
 
-    const throughPreloaders = this._getThroughPreloaders();
+    const throughPreloaders = this.throughPreloaders();
     if (throughPreloaders.every((l) => l.isRun())) {
-      return this._getSourcePreloaders().flatMap((l) => l.runnableLoaders());
+      return this.sourcePreloaders().flatMap((l) => l.runnableLoaders());
     }
 
     return throughPreloaders.flatMap((l) => l.runnableLoaders());
@@ -169,10 +164,10 @@ export class ThroughAssociation extends Association {
   futureClasses(): (typeof Base)[] {
     if (this.isRun()) return [];
 
-    const throughPreloaders = this._getThroughPreloaders();
+    const throughPreloaders = this.throughPreloaders();
     if (throughPreloaders.every((l) => l.isRun())) {
       const seen = new Set<typeof Base>();
-      return this._getSourcePreloaders()
+      return this.sourcePreloaders()
         .flatMap((l) => l.futureClasses())
         .filter((k) => {
           if (seen.has(k)) return false;
@@ -182,7 +177,7 @@ export class ThroughAssociation extends Association {
     }
 
     const throughClasses = throughPreloaders.flatMap((l) => l.futureClasses());
-    const sourceRefl = this._sourceReflection;
+    const sourceRefl = this.sourceReflection;
     const sourceClasses: (typeof Base)[] = [];
     if (sourceRefl) {
       try {
@@ -208,19 +203,19 @@ export class ThroughAssociation extends Association {
     });
   }
 
-  private _dataAvailable(): boolean {
+  private dataAvailable(): boolean {
     return (
       this.owners.every((owner) => this.isLoaded(owner)) ||
-      (this._getThroughPreloaders().every((l) => l.isRun()) &&
-        this._getSourcePreloaders().every((l) => l.isRun()))
+      (this.throughPreloaders().every((l) => l.isRun()) &&
+        this.sourcePreloaders().every((l) => l.isRun()))
     );
   }
 
-  private _getSourcePreloaders(): Association[] {
+  private sourcePreloaders(): Association[] {
     if (this._sourcePreloaders !== undefined) return this._sourcePreloaders;
 
-    const middleRecords = this._getMiddleRecords();
-    const sourceRefl = this._sourceReflection;
+    const middleRecords = this.middleRecords();
+    const sourceRefl = this.sourceReflection;
     if (!sourceRefl || middleRecords.length === 0) {
       return [];
     }
@@ -229,7 +224,7 @@ export class ThroughAssociation extends Association {
     // `source_reflection.name` passing this preloader's built `scope`
     // (through_association.rb:70-71). Rails passes the full built scope
     // (reflection_scope merged, `preloader/association.rb:294-304`); trails empties
-    // the source where_clause ONLY when `_buildThroughScope` already resolved it
+    // the source where_clause ONLY when `throughScope` already resolved it
     // by copying the FULL where_clause onto the through query and eager-loading the
     // source there (the `!where_clause.empty?` branch, for every source kind). In
     // that case the middle records arrive with their source association already
@@ -240,7 +235,7 @@ export class ThroughAssociation extends Association {
     // `orderedPostComments`' `order(id: :desc)` still orders the source query in
     // the fallthrough where the reflection where_clause was empty (no eager-load).
     //
-    // The `source_type` branch of `_buildThroughScope` (rb:115-116) applies ONLY
+    // The `source_type` branch of `throughScope` (rb:115-116) applies ONLY
     // the source_type filter and does NOT copy the reflection where_clause onto
     // the through query, so the source is genuinely queried here and MUST keep the
     // reflection scope's (source-table) predicates — otherwise a scoped
@@ -254,16 +249,16 @@ export class ThroughAssociation extends Association {
     let sourceScope = null;
     const sourceIsNested = (sourceRefl as any).isThroughReflection?.() ?? false;
     const hasSourceType = !!(this.reflection as any).options?.sourceType;
-    if (!sourceIsNested && this._reflectionScope != null) {
-      sourceScope = this._reflectionScope._clone();
+    if (!sourceIsNested && this.reflectionScope != null) {
+      sourceScope = this.reflectionScope._clone();
       if (!hasSourceType) {
         sourceScope._whereClause = new WhereClause([]);
       }
     }
-    if (sourceScope != null && this._preloadScope != null) {
-      sourceScope = sourceScope.merge(this._preloadScope);
+    if (sourceScope != null && this.preloadScope != null) {
+      sourceScope = sourceScope.merge(this.preloadScope);
     } else if (sourceScope == null) {
-      sourceScope = this._preloadScope;
+      sourceScope = this.preloadScope;
     }
 
     const preloader = new Preloader({
@@ -276,10 +271,10 @@ export class ThroughAssociation extends Association {
     return this._sourcePreloaders;
   }
 
-  private _getThroughPreloaders(): Association[] {
+  private throughPreloaders(): Association[] {
     if (this._throughPreloaders !== undefined) return this._throughPreloaders;
 
-    const throughRefl = this._throughReflection;
+    const throughRefl = this.throughReflection;
     if (!throughRefl) {
       this._throughPreloaders = [];
       return this._throughPreloaders;
@@ -288,28 +283,32 @@ export class ThroughAssociation extends Association {
     const preloader = new Preloader({
       records: this.owners,
       associations: [throughRefl.name],
-      scope: this._buildThroughScope(),
+      scope: this.throughScope(),
       associateByDefault: false,
     });
     this._throughPreloaders = preloader.loaders;
     return this._throughPreloaders;
   }
 
-  private _getMiddleRecords(): Base[] {
-    return [...this._getThroughRecordsByOwner().values()].flat();
+  private middleRecords(): Base[] {
+    return [...this.throughRecordsByOwner().values()].flat();
   }
 
-  private _getSourceRecordsByOwner(): Map<Base, Base[]> {
-    this._sourceRecordsByOwner ??= mergeRecordsByOwner(this._getSourcePreloaders());
+  private sourceRecordsByOwner(): Map<Base, Base[]> {
+    this._sourceRecordsByOwner ??= this.sourcePreloaders()
+      .map((l) => (l as any)._recordsByOwner as Map<Base, Base[]> | undefined)
+      .reduce(merge, new Map<Base, Base[]>());
     return this._sourceRecordsByOwner ?? new Map();
   }
 
-  private _getThroughRecordsByOwner(): Map<Base, Base[]> {
-    this._throughRecordsByOwner ??= mergeRecordsByOwner(this._getThroughPreloaders());
+  private throughRecordsByOwner(): Map<Base, Base[]> {
+    this._throughRecordsByOwner ??= this.throughPreloaders()
+      .map((l) => (l as any)._recordsByOwner as Map<Base, Base[]> | undefined)
+      .reduce(merge, new Map<Base, Base[]>());
     return this._throughRecordsByOwner ?? new Map();
   }
 
-  private _getPreloadIndex(): Map<Base, number> {
+  private preloadIndex(): Map<Base, number> {
     if (this._preloadIndex !== undefined) return this._preloadIndex;
     this._preloadIndex = new Map();
     this.preloadedRecords.forEach((record, index) => {
@@ -340,8 +339,8 @@ export class ThroughAssociation extends Association {
    * which this query never takes. `disable_joins` and polymorphic `source_type`
    * keep their own paths.
    */
-  private _buildThroughScope(): any {
-    const throughRefl = this._throughReflection;
+  private throughScope(): any {
+    const throughRefl = this.throughReflection;
     if (!throughRefl) return undefined;
 
     let throughKlass: typeof Base;
@@ -358,7 +357,7 @@ export class ThroughAssociation extends Association {
     // the association opts out of joins (through_association.rb:108).
     if (options.disableJoins) return scope;
 
-    const reflScope = this._reflectionScope;
+    const reflScope = this.reflectionScope;
 
     // values[:annotate] → scope.annotate!(*annotations) (through_association.rb:111-113)
     const annotations: string[] = reflScope?._annotations ?? [];
@@ -377,7 +376,7 @@ export class ThroughAssociation extends Association {
       // elsif !reflection_scope.where_clause.empty? (rb:117-143): copy the FULL
       // where_clause onto the through query and JOIN the source reflection so
       // every referenced column resolves in this single query.
-      const sourceRefl = this._sourceReflection;
+      const sourceRefl = this.sourceReflection;
       if (sourceRefl) {
         // Mirror Rails' `through_scope` eager-load branch exactly for EVERY
         // source kind (to-one, collection, nested through).
@@ -389,7 +388,7 @@ export class ThroughAssociation extends Association {
         // a to-many nested include such as the canonical `tag` source's own
         // `includes(:tagging)`) no longer fans the middle records out. The
         // instantiated middle records carry their source association already
-        // loaded, so the recursive `_getSourcePreloaders` stage finds it loaded
+        // loaded, so the recursive `sourcePreloaders` stage finds it loaded
         // and issues no further query — collapsing authors+posts+taggings+tags
         // to two queries. Every referenced column (through-table, source-table,
         // or sub-chain intermediate) resolves in this one join, closing the
@@ -462,10 +461,10 @@ export class ThroughAssociation extends Association {
 
     // cascade_strict_loading: a strict-loading preload scope propagates to the
     // through query so intermediate records inherit the constraint (rb:145).
-    return this._cascadeStrictLoading(scope);
+    return this.cascadeStrictLoading(scope);
   }
 
-  private get _throughReflection(): AssociationLikeReflection | null {
+  private get throughReflection(): AssociationLikeReflection | null {
     const refl = (this.reflection as any).throughReflection;
     if (refl) return refl;
 
@@ -479,11 +478,11 @@ export class ThroughAssociation extends Association {
     return null;
   }
 
-  private get _sourceReflection(): AssociationLikeReflection | null {
+  private get sourceReflection(): AssociationLikeReflection | null {
     const refl = (this.reflection as any).sourceReflection;
     if (refl && refl !== this.reflection) return refl;
 
-    const throughRefl = this._throughReflection;
+    const throughRefl = this.throughReflection;
     if (!throughRefl) return null;
     const model = (this.reflection as any).activeRecord;
     const assocDef = model?._associations?.find((a: any) => a.name === this.reflection.name);
@@ -505,55 +504,4 @@ export class ThroughAssociation extends Association {
     }
     return null;
   }
-}
-
-/**
-/** @internal */
-function isDataAvailable(assoc: ThroughAssociation): boolean {
-  return (assoc as any)._dataAvailable();
-}
-
-/** @internal */
-function sourcePreloaders(assoc: ThroughAssociation): unknown[] {
-  return (assoc as any)._sourcePreloaders ?? [];
-}
-
-/** @internal */
-function middleRecords(assoc: ThroughAssociation): unknown[] {
-  return (assoc as any)._getMiddleRecords?.() ?? [];
-}
-
-/** @internal */
-function throughPreloaders(assoc: ThroughAssociation): unknown[] {
-  return (assoc as any)._throughPreloaders ?? [];
-}
-
-/** @internal */
-function throughReflection(assoc: ThroughAssociation): unknown {
-  return (assoc as any)._throughReflection;
-}
-
-/** @internal */
-function sourceReflection(assoc: ThroughAssociation): unknown {
-  return (assoc as any)._sourceReflection;
-}
-
-/** @internal */
-function sourceRecordsByOwner(assoc: ThroughAssociation): Map<unknown, unknown[]> {
-  return (assoc as any)._sourceRecordsByOwner ?? new Map();
-}
-
-/** @internal */
-function throughRecordsByOwner(assoc: ThroughAssociation): Map<unknown, unknown[]> {
-  return (assoc as any)._throughRecordsByOwner ?? new Map();
-}
-
-/** @internal */
-function preloadIndex(assoc: ThroughAssociation): Map<unknown, number> {
-  return (assoc as any)._preloadIndex ?? new Map();
-}
-
-/** @internal */
-function throughScope(assoc: ThroughAssociation): unknown {
-  return (assoc as any)._buildThroughScope?.() ?? null;
 }

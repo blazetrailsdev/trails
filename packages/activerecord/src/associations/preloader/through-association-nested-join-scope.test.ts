@@ -125,8 +125,8 @@ describe("Preloader::ThroughAssociation#through_scope multi-level nested join ca
       associateByDefault: false,
     }).loaders.find((l) => l instanceof ThroughAssociation);
     if (!loader) throw new Error("expected a ThroughAssociation loader");
-    return (loader as unknown as { _buildThroughScope: () => { toSql: () => string } })
-      ._buildThroughScope()
+    return (loader as unknown as { throughScope: () => { toSql: () => string } })
+      .throughScope()
       .toSql();
   }
 

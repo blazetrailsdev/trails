@@ -592,6 +592,30 @@ describe("DateTime", () => {
       "Sat, 01 Mar 2008 06:00:00 +00:00",
     );
   });
+
+  it("carries the start it was built under, as datetime_s_new does", () => {
+    // ruby 3.3.11: DateTime.new(2001, 2, 3, 4, 5, 6, 0, Date::ENGLAND).start #=> 2361222.0
+    expect(new RubyDateTime(2001, 2, 3, 4, 5, 6, RubyDate.ENGLAND).start).toBe(2361222);
+    expect(new RubyDateTime(2001, 2, 3, 4, 5, 6).start).toBe(RubyDate.ITALY);
+  });
+
+  it("dups the receiver on new_start, keeping its class and time of day", () => {
+    // ruby 3.3.11: DateTime.new(2000, 2, 3, 6, 7, 8).julian
+    //   #=> #<DateTime: 2000-01-21T06:07:08+00:00>, start Infinity
+    const julian = new RubyDateTime(2000, 2, 3, 6, 7, 8).julian();
+    expect(julian).toBeInstanceOf(RubyDateTime);
+    expect(julian.strftime("%Y-%m-%dT%H:%M:%S")).toBe("2000-01-21T06:07:08");
+    expect(julian.start).toBe(RubyDate.JULIAN);
+
+    const england = new RubyDateTime(2001, 2, 3, 4, 5, 6).england();
+    expect(england).toBeInstanceOf(RubyDateTime);
+    expect(england.start).toBe(2361222);
+    expect(england.strftime("%Y-%m-%dT%H:%M:%S")).toBe("2001-02-03T04:05:06");
+
+    expect(new RubyDateTime(2000, 2, 3, 6, 7, 8).newStart(RubyDate.JULIAN).hour).toBe(6);
+    expect(new RubyDateTime(2000, 2, 3, 6, 7, 8).italy()).toBeInstanceOf(RubyDateTime);
+    expect(new RubyDateTime(2000, 2, 3, 6, 7, 8).gregorian().start).toBe(RubyDate.GREGORIAN);
+  });
 });
 
 describe("Time", () => {
