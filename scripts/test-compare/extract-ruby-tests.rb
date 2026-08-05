@@ -607,18 +607,29 @@ class TestExtractor
   # whether the body runs when the condition is true (`if` → true, `unless` → false).
   def gate_from_run_condition(cond, positive)
     acc = { adapter_syms: [], neg_adapter_syms: [], features: [], neg_features: [], guards: [],
-            has_or: false }
+            has_or: false, has_and: false }
     scan_run_condition(cond, acc)
 
-    # A NEGATED feature predicate only decomposes on the run-when-true path of a
-    # pure conjunction (`if current_adapter?(:X) && !supports_y?`): there the test
-    # runs on `X ∩ ¬y`, which a surviving adapter set plus a `no_y` guard states
-    # exactly — while lumping `y` into `:features` would claim the OPPOSITE
-    # capability alongside that adapter set. Elsewhere the run-on set isn't that
-    # intersection, so the polarity-blind lumping stays.
-    split = positive && !acc[:has_or]
-    features = split ? acc[:features] : acc[:features] + acc[:neg_features]
-    inverted_features = split ? acc[:neg_features] : []
+    # A NEGATED feature predicate only decomposes when the RUN condition is a pure
+    # conjunction: there the test runs on an intersection, which a surviving
+    # adapter set plus a `no_y` guard states exactly — while lumping `y` into
+    # `:features` would claim the OPPOSITE capability alongside that adapter set.
+    # Elsewhere the run-on set isn't that intersection, so the polarity-blind
+    # lumping stays.
+    #
+    # `has_or` is textual, so it only answers that question on the run-when-true
+    # path. On the `unless` path the run condition is the NEGATION of the source
+    # condition, and De Morgan turns its `&&` into a disjunction (`unless A && B`
+    # runs on `!A || B`) that `has_or` never sees — hence `has_and`.
+    run_has_or = positive ? acc[:has_or] : (acc[:has_and] || acc[:has_or])
+    split = !run_has_or
+    # Feature polarity is read against the RUN condition: on the `unless` path a
+    # textually-negated predicate is the one the test RUNS on (`skip if
+    # !supports_x?` runs on `supports_x?`), so the two buckets swap.
+    run_features = positive ? acc[:features] : acc[:neg_features]
+    run_neg_features = positive ? acc[:neg_features] : acc[:features]
+    features = split ? run_features : acc[:features] + acc[:neg_features]
+    inverted_features = split ? run_neg_features : []
     any_feature = !features.empty? || !inverted_features.empty?
 
     adapters = acc[:adapter_syms].map { |s| ADAPTER_SYMBOL_MAP[s] }.compact.uniq
@@ -671,7 +682,7 @@ class TestExtractor
       gate[:adapters] = base - neg_adapters
     end
     unless features.empty?
-      if positive
+      if positive || split
         gate[:features] = features.uniq
       else
         gate[:guards] = (gate[:guards] || []) + features.map { |f| "no_#{f}" }
@@ -699,6 +710,10 @@ class TestExtractor
     # `||`/`or` anywhere makes the run-on adapter set a disjunction; record it so
     # a negated-adapter exclusion isn't unsoundly emitted from a compound.
     acc[:has_or] = true if node[0] == :binary && (node[2] == :"||" || node[2] == :or)
+    # `&&`/`and` becomes a disjunction once the condition is negated, which is
+    # exactly what the `unless` path runs on; recorded so the polarity split can
+    # tell a pure run-condition conjunction from `!(A && B)`.
+    acc[:has_and] = true if node[0] == :binary && (node[2] == :"&&" || node[2] == :and)
     name = call_ident_name(node)
     if name
       # Once a predicate is identified, stop: recursing into its own receiver/args

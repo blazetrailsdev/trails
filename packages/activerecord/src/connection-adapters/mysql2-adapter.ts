@@ -16,11 +16,7 @@ import { isRubyTruthy } from "../ruby-truthy.js";
 import { TypeMap } from "../type/type-map.js";
 import * as Type from "../type.js";
 import { UnsignedInteger } from "../type/unsigned-integer.js";
-import {
-  AbstractAdapter,
-  Version,
-  RAW_CONNECTION_DEPRECATION_MESSAGE,
-} from "./abstract-adapter.js";
+import { AbstractAdapter, RAW_CONNECTION_DEPRECATION_MESSAGE } from "./abstract-adapter.js";
 import { deprecator } from "../deprecator.js";
 import { captureUnwrappedExecute, dirtiesQueryCache } from "./abstract/query-cache.js";
 import {
@@ -351,7 +347,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     super.clearCacheBang();
     this._statementPool?.clear();
   }
-  private _fullVersionString: string | null = null;
   private _database: string | undefined;
 
   /**
@@ -1742,19 +1737,15 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   /**
-   * Fetch the raw version string from the server (e.g. "8.0.28").
-   * Populates _databaseVersion and _mariadb as a side effect.
+   * Mirrors: Mysql2Adapter#get_full_version (mysql2_adapter.rb:168-170) —
+   * `any_raw_connection.server_info[:version]`. No memo: `database_version` is
+   * the only memo in the Rails chain.
    * @internal
    */
   async getFullVersion(): Promise<string> {
-    if (this._fullVersionString) return this._fullVersionString;
     const conn = await this.getConn();
     const [[row]] = (await conn.query("SELECT VERSION() AS v")) as [Array<{ v: string }>, unknown];
-    const ver = row?.v ?? "0.0.0";
-    this._fullVersionString = ver;
-    this._mariadb = /mariadb/i.test(ver);
-    this._databaseVersion = new Version(this.versionString(ver), ver);
-    return ver;
+    return row?.v ?? "0.0.0";
   }
 
   /**

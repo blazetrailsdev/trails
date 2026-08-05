@@ -139,6 +139,38 @@ to carry a real reason (writing one is still the rule, enforced by whoever
 reviews the baseline diff). `pnpm api:calls:wide:unreviewed` prints the count
 and the mark.
 
+#### Row count is the debt metric; the unreviewed count is not
+
+Decision (RFC 0084): the debt this campaign burns down is the wide baseline's
+**row count**. The unreviewed-reason count is a review-hygiene signal, not a
+debt metric, and is not tracked as one.
+
+The evidence is the two series side by side. Rows went 6,845 (2026-07-17) →
+2,218 (2026-08-03) → 2,195 today, because rows converge by **deletion** — the
+port starts making the call Rails makes and the row goes stale. Over the same
+window the unreviewed count barely moved: 2,028 of 2,218 rows (91%) still
+carried the verbatim RFC 0047 seed weeks after seeding, and it is 2,005 of
+2,195 now. Per-row reason wordsmithing is not happening at any rate that
+matters, and reviewer cycles spent demanding it buy no convergence — the row
+they would have justified is one a later PR deletes outright.
+
+So, concretely:
+
+- **Do not block a PR on seeded reasons in rows it did not add.** Inherited
+  seed strings are not that PR's debt.
+- **Do write a real reason for a row you add.** That rule stands (CLAUDE.md's
+  pre-PR checklist) — it is what makes the baseline diff reviewable — and
+  `@missingRailsCall` at the call site remains the alternative. Rows an author
+  chooses to justify keep their reviewed reason; nothing about the reviewed
+  path is withdrawn.
+- **Report progress in rows retired**, not reasons written.
+
+Nothing mechanical is loosened. The only-shrink row ratchet, the per-file
+unreviewed high-water marks, the stale-tag arm, the reseed-drift arm and the
+sharding are all untouched — every one of them has a paid-for incident behind
+it (#4020, #5869), and the unreviewed marks in particular still stop the count
+from _growing_. What changes is what we ask reviewers to spend cycles on.
+
 Decision (this story): the wide lint is deliberately **kept out of
 `pnpm api:compare`** and documented here instead. Folding it in would make the
 common narrow run pay for the wide-artifact regeneration on every invocation,
