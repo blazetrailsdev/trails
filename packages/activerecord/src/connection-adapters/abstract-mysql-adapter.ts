@@ -395,10 +395,15 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    * adapter and reaches it from the abstract class by duck typing; TS needs a
    * declared member, so the single definition lives here. Sync like Rails,
    * because `database_version` is the memo `configureConnection` warms.
+   *
+   * Deviation: `Version#fullVersionString` is nullable in trails — a Version
+   * built from a bare numeric string carries none — where Rails always sets it
+   * from `get_full_version`, so the `?? ""` stands in for a field Rails cannot
+   * observe as nil.
    * @internal
    */
   fullVersion(): string {
-    return this._databaseVersion?.fullVersionString ?? "";
+    return this.databaseVersion.fullVersionString ?? "";
   }
 
   /**
@@ -436,15 +441,15 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   supportsIndexSortOrder(): boolean {
     // Rails: `mariadb? ? database_version >= "10.8.1" : database_version >= "8.0.1"`
     // (abstract_mysql_adapter.rb#supports_index_sort_order?).
-    if (this.isMariadb()) return (this._databaseVersion?.compare("10.8.1") ?? -1) >= 0;
-    return (this._databaseVersion?.compare("8.0.1") ?? -1) >= 0;
+    if (this.isMariadb()) return this.databaseVersion.compare("10.8.1") >= 0;
+    return this.databaseVersion.compare("8.0.1") >= 0;
   }
 
   supportsExpressionIndex(): boolean {
     // Mirror Rails `!mariadb? && database_version >= "8.0.13"`
     // (abstract_mysql_adapter.rb:104) — MariaDB is excluded.
     if (this.isMariadb()) return false;
-    return (this._databaseVersion?.compare("8.0.13") ?? -1) >= 0;
+    return this.databaseVersion.compare("8.0.13") >= 0;
   }
 
   supportsTransactionIsolation(): boolean {
@@ -472,14 +477,12 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
       // Rails' two-branch MariaDB floor (abstract_mysql_adapter.rb:128-132):
       // 10.3.10+, or a pre-10.3 series from 10.2.22 — 10.3.0..10.3.9 is
       // excluded, which a single `>= 10.2.22` would wrongly admit.
-      const version = this._databaseVersion;
-      if (!version) return false;
       return (
-        version.compare("10.3.10") >= 0 ||
-        (version.compare("10.3") < 0 && version.compare("10.2.22") >= 0)
+        this.databaseVersion.compare("10.3.10") >= 0 ||
+        (this.databaseVersion.compare("10.3") < 0 && this.databaseVersion.compare("10.2.22") >= 0)
       );
     }
-    return (this._databaseVersion?.compare("8.0.16") ?? -1) >= 0;
+    return this.databaseVersion.compare("8.0.16") >= 0;
   }
 
   supportsViews(): boolean {
@@ -496,12 +499,12 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   supportsOptimizerHints(): boolean {
     if (this.isMariadb()) return false;
-    return (this._databaseVersion?.compare("5.7.7") ?? -1) >= 0;
+    return this.databaseVersion.compare("5.7.7") >= 0;
   }
 
   supportsCommonTableExpressions(): boolean {
-    if (this.isMariadb()) return (this._databaseVersion?.compare("10.2.1") ?? -1) >= 0;
-    return (this._databaseVersion?.compare("8.0") ?? -1) >= 0;
+    if (this.isMariadb()) return this.databaseVersion.compare("10.2.1") >= 0;
+    return this.databaseVersion.compare("8.0.1") >= 0;
   }
 
   supportsAdvisoryLocks(): boolean {
@@ -517,7 +520,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   supportsInsertReturning(): boolean {
-    if (this.isMariadb()) return (this._databaseVersion?.compare("10.5.0") ?? -1) >= 0;
+    if (this.isMariadb()) return this.databaseVersion.compare("10.5.0") >= 0;
     return false;
   }
 
@@ -549,7 +552,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     // (mysql2_adapter.rb:70 / trilogy_adapter.rb:95) — MariaDB JSON is a
     // LONGTEXT alias, so Rails reports it unsupported.
     if (this.isMariadb()) return false;
-    return (this._databaseVersion?.compare("5.7.8") ?? -1) >= 0;
+    return this.databaseVersion.compare("5.7.8") >= 0;
   }
 
   supportsComments(): boolean {
@@ -1243,18 +1246,15 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return sql;
   }
 
-  // Mirrors: ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#check_version.
-  // Rails reads `database_version` (a synchronous accessor over the already-
-  // established connection); in trails the version is warmed asynchronously into
-  // `_databaseVersion` (getFullVersion) before checkVersion runs at connect time,
-  // so we read that cached value rather than issue a round-trip. When the version
-  // has not been warmed yet (`_databaseVersion` is null) we skip the floor check
-  // rather than raise a false positive — a query-issuing sync port isn't possible.
+  // Mirrors: ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#check_version
+  // (abstract_mysql_adapter.rb:684-688). Rails' `database_version` issues the
+  // round-trip itself when unmemoized; trails' sync getter cannot, so
+  // `Mysql2Adapter#configureConnection` awaits `getDatabaseVersion()` before
+  // super invokes this.
   override checkVersion(): void {
-    const version = this._databaseVersion;
-    if (version && version.compare("5.6.4") < 0) {
+    if (this.databaseVersion.compare("5.6.4") < 0) {
       throw new DatabaseVersionError(
-        `Your version of MySQL (${version}) is too old. Active Record supports MySQL >= 5.6.4.`,
+        `Your version of MySQL (${this.databaseVersion}) is too old. Active Record supports MySQL >= 5.6.4.`,
       );
     }
   }
@@ -1438,7 +1438,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::DatabaseStatements#analyze_without_explain?
    */
   protected analyzeWithoutExplain(): boolean {
-    return this.isMariadb() && (this._databaseVersion?.compare("10.1.0") ?? -1) >= 0;
+    return this.isMariadb() && this.databaseVersion.compare("10.1.0") >= 0;
   }
 
   /**
@@ -1719,19 +1719,19 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   /** @internal */
   supportsInsertRawAliasSyntax(): boolean {
     if (this.isMariadb()) return false;
-    return (this._databaseVersion?.compare("8.0.19") ?? -1) >= 0;
+    return this.databaseVersion.compare("8.0.19") >= 0;
   }
 
   /** @internal */
   supportsRenameIndex(): boolean {
-    if (this.isMariadb()) return (this._databaseVersion?.compare("10.5.2") ?? -1) >= 0;
-    return (this._databaseVersion?.compare("5.7.6") ?? -1) >= 0;
+    if (this.isMariadb()) return this.databaseVersion.compare("10.5.2") >= 0;
+    return this.databaseVersion.compare("5.7.6") >= 0;
   }
 
   /** @internal */
   supportsRenameColumn(): boolean {
-    if (this.isMariadb()) return (this._databaseVersion?.compare("10.5.2") ?? -1) >= 0;
-    return (this._databaseVersion?.compare("8.0.3") ?? -1) >= 0;
+    if (this.isMariadb()) return this.databaseVersion.compare("10.5.2") >= 0;
+    return this.databaseVersion.compare("8.0.3") >= 0;
   }
 
   /**
@@ -1836,9 +1836,9 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     columnName: string,
     newColumnName: string,
   ): Promise<string> {
-    // Ensure version is cached before branching — supportsRenameColumn() returns false when
-    // _databaseVersion is unset, so we'd always fall through to the CHANGE path on uninitialized
-    // connections. getDatabaseVersion() memoizes after the first DB round-trip.
+    // Ensure the version is cached before branching — supportsRenameColumn() reads the sync
+    // `databaseVersion` getter, which throws on an uninitialized connection where Rails'
+    // `database_version` would issue the round-trip itself. getDatabaseVersion() memoizes.
     await this.getDatabaseVersion();
     if (this.supportsRenameColumn()) {
       return `RENAME COLUMN ${this.quoteColumnName(columnName)} TO ${this.quoteColumnName(newColumnName)}`;
