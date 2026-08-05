@@ -255,14 +255,19 @@ function defParts(
   ).asyncBindings = new Set();
   e.inAsyncMethod = isAsync;
   e.inLoop = false;
-  const params = emitParams(n.parameters as PrismNode | undefined, e);
+  let params = emitParams(n.parameters as PrismNode | undefined, e);
   const explicitBlock = (n.parameters as PrismNode | null)?.block as PrismNode | null;
   if (explicitBlock) {
     e.blockParamName = explicitBlock.name ? String(explicitBlock.name) : "block";
   } else if (params !== null && usesImplicitBlock(n.body as PrismNode | null)) {
-    params.push(f.createParameterDeclaration(undefined, undefined, "block"));
-    e.declared.add("block");
-    e.blockParamName = "block";
+    params = endsInRestParameter(params) ? null : params;
+    if (params !== null) {
+      params.push(f.createParameterDeclaration(undefined, undefined, "block"));
+      e.declared.add("block");
+      e.blockParamName = "block";
+    } else {
+      e.blockParamName = null;
+    }
   } else {
     e.blockParamName = null;
   }
@@ -308,6 +313,17 @@ function containsAwait(node: ts.Node): boolean {
       return containsAwait(child);
     }) ?? false
   );
+}
+/**
+ * Whether the emitted signature already ends in `...rest`. A Ruby def can put a
+ * block or keyword arguments after a splat (`def extending(*modules, &block)`,
+ * `def touch(*names, time: nil)`, `def with(*args) ... if block_given?`), but JS
+ * forbids any parameter after a rest parameter, and neither a block nor a kwarg
+ * is positional in Ruby, so there is no faithful ordering to emit. Such a def
+ * declines rather than emitting a signature that does not parse as JS.
+ */
+function endsInRestParameter(params: ts.ParameterDeclaration[]): boolean {
+  return params.at(-1)?.dotDotDotToken != null;
 }
 function emitParams(params: PrismNode | undefined, e: Emitter): ts.ParameterDeclaration[] | null {
   if (!params) return [];
@@ -356,6 +372,7 @@ function emitParams(params: PrismNode | undefined, e: Emitter): ts.ParameterDecl
   }
   const kw = (params.keywords as PrismNode[]) ?? [];
   if (kw.length || params.keywordRest) {
+    if (endsInRestParameter(out)) return null;
     const elements: ts.BindingElement[] = [];
     for (const k of kw) {
       const kn = String(k.name).replace(/:$/, "");
@@ -392,6 +409,7 @@ function emitParams(params: PrismNode | undefined, e: Emitter): ts.ParameterDecl
   }
   const block = params.block as PrismNode | null;
   if (block) {
+    if (endsInRestParameter(out)) return null;
     const bn = block.name ? String(block.name) : "block";
     if (!isBindableIdent(bn)) return null;
     out.push(f.createParameterDeclaration(undefined, undefined, bn));

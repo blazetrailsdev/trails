@@ -110,6 +110,19 @@ describe("prism-codegen", () => {
     expect(code).not.toContain("__PRISM_TODO(");
     expect(coverage.counts.get("DefNode")?.passthrough ?? 0).toBe(0);
   });
+  it("declines a def that would place a parameter after a rest parameter", async () => {
+    // JS forbids anything after `...rest`; Ruby allows a block or a kwarg
+    // there, and neither is positional, so there is no faithful ordering.
+    for (const src of [
+      `def extending(*modules, &block); block; end`,
+      `def touch(*names, time: nil); time; end`,
+      `def with(*args); block_given?; end`,
+    ]) {
+      const { code } = await generateFromSource(src);
+      expect(code).toContain('__PRISM_TODO("DefNode")');
+      expect(code).not.toMatch(/\(\.\.\.[A-Za-z0-9_]+,/);
+    }
+  });
   it("records handled vs. passthrough coverage per node kind", async () => {
     const { coverage } = await generateFromSource(`def f(a); a + 1; end`);
     const s = summarizeCoverage(coverage);

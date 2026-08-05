@@ -152,36 +152,6 @@ export class Relation {
             return !this.isExists();
         }
     }
-    isNone(...args, block) {
-        if (this.none) {
-            return true;
-        }
-        if (args.isPresent() || block !== undefined) {
-            return super(...arguments);
-        }
-        return this.isEmpty;
-    }
-    isAny(...args, block) {
-        if (this.none) {
-            return false;
-        }
-        if (args.isPresent() || block !== undefined) {
-            return super(...arguments);
-        }
-        return !this.isEmpty;
-    }
-    isOne(...args, block) {
-        if (this.none) {
-            return false;
-        }
-        if (args.isPresent() || block !== undefined) {
-            return super(...arguments);
-        }
-        if (this.isLoaded) {
-            return this.records.isOne();
-        }
-        return this.limitedCount() === 1;
-    }
     isMany(block) {
         if (this.none) {
             return false;
@@ -377,9 +347,6 @@ export class Relation {
             }
         }
         return await this.updateAll(updates);
-    }
-    async touchAll(...names, { time = null } = {}) {
-        return await this.updateAll(this.model.touchAttributesWithTime(...names, { time: time }));
     }
     destroyAll() {
         return this.records.forEach(x => x.destroy()).tap(() => this.reset());

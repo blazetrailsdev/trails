@@ -165,20 +165,7 @@ included(() => {
 export function initializeFindByCache() {
     return this.find_by_statement_cache = { [true]: new Concurrent.Map(), [false]: new Concurrent.Map() };
 }
-export async function find(...ids, block) {
-    let id;
-    if (!(ids.length() === 1)) {
-        return __PRISM_SUPER_OUTSIDE_CORPUS("Core::ClassMethods#find");
-    }
-    if (block !== undefined || this.primaryKey == null || this.isScopeAttributes) {
-        return __PRISM_SUPER_OUTSIDE_CORPUS("Core::ClassMethods#find");
-    }
-    id = ids.first();
-    if (StatementCache.isUnsupportedValue(id)) {
-        return __PRISM_SUPER_OUTSIDE_CORPUS("Core::ClassMethods#find");
-    }
-    return await this.cachedFindBy([this.primaryKey], [id]) || (() => { throw new RecordNotFound(`Couldn't find ${this.name} with '${this.primaryKey}'=${id}`, this.name, this.primaryKey, id); })();
-}
+__PRISM_TODO("DefNode");
 export async function findBy(...args) {
     let hash;
     if (this.isScopeAttributes) {

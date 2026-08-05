@@ -2,7 +2,7 @@
 // but parse-clean by construction (emitted via the TypeScript AST factory).
 // Regenerate with `pnpm codegen:generate`. Do not edit by hand.
 
-import { idxGet, union } from "../runtime.js";
+import { idxGet } from "../runtime.js";
 
 require("active_record/insert_all");
 // module Persistence
@@ -333,29 +333,7 @@ export function reload(options = null) {
     this.previously_new_record = false;
     return this;
 }
-export function touch(...names, { time = null } = {}) {
-    let attribute_names, name, affected_rows;
-    if (!this.isPersisted) {
-        this._raiseRecordNotTouchedError();
-    }
-    if (this.isReadonly) {
-        this._raiseReadonlyRecordError();
-    }
-    attribute_names = this.timestampAttributesForUpdateInModel();
-    attribute_names = (union(attribute_names, names)).mapBang(name => {
-        name = String(name);
-        name = this.constructor.attributeAliases()[name] || name;
-        this.verifyReadonlyAttribute(name);
-        return name;
-    });
-    if (!(attribute_names.length === 0)) {
-        affected_rows = this._touchRow(attribute_names, time);
-        return this._trigger_update_callback = affected_rows === 1;
-    }
-    else {
-        return true;
-    }
-}
+__PRISM_TODO("DefNode");
 __PRISM_TODO("CallNode");
 export function initInternals() {
     Core.initInternals.call(this, ...arguments);
