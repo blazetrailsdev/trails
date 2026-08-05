@@ -23,6 +23,7 @@ import { InternalMetadata } from "../internal-metadata.js";
 import {
   canonicalSchemaStamp,
   canonicalSchemaUpToDate,
+  laidTables,
   stampCanonicalSchema,
 } from "./canonical-schema-stamp.js";
 import { resetTestTables } from "./drop-all-tables.js";
@@ -65,6 +66,28 @@ describe.skipIf(!runToken)("boot fast path stamp", () => {
     await loadAdapterSpecificSchema(connection);
     await stampCanonicalSchema(connection);
     expect(await canonicalSchemaUpToDate(await Base.leaseConnection())).toBe(true);
+  });
+});
+
+describe.skipIf(!runToken)("laid-tables snapshot", () => {
+  it("records the carried-forward set, not what the live database happens to hold", async () => {
+    // The fast path skips the adapter-specific arm when the snapshot is intact,
+    // so the snapshot must not shrink to whatever a test file left behind. A
+    // re-stamp that took a fresh snapshot here would drop `defaults` from the
+    // recorded set for every later file, with nothing left to re-lay it.
+    const connection = await Base.leaseConnection();
+    const before = await laidTables(connection);
+    expect(before, "boot must have recorded a snapshot").not.toBeNull();
+    expect(before).toContain("defaults");
+
+    await connection.dropTable("defaults", { ifExists: true });
+    try {
+      await stampCanonicalSchema(connection, undefined, before!);
+      expect(await laidTables(connection)).toContain("defaults");
+    } finally {
+      await loadAdapterSpecificSchema(connection);
+      await stampCanonicalSchema(connection, undefined, before!);
+    }
   });
 });
 

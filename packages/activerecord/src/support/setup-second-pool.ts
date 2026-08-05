@@ -58,7 +58,8 @@ async function createOtherDogsTable(adapter: DatabaseAdapter): Promise<void> {
  * The rows still go, on both paths: the DDL is what is memoised, not the reset,
  * so a suite that wrote to `colleges` cannot hand its rows to the next file's
  * `College.count`. Suites that mutate these tables mid-run re-prepare them
- * through `withSecondPool` regardless.
+ * through `withSecondPool` regardless, and a table missing outright puts this
+ * boot back on the full rebuild.
  *
  * @internal
  */
@@ -71,8 +72,10 @@ export async function provisionSecondDatabase(): Promise<void> {
     await primary.createDatabase(database).catch(() => undefined);
   }
   const arunit2 = await ARUnit2Model.leaseConnection();
-  if (await canonicalSchemaUpToDate(arunit2)) {
-    await arunit2.truncateTables(...ARUNIT2_TABLES, "dogs");
+  const wanted = [...ARUNIT2_TABLES, "dogs"];
+  const present = new Set(await arunit2.tables());
+  if ((await canonicalSchemaUpToDate(arunit2)) && wanted.every((name) => present.has(name))) {
+    await arunit2.truncateTables(...wanted);
     return;
   }
   await rebuildCanonicalTables(arunit2, ARUNIT2_TABLES);

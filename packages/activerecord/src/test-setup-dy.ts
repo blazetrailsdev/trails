@@ -53,26 +53,31 @@ if (await canonicalSchemaUpToDate(await Base.leaseConnection())) {
   // every non-empty canonical table and drops everything else, so a
   // `DatabaseTasks.truncateTables` here emptied the same tables a second time.
   //
-  // Both arms are skipped here when the stamp carries a `laidTables` snapshot:
-  // those tables — canonical *and* adapter-specific — are already laid, and the
-  // purge below truncates them rather than dropping them, so there is nothing
-  // for the adapter-specific arm to re-lay. Read the snapshot first: the purge
-  // drops `ar_internal_metadata` along with the other bookkeeping tables.
+  // Both arms are skipped when the stamp's `laidTables` snapshot is still
+  // intact on the database: those tables — canonical *and* adapter-specific —
+  // are already laid, and the purge truncates them rather than dropping them,
+  // so there is nothing for the adapter-specific arm to re-lay. The snapshot is
+  // read first because the purge drops `ar_internal_metadata` with the other
+  // bookkeeping tables.
   //
-  // Without a snapshot (a database stamped before this key existed) the old
-  // behaviour stands: the purge drops every table outside the canonical half
-  // and the arm re-lays the adapter-specific ones it took with it.
+  // A table missing from the database puts this boot back on the old behaviour
+  // — the arm re-lays the adapter-specific half — which is what a test file
+  // that drops one (`support/drop-all-tables.test.ts`) relies on. The snapshot
+  // is carried forward rather than re-taken for the same reason: re-taking it
+  // here would record the shrunken set as authoritative.
   const conn = await Base.leaseConnection();
   const laid = await laidTables(conn);
   await purgeToCanonicalTables(conn, laid ?? []);
-  if (!laid) await loadAdapterSpecificSchema(conn);
+  const present = new Set(await conn.tables());
+  const intact = laid !== null && laid.every((name) => present.has(name));
+  if (!intact) await loadAdapterSpecificSchema(conn);
   // Re-stamp: the purge drops `ar_internal_metadata` along with the
   // other bookkeeping tables, so the stamp this boot consumed is gone. What is
   // left behind is the same state the full-load arm below stamps — canonical
   // plus adapter-specific, laid and empty — so the next worker recycled onto
   // this database is entitled to the same fast path. Without this the stamp is
   // single-use per database and every recycle pays the full purge+reload.
-  await stampCanonicalSchema(conn);
+  await stampCanonicalSchema(conn, undefined, intact ? laid : undefined);
   await recordBootOutcome("fastPath", await canonicalSchemaUpToDate(conn));
 } else {
   // `DatabaseTasks.purge` re-establishes Base's pool on the recreated database,

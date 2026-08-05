@@ -75,6 +75,13 @@ export async function laidTables(adapter: DatabaseAdapter): Promise<string[] | n
  * metadata table itself is present and filtered out along with
  * `schema_migrations`.
  *
+ * `laid` carries a snapshot forward instead of taking a fresh one. Only a
+ * caller that has just *laid* schema may let it default: the purge drops
+ * `ar_internal_metadata`, so a re-stamping caller that snapshotted the live
+ * database would record whatever the last test file left behind, and a file
+ * that dropped an adapter-specific table would shrink the recorded set for
+ * every later file with nothing to restore it.
+ *
  * A run without a token (globalSetup disabled) stamps nothing, which leaves
  * every worker on the full load path.
  *
@@ -83,12 +90,14 @@ export async function laidTables(adapter: DatabaseAdapter): Promise<string[] | n
 export async function stampCanonicalSchema(
   adapter: DatabaseAdapter,
   runToken = getEnv(RUN_TOKEN_ENV),
+  laid?: readonly string[],
 ): Promise<void> {
   if (!runToken) return;
   const metadata = new InternalMetadata(adapter);
   await metadata.createTableAndSetFlags("test", stampFor(runToken));
-  const laid = (await adapter.tables()).filter((name) => !BOOKKEEPING_TABLE_NAMES.has(name));
-  await metadata.set(LAID_TABLES_KEY, JSON.stringify(laid.sort()));
+  const snapshot =
+    laid ?? (await adapter.tables()).filter((name) => !BOOKKEEPING_TABLE_NAMES.has(name));
+  await metadata.set(LAID_TABLES_KEY, JSON.stringify([...snapshot].sort()));
 }
 
 /**
