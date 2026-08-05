@@ -1593,16 +1593,14 @@ export async function checkCurrentProtectedEnvironmentBang(
 ): Promise<void> {
   const { NoDatabaseError } = await import("../errors.js");
   const { EnvironmentMismatchError } = await import("../migration.js");
-  // Rails reads the context straight off the pool (`database_tasks.rb:635-636`
-  // — `with_temporary_pool { |pool| pool.migration_context }`) and puts the
-  // `NoDatabaseError` rescue inside the block (`:648-649`). Neither shape is
-  // reachable yet: `ConnectionPool#migrationContext` builds its collaborators
-  // over the pool's adapter proxy, whose `get` trap routes every member through
-  // `withConnection`, so the synchronous `toSql` a SchemaMigration /
-  // InternalMetadata query needs comes back as a Promise and the query is handed
-  // a Promise instead of SQL; and `withTemporaryConnection` leases eagerly, so
-  // `NoDatabaseError` can surface from the lease rather than from inside the
-  // block. Both are the adapter-vs-pool gap, tracked separately.
+  // Deviation: Rails uses `with_temporary_pool { |pool| pool.migration_context }`
+  // and rescues inside the block (`database_tasks.rb:635-636`, `:648-649`).
+  // `ConnectionPool#migrationContext` builds its collaborators over the pool's
+  // adapter proxy, which routes the synchronous `toSql` those queries need
+  // through `withConnection` and hands them a Promise instead of SQL; and
+  // `withTemporaryConnection` leases eagerly, so `NoDatabaseError` can surface
+  // from the lease. Both converge in
+  // `check-current-protected-environment-pool-migration-context-blocked-on-adapter-proxy`.
   try {
     await DatabaseTasks.withTemporaryConnection(dbConfig, async (adapter) => {
       const migrationContext = await DatabaseTasks._migrationContextFor(adapter, dbConfig);

@@ -95,11 +95,17 @@ export class InternalMetadata {
    * Mirrors ActiveRecord::InternalMetadata#enabled?
    * (`internal_metadata.rb:35-36`) — `@pool.db_config.use_metadata_table?`.
    *
-   * trails threads an adapter rather than a pool, so the db_config is reached
-   * through `adapter.pool`. A bare adapter carries a NullPool, whose config
-   * answers nil for every key (Rails' `NullConfig#method_missing`), which is
-   * why an absent flag reads as enabled — the same default
-   * `DatabaseConfig#useMetadataTable` applies.
+   * trails threads an adapter rather than a pool, so the config is reached
+   * through `adapter.pool`.
+   *
+   * Deviation: a `NullPool` answers `NULL_CONFIG`, whose every key is undefined
+   * (Rails' `NullConfig#method_missing` returns nil), so Rails would read that
+   * arm as disabled. Rails never gets there — its `InternalMetadata` is always
+   * built from a real pool — while trails builds one over bare, NullPool-backed
+   * adapters throughout the test suite and the trailties `db` commands, so the
+   * absent flag has to keep `DatabaseConfig#useMetadataTable`'s default. It
+   * converges once those call sites hold a pool
+   * (`migration-context-collaborators-need-a-pool`).
    */
   get enabled(): boolean {
     const pool = this._connection.pool as { dbConfig?: { useMetadataTable?: boolean } } | null;

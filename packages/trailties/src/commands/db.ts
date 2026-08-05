@@ -735,7 +735,7 @@ export function dbCommand(): Command {
     .description("Print the current schema version")
     .option("--database <name>", "Target a specific named database")
     .action(async (opts: DatabaseOpts) => {
-      await forEachDatabase(opts, async ({ adapter, prefix, raw: dbRaw }) => {
+      await forEachDatabase(opts, async ({ adapter, prefix }) => {
         const migrator = createMigrator(adapter, []);
         const version = await migrator.currentVersionReadOnly();
         console.log(`${prefix}Current version: ${version}`);
@@ -747,7 +747,7 @@ export function dbCommand(): Command {
     .description("Stamp the schema with the current environment name")
     .option("--database <name>", "Target a specific named database")
     .action(async (opts: DatabaseOpts) => {
-      await forEachDatabase(opts, async ({ adapter, raw, prefix }) => {
+      await forEachDatabase(opts, async ({ adapter, prefix }) => {
         const envName = resolveEnv();
         const internalMetadata = new InternalMetadata(adapter);
         if (!internalMetadata.enabled) {

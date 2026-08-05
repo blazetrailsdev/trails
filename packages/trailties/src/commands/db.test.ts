@@ -1353,11 +1353,7 @@ export class CreatePosts extends Migration {
     }
   });
 
-  /**
-   * Give a bare adapter a pool whose db_config opts out of metadata storage.
-   * `InternalMetadata#enabled?` is `@pool.db_config.use_metadata_table?`
-   * (internal_metadata.rb:35-36), so this is how Rails turns it off.
-   */
+  // internal_metadata.rb:35-36 — `enabled?` is `@pool.db_config.use_metadata_table?`.
   function disableMetadataTable(adapter: unknown): void {
     (adapter as { pool: unknown }).pool = { dbConfig: { useMetadataTable: false } };
   }

@@ -75,9 +75,7 @@ describe("Migrator trails extensions", () => {
   });
 
   it("stamps the environment once per run, not once per migration", async () => {
-    // Rails stamps it in `record_environment` before the migration loop
-    // (migration.rb:1508-1512); `execute_migration_in_transaction`
-    // (:1528-1537) writes no metadata at all.
+    // migration.rb:1508-1512 stamps before the loop; :1528-1537 writes nothing.
     const migrator = new Migrator(
       adapter,
       [makeMigration("1", "M1"), makeMigration("2", "M2"), makeMigration("3", "M3")],

@@ -1121,9 +1121,8 @@ describe("MigrationTest", () => {
     const adapter = Base.connection;
     const { InternalMetadata } = await import("./internal-metadata.js");
 
-    // Rails swaps `use_metadata_table: false` into the pool's db_config
-    // configuration_hash (migration_test.rb:728-730) and lets `enabled?`
-    // read it back off `@pool.db_config` (internal_metadata.rb:35-36).
+    // migration_test.rb:727-730 — drop the table, then swap
+    // `use_metadata_table: false` into the pool's db_config configuration_hash.
     const im = new InternalMetadata(adapter);
     await im.dropTable();
 
