@@ -164,10 +164,12 @@ export class EncryptableRecord {
    * (via encryption.ts#encrypts) and direct callers route through here, mirroring
    * Rails' single `encrypt_attribute`.
    *
-   * `prebuiltScheme` lets `Base.encrypts` supply a scheme built by
-   * encryption.ts#buildScheme (which adapts the legacy `{ encrypt, decrypt }`
-   * shim and supplies a defaultEncryptor fallback); direct callers omit it and
-   * get a per-attribute scheme from `schemeFor`.
+   * `buildScheme` lets `Base.encrypts` supply encryption.ts#buildScheme (which
+   * adapts the legacy `{ encrypt, decrypt }` shim and supplies a defaultEncryptor
+   * fallback) in place of `schemeFor`, which direct callers get by omitting it.
+   * It is a function, not a scheme, because Rails calls `scheme_for` inside the
+   * `decorate_attributes` block (encryptable_record.rb:85-88) — see
+   * `PendingEncryption`.
    *
    * @internal
    */
