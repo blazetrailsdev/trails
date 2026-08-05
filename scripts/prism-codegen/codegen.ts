@@ -46,6 +46,7 @@ export class Codegen implements Emitter {
     readonly delegations: ReadonlyMap<string, string> = new Map(),
     readonly linearization: Linearization | null = null,
     readonly portMethods: ReadonlySet<string> = new Set(),
+    readonly source: string = "",
   ) {}
   private declined = false;
   decline(kind: string): void {

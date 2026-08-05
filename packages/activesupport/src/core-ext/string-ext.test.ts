@@ -6,6 +6,7 @@ import {
   runSafeConstantizeTestsOn,
 } from "../constantize-test-cases.js";
 
+import { pluralize as stringPluralize } from "../core-ext/string/inflections.js";
 import { htmlSafe, isHtmlSafe } from "../core-ext/string/output-safety.js";
 import { htmlEscape, htmlEscapeOnce, xmlNameEscape } from "../core-ext/tse/util.js";
 import {
@@ -218,7 +219,7 @@ describe("StringInflectionsTest", () => {
   });
 
   it("pluralize with count = 1 still returns new string", () => {
-    expect(pluralize("count", 1)).toBe("count");
+    expect(stringPluralize("count", 1)).toBe("count");
     expect(pluralize("count")).toBe("counts");
   });
 

@@ -2,7 +2,7 @@
 // but parse-clean by construction (emitted via the TypeScript AST factory).
 // Regenerate with `pnpm codegen:generate`. Do not edit by hand.
 
-import { caseEq, idxGet, union } from "../../runtime.js";
+import { caseEq, idxGet, rubyLastMatch, union } from "../../runtime.js";
 
 require("active_record/relation/from_clause");
 require("active_record/relation/query_attribute");
@@ -81,7 +81,7 @@ for (const name of Relation.VALUE_METHODS) {
           assert_modifiable!                   #   assert_modifiable!
           @values[:${name}] = value            #   @values[:includes] = value
         end                                    # end
-`, __PRISM_TODO("SourceFileNode"), __PRISM_TODO("SourceLineNode") + 1);
+`, "active_record/relation/query_methods.rb", 173 + 1);
 }
 const extensions = extendingValues;
 export function includes(...args) {
@@ -990,7 +990,7 @@ export function isTableNameMatches(from) {
     let table_name, quoted_table_name;
     table_name = Regexp.escape(this.table.name());
     quoted_table_name = Regexp.escape(this.model.adapterClass().quoteTableName(this.table.name()));
-    return __PRISM_TODO("InterpolatedRegularExpressionNode").isMatch(String(from));
+    return new RegExp(`(?:\\A|(?<!FROM)\\s)(?:\\b${table_name}\\b|${quoted_table_name})(?!\\.)`).isMatch(String(from));
 }
 export function reverseSqlOrder(order_query) {
     if (order_query.length === 0) {
@@ -1129,7 +1129,7 @@ export function columnReferences(order_args) {
     });
 }
 export function extractTableNameFrom(string) {
-    return string.match(/^\W?(\w+)\W?\./) && __PRISM_TODO("NumberedReferenceReadNode");
+    return string.match(/^\W?(\w+)\W?\./) && rubyLastMatch()?.[1];
 }
 export function orderColumn(field) {
     return this.arelColumn(field, attr_name => {

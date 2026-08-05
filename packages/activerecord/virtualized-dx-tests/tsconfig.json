@@ -14,6 +14,9 @@
         "../../activesupport/src/message-verifier.ts"
       ],
       "@blazetrails/activesupport/process-adapter": ["../../activesupport/src/process-adapter.ts"],
+      "@blazetrails/activesupport/core-ext/string/inflections": [
+        "../../activesupport/src/core-ext/string/inflections.ts"
+      ],
       "@blazetrails/activesupport/gzip": ["../../activesupport/src/gzip.ts"],
       "@blazetrails/activesupport/yaml": ["../../activesupport/src/yaml.ts"],
       "@blazetrails/globalid/signed-global-id": ["../../globalid/src/signed-global-id.ts"]

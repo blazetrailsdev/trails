@@ -40,6 +40,7 @@ async function main() {
     undefined,
     undefined,
     portMethodNames(),
+    rel,
   );
   const s = summarizeCoverage(coverage);
   const defs = [...perDef].filter(([name]) => name !== TOPLEVEL);

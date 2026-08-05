@@ -7,7 +7,12 @@ import type { Linearization } from "./linearization.js";
 import type { Coverage, PrismNode } from "./types.js";
 let parsePromise:
   | Promise<
-      (src: string) => {
+      (
+        src: string,
+        options?: {
+          filepath?: string;
+        },
+      ) => {
         value: unknown;
       }
     >
@@ -39,12 +44,20 @@ export async function generateFromSource(
   inheritedDelegations: DelegationTable = new Map(),
   linearization: Linearization | null = null,
   portMethods: ReadonlySet<string> = new Set(),
+  rubyPath = "",
 ): Promise<GenResult> {
   const parse = await getParser();
-  const result = parse(rubySource);
+  const result = parse(rubySource, { filepath: rubyPath });
   const program = result.value as PrismNode;
   const delegations = mergeDelegations(inheritedDelegations, collectDelegations(program));
-  const gen = new Codegen(defaultRegistry(), asyncMethods, delegations, linearization, portMethods);
+  const gen = new Codegen(
+    defaultRegistry(),
+    asyncMethods,
+    delegations,
+    linearization,
+    portMethods,
+    rubySource,
+  );
   const statements = gen.stmt(program, false);
   const sourceFile = ts.factory.createSourceFile(
     statements,

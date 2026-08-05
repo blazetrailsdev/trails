@@ -211,6 +211,7 @@ async function main() {
       await inheritedDelegationsFor(f),
       await targetLinearization(),
       portMethodNames(),
+      f.ruby,
     );
     const cleanDefs = new Set(
       [...perDef].filter(([n, d]) => n !== TOPLEVEL && d.passthrough === 0).map(([n]) => n),

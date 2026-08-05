@@ -8,10 +8,14 @@ import { NameError } from "./core-ext/name-error.js";
 import { I18n } from "./i18n.js";
 
 /** @internal */
-function applyInflections(word: string, rules: { rule: RegExp; replacement: string }[]): string {
+function applyInflections(
+  word: string,
+  rules: { rule: RegExp; replacement: string }[],
+  locale = "en",
+): string {
   if (!word || word.length === 0) return word;
 
-  const inflections = Inflections.instance("en");
+  const inflections = Inflections.instance(locale);
   if (inflections.uncountables.has(word.toLowerCase())) {
     return word;
   }
@@ -25,13 +29,12 @@ function applyInflections(word: string, rules: { rule: RegExp; replacement: stri
   return word;
 }
 
-export function pluralize(word: string, count?: number): string {
-  if (count === 1) return word;
-  return applyInflections(word, Inflections.instance("en").plurals);
+export function pluralize(word: string, locale = "en"): string {
+  return applyInflections(word, Inflections.instance(locale).plurals, locale);
 }
 
-export function singularize(word: string): string {
-  return applyInflections(word, Inflections.instance("en").singulars);
+export function singularize(word: string, locale = "en"): string {
+  return applyInflections(word, Inflections.instance(locale).singulars, locale);
 }
 
 export function camelize(

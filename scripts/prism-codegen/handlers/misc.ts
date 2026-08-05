@@ -106,6 +106,56 @@ export function registerMisc(r: Registry): void {
     if (body.includes("\n") || body.length === 0) return null;
     return f.createRegularExpressionLiteral(`/${body}/`);
   });
+  r.on("SourceFileNode", (n) =>
+    f.createStringLiteral(rubyStr((n.filepath as { value: string }).value)),
+  );
+  r.on("SourceLineNode", (n, e) => f.createNumericLiteral(lineOf(n, e)));
+  r.onStmt("MatchWriteNode", (n, e) => {
+    const call = n.call as PrismNode;
+    const args = ((call.arguments_ as PrismNode | null)?.arguments_ as PrismNode[]) ?? [];
+    if (args.length !== 1) return null;
+    const names = ((n.targets as PrismNode[]) ?? []).map((t) => String(t.name));
+    if (!names.every((name) => isJsIdentName(name))) return null;
+    e.helpers.add("rubyMatch");
+    for (const name of names) e.declared.add(name);
+    return [
+      f.createVariableStatement(
+        undefined,
+        f.createVariableDeclarationList(
+          [
+            f.createVariableDeclaration(
+              f.createObjectBindingPattern(
+                names.map((name) =>
+                  f.createBindingElement(undefined, undefined, f.createIdentifier(name)),
+                ),
+              ),
+              undefined,
+              undefined,
+              f.createCallExpression(f.createIdentifier("rubyMatch"), undefined, [
+                e.expr(call.receiver as PrismNode),
+                e.expr(args[0]),
+              ]),
+            ),
+          ],
+          ts.NodeFlags.Const,
+        ),
+      ),
+    ];
+  });
+  r.on("NumberedReferenceReadNode", (n, e) => {
+    e.helpers.add("rubyLastMatch");
+    return f.createElementAccessChain(
+      f.createCallExpression(f.createIdentifier("rubyLastMatch"), undefined, []),
+      f.createToken(ts.SyntaxKind.QuestionDotToken),
+      f.createNumericLiteral(Number(n.number)),
+    );
+  });
+  r.on("BackReferenceReadNode", (n, e) => {
+    e.helpers.add("rubyBackRef");
+    return f.createCallExpression(f.createIdentifier("rubyBackRef"), undefined, [
+      f.createStringLiteral(String(n.name)),
+    ]);
+  });
   r.onStmt("AliasMethodNode", (n) => {
     const nn = symName(n.newName as PrismNode);
     const on = symName(n.oldName as PrismNode);
@@ -173,4 +223,15 @@ function superArgs(n: PrismNode, e: Emitter): ts.Expression[] {
   return (((n.arguments_ as PrismNode | null)?.arguments_ as PrismNode[]) ?? []).map((x) =>
     e.expr(x),
   );
+}
+
+/**
+ * The 1-based line a node starts on. Prism's JS location carries a byte offset
+ * rather than a line, so the line is the newline count ahead of it.
+ */
+function lineOf(n: PrismNode, e: Emitter): number {
+  const offset = (n.location as { startOffset: number } | undefined)?.startOffset ?? 0;
+  let line = 1;
+  for (let i = 0; i < offset && i < e.source.length; i++) if (e.source[i] === "\n") line++;
+  return line;
 }
