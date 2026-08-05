@@ -88,9 +88,8 @@ export class Association {
    *  collection proxy that it can hydrate from this instance's target. */
   _loadedViaAsync = false;
   /**
-   * Nonzero while THIS holder is itself driving a loader through
-   * `findTarget`, so the loader's own `setTarget` writeback
-   * into this holder must be skipped — the driving caller assigns the result
+   * Nonzero while THIS holder is itself driving a loader through `findTarget`,
+   * so the loader's own `setTarget` writeback into this holder must be skipped — the driving caller assigns the result
    * itself the moment its `await` resumes.
    *
    * Rails needs no such flag: `Association#find_target`
