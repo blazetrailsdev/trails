@@ -217,46 +217,6 @@ export class SchemaCreation extends AbstractSchemaCreation {
     return this.adapter.supportsCheckConstraints();
   }
 
-  /**
-   * MySQL CREATE TABLE generator. Mirrors Rails'
-   * `abstract/schema_creation.rb#visit_TableDefinition`, routing every
-   * column through {@link SchemaCreation#visitColumnDefinition} so
-   * `addColumnOptions` (this subclass) handles `AUTO_INCREMENT`,
-   * `ON UPDATE`, charset/collation, etc. consistently with addColumn.
-   *
-   * @internal
-   */
-  protected override async visitTableDefinition(o: TableDefinition): Promise<string> {
-    let sql = `CREATE${this.tableModifierInCreate(o)} TABLE`;
-    if (o.ifNotExists) sql += " IF NOT EXISTS";
-    sql += ` ${this.adapter.quoteTableName(o.tableName)}`;
-
-    // Mirrors the abstract visitor's sequential map-to-thunks shape.
-    const statements: string[] = [];
-    for (const visit of o.columns.map((c) => () => this.visitColumnDefinition(c))) {
-      statements.push(await visit());
-    }
-    const primaryKeys = o.primaryKeys();
-    if (primaryKeys) statements.push(this.visitPrimaryKeyDefinition(primaryKeys));
-    if (this.supportsIndexesInCreate()) {
-      for (const [columnName, options] of o.indexes) {
-        statements.push(await this.indexInCreate(o.tableName, columnName, options));
-      }
-    }
-    if (this.useForeignKeys()) {
-      for (const fk of o.foreignKeys) statements.push(this.visitForeignKeyDefinition(fk));
-    }
-    if (this.supportsCheckConstraints()) {
-      for (const chk of o.checkConstraints)
-        statements.push(this.visitCheckConstraintDefinition(chk));
-    }
-
-    if (statements.length > 0) sql += ` (${statements.join(", ")})`;
-    sql = this.addTableOptionsBang(sql, o);
-    if (o.as) sql += ` AS ${o.as}`;
-    return sql;
-  }
-
   /** @internal */
   override accept(
     o:

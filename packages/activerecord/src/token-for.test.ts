@@ -10,7 +10,7 @@ import { Room } from "./test-helpers/models/room.js";
 import { CpkBook } from "./test-helpers/models/cpk.js";
 import { InvalidSignature } from "@blazetrails/activesupport/message-verifier";
 import { travel, travelBack } from "@blazetrails/activesupport";
-import { generatesTokenFor, setTokenForSecret } from "./token-for.js";
+import { setTokenForSecret } from "./token-for.js";
 import { fixtures } from "./test-fixtures.js";
 // Zeitwerk analog: Cpk::Book's counter-cached/association targets (Cpk::Order)
 // are resolved by name, as Rails resolves them from the autoloaded models tree.
@@ -19,13 +19,13 @@ import "./support/canonical-model-index.js";
 // Rails: class User < ::User { generates_token_for :lookup; … }
 class TokenUser extends User {
   static {
-    generatesTokenFor(this, "lookup");
-    generatesTokenFor(this, "password_reset", {
+    this.generatesTokenFor("lookup");
+    this.generatesTokenFor("password_reset", {
       expiresIn: 15 * 60,
       // first 10 characters of the BCrypt salt — Rails: password_digest.to_s[-(31 + 22), 10]
       generator: (r: any) => String(r.password_digest ?? "").slice(-(31 + 22), -(31 + 22) + 10),
     });
-    generatesTokenFor(this, "snapshot", {
+    this.generatesTokenFor("snapshot", {
       generator: (r: any) => ({ updated_at: r.updated_at }),
     });
   }
@@ -56,8 +56,8 @@ describe("TokenForTest", () => {
     user = new TokenUser();
     (user as any).password_digest = `$2a$4$${"x".repeat(22)}${"y".repeat(31)}`;
     await user.save();
-    lookupToken = (user as any).generateTokenFor("lookup");
-    passwordResetToken = (user as any).generateTokenFor("password_reset");
+    lookupToken = user.generateTokenFor("lookup");
+    passwordResetToken = user.generateTokenFor("password_reset");
   });
 
   afterEach(async () => {
@@ -68,91 +68,85 @@ describe("TokenForTest", () => {
   });
 
   it("finds record by token", async () => {
-    expect((await (TokenUser as any).findByTokenFor("lookup", lookupToken)).id).toBe(user.id);
-    expect((await (TokenUser as any).findByTokenForBang("lookup", lookupToken)).id).toBe(user.id);
+    expect((await TokenUser.findByTokenFor("lookup", lookupToken))!.id).toBe(user.id);
+    expect((await TokenUser.findByTokenForBang("lookup", lookupToken)).id).toBe(user.id);
   });
 
   it("returns nil when record is not found", async () => {
     await user.destroy();
-    expect(await (TokenUser as any).findByTokenFor("lookup", lookupToken)).toBeNull();
+    expect(await TokenUser.findByTokenFor("lookup", lookupToken)).toBeNull();
   });
 
   it("raises on bang when record is not found", async () => {
     await user.destroy();
-    await expect((TokenUser as any).findByTokenForBang("lookup", lookupToken)).rejects.toThrow(
+    await expect(TokenUser.findByTokenForBang("lookup", lookupToken)).rejects.toThrow(
       RecordNotFound,
     );
   });
 
   it("raises when token definition does not exist", async () => {
-    await expect((TokenUser as any).findByTokenFor("bad", lookupToken)).rejects.toThrow();
+    await expect(TokenUser.findByTokenFor("bad", lookupToken)).rejects.toThrow();
   });
 
   it("does not find record when token is invalid", async () => {
-    expect(await (TokenUser as any).findByTokenFor("lookup", "bad")).toBeNull();
-    await expect((TokenUser as any).findByTokenForBang("lookup", "bad")).rejects.toThrow(
+    expect(await TokenUser.findByTokenFor("lookup", "bad")).toBeNull();
+    await expect(TokenUser.findByTokenForBang("lookup", "bad")).rejects.toThrow(InvalidSignature);
+  });
+
+  it("does not find record when token is for a different purpose", async () => {
+    expect(await TokenUser.findByTokenFor("password_reset", lookupToken)).toBeNull();
+    await expect(TokenUser.findByTokenForBang("password_reset", lookupToken)).rejects.toThrow(
       InvalidSignature,
     );
   });
 
-  it("does not find record when token is for a different purpose", async () => {
-    expect(await (TokenUser as any).findByTokenFor("password_reset", lookupToken)).toBeNull();
-    await expect(
-      (TokenUser as any).findByTokenForBang("password_reset", lookupToken),
-    ).rejects.toThrow(InvalidSignature);
-  });
-
   it("finds record when token has not expired and embedded data has not changed", async () => {
-    expect((await (TokenUser as any).findByTokenFor("password_reset", passwordResetToken)).id).toBe(
+    expect((await TokenUser.findByTokenFor("password_reset", passwordResetToken))!.id).toBe(
       user.id,
     );
   });
 
   it("does not find record when token has expired", async () => {
     travel(DAY);
-    expect(
-      await (TokenUser as any).findByTokenFor("password_reset", passwordResetToken),
-    ).toBeNull();
+    expect(await TokenUser.findByTokenFor("password_reset", passwordResetToken)).toBeNull();
     await expect(
-      (TokenUser as any).findByTokenForBang("password_reset", passwordResetToken),
+      TokenUser.findByTokenForBang("password_reset", passwordResetToken),
     ).rejects.toThrow(InvalidSignature);
   });
 
   it("tokens do not expire by default", async () => {
     travel(1000 * 365 * DAY);
-    expect((await (TokenUser as any).findByTokenFor("lookup", lookupToken)).id).toBe(user.id);
+    expect((await TokenUser.findByTokenFor("lookup", lookupToken))!.id).toBe(user.id);
   });
 
   it("does not find record when expires_in is different", async () => {
-    generatesTokenFor(TokenUser, "lookup", { expiresIn: 365 * DAY });
+    TokenUser.generatesTokenFor("lookup", { expiresIn: 365 * DAY });
 
     try {
-      expect(await (TokenUser as any).findByTokenFor("lookup", lookupToken)).toBeNull();
-      const newLookupToken = (user as any).generateTokenFor("lookup");
-      expect((await (TokenUser as any).findByTokenFor("lookup", newLookupToken)).id).toBe(user.id);
+      expect(await TokenUser.findByTokenFor("lookup", lookupToken)).toBeNull();
+      const newLookupToken = user.generateTokenFor("lookup");
+      expect((await TokenUser.findByTokenFor("lookup", newLookupToken))!.id).toBe(user.id);
     } finally {
-      generatesTokenFor(TokenUser, "lookup");
+      TokenUser.generatesTokenFor("lookup");
     }
   });
 
   it("does not find record when embedded data is different", async () => {
     (user as any).password_digest = "new password";
     await user.save();
-    expect(
-      await (TokenUser as any).findByTokenFor("password_reset", passwordResetToken),
-    ).toBeNull();
+    expect(await TokenUser.findByTokenFor("password_reset", passwordResetToken)).toBeNull();
     await expect(
-      (TokenUser as any).findByTokenForBang("password_reset", passwordResetToken),
+      TokenUser.findByTokenForBang("password_reset", passwordResetToken),
     ).rejects.toThrow(InvalidSignature);
   });
 
   it("supports JSON-serializable embedded data", async () => {
-    const snapshotToken = (user as any).generateTokenFor("snapshot");
-    expect((await (TokenUser as any).findByTokenFor("snapshot", snapshotToken)).id).toBe(user.id);
+    const snapshotToken = user.generateTokenFor("snapshot");
+    expect((await TokenUser.findByTokenFor("snapshot", snapshotToken))!.id).toBe(user.id);
     // Rails: @user.touch(time: @user.updated_at.advance(seconds: 1))
     const advanced = new Date(new Date(String((user as any).updated_at)).getTime() + 1000);
     await (user as any).touch({ time: advanced });
-    expect(await (TokenUser as any).findByTokenFor("snapshot", snapshotToken)).toBeNull();
+    expect(await TokenUser.findByTokenFor("snapshot", snapshotToken)).toBeNull();
   });
 
   it("finds record through relation", async () => {
@@ -164,26 +158,24 @@ describe("TokenForTest", () => {
 
   it("finds record through subclass", async () => {
     class Subclass extends TokenUser {}
-    const subclassedUser = await (Subclass as any).findByTokenFor("lookup", lookupToken);
+    const subclassedUser = await Subclass.findByTokenFor("lookup", lookupToken);
 
     expect(subclassedUser).toBeInstanceOf(Subclass);
-    expect(subclassedUser.id).toBe(user.id);
+    expect(subclassedUser!.id).toBe(user.id);
   });
 
   it("subclasses can redefine tokens", async () => {
     class Subclass extends TokenUser {
       static {
-        generatesTokenFor(this, "lookup");
+        this.generatesTokenFor("lookup");
       }
     }
     const subclassedUser = await Subclass.find(user.id);
     const subclassedLookupToken = (subclassedUser as any).generateTokenFor("lookup");
 
-    expect((await (Subclass as any).findByTokenFor("lookup", subclassedLookupToken)).id).toBe(
-      user.id,
-    );
-    expect(await (Subclass as any).findByTokenFor("lookup", lookupToken)).toBeNull();
-    expect(await (TokenUser as any).findByTokenFor("lookup", subclassedLookupToken)).toBeNull();
+    expect((await Subclass.findByTokenFor("lookup", subclassedLookupToken))!.id).toBe(user.id);
+    expect(await Subclass.findByTokenFor("lookup", lookupToken)).toBeNull();
+    expect(await TokenUser.findByTokenFor("lookup", subclassedLookupToken)).toBeNull();
   });
 
   it("finds record with a custom primary key", async () => {
@@ -193,29 +185,27 @@ describe("TokenForTest", () => {
     const customPkUser = await CustomPk.find((user as any).auth_token);
     const customPkLookupToken = (customPkUser as any).generateTokenFor("lookup");
 
-    expect((await (CustomPk as any).findByTokenFor("lookup", customPkLookupToken)).id).toBe(
+    expect((await CustomPk.findByTokenFor("lookup", customPkLookupToken))!.id).toBe(
       (customPkUser as any).id,
     );
-    expect(await (CustomPk as any).findByTokenFor("lookup", lookupToken)).toBeNull();
+    expect(await CustomPk.findByTokenFor("lookup", lookupToken)).toBeNull();
   });
 
   it("finds record with a composite primary key", async () => {
     // Rails: Cpk::Book.create!(id: [1, 3], shop_id: 2) — composite PK [author_id, id].
     const book = await CpkBook.create({ id: [1, 3], shop_id: 2 });
-    const token = (book as any).generateTokenFor("test");
+    const token = book.generateTokenFor("test");
 
-    expect((await (CpkBook as any).findByTokenFor("test", token)).id).toEqual((book as any).id);
+    expect((await CpkBook.findByTokenFor("test", token))!.id).toEqual((book as any).id);
   });
 
   it("raises when no primary key has been declared", async () => {
     class NoPk extends Matey {
       static {
-        generatesTokenFor(this, "parley");
+        this.generatesTokenFor("parley");
       }
     }
 
-    await expect(
-      (NoPk as any).findByTokenFor("parley", "this token will not be checked"),
-    ).rejects.toThrow();
+    await expect(NoPk.findByTokenFor("parley", "this token will not be checked")).rejects.toThrow();
   });
 });

@@ -1,7 +1,6 @@
 import { getCrypto, camelize, humanize, isBlank, pbkdf2Async } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { Base } from "./base.js";
-import { generatesTokenFor } from "./token-for.js";
 
 /**
  * Secure password support using PBKDF2 (Web Crypto API).
@@ -271,7 +270,7 @@ export function hasSecurePassword(
     // When the password (and therefore the digest) changes, the hash changes
     // too — existing tokens are automatically invalidated, matching Rails'
     // BCrypt::Password#version approach.
-    generatesTokenFor(modelClass, purpose, {
+    modelClass.generatesTokenFor(purpose, {
       expiresIn: FIFTEEN_MINUTES,
       generator: (record: Base) => {
         const digest = record._readAttribute(digestAttr);

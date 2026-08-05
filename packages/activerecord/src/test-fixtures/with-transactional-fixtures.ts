@@ -5,6 +5,8 @@
  * module for size only; see the header of `../test-fixtures.ts`.
  */
 import { beforeEach, afterEach, type TaskContext } from "vitest";
+import { Notifications, type NotificationSubscriber } from "@blazetrails/activesupport";
+import { Base } from "../base.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
 import { NullPool } from "../connection-adapters/abstract/connection-pool.js";
@@ -130,38 +132,34 @@ let fixtureConnectionPools: ConnectionPool[] | null = null;
 let fixtureScopeDepth = 0;
 
 /**
- * Pin the pool a fixture set is about to seed through, if the running test has
- * not pinned it already.
- *
- * Rails discovers these the same way, from the `!connection.active_record`
- * subscriber `setup_transactional_fixtures` installs
- * (`test_fixtures.rb:183-200`): a pool that shows up after setup is pinned,
- * leased and appended to `@fixture_connection_pools`. trails has no such
- * notification, but `fixtures()` seeds each set through its own model's pool
- * (`leaseFixtureConnectionFor`), so the seeding site is the discovery point —
- * without this, a set on the arunit2 secondary commits its rows and only
- * teardown's per-set DELETE removes them.
- *
- * A no-op outside a transactional test, and for an adapter with no pool of its
- * own (the raw-adapter cluster suites seed through the connection the wrapper
- * already opened a transaction on).
- *
- * @noRailsEquivalent CONVERGEABLE — Rails' counterpart is the anonymous
- * `ActiveSupport::Notifications.subscribe("!connection.active_record")` block in
- * `setup_transactional_fixtures` (test_fixtures.rb:183-200); trails has no such
- * notification to subscribe to yet. Retired by RFC 0064
- * `pin-fixture-pools-via-connection-notification`, which emits it from
- * `ConnectionPool#newConnection` and deletes this function.
+ * The pools whose `pinConnectionBang` actually resolved, and therefore the only
+ * ones teardown may unpin. Rails needs no such split: its push and its
+ * pin/lease are one synchronous step (`test_fixtures.rb:176-180`, `:192-196`),
+ * so membership in `@fixture_connection_pools` is proof of a pin. The
+ * subscriber's are two events, and `unpinConnectionBang` raises on a pool that
+ * was never pinned (`connection-pool.ts:726`).
  */
-export async function pinFixtureConnectionPool(
-  adapter: TransactionalFixturesAdapter,
-): Promise<void> {
-  if (fixtureConnectionPools === null) return;
-  const pool = pooledAdapterPool(adapter);
-  if (pool === null || fixtureConnectionPools.includes(pool)) return;
+let pinnedPools: ConnectionPool[] = [];
+
+/** Rails' `@connection_subscriber` (`test_fixtures.rb:183`). */
+let connectionSubscriber: NotificationSubscriber | null = null;
+
+/**
+ * In-flight pins queued by the `!connection.active_record` subscriber. Settled
+ * in teardown so a rejected pin fails the test instead of surfacing as an
+ * unhandled rejection.
+ */
+let pendingPins: Promise<void>[] = [];
+
+/**
+ * Pin, lease and register `pool` unless the running test already has it.
+ * Mirrors the body Rails runs from both `setup_transactional_fixtures` sites
+ * (`test_fixtures.rb:177-180` and `:192-196`).
+ */
+async function pinConnectionPool(pool: ConnectionPool): Promise<void> {
   await pool.pinConnectionBang({ fixture: true });
+  pinnedPools.push(pool);
   await pool.leaseConnection();
-  fixtureConnectionPools.push(pool);
 }
 
 /**
@@ -279,11 +277,6 @@ export function withTransactionalFixtures(
   // Tracks whether we opened an outer transaction for the current test.
   // Tests in usesTransaction run without a wrapping transaction (Rails parity:
   // test_fixtures.rb:108-110 run_in_transaction? returns false for these).
-  // Known gap vs Rails: Rails also subscribes to "!connection.active_record"
-  // to pin connection pools opened mid-test (test_fixtures.rb:183-200). We
-  // only pin the pools that exist at beforeEach time; pools opened during the
-  // test body are not pinned. Closing this gap requires adding a notification
-  // hook to ConnectionPool#newConnection (production code change).
   let _txnOpenedForTest = false;
 
   beforeEach(async (ctx: TaskContext) => {
@@ -322,23 +315,84 @@ export function withTransactionalFixtures(
       // won't find the pin set in beforeEach.
       if (fixtureConnectionPools === null) fixtureConnectionPools = [];
       fixtureScopeDepth++;
-      await pinFixtureConnectionPool(adapter);
+      // Mirrors test_fixtures.rb:175-180:
+      //   @fixture_connection_pools = ActiveRecord::Base.connection_handler
+      //     .connection_pool_list(:writing)
+      //   @fixture_connection_pools.each { |pool| pool.pin_connection!(...); pool.lease_connection }
+      // Every writing pool, not just this adapter's: a fixture set on the
+      // arunit2 secondary seeds through its own model's pool, and an unpinned
+      // one commits its rows. This is what retired `pinFixtureConnectionPool`,
+      // which pinned the same pools later, from the seeding site.
+      const writingPools = [pool, ...Base.connectionHandler.connectionPoolList("writing")];
+      for (const p of writingPools) {
+        if (fixtureConnectionPools.includes(p)) continue;
+        fixtureConnectionPools.push(p);
+        await pinConnectionPool(p);
+      }
     } else {
       // Non-pooled path — preserved verbatim. Mirrors Rails
       // ConnectionPool#pin_connection! body.
       await tm(adapter).beginTransaction({ joinable: false, _lazy: false });
     }
+
+    // When connections are established in the future, begin a transaction too.
+    // Mirrors test_fixtures.rb:182-200 — Rails' anonymous subscriber block on
+    // "!connection.active_record", emitted by ConnectionHandler#establishConnection
+    // (connection_handler.rb:149).
+    connectionSubscriber = Notifications.subscribe("!connection.active_record", (event) => {
+      const payload = event.payload as { connection_name?: string; shard?: string };
+      const connectionName = "connection_name" in payload ? payload.connection_name : undefined;
+      const shard = "shard" in payload ? payload.shard : undefined;
+
+      if (connectionName != null) {
+        const newPool = Base.connectionHandler.retrieveConnectionPool(connectionName, { shard });
+        if (newPool) {
+          if (fixtureConnectionPools !== null && !fixtureConnectionPools.includes(newPool)) {
+            // The pin/lease pair is async where Rails' is not
+            // (test_fixtures.rb:193-194), and the subscriber body must stay
+            // synchronous because Notifications does not await its listeners.
+            // The push stays synchronous so a second notification for the same
+            // pool is deduplicated by the `includes` guard above, the way
+            // Rails' fully-synchronous block is; the promise settles in
+            // teardown.
+            fixtureConnectionPools.push(newPool);
+            pendingPins.push(pinConnectionPool(newPool));
+          }
+        }
+      }
+    });
   });
 
   afterEach(async () => {
-    if (!_txnOpenedForTest) return;
+    // Mirrors test_fixtures.rb:203.
+    if (connectionSubscriber) {
+      Notifications.unsubscribe(connectionSubscriber);
+      connectionSubscriber = null;
+    }
+    // `allSettled`, not `all`: every pin has to settle before `pinnedPools` is
+    // final, and one rejection must not skip the unpin of the pools that did
+    // pin. The failure is re-raised at the end of teardown so the rest of it
+    // still runs — Rails raises straight out of the subscriber body, but its
+    // pin is synchronous, so there is nothing left half-done to clean up.
+    const pins = pendingPins;
+    pendingPins = [];
+    const pinResults = await Promise.allSettled(pins);
+    if (!_txnOpenedForTest) {
+      const failed = pinResults.find((r) => r.status === "rejected");
+      if (failed) throw failed.reason;
+      return;
+    }
     const adapter = getAdapter();
     if (fixtureConnectionPools !== null && pooledAdapterPool(adapter) !== null) {
       // Mirrors Rails test_fixtures.rb:206-211 teardown:
       //   @fixture_connection_pools.map(&:unpin_connection!)
       //   @fixture_connection_pools.clear
       if (--fixtureScopeDepth === 0) {
-        for (const pool of fixtureConnectionPools) {
+        // Driven by `pinnedPools`, not by the registered list: a pool whose pin
+        // rejected is registered but not pinned.
+        const pools = pinnedPools;
+        pinnedPools = [];
+        for (const pool of pools) {
           await pool.unpinConnectionBang();
         }
         fixtureConnectionPools = null;
@@ -348,5 +402,7 @@ export function withTransactionalFixtures(
       while (t.openTransactions > 0) await t.rollbackTransaction();
     }
     if (invalidateSchemaCache) await reReflectTouchedTables(adapter);
+    const failed = pinResults.find((r) => r.status === "rejected");
+    if (failed) throw failed.reason;
   });
 }

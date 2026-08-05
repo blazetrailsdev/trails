@@ -3,7 +3,6 @@ import { throwAbort } from "@blazetrails/activesupport";
 // vendor/rails/activerecord/test/models/cpk/
 import { Base } from "../../base.js";
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
-import { generatesTokenFor } from "../../token-for.js";
 
 // cpk/author.rb
 export class CpkAuthor extends Base {
@@ -61,7 +60,7 @@ export class CpkBook extends Base {
 }
 
 acceptsNestedAttributesFor(CpkBook, "chapters");
-generatesTokenFor(CpkBook, "test");
+CpkBook.generatesTokenFor("test");
 
 export class CpkBestSeller extends CpkBook {
   declare loadBelongsTo: ((name: "order") => Promise<CpkOrder | null>) &

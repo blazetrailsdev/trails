@@ -34,7 +34,6 @@ import { Base } from "./base.js";
 import { registerModel } from "./associations.js";
 import {
   withTransactionalFixtures,
-  pinFixtureConnectionPool,
   type WithTransactionalFixturesOptions,
 } from "./test-fixtures/with-transactional-fixtures.js";
 import {
@@ -517,7 +516,6 @@ function useFixtures(
         registerModel(model);
       }
       const adapter = await leaseFixtureConnectionFor(model, fixtureConnection);
-      await pinFixtureConnectionPool(adapter);
       setAdapters.set(key, adapter);
       let group = groups.get(adapter);
       if (group === undefined) {

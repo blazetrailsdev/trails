@@ -7,12 +7,12 @@
  */
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { User } from "./test-helpers/models/user.js";
-import { generatesTokenFor, setTokenForSecret } from "./token-for.js";
+import { setTokenForSecret } from "./token-for.js";
 import { fixtures } from "./test-fixtures.js";
 
 class TokenUser extends User {
   static {
-    generatesTokenFor(this, "lookup");
+    this.generatesTokenFor("lookup");
   }
 }
 
