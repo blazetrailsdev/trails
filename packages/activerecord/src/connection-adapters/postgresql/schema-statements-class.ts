@@ -117,7 +117,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     for (const name of tableNames) {
       await this.schemaCache.clearDataSourceCacheBang(name);
     }
-    const quoted = tableNames.map((n) => this._qt(n)).join(", ");
+    const quoted = tableNames.map((n) => this.quoteTableName(n)).join(", ");
     await this.execute(`DROP TABLE${ifExists} ${quoted}${cascade}`);
   }
 
@@ -847,7 +847,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     const clause = await this.pg.schemaCreation.accept(changeColDef);
     // Route DDL through the public `execute` (not the raw `exec`) so the
     // dirties_query_cache wrapper clears the query cache on schema changes.
-    await this.execute(`ALTER TABLE ${this._qt(tableName)} ${clause}`);
+    await this.execute(`ALTER TABLE ${this.quoteTableName(tableName)} ${clause}`);
     if ("comment" in options) {
       await this.changeColumnComment(tableName, columnName, options.comment ?? null);
     }
@@ -886,7 +886,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     this.pg.clearCacheBang();
     await this.schemaCache.clearDataSourceCacheBang(tableName);
     await this.execute(
-      `ALTER TABLE ${this._qt(tableName)} RENAME COLUMN ${this._qi(columnName)} TO ${this._qi(newColumnName)}`,
+      `ALTER TABLE ${this.quoteTableName(tableName)} RENAME COLUMN ${this.quoteColumnName(columnName)} TO ${this.quoteColumnName(newColumnName)}`,
     );
     await this.renameColumnIndexes(tableName, columnName, newColumnName);
   }
@@ -897,7 +897,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     const [schema] = this.pg.extractSchemaQualifiedName(tableName);
     await this.schemaCache.clearDataSourceCacheBang(tableName);
     await this.execute(
-      `ALTER INDEX ${schema ? `${this._qt(schema)}.` : ""}${this._qi(oldName)} RENAME TO ${this._qt(newName)}`,
+      `ALTER INDEX ${schema ? `${this.quoteTableName(schema)}.` : ""}${this.quoteColumnName(oldName)} RENAME TO ${this.quoteTableName(newName)}`,
     );
   }
 
@@ -913,7 +913,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     // pg_catalog directly, not the cache.
     await this.schemaCache.clearDataSourceCacheBang(tableName);
     await this.execute(
-      `ALTER TABLE ${this._qt(tableName)} ${await this.changeColumnDefaultForAlter(tableName, columnName, defaultOrChanges)}`,
+      `ALTER TABLE ${this.quoteTableName(tableName)} ${await this.changeColumnDefaultForAlter(tableName, columnName, defaultOrChanges)}`,
     );
   }
 
@@ -962,8 +962,8 @@ export class SchemaStatements extends AbstractSchemaStatements {
     // boolean argument and clear the statement cache before issuing DDL.
     this.validateChangeColumnNullArgumentBang(nullable);
     this.pg.clearCacheBang();
-    const quotedTable = this._qt(tableName);
-    const quotedCol = this._qi(columnName);
+    const quotedTable = this.quoteTableName(tableName);
+    const quotedCol = this.quoteColumnName(columnName);
     if (!nullable && defaultValue != null) {
       const col = (await this.columns(tableName)).find((c) => c.name === columnName);
       // Rails guards the pre-ALTER UPDATE with `if column` — skip it when the
@@ -1002,7 +1002,9 @@ export class SchemaStatements extends AbstractSchemaStatements {
     // Mirrors PostgreSQL::SchemaStatements#change_table_comment.
     this.pg.clearCacheBang();
     const comment = this.extractNewCommentValue(commentOrChanges) as string | null;
-    await this.execute(`COMMENT ON TABLE ${this._qt(tableName)} IS ${this.pg.quote(comment)}`);
+    await this.execute(
+      `COMMENT ON TABLE ${this.quoteTableName(tableName)} IS ${this.pg.quote(comment)}`,
+    );
   }
 
   // ---------------------------------------------------------------------------

@@ -71,7 +71,7 @@ const MISSING_TRANSLATION = -(2 ** 60);
 export interface ModelLike {
   readonly name: string;
   i18nScope?: string;
-  lookupAncestors?: () => ModelLike[];
+  lookupAncestors?: () => Array<ModelLike & { modelName: ModelName }>;
   modelName?: ModelName;
 }
 
@@ -371,10 +371,7 @@ export class ModelName {
     if (this._cachedI18nKeys) return this._cachedI18nKeys;
     const keys =
       typeof this._klass?.lookupAncestors === "function"
-        ? this._klass.lookupAncestors().map((k) => {
-            if (k.modelName) return k.modelName.i18nKey;
-            return underscore(k.name);
-          })
+        ? this._klass.lookupAncestors().map((k) => k.modelName.i18nKey)
         : [];
     this._cachedI18nKeys = keys;
     return keys;

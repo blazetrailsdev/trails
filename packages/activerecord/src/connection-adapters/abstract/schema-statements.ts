@@ -327,14 +327,6 @@ export class SchemaStatements {
     return new SchemaCreation(this.adapterName as AdapterName, this);
   }
 
-  protected _qi(name: string): string {
-    return this.quoteColumnName(name);
-  }
-
-  protected _qt(tableName: string): string {
-    return this.quoteTableName(tableName);
-  }
-
   /**
    * Split a (possibly schema-qualified) table name into the introspection-PRAGMA
    * schema prefix and bare name, converged with SQLite3Adapter's
@@ -347,7 +339,7 @@ export class SchemaStatements {
     const dot = tableName.lastIndexOf(".");
     const schema = dot === -1 ? "" : tableName.slice(0, dot);
     const bare = dot === -1 ? tableName : tableName.slice(dot + 1);
-    return { prefix: schema ? `${this._qi(schema)}.` : "", bare };
+    return { prefix: schema ? `${this.quoteColumnName(schema)}.` : "", bare };
   }
 
   async createTable(
@@ -502,7 +494,7 @@ export class SchemaStatements {
     const ifExists = options.ifExists ? " IF EXISTS" : "";
     for (const name of tableNames) {
       await this.schemaCache.clearDataSourceCacheBang(name);
-      await this.execute(`DROP TABLE${ifExists} ${this._qt(name)}`);
+      await this.execute(`DROP TABLE${ifExists} ${this.quoteTableName(name)}`);
     }
   }
 
@@ -531,13 +523,15 @@ export class SchemaStatements {
       return;
     }
     await this.schemaCache.clearDataSourceCacheBang(tableName);
-    await this.execute(`ALTER TABLE ${this._qi(tableName)} DROP COLUMN ${this._qi(columnName)}`);
+    await this.execute(
+      `ALTER TABLE ${this.quoteColumnName(tableName)} DROP COLUMN ${this.quoteColumnName(columnName)}`,
+    );
   }
 
   async renameColumn(tableName: string, oldName: string, newName: string): Promise<void> {
     await this.schemaCache.clearDataSourceCacheBang(tableName);
     await this.execute(
-      `ALTER TABLE ${this._qi(tableName)} RENAME COLUMN ${this._qi(oldName)} TO ${this._qi(newName)}`,
+      `ALTER TABLE ${this.quoteColumnName(tableName)} RENAME COLUMN ${this.quoteColumnName(oldName)} TO ${this.quoteColumnName(newName)}`,
     );
   }
 
@@ -604,9 +598,11 @@ export class SchemaStatements {
     const indexName = await this.indexNameForRemove(tableName, positional, resolveOpts);
 
     if (this.adapterName === "mysql") {
-      await this.execute(`DROP INDEX ${this._qi(indexName)} ON ${this._qi(tableName)}`);
+      await this.execute(
+        `DROP INDEX ${this.quoteColumnName(indexName)} ON ${this.quoteColumnName(tableName)}`,
+      );
     } else {
-      await this.execute(`DROP INDEX ${this._qi(indexName)}`);
+      await this.execute(`DROP INDEX ${this.quoteColumnName(indexName)}`);
     }
   }
 
@@ -618,8 +614,8 @@ export class SchemaStatements {
   ): Promise<void> {
     await this.schemaCache.clearDataSourceCacheBang(tableName);
     const sqlType = this.schemaCreation.typeToSql(type, options);
-    const table = this._qi(tableName);
-    const col = this._qi(columnName);
+    const table = this.quoteColumnName(tableName);
+    const col = this.quoteColumnName(columnName);
 
     if (this.adapterName === "mysql") {
       const nullable = options.null === false ? " NOT NULL" : "";
@@ -658,7 +654,9 @@ export class SchemaStatements {
   async renameTable(oldName: string, newName: string): Promise<void> {
     await this.schemaCache.clearDataSourceCacheBang(oldName);
     await this.schemaCache.clearDataSourceCacheBang(newName);
-    await this.execute(`ALTER TABLE ${this._qi(oldName)} RENAME TO ${this._qi(newName)}`);
+    await this.execute(
+      `ALTER TABLE ${this.quoteColumnName(oldName)} RENAME TO ${this.quoteColumnName(newName)}`,
+    );
   }
 
   async tableExists(tableName: string): Promise<boolean> {
@@ -718,7 +716,7 @@ export class SchemaStatements {
     await this.schemaCache.clearDataSourceCacheBang(tableName);
     const clause = await this.quoteDefaultExpression(defaultVal);
     await this.execute(
-      `ALTER TABLE ${this._qi(tableName)} ALTER COLUMN ${this._qi(columnName)} SET DEFAULT ${clause || "NULL"}`,
+      `ALTER TABLE ${this.quoteColumnName(tableName)} ALTER COLUMN ${this.quoteColumnName(columnName)} SET DEFAULT ${clause || "NULL"}`,
     );
   }
 
@@ -732,12 +730,12 @@ export class SchemaStatements {
     if (!allowNull && defaultValue !== undefined) {
       const quoted = await this.quoteDefaultExpression(defaultValue);
       await this.execute(
-        `UPDATE ${this._qi(tableName)} SET ${this._qi(columnName)} = ${quoted} WHERE ${this._qi(columnName)} IS NULL`,
+        `UPDATE ${this.quoteColumnName(tableName)} SET ${this.quoteColumnName(columnName)} = ${quoted} WHERE ${this.quoteColumnName(columnName)} IS NULL`,
       );
     }
     const constraint = allowNull ? "DROP NOT NULL" : "SET NOT NULL";
     await this.execute(
-      `ALTER TABLE ${this._qi(tableName)} ALTER COLUMN ${this._qi(columnName)} ${constraint}`,
+      `ALTER TABLE ${this.quoteColumnName(tableName)} ALTER COLUMN ${this.quoteColumnName(columnName)} ${constraint}`,
     );
   }
 
@@ -940,7 +938,7 @@ export class SchemaStatements {
 
   async addTimestamps(tableName: string, options: ColumnOptions = {}): Promise<void> {
     const fragments = await this.addTimestampsForAlter(tableName, options);
-    await this.execute(`ALTER TABLE ${this._qt(tableName)} ${fragments.join(", ")}`);
+    await this.execute(`ALTER TABLE ${this.quoteTableName(tableName)} ${fragments.join(", ")}`);
   }
 
   async removeTimestamps(tableName: string): Promise<void> {
@@ -1057,7 +1055,7 @@ export class SchemaStatements {
       string,
       unknown
     >);
-    await this.execute(`ALTER TABLE ${this._qt(tableName)} ${fragments.join(", ")}`);
+    await this.execute(`ALTER TABLE ${this.quoteTableName(tableName)} ${fragments.join(", ")}`);
   }
 
   async addColumns(
@@ -1083,7 +1081,9 @@ export class SchemaStatements {
     switch (this.adapterName as AdapterName) {
       case "sqlite": {
         const { prefix, bare } = this._sqliteSchemaPrefix(tableName);
-        const rows = await this.schemaQuery(`PRAGMA ${prefix}table_info(${this._qi(bare)})`);
+        const rows = await this.schemaQuery(
+          `PRAGMA ${prefix}table_info(${this.quoteColumnName(bare)})`,
+        );
         return rows.map((row: any) => {
           const meta = deduplicate(new SqlTypeMetadata({ sqlType: row.type, type: row.type }));
           return new Column(row.name, row.dflt_value, meta, row.notnull === 0, {
@@ -1257,7 +1257,7 @@ export class SchemaStatements {
       }
       case "mysql": {
         const rows = await this.schemaQuery(
-          `SHOW INDEX FROM ${this._qt(tableName)} WHERE Key_name != 'PRIMARY'`,
+          `SHOW INDEX FROM ${this.quoteTableName(tableName)} WHERE Key_name != 'PRIMARY'`,
         );
         const indexMap = new Map<
           string,
@@ -1297,7 +1297,9 @@ export class SchemaStatements {
     switch (this.adapterName as AdapterName) {
       case "sqlite": {
         const { prefix, bare } = this._sqliteSchemaPrefix(tableName);
-        const rows = await this.schemaQuery(`PRAGMA ${prefix}table_info(${this._qi(bare)})`);
+        const rows = await this.schemaQuery(
+          `PRAGMA ${prefix}table_info(${this.quoteColumnName(bare)})`,
+        );
         const pk = (rows as any[]).find((r: any) => r.pk > 0);
         return pk ? pk.name : null;
       }
@@ -1678,7 +1680,7 @@ export class SchemaStatements {
     const verNum = leading ? parseInt(leading[1].replace(/_/g, ""), 10) : 0;
 
     const pool = this._pool;
-    const smTable = this._qt(pool.schemaMigration.tableName);
+    const smTable = this.quoteTableName(pool.schemaMigration.tableName);
 
     const migrationContext = pool.migrationContext;
     const migrated = (await migrationContext.getAllVersions()).map(Number);
@@ -1881,7 +1883,7 @@ export class SchemaStatements {
   }
 
   quotedColumnsForIndex(columnNames: string[], options: Record<string, unknown> = {}): string {
-    const quotedColumns = new Map(columnNames.map((name) => [name, this._qi(name)]));
+    const quotedColumns = new Map(columnNames.map((name) => [name, this.quoteColumnName(name)]));
     return Array.from(
       this.addOptionsForIndexColumns(
         quotedColumns,
@@ -1949,7 +1951,9 @@ export class SchemaStatements {
         }
       } else {
         if (sqlFragments.length > 0) {
-          await this.execute(`ALTER TABLE ${this._qt(tableName)} ${sqlFragments.join(", ")}`);
+          await this.execute(
+            `ALTER TABLE ${this.quoteTableName(tableName)} ${sqlFragments.join(", ")}`,
+          );
           sqlFragments.length = 0;
         }
         for (const proc of nonCombinable) await proc();
@@ -1965,7 +1969,9 @@ export class SchemaStatements {
     }
 
     if (sqlFragments.length > 0) {
-      await this.execute(`ALTER TABLE ${this._qt(tableName)} ${sqlFragments.join(", ")}`);
+      await this.execute(
+        `ALTER TABLE ${this.quoteTableName(tableName)} ${sqlFragments.join(", ")}`,
+      );
     }
     for (const proc of nonCombinable) await proc();
   }
@@ -2487,7 +2493,7 @@ export class SchemaStatements {
 
   /** @internal */
   insertVersionsSql(versions: string | number | Array<string | number>): string {
-    const smTable = this._qt(this._pool.schemaMigration.tableName);
+    const smTable = this.quoteTableName(this._pool.schemaMigration.tableName);
 
     if (Array.isArray(versions)) {
       // Ruby's Array#reverse returns a new array; copy before reversing so we

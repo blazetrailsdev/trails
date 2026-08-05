@@ -1216,16 +1216,6 @@ export class AbstractAdapter implements Quoting {
     return "Abstract";
   }
 
-  /** @internal */
-  protected _qi(name: string): string {
-    return this.quoteColumnName(name);
-  }
-
-  /** @internal */
-  protected _qt(name: string): string {
-    return this.quoteTableName(name);
-  }
-
   // --- Identity & lifecycle ---
 
   isConnected(): boolean {

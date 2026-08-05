@@ -88,9 +88,8 @@ export class Association {
    *  collection proxy that it can hydrate from this instance's target. */
   _loadedViaAsync = false;
   /**
-   * Nonzero while THIS holder is itself driving a loader (`findTarget` &c.)
-   * through `doAsyncFindTarget`, so the loader's own `setTarget` writeback
-   * into this holder must be skipped — the driving caller assigns the result
+   * Nonzero while THIS holder is itself driving a loader through `findTarget`,
+   * so the loader's own `setTarget` writeback into this holder must be skipped — the driving caller assigns the result
    * itself the moment its `await` resumes.
    *
    * Rails needs no such flag: `Association#find_target`
@@ -677,14 +676,6 @@ export class Association {
     return undefined;
   }
 
-  /**
-   * Async find — delegates to the actual load functions in associations.ts.
-   * Subclasses override to call the appropriate load function.
-   */
-  protected async doAsyncFindTarget(): Promise<Base | Base[] | null> {
-    return null;
-  }
-
   protected findTargetNeeded(): boolean {
     // Mirrors Rails `find_target?` (association.rb:320):
     //   !loaded? && (!owner.new_record? || foreign_key_present?) && klass
@@ -855,16 +846,9 @@ export class Association {
    * (association.rb:248) — the seam `load_target` (association.rb:189) and
    * `CollectionAssociation#load_target` (collection_association.rb:272) run to
    * fetch the target. Subclasses override it with the actual query.
-   *
-   * Subclasses that still override the older trails hook
-   * (`doAsyncFindTarget`) rather than this reach their query through the
-   * delegation below, so there is one implementation per subclass either way.
-   *
-   * (Was previously a private stub that called `loadTarget()` — the inverse of
-   * Rails' direction, and unreachable.)
    */
   protected async findTarget(): Promise<Base | Base[] | null> {
-    return this.doAsyncFindTarget();
+    return null;
   }
 
   /**

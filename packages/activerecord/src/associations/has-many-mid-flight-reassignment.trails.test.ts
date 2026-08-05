@@ -162,7 +162,7 @@ describe("has_many mid-flight reassignment", () => {
   });
 
   it("replacing a has_many :through target mid-load raises", async () => {
-    // HasManyThroughAssociation inherits doAsyncFindTarget from
+    // HasManyThroughAssociation inherits findTarget from
     // HasManyAssociation, so it must inherit the guard with it.
     const author = (await Author.first()) as Author;
     const other = (await Comment.first()) as Comment;
