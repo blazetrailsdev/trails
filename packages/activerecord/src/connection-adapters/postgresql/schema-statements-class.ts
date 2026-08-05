@@ -71,7 +71,6 @@ interface PgSchemaAdapter {
     actionSql(action: string, dependency: string): string;
     accept(o: unknown): string;
   };
-  readonly typeMap: HashLookupTypeMap;
   readonly visitor: Visitors.ToSql;
   loadAdditionalTypes(oids?: number[]): Promise<void>;
   lookupCastTypeFromColumn(column: {
@@ -107,8 +106,9 @@ function toS(value: unknown): string {
  * declared on a base class wins over a merged-interface property. The bodies use
  * the abstract signature for them, which is why `resetPkSequenceBang` casts
  * `getDatabaseVersion`'s `number | Version` (PG returns `server_version_num`)
- * back to `number`. The three restated below are the reverse case: own members
- * TypeScript does accept, narrowed from the generic adapter's. @internal
+ * back to `number`, and `columns` casts the base's `unknown` `typeMap` accessor.
+ * The two restated below are the reverse case: own members TypeScript does
+ * accept, narrowed from the generic adapter's. @internal
  */
 export interface SchemaStatements extends Omit<
   PgSchemaAdapter,
@@ -122,7 +122,6 @@ export interface SchemaStatements extends Omit<
   | "logger"
   | "nativeDatabaseTypes"
 > {
-  readonly typeMap: HashLookupTypeMap;
   readonly logger: { warn?(message: string): void } | null;
   nativeDatabaseTypes(): Record<string, string | { name?: string; limit?: number }>;
 }
@@ -666,17 +665,18 @@ export class SchemaStatements extends AbstractSchemaStatements {
     // Mirrors Rails' load_additional_types batch call: gather all OIDs not
     // yet in the map and load them in a single pg_type query before building
     // Column objects. This avoids N concurrent queries for wide tables.
+    const typeMap = this.typeMap as HashLookupTypeMap;
     const missingOids = [
-      ...new Set(rows.map((r) => Number(r.oid)).filter((oid) => !this.typeMap.has(oid))),
+      ...new Set(rows.map((r) => Number(r.oid)).filter((oid) => !typeMap.has(oid))),
     ];
     if (missingOids.length > 0) {
       await this.loadAdditionalTypes(missingOids);
       // Mirrors Rails' get_oid_type fallback: register any OIDs still absent
       // after the pg_type query so repeated columns() calls don't re-query.
       for (const oid of missingOids) {
-        if (!this.typeMap.has(oid)) {
+        if (!typeMap.has(oid)) {
           console.warn(`unknown OID ${oid}: unrecognized column type, treating as generic value.`);
-          this.typeMap.registerType(oid, new ValueType());
+          typeMap.registerType(oid, new ValueType());
         }
       }
     }
