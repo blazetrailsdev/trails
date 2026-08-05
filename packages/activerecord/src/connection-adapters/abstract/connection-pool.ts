@@ -60,7 +60,8 @@ export interface AbstractPool {
  * Mirrors: ActiveRecord::ConnectionAdapters::NullPool::NullConfig
  */
 export class NullConfig {
-  [key: string]: unknown;
+  // `method_missing` answers nil for every key (abstract/connection_pool.rb:17-22).
+  [key: string]: null | undefined;
 
   get schemaCache(): null {
     return null;
@@ -1392,9 +1393,11 @@ export class ConnectionPool implements ReapablePool {
     // Clear the back-reference we set in newConnection so a removed
     // adapter can't observe stale pool/poolConfig state post-eviction.
     // Mirror the same narrow gate — only touch AbstractAdapter's slot,
-    // never a driver-adapter's own `pool` field.
+    // never a driver-adapter's own `pool` field. Rails' `remove`
+    // (abstract/connection_pool.rb:593) leaves `conn.pool` alone; NullPool is
+    // Rails' unpooled-adapter value (abstract_adapter.rb:153).
     if (conn instanceof AbstractAdapter && (conn as unknown as { pool: unknown }).pool === this) {
-      (conn as unknown as { pool: unknown }).pool = null;
+      (conn as unknown as { pool: unknown }).pool = new NullPool();
     }
 
     for (const [ctxId, pin] of this._pinnedConnections) {

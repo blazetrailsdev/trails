@@ -98,6 +98,12 @@ import {
   arityExcludeKeys,
   parseArityExcludes,
 } from "./arity-exclude.js";
+import {
+  INHERITANCE_EXCLUDE_PATH,
+  inheritanceExcludeKeyOf,
+  inheritanceExcludeKeys,
+  parseInheritanceExcludes,
+} from "./inheritance-exclude.js";
 import { matchOptionKeysAgainst } from "./options-keys.js";
 import { callOf } from "./call-mismatch-baseline.js";
 import {
@@ -696,6 +702,10 @@ interface InheritanceMismatch {
 interface InheritanceResult {
   checked: number;
   matched: number;
+  /** Mismatches suppressed by a reasoned inheritance-exclude.json entry, and
+   *  dropped from `checked` — reported so the shrunken denominator is
+   *  auditable rather than silently absorbing the deviation. */
+  excluded: number;
   mismatches: InheritanceMismatch[];
 }
 
@@ -1517,6 +1527,13 @@ export function main() {
     parseArityExcludes(fs.readFileSync(ARITY_EXCLUDE_PATH, "utf-8")),
   );
   const appliedArityExcludes = new Set<string>();
+
+  // Reasoned inheritance suppressions (RFC 0072) — a ported class whose TS
+  // superclass deliberately differs, each with its justification.
+  const inheritanceExcludes = inheritanceExcludeKeys(
+    parseInheritanceExcludes(fs.readFileSync(INHERITANCE_EXCLUDE_PATH, "utf-8")),
+  );
+  const appliedInheritanceExcludes = new Set<string>();
 
   const results: PackageResult[] = [];
 
@@ -2363,7 +2380,12 @@ export function main() {
     // file + same short name) and verify Ruby's immediate superclass appears
     // somewhere in TS's ancestor chain. If the TS class is absent entirely,
     // surface that as a mismatch so regressions don't hide.
-    const inheritance: InheritanceResult = { checked: 0, matched: 0, mismatches: [] };
+    const inheritance: InheritanceResult = {
+      checked: 0,
+      matched: 0,
+      excluded: 0,
+      mismatches: [],
+    };
     if (tsPkg) {
       // Index TS classes by (file, shortName) and by short name for ancestor walks.
       const tsByFileName = new Map<string, ClassInfo>();
@@ -2438,6 +2460,18 @@ export function main() {
         // actually declares (e.g. "ValueType", not Ruby's "Value").
         if (superclassesMatch(rubySuper, chain, tsCls.name)) {
           inheritance.matched++;
+        } else if (
+          inheritanceExcludes.has(
+            inheritanceExcludeKeyOf({ package: pkg, rubyFile: info.file, rubyFqn: fqn }),
+          )
+        ) {
+          // Reviewed deviation: drop it from the denominator rather than score
+          // it as a match, the way the arity check reports its excludes.
+          appliedInheritanceExcludes.add(
+            inheritanceExcludeKeyOf({ package: pkg, rubyFile: info.file, rubyFqn: fqn }),
+          );
+          inheritance.checked--;
+          inheritance.excluded++;
         } else {
           inheritance.mismatches.push({
             rubyFqn: fqn,
@@ -2507,6 +2541,9 @@ export function main() {
     JSON.stringify(
       {
         generatedAt: new Date().toISOString(),
+        // The inheritance gate treats every committed exclude absent from this
+        // list as stale, the same only-shrink contract arity-exclude has.
+        appliedInheritanceExcludes: [...appliedInheritanceExcludes].sort(),
         results: results.map(({ bodyHashes: _bodyHashes, ...rest }) => rest),
       },
       null,
@@ -2747,8 +2784,11 @@ function printReport(
       pkg.excludedFiles.length > 0 ? "  (some intentionally excluded, see unported-files.ts)" : "";
     const inh = pkg.inheritance;
     const inhPct = inh.checked > 0 ? Math.round((inh.matched / inh.checked) * 1000) / 10 : 0;
+    const inhExcludedNote = inh.excluded > 0 ? `, ${inh.excluded} excluded` : "";
     const inhNote =
-      inh.checked > 0 ? `  |  inheritance: ${inh.matched}/${inh.checked} (${inhPct}%)` : "";
+      inh.checked > 0
+        ? `  |  inheritance: ${inh.matched}/${inh.checked} (${inhPct}%${inhExcludedNote})`
+        : "";
     const misplacedNote = pkg.misplacedFiles > 0 ? `  |  ${pkg.misplacedFiles} misplaced` : "";
     const ar = pkg.arity;
     const arOk = ar.compared - ar.mismatched;

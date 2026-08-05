@@ -15,6 +15,7 @@ import { Post } from "./test-helpers/models/post.js";
 import { LiveParrot, DeadParrot } from "./test-helpers/models/parrot.js";
 import { Cucumber, Cabbage, RedCabbage } from "./test-helpers/models/vegetables.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
+import { NullPool } from "./connection-adapters/abstract/connection-pool.js";
 import {
   leaseFixtureConnection,
   leaseFixtureConnectionFor,
@@ -52,6 +53,10 @@ function makeAdapter(): DatabaseAdapter {
     quote: (v: unknown) => (typeof v === "string" ? `'${v}'` : String(v)),
     quoteTableName: (n: string) => `"${n}"`,
     quoteColumnName: (n: string) => `"${n}"`,
+    // Every Rails adapter carries a pool (abstract_adapter.rb:153); the
+    // fixture machinery reads it to decide whether a set seeds through the
+    // model's own pool.
+    pool: new NullPool(),
   } as unknown as DatabaseAdapter;
 }
 

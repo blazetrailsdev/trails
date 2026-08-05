@@ -28,6 +28,7 @@ import { ActiveRecord } from "../ar-config.js";
 import { Result, type ColumnTypes } from "../result.js";
 import { SchemaCache, SchemaReflection, BoundSchemaReflection, FakePool } from "./schema-cache.js";
 import { NullPool } from "./abstract/connection-pool.js";
+import type { ConnectionPool } from "./abstract/connection-pool.js";
 import { stripSqlComments } from "./sql-classification.js";
 import {
   TransactionManager,
@@ -813,7 +814,6 @@ export class AbstractAdapter implements Quoting {
   private _owner: string | null = null;
   private _inUse = false;
   private _preparedStatements = false;
-  private _schemaReflection: SchemaReflection | null = null;
   private _schemaCache: BoundSchemaReflection | null = null;
   private _idleSince = Date.now();
   protected _lastActivity = 0;
@@ -849,7 +849,9 @@ export class AbstractAdapter implements Quoting {
 
   _queryCache: Store | null = null;
 
-  pool: unknown = null;
+  // Rails' @pool is a ConnectionPool once one owns the connection and a
+  // NullPool until then (abstract_adapter.rb:153).
+  pool: ConnectionPool | NullPool = new NullPool();
   logger: unknown = null;
   lock: unknown = null;
   /** Stable per-instance hex slot + monotonic source for {@link inspect}. @internal */
@@ -1378,11 +1380,14 @@ export class AbstractAdapter implements Quoting {
   }
 
   get role(): string {
-    return (this.pool as any)?.role ?? "writing";
+    // Rails is a bare `@pool.role` (abstract_adapter.rb:288); NullPool defines
+    // none (abstract/connection_pool.rb:14-51), so the default stands in.
+    return this.pool instanceof NullPool ? "writing" : this.pool.role;
   }
 
   get shard(): string {
-    return (this.pool as any)?.shard ?? "default";
+    // Same NullPool arm as `role` — abstract_adapter.rb:294.
+    return this.pool instanceof NullPool ? "default" : this.pool.shard;
   }
 
   /**
@@ -1393,9 +1398,11 @@ export class AbstractAdapter implements Quoting {
    */
   inspect(): string {
     const q = (v: string): string => JSON.stringify(String(v));
-    const pool = this.pool as { dbConfig?: { envName?: string; name?: string } } | null;
-    const envName = pool?.dbConfig?.envName ?? "test";
-    const configName = pool?.dbConfig?.name;
+    // Rails renders a NullConfig's nil answers as `nil`
+    // (abstract/connection_pool.rb:17-22); trails defaults them.
+    const dbConfig = this.pool.dbConfig;
+    const envName = dbConfig.envName ?? "test";
+    const configName = dbConfig.name;
     const nameField = configName && configName !== "primary" ? ` name=${q(configName)}` : "";
     const shardField = this.shard !== "default" ? ` shard=${q(this.shard)}` : "";
     this._inspectId ??= AbstractAdapter._inspectSeq = (AbstractAdapter._inspectSeq ?? 0) + 1;
@@ -1453,9 +1460,11 @@ export class AbstractAdapter implements Quoting {
   }
 
   isReplica(): boolean {
-    if (typeof (this.pool as any)?.dbConfig?.replica === "boolean") {
-      return (this.pool as any).dbConfig.replica;
-    }
+    // Rails' `replica?` reads only `@config[:replica]` (abstract_adapter.rb:199);
+    // the db_config arm is a trails addition for pooled adapters whose
+    // per-connection config never carries the flag.
+    const replica = this.pool.dbConfig.replica;
+    if (typeof replica === "boolean") return replica;
     if (this.role === "reading") return true;
     return this._config.replica === true;
   }
@@ -1463,12 +1472,13 @@ export class AbstractAdapter implements Quoting {
   isPreventingWrites(): boolean {
     if (this.isReplica()) return true;
     if (this.connectionDescriptor === null) return false;
-    const pool = this.pool as any;
+    const pool = this.pool;
     // Mirrors Rails: connection_descriptor.current_preventing_writes →
     // Base.preventing_writes?(class_name). Walks the stack in reverse and
     // returns the entry's prevent_writes flag when (a) it includes Base by
     // identity, or (b) any klass's name matches the pool's connection name.
-    const ownerName: string | undefined = pool?.poolConfig?.connectionDescriptor?.name;
+    const ownerName: string | undefined =
+      pool instanceof NullPool ? undefined : pool.poolConfig.connectionDescriptor.name;
     const stack = connectedToStack();
     for (let i = stack.length - 1; i >= 0; i--) {
       const entry = stack[i];
@@ -1535,8 +1545,8 @@ export class AbstractAdapter implements Quoting {
    * adapter.
    */
   get schemaCache(): BoundSchemaReflection {
-    const pool = this.pool as { schemaCache?: BoundSchemaReflection } | null;
-    if (pool?.schemaCache instanceof BoundSchemaReflection) return pool.schemaCache;
+    const schemaCache = this.pool.schemaCache;
+    if (schemaCache instanceof BoundSchemaReflection) return schemaCache;
     this._schemaCache ??= BoundSchemaReflection.forLoneConnection(
       this._poolSchemaReflection(),
       this,
@@ -1547,15 +1557,10 @@ export class AbstractAdapter implements Quoting {
   /**
    * @internal Rails' `@pool.schema_reflection` — ConnectionPool delegates to its
    * PoolConfig and NullPool answers a bare `SchemaReflection.new(nil)`
-   * (connection_pool.rb:34-36). The fallback covers a mock that skipped the
-   * constructor and so carries no pool at all; Rails cannot get there because
-   * `initialize` always plants a NullPool.
+   * (connection_pool.rb:34-36).
    */
   private _poolSchemaReflection(): SchemaReflection {
-    const pool = this.pool as { schemaReflection?: SchemaReflection } | null;
-    if (pool?.schemaReflection) return pool.schemaReflection;
-    this._schemaReflection ??= new SchemaReflection(null);
-    return this._schemaReflection;
+    return this.pool.schemaReflection;
   }
 
   checkIfWriteQuery(sql: string): void {
@@ -1764,12 +1769,10 @@ export class AbstractAdapter implements Quoting {
 
   close(): void | Promise<void> {
     // Mirrors Rails' `close` (abstract_adapter.rb:830): `pool.checkin self`.
-    // Rails adapters always carry a pool (NullPool by default), whose
-    // `checkin` is a no-op; trails leaves `pool` null for standalone adapters,
-    // so the no-pool branch expires a leased connection and otherwise no-ops
-    // (matching NullPool#checkin).
-    const pool = this.pool as { checkin?: (conn: unknown) => void } | null;
-    if (pool && !(pool instanceof NullPool) && typeof pool.checkin === "function") {
+    // NullPool#checkin is a no-op in Rails; trails expires a leased connection
+    // on that arm instead.
+    const pool = this.pool;
+    if (!(pool instanceof NullPool)) {
       pool.checkin(this);
     } else if (this._inUse) {
       this.expire();
@@ -1820,7 +1823,7 @@ export class AbstractAdapter implements Quoting {
   }
 
   get connectionDescriptor(): unknown {
-    return (this.pool as any)?.connectionDescriptor ?? null;
+    return this.pool.connectionDescriptor ?? null;
   }
 
   /**
@@ -2111,8 +2114,8 @@ export class AbstractAdapter implements Quoting {
     // Mirrors Rails AbstractAdapter#throw_away! (abstract_adapter.rb:733):
     // `pool.remove self; disconnect!`. Removing from the pool is what evicts
     // the connection so it can't be leased again after a transaction failure;
-    // standalone adapters (no pool) just disconnect.
-    (this.pool as { remove?: (conn: unknown) => void } | null)?.remove?.(this);
+    // NullPool#remove is a no-op.
+    this.pool.remove(this);
     this.disconnectBang();
   }
 

@@ -16,6 +16,7 @@ import { Base } from "../base.js";
 import { ActiveRecord } from "../ar-config.js";
 import { leaseFixtureConnection, leaseFixtureConnectionFor } from "./fixture-connection.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
+import { NullPool } from "../connection-adapters/abstract/connection-pool.js";
 
 describe("fixture connection source", () => {
   afterEach(() => {
@@ -49,7 +50,10 @@ describe("fixture connection source", () => {
 });
 
 describe("per-set fixture connection", () => {
-  const fixtureConnection = { marker: "pinned-fixture-connection" } as unknown as DatabaseAdapter;
+  const fixtureConnection = {
+    marker: "pinned-fixture-connection",
+    pool: new NullPool(),
+  } as unknown as DatabaseAdapter;
 
   it("seeds a model-less (join-table) set through the fixture connection", async () => {
     expect(await leaseFixtureConnectionFor(null, fixtureConnection)).toBe(fixtureConnection);

@@ -61,7 +61,6 @@ interface PgSchemaAdapter {
   supportsVirtualColumns(): boolean;
   extractSchemaQualifiedName(string: string): [string | null, string];
   maxIdentifierLength(): number;
-  getDatabaseVersion(): Promise<number>;
   dataSourceSql(name?: string | null, options?: { type?: string }): string;
   quotedScope(
     name?: string | null,
@@ -102,11 +101,12 @@ function toS(value: unknown): string {
  * calls the PG adapter's type.
  *
  * The `Omit`ted names already reach `this` from `AbstractSchemaStatements` with
- * a signature TypeScript will not let a narrower PG one merge over — a method
- * declared on a base class wins over a merged-interface property. The bodies use
- * the abstract signature for them, which is why `resetPkSequenceBang` casts
- * `getDatabaseVersion`'s `number | Version` (PG returns `server_version_num`)
- * back to `number`, and `columns` casts the base's `unknown` `typeMap` accessor.
+ * a signature TypeScript will not let a narrower PG one merge over — a member
+ * declared on a base class wins over a merged-interface property. `getDatabaseVersion`
+ * is off that list: a declaration-only `declare` field in the class body does
+ * outrank the inherited method (see the class), which is what removed
+ * `resetPkSequenceBang`'s cast. The same trick cannot reach `typeMap`, which the
+ * generic adapter declares as an accessor (TS2610) — `columns` still casts it.
  * The two restated below are the reverse case: own members TypeScript does
  * accept, narrowed from the generic adapter's. @internal
  */
@@ -114,7 +114,6 @@ export interface SchemaStatements extends Omit<
   PgSchemaAdapter,
   | "execute"
   | "internalExecute"
-  | "getDatabaseVersion"
   | "lookupCastTypeFromColumn"
   | "schemaCreation"
   | "quotedScope"
@@ -128,6 +127,11 @@ export interface SchemaStatements extends Omit<
 
 export class SchemaStatements extends AbstractSchemaStatements {
   /* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
+
+  // Rails gets PostgreSQLAdapter's `get_database_version` (`server_version_num`)
+  // by ordinary method lookup; TS picks the inherited generic-adapter method
+  // ahead of a merged-interface one, so restate it declaration-only.
+  declare getDatabaseVersion: () => Promise<number>;
 
   /** Mirrors: PostgreSQL::SchemaStatements#update_table_definition */
   override updateTableDefinition(tableName: string, base?: unknown): PgTable {
@@ -665,6 +669,8 @@ export class SchemaStatements extends AbstractSchemaStatements {
     // Mirrors Rails' load_additional_types batch call: gather all OIDs not
     // yet in the map and load them in a single pg_type query before building
     // Column objects. This avoids N concurrent queries for wide tables.
+    // TS2610: an inherited accessor cannot be narrowed, and overriding it here
+    // would shadow PostgreSQLAdapter's own `type_map` under `include()`.
     const typeMap = this.typeMap as HashLookupTypeMap;
     const missingOids = [
       ...new Set(rows.map((r) => Number(r.oid)).filter((oid) => !typeMap.has(oid))),
@@ -1896,7 +1902,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     );
     let minvalue: unknown = null;
     if (maxPk == null) {
-      const dbVersion = (await this.getDatabaseVersion()) as number;
+      const dbVersion = await this.getDatabaseVersion();
       minvalue =
         dbVersion >= 100000
           ? await this.queryValue(
