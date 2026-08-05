@@ -1037,7 +1037,7 @@ describe("PreloaderTest", () => {
     const maryPost = posts("misc_by_mary");
     const mary = authors("mary");
 
-    const loadedBob = await findTarget(bobPost, "author", {});
+    const loadedBob = (await bobPost.author) as Author;
     expect(bobPost.association("author").isLoaded()).toBe(true);
     expect(maryPost.association("author").isLoaded()).toBe(false);
 
@@ -1223,7 +1223,7 @@ describe("PreloaderTest", () => {
   it("preload loaded belongs to association with composite foreign key", async () => {
     const comment = shardedComments("great_comment_blog_post_one");
 
-    await findTarget(comment, "blogPost", { className: "ShardedBlogPost" });
+    await comment.blogPost;
 
     const sqls = await captureSql(async () => {
       await new Preloader({ records: [comment], associations: ["blogPost"] }).call();
