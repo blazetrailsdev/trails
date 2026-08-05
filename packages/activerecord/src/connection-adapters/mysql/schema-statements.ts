@@ -36,11 +36,9 @@ type CreateTableOptions = Extract<CreateTableArgs[1], { options?: string }>;
  * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements (partial)
  */
 export class MysqlSchemaStatements extends BaseSchemaStatements {
-  private _mysqlSchemaCreation?: MysqlSchemaCreation;
+  /** Mirrors: MySQL::SchemaStatements#schema_creation */
   override get schemaCreation(): MysqlSchemaCreation {
-    return (this._mysqlSchemaCreation ??= new MysqlSchemaCreation(
-      this as unknown as VisitorHostAdapter,
-    ));
+    return new MysqlSchemaCreation(this as unknown as VisitorHostAdapter);
   }
 
   /** Mirrors: MySQL::SchemaStatements#update_table_definition */

@@ -211,8 +211,9 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return "sqlite";
   }
 
+  /** Mirrors: SQLite3::SchemaStatements#schema_creation */
   get schemaCreation(): SQLite3SchemaCreation {
-    return (this._sqlite3SchemaCreation ??= new SQLite3SchemaCreation("sqlite", this));
+    return new SQLite3SchemaCreation("sqlite", this);
   }
 
   /** @internal */
@@ -305,7 +306,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   private _inTransaction = false;
-  private _sqlite3SchemaCreation?: SQLite3SchemaCreation;
   private _readonly: boolean;
   private _strict: boolean;
   /** @internal Rails' `@last_affected_rows`; read by the affected_rows port. */

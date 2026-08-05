@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { PostgreSQLDatabaseTasks, normalizeSchemaSearchPath } from "./postgresql-database-tasks.js";
 import { DatabaseTasks } from "./database-tasks.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
+import { UrlConfig } from "../database-configurations/url-config.js";
 import { DatabaseAlreadyExists } from "../errors.js";
 
 function config(overrides: Record<string, unknown> = {}): HashConfig {
@@ -176,6 +177,50 @@ describe("PostgreSQLDatabaseTasks", () => {
 
     expect(establishCalls).toHaveLength(1);
     expect(establishCalls[0]).toMatchObject({ database: "postgres", schemaSearchPath: "public" });
+  });
+
+  it("test_creates_database_with_url_only_configuration", async () => {
+    // UrlConfig resolves the URL into configuration_hash (url_config.rb:35-42),
+    // so the task reads db_config.database like every other config shape.
+    const establishCalls: Array<Record<string, unknown> | undefined> = [];
+    const createDatabase = vi.fn(async () => {});
+    const tasks = new PostgreSQLDatabaseTasks(
+      new UrlConfig("development", "primary", "postgres://someone:secret@localhost:5433/url_db"),
+    );
+    vi.spyOn(
+      tasks as unknown as { connection(): Promise<unknown> },
+      "connection",
+    ).mockResolvedValue({ createDatabase });
+    vi.spyOn(
+      tasks as unknown as { establishConnection(c?: Record<string, unknown>): Promise<void> },
+      "establishConnection",
+    ).mockImplementation(async (c?: Record<string, unknown>) => {
+      establishCalls.push(c);
+    });
+
+    await tasks.create();
+
+    expect(createDatabase).toHaveBeenCalledWith(
+      "url_db",
+      expect.objectContaining({ host: "localhost", port: 5433, encoding: "utf8" }),
+    );
+    expect(establishCalls[0]).toMatchObject({ database: "postgres", schemaSearchPath: "public" });
+  });
+
+  it("test_psql_env_reads_the_configuration_hash_for_a_url_config", () => {
+    const tasks = new PostgreSQLDatabaseTasks(
+      new UrlConfig(
+        "development",
+        "primary",
+        "postgres://someone:secret@localhost:5433/url_db?sslmode=require",
+      ),
+    );
+    const env = (tasks as unknown as { psqlEnv(): Record<string, string> }).psqlEnv();
+    expect(env.PGHOST).toBe("localhost");
+    expect(env.PGPORT).toBe("5433");
+    expect(env.PGUSER).toBe("someone");
+    expect(env.PGPASSWORD).toBe("secret");
+    expect(env.PGSSLMODE).toBe("require");
   });
 
   describe("structureDump schema filtering", () => {

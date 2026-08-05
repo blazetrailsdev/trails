@@ -29,43 +29,9 @@ const SQL_COMMENT_BEGIN = "--";
 
 type ConfigHash = Record<string, unknown>;
 
-interface UrlParts {
-  host?: string;
-  port?: string;
-  username?: string;
-  password?: string;
-  database?: string;
-  sslmode?: string;
-  sslcert?: string;
-  sslkey?: string;
-  sslrootcert?: string;
-}
-
-function parseDbUrl(url: string | undefined): UrlParts {
-  if (!url) return {};
-  try {
-    const parsed = new URL(url);
-    const database = decodeURIComponent(parsed.pathname.replace(/^\/+/, ""));
-    return {
-      host: parsed.hostname || undefined,
-      port: parsed.port || undefined,
-      username: parsed.username ? decodeURIComponent(parsed.username) : undefined,
-      password: parsed.password ? decodeURIComponent(parsed.password) : undefined,
-      database: database || undefined,
-      sslmode: parsed.searchParams.get("sslmode") ?? undefined,
-      sslcert: parsed.searchParams.get("sslcert") ?? undefined,
-      sslkey: parsed.searchParams.get("sslkey") ?? undefined,
-      sslrootcert: parsed.searchParams.get("sslrootcert") ?? undefined,
-    };
-  } catch {
-    return {};
-  }
-}
-
 export class PostgreSQLDatabaseTasks {
   private readonly dbConfig: DatabaseConfig;
   private readonly configurationHash: ConfigHash;
-  private readonly urlParts: UrlParts;
 
   static usingDatabaseConfigurations(): boolean {
     return true;
@@ -74,7 +40,6 @@ export class PostgreSQLDatabaseTasks {
   constructor(dbConfig: DatabaseConfig) {
     this.dbConfig = dbConfig;
     this.configurationHash = { ...dbConfig.configuration };
-    this.urlParts = parseDbUrl(this.configurationHash.url as string | undefined);
   }
 
   async create(connectionAlreadyEstablished = false): Promise<void> {
@@ -82,7 +47,9 @@ export class PostgreSQLDatabaseTasks {
       await this.establishConnection(this.publicSchemaConfig());
     }
     const conn = await this.connection();
-    await conn.createDatabase(this.requireDatabaseName(), {
+    // Rails names `db_config.database` unguarded (postgresql_database_tasks.rb:22);
+    // a config with no database lets the adapter raise, as it does in Ruby.
+    await conn.createDatabase(this.dbConfig.database as string, {
       ...this.configurationHash,
       encoding: this.encoding(),
     });
@@ -92,7 +59,7 @@ export class PostgreSQLDatabaseTasks {
   async drop(): Promise<void> {
     await this.establishConnection(this.publicSchemaConfig());
     const conn = await this.connection();
-    await conn.dropDatabase(this.requireDatabaseName());
+    await conn.dropDatabase(this.dbConfig.database as string);
   }
 
   async charset(): Promise<string> {
@@ -117,7 +84,7 @@ export class PostgreSQLDatabaseTasks {
       "--no-owner",
       "--file",
       filename,
-      `--dbname=${this.requireDatabaseName()}`,
+      `--dbname=${this.dbConfig.database}`,
     ];
     if (extraFlags) {
       args.push(...(Array.isArray(extraFlags) ? extraFlags : [extraFlags]));
@@ -187,7 +154,7 @@ export class PostgreSQLDatabaseTasks {
       nullDevice,
       "--file",
       filename,
-      `--dbname=${this.requireDatabaseName()}`,
+      `--dbname=${this.dbConfig.database}`,
     ];
     if (extraFlags) {
       args.push(...(Array.isArray(extraFlags) ? extraFlags : [extraFlags]));
@@ -209,7 +176,7 @@ export class PostgreSQLDatabaseTasks {
       : new PostgreSQLAdapter({
           host: (c.host as string) ?? "localhost",
           port: coercePort(c.port, 5432),
-          database: this.requireDatabaseName(),
+          database: this.dbConfig.database,
           user: c.username as string | undefined,
           password: c.password as string | undefined,
         });
@@ -263,18 +230,18 @@ export class PostgreSQLDatabaseTasks {
       ...((globalThis as { process?: { env?: NodeJS.ProcessEnv } }).process?.env ?? {}),
     };
     const c = this.configurationHash;
-    const host = this.dbConfig.host ?? this.urlParts.host;
-    const port = c.port ?? this.urlParts.port;
-    const password = c.password ?? this.urlParts.password;
-    const username = c.username ?? this.urlParts.username;
+    const host = this.dbConfig.host;
+    const port = c.port;
+    const password = c.password;
+    const username = c.username;
     if (host) env.PGHOST = String(host);
     if (port !== undefined) env.PGPORT = String(port);
     if (password !== undefined) env.PGPASSWORD = String(password);
     if (username !== undefined) env.PGUSER = String(username);
-    const sslmode = c.sslmode ?? this.urlParts.sslmode;
-    const sslcert = c.sslcert ?? this.urlParts.sslcert;
-    const sslkey = c.sslkey ?? this.urlParts.sslkey;
-    const sslrootcert = c.sslrootcert ?? this.urlParts.sslrootcert;
+    const sslmode = c.sslmode;
+    const sslcert = c.sslcert;
+    const sslkey = c.sslkey;
+    const sslrootcert = c.sslrootcert;
     if (sslmode !== undefined) env.PGSSLMODE = String(sslmode);
     if (sslcert !== undefined) env.PGSSLCERT = String(sslcert);
     if (sslkey !== undefined) env.PGSSLKEY = String(sslkey);
@@ -319,12 +286,6 @@ export class PostgreSQLDatabaseTasks {
     }
   }
 
-  private requireDatabaseName(): string {
-    const name = this.dbConfig.database ?? this.urlParts.database;
-    if (!name) throw new Error("PostgreSQL configuration missing 'database'");
-    return name;
-  }
-
   /** @internal */
   private async establishConnection(configHash?: Record<string, unknown>): Promise<void> {
     await Base.establishConnection(
@@ -334,18 +295,7 @@ export class PostgreSQLDatabaseTasks {
 
   /** @internal */
   private publicSchemaConfig(): ConfigHash {
-    const c = this.configurationHash;
-    if (c.url) {
-      // Modify the URL to target the postgres system DB and strip `database`
-      // from the spread. buildAdapterArg uses the URL path when `database` is
-      // undefined; if `database` remains in the hash it discards the URL and
-      // builds a host-less config instead.
-      const parsed = new URL(String(c.url));
-      parsed.pathname = "/postgres";
-      const { database: _db, ...rest } = c;
-      return { ...rest, url: parsed.toString(), schemaSearchPath: "public" };
-    }
-    return { ...c, database: "postgres", schemaSearchPath: "public" };
+    return { ...this.configurationHash, database: "postgres", schemaSearchPath: "public" };
   }
 }
 
