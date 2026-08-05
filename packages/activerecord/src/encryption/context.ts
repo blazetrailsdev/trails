@@ -7,6 +7,7 @@
 import type { MessageSerializerLike } from "./message-serializer.js";
 import { NullEncryptor } from "./null-encryptor.js";
 import { Configurable } from "./configurable.js";
+import { Cipher } from "./cipher.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
 
 // EncryptingOnlyEncryptor extends the full Encryptor, which transitively imports
@@ -22,6 +23,24 @@ export function setEncryptingOnlyEncryptorFactory(factory: () => unknown): void 
 }
 
 /**
+ * @internal Rails `Context::PROPERTIES` (context.rb:13) as a hoisted function
+ * so `configurable.ts` can read the names at module-eval time: the two modules
+ * form a cycle, and whichever evaluates second sees the other's `class`/`const`
+ * bindings in TDZ, while a function declaration is initialized at
+ * instantiation. Read it as `Context.PROPERTIES`.
+ */
+export function contextProperties(): string[] {
+  return [
+    "keyProvider",
+    "keyGenerator",
+    "cipher",
+    "messageSerializer",
+    "encryptor",
+    "frozenEncryption",
+  ];
+}
+
+/**
  * Holds the encryption configuration for a single context frame:
  * key provider, key generator, cipher, message serializer, encryptor,
  * and whether encryption is frozen (read-only mode).
@@ -34,14 +53,7 @@ export class Context {
    * defines on a Context. `Configurable.configure` tests against it for the
    * `respond_to?("#{name}=")` guard Rails uses (configurable.rb:35-37).
    */
-  static readonly PROPERTIES = [
-    "keyProvider",
-    "keyGenerator",
-    "cipher",
-    "messageSerializer",
-    "encryptor",
-    "frozenEncryption",
-  ];
+  static readonly PROPERTIES = contextProperties();
 
   private _keyProvider?: unknown;
   keyGenerator?: unknown;
@@ -62,9 +74,18 @@ export class Context {
     this._keyProvider = value;
   }
 
-  /** @internal */
+  /**
+   * @internal Rails `Context#set_defaults` (context.rb:29-35) also seeds
+   * `key_generator`, `encryptor` and `message_serializer`. Each of those
+   * modules imports `Configurable`, and this module is evaluated while
+   * building the default context, so constructing them here would close an
+   * eval-time cycle. Story
+   * `0072-api-compare-parity-burndown/converge-context-set-defaults-remaining-three`
+   * carries the convergence.
+   */
   private setDefaults(): void {
     this.frozenEncryption = false;
+    this.cipher = new Cipher();
   }
 
   /**
@@ -78,53 +99,43 @@ export class Context {
   }
 }
 
-export interface EncryptionContext {
-  encryptor?: unknown;
-  frozenEncryption?: boolean;
-  keyProvider?: unknown;
-  messageSerializer?: MessageSerializerLike;
-  [key: string]: unknown;
-}
-
-const contextStack: EncryptionContext[] = [];
+const contextStack: Context[] = [];
 /**
  * Rails' `mattr_accessor :default_context, default: Context.new`
  * (contexts.rb:18). A real Context, not a bare object, because Context is where
  * the default key provider is memoized (context.rb:25-27) — that memo is Rails'
  * only key-provider cache, and `reset_default_context` is its only invalidation.
  */
-let _defaultContext: EncryptionContext = new Context() as unknown as EncryptionContext;
+let _defaultContext: Context = new Context();
 
-export function getDefaultContext(): EncryptionContext {
+export function getDefaultContext(): Context {
   return _defaultContext;
 }
 
 /** @internal */
-export function setDefaultContext(context: EncryptionContext): void {
+export function setDefaultContext(context: Context): void {
   _defaultContext = context;
 }
 
 export function resetDefaultContext(): void {
-  _defaultContext = new Context() as unknown as EncryptionContext;
+  _defaultContext = new Context();
 }
 
-function currentContext(): EncryptionContext {
+function currentContext(): Context {
   return contextStack.length > 0 ? contextStack[contextStack.length - 1] : _defaultContext;
 }
 
-export function withEncryptionContext<T>(overrides: EncryptionContext, fn: () => T): T {
+export function withEncryptionContext<T>(overrides: Partial<Context>, fn: () => T): T {
   // Mirrors Rails Contexts#with_encryption_context (contexts.rb:32-42): every frame
   // is `default_context.dup` + the overrides — NOT a copy of the enclosing custom
   // context. So nested contexts reset every unspecified property to the default
   // (e.g. without_encryption nested inside protecting_encrypted_data resets
   // frozen_encryption to false), rather than inheriting it from the outer frame.
-  const frame = Object.assign(
+  const frame: Context = Object.assign(
     Object.create(Object.getPrototypeOf(getDefaultContext())),
     getDefaultContext(),
-  ) as EncryptionContext;
-  for (const [key, value] of Object.entries(overrides)) {
-    frame[key] = value;
-  }
+  );
+  Object.assign(frame, overrides);
   contextStack.push(frame);
   let result: T;
   try {
@@ -167,22 +178,10 @@ export function protectingEncryptedData<T>(fn: () => T): T {
   return withEncryptionContext({ encryptor, frozenEncryption: true }, fn);
 }
 
-export function getEncryptionContext(): EncryptionContext {
+export function getEncryptionContext(): Context {
   return currentContext();
 }
 
-export function getCurrentCustomContext(): EncryptionContext | null {
+export function getCurrentCustomContext(): Context | null {
   return contextStack.length > 0 ? contextStack[contextStack.length - 1] : null;
-}
-
-// Compatibility shims, reimplemented on the encryptor-swap model. The flag fields
-// are gone; these now derive from the context encryptor/frozenEncryption so the
-// existing contexts.test.ts assertions stay green. They become truly dead once
-// PR 2 rewrites contexts.test.ts as a DB-backed faithful port — removed there.
-export function isEncryptionDisabled(): boolean {
-  return currentContext().encryptor instanceof NullEncryptor;
-}
-
-export function isProtectedMode(): boolean {
-  return currentContext().frozenEncryption === true;
 }

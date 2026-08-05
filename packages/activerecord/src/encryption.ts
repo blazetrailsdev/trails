@@ -27,7 +27,7 @@ export { Cipher } from "./encryption/cipher.js";
 import { EncryptableRecord, encryptedTypeOf } from "./encryption/encryptable-record.js";
 import { Configurable } from "./encryption/configurable.js";
 import { Contexts } from "./encryption/contexts.js";
-import { getEncryptionContext, type EncryptionContext } from "./encryption/context.js";
+import { getEncryptionContext, type Context } from "./encryption/context.js";
 import type { Config } from "./encryption/config.js";
 
 /**
@@ -336,7 +336,7 @@ export function encryptedAttributeWasDeclared(klass: any, name: string): void {
 // ─── Delegation to Contexts (included into Encryption in Rails) ──────────────
 
 /** Mirrors: ActiveRecord::Encryption.with_encryption_context */
-export function withEncryptionContext<T>(properties: EncryptionContext, fn: () => T): T {
+export function withEncryptionContext<T>(properties: Partial<Context>, fn: () => T): T {
   return Contexts.withEncryptionContext(properties, fn);
 }
 
@@ -351,12 +351,12 @@ export function protectingEncryptedData<T>(fn: () => T): T {
 }
 
 /** Mirrors: ActiveRecord::Encryption.context */
-export function context(): EncryptionContext {
+export function context(): Context {
   return Contexts.context;
 }
 
 /** Mirrors: ActiveRecord::Encryption.current_custom_context */
-export function currentCustomContext(): EncryptionContext | null {
+export function currentCustomContext(): Context | null {
   return Contexts.currentCustomContext;
 }
 
@@ -365,7 +365,7 @@ export function currentCustomContext(): EncryptionContext | null {
  * on Encryption via the Contexts concern. Called with no argument it reads;
  * called with a value it writes.
  */
-export function defaultContext(value?: EncryptionContext): EncryptionContext {
+export function defaultContext(value?: Context): Context {
   if (value !== undefined) {
     Contexts.defaultContext = value;
   }

@@ -25,8 +25,17 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { TEST_SCHEMA } from "../../packages/activerecord/src/test-helpers/test-schema.js";
-import type { ColumnSpec, Schema } from "../../packages/activerecord/src/support/schema-types.js";
-import { columnsOf } from "../../packages/activerecord/src/support/schema-types.js";
+import type {
+  ColumnSpec,
+  ForeignKeySpec,
+  IndexSpec,
+  Schema,
+  TableSchema,
+} from "../../packages/activerecord/src/support/schema-types.js";
+import {
+  columnsOf,
+  isWrappedSchema,
+} from "../../packages/activerecord/src/support/schema-types.js";
 import { canonicalRegistrySchema } from "../../packages/activerecord/src/support/canonical-schema.js";
 import type { RailsColumnOptions, RailsTable } from "./parse-schema-rb.js";
 import { parseSchemaRbWithCoverage } from "./parse-schema-rb.js";
@@ -403,12 +412,16 @@ export function describeSpec(spec: ColumnSpec): string {
  * {@link TRANSCRIPTION_DIVERGENCE_ALLOW_LIST} documents it — this is what makes
  * the hand-sync requirement enforced rather than merely written down.
  *
- * Scope is the column shape only. Indexes, foreign keys, and table-level
- * primary-key metadata are declared in structurally different ways on the two
- * sides (`t.foreignKey` / `t.index` calls versus a `references:` option and a
- * separate index list), so diffing them here would manufacture findings rather
- * than catch drift; they stay uncompared until a later story reconciles the two
- * spellings.
+ * Scope is a table's column shape, its index set, its inline foreign keys and
+ * its table-level primary key. The registry spells the last three as
+ * `t.index` / `t.foreignKey` calls and `create_table` meta;
+ * {@link canonicalRegistrySchema} replays them back into the same `IndexSpec` /
+ * `ForeignKeySpec` / `primaryKey` shapes `TEST_SCHEMA` declares, so the two are
+ * compared as one vocabulary rather than diffed across spellings.
+ *
+ * `serialPk` is the one piece of registry table meta with no counterpart:
+ * `TEST_SCHEMA` declares the column and lets the loader promote it, so there is
+ * nothing on that side to compare against and it stays out.
  *
  * Pure: the caller supplies both sides.
  */
@@ -448,8 +461,126 @@ export function compareTranscriptions(testSchema: Schema, registry: Schema): str
         );
       }
     }
+    divergences.push(...compareTableExtras(table, inTestSchema, inRegistry));
   }
   return divergences;
+}
+
+/** The index options both transcriptions must agree on, in report order. */
+const COMPARED_INDEX_KEYS = [
+  "unique",
+  "where",
+  "name",
+  "order",
+  "length",
+  "nullsNotDistinct",
+  "using",
+  "type",
+  "adapters",
+] as const;
+
+/**
+ * The comparable shape of an `IndexSpec`: its columns plus every option that
+ * reaches the DDL, including the `adapters` gate — an index one side lays
+ * everywhere and the other gates to MySQL is a real divergence.
+ */
+export function describeIndex(spec: IndexSpec): string {
+  const columns = Array.isArray(spec.columns) ? spec.columns.join(",") : spec.columns;
+  const parts = [`(${columns})`];
+  for (const key of COMPARED_INDEX_KEYS) {
+    const value = spec[key];
+    if (value !== undefined) parts.push(`${key}=${JSON.stringify(value)}`);
+  }
+  return parts.join(" ");
+}
+
+/** The comparable shape of a `ForeignKeySpec`. */
+export function describeForeignKey(spec: ForeignKeySpec): string {
+  const parts = [`${spec.column}→${spec.toTable}`];
+  if (spec.primaryKey !== undefined) parts.push(`primaryKey=${spec.primaryKey}`);
+  if (spec.name !== undefined) parts.push(`name=${spec.name}`);
+  return parts.join(" ");
+}
+
+/** A table's declarations beside its columns, defaulted for the legacy shape. */
+function extrasOf(table: TableSchema): {
+  primaryKey: string;
+  indexes: IndexSpec[];
+  foreignKeys: ForeignKeySpec[];
+} {
+  const wrapped = isWrappedSchema(table) ? table : undefined;
+  const primaryKey = wrapped?.primaryKey;
+  return {
+    primaryKey:
+      primaryKey === undefined
+        ? "default"
+        : primaryKey === false
+          ? "none"
+          : `(${primaryKey.join(",")})`,
+    indexes: wrapped?.indexes ?? [],
+    foreignKeys: wrapped?.foreignKeys ?? [],
+  };
+}
+
+/**
+ * The per-table declarations that live alongside the columns: indexes, inline
+ * foreign keys, and the table-level primary key. Indexes and foreign keys are
+ * compared as multisets of their described shapes — declaration ORDER is not
+ * compared, because neither transcription's order reaches the DDL as anything
+ * observable, but a duplicate on one side is still a divergence.
+ */
+function compareTableExtras(
+  table: string,
+  inTestSchema: TableSchema,
+  inRegistry: TableSchema,
+): string[] {
+  const testSchema = extrasOf(inTestSchema);
+  const registry = extrasOf(inRegistry);
+  const divergences: string[] = [];
+  if (testSchema.primaryKey !== registry.primaryKey) {
+    divergences.push(
+      `${table} — primary key: ${TEST_SCHEMA_LABEL} ${testSchema.primaryKey}, ` +
+        `${REGISTRY_LABEL} ${registry.primaryKey}`,
+    );
+  }
+  divergences.push(
+    ...compareDescribed(
+      table,
+      "index",
+      testSchema.indexes.map(describeIndex),
+      registry.indexes.map(describeIndex),
+    ),
+    ...compareDescribed(
+      table,
+      "foreign key",
+      testSchema.foreignKeys.map(describeForeignKey),
+      registry.foreignKeys.map(describeForeignKey),
+    ),
+  );
+  return divergences;
+}
+
+/** One side's described declarations minus the other's, reported both ways. */
+function compareDescribed(
+  table: string,
+  kind: string,
+  testSchema: string[],
+  registry: string[],
+): string[] {
+  const missingFrom = (from: string[], other: string[], label: string): string[] => {
+    const remaining = [...other];
+    return from
+      .filter((described) => {
+        const at = remaining.indexOf(described);
+        if (at !== -1) remaining.splice(at, 1);
+        return at === -1;
+      })
+      .map((described) => `${table} — ${kind} ${described} declared only by ${label}`);
+  };
+  return [
+    ...missingFrom(testSchema, registry, TEST_SCHEMA_LABEL),
+    ...missingFrom(registry, testSchema, REGISTRY_LABEL),
+  ].sort();
 }
 
 /**

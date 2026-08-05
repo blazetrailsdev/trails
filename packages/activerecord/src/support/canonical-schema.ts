@@ -20,6 +20,7 @@
  */
 
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
+import { singularize } from "@blazetrails/activesupport";
 import { ActiveRecordError } from "../errors.js";
 import type {
   TableDefinition,
@@ -27,7 +28,14 @@ import type {
   AddForeignKeyOptions,
 } from "../connection-adapters/abstract/schema-definitions.js";
 import type { SchemaStatements } from "../connection-adapters/abstract/schema-statements.js";
-import type { AnyPrimitiveColumnSpec, ColumnSpec, Schema } from "./schema-types.js";
+import type {
+  AnyPrimitiveColumnSpec,
+  ColumnSpec,
+  ForeignKeySpec,
+  IndexSpec,
+  Schema,
+  WrappedTableSchema,
+} from "./schema-types.js";
 import {
   COLUMN_TYPE_MAP_MYSQL,
   COLUMN_TYPE_MAP_PG,
@@ -2174,6 +2182,16 @@ export async function canonicalForeignKeyDependents(): Promise<Map<string, strin
  * {@link assertSerialPkIsPlainInteger} fails loudly the moment one does, rather
  * than letting the replay report a shape the real DDL never had.
  *
+ * The wrapper form carries what `TEST_SCHEMA` spells alongside its columns: the
+ * index list, the inline foreign keys and the table-level primary key.
+ * `serialPk` transcribes as the one-column `primaryKey` array `TEST_SCHEMA`
+ * spells the same declaration with (`auto_id_tests`, test-schema.ts:134-144);
+ * the serial rendering is the loader's business. A composite `column:` /
+ * `primary_key:` collapses to its comma-joined spelling, `ForeignKeySpec` being
+ * single-column as every canonical `t.foreignKey` is today. An omitted
+ * `column:` defaults the way `foreign_key_column_for` does
+ * (schema_statements.rb:1241-1244): the singularized table name plus `_id`.
+ *
  * @internal Read by `scripts/schema-compare/compare.ts`. Lives here, next to the
  * registry it replays, for the same reason as
  * {@link canonicalForeignKeyDependents}: `TableBuilder` stays file-local.
@@ -2182,13 +2200,26 @@ export async function canonicalRegistrySchema(): Promise<Schema> {
   const schema: Schema = {};
   for (const def of await buildCanonicalRegistry()) {
     const columns: Record<string, ColumnSpec> = {};
+    const foreignKeys: ForeignKeySpec[] = [];
     const probe = {
       column: (name: string, type: string, options: Record<string, unknown> = {}) => {
         columns[name] = specFromColumnCall(type, options);
       },
-      foreignKey: () => {},
+      foreignKey: (toTable: string, opts: Partial<AddForeignKeyOptions> = {}) => {
+        const join = (v: string | string[] | undefined): string | undefined =>
+          Array.isArray(v) ? v.join(",") : v;
+        const fk: ForeignKeySpec = {
+          toTable,
+          column: join(opts.column) ?? `${singularize(toTable)}_id`,
+        };
+        const primaryKey = join(opts.primaryKey);
+        if (primaryKey !== undefined) fk.primaryKey = primaryKey;
+        if (opts.name !== undefined) fk.name = opts.name;
+        foreignKeys.push(fk);
+      },
     } as unknown as TableDefinition;
-    def.fn(new TableBuilder(probe, "sqlite", COLUMN_TYPE_MAP_SQLITE, null));
+    const builder = new TableBuilder(probe, "sqlite", COLUMN_TYPE_MAP_SQLITE, null);
+    def.fn(builder);
     if (def.meta.serialPk !== undefined) {
       assertSerialPkIsPlainInteger(def.name, def.meta.serialPk, columns[def.meta.serialPk]);
     }
@@ -2196,6 +2227,25 @@ export async function canonicalRegistrySchema(): Promise<Schema> {
       // `col` leaves these as declared, so nothing to reconcile; declaredSpec
       // still raises when `primaryKey:` names a column the block never declared.
       for (const column of def.meta.primaryKey) declaredSpec(def.name, column, columns[column]);
+    }
+    const indexes: IndexSpec[] = builder.indexes.map(({ columns: c, opts }) => ({
+      columns: c,
+      ...opts,
+    }));
+    const primaryKey =
+      def.meta.primaryKey ??
+      (def.meta.serialPk !== undefined
+        ? [def.meta.serialPk]
+        : def.meta.id === false
+          ? false
+          : undefined);
+    if (indexes.length > 0 || foreignKeys.length > 0 || primaryKey !== undefined) {
+      const wrapped: WrappedTableSchema = { columns };
+      if (primaryKey !== undefined) wrapped.primaryKey = primaryKey;
+      if (indexes.length > 0) wrapped.indexes = indexes;
+      if (foreignKeys.length > 0) wrapped.foreignKeys = foreignKeys;
+      schema[def.name] = wrapped;
+      continue;
     }
     schema[def.name] = columns;
   }

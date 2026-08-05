@@ -127,6 +127,43 @@ describe("non-transactional row writes", () => {
     expect(rowWritesAtItScope(src).map((w) => w.pattern)).toEqual(["INSERT INTO"]);
   });
 
+  it("catches a write in an it.each table body", () => {
+    const src = `describe("x", () => {
+  it.each([{ name: "Dune" }, { name: "Emma" }])("writes %s", async (row) => {
+    await Book.create({ name: row.name });
+  });
+});
+`;
+    expect(rowWritesAtItScope(src).map((w) => w.pattern)).toEqual([".create("]);
+    expect(isOffender(src)).toBe(true);
+  });
+
+  it("does not attribute a write inside the it.each table itself", () => {
+    const src = `describe("x", () => {
+  const rows = [{ name: "Dune" }];
+  it.each(rows)("reads %s", async (row) => {
+    expect(await Book.count()).toBe(0);
+  });
+
+  beforeEach(async () => {
+    await Book.create({ name: "Dune" });
+  });
+});
+`;
+    expect(rowWritesAtItScope(src)).toEqual([]);
+  });
+
+  it("catches a write in a test.each body split across lines", () => {
+    const src = `describe("x", () => {
+  test.each([1, 2])(
+    "writes %i",
+    async (n) => await Book.create({ name: String(n) }),
+  );
+});
+`;
+    expect(rowWritesAtItScope(src).map((w) => w.pattern)).toEqual([".create("]);
+  });
+
   it("does not grow past the seeded ratchet", async () => {
     const offenders = await findOffenders(path.join(REPO_ROOT, TEST_ROOT));
     const relative = offenders.map((file) => path.relative(REPO_ROOT, file));

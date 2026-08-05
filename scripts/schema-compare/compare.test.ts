@@ -15,13 +15,19 @@ import {
   TRANSCRIPTION_DIVERGENCE_ALLOW_LIST,
   compareTranscriptions,
   describeSpec,
+  describeIndex,
+  describeForeignKey,
   staleDivergenceAllowances,
   unresolvedCallSites,
 } from "./compare.js";
 import { canonicalRegistrySchema } from "../../packages/activerecord/src/support/canonical-schema.js";
 import { TEST_SCHEMA } from "../../packages/activerecord/src/test-helpers/test-schema.js";
 import type { Finding } from "./compare.js";
-import type { ColumnSpec, Schema } from "../../packages/activerecord/src/support/schema-types.js";
+import type { Schema } from "../../packages/activerecord/src/support/schema-types.js";
+import {
+  columnsOf,
+  isWrappedSchema,
+} from "../../packages/activerecord/src/support/schema-types.js";
 
 const parse = (rb: string) => parseSchemaRb(`ActiveRecord::Schema.define do\n${rb}\nend\n`);
 const columnsOfTable = (rb: string, table: string) => [...parse(rb).get(table)!.columns.keys()];
@@ -756,6 +762,58 @@ describe("against the canonical registry", () => {
     expect(staleDivergenceAllowances(TEST_SCHEMA, await canonicalRegistrySchema())).toEqual([]);
   });
 
+  it("reports an index one transcription declares, or gates, differently", () => {
+    const columns = { isbn: "string" as const };
+    const testSchema = {
+      books: {
+        columns,
+        indexes: [{ columns: "isbn", unique: true }, { columns: "author_id" }],
+      },
+    };
+    const registry = {
+      books: { columns, indexes: [{ columns: "isbn", unique: true, adapters: ["mysql"] }] },
+    };
+    expect(compareTranscriptions(testSchema, registry)).toEqual([
+      "books — index (author_id) declared only by TEST_SCHEMA",
+      'books — index (isbn) unique=true adapters=["mysql"] declared only by canonical-registry',
+      "books — index (isbn) unique=true declared only by TEST_SCHEMA",
+    ]);
+  });
+
+  it("reports a foreign key or table-level primary key only one side declares", () => {
+    const testSchema = {
+      fk_test_has_fk: {
+        columns: { fk_id: "integer" as const },
+        primaryKey: ["fk_id"],
+        foreignKeys: [{ toTable: "fk_test_has_pk", column: "fk_id", primaryKey: "pk_id" }],
+      },
+    };
+    const registry = { fk_test_has_fk: { fk_id: "integer" as const } };
+    expect(compareTranscriptions(testSchema, registry)).toEqual([
+      "fk_test_has_fk — primary key: TEST_SCHEMA (fk_id), canonical-registry default",
+      "fk_test_has_fk — foreign key fk_id→fk_test_has_pk primaryKey=pk_id declared only by TEST_SCHEMA",
+    ]);
+  });
+
+  it("transcribes the registry's indexes, foreign keys and primary keys", async () => {
+    const registry = await canonicalRegistrySchema();
+    const books = registry["books"];
+    const fkTest = registry["fk_test_has_fk"];
+    const autoId = registry["auto_id_tests"];
+    if (!isWrappedSchema(books) || !isWrappedSchema(fkTest) || !isWrappedSchema(autoId)) {
+      throw new Error("expected the wrapper form for tables carrying indexes/FKs/a primary key");
+    }
+    expect(books.indexes?.map(describeIndex)).toEqual([
+      "(author_id,name) unique=true",
+      '(isbn) unique=true where="published_on IS NOT NULL"',
+      "((lower(external_id))) unique=true",
+    ]);
+    expect(fkTest.foreignKeys?.map(describeForeignKey)).toEqual([
+      "fk_id→fk_test_has_pk primaryKey=pk_id name=fk_name",
+    ]);
+    expect(autoId.primaryKey).toEqual(["auto_id"]);
+  });
+
   it("recovers the declared column shape rather than one adapter's rendering", async () => {
     const registry = await canonicalRegistrySchema();
     // big_integer, not SQLite's `bigint` spelling; a declared limit survives.
@@ -769,5 +827,5 @@ describe("against the canonical registry", () => {
 });
 
 function columnsOfRegistry(registry: Schema, table: string, column: string) {
-  return (registry[table] as Record<string, ColumnSpec>)[column];
+  return columnsOf(registry[table])[column];
 }
