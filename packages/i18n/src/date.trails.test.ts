@@ -558,12 +558,14 @@ describe("Date", () => {
     expect(civilOrError(1582, 10, 15, RubyDate.ITALY)).toEqual([1582, 10, 15]);
     expect(civilOrError(1752, 9, 3, RubyDate.ENGLAND)).toBe("E");
     expect(civilOrError(1930, 12, 31, RubyDate.ITALY)).toEqual([1930, 12, 31]);
+    expect(civilOrError(1900, 2, 29, RubyDate.ITALY)).toBe("E");
   });
 
   it("takes date_initialize's valid_gregorian_p arm past REFORM_END_YEAR", () => {
     expect(civilOrError(1931, 1, 1, RubyDate.ITALY)).toEqual([1931, 1, 1]);
-    expect(civilOrError(1900, 2, 29, RubyDate.ITALY)).toBe("E");
     expect(civilOrError(2000, 2, 29, RubyDate.ITALY)).toEqual([2000, 2, 29]);
+    expect(civilOrError(2100, 2, 29, RubyDate.ITALY)).toBe("E");
+    expect(civilOrError(2100, 2, 28, RubyDate.ITALY)).toEqual([2100, 2, 28]);
     expect(civilOrError(2001, 2, 29, RubyDate.ITALY)).toBe("E");
     expect(civilOrError(2001, -1, -1, RubyDate.ITALY)).toEqual([2001, 12, 31]);
     expect(civilOrError(2001, 13, 1, RubyDate.ITALY)).toBe("E");
