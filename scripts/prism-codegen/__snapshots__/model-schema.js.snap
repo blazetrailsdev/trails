@@ -57,7 +57,20 @@ export function quotedTableName() {
     return this.adapterClass.quoteTableName(this.tableName);
 }
 export function resetTableName() {
-    return this.tableName = __PRISM_TODO("IfNode");
+    return this.tableName = (() => {
+        if (this === Base) {
+            return null;
+        }
+        else if (this.isAbstractClass) {
+            return this.superclass.tableName();
+        }
+        else if (this.superclass.isAbstractClass()) {
+            return this.superclass.tableName() || this.computeTableName();
+        }
+        else {
+            return this.computeTableName();
+        }
+    })();
 }
 export function fullTableNamePrefix() {
     return (this.moduleParents.find(p => p.respondTo("table_name_prefix")) || this).tableNamePrefix();

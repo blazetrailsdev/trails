@@ -370,4 +370,25 @@ describe("PostgreSQL::SchemaDumper", () => {
       expect(lines).toHaveLength(0);
     });
   });
+
+  describe("resolvePrimaryKeyColumns", () => {
+    it("resolves the primary key from primaryKeyOrderCache, not a per-column flag", () => {
+      const dumper = new (SchemaDumper as any)(emptySource);
+      dumper.primaryKeyOrderCache["orders"] = ["shop_id", "id"];
+      const columns = [
+        makeColumn({ name: "id" }),
+        makeColumn({ name: "shop_id" }),
+        makeColumn({ name: "status" }),
+      ];
+      const result = dumper.resolvePrimaryKeyColumns("orders", columns);
+      expect(result.map((c: Column) => c.name)).toEqual(["shop_id", "id"]);
+    });
+
+    it("resolves no primary key when the table has none", () => {
+      const dumper = new (SchemaDumper as any)(emptySource);
+      dumper.primaryKeyOrderCache["logs"] = [];
+      const result = dumper.resolvePrimaryKeyColumns("logs", [makeColumn({ name: "message" })]);
+      expect(result).toEqual([]);
+    });
+  });
 });

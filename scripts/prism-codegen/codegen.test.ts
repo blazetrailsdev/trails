@@ -570,9 +570,51 @@ describe("prism-codegen", () => {
     expect(summarizeCoverage(coverage).passthrough).toBeGreaterThan(0);
   });
   it("declines silently-lossy translations instead of emitting wrong JS", async () => {
-    const splat = await generateFromSource(`def g; a, *b = list; end`);
+    // A mid-splat has no JS spelling — a rest element must be the last array
+    // binding element — so it stays declined. A trailing splat does emit.
+    const splat = await generateFromSource(`def g; a, *b, c = list; end`);
     expect(splat.parseErrorCount).toBe(0);
     expect(splat.code).toContain("__PRISM_TODO(");
+  });
+
+  it("images a trailing-splat multi-assign as a JS rest element", async () => {
+    const { code, parseErrorCount } = await generateFromSource(`def g; a, *b = list; a; end`);
+    expect(parseErrorCount).toBe(0);
+    expect(code).toContain("[a, ...b] = ");
+    expect(code).not.toContain("__PRISM_TODO(");
+  });
+
+  it("images a lambda as an arrow function", async () => {
+    const { code, parseErrorCount } = await generateFromSource(
+      `def g; adder = ->(x, y) { x + y }; adder; end`,
+    );
+    expect(parseErrorCount).toBe(0);
+    expect(code).toContain("(x, y) => x + y");
+    expect(code).not.toContain("__PRISM_TODO(");
+  });
+
+  it("images an expression-position if with multi-statement branches as an invoked arrow", async () => {
+    const { code, parseErrorCount } = await generateFromSource(
+      `def g(flag)\n x = if flag\n  n = 1\n  n + 1\n else\n  0\n end\n x\nend`,
+    );
+    expect(parseErrorCount).toBe(0);
+    expect(code).toContain("(() => {");
+    expect(code).toContain("})()");
+    expect(code).toContain("return n + 1;");
+    expect(code).not.toContain("__PRISM_TODO(");
+  });
+
+  it("images chained rescues as one catch dispatching on the exception class", async () => {
+    const { code, parseErrorCount } = await generateFromSource(
+      `def g\n risky\nrescue Foo => err\n 1\nrescue Bar, Baz\n 2\nend`,
+    );
+    expect(parseErrorCount).toBe(0);
+    expect(code).toContain("catch (e)");
+    expect(code).toContain("caseEq(Foo, e)");
+    expect(code).toContain("caseEq(Bar, e) || caseEq(Baz, e)");
+    expect(code).toContain("const err = e;");
+    expect(code).toContain("throw e;");
+    expect(code).not.toContain("__PRISM_TODO(");
   });
 
   it("routes a multi-argument index get/set through the idxGet/idxSet helpers", async () => {

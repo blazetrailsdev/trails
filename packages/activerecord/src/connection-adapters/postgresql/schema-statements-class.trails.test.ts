@@ -306,7 +306,6 @@ describe("SchemaStatements#columns delegates to newColumnFromField", () => {
           type: "integer",
           default: "nextval('things_id_seq'::regclass)",
           notnull: true,
-          is_primary: true,
           oid: 23,
           fmod: -1,
           identity: "",
@@ -319,7 +318,6 @@ describe("SchemaStatements#columns delegates to newColumnFromField", () => {
           type: "character varying",
           default: null,
           notnull: false,
-          is_primary: false,
           oid: 1043,
           fmod: -1,
           identity: "",
@@ -351,7 +349,21 @@ describe("SchemaStatements#columns delegates to newColumnFromField", () => {
     expect(sql.filter((text) => text.includes("pg_attribute"))).toHaveLength(1);
   });
 
-  it("carries the serial, comment and primaryKey flags through the ported body", async () => {
+  it("selects Rails' ten column_definitions fields and no primary-key flag", async () => {
+    const { ss, sql } = columnsAdapter();
+    vi.spyOn(ss, "loadAdditionalTypes").mockImplementation(async (oids?: number[]) => {
+      for (const oid of oids ?? []) ss.typeMap.registerType(oid, new ValueType());
+    });
+
+    const [id] = await ss.columns("things");
+
+    const definitions = sql.find((text) => text.includes("pg_attribute"))!;
+    expect(definitions).not.toContain("indisprimary");
+    expect(definitions).not.toContain("pg_index");
+    expect(id.primaryKey).toBe(false);
+  });
+
+  it("carries the serial and comment flags through the ported body", async () => {
     const { ss } = columnsAdapter();
     vi.spyOn(ss, "loadAdditionalTypes").mockImplementation(async (oids?: number[]) => {
       for (const oid of oids ?? []) ss.typeMap.registerType(oid, new ValueType());
@@ -360,9 +372,7 @@ describe("SchemaStatements#columns delegates to newColumnFromField", () => {
     const [id, name] = await ss.columns("things");
 
     expect(id.isSerial).toBe(true);
-    expect(id.primaryKey).toBe(true);
     expect(id.null).toBe(false);
-    expect(name.primaryKey).toBe(false);
     expect(name.comment).toBe("the name");
     expect(name.null).toBe(true);
   });

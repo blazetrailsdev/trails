@@ -13,6 +13,8 @@ import {
   association as collectionProxyFor,
   applyAssociationScope,
   _hmtNotFound,
+  _canRouteThroughViaDisableJoinsAssociationScope,
+  _loadThroughViaDisableJoinsScope,
 } from "../associations.js";
 import {
   sourceReflection,
@@ -42,12 +44,23 @@ export class HasManyThroughAssociation extends HasManyAssociation {
    * Mirrors: ActiveRecord::Associations::HasManyThroughAssociation#find_target
    * (has_many_through_association.rb:225) — reads owner and reflection off
    * `this`, exactly as Rails does, and delegates the query itself to
-   * `HasManyAssociation#findTarget` (Rails' `super`). Rails' `disable_joins`
-   * arm is handled inside that loader, which routes the disable-joins shape
-   * through `_loadThroughViaDisableJoinsScope`.
+   * `HasManyAssociation#findTarget` (Rails' `super`).
+   *
+   * Rails' `return scope.to_a if disable_joins` is trails'
+   * `_loadThroughViaDisableJoinsScope`: `scope()`'s own `disable_joins` branch
+   * (association.rb:302) builds the DisableJoinsAssociationScope relation, and
+   * that loader is what runs it. The routing predicate stays the single one
+   * `HasManyAssociation`'s loader consults, so the branch here and the branch
+   * there agree by construction rather than by two copies of the gate.
    */
   protected override async findTarget(): Promise<Base[]> {
     if (!this.targetReflectionHasAssociatedRecord()) return [];
+    const reflection = (this.owner.constructor as typeof Base)._reflectOnAssociation?.(
+      this.reflection.name,
+    );
+    if (_canRouteThroughViaDisableJoinsAssociationScope(reflection, this.reflection.options)) {
+      return _loadThroughViaDisableJoinsScope(this.owner, reflection, this.reflection.options);
+    }
     return super.findTarget();
   }
 

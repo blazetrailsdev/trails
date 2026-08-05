@@ -565,7 +565,12 @@ export class Relation {
     currentScopeRestoringBlock(block) {
         let current_scope;
         current_scope = this.model.currentScope(true);
-        return __PRISM_TODO("LambdaNode");
+        return record => {
+            this.model.currentScope = current_scope;
+            if (block !== undefined) {
+                return block(record);
+            }
+        };
     }
     _new(attributes, block) {
         return new this.model(attributes);
@@ -618,9 +623,18 @@ export class Relation {
         return expr.expr();
     }
     execQueries(block) {
-        let rows, records;
+        let rows, future, records;
         return this.skipQueryCacheIfNecessary(async () => {
-            rows = __PRISM_TODO("IfNode");
+            rows = await (async () => {
+                if (this.isScheduled) {
+                    future = this.future_result;
+                    this.future_result = null;
+                    return future.result();
+                }
+                else {
+                    return await this.execMainQuery();
+                }
+            })();
             records = this.instantiateRecords(rows, block);
             if (!this.skipPreloadingValue) {
                 await this.preloadAssociations(records);

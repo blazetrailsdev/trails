@@ -17,6 +17,7 @@ import {
 } from "./mysql/database-statements.js";
 import { Result } from "../result.js";
 import { isRubyTruthy } from "../ruby-truthy.js";
+import { rubyInspect } from "../relation/ruby-inspect.js";
 import type { InsertBuilder } from "../insert-all.js";
 import type { AdapterName } from "./abstract-adapter.js";
 import { AbstractAdapter, Version } from "./abstract-adapter.js";
@@ -1741,17 +1742,20 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   /** @internal */
   protected versionString(fullVersionString: string | null | undefined): string {
-    if (fullVersionString == null) {
-      throw new DatabaseVersionError("Unable to parse MySQL version from nil");
+    // Ruby's `if full_version_string && matches = ...` — `""` is truthy in
+    // Ruby, so an empty banner reaches `match` and fails there, taking the
+    // same `else` as nil.
+    let matches: RegExpMatchArray | null;
+    if (
+      fullVersionString != null &&
+      (matches = fullVersionString.match(/^(?:5\.5\.5-)?(\d+\.\d+\.\d+)/))
+    ) {
+      return matches[1];
+    } else {
+      throw new DatabaseVersionError(
+        `Unable to parse MySQL version from ${rubyInspect(fullVersionString)}`,
+      );
     }
-    if (fullVersionString.length === 0) {
-      throw new DatabaseVersionError(`Unable to parse MySQL version from ""`);
-    }
-    const matches = fullVersionString.match(/^(?:5\.5\.5-)?(\d+\.\d+\.\d+)/);
-    if (matches) return matches[1];
-    throw new DatabaseVersionError(
-      `Unable to parse MySQL version from ${JSON.stringify(fullVersionString)}`,
-    );
   }
 
   /** @internal */
