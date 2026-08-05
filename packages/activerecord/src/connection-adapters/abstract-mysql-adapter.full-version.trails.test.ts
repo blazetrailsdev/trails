@@ -3,12 +3,15 @@ import { Mysql2Adapter } from "./mysql2-adapter.js";
 import { Version } from "./abstract-adapter.js";
 
 // Trails-specific guard (no Rails counterpart, because Rails cannot reach the
-// state): Rails' #full_version is a bare `database_version.full_version_string`
-// (mysql2_adapter.rb:164-166) and every MySQL Version it builds carries one
-// (abstract_mysql_adapter.rb:86-90), so nil is unobservable there. Trails can
-// build a Version from a bare numeric string (abstract_adapter.rb:248), and
-// #full_version used to substitute "" for it — which answered #mariadb? "no"
-// for a server it had never asked.
+// state through MySQL): #full_version is a bare
+// `database_version.full_version_string` (mysql2_adapter.rb:164-166) and every
+// MySQL Version is built with both arguments (abstract_mysql_adapter.rb:86-90),
+// so nil is unobservable on that adapter. It stays reachable on the class —
+// `full_version_string` defaults to nil (abstract_adapter.rb:248) and
+// SQLite3Adapter#get_database_version builds one that way
+// (sqlite3_adapter.rb:477) — so these pin both arms. #full_version used to
+// substitute "" for the nil, which answered #mariadb? "no" for a server it had
+// never asked.
 describe("AbstractMysqlAdapter#full_version", () => {
   function adapterWith(version: Version): Mysql2Adapter {
     const adapter = new Mysql2Adapter({ host: "localhost" });
