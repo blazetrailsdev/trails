@@ -762,55 +762,36 @@ describe("against the canonical registry", () => {
     expect(staleDivergenceAllowances(TEST_SCHEMA, await canonicalRegistrySchema())).toEqual([]);
   });
 
-  it("reports an index one transcription declares and the other does not", () => {
+  it("reports an index one transcription declares, or gates, differently", () => {
+    const columns = { isbn: "string" as const };
     const testSchema = {
-      books: { columns: { isbn: "string" as const }, indexes: [{ columns: "isbn", unique: true }] },
+      books: {
+        columns,
+        indexes: [{ columns: "isbn", unique: true }, { columns: "author_id" }],
+      },
     };
-    const registry = { books: { columns: { isbn: "string" as const }, indexes: [] } };
+    const registry = {
+      books: { columns, indexes: [{ columns: "isbn", unique: true, adapters: ["mysql"] }] },
+    };
     expect(compareTranscriptions(testSchema, registry)).toEqual([
+      "books — index (author_id) declared only by TEST_SCHEMA",
+      'books — index (isbn) unique=true adapters=["mysql"] declared only by canonical-registry',
       "books — index (isbn) unique=true declared only by TEST_SCHEMA",
     ]);
   });
 
-  it("reports an index whose options or adapter gate differ", () => {
-    const testSchema = {
-      books: {
-        columns: { isbn: "string" as const },
-        indexes: [{ columns: "isbn", where: "published_on IS NOT NULL" }],
-      },
-    };
-    const registry = {
-      books: {
-        columns: { isbn: "string" as const },
-        indexes: [{ columns: "isbn", where: "published_on IS NOT NULL", adapters: ["mysql"] }],
-      },
-    };
-    expect(compareTranscriptions(testSchema, registry)).toEqual([
-      'books — index (isbn) where="published_on IS NOT NULL" adapters=["mysql"] declared only by canonical-registry',
-      'books — index (isbn) where="published_on IS NOT NULL" declared only by TEST_SCHEMA',
-    ]);
-  });
-
-  it("reports a foreign key one transcription declares and the other does not", () => {
+  it("reports a foreign key or table-level primary key only one side declares", () => {
     const testSchema = {
       fk_test_has_fk: {
         columns: { fk_id: "integer" as const },
+        primaryKey: ["fk_id"],
         foreignKeys: [{ toTable: "fk_test_has_pk", column: "fk_id", primaryKey: "pk_id" }],
       },
     };
     const registry = { fk_test_has_fk: { fk_id: "integer" as const } };
     expect(compareTranscriptions(testSchema, registry)).toEqual([
+      "fk_test_has_fk — primary key: TEST_SCHEMA (fk_id), canonical-registry default",
       "fk_test_has_fk — foreign key fk_id→fk_test_has_pk primaryKey=pk_id declared only by TEST_SCHEMA",
-    ]);
-  });
-
-  it("reports a table-level primary key the two transcriptions disagree on", () => {
-    const testSchema = {
-      cpk_books: { columns: { id: "integer" as const }, primaryKey: ["author_id", "id"] },
-    };
-    const registry = { cpk_books: { columns: { id: "integer" as const }, primaryKey: ["id"] } };
-    expect(compareTranscriptions(testSchema, registry)).toEqual([
-      "cpk_books — primary key: TEST_SCHEMA (author_id,id), canonical-registry (id)",
     ]);
   });
 

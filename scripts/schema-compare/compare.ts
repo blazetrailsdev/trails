@@ -558,22 +558,19 @@ function compareDescribed(
   testSchema: string[],
   registry: string[],
 ): string[] {
-  const missingFrom = (from: string[], other: string[]): string[] => {
+  const missingFrom = (from: string[], other: string[], label: string): string[] => {
     const remaining = [...other];
-    return from.filter((described) => {
-      const at = remaining.indexOf(described);
-      if (at === -1) return true;
-      remaining.splice(at, 1);
-      return false;
-    });
+    return from
+      .filter((described) => {
+        const at = remaining.indexOf(described);
+        if (at !== -1) remaining.splice(at, 1);
+        return at === -1;
+      })
+      .map((described) => `${table} — ${kind} ${described} declared only by ${label}`);
   };
   return [
-    ...missingFrom(testSchema, registry).map(
-      (described) => `${table} — ${kind} ${described} declared only by ${TEST_SCHEMA_LABEL}`,
-    ),
-    ...missingFrom(registry, testSchema).map(
-      (described) => `${table} — ${kind} ${described} declared only by ${REGISTRY_LABEL}`,
-    ),
+    ...missingFrom(testSchema, registry, TEST_SCHEMA_LABEL),
+    ...missingFrom(registry, testSchema, REGISTRY_LABEL),
   ].sort();
 }
 
