@@ -263,7 +263,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
       : super.removeForeignKey(fromTable, toTableOrOptions, opts);
   }
 
-  protected _databaseVersion: Version | null = null;
   /**
    * `database.yml`'s `statement_limit`, which Rails reads as
    * `@config[:statement_limit]` inline at StatementPool construction
@@ -401,18 +400,14 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   /**
-   * Sync accessor for the cached database version. Mirrors the PostgreSQLAdapter
-   * pattern: throws a clear error when called before `getDatabaseVersion()` has
-   * been awaited. Overrides AbstractAdapter#databaseVersion which throws whenever
-   * it sees a Promise return from getDatabaseVersion().
+   * Rails has no MySQL override — `AbstractAdapter#database_version` already
+   * answers a `Version` there. TS cannot redeclare an inherited getter's type
+   * without a body, so this narrows the base `Version | number` to the `Version`
+   * every MySQL version gate reads; the value and the pool memo behind it are
+   * the base getter's.
    */
   override get databaseVersion(): Version {
-    if (!this._databaseVersion) {
-      throw new Error(
-        "databaseVersion is not available yet — await getDatabaseVersion() after connecting",
-      );
-    }
-    return this._databaseVersion;
+    return super.databaseVersion as Version;
   }
 
   supportsBulkAlter(): boolean {
@@ -726,7 +721,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   async renameIndex(tableName: string, oldName: string, newName: string): Promise<void> {
     await this.schemaCache.clearDataSourceCacheBang(tableName);
-    await this.getDatabaseVersion();
+    await this.pool.serverVersion(this);
     this.validateIndexLengthBang(tableName, newName);
     if (!this.supportsRenameIndex()) {
       // Mirrors Rails AbstractAdapter#rename_index super path: drop the
@@ -1042,8 +1037,9 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   async checkConstraints(tableName: string): Promise<CheckConstraintDefinition[]> {
     // supportsCheckConstraints() reads the cached databaseVersion, which throws
-    // pre-init; ensure it is loaded first (mirrors the indexes() guard).
-    await this.getDatabaseVersion();
+    // pre-init; ensure the pool memo (`pool_config.rb:39-41`) is loaded first
+    // (mirrors the indexes() guard).
+    await this.pool.serverVersion(this);
     if (!this.supportsCheckConstraints()) {
       // @nie disposition=port-real rails=activerecord/lib/active_record/connection_adapters/abstract_mysql_adapter.rb:545
       throw new NotImplementedError("check constraints are not supported by this database");
@@ -1733,18 +1729,14 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   /**
    * Mirrors: AbstractMysqlAdapter#get_database_version
-   * (abstract_mysql_adapter.rb:86-90). The leading memo guard stands in for
-   * Rails' `AbstractAdapter#database_version` (`pool.server_version(self)`),
-   * which trails' pool does not cache — without it every `databaseVersion` read
-   * would re-query. It also backs the sync `databaseVersion` getter.
+   * (abstract_mysql_adapter.rb:86-90) — a pure derivation. The memo lives on
+   * the pool (`pool_config.rb:39-41`), reached through
+   * `AbstractAdapter#databaseVersion`.
    */
   override async getDatabaseVersion(): Promise<Version> {
-    if (this._databaseVersion) return this._databaseVersion;
     const fullVersionString = await this.getFullVersion();
     const versionString = this.versionString(fullVersionString);
-    const version = new Version(versionString, fullVersionString);
-    this._databaseVersion = version;
-    return version;
+    return new Version(versionString, fullVersionString);
   }
 
   /** @internal */
@@ -1824,8 +1816,8 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   ): Promise<string> {
     // Ensure the version is cached before branching — supportsRenameColumn() reads the sync
     // `databaseVersion` getter, which throws on an uninitialized connection where Rails'
-    // `database_version` would issue the round-trip itself. getDatabaseVersion() memoizes.
-    await this.getDatabaseVersion();
+    // `database_version` would issue the round-trip itself. The pool memoizes.
+    await this.pool.serverVersion(this);
     if (this.supportsRenameColumn()) {
       return `RENAME COLUMN ${this.quoteColumnName(columnName)} TO ${this.quoteColumnName(newColumnName)}`;
     }

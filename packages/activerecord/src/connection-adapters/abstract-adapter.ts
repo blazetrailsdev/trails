@@ -2201,10 +2201,12 @@ export class AbstractAdapter implements Quoting {
     return new Version("0.0.0");
   }
 
-  // Rails' `database_version` is a sync accessor (`pool.server_version(self)`
-  // caches the result). Overrides may narrow to `Version` or `number`.
+  // Mirrors: AbstractAdapter#database_version (`abstract_adapter.rb:854-856`)
+  // — `pool.server_version(self)`, the pool-level memo that makes every
+  // adapter's `get_database_version` a pure fetch run at most once. Overrides
+  // may narrow to `Version` or `number`.
   get databaseVersion(): Version | number {
-    const v = this.getDatabaseVersion();
+    const v = this.pool.serverVersion(this) as Version | number | Promise<Version | number>;
     if (v instanceof Promise) {
       throw new Error(
         "databaseVersion is only available synchronously after getDatabaseVersion() has resolved; await getDatabaseVersion() first",

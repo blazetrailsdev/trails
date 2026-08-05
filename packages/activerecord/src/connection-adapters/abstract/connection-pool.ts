@@ -115,15 +115,21 @@ export class NullPool implements AbstractPool {
   static readonly NULL_CONFIG = NULL_CONFIG;
 
   private _serverVersion: unknown = null;
-  private _serverVersionCached = false;
   private _schemaReflection: SchemaReflection | null = null;
 
+  /**
+   * Mirrors: ConnectionPool::NullPool#server_version
+   * (`abstract/connection_pool.rb:30-32`) — the same `@server_version ||=`
+   * memo the real pool keeps on its PoolConfig. The promise arm is the trails
+   * async shape documented on `PoolConfig#serverVersion`.
+   */
   serverVersion(connection: DatabaseAdapter): unknown {
-    if (!this._serverVersionCached) {
-      this._serverVersion = connection.getDatabaseVersion?.();
-      this._serverVersionCached = true;
+    if (this._serverVersion != null) return this._serverVersion;
+    const version = connection.getDatabaseVersion?.();
+    if (version instanceof Promise) {
+      return (this._serverVersion = version.then((v) => (this._serverVersion = v)));
     }
-    return this._serverVersion;
+    return (this._serverVersion = version);
   }
 
   get schemaReflection(): SchemaReflection {

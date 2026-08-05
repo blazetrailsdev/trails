@@ -45,7 +45,7 @@ function rowFormatHost(isMariadb: boolean, version: string, probeResult = 0) {
   const queries: string[] = [];
   return {
     isMariadb: () => isMariadb,
-    getDatabaseVersion: async () => new Version(version),
+    pool: { serverVersion: async () => new Version(version) },
     queryValue: async (sql: string) => {
       queries.push(sql);
       return probeResult;

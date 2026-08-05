@@ -163,17 +163,17 @@ interface QuotedScopeHost {
  */
 export interface RowFormatHost {
   isMariadb(): boolean;
-  getDatabaseVersion(): Promise<Version>;
+  pool: { serverVersion(connection: unknown): unknown };
   queryValue(sql: string, name?: string): Promise<unknown>;
   _defaultRowFormat?: string | null;
 }
 
 /** @internal */
 export async function isRowFormatDynamicByDefault(this: RowFormatHost): Promise<boolean> {
-  // Rails' `database_version` is `pool.server_version(self)`, which computes
-  // `get_database_version` lazily; the TS spelling of that laziness is awaiting
-  // `getDatabaseVersion()`, whose result the adapter memoizes.
-  const databaseVersion = await this.getDatabaseVersion();
+  // Rails' `database_version` is `pool.server_version(self)`
+  // (abstract_adapter.rb:854-856), which computes `get_database_version`
+  // lazily; the TS spelling of that laziness is awaiting the pool memo.
+  const databaseVersion = (await this.pool.serverVersion(this)) as Version;
   return this.isMariadb()
     ? databaseVersion.compare("10.2.2") >= 0
     : databaseVersion.compare("5.7.9") >= 0;
