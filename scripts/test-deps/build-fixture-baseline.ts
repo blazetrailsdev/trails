@@ -14,7 +14,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-import { parser } from "typescript-eslint";
+import { parseForESLint } from "@typescript-eslint/parser";
 
 import { writeJsonManifest } from "../api-compare/write-json-manifest.js";
 
@@ -24,11 +24,6 @@ const ROOT = path.resolve(__dirname, "../..");
 const DEPS_PATH = path.join(ROOT, "scripts/test-deps/output/activerecord-test-deps.json");
 const OUT_PATH = path.join(ROOT, "eslint/expected-fixtures-exclude.json");
 const AR_SRC = path.join(ROOT, "packages/activerecord/src");
-
-const parseForESLint = parser.parseForESLint as unknown as (
-  code: string,
-  options: { loc: boolean; range: boolean },
-) => { ast: unknown };
 
 async function main(): Promise<void> {
   // Dynamic import avoids the CJS-style top-level / static-`.mjs`-import

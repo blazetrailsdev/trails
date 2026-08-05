@@ -12,36 +12,6 @@ import { Encryptor } from "./encryptor.js";
 import { KeyGenerator } from "./key-generator.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
 
-// EncryptingOnlyEncryptor extends the full Encryptor, which transitively imports
-// Configurable. Importing it eagerly here would create an eval-time cycle
-// (context → encrypting-only-encryptor → encryptor → configurable → contexts →
-// context). Inject the factory instead — registered by encryptable-record.ts at
-// module load, mirroring setGlobalPreviousSchemesFn's approach to the same problem.
-let _encryptingOnlyEncryptorFactory: (() => unknown) | undefined;
-
-/** @internal */
-export function setEncryptingOnlyEncryptorFactory(factory: () => unknown): void {
-  _encryptingOnlyEncryptorFactory = factory;
-}
-
-/**
- * @internal Rails `Context::PROPERTIES` (context.rb:13) as a hoisted function
- * so `configurable.ts` can read the names at module-eval time: the two modules
- * form a cycle, and whichever evaluates second sees the other's `class`/`const`
- * bindings in TDZ, while a function declaration is initialized at
- * instantiation. Read it as `Context.PROPERTIES`.
- */
-export function contextProperties(): string[] {
-  return [
-    "keyProvider",
-    "keyGenerator",
-    "cipher",
-    "messageSerializer",
-    "encryptor",
-    "frozenEncryption",
-  ];
-}
-
 /**
  * Holds the encryption configuration for a single context frame:
  * key provider, key generator, cipher, message serializer, encryptor,
@@ -55,7 +25,14 @@ export class Context {
    * defines on a Context. `Configurable.configure` tests against it for the
    * `respond_to?("#{name}=")` guard Rails uses (configurable.rb:35-37).
    */
-  static readonly PROPERTIES = contextProperties();
+  static readonly PROPERTIES = [
+    "keyProvider",
+    "keyGenerator",
+    "cipher",
+    "messageSerializer",
+    "encryptor",
+    "frozenEncryption",
+  ];
 
   private _keyProvider?: unknown;
   keyGenerator?: unknown;
@@ -88,8 +65,8 @@ export class Context {
   /**
    * @internal Rails `Context#build_default_key_provider` (context.rb:37-39).
    * `Configurable` is imported for this body alone — the import closes a cycle
-   * (context → configurable → contexts → context) that holds only because
-   * nothing in this module reads it at eval time.
+   * (context → configurable → context) that holds only because neither module
+   * reads the other at eval time.
    */
   private buildDefaultKeyProvider(): unknown {
     return new DerivedSecretKeyProvider(Configurable.config.primaryKey);
@@ -166,19 +143,6 @@ export function withEncryptionContext<T>(overrides: Partial<Context>, fn: () => 
 
 export function withoutEncryption<T>(fn: () => T): T {
   return withEncryptionContext({ encryptor: new NullEncryptor() }, fn);
-}
-
-export function protectingEncryptedData<T>(fn: () => T): T {
-  // The EncryptingOnlyEncryptor factory is registered by encryptable-record.ts,
-  // which is always loaded before any real protected-mode read/write/query. The
-  // NullEncryptor fallback applies only when context.ts is consumed in isolation
-  // (no encryption stack wired) — there the encryptor is never exercised, and
-  // frozenEncryption alone drives the observable behavior (write validation +
-  // encrypt/decrypt raising Configuration).
-  const encryptor = _encryptingOnlyEncryptorFactory
-    ? _encryptingOnlyEncryptorFactory()
-    : new NullEncryptor();
-  return withEncryptionContext({ encryptor, frozenEncryption: true }, fn);
 }
 
 export function getEncryptionContext(): Context {

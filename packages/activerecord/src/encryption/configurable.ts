@@ -1,6 +1,13 @@
 import { Config } from "./config.js";
-import { Contexts } from "./contexts.js";
-import { Context, contextProperties } from "./context.js";
+// Rails reads `ActiveRecord::Encryption.context` / `.reset_default_context`
+// (configurable.rb:17, 33, 36) — the `Contexts` module those come from. This
+// module imports their implementations from `context.js` rather than `Contexts`
+// itself: `Contexts` imports `EncryptingOnlyEncryptor` for
+// `protecting_encrypted_data` (contexts.rb:57), and that class `extends
+// Encryptor`, which imports this module. Going through `Contexts` would put
+// that `extends` inside an ESM cycle, where a graph entered at `encryptor.ts`
+// evaluates the subclass while `Encryptor` is still in TDZ.
+import { getEncryptionContext, resetDefaultContext, Context } from "./context.js";
 import { Cipher } from "./cipher.js";
 import type { EncryptorLike } from "./encryptor.js";
 import type { MessageSerializerLike } from "./message-serializer.js";
@@ -38,18 +45,34 @@ export class Configurable {
     _listeners = value;
   }
 
-  /**
-   * Rails' `Context::PROPERTIES.each { |name| delegate name, to: :context }`
-   * (configurable.rb:16-19). The readers are installed off that constant at the
-   * bottom of this file, so the set cannot drift from it; these declarations
-   * only give each one a type.
-   */
-  declare static readonly keyProvider: unknown;
-  declare static readonly keyGenerator: unknown;
-  declare static readonly cipher: Cipher;
-  declare static readonly messageSerializer: MessageSerializerLike | undefined;
-  declare static readonly encryptor: EncryptorLike | undefined;
-  declare static readonly frozenEncryption: boolean;
+  // Rails' `Context::PROPERTIES.each { |name| delegate name, to: :context }`
+  // (configurable.rb:16-19). Written out one reader per property rather than
+  // installed from the constant in a loop: `Context` is in TDZ while this
+  // module's body runs on a graph entered at `context.ts`. The set is held to
+  // `Context::PROPERTIES` by configurable.trails.test.ts instead.
+  static get keyProvider(): unknown {
+    return getEncryptionContext().keyProvider;
+  }
+
+  static get keyGenerator(): unknown {
+    return getEncryptionContext().keyGenerator;
+  }
+
+  static get cipher(): Cipher {
+    return getEncryptionContext().cipher as Cipher;
+  }
+
+  static get messageSerializer(): MessageSerializerLike | undefined {
+    return getEncryptionContext().messageSerializer;
+  }
+
+  static get encryptor(): EncryptorLike | undefined {
+    return getEncryptionContext().encryptor as EncryptorLike | undefined;
+  }
+
+  static get frozenEncryption(): boolean {
+    return getEncryptionContext().frozenEncryption;
+  }
 
   /**
    * Mirrors `Configurable.configure`
@@ -100,7 +123,7 @@ export class Configurable {
       }
     }
 
-    Contexts.resetDefaultContext();
+    resetDefaultContext();
 
     for (const [key, value] of Object.entries(properties)) {
       if (key === "primaryKey" || key === "deterministicKey" || key === "keyDerivationSalt") {
@@ -108,7 +131,7 @@ export class Configurable {
       }
       if (value === undefined) continue;
       if (!Context.PROPERTIES.includes(key)) continue;
-      (Contexts.context as unknown as Record<string, unknown>)[key] = value;
+      (getEncryptionContext() as unknown as Record<string, unknown>)[key] = value;
     }
   }
 
@@ -131,13 +154,4 @@ export class Configurable {
       listener(klass, name);
     }
   }
-}
-
-for (const name of contextProperties()) {
-  Object.defineProperty(Configurable, name, {
-    configurable: true,
-    get(): unknown {
-      return (Contexts.context as unknown as Record<string, unknown>)[name];
-    },
-  });
 }
