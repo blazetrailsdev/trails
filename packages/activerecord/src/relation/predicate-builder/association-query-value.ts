@@ -102,7 +102,7 @@ export class AssociationQueryValue {
         // Select the table-qualified primary key so the subquery's projection
         // stays unambiguous once its arel carries joins (build_arel
         // convergence) — matching RelationHandler's `arel_table[primary_key]`.
-        const arelTable = relation._modelClass?.arelTable;
+        const arelTable = relation._model?.arelTable;
         relation = relation.select(arelTable ? arelTable.get(pk) : pk);
       }
       if (this.isPolymorphicClause(relation)) {
@@ -174,8 +174,6 @@ export class AssociationQueryValue {
   }
 
   private isRelation(value: unknown): boolean {
-    return (
-      typeof value === "object" && value !== null && "_modelClass" in value && "toArel" in value
-    );
+    return typeof value === "object" && value !== null && "_model" in value && "toArel" in value;
   }
 }

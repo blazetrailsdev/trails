@@ -460,12 +460,12 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries.installSupport"
   // the other test files running in the same process.
   function isolatedTargets() {
     class FakeRelation {
-      _modelClass: any;
+      _model: any;
       constructor(model: any) {
-        this._modelClass = model;
+        this._model = model;
       }
       get model() {
-        return this._modelClass;
+        return this._model;
       }
       where(conditions: Record<string, unknown>) {
         (this as any)._lastWhere = conditions;

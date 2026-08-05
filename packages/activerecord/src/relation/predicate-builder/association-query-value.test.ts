@@ -95,7 +95,7 @@ describe("AssociationQueryValue", () => {
       // can't await pluck, so we emit one reselected subquery per FK column.
       const reselected: string[] = [];
       const fakeRelation = {
-        _modelClass: {},
+        _model: {},
         toArel() {
           return null;
         },

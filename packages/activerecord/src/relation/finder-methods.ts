@@ -263,12 +263,12 @@ export function raiseNotFoundSingle(
 }
 
 interface FinderRelation {
-  model: FinderRelation["_modelClass"];
+  model: FinderRelation["_model"];
   /** Rails `attr_reader :table` (relation.rb:71) — the relation's own Arel table. */
   table: { get(name: string): Nodes.Node };
   /** Rails `delegate :primary_key, to: :model` (delegation.rb:106). */
   primaryKey: string | string[];
-  _modelClass: {
+  _model: {
     name: string;
     primaryKey: string | string[];
     compositePrimaryKey: boolean;
@@ -319,7 +319,7 @@ function buildPkWhere(pk: string[], tuple: unknown[]): Record<string, unknown> {
 /** @internal */
 export async function performFind(this: FinderRelation, ...args: unknown[]): Promise<any> {
   const pk = this.primaryKey;
-  const modelName = this._modelClass.name;
+  const modelName = this._model.name;
   const normalized = normalizeFindArgs(modelName, pk, args);
   if (normalized.emptyArray) return [];
   const { ids, wantArray, tuples } = normalized;
@@ -332,7 +332,7 @@ export async function performFind(this: FinderRelation, ...args: unknown[]): Pro
   // default-scope predicates.
   const conditions = this._whereClause.isEmpty()
     ? ""
-    : ` [${this.arel().whereSql(this._modelClass)?.value ?? ""}]`;
+    : ` [${this.arel().whereSql(this._model)?.value ?? ""}]`;
 
   // Composite PK: OR over per-tuple WHERE conditions. The
   // `Array.isArray(pk)` guard narrows `pk` to `string[]` via
@@ -528,7 +528,7 @@ export async function performSole(this: FinderRelation): Promise<any> {
     raiseRecordNotFoundExceptionBang.call(this);
   }
   if (records.length > 1) {
-    throw new SoleRecordExceeded(this._modelClass);
+    throw new SoleRecordExceeded(this._model);
   }
   return records[0];
 }
@@ -676,9 +676,9 @@ export async function performCreateOrFindByBang(
   //   rescue ActiveRecord::RecordNotUnique
   //     where(attributes).lock.find_by!(attributes)
   try {
-    const result = await this._modelClass.transaction(
+    const result = await this._model.transaction(
       () =>
-        this._modelClass.createBang({
+        this._model.createBang({
           ...this.scopeForCreate(),
           ...conditions,
           ...extra,
@@ -690,7 +690,7 @@ export async function performCreateOrFindByBang(
     // the bang caller.
     if (result === undefined) {
       throw new RecordNotSaved(
-        `${this._modelClass.name}.createOrFindByBang rolled back before persist`,
+        `${this._model.name}.createOrFindByBang rolled back before persist`,
         undefined,
       );
     }

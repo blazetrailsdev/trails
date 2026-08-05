@@ -181,7 +181,7 @@ export class DelegateCache {
  * Wrap a Relation in a Proxy that delegates named scope lookups
  * to the model's scope registry.
  *
- * Constrained to `object` because Relation._modelClass is private;
+ * Constrained to `object` because Relation._model is private;
  * internal access uses `any` casts.
  */
 const _delegatedClasses = new Set<typeof Base>();
@@ -523,7 +523,7 @@ export function generateRelationMethod(
  *
  * The delegator is **model-agnostic** (Rails' generated body is
  * `def m(...); scoping { model.m(...) }; end`, delegation.rb:76-88): it reads
- * the live model off the relation it's invoked on (`this._modelClass`) rather
+ * the live model off the relation it's invoked on (`this._model`) rather
  * than capturing a specific `modelClass`, resolving and scoping that model's
  * class method at call time. This is what lets a single delegator be correct on
  * any model in an STI hierarchy — a parent model's generated module can be
@@ -536,7 +536,7 @@ export function generateRelationMethod(
  */
 export function classMethodDelegator(prop: string): AnyCallable {
   return function (this: any, ...args: any[]) {
-    const modelClass = this._modelClass as typeof Base;
+    const modelClass = this._model as typeof Base;
     guardBaseMethodDelegation(modelClass, prop);
     const classMethod = (modelClass as any)[prop] as AnyCallable;
     const prev = ScopeRegistry.currentScope(modelClass);
@@ -754,7 +754,7 @@ export function wrapWithScopeProxy<T extends object>(rel: T): T {
       if (value !== undefined) return value;
       if (prop in target) return value;
 
-      const modelClass = target._modelClass as typeof Base;
+      const modelClass = target._model as typeof Base;
 
       // Generated relation methods (Rails' GeneratedRelationMethods) now resolve
       // as real methods via the top-of-trap `Reflect.get` above: they live on

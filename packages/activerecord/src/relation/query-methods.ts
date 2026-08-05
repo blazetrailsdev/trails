@@ -95,7 +95,7 @@ export class WhereChain<R = any> {
   }
 
   private scopeAssociationReflection(association: string): unknown {
-    const model = (this._scope as any)._modelClass ?? (this._scope as any).model;
+    const model = (this._scope as any)._model ?? (this._scope as any).model;
     const reflection = model?._reflectOnAssociation?.(association);
     if (!reflection) {
       throw argumentError(
@@ -229,8 +229,8 @@ interface QueryMethodsHost {
   _ctes: Array<{ name: string; expression: Nodes.Node; recursive: boolean }>;
   _skipPreloading: boolean;
   _skipQueryCache: boolean | undefined;
-  _modelClass: typeof import("../base.js").Base;
-  model: QueryMethodsHost["_modelClass"];
+  _model: typeof import("../base.js").Base;
+  model: QueryMethodsHost["_model"];
   /** Rails `attr_reader :table` (relation.rb:71) — the relation's own Arel table. */
   table: ArelTable;
   predicateBuilder: import("./predicate-builder.js").PredicateBuilder;
@@ -947,14 +947,14 @@ function whereBang(this: QueryMethodsHost, opts: any, ...rest: unknown[]): any {
 /**
  * True for values that PredicateBuilder will route through its
  * RelationHandler (subquery IN/NOT IN). Mirrors the shape check in
- * `PredicateBuilder#isRelation`: a Relation exposes `_modelClass` and a
+ * `PredicateBuilder#isRelation`: a Relation exposes `_model` and a
  * `toArel()` method.
  */
 function isRelationLike(value: unknown): boolean {
   return (
     typeof value === "object" &&
     value !== null &&
-    "_modelClass" in value &&
+    "_model" in value &&
     typeof (value as { toArel?: unknown }).toArel === "function"
   );
 }
@@ -1228,7 +1228,7 @@ function havingBang(
   if (opts == null || isBlankArgument(opts)) return this;
 
   if (typeof opts === "string") {
-    const sql = rest.length > 0 ? this._modelClass.sanitizeSqlArray(opts, ...rest) : opts;
+    const sql = rest.length > 0 ? this._model.sanitizeSqlArray(opts, ...rest) : opts;
     this._havingClause.predicates.push(new Nodes.SqlLiteral(sql));
     return this;
   }
@@ -1658,7 +1658,7 @@ export function buildCastValue(name: string, value: unknown): Attribute {
  */
 export function normalizeBoundValue(this: QueryMethodsHost, value: unknown): unknown {
   if (value instanceof Nodes.Node) {
-    return arelSql(connectionFor(this._modelClass).toSql(value));
+    return arelSql(connectionFor(this._model).toSql(value));
   }
   if (isRelationLike(value)) {
     return arelSql((value as { toSql(): string }).toSql());
@@ -1758,7 +1758,7 @@ export function isDoesNotSupportReverse(order: string): boolean {
 /** @internal */
 export function reverseSqlOrder(this: QueryMethodsHost, orderQuery: unknown[]): unknown[] {
   if (orderQuery.length === 0) {
-    const pk = (this as any)._modelClass?.primaryKey;
+    const pk = (this as any)._model?.primaryKey;
     // Rails guards on `if primary_key` alone: a composite primary key is an
     // Array, which is truthy, so it takes the same `table[primary_key].desc`
     // path as a scalar one. The raise is reserved for a nil primary key.

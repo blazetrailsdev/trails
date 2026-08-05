@@ -89,7 +89,7 @@ export class InsertAll {
     inserts: Record<string, unknown>[],
     options: InsertAllOptions = {},
   ): Promise<Result> {
-    const model = (relation as any)._modelClass as ModelClass;
+    const model = (relation as any)._model as ModelClass;
     return withPooledOrDirectConnection(model as any, (c) =>
       new InsertAll(relation, c, inserts, options).execute(),
     );
@@ -101,7 +101,7 @@ export class InsertAll {
     inserts: Record<string, unknown>[],
     options: InsertAllOptions = {},
   ) {
-    this.model = (relation as any)._modelClass as ModelClass;
+    this.model = (relation as any)._model as ModelClass;
     this.connection = connection;
     this.inserts = inserts.map((r) => ({ ...r }));
     this.updateOnly = options.updateOnly;

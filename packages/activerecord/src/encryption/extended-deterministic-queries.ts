@@ -117,7 +117,7 @@ export class EncryptedQuery {
     args: unknown[],
     checkForAdditionalValues: boolean,
   ): unknown[] {
-    const model = owner._modelClass ?? owner;
+    const model = owner._model ?? owner;
     const encryptedAttrs = model._encryptedAttributes as Set<string> | undefined;
     if (!encryptedAttrs?.size) return args;
 

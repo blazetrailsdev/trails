@@ -58,9 +58,7 @@ export class Topic extends Base {
     this.scope("approved", (q: any) => q.where({ approved: true }));
     this.scope("rejected", (q: any) => q.where({ approved: false }));
     this.scope("children", (q: any) => q.whereNot({ parent_id: null }));
-    this.scope("hasChildren", (q: any) =>
-      q.where({ id: q._modelClass.children().select("parent_id") }),
-    );
+    this.scope("hasChildren", (q: any) => q.where({ id: q.model.children().select("parent_id") }));
     this.scope("byLifo", (q: any) => q.where({ author_name: "lifo" }));
     this.scope("replied", (q: any) => q.where("replies_count > 0"));
     // "true"/"false" are reserved words; call via bracket notation: Topic["true"]()

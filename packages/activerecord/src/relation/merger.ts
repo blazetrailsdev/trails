@@ -192,7 +192,7 @@ export class Merger {
   // before copying. Dotted refs, raw SQL, and existing Arel nodes pass through.
   private qualifyOrderForOther(clause: unknown): unknown {
     if (clause instanceof Nodes.Node) return clause;
-    const table: any = this.other._modelClass?.arelTable;
+    const table: any = this.other._model?.arelTable;
     if (!table) return clause;
     const asNode = (col: string, dir: string): unknown => {
       const attr = table.get(col);
@@ -209,7 +209,7 @@ export class Merger {
 
   private mergeMultiValues(rel: any): void {
     if (this.other._orderClauses && this.other._orderClauses.length > 0) {
-      const sameKlass = this.other._modelClass === rel._modelClass;
+      const sameKlass = this.other._model === rel._model;
       rel._orderClauses = sameKlass
         ? [...this.other._orderClauses]
         : this.other._orderClauses.map((c: unknown) => this.qualifyOrderForOther(c));

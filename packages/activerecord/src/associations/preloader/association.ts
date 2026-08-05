@@ -418,7 +418,7 @@ export class LoaderQuery {
   }
 
   private _scopeTableName(): string {
-    return this.scope?._modelClass?.tableName ?? this.scope?.tableName ?? "";
+    return this.scope?._model?.tableName ?? this.scope?.tableName ?? "";
   }
 
   // Mirrors Rails' `scope.model.connection_specification_name` in
@@ -426,7 +426,7 @@ export class LoaderQuery {
   // check out a connection on first call, but in practice the preloader runs
   // after records are loaded so the adapter is already cached on the class.
   private _scopeAdapterId(): string {
-    const klass = this.scope?._modelClass;
+    const klass = this.scope?._model;
     if (klass == null) return "";
     const spec = klass.connectionSpecificationName ?? "";
     let adapter: object;
