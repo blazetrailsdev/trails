@@ -1,13 +1,14 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
+import { aliasedRow } from "../support/join-dependency-aliased-row.js";
 import { fixtures } from "../test-fixtures.js";
 import { JoinDependency } from "./join-dependency.js";
 import { Nodes } from "@blazetrails/arel";
 
 describe("JoinDependency extra columns in instantiate", () => {
   // Ride the canonical schema `fixtures({})` warms; the hydration rows below are
-  // built by column name via `jd.aliasedRow`, so no bespoke schema is declared
+  // built by column name via `aliasedRow`, so no bespoke schema is declared
   // and no `tN_rN` offsets are hardcoded.
   fixtures({});
 
@@ -40,21 +41,21 @@ describe("JoinDependency extra columns in instantiate", () => {
 
     const rows = [
       {
-        ...jd.aliasedRow({
+        ...aliasedRow(jd, {
           "": { id: 1, title: "First Post" },
           comments: { id: 10, post_id: 1, body: "Nice" },
         }),
         comment_count: 5,
       },
       {
-        ...jd.aliasedRow({
+        ...aliasedRow(jd, {
           "": { id: 1, title: "First Post" },
           comments: { id: 11, post_id: 1, body: "Great" },
         }),
         comment_count: 5,
       },
       {
-        ...jd.aliasedRow({
+        ...aliasedRow(jd, {
           "": { id: 2, title: "Second Post" },
           comments: { id: 12, post_id: 2, body: "Cool" },
         }),
@@ -74,7 +75,7 @@ describe("JoinDependency extra columns in instantiate", () => {
 
     const rows = [
       {
-        ...jd.aliasedRow({
+        ...aliasedRow(jd, {
           "": { id: 1, title: "Post" },
           comments: { id: 10, post_id: 1, body: "Hello" },
         }),
@@ -96,7 +97,10 @@ describe("JoinDependency extra columns in instantiate", () => {
     const jd = new JoinDependency(Post, null, "comments", Nodes.OuterJoin);
 
     const rows = [
-      jd.aliasedRow({ "": { id: 1, title: "Post" }, comments: { id: 10, post_id: 1, body: "Hi" } }),
+      aliasedRow(jd, {
+        "": { id: 1, title: "Post" },
+        comments: { id: 10, post_id: 1, body: "Hi" },
+      }),
     ];
 
     const { parents } = jd.instantiateFromRows(rows);

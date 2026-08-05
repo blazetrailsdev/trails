@@ -1,13 +1,14 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
+import { aliasedRow } from "../support/join-dependency-aliased-row.js";
 import { fixtures } from "../test-fixtures.js";
 import { JoinDependency } from "./join-dependency.js";
 import { Nodes } from "@blazetrails/arel";
 
 describe("JoinDependency nested hydration", () => {
   // Ride the canonical schema `fixtures({})` warms; the hydration rows below are
-  // built by column name via `jd.aliasedRow`, so no bespoke schema is declared
+  // built by column name via `aliasedRow`, so no bespoke schema is declared
   // and no `tN_rN` offsets (or canonical-prefix column padding) are hardcoded.
   fixtures({});
 
@@ -40,12 +41,12 @@ describe("JoinDependency nested hydration", () => {
     const jd = new JoinDependency(Post, null, "comments.author", Nodes.OuterJoin);
 
     const rows = [
-      jd.aliasedRow({
+      aliasedRow(jd, {
         "": { id: 1, title: "Post A" },
         comments: { id: 10, post_id: 1, body: "Comment 1", author_id: 42 },
         "comments.author": { id: 42, name: "Alice" },
       }),
-      jd.aliasedRow({
+      aliasedRow(jd, {
         "": { id: 1, title: "Post A" },
         comments: { id: 11, post_id: 1, body: "Comment 2", author_id: 42 },
         "comments.author": { id: 42, name: "Alice" },
@@ -80,12 +81,12 @@ describe("JoinDependency nested hydration", () => {
     const jd = new JoinDependency(Post, null, "comments.author", Nodes.OuterJoin);
 
     const rows = [
-      jd.aliasedRow({
+      aliasedRow(jd, {
         "": { id: 1, title: "Post A" },
         comments: { id: 10, post_id: 1, body: "C1", author_id: 42 },
         "comments.author": { id: 42, name: "Alice" },
       }),
-      jd.aliasedRow({
+      aliasedRow(jd, {
         "": { id: 2, title: "Post B" },
         comments: { id: 20, post_id: 2, body: "C2", author_id: 42 },
         "comments.author": { id: 42, name: "Alice" },
@@ -103,7 +104,7 @@ describe("JoinDependency nested hydration", () => {
   it("nested records are not readonly by default when no reflection scope marks readonly", () => {
     const jd = new JoinDependency(Post, null, "comments", Nodes.OuterJoin);
     const rows = [
-      jd.aliasedRow({
+      aliasedRow(jd, {
         "": { id: 1, title: "Post A" },
         comments: { id: 10, post_id: 1, body: "C1", author_id: null },
       }),

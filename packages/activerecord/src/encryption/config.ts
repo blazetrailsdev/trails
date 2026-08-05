@@ -176,7 +176,8 @@ let _sharedConfig: Config | undefined;
  * (encryption/configurable.rb:9), read through `Configurable.config` — which
  * stays the reader, where Rails declares it.
  *
- * @noRailsEquivalent Ruby resolves `ActiveRecord::Encryption.config` at call
+ * Why it is here and not on `Configurable`: Ruby resolves
+ * `ActiveRecord::Encryption.config` at call
  * time, so `Encryptor`, `Context`, `Scheme`, `KeyProvider` and `KeyGenerator`
  * name it with no load-order consequence. ESM has no such deferral: an `import`
  * of `configurable.js` from those files puts `Contexts` — and therefore

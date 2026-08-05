@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { PostgreSQLDatabaseTasks, normalizeSchemaSearchPath } from "./postgresql-database-tasks.js";
 import { DatabaseTasks } from "./database-tasks.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
+import { DatabaseAlreadyExists } from "../errors.js";
 
 function config(overrides: Record<string, unknown> = {}): HashConfig {
   return new HashConfig("development", "primary", {
@@ -120,6 +121,61 @@ describe("PostgreSQLDatabaseTasks", () => {
     expect(mutationCalls[0]).not.toContain("ar_internal_metadata");
 
     expect(closeMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("create passes the whole configuration hash to connection.createDatabase", async () => {
+    const createDatabase = vi.fn(async () => {});
+    const establishCalls: Array<Record<string, unknown> | undefined> = [];
+    const tasks = new PostgreSQLDatabaseTasks(
+      config({ owner: "trails_owner", template: "template0" }),
+    );
+    vi.spyOn(
+      tasks as unknown as { connection(): Promise<unknown> },
+      "connection",
+    ).mockResolvedValue({ createDatabase });
+    vi.spyOn(
+      tasks as unknown as { establishConnection(c?: Record<string, unknown>): Promise<void> },
+      "establishConnection",
+    ).mockImplementation(async (c?: Record<string, unknown>) => {
+      establishCalls.push(c);
+    });
+
+    await tasks.create();
+
+    expect(createDatabase).toHaveBeenCalledWith("trails_test", {
+      adapter: "postgresql",
+      database: "trails_test",
+      owner: "trails_owner",
+      template: "template0",
+      encoding: "utf8",
+    });
+    expect(establishCalls).toHaveLength(2);
+    expect(establishCalls[0]).toMatchObject({ database: "postgres", schemaSearchPath: "public" });
+    expect(establishCalls[1]).toBeUndefined();
+  });
+
+  it("create leaves the pool on the public schema config when createDatabase raises", async () => {
+    const establishCalls: Array<Record<string, unknown> | undefined> = [];
+    const tasks = new PostgreSQLDatabaseTasks(config());
+    vi.spyOn(
+      tasks as unknown as { connection(): Promise<unknown> },
+      "connection",
+    ).mockResolvedValue({
+      createDatabase: vi.fn(async () => {
+        throw new DatabaseAlreadyExists('database "trails_test" already exists');
+      }),
+    });
+    vi.spyOn(
+      tasks as unknown as { establishConnection(c?: Record<string, unknown>): Promise<void> },
+      "establishConnection",
+    ).mockImplementation(async (c?: Record<string, unknown>) => {
+      establishCalls.push(c);
+    });
+
+    await expect(tasks.create()).rejects.toBeInstanceOf(DatabaseAlreadyExists);
+
+    expect(establishCalls).toHaveLength(1);
+    expect(establishCalls[0]).toMatchObject({ database: "postgres", schemaSearchPath: "public" });
   });
 
   describe("structureDump schema filtering", () => {

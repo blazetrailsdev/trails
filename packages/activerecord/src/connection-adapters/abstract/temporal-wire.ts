@@ -9,6 +9,16 @@
  * in `defaultSqlTimezone()` — UTC by default, host-system local when
  * `ActiveRecord.default_timezone === "local"`. This is the only non-pure
  * dependency; everything else is pure and unit-testable without a live DB.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby never sees these wire strings. The `pg`
+ * gem decodes `timestamp`/`date`/`time`/`timestamptz` into `Time`/`Date`
+ * objects in its own C type-maps before Active Record's cast layer runs, and
+ * mysql2 does the same, so Rails' PostgreSQL and MySQL adapters declare no
+ * wire-format parser at all — `OID::DateTime#cast_value`
+ * (postgresql/oid/date_time.rb) already receives a `Time`. The JS drivers hand
+ * back raw strings instead, so trails must do that decoding itself, and every
+ * name here belongs to that decoding step. There is no Rails method to
+ * converge onto because the gem, not the framework, owns this side in Ruby.
  */
 
 import { Temporal } from "@blazetrails/activesupport/temporal";
