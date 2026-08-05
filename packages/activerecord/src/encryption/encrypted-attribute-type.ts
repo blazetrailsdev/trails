@@ -24,12 +24,14 @@ export function setGlobalPreviousSchemesFn(fn: (scheme: Scheme) => Scheme[]): vo
   _globalPreviousVersion++;
 }
 
-// Rails recomputes `previous_types` on every call; the memos below stand in for
-// that, so their generation must turn over whenever config does. `configure`
-// ends in `reset_default_context` (configurable.rb:30), so the default context's
-// identity IS the config generation — no configure hook needed.
 let _lastDefaultContext: unknown = getDefaultContext();
 
+/**
+ * @internal Rails recomputes `previous_types` on every call; the memos below
+ * stand in for that, so their generation must turn over whenever config does.
+ * `configure` ends in `reset_default_context` (configurable.rb:30), so the
+ * default context's identity is the config generation.
+ */
 function globalPreviousGeneration(): number {
   const defaultContext = getDefaultContext();
   if (defaultContext !== _lastDefaultContext) {
@@ -178,9 +180,6 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
   }
 
   get previousTypes(): EncryptedAttributeType[] {
-    // Key on both supportUnencryptedData and the global-previous generation so
-    // the list is recomputed whenever config changes (e.g. configure() called
-    // after encrypts() is declared — the lazy-resolution contract).
     const key = `${this.supportUnencryptedData}:${globalPreviousGeneration()}`;
     if (!this._previousTypesMemo || this._previousTypesMemoKey !== key) {
       this._previousTypesMemo = this.buildPreviousTypesFor(

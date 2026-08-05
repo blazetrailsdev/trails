@@ -92,10 +92,7 @@ describe("ActiveRecord::Encryption::SchemeTest", () => {
   it("keyProvider raises when no key/keyProvider/deterministic configured", () => {
     // The suite-wide bootstrap (cases/helper.ts, mirroring Rails helper.rb)
     // configures a global primary key, so clear it locally to exercise the
-    // truly-unconfigured resolution path. Rails falls all the way through to
-    // `Encryption.key_provider` → `Context#build_default_key_provider`
-    // (context.rb:38), which reads `config.primary_key` — and that raises when
-    // the credential is missing (config.rb:42-44).
+    // truly-unconfigured resolution path.
     const c = Configurable.config;
     const saved = {
       primaryKey: c.primaryKey,

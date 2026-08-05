@@ -6,9 +6,6 @@
 
 import type { MessageSerializerLike } from "./message-serializer.js";
 import { NullEncryptor } from "./null-encryptor.js";
-// Only referenced from method bodies, never at module top level: the import
-// closes a cycle (context → configurable → contexts → context) that is safe
-// exactly as long as nothing here runs at eval time.
 import { Configurable } from "./configurable.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
 
@@ -56,7 +53,12 @@ export class Context {
     this.frozenEncryption = false;
   }
 
-  /** @internal */
+  /**
+   * @internal Rails `Context#build_default_key_provider` (context.rb:37-39).
+   * `Configurable` is imported for this body alone — the import closes a cycle
+   * (context → configurable → contexts → context) that holds only because
+   * nothing in this module reads it at eval time.
+   */
   private buildDefaultKeyProvider(): unknown {
     return new DerivedSecretKeyProvider(Configurable.config.primaryKey);
   }
@@ -71,10 +73,12 @@ export interface EncryptionContext {
 }
 
 const contextStack: EncryptionContext[] = [];
-// Mirrors Rails' `mattr_accessor :default_context, default: Context.new`
-// (contexts.rb:18). A real Context, not a bare object, because Context is where
-// the default key provider is memoized (context.rb:26) — that memo is Rails'
-// only key-provider cache, and `reset_default_context` is its only invalidation.
+/**
+ * Rails' `mattr_accessor :default_context, default: Context.new`
+ * (contexts.rb:18). A real Context, not a bare object, because Context is where
+ * the default key provider is memoized (context.rb:25-27) — that memo is Rails'
+ * only key-provider cache, and `reset_default_context` is its only invalidation.
+ */
 let _defaultContext: EncryptionContext = new Context() as unknown as EncryptionContext;
 
 export function getDefaultContext(): EncryptionContext {
@@ -100,9 +104,6 @@ export function withEncryptionContext<T>(overrides: EncryptionContext, fn: () =>
   // context. So nested contexts reset every unspecified property to the default
   // (e.g. without_encryption nested inside protecting_encrypted_data resets
   // frozen_encryption to false), rather than inheriting it from the outer frame.
-  // `default_context.dup` keeps the Context class (and so its key_provider
-  // getter and its memo); a spread would flatten the frame to a bare object and
-  // lose the default key provider inside every custom context.
   const frame = Object.assign(
     Object.create(Object.getPrototypeOf(getDefaultContext())),
     getDefaultContext(),

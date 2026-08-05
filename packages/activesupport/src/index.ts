@@ -512,13 +512,11 @@ export { makeRange, rangeIncludesValue, rangeIncludesStringValue } from "./range
 export type { Range as RangeExt } from "./range-ext.js";
 export { caseEquals, isInclude } from "./core-ext/range/compare-range.js";
 export { overlap, overlaps } from "./core-ext/range/overlap.js";
-// Note: `core-ext/range/conversions` and `core-ext/range/each` are intentionally
-// kept as subpath imports
-// (`@blazetrails/activesupport/core-ext/range/conversions`), the way Rails users
-// reach them through `require "active_support/core_ext/range/conversions"`.
-// Re-exporting them here would collide in this flat barrel — `toFs` with
-// `time-ext.ts`'s `Date#to_fs`, `each`/`step` with the enumerable helpers — and
-// the aliases that collision forces diverge from the Rails names.
+// Note: core-ext/range's conversions and each are intentionally kept as subpath
+// imports (`@blazetrails/activesupport/core-ext/range/conversions`), the way
+// Rails users reach them through `require "active_support/core_ext/range/..."`.
+// Re-exporting them here would collide with `time-ext.ts`'s `Date#to_fs` and the
+// enumerable `each`/`step`. Mirrors the pattern used by glob, digest, etc.
 
 export { I18n } from "./i18n.js";
 export { Scalar } from "./duration.js";

@@ -146,8 +146,6 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
   });
 
   it("configure resets the default context so config-derived properties are rebuilt", () => {
-    // configurable.rb:30 — `configure` ends in `reset_default_context`, which is
-    // the only key-provider invalidation Rails has.
     const before = Contexts.defaultContext;
     Configurable.configure({ primaryKey: "test-key", keyDerivationSalt: "the salt" });
     expect(Contexts.defaultContext).not.toBe(before);

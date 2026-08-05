@@ -14,10 +14,12 @@ import {
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-// `encryption/encryptable-record.test.ts` as it stood before #5719 gave it the
-// Rails shape: no transactional wrap, and two cases writing the same `books`
-// row. The second one's `findBy({ name: "dune" })` read the first one's leftover
-// on all three lanes. This is the regression test for the lint itself.
+/**
+ * `encryption/encryptable-record.test.ts` as it stood before #5719 gave it the
+ * Rails shape: no transactional wrap, and two cases writing the same `books`
+ * row. The second one's `findBy({ name: "dune" })` read the first one's leftover
+ * on all three lanes. This is the regression test for the lint itself.
+ */
 const PRE_5719_ENCRYPTABLE_RECORD = `
 describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   beforeEach(() => {
@@ -39,7 +41,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
 });
 `;
 
-// The same file after #5719.
+/** The same file after #5719. */
 const POST_5719_ENCRYPTABLE_RECORD = PRE_5719_ENCRYPTABLE_RECORD.replace(
   "  beforeEach(() => {",
   "  withTransactionalFixtures(() => txnAdapter);\n\n  beforeEach(() => {",
@@ -109,12 +111,7 @@ describe("non-transactional row writes", () => {
       relative,
       await loadRatchet(path.join(REPO_ROOT, RATCHET_PATH)),
     );
-    // A new offender is a file that writes rows with no transactional wrap. The
-    // fix is always the Rails shape — `fixtures()` / `useTransactionalTests()` /
-    // `withTransactionalFixtures` — never a reseed, and never any part of the
-    // global reset #5719 removed.
     expect(added).toEqual([]);
-    // Converged a file? Delete its row from the ratchet; it only shrinks.
     expect(stale).toEqual([]);
   });
 });

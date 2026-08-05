@@ -1,28 +1,30 @@
-// PR #5719 removed the global between-test reset (`cases/helper.ts` →
-// `resetTestAdapterState` → `resetTestTables`). That reset both DROPped every
-// non-canonical table and TRUNCATEd the boot-laid canonical ones, and the RFC
-// 0064 measurement that unblocked its removal instrumented only the DROP half —
-// so it proved no test leaked a *table*, and said nothing about leaked *rows*.
-//
-// The TRUNCATE half was load-bearing for test files that write rows without a
-// transactional wrap. #5719's first CI run found one on all three lanes:
-// `encryption/encryptable-record.test.ts`, where the `downcase: true` case's
-// book survived into the `ignore_case: true` case and `findBy({ name: "dune" })`
-// read the wrong row. The fix was to give that describe the Rails shape, since
-// Rails' own `ActiveRecord::TestCase` runs with `use_transactional_tests` on
-// (vendor/rails/activerecord/lib/active_record/test_fixtures.rb:113, :146).
-//
-// What was left is an unenforced invariant: a test file that writes rows must
-// either ride `fixtures()` / `useTransactionalTests()` / `withTransactionalFixtures`,
-// or delete its own rows. This module checks it. A new non-transactional file
-// that writes rows is otherwise silently fine until some sibling case happens to
-// read the same table, and the resulting failure can be lane-specific (#5719's
-// second failure, in `abstract-mysql-adapter/warnings.test.ts`, only reproduced
-// on MariaDB) and so may not surface on the lane the author runs locally.
-//
-// The population is large and most of it is legitimate — files that clean up in
-// `afterEach`, or write to a table nothing else reads — so this is a ratchet
-// seeded from the tree, not a suite-reddening gate: the count may not grow.
+/**
+ * PR #5719 removed the global between-test reset (`cases/helper.ts` →
+ * `resetTestAdapterState` → `resetTestTables`). That reset both DROPped every
+ * non-canonical table and TRUNCATEd the boot-laid canonical ones, and the RFC
+ * 0064 measurement that unblocked its removal instrumented only the DROP half —
+ * so it proved no test leaked a *table*, and said nothing about leaked *rows*.
+ *
+ * The TRUNCATE half was load-bearing for test files that write rows without a
+ * transactional wrap. #5719's first CI run found one on all three lanes:
+ * `encryption/encryptable-record.test.ts`, where the `downcase: true` case's
+ * book survived into the `ignore_case: true` case and `findBy({ name: "dune" })`
+ * read the wrong row. The fix was to give that describe the Rails shape, since
+ * Rails' own `ActiveRecord::TestCase` runs with `use_transactional_tests` on
+ * (vendor/rails/activerecord/lib/active_record/test_fixtures.rb:113, :146).
+ *
+ * What was left is an unenforced invariant: a test file that writes rows must
+ * either ride `fixtures()` / `useTransactionalTests()` / `withTransactionalFixtures`,
+ * or delete its own rows. This module checks it. A new non-transactional file
+ * that writes rows is otherwise silently fine until some sibling case happens to
+ * read the same table, and the resulting failure can be lane-specific (#5719's
+ * second failure, in `abstract-mysql-adapter/warnings.test.ts`, only reproduced
+ * on MariaDB) and so may not surface on the lane the author runs locally.
+ *
+ * The population is large and most of it is legitimate — files that clean up in
+ * `afterEach`, or write to a table nothing else reads — so this is a ratchet
+ * seeded from the tree, not a suite-reddening gate: the count may not grow.
+ */
 
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";

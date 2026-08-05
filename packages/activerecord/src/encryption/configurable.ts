@@ -58,6 +58,10 @@ export class Configurable {
    * defaulting to `nil` and assigned unconditionally (configurable.rb:21-23),
    * so a call that omits one *clears* the credential it had rather than keeping
    * it. Callers that want the previous value pass it explicitly.
+   *
+   * It ends in `reset_default_context`, which is the only key-provider
+   * invalidation Rails has: `Context` memoizes its default key provider
+   * (context.rb:25-27), so a fresh `Context` is a fresh provider.
    */
   static configure(options: {
     primaryKey?: string | string[];
@@ -91,9 +95,6 @@ export class Configurable {
       }
     }
 
-    // configurable.rb:30 — the config generation turns over here, and this is
-    // the only invalidation Rails has: Context rebuilds its key provider on the
-    // next read because it is a new Context.
     _defaultCipher = null;
     Contexts.resetDefaultContext();
   }
