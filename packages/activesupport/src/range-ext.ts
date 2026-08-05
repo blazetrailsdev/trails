@@ -1,10 +1,14 @@
 /**
- * Range utility functions mirroring ActiveSupport's Range extensions.
+ * The `Range` data triple, plus the core `Range` methods Ruby provides and
+ * Rails' `core_ext/range/*` files reopen. Those Rails files are ported
+ * one-for-one under `core-ext/range/`.
  *
- * @boundary-file: Date-aware range comparators (`overlap`, `cover`, `each`)
- *   coerce `Date` ↔ epoch number for ordering since Rails' `Range#include?`
- *   accepts any `<=>`-comparable value. Temporal-typed ranges live elsewhere.
+ * @boundary-file: the Date-aware comparators here coerce `Date` ↔ epoch number
+ *   for ordering since Rails' `Range#include?` accepts any `<=>`-comparable
+ *   value. Temporal-typed ranges live elsewhere.
  */
+
+import { succ } from "./core-ext/string/succ.js";
 
 /**
  * The value shape these helpers operate on. Ruby's `Range` is a core class
@@ -27,32 +31,6 @@ export function makeRange<T>(begin: T | null, end: T | null, excludeEnd = false)
 }
 
 /**
- * overlap? — returns true if two ranges overlap.
- * Mirrors ActiveSupport Range#overlap?
- */
-export function overlap<T extends number | Date>(a: Range<T>, b: Range<T>): boolean {
-  const toNum = (v: T): number => (v instanceof Date ? v.getTime() : v);
-
-  // a starts after b ends
-  if (a.begin !== null && b.end !== null) {
-    const aBegin = toNum(a.begin);
-    const bEnd = toNum(b.end);
-    if (b.excludeEnd ? aBegin >= bEnd : aBegin > bEnd) return false;
-  }
-
-  // b starts after a ends
-  if (b.begin !== null && a.end !== null) {
-    const bBegin = toNum(b.begin);
-    const aEnd = toNum(a.end);
-    if (a.excludeEnd ? bBegin >= aEnd : bBegin > aEnd) return false;
-  }
-
-  return true;
-}
-
-export const overlaps = overlap; // alias
-
-/**
  * cover? — returns true if a numeric/date range covers a scalar value
  * (endpoint comparison via `<=>`).
  */
@@ -65,109 +43,6 @@ export function rangeIncludesValue<T extends number | Date>(range: Range<T>, val
     if (range.excludeEnd ? n >= toNum(range.end) : n > toNum(range.end)) return false;
   }
   return true;
-}
-
-const isAsciiAlnum = (c: number): boolean =>
-  (c >= 48 && c <= 57) || (c >= 65 && c <= 90) || (c >= 97 && c <= 122);
-
-/**
- * `String#succ` — Ruby's successor. Increments the rightmost alphanumeric,
- * carrying within its character class (`9→0`, `z→a`, `Z→A`) and skipping
- * non-alphanumerics during the carry; an overflow past the leftmost member of
- * a class inserts a new leading digit/letter (`"Zz".succ == "AAa"`,
- * `"99".succ == "100"`). Strings with no alphanumeric increment by raw code
- * unit instead (`"<<".succ == "<="`).
- */
-/** Inclusive [min, max] code-point bounds of the UTF-8 width encoding `cp`. */
-function utf8WidthBounds(cp: number): [number, number] {
-  if (cp < 0x80) return [0x00, 0x7f];
-  if (cp < 0x800) return [0x80, 0x7ff];
-  if (cp < 0x10000) return [0x800, 0xffff];
-  return [0x10000, 0x10ffff];
-}
-
-export function stringSucc(s: string): string {
-  if (s.length === 0) return "";
-  const codes = Array.from(s, (ch) => ch.codePointAt(0) as number);
-
-  let lastAlnum = -1;
-  for (let i = codes.length - 1; i >= 0; i--) {
-    if (isAsciiAlnum(codes[i])) {
-      lastAlnum = i;
-      break;
-    }
-  }
-
-  if (lastAlnum === -1) {
-    // No alphanumeric: whole-code-point increment with carry, matching Ruby's
-    // `enc_succ_char`, which advances by encoded character — not by UTF-16
-    // code unit, which would truncate an astral char to its high surrogate.
-    let i = codes.length - 1;
-    let carry = true;
-    while (i >= 0 && carry) {
-      const [min, max] = utf8WidthBounds(codes[i]);
-      if (codes[i] >= max) {
-        // `enc_succ_char` reports NEIGHBOR_WRAPPED whenever the successor's
-        // encoded length would differ (string.c: `l != len`), so a character
-        // at the top of its UTF-8 width wraps to that width's *minimum* and
-        // carries — `"\u{FFFF}".succ.codepoints == [0x1, 0x800]`, not
-        // [0x10000]. The carry then prepends U+0001 below.
-        codes[i] = min;
-      } else {
-        codes[i]++;
-        // Surrogates are not valid characters; `enc_succ_char` skips past
-        // them to the next valid one rather than emitting an unpaired half.
-        if (codes[i] >= 0xd800 && codes[i] <= 0xdfff) codes[i] = 0xe000;
-        carry = false;
-      }
-      i--;
-    }
-    if (carry) codes.unshift(1);
-    return String.fromCodePoint(...codes);
-  }
-
-  // Carry leftward from the rightmost alphanumeric, wrapping within a class.
-  // Ruby stops the carry rather than crossing a non-alphanumeric gap into a
-  // *different* class (digit vs letter): `"z.9".succ == "z.10"`, not `"aa.0"`.
-  const DIGIT = 1;
-  const ALPHA = 2;
-  let i = lastAlnum;
-  let carry = true;
-  let overflowPos = lastAlnum;
-  let overflowChar = 0;
-  let lastWrapClass = 0;
-  let crossedGap = false;
-  while (i >= 0 && carry) {
-    const c = codes[i];
-    if (!isAsciiAlnum(c)) {
-      crossedGap = true;
-      i--;
-      continue;
-    }
-    const thisClass = c >= 48 && c <= 57 ? DIGIT : ALPHA;
-    if (crossedGap && lastWrapClass !== 0 && thisClass !== lastWrapClass) break;
-    crossedGap = false;
-    overflowPos = i;
-    if (c === 57) {
-      codes[i] = 48; // '9' → '0'
-      overflowChar = 49; // insert '1'
-      lastWrapClass = DIGIT;
-    } else if (c === 122) {
-      codes[i] = 97; // 'z' → 'a'
-      overflowChar = 97;
-      lastWrapClass = ALPHA;
-    } else if (c === 90) {
-      codes[i] = 65; // 'Z' → 'A'
-      overflowChar = 65;
-      lastWrapClass = ALPHA;
-    } else {
-      codes[i] = c + 1;
-      carry = false;
-    }
-    i--;
-  }
-  if (carry) codes.splice(overflowPos, 0, overflowChar);
-  return String.fromCodePoint(...codes);
 }
 
 const lexCmp = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
@@ -200,12 +75,12 @@ export function rangeIncludesStringValue(range: Range<string>, value: string): b
   // grows past `end`'s length (succ is non-decreasing in length).
   const n = lexCmp(begin, end);
   if (n > 0 || (excludeEnd && n === 0)) return false;
-  const afterEnd = stringSucc(end);
+  const afterEnd = succ(end);
   let current = begin;
   let guard = 0;
   while (current !== afterEnd) {
     let next: string | null = null;
-    if (excludeEnd || current !== end) next = stringSucc(current);
+    if (excludeEnd || current !== end) next = succ(current);
     if (current === value) return true;
     if (next === null) break;
     current = next;
@@ -219,36 +94,4 @@ export function rangeIncludesStringValue(range: Range<string>, value: string): b
     }
   }
   return false;
-}
-
-/**
- * toFs — format a range as a string.
- */
-export function rangeToFs<T>(range: Range<T>, format?: string): string {
-  const fmtBegin = range.begin !== null ? String(range.begin) : "";
-  const fmtEnd = range.end !== null ? String(range.end) : "";
-  const sep = range.excludeEnd ? "..." : "..";
-  return `${fmtBegin}${sep}${fmtEnd}`;
-}
-
-/**
- * step — iterate over a numeric range with a step value.
- */
-export function* rangeStep(range: Range<number>, step: number): Generator<number> {
-  if (range.begin === null) throw new Error("Cannot step over beginless range");
-  let current = range.begin;
-  while (true) {
-    if (range.end !== null) {
-      if (range.excludeEnd ? current >= range.end : current > range.end) break;
-    }
-    yield current;
-    current += step;
-  }
-}
-
-/**
- * each — iterate over a numeric range.
- */
-export function* rangeEach(range: Range<number>): Generator<number> {
-  yield* rangeStep(range, 1);
 }

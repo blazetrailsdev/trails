@@ -179,7 +179,7 @@ function lastInsertedId(result: any): never {
  * Mirrors: ActiveRecord::ConnectionAdapters::Mysql2::DatabaseStatements#multi_statements_enabled?
  * @internal
  */
-export function multiStatementsEnabled(this: MultiStatementsHost): boolean {
+export function isMultiStatementsEnabled(this: MultiStatementsHost): boolean {
   const flags = this._config?.flags;
   if (Array.isArray(flags)) return flags.includes("MULTI_STATEMENTS");
   if (typeof flags === "number") return (flags & MULTI_STATEMENTS_BIT) !== 0;
