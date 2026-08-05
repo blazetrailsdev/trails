@@ -32,6 +32,7 @@ describe("ConnectionHandlingTest", () => {
       "establish_connection with a url stores a UrlConfig with discrete fields",
       "remove_connection removes the pool",
       "remove_connection returns undefined when no pool exists",
+      "establishConnection backfills the adapter on an adapter-less HashConfig",
     ],
   });
 
