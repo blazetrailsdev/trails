@@ -2349,13 +2349,15 @@ export class Date {
    * Ruby `Date.jd(jd = 0, start = Date::ITALY)` (ruby/date, `date_core.c`
    * `date_s_jd`), the date the given Julian day names under `start`: Gregorian
    * at or after it, Julian before. `date_s_jd` writes the day straight into a
-   * fresh `SimpleDateData` under `HAVE_JD` alone
-   * (`date_core.c:3286-3296`), leaving the civil date to `get_s_civil`.
+   * fresh `SimpleDateData` under `HAVE_JD` alone (`date_core.c:3377-3387`),
+   * leaving the civil date to `get_s_civil`.
+   *
+   * `d_simple_new_internal` allocates the object and writes its fields in one
+   * step; a JS private field is only installed by a constructor call, so the
+   * allocation runs through `Date.new`'s default date and is then written
+   * over.
    */
   static jd(jd = 0, start: number = DEFAULT_SG): Date {
-    // `d_simple_new_internal` allocates the object and writes its fields;
-    // private fields are only installed by a constructor call in JS, so the
-    // allocation runs through `Date.new`'s default date and is overwritten.
     const date = new Date(undefined, undefined, undefined, start);
     date.#setToSimple(jd, start, 0, 0, 0, HAVE_JD);
     return date;
@@ -2386,24 +2388,46 @@ export class Date {
    * @internal ruby/date's `get_s_jd` (`date_core.c:1168-1186`), which computes
    * the Julian day from the civil date on first read and records `HAVE_JD`.
    */
-  #getSJd(): number {
+  #getSJd(): void {
     if (!(this.#flags & HAVE_JD)) {
       this.#jd = cCivilToJd(this.#year, this.#mon, this.#mday, this.#sg)[0];
       this.#flags |= HAVE_JD;
     }
-    return this.#jd;
   }
 
   /**
    * @internal ruby/date's `get_s_civil` (`date_core.c:1188-1206`), the mirror
    * image: the civil date from the Julian day, recording `HAVE_CIVIL`.
    */
-  #getSCivil(): [number, number, number] {
+  #getSCivil(): void {
     if (!(this.#flags & HAVE_CIVIL)) {
       [this.#year, this.#mon, this.#mday] = cJdToCivil(this.#jd, this.#sg);
       this.#flags |= HAVE_CIVIL;
     }
-    return [this.#year, this.#mon, this.#mday];
+  }
+
+  /** @internal ruby/date's `m_jd` (`date_core.c:1459-1470`). */
+  #mJd(): number {
+    this.#getSJd();
+    return this.#jd;
+  }
+
+  /** @internal ruby/date's `m_year` (`date_core.c:1732-1743`). */
+  #mYear(): number {
+    this.#getSCivil();
+    return this.#year;
+  }
+
+  /** @internal ruby/date's `m_mon` (`date_core.c:1763-1782`). */
+  #mMon(): number {
+    this.#getSCivil();
+    return this.#mon;
+  }
+
+  /** @internal ruby/date's `m_mday` (`date_core.c:1784-1800`). */
+  #mMday(): number {
+    this.#getSCivil();
+    return this.#mday;
   }
 
   /**
@@ -2532,28 +2556,28 @@ export class Date {
   }
 
   get year(): number {
-    return this.#getSCivil()[0];
+    return this.#mYear();
   }
 
   get mon(): number {
-    return this.#getSCivil()[1];
+    return this.#mMon();
   }
 
   get month(): number {
-    return this.#getSCivil()[1];
+    return this.#mMon();
   }
 
   get day(): number {
-    return this.#getSCivil()[2];
+    return this.#mMday();
   }
 
   /** `date_core.c` `c_jd_to_wday` (`date_core.c:636-640`), Sunday as `0`. */
   get wday(): number {
-    return mod(this.#getSJd() + 1, 7);
+    return mod(this.#mJd() + 1, 7);
   }
 
   get yday(): number {
-    return cJdToOrdinal(this.#getSJd(), this.#sg)![1];
+    return cJdToOrdinal(this.#mJd(), this.#sg)![1];
   }
 
   /**
@@ -2574,7 +2598,7 @@ export class Date {
    */
   isJulian(): boolean {
     if (!Number.isFinite(this.#sg)) return this.#sg === JULIAN;
-    return this.#getSJd() < this.#sg;
+    return this.#mJd() < this.#sg;
   }
 
   /** Ruby `Date#gregorian?` (ruby/date, `date_core.c` `d_lite_gregorian_p`). */
@@ -2593,7 +2617,7 @@ export class Date {
    * `0074-i18n-parity/datetime-new-start-preserves-the-receiver`.
    */
   newStart(start: number = DEFAULT_SG): Date {
-    return Date.jd(this.#getSJd(), start);
+    return Date.jd(this.#mJd(), start);
   }
 
   /** Ruby `Date#italy` (ruby/date, `date_core.c` `d_lite_italy`). */
