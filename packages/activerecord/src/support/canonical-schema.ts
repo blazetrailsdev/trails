@@ -20,6 +20,7 @@
  */
 
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
+import { singularize } from "@blazetrails/activesupport";
 import { ActiveRecordError } from "../errors.js";
 import type {
   TableDefinition,
@@ -2187,7 +2188,9 @@ export async function canonicalForeignKeyDependents(): Promise<Map<string, strin
  * spells the same declaration with (`auto_id_tests`, test-schema.ts:134-144);
  * the serial rendering is the loader's business. A composite `column:` /
  * `primary_key:` collapses to its comma-joined spelling, `ForeignKeySpec` being
- * single-column as every canonical `t.foreignKey` is today.
+ * single-column as every canonical `t.foreignKey` is today. An omitted
+ * `column:` defaults the way `foreign_key_column_for` does
+ * (schema_statements.rb:1241-1244): the singularized table name plus `_id`.
  *
  * @internal Read by `scripts/schema-compare/compare.ts`. Lives here, next to the
  * registry it replays, for the same reason as
@@ -2205,7 +2208,10 @@ export async function canonicalRegistrySchema(): Promise<Schema> {
       foreignKey: (toTable: string, opts: Partial<AddForeignKeyOptions> = {}) => {
         const join = (v: string | string[] | undefined): string | undefined =>
           Array.isArray(v) ? v.join(",") : v;
-        const fk: ForeignKeySpec = { toTable, column: join(opts.column) ?? `${toTable}_id` };
+        const fk: ForeignKeySpec = {
+          toTable,
+          column: join(opts.column) ?? `${singularize(toTable)}_id`,
+        };
         const primaryKey = join(opts.primaryKey);
         if (primaryKey !== undefined) fk.primaryKey = primaryKey;
         if (opts.name !== undefined) fk.name = opts.name;

@@ -79,7 +79,9 @@ export class Context {
    * `key_generator`, `encryptor` and `message_serializer`. Each of those
    * modules imports `Configurable`, and this module is evaluated while
    * building the default context, so constructing them here would close an
-   * eval-time cycle. They stay unset until RFC 0072 breaks the cycle.
+   * eval-time cycle. Story
+   * `0072-api-compare-parity-burndown/converge-context-set-defaults-remaining-three`
+   * carries the convergence.
    */
   private setDefaults(): void {
     this.frozenEncryption = false;
