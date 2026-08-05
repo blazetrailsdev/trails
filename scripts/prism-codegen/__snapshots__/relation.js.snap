@@ -727,11 +727,3 @@ Relation.include(FinderMethods, Calculations, SpawnMethods, QueryMethods, Batche
 Relation.include(SignedId.RelationMethods, TokenFor.RelationMethods);
 Relation.attrReader("table", "model", "loaded", "predicate_builder");
 Relation.attrAccessor("skip_preloading_value");
-export class StrictLoadingScope {
-    static isEmptyScope() {
-        return true;
-    }
-    static strictLoadingValue() {
-        return true;
-    }
-}

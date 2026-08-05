@@ -112,12 +112,18 @@ function classBody(
  * then throws on load; the visibility keywords, which declare the default
  * visibility of the `def`s that follow and have no statement to be; and `+` on
  * a constant, which is `Array#+` in every class-body use and which `INFIX`
- * images as JS `+`, coercing both arrays to strings. Tracked as
- * `codegen-array-infix-plus`.
+ * images as JS `+`, coercing both arrays to strings (`codegen-array-infix-plus`).
+ *
+ * A nested `class`/`module` is excluded for a different reason: it is a
+ * declaration rather than a macro, and the conformance scorer keys a generated
+ * def by its bare short name under the enclosing Rails file, so emitting
+ * `Relation::StrictLoadingScope.strict_loading_value` reports a phantom
+ * divergence against `Relation#strict_loading_value`. Tracked as
+ * `codegen-nested-class-declarations`.
  */
 function unportedMacro(n: PrismNode): boolean {
   const kind = n.constructor.name;
-  if (kind === "AliasMethodNode") return true;
+  if (kind === "AliasMethodNode" || kind === "ClassNode" || kind === "ModuleNode") return true;
   if (kind === "CallNode" && n.receiver == null && VISIBILITY_MACROS.has(String(n.name)))
     return true;
   if (kind === "CallNode" && String(n.name) === "+" && isConstantish(n.receiver as PrismNode))
