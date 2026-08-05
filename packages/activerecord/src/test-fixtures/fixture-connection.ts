@@ -73,7 +73,8 @@ export async function leaseFixtureConnectionFor(
   const modelPool = modelFixturePool(model);
   if (modelPool === null) return fixtureConnection;
   const rawFixturePool = fixtureConnection.pool;
-  const fixturePool = rawFixturePool instanceof NullPool ? null : rawFixturePool;
+  const fixturePool =
+    rawFixturePool == null || rawFixturePool instanceof NullPool ? null : rawFixturePool;
   if (fixturePool === null || fixturePool === modelPool) return fixtureConnection;
   return await modelPool.leaseConnection();
 }

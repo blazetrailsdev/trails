@@ -128,11 +128,9 @@ export interface SchemaStatements extends Omit<
 export class SchemaStatements extends AbstractSchemaStatements {
   /* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
 
-  // Rails resolves `get_database_version` to PostgreSQLAdapter's own override
-  // (`server_version_num` — postgresql_adapter.rb:1000) by ordinary method
-  // lookup. TypeScript picks the inherited generic-adapter method ahead of a
-  // merged-interface member, so the PG return type is restated here as a
-  // declaration-only field: no runtime emit, and no cast in the bodies.
+  // Rails gets PostgreSQLAdapter's `get_database_version` (`server_version_num`)
+  // by ordinary method lookup; TS picks the inherited generic-adapter method
+  // ahead of a merged-interface one, so restate it declaration-only.
   declare getDatabaseVersion: () => Promise<number>;
 
   /** Mirrors: PostgreSQL::SchemaStatements#update_table_definition */
@@ -671,11 +669,8 @@ export class SchemaStatements extends AbstractSchemaStatements {
     // Mirrors Rails' load_additional_types batch call: gather all OIDs not
     // yet in the map and load them in a single pg_type query before building
     // Column objects. This avoids N concurrent queries for wide tables.
-    // `typeMap` is an accessor on the generic adapter, and TypeScript refuses
-    // to narrow an inherited accessor either from the merged interface or from
-    // a `declare` field (TS2610); a real accessor override would shadow
-    // PostgreSQLAdapter's own `type_map` once `include()` installs this module
-    // on its prototype. Rails needs neither (postgresql_adapter.rb:938).
+    // TS2610: an inherited accessor cannot be narrowed, and overriding it here
+    // would shadow PostgreSQLAdapter's own `type_map` under `include()`.
     const typeMap = this.typeMap as HashLookupTypeMap;
     const missingOids = [
       ...new Set(rows.map((r) => Number(r.oid)).filter((oid) => !typeMap.has(oid))),
