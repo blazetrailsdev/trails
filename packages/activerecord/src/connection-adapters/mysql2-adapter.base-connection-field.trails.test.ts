@@ -24,7 +24,7 @@ describe("Mysql2Adapter base _connection field", () => {
     const fakeConn = {
       end,
       ping: () => Promise.resolve(),
-      _handshakePacket: { serverVersion: "8.0.28" },
+      connection: { _handshakePacket: { serverVersion: "8.0.28" } },
       query: () => Promise.resolve([[]]),
     };
     vi.spyOn(Mysql2Adapter, "newClient").mockResolvedValue(fakeConn as never);

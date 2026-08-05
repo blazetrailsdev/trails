@@ -1743,17 +1743,21 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    * is read off the connection's handshake state rather than queried —
    * node-mysql2 keeps the parsed handshake on `_handshakePacket`
    * (mysql2/lib/base/connection.js:135, `serverVersion` per
-   * lib/packets/handshake.js:62), which is the same string the Ruby driver's
+   * lib/packets/handshake.js:62) of the core connection, which the promise
+   * wrapper we hold delegates to as `.connection`
+   * (mysql2/lib/promise/connection.js:12). It carries the same string the Ruby
+   * driver's
    * `server_info[:version]` reports. An absent banner is Ruby's nil: it is
    * passed through so it reaches `versionString` and raises there, where Rails'
    * nil does.
    * @internal
    */
   override async getFullVersion(): Promise<string | null> {
-    const conn = (await this.anyRawConnection()) as unknown as {
-      _handshakePacket?: { serverVersion?: string };
-    } | null;
-    return conn?._handshakePacket?.serverVersion ?? null;
+    type Handshake = { _handshakePacket?: { serverVersion?: string } };
+    const conn = (await this.anyRawConnection()) as unknown as
+      | (Handshake & { connection?: Handshake })
+      | null;
+    return (conn?.connection ?? conn)?._handshakePacket?.serverVersion ?? null;
   }
 
   /** @internal */

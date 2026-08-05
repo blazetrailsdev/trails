@@ -25,7 +25,7 @@ describe("Mysql2Adapter configure-on-fresh-connect", () => {
       // getFullVersion() (run by the connect-once configure to warm the version
       // before checkVersion) reads the driver's handshake banner; hand it one
       // so the warm resolves offline.
-      _handshakePacket: { serverVersion: version },
+      connection: { _handshakePacket: { serverVersion: version } },
       query: () => Promise.resolve([[]]),
     };
     vi.spyOn(Mysql2Adapter, "newClient").mockResolvedValue(fakeConn as never);
