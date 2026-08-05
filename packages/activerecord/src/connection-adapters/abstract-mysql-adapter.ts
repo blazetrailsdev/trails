@@ -1742,9 +1742,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   /** @internal */
   protected versionString(fullVersionString: string | null | undefined): string {
-    // Ruby's `if full_version_string && matches = ...` — `""` is truthy in
-    // Ruby, so an empty banner reaches `match` and fails there, taking the
-    // same `else` as nil.
     let matches: RegExpMatchArray | null;
     if (
       fullVersionString != null &&

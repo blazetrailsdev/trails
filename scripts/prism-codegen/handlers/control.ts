@@ -13,9 +13,6 @@ export function registerControl(r: Registry): void {
     const neg = n.constructor.name === "UnlessNode";
     const consNode = singleStmtNode(n.statements as PrismNode | null);
     const altNode = elseSingleStmtNode(n);
-    // A branch that is more than one statement has no conditional-expression
-    // spelling; wrap the statement form in an immediately-invoked arrow so the
-    // whole `if` still yields a value.
     if (!consNode || !altNode) return conditionalIife(n, e, neg);
     let cond = e.expr(n.predicate as PrismNode);
     if (neg) cond = f.createLogicalNot(cond);
@@ -195,7 +192,11 @@ function elseSingleStmtNode(n: PrismNode): PrismNode | null {
  * which JS has no syntax for: one `catch` binds every exception. Dispatch the
  * clauses inside the catch with the same `caseEq` test `case/when` uses, and
  * rethrow when none matches so an unhandled class still propagates. A bare
- * `rescue` (no exception list) is the catch-all and closes the chain.
+ * `rescue` (no exception list) is the catch-all and closes the chain. Each
+ * clause aliases its own exception variable to the single catch binding rather
+ * than renaming reads inside the body. A lone `rescue` keeps the plain
+ * `catch (e)` shape it has always emitted: the dispatch exists for the chain,
+ * and adding a class test to the single-clause form is a separate change.
  */
 function rescueToCatch(
   rescue: PrismNode,
@@ -215,8 +216,6 @@ function rescueToCatch(
       e.asyncBindings,
       () => {
         const body = e.stmts((clause.statements as PrismNode) ?? null, isLast);
-        // Each clause names its own exception variable; alias it to the single
-        // catch binding rather than renaming reads inside the body.
         const alias =
           ref && ref !== caught
             ? [
@@ -237,9 +236,6 @@ function rescueToCatch(
     arms.push(arm);
     blocks.push(arm.value);
   }
-  // A lone `rescue` keeps the plain `catch (e)` shape it has always emitted —
-  // the caseEq dispatch below exists for the chain, and adding a class test to
-  // the single-clause form would be a separate behaviour change.
   if (clauses.length === 1) {
     const ref = clauses[0].reference ? String((clauses[0].reference as PrismNode).name) : caught;
     return {

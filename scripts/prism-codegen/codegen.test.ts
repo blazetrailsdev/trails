@@ -570,8 +570,6 @@ describe("prism-codegen", () => {
     expect(summarizeCoverage(coverage).passthrough).toBeGreaterThan(0);
   });
   it("declines silently-lossy translations instead of emitting wrong JS", async () => {
-    // A mid-splat has no JS spelling — a rest element must be the last array
-    // binding element — so it stays declined. A trailing splat does emit.
     const splat = await generateFromSource(`def g; a, *b, c = list; end`);
     expect(splat.parseErrorCount).toBe(0);
     expect(splat.code).toContain("__PRISM_TODO(");

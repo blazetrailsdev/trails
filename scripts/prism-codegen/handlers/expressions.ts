@@ -83,9 +83,6 @@ export function registerExpressions(r: Registry): void {
   );
   r.on("MultiWriteNode", (n, e) => {
     if (!((n.lefts as PrismNode[]) ?? []).every(isEmittableTarget)) return null;
-    // A trailing splat is JS' rest element: `a, *b = x` → `[a, ...b] = x`. A
-    // mid-splat (`a, *b, c = x`) has no JS spelling — a rest element must come
-    // last in an array binding — so it stays declined.
     const rest = n.rest as PrismNode | null;
     let restTarget: PrismNode | undefined;
     if (rest) {
