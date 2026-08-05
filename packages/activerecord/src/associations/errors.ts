@@ -405,8 +405,11 @@ export class NestedAttributesDisplacementError extends ActiveRecordError {
 }
 
 /**
- * Thrown when a `has_one` association is assigned with the native `=` setter
- * (or a mass-assignment key) on a *persisted* owner. This is a deliberate
+ * Thrown when a `has_one` association is assigned by mass assignment —
+ * `owner.assignAttributes({ account: x })`, `new Owner({ account: x })` — on a
+ * *persisted* owner. (RFC 0087 §1 removed the native `=` setter that also
+ * raised this; the mass-assignment arm is retired by that RFC's
+ * `retire-sync-association-mass-assignment-arms`.) This is a deliberate
  * trails-only deviation with no Rails counterpart: Rails'
  * `HasOneAssociation#replace` persists the displacement + new record inline at
  * assignment, which is synchronous DB I/O JS cannot do from a property setter.
@@ -421,7 +424,7 @@ export class HasOnePersistedAssignmentError extends ActiveRecordError {
   constructor(association: string) {
     const cap = association.charAt(0).toUpperCase() + association.slice(1);
     super(
-      `Cannot assign has_one association \`${association}\` with \`=\` on a ` +
+      `Cannot assign has_one association \`${association}\` by mass assignment on a ` +
         `persisted record: Rails persists the replacement at assignment time, ` +
         `which requires \`await\` in JS. Use \`await owner.set${cap}(x)\` (or ` +
         `\`await owner.association("${association}").writer(x)\`).`,

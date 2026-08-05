@@ -18,6 +18,7 @@ import {
   isRubyOnlyClass,
   isScopedSkip,
   ALREADY_PREDICATE_PREFIXES,
+  TOKEN_RENAMES,
   explainConventions,
 } from "./conventions.js";
 
@@ -114,6 +115,20 @@ describe("snakeToCamel", () => {
     expect(snakeToCamel("superb_thing")).toBe("superbThing");
     // `erb` must keep winning the alternation over the shorter `rb`.
     expect(snakeToCamel("compile_erb")).toBe("compileTse");
+  });
+
+  it("honors every TOKEN_RENAMES entry", () => {
+    // The `rb: js` entry was dead code on main until #6043 — the table and the
+    // substitution's alternation were two sources of truth and drifted. The
+    // pattern is derived from the table now; this asserts every key is reachable
+    // so a future entry cannot go unhonored while the generated conventions doc
+    // advertises it as live.
+    for (const [tok, renamed] of Object.entries(TOKEN_RENAMES)) {
+      expect(snakeToCamel(tok)).toBe(renamed);
+      expect(snakeToCamel(`load_${tok}`)).toBe(
+        `load${renamed[0].toUpperCase()}${renamed.slice(1)}`,
+      );
+    }
   });
 });
 

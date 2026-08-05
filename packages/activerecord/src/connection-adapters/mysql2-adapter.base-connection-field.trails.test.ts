@@ -18,12 +18,14 @@ describe("Mysql2Adapter base _connection field", () => {
 
   function stubNewClient(): { end: ReturnType<typeof vi.fn> } {
     const end = vi.fn(() => Promise.resolve());
-    // The connect-once configure warms the server version (getFullVersion issues
-    // SELECT VERSION() before checkVersion); hand it a row so the warm resolves.
+    // The connect-once configure warms the server version (getFullVersion reads
+    // the driver's handshake banner before checkVersion); hand it one so the
+    // warm resolves.
     const fakeConn = {
       end,
       ping: () => Promise.resolve(),
-      query: () => Promise.resolve([[{ v: "8.0.28" }]]),
+      _handshakePacket: { serverVersion: "8.0.28" },
+      query: () => Promise.resolve([[]]),
     };
     vi.spyOn(Mysql2Adapter, "newClient").mockResolvedValue(fakeConn as never);
     return { end };

@@ -1739,15 +1739,20 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   /**
    * Mirrors: Mysql2Adapter#get_full_version (mysql2_adapter.rb:168-170). No
    * memo and no side effects: `database_version` is the only memo in the Rails
-   * chain. Rails reads `any_raw_connection.server_info[:version]`; node-mysql2
-   * exposes no `server_info`, so the banner comes from `SELECT VERSION()` —
-   * the same string the server reports there.
+   * chain. Like Rails' `any_raw_connection.server_info[:version]`, the banner
+   * is read off the connection's handshake state rather than queried —
+   * node-mysql2 keeps the parsed handshake on `_handshakePacket`
+   * (mysql2/lib/base/connection.js:135, `serverVersion` per
+   * lib/packets/handshake.js:62), which is the same string the Ruby driver's
+   * `server_info[:version]` reports. A missing banner is passed through, so it
+   * reaches `versionString` and raises there as Rails' nil does.
    * @internal
    */
   async getFullVersion(): Promise<string> {
-    const conn = await this.getConn();
-    const [[row]] = (await conn.query("SELECT VERSION() AS v")) as [Array<{ v: string }>, unknown];
-    return row?.v ?? "0.0.0";
+    const conn = (await this.anyRawConnection()) as unknown as {
+      _handshakePacket?: { serverVersion?: string };
+    };
+    return conn?._handshakePacket?.serverVersion as string;
   }
 
   /** @internal */

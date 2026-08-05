@@ -1,11 +1,13 @@
 /**
- * Trails-only: the native `=` has_one setter (and the mass-assignment hasOne
- * arm) deviates from Rails on a *persisted* owner. Rails' `HasOneAssociation#replace`
+ * Trails-only: the mass-assignment hasOne arm deviates from Rails on a
+ * *persisted* owner. (RFC 0087 §1 removed the native `=` property setter that
+ * shared the deviation; `set#{Name}` is the writer now.)
+ * Rails' `HasOneAssociation#replace`
  * (vendor/rails/activerecord/lib/active_record/associations/has_one_association.rb:59-84)
  * persists the displacement + new record inline at assignment — synchronous DB
  * I/O JS cannot do from a property setter. Rather than silently deferring the
  * writes to the owner's next `save()` (the order-undefined two-row race
- * RFC 0068 exists to kill), the setter THROWS and names the awaitable
+ * RFC 0068 exists to kill), the assignment THROWS and names the awaitable
  * replacement (`await owner.set#{Name}(x)`). On an *unpersisted* owner Rails
  * does no I/O either, so the in-memory replace is faithful and kept. There is
  * no Rails test for this deviation.
@@ -40,30 +42,47 @@ describe("HasOnePersistedSetterThrows", () => {
     registerModel(Club);
   });
 
-  it("native = setter throws on a persisted owner", async () => {
+  it("set#{Name} persists the replacement on a persisted owner", async () => {
+    // The awaitable writer the deviation names: it reaches
+    // `HasOneAssociation#writer` → Rails' inline replace/persist.
+    const firm = (await Firm.create({ name: "GlobalMegaCorp" })) as unknown as HasOneOwner;
+    const account = await Account.create({ credit_limit: 1000 });
+    await firm.setAccount(account);
+    expect((account as unknown as { firm_id: number }).firm_id).toBe(
+      Number((firm as unknown as { id: unknown }).id),
+    );
+  });
+
+  it("assigning the property is a plain JS write to a getter-only accessor", async () => {
+    // RFC 0087 §1: no `#{name}=` setter is generated, so the write fails as an
+    // ordinary strict-mode assignment rather than routing anywhere.
     const firm = (await Firm.create({ name: "GlobalMegaCorp" })) as unknown as HasOneOwner;
     const account = await Account.create({ credit_limit: 1000 });
     expect(() => {
       firm.account = account;
-    }).toThrow(HasOnePersistedAssignmentError);
+    }).toThrow(TypeError);
   });
 
-  it("native = setter raises the type mismatch before the persisted-owner throw", async () => {
+  it("mass-assignment raises the type mismatch before the persisted-owner throw", async () => {
     // Rails' `replace` raises `AssociationTypeMismatch` as its first line
     // (has_one_association.rb:59-60), before any other work — the sync guard is
     // preserved ahead of the persisted-owner deviation.
     const firm = (await Firm.create({ name: "GlobalMegaCorp" })) as unknown as HasOneOwner;
-    expect(() => {
-      firm.account = 1;
-    }).toThrow(AssociationTypeMismatch);
+    expect(() =>
+      (firm as unknown as { association(n: string): { syncWrite(v: unknown): void } })
+        .association("account")
+        .syncWrite(1),
+    ).toThrow(AssociationTypeMismatch);
   });
 
   it("throw message names the association and the awaitable replacement", async () => {
     const firm = (await Firm.create({ name: "GlobalMegaCorp" })) as unknown as HasOneOwner;
     const account = await Account.create({ credit_limit: 1000 });
     try {
-      firm.account = account;
-      expect.unreachable("expected the persisted setter to throw");
+      (firm as unknown as { association(n: string): { syncWrite(v: unknown): void } })
+        .association("account")
+        .syncWrite(account);
+      expect.unreachable("expected the persisted assignment to throw");
     } catch (e) {
       expect(e).toBeInstanceOf(HasOnePersistedAssignmentError);
       expect((e as Error).message).toContain("`account`");
@@ -82,18 +101,26 @@ describe("HasOnePersistedSetterThrows", () => {
     }).toThrow(/await owner\.setAccount\(x\)/);
   });
 
-  it("update throws on a persisted owner with a hasOne key", async () => {
+  it("update awaits the has_one writer on a persisted owner", async () => {
+    // `#update` is async, so — unlike mass assignment — it reaches Rails'
+    // inline replace/persist (has_one_association.rb:59-84) instead of the
+    // deviation's throw.
     const firm = (await Firm.create({ name: "GlobalMegaCorp" })) as unknown as HasOneOwner;
     const account = await Account.create({ credit_limit: 1000 });
-    await expect(firm.update({ account })).rejects.toThrow(/await owner\.setAccount\(x\)/);
+    await firm.update({ account });
+    expect((account as unknown as { firm_id: number }).firm_id).toBe(
+      Number((firm as unknown as { id: unknown }).id),
+    );
   });
 
-  it("has_one_through native = setter throws on a persisted owner", async () => {
+  it("has_one_through mass-assignment throws HasOnePersistedAssignmentError on a persisted owner", async () => {
     const member = (await Member.create({ name: "Groucho" })) as unknown as HasOneOwner;
     const club = await Club.create({ name: "Moustache" });
-    expect(() => {
-      member.club = club;
-    }).toThrow(HasOnePersistedAssignmentError);
+    expect(() =>
+      (member as unknown as { association(n: string): { syncWrite(v: unknown): void } })
+        .association("club")
+        .syncWrite(club),
+    ).toThrow(HasOnePersistedAssignmentError);
   });
 
   it("has_one_through mass-assignment throws on a persisted owner", async () => {
@@ -104,12 +131,12 @@ describe("HasOnePersistedSetterThrows", () => {
     }).toThrow(/await owner\.setClub\(x\)/);
   });
 
-  it("native = setter does the in-memory replace on an unpersisted owner", async () => {
+  it("mass-assignment does the in-memory replace on an unpersisted owner", async () => {
     const firm = new Firm({ name: "GlobalMegaCorp" });
     const account = new Account({ credit_limit: 1000 });
     const owner = firm as unknown as HasOneOwner;
     expect(() => {
-      owner.account = account;
+      owner.assignAttributes({ account });
     }).not.toThrow();
     await firm.save();
     expect((account as unknown as { firm_id: number }).firm_id).toBe(Number(firm.id));

@@ -22,7 +22,7 @@ import * as path from "path";
  * `visit_Arel_Nodes_X`. File paths get the equivalent substitution
  * separately in `rubyFileToTs` below.
  */
-const TOKEN_RENAMES: Record<string, string> = {
+export const TOKEN_RENAMES: Record<string, string> = {
   erb: "tse",
   // A Ruby source file is a TypeScript one: I18n::Backend::Base#load_rb
   // (i18n/lib/i18n/backend/base.rb:254) loads a translation file written in
@@ -33,11 +33,24 @@ const TOKEN_RENAMES: Record<string, string> = {
   Erb: "Tse",
 };
 
+/**
+ * Alternation built from `TOKEN_RENAMES` itself, so an entry added to the table
+ * can never be dead code — the regex used to restate the token list and the two
+ * drifted (the `rb` entry sat unreachable on main until #6043 widened the
+ * literal). Longest key first so a longer token beats a shorter one that
+ * suffixes it (`erb` must win over `rb`), and keys are escaped so a future entry
+ * containing a metacharacter cannot corrupt the pattern.
+ */
+const TOKEN_RENAME_PATTERN = new RegExp(
+  `(^|_)(${Object.keys(TOKEN_RENAMES)
+    .sort((a, b) => b.length - a.length || (a < b ? -1 : 1))
+    .map((tok) => tok.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .join("|")})(?=_|$|[A-Z])`,
+  "g",
+);
+
 function applyTokenRenames(snake: string): string {
-  return snake.replace(
-    /(^|_)(erb|ERB|Erb|rb)(?=_|$|[A-Z])/g,
-    (_m, pre, tok: string) => pre + TOKEN_RENAMES[tok],
-  );
+  return snake.replace(TOKEN_RENAME_PATTERN, (_m, pre, tok: string) => pre + TOKEN_RENAMES[tok]);
 }
 
 export function snakeToCamel(name: string): string {
