@@ -613,6 +613,49 @@ const DELEGATED_ARRAY_METHODS = new Set<string>([
 ]);
 
 /**
+ * `Array#&`, `Array#|` and `Array#-` — three of the five operators
+ * delegation.rb:101 sends to `records` (`[]`, `&`, `|`, `+`, `-`). `[]` and
+ * `+` reach `Array.prototype` directly (`at`/`slice`, `concat`) and so live in
+ * DELEGATED_ARRAY_METHODS; these three have no `Array.prototype` counterpart,
+ * so they are spelled out here under Ruby's OWN alias names for them —
+ * `Array#intersection`, `Array#union`, `Array#difference` — rather than
+ * dropped. TS has no operator overloading, and the aliases are the spelling
+ * Ruby itself offers when the operator can't be written.
+ *
+ * Ruby's set semantics, not JS's: `&` and `|` de-duplicate, `-` does not, and
+ * membership compares with `eql?` — for records, `Core#==` (core.rb:631, ported
+ * as `equals`), which matches on class + id rather than object identity.
+ *
+ * These are runtime delegation-table entries, not declared TS members, so
+ * `OPERATOR_SPELLING_BY_FQN` (scripts/api-compare/operator-order-spelling.ts)
+ * still leaves `ActiveRecord::Delegation`'s operators unmapped: that table only
+ * accepts a spelling verified against a real member of the mapped container,
+ * and delegation.ts's container holds top-level functions.
+ */
+const DELEGATED_RECORD_SET_OPERATORS: Record<string, (a: unknown[], b: unknown[]) => unknown[]> = {
+  intersection: (a, b) => uniqRecords(a).filter((record) => includesRecord(b, record)),
+  union: (a, b) => uniqRecords([...a, ...b]),
+  difference: (a, b) => a.filter((record) => !includesRecord(b, record)),
+};
+
+/** Ruby `eql?` for the delegated set operators: `Core#==` when the value has it. */
+function recordsEql(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  const equals = (a as { equals?: (other: unknown) => boolean } | null | undefined)?.equals;
+  return typeof equals === "function" ? equals.call(a, b) === true : false;
+}
+
+function includesRecord(records: unknown[], record: unknown): boolean {
+  return records.some((candidate) => recordsEql(candidate, record));
+}
+
+function uniqRecords(records: unknown[]): unknown[] {
+  const uniq: unknown[] = [];
+  for (const record of records) if (!includesRecord(uniq, record)) uniq.push(record);
+  return uniq;
+}
+
+/**
  * Array-method delegation — mirrors Rails' `delegate ... to: :records`
  * (delegation.rb): once a property isn't an own/scope/model method,
  * CollectionProxy/Relation route curated `Array`/`Enumerable` methods through
@@ -630,6 +673,8 @@ export function delegateArrayMethod(
   prop: string,
   records: () => unknown[],
 ): ((...args: any[]) => unknown) | undefined {
+  const setOperator = DELEGATED_RECORD_SET_OPERATORS[prop];
+  if (setOperator) return (other: unknown[]) => setOperator(records(), other ?? []);
   if (!DELEGATED_ARRAY_METHODS.has(prop)) return undefined;
   const arrayMethod = (Array.prototype as unknown as Record<string, unknown>)[prop];
   if (typeof arrayMethod !== "function") return undefined;
@@ -651,6 +696,8 @@ export function delegateArrayMethodAsync(
   prop: string,
   loadRecords: () => Promise<unknown[]>,
 ): ((...args: any[]) => Promise<unknown>) | undefined {
+  const setOperator = DELEGATED_RECORD_SET_OPERATORS[prop];
+  if (setOperator) return async (other: unknown[]) => setOperator(await loadRecords(), other ?? []);
   if (!DELEGATED_ARRAY_METHODS.has(prop)) return undefined;
   const arrayMethod = (Array.prototype as unknown as Record<string, unknown>)[prop];
   if (typeof arrayMethod !== "function") return undefined;

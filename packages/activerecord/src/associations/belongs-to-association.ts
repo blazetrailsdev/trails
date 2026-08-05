@@ -4,7 +4,7 @@ import { reflectLockVersionBump } from "../associations.js";
 import { underscore } from "@blazetrails/activesupport";
 import { belongsToCounterCacheColumn } from "../reflection.js";
 import { hasQueryConstraints, queryConstraintsList } from "../persistence.js";
-import { SingularAssociation, findTarget } from "./singular-association.js";
+import { SingularAssociation } from "./singular-association.js";
 import { Rollback } from "../errors.js";
 import { MissingAttributeError } from "@blazetrails/activemodel";
 
@@ -310,20 +310,6 @@ export class BelongsToAssociation extends SingularAssociation {
           : (this.owner as any)[fk];
       return value != null;
     });
-  }
-
-  protected override async doAsyncFindTarget(): Promise<Base | null> {
-    // Suppress the loader's own tail writeback and let `setTarget` refuse a
-    // mid-load replacement, exactly as has_many and has_one do. #4919 already
-    // guards a mid-load *FK* change here; this covers a same-FK reassignment
-    // (`client.association("firm").setTarget(other)`) that leaves the FK put,
-    // which the stale-key check cannot see. See `_loaderWritebackSuppressed`.
-    this._loaderWritebackSuppressed++;
-    try {
-      return await findTarget(this.owner, this.reflection.name, this.reflection.options);
-    } finally {
-      this._loaderWritebackSuppressed--;
-    }
   }
 
   // --- Private helpers ---

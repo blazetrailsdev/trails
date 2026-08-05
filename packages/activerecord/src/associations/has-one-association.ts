@@ -10,7 +10,7 @@ import {
   ownerForeignKeyColumns,
 } from "./foreign-association.js";
 import type { AssociationReflection } from "../reflection.js";
-import { findTarget, SingularAssociation } from "./singular-association.js";
+import { SingularAssociation } from "./singular-association.js";
 import { polymorphicName } from "../inheritance.js";
 
 /**
@@ -509,20 +509,6 @@ export class HasOneAssociation extends SingularAssociation {
     const displaced = this.target;
     if (!displaced) return false;
     return (displaced as { isDestroyed?: () => boolean }).isDestroyed?.() !== true;
-  }
-
-  protected override async doAsyncFindTarget(): Promise<Base | null> {
-    // `loadHasOne`'s tail writeback lands in this holder mid-await, so a target
-    // replaced while the query is in flight would be silently clobbered. Arm
-    // the same guard has_many uses (`HasManyAssociation#doAsyncFindTarget`):
-    // suppress the loader's own writeback and let `setTarget` refuse the race.
-    // See `Association#_loaderWritebackSuppressed`.
-    this._loaderWritebackSuppressed++;
-    try {
-      return await findTarget(this.owner, this.reflection.name, this.reflection.options);
-    } finally {
-      this._loaderWritebackSuppressed--;
-    }
   }
 
   private foreignKeyColumns(): string[] {

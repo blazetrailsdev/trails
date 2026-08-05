@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { ArgumentError } from "@blazetrails/activemodel";
+import { ArgumentError, ValueType } from "@blazetrails/activemodel";
+import { HashLookupTypeMap } from "../../type/hash-lookup-type-map.js";
 import { PostgreSQLAdapter } from "../postgresql-adapter.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
 import { Table as PgTable } from "./schema-definitions.js";
@@ -288,5 +289,81 @@ describe("SchemaStatements#indexes", () => {
     const ss = withSchemaStatements(adapter);
     const [index] = await ss.indexes("my_schema.things");
     expect(index.table).toBe("my_schema.things");
+  });
+});
+
+// Rails' SchemaStatements#columns (abstract/schema_statements.rb:107) maps
+// every field through new_column_from_field. trails' PG columns() batch-loads
+// the row OIDs first, so the fetch_type_metadata → get_oid_type hop inside
+// new_column_from_field must stay a pure type-map read: one pg_type query for
+// the whole table, never one per column.
+describe("SchemaStatements#columns delegates to newColumnFromField", () => {
+  function columnsAdapter() {
+    const { adapter, sql } = makeAdapter({
+      schemaQuery: async () => [
+        {
+          name: "id",
+          type: "integer",
+          default: "nextval('things_id_seq'::regclass)",
+          notnull: true,
+          is_primary: true,
+          oid: 23,
+          fmod: -1,
+          identity: "",
+          attgenerated: "",
+          collation: null,
+          col_comment: null,
+        },
+        {
+          name: "name",
+          type: "character varying",
+          default: null,
+          notnull: false,
+          is_primary: false,
+          oid: 1043,
+          fmod: -1,
+          identity: "",
+          attgenerated: "",
+          collation: null,
+          col_comment: "the name",
+        },
+      ],
+    });
+    const ss = withSchemaStatements(adapter);
+    const typeMap = new HashLookupTypeMap();
+    Object.defineProperty(ss, "typeMap", { value: typeMap, configurable: true });
+    return { ss, sql };
+  }
+
+  it("issues one pg_type load for the whole table, not one per column", async () => {
+    const { ss, sql } = columnsAdapter();
+    const loadAdditionalTypes = vi
+      .spyOn(ss, "loadAdditionalTypes")
+      .mockImplementation(async (oids?: number[]) => {
+        for (const oid of oids ?? []) ss.typeMap.registerType(oid, new ValueType());
+      });
+
+    const columns = await ss.columns("things");
+
+    expect(columns.map((c) => c.name)).toEqual(["id", "name"]);
+    expect(loadAdditionalTypes).toHaveBeenCalledTimes(1);
+    expect(loadAdditionalTypes).toHaveBeenCalledWith([23, 1043]);
+    expect(sql.filter((text) => text.includes("pg_attribute"))).toHaveLength(1);
+  });
+
+  it("carries the serial, comment and primaryKey flags through the ported body", async () => {
+    const { ss } = columnsAdapter();
+    vi.spyOn(ss, "loadAdditionalTypes").mockImplementation(async (oids?: number[]) => {
+      for (const oid of oids ?? []) ss.typeMap.registerType(oid, new ValueType());
+    });
+
+    const [id, name] = await ss.columns("things");
+
+    expect(id.isSerial).toBe(true);
+    expect(id.primaryKey).toBe(true);
+    expect(id.null).toBe(false);
+    expect(name.primaryKey).toBe(false);
+    expect(name.comment).toBe("the name");
+    expect(name.null).toBe(true);
   });
 });

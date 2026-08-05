@@ -3695,25 +3695,6 @@ export class PostgreSQLAdapter
     );
   }
 
-  /**
-   * The serial detection Rails inlines in `new_column_from_field`, extracted so
-   * PostgreSQL::SchemaStatements#columns can share it: that path cannot delegate
-   * to newColumnFromField because it batch-preloads the row OIDs and resolves
-   * types through lookupCastTypeFromColumn, where fetchTypeMetadata would issue
-   * a per-column pg_type query.
-   * @internal
-   */
-  _serialFromDefaultFunction(
-    tableName: string,
-    columnName: string,
-    defaultFunction: string | null,
-  ): boolean {
-    const match = defaultFunction?.match(SERIAL_SEQUENCE_RE);
-    if (!match) return false;
-    const { sequenceName, suffix } = match.groups!;
-    return this.sequenceNameFromParts(tableName, columnName, suffix) === sequenceName;
-  }
-
   async foreignTables(): Promise<string[]> {
     const names = await this.queryValues(
       this.dataSourceSql(null, { type: "FOREIGN TABLE" }),
@@ -4198,19 +4179,34 @@ export class PostgreSQLAdapter
     field: unknown[],
     _definitions: unknown,
   ): Promise<Column> {
-    const [columnName, type, default_, notnull, oid, fmod, collation, comment, identity, gen] =
-      field as [
-        string,
-        string,
-        string | null,
-        boolean,
-        number,
-        number,
-        string | null,
-        string | null,
-        string | null,
-        string | null,
-      ];
+    // `isPrimary` is an 11th field element past Rails' ten — trails'
+    // `column_definitions` also selects `indisprimary` for the schema dumper.
+    // See the tuple built in PostgreSQL::SchemaStatements#columns.
+    const [
+      columnName,
+      type,
+      default_,
+      notnull,
+      oid,
+      fmod,
+      collation,
+      comment,
+      identity,
+      gen,
+      isPrimary,
+    ] = field as [
+      string,
+      string,
+      string | null,
+      boolean,
+      number,
+      number,
+      string | null,
+      string | null,
+      string | null,
+      string | null,
+      boolean | undefined,
+    ];
     const typeMetadata = await this.fetchTypeMetadata(columnName, type, Number(oid), Number(fmod));
     // The literal stays a raw String: deserialization is deferred to
     // Attribute.from_database so *_before_type_cast reads back the raw default.
@@ -4247,6 +4243,7 @@ export class PostgreSQLAdapter
         defaultFunction: defaultFunction ?? undefined,
         collation: collation ?? undefined,
         comment: comment || null,
+        primaryKey: isPrimary ?? false,
         serial,
         array: type.endsWith("[]"),
         identity: identity || null,
