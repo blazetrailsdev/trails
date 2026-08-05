@@ -325,6 +325,10 @@ import {
 import * as _AttributeAssignment from "./attribute-assignment.js";
 import * as _NestedAttributes from "./nested-attributes.js";
 import {
+  hasSecureToken as _hasSecureToken,
+  generateUniqueSecureToken as _generateUniqueSecureToken,
+} from "./secure-token.js";
+import {
   store as _storeFunction,
   storeAccessor as _storeAccessorFunction,
   registerSerializeFn as _registerSerializeFn,
@@ -2102,6 +2106,12 @@ export class Base extends Model {
       suffix: options?.suffix,
     });
   }
+
+  /** Mirrors: ActiveRecord::SecureToken::ClassMethods#has_secure_token (secure_token.rb:38). */
+  static hasSecureToken = _hasSecureToken;
+
+  /** Mirrors: ActiveRecord::SecureToken::ClassMethods#generate_unique_secure_token (secure_token.rb:57). */
+  static generateUniqueSecureToken = _generateUniqueSecureToken;
 
   // The fallback coder used by `serialize` when no explicit coder is given
   // (`coder ||= default_column_serializer`). Subclasses inherit via JS

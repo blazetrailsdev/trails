@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { MessagePackMessageSerializer } from "./message-pack-message-serializer.js";
 import { Message } from "./message.js";
-import { DecryptionError, ForbiddenClass } from "./errors.js";
+import { Decryption, ForbiddenClass } from "./errors.js";
 
 describe("ActiveRecord::Encryption::MessagePackMessageSerializerTest", () => {
   let serializer: MessagePackMessageSerializer;
@@ -38,11 +38,11 @@ describe("ActiveRecord::Encryption::MessagePackMessageSerializerTest", () => {
   });
 
   it("detects random data and raises a decryption error", () => {
-    expect(() => serializer.load("hey there")).toThrow(DecryptionError);
+    expect(() => serializer.load("hey there")).toThrow(Decryption);
   });
 
   it("detects random JSON hashes and raises a decryption error", () => {
-    expect(() => serializer.load(JSON.stringify({ some: "other data" }))).toThrow(DecryptionError);
+    expect(() => serializer.load(JSON.stringify({ some: "other data" }))).toThrow(Decryption);
   });
 
   it("raises a TypeError when trying to deserialize other data types", () => {
@@ -114,6 +114,6 @@ describe("ActiveRecord::Encryption::MessagePackMessageSerializerTest", () => {
     nested.headers.set("yet_another_message", deepNested);
     message.headers.set("other_message", nested);
 
-    expect(() => serializer.load(serializer.dump(message))).toThrow(DecryptionError);
+    expect(() => serializer.load(serializer.dump(message))).toThrow(Decryption);
   });
 });

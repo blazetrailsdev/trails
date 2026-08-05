@@ -210,7 +210,7 @@ export class MyAppBillingAccount extends Base {
   private checkEmptyCreditLimit(): void {
     const creditCard = this.readAttribute("credit_card");
     if (creditCard == null || creditCard === "") {
-      this.errors.add("credit_card", "blank");
+      this.errors.add("credit_card", ":blank");
     }
   }
 }

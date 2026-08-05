@@ -211,9 +211,7 @@ export class HasOneAssociation extends SingularAssociation {
             humanAttributeName(attr: string): string;
           };
           const record = ctor.humanAttributeName(this.reflection.name).toLowerCase();
-          owner.errors.add("base", "invalid", {
-            message: `Cannot delete record because a dependent ${record} exists`,
-          });
+          owner.errors.add("base", ":restrict_dependent_destroy.has_one", { record });
           return false;
         }
         break;

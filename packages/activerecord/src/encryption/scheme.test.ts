@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Scheme } from "./scheme.js";
-import { ConfigError, Configuration } from "./errors.js";
+import { Configuration } from "./errors.js";
 import { Configurable } from "./configurable.js";
 import { getEncryptionContext } from "./context.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
@@ -8,9 +8,9 @@ import { DeterministicKeyProvider } from "./deterministic-key-provider.js";
 
 describe("ActiveRecord::Encryption::SchemeTest", () => {
   it("validates config options when using encrypted attributes", () => {
-    expect(() => new Scheme({ ignoreCase: true, deterministic: false })).toThrow(ConfigError);
-    expect(() => new Scheme({ downcase: true, deterministic: false })).toThrow(ConfigError);
-    expect(() => new Scheme({ key: "k", keyProvider: {} })).toThrow(ConfigError);
+    expect(() => new Scheme({ ignoreCase: true, deterministic: false })).toThrow(Configuration);
+    expect(() => new Scheme({ downcase: true, deterministic: false })).toThrow(Configuration);
+    expect(() => new Scheme({ key: "k", keyProvider: {} })).toThrow(Configuration);
     expect(
       () =>
         new Scheme({
@@ -22,14 +22,14 @@ describe("ActiveRecord::Encryption::SchemeTest", () => {
             isBinary: () => false,
           },
         }),
-    ).toThrow(ConfigError);
+    ).toThrow(Configuration);
     expect(
       () =>
         new Scheme({
           compress: false,
           compressor: { deflate: () => Buffer.alloc(0), inflate: () => "" },
         }),
-    ).toThrow(ConfigError);
+    ).toThrow(Configuration);
   });
 
   it("keyProvider resolves from bare key: option via DerivedSecretKeyProvider, using config salt", () => {

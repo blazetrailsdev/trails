@@ -1239,6 +1239,14 @@ function buildPackageReport(
             Object.keys(rubyPkg.fileConstants?.[rubyFile] ?? {}),
           );
 
+    // `compare_range.rb` declares `CompareWithRange`: the container synthesized
+    // from the FILENAME is a name nobody wrote (see `synthesizedFileModule`).
+    if (rubyFile !== null && (rubyFiles.get(rubyFile)?.length ?? 0) > 0) {
+      for (const c of [...classes, ...modules]) {
+        if (c.file === expectedTs && c.synthesizedFileModule === true) allowed.add(c.name);
+      }
+    }
+
     const scored: ExtraName[] = [];
     let allowlistedCount = 0;
     let interfaceExemptCount = 0;

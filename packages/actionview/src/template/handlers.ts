@@ -141,9 +141,6 @@ export const TemplateHandlerRegistry = {
     for (const ext of handler.extensions) {
       TemplateHandlers.registerTemplateHandler(ext, handler);
     }
-    if (legacyDefaultExt === null && handler.extensions.length > 0) {
-      legacyDefaultExt = handler.extensions[0]!;
-    }
   },
   handlerForExtension(ext: string): TemplateHandler | undefined {
     return TemplateHandlers.handlerForExtension(ext);
@@ -154,19 +151,7 @@ export const TemplateHandlerRegistry = {
   has(ext: string): boolean {
     return TemplateHandlers.registeredTemplateHandler(ext) !== undefined;
   },
-  get defaultExt(): string | null {
-    return legacyDefaultExt;
-  },
-  setDefault(ext: string): void {
-    if (TemplateHandlers.registeredTemplateHandler(ext) === undefined) {
-      throw new Error(`No handler registered for extension "${ext}"`);
-    }
-    legacyDefaultExt = ext;
-  },
   clear(): void {
     TemplateHandlers.clear();
-    legacyDefaultExt = null;
   },
 };
-
-let legacyDefaultExt: string | null = null;

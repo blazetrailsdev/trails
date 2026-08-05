@@ -662,7 +662,7 @@ describe("numericality with in: range", () => {
     const stubRecord = { errors: errs };
     v.validateEach(stubRecord, "x", { not: "a number" });
     expect(errs.get("x")).toHaveLength(1);
-    expect(errs.where("x", "not_a_number")).toHaveLength(1);
+    expect(errs.where("x", ":not_a_number")).toHaveLength(1);
   });
 
   it("validates against the raw before-type-cast value (prepareValueForValidation)", async () => {

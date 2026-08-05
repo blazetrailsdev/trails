@@ -11,7 +11,7 @@ import { presence } from "@blazetrails/activesupport";
 import { Configuration } from "./errors.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
 import { KeyGenerator } from "./key-generator.js";
-import type { SchemeOptions } from "./scheme.js";
+import { Scheme, type SchemeOptions } from "./scheme.js";
 
 /**
  * The `deflate`/`inflate` pair a compressor answers.
@@ -51,7 +51,7 @@ export class Config {
   validateColumnSize: boolean = true;
   addToFilterParameters: boolean = true;
   excludedFromFilterParameters: string[] = [];
-  previousSchemes: SchemeOptions[] = [];
+  previousSchemes: Scheme[] = [];
   extendQueries: boolean = false;
   hashDigestClass: string = "SHA1";
   compressor: Compressor = Zlib;
@@ -163,8 +163,8 @@ export class Config {
     this.extendQueries = false;
   }
 
-  /** @internal */
+  /** Rails `add_previous_scheme` (encryption/config.rb:65-67). */
   private addPreviousScheme(properties: SchemeOptions): void {
-    this.previousSchemes.push(properties);
+    this.previousSchemes.push(new Scheme(properties));
   }
 }

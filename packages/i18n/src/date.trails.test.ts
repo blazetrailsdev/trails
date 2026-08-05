@@ -91,6 +91,19 @@ describe("Date", () => {
     expect(() => RubyDate.parse("2007366")).toThrow("invalid date");
   });
 
+  it("raises when no combination of frags is there, as rt__valid_date_frags_p answers nil", () => {
+    for (const str of ["10:30", "not a date"]) {
+      const parts = RubyDate._parse(str);
+      expect([str, parts.jd, parts.year, parts.cwyear]).toEqual([
+        str,
+        undefined,
+        undefined,
+        undefined,
+      ]);
+      expect(() => RubyDate.parse(str)).toThrow("invalid date");
+    }
+  });
+
   it("reads a narrow run followed by a fraction as a time of day, not a date", () => {
     expect(() => RubyDate.parse("07.2008")).toThrow("invalid date");
   });
@@ -272,6 +285,22 @@ describe("Date", () => {
   it("leaves a signed year uncompleted, as date_parse.c does", () => {
     expect(RubyDate.parse("-08-07-02").year).toBe(-8);
     expect(RubyDate.parse("+08-07-02").year).toBe(8);
+  });
+
+  it("takes an apostrophe-marked token as the year, as s3e does", () => {
+    expect(RubyDate._parse("'01-02-03")).toEqual({ year: 2001, mon: 2, mday: 3 });
+    expect(RubyDate._parse("'01/02/03")).toEqual({ year: 2001, mon: 2, mday: 3 });
+    expect(RubyDate._parse("'01.02.03")).toEqual({ year: 2001, mon: 2, mday: 3 });
+    expect(RubyDate._parse("'01-02-'03")).toEqual({ year: 2003, mon: 2, mday: 1 });
+    expect(RubyDate._parse("'01/02/'03")).toEqual({ year: 2003, mon: 2, mday: 1 });
+    expect(RubyDate._parse("'01.02.'03")).toEqual({ year: 2003, mon: 2, mday: 1 });
+    expect(RubyDate._parse("2008-07-'02")).toEqual({ year: 2002, mon: 7, mday: 2008 });
+  });
+
+  it("takes a leading + only where parse_iso does, as date_parse.c does", () => {
+    expect(RubyDate._parse("+01-02-03")).toEqual({ year: 1, mon: 2, mday: 3 });
+    expect(RubyDate._parse("+01/02/03")).toEqual({ year: 2001, mon: 2, mday: 3 });
+    expect(RubyDate._parse("+01.02.03")).toEqual({ year: 2001, mon: 2, mday: 3 });
   });
 
   it("completes a two-digit year unless comp is false, as Ruby does", () => {

@@ -42,7 +42,7 @@ export class InclusionValidator extends EachValidator {
 
   validateEach(record: ValidatableRecord, attribute: string, value: unknown): void {
     if (!this.isInclude(record, value)) {
-      record.errors.add(attribute, "inclusion", exceptInWithinMergeValue(this.options, value));
+      record.errors.add(attribute, ":inclusion", exceptInWithinMergeValue(this.options, value));
     }
   }
 

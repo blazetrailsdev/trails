@@ -8,6 +8,8 @@ import "./relation.js"; // registers the Relation ctor so Model.findBy/.all/.cou
 import { fixtureId, defineFixtures, defineJoinTableFixtures, isFixtureRef } from "./fixtures.js";
 import { fixtures } from "./test-fixtures.js";
 import { withTransactionalFixtures } from "./test-fixtures/with-transactional-fixtures.js";
+import { withSecondPool } from "./support/setup-second-pool.js";
+import { College } from "./test-helpers/models/college.js";
 import { Author } from "./test-helpers/models/author.js";
 import { Post } from "./test-helpers/models/post.js";
 import { LiveParrot, DeadParrot } from "./test-helpers/models/parrot.js";
@@ -927,5 +929,23 @@ describe("FixtureSet.createFixtures", () => {
     expect(deleteIdx).toBeGreaterThanOrEqual(0);
     expect(insertIdx).toBeGreaterThanOrEqual(0);
     expect(deleteIdx).toBeLessThan(insertIdx);
+  });
+});
+
+/**
+ * `setup_fixtures` pins EVERY writing pool, not just the one behind the
+ * connection fixtures default to (`test_fixtures.rb:177-184`). `colleges` lives
+ * in arunit2, so `fixtures()` seeds it through `College`'s own pool; without a
+ * pin on that pool its rows commit and only teardown's DELETE removes them.
+ */
+describe("fixtures() pins every pool its sets seed through", () => {
+  withSecondPool();
+  const { colleges } = fixtures(["colleges"]);
+
+  it("wraps the secondary pool's connection in the fixture transaction", async () => {
+    expect(colleges("FIU").name).toBe("Florida International University");
+    const secondary = await College.leaseConnection();
+    expect(secondary).not.toBe(await Base.leaseConnection());
+    expect(secondary.openTransactions).toBeGreaterThan(0);
   });
 });

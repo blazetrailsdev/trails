@@ -985,7 +985,7 @@ function parseIsoCb(m: RegExpExecArray, hash: DateParts): number {
 
 /** @internal `date_parse.c` `parse_iso` (`date_parse.c:1015-1033`): `2008-07-02`, and the unpadded `2008-7-2`. */
 function parseIso(str: string, hash: DateParts): string | null {
-  const pat = /([-+]?\d+)-(\d+)-(-?\d+)/;
+  const pat = new RegExp(`('?[-+]?${NUMBER}+)-(\\d+)-('?-?\\d+)`);
   return subx(str, " ", pat, hash, parseIsoCb);
 }
 
@@ -1233,7 +1233,7 @@ function parseSlaCb(m: RegExpExecArray, hash: DateParts): number {
 
 /** @internal `date_parse.c` `parse_sla` (`date_parse.c:1464-1483`): `2012/12/13`, `01/01/2012`, `2008/07`. */
 function parseSla(str: string, hash: DateParts): string | null {
-  const pat = /([-+]?\d+)\/\s*(\d+)(?:\D\s*(-?\d+))?/;
+  const pat = new RegExp(`('?-?${NUMBER}+)/\\s*('?\\d+)(?:\\D\\s*('?-?\\d+))?`);
   return subx(str, " ", pat, hash, parseSlaCb);
 }
 
@@ -1249,7 +1249,7 @@ function parseDotCb(m: RegExpExecArray, hash: DateParts): number {
 
 /** @internal `date_parse.c` `parse_dot` (`date_parse.c:1572-1591`): `2012.12.13`, `01.01.2012`. */
 function parseDot(str: string, hash: DateParts): string | null {
-  const pat = /([-+]?\d+)\.\s*(\d+)\.\s*(-?\d+)/;
+  const pat = new RegExp(`('?-?${NUMBER}+)\\.\\s*('?\\d+)\\.\\s*('?-?\\d+)`);
   return subx(str, " ", pat, hash, parseDotCb);
 }
 
@@ -1847,6 +1847,11 @@ function rtValidCivilP(y: number, m: number, d: number): Temporal.PlainDate | nu
  * The commercial arm reads `:cwday` and falls back to a `:wday` whose `0` it
  * maps to `7`, which is how `"2001-W05 sun"` names the Sunday of that ISO week;
  * the `:wnum0` arm mirrors it the other way, mapping a `:cwday` of `7` to `0`.
+ *
+ * When no arm answers Ruby answers `nil` — `"Feb 3rd"` parsed with no
+ * completion has no `:year` at all — and `d_new_by_frags`
+ * (`date_core.c:4283-4300`) is what turns that `nil` into
+ * `Date::Error, "invalid date"`.
  */
 function rtValidDateFragsP(parts: DateParts): Temporal.PlainDate | null {
   if (parts.jd !== undefined) {

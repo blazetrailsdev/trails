@@ -129,7 +129,7 @@ export class LengthValidator extends EachValidator {
         const opts = { ...baseOptions, count: min } as Record<string, unknown>;
         const defaultMsg = this.options.tooShort ?? this.options.message;
         if (defaultMsg != null && !opts["message"]) opts["message"] = defaultMsg;
-        record.errors.add(attribute, "too_short", opts);
+        record.errors.add(attribute, ":too_short", opts);
       }
     }
     if (max !== undefined && length > max) {
@@ -137,7 +137,7 @@ export class LengthValidator extends EachValidator {
         const opts = { ...baseOptions, count: max } as Record<string, unknown>;
         const defaultMsg = this.options.tooLong ?? this.options.message;
         if (defaultMsg != null && !opts["message"]) opts["message"] = defaultMsg;
-        record.errors.add(attribute, "too_long", opts);
+        record.errors.add(attribute, ":too_long", opts);
       }
     }
     if (is !== undefined && length !== is) {
@@ -145,7 +145,7 @@ export class LengthValidator extends EachValidator {
         const opts = { ...baseOptions, count: is } as Record<string, unknown>;
         const defaultMsg = this.options.wrongLength ?? this.options.message;
         if (defaultMsg != null && !opts["message"]) opts["message"] = defaultMsg;
-        record.errors.add(attribute, "wrong_length", opts);
+        record.errors.add(attribute, ":wrong_length", opts);
       }
     }
   }

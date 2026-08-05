@@ -11,6 +11,8 @@ import {
   EncryptedBookWithSerializedFirstBinary,
   EncryptedBookWithSerializedSecondBinary,
   EncryptedBookWithSerializedDeterministicName,
+  EncryptedBook,
+  UnencryptedBook,
 } from "../test-helpers/models/book-encrypted.js";
 import { EncryptableRecord } from "./encryptable-record.js";
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
@@ -135,5 +137,20 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest (trails)", () => {
     const reloaded = await EncryptedBookWithSerializedDeterministicName.find(book.id);
     expect(reloaded.name).toBe("Dune");
     expect(reloaded.encryptedAttribute("name")).toBe(true);
+  });
+});
+
+/**
+ * `class_attribute :encrypted_attributes` (encryptable_record.rb:11) generates a
+ * predicate alongside the reader. Rails has no test of its own for it — it is
+ * generated surface — so the coverage lives here.
+ */
+describe("ActiveRecord::Encryption::EncryptableRecord.encrypted_attributes? (trails)", () => {
+  it("is true once a model has declared an encrypted attribute", () => {
+    expect(EncryptableRecord.isEncryptedAttributes(EncryptedBook)).toBe(true);
+  });
+
+  it("is false for a model that never assigned the class_attribute", () => {
+    expect(EncryptableRecord.isEncryptedAttributes(UnencryptedBook)).toBe(false);
   });
 });

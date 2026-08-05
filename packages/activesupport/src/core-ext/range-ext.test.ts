@@ -1,50 +1,52 @@
 import { describe, it, expect } from "vitest";
 
-import {
-  makeRange,
-  overlap,
-  overlaps,
-  rangeIncludesValue,
-  rangeIncludesStringValue,
-  rangeToFs,
-  rangeStep,
-  rangeEach,
-  stringSucc,
-} from "../range-ext.js";
+import { Temporal } from "../temporal.js";
+
+import { hours } from "../duration.js";
+import { makeRange, rangeIncludesValue, rangeIncludesStringValue } from "../range-ext.js";
+import { instantFromDate } from "../testing/temporal-helpers.js";
+import { TimeWithZone } from "../time-with-zone.js";
+import { TimeZone } from "../values/time-zone.js";
 import { caseEquals, isInclude } from "./range/compare-range.js";
+import { succ } from "./string/succ.js";
+import { toFs, toFormattedS } from "./range/conversions.js";
+import { each, step } from "./range/each.js";
+import { overlap, overlaps } from "./range/overlap.js";
 
 describe("RangeTest", () => {
   it("to fs from dates", () => {
-    const d1 = new Date("2023-01-01");
-    const d2 = new Date("2023-12-31");
-    const r = makeRange(d1, d2);
-    expect(rangeToFs(r)).toContain("2023");
+    const dateRange = makeRange(
+      Temporal.PlainDate.from("2005-12-10"),
+      Temporal.PlainDate.from("2005-12-12"),
+    );
+    expect(toFs(dateRange, "db")).toBe("BETWEEN '2005-12-10' AND '2005-12-12'");
+    expect(toFormattedS(dateRange, "db")).toBe("BETWEEN '2005-12-10' AND '2005-12-12'");
   });
 
   it("to fs from times", () => {
-    const t1 = new Date("2023-06-01T10:00:00Z");
-    const t2 = new Date("2023-06-01T18:00:00Z");
-    const r = makeRange(t1, t2);
-    expect(rangeToFs(r)).toContain("2023");
+    const dateRange = makeRange(
+      new Date(Date.UTC(2005, 11, 10, 15, 30)),
+      new Date(Date.UTC(2005, 11, 10, 17, 30)),
+    );
+    expect(toFs(dateRange, "db")).toBe("BETWEEN '2005-12-10 15:30:00' AND '2005-12-10 17:30:00'");
   });
 
   it("to fs with alphabets", () => {
-    const r = makeRange("a", "z");
-    const result = rangeToFs(r);
-    expect(result).toContain("a");
-    expect(result).toContain("z");
+    expect(toFs(makeRange("a", "z"), "db")).toBe("BETWEEN 'a' AND 'z'");
+    expect(toFs(makeRange("a", null), "db")).toBe(">= 'a'");
+    expect(toFs(makeRange(null, "z"), "db")).toBe("<= 'z'");
   });
 
   it("to fs with numeric", () => {
-    const r = makeRange(1, 10);
-    const result = rangeToFs(r);
-    expect(result).toContain("1");
-    expect(result).toContain("10");
+    expect(toFs(makeRange(1, 100), "db")).toBe("BETWEEN '1' AND '100'");
+    expect(toFs(makeRange(1, null), "db")).toBe(">= '1'");
+    expect(toFs(makeRange(null, 100), "db")).toBe("<= '100'");
   });
 
   it("to fs with format invalid format", () => {
-    const r = makeRange(1, 10);
-    expect(typeof rangeToFs(r)).toBe("string");
+    const numberRange = makeRange(1, 100);
+
+    expect(toFs(numberRange, "not_existent")).toBe("1..100");
   });
 
   it("date range", () => {
@@ -204,14 +206,27 @@ describe("RangeTest", () => {
     expect(overlap(makeRange(t1, t2), makeRange(t3, t4))).toBe(false);
   });
 
-  it.skip("each on time with zone");
-  it.skip("step on time with zone");
+  it("each on time with zone", () => {
+    const twz = new TimeWithZone(
+      instantFromDate(new Date(Date.UTC(2006, 10, 28, 10, 30))),
+      TimeZone.find("Eastern Time (US & Canada)"),
+    );
+    expect(() => [...each(makeRange(twz.minus(hours(1)), twz))]).toThrow(TypeError);
+  });
+
+  it("step on time with zone", () => {
+    const twz = new TimeWithZone(
+      instantFromDate(new Date(Date.UTC(2006, 10, 28, 10, 30))),
+      TimeZone.find("Eastern Time (US & Canada)"),
+    );
+    expect(() => [...step(makeRange(twz.minus(hours(1)), twz), 1)]).toThrow(TypeError);
+  });
   it.skip("cover on time with zone");
   it.skip("case equals on time with zone");
 
   it("date time with each", () => {
     const r = makeRange(0, 4);
-    expect([...rangeEach(r)]).toEqual([0, 1, 2, 3, 4]);
+    expect([...each(r)]).toEqual([0, 1, 2, 3, 4]);
   });
 
   it("string include uses succ order not lexicographic", () => {
@@ -248,28 +263,28 @@ describe("RangeTest", () => {
 
   it("string succ carries within character classes", () => {
     // Mirrors Ruby String#succ.
-    expect(stringSucc("abcd")).toBe("abce");
-    expect(stringSucc("az")).toBe("ba");
-    expect(stringSucc("zz")).toBe("aaa");
-    expect(stringSucc("Zz")).toBe("AAa");
-    expect(stringSucc("99")).toBe("100");
-    expect(stringSucc("a9")).toBe("b0");
-    expect(stringSucc("1.9")).toBe("2.0");
-    expect(stringSucc("<<")).toBe("<=");
+    expect(succ("abcd")).toBe("abce");
+    expect(succ("az")).toBe("ba");
+    expect(succ("zz")).toBe("aaa");
+    expect(succ("Zz")).toBe("AAa");
+    expect(succ("99")).toBe("100");
+    expect(succ("a9")).toBe("b0");
+    expect(succ("1.9")).toBe("2.0");
+    expect(succ("<<")).toBe("<=");
     // Carry stops at a non-alnum gap into a different class.
-    expect(stringSucc("z.9")).toBe("z.10");
-    expect(stringSucc("a.z")).toBe("b.a");
+    expect(succ("z.9")).toBe("z.10");
+    expect(succ("a.z")).toBe("b.a");
     // Astral (non-alnum) chars succ as whole code points, not UTF-16 units.
-    expect(stringSucc("\u{1F600}")).toBe("\u{1F601}");
+    expect(succ("\u{1F600}")).toBe("\u{1F601}");
     // Wrapping is per UTF-8 encoded width (`enc_succ_char` NEIGHBOR_WRAPPED).
     const points = (str: string) => Array.from(str, (c) => c.codePointAt(0));
-    expect(points(stringSucc("\u{10FFFF}"))).toEqual([0x1, 0x10000]);
-    expect(points(stringSucc("\u{FFFF}"))).toEqual([0x1, 0x800]);
-    expect(points(stringSucc("\u{07FF}"))).toEqual([0x1, 0x80]);
+    expect(points(succ("\u{10FFFF}"))).toEqual([0x1, 0x10000]);
+    expect(points(succ("\u{FFFF}"))).toEqual([0x1, 0x800]);
+    expect(points(succ("\u{07FF}"))).toEqual([0x1, 0x80]);
   });
 
   it("date time with step", () => {
     const r = makeRange(0, 10);
-    expect([...rangeStep(r, 2)]).toEqual([0, 2, 4, 6, 8, 10]);
+    expect([...step(r, 2)]).toEqual([0, 2, 4, 6, 8, 10]);
   });
 });

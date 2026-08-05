@@ -21,13 +21,9 @@ import { encryptionHooks } from "../encryption-hooks.js";
  * @internal
  */
 export function globalPreviousSchemesFor(scheme: Scheme): Scheme[] {
-  const config = Configurable.config;
-  const allSchemeOptions: SchemeOptions[] = [...config.previousSchemes];
-
-  return allSchemeOptions
-    .map((opts) => new Scheme(opts))
-    .filter((prev) => scheme.isCompatibleWith(prev))
-    .map((prev) => scheme.merge(prev));
+  return Configurable.config.previousSchemes
+    .filter((previousScheme) => scheme.isCompatibleWith(previousScheme))
+    .map((previousScheme) => scheme.merge(previousScheme));
 }
 
 /**
@@ -121,6 +117,19 @@ export class EncryptableRecord {
 
   static encryptedAttributes(modelClass: any): Set<string> {
     return modelClass._encryptedAttributes ?? new Set();
+  }
+
+  /**
+   * `class_attribute :encrypted_attributes` (encryptable_record.rb:11) also
+   * generates the predicate, whose body is `!!encrypted_attributes` — true once
+   * the slot has been assigned (`self.encrypted_attributes ||= Set.new`,
+   * encryptable_record.rb:50), including for an assigned-but-empty Set. That is
+   * NOT `has_encrypted_attributes?`, which is `present?` and so false when the
+   * Set is empty (encryptable_record.rb:204-206). The reader's `?? new Set()`
+   * default can't answer it, so read the slot directly.
+   */
+  static isEncryptedAttributes(modelClass: any): boolean {
+    return modelClass._encryptedAttributes != null;
   }
 
   static sourceAttributeFromPreservedAttribute(attributeName: string): string | undefined {

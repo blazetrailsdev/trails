@@ -1,10 +1,5 @@
-import {
-  GeneratorBase,
-  type GeneratorOptions,
-  classify,
-  dasherize,
-  underscore,
-} from "../../base.js";
+import { GeneratorBase, type GeneratorOptions, classify, dasherize } from "../../base.js";
+import { underscore } from "@blazetrails/activesupport";
 
 export interface HelperRunOptions {
   test?: boolean;

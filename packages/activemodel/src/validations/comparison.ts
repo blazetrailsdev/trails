@@ -18,12 +18,12 @@ const COMPARE_OPS = {
 } satisfies Record<CompareKey, (cmp: number) => boolean>;
 
 const COMPARE_KEYS_TO_RAILS = {
-  greaterThan: "greater_than",
-  greaterThanOrEqualTo: "greater_than_or_equal_to",
-  equalTo: "equal_to",
-  lessThan: "less_than",
-  lessThanOrEqualTo: "less_than_or_equal_to",
-  otherThan: "other_than",
+  greaterThan: ":greater_than",
+  greaterThanOrEqualTo: ":greater_than_or_equal_to",
+  equalTo: ":equal_to",
+  lessThan: ":less_than",
+  lessThanOrEqualTo: ":less_than_or_equal_to",
+  otherThan: ":other_than",
 } satisfies Record<CompareKey, string>;
 
 export class ComparisonValidator extends EachValidator {
@@ -37,7 +37,7 @@ export class ComparisonValidator extends EachValidator {
       const optionValue = this.resolveValue(record, raw);
 
       if (value === null || value === undefined || (typeof value === "string" && isBlank(value))) {
-        record.errors.add(attribute, "blank", this.errorOptions(value, optionValue));
+        record.errors.add(attribute, ":blank", this.errorOptions(value, optionValue));
         return;
       }
 

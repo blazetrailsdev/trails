@@ -12,7 +12,7 @@ describe("ValidatesWithTest", () => {
       validate(record: any) {
         const name = record.readAttribute("name");
         if (typeof name === "string" && name.length < this.minLength) {
-          record.errors.add("name", "invalid", { message: "too short" });
+          record.errors.add("name", ":invalid", { message: "too short" });
         }
       }
     }
@@ -32,14 +32,14 @@ describe("ValidatesWithTest", () => {
     class V1 {
       validate(record: any) {
         if (!record.readAttribute("name")) {
-          record.errors.add("name", "blank");
+          record.errors.add("name", ":blank");
         }
       }
     }
     class V2 {
       validate(record: any) {
         if (!record.readAttribute("age")) {
-          record.errors.add("age", "blank");
+          record.errors.add("age", ":blank");
         }
       }
     }
@@ -60,7 +60,7 @@ describe("ValidatesWithTest", () => {
     class CustomValidator {
       validate(record: any) {
         if (!record.readAttribute("name")) {
-          record.errors.add("name", "blank");
+          record.errors.add("name", ":blank");
         }
       }
     }
@@ -118,7 +118,7 @@ describe("ValidatesWithTest", () => {
       }
     }
     Person.validatesEach(["name"], (record, attr, value) => {
-      if (!value) record.errors.add(attr, "blank");
+      if (!value) record.errors.add(attr, ":blank");
     });
     const p = new Person({});
     await p.isValid();
@@ -132,7 +132,7 @@ describe("ValidatesWithTest", () => {
       }
     }
     Person.validatesEach(["name"], (record, attr, value) => {
-      if (!value) record.errors.add(attr, "blank");
+      if (!value) record.errors.add(attr, ":blank");
     });
     const p = new Person({});
     await p.isValid();
@@ -147,7 +147,7 @@ describe("ValidatesWithTest", () => {
     }
     Person.validatesEach(["name"], (record, attr, value) => {
       if (value !== null && value !== undefined && !value) {
-        record.errors.add(attr, "blank");
+        record.errors.add(attr, ":blank");
       }
     });
     const p = new Person({});
@@ -167,7 +167,7 @@ describe("ValidatesWithTest", () => {
         return; // skip blank
       }
       if (value === null || value === undefined) return;
-      record.errors.add(attr, "invalid");
+      record.errors.add(attr, ":invalid");
     });
     const p = new Person({ name: "  " });
     await p.isValid();
@@ -181,7 +181,7 @@ describe("ValidatesWithTest", () => {
       }
       customValidation() {
         if (!this.readAttribute("name")) {
-          this.errors.add("name", "blank");
+          this.errors.add("name", ":blank");
         }
       }
     }
@@ -198,7 +198,7 @@ describe("ValidatesWithTest", () => {
       }
       checkName() {
         if (!this.readAttribute("name")) {
-          this.errors.add("name", "blank");
+          this.errors.add("name", ":blank");
         }
       }
     }
@@ -217,7 +217,7 @@ describe("ValidatesWithTest", () => {
     }
     Person.validatesEach(["name", "age"], (record, attr, value) => {
       if (value === null || value === undefined) {
-        record.errors.add(attr, "blank");
+        record.errors.add(attr, ":blank");
       }
     });
     const p = new Person({});
@@ -232,7 +232,7 @@ describe("ValidatesWithTest", () => {
       validate(record: any) {
         const val = record.readAttribute("name");
         if (!val || val === "") {
-          record.errors.add("name", "blank");
+          record.errors.add("name", ":blank");
         }
       }
     }
@@ -272,7 +272,7 @@ describe("ValidatesWithTest", () => {
       validate(record: any) {
         const val = record.readAttribute("name");
         if (typeof val === "string" && val.length < this.min) {
-          record.errors.add("name", "too_short");
+          record.errors.add("name", ":too_short");
         }
       }
     }

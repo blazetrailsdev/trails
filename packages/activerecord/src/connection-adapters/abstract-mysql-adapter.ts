@@ -254,49 +254,17 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   protected _mariadb = false;
   protected _databaseVersion: Version | null = null;
-  // Rails' `statement_limit` database.yml key — max prepared
-  // statements cached per session before LRU eviction (default 1000).
-  // Mirrors the same surface we expose on PostgreSQLAdapter; driver-
-  // specific subclasses (Mysql2Adapter) decide how to actually wire
-  // the per-connection pool.
+  /**
+   * `database.yml`'s `statement_limit`, which Rails reads as
+   * `@config[:statement_limit]` inline at StatementPool construction
+   * (abstract_mysql_adapter.rb:975) and never exposes. trails' constructors
+   * destructure the adapter-level keys out of the config hash, so the value is
+   * held here — read by `buildStatementPool` and, in Mysql2Adapter, by
+   * `_getStmtPool` / `_shouldPrepare`.
+   *
+   * @internal
+   */
   protected _statementLimit = 1000;
-
-  /**
-   * Maximum prepared statements cached per MySQL connection.
-   *
-   * Mirrors: `database.yml`'s `statement_limit` — read by Rails as
-   * `config[:statement_limit]` in AbstractMysqlAdapter#initialize.
-   *
-   * @noRailsEquivalent CONVERGEABLE (story: retire-public-statement-limit-accessor).
-   * `statement_limit` is a `database.yml` config key Rails reads as
-   *   `config[:statement_limit]` in
-   *   each adapter's `initialize` (abstract_mysql_adapter.rb, postgresql_adapter.rb,
-   *   sqlite3_adapter.rb) — a config option, never a Ruby `def`, so there is nothing for the
-   *   extractor to match. trails exposes the same setting as a validated accessor on the adapter,
-   *   identically on all three.
-   */
-  get statementLimit(): number {
-    return this._statementLimit;
-  }
-
-  set statementLimit(value: number) {
-    if (!Number.isInteger(value) || value < 0) {
-      throw new RangeError(
-        `statementLimit must be a finite non-negative integer; got ${String(value)}`,
-      );
-    }
-    this._statementLimit = value;
-    // Driver-specific subclasses override this to resize their active
-    // per-connection pool. Base impl is a no-op.
-    this._onStatementLimitChanged(value);
-  }
-
-  /**
-   * Hook for driver-specific subclasses to propagate a statementLimit
-   * change to the currently-held connection's StatementPool, if any.
-   * Base impl intentionally does nothing.
-   */
-  protected _onStatementLimitChanged(_value: number): void {}
 
   get adapterName(): AdapterName {
     return "mysql";
@@ -2001,7 +1969,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   /** @internal */
   buildStatementPool(): StatementPool {
     return new StatementPool(
-      AbstractMysqlAdapter.typeCastConfigToInteger(this.statementLimit) as number,
+      AbstractMysqlAdapter.typeCastConfigToInteger(this._statementLimit) as number,
     );
   }
 

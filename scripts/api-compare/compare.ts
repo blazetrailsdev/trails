@@ -1185,13 +1185,55 @@ export function flattenIncludedMethodInfos(
     // leaks expected methods onto the host. See UNPORTED_FILES.
     if (mod.file && isSourceUnported(mod.file, pkg)) return;
     const sink = asClassMethods ? klass : instance;
-    for (const m of mod.instanceMethods) sink.push(m);
+    for (const m of mod.instanceMethods) sink.push(mod.file ? { ...m, mixinFile: mod.file } : m);
     for (const inc of mod.includes ?? []) walk(inc, asClassMethods, fqn);
   };
 
   for (const inc of entity.includes ?? []) walk(inc, false, entityFqn);
   for (const ext of entity.extends ?? []) walk(ext, true, entityFqn);
   return { instance, klass };
+}
+
+/**
+ * Is this flattened mixin method already credited in the file mirroring the
+ * mixin's OWN Ruby file, and therefore not a gap in the host's file?
+ *
+ * Ruby's `include` flattens a module's methods onto every host, and
+ * `flattenIncludedMethodInfos` reproduces that — so `PostgreSQL::Quoting#escape_bytea`
+ * is expected in `connection_adapters/postgresql/quoting.rb` (where trails
+ * ports it, and where it matches) and again in
+ * `connection_adapters/postgresql_adapter.rb`, where trails does not repeat it
+ * because Rails does not either. The host copy is a duplicate expectation: the
+ * same method counted twice in the denominator and once in the numerator.
+ *
+ * The credit is deliberately narrow. It applies only when the mixin's own Ruby
+ * file has a bucket of its own in this run (so the method IS being measured
+ * somewhere) and one of its TS candidates really is present in that bucket's
+ * mirrored TS file. An unported mixin method is credited nowhere and still
+ * lands as missing on the host, which is how `encrypted_attributes?` stayed
+ * visible while the other 18 `EncryptableRecord` methods on `base.rb` did not.
+ *
+ * The host expectation is credited, not dropped: the method stays in the host
+ * file's denominator and is reported as a move to the mixin's own TS file, the
+ * same accounting the include-chain and misplaced-file arms already use.
+ */
+export function mixinMethodCreditedToOwnFile(
+  rm: { rubyName: string; mixinFile?: string },
+  hostRubyFile: string,
+  pkg: string,
+  rubyFileHasBucket: (rubyFile: string) => boolean,
+  tsMethodsByFile: ReadonlyMap<string, Set<string>>,
+): { tsName: string; tsFile: string } | null {
+  const mixinFile = rm.mixinFile;
+  if (mixinFile === undefined || mixinFile === hostRubyFile) return null;
+  if (!rubyFileHasBucket(mixinFile)) return null;
+  const candidates = rubyMethodToTs(rm.rubyName);
+  if (candidates === null) return null;
+  const tsFile = rubyFileToTs(mixinFile, pkg);
+  const mixinTsMethods = tsMethodsByFile.get(tsFile);
+  if (mixinTsMethods === undefined) return null;
+  const tsName = candidates.find((c) => mixinTsMethods.has(c));
+  return tsName === undefined ? null : { tsName, tsFile };
 }
 
 /** A Ruby class or module, paired with the fully-qualified name it was found under. */
@@ -1262,7 +1304,7 @@ export function splitOverriddenFileBuckets(entity: RubyEntity, pkg: string): Rub
  * (operators, SKIP list).
  */
 export function dedupeRubyMethodInto(
-  seen: Map<string, { rubyName: string; rubyModule: string; umbrellaConfig?: boolean }>,
+  seen: Map<string, SeenRubyMethod>,
   rm: MethodInfo,
   itemFqn: string,
   rubyFile?: string,
@@ -1272,8 +1314,22 @@ export function dedupeRubyMethodInto(
   if (rubyFile !== undefined && isScopedSkip(rm.name, rubyFile)) return;
   const key = rm.name;
   if (!seen.has(key)) {
-    seen.set(key, { rubyName: rm.name, rubyModule: itemFqn, umbrellaConfig: rm.umbrellaConfig });
+    seen.set(key, {
+      rubyName: rm.name,
+      rubyModule: itemFqn,
+      umbrellaConfig: rm.umbrellaConfig,
+      mixinFile: rm.mixinFile,
+    });
   }
+}
+
+/** One deduped Ruby method expected from a Ruby file (see `dedupeRubyMethodInto`). */
+export interface SeenRubyMethod {
+  rubyName: string;
+  rubyModule: string;
+  umbrellaConfig?: boolean;
+  /** Set when the first sighting came in through `include`/`extend` — see `mixinMethodCreditedToOwnFile`. */
+  mixinFile?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -1939,10 +1995,7 @@ export function main() {
       // survive). Multiple Ruby classes in the same file often define
       // the same method (e.g., 8 subclasses in binary.rb each override
       // `invert`). Count once.
-      const seen = new Map<
-        string,
-        { rubyName: string; rubyModule: string; umbrellaConfig?: boolean }
-      >();
+      const seen = new Map<string, SeenRubyMethod>();
       // First-sighting Ruby params per name (mirrors `seen`'s dedup) for arity.
       const rubyParamsByName = new Map<string, ParamInfo[]>();
       // Names whose first-sighting Ruby entry is a forwarding-macro placeholder
@@ -2181,7 +2234,7 @@ export function main() {
         ? tsMethodsByFile.get(misplacedActualFile) || new Set<string>()
         : null;
 
-      for (const [_dedupeKey, { rubyName, rubyModule, umbrellaConfig }] of seen) {
+      for (const [_dedupeKey, { rubyName, rubyModule, umbrellaConfig, mixinFile }] of seen) {
         const tsCandidates = rubyMethodToTs(rubyName)!;
 
         // Check direct match first — find which candidate matched
@@ -2215,6 +2268,29 @@ export function main() {
             rubyModule,
             expectedFile: expectedTs,
             actualFile: foundViaInclude,
+          });
+          continue;
+        }
+
+        // Mixed in from another Ruby file and ported there, once, exactly as
+        // Rails writes it — see `mixinMethodCreditedToOwnFile`.
+        const creditedToMixin = mixinMethodCreditedToOwnFile(
+          { rubyName, mixinFile },
+          rubyFile,
+          pkg,
+          (f) => byFile.has(f),
+          tsMethodsByFile,
+        );
+        if (creditedToMixin) {
+          fileMatched++;
+          // No `checkArity`: the same pair is already compared in the mixin's
+          // own bucket, so re-running it per host double-counts every mismatch.
+          moves.push({
+            tsName: creditedToMixin.tsName,
+            rubyName,
+            rubyModule,
+            expectedFile: expectedTs,
+            actualFile: creditedToMixin.tsFile,
           });
           continue;
         }
