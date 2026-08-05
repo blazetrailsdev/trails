@@ -332,6 +332,18 @@ export interface ScopedSkipGroup {
   reason: string;
   names: string[];
   rubyFiles: string[];
+  /**
+   * The TS spelling that IS the faithful port of these names inside
+   * `rubyFiles`, when there is one but it isn't the spelling
+   * {@link rubyMethodToTs} produces. Set it when the skip is about the *mapped
+   * site* being unavailable rather than the method being unported: extra-surface
+   * then treats a declaration of this name in those files as allowed rather than
+   * novel, exactly as {@link SKIP} names are mirrored file-scoped.
+   *
+   * Leave unset for a genuinely-absent surface — then a TS declaration of the
+   * name stays flagged.
+   */
+  tsMirrorName?: string;
 }
 
 export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
@@ -469,6 +481,24 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
     ],
     rubyFiles: ["config.rb"],
   },
+  {
+    reason:
+      "`ActiveSupport::Messages::Rotator#initialize` (messages/rotator.rb:6-12) " +
+      "is an `initialize` on a module Rails installs with `prepend`, so it runs " +
+      "as part of the *host's* constructor chain via `super`. TypeScript has no " +
+      "expression for that: `prepend()` " +
+      "(packages/activesupport/src/prepend.ts) wraps methods on the prototype " +
+      "and cannot wrap a constructor, so the port keeps the Rails name as an " +
+      "exported `initialize` function that each rotatable class calls from its " +
+      "own constructor (message-verifier.ts, message-encryptor.ts). There is no " +
+      "TS `constructor` at the mapped site for the comparison to find — the same " +
+      "shape as the `included`/`extended`/`inherited` hooks. Scoped to " +
+      "messages/rotator.rb so a real class's `initialize` is still expected to " +
+      "map to a `constructor`.",
+    names: ["initialize"],
+    rubyFiles: ["messages/rotator.rb"],
+    tsMirrorName: "initialize",
+  },
 ];
 
 /** Map of scoped-skip Ruby method name → the set of Ruby files it's skipped in. */
@@ -484,6 +514,18 @@ for (const g of SCOPED_SKIP_GROUPS) {
 /** True when `rubyName` should be skipped specifically within `rubyFile`. */
 export function isScopedSkip(rubyName: string, rubyFile: string): boolean {
   return SCOPED_SKIP_FILES.get(rubyName)?.has(rubyFile) ?? false;
+}
+
+/**
+ * {@link ScopedSkipGroup.tsMirrorName} for `rubyName` in `rubyFile`, or null
+ * when the scoped skip declares no faithful TS spelling (or doesn't apply).
+ */
+export function scopedSkipMirrorName(rubyName: string, rubyFile: string): string | null {
+  for (const g of SCOPED_SKIP_GROUPS) {
+    if (g.tsMirrorName === undefined) continue;
+    if (g.names.includes(rubyName) && g.rubyFiles.includes(rubyFile)) return g.tsMirrorName;
+  }
+  return null;
 }
 
 /**
@@ -890,7 +932,8 @@ export function explainConventions(): string {
   const scopedSkipSections = SCOPED_SKIP_GROUPS.map((g) => {
     const names = g.names.map((n) => `\`${n}\``).join(", ");
     const files = g.rubyFiles.map((f) => `\`${f}\``).join(", ");
-    return `- ${g.reason}\n  - ${names} (only in: ${files})`;
+    const mirror = g.tsMirrorName === undefined ? "" : `; ported in TS as \`${g.tsMirrorName}\``;
+    return `- ${g.reason}\n  - ${names} (only in: ${files}${mirror})`;
   }).join("\n");
 
   return `# Ruby → TypeScript naming conventions

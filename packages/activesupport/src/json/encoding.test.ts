@@ -37,12 +37,30 @@ describe("TestJSONEncoding", () => {
   });
 
   it("hash keys encoding", () => {
-    const h = { key_one: 1, key_two: 2 };
-    const parsed = JSON.parse(JSON.stringify(h));
-    expect(parsed.key_one).toBe(1);
+    Encoding.escapeHtmlEntitiesInJson = true;
+    try {
+      expect(ActiveSupportJSON.encode({ "<>": "<>" })).toBe('{"\\u003c\\u003e":"\\u003c\\u003e"}');
+    } finally {
+      Encoding.escapeHtmlEntitiesInJson = false;
+    }
   });
 
-  it.skip("hash keys encoding option");
+  it("hash keys encoding option", () => {
+    const globalConfig = Encoding.escapeHtmlEntitiesInJson;
+    try {
+      Encoding.escapeHtmlEntitiesInJson = true;
+      expect(ActiveSupportJSON.encode({ "<>": "<>" }, { escapeHtmlEntities: false })).toBe(
+        '{"<>":"<>"}',
+      );
+
+      Encoding.escapeHtmlEntitiesInJson = false;
+      expect(ActiveSupportJSON.encode({ "<>": "<>" }, { escapeHtmlEntities: true })).toBe(
+        '{"\\u003c\\u003e":"\\u003c\\u003e"}',
+      );
+    } finally {
+      Encoding.escapeHtmlEntitiesInJson = globalConfig;
+    }
+  });
 
   it("utf8 string encoded properly", () => {
     const s = "こんにちは";

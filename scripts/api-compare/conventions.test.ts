@@ -14,6 +14,7 @@ import {
   isArityOverridden,
   RUBY_ONLY_CLASSES,
   SCOPED_SKIP_GROUPS,
+  scopedSkipMirrorName,
   isRubyOnlyClass,
   isScopedSkip,
   ALREADY_PREDICATE_PREFIXES,
@@ -354,6 +355,20 @@ describe("SCOPED_SKIP_GROUPS", () => {
         expect(isScopedSkip(name, "some/other/unrelated.rb")).toBe(false);
       }
     }
+  });
+
+  it("scopes `initialize` to the prepended Rotator module, not to real classes", () => {
+    expect(isScopedSkip("initialize", "messages/rotator.rb")).toBe(true);
+    expect(isScopedSkip("initialize", "messages/message_verifier.rb")).toBe(false);
+    expect(rubyMethodToTs("initialize")).toEqual(["constructor"]);
+  });
+
+  it("names the faithful TS spelling only where the scoped skip declares one", () => {
+    expect(scopedSkipMirrorName("initialize", "messages/rotator.rb")).toBe("initialize");
+    expect(scopedSkipMirrorName("initialize", "messages/message_verifier.rb")).toBeNull();
+    expect(
+      scopedSkipMirrorName("lookup_cast_type", "connection_adapters/postgresql/quoting.rb"),
+    ).toBeNull();
   });
 
   it("scopes `-@` to AR value objects but not ActiveSupport::Duration", () => {

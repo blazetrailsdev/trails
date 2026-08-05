@@ -93,6 +93,7 @@ import {
   rubyFileToTs,
   rubyMethodToTs,
   rubyMethodToTsIgnoringSkip,
+  scopedSkipMirrorName,
   snakeToCamel,
 } from "./conventions.js";
 import { resolveModuleName } from "./compare.js";
@@ -888,6 +889,7 @@ function collectAllowedNames(
   crossPackageModules: Record<string, ClassInfo>,
   crossPackagePkgByFqn: Record<string, string>,
   fileConstantNames: string[],
+  rubyFile: string,
 ): Set<string> {
   const allowed = new Set<string>();
   // File-level constants are declared per Ruby *file*, not per entity, so they
@@ -898,12 +900,17 @@ function collectAllowedNames(
   }
   const visited = new Set<string>();
 
+  // `scopedSkipMirrorName`: a scoped skip that names its TS spelling means the
+  // port exists but not at the mapped site (a `prepend`ed module's `initialize`,
+  // which has no TS constructor to wrap), so the declaration is the port.
   const addMethods = (methods: MethodInfo[]): void => {
     for (const m of methods) {
       // Private/protected Ruby methods (internal) still count: a TS method
       // mirroring a Rails-private method isn't *extra* surface, it's a
       // visibility divergence — the method exists in Rails. Excluding them
       // here would mislabel every public-port-of-a-private-method as drift.
+      const mirror = scopedSkipMirrorName(m.name, rubyFile);
+      if (mirror !== null) allowed.add(mirror);
       const candidates = rubyMethodCandidates(m.name);
       if (!candidates) continue;
       for (const c of candidates) allowed.add(c);
@@ -1237,6 +1244,7 @@ function buildPackageReport(
             crossPackageModules,
             crossPackagePkgByFqn,
             Object.keys(rubyPkg.fileConstants?.[rubyFile] ?? {}),
+            rubyFile,
           );
 
     // `compare_range.rb` declares `CompareWithRange`: the container synthesized
