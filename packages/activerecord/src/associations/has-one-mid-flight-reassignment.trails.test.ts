@@ -14,6 +14,13 @@
  * assigning its result. trails awaits, which opens the window. There is no
  * correct silent winner, so trails refuses the race rather than resolving it;
  * the repo owner rejected picking a winner during #5038's review.
+ *
+ * The last describe covers the complementary case, where nothing calls
+ * `setTarget` so `raiseIfLoadInFlight` never fires: the owner's FK column moves
+ * on its own while the query is in flight, which makes the row the query
+ * returns stale the moment it arrives. That one is decided at
+ * `Association#_findTarget` — the single writeback site — so `loadTarget` owns
+ * staleness in one place.
  */
 import { describe, it, expect } from "vitest";
 
@@ -122,13 +129,6 @@ describe("belongs_to mid-flight foreign-key change", () => {
   fixtures(["companies"]);
 
   it("a row fetched under a foreign key that moved mid-load is not stored", async () => {
-    // The complementary case to the raise above: nothing calls `setTarget`, so
-    // `raiseIfLoadInFlight` never fires — the owner's FK column simply moves
-    // while the query is in flight, which makes the row the query returns stale
-    // the moment it arrives. Rails cannot reach this state at all
-    // (`find_target`, association.rb:248, is synchronous). Decided at
-    // `Association#_findTarget`, the single writeback site, rather than in the
-    // query body, so `loadTarget` owns staleness in one place.
     const firms = await Firm.order("id");
     const [first, second, third] = firms;
     const client = (await Client.first()) as Client;
@@ -154,7 +154,6 @@ describe("belongs_to mid-flight foreign-key change", () => {
     };
 
     const inFlight = assoc.loadTarget();
-    // The FK moves again after the row for `second` is already in hand.
     client.client_of = third.id as bigint;
     release();
     await inFlight;

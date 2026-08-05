@@ -270,13 +270,14 @@ export class SingularAssociation extends Association {
    * sugar and the through loaders reach without an association instance; that
    * owner/name/options triple is a trails-only calling convention, not Rails
    * surface.
+   *
+   * `_loaderWritebackSuppressed` is armed for the raise, not for a writeback:
+   * the loader body writes nothing back, so what the flag buys here is
+   * `setTarget` refusing a replacement that lands mid-query rather than losing
+   * it silently. `Association#_findTarget` handles the complementary case the
+   * raise cannot see — a bare FK change that never touches the holder.
    */
   protected override async findTarget(): Promise<Base | null> {
-    // Armed for the raise, not for a writeback: the loader body no longer
-    // writes back, so what this flag buys here is `setTarget` refusing a
-    // replacement landing mid-query rather than silently losing it. `_findTarget`
-    // handles the complementary case the raise cannot see — a bare *FK* change
-    // that never touches the holder. See `Association#_loaderWritebackSuppressed`.
     this._loaderWritebackSuppressed++;
     try {
       return await findTarget(this.owner, this.reflection.name, this.reflection.options);
@@ -386,7 +387,9 @@ function _validateHasOnePolymorphicKeys(
  * the `find_target?` predicate (`belongs_to_association.rb:124-126`), never
  * `find_target`, which is why there is no belongs_to override here either.
  *
- * It reads no cache: `find_target` is a pure query, and the cached read lives
+ * It neither reads nor writes the association: Rails' body opens at the scope
+ * and ends at `scope.first` (`singular_association.rb:47-55`), returning the
+ * record. The cached read lives
  * one level up in `Association#loadTarget` → `doFindTarget`, mirroring
  * `load_target`'s `(@stale_state && stale_target?) || find_target?` guard
  * (`association.rb:190`). `reflection.check_validity!` has likewise already run
@@ -502,9 +505,5 @@ export async function findTarget(
     if (inverseName) _wireInverseAssociation(record, result, inverseName);
   }
 
-  // Rails' body ends at `scope.first` (singular_association.rb:47-55) — it
-  // returns the record and writes nothing back into the association. The
-  // holder writeback, and the staleness reconciliation that guarded it, both
-  // live at `Association#_findTarget`, the single writeback site.
   return result;
 }

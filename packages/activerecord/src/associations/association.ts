@@ -562,17 +562,20 @@ export class Association {
    * record. Rails inlines this in `load_target` / `async_load_target`
    * (association.rb:189, :198); the split exists only because the assignment
    * is shared by both call sites above.
+   *
+   * The `staleStateBeforeLoad` re-check is a trails-only guard with no Rails
+   * counterpart, and it is here because this is the one writeback site. Rails'
+   * `find_target` (association.rb:248) is synchronous, so the owner's stale
+   * state cannot move between issuing the query and storing the row. Ours
+   * awaits DB I/O: an in-flight reader (`node.parent` accessed but never
+   * awaited) can still be pending when the caller reassigns the association
+   * with a new FK, and once RFC 0063 made `save` genuinely await the validation
+   * chain that window widened enough for the stale query to resolve mid-save
+   * and clobber the freshly-assigned target, dropping the FK change from
+   * `previousChanges`. Keeping it here rather than in the query body leaves
+   * staleness decided in one place, next to `loadTarget`'s guard.
    */
   private async _findTarget(): Promise<void> {
-    // Rails' `find_target` (association.rb:248) is synchronous, so the owner's
-    // stale state cannot move between issuing the query and storing the row.
-    // Ours awaits DB I/O: an in-flight reader (`node.parent` accessed but never
-    // awaited) can still be pending when the caller reassigns the association
-    // with a new FK, and once RFC 0063 made `save` genuinely await the
-    // validation chain that window widened enough for the stale query to
-    // resolve mid-save and clobber the freshly-assigned target, dropping the FK
-    // change from `previousChanges`. Decided here rather than inside the query
-    // body so staleness is decided once, next to `loadTarget`'s guard.
     const staleStateBeforeLoad = this.staleState();
     const result = await this.findTarget();
     if (result !== undefined) {
