@@ -390,11 +390,12 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   /**
    * Mirrors: AbstractMysqlAdapter#mariadb? (abstract_mysql_adapter.rb:92-94) —
-   * `/mariadb/i.match?(full_version)`.
+   * `/mariadb/i.match?(full_version)`. Ruby's `Regexp#match?` accepts nil and
+   * answers false; `RegExp#test` stringifies `null` to `"null"`, so the nil
+   * arm — a Version built without a full version string
+   * (`abstract_adapter.rb:248`) — is spelled out.
    */
   isMariadb(): boolean {
-    // Ruby's `Regexp#match?` accepts nil and answers false; `RegExp#test`
-    // stringifies null to "null", so the nil arm is spelled out.
     const fullVersion = this.fullVersion();
     return fullVersion != null && /mariadb/i.test(fullVersion);
   }

@@ -7,13 +7,12 @@
 import { getCrypto } from "@blazetrails/activesupport";
 import { KeyGenerator as AsKeyGenerator } from "@blazetrails/activesupport/key-generator";
 
-import { _Configurable } from "./configurable-slot.js";
+import { Configurable } from "./configurable-slot.js";
 
 export class KeyGenerator {
   private _hashDigestClass: string;
 
   constructor(hashDigestClass?: string) {
-    const Configurable = _Configurable!;
     this._hashDigestClass = hashDigestClass ?? Configurable.config.hashDigestClass;
   }
 
@@ -50,7 +49,6 @@ export class KeyGenerator {
 
   /** @internal */
   private keyDerivationSalt(): string {
-    const Configurable = _Configurable!;
     return Configurable.config.keyDerivationSalt;
   }
 

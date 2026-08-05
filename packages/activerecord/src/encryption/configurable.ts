@@ -13,9 +13,6 @@ type DeclarationListener = (klass: any, name: string) => void;
 // (no default → nil). Lazily allocated in onEncryptedAttributeDeclared.
 let _listeners: DeclarationListener[] | undefined;
 
-// Mirrors Rails' `mattr_reader :config, default: Config.new`
-// (configurable.rb:9). Built on first read rather than at module eval so the
-// singleton does not depend on where in the import graph this module lands.
 let _config: Config | undefined;
 
 /**
@@ -25,6 +22,11 @@ let _config: Config | undefined;
  * Mirrors: ActiveRecord::Encryption::Configurable
  */
 export class Configurable {
+  /**
+   * Mirrors Rails' `mattr_reader :config, default: Config.new`
+   * (configurable.rb:9). Built on first read rather than at module eval so the
+   * singleton does not depend on where in the import graph this module lands.
+   */
   static get config(): Config {
     return (_config ??= new Config());
   }

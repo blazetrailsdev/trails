@@ -7,7 +7,7 @@
 import { MessageSerializer, type MessageSerializerLike } from "./message-serializer.js";
 import { NullEncryptor } from "./null-encryptor.js";
 import { Cipher } from "./cipher.js";
-import { _Configurable } from "./configurable-slot.js";
+import { Configurable } from "./configurable-slot.js";
 import { Encryptor } from "./encryptor.js";
 import { KeyGenerator } from "./key-generator.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
@@ -66,7 +66,6 @@ export class Context {
    * @internal Rails `Context#build_default_key_provider` (context.rb:37-39).
    */
   private buildDefaultKeyProvider(): unknown {
-    const Configurable = _Configurable!;
     return new DerivedSecretKeyProvider(Configurable.config.primaryKey);
   }
 }

@@ -9,7 +9,7 @@ import type { Properties } from "./properties.js";
 import type { MessageSerializerLike } from "./message-serializer.js";
 import { Base, Configuration, Decryption, Encoding, ForbiddenClass } from "./errors.js";
 import { type Compressor } from "./config.js";
-import { _Configurable } from "./configurable-slot.js";
+import { Configurable } from "./configurable-slot.js";
 import { normalizeEncoding, replaceUnencodable } from "./encoding-helpers.js";
 
 // Mirrors: ActiveRecord::Encryption::Encryptor::THRESHOLD_TO_JUSTIFY_COMPRESSION
@@ -119,7 +119,6 @@ export class Encryptor {
 
   constructor(options?: { compress?: boolean; compressor?: Compressor }) {
     this._compress = options?.compress ?? true;
-    const Configurable = _Configurable!;
     this._compressor = options?.compressor ?? Configurable.config.compressor;
   }
 
@@ -214,7 +213,6 @@ export class Encryptor {
 
   /** @internal */
   private cipher() {
-    const Configurable = _Configurable!;
     return Configurable.cipher;
   }
 
@@ -228,7 +226,6 @@ export class Encryptor {
 
   /** @internal */
   private defaultKeyProvider(): KeyProviderLike | undefined {
-    const Configurable = _Configurable!;
     return Configurable.keyProvider as KeyProviderLike | undefined;
   }
 
@@ -261,7 +258,6 @@ export class Encryptor {
 
   /** @internal */
   private serializer(): MessageSerializerLike {
-    const Configurable = _Configurable!;
     return Configurable.messageSerializer as MessageSerializerLike;
   }
 
@@ -329,7 +325,6 @@ export class Encryptor {
 
   /** @internal */
   private forcedEncodingForDeterministicEncryption(): string {
-    const Configurable = _Configurable!;
     return Configurable.config.forcedEncodingForDeterministicEncryption;
   }
 }
