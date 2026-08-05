@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import {
   freshAdapter,
   configureEncryption,
@@ -15,9 +15,21 @@ import {
 } from "./test-helpers.js";
 import { Scheme } from "./scheme.js";
 import { Configurable } from "./configurable.js";
+import { withTransactionalFixtures } from "../test-fixtures/with-transactional-fixtures.js";
 
 describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
   let configSnapshot: ReturnType<typeof snapshotEncryptionConfig>;
+
+  // Rails' `EncryptionTestCase < ActiveRecord::TestCase` runs with
+  // `use_transactional_tests` on (test_fixtures.rb:113, :146), so every record
+  // these cases create is rolled back before the next one. Without it the posts
+  // and books written here survive into sibling cases on the shared canonical
+  // connection — the leak class #5719 hit in `encryptable-record.test.ts`.
+  let txnAdapter: Awaited<ReturnType<typeof freshAdapter>>;
+  beforeAll(async () => {
+    txnAdapter = await freshAdapter();
+  });
+  withTransactionalFixtures(() => txnAdapter);
 
   beforeEach(() => {
     configSnapshot = snapshotEncryptionConfig();
