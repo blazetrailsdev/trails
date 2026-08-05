@@ -179,9 +179,7 @@ describe("PostgreSQLDatabaseTasks", () => {
     expect(establishCalls[0]).toMatchObject({ database: "postgres", schemaSearchPath: "public" });
   });
 
-  it("test_creates_database_with_url_only_configuration", async () => {
-    // UrlConfig resolves the URL into configuration_hash (url_config.rb:35-42),
-    // so the task reads db_config.database like every other config shape.
+  it("create names db_config.database on a url-only configuration", async () => {
     const establishCalls: Array<Record<string, unknown> | undefined> = [];
     const createDatabase = vi.fn(async () => {});
     const tasks = new PostgreSQLDatabaseTasks(
@@ -207,7 +205,7 @@ describe("PostgreSQLDatabaseTasks", () => {
     expect(establishCalls[0]).toMatchObject({ database: "postgres", schemaSearchPath: "public" });
   });
 
-  it("test_psql_env_reads_the_configuration_hash_for_a_url_config", () => {
+  it("psqlEnv reads the configuration hash on a url-only configuration", () => {
     const tasks = new PostgreSQLDatabaseTasks(
       new UrlConfig(
         "development",

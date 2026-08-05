@@ -47,8 +47,6 @@ export class PostgreSQLDatabaseTasks {
       await this.establishConnection(this.publicSchemaConfig());
     }
     const conn = await this.connection();
-    // Rails names `db_config.database` unguarded (postgresql_database_tasks.rb:22);
-    // a config with no database lets the adapter raise, as it does in Ruby.
     await conn.createDatabase(this.dbConfig.database as string, {
       ...this.configurationHash,
       encoding: this.encoding(),
@@ -230,22 +228,14 @@ export class PostgreSQLDatabaseTasks {
       ...((globalThis as { process?: { env?: NodeJS.ProcessEnv } }).process?.env ?? {}),
     };
     const c = this.configurationHash;
-    const host = this.dbConfig.host;
-    const port = c.port;
-    const password = c.password;
-    const username = c.username;
-    if (host) env.PGHOST = String(host);
-    if (port !== undefined) env.PGPORT = String(port);
-    if (password !== undefined) env.PGPASSWORD = String(password);
-    if (username !== undefined) env.PGUSER = String(username);
-    const sslmode = c.sslmode;
-    const sslcert = c.sslcert;
-    const sslkey = c.sslkey;
-    const sslrootcert = c.sslrootcert;
-    if (sslmode !== undefined) env.PGSSLMODE = String(sslmode);
-    if (sslcert !== undefined) env.PGSSLCERT = String(sslcert);
-    if (sslkey !== undefined) env.PGSSLKEY = String(sslkey);
-    if (sslrootcert !== undefined) env.PGSSLROOTCERT = String(sslrootcert);
+    if (this.dbConfig.host) env.PGHOST = String(this.dbConfig.host);
+    if (c.port != null) env.PGPORT = String(c.port);
+    if (c.password != null) env.PGPASSWORD = String(c.password);
+    if (c.username != null) env.PGUSER = String(c.username);
+    if (c.sslmode != null) env.PGSSLMODE = String(c.sslmode);
+    if (c.sslcert != null) env.PGSSLCERT = String(c.sslcert);
+    if (c.sslkey != null) env.PGSSLKEY = String(c.sslkey);
+    if (c.sslrootcert != null) env.PGSSLROOTCERT = String(c.sslrootcert);
     return env;
   }
 

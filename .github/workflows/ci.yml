@@ -1298,19 +1298,11 @@ jobs:
       - name: API comparison (privates)
         run: pnpm exec tsx scripts/api-compare/compare.ts --privates
       - name: Extra-surface tag gates
-        # RFC 0072. extra-surface.ts implements three hard gates — a STALE
-        # `@noRailsEquivalent` (tag on a name that no longer flags), a reason
-        # stating neither PERMANENT nor CONVERGEABLE, and a refused file-level
-        # tag (Rails counterpart exists, or a name in the file scores `moved`) —
-        # and exits non-zero on any of them. Until this step, nothing in CI
-        # invoked it, so all three were a lint you had to remember to run: a PR
-        # could delete a Rails method, leave behind the tag that excused its TS
-        # counterpart, and go green. Rides this job because the gates read the
-        # api-compare manifests the API comparison step above already wrote —
-        # no extra build.
-        #
-        # No --exclude-glob here: an exclusion disarms the stale gate (see
-        # main()), which is the gate with the most to say.
+        # RFC 0072. Fails on a STALE `@noRailsEquivalent` (tag on a name that no
+        # longer flags), a reason stating neither PERMANENT nor CONVERGEABLE, or
+        # a refused file-level tag. Rides this job because the gates read the
+        # api-compare manifests the step above already wrote. No --exclude-glob:
+        # an exclusion disarms the stale gate (see extra-surface.ts `main()`).
         run: pnpm exec tsx scripts/api-compare/extra-surface.ts
       - name: Arity excludes gate
         # Fails on a malformed or STALE entry in
