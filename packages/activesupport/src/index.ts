@@ -406,11 +406,16 @@ export {
   SafeBuffer,
   SafeConcatError,
   htmlSafe,
-  htmlEscape,
-  htmlEscapeOnce,
-  xmlNameEscape,
   isHtmlSafe,
 } from "./core-ext/string/output-safety.js";
+export {
+  unwrappedHtmlEscape,
+  htmlEscape,
+  h,
+  htmlEscapeOnce,
+  jsonEscape,
+  xmlNameEscape,
+} from "./core-ext/tse/util.js";
 export { HtmlSafeTranslation } from "./html-safe-translation.js";
 // KeyGenerator uses getCrypto() adapter — import from "@blazetrails/activesupport/key-generator"
 export { BacktraceCleaner } from "./backtrace-cleaner.js";

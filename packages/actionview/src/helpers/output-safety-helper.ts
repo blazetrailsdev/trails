@@ -4,31 +4,10 @@ import {
   camelize,
   SafeBuffer,
   htmlEscape,
-  htmlEscapeOnce as _htmlEscapeOnce,
   htmlSafe,
+  unwrappedHtmlEscape,
 } from "@blazetrails/activesupport";
 import { OutputBuffer } from "../buffers.js";
-
-export { htmlEscape };
-export const h = htmlEscape;
-export const htmlEscapeOnce = _htmlEscapeOnce;
-
-const JSON_ESCAPE: Record<string, string> = {
-  "&": "\\u0026",
-  ">": "\\u003e",
-  "<": "\\u003c",
-  "\u2028": "\\u2028",
-  "\u2029": "\\u2029",
-};
-
-const JSON_ESCAPE_PATTERN = /[&><\u2028\u2029]/g;
-
-export function jsonEscape(value: unknown): string | SafeBuffer {
-  const wasSafe = value instanceof SafeBuffer && value.htmlSafe;
-  const input = value == null ? "" : String(value);
-  const result = input.replace(JSON_ESCAPE_PATTERN, (c) => JSON_ESCAPE[c]);
-  return wasSafe ? htmlSafe(result) : result;
-}
 
 /**
  * ActionView::Helpers::OutputSafetyHelper
@@ -42,20 +21,6 @@ export function jsonEscape(value: unknown): string | SafeBuffer {
 export function raw(stringish: unknown): SafeBuffer {
   if (stringish instanceof OutputBuffer) return htmlSafe(stringish.toStr());
   return htmlSafe(String(stringish ?? ""));
-}
-
-/**
- * unwrappedHtmlEscape — escapes HTML but returns SafeBuffer with the underlying
- * string value (for joining purposes). If value is already html_safe, returns as-is.
- */
-function unwrappedHtmlEscape(value: unknown): SafeBuffer {
-  if (value instanceof SafeBuffer) {
-    if (value.htmlSafe) {
-      return value;
-    }
-    return htmlEscape(value.toString());
-  }
-  return htmlEscape(value);
 }
 
 /**
@@ -126,7 +91,7 @@ export function toSentence(array: unknown[], options: ToSentenceOptions = {}): S
     case 0:
       return htmlSafe("");
     case 1:
-      return unwrappedHtmlEscape(array[0]);
+      return htmlEscape(array[0]);
     case 2:
       return safeJoin([array[0], array[1]], twoWordsConnector as string | SafeBuffer);
     default: {

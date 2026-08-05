@@ -6,13 +6,8 @@ import {
   runSafeConstantizeTestsOn,
 } from "../constantize-test-cases.js";
 
-import {
-  htmlSafe,
-  isHtmlSafe,
-  htmlEscape,
-  htmlEscapeOnce,
-  xmlNameEscape,
-} from "../core-ext/string/output-safety.js";
+import { htmlSafe, isHtmlSafe } from "../core-ext/string/output-safety.js";
+import { htmlEscape, htmlEscapeOnce, xmlNameEscape } from "../core-ext/tse/util.js";
 import {
   pluralize,
   singularize,

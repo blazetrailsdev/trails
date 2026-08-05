@@ -1,6 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { htmlEscape, h, htmlEscapeOnce, jsonEscape } from "../helpers/output-safety-helper.js";
-import { htmlSafe, SafeBuffer } from "@blazetrails/activesupport";
+import {
+  htmlEscape,
+  h,
+  htmlEscapeOnce,
+  jsonEscape,
+  htmlSafe,
+  SafeBuffer,
+} from "@blazetrails/activesupport";
 
 const HTML_ESCAPE_TEST_CASES: [string, string][] = [
   ["<br>", "&lt;br&gt;"],
