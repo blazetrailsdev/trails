@@ -37,7 +37,7 @@ export const INFIX_HELPER: Record<string, string> = {
 };
 export function registerExpressions(r: Registry): void {
   r.on("CallNode", (n, e) => emitCall(n, e));
-  r.on("SelfNode", () => f.createThis());
+  r.on("SelfNode", (_n, e) => selfOf(e));
   r.on("LocalVariableReadNode", (n) =>
     isBindableIdent(String(n.name)) ? f.createIdentifier(String(n.name)) : null,
   );
@@ -255,7 +255,7 @@ function emitCall(n: PrismNode, e: Emitter): ts.Expression | null {
     );
   }
   const jsName = (hasRecv ? stdlibRename(name, block != null) : undefined) ?? methodName(name);
-  const selfCall = !hasRecv && e.currentDef !== TOPLEVEL;
+  const selfCall = !hasRecv && (e.currentDef !== TOPLEVEL || e.selfName !== null);
   if (hasRecv || selfCall ? !isJsIdentName(jsName) : !isBindableIdent(jsName)) return null;
   let blockParams: string[] | null = null;
   let symToProc: string | null = null;
@@ -297,8 +297,8 @@ function emitCall(n: PrismNode, e: Emitter): ts.Expression | null {
   }
   const delegatedTo = selfCall && !e.inSingleton ? e.delegations.get(jsName) : undefined;
   const self: ts.Expression = delegatedTo
-    ? f.createPropertyAccessExpression(f.createThis(), delegatedTo)
-    : f.createThis();
+    ? f.createPropertyAccessExpression(selfOf(e), delegatedTo)
+    : selfOf(e);
   const target: ts.Expression = recv
     ? f.createPropertyAccessExpression(recv, jsName)
     : selfCall
@@ -458,4 +458,12 @@ function isEmittableTarget(t: PrismNode): boolean {
     default:
       return false;
   }
+}
+/**
+ * Ruby's `self`. Inside a method body that is the receiver, which TypeScript
+ * spells `this`; in a class body it is the class itself, and a class-body macro
+ * statement is emitted after the declaration where `this` no longer names it.
+ */
+function selfOf(e: Emitter): ts.Expression {
+  return e.selfName ? f.createIdentifier(e.selfName) : f.createThis();
 }

@@ -46,6 +46,12 @@ export interface Emitter {
   readonly linearization: Linearization | null;
   inClass: boolean;
   inSingleton: boolean;
+  /**
+   * The class name `self` resolves to, set while emitting a class body's macro
+   * statements after the class declaration. `null` inside a method body, where
+   * `self` is the receiver and `this` is the faithful rendering.
+   */
+  selfName: string | null;
   readonly asyncMethods: ReadonlySet<string>;
   /**
    * Names the port declares as methods rather than getters. A paren-less,

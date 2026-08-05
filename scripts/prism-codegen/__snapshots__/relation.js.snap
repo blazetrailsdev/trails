@@ -718,3 +718,67 @@ export class Relation {
         }
     }
 }
+export class ExplainProxy {
+    constructor(relation, options) {
+        this.relation = relation;
+        this.options = options;
+    }
+    async inspect() {
+        return await Relation.execExplain(() => this.relation.send("exec_queries"));
+    }
+    average(column_name) {
+        return Relation.execExplain(() => this.relation.average(column_name));
+    }
+    count(column_name = null) {
+        return Relation.execExplain(() => this.relation.count(column_name));
+    }
+    async first(limit = null) {
+        return await Relation.execExplain(() => this.relation.first(limit));
+    }
+    async last(limit = null) {
+        return await Relation.execExplain(() => this.relation.last(limit));
+    }
+    maximum(column_name) {
+        return Relation.execExplain(() => this.relation.maximum(column_name));
+    }
+    minimum(column_name) {
+        return Relation.execExplain(() => this.relation.minimum(column_name));
+    }
+    async pluck(...column_names) {
+        return await Relation.execExplain(() => this.relation.pluck(...column_names));
+    }
+    sum(identity_or_column = null) {
+        return Relation.execExplain(() => this.relation.sum(identity_or_column));
+    }
+    execExplain(block) {
+        return this.relation.execExplain(this.relation.collectingQueriesForExplain(() => block.call()), this.options);
+    }
+}
+ExplainProxy.private;
+const MULTI_VALUE_METHODS = ["includes", "eager_load", "preload", "select", "group", "order", "joins", "left_outer_joins", "references", "extending", "unscope", "optimizer_hints", "annotate", "with"];
+const SINGLE_VALUE_METHODS = ["limit", "offset", "lock", "readonly", "reordering", "strict_loading", "reverse_order", "distinct", "create_with", "skip_query_cache"];
+const CLAUSE_METHODS = ["where", "having", "from"];
+const INVALID_METHODS_FOR_DELETE_ALL = ["distinct", "with", "with_recursive"];
+const VALUE_METHODS = MULTI_VALUE_METHODS + SINGLE_VALUE_METHODS + CLAUSE_METHODS;
+Relation.include(Enumerable);
+Relation.include(FinderMethods, Calculations, SpawnMethods, QueryMethods, Batches, Explain, Delegation);
+Relation.include(SignedId.RelationMethods, TokenFor.RelationMethods);
+Relation.attrReader("table", "model", "loaded", "predicate_builder");
+Relation.attrAccessor("skip_preloading_value");
+const klass = model;
+const isLoaded = loaded;
+const isLocked = lockValue;
+const build = constructor;
+const toA = toAry;
+Relation.private("compute_cache_key");
+Relation.private("compute_cache_version");
+export class StrictLoadingScope {
+    static isEmptyScope() {
+        return true;
+    }
+    static strictLoadingValue() {
+        return true;
+    }
+}
+Relation.protected;
+Relation.private;

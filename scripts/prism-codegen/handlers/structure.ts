@@ -38,7 +38,7 @@ export function registerStructure(r: Registry): void {
     const prevModule = e.currentModule;
     e.inClass = true;
     e.currentModule = prevModule ? `${prevModule}::${name}` : name;
-    const members = classMembers((n.body as PrismNode) ?? null, e);
+    const { members, macros } = classBody((n.body as PrismNode) ?? null, e, name);
     e.inClass = prev;
     e.currentModule = prevModule;
     return [
@@ -49,6 +49,7 @@ export function registerStructure(r: Registry): void {
         heritage,
         members,
       ),
+      ...macros,
     ];
   });
   r.onStmt("DefNode", (n, e) => emitDef(n, e));
@@ -56,16 +57,31 @@ export function registerStructure(r: Registry): void {
 function topLevel(body: PrismNode | null, e: Emitter): ts.Statement[] {
   return e.stmts(body, false);
 }
-function classMembers(body: PrismNode | null, e: Emitter): ts.ClassElement[] {
-  if (!body) return [];
+/**
+ * A class body's `def`s become class members; everything else — the macro
+ * statements a Rails class body is mostly made of, `include Persistence` and
+ * its kind — becomes a statement emitted after the declaration, with `self`
+ * bound to the class, which is how the port wires modules at its composition
+ * points.
+ */
+function classBody(
+  body: PrismNode | null,
+  e: Emitter,
+  className: string,
+): {
+  members: ts.ClassElement[];
+  macros: ts.Statement[];
+} {
+  const members: ts.ClassElement[] = [];
+  const macros: ts.Statement[] = [];
+  if (!body) return { members, macros };
   const kids = body.constructor?.name === "StatementsNode" ? body.compactChildNodes() : [body];
   if (body.constructor?.name === "StatementsNode") e.coverage.record("StatementsNode", true);
-  const out: ts.ClassElement[] = [];
   for (const k of kids) {
     const kind = k.constructor.name;
     if (kind === "DefNode") {
       const m = defAsMember(k, e);
-      if (m) out.push(m);
+      if (m) members.push(m);
       else recordSubtreePassthrough(k, e);
     } else if (
       kind === "SingletonClassNode" &&
@@ -74,13 +90,34 @@ function classMembers(body: PrismNode | null, e: Emitter): ts.ClassElement[] {
       e.coverage.record("SingletonClassNode", true);
       const prev = e.inSingleton;
       e.inSingleton = true;
-      out.push(...classMembers((k.body as PrismNode) ?? null, e));
+      const inner = classBody((k.body as PrismNode) ?? null, e, className);
       e.inSingleton = prev;
+      members.push(...inner.members);
+      macros.push(...inner.macros);
     } else {
-      recordSubtreePassthrough(k, e);
+      const stmts = macroStmt(k, e, className);
+      if (stmts) macros.push(...stmts);
+      else recordSubtreePassthrough(k, e);
     }
   }
-  return out;
+  return { members, macros };
+}
+/**
+ * One class-body macro statement, emitted with `self` bound to the class and
+ * outside the class context so a nested `def` is not swallowed by
+ * {@link emitDef}'s in-class guard.
+ */
+function macroStmt(n: PrismNode, e: Emitter, className: string): ts.Statement[] | null {
+  const prevSelf = e.selfName;
+  const prevClass = e.inClass;
+  e.selfName = className;
+  e.inClass = false;
+  try {
+    return e.stmt(n, false);
+  } finally {
+    e.selfName = prevSelf;
+    e.inClass = prevClass;
+  }
 }
 function recordSubtreePassthrough(n: PrismNode, e: Emitter): void {
   e.coverage.record(n.constructor.name, false);

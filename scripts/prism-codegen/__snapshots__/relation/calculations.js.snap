@@ -37,6 +37,7 @@ export class ColumnAliasTracker {
         return name.slice(0, this.connection.tableAliasLength() - 2);
     }
 }
+ColumnAliasTracker.private;
 export async function count(column_name = null, block) {
     if (block !== undefined) {
         if (!(column_name == null)) {

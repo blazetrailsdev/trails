@@ -14,6 +14,44 @@ import {
 } from "./async-source.js";
 import type { Coverage } from "./types.js";
 describe("prism-codegen", () => {
+  it("emits class-body macro statements after the class, with self bound to the class", async () => {
+    const { code } = await generateFromSource(`
+      class Widget < Base
+        include Persistence
+        extend Querying
+        self.param_delimiter = "_"
+        def save!; true; end
+      end
+    `);
+    expect(code).toMatch(/export class Widget extends Base \{[\s\S]*saveBang\(\)[\s\S]*\}/);
+    expect(code).toContain("Widget.include(Persistence)");
+    expect(code).toContain("Widget.extend(Querying)");
+    expect(code).toContain('Widget.paramDelimiter = "_"');
+    expect(code.indexOf("Widget.include")).toBeGreaterThan(code.indexOf("class Widget"));
+  });
+
+  it("keeps self as this inside a method body", async () => {
+    const { code } = await generateFromSource(`
+      class Widget
+        include Persistence
+        def owner; self; end
+      end
+    `);
+    expect(code).toContain("Widget.include(Persistence)");
+    expect(code).toContain("return this;");
+  });
+
+  it("emits a singleton class body's macros against the class too", async () => {
+    const { code } = await generateFromSource(`
+      class Widget
+        class << self
+          attr_reader :name
+        end
+      end
+    `);
+    expect(code).toContain('Widget.attrReader("name")');
+  });
+
   it("translates class/def shape and method-name conventions", async () => {
     const { code } = await generateFromSource(`
       class Widget < Base

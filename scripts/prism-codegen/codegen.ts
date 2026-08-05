@@ -33,6 +33,7 @@ export class Codegen implements Emitter {
   currentModule: string | null = null;
   inClass = false;
   inSingleton = false;
+  selfName: string | null = null;
   inAsyncMethod = false;
   inLoop = false;
   readonly helpers = new Set<string>();
