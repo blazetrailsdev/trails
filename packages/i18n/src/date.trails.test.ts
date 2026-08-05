@@ -537,6 +537,46 @@ describe("Date", () => {
     expect(() => new RubyDate(1582, 10, 10)).toThrow(RubyDate.Error);
     expect(new RubyDate(1582, 10, 10, RubyDate.GREGORIAN).toS()).toBe("1582-10-10");
   });
+  // `date_initialize` branches on `guess_style` (date_core.c:3533) before it
+  // validates: outside REFORM_BEGIN_YEAR..REFORM_END_YEAR, or under an infinite
+  // `start`, it takes the `valid_gregorian_p` arm (date_core.c:3533-3542)
+  // instead of `valid_civil_p`. Every expectation below is `ruby 3.3.11 -rdate`.
+  it("takes date_initialize's guess_style arms either side of the reform years", () => {
+    const cases: Array<[number, number, number, number, [number, number, number] | "E"]> = [
+      // y < REFORM_BEGIN_YEAR — positive style, still the valid_civil_p arm.
+      [1581, 12, 31, RubyDate.ITALY, [1581, 12, 31]],
+      [1500, 2, 29, RubyDate.ITALY, [1500, 2, 29]],
+      [1500, 2, 29, RubyDate.GREGORIAN, "E"],
+      // inside the reform window — the valid_civil_p arm, deleted days and all.
+      [1582, 10, 10, RubyDate.ITALY, "E"],
+      [1582, 10, 15, RubyDate.ITALY, [1582, 10, 15]],
+      [1752, 9, 3, RubyDate.ENGLAND, "E"],
+      [1930, 12, 31, RubyDate.ITALY, [1930, 12, 31]],
+      // y > REFORM_END_YEAR — negative style, the valid_gregorian_p arm.
+      [1931, 1, 1, RubyDate.ITALY, [1931, 1, 1]],
+      [1900, 2, 29, RubyDate.ITALY, "E"],
+      [2000, 2, 29, RubyDate.ITALY, [2000, 2, 29]],
+      [2001, 2, 29, RubyDate.ITALY, "E"],
+      [2001, -1, -1, RubyDate.ITALY, [2001, 12, 31]],
+      [2001, 13, 1, RubyDate.ITALY, "E"],
+      // an infinite start — non-zero style whatever the year.
+      [2001, 1, 1, RubyDate.JULIAN, [2001, 1, 1]],
+      [1, 1, 1, RubyDate.JULIAN, [1, 1, 1]],
+      [1, 1, 1, RubyDate.GREGORIAN, [1, 1, 1]],
+      [-4712, 1, 1, RubyDate.GREGORIAN, [-4712, 1, 1]],
+    ];
+    for (const [year, month, day, start, expected] of cases) {
+      const got = (() => {
+        try {
+          const date = new RubyDate(year, month, day, start);
+          return [date.year, date.mon, date.day];
+        } catch {
+          return "E";
+        }
+      })();
+      expect([year, month, day, start, got]).toEqual([year, month, day, start, expected]);
+    }
+  });
 });
 
 describe("DateTime", () => {

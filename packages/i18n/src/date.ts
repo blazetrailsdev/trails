@@ -1747,6 +1747,21 @@ const GREGORIAN = -Infinity;
 /** @internal `date_core.c`'s `DEFAULT_SG` (`date_core.c:190`). */
 const DEFAULT_SG = ITALY;
 
+/** @internal `date_core.c:207`, the first year the calendar reform can touch. */
+const REFORM_BEGIN_YEAR = 1582;
+
+/** @internal `date_core.c:208`, the last year the calendar reform can touch. */
+const REFORM_END_YEAR = 1930;
+
+/**
+ * @internal `date_core.c` `monthtab` (`date_core.c:697-700`), the last day of
+ * each month indexed by leapness then month, with a `0` in slot zero.
+ */
+const monthtab: readonly (readonly number[])[] = [
+  [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31],
+  [0, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31],
+];
+
 /** @internal `date_core.c`'s `DIV` macro (`date_core.c:168-170`), floored division. */
 function div(n: number, d: number): number {
   return Math.floor(n / d);
@@ -1824,6 +1839,61 @@ function cFindFdoy(y: number, sg: number): [rjd: number, ns: number] | null {
     if (r !== null) return r;
   }
   return null;
+}
+
+/** @internal `date_core.c` `c_gregorian_leap_p` (`date_core.c:708-712`). */
+function cGregorianLeapP(y: number): boolean {
+  return (mod(y, 4) === 0 && y % 100 !== 0) || mod(y, 400) === 0;
+}
+
+/** @internal `date_core.c` `c_gregorian_last_day_of_month` (`date_core.c:721-726`). */
+function cGregorianLastDayOfMonth(y: number, m: number): number {
+  return monthtab[cGregorianLeapP(y) ? 1 : 0][m];
+}
+
+/**
+ * @internal `date_core.c` `c_valid_gregorian_p` (`date_core.c:747-763`), the
+ * table lookup {@link cValidCivilP}'s round trip stands in for once the
+ * calendar reform is known not to bite. A negative `m` counts back from a
+ * thirteenth month and a negative `d` from the month's last day, as there.
+ */
+function cValidGregorianP(y: number, m: number, d: number): [rm: number, rd: number] | null {
+  if (m < 0) m += 13;
+  if (m < 1 || m > 12) return null;
+  const last = cGregorianLastDayOfMonth(y, m);
+  if (d < 0) d = last + d + 1;
+  if (d < 1 || d > last) return null;
+  return [m, d];
+}
+
+/**
+ * @internal `date_core.c` `valid_gregorian_p` (`date_core.c:2229-2236`).
+ * `decode_year` splits a bignum year into an `nth` cycle count and a fixnum
+ * remainder; the port carries no `nth`, so the year passes straight through.
+ */
+function validGregorianP(y: number, m: number, d: number): [rm: number, rd: number] | null {
+  return cValidGregorianP(y, m, d);
+}
+
+/**
+ * @internal `date_core.c` `guess_style` (`date_core.c:1413-1432`), which
+ * answers a non-zero style — `-/+oo` — whenever the calendar reform cannot
+ * possibly bite: an infinite `sg`, a year too large for a fixnum, or a year
+ * outside `REFORM_BEGIN_YEAR .. REFORM_END_YEAR`. Ruby's fixnum bound is a JS
+ * safe integer here.
+ */
+function guessStyle(y: number, sg: number): number {
+  let style = 0;
+
+  if (!Number.isFinite(sg)) style = sg;
+  else if (!Number.isSafeInteger(y)) style = y > 0 ? GREGORIAN : JULIAN;
+  else {
+    const iy = y;
+
+    if (iy < REFORM_BEGIN_YEAR) style = JULIAN;
+    else if (iy > REFORM_END_YEAR) style = GREGORIAN;
+  }
+  return style;
 }
 
 /**
@@ -2237,11 +2307,25 @@ export class Date {
    * (ruby/date, `date_core.c` `date_s_civil`), which raises `Date::Error` on a
    * civil date `c_valid_civil_p` rejects — 1582-10-10 under `Date::ITALY` is a
    * day the reform deleted.
+   *
+   * `date_initialize` branches on `guess_style` first (`date_core.c:3533`): on a
+   * negative style the reform cannot bite, so it validates with
+   * `valid_gregorian_p` and stores `HAVE_CIVIL` alone — no Julian day is
+   * computed at all (`date_core.c:3533-3542`). `SimpleDateData`'s `flags`
+   * (`date_core.c:173-183`) is what lets it defer that; the port carries `jd`
+   * and `sg` in place of the flags word, so the Julian day is computed here
+   * either way and only the validation differs.
    */
   constructor(year = -4712, month = 1, day = 1, start: number = DEFAULT_SG) {
-    const r = cValidCivilP(year, month, day, start);
-    if (r === null) throw new DateError("invalid date");
-    this.#jd = r[0];
+    if (guessStyle(year, start) < 0) {
+      const r = validGregorianP(year, month, day);
+      if (r === null) throw new DateError("invalid date");
+      this.#jd = cCivilToJd(year, r[0], r[1], start)[0];
+    } else {
+      const r = cValidCivilP(year, month, day, start);
+      if (r === null) throw new DateError("invalid date");
+      this.#jd = r[0];
+    }
     this.#sg = start;
   }
 
