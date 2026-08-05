@@ -101,6 +101,23 @@ export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
   // `interpolate_hash` are measured against `backend/cache.ts` and, since
   // cache.rb is unported, drop out of accounting entirely.
   "i18n:interpolate/ruby.rb": "interpolate/ruby.ts",
+  // `encryption.rb` defines `module Cipher` (encryption.rb:22, `autoload`
+  // aside) before `encryption/cipher.rb` reopens it with the whole class-method
+  // surface, so all six land in the `encryption.rb` bucket and read as missing.
+  "activerecord:encryption/cipher.rb": "encryption/cipher.ts",
+  // `GlobalID` is first defined by `fixture_set.rb`'s reopening, so the class's
+  // entire surface — every method in `global_id.rb` itself — buckets there.
+  "globalid:global_id.rb": "global-id.ts",
+  // `validations.rb` opens `Validations::ClassMethods` first, so `validates`,
+  // `validates!` and their two private helpers bucket under it. trails carries
+  // all four on `Model` (model.ts), the class `Validations` is mixed into.
+  "activemodel:validations/validates.rb": "model.ts",
+  // Likewise `HelperMethods`, whose first definition Rails puts in
+  // `validations/absence.rb`; trails' `_mergeAttributes` lives in validations.ts.
+  "activemodel:validations/helper_methods.rb": "validations.ts",
+  // `ARTest` is defined by `config.rb` first; `connection.rb` reopens it for the
+  // three connection helpers, which trails ports to `support/connection.ts`.
+  "activerecord-test-support:connection.rb": "connection.ts",
 };
 
 /** The explicit TS mapping for `rubyFile` in `pkg`, or undefined when unmapped. */

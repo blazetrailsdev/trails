@@ -46,10 +46,13 @@
  *   GCM cipher's `.update(...)`. None of those files touch the shared
  *   connection either.
  *
- * Known gap: a model-level write (`Book.create(...)`) that reaches the shared
- * connection implicitly, naming no accessor. No file in this tree has that
- * shape — the canonical-schema files all ride `fixtures()` — and closing it
- * needs receiver-level knowledge the textual scan does not have.
+ * A model-level write (`Book.create(...)`) reaches the shared connection without
+ * naming any accessor, so clause (c) also counts a write whose receiver is a
+ * model class — a capitalised identifier that is not one of the
+ * {@link NON_MODEL_RECEIVERS} the textual `WRITE_PATTERNS` also match. A file
+ * that binds its models to an adapter it owns (`EnumTest.adapter = adapter`,
+ * {@link EXPLICIT_ADAPTER_BINDING}) is writing over that adapter, not the shared
+ * connection, which is what keeps the `adapters/*` cluster retired.
  *
  * The seed grew by one once `stripCommentsAndStrings` became a scanner. The
  * regex chain it replaced ran one pass per quote kind, so a quote of one kind
@@ -174,6 +177,31 @@ const IT_CALL = /(?:^|[^.\w])(?:it|test)((?:\.\w+)*)\s*[(`]/g;
 export interface RowWrite {
   line: number;
   pattern: string;
+  /** The identifier the call was made on — `""` for `INSERT INTO` and for a
+   *  call with no receiver at all (`create(...)`, `(await x).insert`). */
+  receiver: string;
+}
+
+/**
+ * Capitalised receivers `WRITE_PATTERNS` matches that are not model classes and
+ * so write no row: the false positives the module header enumerates.
+ */
+export const NON_MODEL_RECEIVERS = new Set([
+  "AliasTracker",
+  "DatabaseTasks",
+  "Object",
+  "SchemaDumper",
+]);
+
+/**
+ * A model bound to an adapter the file owns (`EnumTest.adapter = adapter`).
+ * Writes on it land in that adapter's database, not the shared per-worker one.
+ */
+export const EXPLICIT_ADAPTER_BINDING = /\.adapter\s*=[^=]/;
+
+/** Whether a write's receiver is a model class rather than a known false positive. */
+export function isModelReceiver(receiver: string): boolean {
+  return /^[A-Z]/.test(receiver) && !NON_MODEL_RECEIVERS.has(receiver);
 }
 
 /**
@@ -195,6 +223,19 @@ export interface RowWrite {
  * (`` it.each`…`("name", fn) ``) is the same shape with a template in place of
  * the array, so the same deferral runs off the template's closing backtick.
  */
+/**
+ * The identifier a `.`-prefixed write was called on, read backwards from the
+ * dot. A pattern that is not a method call (`INSERT INTO`) has no receiver, and
+ * neither does a dotted call whose left-hand side is an expression rather than
+ * an identifier (`(await adapter).insert`).
+ */
+function receiverAt(line: string, index: number, pattern: string): string {
+  if (!pattern.startsWith(".")) return "";
+  let start = index;
+  while (start > 0 && /[\w$]/.test(line[start - 1])) start--;
+  return line.slice(start, index);
+}
+
 export function rowWritesAtItScope(src: string): RowWrite[] {
   const stripped = stripCommentsAndStrings(src);
   const writes: RowWrite[] = [];
@@ -253,7 +294,9 @@ export function rowWritesAtItScope(src: string): RowWrite[] {
       if (bodyCallPending && ch.trim() !== "") bodyCallPending = false;
       if (itParens.length === 0) continue;
       for (const pattern of WRITE_PATTERNS) {
-        if (line.startsWith(pattern, c)) writes.push({ line: i + 1, pattern });
+        if (line.startsWith(pattern, c)) {
+          writes.push({ line: i + 1, pattern, receiver: receiverAt(line, c, pattern) });
+        }
       }
     }
   }
@@ -284,10 +327,21 @@ export function reachesSharedConnection(src: string): boolean {
   return SHARED_CONNECTION_ACCESSORS.some((accessor) => stripped.includes(accessor));
 }
 
+/**
+ * Whether a write reaches the shared connection through a model class instead of
+ * a named accessor. A file that binds an adapter of its own to its models is
+ * writing over that adapter, so its model writes do not count.
+ */
+export function writesThroughModel(src: string, writes: RowWrite[]): boolean {
+  if (EXPLICIT_ADAPTER_BINDING.test(stripCommentsAndStrings(src))) return false;
+  return writes.some((write) => isModelReceiver(write.receiver));
+}
+
 export function isOffender(src: string): boolean {
   if (hasTransactionalWiring(src)) return false;
-  if (!reachesSharedConnection(src)) return false;
-  return rowWritesAtItScope(src).length > 0;
+  const writes = rowWritesAtItScope(src);
+  if (writes.length === 0) return false;
+  return reachesSharedConnection(src) || writesThroughModel(src, writes);
 }
 
 async function collectTestFiles(dir: string, out: string[]): Promise<void> {
