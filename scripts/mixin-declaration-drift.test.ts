@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import * as fs from "fs/promises";
 import { BetterSQLite3Adapter } from "../packages/activerecord/src/connection-adapters/better-sqlite3-adapter.js";
 import { PostgreSQLAdapter } from "../packages/activerecord/src/connection-adapters/postgresql-adapter.js";
+import { AbstractMysqlAdapter } from "../packages/activerecord/src/connection-adapters/abstract-mysql-adapter.js";
 import {
   findDrift,
   findUninstalled,
@@ -40,6 +41,14 @@ const PAIRS = [
     adapterFile: `${ADAPTERS}postgresql-adapter.ts`,
     adapterInterface: "PostgreSQLAdapter",
     witness: PostgreSQLAdapter,
+  },
+  {
+    label: "AbstractMysqlAdapter / MySQL::SchemaStatements",
+    mixinFile: `${ADAPTERS}mysql/schema-statements.ts`,
+    mixinClass: "MysqlSchemaStatements",
+    adapterFile: `${ADAPTERS}abstract-mysql-adapter.ts`,
+    adapterInterface: "AbstractMysqlAdapter",
+    witness: AbstractMysqlAdapter,
   },
 ] as const;
 

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Scheme } from "./scheme.js";
+import { Encryptor } from "./encryptor.js";
 import { Configuration } from "./errors.js";
 import { Configurable } from "./configurable.js";
 import { Contexts } from "./contexts.js";
@@ -189,7 +190,7 @@ describe("ActiveRecord::Encryption::SchemeTest", () => {
     let ran = false;
     scheme.withContext(() => {
       ran = true;
-      expect(getEncryptionContext().encryptor).toBeUndefined();
+      expect(getEncryptionContext().encryptor).toBeInstanceOf(Encryptor);
     });
     expect(ran).toBe(true);
   });
@@ -207,7 +208,7 @@ describe("ActiveRecord::Encryption::SchemeTest", () => {
       encryptorInContext = getEncryptionContext().encryptor;
     });
     expect(encryptorInContext).toBe(customEncryptor);
-    expect(getEncryptionContext().encryptor).toBeUndefined();
+    expect(getEncryptionContext().encryptor).toBeInstanceOf(Encryptor);
   });
 
   it("isCompatibleWith returns true when deterministic flags match", () => {

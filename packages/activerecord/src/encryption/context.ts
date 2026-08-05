@@ -4,10 +4,12 @@
  * Mirrors: ActiveRecord::Encryption::Contexts
  */
 
-import type { MessageSerializerLike } from "./message-serializer.js";
+import { MessageSerializer, type MessageSerializerLike } from "./message-serializer.js";
 import { NullEncryptor } from "./null-encryptor.js";
 import { Configurable } from "./configurable.js";
 import { Cipher } from "./cipher.js";
+import { Encryptor } from "./encryptor.js";
+import { KeyGenerator } from "./key-generator.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
 
 // EncryptingOnlyEncryptor extends the full Encryptor, which transitively imports
@@ -74,18 +76,13 @@ export class Context {
     this._keyProvider = value;
   }
 
-  /**
-   * @internal Rails `Context#set_defaults` (context.rb:29-35) also seeds
-   * `key_generator`, `encryptor` and `message_serializer`. Each of those
-   * modules imports `Configurable`, and this module is evaluated while
-   * building the default context, so constructing them here would close an
-   * eval-time cycle. Story
-   * `0072-api-compare-parity-burndown/converge-context-set-defaults-remaining-three`
-   * carries the convergence.
-   */
+  /** @internal */
   private setDefaults(): void {
     this.frozenEncryption = false;
+    this.keyGenerator = new KeyGenerator();
     this.cipher = new Cipher();
+    this.encryptor = new Encryptor();
+    this.messageSerializer = new MessageSerializer();
   }
 
   /**
@@ -105,11 +102,17 @@ const contextStack: Context[] = [];
  * (contexts.rb:18). A real Context, not a bare object, because Context is where
  * the default key provider is memoized (context.rb:25-27) — that memo is Rails'
  * only key-provider cache, and `reset_default_context` is its only invalidation.
+ *
+ * Built on first read rather than at module eval: `set_defaults` constructs a
+ * KeyGenerator/Encryptor (context.rb:29-35), and both transitively import this
+ * module. Ruby's autoload resolves that at the point of use; ESM would evaluate
+ * whichever module was entered first and hit the other's class binding in its
+ * TDZ, so the construction has to happen after both module bodies have run.
  */
-let _defaultContext: Context = new Context();
+let _defaultContext: Context | undefined;
 
 export function getDefaultContext(): Context {
-  return _defaultContext;
+  return (_defaultContext ??= new Context());
 }
 
 /** @internal */
@@ -122,7 +125,7 @@ export function resetDefaultContext(): void {
 }
 
 function currentContext(): Context {
-  return contextStack.length > 0 ? contextStack[contextStack.length - 1] : _defaultContext;
+  return contextStack.length > 0 ? contextStack[contextStack.length - 1] : getDefaultContext();
 }
 
 export function withEncryptionContext<T>(overrides: Partial<Context>, fn: () => T): T {

@@ -4566,20 +4566,6 @@ export class Base extends Model {
   generateTokenFor(purpose: string): string {
     return _generateTokenFor(this, purpose);
   }
-
-  /** @internal */
-  declare fullPurpose: () => string;
-  /** @internal */
-  declare messageVerifier: () => unknown;
-  /** @internal */
-  declare payloadFor: (model: Base) => unknown[];
-  /** @internal */
-  declare generateToken: (model: Base) => string;
-  /** @internal */
-  declare resolveToken: (
-    token: string,
-    finder: (id: unknown) => Promise<Base | null>,
-  ) => Promise<Base | null>;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging

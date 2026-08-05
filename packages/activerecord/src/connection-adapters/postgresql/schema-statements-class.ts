@@ -95,10 +95,38 @@ function toS(value: unknown): string {
   return value == null ? "" : String(value);
 }
 
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging */
+/**
+ * PostgreSQL's `SchemaStatements` is only ever mixed into `PostgreSQLAdapter`
+ * (`include()` at the bottom of the adapter module), so its bodies call plain
+ * `this` methods the way Rails' module does. This merged interface gives those
+ * calls the PG adapter's type. @internal
+ */
+// drift-ok: the omitted names already come from `AbstractSchemaStatements` with
+// a signature TS will not let a narrower PG one merge over (a method declared on
+// a base class wins over a merged-interface property). The bodies below use the
+// abstract signature for them, so nothing is lost.
+export interface SchemaStatements extends Omit<
+  PgSchemaAdapter,
+  | "execute"
+  | "internalExecute"
+  | "getDatabaseVersion"
+  | "lookupCastTypeFromColumn"
+  | "schemaCreation"
+  | "quotedScope"
+  | "typeMap"
+  | "logger"
+  | "nativeDatabaseTypes"
+> {
+  // Declared as own members rather than inherited: `AbstractSchemaStatements`
+  // types each of these for the generic adapter, and PG narrows them.
+  readonly typeMap: HashLookupTypeMap;
+  readonly logger: { warn?(message: string): void } | null;
+  nativeDatabaseTypes(): Record<string, string | { name?: string; limit?: number }>;
+}
+
 export class SchemaStatements extends AbstractSchemaStatements {
-  private get pg(): PgSchemaAdapter {
-    return this as unknown as PgSchemaAdapter;
-  }
+  /* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
 
   /** Mirrors: PostgreSQL::SchemaStatements#update_table_definition */
   override updateTableDefinition(tableName: string, base?: unknown): PgTable {
@@ -126,9 +154,9 @@ export class SchemaStatements extends AbstractSchemaStatements {
   // ---------------------------------------------------------------------------
 
   async indexes(tableName: string): Promise<IndexDefinition[]> {
-    const scope = this.pg.quotedScope(tableName);
+    const scope = this.quotedScope(tableName);
 
-    const result = await this.pg.query(
+    const result = await this.query(
       `SELECT distinct i.relname, d.indisunique, d.indkey, pg_get_indexdef(d.indexrelid), t.oid,
                       pg_catalog.obj_description(i.oid, 'pg_class') AS comment, d.indisvalid
        FROM pg_class t
@@ -215,9 +243,9 @@ export class SchemaStatements extends AbstractSchemaStatements {
   }
 
   async indexNameExists(tableName: string, indexName: string): Promise<boolean> {
-    const table = this.pg.quotedScope(tableName);
-    const index = this.pg.quotedScope(indexName);
-    const count = await this.pg.queryValue(
+    const table = this.quotedScope(tableName);
+    const index = this.quotedScope(indexName);
+    const count = await this.queryValue(
       `
       SELECT COUNT(*)
       FROM pg_class t
@@ -247,7 +275,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
   // Mirrors Rails #tables (data_source_sql type: "BASE TABLE" → relkind
   // IN ('r','p')). pg_tables would omit partitioned tables (relkind 'p').
   async tables(): Promise<string[]> {
-    const rows = await this.pg.schemaQuery(this.pg.dataSourceSql(null, { type: "BASE TABLE" }));
+    const rows = await this.schemaQuery(this.dataSourceSql(null, { type: "BASE TABLE" }));
     return rows.map((r) => r.relname as string);
   }
 
@@ -260,7 +288,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
    * directly catches both.
    */
   async views(): Promise<string[]> {
-    const rows = await this.pg.schemaQuery(
+    const rows = await this.schemaQuery(
       `SELECT c.relname FROM pg_class c
          LEFT JOIN pg_namespace n ON n.oid = c.relnamespace
          WHERE n.nspname = ANY(current_schemas(false))
@@ -293,11 +321,11 @@ export class SchemaStatements extends AbstractSchemaStatements {
     // Rails' table_exists?(nil) / "" returns false; a null/empty name has no
     // identifier to parse, so short-circuit before extractSchemaQualifiedName.
     if (!name) return false;
-    const [schema, table] = this.pg.extractSchemaQualifiedName(name);
+    const [schema, table] = this.extractSchemaQualifiedName(name);
     if (schema) {
       // $1=schema, $2=table, $3..=relkinds
       const relPlaceholders = relkinds.map((_, i) => `$${i + 3}`).join(", ");
-      const rows = await this.pg.schemaQuery(
+      const rows = await this.schemaQuery(
         `SELECT 1 AS one FROM pg_class c
            LEFT JOIN pg_namespace n ON n.oid = c.relnamespace
            WHERE n.nspname = $1 AND c.relname = $2
@@ -313,7 +341,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     // compared against `relname = '"widgets"'` in pg_class, which
     // never matches (the catalog stores names unquoted).
     const relPlaceholders = relkinds.map((_, i) => `$${i + 2}`).join(", ");
-    const rows = await this.pg.schemaQuery(
+    const rows = await this.schemaQuery(
       `SELECT 1 AS one FROM pg_class c
          LEFT JOIN pg_namespace n ON n.oid = c.relnamespace
          WHERE n.nspname = ANY(current_schemas(false))
@@ -325,9 +353,9 @@ export class SchemaStatements extends AbstractSchemaStatements {
   }
 
   override async tableComment(tableName: string): Promise<string | null> {
-    const scope = this.pg.quotedScope(tableName, { type: "BASE TABLE" });
+    const scope = this.quotedScope(tableName, { type: "BASE TABLE" });
     if (!scope.name) return null;
-    const comment = await this.pg.queryValue(
+    const comment = await this.queryValue(
       `
       SELECT pg_catalog.obj_description(c.oid, 'pg_class')
       FROM pg_catalog.pg_class c
@@ -342,8 +370,8 @@ export class SchemaStatements extends AbstractSchemaStatements {
   }
 
   async tablePartitionDefinition(tableName: string): Promise<string | null> {
-    const scope = this.pg.quotedScope(tableName, { type: "BASE TABLE" });
-    const def = await this.pg.queryValue(
+    const scope = this.quotedScope(tableName, { type: "BASE TABLE" });
+    const def = await this.queryValue(
       `SELECT pg_catalog.pg_get_partkeydef(c.oid)
        FROM pg_catalog.pg_class c
        LEFT JOIN pg_namespace n ON n.oid = c.relnamespace
@@ -356,8 +384,8 @@ export class SchemaStatements extends AbstractSchemaStatements {
   }
 
   async inheritedTableNames(tableName: string): Promise<string[]> {
-    const scope = this.pg.quotedScope(tableName, { type: "BASE TABLE" });
-    const names = await this.pg.queryValues(
+    const scope = this.quotedScope(tableName, { type: "BASE TABLE" });
+    const names = await this.queryValues(
       `SELECT parent.relname
        FROM pg_catalog.pg_inherits i
        JOIN pg_catalog.pg_class child ON i.inhrelid = child.oid
@@ -373,7 +401,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
 
   override async tableOptions(tableName: string): Promise<Record<string, unknown>> {
     // supportsNativePartitioning() reads databaseVersion; ensure it's populated.
-    await this.pg.getDatabaseVersion();
+    await this.getDatabaseVersion();
     const options: Record<string, unknown> = {};
     const comment = await this.tableComment(tableName);
     if (comment !== null) options.comment = comment;
@@ -381,7 +409,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     if (inherited.length > 0) {
       options.options = `INHERITS (${inherited.join(", ")})`;
     }
-    if (!options.options && this.pg.supportsNativePartitioning()) {
+    if (!options.options && this.supportsNativePartitioning()) {
       const partDef = await this.tablePartitionDefinition(tableName);
       if (partDef) options.options = `PARTITION BY ${partDef}`;
     }
@@ -402,13 +430,13 @@ export class SchemaStatements extends AbstractSchemaStatements {
       attgenerated: string | null;
     }[]
   > {
-    const identityCol = this.pg.supportsIdentityColumns()
+    const identityCol = this.supportsIdentityColumns()
       ? "attidentity"
-      : `${this.pg.quote("")}::varchar`;
-    const generatedCol = this.pg.supportsVirtualColumns()
+      : `${this.quote("")}::varchar`;
+    const generatedCol = this.supportsVirtualColumns()
       ? "attgenerated"
-      : `${this.pg.quote("")}::varchar`;
-    const rows = await this.pg.schemaQuery(
+      : `${this.quote("")}::varchar`;
+    const rows = await this.schemaQuery(
       `SELECT a.attname, format_type(a.atttypid, a.atttypmod),
               pg_get_expr(d.adbin, d.adrelid), a.attnotnull, a.atttypid, a.atttypmod,
               c.collname, col_description(a.attrelid, a.attnum) AS comment,
@@ -418,7 +446,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
          LEFT JOIN pg_attrdef d ON a.attrelid = d.adrelid AND a.attnum = d.adnum
          LEFT JOIN pg_type t ON a.atttypid = t.oid
          LEFT JOIN pg_collation c ON a.attcollation = c.oid AND a.attcollation <> t.typcollation
-        WHERE a.attrelid = ${this.pg.quote(this.pg.quoteTableName(tableName))}::regclass
+        WHERE a.attrelid = ${this.quote(this.quoteTableName(tableName))}::regclass
           AND a.attnum > 0 AND NOT a.attisdropped
         ORDER BY a.attnum`,
     );
@@ -441,7 +469,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
   // ---------------------------------------------------------------------------
 
   async schemaNames(): Promise<string[]> {
-    const names = await this.pg.queryValues(
+    const names = await this.queryValues(
       `SELECT nspname
          FROM pg_namespace
         WHERE nspname !~ '^pg_.*'
@@ -474,15 +502,15 @@ export class SchemaStatements extends AbstractSchemaStatements {
   }
 
   async schemaExists(name: string): Promise<boolean> {
-    const count = await this.pg.queryValue(
-      `SELECT COUNT(*) FROM pg_namespace WHERE nspname = ${this.pg.quote(name)}`,
+    const count = await this.queryValue(
+      `SELECT COUNT(*) FROM pg_namespace WHERE nspname = ${this.quote(name)}`,
       "SCHEMA",
     );
     return Number(count) > 0;
   }
 
   async currentSchema(): Promise<string> {
-    return (await this.pg.queryValue("SELECT current_schema", "SCHEMA")) as string;
+    return (await this.queryValue("SELECT current_schema", "SCHEMA")) as string;
   }
 
   // ---------------------------------------------------------------------------
@@ -521,11 +549,11 @@ export class SchemaStatements extends AbstractSchemaStatements {
       }
     }
 
-    await this.execute(`CREATE DATABASE ${this.pg.quoteTableName(name)}${optionString}`);
+    await this.execute(`CREATE DATABASE ${this.quoteTableName(name)}${optionString}`);
   }
 
   async dropDatabase(name: string): Promise<void> {
-    await this.execute(`DROP DATABASE IF EXISTS ${this.pg.quoteTableName(name)}`);
+    await this.execute(`DROP DATABASE IF EXISTS ${this.quoteTableName(name)}`);
   }
 
   async recreateDatabase(name: string, options: CreateDatabaseOptions = {}): Promise<void> {
@@ -534,25 +562,25 @@ export class SchemaStatements extends AbstractSchemaStatements {
   }
 
   async currentDatabase(): Promise<string> {
-    return (await this.pg.queryValue("SELECT current_database()", "SCHEMA")) as string;
+    return (await this.queryValue("SELECT current_database()", "SCHEMA")) as string;
   }
 
   async encoding(): Promise<string> {
-    return (await this.pg.queryValue(
+    return (await this.queryValue(
       "SELECT pg_encoding_to_char(encoding) FROM pg_database WHERE datname = current_database()",
       "SCHEMA",
     )) as string;
   }
 
   async collation(): Promise<string> {
-    return (await this.pg.queryValue(
+    return (await this.queryValue(
       "SELECT datcollate FROM pg_database WHERE datname = current_database()",
       "SCHEMA",
     )) as string;
   }
 
   async ctype(): Promise<string> {
-    return (await this.pg.queryValue(
+    return (await this.queryValue(
       "SELECT datctype FROM pg_database WHERE datname = current_database()",
       "SCHEMA",
     )) as string;
@@ -563,27 +591,24 @@ export class SchemaStatements extends AbstractSchemaStatements {
   // ---------------------------------------------------------------------------
 
   async schemaSearchPath(): Promise<string> {
-    if (this.pg._schemaSearchPathMemo == null) {
-      this.pg._schemaSearchPathMemo = (await this.pg.queryValue(
-        "SHOW search_path",
-        "SCHEMA",
-      )) as string;
+    if (this._schemaSearchPathMemo == null) {
+      this._schemaSearchPathMemo = (await this.queryValue("SHOW search_path", "SCHEMA")) as string;
     }
-    return this.pg._schemaSearchPathMemo;
+    return this._schemaSearchPathMemo;
   }
 
   async setSchemaSearchPath(searchPath: string | null): Promise<void> {
     if (!searchPath) return;
-    await this.pg.internalExecute(`SET search_path TO ${searchPath}`);
-    this.pg._schemaSearchPathMemo = searchPath;
+    await this.internalExecute(`SET search_path TO ${searchPath}`);
+    this._schemaSearchPathMemo = searchPath;
   }
 
   async clientMinMessages(): Promise<string> {
-    return (await this.pg.queryValue("SHOW client_min_messages", "SCHEMA")) as string;
+    return (await this.queryValue("SHOW client_min_messages", "SCHEMA")) as string;
   }
 
   async setClientMinMessages(level: string): Promise<void> {
-    await this.pg.internalExecute(`SET client_min_messages TO '${level}'`, "SCHEMA");
+    await this.internalExecute(`SET client_min_messages TO '${level}'`, "SCHEMA");
   }
 
   private quoteSchemaName(name: string): string {
@@ -595,7 +620,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
   // ---------------------------------------------------------------------------
 
   override async columns(tableName: string): Promise<Column[]> {
-    const [schema, table] = this.pg.extractSchemaQualifiedName(tableName);
+    const [schema, table] = this.extractSchemaQualifiedName(tableName);
 
     let tableCondition: string;
     const binds: unknown[] = [];
@@ -608,7 +633,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
       tableCondition = `t.oid = to_regclass($1)`;
     }
 
-    const rows = await this.pg.schemaQuery(
+    const rows = await this.schemaQuery(
       `SELECT a.attname AS name,
               pg_catalog.format_type(a.atttypid, a.atttypmod) AS type,
               pg_get_expr(d.adbin, d.adrelid) AS "default",
@@ -640,16 +665,16 @@ export class SchemaStatements extends AbstractSchemaStatements {
     // yet in the map and load them in a single pg_type query before building
     // Column objects. This avoids N concurrent queries for wide tables.
     const missingOids = [
-      ...new Set(rows.map((r) => Number(r.oid)).filter((oid) => !this.pg.typeMap.has(oid))),
+      ...new Set(rows.map((r) => Number(r.oid)).filter((oid) => !this.typeMap.has(oid))),
     ];
     if (missingOids.length > 0) {
-      await this.pg.loadAdditionalTypes(missingOids);
+      await this.loadAdditionalTypes(missingOids);
       // Mirrors Rails' get_oid_type fallback: register any OIDs still absent
       // after the pg_type query so repeated columns() calls don't re-query.
       for (const oid of missingOids) {
-        if (!this.pg.typeMap.has(oid)) {
+        if (!this.typeMap.has(oid)) {
           console.warn(`unknown OID ${oid}: unrecognized column type, treating as generic value.`);
-          this.pg.typeMap.registerType(oid, new ValueType());
+          this.typeMap.registerType(oid, new ValueType());
         }
       }
     }
@@ -675,7 +700,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
         r.identity,
         r.attgenerated,
       ];
-      columns.push(await this.pg.newColumnFromField(tableName, field, rows));
+      columns.push(await this.newColumnFromField(tableName, field, rows));
     }
     return columns;
   }
@@ -688,7 +713,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
         throw new TypeError("columnNumbers must contain only safe integers");
       return n;
     });
-    const rows = await this.pg.query(
+    const rows = await this.query(
       `SELECT a.attnum, a.attname
        FROM pg_attribute a
        WHERE a.attrelid = ${tableOid}
@@ -704,7 +729,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     orders?: (string | Nodes.Node)[],
   ): string {
     const base = Array.isArray(columns) ? columns.join(", ") : columns;
-    const visitor = this.pg.visitor;
+    const visitor = this.visitor;
     // Mirrors Rails two-pass compact_blank: filter blanks before AND after stripping
     // so an order that becomes empty after stripping (e.g. bare "DESC") doesn't
     // consume an alias index slot and shift subsequent aliases.
@@ -768,7 +793,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
         break;
       default: {
         const { precision, scale } = options;
-        const native = this.pg.nativeDatabaseTypes()[type];
+        const native = this.nativeDatabaseTypes()[type];
         const baseName = native
           ? typeof native === "string"
             ? native
@@ -813,11 +838,11 @@ export class SchemaStatements extends AbstractSchemaStatements {
     name: string,
     options: Record<string, unknown> = {},
   ): AbstractTableDefinition {
-    return this.pg.createTableDefinition(name, options);
+    return this.createTableDefinition(name, options);
   }
 
   override createAlterTable(name: string): AlterTable {
-    return this.pg.createAlterTable(name);
+    return this.createAlterTable(name);
   }
 
   override async changeColumn(
@@ -832,9 +857,9 @@ export class SchemaStatements extends AbstractSchemaStatements {
     // running the procs. The visitor (visit_ChangeColumnDefinition) emits the
     // combined "ALTER COLUMN ... TYPE ..., ALTER COLUMN ... SET DEFAULT ..."
     // string; the only proc Rails appends here is the :comment change.
-    this.pg.clearCacheBang();
+    this.clearCacheBang();
     const changeColDef = this.buildChangeColumnDefinition(tableName, columnName, type, options);
-    const clause = await this.pg.schemaCreation.accept(changeColDef);
+    const clause = await this.schemaCreation.accept(changeColDef);
     // Route DDL through the public `execute` (not the raw `exec`) so the
     // dirties_query_cache wrapper clears the query cache on schema changes.
     await this.execute(`ALTER TABLE ${this.quoteTableName(tableName)} ${clause}`);
@@ -859,7 +884,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     // cache, defer to the abstract implementation (which builds an AlterTable
     // and accepts it through schema_creation), then propagate :comment via
     // change_column_comment.
-    this.pg.clearCacheBang();
+    this.clearCacheBang();
     await super.addColumn(tableName, columnName, type, options);
     if ("comment" in options) {
       await this.changeColumnComment(tableName, columnName, options.comment ?? null);
@@ -873,7 +898,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
   ): Promise<void> {
     // Mirrors PostgreSQL::SchemaStatements#rename_column: clear the statement
     // cache, rename, then fix up index names that embed the column name.
-    this.pg.clearCacheBang();
+    this.clearCacheBang();
     await this.schemaCache.clearDataSourceCacheBang(tableName);
     await this.execute(
       `ALTER TABLE ${this.quoteTableName(tableName)} RENAME COLUMN ${this.quoteColumnName(columnName)} TO ${this.quoteColumnName(newColumnName)}`,
@@ -884,7 +909,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
   override async renameIndex(tableName: string, oldName: string, newName: string): Promise<void> {
     this.validateIndexLengthBang(tableName, newName);
 
-    const [schema] = this.pg.extractSchemaQualifiedName(tableName);
+    const [schema] = this.extractSchemaQualifiedName(tableName);
     await this.schemaCache.clearDataSourceCacheBang(tableName);
     await this.execute(
       `ALTER INDEX ${schema ? `${this.quoteTableName(schema)}.` : ""}${this.quoteColumnName(oldName)} RENAME TO ${this.quoteTableName(newName)}`,
@@ -951,7 +976,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     // Mirrors PostgreSQL::SchemaStatements#change_column_null: validate the
     // boolean argument and clear the statement cache before issuing DDL.
     this.validateChangeColumnNullArgumentBang(nullable);
-    this.pg.clearCacheBang();
+    this.clearCacheBang();
     const quotedTable = this.quoteTableName(tableName);
     const quotedCol = this.quoteColumnName(columnName);
     if (!nullable && defaultValue != null) {
@@ -978,10 +1003,10 @@ export class SchemaStatements extends AbstractSchemaStatements {
     // Mirrors PostgreSQL::SchemaStatements#change_column_comment: clear the
     // statement cache and unwrap the {from:, to:} change hash before issuing
     // the COMMENT ON statement.
-    this.pg.clearCacheBang();
+    this.clearCacheBang();
     const comment = this.extractNewCommentValue(commentOrChanges) as string | null;
     await this.execute(
-      `COMMENT ON COLUMN ${this.quoteTableName(tableName)}.${this.quoteColumnName(columnName)} IS ${this.pg.quote(comment)}`,
+      `COMMENT ON COLUMN ${this.quoteTableName(tableName)}.${this.quoteColumnName(columnName)} IS ${this.quote(comment)}`,
     );
   }
 
@@ -990,10 +1015,10 @@ export class SchemaStatements extends AbstractSchemaStatements {
     commentOrChanges: string | null | { from?: string | null; to?: string | null },
   ): Promise<void> {
     // Mirrors PostgreSQL::SchemaStatements#change_table_comment.
-    this.pg.clearCacheBang();
+    this.clearCacheBang();
     const comment = this.extractNewCommentValue(commentOrChanges) as string | null;
     await this.execute(
-      `COMMENT ON TABLE ${this.quoteTableName(tableName)} IS ${this.pg.quote(comment)}`,
+      `COMMENT ON TABLE ${this.quoteTableName(tableName)} IS ${this.quote(comment)}`,
     );
   }
 
@@ -1003,9 +1028,9 @@ export class SchemaStatements extends AbstractSchemaStatements {
 
   /** @internal */
   async validateConstraint(tableName: string, constraintName: string): Promise<void> {
-    const at = this.pg.createAlterTable(tableName) as PgAlterTable;
+    const at = this.createAlterTable(tableName) as PgAlterTable;
     at.validateConstraint(constraintName);
-    await this.execute(await this.pg.schemaCreation.accept(at));
+    await this.execute(await this.schemaCreation.accept(at));
   }
 
   async validateCheckConstraint(
@@ -1028,7 +1053,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
   }
 
   override foreignKeyColumnFor(tableName: string, columnName = "id"): string {
-    const [, table] = this.pg.extractSchemaQualifiedName(tableName);
+    const [, table] = this.extractSchemaQualifiedName(tableName);
     return `${singularize(table)}_${columnName}`;
   }
 
@@ -1071,8 +1096,8 @@ export class SchemaStatements extends AbstractSchemaStatements {
   }
 
   override async foreignKeys(tableName: string): Promise<ForeignKeyDefinition[]> {
-    const scope = this.pg.quotedScope(tableName);
-    const fkInfo = await this.pg.internalExecQuery(
+    const scope = this.quotedScope(tableName);
+    const fkInfo = await this.internalExecQuery(
       `
       SELECT t2.oid::regclass::text AS to_table, a1.attname AS column, a2.attname AS primary_key,
              c.conname AS name, c.confupdtype AS on_update, c.confdeltype AS on_delete,
@@ -1085,7 +1110,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
       JOIN pg_attribute a2 ON a2.attnum = c.confkey[1] AND a2.attrelid = t2.oid
       JOIN pg_namespace t3 ON c.connamespace = t3.oid
       WHERE c.contype = 'f'
-        AND t1.relname = ${scope.name!}
+        AND t1.relname = ${scope.name}
         AND t3.nspname = ${scope.schema}
       ORDER BY c.conname
     `,
@@ -1159,23 +1184,23 @@ export class SchemaStatements extends AbstractSchemaStatements {
       toTable,
       options as Record<string, unknown>,
     );
-    const at = this.pg.createAlterTable(fromTable);
+    const at = this.createAlterTable(fromTable);
     // Route through AlterTable#addForeignKey -> TableDefinition#newForeignKeyDefinition
     // (now converged): it applies table_name_prefix/suffix and re-runs
     // foreign_key_options idempotently (column/name already filled above).
     at.addForeignKey(toTable, fkOptions as Partial<AddForeignKeyOptions>);
-    await this.execute(await this.pg.schemaCreation.accept(at));
+    await this.execute(await this.schemaCreation.accept(at));
   }
 
   override async checkConstraints(tableName: string): Promise<CheckConstraintDefinition[]> {
-    const scope = this.pg.quotedScope(tableName);
-    const checkInfo = await this.pg.internalExecQuery(
+    const scope = this.quotedScope(tableName);
+    const checkInfo = await this.internalExecQuery(
       `SELECT conname, pg_get_constraintdef(c.oid, true) AS constraintdef, c.convalidated AS valid
        FROM pg_constraint c
        JOIN pg_class t ON c.conrelid = t.oid
        JOIN pg_namespace n ON n.oid = c.connamespace
        WHERE c.contype = 'c'
-         AND t.relname = ${scope.name!}
+         AND t.relname = ${scope.name}
          AND n.nspname = ${scope.schema}`,
       "SCHEMA",
       [],
@@ -1211,9 +1236,9 @@ export class SchemaStatements extends AbstractSchemaStatements {
     options: ExclusionConstraintOptions = {},
   ): Promise<void> {
     const opts = this.exclusionConstraintOptions(tableName, expression, options);
-    const at = this.pg.createAlterTable(tableName) as PgAlterTable;
+    const at = this.createAlterTable(tableName) as PgAlterTable;
     at.addExclusionConstraint(expression, opts);
-    await this.execute(await this.pg.schemaCreation.accept(at));
+    await this.execute(await this.schemaCreation.accept(at));
   }
 
   async removeExclusionConstraint(
@@ -1236,8 +1261,8 @@ export class SchemaStatements extends AbstractSchemaStatements {
   }
 
   async exclusionConstraints(tableName: string): Promise<ExclusionConstraintDefinition[]> {
-    const scope = this.pg.quotedScope(tableName);
-    const exclusionInfo = await this.pg.internalExecQuery(
+    const scope = this.quotedScope(tableName);
+    const exclusionInfo = await this.internalExecQuery(
       `
       SELECT conname, pg_get_constraintdef(c.oid) AS constraintdef, c.condeferrable, c.condeferred
       FROM pg_constraint c
@@ -1295,8 +1320,8 @@ export class SchemaStatements extends AbstractSchemaStatements {
     options: Record<string, unknown> = {},
   ): Promise<ExclusionConstraintDefinition | undefined> {
     const name = this.exclusionConstraintName(tableName, options);
-    const scope = this.pg.quotedScope(tableName);
-    const rows = await this.pg.schemaQuery(
+    const scope = this.quotedScope(tableName);
+    const rows = await this.schemaQuery(
       `SELECT conname, pg_get_constraintdef(c.oid) AS constraintdef FROM pg_constraint c
        JOIN pg_class t ON c.conrelid = t.oid JOIN pg_namespace n ON n.oid = c.connamespace
        WHERE c.contype = 'x' AND c.conname = $1 AND t.relname = ${scope.name} AND n.nspname = ${scope.schema}`,
@@ -1349,9 +1374,9 @@ export class SchemaStatements extends AbstractSchemaStatements {
     options: UniqueConstraintOptions = {},
   ): Promise<void> {
     const opts = this.uniqueConstraintOptions(tableName, columnName, options);
-    const at = this.pg.createAlterTable(tableName) as PgAlterTable;
+    const at = this.createAlterTable(tableName) as PgAlterTable;
     at.addUniqueConstraint(columnName as string | string[], opts);
-    await this.execute(await this.pg.schemaCreation.accept(at));
+    await this.execute(await this.schemaCreation.accept(at));
   }
 
   async removeUniqueConstraint(
@@ -1378,8 +1403,8 @@ export class SchemaStatements extends AbstractSchemaStatements {
   }
 
   async uniqueConstraints(tableName: string): Promise<UniqueConstraintDefinition[]> {
-    const scope = this.pg.quotedScope(tableName);
-    const uniqueInfo = await this.pg.internalExecQuery(
+    const scope = this.quotedScope(tableName);
+    const uniqueInfo = await this.internalExecQuery(
       `
       SELECT c.conname, c.conrelid, c.conkey, c.condeferrable, c.condeferred,
              pg_get_constraintdef(c.oid) AS constraintdef
@@ -1484,7 +1509,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
       GROUP BY type.OID, n.nspname, type.typname
     `;
     const currentSchema = await this.currentSchema();
-    const rows = (await this.pg.schemaQuery(query)) as Array<{
+    const rows = (await this.schemaQuery(query)) as Array<{
       name: string;
       schema: string;
       value: string[];
@@ -1502,23 +1527,23 @@ export class SchemaStatements extends AbstractSchemaStatements {
     values: string[],
     _options?: Record<string, unknown>,
   ): Promise<void> {
-    const [schema, enumName] = this.pg.extractSchemaQualifiedName(name);
+    const [schema, enumName] = this.extractSchemaQualifiedName(name);
     const qualifiedName = schema
-      ? `${this.pg.quoteColumnName(schema)}.${this.pg.quoteColumnName(enumName)}`
-      : this.pg.quoteColumnName(enumName);
-    const valueList = values.map((v) => this.pg.quoteLiteral(v)).join(", ");
+      ? `${this.quoteColumnName(schema)}.${this.quoteColumnName(enumName)}`
+      : this.quoteColumnName(enumName);
+    const valueList = values.map((v) => this.quoteLiteral(v)).join(", ");
     // Mirrors Rails create_enum: guard with IF NOT EXISTS so re-running a
     // Schema.define under a different search_path is idempotent. The schema
     // scope defaults to the search path (current_schemas) when unqualified.
-    const schemaScope = schema ? this.pg.quoteLiteral(schema) : "ANY (current_schemas(false))";
-    await this.pg.exec(`
+    const schemaScope = schema ? this.quoteLiteral(schema) : "ANY (current_schemas(false))";
+    await this.exec(`
       DO $$
       BEGIN
           IF NOT EXISTS (
             SELECT 1
             FROM pg_type t
             JOIN pg_namespace n ON t.typnamespace = n.oid
-            WHERE t.typname = ${this.pg.quoteLiteral(enumName)}
+            WHERE t.typname = ${this.quoteLiteral(enumName)}
               AND n.nspname = ${schemaScope}
           ) THEN
               CREATE TYPE ${qualifiedName} AS ENUM (${valueList});
@@ -1526,39 +1551,39 @@ export class SchemaStatements extends AbstractSchemaStatements {
       END
       $$;
     `);
-    await this.pg.reloadTypeMap();
+    await this.reloadTypeMap();
   }
 
   async dropEnum(name: string, options: { ifExists?: boolean } = {}): Promise<void> {
-    const [schema, enumName] = this.pg.extractSchemaQualifiedName(name);
+    const [schema, enumName] = this.extractSchemaQualifiedName(name);
     const qualifiedName = schema
-      ? `${this.pg.quoteColumnName(schema)}.${this.pg.quoteColumnName(enumName)}`
-      : this.pg.quoteColumnName(enumName);
+      ? `${this.quoteColumnName(schema)}.${this.quoteColumnName(enumName)}`
+      : this.quoteColumnName(enumName);
     const ifExists = options.ifExists ? " IF EXISTS" : "";
-    await this.pg.exec(`DROP TYPE${ifExists} ${qualifiedName}`);
+    await this.exec(`DROP TYPE${ifExists} ${qualifiedName}`);
     // Mirrors Rails drop_enum: `internal_exec_query(query).tap { reload_type_map }`
     // (postgresql_adapter.rb:571-576). reloadTypeMap also drops the
     // prepared-statement name map so a cached plan referencing the dropped
     // type's OID is never re-executed ("cache lookup failed for type <oid>").
-    await this.pg.reloadTypeMap();
+    await this.reloadTypeMap();
   }
 
   async renameEnum(name: string, newNameOrOptions: string | { to: string }): Promise<void> {
     const newName = typeof newNameOrOptions === "string" ? newNameOrOptions : newNameOrOptions.to;
-    const [newSchema] = this.pg.extractSchemaQualifiedName(newName);
+    const [newSchema] = this.extractSchemaQualifiedName(newName);
     if (newSchema) {
       throw new Error(
         "PostgreSQLAdapter#renameEnum does not support changing enum schema; pass an unqualified type name.",
       );
     }
-    const [schema, enumName] = this.pg.extractSchemaQualifiedName(name);
+    const [schema, enumName] = this.extractSchemaQualifiedName(name);
     const qualifiedName = schema
-      ? `${this.pg.quoteColumnName(schema)}.${this.pg.quoteColumnName(enumName)}`
-      : this.pg.quoteColumnName(enumName);
-    await this.pg.exec(`ALTER TYPE ${qualifiedName} RENAME TO ${this.pg.quoteColumnName(newName)}`);
+      ? `${this.quoteColumnName(schema)}.${this.quoteColumnName(enumName)}`
+      : this.quoteColumnName(enumName);
+    await this.exec(`ALTER TYPE ${qualifiedName} RENAME TO ${this.quoteColumnName(newName)}`);
     // Mirrors Rails rename_enum: `exec_query(...).tap { reload_type_map }`
     // (postgresql_adapter.rb:584).
-    await this.pg.reloadTypeMap();
+    await this.reloadTypeMap();
   }
 
   async addEnumValue(
@@ -1566,39 +1591,39 @@ export class SchemaStatements extends AbstractSchemaStatements {
     value: string,
     options: { before?: string; after?: string; ifNotExists?: boolean } = {},
   ): Promise<void> {
-    const [schema, enumName] = this.pg.extractSchemaQualifiedName(name);
+    const [schema, enumName] = this.extractSchemaQualifiedName(name);
     const qualifiedName = schema
-      ? `${this.pg.quoteColumnName(schema)}.${this.pg.quoteColumnName(enumName)}`
-      : this.pg.quoteColumnName(enumName);
+      ? `${this.quoteColumnName(schema)}.${this.quoteColumnName(enumName)}`
+      : this.quoteColumnName(enumName);
     const ifNotExists = options.ifNotExists ? " IF NOT EXISTS" : "";
     if (options.before && options.after) {
       throw new Error("Cannot specify both `before` and `after` for addEnumValue");
     }
     let position = "";
     if (options.before) {
-      position = ` BEFORE ${this.pg.quoteLiteral(options.before)}`;
+      position = ` BEFORE ${this.quoteLiteral(options.before)}`;
     } else if (options.after) {
-      position = ` AFTER ${this.pg.quoteLiteral(options.after)}`;
+      position = ` AFTER ${this.quoteLiteral(options.after)}`;
     }
-    await this.pg.exec(
-      `ALTER TYPE ${qualifiedName} ADD VALUE${ifNotExists} ${this.pg.quoteLiteral(value)}${position}`,
+    await this.exec(
+      `ALTER TYPE ${qualifiedName} ADD VALUE${ifNotExists} ${this.quoteLiteral(value)}${position}`,
     );
     // Mirrors Rails add_enum_value: `exec_query(...).tap { reload_type_map }`
     // (postgresql_adapter.rb:602).
-    await this.pg.reloadTypeMap();
+    await this.reloadTypeMap();
   }
 
   async renameEnumValue(name: string, options: { from: string; to: string }): Promise<void> {
-    const [schema, enumName] = this.pg.extractSchemaQualifiedName(name);
+    const [schema, enumName] = this.extractSchemaQualifiedName(name);
     const qualifiedName = schema
-      ? `${this.pg.quoteColumnName(schema)}.${this.pg.quoteColumnName(enumName)}`
-      : this.pg.quoteColumnName(enumName);
-    await this.pg.exec(
-      `ALTER TYPE ${qualifiedName} RENAME VALUE ${this.pg.quoteLiteral(options.from)} TO ${this.pg.quoteLiteral(options.to)}`,
+      ? `${this.quoteColumnName(schema)}.${this.quoteColumnName(enumName)}`
+      : this.quoteColumnName(enumName);
+    await this.exec(
+      `ALTER TYPE ${qualifiedName} RENAME VALUE ${this.quoteLiteral(options.from)} TO ${this.quoteLiteral(options.to)}`,
     );
     // Mirrors Rails rename_enum_value: `exec_query(...).tap { reload_type_map }`
     // (postgresql_adapter.rb:614-616).
-    await this.pg.reloadTypeMap();
+    await this.reloadTypeMap();
   }
 
   // ---------------------------------------------------------------------------
@@ -1609,10 +1634,10 @@ export class SchemaStatements extends AbstractSchemaStatements {
     name: string,
     options: { subtype: string; subtypeDiff?: string },
   ): Promise<void> {
-    const [schema, rangeName] = this.pg.extractSchemaQualifiedName(name);
+    const [schema, rangeName] = this.extractSchemaQualifiedName(name);
     const qualifiedName = schema
-      ? `${this.pg.quoteColumnName(schema)}.${this.pg.quoteColumnName(rangeName)}`
-      : this.pg.quoteColumnName(rangeName);
+      ? `${this.quoteColumnName(schema)}.${this.quoteColumnName(rangeName)}`
+      : this.quoteColumnName(rangeName);
     const quoteQualifiedIdentifier = (identifier: string, param: string) => {
       if (/[\s()]/.test(identifier)) {
         throw new Error(
@@ -1626,16 +1651,14 @@ export class SchemaStatements extends AbstractSchemaStatements {
           `PostgreSQLAdapter#createRange: ${param} must have 1 or 2 dot-separated parts, got ${parts.length}: "${identifier}".`,
         );
       }
-      const [s, t] = this.pg.extractSchemaQualifiedName(identifier);
-      return s
-        ? `${this.pg.quoteColumnName(s)}.${this.pg.quoteColumnName(t)}`
-        : this.pg.quoteColumnName(t);
+      const [s, t] = this.extractSchemaQualifiedName(identifier);
+      return s ? `${this.quoteColumnName(s)}.${this.quoteColumnName(t)}` : this.quoteColumnName(t);
     };
     const parts = [`SUBTYPE = ${quoteQualifiedIdentifier(options.subtype, "subtype")}`];
     if (options.subtypeDiff) {
       parts.push(`SUBTYPE_DIFF = ${quoteQualifiedIdentifier(options.subtypeDiff, "subtypeDiff")}`);
     }
-    await this.pg.exec(`CREATE TYPE ${qualifiedName} AS RANGE (${parts.join(", ")})`);
+    await this.exec(`CREATE TYPE ${qualifiedName} AS RANGE (${parts.join(", ")})`);
     // createRange/dropRange are deliberate, permanent trails surface, not
     // unfinished porting: Rails supports PG range *column* types first-class but
     // ships no range-type DDL helper because Ruby has a core `Range` to lean on,
@@ -1651,18 +1674,18 @@ export class SchemaStatements extends AbstractSchemaStatements {
     // built against a prior incarnation of the type (drop + recreate reassigns
     // the OID) is re-prepared instead of raising
     // "cache lookup failed for type <oid>".
-    await this.pg.reloadTypeMap();
+    await this.reloadTypeMap();
   }
 
   async dropRange(name: string, options: { ifExists?: boolean } = {}): Promise<void> {
-    const [schema, rangeName] = this.pg.extractSchemaQualifiedName(name);
+    const [schema, rangeName] = this.extractSchemaQualifiedName(name);
     const qualifiedName = schema
-      ? `${this.pg.quoteColumnName(schema)}.${this.pg.quoteColumnName(rangeName)}`
-      : this.pg.quoteColumnName(rangeName);
+      ? `${this.quoteColumnName(schema)}.${this.quoteColumnName(rangeName)}`
+      : this.quoteColumnName(rangeName);
     const ifExists = options.ifExists ? " IF EXISTS" : "";
-    await this.pg.exec(`DROP TYPE${ifExists} ${qualifiedName}`);
+    await this.exec(`DROP TYPE${ifExists} ${qualifiedName}`);
     // See createRange: mirror Rails' type-DDL `reload_type_map` pattern.
-    await this.pg.reloadTypeMap();
+    await this.reloadTypeMap();
   }
 
   // ---------------------------------------------------------------------------
@@ -1670,7 +1693,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
   // ---------------------------------------------------------------------------
 
   override async primaryKey(tableName: string): Promise<string | string[] | null> {
-    const [schema, table] = this.pg.extractSchemaQualifiedName(tableName);
+    const [schema, table] = this.extractSchemaQualifiedName(tableName);
 
     let tableCondition: string;
     const binds: unknown[] = [];
@@ -1691,7 +1714,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     // non-deterministic order pg_attribute happens to yield rows.
     // `array_position(i.indkey, a.attnum)` gives each column's
     // 1-based position inside the index definition.
-    const rows = await this.pg.schemaQuery(
+    const rows = await this.schemaQuery(
       `SELECT a.attname
        FROM pg_index i
        JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
@@ -1709,7 +1732,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
   }
 
   async primaryKeys(tableName: string): Promise<string[]> {
-    const names = await this.pg.queryValues(
+    const names = await this.queryValues(
       `SELECT a.attname
        FROM (
          SELECT indrelid, indkey, generate_subscripts(indkey, 1) idx
@@ -1730,12 +1753,12 @@ export class SchemaStatements extends AbstractSchemaStatements {
     // Rails wraps the whole of `pk_and_sequence_for` in a bare `rescue nil`, so
     // ANY error — not just an unknown table — yields nil.
     try {
-      const quotedTable = this.pg.quote(this.pg.quoteTableName(tableName));
+      const quotedTable = this.quote(this.quoteTableName(tableName));
 
       // First try looking for a sequence with a dependency on the
       // given table's primary key.
       let result = (
-        await this.pg.query(
+        await this.query(
           `SELECT attr.attname, nsp.nspname, seq.relname
            FROM pg_class      seq,
                 pg_attribute  attr,
@@ -1758,7 +1781,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
 
       if (result == null || result.length === 0) {
         result = (
-          await this.pg.query(
+          await this.query(
             `SELECT attr.attname, nsp.nspname,
                CASE
                  WHEN pg_get_expr(def.adbin, def.adrelid) !~* 'nextval' THEN NULL
@@ -1791,8 +1814,8 @@ export class SchemaStatements extends AbstractSchemaStatements {
   }
 
   async serialSequence(tableName: string, column: string): Promise<string | null> {
-    return ((await this.pg.queryValue(
-      `SELECT pg_get_serial_sequence(${this.pg.quote(tableName)}, ${this.pg.quote(column)})`,
+    return ((await this.queryValue(
+      `SELECT pg_get_serial_sequence(${this.quote(tableName)}, ${this.quote(column)})`,
       "SCHEMA",
     )) ?? null) as string | null;
   }
@@ -1813,8 +1836,8 @@ export class SchemaStatements extends AbstractSchemaStatements {
 
   /** @internal */
   sequenceNameFromParts(tableName: string, columnName: string, suffix: string): string {
-    const maxIdentifierLength = this.pg.maxIdentifierLength();
-    const [, unqualifiedTable] = this.pg.extractSchemaQualifiedName(tableName);
+    const maxIdentifierLength = this.maxIdentifierLength();
+    const [, unqualifiedTable] = this.extractSchemaQualifiedName(tableName);
     let overLength =
       unqualifiedTable.length + columnName.length + suffix.length + 2 - maxIdentifierLength;
     let col = columnName;
@@ -1840,10 +1863,10 @@ export class SchemaStatements extends AbstractSchemaStatements {
     const [pk, seq] = result ?? [null, null];
     if (!pk) return;
     if (seq) {
-      const quotedSequence = this.pg.quoteTableName(seq.toString());
-      await this.queryValue(`SELECT setval(${this.pg.quote(quotedSequence)}, ${value})`, "SCHEMA");
+      const quotedSequence = this.quoteTableName(seq.toString());
+      await this.queryValue(`SELECT setval(${this.quote(quotedSequence)}, ${value})`, "SCHEMA");
     } else {
-      this.pg.logger?.warn?.(`${tableName} has primary key ${pk} with no default sequence.`);
+      this.logger?.warn?.(`${tableName} has primary key ${pk} with no default sequence.`);
     }
   }
 
@@ -1859,23 +1882,25 @@ export class SchemaStatements extends AbstractSchemaStatements {
     }
 
     if (pk && !sequence) {
-      this.pg.logger?.warn?.(`${tableName} has primary key ${pk} with no default sequence.`);
+      this.logger?.warn?.(`${tableName} has primary key ${pk} with no default sequence.`);
     }
 
     if (!pk || !sequence) return;
 
-    const quotedSequence = this.pg.quoteTableName(sequence);
+    const quotedSequence = this.quoteTableName(sequence);
     const maxPk = await this.queryValue(
-      `SELECT MAX(${this.pg.quoteColumnName(pk)}) FROM ${this.pg.quoteTableName(tableName)}`,
+      `SELECT MAX(${this.quoteColumnName(pk)}) FROM ${this.quoteTableName(tableName)}`,
       "SCHEMA",
     );
     let minvalue: unknown = null;
     if (maxPk == null) {
-      const dbVersion = await this.pg.getDatabaseVersion();
+      // PG's own `getDatabaseVersion` returns `server_version_num`; the abstract
+      // adapter types the return as `number | Version` for MySQL's sake.
+      const dbVersion = (await this.getDatabaseVersion()) as number;
       minvalue =
         dbVersion >= 100000
           ? await this.queryValue(
-              `SELECT seqmin FROM pg_sequence WHERE seqrelid = ${this.pg.quote(quotedSequence)}::regclass`,
+              `SELECT seqmin FROM pg_sequence WHERE seqrelid = ${this.quote(quotedSequence)}::regclass`,
               "SCHEMA",
             )
           : await this.queryValue(`SELECT min_value FROM ${quotedSequence}`, "SCHEMA");
@@ -1884,7 +1909,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     // Ruby's `max_pk ? true : false` is a nil check — 0 is truthy in Ruby, so a
     // table whose max primary key is 0 must still emit `true`.
     await this.queryValue(
-      `SELECT setval(${this.pg.quote(quotedSequence)}, ${maxPk ?? minvalue}, ${maxPk == null ? "false" : "true"})`,
+      `SELECT setval(${this.quote(quotedSequence)}, ${maxPk ?? minvalue}, ${maxPk == null ? "false" : "true"})`,
       "SCHEMA",
     );
   }

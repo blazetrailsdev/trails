@@ -6,7 +6,7 @@
 
 import { Message } from "./message.js";
 import type { Properties } from "./properties.js";
-import { MessageSerializer, type MessageSerializerLike } from "./message-serializer.js";
+import type { MessageSerializerLike } from "./message-serializer.js";
 import { getEncryptionContext } from "./context.js";
 import { Configurable } from "./configurable.js";
 import { Base, Configuration, Decryption, Encoding, ForbiddenClass } from "./errors.js";
@@ -45,7 +45,6 @@ export interface KeyProviderLike {
 export class Encryptor {
   private _compress: boolean;
   private _compressor: Compressor;
-  private _serializer = new MessageSerializer();
 
   constructor(options?: { compress?: boolean; compressor?: Compressor }) {
     this._compress = options?.compress ?? true;
@@ -188,7 +187,7 @@ export class Encryptor {
 
   /** @internal */
   private serializer(): MessageSerializerLike {
-    return getEncryptionContext().messageSerializer ?? this._serializer;
+    return getEncryptionContext().messageSerializer as MessageSerializerLike;
   }
 
   /** @internal */
