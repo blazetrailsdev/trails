@@ -45,9 +45,6 @@ describe("Migration", () => {
         t.integer("quantity");
       });
 
-      // Rails' setup also creates a `constraint_test` table on the MySQL lanes
-      // for `test_check_constraints` (check_constraint_test.rb:27-31), which is
-      // not ported yet.
       Trade.resetColumnInformation();
     });
 

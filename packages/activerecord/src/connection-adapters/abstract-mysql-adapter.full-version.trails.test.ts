@@ -12,9 +12,6 @@ import { Version } from "./abstract-adapter.js";
 // (sqlite3_adapter.rb:477) — so these pin both arms. #full_version used to
 // substitute "" for the nil, which answered #mariadb? "no" for a server it had
 // never asked.
-// The file keeps its abstract-mysql-adapter name so it stays on the default
-// vitest project: `mysql2-*.test.ts` routes to the server-backed mysql2 lane,
-// and these two cases construct the adapter without ever connecting.
 describe("Mysql2Adapter#full_version", () => {
   function adapterWith(version: Version): Mysql2Adapter {
     const adapter = new Mysql2Adapter({ host: "localhost" });

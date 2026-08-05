@@ -17,6 +17,9 @@ export class InvalidMatch extends Error {}
  * One real use case example would be to rotate a basic auth credentials.
  *
  * Mirrors: ActiveSupport::SecureCompareRotator (secure_compare_rotator.rb:32-56).
+ * Ruby's `include SecurityUtils` (:33) makes `secure_compare` an instance
+ * method; trails' SecurityUtils is a statics-only class, so the calls go
+ * through it by name.
  */
 export class SecureCompareRotator {
   private value: string;
