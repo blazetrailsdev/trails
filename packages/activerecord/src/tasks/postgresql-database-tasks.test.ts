@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { PostgreSQLDatabaseTasks, normalizeSchemaSearchPath } from "./postgresql-database-tasks.js";
 import { DatabaseTasks } from "./database-tasks.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
+import { UrlConfig } from "../database-configurations/url-config.js";
 import { DatabaseAlreadyExists } from "../errors.js";
 
 function config(overrides: Record<string, unknown> = {}): HashConfig {
@@ -176,6 +177,48 @@ describe("PostgreSQLDatabaseTasks", () => {
 
     expect(establishCalls).toHaveLength(1);
     expect(establishCalls[0]).toMatchObject({ database: "postgres", schemaSearchPath: "public" });
+  });
+
+  it("create names db_config.database on a url-only configuration", async () => {
+    const establishCalls: Array<Record<string, unknown> | undefined> = [];
+    const createDatabase = vi.fn(async () => {});
+    const tasks = new PostgreSQLDatabaseTasks(
+      new UrlConfig("development", "primary", "postgres://someone:secret@localhost:5433/url_db"),
+    );
+    vi.spyOn(
+      tasks as unknown as { connection(): Promise<unknown> },
+      "connection",
+    ).mockResolvedValue({ createDatabase });
+    vi.spyOn(
+      tasks as unknown as { establishConnection(c?: Record<string, unknown>): Promise<void> },
+      "establishConnection",
+    ).mockImplementation(async (c?: Record<string, unknown>) => {
+      establishCalls.push(c);
+    });
+
+    await tasks.create();
+
+    expect(createDatabase).toHaveBeenCalledWith(
+      "url_db",
+      expect.objectContaining({ host: "localhost", port: 5433, encoding: "utf8" }),
+    );
+    expect(establishCalls[0]).toMatchObject({ database: "postgres", schemaSearchPath: "public" });
+  });
+
+  it("psqlEnv reads the configuration hash on a url-only configuration", () => {
+    const tasks = new PostgreSQLDatabaseTasks(
+      new UrlConfig(
+        "development",
+        "primary",
+        "postgres://someone:secret@localhost:5433/url_db?sslmode=require",
+      ),
+    );
+    const env = (tasks as unknown as { psqlEnv(): Record<string, string> }).psqlEnv();
+    expect(env.PGHOST).toBe("localhost");
+    expect(env.PGPORT).toBe("5433");
+    expect(env.PGUSER).toBe("someone");
+    expect(env.PGPASSWORD).toBe("secret");
+    expect(env.PGSSLMODE).toBe("require");
   });
 
   describe("structureDump schema filtering", () => {
