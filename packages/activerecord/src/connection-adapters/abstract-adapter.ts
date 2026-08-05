@@ -154,16 +154,24 @@ export function adapterNameFromConfig(configAdapter: string | undefined): Adapte
  * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter::Version
  */
 export class Version {
-  private _version: string;
-  private _parts: number[];
+  /**
+   * Rails' `@version` (abstract_adapter.rb:249), the parsed parts — not the
+   * string it was built from. Ruby's `String#to_i` reads the leading integer
+   * and answers `0` for a part that has none, which is what keeps a banner
+   * like `"8.0.31-log"` parsing as `[8, 0, 31]`.
+   */
+  private _version: number[];
 
-  constructor(version: string) {
-    this._version = version;
-    this._parts = version.split(".").map(Number);
+  /** Rails: `attr_reader :full_version_string` (abstract_adapter.rb:246). */
+  readonly fullVersionString: string | null;
+
+  constructor(versionString: string, fullVersionString: string | null = null) {
+    this._version = versionString.split(".").map((part) => parseInt(part, 10) || 0);
+    this.fullVersionString = fullVersionString;
   }
 
   toString(): string {
-    return this._version;
+    return this._version.join(".");
   }
 
   /**
@@ -175,12 +183,12 @@ export class Version {
    * spell them `compare(...) >= 0` / `compare(...) < 0`.
    */
   compare(versionString: string): number {
-    const other = versionString.split(".").map(Number);
-    for (let i = 0; i < Math.min(this._parts.length, other.length); i++) {
-      if (this._parts[i] > other[i]) return 1;
-      if (this._parts[i] < other[i]) return -1;
+    const other = versionString.split(".").map((part) => parseInt(part, 10) || 0);
+    for (let i = 0; i < Math.min(this._version.length, other.length); i++) {
+      if (this._version[i] > other[i]) return 1;
+      if (this._version[i] < other[i]) return -1;
     }
-    return this._parts.length === other.length ? 0 : this._parts.length > other.length ? 1 : -1;
+    return this._version.length === other.length ? 0 : this._version.length > other.length ? 1 : -1;
   }
 }
 
