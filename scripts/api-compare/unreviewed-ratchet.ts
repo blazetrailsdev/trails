@@ -1,7 +1,7 @@
 /**
- * Only-shrink counter for UNREVIEWED wide-ratchet baseline entries (RFC 0083).
+ * Only-shrink counter for UNREVIEWED ratchet baseline entries (RFC 0083).
  *
- * The wide call-mismatch ratchet (lint-call-mismatches-wide.ts) counts ENTRIES:
+ * The call-mismatch ratchet (lint-call-mismatches.ts) counts ENTRIES:
  * it moves only when a call converges and the row disappears. But 92.7% of the
  * baseline still carries the verbatim `DEFAULT_REASON` seed written when the
  * ratchet landed — those rows have never been looked at, and an agent who reads
@@ -15,7 +15,7 @@
  *
  * ── The mark is SHARDED, one file per source ────────────────────────────────
  * It is not one number: it mirrors the split exclude baseline exactly, at
- * `call-mismatches-wide-unreviewed/<package>/<tsFile with .ts→.json>`, each
+ * `call-mismatches-unreviewed/<package>/<tsFile with .ts→.json>`, each
  * file holding `{"max": N}` for that ONE source file. A single repo-wide
  * `{"max": N}` made every PR that reviewed a reason rewrite the same file, so
  * any two concurrent PRs conflicted on it — a serialization point for the whole
@@ -93,7 +93,7 @@ export function totalMark(marks: MarkSet): number {
 /**
  * Unreviewed rows per source file, keyed like {@link MarkSet}. `pathFor` is
  * injected rather than imported so this module stays free of the gate that
- * consumes it (lint-call-mismatches-wide.ts owns `relPathFor`).
+ * consumes it (lint-call-mismatches.ts owns `relPathFor`).
  */
 export function unreviewedCounts(
   entries: ExcludeEntry[],
@@ -293,7 +293,7 @@ export function excessByPath(counts: MarkSet, marks: MarkSet): MarkDelta[] {
 export function renderExcess(excess: MarkDelta[], markDir: string): string {
   const total = excess.reduce((n, d) => n + d.count - d.mark, 0);
   return (
-    `\nwide call-mismatches unreviewed ratchet: ${total} baselined entr(ies) across ` +
+    `\ncall-mismatches unreviewed ratchet: ${total} baselined entr(ies) across ` +
     `${excess.length} source file(s) carry the seeded default reason beyond that file's ` +
     "committed high-water mark.\n" +
     `That means ${total} row(s) gained the placeholder reason since the mark was set — either ` +
@@ -337,13 +337,13 @@ export function slackByPath(counts: MarkSet, marks: MarkSet): MarkDelta[] {
 export function renderSlack(slack: MarkDelta[], markDir: string): string {
   const total = slack.reduce((n, d) => n + d.mark - d.count, 0);
   return (
-    `\nwide call-mismatches unreviewed ratchet: STALE high-water mark — ${slack.length} file(s) ` +
+    `\ncall-mismatches unreviewed ratchet: STALE high-water mark — ${slack.length} file(s) ` +
     `under ${markDir}/ claim more unreviewed entr(ies) than the baseline still carries ` +
     `(${total} of slack).\n` +
     "A mark is a measurement of remaining unreviewed debt; left high it hands the next " +
     "story a “before” value no clean tree produces, and the drift is discovered only " +
     "when someone reseeds. A mark only shrinks, so tightening is always safe:\n" +
-    "  pnpm api:calls:wide:reseed\n" +
+    "  pnpm api:calls:reseed\n" +
     slack.map((d) => `  - ${d.file}  mark ${d.mark}, only ${d.count} unreviewed`).join("\n")
   );
 }

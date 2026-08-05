@@ -1,10 +1,10 @@
 #!/usr/bin/env npx tsx
 /**
- * Ratcheting gate for the WIDE call-set parity dimension (RFC 0047).
+ * Ratcheting gate for the call-set parity dimension (RFC 0047).
  *
- * Ratchets output/call-mismatches-wide.json, produced when compare.ts runs with
- * `--wide-calls` / `API_COMPARE_WIDE_CALLS=1` (WIDE_SIGNIFICANT_CALLS — every
- * ported call name except `super` and the WIDE_NO_JS_CALL_FORM names).
+ * Ratchets output/call-mismatches.json, produced when compare.ts runs with
+ * `--calls` / `API_COMPARE_CALLS=1` (SIGNIFICANT_CALLS — every
+ * ported call name except `super` and the NO_JS_CALL_FORM names).
  *
  * This is the only call-set gate. RFC 0084 folded in the narrow RFC 0044 gate,
  * which ratcheted a second artifact over a curated SIGNIFICANT_CALLS allowlist:
@@ -13,16 +13,16 @@
  * signal not already here. Its reviewed reasons live in this baseline.
  *
  * Same only-shrink contract: a committed baseline lists the currently-known
- * wide mismatches keyed by `package + tsFile + rubyName + call`, each with a
+ * mismatches keyed by `package + tsFile + rubyName + call`, each with a
  * one-line `reason`, and CI fails on:
  *
- *   - any NEW wide mismatch absent from the baseline (the ratchet);
+ *   - any NEW mismatch absent from the baseline (the ratchet);
  *   - any STALE baseline entry that no longer flags (only-shrink);
  *   - any STALE `@missingRailsCall` tag whose call no longer flags (RFC 0083 —
- *     the tag is the OTHER place a wide deviation can be justified, and it
+ *     the tag is the OTHER place a deviation can be justified, and it
  *     shrinks by the same rule; see missing-rails-call-tags.ts);
  *   - any source file carrying more entries with the seeded {@link DEFAULT_REASON}
- *     than its committed high-water mark under call-mismatches-wide-unreviewed/
+ *     than its committed high-water mark under call-mismatches-unreviewed/
  *     (RFC 0083 — see unreviewed-ratchet.ts for why that is a second ratchet,
  *     and why the mark is sharded per source file like the baseline itself);
  *   - a high-water mark left ABOVE what a clean reseed would write (RFC 0083 —
@@ -30,7 +30,7 @@
  *     stale-HIGH mark, so drift used to surface only when the next story
  *     reseeded and found its own before-value was never reproducible. It is a
  *     GATE, not advisory: the mark only shrinks, so tightening is always safe,
- *     and `pnpm api:calls:wide:reseed` fixes it in one command. Baseline ROW
+ *     and `pnpm api:calls:reseed` fixes it in one command. Baseline ROW
  *     drift needs no separate arm — a gating run regenerates the artifact
  *     itself (see below), so a row set that a clean reseed would change already
  *     fails as NEW or STALE entries.
@@ -41,13 +41,13 @@
  * method and say nothing about the port (RFC 0083; see
  * extract-ruby-api.rb#walk_for_calls and compare.ts#dropWeakCalls).
  *
- * The wide population is large and dominated by bucket-(b) confirmed
+ * The population is large and dominated by bucket-(b) confirmed
  * equivalents and bucket-(c) tooling noise (see RFC 0047 README). The baseline
  * seeds with the whole current population and shrinks as the per-cluster
  * convergence stories land — removing an entry is how a converged call drops out.
  *
  * ── Split baseline layout ───────────────────────────────────────────────────
- * The baseline is NOT one file: it is a directory (call-mismatches-wide-exclude/)
+ * The baseline is NOT one file: it is a directory (call-mismatches-exclude/)
  * that mirrors the source tree, one JSON file per `tsFile`, at
  * `<dir>/<package>/<tsFile with .ts→.json>`. Each file is a JSON array of
  * exactly that source file's entries, sorted by the code-unit `compareKeys`
@@ -62,25 +62,25 @@
  * baseline changes.
  *
  * Usage:
- *   pnpm tsx scripts/api-compare/lint-call-mismatches-wide.ts           # gate (CI)
- *   pnpm tsx scripts/api-compare/lint-call-mismatches-wide.ts --write   # reseed baseline
- *   pnpm tsx scripts/api-compare/lint-call-mismatches-wide.ts --report  # read-only grouping
- *   pnpm tsx scripts/api-compare/lint-call-mismatches-wide.ts --no-regen # gate the artifact on disk
+ *   pnpm tsx scripts/api-compare/lint-call-mismatches.ts           # gate (CI)
+ *   pnpm tsx scripts/api-compare/lint-call-mismatches.ts --write   # reseed baseline
+ *   pnpm tsx scripts/api-compare/lint-call-mismatches.ts --report  # read-only grouping
+ *   pnpm tsx scripts/api-compare/lint-call-mismatches.ts --no-regen # gate the artifact on disk
  *
- * A plain gating run first regenerates output/call-mismatches-wide.json itself
- * by shelling out to `pnpm api:compare --wide-calls` (RFC 0083). Gating a stale
+ * A plain gating run first regenerates output/call-mismatches.json itself
+ * by shelling out to `pnpm api:compare --calls` (RFC 0083). Gating a stale
  * artifact is what makes a sibling PR's deleted TS method surface here as
  * `STALE baseline entr(ies)` on a branch that never touched it, and the fix was
  * always "re-extract, then re-run". It goes through run.sh rather than
  * compare.ts so the extraction manifests compare.ts reads are refreshed first.
  * `--write` regenerates first too, unless API_COMPARE_FORCE is set, which is
- * how api:calls:wide:reseed signals it already ran the forced regeneration.
- * Opt out with `--no-regen`, API_COMPARE_SKIP_WIDE_REGEN=1, or any CI value —
+ * how api:calls:reseed signals it already ran the forced regeneration.
+ * Opt out with `--no-regen`, API_COMPARE_SKIP_REGEN=1, or any CI value —
  * CI runs the extraction step separately and must not pay for it twice. The
  * partial-scope determinism guard runs unchanged either way.
  *
  * The unreviewed high-water marks are sharded the same way, under
- * call-mismatches-wide-unreviewed/ with the identical
+ * call-mismatches-unreviewed/ with the identical
  * `<package>/<tsFile .ts→.json>` key, so reviewing a seeded reason rewrites one
  * small file instead of a repo-wide counter every concurrent PR conflicts on.
  *
@@ -90,7 +90,7 @@
  * the baseline and always exits 0. `--unreviewed` prints just the count of
  * entries whose `reason` is still the seeded {@link DEFAULT_REASON}.
  *
- * `--write` regenerates the baseline from the current wide artifact, preserving
+ * `--write` regenerates the baseline from the current artifact, preserving
  * the `reason` of entries that still flag and dropping stale rows, then
  * repartitions it across the split files (adding/removing files as needed). It
  * reports the rows it dropped so the author can tell a converged port from a
@@ -153,7 +153,7 @@ import type { ApiManifest, ClassInfo, MethodInfo } from "./types.js";
 // with .ts→.json>.
 const BASELINE_DIR = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
-  "call-mismatches-wide-exclude",
+  "call-mismatches-exclude",
 );
 
 // Relative baseline path (under BASELINE_DIR) for an entry, mirroring its
@@ -164,23 +164,23 @@ const BASELINE_DIR = path.join(
 export function relPathFor(k: CallMismatchKey): string {
   if (!k.tsFile.endsWith(".ts")) {
     throw new Error(
-      `wide call-mismatches baseline: tsFile ${JSON.stringify(k.tsFile)} does not end in ` +
+      `call-mismatches baseline: tsFile ${JSON.stringify(k.tsFile)} does not end in ` +
         `".ts" (package ${k.package}); the split baseline maps <tsFile .ts→.json> and ` +
         "cannot place a non-.ts source.",
     );
   }
   return path.join(k.package, k.tsFile.replace(/\.ts$/, ".json"));
 }
-// Gates the full-surface wide artifact only — privates are advisory-only
+// Gates the full-surface artifact only — privates are advisory-only
 // throughout the compare tooling.
-const ARTIFACT_PATH = path.join(OUTPUT_DIR, "call-mismatches-wide.json");
+const ARTIFACT_PATH = path.join(OUTPUT_DIR, "call-mismatches.json");
 
 // Committed high-water marks for the unreviewed-reason counter (RFC 0083),
 // sharded per source file exactly like the baseline above so the two trees
 // share one merge-conflict boundary; see unreviewed-ratchet.ts.
 export const MARK_DIR = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
-  "call-mismatches-wide-unreviewed",
+  "call-mismatches-unreviewed",
 );
 
 export { DEFAULT_REASON } from "./missing-rails-call-tags.js";
@@ -199,7 +199,7 @@ export async function loadSplitBaseline(dir: string): Promise<ExcludeEntry[]> {
   return sortKeys(merged);
 }
 
-/** The committed wide baseline, merged across its split files. @internal */
+/** The committed baseline, merged across its split files. @internal */
 export async function loadBaseline(): Promise<ExcludeEntry[]> {
   return loadSplitBaseline(BASELINE_DIR);
 }
@@ -239,7 +239,7 @@ async function loadArtifact(): Promise<Artifact> {
   if (!exists) {
     throw new Error(
       `Missing ${path.relative(ROOT_DIR, ARTIFACT_PATH)} — run \`pnpm exec tsx ` +
-        "scripts/api-compare/compare.ts --wide-calls` (or `pnpm api:compare --wide-calls`) first to write it.",
+        "scripts/api-compare/compare.ts --calls` (or `pnpm api:compare --calls`) first to write it.",
     );
   }
   return readJson<Artifact>(ARTIFACT_PATH);
@@ -337,7 +337,7 @@ function section(title: string, rows: [string, number][], top?: number): string 
 export function renderStaleTags(staleTags: StaleTag[]): string | null {
   if (staleTags.length === 0) return null;
   return [
-    `\nwide call-mismatches ratchet: ${staleTags.length} STALE ${TAG} tag(s) whose call is ` +
+    `\ncall-mismatches ratchet: ${staleTags.length} STALE ${TAG} tag(s) whose call is ` +
       "no longer flagged.",
     "A justification only shrinks, exactly like a baseline entry: the TS body now makes " +
       "the call, so delete the tag from its JSDoc block (or run `pnpm api:build --package " +
@@ -358,7 +358,7 @@ export function renderReport(
 ): string {
   const files = new Set(entries.map((e) => `${e.package} ${e.tsFile}`)).size;
   const parts = [
-    `wide call-mismatches report: ${entries.length} entr(ies) across ${files} file(s)`,
+    `call-mismatches report: ${entries.length} entr(ies) across ${files} file(s)`,
     `  unreviewed (reason still the seeded default): ${unreviewedCount(entries)} of ${entries.length}` +
       (mark === undefined ? "" : ` — high-water mark ${mark}`),
     section(
@@ -405,7 +405,7 @@ async function main(write: boolean, showSeededKeys: boolean): Promise<number> {
   const dups = findDuplicateKeys(baseline);
   if (dups.length > 0) {
     console.error(
-      `\nwide call-mismatches ratchet: ${dups.length} duplicate baseline key(s):\n` +
+      `\ncall-mismatches ratchet: ${dups.length} duplicate baseline key(s):\n` +
         dups.map((d) => `  ${d}`).join("\n"),
     );
     return 1;
@@ -416,13 +416,13 @@ async function main(write: boolean, showSeededKeys: boolean): Promise<number> {
   const absent = missingScope(artifact);
   if (absent.length > 0) {
     console.error(
-      `\nwide call-mismatches ratchet: artifact compared a PARTIAL scope — missing ` +
+      `\ncall-mismatches ratchet: artifact compared a PARTIAL scope — missing ` +
         `${absent.length} package(s): ${absent.join(", ")}.\n` +
         "It covers fewer packages than CI (an unfetched vendor source, a " +
         "`--package`-filtered run, or a stale artifact); reseeding or gating " +
         "from it would desync local vs CI. Regenerate the full surface:\n" +
-        "  pnpm api:calls:wide:reseed   (or `API_COMPARE_FORCE=1 pnpm " +
-        "api:compare --wide-calls` then re-run this).\n",
+        "  pnpm api:calls:reseed   (or `API_COMPARE_FORCE=1 pnpm " +
+        "api:compare --calls` then re-run this).\n",
     );
     return 1;
   }
@@ -431,7 +431,7 @@ async function main(write: boolean, showSeededKeys: boolean): Promise<number> {
     const next = reseed(current, baseline, DEFAULT_REASON);
     await writeSplitBaseline(next, BASELINE_DIR);
     console.log(
-      `Wrote ${path.relative(ROOT_DIR, BASELINE_DIR)}/: ${next.length} baselined wide call mismatches`,
+      `Wrote ${path.relative(ROOT_DIR, BASELINE_DIR)}/: ${next.length} baselined call mismatches`,
     );
 
     const count = unreviewedCount(next);
@@ -455,7 +455,7 @@ async function main(write: boolean, showSeededKeys: boolean): Promise<number> {
   // The marks are committed and `--write`-generated like the split baseline
   // files, so they are held to the same canonical form.
   const files = [...(await listJsonFiles(BASELINE_DIR)), ...(await listJsonFiles(MARK_DIR))];
-  if (await reportNonCanonicalBaselines(files, "wide call-mismatches ratchet")) return 1;
+  if (await reportNonCanonicalBaselines(files, "call-mismatches ratchet")) return 1;
 
   const { added, stale } = diffAgainstBaseline(current, baseline);
   const staleTags = artifact.staleTags ?? [];
@@ -476,7 +476,7 @@ async function main(write: boolean, showSeededKeys: boolean): Promise<number> {
   if (added.length === 0 && stale.length === 0 && staleTags.length === 0) {
     if (excess.length > 0 || slack.length > 0) return 1;
     console.log(
-      `wide call-mismatches ratchet: OK (${baseline.length} baselined, ` +
+      `call-mismatches ratchet: OK (${baseline.length} baselined, ` +
         `${unreviewed} unreviewed, ${marks.size} per-file mark(s) totalling ` +
         `${totalMark(marks)} tight)`,
     );
@@ -485,10 +485,10 @@ async function main(write: boolean, showSeededKeys: boolean): Promise<number> {
 
   if (added.length > 0) {
     console.error(
-      `\nwide call-mismatches ratchet: ${added.length} NEW wide mismatch(es) not in the baseline.`,
+      `\ncall-mismatches ratchet: ${added.length} NEW mismatch(es) not in the baseline.`,
     );
     console.error(
-      "A ported TS body omits a call Rails makes (wide population). Implement the " +
+      "A ported TS body omits a call Rails makes (population). Implement the " +
         "call, or — if it is satisfied by a different path — add it (with a " +
         "one-line reason) to its per-source baseline file under\n  " +
         `${path.relative(ROOT_DIR, BASELINE_DIR)}/  (<package>/<tsFile .ts→.json>).\n`,
@@ -500,7 +500,7 @@ async function main(write: boolean, showSeededKeys: boolean): Promise<number> {
 
   if (stale.length > 0) {
     console.error(
-      `\nwide call-mismatches ratchet: ${stale.length} STALE baseline entr(ies) that no longer flag.`,
+      `\ncall-mismatches ratchet: ${stale.length} STALE baseline entr(ies) that no longer flag.`,
     );
     console.error(
       "The baseline only shrinks. Remove the converged entr(ies) (or run " +
@@ -518,7 +518,7 @@ async function reportMain(top: number, unreviewedOnly: boolean): Promise<number>
   const baseline = await loadBaseline();
   if (unreviewedOnly) {
     console.log(
-      `wide call-mismatches: ${unreviewedCount(baseline)} of ${baseline.length} baselined ` +
+      `call-mismatches: ${unreviewedCount(baseline)} of ${baseline.length} baselined ` +
         `entr(ies) still carry the seeded default reason (unreviewed); per-file high-water ` +
         `marks total ${totalMark(await loadMarks(MARK_DIR))}.`,
     );
@@ -528,9 +528,7 @@ async function reportMain(top: number, unreviewedOnly: boolean): Promise<number>
   const entries = [...baseline];
   const artifact = await readJsonIfPresent<Artifact>(ARTIFACT_PATH);
   if (artifact === undefined) {
-    console.log(
-      "(baseline only — the wide artifact is missing; run `pnpm api:compare --wide-calls`)",
-    );
+    console.log("(baseline only — the artifact is missing; run `pnpm api:compare --calls`)");
   } else {
     // Not-yet-baselined mismatches carry no reason, so they are reported in the
     // groupings without inflating the unreviewed-but-seeded count.
@@ -569,12 +567,12 @@ async function runAsScript(): Promise<void> {
   const unreviewed = argv.includes("--unreviewed");
   if (!argv.includes("--report") && !unreviewed) {
     if (shouldRegenerate(argv, process.env)) {
-      console.log("Regenerating output/call-mismatches-wide.json (compare.ts --wide-calls)…");
+      console.log("Regenerating output/call-mismatches.json (compare.ts --calls)…");
       try {
-        await regenerateArtifact(process.env, ["--wide-calls"]);
+        await regenerateArtifact(process.env, ["--calls"]);
       } catch (e) {
         console.error(
-          `\nwide call-mismatches ratchet: could not regenerate the wide artifact: ${
+          `\ncall-mismatches ratchet: could not regenerate the artifact: ${
             (e as Error).message
           }\n` + `Re-run with ${NO_REGEN_FLAG} to gate against the artifact already on disk.\n`,
         );
@@ -587,7 +585,7 @@ async function runAsScript(): Promise<void> {
   try {
     top = parseTop(argv, 20);
   } catch (e) {
-    console.error(`wide call-mismatches report: ${(e as Error).message}`);
+    console.error(`call-mismatches report: ${(e as Error).message}`);
     process.exit(2);
   }
   process.exit(await reportMain(top, unreviewed));

@@ -17,7 +17,7 @@ import {
   unreviewedCount,
   writeSplitBaseline,
   renderStaleTags,
-} from "./lint-call-mismatches-wide.js";
+} from "./lint-call-mismatches.js";
 import type { ApiManifest, ClassInfo, MethodInfo } from "./types.js";
 
 const entry = (
@@ -55,7 +55,7 @@ describe("relPathFor", () => {
 describe("split baseline round-trip", () => {
   let dir: string;
   beforeEach(async () => {
-    dir = await fs.mkdtemp(path.join(os.tmpdir(), "wide-baseline-"));
+    dir = await fs.mkdtemp(path.join(os.tmpdir(), "baseline-"));
   });
   afterEach(async () => {
     await fs.rm(dir, { recursive: true, force: true });
@@ -146,7 +146,7 @@ describe("split baseline round-trip", () => {
 
 describe("loadSplitBaseline on a missing directory", () => {
   it("returns an empty baseline rather than throwing", async () => {
-    const missing = path.join(os.tmpdir(), "wide-baseline-does-not-exist-xyz");
+    const missing = path.join(os.tmpdir(), "baseline-does-not-exist-xyz");
     expect(await loadSplitBaseline(missing)).toEqual([]);
   });
 });
@@ -154,7 +154,7 @@ describe("loadSplitBaseline on a missing directory", () => {
 describe("emission order", () => {
   let dir: string;
   beforeEach(async () => {
-    dir = await fs.mkdtemp(path.join(os.tmpdir(), "wide-baseline-order-"));
+    dir = await fs.mkdtemp(path.join(os.tmpdir(), "baseline-order-"));
   });
   afterEach(async () => {
     await fs.rm(dir, { recursive: true, force: true });
@@ -354,11 +354,11 @@ describe("the committed per-file unreviewed marks", () => {
   const HERE = path.dirname(fileURLToPath(import.meta.url));
   const load = async () => ({
     counts: unreviewedCounts(
-      await loadSplitBaseline(path.join(HERE, "call-mismatches-wide-exclude")),
+      await loadSplitBaseline(path.join(HERE, "call-mismatches-exclude")),
       DEFAULT_REASON,
       relPathFor,
     ),
-    marks: await loadMarks(path.join(HERE, "call-mismatches-wide-unreviewed")),
+    marks: await loadMarks(path.join(HERE, "call-mismatches-unreviewed")),
   });
 
   it("sit at or below their own source file's seeded-reason count", async () => {

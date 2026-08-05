@@ -1,13 +1,13 @@
 /**
- * Shared machinery for the call-set parity ratchet (RFC 0047, wide gate:
- * lint-call-mismatches-wide.ts): the artifact/baseline row shapes, the key
+ * Shared machinery for the call-set parity ratchet (RFC 0047, gate:
+ * lint-call-mismatches.ts): the artifact/baseline row shapes, the key
  * grain the baselines are recorded at, and the diff/reseed/sort primitives the
  * gate, `api:build` and the unreviewed ratchet all agree on.
  *
- * `compare.ts --wide-calls` writes output/call-mismatches-wide.json — name-matched
+ * `compare.ts --calls` writes output/call-mismatches.json — name-matched
  * (Ruby, TS) method pairs whose ported TS body omits a call Rails' body makes.
  * That artifact is advisory and never affects the parity %, so on its own
- * nothing stops new mismatches from landing. The wide gate turns it into a
+ * nothing stops new mismatches from landing. The gate turns it into a
  * one-way ratchet, mirroring the `eslint/*-exclude.json` baselines
  * (no-explicit-any, rails-error-parity, …): a committed baseline lists the
  * currently-known mismatches keyed by `package + tsFile + rubyName + call`, and
@@ -17,12 +17,12 @@
  *   - any STALE baseline entry that no longer flags (only-shrink — the baseline
  *     can only get smaller, so a converged call must be removed from it).
  *
- * RFC 0084 folded the narrow RFC 0044 gate into the wide one. That gate ratcheted
- * a second artifact (output/call-mismatches.json) against a curated
- * SIGNIFICANT_CALLS allowlist; the wide population strictly subsumed it, so it
+ * RFC 0084 folded the narrow RFC 0044 gate into this one. That gate ratcheted
+ * a second artifact of its own against a curated significant-call allowlist;
+ * this gate's population strictly subsumed it, so it
  * cost a duplicate artifact, a second CI step and the two-artifact
- * `API_COMPARE_FORCE` trap for no signal the wide gate did not already carry.
- * Its reviewed reasons moved into the wide baseline shards. What survives here
+ * `API_COMPARE_FORCE` trap for no signal the gate did not already carry.
+ * Its reviewed reasons moved into the baseline shards. What survives here
  * is the machinery both gates shared — no CLI: this module is a library.
  *
  * ── Gate ONLY from a full, fresh artifact (RFC 0044 determinism) ────────────
@@ -41,7 +41,7 @@
  *   2. reseed ONLY through the canonical path, which force-rebuilds every
  *      cache first so the artifact can't be a warm-cache under-report:
  *
- *        pnpm api:calls:wide:reseed
+ *        pnpm api:calls:reseed
  *
  *   3. as a backstop, the artifact records the `packages` it compared and the
  *      gate ABORTS (gate AND `--write`) unless that set covers every
@@ -87,7 +87,7 @@ export interface Artifact {
   mismatches: ArtifactMismatch[];
   /** `@missingRailsCall` tags on a compared method whose call no longer flags
    *  (RFC 0083). Optional so an artifact predating the field still loads; the
-   *  wide gate fails on a non-empty list, the tag's only-shrink half. */
+   *  gate fails on a non-empty list, the tag's only-shrink half. */
   staleTags?: StaleTag[];
 }
 

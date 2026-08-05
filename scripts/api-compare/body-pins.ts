@@ -49,7 +49,7 @@
  * (Run `pnpm api:compare` first so output/body-hashes.json is fresh.)
  *
  * Hard rules: no node:* imports, no process.* in the library surface (the CLI
- * entry guard is the sole exception, matching lint-call-mismatches-wide.ts), async
+ * entry guard is the sole exception, matching lint-call-mismatches.ts), async
  * fs only, no third-party runtime deps.
  */
 

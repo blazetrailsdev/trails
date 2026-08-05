@@ -1,6 +1,6 @@
 /**
  * Reasoned suppression file for the advisory arity check (RFC 0072), shaped
- * like the calls check's `call-mismatches-wide-exclude/`: a mandatory `reason`
+ * like the calls check's `call-mismatches-exclude/`: a mandatory `reason`
  * per entry, and a ratchet — an entry that no longer suppresses a live
  * mismatch is STALE and fails the gate, so the file can only shrink.
  *

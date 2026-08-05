@@ -361,13 +361,13 @@ guard story (item 7). For the 10 targets, every generated Rails-named symbol
 absent from the port fell into one of these buckets, none of them a new
 untracked deviation:
 
-| bucket                   | examples                                                                                                | status                                 |
-| ------------------------ | ------------------------------------------------------------------------------------------------------- | -------------------------------------- |
-| Tracked API deviation    | `async_count`/`async_pluck`/`async_sum` family (trails uses an `{ async: true }` path)                  | in `call-mismatches-wide-exclude.json` |
-| Tracked scoped-skip      | `build_count_subquery`, `perform_calculation` (realized inline)                                         | `SCOPED_SKIP` in `conventions.ts`      |
-| Confirmed-equivalent     | `_create_record` (ported in `callbacks.ts`/`dirty.ts`, not `persistence.ts`)                            | `call-mismatches-exclude.json`         |
-| Ruby object-protocol     | `encode_with`, `init_with`, `to_ary`, `initialize_dup`                                                  | `SKIP` in `conventions.ts`             |
-| Generator false positive | `isExists`/`isAbstractClass` (port uses `exists`/`abstractClass`); cross-file symbols read as "missing" | not a deviation — generator artifact   |
+| bucket                   | examples                                                                                                | status                               |
+| ------------------------ | ------------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| Tracked API deviation    | `async_count`/`async_pluck`/`async_sum` family (trails uses an `{ async: true }` path)                  | in `call-mismatches-exclude/`        |
+| Tracked scoped-skip      | `build_count_subquery`, `perform_calculation` (realized inline)                                         | `SCOPED_SKIP` in `conventions.ts`    |
+| Confirmed-equivalent     | `_create_record` (ported in `callbacks.ts`/`dirty.ts`, not `persistence.ts`)                            | `call-mismatches-exclude.json`       |
+| Ruby object-protocol     | `encode_with`, `init_with`, `to_ary`, `initialize_dup`                                                  | `SKIP` in `conventions.ts`           |
+| Generator false positive | `isExists`/`isAbstractClass` (port uses `exists`/`abstractClass`); cross-file symbols read as "missing" | not a deviation — generator artifact |
 
 The takeaway is not the (unverified) "zero residual" number but the _shape_:
 the diff independently re-derives entries the deviation catalog already records,
@@ -412,7 +412,7 @@ big to review (292 + 79 on the current corpus), so the guard subtracts the
   on `SCOPED_SKIP` for the Rails file it was generated from.
 - A `divergent` def is expected when **every** token that differs between the
   generated and port skeletons is a Ruby call that `call-mismatches-exclude.json`
-  or the split `call-mismatches-wide-exclude/` tree already accepts for that
+  or the split `call-mismatches-exclude/` tree already accepts for that
   (`tsFile`, method). One unexplained token — a dropped `if`, an extra `throw`,
   an un-excluded call — keeps the whole row in the residue; partial credit would
   let a real regression ride in behind a reviewed one.

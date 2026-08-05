@@ -2,7 +2,7 @@
  * Single source of truth for Ruby Enumerable/Comparable idioms whose faithful
  * port is a native JS method spelled DIFFERENTLY. Two api-compare tools consume
  * it (RFC 0025), so it lives here rather than in a copy each keeps in sync:
- *   - compare.ts's wide call ratchet counts the analogue (`some` for `any?`) as
+ *   - compare.ts's call ratchet counts the analogue (`some` for `any?`) as
  *     making the Ruby call, so a faithful port isn't flagged as an omission;
  *   - lint-calls.ts's call-graph lint treats the KEYS as noise — Ruby records
  *     them as calls but the port is a native JS method, not a ported internal.
@@ -60,7 +60,7 @@ export function jsEnumerableAliases(rubyCall: string): string[] {
  * NEGATION of that JS analogue, so only a NEGATED TS call counts:
  * `none?` → `!xs.some(p)`, `exclude?` → `!xs.includes(y)` / `!set.has(y)`.
  * Without this, a port that INVERTED the condition (a bare `xs.includes(y)`
- * where Rails wrote `exclude?`) silenced the wide ratchet just as well as the
+ * where Rails wrote `exclude?`) silenced the ratchet just as well as the
  * faithful one.
  *
  * Keyed per-ALIAS, not per Ruby call, because a negating Ruby call can also

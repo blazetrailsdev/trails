@@ -13,7 +13,7 @@
  * hand with its justification, which is the whole point of the `reason` field.
  *
  * Hard rules: no node:* imports, no process.* in the library surface (the CLI
- * entry guard is the sole exception, matching lint-call-mismatches-wide.ts), async
+ * entry guard is the sole exception, matching lint-call-mismatches.ts), async
  * fs only.
  */
 
@@ -41,7 +41,7 @@ export interface ArityArtifact {
 
 /** Packages absent from the artifact: a `--package`-filtered (or otherwise
  *  partial) run would report every other package's excludes as stale. Same
- *  determinism guard as lint-call-mismatches-wide.ts. */
+ *  determinism guard as lint-call-mismatches.ts. */
 export function missingScope(
   artifact: ArityArtifact,
   expected: readonly string[] = PACKAGES,

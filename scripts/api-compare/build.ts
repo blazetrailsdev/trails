@@ -4,8 +4,8 @@
  * reconcile-only slice of docs/infrastructure/api-build-stub-generation-plan.md;
  * stub generation is a later phase).
  *
- * Reads the wide call-mismatch artifact (output/call-mismatches-wide.json,
- * written by `pnpm api:compare --wide-calls`) and, for each matched TS
+ * Reads the call-mismatch artifact (output/call-mismatches.json,
+ * written by `pnpm api:compare --calls`) and, for each matched TS
  * method, rewrites its JSDoc so that:
  *
  *   - every currently-missing Rails call WITH a curated baseline reason carries
@@ -20,9 +20,9 @@
  *   - a tag with no reason fails the run (see the empty-reason contract in
  *     docs/infrastructure/api-build-stub-generation-plan.md);
  *   - reasons for newly-added tags migrate from the committed baselines
- *     (call-mismatches-wide-exclude/);
+ *     (call-mismatches-exclude/);
  *   - the unreviewed high-water marks of the sources whose baseline rows were
- *     dropped are lowered in step, so a migration never leaves the wide gate's
+ *     dropped are lowered in step, so a migration never leaves the gate's
  *     slack arm red pending a whole-repo reseed (RFC 0083).
  *
  * Method bodies are NEVER edited — only JSDoc blocks.
@@ -31,7 +31,7 @@
  *   pnpm api:build --package <pkg> [--file <tsFile>] [--dry-run]
  *
  * Hard rules: no node:* imports, no process.* in the library surface (the CLI
- * entry guard is the sole exception, matching lint-call-mismatches-wide.ts).
+ * entry guard is the sole exception, matching lint-call-mismatches.ts).
  */
 
 import * as fs from "fs/promises";
@@ -45,7 +45,7 @@ import {
   loadSplitBaseline,
   relPathFor,
   writeSplitBaseline,
-} from "./lint-call-mismatches-wide.js";
+} from "./lint-call-mismatches.js";
 import {
   type MarkSet,
   loadMarks,
@@ -63,10 +63,10 @@ import {
   parseJsdoc,
 } from "./missing-rails-call-tags.js";
 
-const ARTIFACT_PATH = path.join(OUTPUT_DIR, "call-mismatches-wide.json");
-const WIDE_BASELINE_DIR = path.join(
+const ARTIFACT_PATH = path.join(OUTPUT_DIR, "call-mismatches.json");
+const BASELINE_DIR = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
-  "call-mismatches-wide-exclude",
+  "call-mismatches-exclude",
 );
 
 export { TAG, parseJsdoc } from "./missing-rails-call-tags.js";
@@ -97,7 +97,7 @@ export interface SuppressedCall {
   call: string;
 }
 
-export interface WideArtifact {
+export interface Artifact {
   packages?: string[];
   mismatches: ArtifactMismatch[];
   /** Flags a `@missingRailsCall` tag already suppressed (compare.ts). They are
@@ -365,7 +365,7 @@ export function reconcileFileText(
  *  `mismatches`, so without it the tag that earned the suppression would be
  *  dropped as satisfied and the flag would return to the ratchet. */
 export function buildExpectations(
-  artifact: WideArtifact,
+  artifact: Artifact,
   pkg: string,
   onlyFile?: string,
 ): Map<string, Map<string, MethodExpectation>> {
@@ -395,10 +395,10 @@ export function buildExpectations(
  * Lower the unreviewed high-water marks of the sources whose baseline rows this
  * run just migrated into `@missingRailsCall` tags (RFC 0083).
  *
- * A dropped row that carried the seeded {@link DEFAULT_TAG_REASON} in the WIDE
+ * A dropped row that carried the seeded {@link DEFAULT_TAG_REASON} in the
  * baseline (its tag reason came from the curated narrow one, which wins) leaves
  * its shard stale-HIGH, and the gate's slack arm reds on the next run — with a
- * whole-repo `api:calls:wide:reseed`, a compare regeneration this run never
+ * whole-repo `api:calls:reseed`, a compare regeneration this run never
  * needed, as the only remedy. The shard makes the fix precise: only the sources
  * actually rewritten are recomputed, so every other shard keeps its committed
  * value. Only-shrink comes free from `nextMarks` (it takes the min), and a
@@ -443,19 +443,19 @@ async function main(argv: string[]): Promise<number> {
     return 1;
   }
 
-  const artifact = JSON.parse(await fs.readFile(ARTIFACT_PATH, "utf-8")) as WideArtifact;
+  const artifact = JSON.parse(await fs.readFile(ARTIFACT_PATH, "utf-8")) as Artifact;
   const absent = missingScope(artifact);
   if (absent.length > 0) {
     console.error(
       `api:build: artifact compared a PARTIAL scope (missing: ${absent.join(", ")}). ` +
-        "Regenerate with `API_COMPARE_FORCE=1 pnpm api:compare --wide-calls` first.",
+        "Regenerate with `API_COMPARE_FORCE=1 pnpm api:compare --calls` first.",
     );
     return 1;
   }
 
-  const wideBaseline = await loadSplitBaseline(WIDE_BASELINE_DIR);
+  const baseline = await loadSplitBaseline(BASELINE_DIR);
   const reasons = new Map<string, string>();
-  for (const e of wideBaseline) {
+  for (const e of baseline) {
     reasons.set(keyOf(e), e.reason);
   }
 
@@ -503,11 +503,11 @@ async function main(argv: string[]): Promise<number> {
       else await fs.writeFile(abs, next);
     }
   }
-  const remaining = wideBaseline.filter((e) => !migrated.has(keyOf(e)));
-  const droppedEntries = wideBaseline.filter((e) => migrated.has(keyOf(e)));
+  const remaining = baseline.filter((e) => !migrated.has(keyOf(e)));
+  const droppedEntries = baseline.filter((e) => migrated.has(keyOf(e)));
   const dropped = droppedEntries.length;
   if (dropped > 0 && !dryRun) {
-    await writeSplitBaseline(remaining, WIDE_BASELINE_DIR);
+    await writeSplitBaseline(remaining, BASELINE_DIR);
     const { marks, moved } = await lowerMarksForDropped(MARK_DIR, droppedEntries, remaining);
     console.log(
       `api:build: lowered ${moved.length} unreviewed high-water mark(s) under ` +
@@ -519,14 +519,14 @@ async function main(argv: string[]): Promise<number> {
   console.log(
     `api:build: ${dropped} baseline entr(ies) ${dryRun ? "would migrate" : "migrated"} to ` +
       `@missingRailsCall tags and ${dryRun ? "would be" : "were"} dropped from ` +
-      `${path.relative(ROOT_DIR, WIDE_BASELINE_DIR)}/.`,
+      `${path.relative(ROOT_DIR, BASELINE_DIR)}/.`,
   );
   console.log(`api:build: ${changed} file(s) ${dryRun ? "would change" : "updated"} (${pkg}).`);
   if (skipped > 0) {
     console.log(
       `api:build: ${skipped} missing call(s) left untagged — their baseline reason is still ` +
         "the seeded placeholder. Write per-entry prose in " +
-        `${path.relative(ROOT_DIR, WIDE_BASELINE_DIR)}/ (or at the call site) to migrate them.`,
+        `${path.relative(ROOT_DIR, BASELINE_DIR)}/ (or at the call site) to migrate them.`,
     );
   }
   return 0;

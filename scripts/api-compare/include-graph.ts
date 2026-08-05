@@ -23,7 +23,7 @@ export interface GraphEntity {
 }
 
 /**
- * The include/extends graph the wide calls-parity gate resolves candidates
+ * The include/extends graph the calls-parity gate resolves candidates
  * through (RFC 0083).
  *
  * Rails attributes a mixed-in module's methods to the INCLUDING class's file,

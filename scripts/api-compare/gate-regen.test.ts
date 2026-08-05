@@ -39,9 +39,9 @@ describe("regenerateArtifact", () => {
     await expect(regenerateArtifact({ PATH: "" })).rejects.toThrow(/pnpm api:compare|spawn/);
   });
 
-  it("names the wide scope in the failure when the caller passes it", async () => {
-    await expect(regenerateArtifact({ PATH: "" }, ["--wide-calls"])).rejects.toThrow(
-      /pnpm api:compare --wide-calls|spawn/,
+  it("names the calls scope in the failure when the caller passes it", async () => {
+    await expect(regenerateArtifact({ PATH: "" }, ["--calls"])).rejects.toThrow(
+      /pnpm api:compare --calls|spawn/,
     );
   });
 });

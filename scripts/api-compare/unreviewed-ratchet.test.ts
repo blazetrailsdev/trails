@@ -37,7 +37,7 @@ const entry = (call: string, reason = SEED, tsFile = "relation.ts"): ExcludeEntr
 });
 
 // The sharded key: the same `<package>/<tsFile .ts→.json>` the split exclude
-// baseline uses (relPathFor in lint-call-mismatches-wide.ts), injected here so
+// baseline uses (relPathFor in lint-call-mismatches.ts), injected here so
 // this module never depends on the gate that consumes it.
 const pathFor = (k: { package: string; tsFile: string }): string =>
   path.join(k.package, k.tsFile.replace(/\.ts$/, ".json"));
@@ -377,6 +377,6 @@ describe("renderSlack", () => {
     expect(msg).toContain("1 file(s)");
     expect(msg).toContain("50 of slack");
     expect(msg).toContain(`  - ${REL}  mark 2837, only 2787 unreviewed`);
-    expect(msg).toContain("pnpm api:calls:wide:reseed");
+    expect(msg).toContain("pnpm api:calls:reseed");
   });
 });

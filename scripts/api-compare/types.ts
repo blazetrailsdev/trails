@@ -44,7 +44,7 @@ export interface MethodInfo {
    * Ruby-side only (RFC 0083): the subset of `calls` whose every occurrence in
    * the body had a provably inert receiver — a local variable or a literal
    * (`xs.first`, `opts.fetch`, `{}.merge`). Those say nothing about the port,
-   * so the WIDE calls gate drops them; the narrow RFC 0044 gate ignores this
+   * so the calls gate drops them; the narrow RFC 0044 gate ignores this
    * field and keeps its population unchanged. See
    * extract-ruby-api.rb#walk_for_calls.
    */
@@ -52,7 +52,7 @@ export interface MethodInfo {
   /**
    * TS-side only (RFC 0083): the Ruby call names this declaration's JSDoc tags
    * as deliberately not made, via `@missingRailsCall <call> — <reason>`.
-   * compare.ts's `checkCalls` drops these from the wide call-mismatch
+   * compare.ts's `checkCalls` drops these from the call-mismatch
    * population, which is what makes the tag load-bearing instead of
    * documentation — see missing-rails-call-tags.ts.
    */
