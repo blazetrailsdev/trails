@@ -5,8 +5,20 @@
 
 import { Temporal } from "@js-temporal/polyfill";
 import { describe, it, expect, vi } from "vitest";
-import { ArgumentError, Date as RubyDate, DateTime as RubyDateTime, Rational } from "./date.js";
+import {
+  ArgumentError,
+  Date as RubyDate,
+  DateTime as RubyDateTime,
+  Rational,
+  dNewByFrags,
+  type DateParts,
+} from "./date.js";
 import { Time as RubyTime } from "./time.js";
+
+/** The `y-mm-dd` a date names, for a one-line assertion. */
+function ymd(date: RubyDate): string {
+  return `${date.year}-${String(date.mon).padStart(2, "0")}-${String(date.day).padStart(2, "0")}`;
+}
 
 describe("Date", () => {
   it("parses a y-m-d string, padded or not", () => {
@@ -273,6 +285,57 @@ describe("Date", () => {
       expect([args, `${date.year}-${mon}-${day}`]).toEqual([args, expected]);
     }
     expect(() => RubyDate.commercial(2001, -53, 1)).toThrow("invalid date");
+  });
+
+  it("counts a negative yday back from the year's last day, as c_valid_ordinal_p does", () => {
+    for (const [args, expected] of [
+      [[2001, -1], "2001-12-31"],
+      [[2004, -60], "2004-11-02"],
+      [[2001, -365], "2001-01-01"],
+      [[2000, -366], "2000-01-01"],
+    ] as const) {
+      expect([args, ymd(RubyDate.ordinal(args[0], args[1]))]).toEqual([args, expected]);
+    }
+    expect(() => RubyDate.ordinal(2001, -366)).toThrow("invalid date");
+    expect(() => RubyDate.ordinal(2001, 0)).toThrow("invalid date");
+  });
+
+  it("counts a negative mon back from December and a negative mday back from the month's end, as c_valid_civil_p does", () => {
+    for (const [args, expected] of [
+      [[2001, -1, -1], "2001-12-31"],
+      [[2001, 2, -1], "2001-02-28"],
+      [[2004, 2, -1], "2004-02-29"],
+      [[2001, -11, 1], "2001-02-01"],
+      [[2001, 12, -31], "2001-12-01"],
+    ] as const) {
+      expect([args, ymd(RubyDate.civil(args[0], args[1], args[2]))]).toEqual([args, expected]);
+    }
+    for (const args of [
+      [2001, 2, -29],
+      [2001, 0, 1],
+      [2001, 13, 1],
+      [2001, -13, 1],
+    ] as const) {
+      expect(() => RubyDate.civil(args[0], args[1], args[2])).toThrow("invalid date");
+    }
+  });
+
+  it("expands a seconds frag into a jd and a time of day, as rt_rewrite_frags does", () => {
+    const hash: DateParts = { seconds: 1000000000 };
+    expect(ymd(dNewByFrags(hash, RubyDate.ITALY))).toBe("2001-09-09");
+    expect(hash).toEqual({ jd: 2452162, hour: 1, min: 46, sec: 40, secFraction: 0 });
+    const offsetted: DateParts = { seconds: 1000000000, offset: -7200 };
+    expect(ymd(dNewByFrags(offsetted, RubyDate.ITALY))).toBe("2001-09-08");
+    expect([offsetted.hour, offsetted.min, offsetted.sec]).toEqual([23, 46, 40]);
+    const negative: DateParts = { seconds: -1 };
+    expect(ymd(dNewByFrags(negative, RubyDate.ITALY))).toBe("1969-12-31");
+    expect([negative.hour, negative.min, negative.sec]).toEqual([23, 59, 59]);
+  });
+
+  it("skips rt_rewrite_frags and rt_complete_frags for a civil date, as d_new_by_frags does", () => {
+    expect(ymd(dNewByFrags({ year: 2008, mon: 7, mday: 2, seconds: 1000000000 }, RubyDate.ITALY))).toBe(
+      "2008-07-02",
+    );
   });
 
   it("negates the year of a BC date, as parse_bc does", () => {

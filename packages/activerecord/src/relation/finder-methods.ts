@@ -9,7 +9,7 @@
  */
 
 import { Nodes } from "@blazetrails/arel";
-import { pluralize } from "@blazetrails/activesupport";
+import { pluralize } from "@blazetrails/activesupport/core-ext/string/inflections";
 import {
   RangeError as ActiveModelRangeError,
   sanitizeForMassAssignment as sanitizeForbiddenAttributes,

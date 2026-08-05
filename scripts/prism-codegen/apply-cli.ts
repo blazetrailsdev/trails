@@ -63,6 +63,7 @@ async function main() {
     undefined,
     undefined,
     portMethodNames(),
+    target.ruby,
   );
   const plan = planApply({
     generatedCode: code,

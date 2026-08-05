@@ -2,6 +2,8 @@
 // but parse-clean by construction (emitted via the TypeScript AST factory).
 // Regenerate with `pnpm codegen:generate`. Do not edit by hand.
 
+import { rubyBackRef } from "../runtime.js";
+
 require("active_support/inflector");
 require("active_support/core_ext/hash/indifferent_access");
 // module Inheritance
@@ -120,7 +122,7 @@ export function computeType(type_name) {
             return type_constant;
         }
         candidates = [];
-        this.name.scan(/::|$/, () => candidates.unshift(`${__PRISM_TODO("BackReferenceReadNode")}::${type_name}`));
+        this.name.scan(/::|$/, () => candidates.unshift(`${rubyBackRef("$`")}::${type_name}`));
         candidates.push(type_name);
         for (const candidate of candidates) {
             constant = candidate.safeConstantize();

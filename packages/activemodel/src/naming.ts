@@ -233,9 +233,12 @@ export class ModelName {
     options?: {
       namespace?: string | readonly string[] | { name: string };
       klass?: ModelLike;
+      /** Rails' fourth positional argument (naming.rb:166), `:en` by default. */
+      locale?: string;
     },
   ) {
     this._klass = options?.klass ?? null;
+    const locale = options?.locale ?? "en";
     const rawNs = options?.namespace ?? null;
     const invalidNamespace = (): ArgumentError =>
       new ArgumentError(
@@ -295,9 +298,9 @@ export class ModelName {
     // result. (`_singularize` is exposed below for parity with Rails.)
     this.singular = [...segmentsUnderscored, bareUnderscored].join("_");
     // Rails `@plural = pluralize(@singular)`.
-    this.plural = ModelName._uncountables.has(this.singular)
+    this.plural = ModelName._uncountables(locale).has(this.singular)
       ? this.singular
-      : pluralize(this.singular);
+      : pluralize(this.singular, locale);
     const uncountable = this.plural === this.singular;
     // Rails `@element = underscore(demodulize(@name))` — bare name only.
     this.element = bareUnderscored;
@@ -314,7 +317,7 @@ export class ModelName {
       const prefix = `${segmentsUnderscored.join("_")}_`;
       collectionTail = this.plural.startsWith(prefix)
         ? this.plural.slice(prefix.length)
-        : pluralize(bareUnderscored);
+        : pluralize(bareUnderscored, locale);
     }
     this.collection = [...segmentsUnderscored, collectionTail].join("/");
     // Rails `@param_key = namespace ? _singularize(@unnamespaced) : @singular`.
@@ -324,10 +327,10 @@ export class ModelName {
     // Rails `@i18n_key = @name.underscore.to_sym` — path form with bare name.
     this.i18nKey = [...segmentsUnderscored, bareUnderscored].join("/");
     // Rails `@route_key = namespace ? pluralize(@param_key) : @plural.dup`.
-    let routeKey = segments.length > 0 ? pluralize(this.paramKey) : this.plural;
+    let routeKey = segments.length > 0 ? pluralize(this.paramKey, locale) : this.plural;
     if (uncountable) routeKey = `${routeKey}_index`;
     this.routeKey = routeKey;
-    this.singularRouteKey = singularize(this.routeKey);
+    this.singularRouteKey = singularize(this.routeKey, locale);
   }
 
   human(options: TranslateOptions = {}): string {
@@ -390,14 +393,14 @@ export class ModelName {
   }
 
   // Uncountable lookup delegates to `@blazetrails/activesupport`'s
-  // `Inflections.instance("en")` — the same store Rails models go
+  // `Inflections.instance(locale)` — the same store Rails models go
   // through via `ActiveSupport::Inflector.inflections { |i| i.uncountable ... }`
   // (activesupport/lib/active_support/inflections.rb). Previously we
   // maintained a local 6-word set that ignored user-added inflections
   // and diverged from activesupport's own pluralize() which uses the
   // shared store.
-  private static get _uncountables(): Set<string> {
-    return Inflections.instance("en").uncountables;
+  private static _uncountables(locale: string): Set<string> {
+    return Inflections.instance(locale).uncountables;
   }
 
   /**

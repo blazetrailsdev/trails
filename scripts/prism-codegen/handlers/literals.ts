@@ -13,6 +13,12 @@ export function registerLiterals(r: Registry): void {
   r.on("FalseNode", () => f.createFalse());
   r.on("NilNode", () => f.createNull());
   r.on("InterpolatedStringNode", (n, e) => template((n.parts as PrismNode[]) ?? [], e));
+  r.on("InterpolatedSymbolNode", (n, e) => template((n.parts as PrismNode[]) ?? [], e));
+  r.on("InterpolatedRegularExpressionNode", (n, e) =>
+    f.createNewExpression(f.createIdentifier("RegExp"), undefined, [
+      template((n.parts as PrismNode[]) ?? [], e),
+    ]),
+  );
   r.on("EmbeddedStatementsNode", (n, e) => {
     const body = (n.statements as PrismNode | null)?.compactChildNodes?.() ?? [];
     if (body.length !== 1) return null;

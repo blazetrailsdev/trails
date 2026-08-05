@@ -88,3 +88,47 @@ export function idxSet(receiver: unknown, ...args: unknown[]): unknown {
   (receiver as { setIdx(...a: unknown[]): unknown }).setIdx(...index, value);
   return value;
 }
+
+/**
+ * Ruby's last-match state, the `$~` every back-reference reads through. Ruby
+ * scopes it to the calling frame; a module-level binding is the closest JS has,
+ * and it is what {@link rubyMatch} writes on every match.
+ */
+let lastMatch: RegExpMatchArray | null = null;
+
+/**
+ * Ruby `regexp =~ string` where the pattern has named captures — the form that
+ * writes a local per capture. The named groups come back as an object so the
+ * emitted code can destructure exactly the locals Ruby would have written, and
+ * a failed match answers an empty one so the destructure still binds.
+ */
+export function rubyMatch(re: RegExp, subject: unknown): Record<string, string | undefined> {
+  lastMatch = String(subject).match(re);
+  return lastMatch?.groups ?? {};
+}
+
+/** Ruby `$~`, the last match — `null` when the last match failed. */
+export function rubyLastMatch(): RegExpMatchArray | null {
+  return lastMatch;
+}
+
+/** Ruby's punctuation back-references: `$&`, `` $` ``, `$'` and `$+`. */
+export function rubyBackRef(name: string): string | undefined {
+  const m = lastMatch;
+  if (!m) return undefined;
+  switch (name) {
+    case "$&":
+      return m[0];
+    case "$`":
+      return (m.input ?? "").slice(0, m.index ?? 0);
+    case "$'":
+      return (m.input ?? "").slice((m.index ?? 0) + m[0].length);
+    case "$+":
+      return [...m]
+        .slice(1)
+        .filter((g) => g !== undefined)
+        .pop();
+    default:
+      return undefined;
+  }
+}

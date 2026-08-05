@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Model } from "./index.js";
 import { ModelName, Naming } from "./naming.js";
 import { ArgumentError } from "./attribute-assignment.js";
+import { Inflections } from "@blazetrails/activesupport";
 
 describe("NamingTest", () => {
   class Post extends Model {}
@@ -609,5 +610,22 @@ describe("i18nScope", () => {
       }
     }
     expect(User.i18nScope).toBe("activemodel");
+  });
+});
+
+describe("ModelName locale", () => {
+  it("pluralizes and looks up uncountables through the locale's inflections", () => {
+    Inflections.instance("es").plural(/$/, "es");
+    Inflections.instance("es").singular(/es$/, "");
+    const name = new ModelName("Ley", { locale: "es" });
+    expect(name.plural).toBe("leyes");
+    expect(name.collection).toBe("leyes");
+    expect(name.routeKey).toBe("leyes");
+    expect(name.singularRouteKey).toBe("ley");
+    expect(new ModelName("Ley").plural).toBe("leys");
+    Inflections.instance("es").uncountable("dinero");
+    const uncountable = new ModelName("Dinero", { locale: "es" });
+    expect(uncountable.plural).toBe("dinero");
+    expect(uncountable.routeKey).toBe("dinero_index");
   });
 });

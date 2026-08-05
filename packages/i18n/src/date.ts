@@ -164,7 +164,7 @@ const ABBR_DAYS = "sun|mon|tue|wed|thu|fri|sat";
  * sets the key from a `nil` return (`date_parse.c:2290-2294`), and Ruby's Hash
  * answers `{... :offset => nil}` there.
  */
-interface DateParts {
+export interface DateParts {
   jd?: number;
   year?: number;
   mon?: number;
@@ -180,6 +180,12 @@ interface DateParts {
   min?: number;
   sec?: number;
   secFraction?: number;
+  /**
+   * Seconds since the Unix epoch, which `rt_rewrite_frags` expands into a `:jd`
+   * and a time of day. No ported sub-parser sets it: it is `Date._strptime`'s
+   * `%s`/`%Q`, never anything `date__parse` answers.
+   */
+  seconds?: number;
   zone?: string;
   offset?: number | Rational | null;
   _comp?: boolean;
@@ -1568,6 +1574,46 @@ function parseFrag(str: string, hash: DateParts): string | null {
  * date. `:time` names no date, so it has no completion branch here — Ruby's
  * only fills a `:jd` for `DateTime` — and the string goes on to raise.
  */
+/**
+ * @internal `date_core.c` `rt_rewrite_frags` (`date_core.c:3839-3872`), which
+ * runs ahead of {@link completeFrags} and expands a `:seconds` frag — seconds
+ * since the Unix epoch — into the `:jd` and the time of day it names, folding
+ * an `:offset` in first. The division is floored, so a negative `:seconds`
+ * still lands on the day before the epoch with a positive time of day. A
+ * `Rational` `:offset` is taken as its value: Ruby's `f_add` would carry the
+ * fraction into `:sec_fraction`, and `Temporal` has no rational arithmetic.
+ */
+function rtRewriteFrags(hash: DateParts): DateParts {
+  const seconds = hash.seconds;
+  delete hash.seconds;
+  if (seconds !== undefined) {
+    const offset = hash.offset;
+    let s0 = seconds;
+    if (offset != null) {
+      s0 += offset instanceof Rational ? offset.numerator / offset.denominator : offset;
+    }
+
+    const d = div(s0, DAY_IN_SECONDS);
+    let fr = mod(s0, DAY_IN_SECONDS);
+
+    const h = div(fr, HOUR_IN_SECONDS);
+    fr = mod(fr, HOUR_IN_SECONDS);
+
+    const min = div(fr, MINUTE_IN_SECONDS);
+    fr = mod(fr, MINUTE_IN_SECONDS);
+
+    const sec = div(fr, 1);
+    fr = mod(fr, 1);
+
+    hash.jd = UNIX_EPOCH_IN_CJD + d;
+    hash.hour = h;
+    hash.min = min;
+    hash.sec = sec;
+    hash.secFraction = fr;
+  }
+  return hash;
+}
+
 function completeFrags(parts: DateParts): void {
   const tab: [string | null, DateFrag[]][] = [
     ["time", ["hour", "min", "sec"]],
@@ -1667,6 +1713,11 @@ function completeFrags(parts: DateParts): void {
  * `date__parse` itself converts a `Time` to a `:jd` on (`date_core.c:3864`).
  */
 const UNIX_EPOCH_IN_CJD = 2440588;
+
+/** @internal `date_core.c`'s seconds constants (`date_core.c:194-196`). */
+const MINUTE_IN_SECONDS = 60;
+const HOUR_IN_SECONDS = 3600;
+const DAY_IN_SECONDS = 86400;
 
 /** @internal 1970-01-01, the day {@link UNIX_EPOCH_IN_CJD} numbers. */
 const UNIX_EPOCH = new Temporal.PlainDate(1970, 1, 1);
@@ -1774,16 +1825,50 @@ function cFindFdoy(y: number, sg: number): number | null {
 /**
  * @internal `date_core.c` `c_valid_civil_p` (`date_core.c:766-790`), which
  * rebuilds the date and rejects it if the round-trip does not name the same
- * `y`/`m`/`d` back — which is how a day the reform deleted is rejected. Its
- * negative-`m`/`d` normalization is not carried, for the reason
- * {@link rtValidOrdinalP} gives.
+ * `y`/`m`/`d` back — which is how a day the reform deleted is rejected. A
+ * negative `m` counts back from a thirteenth month — `-1` is December — and a
+ * negative `d` back from the last day of that month, rejected when the walk
+ * leaves the month it started in.
  */
 function cValidCivilP(y: number, m: number, d: number, sg: number): number | null {
+  if (m < 0) m += 13;
   if (m < 1 || m > 12) return null;
+  if (d < 0) {
+    const rjd2 = cFindLdom(y, m, sg);
+    if (rjd2 === null) return null;
+    const [ry2, rm2, rd2] = cJdToCivil(rjd2 + d + 1, sg);
+    if (ry2 !== y || rm2 !== m) return null;
+    d = rd2;
+  }
   const rjd = cCivilToJd(y, m, d, sg);
   const [ry, rm, rd] = cJdToCivil(rjd, sg);
   if (ry !== y || rm !== m || rd !== d) return null;
   return rjd;
+}
+
+/**
+ * @internal `date_core.c` `c_find_ldoy` (`date_core.c:465-475`), the Julian day
+ * of the last day of year `y`, or `null` when there is none: the same scan as
+ * {@link cFindFdoy} backwards from 31 December.
+ */
+function cFindLdoy(y: number, sg: number): number | null {
+  for (let i = 0; i < 30; i++) {
+    const rjd = cValidCivilP(y, 12, 31 - i, sg);
+    if (rjd !== null) return rjd;
+  }
+  return null;
+}
+
+/**
+ * @internal `date_core.c` `c_find_ldom` (`date_core.c:490-500`), the same
+ * backwards scan from the 31st over month `m` rather than December.
+ */
+function cFindLdom(y: number, m: number, sg: number): number | null {
+  for (let i = 0; i < 30; i++) {
+    const rjd = cValidCivilP(y, m, 31 - i, sg);
+    if (rjd !== null) return rjd;
+  }
+  return null;
 }
 
 /** @internal `date_core.c` `c_ordinal_to_jd` (`date_core.c:556-564`), the `d`th day of year `y`. */
@@ -1803,11 +1888,18 @@ function cJdToOrdinal(jd: number, sg: number): [ry: number, rd: number] | null {
 
 /**
  * @internal `date_core.c` `c_valid_ordinal_p` (`date_core.c:674-695`), the
- * round-trip rejection of {@link cValidCivilP} over an ordinal date. Its
- * negative-`d` normalization is not carried, for the reason
- * {@link rtValidOrdinalP} gives.
+ * round-trip rejection of {@link cValidCivilP} over an ordinal date. A negative
+ * `d` counts back from the last day of the year — `-1` is 31 December — and is
+ * rejected when that walk leaves `y`.
  */
 function cValidOrdinalP(y: number, d: number, sg: number): number | null {
+  if (d < 0) {
+    const rjd2 = cFindLdoy(y, sg);
+    if (rjd2 === null) return null;
+    const ro2 = cJdToOrdinal(rjd2 + d + 1, sg);
+    if (ro2 === null || ro2[0] !== y) return null;
+    d = ro2[1];
+  }
   const rjd = cOrdinalToJd(y, d, sg);
   if (rjd === null) return null;
   const ro = cJdToOrdinal(rjd, sg);
@@ -1938,10 +2030,6 @@ function rtValidJdP(jd: number, _sg: number): number {
  * `c_valid_ordinal_p` (`date_core.c:747-768`), which answers `nil` rather than
  * raising so its caller can fall through to the next kind of date.
  *
- * `c_valid_ordinal_p`'s negative-`yday` normalization is not carried — the
- * ported sub-parsers cannot emit one, and it is the ordinal twin of the
- * commercial normalization this file does carry. Tracked as
- * `i18n-date-valid-ordinal-civil-negative-fields`.
  */
 function rtValidOrdinalP(y: number, d: number, sg: number): number | null {
   return cValidOrdinalP(y, d, sg);
@@ -2030,6 +2118,40 @@ function rtValidDateFragsP(parts: DateParts, sg: number): number | null {
 }
 
 /**
+ * @internal `date_core.c` `d_new_by_frags` (`date_core.c:4282-4304`), which
+ * turns the frags `Date._parse` found into a date and raises
+ * `Date::Error, "invalid date"` when none of them names one. A frag set that
+ * already names a civil date — no `:jd` and no `:yday`, but a `:year`, a
+ * `:mon` and a `:mday` — goes straight to {@link rtValidCivilP}, skipping both
+ * {@link rtRewriteFrags} and {@link completeFrags}.
+ */
+export function dNewByFrags(hash: DateParts, sg: number): Date {
+  let jd: number | null;
+
+  if (
+    hash.jd === undefined &&
+    hash.yday === undefined &&
+    hash.year !== undefined &&
+    hash.mon !== undefined &&
+    hash.mday !== undefined
+  ) {
+    jd = rtValidCivilP(hash.year, hash.mon, hash.mday, sg);
+  } else {
+    hash = rtRewriteFrags(hash);
+    completeFrags(hash);
+    try {
+      jd = rtValidDateFragsP(hash, sg);
+    } catch {
+      jd = null;
+    }
+  }
+
+  if (jd === null) throw new DateError("invalid date");
+  const [y, m, d] = cJdToCivil(jd, sg);
+  return new Date(y, m, d);
+}
+
+/**
  * @internal Ruby `Date::Error`, the `ArgumentError` subclass ruby/date defines
  * under `::Date` (`date_core.c` `eDateError` / `Init_date_core`). It is reached
  * as `Date.Error`; this binding only exists so the class body can name it.
@@ -2076,30 +2198,28 @@ export class Date {
   }
 
   /**
-   * Ruby `Date.parse(str, comp = true)`, which runs `Date._parse` and then
-   * builds the date from the `:year`/`:mon`/`:mday` it found (ruby/date,
-   * `date_core.c` `date_s_parse` → `date__parse` in `date_parse.c`).
-   * `String#to_date` delegates straight to it
-   * (activesupport/lib/active_support/core_ext/string/conversions.rb:47-48),
-   * so every spelling its doc example lists — `"1-1-2012"`, `"01/01/2012"`,
-   * `"2012-12-13"` — reaches here, and `activesupport/test/i18n_test.rb:9`
-   * passes the unpadded `"2008-7-2"`.
-   *
-   * `comp` completes a two-digit year, which is why `"080702"` is 2008 here
-   * and 0008 through Rails' `::Date.parse(self, false)`.
-   *
-   * A string that named only a time of day answers no arm of
-   * {@link rtValidDateFragsP} and raises.
+   * Ruby `Date.ordinal(year = -4712, yday = 1, start = Date::ITALY)` (ruby/date,
+   * `date_core.c` `date_s_ordinal`, `date_core.c:3394`), which raises
+   * `Date::Error` on a date `c_valid_ordinal_p` rejects. A negative `yday`
+   * counts back from the last day of the year, so `Date.ordinal(2001, -1)` is
+   * 2001-12-31.
    */
-  static parse(str: string, comp = true, start: number = DEFAULT_SG): Date {
-    const parts = Date._parse(str, comp);
-    completeFrags(parts);
-    let jd: number | null;
-    try {
-      jd = rtValidDateFragsP(parts, start);
-    } catch {
-      jd = null;
-    }
+  static ordinal(year = -4712, yday = 1, start: number = DEFAULT_SG): Date {
+    const jd = cValidOrdinalP(year, yday, start);
+    if (jd === null) throw new DateError("invalid date");
+    const [y, m, d] = cJdToCivil(jd, start);
+    return new Date(y, m, d);
+  }
+
+  /**
+   * Ruby `Date.civil(year = -4712, month = 1, mday = 1, start = Date::ITALY)`
+   * (ruby/date, `date_core.c` `date_s_civil` → `date_initialize`,
+   * `date_core.c:3478`), which raises `Date::Error` on a date `c_valid_civil_p`
+   * rejects. A negative `month` counts back from December and a negative `mday`
+   * from the month's end, so `Date.civil(2001, -1, -1)` is 2001-12-31.
+   */
+  static civil(year = -4712, month = 1, mday = 1, start: number = DEFAULT_SG): Date {
+    const jd = cValidCivilP(year, month, mday, start);
     if (jd === null) throw new DateError("invalid date");
     const [y, m, d] = cJdToCivil(jd, start);
     return new Date(y, m, d);
@@ -2185,6 +2305,26 @@ export class Date {
     }
     delete hash._comp;
     return hash;
+  }
+
+  /**
+   * Ruby `Date.parse(str, comp = true)`, which runs `Date._parse` and then
+   * builds the date from the `:year`/`:mon`/`:mday` it found (ruby/date,
+   * `date_core.c` `date_s_parse` → `date__parse` in `date_parse.c`).
+   * `String#to_date` delegates straight to it
+   * (activesupport/lib/active_support/core_ext/string/conversions.rb:47-48),
+   * so every spelling its doc example lists — `"1-1-2012"`, `"01/01/2012"`,
+   * `"2012-12-13"` — reaches here, and `activesupport/test/i18n_test.rb:9`
+   * passes the unpadded `"2008-7-2"`.
+   *
+   * `comp` completes a two-digit year, which is why `"080702"` is 2008 here
+   * and 0008 through Rails' `::Date.parse(self, false)`.
+   *
+   * A string that named only a time of day answers no arm of
+   * {@link rtValidDateFragsP} and raises.
+   */
+  static parse(str: string, comp = true, start: number = DEFAULT_SG): Date {
+    return dNewByFrags(Date._parse(str, comp), start);
   }
 
   get year(): number {

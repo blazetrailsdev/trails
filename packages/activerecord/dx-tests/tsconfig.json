@@ -15,6 +15,9 @@
       ],
       "@blazetrails/activesupport/key-generator": ["../../activesupport/src/key-generator.ts"],
       "@blazetrails/activesupport/temporal": ["../../activesupport/src/temporal.ts"],
+      "@blazetrails/activesupport/core-ext/string/inflections": [
+        "../../activesupport/src/core-ext/string/inflections.ts"
+      ],
       "@blazetrails/activesupport/gzip": ["../../activesupport/src/gzip.ts"],
       "@blazetrails/activesupport/yaml": ["../../activesupport/src/yaml.ts"],
       "@blazetrails/activesupport/process-adapter": ["../../activesupport/src/process-adapter.ts"],

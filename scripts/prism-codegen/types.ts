@@ -66,6 +66,9 @@ export interface Emitter {
 
   readonly helpers: Set<string>;
 
+  /** The Ruby source being generated from, for the `__LINE__` image. */
+  readonly source: string;
+
   blockParamName: string | null;
   readonly declared: Set<string>;
   /**

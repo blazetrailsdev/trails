@@ -296,9 +296,9 @@ export function increment(attribute, by = 1) {
 export function incrementBang(attribute, by = 1, { touch = null } = {}) {
     let change;
     this.increment(attribute, by);
-    change = this.publicSend(attribute) - (this.publicSend(__PRISM_TODO("InterpolatedSymbolNode")) || 0);
+    change = this.publicSend(attribute) - (this.publicSend(`${attribute}_in_database`) || 0);
     this.constructor.updateCounters(this.id, { [attribute]: change, touch: touch });
-    this.publicSend(__PRISM_TODO("InterpolatedSymbolNode"));
+    this.publicSend(`clear_${attribute}_change`);
     return this;
 }
 export function decrement(attribute, by = 1) {

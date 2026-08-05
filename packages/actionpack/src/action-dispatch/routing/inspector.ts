@@ -2,7 +2,8 @@
  * ActionDispatch::Routing::RoutesInspector — formats routes for `rails routes`.
  */
 
-import { pluralize, underscore } from "@blazetrails/activesupport";
+import { underscore } from "@blazetrails/activesupport";
+import { pluralize } from "@blazetrails/activesupport/core-ext/string/inflections";
 import { escapePath } from "../journey/router/utils.js";
 import type { Route } from "./route.js";
 

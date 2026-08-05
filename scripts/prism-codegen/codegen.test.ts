@@ -13,6 +13,7 @@ import {
   scopedRubyDefs,
 } from "./async-source.js";
 import type { Coverage } from "./types.js";
+import { rubyMatch, rubyLastMatch, rubyBackRef } from "./runtime.js";
 describe("prism-codegen", () => {
   it("emits class-body macro statements after the class, with self bound to the class", async () => {
     const { code } = await generateFromSource(`
@@ -1229,5 +1230,68 @@ end`,
     expect(code).toContain("static describe()");
     expect(code).not.toContain("this.model.primaryKey");
     expect(code).not.toContain("this.arelTable.tableName");
+  });
+});
+
+describe("prism-codegen literal/regex long tail", () => {
+  it("folds an interpolated symbol like a string, and an interpolated regexp into new RegExp", async () => {
+    const { code, parseErrorCount } = await generateFromSource(
+      `def f(x); a = :"pre#{x}post"; /a#{x}b/; end`,
+    );
+    expect(code).toContain("`pre${x}post`");
+    expect(code).toContain("new RegExp(`a${x}b`)");
+    expect(parseErrorCount).toBe(0);
+  });
+
+  it("emits __FILE__ and __LINE__ as literals", async () => {
+    const { code, coverage } = await generateFromSource(
+      "def f\n  path = __FILE__\n  line = __LINE__\n  [path, line]\nend\n",
+      new Set(),
+      "./runtime.js",
+      new Map(),
+      null,
+      new Set(),
+      "active_record/base.rb",
+    );
+    expect(code).toContain('"active_record/base.rb"');
+    expect(code).toContain("line = 3");
+    const passthrough = summarizeCoverage(coverage).topPassthrough.map((p) => p.kind);
+    expect(passthrough).not.toContain("SourceFileNode");
+    expect(passthrough).not.toContain("SourceLineNode");
+  });
+
+  it("destructures the captures a match write binds", async () => {
+    const { code, parseErrorCount } = await generateFromSource(
+      `def f(x)\n  /(?<head>a)(?<tail>b)/ =~ x\n  [head, tail]\nend`,
+    );
+    expect(code).toContain("const { head, tail } = rubyMatch(/(?<head>a)(?<tail>b)/, x);");
+    expect(code).toContain('import { rubyMatch } from "./runtime.js"');
+    expect(parseErrorCount).toBe(0);
+  });
+
+  it("reads numbered and punctuation back-references through the last match", async () => {
+    const { code, coverage, parseErrorCount } = await generateFromSource(`def f\n  [$1, $&]\nend`);
+    expect(code).toContain("rubyLastMatch()?.[1]");
+    expect(code).toContain('rubyBackRef("$&")');
+    expect(parseErrorCount).toBe(0);
+    const passthrough = summarizeCoverage(coverage).topPassthrough.map((p) => p.kind);
+    expect(passthrough).not.toContain("NumberedReferenceReadNode");
+    expect(passthrough).not.toContain("BackReferenceReadNode");
+  });
+});
+
+describe("prism-codegen runtime rubyMatch", () => {
+  it("answers the named captures, records the last match, and empties on a failure", () => {
+    expect(rubyMatch(/(?<head>a)(?<tail>b)/, "zab")).toEqual({ head: "a", tail: "b" });
+    expect(rubyLastMatch()?.[0]).toBe("ab");
+    expect([rubyBackRef("$&"), rubyBackRef("$`"), rubyBackRef("$'"), rubyBackRef("$+")]).toEqual([
+      "ab",
+      "z",
+      "",
+      "b",
+    ]);
+    expect(rubyMatch(/(?<head>a)/, "zzz")).toEqual({});
+    expect(rubyLastMatch()).toBeNull();
+    expect(rubyBackRef("$&")).toBeUndefined();
   });
 });

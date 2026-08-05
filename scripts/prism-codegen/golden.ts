@@ -89,6 +89,7 @@ export async function generateTarget(f: TargetFile): Promise<GeneratedTarget> {
     await inheritedDelegationsFor(f),
     await targetLinearization(),
     portMethodNames(),
+    f.ruby,
   );
   return { ...result, file: f, outName };
 }
