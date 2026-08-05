@@ -31,6 +31,45 @@ function stampFor(runToken: string): string {
 }
 
 /**
+ * `ar_internal_metadata` key holding the tables the load that stamped this
+ * database laid — canonical *and* adapter-specific, as they stood before any
+ * test ran. Persisted rather than recomputed because a worker arriving on a
+ * stamped database cannot tell an adapter-specific table (`defaults`,
+ * `postgresql_times`, …) from a bespoke one a previous file left behind, and
+ * the two have opposite fates in the purge.
+ */
+const LAID_TABLES_KEY = "laid_tables";
+
+/**
+ * Bookkeeping tables are never part of the laid set — `resetTables` drops them
+ * unconditionally, so recording them would only make the snapshot lie.
+ */
+const BOOKKEEPING_TABLE_NAMES: ReadonlySet<string> = new Set([
+  "schema_migrations",
+  "ar_internal_metadata",
+]);
+
+/**
+ * The tables the stamping load laid, or `null` if this database carries no
+ * snapshot (an unstamped run, or one laid before this key existed). A `null`
+ * puts the caller back on the re-lay-everything path.
+ *
+ * @internal
+ */
+export async function laidTables(adapter: DatabaseAdapter): Promise<string[] | null> {
+  const metadata = new InternalMetadata(adapter);
+  if (!(await metadata.tableExists())) return null;
+  const raw = await metadata.get(LAID_TABLES_KEY);
+  if (raw == null || raw === "") return null;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as string[]) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Write the stamp onto a database whose canonical schema has just been laid.
  * A run without a token (globalSetup disabled) stamps nothing, which leaves
  * every worker on the full load path.
@@ -42,7 +81,12 @@ export async function stampCanonicalSchema(
   runToken = getEnv(RUN_TOKEN_ENV),
 ): Promise<void> {
   if (!runToken) return;
-  await new InternalMetadata(adapter).createTableAndSetFlags("test", stampFor(runToken));
+  const metadata = new InternalMetadata(adapter);
+  await metadata.createTableAndSetFlags("test", stampFor(runToken));
+  // Snapshot after the flags so the metadata table itself is already there and
+  // is filtered out along with `schema_migrations`.
+  const laid = (await adapter.tables()).filter((name) => !BOOKKEEPING_TABLE_NAMES.has(name));
+  await metadata.set(LAID_TABLES_KEY, JSON.stringify(laid.sort()));
 }
 
 /**

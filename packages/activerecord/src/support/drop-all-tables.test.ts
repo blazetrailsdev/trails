@@ -246,8 +246,28 @@ describe("purge-only pre-snapshot path", () => {
     await expect(dropAllTablesModule.purgeToCanonicalTables(inertAdapter)).resolves.toBeUndefined();
   });
 
+  it("allows the purge after the arm when the caller names the tables it laid", async () => {
+    const { dropAllTablesModule, loadSchemaHelper } = await freshModules();
+    await loadSchemaHelper.loadAdapterSpecificSchema(armOnlyAdapter);
+
+    await expect(
+      dropAllTablesModule.purgeToCanonicalTables(inertAdapter, ["defaults"]),
+    ).resolves.toBeUndefined();
+  });
+
   it("rejects a purge that runs after the boot-laid snapshot", async () => {
     await expect(purgeToCanonicalTables(adapter)).rejects.toThrow(/after recordBootLaidTables/);
+  });
+
+  // `defaults` is the one table all three `<adapter>_specific_schema.rb` arms
+  // lay, so it stands in here for the whole adapter-specific half the boot's
+  // fast path now carries across test files rather than re-laying.
+  it("truncates a named adapter-specific table instead of dropping it", async () => {
+    const { dropAllTablesModule } = await freshModules();
+
+    await dropAllTablesModule.purgeToCanonicalTables(adapter, ["defaults"]);
+
+    expect(await listTables(adapter)).toContain("defaults");
   });
 
   // Kept last: this one runs a real purge, which drops the adapter-specific

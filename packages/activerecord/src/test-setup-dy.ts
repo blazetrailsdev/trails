@@ -44,7 +44,7 @@ const ownsDatabase =
 const { recordBootLaidTables, dropAllTables, purgeToCanonicalTables } =
   await import("./support/drop-all-tables.js");
 const { loadSchema, loadAdapterSpecificSchema } = await import("./support/load-schema-helper.js");
-const { canonicalSchemaUpToDate, stampCanonicalSchema } =
+const { canonicalSchemaUpToDate, stampCanonicalSchema, laidTables } =
   await import("./support/canonical-schema-stamp.js");
 const { recordBootOutcome } = await import("./support/boot-outcome.js");
 
@@ -53,15 +53,19 @@ if (await canonicalSchemaUpToDate(await Base.leaseConnection())) {
   // every non-empty canonical table and drops everything else, so a
   // `DatabaseTasks.truncateTables` here emptied the same tables a second time.
   //
-  // Only the canonical arm is skipped here — those tables are already laid, and
-  // now empty. The adapter-specific arm is re-run as on the full path: its
-  // tables are `force: true` throughout, and a worker recycled onto a database
-  // an earlier worker's tests ran against finds them dropped —
-  // `purgeToCanonicalTables` drops every table outside the canonical half, and
-  // the arm below re-lays the adapter-specific ones it took with it.
+  // Both arms are skipped here when the stamp carries a `laidTables` snapshot:
+  // those tables — canonical *and* adapter-specific — are already laid, and the
+  // purge below truncates them rather than dropping them, so there is nothing
+  // for the adapter-specific arm to re-lay. Read the snapshot first: the purge
+  // drops `ar_internal_metadata` along with the other bookkeeping tables.
+  //
+  // Without a snapshot (a database stamped before this key existed) the old
+  // behaviour stands: the purge drops every table outside the canonical half
+  // and the arm re-lays the adapter-specific ones it took with it.
   const conn = await Base.leaseConnection();
-  await purgeToCanonicalTables(conn);
-  await loadAdapterSpecificSchema(conn);
+  const laid = await laidTables(conn);
+  await purgeToCanonicalTables(conn, laid ?? []);
+  if (!laid) await loadAdapterSpecificSchema(conn);
   // Re-stamp: the purge drops `ar_internal_metadata` along with the
   // other bookkeeping tables, so the stamp this boot consumed is gone. What is
   // left behind is the same state the full-load arm below stamps — canonical

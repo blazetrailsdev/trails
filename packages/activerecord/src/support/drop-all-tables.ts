@@ -65,28 +65,39 @@ export async function recordBootLaidTables(adapter: DatabaseAdapter): Promise<vo
  *
  * The one caller is `test-setup-dy.ts`'s fast path, which purges between the
  * canonical load and the adapter-specific arm and re-lays that arm immediately
- * after (PR #5659). It is a separate entry point rather than a fallback inside
+ * after (PR #5659) — unless the stamped database carries a `laidTables`
+ * snapshot, in which case it passes those names as `alsoProtect` and the arm's
+ * tables are truncated in place instead of dropped and re-laid per test file.
+ *
+ * It is a separate entry point rather than a fallback inside
  * {@link resetTestTables} so that intent is stated at the call site: a
  * pre-snapshot reset that did *not* mean to lose the adapter-specific tables now
  * throws instead of silently losing them.
  *
  * @internal Boot/template setup paths only.
  */
-export async function purgeToCanonicalTables(adapter: DatabaseAdapter): Promise<void> {
+export async function purgeToCanonicalTables(
+  adapter: DatabaseAdapter,
+  alsoProtect: readonly string[] = [],
+): Promise<void> {
   if (_bootLaidTableNames !== null) {
     throw new ActiveRecordError(
       "purgeToCanonicalTables ran after recordBootLaidTables — the boot-laid " +
         "snapshot is the protected set once it exists; call resetTestTables.",
     );
   }
-  if (_adapterSpecificSchemaLoaded) {
+  if (alsoProtect.length === 0 && _adapterSpecificSchemaLoaded) {
     throw new ActiveRecordError(
       "purgeToCanonicalTables ran after the adapter-specific schema arm — it " +
         "would drop the tables that arm just laid (defaults, postgresql_times, " +
         "binary_fields, …) with nothing to re-lay them. Purge first, then load.",
     );
   }
-  await resetTables(adapter, "reset", CANONICAL_TABLE_NAMES);
+  const protectedNames =
+    alsoProtect.length === 0
+      ? CANONICAL_TABLE_NAMES
+      : new Set([...CANONICAL_TABLE_NAMES, ...alsoProtect]);
+  await resetTables(adapter, "reset", protectedNames);
 }
 
 function bootLaidTableNames(): ReadonlySet<string> {

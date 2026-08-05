@@ -9,6 +9,7 @@ import { College } from "../test-helpers/models/college.js";
 import { Entrant } from "../test-helpers/models/entrant.js";
 import { Professor } from "../test-helpers/models/professor.js";
 import { activeLane } from "./connection.js";
+import { canonicalSchemaUpToDate, stampCanonicalSchema } from "./canonical-schema-stamp.js";
 
 /**
  * The tables `schema.rb:1444-1460` creates through the second connection
@@ -57,8 +58,25 @@ export async function provisionSecondDatabase(): Promise<void> {
     await primary.createDatabase(database).catch(() => undefined);
   }
   const arunit2 = await ARUnit2Model.leaseConnection();
+  // Rails lays these tables exactly once per process, inside `schema.rb`
+  // itself (`schema.rb:1444-1462`). trails' bootstrap runs once per *test
+  // file*, so without a memo every file pays 10 DROP/CREATE TABLE statements
+  // for tables it never touches. The stamp is the same run-token marker the
+  // primary database carries, written onto the arunit2 database — which is
+  // per-slot and per-run by name (`arunit2-config.ts`), so "stamped" means
+  // "this run already laid these tables in this slot".
+  //
+  // The rows still have to go: the DDL is what is memoised, not the reset. A
+  // suite that wrote to `colleges` must not hand its rows to the next file's
+  // `College.count`. Suites that mutate these tables mid-run re-prepare them
+  // through `withSecondPool` regardless.
+  if (await canonicalSchemaUpToDate(arunit2)) {
+    await arunit2.truncateTables(...ARUNIT2_TABLES, "dogs");
+    return;
+  }
   await rebuildCanonicalTables(arunit2, ARUNIT2_TABLES);
   await createOtherDogsTable(arunit2);
+  await stampCanonicalSchema(arunit2);
 }
 
 /**
