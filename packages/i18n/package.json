@@ -23,7 +23,7 @@
     "build": "tsc"
   },
   "dependencies": {
-    "@js-temporal/polyfill": "^0.5.1"
+    "@blazetrails/date": "workspace:*"
   },
   "optionalDependencies": {
     "yaml": "^2.8.3"

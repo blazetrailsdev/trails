@@ -6,5 +6,5 @@
     "rootDir": "src"
   },
   "include": ["src"],
-  "references": [{ "path": "../date" }, { "path": "../i18n" }, { "path": "../nokogiri" }]
+  "references": []
 }

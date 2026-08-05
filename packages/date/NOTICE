@@ -1,0 +1,10 @@
+@blazetrails/date
+=================
+
+This package is a TypeScript port of Ruby's date gem
+(https://github.com/ruby/date), licensed under the Ruby License / 2-clause
+BSDL.
+
+It re-exports `Temporal` from @js-temporal/polyfill
+(https://github.com/js-temporal/temporal-polyfill), licensed under the ISC
+License.

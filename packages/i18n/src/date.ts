@@ -19,7 +19,7 @@
  * packages' localization tests drive the same objects.
  */
 
-import { Temporal } from "@js-temporal/polyfill";
+import { Temporal } from "@blazetrails/date";
 
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const ABBR_DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];

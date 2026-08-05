@@ -481,7 +481,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   supportsVirtualColumns(): boolean {
-    return true;
+    return this.isMariadb() || this.databaseVersion.compare("5.7.5") >= 0;
   }
 
   supportsOptimizerHints(): boolean {

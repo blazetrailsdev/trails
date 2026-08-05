@@ -18,6 +18,7 @@
   },
   "files": [],
   "references": [
+    { "path": "packages/date" },
     { "path": "packages/activesupport" },
     { "path": "packages/tse-compiler" },
     { "path": "packages/arel" },

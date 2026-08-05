@@ -5,7 +5,7 @@
  * and `%z`/`%Z` answer the receiver's zone rather than a constant.
  */
 
-import { Temporal } from "@js-temporal/polyfill";
+import { Temporal } from "@blazetrails/date";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ArgumentError } from "./date.js";
 import { Time } from "./time.js";

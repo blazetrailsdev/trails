@@ -95,7 +95,7 @@
   },
   "dependencies": {
     "@blazetrails/i18n": "workspace:*",
-    "@js-temporal/polyfill": "^0.5.1",
+    "@blazetrails/date": "workspace:*",
     "tinyglobby": "^0.2.16"
   },
   "optionalDependencies": {
