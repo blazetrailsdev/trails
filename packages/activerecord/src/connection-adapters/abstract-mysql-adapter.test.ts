@@ -78,8 +78,6 @@ describe("AbstractMysqlAdapter#renameColumnForAlter fallback", () => {
     const { AbstractMysqlAdapter } = await import("./abstract-mysql-adapter.js");
     const adapter = Object.create(AbstractMysqlAdapter.prototype);
     adapter.supportsRenameColumn = () => supportsRename;
-    // Object.create skips the constructor that plants Rails' NullPool
-    // (abstract_adapter.rb:153); the version warm reads it.
     adapter.pool = new NullPool();
     adapter.getDatabaseVersion = async () => {};
     adapter.quoteColumnName = (s: string) => `\`${s}\``;
@@ -812,8 +810,6 @@ describe("AbstractMysqlAdapter#checkVersion", () => {
     >;
     const { NullPool } = await import("./abstract/connection-pool.js");
     adapter.pool = new NullPool();
-    // A sync stub stands in for the awaited warm: `checkVersion` reads the
-    // pool memo synchronously (`abstract_adapter.rb:854-856`).
     (
       adapter as unknown as { getDatabaseVersion: () => InstanceType<typeof Version> }
     ).getDatabaseVersion = () => new Version("5.6.3");
@@ -831,8 +827,6 @@ describe("AbstractMysqlAdapter#checkVersion", () => {
     >;
     const { NullPool } = await import("./abstract/connection-pool.js");
     adapter.pool = new NullPool();
-    // A sync stub stands in for the awaited warm: `checkVersion` reads the
-    // pool memo synchronously (`abstract_adapter.rb:854-856`).
     (
       adapter as unknown as { getDatabaseVersion: () => InstanceType<typeof Version> }
     ).getDatabaseVersion = () => new Version("5.6.4");

@@ -15,7 +15,6 @@ import { Version } from "./abstract-adapter.js";
 describe("AbstractMysqlAdapter#full_version", () => {
   function adapterWith(version: Version): Mysql2Adapter {
     const adapter = new Mysql2Adapter({ host: "localhost" });
-    // The version memo lives on the pool; seed the fetch it caches.
     (adapter as unknown as { getDatabaseVersion: () => Version }).getDatabaseVersion = () =>
       version;
     return adapter;
