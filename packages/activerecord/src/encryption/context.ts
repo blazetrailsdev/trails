@@ -32,7 +32,7 @@ export class Context {
     "messageSerializer",
     "encryptor",
     "frozenEncryption",
-  ];
+  ] as const;
 
   private _keyProvider?: unknown;
   keyGenerator?: unknown;

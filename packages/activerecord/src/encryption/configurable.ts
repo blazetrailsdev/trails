@@ -45,11 +45,19 @@ export class Configurable {
     _listeners = value;
   }
 
-  // Rails' `Context::PROPERTIES.each { |name| delegate name, to: :context }`
-  // (configurable.rb:16-19). Written out one reader per property rather than
-  // installed from the constant in a loop: `Context` is in TDZ while this
-  // module's body runs on a graph entered at `context.ts`. The set is held to
-  // `Context::PROPERTIES` by configurable.trails.test.ts instead.
+  /**
+   * Rails' `Context::PROPERTIES.each { |name| delegate name, to: :context }`
+   * (configurable.rb:16-19), written out one reader per property.
+   *
+   * The loop cannot survive: it runs while this module's body does, and on a
+   * graph entered at `context.ts` — `index.ts` re-exports `context.js` before
+   * `configurable.js`, and `context.ts` imports this module for
+   * `build_default_key_provider` — `Context` is then still in TDZ, which is a
+   * `ReferenceError`, not a stale read. A hoisted function is what could be
+   * read there, and that function was the shim this story deletes. The set is
+   * instead held to `Context::PROPERTIES` at compile time, by
+   * {@link DelegatedProperty} below.
+   */
   static get keyProvider(): unknown {
     return getEncryptionContext().keyProvider;
   }
@@ -130,7 +138,7 @@ export class Configurable {
         continue;
       }
       if (value === undefined) continue;
-      if (!Context.PROPERTIES.includes(key)) continue;
+      if (!(Context.PROPERTIES as readonly string[]).includes(key)) continue;
       (getEncryptionContext() as unknown as Record<string, unknown>)[key] = value;
     }
   }
@@ -155,3 +163,13 @@ export class Configurable {
     }
   }
 }
+
+/** @internal One `Context::PROPERTIES` name (context.rb:13). */
+type DelegatedProperty = (typeof Context.PROPERTIES)[number];
+
+/**
+ * @internal Type-only, erased at emit: `Pick` fails to compile the moment a
+ * `Context::PROPERTIES` name has no reader on `Configurable`, which is the
+ * drift the deleted `PROPERTIES.each` loop prevented by construction.
+ */
+declare const _contextPropertiesAreDelegated: Pick<typeof Configurable, DelegatedProperty>;
