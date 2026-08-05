@@ -94,6 +94,8 @@ function classBody(
       e.inSingleton = prev;
       members.push(...inner.members);
       macros.push(...inner.macros);
+    } else if (unportedMacro(k)) {
+      recordSubtreePassthrough(k, e);
     } else {
       const stmts = macroStmt(k, e, className);
       if (stmts) macros.push(...stmts);
@@ -102,6 +104,21 @@ function classBody(
   }
   return { members, macros };
 }
+/**
+ * Class-body macros with no faithful image yet, kept out of the emitted output
+ * — and so out of the clean denominator — rather than emitted as something that
+ * only looks like a port: `alias :new_name :old_name`, whose handler is written
+ * for a method body where the old name reads as a local and would emit a
+ * module-scope `const` bound to an undefined identifier — code that parses and
+ * then throws on load — and the visibility keywords, which declare the default
+ * visibility of the `def`s that follow and have no statement to be.
+ */
+function unportedMacro(n: PrismNode): boolean {
+  const kind = n.constructor.name;
+  if (kind === "AliasMethodNode") return true;
+  return kind === "CallNode" && n.receiver == null && VISIBILITY_MACROS.has(String(n.name));
+}
+const VISIBILITY_MACROS = new Set(["private", "protected", "public", "module_function"]);
 /**
  * One class-body macro statement, emitted with `self` bound to the class and
  * outside the class context so a nested `def` is not swallowed by

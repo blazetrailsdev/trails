@@ -52,6 +52,22 @@ describe("prism-codegen", () => {
     expect(code).toContain('Widget.attrReader("name")');
   });
 
+  it("leaves a class-body alias and the bare visibility keywords unemitted", async () => {
+    const { code } = await generateFromSource(`
+      class Widget
+        include Persistence
+        alias :klass :model
+        private
+        protected
+        def save!; true; end
+      end
+    `);
+    expect(code).toContain("Widget.include(Persistence)");
+    expect(code).not.toContain("const klass");
+    expect(code).not.toContain("Widget.private");
+    expect(code).not.toContain("Widget.protected");
+  });
+
   it("translates class/def shape and method-name conventions", async () => {
     const { code } = await generateFromSource(`
       class Widget < Base

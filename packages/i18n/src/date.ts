@@ -1944,7 +1944,6 @@ function cValidWeeknumP(y: number, w: number, d: number, f: number, sg: number):
 }
 
 /**
-/**
  * @internal `date_core.c` `rt__valid_jd_p` (`date_core.c:4119-4123`), which
  * answers the Julian day back: every integer names a day, so there is nothing
  * for the calendar-reform start to reject.

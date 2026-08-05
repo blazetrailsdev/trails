@@ -754,7 +754,6 @@ export class ExplainProxy {
         return this.relation.execExplain(this.relation.collectingQueriesForExplain(() => block.call()), this.options);
     }
 }
-ExplainProxy.private;
 const MULTI_VALUE_METHODS = ["includes", "eager_load", "preload", "select", "group", "order", "joins", "left_outer_joins", "references", "extending", "unscope", "optimizer_hints", "annotate", "with"];
 const SINGLE_VALUE_METHODS = ["limit", "offset", "lock", "readonly", "reordering", "strict_loading", "reverse_order", "distinct", "create_with", "skip_query_cache"];
 const CLAUSE_METHODS = ["where", "having", "from"];
@@ -765,13 +764,6 @@ Relation.include(FinderMethods, Calculations, SpawnMethods, QueryMethods, Batche
 Relation.include(SignedId.RelationMethods, TokenFor.RelationMethods);
 Relation.attrReader("table", "model", "loaded", "predicate_builder");
 Relation.attrAccessor("skip_preloading_value");
-const klass = model;
-const isLoaded = loaded;
-const isLocked = lockValue;
-const build = constructor;
-const toA = toAry;
-Relation.private("compute_cache_key");
-Relation.private("compute_cache_version");
 export class StrictLoadingScope {
     static isEmptyScope() {
         return true;
@@ -780,5 +772,3 @@ export class StrictLoadingScope {
         return true;
     }
 }
-Relation.protected;
-Relation.private;
