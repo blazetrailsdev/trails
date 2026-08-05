@@ -1763,11 +1763,12 @@ function mod(n: number, d: number): number {
  * arithmetic, with the century correction `b` taken back off again for a day
  * before the reform, which is a Julian one.
  *
- * Ruby's `*ns` out-param — which side of the reform the day landed on — has no
- * counterpart here: this port's {@link Date} carries no `sg`/`ns` state of its
- * own to answer `Date#julian?` off.
+ * `ns` is Ruby's out-param saying which side of the reform the day landed on.
+ * Every `c_*_to_jd` answers one and every `c_valid_*_p` carries it out, so the
+ * port does too, and it is discarded at the `rt__valid_*_p` boundary exactly
+ * where ruby/date discards it (`date_core.c:4126-4139`).
  */
-function cCivilToJd(y: number, m: number, d: number, sg: number): number {
+function cCivilToJd(y: number, m: number, d: number, sg: number): [rjd: number, ns: number] {
   if (m <= 2) {
     y -= 1;
     m += 12;
@@ -1775,8 +1776,12 @@ function cCivilToJd(y: number, m: number, d: number, sg: number): number {
   const a = Math.floor(y / 100);
   const b = 2 - a + Math.floor(a / 4);
   let jd = Math.floor(365.25 * (y + 4716)) + Math.floor(30.6001 * (m + 1)) + d + b - 1524;
-  if (jd < sg) jd -= b;
-  return jd;
+  let ns: number;
+  if (jd < sg) {
+    jd -= b;
+    ns = 0;
+  } else ns = 1;
+  return [jd, ns];
 }
 
 /**
@@ -1814,10 +1819,10 @@ function cJdToCivil(jd: number, sg: number): [ry: number, rm: number, rdom: numb
  * assume 1 January exists — the reform deletes real days, 1582-10-05..14 under
  * `Date::ITALY` — so it scans January for the first `c_valid_civil_p` accepts.
  */
-function cFindFdoy(y: number, sg: number): number | null {
+function cFindFdoy(y: number, sg: number): [rjd: number, ns: number] | null {
   for (let d = 1; d < 31; d++) {
-    const rjd = cValidCivilP(y, 1, d, sg);
-    if (rjd !== null) return rjd;
+    const r = cValidCivilP(y, 1, d, sg);
+    if (r !== null) return r;
   }
   return null;
 }
@@ -1830,20 +1835,25 @@ function cFindFdoy(y: number, sg: number): number | null {
  * negative `d` back from the last day of that month, rejected when the walk
  * leaves the month it started in.
  */
-function cValidCivilP(y: number, m: number, d: number, sg: number): number | null {
+function cValidCivilP(
+  y: number,
+  m: number,
+  d: number,
+  sg: number,
+): [rjd: number, ns: number] | null {
   if (m < 0) m += 13;
   if (m < 1 || m > 12) return null;
   if (d < 0) {
-    const rjd2 = cFindLdom(y, m, sg);
-    if (rjd2 === null) return null;
-    const [ry2, rm2, rd2] = cJdToCivil(rjd2 + d + 1, sg);
+    const ldom = cFindLdom(y, m, sg);
+    if (ldom === null) return null;
+    const [ry2, rm2, rd2] = cJdToCivil(ldom[0] + d + 1, sg);
     if (ry2 !== y || rm2 !== m) return null;
     d = rd2;
   }
-  const rjd = cCivilToJd(y, m, d, sg);
+  const [rjd, ns] = cCivilToJd(y, m, d, sg);
   const [ry, rm, rd] = cJdToCivil(rjd, sg);
   if (ry !== y || rm !== m || rd !== d) return null;
-  return rjd;
+  return [rjd, ns];
 }
 
 /**
@@ -1851,10 +1861,10 @@ function cValidCivilP(y: number, m: number, d: number, sg: number): number | nul
  * of the last day of year `y`, or `null` when there is none: the same scan as
  * {@link cFindFdoy} backwards from 31 December.
  */
-function cFindLdoy(y: number, sg: number): number | null {
+function cFindLdoy(y: number, sg: number): [rjd: number, ns: number] | null {
   for (let i = 0; i < 30; i++) {
-    const rjd = cValidCivilP(y, 12, 31 - i, sg);
-    if (rjd !== null) return rjd;
+    const r = cValidCivilP(y, 12, 31 - i, sg);
+    if (r !== null) return r;
   }
   return null;
 }
@@ -1863,27 +1873,28 @@ function cFindLdoy(y: number, sg: number): number | null {
  * @internal `date_core.c` `c_find_ldom` (`date_core.c:490-500`), the same
  * backwards scan from the 31st over month `m` rather than December.
  */
-function cFindLdom(y: number, m: number, sg: number): number | null {
+function cFindLdom(y: number, m: number, sg: number): [rjd: number, ns: number] | null {
   for (let i = 0; i < 30; i++) {
-    const rjd = cValidCivilP(y, m, 31 - i, sg);
-    if (rjd !== null) return rjd;
+    const r = cValidCivilP(y, m, 31 - i, sg);
+    if (r !== null) return r;
   }
   return null;
 }
 
 /** @internal `date_core.c` `c_ordinal_to_jd` (`date_core.c:556-564`), the `d`th day of year `y`. */
-function cOrdinalToJd(y: number, d: number, sg: number): number | null {
-  const rjd = cFindFdoy(y, sg);
-  if (rjd === null) return null;
-  return rjd + d - 1;
+function cOrdinalToJd(y: number, d: number, sg: number): [rjd: number, ns: number] | null {
+  const fdoy = cFindFdoy(y, sg);
+  if (fdoy === null) return null;
+  const rjd = fdoy[0] + d - 1;
+  return [rjd, rjd < sg ? 0 : 1];
 }
 
 /** @internal `date_core.c` `c_jd_to_ordinal` (`date_core.c:566-575`), the inverse of {@link cOrdinalToJd}. */
 function cJdToOrdinal(jd: number, sg: number): [ry: number, rd: number] | null {
   const ry = cJdToCivil(jd, sg)[0];
-  const rjd = cFindFdoy(ry, sg);
-  if (rjd === null) return null;
-  return [ry, jd - rjd + 1];
+  const fdoy = cFindFdoy(ry, sg);
+  if (fdoy === null) return null;
+  return [ry, jd - fdoy[0] + 1];
 }
 
 /**
@@ -1892,19 +1903,19 @@ function cJdToOrdinal(jd: number, sg: number): [ry: number, rd: number] | null {
  * `d` counts back from the last day of the year — `-1` is 31 December — and is
  * rejected when that walk leaves `y`.
  */
-function cValidOrdinalP(y: number, d: number, sg: number): number | null {
+function cValidOrdinalP(y: number, d: number, sg: number): [rjd: number, ns: number] | null {
   if (d < 0) {
-    const rjd2 = cFindLdoy(y, sg);
-    if (rjd2 === null) return null;
-    const ro2 = cJdToOrdinal(rjd2 + d + 1, sg);
+    const ldoy = cFindLdoy(y, sg);
+    if (ldoy === null) return null;
+    const ro2 = cJdToOrdinal(ldoy[0] + d + 1, sg);
     if (ro2 === null || ro2[0] !== y) return null;
     d = ro2[1];
   }
-  const rjd = cOrdinalToJd(y, d, sg);
-  if (rjd === null) return null;
-  const ro = cJdToOrdinal(rjd, sg);
+  const r = cOrdinalToJd(y, d, sg);
+  if (r === null) return null;
+  const ro = cJdToOrdinal(r[0], sg);
   if (ro === null || ro[0] !== y || ro[1] !== d) return null;
-  return rjd;
+  return r;
 }
 
 /**
@@ -1913,26 +1924,32 @@ function cValidOrdinalP(y: number, d: number, sg: number): number | null {
  * from Monday: the year's first day floored back to the Monday on or before it,
  * then `w` weeks and `d` days on.
  */
-function cCommercialToJd(y: number, w: number, d: number, sg: number): number | null {
-  let rjd2 = cFindFdoy(y, sg);
-  if (rjd2 === null) return null;
-  rjd2 += 3;
-  return rjd2 - mod(rjd2 - 1 + 1, 7) + 7 * (w - 1) + (d - 1);
+function cCommercialToJd(
+  y: number,
+  w: number,
+  d: number,
+  sg: number,
+): [rjd: number, ns: number] | null {
+  const fdoy = cFindFdoy(y, sg);
+  if (fdoy === null) return null;
+  const rjd2 = fdoy[0] + 3;
+  const rjd = rjd2 - mod(rjd2 - 1 + 1, 7) + 7 * (w - 1) + (d - 1);
+  return [rjd, rjd < sg ? 0 : 1];
 }
 
 /** @internal `date_core.c` `c_jd_to_commercial` (`date_core.c:590-609`), the inverse of {@link cCommercialToJd}. */
 function cJdToCommercial(jd: number, sg: number): [ry: number, rw: number, rd: number] | null {
   const a = cJdToCivil(jd - 3, sg)[0];
   let ry: number;
-  let rjd2 = cCommercialToJd(a + 1, 1, 1, sg);
-  if (rjd2 === null) return null;
-  if (jd >= rjd2) ry = a + 1;
+  let c2 = cCommercialToJd(a + 1, 1, 1, sg);
+  if (c2 === null) return null;
+  if (jd >= c2[0]) ry = a + 1;
   else {
-    rjd2 = cCommercialToJd(a, 1, 1, sg);
-    if (rjd2 === null) return null;
+    c2 = cCommercialToJd(a, 1, 1, sg);
+    if (c2 === null) return null;
     ry = a;
   }
-  const rw = 1 + div(jd - rjd2, 7);
+  const rw = 1 + div(jd - c2[0], 7);
   let rd = mod(jd + 1, 7);
   if (rd === 0) rd = 7;
   return [ry, rw, rd];
@@ -1944,22 +1961,27 @@ function cJdToCommercial(jd: number, sg: number): [ry: number, rw: number, rd: n
  * of the commercial year before rebuilding the date and rejecting it if the
  * round-trip does not name the same `y`/`w`/`d` back.
  */
-function cValidCommercialP(y: number, w: number, d: number, sg: number): number | null {
+function cValidCommercialP(
+  y: number,
+  w: number,
+  d: number,
+  sg: number,
+): [rjd: number, ns: number] | null {
   if (d < 0) d += 8;
   if (w < 0) {
-    const rjd2 = cCommercialToJd(y + 1, 1, 1, sg);
-    if (rjd2 === null) return null;
-    const c2 = cJdToCommercial(rjd2 + w * 7, sg);
+    const r2 = cCommercialToJd(y + 1, 1, 1, sg);
+    if (r2 === null) return null;
+    const c2 = cJdToCommercial(r2[0] + w * 7, sg);
     if (c2 === null || c2[0] !== y) return null;
     w = c2[1];
   }
-  const rjd = cCommercialToJd(y, w, d, sg);
-  if (rjd === null) return null;
-  const c = cJdToCommercial(rjd, sg);
+  const r = cCommercialToJd(y, w, d, sg);
+  if (r === null) return null;
+  const c = cJdToCommercial(r[0], sg);
   if (c === null) return null;
   const [ry, rw, rd] = c;
   if (y !== ry || w !== rw || d !== rd) return null;
-  return rjd;
+  return r;
 }
 
 /**
@@ -1970,11 +1992,18 @@ function cValidCommercialP(y: number, w: number, d: number, sg: number): number 
  * partial week before the year's first one. Week `0` is therefore empty in a
  * year whose 1 January is itself an `f`-day: there, 1 January opens week `1`.
  */
-function cWeeknumToJd(y: number, w: number, d: number, f: number, sg: number): number | null {
-  let rjd2 = cFindFdoy(y, sg);
-  if (rjd2 === null) return null;
-  rjd2 += 6;
-  return rjd2 - mod(rjd2 - f + 1, 7) - 7 + 7 * w + d;
+function cWeeknumToJd(
+  y: number,
+  w: number,
+  d: number,
+  f: number,
+  sg: number,
+): [rjd: number, ns: number] | null {
+  const fdoy = cFindFdoy(y, sg);
+  if (fdoy === null) return null;
+  const rjd2 = fdoy[0] + 6;
+  const rjd = rjd2 - mod(rjd2 - f + 1, 7) - 7 + 7 * w + d;
+  return [rjd, rjd < sg ? 0 : 1];
 }
 
 /** @internal `date_core.c` `c_jd_to_weeknum` (`date_core.c:621-634`), the inverse of {@link cWeeknumToJd}. */
@@ -1984,9 +2013,9 @@ function cJdToWeeknum(
   sg: number,
 ): [ry: number, rw: number, rd: number] | null {
   const ry = cJdToCivil(jd, sg)[0];
-  let rjd = cFindFdoy(ry, sg);
-  if (rjd === null) return null;
-  rjd += 6;
+  const fdoy = cFindFdoy(ry, sg);
+  if (fdoy === null) return null;
+  const rjd = fdoy[0] + 6;
   const j = jd - (rjd - mod(rjd - f + 1, 7)) + 7;
   return [ry, div(j, 7), mod(j, 7)];
 }
@@ -1998,22 +2027,28 @@ function cJdToWeeknum(
  * rather than a `1`..`7` one, so a negative day takes `7` where the commercial
  * one takes `8`.
  */
-function cValidWeeknumP(y: number, w: number, d: number, f: number, sg: number): number | null {
+function cValidWeeknumP(
+  y: number,
+  w: number,
+  d: number,
+  f: number,
+  sg: number,
+): [rjd: number, ns: number] | null {
   if (d < 0) d += 7;
   if (w < 0) {
-    const rjd2 = cWeeknumToJd(y + 1, 1, f, f, sg);
-    if (rjd2 === null) return null;
-    const w2 = cJdToWeeknum(rjd2 + w * 7, f, sg);
+    const r2 = cWeeknumToJd(y + 1, 1, f, f, sg);
+    if (r2 === null) return null;
+    const w2 = cJdToWeeknum(r2[0] + w * 7, f, sg);
     if (w2 === null || w2[0] !== y) return null;
     w = w2[1];
   }
-  const rjd = cWeeknumToJd(y, w, d, f, sg);
-  if (rjd === null) return null;
-  const wn = cJdToWeeknum(rjd, f, sg);
+  const r = cWeeknumToJd(y, w, d, f, sg);
+  if (r === null) return null;
+  const wn = cJdToWeeknum(r[0], f, sg);
   if (wn === null) return null;
   const [ry, rw, rd] = wn;
   if (y !== ry || w !== rw || d !== rd) return null;
-  return rjd;
+  return r;
 }
 
 /**
@@ -2032,7 +2067,7 @@ function rtValidJdP(jd: number, _sg: number): number {
  *
  */
 function rtValidOrdinalP(y: number, d: number, sg: number): number | null {
-  return cValidOrdinalP(y, d, sg);
+  return cValidOrdinalP(y, d, sg)?.[0] ?? null;
 }
 
 /**
@@ -2041,7 +2076,7 @@ function rtValidOrdinalP(y: number, d: number, sg: number): number | null {
  * raising so its caller can fall through to the next kind of date.
  */
 function rtValidCivilP(y: number, m: number, d: number, sg: number): number | null {
-  return cValidCivilP(y, m, d, sg);
+  return cValidCivilP(y, m, d, sg)?.[0] ?? null;
 }
 
 /**
@@ -2088,7 +2123,7 @@ function rtValidDateFragsP(parts: DateParts, sg: number): number | null {
     }
     if (wday !== undefined && parts.cweek !== undefined && parts.cwyear !== undefined) {
       const d = cValidCommercialP(parts.cwyear, parts.cweek, wday, sg);
-      if (d !== null) return d;
+      if (d !== null) return d[0];
     }
   }
 
@@ -2100,7 +2135,7 @@ function rtValidDateFragsP(parts: DateParts, sg: number): number | null {
     }
     if (wday !== undefined && parts.wnum0 !== undefined && parts.year !== undefined) {
       const d = cValidWeeknumP(parts.year, parts.wnum0, wday, 0, sg);
-      if (d !== null) return d;
+      if (d !== null) return d[0];
     }
   }
 
@@ -2111,7 +2146,7 @@ function rtValidDateFragsP(parts: DateParts, sg: number): number | null {
 
     if (wday !== undefined && parts.wnum1 !== undefined && parts.year !== undefined) {
       const d = cValidWeeknumP(parts.year, parts.wnum1, wday, 1, sg);
-      if (d !== null) return d;
+      if (d !== null) return d[0];
     }
   }
   return null;
@@ -2189,12 +2224,37 @@ export class Date {
   /** Ruby `Date::GREGORIAN` (ruby/date, `date_core.c:189`), the proleptic Gregorian calendar. */
   static GREGORIAN = GREGORIAN;
 
-  /** @internal Ruby's `::Date` value, which has no public reader. */
-  readonly #plain: Temporal.PlainDate;
+  /**
+   * @internal `SimpleDateData`'s `jd` and `sg` (`date_core.c:203-213`), the
+   * state ruby/date carries: the Julian day, and the calendar-reform start it
+   * is read under. A `Temporal.PlainDate` cannot stand in for the pair — it is
+   * proleptic Gregorian, so a Julian date such as 1500-02-29 has no
+   * `Temporal.PlainDate` at all.
+   */
+  readonly #jd: number;
+  readonly #sg: number;
 
-  /** Ruby `Date.new(year, month, day)`. */
-  constructor(year: number, month: number, day: number) {
-    this.#plain = new Temporal.PlainDate(year, month, day);
+  /**
+   * Ruby `Date.new(year = -4712, month = 1, mday = 1, start = Date::ITALY)`
+   * (ruby/date, `date_core.c` `date_s_civil`), which raises `Date::Error` on a
+   * civil date `c_valid_civil_p` rejects — 1582-10-10 under `Date::ITALY` is a
+   * day the reform deleted.
+   */
+  constructor(year: number, month: number, day: number, start: number = DEFAULT_SG) {
+    const r = cValidCivilP(year, month, day, start);
+    if (r === null) throw new DateError("invalid date");
+    this.#jd = r[0];
+    this.#sg = start;
+  }
+
+  /**
+   * Ruby `Date.jd(jd = 0, start = Date::ITALY)` (ruby/date, `date_core.c`
+   * `date_s_jd`), the date the given Julian day names under `start`: Gregorian
+   * at or after it, Julian before.
+   */
+  static jd(jd = 0, start: number = DEFAULT_SG): Date {
+    const [y, m, d] = cJdToCivil(jd, start);
+    return new Date(y, m, d, start);
   }
 
   /**
@@ -2205,10 +2265,9 @@ export class Date {
    * 2001-12-31.
    */
   static ordinal(year = -4712, yday = 1, start: number = DEFAULT_SG): Date {
-    const jd = cValidOrdinalP(year, yday, start);
-    if (jd === null) throw new DateError("invalid date");
-    const [y, m, d] = cJdToCivil(jd, start);
-    return new Date(y, m, d);
+    const r = cValidOrdinalP(year, yday, start);
+    if (r === null) throw new DateError("invalid date");
+    return Date.jd(r[0], start);
   }
 
   /**
@@ -2219,10 +2278,7 @@ export class Date {
    * from the month's end, so `Date.civil(2001, -1, -1)` is 2001-12-31.
    */
   static civil(year = -4712, month = 1, mday = 1, start: number = DEFAULT_SG): Date {
-    const jd = cValidCivilP(year, month, mday, start);
-    if (jd === null) throw new DateError("invalid date");
-    const [y, m, d] = cJdToCivil(jd, start);
-    return new Date(y, m, d);
+    return new Date(year, month, mday, start);
   }
 
   /**
@@ -2233,10 +2289,9 @@ export class Date {
    * the commercial year, so `Date.commercial(2001, -1, -1)` is 2001-12-30.
    */
   static commercial(cwyear = -4712, cweek = 1, cwday = 1, start: number = DEFAULT_SG): Date {
-    const jd = cValidCommercialP(cwyear, cweek, cwday, start);
-    if (jd === null) throw new DateError("invalid date");
-    const [y, m, d] = cJdToCivil(jd, start);
-    return new Date(y, m, d);
+    const r = cValidCommercialP(cwyear, cweek, cwday, start);
+    if (r === null) throw new DateError("invalid date");
+    return Date.jd(r[0], start);
   }
 
   /**
@@ -2328,28 +2383,86 @@ export class Date {
   }
 
   get year(): number {
-    return this.#plain.year;
+    return cJdToCivil(this.#jd, this.#sg)[0];
   }
 
   get mon(): number {
-    return this.#plain.month;
+    return cJdToCivil(this.#jd, this.#sg)[1];
   }
 
   get month(): number {
-    return this.#plain.month;
+    return cJdToCivil(this.#jd, this.#sg)[1];
   }
 
   get day(): number {
-    return this.#plain.day;
+    return cJdToCivil(this.#jd, this.#sg)[2];
   }
 
-  /** Ruby counts Sunday as 0; `Temporal.PlainDate#dayOfWeek` counts Monday as 1. */
+  /** `date_core.c` `c_jd_to_wday` (`date_core.c:636-640`), Sunday as `0`. */
   get wday(): number {
-    return this.#plain.dayOfWeek % 7;
+    return mod(this.#jd + 1, 7);
   }
 
   get yday(): number {
-    return this.#plain.dayOfYear;
+    return cJdToOrdinal(this.#jd, this.#sg)![1];
+  }
+
+  /**
+   * Ruby `Date#start` (ruby/date, `date_core.c` `d_lite_start`), the
+   * calendar-reform start the date is read under. `Date.new(2001, 2, 3,
+   * Date::ENGLAND).start` is `2361222`.
+   */
+  get start(): number {
+    return this.#sg;
+  }
+
+  /**
+   * Ruby `Date#julian?` (ruby/date, `date_core.c` `d_lite_julian_p` over
+   * `m_julian_p`, `date_core.c:1683-1702`), which answers the `start` itself
+   * for the two infinite ones and compares the Julian day against it otherwise.
+   */
+  isJulian(): boolean {
+    if (!Number.isFinite(this.#sg)) return this.#sg === JULIAN;
+    return this.#jd < this.#sg;
+  }
+
+  /** Ruby `Date#gregorian?` (ruby/date, `date_core.c` `d_lite_gregorian_p`). */
+  isGregorian(): boolean {
+    return !this.isJulian();
+  }
+
+  /**
+   * Ruby `Date#new_start(start = Date::ITALY)` (ruby/date, `date_core.c`
+   * `d_lite_new_start` over `dup_obj_with_new_start`), a copy of the date
+   * naming the same Julian day under a different reform start.
+   */
+  newStart(start: number = DEFAULT_SG): Date {
+    return Date.jd(this.#jd, start);
+  }
+
+  /** Ruby `Date#italy` (ruby/date, `date_core.c` `d_lite_italy`). */
+  italy(): Date {
+    return this.newStart(ITALY);
+  }
+
+  /** Ruby `Date#england` (ruby/date, `date_core.c` `d_lite_england`). */
+  england(): Date {
+    return this.newStart(ENGLAND);
+  }
+
+  /** Ruby `Date#julian` (ruby/date, `date_core.c` `d_lite_julian`). */
+  julian(): Date {
+    return this.newStart(JULIAN);
+  }
+
+  /** Ruby `Date#gregorian` (ruby/date, `date_core.c` `d_lite_gregorian`). */
+  gregorian(): Date {
+    return this.newStart(GREGORIAN);
+  }
+
+  /** Ruby `Date#to_s` (ruby/date, `date_core.c` `d_lite_to_s`). */
+  toS(): string {
+    return this.strftime("%Y-%m-%d");
   }
 
   /**
