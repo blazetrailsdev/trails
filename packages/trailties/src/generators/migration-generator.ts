@@ -3,11 +3,9 @@ import {
   GeneratorOptions,
   migrationTimestamp,
   classify,
-  tableize,
-  underscore,
   ColumnType,
 } from "./base.js";
-import { pluralize, singularize } from "@blazetrails/activesupport";
+import { pluralize, singularize, tableize, underscore } from "@blazetrails/activesupport";
 
 const VIRTUAL_TYPES = new Set(["rich_text", "attachment", "attachments"]);
 

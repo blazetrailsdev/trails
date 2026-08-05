@@ -119,6 +119,19 @@ export class EncryptableRecord {
     return modelClass._encryptedAttributes ?? new Set();
   }
 
+  /**
+   * `class_attribute :encrypted_attributes` (encryptable_record.rb:11) also
+   * generates the predicate, whose body is `!!encrypted_attributes` — true once
+   * the slot has been assigned (`self.encrypted_attributes ||= Set.new`,
+   * encryptable_record.rb:50), including for an assigned-but-empty Set. That is
+   * NOT `has_encrypted_attributes?`, which is `present?` and so false when the
+   * Set is empty (encryptable_record.rb:204-206). The reader's `?? new Set()`
+   * default can't answer it, so read the slot directly.
+   */
+  static isEncryptedAttributes(modelClass: any): boolean {
+    return modelClass._encryptedAttributes != null;
+  }
+
   static sourceAttributeFromPreservedAttribute(attributeName: string): string | undefined {
     return attributeName.startsWith(ORIGINAL_ATTRIBUTE_PREFIX)
       ? attributeName.slice(ORIGINAL_ATTRIBUTE_PREFIX.length)

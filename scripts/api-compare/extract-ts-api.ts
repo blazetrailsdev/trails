@@ -987,6 +987,7 @@ export function extractFromProgram(
           extends: [],
           instanceMethods: fileFunctions,
           classMethods: [],
+          synthesizedFileModule: true,
         };
       }
     }

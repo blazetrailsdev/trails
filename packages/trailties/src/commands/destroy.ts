@@ -2,7 +2,8 @@ import { cwd as getCwd } from "@blazetrails/activesupport/process-adapter";
 import { Command } from "commander";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { classify, dasherize, tableize } from "../generators/base.js";
+import { classify, dasherize } from "../generators/base.js";
+import { tableize } from "@blazetrails/activesupport";
 
 export function destroyCommand(): Command {
   const cmd = new Command("destroy");

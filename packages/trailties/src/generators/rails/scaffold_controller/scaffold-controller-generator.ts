@@ -4,10 +4,8 @@ import {
   classify,
   dasherize,
   parseColumns,
-  tableize,
-  underscore,
 } from "../../base.js";
-import { singularize } from "@blazetrails/activesupport";
+import { singularize, tableize, underscore } from "@blazetrails/activesupport";
 import { tsBody, tsMethod, type Method } from "../../../template-builder/index.js";
 import { emitControllerClass } from "../controller/controller-paths.js";
 import { emitResourceRouteSnippet } from "../resource-route/resource-route-generator.js";

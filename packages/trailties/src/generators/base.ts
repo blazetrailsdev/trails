@@ -5,7 +5,6 @@ import {
   type PathAdapter,
   underscore as _underscore,
   camelize as _camelize,
-  tableize as _tableize,
   dasherize as _dasherize,
 } from "@blazetrails/activesupport";
 import * as Actions from "./actions.js";
@@ -113,9 +112,6 @@ export function migrationTimestamp(): string {
   const sec = now.getSeconds().toString().padStart(2, "0");
   return `${y}${m}${d}${h}${min}${sec}`;
 }
-
-export const tableize = _tableize;
-export const underscore = _underscore;
 
 export function classify(name: string): string {
   return _camelize(name.replace(/-/g, "_"));

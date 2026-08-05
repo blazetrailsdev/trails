@@ -66,6 +66,15 @@ export interface MethodInfo {
    */
   bodyDigest?: string;
   /**
+   * Compare-side only: set by `flattenIncludedMethodInfos` on a method a host
+   * entity picked up through `include`/`extend`, naming the Ruby file the
+   * mixin that defines it lives in. Ruby flattens the method onto every host,
+   * but trails ports it once — in the file mirroring the mixin's own — so the
+   * host copy is a duplicate expectation, not a parity gap. See
+   * `mixinMethodCreditedToOwnFile`.
+   */
+  mixinFile?: string;
+  /**
    * True when the method is not part of the public API surface:
    * Ruby `private`/`protected`, TS `private`/`protected`, or
    * TS `#`-prefixed private fields. Consumers should filter these
@@ -178,6 +187,15 @@ export interface ClassInfo {
    * consult `MethodInfo.declaredIn`. See extract-ts-api.ts.
    */
   synthesizedMixin?: boolean;
+  /**
+   * TS-side only: this entry is the file-level container the extractor
+   * synthesizes for a file that declares only top-level functions, and its
+   * `name` is derived from the FILENAME — nobody wrote it. Rails' filename and
+   * module name are not always the same word (`compare_range.rb` declares
+   * `CompareWithRange`), so extra-surface must not score the derived name as
+   * novel surface. See extract-ts-api.ts.
+   */
+  synthesizedFileModule?: boolean;
   /**
    * TS-side only: this entry came from an `interface` declaration rather than a
    * `class`, `namespace`, or synthesized module. Interfaces are type-only, so a
