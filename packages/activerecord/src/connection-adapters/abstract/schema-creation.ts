@@ -17,6 +17,7 @@ import {
   AlterTable,
   CreateIndexDefinition,
   IndexDefinition,
+  type AddIndexOptions,
   ForeignKeyDefinition,
   CheckConstraintDefinition,
   PrimaryKeyDefinition,
@@ -29,6 +30,7 @@ import {
 } from "./native-database-types.js";
 import type { SchemaQuoter } from "./assert-schema-adapter.js";
 import { ArgumentError } from "@blazetrails/activemodel";
+import { NotImplementedError } from "../../errors.js";
 
 type Definition =
   | TableDefinition
@@ -36,6 +38,7 @@ type Definition =
   | ColumnDefinition
   | AddColumnDefinition
   | CreateIndexDefinition
+  | IndexDefinition
   | ForeignKeyDefinition
   | CheckConstraintDefinition
   | PrimaryKeyDefinition;
@@ -123,6 +126,7 @@ export class SchemaCreation {
     if (o instanceof AddColumnDefinition) return this.visitAddColumnDefinition(o);
     if (o instanceof ColumnDefinition) return this.visitColumnDefinition(o);
     if (o instanceof CreateIndexDefinition) return this.visitCreateIndexDefinition(o);
+    if (o instanceof IndexDefinition) return this.visitIndexDefinition(o);
     if (o instanceof ForeignKeyDefinition) return this.visitForeignKeyDefinition(o);
     if (o instanceof CheckConstraintDefinition) return this.visitCheckConstraintDefinition(o);
     if (o instanceof PrimaryKeyDefinition) return this.visitPrimaryKeyDefinition(o);
@@ -147,6 +151,12 @@ export class SchemaCreation {
     const primaryKeys = o.primaryKeys();
     if (primaryKeys) statements.push(this.visitPrimaryKeyDefinition(primaryKeys));
 
+    if (this.supportsIndexesInCreate()) {
+      for (const [columnName, options] of o.indexes) {
+        statements.push(await this.indexInCreate(o.tableName, columnName, options));
+      }
+    }
+
     if (this.useForeignKeys()) {
       for (const fk of o.foreignKeys) {
         statements.push(this.visitForeignKeyDefinition(fk));
@@ -166,6 +176,33 @@ export class SchemaCreation {
     if (o.as) sql += ` AS ${this.toSql(o.as)}`;
 
     return sql;
+  }
+
+  /**
+   * Rails leaves `index_in_create` undefined on the abstract visitor and relies
+   * on `supports_indexes_in_create?` being false there; TS's static dispatch
+   * needs the declaration, so the unreachable arm raises the way Ruby's missing
+   * method would.
+   * @internal
+   */
+  protected indexInCreate(
+    _tableName: string,
+    _columnName: string | string[],
+    _options: AddIndexOptions,
+  ): Promise<string> {
+    // @nie disposition=TODO
+    throw new NotImplementedError();
+  }
+
+  /**
+   * Same shape as {@link indexInCreate}: Rails defines `visit_IndexDefinition`
+   * only on `MySQL::SchemaCreation` (mysql/schema_creation.rb:44), and `accept`'s
+   * `send` would raise for any other adapter.
+   * @internal
+   */
+  protected visitIndexDefinition(_o: IndexDefinition, _create = false): string {
+    // @nie disposition=TODO
+    throw new NotImplementedError();
   }
 
   /** @internal */

@@ -87,6 +87,17 @@ describe("MySQL::SchemaCreation", () => {
     );
   });
 
+  it("index_in_create renders the index through accept", async () => {
+    expect(await (sc as any).indexInCreate("users", "email", {})).toBe(
+      "INDEX `index_users_on_email` (`email`)",
+    );
+  });
+
+  it("accept dispatches an IndexDefinition to visit_IndexDefinition", async () => {
+    const idx = new IndexDefinition("users", "idx_users_email", false, ["email"]);
+    expect(await sc.accept(idx)).toBe("INDEX `idx_users_email` (`email`)");
+  });
+
   it("visitCreateIndexDefinition appends algorithm", async () => {
     const idx = new IndexDefinition("users", "idx", false, ["col"]);
     const def = new CreateIndexDefinition(idx, false, "INPLACE");

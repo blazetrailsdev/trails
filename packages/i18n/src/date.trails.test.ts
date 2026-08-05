@@ -241,6 +241,22 @@ describe("Date", () => {
     expect(RubyDate.parse("+08-07-02").year).toBe(8);
   });
 
+  it("takes an apostrophe-marked token as the year, as s3e does", () => {
+    expect(RubyDate._parse("'01-02-03")).toEqual({ year: 2001, mon: 2, mday: 3 });
+    expect(RubyDate._parse("'01/02/03")).toEqual({ year: 2001, mon: 2, mday: 3 });
+    expect(RubyDate._parse("'01.02.03")).toEqual({ year: 2001, mon: 2, mday: 3 });
+    expect(RubyDate._parse("'01-02-'03")).toEqual({ year: 2003, mon: 2, mday: 1 });
+    expect(RubyDate._parse("'01/02/'03")).toEqual({ year: 2003, mon: 2, mday: 1 });
+    expect(RubyDate._parse("'01.02.'03")).toEqual({ year: 2003, mon: 2, mday: 1 });
+    expect(RubyDate._parse("2008-07-'02")).toEqual({ year: 2002, mon: 7, mday: 2008 });
+  });
+
+  it("takes a leading + only where parse_iso does, as date_parse.c does", () => {
+    expect(RubyDate._parse("+01-02-03")).toEqual({ year: 1, mon: 2, mday: 3 });
+    expect(RubyDate._parse("+01/02/03")).toEqual({ year: 2001, mon: 2, mday: 3 });
+    expect(RubyDate._parse("+01.02.03")).toEqual({ year: 2001, mon: 2, mday: 3 });
+  });
+
   it("completes a two-digit year unless comp is false, as Ruby does", () => {
     expect(RubyDate.parse("080702").year).toBe(2008);
     expect(RubyDate.parse("690702").year).toBe(1969);

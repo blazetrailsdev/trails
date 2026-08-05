@@ -5,7 +5,7 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { Base } from "./index.js";
 import { User } from "./test-helpers/models/user.js";
-import { hasSecureToken, MinimumLengthError } from "./secure-token.js";
+import { MinimumLengthError } from "./secure-token.js";
 import { fixtures } from "./test-fixtures.js";
 
 describe("SecureTokenTest", () => {
@@ -25,7 +25,7 @@ describe("SecureTokenTest", () => {
       static _tableName = "users";
     }
     await TokenUser.loadSchema();
-    hasSecureToken(TokenUser, "token", { on: "initialize" });
+    TokenUser.hasSecureToken("token", { on: "initialize" });
     return TokenUser;
   }
 
@@ -91,7 +91,7 @@ describe("SecureTokenTest", () => {
   });
 
   it("token length cannot be less than 24 characters", () => {
-    expect(() => hasSecureToken(User, "not_valid_token", { length: 12 })).toThrow(
+    expect(() => User.hasSecureToken("not_valid_token", { length: 12 })).toThrow(
       MinimumLengthError,
     );
   });
@@ -114,7 +114,7 @@ describe("SecureTokenTest", () => {
       static _tableName = "users";
     }
     await TokenUser.loadSchema();
-    hasSecureToken(TokenUser, "token", { on: "initialize" });
+    TokenUser.hasSecureToken("token", { on: "initialize" });
 
     const proto = TokenUser.prototype as any;
     let superDesc: PropertyDescriptor | undefined;
