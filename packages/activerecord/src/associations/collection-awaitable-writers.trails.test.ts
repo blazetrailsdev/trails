@@ -1,27 +1,24 @@
 /**
- * Trails-only: the native `=` collection setter (`owner.items = [...]`, the
- * `#{singular}Ids=` setter, and the mass-assignment hasMany/HABTM arm)
- * deviates from Rails on a *persisted* owner. Rails'
- * `CollectionAssociation#writer` → `replace`
- * (vendor/rails/activerecord/lib/active_record/associations/collection_association.rb:46-48,
- * :242) diffs against the loaded target and runs the deletes + inserts inline
- * in a transaction (`replace_records`) — synchronous DB I/O JS cannot do from
- * a property setter. Rather than silently deferring the writes to the owner's
- * next `save()` (where a deferred delete can race an interim insert), the
- * setter THROWS and names the awaitable Rails-named replacement
- * (`await owner.items.replace([...])`). On an *unpersisted* owner Rails does
- * no I/O either, so the in-memory replace is faithful and kept. There is no
- * Rails test for this deviation.
+ * Trails-only: collection associations have NO native `=` writers. Rails
+ * generates `#{name}=` and `#{name.singularize}_ids=`
+ * (vendor/rails/activerecord/lib/active_record/associations/builder/collection_association.rb:67-74),
+ * but both do DB I/O at assignment time — `writer` → `replace` diffs the
+ * loaded target and runs the deletes + inserts in a transaction
+ * (collection_association.rb:46-48, :242), and `ids_writer` resolves the ids
+ * with a query first (:61-83). A JS property setter cannot `await` either, so
+ * RFC 0087 §1 deletes them: the awaitable ports on the association —
+ * `writer` / `replace` / `idsWriter` — are the only collection-mutation
+ * surface. There is no Rails test for this deviation.
  *
- * The `#{singular}Ids=` setter goes further and throws on BOTH owner arms
- * (`CollectionIdsAssignmentError`): `ids_writer` resolves the ids to records
- * with a query before replacing (collection_association.rb:61-83), so even the
- * new-record arm is DB I/O. The awaitable surfaces are
- * `await owner.update({ itemIds: [...] })` and
- * `await owner.association(name).idsWriter([...])`.
+ * Mass assignment still reaches the collection keys (Rails' `assign_attributes`
+ * → `public_send("#{k}=")`), and is retired separately by RFC 0087's
+ * `retire-sync-association-mass-assignment-arms`. Until then it keeps RFC
+ * 0068's split: in-memory on an unpersisted owner for the record key, and a
+ * throw on both arms for the ids key, whose resolving query has no in-memory
+ * arm at all.
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { registerModel, AssociationTypeMismatch, RecordNotFound } from "../index.js";
+import { registerModel, RecordNotFound } from "../index.js";
 import { CollectionIdsAssignmentError, CollectionPersistedAssignmentError } from "./errors.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
@@ -30,8 +27,6 @@ import { Category } from "../test-helpers/models/category.js";
 import { fixtures } from "../test-fixtures.js";
 
 interface CollectionOwner {
-  posts?: unknown;
-  postIds?: unknown;
   assignAttributes(attrs: Record<string, unknown>): void;
 }
 
@@ -53,7 +48,14 @@ const writerOf =
       .association("posts")
       .writer(records);
 
-describe("CollectionPersistedSetterThrows", () => {
+const idsWriterOf =
+  (owner: Author) =>
+  (ids: unknown[]): Promise<void> =>
+    (owner as unknown as { association(n: string): { idsWriter(i: unknown[]): Promise<void> } })
+      .association("posts")
+      .idsWriter(ids);
+
+describe("CollectionAwaitableWriters", () => {
   fixtures(["authors", "posts", "comments"]);
 
   beforeAll(() => {
@@ -63,56 +65,27 @@ describe("CollectionPersistedSetterThrows", () => {
     registerModel(Category);
   });
 
-  it("native = setter throws on a persisted owner", async () => {
-    const author = (await Author.create({ name: "Bill" })) as unknown as CollectionOwner;
+  it("no native = setter is generated for the collection", async () => {
+    const author = await Author.create({ name: "Bill" });
     const post = await Post.create({ title: "t", body: "b" });
+    // The reader survives; only the writer half of the property is gone.
     expect(() => {
-      author.posts = [post];
-    }).toThrow(CollectionPersistedAssignmentError);
-    // The message names the awaitable Rails-named replacement.
-    expect(() => {
-      author.posts = [post];
-    }).toThrow(/await owner\.posts\.replace\(\[\.\.\.\]\)/);
+      (author as unknown as { posts: unknown }).posts = [post];
+    }).toThrow(TypeError);
+    expect(postsOf(author)).toBeDefined();
   });
 
-  it("native = setter raises the type mismatch before the persisted-owner throw", async () => {
-    // Rails' `replace` raises `AssociationTypeMismatch` for every element as
-    // its first statement (collection_association.rb:242), before any other
-    // work — the sync guard is preserved ahead of the persisted-owner throw.
-    const author = (await Author.create({ name: "Bill" })) as unknown as CollectionOwner;
+  it("no native ids= setter is generated for the collection", async () => {
+    const author = await Author.create({ name: "Bill" });
     expect(() => {
-      author.posts = [1];
-    }).toThrow(AssociationTypeMismatch);
-  });
-
-  it("ids= setter throws on a persisted owner", async () => {
-    const author = (await Author.create({ name: "Bill" })) as unknown as CollectionOwner;
-    const post = await Post.create({ title: "t", body: "b" });
-    expect(() => {
-      author.postIds = [post.id];
-    }).toThrow(CollectionIdsAssignmentError);
-    // The message names the awaitable replacements.
-    expect(() => {
-      author.postIds = [post.id];
-    }).toThrow(/await owner\.update\(\{ postIds: \[\.\.\.\] \}\)/);
-  });
-
-  it("ids= setter throws on an unpersisted owner too", () => {
-    // Unlike the record writer, whose unpersisted arm is pure in-memory work,
-    // `ids_writer` queries to resolve the ids even for a new record. Returning
-    // that promise from the sync setter made a bad id an unhandled rejection
-    // and let an immediate `save()` race the in-flight replace, so this arm
-    // throws rather than floating a promise.
-    const author = new Author({ name: "Bill" });
-    expect(() => {
-      (author as unknown as CollectionOwner).postIds = [1];
-    }).toThrow(CollectionIdsAssignmentError);
+      (author as unknown as { postIds: unknown }).postIds = [1];
+    }).toThrow(TypeError);
+    expect(await (author as unknown as { postIds: Promise<unknown> }).postIds).toBeDefined();
   });
 
   it("ids= mass-assignment throws on both owner arms", async () => {
-    // Mass-assignment shares the setter, so it raises through
-    // `_assign_attributes`' rescue — the deviation is the `cause`, as in the
-    // record-writer case below.
+    // Mass-assignment raises through `_assign_attributes`' rescue, so the
+    // deviation is the `cause`, as in the record-writer case below.
     const post = await Post.create({ title: "t", body: "b" });
     const causeOf = (owner: Author): unknown => {
       try {
@@ -130,8 +103,6 @@ describe("CollectionPersistedSetterThrows", () => {
   });
 
   it("a bad id is a catchable rejection on the awaitable ids surface", async () => {
-    // The hazard this replaces: through the setter, an id that doesn't resolve
-    // surfaced as an unhandled rejection. Through `update` it is catchable.
     const author = await Author.create({ name: "Bill" });
     await expect(author.update({ postIds: [0] })).rejects.toThrow(RecordNotFound);
   });
@@ -153,9 +124,6 @@ describe("CollectionPersistedSetterThrows", () => {
   it("mass-assignment throws on a persisted owner", async () => {
     const author = (await Author.create({ name: "Bill" })) as unknown as CollectionOwner;
     const post = await Post.create({ title: "t", body: "b" });
-    // Mass-assignment wraps a failing setter in `AttributeAssignmentError`
-    // (Rails' `_assign_attributes` rescue), so the deviation surfaces as the
-    // `cause`.
     let raised: unknown;
     try {
       author.assignAttributes({ posts: [post] });
@@ -167,13 +135,13 @@ describe("CollectionPersistedSetterThrows", () => {
     );
   });
 
-  it("keeps in-memory assignment on an unpersisted owner", async () => {
+  it("keeps in-memory mass-assignment on an unpersisted owner", async () => {
     // Rails defers here too (`replace_records` without a save — the FK isn't
-    // known yet), so the sync setter is faithful and autosave persists at the
+    // known yet), so the in-memory arm is faithful and autosave persists at the
     // owner's first `save()`.
     const author = new Author({ name: "Bill" });
     const post = new Post({ title: "t", body: "b" });
-    (author as unknown as CollectionOwner).posts = [post];
+    (author as unknown as CollectionOwner).assignAttributes({ posts: [post] });
 
     expect(targetOf(author).length).toBe(1);
     await author.save();
@@ -221,5 +189,15 @@ describe("CollectionPersistedSetterThrows", () => {
     await author.reload();
     const titles = (await postsOf(author).toArray()).map((p) => p.title);
     expect(titles).toEqual(["b"]);
+  });
+
+  it("the awaitable idsWriter replaces on a persisted owner", async () => {
+    const author = await Author.create({ name: "Bill" });
+    const first = await Post.create({ title: "a", body: "a" });
+    const second = await Post.create({ title: "b", body: "b" });
+
+    await idsWriterOf(author)([first.id, second.id]);
+    await author.reload();
+    expect(await postsOf(author).count()).toBe(2);
   });
 });

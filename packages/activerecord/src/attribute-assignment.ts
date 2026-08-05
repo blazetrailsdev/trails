@@ -14,6 +14,7 @@ import {
   extractMultiparameterCallstack,
   executeMultiparameterAssignment,
 } from "./multiparameter-attribute-assignment.js";
+import { singularize } from "@blazetrails/activesupport";
 
 interface AttributeAssignmentHost {
   writeAttribute(key: string, value: unknown): void;
@@ -161,18 +162,39 @@ export function assignAssociationIfMatch(
   const ctor = host.constructor as
     | { _associations?: Array<{ name: string; type: string }> }
     | undefined;
-  const assoc = ctor?._associations?.find((a) => a.name === key);
+  let assoc = ctor?._associations?.find((a) => a.name === key);
+  // `#{singular}Ids` is a second mass-assignment key onto the same collection
+  // association — Rails generates `#{name.singularize}_ids=`
+  // (builder/collection_association.rb:67-74) and `assign_attributes` reaches
+  // it through `public_send`. trails has no such property setter (it would
+  // have to await `ids_writer`'s resolving query — RFC 0087 §1), so the key is
+  // matched here and dispatched to the association below.
+  let idsKey = false;
+  if (!assoc) {
+    assoc = ctor?._associations?.find(
+      (a) =>
+        (a.type === "hasMany" || a.type === "hasAndBelongsToMany") &&
+        `${singularize(a.name)}Ids` === key,
+    );
+    idsKey = assoc !== undefined;
+  }
   if (!assoc) return false;
   if (typeof host.association !== "function") return false;
-  const proxy = host.association(key) as
+  const proxy = host.association(assoc.name) as
     | {
         replace?: (v: unknown[]) => void;
         writer?: (v: unknown) => void;
         syncWrite?: (v: unknown) => void;
+        syncIdsWrite?: (v: unknown[]) => never;
       }
     | null
     | undefined;
   if (!proxy) return false;
+  if (idsKey) {
+    if (typeof proxy.syncIdsWrite !== "function") return false;
+    proxy.syncIdsWrite(value as unknown[]);
+    return true;
+  }
   if (assoc.type === "hasMany" || assoc.type === "hasAndBelongsToMany") {
     // Mass-assignment can't await, so it shares the native `=` setter's
     // `syncWrite` dispatch: in-memory replace on an unpersisted owner, and a

@@ -248,7 +248,9 @@ describe("RequiredAssociationsTest", () => {
     registerModel("Child", Child);
 
     const parent = new Parent();
-    (parent as any).children = [new Child()];
+    // Rails: `parent.children = [Child.new]` — the awaitable writer since
+    // RFC 0087 §1 removed the sync `=` setter.
+    await (parent as any).association("children").writer([new Child()]);
     expect(await parent.save()).toBe(false);
     expect(parent.errors.fullMessages).toEqual(["Children is invalid"]);
   });

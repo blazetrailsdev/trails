@@ -7,14 +7,7 @@
 
 import { describe, it, expect } from "vitest";
 import { throwAbort } from "@blazetrails/activesupport";
-import {
-  Base,
-  association,
-  registerModel,
-  RecordInvalid,
-  RecordNotFound,
-  CollectionPersistedAssignmentError,
-} from "../index.js";
+import { Base, association, registerModel, RecordInvalid, RecordNotFound } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
 // Opt this file into the canonical-model autoload index (Zeitwerk analog):
 // `Comment`, `Tagging`, `Tag`, and `Owner` — association targets with no
@@ -375,10 +368,11 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
   });
 
   it("writer `author.posts = [...]` still flows through Association#writer", async () => {
-    // R.2 only swapped the reader; the writer still routes through
-    // `this.association(name).writer(value)` — but as of RFC 0068 that writer
-    // is awaitable (it persists the replacement inline for a persisted owner),
-    // so the non-awaitable `=` setter throws rather than deferring the writes.
+    // R.2 only swapped the reader; the writer routes through
+    // `this.association(name).writer(value)` — awaitable since RFC 0068 (it
+    // persists the replacement inline for a persisted owner), so RFC 0087 §1
+    // deleted the `=` setter that could not await it. `author.posts` is a
+    // getter-only property now and the awaitable `replace` is the writer.
     const author = await authorWithPosts();
     const replacement = await Post.create({
       title: "z",
@@ -387,7 +381,7 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
     });
     expect(() => {
       (author as any).posts = [replacement];
-    }).toThrow(CollectionPersistedAssignmentError);
+    }).toThrow(TypeError);
     await association<Post>(author, "posts").replace([replacement]);
     // The proxy returned by the reader reflects the new target.
     const reader = (author as any).posts;

@@ -670,24 +670,21 @@ interface _AssociationDefLike {
 }
 
 /**
- * A constructor-form assignment held back until after `super()`. `viaSetter`
- * entries name a generated writer (`postIds`) rather than an association, so
- * they must be dispatched through that setter — `assignAssociationIfMatch`
- * matches on association name and would drop the value.
+ * A constructor-form assignment held back until after `super()` —
+ * `assignAssociationIfMatch` reaches `this.association(...)`, whose cache
+ * field is not initialized until `super()` returns.
  * @internal
  */
 interface _PendingAssociationAttr {
   name: string;
   value: unknown;
-  viaSetter?: boolean;
 }
 
 /**
  * @internal
- * Is `key` the generated `#{singular}Ids` writer of one of `defs`' collection
- * associations? Requires a live setter on the prototype as well as the name
- * match, so that a `*Ids` key which would NOT dispatch an association writer
- * inside `super()` (a genuine column, say) is left on the attribute path.
+ * Is `key` the `#{singular}Ids` mass-assignment key of one of `defs`'
+ * collection associations? A `*Ids` key naming no collection association
+ * (a genuine column, say) is left on the attribute path.
  */
 function _isCollectionIdsWriter(
   ctor: typeof Base | undefined,
@@ -700,14 +697,7 @@ function _isCollectionIdsWriter(
       (a.type === "hasMany" || a.type === "hasAndBelongsToMany") &&
       `${_singularize(a.name)}Ids` === key,
   );
-  if (!named) return false;
-  let proto: object | null = (ctor as unknown as { prototype?: object })?.prototype ?? null;
-  while (proto) {
-    const descriptor = Object.getOwnPropertyDescriptor(proto, key);
-    if (descriptor) return typeof descriptor.set === "function";
-    proto = Object.getPrototypeOf(proto) as object | null;
-  }
-  return false;
+  return named;
 }
 
 /**
@@ -717,9 +707,9 @@ function _isCollectionIdsWriter(
  * when no key matches a declared association so the hot path allocates
  * nothing.
  *
- * A generated `#{singular}Ids` key (`new Author({postIds: [...]})`) is deferred
- * too: its setter reaches `this.association(name)`, whose cache field is not
- * initialized until after `super()` returns.
+ * A `#{singular}Ids` key (`new Author({postIds: [...]})`) is deferred too:
+ * `assignAssociationIfMatch` reaches `this.association(name)`, whose cache
+ * field is not initialized until after `super()` returns.
  */
 function _extractAssociationAttrs(
   ctor: typeof Base | undefined,
@@ -739,7 +729,7 @@ function _extractAssociationAttrs(
     if (defs.find((a) => a.name === k)) {
       (assocs ??= []).push({ name: k, value: attrs[k] });
     } else if (_isCollectionIdsWriter(ctor, defs, k)) {
-      (assocs ??= []).push({ name: k, value: attrs[k], viaSetter: true });
+      (assocs ??= []).push({ name: k, value: attrs[k] });
     }
   }
   if (!assocs) return null;
@@ -853,11 +843,7 @@ function _reinstateConstructorDirtiness(
 
 /** @internal */
 function _dispatchAssociationAttrs(record: Base, assocs: _PendingAssociationAttr[]): void {
-  for (const { name, value, viaSetter } of assocs) {
-    if (viaSetter) {
-      (record as unknown as Record<string, unknown>)[name] = value;
-      continue;
-    }
+  for (const { name, value } of assocs) {
     _AttributeAssignment.assignAssociationIfMatch(
       record as unknown as { constructor?: unknown; association?: (name: string) => unknown },
       name,
