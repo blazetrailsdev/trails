@@ -100,12 +100,16 @@ function toS(value: unknown): string {
  * PostgreSQL's `SchemaStatements` is only ever mixed into `PostgreSQLAdapter`
  * (`include()` at the bottom of the adapter module), so its bodies call plain
  * `this` methods the way Rails' module does. This merged interface gives those
- * calls the PG adapter's type. @internal
+ * calls the PG adapter's type.
+ *
+ * The `Omit`ted names already reach `this` from `AbstractSchemaStatements` with
+ * a signature TypeScript will not let a narrower PG one merge over — a method
+ * declared on a base class wins over a merged-interface property. The bodies use
+ * the abstract signature for them, which is why `resetPkSequenceBang` casts
+ * `getDatabaseVersion`'s `number | Version` (PG returns `server_version_num`)
+ * back to `number`. The three restated below are the reverse case: own members
+ * TypeScript does accept, narrowed from the generic adapter's. @internal
  */
-// drift-ok: the omitted names already come from `AbstractSchemaStatements` with
-// a signature TS will not let a narrower PG one merge over (a method declared on
-// a base class wins over a merged-interface property). The bodies below use the
-// abstract signature for them, so nothing is lost.
 export interface SchemaStatements extends Omit<
   PgSchemaAdapter,
   | "execute"
@@ -118,8 +122,6 @@ export interface SchemaStatements extends Omit<
   | "logger"
   | "nativeDatabaseTypes"
 > {
-  // Declared as own members rather than inherited: `AbstractSchemaStatements`
-  // types each of these for the generic adapter, and PG narrows them.
   readonly typeMap: HashLookupTypeMap;
   readonly logger: { warn?(message: string): void } | null;
   nativeDatabaseTypes(): Record<string, string | { name?: string; limit?: number }>;
@@ -1894,8 +1896,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
     );
     let minvalue: unknown = null;
     if (maxPk == null) {
-      // PG's own `getDatabaseVersion` returns `server_version_num`; the abstract
-      // adapter types the return as `number | Version` for MySQL's sake.
       const dbVersion = (await this.getDatabaseVersion()) as number;
       minvalue =
         dbVersion >= 100000

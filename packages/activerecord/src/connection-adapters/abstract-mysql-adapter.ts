@@ -72,14 +72,15 @@ import {
   CreateIndexDefinition,
   IndexDefinition,
 } from "./abstract/schema-definitions.js";
-import type { ColumnOptions, RemoveForeignKeyOptions } from "./abstract/schema-definitions.js";
+import type {
+  AddIndexOptions,
+  ColumnOptions,
+  RemoveForeignKeyOptions,
+} from "./abstract/schema-definitions.js";
 import {
   TableDefinition as MysqlTableDefinition,
   Table as MysqlTable,
 } from "./mysql/schema-definitions.js";
-import type { AddIndexOptions } from "./abstract/schema-definitions.js";
-
-type CreateTableArgs = Parameters<MysqlSchemaStatements["createTable"]>;
 import {
   dataSourceSql as mysqlDataSourceSql,
   extractForeignKeyAction as mysqlExtractForeignKeyAction,
@@ -169,6 +170,8 @@ const ER_CLIENT_INTERACTION_TIMEOUT = 4031;
 
 // eslint-disable-next-line no-control-regex
 const QUOTE_STRING_RE = /['\\\x00\n\r\x1a]/g;
+type CreateTableArgs = Parameters<MysqlSchemaStatements["createTable"]>;
+
 const QUOTE_STRING_MAP: Record<string, string> = {
   "'": "\\'",
   "\\": "\\\\",
