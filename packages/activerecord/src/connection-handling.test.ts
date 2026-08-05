@@ -512,6 +512,7 @@ describe("ConnectionHandlingTest", () => {
     // Snapshot it so test ordering can't pin the wrong registry.
     const priorCurrent = (DatabaseConfigurations as any).current;
     const priorConfigs = Base.configurations();
+    class InMemoryModel extends Base {}
     try {
       const inMemory = new DatabaseConfigurations([
         new HashConfig(env, "primary", {
@@ -523,12 +524,18 @@ describe("ConnectionHandlingTest", () => {
       // Rails' registry is one class variable, so the config goes on Base
       // even though the connection is established on the subclass.
       Base.configurations(inMemory);
-      class InMemoryModel extends Base {}
 
       await InMemoryModel.establishConnection();
       expect(InMemoryModel.connectionPool().dbConfig.database).toBe("db/common.sqlite3");
       expect(await InMemoryModel.adapterClass()).toBe(await Base.adapterClass());
     } finally {
+      // The pool is never connected here (only its dbConfig is read), but it
+      // stays in the handler's writing list, and `setup_transactional_fixtures`
+      // pins EVERY writing pool with an eager `verify!`
+      // (connection_pool.rb:335) — which would try to open `db/common.sqlite3`
+      // for real in a later test. Drop it, as the sibling establishConnection
+      // tests in this file do.
+      InMemoryModel.removeConnection();
       Base.configurations(priorConfigs);
       (DatabaseConfigurations as any).current = priorCurrent;
     }
