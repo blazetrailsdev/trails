@@ -259,9 +259,6 @@ describe("purge-only pre-snapshot path", () => {
     await expect(purgeToCanonicalTables(adapter)).rejects.toThrow(/after recordBootLaidTables/);
   });
 
-  // `defaults` is the one table all three `<adapter>_specific_schema.rb` arms
-  // lay, so it stands in here for the whole adapter-specific half the boot's
-  // fast path now carries across test files rather than re-laying.
   it("truncates a named adapter-specific table instead of dropping it", async () => {
     const { dropAllTablesModule } = await freshModules();
 

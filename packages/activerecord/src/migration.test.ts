@@ -1402,9 +1402,6 @@ describe("MigrationTest", () => {
           async () => {},
         ),
     };
-    // Rails holds the lock from another process (migration_test.rb:1074);
-    // stubbing the acquire to fail is the same "lock unavailable" state on
-    // the real connection.
     const adapter = Base.connection;
     const getSpy = vi.spyOn(adapter as any, "getAdvisoryLock").mockResolvedValue(false);
     try {

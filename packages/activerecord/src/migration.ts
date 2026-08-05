@@ -2138,22 +2138,21 @@ export class Migrator {
    * @internal Mirrors: ActiveRecord::Migrator#with_advisory_lock
    */
   async withAdvisoryLock<T>(fn: () => Promise<T>): Promise<T> {
-    const adapter = this.connection;
     if (
-      !adapter.supportsAdvisoryLocks?.() ||
-      !adapter.getAdvisoryLock ||
-      !adapter.releaseAdvisoryLock
+      !this.connection.supportsAdvisoryLocks?.() ||
+      !this.connection.getAdvisoryLock ||
+      !this.connection.releaseAdvisoryLock
     ) {
       return fn();
     }
-    if (typeof adapter.currentDatabase !== "function") {
+    if (typeof this.connection.currentDatabase !== "function") {
       throw new Error(
-        `${adapter.constructor.name} must implement currentDatabase() to support advisory-locked migrations`,
+        `${this.connection.constructor.name} must implement currentDatabase() to support advisory-locked migrations`,
       );
     }
     const lockId = await this.generateMigratorAdvisoryLockId();
-    const locked = await adapter.getAdvisoryLock(lockId);
-    if (!locked) {
+    const gotLock = await this.connection.getAdvisoryLock(lockId);
+    if (!gotLock) {
       throw new ConcurrentMigrationError();
     }
     await this._ensureSchemaTable();
@@ -2173,7 +2172,7 @@ export class Migrator {
     // Rails: `release_advisory_lock(...) or raise` (migration.rb:1608-1612).
     let released: boolean | undefined;
     try {
-      released = await adapter.releaseAdvisoryLock(lockId);
+      released = await this.connection.releaseAdvisoryLock(lockId);
     } catch (releaseErr) {
       if (fnError !== _sentinel) throw fnError;
       throw releaseErr;

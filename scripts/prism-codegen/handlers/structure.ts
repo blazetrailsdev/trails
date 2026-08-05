@@ -166,11 +166,6 @@ function emitDef(n: PrismNode, e: Emitter): ts.Statement[] | null {
   }
   const name = methodName(String(n.name));
   if (!isJsIdentName(name)) return null;
-  // A Rails method whose JS name is a reserved word (`delete` in
-  // persistence.rb) cannot be a function *declaration* name, but it can still
-  // be an export name — string/identifier export specifiers are unreserved.
-  // Declare it under an underscore-prefixed local and re-export it at the
-  // Rails name.
   const reserved = !isBindableIdent(name);
   const localName = reserved ? `_${name}` : name;
   const { params, body, isAsync } = defParts(n, e, name);

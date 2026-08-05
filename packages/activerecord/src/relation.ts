@@ -503,7 +503,7 @@ export class Relation<T extends Base> {
   private _table: Table | null = null;
 
   constructor(
-    modelClass: typeof Base,
+    model: typeof Base,
     // Rails `Relation.create(model, table:)` stores any supplied table object as
     // `@table`, including an aliased table (`arel_table.alias(...)`). Accept the
     // Arel `TableAlias` node directly so callers don't need to cast; the build
@@ -512,7 +512,7 @@ export class Relation<T extends Base> {
     table?: Table | Nodes.TableAlias,
     predicateBuilder?: PredicateBuilder,
   ) {
-    this._model = modelClass;
+    this._model = model;
     if (table) {
       this._table = table as Table;
     }

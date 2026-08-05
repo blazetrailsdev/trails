@@ -21,7 +21,6 @@ const COMPOUND_HELPER: Record<string, string> = {
 };
 export function registerMisc(r: Registry): void {
   r.on("SplatNode", (n, e) => f.createSpreadElement(e.expr((n.expression as PrismNode) ?? null)));
-  // `bar(...)` inside a `def foo(...)`: spread the rest parameter emitParams laid down.
   r.on("ForwardingArgumentsNode", () => f.createSpreadElement(f.createIdentifier(FORWARDED_ARGS)));
   r.onManyStmt(["ForwardingSuperNode", "SuperNode"], (n, e, isLast) => {
     if (e.inClass || isLast) return null;

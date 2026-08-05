@@ -70,7 +70,11 @@ export async function laidTables(adapter: DatabaseAdapter): Promise<string[] | n
 }
 
 /**
- * Write the stamp onto a database whose canonical schema has just been laid.
+ * Write the stamp onto a database whose canonical schema has just been laid,
+ * together with the {@link laidTables} snapshot — taken after the flags, so the
+ * metadata table itself is present and filtered out along with
+ * `schema_migrations`.
+ *
  * A run without a token (globalSetup disabled) stamps nothing, which leaves
  * every worker on the full load path.
  *
@@ -83,8 +87,6 @@ export async function stampCanonicalSchema(
   if (!runToken) return;
   const metadata = new InternalMetadata(adapter);
   await metadata.createTableAndSetFlags("test", stampFor(runToken));
-  // Snapshot after the flags so the metadata table itself is already there and
-  // is filtered out along with `schema_migrations`.
   const laid = (await adapter.tables()).filter((name) => !BOOKKEEPING_TABLE_NAMES.has(name));
   await metadata.set(LAID_TABLES_KEY, JSON.stringify(laid.sort()));
 }
