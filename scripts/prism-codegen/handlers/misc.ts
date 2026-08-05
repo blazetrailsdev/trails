@@ -120,10 +120,7 @@ export function registerMisc(r: Registry): void {
     ];
   });
 }
-/**
- * `target OP= value` — a JS compound assignment where one exists, `push` for
- * `<<=`, a read-through helper for `|=` / `&=`, and a decline otherwise.
- */
+/** `target OP= value` — compound token, `push` for `<<=`, else a helper. */
 function compoundWrite(target: ts.Expression, n: PrismNode, e: Emitter): ts.Expression | null {
   const rubyOp = String(n.binaryOperator);
   const value = e.expr(n.value as PrismNode);

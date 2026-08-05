@@ -29,10 +29,7 @@ const INFIX: Record<string, ts.BinaryOperator> = {
   "**": ts.SyntaxKind.AsteriskAsteriskToken,
   "^": ts.SyntaxKind.CaretToken,
 };
-/**
- * Ruby operators whose image is a runtime helper: `<=>` has no JS counterpart,
- * and `|` / `&` span three receiver families only the runtime can tell apart.
- */
+/** Operators imaged as a runtime helper: no JS counterpart, or three families. */
 export const INFIX_HELPER: Record<string, string> = {
   "<=>": "cmp",
   "|": "union",

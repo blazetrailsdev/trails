@@ -382,7 +382,7 @@ export class ModelName {
 
   /**
    * Mirrors Rails `i18n_scope` (activemodel/lib/active_model/naming.rb:228-230).
-   * Ruby's `respond_to?(:i18n_scope)` is a `typeof` check here because the trails
+   * `respond_to?(:i18n_scope)` is a `typeof` check because the trails
    * counterpart is a property, not a method.
    *
    * @internal Rails-private helper.
