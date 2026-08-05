@@ -2182,8 +2182,7 @@ export function dNewByFrags(hash: DateParts, sg: number): Date {
   }
 
   if (jd === null) throw new DateError("invalid date");
-  const [y, m, d] = cJdToCivil(jd, sg);
-  return new Date(y, m, d);
+  return Date.jd(jd, sg);
 }
 
 /**
