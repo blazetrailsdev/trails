@@ -370,15 +370,6 @@ export interface ReadAttributeForValidationHost {
 }
 
 /**
- * Rails: ActiveModel::Validations extends Translation (validations.rb:43),
- * so the singleton accessor surfaces on Validations directly. Mirror that
- * here so callers can read/write via `Validations.raiseOnMissingTranslations(...)`.
- */
-export function raiseOnMissingTranslations(value?: boolean): boolean {
-  return translationRaise(value);
-}
-
-/**
  * Normalize the `validates_each` argument list, splitting attribute
  * names from the trailing options hash and stamping the merged
  * options with `attributes:`. Mirrors Rails
@@ -396,6 +387,15 @@ export function _mergeAttributes(attrNames: unknown[]): Record<string, unknown> 
   const flat = attrNames.flat(Infinity).map((n) => String(n));
   options.attributes = flat;
   return options;
+}
+
+/**
+ * Rails: ActiveModel::Validations extends Translation (validations.rb:43),
+ * so the singleton accessor surfaces on Validations directly. Mirror that
+ * here so callers can read/write via `Validations.raiseOnMissingTranslations(...)`.
+ */
+export function raiseOnMissingTranslations(value?: boolean): boolean {
+  return translationRaise(value);
 }
 
 /**

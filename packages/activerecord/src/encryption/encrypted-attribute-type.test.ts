@@ -8,6 +8,8 @@ import {
 } from "./test-helpers.js";
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 import { Scheme } from "./scheme.js";
+import { Configurable } from "./configurable.js";
+import { Decryption } from "./errors.js";
 
 describe("EncryptedAttributeType#databaseTypeToText — serialized+binary cast type", () => {
   let savedConfig: ReturnType<typeof snapshotEncryptionConfig>;
@@ -129,5 +131,56 @@ describe("EncryptedAttributeType — delegations to scheme", () => {
 
     expect(result).toBe("value");
     expect(spy).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("EncryptedAttributeType#supportUnencryptedData — global config conjunct", () => {
+  // encrypted_attribute_type.rb:61-63 —
+  //   config.support_unencrypted_data && scheme.support_unencrypted_data? && !previous_type?
+  // The global config is not merely the scheme's fallback (scheme.rb:48-50): it
+  // AND-gates an explicit per-attribute opt-in too.
+  let savedConfig: ReturnType<typeof snapshotEncryptionConfig>;
+
+  beforeEach(() => {
+    savedConfig = snapshotEncryptionConfig();
+    configureEncryption({ supportUnencryptedData: false });
+  });
+
+  afterEach(() => {
+    restoreEncryptionConfig(savedConfig);
+  });
+
+  it("an attribute-level opt-in does not survive a global opt-out", () => {
+    const scheme = new Scheme({ supportUnencryptedData: true });
+    expect(scheme.isSupportUnencryptedData()).toBe(true);
+    expect(new EncryptedAttributeType({ scheme }).supportUnencryptedData).toBe(false);
+  });
+
+  it("re-raises a Decryption error instead of returning the ciphertext as clear text", () => {
+    const type = new EncryptedAttributeType({
+      scheme: new Scheme({ supportUnencryptedData: true }),
+    });
+
+    expect(() => type.deserialize("not a valid ciphertext")).toThrow(Decryption);
+  });
+
+  it("is true when both the global config and the scheme allow it", () => {
+    Configurable.config.supportUnencryptedData = true;
+    const type = new EncryptedAttributeType({
+      scheme: new Scheme({ supportUnencryptedData: true }),
+    });
+
+    expect(type.supportUnencryptedData).toBe(true);
+    expect(type.deserialize("not a valid ciphertext")).toBe("not a valid ciphertext");
+  });
+
+  it("is false for a previous type even when everything else allows it", () => {
+    Configurable.config.supportUnencryptedData = true;
+    const type = new EncryptedAttributeType({
+      scheme: new Scheme({ supportUnencryptedData: true }),
+      previousType: true,
+    });
+
+    expect(type.supportUnencryptedData).toBe(false);
   });
 });

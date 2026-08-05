@@ -161,11 +161,11 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
   }
 
   get supportUnencryptedData(): boolean {
-    if (this._previousType) return false;
-    // Mirrors Rails' EncryptedAttributeType#support_unencrypted_data? which delegates
-    // directly to scheme.support_unencrypted_data?. The scheme already handles the
-    // per-attribute override vs global config fallback — no extra AND-gate needed here.
-    return this.scheme.isSupportUnencryptedData();
+    return (
+      Configurable.config.supportUnencryptedData &&
+      this.scheme.isSupportUnencryptedData() &&
+      !this._previousType
+    );
   }
 
   /** @internal */

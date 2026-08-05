@@ -7,6 +7,7 @@ import {
   hasTransactionalWiring,
   isOffender,
   loadRatchet,
+  NON_MODEL_RECEIVERS,
   RATCHET_PATH,
   reachesSharedConnection,
   rowWritesAtItScope,
@@ -237,6 +238,55 @@ describe("non-transactional row writes", () => {
       "",
     ].join("\n");
     expect(rowWritesAtItScope(src).map((w) => w.line)).toEqual([10]);
+  });
+
+  it("catches a model-level write that names no shared-connection accessor", () => {
+    const src = `describe("x", () => {
+  it("writes", async () => {
+    await Book.create({ name: "Dune" });
+  });
+});
+`;
+    expect(reachesSharedConnection(src)).toBe(false);
+    expect(rowWritesAtItScope(src).map((w) => w.receiver)).toEqual(["Book"]);
+    expect(isOffender(src)).toBe(true);
+  });
+
+  it.each([...NON_MODEL_RECEIVERS])("clears a %s.create( false positive", (receiver) => {
+    const src = `describe("x", () => {
+  it("does not write", () => {
+    ${receiver}.create({ name: "Dune" });
+  });
+});
+`;
+    expect(isOffender(src)).toBe(false);
+  });
+
+  it("clears a model bound to an adapter the file owns", () => {
+    const src = `describe("x", () => {
+  let adapter: Mysql2Adapter;
+  beforeEach(async () => {
+    adapter = await leaseMysqlAdapter();
+    EnumTest.adapter = adapter;
+  });
+
+  it("writes", async () => {
+    await EnumTest.create({ enum_column: "text" });
+  });
+});
+`;
+    expect(isOffender(src)).toBe(false);
+  });
+
+  it("clears a lowercase receiver whose update writes no row", () => {
+    const src = `describe("x", () => {
+  it("encrypts", () => {
+    cipher.update(clearText);
+  });
+});
+`;
+    expect(rowWritesAtItScope(src).map((w) => w.receiver)).toEqual(["cipher"]);
+    expect(isOffender(src)).toBe(false);
   });
 
   it("does not grow past the seeded ratchet", async () => {
