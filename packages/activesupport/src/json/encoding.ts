@@ -237,17 +237,18 @@ function normalizeOptions(options: EncodeOptions): NormalizedOptions {
 
 /**
  * Backing storage for the `Encoding` singleton accessors below. Rails' module
- * sets them at the bottom of encoding.rb (:129-132); the defaults live on the
- * declarations here so a reader before any writer still sees Rails' value.
+ * sets them at the bottom of encoding.rb (:132-135), in this order; the
+ * defaults live on the declarations here so a reader before any writer still
+ * sees Rails' value.
  */
 let _useStandardJsonTimeFormat = true;
 let _escapeHtmlEntitiesInJson = true;
-let _timePrecision = 3;
 let _jsonEncoder: typeof JSONGemEncoder = JSONGemEncoder;
+let _timePrecision = 3;
 
 /**
  * Rails' `ActiveSupport::JSON::Encoding` singleton accessors
- * (encoding.rb:109-127). A class with `static` accessors rather than an object
+ * (encoding.rb:113-130). A class with `static` accessors rather than an object
  * literal so `class << self; attr_accessor ...` maps member-for-member.
  */
 export class Encoding {
