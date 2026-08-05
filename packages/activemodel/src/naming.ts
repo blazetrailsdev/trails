@@ -101,7 +101,7 @@ export class ModelName {
   /** I18n key in path form — `"blog/post"`. */
   readonly i18nKey: string;
 
-  private _humanFallback: string;
+  private _human: string;
   private _klass: ModelLike | null;
 
   get cacheKey(): string {
@@ -301,7 +301,7 @@ export class ModelName {
     const uncountable = this.plural === this.singular;
     // Rails `@element = underscore(demodulize(@name))` — bare name only.
     this.element = bareUnderscored;
-    this._humanFallback = humanize(this.element);
+    this._human = humanize(this.element);
     // Rails `@collection = tableize(@name)` — path form, last segment
     // pluralized. Derive the last segment from `this.plural` (rather than
     // pluralizing the bare name independently) so any uncountable decision
@@ -331,11 +331,9 @@ export class ModelName {
   }
 
   human(options: TranslateOptions = {}): string {
-    if (!this._klass) return this._humanFallback;
-
     const i18nKeys = this.i18nKeys();
     const i18nScope = this._i18nScope();
-    if (i18nKeys.length === 0 || i18nScope.length === 0) return this._humanFallback;
+    if (i18nKeys.length === 0 || i18nScope.length === 0) return this._human;
 
     const [key, ...defaults] = i18nKeys as unknown[];
     const defaultChain: unknown[] = defaults.map((k) => `:${k as string}`);
@@ -348,7 +346,7 @@ export class ModelName {
       ...options,
       default: defaultChain,
     });
-    if (translation === MISSING_TRANSLATION) translation = this._humanFallback;
+    if (translation === MISSING_TRANSLATION) translation = this._human;
     return translation as string;
   }
 

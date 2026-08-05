@@ -29,6 +29,28 @@ function makeColumn(
   );
 }
 
+/**
+ * Warm a cache the way Rails' SchemaCache tests do — through the blocking
+ * `add(pool, table_name)`, which runs `primary_keys` before `columns` so the
+ * authoritative key always reconciles the reflected column flags.
+ */
+async function warm(
+  cache: SchemaCache,
+  tableName: string,
+  cols: Column[],
+  pk: string | string[] | null = null,
+  indexes: unknown[] = [],
+): Promise<void> {
+  const connection = {
+    dataSources: async () => [tableName],
+    dataSourceExists: async () => true,
+    primaryKey: async () => pk,
+    columns: async () => cols,
+    indexes: async () => indexes,
+  };
+  await cache.add(new FakePool(connection), tableName);
+}
+
 describe("SchemaCacheTest", () => {
   let tmpDir: string;
 
@@ -54,15 +76,14 @@ describe("SchemaCacheTest", () => {
     expect(loaded!.isCached("courses")).toBe(true);
   });
 
-  it("yaml dump and load", () => {
+  it("yaml dump and load", async () => {
     const cache = new SchemaCache();
     const cols = [
       makeColumn("id", "integer", { primaryKey: true, null: false }),
       makeColumn("name", "varchar(255)"),
       makeColumn("created_at", "timestamp"),
     ];
-    cache.setColumns("users", cols);
-    cache.setPrimaryKeys("users", "id");
+    await warm(cache, "users", cols, "id");
 
     const filename = path.join(tmpDir, "schema_cache.json");
     cache.dumpTo(filename);
@@ -95,19 +116,23 @@ describe("SchemaCacheTest", () => {
     expect(loaded!.isCached("posts")).toBe(true);
   });
 
-  it("yaml dump and load with gzip", () => {
+  it("yaml dump and load with gzip", async () => {
     // Trails serializes the schema cache as JSON (not YAML), but the
     // gzip-round-trip property the Rails test asserts — dump_to a .gz
     // path and load_from the same path produces a populated cache —
     // applies to our JSON encoding too. dumpTo(".gz") writes gzipped
     // JSON; _loadFrom auto-detects the .gz extension and gunzips first.
     const cache = new SchemaCache();
-    cache.setColumns("courses", [
-      makeColumn("id", "integer", { primaryKey: true, null: false }),
-      makeColumn("name", "varchar(255)"),
-      makeColumn("created_at", "timestamp"),
-    ]);
-    cache.setPrimaryKeys("courses", "id");
+    await warm(
+      cache,
+      "courses",
+      [
+        makeColumn("id", "integer", { primaryKey: true, null: false }),
+        makeColumn("name", "varchar(255)"),
+        makeColumn("created_at", "timestamp"),
+      ],
+      "id",
+    );
 
     const filename = path.join(tmpDir, "schema_cache.json.gz");
     cache.dumpTo(filename);
@@ -129,7 +154,7 @@ describe("SchemaCacheTest", () => {
 
   it("primary key for existent table", async () => {
     const cache = new SchemaCache();
-    cache.setPrimaryKeys("users", "id");
+    await warm(cache, "users", [], "id");
     const pk = await cache.primaryKeys(null, "users");
     expect(pk).toBe("id");
   });
@@ -137,7 +162,7 @@ describe("SchemaCacheTest", () => {
   it("primary key for non existent table", async () => {
     const cache = new SchemaCache();
     // Cached as having no primary key
-    cache.setPrimaryKeys("other", null);
+    await warm(cache, "other", [], null);
     const pk = await cache.primaryKeys(null, "other");
     expect(pk).toBeNull();
   });
@@ -175,32 +200,29 @@ describe("SchemaCacheTest", () => {
     expect(cache.getCachedPrimaryKeys("missing")).toBeUndefined();
   });
 
-  it("getCachedPrimaryKeys prefers the explicit primary-keys map over columns", () => {
+  it("getCachedPrimaryKeys prefers the explicit primary-keys map over columns", async () => {
     const cache = new SchemaCache();
-    cache.setColumns("users", [makeColumn("id", "integer", { primaryKey: true })]);
-    cache.setPrimaryKeys("users", null);
+    await warm(cache, "users", [makeColumn("id", "integer", { primaryKey: true })], null);
     expect(cache.getCachedPrimaryKeys("users")).toBeNull();
   });
 
-  it("setColumns clears a promoted-unique primaryKey flag the authoritative key excludes", () => {
+  it("setColumns clears a promoted-unique primaryKey flag the authoritative key excludes", async () => {
     // MySQL/MariaDB report column_key = 'PRI' for a UNIQUE-NOT-NULL column when
     // the table has no PRIMARY KEY, so the adapter reflects a bogus primary
     // flag. add() warms _primaryKeys (authoritative, null here) before columns,
     // so setColumns reconciles the flag away — matching Rails' MySQL::Column,
     // which carries no per-column primary flag.
     const cache = new SchemaCache();
-    cache.setPrimaryKeys("subscribers", null);
     const nick = makeColumn("nick", "varchar(100)", { primaryKey: true, null: false });
-    cache.setColumns("subscribers", [nick, makeColumn("name", "varchar(100)")]);
+    await warm(cache, "subscribers", [nick, makeColumn("name", "varchar(100)")], null);
     expect(nick.primaryKey).toBe(false);
     expect(cache.getCachedColumnsHash("subscribers")!["nick"].primaryKey).toBe(false);
   });
 
-  it("setColumns keeps a genuine primaryKey flag the authoritative key includes", () => {
+  it("setColumns keeps a genuine primaryKey flag the authoritative key includes", async () => {
     const cache = new SchemaCache();
-    cache.setPrimaryKeys("users", "id");
     const id = makeColumn("id", "integer", { primaryKey: true, null: false });
-    cache.setColumns("users", [id, makeColumn("name", "text")]);
+    await warm(cache, "users", [id, makeColumn("name", "text")], "id");
     expect(id.primaryKey).toBe(true);
   });
 
@@ -232,17 +254,6 @@ describe("SchemaCacheTest", () => {
     });
     expect(cache.getCachedColumnsHash("subscribers")!["nick"].primaryKey).toBe(false);
     expect(cache.getCachedPrimaryKeys("subscribers")).toBeNull();
-  });
-
-  it("setPrimaryKeys reconciles already-warm columns regardless of warm order", () => {
-    // Reverse order: columns warmed first (bogus promoted-unique flag), then the
-    // authoritative key. setPrimaryKeys reconciles the already-warm columns.
-    const cache = new SchemaCache();
-    const nick = makeColumn("nick", "varchar(100)", { primaryKey: true, null: false });
-    cache.setColumns("subscribers", [nick, makeColumn("name", "varchar(100)")]);
-    expect(nick.primaryKey).toBe(true);
-    cache.setPrimaryKeys("subscribers", null);
-    expect(nick.primaryKey).toBe(false);
   });
 
   it("columns for existent table", async () => {
@@ -287,7 +298,6 @@ describe("SchemaCacheTest", () => {
     };
     const pool = new FakePool(fakeConn);
     const cache = new SchemaCache();
-    cache.setDataSourceExists("users", true);
     const idx = await cache.indexes(pool, "users");
     expect(idx).toHaveLength(1);
   });
@@ -304,11 +314,9 @@ describe("SchemaCacheTest", () => {
     expect(idx).toEqual([]);
   });
 
-  it("clearing", () => {
+  it("clearing", async () => {
     const cache = new SchemaCache();
-    cache.setColumns("users", [makeColumn("id", "integer")]);
-    cache.setPrimaryKeys("users", "id");
-    cache.setDataSourceExists("users", true);
+    await warm(cache, "users", [makeColumn("id", "integer")], "id");
     expect(cache.size).toBeGreaterThan(0);
 
     cache.clear();
@@ -316,14 +324,14 @@ describe("SchemaCacheTest", () => {
     expect(cache.isCached("users")).toBe(false);
   });
 
-  it("marshal dump and load", () => {
+  it("marshal dump and load", async () => {
     const cache = new SchemaCache();
-    cache.setColumns("users", [
-      makeColumn("id", "integer", { primaryKey: true }),
-      makeColumn("email", "varchar(255)"),
-    ]);
-    cache.setPrimaryKeys("users", "id");
-    cache.setDataSourceExists("users", true);
+    await warm(
+      cache,
+      "users",
+      [makeColumn("id", "integer", { primaryKey: true }), makeColumn("email", "varchar(255)")],
+      "id",
+    );
 
     const dumped = cache.marshalDump();
     const restored = new SchemaCache();
@@ -336,10 +344,9 @@ describe("SchemaCacheTest", () => {
     expect(hash!["email"].sqlType).toBe("varchar(255)");
   });
 
-  it("marshal dump and load via disk", () => {
+  it("marshal dump and load via disk", async () => {
     const cache = new SchemaCache();
-    cache.setColumns("posts", [makeColumn("title", "text")]);
-    cache.setPrimaryKeys("posts", "id");
+    await warm(cache, "posts", [makeColumn("title", "text")], "id");
 
     const dumped = JSON.stringify(cache.marshalDump());
     const parsed = JSON.parse(dumped);
@@ -396,7 +403,7 @@ describe("SchemaCacheTest", () => {
       ActiveRecord.schemaCacheIgnoredTables = [];
     }
   });
-  it("marshal dump and load with gzip", () => {
+  it("marshal dump and load with gzip", async () => {
     // Rails' equivalent gzips a Marshal payload to a `.dump.gz` file and
     // round-trips it through `dump_to` / `_load_from`. Trails serializes
     // via `encodeWith` (JSON) rather than Marshal, but the on-disk
@@ -404,12 +411,16 @@ describe("SchemaCacheTest", () => {
     // cached columns survive — still applies. `dumpTo(".gz")` gzips the
     // JSON payload and `_loadFrom` auto-detects the `.gz` suffix.
     const cache = new SchemaCache();
-    cache.setColumns("courses", [
-      makeColumn("id", "integer", { primaryKey: true }),
-      makeColumn("name", "varchar(255)"),
-      makeColumn("created_at", "timestamp"),
-    ]);
-    cache.setPrimaryKeys("courses", "id");
+    await warm(
+      cache,
+      "courses",
+      [
+        makeColumn("id", "integer", { primaryKey: true }),
+        makeColumn("name", "varchar(255)"),
+        makeColumn("created_at", "timestamp"),
+      ],
+      "id",
+    );
 
     const filename = path.join(tmpDir, "schema_cache.dump.gz");
     cache.dumpTo(filename);
@@ -418,13 +429,12 @@ describe("SchemaCacheTest", () => {
     expect(loaded!.isCached("courses")).toBe(true);
     expect(loaded!.getCachedColumnsHash("courses")!["id"].primaryKey).toBe(true);
   });
-  it("gzip dumps identical", () => {
+  it("gzip dumps identical", async () => {
     // Rails: two .gz dumps of the same cache (with a 1s sleep between) must
     // be byte-identical, since the gzip header carries no mtime. Node's
     // zlib.gzipSync writes mtime=0 / OS=0xff, so the same property holds.
     const cache = new SchemaCache();
-    cache.setColumns("posts", [makeColumn("id", "integer", { primaryKey: true })]);
-    cache.setPrimaryKeys("posts", "id");
+    await warm(cache, "posts", [makeColumn("id", "integer", { primaryKey: true })], "id");
 
     const a = path.join(tmpDir, "schema_cache_a.json.gz");
     const b = path.join(tmpDir, "schema_cache_b.json.gz");
@@ -440,19 +450,21 @@ describe("SchemaCacheTest", () => {
     expect(loaded!.isCached("posts")).toBe(true);
   });
 
-  it("data source exist", () => {
+  it("data source exist", async () => {
     const cache = new SchemaCache();
-    cache.setDataSourceExists("users", true);
+    const pool = new FakePool({
+      dataSources: async () => ["users"],
+      dataSourceExists: async () => true,
+    });
+    expect(await cache.dataSourceExists(pool, "users")).toBe(true);
     expect(cache.isCached("users")).toBe(false); // isCached checks _columns
     cache.setColumns("users", [makeColumn("id", "integer")]);
     expect(cache.isCached("users")).toBe(true);
   });
 
-  it("clear data source cache", () => {
+  it("clear data source cache", async () => {
     const cache = new SchemaCache();
-    cache.setColumns("users", [makeColumn("id", "integer")]);
-    cache.setPrimaryKeys("users", "id");
-    cache.setDataSourceExists("users", true);
+    await warm(cache, "users", [makeColumn("id", "integer")], "id");
     expect(cache.isCached("users")).toBe(true);
 
     cache.clearDataSourceCacheBang(null, "users");
@@ -484,9 +496,13 @@ describe("SchemaCacheTest", () => {
     expect(hash!["id"]).toBeInstanceOf(Column);
   });
 
-  it("#columns_hash? is not populated by #data_source_exists?", () => {
+  it("#columns_hash? is not populated by #data_source_exists?", async () => {
     const cache = new SchemaCache();
-    cache.setDataSourceExists("users", true);
+    const pool = new FakePool({
+      dataSources: async () => ["users"],
+      dataSourceExists: async () => true,
+    });
+    expect(await cache.dataSourceExists(pool, "users")).toBe(true);
     expect(cache.isColumnsHash(null, "users")).toBe(false);
   });
 
@@ -515,8 +531,7 @@ describe("SchemaCacheTest", () => {
     // here we cover the SchemaReflection-level contract that backs it.
     const cachePath = path.join(tmpDir, "schema_cache.json");
     const cache = new SchemaCache();
-    cache.setColumns("gadgets", [makeColumn("id", "integer", { primaryKey: true })]);
-    cache.setPrimaryKeys("gadgets", "id");
+    await warm(cache, "gadgets", [makeColumn("id", "integer", { primaryKey: true })], "id");
     cache.dumpTo(cachePath);
 
     const prevCheck = SchemaReflection.checkSchemaCacheDumpVersion;
@@ -546,12 +561,10 @@ describe("SchemaCacheTest", () => {
     expect((cache as unknown as { _columns: Map<string, Column[]> })._columns).toBe(cols);
   });
 
-  it("#encode_with sorts members", () => {
+  it("#encode_with sorts members", async () => {
     const cache = new SchemaCache();
-    cache.setColumns("zebras", [makeColumn("id", "integer")]);
-    cache.setColumns("alpacas", [makeColumn("id", "integer")]);
-    cache.setPrimaryKeys("zebras", "id");
-    cache.setPrimaryKeys("alpacas", "id");
+    await warm(cache, "zebras", [makeColumn("id", "integer")], "id");
+    await warm(cache, "alpacas", [makeColumn("id", "integer")], "id");
 
     const coder: Record<string, unknown> = {};
     cache.encodeWith(coder);
@@ -562,12 +575,12 @@ describe("SchemaCacheTest", () => {
     expect(pkKeys).toEqual(["alpacas", "zebras"]);
   });
 
-  it("stores and round-trips composite primary keys as arrays", () => {
+  it("stores and round-trips composite primary keys as arrays", async () => {
     // Rails' SchemaCache stores composite PKs as an array of column
     // names. Phase 13 widened the type from string|null to
     // string|string[]|null. Verify encode → initWith round-trips.
     const cache = new SchemaCache();
-    cache.setPrimaryKeys("memberships", ["user_id", "group_id"]);
+    await warm(cache, "memberships", [], ["user_id", "group_id"]);
 
     const coder: Record<string, unknown> = {};
     cache.encodeWith(coder);
@@ -584,10 +597,10 @@ describe("SchemaCacheTest", () => {
     });
   });
 
-  it("marshalDump / marshalLoad round-trips composite primary keys", () => {
+  it("marshalDump / marshalLoad round-trips composite primary keys", async () => {
     const cache = new SchemaCache();
-    cache.setPrimaryKeys("memberships", ["user_id", "group_id"]);
-    cache.setPrimaryKeys("users", "id");
+    await warm(cache, "memberships", [], ["user_id", "group_id"]);
+    await warm(cache, "users", [], "id");
 
     const data = cache.marshalDump();
     const restored = new SchemaCache();
@@ -620,8 +633,7 @@ describe("SchemaReflectionTest", () => {
 
     // Dump a cache to disk
     const cache = new SchemaCache();
-    cache.setColumns("users", [makeColumn("id", "integer"), makeColumn("name", "text")]);
-    cache.setPrimaryKeys("users", "id");
+    await warm(cache, "users", [makeColumn("id", "integer"), makeColumn("name", "text")], "id");
     cache.dumpTo(cachePath);
 
     // Create reflection pointing at that file, version check disabled

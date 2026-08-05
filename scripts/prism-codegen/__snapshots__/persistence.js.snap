@@ -2,6 +2,8 @@
 // but parse-clean by construction (emitted via the TypeScript AST factory).
 // Regenerate with `pnpm codegen:generate`. Do not edit by hand.
 
+import { idxGet, union } from "../runtime.js";
+
 require("active_record/insert_all");
 // module Persistence
 // module ActiveRecord
@@ -120,7 +122,7 @@ export function _insertRecord(connection, values, returning) {
 }
 export function _updateRecord(values, constraints) {
     let default_constraint, current_scope, um;
-    constraints = constraints.map((name, value) => __PRISM_TODO("CallNode"));
+    constraints = constraints.map((name, value) => idxGet(this.predicateBuilder, name, value));
     default_constraint = this.buildDefaultConstraint();
     if (default_constraint) {
         constraints.push(default_constraint);
@@ -135,7 +137,7 @@ export function _updateRecord(values, constraints) {
 }
 export function _deleteRecord(constraints) {
     let default_constraint, current_scope, dm;
-    constraints = constraints.map((name, value) => __PRISM_TODO("CallNode"));
+    constraints = constraints.map((name, value) => idxGet(this.predicateBuilder, name, value));
     default_constraint = this.buildDefaultConstraint();
     if (default_constraint) {
         constraints.push(default_constraint);
@@ -328,7 +330,7 @@ export function touch(...names, { time = null } = {}) {
         this._raiseReadonlyRecordError();
     }
     attribute_names = this.timestampAttributesForUpdateInModel();
-    attribute_names = (__PRISM_TODO("CallNode")).mapBang(name => {
+    attribute_names = (union(attribute_names, names)).mapBang(name => {
         name = String(name);
         name = this.constructor.attributeAliases()[name] || name;
         this.verifyReadonlyAttribute(name);

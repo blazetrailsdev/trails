@@ -23,7 +23,6 @@ describe("SchemaCacheIndexDefinitionRoundTripTest", () => {
       dataSources: async () => ["people"],
     });
     const cache = new SchemaCache();
-    cache.setDataSourceExists("people", true);
     await cache.indexes(pool, "people");
 
     const filename = path.join(tmpDir, "schema_cache.json");
@@ -91,7 +90,6 @@ describe("SchemaCacheIndexDefinitionRoundTripTest", () => {
       orders: { first_name: "desc" },
     });
     const source = new SchemaCache();
-    source.setDataSourceExists("people", true);
     await source.indexes(
       new FakePool({
         indexes: async () => [live],

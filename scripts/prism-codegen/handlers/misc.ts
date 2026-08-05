@@ -11,6 +11,14 @@ const COMPOUND: Record<string, ts.BinaryOperator> = {
   "*": ts.SyntaxKind.AsteriskEqualsToken,
   "/": ts.SyntaxKind.SlashEqualsToken,
   "%": ts.SyntaxKind.PercentEqualsToken,
+  "**": ts.SyntaxKind.AsteriskAsteriskEqualsToken,
+  ">>": ts.SyntaxKind.GreaterThanGreaterThanEqualsToken,
+  "^": ts.SyntaxKind.CaretEqualsToken,
+};
+/** Compound operators with no JS assignment token — read through, write back. */
+const COMPOUND_HELPER: Record<string, string> = {
+  "|": "union",
+  "&": "intersection",
 };
 export function registerMisc(r: Registry): void {
   r.on("SplatNode", (n, e) => f.createSpreadElement(e.expr((n.expression as PrismNode) ?? null)));
@@ -40,38 +48,27 @@ export function registerMisc(r: Registry): void {
     ]);
   });
   r.on("LocalVariableOperatorWriteNode", (n, e) => {
-    const op = COMPOUND[String(n.binaryOperator)];
-    if (!op || !isBindableIdent(String(n.name))) return null;
+    if (!isBindableIdent(String(n.name))) return null;
     e.declared.add(String(n.name));
     clearAsyncProvenance(n, e.asyncBindings);
-    return f.createBinaryExpression(
-      f.createIdentifier(String(n.name)),
-      op,
-      e.expr(n.value as PrismNode),
-    );
+    return compoundWrite(f.createIdentifier(String(n.name)), n, e);
   });
   r.on("InstanceVariableOperatorWriteNode", (n, e) => {
-    const op = COMPOUND[String(n.binaryOperator)];
-    if (!op) return null;
     clearAsyncProvenance(n, e.asyncBindings);
-    return f.createBinaryExpression(thisProp(n.name), op, e.expr(n.value as PrismNode));
+    return compoundWrite(thisProp(n.name), n, e);
   });
   r.on("CallOperatorWriteNode", (n, e) => {
-    const op = COMPOUND[String(n.binaryOperator)];
-    if (!op) return null;
     const prop = methodName(String(n.readName));
     if (n.receiver ? !isJsIdentName(prop) : !isBindableIdent(prop)) return null;
     const target = n.receiver
       ? f.createPropertyAccessExpression(e.expr(n.receiver as PrismNode), prop)
       : f.createIdentifier(prop);
-    return f.createBinaryExpression(target, op, e.expr(n.value as PrismNode));
+    return compoundWrite(target, n, e);
   });
   r.on("IndexOperatorWriteNode", (n, e) => {
-    const op = COMPOUND[String(n.binaryOperator)];
-    if (!op) return null;
     const target = indexTarget(n, e);
     if (!target) return null;
-    return f.createBinaryExpression(target, op, e.expr(n.value as PrismNode));
+    return compoundWrite(target, n, e);
   });
   r.on("IndexOrWriteNode", (n, e) => {
     const target = indexTarget(n, e);
@@ -123,6 +120,28 @@ export function registerMisc(r: Registry): void {
       ),
     ];
   });
+}
+/**
+ * `target OP= value` — a JS compound assignment where one exists, `push` for
+ * `<<=`, a read-through helper for `|=` / `&=`, and a decline otherwise.
+ */
+function compoundWrite(target: ts.Expression, n: PrismNode, e: Emitter): ts.Expression | null {
+  const rubyOp = String(n.binaryOperator);
+  const value = e.expr(n.value as PrismNode);
+  const op = COMPOUND[rubyOp];
+  if (op) return f.createBinaryExpression(target, op, value);
+  if (rubyOp === "<<") {
+    return f.createCallExpression(f.createPropertyAccessExpression(target, "push"), undefined, [
+      value,
+    ]);
+  }
+  const helper = COMPOUND_HELPER[rubyOp];
+  if (!helper) return null;
+  e.helpers.add(helper);
+  return f.createAssignment(
+    target,
+    f.createCallExpression(f.createIdentifier(helper), undefined, [target, value]),
+  );
 }
 function thisProp(name: unknown): ts.PropertyAccessExpression {
   return f.createPropertyAccessExpression(f.createThis(), String(name).replace(/^@+/, ""));

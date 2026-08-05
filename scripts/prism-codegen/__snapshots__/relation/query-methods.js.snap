@@ -2,7 +2,7 @@
 // but parse-clean by construction (emitted via the TypeScript AST factory).
 // Regenerate with `pnpm codegen:generate`. Do not edit by hand.
 
-import { caseEq } from "../../runtime.js";
+import { caseEq, idxGet, union } from "../../runtime.js";
 
 require("active_record/relation/from_clause");
 require("active_record/relation/query_attribute");
@@ -88,7 +88,7 @@ export function includes(...args) {
     return this.spawn.includesBang(...args);
 }
 export function includesBang(...args) {
-    __PRISM_TODO("CallOperatorWriteNode");
+    this.includesValues = union(this.includesValues, args);
     return this;
 }
 export function all() {
@@ -99,7 +99,7 @@ export function eagerLoad(...args) {
     return this.spawn.eagerLoadBang(...args);
 }
 export function eagerLoadBang(...args) {
-    __PRISM_TODO("CallOperatorWriteNode");
+    this.eagerLoadValues = union(this.eagerLoadValues, args);
     return this;
 }
 export function preload(...args) {
@@ -107,7 +107,7 @@ export function preload(...args) {
     return this.spawn.preloadBang(...args);
 }
 export function preloadBang(...args) {
-    __PRISM_TODO("CallOperatorWriteNode");
+    this.preloadValues = union(this.preloadValues, args);
     return this;
 }
 export function extractAssociated(association) {
@@ -118,7 +118,7 @@ export function references(...table_names) {
     return this.spawn.referencesBang(...table_names);
 }
 export function referencesBang(...table_names) {
-    __PRISM_TODO("CallOperatorWriteNode");
+    this.referencesValues = union(this.referencesValues, table_names);
     return this;
 }
 export function select(...fields, block) {
@@ -133,13 +133,13 @@ export function select(...fields, block) {
     return this.spawn._selectBang(...fields);
 }
 export function _selectBang(...fields) {
-    __PRISM_TODO("CallOperatorWriteNode");
+    this.selectValues = union(this.selectValues, fields);
     return this;
 }
 __PRISM_TODO("DefNode");
 export function withBang(...args) {
     args = this.processWithArgs(args);
-    __PRISM_TODO("CallOperatorWriteNode");
+    this.withValues = union(this.withValues, args);
     return this;
 }
 export function withRecursive(...args) {
@@ -148,7 +148,7 @@ export function withRecursive(...args) {
 }
 export function withRecursiveBang(...args) {
     args = this.processWithArgs(args);
-    __PRISM_TODO("CallOperatorWriteNode");
+    this.withValues = union(this.withValues, args);
     this.with_is_recursive = true;
     return this;
 }
@@ -185,7 +185,7 @@ export function orderBang(...args) {
     if (!(args.length === 0)) {
         this.preprocessOrderArgs(args);
     }
-    __PRISM_TODO("CallOperatorWriteNode");
+    this.orderValues = union(this.orderValues, args);
     return this;
 }
 export function inOrderOf(column, values, { filter = true } = {}) {
@@ -196,7 +196,7 @@ export function inOrderOf(column, values, { filter = true } = {}) {
     }
     references = this.columnReferences([column]);
     if (!(references.length === 0)) {
-        __PRISM_TODO("CallOperatorWriteNode");
+        this.referencesValues = union(this.referencesValues, references);
     }
     values = values.map(value => this.model.typeCaster().typeCastForDatabase(column, value));
     arel_column = column.isA(Arel.Nodes.SqlLiteral) ? column : this.orderColumn(String(column));
@@ -257,7 +257,7 @@ export function joins(...args) {
     return this.spawn.joinsBang(...args);
 }
 export function joinsBang(...args) {
-    __PRISM_TODO("CallOperatorWriteNode");
+    this.joinsValues = union(this.joinsValues, args);
     return this;
 }
 export function leftOuterJoins(...args) {
@@ -266,7 +266,7 @@ export function leftOuterJoins(...args) {
 }
 const leftJoins = leftOuterJoins;
 export function leftOuterJoinsBang(...args) {
-    __PRISM_TODO("CallOperatorWriteNode");
+    this.leftOuterJoinsValues = union(this.leftOuterJoinsValues, args);
     return this;
 }
 export function where(...args) {
@@ -319,9 +319,9 @@ export function andBang(other) {
     if (!(incompatible_values.length === 0)) {
         throw new ArgumentError(`Relation passed to #and must be structurally compatible. Incompatible values: ${incompatible_values}`);
     }
-    __PRISM_TODO("CallOperatorWriteNode");
-    __PRISM_TODO("CallOperatorWriteNode");
-    __PRISM_TODO("CallOperatorWriteNode");
+    this.whereClause = union(this.whereClause, other.whereClause());
+    this.havingClause = union(this.havingClause, other.havingClause());
+    this.referencesValues = union(this.referencesValues, other.referencesValues());
     return this;
 }
 export function or(other) {
@@ -345,7 +345,7 @@ export function orBang(other) {
     }
     this.whereClause = this.whereClause.or(other.whereClause());
     this.havingClause = this.havingClause.or(other.havingClause());
-    __PRISM_TODO("CallOperatorWriteNode");
+    this.referencesValues = union(this.referencesValues, other.referencesValues());
     return this;
 }
 export function having(opts, ...rest) {
@@ -464,7 +464,7 @@ export function optimizerHints(...args) {
     return this.spawn.optimizerHintsBang(...args);
 }
 export function optimizerHintsBang(...args) {
-    __PRISM_TODO("CallOperatorWriteNode");
+    this.optimizerHintsValues = union(this.optimizerHintsValues, args);
     return this;
 }
 export function reverseOrder() {
@@ -514,7 +514,7 @@ export function excluding(...records) {
 const without = excluding;
 export function excludingBang(records) {
     let predicates;
-    predicates = [__PRISM_TODO("CallNode").invert()];
+    predicates = [idxGet(this.predicateBuilder, this.model.primaryKey, records).invert()];
     this.whereClause += new Relation.WhereClause(predicates);
     return this;
 }
@@ -566,7 +566,7 @@ export function buildWhereClause(opts, rest = []) {
         });
         references = PredicateBuilder.references(opts);
         if (!(references.length === 0)) {
-            __PRISM_TODO("CallOperatorWriteNode");
+            this.referencesValues = union(this.referencesValues, references);
         }
         parts = this.predicateBuilder.buildFromHash(opts, table_name => this.lookupTableKlassFromJoinDependencies(table_name));
     }
@@ -691,12 +691,12 @@ export function eachJoinDependencies(join_dependencies = this.buildJoinDependenc
 }
 export function buildJoinDependencies() {
     let joins, join_dependencies;
-    joins = __PRISM_TODO("CallNode");
+    joins = union(this.joinsValues, this.leftOuterJoinsValues);
     if (!(this.eagerLoadValues.length === 0)) {
-        __PRISM_TODO("LocalVariableOperatorWriteNode");
+        joins = union(joins, this.eagerLoadValues);
     }
     if (!(this.includesValues.length === 0)) {
-        __PRISM_TODO("LocalVariableOperatorWriteNode");
+        joins = union(joins, this.includesValues);
     }
     join_dependencies = [];
     return join_dependencies.unshift(this.constructJoinDependency(this.selectNamedJoins(joins, join_dependencies), null));
@@ -952,7 +952,7 @@ export function arelColumnsFromHash(fields) {
     });
 }
 export function arelColumnWithTable(table_name, column_name) {
-    __PRISM_TODO("CallOperatorWriteNode");
+    this.referencesValues = union(this.referencesValues, [Arel.sql(table_name, { retryable: true })]);
     if (typeof column_name === "string" || !column_name.isMatch(/\W/)) {
         return this.predicateBuilder.resolveArelAttribute(table_name, column_name, () => this.lookupTableKlassFromJoinDependencies(table_name));
     }
@@ -1065,7 +1065,7 @@ export function preprocessOrderArgs(order_args) {
     this.validateOrderArgs(order_args);
     references = this.columnReferences(order_args);
     if (!(references.length === 0)) {
-        __PRISM_TODO("CallOperatorWriteNode");
+        this.referencesValues = union(this.referencesValues, references);
     }
     return order_args.mapBang(arg => {
         if (caseEq(Symbol, arg)) {

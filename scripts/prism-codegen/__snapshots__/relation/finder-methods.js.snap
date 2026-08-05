@@ -2,7 +2,7 @@
 // but parse-clean by construction (emitted via the TypeScript AST factory).
 // Regenerate with `pnpm codegen:generate`. Do not edit by hand.
 
-import { caseEq } from "../../runtime.js";
+import { caseEq, idxGet, union } from "../../runtime.js";
 
 require("active_support/core_ext/string/filters");
 // module FinderMethods
@@ -202,7 +202,7 @@ export function constructRelationForExists(conditions) {
 }
 export function applyJoinDependency({ eager_loading = this.groupValues.length === 0 } = {}, block) {
     let join_dependency, relation;
-    join_dependency = this.constructJoinDependency(__PRISM_TODO("CallNode"), Arel.Nodes.OuterJoin);
+    join_dependency = this.constructJoinDependency(union(this.eagerLoadValues, this.includesValues), Arel.Nodes.OuterJoin);
     relation = this.except("includes", "eager_load", "preload").joinsBang(join_dependency);
     if (eager_loading && this.hasLimitOrOffset && !(this.isUsingLimitableReflections(join_dependency.reflections()) && this.isUsingLimitableReflections(this.constructJoinDependency(this.selectAssociationList(this.joinsValues).concat(this.selectAssociationList(this.leftOuterJoinsValues)), null).reflections()))) {
         relation = this.skipQueryCacheIfNecessary(() => this.model.withConnection(c => c.distinctRelationForPrimaryKey(relation)));
@@ -320,7 +320,7 @@ export async function findNth(index) {
 export function findNthWithLimit(index, limit) {
     let relation;
     if (this.isLoaded) {
-        return __PRISM_TODO("CallNode") || [];
+        return idxGet(this.records, index, limit) || [];
     }
     else {
         relation = this.orderedRelation();

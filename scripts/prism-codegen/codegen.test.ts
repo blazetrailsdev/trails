@@ -561,11 +561,11 @@ describe("prism-codegen", () => {
   it("emits parse-clean output by construction, even around passthroughs", async () => {
     const { code, coverage, parseErrorCount } = await generateFromSource(`
       def compare(a, b)
-        a <=> b
+        a =~ b
       end
     `);
     expect(parseErrorCount).toBe(0);
-    expect(code).not.toContain("<=>");
+    expect(code).not.toContain("=~");
     expect(code).toContain("__PRISM_TODO(");
     expect(summarizeCoverage(coverage).passthrough).toBeGreaterThan(0);
   });
@@ -573,11 +573,62 @@ describe("prism-codegen", () => {
     const splat = await generateFromSource(`def g; a, *b = list; end`);
     expect(splat.parseErrorCount).toBe(0);
     expect(splat.code).toContain("__PRISM_TODO(");
+  });
 
-    const multiIndex = await generateFromSource(`def h(m); m[1, 2] = 3; m[1, 2]; end`);
-    expect(multiIndex.parseErrorCount).toBe(0);
-    expect(multiIndex.code).not.toContain("m[1] = 3");
-    expect(multiIndex.code).toContain("__PRISM_TODO(");
+  it("routes a multi-argument index get/set through the idxGet/idxSet helpers", async () => {
+    const { code, parseErrorCount } = await generateFromSource(
+      `def h(m); m[1, 2] = 3; m[1, 2]; end`,
+    );
+    expect(parseErrorCount).toBe(0);
+    expect(code).not.toContain("m[1] = 3");
+    expect(code).toContain('import { idxGet, idxSet } from "./runtime.js"');
+    expect(code).toContain("idxSet(m, 1, 2, 3)");
+    expect(code).toContain("idxGet(m, 1, 2)");
+    expect(code).not.toContain("__PRISM_TODO(");
+  });
+
+  it("images <=> through the cmp helper and | / & through union / intersection", async () => {
+    const { code, parseErrorCount } = await generateFromSource(
+      `def f(a, b); (a <=> b) + (a | b) + (a & b); end`,
+    );
+    expect(parseErrorCount).toBe(0);
+    expect(code).toContain('import { cmp, intersection, union } from "./runtime.js"');
+    expect(code).toContain("cmp(a, b)");
+    expect(code).toContain("union(a, b)");
+    expect(code).toContain("intersection(a, b)");
+  });
+
+  it("images an operator sym-to-proc as a two-argument arrow", async () => {
+    const { code, parseErrorCount } = await generateFromSource(
+      `def total(list); list.reduce(&:+); end`,
+    );
+    expect(parseErrorCount).toBe(0);
+    expect(code).toContain("(a, b) => a + b");
+  });
+
+  it("images an operator sym-to-proc that needs a helper through the helper", async () => {
+    const { code, parseErrorCount } = await generateFromSource(
+      `def ordered(list); list.sort(&:<=>); end`,
+    );
+    expect(parseErrorCount).toBe(0);
+    expect(code).toContain("cmp(a, b)");
+  });
+
+  it("images the compound operators JS has no assignment token for", async () => {
+    const { code, parseErrorCount } = await generateFromSource(`
+      def f(list, seen, other)
+        list <<= 1
+        seen |= other
+        seen &= other
+        @count **= 2
+        list
+      end
+    `);
+    expect(parseErrorCount).toBe(0);
+    expect(code).toContain("list.push(1)");
+    expect(code).toContain("seen = union(seen, other)");
+    expect(code).toContain("seen = intersection(seen, other)");
+    expect(code).toContain("this.count **= 2");
   });
 
   it("translates the decided block protocol: yield, block_given?, &:sym, <<", async () => {
@@ -685,7 +736,7 @@ describe("prism-codegen", () => {
   });
 
   it("counts each node exactly once when a call declines after partial validation", async () => {
-    const { coverage } = await generateFromSource(`def d(list); probe(9, &:+); end`);
+    const { coverage } = await generateFromSource(`def d(list); probe(9, &:=~); end`);
     const int = coverage.counts.get("IntegerNode") ?? { handled: 0, passthrough: 0 };
     expect(int.handled).toBe(0);
     expect(int.passthrough).toBe(1);
@@ -766,7 +817,7 @@ describe("prism-codegen", () => {
   it("attributes passthrough to the enclosing def for a trustworthy denominator", async () => {
     const { perDef } = await generateFromSource(`
       def clean(a); a + 1; end
-      def dirty(oc); oc <=> 1; end
+      def dirty(oc); oc =~ 1; end
     `);
     expect(perDef.get("clean")?.passthrough).toBe(0);
     expect(perDef.get("dirty")?.passthrough).toBeGreaterThan(0);

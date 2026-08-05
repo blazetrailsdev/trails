@@ -2,6 +2,8 @@
 // but parse-clean by construction (emitted via the TypeScript AST factory).
 // Regenerate with `pnpm codegen:generate`. Do not edit by hand.
 
+import { intersection } from "../runtime.js";
+
 // module ActiveRecord
 export class Relation {
     constructor(model, { table = null, predicate_builder = null, values = {} } = {}) {
@@ -498,7 +500,7 @@ export class Relation {
         return this.should_eager_load ||= this.eagerLoadValues.isAny() || this.includesValues.isAny() && (this.joinedIncludesValues.isAny() || this.isReferencesEagerLoadedTables);
     }
     joinedIncludesValues() {
-        return __PRISM_TODO("CallNode");
+        return intersection(this.includesValues, this.joinsValues);
     }
     prettyPrint(pp) {
         let subject, entries;

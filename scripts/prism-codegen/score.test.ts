@@ -322,7 +322,7 @@ describe("prism-codegen scorer", () => {
 
   it("only scores clean defs — tainted ones stay out of the denominator", async () => {
     const score = await scoreRuby(
-      `def tainted(a); a <=> 1; end`,
+      `def tainted(a); a =~ 1; end`,
       `export function tainted(a: number) { return a; }`,
     );
     expect(score.entries).toEqual([]);
