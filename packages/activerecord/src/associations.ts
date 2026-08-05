@@ -577,7 +577,7 @@ export function _cacheSingularTarget(record: Base, assocName: string, target: Ba
  * RFC 0022: singular writers and inverse-of seeders store their target on the
  * `SingularAssociation` holder (`record.association(name).target`, Rails'
  * `@target`) as the source of truth. These inner loaders run *inside* the
- * holder's own `loadTarget` (`doAsyncFindTarget`) and from sibling
+ * holder's own `loadTarget` (`findTarget`) and from sibling
  * through-writers, where the holder is not yet loaded — so a loaded holder here
  * carries an explicit set/seed (or a prior explicit load), the short-circuit we
  * want, plus the `_preloadedAssociations` fallback. Returns a one-key box
