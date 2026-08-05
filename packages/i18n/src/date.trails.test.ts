@@ -242,6 +242,39 @@ describe("Date", () => {
     expect([cwday.year, cwday.mon, cwday.day]).toEqual([2001, 2, 3]);
   });
 
+  it("prefers rt_complete_frags' wnum0 entry to the civil one on a year, a wday and a time", () => {
+    for (const [str, expected] of [
+      ["wed 10:00:00 '01", "2001-01-03"],
+      ["'01 00:00:00 mon", "2001-01-01"],
+      ["'26 12:00:00 sat", "2026-01-03"],
+      ["mon 10:00:00 '90", "1990-01-01"],
+    ] as const) {
+      const date = RubyDate.parse(str);
+      const mon = String(date.mon).padStart(2, "0");
+      const day = String(date.day).padStart(2, "0");
+      expect([str, `${date.year}-${mon}-${day}`]).toEqual([str, expected]);
+    }
+    expect(() => RubyDate.parse("sun 10:00:00 '01")).toThrow("invalid date");
+    expect(() => RubyDate.parse("thu 1:2:3 '99")).toThrow("invalid date");
+    expect(() => RubyDate.parse("wed 10:00:00 '23")).toThrow("invalid date");
+  });
+
+  it("counts a negative week back from the year's end and a negative day back from Sunday, as c_valid_commercial_p does", () => {
+    for (const [args, expected] of [
+      [[2001, -1, -1], "2001-12-30"],
+      [[2001, 5, -1], "2001-02-04"],
+      [[2001, -1, 1], "2001-12-24"],
+      [[2001, -52, 7], "2001-01-07"],
+      [[2020, -1, -1], "2021-01-03"],
+    ] as const) {
+      const date = RubyDate.commercial(args[0], args[1], args[2]);
+      const mon = String(date.mon).padStart(2, "0");
+      const day = String(date.day).padStart(2, "0");
+      expect([args, `${date.year}-${mon}-${day}`]).toEqual([args, expected]);
+    }
+    expect(() => RubyDate.commercial(2001, -53, 1)).toThrow("invalid date");
+  });
+
   it("negates the year of a BC date, as parse_bc does", () => {
     expect(RubyDate.parse("4004-01-02 BC").year).toBe(-4003);
     expect(RubyDate.parse("feb 3 4004 b.c.e.").year).toBe(-4003);

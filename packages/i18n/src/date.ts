@@ -174,6 +174,8 @@ interface DateParts {
   cweek?: number;
   cwday?: number;
   wday?: number;
+  wnum0?: number;
+  wnum1?: number;
   hour?: number;
   min?: number;
   sec?: number;
@@ -186,7 +188,7 @@ interface DateParts {
 
 /**
  * @internal The date and time elements of `rt_complete_frags`' table
- * (`date_core.c:3884-3968`) this shim carries.
+ * (`date_core.c:3885-3968`).
  */
 type DateFrag =
   | "jd"
@@ -198,6 +200,8 @@ type DateFrag =
   | "cweek"
   | "cwday"
   | "wday"
+  | "wnum0"
+  | "wnum1"
   | "hour"
   | "min"
   | "sec";
@@ -1558,12 +1562,11 @@ function parseFrag(str: string, hash: DateParts): string | null {
  * `activesupport/test/core_ext/string_ext_test.rb:775` — and `"102".to_date` is
  * this year's 102nd day.
  *
- * The three `:wnum0`/`:wnum1` entries of that table are not carried: no
- * sub-parser ported here sets `:wnum0` or `:wnum1`, and their completion
- * branches read a week number off `Date.today` that Ruby's `::Date` has no
- * reader for. `:time` names no date, so it has no completion branch here
- * either — Ruby's only fills a `:jd` for `DateTime` — and the string goes on
- * to raise.
+ * The week-numbered entries win on a string that names a `:year`, a `:wday`
+ * and a time — four fields against the civil entry's two — so `"wed 10:00:00
+ * '01"` is the Wednesday of `:wnum0` week `0` of 2001 rather than a 1 January
+ * date. `:time` names no date, so it has no completion branch here — Ruby's
+ * only fills a `:jd` for `DateTime` — and the string goes on to raise.
  */
 function completeFrags(parts: DateParts): void {
   const tab: [string | null, DateFrag[]][] = [
@@ -1573,7 +1576,11 @@ function completeFrags(parts: DateParts): void {
     ["civil", ["year", "mon", "mday", "hour", "min", "sec"]],
     ["commercial", ["cwyear", "cweek", "cwday", "hour", "min", "sec"]],
     ["wday", ["wday", "hour", "min", "sec"]],
+    ["wnum0", ["year", "wnum0", "wday", "hour", "min", "sec"]],
+    ["wnum1", ["year", "wnum1", "wday", "hour", "min", "sec"]],
     [null, ["cwyear", "cweek", "wday", "hour", "min", "sec"]],
+    [null, ["year", "wnum0", "cwday", "hour", "min", "sec"]],
+    [null, ["year", "wnum1", "cwday", "hour", "min", "sec"]],
   ];
 
   let g: boolean;
@@ -1613,6 +1620,8 @@ function completeFrags(parts: DateParts): void {
       cwyear: d.yearOfWeek ?? undefined,
       cweek: d.weekOfYear ?? undefined,
       cwday: d.dayOfWeek,
+      wnum0: cJdToWeeknum(jdOf(d), 0)[1],
+      wnum1: cJdToWeeknum(jdOf(d), 1)[1],
     };
 
     if (k === "ordinal") {
@@ -1634,6 +1643,20 @@ function completeFrags(parts: DateParts): void {
       parts.cwday ??= 1;
     } else if (k === "wday") {
       parts.jd = jdOf(d.subtract({ days: d.dayOfWeek % 7 }).add({ days: parts.wday as number }));
+    } else if (k === "wnum0") {
+      for (const el of a) {
+        if (parts[el] !== undefined) break;
+        parts[el] = today[el];
+      }
+      parts.wnum0 ??= 0;
+      parts.wday ??= 0;
+    } else if (k === "wnum1") {
+      for (const el of a) {
+        if (parts[el] !== undefined) break;
+        parts[el] = today[el];
+      }
+      parts.wnum1 ??= 0;
+      parts.wday ??= 1;
     }
   }
 }
@@ -1666,61 +1689,218 @@ function jdToCivil(jd: number): Temporal.PlainDate {
   return UNIX_EPOCH.add({ days: jd - UNIX_EPOCH_IN_CJD });
 }
 
+/** @internal `date_core.c`'s `DIV` macro (`date_core.c:168-170`), floored division. */
+function div(n: number, d: number): number {
+  return Math.floor(n / d);
+}
+
+/** @internal `date_core.c`'s `MOD` macro (`date_core.c:169-171`), floored modulo. */
+function mod(n: number, d: number): number {
+  return n - d * div(n, d);
+}
+
 /**
- * @internal Ruby `rt__valid_date_frags_p` (ruby/date, `date_core.c:4185-4220`):
- * the frags a sub-parser found, completed by `rt_complete_frags`, become a date
- * only through a fixed sequence of combinations, each tried in turn — the
- * `:jd`, then the ordinal (`:year` + `:yday`), then the civil
- * (`:year` + `:mon` + `:mday`), then the commercial one. A combination whose
- * frags are present but do not name a real date does not end the search: Ruby's
- * `valid_*_p` answers `nil` and the next combination is tried. When none is
- * buildable Ruby answers `nil` — `"Feb 3rd"` parsed with no completion has no
- * `:year` at all — and `d_new_by_frags` (`date_core.c:4260-4271`) is what turns
- * that `nil` into `Date::Error, "invalid date"`.
+ * @internal `date_core.c` `c_find_fdoy` (`date_core.c:455-464`), the Julian day
+ * of the first day of year `y`. Ruby scans January for the first date the
+ * calendar-reform start accepts; this port is proleptic ISO throughout, where
+ * that is always 1 January.
+ */
+function cFindFdoy(y: number): number {
+  return jdOf(new Temporal.PlainDate(y, 1, 1));
+}
+
+/**
+ * @internal `date_core.c` `c_commercial_to_jd` (`date_core.c:576-589`), the
+ * Julian day of the `d`th day of the `w`th ISO week of commercial year `y`,
+ * `d` running `1`..`7` from Monday: 4 January floored back to the Monday on or
+ * before it, then `w` weeks and `d` days on.
+ */
+function cCommercialToJd(y: number, w: number, d: number): number {
+  let rjd2 = cFindFdoy(y);
+  rjd2 += 3;
+  return rjd2 - mod(rjd2 - 1 + 1, 7) + 7 * (w - 1) + (d - 1);
+}
+
+/**
+ * @internal `date_core.c` `c_jd_to_commercial` (`date_core.c:591-609`), the
+ * inverse of {@link cCommercialToJd}. Ruby rebuilds the week date from the
+ * commercial arithmetic; `Temporal`'s `yearOfWeek`/`weekOfYear`/`dayOfWeek` are
+ * the same ISO-8601 week date by definition.
+ */
+function cJdToCommercial(jd: number): [ry: number, rw: number, rd: number] {
+  const c = jdToCivil(jd);
+  return [c.yearOfWeek as number, c.weekOfYear as number, c.dayOfWeek];
+}
+
+/**
+ * @internal `date_core.c` `c_valid_commercial_p` (`date_core.c:791-813`), which
+ * counts a negative day back from Sunday and a negative week back from the end
+ * of the commercial year before rebuilding the date and rejecting it if the
+ * round-trip does not name the same `y`/`w`/`d` back.
+ */
+function cValidCommercialP(y: number, w: number, d: number): Temporal.PlainDate | null {
+  if (d < 0) d += 8;
+  if (w < 0) {
+    const rjd2 = cCommercialToJd(y + 1, 1, 1);
+    const [ry2, rw2] = cJdToCommercial(rjd2 + w * 7);
+    if (ry2 !== y) return null;
+    w = rw2;
+  }
+  const rjd = cCommercialToJd(y, w, d);
+  const [ry, rw, rd] = cJdToCommercial(rjd);
+  if (y !== ry || w !== rw || d !== rd) return null;
+  return jdToCivil(rjd);
+}
+
+/**
+ * @internal `date_core.c` `c_weeknum_to_jd` (`date_core.c:610-620`), the
+ * Julian day of the `d`th day of the `w`th week of year `y`, where a week
+ * starts on day `f` — `0` for the Sunday-based `:wnum0`, `1` for the
+ * Monday-based `:wnum1` — `d` runs `0`..`6` from that day, and week `0` is the
+ * partial week before the year's first one. Week `0` is therefore empty in a
+ * year whose 1 January is itself an `f`-day: there, 1 January opens week `1`.
+ */
+function cWeeknumToJd(y: number, w: number, d: number, f: number): number {
+  let rjd2 = cFindFdoy(y);
+  rjd2 += 6;
+  return rjd2 - mod(rjd2 - f + 1, 7) - 7 + 7 * w + d;
+}
+
+/** @internal `date_core.c` `c_jd_to_weeknum` (`date_core.c:621-634`), the inverse of {@link cWeeknumToJd}. */
+function cJdToWeeknum(jd: number, f: number): [ry: number, rw: number, rd: number] {
+  const ry = jdToCivil(jd).year;
+  let rjd = cFindFdoy(ry);
+  rjd += 6;
+  const j = jd - (rjd - mod(rjd - f + 1, 7)) + 7;
+  return [ry, div(j, 7), mod(j, 7)];
+}
+
+/**
+ * @internal `date_core.c` `c_valid_weeknum_p` (`date_core.c:815-838`), the
+ * `:wnum0`/`:wnum1` counterpart of {@link cValidCommercialP}: same two
+ * normalizations and the same round-trip rejection, but over a `0`..`6` week
+ * rather than a `1`..`7` one, so a negative day takes `7` where the commercial
+ * one takes `8`.
+ */
+function cValidWeeknumP(y: number, w: number, d: number, f: number): Temporal.PlainDate | null {
+  if (d < 0) d += 7;
+  if (w < 0) {
+    const rjd2 = cWeeknumToJd(y + 1, 1, f, f);
+    const [ry2, rw2] = cJdToWeeknum(rjd2 + w * 7, f);
+    if (ry2 !== y) return null;
+    w = rw2;
+  }
+  const rjd = cWeeknumToJd(y, w, d, f);
+  const [ry, rw, rd] = cJdToWeeknum(rjd, f);
+  if (y !== ry || w !== rw || d !== rd) return null;
+  return jdToCivil(rjd);
+}
+
+/**
+ * @internal `date_core.c` `rt__valid_ordinal_p` (`date_core.c:4126-4139`) over
+ * `c_valid_ordinal_p` (`date_core.c:747-768`), which answers `nil` rather than
+ * raising so its caller can fall through to the next kind of date.
  *
- * Ruby's `valid_ordinal_p` / `valid_civil_p` / `valid_commercial_p` answer a
- * Julian day or `nil`; `Temporal.PlainDate` raises instead, so an out-of-range
- * day arrives here as a throw where Ruby reads a `nil`.
+ * `c_valid_ordinal_p`'s negative-`yday` normalization is not carried — the
+ * ported sub-parsers cannot emit one, and it is the ordinal twin of the
+ * commercial normalization this file does carry. Tracked as
+ * `i18n-date-valid-ordinal-civil-negative-fields`.
+ */
+function rtValidOrdinalP(y: number, d: number): Temporal.PlainDate | null {
+  if (d < 1) return null;
+  try {
+    const rjd = new Temporal.PlainDate(y, 1, 1).add({ days: d - 1 });
+    return rjd.year === y ? rjd : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * @internal `date_core.c` `rt__valid_civil_p` (`date_core.c:4141-4155`) over
+ * `c_valid_civil_p` (`date_core.c:770-790`). `Temporal.PlainDate` rejects the
+ * out-of-range month or day `c_valid_civil_p` rejects by round-trip, so the
+ * throw is the answer, mapped to `null` for the same fall-through.
  *
- * The two week-numbered blocks C tries last (`:wnum0` / `:wnum1`,
- * `date_core.c:4240-4276`) are not carried: no sub-parser ported here sets
- * either key, so they can never be the combination that wins.
+ * Its negative-`mon`/`mday` normalizations are not carried, for the reason
+ * {@link rtValidOrdinalP} gives.
+ */
+function rtValidCivilP(y: number, m: number, d: number): Temporal.PlainDate | null {
+  try {
+    return new Temporal.PlainDate(y, m, d);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * @internal `date_core.c` `rt__valid_date_frags_p` (`date_core.c:4186-4278`),
+ * which tries each kind of date the completed fields could name in turn and
+ * answers the first that makes one: the Julian day, the ordinal date — a
+ * `:year` and a `:yday`, which is what `"2008070"` names — the civil one, the
+ * commercial one — a `:cwyear`, a `:cweek` and a `:cwday`, which is what
+ * `"2001-W05-6"` names — and then the two week-numbered ones. An arm whose
+ * fields are present but do not make a date does not answer: it falls through
+ * to the next, which is why an invalid civil date can still resolve as a week
+ * number rather than raising outright.
+ *
+ * The commercial arm reads `:cwday` and falls back to a `:wday` whose `0` it
+ * maps to `7`, which is how `"2001-W05 sun"` names the Sunday of that ISO week;
+ * the `:wnum0` arm mirrors it the other way, mapping a `:cwday` of `7` to `0`.
+ *
+ * When no arm answers Ruby answers `nil` — `"Feb 3rd"` parsed with no
+ * completion has no `:year` at all — and `d_new_by_frags`
+ * (`date_core.c:4283-4300`) is what turns that `nil` into
+ * `Date::Error, "invalid date"`.
  */
 function rtValidDateFragsP(parts: DateParts): Temporal.PlainDate | null {
   if (parts.jd !== undefined) {
-    return jdToCivil(parts.jd);
+    const d = jdToCivil(parts.jd);
+    if (d !== null) return d;
   }
-  if (parts.yday !== undefined && parts.year !== undefined && parts.yday >= 1) {
-    try {
-      const d = new Temporal.PlainDate(parts.year, 1, 1).add({ days: parts.yday - 1 });
-      if (d.year === parts.year) return d;
-    } catch {
-      // `valid_ordinal_p`'s `nil`.
-    }
+
+  if (parts.yday !== undefined && parts.year !== undefined) {
+    const d = rtValidOrdinalP(parts.year, parts.yday);
+    if (d !== null) return d;
   }
+
   if (parts.mday !== undefined && parts.mon !== undefined && parts.year !== undefined) {
-    try {
-      return new Temporal.PlainDate(parts.year, parts.mon, parts.mday);
-    } catch {
-      // `valid_civil_p`'s `nil`.
+    const d = rtValidCivilP(parts.year, parts.mon, parts.mday);
+    if (d !== null) return d;
+  }
+
+  {
+    let wday = parts.cwday;
+    if (wday === undefined) {
+      wday = parts.wday;
+      if (wday !== undefined) if (wday === 0) wday = 7;
+    }
+    if (wday !== undefined && parts.cweek !== undefined && parts.cwyear !== undefined) {
+      const d = cValidCommercialP(parts.cwyear, parts.cweek, wday);
+      if (d !== null) return d;
     }
   }
-  let cwday = parts.cwday;
-  if (cwday === undefined) {
-    cwday = parts.wday;
-    if (cwday !== undefined) if (cwday === 0) cwday = 7;
+
+  {
+    let wday = parts.wday;
+    if (wday === undefined) {
+      wday = parts.cwday;
+      if (wday !== undefined) if (wday === 7) wday = 0;
+    }
+    if (wday !== undefined && parts.wnum0 !== undefined && parts.year !== undefined) {
+      const d = cValidWeeknumP(parts.year, parts.wnum0, wday, 0);
+      if (d !== null) return d;
+    }
   }
-  if (cwday !== undefined && parts.cweek !== undefined && parts.cwyear !== undefined) {
-    try {
-      const jan4 = new Temporal.PlainDate(parts.cwyear, 1, 4);
-      const d = jan4
-        .subtract({ days: jan4.dayOfWeek - 1 })
-        .add({ days: (parts.cweek - 1) * 7 + (cwday - 1) });
-      if (d.yearOfWeek === parts.cwyear && d.weekOfYear === parts.cweek && d.dayOfWeek === cwday) {
-        return d;
-      }
-    } catch {
-      // `valid_commercial_p`'s `nil`.
+
+  {
+    let wday = parts.wday;
+    if (wday === undefined) wday = parts.cwday;
+    if (wday !== undefined) wday = mod(wday - 1, 7);
+
+    if (wday !== undefined && parts.wnum1 !== undefined && parts.year !== undefined) {
+      const d = cValidWeeknumP(parts.year, parts.wnum1, wday, 1);
+      if (d !== null) return d;
     }
   }
   return null;
@@ -1773,22 +1953,31 @@ export class Date {
    * `comp` completes a two-digit year, which is why `"080702"` is 2008 here
    * and 0008 through Rails' `::Date.parse(self, false)`.
    *
-   * `rt__valid_date_frags_p` (`date_core.c:4185-4220`) tries the ordinal date
-   * — a `:year` and a `:yday`, which is what `"2008070"` names — before the
-   * civil one, and the commercial date — a `:cwyear`, a `:cweek` and a
-   * `:cwday`, which is what `"2001-W05-6"` names — after both. A string that
-   * named only a time of day answers none of them and raises. The
-   * out-of-range week or day Ruby rejects in `c_valid_commercial_p`
-   * (`date_core.c:792-810`) is rejected here by round-tripping the built date's
-   * own week date. That arm reads `:cwday` and falls back to a `:wday` whose
-   * `0` it maps to `7`, which is how `"2001-W05 sun"` names the Sunday of that
-   * ISO week. A `:jd` — which `rt_complete_frags` writes for a string that
-   * named only a day of the week — answers before all of them.
+   * A string that named only a time of day answers no arm of
+   * {@link rtValidDateFragsP} and raises.
    */
   static parse(str: string, comp = true): Date {
     const parts = Date._parse(str, comp);
     completeFrags(parts);
-    const d = rtValidDateFragsP(parts);
+    let d: Temporal.PlainDate | null;
+    try {
+      d = rtValidDateFragsP(parts);
+    } catch {
+      d = null;
+    }
+    if (d === null) throw new DateError("invalid date");
+    return new Date(d.year, d.month, d.day);
+  }
+
+  /**
+   * Ruby `Date.commercial(cwyear = -4712, cweek = 1, cwday = 1)` (ruby/date,
+   * `date_core.c` `date_s_commercial`), which builds a date from a week date
+   * and raises `Date::Error` on one `c_valid_commercial_p` rejects. A negative
+   * `cwday` counts back from Sunday and a negative `cweek` back from the end of
+   * the commercial year, so `Date.commercial(2001, -1, -1)` is 2001-12-30.
+   */
+  static commercial(cwyear = -4712, cweek = 1, cwday = 1): Date {
+    const d = cValidCommercialP(cwyear, cweek, cwday);
     if (d === null) throw new DateError("invalid date");
     return new Date(d.year, d.month, d.day);
   }

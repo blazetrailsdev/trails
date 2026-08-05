@@ -52,6 +52,15 @@ export class Configurable {
     return Contexts.context.encryptor as EncryptorLike | undefined;
   }
 
+  /**
+   * Mirrors `Configurable.configure`
+   * (activerecord/lib/active_record/encryption/configurable.rb:20-36).
+   *
+   * `primary_key:`, `deterministic_key:` and `key_derivation_salt:` are kwargs
+   * defaulting to `nil` and assigned unconditionally (configurable.rb:21-23),
+   * so a call that omits one *clears* the credential it had rather than keeping
+   * it. Callers that want the previous value pass it explicitly.
+   */
   static configure(options: {
     primaryKey?: string | string[];
     deterministicKey?: string;
@@ -60,10 +69,9 @@ export class Configurable {
     [key: string]: unknown;
   }): void {
     const config = this.config;
-    if (options.primaryKey !== undefined) config.primaryKey = options.primaryKey;
-    if (options.deterministicKey !== undefined) config.deterministicKey = options.deterministicKey;
-    if (options.keyDerivationSalt !== undefined)
-      config.keyDerivationSalt = options.keyDerivationSalt;
+    config.primaryKey = options.primaryKey;
+    config.deterministicKey = options.deterministicKey;
+    config.keyDerivationSalt = options.keyDerivationSalt;
 
     const properties: Record<string, unknown> = { ...options };
     // Set the default for this property here instead of in +Config#set_defaults+ as this needs

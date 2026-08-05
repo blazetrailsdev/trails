@@ -161,7 +161,7 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
       fired = true;
     });
     try {
-      Configurable.configure({ primaryKey: "test-key" });
+      Configurable.configure({ primaryKey: "test-key", keyDerivationSalt: "the salt" });
       expect(fired).toBe(true);
     } finally {
       dispose();
