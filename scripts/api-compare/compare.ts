@@ -1492,8 +1492,7 @@ export function main() {
 
   // Opt-in calls knob (RFC 0047): widen the calls-check `significant` set to
   // all ported names except `super`, writing the separate call-mismatches
-  // artifact gated by lint-call-mismatches.ts. The narrow 0044 artifact is
-  // not written in a calls run (and vice-versa), so the two ratchets never collide.
+  // artifact gated by lint-call-mismatches.ts.
   const callsGate = args.includes("--calls") || process.env.API_COMPARE_CALLS === "1";
   const callsSignificant = SIGNIFICANT_CALLS;
 

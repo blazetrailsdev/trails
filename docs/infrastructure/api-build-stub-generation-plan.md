@@ -586,7 +586,7 @@ Three options for the exclude JSON after migration:
    order. Routing between the two needs no tag-side marker: the narrow
    population is a strict subset of the wide one, so a tag emits a narrow
    row iff its Ruby call is in `SIGNIFICANT_CALLS` and the package passes
-   `narrowCallsApplies` (activerecord-only today) — one tag, both baselines. `lint-call-mismatches{,-wide}.ts` and both CI jobs are untouched;
+   `narrowCallsApplies` (activerecord-only today) — one tag, both baselines. `lint-call-mismatches.ts` and both CI jobs are untouched;
    the only-shrink ratchet semantics are preserved wholesale (a stale JSON
    row now means a stale tag — same red gate, same fix, but the fix is a
    JSDoc edit next to the code). A small CI drift check
