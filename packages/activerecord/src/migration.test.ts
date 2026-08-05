@@ -42,6 +42,11 @@ import { describeIfMysqlAdapter } from "./support/describe-if-mysql-adapter.js";
 import { leaseMysqlAdapter } from "./adapters/abstract-mysql-adapter/test-helper.js";
 import { anonymousMigration } from "./test-helpers/anonymous-migration.js";
 import { schemaConn } from "./support/schema-conn.js";
+import { InternalMetadata } from "./internal-metadata.js";
+
+// Mirrors `MIGRATIONS_ROOT` from cases/helper.rb:14 — the directory the
+// versioned migration fixtures live under.
+const MIGRATIONS_ROOT = new URL("./test-helpers/migrations", import.meta.url).pathname;
 
 // The migration-on-`people` tests (Rails runs `add_column/remove_column
 // "people", "last_name"` through a `Migrator`) need the canonical `people`
@@ -111,6 +116,12 @@ afterEach(async () => {
     }
   } catch {
     /* column absent / adapter without the column — nothing to strip */
+  }
+  // migration_test.rb's setup and teardown both drop the tables the
+  // `MIGRATIONS_ROOT + "/valid"` migrations create, so a run that stopped part
+  // way through cannot poison the next test.
+  for (const table of ["reminders", "people_reminders"]) {
+    await adapter.dropTable(table, { ifExists: true });
   }
   try {
     await new SchemaMigration(adapter).deleteAllVersions();
@@ -605,99 +616,76 @@ describe("MigrationTest", () => {
     );
   });
 
+  // Rails builds `MigrationContext.new(migrations_path)` here and lets it
+  // default `schema_migration` / `internal_metadata` off the connection pool
+  // (migration.rb:1214-1218) — that default is the only thing separating this
+  // case from `migrator versions`, which passes both explicitly
+  // (migration_test.rb:107). trails' MigrationContext takes an adapter, not a
+  // pool, so it has nothing to default from and both cases must pass them; the
+  // two bodies are therefore identical until story
+  // 0051/migration-context-collaborators-need-a-pool lands the pool-defaulted
+  // constructor, at which point this one drops its arguments and the
+  // distinction Rails is testing comes back.
   it("migration context with default schema migration", async () => {
+    const migrationsPath = `${MIGRATIONS_ROOT}/valid`;
     const adapter = Base.connection;
-    const migrations: MigrationProxy[] = [
-      {
-        version: "1",
-        name: "First",
-        migration: () => anonymousMigration("First", "1"),
-      },
-      {
-        version: "2",
-        name: "Second",
-        migration: () => anonymousMigration("Second", "2"),
-      },
-      {
-        version: "3",
-        name: "Third",
-        migration: () => anonymousMigration("Third", "3"),
-      },
-    ];
-    const migrator = new Migrator(adapter, migrations);
+    const schemaMigration = new SchemaMigration(adapter);
+    const migrator = new MigrationContext(
+      [migrationsPath],
+      schemaMigration,
+      new InternalMetadata(adapter),
+    );
     await migrator.up();
-    expect(await migrator.currentVersion()).toBe(3);
-    const pending = await migrator.pendingMigrations();
-    expect(pending.length).toBe(0);
 
-    await migrator.down(0);
+    expect(await migrator.currentVersion()).toBe(3);
+    expect(await migrator.needsMigration()).toBe(false);
+
+    await migrator.down();
     expect(await migrator.currentVersion()).toBe(0);
-    const pendingAfter = await migrator.pendingMigrations();
-    expect(pendingAfter.length).toBe(3);
+    expect(await migrator.needsMigration()).toBe(true);
+
+    await schemaMigration.createVersion("3");
+    expect(await migrator.needsMigration()).toBe(true);
   });
 
   it("migrator versions", async () => {
+    const migrationsPath = `${MIGRATIONS_ROOT}/valid`;
     const adapter = Base.connection;
-    const migrations: MigrationProxy[] = [
-      {
-        version: "1",
-        name: "First",
-        migration: () => anonymousMigration("First", "1"),
-      },
-      {
-        version: "2",
-        name: "Second",
-        migration: () => anonymousMigration("Second", "2"),
-      },
-      {
-        version: "3",
-        name: "Third",
-        migration: () => anonymousMigration("Third", "3"),
-      },
-    ];
-    const migrator = new Migrator(adapter, migrations);
+    const schemaMigration = new SchemaMigration(adapter);
+    const migrator = new MigrationContext(
+      [migrationsPath],
+      schemaMigration,
+      new InternalMetadata(adapter),
+    );
+
     await migrator.up();
     expect(await migrator.currentVersion()).toBe(3);
+    expect(await migrator.needsMigration()).toBe(false);
 
-    await migrator.down(0);
+    await migrator.down();
     expect(await migrator.currentVersion()).toBe(0);
+    expect(await migrator.needsMigration()).toBe(true);
 
-    const versions = await migrator.getAllVersions();
-    expect(versions.length).toBe(0);
+    await schemaMigration.createVersion("3");
+    expect(await migrator.needsMigration()).toBe(true);
   });
 
   it("name collision across dbs", async () => {
-    // Rails builds `MigrationContext.new(MIGRATIONS_ROOT + "/valid")` and runs
-    // `migrator.up`, loading versioned migration files from a directory, then
-    // asserts `Person` gained a `last_name` column. trails' filesystem
-    // equivalent is `new Migrator(adapter, new MigrationContext([dir]).migrations)`, which discovers
-    // `\d+_*.ts` files, imports each as a MigrationLike, and runs them in
-    // version order.
-    const adp = await freshAdapterWithPeople();
-    const { fileURLToPath } = await import("node:url");
-    const { dirname, join } = await import("node:path");
-    const here = dirname(fileURLToPath(import.meta.url));
-    const migrationsPath = join(here, "test-helpers", "migrations", "valid");
-
-    const migrator = new Migrator(adp, new MigrationContext([migrationsPath]).migrations);
+    const migrationsPath = `${MIGRATIONS_ROOT}/valid`;
+    const adapter = await freshAdapterWithPeople();
+    const migrator = new MigrationContext(
+      [migrationsPath],
+      new SchemaMigration(adapter),
+      new InternalMetadata(adapter),
+    );
     await migrator.up();
 
-    // Point Person at the isolated migration DB only for the duration of the
-    // assertion, then restore. Unlike Rails — where the pool is global and
-    // `MigrationContext.new(path)` never touches the connection — our test
-    // adapter is per-instance, so we must restore Person's original adapter
-    // (and re-reset its column cache) to avoid leaking `last_name` into later
-    // tests in this worker.
-    const originalAdapter = (Person as any)._adapter;
-    try {
-      (Person as any).adapter = adp;
-      (Person as any).resetColumnInformation();
-      await loadSchemaFromAdapter.call(Person as any);
-      expect(Person.columnNames()).toContain("last_name");
-    } finally {
-      (Person as any)._adapter = originalAdapter;
-      (Person as any).resetColumnInformation();
-    }
+    // Rails' `assert_column Person, :last_name`. Person rides the same
+    // canonical connection the migration ran against, so it only needs its
+    // column cache re-read; the afterEach strips `last_name` again.
+    Person.resetColumnInformation();
+    await loadSchemaFromAdapter.call(Person as any);
+    expect(Person.columnNames()).toContain("last_name");
   });
 
   it("migration detection without schema migration table", async () => {
@@ -885,40 +873,27 @@ describe("MigrationTest", () => {
 
   it("filtering migrations", async () => {
     const adapter = Base.connection;
-    const ran: string[] = [];
-    const migrations: MigrationProxy[] = [
-      {
-        version: "1",
-        name: "First",
-        migration: () =>
-          anonymousMigration(
-            "First",
-            "1",
-            async () => {
-              ran.push("first");
-            },
-            async () => {},
-          ),
-      },
-      {
-        version: "2",
-        name: "Second",
-        migration: () =>
-          anonymousMigration(
-            "Second",
-            "2",
-            async () => {
-              ran.push("second");
-            },
-            async () => {},
-          ),
-      },
-    ];
-    const migrator = new Migrator(adapter, migrations);
-    // Run only the first migration
-    await migrator.up("1");
-    expect(ran).toEqual(["first"]);
-    expect(await migrator.currentVersion()).toBe(1);
+    expect(await adapter.columnExists("people", "last_name")).toBe(false);
+    expect(await adapter.tableExists("reminders")).toBe(false);
+
+    const nameFilter = (migration: MigrationProxy): boolean =>
+      migration.name === "ValidPeopleHaveLastNames";
+    const migrator = new MigrationContext(
+      [`${MIGRATIONS_ROOT}/valid`],
+      new SchemaMigration(adapter),
+      new InternalMetadata(adapter),
+    );
+    await migrator.up(null, nameFilter);
+
+    expect(await adapter.columnExists("people", "last_name")).toBe(true);
+    // Rails asserts `Reminder.first` raises StatementInvalid — the filtered-out
+    // `WeNeedReminders` never ran, so the table is not there.
+    expect(await adapter.tableExists("reminders")).toBe(false);
+
+    await migrator.down(null, nameFilter);
+
+    expect(await adapter.columnExists("people", "last_name")).toBe(false);
+    expect(await adapter.tableExists("reminders")).toBe(false);
   });
 
   itIfSupports("ddl_transactions", "migrator one up with exception and rollback", async () => {

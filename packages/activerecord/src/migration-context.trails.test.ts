@@ -98,6 +98,20 @@ describe("MigrationContext connected surface", () => {
     );
   });
 
+  // The `valid` migrations do real DDL against the canonical schema, so undo it
+  // — this describe runs without the transactional wrap. Mirrors
+  // migration_test.rb's teardown, which drops the tables its migrations create
+  // and strips `last_name` back off `people`.
+  afterEach(async () => {
+    const adapter = Base.connection;
+    for (const table of ["people_reminders", "reminders"]) {
+      await adapter.dropTable(table, { ifExists: true });
+    }
+    if (await adapter.columnExists("people", "last_name")) {
+      await adapter.removeColumn("people", "last_name");
+    }
+  });
+
   it("getAllVersions reads the versions recorded for this context", async () => {
     await context.schemaMigration.createVersion("1");
     await context.schemaMigration.createVersion("2");
@@ -140,6 +154,28 @@ describe("MigrationContext connected surface", () => {
 
   it("lastStoredEnvironment is null until a version has been recorded", async () => {
     expect(await context.lastStoredEnvironment()).toBeNull();
+  });
+
+  // `MigrationContext#migrate` has no Rails test of its own — upstream reaches
+  // it through `DatabaseTasks.migrate` — so pin its routing end-to-end here:
+  // no target runs `up`, and a target below the current version runs `down`.
+  it("migrate with no target runs every migration, and a lower target runs down", async () => {
+    const adapter = Base.connection;
+
+    await context.migrate();
+    expect(await context.getAllVersions()).toEqual([1, 2, 3]);
+    expect(await adapter.tableExists("reminders")).toBe(true);
+    expect(await adapter.tableExists("people_reminders")).toBe(true);
+
+    await context.migrate(1);
+    expect(await context.getAllVersions()).toEqual([1]);
+    expect(await adapter.tableExists("reminders")).toBe(false);
+    expect(await adapter.tableExists("people_reminders")).toBe(false);
+    expect(await adapter.columnExists("people", "last_name")).toBe(true);
+
+    await context.migrate(0);
+    expect(await context.getAllVersions()).toEqual([]);
+    expect(await adapter.columnExists("people", "last_name")).toBe(false);
   });
 
   it("rollback goes through move, not Migrator's applied-version walk", async () => {

@@ -10,6 +10,7 @@
  */
 import { describe, it, afterAll, beforeAll, expect } from "vitest";
 import { Base } from "../base.js";
+import { useTransactionalTests } from "../test-fixtures/use-transactional-tests.js";
 
 class HandlerResolvedPost extends Base {
   static {
@@ -28,6 +29,13 @@ class HandlerResolvedComment extends Base {
 }
 
 describe("handler-resolved adapter (Phase D-0)", () => {
+  // Rails' `ActiveRecord::TestCase` runs with `use_transactional_tests` on
+  // (test_fixtures.rb:113, :146), so the comment this file's lazy-reflection
+  // case creates is rolled back rather than left behind on the shared
+  // per-worker connection. The table itself is laid in `beforeAll`, outside the
+  // per-test transaction, so it survives for every case.
+  useTransactionalTests();
+
   // Table laid via Base.connection — the connection itself resolves through
   // Base.connectionHandler, the Rails-shape resolution path D-1..N files use.
   beforeAll(async () => {
