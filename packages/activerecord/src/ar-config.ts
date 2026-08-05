@@ -61,6 +61,7 @@ let _belongsToRequiredValidatesForeignKey = true;
 let _applicationRecordClass: AnyClass | null = null;
 let _errorOnIgnoredOrder = false;
 let _timestampedMigrations = true;
+let _validateMigrationTimestamps = false;
 let _migrationStrategy: AnyClass = DefaultStrategy;
 let _verifyForeignKeysForFixtures = false;
 let _useYamlUnsafeLoad = false;
@@ -347,6 +348,21 @@ export const ActiveRecord = {
 
   set timestampedMigrations(value: boolean) {
     _timestampedMigrations = value;
+  },
+
+  /**
+   * Whether or not to validate migration timestamps. When set, an error is
+   * raised if a timestamp is more than a day ahead of the timestamp associated
+   * with the current time. `timestampedMigrations` must be set to true. Mirrors
+   * `ActiveRecord.validate_migration_timestamps` (active_record.rb:389-395,
+   * default false).
+   */
+  get validateMigrationTimestamps(): boolean {
+    return _validateMigrationTimestamps;
+  },
+
+  set validateMigrationTimestamps(value: boolean) {
+    _validateMigrationTimestamps = value;
   },
 
   /**

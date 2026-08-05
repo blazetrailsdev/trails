@@ -7,6 +7,7 @@ import { describe, it, expect, beforeEach, afterAll, afterEach, vi } from "vites
 import { ArgumentError } from "@blazetrails/activemodel";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { Base, Migrator, RecordNotUnique, StatementInvalid } from "./index.js";
+import { ActiveRecord } from "./ar-config.js";
 import { SchemaMigration } from "./schema-migration.js";
 import type { MigrationProxy } from "./migration.js";
 import { ConcurrentMigrationError, MigrationContext } from "./migration.js";
@@ -2169,9 +2170,9 @@ describe("MigrationTest", () => {
       });
 
       it("migration raises if timestamp is future date", () => {
-        const savedValidate = Migrator.validateMigrationTimestamps;
+        const savedValidate = ActiveRecord.validateMigrationTimestamps;
         try {
-          Migrator.validateMigrationTimestamps = true;
+          ActiveRecord.validateMigrationTimestamps = true;
           // Rails validates the timestamp at migration *load* time
           // (MigrationContext#migrations), so exercise the fromPath loader
           // rather than the Migrator constructor. The fixture's version
@@ -2182,7 +2183,7 @@ describe("MigrationTest", () => {
             /Invalid timestamp 99991231235959 for migration file: future_timestamp_migration/,
           );
         } finally {
-          Migrator.validateMigrationTimestamps = savedValidate;
+          ActiveRecord.validateMigrationTimestamps = savedValidate;
         }
       });
 

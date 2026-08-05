@@ -2013,7 +2013,7 @@ export class MigrationContext {
 
   /** @internal Mirrors: ActiveRecord::MigrationContext#validate_timestamp? (`migration.rb:1378-1380`) */
   private isValidateTimestamp(): boolean {
-    return ActiveRecord.timestampedMigrations && Migrator.validateMigrationTimestamps;
+    return ActiveRecord.timestampedMigrations && ActiveRecord.validateMigrationTimestamps;
   }
 
   /** @internal Mirrors: ActiveRecord::MigrationContext#valid_migration_timestamp? (`migration.rb:1382-1384`) */
@@ -2067,8 +2067,6 @@ type MigratorOptions = {
 export class Migrator {
   /** Mirrors: ActiveRecord::Migrator.migrations_paths (`migration.rb:1407`) */
   static migrationsPaths: string[] = [];
-
-  static validateMigrationTimestamps = false;
 
   private _adapter: DatabaseAdapter;
   private _migrations: MigrationProxy[];

@@ -235,10 +235,23 @@ export class PostgreSQLAdapter
     return env;
   }
 
+  // Is this connection alive and ready for queries?
+  // Mirrors Rails' PostgreSQLAdapter#active? (postgresql_adapter.rb:347-356):
+  // the `@raw_connection` presence guard, then a live `query ";"` probe and
+  // `verified!`, rescuing PG::Error to false. `_closed`/`_pgClientOptions` are
+  // trails' handle-state terms for "this client was torn down / never
+  // configured" — a client in either state has no usable socket, so they sit
+  // with the presence guard rather than letting the probe throw.
   override async active(): Promise<boolean> {
-    // Rails' active? starts with `return false unless @raw_connection`
-    // (postgresql_adapter.rb); the `query ";"` probe half is not ported yet.
-    return this._rawConnection !== null && !this._closed && this._pgClientOptions != null;
+    const rawConnection = this._rawConnection;
+    if (rawConnection === null || this._closed || this._pgClientOptions == null) return false;
+    try {
+      await rawConnection.query(";");
+      this.verifiedBang();
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   // Mirrors Rails' `PostgreSQLAdapter#connected?`
