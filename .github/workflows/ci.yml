@@ -1571,6 +1571,26 @@ jobs:
         # entries and with them the rails-deprecated-jsdoc coverage for those
         # methods. Regenerate with `pnpm rails-privates:manifest`.
         run: pnpm exec tsx scripts/build-rails-privates-manifest.ts --check-deprecated
+      - name: ESLint exclude baselines up to date
+        # Both baselines are generated grandfather lists that only ever shrink
+        # as sites convert. Nothing read them back, so they drifted ~200 rows
+        # loose on main before this guard: a ratchet grandfathering sites that
+        # no longer exist stops catching what it was installed to catch.
+        # Regenerate with `pnpm tsx scripts/generate-standalone-associations-exclude.ts`
+        # and `pnpm fixture-baseline:refresh`.
+        run: |
+          set -euo pipefail
+          pnpm exec tsx scripts/generate-standalone-associations-exclude.ts
+          pnpm exec tsx scripts/test-deps/rails-test-deps.ts
+          pnpm exec tsx scripts/test-deps/build-fixture-baseline.ts
+          baselines='eslint/no-standalone-associations-exclude.json eslint/expected-fixtures-exclude.json'
+          if git diff --quiet -- $baselines; then
+            echo "ESLint exclude baselines are in sync with a fresh regeneration."
+            exit 0
+          fi
+          echo "::error title=ESLint exclude baseline drift::A committed ESLint exclude baseline differs from a fresh regeneration. Run the generators and commit the result — the diff below is what your branch is missing."
+          git --no-pager diff -- $baselines
+          exit 1
       - name: Schema comparison
         # Structural parity of TEST_SCHEMA against the vendored
         # test/schema/schema.rb it mirrors (RFC 0025). Fails on a table or

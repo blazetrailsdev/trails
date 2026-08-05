@@ -1,14 +1,14 @@
 import { Config } from "./config.js";
 import { Contexts } from "./contexts.js";
-import { Context } from "./context.js";
+import { Context, contextProperties } from "./context.js";
 import { Cipher } from "./cipher.js";
 import type { EncryptorLike } from "./encryptor.js";
+import type { MessageSerializerLike } from "./message-serializer.js";
 import type { SchemeOptions } from "./scheme.js";
 
 type DeclarationListener = (klass: any, name: string) => void;
 
 let _sharedConfig: Config | null = null;
-let _defaultCipher: Cipher | null = null;
 // Mirrors Rails' `mattr_accessor :encrypted_attribute_declaration_listeners`
 // (no default → nil). Lazily allocated in onEncryptedAttributeDeclared.
 let _listeners: DeclarationListener[] | undefined;
@@ -38,18 +38,16 @@ export class Configurable {
     _listeners = value;
   }
 
-  // Mirrors Rails' delegation of Context::PROPERTIES to context.
-  static get keyProvider(): unknown {
-    return Contexts.context.keyProvider;
-  }
-
-  static get cipher(): Cipher {
-    return (Contexts.context.cipher as Cipher | undefined) ?? (_defaultCipher ??= new Cipher());
-  }
-
-  static get encryptor(): EncryptorLike | undefined {
-    return Contexts.context.encryptor as EncryptorLike | undefined;
-  }
+  // Rails' `Context::PROPERTIES.each { |name| delegate name, to: :context }`
+  // (configurable.rb:16-19). The readers themselves are installed off that
+  // constant at the bottom of this file, so the set cannot drift from it;
+  // these declarations only give each one a type.
+  declare static readonly keyProvider: unknown;
+  declare static readonly keyGenerator: unknown;
+  declare static readonly cipher: Cipher;
+  declare static readonly messageSerializer: MessageSerializerLike | undefined;
+  declare static readonly encryptor: EncryptorLike | undefined;
+  declare static readonly frozenEncryption: boolean;
 
   /**
    * Mirrors `Configurable.configure`
@@ -100,7 +98,6 @@ export class Configurable {
       }
     }
 
-    _defaultCipher = null;
     Contexts.resetDefaultContext();
 
     for (const [key, value] of Object.entries(properties)) {
@@ -109,7 +106,7 @@ export class Configurable {
       }
       if (value === undefined) continue;
       if (!Context.PROPERTIES.includes(key)) continue;
-      (Contexts.context as Record<string, unknown>)[key] = value;
+      (Contexts.context as unknown as Record<string, unknown>)[key] = value;
     }
   }
 
@@ -132,4 +129,17 @@ export class Configurable {
       listener(klass, name);
     }
   }
+}
+
+// The delegation Rails writes as `Context::PROPERTIES.each { delegate … }`
+// (configurable.rb:16-19). Driven off the constant rather than hand-written
+// per name; `contextProperties()` rather than `Context.PROPERTIES` because
+// this runs at module-eval time inside the context↔configurable cycle.
+for (const name of contextProperties()) {
+  Object.defineProperty(Configurable, name, {
+    configurable: true,
+    get(): unknown {
+      return (Contexts.context as unknown as Record<string, unknown>)[name];
+    },
+  });
 }

@@ -3,7 +3,8 @@ import { EncryptedUniquenessValidator } from "./extended-deterministic-uniquenes
 import { ExtendedDeterministicQueries } from "./extended-deterministic-queries.js";
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 import { Scheme } from "./scheme.js";
-import { isEncryptionDisabled } from "./context.js";
+import { getEncryptionContext } from "./context.js";
+import { NullEncryptor } from "./null-encryptor.js";
 import type { EncryptorLike } from "./encryptor.js";
 
 // Encryptors that produce distinguishable ciphertexts so assertions are meaningful.
@@ -46,7 +47,11 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicUniquenessValidatorTest
 
     const calls: Array<{ attribute: string; value: unknown; encryptionDisabled: boolean }> = [];
     const originalValidateEach = (_record: any, attribute: string, value: unknown) => {
-      calls.push({ attribute, value, encryptionDisabled: isEncryptionDisabled() });
+      calls.push({
+        attribute,
+        value,
+        encryptionDisabled: getEncryptionContext().encryptor instanceof NullEncryptor,
+      });
     };
 
     await new EncryptedUniquenessValidator().validateEach(

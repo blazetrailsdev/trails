@@ -7,7 +7,7 @@ import {
   setDefaultContext as _setDefaultContext,
   getCurrentCustomContext,
   resetDefaultContext as _resetDefaultContext,
-  type EncryptionContext,
+  type Context,
 } from "./context.js";
 
 /**
@@ -17,11 +17,11 @@ import {
  * Mirrors: ActiveRecord::Encryption::Contexts
  */
 export class Contexts {
-  static get context(): EncryptionContext {
+  static get context(): Context {
     return getEncryptionContext();
   }
 
-  static withEncryptionContext<T>(properties: EncryptionContext, fn: () => T): T {
+  static withEncryptionContext<T>(properties: Partial<Context>, fn: () => T): T {
     return _withCtx(properties, fn);
   }
 
@@ -33,15 +33,15 @@ export class Contexts {
     return _protecting(fn);
   }
 
-  static get currentCustomContext(): EncryptionContext | null {
+  static get currentCustomContext(): Context | null {
     return getCurrentCustomContext();
   }
 
-  static get defaultContext(): EncryptionContext {
+  static get defaultContext(): Context {
     return getDefaultContext();
   }
 
-  static set defaultContext(value: EncryptionContext) {
+  static set defaultContext(value: Context) {
     _setDefaultContext(value);
   }
 

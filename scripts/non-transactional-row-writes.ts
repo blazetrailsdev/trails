@@ -67,7 +67,7 @@ export function stripCommentsAndStrings(src: string): string {
     .replace(/"(?:\\.|[^"\\])*"/g, '""');
 }
 
-const IT_CALL = /(?:^|[^.\w])(?:it|test)(?:\.\w+)*\s*\(/g;
+const IT_CALL = /(?:^|[^.\w])(?:it|test)((?:\.\w+)*)\s*\(/g;
 
 export interface RowWrite {
   line: number;
@@ -86,14 +86,22 @@ export interface RowWrite {
  * destructuring pattern, an inline options object — can no longer be mistaken
  * for the body and swallow everything up to its match.
  *
- * Known gap: `it.each([...])("name", fn)` puts the body in a second call, so
- * its writes are not attributed. That shape is rare in this tree and the gate
- * is a human-reviewed ratchet, not a hard gate.
+ * The table form `it.each([...])("name", fn)` puts the body in a SECOND call,
+ * so the `it.each(` paren closes before the body starts. That paren is tracked
+ * separately and, when it closes, the scope push is deferred to the `(` that
+ * opens the body call.
+ *
+ * Known gap: the tagged-template table form (`` it.each`…`("name", fn) ``) is
+ * not recognized — template literals survive `stripCommentsAndStrings`, so the
+ * parens inside a table cell would be read as code. No file in this tree uses
+ * it.
  */
 export function rowWritesAtItScope(src: string): RowWrite[] {
   const stripped = stripCommentsAndStrings(src);
   const writes: RowWrite[] = [];
   const itParens: number[] = [];
+  const eachParens: number[] = [];
+  let bodyCallPending = false;
   let parenDepth = 0;
 
   const lines = stripped.split("\n");
@@ -101,23 +109,32 @@ export function rowWritesAtItScope(src: string): RowWrite[] {
     const line = lines[i];
 
     const itColumns = new Set<number>();
+    const eachColumns = new Set<number>();
     IT_CALL.lastIndex = 0;
     for (let m = IT_CALL.exec(line); m !== null; m = IT_CALL.exec(line)) {
-      itColumns.add(m.index + m[0].length - 1);
+      const column = m.index + m[0].length - 1;
+      (m[1].split(".").includes("each") ? eachColumns : itColumns).add(column);
     }
 
     for (let c = 0; c < line.length; c++) {
       const ch = line[c];
       if (ch === "(") {
         parenDepth++;
-        if (itColumns.has(c)) itParens.push(parenDepth);
+        if (eachColumns.has(c)) eachParens.push(parenDepth);
+        else if (itColumns.has(c) || bodyCallPending) itParens.push(parenDepth);
+        bodyCallPending = false;
         continue;
       }
       if (ch === ")") {
         if (itParens[itParens.length - 1] === parenDepth) itParens.pop();
+        if (eachParens[eachParens.length - 1] === parenDepth) {
+          eachParens.pop();
+          bodyCallPending = true;
+        }
         parenDepth--;
         continue;
       }
+      if (bodyCallPending && ch.trim() !== "") bodyCallPending = false;
       if (itParens.length === 0) continue;
       for (const pattern of WRITE_PATTERNS) {
         if (line.startsWith(pattern, c)) writes.push({ line: i + 1, pattern });
