@@ -971,10 +971,11 @@ export class ConnectionPool implements ReapablePool {
         const drain = (conn as unknown as { whenClosed?: () => Promise<void> }).whenClosed?.();
         if (drain) draining.push(drain);
       }
-      // Pins deliberately survive: `disconnect` (connection_pool.rb:454-465)
-      // clears `@connections`, `@leases` and `@available` but leaves
-      // `@pinned_connection` alone, so a disconnected-but-pinned pool still
-      // unpins cleanly at fixture teardown.
+      // No pin clearing here: `disconnect` (connection_pool.rb:454-465) clears
+      // `@connections`, `@leases` and `@available` only. Rails clears
+      // `@pinned_connection` in `initialize` (:267) and `unpin_connection!`
+      // (:347) and nowhere else, so a pool disconnected mid-test still unpins
+      // cleanly at fixture teardown.
       if (this._connections) this._connections.length = 0;
       this._available?.rejectAll(
         new ConnectionNotEstablished("Connection pool has been disconnected"),
@@ -1039,8 +1040,7 @@ export class ConnectionPool implements ReapablePool {
       if (drain) draining.push(drain);
     }
     // As in `_disconnect`: `discard!` (connection_pool.rb:484-492) nils
-    // `@connections`/`@available`/`@leases` only — `@pinned_connection` is
-    // cleared in `initialize` and `unpin_connection!` and nowhere else.
+    // `@connections`/`@available`/`@leases` only, never the pin.
     this._connections = null;
     this._available?.rejectAll(new ConnectionNotEstablished("Connection pool has been discarded"));
     this._available?.clear();

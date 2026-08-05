@@ -285,9 +285,9 @@ export class TableDefinition extends AbstractTableDefinition {
     options: ColumnOptions,
   ): ColumnType {
     if (type === "bigint" || options.limit === 8) {
-      return "bigserial" as ColumnType;
+      return "bigserial";
     } else {
-      return "serial" as ColumnType;
+      return "serial";
     }
   }
 

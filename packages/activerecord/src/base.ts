@@ -686,7 +686,7 @@ interface _PendingAssociationAttr {
  * collection associations? A `*Ids` key naming no collection association
  * (a genuine column, say) is left on the attribute path.
  */
-function _isCollectionIdsWriter(
+function _isCollectionIdsKey(
   ctor: typeof Base | undefined,
   defs: _AssociationDefLike[],
   key: string,
@@ -728,7 +728,7 @@ function _extractAssociationAttrs(
   for (const k of Object.keys(attrs)) {
     if (defs.find((a) => a.name === k)) {
       (assocs ??= []).push({ name: k, value: attrs[k] });
-    } else if (_isCollectionIdsWriter(ctor, defs, k)) {
+    } else if (_isCollectionIdsKey(ctor, defs, k)) {
       (assocs ??= []).push({ name: k, value: attrs[k] });
     }
   }
