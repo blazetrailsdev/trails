@@ -452,10 +452,9 @@ export class DatabaseTasks {
    * @internal Rails has no `DatabaseTasks.rollback`; `rake db:rollback`
    * (`railties/databases.rake:269`) inlines
    * `DatabaseTasks.migration_connection_pool.migration_context.rollback(step)`.
-   * The body lives here rather than in the CLI because `MigrationContext` is
-   * not ported, so the migrator is built from the pool directly — otherwise
-   * this is the rake task: the pool it is handed, no `configurations` lookup
-   * and no early return.
+   * The body lives here rather than in the CLI because the pool handle is
+   * here — otherwise this is the rake task: the pool it is handed, no
+   * `configurations` lookup and no early return.
    */
   static async rollback(steps: number = 1): Promise<void> {
     await this._stepMigrations("rollback", steps);
@@ -488,8 +487,8 @@ export class DatabaseTasks {
     const pool = await this.migrationConnectionPool();
     const adapter = await pool.leaseConnection();
     const dbConfig = pool.dbConfig;
-    const migrator = await this._migratorFor(adapter, dbConfig);
-    await migrator[direction](steps);
+    const context = await this._migrationContextFor(adapter, dbConfig);
+    await context[direction](steps);
     adapter.schemaCache.clearBang();
   }
 

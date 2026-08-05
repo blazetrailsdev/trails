@@ -3,7 +3,7 @@ import { DatabaseTasks } from "./database-tasks.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
 import { SchemaMigration } from "../schema-migration.js";
 import { Base } from "../base.js";
-import type { MigrationProxy } from "../migration.js";
+import { UnknownMigrationVersionError, type MigrationProxy } from "../migration.js";
 import { anonymousMigration } from "../test-helpers/anonymous-migration.js";
 
 describe("DatabaseTasksRollbackTest", () => {
@@ -57,6 +57,65 @@ describe("DatabaseTasksRollbackTest", () => {
 
     expect(reverted).toEqual(["PrimaryOnly"]);
     expect(await schemaMigration.versions()).toEqual([]);
+  });
+
+  it("rollback goes through move, not Migrator's applied-version walk", async () => {
+    const reverted: string[] = [];
+    const migration = (version: string, name: string): MigrationProxy => ({
+      version,
+      name,
+      migration: () =>
+        anonymousMigration(
+          name,
+          version,
+          async () => {},
+          async () => {
+            reverted.push(name);
+          },
+        ),
+    });
+
+    DatabaseTasks.registerMigrations([
+      migration("1", "First"),
+      migration("2", "Second"),
+      migration("3", "Third"),
+    ]);
+
+    DatabaseTasks.databaseConfiguration = null;
+    await Base.establishConnection({ adapter: "sqlite3", database: ":memory:", pool: 1 });
+    const schemaMigration = new SchemaMigration(await Base.connectionPool().leaseConnection());
+    await schemaMigration.createTable();
+    await schemaMigration.createVersion("1");
+    await schemaMigration.createVersion("3");
+
+    await DatabaseTasks.rollback(2);
+
+    expect(reverted).toEqual(["Third"]);
+    expect(await schemaMigration.versions()).toEqual(["1"]);
+  });
+
+  it("rollback raises UnknownMigrationVersionError for an unknown current version", async () => {
+    DatabaseTasks.registerMigrations([
+      {
+        version: "1",
+        name: "Known",
+        migration: () =>
+          anonymousMigration(
+            "Known",
+            "1",
+            async () => {},
+            async () => {},
+          ),
+      },
+    ]);
+
+    DatabaseTasks.databaseConfiguration = null;
+    await Base.establishConnection({ adapter: "sqlite3", database: ":memory:", pool: 1 });
+    const schemaMigration = new SchemaMigration(await Base.connectionPool().leaseConnection());
+    await schemaMigration.createTable();
+    await schemaMigration.createVersion("999");
+
+    await expect(DatabaseTasks.rollback()).rejects.toThrow(UnknownMigrationVersionError);
   });
 
   it("rolls back off the ambient pool when no configurations are loaded", async () => {

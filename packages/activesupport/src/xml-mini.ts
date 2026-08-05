@@ -1,5 +1,5 @@
 import { camelize, singularize, underscore } from "./inflector.js";
-import { htmlEscape } from "./core-ext/string/output-safety.js";
+import { htmlEscape } from "./core-ext/tse/util.js";
 import { BigDecimal } from "./core-ext/big-decimal/conversions.js";
 import { Temporal } from "./temporal.js";
 

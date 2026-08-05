@@ -18,8 +18,6 @@ export {
   resetTagBuilder,
 } from "./tag-helper.js";
 
-export { htmlEscape, h, htmlEscapeOnce, jsonEscape } from "./output-safety-helper.js";
-
 export { escapeJavascript, j, javascriptCdataSection, javascriptTag } from "./javascript-helper.js";
 
 export {

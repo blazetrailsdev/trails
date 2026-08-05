@@ -20,6 +20,21 @@
     "reason": "Rails' body is `super; ensure_proper_type` and the generated def now realizes that super as `Core.initializeInternalsCallback.call(this, ...)`. The port holds only this module's contribution (`ensureProperType.call(this)`, inheritance.ts:824) because base.ts orchestrates the chain explicitly at both constructor branches — the composition-point pattern from #5727. Same two reaches, one of them relocated to the composition point, whose order is now machine-checked against Base's MRO by the `prism-mro:` markers there (composition.ts)."
   },
   {
+    "rubyFile": "active_record/model_schema.rb",
+    "name": "realInheritanceColumn",
+    "reason": "`self._inheritance_column = value.to_s` (model_schema.rb:326) — same single assignment. The missing `to_s` is Ruby's Symbol-or-String coercion; the port's parameter is already typed `string | null`, and a Ruby Symbol is a JS string in trails, so there is nothing left to coerce."
+  },
+  {
+    "rubyFile": "active_record/persistence.rb",
+    "name": "_raiseReadonlyRecordError",
+    "reason": "`raise ReadOnlyRecord, \"#{self.class} is marked as readonly\"` (persistence.rb:958) — same error class and message; the extra token is `self.class` spelled `this.constructor.name`, which is how the port reads a class name (JS has no `Class#to_s`)."
+  },
+  {
+    "rubyFile": "active_record/persistence.rb",
+    "name": "_raiseRecordNotTouchedError",
+    "reason": "`raise ActiveRecordError, <<~MSG.squish` (persistence.rb:962-965) — same error class and same message; the port writes the already-squished string literal, so the only missing token is the `squish` Ruby heredoc idiom has no counterpart for."
+  },
+  {
     "rubyFile": "active_record/persistence.rb",
     "name": "isNewRecord",
     "reason": "Ruby reads the ivar `@new_record`; the port reads the `_newRecord` field. Same single read — the whole divergence is the ivar spelling."
@@ -35,8 +50,23 @@
     "reason": "Ruby reads the ivar `@previously_new_record`; the port reads the `_previouslyNewRecord` field. Same single read — the whole divergence is the ivar spelling."
   },
   {
+    "rubyFile": "active_record/relation.rb",
+    "name": "aliasTracker",
+    "reason": "`ActiveRecord::Associations::AliasTracker.create(model.connection_pool, table.name, joins, aliases)` (relation.rb:1308) vs `AliasTracker.create(this.model.connectionPool(), this.table.name, joins, aliases)` (relation.ts:6349) — same call, same four arguments in order. The only differing tokens are the `ActiveRecord::Associations::` constant path, which the port reaches through an import."
+  },
+  {
+    "rubyFile": "active_record/relation.rb",
+    "name": "isAlreadyInScope",
+    "reason": "`@delegate_to_model && registry.current_scope(model, true)` (relation.rb:1338) — the port is the same conjunction over the same two reads; the divergence is the ivar spelling `@delegate_to_model` vs the `delegateToModel` field."
+  },
+  {
     "rubyFile": "active_record/relation/finder_methods.rb",
     "name": "findNthWithLimit",
     "reason": "Spelling-only. Rails' `records[index, limit]` (finder_methods.rb) generates as `idxGet(records, index, limit)` because codegen cannot know the receiver is an Array; the port writes the same slice as `records.slice(...)`. The only other differing token is Ruby's `offset.zero?`, which the port spells as a numeric comparison. Every remaining token matches in order."
+  },
+  {
+    "rubyFile": "active_record/relation/finder_methods.rb",
+    "name": "findTakeWithLimit",
+    "reason": "`records.take(limit)` (finder_methods.rb:592) vs `records.slice(0, limit)` — `Array#take(n)` is `slice(0, n)`. The `loaded?` guard, the else arm `limit(limit).to_a`, and their order all match."
   }
 ]

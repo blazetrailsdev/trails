@@ -1,7 +1,8 @@
 /** @internal */
 import { MissingTranslationData } from "@blazetrails/i18n";
 import { I18n } from "./i18n.js";
-import { SafeBuffer, htmlEscape, isHtmlSafe } from "./core-ext/string/output-safety.js";
+import { SafeBuffer, isHtmlSafe } from "./core-ext/string/output-safety.js";
+import { htmlEscape } from "./core-ext/tse/util.js";
 
 const I18N_OPTION_NAMES = new Set(["locale", "default", "raise", "scope", "separator"]);
 const HTML_KEY_PATTERN = /(?:_|\b)html$/;

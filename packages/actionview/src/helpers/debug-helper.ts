@@ -1,7 +1,6 @@
-import { SafeBuffer } from "@blazetrails/activesupport";
+import { SafeBuffer, htmlEscape } from "@blazetrails/activesupport";
 import { stringify } from "@blazetrails/activesupport/yaml";
 import { contentTag } from "./tag-helper.js";
-import { htmlEscape } from "./output-safety-helper.js";
 
 /**
  * debug — returns a YAML representation of `object` wrapped with `<pre>`.
