@@ -1944,6 +1944,16 @@ function cValidWeeknumP(y: number, w: number, d: number, f: number, sg: number):
 }
 
 /**
+/**
+ * @internal `date_core.c` `rt__valid_jd_p` (`date_core.c:4119-4123`), which
+ * answers the Julian day back: every integer names a day, so there is nothing
+ * for the calendar-reform start to reject.
+ */
+function rtValidJdP(jd: number, _sg: number): number {
+  return jd;
+}
+
+/**
  * @internal `date_core.c` `rt__valid_ordinal_p` (`date_core.c:4126-4139`) over
  * `c_valid_ordinal_p` (`date_core.c:747-768`), which answers `nil` rather than
  * raising so its caller can fall through to the next kind of date.
@@ -1988,7 +1998,7 @@ function rtValidCivilP(y: number, m: number, d: number, sg: number): number | nu
  */
 function rtValidDateFragsP(parts: DateParts, sg: number): number | null {
   if (parts.jd !== undefined) {
-    const d = parts.jd;
+    const d = rtValidJdP(parts.jd, sg);
     if (d !== null) return d;
   }
 
