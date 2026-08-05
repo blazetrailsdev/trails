@@ -624,6 +624,13 @@ describe("prism-codegen", () => {
     expect(code).toContain("this.count **= 2");
   });
 
+  it("declines a compound operator with no image without declaring its target", async () => {
+    const { code, parseErrorCount } = await generateFromSource(`def f; y >>= 1; y; end`);
+    expect(parseErrorCount).toBe(0);
+    expect(code).toContain("__PRISM_TODO(");
+    expect(code).not.toContain("let y");
+  });
+
   it("translates the decided block protocol: yield, block_given?, &:sym, <<", async () => {
     const { code, parseErrorCount } = await generateFromSource(`
       def each_name(list)

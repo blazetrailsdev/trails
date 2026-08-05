@@ -47,12 +47,13 @@ export function registerMisc(r: Registry): void {
     ]);
   });
   r.on("LocalVariableOperatorWriteNode", (n, e) => {
-    if (!isBindableIdent(String(n.name))) return null;
+    if (!isBindableIdent(String(n.name)) || !hasCompoundImage(n)) return null;
     e.declared.add(String(n.name));
     clearAsyncProvenance(n, e.asyncBindings);
     return compoundWrite(f.createIdentifier(String(n.name)), n, e);
   });
   r.on("InstanceVariableOperatorWriteNode", (n, e) => {
+    if (!hasCompoundImage(n)) return null;
     clearAsyncProvenance(n, e.asyncBindings);
     return compoundWrite(thisProp(n.name), n, e);
   });
@@ -119,6 +120,15 @@ export function registerMisc(r: Registry): void {
       ),
     ];
   });
+}
+/**
+ * Whether {@link compoundWrite} has an image for this operator. Checked before
+ * the declare / clear-provenance side effects, which must not fire for a write
+ * that goes on to decline.
+ */
+function hasCompoundImage(n: PrismNode): boolean {
+  const rubyOp = String(n.binaryOperator);
+  return COMPOUND[rubyOp] != null || rubyOp === "<<" || COMPOUND_HELPER[rubyOp] != null;
 }
 /** `target OP= value` — compound token, `push` for `<<=`, else a helper. */
 function compoundWrite(target: ts.Expression, n: PrismNode, e: Emitter): ts.Expression | null {
