@@ -73,11 +73,7 @@ export async function leaseFixtureConnectionFor(
   const modelPool = modelFixturePool(model);
   if (modelPool === null) return fixtureConnection;
   const rawFixturePool = fixtureConnection.pool;
-  // No Rails counterpart, so this tolerates a pool-less adapter: callers may
-  // pass a hand-built stub through `fixtures({ connection })`, which never runs
-  // AbstractAdapter's constructor and so never gets Rails' NullPool.
-  const fixturePool =
-    rawFixturePool == null || rawFixturePool instanceof NullPool ? null : rawFixturePool;
+  const fixturePool = rawFixturePool instanceof NullPool ? null : rawFixturePool;
   if (fixturePool === null || fixturePool === modelPool) return fixtureConnection;
   return await modelPool.leaseConnection();
 }
