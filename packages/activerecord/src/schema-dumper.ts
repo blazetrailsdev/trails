@@ -348,7 +348,6 @@ export function statelessTest(pattern: RegExp, value: string): boolean {
  * Rails' base `ActiveRecord::SchemaDumper` class.
  */
 export abstract class SchemaDumper {
-  static readonly DEFAULT_DATETIME_PRECISION = 6;
   static ignoreTables: (string | RegExp)[] = [];
   /** @internal Mirrors Rails' `SchemaDumper.fk_ignore_pattern`. */
   static fkIgnorePattern: RegExp = /^fk_rails_[0-9a-f]{10}$/;
@@ -857,14 +856,12 @@ export abstract class SchemaDumper {
     return reordered;
   }
 
-  // The column-spec half of the dumper is defined by the adapter subclass
-  // `ConnectionAdapters::SchemaDumper` (connection_adapters/abstract/schema_dumper.rb:13-101),
-  // exactly as in Rails, where this base's `table` calls a private `column_spec`
-  // it never defines. These `declare`s emit no runtime member, so the calls
-  // dispatch dynamically on the instance and this module never imports the
-  // adapter module — which is what lets that module `extends` this one.
-
-  /** @internal */
+  /**
+   * The column-spec half of the dumper, defined only by the adapter subclass
+   * `ConnectionAdapters::SchemaDumper` (abstract/schema_dumper.rb:13-101) — as in
+   * Rails, where this base's `table` calls a private `column_spec` it never defines.
+   * @internal
+   */
   protected abstract validType(type: string | null | undefined): boolean;
 
   /** @internal */

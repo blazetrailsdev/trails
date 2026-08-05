@@ -6,21 +6,14 @@
  * `schema_limit`, `schema_default`, etc.
  *
  * The base `SchemaDumper#table` calls the unqualified (private) `column_spec`
- * that only this subclass defines; in TypeScript the base declares those members
- * without implementing them (`declare`, no runtime emit), so the calls resolve by
- * dynamic dispatch on the instance exactly as they do in Ruby and the base module
- * never has to import this one.
+ * that only this subclass defines. The base declares those members `abstract`
+ * and implements none of them, so they resolve by dynamic dispatch on the
+ * instance as they do in Ruby and the base module never imports this one — which
+ * is what lets this module `extends` it.
  */
 
 import { SchemaDumper as BaseSchemaDumper } from "../../schema-dumper.js";
 import type { ColumnInfo, IndexInfo, SchemaSource } from "../../schema-dumper.js";
-
-/**
- * Mirrors the abstract subclass's `DEFAULT_DATETIME_PRECISION = 6` (Rails
- * redeclares the constant on `ConnectionAdapters::SchemaDumper`). Kept local so
- * `schemaPrecision` doesn't reach back into the base class value at module eval.
- */
-export const DEFAULT_DATETIME_PRECISION = 6;
 
 /**
  * Column-shaped interface these helpers depend on.
@@ -46,7 +39,7 @@ export interface Column extends ColumnInfo {
  * (connection_adapters/abstract/schema_dumper.rb:5-12).
  */
 export class SchemaDumper extends BaseSchemaDumper {
-  static readonly DEFAULT_DATETIME_PRECISION = DEFAULT_DATETIME_PRECISION;
+  static readonly DEFAULT_DATETIME_PRECISION = 6;
 
   /** Mirrors `def self.create(connection, options)` (abstract/schema_dumper.rb:8-10). */
   static override create<T extends typeof BaseSchemaDumper>(
@@ -158,7 +151,7 @@ export class SchemaDumper extends BaseSchemaDumper {
       // TS-DSL literal `null` (Rails dumps the Ruby `nil`); the value is emitted
       // verbatim by formatColspec, so it must already read as valid TS.
       if (column.precision == null) return "null";
-      if (column.precision === DEFAULT_DATETIME_PRECISION) return undefined;
+      if (column.precision === SchemaDumper.DEFAULT_DATETIME_PRECISION) return undefined;
       return String(column.precision);
     }
     if (column.precision != null) return String(column.precision);

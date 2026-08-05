@@ -64,11 +64,8 @@ describe("MessageEncryptorTest", () => {
     expect(firstMessage).not.toEqual(secondMessage);
   });
 
-  // Recovering `text`/`iv` through `@verifier.verify(...)` needs Rails' wire
-  // format, where the encryptor signs through a NullSerializer MessageVerifier
-  // and the payload is base64-encoded a second time. trails emits
-  // `<b64text>--<b64iv>--<digest>`, so the verify hits a strict base64 decode.
-  // Story: converge-message-encryptor-sign-through-message-verifier.
+  // Needs Rails' wire format — story:
+  // converge-message-encryptor-sign-through-message-verifier.
   it.skip("messing with either encrypted values causes failure", () => {
     const [text, iv] = (verifier.verify(encryptor.encryptAndSign(data)) as string).split("--") as [
       string,
@@ -191,9 +188,8 @@ describe("MessageEncryptorTest", () => {
     assertAeadNotDecrypted(encryptor, [text, iv, authTag.slice(0, -1)].join("--"));
   });
 
-  // The historic payload is Marshal-serialized; trails' default serializer is
-  // `:json` and `SerializerWithFallback` has no Marshal reader.
-  // Story: message-encryptor-marshal-payload-backwards-compatibility.
+  // The historic payload is Marshal-serialized — story:
+  // message-encryptor-marshal-payload-backwards-compatibility.
   it.skip("backwards compatibility decrypt previously encrypted messages without metadata", () => {
     const secret = Buffer.from(
       "b7f0bc57b11860abf08110a424f434eca1dcc1dd44afa9b814cd189a99208029",
@@ -206,10 +202,8 @@ describe("MessageEncryptorTest", () => {
     expect(encryptor.decryptAndVerify(encryptedMessage)).toEqual("Ruby on Rails");
   });
 
-  // Ruby's `#inspect` has no JS analogue: a JS object has no
-  // implementation-defined string form that could leak `@secret`, and trails
-  // adds no `inspect` method for one to redact. Left unported pending the same
-  // open decision in `port-activesupport-message-verifier-tests`.
+  // No Ruby `#inspect` analogue — same open decision as
+  // port-activesupport-message-verifier-tests.
   it.skip("inspect does not show secrets");
 
   it("invalid base64 argument", () => {
