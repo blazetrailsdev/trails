@@ -6,8 +6,8 @@
 
 import { MessageSerializer, type MessageSerializerLike } from "./message-serializer.js";
 import { NullEncryptor } from "./null-encryptor.js";
-import { Configurable } from "./configurable.js";
 import { Cipher } from "./cipher.js";
+import { getSharedConfig } from "./config.js";
 import { Encryptor } from "./encryptor.js";
 import { KeyGenerator } from "./key-generator.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
@@ -64,12 +64,9 @@ export class Context {
 
   /**
    * @internal Rails `Context#build_default_key_provider` (context.rb:37-39).
-   * `Configurable` is imported for this body alone — the import closes a cycle
-   * (context → configurable → context) that holds only because neither module
-   * reads the other at eval time.
    */
   private buildDefaultKeyProvider(): unknown {
-    return new DerivedSecretKeyProvider(Configurable.config.primaryKey);
+    return new DerivedSecretKeyProvider(getSharedConfig().primaryKey);
   }
 }
 

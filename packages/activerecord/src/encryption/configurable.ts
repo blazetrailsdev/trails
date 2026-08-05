@@ -1,13 +1,6 @@
-import { Config } from "./config.js";
-// Rails reads `ActiveRecord::Encryption.context` / `.reset_default_context`
-// (configurable.rb:17, 33, 36) — the `Contexts` module those come from. This
-// module imports their implementations from `context.js` rather than `Contexts`
-// itself: `Contexts` imports `EncryptingOnlyEncryptor` for
-// `protecting_encrypted_data` (contexts.rb:57), and that class `extends
-// Encryptor`, which imports this module. Going through `Contexts` would put
-// that `extends` inside an ESM cycle, where a graph entered at `encryptor.ts`
-// evaluates the subclass while `Encryptor` is still in TDZ.
-import { getEncryptionContext, resetDefaultContext, Context } from "./context.js";
+import { Config, getSharedConfig } from "./config.js";
+import { Context } from "./context.js";
+import { Contexts } from "./contexts.js";
 import { Cipher } from "./cipher.js";
 import type { EncryptorLike } from "./encryptor.js";
 import type { MessageSerializerLike } from "./message-serializer.js";
@@ -15,7 +8,6 @@ import type { SchemeOptions } from "./scheme.js";
 
 type DeclarationListener = (klass: any, name: string) => void;
 
-let _sharedConfig: Config | null = null;
 // Mirrors Rails' `mattr_accessor :encrypted_attribute_declaration_listeners`
 // (no default → nil). Lazily allocated in onEncryptedAttributeDeclared.
 let _listeners: DeclarationListener[] | undefined;
@@ -28,10 +20,7 @@ let _listeners: DeclarationListener[] | undefined;
  */
 export class Configurable {
   static get config(): Config {
-    if (!_sharedConfig) {
-      _sharedConfig = new Config();
-    }
-    return _sharedConfig;
+    return getSharedConfig();
   }
 
   // Mirrors Rails' `mattr_accessor :encrypted_attribute_declaration_listeners`
@@ -58,27 +47,27 @@ export class Configurable {
    * {@link DelegatedProperty} below.
    */
   static get keyProvider(): unknown {
-    return getEncryptionContext().keyProvider;
+    return Contexts.context.keyProvider;
   }
 
   static get keyGenerator(): unknown {
-    return getEncryptionContext().keyGenerator;
+    return Contexts.context.keyGenerator;
   }
 
   static get cipher(): Cipher {
-    return getEncryptionContext().cipher as Cipher;
+    return Contexts.context.cipher as Cipher;
   }
 
   static get messageSerializer(): MessageSerializerLike | undefined {
-    return getEncryptionContext().messageSerializer;
+    return Contexts.context.messageSerializer;
   }
 
   static get encryptor(): EncryptorLike | undefined {
-    return getEncryptionContext().encryptor as EncryptorLike | undefined;
+    return Contexts.context.encryptor as EncryptorLike | undefined;
   }
 
   static get frozenEncryption(): boolean {
-    return getEncryptionContext().frozenEncryption;
+    return Contexts.context.frozenEncryption;
   }
 
   /**
@@ -130,7 +119,7 @@ export class Configurable {
       }
     }
 
-    resetDefaultContext();
+    Contexts.resetDefaultContext();
 
     for (const [key, value] of Object.entries(properties)) {
       if (key === "primaryKey" || key === "deterministicKey" || key === "keyDerivationSalt") {
@@ -138,7 +127,7 @@ export class Configurable {
       }
       if (value === undefined) continue;
       if (!(Context.PROPERTIES as readonly string[]).includes(key)) continue;
-      (getEncryptionContext() as unknown as Record<string, unknown>)[key] = value;
+      (Contexts.context as unknown as Record<string, unknown>)[key] = value;
     }
   }
 

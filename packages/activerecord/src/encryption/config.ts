@@ -168,3 +168,23 @@ export class Config {
     this.previousSchemes.push(new Scheme(properties));
   }
 }
+
+/**
+ * Backing store for Rails' `mattr_reader :config, default: Config.new`
+ * (encryption/configurable.rb:9), read through {@link Configurable.config}.
+ *
+ * @noRailsEquivalent Ruby resolves `ActiveRecord::Encryption.config` at call
+ * time, so `Encryptor` and `Context` can name it without any load-order
+ * consequence. ESM has no such deferral: an `import` of `configurable.js` from
+ * those two files puts `Contexts` — and therefore
+ * `EncryptingOnlyEncryptor extends Encryptor` — inside a cycle entered at
+ * `encryptor.ts`, where the subclass evaluates with `Encryptor` in its TDZ.
+ * Holding the singleton next to its class keeps the reader on `Configurable`
+ * where Rails declares it, and keeps the `extends` out of the cycle.
+ */
+let _sharedConfig: Config | undefined;
+
+/** @internal Backs `Configurable.config`; see {@link _sharedConfig}. */
+export function getSharedConfig(): Config {
+  return (_sharedConfig ??= new Config());
+}

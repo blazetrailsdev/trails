@@ -6,10 +6,9 @@
 
 import { Encryptor, type EncryptorLike } from "./encryptor.js";
 import { Configuration } from "./errors.js";
-import type { Compressor } from "./config.js";
+import { getSharedConfig, type Compressor } from "./config.js";
 import type { MessageSerializerLike } from "./message-serializer.js";
-import { Configurable } from "./configurable.js";
-import { withEncryptionContext, type Context } from "./context.js";
+import { withEncryptionContext, getEncryptionContext, type Context } from "./context.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
 import { DeterministicKeyProvider } from "./deterministic-key-provider.js";
 
@@ -81,7 +80,7 @@ export class Scheme {
   }
 
   isSupportUnencryptedData(): boolean {
-    return this._opts.supportUnencryptedData ?? Configurable.config.supportUnencryptedData;
+    return this._opts.supportUnencryptedData ?? getSharedConfig().supportUnencryptedData;
   }
 
   // fixed: true (default for deterministic) → serialize uses the oldest previous
@@ -142,13 +141,13 @@ export class Scheme {
 
   /** @internal */
   private defaultKeyProvider(): unknown {
-    return Configurable.keyProvider;
+    return getEncryptionContext().keyProvider;
   }
 
   /** @internal */
   private deterministicKeyProvider(): DeterministicKeyProvider | undefined {
     if (this.deterministic) {
-      const deterministicKey = Configurable.config.deterministicKey;
+      const deterministicKey = getSharedConfig().deterministicKey;
       this._cachedDeterministicKeyProvider ??= new DeterministicKeyProvider(deterministicKey);
       return this._cachedDeterministicKeyProvider;
     }

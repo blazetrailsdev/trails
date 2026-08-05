@@ -6,7 +6,7 @@
 
 import { Key } from "./key.js";
 import { headerString } from "./encoding-helpers.js";
-import { Configurable } from "./configurable.js";
+import { getSharedConfig } from "./config.js";
 import type { Message } from "./message.js";
 
 export class KeyProvider {
@@ -21,7 +21,7 @@ export class KeyProvider {
   encryptionKey(): Key {
     if (!this._encryptionKey) {
       const key = this._keys[this._keys.length - 1];
-      if (Configurable.config.storeKeyReferences) {
+      if (getSharedConfig().storeKeyReferences) {
         key.publicTags.encryptedDataKeyId = key.id;
       }
       this._encryptionKey = key;
