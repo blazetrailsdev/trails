@@ -29,7 +29,10 @@ export function schemaConn(name: SchemaConnName): TableDefinitionConn {
           ? new PostgreSQLAdapter("postgresql://localhost/trails_schema_conn")
           : new Mysql2Adapter("mysql://localhost/trails_schema_conn");
     if (name === "mysql") {
-      (conn as unknown as { _databaseVersion: Version })._databaseVersion = new Version("8.0.35");
+      (conn as unknown as { _databaseVersion: Version })._databaseVersion = new Version(
+        "8.0.35",
+        "8.0.35",
+      );
     }
     conns.set(name, conn);
   }

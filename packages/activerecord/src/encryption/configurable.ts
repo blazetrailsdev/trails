@@ -1,4 +1,5 @@
-import { Config, getSharedConfig } from "./config.js";
+import { Config } from "./config.js";
+import { _setConfigurable } from "./configurable-slot.js";
 import { Context } from "./context.js";
 import { Contexts } from "./contexts.js";
 import { Cipher } from "./cipher.js";
@@ -12,6 +13,8 @@ type DeclarationListener = (klass: any, name: string) => void;
 // (no default → nil). Lazily allocated in onEncryptedAttributeDeclared.
 let _listeners: DeclarationListener[] | undefined;
 
+let _config: Config | undefined;
+
 /**
  * Configuration API for ActiveRecord::Encryption. Manages the shared
  * Config instance and encrypted attribute declaration callbacks.
@@ -19,8 +22,13 @@ let _listeners: DeclarationListener[] | undefined;
  * Mirrors: ActiveRecord::Encryption::Configurable
  */
 export class Configurable {
+  /**
+   * Mirrors Rails' `mattr_reader :config, default: Config.new`
+   * (configurable.rb:9). Built on first read rather than at module eval so the
+   * singleton does not depend on where in the import graph this module lands.
+   */
   static get config(): Config {
-    return getSharedConfig();
+    return (_config ??= new Config());
   }
 
   // Mirrors Rails' `mattr_accessor :encrypted_attribute_declaration_listeners`
@@ -151,6 +159,8 @@ export class Configurable {
     }
   }
 }
+
+_setConfigurable(Configurable);
 
 /** @internal One `Context::PROPERTIES` name (context.rb:13). */
 type DelegatedProperty = (typeof Context.PROPERTIES)[number];

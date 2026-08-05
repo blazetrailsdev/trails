@@ -5,12 +5,11 @@
  */
 
 import { Message } from "./message.js";
-import type { Cipher } from "./cipher.js";
 import type { Properties } from "./properties.js";
 import type { MessageSerializerLike } from "./message-serializer.js";
-import { getEncryptionContext } from "./context.js";
 import { Base, Configuration, Decryption, Encoding, ForbiddenClass } from "./errors.js";
-import { getSharedConfig, type Compressor } from "./config.js";
+import { type Compressor } from "./config.js";
+import { Configurable } from "./configurable-slot.js";
 import { normalizeEncoding, replaceUnencodable } from "./encoding-helpers.js";
 
 // Mirrors: ActiveRecord::Encryption::Encryptor::THRESHOLD_TO_JUSTIFY_COMPRESSION
@@ -120,7 +119,7 @@ export class Encryptor {
 
   constructor(options?: { compress?: boolean; compressor?: Compressor }) {
     this._compress = options?.compress ?? true;
-    this._compressor = options?.compressor ?? getSharedConfig().compressor;
+    this._compressor = options?.compressor ?? Configurable.config.compressor;
   }
 
   encrypt(
@@ -214,7 +213,7 @@ export class Encryptor {
 
   /** @internal */
   private cipher() {
-    return getEncryptionContext().cipher as Cipher;
+    return Configurable.cipher;
   }
 
   get compressor(): Compressor {
@@ -227,7 +226,7 @@ export class Encryptor {
 
   /** @internal */
   private defaultKeyProvider(): KeyProviderLike | undefined {
-    return getEncryptionContext().keyProvider as KeyProviderLike | undefined;
+    return Configurable.keyProvider as KeyProviderLike | undefined;
   }
 
   /** @internal */
@@ -259,7 +258,7 @@ export class Encryptor {
 
   /** @internal */
   private serializer(): MessageSerializerLike {
-    return getEncryptionContext().messageSerializer as MessageSerializerLike;
+    return Configurable.messageSerializer as MessageSerializerLike;
   }
 
   /** @internal */
@@ -326,6 +325,6 @@ export class Encryptor {
 
   /** @internal */
   private forcedEncodingForDeterministicEncryption(): string {
-    return getSharedConfig().forcedEncodingForDeterministicEncryption;
+    return Configurable.config.forcedEncodingForDeterministicEncryption;
   }
 }

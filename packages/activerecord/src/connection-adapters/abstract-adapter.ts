@@ -158,7 +158,17 @@ export class Version {
   /** Rails' `@version` (abstract_adapter.rb:249). */
   private _version: number[];
 
-  /** Rails: `attr_reader :full_version_string` (abstract_adapter.rb:246). */
+  /**
+   * Rails: `attr_reader :full_version_string` (abstract_adapter.rb:246).
+   *
+   * Nullable because Rails' own `initialize` defaults it to `nil`
+   * (abstract_adapter.rb:248) and an adapter really does build one that way:
+   * `SQLite3Adapter#get_database_version` passes only the version string
+   * (sqlite3_adapter.rb:477). The MySQL side is the one that must always carry
+   * it, and does — `get_database_version` passes both
+   * (abstract_mysql_adapter.rb:86-90) — which is why `Mysql2Adapter#full_version`
+   * needs no arm for the nil (mysql2_adapter.rb:164-166).
+   */
   readonly fullVersionString: string | null;
 
   constructor(versionString: string, fullVersionString: string | null = null) {

@@ -196,12 +196,17 @@ export const SOURCES: readonly UpstreamSource[] = [
         name: "date",
         libPath: "lib",
         testPath: "test/date",
-        // Vendored-only for now: the gem's surface is implemented in C, so
-        // the Ruby extractor sees almost nothing until RFC
-        // 0088-date-gem-port's `date-package-scaffold`,
-        // `date-api-compare-enrollment` and `date-test-compare-enrollment`
-        // stories land `packages/date` and flip these on. Same
-        // shipped-interim pattern RFC 0074 used for i18n.
+        // Vendored-only: the gem's surface is implemented in C, so the Ruby
+        // extractor sees almost nothing. Measured by RFC 0088-date-gem-port's
+        // `date-c-source-extractor-decision` spike, running
+        // `scripts/api-compare/extract-ruby-api.rb` against this `libPath`:
+        // `date: 2 classes, 0 modules, 12 public methods (1 internal)` — all of
+        // `lib/date.rb`'s `Date#infinite?` and the `:nodoc:` `Date::Infinity`,
+        // against 2,805 lines of port. So `compareApi` stays off; the C sources
+        // are a read-anchor, and they need no `UNPORTED_FILES` entry because
+        // the extractor globs `**/*.rb` and never sees them. `compareTests`
+        // flips in `date-test-compare-enrollment` — `test/date/` is 12 files
+        // and 145 `def test_` methods, and it is the gate for this cluster.
         compareApi: false,
         compareTests: false,
       },
