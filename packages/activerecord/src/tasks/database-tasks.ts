@@ -361,7 +361,7 @@ export class DatabaseTasks {
     })(
       paths == null ? [] : Array.isArray(paths) ? paths : [paths],
       new SchemaMigration(adapter),
-      new InternalMetadata(adapter, { enabled: dbConfig.useMetadataTable }),
+      new InternalMetadata(adapter),
     );
   }
 
@@ -372,7 +372,6 @@ export class DatabaseTasks {
     const { Migrator } = await import("../migration.js");
     return new Migrator(adapter, this._migrationsFor(dbConfig), {
       environment: dbConfig.envName,
-      internalMetadataEnabled: dbConfig.useMetadataTable,
     });
   }
 
@@ -1594,14 +1593,26 @@ export async function checkCurrentProtectedEnvironmentBang(
 ): Promise<void> {
   const { NoDatabaseError } = await import("../errors.js");
   const { EnvironmentMismatchError } = await import("../migration.js");
+  // Rails reads the context straight off the pool (`database_tasks.rb:635-636`
+  // — `with_temporary_pool { |pool| pool.migration_context }`) and puts the
+  // `NoDatabaseError` rescue inside the block (`:648-649`). Neither shape is
+  // reachable yet: `ConnectionPool#migrationContext` builds its collaborators
+  // over the pool's adapter proxy, whose `get` trap routes every member through
+  // `withConnection`, so the synchronous `toSql` a SchemaMigration /
+  // InternalMetadata query needs comes back as a Promise and the query is handed
+  // a Promise instead of SQL; and `withTemporaryConnection` leases eagerly, so
+  // `NoDatabaseError` can surface from the lease rather than from inside the
+  // block. Both are the adapter-vs-pool gap, tracked separately.
   try {
     await DatabaseTasks.withTemporaryConnection(dbConfig, async (adapter) => {
-      const context = await DatabaseTasks._migrationContextFor(adapter, dbConfig);
-      const current = context.currentEnvironment;
-      const stored = await context.lastStoredEnvironment();
-      if (stored && (await context.protectedEnvironment())) {
-        throw new ProtectedEnvironmentError(stored);
+      const migrationContext = await DatabaseTasks._migrationContextFor(adapter, dbConfig);
+      const current = migrationContext.currentEnvironment;
+      const stored = await migrationContext.lastStoredEnvironment();
+
+      if (await migrationContext.protectedEnvironment()) {
+        throw new ProtectedEnvironmentError(stored!);
       }
+
       if (stored && stored !== current) {
         throw new EnvironmentMismatchError(current, stored);
       }

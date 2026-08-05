@@ -1353,6 +1353,15 @@ export class CreatePosts extends Migration {
     }
   });
 
+  /**
+   * Give a bare adapter a pool whose db_config opts out of metadata storage.
+   * `InternalMetadata#enabled?` is `@pool.db_config.use_metadata_table?`
+   * (internal_metadata.rb:35-36), so this is how Rails turns it off.
+   */
+  function disableMetadataTable(adapter: unknown): void {
+    (adapter as { pool: unknown }).pool = { dbConfig: { useMetadataTable: false } };
+  }
+
   it("InternalMetadata with enabled=false refuses set writes with EnvironmentStorageError", async () => {
     const { EnvironmentStorageError, InternalMetadata } = await import("@blazetrails/activerecord");
     const { BetterSQLite3Adapter } =
@@ -1361,7 +1370,8 @@ export class CreatePosts extends Migration {
     const dbFile = path.join(tmpDir, "disabled.sqlite3");
     const adapter = new BetterSQLite3Adapter(dbFile);
     try {
-      const disabledMeta = new InternalMetadata(adapter, { enabled: false });
+      disableMetadataTable(adapter);
+      const disabledMeta = new InternalMetadata(adapter);
       expect(disabledMeta.enabled).toBe(false);
 
       // createTable + createTableAndSetFlags silently no-op (Rails'
@@ -1406,9 +1416,8 @@ export class CreatePosts extends Migration {
             })("CreateWidgets", "20260101000000"),
         },
       ];
-      const migrator = new Migrator(adapter, migrations, {
-        internalMetadataEnabled: false,
-      });
+      disableMetadataTable(adapter);
+      const migrator = new Migrator(adapter, migrations);
 
       // Migrate should succeed and NOT throw EnvironmentStorageError
       // despite the stamping call site being hit.
@@ -1426,7 +1435,7 @@ export class CreatePosts extends Migration {
       const context = new MigrationContext(
         [],
         new SchemaMigration(adapter),
-        new InternalMetadata(adapter, { enabled: false }),
+        new InternalMetadata(adapter),
       );
       expect(await context.lastStoredEnvironment()).toBeNull();
     } finally {
@@ -1444,15 +1453,16 @@ export class CreatePosts extends Migration {
     try {
       // Seed a real metadata table + environment value with a separate
       // enabled=true instance.
-      const enabledMeta = new InternalMetadata(adapter, { enabled: true });
+      const enabledMeta = new InternalMetadata(adapter);
       await enabledMeta.createTable();
       await enabledMeta.set("environment", "production");
+      disableMetadataTable(adapter);
 
       // Disabled context should still report null (no stale read).
       const context = new MigrationContext(
         [],
         new SchemaMigration(adapter),
-        new InternalMetadata(adapter, { enabled: false }),
+        new InternalMetadata(adapter),
       );
       expect(await context.lastStoredEnvironment()).toBeNull();
       expect(await context.protectedEnvironment()).toBe(false);

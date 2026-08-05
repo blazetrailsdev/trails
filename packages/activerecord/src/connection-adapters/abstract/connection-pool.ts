@@ -449,6 +449,12 @@ export class ConnectionPool implements ReapablePool {
       const pool = this;
       this._adapterProxy = new Proxy({} as DatabaseAdapter, {
         get(_target, prop) {
+          // `pool` is a data property on every real adapter, not a method, so
+          // answer the pool itself rather than a `withConnection` dispatcher.
+          // Rails' pool-owned collaborators read the config off it —
+          // `InternalMetadata#enabled?` is `@pool.db_config.use_metadata_table?`
+          // (internal_metadata.rb:35-36).
+          if (prop === "pool") return pool;
           if (prop === "adapterName")
             return (
               (pool.activeConnection ?? pool.connections[0])?.adapterName ??

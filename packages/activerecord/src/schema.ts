@@ -6,19 +6,6 @@ import { InternalMetadata } from "./internal-metadata.js";
 import { DatabaseConfigurations } from "./database-configurations.js";
 
 /**
- * Look up an optional pool property without exposing the concrete
- * ConnectionPool type (pool is accessed via `(adapter as any).pool`
- * throughout the schema/migration stack; mirror that here).
- */
-function adapterPool(adapter: DatabaseAdapter):
-  | {
-      dbConfig?: { useMetadataTable?: boolean };
-    }
-  | undefined {
-  return (adapter as unknown as { pool?: { dbConfig?: { useMetadataTable?: boolean } } }).pool;
-}
-
-/**
  * Info hash accepted by `Schema.define`. Mirrors the Ruby
  * positional-hash arg used by Rails' `Schema.define(info = {}, &block)`.
  */
@@ -97,14 +84,6 @@ export class Schema extends Current {
       // migrations between.
       await schema.connection.assumeMigratedUptoVersion(info.version);
     }
-    // Honour the use_metadata_table / useMetadataTable opt-out so
-    // schema loading doesn't create / stamp ar_internal_metadata when
-    // the db_config has it disabled. Rails routes this through
-    // `connection_pool.internal_metadata` which respects
-    // db_config.use_metadata_table; we read it off pool.dbConfig here
-    // (the rest of the migration stack uses the same shape — see
-    // migration.ts:1440).
-    const enabled = adapterPool(adapter)?.dbConfig?.useMetadataTable !== false;
     // Environment fallback chain: explicit info.environment → TRAILS_ENV
     // → NODE_ENV (one-release fallback) → DatabaseConfigurations.defaultEnv
     // (defaults to "development" but can be overridden by the app, e.g. via
@@ -116,7 +95,7 @@ export class Schema extends Current {
       getEnv("TRAILS_ENV") ??
       getEnv("NODE_ENV") ??
       DatabaseConfigurations.defaultEnv;
-    const internalMetadata = new InternalMetadata(adapter, { enabled });
+    const internalMetadata = new InternalMetadata(adapter);
     await internalMetadata.createTableAndSetFlags(environment);
   }
 

@@ -1808,7 +1808,6 @@ export class MigrationContext {
     return new Migrator(this.connection, migrations, {
       direction,
       targetVersion,
-      internalMetadataEnabled: this._internalMetadata?.enabled,
     });
   }
 
@@ -1851,7 +1850,6 @@ export class MigrationContext {
     return new Migrator(this.connection, this.migrations, {
       direction: "up",
       targetVersion: null,
-      internalMetadataEnabled: this._internalMetadata?.enabled,
     });
   }
 
@@ -2062,12 +2060,6 @@ export class MigrationContext {
  */
 type MigratorOptions = {
   environment?: string;
-  /**
-   * Set to false when the db_config opts out of metadata storage
-   * (Rails' `use_metadata_table: false`). environment stamping is a
-   * no-op / raises in `environment:set` when this is false.
-   */
-  internalMetadataEnabled?: boolean;
   direction?: "up" | "down";
   targetVersion?: number | string | null;
 };
@@ -2098,9 +2090,7 @@ export class Migrator {
     this._targetVersion = options.targetVersion ?? null;
     this._adapter = adapter;
     this._schemaMigration = new SchemaMigration(adapter);
-    this._internalMetadata = new InternalMetadata(adapter, {
-      enabled: options.internalMetadataEnabled ?? true,
-    });
+    this._internalMetadata = new InternalMetadata(adapter);
     this._environment =
       options.environment ??
       getEnv("TRAILS_ENV") ??
@@ -2781,9 +2771,6 @@ export class Migrator {
       await this._ddlTransaction(loaded, async () => {
         await loaded.migrate(direction);
         await this.recordVersionStateAfterMigrating(proxy.version, direction);
-        if (direction === "up" && this._internalMetadata.enabled) {
-          await this._internalMetadata.set("environment", this._recordedEnvironment());
-        }
       });
     } catch (e) {
       // Mirrors: ActiveRecord::Migrator#execute_migration_in_transaction rescue block

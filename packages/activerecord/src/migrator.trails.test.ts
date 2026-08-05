@@ -74,6 +74,27 @@ describe("Migrator trails extensions", () => {
     expect(env).toBe(envName(adapter));
   });
 
+  it("stamps the environment once per run, not once per migration", async () => {
+    // Rails stamps it in `record_environment` before the migration loop
+    // (migration.rb:1508-1512); `execute_migration_in_transaction`
+    // (:1528-1537) writes no metadata at all.
+    const migrator = new Migrator(
+      adapter,
+      [makeMigration("1", "M1"), makeMigration("2", "M2"), makeMigration("3", "M3")],
+      { environment: "test" },
+    );
+    const set = vi.spyOn(InternalMetadata.prototype, "set");
+    let environmentWrites: number;
+    try {
+      await migrator.up();
+    } finally {
+      environmentWrites = set.mock.calls.filter(([key]) => key === "environment").length;
+      set.mockRestore();
+    }
+    expect(environmentWrites).toBe(1);
+    expect(await new InternalMetadata(adapter).get("environment")).toBe(envName(adapter));
+  });
+
   it("executeMigrationInTransaction skips migrations already in migrated", async () => {
     const calls: Array<[string, number]> = [];
     const proxy = makeMigration(
