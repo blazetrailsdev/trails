@@ -196,7 +196,7 @@ jobs:
           # eslint/no-raw-control-bytes.drift.test.mjs is a drift guard between
           # its byte set and the ESLint rule's, and scripts/ci/ is carved out
           # of the infra sweep (INFRA_CARVEOUT_RE).
-          UNIT_TESTS_PKGS_RE='^(packages/(arel|activemodel|activesupport|i18n)/|eslint/|scripts/(tasks|guides-typecheck|parity|api-compare|test-compare|fixtures-compare|test-deps|rails-find|sync-stats|prism-codegen)/|scripts/ci/check-control-bytes\.sh$|scripts/(strip-asany|rails-file-structure-mixins|ci-suite-coverage|deprecated-manifest-diff|mixin-declaration-drift|mysql-grant-namespaces|stale-story-references)(\.test)?\.ts$|scripts/db-init/mysql/01-rails-user\.sql$|packages/activerecord-cli/src/__e2e__/|eslint\.config\.mjs$|vendor/(sources\.ts|sources\.lock\.json|sources\.test\.ts|fetch\.ts)$)'
+          UNIT_TESTS_PKGS_RE='^(packages/(arel|activemodel|activesupport|i18n)/|eslint/|scripts/(tasks|guides-typecheck|parity|api-compare|test-compare|fixtures-compare|test-deps|rails-find|sync-stats|prism-codegen)/|scripts/ci/check-control-bytes\.sh$|scripts/(strip-asany|rails-file-structure-mixins|ci-suite-coverage|deprecated-manifest-diff|mixin-declaration-drift|mysql-grant-namespaces|stale-story-references|non-transactional-row-writes)(\.test)?\.ts$|scripts/db-init/mysql/01-rails-user\.sql$|packages/activerecord-cli/src/__e2e__/|eslint\.config\.mjs$|vendor/(sources\.ts|sources\.lock\.json|sources\.test\.ts|fetch\.ts)$)'
           # guides_affected gates the Guides Code Type Check job, which
           # compiles fenced TS blocks in packages/website/docs/guides/**.
           # Today guides only import @blazetrails/activerecord,
@@ -731,6 +731,7 @@ jobs:
           scripts/mixin-declaration-drift.test.ts
           scripts/mysql-grant-namespaces.test.ts
           scripts/stale-story-references.test.ts
+          scripts/non-transactional-row-writes.test.ts
           vendor/sources.test.ts
 
   # Consolidated leaf-test job. The cheapest sub-minute leaf suites — rack

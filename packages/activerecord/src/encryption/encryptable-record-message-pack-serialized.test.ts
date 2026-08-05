@@ -10,7 +10,7 @@ import {
 } from "./test-helpers.js";
 import { type TestDatabaseAdapter } from "../test-adapter.js";
 import { withTransactionalFixtures } from "../test-fixtures/with-transactional-fixtures.js";
-import { Encoding as EncodingError } from "./errors.js";
+import { Encoding } from "./errors.js";
 
 describe("ActiveRecord::Encryption::EncryptableRecordMessagePackSerializedTest", () => {
   let adapter: TestDatabaseAdapter;
@@ -51,6 +51,6 @@ describe("ActiveRecord::Encryption::EncryptableRecordMessagePackSerializedTest",
 
   it("text columns cannot be serialized with message pack", async () => {
     const MsgPackTextBook = makeMsgPackTextBook(adapter);
-    await expect(MsgPackTextBook.create({ name: "Dune" })).rejects.toThrow(EncodingError);
+    await expect(MsgPackTextBook.create({ name: "Dune" })).rejects.toThrow(Encoding);
   });
 });

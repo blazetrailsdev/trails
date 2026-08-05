@@ -6,6 +6,8 @@
 
 import type { MessageSerializerLike } from "./message-serializer.js";
 import { NullEncryptor } from "./null-encryptor.js";
+import { Configurable } from "./configurable.js";
+import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
 
 // EncryptingOnlyEncryptor extends the full Encryptor, which transitively imports
 // Configurable. Importing it eagerly here would create an eval-time cycle
@@ -27,6 +29,20 @@ export function setEncryptingOnlyEncryptorFactory(factory: () => unknown): void 
  * Mirrors: ActiveRecord::Encryption::Context
  */
 export class Context {
+  /**
+   * Rails `Context::PROPERTIES` (context.rb:13), the names `attr_accessor`
+   * defines on a Context. `Configurable.configure` tests against it for the
+   * `respond_to?("#{name}=")` guard Rails uses (configurable.rb:35-37).
+   */
+  static readonly PROPERTIES = [
+    "keyProvider",
+    "keyGenerator",
+    "cipher",
+    "messageSerializer",
+    "encryptor",
+    "frozenEncryption",
+  ];
+
   private _keyProvider?: unknown;
   keyGenerator?: unknown;
   cipher?: unknown;
@@ -51,12 +67,14 @@ export class Context {
     this.frozenEncryption = false;
   }
 
-  /** @internal */
+  /**
+   * @internal Rails `Context#build_default_key_provider` (context.rb:37-39).
+   * `Configurable` is imported for this body alone — the import closes a cycle
+   * (context → configurable → contexts → context) that holds only because
+   * nothing in this module reads it at eval time.
+   */
   private buildDefaultKeyProvider(): unknown {
-    // Avoid importing Configurable here to prevent a circular dependency:
-    // context → configurable → contexts → context. Callers that need the
-    // default key provider resolve it via Configurable.keyProvider directly.
-    return undefined;
+    return new DerivedSecretKeyProvider(Configurable.config.primaryKey);
   }
 }
 
@@ -69,7 +87,13 @@ export interface EncryptionContext {
 }
 
 const contextStack: EncryptionContext[] = [];
-let _defaultContext: EncryptionContext = {};
+/**
+ * Rails' `mattr_accessor :default_context, default: Context.new`
+ * (contexts.rb:18). A real Context, not a bare object, because Context is where
+ * the default key provider is memoized (context.rb:25-27) — that memo is Rails'
+ * only key-provider cache, and `reset_default_context` is its only invalidation.
+ */
+let _defaultContext: EncryptionContext = new Context() as unknown as EncryptionContext;
 
 export function getDefaultContext(): EncryptionContext {
   return _defaultContext;
@@ -81,7 +105,7 @@ export function setDefaultContext(context: EncryptionContext): void {
 }
 
 export function resetDefaultContext(): void {
-  _defaultContext = {};
+  _defaultContext = new Context() as unknown as EncryptionContext;
 }
 
 function currentContext(): EncryptionContext {
@@ -94,7 +118,14 @@ export function withEncryptionContext<T>(overrides: EncryptionContext, fn: () =>
   // context. So nested contexts reset every unspecified property to the default
   // (e.g. without_encryption nested inside protecting_encrypted_data resets
   // frozen_encryption to false), rather than inheriting it from the outer frame.
-  contextStack.push({ ...getDefaultContext(), ...overrides });
+  const frame = Object.assign(
+    Object.create(Object.getPrototypeOf(getDefaultContext())),
+    getDefaultContext(),
+  ) as EncryptionContext;
+  for (const [key, value] of Object.entries(overrides)) {
+    frame[key] = value;
+  }
+  contextStack.push(frame);
   let result: T;
   try {
     result = fn();

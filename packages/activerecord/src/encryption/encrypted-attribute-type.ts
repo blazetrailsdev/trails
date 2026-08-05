@@ -3,9 +3,9 @@ import { Serialized } from "../type/serialized.js";
 import { Scheme } from "./scheme.js";
 import type { EncryptorLike } from "./encryptor.js";
 import type { WrappedType } from "./wrapped-type.js";
-import { getEncryptionContext } from "./context.js";
+import { getDefaultContext, getEncryptionContext } from "./context.js";
 import { Configurable } from "./configurable.js";
-import { Encoding as EncodingError, Decryption, Base } from "./errors.js";
+import { Encoding, Decryption, Base } from "./errors.js";
 import { isRubyTruthy } from "../ruby-truthy.js";
 import { NullEncryptor } from "./null-encryptor.js";
 import {
@@ -24,9 +24,22 @@ export function setGlobalPreviousSchemesFn(fn: (scheme: Scheme) => Scheme[]): vo
   _globalPreviousVersion++;
 }
 
-Configurable.onConfigure(() => {
-  _globalPreviousVersion++;
-});
+let _lastDefaultContext: unknown = getDefaultContext();
+
+/**
+ * @internal Rails recomputes `previous_types` on every call; the memos below
+ * stand in for that, so their generation must turn over whenever config does.
+ * `configure` ends in `reset_default_context` (configurable.rb:30), so the
+ * default context's identity is the config generation.
+ */
+function globalPreviousGeneration(): number {
+  const defaultContext = getDefaultContext();
+  if (defaultContext !== _lastDefaultContext) {
+    _lastDefaultContext = defaultContext;
+    _globalPreviousVersion++;
+  }
+  return _globalPreviousVersion;
+}
 
 /**
  * An ActiveModel type that encrypts/decrypts attribute values. This is
@@ -167,10 +180,7 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
   }
 
   get previousTypes(): EncryptedAttributeType[] {
-    // Key on both supportUnencryptedData and the global-previous version counter
-    // so the list is recomputed whenever config changes (e.g. configure() called
-    // after encrypts() is declared — the lazy-resolution contract).
-    const key = `${this.supportUnencryptedData}:${_globalPreviousVersion}`;
+    const key = `${this.supportUnencryptedData}:${globalPreviousGeneration()}`;
     if (!this._previousTypesMemo || this._previousTypesMemoKey !== key) {
       this._previousTypesMemo = this.buildPreviousTypesFor(
         this.previousSchemesIncludingCleanText(),
@@ -193,10 +203,11 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
     // Previous types are already derived from global+local schemes at the
     // top-level — don't re-expand globals or we get infinite recursion.
     if (this._previousType) return this.scheme.previousSchemes ?? [];
-    if (this._effectivePrevVersion !== _globalPreviousVersion) {
+    const generation = globalPreviousGeneration();
+    if (this._effectivePrevVersion !== generation) {
       const global = _globalPreviousSchemesFn ? _globalPreviousSchemesFn(this.scheme) : [];
       this._effectivePrevMemo = [...global, ...(this.scheme.previousSchemes ?? [])];
-      this._effectivePrevVersion = _globalPreviousVersion;
+      this._effectivePrevVersion = generation;
     }
     return this._effectivePrevMemo!;
   }
@@ -292,10 +303,11 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
 
   /** @internal */
   private isSerializeWithOldest(): boolean {
-    if (this._serializeWithOldestVersion !== _globalPreviousVersion) {
+    const generation = globalPreviousGeneration();
+    if (this._serializeWithOldestVersion !== generation) {
       this._serializeWithOldestMemo =
         this.scheme.isFixed() && this._effectivePreviousSchemes().length > 0;
-      this._serializeWithOldestVersion = _globalPreviousVersion;
+      this._serializeWithOldestVersion = generation;
     }
     return this._serializeWithOldestMemo!;
   }
@@ -334,7 +346,7 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
   private encryptAsText(value: string): string {
     return this.scheme.withContext(() => {
       if (this.encryptor.isBinary() && !this.castType.isBinary()) {
-        throw new EncodingError("Binary encoded data can only be stored in binary columns");
+        throw new Encoding("Binary encoded data can only be stored in binary columns");
       }
       return this.encryptor.encrypt(value, this.encryptionOptions());
     });
