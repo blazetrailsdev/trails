@@ -2181,6 +2181,14 @@ export async function canonicalForeignKeyDependents(): Promise<Map<string, strin
  * {@link assertSerialPkIsPlainInteger} fails loudly the moment one does, rather
  * than letting the replay report a shape the real DDL never had.
  *
+ * The wrapper form carries what `TEST_SCHEMA` spells alongside its columns: the
+ * index list, the inline foreign keys and the table-level primary key.
+ * `serialPk` transcribes as the one-column `primaryKey` array `TEST_SCHEMA`
+ * spells the same declaration with (`auto_id_tests`, test-schema.ts:134-144);
+ * the serial rendering is the loader's business. A composite `column:` /
+ * `primary_key:` collapses to its comma-joined spelling, `ForeignKeySpec` being
+ * single-column as every canonical `t.foreignKey` is today.
+ *
  * @internal Read by `scripts/schema-compare/compare.ts`. Lives here, next to the
  * registry it replays, for the same reason as
  * {@link canonicalForeignKeyDependents}: `TableBuilder` stays file-local.
@@ -2195,9 +2203,6 @@ export async function canonicalRegistrySchema(): Promise<Schema> {
         columns[name] = specFromColumnCall(type, options);
       },
       foreignKey: (toTable: string, opts: Partial<AddForeignKeyOptions> = {}) => {
-        // `ForeignKeySpec` is single-column (as is every canonical
-        // `t.foreignKey` today), so a composite collapses to its comma-joined
-        // spelling rather than being dropped.
         const join = (v: string | string[] | undefined): string | undefined =>
           Array.isArray(v) ? v.join(",") : v;
         const fk: ForeignKeySpec = { toTable, column: join(opts.column) ?? `${toTable}_id` };
@@ -2217,11 +2222,6 @@ export async function canonicalRegistrySchema(): Promise<Schema> {
       // still raises when `primaryKey:` names a column the block never declared.
       for (const column of def.meta.primaryKey) declaredSpec(def.name, column, columns[column]);
     }
-    // The wrapper form carries what `TEST_SCHEMA` spells alongside its columns:
-    // the index list, the inline foreign keys, and the table-level primary key.
-    // `serialPk` transcribes as the one-column `primaryKey` array TEST_SCHEMA
-    // spells it with (`auto_id_tests`, test-schema.ts:134-144) — the two are the
-    // same declaration, and the serial rendering is the loader's business.
     const indexes: IndexSpec[] = builder.indexes.map(({ columns: c, opts }) => ({
       columns: c,
       ...opts,

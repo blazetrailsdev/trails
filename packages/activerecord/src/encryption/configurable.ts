@@ -38,10 +38,12 @@ export class Configurable {
     _listeners = value;
   }
 
-  // Rails' `Context::PROPERTIES.each { |name| delegate name, to: :context }`
-  // (configurable.rb:16-19). The readers themselves are installed off that
-  // constant at the bottom of this file, so the set cannot drift from it;
-  // these declarations only give each one a type.
+  /**
+   * Rails' `Context::PROPERTIES.each { |name| delegate name, to: :context }`
+   * (configurable.rb:16-19). The readers are installed off that constant at the
+   * bottom of this file, so the set cannot drift from it; these declarations
+   * only give each one a type.
+   */
   declare static readonly keyProvider: unknown;
   declare static readonly keyGenerator: unknown;
   declare static readonly cipher: Cipher;
@@ -131,10 +133,6 @@ export class Configurable {
   }
 }
 
-// The delegation Rails writes as `Context::PROPERTIES.each { delegate … }`
-// (configurable.rb:16-19). Driven off the constant rather than hand-written
-// per name; `contextProperties()` rather than `Context.PROPERTIES` because
-// this runs at module-eval time inside the context↔configurable cycle.
 for (const name of contextProperties()) {
   Object.defineProperty(Configurable, name, {
     configurable: true,

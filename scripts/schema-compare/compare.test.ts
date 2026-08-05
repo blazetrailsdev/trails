@@ -811,8 +811,6 @@ describe("against the canonical registry", () => {
     expect(fkTest.foreignKeys?.map(describeForeignKey)).toEqual([
       "fk_id→fk_test_has_pk primaryKey=pk_id name=fk_name",
     ]);
-    // `serialPk: "auto_id"` transcribes as the one-column primaryKey array
-    // TEST_SCHEMA spells the same declaration with.
     expect(autoId.primaryKey).toEqual(["auto_id"]);
   });
 
