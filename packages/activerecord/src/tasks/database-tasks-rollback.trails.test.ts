@@ -85,9 +85,6 @@ describe("DatabaseTasksRollbackTest", () => {
     await Base.establishConnection({ adapter: "sqlite3", database: ":memory:", pool: 1 });
     const schemaMigration = new SchemaMigration(await Base.connectionPool().leaseConnection());
     await schemaMigration.createTable();
-    // Applied out of order: 2 was never run, so the last two *applied*
-    // versions are 3 and 1, while `move` indexes into the sorted list and
-    // lands on version 1 as the target — leaving 1 applied.
     await schemaMigration.createVersion("1");
     await schemaMigration.createVersion("3");
 

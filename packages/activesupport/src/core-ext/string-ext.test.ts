@@ -780,8 +780,29 @@ describe("OutputSafetyTest", () => {
   });
 
   it("ERB::Util.xml_name_escape should escape unsafe characters for XML names", () => {
-    const result = xmlNameEscape("hello world");
-    expect(result).not.toContain(" ");
+    const unsafeChar = ">";
+    const safeChar = "\u00C1";
+    const safeCharAfterStart = "3";
+    const startingWithDash = "-foo";
+
+    expect(xmlNameEscape(unsafeChar)).toBe("_");
+    expect(xmlNameEscape(unsafeChar + safeChar)).toBe(`_${safeChar}`);
+    expect(xmlNameEscape(unsafeChar.repeat(2))).toBe("__");
+
+    expect(xmlNameEscape(`${unsafeChar.repeat(2)}${safeChar}${unsafeChar}`)).toBe(`__${safeChar}_`);
+
+    expect(xmlNameEscape(safeChar + safeCharAfterStart)).toBe(safeChar + safeCharAfterStart);
+
+    expect(xmlNameEscape(safeCharAfterStart + safeChar)).toBe(`_${safeChar}`);
+
+    expect(xmlNameEscape("img src=nonexistent onerror=alert(1)")).toBe(
+      "img_src_nonexistent_onerror_alert_1_",
+    );
+
+    const commonDangerousChars = "&<>\"' %*+,/;=^|";
+    expect(xmlNameEscape(commonDangerousChars)).toBe("_".repeat(commonDangerousChars.length));
+
+    expect(xmlNameEscape(startingWithDash)).toBe("_foo");
   });
 });
 

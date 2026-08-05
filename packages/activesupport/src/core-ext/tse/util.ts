@@ -22,7 +22,10 @@ const HTML_ESCAPE_ONCE_REGEXP = /["><']|&(?!([a-zA-Z]+|(#\d+)|(#[xX][\dA-Fa-f]+)
  * This method is not for public consumption! Seriously!
  *
  * @internal Mirrors: ActiveSupport::CoreExt::ERBUtil#html_escape, aliased
- * `unwrapped_html_escape` (`core_ext/erb/util.rb:11-18`).
+ * `unwrapped_html_escape` (`core_ext/erb/util.rb:11-18`). Rails' escape arm is
+ * `super(ActiveSupport::Multibyte::Unicode.tidy_bytes(s))`; `tidy_bytes`
+ * repairs invalid UTF-8 byte sequences, which a JS string cannot hold, so the
+ * escape runs on `s` directly.
  */
 export function unwrappedHtmlEscape(s: unknown): string | SafeBuffer {
   if (s instanceof SafeBuffer && s.htmlSafe) return s;
@@ -44,12 +47,9 @@ export function htmlEscape(s: unknown): SafeBuffer {
 export const h = htmlEscape;
 
 // Following XML requirements: https://www.w3.org/TR/REC-xml/#NT-Name
-// `core_ext/erb/util.rb:44-51`. Supplementary-plane code points (U+10000+)
-// are outside the ranges JS character classes spell here and are replaced
-// with TAG_NAME_REPLACEMENT_CHAR.
 /* eslint-disable no-misleading-character-class -- XML spec character ranges */
 const TAG_NAME_START_CODEPOINTS =
-  "@:A-Z_a-z\\xC0-\\xD6\\xD8-\\xF6\\u00F8-\\u02FF\\u0370-\\u037D\\u037F-\\u1FFF\\u200C-\\u200D\\u2070-\\u218F\\u2C00-\\u2FEF\\u3001-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFFD";
+  "@:A-Z_a-z\\xC0-\\xD6\\xD8-\\xF6\\u00F8-\\u02FF\\u0370-\\u037D\\u037F-\\u1FFF\\u200C-\\u200D\\u2070-\\u218F\\u2C00-\\u2FEF\\u3001-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFFD\\u{10000}-\\u{EFFFF}";
 const INVALID_TAG_NAME_START_REGEXP = new RegExp(`[^${TAG_NAME_START_CODEPOINTS}]`, "gu");
 const TAG_NAME_FOLLOWING_CODEPOINTS = `${TAG_NAME_START_CODEPOINTS}\\-.0-9\\xB7\\u0300-\\u036F\\u203F-\\u2040`;
 const INVALID_TAG_NAME_FOLLOWING_REGEXP = new RegExp(`[^${TAG_NAME_FOLLOWING_CODEPOINTS}]`, "gu");
@@ -63,7 +63,9 @@ const TAG_NAME_REPLACEMENT_CHAR = "_";
 /**
  * A utility method for escaping HTML without affecting existing escaped entities.
  *
- * Mirrors: ERB::Util#html_escape_once (`core_ext/erb/util.rb:63-65`).
+ * Mirrors: ERB::Util#html_escape_once (`core_ext/erb/util.rb:63-65`), whose
+ * `tidy_bytes` reach is dropped for the reason given on
+ * {@link unwrappedHtmlEscape}.
  */
 export function htmlEscapeOnce(s: unknown): SafeBuffer {
   return htmlSafe(
