@@ -1734,7 +1734,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     // (e.g. Mysql2Adapter#getFullVersion populates it while fetching); re-check
     // to avoid double-parsing the version string in those subclasses.
     if (this._databaseVersion) return this._databaseVersion;
-    const version = new Version(this.versionString(fullVersion));
+    const version = new Version(this.versionString(fullVersion), fullVersion);
     this._databaseVersion = version;
     return version;
   }

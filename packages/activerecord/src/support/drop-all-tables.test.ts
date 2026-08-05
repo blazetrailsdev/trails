@@ -249,4 +249,16 @@ describe("purge-only pre-snapshot path", () => {
   it("rejects a purge that runs after the boot-laid snapshot", async () => {
     await expect(purgeToCanonicalTables(adapter)).rejects.toThrow(/after recordBootLaidTables/);
   });
+
+  // Kept last: this one runs a real purge, which drops the adapter-specific
+  // tables until the next test file's boot re-lays them.
+  it("clears the rows of a canonical table, so the boot needs no truncate ahead of it", async () => {
+    const { dropAllTablesModule } = await freshModules();
+    await adapter.executeMutation(`INSERT INTO articles (id) VALUES (4243)`);
+    expect(((await adapter.execute(`SELECT id FROM articles`)) as unknown[]).length).toBe(1);
+
+    await dropAllTablesModule.purgeToCanonicalTables(adapter);
+
+    expect(((await adapter.execute(`SELECT id FROM articles`)) as unknown[]).length).toBe(0);
+  });
 });

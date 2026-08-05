@@ -14,8 +14,7 @@
  *
  * On top of Rails' three methods it wires the resolved configurations into
  * `DatabaseTasks`, so the per-worker boot can purge this database through the
- * real Rails-mirrored path (`DatabaseTasks.purge` / `truncateTables`) before
- * the schema load. Rails has no equivalent because its suite loads `schema.rb`
+ * real Rails-mirrored path (`DatabaseTasks.purge`) before the schema load. Rails has no equivalent because its suite loads `schema.rb`
  * directly from `cases/helper.rb` against a database it never re-loads.
  *
  * As in `config.example.yml`, `ENV` only feeds connection *sub-settings*

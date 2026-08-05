@@ -13,8 +13,9 @@
  * What Rails has no counterpart for is the step *before* the load: this
  * database is not freshly created, so it has to be emptied first. Which form
  * that takes is the driver gate (RFC 0002 §Design):
- *   - already laid by this run (`canonicalSchemaUpToDate`) → TRUNCATE, skipping
- *     the canonical DDL only. All three lanes reach it: globalSetup stamps what
+ *   - already laid by this run (`canonicalSchemaUpToDate`) → purge back to the
+ *     canonical tables, skipping the canonical DDL only. All three lanes reach
+ *     it: globalSetup stamps what
  *     it lays (a PG slot cloned from the stamped template, the sqlite template
  *     file each worker clones, each MySQL slot DB), and this arm re-stamps, so
  *     a worker recycled onto a database an earlier worker used takes it too.
@@ -48,9 +49,10 @@ const { canonicalSchemaUpToDate, stampCanonicalSchema } =
 const { recordBootOutcome } = await import("./support/boot-outcome.js");
 
 if (await canonicalSchemaUpToDate(await Base.leaseConnection())) {
-  if (getEnv("SKIP_TEST_DATABASE_TRUNCATE") === undefined) {
-    await DatabaseTasks.truncateTables(envConfig);
-  }
+  // No truncate ahead of the purge: `purgeToCanonicalTables` already truncates
+  // every non-empty canonical table and drops everything else, so a
+  // `DatabaseTasks.truncateTables` here emptied the same tables a second time.
+  //
   // Only the canonical arm is skipped here — those tables are already laid, and
   // now empty. The adapter-specific arm is re-run as on the full path: its
   // tables are `force: true` throughout, and a worker recycled onto a database

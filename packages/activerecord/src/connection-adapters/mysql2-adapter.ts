@@ -1753,19 +1753,20 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     const ver = row?.v ?? "0.0.0";
     this._fullVersionString = ver;
     this._mariadb = /mariadb/i.test(ver);
-    this._databaseVersion = new Version(this.versionString(ver));
+    this._databaseVersion = new Version(this.versionString(ver), ver);
     return ver;
   }
 
   /**
-   * Return the full raw version string, lazily fetching it if needed.
-   * Mirrors Rails' full_version → database_version.full_version_string,
-   * which always returns the real server version without a separate warm-up.
+   * Mirrors: Mysql2Adapter#full_version (mysql2_adapter.rb:164-166) —
+   * `database_version.full_version_string`. Rails' reader is sync because
+   * `database_version` is memoized by `configure_connection`; here the fetch is
+   * awaited, and the banner comes off the `Version` rather than a second field.
    * @internal
    */
   async fullVersion(): Promise<string> {
-    if (!this._fullVersionString) await this.getFullVersion();
-    return this._fullVersionString ?? "0.0.0";
+    const databaseVersion = await this.getDatabaseVersion();
+    return databaseVersion.fullVersionString ?? "0.0.0";
   }
 
   /** @internal */
