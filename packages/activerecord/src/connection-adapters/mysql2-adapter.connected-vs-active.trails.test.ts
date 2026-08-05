@@ -16,7 +16,11 @@ describe("Mysql2Adapter connected? vs active?", () => {
   function stubNewClient(ping: () => Promise<void>): void {
     const fakeConn = {
       end: () => Promise.resolve(),
-      query: () => Promise.resolve([[{ v: "8.0.28" }]]),
+      // The connect-once configure warms the server version off the driver's
+      // handshake banner (getFullVersion) before checkVersion; hand it one so
+      // the warm resolves offline.
+      connection: { _handshakePacket: { serverVersion: "8.0.28" } },
+      query: () => Promise.resolve([[]]),
       ping,
     };
     vi.spyOn(Mysql2Adapter, "newClient").mockResolvedValue(fakeConn as never);
