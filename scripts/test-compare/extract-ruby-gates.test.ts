@@ -256,6 +256,35 @@ describe("Ruby extractor gate detection", () => {
     expect(g["send only"]).toEqual({ features: ["rename_index"], source: ["body-skip"] });
   });
 
+  it("reads feature polarity against the run condition on the skip-if path", () => {
+    const g = rubyGates({
+      // `skip if !supports_x?` runs on `supports_x?`. The run condition is the
+      // NEGATION of the source condition, so the textually-negated predicate is
+      // the one the test runs on — a plain feature gate, not a `no_` guard.
+      // `has_or` is textual and never sees that inversion, hence `has_and`.
+      "cases/bar_test.rb": `
+        class BarTest < ActiveRecord::TestCase
+          def test_skip_if_not_feature
+            skip "x" if !supports_insert_returning?
+          end
+          def test_unless_not_feature
+            skip "x" unless !supports_insert_returning?
+          end
+        end
+      `,
+    });
+    expect(g["skip if not feature"]).toEqual({
+      features: ["insert_returning"],
+      source: ["body-skip"],
+    });
+    // `skip unless !feature` runs on `!supports_x?`, so the same predicate
+    // inverts the other way — into the `no_` guard.
+    expect(g["unless not feature"]).toEqual({
+      guards: ["no_insert_returning"],
+      source: ["body-skip"],
+    });
+  });
+
   it("does not emit an adapter exclusion under `unless` (negation → disjunction)", () => {
     const g = rubyGates({
       // `unless feature && !sqlite` runs when `!feature || sqlite` — a disjunction

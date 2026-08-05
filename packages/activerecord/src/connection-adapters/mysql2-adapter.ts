@@ -16,11 +16,7 @@ import { isRubyTruthy } from "../ruby-truthy.js";
 import { TypeMap } from "../type/type-map.js";
 import * as Type from "../type.js";
 import { UnsignedInteger } from "../type/unsigned-integer.js";
-import {
-  AbstractAdapter,
-  Version,
-  RAW_CONNECTION_DEPRECATION_MESSAGE,
-} from "./abstract-adapter.js";
+import { AbstractAdapter, RAW_CONNECTION_DEPRECATION_MESSAGE } from "./abstract-adapter.js";
 import { deprecator } from "../deprecator.js";
 import { captureUnwrappedExecute, dirtiesQueryCache } from "./abstract/query-cache.js";
 import {
@@ -351,7 +347,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     super.clearCacheBang();
     this._statementPool?.clear();
   }
-  private _fullVersionString: string | null = null;
   private _database: string | undefined;
 
   /**
@@ -1742,31 +1737,17 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   /**
-   * Fetch the raw version string from the server (e.g. "8.0.28").
-   * Populates _databaseVersion and _mariadb as a side effect.
+   * Mirrors: Mysql2Adapter#get_full_version (mysql2_adapter.rb:168-170). No
+   * memo and no side effects: `database_version` is the only memo in the Rails
+   * chain. Rails reads `any_raw_connection.server_info[:version]`; node-mysql2
+   * exposes no `server_info`, so the banner comes from `SELECT VERSION()` —
+   * the same string the server reports there.
    * @internal
    */
   async getFullVersion(): Promise<string> {
-    if (this._fullVersionString) return this._fullVersionString;
     const conn = await this.getConn();
     const [[row]] = (await conn.query("SELECT VERSION() AS v")) as [Array<{ v: string }>, unknown];
-    const ver = row?.v ?? "0.0.0";
-    this._fullVersionString = ver;
-    this._mariadb = /mariadb/i.test(ver);
-    this._databaseVersion = new Version(this.versionString(ver), ver);
-    return ver;
-  }
-
-  /**
-   * Mirrors: Mysql2Adapter#full_version (mysql2_adapter.rb:164-166) —
-   * `database_version.full_version_string`. Rails' reader is sync because
-   * `database_version` is memoized by `configure_connection`; here the fetch is
-   * awaited, and the banner comes off the `Version` rather than a second field.
-   * @internal
-   */
-  async fullVersion(): Promise<string> {
-    const databaseVersion = await this.getDatabaseVersion();
-    return databaseVersion.fullVersionString ?? "0.0.0";
+    return row?.v ?? "0.0.0";
   }
 
   /** @internal */

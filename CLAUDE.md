@@ -287,9 +287,12 @@ catches a class of drift a reviewer would otherwise spend a cycle on.
 
    **New mismatch?** The right fix is almost always to make the TS body call
    what Rails calls. Baselining is the fallback, and it costs a reviewed
-   one-line `reason` — never leave the seeded placeholder (RFC 0083 ratchets the
-   count of unreviewed reasons; leaving placeholders reds the gate for whoever
-   comes next). A single justified omission can also carry a `@missingRailsCall`
+   one-line `reason` for the row **you** add — never leave the seeded
+   placeholder there. But the debt metric for this baseline is the **row
+   count**, not the unreviewed-reason count: rows converge by deletion, and
+   inherited seed strings in rows your PR did not add are not yours to
+   wordsmith and are not grounds to block a PR (RFC 0084; see
+   [CONTRIBUTING.md](CONTRIBUTING.md#row-count-is-the-debt-metric-the-unreviewed-count-is-not)). A single justified omission can also carry a `@missingRailsCall`
    JSDoc tag at the call site instead.
 
    **Converged something?** The wide baseline is **only-shrink**: fixing a real
