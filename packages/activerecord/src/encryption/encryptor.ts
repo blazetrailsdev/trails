@@ -35,6 +35,78 @@ export interface EncryptorLike {
   isBinary(): boolean;
 }
 
+/**
+ * The shape `Scheme`'s `encryptor:` option accepts: the full contract above, or
+ * the simple `{ encrypt, decrypt }` pair `Base.encrypts` has always taken, whose
+ * two optional members `LegacyEncryptorShim` fills in.
+ *
+ * @noRailsEquivalent CONVERGEABLE (story:
+ * converge-encryption-simple-encryptor-onto-encryptor-like). Rails' `encryptor:`
+ * takes one contract, `Encryption::Encryptor`.
+ */
+export type EncryptorOptionLike = Omit<EncryptorLike, "isEncrypted" | "isBinary"> &
+  Partial<Pick<EncryptorLike, "isEncrypted" | "isBinary">>;
+
+/**
+ * Adapts a simple `{ encrypt, decrypt }` pair — the surface `Base.encrypts`'
+ * `encryptor:` option has always accepted — to the wider `EncryptorLike` the
+ * scheme expects. Applied by `Scheme`'s constructor where the `encryptor:`
+ * option is read, so there is exactly one scheme constructor
+ * (`EncryptableRecord#scheme_for`, encryptable_record.rb:69-76) as in Rails.
+ *
+ * Both calls forward their options untouched: a duck that declares no second
+ * parameter simply ignores it, so wrapping a fuller encryptor is transparent.
+ * What the shim adds is the two optional members of the contract:
+ *
+ * - `isEncrypted()` is what `supportUnencryptedData` consults to distinguish
+ *   ciphertext from plaintext on read. Returning the wrong answer is critical
+ *   in both directions: a false positive decrypts plaintext (may corrupt it),
+ *   a false negative skips decryption for real ciphertext. It delegates when
+ *   the inner encryptor supplies one — the only reliable answer — and
+ *   otherwise probes with `decrypt`, treating a throw as "not encrypted",
+ *   matching Rails' `Encryptor#encrypted?`, which does
+ *   `serializer.load(encrypted_text); true; rescue; false`.
+ * - `isBinary()` defaults to false.
+ *
+ * A custom encryptor whose `decrypt` is permissive (doesn't throw on
+ * plaintext) MUST supply `isEncrypted()` to avoid misclassification. With
+ * `supportUnencryptedData` on, the probe path also runs `decrypt` twice —
+ * once for the probe, once for real. Rails avoids that by probing with
+ * `serializer.load` (cheap parse, no cipher); the simple pair has no
+ * equivalent cheap probe, so supplying `isEncrypted()` is worthwhile in
+ * perf-sensitive paths.
+ *
+ * @noRailsEquivalent CONVERGEABLE (story:
+ * converge-encryption-simple-encryptor-onto-encryptor-like). Rails has one
+ * encryptor contract and no adapter; this exists only for the older
+ * `{ encrypt, decrypt }` call sites.
+ */
+export class LegacyEncryptorShim implements EncryptorLike {
+  constructor(private readonly inner: EncryptorOptionLike) {}
+
+  encrypt(clearText: string, options?: Record<string, unknown>): string {
+    return this.inner.encrypt(clearText, options);
+  }
+
+  decrypt(encryptedText: string, options?: Record<string, unknown>): string {
+    return this.inner.decrypt(encryptedText, options);
+  }
+
+  isEncrypted(text: string): boolean {
+    if (this.inner.isEncrypted) return this.inner.isEncrypted(text);
+    try {
+      this.inner.decrypt(text);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  isBinary(): boolean {
+    return this.inner.isBinary?.() ?? false;
+  }
+}
+
 export interface KeyProviderLike {
   encryptionKey(): { secret: string; publicTags?: Record<string, unknown> | Properties };
   decryptionKeys(

@@ -4,7 +4,7 @@
  * Targets: vendor/rails/activerecord/test/cases/strict_loading_test.rb
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { findTarget } from "./associations/singular-association.js";
+import { association as associationInstance } from "./associations/instance-methods.js";
 import { Notifications } from "@blazetrails/activesupport";
 import { ActiveRecord, Base, StrictLoadingViolationError, registerModel } from "./index.js";
 import { association } from "./associations.js";
@@ -22,6 +22,19 @@ import { Treasure } from "./test-helpers/models/treasure.js";
 import { StrictZine } from "./test-helpers/models/strict-zine.js";
 import { Zine } from "./test-helpers/models/zine.js";
 import { Interest } from "./test-helpers/models/interest.js";
+
+/**
+ * Rails' entry point for reading a singular association is
+ * `record.association(name).load_target` (association.rb:190) — the cached
+ * read and the staleness guard live there, and `find_target`
+ * (singular_association.rb:47-55) is a pure query underneath it.
+ */
+async function loadSingularTarget(record: Base, name: string): Promise<Base | null> {
+  // `async` so `check_validity!`, which Rails runs in `Association#initialize`
+  // (association.rb:41-45) and trails runs when the holder is built, surfaces
+  // as a rejection like every other load failure.
+  return associationInstance.call(record, name).loadTarget() as Promise<Base | null>;
+}
 
 // Simulate an eager-preload by seeding the real association holder (RFC 0022:
 // `record.association(name).target` is the source of truth) the same way the
@@ -360,12 +373,12 @@ describe("StrictLoadingTest", () => {
 
       const preloaded = (await Developer.all().includes("ship").first())!;
       expect(preloaded.isStrictLoading()).toBe(true);
-      const loaded = await findTarget(preloaded, "ship", { className: "Ship" });
+      const loaded = await loadSingularTarget(preloaded, "ship");
       expect(loaded?.id).toBe(ship.id);
 
       await preloaded.reload();
 
-      const reloaded = await findTarget(preloaded, "ship", { className: "Ship" });
+      const reloaded = await loadSingularTarget(preloaded, "ship");
       expect(reloaded?.id).toBe(ship.id);
     });
   });
@@ -428,9 +441,7 @@ describe("StrictLoadingTest", () => {
     await expect(association(loaded!, "contracts").toArray()).rejects.toThrow(
       StrictLoadingViolationError,
     );
-    await expect(findTarget(loaded!, "ship", { className: "Ship" })).rejects.toThrow(
-      StrictLoadingViolationError,
-    );
+    await expect(loadSingularTarget(loaded!, "ship")).rejects.toThrow(StrictLoadingViolationError);
   });
 
   // Rails: test_strict_loading_with_has_one_through_does_not_prevent_creation_of_association
@@ -562,13 +573,9 @@ describe("StrictLoadingTest", () => {
     const developer = await Developer.first();
     await developer!.updateColumn("mentor_id", mentor.id);
 
-    await expect(
-      findTarget(developer!, "strictLoadingMentor", {
-        className: "Mentor",
-        foreignKey: "mentor_id",
-        strictLoading: true,
-      }),
-    ).rejects.toThrow(StrictLoadingViolationError);
+    await expect(loadSingularTarget(developer!, "strictLoadingMentor")).rejects.toThrow(
+      StrictLoadingViolationError,
+    );
   });
 
   // Rails: test_raises_on_lazy_loading_a_belongs_to_relation_if_strict_loading_by_default
@@ -578,7 +585,7 @@ describe("StrictLoadingTest", () => {
       const developer = await Developer.first();
       await developer!.updateColumn("mentor_id", mentor.id);
 
-      await expect(findTarget(developer!, "mentor", { className: "Mentor" })).rejects.toThrow(
+      await expect(loadSingularTarget(developer!, "mentor")).rejects.toThrow(
         StrictLoadingViolationError,
       );
     });
@@ -591,11 +598,7 @@ describe("StrictLoadingTest", () => {
       const developer = await Developer.first();
       await developer!.updateColumn("mentor_id", mentor.id);
 
-      const loaded = await findTarget(developer!, "strictLoadingOffMentor", {
-        className: "Mentor",
-        foreignKey: "mentor_id",
-        strictLoading: false,
-      });
+      const loaded = await loadSingularTarget(developer!, "strictLoadingOffMentor");
       expect(loaded?.id).toBe(mentor.id);
     });
   });
@@ -608,11 +611,7 @@ describe("StrictLoadingTest", () => {
 
     const developer = (await Developer.all().includes("strictLoadingMentor").first())!;
 
-    const loaded = await findTarget(developer, "strictLoadingMentor", {
-      className: "Mentor",
-      foreignKey: "mentor_id",
-      strictLoading: true,
-    });
+    const loaded = await loadSingularTarget(developer, "strictLoadingMentor");
     expect(loaded?.id).toBe(mentor.id);
   });
 
@@ -624,7 +623,7 @@ describe("StrictLoadingTest", () => {
       await first!.updateColumn("mentor_id", mentor.id);
 
       const developer = (await Developer.all().includes("mentor").first())!;
-      const loaded = await findTarget(developer, "mentor", { className: "Mentor" });
+      const loaded = await loadSingularTarget(developer, "mentor");
       expect(loaded?.id).toBe(mentor.id);
     });
   });
@@ -635,12 +634,9 @@ describe("StrictLoadingTest", () => {
     const ship = await Ship.first();
     await ship!.updateColumn("developer_id", developer!.id);
 
-    await expect(
-      findTarget(developer!, "strictLoadingShip", {
-        className: "Ship",
-        strictLoading: true,
-      }),
-    ).rejects.toThrow(StrictLoadingViolationError);
+    await expect(loadSingularTarget(developer!, "strictLoadingShip")).rejects.toThrow(
+      StrictLoadingViolationError,
+    );
   });
 
   // Rails: test_raises_on_lazy_loading_a_has_one_relation_if_strict_loading_by_default
@@ -650,7 +646,7 @@ describe("StrictLoadingTest", () => {
       const ship = await Ship.first();
       await ship!.updateColumn("developer_id", developer!.id);
 
-      await expect(findTarget(developer!, "ship", { className: "Ship" })).rejects.toThrow(
+      await expect(loadSingularTarget(developer!, "ship")).rejects.toThrow(
         StrictLoadingViolationError,
       );
     });
@@ -662,10 +658,7 @@ describe("StrictLoadingTest", () => {
     await ship!.updateColumn("developer_id", developers("david").id);
 
     const developer = (await Developer.all().includes("strictLoadingShip").first())!;
-    const loaded = await findTarget(developer, "strictLoadingShip", {
-      className: "Ship",
-      strictLoading: true,
-    });
+    const loaded = await loadSingularTarget(developer, "strictLoadingShip");
     expect(loaded).not.toBeNull();
   });
 
@@ -676,7 +669,7 @@ describe("StrictLoadingTest", () => {
       await ship!.updateColumn("developer_id", developers("david").id);
 
       const developer = (await Developer.all().includes("ship").first())!;
-      const loaded = await findTarget(developer, "ship", { className: "Ship" });
+      const loaded = await loadSingularTarget(developer, "ship");
       expect(loaded).not.toBeNull();
     });
   });
@@ -827,7 +820,7 @@ describe("StrictLoadingTest", () => {
     treasure.strictLoadingBang();
     expect(treasure.isStrictLoading()).toBe(true);
 
-    await expect(findTarget(treasure, "looter", { polymorphic: true })).rejects.toThrow(
+    await expect(loadSingularTarget(treasure, "looter")).rejects.toThrow(
       "`Treasure` is marked for strict_loading. " +
         "The polymorphic association named `:looter` cannot be lazily loaded.",
     );
@@ -848,7 +841,7 @@ describe("StrictLoadingTest", () => {
       logged = event.payload.reflection.strictLoadingViolationMessage(event.payload.owner);
     });
     try {
-      await findTarget(treasure, "looter", { polymorphic: true });
+      await loadSingularTarget(treasure, "looter");
       expect(logged).toBe(
         "`Treasure` is marked for strict_loading. " +
           "The polymorphic association named `:looter` cannot be lazily loaded.",

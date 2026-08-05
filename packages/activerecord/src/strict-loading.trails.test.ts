@@ -8,7 +8,8 @@
  * convention file tracks Rails 1:1.
  */
 import { describe, it, expect } from "vitest";
-import { findTarget } from "./associations/singular-association.js";
+import { association as associationInstance } from "./associations/instance-methods.js";
+import type { Base } from "./base.js";
 import { StrictLoadingViolationError, registerModel } from "./index.js";
 import { findTarget as findHasManyTarget } from "./associations/has-many-association.js";
 import { fixtures } from "./test-fixtures.js";
@@ -16,6 +17,19 @@ import { Developer, AuditLog } from "./test-helpers/models/developer.js";
 import { Ship } from "./test-helpers/models/ship.js";
 import { Project } from "./test-helpers/models/project.js";
 import { Firm } from "./test-helpers/models/company.js";
+
+/**
+ * Rails' entry point for reading a singular association is
+ * `record.association(name).load_target` (association.rb:190) — the cached
+ * read and the staleness guard live there, and `find_target`
+ * (singular_association.rb:47-55) is a pure query underneath it.
+ */
+async function loadSingularTarget(record: Base, name: string): Promise<Base | null> {
+  // `async` so `check_validity!`, which Rails runs in `Association#initialize`
+  // (association.rb:41-45) and trails runs when the holder is built, surfaces
+  // as a rejection like every other load failure.
+  return associationInstance.call(record, name).loadTarget() as Promise<Base | null>;
+}
 
 interface ReflectionHost {
   _reflectOnAssociation(name: string): { options: Record<string, unknown> };
@@ -69,13 +83,13 @@ describe("StrictLoadingNewRecordFindTargetTest", () => {
   it("does not raise on lazy loading a has_one on a new strict-loading owner without the foreign key", async () => {
     const developer = new Developer({ name: "New Dev" });
     developer.strictLoadingBang();
-    await expect(findTarget(developer, "ship", optionsFor("ship"))).resolves.toBeNull();
+    await expect(loadSingularTarget(developer, "ship")).resolves.toBeNull();
   });
 
   it("does not raise on lazy loading a belongs_to on a new strict-loading owner without the foreign key", async () => {
     const developer = new Developer({ name: "New Dev" });
     developer.strictLoadingBang();
-    await expect(findTarget(developer, "firm", optionsFor("firm"))).resolves.toBeNull();
+    await expect(loadSingularTarget(developer, "firm")).resolves.toBeNull();
   });
 
   it("does not raise on lazy loading a habtm on a new strict-loading owner without the foreign key", async () => {
@@ -92,14 +106,14 @@ describe("StrictLoadingNewRecordFindTargetTest", () => {
     developer.firm_id = null as unknown as number;
     developer.strictLoadingBang();
     expect(developer.isNewRecord()).toBe(false);
-    await expect(findTarget(developer, "firm", optionsFor("firm"))).resolves.toBeNull();
+    await expect(loadSingularTarget(developer, "firm")).resolves.toBeNull();
   });
 
   it("raises on lazy loading a belongs_to on a new strict-loading owner with the foreign key present", async () => {
     const developer = new Developer({ name: "New Dev", firm_id: 1 });
     developer.strictLoadingBang();
     expect(developer.isNewRecord()).toBe(true);
-    await expect(findTarget(developer, "firm", optionsFor("firm"))).rejects.toThrow(
+    await expect(loadSingularTarget(developer, "firm")).rejects.toThrow(
       StrictLoadingViolationError,
     );
   });

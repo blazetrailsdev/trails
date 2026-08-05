@@ -7,7 +7,6 @@
  */
 
 import type { Base } from "../base.js";
-import { findTarget } from "./singular-association.js";
 import { Association as AssociationInstance } from "./association.js";
 import { BelongsToAssociation } from "./belongs-to-association.js";
 import { BelongsToPolymorphicAssociation } from "./belongs-to-polymorphic-association.js";
@@ -161,13 +160,14 @@ export function association(this: Base, name: string): AssociationInstance {
  * `BelongsToAssociation` which are the belongs_to-specific preload paths.
  */
 export async function loadBelongsTo(this: Base, name: string): Promise<Base | null> {
-  const assocDef = assertSingularAssociation.call(this, name, "belongsTo");
+  assertSingularAssociation.call(this, name, "belongsTo");
+  // Rails' equivalent of this entry point is `record.association(name)
+  // .load_target`: the cache read, the staleness guard and the writeback all
+  // live in `load_target` (association.rb:190), and `find_target` is a pure
+  // query underneath it.
   const result = await bypassStrictLoading.call(this, () =>
-    findTarget(this, name, (assocDef.options ?? {}) as any),
+    association.call(this, name).loadTarget(),
   );
-  // Loader writeback: this is the tail of this function's own query, not a
-  // caller replacing the target. See Association#_setTargetFromLoader.
-  association.call(this, name)._setTargetFromLoader(result as any);
   return result as Base | null;
 }
 
@@ -179,13 +179,11 @@ export async function loadBelongsTo(this: Base, name: string): Promise<Base | nu
  * Mirrors Rails' `HasOneAssociation` preload path.
  */
 export async function loadHasOne(this: Base, name: string): Promise<Base | null> {
-  const assocDef = assertSingularAssociation.call(this, name, "hasOne");
+  assertSingularAssociation.call(this, name, "hasOne");
+  // See `loadBelongsTo`: `association(name).load_target` is Rails' entry point.
   const result = await bypassStrictLoading.call(this, () =>
-    findTarget(this, name, (assocDef.options ?? {}) as any),
+    association.call(this, name).loadTarget(),
   );
-  // Loader writeback: this is the tail of this function's own query, not a
-  // caller replacing the target. See Association#_setTargetFromLoader.
-  association.call(this, name)._setTargetFromLoader(result as any);
   return result as Base | null;
 }
 

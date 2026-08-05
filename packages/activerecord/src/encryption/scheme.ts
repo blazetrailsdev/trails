@@ -4,7 +4,12 @@
  * Mirrors: ActiveRecord::Encryption::Scheme
  */
 
-import { Encryptor, type EncryptorLike } from "./encryptor.js";
+import {
+  Encryptor,
+  LegacyEncryptorShim,
+  type EncryptorLike,
+  type EncryptorOptionLike,
+} from "./encryptor.js";
 import { Configuration } from "./errors.js";
 import { getSharedConfig, type Compressor } from "./config.js";
 import type { MessageSerializerLike } from "./message-serializer.js";
@@ -23,7 +28,7 @@ export interface SchemeOptions {
   previousSchemes?: Scheme[];
   compress?: boolean;
   compressor?: Compressor;
-  encryptor?: EncryptorLike;
+  encryptor?: EncryptorOptionLike;
   messageSerializer?: MessageSerializerLike;
 }
 
@@ -52,7 +57,14 @@ export class Scheme {
     this.previousSchemes = options.previousSchemes ?? [];
 
     if (options.encryptor) {
-      this._encryptor = options.encryptor;
+      // The option also accepts the simple `{ encrypt, decrypt }` pair
+      // `Base.encrypts` takes; fill in the two members it may omit here, where
+      // the option is read, rather than in a second scheme builder.
+      const encryptor = options.encryptor;
+      this._encryptor =
+        typeof encryptor.isEncrypted === "function" && typeof encryptor.isBinary === "function"
+          ? (encryptor as EncryptorLike)
+          : new LegacyEncryptorShim(encryptor);
     } else {
       this._encryptor = new Encryptor({
         compress: options.compress,

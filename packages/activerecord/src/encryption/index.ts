@@ -50,7 +50,6 @@ export {
   encrypts,
   applyPendingEncryptions,
   isEncryptedAttribute,
-  defaultEncryptor,
   keyLength,
   ivLength,
   eagerLoadBang,

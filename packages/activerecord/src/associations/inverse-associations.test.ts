@@ -2,7 +2,7 @@
  * Mirrors Rails activerecord/test/cases/associations/inverse_associations_test.rb
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { findTarget } from "./singular-association.js";
+import { association as associationInstance } from "./instance-methods.js";
 import {
   Base,
   association,
@@ -40,6 +40,19 @@ import { SpecialContract } from "../test-helpers/models/contract.js";
 import { Book } from "../test-helpers/models/book.js";
 import { Subscription } from "../test-helpers/models/subscription.js";
 import { Subscriber } from "../test-helpers/models/subscriber.js";
+
+/**
+ * Rails' entry point for reading a singular association is
+ * `record.association(name).load_target` (association.rb:190) — the cached
+ * read and the staleness guard live there, and `find_target`
+ * (singular_association.rb:47-55) is a pure query underneath it.
+ */
+async function loadSingularTarget(record: Base, name: string): Promise<Base | null> {
+  // `async` so `check_validity!`, which Rails runs in `Association#initialize`
+  // (association.rb:41-45) and trails runs when the holder is built, surfaces
+  // as a rejection like every other load failure.
+  return associationInstance.call(record, name).loadTarget() as Promise<Base | null>;
+}
 
 /**
  * Rails' `with_has_many_inversing(model = ActiveRecord::Base)` toggles
@@ -260,7 +273,7 @@ describe("AutomaticInverseFindingTests", () => {
     const comment = (await Comment.first())!;
     const rating = await Rating.createBang({ comment_id: (comment as any).id });
 
-    const ratingComment = (await findTarget(rating, "comment", { inverseOf: "ratings" })) as any;
+    const ratingComment = (await loadSingularTarget(rating, "comment")) as any;
     expect(ratingComment.id).toBe((comment as any).id);
 
     ratingComment.body = "Fennec foxes are the smallest of the foxes.";
@@ -270,7 +283,7 @@ describe("AutomaticInverseFindingTests", () => {
   it("has many and belongs to automatic inverse shares objects on comment", async () => {
     const rating = await Rating.createBang({});
     const comment = (await Comment.first())!;
-    await findTarget(rating, "comment", { inverseOf: "ratings" });
+    await loadSingularTarget(rating, "comment");
     (rating as any).comment = comment;
 
     expect((rating as any).comment).toBe(comment);
@@ -407,7 +420,7 @@ describe("InverseHasOneTests", () => {
 
   it("parent instance should be shared with child on find", async () => {
     const human = humans("gordon");
-    const face = (await findTarget(human, "face", { inverseOf: "human" }))!;
+    const face = (await loadSingularTarget(human, "face"))!;
     expect((face as any).human.name).toBe(human.name);
     (human as any).name = "Bongo";
     expect((face as any).human.name).toBe((human as any).name);
@@ -492,17 +505,14 @@ describe("InverseHasOneTests", () => {
 
   it("trying to use inverses that dont exist should raise an error", async () => {
     const human = (await Human.first())!;
-    await expect(
-      findTarget(human, "confusedFace", { className: "Face", inverseOf: "cnffusedHuman" }),
-    ).rejects.toThrow(InverseOfAssociationNotFoundError);
+    await expect(loadSingularTarget(human, "confusedFace")).rejects.toThrow(
+      InverseOfAssociationNotFoundError,
+    );
   });
 
   it("trying to use inverses that dont exist should have suggestions for fix", async () => {
     const human = (await Human.first())!;
-    const err = await findTarget(human, "confusedFace", {
-      className: "Face",
-      inverseOf: "cnffusedHuman",
-    }).catch((e) => e);
+    const err = await loadSingularTarget(human, "confusedFace").catch((e) => e);
     expect(err).toBeInstanceOf(InverseOfAssociationNotFoundError);
     expect(err.detailedMessage()).toMatch(/Did you mean\?/);
     expect(err.corrections[0]).toBe("confusedHuman");
@@ -837,9 +847,9 @@ describe("InverseHasManyTests", () => {
     const post1 = (await Post.first())!;
     const post2 = (await Post.all().order("id").offset(1).first())!;
     const comment = (await findHasManyTarget(post1, "comments", { inverseOf: "post" }))[0] as any;
-    expect(await findTarget(comment, "post", { inverseOf: "comments" })).toBe(post1);
+    expect(await loadSingularTarget(comment, "post")).toBe(post1);
     await comment.updateBang({ post_id: (post2 as any).id });
-    const reloaded = (await findTarget(comment, "post", { inverseOf: "comments" })) as any;
+    const reloaded = (await loadSingularTarget(comment, "post")) as any;
     expect(reloaded.id).toBe((post2 as any).id);
   });
 
@@ -882,7 +892,7 @@ describe("InverseBelongsToTests", () => {
 
   it("child instance should be shared with parent on find", async () => {
     const face = faces("trusting");
-    const human = (await findTarget(face, "human", { inverseOf: "face" }))!;
+    const human = (await loadSingularTarget(face, "human"))!;
     expect((human as any).face.description).toBe((face as any).description);
     (face as any).description = "gormless";
     expect((human as any).face.description).toBe((face as any).description);
@@ -934,7 +944,7 @@ describe("InverseBelongsToTests", () => {
 
   it("should not try to set inverse instances when the inverse is a has many", async () => {
     const interest = interests("trainspotting");
-    const human = (await findTarget(interest, "human", { inverseOf: "interests" }))!;
+    const human = (await loadSingularTarget(interest, "human"))!;
     // Rails: human.interests.detect { |_iz| _iz.id == interest.id } — block-find
     // over the CollectionProxy (Enumerable#detect loads the target), not the AR
     // PK finder.
@@ -950,7 +960,7 @@ describe("InverseBelongsToTests", () => {
   it("with has many inversing should try to set inverse instances when the inverse is a has many", async () => {
     await withHasManyInversing(Human, async () => {
       const interest = interests("trainspotting");
-      const human = (await findTarget(interest, "human", { inverseOf: "interests" })) as any;
+      const human = (await loadSingularTarget(interest, "human")) as any;
       const cached = human._associationCache("interests")?.target as any[];
       const iz = cached.find((i: any) => i.id === (interest as any).id);
       expect(iz).toBeDefined();
@@ -975,11 +985,7 @@ describe("InverseBelongsToTests", () => {
   it("with has many inversing does not trigger association callbacks on set when the inverse is a has many", async () => {
     await withHasManyInversing(Interest, async () => {
       const interest = interests("trainspotting");
-      const human = (await findTarget(interest, "humanWithCallbacks", {
-        className: "Human",
-        foreignKey: "human_id",
-        inverseOf: "interestsWithCallbacks",
-      })) as any;
+      const human = (await loadSingularTarget(interest, "humanWithCallbacks")) as any;
       expect(human.addCallbackCalled).toBe(false);
     });
   });
@@ -1017,23 +1023,23 @@ describe("InverseBelongsToTests", () => {
 
   it("unscope does not set inverse when incorrect", async () => {
     const interest = interests("trainspotting");
-    const human = (await findTarget(interest, "human", { inverseOf: "interests" }))!;
+    const human = (await loadSingularTarget(interest, "human"))!;
     const createdHuman = await Human.create({ name: "wrong human" });
     const foundInterest = await (createdHuman as any).interests
       .or((human as any).interests)
       .detect((thisInterest: any) => (interest as any).id === thisInterest.id);
-    const foundHuman = await findTarget(foundInterest, "human", { inverseOf: "interests" });
+    const foundHuman = await loadSingularTarget(foundInterest, "human");
     expect((foundHuman as any).id).toBe((human as any).id);
   });
 
   it("or does not set inverse when incorrect", async () => {
     const interest = interests("trainspotting");
-    const human = (await findTarget(interest, "human", { inverseOf: "interests" }))!;
+    const human = (await loadSingularTarget(interest, "human"))!;
     const createdHuman = await Human.create({ name: "wrong human" });
     const foundInterest = await (createdHuman as any).interests
       .unscope("where")
       .detect((thisInterest: any) => (interest as any).id === thisInterest.id);
-    const foundHuman = await findTarget(foundInterest, "human", { inverseOf: "interests" });
+    const foundHuman = await loadSingularTarget(foundInterest, "human");
     expect((foundHuman as any).id).toBe((human as any).id);
   });
 
@@ -1051,17 +1057,14 @@ describe("InverseBelongsToTests", () => {
 
   it("trying to use inverses that dont exist should raise an error", async () => {
     const face = (await Face.first())!;
-    await expect(
-      findTarget(face, "confusedHuman", { className: "Human", inverseOf: "cnffusedFace" }),
-    ).rejects.toThrow(InverseOfAssociationNotFoundError);
+    await expect(loadSingularTarget(face, "confusedHuman")).rejects.toThrow(
+      InverseOfAssociationNotFoundError,
+    );
   });
 
   it("trying to use inverses that dont exist should have suggestions for fix", async () => {
     const face = (await Face.first())!;
-    const err = await findTarget(face, "confusedHuman", {
-      className: "Human",
-      inverseOf: "cnffusedFace",
-    }).catch((e) => e);
+    const err = await loadSingularTarget(face, "confusedHuman").catch((e) => e);
     expect(err).toBeInstanceOf(InverseOfAssociationNotFoundError);
     expect(err.detailedMessage()).toMatch(/Did you mean\?/);
     expect(err.corrections[0]).toBe("confusedFace");
@@ -1086,10 +1089,7 @@ describe("InversePolymorphicBelongsToTests", () => {
 
   it("child instance should be shared with parent on find", async () => {
     const face = faces("confused");
-    const human = (await findTarget(face, "polymorphicHuman", {
-      polymorphic: true,
-      inverseOf: "polymorphicFace",
-    })) as any;
+    const human = (await loadSingularTarget(face, "polymorphicHuman")) as any;
     expect(human.polymorphicFace.description).toBe((face as any).description);
     (face as any).description = "gormless";
     expect(human.polymorphicFace.description).toBe((face as any).description);
@@ -1099,10 +1099,7 @@ describe("InversePolymorphicBelongsToTests", () => {
 
   it("eager loaded child instance should be shared with parent on find", async () => {
     let face = (await Face.where({ description: "confused" }).includes("human"))[0] as any;
-    let human = (await findTarget(face, "polymorphicHuman", {
-      polymorphic: true,
-      inverseOf: "polymorphicFace",
-    })) as any;
+    let human = (await loadSingularTarget(face, "polymorphicHuman")) as any;
     expect(human.polymorphicFace.description).toBe(face.description);
     face.description = "gormless";
     expect(human.polymorphicFace.description).toBe(face.description);
@@ -1112,10 +1109,7 @@ describe("InversePolymorphicBelongsToTests", () => {
     face = (
       await Face.where({ description: "confused" }).includes("human").order("humans.id")
     )[0] as any;
-    human = (await findTarget(face, "polymorphicHuman", {
-      polymorphic: true,
-      inverseOf: "polymorphicFace",
-    })) as any;
+    human = (await loadSingularTarget(face, "polymorphicHuman")) as any;
     expect(human.polymorphicFace.description).toBe(face.description);
     face.description = "gormless";
     expect(human.polymorphicFace.description).toBe(face.description);
@@ -1194,10 +1188,7 @@ describe("InversePolymorphicBelongsToTests", () => {
 
   it("should not try to set inverse instances when the inverse is a has many", async () => {
     const interest = interests("llama_wrangling");
-    const human = (await findTarget(interest, "polymorphicHuman", {
-      polymorphic: true,
-      inverseOf: "polymorphicInterests",
-    })) as any;
+    const human = (await loadSingularTarget(interest, "polymorphicHuman")) as any;
     // Rails: human.polymorphic_interests.detect { |_iz| _iz.id == interest.id }
     const iz = await human.polymorphicInterests.detect((i: any) => i.id === (interest as any).id);
     expect(iz).toBeDefined();
@@ -1211,10 +1202,7 @@ describe("InversePolymorphicBelongsToTests", () => {
   it("with has many inversing should try to set inverse instances when the inverse is a has many", async () => {
     await withHasManyInversing(Human, async () => {
       const interest = interests("llama_wrangling");
-      const human = (await findTarget(interest, "polymorphicHuman", {
-        polymorphic: true,
-        inverseOf: "polymorphicInterests",
-      })) as any;
+      const human = (await loadSingularTarget(interest, "polymorphicHuman")) as any;
       const cached = human._associationCache("polymorphicInterests")?.target as any[];
       const iz = cached.find((i: any) => i.id === (interest as any).id);
       expect(iz).toBeDefined();
@@ -1236,10 +1224,7 @@ describe("InversePolymorphicBelongsToTests", () => {
 
   it("trying to access inverses that dont exist shouldnt raise an error", async () => {
     const face = (await Face.first())!;
-    await findTarget(face, "puzzledPolymorphicHuman", {
-      polymorphic: true,
-      inverseOf: "puzzledPolymorphicFace",
-    });
+    await loadSingularTarget(face, "puzzledPolymorphicHuman");
   });
 
   it("trying to set polymorphic inverses that dont exist at all should raise an error", async () => {
@@ -1274,8 +1259,8 @@ describe("InverseMultipleHasManyInversesForSameModel", () => {
 
   it("that we can load associations that have the same reciprocal name from different models", async () => {
     const interest = (await Interest.first())!;
-    await findTarget(interest, "zine", { inverseOf: "interests" });
-    await findTarget(interest, "human", { inverseOf: "interests" });
+    await loadSingularTarget(interest, "zine");
+    await loadSingularTarget(interest, "human");
   });
 
   it("that we can create associations that have the same reciprocal name from different models", async () => {
@@ -1310,10 +1295,7 @@ describe("InverseBelongsToTests", () => {
       const main = await BrokenBranch.create({});
       const feature = await association(main, "branches").create({});
       const topic = association(feature, "branches").build({});
-      const err = await findTarget(topic, "branch", {
-        className: "BrokenBranch",
-        inverseOf: "branch",
-      }).catch((e) => e);
+      const err = await loadSingularTarget(topic, "branch").catch((e) => e);
       expect(err).toBeInstanceOf(InverseOfAssociationRecursiveError);
       expect((err as Error).message).toBe(
         "Inverse association branch (:branch in BrokenBranch) is recursive.",

@@ -21,114 +21,26 @@
 
 import { registerEncryptionHooks } from "./encryption-hooks.js";
 import { Scheme, type SchemeOptions } from "./encryption/scheme.js";
-import type { EncryptorLike } from "./encryption/encryptor.js";
+import type { EncryptorOptionLike } from "./encryption/encryptor.js";
 import { Aes256Gcm as AesGcmCipher } from "./encryption/cipher/aes256-gcm.js";
 export { Cipher } from "./encryption/cipher.js";
-import {
-  EncryptableRecord,
-  encryptedTypeOf,
-  globalPreviousSchemesFor,
-} from "./encryption/encryptable-record.js";
+import { EncryptableRecord, encryptedTypeOf } from "./encryption/encryptable-record.js";
 import { Configurable } from "./encryption/configurable.js";
 import { Contexts } from "./encryption/contexts.js";
 import { getEncryptionContext, type Context } from "./encryption/context.js";
 import type { Config } from "./encryption/config.js";
 
 /**
- * The simple encryptor surface `Base.encrypts({ encryptor })` accepts.
- * If the encryptor implements `isEncrypted(text)` it will be consulted
- * directly; otherwise the shim probes by calling `decrypt(text)` and
- * treats a non-throwing decrypt as encrypted (see
- * `LegacyEncryptorShim.isEncrypted`). Custom encryptors whose `decrypt`
- * accepts plaintext without throwing should also implement
- * `isEncrypted(text)` to avoid misclassification.
+ * The simple encryptor surface `Base.encrypts({ encryptor })` accepts — the
+ * same shape `Scheme`'s `encryptor:` option takes, adapted to the full contract
+ * by `LegacyEncryptorShim` where that option is read.
  *
  * @noRailsEquivalent CONVERGEABLE (story:
  * converge-encryption-simple-encryptor-onto-encryptor-like). Rails has one
  * encryptor contract, `Encryption::Encryptor`, which trails ports as a class
- * plus the `EncryptorLike` shape; this narrow surface and its shim exist only
- * for older call sites.
+ * plus the `EncryptorLike` shape; this alias exists only for older call sites.
  */
-export interface Encryptor {
-  encrypt(value: string): string;
-  decrypt(ciphertext: string): string;
-  isEncrypted?(text: string): boolean;
-  isBinary?(): boolean;
-}
-
-const ENCRYPTED_PREFIX = "AR_ENC:";
-
-export const defaultEncryptor: Encryptor = {
-  encrypt(value: string): string {
-    return ENCRYPTED_PREFIX + Buffer.from(value, "utf-8").toString("base64");
-  },
-  decrypt(ciphertext: string): string {
-    if (!ciphertext.startsWith(ENCRYPTED_PREFIX)) {
-      throw new Error("Not an encrypted value");
-    }
-    return Buffer.from(ciphertext.slice(ENCRYPTED_PREFIX.length), "base64").toString("utf-8");
-  },
-  isEncrypted(text: string): boolean {
-    return typeof text === "string" && text.startsWith(ENCRYPTED_PREFIX);
-  },
-};
-
-/**
- * Adapts the simple `{ encrypt, decrypt }` pair accepted by `Base.encrypts`
- * to the wider `EncryptorLike` surface that `Scheme.encryptor` expects.
- * Options are intentionally ignored — the legacy path has no key provider
- * or deterministic mode.
- *
- * `isEncrypted()` is what `supportUnencryptedData` consults to distinguish
- * ciphertext from plaintext on read. Returning the wrong answer is
- * critical in both directions: false positive and the shim decrypts
- * plaintext (may corrupt it); false negative and it skips decryption
- * for real ciphertext (returns garbage to the caller). Resolution order:
- *
- *   1. Delegate to `inner.isEncrypted(text)` if the user supplied one —
- *      this is the only reliable answer for custom encryptors.
- *   2. Otherwise, try `inner.decrypt(text)` and treat a throw as
- *      "not encrypted". Matches Rails' own
- *      `ActiveRecord::Encryption::Encryptor#encrypted?`, which does
- *      `serializer.load(encrypted_text); true; rescue; false`.
- *
- * Two caveats with the fallback path:
- *
- * - A custom encryptor whose `decrypt` is permissive (doesn't throw
- *   on plaintext) MUST supply `isEncrypted()` to avoid misclassification.
- * - When `supportUnencryptedData` is enabled, the scheme consults
- *   `isEncrypted()` before decrypting, so the fallback path runs
- *   `decrypt` once for the probe and once for real — roughly 2x the
- *   CPU. Rails avoids this by probing with `serializer.load` (cheap
- *   parse, no cipher), but the simple `{ encrypt, decrypt }` surface
- *   has no equivalent cheap probe. Supplying `isEncrypted()` eliminates
- *   the double work; consider doing so in perf-sensitive paths.
- */
-class LegacyEncryptorShim implements EncryptorLike {
-  constructor(private readonly inner: Encryptor) {}
-
-  encrypt(clearText: string, _options?: Record<string, unknown>): string {
-    return this.inner.encrypt(clearText);
-  }
-
-  decrypt(encryptedText: string, _options?: Record<string, unknown>): string {
-    return this.inner.decrypt(encryptedText);
-  }
-
-  isEncrypted(text: string): boolean {
-    if (this.inner.isEncrypted) return this.inner.isEncrypted(text);
-    try {
-      this.inner.decrypt(text);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  isBinary(): boolean {
-    return this.inner.isBinary?.() ?? false;
-  }
-}
+export type Encryptor = EncryptorOptionLike;
 
 /**
  * The options bag `Base.encrypts` accepts. Mirrors Rails' kwargs:
@@ -141,48 +53,6 @@ export interface EncryptsOptions extends Omit<SchemeOptions, "encryptor"> {
   encryptor?: Encryptor;
 }
 
-/**
- * `Base.encrypts`' variant of `EncryptableRecord#scheme_for`, carrying the
- * legacy `{ encrypt, decrypt }` shim and the defaultEncryptor fallback. It owes
- * `scheme_for`'s one-shot `previous_schemes` assignment
- * (encryptable_record.rb:70-76): globals first, then the declared ones.
- */
-function buildScheme(options: EncryptsOptions): Scheme {
-  const { encryptor, previousSchemes: localPrevious = [], ...schemeOptions } = options;
-
-  const hasSchemeOptions =
-    schemeOptions.key !== undefined ||
-    schemeOptions.keyProvider !== undefined ||
-    schemeOptions.deterministic !== undefined ||
-    schemeOptions.downcase !== undefined ||
-    schemeOptions.ignoreCase !== undefined ||
-    localPrevious.length > 0 ||
-    schemeOptions.compress !== undefined ||
-    schemeOptions.compressor !== undefined ||
-    schemeOptions.supportUnencryptedData !== undefined;
-
-  // Switch to the real Scheme whenever any encryption key material is configured.
-  // If config is incomplete (e.g. only keyDerivationSalt set, no primaryKey),
-  // Scheme._defaultKeyProvider() returns undefined and Encryptor raises
-  // "No encryption key provided" at serialize/deserialize time — still more
-  // informative than silently storing AR_ENC:base64 data.
-  const config = Configurable.config;
-  const hasConfiguredKeys =
-    config.hasPrimaryKey() !== undefined ||
-    config.hasDeterministicKey() !== undefined ||
-    config.hasKeyDerivationSalt() !== undefined;
-
-  const coreOpts: SchemeOptions = encryptor
-    ? { ...schemeOptions, encryptor: new LegacyEncryptorShim(encryptor) }
-    : hasSchemeOptions || hasConfiguredKeys
-      ? schemeOptions
-      : { encryptor: new LegacyEncryptorShim(defaultEncryptor) };
-
-  const scheme = new Scheme(coreOpts);
-  scheme.previousSchemes = [...globalPreviousSchemesFor(scheme), ...localPrevious];
-  return scheme;
-}
-
 interface PendingEncryption {
   name: string;
   scheme: Scheme;
@@ -192,9 +62,10 @@ interface PendingEncryption {
  * Declare one or more attributes as encrypted on a model class.
  *
  * Routes each attribute through the shared `EncryptableRecord.encryptAttribute`
- * (single declaration path, mirroring Rails' single `encrypts`), passing a
- * scheme built by `buildScheme` so the legacy `{ encrypt, decrypt }` shim and
- * defaultEncryptor fallback are preserved on the primary path.
+ * (single declaration path, mirroring Rails' single `encrypts`), which builds
+ * its scheme with `scheme_for` (encryptable_record.rb:69-76) — the one scheme
+ * constructor, as in Rails. A legacy `{ encrypt, decrypt }` encryptor rides the
+ * `encryptor:` option and is adapted where `Scheme` reads it.
  *
  * The actual type wrapping is deferred (Rails' `decorate_attributes` /
  * PendingDecorator) — `encryptAttribute` pushes the durable decorator once at
@@ -213,13 +84,8 @@ export function encrypts(klass: any, ...args: Array<string | EncryptsOptions>): 
     }
   }
 
-  // Drop the legacy `encryptor` field so the remaining shape is assignable to
-  // SchemeOptions — the scheme is already built, so `encryptAttribute` only
-  // reads `options.ignoreCase` from here.
-  const { encryptor: _encryptor, ...schemeOptions } = options;
-
   for (const name of names) {
-    EncryptableRecord.encryptAttribute(klass, name, schemeOptions, () => buildScheme(options));
+    EncryptableRecord.encryptAttribute(klass, name, options);
   }
 }
 
@@ -392,7 +258,6 @@ registerEncryptionHooks({
   applyPendingEncryptions,
   requireOriginalColumnsAfterReflection: (klass: any, columnNames: string[]) =>
     EncryptableRecord.requireOriginalColumnsAfterReflection(klass, columnNames),
-  buildScheme,
   encryptedAttribute: (record: any, name: string) =>
     EncryptableRecord.encryptedAttribute(record, name),
   ciphertextFor: (record: any, name: string) => EncryptableRecord.ciphertextFor(record, name),

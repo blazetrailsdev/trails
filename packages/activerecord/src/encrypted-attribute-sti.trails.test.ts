@@ -40,8 +40,8 @@ const encryptedAttributesOf = (klass: typeof Company) =>
 describe("STI subclass encrypts", () => {
   fixtures([]);
 
-  // Encryption must be configured before any declaration runs — buildScheme has
-  // no lazy fallback.
+  // Encryption must be configured before any declaration runs — `scheme_for`
+  // has no lazy fallback.
   const snapshot = snapshotEncryptionConfig();
   beforeAll(() => configureEncryption());
   afterAll(() => restoreEncryptionConfig(snapshot));

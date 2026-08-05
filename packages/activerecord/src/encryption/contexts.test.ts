@@ -44,8 +44,8 @@ describe("ActiveRecord::Encryption::ContextsTest", () => {
     // encryption test (uniqueness-validations.test.ts) hand-rolls models for
     // the same reason. They are also defined after configureEncryption so
     // encrypts() builds the scheme against the configured key material
-    // (otherwise buildScheme falls back to the legacy AR_ENC placeholder
-    // encryptor).
+    // (otherwise the Encryptor raises "No encryption key provided" on the first
+    // serialize).
     EncryptedPost = class EncryptedPost extends Base {
       static {
         this._tableName = "posts";

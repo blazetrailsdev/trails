@@ -2,7 +2,7 @@ import type { AssociationProxy } from "./collection-proxy.js";
 import { describe, it, expect } from "vitest";
 import { Base, registerModel, registerSubclass } from "../index.js";
 import { Associations } from "../associations.js";
-import { findTarget as findSingularTarget } from "./singular-association.js";
+import { association as associationInstance } from "./instance-methods.js";
 import { findTarget } from "./has-many-association.js";
 import { AssociationScope, ReflectionProxy } from "./association-scope.js";
 import { fixtures } from "../test-fixtures.js";
@@ -17,6 +17,19 @@ import { Member } from "../test-helpers/models/member.js";
 import { Membership, CurrentMembership } from "../test-helpers/models/membership.js";
 import { Club } from "../test-helpers/models/club.js";
 import { MemberDetail } from "../test-helpers/models/member-detail.js";
+
+/**
+ * Rails' entry point for reading a singular association is
+ * `record.association(name).load_target` (association.rb:190) — the cached
+ * read and the staleness guard live there, and `find_target`
+ * (singular_association.rb:47-55) is a pure query underneath it.
+ */
+async function loadSingularTarget(record: Base, name: string): Promise<Base | null> {
+  // `async` so `check_validity!`, which Rails runs in `Association#initialize`
+  // (association.rb:41-45) and trails runs when the holder is built, surfaces
+  // as a rejection like every other load failure.
+  return associationInstance.call(record, name).loadTarget() as Promise<Base | null>;
+}
 
 describe("AssociationScope", () => {
   fixtures([]);
@@ -722,11 +735,7 @@ describe("AssociationScope", () => {
     const membership = await Membership.create({ member_id: member.id });
     const memberDetail = await MemberDetail.create({ member_id: member.id });
 
-    const loaded = (await findSingularTarget(memberDetail, "membership", {
-      className: "Membership",
-      through: "member",
-      source: "membership",
-    })) as Membership | null;
+    const loaded = (await loadSingularTarget(memberDetail, "membership")) as Membership | null;
     expect(loaded).not.toBeNull();
     expect(loaded!.id).toBe(membership.id);
   });
@@ -766,11 +775,7 @@ describe("AssociationScope", () => {
     const club = await Club.create({ name: "Great club" });
     await CurrentMembership.create({ member_id: member.id, club_id: club.id });
 
-    const loaded = (await findSingularTarget(member, "club", {
-      className: "Club",
-      through: "currentMembership",
-      source: "club",
-    })) as Club | null;
+    const loaded = (await loadSingularTarget(member, "club")) as Club | null;
     expect(loaded).not.toBeNull();
     expect(loaded!.name).toBe("Great club");
   });
