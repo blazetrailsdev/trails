@@ -49,14 +49,9 @@ const { canonicalSchemaUpToDate, stampCanonicalSchema } =
 const { recordBootOutcome } = await import("./support/boot-outcome.js");
 
 if (await canonicalSchemaUpToDate(await Base.leaseConnection())) {
-  // No `DatabaseTasks.truncateTables` here: the purge below already clears the
-  // rows. `purgeToCanonicalTables` truncates every *non-empty* canonical table
-  // (`support/drop-all-tables.ts`'s `truncateNonEmpty`) and **drops** everything
-  // else — the adapter-specific tables the arm below re-lays, the bookkeeping
-  // tables, bespoke tables a test made. A truncate-all ahead of it emptied the
-  // same tables a second time, over a second connection the task handler opens
-  // per call, and on MySQL that is ~250 DDL-grade `TRUNCATE`s per test file
-  // (measured 1.0-1.3 s) for a database the next two statements empty anyway.
+  // No truncate ahead of the purge: `purgeToCanonicalTables` already truncates
+  // every non-empty canonical table and drops everything else, so a
+  // `DatabaseTasks.truncateTables` here emptied the same tables a second time.
   //
   // Only the canonical arm is skipped here — those tables are already laid, and
   // now empty. The adapter-specific arm is re-run as on the full path: its

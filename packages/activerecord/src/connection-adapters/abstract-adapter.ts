@@ -154,12 +154,7 @@ export function adapterNameFromConfig(configAdapter: string | undefined): Adapte
  * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter::Version
  */
 export class Version {
-  /**
-   * Rails' `@version` (abstract_adapter.rb:249), the parsed parts — not the
-   * string it was built from. Ruby's `String#to_i` reads the leading integer
-   * and answers `0` for a part that has none, which is what keeps a banner
-   * like `"8.0.31-log"` parsing as `[8, 0, 31]`.
-   */
+  /** Rails' `@version` (abstract_adapter.rb:249). */
   private _version: number[];
 
   /** Rails: `attr_reader :full_version_string` (abstract_adapter.rb:246). */
