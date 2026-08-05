@@ -65,9 +65,9 @@ export async function recordBootLaidTables(adapter: DatabaseAdapter): Promise<vo
  *
  * The one caller is `test-setup-dy.ts`'s fast path, which purges between the
  * canonical load and the adapter-specific arm and re-lays that arm immediately
- * after (PR #5659) — unless the stamped database carries a `laidTables`
- * snapshot, in which case it passes those names as `alsoProtect` and the arm's
- * tables are truncated in place instead of dropped and re-laid per test file.
+ * after (PR #5659) — unless the stamped database carries a snapshot of the
+ * adapter-specific tables, in which case it passes those names as `alsoProtect`
+ * and they are truncated in place instead of dropped and re-laid per test file.
  *
  * It is a separate entry point rather than a fallback inside
  * {@link resetTestTables} so that intent is stated at the call site: a
