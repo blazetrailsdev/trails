@@ -21,7 +21,7 @@ const MIGRATIONS_ROOT = new URL("./test-helpers/migrations", import.meta.url).pa
 
 describe("MigrationContext", () => {
   afterEach(() => {
-    Migrator.validateMigrationTimestamps = false;
+    ActiveRecord.validateMigrationTimestamps = false;
   });
 
   it("migrations reads this context's migrationsPaths", () => {
@@ -62,14 +62,14 @@ describe("MigrationContext", () => {
   });
 
   it("migrations raises for a migration timestamp in the future", () => {
-    Migrator.validateMigrationTimestamps = true;
+    ActiveRecord.validateMigrationTimestamps = true;
     const context = new MigrationContext([`${MIGRATIONS_ROOT}/future_timestamp`]);
 
     expect(() => context.migrations).toThrow(InvalidMigrationTimestampError);
   });
 
   it("migrations ignores the timestamp check when timestampedMigrations is off", () => {
-    Migrator.validateMigrationTimestamps = true;
+    ActiveRecord.validateMigrationTimestamps = true;
     const previous = ActiveRecord.timestampedMigrations;
     ActiveRecord.timestampedMigrations = false;
     try {

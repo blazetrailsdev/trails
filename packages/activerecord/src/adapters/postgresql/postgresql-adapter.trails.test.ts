@@ -1468,3 +1468,27 @@ describe("PostgreSQLAdapter advisory lock id guard (unit)", () => {
     ]);
   });
 });
+
+// trails-only: Rails' PostgreSQLAdapter#active? (postgresql_adapter.rb:347-356)
+// is a live probe — `@raw_connection.query ";"` then `verified!`, rescuing
+// PG::Error to false. Rails has no test that isolates the probe from the handle
+// guard, so this covers the half the guard alone cannot answer: a connected
+// client whose backend is gone still reports connected? true but active? false.
+describeIfPg("PostgreSQLAdapter#active", () => {
+  it("returns false once the backend behind a live client is terminated", async () => {
+    const adapter = new PostgreSQLAdapter(PG_TEST_URL);
+    try {
+      const pidRows = await adapter.execute("SELECT pg_backend_pid() AS pid");
+      const pid = (pidRows[0] as { pid: number }).pid;
+      expect(await adapter.active()).toBe(true);
+
+      await withSecondAdapter(PG_TEST_URL, async (adapter2) => {
+        await adapter2.execute(`SELECT pg_terminate_backend(${pid})`);
+      });
+
+      expect(await adapter.active()).toBe(false);
+    } finally {
+      await adapter.close();
+    }
+  });
+});

@@ -3,13 +3,6 @@
     "package": "activerecord",
     "tsFile": "connection-adapters/postgresql-adapter.ts",
     "rubyName": "active?",
-    "call": "query",
-    "reason": "The `query \";\"` liveness probe is registered separately as RFC 0072 story postgresql-active-issues-the-rails-liveness-query."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "active?",
     "call": "synchronize",
     "reason": "@lock.synchronize has no counterpart: trails is single-threaded and ports no adapter mutex."
   },
