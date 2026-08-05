@@ -123,10 +123,6 @@ describe("PostgreSQLDatabaseTasks", () => {
   });
 
   it("passes the whole configuration hash through to connection.createDatabase", async () => {
-    // postgresql_database_tasks.rb:22-24 — `create` delegates the option-string
-    // construction to `create_database`, passing
-    // `configuration_hash.merge(encoding: encoding)`, so keys like `owner` and
-    // `template` reach the DDL instead of being dropped.
     const createCalls: Array<{ name: string; options: Record<string, unknown> }> = [];
 
     class FakePostgreSQLAdapter {
@@ -147,12 +143,7 @@ describe("PostgreSQLDatabaseTasks", () => {
     try {
       const mod = await import("./postgresql-database-tasks.js");
       await new mod.PostgreSQLDatabaseTasks(
-        new HashConfig("development", "primary", {
-          adapter: "postgresql",
-          database: "trails_test",
-          owner: "trails_owner",
-          template: "template0",
-        }),
+        config({ owner: "trails_owner", template: "template0" }),
       ).create();
     } finally {
       vi.doUnmock("../connection-adapters/postgresql-adapter.js");

@@ -88,13 +88,12 @@ export class PostgreSQLDatabaseTasks {
 
   async create(connectionAlreadyEstablished = false): Promise<void> {
     const dbName = this.requireDatabaseName();
-    const encoding = this.encoding();
     if (!connectionAlreadyEstablished) {
       await this.establishConnection(this.publicSchemaConfig());
     }
     const conn = await this.connection();
     try {
-      await conn.createDatabase(dbName, { ...this.configurationHash, encoding });
+      await conn.createDatabase(dbName, { ...this.configurationHash, encoding: this.encoding() });
     } catch (error) {
       if (isPGDuplicateDatabaseError(error)) {
         throw new DatabaseAlreadyExists(`Database '${dbName}' already exists`, {
