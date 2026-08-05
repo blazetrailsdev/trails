@@ -600,18 +600,11 @@ describe("prism-codegen", () => {
 
   it("images an operator sym-to-proc as a two-argument arrow", async () => {
     const { code, parseErrorCount } = await generateFromSource(
-      `def total(list); list.reduce(&:+); end`,
+      `def f(list); list.reduce(&:+) + list.sort(&:<=>); end`,
     );
     expect(parseErrorCount).toBe(0);
     expect(code).toContain("(a, b) => a + b");
-  });
-
-  it("images an operator sym-to-proc that needs a helper through the helper", async () => {
-    const { code, parseErrorCount } = await generateFromSource(
-      `def ordered(list); list.sort(&:<=>); end`,
-    );
-    expect(parseErrorCount).toBe(0);
-    expect(code).toContain("cmp(a, b)");
+    expect(code).toContain("(a, b) => cmp(a, b)");
   });
 
   it("images the compound operators JS has no assignment token for", async () => {

@@ -351,21 +351,15 @@ function trackAsyncProvenance(n: PrismNode, e: Emitter): void {
     e.asyncBindings.delete(key);
   }
 }
-/**
- * `&:+` and friends — an operator sym-to-proc. Ruby passes the operator method
- * itself as the block, so the image is the two-argument arrow that applies it.
- */
+/** `&:+` and friends — the two-argument arrow that applies the operator. */
 function operatorArrow(rubyOp: string, e: Emitter): ts.ArrowFunction {
   const a = f.createIdentifier("a");
   const b = f.createIdentifier("b");
   const helper = INFIX_HELPER[rubyOp];
-  let body: ts.Expression;
-  if (helper) {
-    e.helpers.add(helper);
-    body = f.createCallExpression(f.createIdentifier(helper), undefined, [a, b]);
-  } else {
-    body = f.createBinaryExpression(a, INFIX[rubyOp], b);
-  }
+  if (helper) e.helpers.add(helper);
+  const body = helper
+    ? f.createCallExpression(f.createIdentifier(helper), undefined, [a, b])
+    : f.createBinaryExpression(a, INFIX[rubyOp], b);
   return f.createArrowFunction(
     undefined,
     undefined,

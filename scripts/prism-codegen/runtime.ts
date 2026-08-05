@@ -64,9 +64,8 @@ export function intersection(left: unknown, right: unknown): unknown {
 }
 
 /**
- * Ruby `receiver[a, b]` — the multi-argument index read, which has no JS
- * operator. Array and String take a `(start, length)` slice; every other
- * receiver defines `[]` as an ordinary method, which the port spells `idx`.
+ * Ruby `receiver[a, b]` — the multi-argument index read. Array and String take a
+ * `(start, length)` slice; every other receiver spells `[]` as `idx`.
  */
 export function idxGet(receiver: unknown, ...index: unknown[]): unknown {
   if (index.length === 2 && (Array.isArray(receiver) || typeof receiver === "string")) {
@@ -78,9 +77,8 @@ export function idxGet(receiver: unknown, ...index: unknown[]): unknown {
 }
 
 /**
- * Ruby `receiver[a, b] = value` — the multi-argument index write. Array splices
- * the `(start, length)` window; every other receiver spells `[]=` as `setIdx`.
- * Returns the assigned value, as the Ruby expression does.
+ * Ruby `receiver[a, b] = value`. Array splices the `(start, length)` window;
+ * every other receiver spells `[]=` as `setIdx`. Returns the assigned value.
  */
 export function idxSet(receiver: unknown, ...args: unknown[]): unknown {
   const value = args[args.length - 1];
