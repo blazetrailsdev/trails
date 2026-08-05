@@ -57,6 +57,20 @@ describe("withTransactionalFixtures", () => {
     expect(rows).toHaveLength(0);
   });
 
+  it("pins a connection pool established inside the test body", async () => {
+    // Rails pins mid-test pools from its "!connection.active_record" subscriber
+    // (test_fixtures.rb:183-200); the notification is emitted by
+    // ConnectionHandler#establish_connection (connection_handler.rb:149).
+    const pool = Base.connectionHandler.establishConnection(
+      { adapter: "sqlite3", database: ":memory:" },
+      { owner: "MidTestPool" },
+    );
+    // The subscriber's pin/lease is async, so let its microtasks settle.
+    await Promise.resolve();
+    await Promise.resolve();
+    expect((pool as unknown as { _fixturePin: unknown })._fixturePin).not.toBeNull();
+  });
+
   it("nested user transaction becomes a savepoint and still rolls back at teardown", async () => {
     const tm = ((await primaryAdapter()) as unknown as TmHandle).transactionManager;
     await tm.beginTransaction({});

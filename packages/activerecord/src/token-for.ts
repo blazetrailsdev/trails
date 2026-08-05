@@ -294,49 +294,15 @@ export function setGeneratedTokenVerifier(
  * Mirrors: ActiveRecord::TokenFor::ClassMethods#generates_token_for
  */
 export function generatesTokenFor(
-  modelClass: typeof Base,
+  this: typeof Base,
   purpose: string,
   options: {
     expiresIn?: number;
     generator?: (record: any) => unknown;
   } = {},
 ): void {
-  const def = new TokenDefinition(modelClass, purpose, options.expiresIn, options.generator);
-  setTokenDefinitions(modelClass, tokenDefinitions(modelClass).merge({ [purpose]: def }));
-
-  if (!(modelClass.prototype as any).generateTokenFor) {
-    Object.defineProperty(modelClass.prototype, "generateTokenFor", {
-      value: function (this: Base, purposeName: string): string {
-        return generateTokenFor(this, purposeName);
-      },
-      writable: true,
-      configurable: true,
-    });
-  }
-
-  if (!(modelClass as any).findByTokenFor) {
-    Object.defineProperty(modelClass, "findByTokenFor", {
-      value: async function (
-        this: typeof Base,
-        purposeName: string,
-        token: string,
-      ): Promise<Base | null> {
-        return findByTokenFor(this, purposeName, token);
-      },
-      writable: true,
-      configurable: true,
-    });
-  }
-
-  if (!(modelClass as any).findByTokenForBang) {
-    Object.defineProperty(modelClass, "findByTokenForBang", {
-      value: async function (this: typeof Base, purposeName: string, token: string): Promise<Base> {
-        return findByTokenForBang(this, purposeName, token);
-      },
-      writable: true,
-      configurable: true,
-    });
-  }
+  const def = new TokenDefinition(this, purpose, options.expiresIn, options.generator);
+  setTokenDefinitions(this, tokenDefinitions(this).merge({ [purpose]: def }));
 }
 
 /**
@@ -356,11 +322,11 @@ export function generateTokenFor(record: Base, purpose: string): string {
  * Mirrors: ActiveRecord::TokenFor::ClassMethods#find_by_token_for
  */
 export async function findByTokenFor(
-  modelClass: typeof Base,
+  this: typeof Base,
   purpose: string,
   token: string,
 ): Promise<Base | null> {
-  return modelClass.all().findByTokenFor(purpose, token);
+  return this.all().findByTokenFor(purpose, token);
 }
 
 /**
@@ -369,9 +335,9 @@ export async function findByTokenFor(
  * Mirrors: ActiveRecord::TokenFor::ClassMethods#find_by_token_for!
  */
 export async function findByTokenForBang(
-  modelClass: typeof Base,
+  this: typeof Base,
   purpose: string,
   token: string,
 ): Promise<Base> {
-  return modelClass.all().findByTokenForBang(purpose, token);
+  return this.all().findByTokenForBang(purpose, token);
 }

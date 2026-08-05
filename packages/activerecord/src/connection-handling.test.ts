@@ -24,14 +24,21 @@ import * as nodeOs from "node:os";
 import * as nodePath from "node:path";
 
 describe("ConnectionHandlingTest", () => {
-  // The opted-out cases assert the pool releases its connection, which
-  // transactional fixtures defeat by pinning one for the wrapping transaction.
+  // The opted-out cases either assert the pool releases its connection, or
+  // establish one against a config that is never meant to be dialled
+  // (`db/foo.sqlite3`, an in-memory registry entry). Transactional fixtures
+  // defeat both: setup pins a connection for the wrapping transaction, and the
+  // `!connection.active_record` subscriber pins any pool established mid-test,
+  // whose `verifyBang` then really connects.
   fixtures(["posts"], {
     usesTransaction: [
       "common APIs don't permanently hold a connection when permanent checkout is deprecated or disallowed",
       "establish_connection with a url stores a UrlConfig with discrete fields",
       "remove_connection removes the pool",
       "remove_connection returns undefined when no pool exists",
+      "establishConnection backfills the adapter on an adapter-less HashConfig",
+      "autoConnect honors an in-memory DatabaseConfigurations registry",
+      "autoConnect reconnects via mutated configuration.database for UrlConfig",
     ],
   });
 

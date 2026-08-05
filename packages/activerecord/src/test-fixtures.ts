@@ -34,8 +34,8 @@ import { Base } from "./base.js";
 import { registerModel } from "./associations.js";
 import {
   withTransactionalFixtures,
-  pinFixtureConnectionPool,
   type WithTransactionalFixturesOptions,
+  pinFixtureConnectionPool,
 } from "./test-fixtures/with-transactional-fixtures.js";
 import {
   leaseFixtureConnection,

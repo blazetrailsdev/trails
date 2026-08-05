@@ -286,7 +286,8 @@ export { ColumnNotSerializableError } from "./attribute-methods/serialization.js
 // Encryption is server-only. Import `@blazetrails/activerecord/encryption` BEFORE
 // calling Base.encrypts() — omitting it throws at declaration time.
 // Boot-time installer: `@blazetrails/activerecord/encryption/install.js`.
-// generatesTokenFor requires node:crypto — use subpath: @blazetrails/activerecord/generates-token-for
+// generatesTokenFor / findByTokenFor / findByTokenForBang are class methods on
+// Base (base.rb:328 `include TokenFor`); generateTokenFor is an instance method.
 export { delegatedType, getDelegatedTypeConfig } from "./delegated-type.js";
 export { DatabaseConfig } from "./database-configurations/database-config.js";
 export type { DatabaseConfigOptions } from "./database-configurations/database-config.js";

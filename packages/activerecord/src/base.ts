@@ -138,6 +138,10 @@ import {
   setTokenDefinitions as _setTokenDefinitions,
   generatedTokenVerifier as _generatedTokenVerifier,
   setGeneratedTokenVerifier as _setGeneratedTokenVerifier,
+  generatesTokenFor as _generatesTokenFor,
+  generateTokenFor as _generateTokenFor,
+  findByTokenFor as _findByTokenFor,
+  findByTokenForBang as _findByTokenForBang,
 } from "./token-for.js";
 import type { TokenDefinition as _TokenDefinition } from "./token-for.js";
 import type { MessageVerifier as _MessageVerifier } from "@blazetrails/activesupport/message-verifier";
@@ -2112,6 +2116,15 @@ export class Base extends Model {
 
   /** Mirrors: ActiveRecord::SecureToken::ClassMethods#generate_unique_secure_token (secure_token.rb:57). */
   static generateUniqueSecureToken = _generateUniqueSecureToken;
+
+  /** Mirrors: ActiveRecord::TokenFor::ClassMethods#generates_token_for (token_for.rb:100). */
+  static generatesTokenFor = _generatesTokenFor;
+
+  /** Mirrors: ActiveRecord::TokenFor::ClassMethods#find_by_token_for (token_for.rb:104). */
+  static findByTokenFor = _findByTokenFor;
+
+  /** Mirrors: ActiveRecord::TokenFor::ClassMethods#find_by_token_for! (token_for.rb:108). */
+  static findByTokenForBang = _findByTokenForBang;
 
   // The fallback coder used by `serialize` when no explicit coder is given
   // (`coder ||= default_column_serializer`). Subclasses inherit via JS
@@ -4585,16 +4598,13 @@ export class Base extends Model {
     return defs.has(resolveAliasNameIn(this as never, defs, String(name)));
   }
 
-  // --- TokenFor instance methods (token-for.ts, wired at runtime via generatesTokenFor) ---
-  // Rails' TokenFor module is included in Base; these are its instance methods,
-  // installed on the prototype lazily by generatesTokenFor (so they're only
-  // declared here for api:compare credit). The TokenFor *class* accessors
-  // (token_definitions / generated_token_verifier) are real static getters above
-  // — token-for.ts only imports MessageVerifier, the same node:crypto-backed
-  // dependency base.ts already pulls in via signed-id.ts; crypto stays out of the
-  // public barrel because index.ts routes generatesTokenFor to a subpath (BC-3),
-  // not because base.ts avoids the import.
-  declare generateTokenFor: (purpose: string) => string;
+  /**
+   * Mirrors: ActiveRecord::TokenFor#generate_token_for (token_for.rb:118).
+   */
+  generateTokenFor(purpose: string): string {
+    return _generateTokenFor(this, purpose);
+  }
+
   /** @internal */
   declare fullPurpose: () => string;
   /** @internal */
