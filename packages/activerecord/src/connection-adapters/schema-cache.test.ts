@@ -36,18 +36,17 @@ function makeColumn(
 async function warm(
   cache: SchemaCache,
   tableName: string,
-  cols: Column[],
-  pk: string | string[] | null = null,
-  indexes: unknown[] = [],
+  pk: string | string[] | null,
+  cols: Column[] = [],
 ): Promise<void> {
-  const connection = {
+  const conn = {
     dataSources: async () => [tableName],
     dataSourceExists: async () => true,
     primaryKey: async () => pk,
     columns: async () => cols,
-    indexes: async () => indexes,
+    indexes: async () => [],
   };
-  await cache.add(new FakePool(connection), tableName);
+  await cache.add(new FakePool(conn), tableName);
 }
 
 describe("SchemaCacheTest", () => {
@@ -82,7 +81,7 @@ describe("SchemaCacheTest", () => {
       makeColumn("name", "varchar(255)"),
       makeColumn("created_at", "timestamp"),
     ];
-    await warm(cache, "users", cols, "id");
+    await warm(cache, "users", "id", cols);
 
     const filename = path.join(tmpDir, "schema_cache.json");
     cache.dumpTo(filename);
@@ -122,16 +121,11 @@ describe("SchemaCacheTest", () => {
     // applies to our JSON encoding too. dumpTo(".gz") writes gzipped
     // JSON; _loadFrom auto-detects the .gz extension and gunzips first.
     const cache = new SchemaCache();
-    await warm(
-      cache,
-      "courses",
-      [
-        makeColumn("id", "integer", { primaryKey: true, null: false }),
-        makeColumn("name", "varchar(255)"),
-        makeColumn("created_at", "timestamp"),
-      ],
-      "id",
-    );
+    await warm(cache, "courses", "id", [
+      makeColumn("id", "integer", { primaryKey: true, null: false }),
+      makeColumn("name", "varchar(255)"),
+      makeColumn("created_at", "timestamp"),
+    ]);
 
     const filename = path.join(tmpDir, "schema_cache.json.gz");
     cache.dumpTo(filename);
@@ -153,7 +147,7 @@ describe("SchemaCacheTest", () => {
 
   it("primary key for existent table", async () => {
     const cache = new SchemaCache();
-    await warm(cache, "users", [], "id");
+    await warm(cache, "users", "id");
     const pk = await cache.primaryKeys(null, "users");
     expect(pk).toBe("id");
   });
@@ -161,7 +155,7 @@ describe("SchemaCacheTest", () => {
   it("primary key for non existent table", async () => {
     const cache = new SchemaCache();
     // Cached as having no primary key
-    await warm(cache, "other", [], null);
+    await warm(cache, "other", null);
     const pk = await cache.primaryKeys(null, "other");
     expect(pk).toBeNull();
   });
@@ -201,7 +195,7 @@ describe("SchemaCacheTest", () => {
 
   it("getCachedPrimaryKeys prefers the explicit primary-keys map over columns", async () => {
     const cache = new SchemaCache();
-    await warm(cache, "users", [makeColumn("id", "integer", { primaryKey: true })], null);
+    await warm(cache, "users", null, [makeColumn("id", "integer", { primaryKey: true })]);
     expect(cache.getCachedPrimaryKeys("users")).toBeNull();
   });
 
@@ -213,7 +207,7 @@ describe("SchemaCacheTest", () => {
     // which carries no per-column primary flag.
     const cache = new SchemaCache();
     const nick = makeColumn("nick", "varchar(100)", { primaryKey: true, null: false });
-    await warm(cache, "subscribers", [nick, makeColumn("name", "varchar(100)")], null);
+    await warm(cache, "subscribers", null, [nick, makeColumn("name", "varchar(100)")]);
     expect(nick.primaryKey).toBe(false);
     expect(cache.getCachedColumnsHash("subscribers")!["nick"].primaryKey).toBe(false);
   });
@@ -221,7 +215,7 @@ describe("SchemaCacheTest", () => {
   it("setColumns keeps a genuine primaryKey flag the authoritative key includes", async () => {
     const cache = new SchemaCache();
     const id = makeColumn("id", "integer", { primaryKey: true, null: false });
-    await warm(cache, "users", [id, makeColumn("name", "text")], "id");
+    await warm(cache, "users", "id", [id, makeColumn("name", "text")]);
     expect(id.primaryKey).toBe(true);
   });
 
@@ -315,7 +309,7 @@ describe("SchemaCacheTest", () => {
 
   it("clearing", async () => {
     const cache = new SchemaCache();
-    await warm(cache, "users", [makeColumn("id", "integer")], "id");
+    await warm(cache, "users", "id", [makeColumn("id", "integer")]);
     expect(cache.size).toBeGreaterThan(0);
 
     cache.clear();
@@ -325,12 +319,10 @@ describe("SchemaCacheTest", () => {
 
   it("marshal dump and load", async () => {
     const cache = new SchemaCache();
-    await warm(
-      cache,
-      "users",
-      [makeColumn("id", "integer", { primaryKey: true }), makeColumn("email", "varchar(255)")],
-      "id",
-    );
+    await warm(cache, "users", "id", [
+      makeColumn("id", "integer", { primaryKey: true }),
+      makeColumn("email", "varchar(255)"),
+    ]);
 
     const dumped = cache.marshalDump();
     const restored = new SchemaCache();
@@ -345,7 +337,7 @@ describe("SchemaCacheTest", () => {
 
   it("marshal dump and load via disk", async () => {
     const cache = new SchemaCache();
-    await warm(cache, "posts", [makeColumn("title", "text")], "id");
+    await warm(cache, "posts", "id", [makeColumn("title", "text")]);
 
     const dumped = JSON.stringify(cache.marshalDump());
     const parsed = JSON.parse(dumped);
@@ -410,16 +402,11 @@ describe("SchemaCacheTest", () => {
     // cached columns survive — still applies. `dumpTo(".gz")` gzips the
     // JSON payload and `_loadFrom` auto-detects the `.gz` suffix.
     const cache = new SchemaCache();
-    await warm(
-      cache,
-      "courses",
-      [
-        makeColumn("id", "integer", { primaryKey: true }),
-        makeColumn("name", "varchar(255)"),
-        makeColumn("created_at", "timestamp"),
-      ],
-      "id",
-    );
+    await warm(cache, "courses", "id", [
+      makeColumn("id", "integer", { primaryKey: true }),
+      makeColumn("name", "varchar(255)"),
+      makeColumn("created_at", "timestamp"),
+    ]);
 
     const filename = path.join(tmpDir, "schema_cache.dump.gz");
     cache.dumpTo(filename);
@@ -433,7 +420,7 @@ describe("SchemaCacheTest", () => {
     // be byte-identical, since the gzip header carries no mtime. Node's
     // zlib.gzipSync writes mtime=0 / OS=0xff, so the same property holds.
     const cache = new SchemaCache();
-    await warm(cache, "posts", [makeColumn("id", "integer", { primaryKey: true })], "id");
+    await warm(cache, "posts", "id", [makeColumn("id", "integer", { primaryKey: true })]);
 
     const a = path.join(tmpDir, "schema_cache_a.json.gz");
     const b = path.join(tmpDir, "schema_cache_b.json.gz");
@@ -463,7 +450,7 @@ describe("SchemaCacheTest", () => {
 
   it("clear data source cache", async () => {
     const cache = new SchemaCache();
-    await warm(cache, "users", [makeColumn("id", "integer")], "id");
+    await warm(cache, "users", "id", [makeColumn("id", "integer")]);
     expect(cache.isCached("users")).toBe(true);
 
     cache.clearDataSourceCacheBang(null, "users");
@@ -530,7 +517,7 @@ describe("SchemaCacheTest", () => {
     // here we cover the SchemaReflection-level contract that backs it.
     const cachePath = path.join(tmpDir, "schema_cache.json");
     const cache = new SchemaCache();
-    await warm(cache, "gadgets", [makeColumn("id", "integer", { primaryKey: true })], "id");
+    await warm(cache, "gadgets", "id", [makeColumn("id", "integer", { primaryKey: true })]);
     cache.dumpTo(cachePath);
 
     const prevCheck = SchemaReflection.checkSchemaCacheDumpVersion;
@@ -562,8 +549,8 @@ describe("SchemaCacheTest", () => {
 
   it("#encode_with sorts members", async () => {
     const cache = new SchemaCache();
-    await warm(cache, "zebras", [makeColumn("id", "integer")], "id");
-    await warm(cache, "alpacas", [makeColumn("id", "integer")], "id");
+    await warm(cache, "zebras", "id", [makeColumn("id", "integer")]);
+    await warm(cache, "alpacas", "id", [makeColumn("id", "integer")]);
 
     const coder: Record<string, unknown> = {};
     cache.encodeWith(coder);
@@ -579,7 +566,7 @@ describe("SchemaCacheTest", () => {
     // names. Phase 13 widened the type from string|null to
     // string|string[]|null. Verify encode → initWith round-trips.
     const cache = new SchemaCache();
-    await warm(cache, "memberships", [], ["user_id", "group_id"]);
+    await warm(cache, "memberships", ["user_id", "group_id"]);
 
     const coder: Record<string, unknown> = {};
     cache.encodeWith(coder);
@@ -598,8 +585,8 @@ describe("SchemaCacheTest", () => {
 
   it("marshalDump / marshalLoad round-trips composite primary keys", async () => {
     const cache = new SchemaCache();
-    await warm(cache, "memberships", [], ["user_id", "group_id"]);
-    await warm(cache, "users", [], "id");
+    await warm(cache, "memberships", ["user_id", "group_id"]);
+    await warm(cache, "users", "id");
 
     const data = cache.marshalDump();
     const restored = new SchemaCache();
@@ -632,7 +619,7 @@ describe("SchemaReflectionTest", () => {
 
     // Dump a cache to disk
     const cache = new SchemaCache();
-    await warm(cache, "users", [makeColumn("id", "integer"), makeColumn("name", "text")], "id");
+    await warm(cache, "users", "id", [makeColumn("id", "integer"), makeColumn("name", "text")]);
     cache.dumpTo(cachePath);
 
     // Create reflection pointing at that file, version check disabled
