@@ -178,7 +178,7 @@ describe("RequiredAssociationsTest", () => {
     expect(await record.save()).toBe(false);
     expect(record.errors.fullMessages).toEqual(["Child must exist"]);
 
-    (record as any).child = new Child();
+    await (record as any).setChild(new Child());
     expect(await record.save()).toBe(true);
   });
 

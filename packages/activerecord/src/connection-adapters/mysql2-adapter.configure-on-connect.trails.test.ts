@@ -23,9 +23,10 @@ describe("Mysql2Adapter configure-on-fresh-connect", () => {
     const fakeConn = {
       end: () => Promise.resolve(),
       // getFullVersion() (run by the connect-once configure to warm the version
-      // before checkVersion) issues SELECT VERSION(); hand it a row so the warm
-      // resolves offline.
-      query: () => Promise.resolve([[{ v: version }]]),
+      // before checkVersion) reads the driver's handshake banner; hand it one
+      // so the warm resolves offline.
+      connection: { _handshakePacket: { serverVersion: version } },
+      query: () => Promise.resolve([[]]),
     };
     vi.spyOn(Mysql2Adapter, "newClient").mockResolvedValue(fakeConn as never);
   }

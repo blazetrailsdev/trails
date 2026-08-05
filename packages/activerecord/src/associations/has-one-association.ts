@@ -26,8 +26,11 @@ export class HasOneAssociation extends SingularAssociation {
   }
 
   /**
-   * Writer for the JS property setter (`owner.account = x`, builder/has-one.ts
-   * `defineWriters`) and mass-assignment, neither of which can `await`.
+   * Writer for mass-assignment (`new Firm({ account })`,
+   * `firm.assignAttributes({ account })`), which cannot `await`. RFC 0087 §1
+   * removed the `owner.account = x` property setter that was its other caller;
+   * the mass-assignment arm itself goes in that RFC's
+   * `retire-sync-association-mass-assignment-arms`, and this method with it.
    *
    * - **Unpersisted owner:** in-memory `replace` (FK + inverse set), exactly as
    *   Rails' `replace` does no I/O for a new-record owner (`save &&=
@@ -41,10 +44,10 @@ export class HasOneAssociation extends SingularAssociation {
    *   0068-awaitable-has-one-setter ("Why 'loud' beats 'deferred'") for the
    *   ergonomic-tradeoff decision to deviate loudly from Rails' legal syntax.
    *
-   * `protected`: the generated `#{name}=` property setter (builder/has-one.ts
-   * `defineWriters`) is the sole caller, and it reaches the association through
-   * a structural handle rather than the class type. The Rails-named surface is
-   * `writer` / `set#{Name}`.
+   * `protected`: its callers (`attribute-assignment.ts`'s hasOne arm, and the
+   * through-inverse wiring in collection-proxy.ts / has-many-through-association.ts)
+   * reach the association through a structural handle rather than the class
+   * type. The Rails-named surface is `writer` / `set#{Name}`.
    *
    * @internal
    */
@@ -73,8 +76,7 @@ export class HasOneAssociation extends SingularAssociation {
    * a *saved* owner: the displaced record is nullified/deleted/destroyed and
    * the new record saved immediately. Returns a Promise so callers can `await`
    * the writes — the only floating-promise-free way to reach the immediate path
-   * from JS (the sync property setter cannot await, so it uses `syncWrite`
-   * instead). For a *new* owner the foreign key isn't known yet, so persistence
+   * from JS (mass-assignment cannot await, so it uses `syncWrite` instead). For a *new* owner the foreign key isn't known yet, so persistence
    * defers to the owner's next save (`autosaveHasOne`).
    */
   override writer(record: Base | null): void | Promise<void> {

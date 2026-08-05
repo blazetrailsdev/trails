@@ -95,9 +95,11 @@ export class HasOne extends SingularAssociation {
     // `rubyMethodToTs` offers `set#{Name}` as a candidate for `name=`
     // (scripts/api-compare/conventions.ts).
     //
-    // Generated here — beside the `=` setter below, unconditionally (including
-    // polymorphic has_one) — rather than in `defineConstructors`, which Rails
-    // skips for polymorphic; the writer must exist wherever `=` does. A thin
+    // Generated unconditionally (including polymorphic has_one) rather than in
+    // `defineConstructors`, which Rails skips for polymorphic; the writer must
+    // exist for every has_one. It is the ONLY writer: RFC 0087 §1 removed the
+    // generated `#{name}=` property setter, so assigning the property now fails
+    // as a plain JS write to a getter-only accessor. A thin
     // delegation to the association-level `writer`, whose has_one /
     // has_one_through overrides run the Rails-faithful immediate replace/persist
     // and whose returned promise rejects (`RecordNotSaved`) at the call site.
@@ -114,29 +116,6 @@ export class HasOne extends SingularAssociation {
         configurable: true,
       });
     }
-    const existing = Object.getOwnPropertyDescriptor(mixin, name);
-    if (existing && !existing.configurable) return;
-    Object.defineProperty(mixin, name, {
-      get: existing?.get,
-      // The synchronous path, supported alongside `set${cap}` — Rails defines
-      // `#{name}=`, so this stays. It is fully faithful on the branch where
-      // Rails does no I/O either: an *unpersisted* owner, where Rails'
-      // assignment is in-memory too, so `syncWrite` sets the FK/inverse and
-      // lets autosave persist at the owner's first `save()`.
-      //
-      // On a *persisted* owner Rails persists the displacement inline, which
-      // needs `await` — unreachable from a JS property setter. `syncWrite`
-      // therefore throws `HasOnePersistedAssignmentError`, a deliberate
-      // DEVIATION (Rails raises nothing there): the alternative is accepting
-      // the assignment and silently skipping the write, so the throw is a guard
-      // against data loss, not a deprecation. Persisted-owner callers use
-      // `await owner.set#{Name}(value)` (the `set${cap}` port above) or
-      // `await record.association(name).writer(value)` (RFC 0068).
-      set(this: { association(n: string): { syncWrite(v: unknown): void } }, value: unknown) {
-        this.association(name).syncWrite(value);
-      },
-      configurable: true,
-    });
   }
 
   static override validDependentOptions(): string[] {
