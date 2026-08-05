@@ -14,24 +14,15 @@ import {
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
 import type { DatabaseConfig } from "../database-configurations/database-config.js";
-import { DatabaseAlreadyExists } from "../errors.js";
 import { Base } from "../base.js";
 import { DatabaseTasks, metadataTableNames } from "./database-tasks.js";
 import { coercePort } from "./task-utils.js";
 
 const DEFAULT_ENCODING_FALLBACK = "utf8";
-const DUPLICATE_DATABASE = "42P04";
 
 function defaultEncoding(): string {
   const proc = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process;
   return proc?.env?.CHARSET ?? DEFAULT_ENCODING_FALLBACK;
-}
-
-function isPGDuplicateDatabaseError(error: unknown): boolean {
-  if (!error || typeof error !== "object") return false;
-  const e = error as { code?: unknown; message?: unknown };
-  if (e.code === DUPLICATE_DATABASE) return true;
-  return typeof e.message === "string" && e.message.includes("already exists");
 }
 const ON_ERROR_STOP_1 = "ON_ERROR_STOP=1";
 const SQL_COMMENT_BEGIN = "--";
@@ -87,27 +78,15 @@ export class PostgreSQLDatabaseTasks {
   }
 
   async create(connectionAlreadyEstablished = false): Promise<void> {
-    const dbName = this.requireDatabaseName();
     if (!connectionAlreadyEstablished) {
       await this.establishConnection(this.publicSchemaConfig());
     }
     const conn = await this.connection();
-    try {
-      await conn.createDatabase(dbName, { ...this.configurationHash, encoding: this.encoding() });
-    } catch (error) {
-      if (isPGDuplicateDatabaseError(error)) {
-        throw new DatabaseAlreadyExists(`Database '${dbName}' already exists`, {
-          cause: error,
-        });
-      }
-      throw error;
-    } finally {
-      // Always restore the pool to the target DB. Rails establish_connection at
-      // the end of create() is unconditional — it runs even when called as
-      // create(true) (from purge()), so the pool is always re-pointed at the
-      // target DB after create() finishes, regardless of success or failure.
-      await this.establishConnection();
-    }
+    await conn.createDatabase(this.requireDatabaseName(), {
+      ...this.configurationHash,
+      encoding: this.encoding(),
+    });
+    await this.establishConnection();
   }
 
   async drop(): Promise<void> {
