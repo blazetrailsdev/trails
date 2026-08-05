@@ -6,6 +6,11 @@
 
 import type { MessageSerializerLike } from "./message-serializer.js";
 import { NullEncryptor } from "./null-encryptor.js";
+// Only referenced from method bodies, never at module top level: the import
+// closes a cycle (context → configurable → contexts → context) that is safe
+// exactly as long as nothing here runs at eval time.
+import { Configurable } from "./configurable.js";
+import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
 
 // EncryptingOnlyEncryptor extends the full Encryptor, which transitively imports
 // Configurable. Importing it eagerly here would create an eval-time cycle
@@ -53,10 +58,7 @@ export class Context {
 
   /** @internal */
   private buildDefaultKeyProvider(): unknown {
-    // Avoid importing Configurable here to prevent a circular dependency:
-    // context → configurable → contexts → context. Callers that need the
-    // default key provider resolve it via Configurable.keyProvider directly.
-    return undefined;
+    return new DerivedSecretKeyProvider(Configurable.config.primaryKey);
   }
 }
 
@@ -69,7 +71,11 @@ export interface EncryptionContext {
 }
 
 const contextStack: EncryptionContext[] = [];
-let _defaultContext: EncryptionContext = {};
+// Mirrors Rails' `mattr_accessor :default_context, default: Context.new`
+// (contexts.rb:18). A real Context, not a bare object, because Context is where
+// the default key provider is memoized (context.rb:26) — that memo is Rails'
+// only key-provider cache, and `reset_default_context` is its only invalidation.
+let _defaultContext: EncryptionContext = new Context() as unknown as EncryptionContext;
 
 export function getDefaultContext(): EncryptionContext {
   return _defaultContext;
@@ -81,7 +87,7 @@ export function setDefaultContext(context: EncryptionContext): void {
 }
 
 export function resetDefaultContext(): void {
-  _defaultContext = {};
+  _defaultContext = new Context() as unknown as EncryptionContext;
 }
 
 function currentContext(): EncryptionContext {
@@ -94,7 +100,17 @@ export function withEncryptionContext<T>(overrides: EncryptionContext, fn: () =>
   // context. So nested contexts reset every unspecified property to the default
   // (e.g. without_encryption nested inside protecting_encrypted_data resets
   // frozen_encryption to false), rather than inheriting it from the outer frame.
-  contextStack.push({ ...getDefaultContext(), ...overrides });
+  // `default_context.dup` keeps the Context class (and so its key_provider
+  // getter and its memo); a spread would flatten the frame to a bare object and
+  // lose the default key provider inside every custom context.
+  const frame = Object.assign(
+    Object.create(Object.getPrototypeOf(getDefaultContext())),
+    getDefaultContext(),
+  ) as EncryptionContext;
+  for (const [key, value] of Object.entries(overrides)) {
+    frame[key] = value;
+  }
+  contextStack.push(frame);
   let result: T;
   try {
     result = fn();

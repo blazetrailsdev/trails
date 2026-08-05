@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Scheme } from "./scheme.js";
 import { Configuration } from "./errors.js";
 import { Configurable } from "./configurable.js";
+import { Contexts } from "./contexts.js";
 import { getEncryptionContext } from "./context.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
 import { DeterministicKeyProvider } from "./deterministic-key-provider.js";
@@ -88,10 +89,13 @@ describe("ActiveRecord::Encryption::SchemeTest", () => {
     }
   });
 
-  it("keyProvider returns undefined when no key/keyProvider/deterministic configured", () => {
+  it("keyProvider raises when no key/keyProvider/deterministic configured", () => {
     // The suite-wide bootstrap (cases/helper.ts, mirroring Rails helper.rb)
     // configures a global primary key, so clear it locally to exercise the
-    // truly-unconfigured resolution path.
+    // truly-unconfigured resolution path. Rails falls all the way through to
+    // `Encryption.key_provider` → `Context#build_default_key_provider`
+    // (context.rb:38), which reads `config.primary_key` — and that raises when
+    // the credential is missing (config.rb:42-44).
     const c = Configurable.config;
     const saved = {
       primaryKey: c.primaryKey,
@@ -101,12 +105,16 @@ describe("ActiveRecord::Encryption::SchemeTest", () => {
     c.primaryKey = undefined;
     c.deterministicKey = undefined;
     c.keyDerivationSalt = undefined;
+    Contexts.resetDefaultContext();
     try {
-      expect(new Scheme().keyProvider).toBeUndefined();
+      expect(() => new Scheme().keyProvider).toThrow(
+        "Missing Active Record encryption credential: active_record_encryption.primary_key",
+      );
     } finally {
       c.primaryKey = saved.primaryKey;
       c.deterministicKey = saved.deterministicKey;
       c.keyDerivationSalt = saved.keyDerivationSalt;
+      Contexts.resetDefaultContext();
     }
   });
 

@@ -39,17 +39,7 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
   });
 
   it("can access context properties with top level getters", () => {
-    // Set salt so DerivedSecretKeyProvider can run PBKDF2.
-    Configurable.config.keyDerivationSalt = "the salt";
-    const keyProvider = new DerivedSecretKeyProvider("some secret");
-
-    expect(Configurable.keyProvider).toBeUndefined();
-
-    Contexts.withEncryptionContext({ keyProvider }, () => {
-      expect(Configurable.keyProvider).toBe(keyProvider);
-    });
-
-    expect(Configurable.keyProvider).toBeUndefined();
+    expect(Configurable.keyProvider).toBe(Contexts.context.keyProvider);
   });
 
   it(".configure configures initial config properties", () => {
@@ -155,17 +145,12 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
     }
   });
 
-  it("configure fires onConfigure hooks so cache-clearing callbacks take effect", () => {
-    let fired = false;
-    const dispose = Configurable.onConfigure(() => {
-      fired = true;
-    });
-    try {
-      Configurable.configure({ primaryKey: "test-key", keyDerivationSalt: "the salt" });
-      expect(fired).toBe(true);
-    } finally {
-      dispose();
-    }
+  it("configure resets the default context so config-derived properties are rebuilt", () => {
+    // configurable.rb:30 — `configure` ends in `reset_default_context`, which is
+    // the only key-provider invalidation Rails has.
+    const before = Contexts.defaultContext;
+    Configurable.configure({ primaryKey: "test-key", keyDerivationSalt: "the salt" });
+    expect(Contexts.defaultContext).not.toBe(before);
   });
 
   it("excludeFromFilterParameters excludes specific attributes while others are still filtered", () => {

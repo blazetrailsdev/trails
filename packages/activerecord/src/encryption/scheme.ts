@@ -12,11 +12,6 @@ import { Configurable } from "./configurable.js";
 import { withEncryptionContext, type EncryptionContext } from "./context.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
 import { DeterministicKeyProvider } from "./deterministic-key-provider.js";
-import {
-  getOrCreateDefaultKeyProvider,
-  clearDefaultKeyProviderCache,
-} from "./default-key-provider-cache.js";
-export { clearDefaultKeyProviderCache } from "./default-key-provider-cache.js";
 
 export interface SchemeOptions {
   keyProvider?: unknown;
@@ -147,16 +142,7 @@ export class Scheme {
 
   /** @internal */
   private defaultKeyProvider(): unknown {
-    const ctxKp = Configurable.keyProvider;
-    if (ctxKp != null) return ctxKp;
-    const primaryKey = Configurable.config.hasPrimaryKey();
-    if (primaryKey == null) {
-      clearDefaultKeyProviderCache();
-      return undefined;
-    }
-    const keyDerivationSalt = Configurable.config.hasKeyDerivationSalt();
-    const { hashDigestClass } = Configurable.config;
-    return getOrCreateDefaultKeyProvider(primaryKey, keyDerivationSalt, hashDigestClass);
+    return Configurable.keyProvider;
   }
 
   /** @internal */

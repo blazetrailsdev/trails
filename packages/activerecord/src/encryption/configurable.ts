@@ -1,7 +1,6 @@
 import { Config } from "./config.js";
 import { Contexts } from "./contexts.js";
 import { Cipher } from "./cipher.js";
-import { clearDefaultKeyProviderCache } from "./default-key-provider-cache.js";
 import type { EncryptorLike } from "./encryptor.js";
 import type { SchemeOptions } from "./scheme.js";
 
@@ -12,7 +11,6 @@ let _defaultCipher: Cipher | null = null;
 // Mirrors Rails' `mattr_accessor :encrypted_attribute_declaration_listeners`
 // (no default → nil). Lazily allocated in onEncryptedAttributeDeclared.
 let _listeners: DeclarationListener[] | undefined;
-const _configureHooks: Array<() => void> = [];
 
 /**
  * Configuration API for ActiveRecord::Encryption. Manages the shared
@@ -93,23 +91,11 @@ export class Configurable {
       }
     }
 
-    this._invalidateCaches();
-  }
-
-  private static _invalidateCaches(): void {
-    // Mirror Rails: reset_default_context after setting config so context
-    // properties derived from config (e.g. key_provider) are re-evaluated.
+    // configurable.rb:30 — the config generation turns over here, and this is
+    // the only invalidation Rails has: Context rebuilds its key provider on the
+    // next read because it is a new Context.
     _defaultCipher = null;
     Contexts.resetDefaultContext();
-    for (const hook of [..._configureHooks]) hook();
-  }
-
-  static onConfigure(hook: () => void): () => void {
-    _configureHooks.push(hook);
-    return () => {
-      const idx = _configureHooks.indexOf(hook);
-      if (idx !== -1) _configureHooks.splice(idx, 1);
-    };
   }
 
   static onEncryptedAttributeDeclared(callback: (klass: any, name: string) => void): () => void {
@@ -132,8 +118,3 @@ export class Configurable {
     }
   }
 }
-
-// Registered here, not in default-key-provider-cache.ts: Config constructs a
-// Scheme (config.rb:65-67), so a Configurable import there closes an import
-// cycle through config.ts that runs before this class is defined.
-Configurable.onConfigure(clearDefaultKeyProviderCache);

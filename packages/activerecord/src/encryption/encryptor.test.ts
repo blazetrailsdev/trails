@@ -3,7 +3,6 @@ import { Cipher } from "./cipher.js";
 import { Encryptor } from "./encryptor.js";
 import { Configurable } from "./configurable.js";
 import { Contexts } from "./contexts.js";
-import { clearDefaultKeyProviderCache } from "./default-key-provider-cache.js";
 import { Decryption, ForbiddenClass, Encryption } from "./errors.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
 import { MessageSerializer } from "./message-serializer.js";
@@ -260,7 +259,6 @@ describe("ActiveRecord::Encryption::EncryptorTest", () => {
     afterEach(() => {
       Configurable.config.primaryKey = savedPrimaryKey;
       Configurable.config.keyDerivationSalt = savedSalt;
-      clearDefaultKeyProviderCache();
       Contexts.resetDefaultContext();
     });
 
@@ -293,7 +291,7 @@ describe("ActiveRecord::Encryption::EncryptorTest", () => {
     try {
       Configurable.config.primaryKey = "a".repeat(32);
       Configurable.config.keyDerivationSalt = "testsalt";
-      clearDefaultKeyProviderCache();
+      Contexts.resetDefaultContext();
       const enc = new Encryptor({ compress: false });
       const cipherSpy = vi.spyOn(enc as any, "cipher");
       const encrypted = enc.encrypt("secret text");
@@ -304,7 +302,7 @@ describe("ActiveRecord::Encryption::EncryptorTest", () => {
     } finally {
       Configurable.config.primaryKey = savedKey;
       Configurable.config.keyDerivationSalt = savedSalt;
-      clearDefaultKeyProviderCache();
+      Contexts.resetDefaultContext();
     }
   });
 });

@@ -9,10 +9,6 @@ import type { Properties } from "./properties.js";
 import { MessageSerializer, type MessageSerializerLike } from "./message-serializer.js";
 import { getEncryptionContext } from "./context.js";
 import { Configurable } from "./configurable.js";
-import {
-  getOrCreateDefaultKeyProvider,
-  clearDefaultKeyProviderCache,
-} from "./default-key-provider-cache.js";
 import { Base, Configuration, Decryption, Encoding, ForbiddenClass } from "./errors.js";
 import type { Compressor } from "./config.js";
 import { normalizeEncoding, replaceUnencodable } from "./encoding-helpers.js";
@@ -160,18 +156,7 @@ export class Encryptor {
 
   /** @internal */
   private defaultKeyProvider(): KeyProviderLike | undefined {
-    const ctxKp = Configurable.keyProvider as KeyProviderLike | undefined;
-    if (ctxKp) return ctxKp;
-    const primaryKey = Configurable.config.hasPrimaryKey();
-    const keyDerivationSalt = Configurable.config.hasKeyDerivationSalt();
-    const { hashDigestClass } = Configurable.config;
-    if (primaryKey == null) {
-      clearDefaultKeyProviderCache();
-      return undefined;
-    }
-    // Module-level cache keyed by (primaryKey, salt, digest); invalidated by
-    // the single onConfigure hook registered in default-key-provider-cache.ts.
-    return getOrCreateDefaultKeyProvider(primaryKey, keyDerivationSalt, hashDigestClass);
+    return Configurable.keyProvider as KeyProviderLike | undefined;
   }
 
   /** @internal */

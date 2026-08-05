@@ -58,6 +58,14 @@
       "types": "./dist/testing/temporal-helpers.d.ts",
       "default": "./dist/testing/temporal-helpers.js"
     },
+    "./core-ext/range/conversions": {
+      "types": "./dist/core-ext/range/conversions.d.ts",
+      "default": "./dist/core-ext/range/conversions.js"
+    },
+    "./core-ext/range/each": {
+      "types": "./dist/core-ext/range/each.d.ts",
+      "default": "./dist/core-ext/range/each.js"
+    },
     "./cache/file-store": {
       "types": "./dist/cache/file-store.d.ts",
       "default": "./dist/cache/file-store.js"

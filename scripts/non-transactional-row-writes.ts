@@ -1,0 +1,165 @@
+// PR #5719 removed the global between-test reset (`cases/helper.ts` →
+// `resetTestAdapterState` → `resetTestTables`). That reset both DROPped every
+// non-canonical table and TRUNCATEd the boot-laid canonical ones, and the RFC
+// 0064 measurement that unblocked its removal instrumented only the DROP half —
+// so it proved no test leaked a *table*, and said nothing about leaked *rows*.
+//
+// The TRUNCATE half was load-bearing for test files that write rows without a
+// transactional wrap. #5719's first CI run found one on all three lanes:
+// `encryption/encryptable-record.test.ts`, where the `downcase: true` case's
+// book survived into the `ignore_case: true` case and `findBy({ name: "dune" })`
+// read the wrong row. The fix was to give that describe the Rails shape, since
+// Rails' own `ActiveRecord::TestCase` runs with `use_transactional_tests` on
+// (vendor/rails/activerecord/lib/active_record/test_fixtures.rb:113, :146).
+//
+// What was left is an unenforced invariant: a test file that writes rows must
+// either ride `fixtures()` / `useTransactionalTests()` / `withTransactionalFixtures`,
+// or delete its own rows. This module checks it. A new non-transactional file
+// that writes rows is otherwise silently fine until some sibling case happens to
+// read the same table, and the resulting failure can be lane-specific (#5719's
+// second failure, in `abstract-mysql-adapter/warnings.test.ts`, only reproduced
+// on MariaDB) and so may not surface on the lane the author runs locally.
+//
+// The population is large and most of it is legitimate — files that clean up in
+// `afterEach`, or write to a table nothing else reads — so this is a ratchet
+// seeded from the tree, not a suite-reddening gate: the count may not grow.
+
+import { readdir, readFile } from "node:fs/promises";
+import path from "node:path";
+
+export const TEST_ROOT = path.join("packages", "activerecord", "src");
+
+export const RATCHET_PATH = path.join("scripts", "non-transactional-row-writes.json");
+
+const SKIP_DIRS = new Set(["node_modules", "dist", "__snapshots__", "__fixtures__"]);
+
+/**
+ * The wrappers that put a file (or one of its describes) inside a transaction
+ * that rolls back per test. `fixtures()` is the endgame surface — it wires the
+ * handler, the transactional fixtures, and the canonical schema in one call.
+ */
+export const TRANSACTIONAL_WIRING = [
+  "fixtures(",
+  "useTransactionalTests(",
+  "withTransactionalFixtures(",
+];
+
+/**
+ * Row-writing call shapes. Deliberately textual: the point is to catch a new
+ * file at review time, not to prove reachability.
+ */
+export const WRITE_PATTERNS = [".create(", ".insert", ".update(", "INSERT INTO", ".save()"];
+
+/**
+ * Strip block comments, line comments, and string literals so a commented-out
+ * `.create(` — or a `fixtures(` named in prose — doesn't change the verdict.
+ * Template literals are emptied rather than dropped so an interpolated
+ * `INSERT INTO` inside raw SQL still counts as the write it is; the literal is
+ * replaced by its own contents minus the backticks.
+ */
+export function stripCommentsAndStrings(src: string): string {
+  return src
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/\/\/.*$/gm, "")
+    .replace(/'(?:\\.|[^'\\])*'/g, "''")
+    .replace(/"(?:\\.|[^"\\])*"/g, '""');
+}
+
+const IT_CALL = /(?:^|[^.\w])(?:it|test)(?:\.\w+)*\s*\(/;
+
+export interface RowWrite {
+  line: number;
+  pattern: string;
+}
+
+/**
+ * The row writes this source performs at `it()` scope. Writes in `beforeEach` /
+ * `beforeAll` / module scope are not reported: those are setup, and the files
+ * that do them own their own teardown by construction.
+ */
+export function rowWritesAtItScope(src: string): RowWrite[] {
+  const stripped = stripCommentsAndStrings(src);
+  const writes: RowWrite[] = [];
+  const itDepths: number[] = [];
+  let depth = 0;
+  let pendingIt = false;
+
+  const lines = stripped.split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (IT_CALL.test(line)) pendingIt = true;
+
+    if (itDepths.length > 0) {
+      for (const pattern of WRITE_PATTERNS) {
+        if (line.includes(pattern)) writes.push({ line: i + 1, pattern });
+      }
+    }
+
+    for (const ch of line) {
+      if (ch === "{") {
+        depth++;
+        if (pendingIt) {
+          itDepths.push(depth);
+          pendingIt = false;
+        }
+      } else if (ch === "}") {
+        if (itDepths[itDepths.length - 1] === depth) itDepths.pop();
+        depth--;
+      }
+    }
+  }
+  return writes;
+}
+
+/** Whether the file wires any transactional wrap at all. */
+export function hasTransactionalWiring(src: string): boolean {
+  const stripped = stripCommentsAndStrings(src);
+  return TRANSACTIONAL_WIRING.some((call) => stripped.includes(call));
+}
+
+export function isOffender(src: string): boolean {
+  if (hasTransactionalWiring(src)) return false;
+  return rowWritesAtItScope(src).length > 0;
+}
+
+async function collectTestFiles(dir: string, out: string[]): Promise<void> {
+  const entries = await readdir(dir, { withFileTypes: true });
+  for (const entry of entries) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (SKIP_DIRS.has(entry.name)) continue;
+      await collectTestFiles(full, out);
+    } else if (entry.name.endsWith(".test.ts")) {
+      out.push(full);
+    }
+  }
+}
+
+/** Every `*.test.ts` under `packages/activerecord/src` that writes rows unwrapped. */
+export async function findOffenders(root: string = TEST_ROOT): Promise<string[]> {
+  const files: string[] = [];
+  await collectTestFiles(root, files);
+  const offenders: string[] = [];
+  for (const file of files.sort()) {
+    if (isOffender(await readFile(file, "utf8"))) offenders.push(file);
+  }
+  return offenders;
+}
+
+export async function loadRatchet(ratchetPath: string = RATCHET_PATH): Promise<string[]> {
+  return JSON.parse(await readFile(ratchetPath, "utf8")) as string[];
+}
+
+export interface RatchetDiff {
+  added: string[];
+  stale: string[];
+}
+
+export function diffRatchet(offenders: string[], ratchet: string[]): RatchetDiff {
+  const seeded = new Set(ratchet);
+  const found = new Set(offenders);
+  return {
+    added: offenders.filter((file) => !seeded.has(file)),
+    stale: ratchet.filter((file) => !found.has(file)),
+  };
+}
