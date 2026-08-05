@@ -161,8 +161,6 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
       fired = true;
     });
     try {
-      // configurable.rb:21-23 assigns the three credentials unconditionally, so
-      // the salt has to be passed here rather than left over from an earlier call.
       Configurable.configure({ primaryKey: "test-key", keyDerivationSalt: "the salt" });
       expect(fired).toBe(true);
     } finally {

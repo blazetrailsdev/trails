@@ -28,9 +28,6 @@ describe("ActiveRecord::Encryption::Configurable (trails)", () => {
     });
     expect(Configurable.config.hasDeterministicKey()).toBe("the deterministic key");
 
-    // `configure(primary_key:, deterministic_key:, key_derivation_salt:)`
-    // defaults each kwarg to `nil` and assigns it, so an omitted credential is
-    // cleared rather than kept.
     Configurable.configure({ primaryKey: "another primary key", keyDerivationSalt: "the salt" });
     expect(Configurable.config.hasPrimaryKey()).toBe("another primary key");
     expect(Configurable.config.hasDeterministicKey()).toBeUndefined();

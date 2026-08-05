@@ -1689,21 +1689,22 @@ function jdToCivil(jd: number): Temporal.PlainDate {
   return UNIX_EPOCH.add({ days: jd - UNIX_EPOCH_IN_CJD });
 }
 
-/** @internal `date_core.c`'s `DIV` macro (`date_core.c:56`), floored division. */
+/** @internal `date_core.c`'s `DIV` macro, floored division. */
 function div(n: number, d: number): number {
   return Math.floor(n / d);
 }
 
-/** @internal `date_core.c`'s `MOD` macro (`date_core.c:57`), floored modulo. */
+/** @internal `date_core.c`'s `MOD` macro, floored modulo. */
 function mod(n: number, d: number): number {
   return n - d * div(n, d);
 }
 
 /**
  * @internal `date_core.c` `c_commercial_to_jd`, the Julian day of the `d`th day
- * of the `w`th ISO week of commercial year `y`. Ruby anchors on the year's
- * first Thursday; `Temporal`'s own ISO week starts from the same day, so the
- * Monday of week 1 is the one on or before 4 January.
+ * of the `w`th ISO week of commercial year `y`, `d` running `1`..`7` from
+ * Monday. Ruby walks there from `c_find_fdoy`; `Temporal` has no Julian day to
+ * walk, so the anchor is the Monday on or before 4 January, which is the same
+ * day by the ISO rule `Temporal`'s own `weekOfYear` follows.
  */
 function cCommercialToJd(y: number, w: number, d: number): number {
   const jan4 = new Temporal.PlainDate(y, 1, 4);
@@ -1739,8 +1740,11 @@ function cValidCommercialP(y: number, w: number, d: number): Temporal.PlainDate 
 /**
  * @internal `date_core.c` `c_weeknum_to_jd`, the Julian day of the `d`th day of
  * the `w`th week of year `y`, where a week starts on day `f` — `0` for the
- * Sunday-based `:wnum0`, `1` for the Monday-based `:wnum1` — and week `0` is
- * the partial week before the year's first such day.
+ * Sunday-based `:wnum0`, `1` for the Monday-based `:wnum1` — `d` runs `0`..`6`
+ * from that day, and week `0` is the partial week before the year's first one.
+ * The anchor is therefore the last `f`-day *strictly* before 1 January, which
+ * is what leaves week `0` empty in a year whose 1 January is itself an
+ * `f`-day: there, 1 January opens week `1`.
  */
 function cWeeknumToJd(y: number, w: number, d: number, f: number): number {
   const rjd2 = jdOf(new Temporal.PlainDate(y, 1, 1));
@@ -1756,15 +1760,16 @@ function cJdToWeeknum(jd: number, f: number): [ry: number, rw: number, rd: numbe
 }
 
 /**
- * @internal `date_core.c` `c_valid_weeknum_p` (`date_core.c:4241-4275`), the
- * `:wnum0`/`:wnum1` counterpart of {@link cValidCommercialP} — a negative day
- * counts back over a `0..6` week rather than a `1..7` one, so it takes `7`
- * where the commercial one takes `8`.
+ * @internal `date_core.c` `c_valid_weeknum_p`, the `:wnum0`/`:wnum1`
+ * counterpart of {@link cValidCommercialP}: same two normalizations and the
+ * same round-trip rejection, but over a `0`..`6` week rather than a `1`..`7`
+ * one, so a negative day takes `7` where the commercial one takes `8` and the
+ * negative week rebuilds against day `0` of week `1` rather than day `1`.
  */
 function cValidWeeknumP(y: number, w: number, d: number, f: number): Temporal.PlainDate | null {
   if (d < 0) d += 7;
   if (w < 0) {
-    const rjd2 = cWeeknumToJd(y + 1, 1, f, f);
+    const rjd2 = cWeeknumToJd(y + 1, 1, 0, f);
     const [ry2, rw2] = cJdToWeeknum(rjd2 + w * 7, f);
     if (ry2 !== y) return null;
     w = rw2;

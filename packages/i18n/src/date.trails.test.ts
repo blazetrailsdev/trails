@@ -229,10 +229,7 @@ describe("Date", () => {
     expect([cwday.year, cwday.mon, cwday.day]).toEqual([2001, 2, 3]);
   });
 
-  it("builds a week-numbered date from rt_complete_frags' wnum0 entry", () => {
-    // `:year` + `:wday` + a time gives the `:wnum0` entry five present fields
-    // against the civil entry's four, so Ruby completes `:wnum0` to `0` and
-    // resolves the Wednesday of the partial week before 2001's first Sunday.
+  it("prefers rt_complete_frags' wnum0 entry to the civil one on a year, a wday and a time", () => {
     for (const [str, expected] of [
       ["wed 10:00:00 '01", "2001-01-03"],
       ["'01 00:00:00 mon", "2001-01-01"],
@@ -244,14 +241,12 @@ describe("Date", () => {
       const day = String(date.day).padStart(2, "0");
       expect([str, `${date.year}-${mon}-${day}`]).toEqual([str, expected]);
     }
-    // Week 0 is empty when 1 January is itself a Sunday, and a day that falls
-    // before 1 January does not round-trip to the same year.
     expect(() => RubyDate.parse("sun 10:00:00 '01")).toThrow("invalid date");
     expect(() => RubyDate.parse("thu 1:2:3 '99")).toThrow("invalid date");
     expect(() => RubyDate.parse("wed 10:00:00 '23")).toThrow("invalid date");
   });
 
-  it("counts a negative week and day back, as c_valid_commercial_p does", () => {
+  it("counts a negative week back from the year's end and a negative day back from Sunday, as c_valid_commercial_p does", () => {
     for (const [args, expected] of [
       [[2001, -1, -1], "2001-12-30"],
       [[2001, 5, -1], "2001-02-04"],
@@ -264,7 +259,6 @@ describe("Date", () => {
       const day = String(date.day).padStart(2, "0");
       expect([args, `${date.year}-${mon}-${day}`]).toEqual([args, expected]);
     }
-    // A negative week whose year does not round-trip is still rejected.
     expect(() => RubyDate.commercial(2001, -53, 1)).toThrow("invalid date");
   });
 
