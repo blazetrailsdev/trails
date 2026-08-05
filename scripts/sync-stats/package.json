@@ -1,0 +1,5 @@
+{
+  "private": true,
+  "type": "module",
+  "description": "Marks the stats-sync scripts as ESM. The repo root has no \"type\", so without this tsx loads sync.ts as CommonJS and transforms every workspace dist/ file it pulls in to CJS too — which fails on the top-level await in @blazetrails/activesupport's dist/yaml.js. Enforced by module-format.test.ts."
+}
