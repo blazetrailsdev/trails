@@ -2240,7 +2240,7 @@ export class Date {
    * civil date `c_valid_civil_p` rejects — 1582-10-10 under `Date::ITALY` is a
    * day the reform deleted.
    */
-  constructor(year: number, month: number, day: number, start: number = DEFAULT_SG) {
+  constructor(year = -4712, month = 1, day = 1, start: number = DEFAULT_SG) {
     const r = cValidCivilP(year, month, day, start);
     if (r === null) throw new DateError("invalid date");
     this.#jd = r[0];
@@ -2251,6 +2251,12 @@ export class Date {
    * Ruby `Date.jd(jd = 0, start = Date::ITALY)` (ruby/date, `date_core.c`
    * `date_s_jd`), the date the given Julian day names under `start`: Gregorian
    * at or after it, Julian before.
+   *
+   * `date_s_jd` writes the Julian day straight into a freshly allocated
+   * `SimpleDateData`; a TS class has one constructor, and it is `Date.new`'s,
+   * so the day is named as a civil date and rebuilt through it. `c_jd_to_civil`
+   * and `c_civil_to_jd` are exact inverses under the same `sg` — it is the
+   * round trip `c_valid_civil_p` itself checks — so the two agree.
    */
   static jd(jd = 0, start: number = DEFAULT_SG): Date {
     const [y, m, d] = cJdToCivil(jd, start);
@@ -2420,6 +2426,10 @@ export class Date {
    * Ruby `Date#julian?` (ruby/date, `date_core.c` `d_lite_julian_p` over
    * `m_julian_p`, `date_core.c:1683-1702`), which answers the `start` itself
    * for the two infinite ones and compares the Julian day against it otherwise.
+   *
+   * Spelled `isJulian` rather than `julian` — the second candidate the
+   * predicate rule offers — because `Date#julian` is the `new_start` method
+   * below. Same for `isGregorian`.
    */
   isJulian(): boolean {
     if (!Number.isFinite(this.#sg)) return this.#sg === JULIAN;
@@ -2435,6 +2445,11 @@ export class Date {
    * Ruby `Date#new_start(start = Date::ITALY)` (ruby/date, `date_core.c`
    * `d_lite_new_start` over `dup_obj_with_new_start`), a copy of the date
    * naming the same Julian day under a different reform start.
+   *
+   * `dup_obj_with_new_start` dups the receiver, so a `DateTime` keeps its class
+   * and its time of day; this answers a `Date`, because `DateTime` carries no
+   * `start` to dup yet. Story
+   * `0074-i18n-parity/datetime-new-start-preserves-the-receiver`.
    */
   newStart(start: number = DEFAULT_SG): Date {
     return Date.jd(this.#jd, start);
