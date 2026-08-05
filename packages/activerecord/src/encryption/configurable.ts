@@ -50,12 +50,11 @@ export class Configurable {
    * (configurable.rb:16-19), written out one reader per property.
    *
    * The loop cannot survive: it runs while this module's body does, and on a
-   * graph entered at `context.ts` — `index.ts` re-exports `context.js` before
-   * `configurable.js`, and `context.ts` imports this module for
-   * `build_default_key_provider` — `Context` is then still in TDZ, which is a
-   * `ReferenceError`, not a stale read. A hoisted function is what could be
-   * read there, and that function was the shim this story deletes. The set is
-   * instead held to `Context::PROPERTIES` at compile time, by
+   * graph entered at `context.ts` — which imports this module for
+   * `build_default_key_provider` — `Context` is still in TDZ then, a
+   * `ReferenceError` rather than a stale read. Only a hoisted function is
+   * readable there, and that function was the shim this story deletes. The set
+   * is held to `Context::PROPERTIES` at compile time instead, by
    * {@link DelegatedProperty} below.
    */
   static get keyProvider(): unknown {
@@ -168,8 +167,8 @@ export class Configurable {
 type DelegatedProperty = (typeof Context.PROPERTIES)[number];
 
 /**
- * @internal Type-only, erased at emit: `Pick` fails to compile the moment a
- * `Context::PROPERTIES` name has no reader on `Configurable`, which is the
- * drift the deleted `PROPERTIES.each` loop prevented by construction.
+ * @internal Type-only, erased at emit: `Pick` stops compiling the moment a
+ * `Context::PROPERTIES` name has no reader on `Configurable` — the drift the
+ * `PROPERTIES.each` loop prevented by construction.
  */
 declare const _contextPropertiesAreDelegated: Pick<typeof Configurable, DelegatedProperty>;

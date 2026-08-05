@@ -512,12 +512,9 @@ describe("Date", () => {
     expect(RubyDate.parse("1582-10-10", true, RubyDate.GREGORIAN).start).toBe(RubyDate.GREGORIAN);
     expect(RubyDate.parse("1582-10-10", true, RubyDate.GREGORIAN).toS()).toBe("1582-10-10");
     expect(new RubyDate(2001, 2, 3, RubyDate.ENGLAND).start).toBe(2361222);
-  });
-
-  it("builds a Julian date that has no proleptic-Gregorian counterpart", () => {
-    const d = RubyDate.parse("1500-02-29", true, RubyDate.JULIAN);
-    expect(d.toS()).toBe("1500-02-29");
-    expect(d.start).toBe(RubyDate.JULIAN);
+    // 1500 is not a leap year in the proleptic Gregorian calendar Temporal uses.
+    expect(RubyDate.parse("1500-02-29", true, RubyDate.JULIAN).toS()).toBe("1500-02-29");
+    expect(RubyDate.parse("1500-02-29", true, RubyDate.JULIAN).start).toBe(RubyDate.JULIAN);
   });
 
   it("answers julian? off the start, and the infinite starts off their own sign", () => {

@@ -1763,10 +1763,9 @@ function mod(n: number, d: number): number {
  * arithmetic, with the century correction `b` taken back off again for a day
  * before the reform, which is a Julian one.
  *
- * `ns` is Ruby's out-param saying which side of the reform the day landed on.
- * Every `c_*_to_jd` answers one and every `c_valid_*_p` carries it out, so the
- * port does too, and it is discarded at the `rt__valid_*_p` boundary exactly
- * where ruby/date discards it (`date_core.c:4126-4139`).
+ * `ns` says which side of the reform the day landed on. Every `c_*_to_jd`
+ * answers one and every `c_valid_*_p` carries it out, discarded at the
+ * `rt__valid_*_p` boundary where ruby/date discards it (`date_core.c:4126`).
  */
 function cCivilToJd(y: number, m: number, d: number, sg: number): [rjd: number, ns: number] {
   if (m <= 2) {
@@ -2250,12 +2249,10 @@ export class Date {
    * Ruby `Date.jd(jd = 0, start = Date::ITALY)` (ruby/date, `date_core.c`
    * `date_s_jd`), the date the given Julian day names under `start`: Gregorian
    * at or after it, Julian before.
-   *
-   * `date_s_jd` writes the Julian day straight into a freshly allocated
-   * `SimpleDateData`; a TS class has one constructor, and it is `Date.new`'s,
-   * so the day is named as a civil date and rebuilt through it. `c_jd_to_civil`
-   * and `c_civil_to_jd` are exact inverses under the same `sg` — it is the
-   * round trip `c_valid_civil_p` itself checks — so the two agree.
+   * `date_s_jd` writes the day straight into a fresh `SimpleDateData`; a TS
+   * class has one constructor, and it is `Date.new`'s, so the day is rebuilt
+   * through the civil date it names — the exact round trip `c_valid_civil_p`
+   * itself checks.
    */
   static jd(jd = 0, start: number = DEFAULT_SG): Date {
     const [y, m, d] = cJdToCivil(jd, start);
@@ -2425,10 +2422,8 @@ export class Date {
    * Ruby `Date#julian?` (ruby/date, `date_core.c` `d_lite_julian_p` over
    * `m_julian_p`, `date_core.c:1683-1702`), which answers the `start` itself
    * for the two infinite ones and compares the Julian day against it otherwise.
-   *
-   * Spelled `isJulian` rather than `julian` — the second candidate the
-   * predicate rule offers — because `Date#julian` is the `new_start` method
-   * below. Same for `isGregorian`.
+   * Spelled `isJulian`, not the predicate rule's second candidate `julian`,
+   * because `Date#julian` is the `new_start` method below.
    */
   isJulian(): boolean {
     if (!Number.isFinite(this.#sg)) return this.#sg === JULIAN;
