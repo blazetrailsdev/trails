@@ -35,10 +35,13 @@ export function freezeTime(
 
 /**
  * Rails' `DATA`. Rails' second and third entries also carry a
- * `Time.local(2004)`; a temporal value does not survive the `:json`
- * serializer as a temporal (it decodes back as a string), and the
- * `:message_pack` serializer that would preserve it is excluded — see
- * {@link SERIALIZERS}.
+ * `Time.local(2004)`, which survives its `:message_pack` and `Marshal` arms as
+ * a Time and its `JSON` arms only because Ruby's `Time#<=>` coerces a String
+ * operand through `to_datetime <=> other`
+ * (core_ext/time/calculations.rb:329-343). trails' `:marshal` format is backed
+ * by `cache/coder.ts`, which flattens a `Temporal.Instant` to `{}`, so the
+ * temporal entries stay out until that roundtrips (follow-up story
+ * `metadata-data-set-carries-a-time`).
  */
 const DATA: readonly unknown[] = [
   "a string",
@@ -57,12 +60,16 @@ const CustomSerializer: MessageSerializer = {
 };
 
 /**
- * Rails' `SERIALIZERS`. `ActiveSupport::MessagePack` is excluded pending its
- * temporal packer (follow-up story). Rails lists `JSON` and
- * `ActiveSupport::JSON` separately; trails' `:json` serializer is
- * `ActiveSupport::JSON`, so those two entries collapse into one.
+ * Rails' `SERIALIZERS`. Rails lists `JSON` and `ActiveSupport::JSON`
+ * separately; trails' `:json` serializer is `ActiveSupport::JSON`, so those
+ * two entries collapse into one.
  */
-const SERIALIZERS: readonly (Format | MessageSerializer)[] = ["marshal", "json", CustomSerializer];
+const SERIALIZERS: readonly (Format | MessageSerializer)[] = [
+  "marshal",
+  "json",
+  "message_pack",
+  CustomSerializer,
+];
 
 export function eachScenario<T>(
   makeCodec: (serializer: Format | MessageSerializer) => T,

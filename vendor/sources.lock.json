@@ -1,5 +1,9 @@
 {
   "sources": {
+    "date": {
+      "ref": "v3.4.1",
+      "sha": "a3295ad262773a80ad61526beb500b29e770b817"
+    },
     "did_you_mean": {
       "ref": "v1.6.3",
       "sha": "f7703add765054b6e63ef581818a0c307fdd4abf"

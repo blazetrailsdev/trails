@@ -79,8 +79,19 @@ function signatureOf(node: ts.SignatureDeclarationBase): string {
 /** Stands in for a parameter type TypeScript infers rather than spells. */
 const WILDCARD = "*";
 
-function isPublicInstanceMethod(member: ts.ClassElement): member is ts.MethodDeclaration {
-  if (!ts.isMethodDeclaration(member)) return false;
+/**
+ * A getter's signature, spelled the way an interface has to restate it: a
+ * property type. `get schemaCreation(): T` on the mixin is `readonly
+ * schemaCreation: T` on the interface, so both sides normalize to `: T`.
+ */
+function propertySignatureOf(node: ts.GetAccessorDeclaration | ts.PropertySignature): string {
+  return `: ${typeText(node.type) ?? ""}`;
+}
+
+function isPublicInstanceMember(
+  member: ts.ClassElement,
+): member is ts.MethodDeclaration | ts.GetAccessorDeclaration {
+  if (!ts.isMethodDeclaration(member) && !ts.isGetAccessorDeclaration(member)) return false;
   const modifiers = ts.getModifiers(member) ?? [];
   return !modifiers.some(
     (m) =>
@@ -90,7 +101,7 @@ function isPublicInstanceMethod(member: ts.ClassElement): member is ts.MethodDec
   );
 }
 
-/** Public instance-method signatures of `className` in `source`. */
+/** Public instance method and getter signatures of `className` in `source`. */
 export function mixinSignatures(
   fileName: string,
   source: string,
@@ -100,10 +111,15 @@ export function mixinSignatures(
   for (const statement of parse(fileName, source).statements) {
     if (!ts.isClassDeclaration(statement) || statement.name?.text !== className) continue;
     for (const member of statement.members) {
-      if (!isPublicInstanceMethod(member)) continue;
+      if (!isPublicInstanceMember(member)) continue;
       const name = member.name.getText();
       if (name.startsWith("#")) continue;
-      entries.push({ name, signature: signatureOf(member) });
+      entries.push({
+        name,
+        signature: ts.isGetAccessorDeclaration(member)
+          ? propertySignatureOf(member)
+          : signatureOf(member),
+      });
     }
   }
   return entries;
@@ -122,7 +138,7 @@ function isWaived(source: string, member: ts.TypeElement): boolean {
   );
 }
 
-/** Method-member signatures of `interface <interfaceName>` in `source`. */
+/** Method- and property-member signatures of `interface <interfaceName>` in `source`. */
 export function interfaceSignatures(
   fileName: string,
   source: string,
@@ -132,8 +148,12 @@ export function interfaceSignatures(
   for (const statement of parse(fileName, source).statements) {
     if (!ts.isInterfaceDeclaration(statement) || statement.name.text !== interfaceName) continue;
     for (const member of statement.members) {
-      if (!ts.isMethodSignature(member) || isWaived(source, member)) continue;
-      entries.push({ name: member.name.getText(), signature: signatureOf(member) });
+      if (isWaived(source, member)) continue;
+      if (ts.isMethodSignature(member)) {
+        entries.push({ name: member.name.getText(), signature: signatureOf(member) });
+      } else if (ts.isPropertySignature(member)) {
+        entries.push({ name: member.name.getText(), signature: propertySignatureOf(member) });
+      }
     }
   }
   return entries;
@@ -154,9 +174,8 @@ export function requiredInterfaceMethodNames(
   for (const statement of parse(fileName, source).statements) {
     if (!ts.isInterfaceDeclaration(statement) || statement.name.text !== interfaceName) continue;
     for (const member of statement.members) {
-      if (!ts.isMethodSignature(member) || member.questionToken || isWaived(source, member)) {
-        continue;
-      }
+      if (!ts.isMethodSignature(member) && !ts.isPropertySignature(member)) continue;
+      if (member.questionToken || isWaived(source, member)) continue;
       names.push(member.name.getText());
     }
   }

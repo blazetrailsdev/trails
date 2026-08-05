@@ -1732,6 +1732,15 @@ function jdOf(d: Temporal.PlainDate): number {
   return UNIX_EPOCH_IN_CJD + d.since(UNIX_EPOCH).days;
 }
 
+/**
+ * @internal `date_core.c:173-175`, two of the `flags` bits a `SimpleDateData`
+ * carries: which of the Julian day and the civil date have been computed.
+ * `HAVE_DF` and `HAVE_TIME` are `ComplexDateData`'s and have no bearer here
+ * yet.
+ */
+const HAVE_JD = 1 << 0;
+const HAVE_CIVIL = 1 << 2;
+
 /** @internal `date_core.c:186`, the Julian day of 1582-10-15. */
 const ITALY = 2299161;
 
@@ -1836,7 +1845,7 @@ function cJdToCivil(jd: number, sg: number): [ry: number, rm: number, rdom: numb
 function cFindFdoy(y: number, sg: number): [rjd: number, ns: number] | null {
   for (let d = 1; d < 31; d++) {
     const r = cValidCivilP(y, 1, d, sg);
-    if (r !== null) return r;
+    if (r !== null) return [r[2], r[3]];
   }
   return null;
 }
@@ -1908,7 +1917,7 @@ function cValidCivilP(
   m: number,
   d: number,
   sg: number,
-): [rjd: number, ns: number] | null {
+): [rm: number, rd: number, rjd: number, ns: number] | null {
   if (m < 0) m += 13;
   if (m < 1 || m > 12) return null;
   if (d < 0) {
@@ -1921,7 +1930,7 @@ function cValidCivilP(
   const [rjd, ns] = cCivilToJd(y, m, d, sg);
   const [ry, rm, rd] = cJdToCivil(rjd, sg);
   if (ry !== y || rm !== m || rd !== d) return null;
-  return [rjd, ns];
+  return [rm, rd, rjd, ns];
 }
 
 /**
@@ -1932,7 +1941,7 @@ function cValidCivilP(
 function cFindLdoy(y: number, sg: number): [rjd: number, ns: number] | null {
   for (let i = 0; i < 30; i++) {
     const r = cValidCivilP(y, 12, 31 - i, sg);
-    if (r !== null) return r;
+    if (r !== null) return [r[2], r[3]];
   }
   return null;
 }
@@ -1944,7 +1953,7 @@ function cFindLdoy(y: number, sg: number): [rjd: number, ns: number] | null {
 function cFindLdom(y: number, m: number, sg: number): [rjd: number, ns: number] | null {
   for (let i = 0; i < 30; i++) {
     const r = cValidCivilP(y, m, 31 - i, sg);
-    if (r !== null) return r;
+    if (r !== null) return [r[2], r[3]];
   }
   return null;
 }
@@ -2144,7 +2153,7 @@ function rtValidOrdinalP(y: number, d: number, sg: number): number | null {
  * raising so its caller can fall through to the next kind of date.
  */
 function rtValidCivilP(y: number, m: number, d: number, sg: number): number | null {
-  return cValidCivilP(y, m, d, sg)?.[0] ?? null;
+  return cValidCivilP(y, m, d, sg)?.[2] ?? null;
 }
 
 /**
@@ -2292,14 +2301,26 @@ export class Date {
   static GREGORIAN = GREGORIAN;
 
   /**
-   * @internal `SimpleDateData`'s `jd` and `sg` (`date_core.c:203-213`), the
-   * state ruby/date carries: the Julian day, and the calendar-reform start it
-   * is read under. A `Temporal.PlainDate` cannot stand in for the pair — it is
-   * proleptic Gregorian, so a Julian date such as 1500-02-29 has no
+   * @internal `SimpleDateData`'s fields (`date_core.c:203-213`), the state
+   * ruby/date carries: the Julian day, the civil date, the calendar-reform
+   * start both are read under, and the `flags` word saying which of the two
+   * representations has actually been computed (`HAVE_JD` / `HAVE_CIVIL`,
+   * `date_core.c:173-183`). Neither is authoritative on its own: a
+   * `Temporal.PlainDate` cannot stand in for the civil triple either, because
+   * it is proleptic Gregorian and a Julian date such as 1500-02-29 has no
    * `Temporal.PlainDate` at all.
+   *
+   * `#year`/`#mon`/`#mday` are meaningful only under `HAVE_CIVIL` and `#jd`
+   * only under `HAVE_JD`; `#getSCivil` and `#getSJd` fill the missing
+   * one in on first read, as `get_s_civil` / `get_s_jd` do
+   * (`date_core.c:1168-1206`).
    */
-  readonly #jd: number;
-  readonly #sg: number;
+  #jd = 0;
+  #year = 0;
+  #mon = 0;
+  #mday = 0;
+  #sg = 0;
+  #flags = 0;
 
   /**
    * Ruby `Date.new(year = -4712, month = 1, mday = 1, start = Date::ITALY)`
@@ -2309,37 +2330,80 @@ export class Date {
    *
    * `date_initialize` branches on `guess_style` first (`date_core.c:3533`): on a
    * negative style the reform cannot bite, so it validates with
-   * `valid_gregorian_p` and stores `HAVE_CIVIL` alone — no Julian day is
-   * computed at all (`date_core.c:3533-3542`). `SimpleDateData`'s `flags`
-   * (`date_core.c:173-183`) is what lets it defer that; the port carries `jd`
-   * and `sg` in place of the flags word, so the Julian day is computed here
-   * either way and only the validation differs.
+   * `valid_gregorian_p` and stores `HAVE_CIVIL` alone, computing no Julian day
+   * (`date_core.c:3533-3542`).
    */
   constructor(year = -4712, month = 1, day = 1, start: number = DEFAULT_SG) {
     if (guessStyle(year, start) < 0) {
       const r = validGregorianP(year, month, day);
       if (r === null) throw new DateError("invalid date");
-      this.#jd = cCivilToJd(year, r[0], r[1], start)[0];
+      this.#setToSimple(0, start, year, r[0], r[1], HAVE_CIVIL);
     } else {
       const r = cValidCivilP(year, month, day, start);
       if (r === null) throw new DateError("invalid date");
-      this.#jd = r[0];
+      this.#setToSimple(r[2], start, year, r[0], r[1], HAVE_JD | HAVE_CIVIL);
     }
-    this.#sg = start;
   }
 
   /**
    * Ruby `Date.jd(jd = 0, start = Date::ITALY)` (ruby/date, `date_core.c`
    * `date_s_jd`), the date the given Julian day names under `start`: Gregorian
-   * at or after it, Julian before.
-   * `date_s_jd` writes the day straight into a fresh `SimpleDateData`; a TS
-   * class has one constructor, and it is `Date.new`'s, so the day is rebuilt
-   * through the civil date it names — the exact round trip `c_valid_civil_p`
-   * itself checks.
+   * at or after it, Julian before. `date_s_jd` writes the day straight into a
+   * fresh `SimpleDateData` under `HAVE_JD` alone
+   * (`date_core.c:3286-3296`), leaving the civil date to `get_s_civil`.
    */
   static jd(jd = 0, start: number = DEFAULT_SG): Date {
-    const [y, m, d] = cJdToCivil(jd, start);
-    return new Date(y, m, d, start);
+    // `d_simple_new_internal` allocates the object and writes its fields;
+    // private fields are only installed by a constructor call in JS, so the
+    // allocation runs through `Date.new`'s default date and is overwritten.
+    const date = new Date(undefined, undefined, undefined, start);
+    date.#setToSimple(jd, start, 0, 0, 0, HAVE_JD);
+    return date;
+  }
+
+  /**
+   * @internal ruby/date's `set_to_simple` (`date_core.c:339-348`), which writes
+   * a `SimpleDateData`'s fields and the `flags` saying which of them the write
+   * made meaningful.
+   */
+  #setToSimple(
+    jd: number,
+    sg: number,
+    year: number,
+    mon: number,
+    mday: number,
+    flags: number,
+  ): void {
+    this.#jd = jd;
+    this.#sg = sg;
+    this.#year = year;
+    this.#mon = mon;
+    this.#mday = mday;
+    this.#flags = flags;
+  }
+
+  /**
+   * @internal ruby/date's `get_s_jd` (`date_core.c:1168-1186`), which computes
+   * the Julian day from the civil date on first read and records `HAVE_JD`.
+   */
+  #getSJd(): number {
+    if (!(this.#flags & HAVE_JD)) {
+      this.#jd = cCivilToJd(this.#year, this.#mon, this.#mday, this.#sg)[0];
+      this.#flags |= HAVE_JD;
+    }
+    return this.#jd;
+  }
+
+  /**
+   * @internal ruby/date's `get_s_civil` (`date_core.c:1188-1206`), the mirror
+   * image: the civil date from the Julian day, recording `HAVE_CIVIL`.
+   */
+  #getSCivil(): [number, number, number] {
+    if (!(this.#flags & HAVE_CIVIL)) {
+      [this.#year, this.#mon, this.#mday] = cJdToCivil(this.#jd, this.#sg);
+      this.#flags |= HAVE_CIVIL;
+    }
+    return [this.#year, this.#mon, this.#mday];
   }
 
   /**
@@ -2468,28 +2532,28 @@ export class Date {
   }
 
   get year(): number {
-    return cJdToCivil(this.#jd, this.#sg)[0];
+    return this.#getSCivil()[0];
   }
 
   get mon(): number {
-    return cJdToCivil(this.#jd, this.#sg)[1];
+    return this.#getSCivil()[1];
   }
 
   get month(): number {
-    return cJdToCivil(this.#jd, this.#sg)[1];
+    return this.#getSCivil()[1];
   }
 
   get day(): number {
-    return cJdToCivil(this.#jd, this.#sg)[2];
+    return this.#getSCivil()[2];
   }
 
   /** `date_core.c` `c_jd_to_wday` (`date_core.c:636-640`), Sunday as `0`. */
   get wday(): number {
-    return mod(this.#jd + 1, 7);
+    return mod(this.#getSJd() + 1, 7);
   }
 
   get yday(): number {
-    return cJdToOrdinal(this.#jd, this.#sg)![1];
+    return cJdToOrdinal(this.#getSJd(), this.#sg)![1];
   }
 
   /**
@@ -2510,7 +2574,7 @@ export class Date {
    */
   isJulian(): boolean {
     if (!Number.isFinite(this.#sg)) return this.#sg === JULIAN;
-    return this.#jd < this.#sg;
+    return this.#getSJd() < this.#sg;
   }
 
   /** Ruby `Date#gregorian?` (ruby/date, `date_core.c` `d_lite_gregorian_p`). */
@@ -2529,7 +2593,7 @@ export class Date {
    * `0074-i18n-parity/datetime-new-start-preserves-the-receiver`.
    */
   newStart(start: number = DEFAULT_SG): Date {
-    return Date.jd(this.#jd, start);
+    return Date.jd(this.#getSJd(), start);
   }
 
   /** Ruby `Date#italy` (ruby/date, `date_core.c` `d_lite_italy`). */
