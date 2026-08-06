@@ -87,14 +87,14 @@ export class TimeType extends ValueType<Temporal.Instant> {
       return value;
     } else if (value instanceof Temporal.Instant) {
       value = value
-        .toZonedDateTimeISO(this.zoneId)
+        .toZonedDateTimeISO(this.#zoneId())
         .with({ year: 2000, day: 1, month: 1 })
         .toInstant();
     }
 
     const cast = this.cast(value);
     if (cast === null) return null;
-    return cast.toZonedDateTimeISO(this.zoneId).toPlainDateTime().toZonedDateTime(zone);
+    return cast.toZonedDateTimeISO(this.#zoneId()).toPlainDateTime().toZonedDateTime(zone);
   }
 
   /**
@@ -136,7 +136,7 @@ export class TimeType extends ValueType<Temporal.Instant> {
     if (isHash(value)) return this.valueFromMultiparameterAssignment(value);
     if (typeof value !== "string") {
       if (value instanceof Temporal.PlainDateTime) {
-        value = value.toZonedDateTime(this.zoneId).toInstant();
+        value = value.toZonedDateTime(this.#zoneId()).toInstant();
       }
       return this.applySecondsPrecision(value) as Temporal.Instant | null;
     }
@@ -174,15 +174,14 @@ export class TimeType extends ValueType<Temporal.Instant> {
   }
 
   /**
-   * The zone `is_utc?` picks between. Ruby spells the choice as the receiver of
-   * `Time.utc` / `Time.local` and as `Time.public_send(default_timezone, ...)`
-   * (accepts_multiparameter_time.rb:23); Temporal needs a zone id to build in,
-   * and `Temporal.Now.timeZoneId()` is the host zone `::Time.local` uses.
-   *
-   * @noRailsEquivalent PERMANENT — Ruby names the zone by choosing a
-   * constructor; Temporal names it by argument, so the choice needs a value.
+   * @internal The zone `is_utc?` picks between, which Rails spells inline at
+   * each site as the choice of receiver — `Time.utc` vs `Time.local`
+   * (time_value.rb:56-63), `Time.public_send(default_timezone, *values)`
+   * (accepts_multiparameter_time.rb:23). Temporal names a zone by argument
+   * rather than by constructor, so the branch needs a value;
+   * `Temporal.Now.timeZoneId()` is the host zone `::Time.local` builds in.
    */
-  get zoneId(): string {
+  #zoneId(): string {
     return this.isUtc ? "UTC" : Temporal.Now.timeZoneId();
   }
 
