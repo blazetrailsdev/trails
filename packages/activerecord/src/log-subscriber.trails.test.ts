@@ -6,7 +6,7 @@ import {
   NotificationEvent as Event,
   Logger,
 } from "@blazetrails/activesupport";
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 
 // Trails-only: integer binds type-cast to BigInt (so SQLite binds them as
 // SQLITE_INTEGER). Rails renders a bound Integer bare via `binds.inspect`,

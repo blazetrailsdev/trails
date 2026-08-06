@@ -4,7 +4,7 @@
  *
  * Ported from vendor/rails/activerecord/test/cases/counter_cache_test.rb.
  */
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import { describe, it, expect, beforeEach } from "vitest";
 import { registerModel, registerSubclass } from "./index.js";
 import { association } from "./associations.js";

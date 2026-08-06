@@ -5,7 +5,7 @@
  * Ported from vendor/rails/activerecord/test/cases/timestamp_test.rb.
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import { travel, travelBack } from "@blazetrails/activesupport";
 import { Base, registerModel } from "./index.js";
 import { fixtures } from "./test-fixtures.js";

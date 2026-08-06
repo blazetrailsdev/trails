@@ -6,7 +6,7 @@
 import { describe, it, expect } from "vitest";
 import { typeRegistry, Types } from "@blazetrails/activemodel";
 import { TimeWithZone, TimeZone } from "@blazetrails/activesupport";
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import { Base } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
 import { loadSchemaFromAdapter } from "../model-schema.js";

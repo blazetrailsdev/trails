@@ -19,7 +19,7 @@ import {
   dispatchUnquotedFalse,
   type QuotingDispatchHost,
 } from "../abstract/quoting.js";
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { BinaryData } from "@blazetrails/activemodel";
 

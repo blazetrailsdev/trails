@@ -1,6 +1,6 @@
 import pg from "pg";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import {
   ConnectionNotEstablished,

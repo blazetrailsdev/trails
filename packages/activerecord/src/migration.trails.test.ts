@@ -9,7 +9,7 @@
  * Rails 1:1 while the invariants stay covered.
  */
 import { describe, it, expect } from "vitest";
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import { Migrator } from "./index.js";
 import type { MigrationProxy } from "./migration.js";
 import { Migration, IllegalMigrationNameError } from "./migration.js";

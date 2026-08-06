@@ -1,7 +1,7 @@
 import { throwAbort } from "@blazetrails/activesupport";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Relation } from "../../relation.js";
-import type { Temporal } from "@blazetrails/activesupport/temporal";
+import type { Temporal } from "@blazetrails/date";
 import type { Pirate } from "./pirate.js";
 import type { Treasure } from "./treasure.js";
 // vendor/rails/activerecord/test/models/parrot.rb

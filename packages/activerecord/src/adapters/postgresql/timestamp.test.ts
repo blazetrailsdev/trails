@@ -2,7 +2,7 @@
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/timestamp_test.rb
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import { TimeWithZone } from "@blazetrails/activesupport";
 import { DateInfinity, DateNegativeInfinity } from "@blazetrails/activemodel";
 import {

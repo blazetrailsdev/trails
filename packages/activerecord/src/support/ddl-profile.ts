@@ -25,7 +25,7 @@
  * can be deleted wholesale. See the audit report for findings.
  */
 import { getFs } from "@blazetrails/activesupport";
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 
 export type DdlOp =
   | "CREATE_TABLE"

@@ -62,6 +62,7 @@
     "@blazetrails/activemodel": "workspace:*",
     "@blazetrails/activesupport": "workspace:*",
     "@blazetrails/arel": "workspace:*",
+    "@blazetrails/date": "workspace:*",
     "@blazetrails/did-you-mean": "workspace:*",
     "@blazetrails/globalid": "workspace:*",
     "@blazetrails/i18n": "workspace:*"

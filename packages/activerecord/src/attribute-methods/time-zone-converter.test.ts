@@ -4,7 +4,7 @@ import { DateTime } from "../type/date-time.js";
 import { ActiveRecord } from "../ar-config.js";
 import { ValueType } from "@blazetrails/activemodel";
 import { TimeWithZone, TimeZone, setZone, resetZone } from "@blazetrails/activesupport";
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 
 describe("TimeZoneConverterTest", () => {
   afterEach(() => {

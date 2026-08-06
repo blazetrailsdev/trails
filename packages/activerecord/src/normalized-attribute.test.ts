@@ -7,7 +7,7 @@
  * table via `fixtures([])` — no `defineSchema`, no bespoke adapter.
  */
 import { describe, it, expect, beforeEach } from "vitest";
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import { presence, titleize } from "@blazetrails/activesupport";
 import { Base } from "./index.js";
 import { Aircraft } from "./test-helpers/models/aircraft.js";

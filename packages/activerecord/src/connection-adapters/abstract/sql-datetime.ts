@@ -23,7 +23,7 @@
  * address and calls into this file.
  */
 
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import { ActiveRecord } from "../../ar-config.js";
 
 /**

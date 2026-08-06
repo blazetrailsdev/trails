@@ -5,7 +5,7 @@
  * Ported from vendor/rails/activerecord/test/cases/touch_later_test.rb.
  */
 import { describe, it, expect } from "vitest";
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import { travel, travelBack } from "@blazetrails/activesupport";
 import { fixtures } from "./test-fixtures.js";
 // Opt into the canonical-model autoload index so association targets resolve by

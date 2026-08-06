@@ -2,7 +2,7 @@
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/quoting_test.rb
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { IntegerOutOf64BitRange } from "../../connection-adapters/postgresql/quoting.js";
 import { ActiveRecord } from "../../ar-config.js";

@@ -5,7 +5,7 @@
  * Mirrors: ActiveRecord::Persistence::ClassMethods
  */
 
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import { camelize, singularize } from "@blazetrails/activesupport";
 import { reflectOnAllAssociations } from "./reflection.js";
 import type { Base } from "./base.js";

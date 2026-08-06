@@ -1,6 +1,6 @@
 import { DateType } from "@blazetrails/activemodel";
 import { DateInfinity, DateNegativeInfinity } from "@blazetrails/activemodel";
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import { describe, expect, it } from "vitest";
 
 import { Date as OidDate } from "./date.js";

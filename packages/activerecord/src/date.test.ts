@@ -2,7 +2,7 @@
  * Mirrors: activerecord/test/cases/date_test.rb
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import { Base } from "./base.js";
 import { rebuildCanonicalTables } from "./support/canonical-table-rebuild.js";
 import { fixtures } from "./test-fixtures.js";

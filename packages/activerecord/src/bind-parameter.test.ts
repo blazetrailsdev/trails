@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, afterEach, beforeAll } from "vitest";
 import { Notifications, NotificationEvent as Event, Logger } from "@blazetrails/activesupport";
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import { IntegerType, StringType, ValueType } from "@blazetrails/activemodel";
 import { Nodes, Collectors } from "@blazetrails/arel";
 import { LogSubscriber } from "./log-subscriber.js";

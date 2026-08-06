@@ -25,7 +25,7 @@
 // This mirrors the pattern used for ActiveRecord types (AR_IMPORT in
 // synthesize.ts).
 
-const T = `import("@blazetrails/activesupport/temporal").Temporal`;
+const T = `import("@blazetrails/date").Temporal`;
 const IPADDR = `import("@blazetrails/activerecord").IPAddr`;
 
 export const ATTRIBUTE_TYPE_MAP: Record<string, string> = {

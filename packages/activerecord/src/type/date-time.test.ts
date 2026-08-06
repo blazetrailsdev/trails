@@ -1,5 +1,5 @@
 import { describe, it, expect, afterAll, vi } from "vitest";
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import { DateTime } from "./date-time.js";
 import { Base } from "../index.js";
 import { fixtures } from "../test-fixtures.js";

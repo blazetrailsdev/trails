@@ -55,7 +55,7 @@ import { TypeMap } from "../type/type-map.js";
 import { Date as DateType } from "../type/date.js";
 import { DateTime as ARDateTimeType } from "../type/date-time.js";
 import { Time as TimeType } from "../type/time.js";
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import type { DateTimeCastResult } from "@blazetrails/activemodel";
 import { defaultSqlTimezone } from "./abstract/sql-datetime.js";
 import { Text as TextType } from "../type/text.js";

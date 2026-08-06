@@ -1,5 +1,5 @@
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
-import type { Temporal } from "@blazetrails/activesupport/temporal";
+import type { Temporal } from "@blazetrails/date";
 import type { Tree } from "./tree.js";
 // vendor/rails/activerecord/test/models/node.rb
 import { Base } from "../../base.js";

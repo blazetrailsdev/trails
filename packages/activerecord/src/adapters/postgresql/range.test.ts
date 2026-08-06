@@ -7,7 +7,7 @@ import { parseRange } from "./pg-range.js";
 import { Range } from "../../relation.js";
 import { Base } from "../../index.js";
 import { SchemaDumper } from "../../schema-dumper.js";
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import { TimeWithZone, TimeZone, setZone, resetZone, BigDecimal } from "@blazetrails/activesupport";
 import { fixtures } from "../../test-fixtures.js";
 

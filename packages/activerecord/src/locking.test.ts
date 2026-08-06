@@ -34,7 +34,7 @@ import { Bulb, CustomBulb, FunkyBulb, FailedBulb } from "./test-helpers/models/b
 import { Engine } from "./test-helpers/models/engine.js";
 import { Reader } from "./test-helpers/models/reader.js";
 import { travel, travelBack } from "@blazetrails/activesupport";
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import { assertQueriesCount, assertQueriesMatch } from "./testing/query-assertions.js";
 import { adapterType } from "./test-adapter.js";
 

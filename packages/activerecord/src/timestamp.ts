@@ -1,4 +1,4 @@
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import { currentTimeInstant } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
 import { ActiveRecordError, ReadOnlyRecord, StaleObjectError } from "./errors.js";

@@ -2,7 +2,7 @@
  * Mirrors: activerecord/test/cases/multiparameter_attributes_test.rb
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import { TimeWithZone } from "@blazetrails/activesupport";
 import { Base, composedOf, MultiparameterAssignmentErrors } from "./index.js";
 import { withTimezoneConfig } from "./test-helper.js";

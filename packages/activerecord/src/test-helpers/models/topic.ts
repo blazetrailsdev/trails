@@ -5,7 +5,7 @@ import type { SillyUniqueReply } from "./reply.js";
 import type { UniqueReply } from "./reply.js";
 import type { WebReply } from "./reply.js";
 // vendor/rails/activerecord/test/models/topic.rb
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import { Base } from "../../base.js";
 import { registerSubclass } from "../../inheritance.js";
 

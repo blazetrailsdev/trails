@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Notifications, NotificationEvent as Event } from "@blazetrails/activesupport";
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import { Base } from "./base.js";
 import { fixtures } from "./test-fixtures.js";
 import { Task } from "./test-helpers/models/task.js";

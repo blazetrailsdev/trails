@@ -196,7 +196,7 @@ export function _defineEnumOptionsTypecheck(): void {
 }
 
 // --- Temporal attribute typing ---
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 class Event extends Base {
   declare starts_at: Temporal.Instant | Temporal.PlainDateTime;
   declare starts_on: Temporal.PlainDate;

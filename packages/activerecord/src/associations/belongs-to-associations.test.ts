@@ -68,7 +68,7 @@ import {
 } from "../test-helpers/models/cpk.js";
 import { CompositePrimaryKeyMismatchError } from "./errors.js";
 import { ActiveRecord } from "../ar-config.js";
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import { travelTo, travelBack } from "@blazetrails/activesupport";
 
 // Mirrors the inline classes in Rails'

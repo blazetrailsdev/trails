@@ -1,4 +1,4 @@
-import type { Temporal } from "@blazetrails/activesupport/temporal";
+import type { Temporal } from "@blazetrails/date";
 import type { Developer } from "./developer.js";
 import type { Firm } from "./company.js";
 // vendor/rails/activerecord/test/models/computer.rb

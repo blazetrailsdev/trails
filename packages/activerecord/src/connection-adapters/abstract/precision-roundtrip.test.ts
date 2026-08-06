@@ -5,7 +5,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import {
   formatInstantForSql,
   formatPlainDateTimeForSql,

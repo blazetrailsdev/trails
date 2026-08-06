@@ -5,7 +5,7 @@
  * Values are cast by ActiveModel; this type adds timezone-aware behavior
  * through the `timezone` option and `isUtc` accessor.
  */
-import type { Temporal } from "@blazetrails/activesupport/temporal";
+import type { Temporal } from "@blazetrails/date";
 import { TimeType as ActiveModelTime } from "@blazetrails/activemodel";
 import { isUtc, type TimezoneOptions } from "./internal/timezone.js";
 

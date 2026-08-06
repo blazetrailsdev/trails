@@ -18,7 +18,7 @@ import { registerModel } from "../index.js";
 import { captureSql } from "../testing/sql-capture.js";
 import { fixtures } from "../test-fixtures.js";
 import { adapterType } from "../test-adapter.js";
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import { Topic } from "../test-helpers/models/topic.js";
 import { Reply } from "../test-helpers/models/reply.js";
 import { Post, SpecialPost } from "../test-helpers/models/post.js";

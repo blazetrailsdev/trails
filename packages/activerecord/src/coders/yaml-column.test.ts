@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { YAMLColumn, DisallowedClass } from "./yaml-column.js";
 import { ActiveRecord } from "../ar-config.js";
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 
 // Trails-only round-trip coverage plus the ported safe-dump restriction. The
 // remaining YAMLColumnTest / YAMLColumnTestWithSafeLoad skips stay Ruby-only

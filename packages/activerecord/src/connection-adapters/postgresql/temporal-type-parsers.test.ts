@@ -7,7 +7,7 @@
 
 import { describe, expect, it } from "vitest";
 import pg from "pg";
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import { DateInfinity, DateNegativeInfinity } from "@blazetrails/activemodel";
 import { makeGetTypeParser } from "./temporal-type-parsers.js";
 

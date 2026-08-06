@@ -6,7 +6,7 @@ import {
   currentTimeFromProperTimezone,
 } from "./timestamp.js";
 import { parseTouchArgs, type TouchArgs } from "./timestamp.js";
-import type { Temporal } from "@blazetrails/activesupport/temporal";
+import type { Temporal } from "@blazetrails/date";
 import { reflectOnAllAssociations } from "./reflection.js";
 import { BelongsTo as BelongsToBuilder } from "./associations/builder/belongs-to.js";
 import { HasOne as HasOneBuilder } from "./associations/builder/has-one.js";

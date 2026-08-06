@@ -1,5 +1,5 @@
 import { describe, expect, beforeEach, afterEach } from "vitest";
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import { instantToS } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Base } from "./index.js";

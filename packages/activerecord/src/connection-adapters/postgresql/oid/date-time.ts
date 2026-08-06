@@ -13,7 +13,7 @@
  * Returns Temporal.Instant for all datetime values (treating naive timestamps as UTC).
  */
 
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import { DateTimeType } from "@blazetrails/activemodel";
 import { pgDatetimeConfig } from "../pg-datetime-config.js";
 import {

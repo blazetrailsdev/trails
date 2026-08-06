@@ -4,7 +4,7 @@ import {
   DateInfinity,
   DateNegativeInfinity,
 } from "@blazetrails/activemodel";
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import { describe, expect, it } from "vitest";
 import { Data as ArrayData, Array as OidArray } from "./oid/array.js";
 import { DateTime as PgDateTime } from "./oid/date-time.js";

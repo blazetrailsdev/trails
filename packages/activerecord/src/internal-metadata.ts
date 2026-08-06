@@ -4,7 +4,7 @@
  * Mirrors: ActiveRecord::InternalMetadata
  */
 
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { Base } from "./base.js";
 import { EnvironmentStorageError } from "./migration.js";

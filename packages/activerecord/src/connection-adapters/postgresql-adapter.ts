@@ -1,5 +1,5 @@
 import pg from "pg";
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import { type Type, ValueType, ArgumentError, BinaryData } from "@blazetrails/activemodel";
 import {
   singularize,

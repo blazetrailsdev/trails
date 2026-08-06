@@ -1,5 +1,5 @@
 // vendor/rails/activerecord/test/cases/integration_test.rb
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import { describe, it, expect } from "vitest";
 import { CachedDeveloper, Developer } from "./test-helpers/models/developer.js";
 import { Client, Firm } from "./test-helpers/models/company.js";
