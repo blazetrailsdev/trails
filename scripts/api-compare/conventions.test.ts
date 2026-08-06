@@ -329,6 +329,21 @@ describe("RUBY_FILE_TS_OVERRIDES", () => {
     expect(rubyFileToTs("../i18n.rb", "i18n")).toBe("i18n.ts");
     expect(rubyFileToTs("interpolate/ruby.rb", "i18n")).toBe("interpolate/ruby.ts");
   });
+
+  it("maps all three activesupport calculations.rb reopenings onto time-ext.ts", () => {
+    // `Time`, `Date` and `DateTime` are each first reopened elsewhere
+    // (object/blank.rb:186, date/acts_like.rb:5, date_time/acts_like.rb:6), so
+    // without these the 129 methods the calculations.rb files add are measured
+    // against files that define none of them.
+    expect(rubyFileToTs("core_ext/time/calculations.rb", "activesupport")).toBe("time-ext.ts");
+    expect(rubyFileToTs("core_ext/date/calculations.rb", "activesupport")).toBe("time-ext.ts");
+    expect(rubyFileToTs("core_ext/date_time/calculations.rb", "activesupport")).toBe("time-ext.ts");
+  });
+
+  it("leaves the acts_like.rb reopenings on the default kebab-case rule", () => {
+    expect(hasRubyFileTsOverride("core_ext/date/acts_like.rb", "activesupport")).toBe(false);
+    expect(hasRubyFileTsOverride("core_ext/date_time/acts_like.rb", "activesupport")).toBe(false);
+  });
 });
 
 describe("SKIP_GROUPS", () => {
