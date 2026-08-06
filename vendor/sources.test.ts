@@ -61,6 +61,23 @@ describe("vendor/sources.ts", () => {
     ]);
   });
 
+  it("declares the date source, enrolled in test-compare only", () => {
+    // api-compare stays off deliberately: the gem's surface is C
+    // (ext/date/date_core.c), so extract-ruby-api.rb credits only the 12
+    // methods in lib/date.rb. RFC 0088 `date-c-source-extractor-decision`.
+    const date = SOURCES.find((s) => s.name === "date");
+    expect(date).toBeDefined();
+    expect(date!.origin).toEqual({
+      type: "git",
+      url: "https://github.com/ruby/date.git",
+      ref: "v3.4.1",
+    });
+    expect(apiComparePackages()).not.toContain("date");
+    expect(Object.keys(libPathsManifest())).not.toContain("date");
+    expect(Object.keys(testPathsManifest())).toContain("date");
+    expect(resolvePath("date", "test").endsWith("vendor/date/test/date")).toBe(true);
+  });
+
   it("declares the i18n source, enrolled in both api-compare and test-compare", () => {
     const i18n = SOURCES.find((s) => s.name === "i18n");
     expect(i18n).toBeDefined();
@@ -224,6 +241,7 @@ describe("vendor/sources.ts", () => {
         "activerecord",
         "activesupport",
         "arel",
+        "date",
         "did-you-mean",
         "globalid",
         "i18n",

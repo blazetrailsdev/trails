@@ -1257,6 +1257,7 @@ function extractRelativeTsPath(fullPath: string, pkg: string): string {
     globalid: "packages/globalid/src/",
     "did-you-mean": "packages/did-you-mean/src/",
     i18n: "packages/i18n/src/",
+    date: "packages/date/src/",
   };
 
   const prefix = pkgDirs[pkg];

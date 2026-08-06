@@ -204,11 +204,21 @@ export const SOURCES: readonly UpstreamSource[] = [
         // `lib/date.rb`'s `Date#infinite?` and the `:nodoc:` `Date::Infinity`,
         // against 2,805 lines of port. So `compareApi` stays off; the C sources
         // are a read-anchor, and they need no `UNPORTED_FILES` entry because
-        // the extractor globs `**/*.rb` and never sees them. `compareTests`
-        // flips in `date-test-compare-enrollment` — `test/date/` is 12 files
-        // and 145 `def test_` methods, and it is the gate for this cluster.
+        // the extractor globs `**/*.rb` and never sees them.
         compareApi: false,
-        compareTests: false,
+        // `test/date/` is the gate for this cluster — 12 files, 145 `def test_`
+        // methods — and it is the only fidelity measure the date port has:
+        // per RFC 0088 the gem's test suite is the measure, not a
+        // method-by-method mirror of Ruby's internal representation.
+        //
+        // Assertion-value mismatches against these tests are EXPECTED and
+        // BENIGN, not drift. RFC 0088 returns `Temporal` types by default where
+        // Ruby returns `Date`/`DateTime`/`Time`, so a ported test whose Ruby
+        // form asserts `assert_equal Date.new(2001,2,3), Date.parse("…")`
+        // compares a `Temporal.PlainDate` on our side. `test:compare` matches on
+        // test *names*, so the test still counts. Do not "converge" a
+        // Temporal return back to a Ruby-shaped one to silence a value
+        // mismatch — that reverses the RFC's headline decision.
       },
     ],
   },

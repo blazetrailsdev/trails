@@ -40,6 +40,11 @@
       "kind": 0,
       "value": 0
     },
+    "date": {
+      "assertionCount": 0,
+      "kind": 0,
+      "value": 0
+    },
     "did-you-mean": {
       "assertionCount": 0,
       "kind": 0,

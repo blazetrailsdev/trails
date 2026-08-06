@@ -1321,6 +1321,32 @@ export const UNPORTED_FILES: UnportedFile[] = [
       "conformance mixins excluded above — a file that sits beside the " +
       "directory the pattern above reaches.",
   },
+  {
+    testFile: "test_date_ractor.rb",
+    package: "date",
+    reason:
+      "Ractor is Ruby's actor-based parallelism primitive — the file exercises " +
+      "`Ractor.make_shareable`/`Ractor.new` round-tripping of a Date across " +
+      "isolated interpreter states. JS is single-threaded and has no analogue, " +
+      "same reason `promise.rb` is excluded above.",
+  },
+  {
+    testFile: "test_date_marshal.rb",
+    package: "date",
+    reason:
+      "Ruby's Marshal binary object format — `Marshal.dump`/`Marshal.load` of a " +
+      "Date, including the frozen-string and instance-variable round trip. " +
+      "Not applicable: JS has no Marshal, and the wire format is Ruby-only.",
+  },
+  {
+    testFile: "test_switch_hitter.rb",
+    tests: ["test_marshal14", "test_marshal16", "test_marshal18", "test_marshal192"],
+    reason:
+      "The four Marshal cases inside TestSH load Marshal payloads emitted by " +
+      "Ruby 1.4/1.6/1.8/1.9.2 to check the dumped Date representation stays " +
+      "loadable. Ruby-only wire format, same as test_date_marshal.rb above; the " +
+      "rest of the file stays counted.",
+  },
 ];
 
 export function isSourceUnported(file: string, pkg?: string): boolean {
