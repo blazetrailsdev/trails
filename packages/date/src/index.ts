@@ -16,6 +16,7 @@ export {
   DateTime,
   Rational,
   dNewByFrags,
+  dtNewByFrags,
   strftime,
   type DateParts,
   type StrftimeSubject,

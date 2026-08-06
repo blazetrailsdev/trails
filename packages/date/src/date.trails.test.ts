@@ -621,7 +621,7 @@ describe("DateTime", () => {
 
   it("carries the start it was built under, as datetime_s_new does", () => {
     // ruby 3.3.11: DateTime.new(2001, 2, 3, 4, 5, 6, 0, Date::ENGLAND).start #=> 2361222.0
-    expect(new RubyDateTime(2001, 2, 3, 4, 5, 6, RubyDate.ENGLAND).start).toBe(2361222);
+    expect(new RubyDateTime(2001, 2, 3, 4, 5, 6, 0, RubyDate.ENGLAND).start).toBe(2361222);
     expect(new RubyDateTime(2001, 2, 3, 4, 5, 6).start).toBe(RubyDate.ITALY);
   });
 
@@ -641,6 +641,56 @@ describe("DateTime", () => {
     expect(new RubyDateTime(2000, 2, 3, 6, 7, 8).newStart(RubyDate.JULIAN).hour).toBe(6);
     expect(new RubyDateTime(2000, 2, 3, 6, 7, 8).italy()).toBeInstanceOf(RubyDateTime);
     expect(new RubyDateTime(2000, 2, 3, 6, 7, 8).gregorian().start).toBe(RubyDate.GREGORIAN);
+  });
+
+  it("carries the offset the parsed string named", () => {
+    // ruby 3.3.11:
+    //   DateTime.parse("2008-03-01T06:00:00+09:00").zone #=> "+09:00"
+    //   ...strftime("%Y-%m-%dT%H:%M:%S %z %:z %::z %:::z %Z")
+    //     #=> "2008-03-01T06:00:00 +0900 +09:00 +09:00:00 +09 +09:00"
+    const datetime = RubyDateTime.parse("2008-03-01T06:00:00+09:00");
+    expect(datetime).toBeInstanceOf(RubyDateTime);
+    expect(datetime.zone).toBe("+09:00");
+    expect(datetime.strftime("%Y-%m-%dT%H:%M:%S %z %:z %::z %:::z %Z")).toBe(
+      "2008-03-01T06:00:00 +0900 +09:00 +09:00:00 +09 +09:00",
+    );
+  });
+
+  it("spells a half-hour and a named zone's offset", () => {
+    // ruby 3.3.11:
+    //   DateTime.parse("2008-03-01T06:00:00-04:30").zone #=> "-04:30"
+    //   DateTime.parse("2008-03-01T06:00:00 EST").zone   #=> "-05:00"
+    //   DateTime.parse("2008-03-01T06:00:00+05:45").offset #=> (23/96)
+    expect(RubyDateTime.parse("2008-03-01T06:00:00-04:30").zone).toBe("-04:30");
+    expect(RubyDateTime.parse("2008-03-01T06:00:00-04:30").strftime("%z %::z")).toBe(
+      "-0430 -04:30:00",
+    );
+    expect(RubyDateTime.parse("2008-03-01T06:00:00 EST").zone).toBe("-05:00");
+    expect(RubyDateTime.parse("2008-03-01T06:00:00+05:45").offset).toEqual(new Rational(23, 96));
+  });
+
+  it("defaults to +00:00 when the source named no zone", () => {
+    // ruby 3.3.11: DateTime.parse("2008-07-02").strftime("%Y-%m-%dT%H:%M:%S %z")
+    //   #=> "2008-07-02T00:00:00 +0000"
+    expect(RubyDateTime.parse("2008-07-02").strftime("%Y-%m-%dT%H:%M:%S %z")).toBe(
+      "2008-07-02T00:00:00 +0000",
+    );
+    expect(RubyDateTime.parse("2008-07-02").zone).toBe("+00:00");
+    expect(new RubyDateTime(2008, 3, 1, 6).zone).toBe("+00:00");
+  });
+
+  it("keeps its offset through new_start", () => {
+    // `Date#julian` routes through `newStart`, which `DateTime` overrides —
+    // Ruby's `dup_obj_with_new_start` keeps the receiver's class, but the
+    // declared return type is `Date`'s.
+    const julian = RubyDateTime.parse("2000-02-03T06:07:08+09:00").julian() as RubyDateTime;
+    expect(julian.zone).toBe("+09:00");
+    expect(julian.strftime("%Y-%m-%dT%H:%M:%S%:z")).toBe("2000-01-21T06:07:08+09:00");
+  });
+
+  it("raises Date::Error on a string naming no date, as dt_new_by_frags does", () => {
+    // ruby 3.3.11: DateTime.parse("not a date") #=> Date::Error: invalid date
+    expect(() => RubyDateTime.parse("not a date")).toThrow("invalid date");
   });
 });
 

@@ -1,5 +1,10 @@
-import { Temporal } from "@blazetrails/date";
-import { looseDateParse } from "./helpers/loose-date-parse.js";
+// `RubyDate` is the ruby/date gem's `::Date`; the bare name is the JS global.
+import {
+  ArgumentError as RubyArgumentError,
+  Date as RubyDate,
+  Temporal,
+  type DateParts,
+} from "@blazetrails/date";
 import { AcceptsMultiparameterTime, isHash } from "./helpers/accepts-multiparameter-time.js";
 import { ValueType } from "./value.js";
 
@@ -44,16 +49,29 @@ export class TimeType extends ValueType<Temporal.PlainTime> {
     if (isHash(value)) return this.valueFromMultiparameterAssignment(value);
     const str = String(value).trim();
     if (str === "") return null;
-    const parts = looseDateParse(str);
-    if (!parts || parts.hour === undefined) return null;
+    // Rails' `dummy_time_value` — the empty alternation makes the pattern match
+    // at position 0 whatever the string, so a leading `YYYY-MM-DD` separator is
+    // replaced and a time-only string is prefixed (time.rb:70).
+    const dummyTimeValue = str.replace(/^\d{4}-\d\d-\d\d(?:T|\s)|/, "2000-01-01 ");
+    let timeHash: DateParts | undefined;
+    try {
+      timeHash = RubyDate._parse(dummyTimeValue);
+    } catch (error) {
+      if (!(error instanceof RubyArgumentError)) throw error;
+    }
+    if (timeHash == null || timeHash.hour == null) return null;
+    // Rails hands the components to `new_time`, which answers a `::Time` on the
+    // 2000-01-01 dummy date. Trails' `Time` type is a `Temporal.PlainTime`, so
+    // the date half of the hash is dropped here instead.
+    const microsec = timeHash.secFraction ? Math.trunc(timeHash.secFraction * 1_000_000) : 0;
     try {
       return Temporal.PlainTime.from(
         {
-          hour: parts.hour,
-          minute: parts.minute ?? 0,
-          second: parts.second ?? 0,
-          millisecond: parts.millisecond ?? 0,
-          microsecond: parts.microsecond ?? 0,
+          hour: timeHash.hour,
+          minute: timeHash.min ?? 0,
+          second: timeHash.sec ?? 0,
+          millisecond: Math.trunc(microsec / 1000),
+          microsecond: microsec % 1000,
         },
         { overflow: "reject" },
       );

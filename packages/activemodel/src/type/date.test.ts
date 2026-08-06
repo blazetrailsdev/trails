@@ -82,10 +82,14 @@ describe("DateTest", () => {
     expect((result as Temporal.PlainDate).toString()).toBe("2020-07-04");
   });
 
-  it("cast US-slash string", () => {
+  // `Date._parse`'s slash sub-parser (`date_parse.c` `parse_sla`) reads
+  // day/month/year, not the US month/day/year: `Date._parse("7/4/2020", false)`
+  // is `{year: 2020, mon: 4, mday: 7}` under a live ruby, so `::Date.new` of it
+  // is 2020-04-07. The trails regex this replaced read it the other way round.
+  it("cast slash string", () => {
     const result = type.cast("7/4/2020");
     expect(result).toBeInstanceOf(Temporal.PlainDate);
-    expect((result as Temporal.PlainDate).toString()).toBe("2020-07-04");
+    expect((result as Temporal.PlainDate).toString()).toBe("2020-04-07");
   });
 
   it("cast garbage string returns null", () => {

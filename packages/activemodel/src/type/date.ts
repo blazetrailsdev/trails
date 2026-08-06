@@ -1,6 +1,13 @@
-import { Temporal } from "@blazetrails/date";
+// `::Date` is the ruby/date gem's class, which shadows nothing in Ruby but
+// collides with the JS global `Date` this file also names; `RubyDate` is the
+// spelling the rest of the monorepo already reads it under.
+import {
+  ArgumentError as RubyArgumentError,
+  Date as RubyDate,
+  Temporal,
+  type DateParts,
+} from "@blazetrails/date";
 import { AcceptsMultiparameterTime, isHash } from "./helpers/accepts-multiparameter-time.js";
-import { looseDateParse } from "./helpers/loose-date-parse.js";
 import {
   DateInfinity,
   DateNegativeInfinity,
@@ -82,17 +89,20 @@ export class DateType extends ValueType<DateCastResult> {
    *     new_date(*parts.values_at(:year, :mon, :mday)) if parts
    *   end
    *
-   * Trails mirrors `Date._parse` breadth via `looseDateParse`: layered
-   * Temporal ISO parsing followed by regex coverage for US-slash, year-first
-   * slash, month-name, and space-separated Postgres wire formats. Falls
-   * through to `null` on parse failure, matching Rails' rescued path.
+   * `::Date._parse` is the gem's own entry point, ported at
+   * `packages/date/src/date.ts` from `date_parse.c` `date__parse`. `comp` is
+   * `false`, so a two-digit year stays literal.
    *
    * @internal Rails-private helper.
    */
   protected fallbackStringToDate(s: string): Temporal.PlainDate | null {
-    const parts = looseDateParse(s);
-    if (!parts) return null;
-    return this.newDate(parts.year, parts.month, parts.day);
+    let parts: DateParts | undefined;
+    try {
+      parts = RubyDate._parse(s, false);
+    } catch (error) {
+      if (!(error instanceof RubyArgumentError)) throw error;
+    }
+    return parts ? this.newDate(parts.year, parts.mon, parts.mday) : null;
   }
 
   /**
