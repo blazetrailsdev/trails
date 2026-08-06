@@ -83,11 +83,13 @@ describe("formatPlainDateForSql", () => {
     expect(formatPlainDateForSql(Temporal.PlainDate.from("2026-01-05"))).toBe("2026-01-05");
   });
 
-  it("formats a negative (BCE) year matching quotedDate(Date) convention (no zero-padding)", () => {
-    // year -43 = 44 BC in proleptic Gregorian; String(-43) → "-43", matching
-    // how quotedDate(Date) formats years (String(getUTCFullYear()) — no padding).
+  it("formats a negative (BCE) year the way the date gem's %Y does", () => {
+    // year -43 = 44 BC in proleptic Gregorian. `to_fs(:db)` is
+    // `strftime("%Y-%m-%d")`, and the gem's `%Y` pads the digits to four behind
+    // the sign (`Date.new(-43, 3, 15).to_fs(:db)` → "-0043-03-15"), so routing
+    // this through packages/date drops the old unpadded "-43-03-15".
     expect(formatPlainDateForSql(Temporal.PlainDate.from({ year: -43, month: 3, day: 15 }))).toBe(
-      "-43-03-15",
+      "-0043-03-15",
     );
   });
 });

@@ -23,6 +23,20 @@
   {
     "package": "actioncontroller",
     "tsFile": "metal/request-forgery-protection.ts",
+    "rubyName": "mask_token",
+    "call": "order:encodeCsrfToken,xorByteStrings",
+    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "metal/request-forgery-protection.ts",
+    "rubyName": "masked_authenticity_token",
+    "call": "order:perFormCsrfToken,normalizeActionPath",
+    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "metal/request-forgery-protection.ts",
     "rubyName": "reset",
     "call": "delete",
     "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails request_forgery_protection.rb:328-330/361-363 call `session.delete`/`cookie_jar.delete`; trails request-forgery-protection.ts:138-140/160-162 use the JS `delete obj[key]` operator, which records no call."

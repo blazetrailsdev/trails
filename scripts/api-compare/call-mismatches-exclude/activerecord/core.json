@@ -58,6 +58,13 @@
   {
     "package": "activerecord",
     "tsFile": "core.ts",
+    "rubyName": "find",
+    "call": "order:constructor,primaryKey",
+    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "core.ts",
     "rubyName": "find_by",
     "call": "cached_find_by",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -114,6 +121,13 @@
   {
     "package": "activerecord",
     "tsFile": "core.ts",
+    "rubyName": "inspect_with_attributes",
+    "call": "order:attributeForInspect,join",
+    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "core.ts",
     "rubyName": "preventing_writes?",
     "call": "any?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -124,6 +138,13 @@
     "rubyName": "preventing_writes?",
     "call": "include?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "core.ts",
+    "rubyName": "strict_loading_violation!",
+    "call": "order:constructor,actionOnStrictLoadingViolation",
+    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
   },
   {
     "package": "activerecord",

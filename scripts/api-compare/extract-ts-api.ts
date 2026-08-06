@@ -700,6 +700,7 @@ export function extractFromProgram(
         const line = node.getSourceFile().getLineAndCharacterOfPosition(node.getStart()).line + 1;
         const fnOptionKeys = extractOptionKeys(node.parameters, checker);
         const fnCalls = extractCalls(node.body);
+        const fnCallSeq = extractCallSeq(node.body);
         const internal = hasInternalJsDocTag(node);
         const noRailsEquivalent = noRailsEquivalentReason(node);
         const fnMissingRailsCalls = missingRailsCallTags(node);
@@ -714,6 +715,7 @@ export function extractFromProgram(
           ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
           ...(fnOptionKeys !== undefined ? { optionKeys: fnOptionKeys } : {}),
           ...(fnCalls !== undefined ? { calls: fnCalls } : {}),
+          ...(fnCallSeq !== undefined ? { callSeq: fnCallSeq } : {}),
           ...(fnMissingRailsCalls !== undefined ? { missingRailsCalls: fnMissingRailsCalls } : {}),
         });
       } else if (ts.isVariableStatement(node) && isExported(node)) {
@@ -2028,10 +2030,9 @@ export function extractClass(
       // (double-attribution). Suppress the wrapper's call-set so the canonical
       // module-function candidate is the one compared; the method name still
       // counts for presence/arity parity.
-      const calls =
-        namespaceSelfDelegationName(member.body, checker) === memberName
-          ? undefined
-          : extractCalls(member.body);
+      const suppressed = namespaceSelfDelegationName(member.body, checker) === memberName;
+      const calls = suppressed ? undefined : extractCalls(member.body);
+      const callSeq = suppressed ? undefined : extractCallSeq(member.body);
       const delegatesTo = delegationTargetName(member.body, memberName, name, checker);
       if (delegatesTo) delegationTargets.add(delegatesTo);
       const method: MethodInfo = {
@@ -2045,6 +2046,7 @@ export function extractClass(
         ...tagged,
         ...(optionKeys !== undefined ? { optionKeys } : {}),
         ...(calls !== undefined ? { calls } : {}),
+        ...(callSeq !== undefined ? { callSeq } : {}),
         ...(delegatesTo !== undefined ? { delegatesTo } : {}),
       };
       // Only instance methods are reachable via `this.helper(...)` and only
@@ -2064,6 +2066,7 @@ export function extractClass(
       // Constructor bodies are the home of bare `super(...)` chains — capture
       // calls here so calls-parity can flag a ported constructor that drops it.
       const calls = extractCalls(member.body);
+      const callSeq = extractCallSeq(member.body);
       instanceMethods.push({
         name: "constructor",
         visibility,
@@ -2073,6 +2076,7 @@ export function extractClass(
         ...(internal ? { internal: true } : {}),
         ...tagged,
         ...(calls !== undefined ? { calls } : {}),
+        ...(callSeq !== undefined ? { callSeq } : {}),
       });
     } else if (ts.isGetAccessorDeclaration(member) && memberName) {
       const method: MethodInfo = {
@@ -2542,7 +2546,25 @@ function isNegatedOperand(expr: ts.Node): boolean {
   return !isNegatedOperand(parent);
 }
 
+/**
+ * The same call names in SOURCE ORDER — the sequence the call-order comparison
+ * reads (RFC 0084). `extractCalls` sorts, which is the right shape for a
+ * membership test but erases the one signal a set diff cannot carry: Rails'
+ * branch and call ORDER, which CLAUDE.md's "same branches, in the same order"
+ * makes a first-class fidelity requirement. Deduplicated at first occurrence,
+ * matching the Ruby extractor's `calls.uniq` (extract-ruby-api.rb:2043), so the
+ * two sequences are directly comparable.
+ */
+function extractCallSeq(node: ts.Node | undefined): string[] | undefined {
+  return collectCalls(node);
+}
+
 function extractCalls(node: ts.Node | undefined): string[] | undefined {
+  const names = collectCalls(node);
+  return names === undefined ? undefined : [...names].sort();
+}
+
+function collectCalls(node: ts.Node | undefined): string[] | undefined {
   if (!node) return undefined;
   const aliases = currentImportAliases;
   const resolve = (name: string): string => aliases?.get(name) ?? name;
@@ -2612,7 +2634,7 @@ function extractCalls(node: ts.Node | undefined): string[] | undefined {
   };
   ts.forEachChild(node, visit);
   if (names.size === 0) return undefined;
-  return [...names].sort();
+  return [...names];
 }
 
 /**

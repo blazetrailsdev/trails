@@ -1,0 +1,9 @@
+[
+  {
+    "package": "actiondispatch",
+    "tsFile": "routing/url-for.ts",
+    "rubyName": "full_url_for",
+    "call": "order:polymorphicUrl,handleStringCall",
+    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
+  }
+]

@@ -5,5 +5,12 @@
     "rubyName": "cookie",
     "call": "fetch",
     "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails mock_response.rb:73-75 is `cookies.fetch(name, nil)`; trails mock-response.ts:66-68 is an index read returning undefined when absent."
+  },
+  {
+    "package": "rack",
+    "tsFile": "mock-response.ts",
+    "rubyName": "parse_cookies_from_header",
+    "call": "order:identifyCookieAttributes,constructor",
+    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
   }
 ]

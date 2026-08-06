@@ -41,6 +41,15 @@ export interface MethodInfo {
   depRefs?: Record<string, string[]>;
   calls?: string[];
   /**
+   * TS-side only (RFC 0084): the same call names in SOURCE ORDER, deduplicated
+   * at first occurrence exactly as the Ruby extractor's `calls.uniq` is. `calls`
+   * is sorted, so a set diff over it is blind to ordering; this field is what
+   * lets the calls gate report an order-only divergence — Rails' branch/call
+   * order not preserved by the port — as its own status. Populated for class
+   * members, constructors and top-level functions.
+   */
+  callSeq?: string[];
+  /**
    * Ruby-side only (RFC 0083): the subset of `calls` whose every occurrence in
    * the body had a provably inert receiver — a local variable or a literal
    * (`xs.first`, `opts.fetch`, `{}.merge`). Those say nothing about the port,

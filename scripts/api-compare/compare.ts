@@ -287,6 +287,71 @@ export function significantMissingCalls(
 }
 
 /**
+ * Marker prefix on an ORDER-only call-parity flag (RFC 0084). The baseline keys
+ * on the text left of the arrow (`callOf`), so the prefix is what makes an
+ * order-only row distinguishable from a dropped-call row in the exclude tree
+ * and in review, and greppable as a class.
+ */
+export const ORDER_PREFIX = "order:";
+
+/**
+ * Order-only divergence between a Ruby body and its matched TS body: both make
+ * the same significant calls, but not in the same sequence. A set diff cannot
+ * see this, and CLAUDE.md's "same branches, in the same order, with the same
+ * guards and early returns" makes it a fidelity requirement — the shape mirrors
+ * `scoreFile`'s matched / reordered / divergent split in
+ * scripts/prism-codegen/score.ts, over the ratchet's whole population instead of
+ * the generator's ten files.
+ *
+ * Only calls that pass the same gates as {@link significantMissingCalls} AND are
+ * present in the TS body count: a dropped call is that check's finding, not
+ * this one's, so the two never double-report the same divergence. `super` is
+ * excluded for the same reason it is not significant — the mixin port
+ * structurally drops or respells it, so its position says nothing.
+ *
+ * `tsCalls` must be the body's OWN source-ordered call sequence
+ * (`MethodInfo.callSeq`), never the delegation/helper-union set: a wrapper
+ * resolving in place of the implementation has no meaningful order of its own,
+ * which is the `resolvePortFn` cross-file-fallback false-positive class the
+ * codegen scorer hit on `relation.rb::computeCacheKey`.
+ *
+ * At most one flag per body, naming the first inversion — `order:b,a → a,b`
+ * reads "TS calls b before a; Rails calls a before b" — so the row is a stable
+ * baseline key rather than a whole-sequence string that churns on every edit.
+ */
+export function reorderedCalls(
+  rubyName: string,
+  rubyCalls: readonly string[],
+  tsCalls: readonly string[],
+  isPortedWithArgs: (tsName: string) => boolean,
+  mapCall: (rubyCall: string) => string[] | null = rubyMethodToTs,
+  significant: { has(value: string): boolean } = SIGNIFICANT_CALLS,
+): string[] {
+  const rubySeq: string[] = [];
+  for (const rc of rubyCalls) {
+    if (rc === rubyName) continue; // self/recursive call
+    if (rc === "super") continue;
+    if (!significant.has(rc)) continue;
+    const mapped = mapCall(rc);
+    if (!mapped || mapped.length === 0) continue;
+    if (!mapped.some(isPortedWithArgs)) continue;
+    const hit = mapped.find((c) => tsCalls.includes(c));
+    if (hit === undefined) continue; // missing, not reordered
+    if (rubySeq.includes(hit)) continue; // one position per TS name
+    rubySeq.push(hit);
+  }
+  if (rubySeq.length < 2) return [];
+  for (const [i, name] of rubySeq.entries()) {
+    for (const later of rubySeq.slice(i + 1)) {
+      if (tsCalls.indexOf(later) < tsCalls.indexOf(name)) {
+        return [`${ORDER_PREFIX}${later},${name} → ${name},${later}`];
+      }
+    }
+  }
+  return [];
+}
+
+/**
  * Signature candidates the ported-with-args gate (gate 2 above) resolves a
  * mapped TS name against: the same file's signatures when that file defines the
  * name, else the ones from the SAME PACKAGE only.
@@ -1577,6 +1642,11 @@ export function main() {
     const tsOptionKeysByFileName = new Map<string, Map<string, (string[] | null)[]>>();
     // Body call-sets scoped per (file, name) for the advisory calls-parity check.
     const tsCallsByFileName = new Map<string, Map<string, string[][]>>();
+    // Same population, source-ordered (MethodInfo.callSeq), for the order-only
+    // comparison (RFC 0084). Kept separate from tsCallsByFileName because that
+    // one is unioned/flattened across candidate declarations and helpers, which
+    // has no order to speak of.
+    const tsCallSeqByFileName = new Map<string, Map<string, string[][]>>();
     const tsMissingCallTagsByFileName = new Map<string, Map<string, Set<string>>>();
     // Same call-sets unioned by NAME across this package and its deps (the same
     // scope tsParamsByName uses). Consulted ONLY by the delegation-transparency
@@ -1643,6 +1713,11 @@ export function main() {
         for (const c of m.missingRailsCalls) tagged.add(c);
         byName.set(m.name, tagged);
         tsMissingCallTagsByFileName.set(file, byName);
+      }
+      if (m.callSeq !== undefined) {
+        const byName = tsCallSeqByFileName.get(file) ?? new Map<string, string[][]>();
+        byName.set(m.name, [...(byName.get(m.name) ?? []), m.callSeq]);
+        tsCallSeqByFileName.set(file, byName);
       }
       if (m.calls !== undefined) {
         const byName = tsCallsByFileName.get(file) ?? new Map<string, string[][]>();
@@ -2103,8 +2178,27 @@ export function main() {
             if (tags.has(call)) suppressedCalls.push({ tsFile, rubyName, tsName, call });
           }
         }
-        if (kept.length === 0) return;
-        callMismatches.push({ rubyFile, tsFile, rubyName, tsName, missing: kept });
+        // Order-only parity (RFC 0084), over the body's OWN source-ordered
+        // sequence: a single candidate declaration only — two declarations under
+        // one name have no combined order — and never a delegating wrapper,
+        // whose order belongs to the implementation it forwards to.
+        const seqSets = tsCallSeqByFileName.get(tsFile)?.get(tsName);
+        const ordered: string[] = [];
+        if (seqSets?.length === 1 && !isDelegatingWrapper(tsName, own.calls)) {
+          ordered.push(
+            ...reorderedCalls(
+              rubyName,
+              rubyCalls,
+              [...partitionNegatedCalls(seqSets[0]).calls],
+              (c) => portedWithArgsSigs(tsFile, c).some((sig) => stripThis(sig).length > 0),
+              rubyMethodToTs,
+              callsSignificant,
+            ),
+          );
+        }
+        const flagged = [...kept, ...ordered];
+        if (flagged.length === 0) return;
+        callMismatches.push({ rubyFile, tsFile, rubyName, tsName, missing: flagged });
       };
 
       // Advisory arity check for one name-matched pair: flag when the Ruby and

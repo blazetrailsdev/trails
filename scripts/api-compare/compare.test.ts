@@ -17,6 +17,8 @@ import {
   buildEntitiesByName,
   resolveEntityByDeclaringFile,
   significantMissingCalls,
+  reorderedCalls,
+  ORDER_PREFIX,
   resolvePortedWithArgsSigs,
   jsEnumerableAliases,
   JS_ENUMERABLE_ALIASES,
@@ -1715,5 +1717,69 @@ describe("mixinMethodCreditedToOwnFile", () => {
         tsMethodsByFile,
       ),
     ).toBeNull();
+  });
+});
+
+describe("reorderedCalls (RFC 0084 order-only call parity)", () => {
+  const map = (c: string) => rubyMethodToTs(c);
+  const wide = { has: (k: string) => k !== "super" };
+  const ported = () => true;
+
+  it("flags a body that makes Rails' calls in a different order", () => {
+    expect(
+      reorderedCalls("create", ["build", "save"], ["save", "build"], ported, map, wide),
+    ).toEqual([`${ORDER_PREFIX}save,build → build,save`]);
+  });
+
+  it("stays silent when the sequences agree", () => {
+    expect(
+      reorderedCalls("create", ["build", "save"], ["build", "save"], ported, map, wide),
+    ).toEqual([]);
+  });
+
+  it("ignores intervening TS calls Rails does not make", () => {
+    expect(
+      reorderedCalls("create", ["build", "save"], ["build", "dup", "save"], ported, map, wide),
+    ).toEqual([]);
+  });
+
+  it("leaves a dropped call to the missing-call check rather than reporting order", () => {
+    // `save` is absent from TS, so this is a divergence, not a reordering: the
+    // two checks must not double-report the same body.
+    expect(reorderedCalls("create", ["build", "save"], ["build"], ported, map, wide)).toEqual([]);
+    expect(
+      significantMissingCalls("create", ["build", "save"], new Set(["build"]), ported, map, wide),
+    ).toEqual(["save → save"]);
+  });
+
+  it("reports one flag per body, naming the first inversion", () => {
+    expect(
+      reorderedCalls(
+        "create",
+        ["build", "save", "touch"],
+        ["touch", "save", "build"],
+        ported,
+        map,
+        wide,
+      ),
+    ).toEqual([`${ORDER_PREFIX}save,build → build,save`]);
+  });
+
+  it("never flags a single matched call, nor the self call, nor super", () => {
+    expect(reorderedCalls("create", ["build"], ["build"], ported, map, wide)).toEqual([]);
+    expect(reorderedCalls("save", ["save", "touch"], ["touch", "save"], ported, map, wide)).toEqual(
+      [],
+    );
+    expect(
+      reorderedCalls("save", ["super", "touch", "build"], ["touch", "build"], ported, map, wide),
+    ).toEqual([]);
+  });
+
+  it("respects the ported-with-args gate the missing-call check uses", () => {
+    // A zero-arg reader Ruby records as a call but TS reads as `this.x` must not
+    // manufacture a position — same gate 2 as significantMissingCalls.
+    expect(
+      reorderedCalls("create", ["build", "save"], ["save", "build"], () => false, map, wide),
+    ).toEqual([]);
   });
 });

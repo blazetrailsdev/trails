@@ -65,6 +65,13 @@
   {
     "package": "activerecord",
     "tsFile": "encryption/encryptable-record.ts",
+    "rubyName": "encrypt_attribute",
+    "call": "order:constructor,schemeFor",
+    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "encryption/encryptable-record.ts",
     "rubyName": "has_encrypted_attributes?",
     "call": "encrypted_attributes",
     "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails encryptable_record.rb:204-206 reads `self.class.encrypted_attributes.present?`; trails encryptable-record.ts:165-167 reads `modelClass._encryptedAttributes?.size > 0`."
@@ -110,5 +117,12 @@
     "rubyName": "validate_column_size",
     "call": "columns_hash",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "encryption/encryptable-record.ts",
+    "rubyName": "validate_column_size",
+    "call": "order:validatesLengthOf,limit",
+    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
   }
 ]
