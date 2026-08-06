@@ -403,7 +403,9 @@ describe("TestNestedAttributesOnAHasOneAssociation", () => {
 
   it("should define an attribute writer method for the association", () => {
     const pirate = new Pirate();
-    expect(typeof (pirate as any).setShipAttributes).toBe("function");
+    expect(() => {
+      (pirate as any).shipAttributes = {};
+    }).not.toThrow();
   });
 
   it("should build a new record if there is no id", async () => {
@@ -639,7 +641,9 @@ describe("TestNestedAttributesOnABelongsToAssociation", () => {
 
   it("should define an attribute writer method for the association", () => {
     const ship = new Ship();
-    expect(typeof (ship as any).setPirateAttributes).toBe("function");
+    expect(() => {
+      (ship as any).pirateAttributes = {};
+    }).not.toThrow();
   });
 
   it("should build a new record if there is no id", async () => {
