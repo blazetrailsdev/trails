@@ -31,7 +31,7 @@ describe("discoverMigrations", () => {
     write("20260101000000-create-posts.ts");
     const found = await discoverMigrations(tmpDir);
     expect(found).toHaveLength(1);
-    expect(found[0].version).toBe("20260101000000");
+    expect(found[0].version).toBe(20260101000000);
   });
 
   it("collapses hyphen and underscore variants of the same migration, preferring underscore", async () => {

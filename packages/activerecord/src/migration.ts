@@ -294,7 +294,7 @@ export abstract class Migration {
    * @internal
    */
   static delegate: DatabaseAdapter | null = null;
-  private _version?: string;
+  private _version?: number;
 
   /** Mirrors: ActiveRecord::Migration.verbose (`cattr_accessor`, `migration.rb:797`). */
   static get verbose(): boolean {
@@ -322,7 +322,7 @@ export abstract class Migration {
   /**
    * Mirrors: ActiveRecord::Migration#initialize
    */
-  constructor(name?: string, version?: string) {
+  constructor(name?: string, version?: number) {
     this._name = name;
     this._version = version;
   }
@@ -1263,7 +1263,7 @@ export abstract class Migration {
    * (`migration.rb:799`) — only `@name` defaults to the class name — so an
    * unversioned migration has no version.
    */
-  get version(): string | undefined {
+  get version(): number | undefined {
     return this._version;
   }
 
@@ -1475,8 +1475,8 @@ export abstract class Migration {
           continue;
         }
 
-        const nextNumber = last ? BigInt(last.version) + 1n : 0n;
-        const newVersion = Migration.nextMigrationNumber(nextNumber);
+        const nextNumber = last ? last.version + 1 : 0;
+        const newVersion = toInteger(Migration.nextMigrationNumber(nextNumber));
         const fileBase = underscore(source.name);
         // Preserve the source file extension — a `.js` source must stay
         // loadable under a JS-only runtime; switching to `.ts` would break
@@ -1638,7 +1638,7 @@ export abstract class Migration {
 // === Migrator (Rails defines this in migration.rb) ===
 
 export interface MigrationProxy {
-  version: string;
+  version: number;
   name: string;
   filename?: string;
   /** Mirrors: ActiveRecord::MigrationProxy#scope — engine name for copied engine migrations */
@@ -1659,11 +1659,11 @@ export interface MigrationProxy {
 async function loadMigrationFrom(
   mod: Record<string, unknown>,
   name: string,
-  version: string,
+  version: number,
 ): Promise<Migration> {
   const exported = mod[name];
   if (typeof exported === "function") {
-    return new (exported as new (name?: string, version?: string) => Migration)(name, version);
+    return new (exported as new (name?: string, version?: number) => Migration)(name, version);
   }
   throw new Error(`Migration ${name} must export a Migration class named "${name}"`);
 }
@@ -1676,22 +1676,17 @@ async function loadMigrationFrom(
 /**
  * Ruby's `String#to_i`: the leading signed integer prefix, or 0 when there is
  * none — so `"123abc"` is 123 and a non-numeric legacy version sorts as 0
- * rather than raising. BigInt keeps precision past `Number.MAX_SAFE_INTEGER`.
+ * rather than raising. A migration version is a 14-digit timestamp at most, so
+ * it is exactly representable as a JS number.
  */
-function toInteger(value: string): bigint {
+function toInteger(value: string): number {
   const match = value.match(/^\s*(-?\d+)/);
-  if (!match) return 0n;
-  try {
-    return BigInt(match[1]);
-  } catch {
-    return 0n;
-  }
+  if (!match) return 0;
+  return Number(match[1]);
 }
 
 function byVersion(a: MigrationProxy, b: MigrationProxy): number {
-  const va = BigInt(a.version);
-  const vb = BigInt(b.version);
-  return va < vb ? -1 : va > vb ? 1 : 0;
+  return a.version - b.version;
 }
 
 /**
@@ -1834,7 +1829,7 @@ export class MigrationContext {
   }
 
   /** @internal Mirrors: ActiveRecord::MigrationContext#run (`migration.rb:1268-1270`) */
-  async run(direction: "up" | "down", targetVersion: number | string): Promise<string | undefined> {
+  async run(direction: "up" | "down", targetVersion: number | string): Promise<number | undefined> {
     const migrator = this._newMigrator(direction, this.migrations, targetVersion);
     return migrator.isUseAdvisoryLock()
       ? migrator.withAdvisoryLock(() => migrator.runWithoutLock())
@@ -1948,7 +1943,7 @@ export class MigrationContext {
   /** @internal Mirrors: ActiveRecord::MigrationContext#pending_migration_versions */
   async pendingMigrationVersions(): Promise<number[]> {
     const applied = new Set(await this.getAllVersions());
-    return this.migrations.map((m) => Number(m.version)).filter((v) => !applied.has(v));
+    return this.migrations.map((m) => m.version).filter((v) => !applied.has(v));
   }
 
   /**
@@ -1962,10 +1957,11 @@ export class MigrationContext {
     const migrations = this.migrationFiles().map((file) => {
       const parsed = this.parseMigrationFilename(file);
       if (!parsed) throw new IllegalMigrationNameError(file);
-      const [version, rawName, scope] = parsed;
-      if (this.isValidateTimestamp() && !this.isValidMigrationTimestamp(version)) {
-        throw new InvalidMigrationTimestampError(version, rawName);
+      const [rawVersion, rawName, scope] = parsed;
+      if (this.isValidateTimestamp() && !this.isValidMigrationTimestamp(rawVersion)) {
+        throw new InvalidMigrationTimestampError(rawVersion, rawName);
       }
+      const version = toInteger(rawVersion);
       const name = camelize(rawName);
       return {
         version,
@@ -2075,8 +2071,8 @@ export class Migrator {
   private _environment: string;
   private readonly _options: MigratorOptions;
   private readonly _direction: "up" | "down";
-  private readonly _targetVersion: number | string | null;
-  private _migratedVersions?: Set<string>;
+  private readonly _targetVersion: number | null;
+  private _migratedVersions?: Set<number>;
 
   constructor(
     adapter: DatabaseAdapter,
@@ -2085,7 +2081,8 @@ export class Migrator {
   ) {
     this._options = options;
     this._direction = options.direction ?? "up";
-    this._targetVersion = options.targetVersion ?? null;
+    this._targetVersion =
+      options.targetVersion == null ? null : toInteger(String(options.targetVersion));
     this._adapter = adapter;
     this._schemaMigration = new SchemaMigration(adapter);
     this._internalMetadata = new InternalMetadata(adapter);
@@ -2095,11 +2092,7 @@ export class Migrator {
       getEnv("NODE_ENV") ??
       DatabaseConfigurations.defaultEnv;
     this.validate(migrations);
-    const normalized = migrations.map((m) => ({
-      ...m,
-      version: String(BigInt(m.version)),
-    }));
-    this._migrations = this._sortMigrations(normalized);
+    this._migrations = this._sortMigrations(migrations);
   }
 
   /** @internal Mirrors: ActiveRecord::Migrator#migrations */
@@ -2324,22 +2317,12 @@ export class Migrator {
    * Reads the direction and target version this Migrator was constructed with,
    * as Rails does with `@direction` / `@target_version`.
    */
-  async runWithoutLock(): Promise<string | undefined> {
-    // Rails' `Migrator#run` is only ever built with a target version; a nil one
-    // finds no migration and raises, so mirror that rather than treating it as
-    // "run everything".
-    const targetVersion = this._targetVersion ?? "";
+  async runWithoutLock(): Promise<number | undefined> {
     await this._ensureSchemaTable();
-    let key: string;
-    try {
-      key = String(BigInt(targetVersion));
-    } catch {
-      throw new UnknownMigrationVersionError(targetVersion);
-    }
-    const proxy = this._migrations.find((m) => m.version === key);
-    if (!proxy) throw new UnknownMigrationVersionError(targetVersion);
+    const migration = this._migrations.find((m) => m.version === this._targetVersion);
+    if (!migration) throw new UnknownMigrationVersionError(this._targetVersion ?? "");
     await this.recordEnvironment();
-    return this.executeMigrationInTransaction(proxy);
+    return this.executeMigrationInTransaction(migration);
   }
 
   /** @internal Mirrors: ActiveRecord::Migrator#migrate_without_lock */
@@ -2415,7 +2398,7 @@ export class Migrator {
    * migration actually ran, which is what `run_without_lock` hands back to
    * `MigrationContext#run`.
    */
-  async executeMigrationInTransaction(proxy: MigrationProxy): Promise<string | undefined> {
+  async executeMigrationInTransaction(proxy: MigrationProxy): Promise<number | undefined> {
     const applied = await this.migrated();
     if (this.isDown() && !applied.has(proxy.version)) return undefined;
     if (this.isUp() && applied.has(proxy.version)) return undefined;
@@ -2427,13 +2410,7 @@ export class Migrator {
   /** @internal Mirrors: ActiveRecord::Migrator#target */
   private target(): MigrationProxy | undefined {
     if (this._targetVersion === null) return undefined;
-    let key: string;
-    try {
-      key = String(BigInt(this._targetVersion));
-    } catch {
-      return undefined;
-    }
-    return this.migrations.find((m) => m.version === key);
+    return this.migrations.find((m) => m.version === this._targetVersion);
   }
 
   /** @internal Mirrors: ActiveRecord::Migrator#finish */
@@ -2454,16 +2431,16 @@ export class Migrator {
 
   /** @internal Mirrors: ActiveRecord::Migrator#record_version_state_after_migrating */
   async recordVersionStateAfterMigrating(
-    version: string,
+    version: number,
     direction: "up" | "down" = "up",
   ): Promise<void> {
     const migrated = await this.migrated();
     if (direction === "up") {
       migrated.add(version);
-      await this._schemaMigration.recordVersion(version);
+      await this._schemaMigration.recordVersion(String(version));
     } else {
       migrated.delete(version);
-      await this._schemaMigration.deleteVersion(version);
+      await this._schemaMigration.deleteVersion(String(version));
     }
   }
 
@@ -2505,13 +2482,7 @@ export class Migrator {
    */
   async currentVersion(): Promise<number> {
     const versions = await this.getAllVersions();
-    if (versions.length === 0) return 0;
-    let max = BigInt(0);
-    for (const v of versions) {
-      const bv = BigInt(v);
-      if (bv > max) max = bv;
-    }
-    return Number(max);
+    return versions.length > 0 ? Math.max(...versions) : 0;
   }
 
   /**
@@ -2519,16 +2490,10 @@ export class Migrator {
    *
    * Mirrors: ActiveRecord::Migrator.get_all_versions
    */
-  async getAllVersions(): Promise<string[]> {
+  async getAllVersions(): Promise<number[]> {
     await this._ensureSchemaTable();
     const applied = await this._appliedVersions();
-    return [...applied].sort((a, b) => {
-      const ba = BigInt(a);
-      const bb = BigInt(b);
-      if (ba < bb) return -1;
-      if (ba > bb) return 1;
-      return 0;
-    });
+    return [...applied].sort((a, b) => a - b);
   }
 
   /**
@@ -2576,7 +2541,7 @@ export class Migrator {
   async pendingMigrationsReadOnly(): Promise<MigrationProxy[]> {
     const applied = (await this._schemaMigration.tableExists())
       ? await this._appliedVersions()
-      : new Set<string>();
+      : new Set<number>();
     return this.migrations.filter((m) => !applied.has(m.version));
   }
 
@@ -2603,12 +2568,10 @@ export class Migrator {
     // Mirrors Rails: db_list uses schema_migration.normalized_versions and file
     // versions go through schema_migration.normalize_migration_number before
     // matching (migration.rb:1319-1328 / schema_migration.rb:69-70).
-    const applied = new Set(
-      [...(await this._appliedVersions())].map((v) => SchemaMigration.normalizeMigrationNumber(v)),
-    );
+    const applied = new Set(await this._schemaMigration.normalizedVersions());
 
     const fileList = this._migrations.map((m) => {
-      const normV = SchemaMigration.normalizeMigrationNumber(m.version);
+      const normV = SchemaMigration.normalizeMigrationNumber(String(m.version));
       const isUp = applied.delete(normV);
       return {
         status: (isUp ? "up" : "down") as "up" | "down", // eslint-disable-line @typescript-eslint/no-unnecessary-type-assertion
@@ -2663,13 +2626,12 @@ export class Migrator {
       }
     }
 
-    const versionCounts = new Map<string, number>();
+    const versionCounts = new Map<number, number>();
     for (const m of migrations) {
-      const normalized = String(BigInt(m.version));
-      versionCounts.set(normalized, (versionCounts.get(normalized) ?? 0) + 1);
+      versionCounts.set(m.version, (versionCounts.get(m.version) ?? 0) + 1);
     }
     for (const m of migrations) {
-      if (versionCounts.get(String(BigInt(m.version)))! > 1) {
+      if (versionCounts.get(m.version)! > 1) {
         throw new DuplicateMigrationVersionError(m.version);
       }
     }
@@ -2692,17 +2654,8 @@ export class Migrator {
     })());
   }
 
-  private async _appliedVersions(): Promise<Set<string>> {
-    const versions = await this._schemaMigration.allVersions();
-    return new Set(
-      versions.map((v) => {
-        try {
-          return String(BigInt(v));
-        } catch {
-          return v;
-        }
-      }),
-    );
+  private async _appliedVersions(): Promise<Set<number>> {
+    return new Set(await this._schemaMigration.integerVersions());
   }
 
   /**
@@ -2710,13 +2663,8 @@ export class Migrator {
    * it is given, is not 0, and does not correspond to any known migration.
    */
   private _invalidTarget(targetVersion: number | string): boolean {
-    let key: string;
-    try {
-      key = String(BigInt(targetVersion));
-    } catch {
-      return true;
-    }
-    if (key === "0") return false;
+    const key = toInteger(String(targetVersion));
+    if (key === 0) return false;
     return !this._migrations.some((m) => m.version === key);
   }
 
@@ -2728,7 +2676,7 @@ export class Migrator {
    * Mirrors: ActiveRecord::MigrationContext#run (which builds a Migrator
    * scoped to `target_version` and calls `#run`).
    */
-  async run(direction: "up" | "down", targetVersion: number | string): Promise<string | undefined> {
+  async run(direction: "up" | "down", targetVersion: number | string): Promise<number | undefined> {
     const migrator = new Migrator(
       this._adapter,
       this._migrations,
@@ -2828,8 +2776,7 @@ export class Migrator {
   async currentMigration(): Promise<MigrationProxy | null> {
     const version = await this.currentVersion();
     if (version === 0) return null;
-    const versionStr = String(version);
-    return this._migrations.find((m) => m.version === versionStr) ?? null;
+    return this._migrations.find((m) => m.version === version) ?? null;
   }
 
   /** @internal Mirrors: ActiveRecord::Migrator `alias :current :current_migration` (`migration.rb:1442`) */
@@ -2854,7 +2801,7 @@ export class Migrator {
     return kept;
   }
 
-  async migrated(): Promise<Set<string>> {
+  async migrated(): Promise<Set<number>> {
     return this._migratedVersions ?? this.loadMigrated();
   }
 
@@ -2865,7 +2812,7 @@ export class Migrator {
    * that constructor step (a constructor cannot await), so every entry point
    * that reads versions has to await it — not just `pendingMigrations`.
    */
-  async loadMigrated(): Promise<Set<string>> {
+  async loadMigrated(): Promise<Set<number>> {
     await this._ensureSchemaTable();
     return (this._migratedVersions = await this._appliedVersions());
   }

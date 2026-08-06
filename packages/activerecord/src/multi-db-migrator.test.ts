@@ -12,7 +12,7 @@ import { Base } from "./base.js";
 import { ARUnit2Model } from "./test-helpers/models/arunit2-model.js";
 
 function sensor(
-  version: string,
+  version: number,
   name: string,
 ): MigrationProxy & { wentUp: boolean; wentDown: boolean } {
   const proxy = {
@@ -55,31 +55,31 @@ describe("MultiDbMigratorTest", () => {
 
     migrationsA = [
       {
-        version: "1",
+        version: 1,
         name: "ValidPeopleHaveLastNames",
-        migration: () => anonymousMigration("ValidPeopleHaveLastNames", "1"),
+        migration: () => anonymousMigration("ValidPeopleHaveLastNames", 1),
       },
       {
-        version: "2",
+        version: 2,
         name: "WeNeedReminders",
-        migration: () => anonymousMigration("WeNeedReminders", "2"),
+        migration: () => anonymousMigration("WeNeedReminders", 2),
       },
       {
-        version: "3",
+        version: 3,
         name: "InnocentJointable",
-        migration: () => anonymousMigration("InnocentJointable", "3"),
+        migration: () => anonymousMigration("InnocentJointable", 3),
       },
     ];
     migrationsB = [
       {
-        version: "1",
+        version: 1,
         name: "PeopleHaveHobbies",
-        migration: () => anonymousMigration("PeopleHaveHobbies", "1"),
+        migration: () => anonymousMigration("PeopleHaveHobbies", 1),
       },
       {
-        version: "2",
+        version: 2,
         name: "PeopleHaveDescriptions",
-        migration: () => anonymousMigration("PeopleHaveDescriptions", "2"),
+        migration: () => anonymousMigration("PeopleHaveDescriptions", 2),
       },
     ];
   });
@@ -144,29 +144,29 @@ describe("MultiDbMigratorTest", () => {
   });
 
   it("get all versions", async () => {
-    const sensorsA = [sensor("1", "S1"), sensor("2", "S2"), sensor("3", "S3")];
+    const sensorsA = [sensor(1, "S1"), sensor(2, "S2"), sensor(3, "S3")];
     const migratorA = new Migrator(adapterA, sensorsA);
 
     await migratorA.up();
-    expect(await migratorA.getAllVersions()).toEqual(["1", "2", "3"]);
+    expect(await migratorA.getAllVersions()).toEqual([1, 2, 3]);
 
     await migratorA.rollback();
-    expect(await migratorA.getAllVersions()).toEqual(["1", "2"]);
+    expect(await migratorA.getAllVersions()).toEqual([1, 2]);
 
     await migratorA.rollback();
-    expect(await migratorA.getAllVersions()).toEqual(["1"]);
+    expect(await migratorA.getAllVersions()).toEqual([1]);
 
     await migratorA.rollback();
     expect(await migratorA.getAllVersions()).toEqual([]);
 
-    const sensorsB = [sensor("1", "S1"), sensor("2", "S2")];
+    const sensorsB = [sensor(1, "S1"), sensor(2, "S2")];
     const migratorB = new Migrator(adapterB, sensorsB);
 
     await migratorB.up();
-    expect(await migratorB.getAllVersions()).toEqual(["1", "2"]);
+    expect(await migratorB.getAllVersions()).toEqual([1, 2]);
 
     await migratorB.rollback();
-    expect(await migratorB.getAllVersions()).toEqual(["1"]);
+    expect(await migratorB.getAllVersions()).toEqual([1]);
 
     await migratorB.rollback();
     expect(await migratorB.getAllVersions()).toEqual([]);
@@ -176,14 +176,14 @@ describe("MultiDbMigratorTest", () => {
     await smA.createVersion("1");
     const listA = [
       {
-        version: "1",
+        version: 1,
         name: "Foo",
-        migration: () => anonymousMigration("Foo", "1"),
+        migration: () => anonymousMigration("Foo", 1),
       },
       {
-        version: "3",
+        version: 3,
         name: "Bar",
-        migration: () => anonymousMigration("Bar", "3"),
+        migration: () => anonymousMigration("Bar", 3),
       },
     ];
     const migratorA = new Migrator(adapterA, listA);
@@ -194,14 +194,14 @@ describe("MultiDbMigratorTest", () => {
     await smB.createVersion("1");
     const listB = [
       {
-        version: "1",
+        version: 1,
         name: "Foo",
-        migration: () => anonymousMigration("Foo", "1"),
+        migration: () => anonymousMigration("Foo", 1),
       },
       {
-        version: "3",
+        version: 3,
         name: "Bar",
-        migration: () => anonymousMigration("Bar", "3"),
+        migration: () => anonymousMigration("Bar", 3),
       },
     ];
     const migratorB = new Migrator(adapterB, listB);
@@ -211,7 +211,7 @@ describe("MultiDbMigratorTest", () => {
   });
 
   it("migrator db has no schema migrations table", async () => {
-    const sensorsA = [sensor("1", "S1"), sensor("2", "S2"), sensor("3", "S3")];
+    const sensorsA = [sensor(1, "S1"), sensor(2, "S2"), sensor(3, "S3")];
     const migratorA = new Migrator(adapterA, sensorsA);
 
     await smA.dropTable();
@@ -220,7 +220,7 @@ describe("MultiDbMigratorTest", () => {
     expect(await smA.tableExists()).toBe(true);
     await migratorA.rollback();
 
-    const sensorsB = [sensor("1", "S1"), sensor("2", "S2"), sensor("3", "S3")];
+    const sensorsB = [sensor(1, "S1"), sensor(2, "S2"), sensor(3, "S3")];
     const migratorB = new Migrator(adapterB, sensorsB);
 
     await smB.dropTable();
@@ -231,7 +231,7 @@ describe("MultiDbMigratorTest", () => {
   });
 
   it("migrator forward", async () => {
-    const sensorsA = [sensor("1", "S1"), sensor("2", "S2"), sensor("3", "S3")];
+    const sensorsA = [sensor(1, "S1"), sensor(2, "S2"), sensor(3, "S3")];
     const migratorA = new Migrator(adapterA, sensorsA);
 
     await migratorA.up(1);
@@ -243,7 +243,7 @@ describe("MultiDbMigratorTest", () => {
     await migratorA.forward();
     expect(await migratorA.currentVersion()).toBe(3);
 
-    const sensorsB = [sensor("1", "S1"), sensor("2", "S2"), sensor("3", "S3")];
+    const sensorsB = [sensor(1, "S1"), sensor(2, "S2"), sensor(3, "S3")];
     const migratorB = new Migrator(adapterB, sensorsB);
 
     await migratorB.up(1);

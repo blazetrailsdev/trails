@@ -67,9 +67,9 @@ describe("MigrationTest", () => {
     await new SchemaMigration(adapter).dropTable();
     const migrations: MigrationProxy[] = [
       {
-        version: "1",
+        version: 1,
         name: "AsyncFirst",
-        migration: async () => anonymousMigration("AsyncFirst", "1"),
+        migration: async () => anonymousMigration("AsyncFirst", 1),
       },
     ];
     const migrator = new Migrator(adapter, migrations);

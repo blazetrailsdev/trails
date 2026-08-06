@@ -19,7 +19,7 @@ describe("DatabaseTasksRollbackTest", () => {
 
   it("rolls back the migrations registered for the pool's database", async () => {
     const reverted: string[] = [];
-    const migration = (version: string, name: string): MigrationProxy => ({
+    const migration = (version: number, name: string): MigrationProxy => ({
       version,
       name,
       migration: () =>
@@ -44,9 +44,9 @@ describe("DatabaseTasksRollbackTest", () => {
     const primary = configs.find((c) => c.name === "primary")!;
     const animals = configs.find((c) => c.name === "animals")!;
 
-    DatabaseTasks.registerMigrations([migration("1", "Fallback")]);
-    DatabaseTasks.registerMigrations([migration("2", "PrimaryOnly")], primary);
-    DatabaseTasks.registerMigrations([migration("3", "AnimalsOnly")], animals);
+    DatabaseTasks.registerMigrations([migration(1, "Fallback")]);
+    DatabaseTasks.registerMigrations([migration(2, "PrimaryOnly")], primary);
+    DatabaseTasks.registerMigrations([migration(3, "AnimalsOnly")], animals);
 
     await Base.establishConnection(primary);
     const schemaMigration = new SchemaMigration(await Base.connectionPool().leaseConnection());
@@ -61,7 +61,7 @@ describe("DatabaseTasksRollbackTest", () => {
 
   it("rollback goes through move, not Migrator's applied-version walk", async () => {
     const reverted: string[] = [];
-    const migration = (version: string, name: string): MigrationProxy => ({
+    const migration = (version: number, name: string): MigrationProxy => ({
       version,
       name,
       migration: () =>
@@ -76,9 +76,9 @@ describe("DatabaseTasksRollbackTest", () => {
     });
 
     DatabaseTasks.registerMigrations([
-      migration("1", "First"),
-      migration("2", "Second"),
-      migration("3", "Third"),
+      migration(1, "First"),
+      migration(2, "Second"),
+      migration(3, "Third"),
     ]);
 
     DatabaseTasks.databaseConfiguration = null;
@@ -97,12 +97,12 @@ describe("DatabaseTasksRollbackTest", () => {
   it("rollback raises UnknownMigrationVersionError for an unknown current version", async () => {
     DatabaseTasks.registerMigrations([
       {
-        version: "1",
+        version: 1,
         name: "Known",
         migration: () =>
           anonymousMigration(
             "Known",
-            "1",
+            1,
             async () => {},
             async () => {},
           ),
@@ -122,12 +122,12 @@ describe("DatabaseTasksRollbackTest", () => {
     const reverted: string[] = [];
     DatabaseTasks.registerMigrations([
       {
-        version: "1",
+        version: 1,
         name: "Ambient",
         migration: () =>
           anonymousMigration(
             "Ambient",
-            "1",
+            1,
             async () => {},
             async () => {
               reverted.push("Ambient");

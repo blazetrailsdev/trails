@@ -74,8 +74,8 @@ describe("ActiveRecordSchemaTest", () => {
     class V1 extends Migration {
       async change() {}
     }
-    const m = new V1(undefined, "20230101000000");
-    expect(m.version).toBe("20230101000000");
+    const m = new V1(undefined, 20230101000000);
+    expect(m.version).toBe(20230101000000);
   });
 
   it("schema define", async () => {
@@ -130,7 +130,7 @@ describe("ActiveRecordSchemaTest", () => {
     class NormalMig extends Migration {
       async change() {}
     }
-    expect(new NormalMig(undefined, "001").version).toBe("001");
+    expect(new NormalMig(undefined, 1).version).toBe(1);
   });
 
   it("schema load with multiple indexes for column of different names", async () => {

@@ -637,11 +637,11 @@ describe("discoverMigrations", () => {
 
     const migrations = await discoverMigrations(tmpDir);
     expect(migrations).toHaveLength(2);
-    expect(migrations[0].version).toBe("20260101000000");
+    expect(migrations[0].version).toBe(20260101000000);
     // discoverMigrations camelizes proxy.name as Rails does
     // (migration.rb:1311) regardless of the on-disk separator.
     expect(migrations[0].name).toBe("CreateUsers");
-    expect(migrations[1].version).toBe("20260102000000");
+    expect(migrations[1].version).toBe(20260102000000);
     expect(migrations[1].name).toBe("AddEmailToUsers");
   });
 
@@ -656,8 +656,8 @@ describe("discoverMigrations", () => {
     );
 
     const migrations = await discoverMigrations(tmpDir);
-    expect(migrations[0].version).toBe("20260101000000");
-    expect(migrations[1].version).toBe("20260202000000");
+    expect(migrations[0].version).toBe(20260101000000);
+    expect(migrations[1].version).toBe(20260202000000);
   });
 });
 
@@ -1403,7 +1403,7 @@ export class CreatePosts extends Migration {
     try {
       const migrations = [
         {
-          version: "20260101000000",
+          version: 20260101000000,
           name: "CreateWidgets",
           migration: () =>
             new (class extends Migration {
@@ -1415,7 +1415,7 @@ export class CreatePosts extends Migration {
               override async down(): Promise<void> {
                 await this.connection.executeMutation(`DROP TABLE widgets`);
               }
-            })("CreateWidgets", "20260101000000"),
+            })("CreateWidgets", 20260101000000),
         },
       ];
       disableMetadataTable(adapter);

@@ -2,7 +2,7 @@ import { Migration } from "../migration.js";
 
 export function anonymousMigration(
   name?: string,
-  version?: string,
+  version?: number,
   up: (m: Migration) => Promise<void> = async () => {},
   down: (m: Migration) => Promise<void> = async () => {},
 ): Migration {

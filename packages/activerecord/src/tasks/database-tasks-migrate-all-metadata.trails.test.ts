@@ -22,7 +22,7 @@ describe("DatabaseTasksMigrateAllMetadataTest", () => {
     for (const dir of dirs.splice(0)) await rm(dir, { recursive: true, force: true });
   });
 
-  const migration = (version: string, name: string): MigrationProxy => ({
+  const migration = (version: number, name: string): MigrationProxy => ({
     version,
     name,
     migration: () =>
@@ -54,7 +54,7 @@ describe("DatabaseTasksMigrateAllMetadataTest", () => {
         },
       },
     });
-    DatabaseTasks.registerMigrations([migration("1", "CreateNothing")]);
+    DatabaseTasks.registerMigrations([migration(1, "CreateNothing")]);
   }
 
   async function metadataTablesExist(): Promise<boolean[]> {
