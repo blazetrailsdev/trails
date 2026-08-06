@@ -45,7 +45,6 @@ const NON_EMITTING: ReadonlyMap<string, string> = new Map([
     "definition factory — a stub returns no CreateIndexDefinition and dies at once",
   ],
   ["databaseVersion", "version read behind the index sort-order predicates"],
-  ["_databaseVersion", "memoized backing slot of the databaseVersion read"],
   ["_statementPool", "prepared-statement slot clearCacheBang resets, not a DDL emitter"],
   ["_schemaCache", "memoized backing slot of the schemaCache read"],
   ["_poolSchemaReflection", "pool reflection the schemaCache read binds to"],

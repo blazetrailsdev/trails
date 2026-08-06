@@ -345,7 +345,7 @@ async function loadPostgresqlSpecificSchema(adapter: PostgreSQLAdapter): Promise
  * worker and so cannot pull in `supports.ts`'s `vitest` import.
  */
 async function loadMysql2SpecificSchema(adapter: AbstractMysqlAdapter): Promise<void> {
-  await adapter.getDatabaseVersion();
+  await adapter.pool.serverVersion(adapter);
   const supportsDefaultExpression = adapter.isMariadb()
     ? adapter.databaseVersion.compare("10.2.1") >= 0
     : adapter.databaseVersion.compare("8.0.13") >= 0;

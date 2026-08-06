@@ -58,7 +58,7 @@ export function isWriteQuery(sql: string): boolean {
 
 export interface BuildExplainClauseHost {
   isMariadb?(): boolean;
-  getDatabaseVersion?(): Version;
+  databaseVersion?: Version;
 }
 
 /**
@@ -93,7 +93,8 @@ interface AutoIncrementColumnHost {
 export function isAnalyzeWithoutExplain(this: BuildExplainClauseHost | void): boolean {
   const host = this as BuildExplainClauseHost | null;
   if (!host?.isMariadb?.()) return false;
-  return (host.getDatabaseVersion?.().compare("10.1.0") ?? -1) >= 0;
+  // Rails: `database_version >= "10.1.0"` (mysql/database_statements.rb:50).
+  return (host.databaseVersion?.compare("10.1.0") ?? -1) >= 0;
 }
 
 /** @internal */

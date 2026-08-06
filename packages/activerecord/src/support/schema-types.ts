@@ -212,8 +212,8 @@ export function columnsOf(table: TableSchema): Record<string, ColumnSpec> {
 /**
  * Whether the adapter supports expression indexes. The getter reads
  * `databaseVersion` synchronously (SQLite ≥ 3.9, MySQL ≥ 8.0.13, never MariaDB),
- * which throws before the version cache is populated — so prime it via the
- * async `getDatabaseVersion()` first. A missing/throwing getter is treated as
+ * which throws before the version cache is populated — so prime the pool memo
+ * (`pool_config.rb:39-41`) first. A missing/throwing getter is treated as
  * unsupported, so we skip the expression index rather than emit invalid DDL.
  *
  * @internal
@@ -221,11 +221,11 @@ export function columnsOf(table: TableSchema): Record<string, ColumnSpec> {
 export async function supportsExpressionIndex(adapter: DatabaseAdapter): Promise<boolean> {
   const a = adapter as {
     supportsExpressionIndex?: () => boolean;
-    getDatabaseVersion?: () => Promise<unknown>;
+    pool?: { serverVersion?: (connection: unknown) => unknown };
   };
   if (typeof a.supportsExpressionIndex !== "function") return false;
   try {
-    if (typeof a.getDatabaseVersion === "function") await a.getDatabaseVersion();
+    await a.pool?.serverVersion?.(a);
     return a.supportsExpressionIndex();
   } catch {
     return false;

@@ -29,10 +29,10 @@ export function schemaConn(name: SchemaConnName): TableDefinitionConn {
           ? new PostgreSQLAdapter("postgresql://localhost/trails_schema_conn")
           : new Mysql2Adapter("mysql://localhost/trails_schema_conn");
     if (name === "mysql") {
-      (conn as unknown as { _databaseVersion: Version })._databaseVersion = new Version(
-        "8.0.35",
-        "8.0.35",
-      );
+      // A connection that is never opened cannot answer `get_database_version`,
+      // so seed the fetch the pool memo (`pool_config.rb:39-41`) caches.
+      const version = new Version("8.0.35", "8.0.35");
+      (conn as unknown as { getDatabaseVersion: () => Version }).getDatabaseVersion = () => version;
     }
     conns.set(name, conn);
   }

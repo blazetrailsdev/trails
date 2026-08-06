@@ -764,7 +764,7 @@ export abstract class SchemaDumper {
       | {
           checkConstraints: (t: string) => Promise<unknown[]>;
           supportsCheckConstraints?: () => boolean;
-          getDatabaseVersion?: () => Promise<unknown>;
+          pool?: { serverVersion?: (connection: unknown) => unknown };
         }
       | undefined;
     if (!host) return;
@@ -776,7 +776,7 @@ export abstract class SchemaDumper {
     // ensure it's resolved first to avoid a false negative dropping real
     // constraints from the dump.
     if (host.supportsCheckConstraints) {
-      await host.getDatabaseVersion?.();
+      await host.pool?.serverVersion?.(host);
       if (!host.supportsCheckConstraints()) return;
     }
     const constraints = (await host.checkConstraints(tableName)) ?? [];

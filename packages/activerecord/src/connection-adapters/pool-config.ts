@@ -28,8 +28,7 @@ export class PoolConfig {
   private _pool: ConnectionPool | null = null;
   private _connectionDescriptor!: ConnectionDescriptor;
   private _schemaReflection: SchemaReflection | null = null;
-  private _serverVersion: unknown;
-  private _serverVersionCached = false;
+  private _serverVersion: unknown = null;
   private _serverVersionFn: ((connection: DatabaseAdapter) => unknown) | null = null;
 
   constructor(
@@ -133,14 +132,33 @@ export class PoolConfig {
     this._schemaReflection = value;
   }
 
+  /**
+   * Mirrors: ActiveRecord::ConnectionAdapters::PoolConfig#server_version
+   * (`pool_config.rb:39-41`) — `@server_version || synchronize { @server_version
+   * ||= connection.get_database_version }`. This is the single cache every
+   * adapter's `get_database_version` is fetched through; the adapters
+   * themselves stay pure.
+   *
+   * Ruby has both `server_version(connection)` and `attr_writer
+   * :server_version` (`pool_config.rb:9`); TS cannot carry a method and a
+   * setter under one name, so the reader is a getter returning the callable.
+   */
   get serverVersion(): (connection: DatabaseAdapter) => unknown {
     if (!this._serverVersionFn) {
       this._serverVersionFn = (connection: DatabaseAdapter) => {
-        if (!this._serverVersionCached) {
-          this._serverVersion = connection.getDatabaseVersion?.();
-          this._serverVersionCached = true;
+        // trails-only: `getDatabaseVersion` is a real await on every adapter
+        // whose version comes off the wire, where Rails' is sync.
+        if (this._serverVersion != null) return this._serverVersion;
+        const version = connection.getDatabaseVersion?.();
+        // Only the resolved value is memoized, never the in-flight promise: the
+        // fetch opens the connection, whose `configureConnection`
+        // (`abstract_adapter.rb:1212`) reads back through here, and handing that
+        // nested call the promise it is itself inside would deadlock. Ruby's
+        // `synchronize` is a re-entrant Monitor, so it recomputes there too.
+        if (version instanceof Promise) {
+          return version.then((v) => (this._serverVersion = v));
         }
-        return this._serverVersion;
+        return (this._serverVersion = version);
       };
     }
     return this._serverVersionFn;
@@ -148,8 +166,6 @@ export class PoolConfig {
 
   set serverVersion(value: unknown) {
     this._serverVersion = value;
-    this._serverVersionCached = true;
-    this._serverVersionFn = null;
   }
 
   get pool(): ConnectionPool {

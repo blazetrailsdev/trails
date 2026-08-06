@@ -10,3 +10,14 @@
  * `AbstractAdapter#quote` into its `can't quote` TypeError.
  */
 export { Temporal } from "@js-temporal/polyfill";
+export {
+  ArgumentError,
+  Date,
+  DateTime,
+  Rational,
+  dNewByFrags,
+  strftime,
+  type DateParts,
+  type StrftimeSubject,
+} from "./date.js";
+export { Time } from "./time.js";

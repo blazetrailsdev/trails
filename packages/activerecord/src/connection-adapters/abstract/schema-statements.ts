@@ -415,8 +415,9 @@ export class SchemaStatements {
     // Prime the cached database version before the visitor emits DDL: inline
     // `t.index order:` runs through SchemaCreation's synchronous
     // supportsIndexSortOrder gate, which yields false on a cold connection
-    // (mirrors addIndex's warm-up). Memoized → no-op when already warm.
-    await this.getDatabaseVersion?.();
+    // (mirrors addIndex's warm-up). The pool memo (`pool_config.rb:39-41`) makes
+    // this a no-op when already warm.
+    await this.pool?.serverVersion?.(this);
     await this.execute(await this.schemaCreation.accept(td));
 
     if (!this.supportsIndexesInCreate?.()) {
@@ -534,7 +535,7 @@ export class SchemaStatements {
     // `databaseVersion` synchronously and silently yield `false` on a cold
     // connection (`undefined?.gte(...) !== true`); addIndex runs on the
     // shared-worker reconstruct path before any query warms the cache.
-    await this.getDatabaseVersion?.();
+    await this.pool?.serverVersion?.(this);
     await this.schemaCache.clearDataSourceCacheBang(tableName);
     const createIndex = await this.buildCreateIndexDefinition(
       tableName,

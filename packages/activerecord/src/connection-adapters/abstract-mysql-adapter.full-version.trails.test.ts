@@ -15,7 +15,8 @@ import { Version } from "./abstract-adapter.js";
 describe("AbstractMysqlAdapter#full_version", () => {
   function adapterWith(version: Version): Mysql2Adapter {
     const adapter = new Mysql2Adapter({ host: "localhost" });
-    (adapter as unknown as { _databaseVersion: Version })._databaseVersion = version;
+    (adapter as unknown as { getDatabaseVersion: () => Version }).getDatabaseVersion = () =>
+      version;
     return adapter;
   }
 

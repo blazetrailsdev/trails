@@ -10,16 +10,17 @@
  * date. `I18n::Backend::Base#localize` is exactly such a method: it asks for
  * `strftime`, `wday` and `mon`, and picks `date.formats` over `time.formats` by
  * the *absence* of `sec` (i18n/lib/i18n/backend/base.rb:105-115, ported at
- * `./backend/base.ts:245-271`). These wrappers are that duck type, and `Date`'s
+ * `packages/i18n/src/backend/base.ts:245-271`). These wrappers are that duck type, and `Date`'s
  * lack of `sec`/`hour` is the distinction Ruby gets from `Date` not being a
  * `Time`.
  *
- * This lives in `packages/i18n` rather than `packages/activesupport` because
- * `packages/i18n` is a dependency of `packages/activesupport`, and both
- * packages' localization tests drive the same objects.
+ * This lives in `packages/date` rather than `packages/i18n` or
+ * `packages/activesupport` because it is Ruby's stdlib `date`, not i18n: the
+ * gem ships no date implementation, and `packages/date` is a dependency of
+ * both.
  */
 
-import { Temporal } from "@blazetrails/date";
+import { Temporal } from "@js-temporal/polyfill";
 
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const ABBR_DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];

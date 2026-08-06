@@ -446,16 +446,13 @@ export class InsertAll {
     // and emit a bogus conflict target.
     const conn = this.connection as {
       supportsInsertConflictTarget?: () => boolean;
-      getDatabaseVersion?: () => Promise<unknown>;
+      pool?: { serverVersion?: (connection: unknown) => unknown };
     };
     // PG's supports_insert_conflict_target reads databaseVersion via a sync
-    // getter that throws until getDatabaseVersion() has populated the cache.
-    // Cold upsertAll(..., { uniqueBy }) would trip that before uniqueIndexes
-    // ran, so prime the version here when the adapter advertises the async
-    // initializer (mirroring how AbstractAdapter#prepareCoercedClass uses it).
-    if (typeof conn.getDatabaseVersion === "function") {
-      await conn.getDatabaseVersion();
-    }
+    // getter that throws until the pool memo (`pool_config.rb:39-41`) has been
+    // populated. Cold upsertAll(..., { uniqueBy }) would trip that before
+    // uniqueIndexes ran, so prime the version here.
+    await conn.pool?.serverVersion?.(conn);
     const supports =
       typeof conn.supportsInsertConflictTarget === "function"
         ? conn.supportsInsertConflictTarget()

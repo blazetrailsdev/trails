@@ -9,14 +9,6 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
-    },
-    "./date": {
-      "types": "./dist/date.d.ts",
-      "default": "./dist/date.js"
-    },
-    "./time": {
-      "types": "./dist/time.d.ts",
-      "default": "./dist/time.js"
     }
   },
   "scripts": {
