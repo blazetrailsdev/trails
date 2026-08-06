@@ -187,7 +187,6 @@ export class TimeWithZone {
       minute: z.minute,
       second: z.second,
       millisecond: z.millisecond,
-      // Ruby's Time#nsec: the whole sub-second part, not Temporal's third digit group.
       nsec: z.millisecond * 1_000_000 + z.microsecond * 1_000 + z.nanosecond,
     };
   }
@@ -416,7 +415,6 @@ export class TimeWithZone {
       `${pad2(l.hour)}:${pad2(l.minute)}:${pad2(l.second)}`;
 
     if (fractionDigits > 0) {
-      // Rails' PRECISIONS are "%FT%T.%<n>N" — the fraction is truncated, not rounded.
       base += `.${String(l.nsec).padStart(9, "0").slice(0, fractionDigits).padEnd(fractionDigits, "0")}`;
     }
 

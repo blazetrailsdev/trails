@@ -4,9 +4,8 @@ import { TimeZone } from "./values/time-zone.js";
 import { Temporal } from "./temporal.js";
 
 // Ruby's Time carries full nanosecond precision, so %N answers nine significant
-// digits. Our receiver is a Temporal.ZonedDateTime, which carries the same
-// precision; these cover the readers and formatters that used to derive the
-// sub-second part from the millisecond field alone.
+// digits (time_with_zone.rb:223-227 delegates strftime to that Time). These
+// cover the readers and formatters that derive the sub-second part.
 describe("TimeWithZone sub-millisecond precision", () => {
   const eastern = TimeZone.find("Eastern Time (US & Canada)");
   const subMs = () =>

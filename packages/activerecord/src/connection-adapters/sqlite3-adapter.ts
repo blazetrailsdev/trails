@@ -1426,8 +1426,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    * Database text encoding. Rails reads `@raw_connection.encoding`
    * synchronously; an async-only driver (no `openSync()`) returns a Promise
    * from `pragma()`, so we memoize the value during `connect()`/`connectAsync()`
-   * — and the getter serves the
-   * cached string. Before the connection is open (deferred async-only checkout),
+   * and the getter serves the cached string. Before the connection is open (deferred async-only checkout),
    * there is nothing to read, so we fall back to SQLite's "UTF-8" default rather
    * than leaking a Promise cast as an array.
    */
@@ -1453,15 +1452,22 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   /**
    * Mirrors: SQLite3Adapter#get_database_version (`sqlite3_adapter.rb:476-478`)
    * — a pure fetch, run at most once through the pool memo
-   * (`pool_config.rb:39-41`), which `configureConnection` fills at connect time.
-   * An async-only driver answers the query as a Promise; the memo resolves it.
+   * (`pool_config.rb:39-41`) that `configureConnection` fills at connect time.
+   *
+   * Deviation, language-forced: Rails reads the value through
+   * `query_value(..., "SCHEMA")`, whose trails counterpart is `async`, and the
+   * version-gated `supports*()` readers are sync. The query is issued on the
+   * driver so an in-process driver can answer synchronously; an async-only
+   * driver (no `openSync()`) answers a Promise, which the pool memo resolves.
+   * Nothing is open on the deferred async-checkout path, where Rails has no
+   * connection to ask at all.
    */
   override getDatabaseVersion(): Version | Promise<Version> {
     const driver = this.driver as SqliteConnection | undefined;
     if (!driver) return new Version("0.0.0");
     const toVersion = (row: unknown) => new Version((row as { v?: string })?.v ?? "0.0.0");
-    // eslint-disable-next-line blazetrails/sqlite-driver-await -- both arms handled: a sync driver answers the row directly, an async one its Promise.
-    const stmt = driver.prepare("SELECT sqlite_version() AS v");
+    // eslint-disable-next-line blazetrails/sqlite-driver-await -- both arms handled below: an in-process driver answers directly, an async-only one with a Promise.
+    const stmt = driver.prepare("SELECT sqlite_version(*) AS v");
     if (stmt instanceof Promise) {
       return stmt.then(async (s) => toVersion(await s.get()));
     }
@@ -2671,8 +2677,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
         return;
       }
       const syncConn = factory.openSync(openConfig);
-      // Pre-warm encoding so the sync `encoding` getter never touches the
-      // driver directly.
       this._encoding = SQLite3Adapter.parseEncoding(syncConn.pragma("encoding"));
       this.driver = syncConn as SqliteConnection;
     } catch (e) {

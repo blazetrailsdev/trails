@@ -1413,11 +1413,15 @@ export class DatabaseTasks {
     }
   }
 
-  /** @internal */
+  /**
+   * Mirrors: DatabaseTasks#truncate_tables (`tasks/database_tasks.rb:230-234`)
+   * — `with_temporary_connection(db_config) { |conn| conn.truncate_tables(*conn.tables) }`,
+   * letting each adapter emit its own statement
+   * (`abstract/database_statements.rb:222-231`). The handler hook checked first
+   * is a trails invention the remaining mysql/sqlite tasks still ride on.
+   * @internal
+   */
   static async truncateTables(config: DatabaseConfig): Promise<void> {
-    // Rails: with_temporary_connection(db_config) { |conn| conn.truncate_tables(*conn.tables) }
-    // (tasks/database_tasks.rb:230-234). The adapter-specific handler hook is a
-    // trails invention that the remaining mysql/sqlite handlers still ride on.
     const handler = this._resolveTaskOrThrow(this._adapterFor(config));
     if (handler.truncateAll) {
       await handler.truncateAll(config);
