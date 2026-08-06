@@ -5,6 +5,7 @@ import { StatementInvalid } from "../errors.js";
 import type { CheckConstraintDefinition } from "../connection-adapters/abstract/schema-definitions.js";
 import type { ValidateConstraintStatements } from "../connection-adapters/abstract/schema-statements.js";
 import { ambientConnection } from "../support/rocket-tables.js";
+import { useTransactionalTests } from "../test-fixtures/use-transactional-tests.js";
 import { adapterSupports, describeIfSupports, itIfSupports } from "../support/supports.js";
 import { adapterType } from "../test-adapter.js";
 
@@ -33,6 +34,14 @@ function assertEmpty(collection: CheckConstraintDefinition[]): void {
 
 describe("Migration", () => {
   describeIfSupports("check_constraints", "CheckConstraintTest", () => {
+    useTransactionalTests({
+      usesTransaction: [
+        "add check constraint with non existent table raises",
+        "added check constraint ensures valid values",
+        "not valid check constraint",
+      ],
+    });
+
     beforeEach(async () => {
       const connection = await ambientConnection();
       await connection.createTable("trades", { force: true }, (t) => {
