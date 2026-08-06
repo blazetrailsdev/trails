@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Mysql2Adapter } from "./mysql2-adapter.js";
+import { NullPool } from "./abstract/connection-pool.js";
+import type { AbstractAdapter } from "./abstract-adapter.js";
 import { Version } from "./abstract-adapter.js";
 
 // Trails-only: Rails' `PoolConfig#server_version` (`pool_config.rb:39-41`) and
@@ -55,4 +57,29 @@ describe("ConnectionPool#server_version", () => {
     expect(adapter.databaseVersion).toBeInstanceOf(Version);
     expect(adapter.supportsExpressionIndex()).toBe(true);
   });
+
+  // The fetch opens the connection, and `connect()` runs `configureConnection`
+  // (`abstract_adapter.rb:1212`), whose `checkVersion` reads the version back
+  // through the pool. Rails' `synchronize` is a re-entrant Monitor, so that
+  // nested call recomputes against a still-nil `@server_version`; a memo that
+  // held the in-flight promise would hand the nested call the promise it is
+  // itself inside, and neither would ever settle.
+  it("re-entrant read from inside the fetch resolves rather than awaiting itself", async () => {
+    const pool = new NullPool();
+    const connected = Promise.resolve();
+    let fetches = 0;
+    const connection = {
+      async getDatabaseVersion(): Promise<Version> {
+        fetches += 1;
+        // The nested read lands after the fetch has yielded, exactly as
+        // `configureConnection` does behind the connect the fetch awaits.
+        await connected;
+        if (fetches === 1) await pool.serverVersion(this as unknown as AbstractAdapter);
+        return new Version("8.0.35");
+      },
+    } as unknown as AbstractAdapter;
+
+    expect(String(await pool.serverVersion(connection))).toBe("8.0.35");
+    expect(fetches).toBe(2);
+  }, 5000);
 });
