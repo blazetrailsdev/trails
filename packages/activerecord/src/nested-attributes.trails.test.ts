@@ -22,6 +22,8 @@ import { Ship } from "./test-helpers/models/ship.js";
 // type-safe via an unknown-valued record view.
 const cols = (record: Base): Record<string, unknown> =>
   record as unknown as Record<string, unknown>;
+const nested = (record: Base): Record<string, (attributes: unknown) => Promise<void>> =>
+  record as unknown as Record<string, (attributes: unknown) => Promise<void>>;
 const readAttr = (record: Base, name: string): unknown =>
   (record as unknown as { _readAttribute(n: string): unknown })._readAttribute(name);
 
@@ -39,7 +41,7 @@ describe("nested attributes (trails-only)", () => {
     CpkBook.acceptsNestedAttributesFor("order");
 
     const book = await CpkBook.createBang({ id: [1, 1], title: "T" });
-    cols(book).orderAttributes = { shop_id: 7, status: "open" };
+    await nested(book).setOrderAttributes({ shop_id: 7, status: "open" });
     await book.save();
 
     const order = await CpkOrder.where({ shop_id: 7, status: "open" }).first();
@@ -81,7 +83,7 @@ describe("nested attributes (trails-only)", () => {
     Categorization.acceptsNestedAttributesFor("category");
 
     const categorization = await Categorization.create({});
-    cols(categorization).categoryAttributes = { name: "General" };
+    await nested(categorization).setCategoryAttributes({ name: "General" });
     await categorization.save();
 
     const category = await Category.findBy({ name: "General" });
@@ -98,7 +100,7 @@ describe("nested attributes (trails-only)", () => {
     CpkSportsCar.acceptsNestedAttributesFor("carReviews");
 
     const car = await CpkSportsCar.createBang({ make: "Honda", model: "Civic" });
-    cols(car).carReviewsAttributes = [{ comment: "zippy", rating: 5 }];
+    await nested(car).setCarReviewsAttributes([{ comment: "zippy", rating: 5 }]);
     await car.save();
 
     const reviews = await CpkCarReview.where({ car_make: "Honda", car_model: "Civic" });
@@ -129,7 +131,7 @@ describe("nested attributes flush path alias resolution (trails-only)", () => {
       parrot_id: readAttr(parrot, "id"),
     });
 
-    cols(pirate).parrotAttributes = { id: readAttr(parrot, "id"), title: "Renamed" };
+    await nested(pirate).setParrotAttributes({ id: readAttr(parrot, "id"), title: "Renamed" });
     await pirate.save();
 
     const reloaded = await Parrot.find(readAttr(parrot, "id"));
