@@ -1882,8 +1882,10 @@ function cValidTimeP(
  *
  * Ruby scans January for the year's first day (`c_find_fdoy`,
  * `date_core.c:455-465`) because the calendar reform can delete 1 January
- * itself. `Temporal.PlainDate` is proleptic Gregorian, so 1 January always
- * exists and the scan collapses to it.
+ * itself, and rejects by round-tripping back through `c_jd_to_ordinal`
+ * (`date_core.c:566-575`), which is how a walk that left `y` comes back naming
+ * a different year. `Temporal.PlainDate` is proleptic Gregorian, so the scan
+ * collapses to 1 January and the round trip to reading `#year` back.
  */
 function cValidOrdinalP(y: number, d: number): Temporal.PlainDate | null {
   const fdoy = new Temporal.PlainDate(y, 1, 1);
@@ -2263,8 +2265,11 @@ export class Date {
   }
 
   /**
-   * Ruby `Date.jd(jd = 0)` (ruby/date, `date_core.c` `date_s_jd`), the date the
-   * given Julian day names.
+   * Ruby `Date.jd(jd = 0)` (ruby/date, `date_core.c` `date_s_jd`,
+   * `date_core.c:3377-3387`), the date the given Julian day names. Ruby writes
+   * the day straight into a fresh `SimpleDateData` under `HAVE_JD` alone and
+   * leaves the civil date to `get_s_civil`; there is one representation here,
+   * so the conversion happens at the call.
    */
   static jd(jd = 0): Date {
     const d = jdToPlainDate(jd);
@@ -2419,7 +2424,12 @@ export class Date {
     return this.#date.dayOfWeek % 7;
   }
 
-  /** Ruby `Date#yday` (ruby/date, `date_core.c` `d_lite_yday` over `m_yday`). */
+  /**
+   * Ruby `Date#yday` (ruby/date, `date_core.c` `d_lite_yday` over `m_yday`,
+   * `date_core.c:1824-1839`). `m_yday`'s three arms — the Gregorian table, the
+   * Julian table, and `c_jd_to_ordinal` for the reform window — collapse to one
+   * on a proleptic Gregorian substrate.
+   */
   get yday(): number {
     return this.#date.dayOfYear;
   }
