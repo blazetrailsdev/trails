@@ -679,17 +679,23 @@ interface _AssociationDefLike {
 interface _PendingAssociationAttr {
   name: string;
   value: unknown;
+  /** The association `name` resolved to, and whether `name` was its `#{singular}Ids` key. */
+  assoc: _AssociationDefLike;
+  idsKey: boolean;
 }
 
 /**
  * @internal
- * Is `key` the `#{singular}Ids` mass-assignment key of one of `defs`'
- * collection associations? A `*Ids` key naming no collection association
- * (a genuine column, say) is left on the attribute path.
+ * The collection association whose `#{singular}Ids` mass-assignment key is
+ * `key`, if any. A `*Ids` key naming no collection association (a genuine
+ * column, say) is left on the attribute path.
  */
-function _isCollectionIdsKey(defs: _AssociationDefLike[], key: string): boolean {
-  if (!key.endsWith("Ids")) return false;
-  return defs.some(
+function _collectionIdsKeyOwner(
+  defs: _AssociationDefLike[],
+  key: string,
+): _AssociationDefLike | undefined {
+  if (!key.endsWith("Ids")) return undefined;
+  return defs.find(
     (a) =>
       (a.type === "hasMany" || a.type === "hasAndBelongsToMany") &&
       `${_singularize(a.name)}Ids` === key,
@@ -722,10 +728,14 @@ function _extractAssociationAttrs(
   // copy entries. Avoids per-construction overhead for the hot path.
   let assocs: _PendingAssociationAttr[] | null = null;
   for (const k of Object.keys(attrs)) {
-    if (defs.find((a) => a.name === k)) {
-      (assocs ??= []).push({ name: k, value: attrs[k] });
-    } else if (_isCollectionIdsKey(defs, k)) {
-      (assocs ??= []).push({ name: k, value: attrs[k] });
+    const named = defs.find((a) => a.name === k);
+    if (named) {
+      (assocs ??= []).push({ name: k, value: attrs[k], assoc: named, idsKey: false });
+      continue;
+    }
+    const idsOwner = _collectionIdsKeyOwner(defs, k);
+    if (idsOwner) {
+      (assocs ??= []).push({ name: k, value: attrs[k], assoc: idsOwner, idsKey: true });
     }
   }
   if (!assocs) return null;
@@ -854,19 +864,7 @@ function _reinstateConstructorDirtiness(
  * @internal
  */
 function _dispatchAssociationAttrs(record: Base, assocs: _PendingAssociationAttr[]): void {
-  const defs = (record.constructor as { _associations?: _AssociationDefLike[] })._associations;
-  for (const { name, value } of assocs) {
-    let assoc = defs?.find((a) => a.name === name);
-    let idsKey = false;
-    if (!assoc) {
-      assoc = defs?.find(
-        (a) =>
-          (a.type === "hasMany" || a.type === "hasAndBelongsToMany") &&
-          `${_singularize(a.name)}Ids` === name,
-      );
-      idsKey = assoc !== undefined;
-    }
-    if (!assoc) continue;
+  for (const { value, assoc, idsKey } of assocs) {
     const proxy = (
       record as unknown as { association(n: string): _ConstructorAssociationWriter | null }
     ).association(assoc.name);
