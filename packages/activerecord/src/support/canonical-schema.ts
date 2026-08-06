@@ -267,7 +267,7 @@ export async function prepareSchema(
   // `supports_index_sort_order?`) are sync. Establishing the connection here is
   // what Rails' checkout does; `configure_connection` fills the version memo on
   // the way through, so no ported body needs a warm of its own.
-  await (adapter as { verifyBang?: () => Promise<void> }).verifyBang?.();
+  await adapter.verifyBang();
   const ss = adapter as unknown as SchemaStatements;
   const typeMap =
     adapter.adapterName === "postgres"
