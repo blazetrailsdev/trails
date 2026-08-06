@@ -323,20 +323,20 @@ describe("Date", () => {
 
   it("expands a seconds frag into a jd and a time of day, as rt_rewrite_frags does", () => {
     const hash: DateParts = { seconds: 1000000000 };
-    expect(ymd(dNewByFrags(hash, RubyDate.ITALY))).toBe("2001-09-09");
+    expect(ymd(dNewByFrags(hash))).toBe("2001-09-09");
     expect(hash).toEqual({ jd: 2452162, hour: 1, min: 46, sec: 40, secFraction: 0 });
     const offsetted: DateParts = { seconds: 1000000000, offset: -7200 };
-    expect(ymd(dNewByFrags(offsetted, RubyDate.ITALY))).toBe("2001-09-08");
+    expect(ymd(dNewByFrags(offsetted))).toBe("2001-09-08");
     expect([offsetted.hour, offsetted.min, offsetted.sec]).toEqual([23, 46, 40]);
     const negative: DateParts = { seconds: -1 };
-    expect(ymd(dNewByFrags(negative, RubyDate.ITALY))).toBe("1969-12-31");
+    expect(ymd(dNewByFrags(negative))).toBe("1969-12-31");
     expect([negative.hour, negative.min, negative.sec]).toEqual([23, 59, 59]);
   });
 
   it("skips rt_rewrite_frags and rt_complete_frags for a civil date, as d_new_by_frags does", () => {
-    expect(
-      ymd(dNewByFrags({ year: 2008, mon: 7, mday: 2, seconds: 1000000000 }, RubyDate.ITALY)),
-    ).toBe("2008-07-02");
+    expect(ymd(dNewByFrags({ year: 2008, mon: 7, mday: 2, seconds: 1000000000 }))).toBe(
+      "2008-07-02",
+    );
   });
 
   it("negates the year of a BC date, as parse_bc does", () => {
@@ -486,43 +486,18 @@ describe("Date", () => {
     expect(date.strftime("%Q")).toBe("%Q");
   });
 
-  it("rejects a day the calendar reform deleted, under the default start", () => {
-    expect(() => RubyDate.parse("1582-10-10")).toThrow("invalid date");
-    expect(RubyDate.parse("1582-10-04").strftime("%Y-%m-%d")).toBe("1582-10-04");
-    expect(RubyDate.parse("1582-10-15").strftime("%Y-%m-%d")).toBe("1582-10-15");
-  });
-
-  it("takes the reform start as its third argument", () => {
-    expect(RubyDate.parse("1582-10-10", true, RubyDate.GREGORIAN).strftime("%Y-%m-%d")).toBe(
-      "1582-10-10",
-    );
-    expect(RubyDate.parse("1582-10-14", true, RubyDate.JULIAN).strftime("%Y-%m-%d")).toBe(
-      "1582-10-14",
-    );
-    expect(() => RubyDate.parse("1752-09-05", true, RubyDate.ENGLAND)).toThrow("invalid date");
-    expect(RubyDate.parse("1752-09-05", true, RubyDate.ITALY).strftime("%Y-%m-%d")).toBe(
-      "1752-09-05",
-    );
-  });
-
-  it("finds the first day of a year the reform truncated, rather than assuming 1 January", () => {
-    expect(RubyDate.commercial(1582, 41, 1).strftime("%Y-%m-%d")).toBe("1582-10-18");
-    expect(RubyDate.commercial(1582, 41, 1, RubyDate.GREGORIAN).strftime("%Y-%m-%d")).toBe(
-      "1582-10-11",
-    );
-    expect(RubyDate.commercial(2001, -1, -1).strftime("%Y-%m-%d")).toBe("2001-12-30");
-  });
-
-  it("resolves the ordinal and week-date arms across the reform", () => {
+  it("resolves the ordinal and week-date arms", () => {
     expect(RubyDate.parse("2008070").strftime("%Y-%m-%d")).toBe("2008-03-10");
     expect(RubyDate.parse("2001-W05-6").strftime("%Y-%m-%d")).toBe("2001-02-03");
   });
 
-  // Every expectation below is `ruby 3.3.11 -rdate` output.
-  it("names the day either side of the reform off a Julian day", () => {
-    expect(RubyDate.jd(2299160).toS()).toBe("1582-10-04");
+  it("names a day off a Julian day, as date_s_jd does", () => {
+    // Every expectation is `ruby 3.3.11 -rdate`'s `Date.jd(jd, Date::GREGORIAN)`
+    // — the proleptic Gregorian reading `Temporal.PlainDate` is seated on.
+    expect(RubyDate.jd(2440588).toS()).toBe("1970-01-01");
     expect(RubyDate.jd(2299161).toS()).toBe("1582-10-15");
-    expect(RubyDate.jd(2299160).yday).toBe(277);
+    expect(RubyDate.jd(2299160).toS()).toBe("1582-10-14");
+    expect(RubyDate.jd(2299160).yday).toBe(287);
   });
 
   it("pads the year to four digits the way date_strftime's %Y does", () => {
@@ -535,75 +510,33 @@ describe("Date", () => {
     expect(new RubyDate(1, 1, 1).strftime("%F")).toBe("0001-01-01");
   });
 
-  it("carries the start the date was resolved under, rather than defaulting it to ITALY", () => {
-    expect(RubyDate.parse("1582-10-10", true, RubyDate.GREGORIAN).start).toBe(RubyDate.GREGORIAN);
-    expect(RubyDate.parse("1582-10-10", true, RubyDate.GREGORIAN).toS()).toBe("1582-10-10");
-    expect(new RubyDate(2001, 2, 3, RubyDate.ENGLAND).start).toBe(2361222);
-    // 1500 is not a leap year in the proleptic Gregorian calendar Temporal uses.
-    expect(RubyDate.parse("1500-02-29", true, RubyDate.JULIAN).toS()).toBe("1500-02-29");
-    expect(RubyDate.parse("1500-02-29", true, RubyDate.JULIAN).start).toBe(RubyDate.JULIAN);
-  });
-
-  it("answers julian? off the start, and the infinite starts off their own sign", () => {
-    expect(RubyDate.jd(2299160).isJulian()).toBe(true);
-    expect(RubyDate.jd(2299160).isGregorian()).toBe(false);
-    expect(RubyDate.jd(2299161).isJulian()).toBe(false);
-    expect(new RubyDate(2000, 2, 3).isJulian()).toBe(false);
-    expect(new RubyDate(2000, 2, 3).julian().isJulian()).toBe(true);
-    expect(new RubyDate(2000, 2, 3).gregorian().isJulian()).toBe(false);
-  });
-
-  it("re-reads the same Julian day under a new start", () => {
-    expect(new RubyDate(2000, 2, 3).newStart(RubyDate.JULIAN).toS()).toBe("2000-01-21");
-    expect(new RubyDate(2001, 2, 3).england().start).toBe(2361222);
-    expect(new RubyDate(2001, 2, 3).italy().start).toBe(RubyDate.ITALY);
-    expect(new RubyDate(2001, 2, 3).gregorian().start).toBe(RubyDate.GREGORIAN);
-  });
-
-  it("raises Date::Error on a civil date the reform deleted", () => {
-    expect(() => new RubyDate(1582, 10, 10)).toThrow(RubyDate.Error);
-    expect(new RubyDate(1582, 10, 10, RubyDate.GREGORIAN).toS()).toBe("1582-10-10");
-  });
   const civilOrError = (
     year: number,
     month: number,
     day: number,
-    start: number,
   ): [number, number, number] | "E" => {
     try {
-      const date = new RubyDate(year, month, day, start);
+      const date = new RubyDate(year, month, day);
       return [date.year, date.mon, date.day];
     } catch {
       return "E";
     }
   };
 
-  it("takes date_initialize's valid_civil_p arm at or before REFORM_END_YEAR", () => {
-    expect(civilOrError(1581, 12, 31, RubyDate.ITALY)).toEqual([1581, 12, 31]);
-    expect(civilOrError(1500, 2, 29, RubyDate.ITALY)).toEqual([1500, 2, 29]);
-    expect(civilOrError(1582, 10, 10, RubyDate.ITALY)).toBe("E");
-    expect(civilOrError(1582, 10, 15, RubyDate.ITALY)).toEqual([1582, 10, 15]);
-    expect(civilOrError(1752, 9, 3, RubyDate.ENGLAND)).toBe("E");
-    expect(civilOrError(1930, 12, 31, RubyDate.ITALY)).toEqual([1930, 12, 31]);
-    expect(civilOrError(1900, 2, 29, RubyDate.ITALY)).toBe("E");
-  });
-
-  it("takes date_initialize's valid_gregorian_p arm past REFORM_END_YEAR", () => {
-    expect(civilOrError(1931, 1, 1, RubyDate.ITALY)).toEqual([1931, 1, 1]);
-    expect(civilOrError(2000, 2, 29, RubyDate.ITALY)).toEqual([2000, 2, 29]);
-    expect(civilOrError(2100, 2, 29, RubyDate.ITALY)).toBe("E");
-    expect(civilOrError(2100, 2, 28, RubyDate.ITALY)).toEqual([2100, 2, 28]);
-    expect(civilOrError(2001, 2, 29, RubyDate.ITALY)).toBe("E");
-    expect(civilOrError(2001, -1, -1, RubyDate.ITALY)).toEqual([2001, 12, 31]);
-    expect(civilOrError(2001, 13, 1, RubyDate.ITALY)).toBe("E");
-  });
-
-  it("takes date_initialize's guess_style arm under an infinite start", () => {
-    expect(civilOrError(2001, 1, 1, RubyDate.JULIAN)).toEqual([2001, 1, 1]);
-    expect(civilOrError(1, 1, 1, RubyDate.JULIAN)).toEqual([1, 1, 1]);
-    expect(civilOrError(1, 1, 1, RubyDate.GREGORIAN)).toEqual([1, 1, 1]);
-    expect(civilOrError(1500, 2, 29, RubyDate.GREGORIAN)).toBe("E");
-    expect(civilOrError(-4712, 1, 1, RubyDate.GREGORIAN)).toEqual([-4712, 1, 1]);
+  it("raises Date::Error on a civil date c_valid_civil_p rejects", () => {
+    // Every expectation is `ruby 3.3.11 -rdate`'s `Date.new(y, m, d,
+    // Date::GREGORIAN)` — the proleptic Gregorian reading `Temporal.PlainDate`
+    // is seated on, where 1500 is not a leap year and no day is deleted.
+    expect(() => new RubyDate(2001, 2, 29)).toThrow(RubyDate.Error);
+    expect(civilOrError(1581, 12, 31)).toEqual([1581, 12, 31]);
+    expect(civilOrError(1582, 10, 10)).toEqual([1582, 10, 10]);
+    expect(civilOrError(1500, 2, 29)).toBe("E");
+    expect(civilOrError(1900, 2, 29)).toBe("E");
+    expect(civilOrError(2000, 2, 29)).toEqual([2000, 2, 29]);
+    expect(civilOrError(2100, 2, 29)).toBe("E");
+    expect(civilOrError(2100, 2, 28)).toEqual([2100, 2, 28]);
+    expect(civilOrError(2001, 13, 1)).toBe("E");
+    expect(civilOrError(-4712, 1, 1)).toEqual([-4712, 1, 1]);
   });
 });
 
@@ -618,30 +551,6 @@ describe("DateTime", () => {
     expect(new RubyDateTime(2008, 3, 1, 6).strftime("%a, %d %b %Y %H:%M:%S %Z")).toBe(
       "Sat, 01 Mar 2008 06:00:00 +00:00",
     );
-  });
-
-  it("carries the start it was built under, as datetime_s_new does", () => {
-    // ruby 3.3.11: DateTime.new(2001, 2, 3, 4, 5, 6, 0, Date::ENGLAND).start #=> 2361222.0
-    expect(new RubyDateTime(2001, 2, 3, 4, 5, 6, 0, RubyDate.ENGLAND).start).toBe(2361222);
-    expect(new RubyDateTime(2001, 2, 3, 4, 5, 6).start).toBe(RubyDate.ITALY);
-  });
-
-  it("dups the receiver on new_start, keeping its class and time of day", () => {
-    // ruby 3.3.11: DateTime.new(2000, 2, 3, 6, 7, 8).julian
-    //   #=> #<DateTime: 2000-01-21T06:07:08+00:00>, start Infinity
-    const julian = new RubyDateTime(2000, 2, 3, 6, 7, 8).julian();
-    expect(julian).toBeInstanceOf(RubyDateTime);
-    expect(julian.strftime("%Y-%m-%dT%H:%M:%S")).toBe("2000-01-21T06:07:08");
-    expect(julian.start).toBe(RubyDate.JULIAN);
-
-    const england = new RubyDateTime(2001, 2, 3, 4, 5, 6).england();
-    expect(england).toBeInstanceOf(RubyDateTime);
-    expect(england.start).toBe(2361222);
-    expect(england.strftime("%Y-%m-%dT%H:%M:%S")).toBe("2001-02-03T04:05:06");
-
-    expect(new RubyDateTime(2000, 2, 3, 6, 7, 8).newStart(RubyDate.JULIAN).hour).toBe(6);
-    expect(new RubyDateTime(2000, 2, 3, 6, 7, 8).italy()).toBeInstanceOf(RubyDateTime);
-    expect(new RubyDateTime(2000, 2, 3, 6, 7, 8).gregorian().start).toBe(RubyDate.GREGORIAN);
   });
 
   it("carries the offset the parsed string named", () => {
@@ -680,12 +589,6 @@ describe("DateTime", () => {
     expect(new RubyDateTime(2008, 3, 1, 6).zone).toBe("+00:00");
   });
 
-  it("keeps its offset through new_start", () => {
-    const julian = RubyDateTime.parse("2000-02-03T06:07:08+09:00").julian() as RubyDateTime;
-    expect(julian.zone).toBe("+09:00");
-    expect(julian.strftime("%Y-%m-%dT%H:%M:%S%:z")).toBe("2000-01-21T06:07:08+09:00");
-  });
-
   it("rolls a 24:00:00 time of day onto the next day, as jd_local_to_utc does", () => {
     // ruby 3.3.11: d = DateTime.parse("2008-03-01T24:00:00")
     //   [d.year, d.mon, d.mday, d.hour] #=> [2008, 3, 2, 0]
@@ -700,9 +603,7 @@ describe("DateTime", () => {
     //   DateTime.parse("2008-03-01T06:00:00+99:00").zone   #=> "+00:00"
     expect(RubyDate._parse("2008-03-01T06:00:00+99:00").offset).toBeNull();
     expect(RubyDateTime.parse("2008-03-01T06:00:00+99:00").zone).toBe("+00:00");
-    expect(dtNewByFrags({ year: 2008, mon: 3, mday: 1, offset: 999999 }, RubyDate.ITALY).zone).toBe(
-      "+00:00",
-    );
+    expect(dtNewByFrags({ year: 2008, mon: 3, mday: 1, offset: 999999 }).zone).toBe("+00:00");
   });
 
   it("raises Date::Error on a string naming no date, as dt_new_by_frags does", () => {
