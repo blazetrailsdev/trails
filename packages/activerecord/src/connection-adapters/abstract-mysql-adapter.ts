@@ -376,15 +376,15 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   /**
-   * Mirrors: Mysql2Adapter#full_version (mysql2_adapter.rb:164-166) —
-   * `database_version.full_version_string`. Rails defines this per concrete
-   * adapter and reaches it from the abstract class by duck typing; TS needs a
-   * declared member, so the single definition lives here. Sync like Rails,
-   * because `database_version` is the memo `configureConnection` warms.
+   * Rails reaches `full_version` from here (abstract_mysql_adapter.rb:93) by
+   * duck typing — it is defined only on the concrete adapters
+   * (mysql2_adapter.rb:164-166). TS needs a declared member for that call, so
+   * the declaration stays and concrete adapters override it with the real
+   * body, the same split `getFullVersion` uses.
    * @internal
    */
   fullVersion(): string | null {
-    return this.databaseVersion.fullVersionString;
+    throw new Error(`${this.constructor.name} must implement fullVersion()`);
   }
 
   /**

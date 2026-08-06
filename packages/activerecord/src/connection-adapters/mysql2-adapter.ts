@@ -1737,6 +1737,16 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   /**
+   * Mirrors: Mysql2Adapter#full_version (mysql2_adapter.rb:164-166). Sync like
+   * Rails, because `database_version` is the memo `configureConnection` warms.
+   *
+   * @internal
+   */
+  override fullVersion(): string | null {
+    return this.databaseVersion.fullVersionString;
+  }
+
+  /**
    * Mirrors: Mysql2Adapter#get_full_version (mysql2_adapter.rb:168-170). No
    * memo and no side effects: `database_version` is the only memo in the Rails
    * chain. Like Rails' `any_raw_connection.server_info[:version]`, the banner

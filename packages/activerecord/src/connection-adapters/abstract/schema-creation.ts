@@ -370,9 +370,6 @@ export class SchemaCreation {
   }
 
   protected visitCheckConstraintDefinition(o: CheckConstraintDefinition): string {
-    if (!o.validate && this.adapterName !== "postgres") {
-      throw new Error("Check constraint validate: false is only supported on PostgreSQL");
-    }
     return `CONSTRAINT ${this.adapter.quoteColumnName(o.name)} CHECK (${o.expression})`;
   }
 
