@@ -112,8 +112,10 @@ const PQTRANS_ACTIVE = 1;
 const PQTRANS_INTRANS = 2;
 const PQTRANS_INERROR = 3;
 const PQTRANS_UNKNOWN = 4;
-// Mirrors: PostgreSQL::DatabaseStatements::IDLE_TRANSACTION_STATUSES
-// (postgresql/database_statements.rb:124)
+/**
+ * Mirrors: `PostgreSQL::DatabaseStatements::IDLE_TRANSACTION_STATUSES`
+ * (postgresql/database_statements.rb:124).
+ */
 const IDLE_TRANSACTION_STATUSES = [PQTRANS_IDLE, PQTRANS_INTRANS, PQTRANS_INERROR];
 import {
   READ_QUERY,
@@ -450,20 +452,26 @@ export class PostgreSQLAdapter
   // "in TX?" check at call sites that mirror the prior shape.
   private _client: pg.Client | null = null;
   private _inTransaction = false;
-  // The status byte of the last ReadyForQuery message on `_rawConnection`
-  // ('I' idle / 'T' in transaction / 'E' failed transaction), which is what
-  // libpq derives `PQtransactionStatus` from. See `transactionStatus`.
+  /**
+   * The status byte of the last ReadyForQuery message on `_rawConnection`
+   * ('I' idle / 'T' in transaction / 'E' failed transaction), which is what
+   * libpq derives `PQtransactionStatus` from. See `transactionStatus`.
+   */
   private _readyForQueryStatus = "I";
-  // Whether the command on the wire has produced its terminating message
-  // (CommandComplete / ErrorResponse) but not yet its ReadyForQuery. libpq has
-  // no such window — PQgetResult returns only once the whole cycle is drained —
-  // but node-pg settles the query promise on the terminating message, so
-  // without this the caller can read the status back in that gap and see a
-  // command that is over reported as PQTRANS_ACTIVE.
+  /**
+   * Whether the command on the wire has produced its terminating message
+   * (CommandComplete / ErrorResponse) but not yet its ReadyForQuery. libpq has
+   * no such window — `PQgetResult` returns only once the whole cycle is drained
+   * — but node-pg settles the query promise on the terminating message, so
+   * without this the caller can read the status back in that gap and see a
+   * command that is over reported as PQTRANS_ACTIVE.
+   */
   private _commandSettled = true;
-  // The TransactionManager lock token of the chain that issued the query
-  // `transactionStatus` reports as PQTRANS_ACTIVE — see
-  // `_cancelAnyRunningQuery`.
+  /**
+   * The TransactionManager lock token of the chain that issued the query
+   * `transactionStatus` reports as PQTRANS_ACTIVE — see
+   * `_cancelAnyRunningQuery`.
+   */
   private _queryInFlightOwner: symbol | null = null;
   private _databaseVersion: number | null = null;
   private _typeMap: HashLookupTypeMap | null = null;
@@ -2278,7 +2286,9 @@ export class PostgreSQLAdapter
   /**
    * Record the ReadyForQuery status byte libpq keeps on the PGconn. Attached
    * once per pg.Client lifecycle alongside the notice listener, for the same
-   * reason: `resetBang` re-runs configure on the same client.
+   * reason: `resetBang` re-runs configure on the same client. An ErrorResponse
+   * aborts the open transaction, which the ReadyForQuery that follows spells
+   * 'E'; recording it on both keeps them consistent across the settle window.
    *
    * @internal
    */
@@ -2295,9 +2305,6 @@ export class PostgreSQLAdapter
       this._commandSettled = true;
     });
     connection.on("errorMessage", () => {
-      // The backend aborts the open transaction on any error; the
-      // ReadyForQuery that follows spells it 'E'. Recording it here as well
-      // keeps the two consistent across the settle window above.
       if (this._readyForQueryStatus === "T") this._readyForQueryStatus = "E";
       this._commandSettled = true;
     });
