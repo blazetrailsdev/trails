@@ -14,7 +14,6 @@ import {
   extractMultiparameterCallstack,
   executeMultiparameterAssignment,
 } from "./multiparameter-attribute-assignment.js";
-import { singularize } from "@blazetrails/activesupport";
 
 interface AttributeAssignmentHost {
   writeAttribute(key: string, value: unknown): void;
@@ -22,8 +21,6 @@ interface AttributeAssignmentHost {
   // a key through its writer, or route a writer-less key to
   // `attribute_writer_missing` (→ UnknownAttributeError). Inherited from `Model`.
   _assignAttribute(key: string, value: unknown): void;
-  constructor: unknown;
-  association?: (name: string) => unknown;
 }
 
 /**
@@ -40,14 +37,6 @@ export function _assignAttributes(
   for (const [k, v] of Object.entries(attributes)) {
     if (k.includes("(")) {
       (multiParameterAttributes ??= Object.create(null))[k] = v;
-    } else if (
-      assignAssociationIfMatch(
-        this as { constructor?: unknown; association?: (name: string) => unknown },
-        k,
-        v,
-      )
-    ) {
-      // Routed to association proxy writer (constructor-form collection / singular).
     } else if (v !== null && typeof v === "object" && !Array.isArray(v)) {
       (nestedParameterAttributes ??= Object.create(null))[k] = v;
     } else {
@@ -140,92 +129,6 @@ export function typeCastAttributeValue(multiparameterName: string, value: string
 export function findParameterPosition(multiparameterName: string): number {
   const match = multiparameterName.match(/\((\d+)/);
   return match ? parseInt(match[1], 10) : 0;
-}
-
-/**
- * @internal
- * Shared dispatch for constructor-form / assignAttributes association
- * writers. When `key` matches a declared association on `host.constructor`,
- * route `value` to the proxy's `replace`/`writer` rather than
- * `writeAttribute`. Mirrors Rails' `_assign_attribute` routing through
- * `public_send("#{k}=")` into association writer methods.
- *
- * Single source of truth used by `persistence.ts#assignAttributes`,
- * `attribute-assignment.ts#_assignAttributes`, and the constructor
- * dispatch in `base.ts`.
- */
-export function assignAssociationIfMatch(
-  host: { constructor?: unknown; association?: (name: string) => unknown },
-  key: string,
-  value: unknown,
-): boolean {
-  const ctor = host.constructor as
-    | { _associations?: Array<{ name: string; type: string }> }
-    | undefined;
-  let assoc = ctor?._associations?.find((a) => a.name === key);
-  // `#{singular}Ids` is a second mass-assignment key onto the same collection
-  // association — Rails generates `#{name.singularize}_ids=`
-  // (builder/collection_association.rb:67-74) and `assign_attributes` reaches
-  // it through `public_send`. trails has no such property setter (it would
-  // have to await `ids_writer`'s resolving query — RFC 0087 §1), so the key is
-  // matched here and dispatched to the association below.
-  let idsKey = false;
-  if (!assoc) {
-    assoc = ctor?._associations?.find(
-      (a) =>
-        (a.type === "hasMany" || a.type === "hasAndBelongsToMany") &&
-        `${singularize(a.name)}Ids` === key,
-    );
-    idsKey = assoc !== undefined;
-  }
-  if (!assoc) return false;
-  if (typeof host.association !== "function") return false;
-  const proxy = host.association(assoc.name) as
-    | {
-        replace?: (v: unknown[]) => void;
-        writer?: (v: unknown) => void;
-        syncWrite?: (v: unknown) => void;
-        syncIdsWrite?: (v: unknown[]) => never;
-      }
-    | null
-    | undefined;
-  if (!proxy) return false;
-  if (idsKey) {
-    if (typeof proxy.syncIdsWrite !== "function") return false;
-    proxy.syncIdsWrite(value as unknown[]);
-    return true;
-  }
-  if (assoc.type === "hasMany" || assoc.type === "hasAndBelongsToMany") {
-    // Mass-assignment can't await, so it shares the native `=` setter's
-    // `syncWrite` dispatch: in-memory replace on an unpersisted owner, and a
-    // throw (`CollectionPersistedAssignmentError`) on a persisted one — Rails
-    // replaces the collection inline at assignment, which needs `await` in JS.
-    // Callers use `await owner.#{name}.replace([...])` instead (RFC 0068).
-    //
-    // Rails fidelity: pass the value through unchanged. The writer path does
-    // not Array.wrap — Rails' replace calls `.each` on the argument and raises
-    // on nil / scalars. Coercing here would silently accept inputs the regular
-    // writer rejects.
-    if (typeof proxy.syncWrite !== "function") return false;
-    proxy.syncWrite(value as unknown[]);
-    return true;
-  }
-  if (assoc.type === "hasOne") {
-    // Mass-assignment can't await, so it shares the native `=` setter's
-    // `syncWrite` dispatch: in-memory replace on an unpersisted owner, and a
-    // throw (`HasOnePersistedAssignmentError`) on a persisted one — Rails
-    // persists a has_one displacement inline at assignment, which needs `await`
-    // in JS. Callers use `await owner.set#{Name}(x)` instead (RFC 0068).
-    if (typeof proxy.syncWrite !== "function") return false;
-    proxy.syncWrite(value);
-    return true;
-  }
-  if (assoc.type === "belongsTo") {
-    if (typeof proxy.writer !== "function") return false;
-    proxy.writer(value);
-    return true;
-  }
-  return false;
 }
 
 export const InstanceMethods = {

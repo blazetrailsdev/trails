@@ -672,24 +672,30 @@ interface _AssociationDefLike {
 
 /**
  * A constructor-form assignment held back until after `super()` —
- * `assignAssociationIfMatch` reaches `this.association(...)`, whose cache
+ * `_dispatchAssociationAttrs` reaches `this.association(...)`, whose cache
  * field is not initialized until `super()` returns.
  * @internal
  */
 interface _PendingAssociationAttr {
   name: string;
   value: unknown;
+  /** The association `name` resolved to, and whether `name` was its `#{singular}Ids` key. */
+  assoc: _AssociationDefLike;
+  idsKey: boolean;
 }
 
 /**
  * @internal
- * Is `key` the `#{singular}Ids` mass-assignment key of one of `defs`'
- * collection associations? A `*Ids` key naming no collection association
- * (a genuine column, say) is left on the attribute path.
+ * The collection association whose `#{singular}Ids` mass-assignment key is
+ * `key`, if any. A `*Ids` key naming no collection association (a genuine
+ * column, say) is left on the attribute path.
  */
-function _isCollectionIdsKey(defs: _AssociationDefLike[], key: string): boolean {
-  if (!key.endsWith("Ids")) return false;
-  return defs.some(
+function _collectionIdsKeyOwner(
+  defs: _AssociationDefLike[],
+  key: string,
+): _AssociationDefLike | undefined {
+  if (!key.endsWith("Ids")) return undefined;
+  return defs.find(
     (a) =>
       (a.type === "hasMany" || a.type === "hasAndBelongsToMany") &&
       `${_singularize(a.name)}Ids` === key,
@@ -704,7 +710,7 @@ function _isCollectionIdsKey(defs: _AssociationDefLike[], key: string): boolean 
  * nothing.
  *
  * A `#{singular}Ids` key (`new Author({postIds: [...]})`) is deferred too:
- * `assignAssociationIfMatch` reaches `this.association(name)`, whose cache
+ * `_dispatchAssociationAttrs` reaches `this.association(name)`, whose cache
  * field is not initialized until after `super()` returns.
  */
 function _extractAssociationAttrs(
@@ -722,10 +728,14 @@ function _extractAssociationAttrs(
   // copy entries. Avoids per-construction overhead for the hot path.
   let assocs: _PendingAssociationAttr[] | null = null;
   for (const k of Object.keys(attrs)) {
-    if (defs.find((a) => a.name === k)) {
-      (assocs ??= []).push({ name: k, value: attrs[k] });
-    } else if (_isCollectionIdsKey(defs, k)) {
-      (assocs ??= []).push({ name: k, value: attrs[k] });
+    const named = defs.find((a) => a.name === k);
+    if (named) {
+      (assocs ??= []).push({ name: k, value: attrs[k], assoc: named, idsKey: false });
+      continue;
+    }
+    const idsOwner = _collectionIdsKeyOwner(defs, k);
+    if (idsOwner) {
+      (assocs ??= []).push({ name: k, value: attrs[k], assoc: idsOwner, idsKey: true });
     }
   }
   if (!assocs) return null;
@@ -837,15 +847,48 @@ function _reinstateConstructorDirtiness(
   record._dirty.reinstateNewRecordChanges(record._attributes);
 }
 
-/** @internal */
+/**
+ * The constructor's association arm. Rails reaches these writers through
+ * `assign_attributes` → `public_send("#{k}=", v)`
+ * (activemodel/lib/active_model/attribute_assignment.rb:67-75); trails cannot,
+ * because a has_one / collection writer is awaitable (RFC 0087) and `new` is
+ * not. It stays synchronous here and only here, because a constructor's owner
+ * is unpersisted by definition and Rails does no I/O for one either:
+ * `save &&= owner.persisted?` (has_one_association.rb:66), `remove_target!`'s
+ * `owner.persisted?` gate (:108) and `find_target?` (association.rb:320-322)
+ * are all false, so the write is in-memory in Rails too and autosave persists
+ * it at the owner's first `save`. Mass assignment onto an *existing* record has
+ * no such guarantee and no longer routes here — it goes through `#update`,
+ * which awaits the real writer.
+ *
+ * @internal
+ */
 function _dispatchAssociationAttrs(record: Base, assocs: _PendingAssociationAttr[]): void {
-  for (const { name, value } of assocs) {
-    _AttributeAssignment.assignAssociationIfMatch(
-      record as unknown as { constructor?: unknown; association?: (name: string) => unknown },
-      name,
-      value,
-    );
+  for (const { value, assoc, idsKey } of assocs) {
+    const proxy = (
+      record as unknown as { association(n: string): _ConstructorAssociationWriter | null }
+    ).association(assoc.name);
+    if (!proxy) continue;
+    if (idsKey) {
+      proxy.syncIdsWrite?.(value as unknown[]);
+    } else if (assoc.type === "hasMany" || assoc.type === "hasAndBelongsToMany") {
+      // Rails fidelity: pass the value through unchanged. `replace` calls
+      // `.each` on the argument and raises on nil / scalars, so an `Array.wrap`
+      // here would silently accept inputs the writer rejects.
+      proxy.syncWrite?.(value as unknown[]);
+    } else if (assoc.type === "hasOne") {
+      proxy.syncWrite?.(value);
+    } else if (assoc.type === "belongsTo") {
+      proxy.writer?.(value);
+    }
   }
+}
+
+/** @internal The writers {@link _dispatchAssociationAttrs} reaches on an association. */
+interface _ConstructorAssociationWriter {
+  writer?: (v: unknown) => void;
+  syncWrite?: (v: unknown) => void;
+  syncIdsWrite?: (v: unknown[]) => void;
 }
 
 // Build the Arel value node for one write-path column (INSERT VALUES / UPDATE
