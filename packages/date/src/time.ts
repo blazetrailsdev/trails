@@ -61,10 +61,6 @@ function utcOffsetArgument(zone: string | number): "UTC" | number {
   throw new ArgumentError('"+HH:MM", "-HH:MM", "UTC" or "A".."I","K".."Z" expected for utc_offset');
 }
 
-function pad2(n: number): string {
-  return String(n).padStart(2, "0");
-}
-
 /**
  * The tzdata abbreviations MRI's `Time#zone` answers, for the zones `Intl`
  * cannot supply them for: an `en-US` `timeZoneName: "short"` is an
@@ -266,9 +262,6 @@ export class Time {
   }
 
   strftime(format: string): string {
-    // `%z` is `±HHMM` — neither `Time#zone` nor `Temporal`'s extended `±HH:MM`.
-    const minutes = Math.floor(Math.abs(this.utcOffset) / 60);
-    const zoneOffset = `${this.utcOffset < 0 ? "-" : "+"}${pad2(Math.floor(minutes / 60))}${pad2(minutes % 60)}`;
     return strftime(
       {
         year: this.year,
@@ -281,7 +274,7 @@ export class Time {
         sec: this.sec,
         nsec: 0,
         zone: this.zone ?? "",
-        zoneOffset,
+        utcOffset: this.utcOffset,
       },
       format,
     );

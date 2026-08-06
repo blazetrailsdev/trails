@@ -372,13 +372,17 @@ export class TimeWithZone {
   }
 
   /**
-   * Rails' `TimeWithZone` defines no `strftime` of its own — `method_missing`
-   * sends it on to the underlying `Time` (`time_with_zone.rb:557-566`), so the
-   * one implementation both reach is the `date` gem's C formatter, ported at
-   * `packages/date/src/date.ts`. `%z` comes off `formattedOffset` rather than
-   * the zone name, as `Time#strftime`'s does off `utc_offset`.
+   * Replaces `%Z` directive with +zone before passing to `Time#strftime`,
+   * so that zone information is correct.
+   *
+   * `getlocal(utc_offset)` answers a `::Time` at the receiver's offset, whose
+   * `strftime` is the `date` gem's C formatter — ported at
+   * `packages/date/src/date.ts`. That `::Time` was built from an offset rather
+   * than a zone, so its own `zone` is `nil` and any `%Z` the gsub left behind
+   * prints empty, as in Ruby.
    */
   strftime(format: string): string {
+    format = format.replace(/((?:^|[^%])(?:%%)*)%Z/g, `$1${this.zone}`);
     const l = this._local();
     return strftime(
       {
@@ -391,8 +395,8 @@ export class TimeWithZone {
         min: l.minute,
         sec: l.second,
         nsec: l.millisecond * 1_000_000,
-        zone: this.zone,
-        zoneOffset: this.formattedOffset(false),
+        zone: "",
+        utcOffset: this.utcOffset,
       },
       format,
     );

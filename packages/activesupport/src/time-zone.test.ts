@@ -642,8 +642,11 @@ describe("TimeZoneTest", () => {
   });
 
   it("z format strings", () => {
-    const zone = TimeZone.find("Eastern Time (US & Canada)");
-    expect(zone.formattedOffset()).toMatch(/^[+-]\d{2}:\d{2}$/);
+    const zone = TimeZone.find("Tokyo");
+    const twz = zone.now();
+    expect(twz.strftime("%z")).toBe("+0900");
+    expect(twz.strftime("%:z")).toBe("+09:00");
+    expect(twz.strftime("%::z")).toBe("+09:00:00");
   });
 
   it("formatted offset zero", () => {

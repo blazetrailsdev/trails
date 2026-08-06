@@ -90,14 +90,13 @@ export interface StrftimeSubject {
   sec: number;
   nsec: number;
   zone: string;
-  zoneOffset: string;
+  utcOffset: number;
 }
 
 /**
  * @internal `%s`'s value — `date_strftime.c` computes it from the receiver's
  * own fields rather than reading a `to_i` off it, which is what lets `::Date`
- * (midnight, UTC) answer `%s` at all. The offset comes back off `zoneOffset`
- * because that is the only spelling of it the subject carries.
+ * (midnight, UTC) answer `%s` at all.
  */
 function epochSeconds(subject: StrftimeSubject): number {
   const utc = new Temporal.PlainDateTime(
@@ -108,11 +107,24 @@ function epochSeconds(subject: StrftimeSubject): number {
     subject.min,
     subject.sec,
   ).toZonedDateTime("UTC");
-  const offset = /^([+-])(\d{2})(\d{2})$/.exec(subject.zoneOffset);
-  const offsetSeconds = offset
-    ? (offset[1] === "-" ? -1 : 1) * (Number(offset[2]) * 3600 + Number(offset[3]) * 60)
-    : 0;
-  return Math.floor(utc.epochMilliseconds / 1000) - offsetSeconds;
+  return Math.floor(utc.epochMilliseconds / 1000) - subject.utcOffset;
+}
+
+/**
+ * @internal The three spellings `date_strftime.c`'s `%z` arm gives the offset,
+ * picked by how many colons preceded the directive: none is `"+0900"`, one is
+ * `"+09:00"` and two is `"+09:00:00"`. All three come off the one offset in
+ * seconds, which is why the subject carries a number rather than a string —
+ * `%::z` is the only directive that can show a sub-minute offset.
+ */
+function formatOffset(utcOffset: number, colons: number): string {
+  const sign = utcOffset < 0 ? "-" : "+";
+  const abs = Math.abs(utcOffset);
+  const hour = pad2(Math.floor(abs / 3600));
+  const min = pad2(Math.floor(abs / 60) % 60);
+  if (colons === 0) return `${sign}${hour}${min}`;
+  if (colons === 1) return `${sign}${hour}:${min}`;
+  return `${sign}${hour}:${min}:${pad2(abs % 60)}`;
 }
 
 /**
@@ -164,15 +176,16 @@ export function strftime(subject: StrftimeSubject, format: string): string {
     p: () => (subject.hour < 12 ? "AM" : "PM"),
     P: () => (subject.hour < 12 ? "am" : "pm"),
     x: () => `${pad2(subject.mon)}/${pad2(subject.day)}/${pad2(subject.year % 100)}`,
-    z: () => subject.zoneOffset,
-    ":z": () => `${subject.zoneOffset.slice(0, 3)}:${subject.zoneOffset.slice(3)}`,
+    z: () => formatOffset(subject.utcOffset, 0),
+    ":z": () => formatOffset(subject.utcOffset, 1),
+    "::z": () => formatOffset(subject.utcOffset, 2),
     Z: () => subject.zone,
     n: () => "\n",
     t: () => "\t",
     "%": () => "%",
   };
 
-  return format.replace(/%(-?)(:?[A-Za-z%])/g, (match, flag, spec) => {
+  return format.replace(/%(-?)(:{0,2}[A-Za-z%])/g, (match, flag, spec) => {
     const fn = tokens[spec];
     if (!fn) return match;
     let result = fn();
@@ -2765,7 +2778,7 @@ export class Date {
         sec: 0,
         nsec: 0,
         zone: "+00:00",
-        zoneOffset: "+0000",
+        utcOffset: 0,
       },
       format,
     );
@@ -2847,7 +2860,7 @@ export class DateTime extends Date {
         sec: this.sec,
         nsec: 0,
         zone: this.zone,
-        zoneOffset: "+0000",
+        utcOffset: 0,
       },
       format,
     );
