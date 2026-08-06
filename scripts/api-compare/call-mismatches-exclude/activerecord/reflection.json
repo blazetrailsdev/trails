@@ -52,6 +52,13 @@
     "package": "activerecord",
     "tsFile": "reflection.ts",
     "rubyName": "join_scope",
+    "call": "order:joinScopes,constructor",
+    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "reflection.ts",
+    "rubyName": "join_scope",
     "call": "with",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }

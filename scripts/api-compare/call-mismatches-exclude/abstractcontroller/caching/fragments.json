@@ -1,0 +1,9 @@
+[
+  {
+    "package": "abstractcontroller",
+    "tsFile": "caching/fragments.ts",
+    "rubyName": "expire_fragment",
+    "call": "order:instrumentFragmentCache,combinedFragmentCacheKey",
+    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
+  }
+]

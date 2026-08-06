@@ -10,6 +10,13 @@
     "package": "activerecord",
     "tsFile": "insert-all.ts",
     "rubyName": "find_unique_index_for",
+    "call": "order:constructor,primaryKey",
+    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "insert-all.ts",
+    "rubyName": "find_unique_index_for",
     "call": "table_name",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -58,6 +65,13 @@
   {
     "package": "activerecord",
     "tsFile": "insert-all.ts",
+    "rubyName": "resolve_attribute_aliases",
+    "call": "order:resolveAttributeAlias,map",
+    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "insert-all.ts",
     "rubyName": "resolve_sti",
     "call": "descends_from_active_record?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -68,6 +82,20 @@
     "rubyName": "resolve_sti",
     "call": "map",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "insert-all.ts",
+    "rubyName": "resolve_sti",
+    "call": "order:inheritanceColumn,stiName",
+    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "insert-all.ts",
+    "rubyName": "unique_indexes",
+    "call": "order:schemaCache,indexes",
+    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
   },
   {
     "package": "activerecord",

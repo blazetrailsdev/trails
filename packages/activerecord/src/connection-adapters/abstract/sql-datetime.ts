@@ -23,8 +23,60 @@
  * address and calls into this file.
  */
 
-import { Temporal } from "@blazetrails/date";
+import { Temporal, strftime, type StrftimeSubject } from "@blazetrails/date";
 import { ActiveRecord } from "../../ar-config.js";
+
+/**
+ * `Time::DATE_FORMATS[:db]` (activesupport/lib/active_support/core_ext/time/
+ * conversions.rb:9) and `Date::DATE_FORMATS[:db]`
+ * (core_ext/date/conversions.rb:12) — the two formats `quoted_date`'s
+ * `value.to_fs(:db)` (abstract/quoting.rb:193) resolves to, depending on
+ * whether the value carries a time.
+ */
+const TIME_DB_FORMAT = "%Y-%m-%d %H:%M:%S";
+const DATE_DB_FORMAT = "%Y-%m-%d";
+
+/**
+ * @internal The fields the `date` gem's `strftime` reads off its receiver.
+ * `%Y-%m-%d %H:%M:%S` touches none of `wday` / `yday` / `zone` / `utcOffset`,
+ * but the subject is the whole receiver, so build it whole.
+ */
+function strftimeSubject(v: {
+  year: number;
+  month: number;
+  day: number;
+  dayOfWeek: number;
+  dayOfYear: number;
+  hour: number;
+  minute: number;
+  second: number;
+  millisecond: number;
+  microsecond: number;
+  nanosecond: number;
+}): StrftimeSubject {
+  return {
+    year: v.year,
+    mon: v.month,
+    day: v.day,
+    wday: v.dayOfWeek % 7,
+    yday: v.dayOfYear,
+    hour: v.hour,
+    min: v.minute,
+    sec: v.second,
+    nsec: v.millisecond * 1_000_000 + v.microsecond * 1_000 + v.nanosecond,
+    zone: "",
+    utcOffset: 0,
+  };
+}
+
+/**
+ * `quoted_date`'s body (abstract/quoting.rb:184-199) over an already
+ * timezone-resolved value: `value.to_fs(:db)`, then `"." + sprintf("%06d",
+ * value.usec)` when `usec > 0`.
+ */
+function toFsDbWithUsec(subject: StrftimeSubject): string {
+  return strftime(subject, TIME_DB_FORMAT) + microsecondFraction(Math.floor(subject.nsec / 1_000));
+}
 
 /**
  * Return the IANA timezone string for SQL datetime serialization/deserialization,
@@ -44,7 +96,7 @@ export function defaultSqlTimezone(): string {
  * otherwise the host system's local timezone.
  */
 export function formatInstantForSql(value: Temporal.Instant): string {
-  return formatZonedComponents(value.toZonedDateTimeISO(defaultSqlTimezone()));
+  return toFsDbWithUsec(strftimeSubject(value.toZonedDateTimeISO(defaultSqlTimezone())));
 }
 
 /**
@@ -54,94 +106,70 @@ export function formatInstantForSql(value: Temporal.Instant): string {
  * (see {@link formatInstantForSql}).
  */
 export function formatPlainDateTimeForSql(value: Temporal.PlainDateTime): string {
-  return formatPlainComponents(value);
+  return toFsDbWithUsec(strftimeSubject(value));
 }
 
 /**
  * Format a `Temporal.PlainDate` for SQL as `YYYY-MM-DD`.
  */
 export function formatPlainDateForSql(value: Temporal.PlainDate): string {
-  const y = padYear(value.year);
-  const m = String(value.month).padStart(2, "0");
-  const d = String(value.day).padStart(2, "0");
-  return `${y}-${m}-${d}`;
+  return strftime(strftimeSubject(value.toPlainDateTime()), DATE_DB_FORMAT);
 }
 
 /**
- * PostgreSQL literal formatters, faithful to `PostgreSQL::Quoting#quoted_date`
- * (and the abstract `quoted_date` it builds on, abstract/quoting.rb:188-197):
+ * PostgreSQL literal formatters. `PostgreSQL::Quoting#quoted_date`
+ * (postgresql/quoting.rb:143-150) is a pure override over the abstract one:
  *
- *   result = value.to_fs(:db)                       # "YYYY-MM-DD HH:MM:SS"
- *   if value.respond_to?(:usec) && value.usec > 0   # append microseconds only
- *     "#{result}.#{sprintf("%06d", value.usec)}"    # when non-zero, fixed 6 digits
- *   ...
- *   # PG#quoted_date then suffixes " BC" for proleptic years <= 0.
+ *   if value.year <= 0
+ *     bce_year = format("%04d", -value.year + 1)
+ *     super.sub(/^-?\d+/, bce_year) + " BC"
+ *   else
+ *     super
+ *   end
  *
- * Shares the fixed-6 microsecond fraction ({@link microsecondFraction}) with the
- * abstract/MySQL formatters; the only PG-specific behavior is the " BC" suffix
- * appended for proleptic years <= 0.
+ * so each PG arm here calls the abstract formatter above — the shared
+ * `to_fs(:db)` path through `packages/date`'s `strftime` — and applies only
+ * that year rewrite, exactly as `super` does.
  */
-function pgDateTimeLiteral(
-  year: number,
-  month: number,
-  day: number,
-  hour: number,
-  min: number,
-  sec: number,
-  usec: number,
-): string {
-  const isBc = year <= 0;
-  const yyyy = String(isBc ? -year + 1 : year).padStart(4, "0");
-  const p2 = (n: number) => String(n).padStart(2, "0");
-  const s = `${yyyy}-${p2(month)}-${p2(day)} ${p2(hour)}:${p2(min)}:${p2(sec)}${microsecondFraction(usec)}`;
-  return isBc ? `${s} BC` : s;
+function bceSuffixed(year: number, superResult: string): string {
+  if (year <= 0) {
+    const bceYear = String(-year + 1).padStart(4, "0");
+    return `${superResult.replace(/^-?\d+/, bceYear)} BC`;
+  }
+  return superResult;
 }
 
 export function formatInstantForSqlPostgres(value: Temporal.Instant): string {
   const z = value.toZonedDateTimeISO(defaultSqlTimezone());
-  return pgDateTimeLiteral(
-    z.year,
-    z.month,
-    z.day,
-    z.hour,
-    z.minute,
-    z.second,
-    z.millisecond * 1000 + z.microsecond,
-  );
+  return bceSuffixed(z.year, formatInstantForSql(value));
 }
 
 export function formatPlainDateTimeForSqlPostgres(value: Temporal.PlainDateTime): string {
-  return pgDateTimeLiteral(
-    value.year,
-    value.month,
-    value.day,
-    value.hour,
-    value.minute,
-    value.second,
-    value.millisecond * 1000 + value.microsecond,
-  );
+  return bceSuffixed(value.year, formatPlainDateTimeForSql(value));
 }
 
 export function formatPlainDateForSqlPostgres(value: Temporal.PlainDate): string {
-  const isBc = value.year <= 0;
-  const yyyy = String(isBc ? -value.year + 1 : value.year).padStart(4, "0");
-  const s = `${yyyy}-${String(value.month).padStart(2, "0")}-${String(value.day).padStart(2, "0")}`;
-  return isBc ? `${s} BC` : s;
+  return bceSuffixed(value.year, formatPlainDateForSql(value));
 }
 
 /**
- * Format a `Temporal.PlainTime` for SQL as `HH:MM:SS[.ffffff]`. Fractional part
- * is a fixed 6-digit microsecond field when `usec > 0`, capped at microseconds
- * (see {@link formatInstantForSql}).
+ * Format a `Temporal.PlainTime` for SQL as `HH:MM:SS[.ffffff]`, the way
+ * `quoted_time` (abstract/quoting.rb:201-204) does it: move the value to
+ * 2000-01-01, format it through `quoted_date`, and strip the date prefix.
  */
 export function formatPlainTimeForSql(value: Temporal.PlainTime): string {
-  return formatTimeComponents(
+  const dt = new Temporal.PlainDateTime(
+    2000,
+    1,
+    1,
     value.hour,
     value.minute,
     value.second,
     value.millisecond,
     value.microsecond,
+    value.nanosecond,
   );
+  return formatPlainDateTimeForSql(dt).replace(/^\d{4}-\d{2}-\d{2} /, "");
 }
 
 /**
@@ -153,41 +181,6 @@ export function formatPlainTimeForSql(value: Temporal.PlainTime): string {
 export const formatInstantForSqlMysql = formatInstantForSql;
 export const formatPlainDateTimeForSqlMysql = formatPlainDateTimeForSql;
 export const formatPlainTimeForSqlMysql = formatPlainTimeForSql;
-
-function formatDatePrefix(v: { year: number; month: number; day: number }): string {
-  return `${padYear(v.year)}-${String(v.month).padStart(2, "0")}-${String(v.day).padStart(2, "0")} `;
-}
-
-function padYear(year: number): string {
-  if (year < 0) return String(year);
-  return String(year).padStart(4, "0");
-}
-
-function formatZonedComponents(zdt: Temporal.ZonedDateTime): string {
-  return (
-    formatDatePrefix(zdt) +
-    formatTimeComponents(zdt.hour, zdt.minute, zdt.second, zdt.millisecond, zdt.microsecond)
-  );
-}
-
-function formatPlainComponents(pdt: Temporal.PlainDateTime): string {
-  return (
-    formatDatePrefix(pdt) +
-    formatTimeComponents(pdt.hour, pdt.minute, pdt.second, pdt.millisecond, pdt.microsecond)
-  );
-}
-
-/**
- * Build the `HH:MM:SS` base and append Rails' fixed 6-digit microsecond field
- * when non-zero. Sub-microsecond precision (nanoseconds) is dropped, matching
- * the abstract `quoted_date` cap and MySQL's fractional-seconds resolution.
- */
-function formatTimeComponents(h: number, min: number, s: number, ms: number, us: number): string {
-  const hh = String(h).padStart(2, "0");
-  const mm = String(min).padStart(2, "0");
-  const ss = String(s).padStart(2, "0");
-  return `${hh}:${mm}:${ss}${microsecondFraction(ms * 1000 + us)}`;
-}
 
 /**
  * Rails `quoted_date`'s fractional-seconds rule (abstract/quoting.rb:194-195):

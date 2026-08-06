@@ -1,0 +1,9 @@
+[
+  {
+    "package": "i18n",
+    "tsFile": "backend/key-value.ts",
+    "rubyName": "translations",
+    "call": "order:map,deepSymbolizeKeys",
+    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
+  }
+]

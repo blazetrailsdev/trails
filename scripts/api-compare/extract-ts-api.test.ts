@@ -198,6 +198,34 @@ describe("body call capture", () => {
     expect(save.calls).toEqual(["helper", "nested", "runCallbacks", "touch"]);
   });
 
+  it("also records the same calls in source order, for the order-only comparison", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        create() {
+          this.build();
+          this.save();
+        }
+      }`,
+    );
+    const create = cls.instanceMethods.find((m) => m.name === "create")!;
+    // `calls` is sorted, so `["build", "save"]` there says nothing about order;
+    // `callSeq` is what a reordered port shows up in (RFC 0084).
+    expect(create.calls).toEqual(["build", "save"]);
+    expect(create.callSeq).toEqual(["build", "save"]);
+
+    const reordered = extractFromSource(
+      `class Foo {
+        create() {
+          this.save();
+          this.build();
+        }
+      }`,
+    );
+    const swapped = reordered.instanceMethods.find((m) => m.name === "create")!;
+    expect(swapped.calls).toEqual(["build", "save"]);
+    expect(swapped.callSeq).toEqual(["save", "build"]);
+  });
+
   it("marks a call made in a negated position with the ! prefix", () => {
     // The faithful port of ActiveSupport's `exclude?` (`!include?`); the
     // call ratchet requires the marker before crediting a negating alias.

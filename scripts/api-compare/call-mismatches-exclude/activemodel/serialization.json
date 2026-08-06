@@ -1,0 +1,9 @@
+[
+  {
+    "package": "activemodel",
+    "tsFile": "serialization.ts",
+    "rubyName": "serializable_hash",
+    "call": "order:serializableAddIncludes,map",
+    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
+  }
+]

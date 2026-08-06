@@ -23,6 +23,20 @@
   {
     "package": "activerecord",
     "tsFile": "attribute-methods.ts",
+    "rubyName": "attributes_for_create",
+    "call": "order:columnForAttribute,isVirtual",
+    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "attribute-methods.ts",
+    "rubyName": "attributes_for_update",
+    "call": "order:columnForAttribute,isVirtual",
+    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "attribute-methods.ts",
     "rubyName": "attributes_for_update",
     "call": "readonly_attribute?",
     "reason": "Unmasked by alias-arity resolution (story arity-resolve-ts-alias-bindings-to-target-params): the TS body reads `_readonlyAttributes` directly instead of delegating to `readonlyAttributeQ`. Real gap, tracked as story converge-readonly-attribute-predicate-callers."

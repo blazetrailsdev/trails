@@ -72,6 +72,13 @@
   {
     "package": "activerecord",
     "tsFile": "attribute-methods/primary-key.ts",
+    "rubyName": "quoted_primary_key",
+    "call": "order:primaryKey,quoteColumnName",
+    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "attribute-methods/primary-key.ts",
     "rubyName": "reset_primary_key",
     "call": "base_class?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
