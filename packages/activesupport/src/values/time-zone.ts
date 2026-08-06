@@ -10,7 +10,8 @@
  */
 
 import { TimeWithZone } from "../time-with-zone.js";
-import { Temporal, instantFrom } from "../temporal.js";
+import { Temporal } from "@blazetrails/date";
+import { instantFrom } from "../temporal.js";
 import { currentTime } from "../time-travel.js";
 
 // Rails maps friendly names to IANA zones

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { InvalidSignature, MessageVerifier } from "../message-verifier.js";
-import { Temporal } from "../temporal.js";
+import { Temporal } from "@blazetrails/date";
 import { currentTimeInstant } from "../time-travel.js";
 import type { MessageSerializer } from "./codec.js";
 import type { Format } from "./serializer-with-fallback.js";

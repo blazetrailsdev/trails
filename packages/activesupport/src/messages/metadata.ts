@@ -2,7 +2,7 @@ import { coder } from "../cache/coder.js";
 import { ActiveSupportJSON } from "../json.js";
 import { Encoding } from "../json/encoding.js";
 import { MessagePack } from "../message-pack/index.js";
-import { Temporal } from "../temporal.js";
+import { Temporal } from "@blazetrails/date";
 import { currentTimeInstant } from "../time-travel.js";
 import type { MessageSerializer } from "./codec.js";
 import { ArgumentError, SERIALIZERS, Thrown } from "./serializer-with-fallback.js";

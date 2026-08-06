@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { coder } from "./coder.js";
-import { Temporal } from "../temporal.js";
+import { Temporal } from "@blazetrails/date";
 
 // Fidelity guarantees of the trails Marshal-equivalent serializer: the cases
 // where plain JSON would lose or mangle a value. These are not Rails tests —

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import type { Temporal } from "../temporal.js";
+import type { Temporal } from "@blazetrails/date";
 import {
   advance,
   ago,

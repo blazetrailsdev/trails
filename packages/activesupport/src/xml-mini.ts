@@ -1,7 +1,7 @@
 import { camelize, singularize, underscore } from "./inflector.js";
 import { htmlEscape } from "./core-ext/tse/util.js";
 import { BigDecimal } from "./core-ext/big-decimal/conversions.js";
-import { Temporal } from "./temporal.js";
+import { Temporal } from "@blazetrails/date";
 
 export interface RenameKeyOptions {
   /** Convert `snake_case` keys to `dashed-keys`. Defaults to `true`. */

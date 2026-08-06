@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { Temporal } from "./temporal.js";
+import { Temporal } from "@blazetrails/date";
 import {
   beginningOfDay,
   middleOfDay,

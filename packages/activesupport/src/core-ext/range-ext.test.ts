@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { Temporal } from "../temporal.js";
+import { Temporal } from "@blazetrails/date";
 
 import { hours } from "../duration.js";
 import { makeRange, rangeIncludesValue, rangeIncludesStringValue } from "../range-ext.js";

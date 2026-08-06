@@ -81,10 +81,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("quote time", async () => {
       const rows = await adapter.execute("SELECT TIME '14:30:00' AS val");
-      const val = rows[0].val as Temporal.PlainTime;
-      expect(val).toBeInstanceOf(Temporal.PlainTime);
-      expect(val.hour).toBe(14);
-      expect(val.minute).toBe(30);
+      expect(rows[0].val).toBe("14:30:00");
     });
 
     it("quote timestamp", async () => {

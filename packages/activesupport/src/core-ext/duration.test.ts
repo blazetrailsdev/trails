@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Temporal } from "../temporal.js";
+import { Temporal } from "@blazetrails/date";
 import { Duration } from "../duration.js";
 
 function asDate(instant: Temporal.Instant): Date {

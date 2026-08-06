@@ -6,7 +6,8 @@
  *   `Temporal.Instant`. The default reference is `Temporal.Now.instant()`.
  */
 
-import { Temporal, instantFrom } from "./temporal.js";
+import { Temporal } from "@blazetrails/date";
+import { instantFrom } from "./temporal.js";
 
 export type DurationParts = {
   years: number;

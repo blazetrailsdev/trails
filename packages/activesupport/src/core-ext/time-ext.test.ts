@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import type { Temporal } from "../temporal.js";
+import type { Temporal } from "@blazetrails/date";
 import {
   nextDay,
   prevDay,

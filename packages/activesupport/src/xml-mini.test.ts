@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { renameKey, toTag, XmlStringBuilder, type ToTagOptions } from "./xml-mini.js";
 import { BigDecimal } from "./core-ext/big-decimal/conversions.js";
-import { Temporal } from "./temporal.js";
+import { Temporal } from "@blazetrails/date";
 
 describe("ParsingTest", () => {
   it.skip("symbol");

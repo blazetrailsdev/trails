@@ -8,8 +8,15 @@ import { SchemaDumper } from "./connection-adapters/abstract/schema-dumper.js";
 import { fixtures } from "./test-fixtures.js";
 import { itIfSupports } from "./support/supports.js";
 
-function nsecTime(v: Temporal.PlainTime): number {
-  return v.millisecond * 1_000_000 + v.microsecond * 1_000 + v.nanosecond;
+/** Ruby `::Time#nsec` — the sub-second nanoseconds of the instant. */
+function nsecTime(v: Temporal.Instant): number {
+  return Number(v.epochNanoseconds % 1_000_000_000n);
+}
+
+/** Ruby `::Time.now.change(nsec:)`. */
+function timeNowChangeNsec(nsec: number): Temporal.Instant {
+  const now = Temporal.Now.instant().epochNanoseconds;
+  return Temporal.Instant.fromEpochNanoseconds(now - (now % 1_000_000_000n) + BigInt(nsec));
 }
 
 describe("TimePrecisionTest", () => {
@@ -55,14 +62,7 @@ describe("TimePrecisionTest", () => {
     await adapter.addColumn("foos", "finish", "time", { precision: 6 });
     const Foo = makeFoo();
     await Foo.loadSchema();
-    const time = Temporal.PlainTime.from({
-      hour: 12,
-      minute: 0,
-      second: 0,
-      millisecond: 123,
-      microsecond: 456,
-      nanosecond: 789,
-    });
+    const time = timeNowChangeNsec(123456789);
     const foo = new Foo({ start: time, finish: time });
     expect(nsecTime((foo as any).start)).toBe(0);
     expect(nsecTime((foo as any).finish)).toBe(123456000);
@@ -84,14 +84,7 @@ describe("TimePrecisionTest", () => {
       await adapter.addColumn("foos", "finish", "time", { precision: 6 });
       const Foo = makeFoo();
       await Foo.loadSchema();
-      const time = Temporal.PlainTime.from({
-        hour: 12,
-        minute: 0,
-        second: 0,
-        millisecond: 0,
-        microsecond: 0,
-        nanosecond: 123,
-      });
+      const time = timeNowChangeNsec(123);
       const foo = new Foo({ start: time, finish: time });
       expect(nsecTime((foo as any).start)).toBe(123);
       expect(nsecTime((foo as any).finish)).toBe(0);

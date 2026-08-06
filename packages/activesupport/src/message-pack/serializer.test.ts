@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { MessagePack, UnserializableObjectError } from "./index.js";
-import { Temporal } from "../temporal.js";
+import { Temporal } from "@blazetrails/date";
 import { TimeWithZone } from "../time-with-zone.js";
 import { TimeZone } from "../values/time-zone.js";
 import { HashWithIndifferentAccess } from "../hash-with-indifferent-access.js";

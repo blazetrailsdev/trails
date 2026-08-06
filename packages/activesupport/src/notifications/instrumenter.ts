@@ -1,4 +1,4 @@
-import { Temporal } from "../temporal.js";
+import { Temporal } from "@blazetrails/date";
 import { IsolatedExecutionState } from "../isolated-execution-state.js";
 
 export type EventPayload = Record<string, unknown>;

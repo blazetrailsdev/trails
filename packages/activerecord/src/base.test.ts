@@ -759,16 +759,16 @@ describe("BasicsTest", () => {
     const inst1 = Temporal.Instant.from("2003-07-16T14:28:11.223300Z");
     const inst2 = Temporal.Instant.from("2003-07-16T14:28:11.009900Z");
     const inst3 = Temporal.Instant.from("2003-07-16T14:28:11.129346Z");
-    const bonusTime = Temporal.PlainTime.from("11:30:45");
+    const bonusTime = new Temporal.PlainDateTime(2000, 1, 1, 11, 30, 45)
+      .toZonedDateTime("UTC")
+      .toInstant();
     const t1 = await Topic.create({ written_on: inst1, bonus_time: bonusTime });
     const t2 = await Topic.create({ written_on: inst2 });
     const t3 = await Topic.create({ written_on: inst3 });
     const topic1 = await Topic.find(t1.id);
-    const reloadedBonusTime = topic1.readAttribute("bonus_time") as Temporal.PlainTime;
-    expect(reloadedBonusTime).toBeInstanceOf(Temporal.PlainTime);
-    expect(reloadedBonusTime.hour).toBe(bonusTime.hour);
-    expect(reloadedBonusTime.minute).toBe(bonusTime.minute);
-    expect(reloadedBonusTime.second).toBe(bonusTime.second);
+    const reloadedBonusTime = topic1.readAttribute("bonus_time") as Temporal.Instant;
+    expect(reloadedBonusTime).toBeInstanceOf(Temporal.Instant);
+    expect(reloadedBonusTime.epochNanoseconds).toBe(bonusTime.epochNanoseconds);
     const wo1 = topic1.readAttribute("written_on") as Temporal.Instant;
     expect(wo1).toBeInstanceOf(Temporal.Instant);
     expect(wo1.epochNanoseconds).toBe(inst1.epochNanoseconds);
@@ -903,13 +903,6 @@ describe("BasicsTest", () => {
     expect(Account.tableName).toBe("accounts");
   });
   it("utc as time zone", async () => {
-    // Rails asserts Time.utc(2000, 1, 1, 5, 42, 0). The `time` type models a SQL
-    // TIME column, which is timezone-naive: AR::Type::Time.cast_value returns a
-    // Time whose date/zone are an artifact of the dummy 2000-01-01 reference, and
-    // our port returns a Temporal.PlainTime carrying only the time-of-day. So the
-    // assertion is on the parsed hour/minute/second — the same component check the
-    // "utc as time zone and new" test uses. `default: "utc"` is kept to mirror
-    // Rails' fixture setup even though PlainTime carries no zone to distinguish it.
     await withTimezoneConfig({ default: "utc" }, async () => {
       class Topic extends Base {
         static {
@@ -919,14 +912,9 @@ describe("BasicsTest", () => {
       const created = await Topic.create({});
       const topic = await Topic.find(created.id);
       topic.assignAttributes({ bonus_time: "5:42:00AM" });
-      const bonusTime = topic.readAttribute("bonus_time") as {
-        hour: number;
-        minute: number;
-        second: number;
-      };
-      expect(bonusTime.hour).toBe(5);
-      expect(bonusTime.minute).toBe(42);
-      expect(bonusTime.second).toBe(0);
+      expect(topic.readAttribute("bonus_time")).toEqual(
+        new Temporal.PlainDateTime(2000, 1, 1, 5, 42, 0).toZonedDateTime("UTC").toInstant(),
+      );
     });
   });
   it("utc as time zone and new", async () => {
@@ -945,14 +933,9 @@ describe("BasicsTest", () => {
         "bonus_time(6i)": "50",
       };
       const topic = new Topic(attributes);
-      const bonusTime = topic.readAttribute("bonus_time") as {
-        hour: number;
-        minute: number;
-        second: number;
-      };
-      expect(bonusTime.hour).toBe(10);
-      expect(bonusTime.minute).toBe(35);
-      expect(bonusTime.second).toBe(50);
+      expect(topic.readAttribute("bonus_time")).toEqual(
+        new Temporal.PlainDateTime(2000, 1, 1, 10, 35, 50).toZonedDateTime("UTC").toInstant(),
+      );
     });
   });
   it("out of range slugs", async () => {
@@ -1175,14 +1158,11 @@ describe("BasicsTest", () => {
       const created = await Topic.create({});
       const topic = await Topic.find(created.id);
       topic.assignAttributes({ bonus_time: "5:42:00AM" });
-      const bonusTime = topic.readAttribute("bonus_time") as {
-        hour: number;
-        minute: number;
-        second: number;
-      };
-      expect(bonusTime.hour).toBe(5);
-      expect(bonusTime.minute).toBe(42);
-      expect(bonusTime.second).toBe(0);
+      expect(topic.readAttribute("bonus_time")).toEqual(
+        new Temporal.PlainDateTime(2000, 1, 1, 5, 42, 0)
+          .toZonedDateTime(Temporal.Now.timeZoneId())
+          .toInstant(),
+      );
 
       // Rails uses save!; saveBang is the faithful form (surfaces save errors).
       // findBy exercises the serialize round-trip, which is the stronger check.

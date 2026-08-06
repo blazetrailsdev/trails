@@ -9,7 +9,8 @@ import { TimeZone } from "./values/time-zone.js";
 import { Duration } from "./duration.js";
 import { currentTime } from "./time-travel.js";
 import { getZone } from "./time-zone-config.js";
-import { Temporal, instantFrom } from "./temporal.js";
+import { Temporal } from "@blazetrails/date";
+import { instantFrom } from "./temporal.js";
 import { strftime } from "@blazetrails/date";
 import { Encoding } from "./json/encoding.js";
 

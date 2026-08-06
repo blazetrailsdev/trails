@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Temporal } from "../temporal.js";
+import type { Temporal } from "@blazetrails/date";
 import { numberToHuman } from "../number-helper.js";
 import { Duration } from "../duration.js";
 

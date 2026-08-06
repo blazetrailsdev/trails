@@ -1792,6 +1792,63 @@ const DAY_IN_SECONDS = 86400;
 const UNIX_EPOCH = new Temporal.PlainDate(1970, 1, 1);
 
 /**
+ * @internal `date_core.c` `df_local_to_utc` (`date_core.c:900-909`), which takes
+ * a `ComplexDateData`'s day-fraction from local to UTC and folds it back into
+ * `0...DAY_IN_SECONDS`. The day the fold crosses is carried by
+ * {@link jdLocalToUtc}, which reads the *unfolded* value for that reason.
+ */
+function dfLocalToUtc(df: number, of: number): number {
+  df -= of;
+  if (df < 0) df += DAY_IN_SECONDS;
+  else if (df >= DAY_IN_SECONDS) df -= DAY_IN_SECONDS;
+  return df;
+}
+
+/** @internal `date_core.c` `df_utc_to_local` (`date_core.c:911-920`). */
+function dfUtcToLocal(df: number, of: number): number {
+  df += of;
+  if (df < 0) df += DAY_IN_SECONDS;
+  else if (df >= DAY_IN_SECONDS) df -= DAY_IN_SECONDS;
+  return df;
+}
+
+/**
+ * @internal `date_core.c` `jd_local_to_utc` (`date_core.c:922-932`), the day
+ * half of the same move. The C carries the day on a Julian day number; `Date` is
+ * seated on `Temporal.PlainDate`, so the `jd -= 1` / `jd += 1` the C writes are
+ * a day subtracted from or added to the date.
+ */
+function jdLocalToUtc(jd: Temporal.PlainDate, df: number, of: number): Temporal.PlainDate {
+  df -= of;
+  if (df < 0) return jd.subtract({ days: 1 });
+  if (df >= DAY_IN_SECONDS) return jd.add({ days: 1 });
+  return jd;
+}
+
+/** @internal `date_core.c` `jd_utc_to_local` (`date_core.c:933-943`). */
+function jdUtcToLocal(jd: Temporal.PlainDate, df: number, of: number): Temporal.PlainDate {
+  df += of;
+  if (df < 0) return jd.subtract({ days: 1 });
+  if (df >= DAY_IN_SECONDS) return jd.add({ days: 1 });
+  return jd;
+}
+
+/** @internal `date_core.c` `time_to_df` (`date_core.c:944-948`). */
+function timeToDf(h: number, min: number, s: number): number {
+  return h * HOUR_IN_SECONDS + min * MINUTE_IN_SECONDS + s;
+}
+
+/**
+ * @internal `date_core.c` `df_to_time` (`date_core.c:950-957`); the `h`/`min`/`s`
+ * out-parameters come back as the tuple.
+ */
+function dfToTime(df: number): [h: number, min: number, s: number] {
+  const h = Math.trunc(df / HOUR_IN_SECONDS);
+  df %= HOUR_IN_SECONDS;
+  return [h, Math.trunc(df / MINUTE_IN_SECONDS), df % MINUTE_IN_SECONDS];
+}
+
+/**
  * @internal Ruby `Date#jd` (`date_core.c` `d_lite_jd`, `date_core.c:5249`), the
  * reader `rt_complete_frags`' `:wday` branch takes its `:jd` off. `Temporal` has
  * no Julian day, so the number is the day count from the Unix epoch Ruby
@@ -2141,10 +2198,10 @@ function of2str(of: number): string {
  * the time of day — defaulting each field to `0` and folding a leap second's
  * `60` back to `59` — and the `:offset` `date_zone_to_diff` left in the frags.
  *
- * Ruby then moves the Julian day and day-fraction to UTC (`jd_local_to_utc` /
- * `df_local_to_utc`, `date_core.c:8311-8313`) and converts back on every read;
- * the port keeps them local, which is what the readers answer either way, so
- * the offset alone is carried.
+ * Ruby then moves the day and day-fraction to UTC (`jd_local_to_utc` /
+ * `df_local_to_utc`, `date_core.c:8311-8313`) and converts back on every read.
+ * The {@link DateTime} constructor does both conversions, so the local civil
+ * date and time of day are handed to it as they are.
  *
  * The `:offset` bound (`date_core.c:8297-8306`) is ported as written — strictly
  * outside `±DAY_IN_SECONDS` is ignored rather than raised on. It is unreachable
@@ -2156,10 +2213,8 @@ function of2str(of: number): string {
  * The one thing the UTC round-trip does observably is
  * normalize the `86400` a `24:00:00` time of day makes — `jd_local_to_utc`'s
  * `df >= DAY_IN_SECONDS` arm rolls the day and the reader answers hour `0`, so
- * `DateTime.parse("2008-03-01T24:00:00")` is 2008-03-02T00:00:00. The port
- * normalizes the local pair for the same effect, which is `canon24oc`
- * (`date_core.c:3306-3312`) with the day carried on the date rather than on a
- * day-fraction.
+ * `DateTime.parse("2008-03-01T24:00:00")` is 2008-03-02T00:00:00. That now
+ * falls out of the representation rather than being normalized here.
  */
 export function dtNewByFrags(hash: DateParts): DateTime {
   let jd: Temporal.PlainDate | null;
@@ -2191,13 +2246,7 @@ export function dtNewByFrags(hash: DateParts): DateTime {
 
   const rt = cValidTimeP(hash.hour ?? 0, hash.min ?? 0, hash.sec ?? 0);
   if (rt === null) throw new DateError("invalid date");
-  let [rh] = rt;
-  const [, rmin, rs] = rt;
-
-  if (rh === 24) {
-    rh = 0;
-    jd = jd.add({ days: 1 });
-  }
+  const [rh, rmin, rs] = rt;
 
   const t = hash.offset;
   let of = t == null ? 0 : t instanceof Rational ? t.numerator / t.denominator : t;
@@ -2474,16 +2523,31 @@ export class Date {
  * `::Date`'s offset spelling rather than `::Time`'s `"UTC"`.
  */
 export class DateTime extends Date {
-  readonly #hour: number;
-  readonly #min: number;
-  readonly #sec: number;
   /**
-   * @internal `ComplexDateData`'s `of` (`date_core.c:215-231`), the offset in
-   * seconds east of UTC — the same representation `Time#utcOffset` keeps, and
-   * the one `Date._parse` answers as `:offset`. A `Temporal` offset time zone
-   * is minute-precision and could not hold `date_zone_to_diff`'s seconds.
+   * @internal `ComplexDateData`'s fields (`date_core.c:215-231`): the day and
+   * the day-fraction, both **in UTC**, and `of`, the offset in seconds east of
+   * UTC — the same representation `Time#utcOffset` keeps, and the one
+   * `Date._parse` answers as `:offset`. A `Temporal` offset time zone is
+   * minute-precision and could not hold `date_zone_to_diff`'s seconds.
+   *
+   * Every reader converts back on the way out through {@link #mLocalJd} /
+   * {@link #mLocalDf}, and the constructor converts in through
+   * `jd_local_to_utc` / `df_local_to_utc`, as `dt_new_by_frags` does
+   * (`date_core.c:8311-8313`). The C carries the day as a Julian day number;
+   * `Date` is seated on `Temporal.PlainDate`, so this is that date.
    */
+  readonly #date: Temporal.PlainDate;
+  readonly #df: number;
   readonly #of: number;
+
+  /**
+   * @internal `ComplexDateData`'s civil fields, which the C comments as
+   * "decoded as local" and leaves to `get_c_civil` (`date_core.c:1297-1324`) to
+   * fill in on first read. The inherited `Date` state cannot stand in for them:
+   * it was written from the constructor's *pre-conversion* civil date, which a
+   * `24:00:00` time of day rolls off.
+   */
+  #civil?: Temporal.PlainDate;
 
   /**
    * Ruby `DateTime.new(y, m, d, h = 0, min = 0, s = 0, offset = 0)` (ruby/date,
@@ -2505,10 +2569,9 @@ export class DateTime extends Date {
    * seconds bound that does is `dt_new_by_frags`', applied at that call site
    * where the C applies it.
    *
-   * Ruby also keeps the Julian day and day-fraction in UTC and converts on
-   * read (`jd_local_to_utc` at build, `m_local_jd` at read); the port keeps the
-   * date and the time of day *local*, which is what the readers answer either
-   * way.
+   * `datetime_initialize` (`date_core.c:5147-5220`) validates the civil date with
+   * `c_valid_civil_p` and the time of day with `c_valid_time_p`, then stores the
+   * day and day-fraction in UTC — which is what the two conversions below do.
    */
   constructor(
     year: number,
@@ -2520,9 +2583,13 @@ export class DateTime extends Date {
     offset = 0,
   ) {
     super(year, month, day);
-    this.#hour = hour;
-    this.#min = minute;
-    this.#sec = second;
+    const rjd = cValidCivilP(year, month, day);
+    if (rjd === null) throw new DateError("invalid date");
+    const rt = cValidTimeP(hour, minute, second);
+    if (rt === null) throw new DateError("invalid date");
+    const df = timeToDf(rt[0], rt[1], rt[2]);
+    this.#date = jdLocalToUtc(rjd, df, offset);
+    this.#df = dfLocalToUtc(df, offset);
     this.#of = offset;
   }
 
@@ -2535,16 +2602,68 @@ export class DateTime extends Date {
     return dtNewByFrags(Date._parse(str, comp));
   }
 
+  /**
+   * @internal `date_core.c` `m_local_jd` (`date_core.c:1486-1497`) over
+   * `local_jd` (`date_core.c:1326-1333`), the complex arm: the stored day read
+   * back in local terms.
+   */
+  #mLocalJd(): Temporal.PlainDate {
+    return jdUtcToLocal(this.#date, this.#df, this.#of);
+  }
+
+  /**
+   * @internal `date_core.c` `m_local_df` (`date_core.c:1533-1541`) over
+   * `local_df` (`date_core.c:1335-1341`).
+   */
+  #mLocalDf(): number {
+    return dfUtcToLocal(this.#df, this.#of);
+  }
+
+  /**
+   * @internal `date_core.c` `get_c_civil` (`date_core.c:1297-1324`), which
+   * decodes the local day into the civil fields on first read.
+   */
+  #getCCivil(): Temporal.PlainDate {
+    return (this.#civil ??= this.#mLocalJd());
+  }
+
+  override get year(): number {
+    return this.#getCCivil().year;
+  }
+
+  override get mon(): number {
+    return this.#getCCivil().month;
+  }
+
+  override get month(): number {
+    return this.#getCCivil().month;
+  }
+
+  override get day(): number {
+    return this.#getCCivil().day;
+  }
+
+  override get wday(): number {
+    return this.#getCCivil().dayOfWeek % 7;
+  }
+
+  override get yday(): number {
+    return this.#getCCivil().dayOfYear;
+  }
+
+  /** Ruby `DateTime#hour` (ruby/date, `date_core.c` `d_lite_hour` over `m_hour`, `date_core.c:1919-1932`). */
   get hour(): number {
-    return this.#hour;
+    return dfToTime(this.#mLocalDf())[0];
   }
 
+  /** Ruby `DateTime#min` (ruby/date, `date_core.c` `d_lite_min` over `m_min`, `date_core.c:1934-1947`). */
   get min(): number {
-    return this.#min;
+    return dfToTime(this.#mLocalDf())[1];
   }
 
+  /** Ruby `DateTime#sec` (ruby/date, `date_core.c` `d_lite_sec` over `m_sec`, `date_core.c:1949-1962`). */
   get sec(): number {
-    return this.#sec;
+    return dfToTime(this.#mLocalDf())[2];
   }
 
   /**

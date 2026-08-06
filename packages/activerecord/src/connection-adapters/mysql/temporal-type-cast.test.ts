@@ -84,17 +84,8 @@ describe("temporalTypeCast", () => {
   });
 
   describe("TIME", () => {
-    it("parses TIME to Temporal.PlainTime", () => {
-      const result = temporalTypeCast(field("TIME", "14:23:55.123456"), next);
-      expect(result).toBeInstanceOf(Temporal.PlainTime);
-      const pt = result as Temporal.PlainTime;
-      expect(pt.hour).toBe(14);
-      expect(pt.minute).toBe(23);
-      expect(pt.second).toBe(55);
-    });
-
-    it("returns null for NULL", () => {
-      expect(temporalTypeCast(field("TIME", null), next)).toBeNull();
+    it("delegates TIME to the driver default so Type::Time casts the string", () => {
+      expect(temporalTypeCast(field("TIME", "14:23:55.123456"), next)).toBe("next-called");
     });
   });
 

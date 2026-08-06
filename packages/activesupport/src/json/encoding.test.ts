@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 
 import { slice, except } from "../hash-utils.js";
 import { ActiveSupportJSON } from "../json.js";
-import { Temporal } from "../temporal.js";
+import { Temporal } from "@blazetrails/date";
 import { TimeWithZone } from "../time-with-zone.js";
 import { TimeZone } from "../values/time-zone.js";
 import { Encoding } from "./encoding.js";

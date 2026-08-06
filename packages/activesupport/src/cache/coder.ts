@@ -29,7 +29,7 @@
 // needs escaping (see ARRAY_ESCAPE below).
 // entry.ts imports `coder` from here; `LazyEntry` extends `Entry` lazily (see
 // lazyEntryClass) so this cyclic import is never dereferenced at module-eval.
-import { Temporal } from "../temporal.js";
+import { Temporal } from "@blazetrails/date";
 import { Entry } from "./entry.js";
 import { DeserializationError } from "./deserialization-error.js";
 

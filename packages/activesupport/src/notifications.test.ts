@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Notifications } from "./notifications.js";
 import { Event, Instrumenter, LegacyHandle, Wrapper } from "./notifications/instrumenter.js";
-import { Temporal } from "./temporal.js";
+import { Temporal } from "@blazetrails/date";
 
 beforeEach(() => {
   Notifications.unsubscribeAll();

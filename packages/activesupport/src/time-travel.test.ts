@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 
-import { Temporal } from "./temporal.js";
+import { Temporal } from "@blazetrails/date";
 import { travelTo, travelBack, travel, freezeTime, currentTime } from "./testing-helpers.js";
 import { currentTimeInstant, setFrozenInstant, setTimeOffsetNs } from "./time-travel.js";
 

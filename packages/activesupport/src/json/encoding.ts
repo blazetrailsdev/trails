@@ -1,4 +1,4 @@
-import { Temporal } from "../temporal.js";
+import { Temporal } from "@blazetrails/date";
 
 /**
  * Serialization options threaded through `as_json` — only the subset Rails'

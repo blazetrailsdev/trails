@@ -1,4 +1,4 @@
-import { Temporal } from "../../temporal.js";
+import { Temporal } from "@blazetrails/date";
 
 import type { Range } from "../../range-ext.js";
 import { toFs as timeToFs } from "../../time-ext.js";

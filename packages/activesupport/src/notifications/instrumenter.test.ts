@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { Notifications } from "../notifications.js";
 import { Event, Instrumenter } from "./instrumenter.js";
-import { Temporal } from "../temporal.js";
+import { Temporal } from "@blazetrails/date";
 
 // Rails' TestNotifier collects the start/finish calls; trails' notifier surface
 // is a single publish, so `finishes` collects the published events.

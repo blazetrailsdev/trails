@@ -282,19 +282,6 @@ function setTimeZoneWithoutConversion(value: unknown, subtypeIsUtc?: boolean): u
   if (value instanceof TimeWithZone) {
     return value.inTimeZone(zone);
   }
-  if (value instanceof Temporal.PlainTime) {
-    // Time-only columns: the subtype casts the multiparameter hash to a
-    // PlainTime. Rails' Type::Time keeps a full ::Time on the dummy date
-    // 2000-01-01; re-interpret the wall-clock on that dummy date in the
-    // current zone so the aware wrapper still yields a TimeWithZone.
-    const base = zone.local(2000, 1, 1, value.hour, value.minute, value.second, value.millisecond);
-    const subMs = value.microsecond * 1000 + value.nanosecond;
-    if (subMs === 0) return base;
-    return new TimeWithZone(
-      Temporal.Instant.fromEpochNanoseconds(base.utc().epochNanoseconds + BigInt(subMs)),
-      zone,
-    );
-  }
   return value;
 }
 
