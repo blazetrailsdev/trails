@@ -1726,13 +1726,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     // getDatabaseVersion — so bail before the gate when there's no `_client`.
     if (this._connectionConfigured || !this._client) return;
     this._connectionConfigured = true;
-    // Warm the server version before checkVersion runs. Rails' check_version
-    // reads database_version, a synchronous accessor that itself triggers the
-    // round-trip (get_database_version) when unmemoized — so Rails guarantees the
-    // version is fetched before the floor check. checkVersion() is sync in trails
-    // and can't issue the query itself, so we await the warm here (the pool memo,
-    // pool_config.rb:39-41) before super.configureConnection() invokes it.
-    await this.pool.serverVersion(this);
     await super.configureConnection();
   }
 
