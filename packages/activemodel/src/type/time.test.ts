@@ -114,8 +114,6 @@ describe("TimeTest", () => {
   });
 
   it("cast datetime with non-zero offset shifts the instant", () => {
-    // time.rb:26-27 — `new_time` subtracts the offset, so the value lands where
-    // the string's zone says it does, not at the hour that was written.
     expect(type.cast("2015-02-09T19:45:54+02:00")).toEqual(timeUtc(2000, 1, 1, 17, 45, 54));
   });
 
@@ -143,10 +141,6 @@ describe("TimeTest", () => {
   });
 
   it("sec_fraction reaches new_time as Time.utc's microsecond argument", () => {
-    // time.rb:82 passes `:sec_fraction` straight through where
-    // `Type::DateTime` calls `microseconds` first (date_time.rb:73), so a
-    // fallback-parsed string's sub-second digits land three orders down:
-    // ruby 3.3.11 `Type::Time.new.cast("3:30:15.5 PM").nsec` is `500`.
     const result = type.cast("3:30:15.5 PM") as Temporal.Instant;
     expect(result.toString()).toBe("2000-01-01T15:30:15.0000005Z");
   });

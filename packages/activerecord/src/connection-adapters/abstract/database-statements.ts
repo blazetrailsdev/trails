@@ -39,7 +39,9 @@ import {
   formatInstantForSqlPostgres,
   formatPlainDateTimeForSqlPostgres,
   formatPlainDateForSqlPostgres,
+  defaultSqlTimezone,
 } from "./sql-datetime.js";
+import { Value as TimeValue } from "../../type/time.js";
 import type { Quoting } from "./quoting.js";
 import { DateInfinity, DateNegativeInfinity } from "@blazetrails/activemodel";
 import { TransactionManager } from "./transaction.js";
@@ -1319,6 +1321,12 @@ export function temporalToBindString(
         : formatPlainDateTimeForSql(value);
   if (value instanceof Temporal.PlainDate)
     return postgres ? formatPlainDateForSqlPostgres(value) : formatPlainDateForSql(value);
+  // A `Type::Time::Value` is the time-of-day wrapper `Type::Time#serialize`
+  // produces; read its components back out in `default_timezone` the way
+  // `quoted_time` does, then take the PlainTime arm below.
+  if (value instanceof TimeValue) {
+    value = value.getobj().toZonedDateTimeISO(defaultSqlTimezone()).toPlainTime();
+  }
   if (value instanceof Temporal.PlainTime) {
     // SQLite stores time with a fixed 2000-01-01 date prefix so it can be
     // read back as a datetime string by the cast layer.

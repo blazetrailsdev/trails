@@ -85,9 +85,6 @@ describe("temporalTypeCast", () => {
 
   describe("TIME", () => {
     it("delegates TIME to the driver default so Type::Time casts the string", () => {
-      // `ActiveRecord::Type::Time#cast_value` is what turns a TIME string into a
-      // `::Time` on the 2000-01-01 dummy date (time.rb:68-83), so the driver
-      // hands the raw string on rather than pre-parsing it.
       expect(temporalTypeCast(field("TIME", "14:23:55.123456"), next)).toBe("next-called");
     });
   });

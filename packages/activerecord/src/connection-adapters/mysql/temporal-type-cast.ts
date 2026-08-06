@@ -34,6 +34,10 @@ type NextFn = () => unknown;
  *
  * Returns Temporal types for temporal fields; delegates all other fields
  * to the driver default via `next()`.
+ *
+ * TIME / TIME2 are deliberately not intercepted: mysql2 leaves them as strings,
+ * and `ActiveRecord::Type::Time#cast_value` is what turns one into a `::Time`
+ * on the 2000-01-01 dummy date (time.rb:68-83).
  */
 export function temporalTypeCast(field: Field, next: NextFn): unknown {
   switch (field.type) {
@@ -56,9 +60,6 @@ export function temporalTypeCast(field: Field, next: NextFn): unknown {
       if (raw === null) return null;
       return parseMysqlDate(raw);
     }
-    // TIME / TIME2 are deliberately absent: mysql2 leaves them as strings, and
-    // `ActiveRecord::Type::Time#cast_value` is what turns one into a `::Time`
-    // on the 2000-01-01 dummy date (time.rb:68-83).
     default:
       return next();
   }

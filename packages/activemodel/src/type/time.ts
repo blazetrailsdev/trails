@@ -5,6 +5,7 @@ import {
   Temporal,
   type DateParts,
 } from "@blazetrails/date";
+import { isBlank } from "@blazetrails/activesupport";
 import { AcceptsMultiparameterTime, isHash } from "./helpers/accepts-multiparameter-time.js";
 import { isUtc } from "./helpers/timezone.js";
 import { applySecondsPrecision, fastStringToTime, newTime } from "./helpers/time-value.js";
@@ -35,11 +36,6 @@ export class TimeType extends ValueType<Temporal.Instant> {
     return this.name;
   }
 
-  /** Mixed in from Helpers::Timezone — `is_utc?` (timezone.rb:9-11). */
-  get isUtc(): boolean {
-    return isUtc();
-  }
-
   /**
    * Mirrors: ActiveModel::Type::Time#user_input_in_time_zone (time.rb:47-63).
    *
@@ -63,35 +59,42 @@ export class TimeType extends ValueType<Temporal.Instant> {
    *   end
    *
    * `super` is `Helpers::TimeValue#user_input_in_time_zone`, `value.in_time_zone`
-   * (time_value.rb:44-46); the zone `Time.zone` names is the `zone` parameter
-   * here, since trails has no thread-local `Time.zone` to read at this depth.
+   * (time_value.rb:44-46). Ruby reads the zone off the thread-local `Time.zone`;
+   * trails has none at this depth, so it is the `zone` parameter, and
+   * `in_time_zone` is the tail below: the components `cast_value` built are read
+   * back out of the `::Time` and re-anchored in `zone`, which is what
+   * `Time.zone.parse` of the dummy-dated string answers.
+   *
+   * The `present?` guard is spelled out rather than routed through
+   * `isBlank`: Ruby's `blank?` is `respond_to?(:empty?) ? !!empty? : !self`, so
+   * a `::Time` is present, while `isBlank` reads any object with no own
+   * enumerable keys as blank — which every Temporal value is.
    */
   userInputInTimeZone(value: unknown, zone: string = "UTC"): Temporal.ZonedDateTime | null {
-    if (value === null || value === undefined) return null;
+    if (value == null || value === false) return null;
+    if (typeof value === "string" && isBlank(value)) return null;
 
     if (typeof value === "string") {
-      if (value.trim() === "") return null;
-      const str = `2000-01-01 ${value}`;
+      value = `2000-01-01 ${value}`;
       let timeHash: DateParts | undefined;
       try {
-        timeHash = RubyDate._parse(str);
+        timeHash = RubyDate._parse(value as string);
       } catch (error) {
         if (!(error instanceof RubyArgumentError)) throw error;
       }
       if (timeHash == null || timeHash.hour == null) return null;
-      value = str;
+    } else if (value instanceof Temporal.ZonedDateTime) {
+      return value;
     } else if (value instanceof Temporal.Instant) {
-      value = value.toZonedDateTimeISO("UTC").with({ year: 2000, day: 1, month: 1 }).toInstant();
+      value = value
+        .toZonedDateTimeISO(this.zoneId)
+        .with({ year: 2000, day: 1, month: 1 })
+        .toInstant();
     }
 
-    if (value instanceof Temporal.ZonedDateTime) return value;
-    if (value instanceof Temporal.Instant) return value.toZonedDateTimeISO(zone);
-
-    try {
-      return Temporal.PlainDateTime.from(String(value).replace(" ", "T")).toZonedDateTime(zone);
-    } catch {
-      return null;
-    }
+    const cast = this.cast(value);
+    if (cast === null) return null;
+    return cast.toZonedDateTimeISO(this.zoneId).toPlainDateTime().toZonedDateTime(zone);
   }
 
   /**
@@ -132,18 +135,9 @@ export class TimeType extends ValueType<Temporal.Instant> {
   protected castValue(value: unknown): Temporal.Instant | null {
     if (isHash(value)) return this.valueFromMultiparameterAssignment(value);
     if (typeof value !== "string") {
-      // Rails' `apply_seconds_precision` answers anything without an `nsec` —
-      // including `Type::Time::Value`, which `ActiveRecord::Type::Time#cast_value`
-      // unwraps after calling `super` — unchanged, so this stays a pass-through.
-      // boundary: a bare `Temporal.PlainTime` has no Ruby analogue — Rails'
-      // `Type::Time` only ever sees a `::Time` — but it is the shape a TS
-      // caller reaches for and the one the adapters' wire parsers hand back.
-      // Read it on the same 2000-01-01 dummy date the String arm builds, so
-      // every cast result is one kind of value.
-      if (value instanceof Temporal.PlainTime) {
-        value = new Temporal.PlainDate(2000, 1, 1).toPlainDateTime(value);
+      if (value instanceof Temporal.PlainDateTime) {
+        value = value.toZonedDateTime(this.zoneId).toInstant();
       }
-      if (value instanceof Temporal.PlainDateTime) value = this.#instantFor(value);
       return this.applySecondsPrecision(value) as Temporal.Instant | null;
     }
     if (value.trim() === "") return null;
@@ -172,6 +166,24 @@ export class TimeType extends ValueType<Temporal.Instant> {
       timeHash.secFraction,
       offset instanceof Rational ? offset.numerator / offset.denominator : offset,
     );
+  }
+
+  /** Mixed in from Helpers::Timezone — `is_utc?` (timezone.rb:9-11). */
+  get isUtc(): boolean {
+    return isUtc();
+  }
+
+  /**
+   * The zone `is_utc?` picks between. Ruby spells the choice as the receiver of
+   * `Time.utc` / `Time.local` and as `Time.public_send(default_timezone, ...)`
+   * (accepts_multiparameter_time.rb:23); Temporal needs a zone id to build in,
+   * and `Temporal.Now.timeZoneId()` is the host zone `::Time.local` uses.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby names the zone by choosing a
+   * constructor; Temporal names it by argument, so the choice needs a value.
+   */
+  get zoneId(): string {
+    return this.isUtc ? "UTC" : Temporal.Now.timeZoneId();
   }
 
   /**
@@ -205,17 +217,6 @@ export class TimeType extends ValueType<Temporal.Instant> {
         "5": 0,
       }).cast(values) as Temporal.Instant | null) ?? null
     );
-  }
-
-  /**
-   * The multiparameter helper reassembles the parts into a
-   * `Temporal.PlainDateTime` and hands it back to `cast`; Rails' assembles a
-   * `::Time` through `Time.public_send(default_timezone, *values)`
-   * (accepts_multiparameter_time.rb:23), so the zone the parts are read in is
-   * `is_utc?`'s, the same branch `new_time` takes.
-   */
-  #instantFor(value: Temporal.PlainDateTime): Temporal.Instant {
-    return value.toZonedDateTime(this.isUtc ? "UTC" : Temporal.Now.timeZoneId()).toInstant();
   }
 
   /**

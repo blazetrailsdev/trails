@@ -17,13 +17,7 @@ import {
   parsePostgresDate,
 } from "../abstract/temporal-wire.js";
 
-// PostgreSQL OIDs for the temporal types we intercept. `time` (1083) and
-// `timetz` (1266) are deliberately absent: Rails hands the driver's raw string
-// to `ActiveRecord::Type::Time`, whose `cast_value` parses it through
-// `::Date._parse` and answers a `::Time` on the 2000-01-01 dummy date —
-// including the shift a `timetz` offset asks for (time.rb:26-27). pg leaves
-// both as strings by default, so not intercepting them is what routes them
-// there.
+// PostgreSQL OIDs for the temporal types we intercept.
 const OID_DATE = 1082;
 const OID_TIMESTAMP = 1114;
 const OID_TIMESTAMPTZ = 1184;
@@ -60,8 +54,13 @@ const TEMPORAL_PARSERS: ReadonlyMap<number, PgParser> = new Map<number, PgParser
  * Returns a drop-in replacement for `pg.types.getTypeParser`.
  * Pass the returned function as `{ types: { getTypeParser } }` in the pg.Pool / pg.Client config.
  *
- * Intercepts text-format for the five temporal OIDs and returns our Temporal
- * wire parsers. All other OIDs delegate to `pgTypes.getTypeParser` so the
+ * Intercepts text-format for the three temporal OIDs and returns our Temporal
+ * wire parsers. `time` (1083) and `timetz` (1266) are deliberately not among
+ * them: Rails hands the driver's raw string to `ActiveRecord::Type::Time`,
+ * whose `cast_value` parses it through `::Date._parse` and answers a `::Time`
+ * on the 2000-01-01 dummy date — including the shift a `timetz` offset asks for
+ * (time.rb:26-27). pg leaves both as strings by default, so not intercepting
+ * them is what routes them there. All other OIDs delegate to `pgTypes.getTypeParser` so the
  * built-in parsers (int, bool, numeric, etc.) remain active. Returning `null`
  * is NOT correct — pg stores the return value directly in its `_parsers` array
  * and calls it; a non-function crashes query processing.

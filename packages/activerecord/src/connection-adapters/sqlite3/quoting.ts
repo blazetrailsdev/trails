@@ -137,7 +137,8 @@ export function quotedDate(
  * `HH:MM:SS`), SQLite normalises the date to 2000-01-01, routes through
  * `quoted_date`, then re-prefixes — so SQLite can round-trip times as datetime
  * strings. Returns the bare literal (no surrounding quotes); the inherited
- * `quote` wraps it.
+ * `quote` wraps it. A `Type::Time::Value` is unwrapped in `default_timezone`
+ * first, as the abstract `quotedTime` does.
  * @internal
  */
 export function quotedTime(value: QuotedTimeValue): string {

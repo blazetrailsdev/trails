@@ -623,12 +623,13 @@ export function quotedDate(
  * — dispatching through `self.quoted_date`. We thread `this` the same way so an
  * adapter `quotedDate` override is honored here too.
  *
+ * A `Type::Time::Value` is unwrapped first: Rails' `value.change(year: 2000,
+ * month: 1, day: 1)` reads the `::Time`'s components in `default_timezone`,
+ * which is what `quoted_date` would have read them in too.
+ *
  * @internal
  */
 export function quotedTime(this: QuotingDispatchHost, value: QuotedTimeValue): string {
-  // Rails' `value.change(year: 2000, month: 1, day: 1)` reads the `::Time`'s
-  // components in `default_timezone`, which is what `quoted_date` would have
-  // read them in too.
   if (value instanceof TimeValue) {
     value = value.getobj().toZonedDateTimeISO(defaultSqlTimezone()).toPlainDateTime();
   }

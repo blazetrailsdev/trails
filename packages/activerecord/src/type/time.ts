@@ -57,12 +57,13 @@ export class Time extends ActiveModelTime {
    *       value
    *     end
    *   end
+   *
+   * Rails' `super` is `ActiveModel::Type::Value#serialize`, the identity, so the
+   * `Value.new` is this method's own. Trails' base `serialize` is
+   * `serializeCastValue(cast(value))`, which already routes through the wrapping
+   * override below — wrapping again here would double it.
    */
   override serialize(value: unknown): Value | null {
-    // Rails' `super` is `ActiveModel::Type::Value#serialize`, the identity, so
-    // the `Value.new` is this method's own. Trails' base `serialize` is
-    // `serializeCastValue(cast(value))`, which already routes through the
-    // wrapping override below — wrapping again here would double it.
     return super.serialize(value) as Value | null;
   }
 

@@ -138,6 +138,12 @@ export function userInputInTimeZone(
  * default zone (`isUtc()` → "UTC", else host-local), matching Rails'
  * `is_utc?` branching.
  *
+ * `microsec` is read the way `Time.utc`'s microsecond argument is: a Rational
+ * one carries sub-microsecond resolution down into `nsec`, which is what
+ * `Type::Time` relies on when it hands a raw `:sec_fraction` straight through
+ * (time.rb:82). Temporal splits the same resolution across millisecond /
+ * microsecond / nanosecond.
+ *
  * @internal Rails-private helper.
  */
 export function newTime(
@@ -155,10 +161,6 @@ export function newTime(
   // Rails' ::Time.utc(year, nil, nil, ...) raises TypeError → rescue nil.
   // Treat missing month/day the same way rather than silently coercing to Jan 1.
   if (mon == null || mday == null) return null;
-  // Ruby's Time.utc takes microsec as 0..999_999, and a Rational one carries
-  // sub-microsecond resolution down into nsec — which is what `Type::Time`
-  // relies on when it hands a raw `:sec_fraction` straight through. Temporal
-  // splits the same resolution across millisecond / microsecond / nanosecond.
   const totalNano = Math.trunc((microsec ?? 0) * 1000);
   const components = {
     year,

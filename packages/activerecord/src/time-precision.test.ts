@@ -13,6 +13,12 @@ function nsecTime(v: Temporal.Instant): number {
   return Number(v.epochNanoseconds % 1_000_000_000n);
 }
 
+/** Ruby `::Time.now.change(nsec:)`. */
+function timeNowChangeNsec(nsec: number): Temporal.Instant {
+  const now = Temporal.Now.instant().epochNanoseconds;
+  return Temporal.Instant.fromEpochNanoseconds(now - (now % 1_000_000_000n) + BigInt(nsec));
+}
+
 describe("TimePrecisionTest", () => {
   // Ride the boot-laid `Base.connection` (single-pool test model) rather than a
   // sidecar `_pool` lease; `fixtures({})` wires the handler (empty map → no seed
@@ -56,14 +62,7 @@ describe("TimePrecisionTest", () => {
     await adapter.addColumn("foos", "finish", "time", { precision: 6 });
     const Foo = makeFoo();
     await Foo.loadSchema();
-    const time = Temporal.PlainTime.from({
-      hour: 12,
-      minute: 0,
-      second: 0,
-      millisecond: 123,
-      microsecond: 456,
-      nanosecond: 789,
-    });
+    const time = timeNowChangeNsec(123456789);
     const foo = new Foo({ start: time, finish: time });
     expect(nsecTime((foo as any).start)).toBe(0);
     expect(nsecTime((foo as any).finish)).toBe(123456000);
@@ -85,14 +84,7 @@ describe("TimePrecisionTest", () => {
       await adapter.addColumn("foos", "finish", "time", { precision: 6 });
       const Foo = makeFoo();
       await Foo.loadSchema();
-      const time = Temporal.PlainTime.from({
-        hour: 12,
-        minute: 0,
-        second: 0,
-        millisecond: 0,
-        microsecond: 0,
-        nanosecond: 123,
-      });
+      const time = timeNowChangeNsec(123);
       const foo = new Foo({ start: time, finish: time });
       expect(nsecTime((foo as any).start)).toBe(123);
       expect(nsecTime((foo as any).finish)).toBe(0);
