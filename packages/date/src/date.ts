@@ -111,20 +111,27 @@ function epochSeconds(subject: StrftimeSubject): number {
 }
 
 /**
- * @internal The three spellings `date_strftime.c`'s `%z` arm gives the offset,
+ * @internal The four spellings `date_strftime.c`'s `%z` arm gives the offset,
  * picked by how many colons preceded the directive: none is `"+0900"`, one is
- * `"+09:00"` and two is `"+09:00:00"`. All three come off the one offset in
- * seconds, which is why the subject carries a number rather than a string —
- * `%::z` is the only directive that can show a sub-minute offset.
+ * `"+09:00"`, two is `"+09:00:00"`, and three is the shortest form that loses
+ * nothing — MRI shows the minute and second only when they are nonzero, so
+ * `+09:00:00` is `"+09"` while `+05:30` stays `"+05:30"`. All four come off the
+ * one offset in seconds, which is why the subject carries a number rather than
+ * a string: `%::z` and `%:::z` are the only spellings that can show a
+ * sub-minute offset.
  */
 function formatOffset(utcOffset: number, colons: number): string {
   const sign = utcOffset < 0 ? "-" : "+";
   const abs = Math.abs(utcOffset);
   const hour = pad2(Math.floor(abs / 3600));
   const min = pad2(Math.floor(abs / 60) % 60);
+  const sec = pad2(abs % 60);
   if (colons === 0) return `${sign}${hour}${min}`;
   if (colons === 1) return `${sign}${hour}:${min}`;
-  return `${sign}${hour}:${min}:${pad2(abs % 60)}`;
+  if (colons === 2) return `${sign}${hour}:${min}:${sec}`;
+  if (abs % 60 !== 0) return `${sign}${hour}:${min}:${sec}`;
+  if (Math.floor(abs / 60) % 60 !== 0) return `${sign}${hour}:${min}`;
+  return `${sign}${hour}`;
 }
 
 /**
@@ -179,13 +186,14 @@ export function strftime(subject: StrftimeSubject, format: string): string {
     z: () => formatOffset(subject.utcOffset, 0),
     ":z": () => formatOffset(subject.utcOffset, 1),
     "::z": () => formatOffset(subject.utcOffset, 2),
+    ":::z": () => formatOffset(subject.utcOffset, 3),
     Z: () => subject.zone,
     n: () => "\n",
     t: () => "\t",
     "%": () => "%",
   };
 
-  return format.replace(/%(-?)(:{0,2}[A-Za-z%])/g, (match, flag, spec) => {
+  return format.replace(/%(-?)(:{0,3}[A-Za-z%])/g, (match, flag, spec) => {
     const fn = tokens[spec];
     if (!fn) return match;
     let result = fn();

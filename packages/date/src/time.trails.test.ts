@@ -37,6 +37,16 @@ describe("Time", () => {
     expect(new Time(2008, 3, 1, 6, 0, 0, "+09").strftime("%z")).toBe("+0900");
   });
 
+  it("spells the offset four ways, one per leading colon", () => {
+    const at = (offset: number) =>
+      new Time(2008, 3, 1, 6, 0, 0, offset).strftime("%z|%:z|%::z|%:::z");
+    expect(at(32400)).toBe("+0900|+09:00|+09:00:00|+09");
+    expect(at(19800)).toBe("+0530|+05:30|+05:30:00|+05:30");
+    expect(at(30)).toBe("+0000|+00:00|+00:00:30|+00:00:30");
+    expect(at(-1800)).toBe("-0030|-00:30|-00:30:00|-00:30");
+    expect(at(0)).toBe("+0000|+00:00|+00:00:00|+00");
+  });
+
   it("Time.new takes a military zone letter", () => {
     expect(new Time(2008, 3, 1, 6, 0, 0, "K").utcOffset).toBe(10 * 3600);
     expect(new Time(2008, 3, 1, 6, 0, 0, "Y").utcOffset).toBe(-12 * 3600);

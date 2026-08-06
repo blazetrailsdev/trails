@@ -394,7 +394,7 @@ export class TimeWithZone {
         hour: l.hour,
         min: l.minute,
         sec: l.second,
-        nsec: l.millisecond * 1_000_000,
+        nsec: this.nsec,
         zone: "",
         utcOffset: this.utcOffset,
       },
