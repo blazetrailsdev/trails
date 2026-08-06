@@ -1340,7 +1340,11 @@ export const UNPORTED_FILES: UnportedFile[] = [
   },
   {
     testFile: "test_switch_hitter.rb",
-    tests: ["test_marshal14", "test_marshal16", "test_marshal18", "test_marshal192"],
+    className: "TestSH",
+    // `tests` matches the extracted description, which is the `def test_` name
+    // with its `test_` prefix stripped — `test_marshal14` extracts as
+    // `marshal14`. A `test_`-prefixed entry here is a silent no-op.
+    tests: ["marshal14", "marshal16", "marshal18", "marshal192"],
     reason:
       "The four Marshal cases inside TestSH load Marshal payloads emitted by " +
       "Ruby 1.4/1.6/1.8/1.9.2 to check the dumped Date representation stays " +

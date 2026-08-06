@@ -4,7 +4,12 @@ import { join, relative } from "node:path";
 import { describe, it, expect } from "vitest";
 
 import { resolvePath } from "../../vendor/sources.js";
-import { isSourceUnported, isTestFileUnported, UNPORTED_FILES } from "./unported-files.js";
+import {
+  isSourceUnported,
+  isTestCaseUnported,
+  isTestFileUnported,
+  UNPORTED_FILES,
+} from "./unported-files.js";
 
 async function walkRb(dir: string): Promise<string[]> {
   const out: string[] = [];
@@ -106,6 +111,16 @@ describe("UNPORTED_FILES schema", () => {
         ).toBeTruthy();
       }
     }
+  });
+
+  it("names per-test entries the way the extractor emits them, without the test_ prefix", () => {
+    // Regression: extract-ruby-tests.rb strips the `def test_` prefix, so
+    // `test_marshal14` reaches isTestCaseUnported as `marshal14`. A
+    // `test_`-prefixed entry matches nothing and the exclusion is a silent
+    // no-op — the test stays in the compared population with no error anywhere.
+    expect(isTestCaseUnported("test_switch_hitter.rb", "marshal14", "TestSH")).toBe(true);
+    expect(isTestCaseUnported("test_switch_hitter.rb", "test_marshal14", "TestSH")).toBe(false);
+    expect(isTestCaseUnported("test_switch_hitter.rb", "strftime", "TestSH")).toBe(false);
   });
 
   it("scopes the globalid railtie_test.rb exclusion so activemodel's is still counted", () => {

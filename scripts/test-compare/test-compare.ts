@@ -67,8 +67,8 @@ import { buildHistogram, diffHistograms, type KindDelta } from "./assertion-kind
 import { assertionValueMismatch, type ValueDelta } from "./assertion-values.js";
 import { isTestCaseUnported, isTestFileUnported } from "../api-compare/unported-files.js";
 import { PATH_SEGMENT_ALIASES } from "../api-compare/conventions.js";
-import { PACKAGES } from "../api-compare/config.js";
 import { SpellChecker } from "../../packages/did-you-mean/src/spell-checker.js";
+import { testPathsManifest } from "../../vendor/sources.js";
 
 const SCRIPT_DIR = __dirname;
 const OUTPUT_DIR = path.join(SCRIPT_DIR, "output");
@@ -427,11 +427,16 @@ function main() {
     process.exit(1);
   }
 
-  if (filterPkg && !PACKAGES.includes(filterPkg)) {
-    const suggestions = new SpellChecker({ dictionary: PACKAGES }).correct(filterPkg);
+  // The dictionary is the TEST-compared population, not the api-compared one:
+  // `date` is enrolled in test:compare and deliberately not in api:compare, so
+  // gating on PACKAGES would reject `--package date` for a package this script
+  // does report on.
+  const comparedPackages = Object.keys(testPathsManifest()).sort();
+  if (filterPkg && !comparedPackages.includes(filterPkg)) {
+    const suggestions = new SpellChecker({ dictionary: comparedPackages }).correct(filterPkg);
     const hint = suggestions.length ? ` Did you mean: ${suggestions.join(", ")}?` : "";
     console.error(`--package: unknown package "${filterPkg}".${hint}`);
-    console.error(`Available: ${PACKAGES.join(", ")}`);
+    console.error(`Available: ${comparedPackages.join(", ")}`);
     process.exit(1);
   }
 
