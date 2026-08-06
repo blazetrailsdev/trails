@@ -14,7 +14,7 @@
  *   branches via `dispatchQuotedDate`.
  */
 
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { Attribute as ModelAttribute, BinaryData, type Type } from "@blazetrails/activemodel";
 import type { TypeMap } from "../../type/type-map.js";

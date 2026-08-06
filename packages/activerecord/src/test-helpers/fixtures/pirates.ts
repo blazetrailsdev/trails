@@ -1,4 +1,4 @@
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import { ref } from "../../fixtures.js";
 
 // activerecord/test/fixtures/pirates.yml

@@ -18,7 +18,7 @@
  */
 
 import { ValueType } from "@blazetrails/activemodel";
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 
 export class Range {
   readonly begin: unknown;

@@ -399,17 +399,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return fullVersion != null && /mariadb/i.test(fullVersion);
   }
 
-  /**
-   * Rails has no MySQL override — `AbstractAdapter#database_version` already
-   * answers a `Version` there. TS cannot redeclare an inherited getter's type
-   * without a body, so this narrows the base `Version | number` to the `Version`
-   * every MySQL version gate reads; the value and the pool memo behind it are
-   * the base getter's.
-   */
-  override get databaseVersion(): Version {
-    return super.databaseVersion as Version;
-  }
-
   supportsBulkAlter(): boolean {
     return true;
   }
@@ -2067,6 +2056,18 @@ export class StatementPool extends ConnectionStatementPool<MysqlPreparedStatemen
 }
 
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging */
+/**
+ * Rails has no MySQL `database_version` — `abstract_adapter.rb:854-856` answers
+ * whatever `get_database_version` returned, and this adapter's
+ * (abstract_mysql_adapter.rb:86-90) returns a `Version`. TS needs that told to
+ * it, so the inherited getter's `Version | number` is narrowed here by
+ * declaration merging rather than by an override method Rails does not have.
+ * @internal
+ */
+export interface AbstractMysqlAdapter {
+  get databaseVersion(): Version;
+}
+
 /**
  * The `MySQL::SchemaStatements` surface `include()` installs below
  * (abstract_mysql_adapter.rb:19). Declaration-merged so callers see the mixin's

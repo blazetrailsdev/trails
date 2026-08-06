@@ -12,7 +12,7 @@
  * does not break compilation.
  */
 
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import {
   DateType,
   DateInfinity,

@@ -4,7 +4,7 @@ import { currentPreventingWrites } from "./core.js";
 import { DatabaseSelector } from "./middleware/database-selector.js";
 import { Resolver, type ResolverContext } from "./middleware/database-selector/resolver.js";
 import { Session, type SessionStore } from "./middleware/database-selector/resolver/session.js";
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 
 function makeStore(data: Record<string, unknown> = {}): SessionStore {
   return {

@@ -1,6 +1,6 @@
 import { throwAbort } from "@blazetrails/activesupport";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
-import type { Temporal } from "@blazetrails/activesupport/temporal";
+import type { Temporal } from "@blazetrails/date";
 import type { Developer } from "./developer.js";
 import type { FamousPirate } from "./pirate.js";
 import type { Pirate } from "./pirate.js";

@@ -1,5 +1,5 @@
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
-import type { Temporal } from "@blazetrails/activesupport/temporal";
+import type { Temporal } from "@blazetrails/date";
 import type { Family } from "./family.js";
 import type { FamilyTree } from "./family-tree.js";
 import type { Job } from "./job.js";

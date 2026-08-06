@@ -48,7 +48,7 @@ import { PreparedStatementInvalid, StatementInvalid } from "./index.js";
 import { ForbiddenAttributesError } from "@blazetrails/activemodel";
 import { ProtectedParams } from "./support/stubs/strong-parameters.js";
 import { withTimezoneConfig } from "./test-helper.js";
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 
 // ==========================================================================
 // FinderTest — faithful port of finder_test.rb riding canonical Topic +

@@ -2,7 +2,7 @@
  * Mirrors: ActiveRecord::Middleware::DatabaseSelector::Resolver::Session
  */
 
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 
 /**
  * The duck type `Resolver::Session` requires of `request.session` — Rails

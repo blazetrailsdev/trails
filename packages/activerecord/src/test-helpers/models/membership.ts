@@ -1,5 +1,5 @@
 import type { Relation } from "../../relation.js";
-import type { Temporal } from "@blazetrails/activesupport/temporal";
+import type { Temporal } from "@blazetrails/date";
 import type { Club } from "./club.js";
 import type { Member } from "./member.js";
 // vendor/rails/activerecord/test/models/membership.rb

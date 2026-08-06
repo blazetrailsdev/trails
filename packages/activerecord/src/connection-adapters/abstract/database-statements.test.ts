@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import { Rollback, StatementInvalid } from "../../errors.js";
 import {
   buildFixtureSql,

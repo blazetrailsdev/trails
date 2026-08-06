@@ -29,7 +29,6 @@ export class PoolConfig {
   private _connectionDescriptor!: ConnectionDescriptor;
   private _schemaReflection: SchemaReflection | null = null;
   private _serverVersion: unknown = null;
-  private _serverVersionFn: ((connection: DatabaseAdapter) => unknown) | null = null;
 
   constructor(
     connectionClass: ConnectionDescriptor | ConnectionOwner,
@@ -138,33 +137,29 @@ export class PoolConfig {
    * ||= connection.get_database_version }`. This is the single cache every
    * adapter's `get_database_version` is fetched through; the adapters
    * themselves stay pure.
-   *
-   * Ruby has both `server_version(connection)` and `attr_writer
-   * :server_version` (`pool_config.rb:9`); TS cannot carry a method and a
-   * setter under one name, so the reader is a getter returning the callable.
    */
-  get serverVersion(): (connection: DatabaseAdapter) => unknown {
-    if (!this._serverVersionFn) {
-      this._serverVersionFn = (connection: DatabaseAdapter) => {
-        // trails-only: `getDatabaseVersion` is a real await on every adapter
-        // whose version comes off the wire, where Rails' is sync.
-        if (this._serverVersion != null) return this._serverVersion;
-        const version = connection.getDatabaseVersion?.();
-        // Only the resolved value is memoized, never the in-flight promise: the
-        // fetch opens the connection, whose `configureConnection`
-        // (`abstract_adapter.rb:1212`) reads back through here, and handing that
-        // nested call the promise it is itself inside would deadlock. Ruby's
-        // `synchronize` is a re-entrant Monitor, so it recomputes there too.
-        if (version instanceof Promise) {
-          return version.then((v) => (this._serverVersion = v));
-        }
-        return (this._serverVersion = version);
-      };
+  serverVersion(connection: DatabaseAdapter): unknown {
+    // trails-only: `getDatabaseVersion` is a real await on every adapter
+    // whose version comes off the wire, where Rails' is sync.
+    if (this._serverVersion != null) return this._serverVersion;
+    const version = connection.getDatabaseVersion?.();
+    // Only the resolved value is memoized, never the in-flight promise: the
+    // fetch opens the connection, whose `configureConnection`
+    // (`abstract_adapter.rb:1212`) reads back through here, and handing that
+    // nested call the promise it is itself inside would deadlock. Ruby's
+    // `synchronize` is a re-entrant Monitor, so it recomputes there too.
+    if (version instanceof Promise) {
+      return version.then((v) => (this._serverVersion = v));
     }
-    return this._serverVersionFn;
+    return (this._serverVersion = version);
   }
 
-  set serverVersion(value: unknown) {
+  /**
+   * Mirrors: `attr_writer :server_version` (`pool_config.rb:9`). TS cannot
+   * carry a method and a setter under one name, so the writer takes the
+   * settled `setX()` spelling and the reader keeps Rails' method shape.
+   */
+  setServerVersion(value: unknown): void {
     this._serverVersion = value;
   }
 

@@ -12,7 +12,7 @@
  * self-evident; it is why reviewers kept having to re-derive it.
  */
 import { describe, expect, it } from "vitest";
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import { BinaryData } from "@blazetrails/activemodel";
 import {
   quote,

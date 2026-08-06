@@ -1,4 +1,4 @@
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import { describe, expect, it } from "vitest";
 import { temporalToBindString } from "../abstract/database-statements.js";
 

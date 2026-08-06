@@ -24,7 +24,7 @@ import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vite
 import { Base } from "./index.js";
 import { ValueType } from "@blazetrails/activemodel";
 import { TimeWithZone, getZone } from "@blazetrails/activesupport";
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 
 import { itIfSupports } from "./support/supports.js";
 import { describeIfPg } from "./support/describe-if-pg.js";

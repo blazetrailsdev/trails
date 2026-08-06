@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import { minutes, BigDecimal } from "@blazetrails/activesupport";
 import {
   quote as quoteFn,

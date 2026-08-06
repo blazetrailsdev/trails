@@ -190,6 +190,9 @@ importers:
       '@blazetrails/arel':
         specifier: workspace:*
         version: link:../arel
+      '@blazetrails/date':
+        specifier: workspace:*
+        version: link:../date
       '@blazetrails/did-you-mean':
         specifier: workspace:*
         version: link:../did-you-mean

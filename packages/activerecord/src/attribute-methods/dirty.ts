@@ -7,7 +7,7 @@
  * Mirrors: ActiveRecord::AttributeMethods::Dirty
  */
 
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 
 interface DirtyRecord {
   changed: boolean;

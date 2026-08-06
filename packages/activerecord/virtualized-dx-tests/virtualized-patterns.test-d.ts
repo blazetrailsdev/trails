@@ -177,14 +177,10 @@ describe("virtualized patterns — trails-tsc injects declares + auto-imports", 
   it("Temporal attribute types: datetime → Instant | PlainDateTime, date → PlainDate, time → PlainTime", () => {
     const e = new Event({});
     expectTypeOf(e.starts_at).toEqualTypeOf<
-      | import("@blazetrails/activesupport/temporal").Temporal.Instant
-      | import("@blazetrails/activesupport/temporal").Temporal.PlainDateTime
+      | import("@blazetrails/date").Temporal.Instant
+      | import("@blazetrails/date").Temporal.PlainDateTime
     >();
-    expectTypeOf(e.starts_on).toEqualTypeOf<
-      import("@blazetrails/activesupport/temporal").Temporal.PlainDate
-    >();
-    expectTypeOf(e.duration).toEqualTypeOf<
-      import("@blazetrails/activesupport/temporal").Temporal.PlainTime
-    >();
+    expectTypeOf(e.starts_on).toEqualTypeOf<import("@blazetrails/date").Temporal.PlainDate>();
+    expectTypeOf(e.duration).toEqualTypeOf<import("@blazetrails/date").Temporal.PlainTime>();
   });
 });

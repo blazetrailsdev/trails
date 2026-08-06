@@ -7,7 +7,7 @@ import {
   NotificationEvent as Event,
   Logger,
 } from "@blazetrails/activesupport";
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import { fixtures } from "./test-fixtures.js";
 import { Developer } from "./test-helpers/models/developer.js";
 

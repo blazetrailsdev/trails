@@ -17,7 +17,7 @@ import {
   typeCast as abstractTypeCast,
   type QuotingDispatchHost,
 } from "../abstract/quoting.js";
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import {
   formatInstantForSqlPostgres,
   formatPlainDateTimeForSqlPostgres,

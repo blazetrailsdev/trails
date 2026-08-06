@@ -4,7 +4,7 @@
  * bound, never inline-quoted.
  */
 import { describe, it, expect } from "vitest";
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import { Nodes } from "@blazetrails/arel";
 import { fixtures } from "../test-fixtures.js";
 import { ArgumentError } from "@blazetrails/activemodel";

@@ -1,4 +1,4 @@
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 // Registers Active Record's `en` locale (active_record.rb's on_load(:i18n) hook).
 import "./i18n.js";
 import {

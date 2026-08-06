@@ -15,7 +15,7 @@
 
 import type { ForeignKeyDefinition } from "./connection-adapters/abstract/schema-definitions.js";
 import { classify, pluralize, singularize, tableize, underscore } from "@blazetrails/activesupport";
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import { metadataTableNames } from "./tasks/database-tasks.js";
 
 /**

@@ -1,5 +1,5 @@
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
-import type { Temporal } from "@blazetrails/activesupport/temporal";
+import type { Temporal } from "@blazetrails/date";
 import type { Comment } from "./comment.js";
 import type { Company } from "./company.js";
 import type { Computer } from "./computer.js";

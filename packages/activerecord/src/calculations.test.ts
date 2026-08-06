@@ -1,4 +1,4 @@
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 // Side-effect: registers encryptionHooks so Base.encrypts() is wired up.
 import "./encryption.js";
 import { describe, it, expect } from "vitest";

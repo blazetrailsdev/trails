@@ -5,7 +5,7 @@
 // `legacy_updated_at`/`legacy_updated_on` columns, so cache keys, fixture
 // auto-timestamping, and touch must all follow the aliases.
 import { describe, it, expect } from "vitest";
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import { Developer } from "./test-helpers/models/developer.js";
 import { fixtures } from "./test-fixtures.js";
 

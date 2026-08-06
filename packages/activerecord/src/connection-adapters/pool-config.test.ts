@@ -156,7 +156,7 @@ describe("PoolConfig", () => {
     });
 
     it("can be set directly via the setter", () => {
-      config.serverVersion = "15.0";
+      config.setServerVersion("15.0");
       const mockConn = { getDatabaseVersion: vi.fn() };
       const version = config.serverVersion(mockConn as any);
       expect(version).toBe("15.0");

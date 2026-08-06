@@ -21,7 +21,7 @@ import {
   RangeError as ActiveModelRangeError,
 } from "@blazetrails/activemodel";
 import { Notifications, BigDecimal } from "@blazetrails/activesupport";
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import {
   TransactionIsolationError,
   NotImplementedError,

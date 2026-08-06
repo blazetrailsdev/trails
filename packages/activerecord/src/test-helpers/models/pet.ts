@@ -1,5 +1,5 @@
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
-import type { Temporal } from "@blazetrails/activesupport/temporal";
+import type { Temporal } from "@blazetrails/date";
 import type { Owner } from "./owner.js";
 import type { Person } from "./person.js";
 import type { PetTreasure } from "./pet-treasure.js";

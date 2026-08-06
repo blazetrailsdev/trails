@@ -9,6 +9,7 @@
   "exclude": ["src/type-virtualization/fixtures"],
   "references": [
     { "path": "../arel" },
+    { "path": "../date" },
     { "path": "../activemodel" },
     { "path": "../did-you-mean" },
     { "path": "../globalid" }

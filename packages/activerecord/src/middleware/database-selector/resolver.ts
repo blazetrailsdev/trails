@@ -3,7 +3,7 @@
  */
 
 import { Notifications } from "@blazetrails/activesupport";
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import { Session } from "./resolver/session.js";
 import { Base } from "../../base.js";
 

@@ -24,8 +24,9 @@ import mysql from "mysql2/promise";
 // version is already cached) and after (their stubbed one must not outlive the
 // test). Rails' @connection is likewise long-lived; its stubs re-run the query.
 function clearVersionCache(adapter: Mysql2Adapter): void {
-  (adapter.pool as unknown as { poolConfig: { serverVersion: unknown } }).poolConfig.serverVersion =
-    null;
+  (
+    adapter.pool as unknown as { poolConfig: { setServerVersion: (v: unknown) => void } }
+  ).poolConfig.setServerVersion(null);
 }
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {

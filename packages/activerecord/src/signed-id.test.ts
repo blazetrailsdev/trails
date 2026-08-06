@@ -3,7 +3,7 @@
  * Test names match the Rails counterpart.
  */
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { travel, travelBack } from "@blazetrails/activesupport";
 import { Base, RecordNotFound, registerModel } from "./index.js";

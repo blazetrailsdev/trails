@@ -1,6 +1,6 @@
 // vendor/rails/activerecord/test/cases/cache_key_test.rb
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import { MissingAttributeError } from "@blazetrails/activemodel";
 import { Base } from "./index.js";
 import { adapterType } from "./test-adapter.js";

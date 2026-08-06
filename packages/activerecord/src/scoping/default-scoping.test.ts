@@ -12,7 +12,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { Nodes } from "@blazetrails/arel";
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import "../index.js";
 import { registerModel, RecordNotFound } from "../index.js";
 import { captureSql } from "../testing/sql-capture.js";

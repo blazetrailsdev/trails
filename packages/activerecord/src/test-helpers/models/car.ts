@@ -10,7 +10,7 @@ import type { Tyre } from "./tyre.js";
 import type { Wheel } from "./wheel.js";
 // vendor/rails/activerecord/test/models/car.rb
 import { Base } from "../../base.js";
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 
 export class Car extends Base {
   declare person: Person | null;

@@ -4,7 +4,7 @@
  * Mirrors: ActiveRecord::Integration
  */
 
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import { MissingAttributeError } from "@blazetrails/activemodel";
 import { squish, parameterize, truncate } from "@blazetrails/activesupport";
 import { ActiveRecord } from "./ar-config.js";

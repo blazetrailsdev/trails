@@ -5,7 +5,7 @@
  *          ActiveRecord::Encryption::EncryptionHelpers (assertions).
  */
 
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import type { TestDatabaseAdapter } from "../test-adapter.js";
 import { ensureCanonicalTables } from "../support/canonical-table-rebuild.js";
 import { Base } from "../index.js";

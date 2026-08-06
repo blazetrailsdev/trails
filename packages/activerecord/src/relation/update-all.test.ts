@@ -4,7 +4,7 @@
  * Mirrors: activerecord/test/cases/relation/update_all_test.rb
  */
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { fixtures } from "../test-fixtures.js";
