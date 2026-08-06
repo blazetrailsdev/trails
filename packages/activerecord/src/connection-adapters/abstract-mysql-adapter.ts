@@ -1819,7 +1819,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     // `database_version` would issue the round-trip itself. The pool memoizes.
     await this.pool.serverVersion(this);
     if (this.supportsRenameColumn()) {
-      return `RENAME COLUMN ${this.quoteColumnName(columnName)} TO ${this.quoteColumnName(newColumnName)}`;
+      return this.renameColumnSql(tableName, columnName, newColumnName);
     }
     // Fallback for MySQL <8.0.3 / MariaDB <10.5.2: mirrors Rails' rename_column_for_alter
     // (abstract_mysql_adapter.rb:863-878). Route through columnFor so function-default and

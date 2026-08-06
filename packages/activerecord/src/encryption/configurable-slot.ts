@@ -19,6 +19,11 @@
  * `encryptor.ts` or `key-provider.ts`, the subclass evaluates with its
  * superclass still in TDZ.
  *
+ * The shape itself — and why the alternatives do not work — is written down
+ * once in CLAUDE.md, "Call-time constant resolution (Ruby autoload → the
+ * zero-import slot)". This file is one of its two instances; do not re-derive
+ * the justification here or add a third instance without reading that section.
+ *
  * @internal
  */
 
