@@ -11,6 +11,7 @@ import {
   DateTime as RubyDateTime,
   Rational,
   dNewByFrags,
+  dtNewByFrags,
   type DateParts,
 } from "./date.js";
 import { Time as RubyTime } from "./time.js";
@@ -691,6 +692,17 @@ describe("DateTime", () => {
     const datetime = RubyDateTime.parse("2008-03-01T24:00:00");
     expect([datetime.year, datetime.mon, datetime.day, datetime.hour]).toEqual([2008, 3, 2, 0]);
     expect(RubyDateTime.parse("2008-03-01T24:00:00+09:00").day).toBe(2);
+  });
+
+  it("ignores an offset the zone table would not answer, as dt_new_by_frags does", () => {
+    // ruby 3.3.11:
+    //   Date._parse("2008-03-01T06:00:00+99:00")[:offset] #=> nil
+    //   DateTime.parse("2008-03-01T06:00:00+99:00").zone   #=> "+00:00"
+    expect(RubyDate._parse("2008-03-01T06:00:00+99:00").offset).toBeNull();
+    expect(RubyDateTime.parse("2008-03-01T06:00:00+99:00").zone).toBe("+00:00");
+    expect(dtNewByFrags({ year: 2008, mon: 3, mday: 1, offset: 999999 }, RubyDate.ITALY).zone).toBe(
+      "+00:00",
+    );
   });
 
   it("raises Date::Error on a string naming no date, as dt_new_by_frags does", () => {

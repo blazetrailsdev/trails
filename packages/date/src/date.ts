@@ -2408,7 +2408,16 @@ function of2str(of: number): string {
  * Ruby then moves the Julian day and day-fraction to UTC (`jd_local_to_utc` /
  * `df_local_to_utc`, `date_core.c:8311-8313`) and converts back on every read;
  * the port keeps them local, which is what the readers answer either way, so
- * the offset alone is carried. The one thing that round-trip does observably is
+ * the offset alone is carried.
+ *
+ * The `:offset` bound (`date_core.c:8297-8306`) is ported as written — strictly
+ * outside `±DAY_IN_SECONDS` is ignored rather than raised on. It is unreachable
+ * from `Date._parse`, since `date_zone_to_diff` already answers `nil` for a
+ * zone that far out and the `NIL_P` arm above takes it — on ruby 3.3.11
+ * `Date._parse("2008-03-01T06:00:00+99:00")[:offset]` is `nil` and
+ * `DateTime.parse` of it answers `"+00:00"` — but the C tests it, so this does.
+ *
+ * The one thing the UTC round-trip does observably is
  * normalize the `86400` a `24:00:00` time of day makes — `jd_local_to_utc`'s
  * `df >= DAY_IN_SECONDS` arm rolls the day and the reader answers hour `0`, so
  * `DateTime.parse("2008-03-01T24:00:00")` is 2008-03-02T00:00:00. The port
@@ -2455,7 +2464,8 @@ export function dtNewByFrags(hash: DateParts, sg: number): DateTime {
   }
 
   const t = hash.offset;
-  const of = t == null ? 0 : t instanceof Rational ? t.numerator / t.denominator : t;
+  let of = t == null ? 0 : t instanceof Rational ? t.numerator / t.denominator : t;
+  if (of < -DAY_IN_SECONDS || of > DAY_IN_SECONDS) of = 0;
 
   const d = Date.jd(jd, sg);
   return new DateTime(d.year, d.mon, d.day, rh, rmin, rs, of, sg);
@@ -2926,19 +2936,26 @@ export class DateTime extends Date {
    * Ruby `DateTime.new(y, m, d, h = 0, min = 0, s = 0, offset = 0, start =
    * Date::ITALY)` (ruby/date, `date_core.c` `datetime_s_new`).
    *
-   * Ruby's `offset` argument is `val2off`'s (`date_core.c:1893-1907`) — a
-   * String such as `"+09:00"`, a Rational of a day, or a numeric — and it
-   * stores the seconds `of2str` spells back out. The port takes those seconds
-   * directly, which is what every caller here already has: `dtNewByFrags`
-   * reads `date_zone_to_diff`'s `:offset`, itself in seconds.
+   * Ruby's `offset` argument goes through `val2off` (`date_core.c:5071-5077`)
+   * over `offset_to_sec` (`date_core.c:2370-2440`), which reads it as a **day
+   * fraction**, not as seconds: the Fixnum arm accepts only `-1`, `0` and `1`
+   * and multiplies by `DAY_IN_SECONDS`, so on ruby 3.3.11
+   * `DateTime.new(2000,1,1,0,0,0,1).zone` is `"+24:00"` and `9`, `24` and `-5`
+   * all warn and collapse to `"+00:00"`. What it stores is the `of` field
+   * `of2str` spells back out, in seconds.
+   *
+   * The port takes that `of` directly — the seconds — rather than `val2off`'s
+   * argument. Ruby's day-fraction spellings are a `Rational` of a day and the
+   * `"+09:00"` String, neither of which any caller here holds: `dtNewByFrags`
+   * reads `date_zone_to_diff`'s `:offset`, which is already seconds, and it is
+   * the only non-test caller. So no `val2off` bound applies here, and the
+   * seconds bound that does is `dt_new_by_frags`', applied at that call site
+   * where the C applies it.
    *
    * Ruby also keeps the Julian day and day-fraction in UTC and converts on
    * read (`jd_local_to_utc` at build, `m_local_jd` at read); the port keeps the
    * civil fields and the time of day *local*, which is what the readers answer
    * either way.
-   *
-   * An offset outside `±DAY_IN_SECONDS` is ignored rather than raised on, as
-   * `dt_new_by_frags` does (`date_core.c:8297-8306`).
    */
   constructor(
     year: number,
@@ -2954,7 +2971,7 @@ export class DateTime extends Date {
     this.#hour = hour;
     this.#min = minute;
     this.#sec = second;
-    this.#of = offset < -DAY_IN_SECONDS || offset > DAY_IN_SECONDS ? 0 : offset;
+    this.#of = offset;
   }
 
   /**
