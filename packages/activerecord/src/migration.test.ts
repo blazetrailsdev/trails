@@ -917,7 +917,7 @@ describe("MigrationTest", () => {
     await expect(migrator.up()).rejects.toThrow("Something broke");
     // Migration should not be recorded as applied
     const versions = await migrator.getAllVersions();
-    expect(versions).not.toContain("100");
+    expect(versions).not.toContain(100);
   });
 
   itIfSupports(
@@ -943,7 +943,7 @@ describe("MigrationTest", () => {
       const migrator = new Migrator(adapter, migrations);
       await expect(migrator.migrate()).rejects.toThrow("Something broke");
       const versions = await migrator.getAllVersions();
-      expect(versions).not.toContain("100");
+      expect(versions).not.toContain(100);
     },
   );
 
@@ -1010,7 +1010,7 @@ describe("MigrationTest", () => {
     // "all later migrations canceled" wrapper never gets built.
     expect(err).toBe(loadError);
     const versions = await migrator.getAllVersions();
-    expect(versions).not.toContain("102");
+    expect(versions).not.toContain(102);
   });
 
   it("internal metadata table name", async () => {
@@ -1439,7 +1439,7 @@ describe("MigrationTest", () => {
         await migrator.migrate();
         expect(getSpy).toHaveBeenCalledTimes(1);
         expect(releaseSpy).toHaveBeenCalledWith(getSpy.mock.calls[0][0]);
-        expect(await migrator.getAllVersions()).toContain("200");
+        expect(await migrator.getAllVersions()).toContain(200);
       } finally {
         getSpy.mockRestore();
         releaseSpy.mockRestore();
