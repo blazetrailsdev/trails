@@ -11,12 +11,10 @@ import {
   getChildProcessAsync,
   type SpawnSyncResult,
 } from "@blazetrails/activesupport";
-import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
 import type { DatabaseConfig } from "../database-configurations/database-config.js";
 import { Base } from "../base.js";
-import { DatabaseTasks, metadataTableNames } from "./database-tasks.js";
-import { coercePort } from "./task-utils.js";
+import { DatabaseTasks } from "./database-tasks.js";
 
 const DEFAULT_ENCODING_FALLBACK = "utf8";
 
@@ -160,39 +158,6 @@ export class PostgreSQLDatabaseTasks {
     await this.runCmd("psql", args, "loading");
   }
 
-  /**
-   * Truncate every user table in `public`, skipping schema_migrations
-   * and ar_internal_metadata. TRUNCATE ... RESTART IDENTITY CASCADE
-   * matches Rails' default for PG (identity sequences reset; FK
-   * dependencies cascaded).
-   */
-  async truncateAll(): Promise<void> {
-    const { PostgreSQLAdapter } = await import("../connection-adapters/postgresql-adapter.js");
-    const c = this.configurationHash;
-    const adapter: DatabaseAdapter = c.url
-      ? new PostgreSQLAdapter(String(c.url))
-      : new PostgreSQLAdapter({
-          host: (c.host as string) ?? "localhost",
-          port: coercePort(c.port, 5432),
-          database: this.dbConfig.database,
-          user: c.username as string | undefined,
-          password: c.password as string | undefined,
-        });
-    try {
-      const bookkeeping = metadataTableNames();
-      const rows = (
-        (await adapter.execute(
-          "SELECT tablename FROM pg_tables WHERE schemaname = 'public'",
-        )) as Array<{ tablename: string }>
-      ).filter((r) => !bookkeeping.has(r.tablename));
-      if (rows.length === 0) return;
-      const quoted = rows.map((r) => `"${r.tablename.replace(/"/g, '""')}"`).join(", ");
-      await adapter.executeMutation(`TRUNCATE TABLE ${quoted} RESTART IDENTITY CASCADE`);
-    } finally {
-      await this.closeAdapter(adapter);
-    }
-  }
-
   static register(): void {
     DatabaseTasks.registerTask(/postgres/, {
       create: async (config) => new PostgreSQLDatabaseTasks(config).create(),
@@ -200,7 +165,6 @@ export class PostgreSQLDatabaseTasks {
       purge: async (config) => new PostgreSQLDatabaseTasks(config).purge(),
       charset: async (config) => new PostgreSQLDatabaseTasks(config).charset(),
       collation: async (config) => new PostgreSQLDatabaseTasks(config).collation(),
-      truncateAll: async (config) => new PostgreSQLDatabaseTasks(config).truncateAll(),
       structureDump: async (config, filename, flags) =>
         new PostgreSQLDatabaseTasks(config).structureDump(filename, flags),
       structureLoad: async (config, filename, flags) =>
@@ -214,13 +178,6 @@ export class PostgreSQLDatabaseTasks {
 
   private async connection(): Promise<PostgreSQLAdapter> {
     return (await Base.connectionPool().leaseConnection()) as PostgreSQLAdapter;
-  }
-
-  private async closeAdapter(adapter: DatabaseAdapter): Promise<void> {
-    const maybeClose = (adapter as unknown as { close?: () => Promise<void> }).close;
-    if (typeof maybeClose === "function") {
-      await maybeClose.call(adapter);
-    }
   }
 
   private psqlEnv(): NodeJS.ProcessEnv {

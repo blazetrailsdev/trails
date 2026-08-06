@@ -176,6 +176,7 @@ export class TimeWithZone {
     minute: number;
     second: number;
     millisecond: number;
+    nsec: number;
   } {
     const z = this._zoned;
     return {
@@ -186,6 +187,8 @@ export class TimeWithZone {
       minute: z.minute,
       second: z.second,
       millisecond: z.millisecond,
+      // Ruby's Time#nsec: the whole sub-second part, not Temporal's third digit group.
+      nsec: z.millisecond * 1_000_000 + z.microsecond * 1_000 + z.nanosecond,
     };
   }
 
@@ -228,14 +231,14 @@ export class TimeWithZone {
     return this._local().millisecond;
   }
 
-  /** Microseconds (milliseconds * 1000, since JS doesn't have sub-ms precision) */
+  /** Microseconds 0-999999 */
   get usec(): number {
-    return this.msec * 1000;
+    return Math.floor(this._local().nsec / 1000);
   }
 
-  /** Nanoseconds (milliseconds * 1_000_000) */
+  /** Nanoseconds 0-999999999 */
   get nsec(): number {
-    return this.msec * 1_000_000;
+    return this._local().nsec;
   }
 
   /** Day of the week, 0=Sunday */
@@ -364,7 +367,7 @@ export class TimeWithZone {
 
   inspect(): string {
     const l = this._local();
-    const ns = String(l.millisecond * 1_000_000).padStart(9, "0");
+    const ns = String(l.nsec).padStart(9, "0");
     return (
       `${l.year}-${pad2(l.month)}-${pad2(l.day)} ` +
       `${pad2(l.hour)}:${pad2(l.minute)}:${pad2(l.second)}.${ns} ` +
@@ -413,8 +416,8 @@ export class TimeWithZone {
       `${pad2(l.hour)}:${pad2(l.minute)}:${pad2(l.second)}`;
 
     if (fractionDigits > 0) {
-      const frac = (l.millisecond / 1000).toFixed(fractionDigits).slice(1);
-      base += frac;
+      // Rails' PRECISIONS are "%FT%T.%<n>N" — the fraction is truncated, not rounded.
+      base += `.${String(l.nsec).padStart(9, "0").slice(0, fractionDigits).padEnd(fractionDigits, "0")}`;
     }
 
     base += this.formattedOffset(true, "Z");
@@ -473,7 +476,7 @@ export class TimeWithZone {
         return this.xmlschema();
       case "inspect": {
         const li = this._local();
-        const nsi = String(li.millisecond * 1_000_000).padStart(9, "0");
+        const nsi = String(li.nsec).padStart(9, "0");
         return (
           `${li.year}-${pad2(li.month)}-${pad2(li.day)} ` +
           `${pad2(li.hour)}:${pad2(li.minute)}:${pad2(li.second)}.${nsi} ` +

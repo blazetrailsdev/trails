@@ -646,6 +646,15 @@ describe("TimeWithZoneTest", () => {
   // Each test creates its own twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1, 0, 0, 0))), eastern)
   // Local: 1999-12-31 19:00:00 EST (-05:00)
   // ---------------------------------------------------------------------------
+  it("nsec", () => {
+    const hawaii = TimeZone.find("Hawaii");
+    const withZone = new TimeWithZone(
+      Temporal.Instant.from("2011-06-08T09:59:59.999999999Z"),
+      hawaii,
+    );
+    expect(withZone.nsec).toBe(999999999);
+  });
+
   it("usec returns 0 when no fractional", () => {
     const twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1, 0, 0, 0))), eastern);
     expect(twz.usec).toBe(0);
