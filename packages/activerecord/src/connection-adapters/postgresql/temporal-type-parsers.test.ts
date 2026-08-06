@@ -84,28 +84,13 @@ describe("getTypeParser — date (OID 1082)", () => {
   });
 });
 
-describe("getTypeParser — time (OID 1083)", () => {
-  it("returns a Temporal.PlainTime", () => {
-    const result = parse(OID_TIME, "14:23:55.123456");
-    expect(result).toBeInstanceOf(Temporal.PlainTime);
-    expect((result as Temporal.PlainTime).toString()).toBe("14:23:55.123456");
-  });
-
-  it("normalizes 24:00:00 to midnight", () => {
-    const result = parse(OID_TIME, "24:00:00") as Temporal.PlainTime;
-    expect(result.toString()).toBe("00:00:00");
-  });
-});
-
-describe("getTypeParser — timetz (OID 1266)", () => {
-  it("returns a TimeTzValue with time and offset", () => {
-    const result = parse(OID_TIMETZ, "14:23:55.123456+02") as {
-      time: Temporal.PlainTime;
-      offset: string;
-    };
-    expect(result.time).toBeInstanceOf(Temporal.PlainTime);
-    expect(result.time.toString()).toBe("14:23:55.123456");
-    expect(result.offset).toBe("+02:00");
+describe("getTypeParser — time (OID 1083) and timetz (OID 1266)", () => {
+  // Not intercepted: `ActiveRecord::Type::Time#cast_value` parses the driver's
+  // raw string through `::Date._parse` and answers a `::Time` on the 2000-01-01
+  // dummy date, including the shift a `timetz` offset asks for (time.rb:26-27).
+  it("delegates to the driver default so Type::Time casts the string", () => {
+    expect(parse(OID_TIME, "14:23:55.123456")).toBe("14:23:55.123456");
+    expect(parse(OID_TIMETZ, "14:23:55.123456+02")).toBe("14:23:55.123456+02");
   });
 });
 

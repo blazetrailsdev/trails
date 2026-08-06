@@ -1,7 +1,20 @@
 import { describe, it, expect } from "vitest";
 import { Temporal } from "@blazetrails/date";
-import { plainTime } from "@blazetrails/activesupport/testing/temporal-helpers";
 import { Types } from "../index.js";
+
+/** `::Time.utc(...)`, the value Rails' own assertions are written against. */
+function timeUtc(
+  year: number,
+  mon: number,
+  mday: number,
+  hour = 0,
+  min = 0,
+  sec = 0,
+): Temporal.Instant {
+  return new Temporal.PlainDateTime(year, mon, mday, hour, min, sec)
+    .toZonedDateTime("UTC")
+    .toInstant();
+}
 
 describe("TimeTest", () => {
   const type = new Types.TimeType();
@@ -10,30 +23,27 @@ describe("TimeTest", () => {
     expect(type.cast(null)).toBe(null);
     expect(type.cast("")).toBe(null);
     expect(type.cast("ABC")).toBe(null);
+    expect(type.cast(" ".repeat(129))).toBe(null);
 
-    const result = type.cast("19:45:54");
-    expect(result).toBeInstanceOf(Temporal.PlainTime);
-    expect((result as Temporal.PlainTime).hour).toBe(19);
-    expect((result as Temporal.PlainTime).minute).toBe(45);
-    expect((result as Temporal.PlainTime).second).toBe(54);
+    expect(type.cast("2015-06-13T19:45:54+03:00")).toEqual(timeUtc(2000, 1, 1, 16, 45, 54));
+    expect(type.cast("06:07:08+09:00")).toEqual(timeUtc(1999, 12, 31, 21, 7, 8));
+    expect(type.cast({ "4": 16, "5": 45, "6": 54 })).toEqual(timeUtc(2000, 1, 1, 16, 45, 54));
+    expect(type.cast("2023-01-01T00:00:00-03:30")).toEqual(timeUtc(2000, 1, 1, 3, 30, 0));
+
+    expect(type.cast("19:45:54")).toEqual(timeUtc(2000, 1, 1, 19, 45, 54));
   });
 
   it("extracts time from full datetime string", () => {
-    const result = type.cast("2015-02-09T19:45:54+00:00");
-    expect(result).toBeInstanceOf(Temporal.PlainTime);
-    expect((result as Temporal.PlainTime).hour).toBe(19);
+    expect(type.cast("2015-02-09T19:45:54+00:00")).toEqual(timeUtc(2000, 1, 1, 19, 45, 54));
   });
 
   it("microsecond precision is preserved through cast", () => {
-    const result = type.cast("14:23:55.123456");
-    expect(result).toBeInstanceOf(Temporal.PlainTime);
-    const t = result as Temporal.PlainTime;
-    expect(t.millisecond).toBe(123);
-    expect(t.microsecond).toBe(456);
+    const result = type.cast("14:23:55.123456") as Temporal.Instant;
+    expect(result.toString()).toBe("2000-01-01T14:23:55.123456Z");
   });
 
-  it("Temporal.PlainTime passthrough", () => {
-    const original = plainTime("14:23:55.123456");
+  it("Temporal.Instant passthrough", () => {
+    const original = timeUtc(2000, 1, 1, 14, 23, 55);
     expect(type.cast(original)).toBe(original);
   });
 
@@ -45,9 +55,9 @@ describe("TimeTest", () => {
     expect(type.cast(undefined)).toBe(null);
   });
 
-  it("serialize returns the cast PlainTime (not a SQL string)", () => {
-    const t = plainTime("14:23:55.123456");
-    expect((type.serialize(t) as Temporal.PlainTime).toString()).toBe("14:23:55.123456");
+  it("serialize returns the cast Instant (not a SQL string)", () => {
+    const t = type.cast("14:23:55.123456") as Temporal.Instant;
+    expect(String(type.serialize(t))).toBe("2000-01-01T14:23:55.123456Z");
   });
 
   it("serialize null returns null", () => {
@@ -56,16 +66,12 @@ describe("TimeTest", () => {
 
   it("serialize respects column precision", () => {
     const t = new Types.TimeType({ precision: 3 });
-    const pt = plainTime("14:23:55.123456");
-    expect((t.serialize(pt) as Temporal.PlainTime).toString()).toBe("14:23:55.123");
+    expect(String(t.serialize("14:23:55.123456"))).toBe("2000-01-01T14:23:55.123Z");
   });
 
   it("PlainDateTime input extracts time (multiparameter support)", () => {
     const pdt = Temporal.PlainDateTime.from("2024-06-15T14:23:55");
-    const result = type.cast(pdt);
-    expect(result).toBeInstanceOf(Temporal.PlainTime);
-    expect((result as Temporal.PlainTime).hour).toBe(14);
-    expect((result as Temporal.PlainTime).minute).toBe(23);
+    expect(type.cast(pdt)).toEqual(timeUtc(2024, 6, 15, 14, 23, 55));
   });
 
   it("user input in time zone wraps plain time in given zone", () => {
@@ -77,6 +83,9 @@ describe("TimeTest", () => {
 
   it("user input in time zone returns null for null", () => {
     expect(type.userInputInTimeZone(null)).toBe(null);
+    expect(type.userInputInTimeZone("")).toBe(null);
+    expect(type.userInputInTimeZone("ABC")).toBe(null);
+    expect(type.userInputInTimeZone(" ".repeat(129))).toBe(null);
   });
 
   it("user input in time zone passthrough for ZonedDateTime", () => {
@@ -84,25 +93,16 @@ describe("TimeTest", () => {
     expect(type.userInputInTimeZone(zdt)).toBe(zdt);
   });
 
-  it("cast 3pm returns PlainTime 15:00", () => {
-    const result = type.cast("3pm");
-    expect(result).toBeInstanceOf(Temporal.PlainTime);
-    expect((result as Temporal.PlainTime).hour).toBe(15);
-    expect((result as Temporal.PlainTime).minute).toBe(0);
+  it("cast 3pm returns 15:00", () => {
+    expect(type.cast("3pm")).toEqual(timeUtc(2000, 1, 1, 15, 0, 0));
   });
 
-  it("cast 3:30 PM returns PlainTime 15:30", () => {
-    const result = type.cast("3:30 PM");
-    expect(result).toBeInstanceOf(Temporal.PlainTime);
-    expect((result as Temporal.PlainTime).hour).toBe(15);
-    expect((result as Temporal.PlainTime).minute).toBe(30);
+  it("cast 3:30 PM returns 15:30", () => {
+    expect(type.cast("3:30 PM")).toEqual(timeUtc(2000, 1, 1, 15, 30, 0));
   });
 
-  it("cast 15:30 returns PlainTime 15:30", () => {
-    const result = type.cast("15:30");
-    expect(result).toBeInstanceOf(Temporal.PlainTime);
-    expect((result as Temporal.PlainTime).hour).toBe(15);
-    expect((result as Temporal.PlainTime).minute).toBe(30);
+  it("cast 15:30 returns 15:30", () => {
+    expect(type.cast("15:30")).toEqual(timeUtc(2000, 1, 1, 15, 30, 0));
   });
 
   it("cast garbage string returns null", () => {
@@ -110,43 +110,28 @@ describe("TimeTest", () => {
   });
 
   it("cast ISO time string still works (regression guard)", () => {
-    const result = type.cast("19:45:54");
-    expect(result).toBeInstanceOf(Temporal.PlainTime);
-    expect((result as Temporal.PlainTime).hour).toBe(19);
+    expect(type.cast("19:45:54")).toEqual(timeUtc(2000, 1, 1, 19, 45, 54));
   });
 
-  it("cast datetime with non-zero offset preserves local time (not UTC-normalized)", () => {
-    // Ruby Time._parse reports the local hour written in the string, not the UTC hour.
-    const result = type.cast("2015-02-09T19:45:54+02:00");
-    expect(result).toBeInstanceOf(Temporal.PlainTime);
-    expect((result as Temporal.PlainTime).hour).toBe(19);
+  it("cast datetime with non-zero offset shifts the instant", () => {
+    // time.rb:26-27 — `new_time` subtracts the offset, so the value lands where
+    // the string's zone says it does, not at the hour that was written.
+    expect(type.cast("2015-02-09T19:45:54+02:00")).toEqual(timeUtc(2000, 1, 1, 17, 45, 54));
   });
 
   it("valueFromMultiparameterAssignment: hour-only hash returns Time on 2000-01-01 base (P21)", () => {
     // Regression: was null before P21 because year defaulted to 0 and hit the short-circuit.
-    const result = (type as any).valueFromMultiparameterAssignment({ "4": 15 });
-    expect(result).toBeInstanceOf(Temporal.PlainTime);
-    expect((result as Temporal.PlainTime).hour).toBe(15);
-    expect((result as Temporal.PlainTime).minute).toBe(0);
+    expect(type.cast({ "4": 15 })).toEqual(timeUtc(2000, 1, 1, 15, 0, 0));
   });
 
   it("valueFromMultiparameterAssignment: hour and minute hash returns Time", () => {
-    const result = (type as any).valueFromMultiparameterAssignment({ "4": 15, "5": 30 });
-    expect(result).toBeInstanceOf(Temporal.PlainTime);
-    expect((result as Temporal.PlainTime).hour).toBe(15);
-    expect((result as Temporal.PlainTime).minute).toBe(30);
+    expect(type.cast({ "4": 15, "5": 30 })).toEqual(timeUtc(2000, 1, 1, 15, 30, 0));
   });
 
   it("valueFromMultiparameterAssignment: full hash with year/month/day/hour still works", () => {
-    const result = (type as any).valueFromMultiparameterAssignment({
-      "1": 2025,
-      "2": 6,
-      "3": 15,
-      "4": 10,
-      "5": 20,
-    });
-    expect(result).toBeInstanceOf(Temporal.PlainTime);
-    expect((result as Temporal.PlainTime).hour).toBe(10);
+    expect(type.cast({ "1": 2025, "2": 6, "3": 15, "4": 10, "5": 20 })).toEqual(
+      timeUtc(2025, 6, 15, 10, 20, 0),
+    );
   });
 
   it("serialize_cast_value is equivalent to serialize after cast", () => {
@@ -154,6 +139,15 @@ describe("TimeTest", () => {
     const value = type.cast("1999-12-31T12:34:56.789-10:00");
 
     expect(type.serializeCastValue(value)).toEqual(type.serialize(value));
-    expect(type.serializeCastValue(value)?.toString()).toBe("12:34:56.7");
+    expect(String(type.serializeCastValue(value))).toBe("2000-01-01T22:34:56.7Z");
+  });
+
+  it("sec_fraction reaches new_time as Time.utc's microsecond argument", () => {
+    // time.rb:82 passes `:sec_fraction` straight through where
+    // `Type::DateTime` calls `microseconds` first (date_time.rb:73), so a
+    // fallback-parsed string's sub-second digits land three orders down:
+    // ruby 3.3.11 `Type::Time.new.cast("3:30:15.5 PM").nsec` is `500`.
+    const result = type.cast("3:30:15.5 PM") as Temporal.Instant;
+    expect(result.toString()).toBe("2000-01-01T15:30:15.0000005Z");
   });
 });

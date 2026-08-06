@@ -411,13 +411,8 @@ describe("SQLite3::Quoting", () => {
       await adapter.executeMutation(`INSERT INTO "quoting_events" ("t") VALUES (${quote(time)})`);
       const rows = await adapter.execute(`SELECT "t" FROM "quoting_events" LIMIT 1`);
       const raw = rows[0].t as string;
-      const cast = new TimeType().cast(raw) as Temporal.PlainTime;
-      expect(cast).toBeInstanceOf(Temporal.PlainTime);
-      expect(cast.hour).toBe(14);
-      expect(cast.minute).toBe(23);
-      expect(cast.second).toBe(55);
-      expect(cast.microsecond).toBe(654321 % 1000); // 321 µs
-      expect(cast.millisecond).toBe(Math.floor(654321 / 1000)); // 654 ms
+      const cast = new TimeType().cast(raw) as Temporal.Instant;
+      expect(cast.toString()).toBe("2000-01-01T14:23:55.654321Z");
     });
   });
 });

@@ -155,9 +155,11 @@ export function newTime(
   // Rails' ::Time.utc(year, nil, nil, ...) raises TypeError → rescue nil.
   // Treat missing month/day the same way rather than silently coercing to Jan 1.
   if (mon == null || mday == null) return null;
-  // Ruby's Time.utc takes microsec as 0..999_999; Temporal splits sub-second
-  // resolution across millisecond (0..999) + microsecond (0..999) fields.
-  const totalMicro = microsec ?? 0;
+  // Ruby's Time.utc takes microsec as 0..999_999, and a Rational one carries
+  // sub-microsecond resolution down into nsec — which is what `Type::Time`
+  // relies on when it hands a raw `:sec_fraction` straight through. Temporal
+  // splits the same resolution across millisecond / microsecond / nanosecond.
+  const totalNano = Math.trunc((microsec ?? 0) * 1000);
   const components = {
     year,
     month: mon,
@@ -165,8 +167,9 @@ export function newTime(
     hour: hour ?? 0,
     minute: min ?? 0,
     second: sec ?? 0,
-    millisecond: Math.trunc(totalMicro / 1000),
-    microsecond: totalMicro % 1000,
+    millisecond: Math.trunc(totalNano / 1_000_000),
+    microsecond: Math.trunc(totalNano / 1000) % 1000,
+    nanosecond: totalNano % 1000,
   };
   try {
     if (offset != null) {

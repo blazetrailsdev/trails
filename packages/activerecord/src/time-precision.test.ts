@@ -8,8 +8,9 @@ import { SchemaDumper } from "./connection-adapters/abstract/schema-dumper.js";
 import { fixtures } from "./test-fixtures.js";
 import { itIfSupports } from "./support/supports.js";
 
-function nsecTime(v: Temporal.PlainTime): number {
-  return v.millisecond * 1_000_000 + v.microsecond * 1_000 + v.nanosecond;
+/** Ruby `::Time#nsec` — the sub-second nanoseconds of the instant. */
+function nsecTime(v: Temporal.Instant): number {
+  return Number(v.epochNanoseconds % 1_000_000_000n);
 }
 
 describe("TimePrecisionTest", () => {

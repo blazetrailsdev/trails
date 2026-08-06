@@ -20,10 +20,12 @@ import { Attribute as ModelAttribute, BinaryData, type Type } from "@blazetrails
 import type { TypeMap } from "../../type/type-map.js";
 import { NotImplementedError } from "../../errors.js";
 import {
+  defaultSqlTimezone,
   formatInstantForSql,
   formatPlainDateTimeForSql,
   formatPlainDateForSql,
 } from "./sql-datetime.js";
+import { Value as TimeValue } from "../../type/time.js";
 
 /**
  * Host shape the standalone {@link quote} / {@link quoteTableName} dispatch
@@ -41,7 +43,7 @@ export interface QuotingDispatchHost {
   /** @internal */
   quotedDate?(value: TemporalDateLike): string;
   /** @internal */
-  quotedTime?(value: Temporal.PlainTime | Temporal.PlainDateTime): string;
+  quotedTime?(value: QuotedTimeValue): string;
   /** @internal */
   quotedBinary?(value: unknown): string;
   /** @internal */
@@ -55,6 +57,13 @@ export interface QuotingDispatchHost {
   /** @internal */
   unquotedFalse?(): boolean | number;
 }
+
+/**
+ * What `quoted_time` is handed: Rails' `Type::Time::Value` (the `DelegateClass`
+ * `Type::Time#serialize` wraps a cast time in), plus the bare `Temporal` shapes
+ * an adapter's own wire parsers produce for a `time` column.
+ */
+export type QuotedTimeValue = TimeValue | Temporal.PlainTime | Temporal.PlainDateTime;
 
 type TemporalDateLike =
   | Temporal.Instant
@@ -150,7 +159,8 @@ export function quote(this: QuotingDispatchHost, value: unknown): string {
   // Rails dispatches date/time literals through `self.quoted_time` (Time::Value)
   // and `self.quoted_date` (Date/Time) so adapter overrides — e.g. PostgreSQL's
   // BC-suffixing `quoted_date` — are honored. Thread `this` to mirror that.
-  if (value instanceof Temporal.PlainTime) return `'${dispatchQuotedTime(this, value)}'`;
+  if (value instanceof TimeValue || value instanceof Temporal.PlainTime)
+    return `'${dispatchQuotedTime(this, value)}'`;
   if (
     value instanceof Temporal.Instant ||
     value instanceof Temporal.PlainDateTime ||
@@ -207,7 +217,8 @@ export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
   // `Date`/`Time` through `self.quoted_date` (abstract/quoting.rb:103-104), the
   // same self-dispatch `quote` uses. Thread `this` so adapter overrides — e.g.
   // PostgreSQL's BC-suffixing `quotedDate` — flow into `type_cast` too.
-  if (value instanceof Temporal.PlainTime) return dispatchQuotedTime(this, value);
+  if (value instanceof TimeValue || value instanceof Temporal.PlainTime)
+    return dispatchQuotedTime(this, value);
   if (
     value instanceof Temporal.Instant ||
     value instanceof Temporal.PlainDateTime ||
@@ -560,7 +571,7 @@ export function dispatchUnquotedFalse(host: QuotingDispatchHost): boolean | numb
 }
 
 /** @internal */
-export function dispatchQuotedTime(host: QuotingDispatchHost, value: Temporal.PlainTime): string {
+export function dispatchQuotedTime(host: QuotingDispatchHost, value: QuotedTimeValue): string {
   if (typeof host.quotedTime === "function") {
     return host.quotedTime(value);
   }
@@ -614,10 +625,13 @@ export function quotedDate(
  *
  * @internal
  */
-export function quotedTime(
-  this: QuotingDispatchHost,
-  value: Temporal.PlainTime | Temporal.PlainDateTime,
-): string {
+export function quotedTime(this: QuotingDispatchHost, value: QuotedTimeValue): string {
+  // Rails' `value.change(year: 2000, month: 1, day: 1)` reads the `::Time`'s
+  // components in `default_timezone`, which is what `quoted_date` would have
+  // read them in too.
+  if (value instanceof TimeValue) {
+    value = value.getobj().toZonedDateTimeISO(defaultSqlTimezone()).toPlainDateTime();
+  }
   const dt =
     value instanceof Temporal.PlainTime
       ? new Temporal.PlainDateTime(

@@ -17,8 +17,11 @@ import {
   dispatchQuotedTime,
   dispatchUnquotedTrue,
   dispatchUnquotedFalse,
+  type QuotedTimeValue,
   type QuotingDispatchHost,
 } from "../abstract/quoting.js";
+import { defaultSqlTimezone } from "../abstract/sql-datetime.js";
+import { Value as TimeValue } from "../../type/time.js";
 import { Temporal } from "@blazetrails/date";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { BinaryData } from "@blazetrails/activemodel";
@@ -137,7 +140,10 @@ export function quotedDate(
  * `quote` wraps it.
  * @internal
  */
-export function quotedTime(value: Temporal.PlainTime | Temporal.PlainDateTime): string {
+export function quotedTime(value: QuotedTimeValue): string {
+  if (value instanceof TimeValue) {
+    value = value.getobj().toZonedDateTimeISO(defaultSqlTimezone()).toPlainDateTime();
+  }
   const dt =
     value instanceof Temporal.PlainTime
       ? new Temporal.PlainDateTime(
@@ -235,7 +241,8 @@ export function typeCast(this: QuotingDispatchHost, value: unknown, bindsAsFloat
   // Rails dispatches date/time through `self.quoted_time` / `self.quoted_date`
   // (abstract/quoting.rb:93-101) — which SQLite overrides to keep a `2000-01-01`
   // prefix on times. Thread `this` so the dispatch lands on those overrides.
-  if (value instanceof Temporal.PlainTime) return dispatchQuotedTime(this, value);
+  if (value instanceof TimeValue || value instanceof Temporal.PlainTime)
+    return dispatchQuotedTime(this, value);
   if (
     value instanceof Temporal.Instant ||
     value instanceof Temporal.PlainDateTime ||

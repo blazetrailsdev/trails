@@ -15,16 +15,18 @@ import {
   parsePostgresInstant,
   parsePostgresTimestampAsInstant,
   parsePostgresDate,
-  parsePostgresTime,
-  parsePostgresTimeTz,
 } from "../abstract/temporal-wire.js";
 
-// PostgreSQL OIDs for the temporal types we intercept.
+// PostgreSQL OIDs for the temporal types we intercept. `time` (1083) and
+// `timetz` (1266) are deliberately absent: Rails hands the driver's raw string
+// to `ActiveRecord::Type::Time`, whose `cast_value` parses it through
+// `::Date._parse` and answers a `::Time` on the 2000-01-01 dummy date —
+// including the shift a `timetz` offset asks for (time.rb:26-27). pg leaves
+// both as strings by default, so not intercepting them is what routes them
+// there.
 const OID_DATE = 1082;
-const OID_TIME = 1083;
 const OID_TIMESTAMP = 1114;
 const OID_TIMESTAMPTZ = 1184;
-const OID_TIMETZ = 1266;
 
 // Array OIDs for the temporal types. pg's default array parsers decode each
 // element with the built-in scalar parser (JS Date in the host's local zone),
@@ -47,8 +49,6 @@ const TEMPORAL_PARSERS: ReadonlyMap<number, PgParser> = new Map<number, PgParser
   [OID_TIMESTAMPTZ, (v) => parsePostgresInstant(v as string)],
   [OID_TIMESTAMP, (v) => parsePostgresTimestampAsInstant(v as string)],
   [OID_DATE, (v) => parsePostgresDate(v as string)],
-  [OID_TIME, (v) => parsePostgresTime(v as string)],
-  [OID_TIMETZ, (v) => parsePostgresTimeTz(v as string)],
   [OID_DATE_ARRAY, passthrough],
   [OID_TIME_ARRAY, passthrough],
   [OID_TIMESTAMP_ARRAY, passthrough],

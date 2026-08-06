@@ -27,6 +27,7 @@ import {
   type QuotingDispatchHost,
 } from "../abstract/quoting.js";
 import { Temporal } from "@blazetrails/date";
+import { Value as TimeValue } from "../../type/time.js";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { BinaryData } from "@blazetrails/activemodel";
 
@@ -292,7 +293,8 @@ export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
   // (abstract/quoting.rb:93-101); thread `this` so MySQL's microsecond-capping
   // `quotedDate` override is honored here. Always invoked with an adapter
   // receiver — the standalone is never called receiver-less.
-  if (value instanceof Temporal.PlainTime) return dispatchQuotedTime(this, value);
+  if (value instanceof TimeValue || value instanceof Temporal.PlainTime)
+    return dispatchQuotedTime(this, value);
   if (
     value instanceof Temporal.Instant ||
     value instanceof Temporal.PlainDateTime ||
