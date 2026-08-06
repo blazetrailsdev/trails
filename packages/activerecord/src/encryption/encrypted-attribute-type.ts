@@ -2,7 +2,6 @@ import { Type, ValueType, StringType, BinaryData } from "@blazetrails/activemode
 import { Serialized } from "../type/serialized.js";
 import { Scheme } from "./scheme.js";
 import type { EncryptorLike } from "./encryptor.js";
-import type { WrappedType } from "./wrapped-type.js";
 import { getEncryptionContext } from "./context.js";
 import { Configurable } from "./configurable.js";
 import { Encoding, Decryption, Base } from "./errors.js";
@@ -20,7 +19,7 @@ import {
  *
  * Mirrors: ActiveRecord::Encryption::EncryptedAttributeType
  */
-export class EncryptedAttributeType extends ValueType implements WrappedType {
+export class EncryptedAttributeType extends ValueType {
   readonly name = "encrypted";
   readonly scheme: Scheme;
   readonly castType: Type;
@@ -43,25 +42,6 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
     this._previousType = options.previousType ?? false;
     this._default = options.default;
     this._encryptor = options.scheme.encryptor;
-  }
-
-  /**
-   * Return a fresh EncryptedAttributeType wrapping `innerType` with the
-   * same scheme. Used by schema reflection to re-wrap with the
-   * adapter-resolved cast type without reconstructing scheme/options.
-   *
-   * Shared contract with the simpler Encryptor-based
-   * EncryptedAttributeType in the parent directory — both classes
-   * expose `withInnerType` so consumers can unify on a single duck-typed
-   * check instead of branching on `instanceof`.
-   */
-  withInnerType(innerType: Type): EncryptedAttributeType {
-    return new EncryptedAttributeType({
-      scheme: this.scheme,
-      castType: innerType,
-      previousType: this._previousType,
-      default: this._default,
-    });
   }
 
   cast(value: unknown): unknown {

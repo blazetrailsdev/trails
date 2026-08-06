@@ -167,6 +167,20 @@ function tzdataAbbreviation(zoned: Temporal.ZonedDateTime): string {
 }
 
 /**
+ * The nanoseconds MRI's `Time#nsec` answers for a `Float` `sec` argument: the
+ * *exact* value of the double, truncated at nine digits rather than rounded —
+ * `Time.utc(2008, 3, 1, 6, 0, 0.3).nsec` is `299999999`, because the nearest
+ * double to `0.3` is `0.29999999999999998889...`. Reading the digits off
+ * `toFixed(20)` is what keeps that truncation exact; `Math.floor(frac * 1e9)`
+ * rounds the product first and answers `300000000`.
+ */
+function subsecNanoseconds(sec: number): number {
+  const fraction = sec - Math.floor(sec);
+  if (fraction === 0) return 0;
+  return Number(fraction.toFixed(20).split(".")[1].slice(0, 9));
+}
+
+/**
  * @noRailsEquivalent PERMANENT — Ruby core `::Time`. Rails never defines the
  * class, only reopens it in `core_ext/time/*.rb`, so there is no Rails
  * counterpart for a port to converge on. trails carries only the members a
@@ -199,7 +213,18 @@ export class Time {
     sec = 0,
     zone: string | number | null = null,
   ) {
-    this.#plain = new Temporal.PlainDateTime(year, month, day, hour, min, sec);
+    const nsec = subsecNanoseconds(sec);
+    this.#plain = new Temporal.PlainDateTime(
+      year,
+      month,
+      day,
+      hour,
+      min,
+      Math.floor(sec),
+      Math.floor(nsec / 1_000_000),
+      Math.floor(nsec / 1_000) % 1_000,
+      nsec % 1_000,
+    );
     const utcOffset = zone == null ? Temporal.Now.timeZoneId() : utcOffsetArgument(zone);
     this.#timeZoneId = typeof utcOffset === "number" ? null : utcOffset;
     this.#utcOffset =
@@ -241,6 +266,27 @@ export class Time {
     return this.#plain.second;
   }
 
+  /** Ruby `Time#nsec` — the fraction of a second, in nanoseconds. */
+  get nsec(): number {
+    return (
+      this.#plain.millisecond * 1_000_000 + this.#plain.microsecond * 1_000 + this.#plain.nanosecond
+    );
+  }
+
+  /** Ruby `Time#usec` — the fraction of a second, in microseconds. */
+  get usec(): number {
+    return this.#plain.millisecond * 1_000 + this.#plain.microsecond;
+  }
+
+  /**
+   * Ruby `Time#subsec` — the fraction of a second. MRI answers a Rational
+   * carrying the full precision of the `Float` it was built from; a JS number
+   * is the nearest analogue, so this is `nsec` over a billion.
+   */
+  get subsec(): number {
+    return this.nsec / 1_000_000_000;
+  }
+
   get yday(): number {
     return this.#plain.dayOfYear;
   }
@@ -272,7 +318,7 @@ export class Time {
         hour: this.hour,
         min: this.min,
         sec: this.sec,
-        nsec: 0,
+        nsec: this.nsec,
         zone: this.zone ?? "",
         utcOffset: this.utcOffset,
       },

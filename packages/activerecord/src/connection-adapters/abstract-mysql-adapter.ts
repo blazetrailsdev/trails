@@ -709,31 +709,16 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   async renameIndex(tableName: string, oldName: string, newName: string): Promise<void> {
-    await this.schemaCache.clearDataSourceCacheBang(tableName);
-    this.validateIndexLengthBang(tableName, newName);
-    if (!this.supportsRenameIndex()) {
-      // Mirrors Rails AbstractAdapter#rename_index super path: drop the
-      // existing index and recreate under the new name.
-      const idx = (
-        await (this as unknown as { indexes(t: string): Promise<unknown[]> }).indexes(tableName)
-      ).find((i) => (i as { name?: string }).name === oldName) as
-        | { name: string; columns: string[]; unique: boolean }
-        | undefined;
-      if (!idx) return;
-      await (
-        this as unknown as {
-          addIndex(t: string, c: string[], o: Record<string, unknown>): Promise<void>;
-        }
-      ).addIndex(tableName, idx.columns, { name: newName, unique: idx.unique });
-      await (
-        this as unknown as { removeIndex(t: string, o: { name: string }): Promise<void> }
-      ).removeIndex(tableName, { name: oldName });
-      return;
+    if (this.supportsRenameIndex()) {
+      this.validateIndexLengthBang(tableName, newName);
+
+      await this._execMutation(
+        `ALTER TABLE ${this.quoteTableName(tableName)} RENAME INDEX ` +
+          `${this.quoteTableName(oldName)} TO ${this.quoteTableName(newName)}`,
+      );
+    } else {
+      await super.renameIndex(tableName, oldName, newName);
     }
-    await this._execMutation(
-      `ALTER TABLE ${this.quoteTableName(tableName)} RENAME INDEX ` +
-        `${this.quoteColumnName(oldName)} TO ${this.quoteColumnName(newName)}`,
-    );
   }
 
   /**

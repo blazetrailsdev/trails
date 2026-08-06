@@ -20,7 +20,6 @@ import { singularize } from "@blazetrails/activesupport";
 import { modelRegistry } from "./associations.js";
 import { TableNotSpecified } from "./errors.js";
 import { encryptionHooks } from "./encryption-hooks.js";
-import { isWrappedType } from "./encryption/wrapped-type.js";
 import { FakePool } from "./connection-adapters/schema-cache.js";
 import { threadedConnectionFor, connectionPool } from "./connection-handling.js";
 
@@ -1097,16 +1096,7 @@ function applyColumnsHash(
     }
 
     const reflectedColumnType = reflectedTypeForColumn(host, adapter, name, column);
-    let type = reflectedColumnType;
-
-    // Preserve encryption wrappers across schema reflection. Both
-    // EncryptedAttributeType variants implement `WrappedType`; any
-    // future type implementing the same contract is automatically
-    // supported. No `instanceof` branching on concrete classes.
-    const existingType = existing?.type;
-    if (isWrappedType(existingType)) {
-      type = existingType.withInnerType(type);
-    }
+    const type = reflectedColumnType;
 
     const defaultValue = (column as { default?: unknown }).default ?? null;
     const colLimit = (column as { limit?: number | null }).limit ?? null;

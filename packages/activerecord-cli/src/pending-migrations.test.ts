@@ -22,12 +22,12 @@ async function makeFakeProject(): Promise<string> {
 }
 
 const PROXY_A = {
-  version: "20240101000001",
+  version: 20240101000001,
   name: "CreateUsers",
   migration: () => new (class extends Migration {})(),
 };
 const PROXY_B = {
-  version: "20240101000002",
+  version: 20240101000002,
   name: "AddIndex",
   migration: () => new (class extends Migration {})(),
 };
@@ -111,7 +111,7 @@ describe("PendingMigrationsTest", () => {
     const dir = await makeFakeProject();
     const pending = await checkPendingMigrations(dir);
     expect(pending).toHaveLength(1);
-    expect(pending[0].version).toBe("20240101000001");
+    expect(pending[0].version).toBe(20240101000001);
   });
 
   it("checkPendingMigrations returns empty array when no pending migrations", async () => {

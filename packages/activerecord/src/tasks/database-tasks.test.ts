@@ -927,12 +927,12 @@ describe("DatabaseTasksMigrateTest", () => {
       let migrated = false;
       DatabaseTasks.registerMigrations([
         {
-          version: "1",
+          version: 1,
           name: "M1",
           migration: () =>
             anonymousMigration(
               "M1",
-              "1",
+              1,
               async () => {
                 migrated = true;
               },
@@ -968,15 +968,15 @@ describe("DatabaseTasksMigrateScopeTest", () => {
     originalScope = process.env.SCOPE;
     DatabaseTasks.registerMigrations([
       {
-        version: "1",
+        version: 1,
         name: "Unscoped",
-        migration: () => anonymousMigration("Unscoped", "1"),
+        migration: () => anonymousMigration("Unscoped", 1),
       },
       {
-        version: "2",
+        version: 2,
         name: "MysqlOnly",
         scope: "mysql",
-        migration: () => anonymousMigration("MysqlOnly", "2"),
+        migration: () => anonymousMigration("MysqlOnly", 2),
       },
     ]);
   });
@@ -1038,19 +1038,19 @@ describe("DatabaseTasksMigrateStatusTest", () => {
     await new SchemaMigration(await pool.leaseConnection()).createTable();
     DatabaseTasks.registerMigrations([
       {
-        version: "1",
+        version: 1,
         name: "Valid people have last names",
-        migration: () => anonymousMigration("Valid people have last names", "1"),
+        migration: () => anonymousMigration("Valid people have last names", 1),
       },
       {
-        version: "2",
+        version: 2,
         name: "We need reminders",
-        migration: () => anonymousMigration("We need reminders", "2"),
+        migration: () => anonymousMigration("We need reminders", 2),
       },
       {
-        version: "3",
+        version: 3,
         name: "Innocent jointable",
-        migration: () => anonymousMigration("Innocent jointable", "3"),
+        migration: () => anonymousMigration("Innocent jointable", 3),
       },
     ]);
   });

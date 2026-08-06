@@ -91,6 +91,43 @@ describe("Time", () => {
     expect(time.strftime("%z")).toBe(local.offset.replace(":", ""));
   });
 
+  // Every expectation below was read off a live `ruby -e`, e.g.
+  // `Time.utc(2008, 3, 1, 6, 0, 0.3).nsec # => 299999999`.
+  it("Time.utc keeps a fractional second", () => {
+    const time = Time.utc(2008, 3, 1, 6, 0, 0.5);
+    expect(time.sec).toBe(0);
+    expect(time.nsec).toBe(500000000);
+    expect(time.usec).toBe(500000);
+    expect(time.subsec).toBe(0.5);
+    expect(time.strftime("%S")).toBe("00");
+    expect(time.strftime("%N")).toBe("500000000");
+    expect(time.strftime("%L")).toBe("500");
+  });
+
+  it("Time.new keeps a fractional second", () => {
+    const time = new Time(2008, 3, 1, 6, 0, 1.123456789, "UTC");
+    expect(time.sec).toBe(1);
+    expect(time.nsec).toBe(123456789);
+    expect(time.usec).toBe(123456);
+  });
+
+  it("a fractional second truncates at nanoseconds, from the exact double", () => {
+    expect(Time.utc(2008, 3, 1, 6, 0, 0.3).nsec).toBe(299999999);
+    expect(Time.utc(2008, 3, 1, 6, 0, 0.1).nsec).toBe(100000000);
+    expect(Time.utc(2008, 3, 1, 6, 0, 59.9999999999).nsec).toBe(999999999);
+    expect(Time.utc(2008, 3, 1, 6, 0, 2.000000001).nsec).toBe(1);
+    expect(Time.utc(2008, 3, 1, 6, 0, 30.987654321).nsec).toBe(987654321);
+  });
+
+  it("a whole second carries no fraction", () => {
+    const time = Time.utc(2008, 3, 1, 6, 0, 0);
+    expect(time.nsec).toBe(0);
+    expect(time.usec).toBe(0);
+    expect(time.subsec).toBe(0);
+    expect(time.strftime("%N")).toBe("000000000");
+    expect(time.strftime("%L")).toBe("000");
+  });
+
   describe("in a local zone `Intl` has no abbreviation for", () => {
     afterEach(() => {
       vi.restoreAllMocks();

@@ -283,8 +283,8 @@ export interface SchemaNamespaceStatements {
 interface SchemaMigrationPool {
   schemaMigration: { tableName: string; versions(): Promise<Array<string | number>> };
   migrationContext: {
-    getAllVersions(): Promise<Array<string | number>>;
-    migrations: ReadonlyArray<{ version: string | number }>;
+    getAllVersions(): Promise<number[]>;
+    migrations: ReadonlyArray<{ version: number }>;
   };
 }
 
@@ -1653,8 +1653,8 @@ export class SchemaStatements {
     const smTable = this.quoteTableName(pool.schemaMigration.tableName);
 
     const migrationContext = pool.migrationContext;
-    const migrated = (await migrationContext.getAllVersions()).map(Number);
-    const allVersions = migrationContext.migrations.map((m) => Number(m.version));
+    const migrated = await migrationContext.getAllVersions();
+    const allVersions = migrationContext.migrations.map((m) => m.version);
 
     // Insert the target version if not already migrated. Rails passes the
     // numeric `version.to_i` to `quote`, emitting an unquoted numeric literal —

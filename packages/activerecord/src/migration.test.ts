@@ -69,7 +69,7 @@ function envName(adapter: DatabaseAdapter): string {
 
 function migrateProxy(version: number, body: (m: Migration) => Promise<void>): MigrationProxy {
   return {
-    version: String(version),
+    version,
     name: `Migration${version}`,
     migration: () =>
       new (class extends Migration {
@@ -712,9 +712,9 @@ describe("MigrationTest", () => {
     const adapter = Base.connection;
     const withMigrations = new Migrator(adapter, [
       {
-        version: "1",
+        version: 1,
         name: "First",
-        migration: () => anonymousMigration("First", "1"),
+        migration: () => anonymousMigration("First", 1),
       },
     ]);
     expect(withMigrations.migrations.length).toBeGreaterThan(0);
@@ -727,9 +727,9 @@ describe("MigrationTest", () => {
     const adapter = Base.connection;
     const migrations: MigrationProxy[] = [
       {
-        version: "20131219224947",
+        version: 20131219224947,
         name: "VersionCheck",
-        migration: () => anonymousMigration("VersionCheck", "20131219224947"),
+        migration: () => anonymousMigration("VersionCheck", 20131219224947),
       },
     ];
     const migrator = new Migrator(adapter, migrations);
@@ -900,12 +900,12 @@ describe("MigrationTest", () => {
     const adapter = Base.connection;
     const migrations: MigrationProxy[] = [
       {
-        version: "100",
+        version: 100,
         name: "Broken",
         migration: () =>
           anonymousMigration(
             "Broken",
-            "100",
+            100,
             async () => {
               throw new Error("Something broke");
             },
@@ -927,12 +927,12 @@ describe("MigrationTest", () => {
       const adapter = Base.connection;
       const migrations: MigrationProxy[] = [
         {
-          version: "100",
+          version: 100,
           name: "Broken",
           migration: () =>
             anonymousMigration(
               "Broken",
-              "100",
+              100,
               async () => {
                 throw new Error("Something broke");
               },
@@ -968,7 +968,7 @@ describe("MigrationTest", () => {
     }
 
     const proxy: MigrationProxy = {
-      version: "101",
+      version: 101,
       name: "MigWithoutTx",
       migration: () => new MigWithoutTx(),
     };
@@ -994,7 +994,7 @@ describe("MigrationTest", () => {
     const adapter = await freshAdapter();
     const loadError = new Error("uninitialized constant MigThatFailsToLoad");
     const proxy: MigrationProxy = {
-      version: "102",
+      version: 102,
       name: "MigThatFailsToLoad",
       migration: () => Promise.reject(loadError),
     };
@@ -1050,7 +1050,7 @@ describe("MigrationTest", () => {
       async down(): Promise<void> {}
     }
     const proxy: MigrationProxy = {
-      version: "1",
+      version: 1,
       name: "Failing",
       migration: () => new FailingMigration(),
     };
@@ -1071,9 +1071,9 @@ describe("MigrationTest", () => {
     await im.set("custom_key", "custom_value");
 
     const proxy: MigrationProxy = {
-      version: "1",
+      version: 1,
       name: "M1",
-      migration: () => anonymousMigration("M1", "1"),
+      migration: () => anonymousMigration("M1", 1),
     };
     const migrator = new Migrator(adapter, [proxy]);
     await migrator.up();
@@ -1100,9 +1100,9 @@ describe("MigrationTest", () => {
     expect(await im.tableExists()).toBe(false);
 
     const proxy: MigrationProxy = {
-      version: "1",
+      version: 1,
       name: "TestMigration",
-      migration: () => anonymousMigration("TestMigration", "1"),
+      migration: () => anonymousMigration("TestMigration", 1),
     };
     const migrator = new Migrator(adapter, [proxy]);
     try {
@@ -1366,12 +1366,12 @@ describe("MigrationTest", () => {
   itIfSupports("advisory_locks", "migrator one up with unavailable lock", async () => {
     const ran: string[] = [];
     const proxy: MigrationProxy = {
-      version: "100",
+      version: 100,
       name: "Broken",
       migration: () =>
         anonymousMigration(
           "Broken",
-          "100",
+          100,
           async () => {
             ran.push("ran");
           },
@@ -1392,12 +1392,12 @@ describe("MigrationTest", () => {
   itIfSupports("advisory_locks", "migrator one up with unavailable lock using run", async () => {
     const ran: string[] = [];
     const proxy: MigrationProxy = {
-      version: "100",
+      version: 100,
       name: "Broken",
       migration: () =>
         anonymousMigration(
           "Broken",
-          "100",
+          100,
           async () => {
             ran.push("ran");
           },
@@ -1431,9 +1431,9 @@ describe("MigrationTest", () => {
       const releaseSpy = vi.spyOn(realAdapter as any, "releaseAdvisoryLock");
       try {
         const proxy: MigrationProxy = {
-          version: "200",
+          version: 200,
           name: "NoOp",
-          migration: () => anonymousMigration("NoOp", "200"),
+          migration: () => anonymousMigration("NoOp", 200),
         };
         const migrator = new Migrator(realAdapter, [proxy]);
         await migrator.migrate();
@@ -1456,9 +1456,9 @@ describe("MigrationTest", () => {
       // own release finds nothing to release (migration_test.rb:1107-1124).
       const realAdapter = Base.connection;
       const proxy: MigrationProxy = {
-        version: "100",
+        version: 100,
         name: "NoOp",
-        migration: () => anonymousMigration("NoOp", "100"),
+        migration: () => anonymousMigration("NoOp", 100),
       };
       const migrator = new Migrator(realAdapter, [proxy], { targetVersion: 100 });
       const lockId = await migrator.generateMigratorAdvisoryLockId();
@@ -1951,7 +1951,7 @@ describe("MigrationTest", () => {
       class CM1 extends Migration {
         async change() {}
       }
-      expect(new CM1(undefined, "001").version).toBe("001");
+      expect(new CM1(undefined, 1).version).toBe(1);
     });
 
     it("copying migrations without timestamps from 2 sources", () => {
@@ -1961,15 +1961,15 @@ describe("MigrationTest", () => {
       class CM2 extends Migration {
         async change() {}
       }
-      expect(new CM1(undefined, "001").version).toBe("001");
-      expect(new CM2(undefined, "002").version).toBe("002");
+      expect(new CM1(undefined, 1).version).toBe(1);
+      expect(new CM2(undefined, 2).version).toBe(2);
     });
 
     it("copying migrations with timestamps", () => {
       class CM1 extends Migration {
         async change() {}
       }
-      expect(new CM1(undefined, "20230101120000").version).toBe("20230101120000");
+      expect(new CM1(undefined, 20230101120000).version).toBe(20230101120000);
     });
 
     it("copying migrations with timestamps from 2 sources", () => {
@@ -1979,8 +1979,8 @@ describe("MigrationTest", () => {
       class CM2 extends Migration {
         async change() {}
       }
-      expect(new CM1(undefined, "20230101120000").version).toBe("20230101120000");
-      expect(new CM2(undefined, "20230201120000").version).toBe("20230201120000");
+      expect(new CM1(undefined, 20230101120000).version).toBe(20230101120000);
+      expect(new CM2(undefined, 20230201120000).version).toBe(20230201120000);
     });
 
     it("copying migrations with timestamps to destination with timestamps in future", async () => {
@@ -2043,7 +2043,7 @@ describe("MigrationTest", () => {
       class CM1 extends Migration {
         async change() {}
       }
-      expect(new CM1(undefined, "001").version).toBe("001");
+      expect(new CM1(undefined, 1).version).toBe(1);
       expect(new CM1().name).toBe("CM1");
     });
 
@@ -2123,7 +2123,7 @@ describe("MigrationTest", () => {
         }
       }
       const { MigrationRunner } = await import("./migrator.js");
-      const runner = new MigrationRunner(cpAdapter, [new CPM1(undefined, "001")]);
+      const runner = new MigrationRunner(cpAdapter, [new CPM1(undefined, 1)]);
       const status = await runner.status();
       expect(status.length).toBe(1);
       expect(status[0].status).toBe("down");
@@ -2139,7 +2139,7 @@ describe("MigrationTest", () => {
         class LongV extends Migration {
           async change() {}
         }
-        expect(new LongV(undefined, "123456789012345").version).toBe("123456789012345");
+        expect(new LongV(undefined, 123456789012345).version).toBe(123456789012345);
       });
 
       it("migration raises if timestamp is future date", () => {
@@ -2162,7 +2162,7 @@ describe("MigrationTest", () => {
 
       it("migration succeeds if timestamp is less than one day in the future", () => {
         const now = Date.now();
-        const ts = String(now);
+        const ts = now;
         class FutureM extends Migration {
           async change() {}
         }
@@ -2173,14 +2173,14 @@ describe("MigrationTest", () => {
         class FutureM2 extends Migration {
           async change() {}
         }
-        expect(new FutureM2(undefined, "99991231235959").version).toBe("99991231235959");
+        expect(new FutureM2(undefined, 99991231235959).version).toBe(99991231235959);
       });
 
       it("migration succeeds despite future timestamp if timestamped migrations is false", () => {
         class NoTs extends Migration {
           async change() {}
         }
-        expect(new NoTs(undefined, "99999999999999").version).toBe("99999999999999");
+        expect(new NoTs(undefined, 99999999999999).version).toBe(99999999999999);
       });
 
       it("copied migrations at timestamp boundary are valid", async () => {
@@ -2374,7 +2374,7 @@ function mockMigration(): { migration: Migration; sql: string[] } {
   const sql: string[] = [];
   const migration = new (class extends Migration {
     async change() {}
-  })(undefined, "20240101000000");
+  })(undefined, 20240101000000);
   (migration as any).adapter = {
     execute: async () => [],
     executeMutation: async (s: string) => {

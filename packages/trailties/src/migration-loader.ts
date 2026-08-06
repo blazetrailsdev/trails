@@ -73,7 +73,7 @@ export async function discoverMigrations(migrationsDir: string): Promise<Migrati
     const match = file.match(MIGRATION_FILE_PATTERN);
     if (!match) continue;
 
-    const version = match[1];
+    const version = Number(match[1]);
     // Rails camelizes the parsed name before building the proxy
     // (migration.rb:1311); the hyphen alias is folded to the underscore form
     // first so Migrator.validate()'s duplicate-name check sees hyphen-alias
@@ -103,7 +103,7 @@ function isMigrationClass(value: unknown): boolean {
 
 async function loadMigrationClass(
   filePath: string,
-): Promise<new (name?: string, version?: string) => Migration> {
+): Promise<new (name?: string, version?: number) => Migration> {
   let mod: any;
   try {
     mod = await import(pathToFileURL(filePath).href);

@@ -1403,7 +1403,7 @@ export class CreatePosts extends Migration {
     try {
       const migrations = [
         {
-          version: "20260101000000",
+          version: 20260101000000,
           name: "CreateWidgets",
           migration: () =>
             new (class extends Migration {
@@ -1415,7 +1415,7 @@ export class CreatePosts extends Migration {
               override async down(): Promise<void> {
                 await this.connection.executeMutation(`DROP TABLE widgets`);
               }
-            })("CreateWidgets", "20260101000000"),
+            })("CreateWidgets", 20260101000000),
         },
       ];
       disableMetadataTable(adapter);

@@ -28,9 +28,9 @@ describe("MigrationContext", () => {
     const context = new MigrationContext([`${MIGRATIONS_ROOT}/valid`]);
 
     expect(context.migrations.map((m) => [m.version, m.name])).toEqual([
-      ["1", "ValidPeopleHaveLastNames"],
-      ["2", "WeNeedReminders"],
-      ["3", "InnocentJointable"],
+      [1, "ValidPeopleHaveLastNames"],
+      [2, "WeNeedReminders"],
+      [3, "InnocentJointable"],
     ]);
   });
 
@@ -41,11 +41,7 @@ describe("MigrationContext", () => {
     ]);
 
     expect(context.migrations.map((m) => m.version)).toEqual([
-      "20090101010101",
-      "20090101010202",
-      "20100101010101",
-      "20100201010101",
-      "20100301010101",
+      20090101010101, 20090101010202, 20100101010101, 20100201010101, 20100301010101,
     ]);
   });
 
@@ -53,11 +49,9 @@ describe("MigrationContext", () => {
     const valid = new MigrationContext([`${MIGRATIONS_ROOT}/valid`]);
     const timestamped = new MigrationContext([`${MIGRATIONS_ROOT}/valid_with_timestamps`]);
 
-    expect(valid.migrations.map((m) => m.version)).toEqual(["1", "2", "3"]);
+    expect(valid.migrations.map((m) => m.version)).toEqual([1, 2, 3]);
     expect(timestamped.migrations.map((m) => m.version)).toEqual([
-      "20100101010101",
-      "20100201010101",
-      "20100301010101",
+      20100101010101, 20100201010101, 20100301010101,
     ]);
   });
 

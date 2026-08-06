@@ -52,14 +52,14 @@ export interface ActiveRecord {
  */
 export class MigrationProxy {
   name: string;
-  version: string;
+  version: number;
   filename: string;
   scope: string;
 
   private _migration: Migration | null = null;
   private _migrationPromise: Promise<Migration> | null = null;
 
-  constructor(name: string, version: string, filename: string, scope: string) {
+  constructor(name: string, version: number, filename: string, scope: string) {
     this.name = name;
     this.version = version;
     this.filename = filename;
@@ -111,7 +111,7 @@ export class MigrationProxy {
         cause === undefined ? undefined : { cause },
       );
     }
-    return new (klass as new (name: string, version: string) => Migration)(this.name, this.version);
+    return new (klass as new (name: string, version: number) => Migration)(this.name, this.version);
   }
 
   /**

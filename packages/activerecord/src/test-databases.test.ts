@@ -265,12 +265,12 @@ describe("TestDatabasesTest", () => {
     const log: string[] = [];
     const migrations: MigrationProxy[] = [
       {
-        version: "1",
+        version: 1,
         name: "M1",
         migration: () =>
           anonymousMigration(
             "M1",
-            "1",
+            1,
             async () => {
               log.push("up");
             },

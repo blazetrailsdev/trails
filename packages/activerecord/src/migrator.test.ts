@@ -29,9 +29,9 @@ const MIGRATIONS_ROOT = new URL("./test-helpers/migrations", import.meta.url).pa
 // passing a bare Migration where the proxy type is annotated.
 function migration(name: string, version?: number): MigrationProxy {
   return {
-    version: version === undefined ? (null as unknown as string) : String(version),
+    version: version === undefined ? (null as unknown as number) : version,
     name,
-    migration: () => anonymousMigration(name, version === undefined ? undefined : String(version)),
+    migration: () => anonymousMigration(name, version),
   };
 }
 
@@ -43,12 +43,12 @@ function sensors(count: number): { calls: Array<[string, number]>; migrations: M
   for (let i = 0; i < count; i++) {
     const version = i + 1;
     migrations.push({
-      version: String(version),
+      version,
       name: `Sensor${version}`,
       migration: () =>
         anonymousMigration(
           `Sensor${version}`,
-          String(version),
+          version,
           async () => {
             calls.push(["up", version]);
           },
@@ -162,7 +162,7 @@ describe("MigratorTest", () => {
         [3, "InnocentJointable"],
       ] as Array<[number, string]>
     ).forEach(([version, name], i) => {
-      expect(migrations[i].version).toBe(String(version));
+      expect(migrations[i].version).toBe(version);
       expect(migrations[i].name).toBe(name);
     });
   });
@@ -178,7 +178,7 @@ describe("MigratorTest", () => {
         [3, "InnocentJointable"],
       ] as Array<[number, string]>
     ).forEach(([version, name], i) => {
-      expect(migrations[i].version).toBe(String(version));
+      expect(migrations[i].version).toBe(version);
       expect(migrations[i].name).toBe(name);
     });
   });
@@ -199,14 +199,14 @@ describe("MigratorTest", () => {
         [20100301010101, "ValidWithTimestampsInnocentJointable"],
       ] as Array<[number, string]>
     ).forEach(([version, name], i) => {
-      expect(migrations[i].version).toBe(String(version));
+      expect(migrations[i].version).toBe(version);
       expect(migrations[i].name).toBe(name);
     });
   });
 
   it("finds migrations in numbered directory", () => {
     const migrations = new MigrationContext([`${MIGRATIONS_ROOT}/10_urban`]).migrations;
-    expect(migrations[0].version).toBe("9");
+    expect(migrations[0].version).toBe(9);
     expect(migrations[0].name).toBe("AddExpressions");
   });
 
@@ -222,7 +222,7 @@ describe("MigratorTest", () => {
     const migrations = await new Migrator(adapter, migrationList).pendingMigrations();
 
     expect(migrations).toHaveLength(1);
-    expect(migrations[0].version).toBe("3");
+    expect(migrations[0].version).toBe(3);
     expect(migrations[0].name).toBe("bar");
   });
 
@@ -576,7 +576,7 @@ describe("MigratorTest", () => {
 
     const result = await migrator.run("up", 1);
 
-    expect(result).toBe("1");
+    expect(result).toBe(1);
   });
 
   it("migrator rollback", async () => {
@@ -637,13 +637,13 @@ describe("MigratorTest", () => {
     const { migrator } = migratorClass(3);
 
     await migrator.migrate();
-    expect(await migrator.getAllVersions()).toEqual(["1", "2", "3"]);
+    expect(await migrator.getAllVersions()).toEqual([1, 2, 3]);
 
     await migrator.rollback();
-    expect(await migrator.getAllVersions()).toEqual(["1", "2"]);
+    expect(await migrator.getAllVersions()).toEqual([1, 2]);
 
     await migrator.rollback();
-    expect(await migrator.getAllVersions()).toEqual(["1"]);
+    expect(await migrator.getAllVersions()).toEqual([1]);
 
     await migrator.rollback();
     expect(await migrator.getAllVersions()).toEqual([]);
@@ -658,12 +658,12 @@ function trackedSensor(
 ): { proxy: MigrationProxy; state: { wentUp: boolean; wentDown: boolean } } {
   const state = { wentUp: false, wentDown: false };
   const proxy: MigrationProxy = {
-    version: String(version),
+    version,
     name: name ?? `Sensor${version}`,
     migration: () =>
       anonymousMigration(
         name ?? `Sensor${version}`,
-        String(version),
+        version,
         async () => {
           state.wentUp = true;
         },

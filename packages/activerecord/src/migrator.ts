@@ -33,7 +33,7 @@ export class MigrationRunner {
       // Rails leaves an unversioned migration's #version nil, but a
       // schema_migrations row needs a key, so this runner keeps its
       // long-standing class-name fallback.
-      version: m.version ?? m.constructor.name,
+      version: String(m.version ?? m.constructor.name),
       migration: m,
     }));
   }

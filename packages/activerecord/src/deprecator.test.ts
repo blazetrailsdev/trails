@@ -10,12 +10,12 @@ describe("MigrationProxy", () => {
   it("stores name, version, filename, scope", () => {
     const proxy = new MigrationProxy(
       "CreateUsers",
-      "20240101000000",
+      20240101000000,
       "/db/migrate/20240101000000_create_users.ts",
       "",
     );
     expect(proxy.name).toBe("CreateUsers");
-    expect(proxy.version).toBe("20240101000000");
+    expect(proxy.version).toBe(20240101000000);
     expect(proxy.filename).toBe("/db/migrate/20240101000000_create_users.ts");
     expect(proxy.scope).toBe("");
   });
@@ -23,7 +23,7 @@ describe("MigrationProxy", () => {
   it("basename returns the filename basename", () => {
     const proxy = new MigrationProxy(
       "CreateUsers",
-      "1",
+      1,
       "/db/migrate/20240101000000_create_users.ts",
       "",
     );
@@ -31,14 +31,14 @@ describe("MigrationProxy", () => {
   });
 
   it("disableDdlTransaction throws before migration() is awaited", () => {
-    const proxy = new MigrationProxy("CreateUsers", "1", "/fake/path.ts", "");
+    const proxy = new MigrationProxy("CreateUsers", 1, "/fake/path.ts", "");
     expect(() => proxy.disableDdlTransaction).toThrow(
       "MigrationProxy: await migration() before reading disableDdlTransaction",
     );
   });
 
   it("loadMigrationAsync falls through to import() on ERR_REQUIRE_ESM", async () => {
-    const proxy = new MigrationProxy("CreateUsers", "1", "/fake/path.ts", "");
+    const proxy = new MigrationProxy("CreateUsers", 1, "/fake/path.ts", "");
     const esmError = Object.assign(new Error("ERR_REQUIRE_ESM"), { code: "ERR_REQUIRE_ESM" });
     vi.spyOn(proxy, "loadMigration").mockImplementation(() => {
       throw esmError;
@@ -52,11 +52,11 @@ describe("MigrationProxy", () => {
       async up(): Promise<void> {}
     }
     NoTransaction.disableDdlTransactionBang();
-    const migration = new NoTransaction("NoTransaction", "1");
+    const migration = new NoTransaction("NoTransaction", 1);
     const migrate = vi.spyOn(migration, "migrate").mockResolvedValue(undefined);
     const announce = vi.spyOn(migration, "announce").mockImplementation(() => {});
     const write = vi.spyOn(migration, "write").mockImplementation(() => {});
-    const proxy = new MigrationProxy("NoTransaction", "1", "/fake/path.ts", "");
+    const proxy = new MigrationProxy("NoTransaction", 1, "/fake/path.ts", "");
     vi.spyOn(proxy, "loadMigrationAsync").mockResolvedValue(migration);
 
     await proxy.migrate("up");
@@ -70,8 +70,8 @@ describe("MigrationProxy", () => {
   });
 
   it("migration() caches the result of loadMigration()", async () => {
-    const proxy = new MigrationProxy("CreateUsers", "1", "/fake/path.ts", "");
-    const sentinel = new CreateUsers("CreateUsers", "1");
+    const proxy = new MigrationProxy("CreateUsers", 1, "/fake/path.ts", "");
+    const sentinel = new CreateUsers("CreateUsers", 1);
     const spy = vi.spyOn(proxy, "loadMigrationAsync").mockResolvedValue(sentinel);
 
     const first = await proxy.migration();
