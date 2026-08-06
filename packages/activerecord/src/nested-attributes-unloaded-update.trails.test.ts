@@ -76,10 +76,12 @@ describe("nested attributes update on an unloaded one-to-one association", () =>
     const [pirate, ship] = await pirateWithUnloadedShip();
     const shipId = (ship as unknown as { id: number }).id;
 
-    (pirate as unknown as { shipAttributes: unknown }).shipAttributes = {
+    await (
+      pirate as unknown as { setShipAttributes(attributes: unknown): Promise<void> }
+    ).setShipAttributes({
       id: shipId,
       name: "Davy Jones Gold Dagger",
-    };
+    });
     await pirate.save();
 
     const reloaded = (await Ship.find(shipId)) as unknown as { name: string };
@@ -101,15 +103,18 @@ describe("nested attributes update on an unloaded one-to-one association", () =>
       pirate.setShipAttributes({ id: (ship as unknown as { id: number }).id + 1000, name: "X" }),
     ).rejects.toThrow(/Couldn't find/);
   });
+
   it("raises a strict-loading violation instead of lazy-loading the unloaded record", async () => {
     const [pirate, ship] = await pirateWithUnloadedShip();
     pirate.strictLoadingBang();
 
-    expect(() => {
-      (pirate as unknown as { shipAttributes: unknown }).shipAttributes = {
+    await expect(
+      (
+        pirate as unknown as { setShipAttributes(attributes: unknown): Promise<void> }
+      ).setShipAttributes({
         id: (ship as unknown as { id: number }).id,
         name: "Davy Jones Gold Dagger",
-      };
-    }).toThrow(StrictLoadingViolationError);
+      }),
+    ).rejects.toThrow(StrictLoadingViolationError);
   });
 });
