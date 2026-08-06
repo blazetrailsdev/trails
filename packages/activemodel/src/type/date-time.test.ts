@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import { instant, plainDateTime } from "@blazetrails/activesupport/testing/temporal-helpers";
 import { TimeZone, setZoneDefault } from "@blazetrails/activesupport";
 import { Types } from "../index.js";

@@ -3,7 +3,7 @@
  *
  * Mirrors: ActiveModel::Type::Helpers::TimeValue
  */
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import { isUtc } from "./timezone.js";
 
 export interface TimezoneAware {

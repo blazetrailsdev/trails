@@ -10,6 +10,7 @@ import { Duration } from "./duration.js";
 import { currentTime } from "./time-travel.js";
 import { getZone } from "./time-zone-config.js";
 import { Temporal, instantFrom } from "./temporal.js";
+import { strftime } from "@blazetrails/date";
 import { Encoding } from "./json/encoding.js";
 
 /**
@@ -39,23 +40,6 @@ export interface AdvanceOptions {
   seconds?: number;
 }
 
-const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-
-const MONTH_NAMES = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-];
-
 const SHORT_MONTH_NAMES = [
   "Jan",
   "Feb",
@@ -75,10 +59,6 @@ const SHORT_DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 function pad2(n: number): string {
   return String(n).padStart(2, "0");
-}
-
-function pad3(n: number): string {
-  return String(n).padStart(3, "0");
 }
 
 function daysInMonth(year: number, month: number): number {
@@ -392,54 +372,30 @@ export class TimeWithZone {
   }
 
   /**
-   * Format using strftime-style format string.
+   * Rails' `TimeWithZone` defines no `strftime` of its own — `method_missing`
+   * sends it on to the underlying `Time` (`time_with_zone.rb:557-566`), so the
+   * one implementation both reach is the `date` gem's C formatter, ported at
+   * `packages/date/src/date.ts`. `%z` comes off `formattedOffset` rather than
+   * the zone name, as `Time#strftime`'s does off `utc_offset`.
    */
   strftime(format: string): string {
     const l = this._local();
-    const tokens: Record<string, () => string> = {
-      Y: () => String(l.year),
-      C: () => String(Math.floor(l.year / 100)),
-      y: () => pad2(l.year % 100),
-      m: () => pad2(l.month),
-      d: () => pad2(l.day),
-      e: () => String(l.day).padStart(2, " "),
-      j: () => String(this.yday).padStart(3, "0"),
-      H: () => pad2(l.hour),
-      k: () => String(l.hour).padStart(2, " "),
-      I: () => pad2(l.hour === 0 ? 12 : l.hour > 12 ? l.hour - 12 : l.hour),
-      l: () => String(l.hour === 0 ? 12 : l.hour > 12 ? l.hour - 12 : l.hour).padStart(2, " "),
-      P: () => (l.hour < 12 ? "am" : "pm"),
-      p: () => (l.hour < 12 ? "AM" : "PM"),
-      M: () => pad2(l.minute),
-      S: () => pad2(l.second),
-      L: () => pad3(l.millisecond),
-      N: () => String(l.millisecond * 1_000_000).padStart(9, "0"),
-      z: () => this.formattedOffset(false),
-      Z: () => this.zone,
-      ":z": () => this.formattedOffset(true),
-      A: () => DAY_NAMES[this.wday],
-      a: () => SHORT_DAY_NAMES[this.wday],
-      u: () => String(this.wday === 0 ? 7 : this.wday),
-      w: () => String(this.wday),
-      B: () => MONTH_NAMES[l.month - 1],
-      b: () => SHORT_MONTH_NAMES[l.month - 1],
-      h: () => SHORT_MONTH_NAMES[l.month - 1],
-      s: () => String(this.toI()),
-      n: () => "\n",
-      t: () => "\t",
-      "%": () => "%",
-    };
-
-    return format.replace(/%(-?)(:?[A-Za-z%])/g, (_match, flag, spec) => {
-      const fn = tokens[spec];
-      if (!fn) return _match;
-      let result = fn();
-      if (flag === "-") {
-        // Remove leading zeros/spaces
-        result = result.replace(/^[0 ]+/, "") || "0";
-      }
-      return result;
-    });
+    return strftime(
+      {
+        year: l.year,
+        mon: l.month,
+        day: l.day,
+        wday: this.wday,
+        yday: this.yday,
+        hour: l.hour,
+        min: l.minute,
+        sec: l.second,
+        nsec: l.millisecond * 1_000_000,
+        zone: this.zone,
+        zoneOffset: this.formattedOffset(false),
+      },
+      format,
+    );
   }
 
   /**

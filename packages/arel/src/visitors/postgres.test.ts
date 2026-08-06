@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { testConnection, postgresqlTestConnection } from "../test-helpers/connection.js";
 import { Table, star, SelectManager, Nodes, Visitors } from "../index.js";
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 
 describe("PostgresTest", () => {
   const users = new Table("users");

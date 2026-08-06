@@ -10,7 +10,8 @@
   },
   "dependencies": {
     "@blazetrails/activemodel": "workspace:*",
-    "@blazetrails/activesupport": "workspace:*"
+    "@blazetrails/activesupport": "workspace:*",
+    "@blazetrails/date": "workspace:*"
   },
   "files": [
     "dist"

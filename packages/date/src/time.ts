@@ -279,6 +279,7 @@ export class Time {
         hour: this.hour,
         min: this.min,
         sec: this.sec,
+        nsec: 0,
         zone: this.zone ?? "",
         zoneOffset,
       },

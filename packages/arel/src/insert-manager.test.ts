@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import { Table, sql, InsertManager, Nodes } from "./index.js";
 import { fakeRecordEngine } from "./test-helpers/connection.js";
 
