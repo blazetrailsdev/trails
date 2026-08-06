@@ -315,6 +315,11 @@ export const ORDER_PREFIX = "order:";
  * which is the `resolvePortFn` cross-file-fallback false-positive class the
  * codegen scorer hit on `relation.rb::computeCacheKey`.
  *
+ * Compared over a SINGLE candidate declaration's sequence only — two
+ * declarations under one name have no combined order — and the `rubyCalls` /
+ * `tsCalls` sequences must both be deduplicated at first occurrence, since a
+ * name's position is its first one.
+ *
  * At most one flag per body, naming the first inversion — `order:b,a → a,b`
  * reads "TS calls b before a; Rails calls a before b" — so the row is a stable
  * baseline key rather than a whole-sequence string that churns on every edit.
@@ -329,15 +334,15 @@ export function reorderedCalls(
 ): string[] {
   const rubySeq: string[] = [];
   for (const rc of rubyCalls) {
-    if (rc === rubyName) continue; // self/recursive call
+    if (rc === rubyName) continue;
     if (rc === "super") continue;
     if (!significant.has(rc)) continue;
     const mapped = mapCall(rc);
     if (!mapped || mapped.length === 0) continue;
     if (!mapped.some(isPortedWithArgs)) continue;
     const hit = mapped.find((c) => tsCalls.includes(c));
-    if (hit === undefined) continue; // missing, not reordered
-    if (rubySeq.includes(hit)) continue; // one position per TS name
+    if (hit === undefined) continue;
+    if (rubySeq.includes(hit)) continue;
     rubySeq.push(hit);
   }
   if (rubySeq.length < 2) return [];
@@ -1642,10 +1647,6 @@ export function main() {
     const tsOptionKeysByFileName = new Map<string, Map<string, (string[] | null)[]>>();
     // Body call-sets scoped per (file, name) for the advisory calls-parity check.
     const tsCallsByFileName = new Map<string, Map<string, string[][]>>();
-    // Same population, source-ordered (MethodInfo.callSeq), for the order-only
-    // comparison (RFC 0084). Kept separate from tsCallsByFileName because that
-    // one is unioned/flattened across candidate declarations and helpers, which
-    // has no order to speak of.
     const tsCallSeqByFileName = new Map<string, Map<string, string[][]>>();
     const tsMissingCallTagsByFileName = new Map<string, Map<string, Set<string>>>();
     // Same call-sets unioned by NAME across this package and its deps (the same
@@ -2178,10 +2179,6 @@ export function main() {
             if (tags.has(call)) suppressedCalls.push({ tsFile, rubyName, tsName, call });
           }
         }
-        // Order-only parity (RFC 0084), over the body's OWN source-ordered
-        // sequence: a single candidate declaration only — two declarations under
-        // one name have no combined order — and never a delegating wrapper,
-        // whose order belongs to the implementation it forwards to.
         const seqSets = tsCallSeqByFileName.get(tsFile)?.get(tsName);
         const ordered: string[] = [];
         if (seqSets?.length === 1 && !isDelegatingWrapper(tsName, own.calls)) {

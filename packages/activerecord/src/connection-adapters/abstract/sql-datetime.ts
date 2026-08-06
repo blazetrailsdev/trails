@@ -33,8 +33,8 @@ import { ActiveRecord } from "../../ar-config.js";
  * `value.to_fs(:db)` (abstract/quoting.rb:193) resolves to, depending on
  * whether the value carries a time.
  */
-const DB_TIME_FORMAT = "%Y-%m-%d %H:%M:%S";
-const DB_DATE_FORMAT = "%Y-%m-%d";
+const TIME_DB_FORMAT = "%Y-%m-%d %H:%M:%S";
+const DATE_DB_FORMAT = "%Y-%m-%d";
 
 /**
  * @internal The fields the `date` gem's `strftime` reads off its receiver.
@@ -75,7 +75,7 @@ function strftimeSubject(v: {
  * value.usec)` when `usec > 0`.
  */
 function toFsDbWithUsec(subject: StrftimeSubject): string {
-  return strftime(subject, DB_TIME_FORMAT) + microsecondFraction(Math.floor(subject.nsec / 1_000));
+  return strftime(subject, TIME_DB_FORMAT) + microsecondFraction(Math.floor(subject.nsec / 1_000));
 }
 
 /**
@@ -113,7 +113,7 @@ export function formatPlainDateTimeForSql(value: Temporal.PlainDateTime): string
  * Format a `Temporal.PlainDate` for SQL as `YYYY-MM-DD`.
  */
 export function formatPlainDateForSql(value: Temporal.PlainDate): string {
-  return strftime(strftimeSubject(value.toPlainDateTime()), DB_DATE_FORMAT);
+  return strftime(strftimeSubject(value.toPlainDateTime()), DATE_DB_FORMAT);
 }
 
 /**
