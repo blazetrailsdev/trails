@@ -93,16 +93,10 @@ describe("assertionValueMismatch", () => {
   });
 
   it("never flags an RFC 0088 Temporal-vs-Ruby-temporal expected value", () => {
-    // RFC 0088's headline decision is that trails returns Temporal types where
-    // the `date` gem returns Date/DateTime/Time, so a faithfully-ported gem test
-    // pairs `assert_equal Date.new(2001, 2, 3), Date.parse("2001-02-03")` with
-    // `expect(...).toEqual(Temporal.PlainDate.from("2001-02-03"))`. Neither
-    // expected argument is a literal — both extractors emit `null` for a method
-    // call (extract-ruby-tests.rb literal_token, extract-ts-core.ts
-    // literalToken) — so the kind is skipped and `date.value` cannot rise for
-    // the intended shape. This is the mechanism the story asked for, and it is
-    // structural rather than an exclusion: locked here so a future extractor
-    // that starts capturing constructor calls has to confront it.
+    // `assert_equal Date.new(2001, 2, 3), …` vs
+    // `expect(…).toEqual(Temporal.PlainDate.from("2001-02-03"))`: both extractors
+    // emit `null` for a method call, so the kind is skipped and `date.value`
+    // cannot rise for RFC 0088's intended shape. See the module header.
     expect(assertionValueMismatch(["assert_equal"], [null], ["toEqual"], [null], false)).toBeNull();
     // A one-sided capture is skipped too: the sides are not both fully literal.
     expect(

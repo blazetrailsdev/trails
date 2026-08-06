@@ -764,21 +764,14 @@ export abstract class SchemaDumper {
       | {
           checkConstraints: (t: string) => Promise<unknown[]>;
           supportsCheckConstraints?: () => boolean;
-          pool?: { serverVersion?: (connection: unknown) => unknown };
         }
       | undefined;
     if (!host) return;
     // Mirror Rails' call-site guard (`schema_dumper.rb:210`: `... if
     // @connection.supports_check_constraints?`): adapters whose checkConstraints
     // raises NotImplementedError when unsupported (e.g. MySQL <8.0.16, MariaDB
-    // <10.2.1) must not be queried. supportsCheckConstraints reads the cached
-    // database version, which the dump path doesn't always load eagerly, so
-    // ensure it's resolved first to avoid a false negative dropping real
-    // constraints from the dump.
-    if (host.supportsCheckConstraints) {
-      await host.pool?.serverVersion?.(host);
-      if (!host.supportsCheckConstraints()) return;
-    }
+    // <10.2.1) must not be queried.
+    if (host.supportsCheckConstraints && !host.supportsCheckConstraints()) return;
     const constraints = (await host.checkConstraints(tableName)) ?? [];
     for (const chk of constraints as { expression: string; name?: string; validate?: boolean }[]) {
       const [expr, ...opts] = this.checkParts(chk);

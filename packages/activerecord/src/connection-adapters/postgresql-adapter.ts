@@ -768,16 +768,13 @@ export class PostgreSQLAdapter
    */
   private async _maybeConfigureConnection(client: pg.Client): Promise<void> {
     if (this._connectionConfigured) return;
-    // Rails' PostgreSQLAdapter#configure_connection opens with `super`
-    // (postgresql_adapter.rb:957), so check_version — and with it the
-    // `database_version` round-trip — runs before anything else on the fresh
-    // socket. Our `databaseVersion` getter is sync and cannot self-fetch, so the
-    // memo is filled here instead, which is what lets every version-gated
-    // `supports*()` predicate read it without a warm of its own. Issued
-    // DIRECTLY on `client`, like the SET statements below: getDatabaseVersion()
-    // acquires its own client and would re-enter the acquire machinery that
-    // still holds `_acquiring`. A zero version is left uncached so
-    // getDatabaseVersion()'s ConnectionFailed path still owns that failure.
+    // Deviation, language-forced: Rails' configure_connection opens with `super`
+    // (postgresql_adapter.rb:957), whose check_version reads the lazy sync
+    // `database_version`. Ours cannot self-fetch, so the memo is filled at that
+    // same position. Issued DIRECTLY on `client`, like the SET statements below:
+    // getDatabaseVersion() acquires its own client and would re-enter the
+    // acquire machinery still holding `_acquiring`. A zero version is left
+    // uncached so getDatabaseVersion()'s ConnectionFailed path still owns it.
     if (this._databaseVersion === null) {
       const version = await this._serverVersion(client);
       if (version !== 0) this._databaseVersion = version;

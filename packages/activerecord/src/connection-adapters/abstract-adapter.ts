@@ -2558,18 +2558,13 @@ export class AbstractAdapter implements Quoting {
 
   /** @internal Mirrors: AbstractAdapter#configure_connection (`abstract_adapter.rb:1212-1214`) */
   configureConnection(..._args: unknown[]): void | Promise<void> {
-    // Rails' body is `check_version` alone. The extra line is the one place
-    // trails pays for a genuine language gap: `database_version`
-    // (`abstract_adapter.rb:854-856`) is a sync reader whose
-    // `pool.server_version(self)` issues the round-trip on demand, while our
-    // `getDatabaseVersion()` is a real await, so the sync `databaseVersion`
-    // getter cannot self-fetch. Filling the pool memo here — at the point Rails
-    // establishes the connection, before `check_version` reads it — makes the
-    // getter warm for the life of the connection, so every version-gated
-    // `supports*()` predicate is a plain memo hit and no ported body carries a
-    // warm of its own.
-    // The sync arm keeps SQLite's `configure_connection` synchronous, exactly
-    // as Rails' is.
+    // Deviation, language-forced: Rails' body is `check_version` alone because
+    // `database_version` (`abstract_adapter.rb:854-856`) is a sync reader that
+    // issues its own round-trip. `getDatabaseVersion()` is a real await, so the
+    // sync getter cannot self-fetch; filling the pool memo at the point Rails
+    // establishes the connection is what keeps every version-gated `supports*()`
+    // read a plain memo hit. The sync arm keeps SQLite's `configure_connection`
+    // synchronous, as Rails' is.
     const serverVersion = this.pool.serverVersion(this);
     if (serverVersion instanceof Promise) return serverVersion.then(() => this.checkVersion());
     this.checkVersion();
