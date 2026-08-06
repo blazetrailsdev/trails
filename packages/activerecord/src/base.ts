@@ -672,7 +672,7 @@ interface _AssociationDefLike {
 
 /**
  * A constructor-form assignment held back until after `super()` —
- * `assignAssociationIfMatch` reaches `this.association(...)`, whose cache
+ * `_dispatchAssociationAttrs` reaches `this.association(...)`, whose cache
  * field is not initialized until `super()` returns.
  * @internal
  */
@@ -704,7 +704,7 @@ function _isCollectionIdsKey(defs: _AssociationDefLike[], key: string): boolean 
  * nothing.
  *
  * A `#{singular}Ids` key (`new Author({postIds: [...]})`) is deferred too:
- * `assignAssociationIfMatch` reaches `this.association(name)`, whose cache
+ * `_dispatchAssociationAttrs` reaches `this.association(name)`, whose cache
  * field is not initialized until after `super()` returns.
  */
 function _extractAssociationAttrs(
