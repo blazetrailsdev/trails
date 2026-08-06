@@ -259,6 +259,15 @@ let _registry: CanonicalTableDef[] | null = null;
 export async function prepareSchema(
   adapter: DatabaseAdapter,
 ): Promise<{ ss: SchemaStatements; typeMap: Record<string, string | undefined> }> {
+  // Rails' schema loader always runs on a checked-out — therefore connected —
+  // connection, because `checkout` ends in `verify!` (`abstract_adapter.rb:759`).
+  // trails' adapters connect lazily on the first query, so the DDL below would
+  // otherwise be the first thing to touch a cold adapter, and the version-gated
+  // predicates `create_table` reads (`row_format_dynamic_by_default?`,
+  // `supports_index_sort_order?`) are sync. Establishing the connection here is
+  // what Rails' checkout does; `configure_connection` fills the version memo on
+  // the way through, so no ported body needs a warm of its own.
+  await (adapter as { verifyBang?: () => Promise<void> }).verifyBang?.();
   const ss = adapter as unknown as SchemaStatements;
   const typeMap =
     adapter.adapterName === "postgres"

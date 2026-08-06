@@ -163,21 +163,29 @@ interface QuotedScopeHost {
  */
 export interface RowFormatHost {
   isMariadb(): boolean;
-  databaseVersion: Version;
+  pool: { serverVersion(connection: unknown): unknown };
   queryValue(sql: string, name?: string): Promise<unknown>;
   _defaultRowFormat?: string | null;
 }
 
 /** @internal */
-export function isRowFormatDynamicByDefault(this: RowFormatHost): boolean {
+export async function isRowFormatDynamicByDefault(this: RowFormatHost): Promise<boolean> {
+  // Rails' `row_format_dynamic_by_default?` (mysql/schema_statements.rb:146-152)
+  // is sync, reading `database_version` — a reader that fetches on demand and so
+  // works on a standalone, not-yet-connected adapter. Ours cannot, and
+  // `create_table` on such an adapter reaches here before anything has opened a
+  // socket, so the await stands in for Rails' lazy read. Converging it needs the
+  // version-gated predicates to go async (RFC 0072
+  // `make-version-gated-predicates-async`).
+  const databaseVersion = (await this.pool.serverVersion(this)) as Version;
   return this.isMariadb()
-    ? this.databaseVersion.compare("10.2.2") >= 0
-    : this.databaseVersion.compare("5.7.9") >= 0;
+    ? databaseVersion.compare("10.2.2") >= 0
+    : databaseVersion.compare("5.7.9") >= 0;
 }
 
 /** @internal */
 export async function defaultRowFormat(this: RowFormatHost): Promise<string | null> {
-  if (isRowFormatDynamicByDefault.call(this)) return null;
+  if (await isRowFormatDynamicByDefault.call(this)) return null;
 
   if (!("_defaultRowFormat" in this)) {
     const value = await this.queryValue(

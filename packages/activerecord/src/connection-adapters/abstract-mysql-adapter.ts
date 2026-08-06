@@ -633,7 +633,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
       await this._execMutation(
         `CREATE DATABASE ${this.quoteTableName(name)} DEFAULT CHARACTER SET ${this.quoteTableName(String(options.charset))}`,
       );
-    } else if (isRowFormatDynamicByDefault.call(this)) {
+    } else if (await isRowFormatDynamicByDefault.call(this)) {
       await this._execMutation(
         `CREATE DATABASE ${this.quoteTableName(name)} DEFAULT CHARACTER SET \`utf8mb4\``,
       );
