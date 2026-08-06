@@ -15,8 +15,9 @@ export { Temporal };
 /**
  * Bridge a JS Date to a Temporal.Instant.
  *
- * @noRailsEquivalent A JS-`Date` bridge; `packages/date` has no opinion about
- * JS `Date` and the ruby/date gem has no counterpart, so this stays here.
+ * @noRailsEquivalent PERMANENT — a JS-`Date` bridge. Ruby has no JS `Date`, so
+ * neither Rails nor the ruby/date gem has anything to port here, and
+ * `packages/date` holds no opinion about the type.
  */
 export function instantFrom(date: Date): Temporal.Instant {
   return Temporal.Instant.fromEpochMilliseconds(date.getTime());
