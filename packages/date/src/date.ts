@@ -2311,7 +2311,7 @@ export class Date {
    */
   constructor(year?: number, month?: number, day?: number);
   /**
-   * @internal `date_core.c` `d_simple_new_internal` (`date_core.c:1057-1078`),
+   * @internal `date_core.c` `d_simple_new_internal` (`date_core.c:3036-3050`),
    * which writes an already-resolved day straight into a fresh
    * `SimpleDateData` under `HAVE_JD` and validates nothing — every caller
    * (`d_new_by_frags`, `date_s_jd`, `date_s_ordinal`, `date_s_commercial`)
