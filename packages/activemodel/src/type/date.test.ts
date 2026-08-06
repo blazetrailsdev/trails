@@ -82,10 +82,11 @@ describe("DateTest", () => {
     expect((result as Temporal.PlainDate).toString()).toBe("2020-07-04");
   });
 
-  it("cast US-slash string", () => {
+  it("cast slash string", () => {
+    // ruby 3.3.11: Date._parse("7/4/2020", false) #=> {year: 2020, mon: 4, mday: 7}
     const result = type.cast("7/4/2020");
     expect(result).toBeInstanceOf(Temporal.PlainDate);
-    expect((result as Temporal.PlainDate).toString()).toBe("2020-07-04");
+    expect((result as Temporal.PlainDate).toString()).toBe("2020-04-07");
   });
 
   it("cast garbage string returns null", () => {

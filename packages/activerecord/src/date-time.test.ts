@@ -78,7 +78,6 @@ describe("DateTimeTest", () => {
   });
 
   it("date time with string value with non iso format", () => {
-    // BLOCKED: type — loose-date-parse.ts doesn't handle "MM/DD/YYYY H:MMam" format
-    // ROOT-CAUSE: ~20 LOC in activemodel/src/type/helpers/loose-date-parse.ts
+    // BLOCKED: fixture — needs Topic model + DB for create(written_on: str) + findBy(written_on: str)
   });
 });

@@ -2027,6 +2027,35 @@ function cValidCivilP(
 }
 
 /**
+ * @internal `date_core.c` `c_valid_time_p` (`date_core.c:870-886`), which folds
+ * a negative field up from the end of its range the way `Date.new`'s negative
+ * `mday` counts back from the end of the month, and accepts the `24:00:00` that
+ * ends a day. The `rh`/`rmin`/`rs` C answers through out-parameters come back
+ * as the tuple; `null` is its `0`.
+ */
+function cValidTimeP(
+  h: number,
+  min: number,
+  s: number,
+): [rh: number, rmin: number, rs: number] | null {
+  if (h < 0) h += 24;
+  if (min < 0) min += 60;
+  if (s < 0) s += 60;
+  if (
+    h < 0 ||
+    h > 24 ||
+    min < 0 ||
+    min > 59 ||
+    s < 0 ||
+    s > 59 ||
+    (h === 24 && (min > 0 || s > 0))
+  ) {
+    return null;
+  }
+  return [h, min, s];
+}
+
+/**
  * @internal `date_core.c` `c_find_ldoy` (`date_core.c:465-475`), the Julian day
  * of the last day of year `y`, or `null` when there is none: the same scan as
  * {@link cFindFdoy} backwards from 31 December.
@@ -2353,6 +2382,93 @@ export function dNewByFrags(hash: DateParts, sg: number): Date {
 
   if (jd === null) throw new DateError("invalid date");
   return Date.jd(jd, sg);
+}
+
+/**
+ * @internal `date_core.c` `of2str` (`date_core.c:1973-1980`) over its
+ * `decode_offset` macro (`date_core.c:1964-1971`): the `±HH:MM` spelling of an
+ * offset in seconds, which is what `DateTime#zone` answers. Seconds below the
+ * minute are dropped, as the `"%c%02d:%02d"` format has nowhere to put them.
+ */
+function of2str(of: number): string {
+  const s = of < 0 ? "-" : "+";
+  const a = of < 0 ? -of : of;
+  const h = Math.floor(a / HOUR_IN_SECONDS);
+  const m = Math.floor((a % HOUR_IN_SECONDS) / MINUTE_IN_SECONDS);
+  return `${s}${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+/**
+ * @internal `date_core.c` `dt_new_by_frags` (`date_core.c:8239-8322`), the
+ * `DateTime` counterpart of {@link dNewByFrags}: the same civil fast path and
+ * the same `rt_rewrite_frags`/`rt_complete_frags` fallback, but it also reads
+ * the time of day — defaulting each field to `0` and folding a leap second's
+ * `60` back to `59` — and the `:offset` `date_zone_to_diff` left in the frags.
+ *
+ * Ruby then moves the Julian day and day-fraction to UTC (`jd_local_to_utc` /
+ * `df_local_to_utc`, `date_core.c:8311-8313`) and converts back on every read;
+ * the port keeps them local, which is what the readers answer either way, so
+ * the offset alone is carried.
+ *
+ * The `:offset` bound (`date_core.c:8297-8306`) is ported as written — strictly
+ * outside `±DAY_IN_SECONDS` is ignored rather than raised on. It is unreachable
+ * from `Date._parse`, since `date_zone_to_diff` already answers `nil` for a
+ * zone that far out and the `NIL_P` arm above takes it — on ruby 3.3.11
+ * `Date._parse("2008-03-01T06:00:00+99:00")[:offset]` is `nil` and
+ * `DateTime.parse` of it answers `"+00:00"` — but the C tests it, so this does.
+ *
+ * The one thing the UTC round-trip does observably is
+ * normalize the `86400` a `24:00:00` time of day makes — `jd_local_to_utc`'s
+ * `df >= DAY_IN_SECONDS` arm rolls the day and the reader answers hour `0`, so
+ * `DateTime.parse("2008-03-01T24:00:00")` is 2008-03-02T00:00:00. The port
+ * normalizes the local pair for the same effect, which is `canon24oc`
+ * (`date_core.c:3306-3312`) with the day carried on the Julian day rather than
+ * on a day-fraction.
+ */
+export function dtNewByFrags(hash: DateParts, sg: number): DateTime {
+  let jd: number | null;
+
+  if (
+    hash.jd === undefined &&
+    hash.yday === undefined &&
+    hash.year !== undefined &&
+    hash.mon !== undefined &&
+    hash.mday !== undefined
+  ) {
+    jd = rtValidCivilP(hash.year, hash.mon, hash.mday, sg);
+
+    if (hash.hour === undefined) hash.hour = 0;
+    if (hash.min === undefined) hash.min = 0;
+    if (hash.sec === undefined) hash.sec = 0;
+    else if (hash.sec === 60) hash.sec = 59;
+  } else {
+    hash = rtRewriteFrags(hash);
+    completeFrags(hash);
+    try {
+      jd = rtValidDateFragsP(hash, sg);
+    } catch {
+      jd = null;
+    }
+  }
+
+  if (jd === null) throw new DateError("invalid date");
+
+  const rt = cValidTimeP(hash.hour ?? 0, hash.min ?? 0, hash.sec ?? 0);
+  if (rt === null) throw new DateError("invalid date");
+  let [rh] = rt;
+  const [, rmin, rs] = rt;
+
+  if (rh === 24) {
+    rh = 0;
+    jd += 1;
+  }
+
+  const t = hash.offset;
+  let of = t == null ? 0 : t instanceof Rational ? t.numerator / t.denominator : t;
+  if (of < -DAY_IN_SECONDS || of > DAY_IN_SECONDS) of = 0;
+
+  const d = Date.jd(jd, sg);
+  return new DateTime(d.year, d.mon, d.day, rh, rmin, rs, of, sg);
 }
 
 /**
@@ -2808,12 +2924,38 @@ export class DateTime extends Date {
   readonly #hour: number;
   readonly #min: number;
   readonly #sec: number;
+  /**
+   * @internal `ComplexDateData`'s `of` (`date_core.c:215-231`), the offset in
+   * seconds east of UTC — the same representation `Time#utcOffset` keeps, and
+   * the one `Date._parse` answers as `:offset`. A `Temporal` offset time zone
+   * is minute-precision and could not hold `date_zone_to_diff`'s seconds.
+   */
+  readonly #of: number;
 
   /**
    * Ruby `DateTime.new(y, m, d, h = 0, min = 0, s = 0, offset = 0, start =
-   * Date::ITALY)` (ruby/date, `date_core.c` `datetime_s_new`). `offset` is the
-   * one argument omitted — `DateTime#zone` is fixed at `"+00:00"` — so `start`
-   * takes its place rather than trailing a hole.
+   * Date::ITALY)` (ruby/date, `date_core.c` `datetime_s_new`).
+   *
+   * Ruby's `offset` argument goes through `val2off` (`date_core.c:5071-5077`)
+   * over `offset_to_sec` (`date_core.c:2370-2440`), which reads it as a **day
+   * fraction**, not as seconds: the Fixnum arm accepts only `-1`, `0` and `1`
+   * and multiplies by `DAY_IN_SECONDS`, so on ruby 3.3.11
+   * `DateTime.new(2000,1,1,0,0,0,1).zone` is `"+24:00"` and `9`, `24` and `-5`
+   * all warn and collapse to `"+00:00"`. What it stores is the `of` field
+   * `of2str` spells back out, in seconds.
+   *
+   * The port takes that `of` directly — the seconds — rather than `val2off`'s
+   * argument. Ruby's day-fraction spellings are a `Rational` of a day and the
+   * `"+09:00"` String, neither of which any caller here holds: `dtNewByFrags`
+   * reads `date_zone_to_diff`'s `:offset`, which is already seconds, and it is
+   * the only non-test caller. So no `val2off` bound applies here, and the
+   * seconds bound that does is `dt_new_by_frags`', applied at that call site
+   * where the C applies it.
+   *
+   * Ruby also keeps the Julian day and day-fraction in UTC and converts on
+   * read (`jd_local_to_utc` at build, `m_local_jd` at read); the port keeps the
+   * civil fields and the time of day *local*, which is what the readers answer
+   * either way.
    */
   constructor(
     year: number,
@@ -2822,12 +2964,23 @@ export class DateTime extends Date {
     hour = 0,
     minute = 0,
     second = 0,
+    offset = 0,
     start: number = DEFAULT_SG,
   ) {
     super(year, month, day, start);
     this.#hour = hour;
     this.#min = minute;
     this.#sec = second;
+    this.#of = offset;
+  }
+
+  /**
+   * Ruby `DateTime.parse(str, comp = true, start = Date::ITALY)` (ruby/date,
+   * `date_core.c` `datetime_s_parse` → `dt_new_by_frags`), which is
+   * `Date.parse`'s `Date._parse` followed by the DateTime-shaped build.
+   */
+  static override parse(str: string, comp = true, start: number = DEFAULT_SG): DateTime {
+    return dtNewByFrags(Date._parse(str, comp), start);
   }
 
   get hour(): number {
@@ -2842,9 +2995,25 @@ export class DateTime extends Date {
     return this.#sec;
   }
 
-  /** `DateTime#zone` is the UTC offset, where `Time#zone` is `"UTC"`. */
+  /**
+   * Ruby `DateTime#zone` (ruby/date, `date_core.c` `d_lite_zone` over
+   * `m_zone`, `date_core.c:1982-1988`): the UTC offset spelled by `of2str`,
+   * where `Time#zone` is the zone's name. A `Date` — `simple_dat_p` — has no
+   * offset to spell and answers the `"+00:00"` literal, which is also what a
+   * `DateTime` parsed from a string that named no zone answers, its `of`
+   * being `0`.
+   */
   get zone(): string {
-    return "+00:00";
+    return of2str(this.#of);
+  }
+
+  /**
+   * Ruby `DateTime#offset` (ruby/date, `date_core.c` `d_lite_offset` over
+   * `m_of` and `INT2FIX(of), INT2FIX(DAY_IN_SECONDS)`): the offset as a
+   * Rational of a day, where the `of` it is built from is the seconds.
+   */
+  get offset(): Rational {
+    return new Rational(this.#of, DAY_IN_SECONDS);
   }
 
   /**
@@ -2857,7 +3026,7 @@ export class DateTime extends Date {
    */
   override newStart(start: number = DEFAULT_SG): DateTime {
     const d = super.newStart(start);
-    return new DateTime(d.year, d.mon, d.day, this.#hour, this.#min, this.#sec, start);
+    return new DateTime(d.year, d.mon, d.day, this.#hour, this.#min, this.#sec, this.#of, start);
   }
 
   override strftime(format: string): string {
@@ -2873,7 +3042,7 @@ export class DateTime extends Date {
         sec: this.sec,
         nsec: 0,
         zone: this.zone,
-        utcOffset: 0,
+        utcOffset: this.#of,
       },
       format,
     );

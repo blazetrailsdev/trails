@@ -1,5 +1,9 @@
-import { Temporal } from "@blazetrails/date";
-import { looseDateParse } from "./helpers/loose-date-parse.js";
+import {
+  ArgumentError as RubyArgumentError,
+  Date as RubyDate,
+  Temporal,
+  type DateParts,
+} from "@blazetrails/date";
 import { AcceptsMultiparameterTime, isHash } from "./helpers/accepts-multiparameter-time.js";
 import { ValueType } from "./value.js";
 
@@ -35,7 +39,44 @@ export class TimeType extends ValueType<Temporal.PlainTime> {
     }
   }
 
-  /** @internal Rails-private helper. */
+  /**
+   * Mirrors: ActiveModel::Type::Time#cast_value (time.rb:68-83).
+   *
+   *   def cast_value(value)
+   *     return apply_seconds_precision(value) unless value.is_a?(::String)
+   *     return if value.blank?
+   *
+   *     dummy_time_value = value.sub(/\A\d{4}-\d\d-\d\d(?:T|\s)|/, "2000-01-01 ")
+   *
+   *     fast_string_to_time(dummy_time_value) || begin
+   *       time_hash = begin
+   *         ::Date._parse(dummy_time_value)
+   *       rescue ArgumentError
+   *       end
+   *
+   *       return if time_hash.nil? || time_hash[:hour].nil?
+   *       new_time(*time_hash.values_at(:year, :mon, :mday, :hour, :min, :sec, :sec_fraction, :offset))
+   *     end
+   *   end
+   *
+   * The `dummy_time_value` substitution's empty alternation makes the pattern
+   * match at position 0 whatever the string, so a leading `YYYY-MM-DD`
+   * separator is replaced and a time-only string is prefixed. `::Date._parse`
+   * is the gem's own entry point, ported at `packages/date/src/date.ts`.
+   *
+   * Rails' `new_time` answers a `::Time` on the 2000-01-01 dummy date; trails'
+   * `Time` is a `Temporal.PlainTime`, so the date half of the hash — and with
+   * it `:offset`, which only shifts an instant — is dropped instead. Rails also
+   * passes `:sec_fraction` to `new_time` raw rather than through
+   * `Type::DateTime#microseconds`, so `Time.utc`'s microsecond argument gets a
+   * fraction of a second and a string's sub-second digits are lost; trails
+   * normalizes, keeping them. Nor is Rails' `fast_string_to_time` arm here: it
+   * answers a `::Time` built in `is_utc?`'s zone, which a `Temporal.PlainTime`
+   * receiver has nowhere to put. All three are tracked by
+   * `activemodel-type-time-returns-a-time` rather than converged here.
+   *
+   * @internal Rails-private helper.
+   */
   protected castValue(value: unknown): Temporal.PlainTime | null {
     if (value instanceof Temporal.PlainTime) return this.applySecondsPrecision(value);
     // Accept PlainDateTime from multiparameter assignment — extract the time part.
@@ -44,16 +85,23 @@ export class TimeType extends ValueType<Temporal.PlainTime> {
     if (isHash(value)) return this.valueFromMultiparameterAssignment(value);
     const str = String(value).trim();
     if (str === "") return null;
-    const parts = looseDateParse(str);
-    if (!parts || parts.hour === undefined) return null;
+    const dummyTimeValue = str.replace(/^\d{4}-\d\d-\d\d(?:T|\s)|/, "2000-01-01 ");
+    let timeHash: DateParts | undefined;
+    try {
+      timeHash = RubyDate._parse(dummyTimeValue);
+    } catch (error) {
+      if (!(error instanceof RubyArgumentError)) throw error;
+    }
+    if (timeHash == null || timeHash.hour == null) return null;
+    const microsec = timeHash.secFraction ? Math.trunc(timeHash.secFraction * 1_000_000) : 0;
     try {
       return Temporal.PlainTime.from(
         {
-          hour: parts.hour,
-          minute: parts.minute ?? 0,
-          second: parts.second ?? 0,
-          millisecond: parts.millisecond ?? 0,
-          microsecond: parts.microsecond ?? 0,
+          hour: timeHash.hour,
+          minute: timeHash.min ?? 0,
+          second: timeHash.sec ?? 0,
+          millisecond: Math.trunc(microsec / 1000),
+          microsecond: microsec % 1000,
         },
         { overflow: "reject" },
       );
