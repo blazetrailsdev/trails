@@ -92,9 +92,10 @@ describe("CollectionAwaitableWriters", () => {
     const post = await Post.create({ title: "t", body: "b" });
     const assignOn = (owner: Author): void =>
       (owner as unknown as CollectionOwner).assignAttributes({ postIds: [post.id] });
+    const persisted = await Author.create({ name: "Bill" });
 
     expect(() => assignOn(new Author({ name: "Bill" }))).toThrow(/unknown attribute `postIds`/);
-    expect(() => assignOn(new Author({ name: "Bill" }))).toThrow(/unknown attribute `postIds`/);
+    expect(() => assignOn(persisted)).toThrow(/unknown attribute `postIds`/);
   });
 
   it("a bad id is a catchable rejection on the awaitable ids surface", async () => {
