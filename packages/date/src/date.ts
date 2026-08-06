@@ -2368,11 +2368,13 @@ class DateError extends ArgumentError {
 }
 
 /**
- * @noRailsEquivalent PERMANENT — Ruby stdlib `::Date`. Rails never defines the
- * class, only reopens it, so there is no Rails counterpart for a port to
- * converge on; JS has no stdlib equivalent either (`Temporal.PlainDate` answers
- * `dayOfWeek`/`month`, not `wday`/`mon`, and has no `strftime`). trails carries
- * only the members a caller duck-types.
+ * @noRailsEquivalent PERMANENT — the `ruby/date` gem's `::Date`. Rails never
+ * defines the class, only reopens it. The gem does have a counterpart now that
+ * it is vendored, but it is C — `vendor/date/ext/date/date_core.c` — and
+ * `extract-ruby-api.rb` parses Ruby, so `api:compare` cannot credit it
+ * (RFC 0088 `date-c-source-extractor-decision`: `lib/date.rb` credits 12
+ * methods, none of them these). The gem's `test/date/` suite is the fidelity
+ * measure instead; see `vendor/sources.ts`'s `date` entry.
  */
 export class Date {
   /**
@@ -2794,8 +2796,11 @@ export class Date {
 }
 
 /**
- * @noRailsEquivalent PERMANENT — Ruby stdlib `::DateTime`, a `::Date` that also
- * answers `hour`, `min` and `sec`. Those are what route a `localize` lookup to
+ * @noRailsEquivalent PERMANENT — the `ruby/date` gem's `::DateTime`, a `::Date`
+ * that also answers `hour`, `min` and `sec`. Defined in C
+ * (`vendor/date/ext/date/date_core.c`), so it is outside `api:compare`'s
+ * population for the same reason as `Date` above. Those readers are what route
+ * a `localize` lookup to
  * `time.formats` (i18n/lib/i18n/backend/base.rb:105-115), while `%Z` keeps
  * `::Date`'s offset spelling rather than `::Time`'s `"UTC"`.
  */
