@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Attribute as ModelAttribute, ValueType } from "@blazetrails/activemodel";
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import {
   Table,
   star,

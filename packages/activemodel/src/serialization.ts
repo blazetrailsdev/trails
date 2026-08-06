@@ -1,4 +1,4 @@
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import { NoMethodError, RuntimeError } from "./attribute-assignment.js";
 
 /** Minimum shape required of a record object passed to serialization helpers. */

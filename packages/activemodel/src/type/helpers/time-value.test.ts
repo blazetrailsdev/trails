@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import { applySecondsPrecision, fastStringToTime, newTime } from "./time-value.js";
 
 // Mirrors ActiveModel::Type::Helpers::TimeValue#apply_seconds_precision

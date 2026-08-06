@@ -18,7 +18,7 @@ describe("AcceptsMultiparameterTime defaults", () => {
     const result = wrapper.cast({ "1": 2025, "2": 7, "3": 4, "4": 15 });
     expect(result).not.toBeNull();
     // The Instant's UTC hour should be 15 (timezone is UTC in test env)
-    const instant = result as import("@blazetrails/activesupport/temporal").Temporal.Instant;
+    const instant = result as import("@blazetrails/date").Temporal.Instant;
     expect(instant.toZonedDateTimeISO("UTC").hour).toBe(15);
   });
 
@@ -28,7 +28,7 @@ describe("AcceptsMultiparameterTime defaults", () => {
     // hour is empty string — should be treated as missing and filled with 0
     const result = wrapper.cast({ "1": 2025, "2": 7, "3": 4, "4": "" });
     expect(result).not.toBeNull();
-    const instant = result as import("@blazetrails/activesupport/temporal").Temporal.Instant;
+    const instant = result as import("@blazetrails/date").Temporal.Instant;
     expect(instant.toZonedDateTimeISO("UTC").hour).toBe(0);
   });
 

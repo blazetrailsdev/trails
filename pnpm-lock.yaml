@@ -169,6 +169,9 @@ importers:
       '@blazetrails/activesupport':
         specifier: workspace:*
         version: link:../activesupport
+      '@blazetrails/date':
+        specifier: workspace:*
+        version: link:../date
       '@blazetrails/i18n':
         specifier: workspace:*
         version: link:../i18n
@@ -258,6 +261,9 @@ importers:
       '@blazetrails/activesupport':
         specifier: workspace:*
         version: link:../activesupport
+      '@blazetrails/date':
+        specifier: workspace:*
+        version: link:../date
 
   packages/date:
     dependencies:

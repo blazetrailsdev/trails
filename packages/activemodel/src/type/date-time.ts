@@ -1,4 +1,4 @@
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import {
   DateInfinity,
   DateNegativeInfinity,

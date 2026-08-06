@@ -28,6 +28,7 @@
   "license": "MIT",
   "dependencies": {
     "@blazetrails/activesupport": "workspace:*",
+    "@blazetrails/date": "workspace:*",
     "@blazetrails/i18n": "workspace:*",
     "bcryptjs": "^3.0.3"
   }

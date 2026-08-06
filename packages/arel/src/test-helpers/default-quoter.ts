@@ -1,6 +1,6 @@
 import type { ArelConnection } from "../visitors/connection.js";
 import { quoteSchemaQualifiedName } from "../visitors/split-schema-qualified-name.js";
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 
 // Standalone comment sanitize for these test hosts: strips block-comment
 // delimiters (leaving `--` alone, like Rails' abstract sanitize). Real

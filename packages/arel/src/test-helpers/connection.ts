@@ -2,7 +2,7 @@ import type { ArelConnection } from "../visitors/connection.js";
 import type { ArelEngine } from "../nodes/node.js";
 import { ToSql } from "../visitors/to-sql.js";
 import { defaultQuoter, mysqlDefaultQuoter, postgresqlDefaultQuoter } from "./default-quoter.js";
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 
 /**
  * Explicit connections for Arel visitor construction in tests.

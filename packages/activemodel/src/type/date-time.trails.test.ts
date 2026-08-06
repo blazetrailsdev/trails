@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import { Types } from "../index.js";
 
 // Fallback-parser coverage for shapes `Date._parse` accepts that no Rails test

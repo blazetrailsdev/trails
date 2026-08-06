@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/date";
 import { testConnection } from "../test-helpers/connection.js";
 import { Table, star, Nodes, Visitors } from "../index.js";
 

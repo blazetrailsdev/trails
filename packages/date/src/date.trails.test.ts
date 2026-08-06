@@ -463,6 +463,22 @@ describe("Date", () => {
     expect(date.strftime("%a %A")).toBe("Wed Wednesday");
   });
 
+  it("formats the strftime directives the conformance mixins use", () => {
+    const date = RubyDate.parse("2008-07-02");
+    expect(date.strftime("%C")).toBe("20");
+    expect(date.strftime("%u %w")).toBe("3 3");
+    expect(date.strftime("%I %k %l")).toBe("12  0 12");
+    expect(date.strftime("%L %N")).toBe("000 000000000");
+    expect(date.strftime("%:z")).toBe("+00:00");
+    expect(date.strftime("%n%t")).toBe("\n\t");
+  });
+
+  it("computes %s from the receiver's own fields, as date_strftime does", () => {
+    expect(RubyDate.parse("2008-07-02").strftime("%s")).toBe("1214956800");
+    expect(RubyDate.parse("1969-12-31").strftime("%s")).toBe("-86400");
+    expect(new RubyDateTime(2008, 7, 2, 6, 30, 15).strftime("%s")).toBe("1214980215");
+  });
+
   it("strips the padding for the %-d flag and leaves unknown directives alone", () => {
     const date = RubyDate.parse("2008-07-02");
     expect(date.strftime("%-m/%-d")).toBe("7/2");

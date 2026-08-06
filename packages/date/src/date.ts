@@ -88,8 +88,50 @@ export interface StrftimeSubject {
   hour: number;
   min: number;
   sec: number;
+  nsec: number;
   zone: string;
-  zoneOffset: string;
+  utcOffset: number;
+}
+
+/**
+ * @internal `%s`'s value — `date_strftime.c` computes it from the receiver's
+ * own fields rather than reading a `to_i` off it, which is what lets `::Date`
+ * (midnight, UTC) answer `%s` at all.
+ */
+function epochSeconds(subject: StrftimeSubject): number {
+  const utc = new Temporal.PlainDateTime(
+    subject.year,
+    subject.mon,
+    subject.day,
+    subject.hour,
+    subject.min,
+    subject.sec,
+  ).toZonedDateTime("UTC");
+  return Math.floor(utc.epochMilliseconds / 1000) - subject.utcOffset;
+}
+
+/**
+ * @internal The four spellings `date_strftime.c`'s `%z` arm gives the offset,
+ * picked by how many colons preceded the directive: none is `"+0900"`, one is
+ * `"+09:00"`, two is `"+09:00:00"`, and three is the shortest form that loses
+ * nothing — MRI shows the minute and second only when they are nonzero, so
+ * `+09:00:00` is `"+09"` while `+05:30` stays `"+05:30"`. All four come off the
+ * one offset in seconds, which is why the subject carries a number rather than
+ * a string: `%::z` and `%:::z` are the only spellings that can show a
+ * sub-minute offset.
+ */
+function formatOffset(utcOffset: number, colons: number): string {
+  const sign = utcOffset < 0 ? "-" : "+";
+  const abs = Math.abs(utcOffset);
+  const hour = pad2(Math.floor(abs / 3600));
+  const min = pad2(Math.floor(abs / 60) % 60);
+  const sec = pad2(abs % 60);
+  if (colons === 0) return `${sign}${hour}${min}`;
+  if (colons === 1) return `${sign}${hour}:${min}`;
+  if (colons === 2) return `${sign}${hour}:${min}:${sec}`;
+  if (abs % 60 !== 0) return `${sign}${hour}:${min}:${sec}`;
+  if (Math.floor(abs / 60) % 60 !== 0) return `${sign}${hour}:${min}`;
+  return `${sign}${hour}`;
 }
 
 /**
@@ -112,8 +154,10 @@ export interface StrftimeSubject {
  * local zone and answers its real offset and abbreviation.
  */
 export function strftime(subject: StrftimeSubject, format: string): string {
+  const hour12 = subject.hour % 12 === 0 ? 12 : subject.hour % 12;
   const tokens: Record<string, () => string> = {
     Y: () => padYear(subject.year),
+    C: () => pad2(Math.floor(subject.year / 100)),
     y: () => pad2(subject.year % 100),
     m: () => pad2(subject.mon),
     d: () => pad2(subject.day),
@@ -125,18 +169,31 @@ export function strftime(subject: StrftimeSubject, format: string): string {
     B: () => MONTH_NAMES[subject.mon - 1],
     b: () => ABBR_MONTH_NAMES[subject.mon - 1],
     h: () => ABBR_MONTH_NAMES[subject.mon - 1],
+    u: () => String(subject.wday === 0 ? 7 : subject.wday),
+    w: () => String(subject.wday),
     H: () => pad2(subject.hour),
+    k: () => String(subject.hour).padStart(2, " "),
+    I: () => pad2(hour12),
+    l: () => String(hour12).padStart(2, " "),
     M: () => pad2(subject.min),
     S: () => pad2(subject.sec),
+    L: () => String(Math.floor(subject.nsec / 1_000_000)).padStart(3, "0"),
+    N: () => String(subject.nsec).padStart(9, "0"),
+    s: () => String(epochSeconds(subject)),
     p: () => (subject.hour < 12 ? "AM" : "PM"),
     P: () => (subject.hour < 12 ? "am" : "pm"),
     x: () => `${pad2(subject.mon)}/${pad2(subject.day)}/${pad2(subject.year % 100)}`,
-    z: () => subject.zoneOffset,
+    z: () => formatOffset(subject.utcOffset, 0),
+    ":z": () => formatOffset(subject.utcOffset, 1),
+    "::z": () => formatOffset(subject.utcOffset, 2),
+    ":::z": () => formatOffset(subject.utcOffset, 3),
     Z: () => subject.zone,
+    n: () => "\n",
+    t: () => "\t",
     "%": () => "%",
   };
 
-  return format.replace(/%(-?)([A-Za-z%])/g, (match, flag, spec) => {
+  return format.replace(/%(-?)(:{0,3}[A-Za-z%])/g, (match, flag, spec) => {
     const fn = tokens[spec];
     if (!fn) return match;
     let result = fn();
@@ -2727,8 +2784,9 @@ export class Date {
         hour: 0,
         min: 0,
         sec: 0,
+        nsec: 0,
         zone: "+00:00",
-        zoneOffset: "+0000",
+        utcOffset: 0,
       },
       format,
     );
@@ -2808,8 +2866,9 @@ export class DateTime extends Date {
         hour: this.hour,
         min: this.min,
         sec: this.sec,
+        nsec: 0,
         zone: this.zone,
-        zoneOffset: "+0000",
+        utcOffset: 0,
       },
       format,
     );
