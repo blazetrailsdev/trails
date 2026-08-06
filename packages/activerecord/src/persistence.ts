@@ -30,7 +30,6 @@ import {
   extractMultiparameterCallstack,
   executeMultiparameterAssignment,
 } from "./multiparameter-attribute-assignment.js";
-import { assignAssociationIfMatch } from "./attribute-assignment.js";
 import { threadedConnectionFor } from "./connection-handling.js";
 import {
   getStiBase,
@@ -1093,17 +1092,6 @@ export function _reapplyNestedAttrSetters(
  */
 function _assignAttribute(self: AttributeIO, key: string, value: unknown): void {
   try {
-    if (
-      assignAssociationIfMatch(
-        self as { constructor?: unknown; association?: (name: string) => unknown },
-        key,
-        value,
-      )
-    ) {
-      // Routed to the association proxy writer (constructor-form collection /
-      // singular) — Rails reaches these through `public_send("#{k}=")` too.
-      return;
-    }
     const setter = findPrototypeSetter(self, key);
     if (setter) {
       setter.call(self, value);

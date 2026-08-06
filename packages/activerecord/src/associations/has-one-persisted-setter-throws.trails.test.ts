@@ -9,8 +9,11 @@
  * writes to the owner's next `save()` (the order-undefined two-row race
  * RFC 0068 exists to kill), the assignment THROWS and names the awaitable
  * replacement (`await owner.set#{Name}(x)`). On an *unpersisted* owner Rails
- * does no I/O either, so the in-memory replace is faithful and kept. There is
- * no Rails test for this deviation.
+ * does no I/O either, so the in-memory replace is faithful and kept — but only
+ * on the *constructor* arm, whose owner is unpersisted by definition. RFC 0087
+ * retired the mass-assignment routing, so a has_one key reaching
+ * `assign_attributes` now falls to ActiveModel's `attribute_writer_missing`.
+ * There is no Rails test for this deviation.
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { registerModel, AssociationTypeMismatch } from "../index.js";
@@ -21,6 +24,7 @@ import { Member } from "../test-helpers/models/member.js";
 import { Membership } from "../test-helpers/models/membership.js";
 import { Club } from "../test-helpers/models/club.js";
 import { fixtures } from "../test-fixtures.js";
+import { assertQueriesCount } from "../testing/query-assertions.js";
 
 interface HasOneOwner {
   account?: unknown;
@@ -91,14 +95,18 @@ describe("HasOnePersistedSetterThrows", () => {
     }
   });
 
-  it("mass-assignment (assignAttributes) throws on a persisted owner", async () => {
+  it("mass-assignment (assignAttributes) reaches no association writer", async () => {
+    // RFC 0087: `assign_attributes` no longer routes a has_one key into the
+    // synchronous writer. Rails would `public_send("account=")` and persist the
+    // displacement inline (has_one_association.rb:59-84); trails cannot await
+    // there, so with no writer for the key ActiveModel's
+    // `attribute_writer_missing` (attribute_assignment.rb:67-75) answers, and
+    // callers use `#update` or `setAccount` instead.
     const firm = (await Firm.create({ name: "GlobalMegaCorp" })) as unknown as HasOneOwner;
     const account = await Account.create({ credit_limit: 1000 });
-    // `assignAttributes` wraps a setter throw in AttributeAssignmentError
-    // (longstanding trails behavior), whose message carries the inner one.
     expect(() => {
       firm.assignAttributes({ account });
-    }).toThrow(/await owner\.setAccount\(x\)/);
+    }).toThrow(/unknown attribute `account`/);
   });
 
   it("update awaits the has_one writer on a persisted owner", async () => {
@@ -123,21 +131,31 @@ describe("HasOnePersistedSetterThrows", () => {
     ).toThrow(HasOnePersistedAssignmentError);
   });
 
-  it("has_one_through mass-assignment throws on a persisted owner", async () => {
+  it("has_one_through mass-assignment reaches no association writer", async () => {
     const member = (await Member.create({ name: "Groucho" })) as unknown as HasOneOwner;
     const club = await Club.create({ name: "Moustache" });
     expect(() => {
       member.assignAttributes({ club });
-    }).toThrow(/await owner\.setClub\(x\)/);
+    }).toThrow(/unknown attribute `club`/);
   });
 
-  it("mass-assignment does the in-memory replace on an unpersisted owner", async () => {
-    const firm = new Firm({ name: "GlobalMegaCorp" });
+  it("construction issues no query for the association assignment", async () => {
+    // The synchronous constructor arm is only faithful because it does no I/O:
+    // `find_target?` (association.rb:320-322) has both disjuncts false for a
+    // has_one on a new owner, so Rails loads nothing either.
     const account = new Account({ credit_limit: 1000 });
-    const owner = firm as unknown as HasOneOwner;
-    expect(() => {
-      owner.assignAttributes({ account });
-    }).not.toThrow();
+    await assertQueriesCount(0, false, async () => {
+      new Firm({ name: "GlobalMegaCorp", account });
+    });
+  });
+
+  it("construction does the in-memory replace on an unpersisted owner", async () => {
+    // The constructor arm stays synchronous: its owner is unpersisted by
+    // definition, so `save &&= owner.persisted?` (has_one_association.rb:66) and
+    // `remove_target!`'s gate (:108) make the write in-memory in Rails too, and
+    // autosave persists it at the owner's first `save`.
+    const account = new Account({ credit_limit: 1000 });
+    const firm = new Firm({ name: "GlobalMegaCorp", account });
     await firm.save();
     expect((account as unknown as { firm_id: number }).firm_id).toBe(Number(firm.id));
   });

@@ -19,7 +19,7 @@
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { registerModel, RecordNotFound } from "../index.js";
-import { CollectionIdsAssignmentError, CollectionPersistedAssignmentError } from "./errors.js";
+import { CollectionIdsAssignmentError } from "./errors.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
@@ -83,23 +83,18 @@ describe("CollectionAwaitableWriters", () => {
     expect(await (author as unknown as { postIds: Promise<unknown> }).postIds).toBeDefined();
   });
 
-  it("ids= mass-assignment throws on both owner arms", async () => {
-    // Mass-assignment raises through `_assign_attributes`' rescue, so the
-    // deviation is the `cause`, as in the record-writer case below.
+  it("ids= mass-assignment reaches no association writer on either owner arm", async () => {
+    // RFC 0087: `assign_attributes` no longer routes `#{singular}Ids` into a
+    // synchronous writer. Rails' generated `post_ids=`
+    // (builder/collection_association.rb:67-74) resolves the ids with a query,
+    // which trails cannot await here, so with no writer for the key
+    // ActiveModel's `attribute_writer_missing` answers on both arms.
     const post = await Post.create({ title: "t", body: "b" });
-    const causeOf = (owner: Author): unknown => {
-      try {
-        (owner as unknown as CollectionOwner).assignAttributes({ postIds: [post.id] });
-      } catch (e) {
-        return (e as { cause?: unknown }).cause;
-      }
-      return undefined;
-    };
+    const assignOn = (owner: Author): void =>
+      (owner as unknown as CollectionOwner).assignAttributes({ postIds: [post.id] });
 
-    expect(causeOf(new Author({ name: "Bill" }))).toBeInstanceOf(CollectionIdsAssignmentError);
-    expect(causeOf(await Author.create({ name: "Bill" }))).toBeInstanceOf(
-      CollectionIdsAssignmentError,
-    );
+    expect(() => assignOn(new Author({ name: "Bill" }))).toThrow(/unknown attribute `postIds`/);
+    expect(() => assignOn(new Author({ name: "Bill" }))).toThrow(/unknown attribute `postIds`/);
   });
 
   it("a bad id is a catchable rejection on the awaitable ids surface", async () => {
@@ -121,27 +116,18 @@ describe("CollectionAwaitableWriters", () => {
     expect((await postsOf(author).toArray()).map((p) => p.title)).toEqual(["b"]);
   });
 
-  it("mass-assignment throws on a persisted owner", async () => {
+  it("mass-assignment reaches no association writer on a persisted owner", async () => {
     const author = (await Author.create({ name: "Bill" })) as unknown as CollectionOwner;
     const post = await Post.create({ title: "t", body: "b" });
-    let raised: unknown;
-    try {
-      author.assignAttributes({ posts: [post] });
-    } catch (e) {
-      raised = e;
-    }
-    expect((raised as { cause?: unknown })?.cause).toBeInstanceOf(
-      CollectionPersistedAssignmentError,
-    );
+    expect(() => author.assignAttributes({ posts: [post] })).toThrow(/unknown attribute `posts`/);
   });
 
-  it("keeps in-memory mass-assignment on an unpersisted owner", async () => {
+  it("keeps in-memory assignment on construction", async () => {
     // Rails defers here too (`replace_records` without a save — the FK isn't
-    // known yet), so the in-memory arm is faithful and autosave persists at the
-    // owner's first `save()`.
-    const author = new Author({ name: "Bill" });
+    // known yet), so the constructor's in-memory arm is faithful and autosave
+    // persists at the owner's first `save()`.
     const post = new Post({ title: "t", body: "b" });
-    (author as unknown as CollectionOwner).assignAttributes({ posts: [post] });
+    const author = new Author({ name: "Bill", posts: [post] });
 
     expect(targetOf(author).length).toBe(1);
     await author.save();

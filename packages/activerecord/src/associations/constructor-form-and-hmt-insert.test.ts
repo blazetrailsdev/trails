@@ -36,27 +36,32 @@ describe("constructor-form association writer", () => {
     expect(target[1]).toBe(p2);
   });
 
-  it("dispatches via assignAttributes (manual-call path, non-multiparameter)", () => {
-    const author = new Author();
+  it("dispatches alongside plain attributes in the same constructor bag", () => {
     const p1 = new Post({ title: "a" });
-    author.assignAttributes({ name: "Acme", posts: [p1] });
+    const author = new Author({ name: "Acme", posts: [p1] });
     expect((author as any).readAttribute("name")).toBe("Acme");
     expect((author as any).association("posts").target).toEqual([p1]);
   });
 
-  it("dispatches via assignAttributes (multiparameter branch)", () => {
-    const author = new Author();
+  it("dispatches alongside a multiparameter key in the same constructor bag", () => {
     const p1 = new Post({ title: "a" });
-    // Mix in a multiparameter key so assignAttributes takes the
-    // hasMultiparameterKeys branch — association routing must still happen.
-    author.assignAttributes({
-      posts: [p1],
-      // Force the multiparameter branch via a parenthesized key —
-      // value content is irrelevant; we only care that `posts` still
-      // routes through assignAssociationIfMatch in this branch.
-      "name(1)": "x",
-    });
+    // Mix in a parenthesized key so construction takes the multiparameter
+    // branch — the association must still be dispatched in that branch. The
+    // value content is irrelevant.
+    const author = new Author({ posts: [p1], "name(1)": "x" });
     expect((author as any).association("posts").target).toEqual([p1]);
+  });
+
+  it("no longer routes an association key reached through assignAttributes", () => {
+    // RFC 0087: mass assignment onto an existing record has no unpersisted-owner
+    // guarantee, so it no longer reaches a synchronous association writer. With
+    // no writer for the key, ActiveModel's `attribute_writer_missing`
+    // (attribute_assignment.rb:67-75) is what answers. Callers use `#update`,
+    // which awaits the real writer.
+    const author = new Author();
+    expect(() => author.assignAttributes({ posts: [new Post({ title: "a" })] })).toThrow(
+      /unknown attribute `posts`/,
+    );
   });
 
   it("dispatches single record to hasOne association on construction", () => {

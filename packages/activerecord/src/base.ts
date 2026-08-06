@@ -837,15 +837,60 @@ function _reinstateConstructorDirtiness(
   record._dirty.reinstateNewRecordChanges(record._attributes);
 }
 
-/** @internal */
+/**
+ * The constructor's association arm. Rails reaches these writers through
+ * `assign_attributes` → `public_send("#{k}=", v)`
+ * (activemodel/lib/active_model/attribute_assignment.rb:67-75); trails cannot,
+ * because a has_one / collection writer is awaitable (RFC 0087) and `new` is
+ * not. It stays synchronous here and only here, because a constructor's owner
+ * is unpersisted by definition and Rails does no I/O for one either:
+ * `save &&= owner.persisted?` (has_one_association.rb:66), `remove_target!`'s
+ * `owner.persisted?` gate (:108) and `find_target?` (association.rb:320-322)
+ * are all false, so the write is in-memory in Rails too and autosave persists
+ * it at the owner's first `save`. Mass assignment onto an *existing* record has
+ * no such guarantee and no longer routes here — it goes through `#update`,
+ * which awaits the real writer.
+ *
+ * @internal
+ */
 function _dispatchAssociationAttrs(record: Base, assocs: _PendingAssociationAttr[]): void {
+  const defs = (record.constructor as { _associations?: _AssociationDefLike[] })._associations;
   for (const { name, value } of assocs) {
-    _AttributeAssignment.assignAssociationIfMatch(
-      record as unknown as { constructor?: unknown; association?: (name: string) => unknown },
-      name,
-      value,
-    );
+    let assoc = defs?.find((a) => a.name === name);
+    let idsKey = false;
+    if (!assoc) {
+      assoc = defs?.find(
+        (a) =>
+          (a.type === "hasMany" || a.type === "hasAndBelongsToMany") &&
+          `${_singularize(a.name)}Ids` === name,
+      );
+      idsKey = assoc !== undefined;
+    }
+    if (!assoc) continue;
+    const proxy = (
+      record as unknown as { association(n: string): _ConstructorAssociationWriter | null }
+    ).association(assoc.name);
+    if (!proxy) continue;
+    if (idsKey) {
+      proxy.syncIdsWrite?.(value as unknown[]);
+    } else if (assoc.type === "hasMany" || assoc.type === "hasAndBelongsToMany") {
+      // Rails fidelity: pass the value through unchanged. `replace` calls
+      // `.each` on the argument and raises on nil / scalars, so an `Array.wrap`
+      // here would silently accept inputs the writer rejects.
+      proxy.syncWrite?.(value as unknown[]);
+    } else if (assoc.type === "hasOne") {
+      proxy.syncWrite?.(value);
+    } else if (assoc.type === "belongsTo") {
+      proxy.writer?.(value);
+    }
   }
+}
+
+/** @internal The writers {@link _dispatchAssociationAttrs} reaches on an association. */
+interface _ConstructorAssociationWriter {
+  writer?: (v: unknown) => void;
+  syncWrite?: (v: unknown) => void;
+  syncIdsWrite?: (v: unknown[]) => void;
 }
 
 // Build the Arel value node for one write-path column (INSERT VALUES / UPDATE
