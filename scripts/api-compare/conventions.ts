@@ -146,6 +146,18 @@ export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
   // `ARTest` is defined by `config.rb` first; `connection.rb` reopens it for the
   // three connection helpers, which trails ports to `support/connection.ts`.
   "activerecord-test-support:connection.rb": "connection.ts",
+  // `Time`, `Date` and `DateTime` are each first reopened by a different
+  // core_ext file — `object/blank.rb:186`, `date/acts_like.rb:5` and
+  // `date_time/acts_like.rb:6` — so the three `calculations.rb` reopenings
+  // (`time/calculations.rb:11`, `date/calculations.rb:10`,
+  // `date_time/calculations.rb:5`) contribute 129 methods to buckets named
+  // after files that define none of them. trails ports all three onto the one
+  // `time-ext.ts` (its three test files — `core-ext/{time,date,date-time}-ext.test.ts`
+  // — all import from it), the same one-TS-file-for-several-reopenings shape as
+  // `inflector.ts` above.
+  "activesupport:core_ext/time/calculations.rb": "time-ext.ts",
+  "activesupport:core_ext/date/calculations.rb": "time-ext.ts",
+  "activesupport:core_ext/date_time/calculations.rb": "time-ext.ts",
 };
 
 /** The explicit TS mapping for `rubyFile` in `pkg`, or undefined when unmapped. */

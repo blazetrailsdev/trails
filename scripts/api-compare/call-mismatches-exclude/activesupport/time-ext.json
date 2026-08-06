@@ -1,0 +1,177 @@
+[
+  {
+    "package": "activesupport",
+    "tsFile": "time-ext.ts",
+    "rubyName": "advance",
+    "call": "change",
+    "reason": "time-ext.ts is a free-function helper module over JS `Date`, not a port of Time/Date/DateTime#advance: it computes the result inline instead of delegating to `change` the way core_ext/*/calculations.rb does. Surfaced (not introduced) by pointing the three calculations.rb reopenings at this file; convergence tracked by story activesupport-core-ext-calculations-delegation."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "time-ext.ts",
+    "rubyName": "advance",
+    "call": "to_date",
+    "reason": "time-ext.ts is a free-function helper module over JS `Date`, not a port of Time/Date/DateTime#advance: it computes the result inline instead of delegating to `to_date` the way core_ext/*/calculations.rb does. Surfaced (not introduced) by pointing the three calculations.rb reopenings at this file; convergence tracked by story activesupport-core-ext-calculations-delegation."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "time-ext.ts",
+    "rubyName": "ago",
+    "call": "in_time_zone",
+    "reason": "time-ext.ts is a free-function helper module over JS `Date`, not a port of Time/Date/DateTime#ago: it computes the result inline instead of delegating to `in_time_zone` the way core_ext/*/calculations.rb does. Surfaced (not introduced) by pointing the three calculations.rb reopenings at this file; convergence tracked by story activesupport-core-ext-calculations-delegation."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "time-ext.ts",
+    "rubyName": "ago",
+    "call": "since",
+    "reason": "time-ext.ts is a free-function helper module over JS `Date`, not a port of Time/Date/DateTime#ago: it computes the result inline instead of delegating to `since` the way core_ext/*/calculations.rb does. Surfaced (not introduced) by pointing the three calculations.rb reopenings at this file; convergence tracked by story activesupport-core-ext-calculations-delegation."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "time-ext.ts",
+    "rubyName": "beginning_of_day",
+    "call": "change",
+    "reason": "time-ext.ts is a free-function helper module over JS `Date`, not a port of Time/Date/DateTime#beginning_of_day: it computes the result inline instead of delegating to `change` the way core_ext/*/calculations.rb does. Surfaced (not introduced) by pointing the three calculations.rb reopenings at this file; convergence tracked by story activesupport-core-ext-calculations-delegation."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "time-ext.ts",
+    "rubyName": "beginning_of_day",
+    "call": "in_time_zone",
+    "reason": "time-ext.ts is a free-function helper module over JS `Date`, not a port of Time/Date/DateTime#beginning_of_day: it computes the result inline instead of delegating to `in_time_zone` the way core_ext/*/calculations.rb does. Surfaced (not introduced) by pointing the three calculations.rb reopenings at this file; convergence tracked by story activesupport-core-ext-calculations-delegation."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "time-ext.ts",
+    "rubyName": "beginning_of_hour",
+    "call": "change",
+    "reason": "time-ext.ts is a free-function helper module over JS `Date`, not a port of Time/Date/DateTime#beginning_of_hour: it computes the result inline instead of delegating to `change` the way core_ext/*/calculations.rb does. Surfaced (not introduced) by pointing the three calculations.rb reopenings at this file; convergence tracked by story activesupport-core-ext-calculations-delegation."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "time-ext.ts",
+    "rubyName": "beginning_of_minute",
+    "call": "change",
+    "reason": "time-ext.ts is a free-function helper module over JS `Date`, not a port of Time/Date/DateTime#beginning_of_minute: it computes the result inline instead of delegating to `change` the way core_ext/*/calculations.rb does. Surfaced (not introduced) by pointing the three calculations.rb reopenings at this file; convergence tracked by story activesupport-core-ext-calculations-delegation."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "time-ext.ts",
+    "rubyName": "days_in_year",
+    "call": "days_in_month",
+    "reason": "time-ext.ts is a free-function helper module over JS `Date`, not a port of Time/Date/DateTime#days_in_year: it computes the result inline instead of delegating to `days_in_month` the way core_ext/*/calculations.rb does. Surfaced (not introduced) by pointing the three calculations.rb reopenings at this file; convergence tracked by story activesupport-core-ext-calculations-delegation."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "time-ext.ts",
+    "rubyName": "end_of_day",
+    "call": "change",
+    "reason": "time-ext.ts is a free-function helper module over JS `Date`, not a port of Time/Date/DateTime#end_of_day: it computes the result inline instead of delegating to `change` the way core_ext/*/calculations.rb does. Surfaced (not introduced) by pointing the three calculations.rb reopenings at this file; convergence tracked by story activesupport-core-ext-calculations-delegation."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "time-ext.ts",
+    "rubyName": "end_of_day",
+    "call": "in_time_zone",
+    "reason": "time-ext.ts is a free-function helper module over JS `Date`, not a port of Time/Date/DateTime#end_of_day: it computes the result inline instead of delegating to `in_time_zone` the way core_ext/*/calculations.rb does. Surfaced (not introduced) by pointing the three calculations.rb reopenings at this file; convergence tracked by story activesupport-core-ext-calculations-delegation."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "time-ext.ts",
+    "rubyName": "end_of_hour",
+    "call": "change",
+    "reason": "time-ext.ts is a free-function helper module over JS `Date`, not a port of Time/Date/DateTime#end_of_hour: it computes the result inline instead of delegating to `change` the way core_ext/*/calculations.rb does. Surfaced (not introduced) by pointing the three calculations.rb reopenings at this file; convergence tracked by story activesupport-core-ext-calculations-delegation."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "time-ext.ts",
+    "rubyName": "end_of_minute",
+    "call": "change",
+    "reason": "time-ext.ts is a free-function helper module over JS `Date`, not a port of Time/Date/DateTime#end_of_minute: it computes the result inline instead of delegating to `change` the way core_ext/*/calculations.rb does. Surfaced (not introduced) by pointing the three calculations.rb reopenings at this file; convergence tracked by story activesupport-core-ext-calculations-delegation."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "time-ext.ts",
+    "rubyName": "middle_of_day",
+    "call": "change",
+    "reason": "time-ext.ts is a free-function helper module over JS `Date`, not a port of Time/Date/DateTime#middle_of_day: it computes the result inline instead of delegating to `change` the way core_ext/*/calculations.rb does. Surfaced (not introduced) by pointing the three calculations.rb reopenings at this file; convergence tracked by story activesupport-core-ext-calculations-delegation."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "time-ext.ts",
+    "rubyName": "middle_of_day",
+    "call": "in_time_zone",
+    "reason": "time-ext.ts is a free-function helper module over JS `Date`, not a port of Time/Date/DateTime#middle_of_day: it computes the result inline instead of delegating to `in_time_zone` the way core_ext/*/calculations.rb does. Surfaced (not introduced) by pointing the three calculations.rb reopenings at this file; convergence tracked by story activesupport-core-ext-calculations-delegation."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "time-ext.ts",
+    "rubyName": "next_day",
+    "call": "advance",
+    "reason": "time-ext.ts is a free-function helper module over JS `Date`, not a port of Time/Date/DateTime#next_day: it computes the result inline instead of delegating to `advance` the way core_ext/*/calculations.rb does. Surfaced (not introduced) by pointing the three calculations.rb reopenings at this file; convergence tracked by story activesupport-core-ext-calculations-delegation."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "time-ext.ts",
+    "rubyName": "next_month",
+    "call": "advance",
+    "reason": "time-ext.ts is a free-function helper module over JS `Date`, not a port of Time/Date/DateTime#next_month: it computes the result inline instead of delegating to `advance` the way core_ext/*/calculations.rb does. Surfaced (not introduced) by pointing the three calculations.rb reopenings at this file; convergence tracked by story activesupport-core-ext-calculations-delegation."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "time-ext.ts",
+    "rubyName": "next_year",
+    "call": "advance",
+    "reason": "time-ext.ts is a free-function helper module over JS `Date`, not a port of Time/Date/DateTime#next_year: it computes the result inline instead of delegating to `advance` the way core_ext/*/calculations.rb does. Surfaced (not introduced) by pointing the three calculations.rb reopenings at this file; convergence tracked by story activesupport-core-ext-calculations-delegation."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "time-ext.ts",
+    "rubyName": "prev_day",
+    "call": "advance",
+    "reason": "time-ext.ts is a free-function helper module over JS `Date`, not a port of Time/Date/DateTime#prev_day: it computes the result inline instead of delegating to `advance` the way core_ext/*/calculations.rb does. Surfaced (not introduced) by pointing the three calculations.rb reopenings at this file; convergence tracked by story activesupport-core-ext-calculations-delegation."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "time-ext.ts",
+    "rubyName": "prev_month",
+    "call": "advance",
+    "reason": "time-ext.ts is a free-function helper module over JS `Date`, not a port of Time/Date/DateTime#prev_month: it computes the result inline instead of delegating to `advance` the way core_ext/*/calculations.rb does. Surfaced (not introduced) by pointing the three calculations.rb reopenings at this file; convergence tracked by story activesupport-core-ext-calculations-delegation."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "time-ext.ts",
+    "rubyName": "prev_year",
+    "call": "advance",
+    "reason": "time-ext.ts is a free-function helper module over JS `Date`, not a port of Time/Date/DateTime#prev_year: it computes the result inline instead of delegating to `advance` the way core_ext/*/calculations.rb does. Surfaced (not introduced) by pointing the three calculations.rb reopenings at this file; convergence tracked by story activesupport-core-ext-calculations-delegation."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "time-ext.ts",
+    "rubyName": "seconds_since_midnight",
+    "call": "change",
+    "reason": "time-ext.ts is a free-function helper module over JS `Date`, not a port of Time/Date/DateTime#seconds_since_midnight: it computes the result inline instead of delegating to `change` the way core_ext/*/calculations.rb does. Surfaced (not introduced) by pointing the three calculations.rb reopenings at this file; convergence tracked by story activesupport-core-ext-calculations-delegation."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "time-ext.ts",
+    "rubyName": "seconds_until_end_of_day",
+    "call": "end_of_day",
+    "reason": "time-ext.ts is a free-function helper module over JS `Date`, not a port of Time/Date/DateTime#seconds_until_end_of_day: it computes the result inline instead of delegating to `end_of_day` the way core_ext/*/calculations.rb does. Surfaced (not introduced) by pointing the three calculations.rb reopenings at this file; convergence tracked by story activesupport-core-ext-calculations-delegation."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "time-ext.ts",
+    "rubyName": "since",
+    "call": "in_time_zone",
+    "reason": "time-ext.ts is a free-function helper module over JS `Date`, not a port of Time/Date/DateTime#since: it computes the result inline instead of delegating to `in_time_zone` the way core_ext/*/calculations.rb does. Surfaced (not introduced) by pointing the three calculations.rb reopenings at this file; convergence tracked by story activesupport-core-ext-calculations-delegation."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "time-ext.ts",
+    "rubyName": "since",
+    "call": "warn",
+    "reason": "time-ext.ts is a free-function helper module over JS `Date`, not a port of Time/Date/DateTime#since: it computes the result inline instead of delegating to `warn` the way core_ext/*/calculations.rb does. Surfaced (not introduced) by pointing the three calculations.rb reopenings at this file; convergence tracked by story activesupport-core-ext-calculations-delegation."
+  }
+]
