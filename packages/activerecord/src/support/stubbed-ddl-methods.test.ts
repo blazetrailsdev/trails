@@ -24,6 +24,16 @@ const NON_EMITTING: ReadonlyMap<string, string> = new Map([
     "warm-up read — primes the memoized version the index sort-order predicates gate on",
   ],
   [
+    "verifyBang",
+    "connection readiness — Rails' `verify!` (`abstract_adapter.rb:759`), which the loader runs before any DDL; emits none itself",
+  ],
+  ["active", "liveness read `verifyBang` branches on, not a DDL emitter"],
+  [
+    "completeAsyncConnect",
+    "settles SQLite's async open so `active` can answer; connection setup, emits no DDL",
+  ],
+  ["verifiedBang", "post-verify bookkeeping — stamps `_lastActivity`/`_verified`, emits no DDL"],
+  [
     "validateCreateTableOptionsBang",
     "option validation — raises on an unknown key, emits no DDL of its own",
   ],

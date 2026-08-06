@@ -768,6 +768,17 @@ export class PostgreSQLAdapter
    */
   private async _maybeConfigureConnection(client: pg.Client): Promise<void> {
     if (this._connectionConfigured) return;
+    // Deviation, language-forced: Rails' configure_connection opens with `super`
+    // (postgresql_adapter.rb:957), whose check_version reads the lazy sync
+    // `database_version`. Ours cannot self-fetch, so the memo is filled at that
+    // same position. Issued DIRECTLY on `client`, like the SET statements below:
+    // getDatabaseVersion() acquires its own client and would re-enter the
+    // acquire machinery still holding `_acquiring`. A zero version is left
+    // uncached so getDatabaseVersion()'s ConnectionFailed path still owns it.
+    if (this._databaseVersion === null) {
+      const version = await this._serverVersion(client);
+      if (version !== 0) this._databaseVersion = version;
+    }
     // Rails resets @mapped_default_timezone = nil while installing decoders in
     // configure_connection (postgresql_adapter.rb:1112) so the next
     // update_typemap_for_default_timezone re-applies the session timezone. This
@@ -3831,11 +3842,6 @@ export class PostgreSQLAdapter
       comment?: string;
     } = {},
   ): Promise<void> {
-    // Priming the cached database version is a trails addition: the visitor's
-    // supportsNullsNotDistinct/supportsIndexInclude predicates read
-    // `databaseVersion` synchronously and silently yield false on a cold
-    // connection.
-    await this.getDatabaseVersion();
     await this.schemaCache.clearDataSourceCacheBang(tableName);
 
     const createIndex = (await this.buildCreateIndexDefinition(tableName, columns, options))!;

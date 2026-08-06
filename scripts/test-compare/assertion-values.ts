@@ -22,6 +22,13 @@
 // divergence for a ported assertion). NOT normalized: numeric width/precision
 // (`n:5` ≠ `n:5.0`), string case/whitespace, or regex/array/hash literals (those
 // arrive as `null` — a non-literal — and are skipped, never compared).
+//
+// RFC 0088 (the `date` gem port) returns Temporal types where Ruby returns
+// Date/DateTime/Time, so a faithful port pairs `assert_equal Date.new(2001,2,3),
+// …` with `expect(…).toEqual(Temporal.PlainDate.from("2001-02-03"))`. Both are
+// method calls, so both extractors emit `null` and the kind is skipped: the
+// value counter cannot rise for that shape, with no exclusion list needed. See
+// the regression test in assertion-values.test.ts.
 
 import { normalizeRailsKind, normalizeTrailsKind, type CanonicalKind } from "./assertion-kinds.js";
 

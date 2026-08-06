@@ -21,11 +21,6 @@ import { STUBBED_DDL_METHODS } from "./stubbed-ddl-methods.js";
  * and the `supports_insert_returning?` trigger table (203-225) — the file whole.
  */
 async function loadPostgresqlSpecificSchema(adapter: PostgreSQLAdapter): Promise<void> {
-  // `supportsPgcryptoUuid()` / `supportsVirtualColumns()` read the cached
-  // `databaseVersion`, whose sync getter throws until the version has been
-  // fetched once.
-  await adapter.getDatabaseVersion();
-
   await adapter.enableExtension("uuid-ossp");
   if (adapter.supportsPgcryptoUuid()) await adapter.enableExtension("pgcrypto");
 
@@ -345,7 +340,6 @@ async function loadPostgresqlSpecificSchema(adapter: PostgreSQLAdapter): Promise
  * worker and so cannot pull in `supports.ts`'s `vitest` import.
  */
 async function loadMysql2SpecificSchema(adapter: AbstractMysqlAdapter): Promise<void> {
-  await adapter.pool.serverVersion(adapter);
   const supportsDefaultExpression = adapter.isMariadb()
     ? adapter.databaseVersion.compare("10.2.1") >= 0
     : adapter.databaseVersion.compare("8.0.13") >= 0;

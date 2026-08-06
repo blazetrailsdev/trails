@@ -277,8 +277,6 @@ export class SchemaCreation extends AbstractSchemaCreation {
     const quotedMap = new Map<string, string>(
       o.columns.map((c) => [c, this.adapter.quoteColumnName(c)]),
     );
-    // The createTable path warms getDatabaseVersion() upstream so the version-gated
-    // supportsIndexSortOrder read isn't cold.
     addOptionsForIndexColumns(
       quotedMap,
       {

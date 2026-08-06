@@ -92,6 +92,18 @@ describe("assertionValueMismatch", () => {
     expect(deltas).toEqual([{ kind: "same", rails: ["n:5"], trails: ["n:4"] }]);
   });
 
+  it("never flags an RFC 0088 Temporal-vs-Ruby-temporal expected value", () => {
+    // `assert_equal Date.new(2001, 2, 3), …` vs
+    // `expect(…).toEqual(Temporal.PlainDate.from("2001-02-03"))`: both extractors
+    // emit `null` for a method call, so the kind is skipped and `date.value`
+    // cannot rise for RFC 0088's intended shape. See the module header.
+    expect(assertionValueMismatch(["assert_equal"], [null], ["toEqual"], [null], false)).toBeNull();
+    // A one-sided capture is skipped too: the sides are not both fully literal.
+    expect(
+      assertionValueMismatch(["assert_equal"], [null], ["toEqual"], ["s:2001-02-03"], false),
+    ).toBeNull();
+  });
+
   it("returns null for a pending stub or missing kind data", () => {
     expect(
       assertionValueMismatch(["assert_equal"], ["n:5"], ["toEqual"], ["n:4"], true),

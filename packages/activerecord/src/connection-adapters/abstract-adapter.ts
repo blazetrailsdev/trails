@@ -2556,8 +2556,17 @@ export class AbstractAdapter implements Quoting {
     return m;
   }
 
-  /** @internal Mirrors: AbstractAdapter#configure_connection */
+  /** @internal Mirrors: AbstractAdapter#configure_connection (`abstract_adapter.rb:1212-1214`) */
   configureConnection(..._args: unknown[]): void | Promise<void> {
+    // Deviation, language-forced: Rails' body is `check_version` alone because
+    // `database_version` (`abstract_adapter.rb:854-856`) is a sync reader that
+    // issues its own round-trip. `getDatabaseVersion()` is a real await, so the
+    // sync getter cannot self-fetch; filling the pool memo at the point Rails
+    // establishes the connection is what keeps every version-gated `supports*()`
+    // read a plain memo hit. The sync arm keeps SQLite's `configure_connection`
+    // synchronous, as Rails' is.
+    const serverVersion = this.pool.serverVersion(this);
+    if (serverVersion instanceof Promise) return serverVersion.then(() => this.checkVersion());
     this.checkVersion();
   }
 
