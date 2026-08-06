@@ -126,8 +126,13 @@ export class NullPool implements AbstractPool {
   serverVersion(connection: DatabaseAdapter): unknown {
     if (this._serverVersion != null) return this._serverVersion;
     const version = connection.getDatabaseVersion?.();
+    // Only the resolved value is memoized, never the in-flight promise: the
+    // fetch opens the connection, whose `configureConnection`
+    // (`abstract_adapter.rb:1212`) reads back through here, and handing that
+    // nested call the promise it is itself inside would deadlock. Ruby's
+    // `synchronize` is a re-entrant Monitor, so it recomputes there too.
     if (version instanceof Promise) {
-      return (this._serverVersion = version.then((v) => (this._serverVersion = v)));
+      return version.then((v) => (this._serverVersion = v));
     }
     return (this._serverVersion = version);
   }

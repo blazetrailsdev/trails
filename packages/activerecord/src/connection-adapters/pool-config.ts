@@ -146,14 +146,17 @@ export class PoolConfig {
   get serverVersion(): (connection: DatabaseAdapter) => unknown {
     if (!this._serverVersionFn) {
       this._serverVersionFn = (connection: DatabaseAdapter) => {
+        // trails-only: `getDatabaseVersion` is a real await on every adapter
+        // whose version comes off the wire, where Rails' is sync.
         if (this._serverVersion != null) return this._serverVersion;
         const version = connection.getDatabaseVersion?.();
-        // trails-only: `getDatabaseVersion` is a real await on every adapter
-        // whose version comes off the wire, where Rails' is sync. Holding the
-        // in-flight promise keeps the fetch once-only, and replacing it with
-        // the resolved value keeps the sync `databaseVersion` read honest.
+        // Only the resolved value is memoized, never the in-flight promise: the
+        // fetch opens the connection, whose `configureConnection`
+        // (`abstract_adapter.rb:1212`) reads back through here, and handing that
+        // nested call the promise it is itself inside would deadlock. Ruby's
+        // `synchronize` is a re-entrant Monitor, so it recomputes there too.
         if (version instanceof Promise) {
-          return (this._serverVersion = version.then((v) => (this._serverVersion = v)));
+          return version.then((v) => (this._serverVersion = v));
         }
         return (this._serverVersion = version);
       };
