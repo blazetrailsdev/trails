@@ -3,7 +3,7 @@
  */
 
 import { stdout } from "./process-adapter.js";
-import { Temporal } from "./temporal.js";
+import { Temporal } from "@blazetrails/date";
 
 export type LogLevel = "debug" | "info" | "warn" | "error" | "fatal" | "unknown";
 

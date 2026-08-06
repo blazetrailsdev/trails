@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Logger, taggedLogging, SimpleFormatter } from "./logger.js";
 import { BroadcastLogger } from "./broadcast-logger.js";
-import { Temporal } from "./temporal.js";
+import { Temporal } from "@blazetrails/date";
 
 function makeBuffer() {
   const lines: string[] = [];

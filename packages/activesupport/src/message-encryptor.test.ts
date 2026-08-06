@@ -6,7 +6,7 @@ import { Encoding } from "./json/encoding.js";
 import { InvalidMessage, MessageEncryptor, NullSerializer } from "./message-encryptor.js";
 import { MessageVerifier } from "./message-verifier.js";
 import type { MessageSerializer } from "./messages/codec.js";
-import { Temporal } from "./temporal.js";
+import { Temporal } from "@blazetrails/date";
 
 const JSONSerializer: MessageSerializer = {
   dump(value: unknown): string {

@@ -16,7 +16,7 @@
 import { MessagePackError } from "./factory.js";
 import type { Factory, Packer, Unpacker } from "./factory.js";
 import { HashWithIndifferentAccess } from "../hash-with-indifferent-access.js";
-import { Temporal } from "../temporal.js";
+import { Temporal } from "@blazetrails/date";
 import { TimeWithZone } from "../time-with-zone.js";
 import { TimeZone } from "../values/time-zone.js";
 

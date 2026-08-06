@@ -2,7 +2,7 @@ import { expect, it } from "vitest";
 
 import { Encoding } from "../json/encoding.js";
 import { NullSerializer } from "../message-encryptor.js";
-import { Temporal } from "../temporal.js";
+import { Temporal } from "@blazetrails/date";
 import { currentTimeInstant, setFrozenInstant } from "../time-travel.js";
 import type { MessageSerializer } from "./codec.js";
 import { Metadata, type ExpectedMetadataOptions, type MetadataOptions } from "./metadata.js";

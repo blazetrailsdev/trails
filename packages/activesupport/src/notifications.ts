@@ -7,7 +7,7 @@
  *   Notifications.unsubscribe(sub);
  */
 
-import { Temporal } from "./temporal.js";
+import { Temporal } from "@blazetrails/date";
 import { Event, Instrumenter } from "./notifications/instrumenter.js";
 import type { EventPayload, NotificationHandle } from "./notifications/instrumenter.js";
 import { Fanout } from "./notifications/fanout.js";

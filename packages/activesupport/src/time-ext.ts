@@ -9,7 +9,8 @@
  *   `toDate`). Predicates (`isPast`, `isFuture`) accept `Date | Temporal.Instant`.
  */
 
-import { Temporal, instantFrom } from "./temporal.js";
+import { Temporal } from "@blazetrails/date";
+import { instantFrom } from "./temporal.js";
 
 const DAY_NAMES = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
 

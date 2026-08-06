@@ -4,7 +4,7 @@ import { TimeWithZone } from "../time-with-zone.js";
 import { TimeZone } from "../values/time-zone.js";
 import { travelTo } from "../testing-helpers.js";
 import { instantFromDate } from "../testing/temporal-helpers.js";
-import { Temporal } from "../temporal.js";
+import { Temporal } from "@blazetrails/date";
 import {
   getZone,
   setZone,

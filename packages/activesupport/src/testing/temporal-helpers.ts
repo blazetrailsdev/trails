@@ -5,7 +5,8 @@
  * fixtures are allowed only when immediately converted to a
  * `Temporal.Instant` via `instantFromDate(...)`, never used directly.
  */
-import { Temporal, instantFrom } from "../temporal.js";
+import { Temporal } from "@blazetrails/date";
+import { instantFrom } from "../temporal.js";
 
 export function instant(iso: string): Temporal.Instant {
   return Temporal.Instant.from(iso);

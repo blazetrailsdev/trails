@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { Notifications } from "./notifications.js";
 import { Event as EventClass } from "./notifications/instrumenter.js";
 import type { Event } from "./notifications/instrumenter.js";
-import { Temporal } from "./temporal.js";
+import { Temporal } from "@blazetrails/date";
 
 /**
  * trails-only coverage for the static Notifications surface: the

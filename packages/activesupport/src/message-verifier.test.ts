@@ -7,7 +7,7 @@ import { secureRandomBase58 } from "./key-generator.js";
 import { InvalidSignature, MessageVerifier } from "./message-verifier.js";
 import type { MessageSerializer } from "./messages/codec.js";
 import { ArgumentError } from "./messages/serializer-with-fallback.js";
-import { Temporal } from "./temporal.js";
+import { Temporal } from "@blazetrails/date";
 import { currentTimeInstant } from "./time-travel.js";
 
 const JSONSerializer: MessageSerializer = {

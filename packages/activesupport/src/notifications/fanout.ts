@@ -1,4 +1,4 @@
-import { Temporal } from "../temporal.js";
+import { Temporal } from "@blazetrails/date";
 import { Event } from "./instrumenter.js";
 import { IsolatedExecutionState } from "../isolated-execution-state.js";
 

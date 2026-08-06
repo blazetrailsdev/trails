@@ -13,7 +13,7 @@
  *   `currentTimeInstant()` (or `Temporal.Now.instant()` directly).
  */
 
-import { Temporal } from "./temporal.js";
+import { Temporal } from "@blazetrails/date";
 
 let _frozenInstant: Temporal.Instant | null = null;
 let _timeOffsetNs: bigint = 0n;

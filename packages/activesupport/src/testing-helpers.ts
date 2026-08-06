@@ -4,7 +4,7 @@
  */
 
 import { setFrozenTime, setTimeOffset, currentTime as _currentTime } from "./time-travel.js";
-import { Temporal } from "./temporal.js";
+import { Temporal } from "@blazetrails/date";
 
 // ── Time Travel ───────────────────────────────────────────────────────────────
 
