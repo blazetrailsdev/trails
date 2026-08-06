@@ -253,6 +253,8 @@ export interface AbstractAdapter {
     options?: ColumnOptions & { ifNotExists?: boolean },
   ): Promise<void>;
   renameColumn(tableName: string, oldName: string, newName: string): Promise<void>;
+  /** @internal */
+  renameColumnSql(tableName: string, columnName: string, newColumnName: string): string;
   changeColumn(
     tableName: string,
     columnName: string,

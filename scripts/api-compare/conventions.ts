@@ -19,8 +19,8 @@ import * as path from "path";
  * Applied to every identifier that flows through `snakeToCamel` —
  * currently Ruby method names (via `rubyMethodToTs`) and constant
  * fragments embedded in dot-notation method names like
- * `visit_Arel_Nodes_X`. File paths get the equivalent substitution
- * separately in `rubyFileToTs` below.
+ * `visit_Arel_Nodes_X`. File paths get the equivalent substitution in
+ * `rubyFileToTs` below, derived from this same table.
  */
 export const TOKEN_RENAMES: Record<string, string> = {
   erb: "tse",
@@ -41,16 +41,31 @@ export const TOKEN_RENAMES: Record<string, string> = {
  * suffixes it (`erb` must win over `rb`), and keys are escaped so a future entry
  * containing a metacharacter cannot corrupt the pattern.
  */
-const TOKEN_RENAME_PATTERN = new RegExp(
-  `(^|_)(${Object.keys(TOKEN_RENAMES)
+/** Longest key first (`erb` must beat `rb`), each escaped. */
+function tokenRenameAlternation(): string {
+  return Object.keys(TOKEN_RENAMES)
     .sort((a, b) => b.length - a.length || (a < b ? -1 : 1))
     .map((tok) => tok.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
-    .join("|")})(?=_|$|[A-Z])`,
-  "g",
-);
+    .join("|");
+}
+
+const TOKEN_RENAME_PATTERN = new RegExp(`(^|_)(${tokenRenameAlternation()})(?=_|$|[A-Z])`, "g");
+
+/**
+ * The same table over file paths, which by this point are kebab-cased — so the
+ * boundary is `\b` rather than the identifier form's `_`-anchor plus
+ * CamelCase lookahead. Two patterns, one table: an entry added to
+ * `TOKEN_RENAMES` used to reach method names and silently not file paths,
+ * which is exactly how the `rb` entry sat dead between #6017 and #6043.
+ */
+const FILE_TOKEN_RENAME_PATTERN = new RegExp(`\\b(${tokenRenameAlternation()})\\b`, "g");
 
 function applyTokenRenames(snake: string): string {
   return snake.replace(TOKEN_RENAME_PATTERN, (_m, pre, tok: string) => pre + TOKEN_RENAMES[tok]);
+}
+
+function applyFileTokenRenames(segment: string): string {
+  return segment.replace(FILE_TOKEN_RENAME_PATTERN, (_m, tok: string) => TOKEN_RENAMES[tok]);
 }
 
 export function snakeToCamel(name: string): string {
@@ -160,12 +175,12 @@ export function rubyFileToTs(rubyFile: string, pkg?: string): string {
   const base = path.posix.basename(rubyFile, ".rb");
   const aliasedBase = PATH_SEGMENT_ALIASES[base] ?? base;
   const kebab = aliasedBase.replace(/_/g, "-");
-  const tsFile = kebab.replace(/\berb\b/g, "tse") + ".ts";
+  const tsFile = applyFileTokenRenames(kebab) + ".ts";
   if (dir === ".") return tsFile;
   const tsDir = dir
     .split("/")
     .map((d) => PATH_SEGMENT_ALIASES[d] ?? d)
-    .map((d) => d.replace(/_/g, "-").replace(/\berb\b/g, "tse"))
+    .map((d) => applyFileTokenRenames(d.replace(/_/g, "-")))
     .join("/");
   return path.posix.join(tsDir, tsFile);
 }

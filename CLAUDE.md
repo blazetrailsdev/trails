@@ -349,3 +349,40 @@ When NOT to use this:
   reason) in `scripts/api-compare/conventions.ts`.
 - If the method needs Model-specific state beyond the host interface,
   keep it in `model.ts` directly.
+
+## Call-time constant resolution (Ruby autoload → the zero-import slot)
+
+Ruby resolves a constant named inside a method body when the method **runs**,
+and Zeitwerk autoloads the file at that moment. So `contexts.rb:36` can name
+`EncryptingOnlyEncryptor` and `config.rb` can name `DerivedSecretKeyProvider`
+without either file taking a load-order dependency on them.
+
+ESM has no equivalent. Every `import` is eager and evaluated before the
+importing module's body, so naming a constant in a method body still costs a
+module-eval edge. When that edge closes a cycle whose participants include a
+`class Sub extends Super`, entering the graph at `super.ts` evaluates `Sub`
+with `Super` still in TDZ and the module throws
+`Cannot access 'Super' before initialization`.
+
+**The settled answer is a zero-import slot module**: a file with no runtime
+imports at all (so it cannot join any cycle) exporting a mutable binding plus a
+`_setX()` setter, which the defining module calls at the bottom of its own
+body. Readers import the binding from the slot and use it at call time, exactly
+where Ruby resolves the constant. Two instances exist and are the only ones:
+
+- `activerecord/src/encryption/configurable-slot.ts` — `Configurable`, read by
+  `encryptor.ts`, `context.ts`, `scheme.ts`, `key-provider.ts`,
+  `key-generator.ts`.
+- `activerecord/src/associations/collection-proxy-slot.ts` — the
+  `CollectionProxy` ctor, read by `associations.ts`.
+
+This is a genuine language shortcoming, not a preference, and it is the one
+sanctioned shape for it — do not re-derive a per-cluster justification, and do
+not reach for a slot when a plain import does not actually close a cycle.
+Verify both directions with a plain-node import of the **built** `dist/**.js`
+modules as entry modules; a vitest run enters the funnel module first and masks
+the TDZ, so a green suite proves nothing here.
+
+Deferring the subclass edges instead (a slot per `extends` site) is the
+alternative that looks smaller and does not work: nothing then loads the
+subclass modules at all, so their self-registration never runs.

@@ -130,6 +130,23 @@ describe("snakeToCamel", () => {
       );
     }
   });
+
+  it("honors every TOKEN_RENAMES entry in file paths too", () => {
+    // The file-path substitution used to restate `erb` as a third hard-coded
+    // spelling of the table, so a new entry reached method names and NOT paths
+    // — the same dead-code shape the `rb` entry had. Both patterns derive from
+    // the table now.
+    for (const [tok, renamed] of Object.entries(TOKEN_RENAMES)) {
+      expect(rubyFileToTs(`${tok}.rb`)).toBe(`${renamed}.ts`);
+      expect(rubyFileToTs(`${tok}/util.rb`)).toBe(`${renamed}/util.ts`);
+      expect(rubyFileToTs(`core_ext/${tok}_util.rb`)).toBe(`core-ext/${renamed}-util.ts`);
+    }
+  });
+
+  it("does NOT rename a file-path token that appears as a substring", () => {
+    expect(rubyFileToTs("http_verb.rb")).toBe("http-verb.ts");
+    expect(rubyFileToTs("superb/thing.rb")).toBe("superb/thing.ts");
+  });
 });
 
 describe("rubyMethodToTsIgnoringSkip", () => {
