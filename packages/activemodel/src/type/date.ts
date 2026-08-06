@@ -1,6 +1,3 @@
-// `::Date` is the ruby/date gem's class, which shadows nothing in Ruby but
-// collides with the JS global `Date` this file also names; `RubyDate` is the
-// spelling the rest of the monorepo already reads it under.
 import {
   ArgumentError as RubyArgumentError,
   Date as RubyDate,

@@ -1,5 +1,3 @@
-// `RubyDate` / `RubyArgumentError` are the ruby/date gem's `::Date` and Ruby's
-// `ArgumentError`; both names are already taken in this file's scope.
 import {
   ArgumentError as RubyArgumentError,
   Date as RubyDate,
@@ -85,7 +83,9 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
    * `::Date._parse` is the gem's own entry point, ported at
    * `packages/date/src/date.ts` from `date_parse.c` `date__parse`, and it is
    * where `:offset` comes from — `date_zone_to_diff`'s reading of the `:zone`
-   * the string named.
+   * the string named. Ruby's `new_time` does `time -= offset` against the
+   * Rational a fractional-hour zone (`+05:45`, `-00:44:30`) answers; the
+   * ported `newTime`'s subtrahend is a number, so it is divided out here.
    *
    * @internal Rails-private helper.
    */
@@ -109,8 +109,6 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
       timeHash.min,
       timeHash.sec,
       timeHash.secFraction,
-      // Ruby's `time -= offset` takes the Rational a fractional-hour zone
-      // (`+05:45`, `-00:44:30`) answers; `new_time`'s subtrahend is a number.
       offset instanceof Rational ? offset.numerator / offset.denominator : offset,
     );
   }

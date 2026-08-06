@@ -680,12 +680,17 @@ describe("DateTime", () => {
   });
 
   it("keeps its offset through new_start", () => {
-    // `Date#julian` routes through `newStart`, which `DateTime` overrides —
-    // Ruby's `dup_obj_with_new_start` keeps the receiver's class, but the
-    // declared return type is `Date`'s.
     const julian = RubyDateTime.parse("2000-02-03T06:07:08+09:00").julian() as RubyDateTime;
     expect(julian.zone).toBe("+09:00");
     expect(julian.strftime("%Y-%m-%dT%H:%M:%S%:z")).toBe("2000-01-21T06:07:08+09:00");
+  });
+
+  it("rolls a 24:00:00 time of day onto the next day, as jd_local_to_utc does", () => {
+    // ruby 3.3.11: d = DateTime.parse("2008-03-01T24:00:00")
+    //   [d.year, d.mon, d.mday, d.hour] #=> [2008, 3, 2, 0]
+    const datetime = RubyDateTime.parse("2008-03-01T24:00:00");
+    expect([datetime.year, datetime.mon, datetime.day, datetime.hour]).toEqual([2008, 3, 2, 0]);
+    expect(RubyDateTime.parse("2008-03-01T24:00:00+09:00").day).toBe(2);
   });
 
   it("raises Date::Error on a string naming no date, as dt_new_by_frags does", () => {

@@ -2406,9 +2406,15 @@ function of2str(of: number): string {
  * `60` back to `59` — and the `:offset` `date_zone_to_diff` left in the frags.
  *
  * Ruby then moves the Julian day and day-fraction to UTC (`jd_local_to_utc` /
- * `df_local_to_utc`) and converts back on every read; the port keeps them
- * local, which is what the readers answer either way, so the offset alone is
- * carried.
+ * `df_local_to_utc`, `date_core.c:8311-8313`) and converts back on every read;
+ * the port keeps them local, which is what the readers answer either way, so
+ * the offset alone is carried. The one thing that round-trip does observably is
+ * normalize the `86400` a `24:00:00` time of day makes — `jd_local_to_utc`'s
+ * `df >= DAY_IN_SECONDS` arm rolls the day and the reader answers hour `0`, so
+ * `DateTime.parse("2008-03-01T24:00:00")` is 2008-03-02T00:00:00. The port
+ * normalizes the local pair for the same effect, which is `canon24oc`
+ * (`date_core.c:3306-3312`) with the day carried on the Julian day rather than
+ * on a day-fraction.
  */
 export function dtNewByFrags(hash: DateParts, sg: number): DateTime {
   let jd: number | null;
@@ -2440,7 +2446,13 @@ export function dtNewByFrags(hash: DateParts, sg: number): DateTime {
 
   const rt = cValidTimeP(hash.hour ?? 0, hash.min ?? 0, hash.sec ?? 0);
   if (rt === null) throw new DateError("invalid date");
-  const [rh, rmin, rs] = rt;
+  let [rh] = rt;
+  const [, rmin, rs] = rt;
+
+  if (rh === 24) {
+    rh = 0;
+    jd += 1;
+  }
 
   const t = hash.offset;
   const of = t == null ? 0 : t instanceof Rational ? t.numerator / t.denominator : t;
@@ -2924,6 +2936,9 @@ export class DateTime extends Date {
    * read (`jd_local_to_utc` at build, `m_local_jd` at read); the port keeps the
    * civil fields and the time of day *local*, which is what the readers answer
    * either way.
+   *
+   * An offset outside `±DAY_IN_SECONDS` is ignored rather than raised on, as
+   * `dt_new_by_frags` does (`date_core.c:8297-8306`).
    */
   constructor(
     year: number,
@@ -2939,8 +2954,6 @@ export class DateTime extends Date {
     this.#hour = hour;
     this.#min = minute;
     this.#sec = second;
-    // `dt_new_by_frags` (`date_core.c:8297-8306`) ignores an out-of-range
-    // offset rather than raising.
     this.#of = offset < -DAY_IN_SECONDS || offset > DAY_IN_SECONDS ? 0 : offset;
   }
 

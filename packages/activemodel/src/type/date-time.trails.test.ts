@@ -88,3 +88,27 @@ describe("DateTimeType date-only strings with a zone token", () => {
     expect(cast("2013-09-04T03:00:00-10")).toBe("2013-09-04T13:00:00Z");
   });
 });
+
+// Offsets `Date._parse` resolves that the hand-rolled zone table this replaced
+// could not: a fractional-hour numeric offset, a sub-minute one, and an
+// abbreviation outside the short list it carried. Each `:offset` below is
+// ruby 3.3.11's `Date._parse` answer.
+describe("DateTimeType offsets sourced from Date._parse", () => {
+  const type = new Types.DateTimeType();
+  const cast = (s: string) => (type.cast(s) as Temporal.Instant | null)?.toString() ?? null;
+
+  it("applies a fractional-hour numeric offset", () => {
+    // Date._parse("2013-09-04 03:00:00 +05:45")[:offset] #=> 20700
+    expect(cast("2013-09-04 03:00:00 +05:45")).toBe("2013-09-03T21:15:00Z");
+  });
+
+  it("applies a sub-minute numeric offset", () => {
+    // Date._parse("2013-09-04 03:00:00 -00:44:30")[:offset] #=> -2670
+    expect(cast("2013-09-04 03:00:00 -00:44:30")).toBe("2013-09-04T03:44:30Z");
+  });
+
+  it("applies an offset from the gem's full zone table", () => {
+    // Date._parse("2013-09-04 03:00:00 IST")[:offset] #=> 19800
+    expect(cast("2013-09-04 03:00:00 IST")).toBe("2013-09-03T21:30:00Z");
+  });
+});
