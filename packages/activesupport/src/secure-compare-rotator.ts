@@ -1,6 +1,11 @@
 import { SecurityUtils } from "./security-utils.js";
 
-export class InvalidMatch extends Error {}
+export class InvalidMatch extends Error {
+  constructor(message?: string) {
+    super(message);
+    this.name = "InvalidMatch";
+  }
+}
 
 /**
  * = Secure Compare Rotator
