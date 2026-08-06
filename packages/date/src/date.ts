@@ -2174,7 +2174,7 @@ export function dNewByFrags(hash: DateParts): Date {
   }
 
   if (jd === null) throw new DateError("invalid date");
-  return new Date(jd.year, jd.month, jd.day);
+  return new Date(jd);
 }
 
 /**
@@ -2199,9 +2199,10 @@ function of2str(of: number): string {
  * `60` back to `59` — and the `:offset` `date_zone_to_diff` left in the frags.
  *
  * Ruby then moves the day and day-fraction to UTC (`jd_local_to_utc` /
- * `df_local_to_utc`, `date_core.c:8311-8313`) and converts back on every read.
- * The {@link DateTime} constructor does both conversions, so the local civil
- * date and time of day are handed to it as they are.
+ * `df_local_to_utc`, `date_core.c:8311-8313`) and converts back on every read,
+ * and hands the converted pair to `d_complex_new_internal` — so the conversion
+ * happens here, at the C's own call site, and the constructor's UTC overload
+ * takes the result as it is.
  *
  * The `:offset` bound (`date_core.c:8297-8306`) is ported as written — strictly
  * outside `±DAY_IN_SECONDS` is ignored rather than raised on. It is unreachable
@@ -2252,7 +2253,8 @@ export function dtNewByFrags(hash: DateParts): DateTime {
   let of = t == null ? 0 : t instanceof Rational ? t.numerator / t.denominator : t;
   if (of < -DAY_IN_SECONDS || of > DAY_IN_SECONDS) of = 0;
 
-  return new DateTime(jd.year, jd.month, jd.day, rh, rmin, rs, of);
+  const df = timeToDf(rh, rmin, rs);
+  return new DateTime(jdLocalToUtc(jd, df, of), dfLocalToUtc(df, of), of);
 }
 
 /**
@@ -2307,7 +2309,26 @@ export class Date {
    * `date_core.c` `date_s_civil`), which raises `Date::Error` on a civil date
    * `c_valid_civil_p` rejects.
    */
-  constructor(year = -4712, month = 1, day = 1) {
+  constructor(year?: number, month?: number, day?: number);
+  /**
+   * @internal `date_core.c` `d_simple_new_internal` (`date_core.c:1057-1078`),
+   * which writes an already-resolved day straight into a fresh
+   * `SimpleDateData` under `HAVE_JD` and validates nothing — every caller
+   * (`d_new_by_frags`, `date_s_jd`, `date_s_ordinal`, `date_s_commercial`)
+   * has already established the date is buildable.
+   *
+   * It is a static C function the module-level `d_new_by_frags` calls; TS has
+   * no member visibility between "the class body" and "exported", so a
+   * `static #` seam would be unreachable from the module-level ports and a
+   * `WeakMap` seam would be machinery ruby/date has no counterpart for. This
+   * overload is the smallest seam that reaches `#date`.
+   */
+  constructor(rjd: Temporal.PlainDate);
+  constructor(year: number | Temporal.PlainDate = -4712, month = 1, day = 1) {
+    if (year instanceof Temporal.PlainDate) {
+      this.#date = year;
+      return;
+    }
     const r = cValidCivilP(year, month, day);
     if (r === null) throw new DateError("invalid date");
     this.#date = r;
@@ -2321,8 +2342,7 @@ export class Date {
    * so the conversion happens at the call.
    */
   static jd(jd = 0): Date {
-    const d = jdToPlainDate(jd);
-    return new Date(d.year, d.month, d.day);
+    return new Date(jdToPlainDate(jd));
   }
 
   /**
@@ -2334,7 +2354,7 @@ export class Date {
   static ordinal(year = -4712, yday = 1): Date {
     const r = cValidOrdinalP(year, yday);
     if (r === null) throw new DateError("invalid date");
-    return new Date(r.year, r.month, r.day);
+    return new Date(r);
   }
 
   /**
@@ -2358,7 +2378,7 @@ export class Date {
   static commercial(cwyear = -4712, cweek = 1, cwday = 1): Date {
     const r = cValidCommercialP(cwyear, cweek, cwday);
     if (r === null) throw new DateError("invalid date");
-    return new Date(r.year, r.month, r.day);
+    return new Date(r);
   }
 
   /**
@@ -2577,11 +2597,37 @@ export class DateTime extends Date {
     year: number,
     month: number,
     day: number,
+    hour?: number,
+    minute?: number,
+    second?: number,
+    offset?: number,
+  );
+  /**
+   * @internal `date_core.c` `d_complex_new_internal` (`date_core.c:3055-3071`),
+   * the seam `dt_new_by_frags` (`date_core.c:8239-8322`) ends at, under
+   * `HAVE_JD | HAVE_DF`: the day and day-fraction it has already converted to
+   * UTC (`date_core.c:8311-8313`) and the offset are written straight into a
+   * fresh `ComplexDateData`, with neither a civil triple nor a time of day to
+   * validate. The arguments are `d_complex_new_internal`'s own `rjd`, `df` and
+   * `of`. Same TS shortcoming as {@link Date}'s counterpart overload.
+   */
+  constructor(rjd: Temporal.PlainDate, df: number, of: number);
+  constructor(
+    year: number | Temporal.PlainDate,
+    month = 1,
+    day = 1,
     hour = 0,
     minute = 0,
     second = 0,
     offset = 0,
   ) {
+    if (year instanceof Temporal.PlainDate) {
+      super(jdUtcToLocal(year, month, day));
+      this.#date = year;
+      this.#df = month;
+      this.#of = day;
+      return;
+    }
     super(year, month, day);
     const rjd = cValidCivilP(year, month, day);
     if (rjd === null) throw new DateError("invalid date");
