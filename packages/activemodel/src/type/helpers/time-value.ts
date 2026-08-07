@@ -95,8 +95,13 @@ export function applySecondsPrecision<T>(this: { precision?: number }, value: T)
 /**
  * Mirrors: ActiveModel::Type::Helpers::TimeValue#user_input_in_time_zone
  * (time_value.rb:42-44) — `value.in_time_zone`, whose zone is the thread-local
- * `Time.zone`. `Time.zone` unset falls back to UTC here, the same convention
- * `isUtc()` applies to an unset `zone_default` (`helpers/timezone.ts`).
+ * `Time.zone`.
+ *
+ * With no zone set at all Ruby takes `in_time_zone`'s else arm and answers a
+ * bare `to_time` (`date_and_time/zones.rb:20-27`) — a value with no zone
+ * attached, which this method's `ZonedDateTime` return type cannot represent.
+ * UTC stands in, the same convention `isUtc()` already applies to an unset
+ * `zone_default` (`helpers/timezone.ts`).
  */
 export function userInputInTimeZone(value: unknown): Temporal.ZonedDateTime | null {
   if (value === null || value === undefined) return null;

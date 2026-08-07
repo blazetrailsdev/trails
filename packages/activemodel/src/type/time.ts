@@ -61,7 +61,9 @@ export class TimeType extends ValueType<Temporal.Instant> {
    * `super` is `Helpers::TimeValue#user_input_in_time_zone`, `value.in_time_zone`
    * (time_value.rb:44-46). The zone is the thread-local `Time.zone`, read here
    * through ActiveSupport's `getZone()` the way `isUtc()` reads
-   * `getZoneDefault()` — unset falls back to UTC on the same convention; `in_time_zone` is the tail below: the components
+   * `getZoneDefault()`; with no zone set at all Ruby answers a bare `to_time`
+   * (`date_and_time/zones.rb:20-27`), which a `ZonedDateTime` cannot represent,
+   * so UTC stands in as it does in the helper. `in_time_zone` is the tail below: the components
    * `cast_value` built are read back out of the `::Time` and re-anchored in
    * that zone, which is what `Time.zone.parse` of the dummy-dated string
    * answers.
