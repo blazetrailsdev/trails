@@ -309,55 +309,29 @@ export class Association {
 
   private isKeyConversionRequired(): boolean {
     if (this._keyConversionRequired === undefined) {
-      const associationKeyType = this.associationKeyType();
-      const ownerKeyType = this.ownerKeyType();
-      // Rails is a bare `association_key_type != owner_key_type`
-      // (`preloader/association.rb:257-263`). Ruby's `type_for_attribute`
-      // always answers a Type, so it never compares against nil; trails'
-      // lookup answers null for an unknown attribute or an ownerless loader,
-      // and an unknown type must not read as a mismatch.
-      this._keyConversionRequired =
-        associationKeyType != null && ownerKeyType != null && associationKeyType !== ownerKeyType;
+      this._keyConversionRequired = this.associationKeyType() !== this.ownerKeyType();
     }
 
     return this._keyConversionRequired;
   }
 
   /** Mirrors: Preloader::Association#association_key_type
-   *  (`preloader/association.rb:282-284`) — `@klass.type_for_attribute(association_key_name).type`. */
-  private associationKeyType(): string | null {
-    return this._typeNames(this.associationKeyName, (name) => this.klass.typeForAttribute(name));
+   *  (`preloader/association.rb:282-284`). A composite key arrives as an array
+   *  of names, which `type_for_attribute` has no answer for in Rails either;
+   *  answering undefined for both sides leaves them equal, i.e. no conversion. */
+  private associationKeyType(): string | undefined {
+    const key = this.associationKeyName;
+    if (Array.isArray(key)) return undefined;
+    return this.klass.typeForAttribute(key).type();
   }
 
   /** Mirrors: Preloader::Association#owner_key_type
-   *  (`preloader/association.rb:286-288`) — `@model.type_for_attribute(owner_key_name).type`. */
-  private ownerKeyType(): string | null {
-    const model = this.model;
-    if (!model) return null;
-    return this._typeNames(this.ownerKeyName, (name) => model.typeForAttribute(name));
-  }
-
-  /**
-   * Ruby's `type_for_attribute(name).type` is one call against one name; a
-   * composite key arrives here as an array of names (Rails hits the same array
-   * and has no answer for it either), so the two readers above share the
-   * per-name mapping rather than each open-coding it.
-   */
-  private _typeNames(key: string | string[], typeFor: (name: string) => unknown): string | null {
-    const names: (string | null)[] = (Array.isArray(key) ? key : [key]).map((name) => {
-      let type: any;
-      try {
-        type = typeFor(name);
-      } catch {
-        return null;
-      }
-      if (!type) return null;
-      if (typeof type === "string") return type;
-      if (typeof type.type === "function") return type.type();
-      return type.name ?? null;
-    });
-    if (names.some((n) => n == null)) return null;
-    return names.join(",");
+   *  (`preloader/association.rb:286-288`). Same composite-key guard as
+   *  {@link Association.associationKeyType}; `model` is null for an ownerless loader. */
+  private ownerKeyType(): string | undefined {
+    const key = this.ownerKeyName;
+    if (this.model == null || Array.isArray(key)) return undefined;
+    return this.model.typeForAttribute(key).type();
   }
 
   private buildScope(): any {

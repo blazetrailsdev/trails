@@ -877,8 +877,6 @@ describe("PreloaderTest", () => {
     expect(fav.association("author").target.name).toBe("Mary");
     expect(fav.association("favoriteAuthor").target.name).toBe("Bob");
     spy.mockClear();
-    // associations_test.rb:1133-1136 — `favorites.first.author` /
-    // `.favorite_author` inside assert_no_queries.
     const reloadedAuthor = await fav.author;
     const reloadedFavorite = await fav.favoriteAuthor;
     expect(reloadedAuthor.name).toBe("Mary");

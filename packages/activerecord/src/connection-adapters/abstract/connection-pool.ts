@@ -154,18 +154,13 @@ export class NullPool implements AbstractPool {
 
   /**
    * Rails' NullPool defines neither `role` nor `shard`
-   * (`abstract/connection_pool.rb:14-51`), so `AbstractAdapter#role` /
-   * `#shard` — bare `@pool.role` / `@pool.shard`
-   * (`abstract_adapter.rb:288,294`) — raise NoMethodError on an adapter that
-   * has no pool. Ruby applications never see that: an adapter is only ever
-   * reached through a pool. trails constructs standalone adapters routinely
-   * (`new BetterSQLite3Adapter(":memory:")` in tests and in the schema/CLI
-   * paths), and `inspect()` — which a serializer can reach from any
-   * translated error — reads both. The Rails defaults for a single-role,
-   * unsharded application (`abstract_adapter.rb:285,291` docs: "In a non-multi
-   * role application, +:writing+ is returned", "In a non-sharded application,
-   * +:default+ is returned") therefore stand in here, once, so that every
-   * reader stays the bare Rails one-liner.
+   * (`abstract/connection_pool.rb:14-51`), so the bare `@pool.role` /
+   * `@pool.shard` of `AbstractAdapter#role` / `#shard`
+   * (`abstract_adapter.rb:288,294`) raises NoMethodError on a pool-less
+   * adapter. Ruby never reaches one; trails constructs standalone adapters
+   * routinely, and `inspect()` reads both. The values Rails documents for a
+   * single-role, unsharded application (`abstract_adapter.rb:285,291`) stand
+   * in here, once, so both readers stay the bare Rails one-liner.
    */
   get role(): string {
     return "writing";
