@@ -1140,14 +1140,9 @@ function _assignAttribute(self: AttributeIO, key: string, value: unknown): Promi
 }
 
 /**
- * Mirrors: ActiveRecord::AttributeAssignment#_assign_attributes
- * (attribute_assignment.rb:6-22), reached through
- * ActiveModel's `assign_attributes` (:32-35).
- *
- * Rails buckets multiparameter keys AND Hash values out of the main loop and
- * assigns the nested hashes only after the scalar pass (:21), so a nested
- * writer's `reject_if` / the built record's callbacks observe an owner whose
- * own attributes are already set. Nested runs before multiparameter (:21-22).
+ * Mirrors: ActiveModel::AttributeAssignment#assign_attributes
+ * (attribute_assignment.rb:28-35) — raise unless the argument is a Hash, return
+ * on a blank one, then sanitize and hand off to `_assign_attributes`.
  *
  * Rails returns nil and so does this. A displacing `#{name}_attributes=` key
  * (see `_assignAttribute`) owes a write that Rails runs inline and JS cannot;
@@ -1168,17 +1163,12 @@ export function assignAttributes(this: AttributeIO, attrs: Record<string, unknow
 }
 
 /**
- * Awaitable `attributes=` — Rails aliases `attributes=` to `assign_attributes`
- * (activemodel attribute_assignment.rb:37), and RFC 0087 spells an awaitable
- * writer `set#{Name}`. This is the entry point for a hash whose nested-attributes
- * key displaces an existing record: Rails' `load_target` / `remove_target!`
- * (has_one_association.rb:59-69) run inline inside the `each`, so the write must
- * finish before the next key is assigned, and only an awaited caller can hold
- * that order.
- *
- * @noRailsEquivalent The awaitable half of Rails' `attributes=`
- * (activemodel attribute_assignment.rb:37); a TS `set` accessor cannot be
- * awaited, so RFC 0087's `set#{Name}` spelling carries it.
+ * Awaitable `attributes=`. This is the entry point for a hash whose
+ * nested-attributes key displaces an existing record: Rails' `load_target` /
+ * `remove_target!` (has_one_association.rb:59-69) run inline inside the `each`,
+ * so the write must finish before the next key is assigned, and only an awaited
+ * caller can hold that order.
+
  */
 export async function setAttributes(
   this: AttributeIO,
@@ -1203,7 +1193,12 @@ function isNestedParameterHash(value: unknown): boolean {
 
 /**
  * Mirrors: ActiveRecord::AttributeAssignment#_assign_attributes
- * (attribute_assignment.rb:9-28).
+ * (attribute_assignment.rb:6-23).
+ *
+ * Rails buckets multiparameter keys AND Hash values out of the main loop and
+ * assigns the nested hashes only after the scalar pass (:21), so a nested
+ * writer's `reject_if` / the built record's callbacks observe an owner whose
+ * own attributes are already set. Nested runs before multiparameter (:21-22).
  *
  * Rails' body is a plain `each`; ours yields the promise a step answered so the
  * two entry points above can drive the same `each` — `assignAttributes` parking

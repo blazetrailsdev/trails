@@ -245,6 +245,26 @@ describe("nested attributes assignment ordering (trails-only)", () => {
     expect(observed).toEqual(["Aye"]);
   });
 
+  // `assign_attributes` returns nil (attribute_assignment.rb:28-35); the write a
+  // displacing key owes `remove_target!` is parked on the owner and drained by
+  // `save`, the deferral the constructor's nested re-dispatch already uses.
+  it("returns nothing from assignAttributes and drains the displacing write on save", async () => {
+    const pirate = (await Pirate.create({ catchphrase: "Aye" })) as unknown as Pirate;
+    const displaced = await Ship.create({
+      name: "Nights Dirty Lightning",
+      pirate_id: (pirate as unknown as { id: number }).id,
+    });
+    await (pirate as unknown as { ship: Promise<Base | null> }).ship;
+
+    expect(
+      pirate.assignAttributes({ shipAttributes: { name: "Davy Jones Gold Dagger" } }),
+    ).toBeUndefined();
+    await pirate.save();
+
+    const reloaded = await Ship.find((displaced as unknown as { id: number }).id);
+    expect((reloaded as unknown as { pirate_id: number | null }).pirate_id).toBe(null);
+  });
+
   // `_assign_attributes` and `assign_nested_parameter_attributes`
   // (attribute_assignment.rb:9-23, 26-28) are plain `each` loops, so an
   // assignment that reaches DB I/O — a displacing `#{name}_attributes=` running
