@@ -520,9 +520,11 @@ export class Model {
   static _nullifyBlanks: string[] | true | false = false;
 
   /**
-   * Apply common options to multiple validation/callback calls.
-   *
-   * Mirrors: ActiveSupport::OptionMerger / with_options
+   * Mirrors: Object#with_options
+   * (activesupport/lib/active_support/core_ext/object/with_options.rb:92),
+   * which Ruby models reach as a receiverless class-body call. TypeScript
+   * cannot monkey-patch Object, so the class carries the entry point and the
+   * ported free function does the work.
    *
    * Usage:
    *   User.withOptions({ if: (r) => r.readAttribute("active") }, (m) => {
@@ -534,7 +536,7 @@ export class Model {
     options: Record<string, unknown>,
     block?: (optionMerger: typeof Model) => void,
   ): typeof Model | void {
-    return block ? withOptions(this, options, block) : withOptions(this, options);
+    return withOptions(this, options, block);
   }
 
   // -- Validations (Phase 1100) --

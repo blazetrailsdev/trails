@@ -1,11 +1,23 @@
-/**
- * Mirrors: ActiveSupport::OptionMerger
- * (activesupport/lib/active_support/option_merger.rb)
- */
-
 import { DeepMergeable } from "./deep-mergeable.js";
 import { isPlainObject } from "./hash-utils.js";
 
+/**
+ * Mirrors: ActiveSupport::OptionMerger
+ * (activesupport/lib/active_support/option_merger.rb)
+ *
+ * Ruby undefines every instance method so `method_missing` sees the whole
+ * surface. JavaScript has no `method_missing`, so the merger *is* a Proxy over
+ * the context returned from the constructor, whose `get` trap routes every
+ * forwarded function through {@link OptionMerger#methodMissing}.
+ *
+ * `methodMissing` deviates from `option_merger.rb:16` on one point, forced by
+ * the language: Ruby's block travels outside `arguments`, while TypeScript
+ * passes it as a trailing positional argument, so a trailing function argument
+ * is held aside before Rails' argument rules run — except when it is the lone
+ * argument, which is Ruby's `arguments.first.is_a?(Proc)` branch. Ruby's
+ * `**options` splat materializes a fresh Hash, so the forwarded options object
+ * is a copy and never `@options` itself.
+ */
 export class OptionMerger {
   private context: any;
   private options: Record<string, unknown>;
@@ -14,9 +26,6 @@ export class OptionMerger {
     this.context = context;
     this.options = options;
 
-    // Ruby undefines every instance method so that `method_missing` sees the
-    // whole surface. JS has no `method_missing`, so the merger *is* a Proxy
-    // over the context whose `get` trap routes calls through `methodMissing`.
     return new Proxy(context, {
       get: (target: object, property: string | symbol): unknown => {
         const value = Reflect.get(target, property);
@@ -28,11 +37,6 @@ export class OptionMerger {
 
   private methodMissing(method: string, ...args: unknown[]): unknown {
     let options: Record<string, unknown> | null = null;
-
-    // Ruby's block travels outside `arguments`; in TypeScript it is a trailing
-    // positional argument, so hold it aside before applying Rails' rules — but
-    // only when it is not the lone argument, which is Ruby's Proc-arg branch
-    // below.
     const block =
       args.length > 1 && typeof args[args.length - 1] === "function" ? args.pop() : null;
 
@@ -47,8 +51,6 @@ export class OptionMerger {
       options = this.options;
     }
 
-    // Ruby forwards these as `**options`, and the double-splat materializes a
-    // fresh Hash — callers must not receive @options itself.
     if (options) args.push({ ...options });
     if (block) args.push(block);
 

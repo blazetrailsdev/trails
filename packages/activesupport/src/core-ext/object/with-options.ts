@@ -17,6 +17,11 @@ export function withOptions<T extends object, R>(
 export function withOptions<T extends object, R>(
   object: T,
   options: Record<string, unknown>,
+  block: ((optionMerger: T) => R) | undefined,
+): R | T;
+export function withOptions<T extends object, R>(
+  object: T,
+  options: Record<string, unknown>,
   block?: (optionMerger: T) => R,
 ): R | T {
   const optionMerger = new OptionMerger(object, options) as unknown as T;

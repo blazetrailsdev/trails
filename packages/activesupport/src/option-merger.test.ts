@@ -1,12 +1,17 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { withOptions } from "./core-ext/object/with-options.js";
 
+/**
+ * Port of activesupport/test/option_merger_test.rb.
+ *
+ * Rails' test case *is* the receiver, and `context` below carries its private
+ * helpers `method_with_options` / `method_with_args`
+ * (option_merger_test.rb:139-155). Ruby's kwargs variants collapse onto one
+ * TypeScript shape — a trailing options object — so `method_with_kwargs` /
+ * `method_with_kwargs_only` have no separate form, and the assertions naming
+ * them fold into their `method_with_options` siblings.
+ */
 describe("OptionMergerTest", () => {
-  // Rails' test case *is* the receiver, and its private helpers below are
-  // `method_with_options` / `method_with_args` (option_merger_test.rb:139-155).
-  // Ruby's kwargs variants collapse onto one TS shape — a trailing options
-  // object — so `method_with_kwargs` / `method_with_kwargs_only` have no
-  // separate form here.
   const context = {
     methodWithArgs(...args: unknown[]): unknown[] {
       return args;
