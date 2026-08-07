@@ -16,6 +16,7 @@ import {
   SerializeCastValue,
   runAfterCallbacksOnProto,
   assertHashAttributes,
+  isMassAssignmentEmpty,
 } from "@blazetrails/activemodel";
 import { InsertManager, UpdateManager, DeleteManager, Table as ArelTable } from "@blazetrails/arel";
 import {
@@ -87,11 +88,10 @@ export async function create(
   await this.ensureSchemaLoaded();
   const mergedAttrs = (this as any)._mergeCurrentScopeAttrs(attrs);
   const record = new this(mergedAttrs);
-  // Rails' `new(attributes, &block)` (persistence.rb:38-42) assigns inline, so
-  // a displacing nested key's write is complete before the block runs and
-  // before `save`. A JS constructor cannot await, so `assignAttributes` parks
-  // it (`_reapplyNestedAttrSetters`); drain it here, at the first point that
-  // can await, rather than leaving it for `save`.
+  // `new(attributes, &block)` (persistence.rb:38-42) assigns inline, so the
+  // block sees a displacing nested key's write already settled. A JS
+  // constructor cannot await, so `assignAttributes` parks it; this is the first
+  // point that can drain it.
   await awaitPendingNestedReaderLoads(record);
   if (block) block(record);
   await record.save();
@@ -117,7 +117,7 @@ export async function createBang(
   await this.ensureSchemaLoaded();
   const mergedAttrs = (this as any)._mergeCurrentScopeAttrs(attrs);
   const record = new this(mergedAttrs);
-  // See create(): drain the constructor's parked assignment before the block.
+  // See create(): persistence.rb:47-51 assigns inline before the block.
   await awaitPendingNestedReaderLoads(record);
   if (block) block(record);
   await record.saveBang();
@@ -572,10 +572,6 @@ export async function toggleBang<T extends ToggleBangRecord>(
 // ---------------------------------------------------------------------------
 
 interface UpdateRecord extends AttributeIO {
-  constructor: {
-    lockingColumn: string;
-    lockingEnabled: boolean;
-  };
   save(options?: { validate?: boolean }): Promise<boolean | undefined>;
   saveBang(options?: { validate?: boolean }): Promise<true | undefined>;
 }
@@ -597,12 +593,11 @@ export async function update<T extends UpdateRecord>(
   assertHashAttributes(attrs);
   const self = this as any;
   return withTransactionReturningStatus.call(self, async () => {
-    // Rails: `assign_attributes(attributes); save` inside the transaction
-    // (persistence.rb:563-570). `setAttributes` is `assign_attributes` on the
-    // awaitable surface, so a displacing `#{name}_attributes=` key's
-    // `load_target` / `remove_target!` (has_one_association.rb:59-69) finishes
-    // before the next key is assigned, as it does in Rails' `each`
-    // (attribute_assignment.rb:9-22) — rather than being parked for `save`.
+    // `assign_attributes(attributes); save` (persistence.rb:563-570).
+    // `setAttributes` is `assign_attributes` on the awaitable surface, so a
+    // displacing `#{name}_attributes=` key's `load_target` / `remove_target!`
+    // (has_one_association.rb:59-69) finishes before the next key is assigned,
+    // as in Rails' `each` (attribute_assignment.rb:9-22).
     await self.setAttributes(attrs);
     return self.save() as Promise<boolean | undefined>;
   }) as Promise<boolean | undefined>;
@@ -619,8 +614,7 @@ export async function updateBang<T extends UpdateRecord>(
   assertHashAttributes(attrs);
   const self = this as any;
   return withTransactionReturningStatus.call(self, async () => {
-    // See update(): `assign_attributes` (persistence.rb:576-579) on the
-    // awaitable surface.
+    // `assign_attributes(attributes); save!` (persistence.rb:576-579).
     await self.setAttributes(attrs);
     return self.saveBang() as Promise<true | undefined>;
   }) as Promise<true | undefined>;
@@ -1046,10 +1040,10 @@ function _assignAttribute(self: AttributeIO, key: string, value: unknown): Promi
  */
 export function assignAttributes(this: AttributeIO, attrs: Record<string, unknown>): void {
   assertHashAttributes(attrs);
-  // Mirrors ActiveModel::AttributeAssignment#assign_attributes: bail before
-  // sanitizing so a blank strong-params object (always un-permitted) is a
-  // no-op rather than raising, then unwrap/forbid via sanitize_for_mass_assignment.
-  if (Object.keys(attrs).length === 0) return;
+  // `new_attributes.empty?` (attribute_assignment.rb:32) runs before the
+  // sanitizer, so a blank strong-params object is a no-op rather than raising;
+  // `isMassAssignmentEmpty` reads a wrapper's contents, not its own fields.
+  if (isMassAssignmentEmpty(attrs)) return;
   for (const pending of _assignAttributes(this, sanitizeForMassAssignment(attrs))) {
     parkNestedReaderLoad(this as unknown as Base, pending);
   }
@@ -1068,7 +1062,7 @@ export async function setAttributes(
   attrs: Record<string, unknown>,
 ): Promise<void> {
   assertHashAttributes(attrs);
-  if (Object.keys(attrs).length === 0) return;
+  if (isMassAssignmentEmpty(attrs)) return;
   for (const pending of _assignAttributes(this, sanitizeForMassAssignment(attrs))) {
     await pending;
   }
