@@ -1251,12 +1251,9 @@ describe("TestNestedAttributesOnAHasAndBelongsToManyAssociation", () => {
 // NestedAttributesLimitTests (mixed into Numeric / Symbol / Proc)
 // ==========================================================================
 function limitTests(makePirate: () => Promise<Pirate>): void {
-  // trails wraps any error thrown from a setter during `attributes=` in an
-  // AttributeAssignmentError, so the bare `parrots_attributes=` setter is used
-  // here to observe the raw TooManyRecords Rails raises.
   it("limit with less records", async () => {
     const pirate = await makePirate();
-    await (pirate as any).setParrotsAttributes({ foo: { name: "Big Big Love" } });
+    await (pirate as any).setAttributes({ parrotsAttributes: { foo: { name: "Big Big Love" } } });
     const before = Number(await Parrot.count());
     await pirate.saveBang();
     expect(Number(await Parrot.count())).toBe(before + 1);
@@ -1264,9 +1261,11 @@ function limitTests(makePirate: () => Promise<Pirate>): void {
 
   it("limit with number exact records", async () => {
     const pirate = await makePirate();
-    await (pirate as any).setParrotsAttributes({
-      foo: { name: "Lovely Day" },
-      bar: { name: "Blown Away" },
+    await (pirate as any).setAttributes({
+      parrotsAttributes: {
+        foo: { name: "Lovely Day" },
+        bar: { name: "Blown Away" },
+      },
     });
     const before = Number(await Parrot.count());
     await pirate.saveBang();
@@ -1275,13 +1274,15 @@ function limitTests(makePirate: () => Promise<Pirate>): void {
 
   it("limit with exceeding records", async () => {
     const pirate = await makePirate();
-    expect(() =>
-      (pirate as any).setParrotsAttributes({
-        foo: { name: "Lovely Day" },
-        bar: { name: "Blown Away" },
-        car: { name: "The Happening" },
+    await expect(
+      (pirate as any).setAttributes({
+        parrotsAttributes: {
+          foo: { name: "Lovely Day" },
+          bar: { name: "Blown Away" },
+          car: { name: "The Happening" },
+        },
       }),
-    ).toThrow(TooManyRecords);
+    ).rejects.toThrow(TooManyRecords);
   });
 }
 
