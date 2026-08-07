@@ -18,7 +18,7 @@ import { ArgumentError, findZoneBang, getZone } from "./time-zone-config.js";
 
 /**
  * Mirrors: `DateAndTime::Calculations::DAYS_INTO_WEEK`
- * (`core_ext/date_and_time/calculations.rb:7-15`) — the week-start day names
+ * (`core_ext/date_and_time/calculations.rb:8-16`) — the week-start day names
  * `Date.beginning_of_week=` validates against.
  */
 const DAYS_INTO_WEEK: Record<string, number> = {
