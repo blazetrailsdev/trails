@@ -1,9 +1,8 @@
 /**
  * Mirrors: i18n/test/backend/fallbacks_test.rb
  *
- * Not ported: the two
- * `Thread.new` cases, which are the gem asserting that its thread-local
- * fallbacks store is visible from another thread. JS has no threads, so
+ * Not ported: the two `Thread.new` cases, which are the gem asserting that its
+ * thread-local fallbacks store is visible from another thread. JS has no threads, so
  * `fallbacks()` is a single module-level binding (see `fallbacks.ts`) and both
  * cases assert the single-threaded behaviour the rest of the file already
  * covers.
