@@ -403,16 +403,6 @@ export class ModelName {
     return Inflections.instance(locale).uncountables;
   }
 
-  /**
-   * Register an uncountable word. Mirrors Rails
-   * `ActiveSupport::Inflector.inflections.uncountable(word)` — writes
-   * through to the shared inflector store so `pluralize("sheep")`,
-   * `ModelName`, and every other inflection consumer see it.
-   */
-  static addUncountable(word: string): void {
-    Inflections.instance("en").uncountable(word);
-  }
-
   private _cachedI18nKeys?: string[];
 
   private static _qualified(mn: ModelName): string {

@@ -168,6 +168,18 @@ function readYaml(source: string): unknown {
   return yamlParse(source);
 }
 
+/**
+ * Psych's and `JSON.load_file`'s `freeze: true` (base.rb:264, base.rb:281),
+ * which freezes the whole parsed structure, not just its root.
+ */
+function deepFreeze(value: unknown): unknown {
+  if (typeof value !== "object" || value === null) return value;
+  if (Object.isFrozen(value)) return value;
+  Object.freeze(value);
+  for (const child of Object.values(value)) deepFreeze(child);
+  return value;
+}
+
 function readFile(filename: string): string {
   const contents = fileContents.get(filename);
   if (contents === undefined) {
@@ -647,10 +659,12 @@ export abstract class Base {
 
   /**
    * Loads a YAML translations file. The data must have locales as toplevel
-   * keys. Only the pre-Psych-4 arm of the gem's `YAML.respond_to?
-   * (:unsafe_load_file)` probe exists here — there is no Psych to probe, and
-   * `yaml`'s `parse` neither symbolizes nor freezes, so `keys_symbolized` is
-   * false.
+   * keys. There is no `YAML.respond_to?(:unsafe_load_file)` probe to port —
+   * JS has no second parser generation — so this takes the Psych 4 arm the gem
+   * takes on every supported Ruby (base.rb:263-264): `keys_symbolized` is
+   * true, and the parsed structure is frozen. Symbolizing keys is inherent in
+   * JS, where a Hash key is already a string, so what the flag buys is
+   * `store_translations` skipping the walk.
    *
    * The npm `yaml` package stands in for Psych, resolved on the
    * `preloadTranslationFiles` seam rather than imported at module scope, so a
@@ -665,7 +679,7 @@ export abstract class Base {
    */
   protected loadYml(filename: string): [unknown, boolean] {
     try {
-      return [readYaml(readFile(filename)), false];
+      return [deepFreeze(readYaml(readFile(filename))), true];
     } catch (e) {
       throw new InvalidLocaleData(filename, inspectError(e));
     }
@@ -683,8 +697,9 @@ export abstract class Base {
 
   /**
    * Loads a JSON translations file. The data must have locales as toplevel
-   * keys. As in #loadYml, only the arm of the gem's `JSON.respond_to?
-   * (:load_file)` probe that neither symbolizes nor freezes exists here.
+   * keys. As in #loadYml there is no `JSON.respond_to?(:load_file)` probe to
+   * port, so this takes the arm the gem takes (base.rb:280-281): symbolized —
+   * inherent in JS — and frozen.
    *
    * @missingRailsCall load_file — Ruby's `JSON.load_file` (base.rb:262) reads
    * and parses in one call; `JSON.parse` only parses, so the read is served
@@ -692,7 +707,7 @@ export abstract class Base {
    */
   protected loadJson(filename: string): [unknown, boolean] {
     try {
-      return [JSON.parse(readFile(filename)), false];
+      return [deepFreeze(JSON.parse(readFile(filename))), true];
     } catch (e) {
       throw new InvalidLocaleData(filename, inspectError(e));
     }

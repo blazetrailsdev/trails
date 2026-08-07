@@ -62,27 +62,9 @@ describe("NamingTest", () => {
   });
 
   it("uncountable", () => {
-    ModelName.addUncountable("sheep");
+    Inflections.instance("en").uncountable("sheep");
     const name = new ModelName("Sheep");
     expect(name.plural).toBe("sheep");
-  });
-
-  it("addUncountable writes through to the shared activesupport inflector", async () => {
-    // Rails `ActiveSupport::Inflector.inflections { |i| i.uncountable ... }`
-    // writes to a shared store every inflection consumer reads. Ours
-    // must do the same so `pluralize` picks up custom uncountables.
-    const { pluralize, Inflections } = await import("@blazetrails/activesupport");
-    const word = "fizzbuzzuncountabletestword";
-    try {
-      ModelName.addUncountable(word);
-      expect(Inflections.instance("en").uncountables.has(word)).toBe(true);
-      expect(pluralize(word)).toBe(word);
-      const mn = new ModelName("Fizzbuzzuncountabletestword");
-      expect(mn.singular).toBe(word);
-      expect(mn.plural).toBe(word);
-    } finally {
-      Inflections.instance("en").uncountables.delete(word);
-    }
   });
 });
 
@@ -427,7 +409,7 @@ describe("ModelName collection is derived from plural", () => {
   });
 
   it("addUncountable on full singular keeps plural and collection in sync", () => {
-    ModelName.addUncountable("legal_status");
+    Inflections.instance("en").uncountable("legal_status");
     const name = new ModelName("Status", { namespace: "Legal" });
     expect(name.singular).toBe("legal_status");
     expect(name.plural).toBe("legal_status"); // uncountable per local table

@@ -333,6 +333,15 @@ describe("Date", () => {
     expect([negative.hour, negative.min, negative.sec]).toEqual([23, 59, 59]);
   });
 
+  it("carries a Rational offset into sec_fraction exactly, as f_add does", () => {
+    // ruby 3.3.11: DateTime.strptime("1234567890 +9.5555", "%s %z") is
+    // 2009-02-14T09:04:49+09:33 with a sec_fraction of (4/5).
+    const hash: DateParts = { seconds: 1234567890, offset: new Rational(171999, 5) };
+    dNewByFrags(hash);
+    expect([hash.hour, hash.min, hash.sec]).toEqual([9, 4, 49]);
+    expect(String(hash.secFraction)).toBe("4/5");
+  });
+
   it("answers the frag hash date__strptime fills, as Date._strptime does", () => {
     expect(RubyDate._strptime("2001-02-03", "%Y-%m-%d")).toEqual({ year: 2001, mon: 2, mday: 3 });
     expect(RubyDate._strptime("2001-W05-6", "%G-W%V-%u")).toEqual({

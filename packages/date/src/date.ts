@@ -302,7 +302,7 @@ export interface DateParts {
   hour?: number;
   min?: number;
   sec?: number;
-  secFraction?: number;
+  secFraction?: number | Rational;
   /**
    * Seconds since the Unix epoch, which `rt_rewrite_frags` expands into a `:jd`
    * and a time of day. No ported sub-parser sets it: it is `Date._strptime`'s
@@ -585,6 +585,23 @@ export class Rational {
   /** `rational.c` `nurat_mul` (`Rational#*`), for the Integer multiplier this port needs. */
   mul(other: number): Rational {
     return new Rational(this.numerator * other, this.denominator);
+  }
+
+  /** `rational.c` `nurat_div` (`Rational#div`), the floored quotient, for the
+   * Integer divisor this port needs. */
+  div(other: number): number {
+    return Math.floor(this.numerator / (this.denominator * other));
+  }
+
+  /** `rational.c` `nurat_mod` (`Rational#%`), `self - other * (self.div other)`,
+   * for the Integer divisor this port needs. */
+  mod(other: number): Rational {
+    return this.add(-other * this.div(other));
+  }
+
+  /** `rational.c` `nurat_to_i` (`Rational#to_i`), which truncates toward zero. */
+  toI(): number {
+    return Math.trunc(this.numerator / this.denominator);
   }
 
   /** `rational.c` `nurat_round` (`Rational#round`), which rounds half away from zero. */
@@ -2246,35 +2263,50 @@ function dateStrptime(str: string, fmt: string, hash: DateParts): DateParts | nu
 }
 
 /**
+ * @internal `date_core.c`'s `f_idiv` macro (`date_core.c:43`), `x.div(y)`, which
+ * is `Integer#div` on a plain `:seconds` and `Rational#div` once an `:offset`
+ * has made it a `Rational`. Either way the quotient is an Integer.
+ */
+function fIdiv(x: number | Rational, y: number): number {
+  return x instanceof Rational ? x.div(y) : div(x, y);
+}
+
+/**
+ * @internal `date_core.c`'s `f_mod` macro (`date_core.c:44`), `x % y`, the
+ * remainder of {@link fIdiv} — a `Rational` whenever `x` is one, which is how
+ * an exact `:offset` reaches `:sec_fraction`.
+ */
+function fMod(x: number | Rational, y: number): number | Rational {
+  return x instanceof Rational ? x.mod(y) : mod(x, y);
+}
+
+/**
  * @internal `date_core.c` `rt_rewrite_frags` (`date_core.c:3839-3872`), which
  * runs ahead of {@link completeFrags} and expands a `:seconds` frag — seconds
  * since the Unix epoch — into the `:jd` and the time of day it names, folding
  * an `:offset` in first. The division is floored, so a negative `:seconds`
- * still lands on the day before the epoch with a positive time of day. A
- * `Rational` `:offset` is taken as its value: Ruby's `f_add` would carry the
- * fraction into `:sec_fraction`, and `Temporal` has no rational arithmetic.
+ * still lands on the day before the epoch with a positive time of day.
  */
 function rtRewriteFrags(hash: DateParts): DateParts {
-  const seconds = hash.seconds;
+  let seconds: number | Rational | undefined = hash.seconds;
   delete hash.seconds;
   if (seconds !== undefined) {
     const offset = hash.offset;
-    let s0 = seconds;
     if (offset != null) {
-      s0 += offset instanceof Rational ? offset.numerator / offset.denominator : offset;
+      seconds = offset instanceof Rational ? offset.add(seconds) : seconds + offset;
     }
 
-    const d = div(s0, DAY_IN_SECONDS);
-    let fr = mod(s0, DAY_IN_SECONDS);
+    const d = fIdiv(seconds, DAY_IN_SECONDS);
+    let fr = fMod(seconds, DAY_IN_SECONDS);
 
-    const h = div(fr, HOUR_IN_SECONDS);
-    fr = mod(fr, HOUR_IN_SECONDS);
+    const h = fIdiv(fr, HOUR_IN_SECONDS);
+    fr = fMod(fr, HOUR_IN_SECONDS);
 
-    const min = div(fr, MINUTE_IN_SECONDS);
-    fr = mod(fr, MINUTE_IN_SECONDS);
+    const min = fIdiv(fr, MINUTE_IN_SECONDS);
+    fr = fMod(fr, MINUTE_IN_SECONDS);
 
-    const sec = div(fr, 1);
-    fr = mod(fr, 1);
+    const sec = fIdiv(fr, 1);
+    fr = fMod(fr, 1);
 
     hash.jd = UNIX_EPOCH_IN_CJD + d;
     hash.hour = h;
@@ -2906,7 +2938,8 @@ export function dtNewByFrags(hash: DateParts): DateTime {
 
   const df = timeToDf(rh, rmin, rs);
 
-  const sf = hash.secFraction == null ? 0 : secToNs(hash.secFraction);
+  const f = hash.secFraction;
+  const sf = f == null ? 0 : secToNs(f instanceof Rational ? f.numerator / f.denominator : f);
 
   const t = hash.offset;
   let of = t == null ? 0 : t instanceof Rational ? t.numerator / t.denominator : t;

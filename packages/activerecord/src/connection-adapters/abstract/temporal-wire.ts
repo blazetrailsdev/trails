@@ -41,8 +41,6 @@ function naiveIsoToInstant(iso: string): Temporal.Instant {
   return Temporal.PlainDateTime.from(iso).toZonedDateTime(defaultSqlTimezone()).toInstant();
 }
 
-export type TimeTzValue = { time: Temporal.PlainTime; offset: string };
-
 // ---------------------------------------------------------------------------
 // Postgres
 // ---------------------------------------------------------------------------
@@ -111,38 +109,6 @@ export function parsePostgresDate(
   );
 }
 
-/**
- * Parse a Postgres `time` wire string to `Temporal.PlainTime`.
- *
- * Wire format: `'HH:MM:SS[.ffffff]'`. Postgres allows `24:00:00` as a valid
- * end-of-day sentinel; Temporal rejects hour 24, so we normalize it to
- * `00:00:00` (midnight), matching Ruby Time's rollover behavior.
- */
-export function parsePostgresTime(text: string): Temporal.PlainTime {
-  return Temporal.PlainTime.from(normalizeTime24(text.trim()));
-}
-
-/**
- * Parse a Postgres `timetz` wire string.
- *
- * Wire format: `'HH:MM:SS[.ffffff]+HH'` or `'HH:MM:SS[.ffffff]±HH:MM'`.
- * Returns the time and offset separately — Temporal.PlainTime has no
- * timezone, so we preserve the offset as a sibling string.
- * `24:00:00` is normalized to `00:00:00` (see `parsePostgresTime`).
- */
-export function parsePostgresTimeTz(text: string): TimeTzValue {
-  // Split on first +/- that appears after the seconds portion
-  const match = /^(\d{2}:\d{2}:\d{2}(?:\.\d+)?)([-+]\d{2}(?::\d{2})?)$/.exec(text.trim());
-  if (!match) {
-    throw new RangeError(`Cannot parse timetz wire value: ${JSON.stringify(text)}`);
-  }
-  const [, timeStr, rawOffset] = match;
-  return {
-    time: Temporal.PlainTime.from(normalizeTime24(timeStr)),
-    offset: expandOffset(rawOffset),
-  };
-}
-
 // ---------------------------------------------------------------------------
 // MySQL
 // ---------------------------------------------------------------------------
@@ -189,17 +155,6 @@ export function parseMysqlDate(text: string): Temporal.PlainDate | null {
   const trimmed = text.trim();
   if (isZeroDate(trimmed)) return null;
   return Temporal.PlainDate.from(trimmed);
-}
-
-/**
- * Parse a MySQL `TIME` wire string to `Temporal.PlainTime`.
- *
- * Wire format: `'HH:MM:SS[.ffffff]'` (standard range, no sign). MySQL TIME
- * can be negative or exceed 24 h for interval values; those paths are the
- * cast layer's responsibility and are not handled here.
- */
-export function parseMysqlTime(text: string): Temporal.PlainTime {
-  return Temporal.PlainTime.from(text.trim());
 }
 
 // ---------------------------------------------------------------------------
@@ -332,17 +287,6 @@ function parseFraction(frac: string | undefined): {
  */
 function expandOffset(offset: string): string {
   return offset.replace(/^([-+]\d{2})$/, "$1:00");
-}
-
-/**
- * Normalize Postgres `24:00:00[.fraction]` (end-of-day sentinel) to
- * `00:00:00[.fraction]`. Only the exact sentinel is normalized; any other
- * `24:xx:xx` value is left unchanged so `Temporal.PlainTime.from` throws —
- * Postgres never emits those and they should not be silently corrupted.
- */
-function normalizeTime24(timeStr: string): string {
-  const match = /^24:00:00(\.\d+)?$/.exec(timeStr);
-  return match ? `00:00:00${match[1] ?? ""}` : timeStr;
 }
 
 function isZeroDate(text: string): boolean {
