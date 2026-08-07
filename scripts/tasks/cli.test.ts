@@ -54,6 +54,7 @@ import {
   rewriteRfcRefs,
   parseCsv,
   setDepsError,
+  packagesError,
   formatFiles,
   formatRows,
   gitCommonDir,
@@ -1320,6 +1321,35 @@ describe("setDepsError", () => {
     const idx = index([story({ id: "a" })]);
     expect(setDepsError(idx, "a", "deps", [])).toBeNull();
     expect(setDepsError(idx, "a", "deps-rfc", [])).toBeNull();
+  });
+});
+
+describe("packagesError", () => {
+  const declared = ["activerecord", "arel"];
+
+  it("accepts packages the parent RFC declares", () => {
+    expect(packagesError(declared, ["arel"], "0013-pg")).toBeNull();
+    expect(packagesError(declared, ["activerecord", "arel"], "0013-pg")).toBeNull();
+  });
+
+  it("accepts an empty array (clearing the field)", () => {
+    expect(packagesError(declared, [], "0013-pg")).toBeNull();
+  });
+
+  it("rejects a package the parent RFC does not declare, listing the valid ones", () => {
+    const msg = packagesError(declared, ["actionview"], "0013-pg");
+    expect(msg).toMatch(/"actionview" not declared in 0013-pg\/README\.md/);
+    expect(msg).toMatch(/valid packages: activerecord, arel/);
+  });
+
+  it("names every undeclared package, not just the first", () => {
+    const msg = packagesError(declared, ["actionview", "arel", "rack"], "0013-pg");
+    expect(msg).toMatch(/"actionview", "rack"/);
+    expect(msg).not.toMatch(/"arel",/);
+  });
+
+  it("constrains nothing when the RFC declares no packages", () => {
+    expect(packagesError([], ["anything"], "0013-pg")).toBeNull();
   });
 });
 

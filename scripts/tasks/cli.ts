@@ -119,9 +119,6 @@ export interface StoryEntry {
   // absent from index.json files built before the override existed.
   raw_status?: string | null;
   cluster: string | null;
-  // Authored packages only; empty means "inherit the parent RFC's list", which
-  // display consumers resolve. Optional: absent from index.json files built
-  // before the field existed.
   packages?: string[];
   deps: string[];
   deps_rfc: string[];
@@ -2158,10 +2155,23 @@ function setDeps(id: string, kind: "deps" | "deps-rfc", csv: string): void {
   console.log(`set ${id} ${kind} = [${items.join(", ")}]`);
 }
 
-// Replaces a story's `packages` array. Mirrors setDeps, but the reference check
-// is containment in the parent RFC's declared `packages` — the same rule
-// validate-lib.mjs enforces, applied here so the edit fails before any commit.
-// An empty csv clears the array, which restores the inherit-from-RFC display.
+/**
+ * Returns why `items` may not be a story's packages under `rfcSlug`, or null
+ * when the edit is legal. An RFC declaring no packages constrains nothing —
+ * the same escape the `cluster` check takes, with validate.mjs as the backstop.
+ * Pure so both authoring paths (`new`, `set-packages`) share one rule and one
+ * message, and so the rule is testable without git.
+ */
+export function packagesError(declared: string[], items: string[], rfcSlug: string): string | null {
+  if (declared.length === 0) return null;
+  const unknown = items.filter((p) => !declared.includes(p));
+  if (unknown.length === 0) return null;
+  return (
+    `package(s) ${unknown.map((p) => `"${p}"`).join(", ")} not declared in ${rfcSlug}/README.md\n` +
+    `  valid packages: ${declared.join(", ")}`
+  );
+}
+
 function setPackages(id: string, csv: string): void {
   inGitTasks();
   const index = loadIndex();
@@ -2181,13 +2191,10 @@ function setPackages(id: string, csv: string): void {
   }
 
   const declared = index.rfcs.find((r) => r.id === entry.rfc)?.packages ?? [];
-  const unknown = items.filter((p) => !declared.includes(p));
-  if (declared.length > 0 && unknown.length > 0) {
+  const error = packagesError(declared, items, entry.rfc);
+  if (error !== null) {
     restoreGeneratedFiles(TASKS_DIR);
-    console.error(
-      `error: package(s) ${unknown.map((p) => `"${p}"`).join(", ")} not declared in ${entry.rfc}/README.md\n` +
-        `  valid packages: ${declared.join(", ")}`,
-    );
+    console.error(`error: ${error}`);
     process.exit(1);
   }
 
@@ -2396,10 +2403,10 @@ function reindex(): void {
 
 // ──────────────────── new story ────────────────────
 
-// Returns the cluster names declared in an RFC's README.md frontmatter, parsed
+// Returns the string list under `key` in an RFC's README.md frontmatter, parsed
 // with the same yaml.load semantics as tasks/scripts/lib.mjs (block sequences,
 // flow sequences, quoted values, comments all handled). Returns [] when the
-// README is missing, unparseable, or has no clusters field — the caller passes
+// README is missing, unparseable, or has no such field — the caller passes
 // through, and validate.mjs will catch any structural error later.
 function readRfcStringList(tasksDir: string, rfcSlug: string, key: string): string[] {
   const readmePath = join(tasksDir, "rfcs", rfcSlug, "README.md");
@@ -2421,14 +2428,10 @@ function readRfcStringList(tasksDir: string, rfcSlug: string, key: string): stri
   }
 }
 
-// The closed set a story's `cluster` must come from.
 function readRfcClusters(tasksDir: string, rfcSlug: string): string[] {
   return readRfcStringList(tasksDir, rfcSlug, "clusters");
 }
 
-// The closed set a story's `packages` must be a subset of. Empty (or an
-// unreadable README) means the RFC declares none, in which case the containment
-// check is skipped and validate.mjs is the backstop.
 function readRfcPackages(tasksDir: string, rfcSlug: string): string[] {
   return readRfcStringList(tasksDir, rfcSlug, "packages");
 }
@@ -2510,9 +2513,6 @@ export function buildStoryContent(
   const title = opts.title ?? storySlug;
   const deps = opts.deps ?? [];
   const depsYaml = deps.length === 0 ? "[]" : `[${deps.map((d) => qs(d)).join(", ")}]`;
-  // Empty `packages` is the normal case: the story then displays its parent
-  // RFC's packages as inherited. Only narrow it when the story really is
-  // scoped to a subset.
   const packages = opts.packages ?? [];
   const packagesYaml = packages.length === 0 ? "[]" : `[${packages.map((p) => qs(p)).join(", ")}]`;
   // A caller-supplied body (`--body-file`) replaces the empty skeleton, trimmed
@@ -2623,13 +2623,9 @@ export function newStory(
     }
   }
   if (opts.packages != null && opts.packages.length > 0) {
-    const declared = readRfcPackages(tasksDir, rfcSlug);
-    const unknown = opts.packages.filter((p) => !declared.includes(p));
-    if (declared.length > 0 && unknown.length > 0) {
-      console.error(
-        `error: package(s) ${unknown.map((p) => `"${p}"`).join(", ")} not declared in ${rfcSlug}/README.md\n` +
-          `  valid packages: ${declared.join(", ")}`,
-      );
+    const error = packagesError(readRfcPackages(tasksDir, rfcSlug), opts.packages, rfcSlug);
+    if (error !== null) {
+      console.error(`error: ${error}`);
       process.exit(1);
     }
   }
@@ -3660,7 +3656,6 @@ function main(): void {
     }
     case "set-packages": {
       const id = pos[0];
-      // As with set-deps, an explicit empty csv clears; a missing one is usage.
       const csv = pos[1];
       if (!id || csv === undefined) usage();
       setPackages(id, csv);
