@@ -377,6 +377,31 @@ describe("Date", () => {
     );
   });
 
+  it("parses a time of day under DateTime's own default format", () => {
+    // ruby 3.3.11:
+    //   DateTime._strptime("2001-02-03T04:05:06+07:00")
+    //   #=> {:year=>2001, :mon=>2, :mday=>3, :hour=>4, :min=>5, :sec=>6,
+    //        :zone=>"+07:00", :offset=>25200}
+    //   Date._strptime("2001-02-03T04:05:06+07:00")
+    //   #=> {:year=>2001, :mon=>2, :mday=>3, :leftover=>"T04:05:06+07:00"}
+    expect(RubyDateTime._strptime("2001-02-03T04:05:06+07:00")).toEqual({
+      year: 2001,
+      mon: 2,
+      mday: 3,
+      hour: 4,
+      min: 5,
+      sec: 6,
+      zone: "+07:00",
+      offset: 25200,
+    });
+    expect(RubyDate._strptime("2001-02-03T04:05:06+07:00")).toEqual({
+      year: 2001,
+      mon: 2,
+      mday: 3,
+      leftover: "T04:05:06+07:00",
+    });
+  });
+
   it("answers the frag hash date__strptime fills, as Date._strptime does", () => {
     expect(RubyDate._strptime("2001-02-03", "%Y-%m-%d")).toEqual({ year: 2001, mon: 2, mday: 3 });
     expect(RubyDate._strptime("2001-W05-6", "%G-W%V-%u")).toEqual({

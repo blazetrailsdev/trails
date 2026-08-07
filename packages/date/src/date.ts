@@ -2054,6 +2054,11 @@ function headMatchP(len: number, name: string, str: string, slen: number, si: nu
  * `READ_DIGITS_MAX` (`date_strptime.c:125`) — `Number.POSITIVE_INFINITY` for
  * its `LONG_MAX` width — `recur` is `recur` (`date_strptime.c:142-150`) and
  * `headMatch` is `HEAD_MATCH_P` (`date_strptime.c:172`).
+ *
+ * `%L`/`%N` is the one arm whose reader result is discarded: C's `READ_DIGITS`
+ * assigns `n` the bignum `str2num` answers, and ours cannot — so the call is
+ * made for its `si` advance and its `fail()`, and `n` is `str2num` over the
+ * span `osi`/`si` bound, which is what `date_strptime.c:377-380` passes.
  */
 function dateStrptimeInternal(str: string, fmt: string, hash: DateParts): number {
   const slen = str.length;
@@ -2251,15 +2256,15 @@ function dateStrptimeInternal(str: string, fmt: string, hash: DateParts): number
             si++;
           }
           const osi = si;
-          const n = numPatternP(fmt.slice(fi + 1))
-            ? readDigitsAt(c === "L" ? 3 : 9)
-            : readDigitsMax();
-          if (n === null) return fail();
-          // `str2num` over the digit span, not the `number` the reader answered:
-          // past sixteen digits that has already lost precision (`date_strptime.c:377-380`).
-          let num = BigInt(str.slice(osi, si));
-          if (sign === -1) num = -num;
-          hash.secFraction = new Rational(num, 10n ** BigInt(si - osi));
+          if (
+            (numPatternP(fmt.slice(fi + 1)) ? readDigitsAt(c === "L" ? 3 : 9) : readDigitsMax()) ===
+            null
+          ) {
+            return fail();
+          }
+          let n = BigInt(str.slice(osi, si));
+          if (sign === -1) n = -n;
+          hash.secFraction = new Rational(n, 10n ** BigInt(si - osi));
           break again;
         }
 
@@ -3797,6 +3802,16 @@ export class DateTime extends Date {
    */
   static override parse(str: string, comp = true): DateTime {
     return dtNewByFrags(Date._parse(str, comp));
+  }
+
+  /**
+   * Ruby `DateTime._strptime(string, format = '%FT%T%z')` (ruby/date,
+   * `date_core.c` `datetime_s__strptime`, `date_core.c:8336-8339`), which is
+   * `Date._strptime` under a different default format — the DateTime one, so a
+   * caller that omits it parses a time of day rather than a date alone.
+   */
+  static override _strptime(str: string, fmt = "%FT%T%z"): DateParts | null {
+    return Date._strptime(str, fmt);
   }
 
   /**
