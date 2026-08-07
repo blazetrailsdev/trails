@@ -2584,7 +2584,7 @@ export class Migrator {
    * rather than silently skipping the lock here (which Rails never does).
    */
   isUseAdvisoryLock(): boolean {
-    return !!this.connection.isAdvisoryLocksEnabled?.();
+    return this.connection.isAdvisoryLocksEnabled();
   }
 
   /** @internal Mirrors: ActiveRecord::Migrator#generate_migrator_advisory_lock_id */
