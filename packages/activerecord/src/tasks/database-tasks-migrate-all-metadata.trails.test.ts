@@ -55,6 +55,12 @@ describe("DatabaseTasksMigrateAllMetadataTest", () => {
       },
     });
     DatabaseTasks.registerMigrations([migration(1, "CreateNothing")]);
+    await Base.establishConnection({
+      adapter: "sqlite3",
+      database: join(dir, "primary.sqlite3"),
+      pool: 1,
+      useMetadataTable: false,
+    });
   }
 
   async function metadataTablesExist(): Promise<boolean[]> {

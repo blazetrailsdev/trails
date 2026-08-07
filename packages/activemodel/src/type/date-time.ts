@@ -59,11 +59,17 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
    * a `Rational` (e.g. `123456/1000000`); multiplying by 1_000_000
    * normalizes it to an integer microsecond count.
    *
+   * Ruby's one line dispatches on the numeric tower and the two arms do not
+   * agree — `(0.123456 * 1_000_000).to_i` is 123456, while the same Float
+   * through `to_r` truncates to 123455. TS has no numeric receiver to
+   * dispatch on, so both arms are spelled out: the Rational one multiplies
+   * exactly, the Float one reproduces Ruby's float multiply.
+   *
    * @internal Rails-private helper.
    */
   protected microseconds(time: DateParts): number {
     const secFraction = time.secFraction;
-    if (!secFraction) return 0;
+    if (secFraction == null) return 0;
     return secFraction instanceof Rational
       ? secFraction.mul(1_000_000).toI()
       : Math.trunc(secFraction * 1_000_000);
@@ -103,7 +109,6 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
 
     timeHash.secFraction = this.microseconds(timeHash);
 
-    const { offset } = timeHash;
     return this.newTime(
       timeHash.year,
       timeHash.mon,
@@ -112,7 +117,7 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
       timeHash.min,
       timeHash.sec,
       timeHash.secFraction,
-      offset instanceof Rational ? offset.toF() : offset,
+      timeHash.offset,
     );
   }
 

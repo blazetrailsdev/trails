@@ -1247,10 +1247,23 @@ export class DatabaseTasks {
   }
 
   /**
-   * Mirrors Rails' `DatabaseTasks.with_temporary_pool`: establishes a pool for
-   * `config` (clobber defaults to false, so an existing pool for the same
-   * config object is reused), yields it, then restores the prior pool (or
-   * removes the pool if none existed before).
+   * Mirrors Rails' `DatabaseTasks.with_temporary_pool`
+   * (`tasks/database_tasks.rb:541-548`): establishes a pool for `config`
+   * (clobber defaults to false, so an existing pool for the same config object
+   * is reused), yields it, then re-establishes the original config
+   * unconditionally in the `ensure` (`:547`).
+   *
+   * Ruby's `ensure` covers the whole body, `original_db_config =
+   * migration_class.connection_db_config` included, so a `migration_class`
+   * with no pool still reaches `establish_connection(nil)` on the way out —
+   * the read is inside the `try` here for the same reason.
+   *
+   * Both establish calls hand over the `DatabaseConfig` OBJECT, as Rails does
+   * (`:542,544`) — that is what lets `ConnectionHandler#establish_connection`
+   * recognise an already-established pool for the same config and reuse it
+   * (`connection_adapters/abstract/connection_handler.rb:139`) instead of
+   * opening a second one, which on a `:memory:` database would discard the
+   * first pool's data.
    *
    * @internal
    */
@@ -1259,28 +1272,15 @@ export class DatabaseTasks {
     fn: (pool: ConnectionPool) => Promise<T>,
     { clobber = false }: { clobber?: boolean } = {},
   ): Promise<T> {
-    const { Base } = await import("../base.js");
-    this._baseClass = Base;
-    let priorConfig: DatabaseConfig | null = null;
+    const migrationClass = await this.migrationClass();
+    let originalDbConfig: DatabaseConfig | undefined;
     try {
-      priorConfig = Base.connectionDbConfig();
-    } catch (error) {
-      if (!(error instanceof ConnectionNotDefined)) throw error;
-    }
-    // Rails passes the `DatabaseConfig` object itself
-    // (tasks/database_tasks.rb:542,544), which is what lets
-    // `ConnectionHandler#establish_connection` recognise an already-established
-    // pool for the same config and reuse it instead of opening a second one
-    // (connection_adapters/abstract/connection_handler.rb:139). Handing over a
-    // plain hash would mint a fresh `HashConfig` that can never match, and a
-    // second pool on a `:memory:` database discards the first one's data.
-    // Mirrors Rails' `ensure` which restores even if establish_connection raises.
-    try {
+      originalDbConfig = migrationClass.connectionDbConfig();
       // Rails: `connection_handler.establish_connection(db_config, clobber:)`
       // (database_tasks.rb:543). Ruby's `establish_connection(config_or_env = nil)`
       // takes no `clobber:`, so the kwarg can only be threaded through the handler.
-      const pool = Base.connectionHandler.establishConnection(config, {
-        owner: Base.connectionClassForSelf(),
+      const pool = migrationClass.connectionHandler.establishConnection(config, {
+        owner: migrationClass.connectionClassForSelf(),
         clobber,
       });
       // Deviation: ESM cannot import synchronously, so the handler resolves the
@@ -1290,24 +1290,10 @@ export class DatabaseTasks {
       await pool.adapterReady;
       return await fn(pool);
     } finally {
-      if (priorConfig !== null) {
-        // Same reason as above: restoring through the config OBJECT lets the
-        // handler recognise the pool it already has. Restoring from a plain
-        // hash would replace (and disconnect) it, which on a `:memory:`
-        // database throws the data away.
-        // Rails: `establish_connection(original_db_config, clobber: clobber)`
-        // (database_tasks.rb:547).
-        await Base.connectionHandler.establishConnection(priorConfig, {
-          owner: Base.connectionClassForSelf(),
-          clobber,
-        }).adapterReady;
-      } else {
-        try {
-          Base.removeConnection();
-        } catch {
-          // No pool to remove
-        }
-      }
+      await migrationClass.connectionHandler.establishConnection(originalDbConfig!, {
+        owner: migrationClass.connectionClassForSelf(),
+        clobber,
+      }).adapterReady;
     }
   }
 

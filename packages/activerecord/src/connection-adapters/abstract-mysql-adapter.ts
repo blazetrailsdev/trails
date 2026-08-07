@@ -75,6 +75,7 @@ import {
 import type {
   AddIndexOptions,
   ColumnOptions,
+  ColumnType,
   RemoveForeignKeyOptions,
 } from "./abstract/schema-definitions.js";
 import {
@@ -848,15 +849,15 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     // "no comment key present" and silently keep the existing comment.
     // Rails has no nil/undefined split — defensive normalization, no
     // Rails analogue.
-    const comment = extracted === undefined ? null : extracted;
+    const comment = (extracted === undefined ? null : extracted) as string | null;
     await this.changeColumn(tableName, columnName, "", { comment });
   }
 
   async changeColumn(
     tableName: string,
     columnName: string,
-    type: string,
-    options: Record<string, unknown> = {},
+    type: ColumnType,
+    options: ColumnOptions = {},
   ): Promise<void> {
     const sql = `ALTER TABLE ${this.quoteTableName(tableName)} ${await this.changeColumnForAlter(tableName, columnName, type, options)}`;
     await this._execMutation(sql);
@@ -865,7 +866,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   async buildChangeColumnDefinition(
     tableName: string,
     columnName: string,
-    type: string,
+    type: ColumnType,
     options: ColumnOptions = {},
   ): Promise<ChangeColumnDefinition> {
     const column = await this.columnFor(tableName, columnName);
@@ -1764,8 +1765,8 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   async changeColumnForAlter(
     tableName: string,
     columnName: string,
-    type: string,
-    options: Record<string, unknown> = {},
+    type: ColumnType,
+    options: ColumnOptions = {},
   ): Promise<string> {
     const cd = await this.buildChangeColumnDefinition(tableName, columnName, type, options);
     return this.schemaCreation.accept(cd);

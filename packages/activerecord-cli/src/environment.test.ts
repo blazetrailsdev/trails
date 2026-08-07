@@ -108,12 +108,13 @@ describe("ArEnvironmentTest", () => {
 
   it("runs the block with a connection and restores the prior state", async () => {
     installConfig({ test: { adapter: "sqlite3", database: ":memory:" } }, "/nowhere");
+    await establishEnvironmentConnection("test");
     let sawPool = false;
     await withEnvironmentConnection(async () => {
       sawPool = Base.connectionPool() != null;
     }, "test");
     expect(sawPool).toBe(true);
-    expect(() => Base.connectionPool()).toThrow();
+    expect(Base.connectionPool()).toBeDefined();
   });
 
   it("still runs the block when the environment has no configuration", async () => {

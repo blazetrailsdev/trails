@@ -65,13 +65,6 @@
   {
     "package": "activerecord",
     "tsFile": "migration.ts",
-    "rubyName": "execute_block",
-    "call": "connection",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "migration.ts",
     "rubyName": "execute_migration_in_transaction",
     "call": "logger",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -128,20 +121,6 @@
   {
     "package": "activerecord",
     "tsFile": "migration.ts",
-    "rubyName": "reversible",
-    "call": "execute_block",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "migration.ts",
-    "rubyName": "reversible",
-    "call": "new",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "migration.ts",
     "rubyName": "revert",
     "call": "run",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -152,13 +131,6 @@
     "rubyName": "reverting?",
     "call": "connection",
     "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails migration.rb:869-871 probes `connection.respond_to?(:reverting) && connection.reverting`; trails migration.ts:1208-1210 isReverting reads the local `_recording && _recorder.reverting` state — the recorder is held on the migration, not looked up through the connection."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "migration.ts",
-    "rubyName": "up_only",
-    "call": "execute_block",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
     "package": "activerecord",

@@ -515,7 +515,7 @@ export interface ColumnOptions {
   array?: boolean;
   charset?: string;
   collation?: string;
-  comment?: string;
+  comment?: string | null;
   ifExists?: boolean;
   ifNotExists?: boolean;
   autoIncrement?: boolean;
