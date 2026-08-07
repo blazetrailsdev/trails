@@ -113,9 +113,9 @@ export class SchemaCreation extends AbstractSchemaCreation {
   /** @internal */
   protected override async visitAlterTable(o: any): Promise<string> {
     let sql = await super.visitAlterTable(o);
-    // schema_creation.rb:12-14 appends one joined string per constraint group;
-    // trails keeps the groups as elements so the `, ` separator below can be
-    // chosen from what `super` produced.
+    // DIVERGENCE (schema_creation.rb:12-14): Rails joins within a group with
+    // " "; trails uses ", " because `super` here emits a comma-separated
+    // ALTER TABLE action list.
     const pgParts: string[] = [];
     if (Array.isArray(o.constraintValidations) && o.constraintValidations.length > 0) {
       pgParts.push(

@@ -1026,6 +1026,10 @@ export async function performCount(
     }
   }
 
+  if (this._limitValue !== null || this._offsetValue !== null) {
+    return performCalculation(this, "count", column ?? null) as Promise<number>;
+  }
+
   // Use the relation's table — the model's arel_table unless the relation was
   // built on a table alias — so COUNT's FROM/WHERE match the alias the predicate
   // builder qualified the conditions with. `Table#project` seeds a SelectManager
@@ -1040,18 +1044,6 @@ export async function performCount(
     return m;
   };
 
-  if (this._limitValue !== null || this._offsetValue !== null) {
-    // calculations.rb:94-104 + 217-246: `count` is `calculate(:count, ...)`, so
-    // the has_limit_or_offset? arm of `build_count_subquery?`
-    // (calculations.rb:655-661) is reached through `perform_calculation` ->
-    // `execute_simple_calculation`, not from the count body. The remaining
-    // `performCount` arms are still fused; converging them is the second half of
-    // this inversion.
-    return performCalculation(this, "count", column ?? null) as Promise<number>;
-  }
-
-  // `table` and `project` (alias-aware) were resolved above the limit/offset
-  // branch so every count path shares them.
   // "all" is the JS analogue of Rails' :all symbol — aggregate_column maps both
   // it and "*" to Arel.star, i.e. COUNT(*) (calculations.rb:414-423).
   const effectiveColumn = column === "*" || column === "all" ? undefined : column;
@@ -1455,8 +1447,6 @@ function buildCountSubquery(
   const selectValue = operationOverAggregateColumn(columnAlias, "count", false) as Nodes.Node & {
     as(alias: string): unknown;
   };
-  // Mirrors `build_subquery` (query_methods.rb:1605-1611): the subquery is the
-  // inner relation aliased, and the optimizer hints move to the outer manager.
   const outerManager = project(selectValue.as("count"));
   outerManager.from(
     new Nodes.TableAlias(new Nodes.Grouping(new Nodes.SqlLiteral(innerSql)), subqueryAlias),

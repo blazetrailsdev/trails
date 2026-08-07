@@ -97,8 +97,6 @@ export class Merger {
     if (this.other.preloadValues.length === 0 && this.other.includesValues.length === 0) return;
 
     if (this.other.model === rel.model) {
-      // merger.rb:100-101 unions the value arrays directly (`|=`) rather than
-      // going through `preload!`/`includes!`.
       if (this.other.preloadValues.length > 0) {
         const preloadValues = rel.preloadValues;
         rel.preloadValues = preloadValues.concat(
