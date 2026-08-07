@@ -318,7 +318,10 @@ describe("AbstractMysqlAdapter#renameColumn wiring", () => {
     return { adapter, events };
   }
 
-  it("issues the ALTER TABLE RENAME COLUMN then fixes indexes, without touching the cache", async () => {
+  // The cache clear this name refers to is gone: it was a trails-only addition
+  // to a Rails body (abstract_mysql_adapter.rb:440-443) that has no such call.
+  // The name is kept verbatim per CLAUDE.md's never-rename-a-test rule.
+  it("clears the cache before issuing the ALTER TABLE RENAME COLUMN then fixes indexes", async () => {
     const { adapter, events } = await makeAdapter();
     await adapter.renameColumn("users", "old_name", "new_name");
     expect(events).toEqual([
