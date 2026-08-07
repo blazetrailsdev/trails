@@ -199,15 +199,21 @@ describe("MigrationTest", () => {
     // with if_not_exists unset and must raise. Ride the canonical `people`
     // table via a Migrator, exactly as migration_test.rb does.
     const adapter = await freshAdapterWithPeople();
-    await new Migrator(adapter, [
-      migrateProxy(100, (m) => m.addColumn("people", "last_name", "string")),
-    ]).up(100);
+    await new Migrator(
+      "up",
+      [migrateProxy(100, (m) => m.addColumn("people", "last_name", "string"))],
+      new SchemaMigration(adapter),
+      new InternalMetadata(adapter),
+    ).up(100);
     expect(await personColumnNames(adapter)).toContain("last_name");
 
     await expect(
-      new Migrator(adapter, [
-        migrateProxy(101, (m) => m.addColumn("people", "last_name", "string")),
-      ]).up(101),
+      new Migrator(
+        "up",
+        [migrateProxy(101, (m) => m.addColumn("people", "last_name", "string"))],
+        new SchemaMigration(adapter),
+        new InternalMetadata(adapter),
+      ).up(101),
     ).rejects.toThrow();
   });
 
@@ -340,15 +346,25 @@ describe("MigrationTest", () => {
     // with if_not_exists: true and asserts it does not raise. Ride the canonical
     // `people` table via a Migrator, as migration_test.rb does.
     const adapter = await freshAdapterWithPeople();
-    await new Migrator(adapter, [
-      migrateProxy(100, (m) => m.addColumn("people", "last_name", "string")),
-    ]).up(100);
+    await new Migrator(
+      "up",
+      [migrateProxy(100, (m) => m.addColumn("people", "last_name", "string"))],
+      new SchemaMigration(adapter),
+      new InternalMetadata(adapter),
+    ).up(100);
     expect(await personColumnNames(adapter)).toContain("last_name");
 
     // if_not_exists: true must not raise even though the column already exists.
-    await new Migrator(adapter, [
-      migrateProxy(101, (m) => m.addColumn("people", "last_name", "string", { ifNotExists: true })),
-    ]).up(101);
+    await new Migrator(
+      "up",
+      [
+        migrateProxy(101, (m) =>
+          m.addColumn("people", "last_name", "string", { ifNotExists: true }),
+        ),
+      ],
+      new SchemaMigration(adapter),
+      new InternalMetadata(adapter),
+    ).up(101);
     expect(await personColumnNames(adapter)).toContain("last_name");
   });
 
@@ -590,23 +606,32 @@ describe("MigrationTest", () => {
     // the missing column, other adapters raise. Ride the canonical `people`
     // table via a Migrator, as migration_test.rb does.
     const adapter = await freshAdapterWithPeople();
-    await new Migrator(adapter, [
-      migrateProxy(100, (m) => m.addColumn("people", "last_name", "string")),
-    ]).up(100);
+    await new Migrator(
+      "up",
+      [migrateProxy(100, (m) => m.addColumn("people", "last_name", "string"))],
+      new SchemaMigration(adapter),
+      new InternalMetadata(adapter),
+    ).up(100);
     expect(await personColumnNames(adapter)).toContain("last_name");
 
-    await new Migrator(adapter, [
-      migrateProxy(101, (m) => m.removeColumn("people", "last_name")),
-    ]).up(101);
+    await new Migrator(
+      "up",
+      [migrateProxy(101, (m) => m.removeColumn("people", "last_name"))],
+      new SchemaMigration(adapter),
+      new InternalMetadata(adapter),
+    ).up(101);
     expect(await personColumnNames(adapter)).not.toContain("last_name");
 
     // Removing a missing column with if_not_exists unset: SQLite removes
     // columns via a table rebuild — copying every column except the dropped one
     // — so a missing column is a no-op (`assert_nothing_raised`). PG and MySQL
     // raise.
-    const error = await new Migrator(adapter, [
-      migrateProxy(102, (m) => m.removeColumn("people", "last_name")),
-    ])
+    const error = await new Migrator(
+      "up",
+      [migrateProxy(102, (m) => m.removeColumn("people", "last_name"))],
+      new SchemaMigration(adapter),
+      new InternalMetadata(adapter),
+    )
       .up(102)
       .catch((e) => e);
     expect(error?.message ?? "").toMatch(
@@ -710,16 +735,26 @@ describe("MigrationTest", () => {
 
   it("any migrations", async () => {
     const adapter = Base.connection;
-    const withMigrations = new Migrator(adapter, [
-      {
-        version: 1,
-        name: "First",
-        migration: () => anonymousMigration("First", 1),
-      },
-    ]);
+    const withMigrations = new Migrator(
+      "up",
+      [
+        {
+          version: 1,
+          name: "First",
+          migration: () => anonymousMigration("First", 1),
+        },
+      ],
+      new SchemaMigration(adapter),
+      new InternalMetadata(adapter),
+    );
     expect(withMigrations.migrations.length).toBeGreaterThan(0);
 
-    const empty = new Migrator(adapter, []);
+    const empty = new Migrator(
+      "up",
+      [],
+      new SchemaMigration(adapter),
+      new InternalMetadata(adapter),
+    );
     expect(empty.migrations.length).toBe(0);
   });
 
@@ -732,7 +767,12 @@ describe("MigrationTest", () => {
         migration: () => anonymousMigration("VersionCheck", 20131219224947),
       },
     ];
-    const migrator = new Migrator(adapter, migrations);
+    const migrator = new Migrator(
+      "up",
+      migrations,
+      new SchemaMigration(adapter),
+      new InternalMetadata(adapter),
+    );
     expect(await migrator.currentVersion()).toBe(0);
     await migrator.up("20131219224947");
     expect(await migrator.currentVersion()).toBe(20131219224947);
@@ -805,20 +845,29 @@ describe("MigrationTest", () => {
     // migration_c removes it again with if_exists: true and asserts nothing
     // raised. Ride the canonical `people` table via a Migrator.
     const adapter = await freshAdapterWithPeople();
-    await new Migrator(adapter, [
-      migrateProxy(100, (m) => m.addColumn("people", "last_name", "string")),
-    ]).up(100);
+    await new Migrator(
+      "up",
+      [migrateProxy(100, (m) => m.addColumn("people", "last_name", "string"))],
+      new SchemaMigration(adapter),
+      new InternalMetadata(adapter),
+    ).up(100);
     expect(await personColumnNames(adapter)).toContain("last_name");
 
-    await new Migrator(adapter, [
-      migrateProxy(101, (m) => m.removeColumn("people", "last_name")),
-    ]).up(101);
+    await new Migrator(
+      "up",
+      [migrateProxy(101, (m) => m.removeColumn("people", "last_name"))],
+      new SchemaMigration(adapter),
+      new InternalMetadata(adapter),
+    ).up(101);
     expect(await personColumnNames(adapter)).not.toContain("last_name");
 
     // if_exists: true must not raise even though the column is already gone.
-    await new Migrator(adapter, [
-      migrateProxy(102, (m) => m.removeColumn("people", "last_name", { ifExists: true })),
-    ]).up(102);
+    await new Migrator(
+      "up",
+      [migrateProxy(102, (m) => m.removeColumn("people", "last_name", { ifExists: true }))],
+      new SchemaMigration(adapter),
+      new InternalMetadata(adapter),
+    ).up(102);
     expect(await personColumnNames(adapter)).not.toContain("last_name");
   });
 
@@ -830,14 +879,20 @@ describe("MigrationTest", () => {
     // fallback, mirroring Rails' :char.
     const type = adapterType === "postgres" ? "char" : "binary";
     const adapter = await freshAdapterWithPeople();
-    await new Migrator(adapter, [
-      migrateProxy(100, (m) => m.addColumn("people", "last_name", type)),
-    ]).up(100);
+    await new Migrator(
+      "up",
+      [migrateProxy(100, (m) => m.addColumn("people", "last_name", type))],
+      new SchemaMigration(adapter),
+      new InternalMetadata(adapter),
+    ).up(100);
     expect(await personColumnNames(adapter)).toContain("last_name");
 
-    await new Migrator(adapter, [
-      migrateProxy(101, (m) => m.addColumn("people", "last_name", type, { ifNotExists: true })),
-    ]).up(101);
+    await new Migrator(
+      "up",
+      [migrateProxy(101, (m) => m.addColumn("people", "last_name", type, { ifNotExists: true }))],
+      new SchemaMigration(adapter),
+      new InternalMetadata(adapter),
+    ).up(101);
     expect(await personColumnNames(adapter)).toContain("last_name");
   });
 
@@ -846,16 +901,24 @@ describe("MigrationTest", () => {
     // it as :boolean with if_not_exists: true and asserts nothing raised (a
     // differing type is still a no-op). Ride canonical `people`.
     const adapter = await freshAdapterWithPeople();
-    await new Migrator(adapter, [
-      migrateProxy(100, (m) => m.addColumn("people", "last_name", "string")),
-    ]).up(100);
+    await new Migrator(
+      "up",
+      [migrateProxy(100, (m) => m.addColumn("people", "last_name", "string"))],
+      new SchemaMigration(adapter),
+      new InternalMetadata(adapter),
+    ).up(100);
     expect(await personColumnNames(adapter)).toContain("last_name");
 
-    await new Migrator(adapter, [
-      migrateProxy(101, (m) =>
-        m.addColumn("people", "last_name", "boolean", { ifNotExists: true }),
-      ),
-    ]).up(101);
+    await new Migrator(
+      "up",
+      [
+        migrateProxy(101, (m) =>
+          m.addColumn("people", "last_name", "boolean", { ifNotExists: true }),
+        ),
+      ],
+      new SchemaMigration(adapter),
+      new InternalMetadata(adapter),
+    ).up(101);
     expect(await personColumnNames(adapter)).toContain("last_name");
   });
 
@@ -913,7 +976,12 @@ describe("MigrationTest", () => {
           ),
       },
     ];
-    const migrator = new Migrator(adapter, migrations);
+    const migrator = new Migrator(
+      "up",
+      migrations,
+      new SchemaMigration(adapter),
+      new InternalMetadata(adapter),
+    );
     await expect(migrator.up()).rejects.toThrow("Something broke");
     // Migration should not be recorded as applied
     const versions = await migrator.getAllVersions();
@@ -940,7 +1008,12 @@ describe("MigrationTest", () => {
             ),
         },
       ];
-      const migrator = new Migrator(adapter, migrations);
+      const migrator = new Migrator(
+        "up",
+        migrations,
+        new SchemaMigration(adapter),
+        new InternalMetadata(adapter),
+      );
       await expect(migrator.migrate()).rejects.toThrow("Something broke");
       const versions = await migrator.getAllVersions();
       expect(versions).not.toContain(100);
@@ -972,7 +1045,12 @@ describe("MigrationTest", () => {
       name: "MigWithoutTx",
       migration: () => new MigWithoutTx(),
     };
-    const migrator = new Migrator(adapter, [proxy]);
+    const migrator = new Migrator(
+      "up",
+      [proxy],
+      new SchemaMigration(adapter),
+      new InternalMetadata(adapter),
+    );
     let err!: Error;
     try {
       await migrator.migrate();
@@ -998,7 +1076,12 @@ describe("MigrationTest", () => {
       name: "MigThatFailsToLoad",
       migration: () => Promise.reject(loadError),
     };
-    const migrator = new Migrator(adapter, [proxy]);
+    const migrator = new Migrator(
+      "up",
+      [proxy],
+      new SchemaMigration(adapter),
+      new InternalMetadata(adapter),
+    );
     let err!: Error;
     try {
       await migrator.migrate();
@@ -1054,7 +1137,12 @@ describe("MigrationTest", () => {
       name: "Failing",
       migration: () => new FailingMigration(),
     };
-    const migrator = new Migrator(adapter, [proxy]);
+    const migrator = new Migrator(
+      "up",
+      [proxy],
+      new SchemaMigration(adapter),
+      new InternalMetadata(adapter),
+    );
     await migrator.up().catch(() => {});
     const env = await im.get("environment");
     // Rails stamps the environment in `record_environment` BEFORE running the
@@ -1075,7 +1163,12 @@ describe("MigrationTest", () => {
       name: "M1",
       migration: () => anonymousMigration("M1", 1),
     };
-    const migrator = new Migrator(adapter, [proxy]);
+    const migrator = new Migrator(
+      "up",
+      [proxy],
+      new SchemaMigration(adapter),
+      new InternalMetadata(adapter),
+    );
     await migrator.up();
     expect(await im.get("environment")).toBe(envName(adapter));
     expect(await im.get("custom_key")).toBe("custom_value");
@@ -1104,7 +1197,12 @@ describe("MigrationTest", () => {
       name: "TestMigration",
       migration: () => anonymousMigration("TestMigration", 1),
     };
-    const migrator = new Migrator(adapter, [proxy]);
+    const migrator = new Migrator(
+      "up",
+      [proxy],
+      new SchemaMigration(adapter),
+      new InternalMetadata(adapter),
+    );
     try {
       await migrator.up();
 
@@ -1340,7 +1438,12 @@ describe("MigrationTest", () => {
 
   itIfSupports("advisory_locks", "migrator generates valid lock id", async () => {
     const realAdapter = Base.connection;
-    const migrator = new Migrator(realAdapter, []);
+    const migrator = new Migrator(
+      "up",
+      [],
+      new SchemaMigration(realAdapter),
+      new InternalMetadata(realAdapter),
+    );
     const lockId = await migrator.generateMigratorAdvisoryLockId();
     const acquired = await (realAdapter as any).getAdvisoryLock(lockId);
     try {
@@ -1356,7 +1459,12 @@ describe("MigrationTest", () => {
   itIfSupports("advisory_locks", "generate migrator advisory lock id", async () => {
     // SchemaAdapter now forwards currentDatabase() — no need to bypass the wrapper
     const testAdapter = Base.connection;
-    const migrator = new Migrator(testAdapter, []);
+    const migrator = new Migrator(
+      "up",
+      [],
+      new SchemaMigration(testAdapter),
+      new InternalMetadata(testAdapter),
+    );
     const lockId = await migrator.generateMigratorAdvisoryLockId();
     // Must fit in a signed 63-bit integer
     expect(lockId).toBeGreaterThanOrEqual(0n);
@@ -1381,7 +1489,12 @@ describe("MigrationTest", () => {
     const adapter = Base.connection;
     const getSpy = vi.spyOn(adapter as any, "getAdvisoryLock").mockResolvedValue(false);
     try {
-      const migrator = new Migrator(adapter, [proxy]);
+      const migrator = new Migrator(
+        "up",
+        [proxy],
+        new SchemaMigration(adapter),
+        new InternalMetadata(adapter),
+      );
       await expect(migrator.migrate()).rejects.toThrow(ConcurrentMigrationError);
     } finally {
       getSpy.mockRestore();
@@ -1407,7 +1520,12 @@ describe("MigrationTest", () => {
     const adapter = Base.connection;
     const getSpy = vi.spyOn(adapter as any, "getAdvisoryLock").mockResolvedValue(false);
     try {
-      const migrator = new Migrator(adapter, [proxy]);
+      const migrator = new Migrator(
+        "up",
+        [proxy],
+        new SchemaMigration(adapter),
+        new InternalMetadata(adapter),
+      );
       await expect(migrator.run("up", 100)).rejects.toThrow(ConcurrentMigrationError);
     } finally {
       getSpy.mockRestore();
@@ -1435,7 +1553,12 @@ describe("MigrationTest", () => {
           name: "NoOp",
           migration: () => anonymousMigration("NoOp", 200),
         };
-        const migrator = new Migrator(realAdapter, [proxy]);
+        const migrator = new Migrator(
+          "up",
+          [proxy],
+          new SchemaMigration(realAdapter),
+          new InternalMetadata(realAdapter),
+        );
         await migrator.migrate();
         expect(getSpy).toHaveBeenCalledTimes(1);
         expect(releaseSpy).toHaveBeenCalledWith(getSpy.mock.calls[0][0]);
@@ -1460,7 +1583,13 @@ describe("MigrationTest", () => {
         name: "NoOp",
         migration: () => anonymousMigration("NoOp", 100),
       };
-      const migrator = new Migrator(realAdapter, [proxy], { targetVersion: 100 });
+      const migrator = new Migrator(
+        "up",
+        [proxy],
+        new SchemaMigration(realAdapter),
+        new InternalMetadata(realAdapter),
+        100,
+      );
       const lockId = await migrator.generateMigratorAdvisoryLockId();
       const error = await migrator
         .withAdvisoryLock(async () => {

@@ -5,6 +5,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Migrator } from "./index.js";
 import { SchemaMigration } from "./schema-migration.js";
+import { InternalMetadata } from "./internal-metadata.js";
 import type { MigrationProxy } from "./migration.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { anonymousMigration } from "./test-helpers/anonymous-migration.js";
@@ -38,20 +39,24 @@ function sensor(
 describe("MultiDbMigratorTest", () => {
   let adapterA: DatabaseAdapter;
   let adapterB: DatabaseAdapter;
-  let smA: SchemaMigration;
-  let smB: SchemaMigration;
+  let schemaMigrationA: SchemaMigration;
+  let schemaMigrationB: SchemaMigration;
+  let internalMetadataA: InternalMetadata;
+  let internalMetadataB: InternalMetadata;
   let migrationsA: MigrationProxy[];
   let migrationsB: MigrationProxy[];
 
   beforeEach(async () => {
     adapterA = await Base.leaseConnection();
     adapterB = await ARUnit2Model.leaseConnection();
-    smA = new SchemaMigration(adapterA);
-    smB = new SchemaMigration(adapterB);
-    await smA.createTable();
-    await smB.createTable();
-    await smA.deleteAllVersions();
-    await smB.deleteAllVersions();
+    schemaMigrationA = new SchemaMigration(adapterA);
+    schemaMigrationB = new SchemaMigration(adapterB);
+    internalMetadataA = new InternalMetadata(adapterA);
+    internalMetadataB = new InternalMetadata(adapterB);
+    await schemaMigrationA.createTable();
+    await schemaMigrationB.createTable();
+    await schemaMigrationA.deleteAllVersions();
+    await schemaMigrationB.deleteAllVersions();
 
     migrationsA = [
       {
@@ -85,20 +90,20 @@ describe("MultiDbMigratorTest", () => {
   });
 
   afterEach(async () => {
-    await smA.deleteAllVersions();
-    await smB.deleteAllVersions();
+    await schemaMigrationA.deleteAllVersions();
+    await schemaMigrationB.deleteAllVersions();
   });
 
   it("schema migration is different for different connections", () => {
-    expect(smA).not.toBe(smB);
+    expect(schemaMigrationA).not.toBe(schemaMigrationB);
     expect(adapterA).not.toBe(adapterB);
     expect(Base.connectionPool().poolConfig.connectionDescriptor.name).toBe("Base");
     expect(ARUnit2Model.connectionPool().poolConfig.connectionDescriptor.name).toBe("ARUnit2Model");
   });
 
   it("finds migrations", () => {
-    const migratorA = new Migrator(adapterA, migrationsA);
-    const migratorB = new Migrator(adapterB, migrationsB);
+    const migratorA = new Migrator("up", migrationsA, schemaMigrationA, internalMetadataA);
+    const migratorB = new Migrator("up", migrationsB, schemaMigrationB, internalMetadataB);
 
     const listA = [
       [1, "ValidPeopleHaveLastNames"],
@@ -121,10 +126,10 @@ describe("MultiDbMigratorTest", () => {
   });
 
   it("migrations status", async () => {
-    await smA.createVersion("2");
-    await smA.createVersion("10");
+    await schemaMigrationA.createVersion("2");
+    await schemaMigrationA.createVersion("10");
 
-    const migratorA = new Migrator(adapterA, migrationsA);
+    const migratorA = new Migrator("up", migrationsA, schemaMigrationA, internalMetadataA);
     const statusA = await migratorA.migrationsStatus();
     expect(statusA).toEqual([
       { status: "down", version: "001", name: "Valid people have last names" },
@@ -133,8 +138,8 @@ describe("MultiDbMigratorTest", () => {
       { status: "up", version: "010", name: "********** NO FILE **********" },
     ]);
 
-    await smB.createVersion("4");
-    const migratorB = new Migrator(adapterB, migrationsB);
+    await schemaMigrationB.createVersion("4");
+    const migratorB = new Migrator("up", migrationsB, schemaMigrationB, internalMetadataB);
     const statusB = await migratorB.migrationsStatus();
     expect(statusB).toEqual([
       { status: "down", version: "001", name: "People have hobbies" },
@@ -145,7 +150,7 @@ describe("MultiDbMigratorTest", () => {
 
   it("get all versions", async () => {
     const sensorsA = [sensor(1, "S1"), sensor(2, "S2"), sensor(3, "S3")];
-    const migratorA = new Migrator(adapterA, sensorsA);
+    const migratorA = new Migrator("up", sensorsA, schemaMigrationA, internalMetadataA);
 
     await migratorA.up();
     expect(await migratorA.getAllVersions()).toEqual([1, 2, 3]);
@@ -160,7 +165,7 @@ describe("MultiDbMigratorTest", () => {
     expect(await migratorA.getAllVersions()).toEqual([]);
 
     const sensorsB = [sensor(1, "S1"), sensor(2, "S2")];
-    const migratorB = new Migrator(adapterB, sensorsB);
+    const migratorB = new Migrator("up", sensorsB, schemaMigrationB, internalMetadataB);
 
     await migratorB.up();
     expect(await migratorB.getAllVersions()).toEqual([1, 2]);
@@ -173,7 +178,7 @@ describe("MultiDbMigratorTest", () => {
   });
 
   it("finds pending migrations", async () => {
-    await smA.createVersion("1");
+    await schemaMigrationA.createVersion("1");
     const listA = [
       {
         version: 1,
@@ -186,12 +191,12 @@ describe("MultiDbMigratorTest", () => {
         migration: () => anonymousMigration("Bar", 3),
       },
     ];
-    const migratorA = new Migrator(adapterA, listA);
+    const migratorA = new Migrator("up", listA, schemaMigrationA, internalMetadataA);
     const pendingA = await migratorA.pendingMigrations();
     expect(pendingA.length).toBe(1);
     expect(pendingA[0].name).toBe("Bar");
 
-    await smB.createVersion("1");
+    await schemaMigrationB.createVersion("1");
     const listB = [
       {
         version: 1,
@@ -204,7 +209,7 @@ describe("MultiDbMigratorTest", () => {
         migration: () => anonymousMigration("Bar", 3),
       },
     ];
-    const migratorB = new Migrator(adapterB, listB);
+    const migratorB = new Migrator("up", listB, schemaMigrationB, internalMetadataB);
     const pendingB = await migratorB.pendingMigrations();
     expect(pendingB.length).toBe(1);
     expect(pendingB[0].name).toBe("Bar");
@@ -212,27 +217,27 @@ describe("MultiDbMigratorTest", () => {
 
   it("migrator db has no schema migrations table", async () => {
     const sensorsA = [sensor(1, "S1"), sensor(2, "S2"), sensor(3, "S3")];
-    const migratorA = new Migrator(adapterA, sensorsA);
+    const migratorA = new Migrator("up", sensorsA, schemaMigrationA, internalMetadataA);
 
-    await smA.dropTable();
-    expect(await smA.tableExists()).toBe(false);
+    await schemaMigrationA.dropTable();
+    expect(await schemaMigrationA.tableExists()).toBe(false);
     await migratorA.up(1);
-    expect(await smA.tableExists()).toBe(true);
+    expect(await schemaMigrationA.tableExists()).toBe(true);
     await migratorA.rollback();
 
     const sensorsB = [sensor(1, "S1"), sensor(2, "S2"), sensor(3, "S3")];
-    const migratorB = new Migrator(adapterB, sensorsB);
+    const migratorB = new Migrator("up", sensorsB, schemaMigrationB, internalMetadataB);
 
-    await smB.dropTable();
-    expect(await smB.tableExists()).toBe(false);
+    await schemaMigrationB.dropTable();
+    expect(await schemaMigrationB.tableExists()).toBe(false);
     await migratorB.up(1);
-    expect(await smB.tableExists()).toBe(true);
+    expect(await schemaMigrationB.tableExists()).toBe(true);
     await migratorB.rollback();
   });
 
   it("migrator forward", async () => {
     const sensorsA = [sensor(1, "S1"), sensor(2, "S2"), sensor(3, "S3")];
-    const migratorA = new Migrator(adapterA, sensorsA);
+    const migratorA = new Migrator("up", sensorsA, schemaMigrationA, internalMetadataA);
 
     await migratorA.up(1);
     expect(await migratorA.currentVersion()).toBe(1);
@@ -244,7 +249,7 @@ describe("MultiDbMigratorTest", () => {
     expect(await migratorA.currentVersion()).toBe(3);
 
     const sensorsB = [sensor(1, "S1"), sensor(2, "S2"), sensor(3, "S3")];
-    const migratorB = new Migrator(adapterB, sensorsB);
+    const migratorB = new Migrator("up", sensorsB, schemaMigrationB, internalMetadataB);
 
     await migratorB.up(1);
     expect(await migratorB.currentVersion()).toBe(1);

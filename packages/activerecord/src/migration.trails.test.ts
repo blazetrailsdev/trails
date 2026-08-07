@@ -17,6 +17,7 @@ import { DefaultStrategy } from "./migration/default-strategy.js";
 import { ActiveRecord } from "./ar-config.js";
 import { Base } from "./base.js";
 import { SchemaMigration } from "./schema-migration.js";
+import { InternalMetadata } from "./internal-metadata.js";
 import { newRawTestAdapter } from "./test-adapter.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Table } from "./connection-adapters/abstract/schema-definitions.js";
@@ -72,7 +73,12 @@ describe("MigrationTest", () => {
         migration: async () => anonymousMigration("AsyncFirst", 1),
       },
     ];
-    const migrator = new Migrator(adapter, migrations);
+    const migrator = new Migrator(
+      "up",
+      migrations,
+      new SchemaMigration(adapter),
+      new InternalMetadata(adapter),
+    );
     await migrator.up();
     expect(await migrator.currentVersion()).toBe(1);
   });

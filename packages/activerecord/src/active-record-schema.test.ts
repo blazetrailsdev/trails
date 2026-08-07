@@ -6,6 +6,7 @@ import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll, vi } 
 import { Base, Migration, Schema, TableDefinition } from "./index.js";
 import { Migrator } from "./migration.js";
 import { SchemaMigration } from "./schema-migration.js";
+import { InternalMetadata } from "./internal-metadata.js";
 
 import { adapterType } from "./test-adapter.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
@@ -103,7 +104,14 @@ describe("ActiveRecordSchemaTest", () => {
           t.string("color");
         });
       });
-      expect(await new Migrator(adapter, []).currentVersion()).toBe(7);
+      expect(
+        await new Migrator(
+          "up",
+          [],
+          new SchemaMigration(adapter),
+          new InternalMetadata(adapter),
+        ).currentVersion(),
+      ).toBe(7);
     } finally {
       // Rails ensure: drop_table :nep_schema_migrations (dropTable resolves the
       // still-prefixed table name).
