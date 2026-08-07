@@ -111,11 +111,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
           adapter as unknown as { _warningCount: () => Promise<number> },
           "_warningCount",
         ).mockResolvedValue(1);
-        // Not a try/catch: a `throw new Error("expected SQLWarning")` in the
-        // try lands in its own catch, so a run where `execute` resolves reports
-        // "expected Error: expected SQLWarning to be an instance of SQLWarning"
-        // and hides whether it raised the wrong thing or nothing at all (RFC
-        // 0028 adapter-unique triage, MariaDB run 30649373370).
         const raised = adapter.execute(`SELECT 'x'`);
         await expect(raised).rejects.toBeInstanceOf(SQLWarning);
         await expect(raised).rejects.toThrow(
