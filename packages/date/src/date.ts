@@ -100,10 +100,12 @@ function epochSeconds(subject: StrftimeSubject): number {
 }
 
 /**
- * @internal `%Q`'s value (`date_strftime.c:354-356`, `tmx_msecs`): the whole
- * milliseconds of the subject's sub-second, which ride on top of `%s`.
+ * @internal `tmx_m_msecs` (`date_core.c:7120-7132`), which `%Q`
+ * (`date_strftime.c:354-356`) reads: `sec_to_ms(tmx_m_secs)` plus the
+ * sub-second's whole milliseconds. `FMTV`'s `"%d"` truncates a fractional
+ * millisecond, so the division is integer here.
  */
-function msec(subject: StrftimeSubject): number {
+function msecs(subject: StrftimeSubject): number {
   return Number(
     (subject.nsec.numerator * 1000n) / (subject.nsec.denominator * BigInt(SECOND_IN_NANOSECONDS)),
   );
@@ -402,12 +404,8 @@ export function strftime(subject: StrftimeSubject, format: string): string {
     const text = (value: string): string =>
       fillPadding(padding, left, precision, value.length) +
       (upper ? value.toUpperCase() : lower ? value.toLowerCase() : value);
-    /**
-     * `date_strftime.c`'s `STRFTIME` macro (`date_strftime.c:117-133`): the
-     * expansion string runs back through `strftime` and the answer is upcased
-     * for `%^`, then left-filled to the requested width. `LOWER` is deliberately
-     * not consulted here — the macro reads only `UPPER`.
-     */
+    // `date_strftime.c`'s `STRFTIME` macro (`date_strftime.c:117-133`): it
+    // reads UPPER but never LOWER, unlike the shared text tail at `:603-614`.
     const recur = (fmt: string): string => {
       const i = strftime(subject, fmt);
       const cased = upper ? i.toUpperCase() : i;
@@ -422,8 +420,9 @@ export function strftime(subject: StrftimeSubject, format: string): string {
       case "C":
         formatted = num("0", 2, div(subject.year, 100));
         break;
+      case "g":
       case "y":
-        formatted = num("0", 2, mod(subject.year, 100));
+        formatted = num("0", 2, mod(spec === "g" ? cwyear(subject) : subject.year, 100));
         break;
       case "m":
         formatted = num("0", 2, subject.mon);
@@ -472,7 +471,7 @@ export function strftime(subject: StrftimeSubject, format: string): string {
         formatted = num("0", 2, wnumx(subject, spec === "U" ? 0 : 1));
         break;
       case "Q":
-        formatted = num("0", 1, epochSeconds(subject) * 1000 + msec(subject));
+        formatted = num("0", 1, epochSeconds(subject) * 1000 + msecs(subject));
         break;
       case "A":
         if (chcase) upper = true;

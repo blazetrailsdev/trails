@@ -103,9 +103,6 @@ describe("Ruby extractor body call capture", () => {
         end
       `,
     });
-    // extract-ts-api.test.ts pins the same two shapes on the TS side; the two
-    // orders have to agree or `compare.ts --calls` manufactures `order:` rows
-    // that no edit to a faithful port can close.
     expect(
       rubyCalls({
         "foo.rb": `

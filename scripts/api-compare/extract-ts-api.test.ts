@@ -302,9 +302,6 @@ describe("body call capture", () => {
       "constructor",
       "loaders",
     ]);
-    // extract-ruby-api.test.ts pins the same two shapes on the Ruby side; the
-    // two orders have to agree or `compare.ts --calls` manufactures `order:`
-    // rows that no edit to a faithful port can close.
     expect(throughScope.skeleton).toEqual([
       "ref:throughReflection",
       "ref:klass",

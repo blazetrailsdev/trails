@@ -656,7 +656,7 @@ describe("Date", () => {
     expect(date.strftime("%G|%V|%U|%W")).toBe("2008|27|26|26");
     expect(dt.strftime("%G|%V|%U|%W")).toBe("2008|09|08|08");
     // The week-based year runs back into the previous year here.
-    expect(RubyDate.parse("2021-01-03").strftime("%U|%W|%V|%G")).toBe("01|00|53|2020");
+    expect(RubyDate.parse("2021-01-03").strftime("%U|%W|%V|%G|%g|%y")).toBe("01|00|53|2020|20|21");
     expect(date.strftime("%Q")).toBe("1214956800000");
     expect(dt.strftime("%Q")).toBe("1204351628500");
   });
