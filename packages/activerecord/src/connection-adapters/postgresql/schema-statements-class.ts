@@ -55,42 +55,26 @@ function toS(value: unknown): string {
  * PostgreSQL's `SchemaStatements` is only ever mixed into `PostgreSQLAdapter`
  * (`include()` at the bottom of the adapter module), so its bodies call plain
  * `this` methods the way Rails' module does. This merged interface gives those
- * calls the PG adapter's type.
+ * calls the PG adapter's own type — `Pick`ed from `PostgreSQLAdapter` rather
+ * than restated by hand, so a signature can no longer drift from the adapter it
+ * describes.
  *
- * The `Omit`ted names already reach `this` from `AbstractSchemaStatements` with
- * a signature TypeScript will not let a narrower PG one merge over — a member
- * declared on a base class wins over a merged-interface property. `getDatabaseVersion`
- * is off that list: a declaration-only `declare` field in the class body does
- * outrank the inherited method (see the class), which is what removed
- * `resetPkSequenceBang`'s cast. The same trick cannot reach `typeMap`, which the
- * generic adapter declares as an accessor (TS2610) — `columns` still casts it.
- * The two restated below are the reverse case: own members TypeScript does
- * accept, narrowed from the generic adapter's. @internal
- */
-/**
- * PostgreSQL's `SchemaStatements` is only ever mixed into `PostgreSQLAdapter`
- * (`include()` at the bottom of the adapter module), so its bodies call plain
- * `this` methods the way Rails' module does. This merged interface gives those
- * calls the PG adapter's own type — not a hand-copied restatement of it, which
- * was free to drift from the adapter it claimed to describe.
- *
- * The `Omit`ted names are the members `PostgreSQLAdapter` *narrows* relative to
- * the signature this class already inherits from `AbstractSchemaStatements` (or
- * from `AbstractAdapter`, which the abstract statements module also declares).
- * A narrowing override is legal on a class and is what Ruby's untyped override
- * translates to; declaration merging, however, demands *identical* types and
- * rejects the pair. Each name below is therefore inherited from the abstract
- * base rather than merged in — the same method at runtime, since PG's override
- * is the one on the prototype. `getDatabaseVersion` is off the list: a
- * declaration-only `declare` field in the class body does outrank the inherited
- * method (see the class), which is what removed `resetPkSequenceBang`'s cast.
+ * Only the members PG adds beyond `AbstractSchemaStatements` are listed: the
+ * rest already reach `this` through the base class, and merging a second
+ * declaration for them would collide with it — `PostgreSQLAdapter` narrows many
+ * (`adapterName` to `AdapterName`, `addColumnForAlter` to `ColumnType`), which is
+ * legal on a class and is what Ruby's untyped override translates to, but
+ * declaration merging demands identical types. `getDatabaseVersion` is the one
+ * exception: a declaration-only `declare` field in the class body does outrank
+ * the inherited method (see the class), which is what removed
+ * `resetPkSequenceBang`'s cast.
  *
  * The same trick cannot reach `typeMap`: `AbstractAdapter` declares it as an
  * accessor (`abstract-adapter.ts:2543`), and TypeScript refuses to narrow an
  * inherited accessor from either a merged-interface member or a `declare` field
  * (TS2610). A real accessor override here would shadow `PostgreSQLAdapter`'s own
  * `type_map` once `include()` installs the module on the prototype, so `columns`
- * keeps its cast — a permanent TypeScript limitation, not deferred work.
+ * keeps its cast.
  *
  * The two members restated in the body are the reverse case: own members
  * TypeScript does accept, narrowed from the generic adapter's. @internal
@@ -98,46 +82,29 @@ function toS(value: unknown): string {
 export interface SchemaStatements
   extends
     PgSchemaAdapterPrivates,
-    Omit<
+    Pick<
       PostgreSQLAdapter,
-      // Narrowed by PostgreSQLAdapter; inherited from the abstract base instead.
-      | "adapterName"
-      | "addColumnForAlter"
-      | "addIndex"
-      | "addIndexOptions"
-      | "buildCreateIndexDefinition"
-      | "buildStatementPool"
-      | "canPerformCaseInsensitiveComparisonFor"
-      | "caseInsensitiveComparison"
-      | "close"
-      | "configureConnection"
-      | "createAlterTable"
-      | "createSchemaDumper"
-      | "createTableDefinition"
-      | "databaseVersion"
-      | "disableExtension"
-      | "disableReferentialIntegrity"
-      | "dumpSchemaInformation"
-      | "enableExtension"
-      | "execute"
-      | "explain"
-      | "extensions"
-      | "fetchTypeMetadata"
-      | "internalExecute"
-      | "lookupCastType"
-      | "lookupCastTypeFromColumn"
-      | "quoteDefaultExpression"
-      | "quotedScope"
-      | "reconnect"
-      | "removeColumns"
-      | "removeIndex"
-      | "returningColumnValues"
-      | "schemaCreation"
-      | "translateException"
-      | "typeMap"
-      // Restated below, narrowed from the generic adapter's.
-      | "logger"
-      | "nativeDatabaseTypes"
+      | "clearCacheBang"
+      | "dataSourceSql"
+      | "exec"
+      | "extractDefaultFunction"
+      | "extractSchemaQualifiedName"
+      | "extractValueFromDefault"
+      | "internalExecQuery"
+      | "loadAdditionalTypes"
+      | "maxIdentifierLength"
+      | "newColumnFromField"
+      | "queryValue"
+      | "queryValues"
+      | "quote"
+      | "quoteColumnName"
+      | "quoteTableName"
+      | "reloadTypeMap"
+      | "schemaQuery"
+      | "supportsIdentityColumns"
+      | "supportsNativePartitioning"
+      | "supportsVirtualColumns"
+      | "visitor"
     > {
   readonly logger: { warn?(message: string): void } | null;
   nativeDatabaseTypes(): Record<string, string | { name?: string; limit?: number }>;
