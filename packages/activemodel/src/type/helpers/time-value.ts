@@ -16,7 +16,7 @@ export interface TimeValue {
   precision?: number;
   serializeCastValue(value: unknown): string | null;
   typeCastForSchema(value: unknown): string;
-  userInputInTimeZone(value: unknown): Temporal.ZonedDateTime | null;
+  userInputInTimeZone(value: unknown): Temporal.ZonedDateTime | Temporal.PlainDateTime | null;
   applySecondsPrecision<T>(this: TimeValue, value: T): T;
 }
 
@@ -99,11 +99,12 @@ export function applySecondsPrecision<T>(this: { precision?: number }, value: T)
  *
  * With no zone set at all Ruby takes `in_time_zone`'s else arm and answers a
  * bare `to_time` (`date_and_time/zones.rb:20-27`) — a value with no zone
- * attached, which this method's `ZonedDateTime` return type cannot represent.
- * UTC stands in, the same convention `isUtc()` already applies to an unset
- * `zone_default` (`helpers/timezone.ts`).
+ * attached. `Temporal.PlainDateTime` is that zoneless value, so the else arm
+ * is answered as one rather than anchored to a zone Ruby never picked.
  */
-export function userInputInTimeZone(value: unknown): Temporal.ZonedDateTime | null {
+export function userInputInTimeZone(
+  value: unknown,
+): Temporal.ZonedDateTime | Temporal.PlainDateTime | null {
   if (value === null || value === undefined) return null;
   if (value instanceof Temporal.ZonedDateTime) return value;
   const str = String(value).trim();
@@ -116,8 +117,10 @@ export function userInputInTimeZone(value: unknown): Temporal.ZonedDateTime | nu
     }
   }
   try {
-    const zone = getZone()?.tzinfo ?? "UTC";
-    return Temporal.PlainDateTime.from(str.replace(" ", "T")).toZonedDateTime(zone);
+    const timeZone = getZone();
+    const time = Temporal.PlainDateTime.from(str.replace(" ", "T"));
+    if (timeZone) return time.toZonedDateTime(timeZone.tzinfo);
+    return time;
   } catch {
     return null;
   }

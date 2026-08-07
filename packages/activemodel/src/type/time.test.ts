@@ -84,6 +84,12 @@ describe("TimeTest", () => {
     });
   });
 
+  it("user input in time zone answers a zoneless value when Time.zone is unset", () => {
+    const result = type.userInputInTimeZone("14:30:00");
+    expect(result).toBeInstanceOf(Temporal.PlainDateTime);
+    expect((result as Temporal.PlainDateTime).hour).toBe(14);
+  });
+
   it("user input in time zone returns null for null", () => {
     expect(type.userInputInTimeZone(null)).toBe(null);
     expect(type.userInputInTimeZone("")).toBe(null);

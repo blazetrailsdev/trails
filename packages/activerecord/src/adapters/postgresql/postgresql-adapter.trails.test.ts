@@ -312,63 +312,12 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
     });
 
-    // The other half of the invariant: a query the rolling-back chain itself
-    // abandoned is still cancelled, so the guard above is a narrowing and not
-    // a removal of Rails' cancel_any_running_query.
-    it("rollback cancels an in-flight query the same chain abandoned", async () => {
-      const other = new PostgreSQLAdapter(PG_TEST_URL);
-      try {
-        let slowError: unknown;
-        let slow!: Promise<unknown>;
-        await other.transactionManager.synchronize(async () => {
-          await other.beginDbTransaction();
-          slow = other.execute("SELECT pg_sleep(5) AS slept").catch((e) => {
-            slowError = e;
-          });
-          await new Promise<void>((r) => setTimeout(r, 100));
-          await other.rollbackDbTransaction();
-        });
-        await slow;
-        expect(slowError).toBeInstanceOf(QueryCanceled);
-      } finally {
-        await other.close();
-      }
-    });
-
-    // `@raw_connection.block` (postgresql/database_statements.rb:127-128): the
-    // ROLLBACK goes out only once the cancelled query has drained off the wire.
-    // `_queryInFlightSettled` is non-null for exactly the span a query is on
-    // the wire, so reading it as ROLLBACK is sent is the drain assertion.
-    it("rollback drains the cancelled query before sending ROLLBACK", async () => {
-      const other = new PostgreSQLAdapter(PG_TEST_URL);
-      const seam = other as unknown as {
-        _queryInFlightSettled: Promise<void> | null;
-        internalExecute(sql: string, ...rest: unknown[]): Promise<unknown>;
-      };
-      const internalExecute = seam.internalExecute.bind(seam);
-      let inFlightAtRollback: Promise<void> | null | "unsent" = "unsent";
-      seam.internalExecute = (sql: string, ...rest: unknown[]) => {
-        if (sql === "ROLLBACK") inFlightAtRollback = seam._queryInFlightSettled;
-        return internalExecute(sql, ...rest);
-      };
-      try {
-        let slowError: unknown;
-        let slow!: Promise<unknown>;
-        await other.transactionManager.synchronize(async () => {
-          await other.beginDbTransaction();
-          slow = other.execute("SELECT pg_sleep(5) AS slept").catch((e) => {
-            slowError = e;
-          });
-          await new Promise<void>((r) => setTimeout(r, 100));
-          await other.rollbackDbTransaction();
-        });
-        await slow;
-        expect(slowError).toBeInstanceOf(QueryCanceled);
-        expect(inFlightAtRollback).toBeNull();
-      } finally {
-        await other.close();
-      }
-    });
+    // Rails' `cancel_any_running_query` has nothing to cancel once the lock
+    // covers each query's whole life — `rollback_transaction` takes the same
+    // lock (abstract/transaction.rb:611) and finds an idle transaction status.
+    // The two tests that lived here drove it by abandoning a query inside
+    // `synchronize`, the shape RFC 0085 removed; there is no Rails-faithful way
+    // to put a query on the wire under a lock this chain holds.
 
     it("translate exception serialization failure", async () => {
       await adapter.exec(`CREATE TABLE "ex_ser" ("id" SERIAL PRIMARY KEY, "val" INTEGER)`);
