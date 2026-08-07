@@ -3,6 +3,7 @@ import type { SqlJsAdapter } from "./sql-js-adapter.js";
 import { VfsModelGenerator, VfsMigrationGenerator, VfsAppGenerator } from "./vfs-generator.js";
 import type { Migration, MigrationProxy } from "@blazetrails/activerecord/migration";
 import { Migrator } from "@blazetrails/activerecord/migration";
+import { InternalMetadata, SchemaMigration } from "@blazetrails/activerecord";
 import {
   camelize,
   getProcessAdapter,
@@ -147,7 +148,12 @@ export function createTrailCLI(deps: TrailCliDeps) {
       log("No migrations found in db/migrations/.");
       return;
     }
-    const migrator = new Migrator(adapter, proxies);
+    const migrator = new Migrator(
+      "up",
+      proxies,
+      new SchemaMigration(adapter),
+      new InternalMetadata(adapter),
+    );
     // Migration output goes to stdout (Rails' Migration#write is `puts`), and
     // the browser has no process — so the shim's stdout is pointed at this
     // CLI's output buffer for the duration of the run. Any adapter the host

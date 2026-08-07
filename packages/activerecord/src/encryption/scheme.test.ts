@@ -4,7 +4,7 @@ import { Encryptor } from "./encryptor.js";
 import { Configuration } from "./errors.js";
 import { Configurable } from "./configurable.js";
 import { Contexts } from "./contexts.js";
-import { getEncryptionContext } from "./context.js";
+
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
 import { DeterministicKeyProvider } from "./deterministic-key-provider.js";
 
@@ -190,7 +190,7 @@ describe("ActiveRecord::Encryption::SchemeTest", () => {
     let ran = false;
     scheme.withContext(() => {
       ran = true;
-      expect(getEncryptionContext().encryptor).toBeInstanceOf(Encryptor);
+      expect(Contexts.context.encryptor).toBeInstanceOf(Encryptor);
     });
     expect(ran).toBe(true);
   });
@@ -205,10 +205,10 @@ describe("ActiveRecord::Encryption::SchemeTest", () => {
     const scheme = new Scheme({ encryptor: customEncryptor });
     let encryptorInContext: unknown;
     scheme.withContext(() => {
-      encryptorInContext = getEncryptionContext().encryptor;
+      encryptorInContext = Contexts.context.encryptor;
     });
     expect(encryptorInContext).toBe(customEncryptor);
-    expect(getEncryptionContext().encryptor).toBeInstanceOf(Encryptor);
+    expect(Contexts.context.encryptor).toBeInstanceOf(Encryptor);
   });
 
   it("isCompatibleWith returns true when deterministic flags match", () => {

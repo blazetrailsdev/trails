@@ -7,6 +7,8 @@
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { MigrationProxy } from "./migration.js";
 import { Migrator } from "./migration.js";
+import { SchemaMigration } from "./schema-migration.js";
+import { InternalMetadata } from "./internal-metadata.js";
 import { Base } from "./base.js";
 import { DatabaseTasks } from "./tasks/database-tasks.js";
 
@@ -20,7 +22,12 @@ export async function createAndMigrate(
   migrations: MigrationProxy[],
 ): Promise<void> {
   for (const adapter of adapters) {
-    const migrator = new Migrator(adapter, migrations, { environment: "test" });
+    const migrator = new Migrator(
+      "up",
+      migrations,
+      new SchemaMigration(adapter),
+      new InternalMetadata(adapter),
+    );
     await migrator.up();
   }
 }

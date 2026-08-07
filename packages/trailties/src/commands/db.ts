@@ -20,6 +20,7 @@ import {
   HashConfig,
   InternalMetadata,
   Migrator,
+  SchemaMigration,
   eachCurrentEnvironment,
 } from "@blazetrails/activerecord";
 import type { DatabaseAdapter } from "@blazetrails/activerecord";
@@ -376,10 +377,12 @@ function createMigrator(
   adapter: DatabaseAdapter,
   migrations: Awaited<ReturnType<typeof discoverMigrations>>,
 ): Migrator {
-  const envName = resolveEnv();
-  return new Migrator(adapter, migrations, {
-    environment: envName,
-  });
+  return new Migrator(
+    "up",
+    migrations,
+    new SchemaMigration(adapter),
+    new InternalMetadata(adapter),
+  );
 }
 
 async function runMigrate(
@@ -592,9 +595,12 @@ async function withMigrationTasksForDb(
     await withRegisteredConfiguration(ctx.config, operation);
   });
   if (opts?.afterPending) {
-    const migrator = new Migrator(ctx.adapter, migrations, {
-      environment: ctx.config.envName,
-    });
+    const migrator = new Migrator(
+      "up",
+      migrations,
+      new SchemaMigration(ctx.adapter),
+      new InternalMetadata(ctx.adapter),
+    );
     opts.afterPending((await migrator.pendingMigrations()).length);
   }
   await dumpSchemaAfterMigrate(ctx.raw, ctx.config);
@@ -650,9 +656,13 @@ async function runMigrateAll(targetVersion: string | null): Promise<void> {
         const prefix = multiDb ? `[${name}] ` : "";
         await DatabaseTasks.withTemporaryPool(hashConfig, async (pool) => {
           const migrations = migrationsFor.get(name) ?? [];
-          const migrator = new Migrator(await pool.leaseConnection(), migrations, {
-            environment: hashConfig.envName,
-          });
+          const adapter = await pool.leaseConnection();
+          const migrator = new Migrator(
+            "up",
+            migrations,
+            new SchemaMigration(adapter),
+            new InternalMetadata(adapter),
+          );
           const pending = await migrator.pendingMigrations();
           if (pending.length === 0) console.log(`${prefix}All migrations are up to date.`);
           await dumpSchemaAfterMigrate(raw, hashConfig);

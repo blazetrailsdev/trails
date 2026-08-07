@@ -1,4 +1,10 @@
-import { DatabaseTasks, DatabaseConfigurations, Migrator } from "@blazetrails/activerecord";
+import {
+  DatabaseTasks,
+  DatabaseConfigurations,
+  InternalMetadata,
+  Migrator,
+  SchemaMigration,
+} from "@blazetrails/activerecord";
 import type { MigrationProxy } from "@blazetrails/activerecord";
 import { loadDatabaseConfig, loadMigrations } from "./db-helpers.js";
 
@@ -9,7 +15,12 @@ async function resolvePending(migrations: MigrationProxy[]): Promise<MigrationPr
   const config = configs.find((c) => c.name === "primary") ?? configs[0];
   let pending: MigrationProxy[] = [];
   await DatabaseTasks.withTemporaryConnection(config, async (adapter) => {
-    const migrator = new Migrator(adapter, migrations);
+    const migrator = new Migrator(
+      "up",
+      migrations,
+      new SchemaMigration(adapter),
+      new InternalMetadata(adapter),
+    );
     pending = await migrator.pendingMigrationsReadOnly();
   });
   return pending;

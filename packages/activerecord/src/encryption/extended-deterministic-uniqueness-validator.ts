@@ -4,7 +4,7 @@ import {
   ExtendedDeterministicQueries,
   type SerializableType,
 } from "./extended-deterministic-queries.js";
-import { withoutEncryption } from "./context.js";
+import { Contexts } from "./contexts.js";
 
 /**
  * Extends uniqueness validation for deterministic encrypted attributes.
@@ -108,7 +108,9 @@ export class EncryptedUniquenessValidator {
     if (!ExtendedDeterministicQueries.installed) {
       const prevCiphertexts = encryptedType.previousTypes.map((pt) => pt.serialize(value));
       if (prevCiphertexts.length > 0) {
-        await withoutEncryption(() => originalValidateEach(record, attribute, prevCiphertexts));
+        await Contexts.withoutEncryption(() =>
+          originalValidateEach(record, attribute, prevCiphertexts),
+        );
       }
     }
   }
