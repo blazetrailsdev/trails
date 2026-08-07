@@ -626,8 +626,11 @@ interface CallResult {
  * `includeGraphCalls` merge, no dedup. Those are set operations by
  * construction; a sequence needs its own merge rule, and until
  * call-sequence-parity decides what it is, carrying the body's own stream and
- * nothing else is the honest shape. Signal only (RFC 0084): written to
- * output/call-skeletons.json, gated by nothing.
+ * nothing else is the honest shape. Recorded for every compared pair, not just
+ * the flagged ones: this is the population call-sequence-parity seeds from, not
+ * a mismatch list. Signal only (RFC 0084) — written to its own
+ * output/call-skeletons.json, so call-mismatches.json and its ratchet read
+ * exactly what they read before, and nothing gates on it yet.
  */
 interface CallSkeleton {
   rubyFile: string;
@@ -2075,7 +2078,6 @@ export function main() {
       const rubyWeakCallsByName = new Map<string, string[]>();
       // First-sighting Ruby body digest per name (source-hash pinning, RFC 0025).
       const rubyBodyDigestByName = new Map<string, string>();
-      // First-sighting Ruby body skeleton per name (RFC 0084 sequence signal).
       const rubySkeletonByName = new Map<string, string[]>();
       for (const item of items) {
         const f = flattenIncludedMethodInfos(item.info, item.fqn, rubyPkg, moduleFqnByShort, pkg);
@@ -2210,9 +2212,6 @@ export function main() {
             if (tags.has(call)) suppressedCalls.push({ tsFile, rubyName, tsName, call });
           }
         }
-        // Uncollapsed on both sides, and recorded for every compared pair
-        // rather than only the flagged ones: this is the population the
-        // sequence gate will seed from, not a mismatch list.
         const rubySkeleton = rubySkeletonByName.get(rubyName);
         const tsSkeletons = tsSkeletonByFileName.get(tsFile)?.get(tsName);
         if (rubySkeleton !== undefined && tsSkeletons?.length === 1) {
@@ -2798,10 +2797,6 @@ export function main() {
       ),
     );
 
-    // Sequence-signal artifact (RFC 0084) — its own file, so
-    // call-mismatches.json stays byte-identical and its ratchet reads exactly
-    // what it read before. Nothing gates on this yet;
-    // call-sequence-parity-in-wide-ratchet is what seeds rows from it.
     const skeletonsPath = path.join(OUTPUT_DIR, `call-skeletons${modeSuffix}.json`);
     const skeletonsFlat = results.flatMap((r) =>
       r.calls.skeletons.map((s) => ({ package: r.package, ...s })),

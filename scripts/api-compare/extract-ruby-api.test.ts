@@ -59,8 +59,6 @@ describe("Ruby extractor body call capture", () => {
   }
 
   it("emits an ordered control + call skeleton, with duplicates, alongside calls", () => {
-    // The hand-checked counterpart of extract-ts-api.test.ts's TS fixture: the
-    // same constructs must produce the same token vocabulary on both sides.
     const s = rubySkeletons({
       "foo.rb": `
         class Foo

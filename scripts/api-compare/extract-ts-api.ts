@@ -2658,8 +2658,6 @@ function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
         break;
       }
       case ts.SyntaxKind.PropertyAccessExpression: {
-        // A property READ is a Ruby reader send, the same rule collectCalls
-        // applies. An assignment target is the writer send `foo=`, not `foo`.
         const access = n as ts.PropertyAccessExpression;
         if (!calleeNodes.has(access) && !isAssignmentWriteTarget(access)) {
           tokens.push(`ref:${access.name.text}`);

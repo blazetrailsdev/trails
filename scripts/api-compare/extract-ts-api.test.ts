@@ -241,8 +241,6 @@ describe("body call capture", () => {
       }`,
     );
     const create = cls.instanceMethods.find((m) => m.name === "create")!;
-    // `calls` and `callSeq` are both deduplicated and carry no control flow —
-    // `save` appears once in each and neither shows the guard or the loop.
     expect(create.callSeq).toEqual(["dirty", "constructor", "save", "rollback"]);
     expect(create.skeleton).toEqual([
       "if",

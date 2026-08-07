@@ -2623,14 +2623,16 @@ export class DateTime extends Date {
    * `c_valid_civil_p` and the time of day with `c_valid_time_p`, then stores the
    * day and day-fraction in UTC — which is what the two conversions below do.
    *
-   * A fractional `second` is split off by `num2int_with_frac`
-   * (`date_core.c:3296-3304`), which truncates the whole second and carries the
-   * remainder to `add_frac`'s `d_lite_plus` (`date_core.c:3313-3318`). That
-   * lands in the `T_FLOAT` arm, whose `sf = (int)round(o)` over
-   * `o *= SECOND_IN_NANOSECONDS` (`date_core.c:6094-6097`) is where the
-   * rounding to a whole nanosecond happens — so
-   * `DateTime.new(2008, 3, 1, 6, 0, 0.3).strftime("%N")` is `"300000000"`,
-   * where `Time#nsec` truncates the double and answers `299999999`.
+   * A fractional `second` is split off by `num2int_with_frac` over `s_trunc`
+   * (`date_core.c:3269-3303`): `f_idiv(s, 1)` — floor, not truncate — is the
+   * whole second, and `f_mod(s, 1)` the remainder, which `s_trunc` divides by
+   * `DAY_IN_SECONDS` to make a day fraction. `add_frac` hands that to
+   * `d_lite_plus` (`date_core.c:3314-3318`), whose `T_FLOAT` arm multiplies it
+   * straight back by `DAY_IN_SECONDS` — the two cancel, so `fr` is kept in
+   * seconds here — and then rounds the nanoseconds: `sf = (int)round(o)` over
+   * `o *= SECOND_IN_NANOSECONDS` (`date_core.c:6094-6097`). That round is why
+   * `DateTime.new(2008, 3, 1, 6, 0, 0.3).strftime("%N")` is `"300000000"`
+   * where `Time#nsec`, which truncates the double, answers `299999999`.
    */
   constructor(
     year: number,
@@ -2672,7 +2674,7 @@ export class DateTime extends Date {
     super(year, month, day);
     const rjd = cValidCivilP(year, month, day);
     if (rjd === null) throw new DateError("invalid date");
-    const s = Math.trunc(second);
+    const s = Math.floor(second);
     const fr = second - s;
     const rt = cValidTimeP(hour, minute, s);
     if (rt === null) throw new DateError("invalid date");
@@ -2789,6 +2791,13 @@ export class DateTime extends Date {
     return new Rational(this.#of, DAY_IN_SECONDS);
   }
 
+  /**
+   * `DateTime#strftime` hands the formatter the real `sf`, truncated to whole
+   * nanoseconds: `date_strftime.c`'s `%N` takes the LEADING digits of the
+   * fraction rather than rounding it, which is what keeps
+   * `DateTime.parse("...00.9999999999").strftime("%N")` at `"999999999"` when
+   * the stored `sf` sits a fraction of a nanosecond above it.
+   */
   override strftime(format: string): string {
     return strftime(
       {
@@ -2800,10 +2809,6 @@ export class DateTime extends Date {
         hour: this.hour,
         min: this.min,
         sec: this.sec,
-        // `%N` truncates rather than rounds (`date_strftime.c`'s `%N` takes the
-        // leading `w` digits of `sf`), which is what keeps
-        // `DateTime.parse("...00.9999999999").strftime("%N")` at `"999999999"`
-        // where the stored `sf` is a fraction of a nanosecond above it.
         nsec: Math.trunc(this.#sf),
         zone: this.zone,
         utcOffset: this.#of,

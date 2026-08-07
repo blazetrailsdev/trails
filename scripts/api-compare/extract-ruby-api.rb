@@ -2047,15 +2047,8 @@ class ApiExtractor
     [calls.uniq, weak_calls]
   end
 
-  # Ripper nodes that token as `if`: every one is a conditional reach, which is
-  # what the TS side's IfStatement / ConditionalExpression / SwitchStatement /
-  # logical-operator arms record (extract-ts-api.ts#extractSkeleton).
   SKELETON_IF_NODES = %i[if elsif unless if_mod unless_mod ifop case].freeze
   SKELETON_LOOP_NODES = %i[while until while_mod until_mod for].freeze
-  # `:bodystmt` rather than `:rescue`/`:ensure`: Ripper hangs the rescue clause
-  # off a LATER slot of the body statement, so tokening the clause itself would
-  # put `try` after the protected calls, where the TS side's TryStatement puts
-  # it before them.
   SKELETON_LOGICAL_OPS = [:"||", :"&&", :and, :or].freeze
 
   # The body's ordered control + call skeleton — `if` / `loop` / `try` /
@@ -2064,9 +2057,12 @@ class ApiExtractor
   # vocabulary is deliberately identical; `calls` cannot stand in for it,
   # because `calls.uniq` drops both the repeats and the control flow.
   #
-  # `raise` tokens as `throw` rather than `ref:raise` so it lines up with the
-  # port's `throw new X(...)`, which is a ThrowStatement on the TS side and
-  # never a call.
+  # Two places where Ripper's shape has to be converged rather than
+  # transcribed. `try` tokens on the `:bodystmt`, not on the `:rescue`/`:ensure`
+  # clause Ripper hangs off its later slots, or it would land AFTER the
+  # protected calls where the TS TryStatement puts it before them. And `raise`
+  # tokens as `throw` rather than `ref:raise`, to line up with the port's
+  # `throw new X(...)` — a ThrowStatement on the TS side, never a call.
   def collect_method_skeleton(body_node)
     tokens = []
     walk_for_skeleton(body_node, tokens)
@@ -2103,8 +2099,8 @@ class ApiExtractor
     node.each { |child| walk_for_skeleton(child, tokens) if child.is_a?(Array) }
   end
 
-  # `[:op, :"||="]` — Ripper wraps the operator in an `:op` node on newer
-  # parsers and hands it bare on older ones.
+  # Ripper wraps an op-assign operator in an `:op` node on newer parsers and
+  # hands it bare on older ones.
   def op_assign_op(op)
     op.is_a?(Array) ? op[1] : op
   end
