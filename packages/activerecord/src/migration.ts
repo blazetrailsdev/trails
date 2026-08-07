@@ -182,23 +182,30 @@ export class PendingMigrationError extends MigrationError {
   /**
    * Mirrors: `PendingMigrationError#initialize` (`migration.rb:159-165`).
    *
-   * Rails' default for a nil `pending_migrations:` reads the pending list
-   * itself (`migration.rb:161`), which in trails is asynchronous and so cannot
-   * run inside a constructor. Callers that want the detailed message pass the
-   * list, exactly as `check_pending_migrations` does.
+   * The one arm that cannot converge is Rails' nil default (`migration.rb:161`),
+   * which reads `connection_pool.migration_context.open.pending_migrations` —
+   * asynchronous in trails, and a JS constructor cannot await. Raise sites
+   * resolve the list first, as `check_pending_migrations` and
+   * `check_all_pending!` already do (`migration.rb:722,743`); reaching the arm
+   * anyway raises rather than inventing a message Rails never produces.
    */
   constructor(
     message?: string,
     { pendingMigrations }: { pendingMigrations?: MigrationProxy[] } = {},
   ) {
-    super(
-      message ??
-        (pendingMigrations
-          ? // `detailedMigrationMessage` reads no instance state, and `super`
-            // has to run before `this` exists.
-            PendingMigrationError.prototype.detailedMigrationMessage(pendingMigrations)
-          : "Migrations are pending. Run `migrate` to resolve."),
-    );
+    if (message == null) {
+      if (pendingMigrations == null) {
+        throw new ArgumentError(
+          "PendingMigrationError needs a message or `pendingMigrations:`; Rails reads the list " +
+            "itself (migration.rb:161), which is asynchronous here and cannot run in a constructor.",
+        );
+      }
+      // `detailedMigrationMessage` reads no instance state, and `super` has to
+      // run before `this` exists.
+      super(PendingMigrationError.prototype.detailedMigrationMessage(pendingMigrations));
+    } else {
+      super(message);
+    }
     this.name = "PendingMigrationError";
   }
 
@@ -2955,20 +2962,17 @@ registerVersion(CURRENT_VERSION, Current);
 export class CheckPending {
   private _app: (env: Record<string, unknown>) => Promise<unknown>;
   private _migrator?: Migrator;
-  private _pendingConnection?: PendingMigrationConnection;
   private _migrations: MigrationProxy[];
 
   constructor(
     app: (env: Record<string, unknown>) => Promise<unknown>,
     options: {
       migrator?: Migrator;
-      pendingConnection?: PendingMigrationConnection;
       migrations?: MigrationProxy[];
     } = {},
   ) {
     this._app = app;
     this._migrator = options.migrator;
-    this._pendingConnection = options.pendingConnection;
     this._migrations = options.migrations ?? [];
   }
 
@@ -2977,50 +2981,6 @@ export class CheckPending {
       await this._migrator.loadMigrated();
       const pending = await this._migrator.pendingMigrations();
       this._throwIfPending(pending.length);
-    } else if (this._pendingConnection) {
-      if (this._migrations.length === 0) {
-        throw new MigrationError(
-          "CheckPending requires a migrations list when using pendingConnection",
-        );
-      }
-      await this._pendingConnection.withAdapter(async (adapter) => {
-        const sm = new SchemaMigration(adapter);
-        let applied = new Set<string>();
-        try {
-          if (await sm.tableExists()) {
-            const versions = await sm.allVersions();
-            applied = new Set(
-              versions.map((v) => {
-                try {
-                  return String(BigInt(v));
-                } catch {
-                  return v;
-                }
-              }),
-            );
-          }
-        } catch (err: unknown) {
-          if (
-            err instanceof Error &&
-            /no such column|does not exist|unknown column/i.test(err.message)
-          ) {
-            // Table exists with incompatible schema; treat as no versions applied
-          } else {
-            throw err;
-          }
-        }
-        let pendingCount = 0;
-        for (const m of this._migrations) {
-          let normalized: string;
-          try {
-            normalized = String(BigInt(m.version));
-          } catch {
-            throw new MigrationError(`Invalid migration version "${m.version}" in CheckPending`);
-          }
-          if (!applied.has(normalized)) pendingCount++;
-        }
-        this._throwIfPending(pendingCount);
-      });
     }
     return this._app(env);
   }

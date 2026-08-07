@@ -16,7 +16,6 @@ import {
 } from "./migration.js";
 import { resetVersionRegistry } from "./migration/compatibility.js";
 import type { MigrationProxy } from "./migration.js";
-import { PendingMigrationConnection } from "./migration/pending-migration-connection.js";
 import { Base } from "./base.js";
 import { SchemaMigration } from "./schema-migration.js";
 import { InternalMetadata } from "./internal-metadata.js";
@@ -232,24 +231,6 @@ describe("Migrator trails extensions", () => {
 
     await expect(check.call({})).rejects.toThrow(PendingMigrationError);
     expect(await schemaMigration.tableExists()).toBe(true);
-  });
-
-  it("CheckPending with PendingMigrationConnection detects pending migrations", async () => {
-    const conn = new PendingMigrationConnection({ adapter });
-    const migrations = [makeMigration(1, "M1")];
-    const app = async () => "ok";
-    const check = new CheckPending(app, { pendingConnection: conn, migrations });
-    await expect(check.call({})).rejects.toThrow(PendingMigrationError);
-  });
-
-  it("CheckPending with PendingMigrationConnection passes when no pending", async () => {
-    const conn = new PendingMigrationConnection({ adapter });
-    const migrations = [makeMigration(1, "M1")];
-    const migrator = new Migrator(adapter, migrations);
-    await migrator.up();
-    const app = async () => "ok";
-    const check = new CheckPending(app, { pendingConnection: conn, migrations });
-    expect(await check.call({})).toBe("ok");
   });
 
   it("Migration.version returns Current for the current version", () => {
