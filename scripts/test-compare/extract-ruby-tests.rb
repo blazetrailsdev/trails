@@ -620,12 +620,11 @@ class TestExtractor
     # `scan_run_condition` records each boolean in RUN space at its own negation
     # parity: `or_true` is "the source condition is a disjunction", `or_false`
     # is "its negation is" — which is what the `unless` path runs on (`unless
-    # A && B` runs on `!A || B`). The `unless` path keeps `or_true` in the union
-    # as well: `unless A || B` runs on the conjunction `!A && !B`, but treating
-    # it as a disjunction only withholds a decomposition, and holding the two
-    # paths' outcomes fixed for un-negated shapes is what keeps this change to
-    # the negated-boolean shapes it is about.
-    run_has_or = positive ? acc[:or_true] : (acc[:or_false] || acc[:or_true])
+    # A && B` runs on `!A || B`, `unless A || B` on the conjunction `!A && !B`).
+    # So each path reads exactly the one flag its own run condition presents,
+    # which is what `gateFromGuardExpr` (scripts/test-compare/gates.ts:186-215)
+    # does on the TS side.
+    run_has_or = positive ? acc[:or_true] : acc[:or_false]
     split = !run_has_or
     # Feature polarity is read against the RUN condition: on the `unless` path a
     # textually-negated predicate is the one the test RUNS on (`skip if

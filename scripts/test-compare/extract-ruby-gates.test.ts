@@ -296,6 +296,23 @@ describe("Ruby extractor gate detection", () => {
     expect(g["unless compound"]).toEqual({ guards: ["no_insert_returning"], source: ["class"] });
   });
 
+  it("reads `unless A || B` as the conjunction it runs on", () => {
+    const g = rubyGates({
+      // `unless !x || !y` runs on `x && y` — a pure CONJUNCTION, so the two
+      // negated predicates decompose into the capabilities the test needs.
+      // Unioning `or_true` into the `unless` path read the source `||` as the
+      // run-space operator and withheld the split, turning both into `no_`
+      // guards — the exact opposite of what the test runs on.
+      "cases/bar_test.rb": `
+        def test_unless_not_x_or_not_y; end unless !supports_insert_returning? || !supports_json?
+      `,
+    });
+    expect(g["unless not x or not y"]).toEqual({
+      features: ["insert_returning", "json"],
+      source: ["class"],
+    });
+  });
+
   it("reads a boolean nested under a negation in run space", () => {
     const g = rubyGates({
       "cases/bar_test.rb": `
