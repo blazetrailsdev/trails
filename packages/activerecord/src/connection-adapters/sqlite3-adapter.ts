@@ -574,14 +574,43 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   // Enable readBigInts on row-returning statements that expose bigint-declared
   // columns so the driver returns JS bigint rather than a lossy number.
-  // Non-bigint integer columns in the same row also return bigint when enabled —
-  // IntegerType.cast handles bigint → number for those.
   // stmt.reader gates out PRAGMA/EXPLAIN and other non-row statements.
   private _maybeEnableReadBigInts(sql: string, stmt: SqliteStatement): void {
     if (isWriteQuerySql(sql) || !stmt.reader) return;
     const cols = stmt.columns();
     if (cols.some((c) => c.type !== null && /bigint/i.test(c.type))) {
       stmt.setReadBigInts(true);
+    }
+  }
+
+  // readBigInts is statement-wide, so enabling it for one BIGINT column also
+  // turns every INTEGER column of the same row into a bigint. Ruby has a single
+  // Integer, and Rails' raw values carry no width: `Book#status_before_type_cast`
+  // over `t.integer :status` is `2`, and `Membership`'s integer `type` reaches
+  // `EnumType#cast` as `2` — a spilled `2n` misses both. Narrow the spill back
+  // at the row boundary so only bigint-declared columns keep the wide value, and
+  // only where the value still fits a JS number (above that, a bigint is the
+  // faithful reading and the alternative is silent precision loss).
+  private _narrowSpilledBigInts(stmt: SqliteStatement, rows: Record<string, unknown>[]): void {
+    const wide = new Set(
+      stmt
+        .columns()
+        .filter((c) => c.type !== null && /bigint/i.test(c.type))
+        .map((c) => c.name),
+    );
+    if (wide.size === 0) return;
+    for (const row of rows) {
+      for (const key of Object.keys(row)) {
+        const value = row[key];
+        if (
+          typeof value === "bigint" &&
+          !wide.has(key) &&
+          value >= BigInt(Number.MIN_SAFE_INTEGER) &&
+          value <= BigInt(Number.MAX_SAFE_INTEGER)
+        ) {
+          row[key] = Number(value);
+        }
+      }
     }
   }
 
@@ -813,6 +842,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
           result = Result.empty();
         } else {
           const rows = (await stmt.all(driverBinds)) as Record<string, unknown>[];
+          this._narrowSpilledBigInts(stmt, rows);
           payload.row_count = rows.length;
           result =
             rows.length > 0

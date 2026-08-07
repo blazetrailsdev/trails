@@ -278,15 +278,19 @@ describe("useFixtures by registry name", () => {
     // authors.david.author_address_id = ref("author_addresses", "david_address"),
     // and author_addresses.david_address declares id: 1. Read the persisted FK
     // straight from the row so the assertion doesn't depend on a reflected getter.
+    // Both columns are `t.references` bigints (schema.rb:91, 973), and a raw read
+    // hands back each driver's own wide-integer spelling — bigint on SQLite
+    // (readBigInts), a decimal string from node-postgres' int8 — so compare the
+    // numeric value rather than the driver's representation of it.
     const [a] = await Base.adapter.execute(
       `SELECT author_address_id FROM ${Base.adapter.quoteTableName(Author.tableName)} WHERE id = 1`,
     );
-    expect((a as { author_address_id: number }).author_address_id).toBe(1);
+    expect(Number((a as { author_address_id: unknown }).author_address_id)).toBe(1);
     // posts.welcome.author_id = ref("authors", "david"), authors.david declares id: 1.
     const [p] = await Base.adapter.execute(
       `SELECT author_id FROM ${Base.adapter.quoteTableName(Post.tableName)} WHERE id = 1`,
     );
-    expect((p as { author_id: number }).author_id).toBe(1);
+    expect(Number((p as { author_id: unknown }).author_id)).toBe(1);
   });
 
   it("isolation part 1 — a delete lands within the test", async () => {
