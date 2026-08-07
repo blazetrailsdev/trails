@@ -440,6 +440,11 @@ const ADAPTER_SPECIFIC_PROBE_TABLE = "defaults";
  * is indistinguishable from one laid at boot: `canonicalSchemaUpToDate` is read
  * by a *starting* worker, and an unstamped in-memory database would be a state
  * boot never produces.
+ *
+ * Both of `connect`'s pools are restored, not just `arunit` — `connection.rb:33`
+ * opens `ARUnit2Model` on `arunit2` in the same breath, so a file that displaced
+ * the worker's pools gets both back and no caller has to know which halves this
+ * covers.
  */
 export async function restoreWorkerConnection(): Promise<void> {
   await Base.establishConnection("arunit");
@@ -450,9 +455,32 @@ export async function restoreWorkerConnection(): Promise<void> {
     const adapter = await Base.leaseConnection();
     await loadSchema(adapter);
     await stampCanonicalSchema(adapter);
-    return;
-  }
-  if (!(await connection.tableExists(ADAPTER_SPECIFIC_PROBE_TABLE))) {
+  } else if (!(await connection.tableExists(ADAPTER_SPECIFIC_PROBE_TABLE))) {
     await loadAdapterSpecificSchema(await Base.leaseConnection());
   }
+  await restoreSecondWorkerConnection();
+}
+
+/**
+ * The `arunit2` half of {@link restoreWorkerConnection} — `connection.rb:33`'s
+ * `ARUnit2Model.establish_connection :arunit2`, plus the same probe-and-reload
+ * the `arunit` half carries, for the same reason: under `ARCONN=sqlite3_mem` the
+ * displaced pool *was* the database, so re-establishing opens a brand-new empty
+ * `:memory:` one and the tables have to be laid again.
+ *
+ * The reload is gated on the probe rather than run unconditionally because
+ * `provisionSecondDatabase()` truncates on its already-provisioned path, and
+ * several callers invoke `restoreWorkerConnection()` per test — a caller that
+ * never displaced this pool must not lose its rows.
+ *
+ * Imported at call time: `setup-second-pool.ts` reads `activeLane` from this
+ * module, so a static import would close a cycle.
+ */
+async function restoreSecondWorkerConnection(): Promise<void> {
+  await ARUnit2Model.establishConnection("arunit2");
+  const { ARUNIT2_TABLES, provisionSecondDatabase } = await import("./setup-second-pool.js");
+  const arunit2 = await ARUnit2Model.leaseConnection();
+  const present = new Set(await arunit2.tables());
+  if ([...ARUNIT2_TABLES, "dogs"].every((name) => present.has(name))) return;
+  await provisionSecondDatabase();
 }

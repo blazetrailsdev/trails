@@ -59,11 +59,50 @@ const ADAPTER_SPECIFIC_TABLES_KEY = "adapter_specific_tables";
  *
  * The recorded half is small by construction (1 table on SQLite, 7 on MySQL,
  * 24 on PostgreSQL), so this is a backstop, not an expected path.
+ *
+ * The MySQL headroom is ~110 characters — roughly five more table names in
+ * `loadMysql2SpecificSchema` — so the backstop is close enough to trip that it
+ * must not trip *silently*: crossing it costs the whole memo (~2.5 min of
+ * MariaDB CI per run) with no failing test to say so. Hence
+ * {@link snapshotWidthDegraded}, and the one warning below.
  */
 const MYSQL_MAX_VALUE_LENGTH = 255;
 
 function fitsValueColumn(adapter: DatabaseAdapter, encoded: string): boolean {
   return adapter.adapterName !== "mysql" || encoded.length <= MYSQL_MAX_VALUE_LENGTH;
+}
+
+let widthDegraded = false;
+
+/**
+ * Whether this process has written an empty snapshot because the encoded set
+ * did not fit {@link MYSQL_MAX_VALUE_LENGTH} — i.e. whether the memo has
+ * switched itself off on this lane. Read back by `template-stamp.test.ts`.
+ *
+ * @internal
+ */
+export function snapshotWidthDegraded(): boolean {
+  return widthDegraded;
+}
+
+/**
+ * Reset, so the case that deliberately overflows the column does not leave the
+ * flag set for a later reader.
+ *
+ * @internal
+ */
+export function clearSnapshotWidthDegraded(): void {
+  widthDegraded = false;
+}
+
+function recordSnapshotWidthDegraded(encoded: string): void {
+  if (widthDegraded) return;
+  widthDegraded = true;
+  console.error(
+    `[canonical-schema-stamp] adapter-specific snapshot is ${encoded.length} chars, over ` +
+      `ar_internal_metadata.value's ${MYSQL_MAX_VALUE_LENGTH}-char MySQL width — the ` +
+      `per-boot memo is now OFF on this lane and every worker re-lays the adapter-specific arm.`,
+  );
 }
 
 /**
@@ -137,7 +176,12 @@ export async function stampCanonicalSchema(
   // An over-long value is written as empty rather than skipped: skipping would
   // leave an earlier, now-stale snapshot in place on a database whose metadata
   // table survived, and {@link adapterSpecificTables} reads empty as absent.
-  await metadata.set(ADAPTER_SPECIFIC_TABLES_KEY, fitsValueColumn(adapter, encoded) ? encoded : "");
+  if (fitsValueColumn(adapter, encoded)) {
+    await metadata.set(ADAPTER_SPECIFIC_TABLES_KEY, encoded);
+    return;
+  }
+  recordSnapshotWidthDegraded(encoded);
+  await metadata.set(ADAPTER_SPECIFIC_TABLES_KEY, "");
 }
 
 /**

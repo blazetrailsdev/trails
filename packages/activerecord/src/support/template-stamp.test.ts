@@ -14,7 +14,7 @@
  * The second probe covers every lane, MySQL included, by replaying the fast
  * path's arm against the worker's own database.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import "../sqlite/better-sqlite3.js";
 import { Base } from "../base.js";
 import { bootOutcome } from "./boot-outcome.js";
@@ -25,6 +25,8 @@ import {
   canonicalSchemaUpToDate,
   adapterSpecificTables,
   stampCanonicalSchema,
+  snapshotWidthDegraded,
+  clearSnapshotWidthDegraded,
 } from "./canonical-schema-stamp.js";
 import { resetTestTables } from "./drop-all-tables.js";
 import { loadAdapterSpecificSchema } from "./load-schema-helper.js";
@@ -111,6 +113,34 @@ describe.skipIf(!runToken)("snapshot width backstop", () => {
       }
     } finally {
       await stampCanonicalSchema(connection, undefined, before ?? undefined);
+      clearSnapshotWidthDegraded();
+    }
+  });
+
+  it("says so when the memo switches itself off", async () => {
+    // ~110 characters of MySQL headroom, and crossing it costs the whole
+    // per-boot memo (~2.5 min of MariaDB CI per run) with no failing test.
+    const connection = await Base.leaseConnection();
+    const before = await adapterSpecificTables(connection);
+    const oversized = Array.from({ length: 200 }, (_, i) => `padding_table_${i}`);
+    clearSnapshotWidthDegraded();
+    const warn = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      await stampCanonicalSchema(connection, undefined, oversized);
+      if (connection.adapterName === "mysql") {
+        expect(snapshotWidthDegraded()).toBe(true);
+        expect(warn).toHaveBeenCalledTimes(1);
+        // Once per process, not once per stamp: every worker boot re-stamps.
+        await stampCanonicalSchema(connection, undefined, oversized);
+        expect(warn).toHaveBeenCalledTimes(1);
+      } else {
+        expect(snapshotWidthDegraded()).toBe(false);
+        expect(warn).not.toHaveBeenCalled();
+      }
+    } finally {
+      warn.mockRestore();
+      await stampCanonicalSchema(connection, undefined, before ?? undefined);
+      clearSnapshotWidthDegraded();
     }
   });
 });

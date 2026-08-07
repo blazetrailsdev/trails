@@ -1758,10 +1758,13 @@ export abstract class Migration {
     }
 
     const { Schema } = await import("./schema.js");
-    const schemaFormat = (getEnv("SCHEMA_FORMAT") ?? databaseTasks.schemaFormat) as SchemaFormat;
     await databaseTasks.withTemporaryPoolForEach({ env: "test" }, async (pool) => {
+      const dbConfig = pool.dbConfig;
       Schema.verbose = false;
-      await databaseTasks.loadSchema(pool.dbConfig, schemaFormat);
+      // `databases.rake:537` — `DatabaseTasks.schemaFormat` is the trails home
+      // of Rails' global `ActiveRecord.schema_format`.
+      const schemaFormat = (getEnv("SCHEMA_FORMAT") ?? databaseTasks.schemaFormat) as SchemaFormat;
+      await databaseTasks.loadSchema(dbConfig, schemaFormat);
     });
   }
 }
