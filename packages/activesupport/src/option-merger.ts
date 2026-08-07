@@ -8,7 +8,10 @@ import { isPlainObject } from "./hash-utils.js";
  * Ruby undefines every instance method so `method_missing` sees the whole
  * surface. JavaScript has no `method_missing`, so the merger *is* a Proxy over
  * the context returned from the constructor, whose `get` trap routes every
- * forwarded function through {@link OptionMerger#methodMissing}.
+ * forwarded function through {@link OptionMerger#methodMissing}. Its
+ * `getPrototypeOf` trap keeps the merger an `OptionMerger` rather than an
+ * instance of the context's class, which is what Ruby gets for free from
+ * `OptionMerger.new` being a real object.
  *
  * `methodMissing` deviates from `option_merger.rb:16` on one point, forced by
  * the language: Ruby's block travels outside `arguments`, while TypeScript
@@ -27,6 +30,7 @@ export class OptionMerger {
     this.options = options;
 
     return new Proxy(context, {
+      getPrototypeOf: (): object => OptionMerger.prototype,
       get: (target: object, property: string | symbol): unknown => {
         const value = Reflect.get(target, property);
         if (typeof value !== "function") return value;

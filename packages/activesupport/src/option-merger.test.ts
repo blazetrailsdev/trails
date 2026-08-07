@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { withOptions } from "./core-ext/object/with-options.js";
+import { OptionMerger } from "./option-merger.js";
 
 /**
  * Port of activesupport/test/option_merger_test.rb.
@@ -131,6 +132,23 @@ describe("OptionMergerTest", () => {
         { ...options, ...localOptions },
       ]);
     });
+  });
+
+  it("option merger class method", () => {
+    expect(new OptionMerger({}, {})).toBeInstanceOf(OptionMerger);
+  });
+
+  it("with options hash like", () => {
+    class HashLike {
+      constructor(hash: Record<string, unknown>) {
+        Object.assign(this, hash);
+      }
+    }
+    const localOptions = { cool: true };
+    const scope = withOptions(context, new HashLike(options) as Record<string, unknown>);
+
+    expect(context.methodWithOptions(localOptions)).toEqual(localOptions);
+    expect(scope.methodWithOptions(localOptions)).toEqual({ ...options, ...localOptions });
   });
 
   it("with options no block", () => {
