@@ -221,8 +221,13 @@ export interface ValidateConstraintStatements {
   ): Promise<void>;
 }
 
-/** A comment argument: either the new value, or Rails' `{ from:, to: }` change hash. */
-export type CommentOrChanges = string | null | { from?: string | null; to?: string | null };
+/**
+ * A comment argument: either the new value, or Rails' `{ from:, to: }` change hash.
+ * Both keys are required: `extract_new_default_value` only unwraps when the hash
+ * `has_key?(:from) && has_key?(:to)`
+ * (activerecord/lib/active_record/connection_adapters/abstract/schema_statements.rb:1820-1827).
+ */
+export type CommentOrChanges = string | null | { from: string | null; to: string | null };
 
 /**
  * Comment DDL that only adapters supporting `supportsComments` implement.
@@ -1867,7 +1872,7 @@ export class SchemaStatements {
   async changeColumnComment(
     _tableName: string,
     _columnName: string,
-    _commentOrChanges: string | null | { from?: string; to?: string },
+    _commentOrChanges: CommentOrChanges,
   ): Promise<void> {
     throw new Error(
       `NotImplementedError: ${this.adapterName} does not support changing column comments`,

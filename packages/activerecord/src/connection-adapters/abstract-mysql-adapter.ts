@@ -10,6 +10,7 @@
 
 import { inspectExplainOption } from "./abstract/database-statements.js";
 import type { ExplainOption } from "./abstract/database-statements.js";
+import type { CommentOrChanges } from "./abstract/schema-statements.js";
 import {
   isWriteQuery as mysqlIsWriteQuery,
   maxAllowedPacket as mysqlMaxAllowedPacket,
@@ -688,10 +689,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return val && val.trim().length > 0 ? val : null;
   }
 
-  async changeTableComment(
-    tableName: string,
-    commentOrChanges: string | Record<string, string | null>,
-  ): Promise<void> {
+  async changeTableComment(tableName: string, commentOrChanges: CommentOrChanges): Promise<void> {
     const raw = this.extractNewCommentValue(commentOrChanges);
     // Mirrors Rails: `comment = "" if comment.nil?` then `COMMENT #{quote(comment)}`.
     const c = raw == null ? "" : String(raw);

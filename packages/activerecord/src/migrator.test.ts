@@ -154,7 +154,11 @@ describe("MigratorTest", () => {
   });
 
   it("finds migrations", () => {
-    const migrations = new MigrationContext([`${MIGRATIONS_ROOT}/valid`]).migrations;
+    const migrations = new MigrationContext(
+      [`${MIGRATIONS_ROOT}/valid`],
+      schemaMigration,
+      internalMetadata,
+    ).migrations;
 
     (
       [
@@ -169,8 +173,11 @@ describe("MigratorTest", () => {
   });
 
   it("finds migrations in subdirectories", () => {
-    const migrations = new MigrationContext([`${MIGRATIONS_ROOT}/valid_with_subdirectories`])
-      .migrations;
+    const migrations = new MigrationContext(
+      [`${MIGRATIONS_ROOT}/valid_with_subdirectories`],
+      schemaMigration,
+      internalMetadata,
+    ).migrations;
 
     (
       [
@@ -189,7 +196,8 @@ describe("MigratorTest", () => {
       `${MIGRATIONS_ROOT}/valid_with_timestamps`,
       `${MIGRATIONS_ROOT}/to_copy_with_timestamps`,
     ];
-    const migrations = new MigrationContext(directories).migrations;
+    const migrations = new MigrationContext(directories, schemaMigration, internalMetadata)
+      .migrations;
 
     (
       [
@@ -206,13 +214,21 @@ describe("MigratorTest", () => {
   });
 
   it("finds migrations in numbered directory", () => {
-    const migrations = new MigrationContext([`${MIGRATIONS_ROOT}/10_urban`]).migrations;
+    const migrations = new MigrationContext(
+      [`${MIGRATIONS_ROOT}/10_urban`],
+      schemaMigration,
+      internalMetadata,
+    ).migrations;
     expect(migrations[0].version).toBe(9);
     expect(migrations[0].name).toBe("AddExpressions");
   });
 
   it("relative migrations", () => {
-    const list = new MigrationContext([`${MIGRATIONS_ROOT}/valid`]).migrations;
+    const list = new MigrationContext(
+      [`${MIGRATIONS_ROOT}/valid`],
+      schemaMigration,
+      internalMetadata,
+    ).migrations;
     const migrationProxy = list.find((item) => item.name === "ValidPeopleHaveLastNames");
     expect(migrationProxy).toBeTruthy();
   });
@@ -238,7 +254,7 @@ describe("MigratorTest", () => {
 
     const status = await new Migrator(
       "up",
-      new MigrationContext([path]).migrations,
+      new MigrationContext([path], schemaMigration, internalMetadata).migrations,
       schemaMigration,
       internalMetadata,
     ).migrationsStatus();
@@ -256,7 +272,7 @@ describe("MigratorTest", () => {
 
     const status = await new Migrator(
       "up",
-      new MigrationContext([path]).migrations,
+      new MigrationContext([path], schemaMigration, internalMetadata).migrations,
       schemaMigration,
       internalMetadata,
     ).migrationsStatus();
@@ -276,7 +292,7 @@ describe("MigratorTest", () => {
 
     const status = await new Migrator(
       "up",
-      new MigrationContext([path]).migrations,
+      new MigrationContext([path], schemaMigration, internalMetadata).migrations,
       schemaMigration,
       internalMetadata,
     ).migrationsStatus();
@@ -294,7 +310,7 @@ describe("MigratorTest", () => {
 
     const status = await new Migrator(
       "up",
-      new MigrationContext([path]).migrations,
+      new MigrationContext([path], schemaMigration, internalMetadata).migrations,
       schemaMigration,
       internalMetadata,
     ).migrationsStatus();
@@ -314,7 +330,7 @@ describe("MigratorTest", () => {
 
     const status = await new Migrator(
       "up",
-      new MigrationContext([path]).migrations,
+      new MigrationContext([path], schemaMigration, internalMetadata).migrations,
       schemaMigration,
       internalMetadata,
     ).migrationsStatus();
@@ -334,7 +350,7 @@ describe("MigratorTest", () => {
 
     const status = await new Migrator(
       "up",
-      new MigrationContext(paths).migrations,
+      new MigrationContext(paths, schemaMigration, internalMetadata).migrations,
       schemaMigration,
       internalMetadata,
     ).migrationsStatus();

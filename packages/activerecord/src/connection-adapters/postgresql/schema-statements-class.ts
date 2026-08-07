@@ -2,6 +2,7 @@ import { ValueType, ArgumentError } from "@blazetrails/activemodel";
 import { Nodes } from "@blazetrails/arel";
 import { singularize, getCrypto } from "@blazetrails/activesupport";
 import { SchemaStatements as AbstractSchemaStatements } from "../abstract/schema-statements.js";
+import type { CommentOrChanges } from "../abstract/schema-statements.js";
 import {
   ChangeColumnDefinition,
   ChangeColumnDefaultDefinition,
@@ -954,7 +955,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
   override async changeColumnComment(
     tableName: string,
     columnName: string,
-    commentOrChanges: string | null | { from?: string | null; to?: string | null },
+    commentOrChanges: CommentOrChanges,
   ): Promise<void> {
     // Mirrors PostgreSQL::SchemaStatements#change_column_comment: clear the
     // statement cache and unwrap the {from:, to:} change hash before issuing
@@ -968,7 +969,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
 
   override async changeTableComment(
     tableName: string,
-    commentOrChanges: string | null | { from?: string | null; to?: string | null },
+    commentOrChanges: CommentOrChanges,
   ): Promise<void> {
     // Mirrors PostgreSQL::SchemaStatements#change_table_comment.
     this.clearCacheBang();
