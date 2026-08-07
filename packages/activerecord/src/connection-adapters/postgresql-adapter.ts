@@ -473,6 +473,16 @@ export class PostgreSQLAdapter
    * `_cancelAnyRunningQuery`.
    */
   private _queryInFlightOwner: symbol | null = null;
+  /**
+   * Settlement of the query `_queryInFlightOwner` names, as a promise that only
+   * ever resolves — what `_cancelAnyRunningQuery` awaits for
+   * `@raw_connection.block` (postgresql/database_statements.rb:128). Attaching
+   * it also *observes* that query's rejection, so the `QueryCanceled` the
+   * cancel provokes cannot surface at run end unattributed when the chain that
+   * issued the query has been dropped (RFC 0061
+   * pg-query-canceled-unhandled-rejection).
+   */
+  private _queryInFlightSettled: Promise<void> | null = null;
   private _databaseVersion: number | null = null;
   private _typeMap: HashLookupTypeMap | null = null;
   private _maxIdentifierLength: number | null = null;
@@ -1563,10 +1573,10 @@ export class PostgreSQLAdapter
    * lack of coverage: `_maybeConfigureConnection` / the reset reconfigure run
    * *inside* the `_inFlightReset` barrier that IS the tail (self-await), the
    * DEALLOCATE / ROLLBACK / DISCARD ALL maintenance ops already chain via
-   * `_enqueueMaintenance`, `execRollbackDbTransaction`'s `ROLLBACK` follows a
-   * `_cancelAnyRunningQuery` that must not be made to wait on the query it just
-   * cancelled, and the memoized `server_version` bootstrap probe runs before the
-   * client is in normal service.
+   * `_enqueueMaintenance`, `execRollbackDbTransaction`'s `ROLLBACK` already
+   * waits on the query `_cancelAnyRunningQuery` cancelled (that method's own
+   * `block` drain), and the memoized `server_version` bootstrap probe runs
+   * before the client is in normal service.
    *
    * @internal
    */
@@ -1592,9 +1602,15 @@ export class PostgreSQLAdapter
     // and closed by the terminating message.
     this._commandSettled = false;
     try {
-      return await fn();
+      const query = fn();
+      this._queryInFlightSettled = query.then(
+        () => {},
+        () => {},
+      );
+      return await query;
     } finally {
       this._queryInFlightOwner = null;
+      this._queryInFlightSettled = null;
       release();
     }
   }
@@ -2180,7 +2196,7 @@ export class PostgreSQLAdapter
 
   // Mirrors: DatabaseStatements#exec_rollback_db_transaction (database_statements.rb:78)
   async execRollbackDbTransaction(): Promise<void> {
-    this._cancelAnyRunningQuery();
+    await this._cancelAnyRunningQuery();
     if (!this._client) throw new Error("No active transaction");
     try {
       await this.internalExecute("ROLLBACK", "TRANSACTION");
@@ -2251,7 +2267,7 @@ export class PostgreSQLAdapter
 
   // Mirrors: DatabaseStatements#exec_restart_db_transaction (database_statements.rb:83)
   async execRestartDbTransaction(): Promise<void> {
-    this._cancelAnyRunningQuery();
+    await this._cancelAnyRunningQuery();
     await this.internalExecute("ROLLBACK AND CHAIN", "TRANSACTION");
   }
 
@@ -2312,8 +2328,10 @@ export class PostgreSQLAdapter
 
   // Mirrors: PostgreSQL::DatabaseStatements#cancel_any_running_query (database_statements.rb private)
   // Sends a CancelRequest to abort any in-flight query on the transaction connection
-  // before issuing ROLLBACK / ROLLBACK AND CHAIN, so the rollback isn't blocked
-  // waiting for a long-running query to finish. Best-effort: errors are swallowed.
+  // before issuing ROLLBACK / ROLLBACK AND CHAIN, then waits for the cancelled
+  // query to drain — the `@raw_connection.block` half
+  // (postgresql/database_statements.rb:127-128) — so the ROLLBACK is sent only
+  // once the query is off the wire. Best-effort: errors are swallowed.
   //
   // INVARIANT: only ever cancels a query *this* unit of work issued. Rails gets
   // that for free — `@connection.lock` is a thread mutex, so the only query that
@@ -2333,7 +2351,7 @@ export class PostgreSQLAdapter
   // checkin, or a direct `beginDbTransaction`/`rollbackDbTransaction` pair on a
   // bare adapter): ownership is unprovable, so those paths also wait on the
   // serializer rather than cancel.
-  private _cancelAnyRunningQuery(): void {
+  private async _cancelAnyRunningQuery(): Promise<void> {
     type PgClientWithPid = pg.Client & {
       processID?: number | null;
       secretKey?: number | null;
@@ -2350,6 +2368,7 @@ export class PostgreSQLAdapter
     if (txClient?.processID == null) return;
     const owner = this._transactionManager.currentLockToken;
     if (owner === null || owner !== this._queryInFlightOwner) return;
+    const drained = this._queryInFlightSettled;
     try {
       // Open a FRESH TCP connection to send a CancelRequest — mirrors
       // libpq PQcancel / Ruby PG::Connection#cancel: new socket, send
@@ -2366,8 +2385,10 @@ export class PostgreSQLAdapter
       } else {
         cancelCon.connect(port, host);
       }
+      if (drained !== null) await drained;
     } catch {
-      // cancel is best-effort
+      // cancel is best-effort — a drain failure must not mask the rollback,
+      // as Rails' `rescue PG::Error` on cancel_any_running_query does not.
     }
   }
 
@@ -3066,10 +3087,17 @@ export class PostgreSQLAdapter
     // Chain off the maintenance tail so ROLLBACK (and the DISCARD ALL below)
     // serialize behind any pending DEALLOCATE on the pinned client rather than
     // firing onto a client that's still executing one.
-    let work: Promise<unknown> = this._maintenanceTail;
+    // Read once, here: a query enqueued after the barrier below is published
+    // chains onto `_maintenanceTail` *behind* that barrier, so re-reading the
+    // field from inside the chain would make this reset wait on a query that is
+    // waiting on this reset.
+    const tail = this._maintenanceTail;
+    let work: Promise<unknown> = tail;
     if (this._client) {
-      this._cancelAnyRunningQuery();
-      work = this._maintenanceTail.then(() => live.query("ROLLBACK")).catch(() => {});
+      work = this._cancelAnyRunningQuery()
+        .then(() => tail)
+        .then(() => live.query("ROLLBACK"))
+        .catch(() => {});
       this._client = null;
       this._inTransaction = false;
     }

@@ -184,6 +184,13 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-adapter.ts",
+    "rubyName": "select_values",
+    "call": "order:selectRows,map",
+    "reason": "ORDER-only (RFC 0084): both bodies are select_rows(...).map — the Ruby extractor records a method chain outer-call first, so the sequences invert with no divergence in the port. Migrated verbatim from the abstract/database-statements.ts row this candidate replaced when callSeq reached object-literal members."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract-adapter.ts",
     "rubyName": "type_cast",
     "call": "quoted_date",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

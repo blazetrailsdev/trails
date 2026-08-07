@@ -333,6 +333,41 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
     });
 
+    // `@raw_connection.block` (postgresql/database_statements.rb:127-128): the
+    // ROLLBACK goes out only once the cancelled query has drained off the wire.
+    // `_queryInFlightOwner` is non-null for exactly the span a query is on the
+    // wire, so reading it as ROLLBACK is sent is the drain assertion.
+    it("rollback drains the cancelled query before sending ROLLBACK", async () => {
+      const other = new PostgreSQLAdapter(PG_TEST_URL);
+      const seam = other as unknown as {
+        _queryInFlightOwner: symbol | null;
+        internalExecute(sql: string, ...rest: unknown[]): Promise<unknown>;
+      };
+      const internalExecute = seam.internalExecute.bind(seam);
+      let inFlightAtRollback: symbol | null | "unsent" = "unsent";
+      seam.internalExecute = (sql: string, ...rest: unknown[]) => {
+        if (sql === "ROLLBACK") inFlightAtRollback = seam._queryInFlightOwner;
+        return internalExecute(sql, ...rest);
+      };
+      try {
+        let slowError: unknown;
+        let slow!: Promise<unknown>;
+        await other.transactionManager.synchronize(async () => {
+          await other.beginDbTransaction();
+          slow = other.execute("SELECT pg_sleep(5) AS slept").catch((e) => {
+            slowError = e;
+          });
+          await new Promise<void>((r) => setTimeout(r, 100));
+          await other.rollbackDbTransaction();
+        });
+        await slow;
+        expect(slowError).toBeInstanceOf(QueryCanceled);
+        expect(inFlightAtRollback).toBeNull();
+      } finally {
+        await other.close();
+      }
+    });
+
     it("translate exception serialization failure", async () => {
       await adapter.exec(`CREATE TABLE "ex_ser" ("id" SERIAL PRIMARY KEY, "val" INTEGER)`);
       await adapter.executeMutation(`INSERT INTO "ex_ser" (val) VALUES (0)`);

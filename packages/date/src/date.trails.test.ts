@@ -553,6 +553,16 @@ describe("DateTime", () => {
     );
   });
 
+  it("answers an ISO 8601 string with the time of day, as dt_lite_to_s does", () => {
+    // ruby 3.3.11:
+    //   DateTime.new(2008, 3, 1, 6, 0, 0).to_s                  #=> "2008-03-01T06:00:00+00:00"
+    //   DateTime.parse("2008-03-01T06:00:00+09:00").to_s        #=> "2008-03-01T06:00:00+09:00"
+    //   Date.new(2008, 3, 1).to_s                               #=> "2008-03-01"
+    expect(new RubyDateTime(2008, 3, 1, 6, 0, 0).toS()).toBe("2008-03-01T06:00:00+00:00");
+    expect(RubyDateTime.parse("2008-03-01T06:00:00+09:00").toS()).toBe("2008-03-01T06:00:00+09:00");
+    expect(new RubyDate(2008, 3, 1).toS()).toBe("2008-03-01");
+  });
+
   it("carries the offset the parsed string named", () => {
     // ruby 3.3.11:
     //   DateTime.parse("2008-03-01T06:00:00+09:00").zone #=> "+09:00"
