@@ -4,6 +4,10 @@
  * no test for it — its `load_schema!` shells out to `bin/rails db:test:prepare`,
  * so there is nothing to assert in-process there. trails calls the code that
  * Rake task reaches directly, which makes the repair arm observable.
+ *
+ * `DatabaseTasks` is stubbed so the arms are observable without a schema dump on
+ * disk; the connection handler is only proxied for `clearAllConnectionsBang`,
+ * since `checkPendingMigrations` opens a temporary pool through that same handler.
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Base } from "../base.js";
@@ -55,8 +59,6 @@ describe.skipIf(!currentAdapter("SQLite3Adapter"))("Migration.loadSchemaIfPendin
         calls.push("loadSchema");
       },
     };
-    // Everything but the connection clearing stays real — `checkPendingMigrations`
-    // opens a temporary pool through this same handler.
     const realHandler = originalArConfig.connectionHandler!();
     const connectionHandler = new Proxy(realHandler, {
       get(target, property, receiver) {
