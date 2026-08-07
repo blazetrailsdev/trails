@@ -1150,6 +1150,15 @@ function _assignAttribute(self: AttributeIO, key: string, value: unknown): Promi
  * exactly as the constructor's nested re-dispatch parks its own
  * (`_reapplyNestedAttrSetters`). `setAttributes` is the awaitable surface that
  * runs those writes in key order.
+ *
+ * The parking is uniform: every step after a displacing key — later scalar
+ * keys, the nested pass and the multiparameter pass alike — is assigned while
+ * that write is still in flight, because a `void` return has nothing for the
+ * loop to block on. Rails' `each` (attribute_assignment.rb:9-22) orders them,
+ * and so does `setAttributes`; on this surface only `save`'s drain does. The
+ * steps are all in-memory attribute writes (`assign_multiparameter_attributes`
+ * builds a date/time or aggregation and writes the slot), so none of them reads
+ * or writes the association state the parked write is settling.
  */
 export function assignAttributes(this: AttributeIO, attrs: Record<string, unknown>): void {
   assertHashAttributes(attrs);
@@ -1207,6 +1216,10 @@ function isNestedParameterHash(value: unknown): boolean {
  * exceptions stay one body, and they stay synchronous, so a bad multiparameter
  * key still raises out of `assignAttributes` where Rails raises out of
  * `assign_attributes`.
+ *
+ * `assign_multiparameter_attributes` (:22) is not a yield point: our
+ * `executeMultiparameterAssignment` is synchronous and answers nothing, so
+ * there is no promise to hand a driver.
  */
 function* _assignAttributes(
   self: AttributeIO,
