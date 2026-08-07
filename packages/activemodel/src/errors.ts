@@ -15,6 +15,28 @@ export type ErrorDetailHash = { error: string; [k: string]: unknown };
 const EMPTY_ARRAY: readonly never[] = Object.freeze([]);
 
 /**
+ * The JS spelling of Ruby's `hash.default = value` (errors.rb:268-273, :276-284):
+ * override only `get` so a missing key answers `defaultValue`, and bind every
+ * other Map method to the raw target, since Map's internal slots require the
+ * real receiver. Deliberately no `has` trap — `hash.default` does not make
+ * `key?` true.
+ *
+ * @noRailsEquivalent JS has no Hash#default; Ruby's one-line assignment needs a
+ * Proxy here, and one helper is better than a copy per getter.
+ */
+function mapWithDefault<K, V, D>(map: Map<K, V>, defaultValue: D): Map<K, V | D> {
+  return new Proxy(map, {
+    get(target, prop) {
+      if (prop === "get") {
+        return (key: K) => target.get(key) ?? defaultValue;
+      }
+      const val = Reflect.get(target, prop, target);
+      return typeof val === "function" ? val.bind(target) : val;
+    },
+  }) as Map<K, V | D>;
+}
+
+/**
  * Errors — collects validation error messages on a model.
  *
  * Mirrors: ActiveModel::Errors
@@ -166,17 +188,7 @@ export class Errors<TBase extends object = object> {
    * `.get()` returns the singleton frozen `[]`. Mirrors Rails `errors.rb:268-273`.
    */
   get messages(): Map<string, readonly string[]> {
-    const base = this.toHash(false);
-    // Proxy: missing key returns EMPTY_ARRAY (Rails hash.default = EMPTY_ARRAY).
-    return new Proxy(base, {
-      get(target, prop, receiver) {
-        if (prop === "get") {
-          return (key: string) => target.get(key) ?? EMPTY_ARRAY;
-        }
-        const val = Reflect.get(target, prop, target);
-        return typeof val === "function" ? val.bind(target) : val;
-      },
-    });
+    return mapWithDefault(this.toHash(false), EMPTY_ARRAY);
   }
 
   /**
@@ -194,18 +206,7 @@ export class Errors<TBase extends object = object> {
         errors.map((e) => e.details as ErrorDetailHash),
       );
     }
-    // Proxy: override only `get` so missing keys return EMPTY_ARRAY (Rails
-    // hash.default = EMPTY_ARRAY). All other Map methods bound to target so
-    // native Map internals (`size`, `forEach`, etc.) keep the correct receiver.
-    return new Proxy(map, {
-      get(target, prop, receiver) {
-        if (prop === "get") {
-          return (key: string) => target.get(key) ?? EMPTY_ARRAY;
-        }
-        const val = Reflect.get(target, prop, target);
-        return typeof val === "function" ? val.bind(target) : val;
-      },
-    });
+    return mapWithDefault(map, EMPTY_ARRAY);
   }
 
   /**
