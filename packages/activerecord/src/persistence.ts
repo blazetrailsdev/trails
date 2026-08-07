@@ -993,14 +993,26 @@ function associationWriterPromise(
  * (has_one_association.rb:69) a write; that promise is returned rather than
  * dropped.
  */
-function _assignAttribute(self: AttributeIO, key: string, value: unknown): Promise<void> | void {
+function _assignAttribute(
+  self: AttributeIO,
+  key: string,
+  value: unknown,
+  awaitable: boolean,
+): Promise<void> | void {
   const configs = (self as any).constructor?._nestedAttributeConfigs as
     | { associationName: string }[]
     | undefined;
   if (configs?.some((c) => `${c.associationName}Attributes` === key)) {
     return (self as any)[`set${camelize(key, true)}`](value) as Promise<void> | void;
   }
-  const associationWrite = associationWriterPromise(self, key, value);
+  // Only an awaited caller can resolve `#{name}=` / `#{name.singularize}_ids=`
+  // to a writer: RFC 0087 §1 removed the property setters because
+  // `replace`/`ids_writer` do I/O at assignment
+  // (collection_association.rb:46-48, :61-83) and a JS property setter cannot
+  // await. On the synchronous surface there is genuinely no method for the key,
+  // so `attribute_writer_missing` (attribute_assignment.rb:71-73) answers, as
+  // it does in Rails when the setter is absent.
+  const associationWrite = awaitable ? associationWriterPromise(self, key, value) : undefined;
   if (associationWrite) return associationWrite;
   const setter = findPrototypeSetter(self, key);
   if (setter) {
@@ -1044,7 +1056,7 @@ export function assignAttributes(this: AttributeIO, attrs: Record<string, unknow
   // sanitizer, so a blank strong-params object is a no-op rather than raising;
   // `isMassAssignmentEmpty` reads a wrapper's contents, not its own fields.
   if (isMassAssignmentEmpty(attrs)) return;
-  for (const pending of _assignAttributes(this, sanitizeForMassAssignment(attrs))) {
+  for (const pending of _assignAttributes(this, sanitizeForMassAssignment(attrs), false)) {
     parkNestedReaderLoad(this as unknown as Base, pending);
   }
 }
@@ -1063,7 +1075,7 @@ export async function setAttributes(
 ): Promise<void> {
   assertHashAttributes(attrs);
   if (isMassAssignmentEmpty(attrs)) return;
-  for (const pending of _assignAttributes(this, sanitizeForMassAssignment(attrs))) {
+  for (const pending of _assignAttributes(this, sanitizeForMassAssignment(attrs), true)) {
     await pending;
   }
 }
@@ -1102,6 +1114,7 @@ function isNestedParameterHash(value: unknown): boolean {
 function* _assignAttributes(
   self: AttributeIO,
   attrs: Record<string, unknown>,
+  awaitable: boolean,
 ): Generator<Promise<void>, void, undefined> {
   let multiParameterAttributes: Record<string, unknown> | null = null;
   let nestedParameterAttributes: Record<string, unknown> | null = null;
@@ -1112,13 +1125,13 @@ function* _assignAttributes(
     } else if (isNestedParameterHash(value)) {
       (nestedParameterAttributes ??= {})[key] = value;
     } else {
-      const pending = _assignAttribute(self, key, value);
+      const pending = _assignAttribute(self, key, value, awaitable);
       if (pending) yield pending;
     }
   }
 
   if (nestedParameterAttributes) {
-    yield* assignNestedParameterAttributes(self, nestedParameterAttributes);
+    yield* assignNestedParameterAttributes(self, nestedParameterAttributes, awaitable);
   }
   if (multiParameterAttributes) {
     const multi = extractMultiparameterCallstack(multiParameterAttributes).multiparams;
@@ -1134,9 +1147,10 @@ function* _assignAttributes(
 function* assignNestedParameterAttributes(
   self: AttributeIO,
   pairs: Record<string, unknown>,
+  awaitable: boolean,
 ): Generator<Promise<void>, void, undefined> {
   for (const [k, v] of Object.entries(pairs)) {
-    const pending = _assignAttribute(self, k, v);
+    const pending = _assignAttribute(self, k, v, awaitable);
     if (pending) yield pending;
   }
 }
