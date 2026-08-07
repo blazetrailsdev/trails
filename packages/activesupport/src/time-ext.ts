@@ -392,54 +392,38 @@ export function change(
   date: Date | Temporal.ZonedDateTime,
   options: ChangeOptions,
 ): Temporal.Instant | Temporal.ZonedDateTime {
-  // Ruby reads the six components off the receiver directly; a JS `Date` and a
-  // `Temporal.ZonedDateTime` spell those readers differently, so resolve them once.
+  // Ruby reads the components off the receiver; a JS `Date` spells those readers
+  // differently, and reads them in the system's local zone, so widen it to the
+  // one shape both arms below share.
   const self =
-    date instanceof Date
-      ? {
-          year: date.getFullYear(),
-          month: date.getMonth() + 1, // 1-indexed
-          day: date.getDate(),
-          hour: date.getHours(),
-          min: date.getMinutes(),
-          sec: date.getSeconds(),
-          nsec: date.getMilliseconds() * 1_000_000,
-        }
-      : {
-          year: date.year,
-          month: date.month,
-          day: date.day,
-          hour: date.hour,
-          min: date.minute,
-          sec: date.second,
-          nsec: date.millisecond * 1_000_000 + date.microsecond * 1_000 + date.nanosecond,
-        };
+    date instanceof Date ? instantFrom(date).toZonedDateTimeISO(Temporal.Now.timeZoneId()) : date;
+  const nsec = self.millisecond * 1_000_000 + self.microsecond * 1_000 + self.nanosecond;
 
   const newYear = options.year ?? self.year;
   const newMonth = options.month ?? self.month;
   const newDay = options.day ?? self.day;
   const newHour = options.hour ?? self.hour;
-  const newMin = options.min ?? (options.hour !== undefined ? 0 : self.min);
+  const newMin = options.min ?? (options.hour !== undefined ? 0 : self.minute);
   let newSec =
-    options.sec ?? (options.hour !== undefined || options.min !== undefined ? 0 : self.sec);
+    options.sec ?? (options.hour !== undefined || options.min !== undefined ? 0 : self.second);
   const newUsec =
     options.usec ??
     (options.hour !== undefined || options.min !== undefined || options.sec !== undefined
       ? 0
-      : self.nsec / 1000);
+      : nsec / 1000);
 
   newSec += newUsec / 1_000_000;
 
   if (date instanceof Date) {
     // `elsif zone` (time/calculations.rb:173-174): a JS `Date` carries no zone
-    // object — it is always read in the system's local zone — so it lands here
-    // rather than on the `utc_to_local` arm below or the trailing `utc_offset` one.
+    // object, only the system's local zone, so it lands here rather than on the
+    // `utc_to_local` arm below or the trailing `utc_offset` one.
     return instantFrom(local(newSec, newMin, newHour, newDay, newMonth, newYear));
   }
 
   // `elsif zone.respond_to?(:utc_to_local)` (time/calculations.rb:150-172).
   const secFloor = Math.floor(newSec);
-  const nsec = Math.round((newSec - secFloor) * 1_000_000_000);
+  const newNsec = Math.round((newSec - secFloor) * 1_000_000_000);
   let newTime = Temporal.ZonedDateTime.from(
     {
       timeZone: date.timeZoneId,
@@ -449,9 +433,9 @@ export function change(
       hour: newHour,
       minute: newMin,
       second: secFloor,
-      millisecond: Math.floor(nsec / 1_000_000),
-      microsecond: Math.floor(nsec / 1_000) % 1_000,
-      nanosecond: nsec % 1_000,
+      millisecond: Math.floor(newNsec / 1_000_000),
+      microsecond: Math.floor(newNsec / 1_000) % 1_000,
+      nanosecond: newNsec % 1_000,
     },
     // Ruby's `Time.new` with a zone object picks the first chronological
     // occurrence of an ambiguous nominal time; `"compatible"` is the same choice.
