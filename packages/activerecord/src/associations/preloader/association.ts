@@ -315,10 +315,21 @@ export class Association {
     return this._keyConversionRequired;
   }
 
-  /** Mirrors: Preloader::Association#association_key_type
-   *  (`preloader/association.rb:282-284`). A composite key arrives as an array
-   *  of names, which `type_for_attribute` has no answer for in Rails either;
-   *  answering undefined for both sides leaves them equal, i.e. no conversion. */
+  /**
+   * Mirrors: Preloader::Association#association_key_type
+   * (`preloader/association.rb:282-284`).
+   *
+   * A composite key arrives here as an array of names, and Rails answers nil
+   * for it rather than raising: `type_for_attribute` runs the name through
+   * `resolve_attribute_name` → `name.to_s`
+   * (`activemodel/attribute_registration.rb:44,101-103`), so the array
+   * stringifies to a key no attribute has; `attribute_types` carries
+   * `hash.default = Type.default_value` (`:37-41`), which is a bare
+   * `Type::Value` whose `#type` is an empty method returning nil
+   * (`activemodel/type/value.rb:34-35`). Both sides answer nil, compare equal,
+   * and `key_conversion_required?` is false — which is what the guard below
+   * reproduces. ActiveRecord does not override `type_for_attribute`.
+   */
   private associationKeyType(): string | undefined {
     const key = this.associationKeyName;
     if (Array.isArray(key)) return undefined;
@@ -326,8 +337,10 @@ export class Association {
   }
 
   /** Mirrors: Preloader::Association#owner_key_type
-   *  (`preloader/association.rb:286-288`). Same composite-key guard as
-   *  {@link Association.associationKeyType}; `model` is null for an ownerless loader. */
+   *  (`preloader/association.rb:286-288`). Same composite-key answer as
+   *  {@link Association.associationKeyType}; `model` is null for an ownerless
+   *  loader, where Rails' `@model` would be nil and `type_for_attribute`
+   *  unreachable. */
   private ownerKeyType(): string | undefined {
     const key = this.ownerKeyName;
     if (this.model == null || Array.isArray(key)) return undefined;
