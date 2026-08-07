@@ -2384,7 +2384,7 @@ export class SchemaStatements {
     columnName: string,
     type: ColumnType,
     options: ColumnOptions = {},
-  ): Promise<string> {
+  ): Promise<string | [string, () => Promise<void>]> {
     const td = this.createTableDefinition(tableName);
     const cd = td.newColumnDefinition(columnName, type, options);
     return this.schemaCreation.accept(new AddColumnDefinition(cd));
@@ -2436,7 +2436,10 @@ export class SchemaStatements {
   }
 
   /** @internal */
-  async addTimestampsForAlter(tableName: string, options: ColumnOptions = {}): Promise<string[]> {
+  async addTimestampsForAlter(
+    tableName: string,
+    options: ColumnOptions = {},
+  ): Promise<Array<string | [string, () => Promise<void>]>> {
     const opts: ColumnOptions = { ...options };
     if (opts.null == null) opts.null = false;
     if (!("precision" in opts) && (this as any).supportsDatetimeWithPrecision?.()) {

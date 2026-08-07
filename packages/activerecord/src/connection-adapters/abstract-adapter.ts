@@ -305,6 +305,18 @@ export interface AbstractAdapter {
     },
   ): Promise<[IndexDefinition, string | undefined, boolean]>;
   /**
+   * schema_statements.rb:1837. PostgreSQL returns `[sql, proc]` when a
+   * `:comment` is present (postgresql/schema_statements.rb:1046-1049), hence
+   * the union.
+   * @internal
+   */
+  addColumnForAlter(
+    tableName: string,
+    columnName: string,
+    type: ColumnType,
+    options?: ColumnOptions,
+  ): Promise<string | [string, () => Promise<void>]>;
+  /**
    * drift-ok: concrete adapters may return `undefined` (MySQL short-circuits
    * `ifNotExists` when the index already exists), so the declared return type
    * widens the SchemaStatements base, which always returns a definition.
