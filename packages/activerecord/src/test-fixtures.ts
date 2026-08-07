@@ -40,6 +40,7 @@ import {
   leaseFixtureConnection,
   leaseFixtureConnectionFor,
 } from "./test-fixtures/fixture-connection.js";
+import { canonicalForeignKeyDependents } from "./support/canonical-schema.js";
 
 /**
  * A tableless fixture entry: seeds rows directly into the named table with no
@@ -555,6 +556,7 @@ function useFixtures(
       if (tables === undefined) deletesByAdapter.set(adapter, [table]);
       else tables.push(table);
     }
+    const dependents = deletesByAdapter.size > 0 ? await canonicalForeignKeyDependents() : null;
     for (const [adapter, tables] of deletesByAdapter) {
       const tableDeletes = async () => {
         for (const table of tables) {
@@ -565,7 +567,16 @@ function useFixtures(
           }
         }
       };
-      await adapter.disableReferentialIntegrity(tableDeletes, tables);
+      // Rails wraps its table_deletes unconditionally, but a set no foreign key
+      // points into has nothing for the wrap to protect, and the wrap is not
+      // free: PostgreSQL's runs an `ALTER TABLE ... TRIGGER` pass inside a nested
+      // transaction, which a test that deliberately broke its connection's
+      // `begin_db_transaction` cannot survive.
+      if (tables.some((table) => (dependents?.get(table)?.length ?? 0) > 0)) {
+        await adapter.disableReferentialIntegrity(tableDeletes, tables);
+      } else {
+        await tableDeletes();
+      }
     }
     for (const key of Object.keys(store)) {
       delete store[key];
