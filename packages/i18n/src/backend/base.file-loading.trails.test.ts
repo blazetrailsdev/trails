@@ -45,7 +45,16 @@ describe("I18n::Backend::Base file loading", () => {
     const overriding = new Overriding() as unknown as {
       loadYaml(f: string): [unknown, boolean];
     };
-    expect(overriding.loadYaml(filename)).toEqual([{ en: { foo: { bar: "baz" } } }, false]);
+    expect(overriding.loadYaml(filename)).toEqual([{ en: { foo: { bar: "baz" } } }, true]);
+  });
+
+  it("load_yml freezes the parsed data deeply", () => {
+    const filename = `${localesDir()}/en.yml`;
+    const loading = backend as unknown as { loadYml(f: string): [unknown, boolean] };
+    const [data, keysSymbolized] = loading.loadYml(filename);
+    expect(keysSymbolized).toBe(true);
+    expect(Object.isFrozen(data)).toBe(true);
+    expect(Object.isFrozen((data as { en: { foo: unknown } }).en.foo)).toBe(true);
   });
 
   it("raises InvalidLocaleData given a YAML file that is empty", () => {

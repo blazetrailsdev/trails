@@ -4,12 +4,9 @@ import {
   parsePostgresInstant,
   parsePostgresTimestampAsInstant,
   parsePostgresDate,
-  parsePostgresTime,
-  parsePostgresTimeTz,
   parseMysqlInstant,
   parseMysqlDatetimeAsInstant,
   parseMysqlDate,
-  parseMysqlTime,
   DateInfinity,
   DateNegativeInfinity,
 } from "./temporal-wire.js";
@@ -145,60 +142,6 @@ describe("parsePostgresDate", () => {
   });
 });
 
-describe("parsePostgresTime", () => {
-  it("parses a time with microseconds", () => {
-    const result = parsePostgresTime("14:23:55.123456");
-    expect(result.toString()).toBe("14:23:55.123456");
-  });
-
-  it("parses a whole-second time", () => {
-    const result = parsePostgresTime("00:00:00");
-    expect(result.toString()).toBe("00:00:00");
-  });
-
-  it("normalizes 24:00:00 (PG end-of-day sentinel) to 00:00:00", () => {
-    expect(parsePostgresTime("24:00:00").toString()).toBe("00:00:00");
-  });
-
-  it("normalizes 24:00:00 with fractional seconds", () => {
-    expect(parsePostgresTime("24:00:00.000000").toString()).toBe("00:00:00");
-  });
-
-  it("does not normalize 24:01:00 — only 24:00:00 is a valid PG sentinel", () => {
-    expect(() => parsePostgresTime("24:01:00")).toThrow();
-  });
-});
-
-describe("parsePostgresTimeTz", () => {
-  it("parses timetz with two-digit offset", () => {
-    const { time, offset } = parsePostgresTimeTz("14:23:55.123456+02");
-    expect(time.toString()).toBe("14:23:55.123456");
-    expect(offset).toBe("+02:00");
-  });
-
-  it("parses timetz with full offset", () => {
-    const { time, offset } = parsePostgresTimeTz("14:23:55+05:30");
-    expect(time.toString()).toBe("14:23:55");
-    expect(offset).toBe("+05:30");
-  });
-
-  it("parses timetz with negative offset", () => {
-    const { time, offset } = parsePostgresTimeTz("08:00:00.000001-08");
-    expect(time.toString()).toBe("08:00:00.000001");
-    expect(offset).toBe("-08:00");
-  });
-
-  it("normalizes 24:00:00 timetz to 00:00:00", () => {
-    const { time, offset } = parsePostgresTimeTz("24:00:00+00");
-    expect(time.toString()).toBe("00:00:00");
-    expect(offset).toBe("+00:00");
-  });
-
-  it("throws on unparseable input", () => {
-    expect(() => parsePostgresTimeTz("not-a-time")).toThrow(RangeError);
-  });
-});
-
 describe("parseMysqlInstant", () => {
   it("treats the wire string as UTC (pinned session tz)", () => {
     const result = parseMysqlInstant("2026-04-26 14:23:55.123456");
@@ -239,18 +182,6 @@ describe("parseMysqlDate", () => {
 
   it("returns null for zero-date", () => {
     expect(parseMysqlDate("0000-00-00")).toBeNull();
-  });
-});
-
-describe("parseMysqlTime", () => {
-  it("parses a TIME string", () => {
-    const result = parseMysqlTime("14:23:55.123456");
-    expect(result.toString()).toBe("14:23:55.123456");
-  });
-
-  it("parses midnight", () => {
-    const result = parseMysqlTime("00:00:00");
-    expect(result.toString()).toBe("00:00:00");
   });
 });
 

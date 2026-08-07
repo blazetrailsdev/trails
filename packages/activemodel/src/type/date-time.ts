@@ -63,7 +63,11 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
    * @internal Rails-private helper.
    */
   protected microseconds(time: DateParts): number {
-    return time.secFraction ? Math.trunc(time.secFraction * 1_000_000) : 0;
+    const secFraction = time.secFraction;
+    if (!secFraction) return 0;
+    return secFraction instanceof Rational
+      ? secFraction.mul(1_000_000).toI()
+      : Math.trunc(secFraction * 1_000_000);
   }
 
   /**

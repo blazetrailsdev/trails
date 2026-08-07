@@ -155,7 +155,7 @@ export class TimeType extends ValueType<Temporal.Instant> {
     }
     if (timeHash == null || timeHash.hour == null) return null;
 
-    const { offset } = timeHash;
+    const { offset, secFraction } = timeHash;
     return this.newTime(
       timeHash.year,
       timeHash.mon,
@@ -163,7 +163,9 @@ export class TimeType extends ValueType<Temporal.Instant> {
       timeHash.hour,
       timeHash.min,
       timeHash.sec,
-      timeHash.secFraction,
+      secFraction instanceof Rational
+        ? secFraction.numerator / secFraction.denominator
+        : secFraction,
       offset instanceof Rational ? offset.numerator / offset.denominator : offset,
     );
   }
