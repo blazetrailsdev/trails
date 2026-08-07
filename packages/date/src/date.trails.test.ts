@@ -663,6 +663,92 @@ describe("DateTime", () => {
     expect(new RubyDateTime(2008, 3, 1, 6, 0, 0).secFraction).toBe(0);
     expect(new RubyDate(2008, 3, 1).strftime("%N")).toBe("000000000");
   });
+
+  it("raises Date::Error on a fraction in any but the last argument supplied", () => {
+    // ruby 3.3.11 — num2int_with_frac's `argc > n` (date_core.c:3296-3304):
+    //   DateTime.new(2008, 3, 1, 6, 0.5, 0) #=> Date::Error: invalid fraction
+    //   DateTime.new(2008, 3, 1, 6.5, 0)    #=> Date::Error: invalid fraction
+    //   DateTime.new(2008, 3, 1.5, 0)       #=> Date::Error: invalid fraction
+    expect(() => new RubyDateTime(2008, 3, 1, 6, 0.5, 0)).toThrow("invalid fraction");
+    expect(() => new RubyDateTime(2008, 3, 1, 6.5, 0)).toThrow("invalid fraction");
+    expect(() => new RubyDateTime(2008, 3, 1, 6.5, 0, 0)).toThrow("invalid fraction");
+    expect(() => new RubyDateTime(2008, 3, 1.5, 0)).toThrow("invalid fraction");
+    expect(() => new RubyDateTime(2008, 3, 1.5, 6)).toThrow("invalid fraction");
+    // The second's bound is `positive_inf`, so a later argument never makes its
+    // fraction illegal:
+    //   DateTime.new(2008, 3, 1, 6, 0, 0.5, 3600).sec_fraction #=> (1/2)
+    expect(new RubyDateTime(2008, 3, 1, 6, 0, 0.5, 3600).secFraction).toBe(0.5);
+  });
+
+  it("carries the fraction of a legal non-final argument through add_frac", () => {
+    // ruby 3.3.11:
+    //   DateTime.new(2008, 3, 1, 6, 0.5).to_s   #=> "2008-03-01T06:00:30+00:00"
+    //   DateTime.new(2008, 3, 1, 6, 0.5).sec_fraction #=> (0/1)
+    //   DateTime.new(2008, 3, 1, 6, 0.25).to_s  #=> "2008-03-01T06:00:15+00:00"
+    //   DateTime.new(2008, 3, 1, 6.5).to_s      #=> "2008-03-01T06:30:00+00:00"
+    //   DateTime.new(2008, 3, 1, 23.75).to_s    #=> "2008-03-01T23:45:00+00:00"
+    //   DateTime.new(2008, 3, 1.5).to_s         #=> "2008-03-01T12:00:00+00:00"
+    const halfMinute = new RubyDateTime(2008, 3, 1, 6, 0.5);
+    expect(halfMinute.strftime("%H:%M:%S")).toBe("06:00:30");
+    expect(halfMinute.secFraction).toBe(0);
+    expect(new RubyDateTime(2008, 3, 1, 6, 0.25).strftime("%H:%M:%S")).toBe("06:00:15");
+    expect(new RubyDateTime(2008, 3, 1, 6.5).strftime("%H:%M:%S")).toBe("06:30:00");
+    expect(new RubyDateTime(2008, 3, 1, 23.75).strftime("%H:%M:%S")).toBe("23:45:00");
+    expect(new RubyDateTime(2008, 3, 1.5).strftime("%F %H:%M:%S")).toBe("2008-03-01 12:00:00");
+  });
+
+  it("takes the leading digits of the fraction at the width %N and %L are given", () => {
+    // ruby 3.3.11 — date_strftime.c:275-315 reads the width off the directive:
+    //   d = DateTime.new(2008, 3, 1, 6, 0, Rational(1, 2))
+    //   d.strftime("%1N")  #=> "5"
+    //   d.strftime("%3N")  #=> "500"
+    //   d.strftime("%6N")  #=> "500000"
+    //   d.strftime("%9N")  #=> "500000000"
+    //   d.strftime("%12N") #=> "500000000000"
+    //   d.strftime("%3L")  #=> "500"
+    //   d.strftime("%12L") #=> "500000000000"
+    const datetime = new RubyDateTime(2008, 3, 1, 6, 0, 0.5);
+    expect(datetime.strftime("%1N")).toBe("5");
+    expect(datetime.strftime("%3N")).toBe("500");
+    expect(datetime.strftime("%6N")).toBe("500000");
+    expect(datetime.strftime("%9N")).toBe("500000000");
+    expect(datetime.strftime("%12N")).toBe("500000000000");
+    expect(datetime.strftime("%3L")).toBe("500");
+    expect(datetime.strftime("%12L")).toBe("500000000000");
+    // Bare %N and %L keep their nine and three digits.
+    // ruby 3.3.11: d.strftime("%N %L") #=> "500000000 500"
+    expect(datetime.strftime("%N %L")).toBe("500000000 500");
+  });
+
+  it("truncates rather than rounds, so a sub-nanosecond tail survives a wide %N", () => {
+    // ruby 3.3.11:
+    //   d = DateTime.parse("2008-03-01T06:00:00.9999999999")
+    //   d.strftime("%3N")  #=> "999"
+    //   d.strftime("%9N")  #=> "999999999"
+    //   d.strftime("%12N") #=> "999999999900"
+    const datetime = RubyDateTime.parse("2008-03-01T06:00:00.9999999999");
+    expect(datetime.strftime("%3N")).toBe("999");
+    expect(datetime.strftime("%9N")).toBe("999999999");
+    expect(datetime.strftime("%12N")).toBe("999999999900");
+    //   d.strftime("%15N") #=> "999999999900000"
+    //   d.strftime("%20N") #=> "99999999990000000000"
+    expect(datetime.strftime("%15N")).toBe("999999999900000");
+    expect(datetime.strftime("%20N")).toBe("99999999990000000000");
+    // ruby 3.3.11:
+    //   DateTime.new(2008, 3, 1, 6, 0, Rational(1, 2)).strftime("%20N")
+    //     #=> "50000000000000000000"
+    expect(new RubyDateTime(2008, 3, 1, 6, 0, 0.5).strftime("%20N")).toBe("50000000000000000000");
+  });
+
+  it("answers zeros at every width for a ::Date, which has no time of day", () => {
+    // ruby 3.3.11:
+    //   Date.new(2008, 3, 1).strftime("%3N")  #=> "000"
+    //   Date.new(2008, 3, 1).strftime("%12N") #=> "000000000000"
+    //   Date.new(2008, 3, 1).strftime("%12L") #=> "000000000000"
+    expect(new RubyDate(2008, 3, 1).strftime("%3N")).toBe("000");
+    expect(new RubyDate(2008, 3, 1).strftime("%12N")).toBe("000000000000");
+    expect(new RubyDate(2008, 3, 1).strftime("%12L")).toBe("000000000000");
+  });
 });
 
 describe("Time", () => {
