@@ -2696,7 +2696,7 @@ export class Migrator {
       await this._schemaMigration.deleteVersion(String(version));
     } else {
       migrated.add(version);
-      await this._schemaMigration.recordVersion(String(version));
+      await this._schemaMigration.createVersion(String(version));
     }
   }
 

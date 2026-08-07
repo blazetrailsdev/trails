@@ -8,7 +8,7 @@
 import { Temporal } from "@blazetrails/date";
 import { camelize, singularize } from "@blazetrails/activesupport";
 import { reflectOnAllAssociations } from "./reflection.js";
-import { parkNestedReaderLoad } from "./nested-attributes.js";
+import { awaitPendingNestedReaderLoads, parkNestedReaderLoad } from "./nested-attributes.js";
 import type { Base } from "./base.js";
 import {
   ArgumentError,
@@ -21,7 +21,6 @@ import {
 import { InsertManager, UpdateManager, DeleteManager, Table as ArelTable } from "@blazetrails/arel";
 import {
   ActiveRecordError,
-  AttributeAssignmentError,
   ReadOnlyRecord,
   RecordNotDestroyed,
   RecordNotSaved,
@@ -89,6 +88,11 @@ export async function create(
   await this.ensureSchemaLoaded();
   const mergedAttrs = (this as any)._mergeCurrentScopeAttrs(attrs);
   const record = new this(mergedAttrs);
+  // `new(attributes, &block)` (persistence.rb:38-42) assigns inline, so the
+  // block sees a displacing nested key's write already settled. A JS
+  // constructor cannot await, so `assignAttributes` parks it; this is the first
+  // point that can drain it.
+  await awaitPendingNestedReaderLoads(record);
   if (block) block(record);
   await record.save();
   return record;
@@ -113,6 +117,8 @@ export async function createBang(
   await this.ensureSchemaLoaded();
   const mergedAttrs = (this as any)._mergeCurrentScopeAttrs(attrs);
   const record = new this(mergedAttrs);
+  // See create(): persistence.rb:47-51 assigns inline before the block.
+  await awaitPendingNestedReaderLoads(record);
   if (block) block(record);
   await record.saveBang();
   return record;
@@ -566,150 +572,8 @@ export async function toggleBang<T extends ToggleBangRecord>(
 // ---------------------------------------------------------------------------
 
 interface UpdateRecord extends AttributeIO {
-  constructor: {
-    lockingColumn: string;
-    lockingEnabled: boolean;
-  };
   save(options?: { validate?: boolean }): Promise<boolean | undefined>;
   saveBang(options?: { validate?: boolean }): Promise<true | undefined>;
-}
-
-function assertLockingColumnNotExplicitly(
-  record: UpdateRecord,
-  attrs: Record<string, unknown>,
-): void {
-  const ctor = record.constructor;
-  const lockCol = ctor.lockingColumn;
-  if (Object.hasOwn(attrs, lockCol) && ctor.lockingEnabled) {
-    throw new Error(`${lockCol} cannot be updated explicitly`);
-  }
-}
-
-/**
- * Assign one key during `#update` / `#update!`. Mirrors Rails `assign_attributes`,
- * which routes every key through `public_send("#{key}=")`. We keep the raw
- * `writeAttribute` path for plain columns (it preserves original error classes —
- * see {@link update}), but nested-attribute writers (`<assoc>Attributes=`,
- * installed by `acceptsNestedAttributesFor`) must go through their generated
- * setter so records are built / marked-for-destruction in memory before save.
- * @internal
- */
-/**
- * The `assign_attributes` prelude shared by `#update` and `#update!`: the
- * empty-bag guard and `sanitize_for_mass_assignment`
- * (attribute_assignment.rb:32-34), then the raw per-key loop that stands in for
- * `_assign_attributes` (see update() for why the loop is raw rather than a call
- * to Base#assignAttributes).
- *
- * `isMassAssignmentEmpty` rather than `Object.keys(attrs).length` because a
- * params wrapper's own keys are its instance fields, not its contents.
- *
- * The trails-local locking guard runs on the SANITIZED hash, after the
- * sanitizer. Rails' #update does only `assign_attributes` before saving
- * (persistence.rb:563-579), so nothing may preempt ForbiddenAttributesError;
- * and on the raw wrapper the guard inspects a params object's instance fields
- * rather than its contents, so it silently missed `lock_version` there anyway.
- */
-async function assignUpdateAttributes(self: any, attrs: Record<string, unknown>): Promise<void> {
-  if (isMassAssignmentEmpty(attrs)) return;
-  const sanitized = sanitizeForMassAssignment(attrs);
-  assertLockingColumnNotExplicitly(self, sanitized);
-  // Rails buckets every Hash-valued key into `nested_parameter_attributes` and
-  // runs `assign_nested_parameter_attributes` only after the scalar pass
-  // (attribute_assignment.rb:7-22) — "Assign any deferred nested attributes
-  // after the base attributes have been set" (:25). So a nested writer's
-  // `reject_if`, the built record's callbacks, and the association's
-  // `initialize_attributes` all observe an owner whose own attributes are
-  // already assigned. `assign_nested_parameter_attributes` then assigns them in
-  // order, one at a time (:27).
-  let nestedParameterAttributes: [string, unknown][] | undefined;
-  const pending: Promise<void>[] = [];
-  for (const [key, value] of Object.entries(sanitized)) {
-    if (
-      typeof value === "object" &&
-      value !== null &&
-      !Array.isArray(value) &&
-      (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null)
-    ) {
-      (nestedParameterAttributes ??= []).push([key, value]);
-      continue;
-    }
-    const p = assignUpdateAttribute(self, key, value);
-    if (p) pending.push(p);
-  }
-  if (pending.length) await Promise.all(pending);
-  for (const [key, value] of nestedParameterAttributes ?? []) {
-    await assignUpdateAttribute(self, key, value);
-  }
-}
-
-function collectionWriterPromise(
-  self: any,
-  key: string,
-  value: unknown,
-): Promise<void> | undefined {
-  const ctor = self.constructor as typeof Base;
-  for (const ref of reflectOnAllAssociations(ctor)) {
-    if (!ref.isCollection()) continue;
-    const name = String(ref.name);
-    if (key === name) {
-      return self.association(name).writer(value);
-    }
-    if (key === `${singularize(name)}Ids`) {
-      return self.association(name).idsWriter(value);
-    }
-  }
-  return undefined;
-}
-
-function assignUpdateAttribute(self: any, key: string, value: unknown): Promise<void> | void {
-  const configs = self.constructor?._nestedAttributeConfigs as
-    | { associationName: string }[]
-    | undefined;
-  if (configs?.some((c) => `${c.associationName}Attributes` === key)) {
-    // The nested-attributes writer, for the same reason `#{singular}Ids` goes
-    // through `idsWriter` below: Rails' `#{name}_attributes=` runs `load_target`
-    // and `remove_target!` inline (has_one_association.rb:59-69), and `#update`
-    // is async, so it awaits them here.
-    return self[`set${camelize(key, true)}`](value) as Promise<void>;
-  }
-  // Rails' #update → assign_attributes dispatches `id` through `public_send("id=")`,
-  // which for a composite-PK model distributes the value across the key columns.
-  // Route it through the `id=` setter here too: the raw `writeAttribute` path
-  // remaps `id` to the PK and rejects a composite PK (write.rb:35), so a direct
-  // write would wrongly raise for `update(id: [...])`.
-  if (key === "id") {
-    self.id = value;
-    return;
-  }
-  const collectionWrite = collectionWriterPromise(self, key, value);
-  if (collectionWrite) return collectionWrite;
-  // Rails' `#{name}=` removes the displaced record and saves the new one inline
-  // (has_one_association.rb:59-84); `#update` is async, so it awaits that writer.
-  const isHasOne = (
-    self.constructor?._associations as { name: string; type: string }[] | undefined
-  )?.some((a) => a.type === "hasOne" && a.name === key);
-  if (isHasOne) {
-    const result: unknown = self.association(key).writer(value);
-    return result instanceof Promise ? result : undefined;
-  }
-  // Dispatch through prototype setter for generated writers (e.g. *Ids writers
-  // from CollectionAssociation builder). Mirrors Rails' public_send("#{key}=").
-  // *Ids writers are async (they query the DB to resolve records); return the
-  // Promise so update() can await it before save().
-  let proto = Object.getPrototypeOf(self);
-  while (proto && proto !== Object.prototype) {
-    const desc = Object.getOwnPropertyDescriptor(proto, key);
-    if (desc) {
-      if (typeof desc.set === "function") {
-        const result: unknown = desc.set.call(self, value);
-        return result instanceof Promise ? result : undefined;
-      }
-      break;
-    }
-    proto = Object.getPrototypeOf(proto);
-  }
-  self.writeAttribute(key, value);
 }
 
 /**
@@ -729,24 +593,12 @@ export async function update<T extends UpdateRecord>(
   assertHashAttributes(attrs);
   const self = this as any;
   return withTransactionReturningStatus.call(self, async () => {
-    // Rails' #update delegates to `assign_attributes`, which iterates setters
-    // and lets their exceptions propagate raw. Our Base#assignAttributes wraps
-    // every writeAttribute failure in AttributeAssignmentError — more aggressive
-    // than Rails. Use a raw writeAttribute loop here to preserve original error
-    // classes (pre-extraction behavior; closer to Rails than wrapping).
-    // NOTE: this leaves two assignment paths where Rails has one — plain columns
-    // go through raw writeAttribute (above), only nested-attribute writers route
-    // through their setter (assignUpdateAttribute). A column with a custom writer
-    // would be missed; none exist today. TODO: unify on `public_send`-equivalent
-    // setter dispatch if/when a custom column writer is introduced.
-    //
-    // The raw loop replaces only `_assign_attributes`; the empty-bag guard and
-    // `sanitize_for_mass_assignment` that `assign_attributes` runs first
-    // (attribute_assignment.rb:32-34) still apply, or an unpermitted params
-    // wrapper would mass-assign here unchecked. Rails runs both INSIDE the
-    // transaction, so they stay inside this block. An empty bag skips only the
-    // assignment — `save` still runs, as in Rails.
-    await assignUpdateAttributes(self, attrs);
+    // `assign_attributes(attributes); save` (persistence.rb:563-570).
+    // `setAttributes` is `assign_attributes` on the awaitable surface, so a
+    // displacing `#{name}_attributes=` key's `load_target` / `remove_target!`
+    // (has_one_association.rb:59-69) finishes before the next key is assigned,
+    // as in Rails' `each` (attribute_assignment.rb:9-22).
+    await self.setAttributes(attrs);
     return self.save() as Promise<boolean | undefined>;
   }) as Promise<boolean | undefined>;
 }
@@ -762,11 +614,8 @@ export async function updateBang<T extends UpdateRecord>(
   assertHashAttributes(attrs);
   const self = this as any;
   return withTransactionReturningStatus.call(self, async () => {
-    // See update(): raw loop preserves original error classes (matches Rails,
-    // avoids Base#assignAttributes's AttributeAssignmentError wrap); nested
-    // attribute writers still route through their setter, and the empty-bag +
-    // sanitize guards from `assign_attributes` run first.
-    await assignUpdateAttributes(self, attrs);
+    // `assign_attributes(attributes); save!` (persistence.rb:576-579).
+    await self.setAttributes(attrs);
     return self.saveBang() as Promise<true | undefined>;
   }) as Promise<true | undefined>;
 }
@@ -1095,14 +944,48 @@ export function _reapplyNestedAttrSetters(
 }
 
 /**
+ * The association arm of Rails' `public_send("#{key}=", value)`
+ * (attribute_assignment.rb:67-69). RFC 0087 §1 removed the generated
+ * `#{name}=` property setter for the writers that do I/O at assignment —
+ * `replace`'s diffed deletes+inserts (collection_association.rb:46-48) and
+ * `ids_writer`'s resolving query (:61-83) — because a JS property setter
+ * cannot await them, so the dispatch reaches them by their association-level
+ * Rails names here instead.
+ */
+function associationWriterPromise(
+  self: AttributeIO,
+  key: string,
+  value: unknown,
+): Promise<void> | undefined {
+  const ctor = (self as any).constructor as typeof Base;
+  for (const ref of reflectOnAllAssociations(ctor)) {
+    const name = String(ref.name);
+    if (ref.isCollection()) {
+      if (key === name) return (self as any).association(name).writer(value);
+      if (key === `${singularize(name)}Ids`)
+        return (self as any).association(name).idsWriter(value);
+    } else if (key === name && ref.macro === "hasOne") {
+      // Rails' `#{name}=` removes the displaced record and saves the new one
+      // inline (has_one_association.rb:59-84).
+      const result: unknown = (self as any).association(name).writer(value);
+      return result instanceof Promise ? (result as Promise<void>) : undefined;
+    }
+  }
+  return undefined;
+}
+
+/**
  * Mirrors Rails' `_assign_attribute` (ActiveModel
  * attribute_assignment.rb:67-75): dispatch through the public setter when one
  * exists (store accessors write to the store hash, not a standalone attribute
  * slot). Falls back to writeAttribute for plain columns and unknown keys.
  *
- * Rails lets setter exceptions propagate raw; ours additionally wraps them in
- * AttributeAssignmentError with the offending key/value for debugging. (That
- * wrapping is stricter than Rails but longstanding.)
+ * Rails lets setter exceptions propagate raw — the only rescue is the
+ * `NoMethodError` arm that reaches `attribute_writer_missing` (:71-74) — so a
+ * `ReadonlyAttributeError` out of a writer reaches the caller as itself. The
+ * `AttributeAssignmentError` wrap belongs to
+ * `execute_callstack_for_multiparameter_attributes`
+ * (activerecord/attribute_assignment.rb:47) alone.
  *
  * A `#{name}_attributes=` key dispatches to `set#{Name}Attributes`
  * (nested-attributes.ts), which answers a promise when the assignment displaces
@@ -1110,32 +993,30 @@ export function _reapplyNestedAttrSetters(
  * (has_one_association.rb:69) a write; that promise is returned rather than
  * dropped.
  */
-function _assignAttribute(self: AttributeIO, key: string, value: unknown): Promise<void> | void {
-  try {
-    const configs = (self as any).constructor?._nestedAttributeConfigs as
-      | { associationName: string }[]
-      | undefined;
-    if (configs?.some((c) => `${c.associationName}Attributes` === key)) {
-      return (self as any)[`set${camelize(key, true)}`](value) as Promise<void> | void;
-    }
-    const setter = findPrototypeSetter(self, key);
-    if (setter) {
-      setter.call(self, value);
-    } else {
-      self.writeAttribute(key, value);
-    }
-  } catch (e) {
-    let repr: string;
-    try {
-      repr = JSON.stringify(value);
-    } catch {
-      repr = String(value);
-    }
-    throw new AttributeAssignmentError(
-      `error on assignment ${repr} to ${key} (${e instanceof Error ? e.message : String(e)})`,
-      e instanceof Error ? e : undefined,
-      key,
-    );
+function _assignAttribute(
+  self: AttributeIO,
+  key: string,
+  value: unknown,
+  awaitable: boolean,
+): Promise<void> | void {
+  const configs = (self as any).constructor?._nestedAttributeConfigs as
+    | { associationName: string }[]
+    | undefined;
+  if (configs?.some((c) => `${c.associationName}Attributes` === key)) {
+    return (self as any)[`set${camelize(key, true)}`](value) as Promise<void> | void;
+  }
+  // Only an awaited caller can resolve these keys to a writer at all (see
+  // `associationWriterPromise`). On the synchronous surface there is genuinely
+  // no method for the key, so `attribute_writer_missing`
+  // (attribute_assignment.rb:71-73) answers, as in Rails when a setter is absent.
+  const associationWrite = awaitable ? associationWriterPromise(self, key, value) : undefined;
+  if (associationWrite) return associationWrite;
+  const setter = findPrototypeSetter(self, key);
+  if (setter) {
+    const result: unknown = setter.call(self, value);
+    if (result instanceof Promise) return result as Promise<void>;
+  } else {
+    self.writeAttribute(key, value);
   }
 }
 
@@ -1149,29 +1030,30 @@ function _assignAttribute(self: AttributeIO, key: string, value: unknown): Promi
  * on this synchronous surface it is parked on the record and drained by `save`,
  * exactly as the constructor's nested re-dispatch parks its own
  * (`_reapplyNestedAttrSetters`). `setAttributes` is the awaitable surface that
- * runs those writes in key order — it orders the nested keys, it is not the
- * only path that accepts them: `#{name}_attributes=` is an ordinary generated
- * writer (nested_attributes.rb:386-392) and Rails hands it to `assign_attributes`
- * from `ActiveModel::API#initialize` (api.rb:81, reached through
- * `Base#initialize`'s `super`, core.rb:471-478) and from `update` / `update!`
- * (persistence.rb:563-580), none of which can await.
+ * runs those writes in key order, and every Rails entry point that CAN await
+ * now uses it: `update` / `update!` (persistence.rb:563-580) and, via the drain
+ * in `create` / `create!`, the assignment `new` performed. This surface is
+ * reachable only from `ActiveModel::API#initialize` (api.rb:81, through
+ * `Base#initialize`'s `super`, core.rb:471-478) — a JS constructor cannot
+ * await, which is the one genuine language limit here.
  *
- * The parking is uniform: every step after a displacing key — later scalar
- * keys, the nested pass and the multiparameter pass alike — is assigned while
- * that write is still in flight, because a `void` return has nothing for the
- * loop to block on. Rails' `each` (attribute_assignment.rb:9-22) orders them,
- * and so does `setAttributes`; on this surface only `save`'s drain does. The
- * steps are all in-memory attribute writes (`assign_multiparameter_attributes`
- * builds a date/time or aggregation and writes the slot), so none of them reads
- * or writes the association state the parked write is settling.
+ * On that one path the parking is uniform: every step after a displacing key —
+ * later scalar keys, the nested pass and the multiparameter pass alike — is
+ * assigned while that write is still in flight, because a `void` return has
+ * nothing for the loop to block on. Rails' `each`
+ * (attribute_assignment.rb:9-22) orders them, and so does `setAttributes`; on
+ * this surface only the drain does. The steps are all in-memory attribute
+ * writes (`assign_multiparameter_attributes` builds a date/time or aggregation
+ * and writes the slot), so none of them reads or writes the association state
+ * the parked write is settling.
  */
 export function assignAttributes(this: AttributeIO, attrs: Record<string, unknown>): void {
   assertHashAttributes(attrs);
-  // Mirrors ActiveModel::AttributeAssignment#assign_attributes: bail before
-  // sanitizing so a blank strong-params object (always un-permitted) is a
-  // no-op rather than raising, then unwrap/forbid via sanitize_for_mass_assignment.
-  if (Object.keys(attrs).length === 0) return;
-  for (const pending of _assignAttributes(this, sanitizeForMassAssignment(attrs))) {
+  // `new_attributes.empty?` (attribute_assignment.rb:32) runs before the
+  // sanitizer, so a blank strong-params object is a no-op rather than raising;
+  // `isMassAssignmentEmpty` reads a wrapper's contents, not its own fields.
+  if (isMassAssignmentEmpty(attrs)) return;
+  for (const pending of _assignAttributes(this, sanitizeForMassAssignment(attrs), false)) {
     parkNestedReaderLoad(this as unknown as Base, pending);
   }
 }
@@ -1189,8 +1071,8 @@ export async function setAttributes(
   attrs: Record<string, unknown>,
 ): Promise<void> {
   assertHashAttributes(attrs);
-  if (Object.keys(attrs).length === 0) return;
-  for (const pending of _assignAttributes(this, sanitizeForMassAssignment(attrs))) {
+  if (isMassAssignmentEmpty(attrs)) return;
+  for (const pending of _assignAttributes(this, sanitizeForMassAssignment(attrs), true)) {
     await pending;
   }
 }
@@ -1229,6 +1111,7 @@ function isNestedParameterHash(value: unknown): boolean {
 function* _assignAttributes(
   self: AttributeIO,
   attrs: Record<string, unknown>,
+  awaitable: boolean,
 ): Generator<Promise<void>, void, undefined> {
   let multiParameterAttributes: Record<string, unknown> | null = null;
   let nestedParameterAttributes: Record<string, unknown> | null = null;
@@ -1239,13 +1122,13 @@ function* _assignAttributes(
     } else if (isNestedParameterHash(value)) {
       (nestedParameterAttributes ??= {})[key] = value;
     } else {
-      const pending = _assignAttribute(self, key, value);
+      const pending = _assignAttribute(self, key, value, awaitable);
       if (pending) yield pending;
     }
   }
 
   if (nestedParameterAttributes) {
-    yield* assignNestedParameterAttributes(self, nestedParameterAttributes);
+    yield* assignNestedParameterAttributes(self, nestedParameterAttributes, awaitable);
   }
   if (multiParameterAttributes) {
     const multi = extractMultiparameterCallstack(multiParameterAttributes).multiparams;
@@ -1261,9 +1144,10 @@ function* _assignAttributes(
 function* assignNestedParameterAttributes(
   self: AttributeIO,
   pairs: Record<string, unknown>,
+  awaitable: boolean,
 ): Generator<Promise<void>, void, undefined> {
   for (const [k, v] of Object.entries(pairs)) {
-    const pending = _assignAttribute(self, k, v);
+    const pending = _assignAttribute(self, k, v, awaitable);
     if (pending) yield pending;
   }
 }

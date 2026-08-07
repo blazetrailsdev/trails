@@ -415,7 +415,7 @@ describe("SchemaDumperTest", () => {
     const adapter = Base.connection;
     const sm = new SchemaMigration(adapter);
     await sm.createTable();
-    await sm.recordVersion("20240601120000");
+    await sm.createVersion("20240601120000");
     const result = await TopLevelDumper.dumpWithVersion(adapter);
     expect(result).toContain("Schema version: 20240601120000");
     expect(result).toContain("defineSchema");

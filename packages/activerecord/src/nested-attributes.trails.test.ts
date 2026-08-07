@@ -309,4 +309,86 @@ describe("nested attributes assignment ordering (trails-only)", () => {
 
     expect(events).toEqual(["remove_target!:start", "remove_target!:end", "parrots"]);
   });
+
+  // `#update` is `assign_attributes(attributes); save`
+  // (persistence.rb:563-570), so it holds the same `each` order: the displacing
+  // key's `remove_target!` settles before the next key is assigned, rather than
+  // being parked for the `save` that follows.
+  it("finishes a displacing nested assignment before the next key on update", async () => {
+    Pirate.acceptsNestedAttributesFor("parrots");
+    const pirate = (await Pirate.create({ catchphrase: "Aye" })) as unknown as Pirate;
+    await Ship.create({
+      name: "Nights Dirty Lightning",
+      pirate_id: (pirate as unknown as { id: number }).id,
+    });
+    await (pirate as unknown as { ship: Promise<Base | null> }).ship;
+
+    const events: string[] = [];
+    const assoc = pirate.association("ship") as unknown as {
+      detachDisplacedTarget: () => Promise<void>;
+    };
+    const removeTarget = assoc.detachDisplacedTarget.bind(assoc);
+    assoc.detachDisplacedTarget = async () => {
+      events.push("remove_target!:start");
+      await removeTarget();
+      events.push("remove_target!:end");
+    };
+
+    const config = (
+      Pirate as unknown as {
+        _nestedAttributeConfigs: { associationName: string; options: { rejectIf?: unknown } }[];
+      }
+    )._nestedAttributeConfigs.find((c) => c.associationName === "parrots")!;
+    config.options.rejectIf = () => {
+      events.push("parrots");
+      return false;
+    };
+
+    await (pirate as unknown as { update(a: Record<string, unknown>): Promise<unknown> }).update({
+      shipAttributes: { name: "Davy Jones Gold Dagger" },
+      parrotsAttributes: { foo: { name: "Posideons Killer" } },
+    });
+
+    expect(events.slice(0, 3)).toEqual(["remove_target!:start", "remove_target!:end", "parrots"]);
+  });
+
+  // `initialize` yields to the block after `super` (core.rb:206-217), and
+  // `super` → `assign_attributes` assigns synchronously in Ruby, so the block
+  // observes the nested write settled. A JS constructor cannot await, so
+  // `assignAttributes` parks it and `create` / `create!` drain it before
+  // yielding. The writer is made to suspend here — on a record under
+  // construction it never does on its own (the has_one is new, so
+  // `find_target?` is false and it holds no target to displace), which is why
+  // the drain is otherwise unobservable.
+  it("settles the constructor's nested write before create yields to the block", async () => {
+    const setShipAttributes = (Pirate.prototype as unknown as Record<string, unknown>)
+      .setShipAttributes as (attributes: unknown) => Promise<void> | void;
+    let settled = false;
+    (Pirate.prototype as unknown as Record<string, unknown>).setShipAttributes = async function (
+      this: Base,
+      attributes: unknown,
+    ) {
+      await setShipAttributes.call(this, attributes);
+      settled = true;
+    };
+
+    const observed: unknown[] = [];
+    try {
+      await Pirate.create({ catchphrase: "Aye", shipAttributes: { name: "Black Pearl" } }, () => {
+        observed.push(settled);
+      });
+      settled = false;
+      await Pirate.createBang(
+        { catchphrase: "Yarr", shipAttributes: { name: "Nights Dirty Lightning" } },
+        () => {
+          observed.push(settled);
+        },
+      );
+    } finally {
+      (Pirate.prototype as unknown as Record<string, unknown>).setShipAttributes =
+        setShipAttributes;
+    }
+
+    expect(observed).toEqual([true, true]);
+  });
 });

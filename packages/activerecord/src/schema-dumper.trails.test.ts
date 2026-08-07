@@ -307,8 +307,8 @@ describe("SchemaDumperAdapterTest", () => {
     // worker DB and collide on schema_migrations_pkey. Clear first to keep
     // this test hermetic — same guard the sibling "defaults to 0" test uses.
     await sm.deleteAllVersions();
-    await sm.recordVersion("20240101000000");
-    await sm.recordVersion("20240201000000");
+    await sm.createVersion("20240101000000");
+    await sm.createVersion("20240201000000");
     const result = await TopLevelDumper.dumpWithVersion(adapter);
     expect(result).toContain("Schema version: 20240201000000");
   }, 60000);

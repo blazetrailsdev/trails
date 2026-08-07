@@ -160,10 +160,6 @@ export class SchemaMigration {
     }
   }
 
-  async recordVersion(version: string): Promise<void> {
-    await this.createVersion(version);
-  }
-
   static normalizeMigrationNumber(number: string | number): string {
     const n = parseInt(String(number), 10);
     return String(isNaN(n) ? 0 : n).padStart(3, "0");
