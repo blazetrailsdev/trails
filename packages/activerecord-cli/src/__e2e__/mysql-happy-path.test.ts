@@ -6,7 +6,13 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { readdir, writeFile } from "fs/promises";
 import { join } from "path";
 import { run } from "../cli.js";
-import { MIGRATION_BODY, mkE2eTmpDir, teardownE2eFixture } from "./helpers.js";
+import {
+  captureConsoleErrors,
+  exitReason,
+  MIGRATION_BODY,
+  mkE2eTmpDir,
+  teardownE2eFixture,
+} from "./helpers.js";
 
 const MYSQL_URL = process.env.MYSQL_TEST_URL;
 
@@ -57,11 +63,11 @@ describe.skipIf(!MYSQL_URL)("mysql-happy-path E2E", { timeout: 30_000 }, () => {
 
   it("init → db:create → generate:migration → db:migrate → db:version → db:migrate:status", async () => {
     vi.spyOn(console, "log").mockImplementation(() => {});
-    vi.spyOn(console, "error").mockImplementation(() => {});
+    const errors = captureConsoleErrors();
 
     // 1. ar init — scaffolds config/database.ts, db/migrate/, app/models/, db.ts
     const initCode = await run(["init", "--driver", "mysql2"], tmpDir);
-    expect(initCode, "ar init should exit 0").toBe(0);
+    expect(initCode, exitReason("ar init should exit 0", errors)).toBe(0);
 
     // 2. Overwrite config/database.ts with our unique MySQL DB URL.
     const mysqlConfig = `const config = {
@@ -75,11 +81,11 @@ export default config;
 
     // 3. ar db:create
     const createCode = await run(["db:create"], tmpDir);
-    expect(createCode, "ar db:create should exit 0").toBe(0);
+    expect(createCode, exitReason("ar db:create should exit 0", errors)).toBe(0);
 
     // 4. ar generate:migration AddUsersTable
     const genCode = await run(["generate:migration", "AddUsersTable"], tmpDir);
-    expect(genCode, "ar generate:migration should exit 0").toBe(0);
+    expect(genCode, exitReason("ar generate:migration should exit 0", errors)).toBe(0);
 
     const migrateDir = join(tmpDir, "db", "migrate");
     const entries = await readdir(migrateDir);
@@ -94,7 +100,7 @@ export default config;
 
     // 6. ar db:migrate
     const migrateCode = await run(["db:migrate"], tmpDir);
-    expect(migrateCode, "ar db:migrate should exit 0").toBe(0);
+    expect(migrateCode, exitReason("ar db:migrate should exit 0", errors)).toBe(0);
 
     // 7. ar db:version
     const versionLines: string[] = [];
@@ -102,7 +108,7 @@ export default config;
       (...args) => void versionLines.push(args.map(String).join(" ")),
     );
     const versionCode = await run(["db:version"], tmpDir);
-    expect(versionCode, "ar db:version should exit 0").toBe(0);
+    expect(versionCode, exitReason("ar db:version should exit 0", errors)).toBe(0);
     expect(versionLines.join("\n")).toContain(`Current version: ${version}`);
 
     // 8. ar db:migrate:status
@@ -112,7 +118,7 @@ export default config;
       return true;
     });
     const statusCode = await run(["db:migrate:status"], tmpDir);
-    expect(statusCode, "ar db:migrate:status should exit 0").toBe(0);
+    expect(statusCode, exitReason("ar db:migrate:status should exit 0", errors)).toBe(0);
     const statusText = statusChunks.join("");
     expect(statusText).toContain("up");
     expect(statusText).toContain(version);

@@ -111,15 +111,11 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
           adapter as unknown as { _warningCount: () => Promise<number> },
           "_warningCount",
         ).mockResolvedValue(1);
-        try {
-          await adapter.execute(`SELECT 'x'`);
-          throw new Error("expected SQLWarning");
-        } catch (e) {
-          expect(e).toBeInstanceOf(SQLWarning);
-          expect((e as SQLWarning).message).toBe(
-            `Query had warning_count=1 but 'SHOW WARNINGS' did not return the warnings. Check MySQL logs or database configuration.`,
-          );
-        }
+        const raised = adapter.execute(`SELECT 'x'`);
+        await expect(raised).rejects.toBeInstanceOf(SQLWarning);
+        await expect(raised).rejects.toThrow(
+          `Query had warning_count=1 but 'SHOW WARNINGS' did not return the warnings. Check MySQL logs or database configuration.`,
+        );
       });
     });
   });

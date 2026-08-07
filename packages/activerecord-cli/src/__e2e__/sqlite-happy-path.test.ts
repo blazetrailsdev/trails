@@ -4,7 +4,13 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { readdir, readFile, writeFile } from "fs/promises";
 import { join } from "path";
 import { run } from "../cli.js";
-import { MIGRATION_BODY, mkE2eTmpDir, teardownE2eFixture } from "./helpers.js";
+import {
+  captureConsoleErrors,
+  exitReason,
+  MIGRATION_BODY,
+  mkE2eTmpDir,
+  teardownE2eFixture,
+} from "./helpers.js";
 
 describe.skipIf(process.platform === "win32")("sqlite-happy-path E2E", () => {
   let tmpDir: string;
@@ -32,19 +38,19 @@ describe.skipIf(process.platform === "win32")("sqlite-happy-path E2E", () => {
     // Suppress noisy init/create/migrate console output — we only assert on
     // db:version and db:migrate:status below.
     vi.spyOn(console, "log").mockImplementation(() => {});
-    vi.spyOn(console, "error").mockImplementation(() => {});
+    const errors = captureConsoleErrors();
 
     // 1. ar init — scaffolds config/database.ts, db/migrate/, app/models/, db.ts
     const initCode = await run(["init", "--driver", "better-sqlite3"], tmpDir);
-    expect(initCode, "ar init should exit 0").toBe(0);
+    expect(initCode, exitReason("ar init should exit 0", errors)).toBe(0);
 
     // 2. ar db:create — creates db/development.sqlite3 (resolved relative to tmpDir)
     const createCode = await run(["db:create"], tmpDir);
-    expect(createCode, "ar db:create should exit 0").toBe(0);
+    expect(createCode, exitReason("ar db:create should exit 0", errors)).toBe(0);
 
     // 3. ar generate:migration AddUsersTable — emits a stub migration file
     const genCode = await run(["generate:migration", "AddUsersTable"], tmpDir);
-    expect(genCode, "ar generate:migration should exit 0").toBe(0);
+    expect(genCode, exitReason("ar generate:migration should exit 0", errors)).toBe(0);
 
     // Find the generated migration file
     const migrateDir = join(tmpDir, "db", "migrate");
@@ -61,7 +67,7 @@ describe.skipIf(process.platform === "win32")("sqlite-happy-path E2E", () => {
 
     // 5. ar db:migrate — applies the migration, stamps schema_migrations
     const migrateCode = await run(["db:migrate"], tmpDir);
-    expect(migrateCode, "ar db:migrate should exit 0").toBe(0);
+    expect(migrateCode, exitReason("ar db:migrate should exit 0", errors)).toBe(0);
 
     // 6. ar db:version — should report the applied migration version
     const versionLines: string[] = [];
@@ -69,7 +75,7 @@ describe.skipIf(process.platform === "win32")("sqlite-happy-path E2E", () => {
       (...args) => void versionLines.push(args.map(String).join(" ")),
     );
     const versionCode = await run(["db:version"], tmpDir);
-    expect(versionCode, "ar db:version should exit 0").toBe(0);
+    expect(versionCode, exitReason("ar db:version should exit 0", errors)).toBe(0);
     expect(versionLines.join("\n")).toContain(`Current version: ${version}`);
 
     // 7. ar db:migrate:status — should show the migration as "up"
@@ -79,7 +85,7 @@ describe.skipIf(process.platform === "win32")("sqlite-happy-path E2E", () => {
       return true;
     });
     const statusCode = await run(["db:migrate:status"], tmpDir);
-    expect(statusCode, "ar db:migrate:status should exit 0").toBe(0);
+    expect(statusCode, exitReason("ar db:migrate:status should exit 0", errors)).toBe(0);
     const statusText = statusChunks.join("");
     expect(statusText).toContain("up");
     expect(statusText).toContain(version);
@@ -87,7 +93,7 @@ describe.skipIf(process.platform === "win32")("sqlite-happy-path E2E", () => {
     // 8. ar db:schema:dump — dumps the live schema to db/schema.ts
     vi.spyOn(console, "log").mockImplementation(() => {});
     const dumpCode = await run(["db:schema:dump"], tmpDir);
-    expect(dumpCode, "ar db:schema:dump should exit 0").toBe(0);
+    expect(dumpCode, exitReason("ar db:schema:dump should exit 0", errors)).toBe(0);
     const schema = await readFile(join(tmpDir, "db", "schema.ts"), "utf8");
     expect(schema).toContain("createTable");
     expect(schema).toContain("users");

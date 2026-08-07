@@ -112,32 +112,45 @@ function msecs(subject: StrftimeSubject): number {
 }
 
 /**
- * @internal `tmx_cwyear` / `tmx_cweek` (`date_core.c:1849-1885`), the ISO
- * week-based year and week `%G` and `%V` read. Temporal's `yearOfWeek` and
- * `weekOfYear` are the same ISO 8601 quantities `c_jd_to_commercial` computes.
+ * @internal `m_local_jd` (`date_core.c:1485-1497`), the Julian day the
+ * week-number readers below work off. The subject carries the civil date and no
+ * `df`, so the `complex_dat_p` arm's `local_jd` shift has no bearer and the
+ * conversion is {@link jdOf} over it.
  */
-function cwyear(subject: StrftimeSubject): number {
-  return new Temporal.PlainDate(subject.year, subject.mon, subject.day).yearOfWeek ?? subject.year;
-}
-
-function cweek(subject: StrftimeSubject): number {
-  return new Temporal.PlainDate(subject.year, subject.mon, subject.day).weekOfYear ?? 1;
+function mLocalJd(subject: StrftimeSubject): number {
+  return jdOf(new Temporal.PlainDate(subject.year, subject.mon, subject.day));
 }
 
 /**
- * @internal `m_wnumx` (`date_core.c:1895-1917`) through `c_jd_to_weeknum`
- * (`date_core.c:622-632`) — `%U` is `f == 0` (weeks start Sunday) and `%W` is
- * `f == 1` (weeks start Monday).
- *
- * The C works in Julian Day Numbers: it takes the first day of the year,
- * `rjd += 6`, and counts sevenths from the week boundary at or before it. Both
- * `jd` terms cancel against each other once the year's first day is written as
- * `jd - (yday - 1)`, which leaves the count expressible from the subject's own
- * `yday` and `wday` — no JDN conversion needed to get the same integer.
+ * @internal `m_cwyear` (`date_core.c:1848-1856`), which reaches `%G`
+ * (`date_strftime.c:238`) and `%g` (`date_strftime.c:251`) as the `cwyear` slot
+ * of the `tmx_funcs` table (`date_core.c:7153`, through `m_real_cwyear`) that
+ * `tmx_cwyear` (`date_tmx.h:35`) reads.
+ */
+function cwyear(subject: StrftimeSubject): number {
+  const [ry] = cJdToCommercial(mLocalJd(subject));
+  return ry;
+}
+
+/**
+ * @internal `m_cweek` (`date_core.c:1876-1884`), which reaches `%V`
+ * (`date_strftime.c:391`) as the `cweek` slot of the `tmx_funcs` table
+ * (`date_core.c:7154`) that `tmx_cweek` (`date_tmx.h:36`) reads.
+ */
+function cweek(subject: StrftimeSubject): number {
+  const [, rw] = cJdToCommercial(mLocalJd(subject));
+  return rw;
+}
+
+/**
+ * @internal `m_wnumx` (`date_core.c:1897-1905`) — `%U` is `f == 0`, which
+ * `m_wnum0` (`date_core.c:1907-1911`) passes, and `%W` is `f == 1`, which
+ * `m_wnum1` (`date_core.c:1913-1917`) passes; `date_strftime.c:381` picks
+ * between the two.
  */
 function wnumx(subject: StrftimeSubject, f: number): number {
-  const wdayFdoy = mod(subject.wday - (subject.yday - 1), 7);
-  return div(subject.yday + mod(wdayFdoy + 6 - f, 7), 7);
+  const [, rw] = cJdToWeeknum(mLocalJd(subject), f);
+  return rw;
 }
 
 /**
@@ -2999,20 +3012,30 @@ function num2intWithFrac(
  * negative `d` counts back from the last day of the year — `-1` is 31 December
  * — and is rejected when the walk leaves `y`.
  *
- * Ruby scans January for the year's first day (`c_find_fdoy`,
- * `date_core.c:455-465`) because the calendar reform can delete 1 January
- * itself, and rejects by round-tripping back through `c_jd_to_ordinal`
+ * Ruby rejects by round-tripping back through `c_jd_to_ordinal`
  * (`date_core.c:566-575`), which is how a walk that left `y` comes back naming
- * a different year. `Temporal.PlainDate` is proleptic Gregorian, so the scan
- * collapses to 1 January and the round trip to reading `#year` back.
+ * a different year. `Temporal.PlainDate` is proleptic Gregorian, so that round
+ * trip collapses to reading `#year` back.
  */
 function cValidOrdinalP(y: number, d: number): Temporal.PlainDate | null {
-  const fdoy = new Temporal.PlainDate(y, 1, 1);
+  const fdoy = jdToPlainDate(cFindFdoy(y));
   if (d < 0) d = fdoy.daysInYear + d + 1;
   if (d < 1) return null;
   const r = fdoy.add({ days: d - 1 });
   if (r.year !== y) return null;
   return r;
+}
+
+/**
+ * @internal `date_core.c` `c_find_fdoy` (`date_core.c:455-465`), the Julian day
+ * of the first day of year `y`. Ruby scans January for it because the calendar
+ * reform can delete 1 January itself; `Temporal.PlainDate` is proleptic
+ * Gregorian and carries no reform, so the scan collapses to 1 January. The C's
+ * `sg` argument and its `ns` out-parameter both ride on that reform and have no
+ * bearer here, as on {@link jdToPlainDate}.
+ */
+function cFindFdoy(y: number): number {
+  return jdOf(new Temporal.PlainDate(y, 1, 1));
 }
 
 /**
@@ -3022,7 +3045,7 @@ function cValidOrdinalP(y: number, d: number): Temporal.PlainDate | null {
  * then `w` weeks and `d` days on.
  */
 function cCommercialToJd(y: number, w: number, d: number): number {
-  const rjd2 = jdOf(new Temporal.PlainDate(y, 1, 1)) + 3;
+  const rjd2 = cFindFdoy(y) + 3;
   return rjd2 - mod(rjd2, 7) + 7 * (w - 1) + (d - 1);
 }
 
@@ -3070,14 +3093,14 @@ function cValidCommercialP(y: number, w: number, d: number): Temporal.PlainDate 
  * year whose 1 January is itself an `f`-day: there, 1 January opens week `1`.
  */
 function cWeeknumToJd(y: number, w: number, d: number, f: number): number {
-  const rjd2 = jdOf(new Temporal.PlainDate(y, 1, 1)) + 6;
+  const rjd2 = cFindFdoy(y) + 6;
   return rjd2 - mod(rjd2 - f + 1, 7) - 7 + 7 * w + d;
 }
 
 /** @internal `date_core.c` `c_jd_to_weeknum` (`date_core.c:621-634`), the inverse of {@link cWeeknumToJd}. */
 function cJdToWeeknum(jd: number, f: number): [ry: number, rw: number, rd: number] {
   const ry = jdToPlainDate(jd).year;
-  const rjd = jdOf(new Temporal.PlainDate(ry, 1, 1)) + 6;
+  const rjd = cFindFdoy(ry) + 6;
   const j = jd - (rjd - mod(rjd - f + 1, 7)) + 7;
   return [ry, div(j, 7), mod(j, 7)];
 }
