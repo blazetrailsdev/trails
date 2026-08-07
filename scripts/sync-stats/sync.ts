@@ -1895,8 +1895,6 @@ async function syncJobLogs(mode: "latest" | "refresh" | "backfill"): Promise<num
     const prNumber = job.pr_number as number;
 
     try {
-      // gh 2.97 refuses to print a response containing terminal escape
-      // sequences without this flag, and every CI job log is full of them.
       const logs = gh(`api --allow-escape-sequences repos/${REPO}/actions/jobs/${jobId}/logs`);
       await RawJobLog.upsertAll(
         [
@@ -1924,9 +1922,6 @@ async function syncJobLogs(mode: "latest" | "refresh" | "backfill"): Promise<num
   }
 
   console.log(`  Fetched ${fetched} job logs`);
-  // A run that selects jobs and fetches none is a broken feed, not a quiet
-  // no-op: gh 2.97's escape-sequence guard silently stalled this sync for
-  // days because every fetch failed while the run still exited 0.
   if (fetched === 0) {
     throw new JobLogFetchFailedError(jobsToFetch.length);
   }
