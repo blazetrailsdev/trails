@@ -1569,20 +1569,12 @@ export abstract class Migration {
     }
   }
 
-  /**
-   * Mirrors: `ActiveRecord::Migration.load_schema_if_pending!` (`migration.rb:730-736`).
-   *
-   * Rails' repair arm — `if any_schema_needs_update? then load_schema!` — is
-   * dropped whole. `load_schema!` is `system("bin/rails db:test:prepare")`
-   * (`migration.rb:775-783`), a roundtrip to Rake through a subprocess that
-   * trails has no process surface to shell to. `any_schema_needs_update?`
-   * (`migration.rb:747-751`) is portable on its own, being just
-   * `Tasks::DatabaseTasks.schema_up_to_date?` over each config, but it is the
-   * guard for that one branch, so on its own it answers a question nothing here
-   * can act on. Both come back together; until then the pending state is
-   * reported rather than repaired.
-   */
+  /** Mirrors: `ActiveRecord::Migration.load_schema_if_pending!` (`migration.rb:730-736`). */
   static async loadSchemaIfPendingBang(): Promise<void> {
+    if (await this.anySchemaNeedsUpdate()) {
+      await this.loadSchemaBang();
+    }
+
     await this.checkPendingMigrations();
   }
 
@@ -1684,6 +1676,21 @@ export abstract class Migration {
     return new CommandRecorder(this.connection);
   }
 
+  /**
+   * @internal Mirrors: `ActiveRecord::Migration.any_schema_needs_update?`
+   * (`migration.rb:747-751`). Rails reads `ActiveRecord.schema_format`; trails
+   * keeps that setting on `DatabaseTasks` (it is also `schemaUpToDate`'s default).
+   */
+  private static async anySchemaNeedsUpdate(): Promise<boolean> {
+    const databaseTasks = migrationArConfig()?.databaseTasks?.();
+    if (databaseTasks == null) return false;
+
+    for (const dbConfig of this.dbConfigsInCurrentEnv()) {
+      if (!(await databaseTasks.schemaUpToDate(dbConfig, databaseTasks.schemaFormat))) return true;
+    }
+    return false;
+  }
+
   /** @internal Mirrors: `ActiveRecord::Migration.pending_migrations` (`migration.rb:757-769`) */
   private static async pendingMigrations(): Promise<MigrationProxy[]> {
     const pendingMigrations: MigrationProxy[][] = [];
@@ -1706,6 +1713,28 @@ export abstract class Migration {
   /** @internal */
   static env(): string {
     return getEnv("TRAILS_ENV") ?? getEnv("NODE_ENV") ?? "development";
+  }
+
+  /**
+   * @internal Mirrors: `ActiveRecord::Migration.load_schema!` (`migration.rb:775-783`).
+   *
+   * Rails roundtrips to Rake — `FileUtils.cd(root) { clear_all_connections!; system("bin/rails
+   * db:test:prepare") }` — so plugins can hook into database initialization. trails has no
+   * process surface to shell to, so it calls what that Rake task reaches directly:
+   * `db:test:prepare` invokes `db:test:load_schema`, which is purge plus
+   * `DatabaseTasks.load_schema` per test config (`railties/databases.rake:547-565`).
+   */
+  private static async loadSchemaBang(): Promise<void> {
+    const databaseTasks = migrationArConfig()?.databaseTasks?.();
+    if (databaseTasks == null) return;
+
+    await migrationArConfig()?.connectionHandler?.().clearAllConnectionsBang("all");
+
+    await databaseTasks.withTemporaryPoolForEach({ env: "test" }, async (pool) => {
+      const dbConfig = pool.dbConfig;
+      await databaseTasks.purge(dbConfig);
+      await databaseTasks.loadSchema(dbConfig, databaseTasks.schemaFormat);
+    });
   }
 }
 

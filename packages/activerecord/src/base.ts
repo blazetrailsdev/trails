@@ -3170,9 +3170,9 @@ export class Base extends Model {
       // Re-snapshot so mp attrs are part of the initial clean state.
       (this as any)._dirty.snapshot((this as any)._attributes);
       if (!wasSuppressed) {
-        // prism-mro: initialize_internals_callback
-        //   Inheritance=inheritanceInitializeInternalsCallback
-        //   Scoping=_applyScopeAttributes Core=~
+        // Rails runs `initialize_internals_callback` up Base's MRO:
+        // Inheritance (inheritance.rb:349) then Scoping (scoping.rb:54); Core's
+        // (core.rb:851) is empty. base.ts orchestrates that chain explicitly.
         inheritanceInitializeInternalsCallback.call(this as any);
         // Guard before allocating the Set — the no-scope case is the hot path.
         if (_shouldApplyScopeAttributes(ctor)) {
@@ -3254,9 +3254,9 @@ export class Base extends Model {
       _Core.initInternals.call(this as any);
       _applyCompositePrimaryKey(this as unknown as Base, ctor2, attrs);
       if (!wasSuppressed2) {
-        // prism-mro: initialize_internals_callback
-        //   Inheritance=inheritanceInitializeInternalsCallback
-        //   Scoping=_applyScopeAttributes Core=~
+        // Rails runs `initialize_internals_callback` up Base's MRO:
+        // Inheritance (inheritance.rb:349) then Scoping (scoping.rb:54); Core's
+        // (core.rb:851) is empty. base.ts orchestrates that chain explicitly.
         inheritanceInitializeInternalsCallback.call(this as any);
         // Guard before allocating the Set — the no-scope case is the hot path.
         if (_shouldApplyScopeAttributes(ctor2)) {

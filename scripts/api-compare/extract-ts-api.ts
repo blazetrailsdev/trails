@@ -2589,8 +2589,7 @@ function isSkeletonLogicalOp(kind: ts.SyntaxKind): boolean {
 
 /**
  * The body as an ordered CONTROL + call skeleton — the stream a call-SEQUENCE
- * comparison reads (RFC 0084), modelled on
- * scripts/prism-codegen/score.ts:skeletonTokens. Neither `calls` nor `callSeq`
+ * comparison reads (RFC 0084). Neither `calls` nor `callSeq`
  * can stand in for it: both are deduplicated and neither records control flow,
  * so a dropped guard, an inverted branch, or a collaborator called once where
  * Rails calls it twice is invisible to them. Names are raw, as `calls` records

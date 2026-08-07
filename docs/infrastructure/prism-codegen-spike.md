@@ -1,10 +1,64 @@
 # RFC 0065 — Prism-driven deterministic codegen from ActiveRecord Ruby → trails JS
 
-- **Status:** Spike / exploratory (evidence-gathering, not a commitment to ship)
+- **Status:** Concluded — **retired 2026-08-07**. The tool
+  (`scripts/prism-codegen/`), its five `codegen:*` scripts, its two CI gates and
+  its golden snapshots were deleted; `@ruby/prism` was dropped from
+  devDependencies. Everything below is preserved as the spike record.
 - **Area:** Tooling / infrastructure (NOT `docs/activerecord/` — that tree is
   frozen)
-- **Tool:** `scripts/prism-codegen/` (`pnpm codegen:generate`,
-  `pnpm codegen:from-ts <ts-path>`)
+- **Tool:** `scripts/prism-codegen/` — **deleted**; read it at the commit
+  preceding the retirement if you need the implementation.
+
+## Outcome
+
+RFC 0086 called for an audit before productionizing. It was run on 2026-08-05
+(`prism-codegen-coverage-20260805T143753Z.md`) and the evidence said retire:
+
+- **No generated code ever shipped.** `apply.ts:APPLY_MARKER`, the loud
+  `PRISM-CODEGEN DRAFT` marker `codegen:apply` inserts, appears in no commit
+  touching `packages/`. `codegen:apply` landed in #5819 and never produced a
+  port line.
+- **No generated code was close to usable.** The 10 files
+  `pnpm codegen:generate` emitted produced **963 TypeScript errors** under
+  `checkJs` (472 TS2304 undefined name, 340 TS2339 property-does-not-exist, 25
+  TS2307 unresolved import) — including the corpus best case,
+  `out/relation/calculations.js` (95.1% node coverage, flagged `tractable`).
+  Its first 40 lines alone carry `new Hash(0)`, `.gsubBang()` / `.stripBang()`
+  on a JS string, a bare `require("active_support/core_ext/enumerable")` inside
+  an ESM file, and Ruby's unary `+` (unfreeze-string) emitted as JS numeric
+  unary `+`. Closing that gap needs a Ruby core-library shim, a Ruby-constant →
+  trails-module import map, and a type layer; each is larger than the
+  9,173-line tool itself.
+- **Whole-corpus coverage was worse than published and structurally capped.**
+  Over all 305 files under
+  `vendor/rails/activerecord/lib/active_record/**` (94,543 dispatched nodes):
+  **81.8%** node coverage against the 91.8% `codegen:generate` reported on its
+  10-file sample, sharply bimodal (200 files at 90–100%, 28 files at 0–10%),
+  with the near-zero cohort explained by one syntactic rule
+  (`handlers/structure.ts:129` dropped any class body containing a nested
+  `ClassNode`/`ModuleNode`: 10,823 nodes, 62 files). More node coverage does
+  not move the output toward usability — the gap is stdlib semantics, imports
+  and types, not AST coverage.
+- **Its guard was a worse-scoped duplicate.** `codegen:score --guard` scored 10
+  Ruby files / 433 defs, of which 362 of 391 divergent+missing rows were
+  unreviewed baselined residue. `api:calls:wide` covers 1,462 methods across 12
+  packages with every row carrying a reviewed reason. The codegen guard was
+  also uniquely fragile: its generated side was a function of the handler
+  files, so it reddened on **generator** changes rather than port changes, and
+  sampling 18 divergent rows put roughly a third down to generator or resolver
+  artifacts (e.g. `ref:cache_keys` vs `ref:cacheKeys`, because
+  `expressions.ts:157 ivar()` never camelCased).
+
+The one genuinely unique signal — `score.ts:skeletonTokens`' **ordered** call
+skeleton, which a set-based call comparison is blind to — was ported into
+`api:calls:wide` first (RFC 0084, #6152), so nothing was lost in the deletion.
+The two `// prism-mro:` markers in `packages/activerecord/src/base.ts` were
+replaced with the plain MRO note they encoded.
+
+The generator-improvement work the audit inventoried (nested class/module
+declarations, negative literals, `class << self` at module scope, `BeginNode`,
+snake_case identifiers) was deliberately not scheduled: it improves output that
+is being deleted. It is recorded in the audit report for the record only.
 
 ## Summary
 
