@@ -8,7 +8,7 @@
  */
 
 import { Temporal } from "@js-temporal/polyfill";
-import { ArgumentError, strftime } from "./date.js";
+import { ArgumentError, Rational, strftime } from "./date.js";
 
 /**
  * The `utc_offset` argument MRI's `Time.new` accepts: `"UTC"`, an offset —
@@ -318,7 +318,7 @@ export class Time {
         hour: this.hour,
         min: this.min,
         sec: this.sec,
-        nsec: this.nsec,
+        nsec: new Rational(this.nsec, 1),
         zone: this.zone ?? "",
         utcOffset: this.utcOffset,
       },

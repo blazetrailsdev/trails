@@ -166,10 +166,8 @@ export class TimeType extends ValueType<Temporal.Instant> {
       timeHash.hour,
       timeHash.min,
       timeHash.sec,
-      secFraction instanceof Rational
-        ? secFraction.numerator / secFraction.denominator
-        : secFraction,
-      offset instanceof Rational ? offset.numerator / offset.denominator : offset,
+      secFraction instanceof Rational ? secFraction.toF() : secFraction,
+      offset instanceof Rational ? offset.toF() : offset,
     );
   }
 

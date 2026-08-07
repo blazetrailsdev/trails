@@ -63,7 +63,7 @@ function strftimeSubject(v: {
     hour: v.hour,
     min: v.minute,
     sec: v.second,
-    nsec: v.millisecond * 1_000_000 + v.microsecond * 1_000 + v.nanosecond,
+    nsec: new Rational(v.millisecond * 1_000_000 + v.microsecond * 1_000 + v.nanosecond, 1),
     zone: "",
     utcOffset: 0,
   };
@@ -75,7 +75,7 @@ function strftimeSubject(v: {
  * value.usec)` when `usec > 0`.
  */
 function toFsDbWithUsec(subject: StrftimeSubject): string {
-  const nsec = subject.nsec instanceof Rational ? subject.nsec.div(1) : subject.nsec;
+  const nsec = subject.nsec.div(1);
   return strftime(subject, TIME_DB_FORMAT) + microsecondFraction(Math.floor(nsec / 1_000));
 }
 
