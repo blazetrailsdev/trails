@@ -257,7 +257,7 @@ relation.trails.test.ts
 ## Conversion story cut
 
 Clusters are directory-grouped to minimise file-overlap conflicts between
-parallel converters, sized well under the 500-LOC ceiling. Per-file edit size
+parallel converters, sized well under the LOC ceiling. Per-file edit size
 varies: a Bucket A file may hold several per-`describe` pairs (each → one
 `fixtures([], …)` call), a Bucket B file is a single-line delete, and Bucket D
 files need per-`describe` judgement. LOC estimates below account for the
