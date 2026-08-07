@@ -2,20 +2,6 @@
   {
     "package": "activesupport",
     "tsFile": "time-ext.ts",
-    "rubyName": "change",
-    "call": "integer?",
-    "reason": "JS `Date` carries no zone object and no per-value UTC offset, so time-ext.ts's `change` has no counterpart to Time#change's `zone.respond_to?(:utc_to_local)` / `elsif zone` arms (time/calculations.rb:150-185) and cannot route through them."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "time-ext.ts",
-    "rubyName": "change",
-    "call": "local",
-    "reason": "JS `Date` carries no zone object and no per-value UTC offset, so time-ext.ts's `change` has no counterpart to Time#change's `zone.respond_to?(:utc_to_local)` / `elsif zone` arms (time/calculations.rb:150-185) and cannot route through them."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "time-ext.ts",
     "rubyName": "since",
     "call": "warn",
     "reason": "Time#since's `warn` is reached only from its `rescue TypeError` arm, which deprecates passing a non-numeric (time/calculations.rb:126-133). time-ext.ts's `since` takes `seconds: number`, so the deprecated call shape is unrepresentable and the arm has nothing to warn about."

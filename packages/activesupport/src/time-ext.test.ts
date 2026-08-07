@@ -147,6 +147,43 @@ describe("TimeExtCalculationsTest", () => {
     expect(change(d(2005, 2, 22, 15, 15, 10), { min: 45 })).toEqual(i(2005, 2, 22, 15, 45, 0));
   });
 
+  it("change_preserves_offset_for_zoned_times_around_end_of_dst", () => {
+    // DST ended just before 2005-10-30 2:00:00 AM in US/Eastern, and clocks
+    // were rolled back 1 hour.
+    const at = (hour: number) =>
+      Temporal.ZonedDateTime.from({
+        timeZone: "US/Eastern",
+        year: 2005,
+        month: 10,
+        day: 30,
+        hour,
+      });
+    const eq = (actual: Temporal.ZonedDateTime, expected: Temporal.ZonedDateTime) =>
+      expect(actual.epochNanoseconds).toBe(expected.epochNanoseconds);
+
+    const midnight = at(0); // 2005-10-30 00:00:00 -0400
+    const oneAm1 = at(1); // 2005-10-30 01:00:00 -0400
+    const oneAm2 = at(2).subtract({ seconds: 3600 }); // 2005-10-30 01:00:00 -0500
+    const twoAm = at(2); // 2005-10-30 02:00:00 -0500
+    expect(Temporal.ZonedDateTime.compare(oneAm1, oneAm2)).toBe(-1);
+
+    eq(change(midnight, { hour: 1 }), oneAm1);
+    eq(change(midnight, { hour: 2 }), twoAm);
+
+    eq(change(oneAm1, { hour: 0 }), midnight);
+    eq(change(oneAm1, { hour: 1 }), oneAm1);
+    eq(change(oneAm1, { sec: 1 }), oneAm1.add({ seconds: 1 }));
+    eq(change(oneAm1, { hour: 2 }), twoAm);
+
+    eq(change(oneAm2, { hour: 0 }), midnight);
+    eq(change(oneAm2, { hour: 1 }), oneAm2);
+    eq(change(oneAm2, { sec: 1 }), oneAm2.add({ seconds: 1 }));
+    eq(change(oneAm2, { hour: 2 }), twoAm);
+
+    eq(change(twoAm, { hour: 1 }), oneAm2);
+    eq(change(twoAm, { hour: 0 }), midnight);
+  });
+
   it("advance years", () => {
     expect(advance(d(2005, 2, 28, 15, 15, 10), { years: 1 })).toEqual(i(2006, 2, 28, 15, 15, 10));
   });

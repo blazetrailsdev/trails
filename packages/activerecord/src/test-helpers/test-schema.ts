@@ -114,8 +114,8 @@ export const TEST_SCHEMA: Schema = {
   attachments: {
     columns: {
       // Polymorphic reference expanded:
-      record_id: { type: "big_integer", null: false },
       record_type: { type: "string", null: false },
+      record_id: { type: "big_integer", null: false },
     },
     indexes: [{ columns: ["record_type", "record_id"], name: "index_attachments_on_record" }],
   },
@@ -445,8 +445,8 @@ export const TEST_SCHEMA: Schema = {
   sharded_blog_posts: {
     columns: {
       title: "string",
-      parent_id: "big_integer",
       parent_type: "string",
+      parent_id: "big_integer",
       blog_id: "integer",
       revision: "integer",
     },
@@ -501,8 +501,8 @@ export const TEST_SCHEMA: Schema = {
       tags_count: { type: "integer", default: 0 },
       children_count: { type: "integer", default: 0 },
       parent_id: "integer",
-      author_id: "big_integer",
       author_type: "string",
+      author_id: "big_integer",
       // Rails comment: kept as string so preload works when types don't match.
       resource_id: "string",
       resource_type: "string",
@@ -520,8 +520,8 @@ export const TEST_SCHEMA: Schema = {
   comment_overlapping_counter_caches: {
     user_comments_count_id: "integer",
     post_comments_count_id: "integer",
-    commentable_id: "big_integer",
     commentable_type: "string",
+    commentable_id: "big_integer",
   },
 
   companies: {
@@ -1022,8 +1022,8 @@ export const TEST_SCHEMA: Schema = {
   members: {
     name: "string",
     member_type_id: "big_integer",
-    admittable_id: "big_integer",
     admittable_type: "string",
+    admittable_id: "big_integer",
   },
 
   member_details: {
@@ -1189,8 +1189,8 @@ export const TEST_SCHEMA: Schema = {
     columns: {
       name: "string",
       type: "string",
-      looter_id: "big_integer",
       looter_type: "string",
+      looter_id: "big_integer",
       ship_id: "big_integer",
     },
     indexes: [
@@ -1205,6 +1205,10 @@ export const TEST_SCHEMA: Schema = {
       pirate_id: "big_integer",
     },
     indexes: [{ columns: "parrot_id" }, { columns: "pirate_id" }],
+    foreignKeys: [
+      { toTable: "parrots", column: "parrot_id" },
+      { toTable: "pirates", column: "pirate_id" },
+    ],
     primaryKey: false,
   },
 
@@ -1214,6 +1218,10 @@ export const TEST_SCHEMA: Schema = {
       treasure_id: "big_integer",
     },
     indexes: [{ columns: "parrot_id" }, { columns: "treasure_id" }],
+    foreignKeys: [
+      { toTable: "parrots", column: "parrot_id" },
+      { toTable: "treasures", column: "treasure_id" },
+    ],
     primaryKey: false,
   },
 
@@ -1223,6 +1231,10 @@ export const TEST_SCHEMA: Schema = {
       treasure_id: "big_integer",
     },
     indexes: [{ columns: "parrot_id" }, { columns: "treasure_id" }],
+    foreignKeys: [
+      { toTable: "parrots", column: "parrot_id" },
+      { toTable: "treasures", column: "treasure_id" },
+    ],
     primaryKey: false,
   },
 
@@ -1503,10 +1515,10 @@ export const TEST_SCHEMA: Schema = {
 
   sponsors: {
     club_id: "integer",
-    sponsorable_id: "big_integer",
     sponsorable_type: "string",
-    sponsor_id: "big_integer",
+    sponsorable_id: "big_integer",
     sponsor_type: "string",
+    sponsor_id: "big_integer",
   },
 
   // Rails declares `id: false` with an explicit `t.string :id, null: false`
@@ -1663,8 +1675,8 @@ export const TEST_SCHEMA: Schema = {
     poly_human_without_inverse_type: "string",
     puzzled_polymorphic_human_id: "integer",
     puzzled_polymorphic_human_type: "string",
-    super_human_id: "big_integer",
     super_human_type: "string",
+    super_human_id: "big_integer",
   },
 
   interests: {
@@ -1681,8 +1693,8 @@ export const TEST_SCHEMA: Schema = {
   wheels: {
     columns: {
       size: "integer",
-      wheelable_id: "big_integer",
       wheelable_type: "string",
+      wheelable_id: "big_integer",
     },
     indexes: [{ columns: ["wheelable_type", "wheelable_id"], name: "index_wheels_on_wheelable" }],
   },
