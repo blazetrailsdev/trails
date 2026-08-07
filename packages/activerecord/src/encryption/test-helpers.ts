@@ -17,7 +17,6 @@ import { type Compressor } from "./config.js";
 import { Contexts } from "./contexts.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
 import { type Scheme } from "./scheme.js";
-import { withEncryptionContext, withoutEncryption } from "./context.js";
 import { Decryption, Encryption } from "./errors.js";
 import { BinaryData } from "@blazetrails/activemodel";
 // Side-effect: registers encryptionHooks so Base.encrypts() is wired up.
@@ -25,7 +24,8 @@ import "../encryption.js";
 import type { Encryptor } from "../encryption.js";
 import { MessagePackMessageSerializer } from "./message-pack-message-serializer.js";
 
-export { withEncryptionContext, withoutEncryption, Decryption, Encryption };
+export { withEncryptionContext, withoutEncryption } from "../encryption.js";
+export { Decryption, Encryption };
 
 // ─── Test key material ────────────────────────────────────────────────────────
 

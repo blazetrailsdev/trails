@@ -2,7 +2,7 @@ import { Type, ValueType, StringType, BinaryData } from "@blazetrails/activemode
 import { Serialized } from "../type/serialized.js";
 import { Scheme } from "./scheme.js";
 import type { EncryptorLike } from "./encryptor.js";
-import { getEncryptionContext } from "./context.js";
+import { Contexts } from "./contexts.js";
 import { Configurable } from "./configurable.js";
 import { Encoding, Decryption, Base } from "./errors.js";
 import { isRubyTruthy } from "../ruby-truthy.js";
@@ -295,7 +295,7 @@ export class EncryptedAttributeType extends ValueType {
     // (== context.encryptor). The TS default context carries no encryptor, so fall
     // back to the scheme's. Resolved inside the existing scheme.withContext wrapper, so
     // a scheme override has already been pushed onto the context before this reads it.
-    return (getEncryptionContext().encryptor as EncryptorLike | undefined) ?? this._encryptor;
+    return (Contexts.context.encryptor as EncryptorLike | undefined) ?? this._encryptor;
   }
 
   /** @internal */

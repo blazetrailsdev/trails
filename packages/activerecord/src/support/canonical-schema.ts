@@ -1734,11 +1734,15 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   await define("records", {}, (t) => {});
 
   await define("fk_test_has_pk", { serialPk: "pk_id" }, (t) => {
-    t.integer("pk_id", { null: false });
+    t.bigInteger("pk_id", { null: false });
   });
 
   await define("fk_test_has_fk", {}, (t) => {
-    t.integer("fk_id", { null: false });
+    // `t.references :fk, null: false` (schema.rb:1393): a bigint column plus the
+    // default index `t.references` builds — the sibling table at schema.rb:1403
+    // opts out with `index: false`, this one does not.
+    t.bigInteger("fk_id", { null: false });
+    t.index("fk_id");
     t.foreignKey("fk_test_has_pk", { column: "fk_id", name: "fk_name", primaryKey: "pk_id" });
   });
 
@@ -2195,7 +2199,7 @@ export async function canonicalForeignKeyDependents(): Promise<Map<string, strin
  * what the DDL carries.
  * Taking the generic branch is therefore the right reading, but only while no
  * `serialPk` column declares something that branch would have rewritten;
- * {@link assertSerialPkIsPlainInteger} fails loudly the moment one does, rather
+ * {@link assertSerialPkIsPlainIntegral} fails loudly the moment one does, rather
  * than letting the replay report a shape the real DDL never had.
  *
  * The wrapper form carries what `TEST_SCHEMA` spells alongside its columns: the
@@ -2237,7 +2241,7 @@ export async function canonicalRegistrySchema(): Promise<Schema> {
     const builder = new TableBuilder(probe, "sqlite", COLUMN_TYPE_MAP_SQLITE, null);
     def.fn(builder);
     if (def.meta.serialPk !== undefined) {
-      assertSerialPkIsPlainInteger(def.name, def.meta.serialPk, columns[def.meta.serialPk]);
+      assertSerialPkIsPlainIntegral(def.name, def.meta.serialPk, columns[def.meta.serialPk]);
     }
     if (def.meta.primaryKey !== undefined && def.meta.serialPk === undefined) {
       // `col` leaves these as declared, so nothing to reconcile; declaredSpec
@@ -2272,22 +2276,29 @@ export async function canonicalRegistrySchema(): Promise<Schema> {
  * Guard the one place the replay's generic branch and the real `serialPk` branch
  * can disagree. `TableBuilder.col` renders a `serialPk` column as
  * `serialIdType(primitive, adapter)` with `{primaryKey: true}` and nothing else,
- * so a declared `limit`/`default`/`precision`/`scale` never reaches the DDL, and
- * a `big_integer` declaration becomes `bigserial`/`bigint`/`integer` by adapter.
- * A plain `t.integer(pk)` (optionally spelling out the `null: false` a primary
- * key has regardless) is the only form where "declared" and "rendered" agree,
- * which is every live `serialPk` column today. Anything else must teach
+ * so a declared `limit`/`default`/`precision`/`scale` never reaches the DDL.
+ * The declared *type* does survive — `serialIdType` reads it, so `integer`
+ * renders as `serial`/`integer` and `big_integer` as `bigserial`/`bigint`
+ * (`integer` on SQLite, whose rowid alias must be INTEGER either way). A plain
+ * `t.integer(pk)` / `t.bigInteger(pk)` (optionally spelling out the `null: false`
+ * a primary key has regardless) is therefore the only form where "declared" and
+ * "rendered" agree, which is every live `serialPk` column today. Anything else
+ * must teach
  * {@link canonicalRegistrySchema} how to compare the rendered form instead of
  * being silently mis-reported.
  */
-function assertSerialPkIsPlainInteger(
+function assertSerialPkIsPlainIntegral(
   table: string,
   column: string,
   spec: ColumnSpec | undefined,
 ): void {
   const { type, null: nullable, ...rest } = declaredSpec(table, column, spec);
   const extras = Object.keys(rest);
-  if (type === "integer" && extras.length === 0 && (nullable === undefined || nullable === false)) {
+  if (
+    (type === "integer" || type === "big_integer") &&
+    extras.length === 0 &&
+    (nullable === undefined || nullable === false)
+  ) {
     return;
   }
   throw new ActiveRecordError(

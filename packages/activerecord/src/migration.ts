@@ -1901,7 +1901,15 @@ export class MigrationContext {
     block?: (m: MigrationProxy) => boolean,
   ): Promise<MigrationProxy[]> {
     const selectedMigrations = block ? this.migrations.filter(block) : this.migrations;
-    return this._migrateWithMigrator(this._newMigrator("up", selectedMigrations, targetVersion));
+    return this._migrateWithMigrator(
+      new Migrator(
+        "up",
+        selectedMigrations,
+        this.schemaMigration,
+        this.internalMetadata,
+        targetVersion,
+      ),
+    );
   }
 
   /** @internal Mirrors: ActiveRecord::MigrationContext#down (`migration.rb:1258-1266`) */
@@ -1910,7 +1918,15 @@ export class MigrationContext {
     block?: (m: MigrationProxy) => boolean,
   ): Promise<MigrationProxy[]> {
     const selectedMigrations = block ? this.migrations.filter(block) : this.migrations;
-    return this._migrateWithMigrator(this._newMigrator("down", selectedMigrations, targetVersion));
+    return this._migrateWithMigrator(
+      new Migrator(
+        "down",
+        selectedMigrations,
+        this.schemaMigration,
+        this.internalMetadata,
+        targetVersion,
+      ),
+    );
   }
 
   /**
@@ -1924,17 +1940,6 @@ export class MigrationContext {
     return migrator.isUseAdvisoryLock()
       ? migrator.withAdvisoryLock(() => migrator.migrateWithoutLock())
       : migrator.migrateWithoutLock();
-  }
-
-  private _newMigrator(
-    direction: "up" | "down",
-    migrations: MigrationProxy[],
-    targetVersion: number | string | null = null,
-  ): Migrator {
-    return new Migrator(this.connection, migrations, {
-      direction,
-      targetVersion,
-    });
   }
 
   /**
@@ -1961,7 +1966,13 @@ export class MigrationContext {
 
   /** @internal Mirrors: ActiveRecord::MigrationContext#run (`migration.rb:1268-1270`) */
   async run(direction: "up" | "down", targetVersion: number | string): Promise<number | undefined> {
-    const migrator = this._newMigrator(direction, this.migrations, targetVersion);
+    const migrator = new Migrator(
+      direction,
+      this.migrations,
+      this.schemaMigration,
+      this.internalMetadata,
+      targetVersion,
+    );
     return migrator.isUseAdvisoryLock()
       ? migrator.withAdvisoryLock(() => migrator.runWithoutLock())
       : migrator.runWithoutLock();
@@ -1973,10 +1984,7 @@ export class MigrationContext {
    * migrations, so each read sees current schema_migrations.
    */
   open(): Migrator {
-    return new Migrator(this.connection, this.migrations, {
-      direction: "up",
-      targetVersion: null,
-    });
+    return new Migrator("up", this.migrations, this.schemaMigration, this.internalMetadata);
   }
 
   /** @internal Mirrors: ActiveRecord::MigrationContext#migrations_status (`migration.rb:1317-1330`) */
@@ -2159,7 +2167,12 @@ export class MigrationContext {
    * the migrations that ran.
    */
   async move(direction: "up" | "down", steps: number): Promise<MigrationProxy[]> {
-    const migrator = this._newMigrator(direction, this.migrations);
+    const migrator = new Migrator(
+      direction,
+      this.migrations,
+      this.schemaMigration,
+      this.internalMetadata,
+    );
     const currentVersion = (await this.currentVersion()) ?? 0;
     const currentMigration = await migrator.currentMigration();
     if (currentVersion !== 0 && !currentMigration) {
@@ -2205,18 +2218,50 @@ export class Migrator {
   private readonly _targetVersion: number | null;
   private _migratedVersions?: Set<number>;
 
+  /**
+   * Mirrors: `ActiveRecord::Migrator#initialize` (`migration.rb:1421-1433`) —
+   * `(direction, migrations, schema_migration, internal_metadata,
+   * target_version = nil)`. The bookkeeping objects are arguments, as Rails has
+   * them, so a multi-database caller can hand each Migrator its own pair
+   * (`multi_db_migrator_test.rb:142,149`).
+   *
+   * The `(adapter, migrations, options)` arm is the shape trails carried before
+   * the widening; the remaining test call sites still pass it and split 2 of
+   * `migrator-connection-pins-adapter-at-construction` migrates them file by
+   * file, after which this overload goes away with `MigratorOptions`.
+   */
   constructor(
-    adapter: DatabaseAdapter,
+    direction: "up" | "down",
     migrations: MigrationProxy[],
-    options: MigratorOptions = {},
+    schemaMigration: SchemaMigration,
+    internalMetadata: InternalMetadata,
+    targetVersion?: number | string | null,
+  );
+  constructor(adapter: DatabaseAdapter, migrations: MigrationProxy[], options?: MigratorOptions);
+  constructor(
+    direction: "up" | "down" | DatabaseAdapter,
+    migrations: MigrationProxy[],
+    schemaMigration?: SchemaMigration | MigratorOptions,
+    internalMetadata?: InternalMetadata,
+    targetVersion?: number | string | null,
   ) {
+    const options: MigratorOptions =
+      typeof direction === "string"
+        ? { direction, targetVersion: targetVersion ?? null }
+        : ((schemaMigration as MigratorOptions | undefined) ?? {});
     this._options = options;
     this._direction = options.direction ?? "up";
     this._targetVersion =
       options.targetVersion == null ? null : toInteger(String(options.targetVersion));
-    this._adapter = adapter;
-    this._schemaMigration = new SchemaMigration(adapter);
-    this._internalMetadata = new InternalMetadata(adapter);
+    if (typeof direction === "string") {
+      this._schemaMigration = schemaMigration as SchemaMigration;
+      this._internalMetadata = internalMetadata as InternalMetadata;
+      this._adapter = this._schemaMigration.connection;
+    } else {
+      this._adapter = direction;
+      this._schemaMigration = new SchemaMigration(direction);
+      this._internalMetadata = new InternalMetadata(direction);
+    }
     this._environment =
       options.environment ??
       getEnv("TRAILS_ENV") ??

@@ -27,7 +27,7 @@ export { Cipher } from "./encryption/cipher.js";
 import { EncryptableRecord, encryptedTypeOf } from "./encryption/encryptable-record.js";
 import { Configurable } from "./encryption/configurable.js";
 import { Contexts } from "./encryption/contexts.js";
-import { getEncryptionContext, type Context } from "./encryption/context.js";
+import type { Context } from "./encryption/context.js";
 import type { Config } from "./encryption/config.js";
 
 /**
@@ -125,7 +125,7 @@ export function applyPendingEncryptions(klass: any): void {
   ) {
     klass._frozenEncryptionValidatorInstalled = true;
     klass.validate((record: any) => {
-      if (!getEncryptionContext().frozenEncryption) return;
+      if (!Contexts.context.frozenEncryption) return;
       // Delegate to the Rails-mirrored static so both code paths share one impl.
       EncryptableRecord.cantModifyEncryptedAttributesWhenFrozen(record);
     });

@@ -375,9 +375,14 @@ export class DatabaseTasks {
     dbConfig: DatabaseConfig,
   ): Promise<import("../migration.js").Migrator> {
     const { Migrator } = await import("../migration.js");
-    return new Migrator(adapter, this._migrationsFor(dbConfig), {
-      environment: dbConfig.envName,
-    });
+    const { SchemaMigration } = await import("../schema-migration.js");
+    const { InternalMetadata } = await import("../internal-metadata.js");
+    return new Migrator(
+      "up",
+      this._migrationsFor(dbConfig),
+      new SchemaMigration(adapter),
+      new InternalMetadata(adapter),
+    );
   }
 
   /**

@@ -54,8 +54,10 @@ export {
   ivLength,
   eagerLoadBang,
   // Module-level delegates (mirrors Rails' include Configurable + include Contexts).
-  // withEncryptionContext/withoutEncryption/protectingEncryptedData/resetDefaultContext
-  // are already re-exported from context.ts above.
+  withEncryptionContext,
+  withoutEncryption,
+  protectingEncryptedData,
+  resetDefaultContext,
   configure,
   config,
   defaultContext,

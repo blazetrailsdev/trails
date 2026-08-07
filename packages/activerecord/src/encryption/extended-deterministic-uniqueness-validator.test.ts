@@ -3,7 +3,7 @@ import { EncryptedUniquenessValidator } from "./extended-deterministic-uniquenes
 import { ExtendedDeterministicQueries } from "./extended-deterministic-queries.js";
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 import { Scheme } from "./scheme.js";
-import { getEncryptionContext } from "./context.js";
+import { Contexts } from "./contexts.js";
 import { NullEncryptor } from "./null-encryptor.js";
 import type { EncryptorLike } from "./encryptor.js";
 
@@ -50,7 +50,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicUniquenessValidatorTest
       calls.push({
         attribute,
         value,
-        encryptionDisabled: getEncryptionContext().encryptor instanceof NullEncryptor,
+        encryptionDisabled: Contexts.context.encryptor instanceof NullEncryptor,
       });
     };
 

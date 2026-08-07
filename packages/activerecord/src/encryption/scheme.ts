@@ -14,7 +14,8 @@ import { Configuration } from "./errors.js";
 import { type Compressor } from "./config.js";
 import { Configurable } from "./configurable-slot.js";
 import type { MessageSerializerLike } from "./message-serializer.js";
-import { withEncryptionContext, type Context } from "./context.js";
+import type { Context } from "./context.js";
+import { Contexts } from "./contexts.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
 import { DeterministicKeyProvider } from "./deterministic-key-provider.js";
 
@@ -112,7 +113,7 @@ export class Scheme {
       const ctx: Partial<Context> = {};
       if (hasEncryptorOverride) ctx.encryptor = this._encryptor;
       if (messageSerializer !== undefined) ctx.messageSerializer = messageSerializer;
-      return withEncryptionContext(ctx, fn);
+      return Contexts.withEncryptionContext(ctx, fn);
     }
     return fn();
   }

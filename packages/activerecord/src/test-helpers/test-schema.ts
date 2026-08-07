@@ -1654,14 +1654,15 @@ export const TEST_SCHEMA: Schema = {
   // column; no synthetic `id`.
   fk_test_has_pk: {
     columns: {
-      pk_id: { type: "integer", null: false },
+      pk_id: { type: "big_integer", null: false },
     },
     primaryKey: ["pk_id"],
   },
   fk_test_has_fk: {
     columns: {
-      fk_id: { type: "integer", null: false },
+      fk_id: { type: "big_integer", null: false },
     },
+    indexes: [{ columns: "fk_id" }],
     foreignKeys: [
       { toTable: "fk_test_has_pk", column: "fk_id", primaryKey: "pk_id", name: "fk_name" },
     ],
