@@ -1601,12 +1601,12 @@ export class PostgreSQLAdapter
     // `transactionStatus` is opened here, where the query goes on the wire,
     // and closed by the terminating message.
     this._commandSettled = false;
-    const query = fn();
-    this._queryInFlightSettled = query.then(
-      () => {},
-      () => {},
-    );
     try {
+      const query = fn();
+      this._queryInFlightSettled = query.then(
+        () => {},
+        () => {},
+      );
       return await query;
     } finally {
       this._queryInFlightOwner = null;
@@ -3087,10 +3087,15 @@ export class PostgreSQLAdapter
     // Chain off the maintenance tail so ROLLBACK (and the DISCARD ALL below)
     // serialize behind any pending DEALLOCATE on the pinned client rather than
     // firing onto a client that's still executing one.
-    let work: Promise<unknown> = this._maintenanceTail;
+    // Read once, here: a query enqueued after the barrier below is published
+    // chains onto `_maintenanceTail` *behind* that barrier, so re-reading the
+    // field from inside the chain would make this reset wait on a query that is
+    // waiting on this reset.
+    const tail = this._maintenanceTail;
+    let work: Promise<unknown> = tail;
     if (this._client) {
       work = this._cancelAnyRunningQuery()
-        .then(() => this._maintenanceTail)
+        .then(() => tail)
         .then(() => live.query("ROLLBACK"))
         .catch(() => {});
       this._client = null;
