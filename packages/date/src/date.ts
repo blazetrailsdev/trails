@@ -2762,8 +2762,8 @@ function completeFrags(parts: DateParts): void {
       parts.cweek ??= 1;
       parts.cwday ??= 1;
     } else if (k === "wday") {
-      const w = d.subtract({ days: d.dayOfWeek % 7 }).add({ days: parts.wday as number });
-      parts.jd = cCivilToJd(w.year, w.month, w.day);
+      const d2 = d.subtract({ days: d.dayOfWeek % 7 }).add({ days: parts.wday as number });
+      parts.jd = cCivilToJd(d2.year, d2.month, d2.day);
     } else if (k === "wnum0") {
       for (const el of a) {
         if (parts[el] !== undefined) break;

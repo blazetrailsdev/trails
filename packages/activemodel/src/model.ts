@@ -244,17 +244,18 @@ function _xmlTypeInfo(
   return { types, nested };
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (json.rb:47-49); the class/interface merge is how `include()` surfaces on the type side.
+export interface Model {
+  /** `ActiveSupport::ToJsonWithActiveSupportEncoder#to_json` (json.rb:35-43). */
+  toJSON: Included<typeof ToJsonWithActiveSupportEncoder>["toJSON"];
+}
+
 /**
  * Model — the base class that bundles Attributes, Validations, Callbacks,
  * Dirty tracking, Serialization, and Naming.
  *
  * Mirrors: ActiveModel::Model (with all the included modules)
  */
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (json.rb:47-49); the class/interface merge is how `include()` surfaces on the type side.
-export interface Model {
-  /** `ActiveSupport::ToJsonWithActiveSupportEncoder#to_json` (json.rb:35-43). */
-  toJSON: Included<typeof ToJsonWithActiveSupportEncoder>["toJSON"];
-}
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Model {
   // Allow dynamic attribute access (e.g., record.title) for properties

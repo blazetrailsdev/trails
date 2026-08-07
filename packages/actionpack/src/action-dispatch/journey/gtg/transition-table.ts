@@ -43,16 +43,17 @@ function anchorPreservingFlags(re: RegExp): RegExp {
   return new RegExp(`^(?:${re.source})$`, flags.join(""));
 }
 
-/**
- * Generalized Transition table — the DFA produced by Builder. Implements the
- * `TransitionTableLike` shape that `Simulator` consumes. Mirrors Rails'
- * `ActionDispatch::Journey::GTG::TransitionTable`.
- */
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (json.rb:47-49); the class/interface merge is how `include()` surfaces on the type side.
 export interface TransitionTable {
   /** `ActiveSupport::ToJsonWithActiveSupportEncoder#to_json` (json.rb:35-43). */
   toJSON: Included<typeof ToJsonWithActiveSupportEncoder>["toJSON"];
 }
+
+/**
+ * Generalized Transition table — the DFA produced by Builder. Implements the
+ * `TransitionTableLike` shape that `Simulator` consumes. Mirrors Rails'
+ * `ActionDispatch::Journey::GTG::TransitionTable`.
+ */
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class TransitionTable implements TransitionTableLike, DotHost {
   /** @internal */
