@@ -38,6 +38,15 @@ class RateLimitExhaustedError extends Error {
   }
 }
 
+class JobLogFetchFailedError extends Error {
+  constructor(selected: number) {
+    super(
+      `Job log fetch failed: selected ${selected} jobs and fetched 0. ` +
+        `The compare-stats feed is stalled; see the per-job warnings above.`,
+    );
+  }
+}
+
 function waitForCooldownAndInterval() {
   const cooldownRemaining = rateLimitCooldownUntil - Date.now();
   if (cooldownRemaining > 0) {
@@ -1886,7 +1895,7 @@ async function syncJobLogs(mode: "latest" | "refresh" | "backfill"): Promise<num
     const prNumber = job.pr_number as number;
 
     try {
-      const logs = gh(`api repos/${REPO}/actions/jobs/${jobId}/logs`);
+      const logs = gh(`api --allow-escape-sequences repos/${REPO}/actions/jobs/${jobId}/logs`);
       await RawJobLog.upsertAll(
         [
           {
@@ -1913,6 +1922,9 @@ async function syncJobLogs(mode: "latest" | "refresh" | "backfill"): Promise<num
   }
 
   console.log(`  Fetched ${fetched} job logs`);
+  if (fetched === 0) {
+    throw new JobLogFetchFailedError(jobsToFetch.length);
+  }
   return fetched;
 }
 
