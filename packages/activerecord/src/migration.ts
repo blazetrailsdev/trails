@@ -2561,6 +2561,12 @@ export class Migrator {
    * (`migration.rb:1488-1491`). `DatabaseTasks` is reached through the
    * call-time config source: naming `tasks/database-tasks.js` here would be a
    * load-time edge back into a module that already imports this one.
+   *
+   * Rails' body is a bare delegation with no null branch — `migration_connection`
+   * is `migration_class.lease_connection`
+   * (`tasks/database_tasks.rb:533-535`), which raises rather than answering nil.
+   * The assertions keep that shape; adding a guard here would be a branch Rails
+   * does not have.
    */
   private get connection(): DatabaseAdapter {
     return migrationArConfig()!.databaseTasks!().migrationConnection()!;
