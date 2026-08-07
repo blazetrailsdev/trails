@@ -1189,9 +1189,13 @@ export async function _loadSingularViaStatementCache(
  * first-step WHERE would match orphan through rows whose FK is null,
  * leaking them into the chain as phantom associations.
  *
- * Read from the OUTER reflection's `activeRecordPrimaryKey` —
- * that's the owner's own PK column(s), never a delegated downstream
- * target. `isNewRecord()` covers unsaved records; the explicit
+ * Read the columns the chain walk actually seeds from — the tail of
+ * `reflection.chain`'s `joinForeignKey`, which is what
+ * `last_scope_chain` reads off the owner
+ * (`disable_joins_association_scope.rb:20`). The outer reflection's own
+ * `activeRecordPrimaryKey` is not that: on a ThroughReflection it delegates to
+ * the source reflection (`reflection.rb:973-974`), so it describes the source
+ * edge, not the owner. `isNewRecord()` covers unsaved records; the explicit
  * PK-null check covers the defensive edge where a saved record
  * somehow has a null composite-PK component.
  *
@@ -1207,9 +1211,8 @@ export function ownerHasUnresolvedThroughKey(
   reflection: ReflectionLike | null | undefined,
 ): boolean {
   if (record.isNewRecord()) return true;
-  const activeRecordPk = reflection?.activeRecordPrimaryKey;
-  const ownerPkCols =
-    activeRecordPk == null ? [] : Array.isArray(activeRecordPk) ? activeRecordPk : [activeRecordPk];
+  const ownerFk = _ownerChainReflection(reflection)?.joinForeignKey;
+  const ownerPkCols = ownerFk == null ? [] : Array.isArray(ownerFk) ? ownerFk : [ownerFk];
   return ownerPkCols.some((col) => {
     const v = record._readAttribute(col);
     return v === null || v === undefined;
