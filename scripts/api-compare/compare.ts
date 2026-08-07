@@ -1348,6 +1348,12 @@ export interface RubyEntity {
  * A mapped file gets its own bucket instead, holding only the methods it
  * defines. Splits carry no `includes`/`extends`: the include-flattened methods
  * belong to the home bucket, not to every file the entity is reopened in.
+ *
+ * A reopening file declared unported (UNPORTED_FILES) is split for the same
+ * reason with the opposite outcome: only a file that owns a bucket can be
+ * excluded by `isSourceUnported`, which the caller consults per bucket. Without
+ * the split, `version.rb`'s `.version` would sit in `active_record.rb`'s bucket
+ * and read as missing however the exclusion is spelled.
  */
 export function splitOverriddenFileBuckets(entity: RubyEntity, pkg: string): RubyEntity[] {
   const home = entity.info.file || "unknown.rb";
@@ -1355,7 +1361,12 @@ export function splitOverriddenFileBuckets(entity: RubyEntity, pkg: string): Rub
   const splitFiles = new Set(
     allMethods
       .map((m) => m.file)
-      .filter((f): f is string => f !== undefined && f !== home && hasRubyFileTsOverride(f, pkg)),
+      .filter(
+        (f): f is string =>
+          f !== undefined &&
+          f !== home &&
+          (hasRubyFileTsOverride(f, pkg) || isSourceUnported(f, pkg)),
+      ),
   );
   if (splitFiles.size === 0) return [entity];
 

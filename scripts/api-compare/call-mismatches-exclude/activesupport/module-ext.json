@@ -1,0 +1,23 @@
+[
+  {
+    "package": "activesupport",
+    "tsFile": "module-ext.ts",
+    "rubyName": "delegate",
+    "call": "first",
+    "reason": "Part of the same omission: the `location: caller_locations(1, 1).first` argument Rails passes to `Delegation.generate` for error backtraces has no caller in trails' inline generation."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "module-ext.ts",
+    "rubyName": "delegate",
+    "call": "generate",
+    "reason": "Rails' `delegate` is a thin front for `ActiveSupport::Delegation.generate` (delegation.rb:280), the module trails has not ported; `delegate` reimplements the method generation inline instead. A real divergence, surfaced (not introduced) by bucketing `core_ext/module/delegation.rb` on module-ext.ts."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "module-ext.ts",
+    "rubyName": "mattr_accessor",
+    "call": "first",
+    "reason": "Rails passes `location: caller_locations(1, 1).first` to `mattr_reader`/`mattr_writer` (attribute_accessors.rb:66) so a raised NameError points at the declaring line. trails generates the accessors directly with no location plumbing."
+  }
+]

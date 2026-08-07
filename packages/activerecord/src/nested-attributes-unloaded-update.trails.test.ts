@@ -114,7 +114,7 @@ describe("nested attributes update on an unloaded one-to-one association", () =>
     // back a rejected promise.
     expect(() =>
       (
-        pirate as unknown as { setShipAttributes(attributes: unknown): Promise<void> }
+        pirate as unknown as { setShipAttributes(attributes: unknown): Promise<void> | void }
       ).setShipAttributes({
         id: (ship as unknown as { id: number }).id,
         name: "Davy Jones Gold Dagger",

@@ -6,7 +6,6 @@ import {
   association as collectionProxyFor,
 } from "./associations.js";
 import { ActiveRecordError, UnknownAttributeError, RecordNotFound } from "./errors.js";
-import { NestedAttributesDisplacementError } from "./associations/errors.js";
 import { singularize, camelize, underscore, isBlank } from "@blazetrails/activesupport";
 import { Table, UpdateManager } from "@blazetrails/arel";
 import {
@@ -178,9 +177,8 @@ export function acceptsNestedAttributesFor(
       this: Base,
       options?: { validate?: boolean; touch?: boolean },
     ): Promise<boolean> {
-      // Finish the reader load a nested-attributes assignment could not await
-      // (Rails' `send(association_name)` is synchronous), so the parent is never
-      // saved against a half-assigned graph.
+      // Finish the reader load the constructor re-dispatch could not await, so
+      // the parent is never saved against a half-assigned graph.
       await awaitPendingNestedReaderLoads(this);
       const result = await originalSave.call(this, options);
       if (!result) return false;
@@ -568,31 +566,26 @@ function generateAssociationWriter(
     (modelClass as any)._nestedAttributeSetterKeys = new Set<string>();
   }
   (modelClass as any)._nestedAttributeSetterKeys.add(attrName);
-  const assign: (record: Base, name: string, value: any, awaitable?: boolean) => unknown =
+  const assign: (record: Base, name: string, value: any) => Promise<void> | void =
     type === "collection"
       ? assignNestedAttributesForCollectionAssociation
       : assignNestedAttributesForOneToOneAssociation;
-  Object.defineProperty(modelClass.prototype, attrName, {
-    set(this: Base, value: any) {
-      assign(this, associationName, value);
-    },
-    configurable: true,
-  });
 
-  // The awaitable counterpart of the Rails-named `#{name}_attributes=` setter.
-  // Rails' writer loads, removes the displaced record and installs the
-  // replacement inline, raising at the assignment expression; a JS property
-  // setter cannot await, so this is the surface that reproduces that timing
-  // (RFC 0068's `set#{Name}` sugar, applied to nested attributes) — and the one
-  // the synchronous setter names when it refuses a displacing assignment.
-  // Collections get it too, for one uniform awaitable writer per association.
+  // Rails' `#{name}_attributes=` (nested_attributes.rb:401-404). Rails' writer
+  // loads, removes the displaced record and installs the replacement inline,
+  // raising at the assignment expression; a JS property setter can await none of
+  // that, so the Rails name lands on a `set#{Name}Attributes()` method — the
+  // settled trails shape for a Ruby `x=` that must be async (CLAUDE.md).
+  // Collections get it too, for one uniform writer per association.
   Object.defineProperty(modelClass.prototype, `set${camelize(attrName, true)}`, {
     // Deliberately not `async`: Ruby's writer raises at the assignment
     // expression, and an `async` body would turn every synchronous raise
     // (nested_attributes.rb:415's `Cannot build association` among them) into a
-    // rejection observed only at the `await`.
-    value(this: Base, value: any): Promise<void> {
-      return Promise.resolve(assign(this, associationName, value, true)) as Promise<void>;
+    // rejection observed only at the `await`. It answers a promise only when the
+    // assignment owes DB I/O, so an in-memory one also *completes* where Ruby's
+    // does — inside `new Model({...})`, before the constructor returns.
+    value(this: Base, value: any): Promise<void> | void {
+      return assign(this, associationName, value);
     },
     writable: true,
     configurable: true,
@@ -721,10 +714,10 @@ async function detachDisplacedThenSetNewRecord(
  *
  * Rails reads the existing record with `send(association_name)`
  * (nested_attributes.rb:434), a plain synchronous call; ours is a promise for an
- * unloaded association, which the Rails-named setter cannot await. Unlike the
- * displacement removal — which now refuses rather than defers
- * ({@link NestedAttributesDisplacementError}) — this deferral is a *read*, so no
- * DB state is in flight to race an interim insert.
+ * unloaded association. The writer itself awaits that load; this is for the one
+ * caller that cannot — the constructor re-dispatch in `_reapplyNestedAttrSetters`
+ * (persistence.ts). The deferral is a *read*, so no DB state is in flight to
+ * race an interim insert.
  * @internal
  */
 export function parkNestedReaderLoad(record: Base, load: Promise<void>): void {
@@ -804,11 +797,6 @@ export function assignNestedAttributesForOneToOneAssociation(
   record: Base,
   associationName: string,
   attributes: Record<string, unknown>,
-  // Whether the caller can `await` the result: true for the awaitable
-  // `set#{Name}Attributes` writer, false for the Rails-named
-  // `#{name}_attributes=` property setter, which refuses the assignments that
-  // need I/O rather than deferring them (RFC 0068 Design §6).
-  awaitable = false,
 ): Promise<void> | void {
   if (typeof attributes !== "object" || attributes === null || Array.isArray(attributes)) {
     throw new Error(
@@ -822,25 +810,17 @@ export function assignNestedAttributesForOneToOneAssociation(
   const updateOnly = options.updateOnly ?? false;
   const hasId = hasNestedId(attributes);
 
-  // Rails: `existing_record = send(association_name)`. The reader loads an
-  // unloaded association; a synchronous writer cannot await that, so the whole
-  // body is re-entered once it lands (`assoc.isLoaded()` is true by then, so
-  // this resolves and falls through).
+  // Rails: `existing_record = send(association_name)` (nested_attributes.rb:434).
+  // The reader loads an unloaded association; ours answers a promise for that
+  // load, so the whole body is re-entered once it lands (`assoc.isLoaded()` is
+  // true by then, so this resolves and falls through).
   const assoc = record.association(associationName) as unknown as OneToOneAssociation;
   if ((hasId || updateOnly) && assoc.isLoaded?.() === false && "reader" in assoc) {
     const read = assoc.reader;
     if (read instanceof Promise) {
-      const reentry = read.then(() =>
-        assignNestedAttributesForOneToOneAssociation(
-          record,
-          associationName,
-          attributes,
-          awaitable,
-        ),
+      return read.then(() =>
+        assignNestedAttributesForOneToOneAssociation(record, associationName, attributes),
       );
-      if (awaitable) return reentry;
-      parkNestedReaderLoad(record, reentry);
-      return;
     }
   }
   const existing = assoc.target ?? null;
@@ -905,14 +885,14 @@ export function assignNestedAttributesForOneToOneAssociation(
         if (assoc.displacementNeedsAwait?.() === true) {
           // DB I/O Rails runs inline before `self.target = record` (:84) — a
           // SELECT for a never-loaded association, then `remove_target!`'s
-          // nullify/destroy save. A property setter can neither await it nor
-          // defer it without reopening the order-undefined two-row window RFC
-          // 0068 exists to close, so it refuses and names the awaitable writer.
-          if (!awaitable) throw new NestedAttributesDisplacementError(associationName);
+          // nullify/destroy save. Returning the promise puts it at the
+          // assignment expression, where Rails runs it.
           return detachDisplacedThenSetNewRecord(assoc, built);
         }
         // Nothing to displace: Rails' `self.target = record` (:84) is all that
-        // remains of `replace`, and it is in-memory work.
+        // remains of `replace`, and it is in-memory work — so it stays
+        // synchronous, which is what lets `new Model({shipAttributes: …})` build
+        // the associated record inside the constructor Rails runs it in.
         if (built) assoc.setNewRecord(built);
       }
     }

@@ -173,31 +173,25 @@ describe("nested attributes save wrapper argument forwarding (trails-only)", () 
 
   // `new Model(...)` / `Model.create(...)` reach the nested writer by Rails
   // name (`public_send("#{k}=")`, attribute_assignment.rb:35-48), not by
-  // hunting a `#{name}Attributes=` descriptor on the prototype. Deleting the
-  // property setter — which RFC 0087 does next — must therefore leave
-  // construction-time nested attributes assigned rather than silently skipped.
+  // hunting a `#{name}Attributes=` descriptor on the prototype. RFC 0087 §1
+  // deleted that property setter, so construction has none to find.
   it("assigns constructor nested attributes without the property setter", async () => {
     Pirate.acceptsNestedAttributesFor("ship");
-    const setterDescriptor = Object.getOwnPropertyDescriptor(Pirate.prototype, "shipAttributes")!;
-    delete (Pirate.prototype as unknown as Record<string, unknown>).shipAttributes;
+    expect(Object.getOwnPropertyDescriptor(Pirate.prototype, "shipAttributes")).toBeUndefined();
 
-    try {
-      const pirate = new Pirate({ catchphrase: "Arr", shipAttributes: { name: "Black Pearl" } });
-      await pirate.saveBang();
-      expect(
-        cols((await Ship.where({ pirate_id: readAttr(pirate, "id") }).first()) as Base).name,
-      ).toBe("Black Pearl");
+    const pirate = new Pirate({ catchphrase: "Arr", shipAttributes: { name: "Black Pearl" } });
+    await pirate.saveBang();
+    expect(
+      cols((await Ship.where({ pirate_id: readAttr(pirate, "id") }).first()) as Base).name,
+    ).toBe("Black Pearl");
 
-      const created = await Pirate.createBang({
-        catchphrase: "Aye",
-        shipAttributes: { name: "Flying Dutchman" },
-      });
-      expect(
-        cols((await Ship.where({ pirate_id: readAttr(created, "id") }).first()) as Base).name,
-      ).toBe("Flying Dutchman");
-    } finally {
-      Object.defineProperty(Pirate.prototype, "shipAttributes", setterDescriptor);
-    }
+    const created = await Pirate.createBang({
+      catchphrase: "Aye",
+      shipAttributes: { name: "Flying Dutchman" },
+    });
+    expect(
+      cols((await Ship.where({ pirate_id: readAttr(created, "id") }).first()) as Base).name,
+    ).toBe("Flying Dutchman");
   });
 
   it("forwards save options through the nested-attributes save wrapper", async () => {
@@ -249,5 +243,48 @@ describe("nested attributes assignment ordering (trails-only)", () => {
     }
 
     expect(observed).toEqual(["Aye"]);
+  });
+
+  // `_assign_attributes` and `assign_nested_parameter_attributes`
+  // (attribute_assignment.rb:9-23, 26-28) are plain `each` loops, so an
+  // assignment that reaches DB I/O — a displacing `#{name}_attributes=` running
+  // `load_target` / `remove_target!` (has_one_association.rb:59-69) — finishes
+  // before the next key is assigned.
+  it("finishes a displacing nested assignment before assigning the next key", async () => {
+    Pirate.acceptsNestedAttributesFor("parrots");
+    const pirate = (await Pirate.create({ catchphrase: "Aye" })) as unknown as Pirate;
+    await Ship.create({
+      name: "Nights Dirty Lightning",
+      pirate_id: (pirate as unknown as { id: number }).id,
+    });
+    await (pirate as unknown as { ship: Promise<Base | null> }).ship;
+
+    const events: string[] = [];
+    const assoc = pirate.association("ship") as unknown as {
+      detachDisplacedTarget: () => Promise<void>;
+    };
+    const removeTarget = assoc.detachDisplacedTarget.bind(assoc);
+    assoc.detachDisplacedTarget = async () => {
+      events.push("remove_target!:start");
+      await removeTarget();
+      events.push("remove_target!:end");
+    };
+
+    const config = (
+      Pirate as unknown as {
+        _nestedAttributeConfigs: { associationName: string; options: { rejectIf?: unknown } }[];
+      }
+    )._nestedAttributeConfigs.find((c) => c.associationName === "parrots")!;
+    config.options.rejectIf = () => {
+      events.push("parrots");
+      return false;
+    };
+
+    await pirate.assignAttributes({
+      shipAttributes: { name: "Davy Jones Gold Dagger" },
+      parrotsAttributes: { foo: { name: "Posideons Killer" } },
+    });
+
+    expect(events).toEqual(["remove_target!:start", "remove_target!:end", "parrots"]);
   });
 });

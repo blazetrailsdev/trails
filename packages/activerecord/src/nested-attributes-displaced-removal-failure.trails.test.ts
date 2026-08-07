@@ -7,22 +7,18 @@
  * (vendor/rails/activerecord/lib/active_record/associations/has_one_association.rb:95-115),
  * so `pirate.ship_attributes = {...}` surfaces the failure at the assignment
  * expression whether or not the owner is ever saved. A synchronous JS property
- * setter cannot raise on an async write — so it does not start one: the
- * awaitable `set#{Name}Attributes` writer runs the load, the removal and the
- * target install in Rails' order and raises at the assignment point, while the
- * Rails-named setter refuses a displacing assignment up front
- * (`NestedAttributesDisplacementError`) instead of parking a write that would
- * fail later.
+ * setter cannot raise on an async write, so the Rails name lands on the
+ * awaitable `set#{Name}Attributes` writer, which runs the load, the removal and
+ * the target install in Rails' order and raises at the assignment point.
  *
  * No Rails test covers a *failing* displacement removal, hence a trails-only
  * guard rather than a mirrored test.
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { registerModel, NestedAttributesDisplacementError, type Base } from "./index.js";
+import { registerModel, type Base } from "./index.js";
 import { fixtures } from "./test-fixtures.js";
 import { Pirate } from "./test-helpers/models/pirate.js";
 import { Ship } from "./test-helpers/models/ship.js";
-import { Bird } from "./test-helpers/models/bird.js";
 
 /**
  * A pirate with a loaded, persisted ship whose displacement removal is rigged
@@ -50,7 +46,6 @@ describe("nested-attributes displacement removal failure", () => {
   beforeAll(() => {
     registerModel(Pirate);
     registerModel(Ship);
-    registerModel(Bird);
   });
 
   it("detaches the displaced row at the assignment through the awaitable writer", async () => {
@@ -95,38 +90,5 @@ describe("nested-attributes displacement removal failure", () => {
     // (:69), so a raising removal leaves the OLD record cached — the ordering
     // the retired target swap could not express.
     expect(pirate.association("ship").target).toBe(displaced);
-  });
-
-  it("parks no removal for a synchronous displacing assignment to fail later", async () => {
-    const pirate = await pirateWithFailingRemoval();
-
-    // The setter refuses instead of starting a write it cannot await, so there
-    // is no deferred failure to surface at `save()` — and nothing that could
-    // become an unhandled rejection if the owner is never saved.
-    expect(() => {
-      (pirate as unknown as { shipAttributes: unknown }).shipAttributes = {
-        name: "Davy Jones Gold Dagger",
-      };
-    }).toThrow(NestedAttributesDisplacementError);
-
-    await expect(pirate.save()).resolves.toBe(true);
-  });
-
-  it("leaves an unrelated association's awaitable writer unaffected", async () => {
-    const pirate = await pirateWithFailingRemoval();
-
-    expect(() => {
-      (pirate as unknown as { shipAttributes: unknown }).shipAttributes = {
-        name: "Davy Jones Gold Dagger",
-      };
-    }).toThrow(NestedAttributesDisplacementError);
-
-    // With no parked removal, there is no owner-wide sticky failure left for an
-    // unrelated writer to inherit: the refusal was terminal at its own call site.
-    await expect(
-      (
-        pirate as unknown as { setBirdsAttributes: (a: unknown) => Promise<void> }
-      ).setBirdsAttributes([{ name: "Posideons Killer" }]),
-    ).resolves.toBeUndefined();
   });
 });

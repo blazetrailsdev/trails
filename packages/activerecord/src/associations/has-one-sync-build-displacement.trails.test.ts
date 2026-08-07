@@ -9,10 +9,7 @@
  * caller that can displace a persisted record issues the DB half itself. The
  * `build#{Name}` / `create#{Name}` accessors use `detachDisplacedTarget`. The
  * nested-attributes writer calls the same method from its *awaitable* half
- * (`await owner.set#{Name}Attributes({...})`), in Rails' order; the Rails-named
- * synchronous setter refuses a displacing assignment outright
- * (`NestedAttributesDisplacementError`) rather than deferring the write to the
- * owner's next `save()`. A *direct* `record.association(name).build(...)` runs
+ * (`await owner.set#{Name}Attributes({...})`), in Rails' order. A *direct* `record.association(name).build(...)` runs
  * the removal itself and returns the record wrapped in that promise for the
  * caller to `await`.
  *
@@ -22,12 +19,7 @@
  * guard rather than a change to the mirrored test.
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import {
-  registerModel,
-  NestedAttributesDisplacementError,
-  RecordNotSaved,
-  type Base,
-} from "../index.js";
+import { registerModel, RecordNotSaved, type Base } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
 import { Pirate } from "../test-helpers/models/pirate.js";
 import { Ship } from "../test-helpers/models/ship.js";
@@ -61,66 +53,17 @@ describe("has_one displacement via the synchronous build path", () => {
     expect((reloaded as unknown as { pirate_id: number | null }).pirate_id).toBe(null);
   });
 
-  it("refuses a displacing assignment through the synchronous setter", async () => {
-    const pirate = (await Pirate.create({ catchphrase: "Aye" })) as Base;
-    const displaced = (await Ship.create({
-      name: "Nights Dirty Lightning",
-      pirate_id: (pirate as unknown as { id: number }).id,
-    })) as Base;
-    await (pirate as unknown as { ship: Promise<Base | null> }).ship;
-
-    // Rails' `replace` removes the displaced row inline at the assignment
-    // expression; a property setter can neither await that nor defer it without
-    // reopening the two-row window, so it raises and names the awaitable writer.
-    expect(() => {
-      (pirate as unknown as { shipAttributes: unknown }).shipAttributes = {
-        name: "Davy Jones Gold Dagger",
-      };
-    }).toThrow(NestedAttributesDisplacementError);
-
-    // Nothing partial landed: the displaced record is still cached and attached.
-    expect((pirate.association("ship").target as unknown as { id: number }).id).toBe(
-      (displaced as unknown as { id: number }).id,
-    );
-    const reloaded = (await Ship.find((displaced as unknown as { id: number }).id)) as Base;
-    expect((reloaded as unknown as { pirate_id: number | null }).pirate_id).toBe(
-      (pirate as unknown as { id: number }).id,
-    );
-  });
-
-  it("refuses a displacing assignment over an unloaded child through the synchronous setter", async () => {
-    const pirate = (await Pirate.create({ catchphrase: "Aye" })) as Base;
-    const displaced = (await Ship.create({
-      name: "Nights Dirty Lightning",
-      pirate_id: (pirate as unknown as { id: number }).id,
-    })) as Base;
-
-    // Never loaded: Rails' `replace` guard is `return target unless load_target
-    // || record`, whose left operand always runs, so the assignment still owes a
-    // SELECT — which is exactly what the synchronous setter cannot await.
-    const refetched = (await Pirate.find((pirate as unknown as { id: number }).id)) as Base;
-    expect(() => {
-      (refetched as unknown as { shipAttributes: unknown }).shipAttributes = {
-        name: "Davy Jones Gold Dagger",
-      };
-    }).toThrow(NestedAttributesDisplacementError);
-
-    const reloaded = (await Ship.find((displaced as unknown as { id: number }).id)) as Base;
-    expect((reloaded as unknown as { pirate_id: number | null }).pirate_id).toBe(
-      (pirate as unknown as { id: number }).id,
-    );
-  });
-
-  it("keeps the synchronous setter working when the assignment displaces nothing", async () => {
+  it("keeps the writer synchronous when the assignment displaces nothing", async () => {
     const pirate = (await Pirate.create({ catchphrase: "Aye" })) as Base;
     // A loaded, empty association owes no load and has nothing to remove, so
-    // Rails' `replace` reduces to `self.target = record` — in-memory work a
-    // property setter can do.
+    // Rails' `replace` reduces to `self.target = record` — in-memory work the
+    // writer does inline rather than answering a promise for.
     await (pirate as unknown as { ship: Promise<Base | null> }).ship;
 
-    (pirate as unknown as { shipAttributes: unknown }).shipAttributes = {
-      name: "Davy Jones Gold Dagger",
-    };
+    const pending = (
+      pirate as unknown as { setShipAttributes(a: object): Promise<void> | void }
+    ).setShipAttributes({ name: "Davy Jones Gold Dagger" });
+    expect(pending).toBeUndefined();
     await pirate.save();
 
     const ship = (await (pirate as unknown as { ship: Promise<Base | null> }).ship) as Base;
@@ -224,14 +167,16 @@ describe("has_one displacement via the synchronous build path", () => {
     };
 
     expect(() => {
-      (refetched as unknown as { shipAttributes: unknown }).shipAttributes = {
+      void (
+        refetched as unknown as { setShipAttributes(a: object): Promise<void> | void }
+      ).setShipAttributes({
         name: "Davy Jones Gold Dagger",
-      };
+      });
     }).toThrow("build exploded");
 
     // Rails is `build_record(...)` then `set_new_record` → `load_target`, so a
-    // raising build leaves the row untouched — the construction error surfaces,
-    // not the displacement refusal that would follow it.
+    // raising build leaves the row untouched — the construction error surfaces
+    // before the displacement query that would follow it.
     const reloaded = (await Ship.find((displaced as unknown as { id: number }).id)) as Base;
     expect((reloaded as unknown as { pirate_id: number | null }).pirate_id).toBe(
       (pirate as unknown as { id: number }).id,
@@ -301,9 +246,11 @@ describe("has_one displacement via the synchronous build path", () => {
     };
 
     expect(() => {
-      (pirate as unknown as { shipAttributes: unknown }).shipAttributes = {
+      void (
+        pirate as unknown as { setShipAttributes(a: object): Promise<void> | void }
+      ).setShipAttributes({
         name: "Davy Jones Gold Dagger",
-      };
+      });
     }).toThrow("build exploded");
 
     expect(detached).toBe(false);

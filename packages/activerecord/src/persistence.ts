@@ -667,11 +667,10 @@ function assignUpdateAttribute(self: any, key: string, value: unknown): Promise<
     | { associationName: string }[]
     | undefined;
   if (configs?.some((c) => `${c.associationName}Attributes` === key)) {
-    // The awaitable writer, for the same reason `#{singular}Ids` goes through
-    // `idsWriter` below: Rails' `#{name}_attributes=` runs `load_target` and
-    // `remove_target!` inline (has_one_association.rb:59-69), and `#update` is
-    // async, so it can await what the property setter refuses
-    // (`NestedAttributesDisplacementError`).
+    // The nested-attributes writer, for the same reason `#{singular}Ids` goes
+    // through `idsWriter` below: Rails' `#{name}_attributes=` runs `load_target`
+    // and `remove_target!` inline (has_one_association.rb:59-69), and `#update`
+    // is async, so it awaits them here.
     return self[`set${camelize(key, true)}`](value) as Promise<void>;
   }
   // Rails' #update → assign_attributes dispatches `id` through `public_send("id=")`,
@@ -1056,7 +1055,7 @@ function findPrototypeSetter(instance: object, key: string): ((v: unknown) => vo
 }
 
 /**
- * Re-dispatch any `*Attributes=` nested attribute setter keys that the Base
+ * Re-dispatch any `*Attributes` nested attribute keys that the Base
  * constructor wrote as plain attribute values (via `writeAttribute`) rather
  * than through the generated writer. Called by `create`/`createBang` after
  * construction so that `Model.create({commentsAttributes: [...]})` correctly
@@ -1068,9 +1067,12 @@ function findPrototypeSetter(instance: object, key: string): ((v: unknown) => vo
  * The name is the awaitable `set#{Name}Attributes` writer rather than the
  * `#{name}Attributes=` property setter: it is the one that reproduces Rails'
  * inline timing for the assignments that need I/O, and a JS property setter
- * cannot await. Since a constructor cannot await either, the returned promise
- * is parked and drained where the other deferred nested-attributes work is
- * drained — `save` (nested-attributes.ts:184).
+ * cannot await. The writer answers a promise only when the assignment owes DB
+ * I/O, which a record under construction cannot: it is new, so its has_one never
+ * queries (`find_target?` is false) and holds no loaded target. Should one ever
+ * arrive, a constructor cannot await it either, so it is parked and drained
+ * where the other deferred nested-attributes work is drained — `save`
+ * (nested-attributes.ts:182).
  */
 export function _reapplyNestedAttrSetters(
   ctor: PersistenceHost,
@@ -1083,7 +1085,8 @@ export function _reapplyNestedAttrSetters(
     if (own?.value instanceof Set) {
       for (const k of own.value as Set<string>) {
         if (Object.prototype.hasOwnProperty.call(attrs, k)) {
-          parkNestedReaderLoad(record, record[`set${camelize(k, true)}`](attrs[k]));
+          const pending = record[`set${camelize(k, true)}`](attrs[k]);
+          if (pending) parkNestedReaderLoad(record, pending);
         }
       }
     }
@@ -1100,9 +1103,21 @@ export function _reapplyNestedAttrSetters(
  * Rails lets setter exceptions propagate raw; ours additionally wraps them in
  * AttributeAssignmentError with the offending key/value for debugging. (That
  * wrapping is stricter than Rails but longstanding.)
+ *
+ * A `#{name}_attributes=` key dispatches to `set#{Name}Attributes`
+ * (nested-attributes.ts), which answers a promise when the assignment displaces
+ * a record and so owes Rails' inline `remove_target!`
+ * (has_one_association.rb:69) a write; that promise is returned rather than
+ * dropped.
  */
-function _assignAttribute(self: AttributeIO, key: string, value: unknown): void {
+function _assignAttribute(self: AttributeIO, key: string, value: unknown): Promise<void> | void {
   try {
+    const configs = (self as any).constructor?._nestedAttributeConfigs as
+      | { associationName: string }[]
+      | undefined;
+    if (configs?.some((c) => `${c.associationName}Attributes` === key)) {
+      return (self as any)[`set${camelize(key, true)}`](value) as Promise<void> | void;
+    }
     const setter = findPrototypeSetter(self, key);
     if (setter) {
       setter.call(self, value);
@@ -1133,8 +1148,16 @@ function _assignAttribute(self: AttributeIO, key: string, value: unknown): void 
  * assigns the nested hashes only after the scalar pass (:21), so a nested
  * writer's `reject_if` / the built record's callbacks observe an owner whose
  * own attributes are already set. Nested runs before multiparameter (:21-22).
+ *
+ * Rails returns nil; this returns a promise when one of the assignments was a
+ * displacing `#{name}_attributes=` (see `_assignAttribute`), which Rails runs
+ * inline and JS cannot. Callers free to ignore the nil are equally free to
+ * ignore the promise.
  */
-export function assignAttributes(this: AttributeIO, attrs: Record<string, unknown>): void {
+export function assignAttributes(
+  this: AttributeIO,
+  attrs: Record<string, unknown>,
+): Promise<void> | void {
   assertHashAttributes(attrs);
   // Mirrors ActiveModel::AttributeAssignment#assign_attributes: bail before
   // sanitizing so a blank strong-params object (always un-permitted) is a
@@ -1144,6 +1167,7 @@ export function assignAttributes(this: AttributeIO, attrs: Record<string, unknow
 
   let multiParameterAttributes: Record<string, unknown> | null = null;
   let nestedParameterAttributes: Record<string, unknown> | null = null;
+  let pending: Promise<void> | undefined;
 
   for (const [key, value] of Object.entries(attrs)) {
     if (key.includes("(")) {
@@ -1151,19 +1175,38 @@ export function assignAttributes(this: AttributeIO, attrs: Record<string, unknow
     } else if (isNestedParameterHash(value)) {
       (nestedParameterAttributes ??= {})[key] = value;
     } else {
-      _assignAttribute(this, key, value);
+      pending = assignAfter(pending, () => _assignAttribute(this, key, value));
     }
   }
 
   if (nestedParameterAttributes) {
-    assignNestedParameterAttributes(this, nestedParameterAttributes);
+    const nested = nestedParameterAttributes;
+    pending = assignAfter(pending, () => assignNestedParameterAttributes(this, nested));
   }
   if (multiParameterAttributes) {
-    executeMultiparameterAssignment(
-      this as any,
-      extractMultiparameterCallstack(multiParameterAttributes).multiparams,
-    );
+    const multi = extractMultiparameterCallstack(multiParameterAttributes).multiparams;
+    pending = assignAfter(pending, () => executeMultiparameterAssignment(this as any, multi));
   }
+  return pending;
+}
+
+/**
+ * Run one step of Rails' `each` over the assignment list: inline when nothing
+ * is outstanding, chained behind `pending` when a previous step is still
+ * running. Rails' `_assign_attributes` (attribute_assignment.rb:9-23) is a plain
+ * `each`, so a step that reaches DB I/O — a displacing `#{name}_attributes=`
+ * running `load_target` / `remove_target!` (has_one_association.rb:59-69) —
+ * finishes before the next key is assigned. Chaining is how a JS caller that
+ * cannot block between iterations keeps that order; without it two displacing
+ * keys in one hash would issue their writes concurrently.
+ */
+function assignAfter(
+  pending: Promise<void> | undefined,
+  step: () => Promise<void> | void,
+): Promise<void> | undefined {
+  if (pending) return pending.then(() => step());
+  const started = step();
+  return started ?? undefined;
 }
 
 /**
@@ -1181,10 +1224,15 @@ function isNestedParameterHash(value: unknown): boolean {
  * (attribute_assignment.rb:26-28) — assign any deferred nested attributes after
  * the base attributes have been set.
  */
-function assignNestedParameterAttributes(self: AttributeIO, pairs: Record<string, unknown>): void {
+function assignNestedParameterAttributes(
+  self: AttributeIO,
+  pairs: Record<string, unknown>,
+): Promise<void> | void {
+  let pending: Promise<void> | undefined;
   for (const [k, v] of Object.entries(pairs)) {
-    _assignAttribute(self, k, v);
+    pending = assignAfter(pending, () => _assignAttribute(self, k, v));
   }
+  return pending;
 }
 
 // ---------------------------------------------------------------------------
