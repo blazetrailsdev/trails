@@ -1575,8 +1575,8 @@ export class PostgreSQLAdapter
    * DEALLOCATE / ROLLBACK / DISCARD ALL maintenance ops already chain via
    * `_enqueueMaintenance`, `execRollbackDbTransaction`'s `ROLLBACK` already
    * waits on the query `_cancelAnyRunningQuery` cancelled (that method's own
-   * `block` drain), and the memoized `server_version` bootstrap probe runs before the
-   * client is in normal service.
+   * `block` drain), and the memoized `server_version` bootstrap probe runs
+   * before the client is in normal service.
    *
    * @internal
    */
@@ -2368,8 +2368,6 @@ export class PostgreSQLAdapter
     if (txClient?.processID == null) return;
     const owner = this._transactionManager.currentLockToken;
     if (owner === null || owner !== this._queryInFlightOwner) return;
-    // `@raw_connection.block` (postgresql/database_statements.rb:128): the
-    // cancelled query is drained before the caller sends its ROLLBACK.
     const drained = this._queryInFlightSettled;
     try {
       // Open a FRESH TCP connection to send a CancelRequest — mirrors

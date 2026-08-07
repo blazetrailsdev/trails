@@ -333,16 +333,12 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
     });
 
-    // Rails' cancel_any_running_query is `@raw_connection.cancel` followed by
     // `@raw_connection.block` (postgresql/database_statements.rb:127-128): the
     // ROLLBACK goes out only once the cancelled query has drained off the wire.
-    // trails used to send the CancelRequest and return immediately, leaving the
-    // cancelled query's promise to reject unobserved after the ROLLBACK.
+    // `_queryInFlightOwner` is non-null for exactly the span a query is on the
+    // wire, so reading it as ROLLBACK is sent is the drain assertion.
     it("rollback drains the cancelled query before sending ROLLBACK", async () => {
       const other = new PostgreSQLAdapter(PG_TEST_URL);
-      // `_queryInFlightOwner` is non-null for exactly the span a query is on
-      // the wire, so reading it as ROLLBACK goes out says whether the cancelled
-      // query had drained first.
       const seam = other as unknown as {
         _queryInFlightOwner: symbol | null;
         internalExecute(sql: string, ...rest: unknown[]): Promise<unknown>;
