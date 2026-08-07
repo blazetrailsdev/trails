@@ -351,8 +351,6 @@ export class PostgreSQLAdapter
       // StatementPool#dealloc reaches @connection.@raw_connection to issue the
       // DEALLOCATE under the connection's control (postgresql_adapter.rb:307).
       pgDeallocSerializers.set(value, (deallocSql) => {
-        // The serializer is typed void (Rails' `dealloc` is sync), so the
-        // promise is parked for `_drainPendingDeallocate` to await.
         this._pendingDeallocate = (this._pendingDeallocate ?? Promise.resolve())
           .then(() => value.query(deallocSql))
           .then(
@@ -1565,13 +1563,9 @@ export class PostgreSQLAdapter
     const attempt = async (): Promise<R> => {
       const stmtName = prepare ? this._preparedNameFor(client, sql) : null;
       if (stmtName !== null) onPrepared?.(stmtName);
-      // A statement-pool eviction (here, or an earlier `delete`/`clear`) issues
-      // its DEALLOCATE from a sync `dealloc`; land it before the query that
-      // triggered it, as Rails' inline `StatementPool#[]=` dealloc does
-      // (statement_pool.rb:31, postgresql_adapter.rb:307).
       await this._drainPendingDeallocate();
+      this._commandSettled = false;
       if (stmtName !== null) {
-        this._commandSettled = false;
         return client.query({
           name: stmtName,
           text: sql,
@@ -1579,7 +1573,6 @@ export class PostgreSQLAdapter
           ...queryExtra,
         }) as Promise<R>;
       }
-      this._commandSettled = false;
       if (queryExtra.rowMode) {
         return client.query({ text: sql, values: binds, ...queryExtra }) as Promise<R>;
       }
