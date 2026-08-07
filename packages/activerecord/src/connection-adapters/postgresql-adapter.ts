@@ -354,7 +354,11 @@ export class PostgreSQLAdapter
       pgDeallocSerializers.set(value, (deallocSql) => {
         this._pendingDeallocate = (this._pendingDeallocate ?? Promise.resolve())
           .then(() => {
-            this._commandSettled = false;
+            // Only the pinned client's wire cycle is what transactionStatus
+            // reports on; a parked DEALLOCATE that outlives a reconnect would
+            // otherwise strand the flag false, since the ReadyForQuery listener
+            // that re-arms it is attached per pg.Client.
+            if (this._rawConnection === value) this._commandSettled = false;
             return value.query(deallocSql);
           })
           .then(
