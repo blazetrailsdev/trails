@@ -115,10 +115,10 @@ function msecs(subject: StrftimeSubject): number {
  * @internal `m_local_jd` (`date_core.c:1485-1497`), the Julian day the
  * week-number readers below work off. The subject carries the civil date and no
  * `df`, so the `complex_dat_p` arm's `local_jd` shift has no bearer and the
- * conversion is {@link jdOf} over it.
+ * conversion is {@link cCivilToJd} over it.
  */
 function mLocalJd(subject: StrftimeSubject): number {
-  return jdOf(new Temporal.PlainDate(subject.year, subject.mon, subject.day));
+  return cCivilToJd(subject.year, subject.mon, subject.day);
 }
 
 /**
@@ -2740,8 +2740,8 @@ function completeFrags(parts: DateParts): void {
       cwyear: d.yearOfWeek ?? undefined,
       cweek: d.weekOfYear ?? undefined,
       cwday: d.dayOfWeek,
-      wnum0: cJdToWeeknum(jdOf(d), 0)[1],
-      wnum1: cJdToWeeknum(jdOf(d), 1)[1],
+      wnum0: cJdToWeeknum(cCivilToJd(d.year, d.month, d.day), 0)[1],
+      wnum1: cJdToWeeknum(cCivilToJd(d.year, d.month, d.day), 1)[1],
     };
 
     if (k === "ordinal") {
@@ -2762,7 +2762,8 @@ function completeFrags(parts: DateParts): void {
       parts.cweek ??= 1;
       parts.cwday ??= 1;
     } else if (k === "wday") {
-      parts.jd = jdOf(d.subtract({ days: d.dayOfWeek % 7 }).add({ days: parts.wday as number }));
+      const w = d.subtract({ days: d.dayOfWeek % 7 }).add({ days: parts.wday as number });
+      parts.jd = cCivilToJd(w.year, w.month, w.day);
     } else if (k === "wnum0") {
       for (const el of a) {
         if (parts[el] !== undefined) break;
@@ -2874,24 +2875,26 @@ function dfToTime(df: number): [h: number, min: number, s: number] {
 }
 
 /**
- * @internal Ruby `Date#jd` (`date_core.c` `d_lite_jd`, `date_core.c:5249`), the
- * reader `rt_complete_frags`' `:wday` branch takes its `:jd` off. `Temporal` has
- * no Julian day, so the number is the day count from the Unix epoch Ruby
- * anchors its own `Time`-to-`:jd` conversion on.
+ * @internal `date_core.c` `c_civil_to_jd` (`date_core.c:502-524`), the Julian
+ * day of the civil date `y`-`m`-`d`. The C's `jd -= b` correction rides on the
+ * calendar-reform start `sg`, and its `ns` out-parameter reports which side of
+ * the reform the answer landed on; `Temporal.PlainDate` is proleptic Gregorian
+ * and carries no reform, so neither has a bearer here and the conversion is the
+ * day count from the Unix epoch {@link UNIX_EPOCH_IN_CJD} numbers.
  */
-function jdOf(d: Temporal.PlainDate): number {
-  return UNIX_EPOCH_IN_CJD + d.since(UNIX_EPOCH).days;
+function cCivilToJd(y: number, m: number, d: number): number {
+  return UNIX_EPOCH_IN_CJD + new Temporal.PlainDate(y, m, d).since(UNIX_EPOCH).days;
 }
 
 /**
- * @internal The inverse of {@link jdOf}. ruby/date reads a Julian day back as a
- * civil date through `c_jd_to_civil` (`date_core.c:526-555`), whose century
- * correction is skipped for a day before the calendar-reform start `sg` — the
- * Julian arm. `Temporal.PlainDate` is proleptic Gregorian and carries no reform,
- * so the arm has no bearer here and the conversion is the day count alone.
+ * @internal `date_core.c` `c_jd_to_civil` (`date_core.c:526-554`), the inverse
+ * of {@link cCivilToJd}; the `ry`/`rm`/`rdom` out-parameters come back as the
+ * tuple. The C's `jd < sg` arm skips the century correction for a day before
+ * the calendar reform and has no bearer here, as on {@link cCivilToJd}.
  */
-function jdToPlainDate(jd: number): Temporal.PlainDate {
-  return UNIX_EPOCH.add({ days: jd - UNIX_EPOCH_IN_CJD });
+function cJdToCivil(jd: number): [ry: number, rm: number, rdom: number] {
+  const r = UNIX_EPOCH.add({ days: jd - UNIX_EPOCH_IN_CJD });
+  return [r.year, r.month, r.day];
 }
 
 /** @internal `date_core.c`'s `DIV` macro (`date_core.c:168-170`), floored division. */
@@ -3012,18 +3015,24 @@ function num2intWithFrac(
  * negative `d` counts back from the last day of the year — `-1` is 31 December
  * — and is rejected when the walk leaves `y`.
  *
- * Ruby rejects by round-tripping back through `c_jd_to_ordinal`
- * (`date_core.c:566-575`), which is how a walk that left `y` comes back naming
- * a different year. `Temporal.PlainDate` is proleptic Gregorian, so that round
- * trip collapses to reading `#year` back.
+ * Ruby rejects by round-tripping back through {@link cJdToOrdinal}, which is
+ * how a walk that left `y` comes back naming a different year.
  */
 function cValidOrdinalP(y: number, d: number): Temporal.PlainDate | null {
-  const fdoy = jdToPlainDate(cFindFdoy(y));
-  if (d < 0) d = fdoy.daysInYear + d + 1;
-  if (d < 1) return null;
-  const r = fdoy.add({ days: d - 1 });
-  if (r.year !== y) return null;
-  return r;
+  let ry2: number;
+  let rd2: number;
+
+  if (d < 0) {
+    const rjd2 = cFindLdoy(y);
+
+    [ry2, rd2] = cJdToOrdinal(rjd2 + d + 1);
+    if (ry2 !== y) return null;
+    d = rd2;
+  }
+  const rjd = cOrdinalToJd(y, d);
+  [ry2, rd2] = cJdToOrdinal(rjd);
+  if (ry2 !== y || rd2 !== d) return null;
+  return new Temporal.PlainDate(...cJdToCivil(rjd));
 }
 
 /**
@@ -3032,10 +3041,41 @@ function cValidOrdinalP(y: number, d: number): Temporal.PlainDate | null {
  * reform can delete 1 January itself; `Temporal.PlainDate` is proleptic
  * Gregorian and carries no reform, so the scan collapses to 1 January. The C's
  * `sg` argument and its `ns` out-parameter both ride on that reform and have no
- * bearer here, as on {@link jdToPlainDate}.
+ * bearer here, as on {@link cJdToCivil}.
  */
 function cFindFdoy(y: number): number {
-  return jdOf(new Temporal.PlainDate(y, 1, 1));
+  return cCivilToJd(y, 1, 1);
+}
+
+/**
+ * @internal `date_core.c` `c_find_ldoy` (`date_core.c:467-476`), the Julian day
+ * of the last day of year `y`. As on {@link cFindFdoy}, Ruby scans December
+ * backwards because the calendar reform can delete 31 December itself and the
+ * scan collapses to 31 December here.
+ */
+function cFindLdoy(y: number): number {
+  return cCivilToJd(y, 12, 31);
+}
+
+/**
+ * @internal `date_core.c` `c_ordinal_to_jd` (`date_core.c:556-564`), the Julian
+ * day of the `d`th day of year `y`. The C's `ns` out-parameter reports which
+ * side of the calendar reform the answer landed on and has no bearer here, as
+ * on {@link cCivilToJd}.
+ */
+function cOrdinalToJd(y: number, d: number): number {
+  return cFindFdoy(y) + d - 1;
+}
+
+/**
+ * @internal `date_core.c` `c_jd_to_ordinal` (`date_core.c:566-575`), the
+ * inverse of {@link cOrdinalToJd}; the `ry`/`rd` out-parameters come back as
+ * the tuple.
+ */
+function cJdToOrdinal(jd: number): [ry: number, rd: number] {
+  const [ry] = cJdToCivil(jd);
+  const rjd = cFindFdoy(ry);
+  return [ry, jd - rjd + 1];
 }
 
 /**
@@ -3051,7 +3091,7 @@ function cCommercialToJd(y: number, w: number, d: number): number {
 
 /** @internal `date_core.c` `c_jd_to_commercial` (`date_core.c:590-609`), the inverse of {@link cCommercialToJd}. */
 function cJdToCommercial(jd: number): [ry: number, rw: number, rd: number] {
-  const a = jdToPlainDate(jd - 3).year;
+  const [a] = cJdToCivil(jd - 3);
   let ry: number;
   let c2 = cCommercialToJd(a + 1, 1, 1);
   if (jd >= c2) ry = a + 1;
@@ -3081,7 +3121,7 @@ function cValidCommercialP(y: number, w: number, d: number): Temporal.PlainDate 
   const rjd = cCommercialToJd(y, w, d);
   const [ry, rw, rd] = cJdToCommercial(rjd);
   if (y !== ry || w !== rw || d !== rd) return null;
-  return jdToPlainDate(rjd);
+  return new Temporal.PlainDate(...cJdToCivil(rjd));
 }
 
 /**
@@ -3099,7 +3139,7 @@ function cWeeknumToJd(y: number, w: number, d: number, f: number): number {
 
 /** @internal `date_core.c` `c_jd_to_weeknum` (`date_core.c:621-634`), the inverse of {@link cWeeknumToJd}. */
 function cJdToWeeknum(jd: number, f: number): [ry: number, rw: number, rd: number] {
-  const ry = jdToPlainDate(jd).year;
+  const [ry] = cJdToCivil(jd);
   const rjd = cFindFdoy(ry) + 6;
   const j = jd - (rjd - mod(rjd - f + 1, 7)) + 7;
   return [ry, div(j, 7), mod(j, 7)];
@@ -3122,7 +3162,7 @@ function cValidWeeknumP(y: number, w: number, d: number, f: number): Temporal.Pl
   const rjd = cWeeknumToJd(y, w, d, f);
   const [ry, rw, rd] = cJdToWeeknum(rjd, f);
   if (y !== ry || w !== rw || d !== rd) return null;
-  return jdToPlainDate(rjd);
+  return new Temporal.PlainDate(...cJdToCivil(rjd));
 }
 
 /**
@@ -3131,7 +3171,7 @@ function cValidWeeknumP(y: number, w: number, d: number, f: number): Temporal.Pl
  * to reject.
  */
 function rtValidJdP(jd: number): Temporal.PlainDate {
-  return jdToPlainDate(jd);
+  return new Temporal.PlainDate(...cJdToCivil(jd));
 }
 
 /**
@@ -3516,7 +3556,7 @@ export class Date {
    * so the conversion happens at the call.
    */
   static jd(jd = 0): Date {
-    return new Date(jdToPlainDate(jd));
+    return new Date(new Temporal.PlainDate(...cJdToCivil(jd)));
   }
 
   /**

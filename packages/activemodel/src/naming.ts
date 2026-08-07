@@ -4,6 +4,9 @@ import {
   singularize,
   humanize,
   Inflections,
+  include,
+  ToJsonWithActiveSupportEncoder,
+  type Included,
 } from "@blazetrails/activesupport";
 import { ArgumentError } from "./attribute-assignment.js";
 
@@ -75,6 +78,12 @@ export interface ModelLike {
   modelName?: ModelName;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (json.rb:47-49); the class/interface merge is how `include()` surfaces on the type side.
+export interface ModelName {
+  /** `ActiveSupport::ToJsonWithActiveSupportEncoder#to_json` (json.rb:35-43). */
+  toJSON: Included<typeof ToJsonWithActiveSupportEncoder>["toJSON"];
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class ModelName {
   /** Bare class name (no separators), e.g. `"Post"`. */
   readonly name: string;
@@ -410,9 +419,6 @@ export class ModelName {
     // the single-string sort key Rails' `String#<=>` compares.
     return mn.name;
   }
-
-  /** JSON.stringify hook — delegates to `asJson`. */
-  toJSON(): string {
-    return this.asJson();
-  }
 }
+
+include(ModelName, ToJsonWithActiveSupportEncoder);

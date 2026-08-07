@@ -21,6 +21,9 @@ import {
   type XmlTypeInfo,
   resetCallbacks as asResetCallbacks,
   withOptions,
+  include,
+  ToJsonWithActiveSupportEncoder,
+  type Included,
 } from "@blazetrails/activesupport";
 import {
   humanAttributeName as translationHumanAttributeName,
@@ -247,6 +250,12 @@ function _xmlTypeInfo(
  *
  * Mirrors: ActiveModel::Model (with all the included modules)
  */
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (json.rb:47-49); the class/interface merge is how `include()` surfaces on the type side.
+export interface Model {
+  /** `ActiveSupport::ToJsonWithActiveSupportEncoder#to_json` (json.rb:35-43). */
+  toJSON: Included<typeof ToJsonWithActiveSupportEncoder>["toJSON"];
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Model {
   // Allow dynamic attribute access (e.g., record.title) for properties
   // defined at runtime via Model.attribute().
@@ -2270,17 +2279,6 @@ export class Model {
   }
 
   /**
-   * JSON.stringify hook — delegates to `asJson()` so
-   * `JSON.stringify(model)` produces the same output as
-   * `model.toJson()`. Without this, the default walker would
-   * enumerate internal fields (`_attributes`, `_dirty`, `errors`, …)
-   * and potentially throw on BigInt attributes.
-   */
-  toJSON(): unknown {
-    return this.asJson();
-  }
-
-  /**
    * Deserialize a JSON string into this model's attributes.
    *
    * Mirrors: ActiveModel::Serializers::JSON#from_json (json.rb:144-149)
@@ -2625,3 +2623,5 @@ function _rejectOnOption(conditions?: CallbackConditions): void {
     throw new ArgumentError("Unknown key: :on. Valid keys are: :if, :unless, :prepend");
   }
 }
+
+include(Model, ToJsonWithActiveSupportEncoder);
