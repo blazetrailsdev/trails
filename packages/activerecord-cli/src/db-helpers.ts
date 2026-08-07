@@ -1,11 +1,19 @@
 import { join, resolve } from "path";
 import { getFsAsync } from "@blazetrails/activesupport";
 import { DatabaseTasks, DatabaseConfigurations, MigrationContext } from "@blazetrails/activerecord";
-import { normalizeSqlitePaths } from "./environment.js";
+import { establishEnvironmentConnection, normalizeSqlitePaths } from "./environment.js";
 
 /**
  * Load `config/database.ts` from `cwd` and install it into `DatabaseTasks`.
  * Returns the resolved `DatabaseConfigurations` so callers can inspect it.
+ *
+ * The port of `db:load_config` (`railties/databases.rake:22-26`), which depends
+ * on `:environment` — a booted Rails app, with `ActiveRecord::Base` already
+ * connected. Every task downstream relies on that: `with_temporary_pool`'s
+ * first line is `migration_class.connection_db_config`
+ * (`tasks/database_tasks.rb:542`), which raises on an unconnected class in
+ * Ruby too. Establishing the current environment's connection here is this
+ * CLI's stand-in for that prerequisite.
  */
 export async function loadDatabaseConfig(cwd: string): Promise<DatabaseConfigurations> {
   const configPath = resolve(join(cwd, "config", "database.ts"));
@@ -19,6 +27,7 @@ export async function loadDatabaseConfig(cwd: string): Promise<DatabaseConfigura
   const configs = normalizeSqlitePaths(DatabaseConfigurations.fromEnv(raw), cwd);
   DatabaseTasks.databaseConfiguration = configs;
   DatabaseTasks.root = cwd;
+  await establishEnvironmentConnection(DatabaseConfigurations.currentEnv());
   return configs;
 }
 

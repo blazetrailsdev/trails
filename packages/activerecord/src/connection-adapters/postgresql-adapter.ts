@@ -4720,7 +4720,7 @@ export interface PostgreSQLAdapter {
   changeColumn(
     tableName: string,
     columnName: string,
-    type: string,
+    type: ColumnType,
     options?: ColumnOptions & { using?: string; castAs?: string },
   ): Promise<void>;
 

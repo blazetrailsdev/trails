@@ -16,6 +16,7 @@ import {
 } from "../database.js";
 import { discoverMigrations } from "../migration-loader.js";
 import {
+  Base,
   DatabaseTasks,
   HashConfig,
   InternalMetadata,
@@ -672,9 +673,35 @@ async function runMigrateAll(targetVersion: string | null): Promise<void> {
   );
 }
 
+/**
+ * Every task in `railties/lib/.../databases.rake` is declared
+ * `task <name>: :load_config`, and `load_config` itself depends on
+ * `:environment` (databases.rake:22) — so by the time any of them runs, the
+ * app has booted and `ActiveRecord::Base` holds a pool. `with_temporary_pool`
+ * relies on it: its first line is `migration_class.connection_db_config`
+ * (`tasks/database_tasks.rb:542`), which raises on a class with no pool in
+ * Ruby too. This hook is the `:environment` prerequisite for the `db` command
+ * group.
+ *
+ * `establish_connection` only builds the pool, it does not connect, so this is
+ * safe ahead of `db create` on a database that does not exist yet. A config
+ * that cannot be resolved is left to the subcommand, which reports it with the
+ * message written for that command.
+ */
+async function establishTaskConnection(): Promise<void> {
+  try {
+    const envName = resolveEnv();
+    const raw = normalizeRawConfig(await loadDatabaseConfig(envName));
+    await Base.establishConnection(toDbConfig(raw, envName));
+  } catch {
+    return;
+  }
+}
+
 export function dbCommand(): Command {
   const cmd = new Command("db");
   cmd.description("Database management commands");
+  cmd.hook("preSubcommand", establishTaskConnection);
 
   cmd
     .command("migrate")

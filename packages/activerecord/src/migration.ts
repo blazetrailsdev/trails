@@ -1198,7 +1198,10 @@ export abstract class Migration {
    * `execute_block { yield helper }`. The helper runs each `up`/`down` block
    * inline as Ruby yields; the callbacks here are async and the block that
    * registers them is not, so they are collected and awaited on the way out
-   * of the same `execute_block`.
+   * of the same `execute_block`. The whole invocation of `fn` — not just the
+   * selected callbacks — happens inside `execute_block`, so a recording pass
+   * defers the block's own statements to `replay` as Ruby's `yield helper`
+   * does (`migration/command_recorder.rb:148-152`).
    */
   async reversible(
     fn?: (dir: {
@@ -1208,16 +1211,16 @@ export abstract class Migration {
   ): Promise<void> {
     if (!fn) return;
     const reverting = this.isReverting();
-    const toRun: Array<() => Promise<void>> = [];
-    fn({
-      up: (f) => {
-        if (!reverting) toRun.push(f);
-      },
-      down: (f) => {
-        if (reverting) toRun.push(f);
-      },
-    });
     await this.executeBlock(async () => {
+      const toRun: Array<() => Promise<void>> = [];
+      fn({
+        up: (f) => {
+          if (!reverting) toRun.push(f);
+        },
+        down: (f) => {
+          if (reverting) toRun.push(f);
+        },
+      });
       for (const f of toRun) await f();
     });
   }
