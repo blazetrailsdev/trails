@@ -743,15 +743,6 @@ function iGcd(x: bigint, y: bigint): bigint {
 }
 
 /**
- * @internal Ruby's `Integer#div` — the floored quotient, which a `bigint` `/`
- * does not give (it truncates toward zero, as C does).
- */
-function bigFloorDiv(a: bigint, b: bigint): bigint {
-  const q = a / b;
-  return a % b !== 0n && a < 0n !== b < 0n ? q - 1n : q;
-}
-
-/**
  * Ruby's `Rational` (`rational.c`), as much of it as `date_zone_to_diff`'s
  * fractional-hour offset needs: `rb_rational_new` canonicalizes to lowest terms
  * (`rational.c` `nurat_s_canonicalize_internal`), `+` adds an Integer
@@ -818,7 +809,9 @@ export class Rational {
    * floored quotient — the method `date_core.c`'s `f_idiv` macro sends
    * (`date_core.c:43`) — for the Integer divisor this port needs. */
   div(other: number | bigint): number {
-    return Number(bigFloorDiv(this.numerator, this.denominator * BigInt(other)));
+    const den = this.denominator * BigInt(other);
+    const q = this.numerator / den;
+    return Number(this.numerator % den !== 0n && this.numerator < 0n !== den < 0n ? q - 1n : q);
   }
 
   /** `numeric.c` `num_modulo` (`Rational#%`, inherited from Numeric), which is
@@ -3199,9 +3192,8 @@ export function dtNewByFrags(hash: DateParts): DateTime {
 
   const t: number | Rational | null | undefined = hash.secFraction;
   const ns = t == null ? 0 : secToNs(t);
-  // `m_sf`'s only reader is `ns_to_sec`, whose FIXNUM arm is
-  // `rb_rational_new2(n, INT2FIX(SECOND_IN_NANOSECONDS))` (`date_core.c:993-998`),
-  // so an Integer `sf` is stored as the Rational it is always read back as.
+  // `ns_to_sec`, `m_sf`'s only reader, answers `rb_rational_new2` for an
+  // Integer `sf` (`date_core.c:993-998`), so the store carries the Rational.
   const sf = ns instanceof Rational ? ns : new Rational(ns, 1);
 
   const to = hash.offset;
