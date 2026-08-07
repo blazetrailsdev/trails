@@ -705,6 +705,77 @@ describe("CI runs every tooling test suite", () => {
     expect(wf.on.push.branches).toContain("main");
   });
 
+  // The `lint` job lints only the changed files, so a rule whose INPUT changed
+  // — the rule source, its exclude JSON, the eslint pin, a file a rule parses
+  // for its data — would otherwise be re-run over a file set that cannot
+  // contain the newly-reported violation. LINT_ALL_RE is the escape hatch, and
+  // a scoped run is only as sound as this list.
+  it("falls back to linting everything when a rule's own inputs change", async () => {
+    const yml = await readFile(CI_YML, "utf8");
+    const lintAll = gateRegex(yml, "LINT_ALL_RE");
+
+    for (const input of [
+      "eslint.config.mjs",
+      "eslint/no-raw-sql.mjs",
+      "eslint/no-explicit-any-src-exclude.json",
+      "eslint/rails-deprecated-methods.json",
+      "package.json",
+      "pnpm-lock.yaml",
+      "tsconfig.json",
+      "tsconfig.base.json",
+      // eslint/no-load-schema-with-stubbed-ddl.mjs:38 parses this array out of
+      // the source, so it is rule data that happens to live in a package.
+      "packages/activerecord/src/support/stubbed-ddl-methods.ts",
+      // eslint/expected-fixtures.mjs reads the Rails-declared fixture sets.
+      "vendor/rails/activerecord/test/cases/base_test.rb",
+    ]) {
+      expect(lintAll.test(input), `${input} must force a full lint`).toBe(true);
+    }
+
+    // Ordinary source must NOT trip the fallback, or the scoping is a no-op.
+    for (const ordinary of [
+      "packages/activerecord/src/relation.ts",
+      "packages/activerecord/src/relation.test.ts",
+      "scripts/ci-suite-coverage.test.ts",
+    ]) {
+      expect(lintAll.test(ordinary), `${ordinary} must not force a full lint`).toBe(false);
+    }
+  });
+
+  it("keeps the lint file filter to extensions eslint is configured for", async () => {
+    const yml = await readFile(CI_YML, "utf8");
+    const lintable = gateRegex(yml, "LINTABLE_RE");
+
+    for (const f of ["a.ts", "a.tsx", "a.mts", "a.cts", "a.js", "a.mjs", "a.cjs", "a.jsx"]) {
+      expect(lintable.test(f), `${f} is lintable`).toBe(true);
+    }
+    for (const f of ["a.json", "a.md", "a.yml", "a.rb", "a.sql", "a.sh"]) {
+      expect(lintable.test(f), `${f} is not lintable`).toBe(false);
+    }
+  });
+
+  // YAML folds a `>-` block to spaces only for continuation lines at the
+  // block's established indentation (spec 8.1.3); a line indented further is
+  // "more indented" and keeps its literal newline. Aligning a continuation
+  // under an opening paren therefore smuggles a `\n` into the parsed
+  // expression. Actions' grammar treats it as whitespace today, so nothing
+  // fails — which is exactly why this needs pinning rather than watching.
+  it("keeps every if: expression on a single parsed line", async () => {
+    const wf = parseYaml(await readFile(CI_YML, "utf8"));
+    const offenders: string[] = [];
+    for (const [name, job] of Object.entries(
+      wf.jobs as Record<string, { if?: string; steps?: { name?: string; if?: string }[] }>,
+    )) {
+      if (typeof job.if === "string" && job.if.includes("\n")) offenders.push(name);
+      for (const step of job.steps ?? []) {
+        if (typeof step.if === "string" && step.if.includes("\n")) {
+          offenders.push(`${name} > ${step.name ?? "(unnamed step)"}`);
+        }
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
   it("keeps comparison_affected off for website-only changes", async () => {
     const runGate = await gateRunner(await readFile(CI_YML, "utf8"));
     expect((await runGate("packages/website/src/app.ts")).comparison_affected).toBe("false");

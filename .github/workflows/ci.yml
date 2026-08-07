@@ -79,6 +79,11 @@ jobs:
       # deletions excluded) for the Prettier job to check. The literal
       # `__ALL__` means "couldn't compute a reliable diff, check everything".
       prettier_files: ${{ steps.filter.outputs.prettier_files }}
+      # Same shape as prettier_files, narrowed to the extensions ESLint is
+      # configured for. `__ALL__` additionally covers the case where a changed
+      # file feeds a rule's inputs rather than being linted itself — see
+      # LINT_ALL_RE below.
+      lint_files: ${{ steps.filter.outputs.lint_files }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -112,6 +117,24 @@ jobs:
           GUIDES_PKGS_RE='^(packages/(activerecord|activemodel|activesupport|arel|globalid|date|did-you-mean|trails-tsc)/|packages/website/docs/guides/|scripts/guides-typecheck/)'
           GUIDES_EXCL_RE='(/src/test-helpers(/|\.ts$)|/test-fixtures?(/|\.ts$)|/__fixtures__/|/__snapshots__/|\.test\.ts$)'
           WEBSITE_PKGS_RE='^packages/website/'
+          # Files that make a scoped ESLint run unsound, so the whole tree is
+          # linted instead. Three classes, all "the changed file is an INPUT to
+          # a rule rather than a file the rule reports on":
+          #   - eslint.config.mjs / eslint/ — every rule implementation, every
+          #     per-rule exclude JSON, and every path-scoped override.
+          #   - the eslint version pin: package.json declares it,
+          #     pnpm-lock.yaml resolves it. Mirrors the Prettier fallback's
+          #     reasoning about its own pin.
+          #   - stubbed-ddl-methods.ts, whose STUBBED_DDL_METHODS array
+          #     no-load-schema-with-stubbed-ddl parses out of the source
+          #     (eslint/no-load-schema-with-stubbed-ddl.mjs:38).
+          #   - vendor/, which expected-fixtures reads the Rails-declared
+          #     fixture sets from (eslint/expected-fixtures.mjs).
+          # tsconfig changes also land here: typed rules resolve their program
+          # from it, so a project-shape change can move results in files the
+          # diff never touched.
+          LINT_ALL_RE='^(eslint\.config\.mjs$|eslint/|package\.json$|pnpm-lock\.yaml$|tsconfig[^/]*\.json$|vendor/|packages/activerecord/src/support/stubbed-ddl-methods\.ts$)'
+          LINTABLE_RE='\.(m|c)?(t|j)sx?$'
           COMPARISON_RE='^(packages/|scripts/((api|test|fixtures|schema)-compare/|(build-rails-privates-manifest|build-rails-file-structure-manifest|rails-file-structure-mixins|deprecated-manifest-diff)\.ts$)|vendor/|docs/ruby-ts-conventions\.md$|eslint/rails-deprecated-methods\.json$)'
           force_all_affected() {
             echo "activerecord_affected=true" >> "$GITHUB_OUTPUT"
@@ -131,11 +154,13 @@ jobs:
           if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
             echo "docs_only=false" >> "$GITHUB_OUTPUT"
             echo "prettier_files=__ALL__" >> "$GITHUB_OUTPUT"
+            echo "lint_files=__ALL__" >> "$GITHUB_OUTPUT"
             force_all_affected
           elif ! files=$(git diff --name-only "$base"..."$head" 2>/dev/null); then
             echo "git diff failed (base may be unreachable after force-push) — running full matrix"
             echo "docs_only=false" >> "$GITHUB_OUTPUT"
             echo "prettier_files=__ALL__" >> "$GITHUB_OUTPUT"
+            echo "lint_files=__ALL__" >> "$GITHUB_OUTPUT"
             force_all_affected
           else
             echo "Changed files:"
@@ -150,6 +175,17 @@ jobs:
               } >> "$GITHUB_OUTPUT"
             else
               echo "prettier_files=__ALL__" >> "$GITHUB_OUTPUT"
+            fi
+            if echo "$files" | grep -qE "$LINT_ALL_RE"; then
+              echo "lint_files=__ALL__" >> "$GITHUB_OUTPUT"
+            elif lfiles=$(git diff --name-only --diff-filter=ACMR "$base"..."$head" 2>/dev/null); then
+              {
+                echo "lint_files<<__LINT_EOF__"
+                echo "$lfiles" | grep -E "$LINTABLE_RE" || true
+                echo "__LINT_EOF__"
+              } >> "$GITHUB_OUTPUT"
+            else
+              echo "lint_files=__ALL__" >> "$GITHUB_OUTPUT"
             fi
             if [ -z "$files" ]; then
               echo "docs_only=false" >> "$GITHUB_OUTPUT"
@@ -269,7 +305,23 @@ jobs:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
-      - run: pnpm lint
+      # Lints only the changed files. `__ALL__` is the fallback sentinel from
+      # the `changes` job — set whenever the diff couldn't be computed, on
+      # push/schedule/dispatch, or when a changed file is an INPUT to a rule
+      # rather than a file the rule reports on (LINT_ALL_RE there). Empty means
+      # nothing ESLint is configured for changed.
+      - name: ESLint
+        env:
+          LINT_FILES: ${{ needs.changes.outputs.lint_files }}
+        run: |
+          set -euo pipefail
+          if [ "$LINT_FILES" = "__ALL__" ]; then
+            pnpm lint
+          elif [ -z "$LINT_FILES" ]; then
+            echo "No changed files to lint."
+          else
+            printf '%s\n' "$LINT_FILES" | xargs -r -d '\n' pnpm run lint:files
+          fi
   # Consolidated sub-minute PR/push preflight checks. Each of prettier,
   # docs-AR-freeze, and pr-attribution does a few seconds of independent shell
   # work; GitHub bills every job rounded UP to a whole minute, so running them
@@ -464,7 +516,7 @@ jobs:
       needs.changes.outputs.docs_only != 'true' &&
       needs.changes.outputs.guides_affected == 'true' &&
       (github.event_name != 'pull_request' ||
-       contains(github.event.pull_request.labels.*.name, 'run-guides'))
+      contains(github.event.pull_request.labels.*.name, 'run-guides'))
     runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 20
     steps:
@@ -481,7 +533,7 @@ jobs:
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
       (needs.changes.outputs.activerecord_affected == 'true' ||
-       needs.changes.outputs.trails_tsc_affected == 'true')
+      needs.changes.outputs.trails_tsc_affected == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -564,10 +616,10 @@ jobs:
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
       (needs.changes.outputs.rack_affected == 'true' ||
-       needs.changes.outputs.actionview_affected == 'true' ||
-       needs.changes.outputs.tse_compiler_affected == 'true' ||
-       needs.changes.outputs.activerecord_affected == 'true' ||
-       needs.changes.outputs.trailties_affected == 'true')
+      needs.changes.outputs.actionview_affected == 'true' ||
+      needs.changes.outputs.tse_compiler_affected == 'true' ||
+      needs.changes.outputs.activerecord_affected == 'true' ||
+      needs.changes.outputs.trailties_affected == 'true')
     runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 20
     steps:
@@ -596,7 +648,7 @@ jobs:
         if: >-
           ${{ !cancelled() && steps.install.outcome == 'success' &&
           (needs.changes.outputs.activerecord_affected == 'true' ||
-           needs.changes.outputs.trailties_affected == 'true') }}
+          needs.changes.outputs.trailties_affected == 'true') }}
         run: pnpm test:types
 
   actionpack-tests:
@@ -731,7 +783,7 @@ jobs:
       needs.changes.outputs.docs_only != 'true' &&
       needs.changes.outputs.activerecord_affected == 'true' &&
       (github.event_name != 'pull_request' ||
-       contains(github.event.pull_request.labels.*.name, 'run-sqlite-mem'))
+      contains(github.event.pull_request.labels.*.name, 'run-sqlite-mem'))
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -855,7 +907,7 @@ jobs:
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
       (needs.changes.outputs.trails_tsc_affected == 'true' ||
-       needs.changes.outputs.tse_compiler_affected == 'true')
+      needs.changes.outputs.tse_compiler_affected == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -1181,9 +1233,9 @@ jobs:
       needs.changes.outputs.docs_only != 'true' &&
       needs.changes.outputs.activerecord_affected == 'true' &&
       (github.event_name == 'schedule' ||
-       github.event_name == 'workflow_dispatch' ||
-       (github.event_name == 'pull_request' &&
-        contains(github.event.pull_request.labels.*.name, 'run-mysql-prepared')))
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'pull_request' &&
+      contains(github.event.pull_request.labels.*.name, 'run-mysql-prepared')))
     runs-on: ubuntu-latest
     timeout-minutes: 30
     services:
@@ -1227,7 +1279,7 @@ jobs:
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
       (needs.changes.outputs.website_affected == 'true' ||
-       needs.changes.outputs.website_label == 'true')
+      needs.changes.outputs.website_label == 'true')
     # Stays on hosted: SvelteKit + VitePress + typedoc build is too slow
     # on the self-hosted box and ties up a runner slot that cheaper jobs
     # could use. Hosted parallelism is free.
