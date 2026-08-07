@@ -12,7 +12,7 @@ import { EncryptingOnlyEncryptor } from "./encrypting-only-encryptor.js";
  * Rails' `thread_mattr_accessor :custom_contexts` (contexts.rb:19) — the stack
  * `with_encryption_context` pushes a `default_context.dup` onto.
  */
-const contextStack: Context[] = [];
+const customContexts: Context[] = [];
 
 /**
  * Rails' `mattr_accessor :default_context, default: Context.new`
@@ -64,12 +64,12 @@ export class Contexts {
       this.defaultContext,
     );
     Object.assign(frame, properties);
-    contextStack.push(frame);
+    customContexts.push(frame);
     let result: T;
     try {
       result = fn();
     } catch (e) {
-      contextStack.pop();
+      customContexts.pop();
       throw e;
     }
     // Ruby's `ensure` runs when the block returns; an async block returns a
@@ -77,16 +77,16 @@ export class Contexts {
     if (result && typeof (result as { then?: unknown }).then === "function") {
       return (result as unknown as Promise<unknown>).then(
         (val) => {
-          contextStack.pop();
+          customContexts.pop();
           return val;
         },
         (err) => {
-          contextStack.pop();
+          customContexts.pop();
           throw err;
         },
       ) as unknown as T;
     }
-    contextStack.pop();
+    customContexts.pop();
     return result;
   }
 
@@ -126,7 +126,7 @@ export class Contexts {
 
   /** Mirrors: ActiveRecord::Encryption::Contexts#current_custom_context (contexts.rb:66-68) */
   static get currentCustomContext(): Context | null {
-    return contextStack.length > 0 ? contextStack[contextStack.length - 1] : null;
+    return customContexts.length > 0 ? customContexts[customContexts.length - 1] : null;
   }
 
   /** Mirrors: ActiveRecord::Encryption::Contexts#reset_default_context (contexts.rb:70-72) */

@@ -24,8 +24,7 @@ import "../encryption.js";
 import type { Encryptor } from "../encryption.js";
 import { MessagePackMessageSerializer } from "./message-pack-message-serializer.js";
 
-export const withEncryptionContext = Contexts.withEncryptionContext.bind(Contexts);
-export const withoutEncryption = Contexts.withoutEncryption.bind(Contexts);
+export { withEncryptionContext, withoutEncryption } from "../encryption.js";
 export { Decryption, Encryption };
 
 // ─── Test key material ────────────────────────────────────────────────────────
