@@ -2597,7 +2597,10 @@ export class Migrator {
     if (this._internalMetadata.enabled) {
       // `NullConfig#env_name` is nil for a bare-adapter Migrator, as in Rails
       // (`abstract/connection_pool.rb:17-22`); the cast narrows, it does not default.
-      await this._internalMetadata.set("environment", this.connection.pool.dbConfig.envName);
+      await this._internalMetadata.set(
+        "environment",
+        this.connection.pool.dbConfig.envName as string,
+      );
     }
   }
 

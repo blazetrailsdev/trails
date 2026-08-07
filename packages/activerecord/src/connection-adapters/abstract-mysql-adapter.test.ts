@@ -9,7 +9,6 @@ import { parseTableOptions } from "./abstract-mysql-adapter.js";
 import { SchemaCreation as MysqlSchemaCreation } from "./mysql/schema-creation.js";
 import { quote as mysqlQuote } from "./mysql/quoting.js";
 import { NullPool } from "./abstract/connection-pool.js";
-import type { ConnectionPool } from "./abstract/connection-pool.js";
 
 function makeColumn(opts: { autoIncrement?: boolean; defaultFunction?: string | null } = {}) {
   return new Column("id", null, { sqlType: "bigint" }, false, {
@@ -79,7 +78,7 @@ describe("AbstractMysqlAdapter#renameColumnForAlter fallback", () => {
     const { AbstractMysqlAdapter } = await import("./abstract-mysql-adapter.js");
     const adapter = Object.create(AbstractMysqlAdapter.prototype);
     adapter.supportsRenameColumn = () => supportsRename;
-    adapter.pool = new NullPool() as unknown as ConnectionPool;
+    adapter.pool = new NullPool();
     adapter.getDatabaseVersion = async () => {};
     adapter.quoteColumnName = (s: string) => `\`${s}\``;
     adapter.columnDefinitions = async (_: string) => [
@@ -294,7 +293,7 @@ describe("AbstractMysqlAdapter#renameColumn wiring", () => {
     const { AbstractMysqlAdapter } = await import("./abstract-mysql-adapter.js");
     const adapter = Object.create(AbstractMysqlAdapter.prototype);
     const events: string[] = [];
-    adapter.pool = new NullPool() as unknown as ConnectionPool;
+    adapter.pool = new NullPool();
     adapter.supportsRenameColumn = () => true;
     adapter.getDatabaseVersion = async () => {};
     adapter.quoteColumnName = (s: string) => `\`${s}\``;
@@ -810,7 +809,7 @@ describe("AbstractMysqlAdapter#checkVersion", () => {
       typeof AbstractMysqlAdapter
     >;
     const { NullPool } = await import("./abstract/connection-pool.js");
-    adapter.pool = new NullPool() as unknown as ConnectionPool;
+    adapter.pool = new NullPool();
     (
       adapter as unknown as { getDatabaseVersion: () => InstanceType<typeof Version> }
     ).getDatabaseVersion = () => new Version("5.6.3");
@@ -827,7 +826,7 @@ describe("AbstractMysqlAdapter#checkVersion", () => {
       typeof AbstractMysqlAdapter
     >;
     const { NullPool } = await import("./abstract/connection-pool.js");
-    adapter.pool = new NullPool() as unknown as ConnectionPool;
+    adapter.pool = new NullPool();
     (
       adapter as unknown as { getDatabaseVersion: () => InstanceType<typeof Version> }
     ).getDatabaseVersion = () => new Version("5.6.4");
