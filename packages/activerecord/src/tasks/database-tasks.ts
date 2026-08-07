@@ -260,11 +260,10 @@ export class DatabaseTasks {
         await this.create(config);
       }
     }
-    // database_tasks.rb:653 — `establish_connection(environment.to_sym)`, which
-    // resolves the bare env name through `Base.configurations`.
+    // database_tasks.rb:173 — `migration_class.establish_connection(environment.to_sym)`,
+    // which resolves the bare env name through `Base.configurations`.
     const envName = this._normalizeEnv(environment);
-    const { Base } = await import("../base.js");
-    await Base.establishConnection(envName);
+    await (await this.migrationClass()).establishConnection(envName);
   }
 
   static async drop(config: DatabaseConfig): Promise<void> {
