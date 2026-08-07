@@ -63,8 +63,12 @@ export {
 
 import { ActiveRecordError, NoDatabaseError } from "./errors.js";
 import { ActiveRecord } from "./ar-config.js";
+import type { Base } from "./base.js";
 
-let _base: { logger: { info?: (...args: any[]) => void } | null } | undefined;
+/** The one `Base` member `execute_migration_in_transaction` names. */
+type BaseWithLogger = Pick<typeof Base, "logger">;
+
+let _base: BaseWithLogger | undefined;
 
 /**
  * @internal Receives `ActiveRecord::Base` at module init, as
@@ -73,7 +77,7 @@ let _base: { logger: { info?: (...args: any[]) => void } | null } | undefined;
  * (`migration.rb:1532`), so base.rb is not required there; in ESM a value
  * import of `base.js` would be a load-time edge into an import cycle.
  */
-export function _registerBase(base: { logger: { info?: (...args: any[]) => void } | null }): void {
+export function _registerBase(base: BaseWithLogger): void {
   _base = base;
 }
 
@@ -2643,19 +2647,16 @@ export class Migrator {
    * `MigrationContext#run`.
    */
   async executeMigrationInTransaction(proxy: MigrationProxy): Promise<number | undefined> {
-    const applied = await this.migrated();
-    if (this.isDown() && !applied.has(proxy.version)) return undefined;
-    if (this.isUp() && applied.has(proxy.version)) return undefined;
-
-    const logger = _base?.logger;
-    if (logger) logger.info?.(`Migrating to ${proxy.name} (${proxy.version})`);
-
     let migration: Migration | undefined;
-    // Rails wraps both the migration execution AND the version
-    // stamping inside the same ddl_transaction so they commit/rollback
-    // atomically. Without this, a committed migration + failed stamp
-    // would leave schema_migrations out of sync.
+    // Ruby's method-level `rescue` (`migration.rb:1538`) covers the guards and
+    // the log line too, not just the ddl_transaction.
     try {
+      const applied = await this.migrated();
+      if (this.isDown() && !applied.has(proxy.version)) return undefined;
+      if (this.isUp() && applied.has(proxy.version)) return undefined;
+
+      if (_base?.logger) _base.logger.info?.(`Migrating to ${proxy.name} (${proxy.version})`);
+
       const loaded = (migration = await proxy.migration());
       loaded.connection = this._adapter;
       await this.ddlTransaction(loaded, async () => {
