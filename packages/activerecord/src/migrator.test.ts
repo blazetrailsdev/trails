@@ -90,7 +90,7 @@ describe("MigratorTest", () => {
       override get migrations(): MigrationProxy[] {
         return migrations;
       }
-    })([`${MIGRATIONS_ROOT}/valid`], new SchemaMigration(adapter), new InternalMetadata(adapter));
+    })([`${MIGRATIONS_ROOT}/valid`], schemaMigration, internalMetadata);
     return { calls, context };
   }
 
@@ -644,7 +644,6 @@ describe("MigratorTest", () => {
   it("migrator db has no schema migrations table", async () => {
     const { migrator } = migratorClass(3);
 
-    const schemaMigration = new SchemaMigration(adapter);
     await schemaMigration.dropTable();
     expect(await schemaMigration.tableExists()).toBe(false);
     await migrator.migrate(1);

@@ -255,7 +255,6 @@ describe("Migrator trails extensions", () => {
   });
 
   it("CheckPending with a Migrator creates schema_migrations before reading it", async () => {
-    const schemaMigration = new SchemaMigration(adapter);
     await schemaMigration.dropTable();
     const migrator = new Migrator(
       "up",
@@ -600,7 +599,6 @@ describe("Migrator advisory lock wrapping", () => {
     addAdvisoryLockSupport(adapter);
     adapter.getAdvisoryLock = async () => true;
     adapter.releaseAdvisoryLock = async () => true;
-    const schemaMigration = new SchemaMigration(adapter);
     await schemaMigration.createTable();
 
     const migrator = new Migrator(
@@ -641,7 +639,6 @@ describe("Migrator advisory lock wrapping", () => {
 
   it("loadMigrated re-reads schema_migrations so repeated pending checks are not memoized", async () => {
     const adapter = Base.connection;
-    const schemaMigration = new SchemaMigration(adapter);
     await schemaMigration.createTable();
     const migrator = new Migrator(
       "up",
