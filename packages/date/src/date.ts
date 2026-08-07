@@ -346,7 +346,7 @@ export function strftime(subject: StrftimeSubject, format: string): string {
       if (c === ":") {
         let l = 0;
         while (format[g + l] === ":") l++;
-        if (format[g + l] === "z" && l <= 3) {
+        if (format[g + l] === "z") {
           colons = l;
           g += l;
           continue;
@@ -438,6 +438,7 @@ export function strftime(subject: StrftimeSubject, format: string): string {
         formatted = text(subject.hour < 12 ? "am" : "pm");
         break;
       case "z":
+        if (colons > 3) break;
         formatted = formatOffset(subject.utcOffset, colons, precision, left, padding);
         break;
       case "Z":

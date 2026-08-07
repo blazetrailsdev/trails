@@ -132,7 +132,7 @@ export class Fallbacks extends Map<Locale, Locale[]> {
   ): Locale[] {
     let result: Locale[] = [];
     for (const tag of tags == null ? [] : ([] as Locale[]).concat(tags)) {
-      const tags = tagFor(tag)
+      const tags = tagFor(tag)!
         .selfAndParents()
         .map((t) => t.toSym())
         .filter((t) => !exclude.includes(t));
