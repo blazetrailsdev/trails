@@ -5,5 +5,40 @@
     "rubyName": "since",
     "call": "warn",
     "reason": "Time#since's `warn` is reached only from its `rescue TypeError` arm, which deprecates passing a non-numeric (time/calculations.rb:126-133). time-ext.ts's `since` takes `seconds: number`, so the deprecated call shape is unrepresentable and the arm has nothing to warn about."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "time-ext.ts",
+    "rubyName": "to_date",
+    "call": "parse",
+    "reason": "`::Date.parse(self, false)` in `String#to_date`; trails' `toDate` takes an already-parsed `Date` and reads its calendar fields."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "time-ext.ts",
+    "rubyName": "to_fs",
+    "call": "strftime",
+    "reason": "`strftime` is Ruby's C-level time formatter. JS has no strftime; each named DATE_FORMATS entry is expanded with `Intl`/`toISOString` in `toFs`."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "time-ext.ts",
+    "rubyName": "to_time",
+    "call": "getlocal",
+    "reason": "`getlocal` re-zones a Ruby Time to the system offset. A JS `Date` is already an absolute instant with no attached zone, so `toTime` has nothing to re-zone."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "time-ext.ts",
+    "rubyName": "to_time",
+    "call": "new",
+    "reason": "`::Time.new(...)` builds the Time from the parsed parts; trails routes string parsing through `@blazetrails/date` and returns the instant it produces."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "time-ext.ts",
+    "rubyName": "xmlschema",
+    "call": "in_time_zone",
+    "reason": "Rails' `Date#xmlschema` goes through `in_time_zone.xmlschema` to pick up `Time.zone`; trails' is the zoneless arm, and `TimeWithZone#xmlschema` is the zone-aware one."
   }
 ]

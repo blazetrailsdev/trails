@@ -1,3 +1,5 @@
+import { methodMissingProxy } from "@blazetrails/activesupport";
+
 import { Type } from "./value.js";
 
 /**
@@ -62,8 +64,11 @@ export function unwrapNormalization(type: Type): Type {
  *
  * Mirrors: ActiveRecord::Normalization::NormalizedValueType, a
  * `DelegateClass(ActiveModel::Type::Value)` overriding `cast`, `serialize`, and
- * `serialize_cast_value`. We model the DelegateClass with a Proxy so the full
- * surface of the wrapped type is forwarded.
+ * `serialize_cast_value`. We model the DelegateClass with `methodMissingProxy`,
+ * whose delegate IS the wrapped type — so every non-overridden read goes through
+ * its delegate branch and binds to the wrapped type, and `deserialize` (which
+ * internally calls `this.cast`) uses that type's un-normalized cast rather than
+ * this decorator's normalizing one.
  *
  * @param token optional identity used by the attribute-decoration pipeline to
  *   recognize "already decorated by this normalization" during seed + pending
@@ -115,15 +120,9 @@ export function normalizedValueType(
     [NORMALIZED_TOKEN]: token,
   };
 
-  const proxy = new Proxy(castType, {
-    get(target, prop, receiver) {
-      if (prop in overrides) return overrides[prop];
-      const value = Reflect.get(target, prop, target);
-      // Bind delegated methods to the underlying type so that, e.g.,
-      // `deserialize` (which internally calls `this.cast`) uses the underlying
-      // type's un-normalized cast rather than the proxy's normalizing one.
-      return typeof value === "function" ? value.bind(target) : value;
-    },
+  const proxy = methodMissingProxy(castType, {
+    overrides,
+    delegate: (target) => target,
   }) as unknown as Type;
   return proxy;
 }

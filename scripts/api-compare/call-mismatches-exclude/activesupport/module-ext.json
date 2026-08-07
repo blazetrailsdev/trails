@@ -16,6 +16,27 @@
   {
     "package": "activesupport",
     "tsFile": "module-ext.ts",
+    "rubyName": "descendants",
+    "call": "concat",
+    "reason": "Rails' `Class#descendants` walks the subclass tree itself (class/subclasses.rb:20); trails delegates the whole walk to `DescendantsTracker.descendants`, where Rails' own DescendantsTracker keeps it."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "module-ext.ts",
+    "rubyName": "descendants",
+    "call": "flat_map",
+    "reason": "Same one-line delegation to `DescendantsTracker.descendants` — the recursion, and its `flat_map`, live there."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "module-ext.ts",
+    "rubyName": "descendants",
+    "call": "subclasses",
+    "reason": "Same delegation; the tracker reads the subclass set directly, not through this file's `subclasses`."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "module-ext.ts",
     "rubyName": "mattr_accessor",
     "call": "first",
     "reason": "Rails passes `location: caller_locations(1, 1).first` to `mattr_reader`/`mattr_writer` (attribute_accessors.rb:66) so a raised NameError points at the declaring line. trails generates the accessors directly with no location plumbing."

@@ -344,29 +344,6 @@ export class PostgreSQLAdapter
   }
   private set _rawConnection(value: pg.Client | null) {
     this._connection = value as unknown as AbstractAdapter | null;
-    if (value) {
-      // Register this client's DEALLOCATE serializer so a StatementPool built
-      // for it (via buildStatementPool) parks its DEALLOCATE where the eviction
-      // site can await it — without the pool constructor needing a
-      // non-Rails-shaped extra argument. Mirrors Rails, where
-      // StatementPool#dealloc reaches @connection.@raw_connection to issue the
-      // DEALLOCATE under the connection's control (postgresql_adapter.rb:307).
-      pgDeallocSerializers.set(value, (deallocSql) => {
-        this._pendingDeallocate = (this._pendingDeallocate ?? Promise.resolve())
-          .then(() => {
-            // Only the pinned client's wire cycle is what transactionStatus
-            // reports on; a parked DEALLOCATE that outlives a reconnect would
-            // otherwise strand the flag false, since the ReadyForQuery listener
-            // that re-arms it is attached per pg.Client.
-            if (this._rawConnection === value) this._commandSettled = false;
-            return value.query(deallocSql);
-          })
-          .then(
-            () => {},
-            () => {},
-          );
-      });
-    }
   }
   /**
    * The node-pg analogue of `PG::Connection.conndefaults_hash.keys + [:requiressl]`
@@ -542,14 +519,6 @@ export class PostgreSQLAdapter
   // this before proceeding so no query can interleave between the two
   // SQL commands that resetBang fires asynchronously.
   private _inFlightReset: Promise<void> | null = null;
-  // The DEALLOCATE issued by the most recent statement-pool eviction, or null.
-  // Rails deallocates the evicted entry inline, under the connection lock,
-  // before the query that triggered the eviction is sent (statement_pool.rb:31,
-  // postgresql_adapter.rb:307); `StatementPool#dealloc` is sync here too, so the
-  // promise is parked in this slot and awaited at the eviction site instead.
-  // Every other ordering is Rails' own: the connection lock covers the query's
-  // whole life, so nothing else can be on the wire.
-  private _pendingDeallocate: Promise<void> | null = null;
   // Accumulates PG NOTICE/WARNING messages fired during the current query.
   // Cleared before each query; processed by _flushWarnings after.
   private _noticeReceiverSqlWarnings: Array<{
@@ -1520,22 +1489,6 @@ export class PostgreSQLAdapter
   }
 
   /**
-   * Await (and clear) the DEALLOCATE parked by the most recent statement-pool
-   * eviction. `StatementPool#dealloc` is sync — it mirrors Rails' sync
-   * `dealloc` — so the eviction's `client.query` cannot be awaited where it is
-   * issued; this is that await, at the site Rails deallocates inline from
-   * (statement_pool.rb:31).
-   *
-   * @internal
-   */
-  private async _drainPendingDeallocate(): Promise<void> {
-    const pending = this._pendingDeallocate;
-    if (pending === null) return;
-    this._pendingDeallocate = null;
-    await pending;
-  }
-
-  /**
    * Tear down the single StatementPool. Called from `close()` /
    * `reconnect()` only — commit/rollback keep the pool attached
    * because PG prepared statements are session-scoped, not
@@ -1578,9 +1531,8 @@ export class PostgreSQLAdapter
     const { prepareHint, onPrepared, ...queryExtra } = extra;
     const prepare = prepareHint === false ? false : this._shouldPrepare(binds);
     const attempt = async (): Promise<R> => {
-      const stmtName = prepare ? this._preparedNameFor(client, sql) : null;
+      const stmtName = prepare ? await this._preparedNameFor(client, sql) : null;
       if (stmtName !== null) onPrepared?.(stmtName);
-      await this._drainPendingDeallocate();
       this._commandSettled = false;
       if (stmtName !== null) {
         return client.query({
@@ -1614,7 +1566,7 @@ export class PostgreSQLAdapter
             { sql, binds, cause: e },
           );
         }
-        this._poolFor(client).delete(this.sqlKey(sql));
+        await this._poolFor(client).delete(this.sqlKey(sql));
         return await attempt();
       }
       throw e;
@@ -1626,15 +1578,16 @@ export class PostgreSQLAdapter
    * are allocated from the per-pool counter (`StatementPool#nextKey`)
    * so each session has its own `a1`, `a2`, ... sequence. Mirrors
    * Rails' `PostgreSQL::StatementPool#[]` / `#[]=` — present key →
-   * cached name, absent → `next_key` + store.
+   * cached name, absent → `next_key` + store. Awaiting `set` puts the evicted
+   * entry's DEALLOCATE before the query that triggered it (statement_pool.rb:31).
    */
-  private _preparedNameFor(client: pg.Client, sql: string): string {
+  private async _preparedNameFor(client: pg.Client, sql: string): Promise<string> {
     const pool = this._poolFor(client);
     const key = this.sqlKey(sql);
     const existing = pool.get(key);
     if (existing) return existing.name;
     const name = pool.nextKey();
-    pool.set(key, { name });
+    await pool.set(key, { name });
     return name;
   }
 
@@ -2638,7 +2591,7 @@ export class PostgreSQLAdapter
   // Mirrors: PostgreSQLAdapter#session_auth= (postgresql_adapter.rb:625)
   // Returns a Promise so callers can await the SET SESSION AUTHORIZATION round-trip.
   async sessionAuth(user: string): Promise<void> {
-    this.clearCacheBang();
+    await this.clearCacheBang();
     const quoted = user.toUpperCase() === "DEFAULT" ? "DEFAULT" : pgQuoteColumnName(user);
     await this.execute(`SET SESSION AUTHORIZATION ${quoted}`);
   }
@@ -2786,7 +2739,6 @@ export class PostgreSQLAdapter
     await this.withRawConnection(async (conn) => {
       const client = conn as unknown as pg.Client;
       try {
-        await this._drainPendingDeallocate();
         this._commandSettled = false;
         await client.query(sql);
       } catch (e) {
@@ -2969,13 +2921,9 @@ export class PostgreSQLAdapter
     // only AFTER ROLLBACK's response is processed (matching the
     // sequence in Rails' reset!, postgresql_adapter.rb:371-382).
     const live = this._rawConnection;
-    // Sequence behind any pending eviction DEALLOCATE so ROLLBACK (and the
-    // DISCARD ALL below) don't fire onto a client that is still running one.
-    const pendingDeallocate = this._pendingDeallocate ?? Promise.resolve();
-    let work: Promise<unknown> = pendingDeallocate;
+    let work: Promise<unknown> = Promise.resolve();
     if (this._client) {
       work = this._cancelAnyRunningQuery()
-        .then(() => pendingDeallocate)
         .then(() => live.query("ROLLBACK"))
         .catch(() => {});
       this._client = null;
@@ -3155,11 +3103,13 @@ export class PostgreSQLAdapter
    * PG-specific dealloc override). If the connection has been torn
    * down (post-disconnect/reconnect failure window) we mark
    * `_needsDeallocateAll` so the next acquire drains the server side.
+   * Returns the pool's chained DEALLOCATEs so the caller can await them before
+   * putting its own query on the socket; Rails' `clear_cache!` blocks on them.
    */
-  override clearCacheBang(): void {
-    super.clearCacheBang();
+  override clearCacheBang(): void | Promise<void> {
+    void super.clearCacheBang();
     if (this._rawConnection && this._statementPool) {
-      this._statementPool.clear();
+      return this._statementPool.clear();
     } else if (this._statementPool) {
       this._statementPool.reset();
       this._needsDeallocateAll = true;
@@ -4455,6 +4405,9 @@ export class PostgreSQLAdapter
   /**
    * Prepare a statement on the given client, caching by sql_key.
    * Mirrors: PostgreSQLAdapter#prepare_statement
+   *
+   * Awaiting `set` puts any eviction's DEALLOCATE before the caller's
+   * Bind+Execute, so it lands on an idle client (statement_pool.rb:31).
    * @internal
    */
   async prepareStatement(sql: string, _binds: unknown[], client: pg.Client): Promise<string> {
@@ -4468,11 +4421,7 @@ export class PostgreSQLAdapter
     // PREPARE ... AS avoids executing the statement (node-pg's { name, text } form
     // both prepares and executes in a single roundtrip).
     await client.query(`PREPARE ${pgQuoteColumnName(name)} AS ${sql}`);
-    pool.set(key, { name });
-    // `set` may have evicted an LRU entry. Drain its DEALLOCATE before
-    // returning so the caller's Bind+Execute lands on an idle client — Rails
-    // deallocs the evicted entry inline in StatementPool#[]=.
-    await this._drainPendingDeallocate();
+    await pool.set(key, { name });
     return name;
   }
 
@@ -4513,6 +4462,12 @@ export class PostgreSQLAdapter
 
   /**
    * Build the per-adapter StatementPool (used on initialization).
+   *
+   * `onIssue` keeps `_commandSettled`'s invariant across the eviction
+   * DEALLOCATE, guarded on the client still being the pinned one: a DEALLOCATE
+   * outliving a reconnect would strand the flag false, since the
+   * ReadyForQuery listener that re-arms it is attached per `pg.Client`.
+   *
    * Mirrors: PostgreSQLAdapter#build_statement_pool
    * @internal
    */
@@ -4520,6 +4475,9 @@ export class PostgreSQLAdapter
     return new StatementPool(
       client,
       PostgreSQLAdapter.typeCastConfigToInteger(this._statementLimit) as number,
+      () => {
+        if (this._rawConnection === client) this._commandSettled = false;
+      },
     );
   }
 
@@ -4937,17 +4895,6 @@ export interface PreparedStatement {
 }
 
 /**
- * Maps a pinned `pg.Client` to its owning adapter's DEALLOCATE serializer
- * (populated by the adapter's `_rawConnection` setter). A `StatementPool`'s
- * `dealloc` looks the client up here so the adapter can await the DEALLOCATE at
- * the eviction site (as Rails does inline, statement_pool.rb:31), without the
- * pool constructor needing a non-Rails-shaped extra argument. A
- * `WeakMap` so entries vanish when the client is GC'd. Clients no adapter owns
- * (standalone pools) are absent → the prior best-effort fire-and-forget path.
- */
-const pgDeallocSerializers = new WeakMap<pg.Client, (deallocSql: string) => void>();
-
-/**
  * PG-flavored StatementPool. Backs the per-connection statement cache;
  * `dealloc` sends `DEALLOCATE` for the evicted name. PG prepared
  * statements are session-scoped, and after the dual-pool collapse the
@@ -4963,10 +4910,18 @@ export class StatementPool extends GenericStatementPool<PreparedStatement> {
   // session-scoped nature of PG prepared statements and lets the
   // adapter own zero state about naming.
   private _counter = 0;
+  private _deallocating: Promise<void> = Promise.resolve();
+  private _onIssue: () => void;
 
-  constructor(client: pg.Client, maxSize = 1000) {
+  /**
+   * Rails' pool takes the connection (`postgresql_adapter.rb:296`) and reaches
+   * `@connection.@raw_connection` at dealloc time; trails' holds the client, so
+   * `onIssue` is the one piece of connection state it still needs.
+   */
+  constructor(client: pg.Client, maxSize = 1000, onIssue: () => void = () => {}) {
     super(maxSize);
     this._client = client;
+    this._onIssue = onIssue;
   }
 
   /**
@@ -4983,8 +4938,12 @@ export class StatementPool extends GenericStatementPool<PreparedStatement> {
    * does not exist") and errors against a closed connection — the
    * statement is already gone on the server either way. Node-pg
    * surfaces the same as error codes / messages.
+   *
+   * Rails' `dealloc` blocks, so a `clear` deallocating N entries sends them one
+   * at a time. node-pg does not, so each DEALLOCATE chains onto the one before
+   * it (`_deallocating`), and that chain is what `[]=` / `clear` hand back.
    */
-  protected override dealloc(stmt: PreparedStatement): void {
+  protected override dealloc(stmt: PreparedStatement): void | Promise<void> {
     const client = this._client;
     if (!client) return;
     // Best-effort async cleanup. The server drops prepared statements on
@@ -4994,18 +4953,16 @@ export class StatementPool extends GenericStatementPool<PreparedStatement> {
     // of raising, so a leaked caller-supplied name can't produce a synchronous
     // throw at the call site.
     const deallocSql = `DEALLOCATE ${pgQuoteColumnName(stmt.name)}`;
-    const serialize = pgDeallocSerializers.get(client);
-    if (serialize) {
-      // Adapter-owned client: hand the DEALLOCATE to the adapter, which awaits
-      // it at the eviction site before the query that triggered the eviction
-      // goes out — Rails' inline dealloc. It swallows errors.
-      serialize(deallocSql);
-      return;
-    }
-    // Standalone pool whose client no adapter owns: keep the prior best-effort
-    // fire-and-forget. The empty `.catch` keeps node from treating a post-close
-    // DEALLOCATE as an unhandled rejection.
-    client.query(deallocSql).catch(() => {});
+    this._deallocating = this._deallocating
+      .then(() => {
+        this._onIssue();
+        return client.query(deallocSql);
+      })
+      .then(
+        () => {},
+        () => {},
+      );
+    return this._deallocating;
   }
 
   /**

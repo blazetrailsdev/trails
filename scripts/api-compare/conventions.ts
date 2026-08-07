@@ -198,6 +198,37 @@ export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
   // default rule — but Range's home bucket is `core_ext/range/each.rb`, so the
   // reopening still needs the entry.
   "activesupport:core_ext/range/overlap.rb": "core-ext/range/overlap.ts",
+  // The conversions cluster. `toFs` / `toTime` / `toDate` / `xmlschema` take an
+  // instant receiver, so Time, Date and DateTime all read them off `time-ext.ts`;
+  // only `date/calculations.rb`'s Date arm has its own receiver and file.
+  "activesupport:core_ext/time/conversions.rb": "time-ext.ts",
+  "activesupport:core_ext/date/conversions.rb": "time-ext.ts",
+  "activesupport:core_ext/date_time/conversions.rb": "time-ext.ts",
+  "activesupport:core_ext/time/compatibility.rb": "time-ext.ts",
+  "activesupport:core_ext/date_time/compatibility.rb": "time-ext.ts",
+  "activesupport:core_ext/time/acts_like.rb": "time-ext.ts",
+  "activesupport:core_ext/string/conversions.rb": "time-ext.ts",
+  "activesupport:core_ext/string/zones.rb": "time-ext.ts",
+  "activesupport:core_ext/time/zones.rb": "time-zone-config.ts",
+  "activesupport:core_ext/numeric/time.rb": "duration.ts",
+  "activesupport:core_ext/integer/time.rb": "duration.ts",
+  "activesupport:core_ext/date/blank.rb": "core-ext/object/blank.ts",
+  "activesupport:core_ext/date_time/blank.rb": "core-ext/object/blank.ts",
+  "activesupport:core_ext/pathname/blank.rb": "core-ext/object/blank.ts",
+  "activesupport:core_ext/hash/slice.rb": "hash-utils.ts",
+  "activesupport:core_ext/hash/except.rb": "hash-utils.ts",
+  "activesupport:core_ext/hash/deep_merge.rb": "hash-utils.ts",
+  "activesupport:core_ext/hash/indifferent_access.rb": "hash-with-indifferent-access.ts",
+  "activesupport:core_ext/array/conversions.rb": "array-utils.ts",
+  "activesupport:core_ext/string/exclude.rb": "string-utils.ts",
+  "activesupport:core_ext/object/inclusion.rb": "enumerable-utils.ts",
+  "activesupport:core_ext/object/with.rb": "core-ext/object/with.ts",
+  "activesupport:core_ext/class/subclasses.rb": "module-ext.ts",
+  "activesupport:core_ext/kernel/reporting.rb": "module-ext.ts",
+  "activesupport:core_ext/module/redefine_method.rb": "class-attribute.ts",
+  "activesupport:core_ext/array/inquiry.rb": "array-inquirer.ts",
+  "activesupport:core_ext/string/inquiry.rb": "string-inquirer.ts",
+  "activesupport:inflector/transliterate.rb": "transliterate.ts",
 };
 
 /** The explicit TS mapping for `rubyFile` in `pkg`, or undefined when unmapped. */

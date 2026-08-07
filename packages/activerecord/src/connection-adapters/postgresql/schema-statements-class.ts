@@ -833,7 +833,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     type: ColumnType,
     options: ColumnOptions & { using?: string; castAs?: string } = {},
   ): Promise<void> {
-    this.clearCacheBang();
+    await this.clearCacheBang();
     const parts = await this.changeColumnForAlter(tableName, columnName, type, options);
     const sqls = parts.filter((v): v is string => typeof v === "string");
     const procs = parts.filter((v): v is () => Promise<void> => typeof v === "function");
@@ -857,7 +857,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     // cache, defer to the abstract implementation (which builds an AlterTable
     // and accepts it through schema_creation), then propagate :comment via
     // change_column_comment.
-    this.clearCacheBang();
+    await this.clearCacheBang();
     await super.addColumn(tableName, columnName, type, options);
     if ("comment" in options) {
       await this.changeColumnComment(tableName, columnName, options.comment ?? null);
@@ -869,7 +869,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     columnName: string,
     newColumnName: string,
   ): Promise<void> {
-    this.clearCacheBang();
+    await this.clearCacheBang();
     await this.execute(
       `ALTER TABLE ${this.quoteTableName(tableName)} RENAME COLUMN ${this.quoteColumnName(columnName)} TO ${this.quoteColumnName(newColumnName)}`,
     );
@@ -933,7 +933,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     // Mirrors PostgreSQL::SchemaStatements#change_column_null: validate the
     // boolean argument and clear the statement cache before issuing DDL.
     this.validateChangeColumnNullArgumentBang(nullable);
-    this.clearCacheBang();
+    await this.clearCacheBang();
     const quotedTable = this.quoteTableName(tableName);
     const quotedCol = this.quoteColumnName(columnName);
     if (!nullable && defaultValue != null) {
@@ -960,7 +960,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     // Mirrors PostgreSQL::SchemaStatements#change_column_comment: clear the
     // statement cache and unwrap the {from:, to:} change hash before issuing
     // the COMMENT ON statement.
-    this.clearCacheBang();
+    await this.clearCacheBang();
     const comment = this.extractNewCommentValue(commentOrChanges);
     await this.execute(
       `COMMENT ON COLUMN ${this.quoteTableName(tableName)}.${this.quoteColumnName(columnName)} IS ${this.quote(comment)}`,
@@ -972,7 +972,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     commentOrChanges: CommentOrChanges,
   ): Promise<void> {
     // Mirrors PostgreSQL::SchemaStatements#change_table_comment.
-    this.clearCacheBang();
+    await this.clearCacheBang();
     const comment = this.extractNewCommentValue(commentOrChanges);
     await this.execute(
       `COMMENT ON TABLE ${this.quoteTableName(tableName)} IS ${this.quote(comment)}`,

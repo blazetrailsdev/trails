@@ -1629,11 +1629,9 @@ describe("splitOverriddenFileBuckets", () => {
     expect(out.map((e) => e.info.file)).toEqual([
       "inflector/inflections.rb",
       "inflector/methods.rb",
+      "inflector/transliterate.rb",
     ]);
-    expect(out[0].info.instanceMethods.map((im) => im.name)).toEqual([
-      "inflections",
-      "transliterate",
-    ]);
+    expect(out[0].info.instanceMethods.map((im) => im.name)).toEqual(["inflections"]);
     expect(out[1].info.instanceMethods.map((im) => im.name)).toEqual([
       "deconstantize",
       "constantize",
@@ -1660,7 +1658,9 @@ describe("splitOverriddenFileBuckets", () => {
       fqn: "ActiveSupport::Inflector",
       info: { ...inflector, file: "inflector/methods.rb" },
     };
-    expect(splitOverriddenFileBuckets(entity, "activesupport")).toEqual([entity]);
+    const out = splitOverriddenFileBuckets(entity, "activesupport");
+    expect(out[0].info.file).toBe("inflector/methods.rb");
+    expect(out[0].info.instanceMethods).toHaveLength(3);
   });
 });
 

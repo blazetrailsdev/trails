@@ -39,7 +39,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         const pool = adapter._statementPoolForTest()!;
         // Rails' matching test sets statement_limit = 1 and asserts
         // LRU eviction. setMaxSize immediately evicts excess entries.
-        pool.setMaxSize(1);
+        await pool.setMaxSize(1);
         await adapter.execute("SELECT $1::text", ["a"]);
         expect(pool.length).toBe(1);
       } finally {
@@ -74,7 +74,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         await adapter.execute("SELECT $1::text", ["a"]);
         const pool = adapter._statementPoolForTest()!;
         expect(pool.length).toBe(2);
-        pool.clear();
+        await pool.clear();
         expect(pool.length).toBe(0);
       } finally {
         await adapter.rollback();
@@ -183,7 +183,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         await adapter.execute("SELECT $1::text", ["a"]);
         const pool = adapter._statementPoolForTest()!;
         expect(pool.length).toBe(2);
-        adapter.clearCacheBang();
+        await adapter.clearCacheBang();
         expect(pool.length).toBe(0);
         // Pool itself remains attached — counter continues from where
         // it left off so we never collide with a still-PREPAREd name
@@ -208,7 +208,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.rollback();
       // Same pool object survives the rollback (session-scoped lifetime).
       expect(adapter._statementPoolForTest()).toBe(pool);
-      adapter.clearCacheBang();
+      await adapter.clearCacheBang();
       expect(pool.length).toBe(0);
     });
 
@@ -234,7 +234,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const conn = adapter._rawConnectionForTest();
       // @ts-expect-error — driving the reset path by force-clearing _rawConnection.
       adapter._rawConnection = null;
-      adapter.clearCacheBang();
+      await adapter.clearCacheBang();
       expect(adapter._needsDeallocateAllForTest()).toBe(true);
       // Restore so the afterEach close() doesn't double-end.
       // @ts-expect-error — restoring _rawConnection for cleanup.
@@ -274,7 +274,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         // Same pool object — session-scoped lifetime.
         expect(newTxnPool).toBe(failedPool);
         expect(newTxnPool.length).toBeGreaterThan(0);
-        adapter.clearCacheBang();
+        await adapter.clearCacheBang();
         expect(newTxnPool.length).toBe(0);
       } finally {
         await adapter.rollback();

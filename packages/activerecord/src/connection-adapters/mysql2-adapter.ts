@@ -317,7 +317,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     // repeatedly would keep its original insertion position and get
     // evicted the moment any other distinct query came along.
     if (pool.get(sql)) return;
-    pool.set(sql, { sql, key: pool.nextKey() });
+    void pool.set(sql, { sql, key: pool.nextKey() });
   }
 
   /**
@@ -344,8 +344,8 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    * each cached statement on the adapter's sole connection.
    */
   override clearCacheBang(): void {
-    super.clearCacheBang();
-    this._statementPool?.clear();
+    void super.clearCacheBang();
+    void this._statementPool?.clear();
   }
   private _database: string | undefined;
 

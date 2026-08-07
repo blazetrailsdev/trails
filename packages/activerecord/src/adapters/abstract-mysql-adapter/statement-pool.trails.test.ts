@@ -58,7 +58,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         // LRU eviction. With one cached statement, setMaxSize(1) just
         // records the new limit; eviction happens on the next insert
         // via our Mysql2StatementPool#dealloc (conn.unprepare).
-        pool.setMaxSize(1);
+        await pool.setMaxSize(1);
         await adapter.execute("SELECT ? AS s", ["a"]);
         expect(pool.length).toBe(1);
       } finally {
