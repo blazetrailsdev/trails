@@ -2079,7 +2079,7 @@ export class AbstractAdapter implements Quoting {
 
   // --- Referential integrity & FK validation ---
 
-  async disableReferentialIntegrity(fn: () => Promise<void>): Promise<void> {
+  async disableReferentialIntegrity(fn: () => Promise<void>, _tables?: string[]): Promise<void> {
     await fn();
   }
 

@@ -408,8 +408,8 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   });
 
   await define("attachments", {}, (t) => {
-    t.bigInteger("record_id", { null: false });
     t.string("record_type", { null: false });
+    t.bigInteger("record_id", { null: false });
     t.index(["record_type", "record_id"], { name: "index_attachments_on_record" });
   });
 
@@ -668,8 +668,8 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
 
   await define("sharded_blog_posts", {}, (t) => {
     t.string("title");
-    t.bigInteger("parent_id");
     t.string("parent_type");
+    t.bigInteger("parent_id");
     t.index(["parent_type", "parent_id"], { name: "index_sharded_blog_posts_on_parent" });
     t.integer("blog_id");
     t.integer("revision");
@@ -718,8 +718,8 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
     t.integer("tags_count", { default: 0 });
     t.integer("children_count", { default: 0 });
     t.integer("parent_id");
-    t.bigInteger("author_id");
     t.string("author_type");
+    t.bigInteger("author_id");
     t.index(["author_type", "author_id"], { name: "index_comments_on_author" });
     t.string("resource_id");
     t.string("resource_type");
@@ -735,8 +735,8 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   await define("comment_overlapping_counter_caches", {}, (t) => {
     t.integer("user_comments_count_id");
     t.integer("post_comments_count_id");
-    t.bigInteger("commentable_id");
     t.string("commentable_type");
+    t.bigInteger("commentable_id");
   });
 
   await define("companies", {}, (t) => {
@@ -1127,8 +1127,8 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   await define("members", {}, (t) => {
     t.string("name");
     t.bigInteger("member_type_id");
-    t.bigInteger("admittable_id");
     t.string("admittable_type");
+    t.bigInteger("admittable_id");
   });
 
   await define("member_details", {}, (t) => {
@@ -1270,8 +1270,8 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   await define("treasures", {}, (t) => {
     t.string("name");
     t.string("type");
-    t.bigInteger("looter_id");
     t.string("looter_type");
+    t.bigInteger("looter_id");
     t.index(["looter_type", "looter_id"], { name: "index_treasures_on_looter" });
     t.bigInteger("ship_id");
     t.index("ship_id");
@@ -1280,22 +1280,28 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   await define("parrots_pirates", { id: false }, (t) => {
     t.bigInteger("parrot_id");
     t.index("parrot_id");
+    t.foreignKey("parrots", { column: "parrot_id" });
     t.bigInteger("pirate_id");
     t.index("pirate_id");
+    t.foreignKey("pirates", { column: "pirate_id" });
   });
 
   await define("parrots_treasures", { id: false }, (t) => {
     t.bigInteger("parrot_id");
     t.index("parrot_id");
+    t.foreignKey("parrots", { column: "parrot_id" });
     t.bigInteger("treasure_id");
     t.index("treasure_id");
+    t.foreignKey("treasures", { column: "treasure_id" });
   });
 
   await define("parrot_treasures", { id: false }, (t) => {
     t.bigInteger("parrot_id");
     t.index("parrot_id");
+    t.foreignKey("parrots", { column: "parrot_id" });
     t.bigInteger("treasure_id");
     t.index("treasure_id");
+    t.foreignKey("treasures", { column: "treasure_id" });
   });
 
   await define("people", {}, (t) => {
@@ -1540,10 +1546,10 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
 
   await define("sponsors", {}, (t) => {
     t.integer("club_id");
-    t.bigInteger("sponsorable_id");
     t.string("sponsorable_type");
-    t.bigInteger("sponsor_id");
+    t.bigInteger("sponsorable_id");
     t.string("sponsor_type");
+    t.bigInteger("sponsor_id");
   });
 
   await define("string_key_objects", { id: false }, (t) => {
@@ -1684,8 +1690,8 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
     t.string("poly_human_without_inverse_type");
     t.integer("puzzled_polymorphic_human_id");
     t.string("puzzled_polymorphic_human_type");
-    t.bigInteger("super_human_id");
     t.string("super_human_type");
+    t.bigInteger("super_human_id");
   });
 
   await define("interests", {}, (t) => {
@@ -1706,8 +1712,8 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
 
   await define("wheels", {}, (t) => {
     t.integer("size");
-    t.bigInteger("wheelable_id");
     t.string("wheelable_type");
+    t.bigInteger("wheelable_id");
     t.index(["wheelable_type", "wheelable_id"], { name: "index_wheels_on_wheelable" });
   });
 

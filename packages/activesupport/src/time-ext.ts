@@ -355,35 +355,120 @@ export function since(date: Date, seconds: number): Temporal.Instant {
 // change
 // ---------------------------------------------------------------------------
 
+interface ChangeOptions {
+  year?: number;
+  month?: number;
+  day?: number;
+  hour?: number;
+  min?: number;
+  sec?: number;
+  usec?: number;
+}
+
+/**
+ * `::Time.local` (time/calculations.rb:174) — builds a time in the system's
+ * local zone, taking Ruby's reversed component order.
+ * @internal
+ */
+function local(
+  sec: number,
+  min: number,
+  hour: number,
+  day: number,
+  month: number,
+  year: number,
+): Date {
+  const secFloor = Math.floor(sec);
+  const nsec = Math.round((sec - secFloor) * 1_000_000_000);
+  return new Date(year, month - 1, day, hour, min, secFloor, Math.floor(nsec / 1_000_000));
+}
+
 export function change(
-  date: Date,
-  options: {
-    year?: number;
-    month?: number;
-    day?: number;
-    hour?: number;
-    min?: number;
-    sec?: number;
-    usec?: number;
-  },
-): Temporal.Instant {
-  const newYear = options.year ?? date.getFullYear();
-  const newMonth = options.month ?? date.getMonth() + 1; // 1-indexed
-  const newDay = options.day ?? date.getDate();
-  const newHour = options.hour ?? date.getHours();
-  const newMin = options.min ?? (options.hour !== undefined ? 0 : date.getMinutes());
-  const newSec =
-    options.sec ??
-    (options.hour !== undefined || options.min !== undefined ? 0 : date.getSeconds());
+  date: Temporal.ZonedDateTime,
+  options: ChangeOptions,
+): Temporal.ZonedDateTime;
+export function change(date: Date, options: ChangeOptions): Temporal.Instant;
+export function change(
+  date: Date | Temporal.ZonedDateTime,
+  options: ChangeOptions,
+): Temporal.Instant | Temporal.ZonedDateTime {
+  // Ruby reads the components off the receiver; a JS `Date` spells those readers
+  // differently, and reads them in the system's local zone, so widen it to the
+  // one shape both arms below share.
+  const self =
+    date instanceof Date ? instantFrom(date).toZonedDateTimeISO(Temporal.Now.timeZoneId()) : date;
+  const nsec = self.millisecond * 1_000_000 + self.microsecond * 1_000 + self.nanosecond;
+
+  const newYear = options.year ?? self.year;
+  const newMonth = options.month ?? self.month;
+  const newDay = options.day ?? self.day;
+  const newHour = options.hour ?? self.hour;
+  const newMin = options.min ?? (options.hour !== undefined ? 0 : self.minute);
+  let newSec =
+    options.sec ?? (options.hour !== undefined || options.min !== undefined ? 0 : self.second);
   const newUsec =
     options.usec ??
     (options.hour !== undefined || options.min !== undefined || options.sec !== undefined
       ? 0
-      : date.getMilliseconds() * 1000);
+      : nsec / 1000);
 
-  return instantFrom(
-    new Date(newYear, newMonth - 1, newDay, newHour, newMin, newSec, Math.floor(newUsec / 1000)),
+  newSec += newUsec / 1_000_000;
+
+  if (date instanceof Date) {
+    // `elsif zone` (time/calculations.rb:173-174): a JS `Date` carries no zone
+    // object, only the system's local zone, so it lands here rather than on the
+    // `utc_to_local` arm below or the trailing `utc_offset` one.
+    return instantFrom(local(newSec, newMin, newHour, newDay, newMonth, newYear));
+  }
+
+  // `elsif zone.respond_to?(:utc_to_local)` (time/calculations.rb:150-172).
+  const secFloor = Math.floor(newSec);
+  const newNsec = Math.round((newSec - secFloor) * 1_000_000_000);
+  let newTime = Temporal.ZonedDateTime.from(
+    {
+      timeZone: date.timeZoneId,
+      year: newYear,
+      month: newMonth,
+      day: newDay,
+      hour: newHour,
+      minute: newMin,
+      second: secFloor,
+      millisecond: Math.floor(newNsec / 1_000_000),
+      microsecond: Math.floor(newNsec / 1_000) % 1_000,
+      nanosecond: newNsec % 1_000,
+    },
+    // Ruby's `Time.new` with a zone object picks the first chronological
+    // occurrence of an ambiguous nominal time; `"compatible"` is the same choice.
+    { disambiguation: "compatible" },
   );
+
+  // Some versions of Ruby have a bug where Time.new with a zone object and
+  // fractional seconds will end up with a broken utc_offset.
+  // This is fixed in Ruby 3.3.1 and 3.2.4
+  if (!Number.isInteger(newTime.offsetNanoseconds)) {
+    newTime = newTime.add({ nanoseconds: 0 });
+  }
+
+  // When there are two occurrences of a nominal time due to DST ending,
+  // `Time.new` chooses the first chronological occurrence (the one with a
+  // larger UTC offset). However, for `change`, we want to choose the
+  // occurrence that matches this time's UTC offset.
+  //
+  // If the new time's UTC offset is larger than this time's UTC offset, the
+  // new time might be a first chronological occurrence. So we add the offset
+  // difference to fast-forward the new time, and check if the result has the
+  // desired UTC offset (i.e. is the second chronological occurrence).
+  const offsetDifference = newTime.offsetNanoseconds - date.offsetNanoseconds;
+  let newTime2: Temporal.ZonedDateTime;
+  if (
+    offsetDifference > 0 &&
+    (newTime2 = newTime.add({ nanoseconds: offsetDifference })).offsetNanoseconds ===
+      date.offsetNanoseconds
+  ) {
+    return newTime2;
+  } else {
+    return newTime;
+  }
 }
 
 // ---------------------------------------------------------------------------

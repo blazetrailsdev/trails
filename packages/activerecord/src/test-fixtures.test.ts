@@ -50,6 +50,13 @@ function makeAdapter(): DatabaseAdapter {
     createSavepoint: vi.fn(async () => {}),
     releaseSavepoint: vi.fn(async () => {}),
     rollbackToSavepoint: vi.fn(async () => {}),
+    // Rails wraps a fixture set's table_deletes in this
+    // (database_statements.rb:486-495) and every adapter defines it
+    // (abstract_adapter.rb:634), so the mock runs the block the way the base
+    // implementation does rather than making the caller guard for its absence.
+    disableReferentialIntegrity: async (fn: () => Promise<void>) => {
+      await fn();
+    },
     quote: (v: unknown) => (typeof v === "string" ? `'${v}'` : String(v)),
     quoteTableName: (n: string) => `"${n}"`,
     quoteColumnName: (n: string) => `"${n}"`,
