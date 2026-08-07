@@ -8,6 +8,9 @@
 import { Simple } from "./tag/simple.js";
 import type { Parents } from "./tag/parents.js";
 
+export { Simple } from "./tag/simple.js";
+export { Rfc4646 } from "./tag/rfc4646.js";
+
 let implementationStore: TagImplementation | undefined;
 
 /** The surface a tag implementation exposes: a factory, and the tag it makes. */

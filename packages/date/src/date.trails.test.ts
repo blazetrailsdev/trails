@@ -604,7 +604,6 @@ describe("Date", () => {
     const dt = new RubyDateTime(2008, 3, 1, 6, 7, 8.5);
     expect(dt.strftime("%_S")).toBe(" 8");
     expect(dt.strftime("%_m")).toBe(" 3");
-    // `%0` sets the pad character and then reads the width from the same digits.
     expect(dt.strftime("%0S")).toBe("08");
     expect(dt.strftime("%00S")).toBe("08");
   });
@@ -649,6 +648,9 @@ describe("Date", () => {
     expect(new RubyDate(-12345, 1, 1).toS()).toBe("-12345-01-01");
     expect(new RubyDate(12345, 1, 1).toS()).toBe("12345-01-01");
     expect(new RubyDate(1, 1, 1).strftime("%F")).toBe("0001-01-01");
+    // `%C` and `%y` go through the C's floored `div`/`mod`, so a BC year
+    // answers `ruby 3.3.11 -rdate`'s `"-1"` and `"99"`, not `"-1"` and `"-1"`.
+    expect(new RubyDate(-1, 3, 1).strftime("%Y|%-Y|%6Y|%C|%y")).toBe("-0001|-1|-00001|-1|99");
   });
 
   const civilOrError = (

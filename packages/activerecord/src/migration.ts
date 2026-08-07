@@ -2248,6 +2248,12 @@ export class Migrator {
    * `#run` (migration.rb:1447, 1461), never inside this body. Adapters that
    * cannot lock answer `isAdvisoryLocksEnabled()` falsey.
    *
+   * The one call with no Rails counterpart is `_ensureSchemaTable()`: Rails
+   * creates the bookkeeping tables in `Migrator#initialize`
+   * (migration.rb:1470-1476), and a TS constructor cannot await, so they are
+   * ensured at the one point that must see them — before `loadMigrated` reads
+   * schema_migrations.
+   *
    * @internal Mirrors: ActiveRecord::Migrator#with_advisory_lock
    */
   async withAdvisoryLock<T>(fn: () => Promise<T>): Promise<T> {
@@ -2256,10 +2262,6 @@ export class Migrator {
     if (!gotLock) {
       throw new ConcurrentMigrationError();
     }
-    // No Rails counterpart here: Rails creates the bookkeeping tables in
-    // `Migrator#initialize` (migration.rb:1470-1476). A TS constructor cannot
-    // await, so they are ensured at the one point that must see them — before
-    // `loadMigrated` reads schema_migrations.
     await this._ensureSchemaTable();
     await this.loadMigrated();
     // Capture fn error so we can release the lock before re-throwing (no-unsafe-finally).

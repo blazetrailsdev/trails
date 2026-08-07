@@ -22,6 +22,11 @@ export const RFC4646_SUBTAGS = [
   "grandfathered",
 ] as const;
 
+/**
+ * The `String` method each subtag's reader sends itself. A Ruby Symbol is a JS
+ * string, and these are method names rather than values whose Symbol-ness
+ * discriminates, so they carry no leading colon.
+ */
 export const RFC4646_FORMATS: Record<string, string> = {
   language: "downcase",
   script: "capitalize",
@@ -40,10 +45,14 @@ export class Rfc4646 implements Parents {
   /**
    * Parses the given tag and returns a Tag instance if it is valid.
    * Returns false if the given tag is not valid according to RFC 4646.
+   *
+   * The gem's docstring says false, but `new(*matches) if matches`
+   * (rfc4646.rb:20) answers `nil` on the `Parser.match` false — it is `Parser`
+   * that answers false, and this returns nil.
    */
-  static tag(tag: string): Rfc4646 | false {
+  static tag(tag: string): Rfc4646 | null {
     const matches = Rfc4646.parser().match(tag);
-    return matches ? new Rfc4646(...matches) : false;
+    return matches ? new Rfc4646(...matches) : null;
   }
 
   static parser(): typeof Parser {

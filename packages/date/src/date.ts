@@ -268,9 +268,14 @@ function subsecDigits(nsec: number, precision: number): string {
  *
  * The scan mirrors `date_strftime.c`'s `again:` switch
  * (`date_strftime.c:160-235`): the `-` and `_` flags, the padding character and
- * the width are read ahead of EVERY directive, and each arm then formats
- * through `fmt` / `fillPadding` with the C's own defaults for that arm rather
- * than a hardcoded pad.
+ * the width are read ahead of EVERY directive. `num` is then the `FMT` / `FMTV`
+ * macro over a value arm and `text` is `FILL_PADDING` over a `break` arm or a
+ * recursively expanded `STRFTIME` one, each carrying the arm's own default
+ * width and padding character rather than a hardcoded pad. A directive with no
+ * arm goes out verbatim, flags and all, as `unknown:` (`date_strftime.c:591-599`)
+ * does — `%Y`'s five columns for a negative year (`FMT('0', 0 <= y ? 4 : 5)`,
+ * `date_strftime.c:236-247`) are why `Date#to_s` renders a pre-1000 date as
+ * `0001-01-01`.
  *
  * Only the directives the i18n format strings and the conformance mixins use
  * are recognised; Ruby leaves an unknown directive in place, and so does this.
@@ -332,29 +337,21 @@ export function strftime(subject: StrftimeSubject, format: string): string {
       break;
     }
 
-    // The value arms — `FMT` / `FMTV` — and the two that build their own answer.
     const num = (defPad: string, defPrec: number, val: number): string =>
       fmt(padding, left, precision, defPad, defPrec, val);
-    // The `break` arms and the recursively expanded `STRFTIME` ones, which are
-    // carried out to the requested width by `FILL_PADDING`.
     const text = (value: string): string =>
       fillPadding(padding, left, precision, value.length) + value;
 
     let formatted: string | undefined;
     switch (spec) {
       case "Y":
-        // `FMT('0', 0 <= y ? 4 : 5, "ld", y)` (date_strftime.c:236-247), so a
-        // non-negative year pads to four digits and a negative one pads to five
-        // columns counting the sign — `-0001`, not `-1`. `Date#to_s` is
-        // `strftimev("%Y-%m-%d")` (date_core.c:6967-6970), which is why a
-        // pre-1000 date renders as `0001-01-01`.
         formatted = num("0", 0 <= subject.year ? 4 : 5, subject.year);
         break;
       case "C":
-        formatted = num("0", 2, Math.floor(subject.year / 100));
+        formatted = num("0", 2, div(subject.year, 100));
         break;
       case "y":
-        formatted = num("0", 2, subject.year % 100);
+        formatted = num("0", 2, mod(subject.year, 100));
         break;
       case "m":
         formatted = num("0", 2, subject.mon);
@@ -439,8 +436,6 @@ export function strftime(subject: StrftimeSubject, format: string): string {
     }
 
     if (formatted === undefined) {
-      // `unknown:` (date_strftime.c:591-599) — the directive, flags and all,
-      // goes out verbatim with the padding state thrown away.
       out += spec === undefined ? format.slice(sp) : format.slice(sp, g + 1);
       f = spec === undefined ? format.length : g + 1;
       continue;
