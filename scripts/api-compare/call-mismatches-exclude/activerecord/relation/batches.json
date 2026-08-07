@@ -2,13 +2,6 @@
   {
     "package": "activerecord",
     "tsFile": "relation/batches.ts",
-    "rubyName": "batch_on_loaded_relation",
-    "call": "order:buildBatchOrders,map",
-    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/batches.ts",
     "rubyName": "batch_on_unloaded_relation",
     "call": "any?",
     "reason": "Rails' `values.flatten.any?(nil)` guard raises ArgumentError when a custom select clause omits a cursor column; that nil-cursor check is not ported yet and is tracked separately from the empty_scope/use_ranges convergence."
@@ -17,8 +10,8 @@
     "package": "activerecord",
     "tsFile": "relation/batches.ts",
     "rubyName": "batch_on_unloaded_relation",
-    "call": "order:toSql,limit",
-    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
+    "call": "order:applyLimits,limit",
+    "reason": "Baseline (RFC 0084): ORDER-only divergence surfaced when the two extractors' chained-call traversal was aligned — the body's previous first-inversion row retired in the same PR and this is the next one; pending per-body control-flow convergence review."
   },
   {
     "package": "activerecord",

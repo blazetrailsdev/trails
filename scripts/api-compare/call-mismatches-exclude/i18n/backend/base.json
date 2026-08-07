@@ -1,0 +1,9 @@
+[
+  {
+    "package": "i18n",
+    "tsFile": "backend/base.ts",
+    "rubyName": "load_file",
+    "call": "order:tr,extname",
+    "reason": "Baseline (RFC 0084): ORDER-only divergence surfaced when the two extractors' chained-call traversal was aligned — the body's previous first-inversion row retired in the same PR and this is the next one; pending per-body control-flow convergence review."
+  }
+]

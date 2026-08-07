@@ -639,7 +639,41 @@ describe("Date", () => {
   it("strips the padding for the %-d flag and leaves unknown directives alone", () => {
     const date = RubyDate.parse("2008-07-02");
     expect(date.strftime("%-m/%-d")).toBe("7/2");
-    expect(date.strftime("%Q")).toBe("%Q");
+    expect(date.strftime("%i")).toBe("%i");
+  });
+
+  it("formats the composite and week-based directives date_strftime expands", () => {
+    // Every expectation is `ruby 3.3.11 -rdate`'s answer for the same receiver.
+    const date = RubyDate.parse("2008-07-02");
+    const dt = new RubyDateTime(2008, 3, 1, 6, 7, 8.5);
+    expect(date.strftime("%T|%R|%r|%X")).toBe("00:00:00|00:00|12:00:00 AM|00:00:00");
+    expect(dt.strftime("%T|%R|%r|%X")).toBe("06:07:08|06:07|06:07:08 AM|06:07:08");
+    expect(date.strftime("%c")).toBe("Wed Jul  2 00:00:00 2008");
+    expect(dt.strftime("%c")).toBe("Sat Mar  1 06:07:08 2008");
+    expect(date.strftime("%D|%v")).toBe("07/02/08| 2-JUL-2008");
+    expect(dt.strftime("%D|%v")).toBe("03/01/08| 1-MAR-2008");
+    expect(date.strftime("%+")).toBe("Wed Jul  2 00:00:00 +00:00 2008");
+    expect(date.strftime("%G|%V|%U|%W")).toBe("2008|27|26|26");
+    expect(dt.strftime("%G|%V|%U|%W")).toBe("2008|09|08|08");
+    // The week-based year runs back into the previous year here.
+    expect(RubyDate.parse("2021-01-03").strftime("%U|%W|%V|%G|%g|%y")).toBe("01|00|53|2020|20|21");
+    expect(date.strftime("%Q")).toBe("1214956800000");
+    expect(dt.strftime("%Q")).toBe("1204351628500");
+  });
+
+  it("applies the %^ and %# case flags, as date_strftime does", () => {
+    const dt = new RubyDateTime(2008, 3, 1, 6, 7, 8.5);
+    expect(dt.strftime("%^a %#a %^P %P %p %#p %^v")).toBe("SAT SAT AM am AM am  1-MAR-2008");
+  });
+
+  it("pads and left-strips a composite directive, as the STRFTIME macro does", () => {
+    const date = RubyDate.parse("2008-07-02");
+    expect(date.strftime("%12T|%-T")).toBe("    00:00:00|00:00:00");
+  });
+
+  it("round-trips %T through strptime and strftime", () => {
+    const parsed = RubyDateTime.strptime("2008-03-01T06:07:08.5", "%FT%T.%N");
+    expect(parsed.strftime("%FT%T.%20N")).toBe("2008-03-01T06:07:08.50000000000000000000");
   });
 
   it("honours the width prefix ahead of every directive, as date_strftime does", () => {
@@ -698,7 +732,7 @@ describe("Date", () => {
     expect(dt.strftime("%-3S")).toBe("8");
     expect(dt.strftime("%_3S")).toBe("  8");
     expect(dt.strftime("%0-S")).toBe("8");
-    expect(dt.strftime("%^b")).toBe("%^b");
+    expect(dt.strftime("%3^b")).toBe("%3^b");
     expect(dt.strftime("%Ez")).toBe("%Ez");
   });
 

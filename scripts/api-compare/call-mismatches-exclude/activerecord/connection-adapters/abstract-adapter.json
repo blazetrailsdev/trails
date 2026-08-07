@@ -142,13 +142,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-adapter.ts",
-    "rubyName": "quote_default_expression",
-    "call": "order:lookupCastType,serialize",
-    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-adapter.ts",
     "rubyName": "reconnect!",
     "call": "synchronize",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -180,13 +173,6 @@
     "rubyName": "select_value",
     "call": "single_value_from_rows",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-adapter.ts",
-    "rubyName": "select_values",
-    "call": "order:selectRows,map",
-    "reason": "ORDER-only (RFC 0084): both bodies are select_rows(...).map — the Ruby extractor records a method chain outer-call first, so the sequences invert with no divergence in the port. Migrated verbatim from the abstract/database-statements.ts row this candidate replaced when callSeq reached object-literal members."
   },
   {
     "package": "activerecord",

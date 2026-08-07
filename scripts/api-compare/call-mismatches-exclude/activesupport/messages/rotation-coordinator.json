@@ -2,6 +2,13 @@
   {
     "package": "activesupport",
     "tsFile": "messages/rotation-coordinator.ts",
+    "rubyName": "build_with_rotations",
+    "call": "order:uniq,normalizeOptions",
+    "reason": "Baseline (RFC 0084): ORDER-only divergence surfaced when the two extractors' chained-call traversal was aligned — the body's previous first-inversion row retired in the same PR and this is the next one; pending per-body control-flow convergence review."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "messages/rotation-coordinator.ts",
     "rubyName": "changing_configuration!",
     "call": "any?",
     "reason": "Equivalent: `@codecs.any?` over a Hash is `this.#codecs.size > 0` on a Map, which has no `any?`."

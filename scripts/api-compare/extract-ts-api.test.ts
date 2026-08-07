@@ -285,6 +285,32 @@ describe("body call capture", () => {
     ]);
   });
 
+  it("emits a chained call's refs in evaluation order, receiver first", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        throughScope() {
+          const scope = this.throughReflection.klass.unscoped();
+          return new Preloader({ scope }).loaders;
+        }
+      }`,
+    );
+    const throughScope = cls.instanceMethods.find((m) => m.name === "throughScope")!;
+    expect(throughScope.callSeq).toEqual([
+      "throughReflection",
+      "klass",
+      "unscoped",
+      "constructor",
+      "loaders",
+    ]);
+    expect(throughScope.skeleton).toEqual([
+      "ref:throughReflection",
+      "ref:klass",
+      "ref:unscoped",
+      "new:Preloader",
+      "ref:loaders",
+    ]);
+  });
+
   it("tokens a logical operator as if, between its operands", () => {
     const cls = extractFromSource(
       `class Foo {

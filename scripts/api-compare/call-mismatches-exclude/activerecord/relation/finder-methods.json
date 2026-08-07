@@ -65,13 +65,6 @@
   {
     "package": "activerecord",
     "tsFile": "relation/finder-methods.ts",
-    "rubyName": "find_some_ordered",
-    "call": "order:typeForAttribute,cast",
-    "reason": "Re-spelling of the retired `order:model,selectValues` row — the short-name resolver now credits `typeForAttribute`/`cast` where it credited `model` before. Same body, same pending burndown."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/finder-methods.ts",
     "rubyName": "find_take",
     "call": "first",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

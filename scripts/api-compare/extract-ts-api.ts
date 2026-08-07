@@ -2607,7 +2607,6 @@ function isSkeletonLogicalOp(kind: ts.SyntaxKind): boolean {
 function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
   if (!node) return undefined;
   const tokens: string[] = [];
-  const calleeNodes = new Set<ts.Node>();
   const visit = (n: ts.Node): void => {
     switch (n.kind) {
       case ts.SyntaxKind.IfStatement:
@@ -2651,29 +2650,39 @@ function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
         );
         break;
       }
+      // Receiver before the call it receives, matching
+      // extract-ruby-api.rb#walk_for_skeleton; the two orders must agree.
       case ts.SyntaxKind.CallExpression: {
-        const callee = (n as ts.CallExpression).expression;
+        const call = n as ts.CallExpression;
+        const callee = call.expression;
         if (ts.isIdentifier(callee)) {
           tokens.push(`ref:${callee.text}`);
-          calleeNodes.add(callee);
         } else if (ts.isPropertyAccessExpression(callee)) {
+          visit(callee.expression);
           tokens.push(`ref:${callee.name.text}`);
-          calleeNodes.add(callee);
         } else if (callee.kind === ts.SyntaxKind.SuperKeyword) {
           tokens.push("ref:super");
+        } else {
+          visit(callee);
         }
-        break;
+        call.arguments.forEach(visit);
+        return;
       }
       case ts.SyntaxKind.PropertyAccessExpression: {
         const access = n as ts.PropertyAccessExpression;
-        if (!calleeNodes.has(access) && !isAssignmentWriteTarget(access)) {
+        visit(access.expression);
+        if (!isAssignmentWriteTarget(access)) {
           tokens.push(`ref:${access.name.text}`);
         }
-        break;
+        return;
       }
-      case ts.SyntaxKind.ElementAccessExpression:
+      case ts.SyntaxKind.ElementAccessExpression: {
+        const access = n as ts.ElementAccessExpression;
+        visit(access.expression);
         tokens.push("ref:get");
-        break;
+        visit(access.argumentExpression);
+        return;
+      }
     }
     ts.forEachChild(n, visit);
   };
@@ -2712,6 +2721,9 @@ function collectCalls(node: ts.Node | undefined): string[] | undefined {
         names.add(resolve(callee.text));
         addNegated(n, callee.text, resolve(callee.text));
       } else if (ts.isPropertyAccessExpression(callee)) {
+        // Receiver before the call it receives, matching
+        // extract-ruby-api.rb#walk_for_calls; the two orders must agree.
+        visit(callee.expression);
         const prop = callee.name.text;
         names.add(prop);
         addNegated(n, prop);
@@ -2747,6 +2759,7 @@ function collectCalls(node: ts.Node | undefined): string[] | undefined {
       const parent = n.parent;
       const isCallCallee =
         parent !== undefined && ts.isCallExpression(parent) && parent.expression === n;
+      visit(n.expression);
       if (!isCallCallee && !isAssignmentWriteTarget(n)) {
         names.add(n.name.text);
         addNegated(n, n.name.text);
