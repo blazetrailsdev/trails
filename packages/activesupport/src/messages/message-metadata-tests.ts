@@ -41,7 +41,7 @@ export function freezeTime(
  * that decode the time back as a string. JS equality has no such coercion, so
  * the two spellings `ActiveSupport::JSON` can render an instant in —
  * `xmlschema` and the `use_standard_json_time_format = false` slash format
- * (json.ts `temporalAsJson`) — are compared the same way here.
+ * (`core-ext/object/json.ts` `Time.asJson`) — are compared the same way here.
  */
 expect.addEqualityTesters([
   function (a: unknown, b: unknown): boolean | undefined {
