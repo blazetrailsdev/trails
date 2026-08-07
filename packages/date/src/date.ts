@@ -122,24 +122,31 @@ function mLocalJd(subject: StrftimeSubject): number {
 }
 
 /**
- * @internal `m_cwyear` (`date_core.c:1847-1855`), which `tmx_cwyear`
- * (`date_core.c:7153`) hands `%G` and `%g`.
+ * @internal `m_cwyear` (`date_core.c:1848-1856`), which reaches `%G`
+ * (`date_strftime.c:238`) and `%g` (`date_strftime.c:251`) as the `cwyear` slot
+ * of the `tmx_funcs` table (`date_core.c:7153`, through `m_real_cwyear`) that
+ * `tmx_cwyear` (`date_tmx.h:35`) reads.
  */
 function cwyear(subject: StrftimeSubject): number {
   const [ry] = cJdToCommercial(mLocalJd(subject));
   return ry;
 }
 
-/** @internal `m_cweek` (`date_core.c:1874-1883`), which `tmx_cweek` (`date_core.c:7154`) hands `%V`. */
+/**
+ * @internal `m_cweek` (`date_core.c:1876-1884`), which reaches `%V`
+ * (`date_strftime.c:391`) as the `cweek` slot of the `tmx_funcs` table
+ * (`date_core.c:7154`) that `tmx_cweek` (`date_tmx.h:36`) reads.
+ */
 function cweek(subject: StrftimeSubject): number {
   const [, rw] = cJdToCommercial(mLocalJd(subject));
   return rw;
 }
 
 /**
- * @internal `m_wnumx` (`date_core.c:1895-1904`) — `%U` is `f == 0`, which
- * `m_wnum0` (`date_core.c:1906-1911`) passes, and `%W` is `f == 1`, which
- * `m_wnum1` (`date_core.c:1912-1917`) passes.
+ * @internal `m_wnumx` (`date_core.c:1897-1905`) — `%U` is `f == 0`, which
+ * `m_wnum0` (`date_core.c:1907-1911`) passes, and `%W` is `f == 1`, which
+ * `m_wnum1` (`date_core.c:1913-1917`) passes; `date_strftime.c:381` picks
+ * between the two.
  */
 function wnumx(subject: StrftimeSubject, f: number): number {
   const [, rw] = cJdToWeeknum(mLocalJd(subject), f);
