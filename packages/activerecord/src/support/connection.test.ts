@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import { DatabaseTasks } from "../tasks/database-tasks.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
 import { Base } from "../base.js";
-import { connect, testConfigurationHashes } from "./connection.js";
+import { connect, restoreWorkerConnection, testConfigurationHashes } from "./connection.js";
 import { SQLITE_FIXTURE_DATABASE, SQLITE_FIXTURE_DATABASE_2 } from "./config.js";
 
 // Only the cases asserting `connect`'s own side effects call it; everything
@@ -14,13 +14,18 @@ import { SQLITE_FIXTURE_DATABASE, SQLITE_FIXTURE_DATABASE_2 } from "./config.js"
 describe("connect", () => {
   const originalConfigurations = Base.configurations();
 
-  afterEach(() => {
+  afterEach(async () => {
     DatabaseTasks.databaseConfiguration = null;
     DatabaseTasks.clearRegisteredTasks();
     Base.configurations(originalConfigurations);
-    Base.removeConnection();
+    await Base.removeConnection();
     Base._adapter = null;
     vi.unstubAllEnvs();
+    // `connect()` establishes a Base pool from whatever ARCONN this case
+    // stubbed, displacing the worker's own same-named pool for every later
+    // file in the vitest worker — invisible on the sqlite lane, a different
+    // database on the others.
+    await restoreWorkerConnection();
   });
 
   it("sets databaseConfiguration and returns the arunit config", async () => {
