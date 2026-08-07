@@ -1140,73 +1140,59 @@ function _assignAttribute(self: AttributeIO, key: string, value: unknown): Promi
 }
 
 /**
- * Mirrors: ActiveRecord::AttributeAssignment#_assign_attributes
- * (attribute_assignment.rb:6-22), reached through
- * ActiveModel's `assign_attributes` (:32-35).
+ * Mirrors: ActiveModel::AttributeAssignment#assign_attributes
+ * (attribute_assignment.rb:28-35) — raise unless the argument is a Hash, return
+ * on a blank one, then sanitize and hand off to `_assign_attributes`.
  *
- * Rails buckets multiparameter keys AND Hash values out of the main loop and
- * assigns the nested hashes only after the scalar pass (:21), so a nested
- * writer's `reject_if` / the built record's callbacks observe an owner whose
- * own attributes are already set. Nested runs before multiparameter (:21-22).
+ * Rails returns nil and so does this. A displacing `#{name}_attributes=` key
+ * (see `_assignAttribute`) owes a write that Rails runs inline and JS cannot;
+ * on this synchronous surface it is parked on the record and drained by `save`,
+ * exactly as the constructor's nested re-dispatch parks its own
+ * (`_reapplyNestedAttrSetters`). `setAttributes` is the awaitable surface that
+ * runs those writes in key order — it orders the nested keys, it is not the
+ * only path that accepts them: `#{name}_attributes=` is an ordinary generated
+ * writer (nested_attributes.rb:386-392) and Rails hands it to `assign_attributes`
+ * from `ActiveModel::API#initialize` (api.rb:81, reached through
+ * `Base#initialize`'s `super`, core.rb:471-478) and from `update` / `update!`
+ * (persistence.rb:563-580), none of which can await.
  *
- * Rails returns nil; this returns a promise when one of the assignments was a
- * displacing `#{name}_attributes=` (see `_assignAttribute`), which Rails runs
- * inline and JS cannot. Callers free to ignore the nil are equally free to
- * ignore the promise.
+ * The parking is uniform: every step after a displacing key — later scalar
+ * keys, the nested pass and the multiparameter pass alike — is assigned while
+ * that write is still in flight, because a `void` return has nothing for the
+ * loop to block on. Rails' `each` (attribute_assignment.rb:9-22) orders them,
+ * and so does `setAttributes`; on this surface only `save`'s drain does. The
+ * steps are all in-memory attribute writes (`assign_multiparameter_attributes`
+ * builds a date/time or aggregation and writes the slot), so none of them reads
+ * or writes the association state the parked write is settling.
  */
-export function assignAttributes(
-  this: AttributeIO,
-  attrs: Record<string, unknown>,
-): Promise<void> | void {
+export function assignAttributes(this: AttributeIO, attrs: Record<string, unknown>): void {
   assertHashAttributes(attrs);
   // Mirrors ActiveModel::AttributeAssignment#assign_attributes: bail before
   // sanitizing so a blank strong-params object (always un-permitted) is a
   // no-op rather than raising, then unwrap/forbid via sanitize_for_mass_assignment.
   if (Object.keys(attrs).length === 0) return;
-  attrs = sanitizeForMassAssignment(attrs);
-
-  let multiParameterAttributes: Record<string, unknown> | null = null;
-  let nestedParameterAttributes: Record<string, unknown> | null = null;
-  let pending: Promise<void> | undefined;
-
-  for (const [key, value] of Object.entries(attrs)) {
-    if (key.includes("(")) {
-      (multiParameterAttributes ??= {})[key] = value;
-    } else if (isNestedParameterHash(value)) {
-      (nestedParameterAttributes ??= {})[key] = value;
-    } else {
-      pending = assignAfter(pending, () => _assignAttribute(this, key, value));
-    }
+  for (const pending of _assignAttributes(this, sanitizeForMassAssignment(attrs))) {
+    parkNestedReaderLoad(this as unknown as Base, pending);
   }
-
-  if (nestedParameterAttributes) {
-    const nested = nestedParameterAttributes;
-    pending = assignAfter(pending, () => assignNestedParameterAttributes(this, nested));
-  }
-  if (multiParameterAttributes) {
-    const multi = extractMultiparameterCallstack(multiParameterAttributes).multiparams;
-    pending = assignAfter(pending, () => executeMultiparameterAssignment(this as any, multi));
-  }
-  return pending;
 }
 
 /**
- * Run one step of Rails' `each` over the assignment list: inline when nothing
- * is outstanding, chained behind `pending` when a previous step is still
- * running. Rails' `_assign_attributes` (attribute_assignment.rb:9-23) is a plain
- * `each`, so a step that reaches DB I/O — a displacing `#{name}_attributes=`
- * running `load_target` / `remove_target!` (has_one_association.rb:59-69) —
- * finishes before the next key is assigned. Chaining is how a JS caller that
- * cannot block between iterations keeps that order; without it two displacing
- * keys in one hash would issue their writes concurrently.
+ * Awaitable `attributes=`. This is the entry point for a hash whose
+ * nested-attributes key displaces an existing record: Rails' `load_target` /
+ * `remove_target!` (has_one_association.rb:59-69) run inline inside the `each`,
+ * so the write must finish before the next key is assigned, and only an awaited
+ * caller can hold that order.
+
  */
-function assignAfter(
-  pending: Promise<void> | undefined,
-  step: () => Promise<void> | void,
-): Promise<void> | undefined {
-  if (pending) return pending.then(() => step());
-  const started = step();
-  return started ?? undefined;
+export async function setAttributes(
+  this: AttributeIO,
+  attrs: Record<string, unknown>,
+): Promise<void> {
+  assertHashAttributes(attrs);
+  if (Object.keys(attrs).length === 0) return;
+  for (const pending of _assignAttributes(this, sanitizeForMassAssignment(attrs))) {
+    await pending;
+  }
 }
 
 /**
@@ -1220,19 +1206,66 @@ function isNestedParameterHash(value: unknown): boolean {
 }
 
 /**
+ * Mirrors: ActiveRecord::AttributeAssignment#_assign_attributes
+ * (attribute_assignment.rb:6-23).
+ *
+ * Rails buckets multiparameter keys AND Hash values out of the main loop and
+ * assigns the nested hashes only after the scalar pass (:21), so a nested
+ * writer's `reject_if` / the built record's callbacks observe an owner whose
+ * own attributes are already set. Nested runs before multiparameter (:21-22).
+ *
+ * Rails' body is a plain `each`; ours yields the promise a step answered so the
+ * two entry points above can drive the same `each` — `assignAttributes` parking
+ * each one, `setAttributes` awaiting it before the loop moves on. Written as a
+ * generator rather than duplicated per driver: the loop, its bucketing and its
+ * exceptions stay one body, and they stay synchronous, so a bad multiparameter
+ * key still raises out of `assignAttributes` where Rails raises out of
+ * `assign_attributes`.
+ *
+ * `assign_multiparameter_attributes` (:22) is not a yield point: our
+ * `executeMultiparameterAssignment` is synchronous and answers nothing, so
+ * there is no promise to hand a driver.
+ */
+function* _assignAttributes(
+  self: AttributeIO,
+  attrs: Record<string, unknown>,
+): Generator<Promise<void>, void, undefined> {
+  let multiParameterAttributes: Record<string, unknown> | null = null;
+  let nestedParameterAttributes: Record<string, unknown> | null = null;
+
+  for (const [key, value] of Object.entries(attrs)) {
+    if (key.includes("(")) {
+      (multiParameterAttributes ??= {})[key] = value;
+    } else if (isNestedParameterHash(value)) {
+      (nestedParameterAttributes ??= {})[key] = value;
+    } else {
+      const pending = _assignAttribute(self, key, value);
+      if (pending) yield pending;
+    }
+  }
+
+  if (nestedParameterAttributes) {
+    yield* assignNestedParameterAttributes(self, nestedParameterAttributes);
+  }
+  if (multiParameterAttributes) {
+    const multi = extractMultiparameterCallstack(multiParameterAttributes).multiparams;
+    executeMultiparameterAssignment(self as any, multi);
+  }
+}
+
+/**
  * Mirrors: ActiveRecord::AttributeAssignment#assign_nested_parameter_attributes
  * (attribute_assignment.rb:26-28) — assign any deferred nested attributes after
  * the base attributes have been set.
  */
-function assignNestedParameterAttributes(
+function* assignNestedParameterAttributes(
   self: AttributeIO,
   pairs: Record<string, unknown>,
-): Promise<void> | void {
-  let pending: Promise<void> | undefined;
+): Generator<Promise<void>, void, undefined> {
   for (const [k, v] of Object.entries(pairs)) {
-    pending = assignAfter(pending, () => _assignAttribute(self, k, v));
+    const pending = _assignAttribute(self, k, v);
+    if (pending) yield pending;
   }
-  return pending;
 }
 
 // ---------------------------------------------------------------------------
