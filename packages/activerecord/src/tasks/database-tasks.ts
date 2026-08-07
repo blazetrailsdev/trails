@@ -1203,18 +1203,17 @@ export class DatabaseTasks {
     // second pool on a `:memory:` database discards the first one's data.
     // Mirrors Rails' `ensure` which restores even if establish_connection raises.
     try {
-      // Rails: `migration_class.connection_handler.establish_connection(db_config,
-      // clobber: clobber)` (database_tasks.rb:543). `clobber` is the whole reason
-      // this goes through the handler rather than `Base.establish_connection`,
-      // whose Ruby signature takes no such kwarg.
+      // Rails: `connection_handler.establish_connection(db_config, clobber:)`
+      // (database_tasks.rb:543). Ruby's `establish_connection(config_or_env = nil)`
+      // takes no `clobber:`, so the kwarg can only be threaded through the handler.
       const pool = Base.connectionHandler.establishConnection(config, {
         owner: Base.connectionClassForSelf(),
         clobber,
       });
-      // Ruby resolves the adapter class synchronously; trails' handler kicks off
-      // a dynamic `import()` when no adapterFactory is supplied
-      // (connection-handler.ts:181-186), so the pool is not leasable until it
-      // settles. ESM has no synchronous import, so there is nothing to converge.
+      // Deviation: ESM cannot import synchronously, so the handler resolves the
+      // adapter class through a dynamic `import()` when given no adapterFactory
+      // (connection-handler.ts:181-186) and the pool is not leasable until it
+      // settles. Ruby resolves the constant inline at :543.
       await pool.adapterReady;
       return await fn(pool);
     } finally {
