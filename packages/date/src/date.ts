@@ -1739,7 +1739,10 @@ function numPatternP(s: string): boolean {
  * `width` digits off `str` at `si`. The C takes `&str[si]` and answers the
  * count through the return with the value through an out-parameter; the index
  * and the tuple stand in for the pointer arithmetic. `0` digits is the C's `0`,
- * which every caller turns into a `fail()`.
+ * which every caller turns into a `fail()`. The C's wide arm reads a run longer
+ * than a `long` as a Bignum; the port's substrate is `number` throughout, so a
+ * run past 2^53 loses precision the way every other numeric frag in this file
+ * does.
  */
 function readDigits(str: string, slen: number, si: number, width: number): [l: number, n: number] {
   if (!width) return [0, 0];
@@ -1782,6 +1785,12 @@ function headMatchP(len: number, name: string, str: string, slen: number, si: nu
  * `%L`/`%N`'s `:sec_fraction` is a `Rational` in Ruby and a number here, which
  * is the representation `parse_time` and `parse_ddd` already flatten theirs to
  * in this file; `%Q`'s `:seconds` follows it.
+ *
+ * The closures stand in for the C's macros: `readDigitsAt` is `READ_DIGITS`
+ * (`date_strptime.c:115-123`) with `null` for its `fail()`, `readDigitsMax` is
+ * `READ_DIGITS_MAX` (`date_strptime.c:125`) — `Number.POSITIVE_INFINITY` for
+ * its `LONG_MAX` width — `recur` is `recur` (`date_strptime.c:142-150`) and
+ * `headMatch` is `HEAD_MATCH_P` (`date_strptime.c:172`).
  */
 function dateStrptimeInternal(str: string, fmt: string, hash: DateParts): number {
   const slen = str.length;
@@ -1795,16 +1804,13 @@ function dateStrptimeInternal(str: string, fmt: string, hash: DateParts): number
   };
   const failP = (): boolean => hash._fail === true;
 
-  // `READ_DIGITS` (`date_strptime.c:115-123`); `null` stands in for its `fail()`.
   const readDigitsAt = (width: number): number | null => {
     const [l, n] = readDigits(str, slen, si, width);
     if (l === 0) return null;
     si += l;
     return n;
   };
-  // `READ_DIGITS_MAX` (`date_strptime.c:125`), the C's `LONG_MAX` width.
   const readDigitsMax = (): number | null => readDigitsAt(Number.POSITIVE_INFINITY);
-  // `recur` (`date_strptime.c:142-150`).
   const recur = (f: string): boolean => {
     const l = dateStrptimeInternal(str.slice(si), f, hash);
     if (failP()) return false;
@@ -2015,14 +2021,14 @@ function dateStrptimeInternal(str: string, fmt: string, hash: DateParts): number
         case "P":
         case "p": {
           if (slen - si < 2) return fail();
-          let ch = str[si];
-          const hour = ch === "P" || ch === "p" ? 12 : 0;
-          if (!hour && !(ch === "A" || ch === "a")) return fail();
-          if ((ch = str[si + 1]!) === ".") {
+          let c = str[si];
+          const hour = c === "P" || c === "p" ? 12 : 0;
+          if (!hour && !(c === "A" || c === "a")) return fail();
+          if ((c = str[si + 1]!) === ".") {
             if (slen - si < 4 || str[si + 3] !== ".") return fail();
-            ch = str[(si += 2)]!;
+            c = str[(si += 2)]!;
           }
-          if (!(ch === "M" || ch === "m")) return fail();
+          if (!(c === "M" || c === "m")) return fail();
           si += 2;
           hash._merid = hour;
           break again;

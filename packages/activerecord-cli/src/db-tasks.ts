@@ -363,12 +363,8 @@ export async function dbMigrateStatus(cwd: string, args: string[]): Promise<numb
   const env = DatabaseConfigurations.currentEnv();
 
   // Rails: `with_temporary_pool_for_each` (no name) iterates all configs for the env.
-  // --all extends this to every configured env/database, standing in for Rails'
-  // per-name namespaced tasks (databases.rake:464-472). It goes through
-  // `configs_for` — like `each_local_configuration` (database_tasks.rb:598-599)
-  // — not the raw `configurations` array, so `replica: true` and
-  // `database_tasks: false` configs are skipped the way every Rails task skips
-  // them.
+  // --all extends this to every configured env/database, through `configs_for`
+  // as `each_local_configuration` (database_tasks.rb:598-599) does.
   const configs = all
     ? (DatabaseTasks.databaseConfiguration?.configsFor() ?? [])
     : DatabaseTasks.configsFor(env);
