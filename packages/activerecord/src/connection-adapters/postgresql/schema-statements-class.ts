@@ -1,5 +1,5 @@
-import { type Type, ValueType, ArgumentError } from "@blazetrails/activemodel";
-import { Nodes, Visitors } from "@blazetrails/arel";
+import { ValueType, ArgumentError } from "@blazetrails/activemodel";
+import { Nodes } from "@blazetrails/arel";
 import { singularize, getCrypto } from "@blazetrails/activesupport";
 import { SchemaStatements as AbstractSchemaStatements } from "../abstract/schema-statements.js";
 import {
@@ -15,7 +15,7 @@ import {
   type ColumnType,
 } from "../abstract/schema-definitions.js";
 import { HashLookupTypeMap } from "../../type/hash-lookup-type-map.js";
-import type { Result } from "../../result.js";
+import type { PostgreSQLAdapter } from "../postgresql-adapter.js";
 import { Column } from "./column.js";
 import { quoteColumnName as pgQuoteColumnName } from "./quoting.js";
 import { unquoteIdentifier, splitQuotedIdentifier, Name, Utils } from "./utils.js";
@@ -32,59 +32,16 @@ import {
 } from "./schema-definitions.js";
 
 /**
- * PG-specific adapter surface used by the schema/database/session statements
- * below. These members are private on `PostgreSQLAdapter`; the class reaches
- * them through a cast since the methods exist at runtime.
+ * The three members of the PG adapter's runtime surface that the
+ * `PostgreSQLAdapter` *type* does not carry: `query` is mixed in by `include()`
+ * from `abstract/database-statements.ts` rather than declared on the class, and
+ * `quoteLiteral` / `_schemaSearchPathMemo` are `private` there. The bodies below
+ * reach all three the way Rails' module does — plain `this` calls — so they are
+ * restated here and merged into the class's `this` type.
  */
-interface PgSchemaAdapter {
-  schemaQuery(sql: string, binds?: unknown[]): Promise<Record<string, unknown>[]>;
-  internalExecQuery(
-    sql: string,
-    name?: string | null,
-    binds?: unknown[],
-    options?: { prepare?: boolean; allowRetry?: boolean; materializeTransactions?: boolean },
-  ): Promise<Result>;
+interface PgSchemaAdapterPrivates {
   query(sql: string, name?: string | null, binds?: unknown[]): Promise<unknown[][]>;
-  queryValue(sql: string, name?: string | null, binds?: unknown[]): Promise<unknown>;
-  queryValues(sql: string, name?: string | null, binds?: unknown[]): Promise<unknown[]>;
-  exec(sql: string): Promise<void>;
-  execute(sql: string): Promise<unknown>;
-  internalExecute(sql: string, name?: string): Promise<unknown>;
-  clearCacheBang(): void;
-  quote(value: unknown): string;
-  quoteColumnName(name: string): string;
-  quoteTableName(name: string): string;
-  readonly logger: { warn?(message: string): void } | null;
   quoteLiteral(value: unknown): string;
-  supportsNativePartitioning(): boolean;
-  supportsIdentityColumns(): boolean;
-  supportsVirtualColumns(): boolean;
-  extractSchemaQualifiedName(string: string): [string | null, string];
-  maxIdentifierLength(): number;
-  dataSourceSql(name?: string | null, options?: { type?: string }): string;
-  quotedScope(
-    name?: string | null,
-    options?: { type?: string },
-  ): { schema: string; name: string | null; type: string | null };
-  readonly schemaCreation: {
-    actionSql(action: string, dependency: string): string;
-    accept(o: unknown): string;
-  };
-  readonly visitor: Visitors.ToSql;
-  loadAdditionalTypes(oids?: number[]): Promise<void>;
-  lookupCastTypeFromColumn(column: {
-    oid?: number | null;
-    fmod?: number | null;
-    sqlType?: string | null;
-    name?: string;
-  }): Type;
-  reloadTypeMap(): Promise<void>;
-  newColumnFromField(tableName: string, field: unknown[], definitions: unknown): Promise<Column>;
-  extractValueFromDefault(defaultExpr: string | null): unknown;
-  extractDefaultFunction(defaultValue: unknown, defaultExpr: string | null): string | null;
-  nativeDatabaseTypes(): Record<string, string | { name?: string; limit?: number }>;
-  createTableDefinition(name: string, options?: Record<string, unknown>): AbstractTableDefinition;
-  createAlterTable(name: string): AlterTable;
   // Connection-scoped memo backing Rails' @schema_search_path.
   _schemaSearchPathMemo: string | null;
 }
@@ -98,29 +55,57 @@ function toS(value: unknown): string {
  * PostgreSQL's `SchemaStatements` is only ever mixed into `PostgreSQLAdapter`
  * (`include()` at the bottom of the adapter module), so its bodies call plain
  * `this` methods the way Rails' module does. This merged interface gives those
- * calls the PG adapter's type.
+ * calls the PG adapter's own type — `Pick`ed from `PostgreSQLAdapter` rather
+ * than restated by hand, so a signature can no longer drift from the adapter it
+ * describes.
  *
- * The `Omit`ted names already reach `this` from `AbstractSchemaStatements` with
- * a signature TypeScript will not let a narrower PG one merge over — a member
- * declared on a base class wins over a merged-interface property. `getDatabaseVersion`
- * is off that list: a declaration-only `declare` field in the class body does
- * outrank the inherited method (see the class), which is what removed
- * `resetPkSequenceBang`'s cast. The same trick cannot reach `typeMap`, which the
- * generic adapter declares as an accessor (TS2610) — `columns` still casts it.
- * The two restated below are the reverse case: own members TypeScript does
- * accept, narrowed from the generic adapter's. @internal
+ * Only the members PG adds beyond `AbstractSchemaStatements` are listed: the
+ * rest already reach `this` through the base class, and merging a second
+ * declaration for them would collide with it — `PostgreSQLAdapter` narrows many
+ * (`adapterName` to `AdapterName`, `addColumnForAlter` to `ColumnType`), which is
+ * legal on a class and is what Ruby's untyped override translates to, but
+ * declaration merging demands identical types. `getDatabaseVersion` is the one
+ * exception: a declaration-only `declare` field in the class body does outrank
+ * the inherited method (see the class), which is what removed
+ * `resetPkSequenceBang`'s cast.
+ *
+ * The same trick cannot reach `typeMap`: `AbstractAdapter` declares it as an
+ * accessor (`abstract-adapter.ts:2543`), and TypeScript refuses to narrow an
+ * inherited accessor from either a merged-interface member or a `declare` field
+ * (TS2610). A real accessor override here would shadow `PostgreSQLAdapter`'s own
+ * `type_map` once `include()` installs the module on the prototype, so `columns`
+ * keeps its cast.
+ *
+ * The two members restated in the body are the reverse case: own members
+ * TypeScript does accept, narrowed from the generic adapter's. @internal
  */
-export interface SchemaStatements extends Omit<
-  PgSchemaAdapter,
-  | "execute"
-  | "internalExecute"
-  | "lookupCastTypeFromColumn"
-  | "schemaCreation"
-  | "quotedScope"
-  | "typeMap"
-  | "logger"
-  | "nativeDatabaseTypes"
-> {
+export interface SchemaStatements
+  extends
+    PgSchemaAdapterPrivates,
+    Pick<
+      PostgreSQLAdapter,
+      | "clearCacheBang"
+      | "dataSourceSql"
+      | "exec"
+      | "extractDefaultFunction"
+      | "extractSchemaQualifiedName"
+      | "extractValueFromDefault"
+      | "internalExecQuery"
+      | "loadAdditionalTypes"
+      | "maxIdentifierLength"
+      | "newColumnFromField"
+      | "queryValue"
+      | "queryValues"
+      | "quote"
+      | "quoteColumnName"
+      | "quoteTableName"
+      | "reloadTypeMap"
+      | "schemaQuery"
+      | "supportsIdentityColumns"
+      | "supportsNativePartitioning"
+      | "supportsVirtualColumns"
+      | "visitor"
+    > {
   readonly logger: { warn?(message: string): void } | null;
   nativeDatabaseTypes(): Record<string, string | { name?: string; limit?: number }>;
 }
@@ -668,7 +653,9 @@ export class SchemaStatements extends AbstractSchemaStatements {
     // yet in the map and load them in a single pg_type query before building
     // Column objects. This avoids N concurrent queries for wide tables.
     // TS2610: an inherited accessor cannot be narrowed, and overriding it here
-    // would shadow PostgreSQLAdapter's own `type_map` under `include()`.
+    // would shadow PostgreSQLAdapter's own `type_map` under `include()`. That is
+    // a permanent TypeScript limitation, not deferred work — the merged
+    // interface below cannot reach `typeMap` either, for the same reason.
     const typeMap = this.typeMap as HashLookupTypeMap;
     const missingOids = [
       ...new Set(rows.map((r) => Number(r.oid)).filter((oid) => !typeMap.has(oid))),
