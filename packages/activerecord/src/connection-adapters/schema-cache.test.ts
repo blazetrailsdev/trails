@@ -710,13 +710,10 @@ describe("SchemaReflectionTest", () => {
 // Each test seeds the SchemaCache with a known entry, calls a DDL method on a
 // mock adapter, and asserts the entry is gone afterwards.
 //
-// Tests marked .skip are BLOCKED on F2, which will inline
-// schemaCache.clearDataSourceCacheBang() at the missing DDL sites. Once F2
-// lands these are unskipped — the skip rationale names the exact method where
-// the call must be added.
-//
-// Tests that are NOT skipped already pass because the relevant adapter override
-// already calls clearDataSourceCacheBang (dropTable in all three adapters).
+// Only the DDL methods Rails itself invalidates from are covered: `create_table`'s
+// non-force arm (schema_statements.rb:306) and `drop_table` (:542). Rails clears
+// nowhere else in abstract/schema_statements.rb — a case here for add_column,
+// rename_column, add_index et al. would pin behaviour Rails does not have.
 
 class MockAdapter {
   adapterName = "sqlite" as const;
@@ -797,19 +794,6 @@ describe("DDL cache-invalidation safety-net", () => {
     expect(order).toEqual(["clear:accounts_people", "sql"]);
   });
 
-  it("renameTable clears schema cache entry for both old and new name", async () => {
-    const cache = new SchemaCache();
-    cache.setColumns("posts", [makeColumn("id", "integer")]);
-    // Pre-seed new name too (could be stale from a previous run)
-    cache.setColumns("articles", [makeColumn("id", "integer")]);
-
-    const adapter = makeMockAdapter(cache);
-    await adapter.renameTable("posts", "articles");
-
-    expect(cache.isCached("posts")).toBe(false);
-    expect(cache.isCached("articles")).toBe(false);
-  });
-
   it("createTable clears schema cache entry (non-force branch)", async () => {
     const cache = new SchemaCache();
     // Stale entry from a prior create (e.g. after a test dropped the table)
@@ -819,106 +803,6 @@ describe("DDL cache-invalidation safety-net", () => {
     await adapter.createTable("posts");
 
     expect(cache.isCached("posts")).toBe(false);
-  });
-
-  it("addColumn clears schema cache entry", async () => {
-    const cache = new SchemaCache();
-    cache.setColumns("posts", [makeColumn("id", "integer")]);
-
-    const adapter = makeMockAdapter(cache);
-    await adapter.addColumn("posts", "title", "string");
-
-    expect(cache.isCached("posts")).toBe(false);
-  });
-
-  it("removeColumn clears schema cache entry", async () => {
-    const cache = new SchemaCache();
-    cache.setColumns("posts", [makeColumn("id", "integer"), makeColumn("title", "varchar")]);
-
-    const adapter = makeMockAdapter(cache);
-    await adapter.removeColumn("posts", "title");
-
-    expect(cache.isCached("posts")).toBe(false);
-  });
-
-  it("addIndex clears schema cache entry", async () => {
-    const cache = new SchemaCache();
-    cache.setColumns("posts", [makeColumn("id", "integer"), makeColumn("title", "varchar")]);
-
-    const adapter = makeMockAdapter(cache);
-    await adapter.addIndex("posts", ["title"]);
-
-    expect(cache.isCached("posts")).toBe(false);
-  });
-
-  it("removeIndex clears schema cache entry", async () => {
-    const cache = new SchemaCache();
-    cache.setColumns("posts", [makeColumn("id", "integer"), makeColumn("title", "varchar")]);
-
-    const adapter = makeMockAdapter(cache);
-    await adapter.removeIndex("posts", { name: "index_posts_on_title" });
-
-    expect(cache.isCached("posts")).toBe(false);
-  });
-
-  it("changeColumn clears schema cache entry", async () => {
-    const cache = new SchemaCache();
-    cache.setColumns("posts", [makeColumn("id", "integer"), makeColumn("title", "varchar")]);
-
-    const adapter = makeMockAdapter(cache);
-    await adapter.changeColumn("posts", "title", "text");
-
-    expect(cache.isCached("posts")).toBe(false);
-  });
-
-  it("renameColumn clears schema cache entry before RENAME SQL", async () => {
-    const cache = new SchemaCache();
-    cache.setColumns("posts", [makeColumn("id", "integer"), makeColumn("title", "varchar")]);
-    expect(cache.isCached("posts")).toBe(true);
-
-    const order: string[] = [];
-    const adapter = makeMockAdapter(cache);
-    const origClear = cache.clearDataSourceCacheBang.bind(cache);
-    vi.spyOn(cache, "clearDataSourceCacheBang").mockImplementation((pool, name) => {
-      order.push(`clear:${name}`);
-      origClear(pool, name);
-    });
-    adapter.execute.mockImplementation(async () => {
-      order.push("sql");
-      return [];
-    });
-
-    await adapter.renameColumn("posts", "title", "headline");
-
-    expect(cache.isCached("posts")).toBe(false);
-    expect(order).toEqual(["clear:posts", "sql"]);
-  });
-
-  it("renameIndex clears schema cache entry before RENAME SQL", async () => {
-    const cache = new SchemaCache();
-    cache.setColumns("posts", [makeColumn("id", "integer"), makeColumn("title", "varchar")]);
-    expect(cache.isCached("posts")).toBe(true);
-
-    const order: string[] = [];
-    const adapter = makeMockAdapter(cache);
-    const origClear = cache.clearDataSourceCacheBang.bind(cache);
-    vi.spyOn(cache, "clearDataSourceCacheBang").mockImplementation((pool, name) => {
-      order.push(`clear:${name}`);
-      origClear(pool, name);
-    });
-    adapter.execute.mockImplementation(async () => {
-      order.push("sql");
-      return [];
-    });
-
-    vi.spyOn(adapter, "indexes").mockResolvedValue([
-      { table: "posts", name: "index_posts_on_title", columns: ["title"], unique: false } as any,
-    ]);
-    await adapter.renameIndex("posts", "index_posts_on_title", "index_posts_on_headline");
-
-    expect(cache.isCached("posts")).toBe(false);
-    expect(order[0]).toBe("clear:posts");
-    expect(order).toContain("sql");
   });
 });
 

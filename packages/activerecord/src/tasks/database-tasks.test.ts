@@ -1428,6 +1428,28 @@ describe("DatabaseTasksWithTemporaryPoolTest", () => {
     },
   );
 
+  it.skipIf(adapterType !== "sqlite")("replaces the ambient pool when clobber", async () => {
+    // Rails threads `clobber:` down to `establish_connection(db_config, clobber:)`
+    // (database_tasks.rb:512-527,543), where it bypasses the same-config reuse
+    // branch in ConnectionHandler#establish_connection.
+    const config = new HashConfig(DatabaseTasks.env, "primary", {
+      adapter: "sqlite3",
+      database: "db/clobber.sqlite3",
+      pool: 1,
+    });
+    await Base.establishConnection(config);
+    const ambientPool = Base.connectionPool();
+    let temporaryPool: ConnectionPool | null = null;
+    await DatabaseTasks.withTemporaryPool(
+      config,
+      async (pool) => {
+        temporaryPool = pool;
+      },
+      { clobber: true },
+    );
+    expect(temporaryPool).not.toBe(ambientPool);
+  });
+
   it.skipIf(adapterType !== "sqlite")("createAll restores the original pool", async () => {
     const config = new HashConfig(DatabaseTasks.env, "primary", {
       adapter: "sqlite3",

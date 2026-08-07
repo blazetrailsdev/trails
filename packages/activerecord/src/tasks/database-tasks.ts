@@ -1184,6 +1184,7 @@ export class DatabaseTasks {
   static async withTemporaryPool<T>(
     config: DatabaseConfig,
     fn: (pool: ConnectionPool) => Promise<T>,
+    { clobber = false }: { clobber?: boolean } = {},
   ): Promise<T> {
     const { Base } = await import("../base.js");
     this._baseClass = Base;
@@ -1202,8 +1203,19 @@ export class DatabaseTasks {
     // second pool on a `:memory:` database discards the first one's data.
     // Mirrors Rails' `ensure` which restores even if establish_connection raises.
     try {
-      await Base.establishConnection(config);
-      const pool = Base.connectionPool();
+      // Rails: `migration_class.connection_handler.establish_connection(db_config,
+      // clobber: clobber)` (database_tasks.rb:543). `clobber` is the whole reason
+      // this goes through the handler rather than `Base.establish_connection`,
+      // whose Ruby signature takes no such kwarg.
+      const pool = Base.connectionHandler.establishConnection(config, {
+        owner: Base.connectionClassForSelf(),
+        clobber,
+      });
+      // Ruby resolves the adapter class synchronously; trails' handler kicks off
+      // a dynamic `import()` when no adapterFactory is supplied
+      // (connection-handler.ts:181-186), so the pool is not leasable until it
+      // settles. ESM has no synchronous import, so there is nothing to converge.
+      await pool.adapterReady;
       return await fn(pool);
     } finally {
       if (priorConfig !== null) {
@@ -1211,7 +1223,12 @@ export class DatabaseTasks {
         // handler recognise the pool it already has. Restoring from a plain
         // hash would replace (and disconnect) it, which on a `:memory:`
         // database throws the data away.
-        await Base.establishConnection(priorConfig);
+        // Rails: `establish_connection(original_db_config, clobber: clobber)`
+        // (database_tasks.rb:547).
+        await Base.connectionHandler.establishConnection(priorConfig, {
+          owner: Base.connectionClassForSelf(),
+          clobber,
+        }).adapterReady;
       } else {
         try {
           Base.removeConnection();
@@ -1227,17 +1244,19 @@ export class DatabaseTasks {
     fn: (
       adapter: import("../connection-adapters/abstract-adapter.js").AbstractAdapter,
     ) => Promise<T>,
+    { clobber = false }: { clobber?: boolean } = {},
   ): Promise<T> {
-    return this.withTemporaryPool(config, async (pool) => fn(await pool.leaseConnection()));
+    return this.withTemporaryPool(config, async (pool) => fn(await pool.leaseConnection()), {
+      clobber,
+    });
   }
 
   /**
    * @internal Mirrors: `DatabaseTasks.with_temporary_pool_for_each`
-   * (`tasks/database_tasks.rb:512-521`). Rails' `clobber:` kwarg has no
-   * counterpart on {@link withTemporaryPool}, so it is not threaded here.
+   * (`tasks/database_tasks.rb:512-521`).
    */
   static async withTemporaryPoolForEach(
-    { env, name }: { env?: string; name?: string } = {},
+    { env, name, clobber = false }: { env?: string; name?: string; clobber?: boolean } = {},
     block: (pool: ConnectionPool) => Promise<void>,
   ): Promise<void> {
     env = this._normalizeEnv(env);
@@ -1249,12 +1268,12 @@ export class DatabaseTasks {
       const dbConfig = (await this.migrationClass())
         .configurations()
         .configsFor({ envName: env, name })[0];
-      if (dbConfig) await this.withTemporaryPool(dbConfig, block);
+      if (dbConfig) await this.withTemporaryPool(dbConfig, block, { clobber });
     } else {
       for (const dbConfig of (await this.migrationClass())
         .configurations()
         .configsFor({ envName: env, name })) {
-        await this.withTemporaryPool(dbConfig, block);
+        await this.withTemporaryPool(dbConfig, block, { clobber });
       }
     }
   }
