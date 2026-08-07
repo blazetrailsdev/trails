@@ -20,10 +20,6 @@ const NON_EMITTING: ReadonlyMap<string, string> = new Map([
     "read — picks the per-adapter type map and gates schema.rb's inline adapter clauses",
   ],
   [
-    "getDatabaseVersion",
-    "warm-up read — primes the memoized version the index sort-order predicates gate on",
-  ],
-  [
     "verifyBang",
     "connection readiness — Rails' `verify!` (`abstract_adapter.rb:759`), which the loader runs before any DDL; emits none itself",
   ],
