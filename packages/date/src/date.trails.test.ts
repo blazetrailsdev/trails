@@ -334,8 +334,6 @@ describe("Date", () => {
   });
 
   it("carries a Rational offset into sec_fraction exactly, as f_add does", () => {
-    // ruby 3.3.11: DateTime.strptime("1234567890 +9.5555", "%s %z") is
-    // 2009-02-14T09:04:49+09:33 with a sec_fraction of (4/5).
     const hash: DateParts = { seconds: 1234567890, offset: new Rational(171999, 5) };
     dNewByFrags(hash);
     expect([hash.hour, hash.min, hash.sec]).toEqual([9, 4, 49]);

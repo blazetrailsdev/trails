@@ -2938,10 +2938,10 @@ export function dtNewByFrags(hash: DateParts): DateTime {
 
   const df = timeToDf(rh, rmin, rs);
 
-  const f = hash.secFraction;
-  const sf = f == null ? 0 : secToNs(f instanceof Rational ? f.numerator / f.denominator : f);
+  let t: number | Rational | null | undefined = hash.secFraction;
+  const sf = t == null ? 0 : secToNs(t instanceof Rational ? t.numerator / t.denominator : t);
 
-  const t = hash.offset;
+  t = hash.offset;
   let of = t == null ? 0 : t instanceof Rational ? t.numerator / t.denominator : t;
   if (of < -DAY_IN_SECONDS || of > DAY_IN_SECONDS) of = 0;
 

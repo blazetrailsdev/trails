@@ -673,9 +673,9 @@ export abstract class Base {
    * `@blazetrails/activesupport/yaml`: the workspace edge runs
    * activesupport -> i18n, so consuming that re-export would invert it.
    *
-   * @missingRailsCall load_file — Ruby's `YAML.load_file` (base.rb:265) reads
-   * and parses in one call; the npm `yaml` package only parses, so the read is
-   * served from the preload (`preloadTranslationFiles`).
+   * @missingRailsCall unsafe_load_file — Ruby's `YAML.unsafe_load_file`
+   * (base.rb:264) reads and parses in one call; the npm `yaml` package only
+   * parses, so the read is served from the preload (`preloadTranslationFiles`).
    */
   protected loadYml(filename: string): [unknown, boolean] {
     try {
@@ -701,7 +701,7 @@ export abstract class Base {
    * port, so this takes the arm the gem takes (base.rb:280-281): symbolized —
    * inherent in JS — and frozen.
    *
-   * @missingRailsCall load_file — Ruby's `JSON.load_file` (base.rb:262) reads
+   * @missingRailsCall load_file — Ruby's `JSON.load_file` (base.rb:281) reads
    * and parses in one call; `JSON.parse` only parses, so the read is served
    * from the preload (`preloadTranslationFiles`).
    */
