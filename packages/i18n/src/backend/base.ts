@@ -673,9 +673,11 @@ export abstract class Base {
    * `@blazetrails/activesupport/yaml`: the workspace edge runs
    * activesupport -> i18n, so consuming that re-export would invert it.
    *
-   * @missingRailsCall unsafe_load_file — Ruby's `YAML.unsafe_load_file`
-   * (base.rb:264) reads and parses in one call; the npm `yaml` package only
-   * parses, so the read is served from the preload (`preloadTranslationFiles`).
+   * @missingRailsCall load_file — `YAML.load_file` (base.rb:266) is the
+   * pre-Psych-4 arm, which no supported Ruby takes and there is no probe to
+   * reach it by; the arm this body does take, `unsafe_load_file`, reads and
+   * parses in one call, and the npm `yaml` package only parses, so the read is
+   * served from the preload (`preloadTranslationFiles`).
    */
   protected loadYml(filename: string): [unknown, boolean] {
     try {
