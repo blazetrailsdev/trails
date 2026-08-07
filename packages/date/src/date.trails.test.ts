@@ -646,7 +646,9 @@ describe("DateTime", () => {
     expect(new RubyDateTime(2008, 3, 1, 24, 0, 0.5).toS()).toBe("2008-03-02T00:00:00+00:00");
     expect(new RubyDateTime(2008, 3, 1, 24, 0, 0.5).secFraction).toBe(0.5);
     expect(new RubyDateTime(2008, 3, 1, 24.5).toS()).toBe("2008-03-02T00:30:00+00:00");
-    expect(new RubyDateTime(2008, 3, 1, 24, 0, 0, 32400).toS()).toBe("2008-03-02T00:00:00+09:00");
+    expect(new RubyDateTime(2008, 3, 1, 24, 0, 0, "+09:00").toS()).toBe(
+      "2008-03-02T00:00:00+09:00",
+    );
     expect(new RubyDateTime(2008, 3, 1, 23, 59, 59).toS()).toBe("2008-03-01T23:59:59+00:00");
   });
 
