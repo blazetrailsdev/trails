@@ -14,6 +14,8 @@ import {
 } from "./connection-adapters/abstract/database-statements.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Base } from "./base.js";
+import { ActiveRecord } from "./ar-config.js";
+import { StatementInvalid } from "./errors.js";
 import { findStiClass } from "./inheritance.js";
 import type { Quoting } from "./connection-adapters/abstract/quoting.js";
 import { currentTimeFromProperTimezone } from "./timestamp.js";
@@ -695,6 +697,8 @@ export async function insertPreparedFixtureSets(
     throw err;
   }
 
+  await checkAllForeignKeysValidBang(adapter);
+
   if (adapter.adapterName === "postgres") {
     for (const p of prepared) {
       if (p.serialReset) await resetPkSequence(adapter, p.serialReset.table, p.serialReset.column);
@@ -704,6 +708,25 @@ export async function insertPreparedFixtureSets(
   const results: Record<string, unknown>[] = [];
   for (const p of prepared) results.push(await p.finalize());
   return results;
+}
+
+/**
+ * Mirrors: `ActiveRecord::FixtureSet.check_all_foreign_keys_valid!(conn)`
+ * (fixtures.rb:696-704), which `insert` calls once per pool right after
+ * `insert_fixtures_set` — once per load, not once per set.
+ */
+async function checkAllForeignKeysValidBang(conn: DatabaseAdapter): Promise<void> {
+  if (!ActiveRecord.verifyForeignKeysForFixtures) return;
+
+  try {
+    await conn.checkAllForeignKeysValidBang();
+  } catch (e) {
+    if (!(e instanceof StatementInvalid)) throw e;
+    throw new Error(
+      `Foreign key violations found in your fixture data. Ensure you aren't referring to labels that don't exist on associations. Error from database:\n\n${e.message}`,
+      { cause: e },
+    );
+  }
 }
 
 /**

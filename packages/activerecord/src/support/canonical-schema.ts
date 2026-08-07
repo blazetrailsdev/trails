@@ -1746,6 +1746,10 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
 
   await define("fk_pointing_to_non_existent_objects", {}, (t) => {
     t.integer("fk_object_to_point_to_id", { null: false });
+    t.foreignKey("fk_object_to_point_tos", {
+      column: "fk_object_to_point_to_id",
+      name: "fk_that_will_be_broken",
+    });
   });
 
   await define("overloaded_types", {}, (t) => {

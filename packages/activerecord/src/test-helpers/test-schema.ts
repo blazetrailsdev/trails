@@ -1669,7 +1669,16 @@ export const TEST_SCHEMA: Schema = {
 
   fk_object_to_point_tos: {},
   fk_pointing_to_non_existent_objects: {
-    fk_object_to_point_to_id: { type: "integer", null: false },
+    columns: {
+      fk_object_to_point_to_id: { type: "integer", null: false },
+    },
+    foreignKeys: [
+      {
+        toTable: "fk_object_to_point_tos",
+        column: "fk_object_to_point_to_id",
+        name: "fk_that_will_be_broken",
+      },
+    ],
   },
 
   overloaded_types: {
