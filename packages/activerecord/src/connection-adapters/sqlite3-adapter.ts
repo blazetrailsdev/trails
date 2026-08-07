@@ -1716,7 +1716,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     // :from and :to (schema_statements.rb:1820); a bare structured default like
     // `{}` is the literal default, not a changes hash.
     const newDefault = this.extractNewDefaultValue(defaultOrChanges);
-    await this.schemaCache.clearDataSourceCacheBang(tableName);
     await this.alterTable(tableName, undefined, undefined, undefined, (definition) => {
       // The raw value, not a literal: schemaCreation re-emits it through
       // quoteDefaultExpression, which serializes it through the column's cast
@@ -1761,7 +1760,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   async renameColumn(tableName: string, columnName: string, newColumnName: string): Promise<void> {
     const column = await this.columnFor(tableName, columnName);
-    await this.schemaCache.clearDataSourceCacheBang(tableName);
     await this.alterTable(tableName, undefined, undefined, {
       rename: { [column.name]: newColumnName },
     });

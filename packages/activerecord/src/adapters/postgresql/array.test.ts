@@ -238,6 +238,8 @@ describeIfPg("PostgreSQLAdapter", () => {
           this.attribute("id", "integer");
         }
       }
+      // Rails: PgArray.reset_column_information (array_test.rb:139)
+      PgArrays.resetColumnInformation();
       await PgArrays.loadSchema();
       // Rails: assert_equal [], PgArray.column_defaults["tags"]
       expect((PgArrays as any).columnDefaults["tags"]).toEqual([]);

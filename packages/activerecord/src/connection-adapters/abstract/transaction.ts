@@ -304,6 +304,15 @@ export type TransactionConnection = DatabaseAdapter & {
   active?(): boolean | Promise<boolean>;
   currentTransaction?(): Transaction | NullTransaction;
   throwAwayBang?(): void;
+  /**
+   * Rails gets this from lexical scope: `@lock.synchronize`
+   * wraps the whole `with_raw_connection` body (`abstract_adapter.rb:984`), so
+   * a query physically cannot outlive the lock scope that issued it. A JS
+   * `await`-less call escapes its enclosing async scope, so the adapter has to
+   * name its outstanding queries for {@link TransactionManager.synchronize} to
+   * hold the lock until they settle.
+   */
+  _pendingQueries?(): Promise<void>;
 };
 
 /**
@@ -1191,25 +1200,6 @@ export class TransactionManager {
   }
 
   /**
-   * The lock token of the async chain currently executing inside
-   * {@link synchronize}, or `null` when the caller holds no lock. Rails needs
-   * no such accessor — its `@connection.lock` is a mutex over *threads*, so a
-   * connection can only ever have one unit of work touching it. trails' lock
-   * is per async chain, and a chain that returns while work it started is
-   * still awaiting releases the lock with a query still on the wire; this
-   * token is how a later holder tells "a query I issued" from "a query some
-   * other live chain issued" (see PostgreSQLAdapter#_cancelAnyRunningQuery).
-   *
-   * @internal
-   */
-  get currentLockToken(): symbol | null {
-    // Reads `_lockOwner` directly rather than through `_lockStorage()`: this
-    // runs on every pinned query and must not install a storage (nor swap one
-    // out from under a live holder) as a side effect of merely asking.
-    return this._lockOwner?.getStore() ?? null;
-  }
-
-  /**
    * Run `fn` under the per-connection lock that serializes
    * {@link withinNewTransaction}. Mirrors Rails'
    * `@connection.lock.synchronize do … end` so callers can extend the lock
@@ -1238,6 +1228,11 @@ export class TransactionManager {
     try {
       return await storage.run(owner, () => fn());
     } finally {
+      // `fn` can return with a query it launched still awaiting, which Ruby's
+      // block form makes impossible (`abstract_adapter.rb:984`). Hold the lock
+      // until the connection has nothing outstanding, so the next holder never
+      // inherits a wire it does not own.
+      await this._connection._pendingQueries?.().catch(() => {});
       release();
     }
   }

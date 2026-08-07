@@ -868,10 +868,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     columnName: string,
     newColumnName: string,
   ): Promise<void> {
-    // Mirrors PostgreSQL::SchemaStatements#rename_column: clear the statement
-    // cache, rename, then fix up index names that embed the column name.
     this.clearCacheBang();
-    await this.schemaCache.clearDataSourceCacheBang(tableName);
     await this.execute(
       `ALTER TABLE ${this.quoteTableName(tableName)} RENAME COLUMN ${this.quoteColumnName(columnName)} TO ${this.quoteColumnName(newColumnName)}`,
     );
@@ -882,7 +879,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
     this.validateIndexLengthBang(tableName, newName);
 
     const [schema] = this.extractSchemaQualifiedName(tableName);
-    await this.schemaCache.clearDataSourceCacheBang(tableName);
     await this.execute(
       `ALTER INDEX ${schema ? `${this.quoteTableName(schema)}.` : ""}${this.quoteColumnName(oldName)} RENAME TO ${this.quoteTableName(newName)}`,
     );
@@ -893,12 +889,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
     columnName: string,
     defaultOrChanges: unknown,
   ): Promise<void> {
-    // Invalidate the cached reflection before mutating (matching the other DDL
-    // methods, e.g. addColumn) so a subsequent columnsHash()/columnDefaults read
-    // sees the new default rather than a stale (always-warm) entry. Safe to clear
-    // first: buildChangeColumnDefaultDefinition's column lookup queries
-    // pg_catalog directly, not the cache.
-    await this.schemaCache.clearDataSourceCacheBang(tableName);
     await this.execute(
       `ALTER TABLE ${this.quoteTableName(tableName)} ${await this.changeColumnDefaultForAlter(tableName, columnName, defaultOrChanges)}`,
     );
