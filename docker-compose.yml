@@ -4,6 +4,19 @@ services:
     ports:
       - "${PG_PORT:-25432}:5432"
     environment:
+      # AUDITED (RFC 0028, audit-bare-arunit-database-still-needed): a *stamped*
+      # run never connects to this database — globalSetup's admin client targets
+      # `postgres` (support/template-global-setup.ts:179) and every worker
+      # resolves activerecord_unittest_<runToken>_<slot> through `applySlot`
+      # (support/config.ts:159-167). It is nonetheless NOT vestigial and must
+      # stay provisioned, on three counts:
+      #   1. the init script below runs *against* it, and its last statement is
+      #      `ALTER DATABASE activerecord_unittest OWNER TO rails`; CI feeds the
+      #      same file by hand with `psql -d activerecord_unittest` (ci.yml:997);
+      #   2. the activerecord-cli E2E connects to it by name via PG_TEST_URL
+      #      (ci.yml:1023);
+      #   3. `applySlot` falls back to this bare name whenever no run token is
+      #      stamped — a bare adapter script or a harness-less connection.
       POSTGRES_DB: activerecord_unittest
       POSTGRES_USER: postgres
       # Rails' postgresql: entries carry no credential (config.example.yml:74-81),
@@ -25,6 +38,13 @@ services:
     ports:
       - "${MYSQL_PORT:-13306}:3306"
     environment:
+      # AUDITED alongside POSTGRES_DB above. The MySQL admin connection carries
+      # no database at all (support/template-global-setup.ts:285-293), so a
+      # stamped run never touches this one either — but MYSQL_TEST_URL names it
+      # for the activerecord-cli E2E (ci.yml:1088) and the token-less `applySlot`
+      # fallback still resolves to it. Unlike Postgres, the init script does not
+      # need it: `mysql -uroot < 01-rails-user.sql` (ci.yml:1072) runs with no
+      # database selected and only CREATEs users and grants.
       MYSQL_DATABASE: activerecord_unittest
       MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
     volumes:

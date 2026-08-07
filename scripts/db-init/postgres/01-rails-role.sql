@@ -15,5 +15,12 @@
 -- postgres_fdw (adapters/postgresql/foreign-table.test.ts, which also CREATEs a
 -- SERVER) and pg_hint_plan (adapters/postgresql/optimizer-hints.test.ts). Only
 -- the trusted ones (hstore, citext) would work under a plain owner.
+--
+-- The ALTER DATABASE below is why the bare `activerecord_unittest` database
+-- must exist even though no stamped run ever connects to it (audited under RFC
+-- 0028, audit-bare-arunit-database-still-needed): this file is fed to
+-- `psql -d activerecord_unittest` both by the compose entrypoint and by hand in
+-- CI (.github/workflows/ci.yml:997), so dropping the database would break
+-- provisioning itself.
 CREATE ROLE rails LOGIN CREATEDB SUPERUSER;
 ALTER DATABASE activerecord_unittest OWNER TO rails;

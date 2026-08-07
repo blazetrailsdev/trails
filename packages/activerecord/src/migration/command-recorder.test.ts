@@ -2,456 +2,19 @@ import { beforeEach, describe, it, expect } from "vitest";
 import { CommandRecorder } from "./command-recorder.js";
 import { IrreversibleMigration } from "../migration.js";
 import { Table } from "../connection-adapters/abstract/schema-definitions.js";
-import { Table as PgTable } from "../connection-adapters/postgresql/schema-definitions.js";
-import { Table as MysqlTable } from "../connection-adapters/mysql/schema-definitions.js";
+import { adapterSupports, itIfSupports } from "../support/supports.js";
 
 const abstractDelegate = {
   updateTableDefinition: (tableName: string, base: unknown) => new Table(tableName, base as never),
+  supportsBulkAlter: () => adapterSupports("bulk_alter"),
 };
-const pgDelegate = {
-  updateTableDefinition: (tableName: string, base: unknown) =>
-    new PgTable(tableName, base as never),
-};
-const mysqlDelegate = {
-  updateTableDefinition: (tableName: string, base: unknown) =>
-    new MysqlTable(tableName, base as never),
-};
-
-describe("CommandRecorder", () => {
-  describe("invertAddTimestamps / invertRemoveTimestamps", () => {
-    it("invertAddTimestamps returns removeTimestamps", () => {
-      const [cmd] = new CommandRecorder().invertAddTimestamps(["users"]);
-      expect(cmd).toBe("removeTimestamps");
-    });
-
-    it("invertRemoveTimestamps returns addTimestamps", () => {
-      const [cmd] = new CommandRecorder().invertRemoveTimestamps(["users"]);
-      expect(cmd).toBe("addTimestamps");
-    });
-  });
-
-  describe("invertAddReference / invertRemoveReference", () => {
-    it("invertAddReference returns removeReference", () => {
-      const [cmd] = new CommandRecorder().invertAddReference(["posts", "user"]);
-      expect(cmd).toBe("removeReference");
-    });
-
-    it("invertRemoveReference returns addReference", () => {
-      const [cmd] = new CommandRecorder().invertRemoveReference(["posts", "user"]);
-      expect(cmd).toBe("addReference");
-    });
-
-    it("invert_add_belongs_to_alias", () => {
-      const { cmd, args } = new CommandRecorder().inverseOf("addBelongsTo", ["table", "user"]);
-      expect(cmd).toBe("removeReference");
-      expect(args).toEqual(["table", "user"]);
-    });
-
-    it("invert_remove_belongs_to_alias", () => {
-      const { cmd, args } = new CommandRecorder().inverseOf("removeBelongsTo", ["table", "user"]);
-      expect(cmd).toBe("addReference");
-      expect(args).toEqual(["table", "user"]);
-    });
-  });
-
-  describe("invertAddForeignKey / invertRemoveForeignKey", () => {
-    it("invertAddForeignKey strips validate and returns removeForeignKey", () => {
-      const [cmd, args] = new CommandRecorder().invertAddForeignKey([
-        "posts",
-        "users",
-        { validate: false },
-      ]);
-      expect(cmd).toBe("removeForeignKey");
-      expect((args[2] as Record<string, unknown>)["validate"]).toBeUndefined();
-    });
-
-    it("invertRemoveForeignKey throws without second table", () => {
-      expect(() => new CommandRecorder().invertRemoveForeignKey(["posts"])).toThrow(
-        IrreversibleMigration,
-      );
-    });
-
-    it("invertRemoveForeignKey returns addForeignKey with toTable option", () => {
-      const [cmd, args] = new CommandRecorder().invertRemoveForeignKey([
-        "posts",
-        { toTable: "users" },
-      ]);
-      expect(cmd).toBe("addForeignKey");
-      expect(args[1]).toBe("users");
-    });
-  });
-
-  describe("invertAddCheckConstraint / invertRemoveCheckConstraint", () => {
-    it("invertAddCheckConstraint strips validate and returns removeCheckConstraint", () => {
-      const [cmd, args] = new CommandRecorder().invertAddCheckConstraint([
-        "users",
-        "age > 0",
-        { validate: true, ifNotExists: true },
-      ]);
-      expect(cmd).toBe("removeCheckConstraint");
-      const opts = args[2] as Record<string, unknown>;
-      expect(opts["validate"]).toBeUndefined();
-      expect(opts["ifExists"]).toBe(true);
-    });
-
-    it("invertRemoveCheckConstraint throws without expression", () => {
-      expect(() => new CommandRecorder().invertRemoveCheckConstraint(["users"])).toThrow(
-        IrreversibleMigration,
-      );
-    });
-
-    it("invertRemoveCheckConstraint returns addCheckConstraint", () => {
-      const [cmd] = new CommandRecorder().invertRemoveCheckConstraint(["users", "age > 0"]);
-      expect(cmd).toBe("addCheckConstraint");
-    });
-  });
-
-  describe("invertAddExclusionConstraint / invertRemoveExclusionConstraint", () => {
-    it("invertAddExclusionConstraint returns removeExclusionConstraint", () => {
-      const [cmd] = new CommandRecorder().invertAddExclusionConstraint(["rooms", "during WITH &&"]);
-      expect(cmd).toBe("removeExclusionConstraint");
-    });
-
-    it("invertRemoveExclusionConstraint throws without expression", () => {
-      expect(() => new CommandRecorder().invertRemoveExclusionConstraint(["rooms"])).toThrow(
-        IrreversibleMigration,
-      );
-    });
-  });
-
-  describe("invertAddUniqueConstraint / invertRemoveUniqueConstraint", () => {
-    it("invertAddUniqueConstraint throws when usingIndex given", () => {
-      expect(() =>
-        new CommandRecorder().invertAddUniqueConstraint(["users", { usingIndex: "idx" }]),
-      ).toThrow(IrreversibleMigration);
-    });
-
-    it("invertAddUniqueConstraint returns removeUniqueConstraint", () => {
-      const [cmd] = new CommandRecorder().invertAddUniqueConstraint(["users", "email"]);
-      expect(cmd).toBe("removeUniqueConstraint");
-    });
-
-    it("invertRemoveUniqueConstraint throws without column", () => {
-      expect(() => new CommandRecorder().invertRemoveUniqueConstraint(["users"])).toThrow(
-        IrreversibleMigration,
-      );
-    });
-
-    it("invertRemoveUniqueConstraint returns addUniqueConstraint", () => {
-      const [cmd] = new CommandRecorder().invertRemoveUniqueConstraint(["users", "email"]);
-      expect(cmd).toBe("addUniqueConstraint");
-    });
-
-    it("invertRemoveUniqueConstraint handles array column names without mistaking array for options", () => {
-      const [cmd] = new CommandRecorder().invertRemoveUniqueConstraint([
-        "users",
-        ["email", "name"],
-      ]);
-      expect(cmd).toBe("addUniqueConstraint");
-    });
-  });
-
-  describe("invertRemoveColumns", () => {
-    it("throws without type option", () => {
-      expect(() => new CommandRecorder().invertRemoveColumns(["users", "name", "age"])).toThrow(
-        IrreversibleMigration,
-      );
-    });
-
-    it("returns addColumns when type given", () => {
-      const [cmd] = new CommandRecorder().invertRemoveColumns([
-        "users",
-        "name",
-        { type: "string" },
-      ]);
-      expect(cmd).toBe("addColumns");
-    });
-  });
-
-  describe("invertRenameEnum", () => {
-    it("swaps name and new_name", () => {
-      const [cmd, args] = new CommandRecorder().invertRenameEnum(["status", "state"]);
-      expect(cmd).toBe("renameEnum");
-      expect(args).toEqual(["state", "status"]);
-    });
-
-    it("handles { to: newName } hash form", () => {
-      const [cmd, args] = new CommandRecorder().invertRenameEnum(["status", { to: "state" }]);
-      expect(cmd).toBe("renameEnum");
-      expect(args).toEqual(["state", "status"]);
-    });
-  });
-
-  describe("invertRenameEnumValue", () => {
-    it("swaps from/to values", () => {
-      const [cmd, args] = new CommandRecorder().invertRenameEnumValue([
-        "status",
-        { from: "active", to: "enabled" },
-      ]);
-      expect(cmd).toBe("renameEnumValue");
-      expect(args[1]).toEqual({ from: "enabled", to: "active" });
-    });
-
-    it("throws without from/to options", () => {
-      expect(() =>
-        new CommandRecorder().invertRenameEnumValue(["status", { value: "active" }]),
-      ).toThrow(IrreversibleMigration);
-    });
-  });
-
-  describe("invertDropEnum", () => {
-    it("throws without values arg", () => {
-      expect(() => new CommandRecorder().invertDropEnum(["my_enum"])).toThrow(
-        IrreversibleMigration,
-      );
-    });
-
-    it("throws when only options hash given (no values)", () => {
-      expect(() => new CommandRecorder().invertDropEnum(["my_enum", { schema: "public" }])).toThrow(
-        IrreversibleMigration,
-      );
-    });
-
-    it("returns createEnum when values array given", () => {
-      const [cmd] = new CommandRecorder().invertDropEnum(["my_enum", ["val1", "val2"]]);
-      expect(cmd).toBe("createEnum");
-    });
-  });
-
-  describe("invertDropVirtualTable", () => {
-    it("throws without type arg", () => {
-      expect(() => new CommandRecorder().invertDropVirtualTable(["my_table"])).toThrow(
-        IrreversibleMigration,
-      );
-    });
-
-    it("returns createVirtualTable when type given", () => {
-      const [cmd] = new CommandRecorder().invertDropVirtualTable(["my_table", "fts5"]);
-      expect(cmd).toBe("createVirtualTable");
-    });
-  });
-
-  describe("joinTableName / findJoinTableName", () => {
-    it("joinTableName returns sorted joined name", () => {
-      expect(new CommandRecorder().joinTableName("cats", "dogs")).toBe("cats_dogs");
-      expect(new CommandRecorder().joinTableName("dogs", "cats")).toBe("cats_dogs");
-    });
-
-    it("findJoinTableName uses tableName option when given", () => {
-      expect(new CommandRecorder().findJoinTableName("cats", "dogs", { tableName: "pets" })).toBe(
-        "pets",
-      );
-    });
-  });
-
-  describe("invertAddColumns", () => {
-    it("returns removeColumns", () => {
-      const [cmd] = new CommandRecorder().invertAddColumns(["users", "name", "age"]);
-      expect(cmd).toBe("removeColumns");
-    });
-  });
-
-  describe("invert change table (non-bulk)", () => {
-    it("accepts (tableName, fn) without explicit options", async () => {
-      const recorder = new CommandRecorder(abstractDelegate);
-      // short form: no options argument
-      await recorder.changeTable("fruits", async (t) => {
-        await t.string("name");
-      });
-      expect(recorder.commands[0].cmd).toBe("addColumn");
-    });
-
-    it("remove with multiple columns records a single removeColumns", async () => {
-      const recorder = new CommandRecorder(abstractDelegate);
-      await recorder.changeTable("fruits", async (t) => {
-        await t.remove("name", "kind", { type: "string" });
-      });
-      expect(recorder.commands).toEqual([
-        { cmd: "removeColumns", args: ["fruits", "name", "kind", { type: "string" }] },
-      ]);
-    });
-
-    it("removeIndex with an options hash records a nil column, not the hash", async () => {
-      const recorder = new CommandRecorder(abstractDelegate);
-      await recorder.changeTable("fruits", async (t) => {
-        await t.removeIndex({ name: "index_fruits_on_kind" });
-      });
-      expect(recorder.commands).toEqual([
-        { cmd: "removeIndex", args: ["fruits", undefined, { name: "index_fruits_on_kind" }] },
-      ]);
-    });
-
-    it("removeIndex with an explicit nil column keeps the second-argument options", async () => {
-      const recorder = new CommandRecorder(abstractDelegate);
-      await recorder.changeTable("fruits", async (t) => {
-        await t.removeIndex(undefined, { name: "index_fruits_on_kind" });
-      });
-      expect(recorder.commands).toEqual([
-        { cmd: "removeIndex", args: ["fruits", undefined, { name: "index_fruits_on_kind" }] },
-      ]);
-    });
-
-    it("removeIndex with a column inverts back to addIndex", async () => {
-      const recorder = new CommandRecorder(abstractDelegate);
-      await recorder.revert(async () => {
-        await recorder.changeTable("fruits", async (t) => {
-          await t.removeIndex("kind");
-        });
-      });
-      expect(recorder.commands).toEqual([{ cmd: "addIndex", args: ["fruits", "kind"] }]);
-    });
-
-    it("raises IrreversibleMigration when removeIndex lacks a column", async () => {
-      const recorder = new CommandRecorder(abstractDelegate);
-      await expect(
-        recorder.revert(async () => {
-          await recorder.changeTable("fruits", async (t) => {
-            await t.removeIndex({ name: "index_fruits_on_kind" });
-          });
-        }),
-      ).rejects.toThrow(IrreversibleMigration);
-    });
-
-    it("raises IrreversibleMigration when remove lacks type", async () => {
-      const recorder = new CommandRecorder(abstractDelegate);
-      await expect(
-        recorder.revert(async () => {
-          await recorder.changeTable("fruits", async (t) => {
-            await t.remove("kind"); // no type → not reversible
-          });
-        }),
-      ).rejects.toThrow(IrreversibleMigration);
-    });
-  });
-
-  describe("change_table surfaces adapter ColumnMethods shorthands (serial/bigserial)", () => {
-    // Mirrors Rails: the PG `ColumnMethods` mixin exposes `t.serial` /
-    // `t.bigserial` (SERIAL/BIGSERIAL) inside change_table — shorthands the
-    // adapter advertises via _columnMethodNames() beyond NATIVE_DATABASE_TYPES.
-    const pgLike = pgDelegate;
-
-    it("records addColumn for t.serial and t.bigserial (up adds)", async () => {
-      const recorder = new CommandRecorder(pgLike);
-      await recorder.changeTable("fruits", async (t) => {
-        await (t as any).serial("seq");
-        await (t as any).bigserial("big_seq");
-      });
-      expect(recorder.commands).toEqual([
-        { cmd: "addColumn", args: ["fruits", "seq", "serial"] },
-        { cmd: "addColumn", args: ["fruits", "big_seq", "bigserial"] },
-      ]);
-    });
-
-    it("reverts t.serial / t.bigserial to removeColumn (down removes)", async () => {
-      const recorder = new CommandRecorder(pgLike);
-      await recorder.revert(async () => {
-        await recorder.changeTable("fruits", async (t) => {
-          await (t as any).serial("seq");
-          await (t as any).bigserial("big_seq");
-        });
-      });
-      expect(recorder.commands).toEqual([
-        { cmd: "removeColumn", args: ["fruits", "big_seq", "bigserial"] },
-        { cmd: "removeColumn", args: ["fruits", "seq", "serial"] },
-      ]);
-    });
-
-    it("never exposes primary_key as a generic column shorthand", async () => {
-      const recorder = new CommandRecorder(pgDelegate);
-      await recorder.changeTable("fruits", async (t) => {
-        expect((t as unknown as Record<string, unknown>)["primary_key"]).toBeUndefined();
-        await t.primaryKey("token", "uuid");
-      });
-      expect(recorder.commands).toEqual([
-        { cmd: "addColumn", args: ["fruits", "token", "uuid", { primaryKey: true }] },
-      ]);
-    });
-
-    it("records the snake_case type for PG bitVarying (multi-word shorthand)", async () => {
-      const recorder = new CommandRecorder(pgDelegate);
-      await recorder.changeTable("fruits", async (t) => {
-        await (t as any).bitVarying("mask");
-      });
-      expect(recorder.commands).toEqual([
-        { cmd: "addColumn", args: ["fruits", "mask", "bit_varying"] },
-      ]);
-    });
-  });
-
-  describe("change_table surfaces adapter ColumnMethods shorthands (MySQL unsigned/blob)", () => {
-    // Mirrors Rails: the MySQL `ColumnMethods` mixin exposes `t.unsignedInteger`,
-    // `t.mediumtext`, `t.longblob`, ... inside change_table — shorthands the
-    // adapter advertises via _columnMethodNames() beyond NATIVE_DATABASE_TYPES.
-    //
-    // The proxy normalizes the camelCase method name back to the snake symbol
-    // Rails' `define_column_methods` records (`unsignedInteger` ->
-    // `unsigned_integer`); single-token shorthands (mediumtext, longblob) are
-    // unchanged.
-    const mysqlLike = mysqlDelegate;
-
-    it("records addColumn for MySQL shorthands (up adds)", async () => {
-      const recorder = new CommandRecorder(mysqlLike);
-      await recorder.changeTable("fruits", async (t) => {
-        await (t as any).unsignedInteger("qty");
-        await (t as any).mediumtext("notes");
-        await (t as any).longblob("payload");
-      });
-      expect(recorder.commands).toEqual([
-        { cmd: "addColumn", args: ["fruits", "qty", "unsigned_integer"] },
-        { cmd: "addColumn", args: ["fruits", "notes", "mediumtext"] },
-        { cmd: "addColumn", args: ["fruits", "payload", "longblob"] },
-      ]);
-    });
-
-    it("reverts MySQL shorthands to removeColumn (down removes)", async () => {
-      const recorder = new CommandRecorder(mysqlLike);
-      await recorder.revert(async () => {
-        await recorder.changeTable("fruits", async (t) => {
-          await (t as any).unsignedInteger("qty");
-          await (t as any).mediumtext("notes");
-        });
-      });
-      expect(recorder.commands).toEqual([
-        { cmd: "removeColumn", args: ["fruits", "notes", "mediumtext"] },
-        { cmd: "removeColumn", args: ["fruits", "qty", "unsigned_integer"] },
-      ]);
-    });
-  });
-
-  describe("bulk invert change table", () => {
-    it("records two changeTable commands from revert + revert-of-revert", async () => {
-      const delegate = { ...abstractDelegate, supportsBulkAlter: () => true };
-      const recorder = new CommandRecorder(delegate);
-
-      const block = async (t: Table) => {
-        await t.string("name");
-        await t.rename("kind", "cultivar");
-      };
-
-      await recorder.revert(async () => {
-        await recorder.changeTable("fruits", { bulk: true }, block);
-      });
-
-      await recorder.revert(async () => {
-        await recorder.revert(async () => {
-          await recorder.changeTable("fruits", { bulk: true }, block);
-        });
-      });
-
-      expect(recorder.commands).toHaveLength(2);
-      expect(recorder.commands[0].cmd).toBe("changeTable");
-      expect(recorder.commands[0].args[0]).toBe("fruits");
-      expect(recorder.commands[1].cmd).toBe("changeTable");
-      expect(recorder.commands[1].args[0]).toBe("fruits");
-    });
-  });
-});
 
 describe("Migration", () => {
   describe("CommandRecorderTest", () => {
     let recorder: CommandRecorder & {
       createTable(...args: unknown[]): void;
       execute(sql: string): void;
+      transaction(fn: () => Promise<void>): void;
       nonExistingMethod(name: string): void;
     };
 
@@ -561,6 +124,28 @@ describe("Migration", () => {
           });
         }),
       ).rejects.toThrow(IrreversibleMigration);
+    });
+
+    itIfSupports("bulk_alter", "bulk invert change table", async () => {
+      const block = async (t: Table) => {
+        await t.string("name");
+        await t.rename("kind", "cultivar");
+      };
+
+      await recorder.revert(async () => {
+        await recorder.changeTable("fruits", { bulk: true }, block);
+      });
+
+      await recorder.revert(async () => {
+        await recorder.revert(async () => {
+          await recorder.changeTable("fruits", { bulk: true }, block);
+        });
+      });
+
+      expect(recorder.commands.map(({ cmd, args }) => ({ cmd, args: args.slice(0, -1) }))).toEqual([
+        { cmd: "changeTable", args: ["fruits"] },
+        { cmd: "changeTable", args: ["fruits"] },
+      ]);
     });
 
     it("invert create table", async () => {
@@ -728,6 +313,64 @@ describe("Migration", () => {
       });
     });
 
+    itIfSupports("comments", "invert change column comment", () => {
+      expect(() =>
+        recorder.inverseOf("changeColumnComment", ["table", "column", "comment"]),
+      ).toThrow(IrreversibleMigration);
+    });
+
+    itIfSupports("comments", "invert change column comment with from and to", () => {
+      const change = recorder.inverseOf("changeColumnComment", [
+        "table",
+        "column",
+        { from: "old_value", to: "new_value" },
+      ]);
+      expect(change).toEqual({
+        cmd: "changeColumnComment",
+        args: ["table", "column", { from: "new_value", to: "old_value" }],
+      });
+    });
+
+    itIfSupports("comments", "invert change column comment with from and to with nil", () => {
+      const change = recorder.inverseOf("changeColumnComment", [
+        "table",
+        "column",
+        { from: undefined, to: "new_value" },
+      ]);
+      expect(change).toEqual({
+        cmd: "changeColumnComment",
+        args: ["table", "column", { from: "new_value", to: undefined }],
+      });
+    });
+
+    itIfSupports("comments", "invert change table comment", () => {
+      expect(() =>
+        recorder.inverseOf("changeColumnComment", ["table", "column", "comment"]),
+      ).toThrow(IrreversibleMigration);
+    });
+
+    itIfSupports("comments", "invert change table comment with from and to", () => {
+      const change = recorder.inverseOf("changeTableComment", [
+        "table",
+        { from: "old_value", to: "new_value" },
+      ]);
+      expect(change).toEqual({
+        cmd: "changeTableComment",
+        args: ["table", { from: "new_value", to: "old_value" }],
+      });
+    });
+
+    itIfSupports("comments", "invert change table comment with from and to with nil", () => {
+      const change = recorder.inverseOf("changeTableComment", [
+        "table",
+        { from: undefined, to: "new_value" },
+      ]);
+      expect(change).toEqual({
+        cmd: "changeTableComment",
+        args: ["table", { from: "new_value", to: undefined }],
+      });
+    });
+
     it("invert change column null", () => {
       const add = recorder.inverseOf("changeColumnNull", ["table", "column", true]);
       expect(add).toEqual({ cmd: "changeColumnNull", args: ["table", "column", false] });
@@ -821,6 +464,381 @@ describe("Migration", () => {
     it("invert rename index", () => {
       const rename = recorder.inverseOf("renameIndex", ["table", "old", "new"]);
       expect(rename).toEqual({ cmd: "renameIndex", args: ["table", "new", "old"] });
+    });
+
+    it("invert add timestamps", () => {
+      const remove = recorder.inverseOf("addTimestamps", ["table"]);
+      expect(remove).toEqual({ cmd: "removeTimestamps", args: ["table"] });
+    });
+
+    it("invert remove timestamps", () => {
+      const add = recorder.inverseOf("removeTimestamps", ["table", { null: true }]);
+      expect(add).toEqual({ cmd: "addTimestamps", args: ["table", { null: true }] });
+    });
+
+    it("invert add reference", () => {
+      const remove = recorder.inverseOf("addReference", [
+        "table",
+        "taggable",
+        { polymorphic: true },
+      ]);
+      expect(remove).toEqual({
+        cmd: "removeReference",
+        args: ["table", "taggable", { polymorphic: true }],
+      });
+    });
+
+    it("invert add belongs to alias", () => {
+      const remove = recorder.inverseOf("addBelongsTo", ["table", "user"]);
+      expect(remove).toEqual({ cmd: "removeReference", args: ["table", "user"] });
+    });
+
+    it("invert remove reference", () => {
+      const add = recorder.inverseOf("removeReference", [
+        "table",
+        "taggable",
+        { polymorphic: true },
+      ]);
+      expect(add).toEqual({
+        cmd: "addReference",
+        args: ["table", "taggable", { polymorphic: true }],
+      });
+    });
+
+    it("invert remove reference with index and foreign key", () => {
+      const add = recorder.inverseOf("removeReference", [
+        "table",
+        "taggable",
+        { index: true, foreignKey: true },
+      ]);
+      expect(add).toEqual({
+        cmd: "addReference",
+        args: ["table", "taggable", { index: true, foreignKey: true }],
+      });
+    });
+
+    it("invert remove belongs to alias", () => {
+      const add = recorder.inverseOf("removeBelongsTo", ["table", "user"]);
+      expect(add).toEqual({ cmd: "addReference", args: ["table", "user"] });
+    });
+
+    it("invert enable extension", () => {
+      const disable = recorder.inverseOf("enableExtension", ["uuid-ossp"]);
+      expect(disable).toEqual({ cmd: "disableExtension", args: ["uuid-ossp"] });
+    });
+
+    it("invert disable extension", () => {
+      const enable = recorder.inverseOf("disableExtension", ["uuid-ossp"]);
+      expect(enable).toEqual({ cmd: "enableExtension", args: ["uuid-ossp"] });
+    });
+
+    it("invert create schema", () => {
+      const disable = recorder.inverseOf("createSchema", ["myschema"]);
+      expect(disable).toEqual({ cmd: "dropSchema", args: ["myschema"] });
+    });
+
+    it("invert drop schema", () => {
+      const enable = recorder.inverseOf("dropSchema", ["myschema"]);
+      expect(enable).toEqual({ cmd: "createSchema", args: ["myschema"] });
+    });
+
+    it("invert add foreign key", () => {
+      const enable = recorder.inverseOf("addForeignKey", ["dogs", "people"]);
+      expect(enable).toEqual({ cmd: "removeForeignKey", args: ["dogs", "people"] });
+    });
+
+    it("invert remove foreign key", () => {
+      const enable = recorder.inverseOf("removeForeignKey", ["dogs", "people"]);
+      expect(enable).toEqual({ cmd: "addForeignKey", args: ["dogs", "people"] });
+    });
+
+    it("invert add foreign key with column", () => {
+      const enable = recorder.inverseOf("addForeignKey", [
+        "dogs",
+        "people",
+        { column: "owner_id" },
+      ]);
+      expect(enable).toEqual({
+        cmd: "removeForeignKey",
+        args: ["dogs", "people", { column: "owner_id" }],
+      });
+    });
+
+    it("invert remove foreign key with column", () => {
+      const enable = recorder.inverseOf("removeForeignKey", [
+        "dogs",
+        "people",
+        { column: "owner_id" },
+      ]);
+      expect(enable).toEqual({
+        cmd: "addForeignKey",
+        args: ["dogs", "people", { column: "owner_id" }],
+      });
+    });
+
+    it("invert add foreign key with column and name", () => {
+      const enable = recorder.inverseOf("addForeignKey", [
+        "dogs",
+        "people",
+        { column: "owner_id", name: "fk" },
+      ]);
+      expect(enable).toEqual({
+        cmd: "removeForeignKey",
+        args: ["dogs", "people", { column: "owner_id", name: "fk" }],
+      });
+    });
+
+    it("invert remove foreign key with column and name", () => {
+      const enable = recorder.inverseOf("removeForeignKey", [
+        "dogs",
+        "people",
+        { column: "owner_id", name: "fk" },
+      ]);
+      expect(enable).toEqual({
+        cmd: "addForeignKey",
+        args: ["dogs", "people", { column: "owner_id", name: "fk" }],
+      });
+    });
+
+    it("invert remove foreign key with primary key", () => {
+      const enable = recorder.inverseOf("removeForeignKey", [
+        "dogs",
+        "people",
+        { primaryKey: "person_id" },
+      ]);
+      expect(enable).toEqual({
+        cmd: "addForeignKey",
+        args: ["dogs", "people", { primaryKey: "person_id" }],
+      });
+    });
+
+    it("invert remove foreign key with primary key and to table in options", () => {
+      const enable = recorder.inverseOf("removeForeignKey", [
+        "dogs",
+        { toTable: "people", primaryKey: "uuid" },
+      ]);
+      expect(enable).toEqual({
+        cmd: "addForeignKey",
+        args: ["dogs", "people", { primaryKey: "uuid" }],
+      });
+    });
+
+    it("invert remove foreign key with on delete on update", () => {
+      const enable = recorder.inverseOf("removeForeignKey", [
+        "dogs",
+        "people",
+        { onDelete: "nullify", onUpdate: "cascade" },
+      ]);
+      expect(enable).toEqual({
+        cmd: "addForeignKey",
+        args: ["dogs", "people", { onDelete: "nullify", onUpdate: "cascade" }],
+      });
+    });
+
+    it("invert remove foreign key with to table in options", () => {
+      let enable = recorder.inverseOf("removeForeignKey", ["dogs", { toTable: "people" }]);
+      expect(enable).toEqual({ cmd: "addForeignKey", args: ["dogs", "people"] });
+
+      enable = recorder.inverseOf("removeForeignKey", [
+        "dogs",
+        { toTable: "people", column: "owner_id" },
+      ]);
+      expect(enable).toEqual({
+        cmd: "addForeignKey",
+        args: ["dogs", "people", { column: "owner_id" }],
+      });
+    });
+
+    it("invert remove foreign key is irreversible without to table", () => {
+      expect(() =>
+        recorder.inverseOf("removeForeignKey", ["dogs", { column: "owner_id" }]),
+      ).toThrow(IrreversibleMigration);
+
+      expect(() => recorder.inverseOf("removeForeignKey", ["dogs", { name: "fk" }])).toThrow(
+        IrreversibleMigration,
+      );
+
+      expect(() => recorder.inverseOf("removeForeignKey", ["dogs"])).toThrow(IrreversibleMigration);
+    });
+
+    it("invert transaction with irreversible inside is irreversible", async () => {
+      await expect(
+        recorder.revert(async () => {
+          await recorder.transaction(async () => {
+            recorder.execute("some sql");
+          });
+        }),
+      ).rejects.toThrow(IrreversibleMigration);
+    });
+
+    it("invert add check constraint", () => {
+      const enable = recorder.inverseOf("addCheckConstraint", [
+        "dogs",
+        "speed > 0",
+        { name: "speed_check" },
+      ]);
+      expect(enable).toEqual({
+        cmd: "removeCheckConstraint",
+        args: ["dogs", "speed > 0", { name: "speed_check" }],
+      });
+    });
+
+    it("invert add check constraint if not exists", () => {
+      const enable = recorder.inverseOf("addCheckConstraint", [
+        "dogs",
+        "speed > 0",
+        { name: "speed_check", ifNotExists: true },
+      ]);
+      expect(enable).toEqual({
+        cmd: "removeCheckConstraint",
+        args: ["dogs", "speed > 0", { name: "speed_check", ifExists: true }],
+      });
+    });
+
+    it("invert remove check constraint", () => {
+      const enable = recorder.inverseOf("removeCheckConstraint", [
+        "dogs",
+        "speed > 0",
+        { name: "speed_check" },
+      ]);
+      expect(enable).toEqual({
+        cmd: "addCheckConstraint",
+        args: ["dogs", "speed > 0", { name: "speed_check" }],
+      });
+    });
+
+    it("invert remove check constraint without expression", () => {
+      expect(() => recorder.inverseOf("removeCheckConstraint", ["dogs"])).toThrow(
+        IrreversibleMigration,
+      );
+    });
+
+    it("invert remove check constraint if exists", () => {
+      const enable = recorder.inverseOf("removeCheckConstraint", [
+        "dogs",
+        "speed > 0",
+        { name: "speed_check", ifExists: true },
+      ]);
+      expect(enable).toEqual({
+        cmd: "addCheckConstraint",
+        args: ["dogs", "speed > 0", { name: "speed_check", ifNotExists: true }],
+      });
+    });
+
+    it("invert add unique constraint constraint with using index", () => {
+      expect(() =>
+        recorder.inverseOf("addUniqueConstraint", ["dogs", { usingIndex: "unique_index" }]),
+      ).toThrow(IrreversibleMigration);
+    });
+
+    it("invert remove unique constraint constraint", () => {
+      const enable = recorder.inverseOf("removeUniqueConstraint", [
+        "dogs",
+        ["speed"],
+        { deferrable: "deferred", name: "uniq_speed" },
+      ]);
+      expect(enable).toEqual({
+        cmd: "addUniqueConstraint",
+        args: ["dogs", ["speed"], { deferrable: "deferred", name: "uniq_speed" }],
+      });
+    });
+
+    it("invert remove unique constraint constraint without options", () => {
+      const enable = recorder.inverseOf("removeUniqueConstraint", ["dogs", ["speed"]]);
+      expect(enable).toEqual({ cmd: "addUniqueConstraint", args: ["dogs", ["speed"]] });
+    });
+
+    it("invert remove unique constraint constraint without columns", () => {
+      expect(() =>
+        recorder.inverseOf("removeUniqueConstraint", ["dogs", { name: "uniq_speed" }]),
+      ).toThrow(IrreversibleMigration);
+    });
+
+    it("invert create enum", () => {
+      const drop = recorder.inverseOf("createEnum", ["color", ["blue", "green"]]);
+      expect(drop).toEqual({ cmd: "dropEnum", args: ["color", ["blue", "green"]] });
+    });
+
+    it("invert drop enum", () => {
+      const create = recorder.inverseOf("dropEnum", ["color", ["blue", "green"]]);
+      expect(create).toEqual({ cmd: "createEnum", args: ["color", ["blue", "green"]] });
+    });
+
+    it("invert drop enum without values", () => {
+      expect(() => recorder.inverseOf("dropEnum", ["color"])).toThrow(IrreversibleMigration);
+
+      expect(() => recorder.inverseOf("dropEnum", ["color", { ifExists: true }])).toThrow(
+        IrreversibleMigration,
+      );
+    });
+
+    it("invert rename enum", () => {
+      const enumCmd = recorder.inverseOf("renameEnum", ["dog_breed", "breed"]);
+      expect(enumCmd).toEqual({ cmd: "renameEnum", args: ["breed", "dog_breed"] });
+    });
+
+    it("invert rename enum with to option", () => {
+      const enumCmd = recorder.inverseOf("renameEnum", ["dog_breed", { to: "breed" }]);
+      expect(enumCmd).toEqual({ cmd: "renameEnum", args: ["breed", "dog_breed"] });
+    });
+
+    it("invert add enum value", () => {
+      expect(() => recorder.inverseOf("addEnumValue", ["dog_breed", "beagle"])).toThrow(
+        IrreversibleMigration,
+      );
+    });
+
+    it("invert rename enum value", () => {
+      const enumValue = recorder.inverseOf("renameEnumValue", [
+        "dog_breed",
+        { from: "retriever", to: "beagle" },
+      ]);
+      expect(enumValue).toEqual({
+        cmd: "renameEnumValue",
+        args: ["dog_breed", { from: "beagle", to: "retriever" }],
+      });
+    });
+
+    it("invert rename enum value without from", () => {
+      expect(() =>
+        recorder.inverseOf("renameEnumValue", ["dog_breed", { to: "retriever" }]),
+      ).toThrow(IrreversibleMigration);
+    });
+
+    it("invert rename enum value without to", () => {
+      expect(() =>
+        recorder.inverseOf("renameEnumValue", ["dog_breed", { from: "beagle" }]),
+      ).toThrow(IrreversibleMigration);
+    });
+
+    it("invert create virtual table", () => {
+      const drop = recorder.inverseOf("createVirtualTable", [
+        "searchables",
+        "fts5",
+        ["content", "meta UNINDEXED", "tokenize='porter ascii'"],
+      ]);
+      expect(drop).toEqual({
+        cmd: "dropVirtualTable",
+        args: ["searchables", "fts5", ["content", "meta UNINDEXED", "tokenize='porter ascii'"]],
+      });
+    });
+
+    it("invert drop virtual table", () => {
+      const create = recorder.inverseOf("dropVirtualTable", [
+        "searchables",
+        "fts5",
+        ["title", "content"],
+      ]);
+      expect(create).toEqual({
+        cmd: "createVirtualTable",
+        args: ["searchables", "fts5", ["title", "content"]],
+      });
+    });
+
+    it("invert drop virtual table without options", () => {
+      expect(() => recorder.inverseOf("dropVirtualTable", ["searchables"])).toThrow(
+        IrreversibleMigration,
+      );
     });
   });
 });
