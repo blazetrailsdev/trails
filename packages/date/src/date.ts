@@ -135,6 +135,13 @@ function formatOffset(utcOffset: number, colons: number): string {
 }
 
 /**
+ * @internal The largest power of ten a sub-second nanosecond count — under
+ * `1e9` — can be scaled by and still land inside `Number.MAX_SAFE_INTEGER`:
+ * `1e9 * 1e6` is `1e15`, and `1e7` would overflow it. See {@link subsecDigits}.
+ */
+const MAX_EXACT_SUBSEC_SCALE = 6;
+
+/**
  * @internal `date_strftime.c`'s shared `%L`/`%N` arm
  * (`date_strftime.c:275-315`): the directive's own width prefix, defaulting to
  * `3` for `%L` and `9` for `%N`, scales `tmx_sec_fraction` by `10**precision`
@@ -147,13 +154,23 @@ function formatOffset(utcOffset: number, colons: number): string {
  * scale-and-floor the C does would drop `299999999` to `299999998` through a
  * double — and only a width past nine reaches for the sub-nanosecond tail
  * `DateTime.parse("...00.9999999999")` keeps.
+ *
+ * That tail runs out at fifteen digits: `sf` is under `1e9` nanoseconds, so
+ * scaling it by more than {@link MAX_EXACT_SUBSEC_SCALE} leaves
+ * `Number.MAX_SAFE_INTEGER` behind and the digits stop being the ones the value
+ * holds. MRI pads a width past its own Rational's digits with zeros —
+ * `DateTime.parse("...00.9999999999").strftime("%20N")` is
+ * `"99999999990000000000"` — so zeros are also the right answer past the double's
+ * cliff, and the recursion puts it exactly where the arithmetic stays exact.
  */
 function subsecDigits(nsec: number, precision: number): string {
   if (precision <= 9) {
     return String(Math.floor(nsec)).padStart(9, "0").slice(0, precision);
   }
   const extra = precision - 9;
-  if (extra > 15) return subsecDigits(nsec, 24).padEnd(precision, "0");
+  if (extra > MAX_EXACT_SUBSEC_SCALE) {
+    return subsecDigits(nsec, 9 + MAX_EXACT_SUBSEC_SCALE).padEnd(precision, "0");
+  }
   return String(Math.floor(nsec * 10 ** extra)).padStart(precision, "0");
 }
 

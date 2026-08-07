@@ -730,6 +730,14 @@ describe("DateTime", () => {
     expect(datetime.strftime("%3N")).toBe("999");
     expect(datetime.strftime("%9N")).toBe("999999999");
     expect(datetime.strftime("%12N")).toBe("999999999900");
+    //   d.strftime("%15N") #=> "999999999900000"
+    //   d.strftime("%20N") #=> "99999999990000000000"
+    expect(datetime.strftime("%15N")).toBe("999999999900000");
+    expect(datetime.strftime("%20N")).toBe("99999999990000000000");
+    // ruby 3.3.11:
+    //   DateTime.new(2008, 3, 1, 6, 0, Rational(1, 2)).strftime("%20N")
+    //     #=> "50000000000000000000"
+    expect(new RubyDateTime(2008, 3, 1, 6, 0, 0.5).strftime("%20N")).toBe("50000000000000000000");
   });
 
   it("answers zeros at every width for a ::Date, which has no time of day", () => {
