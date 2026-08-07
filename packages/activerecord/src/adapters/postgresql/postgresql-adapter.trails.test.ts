@@ -337,18 +337,18 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     // `@raw_connection.block` (postgresql/database_statements.rb:127-128): the
     // ROLLBACK goes out only once the cancelled query has drained off the wire.
-    // `_queryInFlightOwner` is non-null for exactly the span a query is on the
-    // wire, so reading it as ROLLBACK is sent is the drain assertion.
+    // `_queryInFlightSettled` is non-null for exactly the span a query is on
+    // the wire, so reading it as ROLLBACK is sent is the drain assertion.
     it("rollback drains the cancelled query before sending ROLLBACK", async () => {
       const other = new PostgreSQLAdapter(PG_TEST_URL);
       const seam = other as unknown as {
-        _queryInFlightOwner: symbol | null;
+        _queryInFlightSettled: Promise<void> | null;
         internalExecute(sql: string, ...rest: unknown[]): Promise<unknown>;
       };
       const internalExecute = seam.internalExecute.bind(seam);
-      let inFlightAtRollback: symbol | null | "unsent" = "unsent";
+      let inFlightAtRollback: Promise<void> | null | "unsent" = "unsent";
       seam.internalExecute = (sql: string, ...rest: unknown[]) => {
-        if (sql === "ROLLBACK") inFlightAtRollback = seam._queryInFlightOwner;
+        if (sql === "ROLLBACK") inFlightAtRollback = seam._queryInFlightSettled;
         return internalExecute(sql, ...rest);
       };
       try {
