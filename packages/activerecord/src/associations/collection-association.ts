@@ -727,15 +727,17 @@ export class CollectionAssociation extends Association {
    * the in-memory target. For persisted records, uses scope if not loaded.
    */
   async isInclude(record: Base): Promise<boolean> {
-    if (record.isNewRecord() || this.isLoaded()) {
+    const klass = this.klass;
+    if (klass && !(record instanceof klass)) return false;
+
+    if (record.isNewRecord()) {
       return isIncludeInMemory(this, record);
+    } else if (this.isLoaded()) {
+      return this.target.includes(record);
+    } else {
+      const recordId = this.primaryKeyValue(record);
+      return await this.scope().exists(recordId);
     }
-    const rel = this.scope();
-    if (rel && typeof rel.exists === "function") {
-      const pk = this.primaryKeyValue(record);
-      return await rel.exists(pk);
-    }
-    return isIncludeInMemory(this, record);
   }
 
   /**

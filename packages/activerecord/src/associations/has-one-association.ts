@@ -190,10 +190,7 @@ export class HasOneAssociation extends SingularAssociation {
    * Handle the :dependent option when the owner is being destroyed.
    */
   async handleDependency(): Promise<void | false> {
-    const dependent = this.reflection.options.dependent;
-    if (!dependent) return;
-
-    switch (dependent) {
+    switch (this.reflection.options.dependent) {
       case "restrictWithException":
         if (await this.loadTarget()) {
           throw new DeleteRestrictionError(this.owner, this.reflection.name);
@@ -219,7 +216,7 @@ export class HasOneAssociation extends SingularAssociation {
         break;
 
       default:
-        return await this.delete(dependent);
+        return await this.delete();
     }
   }
 
@@ -227,7 +224,9 @@ export class HasOneAssociation extends SingularAssociation {
    * Delete the associated record using the given method.
    * Supports: delete, destroy, nullify.
    */
-  async delete(method?: string): Promise<void | false> {
+  async delete(
+    method: string | undefined = this.reflection.options.dependent as string | undefined,
+  ): Promise<void | false> {
     if (!(await this.loadTarget())) return;
     const target = this.target!;
 

@@ -65,13 +65,6 @@
   {
     "package": "activerecord",
     "tsFile": "associations/collection-association.ts",
-    "rubyName": "include?",
-    "call": "order:isLoaded,isIncludeInMemory",
-    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/collection-association.ts",
     "rubyName": "load_target",
     "call": "order:mergeTargetLists,findTarget",
     "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
