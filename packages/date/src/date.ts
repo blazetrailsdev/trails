@@ -2602,7 +2602,11 @@ function cValidTimeP(
  * `add_frac` hands the day fraction to `d_lite_plus`, whose `T_FLOAT` arm
  * multiplies it straight back by `DAY_IN_SECONDS` (`date_core.c:6094-6097`), so
  * the two cancel and `unitInSeconds` is that product — `1` for a second,
- * `3600` for an hour.
+ * `3600` for an hour. The T_RATIONAL arm a Rational argument takes does the
+ * same `t = f_mul(t, INT2FIX(DAY_IN_SECONDS))` (`date_core.c:6197`), so the
+ * cancellation — and this seconds scale — holds for both arms. Every consumer
+ * of `fr2` stays in it: the constructor's `df += fr2.div(1)`, and `canon24oc`
+ * adding `DAY_IN_SECONDS` where the C adds a day-unit `1`.
  *
  * `s_trunc`'s `wholenum_p` arm is what a `Rational` argument takes when it
  * reduces to an Integer, which our {@link Rational} does in its constructor —
