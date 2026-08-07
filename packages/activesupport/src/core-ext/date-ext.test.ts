@@ -19,7 +19,7 @@ import {
   allYear,
   endOfWeek,
   beginningOfQuarter,
-  changeDate,
+  change,
   toFs,
   xmlschema,
   toTime,
@@ -121,8 +121,8 @@ describe("DateExtCalculationsTest", () => {
   });
 
   it("change", () => {
-    expect(asDate(changeDate(d(2005, 2, 11), { day: 21 })).getDate()).toBe(21);
-    const changed = asDate(changeDate(d(2005, 2, 11), { year: 2007, month: 5 }));
+    expect(asDate(change(d(2005, 2, 11), { day: 21 })).getDate()).toBe(21);
+    const changed = asDate(change(d(2005, 2, 11), { year: 2007, month: 5 }));
     expect(changed.getFullYear()).toBe(2007);
     expect(changed.getMonth()).toBe(4); // May
     expect(changed.getDate()).toBe(11);

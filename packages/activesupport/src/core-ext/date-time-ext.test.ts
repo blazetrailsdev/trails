@@ -7,7 +7,7 @@ import {
   beginningOfHour,
   beginningOfMinute,
   beginningOfQuarter,
-  changeDate,
+  change,
   endOfDay,
   endOfHour,
   endOfMinute,
@@ -123,7 +123,7 @@ describe("DateTimeExtCalculationsTest", () => {
 
   it("change", () => {
     const dt = d(2005, 2, 22, 15, 15, 10);
-    const result = asDate(changeDate(dt, { year: 2006 }));
+    const result = asDate(change(dt, { year: 2006 }));
     expect(result.getFullYear()).toBe(2006);
   });
 

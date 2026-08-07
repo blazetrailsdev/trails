@@ -11,7 +11,7 @@ import {
   secFraction,
   floor,
   ceil,
-  changeDate,
+  change,
   toFs,
   xmlschema,
   lastWeek,
@@ -247,32 +247,32 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("change", () => {
-    expect(asDate(changeDate(d(2005, 2, 22, 15, 15, 10), { year: 2006 }))).toEqual(
+    expect(asDate(change(d(2005, 2, 22, 15, 15, 10), { year: 2006 }))).toEqual(
       d(2006, 2, 22, 15, 15, 10),
     );
-    expect(asDate(changeDate(d(2005, 2, 22, 15, 15, 10), { month: 6 }))).toEqual(
+    expect(asDate(change(d(2005, 2, 22, 15, 15, 10), { month: 6 }))).toEqual(
       d(2005, 6, 22, 15, 15, 10),
     );
-    expect(asDate(changeDate(d(2005, 2, 22, 15, 15, 10), { year: 2012, month: 9 }))).toEqual(
+    expect(asDate(change(d(2005, 2, 22, 15, 15, 10), { year: 2012, month: 9 }))).toEqual(
       d(2012, 9, 22, 15, 15, 10),
     );
-    expect(asDate(changeDate(d(2005, 2, 22, 15, 15, 10), { hour: 16 }))).toEqual(
+    expect(asDate(change(d(2005, 2, 22, 15, 15, 10), { hour: 16 }))).toEqual(
       d(2005, 2, 22, 16, 0, 0),
     );
-    expect(asDate(changeDate(d(2005, 2, 22, 15, 15, 10), { min: 45 }))).toEqual(
+    expect(asDate(change(d(2005, 2, 22, 15, 15, 10), { min: 45 }))).toEqual(
       d(2005, 2, 22, 15, 45, 0),
     );
   });
 
   it("utc change", () => {
     const t1 = utc(2005, 2, 22, 15, 15, 10);
-    const result = asDate(changeDate(t1, { year: 2006 }));
+    const result = asDate(change(t1, { year: 2006 }));
     expect(result.getFullYear()).toBe(2006);
   });
 
   it("offset change", () => {
     const t = d(2005, 2, 22, 15, 15, 10);
-    const result = asDate(changeDate(t, { year: 2006 }));
+    const result = asDate(change(t, { year: 2006 }));
     expect(result.getFullYear()).toBe(2006);
     expect(result.getHours()).toBe(15);
     expect(result.getMinutes()).toBe(15);
@@ -281,7 +281,7 @@ describe("TimeExtCalculationsTest", () => {
 
   it("change offset", () => {
     const t = d(2006, 2, 22, 15, 15, 10);
-    const result = asDate(changeDate(t, { year: 2006 }));
+    const result = asDate(change(t, { year: 2006 }));
     expect(result.getFullYear()).toBe(2006);
     expect(result.getHours()).toBe(15);
   });
