@@ -135,6 +135,29 @@ function formatOffset(utcOffset: number, colons: number): string {
 }
 
 /**
+ * @internal `date_strftime.c`'s shared `%L`/`%N` arm
+ * (`date_strftime.c:275-315`): the directive's own width prefix, defaulting to
+ * `3` for `%L` and `9` for `%N`, scales `tmx_sec_fraction` by `10**precision`
+ * and integer-divides — so the answer is the LEADING `precision` digits of the
+ * fraction, truncated rather than rounded, zero-padded on the left when the
+ * fraction is small and on the right when the width outruns it.
+ *
+ * The subject carries the fraction as nanoseconds where MRI carries a Rational,
+ * so the first nine digits come off the whole nanoseconds as digits — the
+ * scale-and-floor the C does would drop `299999999` to `299999998` through a
+ * double — and only a width past nine reaches for the sub-nanosecond tail
+ * `DateTime.parse("...00.9999999999")` keeps.
+ */
+function subsecDigits(nsec: number, precision: number): string {
+  if (precision <= 9) {
+    return String(Math.floor(nsec)).padStart(9, "0").slice(0, precision);
+  }
+  const extra = precision - 9;
+  if (extra > 15) return subsecDigits(nsec, 24).padEnd(precision, "0");
+  return String(Math.floor(nsec * 10 ** extra)).padStart(precision, "0");
+}
+
+/**
  * @internal Ruby routes `Date#strftime` and `Time#strftime` through the same C
  * formatter, so trails has one implementation rather than a copy per class.
  *
@@ -155,7 +178,7 @@ function formatOffset(utcOffset: number, colons: number): string {
  */
 export function strftime(subject: StrftimeSubject, format: string): string {
   const hour12 = subject.hour % 12 === 0 ? 12 : subject.hour % 12;
-  const tokens: Record<string, () => string> = {
+  const tokens: Record<string, (precision: number) => string> = {
     Y: () => padYear(subject.year),
     C: () => pad2(Math.floor(subject.year / 100)),
     y: () => pad2(subject.year % 100),
@@ -177,8 +200,8 @@ export function strftime(subject: StrftimeSubject, format: string): string {
     l: () => String(hour12).padStart(2, " "),
     M: () => pad2(subject.min),
     S: () => pad2(subject.sec),
-    L: () => String(Math.floor(subject.nsec / 1_000_000)).padStart(3, "0"),
-    N: () => String(subject.nsec).padStart(9, "0"),
+    L: (precision) => subsecDigits(subject.nsec, precision <= 0 ? 3 : precision),
+    N: (precision) => subsecDigits(subject.nsec, precision <= 0 ? 9 : precision),
     s: () => String(epochSeconds(subject)),
     p: () => (subject.hour < 12 ? "AM" : "PM"),
     P: () => (subject.hour < 12 ? "am" : "pm"),
@@ -193,10 +216,14 @@ export function strftime(subject: StrftimeSubject, format: string): string {
     "%": () => "%",
   };
 
-  return format.replace(/%(-?)(:{0,3}[A-Za-z%])/g, (match, flag, spec) => {
+  // `date_strftime.c` reads a width prefix ahead of EVERY directive
+  // (`date_strftime.c:160-230`); only the `%L`/`%N` arm is honoured here, so a
+  // width on any other directive keeps falling through verbatim as before.
+  return format.replace(/%(-?)(\d*)(:{0,3}[A-Za-z%])/g, (match, flag, width, spec) => {
     const fn = tokens[spec];
     if (!fn) return match;
-    let result = fn();
+    if (width !== "" && spec !== "L" && spec !== "N") return match;
+    let result = fn(width === "" ? -1 : Number(width));
     if (flag === "-") result = result.replace(/^[0 ]+/, "") || "0";
     return result;
   });
@@ -1952,6 +1979,37 @@ function cValidTimeP(
 }
 
 /**
+ * @internal `date_core.c`'s `num2int_with_frac` macro (`date_core.c:3296-3304`)
+ * over the `d_trunc` / `h_trunc` / `min_trunc` / `s_trunc` family
+ * (`date_core.c:3216-3283`): the whole part is `f_idiv(v, 1)` — floor, not
+ * truncate — and the fraction `f_mod(v, 1)`, which each `*_trunc` then divides
+ * by its own unit's share of a day. A fraction is legal only in the LAST
+ * argument supplied: the macro raises `"invalid fraction"` when `argc > n`,
+ * which is `argcGtN` here — Ruby's `argc` has no TS analogue, so
+ * the constructor's optional parameters are what carries the "was a later
+ * argument passed" that the C reads off its `switch (argc)` fall-through.
+ *
+ * `fr` comes back in **seconds** rather than as `*_trunc`'s day fraction:
+ * `add_frac` hands the day fraction to `d_lite_plus`, whose `T_FLOAT` arm
+ * multiplies it straight back by `DAY_IN_SECONDS` (`date_core.c:6094-6097`), so
+ * the two cancel and `unitInSeconds` is that product — `1` for a second,
+ * `3600` for an hour.
+ */
+function num2intWithFrac(
+  v: number,
+  unitInSeconds: number,
+  argcGtN: boolean,
+): [whole: number, fr: number] {
+  const whole = Math.floor(v);
+  const fr = v - whole;
+  if (fr !== 0) {
+    if (argcGtN) throw new DateError("invalid fraction");
+    return [whole, fr * unitInSeconds];
+  }
+  return [whole, 0];
+}
+
+/**
  * @internal `date_core.c` `c_valid_ordinal_p` (`date_core.c:674-695`) over
  * `c_ordinal_to_jd` (`date_core.c:556-564`), the `d`th day of year `y`. A
  * negative `d` counts back from the last day of the year — `-1` is 31 December
@@ -2623,6 +2681,11 @@ export class DateTime extends Date {
    * `c_valid_civil_p` and the time of day with `c_valid_time_p`, then stores the
    * day and day-fraction in UTC — which is what the two conversions below do.
    *
+   * Every time argument is split by {@link num2intWithFrac}, which raises
+   * `"invalid fraction"` for a fraction in any but the last argument supplied —
+   * `DateTime.new(2008, 3, 1, 6, 0.5, 0)` — and carries a legal one through
+   * `add_frac`, so `DateTime.new(2008, 3, 1, 6, 0.5)` is `06:00:30`.
+   *
    * A fractional `second` is split off by `num2int_with_frac` over `s_trunc`
    * (`date_core.c:3269-3303`): `f_idiv(s, 1)` — floor, not truncate — is the
    * whole second, and `f_mod(s, 1)` the remainder, which `s_trunc` divides by
@@ -2656,33 +2719,68 @@ export class DateTime extends Date {
   constructor(rjd: Temporal.PlainDate, df: number, sf: number, of: number);
   constructor(
     year: number | Temporal.PlainDate,
-    month = 1,
-    day = 1,
-    hour = 0,
-    minute = 0,
-    second = 0,
-    offset = 0,
+    month?: number,
+    day?: number,
+    hour?: number,
+    minute?: number,
+    second?: number,
+    offset?: number,
   ) {
     if (year instanceof Temporal.PlainDate) {
-      super(jdUtcToLocal(year, month, hour));
+      const [df, sf, of] = [month ?? 0, day ?? 0, hour ?? 0];
+      super(jdUtcToLocal(year, df, of));
       this.#date = year;
-      this.#df = month;
-      this.#sf = day;
-      this.#of = hour;
+      this.#df = df;
+      this.#sf = sf;
+      this.#of = of;
       return;
     }
-    super(year, month, day);
-    const rjd = cValidCivilP(year, month, day);
+    // `datetime_initialize`'s `switch (argc)` fall-through
+    // (`date_core.c:7826-7849`): the second, then the minute, then the hour,
+    // then the day each give up their fraction, under the `n` bounds
+    // `positive_inf`, `5`, `4` and `3`. Only the LAST argument supplied may
+    // carry one, so at most one of these fractions is ever nonzero — the rest
+    // raised — and `fr2` takes it in the C's own order.
+    const [s, sFr] = num2intWithFrac(second ?? 0, 1, false);
+    const [min, minFr] = num2intWithFrac(minute ?? 0, MINUTE_IN_SECONDS, second !== undefined);
+    const [h, hFr] = num2intWithFrac(
+      hour ?? 0,
+      HOUR_IN_SECONDS,
+      minute !== undefined || second !== undefined,
+    );
+    const [d, dFr] = num2intWithFrac(
+      day ?? 1,
+      DAY_IN_SECONDS,
+      hour !== undefined || minute !== undefined || second !== undefined,
+    );
+    let fr2 = 0;
+    if (sFr !== 0) fr2 = sFr;
+    if (minFr !== 0) fr2 = minFr;
+    if (hFr !== 0) fr2 = hFr;
+    if (dFr !== 0) fr2 = dFr;
+    const of = offset ?? 0;
+    super(year, month ?? 1, d);
+    const rjd = cValidCivilP(year, month ?? 1, d);
     if (rjd === null) throw new DateError("invalid date");
-    const s = Math.floor(second);
-    const fr = second - s;
-    const rt = cValidTimeP(hour, minute, s);
+    const rt = cValidTimeP(h, min, s);
     if (rt === null) throw new DateError("invalid date");
-    const df = timeToDf(rt[0], rt[1], rt[2]);
-    this.#date = jdLocalToUtc(rjd, df, offset);
-    this.#df = dfLocalToUtc(df, offset);
-    this.#sf = Math.round(secToNs(fr));
-    this.#of = offset;
+    const localDf = timeToDf(rt[0], rt[1], rt[2]);
+    let date = jdLocalToUtc(rjd, localDf, of);
+    let df = dfLocalToUtc(localDf, of);
+    // `add_frac()` (`date_core.c:3313-3317`) over `d_lite_plus`'s `T_FLOAT` arm
+    // (`date_core.c:6064-6135`): the fraction's whole seconds go to `df`,
+    // carrying a day where they overflow one, and the rounded remainder to
+    // `sf`. `fr2` is under a day by construction, so the C's `jd` term is 0 and
+    // its sign branch is never taken — `f_mod` leaves every fraction positive.
+    df += Math.floor(fr2);
+    if (df >= DAY_IN_SECONDS) {
+      date = date.add({ days: 1 });
+      df -= DAY_IN_SECONDS;
+    }
+    this.#date = date;
+    this.#df = df;
+    this.#sf = Math.round(secToNs(fr2 - Math.floor(fr2)));
+    this.#of = of;
   }
 
   /**
@@ -2792,11 +2890,12 @@ export class DateTime extends Date {
   }
 
   /**
-   * `DateTime#strftime` hands the formatter the real `sf`, truncated to whole
-   * nanoseconds: `date_strftime.c`'s `%N` takes the LEADING digits of the
-   * fraction rather than rounding it, which is what keeps
+   * `DateTime#strftime` hands the formatter the real `sf`, sub-nanosecond tail
+   * and all: `date_strftime.c`'s `%N` takes the LEADING digits of the fraction
+   * rather than rounding it, which is what keeps
    * `DateTime.parse("...00.9999999999").strftime("%N")` at `"999999999"` when
-   * the stored `sf` sits a fraction of a nanosecond above it.
+   * the stored `sf` sits a fraction of a nanosecond above it — and what lets
+   * `%12N` answer `"999999999900"`, reaching past the nanosecond for the tail.
    */
   override strftime(format: string): string {
     return strftime(
@@ -2809,7 +2908,7 @@ export class DateTime extends Date {
         hour: this.hour,
         min: this.min,
         sec: this.sec,
-        nsec: Math.trunc(this.#sf),
+        nsec: this.#sf,
         zone: this.zone,
         utcOffset: this.#of,
       },

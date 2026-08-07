@@ -196,6 +196,51 @@ export const NO_JS_CALL_FORM = new Set([
   "has_key?", // ditto
 ]);
 
+/**
+ * The JS iteration callee an Enumerable iterator's faithful port would name if
+ * it named one at all. It is the anchor {@link LOOP_SKELETON_NAMES} is derived
+ * through, and it is a JS construct name rather than a Ruby one, so the derived
+ * population still comes entirely from the two existing tables.
+ */
+const JS_ITERATION_CALLEE = "forEach";
+
+/**
+ * The skeleton-stream names that stand for the SAME construct as a native
+ * loop, on either side: Ruby's block iterators and the JS iteration callee.
+ *
+ * Derived, not hand-maintained (RFC 0084) — a Ruby name qualifies when it is
+ * both an Enumerable idiom whose JS analogue is the iteration callback
+ * ({@link JS_ENUMERABLE_ALIASES}) and one whose faithful port emits no call at
+ * all ({@link NO_JS_CALL_FORM}), which is exactly the pairing that makes
+ * `xs.each { ... }` a `ref:each` on the Ruby side and a bare `loop` on the TS
+ * side of the same ported body.
+ */
+const LOOP_SKELETON_NAMES = new Set(
+  [...JS_ENUMERABLE_ALIASES]
+    .filter(([ruby, aliases]) => NO_JS_CALL_FORM.has(ruby) && aliases.includes(JS_ITERATION_CALLEE))
+    .flatMap(([ruby, aliases]) => [ruby, ...aliases]),
+);
+
+/**
+ * Fold a skeleton stream's block-iteration tokens onto `loop`, so Ruby's
+ * `xs.each { |x| save(x) }` (`ref:each ref:save`) and its faithful `for (const
+ * x of xs) this.save(x)` port (`loop ref:save`) read as the same sequence.
+ *
+ * Applied where the two streams are COMPARED, never in the extractors: they
+ * emit raw names by design (extract-ts-api.ts:extractSkeleton), and the Ruby↔TS
+ * conventions live here. `prism-codegen/score.ts:skeletonTokens` folds its
+ * `LOGICAL_OPS` and `ref:get` at comparison time for the same reason. The one
+ * function runs over both sides, since {@link LOOP_SKELETON_NAMES} carries the
+ * Ruby name and the JS analogue alike.
+ */
+export function foldSkeletonTokens(skeleton: string[]): string[] {
+  return skeleton.map((token) =>
+    token.startsWith("ref:") && LOOP_SKELETON_NAMES.has(token.slice("ref:".length))
+      ? "loop"
+      : token,
+  );
+}
+
 // The significant set (RFC 0047): admits EVERY ported Ruby call name as
 // significant, except `super` (which the module-mixin port structurally drops —
 // see the comment at the top of this section) and the NO_JS_CALL_FORM names
@@ -622,7 +667,8 @@ interface CallResult {
 
 /**
  * The ordered control + call skeleton of one name-matched (Ruby, TS) pair, both
- * sides UNCOLLAPSED — no `effectiveTsCalls` delegation union, no
+ * sides run through {@link foldSkeletonTokens} and otherwise UNCOLLAPSED — no
+ * `effectiveTsCalls` delegation union, no
  * `includeGraphCalls` merge, no dedup. Those are set operations by
  * construction; a sequence needs its own merge rule, and until
  * call-sequence-parity decides what it is, carrying the body's own stream and
@@ -2220,8 +2266,8 @@ export function main() {
             rubyName,
             tsFile,
             tsName,
-            ruby: rubySkeleton,
-            ts: tsSkeletons[0],
+            ruby: foldSkeletonTokens(rubySkeleton),
+            ts: foldSkeletonTokens(tsSkeletons[0]),
           });
         }
         const seqSets = tsCallSeqByFileName.get(tsFile)?.get(tsName);
@@ -2806,7 +2852,7 @@ export function main() {
       JSON.stringify(
         {
           generatedAt: new Date().toISOString(),
-          note: "Advisory, ungated. Ordered control + call skeleton per name-matched pair, both sides uncollapsed: if/loop/try/throw, new:Ctor, ref:<name>, in source order with duplicates.",
+          note: "Advisory, ungated. Ordered control + call skeleton per name-matched pair, both sides uncollapsed: if/loop/try/throw, new:Ctor, ref:<name>, in source order with duplicates. Ruby block iteration folds onto loop.",
           packages: [...new Set(results.map((r) => r.package))].sort(),
           skeletons: skeletonsFlat,
         },
