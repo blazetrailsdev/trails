@@ -89,7 +89,9 @@ export class Array {
  * value is recursed with the same options.
  *
  * Ruby's Hash is our plain object and our `Map`; `Array(attrs)` is the scalar-or
- * -list coercion inline in each arm.
+ * -list coercion inline in each arm. `if attrs = options[:only]` (`:178`) is
+ * Ruby-truthy, so a stored `false` falls through to the `except` arm — the
+ * index signature on `EncodeOptions` lets one reach here.
  */
 export class Hash {
   static asJson(value: unknown, options?: EncodeOptions | null): Record<string, unknown> {
@@ -100,13 +102,13 @@ export class Hash {
 
     let subset = entries;
     if (options) {
-      let attrs;
-      if ((attrs = options.only) != null) {
+      let attrs: unknown;
+      if ((attrs = options.only) != null && attrs !== false) {
         const keys = new Set(
           (globalThis.Array.isArray(attrs) ? attrs : [attrs]).map(globalThis.String),
         );
         subset = entries.filter(([k]) => keys.has(globalThis.String(k)));
-      } else if ((attrs = options.except) != null) {
+      } else if ((attrs = options.except) != null && attrs !== false) {
         const keys = new Set(
           (globalThis.Array.isArray(attrs) ? attrs : [attrs]).map(globalThis.String),
         );
