@@ -199,10 +199,8 @@ export class HasManyAssociation extends CollectionAssociation {
    * @internal
    */
   protected override async deleteOrNullifyAllRecords(method?: string): Promise<void> {
-    const scope = (this as any).scope?.();
-    if (!scope) return;
-    const count = await deleteCount(this, method ?? "", scope);
-    if (count > 0) await updateCounter(this, -count);
+    const count = await deleteCount(this, method ?? "", (this as any).scope());
+    await updateCounter(this, -count);
   }
 
   /**

@@ -86,17 +86,9 @@ export class HasManyThroughAssociation extends HasManyAssociation {
    * Mirrors: ActiveRecord::Associations::ThroughAssociation#transaction
    */
   protected override transaction<R>(block: () => Promise<R>): Promise<R | undefined> {
-    const tr = throughReflection(this) as { klass?: unknown } | null;
-    let klass: { transaction?: (...args: unknown[]) => unknown } | null = null;
-    try {
-      klass = (tr?.klass ?? null) as { transaction?: (...args: unknown[]) => unknown } | null;
-    } catch {
-      klass = null;
-    }
-    if (klass && typeof klass.transaction === "function") {
-      return klass.transaction(block) as Promise<R | undefined>;
-    }
-    return block() as Promise<R | undefined>;
+    const klass = (throughReflection(this) as { klass: { transaction(b: unknown): unknown } })
+      .klass;
+    return klass.transaction(block) as Promise<R | undefined>;
   }
 
   /**

@@ -155,6 +155,12 @@ export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
   // `time-ext.ts` (its three test files — `core-ext/{time,date,date-time}-ext.test.ts`
   // — all import from it), the same one-TS-file-for-several-reopenings shape as
   // `inflector.ts` above.
+  // `ActiveSupport::JSON` is defined by `json/decoding.rb:12` first, so the
+  // module's whole singleton surface — `encode`/`dump` from
+  // `json/encoding.rb:16-43` included — buckets there. trails splits the two
+  // Ruby modules the way Rails documents them: `ActiveSupport::JSON` on
+  // `json.ts`, `ActiveSupport::JSON::Encoding` on `json/encoding.ts`.
+  "activesupport:json/decoding.rb": "json.ts",
   "activesupport:core_ext/time/calculations.rb": "time-ext.ts",
   "activesupport:core_ext/date/calculations.rb": "time-ext.ts",
   "activesupport:core_ext/date_time/calculations.rb": "time-ext.ts",

@@ -2,13 +2,6 @@
   {
     "package": "activerecord",
     "tsFile": "associations/belongs-to-association.ts",
-    "rubyName": "default",
-    "call": "order:owner,writer",
-    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/belongs-to-association.ts",
     "rubyName": "handle_dependency",
     "call": "enqueue_destroy_association",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
