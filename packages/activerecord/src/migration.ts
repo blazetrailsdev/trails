@@ -2239,41 +2239,23 @@ export class MigrationContext {
   }
 }
 
-/**
- * Construction-time options. `direction` / `targetVersion` are the per-run
- * state Rails' `Migrator` holds as `@direction` / `@target_version`; a Migrator
- * built without them is the long-lived, MigrationContext-shaped instance
- * (Rails' `MigrationContext#open`).
- */
-type MigratorOptions = {
-  direction?: "up" | "down";
-  targetVersion?: number | string | null;
-};
-
 export class Migrator {
   /** Mirrors: ActiveRecord::Migrator.migrations_paths (`migration.rb:1407`) */
   static migrationsPaths: string[] = [];
 
-  private _adapter: DatabaseAdapter;
   private _migrations: MigrationProxy[];
   private _schemaMigration: SchemaMigration;
   private _internalMetadata: InternalMetadata;
-  private readonly _options: MigratorOptions;
   private readonly _direction: "up" | "down";
   private readonly _targetVersion: number | null;
   private _migratedVersions?: Set<number>;
 
   /**
-   * Mirrors: `ActiveRecord::Migrator#initialize` (`migration.rb:1421-1433`) —
+   * Mirrors: `ActiveRecord::Migrator#initialize` (`migration.rb:1418-1433`) —
    * `(direction, migrations, schema_migration, internal_metadata,
    * target_version = nil)`. The bookkeeping objects are arguments, as Rails has
    * them, so a multi-database caller can hand each Migrator its own pair
    * (`multi_db_migrator_test.rb:142,149`).
-   *
-   * The `(adapter, migrations, options)` arm is the shape trails carried before
-   * the widening; the remaining test call sites still pass it and split 2 of
-   * `migrator-connection-pins-adapter-at-construction` migrates them file by
-   * file, after which this overload goes away with `MigratorOptions`.
    */
   constructor(
     direction: "up" | "down",
@@ -2281,32 +2263,11 @@ export class Migrator {
     schemaMigration: SchemaMigration,
     internalMetadata: InternalMetadata,
     targetVersion?: number | string | null,
-  );
-  constructor(adapter: DatabaseAdapter, migrations: MigrationProxy[], options?: MigratorOptions);
-  constructor(
-    direction: "up" | "down" | DatabaseAdapter,
-    migrations: MigrationProxy[],
-    schemaMigration?: SchemaMigration | MigratorOptions,
-    internalMetadata?: InternalMetadata,
-    targetVersion?: number | string | null,
   ) {
-    const options: MigratorOptions =
-      typeof direction === "string"
-        ? { direction, targetVersion: targetVersion ?? null }
-        : ((schemaMigration as MigratorOptions | undefined) ?? {});
-    this._options = options;
-    this._direction = options.direction ?? "up";
-    this._targetVersion =
-      options.targetVersion == null ? null : toInteger(String(options.targetVersion));
-    if (typeof direction === "string") {
-      this._schemaMigration = schemaMigration as SchemaMigration;
-      this._internalMetadata = internalMetadata as InternalMetadata;
-      this._adapter = this._schemaMigration.connection;
-    } else {
-      this._adapter = direction;
-      this._schemaMigration = new SchemaMigration(direction);
-      this._internalMetadata = new InternalMetadata(direction);
-    }
+    this._direction = direction;
+    this._targetVersion = targetVersion == null ? null : toInteger(String(targetVersion));
+    this._schemaMigration = schemaMigration;
+    this._internalMetadata = internalMetadata;
     this.validate(migrations);
     this._migrations = this._sortMigrations(migrations);
   }
@@ -2314,19 +2275,6 @@ export class Migrator {
   /** @internal Mirrors: ActiveRecord::Migrator#migrations */
   get migrations(): MigrationProxy[] {
     return this.isDown() ? [...this._migrations].reverse() : this._sortMigrations(this._migrations);
-  }
-
-  /**
-   * Options for the per-run Migrator `run` / `up` / `down` each construct
-   * (Rails' `Migrator.new(direction, migrations, schema_migration,
-   * internal_metadata, target_version)`). The `new Migrator(...)` call itself
-   * stays inline at all three sites, as Rails writes it.
-   */
-  private _runOptions(
-    direction: "up" | "down",
-    targetVersion: number | string | null,
-  ): MigratorOptions {
-    return { ...this._options, direction, targetVersion };
   }
 
   // Rails: MIGRATOR_SALT = 2053462845 (Zlib.crc32("googol"))
@@ -2444,9 +2392,11 @@ export class Migrator {
     block?: (m: MigrationProxy) => boolean,
   ): Promise<MigrationProxy[]> {
     const migrator = new Migrator(
-      this._adapter,
+      "up",
       this._selectedMigrations(block),
-      this._runOptions("up", targetVersion ?? null),
+      this._schemaMigration,
+      this._internalMetadata,
+      targetVersion ?? null,
     );
     try {
       return migrator.isUseAdvisoryLock()
@@ -2469,9 +2419,11 @@ export class Migrator {
     block?: (m: MigrationProxy) => boolean,
   ): Promise<MigrationProxy[]> {
     const migrator = new Migrator(
-      this._adapter,
+      "down",
       this._selectedMigrations(block),
-      this._runOptions("down", targetVersion ?? null),
+      this._schemaMigration,
+      this._internalMetadata,
+      targetVersion ?? null,
     );
     try {
       return migrator.isUseAdvisoryLock()
@@ -2605,12 +2557,13 @@ export class Migrator {
   }
 
   /**
-   * @internal Mirrors: ActiveRecord::Migrator#connection — Rails reaches for
-   * `DatabaseTasks.migration_connection`; trails takes the adapter as a
-   * constructor argument, so this exposes it under Rails' name.
+   * @internal Mirrors: ActiveRecord::Migrator#connection
+   * (`migration.rb:1488-1491`). `DatabaseTasks` is reached through the
+   * call-time config source: naming `tasks/database-tasks.js` here would be a
+   * load-time edge back into a module that already imports this one.
    */
   private get connection(): DatabaseAdapter {
-    return this._adapter;
+    return migrationArConfig()!.databaseTasks!().migrationConnection()!;
   }
 
   /** @internal Mirrors: ActiveRecord::Migrator#ran? */
@@ -2648,7 +2601,6 @@ export class Migrator {
       if (_base?.logger) _base.logger.info?.(`Migrating to ${proxy.name} (${proxy.version})`);
 
       const loaded = (migration = await proxy.migration());
-      loaded.connection = this._adapter;
       await this.ddlTransaction(loaded, async () => {
         await loaded.migrate(this._direction);
         await this.recordVersionStateAfterMigrating(proxy.version);
@@ -2933,9 +2885,11 @@ export class Migrator {
    */
   async run(direction: "up" | "down", targetVersion: number | string): Promise<number | undefined> {
     const migrator = new Migrator(
-      this._adapter,
+      direction,
       this._migrations,
-      this._runOptions(direction, targetVersion),
+      this._schemaMigration,
+      this._internalMetadata,
+      targetVersion,
     );
     try {
       return migrator.isUseAdvisoryLock()

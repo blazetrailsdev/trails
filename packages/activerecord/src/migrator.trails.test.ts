@@ -1,7 +1,16 @@
 // trails-only Migrator cases with no counterpart in
 // vendor/rails/activerecord/test/cases/migrator_test.rb. See migrator.test.ts
 // for the faithful Rails mirror.
-import { describe, it, expect, beforeEach, afterEach, vi, type MockInstance } from "vitest";
+import {
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+  onTestFinished,
+  vi,
+  type MockInstance,
+} from "vitest";
 import { stdout } from "@blazetrails/activesupport";
 import {
   Migrator,
@@ -20,8 +29,18 @@ import { Base } from "./base.js";
 import { SchemaMigration } from "./schema-migration.js";
 import { InternalMetadata } from "./internal-metadata.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
+import { DatabaseTasks } from "./tasks/database-tasks.js";
 import { fixtures } from "./test-fixtures.js";
 import { anonymousMigration } from "./test-helpers/anonymous-migration.js";
+
+// `Migrator#connection` is `DatabaseTasks.migration_connection`
+// (migration.rb:1488-1491), so a case that needs the Migrator to run against a
+// stand-in adapter swaps that reader rather than handing one to the
+// constructor.
+function withMigrationConnection(adapter: DatabaseAdapter): void {
+  const spy = vi.spyOn(DatabaseTasks, "migrationConnection").mockReturnValue(adapter);
+  onTestFinished(() => spy.mockRestore());
+}
 
 /** The env name `record_environment` stamps: `connection.pool.db_config.env_name`. */
 function envName(adapter: DatabaseAdapter): string {
@@ -549,13 +568,15 @@ describe("Migrator advisory lock wrapping", () => {
       getAdvisoryLock: async (_id: unknown) => true,
       releaseAdvisoryLock: async (_id: unknown) => true,
       // currentDatabase intentionally absent
-    } as unknown as import("./connection-adapters/abstract-adapter.js").AbstractAdapter;
+    } as unknown as DatabaseAdapter;
+    const adapter = Base.connection;
     const migrator = new Migrator(
       "up",
       [],
-      new SchemaMigration(rawAdapter),
-      new InternalMetadata(rawAdapter),
+      new SchemaMigration(adapter),
+      new InternalMetadata(adapter),
     );
+    withMigrationConnection(rawAdapter);
     await expect(migrator.migrate()).rejects.toThrow("must implement currentDatabase()");
   });
 
@@ -570,9 +591,10 @@ describe("Migrator advisory lock wrapping", () => {
     const migrator = new Migrator(
       "up",
       [],
-      new SchemaMigration(adapter),
-      new InternalMetadata(adapter),
+      new SchemaMigration(Base.connection),
+      new InternalMetadata(Base.connection),
     );
+    withMigrationConnection(adapter);
     expect(migrator.isUseAdvisoryLock()).toBe(true);
   });
 
@@ -584,9 +606,10 @@ describe("Migrator advisory lock wrapping", () => {
     const migrator = new Migrator(
       "up",
       [],
-      new SchemaMigration(adapter),
-      new InternalMetadata(adapter),
+      new SchemaMigration(Base.connection),
+      new InternalMetadata(Base.connection),
     );
+    withMigrationConnection(adapter);
     expect(migrator.isUseAdvisoryLock()).toBe(false);
   });
 

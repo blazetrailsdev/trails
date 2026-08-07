@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, onTestFinished, vi } from "vitest";
 import {
   env,
   setEnv,
@@ -18,6 +18,31 @@ import { InternalMetadata, Migrator, SchemaMigration } from "@blazetrails/active
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
+
+// `Migrator#connection` and `Migration#connection` both resolve
+// `ActiveRecord::Tasks::DatabaseTasks.migration_connection`
+// (migration.rb:1036-1038, 1488-1491) — nothing pins an adapter to the
+// Migrator any more — so a case that drives a hand-built adapter has to
+// establish it as the migration pool's connection for the duration.
+async function establishMigrationConnection(adapter: unknown): Promise<void> {
+  const { Base, HashConfig } = await import("@blazetrails/activerecord");
+  const config = new HashConfig("test", "primary", {
+    adapter: "sqlite3",
+    database: ":memory:",
+  });
+  const pool = Base.connectionHandler.establishConnection(config, {
+    owner: Base,
+    clobber: true,
+    adapterFactory: () => adapter as never,
+  });
+  // Lease eagerly so the adapter's `pool` back-reference is in place before the
+  // caller reads or overrides it (`record_environment` goes through
+  // `connection.pool.db_config`, migration.rb:1512-1516).
+  await pool.leaseConnection();
+  onTestFinished(() => {
+    Base.connectionHandler.removeConnection("Base");
+  });
+}
 
 describe("DbCommand", () => {
   it("has migrate subcommand", () => {
@@ -681,6 +706,7 @@ describe("full migration flow", () => {
     const { BetterSQLite3Adapter } =
       await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
     adapter = new BetterSQLite3Adapter(":memory:");
+    await establishMigrationConnection(adapter);
 
     fs.writeFileSync(
       path.join(tmpDir, "20260101000000-create-posts.ts"),
@@ -742,6 +768,7 @@ export class CreatePosts extends Migration {
     const { BetterSQLite3Adapter } =
       await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
     adapter = new BetterSQLite3Adapter(":memory:");
+    await establishMigrationConnection(adapter);
 
     const a = "20260101000000-create-posts.ts";
     const b = "20260102000000-create-comments.ts";
@@ -791,6 +818,7 @@ export class CreateComments extends Migration {
     const { BetterSQLite3Adapter } =
       await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
     adapter = new BetterSQLite3Adapter(":memory:");
+    await establishMigrationConnection(adapter);
 
     fs.writeFileSync(
       path.join(tmpDir, "20260101000000-create-posts.ts"),
@@ -818,6 +846,7 @@ export class CreatePosts extends Migration {
     const { BetterSQLite3Adapter } =
       await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
     adapter = new BetterSQLite3Adapter(":memory:");
+    await establishMigrationConnection(adapter);
 
     fs.writeFileSync(
       path.join(tmpDir, "20260101000000-create-widgets.ts"),
@@ -852,6 +881,7 @@ export class CreateWidgets extends Migration {
       await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
     const { UnknownMigrationVersionError } = await import("@blazetrails/activerecord");
     adapter = new BetterSQLite3Adapter(":memory:");
+    await establishMigrationConnection(adapter);
 
     const migrator = new Migrator(
       "up",
@@ -868,6 +898,7 @@ export class CreateWidgets extends Migration {
     const { BetterSQLite3Adapter } =
       await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
     adapter = new BetterSQLite3Adapter(":memory:");
+    await establishMigrationConnection(adapter);
 
     fs.writeFileSync(
       path.join(tmpDir, "20260101000000-create-posts.ts"),
@@ -1430,6 +1461,7 @@ export class CreatePosts extends Migration {
 
     const dbFile = path.join(tmpDir, "no-metadata-migrate.sqlite3");
     const adapter = new BetterSQLite3Adapter(dbFile);
+    await establishMigrationConnection(adapter);
     try {
       const migrations = [
         {
