@@ -2917,6 +2917,15 @@ export class DateTime extends Date {
   }
 
   /**
+   * Ruby `DateTime#to_s` (ruby/date, `date_core.c` `dt_lite_to_s`,
+   * `date_core.c:8701-8706`), a distinct C function from `d_lite_to_s` — which
+   * is why `::Date#to_s` keeps the date-only form.
+   */
+  override toS(): string {
+    return this.strftime("%Y-%m-%dT%H:%M:%S%:z");
+  }
+
+  /**
    * `DateTime#strftime` hands the formatter the real `sf`, sub-nanosecond tail
    * and all: `date_strftime.c`'s `%N` takes the LEADING digits of the fraction
    * rather than rounding it, which is what keeps

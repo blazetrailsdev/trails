@@ -917,6 +917,7 @@ export function extractFromProgram(
                 ? decl.initializer.body
                 : undefined;
             const calls = extractCalls(body);
+            const callSeq = extractCallSeq(body);
             const internal = hasInternalJsDocTag(decl);
             // A renamed export (`export { withRoutesHelpers as with }`) is its
             // own surface entry: the declaration's tag justifies the DECLARED
@@ -949,6 +950,7 @@ export function extractFromProgram(
               ...(internal ? { internal: true } : {}),
               ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
               ...(calls !== undefined ? { calls } : {}),
+              ...(callSeq !== undefined ? { callSeq } : {}),
               ...(exportedMissingRailsCalls !== undefined
                 ? { missingRailsCalls: exportedMissingRailsCalls }
                 : {}),
@@ -1824,6 +1826,7 @@ export function harvestObjectLiteralMethods(
     let params: ParamInfo[] = [];
     let optionKeys: string[] | null | undefined;
     let calls: string[] | undefined;
+    let callSeq: string[] | undefined;
     let internal = hasInternalJsDocTag(prop);
     let noRailsEquivalent = noRailsEquivalentReason(prop);
     const propMissingRailsCalls = missingRailsCallTags(prop);
@@ -1832,6 +1835,7 @@ export function harvestObjectLiteralMethods(
       params = extractParameters(prop.parameters);
       optionKeys = extractOptionKeys(prop.parameters, checker);
       calls = extractCalls(prop.body);
+      callSeq = extractCallSeq(prop.body);
     } else if (ts.isShorthandPropertyAssignment(prop)) {
       mname = prop.name.text;
       params = paramsOfCallableRef(prop.name, checker) ?? [];
@@ -1841,10 +1845,12 @@ export function harvestObjectLiteralMethods(
     } else if (ts.isGetAccessorDeclaration(prop) && prop.name && ts.isIdentifier(prop.name)) {
       mname = prop.name.text;
       calls = extractCalls(prop.body);
+      callSeq = extractCallSeq(prop.body);
     } else if (ts.isSetAccessorDeclaration(prop) && prop.name && ts.isIdentifier(prop.name)) {
       mname = prop.name.text;
       params = extractParameters(prop.parameters);
       calls = extractCalls(prop.body);
+      callSeq = extractCallSeq(prop.body);
     } else if (ts.isPropertyAssignment(prop) && ts.isIdentifier(prop.name)) {
       const init = prop.initializer;
       if (ts.isFunctionExpression(init) || ts.isArrowFunction(init)) {
@@ -1852,6 +1858,7 @@ export function harvestObjectLiteralMethods(
         params = extractParameters(init.parameters);
         optionKeys = extractOptionKeys(init.parameters, checker);
         calls = extractCalls(init.body);
+        callSeq = extractCallSeq(init.body);
       } else {
         // `foo: bar` / `foo: NS.bar` — count if the RHS resolves to a
         // callable. Catches `readAttributeForValidation:
@@ -1880,6 +1887,7 @@ export function harvestObjectLiteralMethods(
       ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
       ...(optionKeys !== undefined ? { optionKeys } : {}),
       ...(calls !== undefined ? { calls } : {}),
+      ...(callSeq !== undefined ? { callSeq } : {}),
       ...(propMissingRailsCalls !== undefined ? { missingRailsCalls: propMissingRailsCalls } : {}),
     });
   }

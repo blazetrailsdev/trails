@@ -226,6 +226,35 @@ describe("body call capture", () => {
     expect(swapped.callSeq).toEqual(["save", "build"]);
   });
 
+  it("also records callSeq for an object-literal member and an arrow-function export", () => {
+    // The two populations RFC 0084's order-only check was silently skipping:
+    // `export const X = { method() {...} }` (arel's visitor tables, the
+    // module-function namespaces) and `export const f = (...) => {...}`.
+    const [member] = objectLiteralMethods(
+      `export const ClassMethods = {
+        create() {
+          this.save();
+          this.build();
+        },
+      };`,
+    );
+    expect(member.calls).toEqual(["build", "save"]);
+    expect(member.callSeq).toEqual(["save", "build"]);
+
+    const info = extractFromFiles("/p", {
+      "quoting.ts": `
+        export const quote = (value: unknown): string => {
+          typeCast(value);
+          quoteString(value);
+          return "";
+        };
+      `,
+    });
+    const quote = fileFunctionsOf(info, "quoting.ts").find((f) => f.name === "quote")!;
+    expect(quote.calls).toEqual(["quoteString", "typeCast"]);
+    expect(quote.callSeq).toEqual(["typeCast", "quoteString"]);
+  });
+
   it("emits an ordered control + call skeleton, with duplicates, alongside calls", () => {
     const cls = extractFromSource(
       `class Foo {
