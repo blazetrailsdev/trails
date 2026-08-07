@@ -250,4 +250,47 @@ describe("nested attributes assignment ordering (trails-only)", () => {
 
     expect(observed).toEqual(["Aye"]);
   });
+
+  // `_assign_attributes` and `assign_nested_parameter_attributes`
+  // (attribute_assignment.rb:9-23, 26-28) are plain `each` loops, so an
+  // assignment that reaches DB I/O — a displacing `#{name}_attributes=` running
+  // `load_target` / `remove_target!` (has_one_association.rb:59-69) — finishes
+  // before the next key is assigned.
+  it("finishes a displacing nested assignment before assigning the next key", async () => {
+    Pirate.acceptsNestedAttributesFor("parrots");
+    const pirate = (await Pirate.create({ catchphrase: "Aye" })) as unknown as Pirate;
+    await Ship.create({
+      name: "Nights Dirty Lightning",
+      pirate_id: (pirate as unknown as { id: number }).id,
+    });
+    await (pirate as unknown as { ship: Promise<Base | null> }).ship;
+
+    const events: string[] = [];
+    const assoc = pirate.association("ship") as unknown as {
+      detachDisplacedTarget: () => Promise<void>;
+    };
+    const removeTarget = assoc.detachDisplacedTarget.bind(assoc);
+    assoc.detachDisplacedTarget = async () => {
+      events.push("remove_target!:start");
+      await removeTarget();
+      events.push("remove_target!:end");
+    };
+
+    const config = (
+      Pirate as unknown as {
+        _nestedAttributeConfigs: { associationName: string; options: { rejectIf?: unknown } }[];
+      }
+    )._nestedAttributeConfigs.find((c) => c.associationName === "parrots")!;
+    config.options.rejectIf = () => {
+      events.push("parrots");
+      return false;
+    };
+
+    await pirate.assignAttributes({
+      shipAttributes: { name: "Davy Jones Gold Dagger" },
+      parrotsAttributes: { foo: { name: "Posideons Killer" } },
+    });
+
+    expect(events).toEqual(["remove_target!:start", "remove_target!:end", "parrots"]);
+  });
 });

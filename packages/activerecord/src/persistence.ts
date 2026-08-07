@@ -1167,7 +1167,7 @@ export function assignAttributes(
 
   let multiParameterAttributes: Record<string, unknown> | null = null;
   let nestedParameterAttributes: Record<string, unknown> | null = null;
-  const pending: Promise<void>[] = [];
+  let pending: Promise<void> | undefined;
 
   for (const [key, value] of Object.entries(attrs)) {
     if (key.includes("(")) {
@@ -1175,22 +1175,38 @@ export function assignAttributes(
     } else if (isNestedParameterHash(value)) {
       (nestedParameterAttributes ??= {})[key] = value;
     } else {
-      const assigned = _assignAttribute(this, key, value);
-      if (assigned) pending.push(assigned);
+      pending = assignAfter(pending, () => _assignAttribute(this, key, value));
     }
   }
 
-  const pendingNested = nestedParameterAttributes
-    ? assignNestedParameterAttributes(this, nestedParameterAttributes)
-    : undefined;
-  if (pendingNested) pending.push(pendingNested);
-  if (multiParameterAttributes) {
-    executeMultiparameterAssignment(
-      this as any,
-      extractMultiparameterCallstack(multiParameterAttributes).multiparams,
-    );
+  if (nestedParameterAttributes) {
+    const nested = nestedParameterAttributes;
+    pending = assignAfter(pending, () => assignNestedParameterAttributes(this, nested));
   }
-  if (pending.length > 0) return Promise.all(pending).then(() => undefined);
+  if (multiParameterAttributes) {
+    const multi = extractMultiparameterCallstack(multiParameterAttributes).multiparams;
+    pending = assignAfter(pending, () => executeMultiparameterAssignment(this as any, multi));
+  }
+  return pending;
+}
+
+/**
+ * Run one step of Rails' `each` over the assignment list: inline when nothing
+ * is outstanding, chained behind `pending` when a previous step is still
+ * running. Rails' `_assign_attributes` (attribute_assignment.rb:9-23) is a plain
+ * `each`, so a step that reaches DB I/O — a displacing `#{name}_attributes=`
+ * running `load_target` / `remove_target!` (has_one_association.rb:59-69) —
+ * finishes before the next key is assigned. Chaining is how a JS caller that
+ * cannot block between iterations keeps that order; without it two displacing
+ * keys in one hash would issue their writes concurrently.
+ */
+function assignAfter(
+  pending: Promise<void> | undefined,
+  step: () => Promise<void> | void,
+): Promise<void> | undefined {
+  if (pending) return pending.then(() => step());
+  const started = step();
+  return started ?? undefined;
 }
 
 /**
@@ -1212,12 +1228,11 @@ function assignNestedParameterAttributes(
   self: AttributeIO,
   pairs: Record<string, unknown>,
 ): Promise<void> | void {
-  const pending: Promise<void>[] = [];
+  let pending: Promise<void> | undefined;
   for (const [k, v] of Object.entries(pairs)) {
-    const assigned = _assignAttribute(self, k, v);
-    if (assigned) pending.push(assigned);
+    pending = assignAfter(pending, () => _assignAttribute(self, k, v));
   }
-  if (pending.length > 0) return Promise.all(pending).then(() => undefined);
+  return pending;
 }
 
 // ---------------------------------------------------------------------------
