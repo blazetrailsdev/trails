@@ -92,6 +92,41 @@ describe("Ruby extractor body call capture", () => {
     expect(s["Foo#build"]).toEqual(["ref:cached", "if", "new:Thing"]);
   });
 
+  it("emits a chained call's refs in evaluation order, receiver first", () => {
+    const s = rubySkeletons({
+      "foo.rb": `
+        class Foo
+          def through_scope
+            scope = through_reflection.klass.unscoped
+            Preloader.new(scope: scope).loaders
+          end
+        end
+      `,
+    });
+    // extract-ts-api.test.ts pins the same two shapes on the TS side; the two
+    // orders have to agree or `compare.ts --calls` manufactures `order:` rows
+    // that no edit to a faithful port can close.
+    expect(
+      rubyCalls({
+        "foo.rb": `
+        class Foo
+          def through_scope
+            scope = through_reflection.klass.unscoped
+            Preloader.new(scope: scope).loaders
+          end
+        end
+      `,
+      })["Foo#through_scope"],
+    ).toEqual(["through_reflection", "klass", "unscoped", "new", "loaders"]);
+    expect(s["Foo#through_scope"]).toEqual([
+      "ref:through_reflection",
+      "ref:klass",
+      "ref:unscoped",
+      "new:Preloader",
+      "ref:loaders",
+    ]);
+  });
+
   it('records super(args) and bare super as a "super" call', () => {
     const c = rubyCalls({
       "foo.rb": `

@@ -367,13 +367,6 @@
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "exec_explain",
-    "call": "order:buildExplainClause,join",
-    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "exec_explain",
     "call": "render_bind",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -838,13 +831,6 @@
     "rubyName": "preload_associations",
     "call": "includes_values",
     "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails relation.rb:1321-1328 concatenates preload_values/includes_values and runs Preloader.new(...).call per spec under the strict_loading_value scope; trails relation.ts:6473-6475 returns the merged `[..._preloadAssociations, ..._includesAssociations]` list and the load path consuming it invokes the preloader — the value reads are direct field spreads."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "preload_associations",
-    "call": "order:constructor,call",
-    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
   },
   {
     "package": "activerecord",

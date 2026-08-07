@@ -149,13 +149,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/database-statements.ts",
-    "rubyName": "query_values",
-    "call": "order:query,map",
-    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/database-statements.ts",
     "rubyName": "raw_exec_query",
     "call": "order:rawExecute,castResult",
     "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."

@@ -2087,11 +2087,25 @@ class ApiExtractor
     elsif kind == :opassign && SKELETON_LOGICAL_OPS.include?(op_assign_op(node[2]))
       tokens << "if"
     elsif kind == :aref
+      # Evaluation order: the receiver, then the `[]` reach, then the index.
+      # extract-ts-api.ts#extractSkeleton emits an ElementAccessExpression the
+      # same way.
+      walk_for_skeleton(node[1], tokens)
       tokens << "ref:get"
+      walk_for_skeleton(node[2], tokens)
+      return
     elsif %i[fcall vcall command].include?(kind)
       skeleton_push_name(tokens, ident_name(node[1]), nil)
     elsif %i[call command_call].include?(kind)
+      # A chained call's receiver is emitted BEFORE the call it receives, so
+      # `a.b.c` reads `ref:a, ref:b, ref:c`. Ripper hangs the receiver off a
+      # slot the generic descent below would reach only after the name, which
+      # is the opposite of what a TS PropertyAccessExpression gives — the skew
+      # manufactured `order:` rows on faithful ports.
+      walk_for_skeleton(node[1], tokens)
       skeleton_push_name(tokens, node[3] ? ident_name(node[3]) : nil, node[1])
+      node.drop(4).each { |child| walk_for_skeleton(child, tokens) if child.is_a?(Array) }
+      return
     elsif %i[super zsuper].include?(kind)
       tokens << "ref:super"
     end
@@ -2286,22 +2300,24 @@ class ApiExtractor
       # Unqualified method call: foo() or foo
       name = ident_name(node[1])
       calls << name if name && !name.start_with?("_") && name =~ /\A[a-z]/
-    when :call
-      # Qualified method call: obj.foo
+    when :call, :command_call
+      # Qualified method call: obj.foo. The receiver is walked BEFORE the call
+      # it receives, so `a.b.c` sequences as `a, b, c` — Ripper hangs the
+      # receiver off a slot the generic descent below would reach only after
+      # the name, which is the opposite of what a TS PropertyAccessExpression
+      # gives, and `reorderedCalls` turned the skew into `order:` rows no edit
+      # to a faithful port could close.
+      walk_for_calls(node[1], calls, weak)
       name = ident_name(node[3]) if node[3]
       if name && !name.start_with?("_") && name =~ /\A[a-z]/
         calls << name
         weak << name if inert_receiver?(node[1])
       end
+      node.drop(4).each { |child| walk_for_calls(child, calls, weak) if child.is_a?(Array) }
+      return
     when :command
       name = ident_name(node[1])
       calls << name if name && !name.start_with?("_") && name =~ /\A[a-z]/
-    when :command_call
-      name = ident_name(node[3]) if node[3]
-      if name && !name.start_with?("_") && name =~ /\A[a-z]/
-        calls << name
-        weak << name if inert_receiver?(node[1])
-      end
     when :super, :zsuper
       # super(args) is [:super, ...]; bare super is [:zsuper]. Both chain to
       # the parent method; record as "super" so calls-parity can flag a ported

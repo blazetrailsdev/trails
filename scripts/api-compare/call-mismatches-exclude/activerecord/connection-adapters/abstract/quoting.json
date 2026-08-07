@@ -2,13 +2,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/quoting.ts",
-    "rubyName": "quote_default_expression",
-    "call": "order:lookupCastType,serialize",
-    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/quoting.ts",
     "rubyName": "quoted_date",
     "call": "default_timezone",
     "reason": "Rails' quoted_date branches on default_timezone inline (abstract/quoting.rb:186); trails' quotedDate formats through formatInstantForSql / formatPlainDateTimeForSql in abstract/sql-datetime.ts, whose defaultSqlTimezone() reads ActiveRecord.defaultTimezone."

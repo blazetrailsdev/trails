@@ -115,13 +115,6 @@
     "package": "activerecord",
     "tsFile": "connection-adapters/sqlite3-adapter.ts",
     "rubyName": "explain",
-    "call": "order:constructor,pp",
-    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/sqlite3-adapter.ts",
-    "rubyName": "explain",
     "call": "to_sql",
     "reason": "Per-entry verified (RFC 0072 sqlite3 introspection cluster): Rails database_statements.rb:19 renders `to_sql(arel, binds)` because its `explain` takes an Arel node; every trails adapter's `explain` (sqlite3-adapter.ts, postgresql-adapter.ts, mysql2-adapter.ts) takes an already-rendered SQL string because relation.ts#explain calls `toSql()` before dispatching, so the render happens at the call site, not in the body."
   },

@@ -2607,7 +2607,6 @@ function isSkeletonLogicalOp(kind: ts.SyntaxKind): boolean {
 function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
   if (!node) return undefined;
   const tokens: string[] = [];
-  const calleeNodes = new Set<ts.Node>();
   const visit = (n: ts.Node): void => {
     switch (n.kind) {
       case ts.SyntaxKind.IfStatement:
@@ -2651,29 +2650,40 @@ function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
         );
         break;
       }
+      // A chained call's receiver is emitted BEFORE the call it receives, so
+      // `a.b.c()` reads `ref:a, ref:b, ref:c`. extract-ruby-api.rb's
+      // `walk_for_skeleton` emits a Ripper `:call` the same way.
       case ts.SyntaxKind.CallExpression: {
-        const callee = (n as ts.CallExpression).expression;
+        const call = n as ts.CallExpression;
+        const callee = call.expression;
         if (ts.isIdentifier(callee)) {
           tokens.push(`ref:${callee.text}`);
-          calleeNodes.add(callee);
         } else if (ts.isPropertyAccessExpression(callee)) {
+          visit(callee.expression);
           tokens.push(`ref:${callee.name.text}`);
-          calleeNodes.add(callee);
         } else if (callee.kind === ts.SyntaxKind.SuperKeyword) {
           tokens.push("ref:super");
+        } else {
+          visit(callee);
         }
-        break;
+        call.arguments.forEach(visit);
+        return;
       }
       case ts.SyntaxKind.PropertyAccessExpression: {
         const access = n as ts.PropertyAccessExpression;
-        if (!calleeNodes.has(access) && !isAssignmentWriteTarget(access)) {
+        visit(access.expression);
+        if (!isAssignmentWriteTarget(access)) {
           tokens.push(`ref:${access.name.text}`);
         }
-        break;
+        return;
       }
-      case ts.SyntaxKind.ElementAccessExpression:
+      case ts.SyntaxKind.ElementAccessExpression: {
+        const access = n as ts.ElementAccessExpression;
+        visit(access.expression);
         tokens.push("ref:get");
-        break;
+        visit(access.argumentExpression);
+        return;
+      }
     }
     ts.forEachChild(n, visit);
   };
@@ -2712,6 +2722,13 @@ function collectCalls(node: ts.Node | undefined): string[] | undefined {
         names.add(resolve(callee.text));
         addNegated(n, callee.text, resolve(callee.text));
       } else if (ts.isPropertyAccessExpression(callee)) {
+        // The receiver is walked BEFORE the call it receives, so `a.b.c()`
+        // sequences as `a, b, c`. `names` is insertion-ordered and `callSeq`
+        // reads it as the body's call ORDER, so a chain recorded outermost-first
+        // here would read as an inversion of the same chain in Ruby —
+        // extract-ruby-api.rb#walk_for_calls emits its `:call` receiver first
+        // for the same reason.
+        visit(callee.expression);
         const prop = callee.name.text;
         names.add(prop);
         addNegated(n, prop);
@@ -2747,6 +2764,9 @@ function collectCalls(node: ts.Node | undefined): string[] | undefined {
       const parent = n.parent;
       const isCallCallee =
         parent !== undefined && ts.isCallExpression(parent) && parent.expression === n;
+      // Receiver first, as in the CallExpression branch above: a read chain
+      // `a.b.c` sequences as `a, b, c`.
+      visit(n.expression);
       if (!isCallCallee && !isAssignmentWriteTarget(n)) {
         names.add(n.name.text);
         addNegated(n, n.name.text);
