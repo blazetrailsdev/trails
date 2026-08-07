@@ -1761,10 +1761,8 @@ export abstract class Migration {
     await databaseTasks.withTemporaryPoolForEach({ env: "test" }, async (pool) => {
       const dbConfig = pool.dbConfig;
       Schema.verbose = false;
-      // `databases.rake:537` — read per iteration, not hoisted: a `load_schema`
-      // inside the loop can move the fallback state, and `ENV["SCHEMA_FORMAT"]`
-      // is re-read each time round in Ruby. `DatabaseTasks.schemaFormat` is the
-      // trails home of Rails' global `ActiveRecord.schema_format`.
+      // `databases.rake:537` — `DatabaseTasks.schemaFormat` is the trails home
+      // of Rails' global `ActiveRecord.schema_format`.
       const schemaFormat = (getEnv("SCHEMA_FORMAT") ?? databaseTasks.schemaFormat) as SchemaFormat;
       await databaseTasks.loadSchema(dbConfig, schemaFormat);
     });

@@ -118,11 +118,8 @@ describe.skipIf(!runToken)("snapshot width backstop", () => {
   });
 
   it("says so when the memo switches itself off", async () => {
-    // The MySQL headroom is ~110 characters, so this backstop is close enough to
-    // trip in the ordinary course of adding a table to
-    // `loadMysql2SpecificSchema` — and tripping it costs the whole per-boot memo
-    // (~2.5 min of MariaDB CI per run) with no failing test and, before this,
-    // no log line either. The disablement has to be observable.
+    // ~110 characters of MySQL headroom, and crossing it costs the whole
+    // per-boot memo (~2.5 min of MariaDB CI per run) with no failing test.
     const connection = await Base.leaseConnection();
     const before = await adapterSpecificTables(connection);
     const oversized = Array.from({ length: 200 }, (_, i) => `padding_table_${i}`);
