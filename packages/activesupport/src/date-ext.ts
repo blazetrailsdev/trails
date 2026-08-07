@@ -18,17 +18,17 @@ import { ArgumentError, findZoneBang, getZone } from "./time-zone-config.js";
 
 /**
  * Mirrors: `DateAndTime::Calculations::DAYS_INTO_WEEK`
- * (`core_ext/date_and_time/calculations.rb:8-16`) — the week-start day names
+ * (`core_ext/date_and_time/calculations.rb:7-15`) — the week-start day names
  * `Date.beginning_of_week=` validates against.
  */
 const DAYS_INTO_WEEK: Record<string, number> = {
-  monday: 0,
-  tuesday: 1,
-  wednesday: 2,
-  thursday: 3,
-  friday: 4,
-  saturday: 5,
-  sunday: 6,
+  sunday: 0,
+  monday: 1,
+  tuesday: 2,
+  wednesday: 3,
+  thursday: 4,
+  friday: 5,
+  saturday: 6,
 };
 
 const BEGINNING_OF_WEEK = "beginning_of_week";
