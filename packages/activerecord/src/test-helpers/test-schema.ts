@@ -1669,8 +1669,11 @@ export const TEST_SCHEMA: Schema = {
 
   fk_object_to_point_tos: {},
   fk_pointing_to_non_existent_objects: {
+    // Rails declares this via `t.references :fk_object_to_point_to` (schema.rb:1403),
+    // which defaults to bigint — and `fk_that_will_be_broken` points it at a default
+    // bigint `id`, so an integer column is a MismatchedForeignKey on MySQL.
     columns: {
-      fk_object_to_point_to_id: { type: "integer", null: false },
+      fk_object_to_point_to_id: { type: "big_integer", null: false },
     },
     foreignKeys: [
       {
