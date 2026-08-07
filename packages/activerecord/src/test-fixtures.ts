@@ -541,15 +541,34 @@ function useFixtures(
   afterEach(async () => {
     if (!fixtures) return;
     const fixtureConnection = getAdapter();
-    // Delete in reverse insertion order to respect FK constraints, each set
-    // through the connection it was seeded on.
+    // Delete in reverse insertion order, each set through the connection it was
+    // seeded on. Rails' fixture deletes are the `table_deletes` half of
+    // `insert_fixtures_set` and ride inside its `disable_referential_integrity`
+    // block (database_statements.rb:145-154), so a delete order an FK forbids —
+    // a table whose children the fixture set doesn't own, e.g. the HABTM join
+    // rows a test created itself — never reaches the database.
+    const deletesByAdapter = new Map<DatabaseAdapter, string[]>();
     for (const [key, { table }] of Object.entries(fixtures).reverse()) {
       const adapter = setAdapters.get(key) ?? fixtureConnection;
       if (!shouldDeleteFixtureRows(adapter, seededInTransaction.get(adapter) ?? false)) continue;
-      try {
-        await adapter.executeMutation(`DELETE FROM ${adapter.quoteTableName(table)}`);
-      } catch (e) {
-        if (!isTableMissingError(e)) throw e;
+      const tables = deletesByAdapter.get(adapter);
+      if (tables === undefined) deletesByAdapter.set(adapter, [table]);
+      else tables.push(table);
+    }
+    for (const [adapter, tables] of deletesByAdapter) {
+      const tableDeletes = async () => {
+        for (const table of tables) {
+          try {
+            await adapter.executeMutation(`DELETE FROM ${adapter.quoteTableName(table)}`);
+          } catch (e) {
+            if (!isTableMissingError(e)) throw e;
+          }
+        }
+      };
+      if (adapter.disableReferentialIntegrity) {
+        await adapter.disableReferentialIntegrity(tableDeletes, tables);
+      } else {
+        await tableDeletes();
       }
     }
     for (const key of Object.keys(store)) {

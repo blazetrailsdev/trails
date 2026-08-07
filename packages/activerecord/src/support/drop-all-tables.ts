@@ -1,5 +1,6 @@
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import { ActiveRecordError } from "../errors.js";
+import { canonicalForeignKeyDependents } from "./canonical-schema.js";
 import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 
 /**
@@ -194,6 +195,19 @@ async function truncateNonEmpty(adapter: DatabaseAdapter, candidates: string[]):
       .join(" UNION ALL ");
     const rows = (await adapter.execute(probe)) as Array<{ t?: string; T?: string }>;
     toTruncate = rows.map((r) => r.t ?? r.T).filter((t): t is string => Boolean(t));
+    // A table nobody probed as non-empty still has to ride along when it holds a
+    // foreign key into one that did: PostgreSQL refuses to truncate a table an FK
+    // points at unless the referencing table is in the same statement, and it
+    // refuses whether or not that table holds rows.
+    const dependents = await canonicalForeignKeyDependents();
+    const wanted = new Set(toTruncate);
+    for (const name of toTruncate) {
+      for (const child of dependents.get(name) ?? []) {
+        if (wanted.has(child)) continue;
+        wanted.add(child);
+        toTruncate.push(child);
+      }
+    }
   } catch {
     toTruncate = candidates;
   }
