@@ -10,7 +10,6 @@
 
 import { inspectExplainOption } from "./abstract/database-statements.js";
 import type { ExplainOption } from "./abstract/database-statements.js";
-import type { CommentOrChanges } from "./abstract/schema-statements.js";
 import {
   isWriteQuery as mysqlIsWriteQuery,
   maxAllowedPacket as mysqlMaxAllowedPacket,
