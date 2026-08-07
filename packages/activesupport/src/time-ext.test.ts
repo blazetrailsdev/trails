@@ -39,7 +39,7 @@ import {
   allYear,
   ago,
   since,
-  changeDate,
+  change,
   onWeekday,
   onWeekend,
   isToday,
@@ -141,14 +141,10 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("change (changeDate)", () => {
-    expect(changeDate(d(2005, 2, 22, 15, 15, 10), { year: 2006 })).toEqual(
-      i(2006, 2, 22, 15, 15, 10),
-    );
-    expect(changeDate(d(2005, 2, 22, 15, 15, 10), { month: 6 })).toEqual(
-      i(2005, 6, 22, 15, 15, 10),
-    );
-    expect(changeDate(d(2005, 2, 22, 15, 15, 10), { hour: 16 })).toEqual(i(2005, 2, 22, 16, 0, 0));
-    expect(changeDate(d(2005, 2, 22, 15, 15, 10), { min: 45 })).toEqual(i(2005, 2, 22, 15, 45, 0));
+    expect(change(d(2005, 2, 22, 15, 15, 10), { year: 2006 })).toEqual(i(2006, 2, 22, 15, 15, 10));
+    expect(change(d(2005, 2, 22, 15, 15, 10), { month: 6 })).toEqual(i(2005, 6, 22, 15, 15, 10));
+    expect(change(d(2005, 2, 22, 15, 15, 10), { hour: 16 })).toEqual(i(2005, 2, 22, 16, 0, 0));
+    expect(change(d(2005, 2, 22, 15, 15, 10), { min: 45 })).toEqual(i(2005, 2, 22, 15, 45, 0));
   });
 
   it("advance years", () => {
@@ -476,7 +472,7 @@ describe("TimeExtCalculationsTest", () => {
 
   it("change", () => {
     const t = d(2005, 2, 22, 15, 15, 10);
-    const result = asDate(changeDate(t, { year: 2006, month: 6, day: 1 }));
+    const result = asDate(change(t, { year: 2006, month: 6, day: 1 }));
     expect(result.getFullYear()).toBe(2006);
     expect(result.getMonth()).toBe(5); // June
     expect(result.getDate()).toBe(1);
@@ -729,7 +725,7 @@ describe("DateExtCalculationsTest", () => {
 
   it("change", () => {
     const date = d(2005, 2, 21);
-    const result = asDate(changeDate(date, { year: 2006 }));
+    const result = asDate(change(date, { year: 2006 }));
     expect(result.getFullYear()).toBe(2006);
     expect(result.getMonth()).toBe(1); // February
     expect(result.getDate()).toBe(21);
@@ -1046,7 +1042,7 @@ describe("DateTimeExtCalculationsTest", () => {
 
   it("changeDate preserves time components", () => {
     const dt = d(2005, 2, 22, 15, 15, 10);
-    const result = asDate(changeDate(dt, { year: 2006 }));
+    const result = asDate(change(dt, { year: 2006 }));
     expect(result.getFullYear()).toBe(2006);
     expect(result.getMonth()).toBe(1); // February
     expect(result.getDate()).toBe(22);
@@ -1124,7 +1120,7 @@ describe("DateTimeExtCalculationsTest", () => {
 
   it("change", () => {
     const dt = d(2005, 2, 22, 15, 15, 10);
-    const result = asDate(changeDate(dt, { year: 2006 }));
+    const result = asDate(change(dt, { year: 2006 }));
     expect(result.getFullYear()).toBe(2006);
   });
 

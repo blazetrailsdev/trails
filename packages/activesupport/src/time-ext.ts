@@ -29,21 +29,15 @@ function clone(date: Date): Date {
 // ---------------------------------------------------------------------------
 
 export function beginningOfDay(date: Date): Temporal.Instant {
-  const d = clone(date);
-  d.setHours(0, 0, 0, 0);
-  return instantFrom(d);
+  return change(date, { hour: 0 });
 }
 
 export function middleOfDay(date: Date): Temporal.Instant {
-  const d = clone(date);
-  d.setHours(12, 0, 0, 0);
-  return instantFrom(d);
+  return change(date, { hour: 12 });
 }
 
 export function endOfDay(date: Date): Temporal.Instant {
-  const d = clone(date);
-  d.setHours(23, 59, 59, 999);
-  return instantFrom(d);
+  return change(date, { hour: 23, min: 59, sec: 59, usec: 999999999 / 1000 });
 }
 
 // ---------------------------------------------------------------------------
@@ -51,15 +45,11 @@ export function endOfDay(date: Date): Temporal.Instant {
 // ---------------------------------------------------------------------------
 
 export function beginningOfHour(date: Date): Temporal.Instant {
-  const d = clone(date);
-  d.setMinutes(0, 0, 0);
-  return instantFrom(d);
+  return change(date, { min: 0 });
 }
 
 export function endOfHour(date: Date): Temporal.Instant {
-  const d = clone(date);
-  d.setMinutes(59, 59, 999);
-  return instantFrom(d);
+  return change(date, { min: 59, sec: 59, usec: 999999999 / 1000 });
 }
 
 // ---------------------------------------------------------------------------
@@ -67,15 +57,11 @@ export function endOfHour(date: Date): Temporal.Instant {
 // ---------------------------------------------------------------------------
 
 export function beginningOfMinute(date: Date): Temporal.Instant {
-  const d = clone(date);
-  d.setSeconds(0, 0);
-  return instantFrom(d);
+  return change(date, { sec: 0 });
 }
 
 export function endOfMinute(date: Date): Temporal.Instant {
-  const d = clone(date);
-  d.setSeconds(59, 999);
-  return instantFrom(d);
+  return change(date, { sec: 59, usec: 999999999 / 1000 });
 }
 
 // ---------------------------------------------------------------------------
@@ -192,62 +178,28 @@ export function prevWeek(date: Date, day = "monday"): Temporal.Instant {
   return instantFrom(bow);
 }
 
-export function nextMonth(date: Date): Temporal.Instant {
-  const d = clone(date);
-  const day = d.getDate();
-  d.setMonth(d.getMonth() + 1);
-  // Handle month overflow (e.g. Jan 31 -> Feb 28)
-  if (d.getDate() !== day) {
-    d.setDate(0); // last day of previous month
-  }
-  return instantFrom(d);
+export function nextMonth(date: Date, months = 1): Temporal.Instant {
+  return advance(date, { months: months });
 }
 
-export function prevMonth(date: Date): Temporal.Instant {
-  const d = clone(date);
-  const day = d.getDate();
-  d.setMonth(d.getMonth() - 1);
-  if (d.getDate() !== day) {
-    d.setDate(0);
-  }
-  return instantFrom(d);
+export function prevMonth(date: Date, months = 1): Temporal.Instant {
+  return advance(date, { months: -months });
 }
 
-export function nextYear(date: Date): Temporal.Instant {
-  const d = clone(date);
-  const month = d.getMonth();
-  const day = d.getDate();
-  d.setFullYear(d.getFullYear() + 1);
-  // Handle leap day (Feb 29 -> Feb 28)
-  if (d.getMonth() !== month) {
-    d.setDate(0);
-  }
-  if (d.getDate() !== day && d.getMonth() === month) {
-    d.setDate(0);
-  }
-  return instantFrom(d);
+export function nextYear(date: Date, years = 1): Temporal.Instant {
+  return advance(date, { years: years });
 }
 
-export function prevYear(date: Date): Temporal.Instant {
-  const d = clone(date);
-  const month = d.getMonth();
-  d.setFullYear(d.getFullYear() - 1);
-  if (d.getMonth() !== month) {
-    d.setDate(0);
-  }
-  return instantFrom(d);
+export function prevYear(date: Date, years = 1): Temporal.Instant {
+  return advance(date, { years: -years });
 }
 
-export function nextDay(date: Date): Temporal.Instant {
-  const d = clone(date);
-  d.setDate(d.getDate() + 1);
-  return instantFrom(d);
+export function nextDay(date: Date, days = 1): Temporal.Instant {
+  return advance(date, { days: days });
 }
 
-export function prevDay(date: Date): Temporal.Instant {
-  const d = clone(date);
-  d.setDate(d.getDate() - 1);
-  return instantFrom(d);
+export function prevDay(date: Date, days = 1): Temporal.Instant {
+  return advance(date, { days: -days });
 }
 
 // Alias used in Rails
@@ -279,6 +231,14 @@ export function prevOccurring(date: Date, day: string): Temporal.Instant {
 // advance
 // ---------------------------------------------------------------------------
 
+/**
+ * Rails' `Time#advance` (time/calculations.rb:194-217) writes the normalised
+ * `:weeks` / `:days` back into the caller's hash, but `Date#advance`
+ * (date/calculations.rb:127-136) reads it only — and Rails asserts that
+ * difference (`test_date_advance_should_not_change_passed_options_hash`,
+ * date_ext_test.rb:367-371). One TS function stands in for both reopenings, so
+ * it takes the non-mutating arm and normalises into a copy.
+ */
 export function advance(
   date: Date,
   options: {
@@ -291,42 +251,35 @@ export function advance(
     seconds?: number;
   },
 ): Temporal.Instant {
-  let d = clone(date);
+  options = { ...options };
 
-  if (options.years) {
-    const month = d.getMonth();
-    d.setFullYear(d.getFullYear() + options.years);
-    if (d.getMonth() !== month) d.setDate(0);
+  if (options.weeks != null) {
+    const partialWeeks = options.weeks - Math.trunc(options.weeks);
+    options.weeks = Math.trunc(options.weeks);
+    options.days = (options.days ?? 0) + 7 * partialWeeks;
   }
 
-  if (options.months) {
-    const targetMonth = d.getMonth() + options.months;
-    const expectedMonth = ((targetMonth % 12) + 12) % 12;
-    d.setMonth(targetMonth);
-    if (d.getMonth() !== expectedMonth) d.setDate(0);
+  if (options.days != null) {
+    const partialDays = options.days - Math.trunc(options.days);
+    options.days = Math.trunc(options.days);
+    options.hours = (options.hours ?? 0) + 24 * partialDays;
   }
 
-  if (options.weeks) {
-    const wholeDays = Math.trunc(options.weeks * 7);
-    const fractionalDayMs = (options.weeks * 7 - wholeDays) * 24 * 3600 * 1000;
-    d.setDate(d.getDate() + wholeDays);
-    if (fractionalDayMs) d = new Date(d.getTime() + fractionalDayMs);
+  let d = toDate(date);
+  if (options.years) d = d.add({ months: options.years * 12 });
+  if (options.months) d = d.add({ months: options.months });
+  if (options.weeks) d = d.add({ days: options.weeks * 7 });
+  if (options.days) d = d.add({ days: options.days });
+
+  const timeAdvancedByDate = change(date, { year: d.year, month: d.month, day: d.day });
+  const secondsToAdvance =
+    (options.seconds ?? 0) + (options.minutes ?? 0) * 60 + (options.hours ?? 0) * 3600;
+
+  if (secondsToAdvance === 0) {
+    return timeAdvancedByDate;
+  } else {
+    return since(new Date(timeAdvancedByDate.epochMilliseconds), secondsToAdvance);
   }
-
-  if (options.days) {
-    const wholeDays = Math.trunc(options.days);
-    const fractionalDayMs = (options.days - wholeDays) * 24 * 3600 * 1000;
-    d.setDate(d.getDate() + wholeDays);
-    if (fractionalDayMs) d = new Date(d.getTime() + fractionalDayMs);
-  }
-
-  let ms = 0;
-  if (options.hours) ms += options.hours * 3600 * 1000;
-  if (options.minutes) ms += options.minutes * 60 * 1000;
-  if (options.seconds) ms += options.seconds * 1000;
-
-  if (ms) d = new Date(d.getTime() + ms);
-  return instantFrom(d);
 }
 
 // ---------------------------------------------------------------------------
@@ -334,13 +287,15 @@ export function advance(
 // ---------------------------------------------------------------------------
 
 export function secondsSinceMidnight(date: Date): number {
-  const midnight = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  return (date.getTime() - midnight.getTime()) / 1000;
+  return (
+    Math.floor(date.getTime() / 1000) -
+    Math.floor(change(date, { hour: 0 }).epochMilliseconds / 1000) +
+    (date.getMilliseconds() * 1000) / 1.0e6
+  );
 }
 
 export function secondsUntilEndOfDay(date: Date): number {
-  const eod = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
-  return Math.max(0, Math.floor((eod.getTime() - date.getTime()) / 1000));
+  return Math.floor(endOfDay(date).epochMilliseconds / 1000) - Math.floor(date.getTime() / 1000);
 }
 
 // ---------------------------------------------------------------------------
@@ -357,7 +312,7 @@ export function daysInMonth(month: number, year: number): number {
 }
 
 export function daysInYear(year: number): number {
-  return leapYear(year) ? 366 : 365;
+  return daysInMonth(2, year) + 337;
 }
 
 // ---------------------------------------------------------------------------
@@ -389,7 +344,7 @@ export function allYear(date: Date): { start: Temporal.Instant; end: Temporal.In
 // ---------------------------------------------------------------------------
 
 export function ago(date: Date, seconds: number): Temporal.Instant {
-  return instantFrom(new Date(date.getTime() - seconds * 1000));
+  return since(date, -seconds);
 }
 
 export function since(date: Date, seconds: number): Temporal.Instant {
@@ -397,10 +352,10 @@ export function since(date: Date, seconds: number): Temporal.Instant {
 }
 
 // ---------------------------------------------------------------------------
-// changeDate
+// change
 // ---------------------------------------------------------------------------
 
-export function changeDate(
+export function change(
   date: Date,
   options: {
     year?: number;
@@ -409,16 +364,26 @@ export function changeDate(
     hour?: number;
     min?: number;
     sec?: number;
+    usec?: number;
   },
 ): Temporal.Instant {
-  const d = clone(date);
-  if (options.year !== undefined) d.setFullYear(options.year);
-  if (options.month !== undefined) d.setMonth(options.month - 1); // 1-indexed
-  if (options.day !== undefined) d.setDate(options.day);
-  if (options.hour !== undefined) d.setHours(options.hour, 0, 0, 0);
-  if (options.min !== undefined) d.setMinutes(options.min, 0, 0);
-  if (options.sec !== undefined) d.setSeconds(options.sec, 0);
-  return instantFrom(d);
+  const newYear = options.year ?? date.getFullYear();
+  const newMonth = options.month ?? date.getMonth() + 1; // 1-indexed
+  const newDay = options.day ?? date.getDate();
+  const newHour = options.hour ?? date.getHours();
+  const newMin = options.min ?? (options.hour !== undefined ? 0 : date.getMinutes());
+  const newSec =
+    options.sec ??
+    (options.hour !== undefined || options.min !== undefined ? 0 : date.getSeconds());
+  const newUsec =
+    options.usec ??
+    (options.hour !== undefined || options.min !== undefined || options.sec !== undefined
+      ? 0
+      : date.getMilliseconds() * 1000);
+
+  return instantFrom(
+    new Date(newYear, newMonth - 1, newDay, newHour, newMin, newSec, Math.floor(newUsec / 1000)),
+  );
 }
 
 // ---------------------------------------------------------------------------
