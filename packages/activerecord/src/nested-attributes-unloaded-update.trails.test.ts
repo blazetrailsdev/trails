@@ -108,13 +108,17 @@ describe("nested attributes update on an unloaded one-to-one association", () =>
     const [pirate, ship] = await pirateWithUnloadedShip();
     pirate.strictLoadingBang();
 
-    await expect(
+    // `strict_loading!` makes the `send(association_name)` reader
+    // (nested_attributes.rb:436) raise before any I/O, and Ruby raises that at
+    // the assignment expression — so the writer does too, rather than handing
+    // back a rejected promise.
+    expect(() =>
       (
         pirate as unknown as { setShipAttributes(attributes: unknown): Promise<void> }
       ).setShipAttributes({
         id: (ship as unknown as { id: number }).id,
         name: "Davy Jones Gold Dagger",
       }),
-    ).rejects.toThrow(StrictLoadingViolationError);
+    ).toThrow(StrictLoadingViolationError);
   });
 });

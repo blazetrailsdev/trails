@@ -1572,10 +1572,15 @@ export abstract class Migration {
   /**
    * Mirrors: `ActiveRecord::Migration.load_schema_if_pending!` (`migration.rb:730-736`).
    *
-   * @missingRailsCall `any_schema_needs_update?` / `load_schema!` — the repair
-   * arm is `system("bin/rails db:test:prepare")` (`migration.rb:775-783`), a
-   * roundtrip to Rake through a subprocess; trails has no process surface to
-   * shell to, so the pending state is reported rather than repaired.
+   * Rails' repair arm — `if any_schema_needs_update? then load_schema!` — is
+   * dropped whole. `load_schema!` is `system("bin/rails db:test:prepare")`
+   * (`migration.rb:775-783`), a roundtrip to Rake through a subprocess that
+   * trails has no process surface to shell to. `any_schema_needs_update?`
+   * (`migration.rb:747-751`) is portable on its own, being just
+   * `Tasks::DatabaseTasks.schema_up_to_date?` over each config, but it is the
+   * guard for that one branch, so on its own it answers a question nothing here
+   * can act on. Both come back together; until then the pending state is
+   * reported rather than repaired.
    */
   static async loadSchemaIfPendingBang(): Promise<void> {
     await this.checkPendingMigrations();
