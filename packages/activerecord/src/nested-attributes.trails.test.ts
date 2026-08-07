@@ -351,4 +351,44 @@ describe("nested attributes assignment ordering (trails-only)", () => {
 
     expect(events.slice(0, 3)).toEqual(["remove_target!:start", "remove_target!:end", "parrots"]);
   });
+
+  // `initialize` yields to the block after `super` (core.rb:206-217), and
+  // `super` → `assign_attributes` assigns synchronously in Ruby, so the block
+  // observes the nested write settled. A JS constructor cannot await, so
+  // `assignAttributes` parks it and `create` / `create!` drain it before
+  // yielding. The writer is made to suspend here — on a record under
+  // construction it never does on its own (the has_one is new, so
+  // `find_target?` is false and it holds no target to displace), which is why
+  // the drain is otherwise unobservable.
+  it("settles the constructor's nested write before create yields to the block", async () => {
+    const setShipAttributes = (Pirate.prototype as unknown as Record<string, unknown>)
+      .setShipAttributes as (attributes: unknown) => Promise<void> | void;
+    let settled = false;
+    (Pirate.prototype as unknown as Record<string, unknown>).setShipAttributes = async function (
+      this: Base,
+      attributes: unknown,
+    ) {
+      await setShipAttributes.call(this, attributes);
+      settled = true;
+    };
+
+    const observed: unknown[] = [];
+    try {
+      await Pirate.create({ catchphrase: "Aye", shipAttributes: { name: "Black Pearl" } }, () => {
+        observed.push(settled);
+      });
+      settled = false;
+      await Pirate.createBang(
+        { catchphrase: "Yarr", shipAttributes: { name: "Nights Dirty Lightning" } },
+        () => {
+          observed.push(settled);
+        },
+      );
+    } finally {
+      (Pirate.prototype as unknown as Record<string, unknown>).setShipAttributes =
+        setShipAttributes;
+    }
+
+    expect(observed).toEqual([true, true]);
+  });
 });
