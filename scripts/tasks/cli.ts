@@ -119,6 +119,7 @@ export interface StoryEntry {
   // absent from index.json files built before the override existed.
   raw_status?: string | null;
   cluster: string | null;
+  packages?: string[];
   deps: string[];
   deps_rfc: string[];
   est_loc: number | null;
@@ -730,6 +731,7 @@ const FRONTMATTER_KEY_ORDER = [
   "updated",
   "rfc",
   "cluster",
+  "packages",
   "deps",
   "deps-rfc",
   "est-loc",
@@ -2153,6 +2155,55 @@ function setDeps(id: string, kind: "deps" | "deps-rfc", csv: string): void {
   console.log(`set ${id} ${kind} = [${items.join(", ")}]`);
 }
 
+/**
+ * Returns why `items` may not be a story's packages under `rfcSlug`, or null
+ * when the edit is legal. An RFC declaring no packages constrains nothing —
+ * the same escape the `cluster` check takes, with validate.mjs as the backstop.
+ * Pure so both authoring paths (`new`, `set-packages`) share one rule and one
+ * message, and so the rule is testable without git.
+ */
+export function packagesError(declared: string[], items: string[], rfcSlug: string): string | null {
+  if (declared.length === 0) return null;
+  const unknown = items.filter((p) => !declared.includes(p));
+  if (unknown.length === 0) return null;
+  return (
+    `package(s) ${unknown.map((p) => `"${p}"`).join(", ")} not declared in ${rfcSlug}/README.md\n` +
+    `  valid packages: ${declared.join(", ")}`
+  );
+}
+
+function setPackages(id: string, csv: string): void {
+  inGitTasks();
+  const index = loadIndex();
+  const entry = index.stories.find((s) => s.id === id);
+  if (!entry) {
+    restoreGeneratedFiles(TASKS_DIR);
+    console.error(`error: story "${id}" not found in index`);
+    process.exit(1);
+  }
+  const items = parseCsv(csv);
+
+  const current = entry.packages ?? [];
+  if (current.length === items.length && current.every((p, i) => p === items[i])) {
+    restoreGeneratedFiles(TASKS_DIR);
+    console.log(`${id} packages already [${items.join(", ")}]`);
+    return;
+  }
+
+  const declared = index.rfcs.find((r) => r.id === entry.rfc)?.packages ?? [];
+  const error = packagesError(declared, items, entry.rfc);
+  if (error !== null) {
+    restoreGeneratedFiles(TASKS_DIR);
+    console.error(`error: ${error}`);
+    process.exit(1);
+  }
+
+  flip([id], `set-packages: ${id}`, RETRY_MSG(id), 4, (targets) =>
+    setFrontmatterList(targets[0].file, "packages", items),
+  );
+  console.log(`set ${id} packages = [${items.join(", ")}]`);
+}
+
 // Single exit point for a refine agent: commit whatever it edited in the
 // story file in place, push with the same rebase-retry as the other
 // mutations, and print a machine-readable summary the orchestration layer
@@ -2352,12 +2403,12 @@ function reindex(): void {
 
 // ──────────────────── new story ────────────────────
 
-// Returns the cluster names declared in an RFC's README.md frontmatter, parsed
+// Returns the string list under `key` in an RFC's README.md frontmatter, parsed
 // with the same yaml.load semantics as tasks/scripts/lib.mjs (block sequences,
 // flow sequences, quoted values, comments all handled). Returns [] when the
-// README is missing, unparseable, or has no clusters field — the caller passes
+// README is missing, unparseable, or has no such field — the caller passes
 // through, and validate.mjs will catch any structural error later.
-function readRfcClusters(tasksDir: string, rfcSlug: string): string[] {
+function readRfcStringList(tasksDir: string, rfcSlug: string, key: string): string[] {
   const readmePath = join(tasksDir, "rfcs", rfcSlug, "README.md");
   let text: string;
   try {
@@ -2368,13 +2419,21 @@ function readRfcClusters(tasksDir: string, rfcSlug: string): string[] {
   const fmMatch = text.match(/^---\n([\s\S]*?)\n---/);
   if (!fmMatch) return [];
   try {
-    const fm = parseYaml(fmMatch[1]) as { clusters?: unknown } | null;
-    const clusters = fm?.clusters;
-    if (!Array.isArray(clusters)) return [];
-    return clusters.filter((c): c is string => typeof c === "string");
+    const fm = parseYaml(fmMatch[1]) as Record<string, unknown> | null;
+    const list = fm?.[key];
+    if (!Array.isArray(list)) return [];
+    return list.filter((c): c is string => typeof c === "string");
   } catch {
     return [];
   }
+}
+
+function readRfcClusters(tasksDir: string, rfcSlug: string): string[] {
+  return readRfcStringList(tasksDir, rfcSlug, "clusters");
+}
+
+function readRfcPackages(tasksDir: string, rfcSlug: string): string[] {
+  return readRfcStringList(tasksDir, rfcSlug, "packages");
 }
 
 // Reads the `status:` scalar from an RFC's README.md frontmatter, parsed with
@@ -2441,6 +2500,7 @@ export function buildStoryContent(
     title?: string;
     status?: StoryStatus;
     cluster?: string | null;
+    packages?: string[];
     estLoc?: number | null;
     deps?: string[];
     priority?: number | null;
@@ -2453,6 +2513,8 @@ export function buildStoryContent(
   const title = opts.title ?? storySlug;
   const deps = opts.deps ?? [];
   const depsYaml = deps.length === 0 ? "[]" : `[${deps.map((d) => qs(d)).join(", ")}]`;
+  const packages = opts.packages ?? [];
+  const packagesYaml = packages.length === 0 ? "[]" : `[${packages.map((p) => qs(p)).join(", ")}]`;
   // A caller-supplied body (`--body-file`) replaces the empty skeleton, trimmed
   // to a single leading blank line and one trailing newline so the file is
   // prettier-clean regardless of how the source file was whitespaced.
@@ -2471,6 +2533,7 @@ status: ${opts.status ?? "draft"}
 updated: ${opts.date}
 rfc: ${qs(rfcSlug)}
 cluster: ${opts.cluster != null ? opts.cluster : "null"}
+packages: ${packagesYaml}
 deps: ${depsYaml}
 deps-rfc: []
 est-loc: ${opts.estLoc != null ? opts.estLoc : "null"}
@@ -2510,6 +2573,7 @@ export function newStory(
     title?: string;
     status?: StoryStatus;
     cluster?: string;
+    packages?: string[];
     estLoc?: number | null;
     deps?: string[];
     priority?: number | null;
@@ -2555,6 +2619,13 @@ export function newStory(
         `error: cluster "${opts.cluster}" is not declared in ${rfcSlug}/README.md\n` +
           `  valid clusters: ${validClusters.join(", ")}`,
       );
+      process.exit(1);
+    }
+  }
+  if (opts.packages != null && opts.packages.length > 0) {
+    const error = packagesError(readRfcPackages(tasksDir, rfcSlug), opts.packages, rfcSlug);
+    if (error !== null) {
+      console.error(`error: ${error}`);
       process.exit(1);
     }
   }
@@ -3448,10 +3519,12 @@ function main(): void {
       const statusRaw = stringFlag(flags, "status");
       if (statusRaw !== undefined && !STORY_STATUSES.includes(statusRaw as StoryStatus)) usage();
       const depsRaw = stringFlag(flags, "deps");
+      const packagesRaw = stringFlag(flags, "packages");
       newStory(rfcSlug, storySlug, {
         title: stringFlag(flags, "title"),
         status: statusRaw as StoryStatus | undefined,
         cluster: stringFlag(flags, "cluster"),
+        packages: packagesRaw !== undefined ? parseCsv(packagesRaw) : [],
         estLoc: estLocRaw !== undefined ? Number(estLocRaw) : null,
         deps: depsRaw
           ? depsRaw
@@ -3581,6 +3654,13 @@ function main(): void {
       setDeps(id, cmd === "set-deps" ? "deps" : "deps-rfc", csv);
       break;
     }
+    case "set-packages": {
+      const id = pos[0];
+      const csv = pos[1];
+      if (!id || csv === undefined) usage();
+      setPackages(id, csv);
+      break;
+    }
     default:
       usage();
   }
@@ -3611,7 +3691,8 @@ function usage(): never {
              [--priority <N> | --priority --clear]   (RFC-level default priority for its un-prioritized stories)
   set-deps <id> <csv>                          (replace deps; checks references + cycles; empty csv clears)
   set-deps-rfc <id> <csv>                      (replace deps-rfc; checks references; empty csv clears)
-  new <rfc-slug> <story-slug> [--title "text"] [--status <v>] [--cluster <name>] [--est-loc <N>] [--deps <csv>] [--priority <N>] [--body-file <path>] [--allow-empty]
+  set-packages <id> <csv>                      (replace packages; must be declared by the parent RFC; empty csv clears)
+  new <rfc-slug> <story-slug> [--title "text"] [--status <v>] [--cluster <name>] [--packages <csv>] [--est-loc <N>] [--deps <csv>] [--priority <N>] [--body-file <path>] [--allow-empty]
   finalize <0000-slug> [--dry-run]             (assign the next RFC number: rename dir, rewrite refs, rebuild index)
   new-rfc <slug> [--title "text"] [--owner @handle] [--packages <csv>] [--clusters <csv>] [--related <csv>] [--body-file <path>]
   reindex | build                              (rebuild the index in place)

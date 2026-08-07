@@ -54,6 +54,7 @@ import {
   rewriteRfcRefs,
   parseCsv,
   setDepsError,
+  packagesError,
   formatFiles,
   formatRows,
   gitCommonDir,
@@ -1178,6 +1179,7 @@ status: draft
 updated: 2026-06-04
 rfc: "0000-your-slug"
 cluster: cluster-name-1
+packages: [] # optional subset of the parent RFC's packages; empty inherits the RFC's list
 deps: []
 deps-rfc: []
 est-loc: null
@@ -1319,6 +1321,35 @@ describe("setDepsError", () => {
     const idx = index([story({ id: "a" })]);
     expect(setDepsError(idx, "a", "deps", [])).toBeNull();
     expect(setDepsError(idx, "a", "deps-rfc", [])).toBeNull();
+  });
+});
+
+describe("packagesError", () => {
+  const declared = ["activerecord", "arel"];
+
+  it("accepts packages the parent RFC declares", () => {
+    expect(packagesError(declared, ["arel"], "0013-pg")).toBeNull();
+    expect(packagesError(declared, ["activerecord", "arel"], "0013-pg")).toBeNull();
+  });
+
+  it("accepts an empty array (clearing the field)", () => {
+    expect(packagesError(declared, [], "0013-pg")).toBeNull();
+  });
+
+  it("rejects a package the parent RFC does not declare, listing the valid ones", () => {
+    const msg = packagesError(declared, ["actionview"], "0013-pg");
+    expect(msg).toMatch(/"actionview" not declared in 0013-pg\/README\.md/);
+    expect(msg).toMatch(/valid packages: activerecord, arel/);
+  });
+
+  it("names every undeclared package, not just the first", () => {
+    const msg = packagesError(declared, ["actionview", "arel", "rack"], "0013-pg");
+    expect(msg).toMatch(/"actionview", "rack"/);
+    expect(msg).not.toMatch(/"arel",/);
+  });
+
+  it("constrains nothing when the RFC declares no packages", () => {
+    expect(packagesError([], ["anything"], "0013-pg")).toBeNull();
   });
 });
 
@@ -2351,6 +2382,7 @@ describe("buildStoryContent", () => {
     expect(content).toContain(`status: draft`);
     expect(content).toContain(`rfc: "0005-gaps"`);
     expect(content).toContain(`cluster: null`);
+    expect(content).toContain(`packages: []`);
     expect(content).toContain(`deps: []`);
     expect(content).toContain(`deps-rfc: []`);
     expect(content).toContain(`est-loc: null`);
@@ -2980,6 +3012,47 @@ describe("newStory cluster validation", () => {
     const msg = vi.mocked(console.error).mock.calls[0]?.[0] as string;
     expect(msg).toMatch(/scaffold/);
     expect(msg).toMatch(/conversion/);
+  });
+});
+
+describe("newStory packages validation", () => {
+  function makeRfcDir(dir: string, rfcSlug: string, packages: string[]) {
+    mkdirSync(join(dir, ".git"));
+    mkdirSync(join(dir, "rfcs", rfcSlug, "stories"), { recursive: true });
+    const pkgsYaml = packages.map((p) => `  - ${p}`).join("\n");
+    writeFileSync(
+      join(dir, "rfcs", rfcSlug, "README.md"),
+      `---\nrfc: "${rfcSlug}"\ntitle: "test"\nstatus: active\npackages:\n${pkgsYaml}\n---\n`,
+    );
+  }
+
+  it("writes packages declared by the parent RFC into the story frontmatter", () => {
+    execFileSyncMock.mockImplementation((_file, args) => {
+      const label = args && args.length >= 3 ? args[2] : "";
+      if (label === "symbolic-ref") return "main" as never;
+      if (label === "diff-tree") return "story.md" as never;
+      return "" as never;
+    });
+    const dir = mkdtempSync(join(tmpdir(), "tasks-test-"));
+    makeRfcDir(dir, "0005-gaps", ["activerecord", "arel"]);
+    newStory("0005-gaps", "my-story", { packages: ["arel"], allowEmpty: true }, dir);
+    const out = readFileSync(join(dir, "rfcs", "0005-gaps", "stories", "my-story.md"), "utf8");
+    expect(out).toContain(`packages: ["arel"]`);
+  });
+
+  it("exits 1 for a package the parent RFC does not declare", () => {
+    vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
+      throw new Error(`exit ${code}`);
+    }) as never);
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const dir = mkdtempSync(join(tmpdir(), "tasks-test-"));
+    makeRfcDir(dir, "0005-gaps", ["activerecord", "arel"]);
+    expect(() => newStory("0005-gaps", "my-story", { packages: ["actionview"] }, dir)).toThrow(
+      /exit 1/,
+    );
+    const msg = vi.mocked(console.error).mock.calls[0]?.[0] as string;
+    expect(msg).toMatch(/actionview/);
+    expect(msg).toMatch(/activerecord, arel/);
   });
 });
 
