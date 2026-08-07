@@ -191,7 +191,7 @@ export function newTime(
         .toZonedDateTime("UTC")
         .toInstant();
       if (offset instanceof Rational) {
-        return offset.numerator === 0
+        return offset.isZero()
           ? instant
           : instant.subtract({ nanoseconds: offset.mul(1_000_000_000).toI() });
       }
