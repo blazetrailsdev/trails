@@ -20,6 +20,7 @@ import {
   type RenameKeyOptions,
   type XmlTypeInfo,
   resetCallbacks as asResetCallbacks,
+  withOptions,
 } from "@blazetrails/activesupport";
 import {
   humanAttributeName as translationHumanAttributeName,
@@ -529,19 +530,11 @@ export class Model {
    *     m.validates("email", { presence: true });
    *   });
    */
-  static withOptions(defaults: Record<string, unknown>, fn: (model: typeof Model) => void): void {
-    // Create a proxy that merges defaults into validates() calls
-    const proxy = new Proxy(this, {
-      get(target: typeof Model, prop: string | symbol) {
-        if (prop === "validates") {
-          return (attr: string, rules: Record<string, unknown>) => {
-            target.validates(attr, { ...defaults, ...rules });
-          };
-        }
-        return (target as unknown as Record<string | symbol, unknown>)[prop];
-      },
-    });
-    fn(proxy);
+  static withOptions(
+    options: Record<string, unknown>,
+    block?: (optionMerger: typeof Model) => void,
+  ): typeof Model | void {
+    return block ? withOptions(this, options, block) : withOptions(this, options);
   }
 
   // -- Validations (Phase 1100) --

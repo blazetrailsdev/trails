@@ -1846,7 +1846,10 @@ export class ThroughReflection extends AbstractReflection {
   }
 
   get activeRecordPrimaryKey(): string | string[] {
-    return this._delegate.activeRecordPrimaryKey;
+    // Rails: `delegate :active_record_primary_key, ..., to: :source_reflection`
+    // (reflection.rb:973-974) — it pairs with #foreignKey, which delegates the
+    // same way, so a composite source edge yields matching arities.
+    return this.sourceReflection?.activeRecordPrimaryKey ?? this._delegate.activeRecordPrimaryKey;
   }
 
   get associationForeignKey(): string {
