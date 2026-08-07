@@ -2655,6 +2655,10 @@ export class Migrator {
       if (this.isDown() && !applied.has(proxy.version)) return undefined;
       if (this.isUp() && applied.has(proxy.version)) return undefined;
 
+      // Rails' guard is just `if Base.logger`; the `?.` on `info` is forced by
+      // trails' `Base.logger` type, which declares every level optional
+      // (base.ts:1717-1723) because the logger is app-supplied, where Ruby's is
+      // an ActiveSupport::Logger that always responds to `info`.
       if (_base?.logger) _base.logger.info?.(`Migrating to ${proxy.name} (${proxy.version})`);
 
       const loaded = (migration = await proxy.migration());

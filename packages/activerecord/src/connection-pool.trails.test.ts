@@ -16,6 +16,7 @@ import { describe, it, expect, vi } from "vitest";
 import { Reaper } from "./connection-adapters/abstract/connection-pool/reaper.js";
 import {
   ConnectionPool,
+  NullPool,
   withExecutionContext,
 } from "./connection-adapters/abstract/connection-pool.js";
 import { Store } from "./connection-adapters/abstract/query-cache.js";
@@ -1142,5 +1143,20 @@ describe("checkout/checkin callbacks", () => {
     const base = (AbstractAdapter as unknown as { _connectionCallbacks: unknown })
       ._connectionCallbacks;
     expect(sub).toBe(base);
+  });
+});
+
+describe("NullPool member parity", () => {
+  it("defines no role or shard, matching Rails' NullPool", () => {
+    // connection_pool.rb:14-51 — the whole class is server_version,
+    // schema_reflection, schema_cache, connection_descriptor, checkin, remove,
+    // async_executor, db_config, dirties_query_cache. `AbstractAdapter#role` /
+    // `#shard` (abstract_adapter.rb:286-296) are bare `@pool.role` reads, so a
+    // pool-less adapter raises NoMethodError in Ruby; nothing may reintroduce a
+    // stand-in answer here, because that silently makes a pool-less adapter look
+    // like a writing/default one.
+    const pool = new NullPool();
+    expect("role" in pool).toBe(false);
+    expect("shard" in pool).toBe(false);
   });
 });
