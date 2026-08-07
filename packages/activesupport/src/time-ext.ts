@@ -231,6 +231,14 @@ export function prevOccurring(date: Date, day: string): Temporal.Instant {
 // advance
 // ---------------------------------------------------------------------------
 
+/**
+ * Rails' `Time#advance` (time/calculations.rb:194-217) writes the normalised
+ * `:weeks` / `:days` back into the caller's hash, but `Date#advance`
+ * (date/calculations.rb:127-136) reads it only — and Rails asserts that
+ * difference (`test_date_advance_should_not_change_passed_options_hash`,
+ * date_ext_test.rb:367-371). One TS function stands in for both reopenings, so
+ * it takes the non-mutating arm and normalises into a copy.
+ */
 export function advance(
   date: Date,
   options: {
@@ -282,7 +290,7 @@ export function secondsSinceMidnight(date: Date): number {
   return (
     Math.floor(date.getTime() / 1000) -
     Math.floor(change(date, { hour: 0 }).epochMilliseconds / 1000) +
-    date.getMilliseconds() / 1.0e3
+    (date.getMilliseconds() * 1000) / 1.0e6
   );
 }
 
