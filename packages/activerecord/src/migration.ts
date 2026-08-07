@@ -1559,7 +1559,7 @@ export abstract class Migration {
       ?.databaseTasks?.()
       .withTemporaryPoolForEach({ env: this.env() }, async (pool) => {
         const pending = await pool.migrationContext.open().pendingMigrations();
-        if (pending.length > 0) pendingMigrations.push(pending);
+        if (pending != null) pendingMigrations.push(pending);
       });
 
     const migrations = pendingMigrations.flat();
@@ -1686,7 +1686,7 @@ export abstract class Migration {
     for (const dbConfig of this.dbConfigsInCurrentEnv()) {
       await PendingMigrationConnection.withTemporaryPool(dbConfig, async (pool) => {
         const pending = await pool.migrationContext.open().pendingMigrations();
-        if (pending.length > 0) pendingMigrations.push(pending);
+        if (pending != null) pendingMigrations.push(pending);
       });
     }
 
