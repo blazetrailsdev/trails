@@ -76,6 +76,11 @@ export { collectingQueriesForExplain, execExplain } from "./explain.js";
 import { setBaseResolver as _setBaseResolver } from "./log-subscriber.js";
 _setBaseResolver(() => _Base);
 
+// Same wiring for Migrator#execute_migration_in_transaction's "Migrating to"
+// log line (migration.rb:1532), which names Base at call time in Ruby.
+import { _registerBase as _registerBaseWithMigration } from "./migration.js";
+_registerBaseWithMigration(_Base);
+
 // Auto-attach LogSubscriber to :active_record, matching Rails'
 // `ActiveRecord::LogSubscriber.attach_to :active_record`.
 import { LogSubscriber as _LogSubscriber } from "./log-subscriber.js";

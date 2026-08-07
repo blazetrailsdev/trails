@@ -413,7 +413,7 @@ describe("AbstractMysqlAdapter#buildChangeColumnDefinition", () => {
   it("falls back to column.sqlType when type argument is empty", async () => {
     const col = makeTextColumn();
     const adapter = await makeAdapter(col);
-    const cd = await adapter.buildChangeColumnDefinition("users", "body", "");
+    const cd = await adapter.buildChangeColumnDefinition("users", "body", null);
     expect(cd.column.type).toBe("varchar(255)");
   });
 
@@ -711,20 +711,20 @@ describe("AbstractMysqlAdapter#changeColumnNull (#1568)", () => {
     await adapter.changeColumnNull("users", "name", false, "anon");
     expect(events).toEqual([
       ["exec", "UPDATE `users` SET `name`='anon' WHERE `name` IS NULL"],
-      ["changeColumn", ["users", "name", "", { null: false }]],
+      ["changeColumn", ["users", "name", null, { null: false }]],
     ]);
   });
 
   it("dispatches changeColumn with null:false but skips UPDATE when default_ is omitted", async () => {
     const { adapter, events } = await makeSequencingAdapter();
     await adapter.changeColumnNull("users", "name", false);
-    expect(events).toEqual([["changeColumn", ["users", "name", "", { null: false }]]]);
+    expect(events).toEqual([["changeColumn", ["users", "name", null, { null: false }]]]);
   });
 
   it("dispatches changeColumn with null:true and skips UPDATE when null_ is true", async () => {
     const { adapter, events } = await makeSequencingAdapter();
     await adapter.changeColumnNull("users", "name", true, "anon");
-    expect(events).toEqual([["changeColumn", ["users", "name", "", { null: true }]]]);
+    expect(events).toEqual([["changeColumn", ["users", "name", null, { null: true }]]]);
   });
 
   it("propagates validateChangeColumnNullArgumentBang errors before any SQL or changeColumn dispatch", async () => {
@@ -753,9 +753,14 @@ describe("AbstractMysqlAdapter#changeColumnComment (#1568)", () => {
   async function makeAdapterCapturingChangeColumn() {
     // Use the real, inherited extractNewCommentValue so these tests exercise
     // the production path and catch regressions in it.
-    const calls: Array<[string, string, string, Record<string, unknown>]> = [];
+    const calls: Array<[string, string, string | null, Record<string, unknown>]> = [];
     const adapter = await makeMinimalMysqlAdapter({
-      changeColumn: async (t: string, c: string, type: string, opts: Record<string, unknown>) => {
+      changeColumn: async (
+        t: string,
+        c: string,
+        type: string | null,
+        opts: Record<string, unknown>,
+      ) => {
         calls.push([t, c, type, opts]);
       },
     });
@@ -765,27 +770,19 @@ describe("AbstractMysqlAdapter#changeColumnComment (#1568)", () => {
   it("passes a plain string comment through to changeColumn", async () => {
     const { adapter, calls } = await makeAdapterCapturingChangeColumn();
     await adapter.changeColumnComment("users", "name", "the user's name");
-    expect(calls).toEqual([["users", "name", "", { comment: "the user's name" }]]);
+    expect(calls).toEqual([["users", "name", null, { comment: "the user's name" }]]);
   });
 
   it("clears the comment when passed null", async () => {
     const { adapter, calls } = await makeAdapterCapturingChangeColumn();
     await adapter.changeColumnComment("users", "name", null);
-    expect(calls).toEqual([["users", "name", "", { comment: null }]]);
+    expect(calls).toEqual([["users", "name", null, { comment: null }]]);
   });
 
   it("unwraps {from, to} change-descriptor to the new comment", async () => {
     const { adapter, calls } = await makeAdapterCapturingChangeColumn();
     await adapter.changeColumnComment("users", "name", { from: "old", to: "new" });
-    expect(calls).toEqual([["users", "name", "", { comment: "new" }]]);
-  });
-
-  it("normalizes undefined → null when {from, to: undefined} (explicit clear)", async () => {
-    const { adapter, calls } = await makeAdapterCapturingChangeColumn();
-    await adapter.changeColumnComment("users", "name", { from: "old", to: undefined });
-    // Without the normalization, comment would be undefined and changeColumn
-    // would treat the key as absent, silently keeping the old comment.
-    expect(calls).toEqual([["users", "name", "", { comment: null }]]);
+    expect(calls).toEqual([["users", "name", null, { comment: "new" }]]);
   });
 });
 

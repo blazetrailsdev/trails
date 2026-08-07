@@ -2361,8 +2361,10 @@ export class SchemaStatements {
   }
 
   /** @internal alias */
-  extractNewCommentValue(defaultOrChanges: unknown): unknown {
-    return this.extractNewDefaultValue(defaultOrChanges);
+  extractNewCommentValue(defaultOrChanges: CommentOrChanges): string | null {
+    // Rails aliases this to `extract_new_default_value`, which is untyped; the
+    // comment arm only ever carries a string or nil.
+    return this.extractNewDefaultValue(defaultOrChanges) as string | null;
   }
 
   /** @internal */

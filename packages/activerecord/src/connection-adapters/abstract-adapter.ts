@@ -519,7 +519,7 @@ export interface AbstractAdapter {
   /** @internal */
   extractNewDefaultValue(defaultOrChanges: unknown): unknown;
   /** @internal */
-  extractNewCommentValue(defaultOrChanges: unknown): unknown;
+  extractNewCommentValue(defaultOrChanges: CommentOrChanges): string | null;
   tableAliasFor(tableName: string): string;
   // Provided by the DatabaseLimits mixin (included below); tableAliasFor
   // resolves it through here rather than a duplicate on SchemaStatements.
@@ -1404,11 +1404,15 @@ export class AbstractAdapter implements Quoting {
   }
 
   get role(): string {
-    return this.pool.role;
+    // Ruby's `@pool.role` (`abstract_adapter.rb:288`) is an unchecked send that
+    // raises NoMethodError on a NullPool — which Rails never reaches, because an
+    // adapter is only ever obtained from a real pool. The cast is that same
+    // unchecked read; no trails path reads `role` off a pool-less adapter either.
+    return (this.pool as ConnectionPool).role;
   }
 
   get shard(): string {
-    return this.pool.shard;
+    return (this.pool as ConnectionPool).shard;
   }
 
   /**
