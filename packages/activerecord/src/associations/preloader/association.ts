@@ -78,7 +78,7 @@ export class Association {
 
     if (this._associate) {
       for (const owner of this.owners) {
-        this._associateRecordsToOwner(owner, records.get(owner) ?? []);
+        this.associateRecordsToOwner(owner, records.get(owner) ?? []);
       }
     }
 
@@ -109,7 +109,7 @@ export class Association {
 
     this._ownersByKey = new Map();
     for (const owner of this.owners) {
-      const key = this._deriveKey(owner, this._ownerKeyName);
+      const key = this.deriveKey(owner, this.ownerKeyName);
       if (key == null) continue;
       const existing = this._ownersByKey.get(key);
       if (existing) {
@@ -141,12 +141,12 @@ export class Association {
 
   get scope(): any {
     if (this._scope !== undefined) return this._scope;
-    this._scope = this._buildScope();
+    this._scope = this.buildScope();
     return this._scope;
   }
 
   setInverse(record: Base): void {
-    const key = this._deriveKey(record, this.associationKeyName);
+    const key = this.deriveKey(record, this.associationKeyName);
     const owners = this.ownersByKey.get(key);
     if (owners && owners.length > 0) {
       try {
@@ -180,7 +180,7 @@ export class Association {
 
     this._preloadedRecords = rawRecords.filter((record) => {
       let assignments = false;
-      const key = this._deriveKey(record, this.associationKeyName);
+      const key = this.deriveKey(record, this.associationKeyName);
       const owners = this.ownersByKey.get(key);
 
       if (owners) {
@@ -208,7 +208,7 @@ export class Association {
     if ((this.reflection as any).isCollection?.()) return;
 
     for (const record of unscopedRecords) {
-      const key = this._deriveKey(record, this.associationKeyName);
+      const key = this.deriveKey(record, this.associationKeyName);
       if (key == null) continue;
 
       const owners = this.ownersByKey.get(key);
@@ -232,11 +232,19 @@ export class Association {
     }
   }
 
-  private get _ownerKeyName(): string | string[] {
+  /** Mirrors: Preloader::Association#model — `attr_reader :model` over `@model`
+   *  (`preloader/association.rb:239`). */
+  private get model(): typeof Base | null {
+    return this._model;
+  }
+
+  /** Mirrors: Preloader::Association#owner_key_name
+   *  (`preloader/association.rb:241-243`). */
+  private get ownerKeyName(): string | string[] {
     return (this.reflection as any).joinForeignKey;
   }
 
-  private _associateRecordsToOwner(owner: Base, records: Base[]): void {
+  private associateRecordsToOwner(owner: Base, records: Base[]): void {
     if (this.isLoaded(owner)) return;
 
     const association = (owner as any).association(this.reflection.name);
@@ -278,16 +286,16 @@ export class Association {
     }
   }
 
-  private _deriveKey(record: Base, key: string | string[]): unknown {
+  private deriveKey(record: Base, key: string | string[]): unknown {
     if (Array.isArray(key)) {
-      return JSON.stringify(key.map((k) => this._convertKey((record as any)._readAttribute(k))));
+      return JSON.stringify(key.map((k) => this.convertKey((record as any)._readAttribute(k))));
     }
-    return this._convertKey((record as any)._readAttribute(key));
+    return this.convertKey((record as any)._readAttribute(key));
   }
 
-  private _convertKey(key: unknown): unknown {
+  private convertKey(key: unknown): unknown {
     if (key == null) return key;
-    if (this._isKeyConversionRequired()) return String(key);
+    if (this.isKeyConversionRequired()) return String(key);
     // node-postgres parses int8 (a bigserial PK) to BigInt and int4 (an
     // integer/references FK) to number, so an owner PK `1n` and a child FK `1`
     // are distinct JS Map keys even though Ruby compares them equal (Integer ==
@@ -299,37 +307,60 @@ export class Association {
     return key;
   }
 
-  private _isKeyConversionRequired(): boolean {
-    if (this._keyConversionRequired !== undefined) return this._keyConversionRequired;
-    const assocKeys = Array.isArray(this.associationKeyName)
-      ? this.associationKeyName
-      : [this.associationKeyName];
-    const ownerKeys = Array.isArray(this._ownerKeyName) ? this._ownerKeyName : [this._ownerKeyName];
-    this._keyConversionRequired = false;
-    for (let i = 0; i < Math.min(assocKeys.length, ownerKeys.length); i++) {
-      const assocType = this._attributeTypeName(this.klass, assocKeys[i]);
-      const ownerType = this._attributeTypeName(this._model, ownerKeys[i]);
-      if (assocType != null && ownerType != null && assocType !== ownerType) {
-        this._keyConversionRequired = true;
-        break;
-      }
+  private isKeyConversionRequired(): boolean {
+    if (this._keyConversionRequired === undefined) {
+      const associationKeyType = this.associationKeyType();
+      const ownerKeyType = this.ownerKeyType();
+      // Rails is a bare `association_key_type != owner_key_type`
+      // (`preloader/association.rb:257-263`). Ruby's `type_for_attribute`
+      // always answers a Type, so it never compares against nil; trails'
+      // lookup answers null for an unknown attribute or an ownerless loader,
+      // and an unknown type must not read as a mismatch.
+      this._keyConversionRequired =
+        associationKeyType != null && ownerKeyType != null && associationKeyType !== ownerKeyType;
     }
+
     return this._keyConversionRequired;
   }
 
-  private _attributeTypeName(model: typeof Base | null, key: string): string | null {
-    if (!model) return null;
-    const at = (model as any).attributeTypes;
-    const types = typeof at === "function" ? at.call(model) : at;
-    if (!types) return null;
-    const type = types[key];
-    if (!type) return null;
-    if (typeof type === "string") return type;
-    if (typeof type.type === "function") return type.type();
-    return type.name ?? null;
+  /** Mirrors: Preloader::Association#association_key_type
+   *  (`preloader/association.rb:282-284`) — `@klass.type_for_attribute(association_key_name).type`. */
+  private associationKeyType(): string | null {
+    return this._typeNames(this.associationKeyName, (name) => this.klass.typeForAttribute(name));
   }
 
-  private _buildScope(): any {
+  /** Mirrors: Preloader::Association#owner_key_type
+   *  (`preloader/association.rb:286-288`) — `@model.type_for_attribute(owner_key_name).type`. */
+  private ownerKeyType(): string | null {
+    const model = this.model;
+    if (!model) return null;
+    return this._typeNames(this.ownerKeyName, (name) => model.typeForAttribute(name));
+  }
+
+  /**
+   * Ruby's `type_for_attribute(name).type` is one call against one name; a
+   * composite key arrives here as an array of names (Rails hits the same array
+   * and has no answer for it either), so the two readers above share the
+   * per-name mapping rather than each open-coding it.
+   */
+  private _typeNames(key: string | string[], typeFor: (name: string) => unknown): string | null {
+    const names: (string | null)[] = (Array.isArray(key) ? key : [key]).map((name) => {
+      let type: any;
+      try {
+        type = typeFor(name);
+      } catch {
+        return null;
+      }
+      if (!type) return null;
+      if (typeof type === "string") return type;
+      if (typeof type.type === "function") return type.type();
+      return type.name ?? null;
+    });
+    if (names.some((n) => n == null)) return null;
+    return names.join(",");
+  }
+
+  private buildScope(): any {
     // Mirror Rails' build_scope `scope = klass.scope_for_association`. It bases
     // on the pristine relation (ignoring any enclosing current_scope) and
     // applies the target model's default_scope unless current_scope is itself
@@ -339,7 +370,7 @@ export class Association {
     const type = (this.reflection as any).type;
     if (type && !(this.reflection as any).isThroughReflection?.()) {
       scope = scope.where({
-        [type]: (this._model as any)?.polymorphicName?.() ?? this._model?.name,
+        [type]: (this.model as any)?.polymorphicName?.() ?? this.model?.name,
       });
     }
 
@@ -542,69 +573,4 @@ export class LoaderRecords {
 
     return [...loaded, ...Array.from(alreadyLoadedByKey.values()).flat()];
   }
-}
-
-// Private helpers mirroring Rails' PreloaderAssociation private methods
-/** @internal */
-function owners(assoc: Association): Base[] {
-  return assoc.owners;
-}
-
-/** @internal */
-function reflection(assoc: Association): unknown {
-  return assoc.reflection;
-}
-
-/** @internal */
-function model(assoc: Association): unknown {
-  return (assoc as any)._model;
-}
-
-/** @internal */
-function ownerKeyName(assoc: Association): string | string[] {
-  return (assoc as any)._ownerKeyName;
-}
-
-/** @internal */
-function associateRecordsToOwner(assoc: Association, owner: Base, records: Base[]): void {
-  (assoc as any)._associateRecordsToOwner(owner, records);
-}
-
-/** @internal */
-function isKeyConversionRequired(assoc: Association): boolean {
-  return (assoc as any)._isKeyConversionRequired();
-}
-
-/** @internal */
-function deriveKey(assoc: Association, record: Base, key: string | string[]): unknown {
-  return (assoc as any)._deriveKey(record, key);
-}
-
-/** @internal */
-function convertKey(assoc: Association, key: unknown): unknown {
-  return (assoc as any)._convertKey(key);
-}
-
-/** @internal */
-function associationKeyType(assoc: Association): string | null {
-  // Rails: `@klass.type_for_attribute(association_key_name).type`. We reuse the
-  // class's attribute-type lookup; for composite keys mirror Rails by inspecting
-  // the first key name.
-  const key = assoc.associationKeyName;
-  return (assoc as any)._attributeTypeName(assoc.klass, Array.isArray(key) ? key[0] : key);
-}
-
-/** @internal */
-function ownerKeyType(assoc: Association): string | null {
-  // Rails: `@model.type_for_attribute(owner_key_name).type`.
-  const key = (assoc as any)._ownerKeyName;
-  return (assoc as any)._attributeTypeName(
-    (assoc as any)._model,
-    Array.isArray(key) ? key[0] : key,
-  );
-}
-
-/** @internal */
-function buildScope(assoc: Association): unknown {
-  return (assoc as any)._buildScope();
 }

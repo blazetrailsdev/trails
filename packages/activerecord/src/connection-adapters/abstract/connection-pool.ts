@@ -152,6 +152,30 @@ export class NullPool implements AbstractPool {
     return undefined;
   }
 
+  /**
+   * Rails' NullPool defines neither `role` nor `shard`
+   * (`abstract/connection_pool.rb:14-51`), so `AbstractAdapter#role` /
+   * `#shard` — bare `@pool.role` / `@pool.shard`
+   * (`abstract_adapter.rb:288,294`) — raise NoMethodError on an adapter that
+   * has no pool. Ruby applications never see that: an adapter is only ever
+   * reached through a pool. trails constructs standalone adapters routinely
+   * (`new BetterSQLite3Adapter(":memory:")` in tests and in the schema/CLI
+   * paths), and `inspect()` — which a serializer can reach from any
+   * translated error — reads both. The Rails defaults for a single-role,
+   * unsharded application (`abstract_adapter.rb:285,291` docs: "In a non-multi
+   * role application, +:writing+ is returned", "In a non-sharded application,
+   * +:default+ is returned") therefore stand in here, once, so that every
+   * reader stays the bare Rails one-liner.
+   */
+  get role(): string {
+    return "writing";
+  }
+
+  /** Companion of {@link NullPool.role}; same reason. */
+  get shard(): string {
+    return "default";
+  }
+
   checkout(): never {
     throw new ConnectionNotEstablished("NullPool does not support checkout");
   }
@@ -1401,15 +1425,6 @@ export class ConnectionPool implements ReapablePool {
     this._checkedOut.delete(conn);
     this._lastCheckinAt.delete(conn);
     this._available?.delete(conn);
-    // Clear the back-reference we set in newConnection so a removed
-    // adapter can't observe stale pool/poolConfig state post-eviction.
-    // Mirror the same narrow gate — only touch AbstractAdapter's slot,
-    // never a driver-adapter's own `pool` field. Rails' `remove`
-    // (abstract/connection_pool.rb:593) leaves `conn.pool` alone; NullPool is
-    // Rails' unpooled-adapter value (abstract_adapter.rb:153).
-    if (conn instanceof AbstractAdapter && (conn as unknown as { pool: unknown }).pool === this) {
-      (conn as unknown as { pool: unknown }).pool = new NullPool();
-    }
 
     for (const [ctxId, pin] of this._pinnedConnections) {
       if (pin.connection === conn) {

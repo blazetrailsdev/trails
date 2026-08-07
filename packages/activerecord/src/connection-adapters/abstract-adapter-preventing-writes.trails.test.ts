@@ -15,7 +15,7 @@ describeIfSqlite("AbstractAdapter#isPreventingWrites with no connection descript
   });
 
   it("is not preventing writes inside an ambient Base scope", async () => {
-    expect(adapter.connectionDescriptor).toBeNull();
+    expect(adapter.connectionDescriptor).toBeUndefined();
 
     await Base.whilePreventingWrites(async () => {
       expect(adapter.isPreventingWrites()).toBe(false);
@@ -25,7 +25,7 @@ describeIfSqlite("AbstractAdapter#isPreventingWrites with no connection descript
   it("still reports preventing writes for a standalone replica", async () => {
     const replica = new BetterSQLite3Adapter({ database: ":memory:", replica: true } as never);
     try {
-      expect(replica.connectionDescriptor).toBeNull();
+      expect(replica.connectionDescriptor).toBeUndefined();
       expect(replica.isPreventingWrites()).toBe(true);
     } finally {
       await replica.close();

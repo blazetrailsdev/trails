@@ -29,6 +29,7 @@ import { Result, type ColumnTypes } from "../result.js";
 import { SchemaCache, SchemaReflection, BoundSchemaReflection, FakePool } from "./schema-cache.js";
 import { NullPool } from "./abstract/connection-pool.js";
 import type { ConnectionPool } from "./abstract/connection-pool.js";
+import type { ConnectionDescriptor } from "./abstract/connection-descriptor.js";
 import { stripSqlComments } from "./sql-classification.js";
 import {
   TransactionManager,
@@ -115,7 +116,6 @@ import {
   DecimalType,
   type Type,
 } from "@blazetrails/activemodel";
-import { connectedToStack } from "../core.js";
 import { Text as TextType } from "../type/text.js";
 import { Date as DateType } from "../type/date.js";
 import { Time as TimeType } from "../type/time.js";
@@ -1404,14 +1404,11 @@ export class AbstractAdapter implements Quoting {
   }
 
   get role(): string {
-    // Rails is a bare `@pool.role` (abstract_adapter.rb:288); NullPool defines
-    // none (abstract/connection_pool.rb:14-51), so the default stands in.
-    return this.pool instanceof NullPool ? "writing" : this.pool.role;
+    return this.pool.role;
   }
 
   get shard(): string {
-    // Same NullPool arm as `role` — abstract_adapter.rb:294.
-    return this.pool instanceof NullPool ? "default" : this.pool.shard;
+    return this.pool.shard;
   }
 
   /**
@@ -1484,62 +1481,14 @@ export class AbstractAdapter implements Quoting {
   }
 
   isReplica(): boolean {
-    // Rails' `replica?` reads only `@config[:replica]` (abstract_adapter.rb:199);
-    // the db_config arm is a trails addition for pooled adapters whose
-    // per-connection config never carries the flag.
-    const replica = this.pool.dbConfig.replica;
-    if (typeof replica === "boolean") return replica;
-    if (this.role === "reading") return true;
-    return this._config.replica === true;
+    return (this._config.replica as boolean | undefined) ?? false;
   }
 
   isPreventingWrites(): boolean {
     if (this.isReplica()) return true;
-    if (this.connectionDescriptor === null) return false;
-    const pool = this.pool;
-    // Mirrors Rails: connection_descriptor.current_preventing_writes →
-    // Base.preventing_writes?(class_name). Walks the stack in reverse and
-    // returns the entry's prevent_writes flag when (a) it includes Base by
-    // identity, or (b) any klass's name matches the pool's connection name.
-    const ownerName: string | undefined =
-      pool instanceof NullPool ? undefined : pool.poolConfig.connectionDescriptor.name;
-    const stack = connectedToStack();
-    for (let i = stack.length - 1; i >= 0; i--) {
-      const entry = stack[i];
-      if (entry.preventWrites === undefined) continue;
-      let includesBase = false;
-      let nameMatches = false;
-      for (const k of entry.klasses) {
-        if (typeof k !== "function") continue;
-        // Rails' `klasses.include?(Base)` matches the literal Base class by
-        // identity — so a `Base.connected_to` scope blankets every pool.
-        // ApplicationRecord is NOT promoted here; its scope should only
-        // affect pools that share its normalized descriptor name (handled
-        // below in the name-match branch).
-        //
-        // `withRoleAndShard`/`connectingTo`/`connectedToMany` push the raw
-        // caller class (`[self]`) onto the stack and let read sites resolve
-        // `connection_class_for_self` — so an `ApplicationRecord` scope set
-        // up without `connectsTo` no longer collapses to Base and leak into
-        // every pool. Realistic primary-class flows call `connectsTo` first
-        // (setting `connectionClass = true`) so reads against Base still
-        // match via the descriptor-name branch below.
-        if (Object.prototype.hasOwnProperty.call(k, "_isActiveRecordBase")) {
-          includesBase = true;
-        }
-        if (ownerName !== undefined) {
-          // PoolConfig normalizes primary-class owners (Base/ApplicationRecord)
-          // to the "Base" descriptor name. Mirror that on the read side so an
-          // `ApplicationRecord.connected_to(...)` scope targets the primary
-          // pool without leaking into unrelated abstract-class pools.
-          const targetName =
-            typeof k.primaryClassQ === "function" && k.primaryClassQ() ? "Base" : k.name;
-          if (targetName === ownerName) nameMatches = true;
-        }
-      }
-      if (includesBase || nameMatches) return entry.preventWrites;
-    }
-    return false;
+    if (this.connectionDescriptor == null) return false;
+
+    return this.connectionDescriptor.currentPreventingWrites();
   }
 
   /**
@@ -1846,8 +1795,8 @@ export class AbstractAdapter implements Quoting {
     return typeof v === "string" ? v : "utc";
   }
 
-  get connectionDescriptor(): unknown {
-    return this.pool.connectionDescriptor ?? null;
+  get connectionDescriptor(): ConnectionDescriptor | undefined {
+    return this.pool.connectionDescriptor;
   }
 
   /**

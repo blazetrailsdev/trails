@@ -1,9 +1,0 @@
-[
-  {
-    "package": "activerecord",
-    "tsFile": "associations/foreign-association.ts",
-    "rubyName": "nullified_owner_attributes",
-    "call": "reflection",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  }
-]

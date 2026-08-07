@@ -649,7 +649,7 @@ describe("CI runs every tooling test suite", () => {
     expect(filter.run.length).toBeLessThan(20_500);
   });
 
-  // These two suites import activerecord — scripts/test-deps from src (the
+  // These suites import activerecord — scripts/test-deps from src (the
   // adapter-graph TDZ guard enters the graph from outside the AR vitest project
   // by design), scripts/parity/query/node through the dump runners it spawns —
   // but they are bundled into unit-tests, gated on unit_tests_affected, and
@@ -657,7 +657,17 @@ describe("CI runs every tooling test suite", () => {
   // each has to ALSO run from a job gated on activerecord_affected, or an
   // AR-only PR reports green and the break lands on the next push to main.
   // That is how the `_arConfig` TDZ reached main red (#5647).
-  const AR_IMPORTING_SUITES = ["scripts/test-deps", "scripts/parity/query/node"];
+  //
+  // scripts/mixin-declaration-drift.test.ts is the same shape from the other
+  // direction: it reads the adapter sources under
+  // packages/activerecord/src/connection-adapters/ rather than importing them,
+  // so an adapter-only PR — the one that introduces the drift — never ran it
+  // while it lived only in the unit-tests job.
+  const AR_IMPORTING_SUITES = [
+    "scripts/test-deps",
+    "scripts/parity/query/node",
+    "scripts/mixin-declaration-drift.test.ts",
+  ];
 
   it.each(AR_IMPORTING_SUITES)("runs %s from an activerecord-gated job", async (suite) => {
     const wf = parseYaml(await readFile(CI_YML, "utf8"));

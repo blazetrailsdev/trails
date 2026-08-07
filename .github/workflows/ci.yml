@@ -712,8 +712,15 @@ jobs:
       # job that runs them on an AR-only PR. Separate invocation from the AR
       # suite on purpose: it keeps them in the `other` vitest project, whose
       # lack of AR setupFiles is what reproduces the TDZ entry order.
+      # scripts/mixin-declaration-drift.test.ts rides the same gate for the same
+      # reason: it guards the declaration-merged interfaces in
+      # packages/activerecord/src/connection-adapters/, so the PR that can
+      # introduce the drift is exactly the PR unit_tests_affected does not
+      # fire on. Running it here costs one extra file in a job that is already
+      # running, rather than pulling the whole ~10.5k-test unit job onto every
+      # activerecord PR.
       # (Guard: scripts/ci-suite-coverage.test.ts.)
-      - run: pnpm vitest run scripts/test-deps scripts/parity/query/node
+      - run: pnpm vitest run scripts/test-deps scripts/parity/query/node scripts/mixin-declaration-drift.test.ts
       - run: pnpm vitest run packages/activerecord/
       - run: pnpm vitest run packages/activerecord-cli
 

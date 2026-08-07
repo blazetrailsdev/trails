@@ -289,7 +289,9 @@ describe("AssociationScope", () => {
     await Post.create({ author_id: author.id, title: "published", body: "y" });
 
     // Augmented options.scope — NOT equal to the reflection's macro
-    // scope (which is null here). Loader must still apply it.
+    // scope (which is null here). Loader must still apply it. No reader form:
+    // the caller-supplied `options.scope` IS the subject, and the generated
+    // `author.posts` accessor can only pass the reflection's own options.
     const results = await findTarget(author, "posts", {
       className: "Post",
       foreignKey: "author_id",
@@ -514,6 +516,8 @@ describe("AssociationScope", () => {
     }
     registerModel(CpkAsOwner);
     registerModel(CpkAsTarget);
+    // No reader form: `CpkAsOwner` declares no `comments` association — the
+    // rejected `as:`/CPK combination is passed straight to the loader.
     const owner = new CpkAsOwner({ a: 1, b: 2 });
     await expect(
       findTarget(owner, "comments", {
@@ -696,12 +700,7 @@ describe("AssociationScope", () => {
       taggable_type: "Comment",
     });
 
-    const posts = (await findTarget(tag, "taggedPosts", {
-      className: "Post",
-      through: "taggings",
-      source: "taggable",
-      sourceType: "Post",
-    })) as Post[];
+    const posts = (await (tag as any).taggedPosts.toArray()) as Post[];
     // Without sourceType filtering, the through join would return BOTH
     // tagging rows; we'd then JOIN to the wrong rows. With the filter,
     // only the Post-typed tagging participates.
@@ -744,11 +743,7 @@ describe("AssociationScope", () => {
     const op = await Post.create({ author_id: other.id, title: "op", body: "b" });
     await Comment.create({ post_id: op.id, body: "other" });
 
-    const comments = (await findTarget(author, "comments", {
-      className: "Comment",
-      through: "posts",
-      source: "comments",
-    })) as Comment[];
+    const comments = (await (author as any).comments.toArray()) as Comment[];
     expect(comments.map((c) => c.body).sort()).toEqual(["first", "second"]);
   });
 
@@ -784,11 +779,7 @@ describe("AssociationScope", () => {
     await Categorization.create({ author_id: alice.id, category_id: ts.id });
     await Categorization.create({ author_id: bob.id, category_id: go.id });
 
-    const categories = (await findTarget(alice, "categories", {
-      className: "Category",
-      through: "categorizations",
-      source: "category",
-    })) as Category[];
+    const categories = (await (alice as any).categories.toArray()) as Category[];
     expect(categories.map((c) => c.name).sort()).toEqual(["ruby", "typescript"]);
   });
 

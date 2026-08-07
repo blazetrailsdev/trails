@@ -45,13 +45,6 @@
     "package": "activerecord",
     "tsFile": "associations/belongs-to-association.ts",
     "rubyName": "handle_dependency",
-    "call": "order:reflection,destroy",
-    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/belongs-to-association.ts",
-    "rubyName": "handle_dependency",
     "call": "owner",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -66,8 +59,8 @@
     "package": "activerecord",
     "tsFile": "associations/belongs-to-association.ts",
     "rubyName": "update_counters",
-    "call": "order:reflection,incrementBang",
-    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
+    "call": "order:owner,incrementBang",
+    "reason": "Re-spelling of the pre-existing `order:reflection,incrementBang` row this PR retired: the preloader shim deletion changed which `reflection`/`owner` declaration the short-name resolver picks, so the same unordered body now reports a different first call. Same divergence, same burndown."
   },
   {
     "package": "activerecord",

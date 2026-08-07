@@ -8,7 +8,6 @@
  * self-referential groups) are tracked as sibling stories.
  */
 import { describe, it, expect } from "vitest";
-import { findTarget } from "./singular-association.js";
 import { registerModel } from "../index.js";
 import { Base } from "../base.js";
 import { association } from "../associations.js";
@@ -308,7 +307,8 @@ describe("AssociationsJoinModelTest", () => {
 
     expect(tagging.taggable_type).toBe("Post");
     expect(tagging.taggable_id).toBe(Number(thinking.id));
-    const taggable = (await findTarget(tagging, "taggable", { polymorphic: true })) as Base;
+    // join_model_test.rb:142 — `tagging.taggable`.
+    const taggable = (await tagging.taggable) as Base;
     expect(taggable.id).toBe(thinking.id);
   });
 
@@ -321,7 +321,8 @@ describe("AssociationsJoinModelTest", () => {
 
     expect(tagging.taggable_type).toBe("Post");
     expect(tagging.taggable_id).toBe(Number(post.id));
-    const taggable = (await findTarget(tagging, "taggable", { polymorphic: true })) as Base;
+    // join_model_test.rb:153 — `tagging.taggable`.
+    const taggable = (await tagging.taggable) as Base;
     expect(taggable.id).toBe(post.id);
   });
 
@@ -1158,10 +1159,8 @@ describe("AssociationsJoinModelTest", () => {
 
   it("polymorphic has many going through join model with custom foreign key", async () => {
     const tagging = await Tagging.find(taggings("welcome_general").id);
-    const superTag = (await findTarget(tagging, "superTag", {
-      className: "Tag",
-      foreignKey: "super_tag_id",
-    })) as Base;
+    // join_model_test.rb:97 — `taggings(:welcome_general).super_tag`.
+    const superTag = (await (tagging as any).superTag) as Base;
     expect(superTag.id).toBe(tags("misc").id);
     const post = await Post.find(posts("welcome").id);
     const superTagsList = (await (post as any).superTags.toArray()) as Base[];
