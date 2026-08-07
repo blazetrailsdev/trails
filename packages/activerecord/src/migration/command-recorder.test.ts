@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { beforeEach, describe, it, expect } from "vitest";
 import { CommandRecorder } from "./command-recorder.js";
 import { IrreversibleMigration } from "../migration.js";
 import { Table } from "../connection-adapters/abstract/schema-definitions.js";
@@ -18,129 +18,6 @@ const mysqlDelegate = {
 };
 
 describe("CommandRecorder", () => {
-  it("records commands", () => {
-    const recorder = new CommandRecorder();
-    recorder.record("addColumn", ["users", "name", "string"]);
-    expect(recorder.commands).toEqual([{ cmd: "addColumn", args: ["users", "name", "string"] }]);
-  });
-
-  it("reverting toggles and inverts commands", async () => {
-    const recorder = new CommandRecorder();
-    await recorder.revert(async () => {
-      recorder.record("addColumn", ["users", "name", "string"]);
-    });
-    expect(recorder.commands[0].cmd).toBe("removeColumn");
-  });
-
-  describe("inverseOf", () => {
-    it("returns the inverse command", () => {
-      const recorder = new CommandRecorder();
-      const result = recorder.inverseOf("addColumn", ["users", "name", "string"]);
-      expect(result).toEqual({ cmd: "removeColumn", args: ["users", "name", "string"] });
-    });
-
-    it("throws IrreversibleMigration for unknown commands", () => {
-      const recorder = new CommandRecorder();
-      expect(() => recorder.inverseOf("dropDatabase", [])).toThrow(IrreversibleMigration);
-    });
-  });
-
-  describe("invertCreateTable / invertDropTable", () => {
-    it("invertCreateTable removes ifNotExists and returns dropTable", () => {
-      const recorder = new CommandRecorder();
-      const [cmd, args] = recorder.invertCreateTable(["users", { ifNotExists: true }]);
-      expect(cmd).toBe("dropTable");
-      expect((args[1] as Record<string, unknown>)["ifNotExists"]).toBeUndefined();
-    });
-
-    it("invertCreateTable strips ifNotExists even when fn is last arg", () => {
-      const fn = () => {};
-      const [cmd, args] = new CommandRecorder().invertCreateTable([
-        "users",
-        { ifNotExists: true },
-        fn,
-      ]);
-      expect(cmd).toBe("dropTable");
-      expect((args[1] as Record<string, unknown>)["ifNotExists"]).toBeUndefined();
-    });
-
-    it("invertDropTable throws without options/block for single table", () => {
-      const recorder = new CommandRecorder();
-      expect(() => recorder.invertDropTable(["users"])).toThrow(IrreversibleMigration);
-    });
-
-    it("invertDropTable throws for multiple tables", () => {
-      const recorder = new CommandRecorder();
-      expect(() => recorder.invertDropTable(["users", "posts"])).toThrow(IrreversibleMigration);
-    });
-
-    it("invertDropTable returns createTable when options present", () => {
-      const recorder = new CommandRecorder();
-      const [cmd, args] = recorder.invertDropTable(["users", { force: true }]);
-      expect(cmd).toBe("createTable");
-      expect(args[0]).toBe("users");
-    });
-  });
-
-  describe("invertCreateJoinTable / invertDropJoinTable", () => {
-    it("invertCreateJoinTable returns dropJoinTable", () => {
-      const recorder = new CommandRecorder();
-      const [cmd] = recorder.invertCreateJoinTable(["cats", "dogs"]);
-      expect(cmd).toBe("dropJoinTable");
-    });
-
-    it("invertDropJoinTable returns createJoinTable", () => {
-      const recorder = new CommandRecorder();
-      const [cmd] = recorder.invertDropJoinTable(["cats", "dogs"]);
-      expect(cmd).toBe("createJoinTable");
-    });
-  });
-
-  describe("invertAddColumn / invertRemoveColumn", () => {
-    it("invertAddColumn returns removeColumn", () => {
-      const recorder = new CommandRecorder();
-      const [cmd] = recorder.invertAddColumn(["users", "age", "integer"]);
-      expect(cmd).toBe("removeColumn");
-    });
-
-    it("invertRemoveColumn throws without type", () => {
-      const recorder = new CommandRecorder();
-      expect(() => recorder.invertRemoveColumn(["users", "age"])).toThrow(IrreversibleMigration);
-    });
-
-    it("invertRemoveColumn returns addColumn when type given", () => {
-      const recorder = new CommandRecorder();
-      const [cmd] = recorder.invertRemoveColumn(["users", "age", "integer"]);
-      expect(cmd).toBe("addColumn");
-    });
-  });
-
-  describe("invertAddIndex / invertRemoveIndex", () => {
-    it("invertAddIndex returns removeIndex", () => {
-      const recorder = new CommandRecorder();
-      const [cmd] = recorder.invertAddIndex(["users", "email"]);
-      expect(cmd).toBe("removeIndex");
-    });
-
-    it("invertRemoveIndex throws without column", () => {
-      const recorder = new CommandRecorder();
-      expect(() => recorder.invertRemoveIndex(["users"])).toThrow(IrreversibleMigration);
-    });
-
-    it("invertRemoveIndex returns addIndex with column option", () => {
-      const recorder = new CommandRecorder();
-      const [cmd, args] = recorder.invertRemoveIndex(["users", { column: "email" }]);
-      expect(cmd).toBe("addIndex");
-      expect(args[1]).toBe("email");
-    });
-
-    it("invertRemoveIndex handles array column list without treating it as options", () => {
-      const [cmd, args] = new CommandRecorder().invertRemoveIndex(["users", ["email", "name"]]);
-      expect(cmd).toBe("addIndex");
-      expect(args[1]).toEqual(["email", "name"]);
-    });
-  });
-
   describe("invertAddTimestamps / invertRemoveTimestamps", () => {
     it("invertAddTimestamps returns removeTimestamps", () => {
       const [cmd] = new CommandRecorder().invertAddTimestamps(["users"]);
@@ -274,58 +151,6 @@ describe("CommandRecorder", () => {
     });
   });
 
-  describe("invertRenameTable / invertRenameColumn", () => {
-    it("invertRenameTable swaps table names", () => {
-      const [cmd, args] = new CommandRecorder().invertRenameTable(["old_users", "new_users"]);
-      expect(cmd).toBe("renameTable");
-      expect(args).toEqual(["new_users", "old_users"]);
-    });
-
-    it("invertRenameColumn swaps column names", () => {
-      const [cmd, args] = new CommandRecorder().invertRenameColumn([
-        "users",
-        "old_name",
-        "new_name",
-      ]);
-      expect(cmd).toBe("renameColumn");
-      expect(args).toEqual(["users", "new_name", "old_name"]);
-    });
-  });
-
-  describe("invertRenameIndex", () => {
-    it("swaps index names", () => {
-      const [cmd, args] = new CommandRecorder().invertRenameIndex(["users", "old_idx", "new_idx"]);
-      expect(cmd).toBe("renameIndex");
-      expect(args).toEqual(["users", "new_idx", "old_idx"]);
-    });
-  });
-
-  describe("invertChangeColumnDefault", () => {
-    it("throws without from/to options", () => {
-      expect(() => new CommandRecorder().invertChangeColumnDefault(["users", "age", 0])).toThrow(
-        IrreversibleMigration,
-      );
-    });
-
-    it("swaps from/to values", () => {
-      const [cmd, args] = new CommandRecorder().invertChangeColumnDefault([
-        "users",
-        "age",
-        { from: 0, to: 18 },
-      ]);
-      expect(cmd).toBe("changeColumnDefault");
-      expect(args[2] as Record<string, unknown>).toEqual({ from: 18, to: 0 });
-    });
-  });
-
-  describe("invertChangeColumnNull", () => {
-    it("flips the nullable boolean", () => {
-      const [cmd, args] = new CommandRecorder().invertChangeColumnNull(["users", "email", false]);
-      expect(cmd).toBe("changeColumnNull");
-      expect(args[2]).toBe(true);
-    });
-  });
-
   describe("invertRemoveColumns", () => {
     it("throws without type option", () => {
       expect(() => new CommandRecorder().invertRemoveColumns(["users", "name", "age"])).toThrow(
@@ -419,15 +244,6 @@ describe("CommandRecorder", () => {
     });
   });
 
-  describe("invert change column", () => {
-    it("throws IrreversibleMigration", () => {
-      const recorder = new CommandRecorder();
-      expect(() => recorder.inverseOf("changeColumn", ["table", "column", "string", {}])).toThrow(
-        IrreversibleMigration,
-      );
-    });
-  });
-
   describe("invertAddColumns", () => {
     it("returns removeColumns", () => {
       const [cmd] = new CommandRecorder().invertAddColumns(["users", "name", "age"]);
@@ -453,24 +269,6 @@ describe("CommandRecorder", () => {
       expect(recorder.commands).toEqual([
         { cmd: "removeColumns", args: ["fruits", "name", "kind", { type: "string" }] },
       ]);
-    });
-
-    it("reverts string + rename inside change_table block", async () => {
-      const recorder = new CommandRecorder(abstractDelegate);
-      await recorder.revert(async () => {
-        await recorder.changeTable("fruits", async (t) => {
-          await t.string("name");
-          await t.rename("kind", "cultivar");
-        });
-      });
-      // Reversed order and inverted: renameColumn first, then removeColumn
-      expect(recorder.commands).toHaveLength(2);
-      const [first, second] = recorder.commands;
-      expect(first.cmd).toBe("renameColumn");
-      expect(first.args).toEqual(["fruits", "cultivar", "kind"]);
-      expect(second.cmd).toBe("removeColumn");
-      expect(second.args[0]).toBe("fruits");
-      expect(second.args[1]).toBe("name");
     });
 
     it("removeIndex with an options hash records a nil column, not the hash", async () => {
@@ -539,8 +337,8 @@ describe("CommandRecorder", () => {
         await (t as any).bigserial("big_seq");
       });
       expect(recorder.commands).toEqual([
-        { cmd: "addColumn", args: ["fruits", "seq", "serial", {}] },
-        { cmd: "addColumn", args: ["fruits", "big_seq", "bigserial", {}] },
+        { cmd: "addColumn", args: ["fruits", "seq", "serial"] },
+        { cmd: "addColumn", args: ["fruits", "big_seq", "bigserial"] },
       ]);
     });
 
@@ -553,8 +351,8 @@ describe("CommandRecorder", () => {
         });
       });
       expect(recorder.commands).toEqual([
-        { cmd: "removeColumn", args: ["fruits", "big_seq", "bigserial", {}] },
-        { cmd: "removeColumn", args: ["fruits", "seq", "serial", {}] },
+        { cmd: "removeColumn", args: ["fruits", "big_seq", "bigserial"] },
+        { cmd: "removeColumn", args: ["fruits", "seq", "serial"] },
       ]);
     });
 
@@ -575,7 +373,7 @@ describe("CommandRecorder", () => {
         await (t as any).bitVarying("mask");
       });
       expect(recorder.commands).toEqual([
-        { cmd: "addColumn", args: ["fruits", "mask", "bit_varying", {}] },
+        { cmd: "addColumn", args: ["fruits", "mask", "bit_varying"] },
       ]);
     });
   });
@@ -599,9 +397,9 @@ describe("CommandRecorder", () => {
         await (t as any).longblob("payload");
       });
       expect(recorder.commands).toEqual([
-        { cmd: "addColumn", args: ["fruits", "qty", "unsigned_integer", {}] },
-        { cmd: "addColumn", args: ["fruits", "notes", "mediumtext", {}] },
-        { cmd: "addColumn", args: ["fruits", "payload", "longblob", {}] },
+        { cmd: "addColumn", args: ["fruits", "qty", "unsigned_integer"] },
+        { cmd: "addColumn", args: ["fruits", "notes", "mediumtext"] },
+        { cmd: "addColumn", args: ["fruits", "payload", "longblob"] },
       ]);
     });
 
@@ -614,8 +412,8 @@ describe("CommandRecorder", () => {
         });
       });
       expect(recorder.commands).toEqual([
-        { cmd: "removeColumn", args: ["fruits", "notes", "mediumtext", {}] },
-        { cmd: "removeColumn", args: ["fruits", "qty", "unsigned_integer", {}] },
+        { cmd: "removeColumn", args: ["fruits", "notes", "mediumtext"] },
+        { cmd: "removeColumn", args: ["fruits", "qty", "unsigned_integer"] },
       ]);
     });
   });
@@ -651,11 +449,25 @@ describe("CommandRecorder", () => {
 
 describe("Migration", () => {
   describe("CommandRecorderTest", () => {
+    let recorder: CommandRecorder & {
+      createTable(...args: unknown[]): void;
+      execute(sql: string): void;
+      nonExistingMethod(name: string): void;
+    };
+
+    beforeEach(() => {
+      recorder = new CommandRecorder(abstractDelegate) as typeof recorder;
+    });
+
     it("respond to delegates", () => {
       const recorder = new CommandRecorder({ america() {} }) as unknown as {
         america: unknown;
       };
       expect(typeof recorder.america).toBe("function");
+    });
+
+    it("send calls super", () => {
+      expect(() => recorder.nonExistingMethod("horses")).toThrow(TypeError);
     });
 
     it("send delegates to record", () => {
@@ -673,6 +485,342 @@ describe("Migration", () => {
         },
       }) as unknown as { foo(kw: string): string };
       expect(recorder.foo("bar")).toBe("bar");
+    });
+
+    it("inverse of raise exception on unknown commands", () => {
+      expect(() => recorder.inverseOf("execute", ["some sql"])).toThrow(IrreversibleMigration);
+    });
+
+    it("irreversible commands raise exception", async () => {
+      await expect(
+        recorder.revert(async () => {
+          recorder.execute("some sql");
+        }),
+      ).rejects.toThrow(IrreversibleMigration);
+    });
+
+    it("record", () => {
+      recorder.record("createTable", ["system_settings"]);
+      expect(recorder.commands.length).toBe(1);
+    });
+
+    it("inverted commands are reversed", async () => {
+      await recorder.revert(async () => {
+        recorder.record("createTable", ["hello"]);
+        recorder.record("createTable", ["world"]);
+      });
+      const tables = recorder.commands.map(({ args }) => args);
+      expect(tables).toEqual([["world"], ["hello"]]);
+    });
+
+    it("revert order", async () => {
+      const block = (t: Table) => t.string("name");
+      /* eslint-disable blazetrails/require-table-teardown */
+      recorder.createTable("apples", block);
+      await recorder.revert(async () => {
+        recorder.createTable("bananas", block);
+        await recorder.revert(async () => {
+          recorder.createTable("clementines", block);
+          recorder.createTable("dates");
+        });
+        recorder.createTable("elderberries");
+      });
+      await recorder.revert(async () => {
+        recorder.createTable("figs", block);
+        recorder.createTable("grapes");
+      });
+      /* eslint-enable blazetrails/require-table-teardown */
+      expect(recorder.commands).toEqual([
+        { cmd: "createTable", args: ["apples", block] },
+        { cmd: "dropTable", args: ["elderberries"] },
+        { cmd: "createTable", args: ["clementines", block] },
+        { cmd: "createTable", args: ["dates"] },
+        { cmd: "dropTable", args: ["bananas", block] },
+        { cmd: "dropTable", args: ["grapes"] },
+        { cmd: "dropTable", args: ["figs", block] },
+      ]);
+    });
+
+    it("invert change table", async () => {
+      await recorder.revert(async () => {
+        await recorder.changeTable("fruits", async (t) => {
+          await t.string("name");
+          await t.rename("kind", "cultivar");
+        });
+      });
+
+      expect(recorder.commands).toEqual([
+        { cmd: "renameColumn", args: ["fruits", "cultivar", "kind"] },
+        { cmd: "removeColumn", args: ["fruits", "name", "string"] },
+      ]);
+
+      await expect(
+        recorder.revert(async () => {
+          await recorder.changeTable("fruits", async (t) => {
+            await t.remove("kind");
+          });
+        }),
+      ).rejects.toThrow(IrreversibleMigration);
+    });
+
+    it("invert create table", async () => {
+      await recorder.revert(async () => {
+        recorder.record("createTable", ["system_settings"]);
+      });
+      const dropTable = recorder.commands[0];
+      expect(dropTable).toEqual({ cmd: "dropTable", args: ["system_settings"] });
+    });
+
+    it("invert create table with if not exists", async () => {
+      await recorder.revert(async () => {
+        recorder.record("createTable", ["system_settings", { ifNotExists: true }]);
+      });
+      const dropTable = recorder.commands[0];
+      expect(dropTable).toEqual({ cmd: "dropTable", args: ["system_settings", {}] });
+    });
+
+    it("invert create table with options and block", () => {
+      const block = () => {};
+      const dropTable = recorder.inverseOf("createTable", [
+        "people_reminders",
+        { id: false },
+        block,
+      ]);
+      expect(dropTable).toEqual({
+        cmd: "dropTable",
+        args: ["people_reminders", { id: false }, block],
+      });
+    });
+
+    it("invert drop table", () => {
+      const block = () => {};
+      const createTable = recorder.inverseOf("dropTable", [
+        "people_reminders",
+        { id: false },
+        block,
+      ]);
+      expect(createTable).toEqual({
+        cmd: "createTable",
+        args: ["people_reminders", { id: false }, block],
+      });
+    });
+
+    it("invert drop table with if exists", () => {
+      const block = () => {};
+      const createTable = recorder.inverseOf("dropTable", [
+        "people_reminders",
+        { id: false, ifExists: true },
+        block,
+      ]);
+      expect(createTable).toEqual({
+        cmd: "createTable",
+        args: ["people_reminders", { id: false }, block],
+      });
+    });
+
+    it("invert drop table without a block nor option", () => {
+      const inverseOf = () => recorder.inverseOf("dropTable", ["people_reminders"]);
+      expect(inverseOf).toThrow(IrreversibleMigration);
+      expect(inverseOf).toThrow(
+        "To avoid mistakes, drop_table is only reversible if given options or a block (can be empty).",
+      );
+    });
+
+    it("invert drop table with multiple tables", () => {
+      const inverseOf = () => recorder.inverseOf("dropTable", ["musics", "artists"]);
+      expect(inverseOf).toThrow(IrreversibleMigration);
+      expect(inverseOf).toThrow(
+        "To avoid mistakes, drop_table is only reversible if given a single table name.",
+      );
+    });
+
+    it("invert drop table with multiple tables and options", () => {
+      const inverseOf = () => recorder.inverseOf("dropTable", ["musics", "artists", { id: false }]);
+      expect(inverseOf).toThrow(IrreversibleMigration);
+      expect(inverseOf).toThrow(
+        "To avoid mistakes, drop_table is only reversible if given a single table name.",
+      );
+    });
+
+    it("invert drop table with multiple tables and block", () => {
+      const block = () => {};
+      const inverseOf = () => recorder.inverseOf("dropTable", ["musics", "artists", block]);
+      expect(inverseOf).toThrow(IrreversibleMigration);
+      expect(inverseOf).toThrow(
+        "To avoid mistakes, drop_table is only reversible if given a single table name.",
+      );
+    });
+
+    it("invert create join table", () => {
+      const dropJoinTable = recorder.inverseOf("createJoinTable", ["musics", "artists"]);
+      expect(dropJoinTable).toEqual({ cmd: "dropJoinTable", args: ["musics", "artists"] });
+    });
+
+    it("invert create join table with table name", () => {
+      const dropJoinTable = recorder.inverseOf("createJoinTable", [
+        "musics",
+        "artists",
+        { tableName: "catalog" },
+      ]);
+      expect(dropJoinTable).toEqual({
+        cmd: "dropJoinTable",
+        args: ["musics", "artists", { tableName: "catalog" }],
+      });
+    });
+
+    it("invert drop join table", () => {
+      const block = () => {};
+      const createJoinTable = recorder.inverseOf("dropJoinTable", [
+        "musics",
+        "artists",
+        { tableName: "catalog" },
+        block,
+      ]);
+      expect(createJoinTable).toEqual({
+        cmd: "createJoinTable",
+        args: ["musics", "artists", { tableName: "catalog" }, block],
+      });
+    });
+
+    it("invert rename table", () => {
+      const rename = recorder.inverseOf("renameTable", ["old", "new"]);
+      expect(rename).toEqual({ cmd: "renameTable", args: ["new", "old"] });
+    });
+
+    it("invert add column", () => {
+      const remove = recorder.inverseOf("addColumn", ["table", "column", "type", {}]);
+      expect(remove).toEqual({ cmd: "removeColumn", args: ["table", "column", "type", {}] });
+    });
+
+    it("invert change column", () => {
+      expect(() => recorder.inverseOf("changeColumn", ["table", "column", "type", {}])).toThrow(
+        IrreversibleMigration,
+      );
+    });
+
+    it("invert change column default", () => {
+      expect(() =>
+        recorder.inverseOf("changeColumnDefault", ["table", "column", "default_value"]),
+      ).toThrow(IrreversibleMigration);
+    });
+
+    it("invert change column default with from and to", () => {
+      const change = recorder.inverseOf("changeColumnDefault", [
+        "table",
+        "column",
+        { from: "old_value", to: "new_value" },
+      ]);
+      expect(change).toEqual({
+        cmd: "changeColumnDefault",
+        args: ["table", "column", { from: "new_value", to: "old_value" }],
+      });
+    });
+
+    it("invert change column default with from and to with boolean", () => {
+      const change = recorder.inverseOf("changeColumnDefault", [
+        "table",
+        "column",
+        { from: true, to: false },
+      ]);
+      expect(change).toEqual({
+        cmd: "changeColumnDefault",
+        args: ["table", "column", { from: false, to: true }],
+      });
+    });
+
+    it("invert change column null", () => {
+      const add = recorder.inverseOf("changeColumnNull", ["table", "column", true]);
+      expect(add).toEqual({ cmd: "changeColumnNull", args: ["table", "column", false] });
+    });
+
+    it("invert remove column", () => {
+      const add = recorder.inverseOf("removeColumn", ["table", "column", "type", {}]);
+      expect(add).toEqual({ cmd: "addColumn", args: ["table", "column", "type", {}] });
+    });
+
+    it("invert remove column without type", () => {
+      expect(() => recorder.inverseOf("removeColumn", ["table", "column"])).toThrow(
+        IrreversibleMigration,
+      );
+    });
+
+    it("invert rename column", () => {
+      const rename = recorder.inverseOf("renameColumn", ["table", "old", "new"]);
+      expect(rename).toEqual({ cmd: "renameColumn", args: ["table", "new", "old"] });
+    });
+
+    it("invert add index", () => {
+      const remove = recorder.inverseOf("addIndex", ["table", ["one", "two"]]);
+      expect(remove).toEqual({ cmd: "removeIndex", args: ["table", ["one", "two"]] });
+    });
+
+    it("invert add index with name", () => {
+      const remove = recorder.inverseOf("addIndex", [
+        "table",
+        ["one", "two"],
+        { name: "new_index" },
+      ]);
+      expect(remove).toEqual({
+        cmd: "removeIndex",
+        args: ["table", ["one", "two"], { name: "new_index" }],
+      });
+    });
+
+    it("invert add index with algorithm option", () => {
+      const remove = recorder.inverseOf("addIndex", [
+        "table",
+        "one",
+        { algorithm: "concurrently" },
+      ]);
+      expect(remove).toEqual({
+        cmd: "removeIndex",
+        args: ["table", "one", { algorithm: "concurrently" }],
+      });
+    });
+
+    it("invert remove index", () => {
+      const add = recorder.inverseOf("removeIndex", ["table", "one"]);
+      expect(add).toEqual({ cmd: "addIndex", args: ["table", "one"] });
+    });
+
+    it("invert remove index with positional column", () => {
+      const add = recorder.inverseOf("removeIndex", ["table", ["one", "two"], { options: true }]);
+      expect(add).toEqual({ cmd: "addIndex", args: ["table", ["one", "two"], { options: true }] });
+    });
+
+    it("invert remove index with column", () => {
+      const add = recorder.inverseOf("removeIndex", [
+        "table",
+        { column: ["one", "two"], options: true },
+      ]);
+      expect(add).toEqual({ cmd: "addIndex", args: ["table", ["one", "two"], { options: true }] });
+    });
+
+    it("invert remove index with name", () => {
+      const add = recorder.inverseOf("removeIndex", [
+        "table",
+        { column: ["one", "two"], name: "new_index" },
+      ]);
+      expect(add).toEqual({
+        cmd: "addIndex",
+        args: ["table", ["one", "two"], { name: "new_index" }],
+      });
+    });
+
+    it("invert remove index with no special options", () => {
+      const add = recorder.inverseOf("removeIndex", ["table", { column: ["one", "two"] }]);
+      expect(add).toEqual({ cmd: "addIndex", args: ["table", ["one", "two"]] });
+    });
+
+    it("invert remove index with no column", () => {
+      expect(() => recorder.inverseOf("removeIndex", ["table", { name: "new_index" }])).toThrow(
+        IrreversibleMigration,
+      );
+    });
+
+    it("invert rename index", () => {
+      const rename = recorder.inverseOf("renameIndex", ["table", "old", "new"]);
+      expect(rename).toEqual({ cmd: "renameIndex", args: ["table", "new", "old"] });
     });
   });
 });
