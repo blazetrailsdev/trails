@@ -1,16 +1,11 @@
 import { describe, it, expect } from "vitest";
-import type { Temporal } from "@blazetrails/date";
+import { Temporal } from "@blazetrails/date";
 import {
-  beginningOfDay,
-  middleOfDay,
-  endOfDay,
   endOfMonth,
   endOfYear,
   advance,
   prevDay,
   nextDay,
-  since,
-  ago,
   lastWeek,
   allDay,
   allWeek,
@@ -28,9 +23,16 @@ import {
   isFuture,
   isToday,
 } from "../time-ext.js";
+import * as DateExt from "../date-ext.js";
+import { setZone, resetZone } from "../time-zone-config.js";
+import { TimeZone } from "../values/time-zone.js";
 
 function d(year: number, month: number, day: number, hour = 0, min = 0, sec = 0, ms = 0): Date {
   return new Date(year, month - 1, day, hour, min, sec, ms);
+}
+
+function pd(year: number, month: number, day: number): Temporal.PlainDate {
+  return new Temporal.PlainDate(year, month, day);
 }
 
 function asDate(instant: Temporal.Instant): Date {
@@ -196,31 +198,77 @@ describe("DateExtCalculationsTest", () => {
   it.skip("tomorrow constructor when zone is set");
 
   it("since", () => {
-    const result = asDate(since(d(2005, 2, 21), 45));
-    expect(result.getSeconds()).toBe(45);
-    expect(result.getDate()).toBe(21);
+    const result = DateExt.since(pd(2005, 2, 21), 45);
+    expect(result.sec).toBe(45);
+    expect(result.day).toBe(21);
   });
 
-  it.skip("since when zone is set");
+  it("since when zone is set", () => {
+    const zone = TimeZone.find("Eastern Time (US & Canada)");
+    setZone(zone);
+    try {
+      expect(DateExt.since(pd(2005, 2, 21), 45).toI()).toBe(
+        zone.local(2005, 2, 21, 0, 0, 45).toI(),
+      );
+      expect(DateExt.since(pd(2005, 2, 21), 45).timeZone).toBe(zone);
+    } finally {
+      resetZone();
+    }
+  });
 
   it("ago", () => {
-    const result = asDate(ago(d(2005, 2, 21), 45));
-    expect(result.getDate()).toBe(20);
-    expect(result.getHours()).toBe(23);
-    expect(result.getMinutes()).toBe(59);
-    expect(result.getSeconds()).toBe(15);
+    const result = DateExt.ago(pd(2005, 2, 21), 45);
+    expect(result.day).toBe(20);
+    expect(result.hour).toBe(23);
+    expect(result.min).toBe(59);
+    expect(result.sec).toBe(15);
   });
 
-  it.skip("ago when zone is set");
+  it("ago when zone is set", () => {
+    const zone = TimeZone.find("Eastern Time (US & Canada)");
+    setZone(zone);
+    try {
+      expect(DateExt.ago(pd(2005, 2, 21), 45).toI()).toBe(
+        zone.local(2005, 2, 20, 23, 59, 15).toI(),
+      );
+      expect(DateExt.ago(pd(2005, 2, 21), 45).timeZone).toBe(zone);
+    } finally {
+      resetZone();
+    }
+  });
 
   it("middle of day", () => {
-    const result = asDate(middleOfDay(d(2005, 2, 21)));
-    expect(result.getHours()).toBe(12);
-    expect(result.getMinutes()).toBe(0);
+    const result = DateExt.middleOfDay(pd(2005, 2, 21));
+    expect(result.hour).toBe(12);
+    expect(result.min).toBe(0);
   });
 
-  it.skip("beginning of day when zone is set");
-  it.skip("end of day when zone is set");
+  it("beginning of day when zone is set", () => {
+    const zone = TimeZone.find("Eastern Time (US & Canada)");
+    setZone(zone);
+    try {
+      expect(DateExt.beginningOfDay(pd(2005, 2, 21)).toI()).toBe(
+        zone.local(2005, 2, 21, 0, 0, 0).toI(),
+      );
+      expect(DateExt.beginningOfDay(pd(2005, 2, 21)).timeZone).toBe(zone);
+    } finally {
+      resetZone();
+    }
+  });
+
+  it("end of day when zone is set", () => {
+    const zone = TimeZone.find("Eastern Time (US & Canada)");
+    setZone(zone);
+    try {
+      const endOfDayInZone = DateExt.endOfDay(pd(2005, 2, 21));
+      expect(endOfDayInZone.hour).toBe(23);
+      expect(endOfDayInZone.min).toBe(59);
+      expect(endOfDayInZone.sec).toBe(59);
+      expect(endOfDayInZone.timeZone).toBe(zone);
+    } finally {
+      resetZone();
+    }
+  });
 
   it("all day", () => {
     const { start, end } = allDay(d(2011, 6, 7));
@@ -315,17 +363,16 @@ describe("DateExtCalculationsTest", () => {
   });
 
   it("beginning of day", () => {
-    const date = d(2005, 2, 21, 10, 30, 45);
-    const result = asDate(beginningOfDay(date));
-    expect(result.getHours()).toBe(0);
-    expect(result.getMinutes()).toBe(0);
-    expect(result.getSeconds()).toBe(0);
+    const result = DateExt.beginningOfDay(pd(2005, 2, 21));
+    expect(result.hour).toBe(0);
+    expect(result.min).toBe(0);
+    expect(result.sec).toBe(0);
   });
 
   it("end of day", () => {
-    const date = d(2005, 2, 21, 10, 30, 45);
-    const result = asDate(endOfDay(date));
-    expect(result.getHours()).toBe(23);
-    expect(result.getMinutes()).toBe(59);
+    const result = DateExt.endOfDay(pd(2005, 2, 21));
+    expect(result.hour).toBe(23);
+    expect(result.min).toBe(59);
+    expect(result.sec).toBe(59);
   });
 });

@@ -151,10 +151,10 @@ export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
   // `date_time/acts_like.rb:6` — so the three `calculations.rb` reopenings
   // (`time/calculations.rb:11`, `date/calculations.rb:10`,
   // `date_time/calculations.rb:5`) contribute 129 methods to buckets named
-  // after files that define none of them. trails ports all three onto the one
-  // `time-ext.ts` (its three test files — `core-ext/{time,date,date-time}-ext.test.ts`
-  // — all import from it), the same one-TS-file-for-several-reopenings shape as
-  // `inflector.ts` above.
+  // after files that define none of them. trails ports the `Time` and `DateTime`
+  // reopenings onto the one `time-ext.ts`, the same one-TS-file-for-several-
+  // reopenings shape as `inflector.ts` above; the `Date` reopening has its own
+  // receiver and its own file (see below).
   // `ActiveSupport::JSON` is defined by `json/decoding.rb:12` first, so the
   // module's whole singleton surface — `encode`/`dump` from
   // `json/encoding.rb:16-43` included — buckets there. trails splits the two
@@ -162,7 +162,10 @@ export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
   // `json.ts`, `ActiveSupport::JSON::Encoding` on `json/encoding.ts`.
   "activesupport:json/decoding.rb": "json.ts",
   "activesupport:core_ext/time/calculations.rb": "time-ext.ts",
-  "activesupport:core_ext/date/calculations.rb": "time-ext.ts",
+  // The `Date` arm widens through `in_time_zone` before delegating to the
+  // `Time` arm (`date/calculations.rb:55-87`), so it has its own receiver —
+  // `Temporal.PlainDate` — and its own file.
+  "activesupport:core_ext/date/calculations.rb": "date-ext.ts",
   "activesupport:core_ext/date_time/calculations.rb": "time-ext.ts",
   // The activesupport `core_ext/*` reopenings. Ruby splits one class's extensions
   // across a file per concern and reopens the class in each; the extractor stamps

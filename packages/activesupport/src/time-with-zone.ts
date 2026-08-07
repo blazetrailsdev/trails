@@ -838,6 +838,11 @@ export class TimeWithZone {
     return this.change({ hour: 0, min: 0, sec: 0 });
   }
 
+  /** Mirrors: `DateAndTime::Calculations#middle_of_day` (`date_and_time/calculations.rb:95-97`) */
+  middleOfDay(): TimeWithZone {
+    return this.change({ hour: 12, min: 0, sec: 0 });
+  }
+
   beginningOfHour(): TimeWithZone {
     return this.change({ min: 0, sec: 0 });
   }

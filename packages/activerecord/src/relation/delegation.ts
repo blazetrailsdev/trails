@@ -751,8 +751,8 @@ export function wrapWithScopeProxy<T extends object>(rel: T): T {
     get(target: any, prop: string | symbol, receiver: any) {
       const value = Reflect.get(target, prop, receiver);
       if (typeof prop === "symbol") return value;
+      if (Reflect.has(target, prop)) return value;
       if (value !== undefined) return value;
-      if (prop in target) return value;
 
       const modelClass = target._model as typeof Base;
 
@@ -826,6 +826,16 @@ export function wrapWithScopeProxy<T extends object>(rel: T): T {
         return (...args: any[]) => delegator.apply(target, args);
       }
       return value;
+    },
+    // delegation.rb:150-152 — `super || model.respond_to?(method)`, over the
+    // names the `get` trap above fabricates.
+    has(target: any, prop: string | symbol) {
+      if (Reflect.has(target, prop)) return true;
+      if (typeof prop === "symbol") return false;
+      const modelClass = target._model as typeof Base;
+      if (modelClass._scopes.has(prop)) return true;
+      if (delegateEnumerableMethod(prop, () => target.toArray()) !== undefined) return true;
+      return typeof (modelClass as any)[prop] === "function";
     },
   });
 }

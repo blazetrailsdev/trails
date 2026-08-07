@@ -2,20 +2,6 @@
   {
     "package": "activesupport",
     "tsFile": "time-ext.ts",
-    "rubyName": "ago",
-    "call": "in_time_zone",
-    "reason": "Date#ago delegates to `in_time_zone` (date/calculations.rb:55-57) to widen a Date into a zoned Time. time-ext.ts already takes a JS `Date`, an instant, so there is no Date-to-Time widening step to delegate; it ports the Time arm (time/calculations.rb) instead."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "time-ext.ts",
-    "rubyName": "beginning_of_day",
-    "call": "in_time_zone",
-    "reason": "Date#beginning_of_day delegates to `in_time_zone` (date/calculations.rb:67-69) to widen a Date into a zoned Time. time-ext.ts already takes a JS `Date`, an instant, so there is no Date-to-Time widening step to delegate; it ports the Time arm (time/calculations.rb) instead."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "time-ext.ts",
     "rubyName": "change",
     "call": "integer?",
     "reason": "JS `Date` carries no zone object and no per-value UTC offset, so time-ext.ts's `change` has no counterpart to Time#change's `zone.respond_to?(:utc_to_local)` / `elsif zone` arms (time/calculations.rb:150-185) and cannot route through them."
@@ -26,27 +12,6 @@
     "rubyName": "change",
     "call": "local",
     "reason": "JS `Date` carries no zone object and no per-value UTC offset, so time-ext.ts's `change` has no counterpart to Time#change's `zone.respond_to?(:utc_to_local)` / `elsif zone` arms (time/calculations.rb:150-185) and cannot route through them."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "time-ext.ts",
-    "rubyName": "end_of_day",
-    "call": "in_time_zone",
-    "reason": "Date#end_of_day delegates to `in_time_zone` (date/calculations.rb:85-87) to widen a Date into a zoned Time. time-ext.ts already takes a JS `Date`, an instant, so there is no Date-to-Time widening step to delegate; it ports the Time arm (time/calculations.rb) instead."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "time-ext.ts",
-    "rubyName": "middle_of_day",
-    "call": "in_time_zone",
-    "reason": "Date#middle_of_day delegates to `in_time_zone` (date/calculations.rb:75-77) to widen a Date into a zoned Time. time-ext.ts already takes a JS `Date`, an instant, so there is no Date-to-Time widening step to delegate; it ports the Time arm (time/calculations.rb) instead."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "time-ext.ts",
-    "rubyName": "since",
-    "call": "in_time_zone",
-    "reason": "Date#since delegates to `in_time_zone` (date/calculations.rb:61-63) to widen a Date into a zoned Time. time-ext.ts already takes a JS `Date`, an instant, so there is no Date-to-Time widening step to delegate; it ports the Time arm (time/calculations.rb) instead."
   },
   {
     "package": "activesupport",

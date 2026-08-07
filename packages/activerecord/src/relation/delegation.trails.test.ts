@@ -21,6 +21,8 @@ import {
 import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
 import { Company, Firm } from "../test-helpers/models/company.js";
+import { fixtures } from "../test-fixtures.js";
+import { registerModel } from "../index.js";
 // Loading these registers each delegate class with the relation family so the
 // carrier resolvers find their base ctor and `uncacheableMethods()` sees the
 // subclass-only methods (`target`, …).
@@ -235,5 +237,52 @@ describe("delegated records operators without an Array.prototype counterpart", (
     const same = { equals, id: 1 };
     expect(delegateArrayMethod("intersection", () => [post])!([same])).toEqual([post]);
     expect(delegateArrayMethod("difference", () => [post])!([same])).toEqual([]);
+  });
+});
+
+/**
+ * `respond_to_missing?` (delegation.rb:150-152) has no direct JS spelling — the
+ * `in` operator is what a `respond_to?`-style probe reaches, and it routes to a
+ * Proxy `has` trap. These assert both dispatch proxies answer `in` for every
+ * name their `get` trap fabricates.
+ */
+describe("respond_to_missing? — `in` on the dispatch proxies", () => {
+  fixtures(["posts", "comments"]);
+
+  registerModel(Post);
+  registerModel(Comment);
+
+  it("answers a named scope, a class method and a delegated array method on a Relation", () => {
+    const rel = Comment.all();
+    expect("containingTheLetterE" in rel).toBe(true);
+    expect("whatAreYou" in rel).toBe(true);
+    expect("toSentence" in rel).toBe(true);
+    expect("partition" in rel).toBe(true);
+    expect("noSuchThingAtAll" in rel).toBe(false);
+  });
+
+  it("answers a named scope, a class method and a delegated array method on a CollectionProxy", async () => {
+    const post = await Post.find(1);
+    const comments = post.comments as unknown as object;
+    expect(comments).toBeInstanceOf(CollectionProxy);
+    expect("containingTheLetterE" in comments).toBe(true);
+    expect("whatAreYou" in comments).toBe(true);
+    expect("toSentence" in comments).toBe(true);
+    expect("partition" in comments).toBe(true);
+    expect("noSuchThingAtAll" in comments).toBe(false);
+  });
+
+  it("keeps an own property whose value is undefined off the delegation path", async () => {
+    // `whatAreYou` is a real Comment class method, so the delegation path would
+    // fabricate a callable for it. An own field of the same name holding
+    // `undefined` must win: the property is defined here, it is just unset.
+    const rel = Comment.all() as unknown as Record<string, unknown>;
+    Object.defineProperty(rel, "whatAreYou", { value: undefined, configurable: true });
+    expect(rel.whatAreYou).toBeUndefined();
+
+    const post = await Post.find(1);
+    const comments = post.comments as unknown as Record<string, unknown>;
+    Object.defineProperty(comments, "whatAreYou", { value: undefined, configurable: true });
+    expect(comments.whatAreYou).toBeUndefined();
   });
 });

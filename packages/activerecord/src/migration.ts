@@ -2229,7 +2229,6 @@ export class MigrationContext {
  * (Rails' `MigrationContext#open`).
  */
 type MigratorOptions = {
-  environment?: string;
   direction?: "up" | "down";
   targetVersion?: number | string | null;
 };
@@ -2242,7 +2241,6 @@ export class Migrator {
   private _migrations: MigrationProxy[];
   private _schemaMigration: SchemaMigration;
   private _internalMetadata: InternalMetadata;
-  private _environment: string;
   private readonly _options: MigratorOptions;
   private readonly _direction: "up" | "down";
   private readonly _targetVersion: number | null;
@@ -2292,11 +2290,6 @@ export class Migrator {
       this._schemaMigration = new SchemaMigration(direction);
       this._internalMetadata = new InternalMetadata(direction);
     }
-    this._environment =
-      options.environment ??
-      getEnv("TRAILS_ENV") ??
-      getEnv("NODE_ENV") ??
-      DatabaseConfigurations.defaultEnv;
     this.validate(migrations);
     this._migrations = this._sortMigrations(migrations);
   }
@@ -2568,20 +2561,13 @@ export class Migrator {
   async recordEnvironment(): Promise<void> {
     if (this.isDown()) return;
     if (this._internalMetadata.enabled) {
-      await this._internalMetadata.set("environment", this._recordedEnvironment());
+      // `NullConfig#env_name` is nil for a bare-adapter Migrator, as in Rails
+      // (`abstract/connection_pool.rb:17-22`); the cast narrows, it does not default.
+      await this._internalMetadata.set(
+        "environment",
+        this.connection.pool.dbConfig.envName as string,
+      );
     }
-  }
-
-  /**
-   * The env name stamped into `ar_internal_metadata`. Rails writes
-   * `connection.pool.db_config.env_name` straight through; a Migrator built on
-   * a bare adapter carries a NullPool, whose config answers nil for every key
-   * (Rails' `NullConfig#method_missing`), so fall back to the env name the
-   * Migrator resolved at construction rather than stamping undefined.
-   */
-  private _recordedEnvironment(): string {
-    const pool = this.connection.pool as { dbConfig?: { envName?: string } } | null;
-    return pool?.dbConfig?.envName ?? this._environment;
   }
 
   /**
