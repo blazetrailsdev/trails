@@ -4234,7 +4234,7 @@ export class PostgreSQLAdapter
   async addIndexOptions(
     tableName: string,
     columnName: string | string[],
-    options: Record<string, unknown> = {},
+    options: Parameters<AbstractAdapter["addIndexOptions"]>[2] = {},
   ): Promise<[AbstractIndexDefinition, string | undefined, boolean]> {
     const opts = { ...options };
     if (typeof opts.where === "string") {
@@ -4352,21 +4352,18 @@ export class PostgreSQLAdapter
   async addColumnForAlter(
     tableName: string,
     columnName: string,
-    type: string,
-    options: Record<string, unknown> = {},
-  ): Promise<unknown> {
-    const col = this.createTableDefinition(tableName).newColumnDefinition(
-      columnName,
-      type,
-      options,
-    );
-    const sql = `ADD COLUMN ${await this.schemaCreation.accept(col)}`;
-    return "comment" in options
-      ? [
-          sql,
-          () => this.changeColumnComment(tableName, columnName, options.comment as string | null),
-        ]
-      : sql;
+    type: ColumnType,
+    options: ColumnOptions = {},
+  ): Promise<string | [string, () => Promise<void>]> {
+    // postgresql/schema_statements.rb:1046-1049 — `return super unless
+    // options.key?(:comment)`, else `[super, Proc.new { change_column_comment }]`.
+    if (!("comment" in options)) {
+      return super.addColumnForAlter(tableName, columnName, type, options);
+    }
+    return [
+      (await super.addColumnForAlter(tableName, columnName, type, options)) as string,
+      () => this.changeColumnComment(tableName, columnName, options.comment ?? null),
+    ];
   }
 
   /** @internal */

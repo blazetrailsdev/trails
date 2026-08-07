@@ -3,12 +3,10 @@ import { Nodes } from "@blazetrails/arel";
 import { singularize, getCrypto } from "@blazetrails/activesupport";
 import { SchemaStatements as AbstractSchemaStatements } from "../abstract/schema-statements.js";
 import {
-  AlterTable,
   ChangeColumnDefinition,
   ChangeColumnDefaultDefinition,
   CheckConstraintDefinition,
   ForeignKeyDefinition,
-  TableDefinition as AbstractTableDefinition,
   type AddForeignKeyOptions,
   type ForeignKeyLookupOptions,
   type ColumnOptions,
@@ -62,7 +60,7 @@ function toS(value: unknown): string {
  * Only the members PG adds beyond `AbstractSchemaStatements` are listed: the
  * rest already reach `this` through the base class, and merging a second
  * declaration for them would collide with it — `PostgreSQLAdapter` narrows many
- * (`adapterName` to `AdapterName`, `addColumnForAlter` to `ColumnType`), which is
+ * (`adapterName` to `AdapterName`, `createAlterTable` to `PgAlterTable`), which is
  * legal on a class and is what Ruby's untyped override translates to, but
  * declaration merging demands identical types. `getDatabaseVersion` is the one
  * exception: a declaration-only `declare` field in the class body does outrank
@@ -75,9 +73,7 @@ function toS(value: unknown): string {
  * (TS2610). A real accessor override here would shadow `PostgreSQLAdapter`'s own
  * `type_map` once `include()` installs the module on the prototype, so `columns`
  * keeps its cast.
- *
- * The two members restated in the body are the reverse case: own members
- * TypeScript does accept, narrowed from the generic adapter's. @internal
+ * @internal
  */
 export interface SchemaStatements
   extends
@@ -820,23 +816,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
   // ---------------------------------------------------------------------------
   // Alter table
   // ---------------------------------------------------------------------------
-
-  // Route the schema-definition factories back through the adapter so that
-  // base SchemaStatements methods invoked here (e.g. `super.addColumn` →
-  // `buildAddColumnDefinition` → `createAlterTable` → `createTableDefinition`)
-  // build PG-specific definitions. Without these, `this` resolves to the
-  // generic base factories and PG column normalization (virtual → underlying
-  // type, etc.) is silently dropped.
-  override createTableDefinition(
-    name: string,
-    options: Record<string, unknown> = {},
-  ): AbstractTableDefinition {
-    return this.createTableDefinition(name, options);
-  }
-
-  override createAlterTable(name: string): AlterTable {
-    return this.createAlterTable(name);
-  }
 
   override async changeColumn(
     tableName: string,

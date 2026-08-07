@@ -168,22 +168,19 @@ export async function dbSchemaDump(cwd: string, _args: string[]): Promise<number
   }
 
   const env = DatabaseConfigurations.currentEnv();
-  const configs = DatabaseTasks.configsFor(env);
-  if (configs.length === 0) {
+  if (DatabaseTasks.configsFor(env).length === 0) {
     console.error(`ar: no database configuration found for environment "${env}"`);
     return 1;
   }
   try {
-    // Mirrors Rails' `db:schema:dump` rake task (`task dump: :load_config`):
-    // no model/environment load — just dump each config's schema inside a
-    // temporary pool so the dumper has a live connection.
-    for (const config of configs) {
-      await DatabaseTasks.withTemporaryPool(config, async () => {
-        await DatabaseTasks.dumpSchema(config);
-        const filename = DatabaseTasks.schemaDumpPath(config);
-        if (filename != null) console.log(`Dumped schema to ${filename}`);
-      });
-    }
+    // databases.rake:449-455 — `task dump: :load_config` does no model or
+    // environment load, just `with_temporary_pool_for_each { dump_schema }`.
+    await DatabaseTasks.withTemporaryPoolForEach({ env }, async (pool) => {
+      const dbConfig = pool.dbConfig;
+      await DatabaseTasks.dumpSchema(dbConfig);
+      const filename = DatabaseTasks.schemaDumpPath(dbConfig);
+      if (filename != null) console.log(`Dumped schema to ${filename}`);
+    });
     return 0;
   } catch (err) {
     console.error(`ar: db:schema:dump failed — ${String(err)}`);

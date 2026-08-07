@@ -5,7 +5,11 @@
  */
 
 import { DatabaseConfig } from "../database-configurations/database-config.js";
-import { DatabaseConfigurations } from "../database-configurations.js";
+import {
+  DatabaseConfigurations,
+  configurationsStore,
+  setConfigurationsStore,
+} from "../database-configurations.js";
 import { ProtectedEnvironmentError } from "../migration.js";
 import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
 import {
@@ -71,7 +75,20 @@ export class DatabaseTasks {
   static get name(): string {
     return "primary";
   }
-  static databaseConfiguration: DatabaseConfigurations | null = null;
+  // Rails' `attr_accessor :database_configuration` (database_tasks.rb:61) is an
+  // *input* to `ActiveRecord::Base.configurations`, never a rival store: every
+  // task-side reader goes through `Base.configurations.configs_for`
+  // (database_tasks.rb:514,517,552). So this reads and writes the one
+  // `@@configurations` registry (core.rb:71-79) that `Base.configurations`
+  // backs on to, rather than a second global that can drift out of step.
+  static get databaseConfiguration(): DatabaseConfigurations | null {
+    return configurationsStore();
+  }
+
+  static set databaseConfiguration(value: DatabaseConfigurations | null) {
+    setConfigurationsStore(value ?? DatabaseConfigurations.fromEnv({}));
+  }
+
   static dbDir: string = "db";
   private static _migrationsPaths: string[] = ["db/migrate"];
 
@@ -216,7 +233,6 @@ export class DatabaseTasks {
   }
 
   static async createAll(): Promise<void> {
-    if (!this.databaseConfiguration) return;
     // Rails: capture current db_config before iterating so we can restore it after.
     const { Base } = await import("../base.js");
     this._baseClass = Base;
@@ -244,20 +260,11 @@ export class DatabaseTasks {
         await this.create(config);
       }
     }
-    // Rails is `establish_connection(environment.to_sym)` (database_tasks.rb:653),
-    // which resolves through `Base.configurations`. trails cannot pass the bare env:
-    // `DatabaseTasks.databaseConfiguration` is a SEPARATE registry from
-    // `Base.configurations` (support/connection.ts:390-392 happens to set both, but
-    // callers reassign `databaseConfiguration` alone), so the env string would
-    // resolve against the wrong set of configs. findDbConfig mirrors what
-    // configurations.resolve(:env) does: forCurrentEnv configs first, then the first
-    // config for that env_name.
+    // database_tasks.rb:653 — `establish_connection(environment.to_sym)`, which
+    // resolves the bare env name through `Base.configurations`.
     const envName = this._normalizeEnv(environment);
-    const primaryConfig = this.databaseConfiguration?.findDbConfig(envName);
-    if (primaryConfig) {
-      const { Base } = await import("../base.js");
-      await Base.establishConnection(primaryConfig);
-    }
+    const { Base } = await import("../base.js");
+    await Base.establishConnection(envName);
   }
 
   static async drop(config: DatabaseConfig): Promise<void> {
@@ -280,7 +287,6 @@ export class DatabaseTasks {
   }
 
   static async dropAll(): Promise<void> {
-    if (!this.databaseConfiguration) return;
     for (const config of this.eachLocalConfiguration()) {
       await this.drop(config);
     }
@@ -520,7 +526,6 @@ export class DatabaseTasks {
   }
 
   static async purgeAll(): Promise<void> {
-    if (!this.databaseConfiguration) return;
     for (const config of this.eachLocalConfiguration()) {
       await this.purge(config);
     }
@@ -634,8 +639,8 @@ export class DatabaseTasks {
 
   /** @internal */
   static configsFor(environment: string): DatabaseConfig[] {
-    if (!this.databaseConfiguration) return [];
-    return this.databaseConfiguration.configsFor({ envName: environment });
+    // database_tasks.rb:551-553 — `Base.configurations.configs_for(**options)`.
+    return configurationsStore().configsFor({ envName: environment });
   }
 
   private static _normalizeEnv(environment?: string): string {
@@ -645,9 +650,9 @@ export class DatabaseTasks {
 
   /** @internal */
   static eachLocalConfiguration(): DatabaseConfig[] {
-    if (!this.databaseConfiguration) return [];
     const result: DatabaseConfig[] = [];
-    for (const c of this.databaseConfiguration.configsFor()) {
+    // database_tasks.rb:599 — `configs_for.each`, i.e. Base.configurations.
+    for (const c of configurationsStore().configsFor()) {
       if (!c.database) continue;
       if (this._localDatabase(c)) {
         result.push(c);
@@ -1239,10 +1244,6 @@ export class DatabaseTasks {
     block: (pool: ConnectionPool) => Promise<void>,
   ): Promise<void> {
     env = this._normalizeEnv(env);
-    // Rails reads `ActiveRecord::Base.configurations` here
-    // (`database_tasks.rb:514,517`), not `DatabaseTasks.database_configuration`
-    // — the two are distinct globals in trails, and only the former follows an
-    // app that assigned `Base.configurations` directly.
     if (name != null) {
       const dbConfig = (await this.migrationClass())
         .configurations()
@@ -1484,9 +1485,8 @@ export function resolveConfiguration(configuration: unknown): DatabaseConfig {
   // DatabaseConfig instances don't need a configurations registry — return as-is.
   // Avoids constructing a new DatabaseConfigurations (which mutates the global singleton).
   if (configuration instanceof DatabaseConfig) return configuration;
-  const configs = DatabaseTasks.databaseConfiguration;
-  if (!configs) throw new Error("DatabaseTasks.databaseConfiguration is not set");
-  return configs.resolve(configuration);
+  // database_tasks.rb:555-557 — `Base.configurations.resolve(configuration)`.
+  return configurationsStore().resolve(configuration);
 }
 
 function _errorToS(error: unknown): string {

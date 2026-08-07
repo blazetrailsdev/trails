@@ -1,4 +1,13 @@
-import { describe, it, expect, beforeEach, afterEach, vi, type MockInstance } from "vitest";
+import {
+  describe,
+  it,
+  expect,
+  beforeAll,
+  beforeEach,
+  afterEach,
+  vi,
+  type MockInstance,
+} from "vitest";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -14,6 +23,15 @@ import { adapterType, ambientPoolConfiguration } from "../test-adapter.js";
 import { inMemoryDb } from "../support/adapter-helper.js";
 import { fixtures } from "../test-fixtures.js";
 import { anonymousMigration } from "../test-helpers/anonymous-migration.js";
+
+// database_tasks_test.rb:476-485 — Rails saves and restores
+// `ActiveRecord::Base.configurations` around a stubbed set rather than clearing
+// it: `DatabaseTasks.database_configuration` is a view over that one registry,
+// which also holds the suite's own `arunit` config.
+let originalConfigurations: DatabaseConfigurations | null = null;
+beforeAll(() => {
+  originalConfigurations = DatabaseTasks.databaseConfiguration;
+});
 
 describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
   // Rails: `if current_adapter?(:SQLite3Adapter) && !in_memory_db?`
@@ -70,7 +88,7 @@ describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
 
         await cleanup.executeMutation("DROP TABLE IF EXISTS ar_internal_metadata");
         await cleanup.close();
-        DatabaseTasks.databaseConfiguration = null;
+        DatabaseTasks.databaseConfiguration = originalConfigurations;
         DatabaseTasks.clearRegisteredTasks();
         fs.rmSync(tmp, { recursive: true, force: true });
       }
@@ -116,7 +134,7 @@ describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
       const cleanup = new BetterSQLite3Adapter(dbFile);
       await cleanup.executeMutation("DROP TABLE IF EXISTS schema_migrations");
       await cleanup.close();
-      DatabaseTasks.databaseConfiguration = null;
+      DatabaseTasks.databaseConfiguration = originalConfigurations;
       DatabaseTasks.clearRegisteredTasks();
       fs.rmSync(tmp, { recursive: true, force: true });
     }
@@ -184,7 +202,7 @@ describe("DatabaseTasksCheckProtectedEnvironmentsMultiDatabaseTest", () => {
       );
     } finally {
       Base.protectedEnvironments = protectedEnvironments;
-      DatabaseTasks.databaseConfiguration = null;
+      DatabaseTasks.databaseConfiguration = originalConfigurations;
       DatabaseTasks.clearRegisteredTasks();
       fs.rmSync(tmp, { recursive: true, force: true });
     }
@@ -382,7 +400,7 @@ describe("DatabaseTasksCreateAllTest", () => {
   });
   afterEach(() => {
     DatabaseTasks.clearRegisteredTasks();
-    DatabaseTasks.databaseConfiguration = null;
+    DatabaseTasks.databaseConfiguration = originalConfigurations;
     vi.restoreAllMocks();
   });
 
@@ -464,7 +482,7 @@ describe("DatabaseTasksCreateCurrentTest", () => {
   });
   afterEach(() => {
     DatabaseTasks.clearRegisteredTasks();
-    DatabaseTasks.databaseConfiguration = null;
+    DatabaseTasks.databaseConfiguration = originalConfigurations;
     DatabaseTasks.env = "development";
     vi.restoreAllMocks();
   });
@@ -509,12 +527,10 @@ describe("DatabaseTasksCreateCurrentTest", () => {
   });
   it("establishes connection for the given environments", async () => {
     await DatabaseTasks.createCurrent("development");
-    expect(establishSpy).toHaveBeenCalledWith(
-      expect.objectContaining({
-        adapter: "abstract",
-        database: "dev-db",
-      }),
-    );
+    // database_tasks_test.rb:588,708 — `assert_called_with(Base,
+    // :establish_connection, [:development])`: the bare env name, resolved
+    // through `Base.configurations`.
+    expect(establishSpy).toHaveBeenCalledWith("development");
   });
 });
 
@@ -549,7 +565,7 @@ describe("DatabaseTasksCreateCurrentThreeTierTest", () => {
   });
   afterEach(() => {
     DatabaseTasks.clearRegisteredTasks();
-    DatabaseTasks.databaseConfiguration = null;
+    DatabaseTasks.databaseConfiguration = originalConfigurations;
     DatabaseTasks.env = "development";
     vi.restoreAllMocks();
   });
@@ -584,12 +600,10 @@ describe("DatabaseTasksCreateCurrentThreeTierTest", () => {
 
   it("establishes connection for the given environments config", async () => {
     await DatabaseTasks.createCurrent("development");
-    expect(establishSpy).toHaveBeenCalledWith(
-      expect.objectContaining({
-        adapter: "abstract",
-        database: "dev-db",
-      }),
-    );
+    // database_tasks_test.rb:588,708 — `assert_called_with(Base,
+    // :establish_connection, [:development])`: the bare env name, resolved
+    // through `Base.configurations`.
+    expect(establishSpy).toHaveBeenCalledWith("development");
   });
 });
 
@@ -607,7 +621,7 @@ describe("DatabaseTasksDropAllTest", () => {
   });
   afterEach(() => {
     DatabaseTasks.clearRegisteredTasks();
-    DatabaseTasks.databaseConfiguration = null;
+    DatabaseTasks.databaseConfiguration = originalConfigurations;
     vi.restoreAllMocks();
   });
 
@@ -686,7 +700,7 @@ describe("DatabaseTasksDropCurrentTest", () => {
   });
   afterEach(() => {
     DatabaseTasks.clearRegisteredTasks();
-    DatabaseTasks.databaseConfiguration = null;
+    DatabaseTasks.databaseConfiguration = originalConfigurations;
     DatabaseTasks.env = "development";
   });
 
@@ -751,7 +765,7 @@ describe("DatabaseTasksDropCurrentThreeTierTest", () => {
   });
   afterEach(() => {
     DatabaseTasks.clearRegisteredTasks();
-    DatabaseTasks.databaseConfiguration = null;
+    DatabaseTasks.databaseConfiguration = originalConfigurations;
     DatabaseTasks.env = "development";
   });
 
@@ -886,7 +900,7 @@ function databaseTasksMigrationTestCase(): MigrationTestCase {
     stdoutSpy?.mockRestore();
     stdoutSpy = undefined;
     DatabaseTasks.registerMigrations([]);
-    DatabaseTasks.databaseConfiguration = null;
+    DatabaseTasks.databaseConfiguration = originalConfigurations;
     DatabaseTasks.clearRegisteredTasks();
     try {
       Base.removeConnection();
@@ -1105,7 +1119,7 @@ describe("DatabaseTasksMigrateErrorTest", () => {
       } catch {
         /* no pool */
       }
-      DatabaseTasks.databaseConfiguration = null;
+      DatabaseTasks.databaseConfiguration = originalConfigurations;
       DatabaseTasks.registerMigrations([]);
       DatabaseTasks.clearRegisteredTasks();
       fs.rmSync(tmp, { recursive: true, force: true });
@@ -1116,7 +1130,7 @@ describe("DatabaseTasksMigrateErrorTest", () => {
 describe("DatabaseTasksPurgeCurrentTest", () => {
   afterEach(() => {
     DatabaseTasks.clearRegisteredTasks();
-    DatabaseTasks.databaseConfiguration = null;
+    DatabaseTasks.databaseConfiguration = originalConfigurations;
     DatabaseTasks.env = "development";
   });
 
@@ -1139,7 +1153,7 @@ describe("DatabaseTasksPurgeCurrentTest", () => {
 describe("DatabaseTasksPurgeAllTest", () => {
   afterEach(() => {
     DatabaseTasks.clearRegisteredTasks();
-    DatabaseTasks.databaseConfiguration = null;
+    DatabaseTasks.databaseConfiguration = originalConfigurations;
   });
 
   it("purge all local configurations", async () => {
@@ -1161,7 +1175,7 @@ describe("DatabaseTasksPurgeAllTest", () => {
 describe("DatabaseTasksTruncateAllTest", () => {
   afterEach(() => {
     DatabaseTasks.clearRegisteredTasks();
-    DatabaseTasks.databaseConfiguration = null;
+    DatabaseTasks.databaseConfiguration = originalConfigurations;
     DatabaseTasks.env = "development";
   });
 
@@ -1193,7 +1207,7 @@ describe("DatabaseTasksTruncateAllWithMultipleDatabasesTest", () => {
   });
   afterEach(() => {
     DatabaseTasks.clearRegisteredTasks();
-    DatabaseTasks.databaseConfiguration = null;
+    DatabaseTasks.databaseConfiguration = originalConfigurations;
     DatabaseTasks.env = "development";
   });
 
@@ -1249,7 +1263,7 @@ describe("DatabaseTasksTruncateAllWithMultipleDatabasesTest", () => {
 describe("DatabaseTasksCharsetTest", () => {
   afterEach(() => {
     DatabaseTasks.clearRegisteredTasks();
-    DatabaseTasks.databaseConfiguration = null;
+    DatabaseTasks.databaseConfiguration = originalConfigurations;
     DatabaseTasks.env = "development";
   });
 
@@ -1269,7 +1283,7 @@ describe("DatabaseTasksCharsetTest", () => {
 describe("DatabaseTasksCollationTest", () => {
   afterEach(() => {
     DatabaseTasks.clearRegisteredTasks();
-    DatabaseTasks.databaseConfiguration = null;
+    DatabaseTasks.databaseConfiguration = originalConfigurations;
     DatabaseTasks.env = "development";
   });
 
