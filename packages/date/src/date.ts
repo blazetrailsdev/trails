@@ -172,6 +172,9 @@ function subsecDigits(nsec: number, precision: number): string {
  *
  * Only the directives the i18n format strings and the conformance mixins use
  * are recognised; Ruby leaves an unknown directive in place, and so does this.
+ * `date_strftime.c` reads a width prefix ahead of every directive
+ * (`date_strftime.c:160-230`); only the `%L`/`%N` arm honours one here, so a
+ * width on any other directive keeps falling through verbatim.
  * `%z` and `%Z` both come off the subject: `::Date` has no zone of its own and
  * answers UTC, while a `::Time` built through the public constructor is in the
  * local zone and answers its real offset and abbreviation.
@@ -216,9 +219,6 @@ export function strftime(subject: StrftimeSubject, format: string): string {
     "%": () => "%",
   };
 
-  // `date_strftime.c` reads a width prefix ahead of EVERY directive
-  // (`date_strftime.c:160-230`); only the `%L`/`%N` arm is honoured here, so a
-  // width on any other directive keeps falling through verbatim as before.
   return format.replace(/%(-?)(\d*)(:{0,3}[A-Za-z%])/g, (match, flag, width, spec) => {
     const fn = tokens[spec];
     if (!fn) return match;
@@ -2681,10 +2681,21 @@ export class DateTime extends Date {
    * `c_valid_civil_p` and the time of day with `c_valid_time_p`, then stores the
    * day and day-fraction in UTC — which is what the two conversions below do.
    *
-   * Every time argument is split by {@link num2intWithFrac}, which raises
-   * `"invalid fraction"` for a fraction in any but the last argument supplied —
-   * `DateTime.new(2008, 3, 1, 6, 0.5, 0)` — and carries a legal one through
-   * `add_frac`, so `DateTime.new(2008, 3, 1, 6, 0.5)` is `06:00:30`.
+   * `datetime_initialize`'s `switch (argc)` fall-through
+   * (`date_core.c:7826-7849`) splits the second, then the minute, then the
+   * hour, then the day through {@link num2intWithFrac}, under the `n` bounds
+   * `positive_inf`, `5`, `4` and `3`. Only the LAST argument supplied may carry
+   * a fraction, so at most one of the four is ever nonzero — the rest raise
+   * `"invalid fraction"`, as `DateTime.new(2008, 3, 1, 6, 0.5, 0)` does — and
+   * `fr2` takes it in the C's own order.
+   *
+   * `add_frac()` (`date_core.c:3313-3317`) then hands `fr2` to `d_lite_plus`'s
+   * `T_FLOAT` arm (`date_core.c:6064-6135`), which is what makes
+   * `DateTime.new(2008, 3, 1, 6, 0.5)` `06:00:30`: the fraction's whole seconds
+   * go to `df`, carrying a day where they overflow one, and the rounded
+   * remainder to `sf`. `fr2` is under a day by construction, so the C's `jd`
+   * term is `0` and its sign branch is never taken — `f_mod` leaves every
+   * fraction positive.
    *
    * A fractional `second` is split off by `num2int_with_frac` over `s_trunc`
    * (`date_core.c:3269-3303`): `f_idiv(s, 1)` — floor, not truncate — is the
@@ -2735,12 +2746,6 @@ export class DateTime extends Date {
       this.#of = of;
       return;
     }
-    // `datetime_initialize`'s `switch (argc)` fall-through
-    // (`date_core.c:7826-7849`): the second, then the minute, then the hour,
-    // then the day each give up their fraction, under the `n` bounds
-    // `positive_inf`, `5`, `4` and `3`. Only the LAST argument supplied may
-    // carry one, so at most one of these fractions is ever nonzero — the rest
-    // raised — and `fr2` takes it in the C's own order.
     const [s, sFr] = num2intWithFrac(second ?? 0, 1, false);
     const [min, minFr] = num2intWithFrac(minute ?? 0, MINUTE_IN_SECONDS, second !== undefined);
     const [h, hFr] = num2intWithFrac(
@@ -2758,20 +2763,15 @@ export class DateTime extends Date {
     if (minFr !== 0) fr2 = minFr;
     if (hFr !== 0) fr2 = hFr;
     if (dFr !== 0) fr2 = dFr;
-    const of = offset ?? 0;
+    const rof = offset ?? 0;
     super(year, month ?? 1, d);
     const rjd = cValidCivilP(year, month ?? 1, d);
     if (rjd === null) throw new DateError("invalid date");
     const rt = cValidTimeP(h, min, s);
     if (rt === null) throw new DateError("invalid date");
     const localDf = timeToDf(rt[0], rt[1], rt[2]);
-    let date = jdLocalToUtc(rjd, localDf, of);
-    let df = dfLocalToUtc(localDf, of);
-    // `add_frac()` (`date_core.c:3313-3317`) over `d_lite_plus`'s `T_FLOAT` arm
-    // (`date_core.c:6064-6135`): the fraction's whole seconds go to `df`,
-    // carrying a day where they overflow one, and the rounded remainder to
-    // `sf`. `fr2` is under a day by construction, so the C's `jd` term is 0 and
-    // its sign branch is never taken — `f_mod` leaves every fraction positive.
+    let date = jdLocalToUtc(rjd, localDf, rof);
+    let df = dfLocalToUtc(localDf, rof);
     df += Math.floor(fr2);
     if (df >= DAY_IN_SECONDS) {
       date = date.add({ days: 1 });
@@ -2780,7 +2780,7 @@ export class DateTime extends Date {
     this.#date = date;
     this.#df = df;
     this.#sf = Math.round(secToNs(fr2 - Math.floor(fr2)));
-    this.#of = of;
+    this.#of = rof;
   }
 
   /**

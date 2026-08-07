@@ -3,12 +3,8 @@ import { describe, expect, it } from "vitest";
 import { foldSkeletonTokens } from "./compare.js";
 
 describe("foldSkeletonTokens", () => {
-  it("folds a Ruby block iteration onto the loop its for-of port tokens", () => {
-    // Ruby `xs.each { |x| save(x) }` — walk_for_skeleton records the `each`
-    // call, then the block body inline.
+  it("matches Ruby `xs.each { |x| save(x) }` against its `for (const x of xs) this.save(x)` port", () => {
     const ruby = ["ref:each", "ref:save"];
-    // Its faithful port, `for (const x of xs) this.save(x)` — extractSkeleton
-    // records the ForOfStatement as `loop`.
     const ts = ["loop", "ref:save"];
 
     expect(foldSkeletonTokens(ruby)).toEqual(foldSkeletonTokens(ts));
@@ -18,8 +14,7 @@ describe("foldSkeletonTokens", () => {
     expect(foldSkeletonTokens(["ref:forEach", "ref:save"])).toEqual(["loop", "ref:save"]);
   });
 
-  it("leaves the other no-JS-call-form names alone", () => {
-    // `key?` is in NO_JS_CALL_FORM but ports to the `in` operator, not a loop.
+  it("leaves the no-JS-call-form names that are not loops alone, such as `key?`", () => {
     expect(foldSkeletonTokens(["ref:key?", "if", "ref:to_s"])).toEqual([
       "ref:key?",
       "if",
