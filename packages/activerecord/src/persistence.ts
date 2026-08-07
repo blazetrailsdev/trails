@@ -1149,7 +1149,12 @@ function _assignAttribute(self: AttributeIO, key: string, value: unknown): Promi
  * on this synchronous surface it is parked on the record and drained by `save`,
  * exactly as the constructor's nested re-dispatch parks its own
  * (`_reapplyNestedAttrSetters`). `setAttributes` is the awaitable surface that
- * runs those writes in key order.
+ * runs those writes in key order — it orders the nested keys, it is not the
+ * only path that accepts them: `#{name}_attributes=` is an ordinary generated
+ * writer (nested_attributes.rb:386-392) and Rails hands it to `assign_attributes`
+ * from `ActiveModel::API#initialize` (api.rb:81, reached through
+ * `Base#initialize`'s `super`, core.rb:471-478) and from `update` / `update!`
+ * (persistence.rb:563-580), none of which can await.
  *
  * The parking is uniform: every step after a displacing key — later scalar
  * keys, the nested pass and the multiparameter pass alike — is assigned while
