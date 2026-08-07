@@ -41,6 +41,7 @@ import { InternalMetadata } from "./internal-metadata.js";
 import { DatabaseConfigurations } from "./database-configurations.js";
 import type { DatabaseConfig } from "./database-configurations/database-config.js";
 import { migrationArConfig } from "./migration/ar-config-source.js";
+import type { SchemaFormat } from "./tasks/database-tasks.js";
 import type { ExecutionStrategy } from "./migration/execution-strategy.js";
 import { PendingMigrationConnection } from "./migration/pending-migration-connection.js";
 import { registerVersion, findVersion, CURRENT_VERSION } from "./migration/compatibility.js";
@@ -1720,9 +1721,14 @@ export abstract class Migration {
    *
    * Rails roundtrips to Rake — `FileUtils.cd(root) { clear_all_connections!; system("bin/rails
    * db:test:prepare") }` — so plugins can hook into database initialization. trails has no
-   * process surface to shell to, so it calls what that Rake task reaches directly:
-   * `db:test:prepare` invokes `db:test:load_schema`, which is purge plus
-   * `DatabaseTasks.load_schema` per test config (`railties/databases.rake:547-565`).
+   * process surface to shell to, so it calls what that Rake task reaches directly.
+   * `db:test:prepare` invokes `db:test:load_schema` (`databases.rake:531-539`), which
+   * depends on `db:test:purge` (`:541-545`) — so every test config is purged by a direct
+   * `configs_for(env_name: "test")` loop with no pool open, and only then does
+   * `load_schema` open a temporary pool per config. Both phases are kept, in that order:
+   * the purge must not run behind an established connection to a database it is about
+   * to recreate. `ENV["SCHEMA_FORMAT"]` overrides the configured format there
+   * (`:537`), so it does here; trails keeps that setting on `DatabaseTasks`.
    */
   private static async loadSchemaBang(): Promise<void> {
     const databaseTasks = migrationArConfig()?.databaseTasks?.();
@@ -1730,10 +1736,15 @@ export abstract class Migration {
 
     await migrationArConfig()?.connectionHandler?.().clearAllConnectionsBang("all");
 
-    await databaseTasks.withTemporaryPoolForEach({ env: "test" }, async (pool) => {
-      const dbConfig = pool.dbConfig;
+    const testConfigs =
+      migrationArConfig()?.configurations?.().configsFor({ envName: "test" }) ?? [];
+    for (const dbConfig of testConfigs) {
       await databaseTasks.purge(dbConfig);
-      await databaseTasks.loadSchema(dbConfig, databaseTasks.schemaFormat);
+    }
+
+    const schemaFormat = (getEnv("SCHEMA_FORMAT") ?? databaseTasks.schemaFormat) as SchemaFormat;
+    await databaseTasks.withTemporaryPoolForEach({ env: "test" }, async (pool) => {
+      await databaseTasks.loadSchema(pool.dbConfig, schemaFormat);
     });
   }
 }
