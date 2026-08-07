@@ -567,11 +567,15 @@ function useFixtures(
           }
         }
       };
-      // Rails wraps its table_deletes unconditionally, but a set no foreign key
-      // points into has nothing for the wrap to protect, and the wrap is not
-      // free: PostgreSQL's runs an `ALTER TABLE ... TRIGGER` pass inside a nested
-      // transaction, which a test that deliberately broke its connection's
-      // `begin_db_transaction` cannot survive.
+      // Rails wraps its table_deletes unconditionally (database_statements.rb:492).
+      // We cannot yet, because this loop deletes through the adapter captured at
+      // seed time, which a test may have evicted or poisoned by then — and PG's
+      // wrap opens a nested transaction that a connection whose
+      // `begin_db_transaction` raises re-raises through. Skipping the wrap where
+      // no foreign key points into the set keeps it off exactly those sets.
+      // Converging is tracked by
+      // 0064-ar-test-infra-layout-fidelity/converge-fixture-teardown-delete-onto-a-live-connection,
+      // which retires this conditional along with the stale-connection cause.
       if (tables.some((table) => (dependents?.get(table)?.length ?? 0) > 0)) {
         await adapter.disableReferentialIntegrity(tableDeletes, tables);
       } else {
