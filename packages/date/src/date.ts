@@ -158,10 +158,20 @@ const MAX_EXACT_SUBSEC_SCALE = 6;
  * That tail runs out at fifteen digits: `sf` is under `1e9` nanoseconds, so
  * scaling it by more than {@link MAX_EXACT_SUBSEC_SCALE} leaves
  * `Number.MAX_SAFE_INTEGER` behind and the digits stop being the ones the value
- * holds. MRI pads a width past its own Rational's digits with zeros —
+ * holds. Past that the port pads zeros, which is NOT the C's general behaviour:
+ * `mul`/`div` (`date_strftime.c:288-303`) are exact Rational arithmetic under no
+ * ceiling at all, so `DateTime.new(2008, 3, 1, 6, 0, Rational(1, 3))` keeps
+ * emitting `3`s at any width MRI is given.
+ *
+ * That divergence is unreachable here, and it is `sf`'s own JS-number analogue
+ * (see {@link nsToSec}) rather than this cliff that makes it so: nothing can put
+ * a non-terminating fraction in `sf`. The constructor takes `second` as a
+ * `number` — there is no Rational-accepting overload — and rounds it to a whole
+ * nanosecond through `d_lite_plus`, so the only producer of a sub-nanosecond
+ * `sf` at all is `dtNewByFrags` over a decimal literal in a parsed string, whose
+ * expansion terminates. For those values MRI pads zeros too:
  * `DateTime.parse("...00.9999999999").strftime("%20N")` is
- * `"99999999990000000000"` — so zeros are also the right answer past the double's
- * cliff, and the recursion puts it exactly where the arithmetic stays exact.
+ * `"99999999990000000000"` on ruby 3.3.11.
  */
 function subsecDigits(nsec: number, precision: number): string {
   if (precision <= 9) {
