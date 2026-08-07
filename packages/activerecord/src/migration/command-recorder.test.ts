@@ -738,11 +738,11 @@ describe("Migration", () => {
       const enable = recorder.inverseOf("removeUniqueConstraint", [
         "dogs",
         ["speed"],
-        { deferrable: ":deferred", name: "uniq_speed" },
+        { deferrable: "deferred", name: "uniq_speed" },
       ]);
       expect(enable).toEqual({
         cmd: "addUniqueConstraint",
-        args: ["dogs", ["speed"], { deferrable: ":deferred", name: "uniq_speed" }],
+        args: ["dogs", ["speed"], { deferrable: "deferred", name: "uniq_speed" }],
       });
     });
 
