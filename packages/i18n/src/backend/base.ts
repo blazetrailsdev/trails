@@ -700,10 +700,10 @@ export abstract class Base {
   /**
    * Loads a JSON translations file. The data must have locales as toplevel
    * keys. As in #loadYml there is no `JSON.respond_to?(:load_file)` probe to
-   * port, so this takes the arm the gem takes (base.rb:280-281): symbolized —
+   * port, so this takes the arm the gem takes (base.rb:279-280): symbolized —
    * inherent in JS — and frozen.
    *
-   * @missingRailsCall load_file — Ruby's `JSON.load_file` (base.rb:281) reads
+   * @missingRailsCall load_file — Ruby's `JSON.load_file` (base.rb:280) reads
    * and parses in one call; `JSON.parse` only parses, so the read is served
    * from the preload (`preloadTranslationFiles`).
    */
