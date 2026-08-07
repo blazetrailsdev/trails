@@ -10,6 +10,9 @@
 //   `pattern`  — substring match against the Ruby SOURCE file path
 //                (from extract-ruby-api.rb, e.g. "promise.rb").
 //                Consumed by isSourceUnported() → api:compare.
+//                A leading "/" anchors it to a path boundary, exactly as in
+//                `testFile` below: "/version.rb" matches the top-level
+//                `version.rb` and `<dir>/version.rb`, but NOT `gem_version.rb`.
 //                Omit for test-only entries where the source IS being ported.
 //   `testFile` — substring match against the Ruby TEST file path
 //                (from extract-ruby-tests.rb, e.g. "message_pack_test.rb").
@@ -1272,13 +1275,6 @@ export const UNPORTED_FILES: UnportedFile[] = [
       "explicitly by callers.",
   },
   {
-    pattern: "version.rb",
-    package: "i18n",
-    reason:
-      "Gem version constant. trails carries the version in package.json — no " +
-      "TS counterpart by design.",
-  },
-  {
     testFile: "i18n_test.rb",
     tests: ["exposes its VERSION constant"],
     reason:
@@ -1351,11 +1347,28 @@ export const UNPORTED_FILES: UnportedFile[] = [
       "loadable. Ruby-only wire format, same as test_date_marshal.rb above; the " +
       "rest of the file stays counted.",
   },
+  {
+    pattern: "/version.rb",
+    reason:
+      "`Module.version` / `VERSION` returns the gem version as a Gem::Version " +
+      "(e.g. active_record/version.rb:8). Every trails package carries its " +
+      "version in package.json, which is the JS ecosystem's registry for it, so " +
+      "there is nothing to port. Anchored (leading `/`) so it cannot also " +
+      "exclude `gem_version.rb`, which IS ported and owns real surface " +
+      "(`ActionPack.gem_version`).",
+  },
 ];
 
 export function isSourceUnported(file: string, pkg?: string): boolean {
   return UNPORTED_FILES.some((e) => {
-    if (!e.pattern || !file.includes(e.pattern)) return false;
+    if (!e.pattern) return false;
+    // A leading "/" anchors the pattern to a path boundary — same rule as
+    // `isTestFileUnported` below — so a basename entry cannot swallow a longer
+    // basename that ends with it (`version.rb` vs `gem_version.rb`).
+    const matched = e.pattern.startsWith("/")
+      ? file === e.pattern.slice(1) || file.includes(e.pattern)
+      : file.includes(e.pattern);
+    if (!matched) return false;
     // `package` only exists on the pattern-bearing variant of the union.
     const scope = "package" in e ? e.package : undefined;
     return scope === undefined || pkg === undefined || scope === pkg;

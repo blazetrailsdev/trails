@@ -1,0 +1,16 @@
+[
+  {
+    "package": "activesupport",
+    "tsFile": "array-utils.ts",
+    "rubyName": "in_groups",
+    "call": "div",
+    "reason": "Ruby `size.div number` is Integer#div, floor division as a METHOD (grouping.rb:66). JS has no method form for it — `Math.floor(array.length / n)` (array-utils.ts:94) is the whole of it — so the call cannot survive the port."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "array-utils.ts",
+    "rubyName": "in_groups_of",
+    "call": "new",
+    "reason": "Ruby's `Array.new(padding, fill_with)` (grouping.rb:38) builds the pad run; JS spells the same allocation as an array literal/`fill`, with no constructor call to match."
+  }
+]

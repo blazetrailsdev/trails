@@ -83,10 +83,17 @@ describe("isSourceUnported package scoping", () => {
   });
 
   it("keeps i18n's exclusions from leaking into other packages", () => {
-    // `middleware.rb`, `version.rb` and `gettext` all appear in other gems.
+    // `middleware.rb` and `gettext` all appear in other gems.
     expect(isSourceUnported("middleware.rb", "actiondispatch")).toBe(false);
-    expect(isSourceUnported("version.rb", "activesupport")).toBe(false);
     expect(isSourceUnported("gettext.rb", "activesupport")).toBe(false);
+  });
+
+  it("anchors a leading-slash pattern to a path boundary", () => {
+    // `version.rb` is excluded in every package (the version lives in
+    // package.json), but `gem_version.rb` is ported and owns real surface.
+    expect(isSourceUnported("version.rb", "activesupport")).toBe(true);
+    expect(isSourceUnported("action_pack/version.rb", "actionpackversion")).toBe(true);
+    expect(isSourceUnported("gem_version.rb", "actionpackversion")).toBe(false);
   });
 
   it("treats an absent pkg argument as 'any package' to preserve legacy callers", () => {

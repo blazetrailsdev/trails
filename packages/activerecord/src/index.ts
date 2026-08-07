@@ -249,7 +249,6 @@ export {
   EagerLoadPolymorphicError,
   DeleteRestrictionError,
   HasOnePersistedAssignmentError,
-  NestedAttributesDisplacementError,
   CollectionPersistedAssignmentError,
   CollectionIdsAssignmentError,
 } from "./associations/errors.js";

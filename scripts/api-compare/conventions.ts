@@ -164,6 +164,37 @@ export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
   "activesupport:core_ext/time/calculations.rb": "time-ext.ts",
   "activesupport:core_ext/date/calculations.rb": "time-ext.ts",
   "activesupport:core_ext/date_time/calculations.rb": "time-ext.ts",
+  // The activesupport `core_ext/*` reopenings. Ruby splits one class's extensions
+  // across a file per concern and reopens the class in each; the extractor stamps
+  // the entity with whichever reopening came first (`object/blank.rb` for String,
+  // `object/duplicable.rb` for Hash, …), so every other file's methods are
+  // measured against a TS counterpart that defines none of them. trails collapses
+  // each class's core_ext surface into one module — `hash-utils.ts`,
+  // `string-utils.ts`, `module-ext.ts`, `array-utils.ts` — so the mapping is
+  // many Ruby files to the one TS file, the same shape as `inflector.ts` above.
+  "activesupport:core_ext/hash/keys.rb": "hash-utils.ts",
+  "activesupport:core_ext/hash/reverse_merge.rb": "hash-utils.ts",
+  "activesupport:core_ext/hash/deep_transform_values.rb": "hash-utils.ts",
+  "activesupport:core_ext/object/deep_dup.rb": "hash-utils.ts",
+  // `to_query` is defined on Object, Array and Hash by this one file; trails
+  // carries all three arms on the hash helpers.
+  "activesupport:core_ext/object/to_query.rb": "hash-utils.ts",
+  "activesupport:core_ext/string/filters.rb": "string-utils.ts",
+  "activesupport:core_ext/string/access.rb": "string-utils.ts",
+  "activesupport:core_ext/string/indent.rb": "string-utils.ts",
+  "activesupport:core_ext/string/strip.rb": "string-utils.ts",
+  "activesupport:core_ext/module/attr_internal.rb": "module-ext.ts",
+  "activesupport:core_ext/module/attribute_accessors.rb": "module-ext.ts",
+  "activesupport:core_ext/module/introspection.rb": "module-ext.ts",
+  "activesupport:core_ext/module/delegation.rb": "module-ext.ts",
+  "activesupport:core_ext/module/anonymous.rb": "module-ext.ts",
+  "activesupport:core_ext/array/grouping.rb": "array-utils.ts",
+  "activesupport:core_ext/array/extract.rb": "array-utils.ts",
+  "activesupport:core_ext/array/wrap.rb": "array-utils.ts",
+  // Range keeps Rails' per-concern file layout in trails, so these map by the
+  // default rule — but Range's home bucket is `core_ext/range/each.rb`, so the
+  // reopening still needs the entry.
+  "activesupport:core_ext/range/overlap.rb": "core-ext/range/overlap.ts",
 };
 
 /** The explicit TS mapping for `rubyFile` in `pkg`, or undefined when unmapped. */

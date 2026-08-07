@@ -459,10 +459,8 @@ export class HasOneAssociation extends SingularAssociation {
    * record` (:84) is never reached when `remove_target!` raises (e.g. a failed
    * nullify save, has_one_association.rb:102-108).
    *
-   * There is no synchronous caller: the Rails-named `#{name}_attributes=`
-   * setter refuses a displacing assignment outright
-   * ({@link NestedAttributesDisplacementError}) rather than starting a removal
-   * it cannot await, so every caller here runs Rails' order intact.
+   * There is no synchronous caller: every writer that can displace a record is
+   * awaitable, so each of them runs Rails' order intact.
    *
    * No `isPersisted` pre-screen: Rails' `remove_target!` gates on persistence
    * only inside its `:destroy` and nullify arms; the `:delete` arm calls
@@ -487,17 +485,18 @@ export class HasOneAssociation extends SingularAssociation {
 
   /**
    * Whether a nested-attributes build over this association would reach DB I/O
-   * — the question the *synchronous* `#{name}_attributes=` setter has to answer
-   * before it starts, because it can await neither half of the `load_target`
-   * (has_one_association.rb:59) / `remove_target!` (:69) pair Rails runs inline.
+   * — the `load_target` (has_one_association.rb:59) / `remove_target!` (:69)
+   * pair Rails runs inline. Rails answers it by just running them; ours asks
+   * first, because a build that displaces nothing is pure in-memory work and
+   * has to stay synchronous for `new Model({shipAttributes: {…}})` to build the
+   * associated record inside the constructor, as Rails' does.
    *
    * True on both displacing arms: an already-loaded record to remove, and an
    * unloaded association whose `find_target?` (`findTargetNeeded`) says Rails
    * would query for one — the guard is `return target unless load_target ||
    * record`, and Ruby always evaluates the left operand, so a never-loaded
    * has_one on a persisted owner still discovers (and removes) the row. False
-   * when the build displaces nothing, which keeps the synchronous setter
-   * working for every non-displacing assignment.
+   * when the build displaces nothing, which keeps that assignment synchronous.
    *
    * `protected` because this is association-internal bookkeeping, not API
    * surface. The nested-attributes writer lives outside the class hierarchy and
