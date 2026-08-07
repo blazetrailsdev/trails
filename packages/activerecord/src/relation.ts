@@ -7196,8 +7196,12 @@ export class Relation<T extends Base> {
   }
 
   /** @internal */
-  private isBuildCountSubquery(operation: string, columnName: string, distinct: boolean): boolean {
-    return _isBuildCountSubquery(operation, columnName, distinct);
+  private isBuildCountSubquery(
+    operation: string,
+    columnName: string | string[] | Nodes.Node | null,
+    distinct: boolean,
+  ): boolean {
+    return _isBuildCountSubquery(this as any, operation, columnName, distinct);
   }
 
   // ---------------------------------------------------------------------------

@@ -9,13 +9,6 @@
   {
     "package": "activerecord",
     "tsFile": "relation/batches.ts",
-    "rubyName": "batch_on_unloaded_relation",
-    "call": "order:applyLimits,limit",
-    "reason": "Baseline (RFC 0084): ORDER-only divergence surfaced when the two extractors' chained-call traversal was aligned — the body's previous first-inversion row retired in the same PR and this is the next one; pending per-body control-flow convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/batches.ts",
     "rubyName": "ensure_valid_options_for_batching!",
     "call": "size",
     "reason": "Per-entry verified (RFC 0072 batching cluster): Rails batches.rb:306-312 compares `Array(start).size != cursor.size`; trails relation/batches.ts spells the same arity check with `Array.isArray(...) ? ... : [...]` and `.length`, JS's spelling of `Array()`/`#size`. Equivalent, not an omission."

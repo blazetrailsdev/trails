@@ -10,6 +10,7 @@
 
 import { Nodes, Table, SelectManager } from "@blazetrails/arel";
 import { BigIntegerType } from "@blazetrails/activemodel";
+import { many } from "@blazetrails/activesupport";
 import type { AdapterName } from "../connection-adapters/abstract-adapter.js";
 import type { Base } from "../base.js";
 import { withQueryConnection } from "../connection-handling.js";
@@ -1040,92 +1041,13 @@ export async function performCount(
   };
 
   if (this._limitValue !== null || this._offsetValue !== null) {
-    // Rails: build_count_subquery — wraps the limited relation as a subquery
-    // and counts its rows without instantiating records.
-    // Mirrors: ActiveRecord::Calculations#build_count_subquery
-    const innerTable = table;
-    let innerManager: SelectManager;
-    // columnAlias: what the outer COUNT targets. Mirrors Rails:
-    //   column_name == :all → Arel.star   (outer: COUNT(*))
-    //   else                → "count_column" (outer: COUNT(count_column))
-    const rawEffectiveCol = column === "*" ? undefined : column;
-    // Inherit select-value column when no explicit column is provided (same logic
-    // as the non-limit path below — mirrors Rails execute_simple_calculation).
-    const selectColsLimited = (this as any)._selectColumns as unknown[] | null | undefined;
-    // A single plain-identifier string select (`select("firm_id")`) counts that
-    // column too — Rails' select_for_count compiles string select values via
-    // arel_columns. Raw SQL fragments (commas/spaces) stay out: Rails raises on
-    // those and trails' divergence there is tracked separately.
-    const singleSelectColLimited =
-      !rawEffectiveCol &&
-      selectColsLimited?.length === 1 &&
-      (selectColsLimited[0] instanceof Nodes.Node ||
-        (typeof selectColsLimited[0] === "string" &&
-          /^[a-zA-Z_][a-zA-Z0-9_.]*$/.test(selectColsLimited[0])))
-        ? selectColsLimited[0]
-        : null;
-    const effectiveCol = rawEffectiveCol ?? singleSelectColLimited ?? undefined;
-    let columnAlias: Nodes.Node;
-    // Resolve effectiveCol: an Arel node is used as-is; a string goes through table.get.
-    const resolveColNode = (
-      col: string | Nodes.Node,
-    ): Nodes.Node & { as(alias: string): unknown } =>
-      (col instanceof Nodes.Node ? col : innerTable.get(col)) as Nodes.Node & {
-        as(alias: string): unknown;
-      };
-    if (this._isDistinct && effectiveCol) {
-      // DISTINCT + specific column: project that column aliased as count_column
-      // with DISTINCT applied so the inner query counts distinct non-NULL values
-      // of the requested column (matches COUNT(DISTINCT col) semantics).
-      innerManager = project(resolveColNode(effectiveCol).as("count_column"));
-      innerManager.distinct();
-      columnAlias = new Nodes.SqlLiteral("count_column");
-    } else if (this._isDistinct) {
-      // DISTINCT + count(*): project PK with DISTINCT to deduplicate rows.
-      // Use table.get(c) so PK refs are qualified (unambiguous with joins).
-      const pk = (this._model as any).primaryKey ?? "id";
-      if (Array.isArray(pk)) {
-        innerManager = project(...pk.map((c: string) => innerTable.get(c)));
-      } else {
-        innerManager = project(innerTable.get(pk));
-      }
-      innerManager.distinct();
-      columnAlias = new Nodes.SqlLiteral("*");
-    } else if (effectiveCol) {
-      // Specific column requested: project it aliased as count_column so the
-      // outer COUNT(count_column) excludes NULLs, matching non-limited semantics.
-      const colNode = resolveColNode(effectiveCol);
-      innerManager = project(colNode.as("count_column"));
-      columnAlias = new Nodes.SqlLiteral("count_column");
-    } else {
-      innerManager = project(new Nodes.SqlLiteral("1 AS one"));
-      columnAlias = new Nodes.SqlLiteral("*");
-    }
-    this._applyJoinsToManager(innerManager);
-    this._applyWheresToManager(innerManager, innerTable);
-    applyFromToManager(this, innerManager);
-    applyHavingToManager(this, innerManager);
-    if (this._limitValue !== null) innerManager.take(this._limitValue);
-    if (this._offsetValue !== null) innerManager.skip(this._offsetValue);
-    // Wrap inner query as Arel AST: Grouping (parens) + TableAlias.
-    // Mirrors Rails: Arel::Nodes::TableAlias.new(Arel::Nodes::Grouping.new(inner), alias)
-    const [innerSql, allInnerBinds] = compileManagerWithBinds(this, innerManager);
-    const subqueryNode = new Nodes.TableAlias(
-      new Nodes.Grouping(new Nodes.SqlLiteral(innerSql)),
-      new Nodes.SqlLiteral("subquery_for_count", { retryable: true }),
-    );
-    const countNode = new Nodes.NamedFunction("COUNT", [columnAlias]);
-    const outerManager = project(countNode.as("count"));
-    outerManager.from(subqueryNode);
-    // Rails' build_subquery strips optimizer hints from the inner relation
-    // (except(:optimizer_hints)) and re-applies them to the outer COUNT
-    // SelectManager — keeping the hint at the front of the emitted query.
-    if (this._optimizerHints.length > 0) outerManager.optimizerHints(...this._optimizerHints);
-    const [outerSql, outerBinds] = compileManagerWithBinds(this, outerManager);
-    const [withCtes, ctedBinds] = prependCtes(this, outerSql, [...allInnerBinds, ...outerBinds]);
-    const result = await this._conn().selectAll(withCtes, `${this.model.name} Count`, ctedBinds);
-    const rows = result.toArray();
-    return Number(rows[0]?.count ?? 0);
+    // calculations.rb:94-104 + 217-246: `count` is `calculate(:count, ...)`, so
+    // the has_limit_or_offset? arm of `build_count_subquery?`
+    // (calculations.rb:655-661) is reached through `perform_calculation` ->
+    // `execute_simple_calculation`, not from the count body. The remaining
+    // `performCount` arms are still fused; converging them is the second half of
+    // this inversion.
+    return performCalculation(this, "count", column ?? null) as Promise<number>;
   }
 
   // `table` and `project` (alias-aware) were resolved above the limit/offset
@@ -1472,6 +1394,79 @@ export function operationOverAggregateColumn(
   return typeof column[operation] === "function" ? column[operation]() : column;
 }
 
+/**
+ * Mirrors: ActiveRecord::Calculations#build_count_subquery
+ * (calculations.rb:663-685). Rails returns the outer `SelectManager`; trails
+ * returns it alongside the inner query's binds, because the inner manager is
+ * compiled to SQL here (a trails `SelectManager` cannot carry another
+ * manager's binds through `Nodes.Grouping`).
+ *
+ * @internal
+ */
+function buildCountSubquery(
+  relation: CalculationRelation,
+  columnName: string | Nodes.Node | null,
+  distinct: boolean,
+): [SelectManager, unknown[]] {
+  const baseTable = relation._model.arelTable;
+  const table = (relation as unknown as { table?: typeof baseTable }).table ?? baseTable;
+  const project = (...projections: unknown[]): SelectManager => {
+    if (table instanceof Table) return table.project(...(projections as never[]));
+    const m = new SelectManager(table as never);
+    m.project(...(projections as never[]));
+    return m;
+  };
+
+  let columnAlias: Nodes.Node;
+  let innerManager: SelectManager;
+  if (columnName == null || columnName === "*" || columnName === "all") {
+    columnAlias = new Nodes.SqlLiteral("*");
+    if (!distinct) {
+      innerManager = project(new Nodes.SqlLiteral("1 AS one"));
+    } else {
+      // DIVERGENCE (calculations.rb:665-666): Rails leaves `select_values`
+      // alone for `distinct` and lets the adapter dedupe the projected `*`.
+      // SQLite/PG reject `COUNT(DISTINCT *)`, so the inner query projects the
+      // primary key columns under DISTINCT instead.
+      const pk = (relation._model as any).primaryKey ?? "id";
+      innerManager = Array.isArray(pk)
+        ? project(...pk.map((c: string) => table.get(c)))
+        : project(table.get(pk));
+      innerManager.distinct();
+    }
+  } else {
+    columnAlias = new Nodes.SqlLiteral("count_column");
+    const colNode = aggregateColumn(relation, columnName) as Nodes.Node & {
+      as(alias: string): unknown;
+    };
+    innerManager = project(colNode.as("count_column"));
+    if (distinct) innerManager.distinct();
+  }
+
+  relation._applyJoinsToManager(innerManager);
+  relation._applyWheresToManager(innerManager, table);
+  applyFromToManager(relation, innerManager);
+  applyHavingToManager(relation, innerManager);
+  if (relation._limitValue !== null) innerManager.take(relation._limitValue);
+  if (relation._offsetValue !== null) innerManager.skip(relation._offsetValue);
+  const [innerSql, innerBinds] = compileManagerWithBinds(relation, innerManager);
+
+  const subqueryAlias = new Nodes.SqlLiteral("subquery_for_count", { retryable: true });
+  const selectValue = operationOverAggregateColumn(columnAlias, "count", false) as Nodes.Node & {
+    as(alias: string): unknown;
+  };
+  // Mirrors `build_subquery` (query_methods.rb:1605-1611): the subquery is the
+  // inner relation aliased, and the optimizer hints move to the outer manager.
+  const outerManager = project(selectValue.as("count"));
+  outerManager.from(
+    new Nodes.TableAlias(new Nodes.Grouping(new Nodes.SqlLiteral(innerSql)), subqueryAlias),
+  );
+  if (relation._optimizerHints.length > 0) {
+    outerManager.optimizerHints(...relation._optimizerHints);
+  }
+  return [outerManager, innerBinds];
+}
+
 /** @internal */
 export async function executeSimpleCalculation(
   rel: CalculationRelation,
@@ -1479,6 +1474,18 @@ export async function executeSimpleCalculation(
   columnName: string | string[] | Nodes.Node | null,
   distinct: boolean | null,
 ): Promise<unknown> {
+  if (isBuildCountSubquery(rel, operation, columnName, distinct === true)) {
+    if (rel._limitValue === 0) return 0;
+    const [queryBuilder, innerBinds] = buildCountSubquery(
+      rel,
+      columnName as string | Nodes.Node | null,
+      distinct === true,
+    );
+    const [outerSql, outerBinds] = compileManagerWithBinds(rel, queryBuilder);
+    const [withCtes, ctedBinds] = prependCtes(rel, outerSql, [...innerBinds, ...outerBinds]);
+    const result = await rel._conn().selectAll(withCtes, `${rel.model.name} Count`, ctedBinds);
+    return Number(result.toArray()[0]?.count ?? 0);
+  }
   const fn = operation.toLowerCase() as AggFn;
   // DIVERGENCE (Rails calculations.rb:468-511): the ungrouped aggregate body —
   // the count-subquery shortcut, the `unscope(:order).distinct!(false)` rebase,
@@ -1625,11 +1632,25 @@ export function selectForCount(rel: CalculationRelation): string {
     .join(", ");
 }
 
-/** @internal */
+/**
+ * Mirrors: ActiveRecord::Calculations#build_count_subquery?
+ * (calculations.rb:655-661) — SQLite and older MySQL cannot `COUNT DISTINCT`
+ * over `*` or multiple columns, so those cases go through a subquery.
+ *
+ * @internal
+ */
 export function isBuildCountSubquery(
+  rel: CalculationRelation,
   operation: string,
-  columnName: string,
+  columnName: string | string[] | Nodes.Node | null,
   distinct: boolean,
 ): boolean {
-  return operation === "count" && distinct && columnName !== "*";
+  const isAll = columnName == null || columnName === "*" || columnName === "all";
+  const selectValues = rel.selectValues ?? [];
+  return (
+    operation === "count" &&
+    (((isAll || many(selectValues)) && distinct) ||
+      rel._limitValue !== null ||
+      rel._offsetValue !== null)
+  );
 }

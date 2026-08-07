@@ -628,7 +628,8 @@ export abstract class Base {
    * extensions.
    */
   protected loadFile(filename: string): TranslationData {
-    const type = tr(extname(filename), ".", "").toLowerCase();
+    let type = extname(filename);
+    type = tr(type, ".", "").toLowerCase();
     const loader = (this as unknown as Record<string, unknown>)[
       `load${type.charAt(0).toUpperCase()}${type.slice(1)}`
     ];

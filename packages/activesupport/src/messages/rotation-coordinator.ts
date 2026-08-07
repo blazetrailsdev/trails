@@ -132,7 +132,8 @@ export abstract class RotationCoordinator<C extends FallsBack<C>> {
     if (transitional) {
       compacted = [...compacted.slice(0, 2).reverse(), ...compacted.slice(2)];
     }
-    const rotateOptions = uniq(compacted.map((options) => this.normalizeOptions(options)));
+    let rotateOptions = compacted.map((options) => this.normalizeOptions(options));
+    rotateOptions = uniq(rotateOptions);
 
     if (rotateOptions.length === 0)
       throw new RuntimeError(`No options have been configured for ${saltToS(salt)}`);
