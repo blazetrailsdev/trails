@@ -45,8 +45,8 @@ describe("Backend::Simple", () => {
     expect(backend.translations()).toEqual({ en: { foo: "bar", baz: "baz" } });
   });
 
+  // simple.rb:99-100 retries a missed key with `_key = _key.to_s.to_sym`.
   it("looks a Symbol-spelled key up in the same entry as its String form", () => {
-    // simple.rb:99-100 retries a missed key with `_key = _key.to_s.to_sym`.
     const backend = new Simple();
     backend.storeTranslations("en", { foo: { bar: "baz" } });
 

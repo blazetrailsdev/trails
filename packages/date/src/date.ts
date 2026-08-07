@@ -142,14 +142,16 @@ function formatOffset(utcOffset: number, colons: number): string {
  * fraction, truncated rather than rounded, zero-padded on the left when the
  * fraction is small and on the right when the width outruns it.
  *
- * `mul`/`div` (`date_strftime.c:288-303`) are exact Rational arithmetic under no
- * ceiling at all, and the subject's `nsec` is the same `sf` the C holds — a
- * `Rational` wherever the value has a sub-nanosecond tail — so the digits are
- * taken by long division over the fraction's own numerator and denominator
- * rather than by scaling a double, which would drop `299999999` to `299999998`
- * and run out of exact digits at fifteen. `%30N` over
- * `DateTime.new(2008, 3, 1, 6, 0, Rational(1, 3))` keeps emitting `3`s at any
- * width, as MRI does.
+ * The subject's `nsec` is the same `sf` the C holds — a `Rational` wherever the
+ * value carries a sub-nanosecond tail — so the arm is exact at any width, as
+ * `mul`/`div` (`date_strftime.c:288-303`) are.
+ *
+ * The C's two operations are `f = mul(f, INT2FIX(10**precision))` then
+ * `div(f, INT2FIX(1))`, and they cannot be written that way here: `10**30` is
+ * not a JS integer and the product leaves `Number.MAX_SAFE_INTEGER` long before
+ * the widths MRI accepts. Long division over the fraction's own numerator and
+ * denominator emits the same digits under numbers that stay exact — the C's
+ * scale-and-floor through a double would also drop `299999999` to `299999998`.
  */
 function subsecDigits(nsec: number | Rational, precision: number): string {
   const den = (nsec instanceof Rational ? nsec.denominator : 1) * SECOND_IN_NANOSECONDS;

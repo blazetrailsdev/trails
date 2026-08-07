@@ -11,6 +11,10 @@ import {
 import { primaryKeyErrorFixtureData } from "./test-helpers/fixtures/primary-key-error/primary-key-error.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Base } from "./base.js";
+import { ActiveRecord } from "./ar-config.js";
+import { defineJoinTableFixtures } from "./fixtures.js";
+import { fkObjectToPointToFixtureData } from "./test-helpers/fixtures/fk-object-to-point-to.js";
+import "./relation.js";
 
 function makeAdapter(): DatabaseAdapter {
   return {
@@ -593,5 +597,49 @@ describe("PrimaryKeyError", () => {
       expect((e as Error).message).toContain("name");
       expect((e as Error).message).toContain("Essay");
     }
+  });
+});
+
+// vendor/rails/activerecord/test/cases/fixtures_test.rb:887-952. Rails writes
+// fk_pointing_to_non_existent_object.yml at runtime and reads it back through create_fixtures;
+// the tableless loader takes the same rows directly, as naked-fixtures.test.ts does. Rails'
+// `first: fk_object_to_point_to: one` names a label the tableless loader has no registry for,
+// so the dangling reference is spelled as the id itself.
+describe("FixturesWithForeignKeyViolationsTest", () => {
+  async function withVerifyForeignKeysForFixtures(block: () => Promise<void>): Promise<void> {
+    const settingWas = ActiveRecord.verifyForeignKeysForFixtures;
+    ActiveRecord.verifyForeignKeysForFixtures = true;
+    try {
+      await block();
+    } finally {
+      ActiveRecord.verifyForeignKeysForFixtures = settingWas;
+    }
+  }
+
+  it("test_raises_fk_violations", async () => {
+    await withVerifyForeignKeysForFixtures(async () => {
+      await expect(
+        defineJoinTableFixtures(Base.connection, "fk_pointing_to_non_existent_objects", {
+          first: { fk_object_to_point_to_id: 4242 },
+        }),
+      ).rejects.toThrow(
+        "Foreign key violations found in your fixture data. Ensure you aren't referring to labels that don't exist on associations.",
+      );
+    });
+  });
+
+  it("test_does_not_raise_if_no_fk_violations", async () => {
+    await defineJoinTableFixtures(
+      Base.connection,
+      "fk_object_to_point_tos",
+      fkObjectToPointToFixtureData,
+    );
+    await withVerifyForeignKeysForFixtures(async () => {
+      await expect(
+        defineJoinTableFixtures(Base.connection, "fk_pointing_to_non_existent_objects", {
+          first: { fk_object_to_point_to_id: 1 },
+        }),
+      ).resolves.toBeDefined();
+    });
   });
 });
