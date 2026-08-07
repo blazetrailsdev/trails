@@ -177,11 +177,13 @@ export async function dbSchemaDump(cwd: string, _args: string[]): Promise<number
     // Mirrors Rails' `db:schema:dump` rake task (`task dump: :load_config`):
     // no model/environment load — just dump each config's schema inside a
     // temporary pool so the dumper has a live connection.
-    await DatabaseTasks.withTemporaryPoolForEach(env, async (config) => {
-      await DatabaseTasks.dumpSchema(config);
-      const filename = DatabaseTasks.schemaDumpPath(config);
-      if (filename != null) console.log(`Dumped schema to ${filename}`);
-    });
+    for (const config of configs) {
+      await DatabaseTasks.withTemporaryPool(config, async () => {
+        await DatabaseTasks.dumpSchema(config);
+        const filename = DatabaseTasks.schemaDumpPath(config);
+        if (filename != null) console.log(`Dumped schema to ${filename}`);
+      });
+    }
     return 0;
   } catch (err) {
     console.error(`ar: db:schema:dump failed — ${String(err)}`);

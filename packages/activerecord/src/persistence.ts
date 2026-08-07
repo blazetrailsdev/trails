@@ -8,6 +8,7 @@
 import { Temporal } from "@blazetrails/date";
 import { camelize, singularize } from "@blazetrails/activesupport";
 import { reflectOnAllAssociations } from "./reflection.js";
+import { parkNestedReaderLoad } from "./nested-attributes.js";
 import type { Base } from "./base.js";
 import {
   ArgumentError,
@@ -1038,9 +1039,11 @@ export function valuesAt(this: AttributeIO, ...keys: string[]): unknown[] {
  * Walk the prototype chain of `instance` to find a setter descriptor for
  * `key`. Returns the setter function, or undefined if none exists.
  *
- * Used by assignAttributes to mirror Rails' public_send("#{k}=", v)
- * dispatch — store accessor setters write to the store hash rather than a
- * standalone attribute slot, so they must be called via the descriptor path.
+ * Sole caller: {@link _assignAttribute}'s store-accessor arm. `store_accessor`
+ * generates its readers/writers with `define_method` in Rails
+ * (store.rb:130-148), so `public_send("#{k}=", v)` reaches them by name; ours
+ * are property setters, which `record[k] = v` cannot distinguish from writing a
+ * plain attribute slot, hence the descriptor lookup.
  */
 function findPrototypeSetter(instance: object, key: string): ((v: unknown) => void) | undefined {
   let proto = Object.getPrototypeOf(instance);
@@ -1055,10 +1058,19 @@ function findPrototypeSetter(instance: object, key: string): ((v: unknown) => vo
 /**
  * Re-dispatch any `*Attributes=` nested attribute setter keys that the Base
  * constructor wrote as plain attribute values (via `writeAttribute`) rather
- * than through the prototype setter. Called by `create`/`createBang` after
+ * than through the generated writer. Called by `create`/`createBang` after
  * construction so that `Model.create({commentsAttributes: [...]})` correctly
  * queues nested attributes for processing on save — mirrors Rails'
- * `new Model(attributes)` → `assign_attributes` → `public_send(setter)` path.
+ * `new Model(attributes)` → `assign_attributes` → `public_send(setter)` path
+ * (activemodel attribute_assignment.rb:35-48), which dispatches by *name*
+ * against the `define_method`-generated writer (nested_attributes.rb:582-591).
+ *
+ * The name is the awaitable `set#{Name}Attributes` writer rather than the
+ * `#{name}Attributes=` property setter: it is the one that reproduces Rails'
+ * inline timing for the assignments that need I/O, and a JS property setter
+ * cannot await. Since a constructor cannot await either, the returned promise
+ * is parked and drained where the other deferred nested-attributes work is
+ * drained — `save` (nested-attributes.ts:184).
  */
 export function _reapplyNestedAttrSetters(
   ctor: PersistenceHost,
@@ -1071,8 +1083,7 @@ export function _reapplyNestedAttrSetters(
     if (own?.value instanceof Set) {
       for (const k of own.value as Set<string>) {
         if (Object.prototype.hasOwnProperty.call(attrs, k)) {
-          const setter = findPrototypeSetter(record, k);
-          if (setter) setter.call(record, attrs[k]);
+          parkNestedReaderLoad(record, record[`set${camelize(k, true)}`](attrs[k]));
         }
       }
     }

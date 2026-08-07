@@ -1272,13 +1272,13 @@ function limitTests(makePirate: () => Promise<Pirate>): void {
 
   it("limit with exceeding records", async () => {
     const pirate = await makePirate();
-    await expect(
+    expect(() =>
       (pirate as any).setParrotsAttributes({
         foo: { name: "Lovely Day" },
         bar: { name: "Blown Away" },
         car: { name: "The Happening" },
       }),
-    ).rejects.toThrow(TooManyRecords);
+    ).toThrow(TooManyRecords);
   });
 }
 

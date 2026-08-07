@@ -39,9 +39,10 @@ import { CommandRecorder } from "./migration/command-recorder.js";
 import { SchemaMigration } from "./schema-migration.js";
 import { InternalMetadata } from "./internal-metadata.js";
 import { DatabaseConfigurations } from "./database-configurations.js";
+import type { DatabaseConfig } from "./database-configurations/database-config.js";
 import { migrationArConfig } from "./migration/ar-config-source.js";
 import type { ExecutionStrategy } from "./migration/execution-strategy.js";
-import type { PendingMigrationConnection } from "./migration/pending-migration-connection.js";
+import { PendingMigrationConnection } from "./migration/pending-migration-connection.js";
 import { registerVersion, findVersion, CURRENT_VERSION } from "./migration/compatibility.js";
 
 export type {
@@ -177,8 +178,26 @@ export class InvalidMigrationTimestampError extends MigrationError {
 }
 
 export class PendingMigrationError extends MigrationError {
-  constructor(message = "Migrations are pending. Run `migrate` to resolve.") {
-    super(message);
+  /**
+   * Mirrors: `PendingMigrationError#initialize` (`migration.rb:159-165`).
+   *
+   * Rails' default for a nil `pending_migrations:` reads the pending list
+   * itself (`migration.rb:161`), which in trails is asynchronous and so cannot
+   * run inside a constructor. Callers that want the detailed message pass the
+   * list, exactly as `check_pending_migrations` does.
+   */
+  constructor(
+    message?: string,
+    { pendingMigrations }: { pendingMigrations?: MigrationProxy[] } = {},
+  ) {
+    super(
+      message ??
+        (pendingMigrations
+          ? // `detailedMigrationMessage` reads no instance state, and `super`
+            // has to run before `this` exists.
+            PendingMigrationError.prototype.detailedMigrationMessage(pendingMigrations)
+          : "Migrations are pending. Run `migrate` to resolve."),
+    );
     this.name = "PendingMigrationError";
   }
 
@@ -1518,15 +1537,51 @@ export abstract class Migration {
 
   // --- Pending checks (Rails class methods) ---
 
+  /** @internal Mirrors: `ActiveRecord::Migration.check_pending_migrations` (`migration.rb:739-746`) */
   static async checkPendingMigrations(): Promise<void> {
-    // In a full Rails app this would check all database configs.
-    // Here it's a no-op; use Migrator.pendingMigrations() directly.
+    const migrations = await this.pendingMigrations();
+
+    if (migrations.length > 0) {
+      throw new PendingMigrationError(undefined, { pendingMigrations: migrations });
+    }
   }
 
+  /**
+   * Mirrors: `ActiveRecord::Migration.check_all_pending!` (`migration.rb:714-728`).
+   *
+   * Raises {@link PendingMigrationError} if any migrations are pending for all
+   * database configurations in an environment.
+   */
   static async checkAllPendingBang(): Promise<void> {
-    await this.checkPendingMigrations();
+    const pendingMigrations: MigrationProxy[][] = [];
+
+    await migrationArConfig()
+      ?.databaseTasks?.()
+      .withTemporaryPoolForEach({ env: this.env() }, async (pool) => {
+        const pending = await pool.migrationContext.open().pendingMigrations();
+        if (pending != null) pendingMigrations.push(pending);
+      });
+
+    const migrations = pendingMigrations.flat();
+
+    if (migrations.length > 0) {
+      throw new PendingMigrationError(undefined, { pendingMigrations: migrations });
+    }
   }
 
+  /**
+   * Mirrors: `ActiveRecord::Migration.load_schema_if_pending!` (`migration.rb:730-736`).
+   *
+   * Rails' repair arm — `if any_schema_needs_update? then load_schema!` — is
+   * dropped whole. `load_schema!` is `system("bin/rails db:test:prepare")`
+   * (`migration.rb:775-783`), a roundtrip to Rake through a subprocess that
+   * trails has no process surface to shell to. `any_schema_needs_update?`
+   * (`migration.rb:747-751`) is portable on its own, being just
+   * `Tasks::DatabaseTasks.schema_up_to_date?` over each config, but it is the
+   * guard for that one branch, so on its own it answers a question nothing here
+   * can act on. Both come back together; until then the pending state is
+   * reported rather than repaired.
+   */
   static async loadSchemaIfPendingBang(): Promise<void> {
     await this.checkPendingMigrations();
   }
@@ -1627,6 +1682,25 @@ export abstract class Migration {
   /** @internal */
   commandRecorder(): CommandRecorder {
     return new CommandRecorder(this.connection);
+  }
+
+  /** @internal Mirrors: `ActiveRecord::Migration.pending_migrations` (`migration.rb:757-769`) */
+  private static async pendingMigrations(): Promise<MigrationProxy[]> {
+    const pendingMigrations: MigrationProxy[][] = [];
+
+    for (const dbConfig of this.dbConfigsInCurrentEnv()) {
+      await PendingMigrationConnection.withTemporaryPool(dbConfig, async (pool) => {
+        const pending = await pool.migrationContext.open().pendingMigrations();
+        if (pending != null) pendingMigrations.push(pending);
+      });
+    }
+
+    return pendingMigrations.flat();
+  }
+
+  /** @internal Mirrors: `ActiveRecord::Migration.db_configs_in_current_env` (`migration.rb:753-755`) */
+  private static dbConfigsInCurrentEnv(): DatabaseConfig[] {
+    return migrationArConfig()?.configurations?.().configsFor({ envName: this.env() }) ?? [];
   }
 
   /** @internal */

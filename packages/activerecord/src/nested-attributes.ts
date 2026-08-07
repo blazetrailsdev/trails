@@ -587,8 +587,12 @@ function generateAssociationWriter(
   // the synchronous setter names when it refuses a displacing assignment.
   // Collections get it too, for one uniform awaitable writer per association.
   Object.defineProperty(modelClass.prototype, `set${camelize(attrName, true)}`, {
-    async value(this: Base, value: any): Promise<void> {
-      await assign(this, associationName, value, true);
+    // Deliberately not `async`: Ruby's writer raises at the assignment
+    // expression, and an `async` body would turn every synchronous raise
+    // (nested_attributes.rb:415's `Cannot build association` among them) into a
+    // rejection observed only at the `await`.
+    value(this: Base, value: any): Promise<void> {
+      return Promise.resolve(assign(this, associationName, value, true)) as Promise<void>;
     },
     writable: true,
     configurable: true,
@@ -723,7 +727,7 @@ async function detachDisplacedThenSetNewRecord(
  * DB state is in flight to race an interim insert.
  * @internal
  */
-function parkNestedReaderLoad(record: Base, load: Promise<void>): void {
+export function parkNestedReaderLoad(record: Base, load: Promise<void>): void {
   const settled = load.then(
     () => null,
     (error: unknown) => error ?? new Error("nested attributes reader load failed"),

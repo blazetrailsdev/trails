@@ -1229,22 +1229,30 @@ export class DatabaseTasks {
     return this.withTemporaryPool(config, async (pool) => fn(await pool.leaseConnection()));
   }
 
-  static async withTemporaryPoolForEach<T>(
-    envName: string,
-    fn: (config: DatabaseConfig) => Promise<T>,
-    options: { name?: string } = {},
+  /**
+   * @internal Mirrors: `DatabaseTasks.with_temporary_pool_for_each`
+   * (`tasks/database_tasks.rb:512-521`). Rails' `clobber:` kwarg has no
+   * counterpart on {@link withTemporaryPool}, so it is not threaded here.
+   */
+  static async withTemporaryPoolForEach(
+    { env, name }: { env?: string; name?: string } = {},
+    block: (pool: ConnectionPool) => Promise<void>,
   ): Promise<void> {
-    if (options.name !== undefined) {
-      const dbConfig = this.databaseConfiguration?.configsFor({
-        envName,
-        name: options.name,
-      })?.[0];
-      if (dbConfig) await this.withTemporaryPool(dbConfig, async () => fn(dbConfig));
+    env = this._normalizeEnv(env);
+    // Rails reads `ActiveRecord::Base.configurations` here
+    // (`database_tasks.rb:514,517`), not `DatabaseTasks.database_configuration`
+    // — the two are distinct globals in trails, and only the former follows an
+    // app that assigned `Base.configurations` directly.
+    if (name != null) {
+      const dbConfig = (await this.migrationClass())
+        .configurations()
+        .configsFor({ envName: env, name })[0];
+      if (dbConfig) await this.withTemporaryPool(dbConfig, block);
     } else {
-      for (const config of this.configsFor(envName)) {
-        await this.withTemporaryPool(config, async () => {
-          await fn(config);
-        });
+      for (const dbConfig of (await this.migrationClass())
+        .configurations()
+        .configsFor({ envName: env, name })) {
+        await this.withTemporaryPool(dbConfig, block);
       }
     }
   }
