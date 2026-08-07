@@ -1,11 +1,23 @@
 import { describe, it, expect } from "vitest";
 
-import { slice, except } from "../hash-utils.js";
 import { ActiveSupportJSON } from "../json.js";
 import { Temporal } from "@blazetrails/date";
 import { TimeWithZone } from "../time-with-zone.js";
 import { TimeZone } from "../values/time-zone.js";
 import { Encoding } from "./encoding.js";
+
+/** Rails' `JSONTest::Hashlike` (encoding_test_cases.rb:16-20). */
+class Hashlike {
+  toHash(): Record<string, unknown> {
+    return { foo: "hello", bar: "world" };
+  }
+}
+
+/** Stands in for Rails' bare `Object.new` with `@foo`/`@bar` set (encoding_test.rb:151-153). */
+class Bare {
+  foo?: string;
+  bar?: string;
+}
 
 function withStandardJsonTimeFormat(value: boolean, block: () => void): void {
   const old = Encoding.useStandardJsonTimeFormat;
@@ -89,15 +101,13 @@ describe("TestJSONEncoding", () => {
   });
 
   it("hash should allow key filtering with only", () => {
-    const h = { a: 1, b: 2, c: 3 };
-    const filtered = slice(h, "a", "c");
-    expect(JSON.stringify(filtered)).toBe('{"a":1,"c":3}');
+    expect(ActiveSupportJSON.encode({ a: 1, b: 2, c: 3 }, { only: "a" })).toBe('{"a":1}');
   });
 
   it("hash should allow key filtering with except", () => {
-    const h = { a: 1, b: 2, c: 3 };
-    const filtered = except(h, "b");
-    expect(JSON.stringify(filtered)).toBe('{"a":1,"c":3}');
+    expect(ActiveSupportJSON.encode({ foo: "bar", b: 2, c: 3 }, { except: ["foo", "c"] })).toBe(
+      '{"b":2}',
+    );
   });
 
   it("time to json includes local offset", () => {
@@ -119,8 +129,22 @@ describe("TestJSONEncoding", () => {
     expect(parsed.nested.y).toBeCloseTo(2.75);
   });
 
-  it.skip("hash like with options");
-  it.skip("object to json with options");
+  it("hash like with options", () => {
+    const h = new Hashlike();
+    const json = ActiveSupportJSON.encode(h, { only: ["foo"] });
+
+    expect(JSON.parse(json)).toEqual({ foo: "hello" });
+  });
+
+  it("object to json with options", () => {
+    const obj = new Bare();
+    obj.foo = "hello";
+    obj.bar = "world";
+    const json = ActiveSupportJSON.encode(obj, { only: ["foo"] });
+
+    expect(JSON.parse(json)).toEqual({ foo: "hello" });
+  });
+
   it.skip("struct to json with options");
   it.skip("struct to json with options nested");
 
