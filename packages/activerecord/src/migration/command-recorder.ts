@@ -576,6 +576,21 @@ export class CommandRecorder {
   }
 
   /** @internal */
+  invertCreateSchema(args: unknown[]): [string, unknown[]] {
+    return ["dropSchema", args];
+  }
+
+  /** @internal */
+  invertDropSchema(args: unknown[]): [string, unknown[]] {
+    return ["createSchema", args];
+  }
+
+  /** @internal */
+  invertCreateVirtualTable(args: unknown[]): [string, unknown[]] {
+    return ["dropVirtualTable", args];
+  }
+
+  /** @internal */
   invertDropEnum(args: unknown[]): [string, unknown[]] {
     // Mirror Rails: extract_options! strips trailing hash, then check second positional arg
     const a = args.slice();
