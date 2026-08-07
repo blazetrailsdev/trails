@@ -1247,10 +1247,10 @@ export class DatabaseTasks {
   }
 
   /**
-   * Mirrors Rails' `DatabaseTasks.with_temporary_pool`: establishes a pool for
-   * `config` (clobber defaults to false, so an existing pool for the same
-   * config object is reused), yields it, then restores the prior pool (or
-   * removes the pool if none existed before).
+   * Mirrors Rails' `DatabaseTasks.with_temporary_pool`
+   * (`tasks/database_tasks.rb:541-548`): establishes a pool for `config`
+   * (clobber defaults to false, so an existing pool for the same config object
+   * is reused), yields it, then re-establishes the original config.
    *
    * @internal
    */
@@ -1259,14 +1259,8 @@ export class DatabaseTasks {
     fn: (pool: ConnectionPool) => Promise<T>,
     { clobber = false }: { clobber?: boolean } = {},
   ): Promise<T> {
-    const { Base } = await import("../base.js");
-    this._baseClass = Base;
-    let priorConfig: DatabaseConfig | null = null;
-    try {
-      priorConfig = Base.connectionDbConfig();
-    } catch (error) {
-      if (!(error instanceof ConnectionNotDefined)) throw error;
-    }
+    const migrationClass = await this.migrationClass();
+    const originalDbConfig = migrationClass.connectionDbConfig();
     // Rails passes the `DatabaseConfig` object itself
     // (tasks/database_tasks.rb:542,544), which is what lets
     // `ConnectionHandler#establish_connection` recognise an already-established
@@ -1274,13 +1268,12 @@ export class DatabaseTasks {
     // (connection_adapters/abstract/connection_handler.rb:139). Handing over a
     // plain hash would mint a fresh `HashConfig` that can never match, and a
     // second pool on a `:memory:` database discards the first one's data.
-    // Mirrors Rails' `ensure` which restores even if establish_connection raises.
     try {
       // Rails: `connection_handler.establish_connection(db_config, clobber:)`
       // (database_tasks.rb:543). Ruby's `establish_connection(config_or_env = nil)`
       // takes no `clobber:`, so the kwarg can only be threaded through the handler.
-      const pool = Base.connectionHandler.establishConnection(config, {
-        owner: Base.connectionClassForSelf(),
+      const pool = migrationClass.connectionHandler.establishConnection(config, {
+        owner: migrationClass.connectionClassForSelf(),
         clobber,
       });
       // Deviation: ESM cannot import synchronously, so the handler resolves the
@@ -1290,24 +1283,13 @@ export class DatabaseTasks {
       await pool.adapterReady;
       return await fn(pool);
     } finally {
-      if (priorConfig !== null) {
-        // Same reason as above: restoring through the config OBJECT lets the
-        // handler recognise the pool it already has. Restoring from a plain
-        // hash would replace (and disconnect) it, which on a `:memory:`
-        // database throws the data away.
-        // Rails: `establish_connection(original_db_config, clobber: clobber)`
-        // (database_tasks.rb:547).
-        await Base.connectionHandler.establishConnection(priorConfig, {
-          owner: Base.connectionClassForSelf(),
-          clobber,
-        }).adapterReady;
-      } else {
-        try {
-          Base.removeConnection();
-        } catch {
-          // No pool to remove
-        }
-      }
+      // Rails: `establish_connection(original_db_config, clobber: clobber)`
+      // (database_tasks.rb:547), unconditionally. Same reason as above for
+      // restoring through the config OBJECT rather than a plain hash.
+      await migrationClass.connectionHandler.establishConnection(originalDbConfig, {
+        owner: migrationClass.connectionClassForSelf(),
+        clobber,
+      }).adapterReady;
     }
   }
 

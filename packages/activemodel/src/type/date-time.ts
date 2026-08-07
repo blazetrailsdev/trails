@@ -63,7 +63,11 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
    */
   protected microseconds(time: DateParts): number {
     const secFraction = time.secFraction;
-    if (!secFraction) return 0;
+    if (secFraction == null) return 0;
+    // Ruby's one line dispatches on the numeric tower, and the two arms do not
+    // agree: `(0.123456 * 1_000_000).to_i` is 123456 while the exact Rational
+    // `Date._parse` yields multiplies without float error. TS has no numeric
+    // receiver to dispatch on, so the arms are spelled out.
     return secFraction instanceof Rational
       ? secFraction.mul(1_000_000).toI()
       : Math.trunc(secFraction * 1_000_000);
@@ -103,7 +107,6 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
 
     timeHash.secFraction = this.microseconds(timeHash);
 
-    const { offset } = timeHash;
     return this.newTime(
       timeHash.year,
       timeHash.mon,
@@ -112,7 +115,7 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
       timeHash.min,
       timeHash.sec,
       timeHash.secFraction,
-      offset instanceof Rational ? offset.toF() : offset,
+      timeHash.offset,
     );
   }
 

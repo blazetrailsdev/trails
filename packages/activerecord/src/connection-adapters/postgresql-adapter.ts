@@ -4372,24 +4372,19 @@ export class PostgreSQLAdapter
     ];
   }
 
-  /** @internal */
+  /** @internal postgresql/schema_statements.rb:1051-1056. */
   async changeColumnForAlter(
     tableName: string,
     columnName: string,
-    type: string,
-    options: Record<string, unknown> = {},
-  ): Promise<unknown[]> {
-    const changeDef = this.buildChangeColumnDefinition(
-      tableName,
-      columnName,
-      type,
-      options as Parameters<typeof this.buildChangeColumnDefinition>[3],
-    );
-    const sqls: unknown[] = [await this.schemaCreation.accept(changeDef)];
+    type: ColumnType,
+    options: ColumnOptions & { using?: string; castAs?: string } = {},
+  ): Promise<Array<string | (() => Promise<void>)>> {
+    const changeColDef = this.buildChangeColumnDefinition(tableName, columnName, type, options);
+    const sqls: Array<string | (() => Promise<void>)> = [
+      await this.schemaCreation.accept(changeColDef),
+    ];
     if ("comment" in options)
-      sqls.push(() =>
-        this.changeColumnComment(tableName, columnName, options.comment as string | null),
-      );
+      sqls.push(() => this.changeColumnComment(tableName, columnName, options.comment ?? null));
     return sqls;
   }
 
@@ -4726,7 +4721,7 @@ export interface PostgreSQLAdapter {
     tableName: string,
     columnName: string,
     type: string,
-    options?: ColumnOptions & { using?: string; castAs?: string; comment?: string | null },
+    options?: ColumnOptions & { using?: string; castAs?: string },
   ): Promise<void>;
 
   createJoinTable(
@@ -4757,14 +4752,8 @@ export interface PostgreSQLAdapter {
   buildChangeColumnDefinition(
     tableName: string,
     columnName: string,
-    type: string,
-    options?: {
-      using?: string;
-      castAs?: string;
-      default?: unknown;
-      null?: boolean;
-      array?: boolean;
-    },
+    type: ColumnType,
+    options?: ColumnOptions & { using?: string; castAs?: string },
   ): ChangeColumnDefinition;
 
   buildChangeColumnDefaultDefinition(

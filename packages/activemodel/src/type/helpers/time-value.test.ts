@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Temporal } from "@blazetrails/date";
+import { Rational, Temporal } from "@blazetrails/date";
 import { applySecondsPrecision, fastStringToTime, newTime } from "./time-value.js";
 
 // Mirrors ActiveModel::Type::Helpers::TimeValue#apply_seconds_precision
@@ -95,6 +95,27 @@ describe("newTime", () => {
     const z = i?.toZonedDateTimeISO("UTC");
     expect(z?.millisecond).toBe(123);
     expect(z?.microsecond).toBe(456);
+  });
+
+  // ruby 3.3.11:
+  //   Time.utc(2000,1,1,14,23,55, Rational(123456,1000000)).nsec # => 123
+  //   (Time.utc(...) - Rational(3600,1)).iso8601(9)
+  //     # => "2000-01-01T13:23:55.000000123Z"
+  it("carries a Rational microsec and offset exactly, as Time.utc does", () => {
+    const i = newTime(2000, 1, 1, 14, 23, 55, new Rational(123456, 1_000_000));
+    expect(i?.toString()).toBe("2000-01-01T14:23:55.000000123Z");
+
+    const shifted = newTime(
+      2000,
+      1,
+      1,
+      14,
+      23,
+      55,
+      new Rational(123456, 1_000_000),
+      new Rational(3600, 1),
+    );
+    expect(shifted?.toString()).toBe("2000-01-01T13:23:55.000000123Z");
   });
 });
 

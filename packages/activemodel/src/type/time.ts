@@ -1,7 +1,6 @@
 import {
   ArgumentError as RubyArgumentError,
   Date as RubyDate,
-  Rational,
   Temporal,
   type DateParts,
 } from "@blazetrails/date";
@@ -158,7 +157,6 @@ export class TimeType extends ValueType<Temporal.Instant> {
     }
     if (timeHash == null || timeHash.hour == null) return null;
 
-    const { offset, secFraction } = timeHash;
     return this.newTime(
       timeHash.year,
       timeHash.mon,
@@ -166,8 +164,8 @@ export class TimeType extends ValueType<Temporal.Instant> {
       timeHash.hour,
       timeHash.min,
       timeHash.sec,
-      secFraction instanceof Rational ? secFraction.toF() : secFraction,
-      offset instanceof Rational ? offset.toF() : offset,
+      timeHash.secFraction,
+      timeHash.offset,
     );
   }
 

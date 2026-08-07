@@ -3,7 +3,7 @@
  *
  * Mirrors: ActiveModel::Type::Helpers::TimeValue
  */
-import { Temporal } from "@blazetrails/date";
+import { Rational, Temporal } from "@blazetrails/date";
 import { getZone } from "@blazetrails/activesupport";
 
 import { isUtc } from "./timezone.js";
@@ -165,14 +165,15 @@ export function newTime(
   hour: number | null | undefined,
   min: number | null | undefined,
   sec: number | null | undefined,
-  microsec: number | null | undefined,
-  offset?: number | null,
+  microsec: number | Rational | null | undefined,
+  offset?: number | Rational | null,
 ): Temporal.Instant | null {
   if (year == null || (year === 0 && mon === 0 && mday === 0)) return null;
   // Rails' ::Time.utc(year, nil, nil, ...) raises TypeError → rescue nil.
   // Treat missing month/day the same way rather than silently coercing to Jan 1.
   if (mon == null || mday == null) return null;
-  const totalNano = Math.trunc((microsec ?? 0) * 1000);
+  const totalNano =
+    microsec instanceof Rational ? microsec.mul(1000).toI() : Math.trunc((microsec ?? 0) * 1000);
   const components = {
     year,
     month: mon,
@@ -189,6 +190,11 @@ export function newTime(
       const instant = Temporal.PlainDateTime.from(components, { overflow: "reject" })
         .toZonedDateTime("UTC")
         .toInstant();
+      if (offset instanceof Rational) {
+        return offset.numerator === 0
+          ? instant
+          : instant.subtract({ nanoseconds: offset.mul(1_000_000_000).toI() });
+      }
       return offset === 0 ? instant : instant.subtract({ seconds: offset });
     }
     return (

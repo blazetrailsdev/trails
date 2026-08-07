@@ -1202,19 +1202,24 @@ export abstract class Migration {
     }) => void,
   ): Promise<void> {
     if (!fn) return;
-    const upFns: Array<() => Promise<void>> = [];
-    const downFns: Array<() => Promise<void>> = [];
+    // Rails: `helper = ReversibleBlockHelper.new(reverting?)` then
+    // `execute_block { yield helper }` (migration.rb:909-912). The helper runs
+    // each `up`/`down` block inline as Ruby yields; the callbacks here are
+    // async and the block that registers them is not, so they are collected
+    // and awaited on the way out of the same `execute_block`.
+    const reverting = this.isReverting();
+    const toRun: Array<() => Promise<void>> = [];
     fn({
-      up: (f) => upFns.push(f),
-      down: (f) => downFns.push(f),
+      up: (f) => {
+        if (!reverting) toRun.push(f);
+      },
+      down: (f) => {
+        if (reverting) toRun.push(f);
+      },
     });
-    if (this.isReverting()) {
-      // During reversal recording, run the down fns
-      for (const f of downFns) await f();
-    } else {
-      // During forward migration, run the up fns
-      for (const f of upFns) await f();
-    }
+    await this.executeBlock(async () => {
+      for (const f of toRun) await f();
+    });
   }
 
   /**
@@ -1223,8 +1228,9 @@ export abstract class Migration {
    * Mirrors: ActiveRecord::Migration#up_only
    */
   async upOnly(fn?: () => Promise<void>): Promise<void> {
+    // Rails: `execute_block(&block) unless reverting?` (migration.rb:928-930).
     if (!this.isReverting() && fn) {
-      await fn();
+      await this.executeBlock(fn);
     }
   }
 
@@ -1385,10 +1391,6 @@ export abstract class Migration {
 
   static disableDdlTransactionBang(): void {
     this._disableDdlTransaction = true;
-  }
-
-  compatibleTableDefinition(t: unknown): unknown {
-    return t;
   }
 
   // --- Class methods (Rails: Migration.copy, .proper_table_name, etc.) ---
@@ -1646,9 +1648,31 @@ export abstract class Migration {
     });
   }
 
-  /** @internal */
-  executeBlock(fn: () => Promise<void>): Promise<void> {
-    return fn();
+  /**
+   * Mirrors: ActiveRecord::Migration#execute_block (migration.rb:1146-1152).
+   *
+   *   def execute_block
+   *     if connection.respond_to? :execute_block
+   *       super # use normal delegation to record the block
+   *     else
+   *       yield
+   *     end
+   *   end
+   *
+   * Ruby's `super` has no super-definition, so it falls through to
+   * `method_missing`, which delegates to the connection — the CommandRecorder
+   * while reverting, which records the block for inversion
+   * (command_recorder.rb:52).
+   *
+   * @internal
+   */
+  async executeBlock(fn: () => Promise<void>): Promise<void> {
+    const connection = this.connection as unknown as Record<string, unknown>;
+    if (typeof connection["executeBlock"] === "function") {
+      await this.methodMissing("executeBlock", fn);
+      return;
+    }
+    await fn();
   }
 
   /**
@@ -2993,6 +3017,26 @@ export class Migrator {
  */
 export class Current extends Migration {
   static readonly VERSION = CURRENT_VERSION;
+
+  /**
+   * Mirrors: ActiveRecord::Migration::Current#compatible_table_definition
+   * (migration.rb:612-614), the identity hook the four table-definition
+   * wrappers above it yield through.
+   *
+   * Those wrappers (`create_table`, `change_table`, `create_join_table`,
+   * `drop_table`, migration.rb:580-609) exist solely so
+   * `Migration::Compatibility`'s version classes can override this hook
+   * (compatibility.rb:156, 219, 262, 310, 408, 462). Version compatibility
+   * (`Migration[x.y]`) is out of scope for the port, so the hook has no caller
+   * in the ported subset and the wrappers are not ported with it — porting
+   * four identity wrappers whose only job is to reach an identity hook would
+   * be indirection with no reader.
+   *
+   * @internal
+   */
+  compatibleTableDefinition(t: unknown): unknown {
+    return t;
+  }
 }
 
 // Register the current version so Migration.forVersion(1.0) works

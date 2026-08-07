@@ -80,6 +80,7 @@ export interface SchemaStatements
     PgSchemaAdapterPrivates,
     Pick<
       PostgreSQLAdapter,
+      | "changeColumnForAlter"
       | "clearCacheBang"
       | "dataSourceSql"
       | "exec"
@@ -820,24 +821,21 @@ export class SchemaStatements extends AbstractSchemaStatements {
   override async changeColumn(
     tableName: string,
     columnName: string,
-    type: string,
-    options: ColumnOptions & { using?: string; castAs?: string; comment?: string | null } = {},
+    type: ColumnType,
+    options: ColumnOptions & { using?: string; castAs?: string } = {},
   ): Promise<void> {
-    // Mirrors PostgreSQL::SchemaStatements#change_column: clear the statement
-    // cache, then partition change_column_for_alter into SQL clauses and procs
-    // and issue a single ALTER TABLE with the comma-joined clauses before
-    // running the procs. The visitor (visit_ChangeColumnDefinition) emits the
-    // combined "ALTER COLUMN ... TYPE ..., ALTER COLUMN ... SET DEFAULT ..."
-    // string; the only proc Rails appends here is the :comment change.
+    // Mirrors PostgreSQL::SchemaStatements#change_column
+    // (postgresql/schema_statements.rb:467-471): clear the statement cache,
+    // then partition change_column_for_alter into SQL clauses and procs, issue
+    // a single ALTER TABLE with the comma-joined clauses, and run the procs.
     this.clearCacheBang();
-    const changeColDef = this.buildChangeColumnDefinition(tableName, columnName, type, options);
-    const clause = await this.schemaCreation.accept(changeColDef);
+    const parts = await this.changeColumnForAlter(tableName, columnName, type, options);
+    const sqls = parts.filter((v): v is string => typeof v === "string");
+    const procs = parts.filter((v): v is () => Promise<void> => typeof v === "function");
     // Route DDL through the public `execute` (not the raw `exec`) so the
     // dirties_query_cache wrapper clears the query cache on schema changes.
-    await this.execute(`ALTER TABLE ${this.quoteTableName(tableName)} ${clause}`);
-    if ("comment" in options) {
-      await this.changeColumnComment(tableName, columnName, options.comment ?? null);
-    }
+    await this.execute(`ALTER TABLE ${this.quoteTableName(tableName)} ${sqls.join(", ")}`);
+    for (const proc of procs) await proc();
   }
 
   override async addColumn(
@@ -897,14 +895,8 @@ export class SchemaStatements extends AbstractSchemaStatements {
   buildChangeColumnDefinition(
     tableName: string,
     columnName: string,
-    type: string,
-    options: {
-      using?: string;
-      castAs?: string;
-      default?: unknown;
-      null?: boolean;
-      array?: boolean;
-    } = {},
+    type: ColumnType,
+    options: ColumnOptions & { using?: string; castAs?: string } = {},
   ): ChangeColumnDefinition {
     // Mirrors PostgreSQL::SchemaStatements#build_change_column_definition: route
     // through the table definition so PG-specific column normalization
@@ -914,7 +906,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     // definition — the visitor (visit_ChangeColumnDefinition) computes it on
     // accept.
     const td = this.createTableDefinition(tableName);
-    const cd = td.newColumnDefinition(columnName, type as ColumnType, options as ColumnOptions);
+    const cd = td.newColumnDefinition(columnName, type, options);
     return new ChangeColumnDefinition(cd, columnName);
   }
 
