@@ -345,15 +345,20 @@ export class PostgreSQLAdapter
     this._connection = value as unknown as AbstractAdapter | null;
     if (value) {
       // Register this client's DEALLOCATE serializer so a StatementPool built
-      // for it (via buildStatementPool) deallocates through the adapter-owned
-      // maintenance queue rather than fire-and-forget — without the pool
-      // constructor needing a non-Rails-shaped extra argument. Mirrors Rails,
-      // where StatementPool#dealloc reaches @connection.@raw_connection to issue
-      // the DEALLOCATE under the connection's control (postgresql_adapter.rb:307).
+      // for it (via buildStatementPool) parks its DEALLOCATE where the eviction
+      // site can await it — without the pool constructor needing a
+      // non-Rails-shaped extra argument. Mirrors Rails, where
+      // StatementPool#dealloc reaches @connection.@raw_connection to issue the
+      // DEALLOCATE under the connection's control (postgresql_adapter.rb:307).
       pgDeallocSerializers.set(value, (deallocSql) => {
-        // Fire-and-forget by contract (serializer is typed void; callers ignore
-        // the result). The maintenance queue owns error handling and ordering.
-        void this._enqueueMaintenance(() => value.query(deallocSql));
+        // The serializer is typed void (Rails' `dealloc` is sync), so the
+        // promise is parked for `_drainPendingDeallocate` to await.
+        this._pendingDeallocate = (this._pendingDeallocate ?? Promise.resolve())
+          .then(() => value.query(deallocSql))
+          .then(
+            () => {},
+            () => {},
+          );
       });
     }
   }
@@ -467,16 +472,6 @@ export class PostgreSQLAdapter
    * command that is over reported as PQTRANS_ACTIVE.
    */
   private _commandSettled = true;
-  /**
-   * Settlement of the query currently on the wire, as a promise that only
-   * ever resolves — what `_cancelAnyRunningQuery` awaits for
-   * `@raw_connection.block` (postgresql/database_statements.rb:128). Attaching
-   * it also *observes* that query's rejection, so the `QueryCanceled` the
-   * cancel provokes cannot surface at run end unattributed when the chain that
-   * issued the query has been dropped (RFC 0061
-   * pg-query-canceled-unhandled-rejection).
-   */
-  private _queryInFlightSettled: Promise<void> | null = null;
   private _databaseVersion: number | null = null;
   private _typeMap: HashLookupTypeMap | null = null;
   private _maxIdentifierLength: number | null = null;
@@ -533,16 +528,14 @@ export class PostgreSQLAdapter
   // this before proceeding so no query can interleave between the two
   // SQL commands that resetBang fires asynchronously.
   private _inFlightReset: Promise<void> | null = null;
-  // Serializes out-of-band maintenance SQL on the pinned client — DEALLOCATE
-  // (statement-pool eviction) and resetBang's ROLLBACK + DISCARD ALL — so these
-  // never fire-and-forget onto a client that's already executing a query
-  // (node-pg's "already executing a query" deprecation, the wire-protocol-desync
-  // seam). Each op chains onto the previous; query-acquisition paths drain this
-  // (alongside _inFlightReset) before yielding the socket so a pending DEALLOCATE
-  // can't race the next user query. It is ALSO the tail the full per-query mutex
-  // (`_serializePinnedQuery`) chains onto, so user queries, DEALLOCATE, ROLLBACK,
-  // and DISCARD ALL all serialize on this one chain — a single wire, no overlap.
-  private _maintenanceTail: Promise<void> = Promise.resolve();
+  // The DEALLOCATE issued by the most recent statement-pool eviction, or null.
+  // Rails deallocates the evicted entry inline, under the connection lock,
+  // before the query that triggered the eviction is sent (statement_pool.rb:31,
+  // postgresql_adapter.rb:307); `StatementPool#dealloc` is sync here too, so the
+  // promise is parked in this slot and awaited at the eviction site instead.
+  // Every other ordering is Rails' own: the connection lock covers the query's
+  // whole life, so nothing else can be on the wire.
+  private _pendingDeallocate: Promise<void> | null = null;
   // Accumulates PG NOTICE/WARNING messages fired during the current query.
   // Cleared before each query; processed by _flushWarnings after.
   private _noticeReceiverSqlWarnings: Array<{
@@ -1304,9 +1297,6 @@ export class PostgreSQLAdapter
     // Serialize behind any in-flight reset (ROLLBACK + DISCARD ALL) so no
     // query can interleave between the two commands resetBang fires.
     while (this._inFlightReset) await this._inFlightReset;
-    // Drain any pending maintenance op (DEALLOCATE) so it can't race the query
-    // we're about to hand the caller on the pinned client.
-    await this._maintenanceTail;
     // Re-check after the yield: a concurrent close/disconnect/discard
     // may have run while we were waiting for the reset to complete.
     if (this._closed || this._pgClientOptions == null) {
@@ -1486,9 +1476,6 @@ export class PostgreSQLAdapter
    */
   protected override async awaitRawConnectionReady(): Promise<void> {
     while (this._inFlightReset) await this._inFlightReset;
-    // Drain any pending maintenance op (DEALLOCATE) so it can't race the query
-    // the withRawConnection loop is about to issue on the pinned client.
-    await this._maintenanceTail;
     // If the reset's reconfigure step failed it tore down the socket; re-open
     // a fresh, configured connection so the loop never yields an unconfigured
     // (or null) one. connect() throws here only if the server is truly down —
@@ -1518,103 +1505,19 @@ export class PostgreSQLAdapter
   }
 
   /**
-   * Settle once nothing this adapter issued is still on the wire —
-   * `_maintenanceTail` is that set, since every pinned query chains onto it.
-   * {@link TransactionManager.synchronize} awaits this before releasing the
-   * lock, reproducing the containment Rails gets lexically from
-   * `@lock.synchronize` wrapping the whole `with_raw_connection` body
-   * (`abstract_adapter.rb:984`). No Rails counterpart is possible: an
-   * un-awaited JS call escapes its enclosing async scope, where a Ruby block
-   * contains its work by construction.
+   * Await (and clear) the DEALLOCATE parked by the most recent statement-pool
+   * eviction. `StatementPool#dealloc` is sync — it mirrors Rails' sync
+   * `dealloc` — so the eviction's `client.query` cannot be awaited where it is
+   * issued; this is that await, at the site Rails deallocates inline from
+   * (statement_pool.rb:31).
    *
    * @internal
    */
-  _pendingQueries(): Promise<void> {
-    return this._maintenanceTail;
-  }
-
-  /**
-   * Chain `fn` onto the pinned client's maintenance tail so DEALLOCATE /
-   * ROLLBACK / DISCARD ALL serialize against each other (and, via the drain in
-   * `_acquireFreshClient` / `awaitRawConnectionReady`, against the next user
-   * query). Errors are swallowed — these are best-effort, session-scoped cleanup
-   * commands (Rails' StatementPool#dealloc / reset! likewise rescue), and an
-   * unhandled rejection on a post-close socket must not crash the process.
-   *
-   * @internal
-   */
-  private _enqueueMaintenance(fn: () => Promise<unknown>): Promise<void> {
-    const next = this._maintenanceTail.then(fn).then(
-      () => {},
-      () => {},
-    );
-    this._maintenanceTail = next;
-    return next;
-  }
-
-  /**
-   * Serialize a single `client.query` on the pinned `pg.Client` against every
-   * other query (and maintenance op) on that same client, so no two ever
-   * overlap on the wire. node-pg's own request queue is insufficient under the
-   * write-path query volume: two calls that interleave desync the wire protocol
-   * and leave the connection idle-in-transaction (the
-   * `client.query() … already executing a query` deprecation is that seam). This
-   * is the general per-query mutex the sibling
-   * `pg-serialize-fire-and-forget-client-query-sites` maintenance serializer
-   * anticipated (see `_maintenanceTail`).
-   *
-   * It shares the one `_maintenanceTail` chain so DEALLOCATE / ROLLBACK /
-   * DISCARD ALL and user queries all serialize on a single tail — a maintenance
-   * op enqueued mid-query lands after it, and a query issued after an eviction's
-   * DEALLOCATE lands after that. Each call chains a fresh gate onto the tail and
-   * releases it once `fn` settles; the granularity is one `client.query`, never
-   * a whole `withRawConnection` block, so re-entrant/retry paths (which re-issue
-   * sequentially) each re-acquire without ever awaiting their own outstanding
-   * gate — no self-deadlock.
-   *
-   * Configure-time queries run on a not-yet-published client
-   * (`client !== _rawConnection`) and bypass the mutex: they already run direct
-   * on `client.query()` before the connection is acquirable (RFC 0013), and
-   * chaining them here would interleave with the maintenance tail during
-   * connect.
-   *
-   * A few other pinned-client sites deliberately stay direct because routing
-   * them onto the shared tail would deadlock or defeat their purpose, NOT for
-   * lack of coverage: `_maybeConfigureConnection` / the reset reconfigure run
-   * *inside* the `_inFlightReset` barrier that IS the tail (self-await), the
-   * DEALLOCATE / ROLLBACK / DISCARD ALL maintenance ops already chain via
-   * `_enqueueMaintenance`, `execRollbackDbTransaction`'s `ROLLBACK` already
-   * waits on the query `_cancelAnyRunningQuery` cancelled (that method's own
-   * `block` drain), and the memoized `server_version` bootstrap probe runs
-   * before the client is in normal service.
-   *
-   * @internal
-   */
-  private async _serializePinnedQuery<R>(client: pg.Client, fn: () => Promise<R>): Promise<R> {
-    if (client !== this._rawConnection) return fn();
-    const prev = this._maintenanceTail;
-    let release!: () => void;
-    const gate = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-    this._maintenanceTail = prev.then(() => gate);
-    await prev.catch(() => {});
-    // node-pg emits parsed backend messages only, so the send side of the
-    // cycle has no event to listen for: the outstanding-query half of
-    // `transactionStatus` is opened here, where the query goes on the wire,
-    // and closed by the terminating message.
-    this._commandSettled = false;
-    try {
-      const query = fn();
-      this._queryInFlightSettled = query.then(
-        () => {},
-        () => {},
-      );
-      return await query;
-    } finally {
-      this._queryInFlightSettled = null;
-      release();
-    }
+  private async _drainPendingDeallocate(): Promise<void> {
+    const pending = this._pendingDeallocate;
+    if (pending === null) return;
+    this._pendingDeallocate = null;
+    await pending;
   }
 
   /**
@@ -1660,35 +1563,27 @@ export class PostgreSQLAdapter
     const { prepareHint, onPrepared, ...queryExtra } = extra;
     const prepare = prepareHint === false ? false : this._shouldPrepare(binds);
     const attempt = async (): Promise<R> => {
-      if (prepare) {
-        const stmtName = this._preparedNameFor(client, sql);
-        onPrepared?.(stmtName);
-        // `_preparedNameFor` may have evicted an LRU entry, queueing its
-        // DEALLOCATE on the maintenance tail. The serializer captures that tail
-        // (with the DEALLOCATE already enqueued) and awaits it before issuing,
-        // so the DEALLOCATE lands on an idle client rather than racing the query
-        // that triggered the eviction — subsuming the old explicit drain.
-        // Mirrors Rails, where StatementPool#[]= deallocs the evicted entry
-        // inline (under the connection lock) before the new query is sent
-        // (statement_pool.rb:31, postgresql_adapter.rb:307).
-        return this._serializePinnedQuery(
-          client,
-          () =>
-            client.query({
-              name: stmtName,
-              text: sql,
-              values: binds,
-              ...queryExtra,
-            }) as Promise<R>,
-        );
+      const stmtName = prepare ? this._preparedNameFor(client, sql) : null;
+      if (stmtName !== null) onPrepared?.(stmtName);
+      // A statement-pool eviction (here, or an earlier `delete`/`clear`) issues
+      // its DEALLOCATE from a sync `dealloc`; land it before the query that
+      // triggered it, as Rails' inline `StatementPool#[]=` dealloc does
+      // (statement_pool.rb:31, postgresql_adapter.rb:307).
+      await this._drainPendingDeallocate();
+      if (stmtName !== null) {
+        this._commandSettled = false;
+        return client.query({
+          name: stmtName,
+          text: sql,
+          values: binds,
+          ...queryExtra,
+        }) as Promise<R>;
       }
+      this._commandSettled = false;
       if (queryExtra.rowMode) {
-        return this._serializePinnedQuery(
-          client,
-          () => client.query({ text: sql, values: binds, ...queryExtra }) as Promise<R>,
-        );
+        return client.query({ text: sql, values: binds, ...queryExtra }) as Promise<R>;
       }
-      return this._serializePinnedQuery(client, () => client.query(sql, binds) as Promise<R>);
+      return client.query(sql, binds) as Promise<R>;
     };
     try {
       return await attempt();
@@ -2017,15 +1912,9 @@ export class PostgreSQLAdapter
             // fails and we re-run without it.
             payload.sql = withReturning;
             try {
-              if (useSavepoint)
-                await this._serializePinnedQuery(client, () =>
-                  client.query(`SAVEPOINT "${spName}"`),
-                );
+              if (useSavepoint) await client.query(`SAVEPOINT "${spName}"`);
               const result = await this._performQuery(client, withReturning, binds, payload);
-              if (useSavepoint)
-                await this._serializePinnedQuery(client, () =>
-                  client.query(`RELEASE SAVEPOINT "${spName}"`),
-                );
+              if (useSavepoint) await client.query(`RELEASE SAVEPOINT "${spName}"`);
               const affected = this.affectedRows(result);
               payload.row_count = affected;
               if (result.rows.length > 1) {
@@ -2045,12 +1934,8 @@ export class PostgreSQLAdapter
               // originally written for.
               if (err instanceof PreparedStatementCacheExpired) throw err;
               if (useSavepoint) {
-                await this._serializePinnedQuery(client, () =>
-                  client.query(`ROLLBACK TO SAVEPOINT "${spName}"`),
-                ).catch(() => {});
-                await this._serializePinnedQuery(client, () =>
-                  client.query(`RELEASE SAVEPOINT "${spName}"`),
-                ).catch(() => {});
+                await client.query(`ROLLBACK TO SAVEPOINT "${spName}"`).catch(() => {});
+                await client.query(`RELEASE SAVEPOINT "${spName}"`).catch(() => {});
               }
               payload.sql = pgSql;
               const result = await this._performQuery(client, pgSql, binds, payload);
@@ -2330,10 +2215,11 @@ export class PostgreSQLAdapter
 
   // Mirrors: PostgreSQL::DatabaseStatements#cancel_any_running_query (database_statements.rb private)
   // Sends a CancelRequest to abort any in-flight query on the transaction connection
-  // before issuing ROLLBACK / ROLLBACK AND CHAIN, then waits for the cancelled
-  // query to drain — the `@raw_connection.block` half
-  // (postgresql/database_statements.rb:127-128) — so the ROLLBACK is sent only
-  // once the query is off the wire. Best-effort: errors are swallowed.
+  // before issuing ROLLBACK / ROLLBACK AND CHAIN. Best-effort: errors are
+  // swallowed. There is no `@raw_connection.block` half
+  // (postgresql/database_statements.rb:128) to reproduce: the connection lock
+  // covers each query's whole life, so a caller that reaches here holds the
+  // lock and nothing this adapter issued is still on the wire.
   private async _cancelAnyRunningQuery(): Promise<void> {
     type PgClientWithPid = pg.Client & {
       processID?: number | null;
@@ -2349,7 +2235,6 @@ export class PostgreSQLAdapter
       return;
     }
     if (txClient?.processID == null) return;
-    const drained = this._queryInFlightSettled;
     try {
       // Open a FRESH TCP connection to send a CancelRequest — mirrors
       // libpq PQcancel / Ruby PG::Connection#cancel: new socket, send
@@ -2366,7 +2251,6 @@ export class PostgreSQLAdapter
       } else {
         cancelCon.connect(port, host);
       }
-      if (drained !== null) await drained;
     } catch {
       // cancel is best-effort — a drain failure must not mask the rollback,
       // as Rails' `rescue PG::Error` on cancel_any_running_query does not.
@@ -2884,7 +2768,9 @@ export class PostgreSQLAdapter
     await this.withRawConnection(async (conn) => {
       const client = conn as unknown as pg.Client;
       try {
-        await this._serializePinnedQuery(client, () => client.query(sql));
+        await this._drainPendingDeallocate();
+        this._commandSettled = false;
+        await client.query(sql);
       } catch (e) {
         // The bare driver `exec()` is the DDL path for schema statements.
         // Unlike `execute()`/`executeMutation()`, it bypasses bind rewriting,
@@ -3065,18 +2951,13 @@ export class PostgreSQLAdapter
     // only AFTER ROLLBACK's response is processed (matching the
     // sequence in Rails' reset!, postgresql_adapter.rb:371-382).
     const live = this._rawConnection;
-    // Chain off the maintenance tail so ROLLBACK (and the DISCARD ALL below)
-    // serialize behind any pending DEALLOCATE on the pinned client rather than
-    // firing onto a client that's still executing one.
-    // Read once, here: a query enqueued after the barrier below is published
-    // chains onto `_maintenanceTail` *behind* that barrier, so re-reading the
-    // field from inside the chain would make this reset wait on a query that is
-    // waiting on this reset.
-    const tail = this._maintenanceTail;
-    let work: Promise<unknown> = tail;
+    // Sequence behind any pending eviction DEALLOCATE so ROLLBACK (and the
+    // DISCARD ALL below) don't fire onto a client that is still running one.
+    const pendingDeallocate = this._pendingDeallocate ?? Promise.resolve();
+    let work: Promise<unknown> = pendingDeallocate;
     if (this._client) {
       work = this._cancelAnyRunningQuery()
-        .then(() => tail)
+        .then(() => pendingDeallocate)
         .then(() => live.query("ROLLBACK"))
         .catch(() => {});
       this._client = null;
@@ -3128,9 +3009,6 @@ export class PostgreSQLAdapter
         if (this._inFlightReset === reset) this._inFlightReset = null;
       });
     this._inFlightReset = reset;
-    // Make subsequent maintenance ops (DEALLOCATE) queue behind the full
-    // ROLLBACK → DISCARD ALL → reconfigure chain on this socket.
-    this._maintenanceTail = reset;
     // DISCARD ALL drops server-side prepared statements — reset the
     // local pool so a later PREPARE name (a1, a2, ...) doesn't collide.
     this._statementPool?.reset();
@@ -4573,11 +4451,10 @@ export class PostgreSQLAdapter
     // both prepares and executes in a single roundtrip).
     await client.query(`PREPARE ${pgQuoteColumnName(name)} AS ${sql}`);
     pool.set(key, { name });
-    // `set` may have evicted an LRU entry, queueing its DEALLOCATE on the
-    // maintenance tail. Drain it before returning so the caller's Bind+Execute
-    // lands on an idle client rather than racing the eviction's DEALLOCATE —
-    // matching Rails' inline dealloc-under-lock in StatementPool#[]=.
-    await this._maintenanceTail;
+    // `set` may have evicted an LRU entry. Drain its DEALLOCATE before
+    // returning so the caller's Bind+Execute lands on an idle client — Rails
+    // deallocs the evicted entry inline in StatementPool#[]=.
+    await this._drainPendingDeallocate();
     return name;
   }
 
@@ -5047,9 +4924,9 @@ export interface PreparedStatement {
 /**
  * Maps a pinned `pg.Client` to its owning adapter's DEALLOCATE serializer
  * (populated by the adapter's `_rawConnection` setter). A `StatementPool`'s
- * `dealloc` looks the client up here so eviction cleanup chains behind the
- * in-flight query on the adapter-owned maintenance queue rather than racing it,
- * without the pool constructor needing a non-Rails-shaped extra argument. A
+ * `dealloc` looks the client up here so the adapter can await the DEALLOCATE at
+ * the eviction site (as Rails does inline, statement_pool.rb:31), without the
+ * pool constructor needing a non-Rails-shaped extra argument. A
  * `WeakMap` so entries vanish when the client is GC'd. Clients no adapter owns
  * (standalone pools) are absent → the prior best-effort fire-and-forget path.
  */
@@ -5104,10 +4981,9 @@ export class StatementPool extends GenericStatementPool<PreparedStatement> {
     const deallocSql = `DEALLOCATE ${pgQuoteColumnName(stmt.name)}`;
     const serialize = pgDeallocSerializers.get(client);
     if (serialize) {
-      // Adapter-owned client: route through its maintenance serializer so the
-      // DEALLOCATE chains behind the in-flight query / prior eviction on the
-      // pinned client rather than fire-and-forgetting onto a busy client
-      // (node-pg's "already executing a query" deprecation). It swallows errors.
+      // Adapter-owned client: hand the DEALLOCATE to the adapter, which awaits
+      // it at the eviction site before the query that triggered the eviction
+      // goes out — Rails' inline dealloc. It swallows errors.
       serialize(deallocSql);
       return;
     }
