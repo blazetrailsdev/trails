@@ -1067,14 +1067,12 @@ function findPrototypeSetter(instance: object, key: string): ((v: unknown) => vo
  * The name is the awaitable `set#{Name}Attributes` writer rather than the
  * `#{name}Attributes=` property setter: it is the one that reproduces Rails'
  * inline timing for the assignments that need I/O, and a JS property setter
- * cannot await. Its build arm always answers a promise — it runs Rails'
- * `replace` tail on one path, `load_target` (has_one_association.rb:59) ->
- * `remove_target!` (:69) -> `self.target = record` (:84) — so the promise
- * arrives even when a record under construction owes no I/O, which it never
- * does: it is new, so its has_one never queries (`find_target?` is false) and
- * holds no loaded target. A constructor cannot await, so the promise is parked
- * and drained where the other deferred nested-attributes work is drained —
- * `save` (nested-attributes.ts:182).
+ * cannot await. The writer answers a promise only when the assignment owes DB
+ * I/O, which a record under construction cannot: it is new, so its has_one never
+ * queries (`find_target?` is false) and holds no loaded target. Should one ever
+ * arrive, a constructor cannot await it either, so it is parked and drained
+ * where the other deferred nested-attributes work is drained — `save`
+ * (nested-attributes.ts:182).
  */
 export function _reapplyNestedAttrSetters(
   ctor: PersistenceHost,

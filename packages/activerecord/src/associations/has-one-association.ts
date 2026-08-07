@@ -471,8 +471,8 @@ export class HasOneAssociation extends SingularAssociation {
    * `protected` because this is association-internal bookkeeping, not API
    * surface — Rails' `remove_target!` is private too. The nested-attributes
    * writer lives outside the class hierarchy and reaches it through its
-   * duck-typed `OneToOneAssociation` handle, as it does the sibling
-   * `loadDisplacedForBuild`.
+   * duck-typed `OneToOneAssociation` handle, exactly as it does the sibling
+   * `displacementNeedsAwait`.
    *
    * @internal
    */
@@ -481,6 +481,34 @@ export class HasOneAssociation extends SingularAssociation {
     if (!displaced) return;
     if ((displaced as { isDestroyed?: () => boolean }).isDestroyed?.()) return;
     await this.removeTargetBang((this.reflection.options.dependent as string) ?? "");
+  }
+
+  /**
+   * Whether a nested-attributes build over this association would reach DB I/O
+   * — the `load_target` (has_one_association.rb:59) / `remove_target!` (:69)
+   * pair Rails runs inline. Rails answers it by just running them; ours asks
+   * first, because a build that displaces nothing is pure in-memory work and
+   * has to stay synchronous for `new Model({shipAttributes: {…}})` to build the
+   * associated record inside the constructor, as Rails' does.
+   *
+   * True on both displacing arms: an already-loaded record to remove, and an
+   * unloaded association whose `find_target?` (`findTargetNeeded`) says Rails
+   * would query for one — the guard is `return target unless load_target ||
+   * record`, and Ruby always evaluates the left operand, so a never-loaded
+   * has_one on a persisted owner still discovers (and removes) the row. False
+   * when the build displaces nothing, which keeps that assignment synchronous.
+   *
+   * `protected` because this is association-internal bookkeeping, not API
+   * surface. The nested-attributes writer lives outside the class hierarchy and
+   * reaches it through its duck-typed handle, as it does `detachDisplacedTarget`.
+   *
+   * @internal
+   */
+  protected displacementNeedsAwait(): boolean {
+    if (!this.loaded) return this.findTargetNeeded();
+    const displaced = this.target;
+    if (!displaced) return false;
+    return (displaced as { isDestroyed?: () => boolean }).isDestroyed?.() !== true;
   }
 
   private foreignKeyColumns(): string[] {

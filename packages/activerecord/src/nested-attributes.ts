@@ -678,9 +678,11 @@ interface OneToOneAssociation {
   // where trails raises strict-loading violations (singular-association.ts:210).
   readonly reader?: Base | null | Promise<Base | null>;
   // Rails' leading `load_target` (has_one_association.rb:59) and its
-  // `remove_target!` (:69) — see `detachDisplacedThenSetNewRecord`.
+  // `remove_target!` (:69), plus the predicate that says whether either would do
+  // any work — see `detachDisplacedThenSetNewRecord`.
   loadDisplacedForBuild?(): Promise<unknown> | null;
   detachDisplacedTarget?(): Promise<void>;
+  displacementNeedsAwait?(): boolean;
 }
 
 /**
@@ -880,7 +882,18 @@ export function assignNestedAttributesForOneToOneAssociation(
         // STI `type`, `SubclassNotFound`) neither queries nor detaches a record
         // Rails never touches.
         const built = assoc.buildRecord(assignable);
-        return detachDisplacedThenSetNewRecord(assoc, built);
+        if (assoc.displacementNeedsAwait?.() === true) {
+          // DB I/O Rails runs inline before `self.target = record` (:84) — a
+          // SELECT for a never-loaded association, then `remove_target!`'s
+          // nullify/destroy save. Returning the promise puts it at the
+          // assignment expression, where Rails runs it.
+          return detachDisplacedThenSetNewRecord(assoc, built);
+        }
+        // Nothing to displace: Rails' `self.target = record` (:84) is all that
+        // remains of `replace`, and it is in-memory work — so it stays
+        // synchronous, which is what lets `new Model({shipAttributes: …})` build
+        // the associated record inside the constructor Rails runs it in.
+        if (built) assoc.setNewRecord(built);
       }
     }
   }
