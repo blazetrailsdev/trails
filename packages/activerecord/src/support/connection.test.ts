@@ -2,6 +2,7 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import { DatabaseTasks } from "../tasks/database-tasks.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
 import { Base } from "../base.js";
+import { ARUnit2Model } from "../test-helpers/models/arunit2-model.js";
 import { connect, restoreWorkerConnection, testConfigurationHashes } from "./connection.js";
 import { SQLITE_FIXTURE_DATABASE, SQLITE_FIXTURE_DATABASE_2 } from "./config.js";
 
@@ -21,11 +22,13 @@ describe("connect", () => {
     await Base.removeConnection();
     Base._adapter = null;
     vi.unstubAllEnvs();
-    // `connect()` establishes a Base pool from whatever ARCONN this case
-    // stubbed, displacing the worker's own same-named pool for every later
-    // file in the vitest worker — invisible on the sqlite lane, a different
-    // database on the others.
+    // `connect()` establishes BOTH worker pools from whatever ARCONN this case
+    // stubbed (`connection.rb:32-33`), displacing the worker's own same-named
+    // pools for every later file in the vitest worker — invisible on the sqlite
+    // lane, a different database on the others. `restoreWorkerConnection()`
+    // covers `arunit` only, so `arunit2` is re-established alongside it.
     await restoreWorkerConnection();
+    await ARUnit2Model.establishConnection("arunit2");
   });
 
   it("sets databaseConfiguration and returns the arunit config", async () => {
