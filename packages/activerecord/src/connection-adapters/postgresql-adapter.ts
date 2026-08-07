@@ -77,6 +77,7 @@ import { captureUnwrappedExecute, dirtiesQueryCache } from "./abstract/query-cac
 import { SchemaStatements } from "./postgresql/schema-statements-class.js";
 import type { SchemaStatements as AbstractSchemaStatements } from "./abstract/schema-statements.js";
 import type {
+  CommentOrChanges,
   JoinTableOptions,
   ValidateConstraintStatements,
   CommentStatements,
@@ -352,7 +353,14 @@ export class PostgreSQLAdapter
       // DEALLOCATE under the connection's control (postgresql_adapter.rb:307).
       pgDeallocSerializers.set(value, (deallocSql) => {
         this._pendingDeallocate = (this._pendingDeallocate ?? Promise.resolve())
-          .then(() => value.query(deallocSql))
+          .then(() => {
+            // Only the pinned client's wire cycle is what transactionStatus
+            // reports on; a parked DEALLOCATE that outlives a reconnect would
+            // otherwise strand the flag false, since the ReadyForQuery listener
+            // that re-arms it is attached per pg.Client.
+            if (this._rawConnection === value) this._commandSettled = false;
+            return value.query(deallocSql);
+          })
           .then(
             () => {},
             () => {},
@@ -468,6 +476,14 @@ export class PostgreSQLAdapter
    * — but node-pg settles the query promise on the terminating message, so
    * without this the caller can read the status back in that gap and see a
    * command that is over reported as PQTRANS_ACTIVE.
+   *
+   * The invariant is that it is set `false` immediately before *every*
+   * `client.query` issued on the pinned client — `_performQuery`, `exec`, the
+   * `_bt_ret_*` savepoint wrapper in `executeMutation`, and both DEALLOCATE
+   * sites (statement-pool eviction and `DEALLOCATE ALL` at checkout) — and back
+   * to `true` only by the terminating-message handlers in
+   * `_attachReadyForQueryListener`. Miss an issue site and `transactionStatus`
+   * answers IDLE/INTRANS while that command is mid-cycle.
    */
   private _commandSettled = true;
   private _databaseVersion: number | null = null;
@@ -1457,6 +1473,7 @@ export class PostgreSQLAdapter
   private async _maybeDrainOrphanedPreparedStatements(client: pg.Client): Promise<void> {
     if (!this._needsDeallocateAll) return;
     this._needsDeallocateAll = false;
+    this._commandSettled = false;
     await client.query("DEALLOCATE ALL");
   }
 
@@ -1905,9 +1922,15 @@ export class PostgreSQLAdapter
             // fails and we re-run without it.
             payload.sql = withReturning;
             try {
-              if (useSavepoint) await client.query(`SAVEPOINT "${spName}"`);
+              if (useSavepoint) {
+                this._commandSettled = false;
+                await client.query(`SAVEPOINT "${spName}"`);
+              }
               const result = await this._performQuery(client, withReturning, binds, payload);
-              if (useSavepoint) await client.query(`RELEASE SAVEPOINT "${spName}"`);
+              if (useSavepoint) {
+                this._commandSettled = false;
+                await client.query(`RELEASE SAVEPOINT "${spName}"`);
+              }
               const affected = this.affectedRows(result);
               payload.row_count = affected;
               if (result.rows.length > 1) {
@@ -1927,7 +1950,9 @@ export class PostgreSQLAdapter
               // originally written for.
               if (err instanceof PreparedStatementCacheExpired) throw err;
               if (useSavepoint) {
+                this._commandSettled = false;
                 await client.query(`ROLLBACK TO SAVEPOINT "${spName}"`).catch(() => {});
+                this._commandSettled = false;
                 await client.query(`RELEASE SAVEPOINT "${spName}"`).catch(() => {});
               }
               payload.sql = pgSql;
@@ -4642,13 +4667,10 @@ export interface PostgreSQLAdapter {
   changeColumnComment(
     tableName: string,
     columnName: string,
-    commentOrChanges: string | null | { from?: string | null; to?: string | null },
+    commentOrChanges: CommentOrChanges,
   ): Promise<void>;
 
-  changeTableComment(
-    tableName: string,
-    commentOrChanges: string | null | { from?: string | null; to?: string | null },
-  ): Promise<void>;
+  changeTableComment(tableName: string, commentOrChanges: CommentOrChanges): Promise<void>;
 
   /** @internal */
   validateConstraint(tableName: string, constraintName: string): Promise<void>;
