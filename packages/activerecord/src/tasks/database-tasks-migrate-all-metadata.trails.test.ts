@@ -55,10 +55,6 @@ describe("DatabaseTasksMigrateAllMetadataTest", () => {
       },
     });
     DatabaseTasks.registerMigrations([migration(1, "CreateNothing")]);
-    // `with_temporary_pool` reads `migration_class.connection_db_config`
-    // (database_tasks.rb:542) before establishing anything, which raises on an
-    // unconnected Base exactly as Ruby does — Rails' task tests always run with
-    // a connection established.
     await Base.establishConnection({
       adapter: "sqlite3",
       database: join(dir, "primary.sqlite3"),

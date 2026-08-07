@@ -1193,7 +1193,12 @@ export abstract class Migration {
   /**
    * Define reversible operations.
    *
-   * Mirrors: ActiveRecord::Migration#reversible
+   * Mirrors: ActiveRecord::Migration#reversible (migration.rb:909-912),
+   * `helper = ReversibleBlockHelper.new(reverting?)` then
+   * `execute_block { yield helper }`. The helper runs each `up`/`down` block
+   * inline as Ruby yields; the callbacks here are async and the block that
+   * registers them is not, so they are collected and awaited on the way out
+   * of the same `execute_block`.
    */
   async reversible(
     fn?: (dir: {
@@ -1202,11 +1207,6 @@ export abstract class Migration {
     }) => void,
   ): Promise<void> {
     if (!fn) return;
-    // Rails: `helper = ReversibleBlockHelper.new(reverting?)` then
-    // `execute_block { yield helper }` (migration.rb:909-912). The helper runs
-    // each `up`/`down` block inline as Ruby yields; the callbacks here are
-    // async and the block that registers them is not, so they are collected
-    // and awaited on the way out of the same `execute_block`.
     const reverting = this.isReverting();
     const toRun: Array<() => Promise<void>> = [];
     fn({
@@ -1225,10 +1225,10 @@ export abstract class Migration {
   /**
    * Run code only in the up direction.
    *
-   * Mirrors: ActiveRecord::Migration#up_only
+   * Mirrors: ActiveRecord::Migration#up_only (migration.rb:928-930),
+   * `execute_block(&block) unless reverting?`.
    */
   async upOnly(fn?: () => Promise<void>): Promise<void> {
-    // Rails: `execute_block(&block) unless reverting?` (migration.rb:928-930).
     if (!this.isReverting() && fn) {
       await this.executeBlock(fn);
     }

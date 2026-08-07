@@ -818,22 +818,24 @@ export class SchemaStatements extends AbstractSchemaStatements {
   // Alter table
   // ---------------------------------------------------------------------------
 
+  /**
+   * Mirrors: PostgreSQL::SchemaStatements#change_column
+   * (postgresql/schema_statements.rb:467-471) — clear the statement cache,
+   * partition `change_column_for_alter` into SQL clauses and procs, issue one
+   * ALTER TABLE with the comma-joined clauses, then run the procs. The DDL
+   * goes through the public `execute` rather than the raw `exec` so the
+   * `dirties_query_cache` wrapper clears the query cache on schema changes.
+   */
   override async changeColumn(
     tableName: string,
     columnName: string,
     type: ColumnType,
     options: ColumnOptions & { using?: string; castAs?: string } = {},
   ): Promise<void> {
-    // Mirrors PostgreSQL::SchemaStatements#change_column
-    // (postgresql/schema_statements.rb:467-471): clear the statement cache,
-    // then partition change_column_for_alter into SQL clauses and procs, issue
-    // a single ALTER TABLE with the comma-joined clauses, and run the procs.
     this.clearCacheBang();
     const parts = await this.changeColumnForAlter(tableName, columnName, type, options);
     const sqls = parts.filter((v): v is string => typeof v === "string");
     const procs = parts.filter((v): v is () => Promise<void> => typeof v === "function");
-    // Route DDL through the public `execute` (not the raw `exec`) so the
-    // dirties_query_cache wrapper clears the query cache on schema changes.
     await this.execute(`ALTER TABLE ${this.quoteTableName(tableName)} ${sqls.join(", ")}`);
     for (const proc of procs) await proc();
   }

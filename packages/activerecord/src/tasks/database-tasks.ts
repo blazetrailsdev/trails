@@ -1250,7 +1250,15 @@ export class DatabaseTasks {
    * Mirrors Rails' `DatabaseTasks.with_temporary_pool`
    * (`tasks/database_tasks.rb:541-548`): establishes a pool for `config`
    * (clobber defaults to false, so an existing pool for the same config object
-   * is reused), yields it, then re-establishes the original config.
+   * is reused), yields it, then re-establishes the original config
+   * unconditionally in the `ensure` (`:547`).
+   *
+   * Both establish calls hand over the `DatabaseConfig` OBJECT, as Rails does
+   * (`:542,544`) — that is what lets `ConnectionHandler#establish_connection`
+   * recognise an already-established pool for the same config and reuse it
+   * (`connection_adapters/abstract/connection_handler.rb:139`) instead of
+   * opening a second one, which on a `:memory:` database would discard the
+   * first pool's data.
    *
    * @internal
    */
@@ -1261,13 +1269,6 @@ export class DatabaseTasks {
   ): Promise<T> {
     const migrationClass = await this.migrationClass();
     const originalDbConfig = migrationClass.connectionDbConfig();
-    // Rails passes the `DatabaseConfig` object itself
-    // (tasks/database_tasks.rb:542,544), which is what lets
-    // `ConnectionHandler#establish_connection` recognise an already-established
-    // pool for the same config and reuse it instead of opening a second one
-    // (connection_adapters/abstract/connection_handler.rb:139). Handing over a
-    // plain hash would mint a fresh `HashConfig` that can never match, and a
-    // second pool on a `:memory:` database discards the first one's data.
     try {
       // Rails: `connection_handler.establish_connection(db_config, clobber:)`
       // (database_tasks.rb:543). Ruby's `establish_connection(config_or_env = nil)`
@@ -1283,9 +1284,6 @@ export class DatabaseTasks {
       await pool.adapterReady;
       return await fn(pool);
     } finally {
-      // Rails: `establish_connection(original_db_config, clobber: clobber)`
-      // (database_tasks.rb:547), unconditionally. Same reason as above for
-      // restoring through the config OBJECT rather than a plain hash.
       await migrationClass.connectionHandler.establishConnection(originalDbConfig, {
         owner: migrationClass.connectionClassForSelf(),
         clobber,

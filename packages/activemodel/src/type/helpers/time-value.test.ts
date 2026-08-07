@@ -97,10 +97,6 @@ describe("newTime", () => {
     expect(z?.microsecond).toBe(456);
   });
 
-  // ruby 3.3.11:
-  //   Time.utc(2000,1,1,14,23,55, Rational(123456,1000000)).nsec # => 123
-  //   (Time.utc(...) - Rational(3600,1)).iso8601(9)
-  //     # => "2000-01-01T13:23:55.000000123Z"
   it("carries a Rational microsec and offset exactly, as Time.utc does", () => {
     const i = newTime(2000, 1, 1, 14, 23, 55, new Rational(123456, 1_000_000));
     expect(i?.toString()).toBe("2000-01-01T14:23:55.000000123Z");
