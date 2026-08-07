@@ -92,6 +92,12 @@ export function applySecondsPrecision<T>(this: { precision?: number }, value: T)
   return (roundable as Roundable<T>).round(opts);
 }
 
+/**
+ * Mirrors: ActiveModel::Type::Helpers::TimeValue#user_input_in_time_zone
+ * (time_value.rb:42-44) — `value.in_time_zone`, whose zone is the thread-local
+ * `Time.zone`. `Time.zone` unset falls back to UTC here, the same convention
+ * `isUtc()` applies to an unset `zone_default` (`helpers/timezone.ts`).
+ */
 export function userInputInTimeZone(value: unknown): Temporal.ZonedDateTime | null {
   if (value === null || value === undefined) return null;
   if (value instanceof Temporal.ZonedDateTime) return value;
@@ -105,7 +111,6 @@ export function userInputInTimeZone(value: unknown): Temporal.ZonedDateTime | nu
     }
   }
   try {
-    // `value.in_time_zone` reads the thread-local Time.zone (time_value.rb:43).
     const zone = getZone()?.tzinfo ?? "UTC";
     return Temporal.PlainDateTime.from(str.replace(" ", "T")).toZonedDateTime(zone);
   } catch {

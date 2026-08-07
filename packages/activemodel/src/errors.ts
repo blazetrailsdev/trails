@@ -266,7 +266,9 @@ export class Errors<TBase extends object = object> {
   /**
    * Returns `true` if an error with this exact attribute/type/options has
    * been added. Mirrors Rails `Errors#added?`
-   * (activemodel/lib/active_model/errors.rb:372-388) Symbol-vs-String dispatch:
+   * (activemodel/lib/active_model/errors.rb:372-382): `normalize_arguments`
+   * first (evaluating a callable `type` against the base), then Symbol-vs-String
+   * dispatch —
    * a Ruby Symbol reaches us as a colon-prefixed string, so `":blank"` takes the
    * strict-match branch and a bare String is a full message checked against
    * `messagesFor`.
@@ -289,7 +291,9 @@ export class Errors<TBase extends object = object> {
 
   /**
    * Returns `true` if an error of the given type exists on `attribute`.
-   * Mirrors Rails `errors.rb:395-403` Symbol-vs-String dispatch: a Ruby Symbol
+   * Mirrors Rails `errors.rb:395-403`: `type` defaults to `:invalid` and the
+   * arguments go through `normalize_arguments` before the Symbol-vs-String
+   * dispatch — a Ruby Symbol
    * reaches us as a colon-prefixed string, so `":blank"` goes through `where`
    * and a bare String is a full message checked against `messagesFor`.
    */

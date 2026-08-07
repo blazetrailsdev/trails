@@ -1736,6 +1736,14 @@ export abstract class Migration {
    * the purge must not run behind an established connection to a database it is about
    * to recreate. `ENV["SCHEMA_FORMAT"]` overrides the configured format there
    * (`:537`), so it does here; trails keeps that setting on `DatabaseTasks`.
+   *
+   * `ActiveRecord::Schema.verbose = false` (`:534`) silences the load; `Schema`
+   * inherits `Migration`'s `verbose` cattr, so the assignment writes the same
+   * state. The constant is reached through a call-time `await import` rather
+   * than a module-scope one because `schema.ts` is `class Schema extends
+   * Current`: a value import would close a cycle through this file and evaluate
+   * `Schema` with `Current` in TDZ. Ruby resolves it when the task runs, which
+   * is where the dynamic import resolves it too.
    */
   private static async loadSchemaBang(): Promise<void> {
     const databaseTasks = migrationArConfig()?.databaseTasks?.();
@@ -1749,11 +1757,6 @@ export abstract class Migration {
       await databaseTasks.purge(dbConfig);
     }
 
-    // `ActiveRecord::Schema` is named here rather than imported at module
-    // scope: schema.ts is `class Schema extends Current`, so a value import
-    // would close a cycle through this file and evaluate Schema with Current in
-    // TDZ. Ruby resolves the constant when the task runs (databases.rake:534),
-    // which is what the call-time import does.
     const { Schema } = await import("./schema.js");
     const schemaFormat = (getEnv("SCHEMA_FORMAT") ?? databaseTasks.schemaFormat) as SchemaFormat;
     await databaseTasks.withTemporaryPoolForEach({ env: "test" }, async (pool) => {
