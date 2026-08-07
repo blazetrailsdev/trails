@@ -171,6 +171,11 @@ describe("DJAS composite-key + nested-through", () => {
       if (typeof sql === "string") observed.push(sql);
     });
     try {
+      // No reader form yet: `shop.cknLineItemTags` routes through
+      // CollectionProxy#_throughOwnerCols, which rejects this composite
+      // owner PK / through FK pair ("1 pk vs 2 fk") — a separate seam from the
+      // loader under test here. See story
+      // converge-composite-through-collection-proxy-owner-cols.
       const reflection = (CknShop as any)._reflectOnAssociation("cknLineItemTags");
       const tags = await findTarget(shop, "cknLineItemTags", reflection.options);
       expect(tags.map((t: any) => t.value).sort()).toEqual(["red", "sale"]);
@@ -195,6 +200,7 @@ describe("DJAS composite-key + nested-through", () => {
     await CknTag.create({ ckn_line_item_id: orphanLi.id, value: "orphan-tag" });
 
     const unsaved = CknShop.new({ name: "unsaved" });
+    // Same CollectionProxy composite-through gap as above — no reader form.
     const reflection = (CknShop as any)._reflectOnAssociation("cknLineItemTags");
     const tags = await findTarget(unsaved, "cknLineItemTags", reflection.options);
     expect(tags).toEqual([]);

@@ -66,8 +66,8 @@
     "package": "activerecord",
     "tsFile": "relation/finder-methods.ts",
     "rubyName": "find_some_ordered",
-    "call": "order:model,selectValues",
-    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
+    "call": "order:typeForAttribute,cast",
+    "reason": "Re-spelling of the retired `order:model,selectValues` row — the short-name resolver now credits `typeForAttribute`/`cast` where it credited `model` before. Same body, same pending burndown."
   },
   {
     "package": "activerecord",
@@ -108,8 +108,8 @@
     "package": "activerecord",
     "tsFile": "relation/finder-methods.ts",
     "rubyName": "find_with_ids",
-    "call": "order:model,primaryKey",
-    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
+    "call": "order:findSome,findOne",
+    "reason": "Re-spelling of the retired `order:model,primaryKey` row for the same reason as `find_some_ordered` above."
   },
   {
     "package": "activerecord",

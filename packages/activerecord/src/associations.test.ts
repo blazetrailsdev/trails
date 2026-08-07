@@ -6,7 +6,6 @@
  * GeneratedMethodsTest, and WithAnnotationsTest.
  */
 import { describe, it, expect, afterEach, beforeAll, beforeEach, vi } from "vitest";
-import { findTarget } from "./associations/singular-association.js";
 import { Base, association, reflectOnAssociation, registerModel, NameError, pp } from "./index.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { captureSql } from "./testing/sql-capture.js";
@@ -878,10 +877,8 @@ describe("PreloaderTest", () => {
     expect(fav.association("author").target.name).toBe("Mary");
     expect(fav.association("favoriteAuthor").target.name).toBe("Bob");
     spy.mockClear();
-    const reloadedAuthor = (await findTarget(fav, "author", {
-      inverseOf: "authorFavorites",
-    })) as any;
-    const reloadedFavorite = (await findTarget(fav, "favoriteAuthor", {})) as any;
+    const reloadedAuthor = await fav.author;
+    const reloadedFavorite = await fav.favoriteAuthor;
     expect(reloadedAuthor.name).toBe("Mary");
     expect(reloadedFavorite.name).toBe("Bob");
     expect(spy).not.toHaveBeenCalled();

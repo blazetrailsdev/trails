@@ -152,6 +152,25 @@ export class NullPool implements AbstractPool {
     return undefined;
   }
 
+  /**
+   * Rails' NullPool defines neither `role` nor `shard`
+   * (`abstract/connection_pool.rb:14-51`), so the bare `@pool.role` /
+   * `@pool.shard` of `AbstractAdapter#role` / `#shard`
+   * (`abstract_adapter.rb:288,294`) raises NoMethodError on a pool-less
+   * adapter. Ruby never reaches one; trails constructs standalone adapters
+   * routinely, and `inspect()` reads both. The values Rails documents for a
+   * single-role, unsharded application (`abstract_adapter.rb:285,291`) stand
+   * in here, once, so both readers stay the bare Rails one-liner.
+   */
+  get role(): string {
+    return "writing";
+  }
+
+  /** Companion of {@link NullPool.role}; same reason. */
+  get shard(): string {
+    return "default";
+  }
+
   checkout(): never {
     throw new ConnectionNotEstablished("NullPool does not support checkout");
   }
@@ -1401,15 +1420,6 @@ export class ConnectionPool implements ReapablePool {
     this._checkedOut.delete(conn);
     this._lastCheckinAt.delete(conn);
     this._available?.delete(conn);
-    // Clear the back-reference we set in newConnection so a removed
-    // adapter can't observe stale pool/poolConfig state post-eviction.
-    // Mirror the same narrow gate — only touch AbstractAdapter's slot,
-    // never a driver-adapter's own `pool` field. Rails' `remove`
-    // (abstract/connection_pool.rb:593) leaves `conn.pool` alone; NullPool is
-    // Rails' unpooled-adapter value (abstract_adapter.rb:153).
-    if (conn instanceof AbstractAdapter && (conn as unknown as { pool: unknown }).pool === this) {
-      (conn as unknown as { pool: unknown }).pool = new NullPool();
-    }
 
     for (const [ctxId, pin] of this._pinnedConnections) {
       if (pin.connection === conn) {

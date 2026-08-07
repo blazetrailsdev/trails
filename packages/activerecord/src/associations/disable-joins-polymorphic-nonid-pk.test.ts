@@ -29,7 +29,6 @@ import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import { Base, registerModel, TableDefinition } from "../index.js";
 import { Associations } from "../associations.js";
-import { findTarget } from "./has-many-association.js";
 import { fixtures } from "../test-fixtures.js";
 
 describe("DJAS — polymorphic belongsTo-through with non-id target PK", () => {
@@ -167,8 +166,7 @@ describe("DJAS — polymorphic belongsTo-through with non-id target PK", () => {
       if (typeof sql === "string") observed.push(sql);
     });
     try {
-      const reflection = (DpAuthor as any)._reflectOnAssociation("noJoinsDpPhotos");
-      const photos = await findTarget(author, "noJoinsDpPhotos", reflection.options);
+      const photos = (await (author as any).noJoinsDpPhotos.toArray()) as any[];
       expect(photos.map((p: any) => p.uuid)).toEqual([photo.uuid]);
       expect(photos.map((p: any) => p.title)).toEqual(["p1"]);
     } finally {

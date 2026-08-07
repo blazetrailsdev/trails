@@ -66,22 +66,8 @@
     "package": "activerecord",
     "tsFile": "associations/has-one-association.ts",
     "rubyName": "foreign_key_present?",
-    "call": "order:owner,reflection",
-    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/has-one-association.ts",
-    "rubyName": "foreign_key_present?",
     "call": "primary_key",
     "reason": "Satisfied via the extracted foreignKeyPresentFor helper (foreign-association.ts), which reads klass.primaryKey — same delegation as CollectionAssociation#foreignKeyPresent."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/has-one-association.ts",
-    "rubyName": "handle_dependency",
-    "call": "order:reflection,constructor",
-    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
   },
   {
     "package": "activerecord",
@@ -95,13 +81,6 @@
     "tsFile": "associations/has-one-association.ts",
     "rubyName": "nullify_owner_attributes",
     "call": "primary_key",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/has-one-association.ts",
-    "rubyName": "nullify_owner_attributes",
-    "call": "reflection",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -124,13 +103,6 @@
     "rubyName": "replace",
     "call": "transaction_if",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/has-one-association.ts",
-    "rubyName": "set_owner_attributes",
-    "call": "order:owner,reflection",
-    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
   },
   {
     "package": "activerecord",
