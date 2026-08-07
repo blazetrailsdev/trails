@@ -14,8 +14,12 @@ const HERE = __dirname;
 describe("Ruby extractor body call capture", () => {
   const RUBY_SCRIPT = path.join(HERE, "extract-ruby-api.rb");
 
-  // Returns a map of "<fqn>#<method>" -> calls array for the given fixtures.
-  function rubyCalls(fixtures: Record<string, string>): Record<string, string[] | undefined> {
+  // Returns a map of "<fqn>#<method>" -> the named method_info array for the
+  // given fixtures.
+  function rubyField(
+    fixtures: Record<string, string>,
+    field: string,
+  ): Record<string, string[] | undefined> {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "calls-rb-"));
     try {
       for (const [rel, src] of Object.entries(fixtures)) {
@@ -34,7 +38,7 @@ describe("Ruby extractor body call capture", () => {
         out = {}
         ex.classes.each do |fqn, info|
           (info[:instanceMethods] + info[:classMethods]).each do |m|
-            out["#{fqn}##{m[:name]}"] = m[:calls]
+            out["#{fqn}##{m[:name]}"] = m[${JSON.stringify(field)}.to_sym]
           end
         end
         puts JSON.generate(out)
@@ -45,6 +49,48 @@ describe("Ruby extractor body call capture", () => {
       fs.rmSync(dir, { recursive: true, force: true });
     }
   }
+
+  function rubyCalls(fixtures: Record<string, string>): Record<string, string[] | undefined> {
+    return rubyField(fixtures, "calls");
+  }
+
+  function rubySkeletons(fixtures: Record<string, string>): Record<string, string[] | undefined> {
+    return rubyField(fixtures, "skeleton");
+  }
+
+  it("emits an ordered control + call skeleton, with duplicates, alongside calls", () => {
+    const s = rubySkeletons({
+      "foo.rb": `
+        class Foo
+          def create(xs)
+            raise Boom if dirty
+            xs.each { |x| save(x) }
+            begin
+              save(xs[0])
+            rescue StandardError
+              rollback
+            end
+          end
+
+          def build
+            cached || Thing.new
+          end
+        end
+      `,
+    });
+    expect(s["Foo#create"]).toEqual([
+      "if",
+      "ref:dirty",
+      "throw",
+      "ref:each",
+      "ref:save",
+      "try",
+      "ref:save",
+      "ref:get",
+      "ref:rollback",
+    ]);
+    expect(s["Foo#build"]).toEqual(["ref:cached", "if", "new:Thing"]);
+  });
 
   it('records super(args) and bare super as a "super" call', () => {
     const c = rubyCalls({

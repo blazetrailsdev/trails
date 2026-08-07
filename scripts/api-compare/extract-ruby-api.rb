@@ -662,6 +662,8 @@ class ApiExtractor
     method_info[:depRefs] = dep_info[:depRefs] unless dep_info[:depRefs].empty?
     method_info[:calls] = calls unless calls.empty?
     method_info[:weakCalls] = weak_calls unless weak_calls.empty?
+    skeleton = collect_method_skeleton(body)
+    method_info[:skeleton] = skeleton unless skeleton.empty?
     opt_keys = collect_option_keys(body, params, fqn)
     method_info[:option_keys] = opt_keys unless opt_keys.empty?
     digest = body_digest(body)
@@ -716,6 +718,8 @@ class ApiExtractor
     method_info[:depRefs] = dep_info[:depRefs] unless dep_info[:depRefs].empty?
     method_info[:calls] = calls unless calls.empty?
     method_info[:weakCalls] = weak_calls unless weak_calls.empty?
+    skeleton = collect_method_skeleton(body)
+    method_info[:skeleton] = skeleton unless skeleton.empty?
     opt_keys = collect_option_keys(body, params, fqn)
     method_info[:option_keys] = opt_keys unless opt_keys.empty?
     digest = body_digest(body)
@@ -2041,6 +2045,85 @@ class ApiExtractor
     total = calls.tally
     weak_calls = weak.tally.select { |name, n| total[name] == n }.keys
     [calls.uniq, weak_calls]
+  end
+
+  SKELETON_IF_NODES = %i[if elsif unless if_mod unless_mod ifop case].freeze
+  SKELETON_LOOP_NODES = %i[while until while_mod until_mod for].freeze
+  SKELETON_LOGICAL_OPS = [:"||", :"&&", :and, :or].freeze
+
+  # The body's ordered control + call skeleton — `if` / `loop` / `try` /
+  # `throw`, `new:Const` and `ref:<name>` reaches, in source order and WITH
+  # duplicates. The TS counterpart is extract-ts-api.ts#extractSkeleton and the
+  # vocabulary is deliberately identical; `calls` cannot stand in for it,
+  # because `calls.uniq` drops both the repeats and the control flow.
+  #
+  # Two places where Ripper's shape has to be converged rather than
+  # transcribed. `try` tokens on the `:bodystmt`, not on the `:rescue`/`:ensure`
+  # clause Ripper hangs off its later slots, or it would land AFTER the
+  # protected calls where the TS TryStatement puts it before them. And `raise`
+  # tokens as `throw` rather than `ref:raise`, to line up with the port's
+  # `throw new X(...)` — a ThrowStatement on the TS side, never a call.
+  def collect_method_skeleton(body_node)
+    tokens = []
+    walk_for_skeleton(body_node, tokens)
+    tokens
+  end
+
+  def walk_for_skeleton(node, tokens)
+    return unless node.is_a?(Array)
+
+    kind = node[0]
+    if SKELETON_IF_NODES.include?(kind)
+      tokens << "if"
+    elsif SKELETON_LOOP_NODES.include?(kind)
+      tokens << "loop"
+    elsif kind == :bodystmt && (node[2] || node[4])
+      tokens << "try"
+    elsif kind == :binary && SKELETON_LOGICAL_OPS.include?(node[2])
+      walk_for_skeleton(node[1], tokens)
+      tokens << "if"
+      walk_for_skeleton(node[3], tokens)
+      return
+    elsif kind == :opassign && SKELETON_LOGICAL_OPS.include?(op_assign_op(node[2]))
+      tokens << "if"
+    elsif kind == :aref
+      tokens << "ref:get"
+    elsif %i[fcall vcall command].include?(kind)
+      skeleton_push_name(tokens, ident_name(node[1]), nil)
+    elsif %i[call command_call].include?(kind)
+      skeleton_push_name(tokens, node[3] ? ident_name(node[3]) : nil, node[1])
+    elsif %i[super zsuper].include?(kind)
+      tokens << "ref:super"
+    end
+
+    node.each { |child| walk_for_skeleton(child, tokens) if child.is_a?(Array) }
+  end
+
+  # Ripper wraps an op-assign operator in an `:op` node on newer parsers and
+  # hands it bare on older ones.
+  def op_assign_op(op)
+    op.is_a?(Array) ? op[1] : op
+  end
+
+  def skeleton_push_name(tokens, name, recv)
+    return unless name
+
+    if name == "raise"
+      tokens << "throw"
+    elsif name == "new"
+      const = skeleton_const_name(recv)
+      tokens << (const ? "new:#{const}" : "ref:new")
+    else
+      tokens << "ref:#{name}"
+    end
+  end
+
+  def skeleton_const_name(recv)
+    return nil unless recv.is_a?(Array)
+    return recv[1][1] if recv[0] == :var_ref && recv[1].is_a?(Array) && recv[1][0] == :@const
+    return skeleton_const_name(recv[2]) if recv[0] == :const_path_ref
+
+    recv[0] == :@const ? recv[1] : nil
   end
 
   # Record a `VALID_OPTIONS`-named symbol array so a later

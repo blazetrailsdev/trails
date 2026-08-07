@@ -610,6 +610,59 @@ describe("DateTime", () => {
     // ruby 3.3.11: DateTime.parse("not a date") #=> Date::Error: invalid date
     expect(() => RubyDateTime.parse("not a date")).toThrow("invalid date");
   });
+
+  it("keeps a constructed fractional second, so %N and %L answer real digits", () => {
+    // ruby 3.3.11:
+    //   d = DateTime.new(2008, 3, 1, 6, 0, Rational(1, 2))
+    //   d.strftime("%N")  #=> "500000000"
+    //   d.strftime("%L")  #=> "500"
+    //   d.sec_fraction    #=> (1/2)
+    //   d.sec             #=> 0
+    const datetime = new RubyDateTime(2008, 3, 1, 6, 0, 0.5);
+    expect(datetime.strftime("%N")).toBe("500000000");
+    expect(datetime.strftime("%L")).toBe("500");
+    expect(datetime.secFraction).toBe(0.5);
+    expect(datetime.sec).toBe(0);
+    // ruby 3.3.11: DateTime.new(2008, 3, 1, 6, 0, 1.5).sec #=> 1
+    expect(new RubyDateTime(2008, 3, 1, 6, 0, 1.5).sec).toBe(1);
+  });
+
+  it("keeps a parsed fractional second across the offset conversion", () => {
+    // ruby 3.3.11:
+    //   d = DateTime.parse("2008-03-01T06:00:00.123456789+09:00")
+    //   d.strftime("%N") #=> "123456789"
+    //   d.sec_fraction   #=> (123456789/1000000000)
+    const datetime = RubyDateTime.parse("2008-03-01T06:00:00.123456789+09:00");
+    expect(datetime.strftime("%N")).toBe("123456789");
+    expect(datetime.secFraction).toBe(0.123456789);
+    // ruby 3.3.11:
+    //   DateTime.parse("2008-03-01T06:00:00.9999999999").strftime("%N")
+    //     #=> "999999999"   (sf is (9999999999/10000000000); %N truncates)
+    expect(RubyDateTime.parse("2008-03-01T06:00:00.9999999999").strftime("%N")).toBe("999999999");
+  });
+
+  it("rounds the fractional second to a nanosecond, where Time#nsec truncates", () => {
+    // ruby 3.3.11 — d_lite_plus's T_FLOAT arm rounds (date_core.c:6097):
+    //   DateTime.new(2008, 3, 1, 6, 0, 0.3).strftime("%N")          #=> "300000000"
+    //   DateTime.new(2008, 3, 1, 6, 0, 0.1234567895).strftime("%N") #=> "123456790"
+    //   DateTime.new(2008, 3, 1, 6, 0, 6.1234567891).strftime("%N") #=> "123456789"
+    //   DateTime.new(2008, 3, 1, 6, 0, 0.000000001).strftime("%N")  #=> "000000001"
+    // where Time.utc(2008, 3, 1, 6, 0, 0.3).nsec #=> 299999999
+    expect(new RubyDateTime(2008, 3, 1, 6, 0, 0.3).strftime("%N")).toBe("300000000");
+    expect(new RubyDateTime(2008, 3, 1, 6, 0, 0.1234567895).strftime("%N")).toBe("123456790");
+    expect(new RubyDateTime(2008, 3, 1, 6, 0, 6.1234567891).strftime("%N")).toBe("123456789");
+    expect(new RubyDateTime(2008, 3, 1, 6, 0, 0.000000001).strftime("%N")).toBe("000000001");
+  });
+
+  it("answers zeros for an integer second, as ::Date does with no time of day", () => {
+    // ruby 3.3.11:
+    //   DateTime.new(2008, 3, 1, 6, 0, 0).strftime("%N") #=> "000000000"
+    //   DateTime.new(2008, 3, 1, 6, 0, 0).sec_fraction   #=> (0/1)
+    //   Date.new(2008, 3, 1).strftime("%N")              #=> "000000000"
+    expect(new RubyDateTime(2008, 3, 1, 6, 0, 0).strftime("%N")).toBe("000000000");
+    expect(new RubyDateTime(2008, 3, 1, 6, 0, 0).secFraction).toBe(0);
+    expect(new RubyDate(2008, 3, 1).strftime("%N")).toBe("000000000");
+  });
 });
 
 describe("Time", () => {

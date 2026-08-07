@@ -617,6 +617,28 @@ interface CallResult {
   mismatches: CallMismatch[];
   staleTags: StaleCallTag[];
   suppressed: SuppressedCall[];
+  skeletons: CallSkeleton[];
+}
+
+/**
+ * The ordered control + call skeleton of one name-matched (Ruby, TS) pair, both
+ * sides UNCOLLAPSED — no `effectiveTsCalls` delegation union, no
+ * `includeGraphCalls` merge, no dedup. Those are set operations by
+ * construction; a sequence needs its own merge rule, and until
+ * call-sequence-parity decides what it is, carrying the body's own stream and
+ * nothing else is the honest shape. Recorded for every compared pair, not just
+ * the flagged ones: this is the population call-sequence-parity seeds from, not
+ * a mismatch list. Signal only (RFC 0084) — written to its own
+ * output/call-skeletons.json, so call-mismatches.json and its ratchet read
+ * exactly what they read before, and nothing gates on it yet.
+ */
+interface CallSkeleton {
+  rubyFile: string;
+  rubyName: string;
+  tsFile: string;
+  tsName: string;
+  ruby: string[];
+  ts: string[];
 }
 
 /** A flag a `@missingRailsCall` tag suppressed. Reported in the artifact
@@ -1648,6 +1670,7 @@ export function main() {
     // Body call-sets scoped per (file, name) for the advisory calls-parity check.
     const tsCallsByFileName = new Map<string, Map<string, string[][]>>();
     const tsCallSeqByFileName = new Map<string, Map<string, string[][]>>();
+    const tsSkeletonByFileName = new Map<string, Map<string, string[][]>>();
     const tsMissingCallTagsByFileName = new Map<string, Map<string, Set<string>>>();
     // Same call-sets unioned by NAME across this package and its deps (the same
     // scope tsParamsByName uses). Consulted ONLY by the delegation-transparency
@@ -1719,6 +1742,11 @@ export function main() {
         const byName = tsCallSeqByFileName.get(file) ?? new Map<string, string[][]>();
         byName.set(m.name, [...(byName.get(m.name) ?? []), m.callSeq]);
         tsCallSeqByFileName.set(file, byName);
+      }
+      if (m.skeleton !== undefined) {
+        const byName = tsSkeletonByFileName.get(file) ?? new Map<string, string[][]>();
+        byName.set(m.name, [...(byName.get(m.name) ?? []), m.skeleton]);
+        tsSkeletonByFileName.set(file, byName);
       }
       if (m.calls !== undefined) {
         const byName = tsCallsByFileName.get(file) ?? new Map<string, string[][]>();
@@ -2001,6 +2029,7 @@ export function main() {
     const callMismatches: CallMismatch[] = [];
     const callTagsUsed = new Map<string, Set<string>>();
     const suppressedCalls: SuppressedCall[] = [];
+    const callSkeletons: CallSkeleton[] = [];
     const bodyHashRecords: BodyHashRecord[] = [];
     const fileResults: FileResult[] = [];
 
@@ -2049,6 +2078,7 @@ export function main() {
       const rubyWeakCallsByName = new Map<string, string[]>();
       // First-sighting Ruby body digest per name (source-hash pinning, RFC 0025).
       const rubyBodyDigestByName = new Map<string, string>();
+      const rubySkeletonByName = new Map<string, string[]>();
       for (const item of items) {
         const f = flattenIncludedMethodInfos(item.info, item.fqn, rubyPkg, moduleFqnByShort, pkg);
         const rubyMethods = [...f.instance, ...f.klass];
@@ -2065,6 +2095,9 @@ export function main() {
           if (rm.calls && !rubyCallsByName.has(rm.name)) {
             rubyCallsByName.set(rm.name, rm.calls);
             rubyWeakCallsByName.set(rm.name, rm.weakCalls ?? []);
+          }
+          if (rm.skeleton && !rubySkeletonByName.has(rm.name)) {
+            rubySkeletonByName.set(rm.name, rm.skeleton);
           }
           if (rm.bodyDigest && !rubyBodyDigestByName.has(rm.name)) {
             rubyBodyDigestByName.set(rm.name, rm.bodyDigest);
@@ -2178,6 +2211,18 @@ export function main() {
             const call = callOf(m);
             if (tags.has(call)) suppressedCalls.push({ tsFile, rubyName, tsName, call });
           }
+        }
+        const rubySkeleton = rubySkeletonByName.get(rubyName);
+        const tsSkeletons = tsSkeletonByFileName.get(tsFile)?.get(tsName);
+        if (rubySkeleton !== undefined && tsSkeletons?.length === 1) {
+          callSkeletons.push({
+            rubyFile,
+            rubyName,
+            tsFile,
+            tsName,
+            ruby: rubySkeleton,
+            ts: tsSkeletons[0],
+          });
         }
         const seqSets = tsCallSeqByFileName.get(tsFile)?.get(tsName);
         const ordered: string[] = [];
@@ -2614,6 +2659,7 @@ export function main() {
         mismatches: callMismatches,
         staleTags: staleCallTags(tsMissingCallTagsByFileName, callTagsUsed),
         suppressed: suppressedCalls,
+        skeletons: callSkeletons,
       },
       bodyHashes: bodyHashRecords,
     });
@@ -2745,6 +2791,24 @@ export function main() {
           mismatches: callsFlat,
           staleTags: staleTagsFlat,
           suppressed: suppressedFlat,
+        },
+        null,
+        2,
+      ),
+    );
+
+    const skeletonsPath = path.join(OUTPUT_DIR, `call-skeletons${modeSuffix}.json`);
+    const skeletonsFlat = results.flatMap((r) =>
+      r.calls.skeletons.map((s) => ({ package: r.package, ...s })),
+    );
+    fs.writeFileSync(
+      skeletonsPath,
+      JSON.stringify(
+        {
+          generatedAt: new Date().toISOString(),
+          note: "Advisory, ungated. Ordered control + call skeleton per name-matched pair, both sides uncollapsed: if/loop/try/throw, new:Ctor, ref:<name>, in source order with duplicates.",
+          packages: [...new Set(results.map((r) => r.package))].sort(),
+          skeletons: skeletonsFlat,
         },
         null,
         2,
