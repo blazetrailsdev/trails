@@ -1095,22 +1095,6 @@ export function _reapplyNestedAttrSetters(
 }
 
 /**
- * The generated `set#{Name}Attributes` writer for a nested-attributes key
- * (`shipAttributes`), or undefined when `key` names no such association.
- */
-function nestedAttributesWriter(
-  self: AttributeIO,
-  key: string,
-): ((value: unknown) => Promise<void> | void) | undefined {
-  const configs = (self as any).constructor?._nestedAttributeConfigs as
-    | { associationName: string }[]
-    | undefined;
-  if (!configs?.some((c) => `${c.associationName}Attributes` === key)) return undefined;
-  const writer = (self as any)[`set${camelize(key, true)}`];
-  return typeof writer === "function" ? writer : undefined;
-}
-
-/**
  * Mirrors Rails' `_assign_attribute` (ActiveModel
  * attribute_assignment.rb:67-75): dispatch through the public setter when one
  * exists (store accessors write to the store hash, not a standalone attribute
@@ -1119,16 +1103,21 @@ function nestedAttributesWriter(
  * Rails lets setter exceptions propagate raw; ours additionally wraps them in
  * AttributeAssignmentError with the offending key/value for debugging. (That
  * wrapping is stricter than Rails but longstanding.)
+ *
+ * A `#{name}_attributes=` key dispatches to `set#{Name}Attributes`
+ * (nested-attributes.ts), which answers a promise when the assignment displaces
+ * a record and so owes Rails' inline `remove_target!`
+ * (has_one_association.rb:69) a write; that promise is returned rather than
+ * dropped.
  */
 function _assignAttribute(self: AttributeIO, key: string, value: unknown): Promise<void> | void {
   try {
-    // Rails' `public_send("#{k}=")` reaches `#{name}_attributes=` here; ours is
-    // the awaitable `set#{Name}Attributes` method (nested-attributes.ts), which
-    // answers a promise only when the assignment displaces a record and so owes
-    // Rails' inline `remove_target!` (has_one_association.rb:69) a write. Hand
-    // that promise back to the caller rather than dropping it.
-    const nestedWriter = nestedAttributesWriter(self, key);
-    if (nestedWriter) return nestedWriter.call(self, value);
+    const configs = (self as any).constructor?._nestedAttributeConfigs as
+      | { associationName: string }[]
+      | undefined;
+    if (configs?.some((c) => `${c.associationName}Attributes` === key)) {
+      return (self as any)[`set${camelize(key, true)}`](value) as Promise<void> | void;
+    }
     const setter = findPrototypeSetter(self, key);
     if (setter) {
       setter.call(self, value);
@@ -1159,6 +1148,11 @@ function _assignAttribute(self: AttributeIO, key: string, value: unknown): Promi
  * assigns the nested hashes only after the scalar pass (:21), so a nested
  * writer's `reject_if` / the built record's callbacks observe an owner whose
  * own attributes are already set. Nested runs before multiparameter (:21-22).
+ *
+ * Rails returns nil; this returns a promise when one of the assignments was a
+ * displacing `#{name}_attributes=` (see `_assignAttribute`), which Rails runs
+ * inline and JS cannot. Callers free to ignore the nil are equally free to
+ * ignore the promise.
  */
 export function assignAttributes(
   this: AttributeIO,
@@ -1173,7 +1167,6 @@ export function assignAttributes(
 
   let multiParameterAttributes: Record<string, unknown> | null = null;
   let nestedParameterAttributes: Record<string, unknown> | null = null;
-  // Assignments still owing DB I/O — see the `pendingNested` comment below.
   const pending: Promise<void>[] = [];
 
   for (const [key, value] of Object.entries(attrs)) {
@@ -1187,10 +1180,6 @@ export function assignAttributes(
     }
   }
 
-  // A nested assignment that displaces a record owes Rails' inline
-  // `remove_target!` a write, so it answers a promise; hand it to the caller.
-  // Rails' `assign_attributes` returns nil and every synchronous caller here
-  // still may ignore it, exactly as it ignores the nil.
   const pendingNested = nestedParameterAttributes
     ? assignNestedParameterAttributes(this, nestedParameterAttributes)
     : undefined;

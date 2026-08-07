@@ -56,10 +56,8 @@ describe("has_one displacement via the synchronous build path", () => {
   it("keeps the writer synchronous when the assignment displaces nothing", async () => {
     const pirate = (await Pirate.create({ catchphrase: "Aye" })) as Base;
     // A loaded, empty association owes no load and has nothing to remove, so
-    // Rails' `replace` reduces to `self.target = record` — in-memory work, which
-    // the writer does inline rather than answering a promise for. That is what
-    // keeps `new Pirate({ shipAttributes: {...} })` building its ship inside the
-    // constructor, where Rails' `#{name}_attributes=` builds it.
+    // Rails' `replace` reduces to `self.target = record` — in-memory work the
+    // writer does inline rather than answering a promise for.
     await (pirate as unknown as { ship: Promise<Base | null> }).ship;
 
     const pending = (
@@ -168,8 +166,6 @@ describe("has_one displacement via the synchronous build path", () => {
       throw new Error("build exploded");
     };
 
-    // The writer raises synchronously: `build_record` runs before anything is
-    // awaited (singular_association.rb:29-31).
     expect(() => {
       void (
         refetched as unknown as { setShipAttributes(a: object): Promise<void> | void }
@@ -249,8 +245,6 @@ describe("has_one displacement via the synchronous build path", () => {
       throw new Error("build exploded");
     };
 
-    // The writer raises synchronously: `build_record` runs before anything is
-    // awaited (singular_association.rb:29-31).
     expect(() => {
       void (
         pirate as unknown as { setShipAttributes(a: object): Promise<void> | void }

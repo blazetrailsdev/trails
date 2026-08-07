@@ -401,9 +401,6 @@ describe("TestNestedAttributesOnAHasOneAssociation", () => {
     }).toThrow(/Cannot build association `looter'/);
   });
 
-  // Rails asserts `assert_respond_to @pirate, :ship_attributes=`
-  // (nested_attributes_test.rb:262-264); the Rails-named writer is a method here
-  // because it must be awaitable (RFC 0087 §1).
   it("should define an attribute writer method for the association", () => {
     const pirate = new Pirate();
     expect(typeof (pirate as any).setShipAttributes).toBe("function");
@@ -640,8 +637,6 @@ describe("TestNestedAttributesOnABelongsToAssociation", () => {
     return { ship, pirate };
   }
 
-  // Rails: `assert_respond_to @ship, :pirate_attributes=`
-  // (nested_attributes_test.rb:463-465).
   it("should define an attribute writer method for the association", () => {
     const ship = new Ship();
     expect(typeof (ship as any).setPirateAttributes).toBe("function");
@@ -860,10 +855,6 @@ function collectionAssociationTests(
   buildSetup: () => Promise<{ pirate: Pirate; child1: any; child2: any }>,
 ): void {
   const setter = `${associationName}Attributes`;
-  // Rails' `#{name}_attributes=`; here the awaitable writer that carries the
-  // Rails name (RFC 0087 §1).
-  // A collection assignment is pure in-memory work, so the writer completes
-  // inline — nothing to await, exactly as Rails' `#{name}_attributes=`.
   const write = (p: Pirate, value: unknown): void => {
     void (p as any)[`set${associationName[0].toUpperCase()}${associationName.slice(1)}Attributes`](
       value,
@@ -879,8 +870,6 @@ function collectionAssociationTests(
     };
   }
 
-  // Rails: `assert_respond_to @pirate, association_setter`
-  // (nested_attributes_test.rb:640-642).
   it("should define an attribute writer method for the association", async () => {
     const { pirate } = await buildSetup();
     expect(
