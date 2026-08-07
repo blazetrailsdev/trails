@@ -52,9 +52,14 @@ fixtures({}, { useTransactionalTests: false });
 // version + environment state fresh (mirrors Rails' setup/teardown, which
 // deletes all versions around every test). File-scoped because the advisory-lock
 // describe runs `migrate()` too and needs the same fresh version table.
+let schemaMigration: SchemaMigration;
+let internalMetadata: InternalMetadata;
+
 beforeEach(async () => {
-  await new SchemaMigration(Base.connection).dropTable();
-  await new InternalMetadata(Base.connection).dropTable();
+  schemaMigration = new SchemaMigration(Base.connection);
+  internalMetadata = new InternalMetadata(Base.connection);
+  await schemaMigration.dropTable();
+  await internalMetadata.dropTable();
 });
 
 describe("Migrator trails extensions", () => {
@@ -65,9 +70,12 @@ describe("Migrator trails extensions", () => {
   });
 
   it("stores environment after up migration", async () => {
-    const migrator = new Migrator(adapter, [makeMigration(1, "M1")], {
-      environment: "test",
-    });
+    const migrator = new Migrator(
+      "up",
+      [makeMigration(1, "M1")],
+      schemaMigration,
+      internalMetadata,
+    );
     await migrator.up();
     const env = await new InternalMetadata(adapter).get("environment");
     expect(env).toBe(envName(adapter));
@@ -76,9 +84,10 @@ describe("Migrator trails extensions", () => {
   it("stamps the environment once per run, not once per migration", async () => {
     // migration.rb:1508-1512 stamps before the loop; :1528-1537 writes nothing.
     const migrator = new Migrator(
-      adapter,
+      "up",
       [makeMigration(1, "M1"), makeMigration(2, "M2"), makeMigration(3, "M3")],
-      { environment: "test" },
+      schemaMigration,
+      internalMetadata,
     );
     const set = vi.spyOn(InternalMetadata.prototype, "set");
     let environmentWrites: number;
@@ -106,22 +115,22 @@ describe("Migrator trails extensions", () => {
     await new SchemaMigration(adapter).createTable();
     await new InternalMetadata(adapter).createTable();
 
-    const up = new Migrator(adapter, [proxy]);
+    const up = new Migrator("up", [proxy], schemaMigration, internalMetadata);
     expect(await up.executeMigrationInTransaction(proxy)).toBe(1);
     expect(calls).toEqual([["up", 1]]);
 
-    const again = new Migrator(adapter, [proxy]);
+    const again = new Migrator("up", [proxy], schemaMigration, internalMetadata);
     expect(await again.executeMigrationInTransaction(proxy)).toBeUndefined();
     expect(calls).toEqual([["up", 1]]);
 
-    const down = new Migrator(adapter, [proxy], { direction: "down" });
+    const down = new Migrator("down", [proxy], schemaMigration, internalMetadata);
     expect(await down.executeMigrationInTransaction(proxy)).toBe(1);
     expect(calls).toEqual([
       ["up", 1],
       ["down", 1],
     ]);
 
-    const downAgain = new Migrator(adapter, [proxy], { direction: "down" });
+    const downAgain = new Migrator("down", [proxy], schemaMigration, internalMetadata);
     expect(await downAgain.executeMigrationInTransaction(proxy)).toBeUndefined();
     expect(calls).toHaveLength(2);
   });
@@ -131,11 +140,15 @@ describe("Migrator trails extensions", () => {
     // starts with `raise UnknownMigrationVersionError if invalid_target?`
     // (migration.rb:1503-1505); target 0 stays valid.
     const list = (): MigrationProxy[] => [makeMigration(1, "M1"), makeMigration(2, "M2")];
-    await expect(new Migrator(adapter, list()).up(3)).rejects.toThrow(UnknownMigrationVersionError);
-    await expect(new Migrator(adapter, list()).down(3)).rejects.toThrow(
-      UnknownMigrationVersionError,
-    );
-    await expect(new Migrator(adapter, list()).down(0)).resolves.toEqual([]);
+    await expect(
+      new Migrator("up", list(), schemaMigration, internalMetadata).up(3),
+    ).rejects.toThrow(UnknownMigrationVersionError);
+    await expect(
+      new Migrator("up", list(), schemaMigration, internalMetadata).down(3),
+    ).rejects.toThrow(UnknownMigrationVersionError);
+    await expect(
+      new Migrator("up", list(), schemaMigration, internalMetadata).down(0),
+    ).resolves.toEqual([]);
   });
 
   it("migrate to the current version runs an unapplied lower migration", async () => {
@@ -149,21 +162,21 @@ describe("Migrator trails extensions", () => {
         ran.push("2");
       });
 
-    await new Migrator(adapter, [m2()]).up();
+    await new Migrator("up", [m2()], schemaMigration, internalMetadata).up();
     expect(ran).toEqual(["2"]);
 
     ran.length = 0;
-    await new Migrator(adapter, [m1(), m2()]).migrate(2);
+    await new Migrator("up", [m1(), m2()], schemaMigration, internalMetadata).migrate(2);
     expect(ran).toEqual(["1"]);
   });
 
   it("pendingMigrations on a down migrator returns migrations in reverse order", async () => {
     const migrator = new Migrator(
-      adapter,
+      "down",
       [makeMigration(1, "M1"), makeMigration(2, "M2"), makeMigration(3, "M3")],
-      { direction: "down" },
+      schemaMigration,
+      internalMetadata,
     );
-    const schemaMigration = new SchemaMigration(adapter);
     await schemaMigration.createTable();
     await schemaMigration.createVersion("2");
 
@@ -176,25 +189,35 @@ describe("Migrator trails extensions", () => {
 
   it("migrate returns [] when both the current and target version are 0", async () => {
     const ran: string[] = [];
-    const migrator = new Migrator(adapter, [
-      makeMigration(0, "M0", async () => {
-        ran.push("0");
-      }),
-    ]);
+    const migrator = new Migrator(
+      "up",
+      [
+        makeMigration(0, "M0", async () => {
+          ran.push("0");
+        }),
+      ],
+      schemaMigration,
+      internalMetadata,
+    );
     await expect(migrator.migrate(0)).resolves.toEqual([]);
     expect(ran).toEqual([]);
   });
 
   it("migrate applies its block by selecting the migrations handed to the per-run Migrator", async () => {
     const ran: string[] = [];
-    const migrator = new Migrator(adapter, [
-      makeMigration(1, "M1", async () => {
-        ran.push("1");
-      }),
-      makeMigration(2, "M2", async () => {
-        ran.push("2");
-      }),
-    ]);
+    const migrator = new Migrator(
+      "up",
+      [
+        makeMigration(1, "M1", async () => {
+          ran.push("1");
+        }),
+        makeMigration(2, "M2", async () => {
+          ran.push("2");
+        }),
+      ],
+      schemaMigration,
+      internalMetadata,
+    );
     await migrator.migrate(null, (m) => m.version === 2);
     expect(ran).toEqual(["2"]);
   });
@@ -211,22 +234,34 @@ describe("Migrator trails extensions", () => {
       }),
     ];
 
-    await new Migrator(adapter, migrations()).up();
-    await new Migrator(adapter, migrations()).migrate(1, (m) => m.version !== 3);
+    await new Migrator("up", migrations(), schemaMigration, internalMetadata).up();
+    await new Migrator("up", migrations(), schemaMigration, internalMetadata).migrate(
+      1,
+      (m) => m.version !== 3,
+    );
     expect(reverted).toEqual(["2"]);
   });
 
   it("down does not stamp the environment", async () => {
     // Rails' record_environment returns early when down? (migration.rb:1511).
-    const migrator = new Migrator(adapter, [makeMigration(1, "M1")], { environment: "test" });
+    const migrator = new Migrator(
+      "up",
+      [makeMigration(1, "M1")],
+      schemaMigration,
+      internalMetadata,
+    );
     await migrator.down();
     expect(await new InternalMetadata(adapter).get("environment")).toBeNull();
   });
 
   it("CheckPending with a Migrator creates schema_migrations before reading it", async () => {
-    const schemaMigration = new SchemaMigration(adapter);
     await schemaMigration.dropTable();
-    const migrator = new Migrator(adapter, [makeMigration(1, "M1")]);
+    const migrator = new Migrator(
+      "up",
+      [makeMigration(1, "M1")],
+      schemaMigration,
+      internalMetadata,
+    );
     const check = new CheckPending(async () => "ok", { migrator });
 
     await expect(check.call({})).rejects.toThrow(PendingMigrationError);
@@ -286,7 +321,12 @@ describe("Migrator advisory lock wrapping", () => {
       return true;
     };
 
-    const migrator = new Migrator(adapter, [makeMigration(1, "M1")]);
+    const migrator = new Migrator(
+      "up",
+      [makeMigration(1, "M1")],
+      schemaMigration,
+      internalMetadata,
+    );
     await migrator.migrate();
     expect(lockLog).toEqual(["lock", "unlock"]);
   });
@@ -297,7 +337,12 @@ describe("Migrator advisory lock wrapping", () => {
     adapter.getAdvisoryLock = async () => false;
     adapter.releaseAdvisoryLock = async () => true;
 
-    const migrator = new Migrator(adapter, [makeMigration(1, "M1")]);
+    const migrator = new Migrator(
+      "up",
+      [makeMigration(1, "M1")],
+      schemaMigration,
+      internalMetadata,
+    );
     await expect(migrator.migrate()).rejects.toThrow(ConcurrentMigrationError);
   });
 
@@ -314,18 +359,28 @@ describe("Migrator advisory lock wrapping", () => {
       return true;
     };
 
-    const migrator = new Migrator(adapter, [
-      makeMigration(1, "Boom", async () => {
-        throw new Error("kaboom");
-      }),
-    ]);
+    const migrator = new Migrator(
+      "up",
+      [
+        makeMigration(1, "Boom", async () => {
+          throw new Error("kaboom");
+        }),
+      ],
+      schemaMigration,
+      internalMetadata,
+    );
     await expect(migrator.migrate()).rejects.toThrow("kaboom");
     expect(lockLog).toEqual(["lock", "unlock"]);
   });
 
   it("skips locking when adapter does not support advisory locks", async () => {
     const adapter = Base.connection;
-    const migrator = new Migrator(adapter, [makeMigration(1, "M1")]);
+    const migrator = new Migrator(
+      "up",
+      [makeMigration(1, "M1")],
+      schemaMigration,
+      internalMetadata,
+    );
     await migrator.migrate();
     expect(await migrator.currentVersion()).toBe(1);
   });
@@ -343,7 +398,12 @@ describe("Migrator advisory lock wrapping", () => {
       return true;
     };
 
-    const migrator = new Migrator(adapter, [makeMigration(1, "M1")]);
+    const migrator = new Migrator(
+      "up",
+      [makeMigration(1, "M1")],
+      schemaMigration,
+      internalMetadata,
+    );
     await migrator.migrate();
     lockLog.length = 0;
     await migrator.rollback(1);
@@ -363,7 +423,12 @@ describe("Migrator advisory lock wrapping", () => {
       return true;
     };
 
-    const migrator = new Migrator(adapter, [makeMigration(1, "M1")]);
+    const migrator = new Migrator(
+      "up",
+      [makeMigration(1, "M1")],
+      schemaMigration,
+      internalMetadata,
+    );
     await migrator.run("up", 1);
     expect(lockLog).toEqual(["lock", "unlock"]);
   });
@@ -390,14 +455,24 @@ describe("Migrator advisory lock wrapping", () => {
 
   it("wraps up in advisory lock", async () => {
     const { adapter, lockLog } = await lockableAdapter();
-    const migrator = new Migrator(adapter, [makeMigration(1, "M1")]);
+    const migrator = new Migrator(
+      "up",
+      [makeMigration(1, "M1")],
+      schemaMigration,
+      internalMetadata,
+    );
     await migrator.up();
     expect(lockLog).toEqual(["lock", "unlock"]);
   });
 
   it("wraps down in advisory lock", async () => {
     const { adapter, lockLog } = await lockableAdapter();
-    const migrator = new Migrator(adapter, [makeMigration(1, "M1")]);
+    const migrator = new Migrator(
+      "up",
+      [makeMigration(1, "M1")],
+      schemaMigration,
+      internalMetadata,
+    );
     await migrator.up();
     lockLog.length = 0;
     await migrator.down(0);
@@ -406,7 +481,12 @@ describe("Migrator advisory lock wrapping", () => {
 
   it("wraps forward in advisory lock", async () => {
     const { adapter, lockLog } = await lockableAdapter();
-    const migrator = new Migrator(adapter, [makeMigration(1, "M1")]);
+    const migrator = new Migrator(
+      "up",
+      [makeMigration(1, "M1")],
+      schemaMigration,
+      internalMetadata,
+    );
     await migrator.forward(1);
     expect(lockLog).toEqual(["lock", "unlock"]);
   });
@@ -416,7 +496,12 @@ describe("Migrator advisory lock wrapping", () => {
     addAdvisoryLockSupport(adapter);
     adapter.getAdvisoryLock = async () => true;
     adapter.releaseAdvisoryLock = async () => false;
-    const migrator = new Migrator(adapter, [makeMigration(1, "M1")]);
+    const migrator = new Migrator(
+      "up",
+      [makeMigration(1, "M1")],
+      schemaMigration,
+      internalMetadata,
+    );
     await expect(migrator.migrate()).rejects.toThrow(
       ConcurrentMigrationError.RELEASE_LOCK_FAILED_MESSAGE,
     );
@@ -432,7 +517,7 @@ describe("Migrator advisory lock wrapping", () => {
     };
     adapter.releaseAdvisoryLock = async () => true;
     adapter.currentDatabase = async () => "myapp_test";
-    const migrator = new Migrator(adapter, []);
+    const migrator = new Migrator("up", [], schemaMigration, internalMetadata);
     await migrator.migrate();
     // Ruby: Zlib.crc32("myapp_test") == 601888509
     // Rails: MIGRATOR_SALT (2053462845) * 601888509 == 1235955690063948105
@@ -449,7 +534,7 @@ describe("Migrator advisory lock wrapping", () => {
     };
     adapter.releaseAdvisoryLock = async () => true;
     adapter.currentDatabase = async () => "myapp_test";
-    const migrator = new Migrator(adapter, []);
+    const migrator = new Migrator("up", [], schemaMigration, internalMetadata);
     await migrator.migrate();
     await migrator.migrate();
     expect(lockIds[0]).toBe(lockIds[1]);
@@ -465,7 +550,12 @@ describe("Migrator advisory lock wrapping", () => {
       releaseAdvisoryLock: async (_id: unknown) => true,
       // currentDatabase intentionally absent
     } as unknown as import("./connection-adapters/abstract-adapter.js").AbstractAdapter;
-    const migrator = new Migrator(rawAdapter, []);
+    const migrator = new Migrator(
+      "up",
+      [],
+      new SchemaMigration(rawAdapter),
+      new InternalMetadata(rawAdapter),
+    );
     await expect(migrator.migrate()).rejects.toThrow("must implement currentDatabase()");
   });
 
@@ -477,7 +567,12 @@ describe("Migrator advisory lock wrapping", () => {
       isAdvisoryLocksEnabled: () => true,
       // currentDatabase intentionally absent
     } as unknown as DatabaseAdapter;
-    const migrator = new Migrator(adapter, []);
+    const migrator = new Migrator(
+      "up",
+      [],
+      new SchemaMigration(adapter),
+      new InternalMetadata(adapter),
+    );
     expect(migrator.isUseAdvisoryLock()).toBe(true);
   });
 
@@ -486,7 +581,12 @@ describe("Migrator advisory lock wrapping", () => {
       isAdvisoryLocksEnabled: () => false,
       currentDatabase: async () => "test_db",
     } as unknown as DatabaseAdapter;
-    const migrator = new Migrator(adapter, []);
+    const migrator = new Migrator(
+      "up",
+      [],
+      new SchemaMigration(adapter),
+      new InternalMetadata(adapter),
+    );
     expect(migrator.isUseAdvisoryLock()).toBe(false);
   });
 
@@ -499,10 +599,14 @@ describe("Migrator advisory lock wrapping", () => {
     addAdvisoryLockSupport(adapter);
     adapter.getAdvisoryLock = async () => true;
     adapter.releaseAdvisoryLock = async () => true;
-    const schemaMigration = new SchemaMigration(adapter);
     await schemaMigration.createTable();
 
-    const migrator = new Migrator(adapter, [makeMigration(1, "M1")]);
+    const migrator = new Migrator(
+      "up",
+      [makeMigration(1, "M1")],
+      schemaMigration,
+      internalMetadata,
+    );
     expect(await migrator.migrated()).toEqual(new Set());
 
     // Another process migrates version 1 while we wait for the lock.
@@ -518,7 +622,12 @@ describe("Migrator advisory lock wrapping", () => {
 
   it("record_version_state_after_migrating updates the migrated memo in place", async () => {
     const adapter = Base.connection;
-    const migrator = new Migrator(adapter, [makeMigration(1, "M1")]);
+    const migrator = new Migrator(
+      "up",
+      [makeMigration(1, "M1")],
+      schemaMigration,
+      internalMetadata,
+    );
     await new SchemaMigration(adapter).createTable();
 
     expect(await migrator.migrated()).toEqual(new Set());
@@ -530,9 +639,13 @@ describe("Migrator advisory lock wrapping", () => {
 
   it("loadMigrated re-reads schema_migrations so repeated pending checks are not memoized", async () => {
     const adapter = Base.connection;
-    const schemaMigration = new SchemaMigration(adapter);
     await schemaMigration.createTable();
-    const migrator = new Migrator(adapter, [makeMigration(1, "M1")]);
+    const migrator = new Migrator(
+      "up",
+      [makeMigration(1, "M1")],
+      schemaMigration,
+      internalMetadata,
+    );
 
     expect(await migrator.pendingMigrations()).toHaveLength(1);
     await schemaMigration.recordVersion("1");
@@ -582,13 +695,18 @@ describe("Migrator drives migrations through Migration#migrate", () => {
     class SomeOtherClassName extends Migration {
       override async change(): Promise<void> {}
     }
-    const migrator = new Migrator(adapter, [
-      {
-        version: 1,
-        name: "CreateWidgets",
-        migration: () => new SomeOtherClassName("CreateWidgets", 1),
-      },
-    ]);
+    const migrator = new Migrator(
+      "up",
+      [
+        {
+          version: 1,
+          name: "CreateWidgets",
+          migration: () => new SomeOtherClassName("CreateWidgets", 1),
+        },
+      ],
+      schemaMigration,
+      internalMetadata,
+    );
     await migrator.up();
     const banners = chunks.join("").split("\n").filter(Boolean);
     expect(banners[0]).toMatch(/^== 1 CreateWidgets: migrating =+$/);
@@ -604,9 +722,12 @@ describe("Migrator drives migrations through Migration#migrate", () => {
       }
       override async change(): Promise<void> {}
     }
-    const migrator = new Migrator(adapter, [
-      { version: 1, name: "Shouty", migration: () => new Shouty("Shouty", 1) },
-    ]);
+    const migrator = new Migrator(
+      "up",
+      [{ version: 1, name: "Shouty", migration: () => new Shouty("Shouty", 1) }],
+      schemaMigration,
+      internalMetadata,
+    );
     await migrator.up();
     const output = chunks.join("");
     expect(output).toContain("!! migrating !!");
@@ -615,7 +736,12 @@ describe("Migrator drives migrations through Migration#migrate", () => {
   });
 
   it("announces each banner exactly once", async () => {
-    const migrator = new Migrator(adapter, [makeMigration(1, "M1")]);
+    const migrator = new Migrator(
+      "up",
+      [makeMigration(1, "M1")],
+      schemaMigration,
+      internalMetadata,
+    );
     await migrator.up();
     const output = chunks.join("");
     expect(output.match(/1 M1: migrating/g)).toHaveLength(1);
@@ -628,7 +754,12 @@ describe("Migrator drives migrations through Migration#migrate", () => {
     const was = Migration.verbose;
     Migration.verbose = false;
     try {
-      const migrator = new Migrator(adapter, [makeMigration(1, "M1")]);
+      const migrator = new Migrator(
+        "up",
+        [makeMigration(1, "M1")],
+        schemaMigration,
+        internalMetadata,
+      );
       await migrator.up();
       expect(chunks.join("")).toBe("");
     } finally {
@@ -655,62 +786,50 @@ describe("Migrator runnable direction awareness", () => {
 
   it("migrations is ascending going up and reversed going down", () => {
     const migrations = three();
-    const up = new Migrator(adapter, migrations);
+    const up = new Migrator("up", migrations, schemaMigration, internalMetadata);
     expect(up.migrations.map((m) => m.version)).toEqual([1, 2, 3]);
 
-    const down = new Migrator(adapter, migrations, { direction: "down" });
+    const down = new Migrator("down", migrations, schemaMigration, internalMetadata);
     expect(down.migrations.map((m) => m.version)).toEqual([3, 2, 1]);
   });
 
   it("runnable going up returns only unapplied migrations", async () => {
     const migrations = three();
-    await new Migrator(adapter, migrations).migrate(2);
+    await new Migrator("up", migrations, schemaMigration, internalMetadata).migrate(2);
 
-    const migrator = new Migrator(adapter, migrations, { direction: "up" });
+    const migrator = new Migrator("up", migrations, schemaMigration, internalMetadata);
     expect((await migrator.runnable()).map((m) => m.version)).toEqual([3]);
   });
 
   it("runnable going up stops at the target version", async () => {
     const migrations = three();
-    await new Migrator(adapter, migrations).migrate(1);
+    await new Migrator("up", migrations, schemaMigration, internalMetadata).migrate(1);
 
-    const migrator = new Migrator(adapter, migrations, {
-      direction: "up",
-      targetVersion: 2,
-    });
+    const migrator = new Migrator("up", migrations, schemaMigration, internalMetadata, 2);
     expect((await migrator.runnable()).map((m) => m.version)).toEqual([2]);
   });
 
   it("runnable going down to a target skips the target migration", async () => {
     const migrations = three();
-    await new Migrator(adapter, migrations).migrate();
+    await new Migrator("up", migrations, schemaMigration, internalMetadata).migrate();
 
-    const migrator = new Migrator(adapter, migrations, {
-      direction: "down",
-      targetVersion: 1,
-    });
+    const migrator = new Migrator("down", migrations, schemaMigration, internalMetadata, 1);
     expect((await migrator.runnable()).map((m) => m.version)).toEqual([3, 2]);
   });
 
   it("runnable going all the way down keeps every applied migration", async () => {
     const migrations = three();
-    await new Migrator(adapter, migrations).migrate();
+    await new Migrator("up", migrations, schemaMigration, internalMetadata).migrate();
 
-    const migrator = new Migrator(adapter, migrations, {
-      direction: "down",
-      targetVersion: 0,
-    });
+    const migrator = new Migrator("down", migrations, schemaMigration, internalMetadata, 0);
     expect((await migrator.runnable()).map((m) => m.version)).toEqual([3, 2, 1]);
   });
 
   it("runnable going down ignores migrations that never ran", async () => {
     const migrations = three();
-    await new Migrator(adapter, migrations).migrate(2);
+    await new Migrator("up", migrations, schemaMigration, internalMetadata).migrate(2);
 
-    const migrator = new Migrator(adapter, migrations, {
-      direction: "down",
-      targetVersion: 0,
-    });
+    const migrator = new Migrator("down", migrations, schemaMigration, internalMetadata, 0);
     expect((await migrator.runnable()).map((m) => m.version)).toEqual([2, 1]);
   });
 });

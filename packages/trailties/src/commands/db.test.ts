@@ -14,7 +14,7 @@ import {
   resolveSchemaFormat,
 } from "../database.js";
 import { discoverMigrations } from "../migration-loader.js";
-import { Migrator, SchemaMigration } from "@blazetrails/activerecord";
+import { InternalMetadata, Migrator, SchemaMigration } from "@blazetrails/activerecord";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
@@ -699,7 +699,12 @@ export class CreatePosts extends Migration {
     );
 
     const migrations = await discoverMigrations(tmpDir);
-    const migrator = new Migrator(adapter, migrations);
+    const migrator = new Migrator(
+      "up",
+      migrations,
+      new SchemaMigration(adapter),
+      new InternalMetadata(adapter),
+    );
 
     // Status before migrate
     const beforeStatus = await migrator.migrationsStatus();
@@ -758,7 +763,12 @@ export class CreateComments extends Migration {
     );
 
     const migrations = await discoverMigrations(tmpDir);
-    const migrator = new Migrator(adapter, migrations);
+    const migrator = new Migrator(
+      "up",
+      migrations,
+      new SchemaMigration(adapter),
+      new InternalMetadata(adapter),
+    );
 
     await migrator.forward(1);
     const posts = await adapter.execute(
@@ -792,7 +802,12 @@ export class CreatePosts extends Migration {
     );
 
     const migrations = await discoverMigrations(tmpDir);
-    const migrator = new Migrator(adapter, migrations);
+    const migrator = new Migrator(
+      "up",
+      migrations,
+      new SchemaMigration(adapter),
+      new InternalMetadata(adapter),
+    );
 
     expect(await migrator.currentVersion()).toBe(0);
     await migrator.migrate();
@@ -814,7 +829,12 @@ export class CreateWidgets extends Migration {
     );
 
     const migrations = await discoverMigrations(tmpDir);
-    const migrator = new Migrator(adapter, migrations);
+    const migrator = new Migrator(
+      "up",
+      migrations,
+      new SchemaMigration(adapter),
+      new InternalMetadata(adapter),
+    );
 
     await migrator.run("up", "20260101000000");
     expect(
@@ -833,7 +853,12 @@ export class CreateWidgets extends Migration {
     const { UnknownMigrationVersionError } = await import("@blazetrails/activerecord");
     adapter = new BetterSQLite3Adapter(":memory:");
 
-    const migrator = new Migrator(adapter, []);
+    const migrator = new Migrator(
+      "up",
+      [],
+      new SchemaMigration(adapter),
+      new InternalMetadata(adapter),
+    );
     await expect(migrator.run("up", "99999999999999")).rejects.toBeInstanceOf(
       UnknownMigrationVersionError,
     );
@@ -854,7 +879,12 @@ export class CreatePosts extends Migration {
     );
 
     const migrations = await discoverMigrations(tmpDir);
-    const migrator = new Migrator(adapter, migrations);
+    const migrator = new Migrator(
+      "up",
+      migrations,
+      new SchemaMigration(adapter),
+      new InternalMetadata(adapter),
+    );
 
     expect((await migrator.pendingMigrations()).length).toBe(1);
     await migrator.migrate();
@@ -1419,7 +1449,12 @@ export class CreatePosts extends Migration {
         },
       ];
       disableMetadataTable(adapter);
-      const migrator = new Migrator(adapter, migrations);
+      const migrator = new Migrator(
+        "up",
+        migrations,
+        new SchemaMigration(adapter),
+        new InternalMetadata(adapter),
+      );
 
       // Migrate should succeed and NOT throw EnvironmentStorageError
       // despite the stamping call site being hit.

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Migrator } from "./index.js";
 import { SchemaMigration } from "./schema-migration.js";
+import { InternalMetadata } from "./internal-metadata.js";
 import type { MigrationProxy } from "./migration.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { anonymousMigration } from "./test-helpers/anonymous-migration.js";
@@ -14,32 +15,46 @@ function noopMigration(version: number, name: string): MigrationProxy {
 describe("MultiDbMigratorTest (trails)", () => {
   let adapterA: DatabaseAdapter;
   let adapterB: DatabaseAdapter;
-  let smA: SchemaMigration;
-  let smB: SchemaMigration;
+  let schemaMigrationA: SchemaMigration;
+  let schemaMigrationB: SchemaMigration;
+  let internalMetadataA: InternalMetadata;
+  let internalMetadataB: InternalMetadata;
 
   beforeEach(async () => {
     adapterA = await Base.leaseConnection();
     adapterB = await ARUnit2Model.leaseConnection();
-    smA = new SchemaMigration(adapterA);
-    smB = new SchemaMigration(adapterB);
-    await smA.createTable();
-    await smB.createTable();
-    await smA.deleteAllVersions();
-    await smB.deleteAllVersions();
+    schemaMigrationA = new SchemaMigration(adapterA);
+    schemaMigrationB = new SchemaMigration(adapterB);
+    internalMetadataA = new InternalMetadata(adapterA);
+    internalMetadataB = new InternalMetadata(adapterB);
+    await schemaMigrationA.createTable();
+    await schemaMigrationB.createTable();
+    await schemaMigrationA.deleteAllVersions();
+    await schemaMigrationB.deleteAllVersions();
   });
 
   afterEach(async () => {
-    await smA.deleteAllVersions();
-    await smB.deleteAllVersions();
+    await schemaMigrationA.deleteAllVersions();
+    await schemaMigrationB.deleteAllVersions();
   });
 
   it("records versions only in the migrated connection's schema_migrations", async () => {
-    const migratorA = new Migrator(adapterA, [
-      noopMigration(1, "ValidPeopleHaveLastNames"),
-      noopMigration(2, "WeNeedReminders"),
-      noopMigration(3, "InnocentJointable"),
-    ]);
-    const migratorB = new Migrator(adapterB, [noopMigration(1, "PeopleHaveHobbies")]);
+    const migratorA = new Migrator(
+      "up",
+      [
+        noopMigration(1, "ValidPeopleHaveLastNames"),
+        noopMigration(2, "WeNeedReminders"),
+        noopMigration(3, "InnocentJointable"),
+      ],
+      schemaMigrationA,
+      internalMetadataA,
+    );
+    const migratorB = new Migrator(
+      "up",
+      [noopMigration(1, "PeopleHaveHobbies")],
+      schemaMigrationB,
+      internalMetadataB,
+    );
 
     await migratorA.up();
 
