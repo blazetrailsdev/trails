@@ -22,11 +22,6 @@ const mysqlDelegate = {
     new MysqlTable(tableName, base as never),
 };
 
-/**
- * Adapter `ColumnMethods` shorthands (`t.serial`, `t.unsignedInteger`, …) are
- * installed by the change_table proxy at runtime, so they are not on `Table`'s
- * static type.
- */
 const columnMethods = (t: Table): Record<string, (name: string) => Promise<void>> =>
   t as unknown as Record<string, (name: string) => Promise<void>>;
 

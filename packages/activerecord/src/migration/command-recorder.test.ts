@@ -4,9 +4,6 @@ import { IrreversibleMigration } from "../migration.js";
 import { Table } from "../connection-adapters/abstract/schema-definitions.js";
 import { adapterSupports, itIfSupports } from "../support/supports.js";
 
-// Stands in for Rails' `CommandRecorder.new(ActiveRecord::Base.lease_connection)`:
-// the recorder asks its delegate the same capability questions the real
-// connection answers, so `supports_bulk_alter?` tracks the running lane.
 const abstractDelegate = {
   updateTableDefinition: (tableName: string, base: unknown) => new Table(tableName, base as never),
   supportsBulkAlter: () => adapterSupports("bulk_alter"),
