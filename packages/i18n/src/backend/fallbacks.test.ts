@@ -1,8 +1,7 @@
 /**
  * Mirrors: i18n/test/backend/fallbacks_test.rb
  *
- * Not ported: `I18nBackendFallbacksWithChainTest` (there is no
- * `I18n::Backend::Chain` yet — story `i18n-backend-chain`), and the two
+ * Not ported: the two
  * `Thread.new` cases, which are the gem asserting that its thread-local
  * fallbacks store is visible from another thread. JS has no threads, so
  * `fallbacks()` is a single module-level binding (see `fallbacks.ts`) and both
@@ -16,6 +15,7 @@
 
 import { beforeEach, describe, expect, it } from "vitest";
 import { Fallbacks, fallbacks, setFallbacks } from "./fallbacks.js";
+import { Chain } from "./chain.js";
 import { Simple } from "./simple.js";
 import { config, exists, l, resetConfig, setLocale, t, type Locale } from "../i18n.js";
 import { resetClassConfig } from "../config.js";
@@ -344,6 +344,46 @@ describe("I18nBackendFallbacksLocalizeTest", () => {
 
   it("uses a fallback locale's translation for a key missing in the given locale", () => {
     expect(l(new Date(2010, 1, 3), { format: "%A", locale: "de-DE" })).toBe("Sunday");
+  });
+});
+
+describe("I18nBackendFallbacksWithChainTest", () => {
+  class ChainBackend extends Fallbacks(Chain) {}
+
+  beforeEach(() => {
+    const backend = setup();
+    backend.storeTranslations("de", { foo: "FOO", nested: { key: "value" } });
+    backend.storeTranslations("pt-BR", { foo: "Baz in :pt-BR" });
+    config().backend = new ChainBackend(new Simple(), backend);
+  });
+
+  it("falls back from de-DE to de when there is no translation for de-DE available", () => {
+    expect(t("foo", { locale: "de-DE" })).toBe("FOO");
+  });
+
+  it("exists? falls back from de-DE to de given a key missing from the given locale", () => {
+    expect(exists("foo", null, { locale: "de-DE" })).toBe(true);
+  });
+
+  it("exists? passes along the scope option", () => {
+    expect(exists("key", null, { locale: "de-DE", scope: "nested" })).toBe(true);
+  });
+
+  it("exists? should return false when fallback disabled given a key missing from the given locale", () => {
+    expect(exists("foo", null, { locale: "de-DE", fallback: false })).toBe(false);
+  });
+
+  it("falls back from de-DE to de when there is no translation for de-DE available when using arrays, too", () => {
+    expect(t(["foo", "foo"], { locale: "de-DE" })).toEqual(["FOO", "FOO"]);
+  });
+
+  it("should not raise error when enforce_available_locales is true, :'pt' is missing and default is a Symbol", () => {
+    config().enforceAvailableLocales = true;
+    try {
+      expect(t("model.attrs.foo", { locale: "pt-BR", default: [":attrs.foo", "Foo"] })).toBe("Foo");
+    } finally {
+      config().enforceAvailableLocales = false;
+    }
   });
 });
 
