@@ -78,9 +78,9 @@ describe("PostgreSQL::OID::Array", () => {
   it("delegates user_input_in_time_zone to the subtype", () => {
     const type = new OidArray({
       ...stringSubtype,
-      userInputInTimeZone: (value: unknown, zone?: string) => `${String(value)}@${zone}`,
+      userInputInTimeZone: (value: unknown) => `${String(value)}@sub`,
     });
 
-    expect(type.userInputInTimeZone("ts", "America/Los_Angeles")).toBe("ts@America/Los_Angeles");
+    expect(type.userInputInTimeZone("ts")).toBe("ts@sub");
   });
 });

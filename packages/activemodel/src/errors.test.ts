@@ -177,7 +177,7 @@ describe("ErrorsTest", () => {
 
   it("of_kind? returns false when checking for an error, but not providing message argument", () => {
     const errors = new Errors({});
-    // No errors added for "name"
+    errors.add("name", "cannot be blank");
     expect(errors.ofKind("name")).toBe(false);
   });
 
@@ -484,9 +484,8 @@ describe("ErrorsTest", () => {
 
   it("of_kind? defaults message to :invalid", () => {
     const e = new Errors(null);
-    e.add("name", ":blank");
+    e.add("name");
     expect(e.ofKind("name")).toBe(true);
-    expect(e.ofKind("age")).toBe(false);
   });
 
   it("of_kind? detects indifferent if a specific error was added to the object", () => {
@@ -912,14 +911,16 @@ describe("ErrorsTest", () => {
 
   it("added? handles proc messages", () => {
     const errors = new Errors({});
-    errors.add("name", ":blank", { message: () => "custom" } as any);
-    expect(errors.added("name", ":blank")).toBe(true);
+    const message = () => "cannot be blank";
+    errors.add("name", message);
+    expect(errors.added("name", message)).toBe(true);
   });
 
   it("of_kind? handles proc messages", () => {
     const errors = new Errors({});
-    errors.add("name", ":blank", { message: () => "custom" } as any);
-    expect(errors.ofKind("name", ":blank")).toBe(true);
+    const message = () => "cannot be blank";
+    errors.add("name", message);
+    expect(errors.ofKind("name", message)).toBe(true);
   });
 
   it("of_kind? ignores options", () => {

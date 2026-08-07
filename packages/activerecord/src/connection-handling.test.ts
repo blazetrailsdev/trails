@@ -848,6 +848,7 @@ describe("resolveConfigForConnection / connectsTo with unset configurations", ()
       await SecondaryAbstract.removeConnection();
       __resetPrimaryAbstractClass();
       if (priorConfigs) Base.configurations(priorConfigs);
+      await restoreWorkerConnection();
     }
   });
 });

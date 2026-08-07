@@ -1736,6 +1736,14 @@ export abstract class Migration {
    * the purge must not run behind an established connection to a database it is about
    * to recreate. `ENV["SCHEMA_FORMAT"]` overrides the configured format there
    * (`:537`), so it does here; trails keeps that setting on `DatabaseTasks`.
+   *
+   * `ActiveRecord::Schema.verbose = false` (`:534`) silences the load; `Schema`
+   * inherits `Migration`'s `verbose` cattr, so the assignment writes the same
+   * state. The constant is reached through a call-time `await import` rather
+   * than a module-scope one because `schema.ts` is `class Schema extends
+   * Current`: a value import would close a cycle through this file and evaluate
+   * `Schema` with `Current` in TDZ. Ruby resolves it when the task runs, which
+   * is where the dynamic import resolves it too.
    */
   private static async loadSchemaBang(): Promise<void> {
     const databaseTasks = migrationArConfig()?.databaseTasks?.();
@@ -1749,8 +1757,10 @@ export abstract class Migration {
       await databaseTasks.purge(dbConfig);
     }
 
+    const { Schema } = await import("./schema.js");
     const schemaFormat = (getEnv("SCHEMA_FORMAT") ?? databaseTasks.schemaFormat) as SchemaFormat;
     await databaseTasks.withTemporaryPoolForEach({ env: "test" }, async (pool) => {
+      Schema.verbose = false;
       await databaseTasks.loadSchema(pool.dbConfig, schemaFormat);
     });
   }
@@ -2862,27 +2872,7 @@ export class Migrator {
    */
   async ddlTransaction(migration: Migration, fn: () => Promise<void>): Promise<void> {
     if (this.isUseTransaction(migration)) {
-      // Skip wrapping if the adapter is already in a transaction
-      // (e.g. a caller wrapped the entire migrate in a transaction).
-      // Starting a nested BEGIN would error on adapters that issue
-      // raw BEGIN (vs savepoints).
-      if (this.connection.inTransaction) {
-        await fn();
-      } else {
-        await this.connection.beginTransaction();
-        try {
-          await fn();
-          await this.connection.commit();
-        } catch (e) {
-          try {
-            await this.connection.rollback();
-          } catch {
-            // Swallow rollback errors so the original migration
-            // error isn't masked.
-          }
-          throw e;
-        }
-      }
+      await this.connection.transaction(fn);
     } else {
       await fn();
     }

@@ -4,6 +4,8 @@
  * Mirrors: ActiveModel::Type::Helpers::TimeValue
  */
 import { Temporal } from "@blazetrails/date";
+import { getZone } from "@blazetrails/activesupport";
+
 import { isUtc } from "./timezone.js";
 
 export interface TimezoneAware {
@@ -14,7 +16,7 @@ export interface TimeValue {
   precision?: number;
   serializeCastValue(value: unknown): string | null;
   typeCastForSchema(value: unknown): string;
-  userInputInTimeZone(value: unknown, zone?: string): Temporal.ZonedDateTime | null;
+  userInputInTimeZone(value: unknown): Temporal.ZonedDateTime | null;
   applySecondsPrecision<T>(this: TimeValue, value: T): T;
 }
 
@@ -90,10 +92,18 @@ export function applySecondsPrecision<T>(this: { precision?: number }, value: T)
   return (roundable as Roundable<T>).round(opts);
 }
 
-export function userInputInTimeZone(
-  value: unknown,
-  zone: string = "UTC",
-): Temporal.ZonedDateTime | null {
+/**
+ * Mirrors: ActiveModel::Type::Helpers::TimeValue#user_input_in_time_zone
+ * (time_value.rb:42-44) — `value.in_time_zone`, whose zone is the thread-local
+ * `Time.zone`.
+ *
+ * With no zone set at all Ruby takes `in_time_zone`'s else arm and answers a
+ * bare `to_time` (`date_and_time/zones.rb:20-27`) — a value with no zone
+ * attached, which this method's `ZonedDateTime` return type cannot represent.
+ * UTC stands in, the same convention `isUtc()` already applies to an unset
+ * `zone_default` (`helpers/timezone.ts`).
+ */
+export function userInputInTimeZone(value: unknown): Temporal.ZonedDateTime | null {
   if (value === null || value === undefined) return null;
   if (value instanceof Temporal.ZonedDateTime) return value;
   const str = String(value).trim();
@@ -106,6 +116,7 @@ export function userInputInTimeZone(
     }
   }
   try {
+    const zone = getZone()?.tzinfo ?? "UTC";
     return Temporal.PlainDateTime.from(str.replace(" ", "T")).toZonedDateTime(zone);
   } catch {
     return null;

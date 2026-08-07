@@ -108,18 +108,34 @@ installExtendedQueriesIfConfigured();
  * them at model load and keeps them for the process too
  * (`test/models/contact.rb:6`), so charging them to whichever file first
  * imports the model would report Rails' own arrangement.
+ *
+ * Counting per connection name alone is blind to the other half of the harm: a
+ * file that REPLACES a baseline pool with a different pool of the same name
+ * (`connectsTo` on the primary abstract class normalizes its descriptor to
+ * `"Base"`) keeps the count at one while pointing the suite's own connection at
+ * a database that is not the worker's. So the census is keyed by name AND by
+ * the pool's `adapter:database`, and a same-named replacement reads as an added
+ * signature. Re-establishing the SAME config — what `restoreWorkerConnection()`
+ * does — keeps the signature and stays green, which is the point: the guard is
+ * about where a pool points, not about pool object identity.
  */
-function writingPoolCensus(): Map<string, number> {
-  const census = new Map<string, number>();
+function writingPoolCensus(): Map<string, Map<string, number>> {
+  const census = new Map<string, Map<string, number>>();
   for (const pool of Base.connectionHandler.connectionPoolList("writing")) {
     if (pool.dbConfig?.adapter === "fake") continue;
     const name = String(pool.connectionDescriptor?.name);
-    census.set(name, (census.get(name) ?? 0) + 1);
+    const signature = `${pool.dbConfig?.adapter}:${pool.dbConfig?.database}`;
+    let bySignature = census.get(name);
+    if (!bySignature) {
+      bySignature = new Map<string, number>();
+      census.set(name, bySignature);
+    }
+    bySignature.set(signature, (bySignature.get(signature) ?? 0) + 1);
   }
   return census;
 }
 
-let baselineWritingPools = new Map<string, number>();
+let baselineWritingPools = new Map<string, Map<string, number>>();
 
 /**
  * Takes the census baseline. Called from the setup module that runs LAST
@@ -139,9 +155,19 @@ export function captureWritingPoolBaseline(): void {
  */
 export function writingPoolsLeakedSinceBaseline(): string[] {
   const leaked: string[] = [];
-  for (const [name, count] of writingPoolCensus()) {
-    const before = baselineWritingPools.get(name) ?? 0;
-    if (count > before) leaked.push(before === 0 ? name : `${name} (${before} -> ${count})`);
+  for (const [name, bySignature] of writingPoolCensus()) {
+    const baseline = baselineWritingPools.get(name);
+    for (const [signature, count] of bySignature) {
+      const before = baseline?.get(signature) ?? 0;
+      if (count <= before) continue;
+      leaked.push(
+        baseline === undefined
+          ? name
+          : before === 0
+            ? `${name} (${signature})`
+            : `${name} (${before} -> ${count})`,
+      );
+    }
   }
   return leaked;
 }

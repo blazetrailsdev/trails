@@ -2058,9 +2058,7 @@ describe("errors.ofKind()", () => {
     await u.isValid();
     expect(u.errors.ofKind("name", ":blank")).toBe(true);
     expect(u.errors.ofKind("name", ":invalid")).toBe(false);
-    // Without a type arg, ofKind checks for any error on the attribute.
-    expect(u.errors.ofKind("name")).toBe(true);
-    expect(u.errors.ofKind("other")).toBe(false);
+    expect(u.errors.ofKind("name")).toBe(false);
   });
 });
 

@@ -1,6 +1,7 @@
 import { describe, it, expect, afterAll } from "vitest";
 import { Base } from "../base.js";
 import { writingPoolsLeakedSinceBaseline } from "./helper.js";
+import { restoreWorkerConnection } from "../support/connection.js";
 
 // trails-only: Rails' `ActiveRecord::TestCase` tears its connections down per
 // case, so no pool can outlive the file that opened it and Rails needs no
@@ -18,6 +19,18 @@ await CensusLeakModel.establishConnection({
 
 describe("writing pool census", () => {
   it("reports a pool established at module scope, naming its connection descriptor", () => {
+    expect(writingPoolsLeakedSinceBaseline()).toEqual(["CensusLeakModel"]);
+  });
+
+  it("reports a baseline pool REPLACED by a different pool of the same name", async () => {
+    try {
+      await Base.establishConnection({ adapter: "sqlite3", database: "db/primary.sqlite3" });
+      expect(writingPoolsLeakedSinceBaseline()).toEqual(
+        expect.arrayContaining([expect.stringMatching(/^Base \(/)]),
+      );
+    } finally {
+      await restoreWorkerConnection();
+    }
     expect(writingPoolsLeakedSinceBaseline()).toEqual(["CensusLeakModel"]);
   });
 });

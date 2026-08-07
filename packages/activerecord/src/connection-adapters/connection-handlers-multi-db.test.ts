@@ -6,6 +6,7 @@ import { HashConfig } from "../database-configurations/hash-config.js";
 import { DatabaseConfigurations, type RawConfigurations } from "../database-configurations.js";
 import { Base } from "../base.js";
 import { currentRole } from "../core.js";
+import { restoreWorkerConnection } from "../support/connection.js";
 
 describe("ConnectionHandlersMultiDbTest", () => {
   let handler: ConnectionHandler;
@@ -59,6 +60,7 @@ describe("ConnectionHandlersMultiDbTest", () => {
     try {
       await handler.clearAllConnectionsBang();
       await Base.connectionHandler.clearAllConnectionsBang();
+      await restoreWorkerConnection();
     } finally {
       const fs = await asyncFs();
       const path = await getPathAsync();

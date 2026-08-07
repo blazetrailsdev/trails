@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Temporal } from "@blazetrails/date";
 import { Types } from "../index.js";
+import { useZone } from "@blazetrails/activesupport";
 
 /** `::Time.utc(...)`, the value Rails' own assertions are written against. */
 function timeUtc(
@@ -74,11 +75,13 @@ describe("TimeTest", () => {
     expect(type.cast(pdt)).toEqual(timeUtc(2024, 6, 15, 14, 23, 55));
   });
 
-  it("user input in time zone wraps plain time in given zone", () => {
-    const result = type.userInputInTimeZone("14:30:00", "America/New_York");
-    expect(result).toBeInstanceOf(Temporal.ZonedDateTime);
-    expect((result as Temporal.ZonedDateTime).hour).toBe(14);
-    expect((result as Temporal.ZonedDateTime).timeZoneId).toBe("America/New_York");
+  it("user input in time zone wraps plain time in Time.zone", () => {
+    useZone("Eastern Time (US & Canada)", () => {
+      const result = type.userInputInTimeZone("14:30:00");
+      expect(result).toBeInstanceOf(Temporal.ZonedDateTime);
+      expect((result as Temporal.ZonedDateTime).hour).toBe(14);
+      expect((result as Temporal.ZonedDateTime).timeZoneId).toBe("America/New_York");
+    });
   });
 
   it("user input in time zone returns null for null", () => {
