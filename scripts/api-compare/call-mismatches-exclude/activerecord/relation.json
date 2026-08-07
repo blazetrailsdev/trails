@@ -156,13 +156,6 @@
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
-    "rubyName": "build_count_subquery?",
-    "call": "many?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
     "rubyName": "cache_key",
     "call": "collection_cache_key",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -536,13 +529,6 @@
     "tsFile": "relation.ts",
     "rubyName": "execute_grouped_calculation",
     "call": "with_connection",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "execute_simple_calculation",
-    "call": "build_count_subquery?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

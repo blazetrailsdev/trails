@@ -113,17 +113,30 @@ export class SchemaCreation extends AbstractSchemaCreation {
   /** @internal */
   protected override async visitAlterTable(o: any): Promise<string> {
     let sql = await super.visitAlterTable(o);
+    // DIVERGENCE (schema_creation.rb:12-14): Rails joins within a group with
+    // " "; trails uses ", " because `super` here emits a comma-separated
+    // ALTER TABLE action list.
     const pgParts: string[] = [];
-    if (Array.isArray(o.constraintValidations)) {
-      for (const name of o.constraintValidations) pgParts.push(this.visitValidateConstraint(name));
+    if (Array.isArray(o.constraintValidations) && o.constraintValidations.length > 0) {
+      pgParts.push(
+        (o.constraintValidations as string[])
+          .map((fk) => this.visitValidateConstraint(fk))
+          .join(", "),
+      );
     }
-    if (Array.isArray(o.exclusionConstraintAdds)) {
-      for (const con of o.exclusionConstraintAdds as ExclusionConstraintDefinition[])
-        pgParts.push(this.visitAddExclusionConstraint(con));
+    if (Array.isArray(o.exclusionConstraintAdds) && o.exclusionConstraintAdds.length > 0) {
+      pgParts.push(
+        (o.exclusionConstraintAdds as ExclusionConstraintDefinition[])
+          .map((con) => this.visitAddExclusionConstraint(con))
+          .join(", "),
+      );
     }
-    if (Array.isArray(o.uniqueConstraintAdds)) {
-      for (const con of o.uniqueConstraintAdds as UniqueConstraintDefinition[])
-        pgParts.push(this.visitAddUniqueConstraint(con));
+    if (Array.isArray(o.uniqueConstraintAdds) && o.uniqueConstraintAdds.length > 0) {
+      pgParts.push(
+        (o.uniqueConstraintAdds as UniqueConstraintDefinition[])
+          .map((con) => this.visitAddUniqueConstraint(con))
+          .join(", "),
+      );
     }
     if (pgParts.length > 0) {
       const table = this.adapter.quoteTableName(o.name);

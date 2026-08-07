@@ -97,8 +97,24 @@ export class Merger {
     if (this.other.preloadValues.length === 0 && this.other.includesValues.length === 0) return;
 
     if (this.other.model === rel.model) {
-      if (this.other.preloadValues.length > 0) rel.preloadBang(...this.other.preloadValues);
-      if (this.other.includesValues.length > 0) rel.includesBang(...this.other.includesValues);
+      if (this.other.preloadValues.length > 0) {
+        const preloadValues = rel.preloadValues;
+        rel.preloadValues = preloadValues.concat(
+          this.other.preloadValues.filter(
+            (v: AssociationSpec) =>
+              !preloadValues.some((seen: unknown) => structuralUnionEq(seen, v)),
+          ),
+        );
+      }
+      if (this.other.includesValues.length > 0) {
+        const includesValues = rel.includesValues;
+        rel.includesValues = includesValues.concat(
+          this.other.includesValues.filter(
+            (v: AssociationSpec) =>
+              !includesValues.some((seen: unknown) => structuralUnionEq(seen, v)),
+          ),
+        );
+      }
       return;
     }
 

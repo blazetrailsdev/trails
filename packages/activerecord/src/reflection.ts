@@ -2280,8 +2280,10 @@ function reflectionClassFor(
   scope: ((...args: any[]) => any) | null,
   options: Record<string, unknown>,
   activeRecord: typeof Base,
-) => AssociationReflection {
+) => MacroReflection {
   switch (macro) {
+    case "composedOf":
+      return AggregateReflection;
     case "hasMany":
       return HasManyReflection;
     case "hasOne":
@@ -2319,15 +2321,11 @@ export function create(
   options: Record<string, unknown>,
   activeRecord: typeof Base,
 ): AssociationReflection | ThroughReflection | AggregateReflection {
-  if (macro === "composedOf") {
-    return new AggregateReflection(name, scope, options, activeRecord);
-  }
   const ReflectionClass = reflectionClassFor(macro);
   const reflection = new ReflectionClass(name, scope, options, activeRecord);
-  if (options.through) {
-    return new ThroughReflection(reflection);
-  }
-  return reflection;
+  return options.through
+    ? new ThroughReflection(reflection as AssociationReflection)
+    : (reflection as AssociationReflection | AggregateReflection);
 }
 
 /**

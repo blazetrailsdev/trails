@@ -19,12 +19,5 @@
     "rubyName": "signed_id",
     "call": "combine_signed_id_purposes",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "signed-id.ts",
-    "rubyName": "signed_id",
-    "call": "order:id,generate",
-    "reason": "Baseline (RFC 0084): ORDER-only divergence surfaced when the two extractors' chained-call traversal was aligned — the body's previous first-inversion row retired in the same PR and this is the next one; pending per-body control-flow convergence review."
   }
 ]

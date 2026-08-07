@@ -301,8 +301,12 @@ export function generatesTokenFor(
     generator?: (record: any) => unknown;
   } = {},
 ): void {
-  const def = new TokenDefinition(this, purpose, options.expiresIn, options.generator);
-  setTokenDefinitions(this, tokenDefinitions(this).merge({ [purpose]: def }));
+  setTokenDefinitions(
+    this,
+    tokenDefinitions(this).merge({
+      [purpose]: new TokenDefinition(this, purpose, options.expiresIn, options.generator),
+    }),
+  );
 }
 
 /**

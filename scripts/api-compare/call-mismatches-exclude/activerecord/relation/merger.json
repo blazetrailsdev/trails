@@ -58,13 +58,6 @@
   {
     "package": "activerecord",
     "tsFile": "relation/merger.ts",
-    "rubyName": "merge_preloads",
-    "call": "order:preloadBang,reflectOnAllAssociations",
-    "reason": "Baseline (RFC 0084): ORDER-only divergence surfaced when the two extractors' chained-call traversal was aligned — the body's previous first-inversion row retired in the same PR and this is the next one; pending per-body control-flow convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/merger.ts",
     "rubyName": "merge_select_values",
     "call": "select_values",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
