@@ -8,6 +8,7 @@ import {
 } from "@blazetrails/activesupport/process-adapter";
 import {
   loadDatabaseConfig,
+  loadDatabaseConfigModule,
   loadAllDatabaseConfigs,
   connectAdapter,
   resolveEnv,
@@ -684,18 +685,18 @@ async function runMigrateAll(targetVersion: string | null): Promise<void> {
  * group.
  *
  * `establish_connection` only builds the pool, it does not connect, so this is
- * safe ahead of `db create` on a database that does not exist yet. A config
- * that cannot be resolved is left to the subcommand, which reports it with the
- * message written for that command.
+ * safe ahead of `db create` on a database that does not exist yet. An absent
+ * config file, or one with nothing for this environment, is left to the
+ * subcommand, which reports it with the message written for that command;
+ * everything else — a malformed config, an unresolvable adapter — raises here,
+ * as `load_config` does.
  */
 async function establishTaskConnection(): Promise<void> {
-  try {
-    const envName = resolveEnv();
-    const raw = normalizeRawConfig(await loadDatabaseConfig(envName));
-    await Base.establishConnection(toDbConfig(raw, envName));
-  } catch {
-    return;
-  }
+  const envName = resolveEnv();
+  const loaded = await loadDatabaseConfigModule();
+  if (!loaded || (loaded.module as Record<string, unknown>)[envName] === undefined) return;
+  const raw = normalizeRawConfig(await loadDatabaseConfig(envName));
+  await Base.establishConnection(toDbConfig(raw, envName));
 }
 
 export function dbCommand(): Command {
