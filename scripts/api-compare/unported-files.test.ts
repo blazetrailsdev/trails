@@ -70,6 +70,7 @@ describe("isSourceUnported package scoping", () => {
       "locale/fallbacks.rb",
       "locale/tag.rb",
       "locale/tag/parents.rb",
+      "locale/tag/rfc4646.rb",
       "locale/tag/simple.rb",
       "utils.rb",
     ]);

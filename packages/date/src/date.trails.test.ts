@@ -573,6 +573,60 @@ describe("Date", () => {
     expect(date.strftime("%Q")).toBe("%Q");
   });
 
+  it("honours the width prefix ahead of every directive, as date_strftime does", () => {
+    // Every expectation is `ruby 3.3.11 -rdate`'s answer for the same receiver.
+    const dt = new RubyDateTime(2008, 3, 1, 6, 7, 8.5);
+    expect(dt.strftime("%12S")).toBe("000000000008");
+    expect(dt.strftime("%6m")).toBe("000003");
+    expect(dt.strftime("%4d")).toBe("0001");
+    expect(dt.strftime("%2j")).toBe("61");
+    expect(dt.strftime("%1Y")).toBe("2008");
+    expect(dt.strftime("%3u")).toBe("006");
+    expect(dt.strftime("%4s")).toBe("1204351628");
+    expect(dt.strftime("%5e")).toBe("    1");
+    expect(dt.strftime("%2L")).toBe("50");
+    expect(dt.strftime("%20N")).toBe("50000000000000000000");
+    expect(new RubyDate(2008, 3, 1).strftime("%6m")).toBe("000003");
+  });
+
+  it("fills a width on the text and recursive arms, as FILL_PADDING does", () => {
+    const dt = new RubyDateTime(2008, 3, 1, 6, 7, 8.5);
+    expect(dt.strftime("%12A")).toBe("    Saturday");
+    expect(dt.strftime("%012A")).toBe("0000Saturday");
+    expect(dt.strftime("%_12A")).toBe("    Saturday");
+    expect(dt.strftime("%10F")).toBe("2008-03-01");
+    expect(dt.strftime("%10x")).toBe("  03/01/08");
+    expect(dt.strftime("%12%")).toBe("           %");
+    expect(dt.strftime("%6n")).toBe("     \n");
+  });
+
+  it("reads the padding character off the _ and 0 flags", () => {
+    const dt = new RubyDateTime(2008, 3, 1, 6, 7, 8.5);
+    expect(dt.strftime("%_S")).toBe(" 8");
+    expect(dt.strftime("%_m")).toBe(" 3");
+    // `%0` sets the pad character and then reads the width from the same digits.
+    expect(dt.strftime("%0S")).toBe("08");
+    expect(dt.strftime("%00S")).toBe("08");
+  });
+
+  it("subtracts the punctuation from a width on the %z arm", () => {
+    const dt = new RubyDateTime(2008, 3, 1, 6, 7, 8.5);
+    expect(dt.strftime("%5z")).toBe("+0000");
+    expect(dt.strftime("%8z")).toBe("+0000000");
+    expect(dt.strftime("%-z")).toBe("+000");
+    const east = new RubyDateTime(2008, 3, 1, 6, 0, 0, "+05:30");
+    expect(east.strftime("%8:z")).toBe("+0005:30");
+    expect(east.strftime("%-:::z")).toBe("+5:30");
+    expect(east.strftime("%_9z")).toBe("     +530");
+  });
+
+  it("leaves a width-qualified unknown directive alone", () => {
+    const dt = new RubyDateTime(2008, 3, 1, 6, 7, 8.5);
+    expect(dt.strftime("%9q")).toBe("%9q");
+    expect(dt.strftime("%^b")).toBe("%^b");
+    expect(dt.strftime("%Ez")).toBe("%Ez");
+  });
+
   it("resolves the ordinal and week-date arms", () => {
     expect(RubyDate.parse("2008070").strftime("%Y-%m-%d")).toBe("2008-03-10");
     expect(RubyDate.parse("2001-W05-6").strftime("%Y-%m-%d")).toBe("2001-02-03");

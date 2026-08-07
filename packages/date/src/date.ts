@@ -58,17 +58,6 @@ function pad2(n: number): string {
 }
 
 /**
- * @internal `date_strftime.c`'s `%Y` arm: `FMT('0', 0 <= y ? 4 : 5, "ld", y)`
- * (ruby/date, `date_strftime.c:236-247`), so a non-negative year pads to four
- * digits and a negative one pads to five columns counting the sign — `-0001`,
- * not `-1`. `Date#to_s` is `strftimev("%Y-%m-%d")` (`date_core.c:6967-6970`),
- * which is why a pre-1000 date renders as `0001-01-01`.
- */
-function padYear(year: number): string {
-  return year < 0 ? `-${String(-year).padStart(4, "0")}` : String(year).padStart(4, "0");
-}
-
-/**
  * @internal The fields the one C `strftime(3)` behind both `Date#strftime` and
  * `Time#strftime` reads off its receiver. It is not the public surface of
  * either class — `Date` deliberately answers no `hour`/`sec` — so each caller
@@ -111,27 +100,107 @@ function epochSeconds(subject: StrftimeSubject): number {
 }
 
 /**
- * @internal The four spellings `date_strftime.c`'s `%z` arm gives the offset,
- * picked by how many colons preceded the directive: none is `"+0900"`, one is
- * `"+09:00"`, two is `"+09:00:00"`, and three is the shortest form that loses
- * nothing — MRI shows the minute and second only when they are nonzero, so
- * `+09:00:00` is `"+09"` while `+05:30` stays `"+05:30"`. All four come off the
- * one offset in seconds, which is why the subject carries a number rather than
- * a string: `%::z` and `%:::z` are the only spellings that can show a
- * sub-minute offset.
+ * @internal `date_strftime.c`'s `%z` arm (`date_strftime.c:625-716`), which
+ * picks its spelling from how many colons preceded the directive: none is
+ * `"+0900"`, one is `"+09:00"`, two is `"+09:00:00"`, and three is the shortest
+ * form that loses nothing — MRI shows the minute and second only when they are
+ * nonzero, so `+09:00:00` is `"+09"` while `+05:30` stays `"+05:30"`. All four
+ * come off the one offset in seconds, which is why the subject carries a number
+ * rather than a string: `%::z` and `%:::z` are the only spellings that can show
+ * a sub-minute offset.
+ *
+ * Unlike every other arm this one does its own width arithmetic rather than
+ * going through `FMT`: the width counts the whole rendering, so the C subtracts
+ * the punctuation the spelling will add and pads the HOUR field with what is
+ * left. `hw` is the hour field's own default width, which the `-` flag narrows
+ * to one column for a single-digit hour.
  */
-function formatOffset(utcOffset: number, colons: number): string {
-  const sign = utcOffset < 0 ? "-" : "+";
-  const abs = Math.abs(utcOffset);
-  const hour = pad2(Math.floor(abs / 3600));
-  const min = pad2(Math.floor(abs / 60) % 60);
-  const sec = pad2(abs % 60);
-  if (colons === 0) return `${sign}${hour}${min}`;
-  if (colons === 1) return `${sign}${hour}:${min}`;
-  if (colons === 2) return `${sign}${hour}:${min}:${sec}`;
-  if (abs % 60 !== 0) return `${sign}${hour}:${min}:${sec}`;
-  if (Math.floor(abs / 60) % 60 !== 0) return `${sign}${hour}:${min}`;
-  return `${sign}${hour}`;
+function formatOffset(
+  utcOffset: number,
+  colons: number,
+  precision: number,
+  left: boolean,
+  padding: string,
+): string {
+  let off = utcOffset;
+  const aoff = Math.abs(off);
+
+  const hl = Math.floor(aoff / 3600) < 10 ? 1 : 2;
+  let hw = 2;
+  if (left && hl === 1) hw = 1;
+
+  switch (colons) {
+    case 0:
+      precision = precision <= 3 + hw ? hw : precision - 3;
+      break;
+    case 1:
+      precision = precision <= 4 + hw ? hw : precision - 4;
+      break;
+    case 2:
+      precision = precision <= 7 + hw ? hw : precision - 7;
+      break;
+    default:
+      if (aoff % 3600 === 0) precision = precision <= 1 + hw ? hw : precision - 1;
+      else if (aoff % 60 === 0) precision = precision <= 4 + hw ? hw : precision - 4;
+      else precision = precision <= 7 + hw ? hw : precision - 7;
+      break;
+  }
+
+  let out = "";
+  if (padding === " " && precision > hl) {
+    out += " ".repeat(precision - hl);
+    precision = hl;
+  }
+  if (off < 0) {
+    off = -off;
+    out += "-";
+  } else {
+    out += "+";
+  }
+  out += String(Math.floor(off / 3600)).padStart(precision, "0");
+  off = off % 3600;
+  if (colons === 3 && off === 0) return out;
+  if (1 <= colons) out += ":";
+  out += pad2(Math.floor(off / 60));
+  off = off % 60;
+  if (colons === 3 && off === 0) return out;
+  if (2 <= colons) out += `:${pad2(off)}`;
+  return out;
+}
+
+/**
+ * @internal `date_strftime.c`'s `FMT` macro (`date_strftime.c:105-116`): the
+ * directive's own width, defaulting to `defPrec` and collapsed to a single
+ * column by the `-` flag, with the arm's own default padding character unless
+ * the format string named one.
+ */
+function fmt(
+  padding: string,
+  left: boolean,
+  precision: number,
+  defPad: string,
+  defPrec: number,
+  val: number,
+): string {
+  if (precision <= 0) precision = defPrec;
+  if (left) precision = 1;
+  const sign = val < 0 ? "-" : "";
+  const digits = String(Math.abs(val));
+  return padding === "0" || (padding === "" && defPad === "0")
+    ? sign + digits.padStart(Math.max(precision - sign.length, 0), "0")
+    : (sign + digits).padStart(precision, " ");
+}
+
+/**
+ * @internal `date_strftime.c`'s `FILL_PADDING` macro
+ * (`date_strftime.c:95-104`), and the same left-fill the `STRFTIME` macro
+ * (`date_strftime.c:117-133`) applies to a recursively expanded format: the
+ * blanks that carry an already-formatted `i`-column answer out to the
+ * requested width.
+ */
+function fillPadding(padding: string, left: boolean, precision: number, i: number): string {
+  if (!left && precision > i) return (padding === "" ? " " : padding).repeat(precision - i);
+  return "";
 }
 
 /**
@@ -197,63 +266,190 @@ function subsecDigits(nsec: number, precision: number): string {
  * "module-private" and "exported". Callers use `Date#strftime` /
  * `DateTime#strftime` / `Time#strftime`, never this.
  *
+ * The scan mirrors `date_strftime.c`'s `again:` switch
+ * (`date_strftime.c:160-235`): the `-` and `_` flags, the padding character and
+ * the width are read ahead of EVERY directive, and each arm then formats
+ * through `fmt` / `fillPadding` with the C's own defaults for that arm rather
+ * than a hardcoded pad.
+ *
  * Only the directives the i18n format strings and the conformance mixins use
  * are recognised; Ruby leaves an unknown directive in place, and so does this.
- * `date_strftime.c` reads a width prefix ahead of every directive
- * (`date_strftime.c:160-230`); only the `%L`/`%N` arm honours one here, so a
- * width on any other directive keeps falling through verbatim.
+ * The `^`, `#`, `E` and `O` flags are among the unrecognised ones, so `%^b`
+ * still falls through verbatim rather than upcasing.
  * `%z` and `%Z` both come off the subject: `::Date` has no zone of its own and
  * answers UTC, while a `::Time` built through the public constructor is in the
  * local zone and answers its real offset and abbreviation.
  */
 export function strftime(subject: StrftimeSubject, format: string): string {
   const hour12 = subject.hour % 12 === 0 ? 12 : subject.hour % 12;
-  const tokens: Record<string, (precision: number) => string> = {
-    Y: () => padYear(subject.year),
-    C: () => pad2(Math.floor(subject.year / 100)),
-    y: () => pad2(subject.year % 100),
-    m: () => pad2(subject.mon),
-    d: () => pad2(subject.day),
-    e: () => String(subject.day).padStart(2, " "),
-    j: () => String(subject.yday).padStart(3, "0"),
-    F: () => `${padYear(subject.year)}-${pad2(subject.mon)}-${pad2(subject.day)}`,
-    A: () => DAY_NAMES[subject.wday],
-    a: () => ABBR_DAY_NAMES[subject.wday],
-    B: () => MONTH_NAMES[subject.mon - 1],
-    b: () => ABBR_MONTH_NAMES[subject.mon - 1],
-    h: () => ABBR_MONTH_NAMES[subject.mon - 1],
-    u: () => String(subject.wday === 0 ? 7 : subject.wday),
-    w: () => String(subject.wday),
-    H: () => pad2(subject.hour),
-    k: () => String(subject.hour).padStart(2, " "),
-    I: () => pad2(hour12),
-    l: () => String(hour12).padStart(2, " "),
-    M: () => pad2(subject.min),
-    S: () => pad2(subject.sec),
-    L: (precision) => subsecDigits(subject.nsec, precision <= 0 ? 3 : precision),
-    N: (precision) => subsecDigits(subject.nsec, precision <= 0 ? 9 : precision),
-    s: () => String(epochSeconds(subject)),
-    p: () => (subject.hour < 12 ? "AM" : "PM"),
-    P: () => (subject.hour < 12 ? "am" : "pm"),
-    x: () => `${pad2(subject.mon)}/${pad2(subject.day)}/${pad2(subject.year % 100)}`,
-    z: () => formatOffset(subject.utcOffset, 0),
-    ":z": () => formatOffset(subject.utcOffset, 1),
-    "::z": () => formatOffset(subject.utcOffset, 2),
-    ":::z": () => formatOffset(subject.utcOffset, 3),
-    Z: () => subject.zone,
-    n: () => "\n",
-    t: () => "\t",
-    "%": () => "%",
-  };
+  let out = "";
+  let f = 0;
 
-  return format.replace(/%(-?)(\d*)(:{0,3}[A-Za-z%])/g, (match, flag, width, spec) => {
-    const fn = tokens[spec];
-    if (!fn) return match;
-    if (width !== "" && spec !== "L" && spec !== "N") return match;
-    let result = fn(width === "" ? -1 : Number(width));
-    if (flag === "-") result = result.replace(/^[0 ]+/, "") || "0";
-    return result;
-  });
+  while (f < format.length) {
+    if (format[f] !== "%") {
+      out += format[f];
+      f++;
+      continue;
+    }
+
+    const sp = f;
+    let precision = -1;
+    let left = false;
+    let padding = "";
+    let colons = 0;
+    let g = f + 1;
+    let spec: string | undefined;
+
+    for (;;) {
+      const c = format[g];
+      if (c === "-") {
+        left = true;
+        g++;
+        continue;
+      }
+      if (c === "_") {
+        padding = " ";
+        g++;
+        continue;
+      }
+      if (c !== undefined && isdigit(c)) {
+        if (c === "0") padding = "0";
+        const [prec, e] = strtoul(format, g);
+        precision = prec;
+        g = e;
+        continue;
+      }
+      if (c === ":") {
+        let l = 0;
+        while (format[g + l] === ":") l++;
+        if (format[g + l] === "z" && l <= 3) {
+          colons = l;
+          g += l;
+          continue;
+        }
+      }
+      spec = c;
+      break;
+    }
+
+    // The value arms — `FMT` / `FMTV` — and the two that build their own answer.
+    const num = (defPad: string, defPrec: number, val: number): string =>
+      fmt(padding, left, precision, defPad, defPrec, val);
+    // The `break` arms and the recursively expanded `STRFTIME` ones, which are
+    // carried out to the requested width by `FILL_PADDING`.
+    const text = (value: string): string =>
+      fillPadding(padding, left, precision, value.length) + value;
+
+    let formatted: string | undefined;
+    switch (spec) {
+      case "Y":
+        // `FMT('0', 0 <= y ? 4 : 5, "ld", y)` (date_strftime.c:236-247), so a
+        // non-negative year pads to four digits and a negative one pads to five
+        // columns counting the sign — `-0001`, not `-1`. `Date#to_s` is
+        // `strftimev("%Y-%m-%d")` (date_core.c:6967-6970), which is why a
+        // pre-1000 date renders as `0001-01-01`.
+        formatted = num("0", 0 <= subject.year ? 4 : 5, subject.year);
+        break;
+      case "C":
+        formatted = num("0", 2, Math.floor(subject.year / 100));
+        break;
+      case "y":
+        formatted = num("0", 2, subject.year % 100);
+        break;
+      case "m":
+        formatted = num("0", 2, subject.mon);
+        break;
+      case "d":
+      case "e":
+        formatted = num(spec === "d" ? "0" : " ", 2, subject.day);
+        break;
+      case "j":
+        formatted = num("0", 3, subject.yday);
+        break;
+      case "F":
+        formatted = text(strftime(subject, "%Y-%m-%d"));
+        break;
+      case "x":
+        formatted = text(strftime(subject, "%m/%d/%y"));
+        break;
+      case "A":
+        formatted = text(DAY_NAMES[subject.wday]);
+        break;
+      case "a":
+        formatted = text(ABBR_DAY_NAMES[subject.wday]);
+        break;
+      case "B":
+        formatted = text(MONTH_NAMES[subject.mon - 1]);
+        break;
+      case "b":
+      case "h":
+        formatted = text(ABBR_MONTH_NAMES[subject.mon - 1]);
+        break;
+      case "u":
+        formatted = num("0", 1, subject.wday === 0 ? 7 : subject.wday);
+        break;
+      case "w":
+        formatted = num("0", 1, subject.wday);
+        break;
+      case "H":
+      case "k":
+        formatted = num(spec === "H" ? "0" : " ", 2, subject.hour);
+        break;
+      case "I":
+      case "l":
+        formatted = num(spec === "I" ? "0" : " ", 2, hour12);
+        break;
+      case "M":
+        formatted = num("0", 2, subject.min);
+        break;
+      case "S":
+        formatted = num("0", 2, subject.sec);
+        break;
+      case "L":
+      case "N": {
+        const w = spec === "L" ? 3 : 9;
+        if (precision <= 0) precision = w;
+        formatted = subsecDigits(subject.nsec, precision);
+        break;
+      }
+      case "s":
+        formatted = num("0", 1, epochSeconds(subject));
+        break;
+      case "p":
+        formatted = text(subject.hour < 12 ? "AM" : "PM");
+        break;
+      case "P":
+        formatted = text(subject.hour < 12 ? "am" : "pm");
+        break;
+      case "z":
+        formatted = formatOffset(subject.utcOffset, colons, precision, left, padding);
+        break;
+      case "Z":
+        formatted = text(subject.zone);
+        break;
+      case "n":
+        formatted = text("\n");
+        break;
+      case "t":
+        formatted = text("\t");
+        break;
+      case "%":
+        formatted = text("%");
+        break;
+    }
+
+    if (formatted === undefined) {
+      // `unknown:` (date_strftime.c:591-599) — the directive, flags and all,
+      // goes out verbatim with the padding state thrown away.
+      out += spec === undefined ? format.slice(sp) : format.slice(sp, g + 1);
+      f = spec === undefined ? format.length : g + 1;
+      continue;
+    }
+    out += formatted;
+    f = g + 1;
+  }
+
+  return out;
 }
 
 export class ArgumentError extends Error {

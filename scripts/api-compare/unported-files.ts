@@ -1258,14 +1258,6 @@ export const UNPORTED_FILES: UnportedFile[] = [
       "Sits at test/i18n/, outside the `gettext/` prefix above.",
   },
   {
-    pattern: "locale/tag/rfc4646.rb",
-    package: "i18n",
-    reason:
-      "The alternative `Locale::Tag` implementation. `Tag.implementation` " +
-      "defaults to `Tag::Simple` in the gem and nothing selects this one, so " +
-      "the fallback chain never reaches it — story i18n-locale-tag-rfc4646.",
-  },
-  {
     pattern: "middleware.rb",
     testFile: "i18n/middleware_test.rb",
     package: "i18n",

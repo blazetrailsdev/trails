@@ -133,7 +133,6 @@ export class TimeType extends ValueType<Temporal.Instant> {
    * @internal Rails-private helper.
    */
   protected castValue(value: unknown): Temporal.Instant | null {
-    if (isHash(value)) return this.valueFromMultiparameterAssignment(value);
     if (typeof value !== "string") {
       if (value instanceof Temporal.PlainDateTime) {
         value = value.toZonedDateTime(this.#zoneId()).toInstant();
@@ -216,6 +215,19 @@ export class TimeType extends ValueType<Temporal.Instant> {
         "5": 0,
       }).cast(values) as Temporal.Instant | null) ?? null
     );
+  }
+
+  /**
+   * Mirrors: AcceptsMultiparameterTime::InstanceMethods#cast
+   * (accepts_multiparameter_time.rb:16-22). The nil guard stays in
+   * `Value#cast` (value.rb:53-55), which is `super`.
+   */
+  override cast(value: unknown): Temporal.Instant | null {
+    if (isHash(value)) {
+      return this.valueFromMultiparameterAssignment(value);
+    } else {
+      return super.cast(value);
+    }
   }
 
   /**

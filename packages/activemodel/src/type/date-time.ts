@@ -41,7 +41,6 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
     if (value instanceof Date) {
       return this.applySecondsPrecision(Temporal.Instant.fromEpochMilliseconds(value.getTime()));
     }
-    if (isHash(value)) return this.valueFromMultiparameterAssignment(value);
     const str = String(value).trim();
     if (str === "") return null;
     return this.fastStringToTime(str) ?? this.fallbackStringToTime(str);
@@ -150,6 +149,19 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
 
   get isUtc(): boolean {
     return isUtc();
+  }
+
+  /**
+   * Mirrors: AcceptsMultiparameterTime::InstanceMethods#cast
+   * (accepts_multiparameter_time.rb:16-22). The nil guard stays in
+   * `Value#cast` (value.rb:53-55), which is `super`.
+   */
+  override cast(value: unknown): DateTimeCastResult | null {
+    if (isHash(value)) {
+      return this.valueFromMultiparameterAssignment(value);
+    } else {
+      return super.cast(value);
+    }
   }
 
   /**
