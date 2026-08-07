@@ -100,6 +100,45 @@ function epochSeconds(subject: StrftimeSubject): number {
 }
 
 /**
+ * @internal `%Q`'s value (`date_strftime.c:354-356`, `tmx_msecs`): the whole
+ * milliseconds of the subject's sub-second, which ride on top of `%s`.
+ */
+function msec(subject: StrftimeSubject): number {
+  return Number(
+    (subject.nsec.numerator * 1000n) / (subject.nsec.denominator * BigInt(SECOND_IN_NANOSECONDS)),
+  );
+}
+
+/**
+ * @internal `tmx_cwyear` / `tmx_cweek` (`date_core.c:1849-1885`), the ISO
+ * week-based year and week `%G` and `%V` read. Temporal's `yearOfWeek` and
+ * `weekOfYear` are the same ISO 8601 quantities `c_jd_to_commercial` computes.
+ */
+function cwyear(subject: StrftimeSubject): number {
+  return new Temporal.PlainDate(subject.year, subject.mon, subject.day).yearOfWeek ?? subject.year;
+}
+
+function cweek(subject: StrftimeSubject): number {
+  return new Temporal.PlainDate(subject.year, subject.mon, subject.day).weekOfYear ?? 1;
+}
+
+/**
+ * @internal `m_wnumx` (`date_core.c:1895-1917`) through `c_jd_to_weeknum`
+ * (`date_core.c:622-632`) — `%U` is `f == 0` (weeks start Sunday) and `%W` is
+ * `f == 1` (weeks start Monday).
+ *
+ * The C works in Julian Day Numbers: it takes the first day of the year,
+ * `rjd += 6`, and counts sevenths from the week boundary at or before it. Both
+ * `jd` terms cancel against each other once the year's first day is written as
+ * `jd - (yday - 1)`, which leaves the count expressible from the subject's own
+ * `yday` and `wday` — no JDN conversion needed to get the same integer.
+ */
+function wnumx(subject: StrftimeSubject, f: number): number {
+  const wdayFdoy = mod(subject.wday - (subject.yday - 1), 7);
+  return div(subject.yday + mod(wdayFdoy + 6 - f, 7), 7);
+}
+
+/**
  * @internal `date_strftime.c`'s `%z` arm (`date_strftime.c:625-716`), which
  * picks its spelling from how many colons preceded the directive: none is
  * `"+0900"`, one is `"+09:00"`, two is `"+09:00:00"`, and three is the shortest
@@ -294,11 +333,32 @@ export function strftime(subject: StrftimeSubject, format: string): string {
     let left = false;
     let padding = "";
     let colons = 0;
+    let upper = false;
+    let lower = false;
+    let chcase = false;
     let g = f + 1;
     let spec: string | undefined;
 
     for (;;) {
       const c = format[g];
+      if (c === "^") {
+        if (flagFound(precision)) {
+          spec = c;
+          break;
+        }
+        upper = true;
+        g++;
+        continue;
+      }
+      if (c === "#") {
+        if (flagFound(precision)) {
+          spec = c;
+          break;
+        }
+        chcase = true;
+        g++;
+        continue;
+      }
       if (c === "_") {
         if (flagFound(precision)) {
           spec = c;
@@ -340,7 +400,19 @@ export function strftime(subject: StrftimeSubject, format: string): string {
     const num = (defPad: string, defPrec: number, val: number): string =>
       fmt(padding, left, precision, defPad, defPrec, val);
     const text = (value: string): string =>
-      fillPadding(padding, left, precision, value.length) + value;
+      fillPadding(padding, left, precision, value.length) +
+      (upper ? value.toUpperCase() : lower ? value.toLowerCase() : value);
+    /**
+     * `date_strftime.c`'s `STRFTIME` macro (`date_strftime.c:117-133`): the
+     * expansion string runs back through `strftime` and the answer is upcased
+     * for `%^`, then left-filled to the requested width. `LOWER` is deliberately
+     * not consulted here — the macro reads only `UPPER`.
+     */
+    const recur = (fmt: string): string => {
+      const i = strftime(subject, fmt);
+      const cased = upper ? i.toUpperCase() : i;
+      return fillPadding(padding, left, precision, i.length) + cased;
+    };
 
     let formatted: string | undefined;
     switch (spec) {
@@ -364,22 +436,59 @@ export function strftime(subject: StrftimeSubject, format: string): string {
         formatted = num("0", 3, subject.yday);
         break;
       case "F":
-        formatted = text(strftime(subject, "%Y-%m-%d"));
+        formatted = recur("%Y-%m-%d");
         break;
       case "x":
-        formatted = text(strftime(subject, "%m/%d/%y"));
+      case "D":
+        formatted = recur("%m/%d/%y");
+        break;
+      case "c":
+        formatted = recur("%a %b %e %H:%M:%S %Y");
+        break;
+      case "T":
+      case "X":
+        formatted = recur("%H:%M:%S");
+        break;
+      case "R":
+        formatted = recur("%H:%M");
+        break;
+      case "r":
+        formatted = recur("%I:%M:%S %p");
+        break;
+      case "v":
+        formatted = recur("%e-%^b-%Y");
+        break;
+      case "+":
+        formatted = recur("%a %b %e %H:%M:%S %Z %Y");
+        break;
+      case "G":
+        formatted = num("0", 0 <= cwyear(subject) ? 4 : 5, cwyear(subject));
+        break;
+      case "V":
+        formatted = num("0", 2, cweek(subject));
+        break;
+      case "U":
+      case "W":
+        formatted = num("0", 2, wnumx(subject, spec === "U" ? 0 : 1));
+        break;
+      case "Q":
+        formatted = num("0", 1, epochSeconds(subject) * 1000 + msec(subject));
         break;
       case "A":
+        if (chcase) upper = true;
         formatted = text(DAY_NAMES[subject.wday]);
         break;
       case "a":
+        if (chcase) upper = true;
         formatted = text(ABBR_DAY_NAMES[subject.wday]);
         break;
       case "B":
+        if (chcase) upper = true;
         formatted = text(MONTH_NAMES[subject.mon - 1]);
         break;
       case "b":
       case "h":
+        if (chcase) upper = true;
         formatted = text(ABBR_MONTH_NAMES[subject.mon - 1]);
         break;
       case "u":
@@ -412,17 +521,23 @@ export function strftime(subject: StrftimeSubject, format: string): string {
       case "s":
         formatted = num("0", 1, epochSeconds(subject));
         break;
-      case "p":
-        formatted = text(subject.hour < 12 ? "AM" : "PM");
-        break;
       case "P":
-        formatted = text(subject.hour < 12 ? "am" : "pm");
+      case "p":
+        if ((spec === "p" && chcase) || (spec === "P" && !chcase && !upper)) {
+          upper = false;
+          lower = true;
+        }
+        formatted = text(subject.hour < 12 ? "AM" : "PM");
         break;
       case "z":
         if (colons > 3) break;
         formatted = formatOffset(subject.utcOffset, colons, precision, left, padding);
         break;
       case "Z":
+        if (chcase) {
+          upper = false;
+          lower = true;
+        }
         formatted = text(subject.zone);
         break;
       case "n":
