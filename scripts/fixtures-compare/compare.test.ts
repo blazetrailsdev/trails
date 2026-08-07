@@ -265,6 +265,12 @@ describe("canonicalizeRailsRow", () => {
   it("passes column-named keys through unchanged", () => {
     expect(canonicalizeRailsRow({ id: 1, name: "x" }, {}, cols)).toEqual({ id: 1, name: "x" });
   });
+  it("normalizes Ruby-symbol row-column keys (naked/yml/trees.yml `:id:`)", () => {
+    expect(canonicalizeRailsRow({ ":id": 1, ":name": "The Root" }, {}, cols)).toEqual({
+      id: 1,
+      name: "The Root",
+    });
+  });
   it("expands `assoc: name` belongs_to short-hand into assoc_id", () => {
     expect(canonicalizeRailsRow({ pirate: "blackbeard" }, {}, cols)).toEqual({
       pirate_id: "blackbeard",

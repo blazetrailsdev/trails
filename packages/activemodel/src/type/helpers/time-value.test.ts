@@ -1,6 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { Rational, Temporal } from "@blazetrails/date";
-import { applySecondsPrecision, fastStringToTime, newTime } from "./time-value.js";
+import { useZone } from "@blazetrails/activesupport";
+import {
+  applySecondsPrecision,
+  fastStringToTime,
+  newTime,
+  userInputInTimeZone,
+} from "./time-value.js";
 
 // Mirrors ActiveModel::Type::Helpers::TimeValue#apply_seconds_precision
 // (time_value.rb:24-34). Truncation, not rounding — verify each
@@ -123,5 +129,24 @@ describe("fastStringToTime", () => {
   it("normalizes Postgres short offset (+00) to (+00:00)", () => {
     const i = fastStringToTime("2026-04-26 14:23:55.123456+00");
     expect(i?.toString().startsWith("2026-04-26T14:23:55.123456")).toBe(true);
+  });
+});
+
+// Mirrors ActiveModel::Type::Helpers::TimeValue#user_input_in_time_zone
+// (time_value.rb:42-44) — `value.in_time_zone`, whose else arm with no
+// Time.zone set is a bare `to_time` (date_and_time/zones.rb:20-27).
+describe("userInputInTimeZone", () => {
+  it("answers a zoneless value when Time.zone is unset", () => {
+    const result = userInputInTimeZone("2024-06-15 14:30:00");
+    expect(result).toBeInstanceOf(Temporal.PlainDateTime);
+    expect(result?.toString()).toBe("2024-06-15T14:30:00");
+  });
+
+  it("anchors to Time.zone when one is set", () => {
+    useZone("Eastern Time (US & Canada)", () => {
+      const result = userInputInTimeZone("2024-06-15 14:30:00");
+      expect(result).toBeInstanceOf(Temporal.ZonedDateTime);
+      expect((result as Temporal.ZonedDateTime).timeZoneId).toBe("America/New_York");
+    });
   });
 });

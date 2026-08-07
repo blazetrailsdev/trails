@@ -61,8 +61,9 @@ export class TimeType extends ValueType<Temporal.Instant> {
    * (time_value.rb:44-46). The zone is the thread-local `Time.zone`, read here
    * through ActiveSupport's `getZone()` the way `isUtc()` reads
    * `getZoneDefault()`; with no zone set at all Ruby answers a bare `to_time`
-   * (`date_and_time/zones.rb:20-27`), which a `ZonedDateTime` cannot represent,
-   * so UTC stands in as it does in the helper. `in_time_zone` is the tail below: the components
+   * (`date_and_time/zones.rb:20-27`), which is the zoneless
+   * `Temporal.PlainDateTime` this returns in that arm, as the helper does.
+   * `in_time_zone` is the tail below: the components
    * `cast_value` built are read back out of the `::Time` and re-anchored in
    * that zone, which is what `Time.zone.parse` of the dummy-dated string
    * answers.
@@ -72,7 +73,7 @@ export class TimeType extends ValueType<Temporal.Instant> {
    * a `::Time` is present, while `isBlank` reads any object with no own
    * enumerable keys as blank — which every Temporal value is.
    */
-  userInputInTimeZone(value: unknown): Temporal.ZonedDateTime | null {
+  userInputInTimeZone(value: unknown): Temporal.ZonedDateTime | Temporal.PlainDateTime | null {
     if (value == null || value === false) return null;
     if (typeof value === "string" && isBlank(value)) return null;
 
@@ -96,8 +97,10 @@ export class TimeType extends ValueType<Temporal.Instant> {
 
     const cast = this.cast(value);
     if (cast === null) return null;
-    const zone = getZone()?.tzinfo ?? "UTC";
-    return cast.toZonedDateTimeISO(this.#zoneId()).toPlainDateTime().toZonedDateTime(zone);
+    const timeZone = getZone();
+    const time = cast.toZonedDateTimeISO(this.#zoneId()).toPlainDateTime();
+    if (timeZone) return time.toZonedDateTime(timeZone.tzinfo);
+    return time;
   }
 
   /**

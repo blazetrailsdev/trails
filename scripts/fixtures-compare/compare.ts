@@ -128,7 +128,7 @@ export const ERB_SKIP_SENTINEL = "__ERB_SKIP__";
 // + 4 all/ fixtures ported in Phase 9 (missing: 5 → 1).
 // + Phase 10 (primary_key_error/) — missing: 1 → 0; diff: 9 → 10 (intentional: negative-
 //   assertion fixture omits ownedEssay column by design, not a data parity gap).
-const CI_BASELINE = { match: 133, diff: 10, missing: 0 } as const;
+const CI_BASELINE = { match: 134, diff: 9, missing: 0 } as const;
 
 function parseArgs(argv: string[]): {
   pkg: string;
@@ -619,7 +619,12 @@ export function canonicalizeRailsRow(railsRow: Row, tsRow: Row, columns: Set<str
   const known = (k: string): boolean => (columns ? columns.has(k) : Object.hasOwn(tsRow, k));
   const hasIdForm = (k: string): boolean =>
     columns ? columns.has(`${k}_id`) : Object.hasOwn(tsRow, `${k}_id`);
-  for (const [k, v] of Object.entries(railsRow)) {
+  for (const [rawKey, v] of Object.entries(railsRow)) {
+    // Rails YAML may spell a row's column keys as Ruby symbols
+    // (`naked/yml/trees.yml`: `:id: 1`). The fixture loader reads them through
+    // HashWithIndifferentAccess#convert_key (`Symbol#to_s`), so `:id` is the
+    // `id` column — normalize before column matching, as the value side does.
+    const k = normalizeSymbolKey(rawKey);
     if (known(k)) { out[k] = v; continue; } // prettier-ignore
     // Rails' `replace_belongs_to_keys` also handles polymorphic shorthand —
     // `assoc: label (Type)` splits into `<col>` + `<assoc>_type`. Shared
