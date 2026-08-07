@@ -7,8 +7,6 @@
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { MigrationProxy } from "./migration.js";
 import { Migrator } from "./migration.js";
-import { SchemaMigration } from "./schema-migration.js";
-import { InternalMetadata } from "./internal-metadata.js";
 import { Base } from "./base.js";
 import { DatabaseTasks } from "./tasks/database-tasks.js";
 
@@ -22,12 +20,15 @@ export async function createAndMigrate(
   migrations: MigrationProxy[],
 ): Promise<void> {
   for (const adapter of adapters) {
-    const migrator = new Migrator(
-      "up",
-      migrations,
-      new SchemaMigration(adapter),
-      new InternalMetadata(adapter),
-    );
+    // These adapters are handed in bare, so they carry a NullPool and
+    // `record_environment`'s `connection.pool.db_config.env_name`
+    // (migration.rb:1512-1516) answers nothing — the `environment` option is
+    // the only thing that keeps `ar_internal_metadata.environment` at "test"
+    // rather than whatever TRAILS_ENV/NODE_ENV happen to be. Rails' TestDatabases
+    // defines no `create_and_migrate`, so there is no Rails call shape to
+    // converge this to; it moves to the Rails-shaped arm once the adapters
+    // arrive with a real pool.
+    const migrator = new Migrator(adapter, migrations, { environment: "test" });
     await migrator.up();
   }
 }
