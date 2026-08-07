@@ -565,11 +565,7 @@ function useFixtures(
           }
         }
       };
-      if (adapter.disableReferentialIntegrity) {
-        await adapter.disableReferentialIntegrity(tableDeletes, tables);
-      } else {
-        await tableDeletes();
-      }
+      await adapter.disableReferentialIntegrity(tableDeletes, tables);
     }
     for (const key of Object.keys(store)) {
       delete store[key];
