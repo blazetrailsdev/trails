@@ -610,7 +610,7 @@ describe("Migrator advisory lock wrapping", () => {
     expect(await migrator.migrated()).toEqual(new Set());
 
     // Another process migrates version 1 while we wait for the lock.
-    await schemaMigration.recordVersion("1");
+    await schemaMigration.createVersion("1");
     expect(await migrator.migrated()).toEqual(new Set());
 
     let underLock: Set<number> | undefined;
@@ -645,7 +645,7 @@ describe("Migrator advisory lock wrapping", () => {
     );
 
     expect(await migrator.pendingMigrations()).toHaveLength(1);
-    await schemaMigration.recordVersion("1");
+    await schemaMigration.createVersion("1");
     await migrator.loadMigrated();
     expect(await migrator.pendingMigrations()).toHaveLength(0);
   });
