@@ -4,6 +4,8 @@
  * Mirrors: ActiveModel::Type::Helpers::TimeValue
  */
 import { Temporal } from "@blazetrails/date";
+import { getZone } from "@blazetrails/activesupport";
+
 import { isUtc } from "./timezone.js";
 
 export interface TimezoneAware {
@@ -14,7 +16,7 @@ export interface TimeValue {
   precision?: number;
   serializeCastValue(value: unknown): string | null;
   typeCastForSchema(value: unknown): string;
-  userInputInTimeZone(value: unknown, zone?: string): Temporal.ZonedDateTime | null;
+  userInputInTimeZone(value: unknown): Temporal.ZonedDateTime | null;
   applySecondsPrecision<T>(this: TimeValue, value: T): T;
 }
 
@@ -90,10 +92,7 @@ export function applySecondsPrecision<T>(this: { precision?: number }, value: T)
   return (roundable as Roundable<T>).round(opts);
 }
 
-export function userInputInTimeZone(
-  value: unknown,
-  zone: string = "UTC",
-): Temporal.ZonedDateTime | null {
+export function userInputInTimeZone(value: unknown): Temporal.ZonedDateTime | null {
   if (value === null || value === undefined) return null;
   if (value instanceof Temporal.ZonedDateTime) return value;
   const str = String(value).trim();
@@ -106,6 +105,8 @@ export function userInputInTimeZone(
     }
   }
   try {
+    // `value.in_time_zone` reads the thread-local Time.zone (time_value.rb:43).
+    const zone = getZone()?.tzinfo ?? "UTC";
     return Temporal.PlainDateTime.from(str.replace(" ", "T")).toZonedDateTime(zone);
   } catch {
     return null;

@@ -342,3 +342,18 @@ describe("Migration#createTable id option type", () => {
     });
   });
 });
+
+describe("Schema.verbose", () => {
+  it("reads and writes the same state as the inherited Migration.verbose", async () => {
+    const { Schema } = await import("./schema.js");
+    const was = Migration.verbose;
+    try {
+      Schema.verbose = false;
+      expect(Migration.verbose).toBe(false);
+      Migration.verbose = true;
+      expect(Schema.verbose).toBe(true);
+    } finally {
+      Migration.verbose = was;
+    }
+  });
+});

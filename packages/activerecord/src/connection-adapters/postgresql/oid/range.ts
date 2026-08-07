@@ -59,7 +59,7 @@ export interface RangeSubtype {
   deserialize(value: unknown): unknown;
   /** @internal */
   infinity?(options?: { negative?: boolean }): unknown;
-  userInputInTimeZone?(value: unknown, zone?: string): unknown;
+  userInputInTimeZone?(value: unknown): unknown;
 }
 
 /**
@@ -84,8 +84,8 @@ export class RangeType extends ValueType<Range> {
    * calls the subtype method (or raises if absent), so call directly rather
    * than optional-chaining to `undefined`.
    */
-  userInputInTimeZone(value: unknown, zone?: string): unknown {
-    return this.subtype.userInputInTimeZone!(value, zone);
+  userInputInTimeZone(value: unknown): unknown {
+    return this.subtype.userInputInTimeZone!(value);
   }
 
   override typeCastForSchema(value: unknown): string {

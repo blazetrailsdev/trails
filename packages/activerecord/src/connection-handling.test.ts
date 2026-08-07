@@ -848,6 +848,12 @@ describe("resolveConfigForConnection / connectsTo with unset configurations", ()
       await SecondaryAbstract.removeConnection();
       __resetPrimaryAbstractClass();
       if (priorConfigs) Base.configurations(priorConfigs);
+      // `connectsTo` on the primary abstract class normalizes its descriptor to
+      // "Base" — which is what this case asserts — so the pool it established
+      // DISPLACED the worker's own `Base` pool and now points at
+      // db/primary.sqlite3. `removeConnection()` can't undo that (it is the same
+      // pool the suite runs on); re-establishing the worker config can.
+      await restoreWorkerConnection();
     }
   });
 });

@@ -2058,9 +2058,9 @@ describe("errors.ofKind()", () => {
     await u.isValid();
     expect(u.errors.ofKind("name", ":blank")).toBe(true);
     expect(u.errors.ofKind("name", ":invalid")).toBe(false);
-    // Without a type arg, ofKind checks for any error on the attribute.
-    expect(u.errors.ofKind("name")).toBe(true);
-    expect(u.errors.ofKind("other")).toBe(false);
+    // Rails defaults type to :invalid, so a bare attribute check is false
+    // when the only error is :blank (errors.rb:395).
+    expect(u.errors.ofKind("name")).toBe(false);
   });
 });
 

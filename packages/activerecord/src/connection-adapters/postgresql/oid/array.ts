@@ -41,7 +41,7 @@ export interface ArraySubtype {
   deserialize?(value: unknown): unknown;
   typeCastForSchema?(value: unknown): string;
   map?(value: unknown, block?: (value: unknown) => unknown): unknown;
-  userInputInTimeZone?(value: unknown, zone?: string): unknown;
+  userInputInTimeZone?(value: unknown): unknown;
 }
 
 export class Array extends ValueType<unknown> {
@@ -73,8 +73,8 @@ export class Array extends ValueType<unknown> {
    * calls the subtype method (or raises if absent), so call directly rather
    * than optional-chaining to `undefined`.
    */
-  userInputInTimeZone(value: unknown, zone?: string): unknown {
-    return this.subtype.userInputInTimeZone!(value, zone);
+  userInputInTimeZone(value: unknown): unknown {
+    return this.subtype.userInputInTimeZone!(value);
   }
 
   /**

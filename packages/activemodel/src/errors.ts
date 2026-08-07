@@ -271,13 +271,20 @@ export class Errors<TBase extends object = object> {
    * strict-match branch and a bare String is a full message checked against
    * `messagesFor`.
    */
-  added(attribute: string, type: string = ":invalid", options?: Record<string, unknown>): boolean {
-    if (type.startsWith(":")) {
+  added(
+    attribute: string,
+    type:
+      | string
+      | ((record: TBase | null, options: Record<string, unknown>) => string) = ":invalid",
+    options?: Record<string, unknown>,
+  ): boolean {
+    const [normAttr, normType, normOpts] = this.normalizeArguments(attribute, type, options);
+    if (normType.startsWith(":")) {
       // Symbol branch: strict attribute/type/options match.
-      return this._errors.some((e) => e.strictMatch(attribute, type, options));
+      return this._errors.some((e) => e.strictMatch(normAttr, normType, normOpts));
     }
     // String branch: full-message lookup (Rails else clause in added?).
-    return this.messagesFor(attribute).includes(type);
+    return this.messagesFor(normAttr).includes(normType);
   }
 
   /**
@@ -286,16 +293,19 @@ export class Errors<TBase extends object = object> {
    * reaches us as a colon-prefixed string, so `":blank"` goes through `where`
    * and a bare String is a full message checked against `messagesFor`.
    */
-  ofKind(attribute: string, type?: string): boolean {
-    if (type === undefined) {
-      return this._errors.some((e) => e.attribute === attribute);
-    }
-    if (type.startsWith(":")) {
+  ofKind(
+    attribute: string,
+    type:
+      | string
+      | ((record: TBase | null, options: Record<string, unknown>) => string) = ":invalid",
+  ): boolean {
+    const [normAttr, normType] = this.normalizeArguments(attribute, type);
+    if (normType.startsWith(":")) {
       // Symbol branch: check for errors of this exact type.
-      return this.where(attribute, type).length > 0;
+      return this.where(normAttr, normType).length > 0;
     }
     // String branch: full-message lookup (Rails else clause).
-    return this.messagesFor(attribute).includes(type);
+    return this.messagesFor(normAttr).includes(normType);
   }
 
   get fullMessages(): string[] {

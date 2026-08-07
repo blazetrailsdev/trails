@@ -5,7 +5,7 @@ import {
   Temporal,
   type DateParts,
 } from "@blazetrails/date";
-import { isBlank } from "@blazetrails/activesupport";
+import { getZone, isBlank } from "@blazetrails/activesupport";
 import { AcceptsMultiparameterTime, isHash } from "./helpers/accepts-multiparameter-time.js";
 import { isUtc } from "./helpers/timezone.js";
 import { applySecondsPrecision, fastStringToTime, newTime } from "./helpers/time-value.js";
@@ -59,18 +59,19 @@ export class TimeType extends ValueType<Temporal.Instant> {
    *   end
    *
    * `super` is `Helpers::TimeValue#user_input_in_time_zone`, `value.in_time_zone`
-   * (time_value.rb:44-46). Ruby reads the zone off the thread-local `Time.zone`;
-   * trails has none at this depth, so it is the `zone` parameter, and
-   * `in_time_zone` is the tail below: the components `cast_value` built are read
-   * back out of the `::Time` and re-anchored in `zone`, which is what
-   * `Time.zone.parse` of the dummy-dated string answers.
+   * (time_value.rb:44-46). The zone is the thread-local `Time.zone`, read here
+   * through ActiveSupport's `getZone()` the way `isUtc()` reads
+   * `getZoneDefault()`; `in_time_zone` is the tail below: the components
+   * `cast_value` built are read back out of the `::Time` and re-anchored in
+   * that zone, which is what `Time.zone.parse` of the dummy-dated string
+   * answers.
    *
    * The `present?` guard is spelled out rather than routed through
    * `isBlank`: Ruby's `blank?` is `respond_to?(:empty?) ? !!empty? : !self`, so
    * a `::Time` is present, while `isBlank` reads any object with no own
    * enumerable keys as blank — which every Temporal value is.
    */
-  userInputInTimeZone(value: unknown, zone: string = "UTC"): Temporal.ZonedDateTime | null {
+  userInputInTimeZone(value: unknown): Temporal.ZonedDateTime | null {
     if (value == null || value === false) return null;
     if (typeof value === "string" && isBlank(value)) return null;
 
@@ -94,6 +95,7 @@ export class TimeType extends ValueType<Temporal.Instant> {
 
     const cast = this.cast(value);
     if (cast === null) return null;
+    const zone = getZone()?.tzinfo ?? "UTC";
     return cast.toZonedDateTimeISO(this.#zoneId()).toPlainDateTime().toZonedDateTime(zone);
   }
 

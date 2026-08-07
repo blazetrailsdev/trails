@@ -1749,8 +1749,15 @@ export abstract class Migration {
       await databaseTasks.purge(dbConfig);
     }
 
+    // `ActiveRecord::Schema` is named here rather than imported at module
+    // scope: schema.ts is `class Schema extends Current`, so a value import
+    // would close a cycle through this file and evaluate Schema with Current in
+    // TDZ. Ruby resolves the constant when the task runs (databases.rake:534),
+    // which is what the call-time import does.
+    const { Schema } = await import("./schema.js");
     const schemaFormat = (getEnv("SCHEMA_FORMAT") ?? databaseTasks.schemaFormat) as SchemaFormat;
     await databaseTasks.withTemporaryPoolForEach({ env: "test" }, async (pool) => {
+      Schema.verbose = false;
       await databaseTasks.loadSchema(pool.dbConfig, schemaFormat);
     });
   }
@@ -2853,27 +2860,7 @@ export class Migrator {
    */
   async ddlTransaction(migration: Migration, fn: () => Promise<void>): Promise<void> {
     if (this.isUseTransaction(migration)) {
-      // Skip wrapping if the adapter is already in a transaction
-      // (e.g. a caller wrapped the entire migrate in a transaction).
-      // Starting a nested BEGIN would error on adapters that issue
-      // raw BEGIN (vs savepoints).
-      if (this.connection.inTransaction) {
-        await fn();
-      } else {
-        await this.connection.beginTransaction();
-        try {
-          await fn();
-          await this.connection.commit();
-        } catch (e) {
-          try {
-            await this.connection.rollback();
-          } catch {
-            // Swallow rollback errors so the original migration
-            // error isn't masked.
-          }
-          throw e;
-        }
-      }
+      await this.connection.transaction(fn);
     } else {
       await fn();
     }
