@@ -6,6 +6,7 @@ import { DatabaseConfigurations } from "./database-configurations.js";
 import { DatabaseTasks } from "./tasks/database-tasks.js";
 import { fixtures } from "./test-fixtures.js";
 import { SchemaMigration } from "./schema-migration.js";
+import { InternalMetadata } from "./internal-metadata.js";
 import { anonymousMigration } from "./test-helpers/anonymous-migration.js";
 
 // Build a (minimal) DatabaseConfigurations whose `configsFor` returns the
@@ -294,6 +295,37 @@ describe("TestDatabasesTest", () => {
 
     await createAndMigrate([adapter], migrations);
     expect(log).toEqual(["up"]);
+  });
+
+  it("createAndMigrate stamps the environment from the adapter's pool", async () => {
+    // migration.rb:1512-1516 — `record_environment` writes
+    // `connection.pool.db_config.env_name`, so the stamp follows the pool the
+    // adapter is checked out of, not any TRAILS_ENV/NODE_ENV reading.
+    const adapter = Base.connection;
+    const schemaMigration = new SchemaMigration(adapter);
+    await schemaMigration.createTable();
+    await schemaMigration.deleteVersion("1");
+    const internalMetadata = new InternalMetadata(adapter);
+    await internalMetadata.createTable();
+    await internalMetadata.deleteAllEntries();
+
+    await createAndMigrate([adapter], [
+      {
+        version: 1,
+        name: "M1",
+        migration: () =>
+          anonymousMigration(
+            "M1",
+            1,
+            async () => {},
+            async () => {},
+          ),
+      },
+    ] as MigrationProxy[]);
+
+    expect(await internalMetadata.get("environment")).toBe(
+      (adapter.pool as { dbConfig: { envName: string } }).dbConfig.envName,
+    );
   });
 
   it("eachDatabase iterates all adapters", async () => {

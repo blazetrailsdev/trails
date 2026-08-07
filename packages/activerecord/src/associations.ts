@@ -1853,9 +1853,9 @@ function wrapCollectionProxy<T extends Base = Base>(
       // indexOf/…) are absent from DELEGATION_RECORD_METHOD_NAMES, so they win here.
       const preferSyncRecordDelegate =
         typeof prop === "string" && target.loaded && DELEGATION_RECORD_METHOD_NAMES.has(prop);
-      if (value !== undefined && !preferSyncRecordDelegate) return value;
-      if (prop in target && !preferSyncRecordDelegate) return value;
       if (typeof prop === "symbol") return value;
+      if (Reflect.has(target, prop) && !preferSyncRecordDelegate) return value;
+      if (value !== undefined && !preferSyncRecordDelegate) return value;
 
       // Numeric indexing — `proxy[0]`, `proxy[1]` read the loaded target
       // via the public `target` accessor. Matches array semantics; same
@@ -1945,6 +1945,16 @@ function wrapCollectionProxy<T extends Base = Base>(
       }
 
       return scopeVal;
+    },
+    // delegation.rb:150-152 — `super || model.respond_to?(method)`, over the
+    // names the `get` trap above fabricates.
+    has(target: any, prop: string | symbol) {
+      if (Reflect.has(target, prop)) return true;
+      if (typeof prop === "symbol") return false;
+      const modelClass = target.model as typeof Base & { _scopes?: Map<string, unknown> };
+      if (modelClass._scopes?.has(prop)) return true;
+      if (delegateEnumerableMethod(prop, () => target.load()) !== undefined) return true;
+      return typeof (modelClass as any)[prop] === "function";
     },
   });
 }
