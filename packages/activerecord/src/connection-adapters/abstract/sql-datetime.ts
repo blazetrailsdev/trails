@@ -23,7 +23,7 @@
  * address and calls into this file.
  */
 
-import { Temporal, strftime, type StrftimeSubject } from "@blazetrails/date";
+import { Rational, Temporal, strftime, type StrftimeSubject } from "@blazetrails/date";
 import { ActiveRecord } from "../../ar-config.js";
 
 /**
@@ -75,7 +75,8 @@ function strftimeSubject(v: {
  * value.usec)` when `usec > 0`.
  */
 function toFsDbWithUsec(subject: StrftimeSubject): string {
-  return strftime(subject, TIME_DB_FORMAT) + microsecondFraction(Math.floor(subject.nsec / 1_000));
+  const nsec = subject.nsec instanceof Rational ? subject.nsec.div(1) : subject.nsec;
+  return strftime(subject, TIME_DB_FORMAT) + microsecondFraction(Math.floor(nsec / 1_000));
 }
 
 /**

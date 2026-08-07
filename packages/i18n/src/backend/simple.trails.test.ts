@@ -45,6 +45,15 @@ describe("Backend::Simple", () => {
     expect(backend.translations()).toEqual({ en: { foo: "bar", baz: "baz" } });
   });
 
+  // simple.rb:99-100 retries a missed key with `_key = _key.to_s.to_sym`.
+  it("looks a Symbol-spelled key up in the same entry as its String form", () => {
+    const backend = new Simple();
+    backend.storeTranslations("en", { foo: { bar: "baz" } });
+
+    expect(backend.translate("en", "foo.bar")).toBe("baz");
+    expect(backend.translate(":en", ":foo.bar")).toBe("baz");
+  });
+
   it("does not vivify a locale for the property reads JSON.stringify makes", () => {
     const backend = new Simple();
     backend.storeTranslations("en", { foo: { bar: "baz" } });

@@ -13,7 +13,7 @@
  * rest of the package spells `translations` keys.
  */
 
-import { defaultSeparator, newDoubleNestedCache } from "../i18n.js";
+import { defaultSeparator, newDoubleNestedCache, toSym } from "../i18n.js";
 import type { TranslationData } from "../utils.js";
 
 export const SEPARATOR_ESCAPE_CHAR = "\u0001";
@@ -143,7 +143,7 @@ export function flattenKeys(
   for (const [initialKey, value] of Object.entries(hash)) {
     let key = initialKey;
     if (escape) key = this.escapeDefaultSeparator(key);
-    const currKey = [prevKey, key].filter((k) => k != null).join(FLATTEN_SEPARATOR);
+    const currKey = toSym([prevKey, key].filter((k) => k != null).join(FLATTEN_SEPARATOR)).slice(1);
     block!(currKey, value);
     if (isHash(value)) this.flattenKeys(value, escape, currKey, block);
   }

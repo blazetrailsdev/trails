@@ -798,7 +798,7 @@ describe("DateTime", () => {
     //   d.sec_fraction   #=> (123456789/1000000000)
     const datetime = RubyDateTime.parse("2008-03-01T06:00:00.123456789+09:00");
     expect(datetime.strftime("%N")).toBe("123456789");
-    expect(datetime.secFraction).toBe(0.123456789);
+    expect(datetime.secFraction).toEqual(new Rational(123456789, 1000000000));
     // ruby 3.3.11:
     //   DateTime.parse("2008-03-01T06:00:00.9999999999").strftime("%N")
     //     #=> "999999999"   (sf is (9999999999/10000000000); %N truncates)
@@ -902,6 +902,57 @@ describe("DateTime", () => {
     //   DateTime.new(2008, 3, 1, 6, 0, Rational(1, 2)).strftime("%20N")
     //     #=> "50000000000000000000"
     expect(new RubyDateTime(2008, 3, 1, 6, 0, 0.5).strftime("%20N")).toBe("50000000000000000000");
+  });
+
+  it("keeps a Rational second exact at any width, as ComplexDateData's sf is", () => {
+    // ruby 3.3.11:
+    //   d = DateTime.new(2008, 3, 1, 6, 0, Rational(1, 3))
+    //   d.to_s           #=> "2008-03-01T06:00:00+00:00"
+    //   d.sec            #=> 0
+    //   d.sec_fraction   #=> (1/3)
+    //   d.strftime("%L")   #=> "333"
+    //   d.strftime("%N")   #=> "333333333"
+    //   d.strftime("%12N") #=> "333333333333"
+    //   d.strftime("%30N") #=> "333333333333333333333333333333"
+    const datetime = new RubyDateTime(2008, 3, 1, 6, 0, new Rational(1, 3));
+    expect(datetime.toS()).toBe("2008-03-01T06:00:00+00:00");
+    expect(datetime.sec).toBe(0);
+    expect(datetime.secFraction).toEqual(new Rational(1, 3));
+    expect(datetime.strftime("%L")).toBe("333");
+    expect(datetime.strftime("%N")).toBe("333333333");
+    expect(datetime.strftime("%12N")).toBe("333333333333");
+    expect(datetime.strftime("%30N")).toBe("333333333333333333333333333333");
+  });
+
+  it("splits a Rational second over one, as d_lite_plus's T_RATIONAL arm does", () => {
+    // ruby 3.3.11:
+    //   DateTime.new(2008, 3, 1, 6, 0, Rational(3, 2)).to_s #=> "2008-03-01T06:00:01+00:00"
+    //   DateTime.new(2008, 3, 1, 6, 0, Rational(3, 2)).sec_fraction #=> (1/2)
+    expect(new RubyDateTime(2008, 3, 1, 6, 0, new Rational(3, 2)).toS()).toBe(
+      "2008-03-01T06:00:01+00:00",
+    );
+    expect(new RubyDateTime(2008, 3, 1, 6, 0, new Rational(3, 2)).secFraction).toEqual(
+      new Rational(1, 2),
+    );
+    // ruby 3.3.11: DateTime.new(2008, 3, 1, 6, 0, Rational(2)).sec_fraction #=> (0/1)
+    expect(new RubyDateTime(2008, 3, 1, 6, 0, new Rational(2, 1)).sec).toBe(2);
+  });
+
+  it("folds 24:00 with a Rational second through canon24oc, as fr2 + 1 day does", () => {
+    // ruby 3.3.11:
+    //   DateTime.new(2008, 3, 1, 24, 0, Rational(1, 3)).to_s #=> "2008-03-02T00:00:00+00:00"
+    //   DateTime.new(2008, 3, 1, 24, 0, Rational(1, 3)).sec_fraction #=> (1/3)
+    const datetime = new RubyDateTime(2008, 3, 1, 24, 0, new Rational(1, 3));
+    expect(datetime.toS()).toBe("2008-03-02T00:00:00+00:00");
+    expect(datetime.secFraction).toEqual(new Rational(1, 3));
+  });
+
+  it("raises invalid fraction for a Rational minute behind a second, as num2int_with_frac does", () => {
+    // ruby 3.3.11:
+    //   DateTime.new(2008, 3, 1, 6, Rational(1, 3), 0) #=> Date::Error: invalid fraction
+    expect(() => new RubyDateTime(2008, 3, 1, 6, new Rational(1, 3), 0)).toThrow(
+      "invalid fraction",
+    );
   });
 
   it("answers zeros at every width for a ::Date, which has no time of day", () => {

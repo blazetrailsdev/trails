@@ -1745,7 +1745,14 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   await define("fk_object_to_point_tos", {}, (t) => {});
 
   await define("fk_pointing_to_non_existent_objects", {}, (t) => {
-    t.integer("fk_object_to_point_to_id", { null: false });
+    // Rails declares this via `t.references :fk_object_to_point_to` (schema.rb:1403),
+    // which defaults to bigint — and `fk_that_will_be_broken` below points it at a
+    // default bigint `id`, so an integer column is a MismatchedForeignKey on MySQL.
+    t.bigInteger("fk_object_to_point_to_id", { null: false });
+    t.foreignKey("fk_object_to_point_tos", {
+      column: "fk_object_to_point_to_id",
+      name: "fk_that_will_be_broken",
+    });
   });
 
   await define("overloaded_types", {}, (t) => {

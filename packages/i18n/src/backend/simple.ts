@@ -29,6 +29,7 @@ import {
   config,
   localeAvailable,
   normalizeKeys,
+  toSym,
   type Locale,
   type TranslationKey,
 } from "../i18n.js";
@@ -88,7 +89,7 @@ export class Simple {
     ) {
       return data;
     }
-    locale = isSymbol(locale) ? locale.slice(1) : String(locale);
+    locale = toSym(locale).slice(1);
     const translations = this.translations();
     translations[locale] ??= {};
     const payload = options.skipSymbolizeKeys ? data : deepSymbolizeKeys(data);
@@ -162,10 +163,11 @@ export class Simple {
     let result: unknown = this.translations();
     for (const rawKey of keys) {
       if (!isHash(result)) return null;
-      // Ruby retries the lookup with `_key.to_s.to_sym`; JS object keys are
-      // already strings, so the string form is the only form.
-      const segment = String(rawKey);
-      if (!(segment in result)) return null;
+      let segment = String(rawKey);
+      if (!(segment in result)) {
+        segment = toSym(segment).slice(1);
+        if (!(segment in result)) return null;
+      }
       result = result[segment];
       if (isSymbol(result)) {
         result = this.resolveEntry(

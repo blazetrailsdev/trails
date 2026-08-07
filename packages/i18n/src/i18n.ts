@@ -382,6 +382,26 @@ function normalizeKey(key: unknown, separator: string): TranslationKey[] {
   return normalized;
 }
 
+/**
+ * Ruby `String#to_sym` / `Symbol#to_sym`, which the gem calls wherever a locale
+ * or a key has to reach a Symbol-keyed hash in its canonical spelling —
+ * `store_translations` (simple.rb:42), `lookup`'s retry (simple.rb:99),
+ * `flatten_keys` (flatten.rb:62), and the reserved-key raises in `translate`
+ * (base.rb:66) and `interpolate` (interpolate/ruby.rb:24, :39).
+ *
+ * A Ruby Symbol is a JS string that keeps its leading colon (`":en"`), so this
+ * answers that spelling; a caller that wants the Symbol's *name* — which is
+ * what trails' translation hashes are keyed by — takes `.slice(1)` off it, as
+ * the colon convention prescribes.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core, not `I18n`: `to_sym` is a method on String and
+ * Symbol, and TypeScript cannot reopen either, so the gem's five `to_sym` call
+ * sites share one function here rather than N inline conditionals.
+ */
+export function toSym(value: unknown): string {
+  return typeof value === "string" && value.startsWith(":") ? value : `:${String(value)}`;
+}
+
 export function normalizeKeys(
   locale: Locale | null | undefined,
   key: unknown,

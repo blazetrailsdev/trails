@@ -88,7 +88,7 @@ export interface StrftimeSubject {
   hour: number;
   min: number;
   sec: number;
-  nsec: number;
+  nsec: number | Rational;
   zone: string;
   utcOffset: number;
 }
@@ -135,13 +135,6 @@ function formatOffset(utcOffset: number, colons: number): string {
 }
 
 /**
- * @internal The largest power of ten a sub-second nanosecond count — under
- * `1e9` — can be scaled by and still land inside `Number.MAX_SAFE_INTEGER`:
- * `1e9 * 1e6` is `1e15`, and `1e7` would overflow it. See {@link subsecDigits}.
- */
-const MAX_EXACT_SUBSEC_SCALE = 6;
-
-/**
  * @internal `date_strftime.c`'s shared `%L`/`%N` arm
  * (`date_strftime.c:275-315`): the directive's own width prefix, defaulting to
  * `3` for `%L` and `9` for `%N`, scales `tmx_sec_fraction` by `10**precision`
@@ -149,39 +142,27 @@ const MAX_EXACT_SUBSEC_SCALE = 6;
  * fraction, truncated rather than rounded, zero-padded on the left when the
  * fraction is small and on the right when the width outruns it.
  *
- * The subject carries the fraction as nanoseconds where MRI carries a Rational,
- * so the first nine digits come off the whole nanoseconds as digits — the
- * scale-and-floor the C does would drop `299999999` to `299999998` through a
- * double — and only a width past nine reaches for the sub-nanosecond tail
- * `DateTime.parse("...00.9999999999")` keeps.
+ * The subject's `nsec` is the same `sf` the C holds — a `Rational` wherever the
+ * value carries a sub-nanosecond tail — so the arm is exact at any width, as
+ * `mul`/`div` (`date_strftime.c:288-303`) are.
  *
- * That tail runs out at fifteen digits: `sf` is under `1e9` nanoseconds, so
- * scaling it by more than {@link MAX_EXACT_SUBSEC_SCALE} leaves
- * `Number.MAX_SAFE_INTEGER` behind and the digits stop being the ones the value
- * holds. Past that the port pads zeros, which is NOT the C's general behaviour:
- * `mul`/`div` (`date_strftime.c:288-303`) are exact Rational arithmetic under no
- * ceiling at all, so `DateTime.new(2008, 3, 1, 6, 0, Rational(1, 3))` keeps
- * emitting `3`s at any width MRI is given.
- *
- * That divergence is unreachable here, and it is `sf`'s own JS-number analogue
- * (see {@link nsToSec}) rather than this cliff that makes it so: nothing can put
- * a non-terminating fraction in `sf`. The constructor takes `second` as a
- * `number` — there is no Rational-accepting overload — and rounds it to a whole
- * nanosecond through `d_lite_plus`, so the only producer of a sub-nanosecond
- * `sf` at all is `dtNewByFrags` over a decimal literal in a parsed string, whose
- * expansion terminates. For those values MRI pads zeros too:
- * `DateTime.parse("...00.9999999999").strftime("%20N")` is
- * `"99999999990000000000"` on ruby 3.3.11.
+ * The C's two operations are `f = mul(f, INT2FIX(10**precision))` then
+ * `div(f, INT2FIX(1))`, and they cannot be written that way here: `10**30` is
+ * not a JS integer and the product leaves `Number.MAX_SAFE_INTEGER` long before
+ * the widths MRI accepts. Long division over the fraction's own numerator and
+ * denominator emits the same digits under numbers that stay exact — the C's
+ * scale-and-floor through a double would also drop `299999999` to `299999998`.
  */
-function subsecDigits(nsec: number, precision: number): string {
-  if (precision <= 9) {
-    return String(Math.floor(nsec)).padStart(9, "0").slice(0, precision);
+function subsecDigits(nsec: number | Rational, precision: number): string {
+  const den = (nsec instanceof Rational ? nsec.denominator : 1) * SECOND_IN_NANOSECONDS;
+  let n = (nsec instanceof Rational ? nsec.numerator : nsec) % den;
+  let digits = "";
+  for (let i = 0; i < precision; i++) {
+    n *= 10;
+    digits += Math.floor(n / den);
+    n %= den;
   }
-  const extra = precision - 9;
-  if (extra > MAX_EXACT_SUBSEC_SCALE) {
-    return subsecDigits(nsec, 9 + MAX_EXACT_SUBSEC_SCALE).padEnd(precision, "0");
-  }
-  return String(Math.floor(nsec * 10 ** extra)).padStart(precision, "0");
+  return digits;
 }
 
 /**
@@ -582,19 +563,39 @@ export class Rational {
     return new Rational(this.numerator + other * this.denominator, this.denominator);
   }
 
-  /** `rational.c` `nurat_mul` (`Rational#*`), for the Integer multiplier this port needs. */
+  /** `rational.c` `nurat_mul` (`Rational#*`), for the Integer multiplier this
+   * port needs. `f_muldiv` cancels the multiplier against the denominator
+   * BEFORE it multiplies (`rational.c` `f_muldiv`), which is not a mere
+   * optimisation here: `(9999999999/10000000000) * 1000000000` overflows
+   * `Number.MAX_SAFE_INTEGER` if the product is formed first. */
   mul(other: number): Rational {
-    return new Rational(this.numerator * other, this.denominator);
+    const g = iGcd(other, this.denominator);
+    return new Rational(this.numerator * (other / g), this.denominator / g);
   }
 
-  /** `rational.c` `nurat_div` (`Rational#div`), the floored quotient, for the
-   * Integer divisor this port needs. */
+  /** `rational.c` `nurat_div` (`Rational#/`), for the Integer divisor this port
+   * needs, cancelled the same way {@link mul} is. */
+  quo(other: number): Rational {
+    const g = iGcd(this.numerator, other);
+    return new Rational(this.numerator / g, this.denominator * (other / g));
+  }
+
+  /** `numeric.c` `num_zero_p` (`Rational#zero?`, inherited from Numeric), what
+   * `date_core.c`'s `f_zero_p` dispatches to for a Rational. */
+  isZero(): boolean {
+    return this.numerator === 0;
+  }
+
+  /** `numeric.c` `num_div` (`Rational#div`, inherited from Numeric), the
+   * floored quotient — the method `date_core.c`'s `f_idiv` macro sends
+   * (`date_core.c:43`) — for the Integer divisor this port needs. */
   div(other: number): number {
     return Math.floor(this.numerator / (this.denominator * other));
   }
 
-  /** `rational.c` `nurat_mod` (`Rational#%`), `self - other * (self.div other)`,
-   * for the Integer divisor this port needs. */
+  /** `numeric.c` `num_modulo` (`Rational#%`, inherited from Numeric), which is
+   * `self - other * (self.div other)` there too — what `date_core.c`'s `f_mod`
+   * dispatches to for a Rational — for the Integer divisor this port needs. */
   mod(other: number): Rational {
     return this.add(-other * this.div(other));
   }
@@ -971,7 +972,7 @@ function parseTime2Cb(m: RegExpExecArray, hash: DateParts): number {
   hash.hour = h;
   if (min !== null) hash.min = min;
   if (s !== null) hash.sec = s;
-  if (f !== undefined) hash.secFraction = Number(f) / 10 ** f.length;
+  if (f !== undefined) hash.secFraction = new Rational(Number(f), 10 ** f.length);
 
   return 1;
 }
@@ -1606,7 +1607,7 @@ function parseDddCb(m: RegExpExecArray, hash: DateParts): number {
   if (s4 !== undefined) {
     const l4 = s4.length;
 
-    hash.secFraction = Number(s4) / 10 ** l4;
+    hash.secFraction = new Rational(Number(s4), 10 ** l4);
   }
   if (s5 !== undefined) {
     const cs5 = s5;
@@ -2020,7 +2021,7 @@ function dateStrptimeInternal(str: string, fmt: string, hash: DateParts): number
             : readDigitsMax();
           if (n === null) return fail();
           if (sign === -1) n = -n;
-          hash.secFraction = n / 10 ** (si - osi);
+          hash.secFraction = new Rational(n, 10 ** (si - osi));
           break again;
         }
 
@@ -2429,17 +2430,18 @@ const SECOND_IN_NANOSECONDS = 1_000_000_000;
  * whenever its argument is — so the result here can carry a fraction of a
  * nanosecond, as `DateTime.parse("...00.9999999999").sec_fraction` does.
  */
-function secToNs(s: number): number {
-  return s * SECOND_IN_NANOSECONDS;
+function secToNs(s: number | Rational): number | Rational {
+  return s instanceof Rational ? s.mul(SECOND_IN_NANOSECONDS) : s * SECOND_IN_NANOSECONDS;
 }
 
 /**
- * @internal `date_core.c` `ns_to_sec` (`date_core.c:993-998`), the inverse.
- * MRI answers a Rational; a JS number is the nearest analogue, as
- * `Time#subsec` already documents.
+ * @internal `date_core.c` `ns_to_sec` (`date_core.c:993-998`), the inverse. MRI
+ * answers a Rational whatever it is handed; a whole-nanosecond count divides
+ * out to a JS number here, which is the nearest analogue `Time#subsec` already
+ * documents, and a Rational `sf` stays exact.
  */
-function nsToSec(n: number): number {
-  return n / SECOND_IN_NANOSECONDS;
+function nsToSec(n: number | Rational): number | Rational {
+  return n instanceof Rational ? n.quo(SECOND_IN_NANOSECONDS) : n / SECOND_IN_NANOSECONDS;
 }
 
 /** @internal 1970-01-01, the day {@link UNIX_EPOCH_IN_CJD} numbers. */
@@ -2600,13 +2602,32 @@ function cValidTimeP(
  * `add_frac` hands the day fraction to `d_lite_plus`, whose `T_FLOAT` arm
  * multiplies it straight back by `DAY_IN_SECONDS` (`date_core.c:6094-6097`), so
  * the two cancel and `unitInSeconds` is that product — `1` for a second,
- * `3600` for an hour.
+ * `3600` for an hour. The T_RATIONAL arm a Rational argument takes does the
+ * same `t = f_mul(t, INT2FIX(DAY_IN_SECONDS))` (`date_core.c:6197`), so the
+ * cancellation — and this seconds scale — holds for both arms. Every consumer
+ * of `fr2` stays in it: the constructor's `df += fr2.div(1)`, and `canon24oc`
+ * adding `DAY_IN_SECONDS` where the C adds a day-unit `1`.
+ *
+ * `s_trunc`'s `wholenum_p` arm is what a `Rational` argument takes when it
+ * reduces to an Integer, which our {@link Rational} does in its constructor —
+ * so `new Rational(2, 1)` arrives here with a `1` denominator and comes back
+ * with a `0` fraction, exactly as `DateTime.new(2008, 3, 1, 6, 0, Rational(2))`
+ * does.
  */
 function num2intWithFrac(
-  v: number,
+  v: number | Rational,
   unitInSeconds: number,
   argcGtN: boolean,
-): [whole: number, fr: number] {
+): [whole: number, fr: number | Rational] {
+  if (v instanceof Rational) {
+    const whole = v.div(1);
+    const fr = v.mod(1);
+    if (!fr.isZero()) {
+      if (argcGtN) throw new DateError("invalid fraction");
+      return [whole, fr.mul(unitInSeconds)];
+    }
+    return [whole, 0];
+  }
   const whole = Math.floor(v);
   const fr = v - whole;
   if (fr !== 0) {
@@ -2939,7 +2960,7 @@ export function dtNewByFrags(hash: DateParts): DateTime {
   const df = timeToDf(rh, rmin, rs);
 
   let t: number | Rational | null | undefined = hash.secFraction;
-  const sf = t == null ? 0 : secToNs(t instanceof Rational ? t.numerator / t.denominator : t);
+  const sf = t == null ? 0 : secToNs(t);
 
   t = hash.offset;
   let of = t == null ? 0 : t instanceof Rational ? t.numerator / t.denominator : t;
@@ -3359,8 +3380,12 @@ export class DateTime extends Date {
    * (`date_core.c:215-231`). `jd_local_to_utc` / `df_local_to_utc` do not touch
    * it, so unlike {@link #date} and {@link #df} it is the same value read
    * locally or in UTC.
+   *
+   * The C's is a Rational, exact at any denominator; a whole-nanosecond count
+   * is a JS number here and only a value that carries a sub-nanosecond tail —
+   * a `Rational` `second`, or a parsed decimal literal — keeps the Rational.
    */
-  readonly #sf: number;
+  readonly #sf: number | Rational;
   readonly #of: number;
 
   /**
@@ -3425,14 +3450,23 @@ export class DateTime extends Date {
    * `o *= SECOND_IN_NANOSECONDS` (`date_core.c:6094-6097`). That round is why
    * `DateTime.new(2008, 3, 1, 6, 0, 0.3).strftime("%N")` is `"300000000"`
    * where `Time#nsec`, which truncates the double, answers `299999999`.
+   *
+   * A `Rational` `day`, `hour`, `minute` or `second` — each of which
+   * `datetime_initialize` admits through `check_numeric` and
+   * `num2int_with_frac` (`date_core.c:7825-7841`), while `month` and `year` are
+   * `NUM2INT` — takes `d_lite_plus`'s T_RATIONAL arm instead
+   * (`date_core.c:6174-6201`), whose `sf = f_mul(t, INT2FIX(SECOND_IN_NANOSECONDS))`
+   * has no round in it: the fraction stays exact at any denominator, which is
+   * what keeps `DateTime.new(2008, 3, 1, 6, 0, Rational(1, 3)).strftime("%30N")`
+   * emitting `3`s.
    */
   constructor(
     year: number,
     month: number,
-    day: number,
-    hour?: number,
-    minute?: number,
-    second?: number,
+    day: number | Rational,
+    hour?: number | Rational,
+    minute?: number | Rational,
+    second?: number | Rational,
     offset?: number | Rational | string,
   );
   /**
@@ -3445,18 +3479,20 @@ export class DateTime extends Date {
    * `sf` and `of`, in that order. Same TS shortcoming as {@link Date}'s
    * counterpart overload.
    */
-  constructor(rjd: Temporal.PlainDate, df: number, sf: number, of: number);
+  constructor(rjd: Temporal.PlainDate, df: number, sf: number | Rational, of: number);
   constructor(
     year: number | Temporal.PlainDate,
     month?: number,
-    day?: number,
-    hour?: number,
-    minute?: number,
-    second?: number,
+    day?: number | Rational,
+    hour?: number | Rational,
+    minute?: number | Rational,
+    second?: number | Rational,
     offset?: number | Rational | string,
   ) {
     if (year instanceof Temporal.PlainDate) {
-      const [df, sf, of] = [month ?? 0, day ?? 0, hour ?? 0];
+      const df = month ?? 0;
+      const sf = day ?? 0;
+      const of = (hour ?? 0) as number;
       super(jdUtcToLocal(year, df, of));
       this.#date = year;
       this.#df = df;
@@ -3476,7 +3512,7 @@ export class DateTime extends Date {
       DAY_IN_SECONDS,
       hour !== undefined || minute !== undefined || second !== undefined,
     );
-    let fr2 = 0;
+    let fr2: number | Rational = 0;
     if (sFr !== 0) fr2 = sFr;
     if (minFr !== 0) fr2 = minFr;
     if (hFr !== 0) fr2 = hFr;
@@ -3491,19 +3527,22 @@ export class DateTime extends Date {
     const [, rmin, rs] = rt;
     if (rh === 24) {
       rh = 0;
-      fr2 += DAY_IN_SECONDS;
+      fr2 = fr2 instanceof Rational ? fr2.add(DAY_IN_SECONDS) : fr2 + DAY_IN_SECONDS;
     }
     const localDf = timeToDf(rh, rmin, rs);
     let date = jdLocalToUtc(rjd, localDf, rof);
     let df = dfLocalToUtc(localDf, rof);
-    df += Math.floor(fr2);
+    df += fr2 instanceof Rational ? fr2.div(1) : Math.floor(fr2);
     if (df >= DAY_IN_SECONDS) {
       date = date.add({ days: 1 });
       df -= DAY_IN_SECONDS;
     }
     this.#date = date;
     this.#df = df;
-    this.#sf = Math.round(secToNs(fr2 - Math.floor(fr2)));
+    this.#sf =
+      fr2 instanceof Rational
+        ? (secToNs(fr2.mod(1)) as Rational)
+        : Math.round(secToNs(fr2 - Math.floor(fr2)) as number);
     this.#of = rof;
   }
 
@@ -3584,11 +3623,13 @@ export class DateTime extends Date {
    * Ruby `DateTime#sec_fraction` (ruby/date, `date_core.c`
    * `d_lite_sec_fraction` over `m_sf_in_sec`, `date_core.c:1568-1572`): the
    * fractional part of the second, in `0...1`. MRI answers a Rational —
-   * `DateTime.new(2001, 2, 3, 4, 5, 6.5).sec_fraction` is `(1/2)` — and a JS
-   * number is the nearest analogue, as `Time#subsec` already documents. The
-   * whole second stays on {@link sec}, exactly as `::Time` splits them.
+   * `DateTime.new(2001, 2, 3, 4, 5, 6.5).sec_fraction` is `(1/2)`. A
+   * whole-nanosecond `sf` divides out to a JS number here, as `Time#subsec`
+   * already documents; a `Rational` `second` keeps the exact Rational MRI
+   * answers. The whole second stays on {@link sec}, exactly as `::Time` splits
+   * them.
    */
-  get secFraction(): number {
+  get secFraction(): number | Rational {
     return nsToSec(this.#sf);
   }
 
