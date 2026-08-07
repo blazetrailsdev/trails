@@ -1409,9 +1409,10 @@ function buildCountSubquery(
     return m;
   };
 
+  const isAll = columnName == null || columnName === "*" || columnName === "all";
   let columnAlias: Nodes.Node;
   let innerManager: SelectManager;
-  if (columnName == null || columnName === "*" || columnName === "all") {
+  if (isAll) {
     columnAlias = new Nodes.SqlLiteral("*");
     if (!distinct) {
       innerManager = project(new Nodes.SqlLiteral("1 AS one"));
@@ -1439,6 +1440,8 @@ function buildCountSubquery(
   relation._applyWheresToManager(innerManager, table);
   applyFromToManager(relation, innerManager);
   applyHavingToManager(relation, innerManager);
+  // calculations.rb:681-684: only the `:all` branch unscopes the order.
+  if (!isAll) relation._applyOrderToManager(innerManager);
   if (relation._limitValue !== null) innerManager.take(relation._limitValue);
   if (relation._offsetValue !== null) innerManager.skip(relation._offsetValue);
   const [innerSql, innerBinds] = compileManagerWithBinds(relation, innerManager);
