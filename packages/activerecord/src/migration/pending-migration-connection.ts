@@ -1,11 +1,6 @@
 /**
- * Pending migration connection — provides adapter access for checking
- * pending migrations without requiring a full Migrator.
- *
- * Mirrors: ActiveRecord::PendingMigrationConnection
- *
- * Rails' class is three class methods and no instance state
- * (`pending_migration_connection.rb:4-14`).
+ * Mirrors: ActiveRecord::PendingMigrationConnection — three class methods and
+ * no instance state (`pending_migration_connection.rb:4-14`).
  */
 
 import type { ConnectionHandler } from "../connection-adapters/abstract/connection-handler.js";

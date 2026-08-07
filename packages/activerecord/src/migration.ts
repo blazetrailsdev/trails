@@ -185,17 +185,26 @@ export class PendingMigrationError extends MigrationError {
    * which reads `connection_pool.migration_context.open.pending_migrations` —
    * asynchronous in trails, and a JS constructor cannot await. Raise sites
    * resolve the list first, as `check_pending_migrations` and
-   * `check_all_pending!` already do (`migration.rb:722,743`).
+   * `check_all_pending!` already do (`migration.rb:722,743`); reaching the arm
+   * anyway raises rather than inventing a message Rails never produces.
    */
   constructor(
     message?: string,
     { pendingMigrations }: { pendingMigrations?: MigrationProxy[] } = {},
   ) {
-    // `detailedMigrationMessage` reads no instance state, and `super` has to run
-    // before `this` exists.
-    super(
-      message ?? PendingMigrationError.prototype.detailedMigrationMessage(pendingMigrations ?? []),
-    );
+    if (message == null) {
+      if (pendingMigrations == null) {
+        throw new ArgumentError(
+          "PendingMigrationError needs a message or `pendingMigrations:`; Rails reads the list " +
+            "itself (migration.rb:161), which is asynchronous here and cannot run in a constructor.",
+        );
+      }
+      // `detailedMigrationMessage` reads no instance state, and `super` has to
+      // run before `this` exists.
+      super(PendingMigrationError.prototype.detailedMigrationMessage(pendingMigrations));
+    } else {
+      super(message);
+    }
     this.name = "PendingMigrationError";
   }
 
