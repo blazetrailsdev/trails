@@ -3447,8 +3447,10 @@ export class DateTime extends Date {
    * `DateTime.new(2008, 3, 1, 6, 0, 0.3).strftime("%N")` is `"300000000"`
    * where `Time#nsec`, which truncates the double, answers `299999999`.
    *
-   * A `Rational` `second` — which `datetime_initialize`'s `check_numeric`
-   * admits (`date_core.c:7832`) — takes `d_lite_plus`'s T_RATIONAL arm instead
+   * A `Rational` `day`, `hour`, `minute` or `second` — each of which
+   * `datetime_initialize` admits through `check_numeric` and
+   * `num2int_with_frac` (`date_core.c:7825-7841`), while `month` and `year` are
+   * `NUM2INT` — takes `d_lite_plus`'s T_RATIONAL arm instead
    * (`date_core.c:6174-6201`), whose `sf = f_mul(t, INT2FIX(SECOND_IN_NANOSECONDS))`
    * has no round in it: the fraction stays exact at any denominator, which is
    * what keeps `DateTime.new(2008, 3, 1, 6, 0, Rational(1, 3)).strftime("%30N")`
@@ -3457,9 +3459,9 @@ export class DateTime extends Date {
   constructor(
     year: number,
     month: number,
-    day: number,
-    hour?: number,
-    minute?: number,
+    day: number | Rational,
+    hour?: number | Rational,
+    minute?: number | Rational,
     second?: number | Rational,
     offset?: number | Rational | string,
   );
@@ -3478,15 +3480,15 @@ export class DateTime extends Date {
     year: number | Temporal.PlainDate,
     month?: number,
     day?: number | Rational,
-    hour?: number,
-    minute?: number,
+    hour?: number | Rational,
+    minute?: number | Rational,
     second?: number | Rational,
     offset?: number | Rational | string,
   ) {
     if (year instanceof Temporal.PlainDate) {
       const df = month ?? 0;
       const sf = day ?? 0;
-      const of = hour ?? 0;
+      const of = (hour ?? 0) as number;
       super(jdUtcToLocal(year, df, of));
       this.#date = year;
       this.#df = df;

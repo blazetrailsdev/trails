@@ -950,7 +950,7 @@ describe("DateTime", () => {
   it("raises invalid fraction for a Rational minute behind a second, as num2int_with_frac does", () => {
     // ruby 3.3.11:
     //   DateTime.new(2008, 3, 1, 6, Rational(1, 3), 0) #=> Date::Error: invalid fraction
-    expect(() => new RubyDateTime(2008, 3, 1, 6, new Rational(1, 3) as never, 0)).toThrow(
+    expect(() => new RubyDateTime(2008, 3, 1, 6, new Rational(1, 3), 0)).toThrow(
       "invalid fraction",
     );
   });

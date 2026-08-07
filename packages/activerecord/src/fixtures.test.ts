@@ -14,6 +14,7 @@ import { Base } from "./base.js";
 import { ActiveRecord } from "./ar-config.js";
 import { defineJoinTableFixtures } from "./fixtures.js";
 import { fkObjectToPointToFixtureData } from "./test-helpers/fixtures/fk-object-to-point-to.js";
+import { currentAdapter } from "./support/adapter-helper.js";
 import "./relation.js";
 
 function makeAdapter(): DatabaseAdapter {
@@ -618,13 +619,17 @@ describe("FixturesWithForeignKeyViolationsTest", () => {
 
   it("test_raises_fk_violations", async () => {
     await withVerifyForeignKeysForFixtures(async () => {
-      await expect(
+      const load = (): Promise<unknown> =>
         defineJoinTableFixtures(Base.connection, "fk_pointing_to_non_existent_objects", {
           first: { fk_object_to_point_to_id: 4242 },
-        }),
-      ).rejects.toThrow(
-        "Foreign key violations found in your fixture data. Ensure you aren't referring to labels that don't exist on associations.",
-      );
+        });
+      if (currentAdapter("SQLite3Adapter", "PostgreSQLAdapter")) {
+        await expect(load()).rejects.toThrow(
+          "Foreign key violations found in your fixture data. Ensure you aren't referring to labels that don't exist on associations.",
+        );
+      } else {
+        await expect(load()).resolves.toBeDefined();
+      }
     });
   });
 
