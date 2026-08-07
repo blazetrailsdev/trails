@@ -58,9 +58,11 @@ describeIfSqlite("SQLite3 bigint round-trip", () => {
       42,
     ]);
     const rows = await adapter.execute(`SELECT "score", "count" FROM "big_items"`);
-    // safeIntegers is enabled on this statement (BIGINT column present),
-    // so INTEGER column also comes back as bigint from the driver.
-    // IntegerType.cast converts it back to number — this is the type-layer contract.
+    // safeIntegers is enabled on this statement (BIGINT column present), so the
+    // driver hands the INTEGER column back as a bigint too; the adapter narrows
+    // that spill at the row boundary (_narrowSpilledBigInts), and
+    // IntegerType.cast accepts either spelling — the type-layer contract holds
+    // whichever side normalizes.
     expect(intType.cast(rows[0].count)).toBe(42);
   });
 

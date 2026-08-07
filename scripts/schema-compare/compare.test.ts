@@ -805,6 +805,7 @@ describe("against the canonical registry", () => {
       throw new Error("expected the wrapper form for tables carrying indexes/FKs/a primary key");
     }
     expect(books.indexes?.map(describeIndex)).toEqual([
+      "(author_id)",
       "(author_id,name) unique=true",
       '(isbn) unique=true where="published_on IS NOT NULL"',
       "((lower(external_id))) unique=true",

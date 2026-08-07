@@ -49,6 +49,13 @@ export class HasOneAssociation extends SingularAssociation {
    * reach the association through a structural handle rather than the class
    * type. The Rails-named surface is `writer` / `set#{Name}`.
    *
+   * RFC 0087 §1 listed this for deletion with the `#{name}=` property setter it
+   * backed. The setter is gone; this survives deliberately, because Rails'
+   * `assign_attributes` returns nil and assigns inline
+   * (`activemodel/lib/active_model/attribute_assignment.rb:32-35`) — trails
+   * matches that, so mass assignment can never await and this stays its route
+   * into the has_one writer.
+   *
    * @internal
    */
   protected syncWrite(record: Base | null): void {
