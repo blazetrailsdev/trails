@@ -78,7 +78,6 @@ async function eagerWarmSchemaCache(adapter: TransactionalFixturesAdapter): Prom
 const DDL_TABLE_ARGS: Record<string, (args: unknown[]) => unknown[]> = {
   createTable: (args) => [args[0]],
   dropTable: (args) => args,
-  dropJoinTable: (args) => args,
   changeTable: (args) => [args[0]],
   addColumn: (args) => [args[0]],
   removeColumn: (args) => [args[0]],
