@@ -24,7 +24,7 @@ export class JSONGemEncoder {
    *
    * Rails escapes more than the JSON gem natively does: U+2028 and U+2029, and
    * optionally `>`, `<`, `&`, to work around certain browser problems
-   * (encoding.rb:57-69).
+   * (encoding.rb:60-70).
    *
    * Deviation: Ruby's `@options.fetch(:escape_html_entities, ...)`
    * (encoding.rb:63) returns the *stored* value whenever the key is present —
@@ -65,7 +65,7 @@ export class JSONGemEncoder {
    * Note: the `options` hash passed to `toJson` is only passed to `asJson`, not
    * any of this method's recursive `asJson` calls.
    *
-   * Rails' private `JSONGemEncoder#jsonify` (encoding.rb:85-102). JS has a
+   * Rails' private `JSONGemEncoder#jsonify` (encoding.rb:88-104). JS has a
    * single numeric type, so Ruby's `Integer`-in-the-first-arm / `Float`-in-the
    * -`Numeric`-arm split collapses onto `Float#as_json`, whose finite values
    * are returned unchanged; a `bigint` takes the `Integer` arm.
@@ -99,7 +99,7 @@ export class JSONGemEncoder {
    * Encode a "jsonified" data structure. Rails' private
    * `JSONGemEncoder#stringify` calls
    * `JSON.generate(jsonified, quirks_mode: true, max_nesting: false)`
-   * (encoding.rb:105-107); `quirks_mode` — emitting a bare scalar at the root
+   * (encoding.rb:108-111); `quirks_mode` — emitting a bare scalar at the root
    * rather than raising — is `JSON.stringify`'s only behaviour, and it has no
    * nesting limit to lift. `JSON.stringify` returns `undefined` for `undefined`,
    * which has no Ruby analogue, so it becomes `null` as Ruby's `nil` would.
@@ -122,7 +122,7 @@ let _timePrecision = 3;
 
 /**
  * Rails' `ActiveSupport::JSON::Encoding` singleton accessors
- * (encoding.rb:113-130). A class with `static` accessors rather than an object
+ * (encoding.rb:114-130). A class with `static` accessors rather than an object
  * literal so `class << self; attr_accessor ...` maps member-for-member.
  */
 export class Encoding {

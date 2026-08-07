@@ -4,7 +4,7 @@ import { Encoding, type EncodeOptions } from "../../json/encoding.js";
 
 /**
  * Rails' `core_ext/object/json.rb` — the `as_json` layer
- * `JSONGemEncoder#jsonify` dispatches through (json/encoding.rb:100).
+ * `JSONGemEncoder#jsonify` dispatches through (json/encoding.rb:103).
  *
  * Ruby reopens every core class and defines `as_json` on it; method lookup then
  * picks the right one. TypeScript cannot reopen built-ins, so each Ruby class'
@@ -14,7 +14,7 @@ import { Encoding, type EncodeOptions } from "../../json/encoding.js";
  */
 
 /**
- * `Object#as_json` (json.rb:58-64).
+ * `Object#as_json` (json.rb:58-66).
  *
  * `instance_values` (core_ext/object/instance_variables.rb:14-18) is unported;
  * a spread of the object's own enumerable properties is its analogue.
@@ -28,28 +28,28 @@ export class Object {
   }
 }
 
-/** `TrueClass#as_json` / `FalseClass#as_json` (json.rb:78-88). */
+/** `TrueClass#as_json` / `FalseClass#as_json` (json.rb:80-90). */
 export class TrueClass {
   static asJson(value: boolean): boolean {
     return value;
   }
 }
 
-/** `NilClass#as_json` (json.rb:90-94). */
+/** `NilClass#as_json` (json.rb:92-96). */
 export class NilClass {
   static asJson(value: null | undefined): null | undefined {
     return value;
   }
 }
 
-/** `String#as_json` (json.rb:96-100). */
+/** `String#as_json` (json.rb:98-102). */
 export class String {
   static asJson(value: string): string {
     return value;
   }
 }
 
-/** `Numeric#as_json` (json.rb:108-112). */
+/** `Numeric#as_json` (json.rb:110-114). */
 export class Numeric {
   static asJson(value: number | bigint): number | bigint {
     return value;
@@ -57,7 +57,7 @@ export class Numeric {
 }
 
 /**
- * `Float#as_json` (json.rb:114-120) — Infinity and NaN encode to `null`, since
+ * `Float#as_json` (json.rb:116-122) — Infinity and NaN encode to `null`, since
  * "Infinity"/"NaN" are not valid JSON.
  */
 export class Float {
@@ -66,14 +66,14 @@ export class Float {
   }
 }
 
-/** `Regexp#as_json` (json.rb:136-140). */
+/** `Regexp#as_json` (json.rb:139-143). */
 export class Regexp {
   static asJson(value: RegExp): string {
     return globalThis.String(value);
   }
 }
 
-/** `Array#as_json` (json.rb:154-163). */
+/** `Array#as_json` (json.rb:163-172). */
 export class Array {
   static asJson(value: unknown[], options?: EncodeOptions | null): unknown[] {
     if (options) {
@@ -85,7 +85,7 @@ export class Array {
 }
 
 /**
- * `Hash#as_json` (json.rb:165-188) — `only`/`except` select a subset, then every
+ * `Hash#as_json` (json.rb:174-197) — `only`/`except` select a subset, then every
  * value is recursed with the same options.
  *
  * Ruby's Hash is our plain object and our `Map`; `Array(attrs)` is the scalar-or
@@ -125,7 +125,7 @@ export class Hash {
 }
 
 /**
- * `Time#as_json` (json.rb:190-198), over our Temporal analogues: `Instant` and
+ * `Time#as_json` (json.rb:200-208), over our Temporal analogues: `Instant` and
  * `ZonedDateTime`. `xmlschema` renders a zero offset as "Z"
  * (`formatted_offset(true, 'Z')`), which the ZonedDateTime arm reproduces.
  */
@@ -149,7 +149,7 @@ export class Time {
   }
 }
 
-/** `Date#as_json` (json.rb:200-208), over `Temporal.PlainDate`. */
+/** `Date#as_json` (json.rb:210-218), over `Temporal.PlainDate`. */
 export class Date {
   static asJson(value: Temporal.PlainDate): string {
     if (Encoding.useStandardJsonTimeFormat) {
@@ -161,7 +161,7 @@ export class Date {
 }
 
 /**
- * `DateTime#as_json` (json.rb:210-218), over the zoneless
+ * `DateTime#as_json` (json.rb:220-228), over the zoneless
  * `Temporal.PlainDateTime` — whose `xmlschema` carries Ruby's default `+00:00`
  * offset.
  */
@@ -178,7 +178,7 @@ export class DateTime {
   }
 }
 
-/** `Exception#as_json` (json.rb:250-254). */
+/** `Exception#as_json` (json.rb:256-260). */
 export class Exception {
   static asJson(value: Error): string {
     return value.message;
