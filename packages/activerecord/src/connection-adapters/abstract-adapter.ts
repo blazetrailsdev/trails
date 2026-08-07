@@ -1282,7 +1282,7 @@ export class AbstractAdapter implements Quoting {
         this._verified = true;
 
         await this.resetTransaction({ restore: opts.restoreTransactions ?? false }, async () => {
-          this.clearCacheBang();
+          await this.clearCacheBang();
           await this.attemptConfigureConnection();
         });
         return;
@@ -1355,7 +1355,7 @@ export class AbstractAdapter implements Quoting {
   disconnectBang(): void {
     // Mirrors Rails AbstractAdapter#disconnect! (abstract_adapter.rb): the
     // raw-connection-dirty reset is what lets the next reconnect restore.
-    this.clearCacheBang();
+    void this.clearCacheBang();
     this.resetTransaction();
     this._rawConnectionDirty = false;
     this._connection = null;
@@ -1384,7 +1384,15 @@ export class AbstractAdapter implements Quoting {
     this.verifiedBang();
   }
 
-  clearCacheBang(): void {
+  /**
+   * Clear the connection's prepared-statement cache. Rails' `clear_cache!` is
+   * synchronous because `dealloc` blocks on libpq; node-pg's DEALLOCATE is a
+   * promise, so the PostgreSQL override hands back the pool's dealloc chain and
+   * every call site that can await does.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#clear_cache!
+   */
+  clearCacheBang(): void | Promise<void> {
     // Subclasses with statement caches override this
   }
 
@@ -1664,8 +1672,8 @@ export class AbstractAdapter implements Quoting {
     this.disconnectBang();
   }
 
-  clearCache(): void {
-    this.clearCacheBang();
+  clearCache(): void | Promise<void> {
+    return this.clearCacheBang();
   }
 
   get transactionManager(): TransactionManager {
@@ -1855,7 +1863,7 @@ export class AbstractAdapter implements Quoting {
   discardBang(): void {}
 
   resetBang(): void {
-    this.clearCacheBang();
+    void this.clearCacheBang();
     this.resetTransaction();
   }
 

@@ -1161,10 +1161,10 @@ export class TransactionManager {
    *     @connection.clear_cache!
    */
   /** @internal */
-  private afterFailureActions(transaction: unknown, error: unknown): void {
+  private afterFailureActions(transaction: unknown, error: unknown): void | Promise<void> {
     if (!(transaction instanceof RealTransaction)) return;
     if (!(error instanceof PreparedStatementCacheExpired)) return;
-    this._connection.clearCacheBang?.();
+    return this._connection.clearCacheBang?.();
   }
 
   /**
@@ -1258,7 +1258,7 @@ export class TransactionManager {
         // cache-clear work runs. PG's adapter retains a WeakRef to the
         // just-released txn client so the post-rollback `clearCacheBang`
         // can still reach the StatementPool (see `_lastReleasedTxnClient`).
-        this.afterFailureActions(transaction, e);
+        await this.afterFailureActions(transaction, e);
         throw e;
       }
 

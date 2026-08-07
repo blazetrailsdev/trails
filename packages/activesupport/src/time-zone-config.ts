@@ -27,11 +27,15 @@ export function getZone(): TimeZone | null {
 }
 
 /**
- * Set Time.zone. Accepts a TimeZone, a string name, or null.
- * Passing null resets to zone_default.
+ * Set Time.zone. Accepts a TimeZone, a string name, null, or false.
+ *
+ * Rails stores nil and false verbatim; trails' zone slot has no such state, so
+ * both reset to zone_default — which is also why this does not yet route through
+ * `findZoneBang` the way zones.rb:42 does. See
+ * 0072/converge-time-zone-setter-through-find-zone-bang.
  */
-export function setZone(zone: TimeZone | string | null): void {
-  if (zone === null) {
+export function setZone(zone: TimeZone | string | null | false): void {
+  if (zone === null || zone === false) {
     _zone = undefined; // Reset to zone_default
     return;
   }
@@ -78,11 +82,9 @@ export function setZoneDefault(zone: TimeZone | null): void {
  * callbacks would observe the wrong zone after the first await.
  */
 export function useZone<T>(zone: string | TimeZone, fn: () => T): T {
-  if (typeof zone === "string") {
-    zone = TimeZone.find(zone);
-  }
+  const newZone = findZoneBang(zone);
   const prev = _zone;
-  _zone = zone;
+  _zone = newZone as TimeZone | null;
   try {
     const result = fn();
     if (result != null && typeof (result as any).then === "function") {
@@ -98,26 +100,17 @@ export function useZone<T>(zone: string | TimeZone, fn: () => T): T {
 
 /**
  * Find a timezone, returning null if not found (no exception).
- * Matches Rails' Time.find_zone (without bang).
+ * Matches Rails' `Time.find_zone`: `find_zone!(time_zone) rescue nil` — one
+ * implementation, the bang form, with the ArgumentError swallowed
+ * (core_ext/time/zones.rb:97-99).
  */
-export function findZone(zone: unknown): TimeZone | null {
-  if (zone === null || zone === undefined) return null;
-  if (zone instanceof TimeZone) return zone;
-  if (typeof zone === "string") {
-    try {
-      return TimeZone.find(zone);
-    } catch {
-      return null;
-    }
+export function findZone(zone: unknown): TimeZone | null | false {
+  try {
+    return findZoneBang(zone);
+  } catch (e) {
+    if (e instanceof ArgumentError) return null;
+    throw e;
   }
-  if (typeof zone === "number") {
-    try {
-      return TimeZone.find(zone.toString());
-    } catch {
-      return null;
-    }
-  }
-  return null;
 }
 
 /**

@@ -1,3 +1,5 @@
+import { methodMissingProxy } from "@blazetrails/activesupport";
+
 import { Base } from "../base.js";
 
 /**
@@ -70,16 +72,7 @@ export class BodyProxy {
    */
   static wrap(originalCdr: (() => void) | null, body: RackBody): BodyProxy {
     const target = new BodyProxy(originalCdr, body);
-    return new Proxy(target, {
-      get(proxyTarget, prop, receiver) {
-        if (prop in proxyTarget) return Reflect.get(proxyTarget, prop, receiver);
-        const value = (body as Record<string | symbol, unknown>)?.[prop];
-        return typeof value === "function" ? value.bind(body) : value;
-      },
-      has(proxyTarget, prop) {
-        return prop in proxyTarget || prop in Object(body);
-      },
-    });
+    return methodMissingProxy(target, { delegate: (proxyTarget) => proxyTarget.body });
   }
 
   closedQ(): boolean {

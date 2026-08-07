@@ -403,7 +403,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     // the native driver opens a file handle that would otherwise leak.
     if (options.statementLimit !== undefined) {
       this._statementLimit = options.statementLimit;
-      this._statementPool.setMaxSize(
+      void this._statementPool.setMaxSize(
         SQLite3Adapter.typeCastConfigToInteger(this._statementLimit) as number,
       );
     }
@@ -567,7 +567,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     if (!stmt) {
       stmt = await this.driver.prepare(sql);
       this._maybeEnableReadBigInts(sql, stmt);
-      this._statementPool.set(sql, stmt);
+      void this._statementPool.set(sql, stmt);
     }
     return stmt;
   }
@@ -1386,8 +1386,8 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   override clearCacheBang(): void {
-    super.clearCacheBang();
-    this._statementPool.clear();
+    void super.clearCacheBang();
+    void this._statementPool.clear();
   }
 
   override disconnectBang(): void {

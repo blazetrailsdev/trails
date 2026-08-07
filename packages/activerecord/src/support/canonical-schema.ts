@@ -2211,7 +2211,7 @@ export async function loadCanonicalSchema(adapter: DatabaseAdapter): Promise<voi
   }
   // create_table/drop_table clear the connection's prepared statements in Rails;
   // mirror that so PostgreSQL doesn't reuse a stale cached plan (0A000).
-  (adapter as { clearCacheBang?: () => void }).clearCacheBang?.();
+  await (adapter as { clearCacheBang?: () => void | Promise<void> }).clearCacheBang?.();
 }
 
 /** Memoized dependent-table edges, built once per module instance. */

@@ -242,9 +242,9 @@ describe("PostgreSQLAdapter#sqlKey", () => {
   };
   const poolFor = (client: unknown): StatementPool =>
     (adapter as unknown as { _poolFor: (c: unknown) => StatementPool })._poolFor(client);
-  const preparedNameFor = (client: unknown, sql: string): string =>
+  const preparedNameFor = (client: unknown, sql: string): Promise<string> =>
     (
-      adapter as unknown as { _preparedNameFor: (c: unknown, s: string) => string }
+      adapter as unknown as { _preparedNameFor: (c: unknown, s: string) => Promise<string> }
     )._preparedNameFor(client, sql);
 
   it("scopes the pool key to the current schema_search_path", () => {
@@ -259,14 +259,14 @@ describe("PostgreSQLAdapter#sqlKey", () => {
     expect(sqlKey("SELECT 1")).toBe("-SELECT 1");
   });
 
-  it("preparing the same SQL under two different search paths yields two pool entries", () => {
+  it("preparing the same SQL under two different search paths yields two pool entries", async () => {
     const fakeClient = { query: async () => undefined, release: () => {} };
     const pool = poolFor(fakeClient);
 
     setMemo("schema_a, public");
-    const nameA = preparedNameFor(fakeClient, "SELECT * FROM widgets");
+    const nameA = await preparedNameFor(fakeClient, "SELECT * FROM widgets");
     setMemo("schema_b, public");
-    const nameB = preparedNameFor(fakeClient, "SELECT * FROM widgets");
+    const nameB = await preparedNameFor(fakeClient, "SELECT * FROM widgets");
 
     expect(nameA).not.toBe(nameB);
     expect(pool.keys).toContain("schema_a, public-SELECT * FROM widgets");
@@ -275,7 +275,7 @@ describe("PostgreSQLAdapter#sqlKey", () => {
 
     // Re-keying under the original path reuses the original entry — no stale leak.
     setMemo("schema_a, public");
-    expect(preparedNameFor(fakeClient, "SELECT * FROM widgets")).toBe(nameA);
+    expect(await preparedNameFor(fakeClient, "SELECT * FROM widgets")).toBe(nameA);
     expect(pool.length).toBe(2);
   });
 

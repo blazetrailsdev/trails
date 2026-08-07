@@ -324,7 +324,7 @@ export async function rebuildCanonicalTables(
   for (const def of defs) {
     await runTable(adapter, ss, typeMap, def);
   }
-  (adapter as { clearCacheBang?: () => void }).clearCacheBang?.();
+  await (adapter as { clearCacheBang?: () => void | Promise<void> }).clearCacheBang?.();
 }
 
 /**
@@ -363,5 +363,6 @@ export async function ensureCanonicalTables(
     await runTable(adapter, ss, typeMap, def);
     created = true;
   }
-  if (created) (adapter as { clearCacheBang?: () => void }).clearCacheBang?.();
+  if (created)
+    await (adapter as { clearCacheBang?: () => void | Promise<void> }).clearCacheBang?.();
 }

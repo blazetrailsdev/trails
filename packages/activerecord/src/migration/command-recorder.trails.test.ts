@@ -26,6 +26,15 @@ const columnMethods = (t: Table): Record<string, (name: string) => Promise<void>
   t as unknown as Record<string, (name: string) => Promise<void>>;
 
 describe("CommandRecorder", () => {
+  it("forwards a non-function delegate member the way public_send does", () => {
+    const recorder = new CommandRecorder({ encoding: "utf8", america: () => "hi" }) as unknown as {
+      encoding: string;
+      america: () => string;
+    };
+    expect(recorder.encoding).toBe("utf8");
+    expect(recorder.america()).toBe("hi");
+  });
+
   it("invertCreateTable strips ifNotExists even when fn is last arg", () => {
     const fn = () => {};
     const [cmd, args] = new CommandRecorder().invertCreateTable([
