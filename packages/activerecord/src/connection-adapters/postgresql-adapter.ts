@@ -101,6 +101,22 @@ const TEMPORAL_OIDS = new Set([1082, 1083, 1114, 1184, 1266]);
 const OID_INTERVAL = 1186;
 const OID_INTERVAL_ARRAY = 1187;
 const OID_MONEY = 790;
+/**
+ * ruby-pg's `PG::PQTRANS_*` (libpq `PGTransactionStatusType`), which
+ * `PG::Connection#transaction_status` answers. Rails reads it in
+ * `retryable_query_error?` (postgresql_adapter.rb:850) and in
+ * `cancel_any_running_query` (postgresql/database_statements.rb:127).
+ */
+const PQTRANS_IDLE = 0;
+const PQTRANS_ACTIVE = 1;
+const PQTRANS_INTRANS = 2;
+const PQTRANS_INERROR = 3;
+const PQTRANS_UNKNOWN = 4;
+/**
+ * Mirrors: `PostgreSQL::DatabaseStatements::IDLE_TRANSACTION_STATUSES`
+ * (postgresql/database_statements.rb:124).
+ */
+const IDLE_TRANSACTION_STATUSES = [PQTRANS_IDLE, PQTRANS_INTRANS, PQTRANS_INERROR];
 import {
   READ_QUERY,
   buildTruncateStatements as pgBuildTruncateStatements,
@@ -436,9 +452,26 @@ export class PostgreSQLAdapter
   // "in TX?" check at call sites that mirror the prior shape.
   private _client: pg.Client | null = null;
   private _inTransaction = false;
-  private _queryInFlight = false;
-  // The TransactionManager lock token of the chain that issued the query
-  // `_queryInFlight` refers to — see `_cancelAnyRunningQuery`.
+  /**
+   * The status byte of the last ReadyForQuery message on `_rawConnection`
+   * ('I' idle / 'T' in transaction / 'E' failed transaction), which is what
+   * libpq derives `PQtransactionStatus` from. See `transactionStatus`.
+   */
+  private _readyForQueryStatus = "I";
+  /**
+   * Whether the command on the wire has produced its terminating message
+   * (CommandComplete / ErrorResponse) but not yet its ReadyForQuery. libpq has
+   * no such window — `PQgetResult` returns only once the whole cycle is drained
+   * — but node-pg settles the query promise on the terminating message, so
+   * without this the caller can read the status back in that gap and see a
+   * command that is over reported as PQTRANS_ACTIVE.
+   */
+  private _commandSettled = true;
+  /**
+   * The TransactionManager lock token of the chain that issued the query
+   * `transactionStatus` reports as PQTRANS_ACTIVE — see
+   * `_cancelAnyRunningQuery`.
+   */
   private _queryInFlightOwner: symbol | null = null;
   private _databaseVersion: number | null = null;
   private _typeMap: HashLookupTypeMap | null = null;
@@ -1372,6 +1405,7 @@ export class PostgreSQLAdapter
         // reset (node-pg's EventEmitter, unlike libpq's
         // set_notice_receiver, doesn't replace).
         this._attachNoticeListener(newClient);
+        this._attachReadyForQueryListener(newClient);
         this._rawConnection = newClient;
         client = newClient;
       }
@@ -1545,20 +1579,21 @@ export class PostgreSQLAdapter
     });
     this._maintenanceTail = prev.then(() => gate);
     await prev.catch(() => {});
-    // DEVIATION (converging, RFC 0085): both fields are inventions.
-    // `_queryInFlight` stands in for `@raw_connection.transaction_status`,
-    // `_queryInFlightOwner` for the lock trails releases early — Rails'
-    // `cancel_any_running_query` (postgresql/database_statements.rb:127) needs
-    // neither. Scheduled for deletion; do not build on them. Claimed after the
-    // tail await so the marker names the query actually on the wire rather than
-    // one still queued (#5660) — a placement no test can pin down while these
-    // stand (RFC 0061 pg-in-flight-marker-regression-coverage, wontfix).
-    this._queryInFlight = true;
+    // DEVIATION (converging, RFC 0085): `_queryInFlightOwner` is an invention —
+    // it stands in for the lock trails releases early, which Rails'
+    // `cancel_any_running_query` (postgresql/database_statements.rb:127) does
+    // not need. Scheduled for deletion; do not build on it. Claimed after the
+    // tail await so it names the query actually on the wire rather than one
+    // still queued (#5660).
     this._queryInFlightOwner = this._transactionManager.currentLockToken;
+    // node-pg emits parsed backend messages only, so the send side of the
+    // cycle has no event to listen for: the outstanding-query half of
+    // `transactionStatus` is opened here, where the query goes on the wire,
+    // and closed by the terminating message.
+    this._commandSettled = false;
     try {
       return await fn();
     } finally {
-      this._queryInFlight = false;
       this._queryInFlightOwner = null;
       release();
     }
@@ -2220,6 +2255,61 @@ export class PostgreSQLAdapter
     await this.internalExecute("ROLLBACK AND CHAIN", "TRANSACTION");
   }
 
+  /**
+   * Mirrors: `PG::Connection#transaction_status` (ruby-pg / libpq
+   * `PQtransactionStatus`), which Rails reads in `retryable_query_error?`
+   * (postgresql_adapter.rb:850) and `cancel_any_running_query`
+   * (postgresql/database_statements.rb:127).
+   *
+   * libpq derives it from the status byte of the last ReadyForQuery message
+   * plus whether a query is outstanding; node-pg exposes both — pg-protocol
+   * parses the byte into `ReadyForQueryMessage.status` and `pg.Client` flips
+   * `readyForQuery` false for exactly the span a query is on the wire, which is
+   * the PQTRANS_ACTIVE that has no byte of its own.
+   *
+   * @internal
+   */
+  get transactionStatus(): number {
+    const client = this._rawConnection as (pg.Client & { readyForQuery?: boolean }) | null;
+    if (client == null) return PQTRANS_UNKNOWN;
+    if (client.readyForQuery !== true && !this._commandSettled) return PQTRANS_ACTIVE;
+    switch (this._readyForQueryStatus) {
+      case "T":
+        return PQTRANS_INTRANS;
+      case "E":
+        return PQTRANS_INERROR;
+      default:
+        return PQTRANS_IDLE;
+    }
+  }
+
+  /**
+   * Record the ReadyForQuery status byte libpq keeps on the PGconn. Attached
+   * once per pg.Client lifecycle alongside the notice listener, for the same
+   * reason: `resetBang` re-runs configure on the same client. An ErrorResponse
+   * aborts the open transaction, which the ReadyForQuery that follows spells
+   * 'E'; recording it on both keeps them consistent across the settle window.
+   *
+   * @internal
+   */
+  private _attachReadyForQueryListener(client: pg.Client): void {
+    this._readyForQueryStatus = "I";
+    this._commandSettled = true;
+    const connection = (client as pg.Client & { connection?: pg.Connection }).connection;
+    if (connection == null) return;
+    connection.on("readyForQuery", (message: { status?: string }) => {
+      if (typeof message?.status === "string") this._readyForQueryStatus = message.status;
+      this._commandSettled = true;
+    });
+    connection.on("commandComplete", () => {
+      this._commandSettled = true;
+    });
+    connection.on("errorMessage", () => {
+      if (this._readyForQueryStatus === "T") this._readyForQueryStatus = "E";
+      this._commandSettled = true;
+    });
+  }
+
   // Mirrors: PostgreSQL::DatabaseStatements#cancel_any_running_query (database_statements.rb private)
   // Sends a CancelRequest to abort any in-flight query on the transaction connection
   // before issuing ROLLBACK / ROLLBACK AND CHAIN, so the rollback isn't blocked
@@ -2254,7 +2344,10 @@ export class PostgreSQLAdapter
       cancel(processID: number, secretKey: number): void;
     };
     const txClient = this._client as PgClientWithPid | null;
-    if (!this._queryInFlight || txClient?.processID == null) return;
+    if (this._rawConnection == null || IDLE_TRANSACTION_STATUSES.includes(this.transactionStatus)) {
+      return;
+    }
+    if (txClient?.processID == null) return;
     const owner = this._transactionManager.currentLockToken;
     if (owner === null || owner !== this._queryInFlightOwner) return;
     try {
@@ -4432,14 +4525,9 @@ export class PostgreSQLAdapter
    * @internal
    */
   isRetryableQueryError(exception: unknown): boolean {
-    // Rails additionally guards on `@raw_connection.transaction_status !=
-    // PG::PQTRANS_INERROR`, omitted here for want of a `transaction_status`
-    // port; the abstract predicate (Deadlocked | LockWaitTimeout) is still the
-    // authoritative gate. Not a hard limit of the driver, as previously noted
-    // here: pg-protocol parses the ReadyForQuery status byte into
-    // `ReadyForQueryMessage.status` ('I' / 'T' / 'E'), emitted on
-    // `client.connection`. Porting it is RFC 0085.
-    return super.isRetryableQueryError(exception);
+    // We cannot retry anything if we're inside a broken transaction; we need to at
+    // least raise until the innermost savepoint is rolled back
+    return this.transactionStatus !== PQTRANS_INERROR && super.isRetryableQueryError(exception);
   }
 
   /**
