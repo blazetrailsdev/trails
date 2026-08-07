@@ -10,7 +10,7 @@
 // in activerecord/index.ts) to keep better-sqlite3 a true optional peer for
 // non-test consumers.
 import "../sqlite/better-sqlite3.js";
-import { afterAll, beforeAll, expect } from "vitest";
+import { afterAll, expect } from "vitest";
 import { Base } from "../base.js";
 import { I18n } from "@blazetrails/activemodel";
 import { getZone, setZone, resetZone, isZoneExplicit } from "@blazetrails/activesupport";
@@ -89,12 +89,30 @@ installExtendedQueriesIfConfigured();
  * `ER_DBACCESS_DENIED_ERROR` on MariaDB. Naming the pools by connection
  * descriptor and counting them per file fails the culprit instead of the victim.
  *
- * The baseline is taken once the file's module body has run, so a connection a
- * file establishes at module scope — and keeps for its whole run — is its own.
+ * The baseline is taken at SETUP-module load — `test-setup-dy.ts` calls
+ * {@link captureWritingPoolBaseline} as the last thing it does, which is after
+ * every setupFile has run and before the test file is imported. So the
+ * population is "pools that exist because the suite booted" (Base and
+ * ARUnit2Model, opened by `support/connection.ts` and
+ * `support/setup-second-pool.ts`), and a pool a file establishes at its own
+ * module scope is charged to that file. A `beforeAll` baseline could not do
+ * this: vitest runs it after the test file's module body, so a module-scope
+ * pool was counted into its own baseline and never reported — even though it
+ * outlives the file exactly like a mid-test leak.
+ *
+ * `adapter: "fake"` pools are not counted. The harm the guard exists to catch
+ * is the next file's `pin_connection!` opening the pool FOR REAL and failing on
+ * a config this server rejects; `FakeActiveRecordAdapter` never reaches a
+ * server (`support/fake-adapter.ts` answers `active()` in memory), so verifying
+ * one cannot fail anybody. They are also not leaks to begin with: Rails opens
+ * them at model load and keeps them for the process too
+ * (`test/models/contact.rb:6`), so charging them to whichever file first
+ * imports the model would report Rails' own arrangement.
  */
 function writingPoolCensus(): Map<string, number> {
   const census = new Map<string, number>();
   for (const pool of Base.connectionHandler.connectionPoolList("writing")) {
+    if (pool.dbConfig?.adapter === "fake") continue;
     const name = String(pool.connectionDescriptor?.name);
     census.set(name, (census.get(name) ?? 0) + 1);
   }
@@ -103,18 +121,34 @@ function writingPoolCensus(): Map<string, number> {
 
 let baselineWritingPools = new Map<string, number>();
 
-beforeAll(() => {
+/**
+ * Takes the census baseline. Called from the setup module that runs LAST
+ * (`test-setup-dy.ts`) rather than from this file's own body, because this file
+ * is only the second of the AR setupFiles and the boot pools are opened after
+ * it.
+ */
+export function captureWritingPoolBaseline(): void {
   baselineWritingPools = writingPoolCensus();
-});
+}
 
-afterAll(() => {
+/**
+ * The writing pools this file added on top of the baseline, each named by its
+ * connection descriptor. Split out of the `afterAll` so the guard can be proven
+ * on a real module-scope leak: a test file that leaked on purpose to exercise
+ * the `afterAll` would by construction fail itself.
+ */
+export function writingPoolsLeakedSinceBaseline(): string[] {
   const leaked: string[] = [];
   for (const [name, count] of writingPoolCensus()) {
     const before = baselineWritingPools.get(name) ?? 0;
     if (count > before) leaked.push(before === 0 ? name : `${name} (${before} -> ${count})`);
   }
+  return leaked;
+}
+
+afterAll(() => {
   expect(
-    leaked,
+    writingPoolsLeakedSinceBaseline(),
     "This file left connection pool(s) in the writing list. Remove them in " +
       "teardown (removeConnection() / connectionHandler.removeConnectionPool(name)): " +
       "the next file to run in this worker pins and verifies every writing pool, " +

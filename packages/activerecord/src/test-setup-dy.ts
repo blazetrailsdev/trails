@@ -117,3 +117,12 @@ await recordBootLaidTables(await Base.leaseConnection());
 // after the canonical schema is in place.
 const { provisionSecondDatabase } = await import("./support/setup-second-pool.js");
 await provisionSecondDatabase();
+
+// Last thing this file does, and this is the last AR setupFile: everything the
+// suite's boot opens (Base above, ARUnit2Model via `provisionSecondDatabase`)
+// is now in the writing list, and the test file has not been imported yet. So
+// this is the point at which "pools that exist because the suite booted" is
+// exactly the writing list — which is what the leaked-pool guard in
+// `cases/helper.ts` needs as its baseline.
+const { captureWritingPoolBaseline } = await import("./cases/helper.js");
+captureWritingPoolBaseline();
