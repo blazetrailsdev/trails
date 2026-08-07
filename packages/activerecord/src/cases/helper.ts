@@ -122,25 +122,20 @@ function writingPoolCensus(): Map<string, number> {
 let baselineWritingPools = new Map<string, number>();
 
 /**
- * @noRailsEquivalent PERMANENT — Rails' `ActiveRecord::TestCase` tears
- * connections down per case, so no pool can outlive the file that opened it and
- * Rails needs no census at all. trails' connection handler is module-level
- * state shared by every file in a vitest worker; that is a runtime fact of the
- * port, not unfinished work. The baseline has to be taken from
- * the setup module that runs LAST (`test-setup-dy.ts`) rather than here, because
- * this file is only the second of the AR setupFiles and the boot pools are
- * opened after it.
+ * Takes the census baseline. Called from the setup module that runs LAST
+ * (`test-setup-dy.ts`) rather than from this file's own body, because this file
+ * is only the second of the AR setupFiles and the boot pools are opened after
+ * it.
  */
 export function captureWritingPoolBaseline(): void {
   baselineWritingPools = writingPoolCensus();
 }
 
 /**
- * @noRailsEquivalent PERMANENT — half of the same census guard, which Rails has
- * no counterpart to (see {@link captureWritingPoolBaseline}). Split out from
- * the `afterAll` so the guard can be proven on a real module-scope leak: a test
- * file that leaked on purpose to exercise the `afterAll` would by construction
- * fail itself.
+ * The writing pools this file added on top of the baseline, each named by its
+ * connection descriptor. Split out of the `afterAll` so the guard can be proven
+ * on a real module-scope leak: a test file that leaked on purpose to exercise
+ * the `afterAll` would by construction fail itself.
  */
 export function writingPoolsLeakedSinceBaseline(): string[] {
   const leaked: string[] = [];
