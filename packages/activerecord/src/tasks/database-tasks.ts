@@ -189,9 +189,18 @@ export class DatabaseTasks {
 
   /**
    * @internal Mirrors: `class_for_adapter` (`tasks/database_tasks.rb:574-580`).
+   * Ruby's `@tasks.reverse_each.detect { |pattern, _| adapter[pattern] }` is
+   * `resolveTask` above, which walks the same registrations newest-first;
+   * `task.is_a?(String) ? task.constantize : task` has no analogue because
+   * `registerTask` takes the handler itself, never its name.
+   *
+   * `adapter` carries `db_config.adapter`, nilable at `hash_config.rb:107-109`.
+   * Ruby raises NoMethodError from `adapter[pattern]` in that case; matching
+   * nothing and raising DatabaseNotSupported below keeps the reachable path's
+   * error class and message exact.
    */
-  private static classForAdapter(adapter: string): DatabaseTaskHandler {
-    const task = this.resolveTask(adapter);
+  private static classForAdapter(adapter: string | undefined): DatabaseTaskHandler {
+    const task = adapter === undefined ? undefined : this.resolveTask(adapter);
     if (!task) {
       throw new DatabaseNotSupported(`Rake tasks not supported by '${adapter}' adapter`);
     }
@@ -205,15 +214,7 @@ export class DatabaseTasks {
    * and there are no `*arguments` to forward to a constructor.
    */
   private static databaseAdapterFor(dbConfig: DatabaseConfig): DatabaseTaskHandler {
-    return this.classForAdapter(this._adapterFor(dbConfig));
-  }
-
-  private static _adapterFor(config: DatabaseConfig): string {
-    const adapter = config.adapter;
-    if (!adapter) {
-      throw new Error("database configuration does not specify adapter");
-    }
-    return adapter;
+    return this.classForAdapter(dbConfig.adapter);
   }
 
   static clearRegisteredTasks(): void {
@@ -527,9 +528,13 @@ export class DatabaseTasks {
   }
 
   static async purgeCurrent(environment?: string): Promise<void> {
-    for (const dbConfig of this.eachCurrentConfiguration(this._normalizeEnv(environment))) {
+    const env = this._normalizeEnv(environment);
+    for (const dbConfig of this.eachCurrentConfiguration(env)) {
       await this.purge(dbConfig);
     }
+    // database_tasks.rb:359 — `migration_class.establish_connection(environment.to_sym)`,
+    // which resolves the bare env name through `Base.configurations`.
+    await (await this.migrationClass()).establishConnection(env);
   }
 
   static async purgeAll(): Promise<void> {
@@ -660,12 +665,9 @@ export class DatabaseTasks {
 
   /**
    * @internal Mirrors: `resolve_configuration`
-   * (`tasks/database_tasks.rb:555-557`). A `DatabaseConfig` is returned as-is:
-   * `DatabaseConfigurations#resolve` would otherwise construct a fresh
-   * `DatabaseConfigurations` and mutate the global singleton.
+   * (`tasks/database_tasks.rb:555-557`).
    */
   private static resolveConfiguration(configuration: unknown): DatabaseConfig {
-    if (configuration instanceof DatabaseConfig) return configuration;
     return configurationsStore().resolve(configuration);
   }
 
@@ -827,10 +829,10 @@ export class DatabaseTasks {
     extraFlags?: string | string[] | null,
   ): Promise<void> {
     const config = this.resolveConfiguration(configuration);
-    const flags = extraFlags ?? this.structureDumpFlagsFor(this._adapterFor(config));
+    const flags = extraFlags ?? this.structureDumpFlagsFor(config.adapter);
     const handler = this.databaseAdapterFor(config);
     if (!handler.structureDump) {
-      throw new Error(`Adapter '${this._adapterFor(config)}' does not support structureDump`);
+      throw new Error(`Adapter '${config.adapter}' does not support structureDump`);
     }
     await handler.structureDump(config, filename, flags);
   }
@@ -841,42 +843,50 @@ export class DatabaseTasks {
     extraFlags?: string | string[] | null,
   ): Promise<void> {
     const config = this.resolveConfiguration(configuration);
-    const flags = extraFlags ?? this.structureLoadFlagsFor(this._adapterFor(config));
+    const flags = extraFlags ?? this.structureLoadFlagsFor(config.adapter);
     const handler = this.databaseAdapterFor(config);
     if (!handler.structureLoad) {
-      throw new Error(`Adapter '${this._adapterFor(config)}' does not support structureLoad`);
+      throw new Error(`Adapter '${config.adapter}' does not support structureLoad`);
     }
     await handler.structureLoad(config, filename, flags);
   }
 
   /**
    * @internal Mirrors: `structure_dump_flags_for`
-   * (`tasks/database_tasks.rb:619-625`).
+   * (`tasks/database_tasks.rb:619-625`). Ruby reaches `adapter` only inside the
+   * Hash arm (`flags[adapter.to_sym]`) and raises NoMethodError there when
+   * `db_config.adapter` is nil; TS types it nilable, so that arm misses
+   * instead. `is_a?(Hash)` becomes an object test that excludes the Array and
+   * String forms the accessor also accepts.
    */
-  private static structureDumpFlagsFor(adapter: string): string | string[] | null {
+  private static structureDumpFlagsFor(adapter: string | undefined): string | string[] | null {
     const structureDumpFlags = this.structureDumpFlags;
     if (
       structureDumpFlags !== null &&
       !Array.isArray(structureDumpFlags) &&
       typeof structureDumpFlags === "object"
     ) {
-      return structureDumpFlags[adapter] ?? null;
+      return adapter === undefined ? null : (structureDumpFlags[adapter] ?? null);
     }
     return structureDumpFlags;
   }
 
   /**
    * @internal Mirrors: `structure_load_flags_for`
-   * (`tasks/database_tasks.rb:627-633`).
+   * (`tasks/database_tasks.rb:627-633`). Ruby reaches `adapter` only inside the
+   * Hash arm (`flags[adapter.to_sym]`) and raises NoMethodError there when
+   * `db_config.adapter` is nil; TS types it nilable, so that arm misses
+   * instead. `is_a?(Hash)` becomes an object test that excludes the Array and
+   * String forms the accessor also accepts.
    */
-  private static structureLoadFlagsFor(adapter: string): string | string[] | null {
+  private static structureLoadFlagsFor(adapter: string | undefined): string | string[] | null {
     const structureLoadFlags = this.structureLoadFlags;
     if (
       structureLoadFlags !== null &&
       !Array.isArray(structureLoadFlags) &&
       typeof structureLoadFlags === "object"
     ) {
-      return structureLoadFlags[adapter] ?? null;
+      return adapter === undefined ? null : (structureLoadFlags[adapter] ?? null);
     }
     return structureLoadFlags;
   }
