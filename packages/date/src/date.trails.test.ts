@@ -622,6 +622,13 @@ describe("Date", () => {
   it("leaves a width-qualified unknown directive alone", () => {
     const dt = new RubyDateTime(2008, 3, 1, 6, 7, 8.5);
     expect(dt.strftime("%9q")).toBe("%9q");
+    // `FLAG_FOUND` (date_strftime.c:90-93) — a flag AFTER a width is unknown,
+    // where the same flag before it is honoured.
+    expect(dt.strftime("%3-S")).toBe("%3-S");
+    expect(dt.strftime("%3_S")).toBe("%3_S");
+    expect(dt.strftime("%-3S")).toBe("8");
+    expect(dt.strftime("%_3S")).toBe("  8");
+    expect(dt.strftime("%0-S")).toBe("8");
     expect(dt.strftime("%^b")).toBe("%^b");
     expect(dt.strftime("%Ez")).toBe("%Ez");
   });

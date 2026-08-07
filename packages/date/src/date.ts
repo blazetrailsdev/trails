@@ -192,6 +192,17 @@ function fmt(
 }
 
 /**
+ * @internal `date_strftime.c`'s `FLAG_FOUND` macro
+ * (`date_strftime.c:90-93`), which sends a `-` or `_` that follows a width
+ * straight to `unknown:` — so MRI answers `%3-S` verbatim where `%-3S` is `8`.
+ * Its other two arms, the `%E`/`%O` locale extensions and `%:`, are both
+ * unreachable here: neither can set its flag and go on to read another.
+ */
+function flagFound(precision: number): boolean {
+  return precision > 0;
+}
+
+/**
  * @internal `date_strftime.c`'s `FILL_PADDING` macro
  * (`date_strftime.c:95-104`), and the same left-fill the `STRFTIME` macro
  * (`date_strftime.c:117-133`) applies to a recursively expanded format: the
@@ -307,13 +318,21 @@ export function strftime(subject: StrftimeSubject, format: string): string {
 
     for (;;) {
       const c = format[g];
-      if (c === "-") {
-        left = true;
+      if (c === "_") {
+        if (flagFound(precision)) {
+          spec = c;
+          break;
+        }
+        padding = " ";
         g++;
         continue;
       }
-      if (c === "_") {
-        padding = " ";
+      if (c === "-") {
+        if (flagFound(precision)) {
+          spec = c;
+          break;
+        }
+        left = true;
         g++;
         continue;
       }
