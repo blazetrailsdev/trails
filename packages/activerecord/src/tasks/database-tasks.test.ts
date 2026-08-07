@@ -15,6 +15,7 @@ import { stdout, stderr } from "@blazetrails/activesupport";
 import { DatabaseTasks } from "./database-tasks.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
+import type { DatabaseConfig } from "../database-configurations/database-config.js";
 import { NoEnvironmentInSchemaError, ProtectedEnvironmentError } from "../migration.js";
 import { SchemaMigration } from "../schema-migration.js";
 import { Base } from "../base.js";
@@ -1132,21 +1133,28 @@ describe("DatabaseTasksPurgeCurrentTest", () => {
     DatabaseTasks.clearRegisteredTasks();
     DatabaseTasks.databaseConfiguration = originalConfigurations;
     DatabaseTasks.env = "development";
+    vi.restoreAllMocks();
   });
 
   it("purges current environment database", async () => {
-    let purged = false;
+    const purged: DatabaseConfig[] = [];
+    const establishSpy = vi.spyOn(Base, "establishConnection").mockResolvedValue(undefined);
     DatabaseTasks.registerTask("abstract", {
-      purge: async () => {
-        purged = true;
+      purge: async (config) => {
+        purged.push(config);
       },
     });
     DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+      development: { adapter: "abstract", database: "dev-db" },
       test: { adapter: "abstract", database: "test-db" },
+      production: { adapter: "abstract", database: "prod-db" },
     });
     DatabaseTasks.env = "test";
-    await DatabaseTasks.purgeCurrent("test");
-    expect(purged).toBe(true);
+    await DatabaseTasks.purgeCurrent("production");
+    expect(purged).toEqual(
+      DatabaseTasks.databaseConfiguration.configsFor({ envName: "production", name: "primary" }),
+    );
+    expect(establishSpy).toHaveBeenCalledWith("production");
   });
 });
 

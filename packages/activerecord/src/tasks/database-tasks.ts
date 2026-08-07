@@ -40,7 +40,6 @@ function baseClass(): typeof Base {
  * has no registered task handler. Mirrors Rails'
  * `ActiveRecord::Tasks::DatabaseNotSupported` (tasks/database_tasks.rb:7),
  * which is raised by `class_for_adapter` when no pattern matches.
- * Our `DatabaseTasks._resolveTaskOrThrow` is the direct analog.
  */
 export class DatabaseNotSupported extends Error {
   constructor(message: string) {
@@ -188,33 +187,47 @@ export class DatabaseTasks {
     return undefined;
   }
 
-  private static _resolveTaskOrThrow(adapter: string): DatabaseTaskHandler {
-    const handler = this.resolveTask(adapter);
-    if (!handler) {
-      throw new DatabaseNotSupported(
-        `No database task handler registered for adapter '${adapter}'. ` +
-          `Register one with DatabaseTasks.registerTask().`,
-      );
+  /**
+   * @internal Mirrors: `class_for_adapter` (`tasks/database_tasks.rb:574-580`).
+   * Ruby's `@tasks.reverse_each.detect { |pattern, _| adapter[pattern] }` is
+   * `resolveTask` above, which walks the same registrations newest-first;
+   * `task.is_a?(String) ? task.constantize : task` has no analogue because
+   * `registerTask` takes the handler itself, never its name.
+   *
+   * `adapter` carries `db_config.adapter`, nilable at `hash_config.rb:107-109`.
+   * Ruby raises NoMethodError from `adapter[pattern]` in that case; matching
+   * nothing and raising DatabaseNotSupported below keeps the reachable path's
+   * error class and message exact.
+   */
+  private static classForAdapter(adapter: string | undefined): DatabaseTaskHandler {
+    const task = adapter === undefined ? undefined : this.resolveTask(adapter);
+    if (!task) {
+      throw new DatabaseNotSupported(`Rake tasks not supported by '${adapter}' adapter`);
     }
-    return handler;
+    return task;
   }
 
-  private static _adapterFor(config: DatabaseConfig): string {
-    const adapter = config.adapter;
-    if (!adapter) {
-      throw new Error("database configuration does not specify adapter");
-    }
-    return adapter;
+  /**
+   * @internal Mirrors: `database_adapter_for` (`tasks/database_tasks.rb:566-572`).
+   * Rails instantiates the resolved task class per call; trails registers task
+   * singletons through `registerTask`, so the handler itself is the instance
+   * and there are no `*arguments` to forward to a constructor.
+   */
+  private static databaseAdapterFor(dbConfig: DatabaseConfig): DatabaseTaskHandler {
+    return this.classForAdapter(dbConfig.adapter);
   }
 
   static clearRegisteredTasks(): void {
     this._registeredTasks = [];
   }
 
-  static async create(config: DatabaseConfig): Promise<void> {
+  static async create(
+    configuration: DatabaseConfig | string | Record<string, unknown>,
+  ): Promise<void> {
+    const config = this.resolveConfiguration(configuration);
     const { DatabaseAlreadyExists } = await import("../errors.js");
     try {
-      const handler = this._resolveTaskOrThrow(this._adapterFor(config));
+      const handler = this.databaseAdapterFor(config);
       if (handler.create) {
         await handler.create(config);
       }
@@ -252,13 +265,9 @@ export class DatabaseTasks {
     }
   }
 
-  static async createCurrent(environment?: string): Promise<void> {
-    const envs = this._environmentsFor(environment);
-    for (const env of envs) {
-      const configs = this.configsFor(env);
-      for (const config of configs) {
-        await this.create(config);
-      }
+  static async createCurrent(environment?: string, name?: string): Promise<void> {
+    for (const dbConfig of this.eachCurrentConfiguration(this._normalizeEnv(environment), name)) {
+      await this.create(dbConfig);
     }
     // database_tasks.rb:173 — `migration_class.establish_connection(environment.to_sym)`,
     // which resolves the bare env name through `Base.configurations`.
@@ -266,10 +275,13 @@ export class DatabaseTasks {
     await (await this.migrationClass()).establishConnection(envName);
   }
 
-  static async drop(config: DatabaseConfig): Promise<void> {
+  static async drop(
+    configuration: DatabaseConfig | string | Record<string, unknown>,
+  ): Promise<void> {
+    const config = this.resolveConfiguration(configuration);
     const { NoDatabaseError } = await import("../errors.js");
     try {
-      const handler = this._resolveTaskOrThrow(this._adapterFor(config));
+      const handler = this.databaseAdapterFor(config);
       if (handler.drop) {
         await handler.drop(config);
       }
@@ -292,12 +304,8 @@ export class DatabaseTasks {
   }
 
   static async dropCurrent(environment?: string): Promise<void> {
-    const envs = this._environmentsFor(environment);
-    for (const env of envs) {
-      const configs = this.configsFor(env);
-      for (const config of configs) {
-        await this.drop(config);
-      }
+    for (const dbConfig of this.eachCurrentConfiguration(this._normalizeEnv(environment))) {
+      await this.drop(dbConfig);
     }
   }
 
@@ -514,8 +522,11 @@ export class DatabaseTasks {
     return Base.connectionPool().leaseConnection();
   }
 
-  static async purge(config: DatabaseConfig): Promise<void> {
-    const handler = this._resolveTaskOrThrow(this._adapterFor(config));
+  static async purge(
+    configuration: DatabaseConfig | string | Record<string, unknown>,
+  ): Promise<void> {
+    const config = this.resolveConfiguration(configuration);
+    const handler = this.databaseAdapterFor(config);
     if (handler.purge) {
       await handler.purge(config);
     }
@@ -523,10 +534,12 @@ export class DatabaseTasks {
 
   static async purgeCurrent(environment?: string): Promise<void> {
     const env = this._normalizeEnv(environment);
-    const configs = this.configsFor(env);
-    for (const config of configs) {
-      await this.purge(config);
+    for (const dbConfig of this.eachCurrentConfiguration(env)) {
+      await this.purge(dbConfig);
     }
+    // database_tasks.rb:359 — `migration_class.establish_connection(environment.to_sym)`,
+    // which resolves the bare env name through `Base.configurations`.
+    await (await this.migrationClass()).establishConnection(env);
   }
 
   static async purgeAll(): Promise<void> {
@@ -539,7 +552,7 @@ export class DatabaseTasks {
     const env = this._normalizeEnv(environment);
     const configs = this.configsFor(env);
     for (const config of configs) {
-      const handler = this._resolveTaskOrThrow(this._adapterFor(config));
+      const handler = this.databaseAdapterFor(config);
       if (handler.truncateAll) {
         await handler.truncateAll(config);
       } else {
@@ -548,8 +561,11 @@ export class DatabaseTasks {
     }
   }
 
-  static async charset(config: DatabaseConfig): Promise<string | null> {
-    const handler = this._resolveTaskOrThrow(this._adapterFor(config));
+  static async charset(
+    configuration: DatabaseConfig | string | Record<string, unknown>,
+  ): Promise<string | null> {
+    const config = this.resolveConfiguration(configuration);
+    const handler = this.databaseAdapterFor(config);
     return handler.charset ? handler.charset(config) : null;
   }
 
@@ -561,8 +577,11 @@ export class DatabaseTasks {
     return this.charset(primary);
   }
 
-  static async collation(config: DatabaseConfig): Promise<string | null> {
-    const handler = this._resolveTaskOrThrow(this._adapterFor(config));
+  static async collation(
+    configuration: DatabaseConfig | string | Record<string, unknown>,
+  ): Promise<string | null> {
+    const config = this.resolveConfiguration(configuration);
+    const handler = this.databaseAdapterFor(config);
     if (handler.collation) {
       return handler.collation(config);
     }
@@ -649,6 +668,30 @@ export class DatabaseTasks {
     return configurationsStore().configsFor({ envName: environment });
   }
 
+  /**
+   * @internal Mirrors: `resolve_configuration`
+   * (`tasks/database_tasks.rb:555-557`).
+   */
+  private static resolveConfiguration(configuration: unknown): DatabaseConfig {
+    return configurationsStore().resolve(configuration);
+  }
+
+  /**
+   * @internal Mirrors: `each_current_configuration`
+   * (`tasks/database_tasks.rb:582-590`). Ruby yields; TS collects and the
+   * caller iterates the result.
+   */
+  private static eachCurrentConfiguration(environment: string, name?: string): DatabaseConfig[] {
+    const results: DatabaseConfig[] = [];
+    for (const env of eachCurrentEnvironment(environment)) {
+      for (const dbConfig of this.configsFor(env)) {
+        if (name != null && name !== dbConfig.name) continue;
+        results.push(dbConfig);
+      }
+    }
+    return results;
+  }
+
   private static _normalizeEnv(environment?: string): string {
     const trimmed = environment?.trim();
     return trimmed || this.env;
@@ -660,7 +703,7 @@ export class DatabaseTasks {
     // database_tasks.rb:599 — `configs_for.each`, i.e. Base.configurations.
     for (const c of configurationsStore().configsFor()) {
       if (!c.database) continue;
-      if (this._localDatabase(c)) {
+      if (this.isLocalDatabase(c)) {
         result.push(c);
       } else {
         stderr.write(
@@ -674,9 +717,9 @@ export class DatabaseTasks {
   // Mirrors Rails: LOCAL_HOSTS = ["127.0.0.1", "localhost"] + host.blank?
   // (blank? treats whitespace-only strings as blank, so we trim before
   // comparing.)
-  /** @internal */
-  static _localDatabase(c: DatabaseConfig): boolean {
-    const host = c.host?.trim();
+  /** @internal Mirrors: `local_database?` (`tasks/database_tasks.rb:610-613`). */
+  private static isLocalDatabase(dbConfig: DatabaseConfig): boolean {
+    const host = dbConfig.host?.trim();
     return !host || host === "localhost" || host === "127.0.0.1";
   }
 
@@ -785,48 +828,72 @@ export class DatabaseTasks {
     }
   }
 
-  private static _environmentsFor(environment?: string): string[] {
-    const env = this._normalizeEnv(environment);
-    return eachCurrentEnvironment(env);
-  }
-
   static async structureDump(
-    config: DatabaseConfig,
+    configuration: DatabaseConfig | string | Record<string, unknown>,
     filename: string,
     extraFlags?: string | string[] | null,
   ): Promise<void> {
-    const handler = this._resolveTaskOrThrow(this._adapterFor(config));
+    const config = this.resolveConfiguration(configuration);
+    const flags = extraFlags ?? this.structureDumpFlagsFor(config.adapter);
+    const handler = this.databaseAdapterFor(config);
     if (!handler.structureDump) {
-      throw new Error(`Adapter '${this._adapterFor(config)}' does not support structureDump`);
+      throw new Error(`Adapter '${config.adapter}' does not support structureDump`);
     }
-    const flags = extraFlags ?? this._flagsFor(this.structureDumpFlags, config.adapter);
     await handler.structureDump(config, filename, flags);
   }
 
   static async structureLoad(
-    config: DatabaseConfig,
+    configuration: DatabaseConfig | string | Record<string, unknown>,
     filename: string,
     extraFlags?: string | string[] | null,
   ): Promise<void> {
-    const handler = this._resolveTaskOrThrow(this._adapterFor(config));
+    const config = this.resolveConfiguration(configuration);
+    const flags = extraFlags ?? this.structureLoadFlagsFor(config.adapter);
+    const handler = this.databaseAdapterFor(config);
     if (!handler.structureLoad) {
-      throw new Error(`Adapter '${this._adapterFor(config)}' does not support structureLoad`);
+      throw new Error(`Adapter '${config.adapter}' does not support structureLoad`);
     }
-    const flags = extraFlags ?? this._flagsFor(this.structureLoadFlags, config.adapter);
     await handler.structureLoad(config, filename, flags);
   }
 
-  private static _flagsFor(
-    source: typeof DatabaseTasks.structureDumpFlags,
-    adapter?: string,
-  ): string | string[] | null {
-    if (!source) return null;
-    if (Array.isArray(source) || typeof source === "string") return source;
-    if (adapter && typeof source === "object" && adapter in source) {
-      const value = source[adapter];
-      return value;
+  /**
+   * @internal Mirrors: `structure_dump_flags_for`
+   * (`tasks/database_tasks.rb:619-625`). Ruby reaches `adapter` only inside the
+   * Hash arm (`flags[adapter.to_sym]`) and raises NoMethodError there when
+   * `db_config.adapter` is nil; TS types it nilable, so that arm misses
+   * instead. `is_a?(Hash)` becomes an object test that excludes the Array and
+   * String forms the accessor also accepts.
+   */
+  private static structureDumpFlagsFor(adapter: string | undefined): string | string[] | null {
+    const structureDumpFlags = this.structureDumpFlags;
+    if (
+      structureDumpFlags !== null &&
+      !Array.isArray(structureDumpFlags) &&
+      typeof structureDumpFlags === "object"
+    ) {
+      return adapter === undefined ? null : (structureDumpFlags[adapter] ?? null);
     }
-    return null;
+    return structureDumpFlags;
+  }
+
+  /**
+   * @internal Mirrors: `structure_load_flags_for`
+   * (`tasks/database_tasks.rb:627-633`). Ruby reaches `adapter` only inside the
+   * Hash arm (`flags[adapter.to_sym]`) and raises NoMethodError there when
+   * `db_config.adapter` is nil; TS types it nilable, so that arm misses
+   * instead. `is_a?(Hash)` becomes an object test that excludes the Array and
+   * String forms the accessor also accepts.
+   */
+  private static structureLoadFlagsFor(adapter: string | undefined): string | string[] | null {
+    const structureLoadFlags = this.structureLoadFlags;
+    if (
+      structureLoadFlags !== null &&
+      !Array.isArray(structureLoadFlags) &&
+      typeof structureLoadFlags === "object"
+    ) {
+      return adapter === undefined ? null : (structureLoadFlags[adapter] ?? null);
+    }
+    return structureLoadFlags;
   }
 
   /**
@@ -974,7 +1041,7 @@ export class DatabaseTasks {
       const adapter = await this._migrationAdapter();
       await defineSchema(adapter);
       // Stamp using the resolved absolute path — `filename` may be
-      // relative and `_schemaSha1` reads the file via getFs(), so the
+      // relative and `schemaSha1` reads the file via getFs(), so the
       // path must match what was actually imported.
       await this._stampSchemaSha1(config, absolute);
     } finally {
@@ -995,7 +1062,7 @@ export class DatabaseTasks {
       const adapter = await this._migrationAdapter();
       const { InternalMetadata } = await import("../internal-metadata.js");
       const metadata = new InternalMetadata(adapter);
-      const sha1 = await this._schemaSha1(filename);
+      const sha1 = await this.schemaSha1(filename);
       await metadata.createTableAndSetFlags(config.envName, sha1);
     } catch (error) {
       console.debug?.(
@@ -1010,11 +1077,8 @@ export class DatabaseTasks {
     file?: string,
     environment?: string,
   ): Promise<void> {
-    const envs = this._environmentsFor(environment);
-    for (const env of envs) {
-      for (const config of this.configsFor(env)) {
-        await this.loadSchema(config, format, file);
-      }
+    for (const dbConfig of this.eachCurrentConfiguration(this._normalizeEnv(environment))) {
+      await this.loadSchema(dbConfig, format, file);
     }
   }
 
@@ -1347,12 +1411,21 @@ export class DatabaseTasks {
     const storedSha1 = await metadata.get("schema_sha1");
     if (!storedSha1) return false;
 
-    const fileSha1 = await this._schemaSha1(filename);
+    const fileSha1 = await this.schemaSha1(filename);
     return storedSha1 === fileSha1;
   }
 
-  private static async _schemaSha1(filename: string): Promise<string> {
-    return _sha1File(filename);
+  /**
+   * @internal Mirrors: `schema_sha1` (`tasks/database_tasks.rb:615-617`).
+   * `OpenSSL::Digest::SHA1.hexdigest` has no synchronous JS analogue, so the
+   * `crypto` module is resolved through the async platform accessor.
+   */
+  private static async schemaSha1(file: string): Promise<string> {
+    const bytes = getFs().readFileSync(file);
+    const crypto = await getCryptoAsync();
+    const hash = crypto.createHash("sha1");
+    hash.update(bytes);
+    return hash.digest("hex");
   }
 
   /**
@@ -1445,7 +1518,7 @@ export class DatabaseTasks {
    * @internal
    */
   static async truncateTables(config: DatabaseConfig): Promise<void> {
-    const handler = this._resolveTaskOrThrow(this._adapterFor(config));
+    const handler = this.databaseAdapterFor(config);
     if (handler.truncateAll) {
       await handler.truncateAll(config);
       return;
@@ -1507,23 +1580,6 @@ export interface DatabaseTaskHandler {
   ): Promise<void>;
 }
 
-/** @internal */
-export async function withTemporaryPool<T = void>(
-  dbConfig: DatabaseConfig,
-  fn: (adapter: import("../connection-adapters/abstract-adapter.js").AbstractAdapter) => Promise<T>,
-): Promise<T> {
-  return DatabaseTasks.withTemporaryConnection(dbConfig, fn);
-}
-
-/** @internal */
-export function resolveConfiguration(configuration: unknown): DatabaseConfig {
-  // DatabaseConfig instances don't need a configurations registry — return as-is.
-  // Avoids constructing a new DatabaseConfigurations (which mutates the global singleton).
-  if (configuration instanceof DatabaseConfig) return configuration;
-  // database_tasks.rb:555-557 — `Base.configurations.resolve(configuration)`.
-  return configurationsStore().resolve(configuration);
-}
-
 function _errorToS(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
@@ -1553,36 +1609,6 @@ export function metadataTableNames(): Set<string> {
 }
 
 /** @internal */
-export function databaseAdapterFor(
-  _dbConfig: DatabaseConfig,
-  ...arguments_: unknown[]
-): import("../connection-adapters/abstract-adapter.js").AbstractAdapter | null {
-  void arguments_;
-  return DatabaseTasks.migrationConnection();
-}
-
-/** @internal */
-export function classForAdapter(adapter: string): DatabaseTaskHandler {
-  const handler = DatabaseTasks.resolveTask(adapter);
-  if (!handler) {
-    throw new DatabaseNotSupported(`Rake tasks not supported by '${adapter}' adapter`);
-  }
-  return handler;
-}
-
-/** @internal */
-export function eachCurrentConfiguration(environment: string, name?: string): DatabaseConfig[] {
-  const results: DatabaseConfig[] = [];
-  for (const env of eachCurrentEnvironment(environment)) {
-    for (const cfg of DatabaseTasks.configsFor(env)) {
-      if (name && name !== cfg.name) continue;
-      results.push(cfg);
-    }
-  }
-  return results;
-}
-
-/** @internal */
 export function eachCurrentEnvironment(environment: string): string[] {
   const envs = [environment];
   if (
@@ -1593,40 +1619,6 @@ export function eachCurrentEnvironment(environment: string): string[] {
     envs.push("test");
   }
   return envs;
-}
-
-/** @internal */
-export function isLocalDatabase(dbConfig: DatabaseConfig): boolean {
-  return DatabaseTasks._localDatabase(dbConfig);
-}
-
-/** @internal */
-export function schemaSha1(file: string): Promise<string> {
-  return _sha1File(file);
-}
-
-async function _sha1File(filename: string): Promise<string> {
-  const bytes = getFs().readFileSync(filename);
-  const crypto = await getCryptoAsync();
-  const hash = crypto.createHash("sha1");
-  hash.update(bytes);
-  return hash.digest("hex");
-}
-
-/** @internal */
-export function structureDumpFlagsFor(adapter: string): string | string[] | null {
-  const flags = DatabaseTasks.structureDumpFlags;
-  if (!flags) return null;
-  if (typeof flags === "string" || Array.isArray(flags)) return flags;
-  return flags[adapter] ?? null;
-}
-
-/** @internal */
-export function structureLoadFlagsFor(adapter: string): string | string[] | null {
-  const flags = DatabaseTasks.structureLoadFlags;
-  if (!flags) return null;
-  if (typeof flags === "string" || Array.isArray(flags)) return flags;
-  return flags[adapter] ?? null;
 }
 
 /** @internal */
