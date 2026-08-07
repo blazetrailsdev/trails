@@ -178,7 +178,7 @@
     "package": "activerecord",
     "tsFile": "migration.ts",
     "rubyName": "with_advisory_lock",
-    "call": "order:connection,getAdvisoryLock",
-    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
+    "call": "order:constructor,releaseAdvisoryLock",
+    "reason": "Ruby `raise ConcurrentMigrationError` names the class without constructing it (migration.rb:1604), so Rails' only `.new` is the RELEASE_LOCK_FAILED one after `release_advisory_lock`; TypeScript has no `throw SomeError` spelling, so the port's first `throw new` necessarily precedes it."
   }
 ]

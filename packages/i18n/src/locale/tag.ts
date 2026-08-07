@@ -8,11 +8,19 @@
 import { Simple } from "./tag/simple.js";
 import type { Parents } from "./tag/parents.js";
 
+export { Simple } from "./tag/simple.js";
+export { Rfc4646 } from "./tag/rfc4646.js";
+
 let implementationStore: TagImplementation | undefined;
 
-/** The surface a tag implementation exposes: a factory, and the tag it makes. */
+/**
+ * The surface a tag implementation exposes: a factory, and the tag it makes.
+ * `Rfc4646.tag` answers nil for a tag that is not valid RFC 4646
+ * (rfc4646.rb:20), so the factory is nilable — `Simple.tag` (simple.rb:8-10)
+ * never is.
+ */
 export interface TagImplementation {
-  tag(...tag: string[]): Parents;
+  tag(...tag: string[]): Parents | null;
 }
 
 /**
@@ -36,6 +44,6 @@ export function setImplementation(value: TagImplementation): void {
  * Factory method for locale tags. Delegates to the current locale tag
  * implementation.
  */
-export function tag(tag: string): Parents {
+export function tag(tag: string): Parents | null {
   return implementation().tag(tag);
 }

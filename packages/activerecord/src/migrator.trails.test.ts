@@ -460,6 +460,7 @@ describe("Migrator advisory lock wrapping", () => {
     const rawAdapter = {
       adapterName: "sqlite" as const,
       supportsAdvisoryLocks: () => true,
+      isAdvisoryLocksEnabled: () => true,
       getAdvisoryLock: async (_id: unknown) => true,
       releaseAdvisoryLock: async (_id: unknown) => true,
       // currentDatabase intentionally absent

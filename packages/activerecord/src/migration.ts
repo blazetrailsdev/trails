@@ -2239,29 +2239,24 @@ export class Migrator {
 
   /**
    * Wrap a block with an advisory lock to prevent concurrent migrations.
-   * If the adapter doesn't support advisory locks, runs without locking.
    *
    * Once the lock is held, `loadMigrated` reloads schema_migrations to be sure
    * it wasn't changed by another process while we blocked (migration.rb:1601).
-   * Rails' `Migrator` creates the bookkeeping tables in `initialize`; a
-   * constructor cannot await, so they are ensured here before the reload can
-   * query them.
+   *
+   * Whether the adapter can take a lock at all is the *caller's* question:
+   * `use_advisory_lock?` (migration.rb:1596-1598) is checked by `#migrate` /
+   * `#run` (migration.rb:1447, 1461), never inside this body. Adapters that
+   * cannot lock answer `isAdvisoryLocksEnabled()` falsey.
+   *
+   * The one call with no Rails counterpart is `_ensureSchemaTable()`: Rails
+   * creates the bookkeeping tables in `Migrator#initialize`
+   * (migration.rb:1470-1476), and a TS constructor cannot await, so they are
+   * ensured at the one point that must see them — before `loadMigrated` reads
+   * schema_migrations.
    *
    * @internal Mirrors: ActiveRecord::Migrator#with_advisory_lock
    */
   async withAdvisoryLock<T>(fn: () => Promise<T>): Promise<T> {
-    if (
-      !this.connection.supportsAdvisoryLocks?.() ||
-      !this.connection.getAdvisoryLock ||
-      !this.connection.releaseAdvisoryLock
-    ) {
-      return fn();
-    }
-    if (typeof this.connection.currentDatabase !== "function") {
-      throw new Error(
-        `${this.connection.constructor.name} must implement currentDatabase() to support advisory-locked migrations`,
-      );
-    }
     const lockId = await this.generateMigratorAdvisoryLockId();
     const gotLock = await this.connection.getAdvisoryLock(lockId);
     if (!gotLock) {
@@ -2279,7 +2274,6 @@ export class Migrator {
     } catch (e) {
       fnError = e;
     }
-    // releaseAdvisoryLock is guaranteed present (checked in the guard above).
     // Any non-true return — false or undefined — is treated as failure, matching
     // Rails: `release_advisory_lock(...) or raise` (migration.rb:1608-1612).
     let released: boolean | undefined;
@@ -2360,7 +2354,9 @@ export class Migrator {
       this._runOptions("up", targetVersion ?? null),
     );
     try {
-      return await migrator.withAdvisoryLock(() => migrator.migrateWithoutLock());
+      return migrator.isUseAdvisoryLock()
+        ? await migrator.withAdvisoryLock(() => migrator.migrateWithoutLock())
+        : await migrator.migrateWithoutLock();
     } finally {
       this._invalidateMigrated();
     }
@@ -2383,7 +2379,9 @@ export class Migrator {
       this._runOptions("down", targetVersion ?? null),
     );
     try {
-      return await migrator.withAdvisoryLock(() => migrator.migrateWithoutLock());
+      return migrator.isUseAdvisoryLock()
+        ? await migrator.withAdvisoryLock(() => migrator.migrateWithoutLock())
+        : await migrator.migrateWithoutLock();
     } finally {
       this._invalidateMigrated();
     }
@@ -2399,7 +2397,7 @@ export class Migrator {
       throw new Error(`Invalid steps: ${steps}. Must be a non-negative integer.`);
     }
     let rolledBack: MigrationProxy[] = [];
-    await this.withAdvisoryLock(async () => {
+    const body = async (): Promise<void> => {
       await this._ensureSchemaTable();
       const applied = await this.migrated();
       const appliedMigrations = this._migrations.filter((m) => applied.has(m.version)).reverse();
@@ -2409,7 +2407,12 @@ export class Migrator {
         await this._runMigration(proxy, "down");
       }
       rolledBack = toRollback;
-    });
+    };
+    if (this.isUseAdvisoryLock()) {
+      await this.withAdvisoryLock(body);
+    } else {
+      await body();
+    }
     return rolledBack;
   }
 
@@ -2422,14 +2425,19 @@ export class Migrator {
     if (!Number.isInteger(steps) || steps < 0) {
       throw new Error(`Invalid steps: ${steps}. Must be a non-negative integer.`);
     }
-    await this.withAdvisoryLock(async () => {
+    const body = async (): Promise<void> => {
       const pending = await this.pendingMigrations();
       const toRun = pending.slice(0, steps);
 
       for (const proxy of toRun) {
         await this._runMigration(proxy, "up");
       }
-    });
+    };
+    if (this.isUseAdvisoryLock()) {
+      await this.withAdvisoryLock(body);
+    } else {
+      await body();
+    }
   }
 
   /**
@@ -2571,13 +2579,12 @@ export class Migrator {
    * Rails gates solely on `connection.advisory_locks_enabled?`
    * (`supports_advisory_locks? && @advisory_locks_enabled`), mirrored here by
    * `isAdvisoryLocksEnabled()`. The `currentDatabase` requirement is enforced at
-   * the point it's actually needed — `withAdvisoryLock` /
-   * `generateMigratorAdvisoryLockId`, which throw if an advisory-lock-capable
-   * adapter can't supply the DB name — rather than silently skipping the lock
-   * here (which Rails never does).
+   * the point it's actually needed — `generateMigratorAdvisoryLockId`, which
+   * throws if an advisory-lock-capable adapter can't supply the DB name —
+   * rather than silently skipping the lock here (which Rails never does).
    */
   isUseAdvisoryLock(): boolean {
-    return !!this.connection.isAdvisoryLocksEnabled?.();
+    return this.connection.isAdvisoryLocksEnabled();
   }
 
   /** @internal Mirrors: ActiveRecord::Migrator#generate_migrator_advisory_lock_id */
@@ -2804,7 +2811,9 @@ export class Migrator {
       this._runOptions(direction, targetVersion),
     );
     try {
-      return await migrator.withAdvisoryLock(() => migrator.runWithoutLock());
+      return migrator.isUseAdvisoryLock()
+        ? await migrator.withAdvisoryLock(() => migrator.runWithoutLock())
+        : await migrator.runWithoutLock();
     } finally {
       this._invalidateMigrated();
     }
