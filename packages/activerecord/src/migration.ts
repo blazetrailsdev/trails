@@ -658,14 +658,14 @@ export abstract class Migration {
   async changeColumnDefault(
     tableName: string,
     columnName: string,
-    options: { from?: unknown; to: unknown } | unknown,
+    defaultOrChanges: unknown,
   ): Promise<void> {
     if (this._recording) {
-      this._recorder.record("changeColumnDefault", [tableName, columnName, options]);
+      this._recorder.record("changeColumnDefault", [tableName, columnName, defaultOrChanges]);
       return;
     }
     tableName = this._pt(tableName);
-    await this.connection.changeColumnDefault(tableName, columnName, options);
+    await this.connection.changeColumnDefault(tableName, columnName, defaultOrChanges);
   }
 
   async changeColumnNull(
@@ -2597,10 +2597,7 @@ export class Migrator {
     if (this._internalMetadata.enabled) {
       // `NullConfig#env_name` is nil for a bare-adapter Migrator, as in Rails
       // (`abstract/connection_pool.rb:17-22`); the cast narrows, it does not default.
-      await this._internalMetadata.set(
-        "environment",
-        this.connection.pool.dbConfig.envName as string,
-      );
+      await this._internalMetadata.set("environment", this.connection.pool.dbConfig.envName);
     }
   }
 

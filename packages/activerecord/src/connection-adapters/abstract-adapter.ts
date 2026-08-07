@@ -264,7 +264,7 @@ export interface AbstractAdapter {
   changeColumnDefault(
     tableName: string,
     columnName: string,
-    options: { from?: unknown; to: unknown } | unknown,
+    defaultOrChanges: unknown,
   ): Promise<void>;
   changeColumnNull(
     tableName: string,
@@ -830,7 +830,7 @@ export class AbstractAdapter implements Quoting {
     // adapter carries a NullPool until a real ConnectionPool claims it (the pool
     // overwrites `pool` when it owns the connection), so `connection_pool` on a
     // connect-time error is a NullPool rather than null.
-    this.pool = new NullPool();
+    this.pool = new NullPool() as unknown as ConnectionPool;
   }
 
   protected _visitor!: Visitors.ToSql;
@@ -874,8 +874,13 @@ export class AbstractAdapter implements Quoting {
   _queryCache: Store | null = null;
 
   // Rails' @pool is a ConnectionPool once one owns the connection and a
-  // NullPool until then (abstract_adapter.rb:153).
-  pool: ConnectionPool | NullPool = new NullPool();
+  // NullPool until then (abstract_adapter.rb:153). Ruby's ivar is untyped, so
+  // `@pool.role` / `@pool.shard` (abstract_adapter.rb:288,294) are unchecked
+  // sends that raise NoMethodError while the NullPool is still in the slot.
+  // The declared type is the pool those readers assume; the single cast is the
+  // NullPool seed itself, so the unchecked-ness sits at Rails' assignment
+  // rather than being re-asserted at each reader.
+  pool: ConnectionPool = new NullPool() as unknown as ConnectionPool;
   logger: unknown = null;
   lock: unknown = null;
   /** Stable per-instance hex slot + monotonic source for {@link inspect}. @internal */
@@ -1404,15 +1409,11 @@ export class AbstractAdapter implements Quoting {
   }
 
   get role(): string {
-    // Ruby's `@pool.role` (`abstract_adapter.rb:288`) is an unchecked send that
-    // raises NoMethodError on a NullPool — which Rails never reaches, because an
-    // adapter is only ever obtained from a real pool. The cast is that same
-    // unchecked read; no trails path reads `role` off a pool-less adapter either.
-    return (this.pool as ConnectionPool).role;
+    return this.pool.role;
   }
 
   get shard(): string {
-    return (this.pool as ConnectionPool).shard;
+    return this.pool.shard;
   }
 
   /**
