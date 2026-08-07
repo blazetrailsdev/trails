@@ -701,6 +701,7 @@ export function extractFromProgram(
         const fnOptionKeys = extractOptionKeys(node.parameters, checker);
         const fnCalls = extractCalls(node.body);
         const fnCallSeq = extractCallSeq(node.body);
+        const fnSkeleton = extractSkeleton(node.body);
         const internal = hasInternalJsDocTag(node);
         const noRailsEquivalent = noRailsEquivalentReason(node);
         const fnMissingRailsCalls = missingRailsCallTags(node);
@@ -716,6 +717,7 @@ export function extractFromProgram(
           ...(fnOptionKeys !== undefined ? { optionKeys: fnOptionKeys } : {}),
           ...(fnCalls !== undefined ? { calls: fnCalls } : {}),
           ...(fnCallSeq !== undefined ? { callSeq: fnCallSeq } : {}),
+          ...(fnSkeleton !== undefined ? { skeleton: fnSkeleton } : {}),
           ...(fnMissingRailsCalls !== undefined ? { missingRailsCalls: fnMissingRailsCalls } : {}),
         });
       } else if (ts.isVariableStatement(node) && isExported(node)) {
@@ -2033,6 +2035,7 @@ export function extractClass(
       const suppressed = namespaceSelfDelegationName(member.body, checker) === memberName;
       const calls = suppressed ? undefined : extractCalls(member.body);
       const callSeq = suppressed ? undefined : extractCallSeq(member.body);
+      const skeleton = suppressed ? undefined : extractSkeleton(member.body);
       const delegatesTo = delegationTargetName(member.body, memberName, name, checker);
       if (delegatesTo) delegationTargets.add(delegatesTo);
       const method: MethodInfo = {
@@ -2047,6 +2050,7 @@ export function extractClass(
         ...(optionKeys !== undefined ? { optionKeys } : {}),
         ...(calls !== undefined ? { calls } : {}),
         ...(callSeq !== undefined ? { callSeq } : {}),
+        ...(skeleton !== undefined ? { skeleton } : {}),
         ...(delegatesTo !== undefined ? { delegatesTo } : {}),
       };
       // Only instance methods are reachable via `this.helper(...)` and only
@@ -2067,6 +2071,7 @@ export function extractClass(
       // calls here so calls-parity can flag a ported constructor that drops it.
       const calls = extractCalls(member.body);
       const callSeq = extractCallSeq(member.body);
+      const skeleton = extractSkeleton(member.body);
       instanceMethods.push({
         name: "constructor",
         visibility,
@@ -2077,6 +2082,7 @@ export function extractClass(
         ...tagged,
         ...(calls !== undefined ? { calls } : {}),
         ...(callSeq !== undefined ? { callSeq } : {}),
+        ...(skeleton !== undefined ? { skeleton } : {}),
       });
     } else if (ts.isGetAccessorDeclaration(member) && memberName) {
       const method: MethodInfo = {
@@ -2557,6 +2563,117 @@ function isNegatedOperand(expr: ts.Node): boolean {
  */
 function extractCallSeq(node: ts.Node | undefined): string[] | undefined {
   return collectCalls(node);
+}
+
+/**
+ * Logical operators that token as `if`: each is a conditional reach, and Ruby's
+ * `a || b` and the port's `const x = a; if (!x) b` are the same one.
+ *
+ * A hoisted function rather than a module-level `Set`, because the worker-thread
+ * dispatch block at the top of this file runs before a `const` down here is
+ * initialized and would read it in TDZ.
+ */
+function isSkeletonLogicalOp(kind: ts.SyntaxKind): boolean {
+  switch (kind) {
+    case ts.SyntaxKind.BarBarToken:
+    case ts.SyntaxKind.AmpersandAmpersandToken:
+    case ts.SyntaxKind.QuestionQuestionToken:
+    case ts.SyntaxKind.BarBarEqualsToken:
+    case ts.SyntaxKind.AmpersandAmpersandEqualsToken:
+    case ts.SyntaxKind.QuestionQuestionEqualsToken:
+      return true;
+    default:
+      return false;
+  }
+}
+
+/**
+ * The body as an ordered CONTROL + call skeleton — the stream a call-SEQUENCE
+ * comparison reads (RFC 0084), modelled on
+ * scripts/prism-codegen/score.ts:skeletonTokens. Neither `calls` nor `callSeq`
+ * can stand in for it: both are deduplicated and neither records control flow,
+ * so a dropped guard, an inverted branch, or a collaborator called once where
+ * Rails calls it twice is invisible to them. Names are raw, as `calls` records
+ * them — the Ruby↔TS conventions live in compare.ts. Signal only; nothing gates
+ * on it yet.
+ */
+function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
+  if (!node) return undefined;
+  const tokens: string[] = [];
+  const calleeNodes = new Set<ts.Node>();
+  const visit = (n: ts.Node): void => {
+    switch (n.kind) {
+      case ts.SyntaxKind.IfStatement:
+      case ts.SyntaxKind.ConditionalExpression:
+      case ts.SyntaxKind.SwitchStatement:
+        tokens.push("if");
+        break;
+      case ts.SyntaxKind.BinaryExpression: {
+        const bin = n as ts.BinaryExpression;
+        if (isSkeletonLogicalOp(bin.operatorToken.kind)) {
+          visit(bin.left);
+          tokens.push("if");
+          visit(bin.right);
+          return;
+        }
+        break;
+      }
+      case ts.SyntaxKind.WhileStatement:
+      case ts.SyntaxKind.DoStatement:
+      case ts.SyntaxKind.ForStatement:
+      case ts.SyntaxKind.ForOfStatement:
+      case ts.SyntaxKind.ForInStatement:
+        tokens.push("loop");
+        break;
+      case ts.SyntaxKind.TryStatement:
+        tokens.push("try");
+        break;
+      case ts.SyntaxKind.ThrowStatement:
+        tokens.push("throw");
+        break;
+      case ts.SyntaxKind.NewExpression: {
+        const ctor = (n as ts.NewExpression).expression;
+        tokens.push(
+          `new:${
+            ts.isIdentifier(ctor)
+              ? ctor.text
+              : ts.isPropertyAccessExpression(ctor)
+                ? ctor.name.text
+                : "?"
+          }`,
+        );
+        break;
+      }
+      case ts.SyntaxKind.CallExpression: {
+        const callee = (n as ts.CallExpression).expression;
+        if (ts.isIdentifier(callee)) {
+          tokens.push(`ref:${callee.text}`);
+          calleeNodes.add(callee);
+        } else if (ts.isPropertyAccessExpression(callee)) {
+          tokens.push(`ref:${callee.name.text}`);
+          calleeNodes.add(callee);
+        } else if (callee.kind === ts.SyntaxKind.SuperKeyword) {
+          tokens.push("ref:super");
+        }
+        break;
+      }
+      case ts.SyntaxKind.PropertyAccessExpression: {
+        // A property READ is a Ruby reader send, the same rule collectCalls
+        // applies. An assignment target is the writer send `foo=`, not `foo`.
+        const access = n as ts.PropertyAccessExpression;
+        if (!calleeNodes.has(access) && !isAssignmentWriteTarget(access)) {
+          tokens.push(`ref:${access.name.text}`);
+        }
+        break;
+      }
+      case ts.SyntaxKind.ElementAccessExpression:
+        tokens.push("ref:get");
+        break;
+    }
+    ts.forEachChild(n, visit);
+  };
+  ts.forEachChild(node, visit);
+  return tokens.length === 0 ? undefined : tokens;
 }
 
 function extractCalls(node: ts.Node | undefined): string[] | undefined {

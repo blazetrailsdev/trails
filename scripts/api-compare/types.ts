@@ -50,6 +50,14 @@ export interface MethodInfo {
    */
   callSeq?: string[];
   /**
+   * Both extractors (RFC 0084): the body's ordered control + call skeleton —
+   * `if` / `loop` / `try` / `throw`, `new:Ctor`, `ref:<name>` — in source order,
+   * WITH duplicates. `calls` and `callSeq` are both deduplicated and record no
+   * control flow, so neither carries a dropped guard or an inverted branch.
+   * Names are raw on both sides. Signal only; nothing gates on it yet.
+   */
+  skeleton?: string[];
+  /**
    * Ruby-side only (RFC 0083): the subset of `calls` whose every occurrence in
    * the body had a provably inert receiver — a local variable or a literal
    * (`xs.first`, `opts.fetch`, `{}.merge`). Those say nothing about the port,

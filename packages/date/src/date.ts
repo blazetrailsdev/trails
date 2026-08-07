@@ -1787,6 +1787,26 @@ const UNIX_EPOCH_IN_CJD = 2440588;
 const MINUTE_IN_SECONDS = 60;
 const HOUR_IN_SECONDS = 3600;
 const DAY_IN_SECONDS = 86400;
+const SECOND_IN_NANOSECONDS = 1_000_000_000;
+
+/**
+ * @internal `date_core.c` `sec_to_ns` (`date_core.c:1054-1059`): a count of
+ * seconds as nanoseconds. The C keeps the product exact — it is a Rational
+ * whenever its argument is — so the result here can carry a fraction of a
+ * nanosecond, as `DateTime.parse("...00.9999999999").sec_fraction` does.
+ */
+function secToNs(s: number): number {
+  return s * SECOND_IN_NANOSECONDS;
+}
+
+/**
+ * @internal `date_core.c` `ns_to_sec` (`date_core.c:993-998`), the inverse.
+ * MRI answers a Rational; a JS number is the nearest analogue, as
+ * `Time#subsec` already documents.
+ */
+function nsToSec(n: number): number {
+  return n / SECOND_IN_NANOSECONDS;
+}
 
 /** @internal 1970-01-01, the day {@link UNIX_EPOCH_IN_CJD} numbers. */
 const UNIX_EPOCH = new Temporal.PlainDate(1970, 1, 1);
@@ -2249,12 +2269,15 @@ export function dtNewByFrags(hash: DateParts): DateTime {
   if (rt === null) throw new DateError("invalid date");
   const [rh, rmin, rs] = rt;
 
+  const df = timeToDf(rh, rmin, rs);
+
+  const sf = hash.secFraction == null ? 0 : secToNs(hash.secFraction);
+
   const t = hash.offset;
   let of = t == null ? 0 : t instanceof Rational ? t.numerator / t.denominator : t;
   if (of < -DAY_IN_SECONDS || of > DAY_IN_SECONDS) of = 0;
 
-  const df = timeToDf(rh, rmin, rs);
-  return new DateTime(jdLocalToUtc(jd, df, of), dfLocalToUtc(df, of), of);
+  return new DateTime(jdLocalToUtc(jd, df, of), dfLocalToUtc(df, of), sf, of);
 }
 
 /**
@@ -2558,6 +2581,13 @@ export class DateTime extends Date {
    */
   readonly #date: Temporal.PlainDate;
   readonly #df: number;
+  /**
+   * @internal `ComplexDateData`'s `sf`, the sub-second part in **nanoseconds**
+   * (`date_core.c:215-231`). `jd_local_to_utc` / `df_local_to_utc` do not touch
+   * it, so unlike {@link #date} and {@link #df} it is the same value read
+   * locally or in UTC.
+   */
+  readonly #sf: number;
   readonly #of: number;
 
   /**
@@ -2592,6 +2622,15 @@ export class DateTime extends Date {
    * `datetime_initialize` (`date_core.c:5147-5220`) validates the civil date with
    * `c_valid_civil_p` and the time of day with `c_valid_time_p`, then stores the
    * day and day-fraction in UTC — which is what the two conversions below do.
+   *
+   * A fractional `second` is split off by `num2int_with_frac`
+   * (`date_core.c:3296-3304`), which truncates the whole second and carries the
+   * remainder to `add_frac`'s `d_lite_plus` (`date_core.c:3313-3318`). That
+   * lands in the `T_FLOAT` arm, whose `sf = (int)round(o)` over
+   * `o *= SECOND_IN_NANOSECONDS` (`date_core.c:6094-6097`) is where the
+   * rounding to a whole nanosecond happens — so
+   * `DateTime.new(2008, 3, 1, 6, 0, 0.3).strftime("%N")` is `"300000000"`,
+   * where `Time#nsec` truncates the double and answers `299999999`.
    */
   constructor(
     year: number,
@@ -2608,10 +2647,11 @@ export class DateTime extends Date {
    * `HAVE_JD | HAVE_DF`: the day and day-fraction it has already converted to
    * UTC (`date_core.c:8311-8313`) and the offset are written straight into a
    * fresh `ComplexDateData`, with neither a civil triple nor a time of day to
-   * validate. The arguments are `d_complex_new_internal`'s own `rjd`, `df` and
-   * `of`. Same TS shortcoming as {@link Date}'s counterpart overload.
+   * validate. The arguments are `d_complex_new_internal`'s own `rjd`, `df`,
+   * `sf` and `of`, in that order. Same TS shortcoming as {@link Date}'s
+   * counterpart overload.
    */
-  constructor(rjd: Temporal.PlainDate, df: number, of: number);
+  constructor(rjd: Temporal.PlainDate, df: number, sf: number, of: number);
   constructor(
     year: number | Temporal.PlainDate,
     month = 1,
@@ -2622,20 +2662,24 @@ export class DateTime extends Date {
     offset = 0,
   ) {
     if (year instanceof Temporal.PlainDate) {
-      super(jdUtcToLocal(year, month, day));
+      super(jdUtcToLocal(year, month, hour));
       this.#date = year;
       this.#df = month;
-      this.#of = day;
+      this.#sf = day;
+      this.#of = hour;
       return;
     }
     super(year, month, day);
     const rjd = cValidCivilP(year, month, day);
     if (rjd === null) throw new DateError("invalid date");
-    const rt = cValidTimeP(hour, minute, second);
+    const s = Math.trunc(second);
+    const fr = second - s;
+    const rt = cValidTimeP(hour, minute, s);
     if (rt === null) throw new DateError("invalid date");
     const df = timeToDf(rt[0], rt[1], rt[2]);
     this.#date = jdLocalToUtc(rjd, df, offset);
     this.#df = dfLocalToUtc(df, offset);
+    this.#sf = Math.round(secToNs(fr));
     this.#of = offset;
   }
 
@@ -2713,6 +2757,18 @@ export class DateTime extends Date {
   }
 
   /**
+   * Ruby `DateTime#sec_fraction` (ruby/date, `date_core.c`
+   * `d_lite_sec_fraction` over `m_sf_in_sec`, `date_core.c:1568-1572`): the
+   * fractional part of the second, in `0...1`. MRI answers a Rational —
+   * `DateTime.new(2001, 2, 3, 4, 5, 6.5).sec_fraction` is `(1/2)` — and a JS
+   * number is the nearest analogue, as `Time#subsec` already documents. The
+   * whole second stays on {@link sec}, exactly as `::Time` splits them.
+   */
+  get secFraction(): number {
+    return nsToSec(this.#sf);
+  }
+
+  /**
    * Ruby `DateTime#zone` (ruby/date, `date_core.c` `d_lite_zone` over
    * `m_zone`, `date_core.c:1982-1988`): the UTC offset spelled by `of2str`,
    * where `Time#zone` is the zone's name. A `Date` — `simple_dat_p` — has no
@@ -2744,7 +2800,11 @@ export class DateTime extends Date {
         hour: this.hour,
         min: this.min,
         sec: this.sec,
-        nsec: 0,
+        // `%N` truncates rather than rounds (`date_strftime.c`'s `%N` takes the
+        // leading `w` digits of `sf`), which is what keeps
+        // `DateTime.parse("...00.9999999999").strftime("%N")` at `"999999999"`
+        // where the stored `sf` is a fraction of a nanosecond above it.
+        nsec: Math.trunc(this.#sf),
         zone: this.zone,
         utcOffset: this.#of,
       },

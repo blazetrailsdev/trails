@@ -226,6 +226,50 @@ describe("body call capture", () => {
     expect(swapped.callSeq).toEqual(["save", "build"]);
   });
 
+  it("emits an ordered control + call skeleton, with duplicates, alongside calls", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        create(xs: string[]) {
+          if (this.dirty) throw new Boom();
+          for (const x of xs) this.save(x);
+          try {
+            this.save(xs[0]);
+          } catch {
+            this.rollback();
+          }
+        }
+      }`,
+    );
+    const create = cls.instanceMethods.find((m) => m.name === "create")!;
+    // `calls` and `callSeq` are both deduplicated and carry no control flow —
+    // `save` appears once in each and neither shows the guard or the loop.
+    expect(create.callSeq).toEqual(["dirty", "constructor", "save", "rollback"]);
+    expect(create.skeleton).toEqual([
+      "if",
+      "ref:dirty",
+      "throw",
+      "new:Boom",
+      "loop",
+      "ref:save",
+      "try",
+      "ref:save",
+      "ref:get",
+      "ref:rollback",
+    ]);
+  });
+
+  it("tokens a logical operator as if, between its operands", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        create() {
+          return this.cached() ?? this.build();
+        }
+      }`,
+    );
+    const create = cls.instanceMethods.find((m) => m.name === "create")!;
+    expect(create.skeleton).toEqual(["ref:cached", "if", "ref:build"]);
+  });
+
   it("marks a call made in a negated position with the ! prefix", () => {
     // The faithful port of ActiveSupport's `exclude?` (`!include?`); the
     // call ratchet requires the marker before crediting a negating alias.
