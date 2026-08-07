@@ -372,8 +372,11 @@ export class DeleteRestrictionError extends ActiveRecordError {
  * Thrown when a `has_one` association is assigned by mass assignment —
  * `owner.assignAttributes({ account: x })`, `new Owner({ account: x })` — on a
  * *persisted* owner. (RFC 0087 §1 removed the native `=` setter that also
- * raised this; the mass-assignment arm is retired by that RFC's
- * `retire-sync-association-mass-assignment-arms`.) This is a deliberate
+ * raised this. The mass-assignment arm is the campaign's deliberate residue:
+ * Rails' `assign_attributes` returns nil and does its work inline
+ * (`activemodel/lib/active_model/attribute_assignment.rb:32-35`), so trails'
+ * `assignAttributes` stays synchronous too — which leaves this the only way to
+ * report a write it cannot await.) This is a deliberate
  * trails-only deviation with no Rails counterpart: Rails'
  * `HasOneAssociation#replace` persists the displacement + new record inline at
  * assignment, which is synchronous DB I/O JS cannot do from a property setter.
@@ -444,6 +447,11 @@ export class CollectionPersistedAssignmentError extends ActiveRecordError {
  * rather than a catchable throw, and let an immediate `save()` race the
  * in-flight resolution. See RFC
  * 0068-awaitable-has-one-setter ("Why 'loud' beats 'deferred'").
+ *
+ * RFC 0087 §1 listed this class for deletion; it survives that campaign
+ * deliberately, for the same reason {@link HasOnePersistedAssignmentError}
+ * does — mass assignment is synchronous by design, so the ids arm keeps a
+ * permanent caller.
  */
 export class CollectionIdsAssignmentError extends ActiveRecordError {
   readonly association: string;

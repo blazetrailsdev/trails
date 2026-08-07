@@ -339,7 +339,7 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   });
 
   await define("accounts", {}, (t) => {
-    t.integer("firm_id");
+    t.bigInteger("firm_id");
     t.string("firm_name");
     t.integer("credit_limit");
     t.string("status");
@@ -365,7 +365,8 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
     t.string("json_data", { limit: 1024, null: true });
     t.string("json_data_empty", { limit: 1024, null: true, default: "" });
     t.text("params");
-    t.integer("account_id");
+    t.bigInteger("account_id");
+    t.index("account_id");
     t.json("json_options");
   });
 
@@ -379,7 +380,8 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
     t.string("json_data", { limit: 1024, null: true });
     t.string("json_data_empty", { limit: 1024, null: true, default: "" });
     t.text("params");
-    t.integer("account_id");
+    t.bigInteger("account_id");
+    t.index("account_id");
   });
 
   await define("aircraft", {}, (t) => {
@@ -392,18 +394,23 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   await define("articles", {}, (t) => {});
 
   await define("articles_magazines", {}, (t) => {
-    t.integer("article_id");
-    t.integer("magazine_id");
+    t.bigInteger("article_id");
+    t.index("article_id");
+    t.bigInteger("magazine_id");
+    t.index("magazine_id");
   });
 
   await define("articles_tags", {}, (t) => {
-    t.integer("article_id");
-    t.integer("tag_id");
+    t.bigInteger("article_id");
+    t.index("article_id");
+    t.bigInteger("tag_id");
+    t.index("tag_id");
   });
 
   await define("attachments", {}, (t) => {
-    t.integer("record_id", { null: false });
+    t.bigInteger("record_id", { null: false });
     t.string("record_type", { null: false });
+    t.index(["record_type", "record_id"], { name: "index_attachments_on_record" });
   });
 
   await define("audit_logs", {}, (t) => {
@@ -416,8 +423,10 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
 
   await define("authors", {}, (t) => {
     t.string("name", { null: false });
-    t.integer("author_address_id");
-    t.integer("author_address_extra_id");
+    t.bigInteger("author_address_id");
+    t.index("author_address_id");
+    t.bigInteger("author_address_extra_id");
+    t.index("author_address_extra_id");
     t.string("organization_id");
     t.string("owned_essay_id");
   });
@@ -447,7 +456,8 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   });
 
   await define("books", {}, (t) => {
-    t.integer("author_id");
+    t.bigInteger("author_id");
+    t.index("author_id");
     t.string("format");
     t.integer("format_record_id");
     t.string("format_record_type");
@@ -476,7 +486,8 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   });
 
   await define("encrypted_books", {}, (t) => {
-    t.integer("author_id");
+    t.bigInteger("author_id");
+    t.index("author_id");
     t.string("format");
     t.string("name", { limit: 1024, default: "<untitled>" });
     t.string("original_name");
@@ -493,7 +504,8 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   });
 
   await define("branches", {}, (t) => {
-    t.integer("branch_id");
+    t.bigInteger("branch_id");
+    t.index("branch_id");
   });
 
   await define("bulbs", { serialPk: "ID" }, (t) => {
@@ -638,7 +650,8 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   });
 
   await define("paragraphs", {}, (t) => {
-    t.integer("book_id");
+    t.bigInteger("book_id");
+    t.index("book_id");
   });
 
   await define("clothing_items", {}, (t) => {
@@ -655,8 +668,9 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
 
   await define("sharded_blog_posts", {}, (t) => {
     t.string("title");
-    t.integer("parent_id");
+    t.bigInteger("parent_id");
     t.string("parent_type");
+    t.index(["parent_type", "parent_id"], { name: "index_sharded_blog_posts_on_parent" });
     t.integer("blog_id");
     t.integer("revision");
   });
@@ -692,7 +706,8 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   });
 
   await define("columns", {}, (t) => {
-    t.integer("record_id");
+    t.bigInteger("record_id");
+    t.index("record_id");
   });
 
   await define("comments", {}, (t) => {
@@ -703,8 +718,9 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
     t.integer("tags_count", { default: 0 });
     t.integer("children_count", { default: 0 });
     t.integer("parent_id");
-    t.integer("author_id");
+    t.bigInteger("author_id");
     t.string("author_type");
+    t.index(["author_type", "author_id"], { name: "index_comments_on_author" });
     t.string("resource_id");
     t.string("resource_type");
     t.integer("origin_id");
@@ -719,13 +735,13 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   await define("comment_overlapping_counter_caches", {}, (t) => {
     t.integer("user_comments_count_id");
     t.integer("post_comments_count_id");
-    t.integer("commentable_id");
+    t.bigInteger("commentable_id");
     t.string("commentable_type");
   });
 
   await define("companies", {}, (t) => {
     t.string("type");
-    t.integer("firm_id");
+    t.bigInteger("firm_id");
     t.string("firm_name");
     t.string("name");
     t.bigInteger("client_of");
@@ -779,15 +795,17 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   });
 
   await define("computers_developers", { id: false }, (t) => {
-    t.integer("computer_id");
-    t.integer("developer_id");
+    t.bigInteger("computer_id");
+    t.index("computer_id");
+    t.bigInteger("developer_id");
+    t.index("developer_id");
     t.datetime("created_at");
     t.datetime("updated_at");
   });
 
   await define("contracts", {}, (t) => {
-    t.integer("developer_id");
-    t.integer("company_id");
+    t.bigInteger("developer_id");
+    t.bigInteger("company_id");
     t.string("metadata");
     t.integer("count");
   });
@@ -802,8 +820,10 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   });
 
   await define("customer_carriers", {}, (t) => {
-    t.integer("customer_id");
-    t.integer("carrier_id");
+    t.bigInteger("customer_id");
+    t.index("customer_id");
+    t.bigInteger("carrier_id");
+    t.index("carrier_id");
   });
 
   await define("dashboards", { id: false }, (t) => {
@@ -828,23 +848,28 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
 
   await define("dl_keyed_belongs_tos", { serialPk: "belongs_key" }, (t) => {
     t.integer("belongs_key");
-    t.integer("destroy_async_parent_id");
+    t.bigInteger("destroy_async_parent_id");
+    t.index("destroy_async_parent_id");
   });
 
   await define("dl_keyed_belongs_to_soft_deletes", {}, (t) => {
-    t.integer("destroy_async_parent_soft_delete_id");
+    t.bigInteger("destroy_async_parent_soft_delete_id");
+    t.index("destroy_async_parent_soft_delete_id", { name: "soft_del_parent" });
     t.boolean("deleted");
   });
 
   await define("dl_keyed_has_ones", { serialPk: "has_one_key" }, (t) => {
     t.integer("has_one_key");
-    t.integer("destroy_async_parent_id");
-    t.integer("destroy_async_parent_soft_delete_id");
+    t.bigInteger("destroy_async_parent_id");
+    t.index("destroy_async_parent_id");
+    t.bigInteger("destroy_async_parent_soft_delete_id");
+    t.index("destroy_async_parent_soft_delete_id");
   });
 
   await define("dl_keyed_has_manies", { serialPk: "many_key" }, (t) => {
     t.integer("many_key");
-    t.integer("destroy_async_parent_id");
+    t.bigInteger("destroy_async_parent_id");
+    t.index("destroy_async_parent_id");
   });
 
   await define("dl_keyed_has_many_throughs", { serialPk: "through_key" }, (t) => {
@@ -853,15 +878,17 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
 
   await define("dl_keyed_joins", { serialPk: "joins_key" }, (t) => {
     t.integer("joins_key");
-    t.integer("destroy_async_parent_id");
-    t.integer("dl_keyed_has_many_through_id");
+    t.bigInteger("destroy_async_parent_id");
+    t.index("destroy_async_parent_id");
+    t.bigInteger("dl_keyed_has_many_through_id");
+    t.index("dl_keyed_has_many_through_id");
   });
 
   await define("developers", {}, (t) => {
     t.string("name");
     t.string("first_name");
     t.integer("salary", { default: 70000 });
-    t.integer("firm_id");
+    t.bigInteger("firm_id");
     t.integer("mentor_id");
     t.datetime("legacy_created_at");
     t.datetime("legacy_updated_at");
@@ -931,7 +958,8 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
     t.string("writer_type");
     t.string("category_id");
     t.string("author_id");
-    t.integer("book_id");
+    t.bigInteger("book_id");
+    t.index("book_id");
   });
 
   await define("events", {}, (t) => {
@@ -943,8 +971,10 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   await define("families", {}, (t) => {});
 
   await define("family_trees", {}, (t) => {
-    t.integer("family_id");
-    t.integer("member_id");
+    t.bigInteger("family_id");
+    t.index("family_id");
+    t.bigInteger("member_id");
+    t.index("member_id");
     t.string("token");
   });
 
@@ -1006,7 +1036,8 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   });
 
   await define("iris", {}, (t) => {
-    t.integer("eye_id");
+    t.bigInteger("eye_id");
+    t.index("eye_id");
     t.string("color");
   });
 
@@ -1019,8 +1050,10 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   });
 
   await define("jobs_pool", { id: false }, (t) => {
-    t.integer("job_id", { null: false });
-    t.integer("user_id", { null: false });
+    t.bigInteger("job_id", { null: false });
+    t.index("job_id");
+    t.bigInteger("user_id", { null: false });
+    t.index("user_id");
   });
 
   await define("keyboards", { serialPk: "key_number" }, (t) => {
@@ -1041,7 +1074,9 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
 
   await define("lessons_students", { id: false }, (t) => {
     t.bigInteger("lesson_id");
+    t.index("lesson_id");
     t.bigInteger("student_id");
+    t.index("student_id");
   });
 
   await define("students", {}, (t) => {
@@ -1091,8 +1126,8 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
 
   await define("members", {}, (t) => {
     t.string("name");
-    t.integer("member_type_id");
-    t.integer("admittable_id");
+    t.bigInteger("member_type_id");
+    t.bigInteger("admittable_id");
     t.string("admittable_type");
   });
 
@@ -1235,37 +1270,49 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   await define("treasures", {}, (t) => {
     t.string("name");
     t.string("type");
-    t.integer("looter_id");
+    t.bigInteger("looter_id");
     t.string("looter_type");
-    t.integer("ship_id");
+    t.index(["looter_type", "looter_id"], { name: "index_treasures_on_looter" });
+    t.bigInteger("ship_id");
+    t.index("ship_id");
   });
 
   await define("parrots_pirates", { id: false }, (t) => {
-    t.integer("parrot_id");
-    t.integer("pirate_id");
+    t.bigInteger("parrot_id");
+    t.index("parrot_id");
+    t.bigInteger("pirate_id");
+    t.index("pirate_id");
   });
 
   await define("parrots_treasures", { id: false }, (t) => {
-    t.integer("parrot_id");
-    t.integer("treasure_id");
+    t.bigInteger("parrot_id");
+    t.index("parrot_id");
+    t.bigInteger("treasure_id");
+    t.index("treasure_id");
   });
 
   await define("parrot_treasures", { id: false }, (t) => {
-    t.integer("parrot_id");
-    t.integer("treasure_id");
+    t.bigInteger("parrot_id");
+    t.index("parrot_id");
+    t.bigInteger("treasure_id");
+    t.index("treasure_id");
   });
 
   await define("people", {}, (t) => {
     t.string("first_name", { null: false });
-    t.integer("primary_contact_id");
+    t.bigInteger("primary_contact_id");
+    t.index("primary_contact_id");
     t.string("gender", { limit: 1 });
-    t.integer("number1_fan_id");
+    t.bigInteger("number1_fan_id");
+    t.index("number1_fan_id");
     t.integer("lock_version", { null: false, default: 0 });
     t.string("comments");
     t.integer("followers_count", { default: 0 });
     t.integer("friends_too_count", { default: 0 });
-    t.integer("best_friend_id");
-    t.integer("best_friend_of_id");
+    t.bigInteger("best_friend_id");
+    t.index("best_friend_id");
+    t.bigInteger("best_friend_of_id");
+    t.index("best_friend_of_id");
     t.integer("insures", { null: false, default: 0 });
     t.datetime("born_at");
     t.integer("cars_count", { default: 0 });
@@ -1303,7 +1350,7 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
     // Rails: `t.references :author` — references default `index: true`, so
     // schema.rb emits index_posts_on_author_id (load-bearing for the SQLite
     // explain eager-loading plan: SEARCH posts USING INDEX, not SCAN).
-    t.integer("author_id");
+    t.bigInteger("author_id");
     t.index("author_id", { name: "index_posts_on_author_id" });
     t.string("title", { null: false });
     t.text("body", { null: false });
@@ -1344,8 +1391,10 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   });
 
   await define("products", {}, (t) => {
-    t.integer("collection_id");
-    t.integer("type_id");
+    t.bigInteger("collection_id");
+    t.index("collection_id");
+    t.bigInteger("type_id");
+    t.index("type_id");
     t.string("name");
     t.decimal("price");
     t.decimal("discounted_price");
@@ -1358,7 +1407,7 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   await define("projects", {}, (t) => {
     t.string("name");
     t.string("type");
-    t.integer("firm_id");
+    t.bigInteger("firm_id");
     t.integer("mentor_id");
   });
 
@@ -1402,10 +1451,14 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   });
 
   await define("rooms", {}, (t) => {
-    t.integer("user_id");
-    t.integer("owner_id");
-    t.integer("landlord_id");
-    t.integer("tenant_id");
+    t.bigInteger("user_id");
+    t.index("user_id");
+    t.bigInteger("owner_id");
+    t.index("owner_id");
+    t.bigInteger("landlord_id");
+    t.index("landlord_id");
+    t.bigInteger("tenant_id");
+    t.index("tenant_id");
   });
 
   await define("seminars", {}, (t) => {
@@ -1468,12 +1521,15 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   });
 
   await define("sinks", {}, (t) => {
-    t.integer("kitchen_id");
+    t.bigInteger("kitchen_id");
+    t.index("kitchen_id");
   });
 
   await define("shop_accounts", {}, (t) => {
-    t.integer("customer_id");
-    t.integer("customer_carrier_id");
+    t.bigInteger("customer_id");
+    t.index("customer_id");
+    t.bigInteger("customer_carrier_id");
+    t.index("customer_carrier_id");
   });
 
   await define("speedometers", { id: false }, (t) => {
@@ -1484,9 +1540,9 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
 
   await define("sponsors", {}, (t) => {
     t.integer("club_id");
-    t.integer("sponsorable_id");
+    t.bigInteger("sponsorable_id");
     t.string("sponsorable_type");
-    t.integer("sponsor_id");
+    t.bigInteger("sponsor_id");
     t.string("sponsor_type");
   });
 
@@ -1572,7 +1628,8 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
     t.string("locale", { null: false });
     t.string("key", { null: false });
     t.string("value", { null: false });
-    t.integer("attachment_id");
+    t.bigInteger("attachment_id");
+    t.index("attachment_id");
   });
 
   await define("tuning_pegs", {}, (t) => {
@@ -1591,7 +1648,8 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   });
 
   await define("variants", {}, (t) => {
-    t.integer("product_id");
+    t.bigInteger("product_id");
+    t.index("product_id");
     t.string("name");
   });
 
@@ -1626,7 +1684,7 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
     t.string("poly_human_without_inverse_type");
     t.integer("puzzled_polymorphic_human_id");
     t.string("puzzled_polymorphic_human_type");
-    t.integer("super_human_id");
+    t.bigInteger("super_human_id");
     t.string("super_human_type");
   });
 
@@ -1648,8 +1706,9 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
 
   await define("wheels", {}, (t) => {
     t.integer("size");
-    t.integer("wheelable_id");
+    t.bigInteger("wheelable_id");
     t.string("wheelable_type");
+    t.index(["wheelable_type", "wheelable_id"], { name: "index_wheels_on_wheelable" });
   });
 
   await define("countries", { primaryKey: ["country_id"] }, (t) => {
@@ -1813,8 +1872,8 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   });
 
   await define("courses_professors", { id: false, arunit2: true }, (t) => {
-    t.integer("course_id");
-    t.integer("professor_id");
+    t.bigInteger("course_id");
+    t.bigInteger("professor_id");
     t.index("course_id");
     t.index("professor_id");
   });

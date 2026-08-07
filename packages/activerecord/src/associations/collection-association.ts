@@ -157,6 +157,13 @@ export class CollectionAssociation extends Association {
    *   deferring the writes to the owner's next `save()` (where a deferred
    *   delete can race an interim insert) we throw and name the awaitable
    *   Rails-named replacement (`await owner.items.replace([...])`).
+   *
+   * RFC 0087 §1 listed this for deletion with the property setter it backed.
+   * The setter is gone; this survives deliberately, because Rails'
+   * `assign_attributes` returns nil and assigns inline
+   * (`activemodel/lib/active_model/attribute_assignment.rb:32-35`) — trails
+   * matches that, so mass assignment can never await and this is its only
+   * route into the collection writer.
    */
   syncWrite(records: Base[]): void {
     // Rails' `replace` raises a class mismatch for every element as its very

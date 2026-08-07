@@ -32,7 +32,7 @@ export const TEST_SCHEMA: Schema = {
   },
 
   accounts: {
-    firm_id: "integer",
+    firm_id: "big_integer",
     firm_name: "string",
     credit_limit: "integer",
     status: "string",
@@ -51,33 +51,39 @@ export const TEST_SCHEMA: Schema = {
   },
 
   admin_users: {
-    name: "string",
-    region_id: "integer",
-    settings: { type: "string", null: true, limit: 1024 },
-    parent: { type: "string", null: true, limit: 1024 },
-    spouse: { type: "string", null: true, limit: 1024 },
-    configs: { type: "string", null: true, limit: 1024 },
-    // MySQL does not allow defaults on blobs; Rails fakes it with a large
-    // varchar, mirrored here.
-    preferences: { type: "string", null: true, default: "", limit: 1024 },
-    json_data: { type: "string", null: true, limit: 1024 },
-    json_data_empty: { type: "string", null: true, default: "", limit: 1024 },
-    params: "text",
-    account_id: "integer",
-    json_options: "json",
+    columns: {
+      name: "string",
+      region_id: "integer",
+      settings: { type: "string", null: true, limit: 1024 },
+      parent: { type: "string", null: true, limit: 1024 },
+      spouse: { type: "string", null: true, limit: 1024 },
+      configs: { type: "string", null: true, limit: 1024 },
+      // MySQL does not allow defaults on blobs; Rails fakes it with a large
+      // varchar, mirrored here.
+      preferences: { type: "string", null: true, default: "", limit: 1024 },
+      json_data: { type: "string", null: true, limit: 1024 },
+      json_data_empty: { type: "string", null: true, default: "", limit: 1024 },
+      params: "text",
+      account_id: "big_integer",
+      json_options: "json",
+    },
+    indexes: [{ columns: "account_id" }],
   },
 
   admin_user_jsons: {
-    name: "string",
-    settings: { type: "string", null: true, limit: 1024 },
-    parent: { type: "string", null: true, limit: 1024 },
-    spouse: { type: "string", null: true, limit: 1024 },
-    configs: { type: "string", null: true, limit: 1024 },
-    preferences: { type: "string", null: true, default: "", limit: 1024 },
-    json_data: { type: "string", null: true, limit: 1024 },
-    json_data_empty: { type: "string", null: true, default: "", limit: 1024 },
-    params: "text",
-    account_id: "integer",
+    columns: {
+      name: "string",
+      settings: { type: "string", null: true, limit: 1024 },
+      parent: { type: "string", null: true, limit: 1024 },
+      spouse: { type: "string", null: true, limit: 1024 },
+      configs: { type: "string", null: true, limit: 1024 },
+      preferences: { type: "string", null: true, default: "", limit: 1024 },
+      json_data: { type: "string", null: true, limit: 1024 },
+      json_data_empty: { type: "string", null: true, default: "", limit: 1024 },
+      params: "text",
+      account_id: "big_integer",
+    },
+    indexes: [{ columns: "account_id" }],
   },
 
   aircraft: {
@@ -90,19 +96,28 @@ export const TEST_SCHEMA: Schema = {
   articles: {},
 
   articles_magazines: {
-    article_id: "integer",
-    magazine_id: "integer",
+    columns: {
+      article_id: "big_integer",
+      magazine_id: "big_integer",
+    },
+    indexes: [{ columns: "article_id" }, { columns: "magazine_id" }],
   },
 
   articles_tags: {
-    article_id: "integer",
-    tag_id: "integer",
+    columns: {
+      article_id: "big_integer",
+      tag_id: "big_integer",
+    },
+    indexes: [{ columns: "article_id" }, { columns: "tag_id" }],
   },
 
   attachments: {
-    // Polymorphic reference expanded:
-    record_id: { type: "integer", null: false },
-    record_type: { type: "string", null: false },
+    columns: {
+      // Polymorphic reference expanded:
+      record_id: { type: "big_integer", null: false },
+      record_type: { type: "string", null: false },
+    },
+    indexes: [{ columns: ["record_type", "record_id"], name: "index_attachments_on_record" }],
   },
 
   audit_logs: {
@@ -114,11 +129,14 @@ export const TEST_SCHEMA: Schema = {
   author_addresses: {},
 
   authors: {
-    name: { type: "string", null: false },
-    author_address_id: "integer",
-    author_address_extra_id: "integer",
-    organization_id: "string",
-    owned_essay_id: "string",
+    columns: {
+      name: { type: "string", null: false },
+      author_address_id: "big_integer",
+      author_address_extra_id: "big_integer",
+      organization_id: "string",
+      owned_essay_id: "string",
+    },
+    indexes: [{ columns: "author_address_id" }, { columns: "author_address_extra_id" }],
   },
 
   author_favorites: {
@@ -162,7 +180,7 @@ export const TEST_SCHEMA: Schema = {
   // ids fit either width, so the override is dropped.
   books: {
     columns: {
-      author_id: "integer",
+      author_id: "big_integer",
       format: "string",
       format_record_id: "integer",
       format_record_type: "string",
@@ -194,17 +212,21 @@ export const TEST_SCHEMA: Schema = {
       { columns: ["author_id", "name"], unique: true },
       { columns: "isbn", unique: true, where: "published_on IS NOT NULL" },
       { columns: "(lower(external_id))", unique: true },
+      { columns: "author_id" },
     ],
   },
 
   encrypted_books: {
-    author_id: "integer",
-    format: "string",
-    name: { type: "string", default: "<untitled>", limit: 1024 },
-    original_name: "string",
-    logo: "binary",
-    created_at: "datetime",
-    updated_at: "datetime",
+    columns: {
+      author_id: "big_integer",
+      format: "string",
+      name: { type: "string", default: "<untitled>", limit: 1024 },
+      original_name: "string",
+      logo: "binary",
+      created_at: "datetime",
+      updated_at: "datetime",
+    },
+    indexes: [{ columns: "author_id" }],
   },
 
   hardbacks: {},
@@ -215,7 +237,10 @@ export const TEST_SCHEMA: Schema = {
   },
 
   branches: {
-    branch_id: "integer",
+    columns: {
+      branch_id: "big_integer",
+    },
+    indexes: [{ columns: "branch_id" }],
   },
 
   bulbs: {
@@ -399,7 +424,10 @@ export const TEST_SCHEMA: Schema = {
   },
 
   paragraphs: {
-    book_id: "integer",
+    columns: {
+      book_id: "big_integer",
+    },
+    indexes: [{ columns: "book_id" }],
   },
 
   clothing_items: {
@@ -415,11 +443,16 @@ export const TEST_SCHEMA: Schema = {
   },
 
   sharded_blog_posts: {
-    title: "string",
-    parent_id: "integer",
-    parent_type: "string",
-    blog_id: "integer",
-    revision: "integer",
+    columns: {
+      title: "string",
+      parent_id: "big_integer",
+      parent_type: "string",
+      blog_id: "integer",
+      revision: "integer",
+    },
+    indexes: [
+      { columns: ["parent_type", "parent_id"], name: "index_sharded_blog_posts_on_parent" },
+    ],
   },
 
   sharded_comments: {
@@ -453,42 +486,48 @@ export const TEST_SCHEMA: Schema = {
   },
 
   columns: {
-    record_id: "integer",
+    columns: {
+      record_id: "big_integer",
+    },
+    indexes: [{ columns: "record_id" }],
   },
 
   comments: {
-    post_id: { type: "integer", null: false },
-    body: { type: "text", null: false },
-    type: "string",
-    label: { type: "integer", default: 0 },
-    tags_count: { type: "integer", default: 0 },
-    children_count: { type: "integer", default: 0 },
-    parent_id: "integer",
-    author_id: "integer",
-    author_type: "string",
-    // Rails comment: kept as string so preload works when types don't match.
-    resource_id: "string",
-    resource_type: "string",
-    origin_id: "integer",
-    origin_type: "string",
-    developer_id: "integer",
-    updated_at: "datetime",
-    deleted_at: "datetime",
-    comments: "integer",
-    company: "integer",
+    columns: {
+      post_id: { type: "integer", null: false },
+      body: { type: "text", null: false },
+      type: "string",
+      label: { type: "integer", default: 0 },
+      tags_count: { type: "integer", default: 0 },
+      children_count: { type: "integer", default: 0 },
+      parent_id: "integer",
+      author_id: "big_integer",
+      author_type: "string",
+      // Rails comment: kept as string so preload works when types don't match.
+      resource_id: "string",
+      resource_type: "string",
+      origin_id: "integer",
+      origin_type: "string",
+      developer_id: "integer",
+      updated_at: "datetime",
+      deleted_at: "datetime",
+      comments: "integer",
+      company: "integer",
+    },
+    indexes: [{ columns: ["author_type", "author_id"], name: "index_comments_on_author" }],
   },
 
   comment_overlapping_counter_caches: {
     user_comments_count_id: "integer",
     post_comments_count_id: "integer",
-    commentable_id: "integer",
+    commentable_id: "big_integer",
     commentable_type: "string",
   },
 
   companies: {
     columns: {
       type: "string",
-      firm_id: "integer",
+      firm_id: "big_integer",
       firm_name: "string",
       name: "string",
       client_of: "big_integer",
@@ -562,11 +601,12 @@ export const TEST_SCHEMA: Schema = {
   // Rails declares `id: false` — pure join table, no synthetic PK.
   computers_developers: {
     columns: {
-      computer_id: "integer",
-      developer_id: "integer",
+      computer_id: "big_integer",
+      developer_id: "big_integer",
       created_at: "datetime",
       updated_at: "datetime",
     },
+    indexes: [{ columns: "computer_id" }, { columns: "developer_id" }],
     primaryKey: false,
   },
 
@@ -577,8 +617,8 @@ export const TEST_SCHEMA: Schema = {
   // `having` row Rails sandwiches between goofy_string_id and guids).
 
   contracts: {
-    developer_id: "integer",
-    company_id: "integer",
+    developer_id: "big_integer",
+    company_id: "big_integer",
     metadata: "string",
     count: "integer",
   },
@@ -593,8 +633,11 @@ export const TEST_SCHEMA: Schema = {
   },
 
   customer_carriers: {
-    customer_id: "integer",
-    carrier_id: "integer",
+    columns: {
+      customer_id: "big_integer",
+      carrier_id: "big_integer",
+    },
+    indexes: [{ columns: "customer_id" }, { columns: "carrier_id" }],
   },
 
   // Rails declares `id: false` with a string `dashboard_id` column — the
@@ -628,30 +671,39 @@ export const TEST_SCHEMA: Schema = {
   dl_keyed_belongs_tos: {
     columns: {
       belongs_key: "integer",
-      destroy_async_parent_id: "integer",
+      destroy_async_parent_id: "big_integer",
     },
+    indexes: [{ columns: "destroy_async_parent_id" }],
     primaryKey: ["belongs_key"],
   },
 
   dl_keyed_belongs_to_soft_deletes: {
-    destroy_async_parent_soft_delete_id: "integer",
-    deleted: "boolean",
+    columns: {
+      destroy_async_parent_soft_delete_id: "big_integer",
+      deleted: "boolean",
+    },
+    indexes: [{ columns: "destroy_async_parent_soft_delete_id", name: "soft_del_parent" }],
   },
 
   dl_keyed_has_ones: {
     columns: {
       has_one_key: "integer",
-      destroy_async_parent_id: "integer",
-      destroy_async_parent_soft_delete_id: "integer",
+      destroy_async_parent_id: "big_integer",
+      destroy_async_parent_soft_delete_id: "big_integer",
     },
+    indexes: [
+      { columns: "destroy_async_parent_id" },
+      { columns: "destroy_async_parent_soft_delete_id" },
+    ],
     primaryKey: ["has_one_key"],
   },
 
   dl_keyed_has_manies: {
     columns: {
       many_key: "integer",
-      destroy_async_parent_id: "integer",
+      destroy_async_parent_id: "big_integer",
     },
+    indexes: [{ columns: "destroy_async_parent_id" }],
     primaryKey: ["many_key"],
   },
 
@@ -665,9 +717,10 @@ export const TEST_SCHEMA: Schema = {
   dl_keyed_joins: {
     columns: {
       joins_key: "integer",
-      destroy_async_parent_id: "integer",
-      dl_keyed_has_many_through_id: "integer",
+      destroy_async_parent_id: "big_integer",
+      dl_keyed_has_many_through_id: "big_integer",
     },
+    indexes: [{ columns: "destroy_async_parent_id" }, { columns: "dl_keyed_has_many_through_id" }],
     primaryKey: ["joins_key"],
   },
 
@@ -675,7 +728,7 @@ export const TEST_SCHEMA: Schema = {
     name: "string",
     first_name: "string",
     salary: { type: "integer", default: 70000 },
-    firm_id: "integer",
+    firm_id: "big_integer",
     mentor_id: "integer",
     legacy_created_at: "datetime",
     legacy_updated_at: "datetime",
@@ -754,13 +807,16 @@ export const TEST_SCHEMA: Schema = {
   },
 
   essays: {
-    type: "string",
-    name: "string",
-    writer_id: "string",
-    writer_type: "string",
-    category_id: "string",
-    author_id: "string",
-    book_id: "integer",
+    columns: {
+      type: "string",
+      name: "string",
+      writer_id: "string",
+      writer_type: "string",
+      category_id: "string",
+      author_id: "string",
+      book_id: "big_integer",
+    },
+    indexes: [{ columns: "book_id" }],
   },
 
   events: {
@@ -772,9 +828,12 @@ export const TEST_SCHEMA: Schema = {
   families: {},
 
   family_trees: {
-    family_id: "integer",
-    member_id: "integer",
-    token: "string",
+    columns: {
+      family_id: "big_integer",
+      member_id: "big_integer",
+      token: "string",
+    },
+    indexes: [{ columns: "family_id" }, { columns: "member_id" }],
   },
 
   frogs: {
@@ -852,8 +911,11 @@ export const TEST_SCHEMA: Schema = {
   },
 
   iris: {
-    eye_id: "integer",
-    color: "string",
+    columns: {
+      eye_id: "big_integer",
+      color: "string",
+    },
+    indexes: [{ columns: "eye_id" }],
   },
 
   items: {
@@ -866,9 +928,10 @@ export const TEST_SCHEMA: Schema = {
 
   jobs_pool: {
     columns: {
-      job_id: { type: "integer", null: false },
-      user_id: { type: "integer", null: false },
+      job_id: { type: "big_integer", null: false },
+      user_id: { type: "big_integer", null: false },
     },
+    indexes: [{ columns: "job_id" }, { columns: "user_id" }],
     primaryKey: false,
   },
 
@@ -901,6 +964,7 @@ export const TEST_SCHEMA: Schema = {
       lesson_id: "big_integer",
       student_id: "big_integer",
     },
+    indexes: [{ columns: "lesson_id" }, { columns: "student_id" }],
     primaryKey: false,
   },
 
@@ -957,8 +1021,8 @@ export const TEST_SCHEMA: Schema = {
 
   members: {
     name: "string",
-    member_type_id: "integer",
-    admittable_id: "integer",
+    member_type_id: "big_integer",
+    admittable_id: "big_integer",
     admittable_type: "string",
   },
 
@@ -1122,53 +1186,70 @@ export const TEST_SCHEMA: Schema = {
   },
 
   treasures: {
-    name: "string",
-    type: "string",
-    looter_id: "integer",
-    looter_type: "string",
-    ship_id: "integer",
+    columns: {
+      name: "string",
+      type: "string",
+      looter_id: "big_integer",
+      looter_type: "string",
+      ship_id: "big_integer",
+    },
+    indexes: [
+      { columns: ["looter_type", "looter_id"], name: "index_treasures_on_looter" },
+      { columns: "ship_id" },
+    ],
   },
 
   parrots_pirates: {
     columns: {
-      parrot_id: "integer",
-      pirate_id: "integer",
+      parrot_id: "big_integer",
+      pirate_id: "big_integer",
     },
+    indexes: [{ columns: "parrot_id" }, { columns: "pirate_id" }],
     primaryKey: false,
   },
 
   parrots_treasures: {
     columns: {
-      parrot_id: "integer",
-      treasure_id: "integer",
+      parrot_id: "big_integer",
+      treasure_id: "big_integer",
     },
+    indexes: [{ columns: "parrot_id" }, { columns: "treasure_id" }],
     primaryKey: false,
   },
 
   parrot_treasures: {
     columns: {
-      parrot_id: "integer",
-      treasure_id: "integer",
+      parrot_id: "big_integer",
+      treasure_id: "big_integer",
     },
+    indexes: [{ columns: "parrot_id" }, { columns: "treasure_id" }],
     primaryKey: false,
   },
 
   people: {
-    first_name: { type: "string", null: false },
-    primary_contact_id: "integer",
-    gender: { type: "string", limit: 1 },
-    number1_fan_id: "integer",
-    lock_version: { type: "integer", null: false, default: 0 },
-    comments: "string",
-    followers_count: { type: "integer", default: 0 },
-    friends_too_count: { type: "integer", default: 0 },
-    best_friend_id: "integer",
-    best_friend_of_id: "integer",
-    insures: { type: "integer", null: false, default: 0 },
-    born_at: "datetime",
-    cars_count: { type: "integer", default: 0 },
-    created_at: { type: "datetime", null: false },
-    updated_at: { type: "datetime", null: false },
+    columns: {
+      first_name: { type: "string", null: false },
+      primary_contact_id: "big_integer",
+      gender: { type: "string", limit: 1 },
+      number1_fan_id: "big_integer",
+      lock_version: { type: "integer", null: false, default: 0 },
+      comments: "string",
+      followers_count: { type: "integer", default: 0 },
+      friends_too_count: { type: "integer", default: 0 },
+      best_friend_id: "big_integer",
+      best_friend_of_id: "big_integer",
+      insures: { type: "integer", null: false, default: 0 },
+      born_at: "datetime",
+      cars_count: { type: "integer", default: 0 },
+      created_at: { type: "datetime", null: false },
+      updated_at: { type: "datetime", null: false },
+    },
+    indexes: [
+      { columns: "primary_contact_id" },
+      { columns: "number1_fan_id" },
+      { columns: "best_friend_id" },
+      { columns: "best_friend_of_id" },
+    ],
   },
 
   peoples_treasures: {
@@ -1207,7 +1288,7 @@ export const TEST_SCHEMA: Schema = {
 
   posts: {
     columns: {
-      author_id: "integer",
+      author_id: "big_integer",
       title: { type: "string", null: false },
       body: { type: "text", null: false },
       type: "string",
@@ -1256,11 +1337,14 @@ export const TEST_SCHEMA: Schema = {
   },
 
   products: {
-    collection_id: "integer",
-    type_id: "integer",
-    name: "string",
-    price: "decimal",
-    discounted_price: "decimal",
+    columns: {
+      collection_id: "big_integer",
+      type_id: "big_integer",
+      name: "string",
+      price: "decimal",
+      discounted_price: "decimal",
+    },
+    indexes: [{ columns: "collection_id" }, { columns: "type_id" }],
   },
 
   product_types: {
@@ -1270,7 +1354,7 @@ export const TEST_SCHEMA: Schema = {
   projects: {
     name: "string",
     type: "string",
-    firm_id: "integer",
+    firm_id: "big_integer",
     mentor_id: "integer",
   },
 
@@ -1314,10 +1398,18 @@ export const TEST_SCHEMA: Schema = {
   },
 
   rooms: {
-    user_id: "integer",
-    owner_id: "integer",
-    landlord_id: "integer",
-    tenant_id: "integer",
+    columns: {
+      user_id: "big_integer",
+      owner_id: "big_integer",
+      landlord_id: "big_integer",
+      tenant_id: "big_integer",
+    },
+    indexes: [
+      { columns: "user_id" },
+      { columns: "owner_id" },
+      { columns: "landlord_id" },
+      { columns: "tenant_id" },
+    ],
   },
 
   // PR 0.5f group: S-W range in Rails source order. Covers the second
@@ -1383,11 +1475,19 @@ export const TEST_SCHEMA: Schema = {
 
   prisoners: { ship_id: "integer" },
 
-  sinks: { kitchen_id: "integer" },
+  sinks: {
+    columns: {
+      kitchen_id: "big_integer",
+    },
+    indexes: [{ columns: "kitchen_id" }],
+  },
 
   shop_accounts: {
-    customer_id: "integer",
-    customer_carrier_id: "integer",
+    columns: {
+      customer_id: "big_integer",
+      customer_carrier_id: "big_integer",
+    },
+    indexes: [{ columns: "customer_id" }, { columns: "customer_carrier_id" }],
   },
 
   // Rails declares `id: false` with a string `speedometer_id` column; the
@@ -1403,9 +1503,9 @@ export const TEST_SCHEMA: Schema = {
 
   sponsors: {
     club_id: "integer",
-    sponsorable_id: "integer",
+    sponsorable_id: "big_integer",
     sponsorable_type: "string",
-    sponsor_id: "integer",
+    sponsor_id: "big_integer",
     sponsor_type: "string",
   },
 
@@ -1510,10 +1610,13 @@ export const TEST_SCHEMA: Schema = {
   },
 
   translations: {
-    locale: { type: "string", null: false },
-    key: { type: "string", null: false },
-    value: { type: "string", null: false },
-    attachment_id: "integer",
+    columns: {
+      locale: { type: "string", null: false },
+      key: { type: "string", null: false },
+      value: { type: "string", null: false },
+      attachment_id: "big_integer",
+    },
+    indexes: [{ columns: "attachment_id" }],
   },
 
   tuning_pegs: {
@@ -1528,8 +1631,11 @@ export const TEST_SCHEMA: Schema = {
   unused_belongs_to: { unused_destroy_async_id: "integer" },
 
   variants: {
-    product_id: "integer",
-    name: "string",
+    columns: {
+      product_id: "big_integer",
+      name: "string",
+    },
+    indexes: [{ columns: "product_id" }],
   },
 
   vertices: { label: "string" },
@@ -1557,7 +1663,7 @@ export const TEST_SCHEMA: Schema = {
     poly_human_without_inverse_type: "string",
     puzzled_polymorphic_human_id: "integer",
     puzzled_polymorphic_human_type: "string",
-    super_human_id: "integer",
+    super_human_id: "big_integer",
     super_human_type: "string",
   },
 
@@ -1573,9 +1679,12 @@ export const TEST_SCHEMA: Schema = {
   strict_zines: { title: "string" },
 
   wheels: {
-    size: "integer",
-    wheelable_id: "integer",
-    wheelable_type: "string",
+    columns: {
+      size: "integer",
+      wheelable_id: "big_integer",
+      wheelable_type: "string",
+    },
+    indexes: [{ columns: ["wheelable_type", "wheelable_id"], name: "index_wheels_on_wheelable" }],
   },
 
   // Rails declares `id: false` with `t.string :<x>_id, primary_key: true` —
@@ -1867,8 +1976,8 @@ export const ARUNIT2_SCHEMA: Schema = {
   professors: { name: { type: "string", null: false } },
   courses_professors: {
     columns: {
-      course_id: "integer",
-      professor_id: "integer",
+      course_id: "big_integer",
+      professor_id: "big_integer",
     },
     indexes: [{ columns: "course_id" }, { columns: "professor_id" }],
     primaryKey: false,
