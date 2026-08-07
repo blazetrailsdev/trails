@@ -2960,7 +2960,7 @@ export function dtNewByFrags(hash: DateParts): DateTime {
   const df = timeToDf(rh, rmin, rs);
 
   let t: number | Rational | null | undefined = hash.secFraction;
-  const sf = t == null ? 0 : secToNs(t instanceof Rational ? t.numerator / t.denominator : t);
+  const sf = t == null ? 0 : secToNs(t);
 
   t = hash.offset;
   let of = t == null ? 0 : t instanceof Rational ? t.numerator / t.denominator : t;
