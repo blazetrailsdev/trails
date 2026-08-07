@@ -12,6 +12,21 @@
 
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { ConnectionHandler } from "../connection-adapters/abstract/connection-handler.js";
+import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
+import type { DatabaseConfig } from "../database-configurations/database-config.js";
+import { ActiveRecordError } from "../errors.js";
+import { migrationArConfig } from "./ar-config-source.js";
+
+/**
+ * Call-time read of `ActiveRecord::Base.connection_handler`, which Ruby
+ * resolves by autoload inside the method body
+ * (`pending_migration_connection.rb:6,10`).
+ */
+function connectionHandler(): ConnectionHandler {
+  const handler = migrationArConfig()?.connectionHandler?.();
+  if (!handler) throw new ActiveRecordError("ActiveRecord::Base has not finished loading");
+  return handler;
+}
 
 export class PendingMigrationConnection {
   private _connectionName: string;
@@ -55,21 +70,19 @@ export class PendingMigrationConnection {
   }
 
   /**
-   * Establish a temporary connection pool for the given database config
-   * and yield it. In Rails this creates a real pool from the handler;
-   * here we call the callback directly with the adapter.
-   *
    * Mirrors: ActiveRecord::PendingMigrationConnection.with_temporary_pool
+   * (`pending_migration_connection.rb:5-11`).
    */
   static async withTemporaryPool<T>(
-    dbConfig: { adapter?: DatabaseAdapter },
-    callback: (adapter: DatabaseAdapter) => Promise<T> | T,
+    dbConfig: DatabaseConfig,
+    block: (pool: ConnectionPool) => Promise<T> | T,
   ): Promise<T> {
-    if (!dbConfig.adapter) {
-      throw new Error("withTemporaryPool requires a database adapter");
+    const pool = connectionHandler().establishConnection(dbConfig, { owner: this.name });
+    try {
+      return await block(pool);
+    } finally {
+      connectionHandler().removeConnectionPool(this.name);
     }
-    const connection = new PendingMigrationConnection({ adapter: dbConfig.adapter });
-    return connection.withAdapter(callback);
   }
 
   static isPrimaryClass(): boolean {

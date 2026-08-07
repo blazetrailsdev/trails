@@ -5173,6 +5173,9 @@ registerMigrationArConfig({
   // uses the sync `leaseConnectionSync` escape hatch instead — it resolves a
   // pinned connection / establishes a first lease without the async verify.
   leaseConnection: () => Base.connectionPool().leaseConnectionSync(),
+  configurations: () => Base.configurations(),
+  connectionHandler: () => Base.connectionHandler,
+  databaseTasks: () => DatabaseTasks,
 });
 
 // Side-effect import (currently no-op); kept so future globalid hooks can

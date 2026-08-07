@@ -171,6 +171,35 @@ describe("nested attributes save wrapper argument forwarding (trails-only)", () 
     Pirate.acceptsNestedAttributesFor("ship");
   });
 
+  // `new Model(...)` / `Model.create(...)` reach the nested writer by Rails
+  // name (`public_send("#{k}=")`, attribute_assignment.rb:35-48), not by
+  // hunting a `#{name}Attributes=` descriptor on the prototype. Deleting the
+  // property setter — which RFC 0087 does next — must therefore leave
+  // construction-time nested attributes assigned rather than silently skipped.
+  it("assigns constructor nested attributes without the property setter", async () => {
+    Pirate.acceptsNestedAttributesFor("ship");
+    const setterDescriptor = Object.getOwnPropertyDescriptor(Pirate.prototype, "shipAttributes")!;
+    delete (Pirate.prototype as unknown as Record<string, unknown>).shipAttributes;
+
+    try {
+      const pirate = new Pirate({ catchphrase: "Arr", shipAttributes: { name: "Black Pearl" } });
+      await pirate.saveBang();
+      expect(
+        cols((await Ship.where({ pirate_id: readAttr(pirate, "id") }).first()) as Base).name,
+      ).toBe("Black Pearl");
+
+      const created = await Pirate.createBang({
+        catchphrase: "Aye",
+        shipAttributes: { name: "Flying Dutchman" },
+      });
+      expect(
+        cols((await Ship.where({ pirate_id: readAttr(created, "id") }).first()) as Base).name,
+      ).toBe("Flying Dutchman");
+    } finally {
+      Object.defineProperty(Pirate.prototype, "shipAttributes", setterDescriptor);
+    }
+  });
+
   it("forwards save options through the nested-attributes save wrapper", async () => {
     Pirate.acceptsNestedAttributesFor("ship");
 
