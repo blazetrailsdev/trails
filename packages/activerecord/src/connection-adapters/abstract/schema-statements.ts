@@ -675,12 +675,12 @@ export class SchemaStatements {
   async changeColumnDefault(
     tableName: string,
     columnName: string,
-    options: { from?: unknown; to: unknown } | unknown,
+    defaultOrChanges: unknown,
   ): Promise<void> {
     // Rails unwraps a Hash to its :to only when it carries BOTH :from and :to
     // (extract_new_default_value, schema_statements.rb:1820); a bare structured
     // default like `{ to: 1 }` without :from is the literal default.
-    const defaultVal = this.extractNewDefaultValue(options);
+    const defaultVal = this.extractNewDefaultValue(defaultOrChanges);
     const clause = await this.quoteDefaultExpression(defaultVal);
     await this.execute(
       `ALTER TABLE ${this.quoteColumnName(tableName)} ALTER COLUMN ${this.quoteColumnName(columnName)} SET DEFAULT ${clause || "NULL"}`,

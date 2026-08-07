@@ -264,7 +264,7 @@ export interface AbstractAdapter {
   changeColumnDefault(
     tableName: string,
     columnName: string,
-    options: { from?: unknown; to: unknown } | unknown,
+    defaultOrChanges: unknown,
   ): Promise<void>;
   changeColumnNull(
     tableName: string,

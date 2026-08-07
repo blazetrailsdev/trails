@@ -38,7 +38,12 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
   fixtures(["authors", "posts"]);
 
   // A fresh author owns only the posts we create here, so the loaded `posts`
-  // collection is the deterministic ["a", "b", "c"] set the assertions expect.
+  // collection is the deterministic {"a", "b", "c"} *set*. `Author.posts`
+  // carries no `-> { order(...) }` scope (`test/models/author.rb`), so its
+  // SELECT has no ORDER BY and the row order is whatever the server returns —
+  // PostgreSQL has been observed returning `c, a, b`. Assertions here compare
+  // sets (sorted) or read positions back off the loaded target; none of them
+  // may pin the row order of the unordered SELECT.
   async function authorWithPosts(): Promise<Author> {
     const author = await Author.create({ name: "Dev" });
     for (const title of ["a", "b", "c"]) {
@@ -73,7 +78,7 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
     const proxy = association<Post>(author, "posts");
     const titles: string[] = [];
     for (const p of proxy) titles.push(p.title);
-    expect(titles).toEqual(["a", "b", "c"]);
+    expect(titles.sort()).toEqual(["a", "b", "c"]);
   });
 
   it("supports numeric indexing (proxy[0]) — typed via the index signature", async () => {
@@ -82,27 +87,32 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
     // No `as any` needed — AssociationProxy declares
     // `[index: number]: T | undefined` (the runtime support comes from
     // `wrapCollectionProxy`'s `get` trap). Out-of-range returns undefined.
-    expect(proxy[0]?.title).toBe("a");
-    expect(proxy[2]?.title).toBe("c");
+    expect(proxy[0]).toBe(proxy.target[0]);
+    expect(proxy[2]).toBe(proxy.target[2]);
     expect(proxy[99]).toBeUndefined();
   });
 
   it("at(index) returns the record or undefined", async () => {
     const author = await authorWithPosts();
     const proxy = association<Post>(author, "posts");
-    expect(proxy.at(0)?.title).toBe("a");
-    expect(proxy.at(-1)?.title).toBe("c");
+    expect(proxy.at(0)).toBe(proxy.target[0]);
+    expect(proxy.at(-1)).toBe(proxy.target[2]);
     expect(proxy.at(99)).toBeUndefined();
   });
 
   it("map / filter / forEach delegate to the target", async () => {
     const author = await authorWithPosts();
     const proxy = association<Post>(author, "posts");
-    expect(proxy.map((p) => p.title)).toEqual(["a", "b", "c"]);
-    expect(proxy.filter((p) => p.title !== "b").map((p) => p.title)).toEqual(["a", "c"]);
+    expect(proxy.map((p) => p.title).sort()).toEqual(["a", "b", "c"]);
+    expect(
+      proxy
+        .filter((p) => p.title !== "b")
+        .map((p) => p.title)
+        .sort(),
+    ).toEqual(["a", "c"]);
     const seen: string[] = [];
     proxy.forEach((p) => seen.push(p.title));
-    expect(seen).toEqual(["a", "b", "c"]);
+    expect(seen.sort()).toEqual(["a", "b", "c"]);
   });
 
   it("some / every work", async () => {
@@ -118,16 +128,17 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
     // through the loaded records — e.g. `sort`, `reverse`, `join`.
     const author = await authorWithPosts();
     const proxy = association<Post>(author, "posts") as any;
+    const loaded = proxy.target.map((p: Post) => p.title);
     expect(
       (proxy.sort((a: Post, b: Post) => b.title.localeCompare(a.title)) as Post[]).map(
         (p: Post) => p.title,
       ),
     ).toEqual(["c", "b", "a"]);
-    expect((proxy.reverse() as Post[]).map((p: Post) => p.title)).toEqual(["c", "b", "a"]);
+    expect((proxy.reverse() as Post[]).map((p: Post) => p.title)).toEqual([...loaded].reverse());
     expect(proxy.join(",")).toBe(proxy.target.join(","));
     // Non-mutating: Ruby's `sort`/`reverse`, not `sort!`/`reverse!` — the
     // loaded target order is untouched.
-    expect(proxy.target.map((p: Post) => p.title)).toEqual(["a", "b", "c"]);
+    expect(proxy.target.map((p: Post) => p.title)).toEqual(loaded);
   });
 
   it("preserves Relation#includes (eager loading) — proxy.includes routes to Relation", async () => {
@@ -154,14 +165,14 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
     const v = proxy.values();
     expect(typeof v).toBe("object");
     expect(Array.isArray(v)).toBe(false); // confirms it's not the array iterator
-    expect([...(proxy as Iterable<Post>)].map((p) => p.title)).toEqual(["a", "b", "c"]);
+    expect([...(proxy as Iterable<Post>)].map((p) => p.title).sort()).toEqual(["a", "b", "c"]);
   });
 
   it("slice returns a plain array shallow copy", async () => {
     const author = await authorWithPosts();
     const proxy = association<Post>(author, "posts");
     const head = proxy.slice(0, 2);
-    expect(head.map((p) => p.title)).toEqual(["a", "b"]);
+    expect(head).toEqual(proxy.target.slice(0, 2));
     expect(Array.isArray(head)).toBe(true);
   });
 
@@ -169,7 +180,7 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
     const author = await authorWithPosts();
     const proxy = association<Post>(author, "posts");
     const concatenated = proxy.reduce((acc, p) => acc + p.title, "");
-    expect(concatenated).toBe("abc");
+    expect([...concatenated].sort().join("")).toBe("abc");
   });
 
   it("indexOf / flatMap work", async () => {
@@ -177,14 +188,9 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
     const proxy = association<Post>(author, "posts");
     const second = proxy.at(1)!;
     expect(proxy.indexOf(second)).toBe(1);
-    expect(proxy.flatMap((p) => [p.title, p.title.toUpperCase()])).toEqual([
-      "a",
-      "A",
-      "b",
-      "B",
-      "c",
-      "C",
-    ]);
+    expect(proxy.flatMap((p) => [p.title, p.title.toUpperCase()])).toEqual(
+      proxy.target.flatMap((p) => [p.title, p.title.toUpperCase()]),
+    );
   });
 
   it("array spread reads the loaded target", async () => {
@@ -193,7 +199,7 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
     // proxy is a thenable Relation; spread it via its iterator contract so the
     // lint sees an Iterable, not a Promise being spread.
     const titles = [...(proxy as Iterable<Post>)].map((p) => p.title);
-    expect(titles).toEqual(["a", "b", "c"]);
+    expect(titles.sort()).toEqual(["a", "b", "c"]);
   });
 
   it("Array.from reads the loaded target", async () => {
@@ -206,7 +212,7 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
     const author = await authorWithPosts();
     const proxy = association<Post>(author, "posts");
     const arr = await proxy;
-    expect(arr.map((p) => p.title)).toEqual(["a", "b", "c"]);
+    expect(arr.map((p) => p.title).sort()).toEqual(["a", "b", "c"]);
   });
 
   it("await proxy hydrates `_target` so subsequent sync ops work", async () => {
@@ -220,15 +226,17 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
     const proxy = association<Post>(author, "posts") as any;
     await proxy;
     expect(proxy.target.length).toBe(2);
-    expect(proxy[0]?.title).toBe("x");
-    expect([...proxy].map((p: Post) => p.title)).toEqual(["x", "y"]);
+    expect(proxy[0]).toBe(proxy.target[0]);
+    expect([...proxy].map((p: Post) => p.title).sort()).toEqual(["x", "y"]);
   });
 
   it("keys / entries work (values intentionally not added)", async () => {
     const author = await authorWithPosts();
     const proxy = association<Post>(author, "posts");
     expect([...proxy.keys()]).toEqual([0, 1, 2]);
-    expect([...proxy.entries()].map(([i, p]) => `${i}:${p.title}`)).toEqual(["0:a", "1:b", "2:c"]);
+    expect([...proxy.entries()].map(([i, p]) => `${i}:${p.title}`)).toEqual(
+      proxy.target.map((p, i) => `${i}:${p.title}`),
+    );
   });
 
   it("array methods accept a thisArg (matches Array.prototype signatures)", async () => {
@@ -238,7 +246,7 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
     const titles = proxy.map(function (this: { suffix: string }, p) {
       return p.title + this.suffix;
     }, ctx);
-    expect(titles).toEqual(["a!", "b!", "c!"]);
+    expect(titles.sort()).toEqual(["a!", "b!", "c!"]);
   });
 
   it("reduce supports the no-initial overload (Array.prototype parity)", async () => {
@@ -248,7 +256,7 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
     const concat = proxy.reduce((acc, p) => {
       return { ...acc, title: acc.title + p.title } as Post;
     });
-    expect(concat.title).toBe("abc");
+    expect([...concat.title].sort().join("")).toBe("abc");
   });
 
   it("Array.isArray returns false on the proxy (known limitation)", async () => {
@@ -269,8 +277,9 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
     // resolves to. We intentionally do NOT add an Array-style
     // `find(predicate)` overload — it would shadow the PK lookup.
     // For Array semantics use `Array.from(proxy).find(p => ...)`.
-    const found = await proxy.find((author as any).posts[0]?.id);
-    expect(found?.title).toBe("a");
+    const first = (author as any).posts[0];
+    const found = await proxy.find(first?.id);
+    expect(found?.title).toBe(first?.title);
   });
 
   it("toArray hydrates and caches the target — a second call returns the cached set", async () => {
@@ -360,11 +369,11 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
     const author = await authorWithPosts();
     const reader = (author as any).posts;
     expect(reader.target.length).toBe(3);
-    expect(reader[0]?.title).toBe("a");
-    expect(reader.map((p: Post) => p.title)).toEqual(["a", "b", "c"]);
+    expect(reader[0]).toBe(reader.target[0]);
+    expect(reader.map((p: Post) => p.title).sort()).toEqual(["a", "b", "c"]);
     const titles: string[] = [];
     for (const p of reader as Iterable<Post>) titles.push(p.title);
-    expect(titles).toEqual(["a", "b", "c"]);
+    expect(titles.sort()).toEqual(["a", "b", "c"]);
   });
 
   it("writer `author.posts = [...]` still flows through Association#writer", async () => {
@@ -416,7 +425,12 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
     const author = await authorWithPosts();
     const proxy = association<Post>(author, "posts") as any;
     expect(proxy.readTargets()).toBe(proxy.target);
-    expect(proxy.readTargets().map((p: Post) => p.title)).toEqual(["a", "b", "c"]);
+    expect(
+      proxy
+        .readTargets()
+        .map((p: Post) => p.title)
+        .sort(),
+    ).toEqual(["a", "b", "c"]);
   });
 
   it("targetsByPrimaryKey() keys loaded targets by primary key", async () => {
