@@ -1005,13 +1005,10 @@ function _assignAttribute(
   if (configs?.some((c) => `${c.associationName}Attributes` === key)) {
     return (self as any)[`set${camelize(key, true)}`](value) as Promise<void> | void;
   }
-  // Only an awaited caller can resolve `#{name}=` / `#{name.singularize}_ids=`
-  // to a writer: RFC 0087 §1 removed the property setters because
-  // `replace`/`ids_writer` do I/O at assignment
-  // (collection_association.rb:46-48, :61-83) and a JS property setter cannot
-  // await. On the synchronous surface there is genuinely no method for the key,
-  // so `attribute_writer_missing` (attribute_assignment.rb:71-73) answers, as
-  // it does in Rails when the setter is absent.
+  // Only an awaited caller can resolve these keys to a writer at all (see
+  // `associationWriterPromise`). On the synchronous surface there is genuinely
+  // no method for the key, so `attribute_writer_missing`
+  // (attribute_assignment.rb:71-73) answers, as in Rails when a setter is absent.
   const associationWrite = awaitable ? associationWriterPromise(self, key, value) : undefined;
   if (associationWrite) return associationWrite;
   const setter = findPrototypeSetter(self, key);
