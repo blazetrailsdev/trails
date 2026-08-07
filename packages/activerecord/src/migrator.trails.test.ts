@@ -622,19 +622,16 @@ describe("Migrator advisory lock wrapping", () => {
 
   it("record_version_state_after_migrating updates the migrated memo in place", async () => {
     const adapter = Base.connection;
-    const migrator = new Migrator(
-      "up",
-      [makeMigration(1, "M1")],
-      schemaMigration,
-      internalMetadata,
-    );
+    // Rails reads `down?` off the Migrator, so up and down are two Migrators.
+    const up = new Migrator("up", [makeMigration(1, "M1")], schemaMigration, internalMetadata);
+    const down = new Migrator("down", [makeMigration(1, "M1")], schemaMigration, internalMetadata);
     await new SchemaMigration(adapter).createTable();
 
-    expect(await migrator.migrated()).toEqual(new Set());
-    await migrator.recordVersionStateAfterMigrating(1, "up");
-    expect(await migrator.migrated()).toEqual(new Set([1]));
-    await migrator.recordVersionStateAfterMigrating(1, "down");
-    expect(await migrator.migrated()).toEqual(new Set());
+    expect(await up.migrated()).toEqual(new Set());
+    await up.recordVersionStateAfterMigrating(1);
+    expect(await up.migrated()).toEqual(new Set([1]));
+    await down.recordVersionStateAfterMigrating(1);
+    expect(await down.migrated()).toEqual(new Set());
   });
 
   it("loadMigrated re-reads schema_migrations so repeated pending checks are not memoized", async () => {

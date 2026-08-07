@@ -78,6 +78,7 @@ import type {
   ColumnType,
   RemoveForeignKeyOptions,
 } from "./abstract/schema-definitions.js";
+import type { CommentOrChanges } from "./abstract/schema-statements.js";
 import {
   TableDefinition as MysqlTableDefinition,
   Table as MysqlTable,
@@ -826,7 +827,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
         `UPDATE ${this.quoteTableName(tableName)} SET ${colId}=${this.quote(default_)} WHERE ${colId} IS NULL`,
       );
     }
-    await this.changeColumn(tableName, columnName, "", { null: null_ });
+    await this.changeColumn(tableName, columnName, null, { null: null_ });
   }
 
   /**
@@ -837,26 +838,16 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   async changeColumnComment(
     tableName: string,
     columnName: string,
-    // Mirrors Rails: comment is either a plain value (string|nil) or the
-    // { from:, to: } change-descriptor hash. Both keys are required for
-    // the unwrap branch — `{ to: "x" }` alone falls through as-is in
-    // Rails too, so the type explicitly requires both.
-    commentOrChanges: string | null | { from: unknown; to: string | null },
+    commentOrChanges: CommentOrChanges,
   ): Promise<void> {
-    const extracted = this.extractNewCommentValue(commentOrChanges);
-    // Normalize JS-only `undefined` → `null` so changeColumn doesn't
-    // misinterpret an explicit clear (`{from, to: undefined}` shape) as
-    // "no comment key present" and silently keep the existing comment.
-    // Rails has no nil/undefined split — defensive normalization, no
-    // Rails analogue.
-    const comment = (extracted === undefined ? null : extracted) as string | null;
-    await this.changeColumn(tableName, columnName, "", { comment });
+    const comment = this.extractNewCommentValue(commentOrChanges);
+    await this.changeColumn(tableName, columnName, null, { comment });
   }
 
   async changeColumn(
     tableName: string,
     columnName: string,
-    type: ColumnType,
+    type: ColumnType | null,
     options: ColumnOptions = {},
   ): Promise<void> {
     const sql = `ALTER TABLE ${this.quoteTableName(tableName)} ${await this.changeColumnForAlter(tableName, columnName, type, options)}`;
@@ -866,11 +857,11 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   async buildChangeColumnDefinition(
     tableName: string,
     columnName: string,
-    type: ColumnType,
+    type: ColumnType | null,
     options: ColumnOptions = {},
   ): Promise<ChangeColumnDefinition> {
     const column = await this.columnFor(tableName, columnName);
-    const resolvedType = type || column.sqlType || "";
+    const resolvedType = type ?? column.sqlType ?? "";
 
     const opts: Record<string, unknown> = { ...options };
 
@@ -1765,7 +1756,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   async changeColumnForAlter(
     tableName: string,
     columnName: string,
-    type: ColumnType,
+    type: ColumnType | null,
     options: ColumnOptions = {},
   ): Promise<string> {
     const cd = await this.buildChangeColumnDefinition(tableName, columnName, type, options);

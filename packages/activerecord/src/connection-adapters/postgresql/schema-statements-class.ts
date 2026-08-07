@@ -960,7 +960,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     // statement cache and unwrap the {from:, to:} change hash before issuing
     // the COMMENT ON statement.
     this.clearCacheBang();
-    const comment = this.extractNewCommentValue(commentOrChanges) as string | null;
+    const comment = this.extractNewCommentValue(commentOrChanges);
     await this.execute(
       `COMMENT ON COLUMN ${this.quoteTableName(tableName)}.${this.quoteColumnName(columnName)} IS ${this.quote(comment)}`,
     );
@@ -972,7 +972,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
   ): Promise<void> {
     // Mirrors PostgreSQL::SchemaStatements#change_table_comment.
     this.clearCacheBang();
-    const comment = this.extractNewCommentValue(commentOrChanges) as string | null;
+    const comment = this.extractNewCommentValue(commentOrChanges);
     await this.execute(
       `COMMENT ON TABLE ${this.quoteTableName(tableName)} IS ${this.quote(comment)}`,
     );

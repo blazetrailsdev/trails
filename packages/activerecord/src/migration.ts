@@ -63,6 +63,23 @@ export {
 
 import { ActiveRecordError, NoDatabaseError } from "./errors.js";
 import { ActiveRecord } from "./ar-config.js";
+import type { Base } from "./base.js";
+
+/** The one `Base` member `execute_migration_in_transaction` names. */
+type BaseWithLogger = Pick<typeof Base, "logger">;
+
+let _base: BaseWithLogger | undefined;
+
+/**
+ * @internal Receives `ActiveRecord::Base` at module init, as
+ * `schema-migration.ts`'s `_registerBase` does. Rails resolves the `Base`
+ * constant inside `execute_migration_in_transaction` at call time via autoload
+ * (`migration.rb:1532`), so base.rb is not required there; in ESM a value
+ * import of `base.js` would be a load-time edge into an import cycle.
+ */
+export function _registerBase(base: BaseWithLogger): void {
+  _base = base;
+}
 
 // Mirrors Rails AbstractAdapter#extract_new_comment_value (alias of extract_new_default_value).
 // For {from,to} hashes, returns `to` (which may be null to clear a comment).
@@ -2484,12 +2501,22 @@ export class Migrator {
     let rolledBack: MigrationProxy[] = [];
     const body = async (): Promise<void> => {
       await this._ensureSchemaTable();
-      const applied = await this.migrated();
+      // Rails puts `rollback` on MigrationContext, which builds a Migrator with
+      // the direction baked in (`migration.rb:1240-1242` → `move`); the down
+      // Migrator is what `execute_migration_in_transaction` reads `@direction`
+      // from, and it owns the `migrated` memo the run mutates.
+      const down = new Migrator(
+        "down",
+        this._migrations,
+        this._schemaMigration,
+        this._internalMetadata,
+      );
+      const applied = await down.migrated();
       const appliedMigrations = this._migrations.filter((m) => applied.has(m.version)).reverse();
       const toRollback = appliedMigrations.slice(0, steps);
 
       for (const proxy of toRollback) {
-        await this._runMigration(proxy, "down");
+        await down.executeMigrationInTransaction(proxy);
       }
       rolledBack = toRollback;
     };
@@ -2511,11 +2538,18 @@ export class Migrator {
       throw new Error(`Invalid steps: ${steps}. Must be a non-negative integer.`);
     }
     const body = async (): Promise<void> => {
-      const pending = await this.pendingMigrations();
+      // As in `rollback`, the direction lives on the Migrator, not on the call.
+      const up = new Migrator(
+        "up",
+        this._migrations,
+        this._schemaMigration,
+        this._internalMetadata,
+      );
+      const pending = await up.pendingMigrations();
       const toRun = pending.slice(0, steps);
 
       for (const proxy of toRun) {
-        await this._runMigration(proxy, "up");
+        await up.executeMigrationInTransaction(proxy);
       }
     };
     if (this.isUseAdvisoryLock()) {
@@ -2613,11 +2647,36 @@ export class Migrator {
    * `MigrationContext#run`.
    */
   async executeMigrationInTransaction(proxy: MigrationProxy): Promise<number | undefined> {
-    const applied = await this.migrated();
-    if (this.isDown() && !applied.has(proxy.version)) return undefined;
-    if (this.isUp() && applied.has(proxy.version)) return undefined;
+    let migration: Migration | undefined;
+    // Ruby's method-level `rescue` (`migration.rb:1538`) covers the guards and
+    // the log line too, not just the ddl_transaction.
+    try {
+      const applied = await this.migrated();
+      if (this.isDown() && !applied.has(proxy.version)) return undefined;
+      if (this.isUp() && applied.has(proxy.version)) return undefined;
 
-    await this._runMigration(proxy, this._direction);
+      // Rails' guard is just `if Base.logger`; the `?.` on `info` is forced by
+      // trails' `Base.logger` type, which declares every level optional
+      // (base.ts:1717-1723) because the logger is app-supplied, where Ruby's is
+      // an ActiveSupport::Logger that always responds to `info`.
+      if (_base?.logger) _base.logger.info?.(`Migrating to ${proxy.name} (${proxy.version})`);
+
+      const loaded = (migration = await proxy.migration());
+      loaded.connection = this._adapter;
+      await this.ddlTransaction(loaded, async () => {
+        await loaded.migrate(this._direction);
+        await this.recordVersionStateAfterMigrating(proxy.version);
+      });
+    } catch (e) {
+      // Rails re-resolves the proxy here (`migration.rb:1540` → `use_transaction?`
+      // → `MigrationProxy#disable_ddl_transaction`), so a migration that failed to
+      // load raises again from inside the rescue and escapes unwrapped.
+      const useTx = this.isUseTransaction(migration ?? (await proxy.migration()));
+      // Ruby's `#{e}` interpolates Exception#to_s — the bare message, without
+      // the `Error: ` prefix JS String(e) would add.
+      const msg = `An error has occurred, ${useTx ? "this and " : ""}all later migrations canceled:\n\n${e instanceof Error ? e.message : e}`;
+      throw Object.assign(new Error(msg), { cause: e });
+    }
     return proxy.version;
   }
 
@@ -2644,17 +2703,14 @@ export class Migrator {
   }
 
   /** @internal Mirrors: ActiveRecord::Migrator#record_version_state_after_migrating */
-  async recordVersionStateAfterMigrating(
-    version: number,
-    direction: "up" | "down" = "up",
-  ): Promise<void> {
+  async recordVersionStateAfterMigrating(version: number): Promise<void> {
     const migrated = await this.migrated();
-    if (direction === "up") {
-      migrated.add(version);
-      await this._schemaMigration.recordVersion(String(version));
-    } else {
+    if (this.isDown()) {
       migrated.delete(version);
       await this._schemaMigration.deleteVersion(String(version));
+    } else {
+      migrated.add(version);
+      await this._schemaMigration.recordVersion(String(version));
     }
   }
 
@@ -2901,32 +2957,6 @@ export class Migrator {
         : await migrator.runWithoutLock();
     } finally {
       this._invalidateMigrated();
-    }
-  }
-
-  private async _runMigration(proxy: MigrationProxy, direction: "up" | "down"): Promise<void> {
-    let migration: Migration | undefined;
-    // Rails wraps both the migration execution AND the version
-    // stamping inside the same ddl_transaction so they commit/rollback
-    // atomically. Without this, a committed migration + failed stamp
-    // would leave schema_migrations out of sync.
-    try {
-      const loaded = (migration = await proxy.migration());
-      loaded.connection = this._adapter;
-      await this.ddlTransaction(loaded, async () => {
-        await loaded.migrate(direction);
-        await this.recordVersionStateAfterMigrating(proxy.version, direction);
-      });
-    } catch (e) {
-      // Mirrors: ActiveRecord::Migrator#execute_migration_in_transaction rescue block
-      // Rails re-resolves the proxy here (`migration.rb:1540` → `use_transaction?`
-      // → `MigrationProxy#disable_ddl_transaction`), so a migration that failed to
-      // load raises again from inside the rescue and escapes unwrapped.
-      const useTx = this.isUseTransaction(migration ?? (await proxy.migration()));
-      // Ruby's `#{e}` interpolates Exception#to_s — the bare message, without
-      // the `Error: ` prefix JS String(e) would add.
-      const msg = `An error has occurred, ${useTx ? "this and " : ""}all later migrations canceled:\n\n${e instanceof Error ? e.message : e}`;
-      throw Object.assign(new Error(msg), { cause: e });
     }
   }
 
