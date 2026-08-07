@@ -206,6 +206,45 @@ function gateRegex(yml: string, name: string): RegExp {
  *  (tsc-wrapper + type-virtualization) and scripts/guides-typecheck;
  *  AR consumption is the reason trails-tsc is also in AR_PKGS_RE.
  *
+ *  AUDIT: virtualized-dx-type-tests / trailties-tests / leaf-tests
+ *  (RFC 0028, audit-virtualized-dx-and-leaf-gates-against-real-inputs)
+ *  All three gate on plain `activerecord_affected` and so run on every
+ *  AR PR. The audit asked whether their real source closure is narrower
+ *  than the gate. It is not, for any of them — the gates stay as they
+ *  are. What each suite actually reads:
+ *
+ *  - virtualized-dx-type-tests runs `pnpm test:types:virtualized`
+ *    (package.json:20), which is `tsc -b packages/activerecord-cli`
+ *    followed by the tsc-wrapper CLI over
+ *    packages/activerecord/virtualized-dx-tests/tsconfig.json. That
+ *    tsconfig maps @blazetrails/activerecord to
+ *    packages/activerecord/src/index.ts — the WHOLE public type surface,
+ *    not the type-virtualization or tsc-wrapper subtrees — plus
+ *    activemodel, arel, activesupport, i18n, date and globalid src. So
+ *    the tempting narrowing (the story's own hypothesis: trails-tsc plus
+ *    AR's type-virtualization/tsc-wrapper subtrees) would drop coverage
+ *    of every AR type change the suite exists to catch.
+ *    It has the opposite defect instead: @blazetrails/i18n is in the
+ *    tsconfig's paths but in neither AR_PKGS_RE nor TRAILS_TSC_PKGS_RE,
+ *    so an i18n-only PR type-checks against it without running it.
+ *    Filed as a separate story rather than fixed here — closing it
+ *    widens the gate, which is a burn decision, not an audit finding.
+ *
+ *  - trailties-tests runs `pnpm vitest run packages/trailties`.
+ *    @blazetrails/activerecord is a runtime dependency
+ *    (trailties/package.json) imported by src/database.ts,
+ *    src/migration-loader.ts, src/schema-source.ts, src/commands/db.ts
+ *    and the generators — all of which have their own .test.ts. The AR
+ *    clause in TRAILTIES_PKGS_RE is load-bearing.
+ *
+ *  - leaf-tests' job-level `if` is exactly the union of its five
+ *    per-step `if`s, and AR appears there only through the "DX type
+ *    tests" step (`pnpm test:types`, whose vitest.dx-tests.config.ts
+ *    declares activerecord and trailties projects). Narrowing the job
+ *    gate below that union would skip a step that should have run; the
+ *    per-step gates already keep the unaffected leaves from executing,
+ *    so the measured burn is install cost, not suite cost.
+ *
  *  TSE_COMPILER_PKGS_RE
  *  tse_compiler_affected gates the tse-compiler step of leaf-tests.
  *  The package has
