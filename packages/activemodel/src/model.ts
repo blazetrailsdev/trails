@@ -20,6 +20,7 @@ import {
   type RenameKeyOptions,
   type XmlTypeInfo,
   resetCallbacks as asResetCallbacks,
+  withOptions,
 } from "@blazetrails/activesupport";
 import {
   humanAttributeName as translationHumanAttributeName,
@@ -519,9 +520,11 @@ export class Model {
   static _nullifyBlanks: string[] | true | false = false;
 
   /**
-   * Apply common options to multiple validation/callback calls.
-   *
-   * Mirrors: ActiveSupport::OptionMerger / with_options
+   * Mirrors: Object#with_options
+   * (activesupport/lib/active_support/core_ext/object/with_options.rb:92),
+   * which Ruby models reach as a receiverless class-body call. TypeScript
+   * cannot monkey-patch Object, so the class carries the entry point and the
+   * ported free function does the work.
    *
    * Usage:
    *   User.withOptions({ if: (r) => r.readAttribute("active") }, (m) => {
@@ -529,19 +532,11 @@ export class Model {
    *     m.validates("email", { presence: true });
    *   });
    */
-  static withOptions(defaults: Record<string, unknown>, fn: (model: typeof Model) => void): void {
-    // Create a proxy that merges defaults into validates() calls
-    const proxy = new Proxy(this, {
-      get(target: typeof Model, prop: string | symbol) {
-        if (prop === "validates") {
-          return (attr: string, rules: Record<string, unknown>) => {
-            target.validates(attr, { ...defaults, ...rules });
-          };
-        }
-        return (target as unknown as Record<string | symbol, unknown>)[prop];
-      },
-    });
-    fn(proxy);
+  static withOptions(
+    options: Record<string, unknown>,
+    block?: (optionMerger: typeof Model) => void,
+  ): typeof Model | void {
+    return withOptions(this, options, block);
   }
 
   // -- Validations (Phase 1100) --

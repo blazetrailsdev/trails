@@ -457,6 +457,8 @@ export { EnvironmentInquirer } from "./environment-inquirer.js";
 export { getEnv } from "./environment.js";
 export { ExecutionContext } from "./execution-context.js";
 export { objectWith } from "./core-ext/object/with.js";
+export { withOptions } from "./core-ext/object/with-options.js";
+export { OptionMerger } from "./option-merger.js";
 export { ArrayInquirer, arrayInquiry } from "./array-inquirer.js";
 export { tryCall, tryWith, tryBang } from "./try.js";
 export { OrderedOptions, InheritableOptions } from "./ordered-options.js";
