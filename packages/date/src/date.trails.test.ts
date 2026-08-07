@@ -720,26 +720,45 @@ describe("DateTime", () => {
   });
 
   it("reads the offset argument as a day fraction, as val2off does", () => {
-    // ruby 3.3.11:
+    // Every row transcribed from ruby 3.3.11, e.g.
     //   DateTime.new(2000,1,1,0,0,0, 1).zone        #=> "+24:00"   (1 day)
     //   DateTime.new(2000,1,1,0,0,0, 9).zone        #=> "+00:00"   (rejected)
-    //   DateTime.new(2000,1,1,0,0,0, 24).zone       #=> "+00:00"   (rejected)
-    //   DateTime.new(2000,1,1,0,0,0, -5).zone       #=> "+00:00"   (rejected)
     //   DateTime.new(2000,1,1,0,0,0, "+09:00").zone #=> "+09:00"
     for (const [offset, zone] of [
+      // The Fixnum arm (date_core.c:2376-2385) takes only -1, 0 and 1.
       [1, "+24:00"],
+      [-1, "-24:00"],
+      [0, "+00:00"],
       [9, "+00:00"],
       [24, "+00:00"],
       [-5, "+00:00"],
-      ["+09:00", "+09:00"],
-      [-1, "-24:00"],
-      [0, "+00:00"],
-      // The Float arm: `Rational(1,2)` and `0.5` are the same half day.
+      // The Float arm (:2386-2397), bounded at ±DAY_IN_SECONDS. `1.0` is `1`
+      // in JS, so it lands on the Fixnum arm — which answers the same second.
       [0.5, "+12:00"],
+      [-0.5, "-12:00"],
+      [1.0, "+24:00"],
+      // The String arm (:2435-2449), through date_zone_to_diff.
+      ["+09:00", "+09:00"],
+      ["+05:45", "+05:45"],
+      ["JST", "+09:00"],
+      ["nonsense", "+00:00"],
+      ["+99:00", "+00:00"],
     ] as const) {
       expect(new RubyDateTime(2000, 1, 1, 0, 0, 0, offset).zone).toBe(zone);
     }
-    expect(new RubyDateTime(2000, 1, 1, 0, 0, 0, new Rational(1, 2)).zone).toBe("+12:00");
+    // The Rational arm (:2398-2434). A day_to_sec whose denominator reduces to
+    // 1 is taken as-is and never bounds-checked (:2421-2422), which is why two
+    // whole days east is accepted where the integer `2` is rejected.
+    for (const [num, den, zone] of [
+      [1, 2, "+12:00"],
+      [-1, 2, "-12:00"],
+      [1, 3, "+08:00"],
+      [3, 2, "+36:00"],
+      [2, 1, "+48:00"],
+      [5, 1, "+120:00"],
+    ] as const) {
+      expect(new RubyDateTime(2000, 1, 1, 0, 0, 0, new Rational(num, den)).zone).toBe(zone);
+    }
   });
 
   it("raises Date::Error on a string naming no date, as dt_new_by_frags does", () => {

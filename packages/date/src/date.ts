@@ -587,14 +587,9 @@ export class Rational {
     return new Rational(this.numerator * other, this.denominator);
   }
 
-  /**
-   * `rational.c` `nurat_round` (`Rational#round`), which rounds half away from
-   * zero — not JS `Math.round`'s half-up, which sends `-1/2` to `0` where Ruby
-   * sends it to `-1`.
-   */
+  /** `rational.c` `nurat_round` (`Rational#round`), which rounds half away from zero. */
   round(): number {
-    const q = this.numerator / this.denominator;
-    return q < 0 ? -Math.round(-q) : Math.round(q);
+    return round(this.numerator / this.denominator);
   }
 
   /** `rational.c` `nurat_to_s` (`Rational#to_s`). */
@@ -2920,6 +2915,15 @@ export function dtNewByFrags(hash: DateParts): DateTime {
   return new DateTime(jdLocalToUtc(jd, df, of), dfLocalToUtc(df, of), sf, of);
 }
 
+/**
+ * @internal C's `round()` from `math.h`, which rounds half **away from zero**.
+ * JS `Math.round` rounds half **up**, so it sends `-0.5` to `-0` where C sends
+ * it to `-1`.
+ */
+function round(x: number): number {
+  return x < 0 ? -Math.round(-x) : Math.round(x);
+}
+
 /** @internal `date_core.c` `day_to_sec` (`date_core.c:1029-1035`). */
 function dayToSec(d: Rational): Rational {
   return d.mul(DAY_IN_SECONDS);
@@ -2938,7 +2942,15 @@ function dayToSec(d: Rational): Rational {
  * `±DAY_IN_SECONDS`) for a fractional one. The split is exact rather than a
  * choice: the Float arm's bound admits exactly `|n| <= 1`, whose integral
  * members are the Fixnum arm's `-1`, `0`, `1` and give the same second — so no
- * integral value is read differently by the two arms.
+ * integral value is read differently by the two arms. The remaining arms keep
+ * the C's own case order: `default`, which `f_to_r`s a numeric and falls
+ * through into `T_RATIONAL` (`:2398-2434`), then `T_STRING` (`:2435-2449`).
+ *
+ * The Rational arm bounds only the branch that rounds. A `day_to_sec` whose
+ * denominator reduces to `1` is taken as-is (`:2421-2422`) and never bounds-
+ * checked, which is why on ruby 3.3.11
+ * `DateTime.new(2000,1,1,0,0,0,Rational(2,1)).zone` is `"+48:00"` — two whole
+ * days east — rather than the rejection `±DAY_IN_SECONDS` would suggest.
  *
  * C's `rb_warning("fraction of offset is ignored")` has no port analogue: it
  * writes to stderr under `$VERBOSE` only and is not part of the value.
@@ -2951,20 +2963,25 @@ function offsetToSec(vof: number | Rational | string): number | null {
     }
     const n = vof * DAY_IN_SECONDS;
     if (n < -DAY_IN_SECONDS || n > DAY_IN_SECONDS) return null;
-    return Math.round(n);
+    return round(n);
   }
-  if (typeof vof === "string") {
-    const vs = dateZoneToDiff(vof);
-    // `!FIXNUM_P(vs)` (`:2444`) — `nil` for a zone it does not know, and a
-    // `Rational` for a fractional-hour offset that did not reduce to an integer.
-    if (vs === null || vs instanceof Rational) return null;
-    if (vs < -DAY_IN_SECONDS || vs > DAY_IN_SECONDS) return null;
-    return vs;
+  if (vof instanceof Rational) {
+    const vs = dayToSec(vof);
+    let n: number;
+    if (vs.denominator === 1) {
+      n = vs.numerator;
+    } else {
+      n = vs.round();
+      if (n < -DAY_IN_SECONDS || n > DAY_IN_SECONDS) return null;
+    }
+    return n;
   }
-  const vs = dayToSec(vof);
-  const n = vs.denominator === 1 ? vs.numerator : vs.round();
-  if (n < -DAY_IN_SECONDS || n > DAY_IN_SECONDS) return null;
-  return n;
+  const vs = dateZoneToDiff(vof);
+  // `!FIXNUM_P(vs)` (`:2444`) — `nil` for a zone it does not know, and a
+  // `Rational` for a fractional-hour offset that did not reduce to an integer.
+  if (vs === null || vs instanceof Rational) return null;
+  if (vs < -DAY_IN_SECONDS || vs > DAY_IN_SECONDS) return null;
+  return vs;
 }
 
 /**
