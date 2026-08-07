@@ -86,6 +86,35 @@ describe("DbVersionTest", () => {
     expect(combined).toContain("test.sqlite3");
   });
 
+  it("--all skips replica and database_tasks: false configs", async () => {
+    const dir = await makeFakeProject(`
+const config = {
+  development: {
+    primary: { adapter: "sqlite3", database: "dev.sqlite3", pool: 1 },
+    replica: { adapter: "sqlite3", database: "dev_replica.sqlite3", pool: 1, replica: true },
+  },
+  test: {
+    primary: { adapter: "sqlite3", database: "test.sqlite3", pool: 1 },
+    animals: {
+      adapter: "sqlite3",
+      database: "test_animals.sqlite3",
+      pool: 1,
+      databaseTasks: false,
+    },
+  },
+};
+export default config;
+`);
+    const code = await run(["db:version", "--all"], dir);
+    expect(code).toBe(0);
+    const combined = out.join("\n");
+    expect(combined).toContain("dev.sqlite3");
+    expect(combined).toContain("test.sqlite3");
+    expect(combined).not.toContain("dev_replica.sqlite3");
+    expect(combined).not.toContain("test_animals.sqlite3");
+    expect(withTemporaryPoolFn).toHaveBeenCalledTimes(2);
+  });
+
   it("exits 1 when currentVersion throws", async () => {
     currentVersionSpy.mockRejectedValueOnce(new Error("connection refused"));
     const dir = await makeFakeProject();

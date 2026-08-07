@@ -311,8 +311,19 @@ export interface DateParts {
   seconds?: number;
   zone?: string;
   offset?: number | Rational | null;
+  /**
+   * The tail of the string `Date._strptime`'s format did not consume
+   * (`date_strptime.c:672-677`). `date__parse` never sets it.
+   */
+  leftover?: string;
   _comp?: boolean;
   _bc?: boolean;
+  /** `date_strptime.c`'s `fail()` mark (`date_strptime.c:108-112`). */
+  _fail?: boolean;
+  /** `%C`/`%g`/`%y`'s century, folded into the year by `date__strptime`. */
+  _cent?: number;
+  /** `%P`/`%p`'s meridian, folded into the hour by `date__strptime`. */
+  _merid?: number;
 }
 
 /**
@@ -350,14 +361,14 @@ function dayNum(str: string): number {
   return ABBR_DAY_NAMES.findIndex((d) => d.toLowerCase() === str.slice(0, 3).toLowerCase());
 }
 
-/** @internal `date_parse.c` `issign` (`date_parse.c:63`). */
-function issign(c: string): boolean {
+/** @internal `date_parse.c` `issign` (`date_parse.c:63`), also `date_strptime.c:46`. */
+function issign(c: string | undefined): boolean {
   return c === "-" || c === "+";
 }
 
 /** @internal `date_parse.c` `isdigit`, the C library's. */
-function isdigit(c: string): boolean {
-  return c >= "0" && c <= "9";
+function isdigit(c: string | undefined): boolean {
+  return c !== undefined && c >= "0" && c <= "9";
 }
 
 /** @internal `date_parse.c` `digit_span` (`date_parse.c:71-78`): the run of digits at `s`. */
@@ -1697,6 +1708,527 @@ function parseFrag(str: string, hash: DateParts): string | null {
  * date. `:time` names no date, so it has no completion branch here — Ruby's
  * only fills a `:jd` for `DateTime` — and the string goes on to raise.
  */
+/** `date_core.c`'s `JULIAN_EPOCH_DATE` (`date_core.c:251`). */
+const JULIAN_EPOCH_DATE = "-4712-01-01";
+
+const ABBREVIATED_DAY_NAME_LENGTH = 3;
+const ABBREVIATED_MONTH_NAME_LENGTH = 3;
+
+/**
+ * @internal `date_strptime.c` `num_pattern_p` (`date_strptime.c:48-62`), which
+ * answers whether the format text FOLLOWING the current directive would itself
+ * read digits — the lookahead that makes `%Y` in `"%Y%m%d"` take four digits
+ * where a `%Y` at the end of the format takes as many as it can.
+ */
+function numPatternP(s: string): boolean {
+  let i = 0;
+  if (isdigit(s[i])) return true;
+  if (s[i] === "%") {
+    i++;
+    if (s[i] === "E" || s[i] === "O") i++;
+    const c = s[i];
+    if (c !== undefined && ("CDdeFGgHIjkLlMmNQRrSsTUuVvWwXxYy".includes(c) || isdigit(c))) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * @internal `date_strptime.c` `read_digits` (`date_strptime.c:65-104`): up to
+ * `width` digits off `str` at `si`. The C takes `&str[si]` and answers the
+ * count through the return with the value through an out-parameter; the index
+ * and the tuple stand in for the pointer arithmetic. `0` digits is the C's `0`,
+ * which every caller turns into a `fail()`.
+ */
+function readDigits(str: string, slen: number, si: number, width: number): [l: number, n: number] {
+  if (!width) return [0, 0];
+
+  let l = 0;
+  while (si + l < slen && isdigit(str[si + l])) {
+    if (++l === width) break;
+  }
+
+  if (l === 0) return [0, 0];
+
+  return [l, Number(str.slice(si, si + l))];
+}
+
+/** @internal `date_strptime.c` `valid_range_p` (`date_strptime.c:127-136`). */
+function validRangeP(v: number, a: number, b: number): boolean {
+  return !(v < a || v > b);
+}
+
+/** @internal `date_strptime.c` `head_match_p` (`date_strptime.c:153-157`). */
+function headMatchP(len: number, name: string, str: string, slen: number, si: number): boolean {
+  return (
+    slen - si >= len && str.slice(si, si + len).toLowerCase() === name.slice(0, len).toLowerCase()
+  );
+}
+
+/**
+ * @internal `date_strptime.c` `date__strptime_internal`
+ * (`date_strptime.c:159-663`): the directive walk itself, answering how much of
+ * `str` it consumed and reporting a mismatch through the `:_fail` key the way
+ * the C's `fail()` macro does.
+ *
+ * The C drives its `%E`/`%O`/`%:z` re-dispatch with `goto again`, its literal
+ * comparison with `goto ordinal` and every directive's exit with `goto
+ * matched`. TypeScript has no `goto`, so `again` is the inner `for (;;)` — its
+ * `continue` — `matched` is that loop's `break` followed by the `fi++`, and
+ * `ordinal` is the `ordinal` flag falling through to the same literal
+ * comparison the non-`%` arm makes.
+ *
+ * `%L`/`%N`'s `:sec_fraction` is a `Rational` in Ruby and a number here, which
+ * is the representation `parse_time` and `parse_ddd` already flatten theirs to
+ * in this file; `%Q`'s `:seconds` follows it.
+ */
+function dateStrptimeInternal(str: string, fmt: string, hash: DateParts): number {
+  const slen = str.length;
+  const flen = fmt.length;
+  let si = 0;
+  let fi = 0;
+
+  const fail = (): number => {
+    hash._fail = true;
+    return 0;
+  };
+  const failP = (): boolean => hash._fail === true;
+
+  // `READ_DIGITS` (`date_strptime.c:115-123`); `null` stands in for its `fail()`.
+  const readDigitsAt = (width: number): number | null => {
+    const [l, n] = readDigits(str, slen, si, width);
+    if (l === 0) return null;
+    si += l;
+    return n;
+  };
+  // `READ_DIGITS_MAX` (`date_strptime.c:125`), the C's `LONG_MAX` width.
+  const readDigitsMax = (): number | null => readDigitsAt(Number.POSITIVE_INFINITY);
+  // `recur` (`date_strptime.c:142-150`).
+  const recur = (f: string): boolean => {
+    const l = dateStrptimeInternal(str.slice(si), f, hash);
+    if (failP()) return false;
+    si += l;
+    return true;
+  };
+  const headMatch = (len: number, name: string): boolean => headMatchP(len, name, str, slen, si);
+
+  while (fi < flen) {
+    if (isspace(fmt[fi])) {
+      while (si < slen && isspace(str[si])) si++;
+      while (++fi < flen && isspace(fmt[fi]));
+      continue;
+    }
+
+    if (si >= slen) return fail();
+
+    if (fmt[fi] !== "%") {
+      if (str[si] !== fmt[fi]) return fail();
+      si++;
+      fi++;
+      continue;
+    }
+
+    let ordinal = false;
+    again: for (;;) {
+      fi++;
+      const c = fmt[fi] ?? "";
+
+      switch (c) {
+        case "E":
+          if (fmt[fi + 1] !== undefined && "cCxXyY".includes(fmt[fi + 1])) continue again;
+          fi--;
+          ordinal = true;
+          break;
+        case "O":
+          if (fmt[fi + 1] !== undefined && "deHImMSuUVwWy".includes(fmt[fi + 1])) continue again;
+          fi--;
+          ordinal = true;
+          break;
+        case ":": {
+          let i: number;
+          for (i = 1; i < 3 && fi + i < flen && fmt[fi + i] === ":"; ++i);
+          if (fmt[fi + i] === "z") {
+            fi += i - 1;
+            continue again;
+          }
+          return fail();
+        }
+
+        case "A":
+        case "a": {
+          for (let i = 0; i < DAY_NAMES.length; i++) {
+            const dayName = DAY_NAMES[i];
+            let l = dayName.length;
+            if (headMatch(l, dayName) || headMatch((l = ABBREVIATED_DAY_NAME_LENGTH), dayName)) {
+              si += l;
+              hash.wday = i;
+              break again;
+            }
+          }
+          return fail();
+        }
+        case "B":
+        case "b":
+        case "h": {
+          for (let i = 0; i < MONTH_NAMES.length; i++) {
+            const monthName = MONTH_NAMES[i];
+            let l = monthName.length;
+            if (
+              headMatch(l, monthName) ||
+              headMatch((l = ABBREVIATED_MONTH_NAME_LENGTH), monthName)
+            ) {
+              si += l;
+              hash.mon = i + 1;
+              break again;
+            }
+          }
+          return fail();
+        }
+
+        case "C": {
+          const n = numPatternP(fmt.slice(fi + 1)) ? readDigitsAt(2) : readDigitsMax();
+          if (n === null) return fail();
+          hash._cent = n;
+          break again;
+        }
+
+        case "c":
+          if (!recur("%a %b %e %H:%M:%S %Y")) return 0;
+          break again;
+
+        case "D":
+          if (!recur("%m/%d/%y")) return 0;
+          break again;
+
+        case "d":
+        case "e": {
+          let n: number | null;
+          if (str[si] === " ") {
+            si++;
+            n = readDigitsAt(1);
+          } else {
+            n = readDigitsAt(2);
+          }
+          if (n === null) return fail();
+          if (!validRangeP(n, 1, 31)) return fail();
+          hash.mday = n;
+          break again;
+        }
+
+        case "F":
+          if (!recur("%Y-%m-%d")) return 0;
+          break again;
+
+        case "G": {
+          const n = numPatternP(fmt.slice(fi + 1)) ? readDigitsAt(4) : readDigitsMax();
+          if (n === null) return fail();
+          hash.cwyear = n;
+          break again;
+        }
+
+        case "g": {
+          const n = readDigitsAt(2);
+          if (n === null) return fail();
+          if (!validRangeP(n, 0, 99)) return fail();
+          hash.cwyear = n;
+          if (hash._cent === undefined) hash._cent = n >= 69 ? 19 : 20;
+          break again;
+        }
+
+        case "H":
+        case "k": {
+          let n: number | null;
+          if (str[si] === " ") {
+            si++;
+            n = readDigitsAt(1);
+          } else {
+            n = readDigitsAt(2);
+          }
+          if (n === null) return fail();
+          if (!validRangeP(n, 0, 24)) return fail();
+          hash.hour = n;
+          break again;
+        }
+
+        case "I":
+        case "l": {
+          let n: number | null;
+          if (str[si] === " ") {
+            si++;
+            n = readDigitsAt(1);
+          } else {
+            n = readDigitsAt(2);
+          }
+          if (n === null) return fail();
+          if (!validRangeP(n, 1, 12)) return fail();
+          hash.hour = n;
+          break again;
+        }
+
+        case "j": {
+          const n = readDigitsAt(3);
+          if (n === null) return fail();
+          if (!validRangeP(n, 1, 366)) return fail();
+          hash.yday = n;
+          break again;
+        }
+
+        case "L":
+        case "N": {
+          let sign = 1;
+          if (issign(str[si])) {
+            if (str[si] === "-") sign = -1;
+            si++;
+          }
+          const osi = si;
+          let n = numPatternP(fmt.slice(fi + 1))
+            ? readDigitsAt(c === "L" ? 3 : 9)
+            : readDigitsMax();
+          if (n === null) return fail();
+          if (sign === -1) n = -n;
+          hash.secFraction = n / 10 ** (si - osi);
+          break again;
+        }
+
+        case "M": {
+          const n = readDigitsAt(2);
+          if (n === null) return fail();
+          if (!validRangeP(n, 0, 59)) return fail();
+          hash.min = n;
+          break again;
+        }
+
+        case "m": {
+          const n = readDigitsAt(2);
+          if (n === null) return fail();
+          if (!validRangeP(n, 1, 12)) return fail();
+          hash.mon = n;
+          break again;
+        }
+
+        case "n":
+        case "t":
+          if (!recur(" ")) return 0;
+          break again;
+
+        case "P":
+        case "p": {
+          if (slen - si < 2) return fail();
+          let ch = str[si];
+          const hour = ch === "P" || ch === "p" ? 12 : 0;
+          if (!hour && !(ch === "A" || ch === "a")) return fail();
+          if ((ch = str[si + 1]!) === ".") {
+            if (slen - si < 4 || str[si + 3] !== ".") return fail();
+            ch = str[(si += 2)]!;
+          }
+          if (!(ch === "M" || ch === "m")) return fail();
+          si += 2;
+          hash._merid = hour;
+          break again;
+        }
+
+        case "Q": {
+          let sign = 1;
+          if (str[si] === "-") {
+            sign = -1;
+            si++;
+          }
+          let n = readDigitsMax();
+          if (n === null) return fail();
+          if (sign === -1) n = -n;
+          hash.seconds = n / 1000;
+          break again;
+        }
+
+        case "R":
+          if (!recur("%H:%M")) return 0;
+          break again;
+
+        case "r":
+          if (!recur("%I:%M:%S %p")) return 0;
+          break again;
+
+        case "S": {
+          const n = readDigitsAt(2);
+          if (n === null) return fail();
+          if (!validRangeP(n, 0, 60)) return fail();
+          hash.sec = n;
+          break again;
+        }
+
+        case "s": {
+          let sign = 1;
+          if (str[si] === "-") {
+            sign = -1;
+            si++;
+          }
+          let n = readDigitsMax();
+          if (n === null) return fail();
+          if (sign === -1) n = -n;
+          hash.seconds = n;
+          break again;
+        }
+
+        case "T":
+          if (!recur("%H:%M:%S")) return 0;
+          break again;
+
+        case "U":
+        case "W": {
+          const n = readDigitsAt(2);
+          if (n === null) return fail();
+          if (!validRangeP(n, 0, 53)) return fail();
+          if (c === "U") hash.wnum0 = n;
+          else hash.wnum1 = n;
+          break again;
+        }
+
+        case "u": {
+          const n = readDigitsAt(1);
+          if (n === null) return fail();
+          if (!validRangeP(n, 1, 7)) return fail();
+          hash.cwday = n;
+          break again;
+        }
+
+        case "V": {
+          const n = readDigitsAt(2);
+          if (n === null) return fail();
+          if (!validRangeP(n, 1, 53)) return fail();
+          hash.cweek = n;
+          break again;
+        }
+
+        case "v":
+          if (!recur("%e-%b-%Y")) return 0;
+          break again;
+
+        case "w": {
+          const n = readDigitsAt(1);
+          if (n === null) return fail();
+          if (!validRangeP(n, 0, 6)) return fail();
+          hash.wday = n;
+          break again;
+        }
+
+        case "X":
+          if (!recur("%H:%M:%S")) return 0;
+          break again;
+
+        case "x":
+          if (!recur("%m/%d/%y")) return 0;
+          break again;
+
+        case "Y": {
+          let sign = 1;
+          if (issign(str[si])) {
+            if (str[si] === "-") sign = -1;
+            si++;
+          }
+          let n = numPatternP(fmt.slice(fi + 1)) ? readDigitsAt(4) : readDigitsMax();
+          if (n === null) return fail();
+          if (sign === -1) n = -n;
+          hash.year = n;
+          break again;
+        }
+
+        case "y": {
+          const n = readDigitsAt(2);
+          if (n === null) return fail();
+          if (!validRangeP(n, 0, 99)) return fail();
+          hash.year = n;
+          if (hash._cent === undefined) hash._cent = n >= 69 ? 19 : 20;
+          break again;
+        }
+
+        case "Z":
+        case "z": {
+          const m = ZONE_PAT.exec(str.slice(si));
+          if (m !== null) {
+            const s = m[1];
+            const l = m[0].length;
+            const o = dateZoneToDiff(s);
+            si += l;
+            hash.zone = s;
+            hash.offset = o;
+            break again;
+          }
+          return fail();
+        }
+
+        case "%":
+          if (str[si] !== "%") return fail();
+          si++;
+          break again;
+
+        case "+":
+          if (!recur("%a %b %e %H:%M:%S %Z %Y")) return 0;
+          break again;
+
+        default:
+          if (str[si] !== "%") return fail();
+          si++;
+          if (fi < flen) {
+            if (si >= slen || str[si] !== fmt[fi]) return fail();
+            si++;
+          }
+          break again;
+      }
+      break;
+    }
+
+    if (ordinal) {
+      if (str[si] !== fmt[fi]) return fail();
+      si++;
+      fi++;
+      continue;
+    }
+    fi++;
+  }
+
+  return si;
+}
+
+/**
+ * @internal `date_strptime.c`'s `%Z`/`%z` pattern (`date_strptime.c:576-583`).
+ * The C's `(?-i:...)` groups are dropped: both wrap character classes that
+ * already span both cases, so the enclosing `IGNORECASE` has nothing to undo
+ * there, and JavaScript has no inline modifier to express them with.
+ */
+const ZONE_PAT =
+  /^((?:gmt|utc?)?[-+]\d+(?:[,.:]\d+(?::\d+)?)?|[a-zA-Z.\s]+(?:standard|daylight)\s+time\b|[a-zA-Z]+(?:\s+dst)?\b)/i;
+
+/**
+ * @internal `date_strptime.c` `date__strptime` (`date_strptime.c:665-703`): the
+ * walk, then the `:leftover` the format did not consume, then `:_cent` folded
+ * into the year and `:_merid` into the hour. `null` is its `Qnil`.
+ */
+function dateStrptime(str: string, fmt: string, hash: DateParts): DateParts | null {
+  const si = dateStrptimeInternal(str, fmt, hash);
+
+  if (str.length > si) {
+    hash.leftover = str.slice(si);
+  }
+
+  if (hash._fail === true) return null;
+
+  const cent = hash._cent;
+  delete hash._cent;
+  if (cent !== undefined) {
+    if (hash.cwyear !== undefined) hash.cwyear = hash.cwyear + cent * 100;
+    if (hash.year !== undefined) hash.year = hash.year + cent * 100;
+  }
+
+  const merid = hash._merid;
+  delete hash._merid;
+  if (merid !== undefined) {
+    if (hash.hour !== undefined) hash.hour = (hash.hour % 12) + merid;
+  }
+
+  return hash;
+}
+
 /**
  * @internal `date_core.c` `rt_rewrite_frags` (`date_core.c:3839-3872`), which
  * runs ahead of {@link completeFrags} and expands a `:seconds` frag — seconds
@@ -2257,8 +2789,10 @@ function rtValidDateFragsP(parts: DateParts): Temporal.PlainDate | null {
  * `:mon` and a `:mday` — goes straight to {@link rtValidCivilP}, skipping both
  * {@link rtRewriteFrags} and {@link completeFrags}.
  */
-export function dNewByFrags(hash: DateParts): Date {
+export function dNewByFrags(hash: DateParts | null): Date {
   let jd: Temporal.PlainDate | null;
+
+  if (hash === null) throw new DateError("invalid date");
 
   if (
     hash.jd === undefined &&
@@ -2577,6 +3111,33 @@ export class Date {
     return dNewByFrags(Date._parse(str, comp));
   }
 
+  /**
+   * Ruby `Date._strptime(string, format = '%F')` (`date_core.c`
+   * `date_s__strptime` over `date_s__strptime_internal`,
+   * `date_core.c:4328-4396`), which answers the frag Hash `date__strptime`
+   * filled — or `nil` when a directive did not match. The encoding copies the
+   * C makes onto `:zone` and `:leftover` have no analogue on a JS string.
+   *
+   * This is the only producer of the `:seconds` frag {@link rtRewriteFrags}
+   * expands: `%s` names seconds since the Unix epoch and `%Q` milliseconds.
+   * `date__parse` never sets one.
+   */
+  static _strptime(str: string, fmt = "%F"): DateParts | null {
+    const hash: DateParts = {};
+    return dateStrptime(str, fmt, hash);
+  }
+
+  /**
+   * Ruby `Date.strptime(string = '-4712-01-01', format = '%F', start =
+   * Date::ITALY)` (`date_core.c` `date_s_strptime`, `date_core.c:4424-4447`),
+   * which is `Date._strptime` followed by `d_new_by_frags`. `start` is the
+   * calendar reform, which `Temporal.PlainDate` has no bearer for, so it is not
+   * a parameter here.
+   */
+  static strptime(str = JULIAN_EPOCH_DATE, fmt = "%F"): Date {
+    return dNewByFrags(Date._strptime(str, fmt));
+  }
+
   get year(): number {
     return this.#date.year;
   }
@@ -2716,6 +3277,13 @@ export class DateTime extends Date {
    * `"invalid fraction"`, as `DateTime.new(2008, 3, 1, 6, 0.5, 0)` does — and
    * `fr2` takes it in the C's own order.
    *
+   * `canon24oc()` (`date_core.c:3306-3312`) runs between `c_valid_time_p` and
+   * `set_to_complex` (`date_core.c:7882`): `c_valid_time_p` admits the
+   * `24:00:00` that ends a day, and this is what turns it into midnight of the
+   * NEXT day, by folding `rh` to `0` and adding a whole day to `fr2` for
+   * `add_frac` to apply. `fr2` is carried in seconds here, so the C's `fr2 + 1`
+   * day is `fr2 + DAY_IN_SECONDS`.
+   *
    * `add_frac()` (`date_core.c:3313-3317`) then hands `fr2` to `d_lite_plus`'s
    * `T_FLOAT` arm (`date_core.c:6064-6135`), which is what makes
    * `DateTime.new(2008, 3, 1, 6, 0.5)` `06:00:30`: the fraction's whole seconds
@@ -2796,7 +3364,13 @@ export class DateTime extends Date {
     if (rjd === null) throw new DateError("invalid date");
     const rt = cValidTimeP(h, min, s);
     if (rt === null) throw new DateError("invalid date");
-    const localDf = timeToDf(rt[0], rt[1], rt[2]);
+    let [rh] = rt;
+    const [, rmin, rs] = rt;
+    if (rh === 24) {
+      rh = 0;
+      fr2 += DAY_IN_SECONDS;
+    }
+    const localDf = timeToDf(rh, rmin, rs);
     let date = jdLocalToUtc(rjd, localDf, rof);
     let df = dfLocalToUtc(localDf, rof);
     df += Math.floor(fr2);

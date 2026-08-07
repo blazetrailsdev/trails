@@ -333,6 +333,120 @@ describe("Date", () => {
     expect([negative.hour, negative.min, negative.sec]).toEqual([23, 59, 59]);
   });
 
+  it("answers the frag hash date__strptime fills, as Date._strptime does", () => {
+    // ruby 3.3.11:
+    //   Date._strptime("2001-02-03", "%Y-%m-%d")   #=> {:year=>2001, :mon=>2, :mday=>3}
+    //   Date._strptime("2001-W05-6", "%G-W%V-%u")  #=> {:cwyear=>2001, :cweek=>5, :cwday=>6}
+    //   Date._strptime("2001 04 6", "%Y %U %w")    #=> {:year=>2001, :wnum0=>4, :wday=>6}
+    //   Date._strptime("sat3feb01", "%a%d%b%y")    #=> {:wday=>6, :mday=>3, :mon=>2, :year=>2001}
+    //   Date._strptime("11:22:33 pm", "%I:%M:%S %p") #=> {:hour=>23, :min=>22, :sec=>33}
+    //   Date._strptime("bogus", "%Y")              #=> nil
+    expect(RubyDate._strptime("2001-02-03", "%Y-%m-%d")).toEqual({ year: 2001, mon: 2, mday: 3 });
+    expect(RubyDate._strptime("2001-W05-6", "%G-W%V-%u")).toEqual({
+      cwyear: 2001,
+      cweek: 5,
+      cwday: 6,
+    });
+    expect(RubyDate._strptime("2001 04 6", "%Y %U %w")).toEqual({
+      year: 2001,
+      wnum0: 4,
+      wday: 6,
+    });
+    expect(RubyDate._strptime("sat3feb01", "%a%d%b%y")).toEqual({
+      wday: 6,
+      mday: 3,
+      mon: 2,
+      year: 2001,
+    });
+    expect(RubyDate._strptime("11:22:33 pm", "%I:%M:%S %p")).toEqual({
+      hour: 23,
+      min: 22,
+      sec: 33,
+    });
+    expect(RubyDate._strptime("bogus", "%Y")).toBeNull();
+  });
+
+  it("completes the century of a two-digit year, as date__strptime's _cent does", () => {
+    // ruby 3.3.11:
+    //   Date._strptime("68", "%y") #=> {:year=>2068}
+    //   Date._strptime("69", "%y") #=> {:year=>1969}
+    //   Date._strptime("19 69", "%C %y") #=> {:year=>1969}
+    expect(RubyDate._strptime("68", "%y")).toEqual({ year: 2068 });
+    expect(RubyDate._strptime("69", "%y")).toEqual({ year: 1969 });
+    expect(RubyDate._strptime("19 69", "%C %y")).toEqual({ year: 1969 });
+  });
+
+  it("records the tail the format did not consume, as date__strptime's leftover does", () => {
+    // ruby 3.3.11:
+    //   Date._strptime("2001-02-03 leftovers", "%F")
+    //     #=> {:year=>2001, :mon=>2, :mday=>3, :leftover=>" leftovers"}
+    expect(RubyDate._strptime("2001-02-03 leftovers", "%F")).toEqual({
+      year: 2001,
+      mon: 2,
+      mday: 3,
+      leftover: " leftovers",
+    });
+  });
+
+  it("reads a zone through date_zone_to_diff, as date__strptime's %z does", () => {
+    // ruby 3.3.11:
+    //   Date._strptime("2001-02-03T04:05:06+09:00", "%FT%T%z")
+    //     #=> {:year=>2001, :mon=>2, :mday=>3, :hour=>4, :min=>5, :sec=>6,
+    //          :zone=>"+09:00", :offset=>32400}
+    expect(RubyDate._strptime("2001-02-03T04:05:06+09:00", "%FT%T%z")).toEqual({
+      year: 2001,
+      mon: 2,
+      mday: 3,
+      hour: 4,
+      min: 5,
+      sec: 6,
+      zone: "+09:00",
+      offset: 32400,
+    });
+  });
+
+  it("sets the seconds frag from %s and %Q, the only producers rt_rewrite_frags has", () => {
+    // ruby 3.3.11:
+    //   Date._strptime("1000000000", "%s")     #=> {:seconds=>1000000000}
+    //   Date._strptime("-1000000000", "%s")    #=> {:seconds=>-1000000000}
+    //   Date._strptime("1000000000500", "%Q")  #=> {:seconds=>(2000000001/2)}
+    expect(RubyDate._strptime("1000000000", "%s")).toEqual({ seconds: 1000000000 });
+    expect(RubyDate._strptime("-1000000000", "%s")).toEqual({ seconds: -1000000000 });
+    expect(RubyDate._strptime("1000000000500", "%Q")).toEqual({ seconds: 1000000000.5 });
+  });
+
+  it("builds the date the frags name, as Date.strptime does", () => {
+    // ruby 3.3.11:
+    //   Date.strptime("2001-02-03", "%Y-%m-%d")  #=> #<Date: 2001-02-03>
+    //   Date.strptime("03-02-2001", "%d-%m-%Y")  #=> #<Date: 2001-02-03>
+    //   Date.strptime("2001-034", "%Y-%j")       #=> #<Date: 2001-02-03>
+    //   Date.strptime("2001-W05-6", "%G-W%V-%u") #=> #<Date: 2001-02-03>
+    //   Date.strptime("2001 04 6", "%Y %U %w")   #=> #<Date: 2001-02-03>
+    //   Date.strptime("2001 05 6", "%Y %W %u")   #=> #<Date: 2001-02-03>
+    //   Date.strptime("sat3feb01", "%a%d%b%y")   #=> #<Date: 2001-02-03>
+    for (const [str, fmt] of [
+      ["2001-02-03", "%Y-%m-%d"],
+      ["03-02-2001", "%d-%m-%Y"],
+      ["2001-034", "%Y-%j"],
+      ["2001-W05-6", "%G-W%V-%u"],
+      ["2001 04 6", "%Y %U %w"],
+      ["2001 05 6", "%Y %W %u"],
+      ["sat3feb01", "%a%d%b%y"],
+    ] as const) {
+      expect(ymd(RubyDate.strptime(str, fmt))).toBe("2001-02-03");
+    }
+    // Date.strptime("bogus", "%Y") raises Date::Error, as d_new_by_frags does on a nil hash.
+    expect(() => RubyDate.strptime("bogus", "%Y")).toThrow("invalid date");
+  });
+
+  it("reaches rt_rewrite_frags through %s and %Q, as Date.strptime does", () => {
+    // ruby 3.3.11:
+    //   Date.strptime("1000000000", "%s")    #=> #<Date: 2001-09-09>
+    //   Date.strptime("1000000000500", "%Q") #=> #<Date: 2001-09-09>
+    expect(ymd(RubyDate.strptime("1000000000", "%s"))).toBe("2001-09-09");
+    expect(ymd(RubyDate.strptime("1000000000500", "%Q"))).toBe("2001-09-09");
+  });
+
   it("skips rt_rewrite_frags and rt_complete_frags for a civil date, as d_new_by_frags does", () => {
     expect(ymd(dNewByFrags({ year: 2008, mon: 7, mday: 2, seconds: 1000000000 }))).toBe(
       "2008-07-02",
@@ -545,6 +659,22 @@ describe("DateTime", () => {
     const datetime = new RubyDateTime(2008, 3, 1, 6);
     expect("sec" in datetime).toBe(true);
     expect("hour" in datetime).toBe(true);
+  });
+
+  it("rolls a 24:00:00 time of day to midnight of the next day, as canon24oc does", () => {
+    // ruby 3.3.11:
+    //   DateTime.new(2008, 3, 1, 24).to_s               #=> "2008-03-02T00:00:00+00:00"
+    //   DateTime.new(2008, 3, 1, 24, 0, 0.5).to_s       #=> "2008-03-02T00:00:00+00:00"
+    //   DateTime.new(2008, 3, 1, 24, 0, 0.5).sec_fraction #=> (1/2)
+    //   DateTime.new(2008, 3, 1, 24.5).to_s             #=> "2008-03-02T00:30:00+00:00"
+    //   DateTime.new(2008, 3, 1, 24, 0, 0, "+09:00").to_s #=> "2008-03-02T00:00:00+09:00"
+    //   DateTime.new(2008, 3, 1, 23, 59, 59).to_s       #=> "2008-03-01T23:59:59+00:00"
+    expect(new RubyDateTime(2008, 3, 1, 24).toS()).toBe("2008-03-02T00:00:00+00:00");
+    expect(new RubyDateTime(2008, 3, 1, 24, 0, 0.5).toS()).toBe("2008-03-02T00:00:00+00:00");
+    expect(new RubyDateTime(2008, 3, 1, 24, 0, 0.5).secFraction).toBe(0.5);
+    expect(new RubyDateTime(2008, 3, 1, 24.5).toS()).toBe("2008-03-02T00:30:00+00:00");
+    expect(new RubyDateTime(2008, 3, 1, 24, 0, 0, 32400).toS()).toBe("2008-03-02T00:00:00+09:00");
+    expect(new RubyDateTime(2008, 3, 1, 23, 59, 59).toS()).toBe("2008-03-01T23:59:59+00:00");
   });
 
   it("formats %Z as the UTC offset, as ::DateTime does", () => {
