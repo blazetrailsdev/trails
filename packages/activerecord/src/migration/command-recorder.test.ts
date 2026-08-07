@@ -457,8 +457,6 @@ describe("Migration", () => {
     });
 
     it("send calls super", () => {
-      // Ruby's `NoMethodError` for an undefined method is JS's `TypeError`:
-      // the proxy resolves the unknown name to `undefined`, and calling it throws.
       const recorder = new CommandRecorder(abstractDelegate) as unknown as {
         nonExistingMethod(name: string): void;
       };
@@ -513,15 +511,10 @@ describe("Migration", () => {
     });
 
     it("revert order", async () => {
-      // Ruby passes the block beside the args and `commands` carries it as a
-      // third element; a JS callback is an ordinary argument, so it rides in
-      // `args` instead.
       const block = (t: Table) => t.string("name");
       const recorder = new CommandRecorder(abstractDelegate) as unknown as CommandRecorder & {
         createTable(...args: unknown[]): void;
       };
-      // The recorder only records the commands — no DDL runs, so there is
-      // nothing to tear down.
       /* eslint-disable blazetrails/require-table-teardown */
       recorder.createTable("apples", block);
       await recorder.revert(async () => {
@@ -629,34 +622,44 @@ describe("Migration", () => {
     });
 
     it("invert drop table without a block nor option", () => {
-      expect(() =>
-        new CommandRecorder(abstractDelegate).inverseOf("dropTable", ["people_reminders"]),
-      ).toThrow(
+      const inverseOf = () =>
+        new CommandRecorder(abstractDelegate).inverseOf("dropTable", ["people_reminders"]);
+      expect(inverseOf).toThrow(IrreversibleMigration);
+      expect(inverseOf).toThrow(
         "To avoid mistakes, drop_table is only reversible if given options or a block (can be empty).",
       );
     });
 
     it("invert drop table with multiple tables", () => {
-      expect(() =>
-        new CommandRecorder(abstractDelegate).inverseOf("dropTable", ["musics", "artists"]),
-      ).toThrow("To avoid mistakes, drop_table is only reversible if given a single table name.");
+      const inverseOf = () =>
+        new CommandRecorder(abstractDelegate).inverseOf("dropTable", ["musics", "artists"]);
+      expect(inverseOf).toThrow(IrreversibleMigration);
+      expect(inverseOf).toThrow(
+        "To avoid mistakes, drop_table is only reversible if given a single table name.",
+      );
     });
 
     it("invert drop table with multiple tables and options", () => {
-      expect(() =>
+      const inverseOf = () =>
         new CommandRecorder(abstractDelegate).inverseOf("dropTable", [
           "musics",
           "artists",
           { id: false },
-        ]),
-      ).toThrow("To avoid mistakes, drop_table is only reversible if given a single table name.");
+        ]);
+      expect(inverseOf).toThrow(IrreversibleMigration);
+      expect(inverseOf).toThrow(
+        "To avoid mistakes, drop_table is only reversible if given a single table name.",
+      );
     });
 
     it("invert drop table with multiple tables and block", () => {
       const block = () => {};
-      expect(() =>
-        new CommandRecorder(abstractDelegate).inverseOf("dropTable", ["musics", "artists", block]),
-      ).toThrow("To avoid mistakes, drop_table is only reversible if given a single table name.");
+      const inverseOf = () =>
+        new CommandRecorder(abstractDelegate).inverseOf("dropTable", ["musics", "artists", block]);
+      expect(inverseOf).toThrow(IrreversibleMigration);
+      expect(inverseOf).toThrow(
+        "To avoid mistakes, drop_table is only reversible if given a single table name.",
+      );
     });
 
     it("invert create join table", () => {

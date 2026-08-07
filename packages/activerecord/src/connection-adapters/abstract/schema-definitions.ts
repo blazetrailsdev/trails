@@ -1625,9 +1625,8 @@ export class Table {
   ): Promise<void> {
     this.raiseOnIfExistOptions(options as Record<string, unknown>);
     const { index: indexOpt, ...colOpts } = options;
-    // Ruby's `@base.add_column(name, column_name, type, **options)` passes no
-    // fourth argument at all when `options` is empty; the CommandRecorder
-    // records the arguments verbatim, so the empty hash must not be spread in.
+    // `@base.add_column(name, column_name, type, **options)` passes no fourth
+    // argument when `options` is empty, and CommandRecorder records args verbatim.
     if (Object.keys(colOpts).length === 0) {
       await this._schema.addColumn(this._tableName, columnName, type);
     } else {
