@@ -361,6 +361,22 @@ describe("Date", () => {
     expect(parsed.strftime("%20N")).toBe("11111111111111111111");
   });
 
+  it("keeps a %N numerator past Number.MAX_SAFE_INTEGER exact, as str2num does", () => {
+    // ruby 3.3.11:
+    //   Date._strptime("2008-03-01T06:00:00." + "1" * 20, "%FT%T.%N")[:sec_fraction]
+    //   #=> (11111111111111111111/100000000000000000000)
+    const str = `2008-03-01T06:00:00.${"1".repeat(20)}`;
+    expect(RubyDate._strptime(str, "%FT%T.%N")?.secFraction).toEqual(
+      new Rational(11111111111111111111n, 100000000000000000000n),
+    );
+    //   DateTime.strptime(..., "%FT%T.%N").strftime("%FT%H:%M:%S.%20N")
+    //   #=> "2008-03-01T06:00:00.11111111111111111111"
+    // (`%T` on the way out is the separate `strftime-lacks-composite-conversions`.)
+    expect(RubyDateTime.strptime(str, "%FT%T.%N").strftime("%FT%H:%M:%S.%20N")).toBe(
+      `2008-03-01T06:00:00.${"1".repeat(20)}`,
+    );
+  });
+
   it("answers the frag hash date__strptime fills, as Date._strptime does", () => {
     expect(RubyDate._strptime("2001-02-03", "%Y-%m-%d")).toEqual({ year: 2001, mon: 2, mday: 3 });
     expect(RubyDate._strptime("2001-W05-6", "%G-W%V-%u")).toEqual({

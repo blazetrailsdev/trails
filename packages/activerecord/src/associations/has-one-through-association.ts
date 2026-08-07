@@ -194,18 +194,6 @@ export class HasOneThroughAssociation extends HasOneAssociation {
   }
 
   /**
-   * No load and no removal, for the same reason as `loadDisplacedForBuild`
-   * above: a through `replace` has no `load_target`, so a nested-attributes
-   * build issues no target SELECT and detaches no displaced *end* record for a
-   * has_one_through — so the writer has nothing to await.
-   *
-   * @internal
-   */
-  protected override displacementNeedsAwait(): boolean {
-    return false;
-  }
-
-  /**
    * Mirrors Rails `HasOneThroughAssociation#replace` immediate persist to a
    * saved owner. The base `writer` saves the target's foreign key directly,
    * which is wrong for a through (persistence routes through the join model), so

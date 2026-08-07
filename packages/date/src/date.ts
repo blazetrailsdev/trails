@@ -1971,6 +1971,9 @@ function parseFrag(str: string, hash: DateParts): string | null {
 /** `date_core.c`'s `JULIAN_EPOCH_DATE` (`date_core.c:251`). */
 const JULIAN_EPOCH_DATE = "-4712-01-01";
 
+/** `date_core.c`'s `JULIAN_EPOCH_DATETIME` (`date_core.c:252`). */
+const JULIAN_EPOCH_DATETIME = `${JULIAN_EPOCH_DATE}T00:00:00+00:00`;
+
 const ABBREVIATED_DAY_NAME_LENGTH = 3;
 const ABBREVIATED_MONTH_NAME_LENGTH = 3;
 
@@ -2042,9 +2045,9 @@ function headMatchP(len: number, name: string, str: string, slen: number, si: nu
  * `ordinal` is the `ordinal` flag falling through to the same literal
  * comparison the non-`%` arm makes.
  *
- * `%L`/`%N`'s `:sec_fraction` is a `Rational` in Ruby and a number here, which
- * is the representation `parse_time` and `parse_ddd` already flatten theirs to
- * in this file; `%Q`'s `:seconds` follows it.
+ * `%Q`'s `:seconds` is a `Rational` in Ruby and a number here, which is the
+ * representation `parse_time` and `parse_ddd` already flatten theirs to in
+ * this file.
  *
  * The closures stand in for the C's macros: `readDigitsAt` is `READ_DIGITS`
  * (`date_strptime.c:115-123`) with `null` for its `fail()`, `readDigitsMax` is
@@ -2248,12 +2251,15 @@ function dateStrptimeInternal(str: string, fmt: string, hash: DateParts): number
             si++;
           }
           const osi = si;
-          let n = numPatternP(fmt.slice(fi + 1))
+          const n = numPatternP(fmt.slice(fi + 1))
             ? readDigitsAt(c === "L" ? 3 : 9)
             : readDigitsMax();
           if (n === null) return fail();
-          if (sign === -1) n = -n;
-          hash.secFraction = new Rational(n, 10n ** BigInt(si - osi));
+          // `str2num` over the digit span, not the `number` the reader answered:
+          // past sixteen digits that has already lost precision (`date_strptime.c:377-380`).
+          let num = BigInt(str.slice(osi, si));
+          if (sign === -1) num = -num;
+          hash.secFraction = new Rational(num, 10n ** BigInt(si - osi));
           break again;
         }
 
@@ -3156,8 +3162,10 @@ function of2str(of: number): string {
  * `DateTime.parse("2008-03-01T24:00:00")` is 2008-03-02T00:00:00. That now
  * falls out of the representation rather than being normalized here.
  */
-export function dtNewByFrags(hash: DateParts): DateTime {
+export function dtNewByFrags(hash: DateParts | null): DateTime {
   let jd: Temporal.PlainDate | null;
+
+  if (hash === null) throw new DateError("invalid date");
 
   if (
     hash.jd === undefined &&
@@ -3789,6 +3797,19 @@ export class DateTime extends Date {
    */
   static override parse(str: string, comp = true): DateTime {
     return dtNewByFrags(Date._parse(str, comp));
+  }
+
+  /**
+   * Ruby `DateTime.strptime(string = '-4712-01-01T00:00:00+00:00', format =
+   * '%FT%T%z', start = Date::ITALY)` (ruby/date, `date_core.c`
+   * `datetime_s_strptime`, `date_core.c:8368-8392`), which is `Date._strptime`
+   * followed by `dt_new_by_frags` — the DateTime-shaped build, so unlike
+   * `Date.strptime` it keeps the time of day the frags carry. `start` is the
+   * calendar reform, which `Temporal.PlainDate` has no bearer for, so it is not
+   * a parameter here.
+   */
+  static override strptime(str = JULIAN_EPOCH_DATETIME, fmt = "%FT%T%z"): DateTime {
+    return dtNewByFrags(Date._strptime(str, fmt));
   }
 
   /**
