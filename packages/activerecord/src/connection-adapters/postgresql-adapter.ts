@@ -468,13 +468,7 @@ export class PostgreSQLAdapter
    */
   private _commandSettled = true;
   /**
-   * The TransactionManager lock token of the chain that issued the query
-   * `transactionStatus` reports as PQTRANS_ACTIVE — see
-   * `_cancelAnyRunningQuery`.
-   */
-  private _queryInFlightOwner: symbol | null = null;
-  /**
-   * Settlement of the query `_queryInFlightOwner` names, as a promise that only
+   * Settlement of the query currently on the wire, as a promise that only
    * ever resolves — what `_cancelAnyRunningQuery` awaits for
    * `@raw_connection.block` (postgresql/database_statements.rb:128). Attaching
    * it also *observes* that query's rejection, so the `QueryCanceled` the
@@ -1524,6 +1518,27 @@ export class PostgreSQLAdapter
   }
 
   /**
+   * Settle once nothing this adapter issued is still on the wire.
+   * {@link TransactionManager.synchronize} awaits this before releasing the
+   * lock, which is how trails reproduces the containment Rails gets lexically
+   * from `@lock.synchronize` wrapping the whole `with_raw_connection` body
+   * (`abstract_adapter.rb:984`).
+   *
+   * `_maintenanceTail` is that set: every pinned query chains onto it, so
+   * awaiting it waits out the last one, including a query some caller launched
+   * without awaiting.
+   *
+   * No Rails counterpart, and there cannot be one: an un-awaited JS call
+   * escapes its enclosing async scope, so the lock scope has to be told what it
+   * still covers; Ruby's blocks contain their work by construction.
+   *
+   * @internal
+   */
+  _pendingQueries(): Promise<void> {
+    return this._maintenanceTail;
+  }
+
+  /**
    * Chain `fn` onto the pinned client's maintenance tail so DEALLOCATE /
    * ROLLBACK / DISCARD ALL serialize against each other (and, via the drain in
    * `_acquireFreshClient` / `awaitRawConnectionReady`, against the next user
@@ -1589,13 +1604,6 @@ export class PostgreSQLAdapter
     });
     this._maintenanceTail = prev.then(() => gate);
     await prev.catch(() => {});
-    // DEVIATION (converging, RFC 0085): `_queryInFlightOwner` is an invention —
-    // it stands in for the lock trails releases early, which Rails'
-    // `cancel_any_running_query` (postgresql/database_statements.rb:127) does
-    // not need. Scheduled for deletion; do not build on it. Claimed after the
-    // tail await so it names the query actually on the wire rather than one
-    // still queued (#5660).
-    this._queryInFlightOwner = this._transactionManager.currentLockToken;
     // node-pg emits parsed backend messages only, so the send side of the
     // cycle has no event to listen for: the outstanding-query half of
     // `transactionStatus` is opened here, where the query goes on the wire,
@@ -1609,7 +1617,6 @@ export class PostgreSQLAdapter
       );
       return await query;
     } finally {
-      this._queryInFlightOwner = null;
       this._queryInFlightSettled = null;
       release();
     }
@@ -2332,25 +2339,6 @@ export class PostgreSQLAdapter
   // query to drain — the `@raw_connection.block` half
   // (postgresql/database_statements.rb:127-128) — so the ROLLBACK is sent only
   // once the query is off the wire. Best-effort: errors are swallowed.
-  //
-  // INVARIANT: only ever cancels a query *this* unit of work issued. Rails gets
-  // that for free — `@connection.lock` is a thread mutex, so the only query that
-  // can be on the wire when a rollback reaches here is one the rolling-back
-  // thread itself started and abandoned (Timeout/Interrupt). trails' lock is per
-  // async chain and a chain can release it with work still awaiting, so a
-  // *foreign* chain's query is routinely mid-flight here. Cancelling that one
-  // rejects a promise this rollback does not own, and when the foreign chain has
-  // been dropped (an aborted save cascade, a connection heading back to the
-  // pool) nobody observes the rejection — it surfaces at run end as an
-  // unattributed `QueryCanceled: canceling statement due to user request`
-  // (RFC 0061 pg-query-canceled-unhandled-rejection). Skipping the cancel is
-  // safe: `_serializePinnedQuery` already sequences our ROLLBACK behind whatever
-  // is on the wire, so we wait instead of corrupting someone else's query.
-  //
-  // A null token means the caller holds no lock at all (`resetBang` on pool
-  // checkin, or a direct `beginDbTransaction`/`rollbackDbTransaction` pair on a
-  // bare adapter): ownership is unprovable, so those paths also wait on the
-  // serializer rather than cancel.
   private async _cancelAnyRunningQuery(): Promise<void> {
     type PgClientWithPid = pg.Client & {
       processID?: number | null;
@@ -2366,8 +2354,6 @@ export class PostgreSQLAdapter
       return;
     }
     if (txClient?.processID == null) return;
-    const owner = this._transactionManager.currentLockToken;
-    if (owner === null || owner !== this._queryInFlightOwner) return;
     const drained = this._queryInFlightSettled;
     try {
       // Open a FRESH TCP connection to send a CancelRequest — mirrors
@@ -3831,7 +3817,6 @@ export class PostgreSQLAdapter
   }
 
   async renameIndex(tableName: string, oldName: string, newName: string): Promise<void> {
-    await this.schemaCache.clearDataSourceCacheBang(tableName);
     this.validateIndexLengthBang(tableName, newName);
     const [schema] = this.extractSchemaQualifiedName(tableName);
     const qualifier = schema ? `${this.quoteTableName(schema)}.` : "";
@@ -3963,8 +3948,6 @@ export class PostgreSQLAdapter
       comment?: string;
     } = {},
   ): Promise<void> {
-    await this.schemaCache.clearDataSourceCacheBang(tableName);
-
     const createIndex = (await this.buildCreateIndexDefinition(tableName, columns, options))!;
     await this.execute(await this.schemaCreation.accept(createIndex));
 

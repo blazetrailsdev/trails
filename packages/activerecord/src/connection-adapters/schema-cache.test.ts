@@ -841,20 +841,4 @@ describe("SchemaCache DDL invalidation", () => {
     expect(adapter.internalSchemaCache.isCached("things")).toBe(false);
     expect(adapter.internalSchemaCache.isCached("stuff")).toBe(false);
   });
-
-  it("renameColumn re-reflects the new column name through the warm cache", async () => {
-    // Drop the fake beforeEach seed and warm the real reflection so columnsHash
-    // mirrors the DB. The pool argument is the adapter itself: SchemaCache's
-    // withConnection falls through to calling the column reader on it directly.
-    adapter.internalSchemaCache.clearDataSourceCacheBang(adapter.pool, "things");
-    const before = await adapter.internalSchemaCache.columnsHash(adapter, "things");
-    expect(Object.keys(before!)).toContain("name");
-
-    await adapter.renameColumn("things", "name", "title");
-
-    // Without the clear in renameColumn this still reports the stale "name".
-    const after = await adapter.internalSchemaCache.columnsHash(adapter, "things");
-    expect(Object.keys(after!)).toContain("title");
-    expect(Object.keys(after!)).not.toContain("name");
-  });
 });

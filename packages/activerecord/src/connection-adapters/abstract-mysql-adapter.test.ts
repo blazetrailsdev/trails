@@ -286,8 +286,9 @@ describe("AbstractMysqlAdapter#renameColumnForAlter fallback", () => {
 
 describe("AbstractMysqlAdapter#renameColumn wiring", () => {
   // Drives the public renameColumn surface: it must wrap renameColumnForAlter's
-  // fragment in ALTER TABLE, clear the schema cache BEFORE mutating (RFC 0031
-  // always-warm cache), then fix up index names via renameColumnIndexes.
+  // fragment in ALTER TABLE, then fix up index names via renameColumnIndexes —
+  // the whole of `abstract_mysql_adapter.rb:440-443`, which does not touch the
+  // schema cache.
   async function makeAdapter() {
     const { AbstractMysqlAdapter } = await import("./abstract-mysql-adapter.js");
     const adapter = Object.create(AbstractMysqlAdapter.prototype);
@@ -317,11 +318,10 @@ describe("AbstractMysqlAdapter#renameColumn wiring", () => {
     return { adapter, events };
   }
 
-  it("clears the cache before issuing the ALTER TABLE RENAME COLUMN then fixes indexes", async () => {
+  it("issues the ALTER TABLE RENAME COLUMN then fixes indexes, without touching the cache", async () => {
     const { adapter, events } = await makeAdapter();
     await adapter.renameColumn("users", "old_name", "new_name");
     expect(events).toEqual([
-      "clear:users",
       "exec:ALTER TABLE `users` RENAME COLUMN `old_name` TO `new_name`",
       "indexes:users:old_name:new_name",
     ]);

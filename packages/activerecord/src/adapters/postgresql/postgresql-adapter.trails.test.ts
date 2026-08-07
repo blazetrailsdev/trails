@@ -289,21 +289,23 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
     });
     // Regression for RFC 0061 pg-query-canceled-unhandled-rejection: rolling
-    // back must not fire a CancelRequest at a query some *other* async chain
-    // put on the wire. `_cancelAnyRunningQuery` used to cancel whatever was
-    // in flight, which rejected a promise the rollback didn't own — and when
-    // that chain had been dropped (an aborted save cascade), nobody observed
-    // the rejection and vitest reported an unattributed run-end
-    // `QueryCanceled`. The rollback waits behind the query instead.
+    // back must not fire a CancelRequest at a query some *other* chain put on
+    // the wire. Rails gets that from scope alone — `@lock.synchronize` wraps
+    // the whole `with_raw_connection` body (abstract_adapter.rb:984) and
+    // `rollback_transaction` takes the same lock (abstract/transaction.rb:611),
+    // so the rollback simply waits behind the query and finds an idle
+    // transaction status, which `cancel_any_running_query`'s
+    // IDLE_TRANSACTION_STATUSES gate (postgresql/database_statements.rb:128)
+    // returns on.
     it("rollback does not cancel a query issued by another chain", async () => {
       const other = new PostgreSQLAdapter(PG_TEST_URL);
       try {
         await other.beginDbTransaction();
-        // Issued outside the TransactionManager lock the rollback below takes,
-        // standing in for the foreign chain.
+        // A genuinely concurrent chain: its `withRawConnection` holds the
+        // connection lock for the query's whole life, so nothing is abandoned.
         const foreign = other.execute("SELECT pg_sleep(0.5) AS slept");
         await new Promise<void>((r) => setTimeout(r, 100));
-        await other.rollbackDbTransaction();
+        await other.transactionManager.synchronize(() => other.rollbackDbTransaction());
         await expect(foreign).resolves.toHaveLength(1);
       } finally {
         await other.close();
