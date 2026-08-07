@@ -3030,6 +3030,33 @@ export class Date {
   }
 
   /**
+   * Ruby `Date._strptime(string, format = '%F')` (`date_core.c`
+   * `date_s__strptime` over `date_s__strptime_internal`,
+   * `date_core.c:4328-4396`), which answers the frag Hash `date__strptime`
+   * filled — or `nil` when a directive did not match. The encoding copies the
+   * C makes onto `:zone` and `:leftover` have no analogue on a JS string.
+   *
+   * This is the only producer of the `:seconds` frag {@link rtRewriteFrags}
+   * expands: `%s` names seconds since the Unix epoch and `%Q` milliseconds.
+   * `date__parse` never sets one.
+   */
+  static _strptime(str: string, fmt = "%F"): DateParts | null {
+    const hash: DateParts = {};
+    return dateStrptime(str, fmt, hash);
+  }
+
+  /**
+   * Ruby `Date.strptime(string = '-4712-01-01', format = '%F', start =
+   * Date::ITALY)` (`date_core.c` `date_s_strptime`, `date_core.c:4424-4447`),
+   * which is `Date._strptime` followed by `d_new_by_frags`. `start` is the
+   * calendar reform, which `Temporal.PlainDate` has no bearer for, so it is not
+   * a parameter here.
+   */
+  static strptime(str = JULIAN_EPOCH_DATE, fmt = "%F"): Date {
+    return dNewByFrags(Date._strptime(str, fmt));
+  }
+
+  /**
    * Ruby `Date._parse(str, comp = true)` (ruby/date, `date_parse.c`
    * `date__parse`), which runs its sub-parsers in a fixed order and stops at
    * the first that matches: the alphabetic pair first, then the numeric ones.
@@ -3115,33 +3142,6 @@ export class Date {
    */
   static parse(str: string, comp = true): Date {
     return dNewByFrags(Date._parse(str, comp));
-  }
-
-  /**
-   * Ruby `Date._strptime(string, format = '%F')` (`date_core.c`
-   * `date_s__strptime` over `date_s__strptime_internal`,
-   * `date_core.c:4328-4396`), which answers the frag Hash `date__strptime`
-   * filled — or `nil` when a directive did not match. The encoding copies the
-   * C makes onto `:zone` and `:leftover` have no analogue on a JS string.
-   *
-   * This is the only producer of the `:seconds` frag {@link rtRewriteFrags}
-   * expands: `%s` names seconds since the Unix epoch and `%Q` milliseconds.
-   * `date__parse` never sets one.
-   */
-  static _strptime(str: string, fmt = "%F"): DateParts | null {
-    const hash: DateParts = {};
-    return dateStrptime(str, fmt, hash);
-  }
-
-  /**
-   * Ruby `Date.strptime(string = '-4712-01-01', format = '%F', start =
-   * Date::ITALY)` (`date_core.c` `date_s_strptime`, `date_core.c:4424-4447`),
-   * which is `Date._strptime` followed by `d_new_by_frags`. `start` is the
-   * calendar reform, which `Temporal.PlainDate` has no bearer for, so it is not
-   * a parameter here.
-   */
-  static strptime(str = JULIAN_EPOCH_DATE, fmt = "%F"): Date {
-    return dNewByFrags(Date._strptime(str, fmt));
   }
 
   get year(): number {
