@@ -77,7 +77,7 @@ export interface StrftimeSubject {
   hour: number;
   min: number;
   sec: number;
-  nsec: number | Rational;
+  nsec: Rational;
   zone: string;
   utcOffset: number;
 }
@@ -233,13 +233,13 @@ function fillPadding(padding: string, left: boolean, precision: number, i: numbe
  * denominator emits the same digits under numbers that stay exact — the C's
  * scale-and-floor through a double would also drop `299999999` to `299999998`.
  */
-function subsecDigits(nsec: number | Rational, precision: number): string {
-  const den = (nsec instanceof Rational ? nsec.denominator : 1) * SECOND_IN_NANOSECONDS;
-  let n = (nsec instanceof Rational ? nsec.numerator : nsec) % den;
+function subsecDigits(nsec: Rational, precision: number): string {
+  const den = nsec.denominator * BigInt(SECOND_IN_NANOSECONDS);
+  let n = nsec.numerator % den;
   let digits = "";
   for (let i = 0; i < precision; i++) {
-    n *= 10;
-    digits += Math.floor(n / den);
+    n *= 10n;
+    digits += n / den;
     n %= den;
   }
   return digits;
@@ -731,15 +731,24 @@ function shrinkSpace(s: string, l: number): string {
 }
 
 /** @internal `rational.c` `i_gcd`, the greatest common divisor a Rational reduces by. */
-function iGcd(x: number, y: number): number {
-  if (x < 0) x = -x;
-  if (y < 0) y = -y;
-  while (y !== 0) {
+function iGcd(x: bigint, y: bigint): bigint {
+  if (x < 0n) x = -x;
+  if (y < 0n) y = -y;
+  while (y !== 0n) {
     const t = x % y;
     x = y;
     y = t;
   }
   return x;
+}
+
+/**
+ * @internal Ruby's `Integer#div` — the floored quotient, which a `bigint` `/`
+ * does not give (it truncates toward zero, as C does).
+ */
+function bigFloorDiv(a: bigint, b: bigint): bigint {
+  const q = a / b;
+  return a % b !== 0n && a < 0n !== b < 0n ? q - 1n : q;
 }
 
 /**
@@ -756,69 +765,88 @@ function iGcd(x: number, y: number): number {
  */
 export class Rational {
   /** `rational.c` `nurat_numerator` (`Rational#numerator`).
+   *
+   * Ruby's is an Integer — arbitrary precision — so a `bigint` is the JS
+   * analogue, not a `number`: a `number` is exact only inside
+   * `Number.MAX_SAFE_INTEGER` and a parsed fraction literal of more than
+   * sixteen digits (`date_parse.c:2319-2325`) runs straight past it.
+   *
    * @noRailsEquivalent PERMANENT — Ruby core, part of the Rational above. */
-  readonly numerator: number;
+  readonly numerator: bigint;
 
   /** `rational.c` `nurat_denominator` (`Rational#denominator`).
    * @noRailsEquivalent PERMANENT — Ruby core, part of the Rational above. */
-  readonly denominator: number;
+  readonly denominator: bigint;
 
-  constructor(num: number, den: number) {
-    const g = iGcd(num, den);
-    this.numerator = num / g;
-    this.denominator = den / g;
+  constructor(num: number | bigint, den: number | bigint) {
+    const n = BigInt(num);
+    const d = BigInt(den);
+    const g = iGcd(n, d);
+    this.numerator = n / g;
+    this.denominator = d / g;
   }
 
   /** `rational.c` `nurat_add` (`Rational#+`), for the Integer addend this port needs. */
-  add(other: number): Rational {
-    return new Rational(this.numerator + other * this.denominator, this.denominator);
+  add(other: number | bigint): Rational {
+    return new Rational(this.numerator + BigInt(other) * this.denominator, this.denominator);
   }
 
   /** `rational.c` `nurat_mul` (`Rational#*`), for the Integer multiplier this
    * port needs. `f_muldiv` cancels the multiplier against the denominator
-   * BEFORE it multiplies (`rational.c` `f_muldiv`), which is not a mere
-   * optimisation here: `(9999999999/10000000000) * 1000000000` overflows
-   * `Number.MAX_SAFE_INTEGER` if the product is formed first. */
-  mul(other: number): Rational {
-    const g = iGcd(other, this.denominator);
-    return new Rational(this.numerator * (other / g), this.denominator / g);
+   * BEFORE it multiplies (`rational.c` `f_muldiv`). */
+  mul(other: number | bigint): Rational {
+    const o = BigInt(other);
+    const g = iGcd(o, this.denominator);
+    return new Rational(this.numerator * (o / g), this.denominator / g);
   }
 
   /** `rational.c` `nurat_div` (`Rational#/`), for the Integer divisor this port
    * needs, cancelled the same way {@link mul} is. */
-  quo(other: number): Rational {
-    const g = iGcd(this.numerator, other);
-    return new Rational(this.numerator / g, this.denominator * (other / g));
+  quo(other: number | bigint): Rational {
+    const o = BigInt(other);
+    const g = iGcd(this.numerator, o);
+    return new Rational(this.numerator / g, this.denominator * (o / g));
   }
 
   /** `numeric.c` `num_zero_p` (`Rational#zero?`, inherited from Numeric), what
    * `date_core.c`'s `f_zero_p` dispatches to for a Rational. */
   isZero(): boolean {
-    return this.numerator === 0;
+    return this.numerator === 0n;
   }
 
   /** `numeric.c` `num_div` (`Rational#div`, inherited from Numeric), the
    * floored quotient — the method `date_core.c`'s `f_idiv` macro sends
    * (`date_core.c:43`) — for the Integer divisor this port needs. */
-  div(other: number): number {
-    return Math.floor(this.numerator / (this.denominator * other));
+  div(other: number | bigint): number {
+    return Number(bigFloorDiv(this.numerator, this.denominator * BigInt(other)));
   }
 
   /** `numeric.c` `num_modulo` (`Rational#%`, inherited from Numeric), which is
    * `self - other * (self.div other)` there too — what `date_core.c`'s `f_mod`
    * dispatches to for a Rational — for the Integer divisor this port needs. */
-  mod(other: number): Rational {
-    return this.add(-other * this.div(other));
+  mod(other: number | bigint): Rational {
+    return this.add(-BigInt(other) * BigInt(this.div(other)));
   }
 
   /** `rational.c` `nurat_to_i` (`Rational#to_i`), which truncates toward zero. */
   toI(): number {
-    return Math.trunc(this.numerator / this.denominator);
+    return Number(this.numerator / this.denominator);
   }
 
   /** `rational.c` `nurat_round` (`Rational#round`), which rounds half away from zero. */
   round(): number {
-    return round(this.numerator / this.denominator);
+    const q = this.numerator / this.denominator;
+    const r = this.numerator % this.denominator;
+    const half =
+      (r < 0n ? -r : r) * 2n >= (this.denominator < 0n ? -this.denominator : this.denominator);
+    return Number(half ? q + (r < 0n !== this.denominator < 0n ? -1n : 1n) : q);
+  }
+
+  /** @internal The `Float` a Rational becomes at a `number` seam — `rational.c`
+   * `nurat_to_f`, which is what every reader that hands the value to a
+   * floating-point API needs. */
+  toF(): number {
+    return Number(this.numerator) / Number(this.denominator);
   }
 
   /** `rational.c` `nurat_to_s` (`Rational#to_s`). */
@@ -945,7 +973,7 @@ function dateZoneToDiff(str: string): number | Rational | null {
           } else {
             const denom = 10 ** (n - 2);
             const rat = new Rational(sec, denom).add(hour * 3600);
-            offset = rat.denominator === 1 ? rat.numerator : rat;
+            offset = rat.denominator === 1n ? Number(rat.numerator) : rat;
           }
           return offset;
         } else if (l > 2) {
@@ -1183,7 +1211,7 @@ function parseTime2Cb(m: RegExpExecArray, hash: DateParts): number {
   hash.hour = h;
   if (min !== null) hash.min = min;
   if (s !== null) hash.sec = s;
-  if (f !== undefined) hash.secFraction = new Rational(Number(f), 10 ** f.length);
+  if (f !== undefined) hash.secFraction = new Rational(BigInt(f), 10n ** BigInt(f.length));
 
   return 1;
 }
@@ -1818,7 +1846,7 @@ function parseDddCb(m: RegExpExecArray, hash: DateParts): number {
   if (s4 !== undefined) {
     const l4 = s4.length;
 
-    hash.secFraction = new Rational(Number(s4), 10 ** l4);
+    hash.secFraction = new Rational(BigInt(s4), 10n ** BigInt(l4));
   }
   if (s5 !== undefined) {
     const cs5 = s5;
@@ -2232,7 +2260,7 @@ function dateStrptimeInternal(str: string, fmt: string, hash: DateParts): number
             : readDigitsMax();
           if (n === null) return fail();
           if (sign === -1) n = -n;
-          hash.secFraction = new Rational(n, 10 ** (si - osi));
+          hash.secFraction = new Rational(n, 10n ** BigInt(si - osi));
           break again;
         }
 
@@ -2646,13 +2674,12 @@ function secToNs(s: number | Rational): number | Rational {
 }
 
 /**
- * @internal `date_core.c` `ns_to_sec` (`date_core.c:993-998`), the inverse. MRI
- * answers a Rational whatever it is handed; a whole-nanosecond count divides
- * out to a JS number here, which is the nearest analogue `Time#subsec` already
- * documents, and a Rational `sf` stays exact.
+ * @internal `date_core.c` `ns_to_sec` (`date_core.c:993-998`), the inverse:
+ * `rb_rational_new2(n, INT2FIX(SECOND_IN_NANOSECONDS))`, which answers a
+ * Rational unconditionally, whatever it is handed.
  */
-function nsToSec(n: number | Rational): number | Rational {
-  return n instanceof Rational ? n.quo(SECOND_IN_NANOSECONDS) : n / SECOND_IN_NANOSECONDS;
+function nsToSec(n: Rational): Rational {
+  return n.quo(SECOND_IN_NANOSECONDS);
 }
 
 /** @internal 1970-01-01, the day {@link UNIX_EPOCH_IN_CJD} numbers. */
@@ -3170,11 +3197,15 @@ export function dtNewByFrags(hash: DateParts): DateTime {
 
   const df = timeToDf(rh, rmin, rs);
 
-  let t: number | Rational | null | undefined = hash.secFraction;
-  const sf = t == null ? 0 : secToNs(t);
+  const t: number | Rational | null | undefined = hash.secFraction;
+  const ns = t == null ? 0 : secToNs(t);
+  // `m_sf`'s only reader is `ns_to_sec`, whose FIXNUM arm is
+  // `rb_rational_new2(n, INT2FIX(SECOND_IN_NANOSECONDS))` (`date_core.c:993-998`),
+  // so an Integer `sf` is stored as the Rational it is always read back as.
+  const sf = ns instanceof Rational ? ns : new Rational(ns, 1);
 
-  t = hash.offset;
-  let of = t == null ? 0 : t instanceof Rational ? t.numerator / t.denominator : t;
+  const to = hash.offset;
+  let of = to == null ? 0 : to instanceof Rational ? to.toF() : to;
   if (of < -DAY_IN_SECONDS || of > DAY_IN_SECONDS) of = 0;
 
   return new DateTime(jdLocalToUtc(jd, df, of), dfLocalToUtc(df, of), sf, of);
@@ -3233,8 +3264,8 @@ function offsetToSec(vof: number | Rational | string): number | null {
   if (vof instanceof Rational) {
     const vs = dayToSec(vof);
     let n: number;
-    if (vs.denominator === 1) {
-      n = vs.numerator;
+    if (vs.denominator === 1n) {
+      n = Number(vs.numerator);
     } else {
       n = vs.round();
       if (n < -DAY_IN_SECONDS || n > DAY_IN_SECONDS) return null;
@@ -3552,7 +3583,7 @@ export class Date {
         hour: 0,
         min: 0,
         sec: 0,
-        nsec: 0,
+        nsec: new Rational(0, 1),
         zone: "+00:00",
         utcOffset: 0,
       },
@@ -3592,11 +3623,13 @@ export class DateTime extends Date {
    * it, so unlike {@link #date} and {@link #df} it is the same value read
    * locally or in UTC.
    *
-   * The C's is a Rational, exact at any denominator; a whole-nanosecond count
-   * is a JS number here and only a value that carries a sub-nanosecond tail —
-   * a `Rational` `second`, or a parsed decimal literal — keeps the Rational.
+   * The C's `d_lite_plus` T_FLOAT arm answers an Integer here
+   * (`date_core.c:6094-6097`) and its T_RATIONAL arm a Rational
+   * (`:6174-6201`), but `m_sf`'s only reader is `ns_to_sec`, which answers a
+   * Rational either way (`:993-998`) — so the storage is uniformly a Rational,
+   * exact at any denominator, and the two arms differ only in their rounding.
    */
-  readonly #sf: number | Rational;
+  readonly #sf: Rational;
   readonly #of: number;
 
   /**
@@ -3690,7 +3723,7 @@ export class DateTime extends Date {
    * `sf` and `of`, in that order. Same TS shortcoming as {@link Date}'s
    * counterpart overload.
    */
-  constructor(rjd: Temporal.PlainDate, df: number, sf: number | Rational, of: number);
+  constructor(rjd: Temporal.PlainDate, df: number, sf: Rational, of: number);
   constructor(
     year: number | Temporal.PlainDate,
     month?: number,
@@ -3702,7 +3735,7 @@ export class DateTime extends Date {
   ) {
     if (year instanceof Temporal.PlainDate) {
       const df = month ?? 0;
-      const sf = day ?? 0;
+      const sf = (day ?? new Rational(0, 1)) as Rational;
       const of = (hour ?? 0) as number;
       super(jdUtcToLocal(year, df, of));
       this.#date = year;
@@ -3753,7 +3786,7 @@ export class DateTime extends Date {
     this.#sf =
       fr2 instanceof Rational
         ? (secToNs(fr2.mod(1)) as Rational)
-        : Math.round(secToNs(fr2 - Math.floor(fr2)) as number);
+        : new Rational(Math.round(secToNs(fr2 - Math.floor(fr2)) as number), 1);
     this.#of = rof;
   }
 
@@ -3840,7 +3873,7 @@ export class DateTime extends Date {
    * answers. The whole second stays on {@link sec}, exactly as `::Time` splits
    * them.
    */
-  get secFraction(): number | Rational {
+  get secFraction(): Rational {
     return nsToSec(this.#sf);
   }
 

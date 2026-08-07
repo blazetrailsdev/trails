@@ -340,6 +340,27 @@ describe("Date", () => {
     expect(String(hash.secFraction)).toBe("4/5");
   });
 
+  it("answers a Rational sec_fraction for every argument, as ns_to_sec does", () => {
+    // ruby 3.3.11 — `sec_fraction -> rational` (date_core.c:5623), which
+    // `ns_to_sec`'s `rb_rational_new2` (:993-998) answers whatever it is handed:
+    //   DateTime.new(2008, 3, 1, 6, 0, Rational(2)).sec_fraction #=> (0/1)
+    //   DateTime.new(2001, 2, 3, 4, 5, 6.5).sec_fraction         #=> (1/2)
+    expect(new RubyDateTime(2008, 3, 1, 6, 0, new Rational(2, 1)).secFraction).toEqual(
+      new Rational(0, 1),
+    );
+    expect(new RubyDateTime(2001, 2, 3, 4, 5, 6.5).secFraction).toEqual(new Rational(1, 2));
+  });
+
+  it("keeps a fraction literal past Number.MAX_SAFE_INTEGER exact, as an Integer numerator does", () => {
+    // ruby 3.3.11:
+    //   DateTime.parse("2008-03-01T06:00:00." + "1" * 20).sec_fraction
+    //   #=> (11111111111111111111/100000000000000000000)
+    const parsed = RubyDateTime.parse(`2008-03-01T06:00:00.${"1".repeat(20)}`);
+    expect(parsed.secFraction).toEqual(new Rational(11111111111111111111n, 100000000000000000000n));
+    // The same denominator drives %N's long division, which stays exact too.
+    expect(parsed.strftime("%20N")).toBe("11111111111111111111");
+  });
+
   it("answers the frag hash date__strptime fills, as Date._strptime does", () => {
     expect(RubyDate._strptime("2001-02-03", "%Y-%m-%d")).toEqual({ year: 2001, mon: 2, mday: 3 });
     expect(RubyDate._strptime("2001-W05-6", "%G-W%V-%u")).toEqual({
@@ -714,7 +735,7 @@ describe("DateTime", () => {
     //   DateTime.new(2008, 3, 1, 23, 59, 59).to_s       #=> "2008-03-01T23:59:59+00:00"
     expect(new RubyDateTime(2008, 3, 1, 24).toS()).toBe("2008-03-02T00:00:00+00:00");
     expect(new RubyDateTime(2008, 3, 1, 24, 0, 0.5).toS()).toBe("2008-03-02T00:00:00+00:00");
-    expect(new RubyDateTime(2008, 3, 1, 24, 0, 0.5).secFraction).toBe(0.5);
+    expect(new RubyDateTime(2008, 3, 1, 24, 0, 0.5).secFraction).toEqual(new Rational(1, 2));
     expect(new RubyDateTime(2008, 3, 1, 24.5).toS()).toBe("2008-03-02T00:30:00+00:00");
     expect(new RubyDateTime(2008, 3, 1, 24, 0, 0, "+09:00").toS()).toBe(
       "2008-03-02T00:00:00+09:00",
@@ -848,7 +869,7 @@ describe("DateTime", () => {
     const datetime = new RubyDateTime(2008, 3, 1, 6, 0, 0.5);
     expect(datetime.strftime("%N")).toBe("500000000");
     expect(datetime.strftime("%L")).toBe("500");
-    expect(datetime.secFraction).toBe(0.5);
+    expect(datetime.secFraction).toEqual(new Rational(1, 2));
     expect(datetime.sec).toBe(0);
     // ruby 3.3.11: DateTime.new(2008, 3, 1, 6, 0, 1.5).sec #=> 1
     expect(new RubyDateTime(2008, 3, 1, 6, 0, 1.5).sec).toBe(1);
@@ -887,7 +908,7 @@ describe("DateTime", () => {
     //   DateTime.new(2008, 3, 1, 6, 0, 0).sec_fraction   #=> (0/1)
     //   Date.new(2008, 3, 1).strftime("%N")              #=> "000000000"
     expect(new RubyDateTime(2008, 3, 1, 6, 0, 0).strftime("%N")).toBe("000000000");
-    expect(new RubyDateTime(2008, 3, 1, 6, 0, 0).secFraction).toBe(0);
+    expect(new RubyDateTime(2008, 3, 1, 6, 0, 0).secFraction).toEqual(new Rational(0, 1));
     expect(new RubyDate(2008, 3, 1).strftime("%N")).toBe("000000000");
   });
 
@@ -904,7 +925,7 @@ describe("DateTime", () => {
     // The second's bound is `positive_inf`, so a later argument never makes its
     // fraction illegal:
     //   DateTime.new(2008, 3, 1, 6, 0, 0.5, 3600).sec_fraction #=> (1/2)
-    expect(new RubyDateTime(2008, 3, 1, 6, 0, 0.5, 3600).secFraction).toBe(0.5);
+    expect(new RubyDateTime(2008, 3, 1, 6, 0, 0.5, 3600).secFraction).toEqual(new Rational(1, 2));
   });
 
   it("carries the fraction of a legal non-final argument through add_frac", () => {
@@ -917,7 +938,7 @@ describe("DateTime", () => {
     //   DateTime.new(2008, 3, 1.5).to_s         #=> "2008-03-01T12:00:00+00:00"
     const halfMinute = new RubyDateTime(2008, 3, 1, 6, 0.5);
     expect(halfMinute.strftime("%H:%M:%S")).toBe("06:00:30");
-    expect(halfMinute.secFraction).toBe(0);
+    expect(halfMinute.secFraction).toEqual(new Rational(0, 1));
     expect(new RubyDateTime(2008, 3, 1, 6, 0.25).strftime("%H:%M:%S")).toBe("06:00:15");
     expect(new RubyDateTime(2008, 3, 1, 6.5).strftime("%H:%M:%S")).toBe("06:30:00");
     expect(new RubyDateTime(2008, 3, 1, 23.75).strftime("%H:%M:%S")).toBe("23:45:00");

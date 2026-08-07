@@ -112,7 +112,7 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
       timeHash.min,
       timeHash.sec,
       timeHash.secFraction,
-      offset instanceof Rational ? offset.numerator / offset.denominator : offset,
+      offset instanceof Rational ? offset.toF() : offset,
     );
   }
 

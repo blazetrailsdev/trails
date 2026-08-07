@@ -177,12 +177,14 @@ export function flattenTranslations(
 }
 
 export function storeLink(this: FlattenHost, locale: string, key: string, link: unknown): void {
+  locale = toSym(locale).slice(1);
   const byLocale = this.links().get(locale) ?? new Map<string, string>();
   this.links().set(locale, byLocale);
   byLocale.set(String(key), toS(link));
 }
 
 export function resolveLink(this: FlattenHost, locale: string, key: string): string {
+  [key, locale] = [String(key), toSym(locale).slice(1)];
   const localeLinks = this.links().get(locale) ?? new Map<string, string>();
   this.links().set(locale, localeLinks);
 
