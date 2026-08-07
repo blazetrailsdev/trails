@@ -582,6 +582,21 @@ export class Rational {
     return new Rational(this.numerator + other * this.denominator, this.denominator);
   }
 
+  /** `rational.c` `nurat_mul` (`Rational#*`), for the Integer multiplier this port needs. */
+  mul(other: number): Rational {
+    return new Rational(this.numerator * other, this.denominator);
+  }
+
+  /**
+   * `rational.c` `nurat_round` (`Rational#round`), which rounds half away from
+   * zero — not JS `Math.round`'s half-up, which sends `-1/2` to `0` where Ruby
+   * sends it to `-1`.
+   */
+  round(): number {
+    const q = this.numerator / this.denominator;
+    return q < 0 ? -Math.round(-q) : Math.round(q);
+  }
+
   /** `rational.c` `nurat_to_s` (`Rational#to_s`). */
   toString(): string {
     return `${this.numerator}/${this.denominator}`;
@@ -2905,6 +2920,62 @@ export function dtNewByFrags(hash: DateParts): DateTime {
   return new DateTime(jdLocalToUtc(jd, df, of), dfLocalToUtc(df, of), sf, of);
 }
 
+/** @internal `date_core.c` `day_to_sec` (`date_core.c:1029-1035`). */
+function dayToSec(d: Rational): Rational {
+  return d.mul(DAY_IN_SECONDS);
+}
+
+/**
+ * @internal `date_core.c` `offset_to_sec` (`date_core.c:2369-2452`): reads a
+ * user-supplied offset — a **day fraction**, not seconds — into seconds east of
+ * UTC. C answers `0`/`1` for failure/success and writes through `rof`; `null`
+ * is the failure and the number is `rof`.
+ *
+ * The C switches on the Ruby type. JS has one numeric type, so the Fixnum arm
+ * (`:2376-2385`, which accepts only `-1`, `0` and `1` and multiplies by
+ * `DAY_IN_SECONDS`) is taken for an integral number and the Float arm
+ * (`:2386-2397`, which multiplies by `DAY_IN_SECONDS` and bounds at
+ * `±DAY_IN_SECONDS`) for a fractional one. The split is exact rather than a
+ * choice: the Float arm's bound admits exactly `|n| <= 1`, whose integral
+ * members are the Fixnum arm's `-1`, `0`, `1` and give the same second — so no
+ * integral value is read differently by the two arms.
+ *
+ * C's `rb_warning("fraction of offset is ignored")` has no port analogue: it
+ * writes to stderr under `$VERBOSE` only and is not part of the value.
+ */
+function offsetToSec(vof: number | Rational | string): number | null {
+  if (typeof vof === "number") {
+    if (Number.isInteger(vof)) {
+      if (vof !== -1 && vof !== 0 && vof !== 1) return null;
+      return vof * DAY_IN_SECONDS;
+    }
+    const n = vof * DAY_IN_SECONDS;
+    if (n < -DAY_IN_SECONDS || n > DAY_IN_SECONDS) return null;
+    return Math.round(n);
+  }
+  if (typeof vof === "string") {
+    const vs = dateZoneToDiff(vof);
+    // `!FIXNUM_P(vs)` (`:2444`) — `nil` for a zone it does not know, and a
+    // `Rational` for a fractional-hour offset that did not reduce to an integer.
+    if (vs === null || vs instanceof Rational) return null;
+    if (vs < -DAY_IN_SECONDS || vs > DAY_IN_SECONDS) return null;
+    return vs;
+  }
+  const vs = dayToSec(vof);
+  const n = vs.denominator === 1 ? vs.numerator : vs.round();
+  if (n < -DAY_IN_SECONDS || n > DAY_IN_SECONDS) return null;
+  return n;
+}
+
+/**
+ * @internal `date_core.c` `val2off` (`date_core.c:5071-5077`), the macro every
+ * user-facing `offset` argument is read through: whatever `offset_to_sec`
+ * rejects warns `"invalid offset is ignored"` and becomes `0`.
+ */
+function val2off(vof: number | Rational | string): number {
+  return offsetToSec(vof) ?? 0;
+}
+
 /**
  * @internal Ruby `Date::Error`, the `ArgumentError` subclass ruby/date defines
  * under `::Date` (`date_core.c` `eDateError` / `Init_date_core`). It is reached
@@ -3255,21 +3326,17 @@ export class DateTime extends Date {
    * Ruby `DateTime.new(y, m, d, h = 0, min = 0, s = 0, offset = 0)` (ruby/date,
    * `date_core.c` `datetime_s_new`).
    *
-   * Ruby's `offset` argument goes through `val2off` (`date_core.c:5071-5077`)
-   * over `offset_to_sec` (`date_core.c:2370-2440`), which reads it as a **day
-   * fraction**, not as seconds: the Fixnum arm accepts only `-1`, `0` and `1`
-   * and multiplies by `DAY_IN_SECONDS`, so on ruby 3.3.11
-   * `DateTime.new(2000,1,1,0,0,0,1).zone` is `"+24:00"` and `9`, `24` and `-5`
-   * all warn and collapse to `"+00:00"`. What it stores is the `of` field
-   * `of2str` spells back out, in seconds.
-   *
-   * The port takes that `of` directly — the seconds — rather than `val2off`'s
-   * argument. Ruby's day-fraction spellings are a `Rational` of a day and the
-   * `"+09:00"` String, neither of which any caller here holds: `dtNewByFrags`
-   * reads `date_zone_to_diff`'s `:offset`, which is already seconds, and it is
-   * the only non-test caller. So no `val2off` bound applies here, and the
-   * seconds bound that does is `dt_new_by_frags`', applied at that call site
-   * where the C applies it.
+   * `offset` goes through {@link val2off} (`date_core.c:5071-5077`) over
+   * {@link offsetToSec} (`date_core.c:2369-2452`), which reads it as a **day
+   * fraction**, not as seconds, and accepts a `Rational` of a day or a
+   * `"+09:00"` String too. On ruby 3.3.11
+   * `DateTime.new(2000,1,1,0,0,0,1).zone` is `"+24:00"`, while `9`, `24` and
+   * `-5` are all rejected and collapse to `"+00:00"`. What it stores is the
+   * `of` field `of2str` spells back out, in seconds — which is the
+   * `d_complex_new_internal` overload below, not this one. `dtNewByFrags`
+   * reaches that overload directly, exactly as `dt_new_by_frags` does
+   * (`date_core.c:8297-8306`, which sets `of` itself under its own seconds
+   * bound rather than going through `val2off`).
    *
    * `datetime_initialize` (`date_core.c:5147-5220`) validates the civil date with
    * `c_valid_civil_p` and the time of day with `c_valid_time_p`, then stores the
@@ -3316,7 +3383,7 @@ export class DateTime extends Date {
     hour?: number,
     minute?: number,
     second?: number,
-    offset?: number,
+    offset?: number | Rational | string,
   );
   /**
    * @internal `date_core.c` `d_complex_new_internal` (`date_core.c:3055-3071`),
@@ -3336,7 +3403,7 @@ export class DateTime extends Date {
     hour?: number,
     minute?: number,
     second?: number,
-    offset?: number,
+    offset?: number | Rational | string,
   ) {
     if (year instanceof Temporal.PlainDate) {
       const [df, sf, of] = [month ?? 0, day ?? 0, hour ?? 0];
@@ -3364,7 +3431,7 @@ export class DateTime extends Date {
     if (minFr !== 0) fr2 = minFr;
     if (hFr !== 0) fr2 = hFr;
     if (dFr !== 0) fr2 = dFr;
-    const rof = offset ?? 0;
+    const rof = offset === undefined ? 0 : val2off(offset);
     super(year, month ?? 1, d);
     const rjd = cValidCivilP(year, month ?? 1, d);
     if (rjd === null) throw new DateError("invalid date");

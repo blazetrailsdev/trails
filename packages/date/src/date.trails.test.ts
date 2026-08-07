@@ -719,6 +719,29 @@ describe("DateTime", () => {
     expect(dtNewByFrags({ year: 2008, mon: 3, mday: 1, offset: 999999 }).zone).toBe("+00:00");
   });
 
+  it("reads the offset argument as a day fraction, as val2off does", () => {
+    // ruby 3.3.11:
+    //   DateTime.new(2000,1,1,0,0,0, 1).zone        #=> "+24:00"   (1 day)
+    //   DateTime.new(2000,1,1,0,0,0, 9).zone        #=> "+00:00"   (rejected)
+    //   DateTime.new(2000,1,1,0,0,0, 24).zone       #=> "+00:00"   (rejected)
+    //   DateTime.new(2000,1,1,0,0,0, -5).zone       #=> "+00:00"   (rejected)
+    //   DateTime.new(2000,1,1,0,0,0, "+09:00").zone #=> "+09:00"
+    for (const [offset, zone] of [
+      [1, "+24:00"],
+      [9, "+00:00"],
+      [24, "+00:00"],
+      [-5, "+00:00"],
+      ["+09:00", "+09:00"],
+      [-1, "-24:00"],
+      [0, "+00:00"],
+      // The Float arm: `Rational(1,2)` and `0.5` are the same half day.
+      [0.5, "+12:00"],
+    ] as const) {
+      expect(new RubyDateTime(2000, 1, 1, 0, 0, 0, offset).zone).toBe(zone);
+    }
+    expect(new RubyDateTime(2000, 1, 1, 0, 0, 0, new Rational(1, 2)).zone).toBe("+12:00");
+  });
+
   it("raises Date::Error on a string naming no date, as dt_new_by_frags does", () => {
     // ruby 3.3.11: DateTime.parse("not a date") #=> Date::Error: invalid date
     expect(() => RubyDateTime.parse("not a date")).toThrow("invalid date");
