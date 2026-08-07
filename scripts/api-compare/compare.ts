@@ -228,9 +228,7 @@ const LOOP_SKELETON_NAMES = new Set(
  *
  * Applied where the two streams are COMPARED, never in the extractors: they
  * emit raw names by design (extract-ts-api.ts:extractSkeleton), and the Ruby↔TS
- * conventions live here. `prism-codegen/score.ts:skeletonTokens` folds its
- * `LOGICAL_OPS` and `ref:get` at comparison time for the same reason. The one
- * function runs over both sides, since {@link LOOP_SKELETON_NAMES} carries the
+ * conventions live here. The one function runs over both sides, since {@link LOOP_SKELETON_NAMES} carries the
  * Ruby name and the JS analogue alike.
  */
 export function foldSkeletonTokens(skeleton: string[]): string[] {
@@ -343,10 +341,8 @@ export const ORDER_PREFIX = "order:";
  * Order-only divergence between a Ruby body and its matched TS body: both make
  * the same significant calls, but not in the same sequence. A set diff cannot
  * see this, and CLAUDE.md's "same branches, in the same order, with the same
- * guards and early returns" makes it a fidelity requirement — the shape mirrors
- * `scoreFile`'s matched / reordered / divergent split in
- * scripts/prism-codegen/score.ts, over the ratchet's whole population instead of
- * the generator's ten files.
+ * guards and early returns" makes it a fidelity requirement — the shape is a
+ * matched / reordered / divergent split over the ratchet's whole population.
  *
  * Only calls that pass the same gates as {@link significantMissingCalls} AND are
  * present in the TS body count: a dropped call is that check's finding, not

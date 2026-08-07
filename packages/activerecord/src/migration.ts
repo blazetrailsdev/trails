@@ -41,6 +41,7 @@ import { InternalMetadata } from "./internal-metadata.js";
 import { DatabaseConfigurations } from "./database-configurations.js";
 import type { DatabaseConfig } from "./database-configurations/database-config.js";
 import { migrationArConfig } from "./migration/ar-config-source.js";
+import type { SchemaFormat } from "./tasks/database-tasks.js";
 import type { ExecutionStrategy } from "./migration/execution-strategy.js";
 import { PendingMigrationConnection } from "./migration/pending-migration-connection.js";
 import { registerVersion, findVersion, CURRENT_VERSION } from "./migration/compatibility.js";
@@ -1569,20 +1570,12 @@ export abstract class Migration {
     }
   }
 
-  /**
-   * Mirrors: `ActiveRecord::Migration.load_schema_if_pending!` (`migration.rb:730-736`).
-   *
-   * Rails' repair arm — `if any_schema_needs_update? then load_schema!` — is
-   * dropped whole. `load_schema!` is `system("bin/rails db:test:prepare")`
-   * (`migration.rb:775-783`), a roundtrip to Rake through a subprocess that
-   * trails has no process surface to shell to. `any_schema_needs_update?`
-   * (`migration.rb:747-751`) is portable on its own, being just
-   * `Tasks::DatabaseTasks.schema_up_to_date?` over each config, but it is the
-   * guard for that one branch, so on its own it answers a question nothing here
-   * can act on. Both come back together; until then the pending state is
-   * reported rather than repaired.
-   */
+  /** Mirrors: `ActiveRecord::Migration.load_schema_if_pending!` (`migration.rb:730-736`). */
   static async loadSchemaIfPendingBang(): Promise<void> {
+    if (await this.anySchemaNeedsUpdate()) {
+      await this.loadSchemaBang();
+    }
+
     await this.checkPendingMigrations();
   }
 
@@ -1684,6 +1677,21 @@ export abstract class Migration {
     return new CommandRecorder(this.connection);
   }
 
+  /**
+   * @internal Mirrors: `ActiveRecord::Migration.any_schema_needs_update?`
+   * (`migration.rb:747-751`). Rails reads `ActiveRecord.schema_format`; trails
+   * keeps that setting on `DatabaseTasks` (it is also `schemaUpToDate`'s default).
+   */
+  private static async anySchemaNeedsUpdate(): Promise<boolean> {
+    const databaseTasks = migrationArConfig()?.databaseTasks?.();
+    if (databaseTasks == null) return false;
+
+    for (const dbConfig of this.dbConfigsInCurrentEnv()) {
+      if (!(await databaseTasks.schemaUpToDate(dbConfig, databaseTasks.schemaFormat))) return true;
+    }
+    return false;
+  }
+
   /** @internal Mirrors: `ActiveRecord::Migration.pending_migrations` (`migration.rb:757-769`) */
   private static async pendingMigrations(): Promise<MigrationProxy[]> {
     const pendingMigrations: MigrationProxy[][] = [];
@@ -1706,6 +1714,38 @@ export abstract class Migration {
   /** @internal */
   static env(): string {
     return getEnv("TRAILS_ENV") ?? getEnv("NODE_ENV") ?? "development";
+  }
+
+  /**
+   * @internal Mirrors: `ActiveRecord::Migration.load_schema!` (`migration.rb:775-783`).
+   *
+   * Rails roundtrips to Rake — `FileUtils.cd(root) { clear_all_connections!; system("bin/rails
+   * db:test:prepare") }` — so plugins can hook into database initialization. trails has no
+   * process surface to shell to, so it calls what that Rake task reaches directly.
+   * `db:test:prepare` invokes `db:test:load_schema` (`databases.rake:531-539`), which
+   * depends on `db:test:purge` (`:541-545`) — so every test config is purged by a direct
+   * `configs_for(env_name: "test")` loop with no pool open, and only then does
+   * `load_schema` open a temporary pool per config. Both phases are kept, in that order:
+   * the purge must not run behind an established connection to a database it is about
+   * to recreate. `ENV["SCHEMA_FORMAT"]` overrides the configured format there
+   * (`:537`), so it does here; trails keeps that setting on `DatabaseTasks`.
+   */
+  private static async loadSchemaBang(): Promise<void> {
+    const databaseTasks = migrationArConfig()?.databaseTasks?.();
+    if (databaseTasks == null) return;
+
+    await migrationArConfig()?.connectionHandler?.().clearAllConnectionsBang("all");
+
+    const testConfigs =
+      migrationArConfig()?.configurations?.().configsFor({ envName: "test" }) ?? [];
+    for (const dbConfig of testConfigs) {
+      await databaseTasks.purge(dbConfig);
+    }
+
+    const schemaFormat = (getEnv("SCHEMA_FORMAT") ?? databaseTasks.schemaFormat) as SchemaFormat;
+    await databaseTasks.withTemporaryPoolForEach({ env: "test" }, async (pool) => {
+      await databaseTasks.loadSchema(pool.dbConfig, schemaFormat);
+    });
   }
 }
 
