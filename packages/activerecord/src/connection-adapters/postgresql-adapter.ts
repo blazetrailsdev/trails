@@ -1518,19 +1518,14 @@ export class PostgreSQLAdapter
   }
 
   /**
-   * Settle once nothing this adapter issued is still on the wire.
+   * Settle once nothing this adapter issued is still on the wire —
+   * `_maintenanceTail` is that set, since every pinned query chains onto it.
    * {@link TransactionManager.synchronize} awaits this before releasing the
-   * lock, which is how trails reproduces the containment Rails gets lexically
-   * from `@lock.synchronize` wrapping the whole `with_raw_connection` body
-   * (`abstract_adapter.rb:984`).
-   *
-   * `_maintenanceTail` is that set: every pinned query chains onto it, so
-   * awaiting it waits out the last one, including a query some caller launched
-   * without awaiting.
-   *
-   * No Rails counterpart, and there cannot be one: an un-awaited JS call
-   * escapes its enclosing async scope, so the lock scope has to be told what it
-   * still covers; Ruby's blocks contain their work by construction.
+   * lock, reproducing the containment Rails gets lexically from
+   * `@lock.synchronize` wrapping the whole `with_raw_connection` body
+   * (`abstract_adapter.rb:984`). No Rails counterpart is possible: an
+   * un-awaited JS call escapes its enclosing async scope, where a Ruby block
+   * contains its work by construction.
    *
    * @internal
    */

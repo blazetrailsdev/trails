@@ -238,9 +238,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           this.attribute("id", "integer");
         }
       }
-      // Rails: PgArray.reset_column_information — DDL does not poke the schema
-      // cache (change_column_default, postgresql/schema_statements.rb:485-487,
-      // touches only the wire); invalidation is the model's job.
+      // Rails: PgArray.reset_column_information (array_test.rb:139)
       PgArrays.resetColumnInformation();
       await PgArrays.loadSchema();
       // Rails: assert_equal [], PgArray.column_defaults["tags"]

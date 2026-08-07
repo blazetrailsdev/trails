@@ -1228,12 +1228,10 @@ export class TransactionManager {
     try {
       return await storage.run(owner, () => fn());
     } finally {
-      // Rails' `@lock.synchronize` wraps the query's whole life, so at most one
-      // query is on the wire per connection and it belongs to the lock holder.
-      // `fn` can return with a query it launched still awaiting, so hold the
-      // lock until the connection has nothing outstanding — otherwise the next
-      // holder inherits a wire it does not own, which is the only reason
-      // `cancel_any_running_query` ever needed an ownership concept here.
+      // `fn` can return with a query it launched still awaiting, which Ruby's
+      // block form makes impossible (`abstract_adapter.rb:984`). Hold the lock
+      // until the connection has nothing outstanding, so the next holder never
+      // inherits a wire it does not own.
       await this._connection._pendingQueries?.().catch(() => {});
       release();
     }
