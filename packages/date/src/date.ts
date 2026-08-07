@@ -112,32 +112,36 @@ function msecs(subject: StrftimeSubject): number {
 }
 
 /**
- * @internal `tmx_cwyear` / `tmx_cweek` (`date_core.c:1849-1885`), the ISO
- * week-based year and week `%G` and `%V` read. Temporal's `yearOfWeek` and
- * `weekOfYear` are the same ISO 8601 quantities `c_jd_to_commercial` computes.
+ * @internal `m_local_jd` (`date_core.c:1741-1747`), the Julian day the
+ * week-number readers below work off. The subject carries the civil date, so
+ * the conversion is {@link jdOf} over it.
  */
-function cwyear(subject: StrftimeSubject): number {
-  return new Temporal.PlainDate(subject.year, subject.mon, subject.day).yearOfWeek ?? subject.year;
-}
-
-function cweek(subject: StrftimeSubject): number {
-  return new Temporal.PlainDate(subject.year, subject.mon, subject.day).weekOfYear ?? 1;
+function mLocalJd(subject: StrftimeSubject): number {
+  return jdOf(new Temporal.PlainDate(subject.year, subject.mon, subject.day));
 }
 
 /**
- * @internal `m_wnumx` (`date_core.c:1895-1917`) through `c_jd_to_weeknum`
- * (`date_core.c:622-632`) — `%U` is `f == 0` (weeks start Sunday) and `%W` is
- * `f == 1` (weeks start Monday).
- *
- * The C works in Julian Day Numbers: it takes the first day of the year,
- * `rjd += 6`, and counts sevenths from the week boundary at or before it. Both
- * `jd` terms cancel against each other once the year's first day is written as
- * `jd - (yday - 1)`, which leaves the count expressible from the subject's own
- * `yday` and `wday` — no JDN conversion needed to get the same integer.
+ * @internal `m_cwyear` (`date_core.c:1848-1855`), the ISO week-based year `%G`
+ * and `%g` read.
+ */
+function cwyear(subject: StrftimeSubject): number {
+  const [ry] = cJdToCommercial(mLocalJd(subject));
+  return ry;
+}
+
+/** @internal `m_cweek` (`date_core.c:1875-1883`), the ISO week `%V` reads. */
+function cweek(subject: StrftimeSubject): number {
+  const [, rw] = cJdToCommercial(mLocalJd(subject));
+  return rw;
+}
+
+/**
+ * @internal `m_wnumx` (`date_core.c:1896-1904`) — `%U` is `f == 0` (weeks start
+ * Sunday, `m_wnum0`) and `%W` is `f == 1` (weeks start Monday, `m_wnum1`).
  */
 function wnumx(subject: StrftimeSubject, f: number): number {
-  const wdayFdoy = mod(subject.wday - (subject.yday - 1), 7);
-  return div(subject.yday + mod(wdayFdoy + 6 - f, 7), 7);
+  const [, rw] = cJdToWeeknum(mLocalJd(subject), f);
+  return rw;
 }
 
 /**
@@ -3016,13 +3020,25 @@ function cValidOrdinalP(y: number, d: number): Temporal.PlainDate | null {
 }
 
 /**
+ * @internal `date_core.c` `c_find_fdoy` (`date_core.c:455-465`), the Julian day
+ * of the first day of year `y`. Ruby scans January for it because the calendar
+ * reform can delete 1 January itself; `Temporal.PlainDate` is proleptic
+ * Gregorian and carries no reform, so the scan collapses to 1 January. The C's
+ * `sg` argument and its `ns` out-parameter both ride on that reform and have no
+ * bearer here, as on {@link jdToPlainDate}.
+ */
+function cFindFdoy(y: number): number {
+  return jdOf(new Temporal.PlainDate(y, 1, 1));
+}
+
+/**
  * @internal `date_core.c` `c_commercial_to_jd` (`date_core.c:576-589`), the
  * `d`th day of the `w`th ISO week of commercial year `y`, `d` running `1`..`7`
  * from Monday: the year's first day floored back to the Monday on or before it,
  * then `w` weeks and `d` days on.
  */
 function cCommercialToJd(y: number, w: number, d: number): number {
-  const rjd2 = jdOf(new Temporal.PlainDate(y, 1, 1)) + 3;
+  const rjd2 = cFindFdoy(y) + 3;
   return rjd2 - mod(rjd2, 7) + 7 * (w - 1) + (d - 1);
 }
 
@@ -3070,14 +3086,14 @@ function cValidCommercialP(y: number, w: number, d: number): Temporal.PlainDate 
  * year whose 1 January is itself an `f`-day: there, 1 January opens week `1`.
  */
 function cWeeknumToJd(y: number, w: number, d: number, f: number): number {
-  const rjd2 = jdOf(new Temporal.PlainDate(y, 1, 1)) + 6;
+  const rjd2 = cFindFdoy(y) + 6;
   return rjd2 - mod(rjd2 - f + 1, 7) - 7 + 7 * w + d;
 }
 
 /** @internal `date_core.c` `c_jd_to_weeknum` (`date_core.c:621-634`), the inverse of {@link cWeeknumToJd}. */
 function cJdToWeeknum(jd: number, f: number): [ry: number, rw: number, rd: number] {
   const ry = jdToPlainDate(jd).year;
-  const rjd = jdOf(new Temporal.PlainDate(ry, 1, 1)) + 6;
+  const rjd = cFindFdoy(ry) + 6;
   const j = jd - (rjd - mod(rjd - f + 1, 7)) + 7;
   return [ry, div(j, 7), mod(j, 7)];
 }
