@@ -723,12 +723,14 @@ export class CollectionAssociation extends Association {
   }
 
   /**
-   * Check if a record is in the collection. For new records, checks
-   * the in-memory target. For persisted records, uses scope if not loaded.
+   * Mirrors: ActiveRecord::Associations::CollectionAssociation#include?
+   * (collection_association.rb:258-270) — a new record is looked for in
+   * memory, a loaded collection in its target, and anything else with an
+   * `exists?` against the scope.
    */
   async isInclude(record: Base): Promise<boolean> {
     const klass = this.klass;
-    if (klass && !(record instanceof klass)) return false;
+    if (!(record instanceof klass)) return false;
 
     if (record.isNewRecord()) {
       return isIncludeInMemory(this, record);

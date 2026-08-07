@@ -71,9 +71,8 @@ export class BelongsToAssociation extends SingularAssociation {
    * Called by the before_validation callback set up by the builder.
    */
   async default(block: (owner: Base) => Base | null | Promise<Base | null>): Promise<void> {
-    // Rails: `writer(owner.instance_exec(&block)) if reader.nil?`. `reader`
-    // returns a Promise when the FK is present but unloaded, and the block
-    // itself may be async (e.g. `() => Developer.first()`), so both are awaited.
+    // `reader` and the block are both awaited: TS has no `instance_exec`, and
+    // either side resolves asynchronously (belongs_to_association.rb:44).
     if ((await this.reader) == null) await this.writer(await block(this.owner));
   }
 
