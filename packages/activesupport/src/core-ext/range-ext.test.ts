@@ -207,7 +207,7 @@ describe("RangeTest", () => {
   it("each on time with zone", () => {
     const twz = new TimeWithZone(
       instantFromDate(new Date(Date.UTC(2006, 10, 28, 10, 30))),
-      TimeZone.find("Eastern Time (US & Canada)"),
+      TimeZone.find("Eastern Time (US & Canada)")!,
     );
     expect(() => [...new Range(twz.minus(hours(1)), twz).each()]).toThrow(TypeError);
   });
@@ -215,7 +215,7 @@ describe("RangeTest", () => {
   it("step on time with zone", () => {
     const twz = new TimeWithZone(
       instantFromDate(new Date(Date.UTC(2006, 10, 28, 10, 30))),
-      TimeZone.find("Eastern Time (US & Canada)"),
+      TimeZone.find("Eastern Time (US & Canada)")!,
     );
     expect(() => [...new Range(twz.minus(hours(1)), twz).step(1)]).toThrow(TypeError);
   });

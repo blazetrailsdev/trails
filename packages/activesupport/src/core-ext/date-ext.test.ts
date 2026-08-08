@@ -204,7 +204,7 @@ describe("DateExtCalculationsTest", () => {
   });
 
   it("since when zone is set", () => {
-    const zone = TimeZone.find("Eastern Time (US & Canada)");
+    const zone = TimeZone.find("Eastern Time (US & Canada)")!;
     setZone(zone);
     try {
       expect(DateExt.since(pd(2005, 2, 21), 45).toI()).toBe(
@@ -225,7 +225,7 @@ describe("DateExtCalculationsTest", () => {
   });
 
   it("ago when zone is set", () => {
-    const zone = TimeZone.find("Eastern Time (US & Canada)");
+    const zone = TimeZone.find("Eastern Time (US & Canada)")!;
     setZone(zone);
     try {
       expect(DateExt.ago(pd(2005, 2, 21), 45).toI()).toBe(
@@ -244,7 +244,7 @@ describe("DateExtCalculationsTest", () => {
   });
 
   it("beginning of day when zone is set", () => {
-    const zone = TimeZone.find("Eastern Time (US & Canada)");
+    const zone = TimeZone.find("Eastern Time (US & Canada)")!;
     setZone(zone);
     try {
       expect(DateExt.beginningOfDay(pd(2005, 2, 21)).toI()).toBe(
@@ -257,7 +257,7 @@ describe("DateExtCalculationsTest", () => {
   });
 
   it("end of day when zone is set", () => {
-    const zone = TimeZone.find("Eastern Time (US & Canada)");
+    const zone = TimeZone.find("Eastern Time (US & Canada)")!;
     setZone(zone);
     try {
       const endOfDayInZone = DateExt.endOfDay(pd(2005, 2, 21));

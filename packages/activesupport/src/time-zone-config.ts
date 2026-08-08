@@ -11,6 +11,7 @@ import { Duration } from "./duration.js";
 import { TimeWithZone } from "./time-with-zone.js";
 import { currentTime } from "./time-travel.js";
 import { instantFrom } from "./temporal.js";
+import { ArgumentError } from "./hash-utils.js";
 
 // NOTE: Zone state is stored in module-level variables, mirroring Rails'
 // thread-local Time.zone. This is process-wide and NOT safe for concurrent
@@ -105,31 +106,16 @@ export function findZone(zone: unknown): TimeZone | null | false {
 /**
  * `Time.find_zone!` (core_ext/time/zones.rb:80-90): `return time_zone unless
  * time_zone`, then `ActiveSupport::TimeZone[time_zone] || raise(ArgumentError,
- * "Invalid Timezone: #{time_zone}")`. The whole argument dispatch — including
- * the Numeric/Duration offset scan — lives in `TimeZone.find`, the port of
- * `[]` (time_zone.rb:232-250).
- *
- * Deviation: `[]` returns `nil` for a name or offset it cannot match and
- * raises only for an argument of the wrong class (time_zone.rb:249), while
- * trails' `find` throws in both cases. The argument-class arm therefore stays
- * here, so each of Rails' two messages is still raised for its own case.
+ * "Invalid Timezone: #{time_zone}")`. The whole argument dispatch — the name
+ * lookup, the Numeric/Duration offset scan, and the wrong-class raise
+ * (time_zone.rb:249) — lives in `TimeZone.find`, the port of `[]`.
  */
 export function findZoneBang(zone: unknown): TimeZone | null | false {
   if (zone === null || zone === undefined) return null;
   if (zone === false) return false;
-  if (
-    typeof zone === "string" ||
-    typeof zone === "number" ||
-    zone instanceof Duration ||
-    zone instanceof TimeZone
-  ) {
-    try {
-      return TimeZone.find(zone);
-    } catch {
-      throw new ArgumentError(`Invalid Timezone: ${String(zone)}`);
-    }
-  }
-  throw new ArgumentError(`invalid argument to TimeZone[]: ${String(zone)}`);
+  const found = TimeZone.find(zone);
+  if (found == null) throw new ArgumentError(`Invalid Timezone: ${String(zone)}`);
+  return found;
 }
 
 /**
@@ -150,13 +136,10 @@ export function current(): TimeWithZone | Date {
  * Matches Rails' Date#in_time_zone.
  */
 export function dateInTimeZone(date: Date, zone: string | TimeZone): TimeWithZone {
-  const tz = typeof zone === "string" ? TimeZone.find(zone) : zone;
+  const tz = findZoneBang(zone) as TimeZone;
   return tz.local(date.getFullYear(), date.getMonth() + 1, date.getDate());
 }
 
-export class ArgumentError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "ArgumentError";
-  }
-}
+// One class, so `findZone`'s `instanceof` still narrows the raise `TimeZone[]`
+// makes at time_zone.rb:249 as well as the one `find_zone!` makes itself.
+export { ArgumentError };

@@ -110,7 +110,7 @@ export function inTimeZone(date: Temporal.PlainDate, zone: unknown = getZone()):
   if (timeZone) {
     return timeWithZone(date, timeZone);
   }
-  return timeWithZone(date, TimeZone.find(Temporal.Now.timeZoneId()));
+  return timeWithZone(date, TimeZone.find(Temporal.Now.timeZoneId())!);
 }
 
 /** Mirrors: `DateAndTime::Zones#time_with_zone` (`date_and_time/zones.rb:32-38`) */

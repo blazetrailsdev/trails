@@ -28,7 +28,7 @@ describe("withTimezoneConfig", () => {
 
   it("restores zone to unset state when zone was not explicitly set before", async () => {
     // zone_default is set but _zone is not explicitly set (falls through to default)
-    const paris = TimeZone.find("Europe/Paris");
+    const paris = TimeZone.find("Europe/Paris")!;
     setZoneDefault(paris);
     resetZone(); // ensure _zone is unset (not explicit)
     expect(isZoneExplicit()).toBe(false);
@@ -44,7 +44,7 @@ describe("withTimezoneConfig", () => {
   });
 
   it("restores zone to explicit value when zone was explicitly set before", async () => {
-    const paris = TimeZone.find("Europe/Paris");
+    const paris = TimeZone.find("Europe/Paris")!;
     setZone(paris);
     expect(isZoneExplicit()).toBe(true);
 

@@ -508,7 +508,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
     it("datetime with timezone awareness", async () => {
       const tz = "Pacific Time (US & Canada)";
-      const zone = TimeZone.find(tz);
+      const zone = TimeZone.find(tz)!;
       setZone(tz);
       try {
         class PgArrays extends Base {
