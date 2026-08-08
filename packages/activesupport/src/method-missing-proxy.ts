@@ -12,11 +12,60 @@
  * (command_recorder.rb:400-404) — with functions bound to the delegate. When
  * `delegate(target)` returns `target` there is no own-property step (DelegateClass).
  *
+ * Both traps are *public*-only, because Rails asks `delegate.respond_to?(method)`
+ * and forwards with `delegate.public_send` (command_recorder.rb:396,401), neither
+ * of which sees a private or protected method. The TS analogue of "private" is
+ * the trails leading-underscore convention, so an `_`-prefixed delegate member is
+ * neither forwarded nor answered by `has`.
+ *
+ * A name the delegate does not answer takes Rails' `else super` arm and raises
+ * `NoMethodError` (command_recorder.rb:403). A `get` trap cannot raise there:
+ * `typeof x.foo === "function"` and `"foo" in x` both route through it, so
+ * throwing would blow up every feature probe. The read therefore returns a
+ * function that raises when *called*, which is exactly where Ruby's
+ * `method_missing` raises.
+ *
  * @noRailsEquivalent PERMANENT — Ruby resolves an undefined method through
  * `method_missing` at the language level; JS has no such hook, only `Proxy`.
  * No amount of porting removes the need for a TS-side shape, so this is the one
  * shared one, the way `include()` is the one shape for Ruby `include`.
  */
+/**
+ * Ruby's `NoMethodError` (a subclass of `NameError`), raised by the `else super`
+ * arm. Local to this module rather than exported: the raise site is the proxy,
+ * and callers identify it the way they identify any Ruby error class here — by
+ * `name` and message.
+ */
+class NoMethodError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "NoMethodError";
+  }
+}
+
+/**
+ * Names JS itself probes for on an arbitrary object to decide whether it
+ * implements a protocol — `await x` reads `then`, structured comparison reads
+ * `toJSON`, vitest's matchers read `asymmetricMatch`/`$$typeof`. A raising
+ * function in those slots would be *called* by the probe, so they stay absent.
+ */
+const PROTOCOL_PROBES = new Set([
+  "then",
+  "catch",
+  "finally",
+  "toJSON",
+  "asymmetricMatch",
+  "$$typeof",
+  "nodeType",
+]);
+
+/** Mirrors `delegate.respond_to?(method)` — public members only. */
+function respondsTo(delegate: unknown, prop: string | symbol): boolean {
+  if (delegate == null) return false;
+  if (typeof prop === "string" && prop.startsWith("_")) return false;
+  return prop in Object(delegate);
+}
+
 export function methodMissingProxy<T extends object>(
   target: T,
   /** `delegate` reads the forwarding target; `overrides` is consulted first. */
@@ -33,14 +82,21 @@ export function methodMissingProxy<T extends object>(
       if (delegate !== proxyTarget && Reflect.has(proxyTarget, prop)) {
         return Reflect.get(proxyTarget, prop, receiver);
       }
-      const value = (delegate as Record<string | symbol, unknown> | null | undefined)?.[prop];
-      return typeof value === "function" ? value.bind(delegate) : value;
+      if (respondsTo(delegate, prop)) {
+        const value = (delegate as Record<string | symbol, unknown>)[prop];
+        return typeof value === "function" ? value.bind(delegate) : value;
+      }
+      if (typeof prop === "symbol" || PROTOCOL_PROBES.has(prop)) return undefined;
+      return () => {
+        throw new NoMethodError(
+          `undefined method '${prop}' for an instance of ${(proxyTarget as object).constructor.name}`,
+        );
+      };
     },
     has(proxyTarget, prop) {
       if (overrides !== undefined && prop in overrides) return true;
       if (Reflect.has(proxyTarget, prop)) return true;
-      const delegate = readDelegate(proxyTarget);
-      return delegate != null && prop in Object(delegate);
+      return respondsTo(readDelegate(proxyTarget), prop);
     },
   });
 }

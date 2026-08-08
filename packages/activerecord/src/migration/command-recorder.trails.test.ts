@@ -35,6 +35,23 @@ describe("CommandRecorder", () => {
     expect(recorder.america()).toBe("hi");
   });
 
+  it("does not forward a private delegate member, the way public_send does not", () => {
+    // command_recorder.rb:396,401 — respond_to?/public_send are public-only, and
+    // the trails spelling of a private member is the leading underscore.
+    const recorder = new CommandRecorder({ _secret: () => "no", visible: () => "yes" });
+    expect("_secret" in recorder).toBe(false);
+    expect("visible" in recorder).toBe(true);
+    expect(() => (recorder as unknown as { _secret(): string })._secret()).toThrow(
+      /undefined method '_secret'/,
+    );
+  });
+
+  it("a name no delegate answers raises NoMethodError only when called", () => {
+    const recorder = new CommandRecorder({}) as unknown as Record<string, () => void>;
+    expect(typeof recorder["nope"]).toBe("function");
+    expect(() => recorder["nope"]()).toThrow(/undefined method 'nope'/);
+  });
+
   it("invertCreateTable strips ifNotExists even when fn is last arg", () => {
     const fn = () => {};
     const [cmd, args] = new CommandRecorder().invertCreateTable([

@@ -665,7 +665,11 @@ export class CommandRecorder {
 
   private _dispatchInvert(cmd: string, args: unknown[]): [string, unknown[]] {
     const methodName = `invert${cmd.charAt(0).toUpperCase()}${cmd.slice(1)}` as keyof this;
-    const method = this[methodName];
+    // Rails guards with `respond_to?(method, true)` (command_recorder.rb:116)
+    // before sending, so the membership test comes first: reading a name the
+    // recorder does not answer takes the proxy's `method_missing` arm, which
+    // hands back a NoMethodError-raising function.
+    const method = methodName in this ? this[methodName] : undefined;
     if (typeof method === "function") {
       return (method as (args: unknown[]) => [string, unknown[]]).call(this, args);
     }
