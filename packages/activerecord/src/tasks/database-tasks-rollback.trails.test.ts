@@ -49,7 +49,7 @@ describe("DatabaseTasksRollbackTest", () => {
     DatabaseTasks.registerMigrations([migration(3, "AnimalsOnly")], animals);
 
     await Base.establishConnection(primary);
-    const schemaMigration = new SchemaMigration(await Base.connectionPool().leaseConnection());
+    const schemaMigration = new SchemaMigration(Base.connectionPool());
     await schemaMigration.createTable();
     await schemaMigration.createVersion("2");
 
@@ -83,7 +83,7 @@ describe("DatabaseTasksRollbackTest", () => {
 
     DatabaseTasks.databaseConfiguration = null;
     await Base.establishConnection({ adapter: "sqlite3", database: ":memory:", pool: 1 });
-    const schemaMigration = new SchemaMigration(await Base.connectionPool().leaseConnection());
+    const schemaMigration = new SchemaMigration(Base.connectionPool());
     await schemaMigration.createTable();
     await schemaMigration.createVersion("1");
     await schemaMigration.createVersion("3");
@@ -111,7 +111,7 @@ describe("DatabaseTasksRollbackTest", () => {
 
     DatabaseTasks.databaseConfiguration = null;
     await Base.establishConnection({ adapter: "sqlite3", database: ":memory:", pool: 1 });
-    const schemaMigration = new SchemaMigration(await Base.connectionPool().leaseConnection());
+    const schemaMigration = new SchemaMigration(Base.connectionPool());
     await schemaMigration.createTable();
     await schemaMigration.createVersion("999");
 
@@ -138,7 +138,7 @@ describe("DatabaseTasksRollbackTest", () => {
 
     DatabaseTasks.databaseConfiguration = null;
     await Base.establishConnection({ adapter: "sqlite3", database: ":memory:", pool: 1 });
-    const schemaMigration = new SchemaMigration(await Base.connectionPool().leaseConnection());
+    const schemaMigration = new SchemaMigration(Base.connectionPool());
     await schemaMigration.createTable();
     await schemaMigration.createVersion("1");
 

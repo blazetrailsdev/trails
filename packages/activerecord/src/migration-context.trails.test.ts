@@ -82,13 +82,13 @@ describe("MigrationContext connected surface", () => {
 
   beforeEach(async () => {
     const adapter = Base.connection;
-    const schemaMigration = new SchemaMigration(adapter);
+    const schemaMigration = new SchemaMigration(adapter.pool);
     await schemaMigration.createTable();
     await schemaMigration.deleteAllVersions();
     context = new MigrationContext(
       [`${MIGRATIONS_ROOT}/valid`],
       schemaMigration,
-      new InternalMetadata(adapter),
+      new InternalMetadata(adapter.pool),
     );
   });
 

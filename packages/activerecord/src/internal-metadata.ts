@@ -66,12 +66,6 @@ export class NullInternalMetadata {
 
 export class InternalMetadata {
   private _pool: ConnectionPool | NullPool;
-  /**
-   * SEAM (delete in migration-collaborator-call-sites-pass-a-pool): the adapter
-   * an adapter-built instance was handed, kept because a `NullPool`-backed
-   * adapter cannot check a connection out.
-   */
-  private _fallbackAdapter?: DatabaseAdapter;
   readonly arelTable: Table;
 
   get primaryKey(): string {
@@ -92,18 +86,9 @@ export class InternalMetadata {
   /**
    * Mirrors `InternalMetadata#initialize` (`internal_metadata.rb:18-21`) — it
    * holds a pool.
-   *
-   * SEAM (delete in migration-collaborator-call-sites-pass-a-pool): the adapter
-   * arm. Every construction site still passes an adapter; given one, hold its
-   * pool and keep the adapter itself as the fallback connection.
    */
-  constructor(poolOrAdapter: ConnectionPool | NullPool | DatabaseAdapter) {
-    if ("pool" in poolOrAdapter) {
-      this._fallbackAdapter = poolOrAdapter;
-      this._pool = poolOrAdapter.pool;
-    } else {
-      this._pool = poolOrAdapter;
-    }
+  constructor(pool: ConnectionPool | NullPool) {
+    this._pool = pool;
     this.arelTable = new Table(this.tableName);
   }
 
@@ -111,8 +96,6 @@ export class InternalMetadata {
   private async _withConnection<T>(
     fn: (connection: DatabaseAdapter) => T | Promise<T>,
   ): Promise<T> {
-    // SEAM (delete in migration-collaborator-call-sites-pass-a-pool)
-    if (this._fallbackAdapter) return await fn(this._fallbackAdapter);
     return await (this._pool as ConnectionPool).withConnection(fn);
   }
 
@@ -245,14 +228,9 @@ export class InternalMetadata {
    * @internal
    */
   async tableExists(): Promise<boolean> {
-    // SEAM (delete in migration-collaborator-call-sites-pass-a-pool): a
-    // NullPool-backed adapter has no schema cache to read, so its connection
-    // stands in for one — it answers `dataSourceExists` the same way.
-    const schemaCache =
-      this._fallbackAdapter ??
-      ((this._pool as ConnectionPool).schemaCache as {
-        dataSourceExists(name: string): Promise<boolean | undefined>;
-      });
+    const schemaCache = (this._pool as ConnectionPool).schemaCache as {
+      dataSourceExists(name: string): Promise<boolean | undefined>;
+    };
     return (await schemaCache.dataSourceExists(this.tableName)) ?? false;
   }
 

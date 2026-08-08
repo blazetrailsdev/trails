@@ -47,29 +47,14 @@ export class NullSchemaMigration {
 
 export class SchemaMigration {
   private _pool: ConnectionPool | NullPool;
-  /**
-   * SEAM (delete in migration-collaborator-call-sites-pass-a-pool): the adapter
-   * an adapter-built instance was handed, kept because a `NullPool`-backed
-   * adapter cannot check a connection out.
-   */
-  private _fallbackAdapter?: DatabaseAdapter;
   readonly arelTable: Table;
 
   /**
    * Mirrors `SchemaMigration#initialize` (`schema_migration.rb:14-17`) — it
    * holds a pool.
-   *
-   * SEAM (delete in migration-collaborator-call-sites-pass-a-pool): the adapter
-   * arm. Every construction site still passes an adapter; given one, hold its
-   * pool and keep the adapter itself as the fallback connection.
    */
-  constructor(poolOrAdapter: ConnectionPool | NullPool | DatabaseAdapter) {
-    if ("pool" in poolOrAdapter) {
-      this._fallbackAdapter = poolOrAdapter;
-      this._pool = poolOrAdapter.pool;
-    } else {
-      this._pool = poolOrAdapter;
-    }
+  constructor(pool: ConnectionPool | NullPool) {
+    this._pool = pool;
     this.arelTable = new Table(this.tableName);
   }
 
@@ -77,20 +62,7 @@ export class SchemaMigration {
   private async _withConnection<T>(
     fn: (connection: DatabaseAdapter) => T | Promise<T>,
   ): Promise<T> {
-    // SEAM (delete in migration-collaborator-call-sites-pass-a-pool)
-    if (this._fallbackAdapter) return await fn(this._fallbackAdapter);
     return await (this._pool as ConnectionPool).withConnection(fn);
-  }
-
-  /**
-   * @internal The adapter this instance runs against. Rails holds `@pool` and
-   * exposes no such reader. It has no caller left in the repo — the story
-   * `migration-collaborator-call-sites-pass-a-pool` scopes its removal, so it
-   * is left here rather than deleted out from under that story.
-   */
-  get connection(): DatabaseAdapter {
-    // SEAM (delete in migration-collaborator-call-sites-pass-a-pool)
-    return this._fallbackAdapter!;
   }
 
   get primaryKey(): string {

@@ -133,7 +133,7 @@ async function adapterSpecificHalf(adapter: DatabaseAdapter): Promise<string[]> 
  * @internal
  */
 export async function adapterSpecificTables(adapter: DatabaseAdapter): Promise<string[] | null> {
-  const metadata = new InternalMetadata(adapter);
+  const metadata = new InternalMetadata(adapter.pool);
   if (!(await metadata.tableExists())) return null;
   const raw = await metadata.get(ADAPTER_SPECIFIC_TABLES_KEY);
   if (raw == null || raw === "") return null;
@@ -169,7 +169,7 @@ export async function stampCanonicalSchema(
   laid?: readonly string[],
 ): Promise<void> {
   if (!runToken) return;
-  const metadata = new InternalMetadata(adapter);
+  const metadata = new InternalMetadata(adapter.pool);
   await metadata.createTableAndSetFlags("test", stampFor(runToken));
   const snapshot = laid ?? (await adapterSpecificHalf(adapter));
   const encoded = JSON.stringify([...snapshot].sort());
@@ -192,7 +192,7 @@ export async function stampCanonicalSchema(
 export async function canonicalSchemaUpToDate(adapter: DatabaseAdapter): Promise<boolean> {
   const runToken = getEnv(RUN_TOKEN_ENV);
   if (!runToken) return false;
-  const metadata = new InternalMetadata(adapter);
+  const metadata = new InternalMetadata(adapter.pool);
   if (!(await metadata.tableExists())) return false;
   return (await metadata.get("schema_sha1")) === stampFor(runToken);
 }

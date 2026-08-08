@@ -164,6 +164,12 @@ async function resetTables(
       await resetSqliteTables(adapter, mode, bootLaid);
       break;
   }
+  // The drops here are raw `DROP TABLE` statements, not `SchemaStatements#drop_table`
+  // (`abstract/schema_statements.rb:485`), so nothing has cleared the pool's
+  // data-source cache — and `InternalMetadata#table_exists?` reads exactly that
+  // (`internal_metadata.rb:108-110`), so a stale entry reports a dropped
+  // `ar_internal_metadata` as present and the next read raises on the missing table.
+  adapter.schemaCache.clearBang();
 }
 
 /**

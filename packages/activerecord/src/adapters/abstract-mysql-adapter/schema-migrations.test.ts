@@ -43,7 +43,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
 
     it("initializes schema migrations for encoding utf8mb4", async () => {
       await withEncodingUtf8mb4(adapter, async () => {
-        const schemaMigration = new SchemaMigration(adapter);
+        const schemaMigration = new SchemaMigration(adapter.pool);
         const tableName = schemaMigration.tableName;
         await adapter.dropTable(tableName, { ifExists: true });
         await schemaMigration.createTable();
@@ -53,7 +53,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
 
     it("initializes internal metadata for encoding utf8mb4", async () => {
       await withEncodingUtf8mb4(adapter, async () => {
-        const internalMetadata = new InternalMetadata(adapter);
+        const internalMetadata = new InternalMetadata(adapter.pool);
         const tableName = internalMetadata.tableName;
         await adapter.dropTable(tableName, { ifExists: true });
         await internalMetadata.createTable();

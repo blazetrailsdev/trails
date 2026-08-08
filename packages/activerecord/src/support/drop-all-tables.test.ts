@@ -55,6 +55,7 @@ describe("dropAllTables (PG connection-error retry, fake adapter)", () => {
         return [];
       }),
       executeMutation: vi.fn(async () => {}),
+      schemaCache: { clearBang() {} },
     } as unknown as DatabaseAdapter;
 
     await expect(dropAllTables(fakeAdapter)).resolves.toBeUndefined();
@@ -71,6 +72,7 @@ describe("dropAllTables (PG connection-error retry, fake adapter)", () => {
         throw appErr;
       }),
       executeMutation: vi.fn(async () => {}),
+      schemaCache: { clearBang() {} },
     } as unknown as DatabaseAdapter;
 
     await expect(dropAllTables(fakeAdapter)).rejects.toThrow(appErr);
@@ -96,6 +98,7 @@ describe("dropAllTables (PG connection-error retry, fake adapter)", () => {
         mutationCallCount++;
         if (mutationCallCount === 1) throw connErr;
       }),
+      schemaCache: { clearBang() {} },
     } as unknown as DatabaseAdapter;
 
     await expect(dropAllTables(fakeAdapter)).resolves.toBeUndefined();
@@ -213,7 +216,10 @@ describe("purge-only pre-snapshot path", () => {
     return { dropAllTablesModule, loadSchemaHelper };
   }
 
-  const inertAdapter = { adapterName: "none" } as unknown as DatabaseAdapter;
+  const inertAdapter = {
+    adapterName: "none",
+    schemaCache: { clearBang() {} },
+  } as unknown as DatabaseAdapter;
 
   // The sqlite arm lays its one table through createTable and nothing else, so
   // stubbing that member runs the arm without touching a database.

@@ -46,11 +46,14 @@ import * as os from "node:os";
 // (migration.rb:1036-1038, 1488-1491) — nothing pins an adapter to the
 // Migrator any more — so a case that drives a hand-built adapter has to
 // establish it as the migration pool's connection for the duration.
-async function establishMigrationConnection(adapter: unknown): Promise<void> {
+async function establishMigrationConnection(
+  adapter: unknown,
+  database = ":memory:",
+): Promise<void> {
   const { Base, HashConfig } = await import("@blazetrails/activerecord");
   const config = new HashConfig("test", "primary", {
     adapter: "sqlite3",
-    database: ":memory:",
+    database,
   });
   const pool = Base.connectionHandler.establishConnection(config, {
     owner: Base,
@@ -747,8 +750,8 @@ export class CreatePosts extends Migration {
     );
 
     const migrations = await discoverMigrations(tmpDir);
-    const schemaMigration = new SchemaMigration(adapter);
-    const internalMetadata = new InternalMetadata(adapter);
+    const schemaMigration = new SchemaMigration(adapter.pool);
+    const internalMetadata = new InternalMetadata(adapter.pool);
     const migrator = new Migrator("up", migrations, schemaMigration, internalMetadata);
     // `rollback` lives on MigrationContext (`migration.rb:1240-1242`); it reads
     // the same bookkeeping tables, over the same discovered migration list.
@@ -815,8 +818,8 @@ export class CreateComments extends Migration {
     const migrator = migrationContextFor(
       tmpDir,
       migrations,
-      new SchemaMigration(adapter),
-      new InternalMetadata(adapter),
+      new SchemaMigration(adapter.pool),
+      new InternalMetadata(adapter.pool),
     );
 
     // `MigrationContext#forward` is `move(:up, steps)` (`migration.rb:1244`),
@@ -859,8 +862,8 @@ export class CreatePosts extends Migration {
     const migrator = new Migrator(
       "up",
       migrations,
-      new SchemaMigration(adapter),
-      new InternalMetadata(adapter),
+      new SchemaMigration(adapter.pool),
+      new InternalMetadata(adapter.pool),
     );
 
     expect(await migrator.currentVersion()).toBe(0);
@@ -887,8 +890,8 @@ export class CreateWidgets extends Migration {
     const migrator = new Migrator(
       "up",
       migrations,
-      new SchemaMigration(adapter),
-      new InternalMetadata(adapter),
+      new SchemaMigration(adapter.pool),
+      new InternalMetadata(adapter.pool),
     );
 
     await migrator.run("up", "20260101000000");
@@ -912,8 +915,8 @@ export class CreateWidgets extends Migration {
     const migrator = new Migrator(
       "up",
       [],
-      new SchemaMigration(adapter),
-      new InternalMetadata(adapter),
+      new SchemaMigration(adapter.pool),
+      new InternalMetadata(adapter.pool),
     );
     await expect(migrator.run("up", "99999999999999")).rejects.toBeInstanceOf(
       UnknownMigrationVersionError,
@@ -939,8 +942,8 @@ export class CreatePosts extends Migration {
     const migrator = new Migrator(
       "up",
       migrations,
-      new SchemaMigration(adapter),
-      new InternalMetadata(adapter),
+      new SchemaMigration(adapter.pool),
+      new InternalMetadata(adapter.pool),
     );
 
     expect((await migrator.pendingMigrations()).length).toBe(1);
@@ -1296,12 +1299,13 @@ export class CreatePosts extends Migration {
 
     const dbFile = path.join(tmpDir, "prod.sqlite3");
     const adapter = new BetterSQLite3Adapter(dbFile);
+    await establishMigrationConnection(adapter, dbFile);
     try {
-      const internalMetadata = new InternalMetadata(adapter);
+      const internalMetadata = new InternalMetadata(adapter.pool);
       // Rails' last_stored_environment returns nil at current_version == 0, so
       // record a version (as database_tasks_test.rb does) to make the DB stamped.
-      await new SchemaMigration(adapter).createTable();
-      await new SchemaMigration(adapter).createVersion("1");
+      await new SchemaMigration(adapter.pool).createTable();
+      await new SchemaMigration(adapter.pool).createVersion("1");
       await internalMetadata.createTable();
       await internalMetadata.set("environment", "production");
     } finally {
@@ -1340,12 +1344,13 @@ export class CreatePosts extends Migration {
 
     const dbFile = path.join(tmpDir, "staging.sqlite3");
     const adapter = new BetterSQLite3Adapter(dbFile);
+    await establishMigrationConnection(adapter, dbFile);
     try {
-      const internalMetadata = new InternalMetadata(adapter);
+      const internalMetadata = new InternalMetadata(adapter.pool);
       // Rails' last_stored_environment returns nil at current_version == 0, so
       // record a version (as database_tasks_test.rb does) to make the DB stamped.
-      await new SchemaMigration(adapter).createTable();
-      await new SchemaMigration(adapter).createVersion("1");
+      await new SchemaMigration(adapter.pool).createTable();
+      await new SchemaMigration(adapter.pool).createVersion("1");
       await internalMetadata.createTable();
       await internalMetadata.set("environment", "staging");
     } finally {
@@ -1376,12 +1381,13 @@ export class CreatePosts extends Migration {
 
     const dbFile = path.join(tmpDir, "prod2.sqlite3");
     const adapter = new BetterSQLite3Adapter(dbFile);
+    await establishMigrationConnection(adapter, dbFile);
     try {
-      const internalMetadata = new InternalMetadata(adapter);
+      const internalMetadata = new InternalMetadata(adapter.pool);
       // Rails' last_stored_environment returns nil at current_version == 0, so
       // record a version (as database_tasks_test.rb does) to make the DB stamped.
-      await new SchemaMigration(adapter).createTable();
-      await new SchemaMigration(adapter).createVersion("1");
+      await new SchemaMigration(adapter.pool).createTable();
+      await new SchemaMigration(adapter.pool).createVersion("1");
       await internalMetadata.createTable();
       await internalMetadata.set("environment", "production");
     } finally {
@@ -1415,11 +1421,12 @@ export class CreatePosts extends Migration {
 
     const dbFile = path.join(tmpDir, "fresh.sqlite3");
     const adapter = new BetterSQLite3Adapter(dbFile);
+    await establishMigrationConnection(adapter, dbFile);
     const previousProtected = Base.protectedEnvironments;
     Base.protectedEnvironments = ["production"];
     try {
-      const internalMetadata = new InternalMetadata(adapter);
-      const context = new MigrationContext([], new SchemaMigration(adapter), internalMetadata);
+      const internalMetadata = new InternalMetadata(adapter.pool);
+      const context = new MigrationContext([], new SchemaMigration(adapter.pool), internalMetadata);
       // No environment stamped yet → false even though the current env is
       // in the protected list. Matches Rails' protected_environment? ==
       // nil semantics.
@@ -1429,8 +1436,8 @@ export class CreatePosts extends Migration {
       expect(await internalMetadata.tableExists()).toBe(false);
 
       // After stamping as production, the check reflects the protected state.
-      await new SchemaMigration(adapter).createTable();
-      await new SchemaMigration(adapter).createVersion("1");
+      await new SchemaMigration(adapter.pool).createTable();
+      await new SchemaMigration(adapter.pool).createVersion("1");
       await internalMetadata.createTable();
       await internalMetadata.set("environment", "production");
       expect(await context.protectedEnvironment()).toBe(true);
@@ -1460,7 +1467,7 @@ export class CreatePosts extends Migration {
     const adapter = new BetterSQLite3Adapter(dbFile);
     try {
       disableMetadataTable(adapter);
-      const disabledMeta = new InternalMetadata(adapter);
+      const disabledMeta = new InternalMetadata(adapter.pool);
       expect(disabledMeta.enabled).toBe(false);
 
       // createTable + createTableAndSetFlags silently no-op (Rails'
@@ -1510,8 +1517,8 @@ export class CreatePosts extends Migration {
       const migrator = new Migrator(
         "up",
         migrations,
-        new SchemaMigration(adapter),
-        new InternalMetadata(adapter),
+        new SchemaMigration(adapter.pool),
+        new InternalMetadata(adapter.pool),
       );
 
       // Migrate should succeed and NOT throw EnvironmentStorageError
@@ -1529,8 +1536,8 @@ export class CreatePosts extends Migration {
       // lastStoredEnvironment short-circuits to null when disabled.
       const context = new MigrationContext(
         [],
-        new SchemaMigration(adapter),
-        new InternalMetadata(adapter),
+        new SchemaMigration(adapter.pool),
+        new InternalMetadata(adapter.pool),
       );
       expect(await context.lastStoredEnvironment()).toBeNull();
     } finally {
@@ -1545,10 +1552,11 @@ export class CreatePosts extends Migration {
 
     const dbFile = path.join(tmpDir, "stale-metadata.sqlite3");
     const adapter = new BetterSQLite3Adapter(dbFile);
+    await establishMigrationConnection(adapter, dbFile);
     try {
       // Seed a real metadata table + environment value with a separate
       // enabled=true instance.
-      const enabledMeta = new InternalMetadata(adapter);
+      const enabledMeta = new InternalMetadata(adapter.pool);
       await enabledMeta.createTable();
       await enabledMeta.set("environment", "production");
       disableMetadataTable(adapter);
@@ -1556,8 +1564,8 @@ export class CreatePosts extends Migration {
       // Disabled context should still report null (no stale read).
       const context = new MigrationContext(
         [],
-        new SchemaMigration(adapter),
-        new InternalMetadata(adapter),
+        new SchemaMigration(adapter.pool),
+        new InternalMetadata(adapter.pool),
       );
       expect(await context.lastStoredEnvironment()).toBeNull();
       expect(await context.protectedEnvironment()).toBe(false);
@@ -1577,10 +1585,11 @@ export class CreatePosts extends Migration {
 
     const dbFile = path.join(tmpDir, "truncate.sqlite3");
     const seedAdapter = new BetterSQLite3Adapter(dbFile);
+    await establishMigrationConnection(seedAdapter, dbFile);
     try {
       await seedAdapter.executeMutation("CREATE TABLE posts (id INTEGER PRIMARY KEY, title TEXT)");
       await seedAdapter.executeMutation("INSERT INTO posts (title) VALUES ('a'), ('b')");
-      await new InternalMetadata(seedAdapter).createTableAndSetFlags("development");
+      await new InternalMetadata(seedAdapter.pool).createTableAndSetFlags("development");
       await seedAdapter.executeMutation(
         "CREATE TABLE IF NOT EXISTS schema_migrations (version VARCHAR NOT NULL PRIMARY KEY)",
       );
