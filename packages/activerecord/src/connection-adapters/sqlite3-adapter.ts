@@ -13,6 +13,7 @@ import type { ExplainOption } from "./abstract/database-statements.js";
 import type { SQLite3AdapterOptions, SQLite3Config } from "./pool-config.js";
 import { AbstractAdapter, Version } from "./abstract-adapter.js";
 import { isRubyTruthy } from "../ruby-truthy.js";
+import { isInMemoryDatabase } from "../sqlite/sqlite-uri.js";
 import { SchemaCreation as SQLite3SchemaCreation } from "./sqlite3/schema-creation.js";
 import {
   SQLITE3_NATIVE_DATABASE_TYPES,
@@ -328,17 +329,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   private _statementLimit = 1000;
   private _statementPool = this.buildStatementPool();
 
-  private static _isMemoryFilename(filename: string): boolean {
-    if (filename === ":memory:") return true;
-    if (!filename.startsWith("file:")) return false;
-    if (filename.startsWith("file::memory:")) return true;
-    // Parse query string so a path containing the text "mode=memory" isn't
-    // misclassified (e.g. file:/tmp/mode=memory.db). Mirrors SQLiteDatabaseTasks.
-    const q = filename.indexOf("?");
-    if (q === -1) return false;
-    return new URLSearchParams(filename.slice(q + 1)).get("mode") === "memory";
-  }
-
   /**
    * Whether this connection was opened with strict-strings mode (DQS disabled).
    * Reflects the resolved value of the `strict` constructor option, which
@@ -383,7 +373,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     } else {
       filename = filenameOrConfig;
     }
-    this._memoryDatabase = SQLite3Adapter._isMemoryFilename(filename);
+    this._memoryDatabase = isInMemoryDatabase(filename);
     // Mirrors the non-`:memory:`/non-`file:` branch of Rails'
     // `SQLite3Adapter#initialize`: expand the path and create its parent
     // directory before the driver opens the handle below.

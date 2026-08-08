@@ -1456,8 +1456,31 @@ export interface SeenRubyMethod {
  * All three together rule out the `deprecator.rb ↦ migration.ts`
  * pattern observed during development: 3 hits but only 43% coverage
  * and no separation from the noise floor.
+ *
+ * The package barrel (`index.ts`) is dropped from the vote before any of the
+ * three run. It re-exports the whole package, so it contains a candidate for
+ * essentially every name and clears all three thresholds whenever a real file
+ * would — and then the bucket's methods are compared against whichever
+ * same-named symbol the barrel happens to re-export, which is unrelated to the
+ * port (PR #6225: `core_ext/object/acts_like.rb` landed on
+ * `activesupport/src/index.ts`, so Ruby `Object#as_json` was compared against
+ * `TimeWithZone#asJson`). A barrel is a re-export site, never a port location;
+ * a bucket that genuinely lives there is spelled out in
+ * `RUBY_FILE_TS_OVERRIDES`, which is the direct-match path and does not come
+ * through here.
  */
 export const MISPLACED_MIN_HITS = 3;
+
+/**
+ * True for the package barrel — `index.ts` at the package `src` root. Paths in
+ * `fileHits` are package-src relative, so the barrel is exactly `"index.ts"`;
+ * directory barrels keep their vote, since some of them (`encryption/index.ts`)
+ * carry ported bodies rather than only re-exports.
+ */
+function isPackageBarrel(file: string): boolean {
+  return file === "index.ts";
+}
+
 export function selectMisplacedFile(
   fileHits: Map<string, number>,
   rubyMethodCount: number,
@@ -1466,6 +1489,7 @@ export function selectMisplacedFile(
   let bestCount = 0;
   let secondCount = 0;
   for (const [f, c] of fileHits) {
+    if (isPackageBarrel(f)) continue;
     if (c > bestCount) {
       secondCount = bestCount;
       bestFile = f;
