@@ -2,7 +2,6 @@ import { BetterSQLite3Adapter } from "../connection-adapters/better-sqlite3-adap
 import { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
 import { Mysql2Adapter } from "../connection-adapters/mysql2-adapter.js";
 import { Version } from "../connection-adapters/abstract-adapter.js";
-import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
 import { PoolConfig } from "../connection-adapters/pool-config.js";
 import { ConnectionDescriptor } from "../connection-adapters/abstract/connection-descriptor.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
@@ -11,21 +10,6 @@ import type { TableDefinitionConn } from "../connection-adapters/abstract/schema
 export type SchemaConnName = "sqlite" | "postgres" | "mysql";
 
 const conns = new Map<SchemaConnName, TableDefinitionConn>();
-
-function newAdapter(name: SchemaConnName): AbstractAdapter {
-  switch (name) {
-    case "sqlite":
-      return new BetterSQLite3Adapter(":memory:") as unknown as AbstractAdapter;
-    case "postgres":
-      return new PostgreSQLAdapter(
-        "postgresql://localhost/trails_schema_conn",
-      ) as unknown as AbstractAdapter;
-    default:
-      return new Mysql2Adapter(
-        "mysql://localhost/trails_schema_conn",
-      ) as unknown as AbstractAdapter;
-  }
-}
 
 /**
  * The `conn` argument for DDL-rendering unit tests. Rails' `SchemaCreation.new`
@@ -45,8 +29,10 @@ function newAdapter(name: SchemaConnName): AbstractAdapter {
  * pool stays inert; nothing ever checks a connection out of it.
  *
  * MySQL's `supports_check_constraints?` / `supports_index_sort_order?` are
- * version-gated and read the cached version, which is cold on a connection that
- * was never opened, so that adapter is seeded with a modern server version.
+ * version-gated and read `database_version`, which reaches
+ * `PoolConfig#server_version` (`pool_config.rb:39-41`) — cold on a connection that
+ * was never opened, so the pool config is seeded through Rails'
+ * `attr_writer :server_version` (`pool_config.rb:9`) with a modern server version.
  */
 export function schemaConn(name: SchemaConnName): TableDefinitionConn {
   let conn = conns.get(name);
@@ -61,14 +47,18 @@ export function schemaConn(name: SchemaConnName): TableDefinitionConn {
       dbConfig,
       "writing",
       "default",
-      { adapterFactory: () => newAdapter(name) },
+      {
+        adapterFactory: () =>
+          name === "sqlite"
+            ? new BetterSQLite3Adapter(":memory:")
+            : name === "postgres"
+              ? new PostgreSQLAdapter("postgresql://localhost/trails_schema_conn")
+              : new Mysql2Adapter("mysql://localhost/trails_schema_conn"),
+      },
     );
-    conn = poolConfig.pool.newConnection() as unknown as TableDefinitionConn;
+    conn = poolConfig.pool.newConnection() as TableDefinitionConn;
     if (name === "mysql") {
-      // A connection that is never opened cannot answer `get_database_version`,
-      // so seed the fetch the pool memo (`pool_config.rb:39-41`) caches.
-      const version = new Version("8.0.35", "8.0.35");
-      (conn as unknown as { getDatabaseVersion: () => Version }).getDatabaseVersion = () => version;
+      poolConfig.setServerVersion(new Version("8.0.35", "8.0.35"));
     }
     conns.set(name, conn);
   }
