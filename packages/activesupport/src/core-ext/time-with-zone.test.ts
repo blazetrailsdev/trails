@@ -1228,6 +1228,8 @@ describe("TimeWithZoneMethodsForTimeAndDateTimeTest", () => {
     expect(getZone()!.name).toBe("Alaska");
     setZone("Alaska");
     expect(getZone()!.name).toBe("Alaska");
+    setZone(Duration.hours(-9));
+    expect(getZone()!.name).toBe("Alaska");
     setZone(null);
     expect(getZone()).toBeNull();
   });
@@ -1276,18 +1278,22 @@ describe("TimeWithZoneMethodsForTimeAndDateTimeTest", () => {
 
   it("time zone setter with invalid zone", () => {
     expect(() => setZone("No such timezone exists")).toThrow();
+    expect(() => setZone(Duration.hours(-15))).toThrow();
+    expect(() => setZone({} as unknown as string)).toThrow();
   });
 
   it("find zone without bang returns nil if time zone can not be found", () => {
     expect(findZone("No such timezone exists")).toBeNull();
-    expect(findZone(-54000)).toBeNull();
+    expect(findZone(Duration.hours(-15))).toBeNull();
     expect(findZone({})).toBeNull();
   });
 
   it("find zone with bang raises if time zone can not be found", () => {
-    expect(() => findZoneBang("No such timezone exists")).toThrow(/Invalid time zone/);
-    expect(() => findZoneBang(-54000)).toThrow(/Invalid time zone/);
-    expect(() => findZoneBang({})).toThrow(/Invalid time zone/);
+    expect(() => findZoneBang("No such timezone exists")).toThrow(
+      "Invalid Timezone: No such timezone exists",
+    );
+    expect(() => findZoneBang(Duration.hours(-15))).toThrow("Invalid Timezone: -54000");
+    expect(() => findZoneBang({})).toThrow(/invalid argument to TimeZone\[\]/);
   });
 
   it("find zone with bang doesnt raises with nil and false", () => {

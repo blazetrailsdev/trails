@@ -10,6 +10,7 @@
  */
 
 import { TimeWithZone } from "../time-with-zone.js";
+import { Duration } from "../duration.js";
 import { Temporal } from "@blazetrails/date";
 import { instantFrom } from "../temporal.js";
 import { currentTime } from "../time-travel.js";
@@ -169,6 +170,8 @@ const MAPPING: Record<string, string> = {
 };
 
 const zoneCache = new Map<string, TimeZone>();
+// `@zones` (time_zone.rb:224) — memoizes the sorted zone list.
+let zones: TimeZone[] | null = null;
 
 /**
  * Get timezone abbreviation and offset for a given IANA zone at a specific instant.
@@ -282,9 +285,23 @@ export class TimeZone {
   }
 
   /**
-   * Find a timezone by Rails name or IANA identifier.
+   * Find a timezone by Rails name or IANA identifier, or by a `Numeric` /
+   * `Duration` UTC offset — the port of `ActiveSupport::TimeZone.[]`
+   * (values/time_zone.rb:232-250). Ruby's `[]` returns `nil` where this throws;
+   * `findZoneBang` is the raise site that converts (core_ext/time/zones.rb:83).
    */
-  static find(name: string): TimeZone {
+  static find(name: string | number | Duration): TimeZone {
+    // `when Numeric, ActiveSupport::Duration` (time_zone.rb:244-246): an offset
+    // of 13 or less is hours, anything larger is already seconds.
+    if (typeof name === "number" || name instanceof Duration) {
+      // `arg.abs` / `arg.to_i` on a Duration delegate to its seconds value
+      // (`inSeconds` here — trails' Duration carries no `@value`).
+      let arg = name instanceof Duration ? name.inSeconds() : name;
+      if (Math.abs(arg) <= 13) arg *= 3600;
+      const zone = TimeZone.all().find((z) => z.utcOffset === Math.trunc(arg));
+      if (zone) return zone;
+      throw new Error(`Invalid time zone: ${String(name)}`);
+    }
     if (zoneCache.has(name)) return zoneCache.get(name)!;
 
     // Check Rails mapping first
@@ -313,7 +330,16 @@ export class TimeZone {
 
   /** Returns all Rails-named timezones */
   static all(): TimeZone[] {
-    return Object.keys(MAPPING).map((name) => TimeZone.find(name));
+    // `zones_map.values.sort` (time_zone.rb:224) — `<=>` (time_zone.rb:333-337)
+    // orders by utc_offset, then by name. `[]`'s Numeric arm takes the first
+    // zone at the requested offset, so the order is behavioral.
+    if (zones) return zones;
+    zones = Object.keys(MAPPING)
+      .map((name) => TimeZone.find(name))
+      .sort(
+        (a, b) => a.utcOffset - b.utcOffset || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0),
+      );
+    return zones;
   }
 
   /**
@@ -661,10 +687,16 @@ export class TimeZone {
   }
 
   /**
-   * UTC offset in seconds for the current moment.
+   * `tzinfo.current_period.base_utc_offset` (time_zone.rb:317-319) — the
+   * standard-time offset, so it does not move when DST is in effect. Intl
+   * reports the offset *at* an instant, so the standard offset is the smaller
+   * of the January and July offsets (the same derivation `isDst` uses).
    */
   get utcOffset(): number {
-    return getZoneInfo(this.tzinfo, new Date()).utcOffsetSeconds;
+    const now = new Date();
+    const jan = getZoneInfo(this.tzinfo, new Date(now.getFullYear(), 0, 1)).utcOffsetSeconds;
+    const jul = getZoneInfo(this.tzinfo, new Date(now.getFullYear(), 6, 1)).utcOffsetSeconds;
+    return Math.min(jan, jul);
   }
 
   /**

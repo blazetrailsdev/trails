@@ -7,6 +7,7 @@
  */
 
 import { TimeZone } from "./values/time-zone.js";
+import { Duration } from "./duration.js";
 import { TimeWithZone } from "./time-with-zone.js";
 import { currentTime } from "./time-travel.js";
 import { instantFrom } from "./temporal.js";
@@ -34,7 +35,7 @@ export function getZone(): TimeZone | null {
  * Mirrors `IsolatedExecutionState[:time_zone] = find_zone!(time_zone)`
  * (zones.rb:41-43).
  */
-export function setZone(zone: TimeZone | string | null | false): void {
+export function setZone(zone: TimeZone | string | number | Duration | null | false): void {
   _zone = findZoneBang(zone);
 }
 
@@ -109,21 +110,17 @@ export function findZoneBang(zone: unknown): TimeZone | null | false {
   if (zone === null || zone === undefined) return null;
   if (zone === false) return false;
   if (zone instanceof TimeZone) return zone;
-  if (typeof zone === "string") {
+  // `ActiveSupport::TimeZone[time_zone] || raise(ArgumentError, "Invalid
+  // Timezone: #{time_zone}")` (zones.rb:83). A Numeric/Duration offset is
+  // resolved by `TimeZone[]` itself (time_zone.rb:244-246), not here.
+  if (typeof zone === "string" || typeof zone === "number" || zone instanceof Duration) {
     try {
       return TimeZone.find(zone);
     } catch {
-      throw new ArgumentError(`Invalid time zone: ${zone}`);
+      throw new ArgumentError(`Invalid Timezone: ${String(zone)}`);
     }
   }
-  if (typeof zone === "number") {
-    try {
-      return TimeZone.find(zone.toString());
-    } catch {
-      throw new ArgumentError(`Invalid time zone: ${zone}`);
-    }
-  }
-  throw new ArgumentError(`Invalid time zone: invalid argument to TimeZone[]`);
+  throw new ArgumentError(`invalid argument to TimeZone[]: ${String(zone)}`);
 }
 
 /**
