@@ -875,6 +875,16 @@ export function __setLockDirForTest(dir: string | null): void {
   lockDirForTest = dir;
 }
 
+/**
+ * Test seam: bound the contention wait so a test can drive a real contended
+ * mutation without parking for LOCK_WAIT_MS. An explicit `opts.waitMs` still
+ * wins. Production never sets it.
+ */
+let lockWaitForTest: number | null = null;
+export function __setLockWaitForTest(ms: number | null): void {
+  lockWaitForTest = ms;
+}
+
 // Synchronous sleep with no node timer: park on an Atomics wait against a
 // throwaway shared buffer. The CLI is short-lived, so this is fine.
 function sleepMs(ms: number): void {
@@ -961,7 +971,7 @@ export function acquireTasksLock(
   cwd: string | undefined,
   opts: { waitMs?: number; pollMs?: number } = {},
 ): LockHandle | null {
-  const waitMs = opts.waitMs ?? LOCK_WAIT_MS;
+  const waitMs = opts.waitMs ?? lockWaitForTest ?? LOCK_WAIT_MS;
   const pollMs = opts.pollMs ?? LOCK_POLL_MS;
   let lockPath: string;
   try {

@@ -30,6 +30,7 @@ import {
   bestBundle,
   isIndexStale,
   __setLockDirForTest,
+  __setLockWaitForTest,
   acquireTasksLock,
   assertCleanWorktree,
   buildRfcContent,
@@ -1387,7 +1388,10 @@ describe("numberFlag / stringFlag (value-flag validation)", () => {
 describe("commitAndPush (git mutation flow)", () => {
   // commitAndPush acquires the real shared lock — redirect it to a throwaway dir
   // so these tests don't block behind a live agent. git itself stays mocked.
-  afterEach(() => __setLockDirForTest(null));
+  afterEach(() => {
+    __setLockDirForTest(null);
+    __setLockWaitForTest(null);
+  });
   function setup() {
     const lockDir = mkdtempSync(join(tmpdir(), "trails-cap-lock-"));
     __setLockDirForTest(lockDir);
@@ -1429,6 +1433,34 @@ describe("commitAndPush (git mutation flow)", () => {
     expect(heldAt.status).toBe(true);
     expect(heldAt.checkout).toBe(true);
     expect(heldAt.pull).toBe(true);
+  });
+
+  it("blocks on a live holder's lock instead of failing that holder's staged file", () => {
+    const { lockDir, exit, seen } = setup();
+    execFileSyncMock.mockImplementation((_file, args) => {
+      const label = args && args.length >= 3 ? args[2] : "";
+      seen.push(label);
+      if (label === "status") return "M  rfcs/0024/stories/held.md" as never;
+      if (label === "diff-tree") return "story.md" as never;
+      return "" as never;
+    });
+    __setLockWaitForTest(0);
+    const holder = acquireTasksLock(lockDir, { waitMs: 0, pollMs: 1 });
+    expect(holder).not.toBeNull();
+
+    expect(() =>
+      commitAndPush({
+        message: "second agent",
+        fileToStage: "/some/file.md",
+        mutator: () => {},
+        raceMessage: "unused",
+        raceExitCode: 99,
+      }),
+    ).toThrow(`exit ${LOCK_TIMEOUT_EXIT}`);
+    expect(exit).toHaveBeenCalledWith(LOCK_TIMEOUT_EXIT);
+    expect(exit).not.toHaveBeenCalledWith(1);
+    expect(seen).not.toContain("status");
+    releaseTasksLock(holder);
   });
 
   it("happy path: pull → add → commit → push, no retry", () => {
