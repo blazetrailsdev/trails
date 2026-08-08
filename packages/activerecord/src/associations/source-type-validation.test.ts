@@ -32,7 +32,7 @@
 import { describe, it, expect } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { Associations, association } from "../associations.js";
-import { findTarget } from "./has-many-association.js";
+import { findCollectionTarget as findTarget } from "../test-helpers/find-collection-target.js";
 import { fixtures } from "../test-fixtures.js";
 
 // Local model classes for testing invalid through-association configurations.

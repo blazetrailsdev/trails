@@ -75,7 +75,6 @@ import {
 } from "./has-many-through-association.js";
 import {
   countRecords,
-  findTarget,
   scope as hasManyScope,
   setDifference,
   setIntersection,
@@ -883,6 +882,20 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * `strictLoadingValue` is applied afterward so it wins over cascade (Rails
    * applies `strict_loading_value` after `set_strict_loading` per record).
    */
+  private async _findTargetViaAssociation(queryExecutor?: () => Promise<Base[]>): Promise<Base[]> {
+    // A freshly built (uncached) holder rather than `record.association(name)`:
+    // this proxy IS the owner's holder for that name, so loading through the
+    // cached one would suppress the loader's writeback into it and mark it
+    // loaded behind the proxy's back.
+    const { _buildAssociationInstance } = await import("./instance-methods.js");
+    const assoc = _buildAssociationInstance.call(this._record, this._assocDef) as unknown as {
+      _queryExecutor?: () => Promise<Base[]>;
+      findTarget(): Promise<Base[]>;
+    };
+    assoc._queryExecutor = queryExecutor;
+    return assoc.findTarget();
+  }
+
   private async _execLoad(): Promise<T[]> {
     // Re-throw a foreign-key derivation error deferred from construction, so
     // the underivable-FK `ArgumentError` surfaces at load time (Rails'
@@ -898,12 +911,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
             _AssociationRelationCtor!.prototype as unknown as { toArray(): Promise<Base[]> }
           ).toArray.call(this)
       : undefined;
-    const results = (await findTarget(
-      this._record,
-      this._assocName,
-      this._assocDef.options,
-      queryExecutor,
-    )) as T[];
+    const results = (await this._findTargetViaAssociation(queryExecutor)) as T[];
     this._cascadeStrictLoading(results);
     // Relation's strict_loading wins over cascade — applied last to match
     // Rails: AssociationRelation#exec_queries runs set_strict_loading per
@@ -1808,7 +1816,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         !this._assocDef.options.disableJoins &&
         !_routeThroughViaAssociationScope(this._record, refl, this._assocDef.options)
       ) {
-        const results = await findTarget(this._record, this._assocName, this._assocDef.options);
+        const results = await this._findTargetViaAssociation();
         return results.length;
       }
       // Routed shapes fall through to `countFn.call(this.scope())` below;

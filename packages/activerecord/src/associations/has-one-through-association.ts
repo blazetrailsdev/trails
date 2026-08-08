@@ -1,7 +1,6 @@
 import type { Base } from "../base.js";
 import type { AssociationDefinition, AssociationOptions } from "../associations.js";
-import { association } from "./instance-methods.js";
-import { findTarget as findHasManyTarget } from "./has-many-association.js";
+import { association, _buildAssociationInstance } from "./instance-methods.js";
 import { camelize, underscore } from "@blazetrails/activesupport";
 import { resolveAssocClass, _hmtNotFound } from "../associations.js";
 import { HasOneAssociation, sameRecord } from "./has-one-association.js";
@@ -65,6 +64,19 @@ export class HasOneThroughAssociation extends HasOneAssociation {
 
   constructor(owner: Base, definition: AssociationDefinition) {
     super(owner, definition);
+  }
+
+  /**
+   * trails' two-step through loader: the join record is loaded first and drives
+   * a second query, for the shapes AssociationScope cannot build a single JOIN
+   * for. Rails has no counterpart — its `find_target` is always `scope.first` —
+   * so this is not `find_target` itself but the arm
+   * `SingularAssociation#findTarget` routes to when
+   * `_routeThroughViaAssociationScope` says no.
+   * @internal
+   */
+  protected loadHasOneThrough(): Promise<Base | null> {
+    return loadHasOneThrough(this.owner, this.reflection.name, this.reflection.options);
   }
 
   override reset(): void {
@@ -725,10 +737,13 @@ function ensureNotNested(assoc: HasOneThroughAssociation): void {
 }
 
 /**
+ * The body of `HasOneThroughAssociation#loadHasOneThrough` — trails' two-step
+ * through loader, for the shapes AssociationScope cannot build a JOIN for.
+ *
  * Mirrors: SingularAssociation#find_target as inherited by
  * HasOneThroughAssociation (has_one_through_association.rb).
  */
-export async function findTarget(
+async function loadHasOneThrough(
   record: Base,
   assocName: string,
   options: AssociationOptions,
@@ -746,7 +761,15 @@ export async function findTarget(
   } else if (throughAssoc.type === "belongsTo") {
     throughRecord = (await association.call(record, throughAssoc.name).loadTarget()) as Base | null;
   } else if (throughAssoc.type === "hasMany") {
-    const throughRecords = await findHasManyTarget(record, throughAssoc.name, throughAssoc.options);
+    // A freshly built (uncached) holder: this loads the through step under the
+    // *through* association's own name and options, so it must not disturb the
+    // owner's cached holder for that name.
+    const throughHolder = _buildAssociationInstance.call(record, {
+      name: throughAssoc.name,
+      type: "hasMany",
+      options: throughAssoc.options,
+    }) as unknown as { findTarget(): Promise<Base[]> };
+    const throughRecords = await throughHolder.findTarget();
     throughRecord = throughRecords[0] ?? null;
   } else {
     throughRecord = null;

@@ -2,6 +2,10 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
+import {
+  findCollectionTarget as findHasManyTarget,
+  findCollectionTarget as findHasManyThroughTarget,
+} from "../test-helpers/find-collection-target.js";
 import type { AssociationProxy } from "./collection-proxy.js";
 import { describe, it, expect, beforeAll } from "vitest";
 import { Notifications, throwAbort } from "@blazetrails/activesupport";
@@ -36,8 +40,6 @@ import { Bulb } from "../test-helpers/models/bulb.js";
 import { Developer, AuditLog } from "../test-helpers/models/developer.js";
 import { Project } from "../test-helpers/models/project.js";
 import { Associations, isAssociationCached } from "../associations.js";
-import { findTarget as findHasManyTarget } from "./has-many-association.js";
-import { findTarget as findHasManyThroughTarget } from "./has-many-through-association.js";
 import { DeleteRestrictionError } from "./errors.js";
 import { assertQueriesCount, assertNoQueries } from "../testing/query-assertions.js";
 

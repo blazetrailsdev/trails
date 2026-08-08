@@ -1,7 +1,7 @@
 import type { Base } from "../base.js";
 import type { AssociationDefinition, AssociationOptions } from "../associations.js";
-import { association } from "./instance-methods.js";
-import { HasManyAssociation, findTarget as findHasManyTarget } from "./has-many-association.js";
+import { association, _buildAssociationInstance } from "./instance-methods.js";
+import { HasManyAssociation } from "./has-many-association.js";
 import {
   HasManyThroughCantAssociateThroughHasOneOrManyReflection,
   HasManyThroughNestedAssociationsAreReadonly,
@@ -54,6 +54,10 @@ export class HasManyThroughAssociation extends HasManyAssociation {
    * there agree by construction rather than by two copies of the gate.
    */
   protected override async findTarget(): Promise<Base[]> {
+    // A diverged CollectionProxy runs its own mutated Relation, which the
+    // through routing below would discard; `HasManyAssociation#findTarget` is
+    // where that executor is honored.
+    if (this._queryExecutor) return super.findTarget();
     if (!this.targetReflectionHasAssociatedRecord()) return [];
     const reflection = (this.owner.constructor as typeof Base)._reflectOnAssociation?.(
       this.reflection.name,
@@ -62,6 +66,19 @@ export class HasManyThroughAssociation extends HasManyAssociation {
       return _loadThroughViaDisableJoinsScope(this.owner, reflection, this.reflection.options);
     }
     return super.findTarget();
+  }
+
+  /**
+   * trails' two-step through loader: the through step is loaded first and its
+   * records drive a second query, for the shapes AssociationScope cannot build
+   * a single JOIN for. Rails has no counterpart — its `find_target` is always
+   * `scope.to_a` — so this is not `find_target` itself but the arm
+   * `HasManyAssociation#findTarget` routes to when
+   * `_routeThroughViaAssociationScope` says no.
+   * @internal
+   */
+  protected loadHasManyThrough(): Promise<Base[]> {
+    return loadHasManyThrough(this.owner, this.reflection.name, this.reflection.options);
   }
 
   /**
@@ -1098,12 +1115,30 @@ function targetReflectionHasAssociatedRecord(
 }
 
 /**
- * Mirrors: HasManyThroughAssociation#find_target
- * (has_many_through_association.rb:225).
- *
- * @internal
+ * Load a has_many target through a freshly built (uncached) holder. The
+ * through steps below name an association whose options are *not* the declared
+ * ones — a synthesised `sourceType` scope, or an owner that is a through
+ * record rather than this association's owner — so they must not reuse (or
+ * disturb) the owner's cached holder for that name.
  */
-export async function findTarget(
+function findHasManyTarget(
+  record: Base,
+  assocName: string,
+  options: AssociationOptions,
+): Promise<Base[]> {
+  const assoc = _buildAssociationInstance.call(record, {
+    name: assocName,
+    type: "hasMany",
+    options,
+  });
+  return (assoc as unknown as { findTarget(): Promise<Base[]> }).findTarget();
+}
+
+/**
+ * The body of `HasManyThroughAssociation#loadHasManyThrough` — trails' two-step
+ * through loader, for the shapes AssociationScope cannot build a JOIN for.
+ */
+async function loadHasManyThrough(
   record: Base,
   assocName: string,
   options: AssociationOptions,

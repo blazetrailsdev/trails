@@ -683,10 +683,7 @@ describe("TimeZoneTest", () => {
     for (let i = 1; i < zones.length; i++) {
       const previous = zones[i - 1];
       const current = zones[i];
-      expect(
-        previous.utcOffset < current.utcOffset ||
-          (previous.utcOffset === current.utcOffset && previous.name < current.name),
-      ).toBe(true);
+      expect(previous.compareTo(current)).toBe(-1);
     }
     expect(zones.length).toBeGreaterThan(100);
     // Verify we get a reasonable set of zones
