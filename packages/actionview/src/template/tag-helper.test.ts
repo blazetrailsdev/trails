@@ -297,13 +297,13 @@ describe("TagHelperTest", () => {
     ).toBe('<div id="header"><div class="world"><span>hello</span></div></div>');
   });
 
-  it("content tag with block and options out of erb", () => {
+  it("content tag with block and options out of tse", () => {
     expect(contentTag("div", { class: "green" }, null, true, () => "Hello world!").toString()).toBe(
       '<div class="green">Hello world!</div>',
     );
   });
 
-  it("tag builder with block and options out of erb", () => {
+  it("tag builder with block and options out of tse", () => {
     const t = tag() as any;
     expect(t.div({ class: "green" }, () => "Hello world!").toString()).toBe(
       '<div class="green">Hello world!</div>',
@@ -778,20 +778,20 @@ describe("TagHelperTest", () => {
     );
   });
 
-  it("content tag with block and options outside out of erb", () => {
+  it("content tag with block and options outside out of tse", () => {
     expect(contentTag("a", "Create", { href: "create" }).toString()).toBe(
       contentTag("a", { href: "create" }, null, true, () => "Create").toString(),
     );
   });
 
-  it("tag builder with block and options outside out of erb", () => {
+  it("tag builder with block and options outside out of tse", () => {
     const t = tag() as any;
     expect(t.a("Create", { href: "create" }).toString()).toBe(
       t.a({ href: "create" }, () => "Create").toString(),
     );
   });
 
-  it("content tag with block and non string outside out of erb", () => {
+  it("content tag with block and non string outside out of tse", () => {
     expect(contentTag("p").toString()).toBe(
       contentTag("p", null, null, true, () => {
         for (let i = 0; i < 3; i++) {
@@ -802,7 +802,7 @@ describe("TagHelperTest", () => {
     );
   });
 
-  it("tag builder with block and non string outside out of erb", () => {
+  it("tag builder with block and non string outside out of tse", () => {
     const t = tag() as any;
     expect(t.p().toString()).toBe(
       t
@@ -816,7 +816,7 @@ describe("TagHelperTest", () => {
     );
   });
 
-  it("content tag nested in content tag out of erb", () => {
+  it("content tag nested in content tag out of tse", () => {
     expect(contentTag("p", contentTag("b", "Hello")).toString()).toBe("<p><b>Hello</b></p>");
     const t = tag() as any;
     expect(t.p(t.b("Hello")).toString()).toBe("<p><b>Hello</b></p>");

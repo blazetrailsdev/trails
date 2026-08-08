@@ -51,7 +51,7 @@ const HEADERS = [
   { key: "methods", label: "Methods" },
 ] as const;
 
-const FILE_PATTERN = /^(?!\.).*?\.(rb|js|ts|tsx|css|scss|coffee|rake|erb)$/;
+const FILE_PATTERN = /^(?!\.).*?\.(rb|js|ts|tsx|css|scss|coffee|rake|tse)$/;
 
 export class CodeStatistics {
   static directories: DirectoryPair[] = [...DEFAULT_DIRECTORIES];

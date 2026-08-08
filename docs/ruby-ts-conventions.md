@@ -72,6 +72,18 @@ trails:
 | `ERB`      | `TSE`        |
 | `Erb`      | `Tse`        |
 
+Test names are not an exception. Rails'
+`test "ERB::Util.html_escape should escape unsafe characters"`
+(`activesupport/test/core_ext/string_ext_test.rb:1086`) is
+`it("TSE::Util.html_escape should escape unsafe characters")` in
+`core-ext/string-ext.test.ts`. It still credits: `normalizeErb` in
+`scripts/test-compare/test-compare.ts` applies this table to both sides of the
+comparison, so the Ruby name and the TSE-spelled trails name normalize to the
+same key. `ERB` survives in trails only where the text quotes the Ruby side —
+a JSDoc `Mirrors:` line naming `ERB::Util`, a Rails path like
+`core_ext/erb/util.rb`, or fixtures-compare's statuses for Rails YAML that
+genuinely is ERB.
+
 ## File paths
 
 Ruby `foo_bar.rb` → `foo-bar.ts` (kebab-case), with these path-segment aliases

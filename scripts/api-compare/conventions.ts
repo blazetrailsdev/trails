@@ -16,6 +16,17 @@ import * as path from "path";
  * `verb` / `superb` / `Herb` are untouched — the token still has to start at
  * the identifier or just after an underscore.
  *
+ * There is no exception for test names. `test "ERB::Util.html_escape should
+ * escape unsafe characters"` (activesupport/test/core_ext/string_ext_test.rb:1086)
+ * is `it("TSE::Util.html_escape should escape unsafe characters")` in
+ * string-ext.test.ts. It still credits: `normalizeErb` in
+ * scripts/test-compare/test-compare.ts applies this table to both sides of the
+ * comparison, so the Ruby name and the TSE-spelled trails name normalize to
+ * the same key. `ERB` survives in trails only where the text quotes the Ruby
+ * side — a JSDoc `Mirrors:` line naming `ERB::Util`, a Rails path like
+ * `core_ext/erb/util.rb`, or fixtures-compare's statuses for Rails YAML that
+ * genuinely is ERB.
+ *
  * Applied to every identifier that flows through `snakeToCamel` —
  * currently Ruby method names (via `rubyMethodToTs`) and constant
  * fragments embedded in dot-notation method names like
@@ -1125,6 +1136,18 @@ trails:
 | Ruby token | trails token |
 | ---------- | ------------ |
 ${renameRows}
+
+Test names are not an exception. Rails'
+\`test "ERB::Util.html_escape should escape unsafe characters"\`
+(\`activesupport/test/core_ext/string_ext_test.rb:1086\`) is
+\`it("TSE::Util.html_escape should escape unsafe characters")\` in
+\`core-ext/string-ext.test.ts\`. It still credits: \`normalizeErb\` in
+\`scripts/test-compare/test-compare.ts\` applies this table to both sides of the
+comparison, so the Ruby name and the TSE-spelled trails name normalize to the
+same key. \`ERB\` survives in trails only where the text quotes the Ruby side —
+a JSDoc \`Mirrors:\` line naming \`ERB::Util\`, a Rails path like
+\`core_ext/erb/util.rb\`, or fixtures-compare's statuses for Rails YAML that
+genuinely is ERB.
 
 ## File paths
 

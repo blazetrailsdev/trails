@@ -238,7 +238,14 @@ tasks repo enumerates these as convergence classes.
 - **NEVER rename or reword test names.** Test names are how `test:compare`
   matches our tests to Rails tests. If a test fails or the behavior doesn't
   match the name, fix the implementation — not the name. Read the
-  corresponding Rails test first.
+  corresponding Rails test first. The one thing that does change is the token
+  renames in [docs/ruby-ts-conventions.md](docs/ruby-ts-conventions.md), which
+  apply to test names too — trails spells `tse`, never `erb`, everywhere,
+  including inside a `describe`/`it` string. Rails'
+  `test "ERB::Util.html_escape should escape unsafe characters"` is
+  `it("TSE::Util.html_escape should escape unsafe characters")`; `test:compare`
+  normalizes both sides, so the renamed name still credits. `ERB` survives only
+  where the text quotes the Ruby side (a `Mirrors:` JSDoc line, a Rails path).
 - **Canonical tables only — no bespoke tables.** In AR tests, get the canonical
   schema + fixtures through `fixtures({ ... })` (the endgame surface: one call
   wires the handler, transactional fixtures, and the canonical schema); never

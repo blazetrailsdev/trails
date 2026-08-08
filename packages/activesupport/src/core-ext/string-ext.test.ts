@@ -737,50 +737,50 @@ describe("OutputSafetyTest", () => {
     expect(typeof safe.toString()).toBe("string");
   });
 
-  it("ERB::Util.html_escape should escape unsafe characters", () => {
+  it("TSE::Util.html_escape should escape unsafe characters", () => {
     const result = htmlEscape('<script>alert("xss")</script>');
     expect(result.toString()).toBe("&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;");
   });
 
-  it("ERB::Util.html_escape should correctly handle invalid UTF-8 strings", () => {
+  it("TSE::Util.html_escape should correctly handle invalid UTF-8 strings", () => {
     const result = htmlEscape("hello\uFFFDworld");
     expect(result.toString()).toContain("hello");
     expect(result.toString()).toContain("world");
   });
 
-  it("ERB::Util.html_escape should not escape safe strings", () => {
+  it("TSE::Util.html_escape should not escape safe strings", () => {
     const safe = htmlSafe("<b>bold</b>");
     const result = htmlEscape(safe);
     expect(result.toString()).toBe("<b>bold</b>");
   });
 
-  it("ERB::Util.html_escape_once only escapes once", () => {
+  it("TSE::Util.html_escape_once only escapes once", () => {
     const result = htmlEscapeOnce("&lt;already escaped&gt;");
     expect(result.toString()).toBe("&lt;already escaped&gt;");
     const raw = htmlEscapeOnce("<raw>");
     expect(raw.toString()).toBe("&lt;raw&gt;");
   });
 
-  it("ERB::Util.html_escape_once should correctly handle invalid UTF-8 strings", () => {
+  it("TSE::Util.html_escape_once should correctly handle invalid UTF-8 strings", () => {
     const result = htmlEscapeOnce("hello\uFFFDworld");
     expect(result.toString()).toContain("hello");
     expect(result.toString()).toContain("world");
   });
 
-  it("ERB::Util.html_escape_once preserves numeric character references", () => {
+  it("TSE::Util.html_escape_once preserves numeric character references", () => {
     expect(htmlEscapeOnce("&#123;").toString()).toBe("&#123;");
     expect(htmlEscapeOnce("&#x1F4A9;").toString()).toBe("&#x1F4A9;");
     expect(htmlEscapeOnce("&#X27;").toString()).toBe("&#X27;");
     expect(htmlEscapeOnce("&#x03BB;").toString()).toBe("&#x03BB;");
   });
 
-  it("ERB::Util.html_escape_once escapes invalid entity-like sequences", () => {
+  it("TSE::Util.html_escape_once escapes invalid entity-like sequences", () => {
     expect(htmlEscapeOnce("&1;").toString()).toBe("&amp;1;");
     expect(htmlEscapeOnce("&#1dfa3;").toString()).toBe("&amp;#1dfa3;");
     expect(htmlEscapeOnce("& #123;").toString()).toBe("&amp; #123;");
   });
 
-  it("ERB::Util.xml_name_escape should escape unsafe characters for XML names", () => {
+  it("TSE::Util.xml_name_escape should escape unsafe characters for XML names", () => {
     const unsafeChar = ">";
     const safeChar = "\u00C1";
     const safeCharAfterStart = "3";

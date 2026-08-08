@@ -105,10 +105,10 @@ describe("CodeStatisticsCalculatorTest", () => {
     expect([calc.lines, calc.codeLines, calc.classes, calc.methods]).toEqual([8, 0, 0, 0]);
   });
 
-  it("skip ERB comments", () => {
+  it("skip TSE comments", () => {
     calc.addByString(
       "      <!-- This is an HTML comment -->\n      <%# This is a great comment! %>\n      <div>\n        <%= hello %>\n\n      </div>\n",
-      "erb",
+      "tse",
     );
     expect([calc.lines, calc.codeLines]).toEqual([6, 3]);
   });
