@@ -123,6 +123,20 @@ describe("CollectionAwaitableWriters", () => {
     expect(() => author.assignAttributes({ posts: [post] })).toThrow(/unknown attribute `posts`/);
   });
 
+  it("refuses the association key in place, leaving earlier keys assigned", async () => {
+    // Rails' `_assign_attributes` is a plain `each_pair`
+    // (activemodel/attribute_assignment.rb:60-64): the raise happens when the
+    // loop reaches the offending key, so every key before it is already
+    // assigned. The refusal this surface owes `posts` must keep that order.
+    const author = (await Author.create({ name: "Bill" })) as unknown as CollectionOwner;
+    const post = await Post.create({ title: "t", body: "b" });
+
+    expect(() => author.assignAttributes({ name: "Bob", posts: [post] })).toThrow(
+      /unknown attribute `posts`/,
+    );
+    expect((author as unknown as { name: string }).name).toBe("Bob");
+  });
+
   it("keeps in-memory assignment on construction", async () => {
     // Rails defers here too (`replace_records` without a save — the FK isn't
     // known yet), so the constructor's in-memory arm is faithful and autosave

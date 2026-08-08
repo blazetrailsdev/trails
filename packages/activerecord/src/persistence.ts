@@ -977,6 +977,13 @@ function associationWriter(
 }
 
 /**
+ * The send `_assignAttribute` deferred: an association writer resolved but not
+ * called, because only the driver knows whether the surface it runs on can
+ * await it. Yielded with its key so a driver that refuses it can name the key.
+ */
+type DeferredAssignment = () => Promise<void> | void;
+
+/**
  * Mirrors Rails' `_assign_attribute` (ActiveModel
  * attribute_assignment.rb:67-75): dispatch through the public setter when one
  * exists (store accessors write to the store hash, not a standalone attribute
@@ -995,7 +1002,11 @@ function associationWriter(
  * (has_one_association.rb:69) a write; that promise is returned rather than
  * dropped.
  */
-function _assignAttribute(self: AttributeIO, key: string, value: unknown): Promise<void> | void {
+function _assignAttribute(
+  self: AttributeIO,
+  key: string,
+  value: unknown,
+): Promise<void> | DeferredAssignment | void {
   const configs = (self as any).constructor?._nestedAttributeConfigs as
     | { associationName: string }[]
     | undefined;
@@ -1003,10 +1014,12 @@ function _assignAttribute(self: AttributeIO, key: string, value: unknown): Promi
     return (self as any)[`set${camelize(key, true)}`](value) as Promise<void> | void;
   }
   const writer = associationWriter(self, key);
-  if (writer) {
-    const result: unknown = writer(value);
-    return result instanceof Promise ? (result as Promise<void>) : undefined;
-  }
+  // Returned unsent. A JS property setter cannot await the I/O these writers do
+  // (collection_association.rb:46-48, :61-83; has_one_association.rb:59-84),
+  // which is why RFC 0087 §1 removed them, so `public_send(setter, v)`
+  // (attribute_assignment.rb:69) belongs to the driver that knows whether it can
+  // be awaited rather than to this shared body — which stays one behaviour.
+  if (writer) return () => writer(value) as Promise<void> | void;
   const setter = findPrototypeSetter(self, key);
   if (setter) {
     const result: unknown = setter.call(self, value);
@@ -1050,18 +1063,21 @@ export function assignAttributes(this: AttributeIO, attrs: Record<string, unknow
   // `isMassAssignmentEmpty` reads a wrapper's contents, not its own fields.
   if (isMassAssignmentEmpty(attrs)) return;
   const newAttributes = sanitizeForMassAssignment(attrs);
-  // The one place the synchronous surface parts company with the awaitable one,
-  // and it lives here rather than in the shared `_assign_attribute` port:
-  // RFC 0087 §1 left no `#{key}=` property setter for the association writers
-  // that do I/O at assignment (collection_association.rb:46-48, :61-83;
-  // has_one_association.rb:59-84), so on a surface that cannot await them
-  // `respond_to?(setter)` is genuinely false and the key falls through to
-  // `writeAttribute`, which raises for a name that is not an attribute. Sent
-  // ahead of the loop so the write is never started, only refused.
-  for (const [key, value] of Object.entries(newAttributes)) {
-    if (associationWriter(this, key)) this.writeAttribute(key, value);
-  }
-  for (const pending of _assignAttributes(this, newAttributes)) {
+  for (const [key, pending] of _assignAttributes(this, newAttributes)) {
+    if (typeof pending === "function") {
+      // The one place this surface parts company with the awaitable one, and it
+      // lives in this body rather than in the shared `_assign_attribute` port.
+      // RFC 0087 §1 left no `#{key}=` property setter for the association
+      // writers that do I/O at assignment, because a JS setter cannot await
+      // them, so here `respond_to?(setter)` (attribute_assignment.rb:70) is
+      // genuinely false and the key falls to `writeAttribute`, which raises for
+      // a name that is not an attribute. The deferred send is dropped unrun, so
+      // the write is refused rather than started — and refused in place, at the
+      // key Rails' `each_pair` (attribute_assignment.rb:8) is on, so every key
+      // before it is already assigned.
+      this.writeAttribute(key, newAttributes[key]);
+      continue;
+    }
     parkNestedReaderLoad(this as unknown as Base, pending);
   }
 }
@@ -1080,8 +1096,8 @@ export async function setAttributes(
 ): Promise<void> {
   assertHashAttributes(attrs);
   if (isMassAssignmentEmpty(attrs)) return;
-  for (const pending of _assignAttributes(this, sanitizeForMassAssignment(attrs))) {
-    await pending;
+  for (const [, pending] of _assignAttributes(this, sanitizeForMassAssignment(attrs))) {
+    await (typeof pending === "function" ? pending() : pending);
   }
 }
 
@@ -1104,9 +1120,10 @@ function isNestedParameterHash(value: unknown): boolean {
  * writer's `reject_if` / the built record's callbacks observe an owner whose
  * own attributes are already set. Nested runs before multiparameter (:21-22).
  *
- * Rails' body is a plain `each`; ours yields the promise a step answered so the
- * two entry points above can drive the same `each` — `assignAttributes` parking
- * each one, `setAttributes` awaiting it before the loop moves on. Written as a
+ * Rails' body is a plain `each`; ours yields what a step answered, keyed by the
+ * key it answered for, so the two entry points above can drive the same `each`
+ * — `assignAttributes` parking each promise and refusing each deferred send,
+ * `setAttributes` awaiting both before the loop moves on. Written as a
  * generator rather than duplicated per driver: the loop, its bucketing and its
  * exceptions stay one body, and they stay synchronous, so a bad multiparameter
  * key still raises out of `assignAttributes` where Rails raises out of
@@ -1119,7 +1136,7 @@ function isNestedParameterHash(value: unknown): boolean {
 function* _assignAttributes(
   self: AttributeIO,
   attrs: Record<string, unknown>,
-): Generator<Promise<void>, void, undefined> {
+): Generator<[string, Promise<void> | DeferredAssignment], void, undefined> {
   let multiParameterAttributes: Record<string, unknown> | null = null;
   let nestedParameterAttributes: Record<string, unknown> | null = null;
 
@@ -1130,7 +1147,7 @@ function* _assignAttributes(
       (nestedParameterAttributes ??= {})[key] = value;
     } else {
       const pending = _assignAttribute(self, key, value);
-      if (pending) yield pending;
+      if (pending) yield [key, pending];
     }
   }
 
@@ -1151,10 +1168,10 @@ function* _assignAttributes(
 function* assignNestedParameterAttributes(
   self: AttributeIO,
   pairs: Record<string, unknown>,
-): Generator<Promise<void>, void, undefined> {
+): Generator<[string, Promise<void> | DeferredAssignment], void, undefined> {
   for (const [k, v] of Object.entries(pairs)) {
     const pending = _assignAttribute(self, k, v);
-    if (pending) yield pending;
+    if (pending) yield [k, pending];
   }
 }
 
