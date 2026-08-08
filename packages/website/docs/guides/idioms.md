@@ -241,19 +241,19 @@ surfaces when you need runtime-typed access for generic code.
 | `post[:title]`         | `post.readAttribute("title")`         |
 | `post[:title] = "new"` | `post.writeAttribute("title", "new")` |
 
-## Ranges are plain objects
+## Ranges are a class
 
-Ruby `Range` (`1..10`, `1...10`) has no JS equivalent. Use
-`makeRange` from `@blazetrails/activesupport`.
+Ruby `Range` (`1..10`, `1...10`) has no JS equivalent. Use the `Range`
+class from `@blazetrails/activesupport`.
 
 ```ts
-import { makeRange } from "@blazetrails/activesupport";
+import { Range } from "@blazetrails/activesupport";
 
 // Rails:  Post.where(views: 100..1000)
-Post.where({ views: makeRange(100, 1000) });
+Post.where({ views: new Range(100, 1000) });
 
 // Rails:  Post.where(views: 100...1000)   # exclusive end
-Post.where({ views: makeRange(100, 1000, true) });
+Post.where({ views: new Range(100, 1000, true) });
 ```
 
 ## Per-async-flow state instead of thread locals

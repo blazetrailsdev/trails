@@ -242,13 +242,13 @@ but:
   `post.isDraft()` and `post.draft()` (setter without persist) stay
   synchronous.
 
-## 8. Ranges: plain object
+## 8. Ranges: a `Range` class
 
-Ruby's `Range` (`1..10`, `1...10`, `Date.new(..)..Date.new(..)`) has
-no JS equivalent, so ActiveSupport exposes a plain typed object
-`{ begin, end, excludeEnd }` and helper functions. `where({ age:
-makeRange(18, 65) })` lowers to the right SQL via Arel. Rails passes
-real `Range` instances; we pass this struct.
+Ruby's `Range` (`1..10`, `1...10`, `Date.new(..)..Date.new(..)`) is a
+core class with no JS equivalent, so ActiveSupport ports it as a
+`Range` class carrying `begin`, `end` and `excludeEnd`, which Rails'
+`core_ext/range/*` reopenings extend. `where({ age: new Range(18, 65)
+})` lowers to the right SQL via Arel.
 
 See `packages/activesupport/src/range-ext.ts`.
 

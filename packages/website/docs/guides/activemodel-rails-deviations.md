@@ -118,9 +118,9 @@ The cross-package conventions — [method casing](./index.md#method-casing),
 
 - **`try :foo` → `?.`.** TypeScript's optional chaining replaces Ruby's
   safe-navigation helper.
-- **Range.** Ruby's `Range` becomes a plain `{ begin, end, excludeEnd }`
-  object from `@blazetrails/activesupport`. Relevant to validators like
-  `numericality: { within: makeRange(0, 100) }`.
+- **Range.** Ruby's core `Range` is ported as the `Range` class from
+  `@blazetrails/activesupport`. Relevant to validators like
+  `numericality: { within: new Range(0, 100) }`.
 
 ## Summary
 
