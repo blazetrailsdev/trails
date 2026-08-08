@@ -738,6 +738,7 @@ class MockAdapter {
   supportsIndexSortOrder = async () => true;
   supportsExclusionConstraints = () => false;
   supportsUniqueConstraints = () => false;
+  useForeignKeys = () => true;
   createTableDefinition = (n: string, opts: Record<string, unknown>) =>
     // Rails' create_table_definition passes `self` (schema_statements.rb:1041).
     new TableDefinition(n, { adapter: this as never, ...opts, adapterName: "sqlite" });

@@ -171,7 +171,7 @@ describe("SchemaStatements#addForeignKey use_foreign_keys? guard", () => {
       }),
     } as unknown as DatabaseAdapter;
     const ss = withSchemaStatements(adapter);
-    expect(ss.isUseForeignKeys()).toBe(false);
+    expect(ss.useForeignKeys()).toBe(false);
     await ss.addForeignKey("articles", "authors", { column: "author_id" });
     expect(executed).toEqual([]);
   });

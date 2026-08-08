@@ -53,7 +53,6 @@ type MysqlTableDef = TableDefinition & { charset?: string; collation?: string };
  * half is required and dispatches polymorphically. */
 export interface VisitorHostAdapter extends TableDefinitionConn, SchemaCreationConn {
   supportsCheckConstraints(): Promise<boolean>;
-  supportsForeignKeys(): boolean;
   supportsIndexesInCreate(): boolean;
   /** Version-gated: MariaDB ≥ 10.8.1 / MySQL ≥ 8.0.1 — fetches the server
    * version on demand, so it is awaitable. */
@@ -189,18 +188,6 @@ export class SchemaCreation extends AbstractSchemaCreation {
   /** @internal Delegates to the adapter when wired (Rails: `@conn.supports_indexes_in_create?`). */
   protected supportsIndexesInCreate(): boolean {
     return this.adapter.supportsIndexesInCreate();
-  }
-
-  /** @internal Mirrors Rails' `use_foreign_keys?` (`supports_foreign_keys? &&
-   * foreign_keys_enabled?`). The enabled half reads `adapter._config.foreignKeys`, matching
-   * `SchemaStatements#isForeignKeysEnabled`. */
-  protected useForeignKeys(): boolean {
-    const supports = this.adapter.supportsForeignKeys();
-    // `_config` is protected on the real adapter, so read it via a narrow cast
-    // (mirrors `SchemaStatements#isForeignKeysEnabled`).
-    const host = this.adapter as { _config?: { foreignKeys?: boolean } };
-    const enabled = host._config?.foreignKeys !== false;
-    return supports && enabled;
   }
 
   /** @internal Delegates to the adapter; honors MySQL 8.0.16+ / MariaDB 10.2.1+ version gating. */

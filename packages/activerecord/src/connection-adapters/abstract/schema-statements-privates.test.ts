@@ -55,6 +55,7 @@ function makeStatements(
   adapter["supportsIndexSortOrder"] ??= async () => true;
   adapter["supportsExclusionConstraints"] ??= () => false;
   adapter["supportsUniqueConstraints"] ??= () => false;
+  adapter["useForeignKeys"] ??= () => true;
   // Real hosts override AbstractAdapter#native_database_types (the abstract one
   // is `{}`); the stub answers with SQLite's table so typeToSql resolves.
   adapter["nativeDatabaseTypes"] ??= () => NATIVE_DATABASE_TYPES_BY_ADAPTER["sqlite"];

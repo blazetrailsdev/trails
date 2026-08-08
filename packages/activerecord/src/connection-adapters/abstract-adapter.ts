@@ -427,7 +427,7 @@ export interface AbstractAdapter {
     toTable: string,
     options?: Record<string, unknown>,
   ): Record<string, unknown>;
-  isUseForeignKeys(): boolean;
+  useForeignKeys(): boolean;
   removeForeignKey(
     fromTable: string,
     toTableOrOptions?: string | RemoveForeignKeyOptions,

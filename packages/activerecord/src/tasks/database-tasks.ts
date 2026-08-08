@@ -814,32 +814,40 @@ export class DatabaseTasks {
     }
   }
 
+  /**
+   * Mirrors: `structure_dump` (`tasks/database_tasks.rb:362-367`). What is left
+   * in Ruby's `*arguments` once `filename` is shifted off is the `root`
+   * forwarded to the task constructor by `database_adapter_for`
+   * (`sqlite_rake_test.rb:182` passes `"/rails/root"` there); the flags come
+   * only from `structure_dump_flags_for`, never from the caller.
+   */
   static async structureDump(
     configuration: DatabaseConfig | string | Record<string, unknown>,
     filename: string,
-    extraFlags?: string | string[] | null,
+    root?: string,
   ): Promise<void> {
     const config = this.resolveConfiguration(configuration);
-    const flags = extraFlags ?? this.structureDumpFlagsFor(config.adapter);
+    const flags = this.structureDumpFlagsFor(config.adapter);
     const handler = this.databaseAdapterFor(config);
     if (!handler.structureDump) {
       throw new Error(`Adapter '${config.adapter}' does not support structureDump`);
     }
-    await handler.structureDump(config, filename, flags);
+    await handler.structureDump(config, filename, flags, root);
   }
 
+  /** Mirrors: `structure_load` (`tasks/database_tasks.rb:369-374`). See {@link structureDump}. */
   static async structureLoad(
     configuration: DatabaseConfig | string | Record<string, unknown>,
     filename: string,
-    extraFlags?: string | string[] | null,
+    root?: string,
   ): Promise<void> {
     const config = this.resolveConfiguration(configuration);
-    const flags = extraFlags ?? this.structureLoadFlagsFor(config.adapter);
+    const flags = this.structureLoadFlagsFor(config.adapter);
     const handler = this.databaseAdapterFor(config);
     if (!handler.structureLoad) {
       throw new Error(`Adapter '${config.adapter}' does not support structureLoad`);
     }
-    await handler.structureLoad(config, filename, flags);
+    await handler.structureLoad(config, filename, flags, root);
   }
 
   /**
@@ -1547,15 +1555,23 @@ export interface DatabaseTaskHandler {
   truncateAll?(config: DatabaseConfig): Promise<void>;
   charset?(config: DatabaseConfig): Promise<string | null>;
   collation?(config: DatabaseConfig): Promise<string | null>;
+  /**
+   * `flags` is what `structure_dump_flags_for` computed and `root` is Ruby's
+   * leftover `*arguments`, which `database_adapter_for` forwards to the task
+   * constructor (`database_tasks.rb:566-572`). trails registers task
+   * singletons, so both reach the handler on the one call it gets.
+   */
   structureDump?(
     config: DatabaseConfig,
     filename: string,
-    extraFlags?: string | string[] | null,
+    flags?: string | string[] | null,
+    root?: string,
   ): Promise<void>;
   structureLoad?(
     config: DatabaseConfig,
     filename: string,
-    extraFlags?: string | string[] | null,
+    flags?: string | string[] | null,
+    root?: string,
   ): Promise<void>;
 }
 

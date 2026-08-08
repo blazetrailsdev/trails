@@ -1117,7 +1117,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     // Rails PG `add_foreign_key` is `assert_valid_deferrable(deferrable); super`,
     // and the abstract `super` begins with `return unless use_foreign_keys?`.
     // We replicate the abstract body inline here, so replicate the guard too.
-    if (!this.isUseForeignKeys()) return;
+    if (!this.useForeignKeys()) return;
     if (options.ifNotExists === true) {
       // foreignKeyExists routes through foreignKeyFor/isDefinedFor, which
       // compares `column` element-wise, so composite (array) columns match by
