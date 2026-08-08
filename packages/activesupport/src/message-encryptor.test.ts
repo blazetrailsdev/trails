@@ -203,18 +203,10 @@ describe("MessageEncryptorTest", () => {
     assertAeadNotDecrypted(encryptor, [text, iv, authTag.slice(0, -1)].join("--"));
   });
 
-  // The historic payload is Marshal-serialized — story:
-  // message-encryptor-marshal-payload-backwards-compatibility.
+  // The historic ciphertext decrypts to the Ruby Marshal bytes
+  // `\x04\x08I"\x12Ruby on Rails\x06:\x06ET` — an ivar-wrapped Ruby String.
   it.skip("backwards compatibility decrypt previously encrypted messages without metadata", () => {
-    const secret = Buffer.from(
-      "b7f0bc57b11860abf08110a424f434eca1dcc1dd44afa9b814cd189a99208029",
-      "hex",
-    );
-    const encryptor = new MessageEncryptor(secret, { cipher: "aes-256-gcm" });
-    const encryptedMessage =
-      "9cVnFs2O3lL9SPvIJuxBOLS51nDiBMw=--YNI5HAfHEmZ7VDpl--ddFJ6tXA0iH+XGcCgMINYQ==";
-
-    expect(encryptor.decryptAndVerify(encryptedMessage)).toEqual("Ruby on Rails");
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — marshal
   });
 
   // No Ruby `#inspect` analogue — same open decision as

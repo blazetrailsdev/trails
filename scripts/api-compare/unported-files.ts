@@ -902,6 +902,22 @@ export const UNPORTED_FILES: UnportedFile[] = [
       "rather than exact bytes.",
   },
 
+  // --- activesupport: legacy Ruby-Marshal ciphertext ---
+  {
+    testFile: "message_encryptor_test.rb",
+    tests: ["backwards compatibility decrypt previously encrypted messages without metadata"],
+    reason:
+      "Decrypts a ciphertext minted before message metadata existed " +
+      "(message_encryptor_test.rb:147-154). The plaintext is the Ruby Marshal " +
+      'payload `\\x04\\x08I"\\x12Ruby on Rails\\x06:\\x06ET` — an ivar-wrapped ' +
+      "Ruby String — so passing it requires a real Ruby Marshal wire reader. " +
+      "trails has no Ruby Marshal runtime: the `:marshal` serializer in " +
+      "messages/serializer-with-fallback.ts is a trails-native codec behind " +
+      "Rails' `\\x04\\x08` signature, matching the project-wide Marshal " +
+      "exclusion above (marshalling.rb / marshal_serialization_test.rb). " +
+      "Ruby-only wire format.",
+  },
+
   // === TC100 Phase 0 Story H-3: residual JS-runtime-impossible skips ===
   // These are live `it.skip` in otherwise-portable AR test files whose
   // underlying behavior cannot exist in a single-threaded JS runtime:
