@@ -9,6 +9,7 @@ import { DatabaseTasks } from "./database-tasks.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { DatabaseAlreadyExists, NoDatabaseError } from "../errors.js";
 import { SchemaDumper } from "../schema-dumper.js";
+import { Base } from "../base.js";
 
 function tmpDbPath(): string {
   return path.join(os.tmpdir(), `trails-sqlite-test-${process.pid}-${randomUUID()}.sqlite3`);
@@ -342,5 +343,99 @@ describe("SQLiteDatabaseTasks in-memory URI variants", () => {
     });
     await expect(new SQLiteDatabaseTasks(config).drop()).resolves.toBeUndefined();
     expect(unlinkSpy).not.toHaveBeenCalled();
+  });
+});
+
+// trails-only: an in-memory database has no file for a child `sqlite3` to
+// attach, so structureDump/structureLoad take the named non-CLI fallback
+// (`inMemoryStructureDump` / `inMemoryStructureLoad`). Rails has no in-memory
+// lane and so no counterpart test.
+describe("SQLiteDatabaseTasks in-memory structure dump/load", () => {
+  const created: string[] = [];
+  const configuration = new HashConfig("development", "primary", {
+    adapter: "sqlite3",
+    database: ":memory:",
+  });
+
+  // `removeConnection` hands back the config it removed, which is how the
+  // file-scoped pool is put back afterwards — the suite guard in
+  // `cases/helper.ts:174-183` fails any file that leaves a writing pool behind.
+  let previous: ReturnType<typeof Base.removeConnection>;
+
+  beforeEach(async () => {
+    previous = Base.removeConnection();
+    await Base.establishConnection({ adapter: "sqlite3", database: ":memory:" });
+  });
+
+  afterEach(async () => {
+    SchemaDumper.ignoreTables = [];
+    try {
+      await Base.connectionPool().disconnectBang();
+    } catch {
+      // best effort
+    }
+    Base.removeConnection();
+    if (previous) await Base.establishConnection(previous.configuration);
+    for (const file of created) {
+      try {
+        fs.unlinkSync(file);
+      } catch {
+        // ignore
+      }
+    }
+    created.length = 0;
+  });
+
+  const dumpPath = () => {
+    const file = path.join(os.tmpdir(), `trails-mem-dump-${randomUUID()}.sql`);
+    created.push(file);
+    return file;
+  };
+
+  it("honors ignoreTables", async () => {
+    const conn = await Base.connectionPool().leaseConnection();
+    for (const table of ["bar", "prefix_foo", "prefix_bar"]) {
+      await conn.executeMutation(`CREATE TABLE ${table}(id INTEGER)`);
+    }
+    SchemaDumper.ignoreTables = [/^prefix_/g];
+
+    const filename = dumpPath();
+    await new SQLiteDatabaseTasks(configuration).structureDump(filename);
+
+    const contents = fs.readFileSync(filename, "utf8");
+    expect(contents).toMatch(/CREATE TABLE bar/);
+    expect(contents).not.toMatch(/prefix_foo/);
+    expect(contents).not.toMatch(/prefix_bar/);
+  });
+
+  it("round-trips a trigger body through structureLoad", async () => {
+    const conn = await Base.connectionPool().leaseConnection();
+    await conn.executeMutation(
+      "CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT, updated_at TEXT)",
+    );
+    await conn.executeMutation("CREATE INDEX index_widgets_on_name ON widgets(name)");
+    await conn.executeMutation(
+      "CREATE TRIGGER touch_widgets AFTER UPDATE ON widgets " +
+        "BEGIN " +
+        "UPDATE widgets SET updated_at = datetime('now') WHERE id = NEW.id; " +
+        "END",
+    );
+
+    const filename = dumpPath();
+    await new SQLiteDatabaseTasks(configuration).structureDump(filename);
+    expect(fs.readFileSync(filename, "utf8")).toMatch(/CREATE TRIGGER touch_widgets/);
+
+    // A fresh in-memory database is a different database; load the dump back
+    // into it and the trigger body must have survived intact.
+    await Base.connectionPool().disconnectBang();
+    await Base.establishConnection({ adapter: "sqlite3", database: ":memory:" });
+    await new SQLiteDatabaseTasks(configuration).structureLoad(filename);
+
+    const reloaded = await Base.connectionPool().leaseConnection();
+    const trigger = (await reloaded.execute(
+      "SELECT sql FROM sqlite_master WHERE type='trigger' AND name='touch_widgets'",
+    )) as Array<{ sql: string }>;
+    expect(trigger).toHaveLength(1);
+    expect(trigger[0].sql).toMatch(/UPDATE widgets SET updated_at/);
   });
 });
