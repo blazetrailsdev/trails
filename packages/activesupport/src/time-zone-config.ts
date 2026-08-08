@@ -16,8 +16,7 @@ import { instantFrom } from "./temporal.js";
 // async request handling. For server contexts with overlapping requests,
 // consider using AsyncLocalStorage or passing the zone explicitly.
 let _zoneDefault: TimeZone | null = null;
-// undefined = IsolatedExecutionState has no :time_zone key; null/false are the
-// values Rails stores verbatim when find_zone! resolves to them.
+// undefined = IsolatedExecutionState has no :time_zone key.
 let _zone: TimeZone | null | false | undefined = undefined;
 
 /**
