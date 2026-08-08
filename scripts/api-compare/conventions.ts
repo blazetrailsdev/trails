@@ -182,6 +182,14 @@ export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
   // `to_query` is defined on Object, Array and Hash by this one file; trails
   // carries all three arms on the hash helpers.
   "activesupport:core_ext/object/to_query.rb": "hash-utils.ts",
+  // `json.rb` reopens ~25 classes to define `as_json` on each, but `Object`,
+  // `Time`, `Hash` and friends are all first opened by another core_ext file,
+  // so their `as_json` buckets there and is measured against a TS counterpart
+  // that has none. `Object#as_json`'s landed on `index.ts` — the barrel the
+  // misplaced-file cluster picks for `object/acts_like.rb` — where it paired
+  // with `TimeWithZone#asJson`. The entry gives json.rb its own bucket, so
+  // every arm is measured against the file trails actually ports them to.
+  "activesupport:core_ext/object/json.rb": "core-ext/object/json.ts",
   "activesupport:core_ext/string/filters.rb": "string-utils.ts",
   "activesupport:core_ext/string/access.rb": "string-utils.ts",
   "activesupport:core_ext/string/indent.rb": "string-utils.ts",
