@@ -1,0 +1,9 @@
+[
+  {
+    "package": "activesupport",
+    "tsFile": "index.ts",
+    "rubyName": "as_json",
+    "call": "instance_values",
+    "reason": "Comparator mis-resolution, not a body gap: Ruby `Object#as_json` pairs by bare short name with `TimeWithZone#asJson` (time-with-zone.ts), while the real port — `Object.asJson` in core-ext/object/json.ts — does call `instanceValues`. The flag surfaced only because `instance_values` became a ported method; tracked by `object-as-json-pairs-with-time-with-zone-as-json`."
+  }
+]
