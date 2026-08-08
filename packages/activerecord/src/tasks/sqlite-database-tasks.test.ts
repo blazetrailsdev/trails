@@ -168,9 +168,7 @@ describe("SQLiteDatabaseTasks", () => {
   });
 });
 
-// `sqlite_rake_test.rb:166-231` (SqliteStructureDumpTest) and `:245-262`
-// (SqliteStructureLoadTest). Rails seeds the fixture database with backticked
-// `sqlite3` calls; here that is the same CLI the tasks themselves shell out to.
+// sqlite_rake_test.rb:166-231, :245-262
 describe("SqliteStructureDumpTest", () => {
   const created: string[] = [];
   let database: string;
