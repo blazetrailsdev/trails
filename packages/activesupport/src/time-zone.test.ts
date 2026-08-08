@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { TimeZone } from "./values/time-zone.js";
+import { TimeZone, InvalidTimezoneIdentifier } from "./values/time-zone.js";
 import { Duration } from "./duration.js";
 import { TimeWithZone } from "./time-with-zone.js";
 import { instantFromDate } from "./testing/temporal-helpers.js";
@@ -712,7 +712,9 @@ describe("TimeZoneTest", () => {
   });
 
   it("unknown zone raises exception", () => {
-    expect(() => TimeZone.create("Not/A/Real/Zone")).toThrow();
+    // Rails asserts the class: `assert_raise TZInfo::InvalidTimezoneIdentifier`
+    // (time_zone_test.rb:831-835).
+    expect(() => TimeZone.create("bogus")).toThrow(InvalidTimezoneIdentifier);
   });
 
   it("unknown zones dont store mapping keys", () => {

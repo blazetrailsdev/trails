@@ -235,12 +235,6 @@ export const UNPORTED_FILES: UnportedFile[] = [
       "Rake and PTY shell-out have no Node.js equivalent.",
   },
   {
-    testFile: "adapters/sqlite3/sqlite_rake_test.rb",
-    reason:
-      "Tests Rake db:create/drop/migrate tasks for SQLite via shell exec. " +
-      "Rake and PTY shell-out have no Node.js equivalent.",
-  },
-  {
     testFile: "adapters/postgresql/dbconsole_test.rb",
     reason:
       "Tests `rails dbconsole` PTY/exec invocation for PostgreSQL. " +

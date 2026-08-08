@@ -16,10 +16,6 @@ export function isPresent(value: unknown): boolean {
   return !isBlank(value);
 }
 
-export function presence<T>(value: T): T | undefined {
-  return isPresent(value) ? value : undefined;
-}
-
 export function squish(str: string): string {
   return str.trim().replace(/\s+/g, " ");
 }
