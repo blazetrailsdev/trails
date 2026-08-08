@@ -3,7 +3,7 @@ import { describe, it, expect } from "vitest";
 import { Base, registerModel, registerSubclass } from "../index.js";
 import { Associations } from "../associations.js";
 import { loadSingularTarget } from "../test-helpers/load-singular-target.js";
-import { findTarget } from "./has-many-association.js";
+import { findCollectionTarget as findTarget } from "../test-helpers/find-collection-target.js";
 import { AssociationScope, ReflectionProxy } from "./association-scope.js";
 import { fixtures } from "../test-fixtures.js";
 import { Author } from "../test-helpers/models/author.js";
@@ -494,7 +494,8 @@ describe("AssociationScope", () => {
     // (When the CPK includes "id", it collapses to "id" matching Rails'
     // join_id_for; only the no-id case is unrepresentable.)
     const { CompositePrimaryKeyMismatchError } = await import("../index.js");
-    const { findTarget } = await import("./has-many-association.js");
+    const { findCollectionTarget: findTarget } =
+      await import("../test-helpers/find-collection-target.js");
     class CpkAsOwner extends Base {
       declare a: number | null;
       declare b: number | null;

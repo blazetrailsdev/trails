@@ -14,9 +14,9 @@
  * canonical `Author has_many :posts has_many :comments` fixtures instead of
  * synthetic `cache_*` tables.
  */
+import { findCollectionTarget as findHasManyTarget } from "../test-helpers/find-collection-target.js";
 import { describe, it, expect, beforeAll, afterEach, vi } from "vitest";
 import { registerModel, registerSubclass } from "../index.js";
-import { findTarget as findHasManyTarget } from "./has-many-association.js";
 import { AssociationScope } from "./association-scope.js";
 import { StatementCache } from "../statement-cache.js";
 import { fixtures } from "../test-fixtures.js";

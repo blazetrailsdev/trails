@@ -42,6 +42,15 @@ import { camelize, singularize, underscore } from "@blazetrails/activesupport";
  * Mirrors: ActiveRecord::Associations::HasManyAssociation
  */
 export class HasManyAssociation extends CollectionAssociation {
+  /**
+   * Set on an ad-hoc holder built by a CollectionProxy whose own Relation state
+   * has diverged from the seed (whereBang / orderBang / ...): `findTarget` then
+   * runs that mutated Relation instead of rebuilding the association scope.
+   * Rails has no counterpart because its CollectionProxy *is* the relation.
+   * @internal
+   */
+  _queryExecutor?: () => Promise<Base[]>;
+
   constructor(owner: Base, definition: AssociationDefinition) {
     super(owner, definition);
   }
@@ -154,8 +163,9 @@ export class HasManyAssociation extends CollectionAssociation {
    * Mirrors: ActiveRecord::Associations::Association#find_target
    * (association.rb:248) as reached through `CollectionAssociation#load_target`
    * (collection_association.rb:272). This is the association-instance entry
-   * point; it wraps the functional loader below, which the CollectionProxy and
-   * the through-association loaders reach without an association instance.
+   * point; it wraps the module-private loader below, which the CollectionProxy
+   * and the through-association loaders reach through an ad-hoc holder built by
+   * `_buildAssociationInstance`.
    */
   protected override async findTarget(): Promise<Base[]> {
     // Every caller assigns the returned records into this holder itself, so the
@@ -168,7 +178,7 @@ export class HasManyAssociation extends CollectionAssociation {
         this.owner,
         this.reflection.name,
         this.reflection.options,
-        undefined,
+        this._queryExecutor,
         this._skipStrictLoading,
       );
     } finally {
@@ -500,8 +510,9 @@ export function setIntersection(a: Base[], b: Base[]): Base[] {
  * Rails-shaped entry point (`ActiveRecord::Associations::Association#find_target`,
  * association.rb:248). It takes the owner/name/options triple rather than an
  * association instance because the CollectionProxy load path and the
- * through-association loaders reach the loader without one; that triple shape
- * is a trails-only calling convention, not Rails surface.
+ * through-association loaders build an *ad-hoc* holder for a name/options pair
+ * the model never declared that way; that triple shape is a trails-only
+ * calling convention, not Rails surface, and it is module-private.
  *
  * `skipStrictLoading` carries the association's `@skip_strict_loading`
  * (association.rb) into this loader, since the strict-loading check Rails runs
@@ -509,7 +520,7 @@ export function setIntersection(a: Base[], b: Base[]): Base[] {
  *
  * @internal
  */
-export async function findTarget(
+async function findTarget(
   record: Base,
   assocName: string,
   options: AssociationOptions,
@@ -577,8 +588,13 @@ export async function findTarget(
     // which the SQL JOIN cannot see — `_routeThroughViaAssociationScope` keeps
     // those on the 2-step loader.
     if (!_routeThroughViaAssociationScope(record, reflEarly, options)) {
-      const { findTarget: findThroughTarget } = await import("./has-many-through-association.js");
-      return findThroughTarget(record, assocName, options);
+      const { _buildAssociationInstance } = await import("./instance-methods.js");
+      const through = _buildAssociationInstance.call(record, {
+        name: assocName,
+        type: "hasMany",
+        options,
+      }) as unknown as { loadHasManyThrough(): Promise<Base[]> };
+      return through.loadHasManyThrough();
     }
     // Fall through into the AssociationScope path below.
   }

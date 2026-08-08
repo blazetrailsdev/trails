@@ -20,7 +20,17 @@ import {
   type AssociationDefinition as AssocDef,
 } from "../associations.js";
 
-function buildAssociationInstance(this: Base, assocDef: AssocDef): AssociationInstance {
+/**
+ * Build the macro-specific Association for a definition, *without* caching it
+ * on the record. `association(name)` caches what it builds; the loaders that
+ * hold an ad-hoc definition (a through step carrying a synthesised `scope`, a
+ * through record standing in for the owner) build an uncached holder here
+ * instead, so loadedness, `_loaderWritebackSuppressed` and inverse wiring on
+ * the owner's real holder for that name are left alone.
+ *
+ * @internal
+ */
+export function _buildAssociationInstance(this: Base, assocDef: AssocDef): AssociationInstance {
   const opts = (assocDef.options ?? {}) as Record<string, unknown>;
   switch (assocDef.type) {
     case "belongsTo":
@@ -145,7 +155,7 @@ export function association(this: Base, name: string): AssociationInstance {
     throw _associationNotFound(this, name);
   }
 
-  const instance = buildAssociationInstance.call(this, assocDef);
+  const instance = _buildAssociationInstance.call(this, assocDef);
   this._associationInstances.set(name, instance);
   syncAssociationInstance.call(this, name, instance);
   return instance;

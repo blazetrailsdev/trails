@@ -332,9 +332,9 @@ export class SingularAssociation extends Association {
           return _loadSingularThroughViaDisableJoinsScope(owner, reflection, options);
         }
         if (!_routeThroughViaAssociationScope(owner, reflection, options)) {
-          const { findTarget: findThroughTarget } =
-            await import("./has-one-through-association.js");
-          return findThroughTarget(owner, assocName, options);
+          return (
+            this as unknown as { loadHasOneThrough(): Promise<Base | null> }
+          ).loadHasOneThrough();
         }
         // Otherwise fall through to the scope path below.
       }

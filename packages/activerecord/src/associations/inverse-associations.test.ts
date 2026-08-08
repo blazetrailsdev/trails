@@ -1,6 +1,7 @@
 /**
  * Mirrors Rails activerecord/test/cases/associations/inverse_associations_test.rb
  */
+import { findCollectionTarget as findHasManyTarget } from "../test-helpers/find-collection-target.js";
 import { describe, it, expect, beforeAll } from "vitest";
 import { loadSingularTarget } from "../test-helpers/load-singular-target.js";
 import {
@@ -12,7 +13,6 @@ import {
   InverseOfAssociationRecursiveError,
   RecordNotFound,
 } from "../index.js";
-import { findTarget as findHasManyTarget } from "./has-many-association.js";
 import { fixtures } from "../test-fixtures.js";
 import { Branch, BrokenBranch } from "../test-helpers/models/branch.js";
 import { Human } from "../test-helpers/models/human.js";

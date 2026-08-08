@@ -343,19 +343,17 @@ export class TimeZone {
 
   /**
    * Every Rails-named timezone: `@zones ||= zones_map.values.sort`
-   * (time_zone.rb:223-225), sorted by `<=>` — utc_offset, then name
-   * (time_zone.rb:333-337). `zones_map` keeps a MAPPING entry only when `[]`
-   * resolves it (`zones[name] = timezone if timezone`, time_zone.rb:288-291),
-   * hence the nullish filter.
+   * (time_zone.rb:223-225), sorted by `<=>` (time_zone.rb:333-337).
+   * `zones_map` keeps a MAPPING entry only when `[]` resolves it
+   * (`zones[name] = timezone if timezone`, time_zone.rb:288-291), hence the
+   * nullish filter.
    */
   static all(): TimeZone[] {
     if (zones) return zones;
     zones = Object.keys(MAPPING)
       .map((name) => TimeZone.find(name))
       .filter((zone): zone is TimeZone => zone != null)
-      .sort(
-        (a, b) => a.utcOffset - b.utcOffset || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0),
-      );
+      .sort((a, b) => a.compareTo(b) ?? 0);
     return zones;
   }
 
@@ -734,6 +732,22 @@ export class TimeZone {
     const h = String(Math.floor(abs / 3600)).padStart(2, "0");
     const m = String(Math.floor((abs % 3600) / 60)).padStart(2, "0");
     return colon ? `${sign}${h}:${m}` : `${sign}${h}${m}`;
+  }
+
+  /**
+   * Compare this time zone to the parameter. The two are compared first on
+   * their offsets, and then by name (time_zone.rb:333-337). Returns
+   * `undefined` — Ruby's bare `return` — when the argument does not respond
+   * to `utc_offset`.
+   */
+  compareTo(zone: unknown): number | undefined {
+    if (typeof (zone as { utcOffset?: unknown } | null | undefined)?.utcOffset !== "number") {
+      return undefined;
+    }
+    const other = zone as TimeZone;
+    let result = this.utcOffset < other.utcOffset ? -1 : this.utcOffset > other.utcOffset ? 1 : 0;
+    if (result === 0) result = this.name < other.name ? -1 : this.name > other.name ? 1 : 0;
+    return result;
   }
 
   /**

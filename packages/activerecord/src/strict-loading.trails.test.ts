@@ -7,10 +7,10 @@
  * strict-loading.test.ts (which mirrors strict_loading_test.rb) so the
  * convention file tracks Rails 1:1.
  */
+import { findCollectionTarget as findHasManyTarget } from "./test-helpers/find-collection-target.js";
 import { describe, it, expect } from "vitest";
 import { loadSingularTarget } from "./test-helpers/load-singular-target.js";
 import { StrictLoadingViolationError, registerModel } from "./index.js";
-import { findTarget as findHasManyTarget } from "./associations/has-many-association.js";
 import { fixtures } from "./test-fixtures.js";
 import { Developer, AuditLog } from "./test-helpers/models/developer.js";
 import { Ship } from "./test-helpers/models/ship.js";

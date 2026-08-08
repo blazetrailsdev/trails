@@ -5,6 +5,7 @@
  * AssociationProxyTest, PreloaderTest, OverridingAssociationsTest,
  * GeneratedMethodsTest, and WithAnnotationsTest.
  */
+import { findCollectionTarget as findHasManyTarget } from "./test-helpers/find-collection-target.js";
 import { describe, it, expect, afterEach, beforeAll, beforeEach, vi } from "vitest";
 import { Base, association, reflectOnAssociation, registerModel, NameError, pp } from "./index.js";
 import { ArgumentError } from "@blazetrails/activemodel";
@@ -33,10 +34,7 @@ import { Member } from "./test-helpers/models/member.js";
 import { Membership } from "./test-helpers/models/membership.js";
 import { Human } from "./test-helpers/models/human.js";
 import { Interest } from "./test-helpers/models/interest.js";
-import {
-  findTarget as findHasManyTarget,
-  scope as hasManyScope,
-} from "./associations/has-many-association.js";
+import { scope as hasManyScope } from "./associations/has-many-association.js";
 import "./test-helpers/models/ship.js";
 import "./test-helpers/models/bird.js";
 import "./test-helpers/models/treasure.js";
