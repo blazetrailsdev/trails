@@ -175,6 +175,52 @@ const zoneCache = new Map<string, TimeZone>();
 let zones: TimeZone[] | null = null;
 
 /**
+ * Stands in for `TZInfo::InvalidTimezoneIdentifier` (`tzinfo/timezone.rb:26`,
+ * a `StandardError`), which `find_tzinfo`'s `TZInfo::Timezone.get`
+ * (time_zone.rb:208) raises for an identifier the zone database does not know
+ * — `raise InvalidTimezoneIdentifier, "Invalid identifier: #{identifier}"`
+ * (`tzinfo/data_source.rb:321`), whence the message — and which `[]` rescues by
+ * class (time_zone.rb:239-241). trails resolves zones through `Intl`, so the
+ * raise site is ours, but the class has to exist for `[]` to catch that one
+ * failure rather than every throw the probe could produce.
+ *
+ * @noRailsEquivalent PERMANENT — the class belongs to the TZInfo gem, not to
+ *   Rails, and trails resolves zones through the runtime's own `Intl` database
+ *   rather than TZInfo. Rails names the class (time_zone.rb:239), so the port
+ *   needs a stand-in for it; no amount of further porting produces a Rails
+ *   file for it to live in.
+ */
+export class InvalidTimezoneIdentifier extends Error {
+  override name = "InvalidTimezoneIdentifier";
+}
+
+/**
+ * `Object#inspect`, for the one place Rails interpolates it (time_zone.rb:249).
+ * Ruby dispatches per class — `nil.inspect` is `"nil"`, `{}.inspect` is `"{}"`,
+ * `[1, 2].inspect` is `"[1, 2]"` — so `String(arg)`, which renders every object
+ * as `[object Object]`, loses the distinction the message exists to draw.
+ *
+ * A JS plain object is the Hash analogue and takes `Hash#inspect`'s `=>` form.
+ * `Object.new` has no JS counterpart to be told apart from it, so a non-plain
+ * object falls back to `#<Class>`: Ruby's `#<Object:0x…>` without the heap
+ * address, which is allocator state no port can reproduce.
+ */
+function inspect(value: unknown): string {
+  if (value === null || value === undefined) return "nil";
+  if (typeof value === "string") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(inspect).join(", ")}]`;
+  if (typeof value === "object") {
+    const proto = Object.getPrototypeOf(value) as object | null;
+    if (proto !== Object.prototype && proto !== null) {
+      return `#<${(value.constructor as { name?: string } | undefined)?.name ?? "Object"}>`;
+    }
+    const pairs = Object.entries(value).map(([k, v]) => `${inspect(k)}=>${inspect(v)}`);
+    return `{${pairs.join(", ")}}`;
+  }
+  return String(value);
+}
+
+/**
  * Get timezone abbreviation and offset for a given IANA zone at a specific instant.
  */
 function toDate(at: Date | Temporal.Instant): Date {
@@ -307,7 +353,8 @@ export class TimeZone {
       let tz: TimeZone;
       try {
         tz = TimeZone.create(arg);
-      } catch {
+      } catch (error) {
+        if (!(error instanceof InvalidTimezoneIdentifier)) throw error;
         return null;
       }
       zoneCache.set(arg, tz);
@@ -318,15 +365,14 @@ export class TimeZone {
       if (Math.abs(seconds) <= 13) seconds *= 3600;
       return TimeZone.all().find((z) => z.utcOffset === Math.trunc(seconds)) ?? null;
     }
-    throw new ArgumentError(`invalid argument to TimeZone[]: ${String(arg)}`);
+    throw new ArgumentError(`invalid argument to TimeZone[]: ${inspect(arg)}`);
   }
 
   /**
    * `alias_method :create, :new` (time_zone.rb:211) — the allocator, whose
    * `initialize` resolves the zone through `find_tzinfo` (time_zone.rb:208) and
-   * so RAISES for a name TZInfo does not know, where `[]` returns `nil`. The
-   * raised class is `Error`, not TZInfo's `InvalidTimezoneIdentifier` — trails
-   * resolves zones through `Intl`, which has no TZInfo error hierarchy to port.
+   * so RAISES for a name TZInfo does not know, where `[]` returns `nil` by
+   * rescuing `TZInfo::InvalidTimezoneIdentifier` (time_zone.rb:239-241).
    * A bare allocator: the `@lazy_zones_map` memo belongs to `[]`
    * (`@lazy_zones_map[arg] ||= create(arg)`, time_zone.rb:237-238), so every
    * call here builds a fresh instance as Ruby's `new` does.
@@ -335,8 +381,14 @@ export class TimeZone {
     const ianaName = MAPPING[name] ?? name;
     try {
       new Intl.DateTimeFormat("en-US", { timeZone: ianaName });
-    } catch {
-      throw new Error(`Invalid time zone: ${name}`);
+    } catch (error) {
+      // ECMA-402 mandates a RangeError for a `timeZone` the runtime does not
+      // know, and only for that — so it is the one failure standing in for
+      // `Timezone.get`'s InvalidTimezoneIdentifier. Anything else out of the
+      // probe is a different fault and propagates, as a non-TZInfo error would
+      // through `find_tzinfo` (time_zone.rb:208).
+      if (!(error instanceof RangeError)) throw error;
+      throw new InvalidTimezoneIdentifier(`Invalid identifier: ${ianaName}`);
     }
     return new TimeZone(name, ianaName);
   }

@@ -186,7 +186,6 @@ export {
 export {
   isBlank,
   isPresent,
-  presence,
   squish,
   truncate,
   truncateWords,
@@ -356,7 +355,7 @@ export * from "./time-ext.js";
 export { Duration, seconds, minutes, hours, days, weeks, months, years } from "./duration.js";
 export type { DurationParts } from "./duration.js";
 
-export { TimeZone, ZONES_MAP } from "./values/time-zone.js";
+export { TimeZone, ZONES_MAP, InvalidTimezoneIdentifier } from "./values/time-zone.js";
 export { TimeWithZone } from "./time-with-zone.js";
 export type { ChangeOptions, AdvanceOptions } from "./time-with-zone.js";
 export {
@@ -442,6 +441,7 @@ export { DeepMergeable } from "./deep-mergeable.js";
 export { DelegationError, Delegation } from "./delegation.js";
 export { ActiveSupportJSON } from "./json.js";
 export {
+  presence,
   NilClass,
   FalseClass,
   TrueClass,

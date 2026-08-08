@@ -2,11 +2,11 @@
  * Blank extensions — mirrors Rails' core_ext/object/blank.rb
  *
  * In Ruby, these are monkey-patches on built-in classes. In TypeScript,
- * we export the blank?/present? logic as standalone functions (already in
- * string-utils.ts) and provide type-specific classes for API parity.
+ * `presence` is a standalone function and the per-class `blank?`/`present?`
+ * arms are statics on type-specific classes, one per Ruby reopening.
  */
 
-import { isBlank, isPresent, presence } from "../../string-utils.js";
+import { isBlank, isPresent } from "../../string-utils.js";
 
 const BLANK_RE = /^\s*$/;
 
@@ -67,4 +67,13 @@ export class Time {
   }
 }
 
-export { isBlank, isPresent, presence };
+/**
+ * `Object#presence` (`core_ext/object/blank.rb:44-46`): `self if present?`.
+ * Ruby's `nil` return for a blank receiver is `undefined` here, so the
+ * `presence ?? default` idiom reads the way `presence || default` does in Ruby.
+ */
+export function presence<T>(value: T): T | undefined {
+  return isPresent(value) ? value : undefined;
+}
+
+export { isBlank, isPresent };
