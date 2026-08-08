@@ -418,7 +418,9 @@ export function change(
     if (options.usec !== undefined) {
       throw new ArgumentError(
         `Can't change both :nsec and :usec at the same time: {${Object.entries(options)
-          .map(([key, value]) => `${key}: ${String(value)}`)
+          .map(
+            ([key, value]) => `${key}: ${typeof value === "string" ? `"${value}"` : String(value)}`,
+          )
           .join(", ")}}`,
       );
     }

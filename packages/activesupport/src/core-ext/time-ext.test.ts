@@ -288,6 +288,9 @@ describe("TimeExtCalculationsTest", () => {
     );
 
     expect(() => change(d(2005, 1, 2, 11, 22, 33, 8), { usec: 1, nsec: 1 })).toThrow(ArgumentError);
+    expect(() => change(d(2005, 1, 2, 11, 22, 33, 8), { usec: 1, nsec: 1 })).toThrow(
+      "Can't change both :nsec and :usec at the same time: {usec: 1, nsec: 1}",
+    );
     expect(() => change(zoned("+03:00", 2015, 5, 9, 10, 0, 0), { nsec: 999999999 })).not.toThrow();
   });
 
