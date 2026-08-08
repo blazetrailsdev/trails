@@ -621,13 +621,16 @@ export interface DateParts {
   hour?: number;
   min?: number;
   sec?: number;
-  secFraction?: number | Rational;
+  secFraction?: number | bigint | Rational;
   /**
    * Seconds since the Unix epoch, which `rt_rewrite_frags` expands into a `:jd`
    * and a time of day. No ported sub-parser sets it: it is `Date._strptime`'s
-   * `%s`/`%Q`, never anything `date__parse` answers.
+   * `%s`/`%Q`, never anything `date__parse` answers. Both producers build it
+   * exactly: `%s` is the C's bignum `n` (`date_strptime.c:415-426`), a
+   * `bigint` because Ruby's Integer is arbitrary precision, and `%Q` its
+   * `rb_rational_new2(n, INT2FIX(1000))` (`date_strptime.c:428-442`).
    */
-  seconds?: number;
+  seconds?: number | bigint | Rational;
   zone?: string;
   offset?: number | Rational | null;
   /**
@@ -904,8 +907,15 @@ export class Rational {
     this.denominator = d / g;
   }
 
-  /** `rational.c` `nurat_add` (`Rational#+`), for the Integer addend this port needs. */
-  add(other: number | bigint): Rational {
+  /** `rational.c` `nurat_add` (`Rational#+`), for the Integer and Rational
+   * addends this port needs. */
+  add(other: number | bigint | Rational): Rational {
+    if (other instanceof Rational) {
+      return new Rational(
+        this.numerator * other.denominator + other.numerator * this.denominator,
+        this.denominator * other.denominator,
+      );
+    }
     return new Rational(this.numerator + BigInt(other) * this.denominator, this.denominator);
   }
 
@@ -2172,20 +2182,17 @@ function headMatchP(len: number, name: string, str: string, slen: number, si: nu
  * `ordinal` is the `ordinal` flag falling through to the same literal
  * comparison the non-`%` arm makes.
  *
- * `%Q`'s `:seconds` is a `Rational` in Ruby and a number here, which is the
- * representation `parse_time` and `parse_ddd` already flatten theirs to in
- * this file.
- *
  * The closures stand in for the C's macros: `readDigitsAt` is `READ_DIGITS`
  * (`date_strptime.c:115-123`) with `null` for its `fail()`, `readDigitsMax` is
  * `READ_DIGITS_MAX` (`date_strptime.c:125`) — `Number.POSITIVE_INFINITY` for
  * its `LONG_MAX` width — `recur` is `recur` (`date_strptime.c:142-150`) and
  * `headMatch` is `HEAD_MATCH_P` (`date_strptime.c:172`).
  *
- * `%L`/`%N` is the one arm whose reader result is discarded: C's `READ_DIGITS`
- * assigns `n` the bignum `str2num` answers, and ours cannot — so the call is
- * made for its `si` advance and its `fail()`, and `n` is `str2num` over the
- * span `osi`/`si` bound, which is what `date_strptime.c:377-380` passes.
+ * `%L`/`%N`, `%Q` and `%s` are the arms whose reader result is discarded: C's
+ * `READ_DIGITS` assigns `n` the bignum `str2num` answers, and ours cannot — so
+ * the call is made for its `si` advance and its `fail()`, and `n` is `str2num`
+ * over the span `osi`/`si` bound, which is what `date_strptime.c:377-380`
+ * passes.
  */
 function dateStrptimeInternal(str: string, fmt: string, hash: DateParts): number {
   const slen = str.length;
@@ -2438,10 +2445,11 @@ function dateStrptimeInternal(str: string, fmt: string, hash: DateParts): number
             sign = -1;
             si++;
           }
-          let n = readDigitsMax();
-          if (n === null) return fail();
+          const osi = si;
+          if (readDigitsMax() === null) return fail();
+          let n = BigInt(str.slice(osi, si));
           if (sign === -1) n = -n;
-          hash.seconds = n / 1000;
+          hash.seconds = new Rational(n, 1000n);
           break again;
         }
 
@@ -2467,8 +2475,9 @@ function dateStrptimeInternal(str: string, fmt: string, hash: DateParts): number
             sign = -1;
             si++;
           }
-          let n = readDigitsMax();
-          if (n === null) return fail();
+          const osi = si;
+          if (readDigitsMax() === null) return fail();
+          let n = BigInt(str.slice(osi, si));
           if (sign === -1) n = -n;
           hash.seconds = n;
           break again;
@@ -2638,8 +2647,31 @@ function dateStrptime(str: string, fmt: string, hash: DateParts): DateParts | nu
  * is `Integer#div` on a plain `:seconds` and `Rational#div` once an `:offset`
  * has made it a `Rational`. Either way the quotient is an Integer.
  */
-function fIdiv(x: number | Rational, y: number): number {
-  return x instanceof Rational ? x.div(y) : div(x, y);
+/**
+ * @internal `date_core.c`'s `f_add` macro (`date_core.c:38`), `x + y`, for the
+ * two numeric representations this port carries — a `Rational` on either side
+ * makes the sum one, which is how an exact `:seconds` survives folding an
+ * `:offset` in (`date_core.c:3850`).
+ */
+function fAdd(
+  x: number | bigint | Rational,
+  y: number | bigint | Rational,
+): number | bigint | Rational {
+  if (x instanceof Rational) return x.add(y);
+  if (y instanceof Rational) return y.add(x);
+  if (typeof x === "bigint") return x + BigInt(y);
+  if (typeof y === "bigint") return BigInt(x) + y;
+  return x + y;
+}
+
+function fIdiv(x: number | bigint | Rational, y: number): number {
+  if (x instanceof Rational) return x.div(y);
+  if (typeof x === "bigint") {
+    const d = BigInt(y);
+    const q = x / d;
+    return Number(x % d !== 0n && x < 0n !== d < 0n ? q - 1n : q);
+  }
+  return div(x, y);
 }
 
 /**
@@ -2647,8 +2679,14 @@ function fIdiv(x: number | Rational, y: number): number {
  * remainder of {@link fIdiv} — a `Rational` whenever `x` is one, which is how
  * an exact `:offset` reaches `:sec_fraction`.
  */
-function fMod(x: number | Rational, y: number): number | Rational {
-  return x instanceof Rational ? x.mod(y) : mod(x, y);
+function fMod(x: number | bigint | Rational, y: number): number | bigint | Rational {
+  if (x instanceof Rational) return x.mod(y);
+  if (typeof x === "bigint") {
+    const d = BigInt(y);
+    const r = x % d;
+    return r !== 0n && r < 0n !== d < 0n ? r + d : r;
+  }
+  return mod(x, y);
 }
 
 /**
@@ -2659,12 +2697,12 @@ function fMod(x: number | Rational, y: number): number | Rational {
  * still lands on the day before the epoch with a positive time of day.
  */
 function rtRewriteFrags(hash: DateParts): DateParts {
-  let seconds: number | Rational | undefined = hash.seconds;
+  let seconds = hash.seconds;
   delete hash.seconds;
   if (seconds !== undefined) {
     const offset = hash.offset;
     if (offset != null) {
-      seconds = offset instanceof Rational ? offset.add(seconds) : seconds + offset;
+      seconds = fAdd(seconds, offset);
     }
 
     const d = fIdiv(seconds, DAY_IN_SECONDS);
@@ -2801,8 +2839,10 @@ const SECOND_IN_NANOSECONDS = 1_000_000_000;
  * whenever its argument is — so the result here can carry a fraction of a
  * nanosecond, as `DateTime.parse("...00.9999999999").sec_fraction` does.
  */
-function secToNs(s: number | Rational): number | Rational {
-  return s instanceof Rational ? s.mul(SECOND_IN_NANOSECONDS) : s * SECOND_IN_NANOSECONDS;
+function secToNs(s: number | bigint | Rational): number | bigint | Rational {
+  if (s instanceof Rational) return s.mul(SECOND_IN_NANOSECONDS);
+  if (typeof s === "bigint") return s * BigInt(SECOND_IN_NANOSECONDS);
+  return s * SECOND_IN_NANOSECONDS;
 }
 
 /**
@@ -3380,7 +3420,7 @@ export function dtNewByFrags(hash: DateParts | null): DateTime {
 
   const df = timeToDf(rh, rmin, rs);
 
-  const t: number | Rational | null | undefined = hash.secFraction;
+  const t: number | bigint | Rational | null | undefined = hash.secFraction;
   const ns = t == null ? 0 : secToNs(t);
   // `ns_to_sec`, `m_sf`'s only reader, answers `rb_rational_new2` for an
   // Integer `sf` (`date_core.c:993-998`), so the store carries the Rational.

@@ -79,15 +79,19 @@ describe("PostgreSQLAdapter#getClient (single persistent connection)", () => {
     adapter._rawConnection = { _queryable: true, _ending: false, _ended: false };
     expect(adapter.isConnected()).toBe(true);
 
-    // Each node-pg "finished" signal independently flips connected? false.
-    adapter._rawConnection = { _queryable: false };
-    expect(adapter.isConnected()).toBe(false);
+    // `end()` — node-pg's PQfinish — independently flips connected? false.
     adapter._rawConnection = { _ending: true };
     expect(adapter.isConnected()).toBe(false);
     adapter._rawConnection = { _ended: true };
     expect(adapter.isConnected()).toBe(false);
+
+    // A handle the server killed underneath us is BAD, not finished: ruby-pg's
+    // `finished?` only answers true after `PQfinish`, so Rails' `connected?`
+    // stays true and `active?` is what asks the server.
+    adapter._rawConnection = { _queryable: false };
+    expect(adapter.isConnected()).toBe(true);
     adapter._rawConnection = { _connectionError: true };
-    expect(adapter.isConnected()).toBe(false);
+    expect(adapter.isConnected()).toBe(true);
 
     // A nil raw connection is connected? false via the existing _connection guard.
     adapter._rawConnection = null;

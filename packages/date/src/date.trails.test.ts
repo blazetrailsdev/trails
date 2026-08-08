@@ -461,9 +461,29 @@ describe("Date", () => {
     //   Date._strptime("1000000000", "%s")     #=> {:seconds=>1000000000}
     //   Date._strptime("-1000000000", "%s")    #=> {:seconds=>-1000000000}
     //   Date._strptime("1000000000500", "%Q")  #=> {:seconds=>(2000000001/2)}
-    expect(RubyDate._strptime("1000000000", "%s")).toEqual({ seconds: 1000000000 });
-    expect(RubyDate._strptime("-1000000000", "%s")).toEqual({ seconds: -1000000000 });
-    expect(RubyDate._strptime("1000000000500", "%Q")).toEqual({ seconds: 1000000000.5 });
+    //   Date._strptime("1234567890123", "%Q")  #=> {:seconds=>(1234567890123/1000)}
+    //   Date._strptime("-1234567890123", "%Q") #=> {:seconds=>(-1234567890123/1000)}
+    //   Date._strptime("9007199254740993", "%s") #=> {:seconds=>9007199254740993}
+    expect(RubyDate._strptime("1000000000", "%s")).toEqual({ seconds: 1000000000n });
+    expect(RubyDate._strptime("-1000000000", "%s")).toEqual({ seconds: -1000000000n });
+    expect(RubyDate._strptime("1000000000500", "%Q")).toEqual({
+      seconds: new Rational(2000000001n, 2n),
+    });
+    expect(RubyDate._strptime("1234567890123", "%Q")).toEqual({
+      seconds: new Rational(1234567890123n, 1000n),
+    });
+    expect(RubyDate._strptime("-1234567890123", "%Q")).toEqual({
+      seconds: new Rational(-1234567890123n, 1000n),
+    });
+    expect(RubyDate._strptime("9007199254740993", "%s")).toEqual({
+      seconds: 9007199254740993n,
+    });
+  });
+
+  it("expands an exact %Q through rt_rewrite_frags, as DateTime.strptime does", () => {
+    // ruby 3.3.11:
+    //   DateTime.strptime("1234567890123", "%Q").to_s #=> "2009-02-13T23:31:30+00:00"
+    expect(RubyDateTime.strptime("1234567890123", "%Q").toS()).toBe("2009-02-13T23:31:30+00:00");
   });
 
   it("builds the date the frags name, as Date.strptime does", () => {
