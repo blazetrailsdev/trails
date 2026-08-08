@@ -1,5 +1,6 @@
 import { getApp } from "./config.js";
-import { GID, validateApp, type GidComponents } from "./uri/gid.js"; // TYPE-ONLY on purpose: a runtime edge from here back into the
+import { GID, validateApp, type GidComponents } from "./uri/gid.js";
+// TYPE-ONLY on purpose: a runtime edge from here back into the
 // global-id ↔ signed-global-id ↔ locator cycle would evaluate
 // `class SignedGlobalID extends GlobalID` while `GlobalID` is still in TDZ.
 // `find` therefore reaches Locator through a dynamic import.
