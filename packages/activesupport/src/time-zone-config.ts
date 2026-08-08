@@ -16,38 +16,27 @@ import { instantFrom } from "./temporal.js";
 // async request handling. For server contexts with overlapping requests,
 // consider using AsyncLocalStorage or passing the zone explicitly.
 let _zoneDefault: TimeZone | null = null;
-let _zone: TimeZone | null | undefined = undefined; // undefined = not set (falls through to default)
+// undefined = IsolatedExecutionState has no :time_zone key; null/false are the
+// values Rails stores verbatim when find_zone! resolves to them.
+let _zone: TimeZone | null | false | undefined = undefined;
 
 /**
  * Get the current Time.zone. Returns zone_default if not explicitly set.
+ * Mirrors `IsolatedExecutionState[:time_zone] || zone_default` (zones.rb:19-21),
+ * so a stored `nil`/`false` falls through to zone_default just as it does in Rails.
  */
 export function getZone(): TimeZone | null {
-  if (_zone !== undefined) return _zone;
+  if (_zone != null && _zone !== false) return _zone;
   return _zoneDefault;
 }
 
 /**
  * Set Time.zone. Accepts a TimeZone, a string name, null, or false.
- *
- * Rails stores nil and false verbatim; trails' zone slot has no such state, so
- * both reset to zone_default — which is also why this does not yet route through
- * `findZoneBang` the way zones.rb:42 does. See
- * 0072/converge-time-zone-setter-through-find-zone-bang.
+ * Mirrors `IsolatedExecutionState[:time_zone] = find_zone!(time_zone)`
+ * (zones.rb:41-43).
  */
 export function setZone(zone: TimeZone | string | null | false): void {
-  if (zone === null || zone === false) {
-    _zone = undefined; // Reset to zone_default
-    return;
-  }
-  if (zone instanceof TimeZone) {
-    _zone = zone;
-    return;
-  }
-  if (typeof zone === "string") {
-    _zone = TimeZone.find(zone);
-    return;
-  }
-  throw new ArgumentError(`Invalid time zone: ${zone}`);
+  _zone = findZoneBang(zone);
 }
 
 /**
@@ -84,7 +73,7 @@ export function setZoneDefault(zone: TimeZone | null): void {
 export function useZone<T>(zone: string | TimeZone, fn: () => T): T {
   const newZone = findZoneBang(zone);
   const prev = _zone;
-  _zone = newZone as TimeZone | null;
+  _zone = newZone;
   try {
     const result = fn();
     if (result != null && typeof (result as any).then === "function") {
