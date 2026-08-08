@@ -821,6 +821,28 @@ describe("Date", () => {
     expect(RubyDate.jd(2299160).yday).toBe(277);
   });
 
+  it("reads a Temporal subject's wday and yday off the Julian day too", () => {
+    // `temporalSubject` fills the same `StrftimeSubject` the gem-shaped path
+    // does, so the two must answer one date identically — `Temporal`'s own
+    // `dayOfWeek`/`dayOfYear` are proleptic (1500-03-01 is a Thursday and the
+    // 60th day there, a Sunday and the 61st under `Date::ITALY`), which would
+    // put `%A` days from the `%s` epochSeconds derives from the Julian day.
+    for (const [y, m, d] of [
+      [1, 1, 1],
+      [-1234, 3, 1],
+      [1500, 3, 1],
+      [1582, 10, 4],
+      [1582, 10, 15],
+      [1970, 1, 1],
+      [2008, 3, 1],
+    ]) {
+      expect(strftime(new Temporal.PlainDate(y, m, d), "%A|%u|%w|%s|%j")).toBe(
+        new RubyDate(y, m, d).strftime("%A|%u|%w|%s|%j"),
+      );
+    }
+    expect(strftime(new Temporal.PlainDate(1500, 3, 1), "%A|%j")).toBe("Sunday|061");
+  });
+
   it("pads the year to four digits the way date_strftime's %Y does", () => {
     expect(new RubyDate(1, 1, 1).toS()).toBe("0001-01-01");
     expect(new RubyDate(99, 12, 31).toS()).toBe("0099-12-31");
