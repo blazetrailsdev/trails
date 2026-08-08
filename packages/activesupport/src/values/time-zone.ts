@@ -302,11 +302,16 @@ export class TimeZone {
   static find(arg: unknown): TimeZone | null {
     if (arg instanceof TimeZone) return arg;
     if (typeof arg === "string") {
+      const cached = zoneCache.get(arg);
+      if (cached) return cached;
+      let tz: TimeZone;
       try {
-        return TimeZone.create(arg);
+        tz = TimeZone.create(arg);
       } catch {
         return null;
       }
+      zoneCache.set(arg, tz);
+      return tz;
     }
     if (typeof arg === "number" || arg instanceof Duration) {
       let seconds = arg instanceof Duration ? arg.inSeconds() : arg;
@@ -322,19 +327,18 @@ export class TimeZone {
    * so RAISES for a name TZInfo does not know, where `[]` returns `nil`. The
    * raised class is `Error`, not TZInfo's `InvalidTimezoneIdentifier` — trails
    * resolves zones through `Intl`, which has no TZInfo error hierarchy to port.
+   * A bare allocator: the `@lazy_zones_map` memo belongs to `[]`
+   * (`@lazy_zones_map[arg] ||= create(arg)`, time_zone.rb:237-238), so every
+   * call here builds a fresh instance as Ruby's `new` does.
    */
   static create(name: string): TimeZone {
-    const cached = zoneCache.get(name);
-    if (cached) return cached;
     const ianaName = MAPPING[name] ?? name;
     try {
       new Intl.DateTimeFormat("en-US", { timeZone: ianaName });
     } catch {
       throw new Error(`Invalid time zone: ${name}`);
     }
-    const tz = new TimeZone(name, ianaName);
-    zoneCache.set(name, tz);
-    return tz;
+    return new TimeZone(name, ianaName);
   }
 
   /**

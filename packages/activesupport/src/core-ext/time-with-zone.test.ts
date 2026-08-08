@@ -1378,7 +1378,10 @@ describe("TimeWithZoneMethodsForDate", () => {
   });
 
   it("in time zone with invalid argument", () => {
-    expect(() => dateInTimeZone(new Date(2000, 0, 1), "No such timezone exists")).toThrow();
+    const d = new Date(2000, 0, 1);
+    expect(() => dateInTimeZone(d, "No such timezone exists")).toThrow(ArgumentError);
+    expect(() => dateInTimeZone(d, Duration.hours(-15))).toThrow(ArgumentError);
+    expect(() => dateInTimeZone(d, {})).toThrow(ArgumentError);
   });
 });
 

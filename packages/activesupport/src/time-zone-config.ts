@@ -133,15 +133,17 @@ export function current(): TimeWithZone | Date {
 /**
  * Convert a Date (interpreted as a local date, i.e., year/month/day only)
  * into a TimeWithZone at midnight in the given zone.
- * Matches Rails' Date#in_time_zone.
+ * Matches Rails' Date#in_time_zone, whose first act is `::Time.find_zone!`
+ * (core_ext/date/zones.rb) — so a bad name, an unmatched offset and an argument
+ * of the wrong class all raise there.
  */
-export function dateInTimeZone(date: Date, zone: string | TimeZone): TimeWithZone {
+export function dateInTimeZone(date: Date, zone: unknown): TimeWithZone {
   const tz = findZoneBang(zone) as TimeZone;
   return tz.local(date.getFullYear(), date.getMonth() + 1, date.getDate());
 }
 
 /**
- * Ruby's `ArgumentError`. One class across the package, so `findZone`'s
+ * Ruby's `ArgumentError`. One class across `TimeZone` / `time-zone-config`, so `findZone`'s
  * `instanceof` narrows the raise `TimeZone[]` makes (time_zone.rb:249) as well
  * as the one `find_zone!` makes itself.
  */
