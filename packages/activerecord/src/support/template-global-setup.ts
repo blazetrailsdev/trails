@@ -150,7 +150,8 @@ const sqliteAdapter: DbTemplateAdapter = {
       () => new BetterSQLite3Adapter(templatePath) as unknown as DatabaseAdapter,
     );
     await buildTemplateSchema(adapter, runToken, async () => {
-      await pool.disconnect();
+      pool.releaseConnection();
+      await pool.disconnectBang();
       await (adapter as unknown as { close(): void | Promise<void> }).close();
     });
 
@@ -240,7 +241,8 @@ const pgAdapter: DbTemplateAdapter = {
       // a disconnect/terminate that also throws would replace the original
       // error. Swallow teardown errors so the meaningful one always surfaces.
       try {
-        await pool.disconnect();
+        pool.releaseConnection();
+        await pool.disconnectBang();
         await pgTerminateConnections(admin, templateDb);
       } catch {
         // best-effort cleanup; the template DB is dropped at teardown anyway
@@ -358,7 +360,8 @@ const mysqlAdapter: DbTemplateAdapter = {
             }) as unknown as DatabaseAdapter,
         );
         await buildTemplateSchema(adapter, runToken, async () => {
-          await pool.disconnect();
+          pool.releaseConnection();
+          await pool.disconnectBang();
         });
       }),
     );
