@@ -303,13 +303,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "supports_optimizer_hints?",
-    "call": "extension_available?",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails postgresql_adapter.rb:444-449 memoizes `extension_available?(\"pg_hint_plan\")`; trails postgresql-adapter.ts:3442-3444 returns the `_hasOptimizerHints` flag populated by the same pg_extension count query (postgresql-adapter.ts:3257-3271)."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
     "rubyName": "translate_exception",
     "call": "match?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

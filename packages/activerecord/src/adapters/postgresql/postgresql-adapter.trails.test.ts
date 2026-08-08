@@ -1327,7 +1327,7 @@ describe("PostgreSQLAdapter supports_* predicates (unit)", () => {
 
   function stubVersion(adapter: PostgreSQLAdapter, version: number): void {
     (adapter as any)._initialized = true;
-    (adapter as any)._hasOptimizerHints = false;
+    (adapter as any)._hasPgHintPlan = false;
     // `database_version` reads the pool memo (`abstract_adapter.rb:854-856`),
     // which is the only place the version is cached, so the stub is staged
     // there.
