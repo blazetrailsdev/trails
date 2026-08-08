@@ -38,6 +38,7 @@ import {
   type Locale,
   type TranslationKey,
 } from "../i18n.js";
+import { Temporal, strftime } from "@blazetrails/date";
 import { interpolate as interpolateString } from "../interpolate/ruby.js";
 import { throwException, catchException } from "../throw-catch.js";
 import {
@@ -269,6 +270,55 @@ interface Localizable {
   sec?: number;
 }
 
+/**
+ * @internal The duck type above, read off a `Temporal` value. Ruby's
+ * `::Date`/`::Time` answer `strftime`, `wday`, `mon`, `hour` and `sec`
+ * themselves (base.rb:83-107 sends them straight at the object), so the gem
+ * needs no such seam; a `Temporal` value answers none of them. `strftime` is the
+ * date gem's own, which reads a `Temporal` value directly.
+ *
+ * A `PlainDate` answers no `sec`, which is what routes it to `date.formats`
+ * rather than `time.formats` — the `object.respond_to?(:sec)` arm at
+ * base.rb:85.
+ */
+function temporalLocalizable(
+  object: Temporal.PlainDate | Temporal.PlainDateTime | Temporal.ZonedDateTime | Temporal.Instant,
+): Localizable {
+  const plain =
+    object instanceof Temporal.Instant
+      ? object.toZonedDateTimeISO("UTC").toPlainDateTime()
+      : object instanceof Temporal.ZonedDateTime
+        ? object.toPlainDateTime()
+        : object;
+  const localizable: Localizable = {
+    strftime: (format: string) => strftime(object, format),
+    wday: plain.dayOfWeek % 7,
+    mon: plain.month,
+  };
+  if (!(object instanceof Temporal.PlainDate)) {
+    localizable.hour = (plain as Temporal.PlainDateTime).hour;
+    localizable.sec = (plain as Temporal.PlainDateTime).second;
+  }
+  return localizable;
+}
+
+/**
+ * @internal `object` as the duck type `localize` sends at — itself for the
+ * gem-shaped `Date`/`DateTime`/`Time`, and {@link temporalLocalizable} for a
+ * `Temporal` value.
+ */
+function localizable(object: unknown): unknown {
+  if (
+    object instanceof Temporal.PlainDate ||
+    object instanceof Temporal.PlainDateTime ||
+    object instanceof Temporal.ZonedDateTime ||
+    object instanceof Temporal.Instant
+  ) {
+    return temporalLocalizable(object);
+  }
+  return object;
+}
+
 export abstract class Base {
   /** Mirrors: `include I18n::Backend::Transliterator` (base.rb:9). */
   transliterate = transliterate;
@@ -377,7 +427,10 @@ export abstract class Base {
     if (object == null && "default" in options) {
       return options.default;
     }
-    if (!respondTo(object, "strftime")) {
+    // Every send below goes at the duck type; `options[:object]` and the error
+    // message keep the object as it came in, as the gem's do.
+    const subject = localizable(object);
+    if (!respondTo(subject, "strftime")) {
       throw new ArgumentError(
         `Object must be a Date, DateTime or Time object. ${inspect(object)} given.`,
       );
@@ -385,13 +438,13 @@ export abstract class Base {
 
     if (isSymbol(format)) {
       const key = format;
-      const type = respondTo(object, "sec") ? "time" : "date";
+      const type = respondTo(subject, "sec") ? "time" : "date";
       options = { ...options, raise: true, object, locale };
       format = t(`:${type}.formats.${key.slice(1)}`, options);
     }
 
-    format = this.translateLocalizationFormat(locale, object as Localizable, format, options);
-    return (object as Localizable).strftime(format as string);
+    format = this.translateLocalizationFormat(locale, subject as Localizable, format, options);
+    return (subject as Localizable).strftime(format as string);
   }
 
   /**

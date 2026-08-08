@@ -83,6 +83,55 @@ export interface StrftimeSubject {
 }
 
 /**
+ * @internal The fields above, read off a `Temporal` value. `date_strftime.c`
+ * reads them off the `tmx` the receiver fills in (`date_core.c:7136-7160`), and
+ * Ruby's `::Date`/`::Time` *are* those readers — so the gem needs no such seam
+ * and this one is trails-only. It is not exported: `strftime` below is the only
+ * caller, so a `Temporal` value formats through the same one function as the
+ * gem-shaped object rather than through a wrapper class of its own.
+ *
+ * A `PlainDate` answers the gem's own `::Date` fields — midnight, and `::Date`'s
+ * `"+00:00"` zone spelling (`d_lite_strftime`'s `of` of 0) — while a
+ * `ZonedDateTime` carries its real offset, which `of2str` spells the way
+ * `::DateTime#zone` does.
+ */
+function temporalSubject(
+  value: Temporal.PlainDate | Temporal.PlainDateTime | Temporal.ZonedDateTime | Temporal.Instant,
+): StrftimeSubject {
+  if (value instanceof Temporal.Instant) return temporalSubject(value.toZonedDateTimeISO("UTC"));
+
+  const zoned = value instanceof Temporal.ZonedDateTime ? value : null;
+  const plain =
+    zoned !== null
+      ? zoned.toPlainDateTime()
+      : value instanceof Temporal.PlainDateTime
+        ? value
+        : value.toPlainDateTime();
+  const of = zoned === null ? 0 : zoned.offsetNanoseconds / SECOND_IN_NANOSECONDS;
+
+  return {
+    year: plain.year,
+    mon: plain.month,
+    day: plain.day,
+    // `Temporal`'s `dayOfWeek` is ISO — 1 is Monday, 7 Sunday — where `wday` is
+    // 0 for Sunday.
+    wday: plain.dayOfWeek % 7,
+    yday: plain.dayOfYear,
+    hour: plain.hour,
+    min: plain.minute,
+    sec: plain.second,
+    nsec: new Rational(
+      BigInt(plain.millisecond) * 1000000n +
+        BigInt(plain.microsecond) * 1000n +
+        BigInt(plain.nanosecond),
+      1n,
+    ),
+    zone: of2str(of),
+    utcOffset: of,
+  };
+}
+
+/**
  * @internal `%s`'s value — `date_strftime.c` computes it from the receiver's
  * own fields rather than reading a `to_i` off it, which is what lets `::Date`
  * (midnight, UTC) answer `%s` at all.
@@ -330,8 +379,26 @@ function subsecDigits(nsec: Rational, precision: number): string {
  * `%z` and `%Z` both come off the subject: `::Date` has no zone of its own and
  * answers UTC, while a `::Time` built through the public constructor is in the
  * local zone and answers its real offset and abbreviation.
+ *
+ * A `Temporal` value is accepted in place of the subject and read through
+ * {@link temporalSubject} — the fields Ruby's `::Date`/`::Time` answer natively.
  */
-export function strftime(subject: StrftimeSubject, format: string): string {
+export function strftime(
+  value:
+    | StrftimeSubject
+    | Temporal.PlainDate
+    | Temporal.PlainDateTime
+    | Temporal.ZonedDateTime
+    | Temporal.Instant,
+  format: string,
+): string {
+  const subject: StrftimeSubject =
+    value instanceof Temporal.PlainDate ||
+    value instanceof Temporal.PlainDateTime ||
+    value instanceof Temporal.ZonedDateTime ||
+    value instanceof Temporal.Instant
+      ? temporalSubject(value)
+      : value;
   const hour12 = subject.hour % 12 === 0 ? 12 : subject.hour % 12;
   let out = "";
   let f = 0;
@@ -3387,7 +3454,12 @@ export function dtNewByFrags(hash: DateParts | null): DateTime {
   const sf = ns instanceof Rational ? ns : new Rational(ns, 1);
 
   const to = hash.offset;
-  let of = to == null ? 0 : to instanceof Rational ? to.toF() : to;
+  // `NUM2INT` (`date_core.c:8301`) reads the fragment into a C `int`, so a
+  // `Rational` offset — what `date_zone_to_diff` answers for a fractional-hour
+  // zone past two decimal places (`date_parse.c:523-528`) — truncates toward
+  // zero before the bound below is applied. This is not `round()`: 34399.8
+  // becomes 34399.
+  let of = to == null ? 0 : Math.trunc(to instanceof Rational ? to.toF() : to);
   if (of < -DAY_IN_SECONDS || of > DAY_IN_SECONDS) of = 0;
 
   return new DateTime(jdLocalToUtc(jd, df, of), dfLocalToUtc(df, of), sf, of);

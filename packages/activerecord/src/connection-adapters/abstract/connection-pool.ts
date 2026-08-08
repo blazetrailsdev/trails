@@ -109,12 +109,6 @@ const ADAPTER_PROXY_PROBE_KEYS = new Set<string>([
 ]);
 
 /**
- * Sends Ruby's NullPool has no method for and trails must raise on rather than
- * answer `undefined` — see the NullPool constructor.
- */
-const NULL_POOL_UNDEFINED_METHODS = new Set<string>(["role", "shard"]);
-
-/**
  * Mirrors: ActiveRecord::ConnectionAdapters::NullPool
  */
 export class NullPool implements AbstractPool {
@@ -148,17 +142,15 @@ export class NullPool implements AbstractPool {
    * that raises *without* adding a `role`/`shard` member Rails' NullPool does
    * not have.
    *
-   * Only `role` and `shard` raise. Every other member Ruby's NullPool lacks is
-   * reached through a caller that duck-types the absence instead of sending
-   * unconditionally — `clearQueryCache`'s `this.pool?.clearQueryCache` against
-   * `query_cache.rb:232-234`'s bare `pool.clear_query_cache`. Those call sites
-   * are their own convergence (`0051/clear-query-cache-duck-types-the-pool`),
-   * not a licence to leave this one silent.
+   * Ruby does not override `method_missing`, so *every* send NullPool has no
+   * method for raises — not a fixed set of names. A symbol key is not a Ruby
+   * send but a JS-only probe (thenable duck-typing, serializers), so those keep
+   * reading through and answering `undefined`.
    */
   constructor() {
     return new Proxy(this, {
       get(target, prop, receiver) {
-        if (typeof prop === "symbol" || !NULL_POOL_UNDEFINED_METHODS.has(prop)) {
+        if (typeof prop === "symbol" || prop in target) {
           return Reflect.get(target, prop, receiver);
         }
         throw new NoMethodError(

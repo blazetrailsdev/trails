@@ -12,6 +12,7 @@ import {
   Rational,
   dNewByFrags,
   dtNewByFrags,
+  strftime,
   type DateParts,
 } from "./date.js";
 import { Time as RubyTime } from "./time.js";
@@ -860,6 +861,18 @@ describe("DateTime", () => {
     expect(RubyDateTime.parse("2008-03-01T06:00:00+05:45").offset).toEqual(new Rational(23, 96));
   });
 
+  it("truncates a Rational offset fragment to an int, as NUM2INT does", () => {
+    // ruby 3.3.11:
+    //   Date._parse("2008-03-01T06:00:00+9.5555")[:offset] #=> (171999/5)
+    //   DateTime.parse("2008-03-01T06:00:00+9.5555").offset #=> (34399/86400)
+    //   DateTime.parse("2008-03-01T06:00:00+9.5555").zone   #=> "+09:33"
+    expect(RubyDate._parse("2008-03-01T06:00:00+9.5555").offset).toEqual(new Rational(171999, 5));
+    expect(RubyDateTime.parse("2008-03-01T06:00:00+9.5555").offset).toEqual(
+      new Rational(34399, 86400),
+    );
+    expect(RubyDateTime.parse("2008-03-01T06:00:00+9.5555").zone).toBe("+09:33");
+  });
+
   it("defaults to +00:00 when the source named no zone", () => {
     // ruby 3.3.11: DateTime.parse("2008-07-02").strftime("%Y-%m-%dT%H:%M:%S %z")
     //   #=> "2008-07-02T00:00:00 +0000"
@@ -1135,5 +1148,64 @@ describe("Time", () => {
   it("picks the meridian off the hour", () => {
     expect(RubyTime.utc(2008, 3, 1, 6, 0).strftime("%p%P")).toBe("AMam");
     expect(RubyTime.utc(2008, 3, 1, 18, 0).strftime("%p%P")).toBe("PMpm");
+  });
+});
+
+describe("strftime over a Temporal subject", () => {
+  const FORMATS = [
+    "%Y-%m-%d",
+    "%b %d",
+    "%B %d, %Y",
+    "%a %A",
+    "%C",
+    "%u %w",
+    "%I %k %l",
+    "%H:%M:%S",
+    "%L %N",
+    "%z %:z %::z %Z",
+    "%s",
+    "%j",
+    "%G-W%V-%u",
+    "%c",
+    "%+",
+  ];
+
+  it("formats a PlainDate as the gem-shaped ::Date does", () => {
+    const date = RubyDate.parse("2008-07-02");
+    const plain = Temporal.PlainDate.from("2008-07-02");
+    for (const format of FORMATS) {
+      expect(strftime(plain, format)).toBe(date.strftime(format));
+    }
+    // ::Date is midnight, UTC — `%s` and the zone directives come off that.
+    expect(strftime(plain, "%s %z %Z")).toBe("1214956800 +0000 +00:00");
+  });
+
+  it("formats a PlainDateTime as the gem-shaped ::DateTime does", () => {
+    const datetime = new RubyDateTime(2008, 3, 1, 6, 7, 8);
+    const plain = Temporal.PlainDateTime.from("2008-03-01T06:07:08");
+    for (const format of FORMATS) {
+      expect(strftime(plain, format)).toBe(datetime.strftime(format));
+    }
+  });
+
+  it("carries a ZonedDateTime's offset into %z, %Z and %s", () => {
+    const datetime = RubyDateTime.parse("2008-03-01T06:00:00+09:00");
+    const zoned = Temporal.ZonedDateTime.from("2008-03-01T06:00:00+09:00[+09:00]");
+    for (const format of FORMATS) {
+      expect(strftime(zoned, format)).toBe(datetime.strftime(format));
+    }
+    expect(strftime(zoned, "%z %:z %Z %s")).toBe("+0900 +09:00 +09:00 1204318800");
+  });
+
+  it("reads an Instant as UTC", () => {
+    const instant = Temporal.Instant.from("2008-03-01T06:00:00Z");
+    expect(strftime(instant, "%Y-%m-%dT%H:%M:%S %z %Z %s")).toBe(
+      "2008-03-01T06:00:00 +0000 +00:00 1204351200",
+    );
+  });
+
+  it("carries a Temporal sub-second into %L and %N", () => {
+    const plain = Temporal.PlainDateTime.from("2008-03-01T06:00:00.123456789");
+    expect(strftime(plain, "%L %N %6N %12N")).toBe("123 123456789 123456 123456789000");
   });
 });
