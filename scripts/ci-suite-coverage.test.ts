@@ -156,7 +156,7 @@ function gateRegex(yml: string, name: string): RegExp {
  *  cross-cutting file (lockfile, root tsconfig, vitest config,
  *  shared scripts, this workflow). Push to main / schedule /
  *  workflow_dispatch always force true. Pattern mirrors the
- *  AR-touching set in scripts/parity/run.ts.
+ *  AR-touching set in scripts/parity/pipeline/run.ts.
  *  Cross-cutting paths force every per-package gate true. Anything
  *  here affects all packages: workspace topology, root tooling
  *  config, shared scripts, this workflow, composite actions.
@@ -267,14 +267,14 @@ function gateRegex(yml: string, name: string): RegExp {
  *  packages (ci.yml:604) — and both are carved out of the infra sweep
  *  (INFRA_CARVEOUT_RE), so this clause is what keeps their self-tests
  *  running on a subtree-only change.
- *  scripts/parity/ rides on it too: the query-runner integration tests
+ *  scripts/parity/pipeline/ rides on it too: the query-runner integration tests
  *  spawn dump.ts/ar_dump.ts against the fixtures, so a change to either
  *  the runners or the fixtures has to re-run them. (Their other input,
  *  packages/activerecord/, is deliberately NOT on this gate — pulling
  *  every AR PR into the leaf-package suites costs more than it catches;
  *  the label-gated query-parity-trails job covers that direction.)
  *  NO packages/activerecord/ path feeds this gate. The two suites here
- *  that import AR — scripts/test-deps/ and scripts/parity/query/node/ —
+ *  that import AR — scripts/test-deps/ and scripts/parity/pipeline/query/node/ —
  *  are re-run by sqlite-tests (activerecord_affected) instead; see the
  *  comment there.
  *  The compare tooling's suites run in that same invocation and are
@@ -651,7 +651,7 @@ describe("CI runs every tooling test suite", () => {
 
   // These suites import activerecord — scripts/test-deps from src (the
   // adapter-graph TDZ guard enters the graph from outside the AR vitest project
-  // by design), scripts/parity/query/node through the dump runners it spawns —
+  // by design), scripts/parity/pipeline/query/node through the dump runners it spawns —
   // but they are bundled into unit-tests, gated on unit_tests_affected, and
   // packages/activerecord/ is deliberately off that gate for cost reasons. So
   // each has to ALSO run from a job gated on activerecord_affected, or an
@@ -665,7 +665,7 @@ describe("CI runs every tooling test suite", () => {
   // while it lived only in the unit-tests job.
   const AR_IMPORTING_SUITES = [
     "scripts/test-deps",
-    "scripts/parity/query/node",
+    "scripts/parity/pipeline/query/node",
     "scripts/mixin-declaration-drift.test.ts",
   ];
 

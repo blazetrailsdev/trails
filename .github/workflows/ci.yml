@@ -563,7 +563,7 @@ jobs:
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
       - uses: ./.github/actions/cache-build
-      # scripts/parity/query/node spawns the dump runners as real subprocesses;
+      # scripts/parity/pipeline/query/node spawns the dump runners as real subprocesses;
       # they resolve @blazetrails/* through package `main` entries, so the
       # dist/ trees have to exist before vitest starts.
       - run: pnpm build
@@ -759,7 +759,7 @@ jobs:
       # large suite's worker scheduler (they otherwise starve its reporter RPC
       # / perturb fork scheduling — see trails-models-dump tests).
       # Both suites below import activerecord — scripts/test-deps from src,
-      # scripts/parity/query/node through the dump runners it spawns — yet ride
+      # scripts/parity/pipeline/query/node through the dump runners it spawns — yet ride
       # the unit_tests_affected gate, which the AR tree is off. This is the only
       # job that runs them on an AR-only PR. Separate invocation from the AR
       # suite on purpose: it keeps them in the `other` vitest project, whose
@@ -772,7 +772,7 @@ jobs:
       # running, rather than pulling the whole ~10.5k-test unit job onto every
       # activerecord PR.
       # (Guard: scripts/ci-suite-coverage.test.ts.)
-      - run: pnpm vitest run scripts/test-deps scripts/parity/query/node scripts/mixin-declaration-drift.test.ts
+      - run: pnpm vitest run scripts/test-deps scripts/parity/pipeline/query/node scripts/mixin-declaration-drift.test.ts
       - run: pnpm vitest run packages/activerecord/
       - run: pnpm vitest run packages/activerecord-cli
 
@@ -1551,26 +1551,26 @@ jobs:
       - name: Cache bundled gems
         uses: actions/cache@v4
         with:
-          path: scripts/parity/schema/ruby/vendor/bundle
-          key: ${{ runner.os }}-parity-gems-${{ hashFiles('scripts/parity/schema/ruby/Gemfile', 'scripts/parity/schema/ruby/Gemfile.lock') }}
+          path: scripts/parity/pipeline/schema/ruby/vendor/bundle
+          key: ${{ runner.os }}-parity-gems-${{ hashFiles('scripts/parity/pipeline/schema/ruby/Gemfile', 'scripts/parity/pipeline/schema/ruby/Gemfile.lock') }}
           restore-keys: ${{ runner.os }}-parity-gems-
       - name: Bundle install
         run: bundle install --jobs 4 --retry 3 --path vendor/bundle
-        working-directory: scripts/parity/schema/ruby
+        working-directory: scripts/parity/pipeline/schema/ruby
       - name: Upload Gemfile.lock artifact (commit this to the repo for stable caching)
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: parity-ruby-gemfile-lock
-          path: scripts/parity/schema/ruby/Gemfile.lock
+          path: scripts/parity/pipeline/schema/ruby/Gemfile.lock
           retention-days: 7
       - run: pnpm install --frozen-lockfile --prefer-offline
       - name: Run Rails-side dump
-        run: pnpm tsx scripts/parity/run.ts --side=rails
+        run: pnpm tsx scripts/parity/pipeline/run.ts --side=rails
       - uses: actions/upload-artifact@v4
         with:
           name: parity-rails-dumps
-          path: scripts/parity/.out/rails/
+          path: scripts/parity/pipeline/.out/rails/
           retention-days: 1
 
   schema-parity-trails:
@@ -1588,11 +1588,11 @@ jobs:
       - name: Build dependency packages for trails introspection
         run: pnpm --filter "@blazetrails/activerecord^..." build
       - name: Run trails-side dump
-        run: pnpm tsx scripts/parity/run.ts --side=trails
+        run: pnpm tsx scripts/parity/pipeline/run.ts --side=trails
       - uses: actions/upload-artifact@v4
         with:
           name: parity-trails-dumps
-          path: scripts/parity/.out/trails/
+          path: scripts/parity/pipeline/.out/trails/
           retention-days: 1
 
   schema-parity-diff:
@@ -1615,13 +1615,13 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: parity-rails-dumps
-          path: scripts/parity/.out/rails/
+          path: scripts/parity/pipeline/.out/rails/
       - uses: actions/download-artifact@v4
         with:
           name: parity-trails-dumps
-          path: scripts/parity/.out/trails/
+          path: scripts/parity/pipeline/.out/trails/
       - name: Diff canonical outputs
-        run: pnpm tsx scripts/parity/schema/diff.ts --rails-dir scripts/parity/.out/rails --trails-dir scripts/parity/.out/trails
+        run: pnpm tsx scripts/parity/pipeline/schema/diff.ts --rails-dir scripts/parity/pipeline/.out/rails --trails-dir scripts/parity/pipeline/.out/trails
 
   query-parity-frozen-at:
     name: Query Parity (compute frozen-at)
@@ -1634,7 +1634,7 @@ jobs:
     outputs:
       # Minted once per workflow run and consumed by both dump jobs so they
       # freeze time to the same instant. ISO-8601 UTC with ms precision and
-      # trailing Z — matches scripts/parity/canonical/query.schema.json.
+      # trailing Z — matches scripts/parity/pipeline/canonical/query.schema.json.
       value: ${{ steps.gen.outputs.value }}
     steps:
       - id: gen
@@ -1664,19 +1664,19 @@ jobs:
       - name: Cache bundled gems
         uses: actions/cache@v4
         with:
-          path: scripts/parity/schema/ruby/vendor/bundle
-          key: ${{ runner.os }}-parity-gems-${{ hashFiles('scripts/parity/schema/ruby/Gemfile', 'scripts/parity/schema/ruby/Gemfile.lock') }}
+          path: scripts/parity/pipeline/schema/ruby/vendor/bundle
+          key: ${{ runner.os }}-parity-gems-${{ hashFiles('scripts/parity/pipeline/schema/ruby/Gemfile', 'scripts/parity/pipeline/schema/ruby/Gemfile.lock') }}
           restore-keys: ${{ runner.os }}-parity-gems-
       - name: Bundle install
         run: bundle install --jobs 4 --retry 3 --path vendor/bundle
-        working-directory: scripts/parity/schema/ruby
+        working-directory: scripts/parity/pipeline/schema/ruby
       - run: pnpm install --frozen-lockfile --prefer-offline
       - name: Run Rails-side query dump
-        run: pnpm tsx scripts/parity/run.ts --type=query --side=rails
+        run: pnpm tsx scripts/parity/pipeline/run.ts --type=query --side=rails
       - uses: actions/upload-artifact@v4
         with:
           name: parity-query-rails-dumps
-          path: scripts/parity/.out/query/rails/
+          path: scripts/parity/pipeline/.out/query/rails/
           retention-days: 1
 
   query-parity-trails:
@@ -1698,11 +1698,11 @@ jobs:
       - name: Build activerecord and its workspace dependencies
         run: pnpm --filter "@blazetrails/activerecord..." build
       - name: Run trails-side query dump
-        run: pnpm tsx scripts/parity/run.ts --type=query --side=trails
+        run: pnpm tsx scripts/parity/pipeline/run.ts --type=query --side=trails
       - uses: actions/upload-artifact@v4
         with:
           name: parity-query-trails-dumps
-          path: scripts/parity/.out/query/trails/
+          path: scripts/parity/pipeline/.out/query/trails/
           retention-days: 1
 
   query-parity-diff:
@@ -1725,13 +1725,13 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: parity-query-rails-dumps
-          path: scripts/parity/.out/query/rails/
+          path: scripts/parity/pipeline/.out/query/rails/
       - uses: actions/download-artifact@v4
         with:
           name: parity-query-trails-dumps
-          path: scripts/parity/.out/query/trails/
+          path: scripts/parity/pipeline/.out/query/trails/
       - name: Diff canonical query outputs
-        run: pnpm tsx scripts/parity/query/diff.ts --rails-dir scripts/parity/.out/query/rails --trails-dir scripts/parity/.out/query/trails
+        run: pnpm tsx scripts/parity/pipeline/query/diff.ts --rails-dir scripts/parity/pipeline/.out/query/rails --trails-dir scripts/parity/pipeline/.out/query/trails
 
   ci:
     name: CI

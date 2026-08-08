@@ -58,9 +58,9 @@
     "test:stubs": "pnpm test:compare -- --missing --json && pnpm tsx scripts/test-compare/generate-stubs.ts",
     "prestats:sync": "tsc --build packages/activerecord",
     "stats:sync": "pnpm tsx scripts/sync-stats/sync.ts",
-    "parity:validate": "ajv compile -s scripts/parity/canonical/schema.schema.json -s scripts/parity/canonical/query.schema.json --spec=draft2020",
-    "parity:schema": "pnpm tsx scripts/parity/run.ts --type=schema",
-    "parity:query": "pnpm tsx scripts/parity/run.ts --type=query",
+    "parity:pipeline:validate": "ajv compile -s scripts/parity/pipeline/canonical/schema.schema.json -s scripts/parity/pipeline/canonical/query.schema.json --spec=draft2020",
+    "parity:pipeline:schema": "pnpm tsx scripts/parity/pipeline/run.ts --type=schema",
+    "parity:pipeline:query": "pnpm tsx scripts/parity/pipeline/run.ts --type=query",
     "vendor:fetch": "pnpm tsx vendor/fetch.ts"
   },
   "devDependencies": {

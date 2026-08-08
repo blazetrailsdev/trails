@@ -1,8 +1,8 @@
 # Parity verification — schema + query
 
 Reference for the parity pipelines that diff trails against Rails:
-**schema parity** (`pnpm parity:schema`) and **query parity**
-(`pnpm parity:query`). Both are shipped (schema #730–#746; query
+**schema parity** (`pnpm parity:pipeline:schema`) and **query parity**
+(`pnpm parity:pipeline:query`). Both are shipped (schema #730–#746; query
 #772) and run in CI as label-gated jobs.
 
 This doc is the contract for adding fixtures and bumping the
@@ -33,13 +33,13 @@ canonical formats — not a "what to build" plan.
 | D5  | Node-side SQLite applier                     | `better-sqlite3` as a root `devDependency`. No new workspace package.                                                                                                 |
 | D6  | Fixture sanity manifest                      | Sidecar `expected.json` per fixture: `{ tables: string[], indexCount: number }`. Canonicalizer asserts match — catches silent-drop false negatives.                   |
 | D7  | Diff behavior                                | Run all fixtures, per-fixture pass/fail, exit 1 if any failed.                                                                                                        |
-| D8  | Local dev                                    | Both toolchains required for full run. `pnpm parity:schema --side=rails\|trails\|diff` runs just one side.                                                            |
+| D8  | Local dev                                    | Both toolchains required for full run. `pnpm parity:pipeline:schema --side=rails\|trails\|diff` runs just one side.                                                   |
 | D9  | Canonical format versioning                  | `version: 1` is pinned. Any bump touches: JSON Schema, both canonicalizers, baselines — single PR.                                                                    |
 | D10 | Rails pin                                    | `8.0.2` (matches `vendor/sources.ts`).                                                                                                                                |
 
 ## Canonical formats (v1)
 
-### Schema (`scripts/parity/canonical/schema.schema.json`)
+### Schema (`scripts/parity/pipeline/canonical/schema.schema.json`)
 
 ```ts
 type CanonicalSchema = {
@@ -77,7 +77,7 @@ constraints, generated/virtual columns, partial-index predicates
 beyond simple `WHERE`, collations, default _expressions_
 (`CURRENT_TIMESTAMP`), composite-PK edge cases, SQLite `WITHOUT ROWID`.
 
-### Query (`scripts/parity/canonical/query.schema.json`)
+### Query (`scripts/parity/pipeline/canonical/query.schema.json`)
 
 ```ts
 type CanonicalQuery = {
@@ -104,7 +104,7 @@ and is informational — explicitly excluded from the diff.
 ## Directory layout
 
 ```
-scripts/parity/
+scripts/parity/pipeline/
   canonical/
     schema.schema.json     query.schema.json
     types.ts               query-types.ts
@@ -133,11 +133,11 @@ scripts/parity/
 
 ### Schema fixture
 
-1. Create `scripts/parity/fixtures/NN-name/schema.sql` — pure SQLite
+1. Create `scripts/parity/pipeline/fixtures/NN-name/schema.sql` — pure SQLite
    DDL. No `schema_migrations` / `ar_internal_metadata`.
 2. Create `expected.json` listing user-facing tables (alphabetical) and
    the _post-filter_ index count.
-3. Run `pnpm parity:schema`. If it fails, the failure is a real
+3. Run `pnpm parity:pipeline:schema`. If it fails, the failure is a real
    parsing parity gap in trails — file an issue, fix the
    adapter/dumper, **do not edit the fixture to make the test pass**.
 4. SQL features outside v1 canonical (FKs, checks, generated columns)
@@ -149,11 +149,11 @@ scripts/parity/
 1. Pick the next `arel-NN` slot.
 2. Add `schema.sql` (often shared with a schema fixture) and a comment
    header on `query.rb` / `query.ts` describing the expression.
-3. Run `tsx scripts/parity/translate/arel.ts --fixture arel-NN` to
+3. Run `tsx scripts/parity/pipeline/translate/arel.ts --fixture arel-NN` to
    generate `query.rb` and `query.ts` from the Ruby comment via the
    translation map (Ruby Arel → trails camelCase). Review and commit.
 4. Add `expected.json` per the schema-fixture rules.
-5. Run `pnpm parity:query` — same "fix the code, not the fixture" rule.
+5. Run `pnpm parity:pipeline:query` — same "fix the code, not the fixture" rule.
 
 #### Translation map (Arel Ruby → trails)
 
@@ -186,12 +186,12 @@ Common cases. Full table in git history of `query-parity-verification.md`
 
 ## Time freezing (query parity)
 
-- Orchestrator (`scripts/parity/run.ts`) only forwards `PARITY_FROZEN_AT`
+- Orchestrator (`scripts/parity/pipeline/run.ts`) only forwards `PARITY_FROZEN_AT`
   to both runners via `--frozen-at` if it's already set in the
   environment. If unset, each runner falls back to its built-in
   default frozen timestamp.
 - Ruby side: `ActiveSupport::Testing::TimeHelpers#travel_to`.
-- Node side (`scripts/parity/query/node/dump.ts`): validates `--frozen-at`
+- Node side (`scripts/parity/pipeline/query/node/dump.ts`): validates `--frozen-at`
   (must be ISO 8601 UTC with trailing `Z`), resolves `frozenMs`, then
   installs `@sinonjs/fake-timers` with
   `FakeTimers.install({ now: frozenMs, toFake: ["Date"] })`. Uninstalls
