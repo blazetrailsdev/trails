@@ -323,7 +323,7 @@ export interface TaggedEntry {
 export const FILE_TAG_NAME = "*";
 
 /** Why a file-level tag was refused — see `fileTagVerdict`. */
-export type FileTagRejectionCause = "counterpart-file" | "moved-names";
+export type FileTagRejectionCause = "counterpart-file" | "moved-names" | "stale-moved-declaration";
 
 export interface FileTagRejection {
   package: string;
@@ -331,8 +331,43 @@ export interface FileTagRejection {
   cause: FileTagRejectionCause;
   /** The Rails file that maps onto this TS file (`counterpart-file` only). */
   rubyFile?: string;
-  /** The names scoring `moved` (`moved-names` only). */
+  /** The names scoring `moved` and NOT declared (`moved-names` only). */
   movedNames?: string[];
+  /**
+   * Names the reason declares under `MOVED-BY-SHORT-NAME:` that no longer
+   * score `moved` (`stale-moved-declaration` only).
+   */
+  staleMovedNames?: string[];
+}
+
+/**
+ * The clause a file-level reason uses to declare, name by name, which of its
+ * `moved` scores are bare-short-name coincidences rather than misplaced ports.
+ *
+ * `moved` is decided by a single global Set of every camelized Ruby method
+ * name in Rails-land (`buildGlobalRubyCandidates`), with no file, class, or
+ * package attribution: a TS `close` on a libsql driver handle scores `moved`
+ * off `Rack::BodyProxy#close`, and `prepare` off `Store::HashAccessor#prepare`.
+ * For a file that binds a third-party JS client — a population Ruby does not
+ * have at all — every generic verb in the client's own protocol collides that
+ * way, and there is no Rails name for any of them to move onto.
+ *
+ * The declaration is what keeps that from re-opening the hole the moved gate
+ * exists to close (`postgresql/schema-statements-class.ts`, ~80 moved names of
+ * a genuinely renamed port). It is per-name and reviewed, not a mode switch:
+ * a moved name the reason does not list still refuses the blanket, and a
+ * listed name that stops scoring `moved` is stale and must be deleted, so the
+ * list can only shrink.
+ */
+const MOVED_BY_SHORT_NAME_RE = /MOVED-BY-SHORT-NAME:([^.]*)/;
+
+export function declaredCoincidentalMovedNames(reason: string): Set<string> {
+  const m = MOVED_BY_SHORT_NAME_RE.exec(reason);
+  if (!m) return new Set();
+  // The clause runs to the sentence's period; only identifiers count, so a
+  // stray prose word inside it is ignored rather than minted as a declaration
+  // no extra can ever match (which would read as permanent staleness).
+  return new Set(m[1].split(/[,\s]+/).filter((s) => /^[A-Za-z_$][\w$]*$/.test(s)));
 }
 
 /**
@@ -356,14 +391,36 @@ export interface FileTagRejection {
  *
  * `extras` is the FULL scored set, `--novel-only` notwithstanding: a moved name
  * refutes the claim whether or not this run is reporting moved names.
+ *
+ * A moved name the reason names in its `MOVED-BY-SHORT-NAME:` clause
+ * (`declaredCoincidentalMovedNames`) stops refuting it — see that clause for
+ * why the escape is per-name and reviewed. The declaration is only-shrink: a
+ * declared name that no longer scores `moved` is `stale-moved-declaration`,
+ * refused exactly as loudly as an undeclared moved name.
  */
 export function fileTagVerdict(
   rubyFile: string | null,
   extras: readonly ExtraName[],
+  reason = "",
 ): FileTagRejectionCause | null {
   if (rubyFile !== null) return "counterpart-file";
-  if (extras.some((e) => e.kind === "moved")) return "moved-names";
+  const declared = declaredCoincidentalMovedNames(reason);
+  const moved = new Set(extras.filter((e) => e.kind === "moved").map((e) => e.name));
+  if ([...moved].some((n) => !declared.has(n))) return "moved-names";
+  if ([...declared].some((n) => !moved.has(n))) return "stale-moved-declaration";
   return null;
+}
+
+/** The moved names in `extras` the reason does not declare — `moved-names`. */
+function undeclaredMovedNames(extras: readonly ExtraName[], reason: string): string[] {
+  const declared = declaredCoincidentalMovedNames(reason);
+  return extras.filter((e) => e.kind === "moved" && !declared.has(e.name)).map((e) => e.name);
+}
+
+/** Declared names that no longer score `moved` — `stale-moved-declaration`. */
+function staleMovedDeclarations(extras: readonly ExtraName[], reason: string): string[] {
+  const moved = new Set(extras.filter((e) => e.kind === "moved").map((e) => e.name));
+  return [...declaredCoincidentalMovedNames(reason)].filter((n) => !moved.has(n));
 }
 
 /**
@@ -1278,8 +1335,9 @@ function buildPackageReport(
       scored.push({ name, kind });
     }
 
-    if (fileTags[expectedTs] !== undefined) {
-      const cause = fileTagVerdict(rubyFile, scored);
+    const fileTagReason = fileTags[expectedTs];
+    if (fileTagReason !== undefined) {
+      const cause = fileTagVerdict(rubyFile, scored, fileTagReason);
       if (cause === null) {
         if (scored.length > 0) {
           matchedTagKeys.add(allowKeyOf({ package: pkg, tsFile: expectedTs, name: FILE_TAG_NAME }));
@@ -1293,7 +1351,10 @@ function buildPackageReport(
           cause,
           ...(rubyFile !== null ? { rubyFile } : {}),
           ...(cause === "moved-names"
-            ? { movedNames: scored.filter((e) => e.kind === "moved").map((e) => e.name) }
+            ? { movedNames: undeclaredMovedNames(scored, fileTagReason) }
+            : {}),
+          ...(cause === "stale-moved-declaration"
+            ? { staleMovedNames: staleMovedDeclarations(scored, fileTagReason) }
             : {}),
         });
       }
@@ -1614,18 +1675,31 @@ export function buildReport(
  */
 export function gateFileTagRejections(rejections: readonly FileTagRejection[]): string | null {
   if (rejections.length === 0) return null;
-  const lines = rejections.map((r) =>
-    r.cause === "counterpart-file"
-      ? `  - ${r.package}  ${r.tsFile} — Rails counterpart file ${r.rubyFile}`
-      : `  - ${r.package}  ${r.tsFile} — ${r.movedNames?.length ?? 0} moved name(s): ` +
-        (r.movedNames ?? []).slice(0, 8).join(", ") +
-        ((r.movedNames?.length ?? 0) > 8 ? ", …" : ""),
-  );
+  const list = (names: readonly string[] | undefined): string =>
+    (names ?? []).slice(0, 8).join(", ") + ((names?.length ?? 0) > 8 ? ", …" : "");
+  const lines = rejections.map((r) => {
+    if (r.cause === "counterpart-file") {
+      return `  - ${r.package}  ${r.tsFile} — Rails counterpart file ${r.rubyFile}`;
+    }
+    if (r.cause === "stale-moved-declaration") {
+      return (
+        `  - ${r.package}  ${r.tsFile} — ${r.staleMovedNames?.length ?? 0} ` +
+        `MOVED-BY-SHORT-NAME name(s) that no longer score moved: ${list(r.staleMovedNames)}`
+      );
+    }
+    return (
+      `  - ${r.package}  ${r.tsFile} — ${r.movedNames?.length ?? 0} moved name(s): ` +
+      list(r.movedNames)
+    );
+  });
   return (
     `\nextra-surface: ${rejections.length} file-level @noRailsEquivalent tag(s) claim a ` +
     "file has no Rails counterpart, but the report finds one. A `moved` name means the " +
     "name DOES exist in Rails, just in another file — a rename may be owed, and the " +
-    "blanket would hide it. Tag the names individually, or converge them:\n" +
+    "blanket would hide it. Tag the names individually, or converge them. If the moved " +
+    "score really is a bare-short-name coincidence against an unrelated Rails class, " +
+    "name each such name in a `MOVED-BY-SHORT-NAME: a, b, c` clause in the reason — and " +
+    "delete a listed name once it stops scoring moved:\n" +
     lines.join("\n") +
     "\n"
   );
