@@ -231,6 +231,11 @@ export {
 } from "./hash-utils.js";
 
 export {
+  ToJsonWithActiveSupportEncoder,
+  type ToJsonWithActiveSupportEncoderHost,
+} from "./core-ext/object/json.js";
+
+export {
   wrap,
   inGroupsOf,
   inGroups,

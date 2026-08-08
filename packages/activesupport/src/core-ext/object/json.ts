@@ -1,5 +1,6 @@
 import { Temporal } from "@blazetrails/date";
 
+import { ActiveSupportJSON } from "../../json.js";
 import { Encoding, type EncodeOptions } from "../../json/encoding.js";
 
 /**
@@ -12,6 +13,43 @@ import { Encoding, type EncodeOptions } from "../../json/encoding.js";
  * — the same shape `core-ext/object/blank.ts` uses for `blank?`/`present?` —
  * and the free `asJson()` below stands in for Ruby's method lookup.
  */
+
+/**
+ * The receiver `ToJsonWithActiveSupportEncoder#to_json` is mixed into.
+ * Ruby's `super` reaches the JSON gem's `to_json`; the JS analogue is the
+ * receiver's own `as_json` value, which `JSON.stringify` then serializes.
+ */
+export interface ToJsonWithActiveSupportEncoderHost {
+  asJson(options?: EncodeOptions | null): unknown;
+}
+
+/**
+ * `ActiveSupport::ToJsonWithActiveSupportEncoder#to_json` (json.rb:35-43),
+ * the hook that routes `to_json` through ActiveSupport's encoder rather than
+ * the JSON gem's. Ruby includes it into `[Enumerable, Object, Array,
+ * FalseClass, Float, Hash, Integer, NilClass, String, TrueClass]`
+ * (json.rb:47-49); TypeScript cannot reopen built-ins, so it is assigned onto
+ * the classes of ours that define an `asJson` (the mixin idiom — a
+ * `this`-typed function).
+ *
+ * Ruby discriminates on `::JSON::State`, the argument the JSON gem's encoder
+ * passes. `JSON.stringify` has no state object: it calls `toJSON(key)` with
+ * the property key, a string — so the string is the discriminator here.
+ */
+export const ToJsonWithActiveSupportEncoder = {
+  toJSON(
+    this: ToJsonWithActiveSupportEncoderHost,
+    options?: EncodeOptions | string | null,
+  ): unknown {
+    if (typeof options === "string") {
+      // Called from JSON.stringify, forward it to the JSON serializer
+      return this.asJson();
+    } else {
+      // to_json is being invoked directly, use ActiveSupport's encoder
+      return ActiveSupportJSON.encode(this, options ?? undefined);
+    }
+  },
+};
 
 /**
  * `Object#as_json` (json.rb:58-66).

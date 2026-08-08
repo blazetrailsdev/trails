@@ -1,4 +1,9 @@
-import { getChildProcess } from "@blazetrails/activesupport";
+import {
+  getChildProcess,
+  include,
+  ToJsonWithActiveSupportEncoder,
+  type Included,
+} from "@blazetrails/activesupport";
 import { toDot, type DotHost, type DotTransition } from "../nfa/dot.js";
 import { Symbol as SymbolNode, Terminal, type Node } from "../nodes/node.js";
 import { renderVisualizer } from "../visualizer.js";
@@ -38,11 +43,18 @@ function anchorPreservingFlags(re: RegExp): RegExp {
   return new RegExp(`^(?:${re.source})$`, flags.join(""));
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (json.rb:47-49); the class/interface merge is how `include()` surfaces on the type side.
+export interface TransitionTable {
+  /** `ActiveSupport::ToJsonWithActiveSupportEncoder#to_json` (json.rb:35-43). */
+  toJSON: Included<typeof ToJsonWithActiveSupportEncoder>["toJSON"];
+}
+
 /**
  * Generalized Transition table — the DFA produced by Builder. Implements the
  * `TransitionTableLike` shape that `Simulator` consumes. Mirrors Rails'
  * `ActionDispatch::Journey::GTG::TransitionTable`.
  */
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class TransitionTable implements TransitionTableLike, DotHost {
   /** @internal */
   private readonly _stdparamStates = new Map<number, Map<RegExp, number>>();
@@ -211,10 +223,6 @@ export class TransitionTable implements TransitionTableLike, DotHost {
     };
   }
 
-  toJSON(): Record<string, unknown> {
-    return this.asJson();
-  }
-
   /**
    * Render the DFA as SVG by shelling out to the Graphviz `dot` binary, the
    * same way Rails does. Returns an empty string when `dot` is unavailable
@@ -263,7 +271,7 @@ export class TransitionTable implements TransitionTableLike, DotHost {
     });
     return renderVisualizer({
       title,
-      states: `function tt() { return ${JSON.stringify(this.asJson())}; }`,
+      states: `function tt() { return ${this.toJSON()}; }`,
       svg: this.toSvg(),
       funRoutes,
       paths: paths.map((p) => p.toString()),
@@ -287,3 +295,5 @@ function sample<T>(xs: readonly T[], n: number): T[] {
   }
   return out;
 }
+
+include(TransitionTable, ToJsonWithActiveSupportEncoder);

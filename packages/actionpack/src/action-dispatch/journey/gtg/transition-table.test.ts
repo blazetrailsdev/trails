@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { ActiveSupportJSON } from "@blazetrails/activesupport";
 import { Parser } from "../parser.js";
 import { Or } from "../nodes/node.js";
 import { Builder } from "./builder.js";
@@ -59,7 +60,7 @@ describe("ActionDispatch::Journey::GTG::TransitionTable", () => {
       "/articles/:id/edit(.:format)",
       "/articles/:id(.:format)",
     ]);
-    const json = t.toJSON() as {
+    const json = ActiveSupportJSON.decode(t.toJSON() as string) as {
       regexp_states: Record<string, Record<string, number>>;
       string_states: Record<string, Record<string, number>>;
       stdparam_states: Record<string, Record<string, number>>;
