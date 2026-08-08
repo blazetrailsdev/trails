@@ -391,8 +391,15 @@ describe("DatabaseTasksCreateAllTest", () => {
   captureStdoutAndStderr();
 
   let created: string[];
-  beforeEach(() => {
+  // database_tasks_test.rb:722-729 — `with_stubbed_configurations_establish_connection`
+  // stubs `connection_handler.establish_connection` so `create_all`'s closing
+  // re-establish (database_tasks.rb:132) is a no-op. The suite's own ambient
+  // connection is what `migration_connection.pool.db_config` (:128) reads;
+  // trails' tasks suite has no ambient connection of its own, so lay one here.
+  beforeEach(async () => {
     created = [];
+    await Base.establishConnection(ambientPoolConfiguration());
+    vi.spyOn(Base, "establishConnection").mockResolvedValue(undefined);
     DatabaseTasks.registerTask("abstract", {
       create: async (config) => {
         created.push(config.database ?? "unknown");
