@@ -30,17 +30,12 @@ describe("Migration", () => {
     });
 
     it("send calls super", () => {
-      // Rails asserts NoMethodError from the `else super` arm
-      // (command_recorder.rb:403). The class is module-local to the proxy, so
-      // the assertion is on the Ruby class name it carries.
       expect(() => recorder.nonExistingMethod("horses")).toThrow(
-        /undefined method 'nonExistingMethod'/,
+        expect.objectContaining({
+          name: "NoMethodError",
+          message: expect.stringContaining("undefined method 'nonExistingMethod'"),
+        }) as unknown as Error,
       );
-      try {
-        recorder.nonExistingMethod("horses");
-      } catch (error) {
-        expect((error as Error).name).toBe("NoMethodError");
-      }
     });
 
     it("send delegates to record", () => {

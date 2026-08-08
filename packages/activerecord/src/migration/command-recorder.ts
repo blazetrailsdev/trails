@@ -663,12 +663,13 @@ export class CommandRecorder {
   // private dispatch
   // ---------------------------------------------------------------------------
 
+  /**
+   * Mirrors `inverse_of`'s `respond_to?(method, true)` guard
+   * (command_recorder.rb:116): membership is tested before the read, because a
+   * name the recorder does not answer takes the proxy's `method_missing` arm.
+   */
   private _dispatchInvert(cmd: string, args: unknown[]): [string, unknown[]] {
     const methodName = `invert${cmd.charAt(0).toUpperCase()}${cmd.slice(1)}` as keyof this;
-    // Rails guards with `respond_to?(method, true)` (command_recorder.rb:116)
-    // before sending, so the membership test comes first: reading a name the
-    // recorder does not answer takes the proxy's `method_missing` arm, which
-    // hands back a NoMethodError-raising function.
     const method = methodName in this ? this[methodName] : undefined;
     if (typeof method === "function") {
       return (method as (args: unknown[]) => [string, unknown[]]).call(this, args);
