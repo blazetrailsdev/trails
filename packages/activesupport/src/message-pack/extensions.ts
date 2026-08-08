@@ -305,11 +305,7 @@ export const Extensions = {
   },
 
   loadTimeZone(name: string): TimeZone | null {
-    try {
-      return TimeZone.find(name);
-    } catch {
-      return null;
-    }
+    return TimeZone.find(name);
   },
 
   writeTimeZone(timeZone: TimeZone, packer: Packer): void {

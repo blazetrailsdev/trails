@@ -48,6 +48,7 @@ describe("parseArgs", () => {
       excludeGlobs: [],
       novelOnly: false,
       maxDetail: 40,
+      verbose: false,
     });
   });
 
@@ -154,6 +155,52 @@ describe("buildGlobalRubyCandidates", () => {
     expect(set.has("VERSION")).toBe(true);
     // `version` would absolve any novel TS method of that name, everywhere.
     expect(set.has("version")).toBe(false);
+  });
+
+  it("carries the Rails package, file and Class#method each candidate credits against", () => {
+    const ruby: ApiManifest = {
+      source: "ruby",
+      generatedAt: "",
+      packages: {
+        rack: {
+          classes: {
+            "Rack::BodyProxy": rubyClass({
+              name: "BodyProxy",
+              file: "body_proxy.rb",
+              instance: [method("close")],
+            }),
+          },
+          modules: {},
+        },
+        activerecord: {
+          classes: {
+            "ActiveRecord::ConnectionAdapters::SchemaCache": rubyClass({
+              name: "SchemaCache",
+              file: "connection_adapters/schema_cache.rb",
+              klass: [method("open")],
+            }),
+          },
+          modules: {},
+        },
+      },
+    };
+    const map = buildGlobalRubyCandidates(ruby);
+    expect(map.get("close")).toEqual([
+      {
+        package: "rack",
+        file: "body_proxy.rb",
+        fqn: "Rack::BodyProxy",
+        rubyName: "Rack::BodyProxy#close",
+      },
+    ]);
+    expect(map.get("open")).toEqual([
+      {
+        package: "activerecord",
+        file: "connection_adapters/schema_cache.rb",
+        fqn: "ActiveRecord::ConnectionAdapters::SchemaCache",
+        rubyName: "ActiveRecord::ConnectionAdapters::SchemaCache.open",
+      },
+    ]);
   });
 });
 
@@ -1488,7 +1535,9 @@ describe("buildReport — declaration names", () => {
 
   it("reports a declaration name Rails declares in a DIFFERENT file as moved", () => {
     const report = run(ruby, tsWith(["Foo", "Elsewhere"]));
-    expect(report.packages[0].extraFiles[0].extras).toEqual([{ name: "Elsewhere", kind: "moved" }]);
+    expect(report.packages[0].extraFiles[0].extras).toMatchObject([
+      { name: "Elsewhere", kind: "moved" },
+    ]);
   });
 
   // Rails' filename and its module's name are not always the same word:
@@ -1585,7 +1634,9 @@ describe("buildReport — interface declaration names", () => {
 
   it("still scores an interface declaration name Rails uses elsewhere", () => {
     const report = run(ruby, tsWith([{ name: "Quoting", isInterface: true }]));
-    expect(report.packages[0].extraFiles[0].extras).toEqual([{ name: "Quoting", kind: "moved" }]);
+    expect(report.packages[0].extraFiles[0].extras).toMatchObject([
+      { name: "Quoting", kind: "moved" },
+    ]);
     expect(report.packages[0].totalInterfaceExempt).toBe(0);
   });
 
@@ -2281,7 +2332,7 @@ describe("@noRailsEquivalent — extractor to report", () => {
     const report = reportFor(railsWithout([method("sync_replica")]), {
       "connection-adapters/libsql-replica-adapter.ts": DRIVER_ADAPTER,
     });
-    expect(report.fileTagRejections).toEqual([
+    expect(report.fileTagRejections).toMatchObject([
       {
         package: "activerecord",
         tsFile: "connection-adapters/libsql-replica-adapter.ts",
@@ -2298,6 +2349,22 @@ describe("@noRailsEquivalent — extractor to report", () => {
       "connection-adapters/libsql-replica-adapter.ts",
     ]);
     expect(gateFileTagRejections(report.fileTagRejections)).toContain("moved name(s)");
+    // The rejection states the evidence: which Rails file and member the
+    // moved name credits against, so "is a rename owed?" is answerable from
+    // the message instead of a throwaway walk of rails-api.json.
+    expect(report.fileTagRejections[0].movedOwners).toEqual({
+      syncReplica: [
+        {
+          package: "activerecord",
+          file: "base.rb",
+          fqn: "ActiveRecord::Base",
+          rubyName: "ActiveRecord::Base#sync_replica",
+        },
+      ],
+    });
+    expect(gateFileTagRejections(report.fileTagRejections)).toContain(
+      "syncReplica → activerecord base.rb ActiveRecord::Base#sync_replica",
+    );
   });
 
   it("accepts a file-level tag whose reason declares the moved name as a short-name coincidence", () => {
@@ -2321,7 +2388,7 @@ describe("@noRailsEquivalent — extractor to report", () => {
         "syncReplica(): void {}\n      pragma(): void {}",
       ).replace("subclass onto.", "subclass onto. MOVED-BY-SHORT-NAME: syncReplica."),
     });
-    expect(report.fileTagRejections).toEqual([
+    expect(report.fileTagRejections).toMatchObject([
       {
         package: "activerecord",
         tsFile: "connection-adapters/libsql-replica-adapter.ts",

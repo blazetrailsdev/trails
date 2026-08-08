@@ -16,7 +16,7 @@ describe("I18nTest", () => {
   beforeEach(async () => {
     await I18n.reloadBang();
     date = RubyDate.parse("2008-7-2");
-    time = TimeZone.find("UTC").local(2008, 7, 2, 16, 47, 1);
+    time = TimeZone.find("UTC")!.local(2008, 7, 2, 16, 47, 1);
   });
 
   afterEach(async () => {
@@ -24,7 +24,7 @@ describe("I18nTest", () => {
   });
 
   it("time zone localization with default format", () => {
-    const now = TimeZone.find("UTC").local(2000, 1, 1);
+    const now = TimeZone.find("UTC")!.local(2000, 1, 1);
     expect(I18n.localize(now)).toBe(now.strftime("%a, %d %b %Y %H:%M:%S %z"));
   });
 

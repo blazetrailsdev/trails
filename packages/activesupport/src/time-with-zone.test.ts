@@ -11,9 +11,9 @@ describe("TimeWithZoneTest", () => {
   let utcZone: TimeZone;
 
   beforeEach(() => {
-    eastern = TimeZone.find("Eastern Time (US & Canada)");
-    pacific = TimeZone.find("Pacific Time (US & Canada)");
-    utcZone = TimeZone.find("UTC");
+    eastern = TimeZone.find("Eastern Time (US & Canada)")!;
+    pacific = TimeZone.find("Pacific Time (US & Canada)")!;
+    utcZone = TimeZone.find("UTC")!;
   });
 
   it("creates from TimeZone.local()", () => {
@@ -647,7 +647,7 @@ describe("TimeWithZoneTest", () => {
   // Local: 1999-12-31 19:00:00 EST (-05:00)
   // ---------------------------------------------------------------------------
   it("nsec", () => {
-    const hawaii = TimeZone.find("Hawaii");
+    const hawaii = TimeZone.find("Hawaii")!;
     const withZone = new TimeWithZone(
       Temporal.Instant.from("2011-06-08T09:59:59.999999999Z"),
       hawaii,
@@ -848,7 +848,7 @@ describe("TimeWithZoneTest", () => {
   // Multiple timezone conversion tests (from time_with_zone_test.rb)
   // ---------------------------------------------------------------------------
   it("Hawaii timezone basic operations", () => {
-    const hawaii = TimeZone.find("Hawaii");
+    const hawaii = TimeZone.find("Hawaii")!;
     const twz = hawaii.local(2000, 1, 1, 0, 0, 0);
 
     expect(twz.hour).toBe(0);
@@ -861,7 +861,7 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("Alaska timezone basic operations", () => {
-    const alaska = TimeZone.find("Alaska");
+    const alaska = TimeZone.find("Alaska")!;
     const twz = alaska.local(2000, 1, 1, 15, 0, 0);
 
     expect(twz.hour).toBe(15);
@@ -873,7 +873,7 @@ describe("TimeWithZoneTest", () => {
     const utcTime = new Date(Date.UTC(2024, 6, 15, 12, 0, 0));
     const eastern_twz = new TimeWithZone(instantFromDate(utcTime), eastern);
     const pacific_twz = eastern_twz.inTimeZone(pacific);
-    const hawaii = TimeZone.find("Hawaii");
+    const hawaii = TimeZone.find("Hawaii")!;
     const hawaii_twz = pacific_twz.inTimeZone(hawaii);
     const back_to_eastern = hawaii_twz.inTimeZone(eastern);
 

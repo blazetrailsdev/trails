@@ -461,7 +461,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
     it("timezone awareness tzrange", async () => {
       const tz = "Pacific Time (US & Canada)";
-      const zone = TimeZone.find(tz);
+      const zone = TimeZone.find(tz)!;
       setZone(tz);
       const timeString = "2020-06-15T10:00:00-07:00";
       const instant = Temporal.Instant.from(timeString);
@@ -485,7 +485,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
     it("timezone awareness endless tzrange", async () => {
       const tz = "Pacific Time (US & Canada)";
-      const zone = TimeZone.find(tz);
+      const zone = TimeZone.find(tz)!;
       setZone(tz);
       const timeString = "2020-06-15T10:00:00-07:00";
       const instant = Temporal.Instant.from(timeString);
@@ -511,7 +511,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
     it("timezone awareness beginless tzrange", async () => {
       const tz = "Pacific Time (US & Canada)";
-      const zone = TimeZone.find(tz);
+      const zone = TimeZone.find(tz)!;
       setZone(tz);
       const timeString = "2020-06-15T10:00:00-07:00";
       const instant = Temporal.Instant.from(timeString);
@@ -533,7 +533,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
     it("timezone array awareness tzrange", async () => {
       const tz = "Pacific Time (US & Canada)";
-      const zone = TimeZone.find(tz);
+      const zone = TimeZone.find(tz)!;
       setZone(tz);
 
       const fromStr = "2020-06-15T10:00:00-07:00";
@@ -692,7 +692,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
     it("timezone awareness tsrange", async () => {
       const tz = "Pacific Time (US & Canada)";
-      const zone = TimeZone.find(tz);
+      const zone = TimeZone.find(tz)!;
       setZone(tz);
       const timeString = "2020-06-15T10:00:00-07:00";
       const instant = Temporal.Instant.from(timeString);
@@ -716,7 +716,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
     it("timezone awareness endless tsrange", async () => {
       const tz = "Pacific Time (US & Canada)";
-      const zone = TimeZone.find(tz);
+      const zone = TimeZone.find(tz)!;
       setZone(tz);
       const timeString = "2020-06-15T10:00:00-07:00";
       const instant = Temporal.Instant.from(timeString);
@@ -742,7 +742,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
     it("timezone awareness beginless tsrange", async () => {
       const tz = "Pacific Time (US & Canada)";
-      const zone = TimeZone.find(tz);
+      const zone = TimeZone.find(tz)!;
       setZone(tz);
       const timeString = "2020-06-15T10:00:00-07:00";
       const instant = Temporal.Instant.from(timeString);
@@ -764,7 +764,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
     it("timezone array awareness tsrange", async () => {
       const tz = "Pacific Time (US & Canada)";
-      const zone = TimeZone.find(tz);
+      const zone = TimeZone.find(tz)!;
       setZone(tz);
 
       const fromStr = "2020-06-15T10:00:00-07:00";
@@ -854,7 +854,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       // Rails: time_string = "2017-09-26 07:30:59.132451 -0700"; assert time.usec > 0
       // Verifies sub-millisecond (µs) precision is preserved through the PG round-trip.
       const tz = "Pacific Time (US & Canada)";
-      const zone = TimeZone.find(tz);
+      const zone = TimeZone.find(tz)!;
       setZone(tz);
       const timeString = "2017-09-26T07:30:59.132451-07:00";
       const instant = Temporal.Instant.from(timeString);

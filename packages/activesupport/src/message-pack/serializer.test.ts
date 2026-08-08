@@ -112,7 +112,7 @@ describe("MessagePackSerializerTest", () => {
   it("roundtrips ActiveSupport::TimeWithZone", () => {
     const twz = new TimeWithZone(
       Temporal.Instant.from("1999-12-31T12:34:56.789Z"),
-      TimeZone.find("Australia/Lord_Howe"),
+      TimeZone.find("Australia/Lord_Howe")!,
     );
     const result = roundtrip(twz) as TimeWithZone;
     expect(result).toBeInstanceOf(TimeWithZone);
@@ -121,7 +121,7 @@ describe("MessagePackSerializerTest", () => {
   });
 
   it("roundtrips ActiveSupport::TimeZone", () => {
-    const zone = TimeZone.find("Eastern Time (US & Canada)");
+    const zone = TimeZone.find("Eastern Time (US & Canada)")!;
     expect((roundtrip(zone) as TimeZone).name).toBe(zone.name);
   });
 
@@ -152,7 +152,7 @@ describe("MessagePackSerializerTest", () => {
     expect([...dump(new Set([null, true, 2, "three"]))]).toEqual([
       204, 128, 199, 10, 12, 148, 192, 195, 2, 165, 116, 104, 114, 101, 101,
     ]);
-    expect([...dump(TimeZone.find("Eastern Time (US & Canada)"))]).toEqual([
+    expect([...dump(TimeZone.find("Eastern Time (US & Canada)")!)]).toEqual([
       204, 128, 199, 26, 9, 69, 97, 115, 116, 101, 114, 110, 32, 84, 105, 109, 101, 32, 40, 85, 83,
       32, 38, 32, 67, 97, 110, 97, 100, 97, 41,
     ]);

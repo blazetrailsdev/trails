@@ -11,6 +11,7 @@
 
 import { TimeWithZone } from "../time-with-zone.js";
 import { Duration } from "../duration.js";
+import { ArgumentError } from "../hash-utils.js";
 import { Temporal } from "@blazetrails/date";
 import { instantFrom } from "../temporal.js";
 import { currentTime } from "../time-travel.js";
@@ -287,58 +288,71 @@ export class TimeZone {
   /**
    * The port of `ActiveSupport::TimeZone.[]` (time_zone.rb:232-250): a Rails
    * name or IANA identifier, a `TimeZone`, or a `Numeric`/`Duration` UTC
-   * offset. Ruby's `[]` returns `nil` where every arm here throws — `[]` is
-   * only ever called from a raise site (`findZoneBang`, zones.rb:83), and
-   * making it nullable would rewrite ~60 unrelated call sites.
+   * offset. `null` for a name that resolves to no zone (Ruby's
+   * `rescue TZInfo::InvalidTimezoneIdentifier; nil`, time_zone.rb:239-241) and
+   * for an offset no zone matches (`all.find`, time_zone.rb:246); the only
+   * raise is the wrong-class arm at time_zone.rb:249. The string arm is
+   * `@lazy_zones_map[arg] ||= create(arg)` under its
+   * `rescue TZInfo::InvalidTimezoneIdentifier; nil` (time_zone.rb:237-241).
    *
    * A `Duration` argument reads its seconds through `inSeconds()`, standing in
    * for Ruby's `arg.abs` / `arg.to_i` delegating to `@value` — trails' Duration
    * derives totals from `parts` and carries no `@value`.
    */
-  static find(name: string | number | Duration | TimeZone): TimeZone {
-    if (name instanceof TimeZone) return name;
-    if (typeof name === "number" || name instanceof Duration) {
-      let arg = name instanceof Duration ? name.inSeconds() : name;
-      if (Math.abs(arg) <= 13) arg *= 3600;
-      const zone = TimeZone.all().find((z) => z.utcOffset === Math.trunc(arg));
-      if (zone) return zone;
-      throw new Error(`Invalid time zone: ${String(name)}`);
-    }
-    if (zoneCache.has(name)) return zoneCache.get(name)!;
-
-    // Check Rails mapping first
-    const iana = MAPPING[name];
-    if (iana) {
-      const tz = new TimeZone(name, iana);
-      zoneCache.set(name, tz);
+  static find(arg: unknown): TimeZone | null {
+    if (arg instanceof TimeZone) return arg;
+    if (typeof arg === "string") {
+      const cached = zoneCache.get(arg);
+      if (cached) return cached;
+      let tz: TimeZone;
+      try {
+        tz = TimeZone.create(arg);
+      } catch {
+        return null;
+      }
+      zoneCache.set(arg, tz);
       return tz;
     }
+    if (typeof arg === "number" || arg instanceof Duration) {
+      let seconds = arg instanceof Duration ? arg.inSeconds() : arg;
+      if (Math.abs(seconds) <= 13) seconds *= 3600;
+      return TimeZone.all().find((z) => z.utcOffset === Math.trunc(seconds)) ?? null;
+    }
+    throw new ArgumentError(`invalid argument to TimeZone[]: ${String(arg)}`);
+  }
 
-    // Try as IANA name directly — validate by attempting to use it
+  /**
+   * `alias_method :create, :new` (time_zone.rb:211) — the allocator, whose
+   * `initialize` resolves the zone through `find_tzinfo` (time_zone.rb:208) and
+   * so RAISES for a name TZInfo does not know, where `[]` returns `nil`. The
+   * raised class is `Error`, not TZInfo's `InvalidTimezoneIdentifier` — trails
+   * resolves zones through `Intl`, which has no TZInfo error hierarchy to port.
+   * A bare allocator: the `@lazy_zones_map` memo belongs to `[]`
+   * (`@lazy_zones_map[arg] ||= create(arg)`, time_zone.rb:237-238), so every
+   * call here builds a fresh instance as Ruby's `new` does.
+   */
+  static create(name: string): TimeZone {
+    const ianaName = MAPPING[name] ?? name;
     try {
-      new Intl.DateTimeFormat("en-US", { timeZone: name });
-      const tz = new TimeZone(name, name);
-      zoneCache.set(name, tz);
-      return tz;
+      new Intl.DateTimeFormat("en-US", { timeZone: ianaName });
     } catch {
       throw new Error(`Invalid time zone: ${name}`);
     }
-  }
-
-  /** Alias for find */
-  static create(name: string): TimeZone {
-    return TimeZone.find(name);
+    return new TimeZone(name, ianaName);
   }
 
   /**
    * Every Rails-named timezone: `@zones ||= zones_map.values.sort`
    * (time_zone.rb:223-225), sorted by `<=>` — utc_offset, then name
-   * (time_zone.rb:333-337).
+   * (time_zone.rb:333-337). `zones_map` keeps a MAPPING entry only when `[]`
+   * resolves it (`zones[name] = timezone if timezone`, time_zone.rb:288-291),
+   * hence the nullish filter.
    */
   static all(): TimeZone[] {
     if (zones) return zones;
     zones = Object.keys(MAPPING)
       .map((name) => TimeZone.find(name))
+      .filter((zone): zone is TimeZone => zone != null)
       .sort(
         (a, b) => a.utcOffset - b.utcOffset || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0),
       );
@@ -841,7 +855,7 @@ export class TimeZone {
       "Eastern Time (US & Canada)",
       "Indiana (East)",
     ];
-    return usNames.map((n) => TimeZone.find(n));
+    return usNames.map((n) => TimeZone.find(n)!);
   }
 
   toString(): string {

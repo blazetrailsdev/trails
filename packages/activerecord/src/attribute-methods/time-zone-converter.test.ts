@@ -55,8 +55,8 @@ describe("TimeZoneConverterTest", () => {
   });
 
   it("cast moves existing TimeWithZone to current zone", () => {
-    const pacific = TimeZone.find("Pacific Time (US & Canada)");
-    const eastern = TimeZone.find("Eastern Time (US & Canada)");
+    const pacific = TimeZone.find("Pacific Time (US & Canada)")!;
+    const eastern = TimeZone.find("Eastern Time (US & Canada)")!;
     const instant = Temporal.Instant.from("2024-06-15T14:00:00Z");
     const pacificTime = new TimeWithZone(instant, pacific);
 
@@ -129,7 +129,7 @@ describe("TimeZoneConverterTest", () => {
     setZone("Eastern Time (US & Canada)");
     const converter = new TimeZoneConverter(new DateTime());
     const instant = Temporal.Instant.from("2024-06-15T14:00:00Z");
-    const eastern = TimeZone.find("Eastern Time (US & Canada)");
+    const eastern = TimeZone.find("Eastern Time (US & Canada)")!;
     const twz = new TimeWithZone(instant, eastern);
     // 14:00 UTC displayed as 10:00 EDT; serialize (value_for_database) returns the
     // cast UTC Temporal.Instant — the adapter renders the SQL literal downstream.

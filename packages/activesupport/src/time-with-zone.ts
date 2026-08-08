@@ -8,7 +8,7 @@
 import { TimeZone } from "./values/time-zone.js";
 import { Duration } from "./duration.js";
 import { currentTime } from "./time-travel.js";
-import { getZone } from "./time-zone-config.js";
+import { getZone, findZoneBang } from "./time-zone-config.js";
 import { Temporal } from "@blazetrails/date";
 import { instantFrom } from "./temporal.js";
 import { Rational, strftime } from "@blazetrails/date";
@@ -326,14 +326,21 @@ export class TimeWithZone {
     return this._epochMs / 1000;
   }
 
-  /** Convert to a different timezone. No-argument form uses Time.zone. */
-  inTimeZone(zone?: string | TimeZone | null): TimeWithZone {
+  /**
+   * Convert to a different timezone. No-argument form uses Time.zone.
+   *
+   * `utc.in_time_zone(new_zone)` (time_with_zone.rb:79) lands in
+   * `Time#in_time_zone`, whose first act is `::Time.find_zone!`
+   * (core_ext/time/zones.rb), so every argument class, unmatched offset and bad
+   * name raises there rather than here.
+   */
+  inTimeZone(zone?: unknown): TimeWithZone {
     if (zone == null) {
       const currentZone = getZone();
       if (!currentZone) return this;
       zone = currentZone;
     }
-    const tz = typeof zone === "string" ? TimeZone.find(zone) : zone;
+    const tz = findZoneBang(zone) as TimeZone;
     if (tz.tzinfo === this._timeZone.tzinfo) return this;
     return new TimeWithZone(this._zoned.toInstant(), tz);
   }

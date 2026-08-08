@@ -937,7 +937,7 @@ describe("AttributeMethodsTest", () => {
 
   it("setting time zone-aware attribute in other time zone", async () => {
     const utcTime = Temporal.Instant.from("2008-01-01T00:00:00Z");
-    const cstTime = new TimeWithZone(utcTime, TimeZone.find("Central Time (US & Canada)"));
+    const cstTime = new TimeWithZone(utcTime, TimeZone.find("Central Time (US & Canada)")!);
     await inTimeZone("Pacific Time (US & Canada)", () => {
       class Topic extends Base {
         static {

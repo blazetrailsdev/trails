@@ -7,7 +7,7 @@ import { Temporal } from "@blazetrails/date";
 // digits (time_with_zone.rb:223-227 delegates strftime to that Time). These
 // cover the readers and formatters that derive the sub-second part.
 describe("TimeWithZone sub-millisecond precision", () => {
-  const eastern = TimeZone.find("Eastern Time (US & Canada)");
+  const eastern = TimeZone.find("Eastern Time (US & Canada)")!;
   const subMs = () =>
     new TimeWithZone(Temporal.Instant.from("2000-01-01T00:00:00.123456789Z"), eastern);
 

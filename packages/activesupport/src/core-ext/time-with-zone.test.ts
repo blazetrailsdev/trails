@@ -16,6 +16,7 @@ import {
   findZoneBang,
   current,
   dateInTimeZone,
+  ArgumentError,
 } from "../time-zone-config.js";
 
 describe("TimeWithZoneTest", () => {
@@ -24,9 +25,9 @@ describe("TimeWithZoneTest", () => {
   let utcZone: TimeZone;
 
   beforeEach(() => {
-    eastern = TimeZone.find("Eastern Time (US & Canada)");
-    pacific = TimeZone.find("Pacific Time (US & Canada)");
-    utcZone = TimeZone.find("UTC");
+    eastern = TimeZone.find("Eastern Time (US & Canada)")!;
+    pacific = TimeZone.find("Pacific Time (US & Canada)")!;
+    utcZone = TimeZone.find("UTC")!;
   });
 
   // @twz = 2000-01-01 00:00:00 UTC in Eastern = 1999-12-31 19:00:00 EST
@@ -62,7 +63,7 @@ describe("TimeWithZoneTest", () => {
 
   it("in time zone with argument", () => {
     const twz = maketwz();
-    const alaska = TimeZone.find("Alaska");
+    const alaska = TimeZone.find("Alaska")!;
     const result = twz.inTimeZone("Alaska");
     expect(result.timeZone.name).toBe(alaska.name);
     expect(result.utc().epochMilliseconds).toBe(twz.utc().epochMilliseconds);
@@ -80,7 +81,7 @@ describe("TimeWithZoneTest", () => {
 
   it("in time zone with ambiguous time", () => {
     // 2014-10-26 01:00:00 Moscow time was ambiguous due to DST change
-    const moscow = TimeZone.find("Moscow");
+    const moscow = TimeZone.find("Moscow")!;
     const twz = moscow.local(2014, 10, 26, 1, 0, 0);
     expect(twz.utc().epochMilliseconds).toBe(Date.UTC(2014, 9, 25, 22, 0, 0));
   });
@@ -407,7 +408,7 @@ describe("TimeWithZoneTest", () => {
     expect(twz.eql(new Date(Date.UTC(2000, 0, 1)))).toBe(true);
     expect(
       twz.eql(
-        new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1))), TimeZone.find("Hawaii")),
+        new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1))), TimeZone.find("Hawaii")!),
       ),
     ).toBe(true);
     expect(twz.eql(new Date(Date.UTC(2000, 0, 1, 0, 0, 1)))).toBe(false);
@@ -514,7 +515,7 @@ describe("TimeWithZoneTest", () => {
 
   it("to a", () => {
     // Rails: [45, 30, 5, 1, 2, 2000, 2, 32, false, "HST"]
-    const hawaii = TimeZone.find("Hawaii");
+    const hawaii = TimeZone.find("Hawaii")!;
     const twzH = new TimeWithZone(
       instantFromDate(new Date(Date.UTC(2000, 1, 1, 15, 30, 45))),
       hawaii,
@@ -532,13 +533,13 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("to f", () => {
-    const hawaii = TimeZone.find("Hawaii");
+    const hawaii = TimeZone.find("Hawaii")!;
     const twzH = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1))), hawaii);
     expect(twzH.toF()).toBe(946684800.0);
   });
 
   it("to i", () => {
-    const hawaii = TimeZone.find("Hawaii");
+    const hawaii = TimeZone.find("Hawaii")!;
     const twzH = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1))), hawaii);
     expect(twzH.toI()).toBe(946684800);
   });
@@ -928,7 +929,7 @@ describe("TimeWithZoneTest", () => {
     const parsed = JSON.parse(json);
     const restored = new TimeWithZone(
       instantFromDate(new Date(parsed.utc)),
-      TimeZone.find(parsed.timeZone),
+      TimeZone.find(parsed.timeZone)!,
     );
     expect(restored.utc().epochMilliseconds).toBe(twz.utc().epochMilliseconds);
     expect(restored.timeZone.name).toBe(twz.timeZone.name);
@@ -944,7 +945,7 @@ describe("TimeWithZoneTest", () => {
     const parsed = JSON.parse(json);
     const restored = new TimeWithZone(
       instantFromDate(new Date(parsed.utc)),
-      TimeZone.find(parsed.timeZone),
+      TimeZone.find(parsed.timeZone)!,
     );
     expect(restored.utc().epochMilliseconds).toBe(twz.utc().epochMilliseconds);
     expect(restored.inspect()).toBe(twz.inspect());
@@ -1052,7 +1053,7 @@ describe("TimeWithZoneTest", () => {
     // Time.at(1319936400) = 2011-10-30 02:00:00 UTC
     const twz = new TimeWithZone(
       instantFromDate(new Date(1319936400 * 1000)),
-      TimeZone.find("Madrid"),
+      TimeZone.find("Madrid")!,
     );
     const result = twz.change({ min: 0 });
     expect(result.getTime()).toBe(twz.getTime());
@@ -1061,7 +1062,7 @@ describe("TimeWithZoneTest", () => {
   it("round at dst boundary", () => {
     const twz = new TimeWithZone(
       instantFromDate(new Date(1319936400 * 1000)),
-      TimeZone.find("Madrid"),
+      TimeZone.find("Madrid")!,
     );
     const result = twz.round();
     expect(result.getTime()).toBe(twz.getTime());
@@ -1154,11 +1155,11 @@ describe("TimeWithZoneMethodsForTimeAndDateTimeTest", () => {
 
   it("in time zone", () => {
     useZone("Alaska", () => {
-      const result = new TimeWithZone(instantFromDate(t), TimeZone.find("Alaska"));
+      const result = new TimeWithZone(instantFromDate(t), TimeZone.find("Alaska")!);
       expect(result.inspect()).toBe("1999-12-31 15:00:00.000000000 AKST -09:00");
     });
     useZone("Hawaii", () => {
-      const result = new TimeWithZone(instantFromDate(t), TimeZone.find("Hawaii"));
+      const result = new TimeWithZone(instantFromDate(t), TimeZone.find("Hawaii")!);
       expect(result.inspect()).toBe("1999-12-31 14:00:00.000000000 HST -10:00");
     });
   });
@@ -1171,22 +1172,28 @@ describe("TimeWithZoneMethodsForTimeAndDateTimeTest", () => {
 
   it("in time zone with argument", () => {
     useZone("Eastern Time (US & Canada)", () => {
-      const alaska = new TimeWithZone(instantFromDate(t), TimeZone.find("Alaska"));
+      const alaska = new TimeWithZone(instantFromDate(t), TimeZone.find("Alaska")!);
       expect(alaska.inspect()).toBe("1999-12-31 15:00:00.000000000 AKST -09:00");
-      const hawaii = new TimeWithZone(instantFromDate(t), TimeZone.find("Hawaii"));
+      const hawaii = new TimeWithZone(instantFromDate(t), TimeZone.find("Hawaii")!);
       expect(hawaii.inspect()).toBe("1999-12-31 14:00:00.000000000 HST -10:00");
-      const utcTwz = new TimeWithZone(instantFromDate(t), TimeZone.find("UTC"));
+      const utcTwz = new TimeWithZone(instantFromDate(t), TimeZone.find("UTC")!);
       expect(utcTwz.inspect()).toBe("2000-01-01 00:00:00.000000000 UTC +00:00");
     });
   });
 
   it("in time zone with invalid argument", () => {
-    expect(() => TimeZone.find("No such timezone exists")).toThrow();
+    const twz = new TimeWithZone(
+      instantFromDate(new Date(Date.UTC(2000, 0, 1))),
+      TimeZone.find("UTC")!,
+    );
+    expect(() => twz.inTimeZone("No such timezone exists")).toThrow(ArgumentError);
+    expect(() => twz.inTimeZone(Duration.hours(-15))).toThrow(ArgumentError);
+    expect(() => twz.inTimeZone({})).toThrow(ArgumentError);
   });
 
   it("in time zone with time local instance", () => {
     const time = new Date(Date.UTC(2000, 0, 1, 0, 0, 0)); // UTC midnight
-    const result = new TimeWithZone(instantFromDate(time), TimeZone.find("Alaska"));
+    const result = new TimeWithZone(instantFromDate(time), TimeZone.find("Alaska")!);
     expect(result.inspect()).toBe("1999-12-31 15:00:00.000000000 AKST -09:00");
   });
 
@@ -1218,7 +1225,7 @@ describe("TimeWithZoneMethodsForTimeAndDateTimeTest", () => {
 
   it("time at precision", () => {
     useZone("UTC", () => {
-      const twz = TimeZone.find("UTC").local(2019, 1, 31, 23, 59, 59, 999);
+      const twz = TimeZone.find("UTC")!.local(2019, 1, 31, 23, 59, 59, 999);
       expect(twz.toI()).toBe(Math.floor(twz.getTime() / 1000));
     });
   });
@@ -1330,7 +1337,7 @@ describe("TimeWithZoneMethodsForTimeAndDateTimeTest", () => {
     const time = new Date(Date.UTC(2000, 6, 1));
     const twz = new TimeWithZone(
       instantFromDate(time),
-      TimeZone.find("Eastern Time (US & Canada)"),
+      TimeZone.find("Eastern Time (US & Canada)")!,
     );
     expect(twz.utc().epochMilliseconds).toBe(time.getTime());
     // Original Date should not be modified
@@ -1371,7 +1378,10 @@ describe("TimeWithZoneMethodsForDate", () => {
   });
 
   it("in time zone with invalid argument", () => {
-    expect(() => dateInTimeZone(new Date(2000, 0, 1), "No such timezone exists")).toThrow();
+    const d = new Date(2000, 0, 1);
+    expect(() => dateInTimeZone(d, "No such timezone exists")).toThrow(ArgumentError);
+    expect(() => dateInTimeZone(d, Duration.hours(-15))).toThrow(ArgumentError);
+    expect(() => dateInTimeZone(d, {})).toThrow(ArgumentError);
   });
 });
 
@@ -1384,7 +1394,7 @@ describe("TimeWithZoneMethodsForString", () => {
     useZone("Alaska", () => {
       const result = new TimeWithZone(
         instantFromDate(new Date(Date.UTC(2000, 0, 1))),
-        TimeZone.find("Alaska"),
+        TimeZone.find("Alaska")!,
       );
       expect(result.inspect()).toBe("1999-12-31 15:00:00.000000000 AKST -09:00");
     });
@@ -1399,19 +1409,25 @@ describe("TimeWithZoneMethodsForString", () => {
     useZone("Eastern Time (US & Canada)", () => {
       const alaska = new TimeWithZone(
         instantFromDate(new Date(Date.UTC(2000, 0, 1))),
-        TimeZone.find("Alaska"),
+        TimeZone.find("Alaska")!,
       );
       expect(alaska.inspect()).toBe("1999-12-31 15:00:00.000000000 AKST -09:00");
     });
   });
 
   it("in time zone with invalid argument", () => {
-    expect(() => TimeZone.find("No such timezone exists")).toThrow();
+    const twz = new TimeWithZone(
+      instantFromDate(new Date(Date.UTC(2000, 0, 1))),
+      TimeZone.find("UTC")!,
+    );
+    expect(() => twz.inTimeZone("No such timezone exists")).toThrow(ArgumentError);
+    expect(() => twz.inTimeZone(Duration.hours(-15))).toThrow(ArgumentError);
+    expect(() => twz.inTimeZone({})).toThrow(ArgumentError);
   });
 
   it("in time zone with ambiguous time", () => {
     // 2014-10-26 01:00:00 Moscow time is ambiguous due to DST change
-    const moscow = TimeZone.find("Moscow");
+    const moscow = TimeZone.find("Moscow")!;
     const twz = moscow.local(2014, 10, 26, 1, 0, 0);
     // Should resolve to the UTC equivalent
     expect(twz.utc().epochMilliseconds).toBe(Date.UTC(2014, 9, 25, 22, 0, 0));

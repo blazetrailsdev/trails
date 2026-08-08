@@ -279,7 +279,7 @@ describe("TestJSONEncoding", () => {
   it.skip("json gem pretty generate by passing active support encoder");
   it("twz to json with use standard json time format config set to false", () => {
     withStandardJsonTimeFormat(false, () => {
-      const zone = TimeZone.find("Eastern Time (US & Canada)");
+      const zone = TimeZone.find("Eastern Time (US & Canada)")!;
       const time = new TimeWithZone(Temporal.Instant.from("2000-01-01T00:00:00Z"), zone);
       expect(ActiveSupportJSON.encode(time)).toBe('"1999/12/31 19:00:00 -0500"');
     });
@@ -287,7 +287,7 @@ describe("TestJSONEncoding", () => {
 
   it("twz to json with use standard json time format config set to true", () => {
     withStandardJsonTimeFormat(true, () => {
-      const zone = TimeZone.find("Eastern Time (US & Canada)");
+      const zone = TimeZone.find("Eastern Time (US & Canada)")!;
       const time = new TimeWithZone(Temporal.Instant.from("2000-01-01T00:00:00Z"), zone);
       expect(ActiveSupportJSON.encode(time)).toBe('"1999-12-31T19:00:00.000-05:00"');
     });
@@ -296,7 +296,7 @@ describe("TestJSONEncoding", () => {
   it("twz to json with custom time precision", () => {
     withStandardJsonTimeFormat(true, () => {
       withTimePrecision(0, () => {
-        const zone = TimeZone.find("Eastern Time (US & Canada)");
+        const zone = TimeZone.find("Eastern Time (US & Canada)")!;
         const time = new TimeWithZone(Temporal.Instant.from("2000-01-01T00:00:00Z"), zone);
         expect(ActiveSupportJSON.encode(time)).toBe('"1999-12-31T19:00:00-05:00"');
       });
