@@ -1,9 +1,0 @@
-[
-  {
-    "package": "activesupport",
-    "tsFile": "time-zone-config.ts",
-    "rubyName": "zone=",
-    "call": "find_zone!",
-    "reason": "`setZone` still resolves the argument inline instead of through `findZoneBang`, because trails maps `nil` onto 'unset, fall through to zone_default' where Rails stores nil. Converging the two needs the zone_default fallthrough settled first; `find_zone`/`use_zone` in this file already route through `findZoneBang`."
-  }
-]
