@@ -959,22 +959,35 @@ export class TimeZone {
    * `TZInfo::Country.get(code).zone_identifiers` is
    * `Intl.Locale#getTimeZones` here — the same IANA country table, read off the
    * runtime's own tzdata rather than off a literal list, so a tzdata update
-   * moves the answer as it moves Rails'. It answers `undefined` for a code
-   * with no zones, where TZInfo raises `InvalidCountryCode`; trails resolves
-   * zones through `Intl`, which has no TZInfo error hierarchy to port, the same
-   * reasoning as {@link TimeZone.create}.
+   * moves the answer as it moves Rails'. `TZInfo::Country.get` RAISES
+   * `TZInfo::InvalidCountryCode` on a code it does not know and
+   * `load_country_zones` does not rescue it, so an unknown code raises here
+   * too; the class is `Error` rather than TZInfo's, for the same reason as
+   * {@link TimeZone.create} — trails resolves zones through `Intl`, which has
+   * no TZInfo error hierarchy to port.
    */
   static #loadCountryZones(code: string): TimeZone[] {
-    const country = new Intl.Locale(`und-${code}`).getTimeZones() ?? [];
+    // `getTimeZones` reports an unknown region as no zones rather than by
+    // raising, and rejects a malformed one with a `RangeError`; every real
+    // Alpha2 code has at least one zone, so both are the raise `Country.get`
+    // makes.
+    let country: string[] | undefined;
+    try {
+      country = new Intl.Locale(`und-${code}`).getTimeZones();
+    } catch {
+      country = undefined;
+    }
+    if (country === undefined || country.length === 0) {
+      throw new Error(`Invalid country code: ${code}`);
+    }
     return country
       .flatMap((tzId) => {
         if (Object.values(MAPPING).includes(tzId)) {
           const memo: TimeZone[] = [];
           for (const [key, value] of Object.entries(MAPPING)) {
-            if (value === tzId) {
-              const zone = TimeZone.find(key);
-              if (zone) memo.push(zone);
-            }
+            // `memo << self[key]` is unconditional in Rails: a MAPPING key
+            // always resolves, so there is no miss to guard.
+            if (value === tzId) memo.push(TimeZone.find(key)!);
           }
           return memo;
         }

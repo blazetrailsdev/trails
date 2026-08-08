@@ -3121,7 +3121,9 @@ function cValidCivilP(y: number, m: number, d: number, sg = DEFAULT_SG): number 
   if (m < 0) m += 13;
   if (m < 1 || m > 12) return null;
   if (d < 0) {
-    [ry, rm, rd] = cJdToCivil(cFindLdom(y, m, sg) + d + 1, sg);
+    const ldom = cFindLdom(y, m, sg);
+    if (ldom === null) return null;
+    [ry, rm, rd] = cJdToCivil(ldom + d + 1, sg);
     if (ry !== y || rm !== m) return null;
     d = rd;
   }
@@ -3246,6 +3248,7 @@ function cValidOrdinalP(y: number, d: number, sg = DEFAULT_SG): number | null {
 
   if (d < 0) {
     const rjd2 = cFindLdoy(y, sg);
+    if (rjd2 === null) return null;
 
     [ry2, rd2] = cJdToOrdinal(rjd2 + d + 1, sg);
     if (ry2 !== y) return null;
@@ -3261,16 +3264,16 @@ function cValidOrdinalP(y: number, d: number, sg = DEFAULT_SG): number | null {
  * @internal `date_core.c` `c_find_fdoy` (`date_core.c:455-465`), the Julian day
  * of the first day of year `y`. Ruby scans January forwards, taking the first
  * day `c_valid_civil_p` accepts, because the calendar reform can delete 1
- * January itself. Its `ns` out-parameter and its `0` return — reached only when
- * no day of January is valid — have no reader among the callers below, which is
- * why the answer is the day alone.
+ * January itself. The C's success flag is the return and the day an
+ * out-parameter; here the day IS the return and the C's `0` is `null`. Its `ns`
+ * out-parameter has no reader.
  */
-function cFindFdoy(y: number, sg = DEFAULT_SG): number {
+function cFindFdoy(y: number, sg = DEFAULT_SG): number | null {
   for (let d = 1; d < 31; d++) {
     const rjd = cValidCivilP(y, 1, d, sg);
     if (rjd !== null) return rjd;
   }
-  return 0;
+  return null;
 }
 
 /**
@@ -3278,12 +3281,12 @@ function cFindFdoy(y: number, sg = DEFAULT_SG): number {
  * of the last day of year `y`, scanned backwards from 31 December for the same
  * reason as {@link cFindFdoy}.
  */
-function cFindLdoy(y: number, sg = DEFAULT_SG): number {
+function cFindLdoy(y: number, sg = DEFAULT_SG): number | null {
   for (let i = 0; i < 30; i++) {
     const rjd = cValidCivilP(y, 12, 31 - i, sg);
     if (rjd !== null) return rjd;
   }
-  return 0;
+  return null;
 }
 
 /**
@@ -3293,12 +3296,12 @@ function cFindLdoy(y: number, sg = DEFAULT_SG): number {
  * days under `Date::ITALY` and 28 read proleptically, so `Date.new(1500, 2, -1)`
  * counts back from the 29th as MRI does.
  */
-function cFindLdom(y: number, m: number, sg = DEFAULT_SG): number {
+function cFindLdom(y: number, m: number, sg = DEFAULT_SG): number | null {
   for (let i = 0; i < 30; i++) {
     const rjd = cValidCivilP(y, m, 31 - i, sg);
     if (rjd !== null) return rjd;
   }
-  return 0;
+  return null;
 }
 
 /**
@@ -3308,7 +3311,10 @@ function cFindLdom(y: number, m: number, sg = DEFAULT_SG): number {
  * on {@link cCivilToJd}.
  */
 function cOrdinalToJd(y: number, d: number, sg = DEFAULT_SG): number {
-  return cFindFdoy(y, sg) + d - 1;
+  // The C reads `*rjd` back without checking `c_find_fdoy`'s flag here and in
+  // the four below: every year has a valid 1 January under any `sg`, so the
+  // scan cannot come up empty.
+  return cFindFdoy(y, sg)! + d - 1;
 }
 
 /**
@@ -3318,7 +3324,7 @@ function cOrdinalToJd(y: number, d: number, sg = DEFAULT_SG): number {
  */
 function cJdToOrdinal(jd: number, sg = DEFAULT_SG): [ry: number, rd: number] {
   const [ry] = cJdToCivil(jd, sg);
-  const rjd = cFindFdoy(ry, sg);
+  const rjd = cFindFdoy(ry, sg)!;
   return [ry, jd - rjd + 1];
 }
 
@@ -3329,7 +3335,7 @@ function cJdToOrdinal(jd: number, sg = DEFAULT_SG): [ry: number, rd: number] {
  * then `w` weeks and `d` days on.
  */
 function cCommercialToJd(y: number, w: number, d: number): number {
-  const rjd2 = cFindFdoy(y) + 3;
+  const rjd2 = cFindFdoy(y)! + 3;
   return rjd2 - mod(rjd2, 7) + 7 * (w - 1) + (d - 1);
 }
 
@@ -3377,14 +3383,14 @@ function cValidCommercialP(y: number, w: number, d: number): number | null {
  * year whose 1 January is itself an `f`-day: there, 1 January opens week `1`.
  */
 function cWeeknumToJd(y: number, w: number, d: number, f: number): number {
-  const rjd2 = cFindFdoy(y) + 6;
+  const rjd2 = cFindFdoy(y)! + 6;
   return rjd2 - mod(rjd2 - f + 1, 7) - 7 + 7 * w + d;
 }
 
 /** @internal `date_core.c` `c_jd_to_weeknum` (`date_core.c:621-634`), the inverse of {@link cWeeknumToJd}. */
 function cJdToWeeknum(jd: number, f: number): [ry: number, rw: number, rd: number] {
   const [ry] = cJdToCivil(jd);
-  const rjd = cFindFdoy(ry) + 6;
+  const rjd = cFindFdoy(ry)! + 6;
   const j = jd - (rjd - mod(rjd - f + 1, 7)) + 7;
   return [ry, div(j, 7), mod(j, 7)];
 }
@@ -3985,8 +3991,12 @@ export class Date {
   }
 
   /**
-   * Ruby `Date#jd` (ruby/date, `date_core.c` `d_lite_jd` over `m_jd`,
-   * `date_core.c:1461-1470`), the astronomical Julian day the date names. It is
+   * Ruby `Date#jd` (ruby/date, `date_core.c` `d_lite_jd`,
+   * `date_core.c:5248-5253`, over `m_real_local_jd` → `m_local_jd`,
+   * `date_core.c:1486-1497`), the astronomical Julian day the date names. This
+   * is the LOCAL day — `m_jd` (`date_core.c:1459-1469`) is the UTC one
+   * `m_real_jd` and `tmx_m_secs` read, and the two part company on a
+   * `DateTime` with an offset. It is
    * the calendar-neutral reading every field below is derived from, which is
    * why they agree with MRI at and before the calendar reform where
    * `Temporal.PlainDate`'s own proleptic Gregorian readers do not.
