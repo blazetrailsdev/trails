@@ -110,9 +110,9 @@ export class SQLiteDatabaseTasks {
    */
   async purge(): Promise<void> {
     try {
-      const connection = await this.connection();
+      const connection = (await this.connection()) as SQLite3Adapter;
       connection.disconnectBang();
-      await (connection as { whenClosed?: () => Promise<void> }).whenClosed?.();
+      await connection.whenClosed();
       await this.drop();
     } catch (error) {
       if (!(error instanceof NoDatabaseError)) throw error;
