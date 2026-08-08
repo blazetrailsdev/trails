@@ -1160,12 +1160,7 @@ describe("NullPool member parity", () => {
     expect("shard" in pool).toBe(false);
   });
 
-  it("raises on a pool-less adapter's role, shard and inspect", () => {
-    // The arm the old `this.pool as ConnectionPool` cast left silent: Ruby's
-    // `@pool.role` (abstract_adapter.rb:288) raises NoMethodError on a NullPool,
-    // where a JS read of a missing property answers `undefined` and `inspect`
-    // (abstract_adapter.rb:174-181) renders `shard="undefined"` — a pool-less
-    // adapter passing itself off as a writing/default one.
+  it("raises NoMethodError on a pool-less adapter's role, shard and inspect", () => {
     const adapter = new AbstractAdapter();
     expect(adapter.pool).toBeInstanceOf(NullPool);
     expect(() => adapter.role).toThrow(/undefined method 'role'/);

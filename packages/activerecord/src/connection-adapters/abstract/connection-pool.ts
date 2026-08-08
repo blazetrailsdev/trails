@@ -136,19 +136,26 @@ export class NullPool implements AbstractPool {
   declare readonly role: never;
   declare readonly shard: never;
 
+  /**
+   * Mirrors: ConnectionPool::NullPool#initialize
+   * (`abstract/connection_pool.rb:24-28`).
+   *
+   * The Proxy is a language shortcoming, not a Rails shape: Ruby's NullPool is
+   * a plain object, so a send it has no method for raises NoMethodError, while
+   * a JS read of a missing property is silently `undefined` — which is what let
+   * a pool-less adapter's `role` (`abstract_adapter.rb:288`) answer `undefined`
+   * and `inspect` (`:174-181`) render `shard="undefined"`. It is the only shape
+   * that raises *without* adding a `role`/`shard` member Rails' NullPool does
+   * not have.
+   *
+   * Only `role` and `shard` raise. Every other member Ruby's NullPool lacks is
+   * reached through a caller that duck-types the absence instead of sending
+   * unconditionally — `clearQueryCache`'s `this.pool?.clearQueryCache` against
+   * `query_cache.rb:232-234`'s bare `pool.clear_query_cache`. Those call sites
+   * are their own convergence (`0051/clear-query-cache-duck-types-the-pool`),
+   * not a licence to leave this one silent.
+   */
   constructor() {
-    // Ruby's NullPool is a plain object: a send it has no method for raises
-    // NoMethodError. A JS read of a missing property is silently `undefined`,
-    // which is what let a pool-less adapter's `role` answer `undefined` and
-    // `inspect` render `shard="undefined"` instead of failing. Ruby's dispatch
-    // is modelled with a Proxy because it is the only shape that raises
-    // *without* adding a `role`/`shard` member Rails' NullPool does not have.
-    // Only `role` and `shard` raise: every other member Ruby's NullPool lacks
-    // is reached through a caller that duck-types the absence instead of
-    // sending unconditionally (`clearQueryCache`'s `this.pool?.clearQueryCache`,
-    // query_cache.rb:232-234), and raising underneath those would be a
-    // behavior change unrelated to this reader. Those call sites are their own
-    // convergence, not a licence to leave this one silent.
     return new Proxy(this, {
       get(target, prop, receiver) {
         if (typeof prop === "symbol" || !NULL_POOL_UNDEFINED_METHODS.has(prop)) {

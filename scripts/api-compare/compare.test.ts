@@ -1467,9 +1467,6 @@ describe("selectMisplacedFile", () => {
   });
 
   it("never clusters a bucket registered as a name collision", () => {
-    // `Deprecators`' delegating setters (deprecators.rb:19-49) are spelled like
-    // `Deprecation`'s own, so the bucket cleared all three thresholds against
-    // deprecation.ts with zero ported. It must read as missing, not 60%.
     expect(
       selectMisplacedFile(
         hits(["deprecation.ts", 6], ["b.ts", 1]),
@@ -1481,8 +1478,6 @@ describe("selectMisplacedFile", () => {
   });
 
   it("leaves an unregistered bucket's cluster alone", () => {
-    // The registration is per bucket, not per target file: behaviors.rb is a
-    // real port living in deprecation.ts and keeps its cluster.
     expect(
       selectMisplacedFile(
         hits(["deprecation.ts", 6], ["b.ts", 1]),
