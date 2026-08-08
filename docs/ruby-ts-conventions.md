@@ -72,6 +72,16 @@ trails:
 | `ERB`      | `TSE`        |
 | `Erb`      | `Tse`        |
 
+Test names are the exception. A `describe`/`it` string is `test:compare`'s
+match key and is copied verbatim from the Rails test, so it keeps Rails'
+spelling: `it("ERB::Util.html_escape should escape unsafe characters")` in
+`core-ext/string-ext.test.ts`, mirroring
+`activesupport/test/core_ext/string_ext_test.rb:1086`. `normalizeErb` in
+`scripts/test-compare/test-compare.ts` applies this table to both sides of the
+comparison, so the verbatim name still credits against the TSE-spelled file it
+lives in. Everything else — file names, directories, classes, methods,
+identifiers — is TSE.
+
 ## File paths
 
 Ruby `foo_bar.rb` → `foo-bar.ts` (kebab-case), with these path-segment aliases

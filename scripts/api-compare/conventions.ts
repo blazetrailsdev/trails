@@ -16,6 +16,14 @@ import * as path from "path";
  * `verb` / `superb` / `Herb` are untouched — the token still has to start at
  * the identifier or just after an underscore.
  *
+ * Test names are the one exception, and deliberately so: a `describe`/`it`
+ * string is `test:compare`'s match key and is copied verbatim from the Rails
+ * test, so `test "ERB::Util.html_escape should escape unsafe characters"`
+ * (activesupport/test/core_ext/string_ext_test.rb:1086) stays `ERB::Util…` in
+ * string-ext.test.ts. `normalizeErb` in scripts/test-compare/test-compare.ts
+ * applies this table to both sides of the comparison, so the verbatim name
+ * still credits against the TSE-spelled file it lives in.
+ *
  * Applied to every identifier that flows through `snakeToCamel` —
  * currently Ruby method names (via `rubyMethodToTs`) and constant
  * fragments embedded in dot-notation method names like
@@ -1133,6 +1141,16 @@ trails:
 | Ruby token | trails token |
 | ---------- | ------------ |
 ${renameRows}
+
+Test names are the exception. A \`describe\`/\`it\` string is \`test:compare\`'s
+match key and is copied verbatim from the Rails test, so it keeps Rails'
+spelling: \`it("ERB::Util.html_escape should escape unsafe characters")\` in
+\`core-ext/string-ext.test.ts\`, mirroring
+\`activesupport/test/core_ext/string_ext_test.rb:1086\`. \`normalizeErb\` in
+\`scripts/test-compare/test-compare.ts\` applies this table to both sides of the
+comparison, so the verbatim name still credits against the TSE-spelled file it
+lives in. Everything else — file names, directories, classes, methods,
+identifiers — is TSE.
 
 ## File paths
 
