@@ -1351,11 +1351,6 @@ export const UNPORTED_FILES: UnportedFile[] = [
     reason: "Method-table surgery to silence redefinition warnings; JS reassignment is silent.",
   },
   {
-    pattern: "core_ext/object/instance_variables.rb",
-    package: "activesupport",
-    reason: "Reflects over Ruby `@ivars`; JS has no ivar namespace of its own.",
-  },
-  {
     pattern: "starts_ends_with.rb",
     package: "activesupport",
     reason: "Aliases `start_with?`/`end_with?` for Symbol and String; both are native JS.",

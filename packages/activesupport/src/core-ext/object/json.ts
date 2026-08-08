@@ -2,6 +2,8 @@ import { Temporal } from "@blazetrails/date";
 
 import { ActiveSupportJSON } from "../../json.js";
 import { Encoding, type EncodeOptions } from "../../json/encoding.js";
+import { BigDecimal as BigDecimalValue } from "../big-decimal/conversions.js";
+import * as instanceVariables from "./instance-variables.js";
 
 /**
  * Rails' `core_ext/object/json.rb` — the `as_json` layer
@@ -52,17 +54,22 @@ export const ToJsonWithActiveSupportEncoder = {
 };
 
 /**
- * `Object#as_json` (json.rb:58-66).
- *
- * `instance_values` (core_ext/object/instance_variables.rb:14-18) is unported;
- * a spread of the object's own enumerable properties is its analogue.
+ * `Module#as_json` (json.rb:52-56). A JS class or function is the Module
+ * analogue, and `name` is the same reader Ruby's is.
  */
+export class Module {
+  static asJson(value: { name: string }): string {
+    return value.name;
+  }
+}
+
+/** `Object#as_json` (json.rb:58-66). */
 export class Object {
   static asJson(value: object, options?: EncodeOptions | null): unknown {
     if (typeof (value as { toHash?: unknown }).toHash === "function") {
       return Hash.asJson((value as { toHash(): unknown }).toHash(), options);
     }
-    return Hash.asJson({ ...value }, options);
+    return Hash.asJson(instanceVariables.Object.instanceValues(value), options);
   }
 }
 
@@ -104,10 +111,33 @@ export class Float {
   }
 }
 
+/**
+ * `BigDecimal#as_json` (json.rb:124-137) — a JSON *string*, deliberately, so a
+ * client parsing non-integer JSON numbers as floats can still recover the exact
+ * value. trails' `BigDecimal` (core-ext/big-decimal/conversions.ts) holds
+ * normalized digit strings, so it has no infinite or NaN value and `finite?` is
+ * always true.
+ */
+export class BigDecimal {
+  static asJson(value: BigDecimalValue): string {
+    return value.toString();
+  }
+}
+
 /** `Regexp#as_json` (json.rb:139-143). */
 export class Regexp {
   static asJson(value: RegExp): string {
     return globalThis.String(value);
+  }
+}
+
+/**
+ * `Enumerable#as_json` (json.rb:145-149). Ruby's `Enumerable` is our iterable —
+ * a `Set`, a generator — and `[...value]` is its `to_a`.
+ */
+export class Enumerable {
+  static asJson(value: Iterable<unknown>, options?: EncodeOptions | null): unknown[] {
+    return Array.asJson([...value], options);
   }
 }
 
@@ -262,19 +292,30 @@ export function asJson(value: unknown, options?: EncodeOptions | null): unknown 
   if (typeof value === "number") return Float.asJson(value);
   if (typeof value === "bigint") return Numeric.asJson(value);
 
-  // A class of our own that defines `as_json`, exactly as Ruby's would.
+  // A class of our own that defines `as_json`, exactly as Ruby's would. A
+  // `def self.as_json` singleton outranks `Module#as_json` in Ruby's lookup,
+  // so this precedes the Module arm.
   const own = (value as { asJson?: (o?: unknown) => unknown }).asJson;
   if (typeof own === "function") return own.call(value, options ?? undefined);
+
+  if (typeof value === "function") return Module.asJson(value as { name: string });
 
   if (value instanceof Temporal.Instant || value instanceof Temporal.ZonedDateTime) {
     return Time.asJson(value);
   }
   if (value instanceof Temporal.PlainDate) return Date.asJson(value);
   if (value instanceof Temporal.PlainDateTime) return DateTime.asJson(value);
+  if (value instanceof BigDecimalValue) return BigDecimal.asJson(value);
   if (value instanceof RegExp) return Regexp.asJson(value);
   if (value instanceof Error) return Exception.asJson(value);
   if (globalThis.Array.isArray(value)) return Array.asJson(value, options);
   if (value instanceof Map || isPlainObject(value as object)) return Hash.asJson(value, options);
+  if (
+    typeof (value as { [globalThis.Symbol.iterator]?: unknown })[globalThis.Symbol.iterator] ===
+    "function"
+  ) {
+    return Enumerable.asJson(value as Iterable<unknown>, options);
+  }
 
   // A JS built-in carrying its own JSON form (`Date`, …). Ruby's counterparts
   // define `as_json`; calling `toJSON` reaches the same primitive, where

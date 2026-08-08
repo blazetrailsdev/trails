@@ -5,6 +5,8 @@ import { Temporal } from "@blazetrails/date";
 import { TimeWithZone } from "../time-with-zone.js";
 import { TimeZone } from "../values/time-zone.js";
 import { Encoding } from "./encoding.js";
+import { asJson } from "../core-ext/object/json.js";
+import { BigDecimal } from "../core-ext/big-decimal/conversions.js";
 
 /** Rails' `JSONTest::Hashlike` (encoding_test_cases.rb:16-20). */
 class Hashlike {
@@ -17,6 +19,22 @@ class Hashlike {
 class Bare {
   foo?: string;
   bar?: string;
+}
+
+/** Rails' `JSONTest::People` (encoding_test.rb:227-240) — a bare Enumerable. */
+class People {
+  #people = [
+    { name: "John", address: { city: "London", country: "UK" } },
+    { name: "Jean", address: { city: "Paris", country: "France" } },
+  ];
+
+  each(): IterableIterator<unknown> {
+    return this.#people[Symbol.iterator]();
+  }
+
+  [Symbol.iterator](): IterableIterator<unknown> {
+    return this.each();
+  }
 }
 
 function withStandardJsonTimeFormat(value: boolean, block: () => void): void {
@@ -41,6 +59,24 @@ function withTimePrecision(value: number, block: () => void): void {
 
 describe("TestJSONEncoding", () => {
   it.skip("process status");
+
+  it("numeric", () => {
+    // Rails' NumericTests (encoding_test_cases.rb:62-72); the RomanNumeral /
+    // CustomNumeric cases need Ruby's `Numeric` subclassing and are unported.
+    expect(ActiveSupportJSON.encode(1)).toBe("1");
+    expect(ActiveSupportJSON.encode(2.5)).toBe("2.5");
+    expect(ActiveSupportJSON.encode(NaN)).toBe("null");
+    expect(ActiveSupportJSON.encode(Infinity)).toBe("null");
+    expect(ActiveSupportJSON.encode(-Infinity)).toBe("null");
+    expect(ActiveSupportJSON.encode(new BigDecimal("2.5"))).toBe('"2.5"');
+  });
+
+  it("module", () => {
+    // Rails' ModuleTests (encoding_test_cases.rb:95-98). Ruby's `name` is the
+    // fully-qualified constant path; a JS class carries only its own name.
+    expect(ActiveSupportJSON.encode(Hashlike)).toBe('"Hashlike"');
+    expect(ActiveSupportJSON.encode(People)).toBe('"People"');
+  });
 
   it("hash encoding", () => {
     const h = { a: 1, b: "hello" };
@@ -169,23 +205,28 @@ describe("TestJSONEncoding", () => {
   });
 
   it("enumerable should generate json with as json", () => {
-    const items = [1, 2, 3];
-    expect(JSON.stringify(items)).toBe("[1,2,3]");
+    const json = asJson(new People(), { only: ["address", "city"] });
+    const expected = [{ address: { city: "London" } }, { address: { city: "Paris" } }];
+
+    expect(json).toEqual(expected);
   });
 
   it("enumerable should generate json with to json", () => {
-    const items = ["a", "b", "c"];
-    expect(JSON.stringify(items)).toBe('["a","b","c"]');
+    const json = ActiveSupportJSON.encode(new People(), { only: ["address", "city"] });
+    expect(json).toBe('[{"address":{"city":"London"}},{"address":{"city":"Paris"}}]');
   });
 
   it("enumerable should pass encoding options to children in as json", () => {
-    const items = [{ x: 1 }, { y: 2 }];
-    expect(JSON.parse(JSON.stringify(items))).toEqual(items);
+    const json = asJson(new People().each(), { only: ["address", "city"] });
+    const expected = [{ address: { city: "London" } }, { address: { city: "Paris" } }];
+
+    expect(json).toEqual(expected);
   });
 
   it("enumerable should pass encoding options to children in to json", () => {
-    const items = [true, false, null];
-    expect(JSON.stringify(items)).toBe("[true,false,null]");
+    const json = ActiveSupportJSON.encode(new People().each(), { only: ["address", "city"] });
+
+    expect(json).toBe('[{"address":{"city":"London"}},{"address":{"city":"Paris"}}]');
   });
 
   it("hash to json should not keep options around", () => {
