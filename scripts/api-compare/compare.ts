@@ -1326,6 +1326,44 @@ export function mixinMethodCreditedToOwnFile(
   return tsName === undefined ? null : { tsName, tsFile };
 }
 
+/**
+ * Is this method defined by a *reopening* of the class in another Ruby file,
+ * and ported to the TS file mirroring that reopening?
+ *
+ * Ruby reopens a class across many files but the extractor stamps ONE `file` on
+ * the entity, so a class's whole surface buckets under whichever reopening came
+ * first. `core_ext/object/acts_like.rb` is the first core_ext file to reopen
+ * `Object`, so `blank?` (`core_ext/object/blank.rb:14`), `duplicable?`
+ * (`core_ext/object/duplicable.rb:26`) and `instance_values`
+ * (`core_ext/object/instance_variables.rb:19`) all land in its bucket — and
+ * `RUBY_FILE_TS_OVERRIDES` maps a Ruby file to exactly ONE TS file, so at most
+ * one of those three arms could ever be measured against the file trails
+ * actually ports it to.
+ *
+ * So credit each arm to its own reopening's TS file, the same accounting
+ * `mixinMethodCreditedToOwnFile` gives an included method. Narrow by
+ * construction: the credit only lands when the reopening's mirrored TS file
+ * exists in this run AND really defines one of the method's TS candidates. An
+ * unported reopening arm (`acts_like?`, duck typing in JS) is credited nowhere
+ * and still reports missing.
+ */
+export function reopeningMethodCreditedToOwnFile(
+  rm: { rubyName: string; definedInFile?: string },
+  hostRubyFile: string,
+  pkg: string,
+  tsMethodsByFile: ReadonlyMap<string, Set<string>>,
+): { tsName: string; tsFile: string } | null {
+  const definedInFile = rm.definedInFile;
+  if (definedInFile === undefined || definedInFile === hostRubyFile) return null;
+  const candidates = rubyMethodToTs(rm.rubyName);
+  if (candidates === null) return null;
+  const tsFile = rubyFileToTs(definedInFile, pkg);
+  const reopeningTsMethods = tsMethodsByFile.get(tsFile);
+  if (reopeningTsMethods === undefined) return null;
+  const tsName = candidates.find((c) => reopeningTsMethods.has(c));
+  return tsName === undefined ? null : { tsName, tsFile };
+}
+
 /** A Ruby class or module, paired with the fully-qualified name it was found under. */
 export interface RubyEntity {
   fqn: string;
@@ -1420,6 +1458,7 @@ export function dedupeRubyMethodInto(
       rubyModule: itemFqn,
       umbrellaConfig: rm.umbrellaConfig,
       mixinFile: rm.mixinFile,
+      definedInFile: rm.file,
     });
   }
 }
@@ -1431,6 +1470,8 @@ export interface SeenRubyMethod {
   umbrellaConfig?: boolean;
   /** Set when the first sighting came in through `include`/`extend` — see `mixinMethodCreditedToOwnFile`. */
   mixinFile?: string;
+  /** The Ruby file that actually defines it — see `reopeningMethodCreditedToOwnFile`. */
+  definedInFile?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -2408,7 +2449,10 @@ export function main() {
         ? tsMethodsByFile.get(misplacedActualFile) || new Set<string>()
         : null;
 
-      for (const [_dedupeKey, { rubyName, rubyModule, umbrellaConfig, mixinFile }] of seen) {
+      for (const [
+        _dedupeKey,
+        { rubyName, rubyModule, umbrellaConfig, mixinFile, definedInFile },
+      ] of seen) {
         const tsCandidates = rubyMethodToTs(rubyName)!;
 
         // Check direct match first — find which candidate matched
@@ -2465,6 +2509,27 @@ export function main() {
             rubyModule,
             expectedFile: expectedTs,
             actualFile: creditedToMixin.tsFile,
+          });
+          continue;
+        }
+
+        // Defined by a reopening of this class in another Ruby file, and ported
+        // to that file's TS counterpart — see `reopeningMethodCreditedToOwnFile`.
+        const creditedToReopening = reopeningMethodCreditedToOwnFile(
+          { rubyName, definedInFile },
+          rubyFile,
+          pkg,
+          tsMethodsByFile,
+        );
+        if (creditedToReopening) {
+          fileMatched++;
+          checkArity(rubyName, creditedToReopening.tsName, creditedToReopening.tsFile);
+          moves.push({
+            tsName: creditedToReopening.tsName,
+            rubyName,
+            rubyModule,
+            expectedFile: expectedTs,
+            actualFile: creditedToReopening.tsFile,
           });
           continue;
         }

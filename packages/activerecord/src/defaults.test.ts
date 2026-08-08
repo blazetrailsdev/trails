@@ -14,7 +14,7 @@ import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/a
 import { Mysql2Adapter } from "./connection-adapters/mysql2-adapter.js";
 import { describeIfMysqlAdapter } from "./support/describe-if-mysql-adapter.js";
 import { isMariaDb, MYSQL_TEST_URL } from "./support/mysql-server-version.js";
-import { describeIfPg } from "./support/describe-if-pg.js";
+import { describeIfPostgresqlAdapter } from "./support/describe-if-postgresql-adapter.js";
 import { describeIfSqlite } from "./support/describe-if-sqlite.js";
 import { describeIfSupports, itIfSupports } from "./support/supports.js";
 import { fixtures } from "./test-fixtures.js";
@@ -247,7 +247,7 @@ describeIfSupports("text_column_with_default", "DefaultTextTest", () => {
 // Mirrors `PostgresqlDefaultExpressionTest` (defaults_test.rb), gated to the
 // PostgreSQLAdapter. The `defaults` table comes from postgresql_specific_schema.rb
 // and is laid at boot by the adapter-specific arm of loadSchema.
-describeIfPg("PostgresqlDefaultExpressionTest", () => {
+describeIfPostgresqlAdapter("PostgresqlDefaultExpressionTest", () => {
   let adapter: DatabaseAdapter;
 
   beforeEach(() => {

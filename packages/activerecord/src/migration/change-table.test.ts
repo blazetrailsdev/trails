@@ -5,7 +5,7 @@ import {
   type SchemaStatementsLike,
 } from "../connection-adapters/abstract/schema-definitions.js";
 import { Table as PgTable } from "../connection-adapters/postgresql/schema-definitions.js";
-import { describeIfPg } from "../support/describe-if-pg.js";
+import { describeIfPostgresqlAdapter } from "../support/describe-if-postgresql-adapter.js";
 
 type Call = { method: string; args: unknown[] };
 type ExpectFn = (method: string, returns: unknown, args: unknown[]) => void;
@@ -378,7 +378,7 @@ describe("Migration", () => {
     });
   });
 
-  describeIfPg("TableTest", () => {
+  describeIfPostgresqlAdapter("TableTest", () => {
     it("json creates json column", async () => {
       await withPgChangeTable(async (t, expect) => {
         expect("addColumn", null, ["delete_me", "foo", "json"]);

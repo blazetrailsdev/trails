@@ -48,5 +48,17 @@ export const pgHasHintPlan = probe.hasHintPlan;
  * than the `adapters/postgresql/` test-helper because suites outside that tree
  * gate on it too — a test file should never have to import glue from another
  * adapter's tree. Counterpart to `describeIfSqlite` / `describeIfMysqlAdapter`.
+ *
+ * This is a *server probe*, not the port of `current_adapter?(:PostgreSQLAdapter)`
+ * — it runs on the sqlite and mysql2 lanes too whenever a PostgreSQL server
+ * answers, so a suite under it cannot lease `Base.connection` and must bring
+ * its own adapter. A suite whose body is a plain `Base.connection` interaction
+ * belongs under `describeIfPostgresqlAdapter` instead; that distinction has
+ * been re-derived three times, so: the surviving users of this probe are the
+ * ones that construct a `PostgreSQLAdapter` from `PG_TEST_URL` (the whole
+ * `adapters/postgresql/` tree, `connection-adapters/postgresql/
+ * schema-statements.test.ts`, `postgresql-adapter.transaction-status.trails.
+ * test.ts`, `load-schema-helper-uuid-default.trails.test.ts`) plus the
+ * `pgAvailable` / `pgServerVersion` / `pgHasHintPlan` readers. Do not widen it.
  */
 export const describeIfPg = pgAvailable ? describe : (describe.skip as typeof describe);

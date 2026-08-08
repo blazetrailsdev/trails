@@ -190,14 +190,6 @@ export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
   // with `TimeWithZone#asJson`. The entry gives json.rb its own bucket, so
   // every arm is measured against the file trails actually ports them to.
   "activesupport:core_ext/object/json.rb": "core-ext/object/json.ts",
-  // Object's home bucket: `acts_like.rb` is the first core_ext file to reopen
-  // Object, so every later reopening (`blank.rb`, `duplicable.rb`,
-  // `instance_variables.rb`) dedupes into it, and the bucket is really "Object's
-  // methods". Its expected path has no TS file — `acts_like?` is duck typing in
-  // JS and has no port — so it used to fall to the misplaced-file cluster, which
-  // latched onto the package barrel and scored it against unrelated re-exports.
-  // Point it at the reopening that carries the largest arm instead.
-  "activesupport:core_ext/object/acts_like.rb": "core-ext/object/blank.ts",
   "activesupport:core_ext/string/filters.rb": "string-utils.ts",
   "activesupport:core_ext/string/access.rb": "string-utils.ts",
   "activesupport:core_ext/string/indent.rb": "string-utils.ts",
