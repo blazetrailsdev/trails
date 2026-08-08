@@ -305,7 +305,9 @@ function temporalLocalizable(
 /**
  * @internal `object` as the duck type `localize` sends at — itself for the
  * gem-shaped `Date`/`DateTime`/`Time`, and {@link temporalLocalizable} for a
- * `Temporal` value.
+ * `Temporal` value. `localize` sends every reader at the result, and keeps the
+ * object as it came in for `options[:object]` and the ArgumentError message,
+ * where the gem passes the object itself.
  */
 function localizable(object: unknown): unknown {
   if (
@@ -427,8 +429,6 @@ export abstract class Base {
     if (object == null && "default" in options) {
       return options.default;
     }
-    // Every send below goes at the duck type; `options[:object]` and the error
-    // message keep the object as it came in, as the gem's do.
     const subject = localizable(object);
     if (!respondTo(subject, "strftime")) {
       throw new ArgumentError(

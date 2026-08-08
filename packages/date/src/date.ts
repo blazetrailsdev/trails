@@ -93,7 +93,8 @@ export interface StrftimeSubject {
  * A `PlainDate` answers the gem's own `::Date` fields — midnight, and `::Date`'s
  * `"+00:00"` zone spelling (`d_lite_strftime`'s `of` of 0) — while a
  * `ZonedDateTime` carries its real offset, which `of2str` spells the way
- * `::DateTime#zone` does.
+ * `::DateTime#zone` does. `Temporal`'s `dayOfWeek` is ISO — 1 is Monday, 7
+ * Sunday — where `wday` is 0 for Sunday.
  */
 function temporalSubject(
   value: Temporal.PlainDate | Temporal.PlainDateTime | Temporal.ZonedDateTime | Temporal.Instant,
@@ -113,8 +114,6 @@ function temporalSubject(
     year: plain.year,
     mon: plain.month,
     day: plain.day,
-    // `Temporal`'s `dayOfWeek` is ISO — 1 is Monday, 7 Sunday — where `wday` is
-    // 0 for Sunday.
     wday: plain.dayOfWeek % 7,
     yday: plain.dayOfYear,
     hour: plain.hour,
@@ -3398,6 +3397,11 @@ function of2str(of: number): string {
  * happens here, at the C's own call site, and the constructor's UTC overload
  * takes the result as it is.
  *
+ * `:offset` is read with `NUM2INT` into a C `int` (`date_core.c:8301`), so a
+ * `Rational` fragment — what `date_zone_to_diff` answers for a fractional-hour
+ * zone past two decimal places (`date_parse.c:523-528`) — is truncated toward
+ * zero, and it is the truncated value the bound below is applied to.
+ *
  * The `:offset` bound (`date_core.c:8297-8306`) is ported as written — strictly
  * outside `±DAY_IN_SECONDS` is ignored rather than raised on. It is unreachable
  * from `Date._parse`, since `date_zone_to_diff` already answers `nil` for a
@@ -3455,10 +3459,8 @@ export function dtNewByFrags(hash: DateParts | null): DateTime {
 
   const to = hash.offset;
   // `NUM2INT` (`date_core.c:8301`) reads the fragment into a C `int`, so a
-  // `Rational` offset — what `date_zone_to_diff` answers for a fractional-hour
-  // zone past two decimal places (`date_parse.c:523-528`) — truncates toward
-  // zero before the bound below is applied. This is not `round()`: 34399.8
-  // becomes 34399.
+  // `Rational` offset truncates toward zero before the bound below — not
+  // `round()`: 34399.8 becomes 34399.
   let of = to == null ? 0 : Math.trunc(to instanceof Rational ? to.toF() : to);
   if (of < -DAY_IN_SECONDS || of > DAY_IN_SECONDS) of = 0;
 
