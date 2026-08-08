@@ -133,7 +133,7 @@ describeIfSqlite("SqliteStructureDumpTest", () => {
     const filename = awesomeFile();
     created.push(filename);
 
-    await DatabaseTasks.structureDump(configuration, filename);
+    await DatabaseTasks.structureDump(configuration, filename, "/rails/root");
 
     expect(fs.existsSync(dbfile)).toBeTruthy();
     expect(fs.existsSync(filename)).toBeTruthy();
@@ -152,7 +152,7 @@ describeIfSqlite("SqliteStructureDumpTest", () => {
     runSqlite3(database, "CREATE TABLE ignored_foo(id INTEGER)");
     SchemaDumper.ignoreTables = [/^prefix_/, "ignored_foo"];
 
-    await DatabaseTasks.structureDump(configuration, filename);
+    await DatabaseTasks.structureDump(configuration, filename, "/rails/root");
 
     expect(fs.existsSync(dbfile)).toBeTruthy();
     expect(fs.existsSync(filename)).toBeTruthy();
@@ -175,7 +175,7 @@ describeIfSqlite("SqliteStructureDumpTest", () => {
     let message = "";
     DatabaseTasks.structureDumpFlags = ["--noop"];
     await expect(
-      DatabaseTasks.structureDump(configuration, filename).catch((e: Error) => {
+      DatabaseTasks.structureDump(configuration, filename, "/rails/root").catch((e: Error) => {
         message = e.message;
         throw e;
       }),
@@ -222,7 +222,7 @@ describeIfSqlite("SqliteStructureLoadTest", () => {
     });
 
     fs.writeFileSync(filename, "select datetime('now', 'localtime');\n");
-    await DatabaseTasks.structureLoad(configuration, filename);
+    await DatabaseTasks.structureLoad(configuration, filename, "/rails/root");
 
     expect(fs.existsSync(dbfile)).toBeTruthy();
   });

@@ -501,6 +501,7 @@ describeIfPostgresqlAdapter("TableDefinition#toSql", () => {
       supportsIndexSortOrder: async () => true,
       supportsExclusionConstraints: () => true,
       supportsUniqueConstraints: () => true,
+      isUseForeignKeys: () => true,
     };
     const td = new TableDefinition("widgets", { adapter: stubAdapter as any });
     td.cidr("net");

@@ -1890,10 +1890,7 @@ export class SchemaStatements {
   }
 
   isUseForeignKeys(): boolean {
-    const adapter = this as any;
-    const supportsForeignKeys =
-      typeof adapter.supportsForeignKeys === "function" ? adapter.supportsForeignKeys() : true;
-    return supportsForeignKeys && this.isForeignKeysEnabled();
+    return this.supportsForeignKeys() && this.isForeignKeysEnabled();
   }
 
   async bulkChangeTable(

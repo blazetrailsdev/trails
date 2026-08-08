@@ -53,18 +53,19 @@ export interface SchemaCreationConn extends SchemaQuoter {
   supportsNullsNotDistinct(): Promise<boolean>;
   supportsPartialIndex(): boolean;
   supportsUniqueConstraints(): boolean;
+  isUseForeignKeys(): boolean;
 }
 
 export class SchemaCreation {
   /** Rails' `SchemaCreation#initialize(conn)` (abstract/schema_creation.rb:6-9). */
   constructor(protected adapter: SchemaCreationConn) {}
 
-  // Capability probes. Seven of these are `delegate ... to: :@conn`
+  // Capability probes. Eight of these are `delegate ... to: :@conn`
   // (abstract/schema_creation.rb:16-21): supports_indexes_in_create?,
   // supports_partial_index?, supports_check_constraints?, supports_index_include?,
-  // supports_exclusion_constraints?, supports_unique_constraints? and
-  // supports_nulls_not_distinct?. The connection answers them, so its version
-  // gates reach the visitor.
+  // supports_exclusion_constraints?, supports_unique_constraints?,
+  // supports_nulls_not_distinct? and use_foreign_keys?. The connection answers
+  // them, so its version gates reach the visitor.
 
   protected supportsPartialIndex(): boolean {
     return this.adapter.supportsPartialIndex();
@@ -236,12 +237,7 @@ export class SchemaCreation {
 
   /** @internal */
   protected useForeignKeys(): boolean {
-    const host = this.adapter as unknown as {
-      supportsForeignKeys?: () => boolean;
-      _config?: { foreignKeys?: boolean };
-    };
-    const supports = host.supportsForeignKeys?.() ?? true;
-    return supports && host._config?.foreignKeys !== false;
+    return this.adapter.isUseForeignKeys();
   }
 
   /** @internal */
