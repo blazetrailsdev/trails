@@ -463,7 +463,6 @@ export class PostgreSQLAdapter
    * answers IDLE/INTRANS while that command is mid-cycle.
    */
   private _commandSettled = true;
-  private _databaseVersion: number | null = null;
   private _typeMap: HashLookupTypeMap | null = null;
   private _maxIdentifierLength: number | null = null;
   private _useInsertReturning = true;
@@ -782,22 +781,10 @@ export class PostgreSQLAdapter
    */
   private async _maybeConfigureConnection(client: pg.Client): Promise<void> {
     if (this._connectionConfigured) return;
-    // Deviation, language-forced: Rails' configure_connection opens with `super`
-    // (postgresql_adapter.rb:957), whose check_version reads the lazy sync
-    // `database_version`. Ours cannot self-fetch, so the memo is filled at that
-    // same position. Issued DIRECTLY on `client`, like the SET statements below:
-    // getDatabaseVersion() acquires its own client and would re-enter the
-    // acquire machinery still holding `_acquiring`. A zero version is left
-    // uncached so getDatabaseVersion()'s ConnectionFailed path still owns it.
-    if (this._databaseVersion === null) {
-      const version = await this._serverVersion(client);
-      if (version !== 0) this._databaseVersion = version;
-    }
-    // `super`'s check_version (abstract_adapter.rb:1212-1214), at the position
-    // Rails calls it from. Skipped when the probe came back zero: that path is
-    // owned by getDatabaseVersion()'s ConnectionFailed handling, not by the
-    // version floor.
-    if (this._databaseVersion !== null) await this.checkVersion();
+    // Mirrors: `super` at the top of PostgreSQLAdapter#configure_connection
+    // (postgresql_adapter.rb:957) — warms the pool's server_version memo and
+    // runs check_version (abstract_adapter.rb:1212-1214).
+    await super.configureConnection();
     // Rails resets @mapped_default_timezone = nil while installing decoders in
     // configure_connection (postgresql_adapter.rb:1112) so the next
     // update_typemap_for_default_timezone re-applies the session timezone. This
@@ -3224,37 +3211,34 @@ export class PostgreSQLAdapter
   }
 
   /**
-   * Fetch and cache the server version number. Called automatically on
-   * the first query via _ensureInitialized(). Version-dependent
-   * supports_* methods throw if called before initialization.
+   * Mirrors: PostgreSQLAdapter#get_database_version
+   * (`postgresql_adapter.rb:634-643`) — a pure fetch, run at most once through
+   * the pool memo (`pool_config.rb:39-41`,
+   * `abstract/connection_pool.rb:30-32`) that `configureConnection` warms at
+   * connect time.
+   *
+   * Deviation, language-forced: Rails' `with_raw_connection` is re-entrant on
+   * `@raw_connection`, so this runs on the connection being configured. Ours
+   * takes the published `_rawConnection` when there is one for the same reason
+   * — `_acquireFreshClient()` would await the very acquire this call is nested
+   * inside.
    */
   async getDatabaseVersion(): Promise<number> {
-    if (this._databaseVersion !== null) return this._databaseVersion;
-    // Off the withRawConnection loop: this is a memoized bootstrap probe run
-    // during init / schema introspection (lock-free). Acquire the raw client
-    // directly via _acquireFreshClient(); tear down on a dead socket so the next caller
-    // gets a fresh connection (the recovery withClient used to provide).
-    {
-      const client = await this._acquireFreshClient();
-      try {
-        const version = await this._serverVersion(client);
-        // Mirrors Rails' get_database_version: a zero version means the version
-        // probe failed (e.g. a half-open connection), so don't cache it — raise
-        // ConnectionFailed so the reconnect path can retry.
-        if (version === 0) {
-          throw new ConnectionFailed("Could not determine PostgreSQL version");
-        }
-        this._databaseVersion = version;
-      } catch (error) {
-        if (PostgreSQLAdapter._isConnectionError(error)) this._discardRawConnection();
-        throw error;
+    const conn = this._rawConnection ?? (await this._acquireFreshClient());
+    let version: number;
+    try {
+      version = await this._serverVersion(conn);
+      if (version === 0) {
+        throw new ConnectionFailed("Could not determine PostgreSQL version");
       }
+    } catch (error) {
+      if (PostgreSQLAdapter._isConnectionError(error)) this._discardRawConnection();
+      throw error;
     }
     // Eagerly populate optimizer hints flag
     if (this._hasOptimizerHints === null) {
       try {
-        const client = await this._acquireFreshClient();
-        const result = await client.query(
+        const result = await conn.query(
           "SELECT COUNT(*) AS count FROM pg_available_extensions WHERE name = $1",
           ["pg_hint_plan"],
         );
@@ -3268,7 +3252,7 @@ export class PostgreSQLAdapter
         this._hasOptimizerHints = false;
       }
     }
-    return this._databaseVersion;
+    return version;
   }
 
   /**
