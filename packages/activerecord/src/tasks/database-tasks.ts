@@ -1255,8 +1255,17 @@ export class DatabaseTasks {
    *
    * Ruby's `ensure` covers the whole body, `original_db_config =
    * migration_class.connection_db_config` included, so a `migration_class`
-   * with no pool still reaches `establish_connection(nil)` on the way out —
-   * the read is inside the `try` here for the same reason.
+   * with no pool still reaches the `ensure` on the way out — the read is
+   * inside the `try` here for the same reason. Ruby cannot arrive there
+   * holding a nil `original_db_config` and a live temporary pool, because
+   * `connection_db_config` retrieves with `strict: true` and raises
+   * `ConnectionNotEstablished` before `establish_connection(db_config)` runs
+   * (`connection_adapters/abstract/connection_handler.rb:214-226`). trails'
+   * `connectionDbConfig()` returns `undefined` instead of raising, so the
+   * `ensure` is reachable in a state Ruby has no counterpart for; restoring
+   * `undefined` there would throw over the block's own result, so the restore
+   * is skipped and the temporary pool stays — the same pool Ruby's caller
+   * would have had to establish before calling in the first place.
    *
    * Both establish calls hand over the `DatabaseConfig` OBJECT, as Rails does
    * (`:542,544`) — that is what lets `ConnectionHandler#establish_connection`
@@ -1290,10 +1299,12 @@ export class DatabaseTasks {
       await pool.adapterReady;
       return await fn(pool);
     } finally {
-      await migrationClass.connectionHandler.establishConnection(originalDbConfig!, {
-        owner: migrationClass.connectionClassForSelf(),
-        clobber,
-      }).adapterReady;
+      if (originalDbConfig != null) {
+        await migrationClass.connectionHandler.establishConnection(originalDbConfig, {
+          owner: migrationClass.connectionClassForSelf(),
+          clobber,
+        }).adapterReady;
+      }
     }
   }
 
