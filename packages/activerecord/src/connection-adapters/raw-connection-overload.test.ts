@@ -168,7 +168,7 @@ describe("deprecated raw-connection initialize overload", () => {
 describe("config-hash constructor retains foreignKeys in _config", () => {
   type FkGuards = {
     isForeignKeysEnabled(): boolean;
-    isUseForeignKeys(): boolean;
+    useForeignKeys(): boolean;
   };
   const guards = (adapter: PostgreSQLAdapter | Mysql2Adapter) => adapter as unknown as FkGuards;
 
@@ -176,21 +176,21 @@ describe("config-hash constructor retains foreignKeys in _config", () => {
     const disabled = new PostgreSQLAdapter({ foreignKeys: false });
     expect(disabled.supportsForeignKeys()).toBe(true);
     expect(guards(disabled).isForeignKeysEnabled()).toBe(false);
-    expect(guards(disabled).isUseForeignKeys()).toBe(false);
+    expect(guards(disabled).useForeignKeys()).toBe(false);
 
     const enabled = new PostgreSQLAdapter({});
     expect(guards(enabled).isForeignKeysEnabled()).toBe(true);
-    expect(guards(enabled).isUseForeignKeys()).toBe(true);
+    expect(guards(enabled).useForeignKeys()).toBe(true);
   });
 
   it("Mysql2Adapter honors foreignKeys:false and defaults to true", () => {
     const disabled = new Mysql2Adapter({ foreignKeys: false, _fakeConnection: true } as never);
     expect(disabled.supportsForeignKeys()).toBe(true);
     expect(guards(disabled).isForeignKeysEnabled()).toBe(false);
-    expect(guards(disabled).isUseForeignKeys()).toBe(false);
+    expect(guards(disabled).useForeignKeys()).toBe(false);
 
     const enabled = new Mysql2Adapter({ _fakeConnection: true } as never);
     expect(guards(enabled).isForeignKeysEnabled()).toBe(true);
-    expect(guards(enabled).isUseForeignKeys()).toBe(true);
+    expect(guards(enabled).useForeignKeys()).toBe(true);
   });
 });

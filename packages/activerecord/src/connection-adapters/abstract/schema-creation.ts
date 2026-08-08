@@ -53,7 +53,7 @@ export interface SchemaCreationConn extends SchemaQuoter {
   supportsNullsNotDistinct(): Promise<boolean>;
   supportsPartialIndex(): boolean;
   supportsUniqueConstraints(): boolean;
-  isUseForeignKeys(): boolean;
+  useForeignKeys(): boolean;
 }
 
 export class SchemaCreation {
@@ -237,7 +237,7 @@ export class SchemaCreation {
 
   /** @internal */
   protected useForeignKeys(): boolean {
-    return this.adapter.isUseForeignKeys();
+    return this.adapter.useForeignKeys();
   }
 
   /** @internal */

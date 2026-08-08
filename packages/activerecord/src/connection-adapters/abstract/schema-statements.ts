@@ -766,7 +766,7 @@ export class SchemaStatements {
     options: AddForeignKeyOptions = {},
   ): Promise<void> {
     // Rails: return unless use_foreign_keys?
-    if (!this.isUseForeignKeys()) return;
+    if (!this.useForeignKeys()) return;
     // Mirrors Rails' add_foreign_key short-circuit:
     //   return if options[:if_not_exists] == true &&
     //     foreign_key_exists?(from_table, to_table, **options.slice(:column))
@@ -806,7 +806,7 @@ export class SchemaStatements {
     options: RemoveForeignKeyOptions = {},
   ): Promise<void> {
     // Rails: return unless use_foreign_keys?
-    if (!this.isUseForeignKeys()) return;
+    if (!this.useForeignKeys()) return;
     // Mirrors Rails remove_foreign_key(from_table, to_table = nil, **options):
     // resolve the actual constraint via foreign_key_for! (matching column /
     // name / to_table against the live foreign keys) rather than deriving a
@@ -1889,7 +1889,7 @@ export class SchemaStatements {
     return SchemaDumper.create(this as Parameters<typeof SchemaDumper.create>[0], options);
   }
 
-  isUseForeignKeys(): boolean {
+  useForeignKeys(): boolean {
     return this.supportsForeignKeys() && this.isForeignKeysEnabled();
   }
 
@@ -2243,7 +2243,7 @@ export class SchemaStatements {
     fromTable: string,
     options: ForeignKeyLookupOptions = {},
   ): Promise<ForeignKeyDefinition | undefined> {
-    if (!this.isUseForeignKeys()) return undefined;
+    if (!this.useForeignKeys()) return undefined;
     const fks = await this.foreignKeys(fromTable);
     return fks.find((fk) => fk.isDefinedFor(options));
   }

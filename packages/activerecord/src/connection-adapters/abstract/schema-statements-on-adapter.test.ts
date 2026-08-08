@@ -271,7 +271,7 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
     // would short-circuit removeForeignKey via the use_foreign_keys? guard; opt
     // in so the recursion-prone base path is actually exercised.
     class FkStub extends StubAdapter {
-      isUseForeignKeys() {
+      useForeignKeys() {
         return true;
       }
     }
@@ -340,7 +340,7 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
     // resolution when the name doesn't match. If the ifExists probe wrongly
     // sliced in `name`, this would silently no-op instead.
     class FkStub extends StubAdapter {
-      isUseForeignKeys() {
+      useForeignKeys() {
         return true;
       }
       foreignKeys(_table: string) {
@@ -368,7 +368,7 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
       }
     }
     const stub = new NoFkAdapter();
-    expect((stub as any).isUseForeignKeys()).toBe(false);
+    expect((stub as any).useForeignKeys()).toBe(false);
     await stub.addForeignKey("articles", "authors", { column: "author_id" });
     expect(executed).toBe(false);
   });
@@ -385,7 +385,7 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
       }
     }
     const stub = new NoFkAdapter();
-    expect((stub as any).isUseForeignKeys()).toBe(false);
+    expect((stub as any).useForeignKeys()).toBe(false);
     await expect(
       stub.removeForeignKey("articles", { name: "fk_whatever" }),
     ).resolves.toBeUndefined();
@@ -415,7 +415,7 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
     const stub = new DisabledFkAdapter();
     expect(stub.supportsForeignKeys()).toBe(true);
     expect((stub as any).isForeignKeysEnabled()).toBe(false);
-    expect((stub as any).isUseForeignKeys()).toBe(false);
+    expect((stub as any).useForeignKeys()).toBe(false);
     await stub.addForeignKey("articles", "authors", { column: "author_id" });
     await expect(
       stub.removeForeignKey("articles", { name: "fk_whatever" }),

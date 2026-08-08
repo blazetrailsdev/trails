@@ -29,7 +29,7 @@ const s = () =>
     supportsNullsNotDistinct: async () => true,
     supportsPartialIndex: () => true,
     supportsUniqueConstraints: () => true,
-    isUseForeignKeys: () => true,
+    useForeignKeys: () => true,
     quoteColumnName: (n: string) => `"${n}"`,
     quoteTableName: (n: string) => `"${n}"`,
     quoteDefaultExpression: (v: unknown) => ` DEFAULT ${typeof v === "string" ? `'${v}'` : v}`,

@@ -27,7 +27,7 @@ class DummyCreation extends SchemaCreation {
       supportsNullsNotDistinct: async () => false,
       supportsPartialIndex: () => false,
       supportsUniqueConstraints: () => false,
-      isUseForeignKeys: () => true,
+      useForeignKeys: () => true,
     });
   }
 
