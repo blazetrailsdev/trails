@@ -103,17 +103,26 @@ export function findZone(zone: unknown): TimeZone | null | false {
 }
 
 /**
- * Find a timezone, raising if not found.
- * Matches Rails' Time.find_zone!
+ * `Time.find_zone!` (core_ext/time/zones.rb:80-90): `return time_zone unless
+ * time_zone`, then `ActiveSupport::TimeZone[time_zone] || raise(ArgumentError,
+ * "Invalid Timezone: #{time_zone}")`. The whole argument dispatch — including
+ * the Numeric/Duration offset scan — lives in `TimeZone.find`, the port of
+ * `[]` (time_zone.rb:232-250).
+ *
+ * Deviation: `[]` returns `nil` for a name or offset it cannot match and
+ * raises only for an argument of the wrong class (time_zone.rb:249), while
+ * trails' `find` throws in both cases. The argument-class arm therefore stays
+ * here, so each of Rails' two messages is still raised for its own case.
  */
 export function findZoneBang(zone: unknown): TimeZone | null | false {
   if (zone === null || zone === undefined) return null;
   if (zone === false) return false;
-  if (zone instanceof TimeZone) return zone;
-  // `ActiveSupport::TimeZone[time_zone] || raise(ArgumentError, "Invalid
-  // Timezone: #{time_zone}")` (zones.rb:83). A Numeric/Duration offset is
-  // resolved by `TimeZone[]` itself (time_zone.rb:244-246), not here.
-  if (typeof zone === "string" || typeof zone === "number" || zone instanceof Duration) {
+  if (
+    typeof zone === "string" ||
+    typeof zone === "number" ||
+    zone instanceof Duration ||
+    zone instanceof TimeZone
+  ) {
     try {
       return TimeZone.find(zone);
     } catch {

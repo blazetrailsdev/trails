@@ -170,7 +170,7 @@ const MAPPING: Record<string, string> = {
 };
 
 const zoneCache = new Map<string, TimeZone>();
-// `@zones` (time_zone.rb:224) — memoizes the sorted zone list.
+/** `@zones` (time_zone.rb:224). */
 let zones: TimeZone[] | null = null;
 
 /**
@@ -285,17 +285,19 @@ export class TimeZone {
   }
 
   /**
-   * Find a timezone by Rails name or IANA identifier, or by a `Numeric` /
-   * `Duration` UTC offset — the port of `ActiveSupport::TimeZone.[]`
-   * (values/time_zone.rb:232-250). Ruby's `[]` returns `nil` where this throws;
-   * `findZoneBang` is the raise site that converts (core_ext/time/zones.rb:83).
+   * The port of `ActiveSupport::TimeZone.[]` (time_zone.rb:232-250): a Rails
+   * name or IANA identifier, a `TimeZone`, or a `Numeric`/`Duration` UTC
+   * offset. Ruby's `[]` returns `nil` where every arm here throws — `[]` is
+   * only ever called from a raise site (`findZoneBang`, zones.rb:83), and
+   * making it nullable would rewrite ~60 unrelated call sites.
+   *
+   * A `Duration` argument reads its seconds through `inSeconds()`, standing in
+   * for Ruby's `arg.abs` / `arg.to_i` delegating to `@value` — trails' Duration
+   * derives totals from `parts` and carries no `@value`.
    */
-  static find(name: string | number | Duration): TimeZone {
-    // `when Numeric, ActiveSupport::Duration` (time_zone.rb:244-246): an offset
-    // of 13 or less is hours, anything larger is already seconds.
+  static find(name: string | number | Duration | TimeZone): TimeZone {
+    if (name instanceof TimeZone) return name;
     if (typeof name === "number" || name instanceof Duration) {
-      // `arg.abs` / `arg.to_i` on a Duration delegate to its seconds value
-      // (`inSeconds` here — trails' Duration carries no `@value`).
       let arg = name instanceof Duration ? name.inSeconds() : name;
       if (Math.abs(arg) <= 13) arg *= 3600;
       const zone = TimeZone.all().find((z) => z.utcOffset === Math.trunc(arg));
@@ -328,11 +330,12 @@ export class TimeZone {
     return TimeZone.find(name);
   }
 
-  /** Returns all Rails-named timezones */
+  /**
+   * Every Rails-named timezone: `@zones ||= zones_map.values.sort`
+   * (time_zone.rb:223-225), sorted by `<=>` — utc_offset, then name
+   * (time_zone.rb:333-337).
+   */
   static all(): TimeZone[] {
-    // `zones_map.values.sort` (time_zone.rb:224) — `<=>` (time_zone.rb:333-337)
-    // orders by utc_offset, then by name. `[]`'s Numeric arm takes the first
-    // zone at the requested offset, so the order is behavioral.
     if (zones) return zones;
     zones = Object.keys(MAPPING)
       .map((name) => TimeZone.find(name))
@@ -687,10 +690,11 @@ export class TimeZone {
   }
 
   /**
-   * `tzinfo.current_period.base_utc_offset` (time_zone.rb:317-319) — the
-   * standard-time offset, so it does not move when DST is in effect. Intl
-   * reports the offset *at* an instant, so the standard offset is the smaller
-   * of the January and July offsets (the same derivation `isDst` uses).
+   * `@utc_offset || tzinfo.current_period.base_utc_offset`
+   * (time_zone.rb:317-319) — the standard-time offset, which does not move
+   * when DST is in effect. Intl only reports the offset *at* an instant, so
+   * the standard offset is the smaller of the January and July offsets (the
+   * derivation `isDst` already uses).
    */
   get utcOffset(): number {
     const now = new Date();
