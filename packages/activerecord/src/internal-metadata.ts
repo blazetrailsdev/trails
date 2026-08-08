@@ -226,15 +226,24 @@ export class InternalMetadata {
     );
   }
 
+  /**
+   * `internal_metadata.rb:64-71`. Rails ends the body in `.first`; Ruby's `Enumerable#first` has no JS
+   * array counterpart, so the single value is read as `values[0]`.
+   *
+   * @missingRailsCall first — Enumerable#first; a JS array indexes as values[0].
+   */
   async count(): Promise<number> {
     const sm = new SelectManager(this.arelTable);
     sm.project(new Nodes.NamedFunction("COUNT", [star]).as("cnt"));
-    // Rails: connection.select_values(sm, "#{self.class} Count").first
-    // (internal_metadata.rb:64-71).
     const values = await this._withConnection((connection) =>
       connection.selectValues(sm, `${this.constructor.name} Count`),
     );
-    return Number(values[0] ?? 0);
+    // `select_values` hands back the driver's raw value, and node-postgres
+    // renders `count(*)`'s int8 (OID 20) as a String — there is no type parser
+    // registered for it — so this coercion is load-bearing on PG, not a
+    // stylistic cast. There is no `?? 0`: `COUNT(*)` always yields exactly one
+    // row, and Rails' `.first` would answer `nil` for an empty set, not zero.
+    return Number(values[0]);
   }
 
   /**

@@ -430,6 +430,25 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
     expect((stub as any).isForeignKeysEnabled()).toBe(true);
   });
 
+  it("isForeignKeysEnabled is false when config stores foreign_keys: nil (Rails fetch semantics)", () => {
+    // Hash#fetch(:foreign_keys, true) returns the STORED value whenever the key
+    // is present, so an explicit `foreign_keys: nil` is falsy in Ruby and
+    // disables foreign keys. `??` / `!== false` would answer true here — this is
+    // the one input that distinguishes the two expressions.
+    class NullFkAdapter extends StubAdapter {
+      constructor() {
+        super();
+        (this as any)._config = { foreignKeys: null };
+      }
+      supportsForeignKeys() {
+        return true;
+      }
+    }
+    const stub = new NullFkAdapter();
+    expect((stub as any).isForeignKeysEnabled()).toBe(false);
+    expect((stub as any).useForeignKeys()).toBe(false);
+  });
+
   it("validColumnDefinitionOptions includes ifExists (Rails OPTION_NAMES)", () => {
     const stub = new StubAdapter();
     const opts = (stub as any).validColumnDefinitionOptions() as string[];
