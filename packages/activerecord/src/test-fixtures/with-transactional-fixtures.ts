@@ -25,7 +25,7 @@ interface TxnHost {
  * constructed directly by test files
  * (`new PostgreSQLAdapter(...)`, `new SQLite3Adapter(...)`, etc.). The
  * non-pooled path requires `transactionManager` at runtime, but the pooled
- * path (detected via `.pool.pinConnectionBang`) handles transactions through
+ * path (detected via a non-NullPool `.pool`) handles transactions through
  * the pool, so the static type stays `DatabaseAdapter`.
  */
 export type TransactionalFixturesAdapter = DatabaseAdapter;
@@ -166,15 +166,16 @@ async function reReflectTouchedTables(adapter: TransactionalFixturesAdapter): Pr
  * Detect a pooled adapter (returned by `createPooledTestAdapter()`). The
  * pool back-reference is set by `ConnectionPool#newConnection` (via
  * `adoptConnection`) when a connection is adopted into the pool;
- * non-pooled adapters keep `AbstractAdapter#pool === null`.
+ * non-pooled adapters keep `AbstractAdapter#pool` a NullPool (or null).
  */
 function pooledAdapterPool(adapter: TransactionalFixturesAdapter): ConnectionPool | null {
   const host = adapter as { pool?: unknown };
   const pool = host.pool;
-  if (pool && typeof (pool as ConnectionPool).pinConnectionBang === "function") {
-    return pool as ConnectionPool;
-  }
-  return null;
+  // A NullPool has no `pinConnectionBang`, and Ruby's raises NoMethodError for
+  // the send rather than answering it, so the absence is read off the pool's
+  // class rather than probed for on the object.
+  if (pool == null || pool instanceof NullPool) return null;
+  return pool as ConnectionPool;
 }
 
 /**

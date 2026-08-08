@@ -13,6 +13,7 @@ import { mkdtemp, writeFile, readFile, rm } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import { describe, it, expect, vi } from "vitest";
+import { NoMethodError } from "@blazetrails/activemodel";
 import { Reaper } from "./connection-adapters/abstract/connection-pool/reaper.js";
 import {
   ConnectionPool,
@@ -1166,5 +1167,22 @@ describe("NullPool member parity", () => {
     expect(() => adapter.role).toThrow(/undefined method 'role'/);
     expect(() => adapter.shard).toThrow(/undefined method 'shard'/);
     expect(() => adapter.inspect()).toThrow(/undefined method 'shard'/);
+  });
+
+  it("raises NoMethodError for every send it has no method for", () => {
+    // connection_pool.rb:14-51 does not override method_missing, so any send
+    // outside its fixed member set raises — the raising names are not a set.
+    const pool = new NullPool() as unknown as Record<string, unknown>;
+    for (const name of ["clearQueryCache", "withConnection", "connectionClass", "flush"]) {
+      expect(() => pool[name]).toThrow(NoMethodError);
+    }
+    expect(pool.dirtiesQueryCache).toBe(true);
+    expect(pool.schemaCache).toBeNull();
+    // A JS-only probe is not a Ruby send: a serializer reaching a NullPool
+    // through adapter state must see a non-callable, not a NoMethodError.
+    for (const probe of ["then", "toJSON", "asymmetricMatch", "nodeType", "inspect"]) {
+      expect(pool[probe]).toBeUndefined();
+    }
+    expect(pool.toString).toBe(Object.prototype.toString);
   });
 });
