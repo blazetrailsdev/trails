@@ -24,7 +24,7 @@ const MANIFEST_PATH = path.resolve(__dirname, "rails-deprecated-methods.json");
 
 // Methods the manifest flags as deprecated-in-Rails but which trails does
 // NOT deprecate (the trails port keeps them as live API). Keyed by TS rel
-// path → method names, mirroring how scripts/api-compare/conventions.ts
+// path → method names, mirroring how scripts/parity/conventions.ts
 // documents intentional skips. Empty for now; add entries with a reason.
 const SKIP = {
   // "packages/foo/src/bar.ts": ["baz"], // reason trails keeps baz live

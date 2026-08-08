@@ -25,7 +25,7 @@
 // (shouldSkipArity) and Ruby entries whose recorded arity is a forwarding-macro
 // placeholder (isForwardingRubyEntry).
 
-import type { MethodInfo, ParamInfo } from "./types.js";
+import type { MethodInfo, ParamInfo } from "@blazetrails/parity/types";
 
 /** TS host/receiver types — a leading param of one of these is the explicit host
  *  instance and is stripped. Leaf match also covers `Base<T>` / `ns.Relation`.

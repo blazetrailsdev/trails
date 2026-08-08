@@ -309,7 +309,7 @@ both kept in module scope. It never touches the tooling JSON under
 ### 3.1 Path & symbol mapping
 
 Reuse the data encoded in
-[`scripts/api-compare/conventions.ts`](../scripts/api-compare/conventions.ts):
+[`scripts/parity/conventions.ts`](../scripts/parity/conventions.ts):
 
 - TS↔Ruby filename mapping (kebab→snake, `trailtie`↔`railtie`, package-root
   conventions).
@@ -665,7 +665,7 @@ reason="rails-source-is-itself-disordered"` is the escape hatch and
 - Type-only files (`**/*.d.ts`).
 - Generated files (`packages/*/dist/**`, fixture outputs).
 - Files explicitly listed in
-  [`scripts/api-compare/unported-files.ts`](../scripts/api-compare/unported-files.ts).
+  [`scripts/api-compare/unported-files.ts`](../scripts/parity/unported-files.ts).
 - Restructuring across files — the
   [actionpack restructure audit](../actionpack-100-percent.md) covers
   inter-file moves; this plan is strictly within-file.
@@ -678,7 +678,7 @@ reason="rails-source-is-itself-disordered"` is the escape hatch and
   wave-plan style precedent.
 - [docs/actionpack-100-percent.md](../actionpack-100-percent.md) —
   the directory-level analog to this within-file plan.
-- [scripts/api-compare/conventions.ts](../scripts/api-compare/conventions.ts) —
+- [scripts/parity/conventions.ts](../scripts/parity/conventions.ts) —
   TS↔Ruby naming/path mapping registry; reused by the new rule.
 - `vendor/README.md` — vendor migration history and wave PRs; `vendor/sources.ts` is the source of truth for
   fetched Ruby source locations.

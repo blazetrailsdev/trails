@@ -21,7 +21,7 @@
  * Each entry is verified against BOTH the Rails source position and the actual
  * TS class member; only add an operator once the port's spelling is confirmed.
  */
-import { OPERATORS } from "./conventions.js";
+import { OPERATORS } from "@blazetrails/parity/conventions";
 
 // (Ruby fqn) → (operator) → ordered TS spelling candidates. Candidates mirror
 // `rubyMethodToTs`'s multi-name shape: the rule filters to spellings actually

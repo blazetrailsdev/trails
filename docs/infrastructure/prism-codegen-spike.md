@@ -66,7 +66,7 @@ This spike proves out a deterministic (no-LLM) source-to-source translator that
 ingests Rails ActiveRecord Ruby and emits best-effort **JavaScript** — class /
 module shape, imports, method signatures, **and attempted method bodies** —
 following the Ruby→JS conventions this repo already encodes in
-`scripts/api-compare/conventions.ts`. It answers three questions: (1) is
+`scripts/parity/conventions.ts`. It answers three questions: (1) is
 `@ruby/prism` viable in Node with no Ruby runtime, (2) can an extensible
 handler-registry architecture translate the hardest AR files without drowning,
 and (3) what does the coverage evidence say about productionizing this.
@@ -141,7 +141,7 @@ role):
 | `handlers/misc.ts`        | splats, `super`, compound assignment, multi-assign targets, `defined?`, regex, `alias` |
 
 Convention reuse: naming goes through `rubyMethodToTs` / `snakeToCamel` /
-`rubyFileToTs` from `scripts/api-compare/conventions.ts` (the repo's source of
+`rubyFileToTs` from `scripts/parity/conventions.ts` (the repo's source of
 truth) — no parallel scheme. `def save!` → `saveBang`, `def valid?` → `isValid`,
 `@x` → `this.x`, `initialize` → `constructor`. Module-level `def`s become
 exported free functions (the mixin-as-function runtime shape, TS types dropped);

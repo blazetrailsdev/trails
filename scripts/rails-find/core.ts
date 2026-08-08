@@ -12,7 +12,7 @@
 import * as fs from "fs/promises";
 import * as path from "path";
 
-import type { ApiManifest } from "../api-compare/types.js";
+import type { ApiManifest } from "@blazetrails/parity/types";
 import type { TestCaseInfo, TestManifest } from "../test-compare/types.js";
 
 /** Where each result came from — printed so the caller knows how it matched. */

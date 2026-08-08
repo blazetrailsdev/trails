@@ -7,7 +7,7 @@
 // are seen — dynamic access and keys consumed in callees are missed), so
 // `missingInTs` is the likely-real finding and `extraInTs` is informational.
 
-import { snakeToCamel } from "./conventions.js";
+import { snakeToCamel } from "@blazetrails/parity/conventions";
 
 /** Known Ruby-option-symbol → TS-property renames the camelization can't derive.
  *  Keyed by the raw Ruby symbol. Keep this minimal and evidence-backed — each

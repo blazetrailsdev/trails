@@ -24,7 +24,7 @@ import {
 import { collectTsFileNames } from "./extra-surface.js";
 import { overlappingSubDirs, packageSrcDir } from "./config.js";
 import { COMPARED_TS_FILES, walkTsFilesSync } from "./ts-file-walk.js";
-import type { ClassInfo, MethodInfo, PackageInfo } from "./types.js";
+import type { ClassInfo, MethodInfo, PackageInfo } from "@blazetrails/parity/types";
 
 const VIRTUAL = "virtual.ts";
 

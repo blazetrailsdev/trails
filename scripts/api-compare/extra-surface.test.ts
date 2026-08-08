@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import * as path from "path";
 import * as ts from "typescript";
-import type { ApiManifest, ClassInfo, MethodInfo, PackageInfo } from "./types.js";
+import type { ApiManifest, ClassInfo, MethodInfo, PackageInfo } from "@blazetrails/parity/types";
 import {
   buildGlobalRubyCandidates,
   buildReport,

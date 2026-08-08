@@ -86,7 +86,7 @@
 
 import * as fs from "fs";
 import * as path from "path";
-import type { ApiManifest, ClassInfo, MethodInfo } from "./types.js";
+import type { ApiManifest, ClassInfo, MethodInfo } from "@blazetrails/parity/types";
 import { OUTPUT_DIR, apiComparePackageRoots } from "./config.js";
 import {
   SKIP,
@@ -96,9 +96,9 @@ import {
   rubyMethodToTsIgnoringSkip,
   scopedSkipMirrorName,
   snakeToCamel,
-} from "./conventions.js";
+} from "@blazetrails/parity/conventions";
 import { resolveModuleName } from "./compare.js";
-import { isSourceUnported } from "./unported-files.js";
+import { isSourceUnported } from "@blazetrails/parity/unported-files";
 import { manifestIsStale } from "./build-freshness.js";
 
 /**

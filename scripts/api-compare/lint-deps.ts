@@ -15,9 +15,9 @@ import * as path from "path";
 import { COMPARED_TS_FILES, walkTsFilesSync } from "./ts-file-walk.js";
 import { fileURLToPath } from "url";
 import * as ts from "typescript";
-import type { ApiManifest, ClassInfo } from "./types.js";
+import type { ApiManifest, ClassInfo } from "@blazetrails/parity/types";
 import { OUTPUT_DIR, packageSrcDir } from "./config.js";
-import { rubyFileToTs, rubyMethodToTs } from "./conventions.js";
+import { rubyFileToTs, rubyMethodToTs } from "@blazetrails/parity/conventions";
 import { isNotImplementedStub } from "./extract-ts-api.js";
 
 // ---------------------------------------------------------------------------

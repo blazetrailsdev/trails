@@ -4,8 +4,8 @@
 // symbol→string in either spelling, nil↔null/undefined, escapes); a non-literal
 // is uncomparable.
 
-import type { LiteralValue, ParamInfo } from "./types.js";
-import { snakeToCamel } from "./conventions.js";
+import type { LiteralValue, ParamInfo } from "@blazetrails/parity/types";
+import { snakeToCamel } from "@blazetrails/parity/conventions";
 
 // ESC is one of the characters being canonicalized, so it belongs in the class.
 // eslint-disable-next-line no-control-regex

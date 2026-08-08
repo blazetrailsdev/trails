@@ -5,7 +5,7 @@ import {
   resetOperatorSpellingUsage,
   unusedOperatorSpellings,
 } from "./operator-order-spelling.js";
-import { OPERATORS } from "./conventions.js";
+import { OPERATORS } from "@blazetrails/parity/conventions";
 
 describe("operatorSpelling", () => {
   it("resolves `[]` to the class-specific spelling per fqn", () => {

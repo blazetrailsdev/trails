@@ -7,7 +7,7 @@ import {
   isForwardingRubyEntry,
   renderSig,
 } from "./arity.js";
-import type { MethodInfo, ParamInfo } from "./types.js";
+import type { MethodInfo, ParamInfo } from "@blazetrails/parity/types";
 
 const req = (name: string, type?: string): ParamInfo => ({ name, kind: "required", type });
 const opt = (name: string): ParamInfo => ({ name, kind: "optional", default: "…" });

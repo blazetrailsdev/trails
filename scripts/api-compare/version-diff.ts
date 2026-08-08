@@ -4,7 +4,13 @@
 // call-set deltas); `annotateAgainstTs` flags what intersects OUR ported
 // surface. Pure (no node:* / process / fs) — drift.ts owns all I/O.
 
-import type { ApiManifest, ClassInfo, MethodInfo, PackageInfo, ParamInfo } from "./types.js";
+import type {
+  ApiManifest,
+  ClassInfo,
+  MethodInfo,
+  PackageInfo,
+  ParamInfo,
+} from "@blazetrails/parity/types";
 
 export interface MethodRef {
   name: string;

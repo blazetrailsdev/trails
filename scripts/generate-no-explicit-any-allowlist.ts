@@ -12,7 +12,7 @@
 import { ESLint } from "eslint";
 import { fileURLToPath } from "url";
 import * as path from "path";
-import { writeJsonManifest } from "./api-compare/write-json-manifest.js";
+import { writeJsonManifest } from "@blazetrails/parity/write-json-manifest";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const RULE = "@typescript-eslint/no-explicit-any";

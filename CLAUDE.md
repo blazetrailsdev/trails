@@ -18,7 +18,7 @@ Mirror, method by method and line by line:
 - **Names.** Method, class, module, constant, and field names come from Rails,
   translated by the rules in
   [docs/ruby-ts-conventions.md](docs/ruby-ts-conventions.md) — that file is
-  generated from `scripts/api-compare/conventions.ts` and is what `api:compare`
+  generated from `scripts/parity/conventions.ts` and is what `api:compare`
   actually matches on, so read it _before_ you pick a name, not after CI
   disagrees. It also covers file paths (`PATH_SEGMENT_ALIASES`,
   `RUBY_FILE_TS_OVERRIDES`). If your name isn't the one that table produces
@@ -154,7 +154,7 @@ tasks repo enumerates these as convergence classes.
   are CI-verified current:
   **[docs/ruby-ts-conventions.md](docs/ruby-ts-conventions.md)** for the
   Ruby→TS name and file-path translations `api:compare` matches on (generated
-  from `scripts/api-compare/conventions.ts` — change the rule there, never
+  from `scripts/parity/conventions.ts` — change the rule there, never
   hand-edit the doc), and `SKIP_GROUPS` / `SCOPED_SKIP_GROUPS` in that same
   source file for the members deliberately not mirrored, each with its reason.
   If you think a Ruby name has no reasonable TS spelling, check `SKIP_GROUPS`
@@ -353,7 +353,7 @@ When NOT to use this:
 
 - Ruby lifecycle hooks (`extended`, `included`, `inherited`) — no TS
   equivalent. Don't stub them; add them to a `SKIP_GROUPS` entry (with a
-  reason) in `scripts/api-compare/conventions.ts`.
+  reason) in `scripts/parity/conventions.ts`.
 - If the method needs Model-specific state beyond the host interface,
   keep it in `model.ts` directly.
 

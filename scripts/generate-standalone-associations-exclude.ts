@@ -25,7 +25,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import { parseForESLint } from "@typescript-eslint/parser";
-import { writeJsonManifest } from "./api-compare/write-json-manifest.js";
+import { writeJsonManifest } from "@blazetrails/parity/write-json-manifest";
 // @ts-expect-error — .mjs rule module has no type declarations.
 import { macroOfCall, siteKey, repoRel } from "../eslint/no-standalone-associations.mjs";
 

@@ -24,8 +24,8 @@
 import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
-import { rubyMethodToTs, rubyFileToTs } from "./api-compare/conventions.js";
-import { writeJsonManifest } from "./api-compare/write-json-manifest.js";
+import { rubyMethodToTs, rubyFileToTs } from "@blazetrails/parity/conventions";
+import { writeJsonManifest } from "@blazetrails/parity/write-json-manifest";
 import { mergeBySourceLine } from "./api-compare/source-order.js";
 import {
   operatorSpelling,

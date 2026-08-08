@@ -65,8 +65,8 @@ import type { TestManifest, TestGate } from "./types.js";
 import { classifyGateMismatch, type GateMismatchKind } from "./gates.js";
 import { buildHistogram, diffHistograms, type KindDelta } from "./assertion-kinds.js";
 import { assertionValueMismatch, type ValueDelta } from "./assertion-values.js";
-import { isTestCaseUnported, isTestFileUnported } from "../api-compare/unported-files.js";
-import { PATH_SEGMENT_ALIASES } from "../api-compare/conventions.js";
+import { isTestCaseUnported, isTestFileUnported } from "@blazetrails/parity/unported-files";
+import { PATH_SEGMENT_ALIASES } from "@blazetrails/parity/conventions";
 import { SpellChecker } from "../../packages/did-you-mean/src/spell-checker.js";
 import { testPathsManifest } from "../../vendor/sources.js";
 

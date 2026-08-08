@@ -18,7 +18,7 @@ import {
   writeSplitBaseline,
   renderStaleTags,
 } from "./lint-call-mismatches.js";
-import type { ApiManifest, ClassInfo, MethodInfo } from "./types.js";
+import type { ApiManifest, ClassInfo, MethodInfo } from "@blazetrails/parity/types";
 
 const entry = (
   pkg: string,
