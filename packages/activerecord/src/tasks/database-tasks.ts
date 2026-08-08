@@ -246,22 +246,16 @@ export class DatabaseTasks {
   }
 
   static async createAll(): Promise<void> {
-    // Rails: capture current db_config before iterating so we can restore it after.
-    const migrationClass = this.migrationClass();
-    let originalConfig: DatabaseConfig | null = null;
-    try {
-      originalConfig = migrationClass.connectionDbConfig();
-    } catch (error) {
-      if (!(error instanceof ConnectionNotDefined)) throw error;
+    // The cast covers `AbstractAdapter#pool`'s declared `ConnectionPool |
+    // NullPool`: `NullPool#db_config` is `NullConfig`, which a leased connection
+    // can never be — Ruby, being untyped, needs no narrowing here.
+    const dbConfig = this.migrationConnection().pool.dbConfig as DatabaseConfig;
+
+    for (const dbConfig of this.eachLocalConfiguration()) {
+      await this.create(dbConfig);
     }
-    const configs = this.eachLocalConfiguration();
-    for (const config of configs) {
-      await this.create(config);
-    }
-    // Rails: re-establish connection to the original config after all creates.
-    if (originalConfig !== null) {
-      await migrationClass.establishConnection(originalConfig);
-    }
+
+    await this.migrationClass().establishConnection(dbConfig);
   }
 
   static async createCurrent(environment?: string, name?: string): Promise<void> {
