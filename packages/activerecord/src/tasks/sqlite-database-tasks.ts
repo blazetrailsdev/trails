@@ -349,7 +349,7 @@ function splitSqlStatements(sql: string): string[] {
 /** @internal */
 export async function runCmd(cmd: string, args: string[], out: string): Promise<void> {
   const childProcess = await getChildProcessAsync();
-  const result: SpawnSyncResult = childProcess.spawnSync(cmd, args, { encoding: "utf8" });
+  const result: SpawnSyncResult = childProcess.spawnSync(cmd, args, { encoding: "utf8", out });
   if (result.error || result.status !== 0 || result.signal) {
     const details: string[] = [];
     if (result.error) details.push(`Error: ${result.error.message}`);
@@ -360,7 +360,6 @@ export async function runCmd(cmd: string, args: string[], out: string): Promise<
     if (result.stdout) details.push(`stdout:\n${String(result.stdout).trimEnd()}`);
     throw new Error(runCmdError(cmd, args) + (details.length ? details.join("\n") + "\n" : ""));
   }
-  getFs().writeFileSync(out, result.stdout ?? "");
 }
 
 /** @internal */

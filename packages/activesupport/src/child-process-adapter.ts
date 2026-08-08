@@ -7,6 +7,7 @@
  */
 
 import { env as processEnv } from "./process-adapter.js";
+import { getFs } from "./fs-adapter.js";
 
 export interface SpawnSyncOptions {
   input?: string | Uint8Array;
@@ -18,6 +19,13 @@ export interface SpawnSyncOptions {
    */
   encoding?: "utf8" | "utf-8";
   cwd?: string;
+  /**
+   * Path to redirect the child's stdout to, mirroring Ruby's
+   * `Kernel.system(cmd, *args, out: path)`. The child writes to the file
+   * descriptor directly, so its bytes land in the file untouched (no decode /
+   * re-encode) and are not buffered in memory. `stdout` comes back empty.
+   */
+  out?: string;
 }
 
 export interface SpawnSyncResult {
@@ -62,15 +70,22 @@ type NodeChildProcess = {
 function wrap(cp: NodeChildProcess): ChildProcessAdapter {
   return {
     spawnSync(cmd, args, options) {
-      const result = cp.spawnSync(cmd, args, {
-        input: options?.input,
-        // Default to the trailties-managed env (from process-adapter), not
-        // the host's ambient process.env, so child processes see the
-        // env trailties controls. Explicit `env` still wins.
-        env: options?.env ?? ({ ...processEnv } as NodeJS.ProcessEnv),
-        encoding: options?.encoding ?? "utf8",
-        cwd: options?.cwd,
-      });
+      const outFd = options?.out != null ? getFs().openSync(options.out, "w") : null;
+      let result: NodeSpawnSyncResult;
+      try {
+        result = cp.spawnSync(cmd, args, {
+          input: options?.input,
+          // Default to the trailties-managed env (from process-adapter), not
+          // the host's ambient process.env, so child processes see the
+          // env trailties controls. Explicit `env` still wins.
+          env: options?.env ?? ({ ...processEnv } as NodeJS.ProcessEnv),
+          encoding: options?.encoding ?? "utf8",
+          cwd: options?.cwd,
+          ...(outFd !== null ? { stdio: ["pipe", outFd, "pipe"] } : {}),
+        });
+      } finally {
+        if (outFd !== null) getFs().closeSync(outFd);
+      }
       return {
         status: result.status,
         signal: result.signal,
