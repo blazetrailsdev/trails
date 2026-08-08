@@ -247,11 +247,10 @@ export class DatabaseTasks {
 
   static async createAll(): Promise<void> {
     // Rails: capture current db_config before iterating so we can restore it after.
-    const { Base } = await import("../base.js");
-    this._baseClass = Base;
+    const migrationClass = this.migrationClass();
     let originalConfig: DatabaseConfig | null = null;
     try {
-      originalConfig = Base.connectionDbConfig();
+      originalConfig = migrationClass.connectionDbConfig();
     } catch (error) {
       if (!(error instanceof ConnectionNotDefined)) throw error;
     }
@@ -261,7 +260,7 @@ export class DatabaseTasks {
     }
     // Rails: re-establish connection to the original config after all creates.
     if (originalConfig !== null) {
-      await Base.establishConnection(originalConfig);
+      await migrationClass.establishConnection(originalConfig);
     }
   }
 
@@ -272,7 +271,7 @@ export class DatabaseTasks {
     // database_tasks.rb:173 — `migration_class.establish_connection(environment.to_sym)`,
     // which resolves the bare env name through `Base.configurations`.
     const envName = this._normalizeEnv(environment);
-    await (await this.migrationClass()).establishConnection(envName);
+    await this.migrationClass().establishConnection(envName);
   }
 
   static async drop(
@@ -509,17 +508,10 @@ export class DatabaseTasks {
     adapter.schemaCache.clearBang();
   }
 
-  // Cached sync reference to Base, populated on the first _migrationAdapter() call.
-  // Lets migrationConnection() (which must be synchronous) lease from the pool
-  // without a top-level import that would create a circular-dependency cycle.
-  private static _baseClass: typeof import("../base.js").Base | null = null;
-
   private static async _migrationAdapter(): Promise<
     import("../connection-adapters/abstract-adapter.js").AbstractAdapter
   > {
-    const { Base } = await import("../base.js");
-    this._baseClass = Base;
-    return Base.connectionPool().leaseConnection();
+    return this.migrationClass().connectionPool().leaseConnection();
   }
 
   static async purge(
@@ -539,7 +531,7 @@ export class DatabaseTasks {
     }
     // database_tasks.rb:359 — `migration_class.establish_connection(environment.to_sym)`,
     // which resolves the bare env name through `Base.configurations`.
-    await (await this.migrationClass()).establishConnection(env);
+    await this.migrationClass().establishConnection(env);
   }
 
   static async purgeAll(): Promise<void> {
@@ -1093,9 +1085,7 @@ export class DatabaseTasks {
   }
 
   static async migrateStatus(): Promise<void> {
-    const { Base } = await import("../base.js");
-    this._baseClass = Base;
-    const pool = Base.connectionPool();
+    const pool = this.migrationConnectionPool();
     const adapter = await pool.leaseConnection();
     const migrator = await this._migratorFor(adapter, pool.dbConfig);
     // Mirrors database_tasks.rb:302-305: abort unless schema_migrations exists.
@@ -1272,7 +1262,7 @@ export class DatabaseTasks {
     fn: (pool: ConnectionPool) => Promise<T>,
     { clobber = false }: { clobber?: boolean } = {},
   ): Promise<T> {
-    const migrationClass = await this.migrationClass();
+    const migrationClass = this.migrationClass();
     let originalDbConfig: DatabaseConfig | undefined;
     try {
       originalDbConfig = migrationClass.connectionDbConfig();
@@ -1319,12 +1309,10 @@ export class DatabaseTasks {
   ): Promise<void> {
     env = this._normalizeEnv(env);
     if (name != null) {
-      const dbConfig = (await this.migrationClass())
-        .configurations()
-        .configsFor({ envName: env, name })[0];
+      const dbConfig = this.migrationClass().configurations().configsFor({ envName: env, name })[0];
       if (dbConfig) await this.withTemporaryPool(dbConfig, block, { clobber });
     } else {
-      for (const dbConfig of (await this.migrationClass())
+      for (const dbConfig of this.migrationClass()
         .configurations()
         .configsFor({ envName: env, name })) {
         await this.withTemporaryPool(dbConfig, block, { clobber });
@@ -1332,10 +1320,15 @@ export class DatabaseTasks {
     }
   }
 
-  static async migrationClass(): Promise<typeof import("../base.js").Base> {
-    const { Base } = await import("../base.js");
-    this._baseClass = Base;
-    return Base;
+  /**
+   * Mirrors `DatabaseTasks.migration_class` (database_tasks.rb:529-531) — a
+   * bare `ActiveRecord::Base`. ESM cannot name a constant at call time the way
+   * Ruby's autoload does, so the constant is read out of the module-level slot
+   * base.ts fills through `_registerBase` at the bottom of its own body
+   * (CLAUDE.md § "Call-time constant resolution").
+   */
+  static migrationClass(): typeof Base {
+    return baseClass();
   }
 
   /**
@@ -1347,7 +1340,6 @@ export class DatabaseTasks {
    * dependent on the graph's entry order.
    */
   static _registerBase(base: typeof import("../base.js").Base): void {
-    this._baseClass = base;
     setModuleBase(base);
   }
 
@@ -1357,23 +1349,18 @@ export class DatabaseTasks {
    * nothing is established rather than answering nil, and no caller guards it,
    * so neither does this.
    *
-   * `migrationClass()` is the async spelling (it dynamic-imports base.js to
-   * stay out of the import cycle); `_baseClass` is the same constant, wired at
-   * base.ts module init by `_registerBase`, which is what this sync reader can
-   * name — as Ruby names `ActiveRecord::Base` directly.
-   *
    * The Rails-named `leaseConnection` is async (it awaits per-checkout
    * `verifyBang` — see ConnectionPool#checkout), so this sync reader uses the
    * `leaseConnectionSync` escape hatch, which resolves a pinned connection /
    * establishes a first lease without the async verify.
    */
   static migrationConnection(): import("../connection-adapters/abstract-adapter.js").AbstractAdapter {
-    return this._baseClass!.connectionPool().leaseConnectionSync();
+    return this.migrationClass().connectionPool().leaseConnectionSync();
   }
 
   /** Mirrors `DatabaseTasks.migration_connection_pool` (database_tasks.rb:537-539). */
   static migrationConnectionPool(): ConnectionPool {
-    return this._baseClass!.connectionPool();
+    return this.migrationClass().connectionPool();
   }
 
   static async schemaUpToDate(

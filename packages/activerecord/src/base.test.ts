@@ -911,7 +911,7 @@ describe("BasicsTest", () => {
       }
       const created = await Topic.create({});
       const topic = await Topic.find(created.id);
-      topic.assignAttributes({ bonus_time: "5:42:00AM" });
+      await topic.assignAttributes({ bonus_time: "5:42:00AM" });
       expect(topic.readAttribute("bonus_time")).toEqual(
         new Temporal.PlainDateTime(2000, 1, 1, 5, 42, 0).toZonedDateTime("UTC").toInstant(),
       );
@@ -1087,7 +1087,7 @@ describe("BasicsTest", () => {
       expect(post.readAttribute("title")).toBe("cannot change this");
       expect(post.readAttribute("body")).toBe("changed via write_attribute");
 
-      post.assignAttributes({
+      await post.assignAttributes({
         title: "changed via assign_attributes",
         body: "changed via assign_attributes",
       });
@@ -1157,7 +1157,7 @@ describe("BasicsTest", () => {
       }
       const created = await Topic.create({});
       const topic = await Topic.find(created.id);
-      topic.assignAttributes({ bonus_time: "5:42:00AM" });
+      await topic.assignAttributes({ bonus_time: "5:42:00AM" });
       expect(topic.readAttribute("bonus_time")).toEqual(
         new Temporal.PlainDateTime(2000, 1, 1, 5, 42, 0)
           .toZonedDateTime(Temporal.Now.timeZoneId())
@@ -1180,7 +1180,7 @@ describe("BasicsTest", () => {
     }
     const t = await DummyTopic.create({});
     const found = await DummyTopic.find(t.id);
-    found.assignAttributes({ bonus_time: "not a time" });
+    await found.assignAttributes({ bonus_time: "not a time" });
     expect(found.bonus_time).toBeNull();
   });
   it("previously persisted returns boolean", async () => {

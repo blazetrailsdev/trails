@@ -25,9 +25,9 @@ describe("MultiParameterAttributeTest", () => {
     await Topic.loadSchema();
   });
 
-  it("multiparameter attributes on date", () => {
+  it("multiparameter attributes on date", async () => {
     const topic = new Topic();
-    topic.assignAttributes({
+    await topic.assignAttributes({
       "last_read(1i)": "2004",
       "last_read(2i)": "6",
       "last_read(3i)": "24",
@@ -39,9 +39,9 @@ describe("MultiParameterAttributeTest", () => {
     expect(d.day).toBe(24);
   });
 
-  it("multiparameter attributes on date with empty year", () => {
+  it("multiparameter attributes on date with empty year", async () => {
     const topic = new Topic();
-    topic.assignAttributes({
+    await topic.assignAttributes({
       "last_read(1i)": "",
       "last_read(2i)": "6",
       "last_read(3i)": "24",
@@ -49,9 +49,9 @@ describe("MultiParameterAttributeTest", () => {
     expect(topic.last_read).toBeNull();
   });
 
-  it("multiparameter attributes on date with empty month", () => {
+  it("multiparameter attributes on date with empty month", async () => {
     const topic = new Topic();
-    topic.assignAttributes({
+    await topic.assignAttributes({
       "last_read(1i)": "2004",
       "last_read(2i)": "",
       "last_read(3i)": "24",
@@ -59,9 +59,9 @@ describe("MultiParameterAttributeTest", () => {
     expect(topic.last_read).toBeNull();
   });
 
-  it("multiparameter attributes on date with empty day", () => {
+  it("multiparameter attributes on date with empty day", async () => {
     const topic = new Topic();
-    topic.assignAttributes({
+    await topic.assignAttributes({
       "last_read(1i)": "2004",
       "last_read(2i)": "6",
       "last_read(3i)": "",
@@ -69,9 +69,9 @@ describe("MultiParameterAttributeTest", () => {
     expect(topic.last_read).toBeNull();
   });
 
-  it("multiparameter attributes on date with empty day and year", () => {
+  it("multiparameter attributes on date with empty day and year", async () => {
     const topic = new Topic();
-    topic.assignAttributes({
+    await topic.assignAttributes({
       "last_read(1i)": "",
       "last_read(2i)": "6",
       "last_read(3i)": "",
@@ -79,9 +79,9 @@ describe("MultiParameterAttributeTest", () => {
     expect(topic.last_read).toBeNull();
   });
 
-  it("multiparameter attributes on date with empty day and month", () => {
+  it("multiparameter attributes on date with empty day and month", async () => {
     const topic = new Topic();
-    topic.assignAttributes({
+    await topic.assignAttributes({
       "last_read(1i)": "2004",
       "last_read(2i)": "",
       "last_read(3i)": "",
@@ -89,9 +89,9 @@ describe("MultiParameterAttributeTest", () => {
     expect(topic.last_read).toBeNull();
   });
 
-  it("multiparameter attributes on date with empty year and month", () => {
+  it("multiparameter attributes on date with empty year and month", async () => {
     const topic = new Topic();
-    topic.assignAttributes({
+    await topic.assignAttributes({
       "last_read(1i)": "",
       "last_read(2i)": "",
       "last_read(3i)": "24",
@@ -99,9 +99,9 @@ describe("MultiParameterAttributeTest", () => {
     expect(topic.last_read).toBeNull();
   });
 
-  it("multiparameter attributes on date with all empty", () => {
+  it("multiparameter attributes on date with all empty", async () => {
     const topic = new Topic();
-    topic.assignAttributes({
+    await topic.assignAttributes({
       "last_read(1i)": "",
       "last_read(2i)": "",
       "last_read(3i)": "",
@@ -109,9 +109,9 @@ describe("MultiParameterAttributeTest", () => {
     expect(topic.last_read).toBeNull();
   });
 
-  it("multiparameter attributes on time", () => {
+  it("multiparameter attributes on time", async () => {
     const topic = new Topic();
-    topic.assignAttributes({
+    await topic.assignAttributes({
       "written_on(1i)": "2004",
       "written_on(2i)": "6",
       "written_on(3i)": "24",
@@ -129,9 +129,9 @@ describe("MultiParameterAttributeTest", () => {
     expect(utc(dt).second).toBe(0);
   });
 
-  it("multiparameter attributes on time with no date", () => {
+  it("multiparameter attributes on time with no date", async () => {
     const topic = new Topic();
-    topic.assignAttributes({
+    await topic.assignAttributes({
       "written_on(1i)": "1",
       "written_on(2i)": "1",
       "written_on(3i)": "1",
@@ -144,9 +144,9 @@ describe("MultiParameterAttributeTest", () => {
     expect(utc(dt).minute).toBe(24);
   });
 
-  it("multiparameter attributes on time with invalid time params", () => {
+  it("multiparameter attributes on time with invalid time params", async () => {
     const topic = new Topic();
-    topic.assignAttributes({
+    await topic.assignAttributes({
       "written_on(1i)": "",
       "written_on(2i)": "",
       "written_on(3i)": "",
@@ -156,9 +156,9 @@ describe("MultiParameterAttributeTest", () => {
     expect(topic.written_on).toBeNull();
   });
 
-  it("multiparameter attributes on time with old date", () => {
+  it("multiparameter attributes on time with old date", async () => {
     const topic = new Topic();
-    topic.assignAttributes({
+    await topic.assignAttributes({
       "written_on(1i)": "1850",
       "written_on(2i)": "6",
       "written_on(3i)": "24",
@@ -176,7 +176,7 @@ describe("MultiParameterAttributeTest", () => {
     expect(utc(dt).second).toBe(0);
   });
 
-  it("multiparameter attributes on time will raise on big time if missing date parts", () => {
+  it("multiparameter attributes on time will raise on big time if missing date parts", async () => {
     const topic = new Topic();
     // Rails: time parts without date context → Time.new(nil,nil,nil,16,24) raises ArgumentError,
     // collected into MultiparameterAssignmentErrors.
@@ -185,16 +185,16 @@ describe("MultiParameterAttributeTest", () => {
     ).toThrow(MultiparameterAssignmentErrors);
   });
 
-  it("multiparameter attributes on time with raise on small time if missing date parts", () => {
+  it("multiparameter attributes on time with raise on small time if missing date parts", async () => {
     const topic = new Topic();
     expect(() => topic.assignAttributes({ "written_on(4i)": "1", "written_on(5i)": "2" })).toThrow(
       MultiparameterAssignmentErrors,
     );
   });
 
-  it("multiparameter attributes on time will ignore hour if missing", () => {
+  it("multiparameter attributes on time will ignore hour if missing", async () => {
     const topic = new Topic();
-    topic.assignAttributes({
+    await topic.assignAttributes({
       "written_on(1i)": "2004",
       "written_on(2i)": "6",
       "written_on(3i)": "24",
@@ -205,9 +205,9 @@ describe("MultiParameterAttributeTest", () => {
     expect(utc(dt).hour).toBe(0);
   });
 
-  it("multiparameter attributes on time will ignore hour if blank", () => {
+  it("multiparameter attributes on time will ignore hour if blank", async () => {
     const topic = new Topic();
-    topic.assignAttributes({
+    await topic.assignAttributes({
       "written_on(1i)": "2004",
       "written_on(2i)": "6",
       "written_on(3i)": "24",
@@ -219,9 +219,9 @@ describe("MultiParameterAttributeTest", () => {
     expect(utc(dt).hour).toBe(0);
   });
 
-  it("multiparameter attributes on time will ignore date if empty", () => {
+  it("multiparameter attributes on time will ignore date if empty", async () => {
     const topic = new Topic();
-    topic.assignAttributes({
+    await topic.assignAttributes({
       "written_on(1i)": "",
       "written_on(2i)": "",
       "written_on(3i)": "",
@@ -231,9 +231,9 @@ describe("MultiParameterAttributeTest", () => {
     expect(topic.written_on).toBeNull();
   });
 
-  it("multiparameter attributes on time with seconds will ignore date if empty", () => {
+  it("multiparameter attributes on time with seconds will ignore date if empty", async () => {
     const topic = new Topic();
-    topic.assignAttributes({
+    await topic.assignAttributes({
       "written_on(1i)": "",
       "written_on(2i)": "",
       "written_on(3i)": "",
@@ -245,9 +245,9 @@ describe("MultiParameterAttributeTest", () => {
   });
 
   it("multiparameter attributes on time with utc", async () => {
-    await withTimezoneConfig({ default: "utc" }, () => {
+    await withTimezoneConfig({ default: "utc" }, async () => {
       const topic = new Topic();
-      topic.assignAttributes({
+      await topic.assignAttributes({
         "written_on(1i)": "2004",
         "written_on(2i)": "6",
         "written_on(3i)": "24",
@@ -273,7 +273,7 @@ describe("MultiParameterAttributeTest", () => {
           Topic.resetColumnInformation();
           await Topic.loadSchema();
           const topic = new Topic();
-          topic.assignAttributes({
+          await topic.assignAttributes({
             "written_on(1i)": "2004",
             "written_on(2i)": "6",
             "written_on(3i)": "24",
@@ -302,7 +302,7 @@ describe("MultiParameterAttributeTest", () => {
         Topic.resetColumnInformation();
         await Topic.loadSchema();
         const topic = new Topic();
-        topic.assignAttributes({
+        await topic.assignAttributes({
           "written_on(1i)": "2004",
           "written_on(2i)": "",
           "written_on(3i)": "",
@@ -323,7 +323,7 @@ describe("MultiParameterAttributeTest", () => {
           Topic.resetColumnInformation();
           await Topic.loadSchema();
           const topic = new Topic();
-          topic.assignAttributes({
+          await topic.assignAttributes({
             "written_on(1i)": "2004",
             "written_on(2i)": "6",
             "written_on(3i)": "24",
@@ -352,7 +352,7 @@ describe("MultiParameterAttributeTest", () => {
           Topic.resetColumnInformation();
           await Topic.loadSchema();
           const topic = new Topic();
-          topic.assignAttributes({
+          await topic.assignAttributes({
             "written_on(1i)": "2004",
             "written_on(2i)": "6",
             "written_on(3i)": "24",
@@ -384,7 +384,7 @@ describe("MultiParameterAttributeTest", () => {
           Topic.resetColumnInformation();
           await Topic.loadSchema();
           const topic = new Topic();
-          topic.assignAttributes({
+          await topic.assignAttributes({
             "bonus_time(1i)": "2000",
             "bonus_time(2i)": "1",
             "bonus_time(3i)": "1",
@@ -396,7 +396,7 @@ describe("MultiParameterAttributeTest", () => {
           expect(bt).toBeInstanceOf(TimeWithZone);
           expect(bt.hour).toBe(16);
           // written_on with empty month/day → null
-          topic.assignAttributes({
+          await topic.assignAttributes({
             "written_on(1i)": "2000",
             "written_on(2i)": "",
             "written_on(3i)": "",
@@ -428,9 +428,9 @@ describe("MultiParameterAttributeTest", () => {
     expect(utc(dt).minute).toBe(30);
   });
 
-  it("multiparameter attributes on time with empty seconds", () => {
+  it("multiparameter attributes on time with empty seconds", async () => {
     const topic = new Topic();
-    topic.assignAttributes({
+    await topic.assignAttributes({
       "written_on(1i)": "2004",
       "written_on(2i)": "6",
       "written_on(3i)": "24",
@@ -500,9 +500,9 @@ describe("MultiParameterAttributeTest", () => {
     expect(utc(dt).minute).toBe(55);
   });
 
-  it("multiparameter attributes setting time but not date on date field", () => {
+  it("multiparameter attributes setting time but not date on date field", async () => {
     const topic = new Topic();
-    topic.assignAttributes({
+    await topic.assignAttributes({
       "last_read(1i)": "",
       "last_read(2i)": "",
       "last_read(3i)": "",
@@ -514,7 +514,7 @@ describe("MultiParameterAttributeTest", () => {
   // Aggregation tests
   // -------------------------------------------------------------------------
 
-  it("multiparameter assignment of aggregation", () => {
+  it("multiparameter assignment of aggregation", async () => {
     class Address {
       constructor(
         public street: string,
@@ -536,7 +536,7 @@ describe("MultiParameterAttributeTest", () => {
       }
     }
     const customer = new Customer();
-    customer.assignAttributes({
+    await customer.assignAttributes({
       "address(1)": "Planet Earth",
       "address(2)": "home",
       "address(3)": "USA",
@@ -548,7 +548,7 @@ describe("MultiParameterAttributeTest", () => {
     expect(addr.country).toBe("USA");
   });
 
-  it("multiparameter assignment of aggregation out of order", () => {
+  it("multiparameter assignment of aggregation out of order", async () => {
     class Address {
       constructor(
         public street: string,
@@ -570,7 +570,7 @@ describe("MultiParameterAttributeTest", () => {
       }
     }
     const customer = new Customer();
-    customer.assignAttributes({
+    await customer.assignAttributes({
       "address(3)": "USA",
       "address(1)": "Planet Earth",
       "address(2)": "home",
@@ -581,7 +581,7 @@ describe("MultiParameterAttributeTest", () => {
     expect(addr.country).toBe("USA");
   });
 
-  it("multiparameter assignment of aggregation with missing values", () => {
+  it("multiparameter assignment of aggregation with missing values", async () => {
     class Address {
       constructor(
         public street: string | null,
@@ -603,7 +603,7 @@ describe("MultiParameterAttributeTest", () => {
       }
     }
     const customer = new Customer();
-    customer.assignAttributes({
+    await customer.assignAttributes({
       "address(1)": "Planet Earth",
       "address(3)": "USA",
     });
@@ -613,7 +613,7 @@ describe("MultiParameterAttributeTest", () => {
     expect(addr.country).toBe("USA");
   });
 
-  it("multiparameter assignment of aggregation with blank values", () => {
+  it("multiparameter assignment of aggregation with blank values", async () => {
     class Address {
       constructor(
         public street: string,
@@ -635,7 +635,7 @@ describe("MultiParameterAttributeTest", () => {
       }
     }
     const customer = new Customer();
-    customer.assignAttributes({
+    await customer.assignAttributes({
       "address(1)": "",
       "address(2)": "",
       "address(3)": "",
@@ -644,7 +644,7 @@ describe("MultiParameterAttributeTest", () => {
     expect((customer as any).address).toBeNull();
   });
 
-  it("multiparameter assignment of aggregation with large index", () => {
+  it("multiparameter assignment of aggregation with large index", async () => {
     class Timespan {
       constructor(
         public start: string,
@@ -669,7 +669,7 @@ describe("MultiParameterAttributeTest", () => {
       }
     }
     const meeting = new Meeting();
-    meeting.assignAttributes({
+    await meeting.assignAttributes({
       "duration(1)": "9am",
       "duration(2)": "5pm",
     });

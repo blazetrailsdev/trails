@@ -660,7 +660,14 @@ function _applyScopeAttributes(
   }
   if (Object.keys(toApply).length > 0) {
     // assignAttributes is always mixed into Base instances; call directly.
-    (record as any).assignAttributes(toApply);
+    // `populate_with_current_scope_attributes` runs from `initialize`
+    // (scoping.rb:60-66, core.rb:474), which a JS constructor cannot await, so
+    // the assignment is parked on the record for `save` to drain — the same
+    // deferral the constructor's nested re-dispatch uses
+    // (`_reapplyNestedAttrSetters`). A scope value naming an association (
+    // `Firm.where(firm: f).new`) is the only one that can still be in flight.
+    const pending = (record as any).assignAttributes(toApply) as Promise<void> | void;
+    if (pending) _NestedAttributes.parkNestedReaderLoad(record as any, pending);
   }
 }
 
@@ -4678,8 +4685,8 @@ export interface Base extends Included<typeof AutosaveAssociation> {
   _updateRecord(): Promise<boolean>;
   slice(...keys: string[]): Record<string, unknown>;
   valuesAt(...keys: string[]): unknown[];
-  assignAttributes(attrs: Record<string, unknown>): void;
-  setAttributes(attrs: Record<string, unknown>): Promise<void>;
+  assignAttributes(attrs: Record<string, unknown>): Promise<void> | void;
+  setAttributes(attrs: Record<string, unknown>): Promise<void> | void;
   updateAttribute(name: string, value: unknown): Promise<boolean | undefined>;
   updateAttributeBang(name: string, value: unknown): Promise<true | undefined>;
   updateColumn(name: string, value: unknown): Promise<boolean>;
@@ -5133,7 +5140,11 @@ _setSuperValidates(Model.validates);
     Object.defineProperty(Base.prototype, "attributes", {
       get: modelGetter,
       set(this: Base, attrs: Record<string, unknown>) {
-        this.assignAttributes(attrs);
+        // A TS `set` accessor cannot await, so a key whose writer reaches the
+        // database is parked for `save` to drain; `setAttributes` is the
+        // awaitable spelling of the same alias (attribute_assignment.rb:36).
+        const pending = this.assignAttributes(attrs);
+        if (pending) _NestedAttributes.parkNestedReaderLoad(this, pending);
       },
       configurable: true,
       enumerable: false,

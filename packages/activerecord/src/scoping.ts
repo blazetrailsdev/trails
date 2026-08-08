@@ -1,4 +1,6 @@
 import { IsolatedExecutionState } from "@blazetrails/activesupport";
+import type { Base } from "./base.js";
+import { parkNestedReaderLoad } from "./nested-attributes.js";
 
 const SCOPE_REGISTRY_KEY = "active_record_scope_registry";
 
@@ -111,15 +113,22 @@ function setValueFor(map: WeakMap<object, any>, modelClass: object, value: any):
 
 interface ScopingHost {
   constructor: { isScopeAttributes(): boolean };
-  assignAttributes?(attrs: Record<string, unknown>): void;
+  assignAttributes?(attrs: Record<string, unknown>): Promise<void> | void;
 }
 
+/**
+ * Mirrors: ActiveRecord::Scoping#populate_with_current_scope_attributes
+ * (scoping.rb:60-66). Runs from `initialize` (core.rb:474), which a JS
+ * constructor cannot await, so the assignment is parked on the record for `save`
+ * to drain — see `_applyScopeAttributes` (base.ts).
+ */
 export function populateWithCurrentScopeAttributes(this: ScopingHost): void {
   const klass = this.constructor as any;
   if (!klass.isScopeAttributes()) return;
   const attrs = scopeAttributes.call(klass);
   if (attrs && Object.keys(attrs).length > 0 && this.assignAttributes) {
-    this.assignAttributes(attrs);
+    const pending = this.assignAttributes(attrs);
+    if (pending) parkNestedReaderLoad(this as unknown as Base, pending);
   }
 }
 

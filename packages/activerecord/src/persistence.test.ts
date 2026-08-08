@@ -590,7 +590,7 @@ describe("PersistenceTest", () => {
 
   it("save null string attributes", async () => {
     const topic = await Topic.find(1);
-    topic.assignAttributes({ title: "null", author_name: "null" });
+    await topic.assignAttributes({ title: "null", author_name: "null" });
     await topic.saveBang();
     await topic.reload();
     expect(topic.title).toBe("null");

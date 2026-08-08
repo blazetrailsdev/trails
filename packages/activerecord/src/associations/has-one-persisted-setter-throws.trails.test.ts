@@ -10,9 +10,11 @@
  * RFC 0068 exists to kill), the assignment THROWS and names the awaitable
  * replacement (`await owner.set#{Name}(x)`). On an *unpersisted* owner Rails
  * does no I/O either, so the in-memory replace is faithful and kept — but only
- * on the *constructor* arm, whose owner is unpersisted by definition. RFC 0087
- * retired the mass-assignment routing, so a has_one key reaching
- * `assign_attributes` now falls to ActiveModel's `attribute_writer_missing`.
+ * on the *constructor* arm, whose owner is unpersisted by definition.
+ *
+ * Mass assignment itself is faithful: `_assign_attribute` sends the writer it
+ * resolved (attribute_assignment.rb:67-69), so `assign_attributes` answers a
+ * promise for the I/O and an awaited caller gets Rails' inline timing.
  * There is no Rails test for this deviation.
  */
 import { describe, it, expect, beforeAll } from "vitest";
@@ -30,7 +32,7 @@ interface HasOneOwner {
   account?: unknown;
   club?: unknown;
   setAccount(value: unknown): void | Promise<void>;
-  assignAttributes(attrs: Record<string, unknown>): void;
+  assignAttributes(attrs: Record<string, unknown>): Promise<void> | void;
   update(attrs: Record<string, unknown>): Promise<boolean>;
 }
 
@@ -95,18 +97,18 @@ describe("HasOnePersistedSetterThrows", () => {
     }
   });
 
-  it("mass-assignment (assignAttributes) reaches no association writer", async () => {
-    // RFC 0087: `assign_attributes` no longer routes a has_one key into the
-    // synchronous writer. Rails would `public_send("account=")` and persist the
-    // displacement inline (has_one_association.rb:59-84); trails cannot await
-    // there, so with no writer for the key ActiveModel's
-    // `attribute_writer_missing` (attribute_assignment.rb:67-75) answers, and
-    // callers use `#update` or `setAccount` instead.
+  it("mass-assignment (assignAttributes) awaits the has_one writer", async () => {
+    // `_assign_attribute` sends (attribute_assignment.rb:67-69), so the has_one
+    // key reaches Rails' `public_send("account=")` and the inline
+    // displacement/persist (has_one_association.rb:59-84). The send is what makes
+    // `assign_attributes` answer a promise, so the caller awaits it rather than
+    // reaching for `#update` or `setAccount`.
     const firm = (await Firm.create({ name: "GlobalMegaCorp" })) as unknown as HasOneOwner;
     const account = await Account.create({ credit_limit: 1000 });
-    expect(() => {
-      firm.assignAttributes({ account });
-    }).toThrow(/unknown attribute `account`/);
+    await firm.assignAttributes({ account });
+    expect((account as unknown as { firm_id: number }).firm_id).toBe(
+      Number((firm as unknown as { id: unknown }).id),
+    );
   });
 
   it("update awaits the has_one writer on a persisted owner", async () => {
@@ -131,12 +133,11 @@ describe("HasOnePersistedSetterThrows", () => {
     ).toThrow(HasOnePersistedAssignmentError);
   });
 
-  it("has_one_through mass-assignment reaches no association writer", async () => {
+  it("has_one_through mass-assignment awaits the through writer", async () => {
     const member = (await Member.create({ name: "Groucho" })) as unknown as HasOneOwner;
     const club = await Club.create({ name: "Moustache" });
-    expect(() => {
-      member.assignAttributes({ club });
-    }).toThrow(/unknown attribute `club`/);
+    await member.assignAttributes({ club });
+    expect(await (member as unknown as { club: Promise<unknown> }).club).toBeTruthy();
   });
 
   it("construction issues no query for the association assignment", async () => {
