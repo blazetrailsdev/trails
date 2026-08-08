@@ -480,15 +480,18 @@ export function assignToOrMarkForDestruction(
   childRecord: Base,
   attributes: Record<string, unknown>,
   allowDestroy: boolean,
-): void {
+): Promise<void> | void {
   const assignable: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(attributes)) {
     if (!UNASSIGNABLE_KEYS.has(k)) assignable[k] = v;
   }
-  childRecord.assignAttributes(assignable);
-  if (hasDestroyFlag(attributes) && allowDestroy) {
-    markForDestruction(childRecord);
-  }
+  const pending = childRecord.assignAttributes(assignable);
+  const markIfRequested = (): void => {
+    if (hasDestroyFlag(attributes) && allowDestroy) {
+      markForDestruction(childRecord);
+    }
+  };
+  return pending ? pending.then(markIfRequested) : markIfRequested();
 }
 
 /** @internal */
@@ -834,7 +837,7 @@ export function assignNestedAttributesForOneToOneAssociation(
     (updateOnly || String(existing.id) === String((attributes as any).id))
   ) {
     if (!callRejectIf(record, associationName, attributes)) {
-      assignToOrMarkForDestruction(existing, attributes, options.allowDestroy ?? false);
+      return assignToOrMarkForDestruction(existing, attributes, options.allowDestroy ?? false);
     }
     return;
   }
@@ -853,7 +856,10 @@ export function assignNestedAttributesForOneToOneAssociation(
       // Rails reuses an already-built unsaved target (e.g. after `buildShip`)
       // rather than replacing it: assign into it, then re-anchor FK/scope/
       // inverse via `initialize_attributes`.
-      existing.assignAttributes(assignable);
+      const pending = existing.assignAttributes(assignable);
+      if (pending) {
+        return pending.then(() => assoc.initializeAttributes(existing));
+      }
       assoc.initializeAttributes(existing);
     } else {
       // Rails nested_attributes.rb:451 — `method = :"build_#{association_name}";
@@ -904,7 +910,7 @@ export function assignNestedAttributesForCollectionAssociation(
   record: Base,
   associationName: string,
   attributesCollection: Record<string, unknown>[] | Record<string, Record<string, unknown>>,
-): void {
+): Promise<void> | void {
   if (typeof attributesCollection !== "object" || attributesCollection === null) {
     throw new Error(
       `Hash or Array expected for \`${associationName}\` attributes, got ${nestedTypeName(attributesCollection)}`,
@@ -1000,6 +1006,13 @@ export function assignNestedAttributesForCollectionAssociation(
   const collectionTargetModel = resolveCollectionTargetModel(record, associationName);
   const nestedTarget: (Base | null)[] = [];
   const deferred: Record<string, unknown>[] = [];
+  // `assign_to_or_mark_for_destruction` (nested_attributes.rb:576-579) sends
+  // through `assign_attributes`, which is awaitable here — a grandchild
+  // `#{name}_attributes` key on an existing record reaches DB I/O. The loop
+  // itself stays synchronous so its raises (`raiseNestedAttributesRecordNotFound`,
+  // `Cannot build association`) still raise where Ruby's do, so the sends are
+  // collected and awaited once the loop is through.
+  const pendingAssignments: Promise<void>[] = [];
   for (const a of attrs) {
     if (!hasNestedId(a)) {
       if (!isRejectNewRecord(record, associationName, a)) {
@@ -1011,7 +1024,9 @@ export function assignNestedAttributesForCollectionAssociation(
         nestedTarget.push(null);
       }
     } else if (isAutosave) {
-      nestedTarget.push(populateInMemoryExistingRecord(record, associationName, a));
+      nestedTarget.push(
+        populateInMemoryExistingRecord(record, associationName, a, pendingAssignments),
+      );
     } else {
       deferred.push(a);
     }
@@ -1021,6 +1036,9 @@ export function assignNestedAttributesForCollectionAssociation(
   }
   (record.association(associationName) as CollectionAssociation).nestedAttributesTarget =
     nestedTarget;
+  if (pendingAssignments.length > 0) {
+    return Promise.all(pendingAssignments).then(() => undefined);
+  }
 }
 
 /**
@@ -1055,6 +1073,7 @@ function populateInMemoryExistingRecord(
   record: Base,
   associationName: string,
   attrs: Record<string, unknown>,
+  pendingAssignments: Promise<void>[],
 ): Base | null {
   const ctor = record.constructor as typeof Base;
   const associations: any[] = (ctor as any)._associations ?? [];
@@ -1095,7 +1114,12 @@ function populateInMemoryExistingRecord(
   // (PK-only) stub in the in-memory collection.
   if (callRejectIf(record, associationName, attrs)) return null;
   if (isNewStub) (proxy as any).addExistingRecord(existing);
-  assignToOrMarkForDestruction(existing!, attrs, isAllowDestroy(record, associationName));
+  const pending = assignToOrMarkForDestruction(
+    existing!,
+    attrs,
+    isAllowDestroy(record, associationName),
+  );
+  if (pending) pendingAssignments.push(pending);
   return existing ?? null;
 }
 

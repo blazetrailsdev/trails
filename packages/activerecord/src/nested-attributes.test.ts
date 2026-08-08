@@ -1274,7 +1274,11 @@ function limitTests(makePirate: () => Promise<Pirate>): void {
 
   it("limit with exceeding records", async () => {
     const pirate = await makePirate();
-    await expect(
+    // `@pirate.attributes = { … }` (nested_attributes_test.rb:977-981) raises at
+    // the assignment expression: `check_record_limit!`
+    // (nested_attributes.rb:511) runs before any of the collection's writers, so
+    // the raise is synchronous here too.
+    expect(() =>
       (pirate as any).setAttributes({
         parrotsAttributes: {
           foo: { name: "Lovely Day" },
@@ -1282,7 +1286,7 @@ function limitTests(makePirate: () => Promise<Pirate>): void {
           car: { name: "The Happening" },
         },
       }),
-    ).rejects.toThrow(TooManyRecords);
+    ).toThrow(TooManyRecords);
   });
 }
 

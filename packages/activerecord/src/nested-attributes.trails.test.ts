@@ -216,7 +216,7 @@ describe("nested attributes assignment ordering (trails-only)", () => {
   // pass (:21), so a nested writer's `reject_if` observes an owner whose own
   // attributes are already set — even when the nested key sits first in the
   // literal.
-  it("assigns nested parameter hashes after the base attributes", () => {
+  it("assigns nested parameter hashes after the base attributes", async () => {
     const config = (
       Pirate as unknown as {
         _nestedAttributeConfigs: {
@@ -227,14 +227,14 @@ describe("nested attributes assignment ordering (trails-only)", () => {
     )._nestedAttributeConfigs.find((c) => c.associationName === "ship")!;
     const originalRejectIf = config.options.rejectIf;
     const observed: unknown[] = [];
-    config.options.rejectIf = (_attrs: Record<string, unknown>, record: Base) => {
+    config.options.rejectIf = async (_attrs: Record<string, unknown>, record: Base) => {
       observed.push((record as Pirate).catchphrase);
       return false;
     };
 
     try {
       const pirate = new Pirate();
-      pirate.assignAttributes({
+      await pirate.assignAttributes({
         shipAttributes: { name: "The Black Rock" },
         catchphrase: "Aye",
       });
@@ -257,7 +257,7 @@ describe("nested attributes assignment ordering (trails-only)", () => {
     await (pirate as unknown as { ship: Promise<Base | null> }).ship;
 
     expect(
-      pirate.assignAttributes({ shipAttributes: { name: "Davy Jones Gold Dagger" } }),
+      await pirate.assignAttributes({ shipAttributes: { name: "Davy Jones Gold Dagger" } }),
     ).toBeUndefined();
     await pirate.save();
 

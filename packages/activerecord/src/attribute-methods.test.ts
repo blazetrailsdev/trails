@@ -784,7 +784,7 @@ describe("AttributeMethodsTest", () => {
   it("set attributes", async () => {
     const Topic = makeTopic();
     const t = new Topic({});
-    t.assignAttributes({ title: "Set", author_name: "Alice" });
+    await t.assignAttributes({ title: "Set", author_name: "Alice" });
     expect(t.title).toBe("Set");
     expect(t.author_name).toBe("Alice");
   });

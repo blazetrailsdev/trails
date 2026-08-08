@@ -95,7 +95,7 @@ describe("DupTest", () => {
 
     const attrs = { ...dbtopic!.attributes } as Record<string, unknown>;
     delete attrs.id;
-    topic.assignAttributes(attrs);
+    await topic.assignAttributes(attrs);
 
     // duped has no timestamp values
     const duped = dbtopic!.dup();
@@ -235,7 +235,7 @@ describe("DupTest", () => {
       await Movie.transaction(async () => {
         await movie.saveBang();
         const duped = movie.dup();
-        duped.assignAttributes({ name: null });
+        await duped.assignAttributes({ name: null });
         await duped.saveBang();
       });
     } catch (e) {

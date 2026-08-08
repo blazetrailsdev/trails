@@ -361,7 +361,7 @@ export class HasOneThroughAssociation extends HasOneAssociation {
     const throughRecord = (throughProxy as { target?: Base | null }).target ?? null;
     if (throughRecord) {
       if ((throughRecord as any).isNewRecord?.()) {
-        (throughRecord as any).assignAttributes?.(attrs);
+        void (throughRecord as any).assignAttributes?.(attrs);
         // On a persisted owner, a prior build of an UNLOADED join row queued
         // this association's deferred reconcile (`_pendingReplace`, else-branch
         // below). `persistReplace` resets the through proxy and rebuilds attrs
@@ -383,7 +383,7 @@ export class HasOneThroughAssociation extends HasOneAssociation {
         // deferred path — not the through proxy's `_pendingReplace` below —
         // owns the persistence here, so the built/new-record autosave arm is
         // skipped (throughRecord is not new) and no duplicate join is written.
-        (throughRecord as any).assignAttributes?.(attrs);
+        void (throughRecord as any).assignAttributes?.(attrs);
         // Repeated build/create before save must re-point `record` at the
         // latest source (mirrors the `_pendingReplace.record = record`
         // reassignment in `replace()`): Rails runs `through_record.update`
@@ -543,7 +543,7 @@ async function createThroughRecord(
 
     if (throughRecord) {
       if (throughRecord.isNewRecord?.()) {
-        throughRecord.assignAttributes?.(attrs);
+        await throughRecord.assignAttributes?.(attrs);
       } else {
         await throughRecord.update?.(attrs);
       }

@@ -52,16 +52,15 @@ describe("constructor-form association writer", () => {
     expect((author as any).association("posts").target).toEqual([p1]);
   });
 
-  it("no longer routes an association key reached through assignAttributes", () => {
-    // RFC 0087: mass assignment onto an existing record has no unpersisted-owner
-    // guarantee, so it no longer reaches a synchronous association writer. With
-    // no writer for the key, ActiveModel's `attribute_writer_missing`
-    // (attribute_assignment.rb:67-75) is what answers. Callers use `#update`,
-    // which awaits the real writer.
+  it("routes an association key reached through assignAttributes", async () => {
+    // `_assign_attribute` sends the writer it resolved
+    // (attribute_assignment.rb:67-69), so mass assignment reaches the collection
+    // writer as Rails does. On a new owner `replace` does no I/O, so the send
+    // completes in memory.
     const author = new Author();
-    expect(() => author.assignAttributes({ posts: [new Post({ title: "a" })] })).toThrow(
-      /unknown attribute `posts`/,
-    );
+    const post = new Post({ title: "a" });
+    await author.assignAttributes({ posts: [post] });
+    expect((author as any).association("posts").target).toContain(post);
   });
 
   it("dispatches single record to hasOne association on construction", () => {
