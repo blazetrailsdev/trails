@@ -46,10 +46,7 @@ import {
 } from "../errors.js";
 import { sql as arelSql, Nodes, Visitors } from "@blazetrails/arel";
 import { StatementPool as ConnectionStatementPool } from "./statement-pool.js";
-import type {
-  SchemaCreation as MysqlSchemaCreation,
-  MysqlAddColumnOptions,
-} from "./mysql/schema-creation.js";
+import type { SchemaCreation as MysqlSchemaCreation } from "./mysql/schema-creation.js";
 import {
   quote as mysqlQuote,
   quotedDate as mysqlQuotedDate,
@@ -68,7 +65,6 @@ import {
   ChangeColumnDefinition,
   ChangeColumnDefaultDefinition,
   CheckConstraintDefinition,
-  ColumnDefinition,
   CreateIndexDefinition,
   IndexDefinition,
 } from "./abstract/schema-definitions.js";
@@ -1769,49 +1765,23 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     if (this.supportsRenameColumn()) {
       return this.renameColumnSql(tableName, columnName, newColumnName);
     }
-    // Fallback for MySQL <8.0.3 / MariaDB <10.5.2: mirrors Rails' rename_column_for_alter
-    // (abstract_mysql_adapter.rb:863-878). Route through columnFor so function-default and
-    // on_update detection happens once in newColumnFromField — no second-pass parsing here.
     const column = (await this.columnFor(tableName, columnName)) as MysqlColumn;
-    // Rails' rename_column_for_alter has no equivalent guard, but the rebuild path here
-    // (and in Rails) reconstructs columns from {default,null,auto_increment,comment} only —
-    // the `AS (<expr>) [VIRTUAL|STORED]` generation clause has no slot. Emitting a plain
-    // CHANGE for a virtual/generated column would silently drop the generation expression,
-    // which is unrecoverable. Fail loud instead; callers must upgrade to MySQL ≥8.0.3 or
-    // MariaDB ≥10.5.2 to use the RENAME COLUMN path above.
-    if (column.isVirtual()) {
-      throw new Error(
-        `renameColumnForAlter fallback: cannot safely CHANGE virtual/generated column ` +
-          `"${columnName}" in table "${tableName}" — generation expression would be dropped. ` +
-          `Upgrade to MySQL ≥8.0.3 or MariaDB ≥10.5.2 to use RENAME COLUMN instead.`,
-      );
-    }
-    const defFn = column.defaultFunction;
-    // newColumnFromField sets column.default to null when defaultFunction is present, so we can
-    // pass either through ColumnDefinition's `default` slot: a lambda for function defaults
-    // (emitted unquoted by quoteDefaultExpression) or the literal value otherwise. SHOW FULL
-    // FIELDS returns null Default both when there is no default and when DEFAULT NULL; treat
-    // null as "no explicit default" to avoid emitting DEFAULT NULL on NOT NULL columns.
-    const colDefault: (() => string) | string | undefined =
-      defFn != null ? () => defFn : column.default == null ? undefined : (column.default as string);
-    const colOpts: MysqlAddColumnOptions = {
-      default: colDefault,
+    const options: ColumnOptions = {
+      default: column.default,
       null: column.null,
-      collation: column.collation ?? undefined,
+      autoIncrement: column.autoIncrement,
       comment: column.comment ?? undefined,
-      autoIncrement: column.autoIncrement || undefined,
-      onUpdate: column.onUpdate ?? undefined,
     };
-    if (column.sqlType == null || column.sqlType.length === 0) {
-      throw new Error(
-        `renameColumnForAlter fallback: missing sqlType for column "${columnName}" in table ` +
-          `"${tableName}" — cannot rebuild CHANGE clause without the full column type. ` +
-          `This indicates the column metadata was not fully populated by columns().`,
-      );
-    }
-    const colDef = new ColumnDefinition(newColumnName, column.sqlType, colOpts);
-    const cd = new ChangeColumnDefinition(colDef, columnName);
-    return this.schemaCreation.accept(cd);
+
+    const currentType = (
+      await this.internalExecQuery(
+        `SHOW COLUMNS FROM ${this.quoteTableName(tableName)} LIKE ${this.quote(columnName)}`,
+        "SCHEMA",
+      )
+    ).first()?.["Type"] as ColumnType;
+    const td = this.createTableDefinition(tableName);
+    const cd = td.newColumnDefinition(newColumnName, currentType, options);
+    return this.schemaCreation.accept(new ChangeColumnDefinition(cd, column.name));
   }
 
   /** @internal */
