@@ -209,6 +209,7 @@ describe("nested attributes assignment ordering (trails-only)", () => {
   fixtures({
     pirates: [Pirate, {}],
     ships: [Ship, {}],
+    parrots: [Parrot, {}],
   });
 
   // `_assign_attributes` (attribute_assignment.rb:6-22) buckets every
@@ -263,6 +264,60 @@ describe("nested attributes assignment ordering (trails-only)", () => {
 
     const reloaded = await Ship.find((displaced as unknown as { id: number }).id);
     expect((reloaded as unknown as { pirate_id: number | null }).pirate_id).toBe(null);
+  });
+
+  // Rails calls `assign_to_or_mark_for_destruction` once per record inside the
+  // `map` (nested_attributes.rb:517-544, :538), synchronously — so record n's
+  // assignment has fully completed before record n+1's begins. The port chains
+  // each record's send behind the previous one to keep that; fanning them out
+  // concurrently would start both writes in the same tick.
+  it("sequences one existing collection record's assignment before the next", async () => {
+    Pirate.acceptsNestedAttributesFor("parrots");
+
+    const pirate = (await Pirate.create({ catchphrase: "Aye" })) as unknown as Pirate;
+    const parrots = (
+      pirate as unknown as {
+        parrots: {
+          create(attrs: Record<string, unknown>): Promise<Base>;
+          toArray(): Promise<Base[]>;
+        };
+      }
+    ).parrots;
+    const first = await parrots.create({ name: "First" });
+    const second = await parrots.create({ name: "Second" });
+    await parrots.toArray();
+
+    const events: string[] = [];
+    const proto = Parrot.prototype as unknown as {
+      assignAttributes(attrs: Record<string, unknown>): Promise<void> | void;
+    };
+    const original = proto.assignAttributes;
+    // Each record's send answers a promise, as a grandchild key reaching DB I/O
+    // would, so a concurrent fan-out is observable as interleaved start events.
+    proto.assignAttributes = function (this: Base, attrs: Record<string, unknown>) {
+      const name = String((attrs as { name?: unknown }).name);
+      events.push(`start:${name}`);
+      const result = original.call(this, attrs);
+      return Promise.resolve(result).then(() => {
+        events.push(`end:${name}`);
+      });
+    };
+
+    try {
+      await nested(pirate).setParrotsAttributes({
+        a: { id: readAttr(first, "id"), name: "Renamed First" },
+        b: { id: readAttr(second, "id"), name: "Renamed Second" },
+      });
+    } finally {
+      proto.assignAttributes = original;
+    }
+
+    expect(events).toEqual([
+      "start:Renamed First",
+      "end:Renamed First",
+      "start:Renamed Second",
+      "end:Renamed Second",
+    ]);
   });
 
   // `_assign_attributes` and `assign_nested_parameter_attributes`
