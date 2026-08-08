@@ -738,8 +738,6 @@ export abstract class SchemaDumper {
       const inlineLines: string[] = [];
       const remaining = await this.gatherInlineConstraints(tableName, inlineLines);
       this.emitTable(lines, tableName, columns, indexes, adapterTableOpts, inlineLines);
-      // schema_dumper.rb:216-219: the not-valid check constraints come back as a
-      // second stream, printed after the createTable block's `end`.
       if (remaining && remaining.length > 0) lines.push("", ...remaining);
       lines.push("");
     } finally {
