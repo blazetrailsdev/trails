@@ -299,7 +299,7 @@ export type TransactionConnection = DatabaseAdapter & {
   restartDbTransaction?(): void | Promise<void>;
   resetIsolationLevel?(): void | Promise<void>;
   supportsLazyTransactions?(): boolean;
-  supportsRestartDbTransaction?(): boolean;
+  supportsRestartDbTransaction?(): Promise<boolean>;
   addTransactionRecord?(record: unknown): void;
   active?(): boolean | Promise<boolean>;
   currentTransaction?(): Transaction | NullTransaction;
@@ -866,14 +866,7 @@ export class RealTransaction extends Transaction {
 
     this._instrumenter.finish("restart");
 
-    let supportsRestart = false;
-    try {
-      supportsRestart = !!this.connection.supportsRestartDbTransaction?.();
-    } catch {
-      // databaseVersion may not be loaded yet; fall back to rollback+begin
-    }
-
-    if (supportsRestart) {
+    if (await this.connection.supportsRestartDbTransaction?.()) {
       this._instrumenter.start();
       await this.connection.restartDbTransaction?.();
     } else {

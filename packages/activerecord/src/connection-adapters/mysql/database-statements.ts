@@ -80,7 +80,7 @@ export function buildExplainClause(
 
 interface SupportsInsertReturningHost {
   /** @internal */
-  supportsInsertReturning?(): boolean;
+  supportsInsertReturning?(): Promise<boolean>;
 }
 
 interface AutoIncrementColumnHost {
@@ -105,11 +105,11 @@ export function defaultInsertValue(column: AutoIncrementColumnHost): Nodes.SqlLi
 }
 
 /** @internal */
-export function returningColumnValues(
+export async function returningColumnValues(
   this: SupportsInsertReturningHost | void,
   result: Result,
-): unknown[] | undefined {
-  if ((this as SupportsInsertReturningHost | null)?.supportsInsertReturning?.()) {
+): Promise<unknown[] | undefined> {
+  if (await (this as SupportsInsertReturningHost | null)?.supportsInsertReturning?.()) {
     return result.rows[0] as unknown[] | undefined;
   }
   // Falls back to abstract base behavior (last_inserted_id path)

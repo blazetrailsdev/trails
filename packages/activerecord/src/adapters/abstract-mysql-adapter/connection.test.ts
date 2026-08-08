@@ -42,12 +42,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     // next test in this worker gets a live one.
     clearVersionCache(adapter);
     await adapter.verifyBang();
-    // Rails' `database_version` re-runs the query once the stub is gone, so its
-    // @connection is never left without one. Ours is a sync reader over an async
-    // fetch and `verifyBang` won't re-configure an already-live connection, so
-    // refill the memo this hook just emptied — otherwise the next test in this
-    // worker inherits a permanently cold version.
-    await adapter.pool.serverVersion(adapter);
   });
 
   describe("ConnectionTest", () => {
@@ -332,7 +326,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       });
       try {
         await adapter.renameColumnForAlter("bar_baz", "foo", "foo2");
-        if (adapter.supportsRenameColumn()) {
+        if (await adapter.supportsRenameColumn()) {
           expect(names).not.toContain("SCHEMA");
         } else {
           expect(names).toContain("SCHEMA");

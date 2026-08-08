@@ -77,30 +77,32 @@ describe("PostgreSQL SchemaCreation", () => {
     expect(sql).toContain("DEFERRABLE INITIALLY DEFERRED");
   });
 
-  it("visitUniqueConstraintDefinition: basic + NULLS NOT DISTINCT + USING INDEX", () => {
+  it("visitUniqueConstraintDefinition: basic + NULLS NOT DISTINCT + USING INDEX", async () => {
     expect(
-      s().visitUniqueConstraintDefinition(new UniqueConstraintDefinition("t", "e", { name: "u" })),
+      await s().visitUniqueConstraintDefinition(
+        new UniqueConstraintDefinition("t", "e", { name: "u" }),
+      ),
     ).toContain('CONSTRAINT "u" UNIQUE');
     expect(
-      s().visitUniqueConstraintDefinition(
+      await s().visitUniqueConstraintDefinition(
         new UniqueConstraintDefinition("t", "e", { name: "u", nullsNotDistinct: true }),
       ),
     ).toContain("NULLS NOT DISTINCT");
     expect(
-      s().visitUniqueConstraintDefinition(
+      await s().visitUniqueConstraintDefinition(
         new UniqueConstraintDefinition("t", "e", { name: "u", usingIndex: "idx" }),
       ),
     ).toContain('USING INDEX "idx"');
   });
 
-  it("visitAddExclusionConstraint / visitAddUniqueConstraint", () => {
+  it("visitAddExclusionConstraint / visitAddUniqueConstraint", async () => {
     expect(
       s().visitAddExclusionConstraint(
         new ExclusionConstraintDefinition("t", "e WITH &&", { name: "c" }),
       ),
     ).toMatch(/^ADD CONSTRAINT/);
     expect(
-      s().visitAddUniqueConstraint(new UniqueConstraintDefinition("t", "col", { name: "c" })),
+      await s().visitAddUniqueConstraint(new UniqueConstraintDefinition("t", "col", { name: "c" })),
     ).toMatch(/^ADD CONSTRAINT/);
   });
 
@@ -170,9 +172,9 @@ describe("PostgreSQL SchemaCreation", () => {
     expect(sql).not.toContain("CONSTRAINT");
   });
 
-  it("visitUniqueConstraintDefinition: unnamed constraint omits CONSTRAINT prefix", () => {
+  it("visitUniqueConstraintDefinition: unnamed constraint omits CONSTRAINT prefix", async () => {
     const uc = new UniqueConstraintDefinition("t", "col", {});
-    const sql = s().visitUniqueConstraintDefinition(uc);
+    const sql = await s().visitUniqueConstraintDefinition(uc);
     expect(sql).toMatch(/^UNIQUE/);
     expect(sql).not.toContain("CONSTRAINT");
   });

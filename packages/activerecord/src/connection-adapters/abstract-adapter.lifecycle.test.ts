@@ -81,7 +81,7 @@ describe("AbstractAdapter connection lifecycle privates", () => {
   it("configureConnection invokes checkVersion", async () => {
     const a = new AbstractAdapter();
     let called = 0;
-    a.checkVersion = () => void (called += 1);
+    a.checkVersion = async () => void (called += 1);
     await a.configureConnection();
     expect(called).toBe(1);
   });

@@ -1887,9 +1887,10 @@ describe("PersistenceTest", () => {
     if (adapterType === "postgres") {
       // Mirror postgresql_specific_schema.rb `create_table :defaults`.
       const pg = connection as PostgreSQLAdapter;
+      const supportsVirtualColumns = await pg.supportsVirtualColumns();
       await pg.createTable("defaults", { force: true }, (t) => {
         const d = t as PgTableDefinition;
-        if (pg.supportsVirtualColumns()) {
+        if (supportsVirtualColumns) {
           d.virtual("virtual_stored_number", {
             type: "integer",
             as: "random_number * 10",
@@ -1977,7 +1978,7 @@ describe("PersistenceTest", () => {
   it.skipIf(adapterType !== "postgres")("fills auto populated columns on creation", async () => {
     await withDefaultsTable(async (record) => {
       expect(record.ruby_on_rails).toBe("Ruby on Rails");
-      if ((Base.connection as PostgreSQLAdapter).supportsVirtualColumns()) {
+      if (await (Base.connection as PostgreSQLAdapter).supportsVirtualColumns()) {
         expect(record.virtual_stored_number).not.toBeNull();
       }
       expect(record.random_number).not.toBeNull();
@@ -1990,7 +1991,7 @@ describe("PersistenceTest", () => {
       // returns binary columns as raw bytes, so decode to compare.
       expect(Buffer.from(record.binary_default_function).toString()).toBe("A");
 
-      if ((Base.connection as PostgreSQLAdapter).supportsIdentityColumns()) {
+      if (await (Base.connection as PostgreSQLAdapter).supportsIdentityColumns()) {
         class IdentityTable extends Base {
           static _tableName = "postgresql_identity_table";
         }
@@ -2017,13 +2018,13 @@ describe("PersistenceTest", () => {
 
   // Rails: `elsif current_adapter?(:Mysql2Adapter, :TrilogyAdapter)`.
   it.skipIf(adapterType !== "mysql")("fills auto populated columns on creation", async () => {
-    await withDefaultsTable((record) => {
+    await withDefaultsTable(async (record) => {
       expect(record.char1).not.toBeNull();
       const supportsDefaultExpression =
         (
           Base.connection as { supportsDefaultExpression?: () => boolean }
         ).supportsDefaultExpression?.() ?? false;
-      if (supportsDefaultExpression && Base.connection.supportsInsertReturning?.()) {
+      if (supportsDefaultExpression && (await Base.connection.supportsInsertReturning?.())) {
         expect(record.uuid).not.toBeNull();
       }
     });

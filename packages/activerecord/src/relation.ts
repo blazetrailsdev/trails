@@ -2957,7 +2957,7 @@ export class Relation<T extends Base> {
     // exec_queries path means a real relation always yields at least one
     // captured query (with adapter-quoted SQL — backticks on MySQL), and a
     // query-less relation (`.none()`) yields empty output, matching Rails.
-    const clause = this.buildExplainClause(adapter, options);
+    const clause = await this.buildExplainClause(adapter, options);
     const parts: string[] = [];
     for (const [sql, binds] of queries) {
       let msg = `${clause} ${sql}`;
@@ -3101,7 +3101,10 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#build_explain_clause
    */
-  private buildExplainClause(adapter: DatabaseAdapter, options: ExplainOption[]): string {
+  private async buildExplainClause(
+    adapter: DatabaseAdapter,
+    options: ExplainOption[],
+  ): Promise<string> {
     if (typeof adapter.buildExplainClause === "function") {
       return adapter.buildExplainClause(options);
     }

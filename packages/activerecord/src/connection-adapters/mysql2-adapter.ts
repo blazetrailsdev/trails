@@ -582,7 +582,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     returning?: string[] | null,
   ): Promise<Result | number> {
     const inferredFromPk = pk !== false && pk != null;
-    if (this.supportsInsertReturning() && (returning?.length || inferredFromPk)) {
+    if ((await this.supportsInsertReturning()) && (returning?.length || inferredFromPk)) {
       const [returningSql, returningBinds] = sqlForInsert.call(
         this as never,
         sql,
@@ -1735,8 +1735,8 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    *
    * @internal
    */
-  override fullVersion(): string | null {
-    return this.databaseVersion.fullVersionString;
+  override async fullVersion(): Promise<string | null> {
+    return (await this.databaseVersion).fullVersionString;
   }
 
   /**

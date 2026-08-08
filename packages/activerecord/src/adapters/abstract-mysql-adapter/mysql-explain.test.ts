@@ -38,8 +38,8 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     // MariaDB >= 10.1 prints a bare ANALYZE clause (no EXPLAIN prefix).
     let explainOpt: string;
     let expectedClause: string;
-    beforeAll(() => {
-      const ver = adapter.databaseVersion;
+    beforeAll(async () => {
+      const ver = await adapter.databaseVersion;
       const supportsAnalyze = isMariaDb && ver.compare("10.1.0") >= 0;
       // `version <= "10.0"` expressed as `Version("10.0") >= version`.
       const supportsExplainAnalyze = isMariaDb
@@ -144,10 +144,11 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       expect(clause).toBe("EXPLAIN FORMAT=JSON for:");
     });
 
-    it("buildExplainClause combines string flag and format hash space-separated", () => {
-      const clause = adapter.buildExplainClause(["analyze", { format: "json" }]);
+    it("buildExplainClause combines string flag and format hash space-separated", async () => {
+      const clause = await adapter.buildExplainClause(["analyze", { format: "json" }]);
       // MariaDB >= 10.1 drops the EXPLAIN prefix for ANALYZE (analyze_without_explain?).
-      const analyzeWithoutExplain = isMariaDb && adapter.databaseVersion.compare("10.1.0") >= 0;
+      const analyzeWithoutExplain =
+        isMariaDb && (await adapter.databaseVersion).compare("10.1.0") >= 0;
       expect(clause).toBe(
         analyzeWithoutExplain ? "ANALYZE FORMAT=JSON for:" : "EXPLAIN ANALYZE FORMAT=JSON for:",
       );

@@ -27,12 +27,11 @@ describe("AbstractAdapter::Version", () => {
   });
 });
 
-// Rails' `database_version` (`abstract_adapter.rb:854-856`) fetches on demand,
-// so `check_version` and every `supports_*?` predicate read it with no
-// preparation. trails' sync getter cannot self-fetch, so `configureConnection`
-// (`abstract_adapter.rb:1212-1214`) fills the pool memo instead. These pin that:
-// without them, callers go back to hand-warming.
-describe("AbstractAdapter#configureConnection", () => {
+// Rails' `database_version` (`abstract_adapter.rb:854-856`) is
+// `pool.server_version(self)`, which issues the round-trip on demand — so
+// `check_version` and every `supports_*?` predicate read it from any state,
+// including an adapter that has never connected. These pin that.
+describe("AbstractAdapter#databaseVersion", () => {
   class AsyncVersionAdapter extends AbstractAdapter {
     fetches = 0;
     override async getDatabaseVersion(): Promise<Version> {
@@ -41,18 +40,17 @@ describe("AbstractAdapter#configureConnection", () => {
     }
   }
 
-  it("makes databaseVersion readable with no caller-side warm", async () => {
+  it("is readable from a standalone adapter that has never connected", async () => {
     const adapter = new AsyncVersionAdapter();
-    expect(() => adapter.databaseVersion).toThrow();
-    await adapter.configureConnection();
-    expect(adapter.databaseVersion.toString()).toBe("8.0.31");
+
+    expect(String(await adapter.databaseVersion)).toBe("8.0.31");
   });
 
-  it("fetches the version once, before checkVersion reads it", async () => {
+  it("fetches once, however many readers ask", async () => {
     const seen: string[] = [];
     class CheckingAdapter extends AsyncVersionAdapter {
-      override checkVersion(): void {
-        seen.push(this.databaseVersion.toString());
+      override async checkVersion(): Promise<void> {
+        seen.push(String(await this.databaseVersion));
       }
     }
     const adapter = new CheckingAdapter();

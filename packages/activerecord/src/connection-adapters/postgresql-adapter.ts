@@ -2412,7 +2412,7 @@ export class PostgreSQLAdapter
    *
    * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#build_explain_clause
    */
-  override buildExplainClause(options: ExplainOption[] = []): string {
+  override async buildExplainClause(options: ExplainOption[] = []): Promise<string> {
     if (options.length === 0) return "EXPLAIN for:";
     const parts = this._validateExplainOptions(options);
     return `EXPLAIN (${parts.join(", ")}) for:`;
@@ -3275,48 +3275,35 @@ export class PostgreSQLAdapter
   }
 
   /**
-   * Synchronous version check. Populated lazily on first query via
-   * _ensureInitialized(). Throws if accessed before any query has run.
-   */
-  get databaseVersion(): number {
-    if (this._databaseVersion === null) {
-      throw new Error(
-        "databaseVersion is not available yet — call getDatabaseVersion() after connecting",
-      );
-    }
-    return this._databaseVersion;
-  }
-
-  /**
    * Mirrors Rails' `PostgreSQLAdapter#postgresql_version`, an alias for
    * `database_version` (postgresql_adapter.rb). Public so callers can read the
    * connected server's numeric version without going through the protected
    * `databaseVersion` getter directly.
    */
-  postgresqlVersion(): number {
-    return this.databaseVersion;
+  async postgresqlVersion(): Promise<number> {
+    return await this.databaseVersion;
   }
 
   supportsBulkAlter(): boolean {
     return true;
   }
-  supportsIndexSortOrder(): boolean {
+  async supportsIndexSortOrder(): Promise<boolean> {
     return true;
   }
   // Rails: `index.using == :btree || super` (postgresql_adapter.rb#default_index_type?).
   override defaultIndexType(using?: string): boolean {
     return using === "btree" || super.defaultIndexType(using);
   }
-  supportsPartitionedIndexes(): boolean {
-    return this.databaseVersion >= 110000;
+  async supportsPartitionedIndexes(): Promise<boolean> {
+    return (await this.databaseVersion) >= 110000;
   }
   supportsPartialIndex(): boolean {
     return true;
   }
-  supportsIndexInclude(): boolean {
-    return this.databaseVersion >= 110000;
+  async supportsIndexInclude(): Promise<boolean> {
+    return (await this.databaseVersion) >= 110000;
   }
-  supportsExpressionIndex(): boolean {
+  async supportsExpressionIndex(): Promise<boolean> {
     return true;
   }
   supportsTransactionIsolation(): boolean {
@@ -3325,7 +3312,7 @@ export class PostgreSQLAdapter
   supportsForeignKeys(): boolean {
     return true;
   }
-  supportsCheckConstraints(): boolean {
+  async supportsCheckConstraints(): Promise<boolean> {
     return true;
   }
   supportsExclusionConstraints(): boolean {
@@ -3346,7 +3333,7 @@ export class PostgreSQLAdapter
   supportsDatetimeWithPrecision(): boolean {
     return true;
   }
-  supportsJson(): boolean {
+  async supportsJson(): Promise<boolean> {
     return true;
   }
   supportsComments(): boolean {
@@ -3355,35 +3342,35 @@ export class PostgreSQLAdapter
   supportsSavepoints(): boolean {
     return true;
   }
-  supportsRestartDbTransaction(): boolean {
-    return this.databaseVersion >= 120000;
+  async supportsRestartDbTransaction(): Promise<boolean> {
+    return (await this.databaseVersion) >= 120000;
   }
-  supportsInsertReturning(): boolean {
+  async supportsInsertReturning(): Promise<boolean> {
     return true;
   }
-  supportsInsertOnConflict(): boolean {
-    return this.databaseVersion >= 90500;
+  async supportsInsertOnConflict(): Promise<boolean> {
+    return (await this.databaseVersion) >= 90500;
   }
-  supportsInsertOnDuplicateSkip(): boolean {
-    return this.supportsInsertOnConflict();
+  async supportsInsertOnDuplicateSkip(): Promise<boolean> {
+    return await this.supportsInsertOnConflict();
   }
-  supportsInsertOnDuplicateUpdate(): boolean {
-    return this.supportsInsertOnConflict();
+  async supportsInsertOnDuplicateUpdate(): Promise<boolean> {
+    return await this.supportsInsertOnConflict();
   }
-  supportsInsertConflictTarget(): boolean {
-    return this.supportsInsertOnConflict();
+  async supportsInsertConflictTarget(): Promise<boolean> {
+    return await this.supportsInsertOnConflict();
   }
-  supportsVirtualColumns(): boolean {
-    return this.databaseVersion >= 120000;
+  async supportsVirtualColumns(): Promise<boolean> {
+    return (await this.databaseVersion) >= 120000;
   }
-  supportsIdentityColumns(): boolean {
-    return this.databaseVersion >= 100000;
+  async supportsIdentityColumns(): Promise<boolean> {
+    return (await this.databaseVersion) >= 100000;
   }
-  supportsNullsNotDistinct(): boolean {
-    return this.databaseVersion >= 150000;
+  async supportsNullsNotDistinct(): Promise<boolean> {
+    return (await this.databaseVersion) >= 150000;
   }
-  supportsNativePartitioning(): boolean {
-    return this.databaseVersion >= 100000;
+  async supportsNativePartitioning(): Promise<boolean> {
+    return (await this.databaseVersion) >= 100000;
   }
 
   indexAlgorithms(): Record<string, string> {
@@ -3424,17 +3411,17 @@ export class PostgreSQLAdapter
   supportsForeignTables(): boolean {
     return true;
   }
-  supportsPgcryptoUuid(): boolean {
-    return this.databaseVersion >= 90400;
+  async supportsPgcryptoUuid(): Promise<boolean> {
+    return (await this.databaseVersion) >= 90400;
   }
 
   private _hasOptimizerHints: boolean | null = null;
 
-  supportsOptimizerHints(): boolean {
+  async supportsOptimizerHints(): Promise<boolean> {
     return this._hasOptimizerHints ?? false;
   }
 
-  supportsCommonTableExpressions(): boolean {
+  async supportsCommonTableExpressions(): Promise<boolean> {
     return true;
   }
 
@@ -4307,14 +4294,14 @@ export class PostgreSQLAdapter
    * to the base (sort order) via `super`.
    * @internal
    */
-  addOptionsForIndexColumns(
+  async addOptionsForIndexColumns(
     quotedColumns: Map<string, string>,
     options: {
       order?: string | Record<string, string>;
       opclass?: string | Record<string, string>;
       length?: number | Record<string, number>;
     } = {},
-  ): Map<string, string> {
+  ): Promise<Map<string, string>> {
     quotedColumns = this.addIndexOpclass(quotedColumns, options);
     return super.addOptionsForIndexColumns(quotedColumns, options);
   }
@@ -4580,6 +4567,11 @@ export class PostgreSQLAdapter
 // is declared here — the same shape AbstractAdapter uses for `SchemaStatements`.
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface PostgreSQLAdapter {
+  /** Rails' PG `database_version` (`postgresql_adapter.rb`) is the server
+   * version *integer*; the inherited getter's `Version | number` is narrowed
+   * here by declaration merging rather than by an override Rails does not have. */
+  get databaseVersion(): number | Promise<number>;
+
   /** @internal */
   validateIndexLengthBang(tableName: string, newName: string, internal?: boolean): void;
 

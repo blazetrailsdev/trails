@@ -54,7 +54,7 @@ export class SchemaCreation {
     return this.adapterName !== "mysql";
   }
 
-  protected supportsIndexSortOrder(): boolean {
+  protected async supportsIndexSortOrder(): Promise<boolean> {
     return this.adapterName !== "mysql";
   }
 
@@ -62,11 +62,11 @@ export class SchemaCreation {
     return this.adapterName === "postgres" || this.adapterName === "mysql";
   }
 
-  protected supportsIndexInclude(): boolean {
+  protected async supportsIndexInclude(): Promise<boolean> {
     return this.adapterName === "postgres";
   }
 
-  protected supportsNullsNotDistinct(): boolean {
+  protected async supportsNullsNotDistinct(): Promise<boolean> {
     return this.adapterName === "postgres";
   }
 
@@ -163,13 +163,13 @@ export class SchemaCreation {
       }
     }
 
-    if (this.supportsCheckConstraints()) {
+    if (await this.supportsCheckConstraints()) {
       for (const chk of o.checkConstraints) {
         statements.push(this.visitCheckConstraintDefinition(chk));
       }
     }
 
-    statements.push(...this.tableConstraintStatements(o));
+    statements.push(...(await this.tableConstraintStatements(o)));
 
     if (statements.length > 0) sql += ` (${statements.join(", ")})`;
     sql = this.addTableOptionsBang(sql, o);
@@ -200,7 +200,7 @@ export class SchemaCreation {
    * `send` would raise for any other adapter.
    * @internal
    */
-  protected visitIndexDefinition(_o: IndexDefinition, _create = false): string {
+  protected visitIndexDefinition(_o: IndexDefinition, _create = false): Promise<string> {
     // @nie disposition=TODO
     throw new NotImplementedError();
   }
@@ -216,7 +216,7 @@ export class SchemaCreation {
   }
 
   /** @internal */
-  protected supportsCheckConstraints(): boolean {
+  protected async supportsCheckConstraints(): Promise<boolean> {
     return true;
   }
 
@@ -225,7 +225,7 @@ export class SchemaCreation {
    * (e.g. PostgreSQL exclusion/unique constraints). Returns empty by default.
    * @internal
    */
-  protected tableConstraintStatements(_o: TableDefinition): string[] {
+  protected async tableConstraintStatements(_o: TableDefinition): Promise<string[]> {
     return [];
   }
 
@@ -280,7 +280,7 @@ export class SchemaCreation {
       parts.push(this.visitAddCheckConstraint(chk));
     }
     for (const name of o.checkConstraintDrops) {
-      parts.push(this.visitDropCheckConstraint(name));
+      parts.push(await this.visitDropCheckConstraint(name));
     }
     for (const name of o.constraintDrops) {
       parts.push(this.visitDropConstraint(name));
@@ -304,7 +304,7 @@ export class SchemaCreation {
     return `ADD ${this.visitForeignKeyDefinition(o)}`;
   }
 
-  protected visitCreateIndexDefinition(o: CreateIndexDefinition): string {
+  protected async visitCreateIndexDefinition(o: CreateIndexDefinition): Promise<string> {
     const index = o.index;
     const parts: string[] = ["CREATE"];
     if (index.unique) parts.push("UNIQUE");
@@ -316,11 +316,12 @@ export class SchemaCreation {
       `${this.adapter.quoteColumnName(index.name)} ON ${this.adapter.quoteTableName(index.table)}`,
     );
     if (this.supportsIndexUsing() && index.using) parts.push(`USING ${index.using}`);
-    parts.push(`(${this.quotedColumns(index)})`);
-    if (this.supportsIndexInclude() && index.include && index.include.length > 0) {
+    parts.push(`(${await this.quotedColumns(index)})`);
+    if ((await this.supportsIndexInclude()) && index.include && index.include.length > 0) {
       parts.push(`INCLUDE (${this.quotedIncludeColumns(index.include)})`);
     }
-    if (this.supportsNullsNotDistinct() && index.nullsNotDistinct) parts.push("NULLS NOT DISTINCT");
+    if ((await this.supportsNullsNotDistinct()) && index.nullsNotDistinct)
+      parts.push("NULLS NOT DISTINCT");
     if (this.supportsPartialIndex() && index.where) parts.push(`WHERE ${index.where}`);
     return parts.join(" ");
   }
@@ -337,16 +338,16 @@ export class SchemaCreation {
    * the parallel `quotedIncludeColumns` delegation.
    * @internal
    */
-  protected quotedColumnsForIndex(
+  protected async quotedColumnsForIndex(
     columnNames: string[],
     options: {
       length?: number | Record<string, number>;
       order?: string | Record<string, string>;
       opclass?: string | Record<string, string>;
     },
-  ): string {
+  ): Promise<string> {
     const host = this.adapter as SchemaQuoter & {
-      quotedColumnsForIndex?(cols: string[], options: Record<string, unknown>): string;
+      quotedColumnsForIndex?(cols: string[], options: Record<string, unknown>): Promise<string>;
     };
     if (typeof host.quotedColumnsForIndex === "function") {
       return host.quotedColumnsForIndex(columnNames, options);
@@ -493,7 +494,7 @@ export class SchemaCreation {
   }
 
   /** @internal */
-  protected visitDropCheckConstraint(name: string): string {
+  protected async visitDropCheckConstraint(name: string): Promise<string> {
     return `DROP CONSTRAINT ${this.quoteColumnName(name)}`;
   }
 
@@ -508,7 +509,7 @@ export class SchemaCreation {
    * "(data->'foo')"); otherwise delegate to `quoted_columns_for_index`.
    * @internal
    */
-  protected quotedColumns(o: IndexDefinition): string {
+  protected async quotedColumns(o: IndexDefinition): Promise<string> {
     return typeof o.columns === "string"
       ? o.columns
       : this.quotedColumnsForIndex(o.columns, o.columnOptions());

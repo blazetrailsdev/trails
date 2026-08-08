@@ -48,8 +48,6 @@ describe("supports table vs. the live adapter", () => {
 
   it("answers each feature key exactly as the connection does", async () => {
     const connection = (await Base.leaseConnection()) as unknown as LiveConnection;
-    await connection.getDatabaseVersion();
-
     const drift: string[] = [];
 
     for (const feature of SUPPORTS_FEATURES) {
@@ -59,7 +57,9 @@ describe("supports table vs. the live adapter", () => {
         live = helperAnswer;
       } else {
         const method = connection[methodName(feature)];
-        live = typeof method === "function" && (method as () => boolean).call(connection) === true;
+        live =
+          typeof method === "function" &&
+          (await (method as () => boolean | Promise<boolean>).call(connection)) === true;
       }
       const table = adapterSupports(feature);
       if (table !== live) drift.push(`${feature}: table=${table} adapter=${live}`);

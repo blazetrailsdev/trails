@@ -25,7 +25,7 @@ describe("ConnectionPool#server_version", () => {
 
     expect(String(await adapter.pool.serverVersion(adapter))).toBe("8.0.35");
     expect(String(await adapter.pool.serverVersion(adapter))).toBe("8.0.35");
-    expect(adapter.databaseVersion.fullVersionString).toBe("8.0.35");
+    expect((await adapter.databaseVersion).fullVersionString).toBe("8.0.35");
   });
 
   it("get_database_version itself is a pure derivation, not a memo", async () => {
@@ -44,18 +44,16 @@ describe("ConnectionPool#server_version", () => {
     expect(String(await adapter.pool.serverVersion(adapter))).toBe("5.7.9");
   });
 
-  it("databaseVersion raises before the memo is warm, since the fetch is async", () => {
+  it("databaseVersion fetches on demand, so a never-connected adapter can read it", async () => {
     const adapter = adapterFetching(["8.0.35"]);
 
-    expect(() => adapter.databaseVersion).toThrow(/only available synchronously/);
+    expect(await adapter.databaseVersion).toBeInstanceOf(Version);
   });
 
   it("answers a Version, so MySQL's version gates read it", async () => {
     const adapter = adapterFetching(["8.0.35"]);
-    await adapter.pool.serverVersion(adapter);
 
-    expect(adapter.databaseVersion).toBeInstanceOf(Version);
-    expect(adapter.supportsExpressionIndex()).toBe(true);
+    expect(await adapter.supportsExpressionIndex()).toBe(true);
   });
 
   // The fetch opens the connection, and `connect()` runs `configureConnection`

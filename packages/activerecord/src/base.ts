@@ -3554,7 +3554,9 @@ export class Base extends Model {
       // id into the first still-unset returning column below.
       const returningColumns = ctor._returningColumnsForInsert(adapter as any);
       const supportsReturning =
-        (adapter as { supportsInsertReturning?(): boolean }).supportsInsertReturning?.() ?? false;
+        (await (
+          adapter as { supportsInsertReturning?(): Promise<boolean> }
+        ).supportsInsertReturning?.()) ?? false;
       const returning = supportsReturning && returningColumns.length > 0 ? returningColumns : null;
 
       // Route through the ported `_insert_record` class method

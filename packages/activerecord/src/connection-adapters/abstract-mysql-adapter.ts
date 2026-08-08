@@ -381,7 +381,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    * body, the same split `getFullVersion` uses.
    * @internal
    */
-  fullVersion(): string | null {
+  async fullVersion(): Promise<string | null> {
     throw new Error(`${this.constructor.name} must implement fullVersion()`);
   }
 
@@ -392,8 +392,8 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    * arm — a Version built without a full version string
    * (`abstract_adapter.rb:248`) — is spelled out.
    */
-  isMariadb(): boolean {
-    const fullVersion = this.fullVersion();
+  async isMariadb(): Promise<boolean> {
+    const fullVersion = await this.fullVersion();
     return fullVersion != null && /mariadb/i.test(fullVersion);
   }
 
@@ -406,25 +406,25 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return using === "btree" || super.defaultIndexType(using);
   }
 
-  supportsIndexSortOrder(): boolean {
+  async supportsIndexSortOrder(): Promise<boolean> {
     // Rails: `mariadb? ? database_version >= "10.8.1" : database_version >= "8.0.1"`
     // (abstract_mysql_adapter.rb#supports_index_sort_order?).
-    if (this.isMariadb()) return this.databaseVersion.compare("10.8.1") >= 0;
-    return this.databaseVersion.compare("8.0.1") >= 0;
+    if (await this.isMariadb()) return (await this.databaseVersion).compare("10.8.1") >= 0;
+    return (await this.databaseVersion).compare("8.0.1") >= 0;
   }
 
-  supportsExpressionIndex(): boolean {
+  async supportsExpressionIndex(): Promise<boolean> {
     // Mirror Rails `!mariadb? && database_version >= "8.0.13"`
     // (abstract_mysql_adapter.rb:104) — MariaDB is excluded.
-    if (this.isMariadb()) return false;
-    return this.databaseVersion.compare("8.0.13") >= 0;
+    if (await this.isMariadb()) return false;
+    return (await this.databaseVersion).compare("8.0.13") >= 0;
   }
 
   supportsTransactionIsolation(): boolean {
     return true;
   }
 
-  supportsRestartDbTransaction(): boolean {
+  async supportsRestartDbTransaction(): Promise<boolean> {
     return true;
   }
 
@@ -440,17 +440,18 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return true;
   }
 
-  supportsCheckConstraints(): boolean {
-    if (this.isMariadb()) {
+  async supportsCheckConstraints(): Promise<boolean> {
+    if (await this.isMariadb()) {
       // Rails' two-branch MariaDB floor (abstract_mysql_adapter.rb:128-132):
       // 10.3.10+, or a pre-10.3 series from 10.2.22 — 10.3.0..10.3.9 is
       // excluded, which a single `>= 10.2.22` would wrongly admit.
       return (
-        this.databaseVersion.compare("10.3.10") >= 0 ||
-        (this.databaseVersion.compare("10.3") < 0 && this.databaseVersion.compare("10.2.22") >= 0)
+        (await this.databaseVersion).compare("10.3.10") >= 0 ||
+        ((await this.databaseVersion).compare("10.3") < 0 &&
+          (await this.databaseVersion).compare("10.2.22") >= 0)
       );
     }
-    return this.databaseVersion.compare("8.0.16") >= 0;
+    return (await this.databaseVersion).compare("8.0.16") >= 0;
   }
 
   supportsViews(): boolean {
@@ -461,39 +462,39 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return true;
   }
 
-  supportsVirtualColumns(): boolean {
-    return this.isMariadb() || this.databaseVersion.compare("5.7.5") >= 0;
+  async supportsVirtualColumns(): Promise<boolean> {
+    return (await this.isMariadb()) || (await this.databaseVersion).compare("5.7.5") >= 0;
   }
 
-  supportsOptimizerHints(): boolean {
-    if (this.isMariadb()) return false;
-    return this.databaseVersion.compare("5.7.7") >= 0;
+  async supportsOptimizerHints(): Promise<boolean> {
+    if (await this.isMariadb()) return false;
+    return (await this.databaseVersion).compare("5.7.7") >= 0;
   }
 
-  supportsCommonTableExpressions(): boolean {
-    if (this.isMariadb()) return this.databaseVersion.compare("10.2.1") >= 0;
-    return this.databaseVersion.compare("8.0.1") >= 0;
+  async supportsCommonTableExpressions(): Promise<boolean> {
+    if (await this.isMariadb()) return (await this.databaseVersion).compare("10.2.1") >= 0;
+    return (await this.databaseVersion).compare("8.0.1") >= 0;
   }
 
   supportsAdvisoryLocks(): boolean {
     return true;
   }
 
-  supportsInsertOnDuplicateSkip(): boolean {
+  async supportsInsertOnDuplicateSkip(): Promise<boolean> {
     return true;
   }
 
-  supportsInsertOnDuplicateUpdate(): boolean {
+  async supportsInsertOnDuplicateUpdate(): Promise<boolean> {
     return true;
   }
 
-  supportsInsertReturning(): boolean {
-    if (this.isMariadb()) return this.databaseVersion.compare("10.5.0") >= 0;
+  async supportsInsertReturning(): Promise<boolean> {
+    if (await this.isMariadb()) return (await this.databaseVersion).compare("10.5.0") >= 0;
     return false;
   }
 
-  returnValueAfterInsert(column: Column): boolean {
-    return this.supportsInsertReturning()
+  async returnValueAfterInsert(column: Column): Promise<boolean> {
+    return (await this.supportsInsertReturning())
       ? column.isAutoPopulated()
       : column.isAutoIncrementedByDb();
   }
@@ -503,7 +504,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    *  routes the caller to the `last_inserted_id` path. *
    * @internal
    */
-  override returningColumnValues(result: Result): unknown[] | undefined {
+  override returningColumnValues(result: Result): Promise<unknown[] | undefined> {
     return mysqlReturningColumnValues.call(this, result);
   }
 
@@ -515,12 +516,12 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return true;
   }
 
-  supportsJson(): boolean {
+  async supportsJson(): Promise<boolean> {
     // Mirror Rails `!mariadb? && database_version >= "5.7.8"`
     // (mysql2_adapter.rb:70 / trilogy_adapter.rb:95) — MariaDB JSON is a
     // LONGTEXT alias, so Rails reports it unsupported.
-    if (this.isMariadb()) return false;
-    return this.databaseVersion.compare("5.7.8") >= 0;
+    if (await this.isMariadb()) return false;
+    return (await this.databaseVersion).compare("5.7.8") >= 0;
   }
 
   supportsComments(): boolean {
@@ -704,7 +705,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   async renameIndex(tableName: string, oldName: string, newName: string): Promise<void> {
-    if (this.supportsRenameIndex()) {
+    if (await this.supportsRenameIndex()) {
       this.validateIndexLengthBang(tableName, newName);
 
       await this._execMutation(
@@ -988,7 +989,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   declare extractForeignKeyAction: typeof mysqlExtractForeignKeyAction;
 
   async checkConstraints(tableName: string): Promise<CheckConstraintDefinition[]> {
-    if (!this.supportsCheckConstraints()) {
+    if (!(await this.supportsCheckConstraints())) {
       // @nie disposition=port-real rails=activerecord/lib/active_record/connection_adapters/abstract_mysql_adapter.rb:545
       throw new NotImplementedError("check constraints are not supported by this database");
     }
@@ -1004,9 +1005,10 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
         AND cc.constraint_schema = ${scope.schema}`;
     // MariaDB lacks the schema+name uniqueness MySQL's JOIN relies on, so it
     // additionally filters cc.table_name (mirrors Rails).
-    if (this.isMariadb()) sql += ` AND cc.table_name = ${scope.name}`;
+    if (await this.isMariadb()) sql += ` AND cc.table_name = ${scope.name}`;
 
     const rows = await this.schemaQuery(sql);
+    const isMariadb = await this.isMariadb();
 
     return rows.map((row) => {
       const name = row["name"] as string;
@@ -1015,7 +1017,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
         expression = expression.slice(1, -1);
       }
       expression = this.stripWhitespaceCharacters(expression);
-      if (!this.isMariadb()) {
+      if (!isMariadb) {
         // MySQL returns check constraints expression in an already escaped form.
         // This leads to duplicate escaping later (e.g. when the expression is
         // used in the SchemaDumper).
@@ -1177,14 +1179,11 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   // Mirrors: ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#check_version
-  // (abstract_mysql_adapter.rb:684-688). Rails' `database_version` issues the
-  // round-trip itself when unmemoized; trails' sync getter cannot, so
-  // `AbstractAdapter#configureConnection` fills the pool memo before invoking
-  // this — the same ordering, one call site earlier.
-  override checkVersion(): void {
-    if (this.databaseVersion.compare("5.6.4") < 0) {
+  // (abstract_mysql_adapter.rb:684-688).
+  override async checkVersion(): Promise<void> {
+    if ((await this.databaseVersion).compare("5.6.4") < 0) {
       throw new DatabaseVersionError(
-        `Your version of MySQL (${this.databaseVersion}) is too old. Active Record supports MySQL >= 5.6.4.`,
+        `Your version of MySQL (${await this.databaseVersion}) is too old. Active Record supports MySQL >= 5.6.4.`,
       );
     }
   }
@@ -1355,9 +1354,9 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    *
    * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::DatabaseStatements#build_explain_clause
    */
-  override buildExplainClause(options: ExplainOption[] = []): string {
+  override async buildExplainClause(options: ExplainOption[] = []): Promise<string> {
     if (options.length === 0) return "EXPLAIN for:";
-    return `${this._explainClause(options)} for:`;
+    return `${await this._explainClause(options)} for:`;
   }
 
   /**
@@ -1367,8 +1366,8 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    *
    * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::DatabaseStatements#analyze_without_explain?
    */
-  protected analyzeWithoutExplain(): boolean {
-    return this.isMariadb() && this.databaseVersion.compare("10.1.0") >= 0;
+  protected async analyzeWithoutExplain(): Promise<boolean> {
+    return (await this.isMariadb()) && (await this.databaseVersion).compare("10.1.0") >= 0;
   }
 
   /**
@@ -1377,9 +1376,9 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    * (`_explainStatementClause`), applying the MariaDB `ANALYZE`-without-
    * `EXPLAIN` rewrite. Mirrors MySQL::DatabaseStatements#build_explain_clause.
    */
-  private _explainClause(options: ExplainOption[]): string {
+  private async _explainClause(options: ExplainOption[]): Promise<string> {
     const clause = `EXPLAIN ${this._validateExplainOptions(options).join(" ")}`;
-    return this.analyzeWithoutExplain() && clause.includes("ANALYZE")
+    return (await this.analyzeWithoutExplain()) && clause.includes("ANALYZE")
       ? clause.replace("EXPLAIN ", "")
       : clause;
   }
@@ -1423,7 +1422,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    * Compose the actual `EXPLAIN ...` SQL clause that prefixes the query —
    * distinct from `buildExplainClause`, which builds the printed header.
    */
-  protected _explainStatementClause(options: ExplainOption[]): string {
+  protected async _explainStatementClause(options: ExplainOption[]): Promise<string> {
     if (options.length === 0) return "EXPLAIN";
     return this._explainClause(options);
   }
@@ -1647,21 +1646,21 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   /** @internal */
-  supportsInsertRawAliasSyntax(): boolean {
-    if (this.isMariadb()) return false;
-    return this.databaseVersion.compare("8.0.19") >= 0;
+  async supportsInsertRawAliasSyntax(): Promise<boolean> {
+    if (await this.isMariadb()) return false;
+    return (await this.databaseVersion).compare("8.0.19") >= 0;
   }
 
   /** @internal */
-  supportsRenameIndex(): boolean {
-    if (this.isMariadb()) return this.databaseVersion.compare("10.5.2") >= 0;
-    return this.databaseVersion.compare("5.7.6") >= 0;
+  async supportsRenameIndex(): Promise<boolean> {
+    if (await this.isMariadb()) return (await this.databaseVersion).compare("10.5.2") >= 0;
+    return (await this.databaseVersion).compare("5.7.6") >= 0;
   }
 
   /** @internal */
-  supportsRenameColumn(): boolean {
-    if (this.isMariadb()) return this.databaseVersion.compare("10.5.2") >= 0;
-    return this.databaseVersion.compare("8.0.3") >= 0;
+  async supportsRenameColumn(): Promise<boolean> {
+    if (await this.isMariadb()) return (await this.databaseVersion).compare("10.5.2") >= 0;
+    return (await this.databaseVersion).compare("8.0.3") >= 0;
   }
 
   /**
@@ -1762,7 +1761,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     columnName: string,
     newColumnName: string,
   ): Promise<string> {
-    if (this.supportsRenameColumn()) {
+    if (await this.supportsRenameColumn()) {
       return this.renameColumnSql(tableName, columnName, newColumnName);
     }
     const column = (await this.columnFor(tableName, columnName)) as MysqlColumn;
@@ -1994,7 +1993,7 @@ export class StatementPool extends ConnectionStatementPool<MysqlPreparedStatemen
  * @internal
  */
 export interface AbstractMysqlAdapter {
-  get databaseVersion(): Version;
+  get databaseVersion(): Version | Promise<Version>;
 }
 
 /**

@@ -49,9 +49,11 @@ describeIfPostgresqlAdapter("SchemaCreation drop-constraint visitors", () => {
     expect(sc.visitDropForeignKey("fk_rails_abc")).toBe('DROP CONSTRAINT "fk_rails_abc"');
   });
 
-  it("visit_DropCheckConstraint emits DROP CONSTRAINT with a quoted name", () => {
+  it("visit_DropCheckConstraint emits DROP CONSTRAINT with a quoted name", async () => {
     const sc = new SchemaCreation("postgres", conn) as any;
-    expect(sc.visitDropCheckConstraint("chk_rails_abc")).toBe('DROP CONSTRAINT "chk_rails_abc"');
+    expect(await sc.visitDropCheckConstraint("chk_rails_abc")).toBe(
+      'DROP CONSTRAINT "chk_rails_abc"',
+    );
   });
 });
 
@@ -124,11 +126,11 @@ describeIfPostgresqlAdapter("SchemaCreation quoting delegations", () => {
 // exclusively in AbstractMysqlAdapter#add_index_length; the abstract visitor
 // must NOT, or it emits invalid `("name"(10))` on PG/SQLite.
 describeIfPostgresqlAdapter("SchemaCreation#quotedColumnsForIndex sub-part length gating", () => {
-  it("does not append sub-part length on postgres", () => {
+  it("does not append sub-part length on postgres", async () => {
     const idx = new IndexDefinition("posts", "index_posts_on_title", false, ["title"], {
       lengths: { title: 10 },
     });
-    const sql = (new SchemaCreation("postgres", conn) as any).visitCreateIndexDefinition(
+    const sql = await (new SchemaCreation("postgres", conn) as any).visitCreateIndexDefinition(
       new CreateIndexDefinition(idx, false),
     );
     expect(sql).not.toContain("(10)");
@@ -137,11 +139,11 @@ describeIfPostgresqlAdapter("SchemaCreation#quotedColumnsForIndex sub-part lengt
 });
 
 describeIfSqlite("SchemaCreation#quotedColumnsForIndex sub-part length gating", () => {
-  it("does not append sub-part length on sqlite", () => {
+  it("does not append sub-part length on sqlite", async () => {
     const idx = new IndexDefinition("posts", "index_posts_on_title", false, ["title"], {
       lengths: { title: 10 },
     });
-    const sql = (new SchemaCreation("sqlite", conn) as any).visitCreateIndexDefinition(
+    const sql = await (new SchemaCreation("sqlite", conn) as any).visitCreateIndexDefinition(
       new CreateIndexDefinition(idx, false),
     );
     expect(sql).not.toContain("(10)");
@@ -170,17 +172,17 @@ describe("SchemaCreation#quotedColumns delegates to the connection", () => {
     },
   };
 
-  it("routes an array column set through host.quotedColumnsForIndex", () => {
+  it("routes an array column set through host.quotedColumnsForIndex", async () => {
     const idx = new IndexDefinition("posts", "index_posts_on_title", false, ["title"], {
       opclasses: { title: "text_pattern_ops" },
     });
-    const sql = (new SchemaCreation("postgres", host as any) as any).visitCreateIndexDefinition(
-      new CreateIndexDefinition(idx, false),
-    );
+    const sql = await (
+      new SchemaCreation("postgres", host as any) as any
+    ).visitCreateIndexDefinition(new CreateIndexDefinition(idx, false));
     expect(sql).toContain('("title" text_pattern_ops)');
   });
 
-  it("emits a String column set verbatim without delegating", () => {
+  it("emits a String column set verbatim without delegating", async () => {
     const idx = new IndexDefinition(
       "posts",
       "index_posts_on_expr",
@@ -188,9 +190,9 @@ describe("SchemaCreation#quotedColumns delegates to the connection", () => {
       "lower(title)" as any,
       {},
     );
-    const sql = (new SchemaCreation("postgres", host as any) as any).visitCreateIndexDefinition(
-      new CreateIndexDefinition(idx, false),
-    );
+    const sql = await (
+      new SchemaCreation("postgres", host as any) as any
+    ).visitCreateIndexDefinition(new CreateIndexDefinition(idx, false));
     expect(sql).toContain("(lower(title))");
     expect(sql).not.toContain("DEFAULT_OPS");
   });

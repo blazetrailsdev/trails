@@ -162,25 +162,18 @@ interface QuotedScopeHost {
  * on the slot reproduces.
  */
 export interface RowFormatHost {
-  isMariadb(): boolean;
-  pool: { serverVersion(connection: unknown): unknown };
+  isMariadb(): Promise<boolean>;
+  readonly databaseVersion: Version | number | Promise<Version | number>;
   queryValue(sql: string, name?: string): Promise<unknown>;
   _defaultRowFormat?: string | null;
 }
 
-/** @internal */
+/** @internal Mirrors: MySQL::SchemaStatements#row_format_dynamic_by_default?
+ * (mysql/schema_statements.rb:146-152) */
 export async function isRowFormatDynamicByDefault(this: RowFormatHost): Promise<boolean> {
-  // Rails' `row_format_dynamic_by_default?` (mysql/schema_statements.rb:146-152)
-  // is sync, reading `database_version` — a reader that fetches on demand and so
-  // works on a standalone, not-yet-connected adapter. Ours cannot, and
-  // `create_table` on such an adapter reaches here before anything has opened a
-  // socket, so the await stands in for Rails' lazy read. Converging it needs the
-  // version-gated predicates to go async (RFC 0072
-  // `make-version-gated-predicates-async`).
-  const databaseVersion = (await this.pool.serverVersion(this)) as Version;
-  return this.isMariadb()
-    ? databaseVersion.compare("10.2.2") >= 0
-    : databaseVersion.compare("5.7.9") >= 0;
+  return (await this.isMariadb())
+    ? ((await this.databaseVersion) as Version).compare("10.2.2") >= 0
+    : ((await this.databaseVersion) as Version).compare("5.7.9") >= 0;
 }
 
 /** @internal */
@@ -652,7 +645,7 @@ interface IndexesHost {
   // false, `add_options_for_index_columns`'s `super` skips the DESC/ASC suffix
   // (abstract/schema_statements.rb#add_index_sort_order), so a functional
   // index's collapsed columns string must omit the order even when Collation="D".
-  supportsIndexSortOrder(): boolean;
+  supportsIndexSortOrder(): Promise<boolean>;
 }
 
 /** @internal
@@ -746,6 +739,7 @@ export async function indexes(this: IndexesHost, tableName: string): Promise<Ind
       if (desc) entry.orders[column] = "desc";
     }
   }
+  const supportsIndexSortOrder = await this.supportsIndexSortOrder();
   return Array.from(byIndex.entries()).map(
     ([name, { columns, unique, using, type, comment, lengths, orders, expressions }]) => {
       // Mirrors Rails' final `.map`: a functional (expression) index collapses
@@ -760,7 +754,7 @@ export async function indexes(this: IndexesHost, tableName: string): Promise<Ind
         addOptionsForIndexColumns(
           quotedColumns,
           { order: orders, length: lengths },
-          this.supportsIndexSortOrder(),
+          supportsIndexSortOrder,
         );
         return new IndexDefinition(
           tableName,

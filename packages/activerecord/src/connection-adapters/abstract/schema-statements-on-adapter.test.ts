@@ -293,7 +293,7 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
     class SuperCallingAdapter extends SqliteCapturingAdapter {
       changeColumnDefaultCalls = 0;
       addCheckConstraintCalls = 0;
-      supportsCheckConstraints() {
+      async supportsCheckConstraints() {
         return true;
       }
       quoteColumnName(name: string) {

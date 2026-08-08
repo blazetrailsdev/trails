@@ -1329,79 +1329,79 @@ describe("PostgreSQLAdapter supports_* predicates (unit)", () => {
     (adapter as any)._initialized = true;
     (adapter as any)._databaseVersion = version;
     (adapter as any)._hasOptimizerHints = false;
+    // `database_version` reads the pool memo (`abstract_adapter.rb:854-856`),
+    // so restubbing the adapter's own version has to restamp the memo too.
+    (
+      adapter.pool as unknown as { poolConfig: { setServerVersion(v: unknown): void } }
+    ).poolConfig.setServerVersion(version);
   }
 
-  it("always-true predicates return true regardless of version", () => {
+  it("always-true predicates return true regardless of version", async () => {
     const adapter = makeAdapter();
     stubVersion(adapter, 90300);
     expect(adapter.supportsBulkAlter()).toBe(true);
-    expect(adapter.supportsIndexSortOrder()).toBe(true);
+    expect(await adapter.supportsIndexSortOrder()).toBe(true);
     expect(adapter.supportsPartialIndex()).toBe(true);
-    expect(adapter.supportsExpressionIndex()).toBe(true);
+    expect(await adapter.supportsExpressionIndex()).toBe(true);
     expect(adapter.supportsTransactionIsolation()).toBe(true);
     expect(adapter.supportsForeignKeys()).toBe(true);
-    expect(adapter.supportsCheckConstraints()).toBe(true);
+    expect(await adapter.supportsCheckConstraints()).toBe(true);
     expect(adapter.supportsViews()).toBe(true);
-    expect(adapter.supportsJson()).toBe(true);
+    expect(await adapter.supportsJson()).toBe(true);
     expect(adapter.supportsComments()).toBe(true);
     expect(adapter.supportsSavepoints()).toBe(true);
-    expect(adapter.supportsInsertReturning()).toBe(true);
+    expect(await adapter.supportsInsertReturning()).toBe(true);
     expect(adapter.supportsDdlTransactions()).toBe(true);
     expect(adapter.supportsAdvisoryLocks()).toBe(true);
     expect(adapter.supportsExplain()).toBe(true);
     expect(adapter.supportsExtensions()).toBe(true);
     expect(adapter.supportsMaterializedViews()).toBe(true);
     expect(adapter.supportsForeignTables()).toBe(true);
-    expect(adapter.supportsCommonTableExpressions()).toBe(true);
+    expect(await adapter.supportsCommonTableExpressions()).toBe(true);
     expect(adapter.supportsLazyTransactions()).toBe(true);
   });
 
-  it("version-gated predicates respect version thresholds", () => {
+  it("version-gated predicates respect version thresholds", async () => {
     const adapter = makeAdapter();
 
     stubVersion(adapter, 90300);
-    expect(adapter.supportsInsertOnConflict()).toBe(false);
-    expect(adapter.supportsPgcryptoUuid()).toBe(false);
-    expect(adapter.supportsIdentityColumns()).toBe(false);
-    expect(adapter.supportsPartitionedIndexes()).toBe(false);
-    expect(adapter.supportsVirtualColumns()).toBe(false);
-    expect(adapter.supportsRestartDbTransaction()).toBe(false);
-    expect(adapter.supportsNullsNotDistinct()).toBe(false);
+    expect(await adapter.supportsInsertOnConflict()).toBe(false);
+    expect(await adapter.supportsPgcryptoUuid()).toBe(false);
+    expect(await adapter.supportsIdentityColumns()).toBe(false);
+    expect(await adapter.supportsPartitionedIndexes()).toBe(false);
+    expect(await adapter.supportsVirtualColumns()).toBe(false);
+    expect(await adapter.supportsRestartDbTransaction()).toBe(false);
+    expect(await adapter.supportsNullsNotDistinct()).toBe(false);
 
     stubVersion(adapter, 90500);
-    expect(adapter.supportsInsertOnConflict()).toBe(true);
-    expect(adapter.supportsInsertOnDuplicateSkip()).toBe(true);
-    expect(adapter.supportsInsertOnDuplicateUpdate()).toBe(true);
-    expect(adapter.supportsInsertConflictTarget()).toBe(true);
-    expect(adapter.supportsPgcryptoUuid()).toBe(true);
+    expect(await adapter.supportsInsertOnConflict()).toBe(true);
+    expect(await adapter.supportsInsertOnDuplicateSkip()).toBe(true);
+    expect(await adapter.supportsInsertOnDuplicateUpdate()).toBe(true);
+    expect(await adapter.supportsInsertConflictTarget()).toBe(true);
+    expect(await adapter.supportsPgcryptoUuid()).toBe(true);
 
     stubVersion(adapter, 100000);
-    expect(adapter.supportsIdentityColumns()).toBe(true);
-    expect(adapter.supportsNativePartitioning()).toBe(true);
+    expect(await adapter.supportsIdentityColumns()).toBe(true);
+    expect(await adapter.supportsNativePartitioning()).toBe(true);
 
     stubVersion(adapter, 110000);
-    expect(adapter.supportsPartitionedIndexes()).toBe(true);
-    expect(adapter.supportsIndexInclude()).toBe(true);
+    expect(await adapter.supportsPartitionedIndexes()).toBe(true);
+    expect(await adapter.supportsIndexInclude()).toBe(true);
 
     stubVersion(adapter, 120000);
-    expect(adapter.supportsVirtualColumns()).toBe(true);
-    expect(adapter.supportsRestartDbTransaction()).toBe(true);
+    expect(await adapter.supportsVirtualColumns()).toBe(true);
+    expect(await adapter.supportsRestartDbTransaction()).toBe(true);
 
     stubVersion(adapter, 150000);
-    expect(adapter.supportsNullsNotDistinct()).toBe(true);
+    expect(await adapter.supportsNullsNotDistinct()).toBe(true);
   });
 
-  it("databaseVersion throws before initialization", () => {
-    const adapter = makeAdapter();
-    expect(() => adapter.databaseVersion).toThrow(/not available yet/);
-  });
-
-  it("indexAlgorithms returns concurrently", () => {
+  it("indexAlgorithms returns concurrently", async () => {
     const adapter = makeAdapter();
     expect(adapter.indexAlgorithms()).toEqual({ concurrently: "CONCURRENTLY" });
   });
 
-  it("typeToSql emits TIMESTAMP(n) with explicit precision", () => {
+  it("typeToSql emits TIMESTAMP(n) with explicit precision", async () => {
     const adapter = makeAdapter();
     expect(adapter.typeToSql("datetime", { precision: 6 })).toBe("timestamp(6)");
     expect(adapter.typeToSql("datetime", { precision: 0 })).toBe("timestamp(0)");

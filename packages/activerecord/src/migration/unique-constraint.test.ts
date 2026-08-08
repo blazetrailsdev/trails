@@ -68,7 +68,7 @@ describeIfSupports("unique_constraints", "Migration", () => {
 
       await connection.getDatabaseVersion();
       // eslint-disable-next-line vitest/no-conditional-in-test -- mirrors Rails' inline `if supports_nulls_not_distinct?` guard (PG 15+)
-      if (connection.supportsNullsNotDistinct()) {
+      if (await connection.supportsNullsNotDistinct()) {
         const constraint = uniqueConstraints.find((c) => c.name === expectedNullsNotDistinct.name)!;
         expect(constraint.tableName).toBe("test_unique_constraints");
         expect(constraint.name).toBe(expectedNullsNotDistinct.name);

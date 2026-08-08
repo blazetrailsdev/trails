@@ -1257,15 +1257,15 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return true;
   }
 
-  supportsExpressionIndex(): boolean {
-    return this.databaseVersion.compare("3.9.0") >= 0;
+  async supportsExpressionIndex(): Promise<boolean> {
+    return (await this.databaseVersion).compare("3.9.0") >= 0;
   }
 
   override supportsForeignKeys(): boolean {
     return true;
   }
 
-  override supportsCheckConstraints(): boolean {
+  override async supportsCheckConstraints(): Promise<boolean> {
     return true;
   }
 
@@ -1277,16 +1277,16 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return true;
   }
 
-  override supportsJson(): boolean {
+  override async supportsJson(): Promise<boolean> {
     return true;
   }
 
-  override supportsCommonTableExpressions(): boolean {
-    return this.databaseVersion.compare("3.8.3") >= 0;
+  override async supportsCommonTableExpressions(): Promise<boolean> {
+    return (await this.databaseVersion).compare("3.8.3") >= 0;
   }
 
-  supportsInsertReturning(): boolean {
-    return this.databaseVersion.compare("3.35.0") >= 0;
+  async supportsInsertReturning(): Promise<boolean> {
+    return (await this.databaseVersion).compare("3.35.0") >= 0;
   }
 
   /** Mirrors: SQLite3::DatabaseStatements#returning_column_values — the full
@@ -1321,31 +1321,31 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return this.executeMutation(this.buildTruncateStatement(tableName), [], name ?? "SQL");
   }
 
-  supportsInsertOnConflict(): boolean {
-    return this.databaseVersion.compare("3.24.0") >= 0;
+  async supportsInsertOnConflict(): Promise<boolean> {
+    return (await this.databaseVersion).compare("3.24.0") >= 0;
   }
 
-  override supportsInsertOnDuplicateSkip(): boolean {
-    return this.supportsInsertOnConflict();
+  override async supportsInsertOnDuplicateSkip(): Promise<boolean> {
+    return await this.supportsInsertOnConflict();
   }
 
-  override supportsInsertOnDuplicateUpdate(): boolean {
-    return this.supportsInsertOnConflict();
+  override async supportsInsertOnDuplicateUpdate(): Promise<boolean> {
+    return await this.supportsInsertOnConflict();
   }
 
-  override supportsInsertConflictTarget(): boolean {
-    return this.supportsInsertOnConflict();
+  override async supportsInsertConflictTarget(): Promise<boolean> {
+    return await this.supportsInsertOnConflict();
   }
 
   override supportsConcurrentConnections(): boolean {
     return !this._memoryDatabase;
   }
 
-  override supportsVirtualColumns(): boolean {
-    return this.databaseVersion.compare("3.31.0") >= 0;
+  override async supportsVirtualColumns(): Promise<boolean> {
+    return (await this.databaseVersion).compare("3.31.0") >= 0;
   }
 
-  override supportsIndexSortOrder(): boolean {
+  override async supportsIndexSortOrder(): Promise<boolean> {
     return true;
   }
 
@@ -1496,10 +1496,10 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return toVersion(row);
   }
 
-  override checkVersion(): void {
-    if (this.databaseVersion.compare("3.8.0") < 0) {
+  override async checkVersion(): Promise<void> {
+    if ((await this.databaseVersion).compare("3.8.0") < 0) {
       throw new Error(
-        `Your version of SQLite (${this.databaseVersion}) is too old. Active Record supports SQLite >= 3.8.`,
+        `Your version of SQLite (${await this.databaseVersion}) is too old. Active Record supports SQLite >= 3.8.`,
       );
     }
   }
@@ -2363,7 +2363,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     // as a bare table name and returns zero rows.
     const { schema, bare } = this._splitTableName(tableName);
     const pragmaPrefix = schema ? `${quoteColumnName(schema)}.` : "";
-    const pragma = this.supportsVirtualColumns() ? "table_xinfo" : "table_info";
+    const pragma = (await this.supportsVirtualColumns()) ? "table_xinfo" : "table_info";
     return this.schemaQuery(`PRAGMA ${pragmaPrefix}${pragma}(${quoteColumnName(bare)})`);
   }
 
@@ -3138,7 +3138,7 @@ dirtiesQueryCache(SQLite3Adapter, "execQuery", "execute");
  * @internal
  */
 export interface SQLite3Adapter {
-  get databaseVersion(): Version;
+  get databaseVersion(): Version | Promise<Version>;
 }
 /* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
 

@@ -45,8 +45,8 @@ const quoteHost = { quote };
 function rowFormatHost(isMariadb: boolean, version: string, probeResult = 0) {
   const queries: string[] = [];
   return {
-    isMariadb: () => isMariadb,
-    pool: { serverVersion: async () => new Version(version) },
+    isMariadb: async () => isMariadb,
+    databaseVersion: Promise.resolve(new Version(version)),
     queryValue: async (sql: string) => {
       queries.push(sql);
       return probeResult;
@@ -460,7 +460,7 @@ describe("MySQL::SchemaStatements", () => {
   const indexHost = (rows: Record<string, unknown>[], sortOrderSupported = true) => ({
     schemaQuery: async () => rows,
     quoteTableName: (n: string) => `\`${n}\``,
-    supportsIndexSortOrder: () => sortOrderSupported,
+    supportsIndexSortOrder: async () => sortOrderSupported,
   });
 
   it("indexes: surfaces per-column prefix lengths from Sub_part", async () => {

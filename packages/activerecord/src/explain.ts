@@ -86,7 +86,10 @@ export function renderBind(connection: any, attr: unknown): [string | null, unkn
  *
  * @internal
  */
-export function buildExplainClause(connection: any, options: ExplainOption[] = []): string {
+export async function buildExplainClause(
+  connection: any,
+  options: ExplainOption[] = [],
+): Promise<string> {
   if (connection && typeof connection.buildExplainClause === "function") {
     return connection.buildExplainClause(options);
   }

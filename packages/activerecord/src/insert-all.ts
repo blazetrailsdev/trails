@@ -445,11 +445,11 @@ export class InsertAll {
     // wrapper adapter that forgets to delegate doesn't silently fall through
     // and emit a bogus conflict target.
     const conn = this.connection as {
-      supportsInsertConflictTarget?: () => boolean;
+      supportsInsertConflictTarget?: () => Promise<boolean>;
     };
     const supports =
       typeof conn.supportsInsertConflictTarget === "function"
-        ? conn.supportsInsertConflictTarget()
+        ? await conn.supportsInsertConflictTarget()
         : false;
     if (!supports) {
       // Rails returns nil for a nil unique_by even when conflict targets are
