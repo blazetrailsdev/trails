@@ -13,8 +13,6 @@ function fakeAdapter(defaultTimezone: string): DatabaseAdapter {
 
 type CurrentTimeHost = { currentTime(connection: DatabaseAdapter): string };
 
-// `currentTime` reads the connection it is handed, never the pool, so the
-// NullPool every pool-less adapter carries is enough to build one over.
 const metadataBuiltOverLocalAdapter = new InternalMetadata(
   new NullPool(),
 ) as unknown as CurrentTimeHost;

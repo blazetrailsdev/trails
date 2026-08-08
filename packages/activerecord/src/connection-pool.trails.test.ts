@@ -1178,9 +1178,6 @@ describe("NullPool member parity", () => {
     }
     expect(pool.dirtiesQueryCache).toBe(true);
     expect(pool.schemaCache).toBeNull();
-    // A JS-only probe name is a Ruby send too: `pool.then` is a NoMethodError
-    // in Ruby, so it is one here. Only a Symbol — which cannot spell a Ruby
-    // send at all — reads through alongside the members.
     for (const probe of ["then", "toJSON", "asymmetricMatch", "nodeType", "inspect"]) {
       expect(() => pool[probe]).toThrow(NoMethodError);
     }
@@ -1189,9 +1186,6 @@ describe("NullPool member parity", () => {
   });
 
   it("lets a failing assertion whose subject holds a NullPool report its own failure", () => {
-    // The trap raising for every string send is only safe if no reporter walks
-    // a bare NullPool: a serializer that touched `then`/`toJSON` would replace
-    // the real failure with a NoMethodError of its own.
     const adapter = new AbstractAdapter();
     expect(() =>
       expect({ pool: adapter.pool, n: 1 }).toEqual({ pool: adapter.pool, n: 2 }),

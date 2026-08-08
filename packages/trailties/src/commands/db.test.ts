@@ -1465,6 +1465,7 @@ export class CreatePosts extends Migration {
 
     const dbFile = path.join(tmpDir, "disabled.sqlite3");
     const adapter = new BetterSQLite3Adapter(dbFile);
+    await establishMigrationConnection(adapter, dbFile);
     try {
       disableMetadataTable(adapter);
       const disabledMeta = new InternalMetadata(adapter.pool);
