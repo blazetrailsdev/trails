@@ -59,7 +59,7 @@ describe.skipIf(!currentAdapter("SQLite3Adapter"))("Migration.loadSchemaIfPendin
         calls.push("loadSchema");
       },
     };
-    const realHandler = originalArConfig.connectionHandler!();
+    const realHandler = originalArConfig.connectionHandler();
     const connectionHandler = new Proxy(realHandler, {
       get(target, property, receiver) {
         if (property === "clearAllConnectionsBang") {

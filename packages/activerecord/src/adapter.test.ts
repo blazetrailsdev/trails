@@ -514,7 +514,7 @@ describe("AdapterTest", () => {
 
   it("type_to_sql returns a String for unmapped types", async () => {
     const conn = await Base.leaseConnection();
-    expect(new SchemaCreation("sqlite", conn as never).typeToSql("special_db_type" as any)).toBe(
+    expect(new SchemaCreation(conn as never).typeToSql("special_db_type" as any)).toBe(
       "special_db_type",
     );
   });

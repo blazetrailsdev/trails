@@ -1385,7 +1385,7 @@ export abstract class Migration {
     // call-time config source rather than an import: naming
     // `tasks/database-tasks.js` here would be a load-time edge back into a
     // module that already imports this one.
-    return this._connectionOverride ?? migrationArConfig()!.databaseTasks!().migrationConnection();
+    return this._connectionOverride ?? migrationArConfig()!.databaseTasks().migrationConnection();
   }
 
   set connection(conn: DatabaseAdapter | undefined) {
@@ -1399,7 +1399,7 @@ export abstract class Migration {
    * would be a load-time edge back into a module that already imports this one.
    */
   get connectionPool(): ConnectionPool {
-    return this._poolOverride ?? migrationArConfig()!.databaseTasks!().migrationConnectionPool();
+    return this._poolOverride ?? migrationArConfig()!.databaseTasks().migrationConnectionPool();
   }
 
   // --- Execution (Rails: Migration#exec_migration, #execution_strategy, etc.) ---
@@ -1490,8 +1490,8 @@ export abstract class Migration {
 
   static tableNameOptions(): { tableNamePrefix: string; tableNameSuffix: string } {
     return {
-      tableNamePrefix: migrationArConfig()?.tableNamePrefix ?? "",
-      tableNameSuffix: migrationArConfig()?.tableNameSuffix ?? "",
+      tableNamePrefix: migrationArConfig()!.tableNamePrefix,
+      tableNameSuffix: migrationArConfig()!.tableNameSuffix,
     };
   }
 
@@ -1605,8 +1605,8 @@ export abstract class Migration {
   static async checkAllPendingBang(): Promise<void> {
     const pendingMigrations: MigrationProxy[][] = [];
 
-    await migrationArConfig()
-      ?.databaseTasks?.()
+    await migrationArConfig()!
+      .databaseTasks()
       .withTemporaryPoolForEach({ env: this.env() }, async (pool) => {
         const pending = await pool.migrationContext.open().pendingMigrations();
         if (pending != null) pendingMigrations.push(pending);
@@ -1754,8 +1754,7 @@ export abstract class Migration {
    * keeps that setting on `DatabaseTasks` (it is also `schemaUpToDate`'s default).
    */
   private static async anySchemaNeedsUpdate(): Promise<boolean> {
-    const databaseTasks = migrationArConfig()?.databaseTasks?.();
-    if (databaseTasks == null) return false;
+    const databaseTasks = migrationArConfig()!.databaseTasks();
 
     for (const dbConfig of this.dbConfigsInCurrentEnv()) {
       if (!(await databaseTasks.schemaUpToDate(dbConfig, databaseTasks.schemaFormat))) return true;
@@ -1779,7 +1778,7 @@ export abstract class Migration {
 
   /** @internal Mirrors: `ActiveRecord::Migration.db_configs_in_current_env` (`migration.rb:753-755`) */
   private static dbConfigsInCurrentEnv(): DatabaseConfig[] {
-    return migrationArConfig()?.configurations?.().configsFor({ envName: this.env() }) ?? [];
+    return migrationArConfig()!.configurations().configsFor({ envName: this.env() });
   }
 
   /** @internal */
@@ -1810,13 +1809,11 @@ export abstract class Migration {
    * is where the dynamic import resolves it too.
    */
   private static async loadSchemaBang(): Promise<void> {
-    const databaseTasks = migrationArConfig()?.databaseTasks?.();
-    if (databaseTasks == null) return;
+    const databaseTasks = migrationArConfig()!.databaseTasks();
 
-    await migrationArConfig()?.connectionHandler?.().clearAllConnectionsBang("all");
+    await migrationArConfig()!.connectionHandler().clearAllConnectionsBang("all");
 
-    const testConfigs =
-      migrationArConfig()?.configurations?.().configsFor({ envName: "test" }) ?? [];
+    const testConfigs = migrationArConfig()!.configurations().configsFor({ envName: "test" });
     for (const dbConfig of testConfigs) {
       await databaseTasks.purge(dbConfig);
     }
@@ -2464,7 +2461,7 @@ export class Migrator {
    * load-time edge back into a module that already imports this one.
    */
   private get connection(): DatabaseAdapter {
-    return migrationArConfig()!.databaseTasks!().migrationConnection();
+    return migrationArConfig()!.databaseTasks().migrationConnection();
   }
 
   /** @internal Mirrors: ActiveRecord::Migrator#ran? */

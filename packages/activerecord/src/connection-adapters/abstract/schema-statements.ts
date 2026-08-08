@@ -37,7 +37,7 @@ import {
   type RemoveForeignKeyOptions,
 } from "./schema-definitions.js";
 import type { UniqueConstraintOptions } from "../postgresql/schema-definitions.js";
-import { SchemaCreation } from "./schema-creation.js";
+import { SchemaCreation, type SchemaCreationConn } from "./schema-creation.js";
 import { maxIdentifierLength } from "./database-limits.js";
 import type { SchemaQuoter } from "./assert-schema-adapter.js";
 import { Column } from "../column.js";
@@ -315,9 +315,10 @@ export class SchemaStatements {
 
   /** Mirrors: SchemaStatements#schema_creation — `SchemaCreation.new(self)`. */
   get schemaCreation(): SchemaCreation {
-    // Base AbstractAdapter#adapterName is typed `string` (Rails-faithful
-    // "Abstract"); concrete adapters return a real AdapterName.
-    return new SchemaCreation(this.adapterName as AdapterName, this);
+    // `SchemaStatements` types its host as `DatabaseAdapter & SchemaQuoter`,
+    // which does not surface the capability probes; every runtime `this` is an
+    // AbstractAdapter, which defines all of them (abstract-adapter.ts:1576-1962).
+    return new SchemaCreation(this as unknown as SchemaCreationConn);
   }
 
   /**

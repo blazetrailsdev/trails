@@ -491,6 +491,16 @@ describeIfPostgresqlAdapter("TableDefinition#toSql", () => {
       quoteDefaultExpression: (v: unknown) => ` DEFAULT ${String(v)}`,
       typeToSql: (type: string) => type, // returns lowercase verbatim (mirrors PG native types)
       validColumnDefinitionOptions: () => ColumnDefinition.OPTION_NAMES,
+      // `SchemaCreation` delegates its capability probes to `@conn`
+      // (abstract/schema_creation.rb:16-21); answer as PostgreSQLAdapter does.
+      supportsCheckConstraints: async () => true,
+      supportsIndexesInCreate: () => false,
+      supportsPartialIndex: () => true,
+      supportsIndexInclude: async () => true,
+      supportsNullsNotDistinct: async () => true,
+      supportsIndexSortOrder: async () => true,
+      supportsExclusionConstraints: () => true,
+      supportsUniqueConstraints: () => true,
     };
     const td = new TableDefinition("widgets", { adapter: stubAdapter as any });
     td.cidr("net");

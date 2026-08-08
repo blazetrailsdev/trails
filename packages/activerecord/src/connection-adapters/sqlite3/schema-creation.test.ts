@@ -9,16 +9,17 @@ import { TableDefinition } from "./schema-definitions.js";
 import { Base } from "../../base.js";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
 import type { TableDefinitionConn } from "../abstract/schema-definitions.js";
+import type { SchemaCreationConn } from "../abstract/schema-creation.js";
 
 // Rails' SQLite3 DDL-rendering tests run under `current_adapter?(:SQLite3Adapter)`
 // against `ActiveRecord::Base.lease_connection`.
 describeIfSqlite("SQLite3::SchemaCreation", () => {
-  let conn: TableDefinitionConn;
+  let conn: TableDefinitionConn & SchemaCreationConn;
   let sc: SchemaCreation;
 
   beforeAll(async () => {
-    conn = (await Base.leaseConnection()) as unknown as TableDefinitionConn;
-    sc = new SchemaCreation("sqlite", conn);
+    conn = (await Base.leaseConnection()) as unknown as TableDefinitionConn & SchemaCreationConn;
+    sc = new SchemaCreation(conn);
   });
 
   it("appends DEFERRABLE INITIALLY DEFERRED when deferrable is 'deferred'", async () => {

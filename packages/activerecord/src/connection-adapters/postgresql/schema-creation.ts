@@ -5,7 +5,10 @@
  */
 
 import { wrap } from "@blazetrails/activesupport";
-import { SchemaCreation as AbstractSchemaCreation } from "../abstract/schema-creation.js";
+import {
+  SchemaCreation as AbstractSchemaCreation,
+  type SchemaCreationConn,
+} from "../abstract/schema-creation.js";
 import {
   postgresqlNativeDatabaseTypes,
   type NativeDatabaseTypes,
@@ -20,7 +23,6 @@ import {
   ChangeColumnDefaultDefinition,
   CheckConstraintDefinition,
 } from "../abstract/schema-definitions.js";
-import type { SchemaQuoter } from "../abstract/assert-schema-adapter.js";
 import type {
   ExclusionConstraintDefinition,
   UniqueConstraintDefinition,
@@ -37,7 +39,7 @@ type PgTableDef = AbstractTableDefinition & {
  * resolution back to it (Rails parity: `delegate :type_to_sql, to: :@conn`).
  * @internal
  */
-export interface PgSchemaCreationHost extends SchemaQuoter {
+export interface PgSchemaCreationHost extends SchemaCreationConn {
   typeToSql(type: string, options?: Record<string, unknown>): string;
 }
 
@@ -70,7 +72,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
   declare protected adapter: PgSchemaCreationHost;
 
   constructor(adapter: PgSchemaCreationHost) {
-    super("postgres", adapter);
+    super(adapter);
   }
 
   /**

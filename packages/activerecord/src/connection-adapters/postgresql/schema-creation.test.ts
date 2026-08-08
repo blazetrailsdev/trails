@@ -15,9 +15,20 @@ import {
 // Stub host satisfies `PgSchemaCreationHost`: the inherited Quoting
 // fallback covers quote*, plus a minimal `typeToSql` since PG's override
 // delegates to the adapter (Rails parity: SchemaCreation delegates
-// type_to_sql to @conn).
+// type_to_sql to @conn), plus the capability probes `SchemaCreation`
+// delegates to `@conn` (abstract/schema_creation.rb:16-21), answered as
+// `PostgreSQLAdapter` answers them.
 const s = () =>
   new SchemaCreation({
+    nativeDatabaseTypes: () => ({}),
+    supportsCheckConstraints: async () => true,
+    supportsExclusionConstraints: () => true,
+    supportsIndexInclude: async () => true,
+    supportsIndexSortOrder: async () => true,
+    supportsIndexesInCreate: () => false,
+    supportsNullsNotDistinct: async () => true,
+    supportsPartialIndex: () => true,
+    supportsUniqueConstraints: () => true,
     quoteColumnName: (n: string) => `"${n}"`,
     quoteTableName: (n: string) => `"${n}"`,
     quoteDefaultExpression: (v: unknown) => ` DEFAULT ${typeof v === "string" ? `'${v}'` : v}`,

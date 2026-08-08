@@ -8,6 +8,7 @@ import { SchemaStatements } from "./abstract/schema-statements.js";
 import type { SchemaQuoter } from "./abstract/assert-schema-adapter.js";
 import { include } from "@blazetrails/activesupport";
 import { TableDefinition } from "./abstract/schema-definitions.js";
+import { NATIVE_DATABASE_TYPES_BY_ADAPTER } from "./abstract/native-database-types.js";
 import type { AbstractAdapter } from "./abstract-adapter.js";
 import type { ConnectionPool } from "./abstract/connection-pool.js";
 import { checkoutRawTestAdapter } from "../test-adapter.js";
@@ -725,6 +726,18 @@ class MockAdapter {
   pool = {};
   quoteDefaultExpression = (_v: unknown) => "";
   supportsDatetimeWithPrecision = () => false;
+  // `SchemaCreation` delegates every capability probe and its type map to
+  // `@conn` (abstract/schema_creation.rb:16-21); answer as SQLite3Adapter does,
+  // matching the `adapterName` this mock reports.
+  nativeDatabaseTypes = () => NATIVE_DATABASE_TYPES_BY_ADAPTER["sqlite"];
+  supportsCheckConstraints = async () => true;
+  supportsIndexesInCreate = () => false;
+  supportsPartialIndex = () => true;
+  supportsIndexInclude = async () => false;
+  supportsNullsNotDistinct = async () => false;
+  supportsIndexSortOrder = async () => true;
+  supportsExclusionConstraints = () => false;
+  supportsUniqueConstraints = () => false;
   createTableDefinition = (n: string, opts: Record<string, unknown>) =>
     // Rails' create_table_definition passes `self` (schema_statements.rb:1041).
     new TableDefinition(n, { adapter: this as never, ...opts, adapterName: "sqlite" });

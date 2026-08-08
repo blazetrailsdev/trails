@@ -31,7 +31,7 @@ function emitTableSql(td: TableDefinition): Promise<string> {
   // matching the real adapter call sites and the production `*.toSql()` overrides.
   if (adapterName === "postgres") return new PgSchemaCreation(adapter).accept(td);
   if (adapterName === "mysql") return new MysqlSchemaCreation(adapter).accept(td);
-  return new SQLite3SchemaCreation("sqlite", adapter).accept(td);
+  return new SQLite3SchemaCreation(adapter).accept(td);
 }
 import { Person } from "./test-helpers/models/person.js";
 import { loadSchemaFromAdapter } from "./model-schema.js";

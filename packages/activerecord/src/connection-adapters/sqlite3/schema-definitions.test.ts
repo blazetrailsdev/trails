@@ -4,14 +4,15 @@ import { SchemaCreation } from "./schema-creation.js";
 import { Base } from "../../base.js";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
 import type { TableDefinitionConn } from "../abstract/schema-definitions.js";
+import type { SchemaCreationConn } from "../abstract/schema-creation.js";
 
 // Rails' SQLite3 schema-definition tests run under `current_adapter?(:SQLite3Adapter)`
 // against `ActiveRecord::Base.lease_connection`.
 describeIfSqlite("SQLite3::TableDefinition", () => {
-  let conn: TableDefinitionConn;
+  let conn: TableDefinitionConn & SchemaCreationConn;
 
   beforeAll(async () => {
-    conn = (await Base.leaseConnection()) as unknown as TableDefinitionConn;
+    conn = (await Base.leaseConnection()) as unknown as TableDefinitionConn & SchemaCreationConn;
   });
 
   it("forces type: integer for references", () => {
@@ -45,7 +46,7 @@ describeIfSqlite("SQLite3::TableDefinition", () => {
     td.column("full_name", "virtual" as any, { as: "a || b" } as any);
     const col = td.columns.find((c) => c.name === "full_name")!;
     expect(col.type).toBeUndefined();
-    const sql = await new SchemaCreation("sqlite", (td as any)._adapter).accept(td);
+    const sql = await new SchemaCreation((td as any)._adapter).accept(td);
     expect(sql).toContain('"full_name"  GENERATED ALWAYS AS (a || b)');
     expect(sql).not.toContain("varchar");
     expect(sql).not.toContain("VARCHAR");
@@ -55,7 +56,7 @@ describeIfSqlite("SQLite3::TableDefinition", () => {
     const td = new TableDefinition("items", { adapter: conn });
     td.column("x", "integer");
     td.column("expr", "integer", { as: "x + 1", stored: true } as any);
-    const sql = await new SchemaCreation("sqlite", (td as any)._adapter).accept(td);
+    const sql = await new SchemaCreation((td as any)._adapter).accept(td);
     expect(sql).toContain("GENERATED ALWAYS AS (x + 1) STORED");
   });
 });

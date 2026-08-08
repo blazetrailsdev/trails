@@ -50,6 +50,16 @@ const NON_EMITTING: ReadonlyMap<string, string> = new Map([
   ["quotedColumnsForIndex", "renderer input — renders an index's column list"],
   ["nativeDatabaseTypes", "renderer input — the type map typeToSql reads, a read not an emitter"],
   ["supportsForeignKeys", "capability read — decides whether the renderer emits inline REFERENCES"],
+  [
+    "supportsCheckConstraints",
+    "capability read — decides whether the renderer emits inline CHECK constraints",
+  ],
+  ["supportsPartialIndex", "capability read — decides whether an index renders its WHERE clause"],
+  ["supportsIndexInclude", "capability read — decides whether an index renders INCLUDE (...)"],
+  [
+    "supportsNullsNotDistinct",
+    "capability read — decides whether an index renders NULLS NOT DISTINCT",
+  ],
   ["_config", "connection-config read the renderer consults, not a DDL emitter"],
 ]);
 
