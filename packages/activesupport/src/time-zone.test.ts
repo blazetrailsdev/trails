@@ -727,16 +727,28 @@ describe("TimeZoneTest", () => {
   });
 
   it("us zones", () => {
-    const zones = TimeZone.usZones();
-    expect(zones.length).toBeGreaterThan(0);
-    expect(zones.some((z) => z.name === "Eastern Time (US & Canada)")).toBe(true);
-    expect(zones.some((z) => z.name === "Hawaii")).toBe(true);
+    expect(TimeZone.usZones()).toContain(TimeZone.find("Hawaii"));
+    expect(TimeZone.usZones()).not.toContain(TimeZone.find("Kuala Lumpur"));
   });
 
-  it.skip("country zones");
-  it.skip("country zones with and without mappings");
-  it.skip("country zones with multiple mappings");
-  it.skip("country zones without mappings");
+  it("country zones", () => {
+    expect(TimeZone.countryZones("ru")).toContain(TimeZone.find("Moscow"));
+    expect(TimeZone.countryZones("ru")).not.toContain(TimeZone.find("Kuala Lumpur"));
+  });
+
+  it("country zones with and without mappings", () => {
+    expect(TimeZone.countryZones("au")).toContain(TimeZone.find("Adelaide"));
+    expect(TimeZone.countryZones("au").map((z) => z.name)).toContain("Australia/Lord_Howe");
+  });
+
+  it("country zones with multiple mappings", () => {
+    expect(TimeZone.countryZones("gb")).toContain(TimeZone.find("Edinburgh"));
+    expect(TimeZone.countryZones("gb")).toContain(TimeZone.find("London"));
+  });
+
+  it("country zones without mappings", () => {
+    expect(TimeZone.countryZones("sv").map((z) => z.name)).toContain("America/El_Salvador");
+  });
   it.skip("to yaml");
   it.skip("yaml load");
 

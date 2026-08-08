@@ -93,8 +93,14 @@ export interface StrftimeSubject {
  * A `PlainDate` answers the gem's own `::Date` fields — midnight, and `::Date`'s
  * `"+00:00"` zone spelling (`d_lite_strftime`'s `of` of 0) — while a
  * `ZonedDateTime` carries its real offset, which `of2str` spells the way
- * `::DateTime#zone` does. `Temporal`'s `dayOfWeek` is ISO — 1 is Monday, 7
- * Sunday — where `wday` is 0 for Sunday.
+ * `::DateTime#zone` does.
+ *
+ * `wday` and `yday` come off the Julian day, as {@link Date#wday} and
+ * {@link Date#yday} do, NOT off `Temporal`'s `dayOfWeek`/`dayOfYear`: those are
+ * proleptic Gregorian, and the civil triple here means the same date
+ * `Date.new` does — read under `Date::ITALY`. Reading them off `Temporal`
+ * instead would put `%A` two days from `%s` for a pre-reform subject, since
+ * {@link epochSeconds} is the Julian day's.
  */
 function temporalSubject(
   value: Temporal.PlainDate | Temporal.PlainDateTime | Temporal.ZonedDateTime | Temporal.Instant,
@@ -114,8 +120,8 @@ function temporalSubject(
     year: plain.year,
     mon: plain.month,
     day: plain.day,
-    wday: plain.dayOfWeek % 7,
-    yday: plain.dayOfYear,
+    wday: cJdToWday(cCivilToJd(plain.year, plain.month, plain.day)),
+    yday: cJdToOrdinal(cCivilToJd(plain.year, plain.month, plain.day))[1],
     hour: plain.hour,
     min: plain.minute,
     sec: plain.second,
@@ -131,20 +137,23 @@ function temporalSubject(
 }
 
 /**
- * @internal `%s`'s value — `date_strftime.c` computes it from the receiver's
- * own fields rather than reading a `to_i` off it, which is what lets `::Date`
- * (midnight, UTC) answer `%s` at all.
+ * @internal `%s`'s value — `tmx_m_secs` (`date_core.c:7103-7116`), which
+ * `date_strftime.c:359-361` reads through the `secs` slot of the `tmx_funcs`
+ * table. It computes the value from the receiver's own fields rather than
+ * reading a `to_i` off it, which is what lets `::Date` (midnight, UTC) answer
+ * `%s` at all: `day_to_sec(real_jd - UNIX_EPOCH_IN_CJD)` plus the day-fraction,
+ * both in UTC — the subject's are local, so `utcOffset` comes back off.
+ *
+ * The day is the Julian day, not a `Temporal.PlainDateTime`'s epoch: the two
+ * part company before the calendar reform, where MRI puts 0001-01-01T00:00:00Z
+ * at -62135769600 and the proleptic Gregorian reading two days later.
  */
 function epochSeconds(subject: StrftimeSubject): number {
-  const utc = new Temporal.PlainDateTime(
-    subject.year,
-    subject.mon,
-    subject.day,
-    subject.hour,
-    subject.min,
-    subject.sec,
-  ).toZonedDateTime("UTC");
-  return Math.floor(utc.epochMilliseconds / 1000) - subject.utcOffset;
+  return (
+    (mLocalJd(subject) - UNIX_EPOCH_IN_CJD) * DAY_IN_SECONDS +
+    timeToDf(subject.hour, subject.min, subject.sec) -
+    subject.utcOffset
+  );
 }
 
 /**
@@ -295,13 +304,13 @@ function fmt(
 
 /**
  * @internal `date_strftime.c`'s `FLAG_FOUND` macro
- * (`date_strftime.c:90-93`), which sends a `-` or `_` that follows a width
- * straight to `unknown:` — so MRI answers `%3-S` verbatim where `%-3S` is `8`.
- * Its other two arms, the `%E`/`%O` locale extensions and `%:`, are both
- * unreachable here: neither can set its flag and go on to read another.
+ * (`date_strftime.c:90-93`), which sends a `-` or `_` that follows a width — or
+ * a locale extension — straight to `unknown:`, so MRI answers `%3-S` verbatim
+ * where `%-3S` is `8`. Its `BIT_OF(COLONS)` arm is the one with no bearer here:
+ * `%:` only ever sets the flag on its way to `z`, which is a directive.
  */
-function flagFound(precision: number): boolean {
-  return precision > 0;
+function flagFound(precision: number, localeE: boolean, localeO: boolean): boolean {
+  return precision > 0 || localeE || localeO;
 }
 
 /**
@@ -373,8 +382,11 @@ function subsecDigits(nsec: Rational, precision: number): string {
  *
  * Only the directives the i18n format strings and the conformance mixins use
  * are recognised; Ruby leaves an unknown directive in place, and so does this.
- * The `^`, `#`, `E` and `O` flags are among the unrecognised ones, so `%^b`
- * still falls through verbatim rather than upcasing.
+ * Every flag the C reads is recognised, including the `E` and `O` POSIX locale
+ * extensions (`date_strftime.c:523-535`), which set their bit and are then
+ * ignored exactly as the C ignores them — each reads on only when the NEXT
+ * character is one its own whitelist names, so `%Oy` is `%y` and `%Oz` goes out
+ * verbatim.
  * `%z` and `%Z` both come off the subject: `::Date` has no zone of its own and
  * answers UTC, while a `::Time` built through the public constructor is in the
  * local zone and answers its real offset and abbreviation.
@@ -417,13 +429,15 @@ export function strftime(
     let upper = false;
     let lower = false;
     let chcase = false;
+    let localeE = false;
+    let localeO = false;
     let g = f + 1;
     let spec: string | undefined;
 
     for (;;) {
       const c = format[g];
       if (c === "^") {
-        if (flagFound(precision)) {
+        if (flagFound(precision, localeE, localeO)) {
           spec = c;
           break;
         }
@@ -432,7 +446,7 @@ export function strftime(
         continue;
       }
       if (c === "#") {
-        if (flagFound(precision)) {
+        if (flagFound(precision, localeE, localeO)) {
           spec = c;
           break;
         }
@@ -441,7 +455,7 @@ export function strftime(
         continue;
       }
       if (c === "_") {
-        if (flagFound(precision)) {
+        if (flagFound(precision, localeE, localeO)) {
           spec = c;
           break;
         }
@@ -450,7 +464,7 @@ export function strftime(
         continue;
       }
       if (c === "-") {
-        if (flagFound(precision)) {
+        if (flagFound(precision, localeE, localeO)) {
           spec = c;
           break;
         }
@@ -464,6 +478,24 @@ export function strftime(
         precision = prec;
         g = e;
         continue;
+      }
+      if (c === "E") {
+        localeE = true;
+        if (format[g + 1] !== undefined && "cCxXyY".includes(format[g + 1])) {
+          g++;
+          continue;
+        }
+        spec = c;
+        break;
+      }
+      if (c === "O") {
+        localeO = true;
+        if (format[g + 1] !== undefined && "deHkIlmMSuUVwWy".includes(format[g + 1])) {
+          g++;
+          continue;
+        }
+        spec = c;
+        break;
       }
       if (c === ":") {
         let l = 0;
@@ -2893,6 +2925,26 @@ function completeFrags(parts: DateParts): void {
  */
 const UNIX_EPOCH_IN_CJD = 2440588;
 
+/**
+ * @internal `date_core.c`'s `ITALY` (`date_core.c:186`), the Julian day of
+ * 1582-10-15 — the day Gregory's reform took effect in Italy, and the day from
+ * which `c_civil_to_jd` and `c_jd_to_civil` read a date as Gregorian rather
+ * than Julian.
+ */
+const ITALY = 2299161;
+
+/**
+ * @internal `date_core.c`'s `DEFAULT_SG` (`date_core.c:190`), the reform start
+ * every constructor takes when none is passed. The `start` argument itself
+ * (`Date::JULIAN` / `Date::GREGORIAN`, `date_core.c:188-189`) is not a
+ * parameter here — `Date` is seated on `Temporal.PlainDate`, which can hold
+ * only the spellings the proleptic Gregorian calendar has, so a Julian-only
+ * civil date such as 1500-02-29 has no bearer. The conversions below are the
+ * C's all the same, so every day both calendars can spell — which is every day
+ * outside the ten the reform deleted — answers MRI's `wday`, `yday` and epoch.
+ */
+const DEFAULT_SG = ITALY;
+
 /** @internal `date_core.c`'s seconds constants (`date_core.c:194-196`). */
 const MINUTE_IN_SECONDS = 60;
 const HOUR_IN_SECONDS = 3600;
@@ -2919,9 +2971,6 @@ function secToNs(s: number | bigint | Rational): number | bigint | Rational {
 function nsToSec(n: Rational): Rational {
   return n.quo(SECOND_IN_NANOSECONDS);
 }
-
-/** @internal 1970-01-01, the day {@link UNIX_EPOCH_IN_CJD} numbers. */
-const UNIX_EPOCH = new Temporal.PlainDate(1970, 1, 1);
 
 /**
  * @internal `date_core.c` `df_local_to_utc` (`date_core.c:900-909`), which takes
@@ -2982,25 +3031,62 @@ function dfToTime(df: number): [h: number, min: number, s: number] {
 
 /**
  * @internal `date_core.c` `c_civil_to_jd` (`date_core.c:502-524`), the Julian
- * day of the civil date `y`-`m`-`d`. The C's `jd -= b` correction rides on the
- * calendar-reform start `sg`, and its `ns` out-parameter reports which side of
- * the reform the answer landed on; `Temporal.PlainDate` is proleptic Gregorian
- * and carries no reform, so neither has a bearer here and the conversion is the
- * day count from the Unix epoch {@link UNIX_EPOCH_IN_CJD} numbers.
+ * day of the civil date `y`-`m`-`d` read under the calendar-reform start `sg`.
+ * The `jd -= b` correction is what makes a day before `sg` a Julian one: `b` is
+ * the Gregorian century correction, so dropping it walks the answer back onto
+ * the Julian calendar. The C's `ns` out-parameter reports which side of the
+ * reform the answer landed on; nothing here reads it, so it is not returned.
  */
-function cCivilToJd(y: number, m: number, d: number): number {
-  return UNIX_EPOCH_IN_CJD + new Temporal.PlainDate(y, m, d).since(UNIX_EPOCH).days;
+function cCivilToJd(y: number, m: number, d: number, sg = DEFAULT_SG): number {
+  if (m <= 2) {
+    y -= 1;
+    m += 12;
+  }
+  const a = Math.floor(y / 100);
+  const b = 2 - a + Math.floor(a / 4);
+  let jd = Math.floor(365.25 * (y + 4716)) + Math.floor(30.6001 * (m + 1)) + d + b - 1524;
+  if (jd < sg) jd -= b;
+  return jd;
 }
 
 /**
  * @internal `date_core.c` `c_jd_to_civil` (`date_core.c:526-554`), the inverse
  * of {@link cCivilToJd}; the `ry`/`rm`/`rdom` out-parameters come back as the
- * tuple. The C's `jd < sg` arm skips the century correction for a day before
- * the calendar reform and has no bearer here, as on {@link cCivilToJd}.
+ * tuple. The `jd < sg` arm skips the century correction for a day before the
+ * calendar reform, so such a day reads as the Julian date MRI names.
  */
-function cJdToCivil(jd: number): [ry: number, rm: number, rdom: number] {
-  const r = UNIX_EPOCH.add({ days: jd - UNIX_EPOCH_IN_CJD });
-  return [r.year, r.month, r.day];
+function cJdToCivil(jd: number, sg = DEFAULT_SG): [ry: number, rm: number, rdom: number] {
+  let a: number;
+  if (jd < sg) a = jd;
+  else {
+    const x = Math.floor((jd - 1867216.25) / 36524.25);
+    a = jd + 1 + x - Math.floor(x / 4);
+  }
+  const b = a + 1524;
+  const c = Math.floor((b - 122.1) / 365.25);
+  const d = Math.floor(365.25 * c);
+  const e = Math.floor((b - d) / 30.6001);
+  const dom = b - d - Math.floor(30.6001 * e);
+  let m: number;
+  let y: number;
+  if (e <= 13) {
+    m = e - 1;
+    y = c - 4716;
+  } else {
+    m = e - 13;
+    y = c - 4715;
+  }
+  return [y, m, dom];
+}
+
+/**
+ * @internal `date_core.c` `c_jd_to_wday` (`date_core.c:636-640`), Sunday as
+ * `0`. Reading the day of the week off the Julian day rather than off
+ * `Temporal.PlainDate`'s proleptic `dayOfWeek` is what makes it agree with MRI
+ * at and before the calendar reform, where the two calendars run days apart.
+ */
+function cJdToWday(jd: number): number {
+  return mod(jd + 1, 7);
 }
 
 /** @internal `date_core.c`'s `DIV` macro (`date_core.c:168-170`), floored division. */
@@ -3020,19 +3106,51 @@ function mod(n: number, d: number): number {
  * day of that month.
  *
  * Ruby rejects by round-tripping the civil triple through the Julian day, which
- * is how a day the calendar reform deleted comes back as a different date and
- * fails. The substrate here is `Temporal.PlainDate`, which has no reform to
- * delete a day, so `overflow: "reject"` is the whole of the rejection.
+ * is how a day the calendar reform deleted — 1582-10-10 — comes back as a
+ * different date and fails.
+ *
+ * The C's `rm`/`rd` out-parameters are the folded month and day, which every
+ * caller re-derives from the `rjd` it keeps, so `rjd` alone comes back — `null`
+ * for the C's `0`.
  */
-function cValidCivilP(y: number, m: number, d: number): Temporal.PlainDate | null {
+function cValidCivilP(y: number, m: number, d: number, sg = DEFAULT_SG): number | null {
+  let ry: number;
+  let rm: number;
+  let rd: number;
+
   if (m < 0) m += 13;
   if (m < 1 || m > 12) return null;
-  if (d < 0) d = new Temporal.PlainDate(y, m, 1).daysInMonth + d + 1;
-  if (d < 1) return null;
+  if (d < 0) {
+    const ldom = cFindLdom(y, m, sg);
+    if (ldom === null) return null;
+    [ry, rm, rd] = cJdToCivil(ldom + d + 1, sg);
+    if (ry !== y || rm !== m) return null;
+    d = rd;
+  }
+  const rjd = cCivilToJd(y, m, d, sg);
+  [ry, rm, rd] = cJdToCivil(rjd, sg);
+  if (ry !== y || rm !== m || rd !== d) return null;
+  return rjd;
+}
+
+/**
+ * @internal The `Temporal.PlainDate` a Julian day names — the seat `Date` keeps
+ * its state on. `Date.jd` is `d_simple_new_internal` over a bare `HAVE_JD`
+ * `SimpleDateData` in the C (`date_core.c:3036-3050`); here the day has to
+ * become a civil date at the call, and a Julian-only day such as the one
+ * 1500-02-29 names has no proleptic Gregorian spelling, so `Temporal` rejects
+ * it where MRI builds it. That is the residue of the substrate, not of the
+ * conversions above: RFC 0088 `date-state-onto-temporal-plaindate`.
+ *
+ * Not exported: it is the seam between the C's Julian day and the substrate,
+ * reachable only from the constructors and `Date.jd` below.
+ */
+function plainDateFromJd(rjd: number): Temporal.PlainDate {
+  const [y, m, d] = cJdToCivil(rjd);
   try {
     return Temporal.PlainDate.from({ year: y, month: m, day: d }, { overflow: "reject" });
   } catch {
-    return null;
+    throw new DateError("invalid date");
   }
 }
 
@@ -3124,43 +3242,66 @@ function num2intWithFrac(
  * Ruby rejects by round-tripping back through {@link cJdToOrdinal}, which is
  * how a walk that left `y` comes back naming a different year.
  */
-function cValidOrdinalP(y: number, d: number): Temporal.PlainDate | null {
+function cValidOrdinalP(y: number, d: number, sg = DEFAULT_SG): number | null {
   let ry2: number;
   let rd2: number;
 
   if (d < 0) {
-    const rjd2 = cFindLdoy(y);
+    const rjd2 = cFindLdoy(y, sg);
+    if (rjd2 === null) return null;
 
-    [ry2, rd2] = cJdToOrdinal(rjd2 + d + 1);
+    [ry2, rd2] = cJdToOrdinal(rjd2 + d + 1, sg);
     if (ry2 !== y) return null;
     d = rd2;
   }
-  const rjd = cOrdinalToJd(y, d);
-  [ry2, rd2] = cJdToOrdinal(rjd);
+  const rjd = cOrdinalToJd(y, d, sg);
+  [ry2, rd2] = cJdToOrdinal(rjd, sg);
   if (ry2 !== y || rd2 !== d) return null;
-  return new Temporal.PlainDate(...cJdToCivil(rjd));
+  return rjd;
 }
 
 /**
  * @internal `date_core.c` `c_find_fdoy` (`date_core.c:455-465`), the Julian day
- * of the first day of year `y`. Ruby scans January for it because the calendar
- * reform can delete 1 January itself; `Temporal.PlainDate` is proleptic
- * Gregorian and carries no reform, so the scan collapses to 1 January. The C's
- * `sg` argument and its `ns` out-parameter both ride on that reform and have no
- * bearer here, as on {@link cJdToCivil}.
+ * of the first day of year `y`. Ruby scans January forwards, taking the first
+ * day `c_valid_civil_p` accepts, because the calendar reform can delete 1
+ * January itself. The C's success flag is the return and the day an
+ * out-parameter; here the day IS the return and the C's `0` is `null`. Its `ns`
+ * out-parameter has no reader.
  */
-function cFindFdoy(y: number): number {
-  return cCivilToJd(y, 1, 1);
+function cFindFdoy(y: number, sg = DEFAULT_SG): number | null {
+  for (let d = 1; d < 31; d++) {
+    const rjd = cValidCivilP(y, 1, d, sg);
+    if (rjd !== null) return rjd;
+  }
+  return null;
 }
 
 /**
  * @internal `date_core.c` `c_find_ldoy` (`date_core.c:467-476`), the Julian day
- * of the last day of year `y`. As on {@link cFindFdoy}, Ruby scans December
- * backwards because the calendar reform can delete 31 December itself and the
- * scan collapses to 31 December here.
+ * of the last day of year `y`, scanned backwards from 31 December for the same
+ * reason as {@link cFindFdoy}.
  */
-function cFindLdoy(y: number): number {
-  return cCivilToJd(y, 12, 31);
+function cFindLdoy(y: number, sg = DEFAULT_SG): number | null {
+  for (let i = 0; i < 30; i++) {
+    const rjd = cValidCivilP(y, 12, 31 - i, sg);
+    if (rjd !== null) return rjd;
+  }
+  return null;
+}
+
+/**
+ * @internal `date_core.c` `c_find_ldom` (`date_core.c:490-499`), the Julian day
+ * of the last day of month `m` of year `y`. The scan is what makes the length
+ * of the month the CALENDAR's rather than the substrate's: February 1500 has 29
+ * days under `Date::ITALY` and 28 read proleptically, so `Date.new(1500, 2, -1)`
+ * counts back from the 29th as MRI does.
+ */
+function cFindLdom(y: number, m: number, sg = DEFAULT_SG): number | null {
+  for (let i = 0; i < 30; i++) {
+    const rjd = cValidCivilP(y, m, 31 - i, sg);
+    if (rjd !== null) return rjd;
+  }
+  return null;
 }
 
 /**
@@ -3169,8 +3310,11 @@ function cFindLdoy(y: number): number {
  * side of the calendar reform the answer landed on and has no bearer here, as
  * on {@link cCivilToJd}.
  */
-function cOrdinalToJd(y: number, d: number): number {
-  return cFindFdoy(y) + d - 1;
+function cOrdinalToJd(y: number, d: number, sg = DEFAULT_SG): number {
+  // The C reads `*rjd` back without checking `c_find_fdoy`'s flag here and in
+  // the four below: every year has a valid 1 January under any `sg`, so the
+  // scan cannot come up empty.
+  return cFindFdoy(y, sg)! + d - 1;
 }
 
 /**
@@ -3178,9 +3322,9 @@ function cOrdinalToJd(y: number, d: number): number {
  * inverse of {@link cOrdinalToJd}; the `ry`/`rd` out-parameters come back as
  * the tuple.
  */
-function cJdToOrdinal(jd: number): [ry: number, rd: number] {
-  const [ry] = cJdToCivil(jd);
-  const rjd = cFindFdoy(ry);
+function cJdToOrdinal(jd: number, sg = DEFAULT_SG): [ry: number, rd: number] {
+  const [ry] = cJdToCivil(jd, sg);
+  const rjd = cFindFdoy(ry, sg)!;
   return [ry, jd - rjd + 1];
 }
 
@@ -3191,7 +3335,7 @@ function cJdToOrdinal(jd: number): [ry: number, rd: number] {
  * then `w` weeks and `d` days on.
  */
 function cCommercialToJd(y: number, w: number, d: number): number {
-  const rjd2 = cFindFdoy(y) + 3;
+  const rjd2 = cFindFdoy(y)! + 3;
   return rjd2 - mod(rjd2, 7) + 7 * (w - 1) + (d - 1);
 }
 
@@ -3217,7 +3361,7 @@ function cJdToCommercial(jd: number): [ry: number, rw: number, rd: number] {
  * of the commercial year before rebuilding the date and rejecting it if the
  * round-trip does not name the same `y`/`w`/`d` back.
  */
-function cValidCommercialP(y: number, w: number, d: number): Temporal.PlainDate | null {
+function cValidCommercialP(y: number, w: number, d: number): number | null {
   if (d < 0) d += 8;
   if (w < 0) {
     const c2 = cJdToCommercial(cCommercialToJd(y + 1, 1, 1) + w * 7);
@@ -3227,7 +3371,7 @@ function cValidCommercialP(y: number, w: number, d: number): Temporal.PlainDate 
   const rjd = cCommercialToJd(y, w, d);
   const [ry, rw, rd] = cJdToCommercial(rjd);
   if (y !== ry || w !== rw || d !== rd) return null;
-  return new Temporal.PlainDate(...cJdToCivil(rjd));
+  return rjd;
 }
 
 /**
@@ -3239,14 +3383,14 @@ function cValidCommercialP(y: number, w: number, d: number): Temporal.PlainDate 
  * year whose 1 January is itself an `f`-day: there, 1 January opens week `1`.
  */
 function cWeeknumToJd(y: number, w: number, d: number, f: number): number {
-  const rjd2 = cFindFdoy(y) + 6;
+  const rjd2 = cFindFdoy(y)! + 6;
   return rjd2 - mod(rjd2 - f + 1, 7) - 7 + 7 * w + d;
 }
 
 /** @internal `date_core.c` `c_jd_to_weeknum` (`date_core.c:621-634`), the inverse of {@link cWeeknumToJd}. */
 function cJdToWeeknum(jd: number, f: number): [ry: number, rw: number, rd: number] {
   const [ry] = cJdToCivil(jd);
-  const rjd = cFindFdoy(ry) + 6;
+  const rjd = cFindFdoy(ry)! + 6;
   const j = jd - (rjd - mod(rjd - f + 1, 7)) + 7;
   return [ry, div(j, 7), mod(j, 7)];
 }
@@ -3258,7 +3402,7 @@ function cJdToWeeknum(jd: number, f: number): [ry: number, rw: number, rd: numbe
  * rather than a `1`..`7` one, so a negative day takes `7` where the commercial
  * one takes `8`.
  */
-function cValidWeeknumP(y: number, w: number, d: number, f: number): Temporal.PlainDate | null {
+function cValidWeeknumP(y: number, w: number, d: number, f: number): number | null {
   if (d < 0) d += 7;
   if (w < 0) {
     const w2 = cJdToWeeknum(cWeeknumToJd(y + 1, 1, f, f) + w * 7, f);
@@ -3268,7 +3412,7 @@ function cValidWeeknumP(y: number, w: number, d: number, f: number): Temporal.Pl
   const rjd = cWeeknumToJd(y, w, d, f);
   const [ry, rw, rd] = cJdToWeeknum(rjd, f);
   if (y !== ry || w !== rw || d !== rd) return null;
-  return new Temporal.PlainDate(...cJdToCivil(rjd));
+  return rjd;
 }
 
 /**
@@ -3276,8 +3420,8 @@ function cValidWeeknumP(y: number, w: number, d: number, f: number): Temporal.Pl
  * answers the Julian day back: every integer names a day, so there is nothing
  * to reject.
  */
-function rtValidJdP(jd: number): Temporal.PlainDate {
-  return new Temporal.PlainDate(...cJdToCivil(jd));
+function rtValidJdP(jd: number): number {
+  return jd;
 }
 
 /**
@@ -3285,7 +3429,7 @@ function rtValidJdP(jd: number): Temporal.PlainDate {
  * `c_valid_ordinal_p` (`date_core.c:747-768`), which answers `nil` rather than
  * raising so its caller can fall through to the next kind of date.
  */
-function rtValidOrdinalP(y: number, d: number): Temporal.PlainDate | null {
+function rtValidOrdinalP(y: number, d: number): number | null {
   return cValidOrdinalP(y, d);
 }
 
@@ -3294,7 +3438,7 @@ function rtValidOrdinalP(y: number, d: number): Temporal.PlainDate | null {
  * `c_valid_civil_p` (`date_core.c:766-790`), which answers `nil` rather than
  * raising so its caller can fall through to the next kind of date.
  */
-function rtValidCivilP(y: number, m: number, d: number): Temporal.PlainDate | null {
+function rtValidCivilP(y: number, m: number, d: number): number | null {
   return cValidCivilP(y, m, d);
 }
 
@@ -3322,7 +3466,7 @@ function rtValidCivilP(y: number, m: number, d: number): Temporal.PlainDate | nu
  * `Temporal.PlainDate` substrate carries no reform, so the parameter is gone
  * and each arm answers the date itself rather than a Julian day.
  */
-function rtValidDateFragsP(parts: DateParts): Temporal.PlainDate | null {
+function rtValidDateFragsP(parts: DateParts): number | null {
   if (parts.jd !== undefined) {
     const d = rtValidJdP(parts.jd);
     if (d !== null) return d;
@@ -3384,7 +3528,7 @@ function rtValidDateFragsP(parts: DateParts): Temporal.PlainDate | null {
  * {@link rtRewriteFrags} and {@link completeFrags}.
  */
 export function dNewByFrags(hash: DateParts | null): Date {
-  let jd: Temporal.PlainDate | null;
+  let jd: number | null;
 
   if (hash === null) throw new DateError("invalid date");
 
@@ -3407,7 +3551,7 @@ export function dNewByFrags(hash: DateParts | null): Date {
   }
 
   if (jd === null) throw new DateError("invalid date");
-  return new Date(jd);
+  return new Date(plainDateFromJd(jd));
 }
 
 /**
@@ -3456,7 +3600,7 @@ function of2str(of: number): string {
  * falls out of the representation rather than being normalized here.
  */
 export function dtNewByFrags(hash: DateParts | null): DateTime {
-  let jd: Temporal.PlainDate | null;
+  let jd: number | null;
 
   if (hash === null) throw new DateError("invalid date");
 
@@ -3504,7 +3648,7 @@ export function dtNewByFrags(hash: DateParts | null): DateTime {
   let of = to == null ? 0 : to instanceof Rational ? to.toI() : Math.trunc(to);
   if (of < -DAY_IN_SECONDS || of > DAY_IN_SECONDS) of = 0;
 
-  return new DateTime(jdLocalToUtc(jd, df, of), dfLocalToUtc(df, of), sf, of);
+  return new DateTime(jdLocalToUtc(plainDateFromJd(jd), df, of), dfLocalToUtc(df, of), sf, of);
 }
 
 /**
@@ -3623,12 +3767,18 @@ export class Date {
    * The pair exists in C because the two representations disagree across the
    * reform: under `Date::ITALY` the days 1582-10-05..14 do not exist, and a
    * Julian date such as 1500-02-29 is a real day with no proleptic Gregorian
-   * spelling. Nothing trails exposes reaches that arm — reaching it needs both a
-   * pre-1582 date and a non-default `start`, and no AR column, `localize` call
-   * or format helper passes `start` at all — so `Date` is seated on the
-   * proleptic Gregorian `Temporal.PlainDate` and the reform surface
-   * (`Date::ITALY` and friends, `#start`, `#julian?`, `#new_start`) is gone with
-   * it. RFC 0088 `date-state-onto-temporal-plaindate`.
+   * spelling.
+   *
+   * The stored half is the civil date, and the Julian day is derived from it on
+   * read ({@link Date#jd}) through {@link cCivilToJd} under {@link DEFAULT_SG} —
+   * so `wday`, `yday` and `%s` are the reform's readings, not
+   * `Temporal.PlainDate`'s proleptic ones. What the substrate still cannot hold
+   * is the second case above: a Julian-only spelling has no
+   * `Temporal.PlainDate`, so `Date.new(1500, 2, 29)` raises where MRI builds it
+   * (story `date-state-julian-only-spellings-unbuildable`). The `start`
+   * ARGUMENT is what has no bearer — `#start`, `#julian?` and `#new_start` are
+   * absent with it, and every conversion below takes the one `sg` MRI defaults
+   * to. RFC 0088 `date-state-onto-temporal-plaindate`.
    */
   readonly #date: Temporal.PlainDate;
 
@@ -3659,7 +3809,7 @@ export class Date {
     }
     const r = cValidCivilP(year, month, day);
     if (r === null) throw new DateError("invalid date");
-    this.#date = r;
+    this.#date = plainDateFromJd(r);
   }
 
   /**
@@ -3670,7 +3820,7 @@ export class Date {
    * so the conversion happens at the call.
    */
   static jd(jd = 0): Date {
-    return new Date(new Temporal.PlainDate(...cJdToCivil(jd)));
+    return new Date(plainDateFromJd(jd));
   }
 
   /**
@@ -3682,7 +3832,7 @@ export class Date {
   static ordinal(year = -4712, yday = 1): Date {
     const r = cValidOrdinalP(year, yday);
     if (r === null) throw new DateError("invalid date");
-    return new Date(r);
+    return new Date(plainDateFromJd(r));
   }
 
   /**
@@ -3706,7 +3856,7 @@ export class Date {
   static commercial(cwyear = -4712, cweek = 1, cwday = 1): Date {
     const r = cValidCommercialP(cwyear, cweek, cwday);
     if (r === null) throw new DateError("invalid date");
-    return new Date(r);
+    return new Date(plainDateFromJd(r));
   }
 
   /**
@@ -3841,21 +3991,40 @@ export class Date {
   }
 
   /**
-   * `date_core.c` `c_jd_to_wday` (`date_core.c:636-640`), Sunday as `0`, where
-   * `Temporal`'s `dayOfWeek` is ISO — Monday as `1`, Sunday as `7`.
+   * Ruby `Date#jd` (ruby/date, `date_core.c` `d_lite_jd`,
+   * `date_core.c:5248-5253`, over `m_real_local_jd` → `m_local_jd`,
+   * `date_core.c:1486-1497`), the astronomical Julian day the date names. This
+   * is the LOCAL day — `m_jd` (`date_core.c:1459-1469`) is the UTC one
+   * `m_real_jd` and `tmx_m_secs` read, and the two part company on a
+   * `DateTime` with an offset. It is
+   * the calendar-neutral reading every field below is derived from, which is
+   * why they agree with MRI at and before the calendar reform where
+   * `Temporal.PlainDate`'s own proleptic Gregorian readers do not.
+   */
+  get jd(): number {
+    return cCivilToJd(this.#date.year, this.#date.month, this.#date.day);
+  }
+
+  /**
+   * Ruby `Date#wday` (ruby/date, `date_core.c` `d_lite_wday` over `m_wday`,
+   * `date_core.c:1858-1866`), Sunday as `0`. `m_wday` is `c_jd_to_wday` over
+   * the local Julian day, NOT a reading of the civil date: 0001-01-01 is a
+   * Saturday under `Date::ITALY` and a Monday read proleptically.
    */
   get wday(): number {
-    return this.#date.dayOfWeek % 7;
+    return cJdToWday(this.jd);
   }
 
   /**
    * Ruby `Date#yday` (ruby/date, `date_core.c` `d_lite_yday` over `m_yday`,
-   * `date_core.c:1824-1839`). `m_yday`'s three arms — the Gregorian table, the
-   * Julian table, and `c_jd_to_ordinal` for the reform window — collapse to one
-   * on a proleptic Gregorian substrate.
+   * `date_core.c:1824-1839`). `m_yday`'s Gregorian and Julian day-number tables
+   * are the fast paths its `c_jd_to_ordinal` arm short-circuits; that arm is
+   * the whole of it here, and it is what makes 1500-03-01 the 61st day of the
+   * year, as the Julian leap day before it makes it in MRI.
    */
   get yday(): number {
-    return this.#date.dayOfYear;
+    const [, rd] = cJdToOrdinal(this.jd);
+    return rd;
   }
 
   /** Ruby `Date#to_s` (ruby/date, `date_core.c` `d_lite_to_s`). */
@@ -4070,7 +4239,7 @@ export class DateTime extends Date {
       fr2 = fr2 instanceof Rational ? fr2.add(DAY_IN_SECONDS) : fr2 + DAY_IN_SECONDS;
     }
     const localDf = timeToDf(rh, rmin, rs);
-    let date = jdLocalToUtc(rjd, localDf, rof);
+    let date = jdLocalToUtc(plainDateFromJd(rjd), localDf, rof);
     let df = dfLocalToUtc(localDf, rof);
     df += fr2 instanceof Rational ? fr2.div(1) : Math.floor(fr2);
     if (df >= DAY_IN_SECONDS) {
@@ -4159,12 +4328,14 @@ export class DateTime extends Date {
     return this.#getCCivil().day;
   }
 
-  override get wday(): number {
-    return this.#getCCivil().dayOfWeek % 7;
-  }
-
-  override get yday(): number {
-    return this.#getCCivil().dayOfYear;
+  /**
+   * Ruby `DateTime#jd` reads the LOCAL day, not the stored UTC one
+   * (`m_local_jd`, `date_core.c:1486-1497`), which is the day `wday` and `yday`
+   * are then `c_jd_to_wday` / `c_jd_to_ordinal` over.
+   */
+  override get jd(): number {
+    const local = this.#mLocalJd();
+    return cCivilToJd(local.year, local.month, local.day);
   }
 
   /** Ruby `DateTime#hour` (ruby/date, `date_core.c` `d_lite_hour` over `m_hour`, `date_core.c:1919-1932`). */

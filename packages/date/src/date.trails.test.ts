@@ -757,18 +757,90 @@ describe("Date", () => {
     expect(dt.strftime("%Ez")).toBe("%Ez");
   });
 
+  it("accepts and ignores the E and O locale extensions, as date_strftime does", () => {
+    // Every expectation is `ruby 3.3.11 -rdate`'s.
+    const dt = new RubyDateTime(2008, 3, 1, 6, 7, 8.5);
+    expect(dt.strftime("%Oy")).toBe("08");
+    expect(dt.strftime("%Ey")).toBe("08");
+    expect(dt.strftime("%OV")).toBe("09");
+    expect(dt.strftime("%OH")).toBe("06");
+    expect(dt.strftime("%EX")).toBe("06:07:08");
+    expect(dt.strftime("%Ec")).toBe("Sat Mar  1 06:07:08 2008");
+    // Each whitelist is load-bearing in both directions: `z` is in neither, and
+    // `y` is in `O`'s but `V` is not in `E`'s.
+    expect(dt.strftime("%Oz")).toBe("%Oz");
+    expect(dt.strftime("%Ez")).toBe("%Ez");
+    expect(dt.strftime("%EV")).toBe("%EV");
+    expect(dt.strftime("%E")).toBe("%E");
+    expect(dt.strftime("%O")).toBe("%O");
+    // `FLAG_FOUND` reads the LOCALE_E/LOCALE_O bits, so a width behind the
+    // extension is unknown — and a width in front of it never reaches the
+    // whitelist at all.
+    expect(dt.strftime("%E3y")).toBe("%E3y");
+    expect(dt.strftime("%O3S")).toBe("%O3S");
+  });
+
   it("resolves the ordinal and week-date arms", () => {
     expect(RubyDate.parse("2008070").strftime("%Y-%m-%d")).toBe("2008-03-10");
     expect(RubyDate.parse("2001-W05-6").strftime("%Y-%m-%d")).toBe("2001-02-03");
   });
 
+  it("reads wday, yday and the epoch off the Julian day, as m_wday and tmx_m_secs do", () => {
+    // Every expectation is `ruby 3.3.11 -rdate`'s. `Date.new` / `DateTime.new`
+    // default to `Date::ITALY`, so a date at or before the reform is a Julian
+    // one and runs days apart from the proleptic Gregorian reading
+    // `Temporal.PlainDate` answers — two days at year 1, eleven at -1234.
+    expect(new RubyDateTime(1, 1, 1).strftime("%A|%a|%u|%w|%s")).toBe(
+      "Saturday|Sat|6|6|-62135769600",
+    );
+    expect(new RubyDateTime(-1, 3, 1).strftime("%A|%a|%u|%w|%s")).toBe(
+      "Saturday|Sat|6|6|-62193830400",
+    );
+    expect(new RubyDateTime(-1234, 3, 1).strftime("%A|%a|%u|%w|%s")).toBe(
+      "Friday|Fri|5|5|-101104329600",
+    );
+    // The Julian leap day the Gregorian calendar does not have: 1500 is a leap
+    // year under `Date::ITALY`, so 1 March is the 61st day of it.
+    expect(new RubyDate(1500, 3, 1).yday).toBe(61);
+    expect(new RubyDate(1500, 3, 1).wday).toBe(0);
+    expect(new RubyDate(1500, 3, 1).jd).toBe(2268993);
+    // Post-reform is byte-identical to the proleptic reading.
+    expect(new RubyDateTime(2008, 3, 1, 6, 7, 8).strftime("%A|%a|%u|%w|%s|%j")).toBe(
+      "Saturday|Sat|6|6|1204351628|061",
+    );
+    expect(new RubyDate(1970, 1, 1).jd).toBe(2440588);
+  });
+
   it("names a day off a Julian day, as date_s_jd does", () => {
-    // Every expectation is `ruby 3.3.11 -rdate`'s `Date.jd(jd, Date::GREGORIAN)`
-    // — the proleptic Gregorian reading `Temporal.PlainDate` is seated on.
+    // Every expectation is `ruby 3.3.11 -rdate`'s `Date.jd(jd)` — under the
+    // default `Date::ITALY`, so 2299160 is the Julian 1582-10-04 the reform
+    // deleted ten days after, not the proleptic Gregorian 1582-10-14.
     expect(RubyDate.jd(2440588).toS()).toBe("1970-01-01");
     expect(RubyDate.jd(2299161).toS()).toBe("1582-10-15");
-    expect(RubyDate.jd(2299160).toS()).toBe("1582-10-14");
-    expect(RubyDate.jd(2299160).yday).toBe(287);
+    expect(RubyDate.jd(2299160).toS()).toBe("1582-10-04");
+    expect(RubyDate.jd(2299160).yday).toBe(277);
+  });
+
+  it("reads a Temporal subject's wday and yday off the Julian day too", () => {
+    // `temporalSubject` fills the same `StrftimeSubject` the gem-shaped path
+    // does, so the two must answer one date identically — `Temporal`'s own
+    // `dayOfWeek`/`dayOfYear` are proleptic (1500-03-01 is a Thursday and the
+    // 60th day there, a Sunday and the 61st under `Date::ITALY`), which would
+    // put `%A` days from the `%s` epochSeconds derives from the Julian day.
+    for (const [y, m, d] of [
+      [1, 1, 1],
+      [-1234, 3, 1],
+      [1500, 3, 1],
+      [1582, 10, 4],
+      [1582, 10, 15],
+      [1970, 1, 1],
+      [2008, 3, 1],
+    ]) {
+      expect(strftime(new Temporal.PlainDate(y, m, d), "%A|%u|%w|%s|%j")).toBe(
+        new RubyDate(y, m, d).strftime("%A|%u|%w|%s|%j"),
+      );
+    }
+    expect(strftime(new Temporal.PlainDate(1500, 3, 1), "%A|%j")).toBe("Sunday|061");
   });
 
   it("pads the year to four digits the way date_strftime's %Y does", () => {
@@ -798,13 +870,21 @@ describe("Date", () => {
   };
 
   it("raises Date::Error on a civil date c_valid_civil_p rejects", () => {
-    // Every expectation is `ruby 3.3.11 -rdate`'s `Date.new(y, m, d,
-    // Date::GREGORIAN)` — the proleptic Gregorian reading `Temporal.PlainDate`
-    // is seated on, where 1500 is not a leap year and no day is deleted.
+    // Every expectation is `ruby 3.3.11 -rdate`'s `Date.new(y, m, d)` under the
+    // default `Date::ITALY`, where 1582-10-10 is one of the ten days the reform
+    // deleted. 1500-02-29 is the one MRI accepts and this does not: it is a
+    // real Julian day with no proleptic Gregorian spelling for
+    // `Temporal.PlainDate` to seat (`plainDateFromJd`, date.ts).
     expect(() => new RubyDate(2001, 2, 29)).toThrow(RubyDate.Error);
     expect(civilOrError(1581, 12, 31)).toEqual([1581, 12, 31]);
-    expect(civilOrError(1582, 10, 10)).toEqual([1582, 10, 10]);
+    expect(civilOrError(1582, 10, 10)).toBe("E");
     expect(civilOrError(1500, 2, 29)).toBe("E");
+    // c_find_ldom's scan makes February 1500 twenty-nine days long, as the
+    // Julian calendar has it, so the negative mday counts back from the 29th —
+    // and then hits the same missing seat.
+    expect(civilOrError(1500, 2, -1)).toBe("E");
+    expect(civilOrError(1582, 10, -1)).toEqual([1582, 10, 31]);
+    expect(civilOrError(1900, 2, -1)).toEqual([1900, 2, 28]);
     expect(civilOrError(1900, 2, 29)).toBe("E");
     expect(civilOrError(2000, 2, 29)).toEqual([2000, 2, 29]);
     expect(civilOrError(2100, 2, 29)).toBe("E");
