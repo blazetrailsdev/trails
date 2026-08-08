@@ -1537,12 +1537,12 @@ interface DatabaseStatementsDefaultsHost {
   ): Promise<Record<string, unknown>[]>;
   executeMutation(sql: string, binds?: unknown[], name?: string): Promise<number>;
   selectAll(
-    sql: string,
+    arel: unknown,
     name?: string | null,
     binds?: unknown[],
     opts?: { allowRetry?: boolean; preparable?: boolean | null },
   ): Promise<Result>;
-  selectRows(sql: string, name?: string | null, binds?: unknown[]): Promise<unknown[][]>;
+  selectRows(arel: unknown, name?: string | null, binds?: unknown[]): Promise<unknown[][]>;
   execQuery(
     sql: string,
     name?: string | null,
@@ -1621,11 +1621,23 @@ export const DatabaseStatements = {
   resetTransaction,
   async selectAll(
     this: DatabaseStatementsDefaultsHost,
-    sql: string,
+    arel: unknown,
     name?: string | null,
     binds?: unknown[],
     opts?: { allowRetry?: boolean; preparable?: boolean | null },
   ): Promise<Result> {
+    // Rails: `arel = arel_from_relation(arel)` then `sql, binds, preparable,
+    // allow_retry = to_sql_and_binds(...)` (database_statements.rb:69-71) — a
+    // SQL string passes through both unchanged, an Arel manager compiles here.
+    arel = arelFromRelation(arel);
+    const [sql, compiledBinds, compiledPreparable, compiledAllowRetry] = toSqlAndBinds.call(
+      this as DatabaseStatementsHost,
+      arel,
+      binds ?? [],
+      opts?.preparable ?? null,
+      opts?.allowRetry ?? false,
+    );
+    binds = compiledBinds;
     // Rails: select_all → internal_exec_query → exec_query. Delegating
     // here lets adapters that override execQuery (e.g. PostgreSQLAdapter,
     // which populates columnTypes via its type_map) have their override
@@ -1636,7 +1648,7 @@ export const DatabaseStatements = {
     // threaded through compileWithBinds → _compileSelectSql → opts.preparable.
     // Callers that don't supply opts.preparable fall back to bind presence, which
     // is correct for every shape that carries binds.
-    const preparable = opts?.preparable ?? (binds != null && binds.length > 0);
+    const preparable = compiledPreparable ?? (binds != null && binds.length > 0);
     const prepare = !!((this as { preparedStatements?: boolean }).preparedStatements && preparable);
     try {
       // Rails' select_all runs `internal_exec_query` (the private work method),
@@ -1645,7 +1657,7 @@ export const DatabaseStatements = {
       // it. Route reads through `internalExecQuery` so the cached read path
       // never trips the write-dirtying wrapper on the public `execQuery`.
       return await this.internalExecQuery(sql, name, binds, {
-        allowRetry: opts?.allowRetry ?? false,
+        allowRetry: compiledAllowRetry,
         prepare,
       });
     } catch (e) {
@@ -1662,40 +1674,40 @@ export const DatabaseStatements = {
   // mirroring Rails, where these all funnel through `select_all`.
   async selectOne(
     this: DatabaseStatementsDefaultsHost,
-    sql: string,
+    arel: unknown,
     name?: string | null,
     binds?: unknown[],
   ): Promise<Record<string, unknown> | undefined> {
-    return (await this.selectAll(sql, name, binds)).first();
+    return (await this.selectAll(arel, name, binds)).first();
   },
 
   async selectValue(
     this: DatabaseStatementsDefaultsHost,
-    sql: string,
+    arel: unknown,
     name?: string | null,
     binds?: unknown[],
   ): Promise<unknown> {
-    const rows = await this.selectRows(sql, name, binds);
+    const rows = await this.selectRows(arel, name, binds);
     return rows.length > 0 ? rows[0][0] : undefined;
   },
 
   async selectValues(
     this: DatabaseStatementsDefaultsHost,
-    sql: string,
+    arel: unknown,
     name?: string | null,
     binds?: unknown[],
   ): Promise<unknown[]> {
-    const rows = await this.selectRows(sql, name, binds);
+    const rows = await this.selectRows(arel, name, binds);
     return rows.map((row) => row[0]);
   },
 
   async selectRows(
     this: DatabaseStatementsDefaultsHost,
-    sql: string,
+    arel: unknown,
     name?: string | null,
     binds?: unknown[],
   ): Promise<unknown[][]> {
-    return (await this.selectAll(sql, name, binds)).rows;
+    return (await this.selectAll(arel, name, binds)).rows;
   },
 
   async execQuery(

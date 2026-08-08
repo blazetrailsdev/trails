@@ -555,13 +555,13 @@ export interface AbstractAdapter {
     opts?: { allowRetry?: boolean; preparable?: boolean | null },
   ): Promise<Result>;
   selectOne(
-    sql: string,
+    arel: unknown,
     name?: string | null,
     binds?: unknown[],
   ): Promise<Record<string, unknown> | undefined>;
-  selectValue(sql: string, name?: string | null, binds?: unknown[]): Promise<unknown>;
-  selectValues(sql: string, name?: string | null, binds?: unknown[]): Promise<unknown[]>;
-  selectRows(sql: string, name?: string | null, binds?: unknown[]): Promise<unknown[][]>;
+  selectValue(arel: unknown, name?: string | null, binds?: unknown[]): Promise<unknown>;
+  selectValues(arel: unknown, name?: string | null, binds?: unknown[]): Promise<unknown[]>;
+  selectRows(arel: unknown, name?: string | null, binds?: unknown[]): Promise<unknown[][]>;
   queryValue(sql: string, name?: string | null, binds?: unknown[]): Promise<unknown>;
   queryValues(sql: string, name?: string | null, binds?: unknown[]): Promise<unknown[]>;
   execQuery(
