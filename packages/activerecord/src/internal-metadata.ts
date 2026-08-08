@@ -120,7 +120,6 @@ export class InternalMetadata {
    * Mirrors ActiveRecord::InternalMetadata#enabled?
    * (`internal_metadata.rb:35-36`) — `@pool.db_config.use_metadata_table?`.
    *
-   *
    * Deviation: a `NullPool` answers `NULL_CONFIG`, whose every key is undefined
    * (Rails' `NullConfig#method_missing` returns nil), so Rails would read that
    * arm as disabled. Rails never gets there — its `InternalMetadata` is always
