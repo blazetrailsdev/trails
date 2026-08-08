@@ -7,6 +7,7 @@ import { TimeZone } from "../values/time-zone.js";
 import { Encoding } from "./encoding.js";
 import { asJson } from "../core-ext/object/json.js";
 import { BigDecimal } from "../core-ext/big-decimal/conversions.js";
+import { makeRange } from "../range-ext.js";
 
 /** Rails' `JSONTest::Hashlike` (encoding_test_cases.rb:16-20). */
 class Hashlike {
@@ -76,6 +77,19 @@ describe("TestJSONEncoding", () => {
     // fully-qualified constant path; a JS class carries only its own name.
     expect(ActiveSupportJSON.encode(Hashlike)).toBe('"Hashlike"');
     expect(ActiveSupportJSON.encode(People)).toBe('"People"');
+  });
+
+  it("range", () => {
+    // Rails' RangeTests (encoding_test_cases.rb:86-88).
+    expect(ActiveSupportJSON.encode(makeRange(1, 2))).toBe('"1..2"');
+    expect(ActiveSupportJSON.encode(makeRange(1, 2, true))).toBe('"1...2"');
+    expect(ActiveSupportJSON.encode(makeRange(1.5, 2.5))).toBe('"1.5..2.5"');
+  });
+
+  it("uri", () => {
+    // Rails' URITests (encoding_test_cases.rb:112). `URL#toString` normalizes
+    // an empty path to "/", where Ruby's `URI#to_s` echoes the input back.
+    expect(ActiveSupportJSON.encode(new URL("http://example.com"))).toBe('"http://example.com/"');
   });
 
   it("hash encoding", () => {

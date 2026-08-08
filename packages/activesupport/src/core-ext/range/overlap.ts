@@ -1,4 +1,4 @@
-import type { Range } from "../../range-ext.js";
+import { isRange, type Range } from "../../range-ext.js";
 
 /**
  * `Range#overlap?` / `#overlaps?` (core_ext/range/overlap.rb:8,39), which Ruby
@@ -18,15 +18,6 @@ const toNum = <T extends number | Date>(v: T): number => (v instanceof Date ? v.
 function eq<T extends number | Date>(b: T | null, e: T | null): boolean {
   if (b === null || e === null) return b === e;
   return toNum(b) === toNum(e);
-}
-
-/**
- * Ruby's `value.is_a?(::Range)` (overlap.rb:9). trails' `Range` is a plain
- * object, so the type test is structural, as in `compare-range.ts`.
- */
-function isRange<T extends number | Date>(value: Range<T>): boolean {
-  // boundary: Date endpoints, as in range-ext.ts
-  return typeof value === "object" && value !== null && !(value instanceof Date);
 }
 
 /** Ruby's private `Range#_empty_range?` (overlap.rb:31). */

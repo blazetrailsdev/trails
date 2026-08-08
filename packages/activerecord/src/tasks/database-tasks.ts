@@ -457,7 +457,7 @@ export class DatabaseTasks {
     };
 
     try {
-      const pool = await this.migrationConnectionPool();
+      const pool = this.migrationConnectionPool();
       if (!skipInitialize) await initializeDatabase(pool.dbConfig);
       await runMigration(await pool.leaseConnection(), pool.dbConfig);
     } finally {
@@ -490,7 +490,7 @@ export class DatabaseTasks {
    */
   static async runMigration(direction: "up" | "down", version: number | string): Promise<void> {
     this.checkTargetVersion(version);
-    const pool = await this.migrationConnectionPool();
+    const pool = this.migrationConnectionPool();
     const adapter = await pool.leaseConnection();
     const context = await this._migrationContextFor(adapter, pool.dbConfig);
     await context.run(direction, version);
@@ -501,7 +501,7 @@ export class DatabaseTasks {
     direction: "rollback" | "forward",
     steps: number,
   ): Promise<void> {
-    const pool = await this.migrationConnectionPool();
+    const pool = this.migrationConnectionPool();
     const adapter = await pool.leaseConnection();
     const dbConfig = pool.dbConfig;
     const context = await this._migrationContextFor(adapter, dbConfig);
@@ -1127,7 +1127,7 @@ export class DatabaseTasks {
    * (called by `rails db:version`).
    */
   static async currentVersion(): Promise<number> {
-    const pool = await this.migrationConnectionPool();
+    const pool = this.migrationConnectionPool();
     const adapter = await pool.leaseConnection();
     const migrator = await this._migratorFor(adapter, pool.dbConfig);
     return migrator.currentVersionReadOnly();
@@ -1351,24 +1351,29 @@ export class DatabaseTasks {
     setModuleBase(base);
   }
 
-  static migrationConnection():
-    | import("../connection-adapters/abstract-adapter.js").AbstractAdapter
-    | null {
-    if (!this._baseClass) return null;
-    try {
-      // The Rails-named `leaseConnection` is now async (it awaits per-checkout
-      // `verifyBang` — see ConnectionPool#checkout). This sync accessor uses the
-      // `leaseConnectionSync` escape hatch, which resolves a pinned connection /
-      // establishes a first lease without the async verify.
-      return this._baseClass.connectionPool().leaseConnectionSync();
-    } catch (error) {
-      if (error instanceof ConnectionNotDefined) return null;
-      throw error;
-    }
+  /**
+   * Mirrors `DatabaseTasks.migration_connection` (database_tasks.rb:533-535) —
+   * a bare delegation. `lease_connection` raises `ConnectionNotDefined` when
+   * nothing is established rather than answering nil, and no caller guards it,
+   * so neither does this.
+   *
+   * `migrationClass()` is the async spelling (it dynamic-imports base.js to
+   * stay out of the import cycle); `_baseClass` is the same constant, wired at
+   * base.ts module init by `_registerBase`, which is what this sync reader can
+   * name — as Ruby names `ActiveRecord::Base` directly.
+   *
+   * The Rails-named `leaseConnection` is async (it awaits per-checkout
+   * `verifyBang` — see ConnectionPool#checkout), so this sync reader uses the
+   * `leaseConnectionSync` escape hatch, which resolves a pinned connection /
+   * establishes a first lease without the async verify.
+   */
+  static migrationConnection(): import("../connection-adapters/abstract-adapter.js").AbstractAdapter {
+    return this._baseClass!.connectionPool().leaseConnectionSync();
   }
 
-  static async migrationConnectionPool(): Promise<ConnectionPool> {
-    return (await this.migrationClass()).connectionPool();
+  /** Mirrors `DatabaseTasks.migration_connection_pool` (database_tasks.rb:537-539). */
+  static migrationConnectionPool(): ConnectionPool {
+    return this._baseClass!.connectionPool();
   }
 
   static async schemaUpToDate(

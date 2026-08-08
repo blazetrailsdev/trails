@@ -27,8 +27,15 @@ function toFsDb(value: unknown): string {
   return String(value);
 }
 
-/** Ruby's `Range#to_s` (the `to_fs` fallback at conversions.rb:55). */
-function toS<T>(range: Range<T>): string {
+/**
+ * Ruby's `Range#to_s` (the `to_fs` fallback at conversions.rb:55).
+ *
+ * @noRailsEquivalent PERMANENT — `Range#to_s` is core Ruby, not a Rails
+ * reopening, so no Rails file declares it; it is exported from here, the Rails
+ * file whose `to_fs` falls back to it, rather than copied into
+ * `core-ext/object/json.ts` for `Range#as_json`.
+ */
+export function toS<T>(range: Range<T>): string {
   const begin = range.begin !== null ? String(range.begin) : "";
   const end = range.end !== null ? String(range.end) : "";
   return `${begin}${range.excludeEnd ? "..." : ".."}${end}`;

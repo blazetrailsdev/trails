@@ -22,7 +22,8 @@ import { HashConfig } from "../database-configurations/hash-config.js";
 /**
  * Checks a second `PostgreSQLAdapter` out of a pool for the given URL, calls
  * `fn` with it, then checks it back in and disconnects the pool on the way out
- * (success or failure).
+ * (success or failure). `pool.disconnect` awaits each connection's drain, so
+ * the second backend is fully closed by the time this returns.
  */
 export async function withSecondAdapter<T>(
   url: string,
@@ -47,12 +48,6 @@ export async function withSecondAdapter<T>(
       return await fn(adapter);
     } finally {
       pool.checkin(adapter as unknown as DatabaseAdapter);
-      // Closed explicitly, and awaited, before the pool is torn down: callers
-      // like `translate no connection exception to not established` terminate
-      // the FIRST adapter's backend from here, and only a fully-drained second
-      // connection guarantees that termination has landed on it by the time the
-      // block returns.
-      await adapter.close().catch(() => {});
     }
   } finally {
     await pool.disconnect(false).catch(() => {});

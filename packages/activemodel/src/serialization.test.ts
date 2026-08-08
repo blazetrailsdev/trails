@@ -813,7 +813,7 @@ describe("Serialization", () => {
 
   it("toJson returns valid JSON string", () => {
     const p = new Post({ title: "Hello", body: "World", rating: 5 });
-    const parsed = JSON.parse(p.toJSON() as string);
+    const parsed = JSON.parse(p.toJSON());
     expect(parsed.title).toBe("Hello");
     expect(parsed.rating).toBe(5);
   });
