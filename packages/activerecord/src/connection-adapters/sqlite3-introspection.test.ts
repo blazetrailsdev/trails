@@ -3,34 +3,18 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { SQLite3Adapter } from "./sqlite3-adapter.js";
-import { BetterSQLite3Adapter } from "./better-sqlite3-adapter.js";
-import { ConnectionPool } from "./abstract/connection-pool.js";
-import { PoolConfig } from "./pool-config.js";
-import { ConnectionDescriptor } from "./abstract/connection-descriptor.js";
-import { HashConfig } from "../database-configurations/hash-config.js";
-import type { AbstractAdapter as DatabaseAdapter } from "./abstract-adapter.js";
+import { newSqlitePool } from "../support/pooled-sqlite-adapter.js";
+import type { ConnectionPool } from "./abstract/connection-pool.js";
 
 describe("SQLite3Adapter schema introspection", () => {
   let adapter: SQLite3Adapter;
   let pool: ConnectionPool;
   let tmpDir: string;
 
-  // Checked out of a real pool, not constructed bare: `removeColumn` rebuilds
-  // the table and ends in `clear_query_cache`, whose `pool.clear_query_cache`
-  // (query_cache.rb:232-234) is an unchecked send that a NullPool adapter
-  // cannot answer.
   beforeEach(async () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-sqlite-introspect-"));
     const file = path.join(tmpDir, "db.sqlite3");
-    pool = new ConnectionPool(
-      new PoolConfig(
-        new ConnectionDescriptor("primary"),
-        new HashConfig("test", "primary", { adapter: "sqlite3", database: file }),
-        "writing",
-        "default",
-        { adapterFactory: () => new BetterSQLite3Adapter(file) as unknown as DatabaseAdapter },
-      ),
-    );
+    pool = newSqlitePool(file);
     adapter = (await pool.checkout()) as unknown as SQLite3Adapter;
   });
 

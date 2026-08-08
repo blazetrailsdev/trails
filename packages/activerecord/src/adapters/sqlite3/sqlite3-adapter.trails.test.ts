@@ -1,37 +1,21 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "../../connection-adapters/better-sqlite3-adapter.js";
-import { ConnectionPool } from "../../connection-adapters/abstract/connection-pool.js";
-import { PoolConfig } from "../../connection-adapters/pool-config.js";
-import { ConnectionDescriptor } from "../../connection-adapters/abstract/connection-descriptor.js";
-import { HashConfig } from "../../database-configurations/hash-config.js";
-import type { AbstractAdapter as DatabaseAdapter } from "../../connection-adapters/abstract-adapter.js";
+import { newSqlitePool } from "../../support/pooled-sqlite-adapter.js";
+import type { ConnectionPool } from "../../connection-adapters/abstract/connection-pool.js";
 import { isInMemoryDatabase } from "../../sqlite/sqlite-uri.js";
 
 describe("SqliteAdapter", () => {
   let adapter: SQLite3Adapter;
   let pool: ConnectionPool;
 
-  // Checked out of a real pool, not constructed bare: `removeColumn` rebuilds
-  // the table and ends in `clear_query_cache`, whose `pool.clear_query_cache`
-  // (query_cache.rb:232-234) is an unchecked send that a NullPool adapter
-  // cannot answer.
   beforeEach(async () => {
-    pool = new ConnectionPool(
-      new PoolConfig(
-        new ConnectionDescriptor("primary"),
-        new HashConfig("test", "primary", { adapter: "sqlite3", database: ":memory:" }),
-        "writing",
-        "default",
-        {
-          adapterFactory: () => new BetterSQLite3Adapter(":memory:") as unknown as DatabaseAdapter,
-        },
-      ),
-    );
+    pool = newSqlitePool();
     adapter = (await pool.checkout()) as unknown as SQLite3Adapter;
   });
 
   afterEach(async () => {
+    await adapter.exec(`DROP TABLE IF EXISTS "affinities"`);
     await pool.disconnect();
   });
 
@@ -52,8 +36,6 @@ describe("SqliteAdapter", () => {
       expect(columns.find((c) => c.name === "untyped")?.sqlType).toBe("");
       const rows = await adapter.selectAll(`SELECT typeof("untyped") AS t FROM "affinities"`);
       expect(rows.rows[0]?.[0]).toBe("integer");
-
-      await adapter.dropTable("affinities");
     });
   });
 

@@ -3,6 +3,7 @@ import "../sqlite/better-sqlite3.js";
 import { BetterSQLite3Adapter } from "../connection-adapters/better-sqlite3-adapter.js";
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
 import { loadCanonicalSchema } from "./canonical-schema.js";
+import { newSqlitePool } from "./pooled-sqlite-adapter.js";
 import type { FkSafeDropPlanHost } from "./canonical-table-rebuild.js";
 import {
   bulkInboundFkHost,
@@ -29,7 +30,8 @@ async function dumpSchema(adapter: AbstractAdapter): Promise<string> {
 
 describe("rebuildCanonicalTables", () => {
   test("drops + recreates a named subset to its canonical shape", async () => {
-    const adapter = new BetterSQLite3Adapter(":memory:") as unknown as AbstractAdapter;
+    const pool = newSqlitePool();
+    const adapter = (await pool.checkout()) as unknown as AbstractAdapter;
     try {
       await loadCanonicalSchema(adapter);
       const canonical = await dumpSchema(adapter);
@@ -43,12 +45,13 @@ describe("rebuildCanonicalTables", () => {
       await rebuildCanonicalTables(adapter, ["topics"]);
       expect(await dumpSchema(adapter)).toBe(canonical);
     } finally {
-      await (adapter as unknown as BetterSQLite3Adapter).close();
+      await pool.disconnect();
     }
   });
 
   test("rebuilds a referencing table when only its target was named", async () => {
-    const adapter = new BetterSQLite3Adapter(":memory:") as unknown as AbstractAdapter;
+    const pool = newSqlitePool();
+    const adapter = (await pool.checkout()) as unknown as AbstractAdapter;
     try {
       await loadCanonicalSchema(adapter);
       const canonical = await dumpSchema(adapter);
@@ -60,12 +63,13 @@ describe("rebuildCanonicalTables", () => {
       expect(dump).toBe(canonical);
       expect(dump).toContain('CONSTRAINT "fk_name" FOREIGN KEY ("fk_id")');
     } finally {
-      await (adapter as unknown as BetterSQLite3Adapter).close();
+      await pool.disconnect();
     }
   });
 
   test("drops a foreign key reaching in from a table it is not rebuilding", async () => {
-    const adapter = new BetterSQLite3Adapter(":memory:") as unknown as AbstractAdapter;
+    const pool = newSqlitePool();
+    const adapter = (await pool.checkout()) as unknown as AbstractAdapter;
     const sqlite = adapter as unknown as BetterSQLite3Adapter;
     try {
       await loadCanonicalSchema(adapter);
@@ -82,19 +86,20 @@ describe("rebuildCanonicalTables", () => {
       expect(await sqlite.foreignKeys("lessons_students")).toEqual([]);
       expect(await dumpSchema(adapter)).toBe(canonical);
     } finally {
-      await sqlite.close();
+      await pool.disconnect();
     }
   });
 
   test("throws on an unknown canonical table name", async () => {
-    const adapter = new BetterSQLite3Adapter(":memory:") as unknown as AbstractAdapter;
+    const pool = newSqlitePool();
+    const adapter = (await pool.checkout()) as unknown as AbstractAdapter;
     try {
       await loadCanonicalSchema(adapter);
       await expect(rebuildCanonicalTables(adapter, ["topics", "not_a_real_table"])).rejects.toThrow(
         /unknown canonical table\(s\): not_a_real_table/,
       );
     } finally {
-      await (adapter as unknown as BetterSQLite3Adapter).close();
+      await pool.disconnect();
     }
   });
 });
@@ -301,7 +306,8 @@ async function tableNames(adapter: AbstractAdapter): Promise<Set<string>> {
 
 describe("ensureCanonicalTables", () => {
   test("creates only the missing named tables, restoring canonical shape", async () => {
-    const adapter = new BetterSQLite3Adapter(":memory:") as unknown as AbstractAdapter;
+    const pool = newSqlitePool();
+    const adapter = (await pool.checkout()) as unknown as AbstractAdapter;
     try {
       await loadCanonicalSchema(adapter);
       const canonical = await dumpSchema(adapter);
@@ -315,12 +321,13 @@ describe("ensureCanonicalTables", () => {
       expect(await tableNames(adapter)).toContain("topics");
       expect(await dumpSchema(adapter)).toBe(canonical);
     } finally {
-      await (adapter as unknown as BetterSQLite3Adapter).close();
+      await pool.disconnect();
     }
   });
 
   test("is a no-op when every named table already exists", async () => {
-    const adapter = new BetterSQLite3Adapter(":memory:") as unknown as AbstractAdapter;
+    const pool = newSqlitePool();
+    const adapter = (await pool.checkout()) as unknown as AbstractAdapter;
     try {
       await loadCanonicalSchema(adapter);
       // A drifted `topics` must survive: ensure creates nothing (all present)
@@ -332,19 +339,20 @@ describe("ensureCanonicalTables", () => {
       await ensureCanonicalTables(adapter, ["topics", "authors"]);
       expect(await dumpSchema(adapter)).toBe(drifted);
     } finally {
-      await (adapter as unknown as BetterSQLite3Adapter).close();
+      await pool.disconnect();
     }
   });
 
   test("throws on an unknown canonical table name", async () => {
-    const adapter = new BetterSQLite3Adapter(":memory:") as unknown as AbstractAdapter;
+    const pool = newSqlitePool();
+    const adapter = (await pool.checkout()) as unknown as AbstractAdapter;
     try {
       await loadCanonicalSchema(adapter);
       await expect(ensureCanonicalTables(adapter, ["topics", "not_a_real_table"])).rejects.toThrow(
         /unknown canonical table\(s\): not_a_real_table/,
       );
     } finally {
-      await (adapter as unknown as BetterSQLite3Adapter).close();
+      await pool.disconnect();
     }
   });
 });

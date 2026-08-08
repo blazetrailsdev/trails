@@ -14,28 +14,14 @@ import type {
   SyncSqliteStatement,
 } from "../../sqlite-adapter.js";
 import { assertLogged } from "./test-helper.js";
-import { ConnectionPool } from "../../connection-adapters/abstract/connection-pool.js";
-import { PoolConfig } from "../../connection-adapters/pool-config.js";
-import { ConnectionDescriptor } from "../../connection-adapters/abstract/connection-descriptor.js";
-import { HashConfig } from "../../database-configurations/hash-config.js";
-import type { AbstractAdapter as DatabaseAdapter } from "../../connection-adapters/abstract-adapter.js";
+import { newSqlitePool } from "../../support/pooled-sqlite-adapter.js";
+import type { ConnectionPool } from "../../connection-adapters/abstract/connection-pool.js";
 
 let adapter: SQLite3Adapter;
 let pool: ConnectionPool;
 
-// Checked out of a real pool, not constructed bare: the alter_table rebuild
-// ends in `clear_query_cache`, whose `pool.clear_query_cache`
-// (query_cache.rb:232-234) is an unchecked send a NullPool cannot answer.
 beforeEach(async () => {
-  pool = new ConnectionPool(
-    new PoolConfig(
-      new ConnectionDescriptor("primary"),
-      new HashConfig("test", "primary", { adapter: "sqlite3", database: ":memory:" }),
-      "writing",
-      "default",
-      { adapterFactory: () => new BetterSQLite3Adapter(":memory:") as unknown as DatabaseAdapter },
-    ),
-  );
+  pool = newSqlitePool();
   adapter = (await pool.checkout()) as unknown as SQLite3Adapter;
 });
 

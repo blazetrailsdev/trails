@@ -1,34 +1,15 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import type { SQLite3Adapter } from "./sqlite3-adapter.js";
-import { BetterSQLite3Adapter } from "./better-sqlite3-adapter.js";
 import { Base } from "../base.js";
-import { ConnectionPool } from "./abstract/connection-pool.js";
-import { PoolConfig } from "./pool-config.js";
-import { ConnectionDescriptor } from "./abstract/connection-descriptor.js";
-import { HashConfig } from "../database-configurations/hash-config.js";
-import type { AbstractAdapter as DatabaseAdapter } from "./abstract-adapter.js";
-
-// Checked out of a real pool, not constructed bare: the alter_table rebuild
-// ends in `clear_query_cache`, whose `pool.clear_query_cache`
-// (query_cache.rb:232-234) is an unchecked send a NullPool cannot answer.
-function newPool(): ConnectionPool {
-  return new ConnectionPool(
-    new PoolConfig(
-      new ConnectionDescriptor("primary"),
-      new HashConfig("test", "primary", { adapter: "sqlite3", database: ":memory:" }),
-      "writing",
-      "default",
-      { adapterFactory: () => new BetterSQLite3Adapter(":memory:") as unknown as DatabaseAdapter },
-    ),
-  );
-}
+import { newSqlitePool } from "../support/pooled-sqlite-adapter.js";
+import type { ConnectionPool } from "./abstract/connection-pool.js";
 
 describe("SQLite3Adapter addForeignKey under a table name prefix/suffix", () => {
   let adapter: SQLite3Adapter;
   let pool: ConnectionPool;
 
   beforeEach(async () => {
-    pool = newPool();
+    pool = newSqlitePool();
     adapter = (await pool.checkout()) as unknown as SQLite3Adapter;
     Base.tableNamePrefix = "p_";
     Base.tableNameSuffix = "_s";
@@ -69,7 +50,7 @@ describe("SQLite3Adapter alterTable under a table name prefix/suffix", () => {
   let pool: ConnectionPool;
 
   beforeEach(async () => {
-    pool = newPool();
+    pool = newSqlitePool();
     adapter = (await pool.checkout()) as unknown as SQLite3Adapter;
     Base.tableNamePrefix = "p_";
     Base.tableNameSuffix = "_s";
