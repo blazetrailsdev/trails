@@ -152,7 +152,6 @@ const sqliteAdapter: DbTemplateAdapter = {
     await buildTemplateSchema(adapter, runToken, async () => {
       pool.releaseConnection();
       await pool.disconnectBang();
-      await (adapter as unknown as { close(): void | Promise<void> }).close();
     });
 
     process.env[TEMPLATE_PATH_ENV] = templatePath;
