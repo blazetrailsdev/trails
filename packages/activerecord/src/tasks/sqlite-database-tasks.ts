@@ -146,14 +146,13 @@ export class SQLiteDatabaseTasks {
 
     const flags = extraFlags != null ? (Array.isArray(extraFlags) ? extraFlags : [extraFlags]) : [];
     // Rails' backtick form redirects the dump file into sqlite3's stdin
-    // (`sqlite3 #{flags} #{database} < "#{filename}"`). The child-process
-    // adapter has no shell, so the same bytes go in through `input`.
+    // (`sqlite3 #{flags} #{database} < "#{filename}"`) and does NOT check the
+    // child's exit status. The child-process adapter has no shell, so the
+    // redirect is expressed as the `in` option — the child reads the file
+    // descriptor, so the dump's bytes reach it verbatim.
     const childProcess = await getChildProcessAsync();
     const args = [...flags, this.dbConfig.database as string];
-    childProcess.spawnSync("sqlite3", args, {
-      encoding: "utf8",
-      input: getFs().readFileSync(filename, "utf8"),
-    });
+    childProcess.spawnSync("sqlite3", args, { encoding: "utf8", in: filename });
   }
 
   /**

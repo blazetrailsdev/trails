@@ -125,20 +125,24 @@ export class SchemaMigration {
     );
   }
 
-  // Rails: connection.insert(im, "...", primary_key, version) — returns the
+  // Rails: connection.insert(im, "...", primary_key, version) — answers the
   // supplied id value, i.e. the version (schema_migration.rb:19-25).
   async createVersion(version: string): Promise<string> {
     const im = new InsertManager(this.arelTable);
     im.insert([[this.arelTable.get(this.primaryKey), version]]);
-    await this._withConnection((connection) => connection.execute(connection.toSql(im)));
-    return version;
+    return (await this._withConnection((connection) =>
+      connection.insert(im, `${this.constructor.name} Create`, this.primaryKey, version),
+    )) as string;
   }
 
+  // Rails: connection.delete(dm, "#{self.class} Destroy") (schema_migration.rb:27-33).
   async deleteVersion(version: string): Promise<void> {
     const dm = new DeleteManager();
     dm.from(this.arelTable);
     dm.where(this.arelTable.get(this.primaryKey).eq(version));
-    await this._withConnection((connection) => connection.execute(connection.toSql(dm)));
+    await this._withConnection((connection) =>
+      connection.delete(dm, `${this.constructor.name} Destroy`),
+    );
   }
 
   async deleteAllVersions(): Promise<void> {
@@ -156,10 +160,9 @@ export class SchemaMigration {
     const sm = new SelectManager(this.arelTable);
     sm.project(this.arelTable.get(this.primaryKey));
     sm.order(this.arelTable.get(this.primaryKey).asc());
-    const rows = await this._withConnection((connection) =>
-      connection.execute(connection.toSql(sm)),
-    );
-    return rows.map((row) => String(row[this.primaryKey]).trim());
+    return (await this._withConnection((connection) =>
+      connection.selectValues(sm, `${this.constructor.name} Load`),
+    )) as string[];
   }
 
   async allVersions(): Promise<string[]> {
@@ -169,22 +172,15 @@ export class SchemaMigration {
   async count(): Promise<number> {
     const sm = new SelectManager(this.arelTable);
     sm.project(new Nodes.NamedFunction("COUNT", [star]).as("cnt"));
-    const rows = await this._withConnection((connection) =>
-      connection.execute(connection.toSql(sm)),
+    const values = await this._withConnection((connection) =>
+      connection.selectValues(sm, `${this.constructor.name} Count`),
     );
-    return Number(rows[0]?.cnt ?? 0);
+    return Number(values[0] ?? 0);
   }
 
+  // Rails: connection.data_source_exists?(table_name) (schema_migration.rb:100-104).
   async tableExists(): Promise<boolean> {
-    try {
-      const sm = new SelectManager(this.arelTable);
-      sm.project(new Nodes.Quoted(1));
-      sm.take(1);
-      await this._withConnection((connection) => connection.execute(connection.toSql(sm)));
-      return true;
-    } catch {
-      return false;
-    }
+    return await this._withConnection((connection) => connection.dataSourceExists(this.tableName));
   }
 
   static normalizeMigrationNumber(number: string | number): string {

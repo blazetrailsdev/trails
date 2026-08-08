@@ -230,7 +230,10 @@ export class InternalMetadata {
     if (!this.enabled) return;
     const dm = new DeleteManager();
     dm.from(this.arelTable);
-    await this._withConnection((connection) => connection.execute(connection.toSql(dm)));
+    // Rails: connection.delete(dm, "#{self.class} Destroy") (internal_metadata.rb:58-62).
+    await this._withConnection((connection) =>
+      connection.delete(dm, `${this.constructor.name} Destroy`),
+    );
   }
 
   async count(): Promise<number> {
@@ -240,18 +243,19 @@ export class InternalMetadata {
     if (!this.enabled) return 0;
     const sm = new SelectManager(this.arelTable);
     sm.project(new Nodes.NamedFunction("COUNT", [star]).as("cnt"));
-    const rows = await this._withConnection((connection) =>
-      connection.execute(connection.toSql(sm)),
+    // Rails: connection.select_values(sm, "#{self.class} Count").first
+    // (internal_metadata.rb:64-71).
+    const values = await this._withConnection((connection) =>
+      connection.selectValues(sm, `${this.constructor.name} Count`),
     );
-    return Number(rows[0]?.cnt ?? 0);
+    return Number(values[0] ?? 0);
   }
 
   /**
-   * Whether `ar_internal_metadata` exists on the wrapped adapter. Reads the
-   * table directly (SELECT 1) rather than consulting the schema cache, so
-   * the result is fresh after recent DDL.
-   *
    * Mirrors: ActiveRecord::InternalMetadata#table_exists?
+   * (`internal_metadata.rb:108-110`) — `@pool.schema_cache.data_source_exists?`.
+   * Unlike `SchemaMigration#table_exists?` this reads through the pool's schema
+   * cache, not a checked-out connection; Rails has that difference deliberately.
    * @internal
    */
   async tableExists(): Promise<boolean> {
@@ -259,15 +263,15 @@ export class InternalMetadata {
     // accidentally trust it. The physical table may still exist on disk
     // from a previous run; the flag is what drives semantic visibility.
     if (!this.enabled) return false;
-    try {
-      const sm = new SelectManager(this.arelTable);
-      sm.project(new Nodes.Quoted(1));
-      sm.take(1);
-      await this._withConnection((connection) => connection.execute(connection.toSql(sm)));
-      return true;
-    } catch {
-      return false;
-    }
+    // SEAM (delete in migration-collaborator-call-sites-pass-a-pool): a
+    // NullPool-backed adapter has no schema cache to read, so its connection
+    // stands in for one — it answers `dataSourceExists` the same way.
+    const schemaCache =
+      this._fallbackAdapter ??
+      ((this._pool as ConnectionPool).schemaCache as {
+        dataSourceExists(name: string): Promise<boolean | undefined>;
+      });
+    return (await schemaCache.dataSourceExists(this.tableName)) ?? false;
   }
 
   async deleteAll(): Promise<void> {
@@ -294,8 +298,10 @@ export class InternalMetadata {
     sm.where(this.arelTable.get(this.primaryKey).eq(key));
     sm.order(this.arelTable.get(this.primaryKey).asc());
     sm.take(1);
-    const rows = await connection.execute(connection.toSql(sm));
-    return rows[0] ?? null;
+    // Rails: connection.select_all(sm, "#{self.class} Load").first
+    // (internal_metadata.rb:155-160).
+    const result = await connection.selectAll(sm, `${this.constructor.name} Load`);
+    return result.first() ?? null;
   }
 
   private async createEntry(
@@ -303,15 +309,14 @@ export class InternalMetadata {
     key: string,
     value: string,
   ): Promise<void> {
-    const now = this.currentTime(connection);
     const im = new InsertManager(this.arelTable);
     im.insert([
       [this.arelTable.get(this.primaryKey), key],
       [this.arelTable.get(this.valueKey), value],
-      [this.arelTable.get("created_at"), now],
-      [this.arelTable.get("updated_at"), now],
+      [this.arelTable.get("created_at"), this.currentTime(connection)],
+      [this.arelTable.get("updated_at"), this.currentTime(connection)],
     ]);
-    await connection.execute(connection.toSql(im));
+    await connection.insert(im, `${this.constructor.name} Create`, this.primaryKey, key);
   }
 
   private async updateEntry(
@@ -319,14 +324,13 @@ export class InternalMetadata {
     key: string,
     newValue: string,
   ): Promise<void> {
-    const now = this.currentTime(connection);
     const um = new UpdateManager();
     um.table(this.arelTable);
     um.set([
       [this.arelTable.get(this.valueKey), newValue],
-      [this.arelTable.get("updated_at"), now],
+      [this.arelTable.get("updated_at"), this.currentTime(connection)],
     ]);
     um.where(this.arelTable.get(this.primaryKey).eq(key));
-    await connection.execute(connection.toSql(um));
+    await connection.update(um, `${this.constructor.name} Update`);
   }
 }

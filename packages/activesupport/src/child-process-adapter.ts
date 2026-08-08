@@ -26,6 +26,13 @@ export interface SpawnSyncOptions {
    * re-encode) and are not buffered in memory. `stdout` comes back empty.
    */
   out?: string;
+  /**
+   * Path to redirect the child's stdin from, mirroring Ruby's shell `<`
+   * redirect (`cmd < "path"`). The child reads the file descriptor directly,
+   * so the file's bytes reach it untouched (no decode / re-encode) and are not
+   * buffered in memory — the mirror of {@link SpawnSyncOptions.out}.
+   */
+  in?: string;
 }
 
 export interface SpawnSyncResult {
@@ -71,6 +78,7 @@ function wrap(cp: NodeChildProcess): ChildProcessAdapter {
   return {
     spawnSync(cmd, args, options) {
       const outFd = options?.out != null ? getFs().openSync(options.out, "w") : null;
+      const inFd = options?.in != null ? getFs().openSync(options.in, "r") : null;
       let result: NodeSpawnSyncResult;
       try {
         result = cp.spawnSync(cmd, args, {
@@ -81,10 +89,13 @@ function wrap(cp: NodeChildProcess): ChildProcessAdapter {
           env: options?.env ?? ({ ...processEnv } as NodeJS.ProcessEnv),
           encoding: options?.encoding ?? "utf8",
           cwd: options?.cwd,
-          ...(outFd !== null ? { stdio: ["pipe", outFd, "pipe"] } : {}),
+          ...(outFd !== null || inFd !== null
+            ? { stdio: [inFd ?? "pipe", outFd ?? "pipe", "pipe"] }
+            : {}),
         });
       } finally {
         if (outFd !== null) getFs().closeSync(outFd);
+        if (inFd !== null) getFs().closeSync(inFd);
       }
       return {
         status: result.status,
