@@ -159,7 +159,7 @@ export async function checkoutRawTestAdapter(): Promise<DatabaseAdapter> {
     dbConfig,
     "writing",
     "default",
-    { adapterFactory: () => newRawTestAdapter() },
+    { adapterFactory: newRawTestAdapter },
   );
   return new RealConnectionPool(poolConfig).leaseConnection();
 }
