@@ -30,7 +30,12 @@ describe("Migration", () => {
     });
 
     it("send calls super", () => {
-      expect(() => recorder.nonExistingMethod("horses")).toThrow(TypeError);
+      expect(() => recorder.nonExistingMethod("horses")).toThrow(
+        expect.objectContaining({
+          name: "NoMethodError",
+          message: expect.stringContaining("undefined method 'nonExistingMethod'"),
+        }) as unknown as Error,
+      );
     });
 
     it("send delegates to record", () => {
