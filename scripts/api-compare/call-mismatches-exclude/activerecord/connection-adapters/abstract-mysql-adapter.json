@@ -135,13 +135,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
-    "rubyName": "extract_precision",
-    "call": "match?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
     "rubyName": "handle_warnings",
     "call": "call",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -166,13 +159,6 @@
     "rubyName": "handle_warnings",
     "call": "warning_ignored?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
-    "rubyName": "mariadb?",
-    "call": "match?",
-    "reason": "Per-entry verified: Rails abstract_mysql_adapter.rb:92-94 runs `/mariadb/i.match?(full_version)`; trails isMariadb runs the same regex over the same `fullVersion()` reader, spelled `RegExp#test` because TS has no `Regexp#match?`."
   },
   {
     "package": "activerecord",
@@ -214,13 +200,6 @@
     "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
     "rubyName": "recreate_database",
     "call": "reconnect!",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
-    "rubyName": "register_integer_type",
-    "call": "match?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -268,22 +247,8 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
-    "rubyName": "translate_exception",
-    "call": "match?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
     "rubyName": "type_cast",
     "call": "default_timezone",
     "reason": "Rails' MySQL type_cast branches on default_timezone inline (mysql/quoting.rb:100,106); trails' override delegates to mysql/quoting.ts typeCast, which reaches ActiveRecord.defaultTimezone via dispatchQuotedDate to quotedDate to defaultSqlTimezone()."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
-    "rubyName": "write_query?",
-    "call": "match?",
-    "reason": "Include stand-in: `MySQL::DatabaseStatements#write_query?` is ported in the Rails-layout file `connection-adapters/mysql/database-statements.ts` (`isWriteQuery`, which does run `READ_QUERY.test(sql)`); the adapter method is the `include` resolution point and only delegates."
   }
 ]

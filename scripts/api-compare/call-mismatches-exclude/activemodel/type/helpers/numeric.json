@@ -1,9 +1,0 @@
-[
-  {
-    "package": "activemodel",
-    "tsFile": "type/helpers/numeric.ts",
-    "rubyName": "non_numeric_string?",
-    "call": "match?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  }
-]

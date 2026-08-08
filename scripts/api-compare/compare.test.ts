@@ -465,6 +465,30 @@ describe("significantMissingCalls", () => {
       expect(missing).toEqual([]);
     });
 
+    it("does not flag match? when the TS body uses RegExp#test", () => {
+      const missing = significantMissingCalls(
+        "isBigint",
+        ["match?"],
+        new Set(["test"]),
+        () => true,
+        rubyMethodToTs,
+        wide,
+      );
+      expect(missing).toEqual([]);
+    });
+
+    it("still flags match? when the TS body makes no matching call", () => {
+      const missing = significantMissingCalls(
+        "isBigint",
+        ["match?"],
+        new Set(["includes"]),
+        () => true,
+        rubyMethodToTs,
+        wide,
+      );
+      expect(missing).toEqual(["match? → isMatch|match"]);
+    });
+
     it("still flags an enumerable call the TS body makes in no form", () => {
       const missing = significantMissingCalls(
         "check",
@@ -1478,14 +1502,15 @@ describe("selectMisplacedFile", () => {
   });
 
   it("never clusters a bucket registered as a name collision", () => {
-    expect(
-      selectMisplacedFile(
-        hits(["deprecation.ts", 6], ["b.ts", 1]),
-        10,
-        "activesupport:deprecation/deprecators.rb",
-      ),
-    ).toBeNull();
-    expect(NAME_COLLISION_CLUSTERS.has("activesupport:deprecation/deprecators.rb")).toBe(true);
+    for (const bucketKey of NAME_COLLISION_CLUSTERS) {
+      expect(
+        selectMisplacedFile(hits(["deprecation.ts", 6], ["b.ts", 1]), 10, bucketKey),
+      ).toBeNull();
+    }
+    // Only-shrink registry: `activesupport:deprecation/deprecators.rb` left it
+    // when `deprecation/deprecators.ts` landed, so it is now empty.
+    expect(NAME_COLLISION_CLUSTERS.has("activesupport:deprecation/deprecators.rb")).toBe(false);
+    expect(NAME_COLLISION_CLUSTERS.size).toBe(0);
   });
 
   it("leaves an unregistered bucket's cluster alone", () => {

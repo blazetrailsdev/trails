@@ -341,11 +341,84 @@ describe("TimeExtCalculationsTest", () => {
     ).toThrow(ArgumentError);
   });
 
+  // Rails' `Time.local` receiver lands on `change`'s `elsif zone` arm
+  // (time/calculations.rb:173-174), which re-runs `Time.local` with the
+  // receiver's `isdst`. trails' JS-`Date` arm calls `local(...)` with no isdst
+  // equivalent, so a nominal time that occurs twice always resolves to the
+  // first occurrence and the second-occurrence assertions below cannot hold.
+  // Unskips with the `elsif zone` / `isdst` port
+  // (story `time-change-local-and-utc-offset-arms-conflated`).
   it.skip("change preserves offset for local times around end of dst");
-  it.skip("change preserves offset for zoned times around end of dst");
-  it.skip("change preserves fractional seconds on zoned time");
+
+  it("change preserves offset for zoned times around end of dst", () => {
+    // DST ended just before 2005-10-30 2:00:00 AM in US/Eastern, and clocks
+    // were rolled back 1 hour.
+    const midnight = zoned("US/Eastern", 2005, 10, 30, 0, 0, 0); // 2005-10-30 00:00:00 -0400
+    const oneAm1 = zoned("US/Eastern", 2005, 10, 30, 1, 0, 0); // 2005-10-30 01:00:00 -0400
+    const oneAm2 = zoned("US/Eastern", 2005, 10, 30, 2, 0, 0).subtract({ seconds: 3600 }); // -0500
+    const twoAm = zoned("US/Eastern", 2005, 10, 30, 2, 0, 0); // 2005-10-30 02:00:00 -0500
+    expect(Temporal.ZonedDateTime.compare(oneAm1, oneAm2)).toBe(-1);
+
+    expect(change(midnight, { hour: 1 }).equals(oneAm1)).toBe(true);
+    expect(change(midnight, { hour: 2 }).equals(twoAm)).toBe(true);
+
+    expect(change(oneAm1, { hour: 0 }).equals(midnight)).toBe(true);
+    expect(change(oneAm1, { hour: 1 }).equals(oneAm1)).toBe(true);
+    expect(change(oneAm1, { sec: 1 }).equals(oneAm1.add({ seconds: 1 }))).toBe(true);
+    expect(change(oneAm1, { hour: 2 }).equals(twoAm)).toBe(true);
+
+    expect(change(oneAm2, { hour: 0 }).equals(midnight)).toBe(true);
+    expect(change(oneAm2, { hour: 1 }).equals(oneAm2)).toBe(true);
+    expect(change(oneAm2, { sec: 1 }).equals(oneAm2.add({ seconds: 1 }))).toBe(true);
+    expect(change(oneAm2, { hour: 2 }).equals(twoAm)).toBe(true);
+
+    expect(change(twoAm, { hour: 1 }).equals(oneAm2)).toBe(true);
+    expect(change(twoAm, { hour: 0 }).equals(midnight)).toBe(true);
+  });
+
+  it("change preserves fractional seconds on zoned time", () => {
+    const time = zoned("US/Eastern", 2005, 10, 30, 0, 0, 0).add({ milliseconds: 990 });
+    const time2 = change(time, { month: 1 });
+
+    // Rails asserts on `inspect`: "2005-10-30 00:00:00.99 -0400" and
+    // "2005-01-30 00:00:00.99 -0500".
+    expect(time.offset).toBe("-04:00");
+    expect(time.millisecond).toBe(990);
+    expect(time2.offset).toBe("-05:00");
+    expect(time2.millisecond).toBe(990);
+    expect([time2.year, time2.month, time2.day]).toEqual([2005, 1, 30]);
+  });
+
+  // Same `elsif zone` / `isdst` gap as the US/Eastern local-times test above
+  // (story `time-change-local-and-utc-offset-arms-conflated`).
   it.skip("change preserves fractional hour offset for local times around end of dst");
-  it.skip("change preserves fractional hour offset for zoned times around end of dst");
+
+  it("change preserves fractional hour offset for zoned times around end of dst", () => {
+    // DST ended just before 2005-03-27 2:00:00 AM in Australia/Lord_Howe, and
+    // clocks were rolled back 30 minutes.
+    const tz = "Australia/Lord_Howe";
+    const oneAm = zoned(tz, 2005, 3, 27, 1, 0, 0); // 2005-03-27 01:00:00 +1100
+    const one30Am1 = zoned(tz, 2005, 3, 27, 1, 30, 0); // 2005-03-27 01:30:00 +1100
+    const one30Am2 = zoned(tz, 2005, 3, 27, 2, 0, 0).subtract({ seconds: 1800 }); // +1030
+    const twoAm = zoned(tz, 2005, 3, 27, 2, 0, 0); // 2005-03-27 02:00:00 +1030
+    expect(Temporal.ZonedDateTime.compare(one30Am1, one30Am2)).toBe(-1);
+
+    expect(change(oneAm, { min: 30 }).equals(one30Am1)).toBe(true);
+    expect(change(oneAm, { hour: 2 }).equals(twoAm)).toBe(true);
+
+    expect(change(one30Am1, { min: 0 }).equals(oneAm)).toBe(true);
+    expect(change(one30Am1, { min: 30 }).equals(one30Am1)).toBe(true);
+    expect(change(one30Am1, { min: 30, sec: 1 }).equals(one30Am1.add({ seconds: 1 }))).toBe(true);
+    expect(change(one30Am1, { hour: 2 }).equals(twoAm)).toBe(true);
+
+    expect(change(one30Am2, { min: 0 }).equals(oneAm)).toBe(true);
+    expect(change(one30Am2, { min: 30 }).equals(one30Am2)).toBe(true);
+    expect(change(one30Am2, { min: 30, sec: 1 }).equals(one30Am2.add({ seconds: 1 }))).toBe(true);
+    expect(change(one30Am2, { hour: 2 }).equals(twoAm)).toBe(true);
+
+    expect(change(twoAm, { hour: 1, min: 30 }).equals(one30Am2)).toBe(true);
+    expect(change(twoAm, { hour: 1 }).equals(oneAm)).toBe(true);
+  });
 
   it("utc advance", () => {
     const t = utc(2005, 2, 22, 15, 15, 10);

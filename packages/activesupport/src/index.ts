@@ -346,6 +346,7 @@ export type { CacheOptions, CacheStore } from "./cache/index.js";
 
 export { Deprecation, DeprecationError, deprecator } from "./deprecation.js";
 export type { DeprecationBehavior } from "./deprecation.js";
+export { Deprecators } from "./deprecation/deprecators.js";
 
 export * from "./time-ext.js";
 // MessageEncryptor/MessageVerifier use getCrypto() adapter but are kept as subpath imports:

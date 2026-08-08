@@ -9,20 +9,6 @@
   {
     "package": "activemodel",
     "tsFile": "validations/numericality.ts",
-    "rubyName": "is_hexadecimal_literal?",
-    "call": "match?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "validations/numericality.ts",
-    "rubyName": "is_integer?",
-    "call": "match?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "validations/numericality.ts",
     "rubyName": "parse_as_number",
     "call": "is_hexadecimal_literal?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

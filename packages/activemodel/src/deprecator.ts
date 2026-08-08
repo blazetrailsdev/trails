@@ -10,7 +10,7 @@ import { Deprecation } from "@blazetrails/activesupport";
 
 export { Deprecation as Deprecator };
 
-const _deprecator = new Deprecation({ gem: "activemodel" });
+const _deprecator = new Deprecation({ gemName: "activemodel" });
 
 export function deprecator(): Deprecation {
   return _deprecator;

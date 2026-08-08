@@ -7,7 +7,7 @@ import { Deprecation } from "@blazetrails/activesupport";
 
 export { Deprecation as Deprecator };
 
-const _deprecator = new Deprecation({ gem: "actionview" });
+const _deprecator = new Deprecation({ gemName: "actionview" });
 
 export function deprecator(): Deprecation {
   return _deprecator;

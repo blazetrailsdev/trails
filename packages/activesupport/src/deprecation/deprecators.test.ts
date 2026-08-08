@@ -1,99 +1,143 @@
+/**
+ * Mirrors Rails activesupport/test/deprecation/deprecators_test.rb
+ */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { Deprecation, deprecator } from "../deprecation.js";
+import { Deprecation } from "../deprecation.js";
+import { Deprecators } from "./deprecators.js";
 
 describe("DeprecationTest", () => {
-  let dep: Deprecation;
+  const deprecatorNames = ["fubar", "foo", "bar"];
+  let deprecators: Deprecators;
 
   beforeEach(() => {
-    dep = new Deprecation();
+    deprecators = new Deprecators();
+    for (const name of deprecatorNames) {
+      deprecators.set(name, new Deprecation({ horizon: "2.0", gemName: name }));
+    }
   });
 
+  // Rails' assert_deprecated / assert_not_deprecated over `deprecator.warn`:
+  // a silenced deprecator emits nothing to stderr.
+  function assertSilencing(deprecator: Deprecation, silencing: boolean): void {
+    const behaviorWas = deprecator.behavior;
+    const emitted = vi.fn();
+    deprecator.behavior = emitted;
+    try {
+      deprecator.warn("deprecated!");
+      expect(emitted).toHaveBeenCalledTimes(silencing ? 0 : 1);
+    } finally {
+      deprecator.behavior = behaviorWas;
+    }
+  }
+
   it("#[] gets an individual deprecator", () => {
-    // The deprecator singleton is a Deprecation instance
-    expect(deprecator).toBeInstanceOf(Deprecation);
+    for (const name of deprecatorNames) {
+      expect(deprecators.get(name)!.gemName).toBe(name);
+    }
   });
 
   it("#each iterates over each deprecator", () => {
-    // In our impl, a single deprecator; verify it's accessible
-    expect(deprecator).toBeDefined();
+    const gemNames: (string | undefined)[] = [];
+    deprecators.each((deprecator) => gemNames.push(deprecator.gemName));
+
+    expect(gemNames.sort()).toEqual([...deprecatorNames].sort());
   });
 
   it("#each without block returns an Enumerator", () => {
-    // Not applicable in TS; verify deprecator exists
-    expect(deprecator).toBeInstanceOf(Deprecation);
+    // JS has no Enumerator; `each` always takes a block. Its iteration order
+    // and membership are what the Rails assertion checks.
+    const gemNames: (string | undefined)[] = [];
+    deprecators.each((deprecator) => gemNames.push(deprecator.gemName));
+    expect(gemNames.sort()).toEqual([...deprecatorNames].sort());
   });
 
   it("#silenced= applies to each deprecator", () => {
-    dep.silenced = true;
-    const spy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-    dep.warn("should be silent");
-    expect(spy).not.toHaveBeenCalled();
-    spy.mockRestore();
-    dep.silenced = false;
+    deprecators.each((deprecator) => expect(deprecator.silenced).toBe(false));
+
+    deprecators.setSilenced(true);
+    deprecators.each((deprecator) => expect(deprecator.silenced).toBe(true));
+
+    deprecators.setSilenced(false);
+    deprecators.each((deprecator) => expect(deprecator.silenced).toBe(false));
   });
 
   it("#debug= applies to each deprecator", () => {
-    // No debug flag in our implementation; verify instance exists
-    expect(dep).toBeInstanceOf(Deprecation);
+    deprecators.each((deprecator) => expect(deprecator.debug).toBe(false));
+
+    deprecators.setDebug(true);
+    deprecators.each((deprecator) => expect(deprecator.debug).toBe(true));
+
+    deprecators.setDebug(false);
+    deprecators.each((deprecator) => expect(deprecator.debug).toBe(false));
   });
 
   it("#behavior= applies to each deprecator", () => {
-    dep.behavior = "silence";
-    expect(() => dep.warn("silenced")).not.toThrow();
+    const callback = (): void => {};
+
+    deprecators.setBehavior(callback);
+    deprecators.each((deprecator) => expect(deprecator.behavior).toBe(callback));
   });
 
   it("#disallowed_behavior= applies to each deprecator", () => {
-    dep.disallowedBehavior = "raise";
-    expect(dep.disallowedBehavior).toBe("raise");
+    const callback = (): void => {};
+
+    deprecators.setDisallowedBehavior(callback);
+    deprecators.each((deprecator) => expect(deprecator.disallowedBehavior).toBe(callback));
   });
 
   it("#disallowed_warnings= applies to each deprecator", () => {
-    dep.disallowedWarnings = ["unsafe method"];
-    expect(dep.disallowedWarnings).toEqual(["unsafe method"]);
+    deprecators.setDisallowedWarnings(["all"]);
+    deprecators.each((deprecator) => expect(deprecator.disallowedWarnings).toEqual(["all"]));
   });
 
   it("#silence silences each deprecator", () => {
-    const spy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-    dep.silence(() => {
-      dep.warn("should be silent");
+    deprecators.each((deprecator) => assertSilencing(deprecator, false));
+
+    deprecators.silence(() => {
+      deprecators.each((deprecator) => assertSilencing(deprecator, true));
     });
-    expect(spy).not.toHaveBeenCalled();
-    spy.mockRestore();
+
+    deprecators.each((deprecator) => assertSilencing(deprecator, false));
   });
 
   it("#silence returns the result of the block", () => {
-    expect(dep.silence(() => 123)).toBe(123);
+    expect(deprecators.silence(() => 123)).toBe(123);
   });
 
   it("#silence ensures silencing is reverted after an error is raised", () => {
-    expect(() => {
-      dep.silence(() => {
+    expect(() =>
+      deprecators.silence(() => {
         throw new Error("oops");
-      });
-    }).toThrow("oops");
-    dep.behavior = "raise";
-    expect(() => dep.warn("still active")).toThrow();
+      }),
+    ).toThrow("oops");
+
+    deprecators.each((deprecator) => assertSilencing(deprecator, false));
   });
 
   it("#silence blocks can be nested", () => {
-    const spy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-    dep.silence(() => {
-      dep.silence(() => {
-        dep.warn("double silenced");
+    deprecators.each((deprecator) => assertSilencing(deprecator, false));
+
+    deprecators.silence(() => {
+      deprecators.each((deprecator) => assertSilencing(deprecator, true));
+
+      deprecators.silence(() => {
+        deprecators.each((deprecator) => assertSilencing(deprecator, true));
       });
+
+      deprecators.each((deprecator) => assertSilencing(deprecator, true));
     });
-    expect(spy).not.toHaveBeenCalled();
-    spy.mockRestore();
+
+    deprecators.each((deprecator) => assertSilencing(deprecator, false));
   });
 
   it("#silence only affects the current thread", () => {
-    // In JS there's no threading; verify silence works
-    const spy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-    dep.silence(() => {
-      dep.warn("silenced");
+    // JS has no threads; the silence counter is per-instance, so the
+    // observable half of the Rails test is that silencing is scoped to the
+    // block and reverted after it.
+    deprecators.silence(() => {
+      deprecators.each((deprecator) => assertSilencing(deprecator, true));
     });
-    dep.warn("not silenced");
-    expect(spy).toHaveBeenCalledTimes(1);
-    spy.mockRestore();
+
+    deprecators.each((deprecator) => assertSilencing(deprecator, false));
   });
 });

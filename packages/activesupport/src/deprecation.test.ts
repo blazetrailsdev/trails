@@ -127,8 +127,8 @@ describe("DeprecationTest", () => {
   });
 
   it("gem option stored on instance", () => {
-    const d = new Deprecation({ gem: "MyGem" });
-    expect(d.gem).toBe("MyGem");
+    const d = new Deprecation({ gemName: "MyGem" });
+    expect(d.gemName).toBe("MyGem");
   });
 
   it("horizon option stored on instance", () => {
@@ -261,14 +261,14 @@ describe("DeprecationTest", () => {
   });
 
   it("custom gem_name", () => {
-    const d = new Deprecation({ gem: "MyLib" });
-    expect(d.gem).toBe("MyLib");
+    const d = new Deprecation({ gemName: "MyLib" });
+    expect(d.gemName).toBe("MyLib");
   });
 
   it("default gem_name is Rails", () => {
     const d = new Deprecation();
     // No default gem, but we can set it
-    expect(d.gem).toBeUndefined();
+    expect(d.gemName).toBeUndefined();
   });
 
   it("default deprecation_horizon is greater than the current Rails version", () => {
