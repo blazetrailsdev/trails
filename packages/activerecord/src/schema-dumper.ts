@@ -736,8 +736,11 @@ export abstract class SchemaDumper {
       const indexes = await this.filterIndexesForDump(tableName, rawIndexes);
       const adapterTableOpts = await this.fetchTableOptions(tableName);
       const inlineLines: string[] = [];
-      await this.gatherInlineConstraints(tableName, inlineLines);
+      const remaining = await this.gatherInlineConstraints(tableName, inlineLines);
       this.emitTable(lines, tableName, columns, indexes, adapterTableOpts, inlineLines);
+      // schema_dumper.rb:216-219: the not-valid check constraints come back as a
+      // second stream, printed after the createTable block's `end`.
+      if (remaining && remaining.length > 0) lines.push("", ...remaining);
       lines.push("");
     } finally {
       this.tableName = undefined;
@@ -750,34 +753,65 @@ export abstract class SchemaDumper {
    * constraints. Base implementation handles check constraints.
    * @internal
    */
-  protected async gatherInlineConstraints(tableName: string, lines: string[]): Promise<void> {
-    await this.checkConstraintsInCreate(tableName, lines);
+  protected async gatherInlineConstraints(
+    tableName: string,
+    lines: string[],
+  ): Promise<string[] | undefined> {
+    return this.checkConstraintsInCreate(tableName, lines);
   }
 
   /**
    * Emit inline check-constraint `t.checkConstraint(...)` lines inside the
-   * createTable block. Mirrors Rails' `SchemaDumper#check_constraints_in_create`.
+   * createTable block. Mirrors Rails' `SchemaDumper#check_constraints_in_create`:
+   * only the validated constraints go inline; the not-valid ones are returned as
+   * the `remaining` stream of `ctx.addCheckConstraint(...)` calls the caller
+   * prints after the block.
    * @internal
    */
-  protected async checkConstraintsInCreate(tableName: string, lines: string[]): Promise<void> {
+  protected async checkConstraintsInCreate(
+    tableName: string,
+    lines: string[],
+  ): Promise<string[] | undefined> {
     const host = this._hookHost("checkConstraints") as
       | {
           checkConstraints: (t: string) => Promise<unknown[]>;
           supportsCheckConstraints?: () => boolean;
         }
       | undefined;
-    if (!host) return;
+    if (!host) return undefined;
     // Mirror Rails' call-site guard (`schema_dumper.rb:210`: `... if
     // @connection.supports_check_constraints?`): adapters whose checkConstraints
     // raises NotImplementedError when unsupported (e.g. MySQL <8.0.16, MariaDB
     // <10.2.1) must not be queried.
-    if (host.supportsCheckConstraints && !host.supportsCheckConstraints()) return;
-    const constraints = (await host.checkConstraints(tableName)) ?? [];
-    for (const chk of constraints as { expression: string; name?: string; validate?: boolean }[]) {
-      const [expr, ...opts] = this.checkParts(chk);
-      const optStr = opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
-      lines.push(`    t.checkConstraint(${expr}${optStr});`);
+    if (host.supportsCheckConstraints && !host.supportsCheckConstraints()) return undefined;
+    const checkConstraints = ((await host.checkConstraints(tableName)) ?? []) as {
+      expression: string;
+      name?: string;
+      validate?: boolean;
+    }[];
+    if (checkConstraints.length === 0) return undefined;
+    const checkValid = checkConstraints.filter((chk) => chk.validate !== false);
+    const checkInvalid = checkConstraints.filter((chk) => chk.validate === false);
+
+    if (checkValid.length > 0) {
+      const checkConstraintStatements = checkValid.map((check) => {
+        const [expr, ...opts] = this.checkParts(check);
+        const optStr = opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
+        return `    t.checkConstraint(${expr}${optStr});`;
+      });
+      lines.push(...checkConstraintStatements.sort());
     }
+
+    if (checkInvalid.length > 0) {
+      const tableNameStr = JSON.stringify(this.removePrefixAndSuffix(tableName));
+      const addCheckConstraintStatements = checkInvalid.map((check) => {
+        const [expr, ...opts] = this.checkParts(check);
+        const optStr = opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
+        return `  await ctx.addCheckConstraint(${tableNameStr}, ${expr}${optStr});`;
+      });
+      return addCheckConstraintStatements.sort();
+    }
+    return undefined;
   }
 
   /**

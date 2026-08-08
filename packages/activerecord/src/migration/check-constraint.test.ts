@@ -1,13 +1,27 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Base } from "../base.js";
-import { StatementInvalid } from "../errors.js";
+import { NotImplementedError, StatementInvalid } from "../errors.js";
 import type { CheckConstraintDefinition } from "../connection-adapters/abstract/schema-definitions.js";
 import type { ValidateConstraintStatements } from "../connection-adapters/abstract/schema-statements.js";
 import { ambientConnection } from "../support/rocket-tables.js";
 import { useTransactionalTests } from "../test-fixtures/use-transactional-tests.js";
 import { adapterSupports, describeIfSupports, itIfSupports } from "../support/supports.js";
 import { adapterType } from "../test-adapter.js";
+import { isMariaDb, serverVersion } from "../support/mysql-server-version.js";
+import { dumpTableSchema } from "../support/schema-dumping-helper.js";
+import type { SchemaSource } from "../schema-dumper.js";
+
+// Rails' `if current_adapter?(:Mysql2Adapter, :TrilogyAdapter)` arm of
+// `test_check_constraints` calls `json_schema_valid()`, which MySQL only ships
+// from 8.0.17 and MariaDB does not have at all — and the CI mysql lane runs
+// mariadb:11 (ci.yml:1186). Rails' own mysql lane is MySQL 8, so the adapter
+// check alone is enough there; here the function's availability has to be read
+// off the server the way every other version-keyed gate in
+// support/mysql-server-version.ts does.
+const supportsJsonSchemaValid = !isMariaDb && (serverVersion?.compare("8.0.17") ?? -1) >= 0;
+
+const supportsCheckConstraints = adapterSupports("check_constraints");
 
 class Trade extends Base {
   static {
@@ -54,13 +68,106 @@ describe("Migration", () => {
         t.integer("quantity");
       });
 
+      if (adapterType === "mysql") {
+        await connection.createTable("constraint_test", { force: true }, (t) => {
+          t.json("options", { default: null });
+        });
+      }
+
       Trade.resetColumnInformation();
     });
 
     afterEach(async () => {
       const connection = await ambientConnection();
       await connection.dropTable("trades", "purchases", { ifExists: true });
+
+      if (adapterType === "mysql") {
+        await connection.dropTable("constraint_test", { ifExists: true });
+      }
+
       Trade.resetColumnInformation();
+    });
+
+    it("check constraints", async () => {
+      const connection = await ambientConnection();
+      const checkConstraints = await connection.checkConstraints("products");
+      expect(checkConstraints.length).toBe(1);
+
+      let constraint = checkConstraints[0];
+      expect(constraint.tableName).toBe("products");
+      expect(constraint.name).toBe("products_price_check");
+
+      // eslint-disable-next-line vitest/no-conditional-in-test -- mirrors Rails' inline `if current_adapter?(:Mysql2Adapter, :TrilogyAdapter)` (check_constraint_test.rb:50-54)
+      if (adapterType === "mysql") {
+        expect(constraint.expression).toBe("`price` > `discounted_price`");
+      } else {
+        expect(constraint.expression).toBe("price > discounted_price");
+      }
+
+      // eslint-disable-next-line vitest/no-conditional-in-test -- mirrors Rails' inline `if current_adapter?(:Mysql2Adapter, :TrilogyAdapter)` (check_constraint_test.rb:57-70); see supportsJsonSchemaValid
+      if (adapterType === "mysql" && supportsJsonSchemaValid) {
+        try {
+          await connection.addCheckConstraint(
+            "constraint_test",
+            'json_schema_valid(_utf8mb4\'\n        {\n          "oneOf": [\n            {\n              "type": "null"\n            },\n            {\n              "type": "array",\n              "minItems": 1,\n              "items": {\n                "type": "integer",\n                "minimum": 0\n              }\n            }\n          ]\n        }\',`options`)\n',
+            { name: "non_empty_test_array" },
+          );
+
+          constraint = (await connection.checkConstraints("constraint_test")).find(
+            (c) => c.name === "non_empty_test_array",
+          )!;
+          expect(constraint.expression).toContain("json_schema_valid");
+          expect(constraint.expression).toBe(
+            'json_schema_valid(_utf8mb4\' { "oneOf": [ { "type": "null" }, { "type": "array", "minItems": 1, "items": { "type": "integer", "minimum": 0 } } ] }\',`options`)',
+          );
+        } finally {
+          await connection.removeCheckConstraint("constraint_test", {
+            name: "non_empty_test_array",
+            ifExists: true,
+          });
+        }
+      }
+
+      // eslint-disable-next-line vitest/no-conditional-in-test -- mirrors Rails' inline `if current_adapter?(:PostgreSQLAdapter)` (check_constraint_test.rb:72-83)
+      if (adapterType === "postgres") {
+        try {
+          // Test that complex expression is correctly parsed from the database
+          await connection.addCheckConstraint(
+            "trades",
+            "CASE WHEN price IS NOT NULL THEN true ELSE false END",
+            { name: "price_is_required" },
+          );
+
+          constraint = (await connection.checkConstraints("trades")).find(
+            (c) => c.name === "price_is_required",
+          )!;
+          expect(constraint.expression).toContain("WHEN price IS NOT NULL");
+        } finally {
+          await connection.removeCheckConstraint("trades", { name: "price_is_required" });
+        }
+      }
+    });
+
+    it.runIf(adapterType === "postgres")("check constraints scoped to schemas", async () => {
+      const connection = await ambientConnection();
+      await connection.addCheckConstraint("trades", "quantity > 0");
+
+      const schemas = connection as unknown as {
+        createSchema(name: string): Promise<void>;
+        dropSchema(name: string): Promise<void>;
+      };
+      try {
+        const before = (await connection.checkConstraints("trades")).length;
+        await schemas.createSchema("test_schema");
+        // eslint-disable-next-line blazetrails/require-table-teardown -- Rails' `ensure` drops the whole schema (check_constraint_test.rb:97-98), and PG's DROP SCHEMA is a CASCADE (postgresql/schema_statements.rb:70), so the table goes with it.
+        await connection.createTable("test_schema.trades", {}, (t) => {
+          t.integer("quantity");
+        });
+        await connection.addCheckConstraint("test_schema.trades", "quantity > 0");
+        expect((await connection.checkConstraints("trades")).length).toBe(before);
+      } finally {
+        await schemas.dropSchema("test_schema");
+      }
     });
 
     it("add check constraint", async () => {
@@ -206,6 +313,34 @@ describe("Migration", () => {
       },
     );
 
+    itIfSupports("validate_constraints", "schema dumping with validate false", async () => {
+      const connection = await ambientConnection();
+      await connection.addCheckConstraint("trades", "quantity > 0", {
+        name: "quantity_check",
+        validate: false,
+      });
+
+      const output = await dumpTableSchema(connection as unknown as SchemaSource, "trades");
+
+      expect(output).toMatch(
+        /\s+await ctx\.addCheckConstraint\("trades", "quantity > 0", \{ name: "quantity_check", validate: false \}\);$/m,
+      );
+    });
+
+    itIfSupports("validate_constraints", "schema dumping with validate true", async () => {
+      const connection = await ambientConnection();
+      await connection.addCheckConstraint("trades", "quantity > 0", {
+        name: "quantity_check",
+        validate: true,
+      });
+
+      const output = await dumpTableSchema(connection as unknown as SchemaSource, "trades");
+
+      expect(output).toMatch(
+        /\s+t\.checkConstraint\("quantity > 0", \{ name: "quantity_check" \}\);$/m,
+      );
+    });
+
     // Check constraint should still be created, but should not be invalid
     it.skipIf(adapterSupports("validate_constraints"))("add invalid check constraint", async () => {
       const connection = await ambientConnection();
@@ -329,6 +464,35 @@ describe("Migration", () => {
       });
 
       expect((await connection.checkConstraints("trades")).length).toBe(0);
+    });
+  });
+
+  // Rails' `else` arm of the file-level `if
+  // ActiveRecord::Base.lease_connection.supports_check_constraints?`
+  // (check_constraint_test.rb:317-341). Held in a const so the `skipIf` call
+  // site carries no feature literal: the gate extractor drops the negation, and
+  // an inline `adapterSupports("check_constraints")` would tag the else-arm
+  // cases with the very feature that excludes them.
+  describe.skipIf(supportsCheckConstraints)("NoCheckConstraintSupportTest", () => {
+    it("add check constraint should be noop", async () => {
+      const connection = await ambientConnection();
+      await assertNothingRaised(() =>
+        connection.addCheckConstraint("products", "discounted_price > 0", {
+          name: "discounted_price_check",
+        }),
+      );
+    });
+
+    it("remove check constraint should be noop", async () => {
+      const connection = await ambientConnection();
+      await assertNothingRaised(() =>
+        connection.removeCheckConstraint("products", { name: "price_check" }),
+      );
+    });
+
+    it("check constraints should raise not implemented", async () => {
+      const connection = await ambientConnection();
+      await expect(connection.checkConstraints("products")).rejects.toThrow(NotImplementedError);
     });
   });
 });
