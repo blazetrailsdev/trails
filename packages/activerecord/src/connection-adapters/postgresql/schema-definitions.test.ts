@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeAll } from "vitest";
 import { SchemaDumper } from "../../schema-dumper.js";
 import { ColumnDefinition } from "../abstract/schema-definitions.js";
 import {
@@ -9,12 +9,13 @@ import {
   AlterTable,
   type SchemaStatementsConstraintLike,
 } from "./schema-definitions.js";
-import { SchemaCreation as PgSchemaCreation } from "./schema-creation.js";
+import {
+  SchemaCreation as PgSchemaCreation,
+  type PgSchemaCreationHost,
+} from "./schema-creation.js";
 import { Base } from "../../base.js";
 import { describeIfPostgresqlAdapter } from "../../support/describe-if-postgresql-adapter.js";
 import type { TableDefinitionConn } from "../abstract/schema-definitions.js";
-import { describeIfPg, PG_TEST_URL } from "../../support/describe-if-pg.js";
-import { PostgreSQLAdapter } from "../postgresql-adapter.js";
 
 // Rails hands `TableDefinition#initialize` / `SchemaCreation.new` an
 // `ActiveRecord::Base.lease_connection`, and its PostgreSQL DDL-rendering tests
@@ -508,22 +509,12 @@ describeIfPostgresqlAdapter("TableDefinition#toSql", () => {
   });
 });
 
-describeIfPg("TableDefinition#toSql default quoting", () => {
-  let conn: PostgreSQLAdapter;
-
-  beforeAll(() => {
-    conn = new PostgreSQLAdapter(PG_TEST_URL);
-  });
-
-  afterAll(() => {
-    conn.disconnect();
-  });
-
+describeIfPostgresqlAdapter("TableDefinition#toSql default quoting", () => {
   it("handles default values containing doubled single-quotes without mis-parsing", async () => {
-    const td = new TableDefinition("messages", { adapter: conn });
+    const td = new TableDefinition("messages", { adapter: leased });
     td.string("body", { default: "Bob's" });
     td.uniqueConstraint("body", { name: "unique_body" });
-    const sql = await new PgSchemaCreation(conn).accept(td);
+    const sql = await new PgSchemaCreation(leased as unknown as PgSchemaCreationHost).accept(td);
     expect(sql).toContain("Bob''s");
     expect(sql).toContain('CONSTRAINT "unique_body"');
   });

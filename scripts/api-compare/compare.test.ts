@@ -8,6 +8,7 @@ import {
   tsShouldIncludeInIndex,
   flattenIncludedMethodInfos,
   mixinMethodCreditedToOwnFile,
+  reopeningMethodCreditedToOwnFile,
   resolveModuleName,
   buildModuleIncluderFqns,
   dedupeRubyMethodInto,
@@ -1399,7 +1400,11 @@ describe("dedupeRubyMethodInto", () => {
     dedupeRubyMethodInto(seen, rm("invert"), "Foo::C");
     expect(seen.size).toBe(1);
     // First insertion wins, so the FQN points at the first observer.
-    expect([...seen.values()][0]).toEqual({ rubyName: "invert", rubyModule: "Foo::A" });
+    expect([...seen.values()][0]).toEqual({
+      rubyName: "invert",
+      rubyModule: "Foo::A",
+      definedInFile: "x.rb",
+    });
   });
 });
 
@@ -1735,6 +1740,70 @@ describe("mixinMethodCreditedToOwnFile", () => {
         "base.rb",
         "activerecord",
         () => false,
+        tsMethodsByFile,
+      ),
+    ).toBeNull();
+  });
+});
+
+describe("reopeningMethodCreditedToOwnFile", () => {
+  // `core_ext/object/acts_like.rb` is the first core_ext file to reopen Object,
+  // so `blank?`, `duplicable?` and `instance_values` all bucket under it while
+  // trails ports each to the file mirroring its own reopening.
+  const tsMethodsByFile = new Map([
+    ["core-ext/object/blank.ts", new Set(["isBlank", "isPresent"])],
+    ["core-ext/object/duplicable.ts", new Set(["isDuplicable"])],
+    ["core-ext/object/instance-variables.ts", new Set(["instanceValues"])],
+  ]);
+
+  it("credits each reopening's arm to the TS file mirroring that reopening", () => {
+    expect(
+      reopeningMethodCreditedToOwnFile(
+        { rubyName: "duplicable?", definedInFile: "core_ext/object/duplicable.rb" },
+        "core_ext/object/acts_like.rb",
+        "activesupport",
+        tsMethodsByFile,
+      ),
+    ).toEqual({ tsName: "isDuplicable", tsFile: "core-ext/object/duplicable.ts" });
+
+    expect(
+      reopeningMethodCreditedToOwnFile(
+        { rubyName: "instance_values", definedInFile: "core_ext/object/instance_variables.rb" },
+        "core_ext/object/acts_like.rb",
+        "activesupport",
+        tsMethodsByFile,
+      ),
+    ).toEqual({ tsName: "instanceValues", tsFile: "core-ext/object/instance-variables.ts" });
+  });
+
+  it("does not credit a method the home file defines itself", () => {
+    expect(
+      reopeningMethodCreditedToOwnFile(
+        { rubyName: "acts_like?", definedInFile: "core_ext/object/acts_like.rb" },
+        "core_ext/object/acts_like.rb",
+        "activesupport",
+        tsMethodsByFile,
+      ),
+    ).toBeNull();
+  });
+
+  it("does not credit a reopening arm that is unported in its own file", () => {
+    expect(
+      reopeningMethodCreditedToOwnFile(
+        { rubyName: "deep_dup", definedInFile: "core_ext/object/duplicable.rb" },
+        "core_ext/object/acts_like.rb",
+        "activesupport",
+        tsMethodsByFile,
+      ),
+    ).toBeNull();
+  });
+
+  it("does not credit when the reopening's TS file is absent from the run", () => {
+    expect(
+      reopeningMethodCreditedToOwnFile(
+        { rubyName: "to_query", definedInFile: "core_ext/object/to_query.rb" },
+        "core_ext/object/acts_like.rb",
+        "activesupport",
         tsMethodsByFile,
       ),
     ).toBeNull();

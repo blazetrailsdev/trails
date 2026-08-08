@@ -27,7 +27,7 @@ import { TimeWithZone, getZone } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/date";
 
 import { itIfSupports } from "./support/supports.js";
-import { describeIfPg } from "./support/describe-if-pg.js";
+import { describeIfPostgresqlAdapter } from "./support/describe-if-postgresql-adapter.js";
 import { withTimezoneConfig } from "./test-helper.js";
 import { fixtures } from "./test-fixtures.js";
 import { rebuildCanonicalTables } from "./support/canonical-table-rebuild.js";
@@ -1184,7 +1184,7 @@ describe("DirtyTest", () => {
 // Mirrors: activerecord/test/cases/dirty_test.rb
 //   if current_adapter?(:PostgreSQLAdapter) && supports_identity_columns?
 // ==========================================================================
-describeIfPg("DirtyTest", () => {
+describeIfPostgresqlAdapter("DirtyTest", () => {
   fixtures([], { useTransactionalTests: false });
 
   itIfSupports(

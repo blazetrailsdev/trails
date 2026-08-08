@@ -36,7 +36,7 @@ function emitTableSql(td: TableDefinition): Promise<string> {
 import { Person } from "./test-helpers/models/person.js";
 import { loadSchemaFromAdapter } from "./model-schema.js";
 import { itIfSupports, describeIfSupports } from "./support/supports.js";
-import { describeIfPg } from "./support/describe-if-pg.js";
+import { describeIfPostgresqlAdapter } from "./support/describe-if-postgresql-adapter.js";
 import { Mysql2Adapter } from "./connection-adapters/mysql2-adapter.js";
 import { describeIfMysqlAdapter } from "./support/describe-if-mysql-adapter.js";
 import { leaseMysqlAdapter } from "./adapters/abstract-mysql-adapter/test-helper.js";
@@ -257,7 +257,7 @@ describe("MigrationTest", () => {
     );
   });
 
-  describeIfPg("IndexForTableWithSchemaMigrationTest", () => {
+  describeIfPostgresqlAdapter("IndexForTableWithSchemaMigrationTest", () => {
     // Schema-qualified `my_schema.values`: Rails' PG `index_name` strips the
     // schema (postgresql/schema_statements.rb) → `index_values_on_value`,
     // created in `my_schema` via the schema-qualified table, and `remove_index`
@@ -1745,7 +1745,7 @@ describe("MigrationTest", () => {
     });
   });
 
-  describeIfPg("PostgresqlIndexTest", () => {
+  describeIfPostgresqlAdapter("PostgresqlIndexTest", () => {
     // Mirrors PostgreSQLAdapterTest#test_invalid_index — a failed CONCURRENTLY
     // unique index is left behind marked invalid; Migration#indexExists must
     // forward `valid` to distinguish it, matching the adapter twin.
