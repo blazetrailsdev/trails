@@ -4,18 +4,17 @@ import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { InternalMetadata } from "./internal-metadata.js";
 import { Base } from "./base.js";
 import { fixtures } from "./test-fixtures.js";
+import { NullPool } from "./connection-adapters/abstract/connection-pool.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 
 function fakeAdapter(defaultTimezone: string): DatabaseAdapter {
-  // `pool` is what the constructor discriminates an adapter on; a bare adapter
-  // carries a NullPool, and these cases only exercise `currentTime`.
-  return { defaultTimezone, pool: null } as unknown as DatabaseAdapter;
+  return { defaultTimezone } as unknown as DatabaseAdapter;
 }
 
 type CurrentTimeHost = { currentTime(connection: DatabaseAdapter): string };
 
 const metadataBuiltOverLocalAdapter = new InternalMetadata(
-  fakeAdapter("local"),
+  new NullPool(),
 ) as unknown as CurrentTimeHost;
 
 function currentTime(defaultTimezone: string): string {

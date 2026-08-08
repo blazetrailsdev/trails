@@ -366,8 +366,8 @@ export class DatabaseTasks {
       }
     })(
       paths == null ? [] : Array.isArray(paths) ? paths : [paths],
-      new SchemaMigration(adapter),
-      new InternalMetadata(adapter),
+      new SchemaMigration(adapter.pool),
+      new InternalMetadata(adapter.pool),
     );
   }
 
@@ -381,8 +381,8 @@ export class DatabaseTasks {
     return new Migrator(
       "up",
       this._migrationsFor(dbConfig),
-      new SchemaMigration(adapter),
-      new InternalMetadata(adapter),
+      new SchemaMigration(adapter.pool),
+      new InternalMetadata(adapter.pool),
     );
   }
 
@@ -1055,7 +1055,7 @@ export class DatabaseTasks {
     try {
       const adapter = await this._migrationAdapter();
       const { InternalMetadata } = await import("../internal-metadata.js");
-      const metadata = new InternalMetadata(adapter);
+      const metadata = new InternalMetadata(adapter.pool);
       const sha1 = await this.schemaSha1(filename);
       await metadata.createTableAndSetFlags(config.envName, sha1);
     } catch (error) {
@@ -1392,7 +1392,7 @@ export class DatabaseTasks {
     }
 
     const { InternalMetadata } = await import("../internal-metadata.js");
-    const metadata = new InternalMetadata(adapter);
+    const metadata = new InternalMetadata(adapter.pool);
     if (!(await metadata.tableExists())) return false;
 
     const storedSha1 = await metadata.get("schema_sha1");
@@ -1441,7 +1441,7 @@ export class DatabaseTasks {
     }
 
     const { SchemaMigration } = await import("../schema-migration.js");
-    const migration = new SchemaMigration(adapter);
+    const migration = new SchemaMigration(adapter.pool);
     if (!(await migration.tableExists())) return;
 
     const versions = await migration.allVersions();
@@ -1662,7 +1662,7 @@ export async function initializeDatabase(dbConfig: DatabaseConfig): Promise<bool
         // Probe DB connectivity first — throws NoDatabaseError if the DB doesn't exist.
         // tableExists() swallows all errors internally so can't detect a missing DB.
         await adapter.execute("SELECT 1");
-        const sm = new SchemaMigration(adapter);
+        const sm = new SchemaMigration(adapter.pool);
         alreadyInitialized = await sm.tableExists();
         break;
       } catch (error) {

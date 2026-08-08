@@ -123,7 +123,7 @@ afterEach(async () => {
     await adapter.dropTable(table, { ifExists: true });
   }
   try {
-    await new SchemaMigration(adapter).deleteAllVersions();
+    await new SchemaMigration(adapter.pool).deleteAllVersions();
   } catch {
     /* schema_migrations may not exist yet */
   }
@@ -201,8 +201,8 @@ describe("MigrationTest", () => {
     await new Migrator(
       "up",
       [migrateProxy(100, (m) => m.addColumn("people", "last_name", "string"))],
-      new SchemaMigration(adapter),
-      new InternalMetadata(adapter),
+      new SchemaMigration(adapter.pool),
+      new InternalMetadata(adapter.pool),
     ).migrate(100);
     expect(await personColumnNames(adapter)).toContain("last_name");
 
@@ -210,8 +210,8 @@ describe("MigrationTest", () => {
       new Migrator(
         "up",
         [migrateProxy(101, (m) => m.addColumn("people", "last_name", "string"))],
-        new SchemaMigration(adapter),
-        new InternalMetadata(adapter),
+        new SchemaMigration(adapter.pool),
+        new InternalMetadata(adapter.pool),
       ).migrate(101),
     ).rejects.toThrow();
   });
@@ -348,8 +348,8 @@ describe("MigrationTest", () => {
     await new Migrator(
       "up",
       [migrateProxy(100, (m) => m.addColumn("people", "last_name", "string"))],
-      new SchemaMigration(adapter),
-      new InternalMetadata(adapter),
+      new SchemaMigration(adapter.pool),
+      new InternalMetadata(adapter.pool),
     ).migrate(100);
     expect(await personColumnNames(adapter)).toContain("last_name");
 
@@ -361,8 +361,8 @@ describe("MigrationTest", () => {
           m.addColumn("people", "last_name", "string", { ifNotExists: true }),
         ),
       ],
-      new SchemaMigration(adapter),
-      new InternalMetadata(adapter),
+      new SchemaMigration(adapter.pool),
+      new InternalMetadata(adapter.pool),
     ).migrate(101);
     expect(await personColumnNames(adapter)).toContain("last_name");
   });
@@ -504,7 +504,7 @@ describe("MigrationTest", () => {
 
   it("schema migrations table name", async () => {
     const adapter = Base.connection;
-    const schemaMigration = new SchemaMigration(adapter);
+    const schemaMigration = new SchemaMigration(adapter.pool);
     const originalTableName = Base.schemaMigrationsTableName;
     const savedPrefix = Base.tableNamePrefix;
     const savedSuffix = Base.tableNameSuffix;
@@ -608,16 +608,16 @@ describe("MigrationTest", () => {
     await new Migrator(
       "up",
       [migrateProxy(100, (m) => m.addColumn("people", "last_name", "string"))],
-      new SchemaMigration(adapter),
-      new InternalMetadata(adapter),
+      new SchemaMigration(adapter.pool),
+      new InternalMetadata(adapter.pool),
     ).migrate(100);
     expect(await personColumnNames(adapter)).toContain("last_name");
 
     await new Migrator(
       "up",
       [migrateProxy(101, (m) => m.removeColumn("people", "last_name"))],
-      new SchemaMigration(adapter),
-      new InternalMetadata(adapter),
+      new SchemaMigration(adapter.pool),
+      new InternalMetadata(adapter.pool),
     ).migrate(101);
     expect(await personColumnNames(adapter)).not.toContain("last_name");
 
@@ -628,8 +628,8 @@ describe("MigrationTest", () => {
     const error: unknown = await new Migrator(
       "up",
       [migrateProxy(102, (m) => m.removeColumn("people", "last_name"))],
-      new SchemaMigration(adapter),
-      new InternalMetadata(adapter),
+      new SchemaMigration(adapter.pool),
+      new InternalMetadata(adapter.pool),
     )
       .migrate(102)
       .catch((e: unknown) => e);
@@ -653,11 +653,11 @@ describe("MigrationTest", () => {
   it("migration context with default schema migration", async () => {
     const migrationsPath = `${MIGRATIONS_ROOT}/valid`;
     const adapter = Base.connection;
-    const schemaMigration = new SchemaMigration(adapter);
+    const schemaMigration = new SchemaMigration(adapter.pool);
     const migrator = new MigrationContext(
       [migrationsPath],
       schemaMigration,
-      new InternalMetadata(adapter),
+      new InternalMetadata(adapter.pool),
     );
     await migrator.migrate();
 
@@ -675,11 +675,11 @@ describe("MigrationTest", () => {
   it("migrator versions", async () => {
     const migrationsPath = `${MIGRATIONS_ROOT}/valid`;
     const adapter = Base.connection;
-    const schemaMigration = new SchemaMigration(adapter);
+    const schemaMigration = new SchemaMigration(adapter.pool);
     const migrator = new MigrationContext(
       [migrationsPath],
       schemaMigration,
-      new InternalMetadata(adapter),
+      new InternalMetadata(adapter.pool),
     );
 
     await migrator.migrate();
@@ -699,8 +699,8 @@ describe("MigrationTest", () => {
     const adapter = await freshAdapterWithPeople();
     const migrator = new MigrationContext(
       [migrationsPath],
-      new SchemaMigration(adapter),
-      new InternalMetadata(adapter),
+      new SchemaMigration(adapter.pool),
+      new InternalMetadata(adapter.pool),
     );
     await migrator.migrate();
 
@@ -722,7 +722,7 @@ describe("MigrationTest", () => {
       "migrations",
       "valid",
     );
-    const schemaMigration = new SchemaMigration(adapter);
+    const schemaMigration = new SchemaMigration(adapter.pool);
     const migrator = new MigrationContext([migrationsPath], schemaMigration);
     try {
       await schemaMigration.dropTable();
@@ -743,16 +743,16 @@ describe("MigrationTest", () => {
           migration: () => anonymousMigration("First", 1),
         },
       ],
-      new SchemaMigration(adapter),
-      new InternalMetadata(adapter),
+      new SchemaMigration(adapter.pool),
+      new InternalMetadata(adapter.pool),
     );
     expect(withMigrations.migrations.length).toBeGreaterThan(0);
 
     const empty = new Migrator(
       "up",
       [],
-      new SchemaMigration(adapter),
-      new InternalMetadata(adapter),
+      new SchemaMigration(adapter.pool),
+      new InternalMetadata(adapter.pool),
     );
     expect(empty.migrations.length).toBe(0);
   });
@@ -769,8 +769,8 @@ describe("MigrationTest", () => {
     const migrator = new Migrator(
       "up",
       migrations,
-      new SchemaMigration(adapter),
-      new InternalMetadata(adapter),
+      new SchemaMigration(adapter.pool),
+      new InternalMetadata(adapter.pool),
     );
     expect(await migrator.currentVersion()).toBe(0);
     await migrator.migrate("20131219224947");
@@ -847,16 +847,16 @@ describe("MigrationTest", () => {
     await new Migrator(
       "up",
       [migrateProxy(100, (m) => m.addColumn("people", "last_name", "string"))],
-      new SchemaMigration(adapter),
-      new InternalMetadata(adapter),
+      new SchemaMigration(adapter.pool),
+      new InternalMetadata(adapter.pool),
     ).migrate(100);
     expect(await personColumnNames(adapter)).toContain("last_name");
 
     await new Migrator(
       "up",
       [migrateProxy(101, (m) => m.removeColumn("people", "last_name"))],
-      new SchemaMigration(adapter),
-      new InternalMetadata(adapter),
+      new SchemaMigration(adapter.pool),
+      new InternalMetadata(adapter.pool),
     ).migrate(101);
     expect(await personColumnNames(adapter)).not.toContain("last_name");
 
@@ -864,8 +864,8 @@ describe("MigrationTest", () => {
     await new Migrator(
       "up",
       [migrateProxy(102, (m) => m.removeColumn("people", "last_name", { ifExists: true }))],
-      new SchemaMigration(adapter),
-      new InternalMetadata(adapter),
+      new SchemaMigration(adapter.pool),
+      new InternalMetadata(adapter.pool),
     ).migrate(102);
     expect(await personColumnNames(adapter)).not.toContain("last_name");
   });
@@ -881,16 +881,16 @@ describe("MigrationTest", () => {
     await new Migrator(
       "up",
       [migrateProxy(100, (m) => m.addColumn("people", "last_name", type))],
-      new SchemaMigration(adapter),
-      new InternalMetadata(adapter),
+      new SchemaMigration(adapter.pool),
+      new InternalMetadata(adapter.pool),
     ).migrate(100);
     expect(await personColumnNames(adapter)).toContain("last_name");
 
     await new Migrator(
       "up",
       [migrateProxy(101, (m) => m.addColumn("people", "last_name", type, { ifNotExists: true }))],
-      new SchemaMigration(adapter),
-      new InternalMetadata(adapter),
+      new SchemaMigration(adapter.pool),
+      new InternalMetadata(adapter.pool),
     ).migrate(101);
     expect(await personColumnNames(adapter)).toContain("last_name");
   });
@@ -903,8 +903,8 @@ describe("MigrationTest", () => {
     await new Migrator(
       "up",
       [migrateProxy(100, (m) => m.addColumn("people", "last_name", "string"))],
-      new SchemaMigration(adapter),
-      new InternalMetadata(adapter),
+      new SchemaMigration(adapter.pool),
+      new InternalMetadata(adapter.pool),
     ).migrate(100);
     expect(await personColumnNames(adapter)).toContain("last_name");
 
@@ -915,8 +915,8 @@ describe("MigrationTest", () => {
           m.addColumn("people", "last_name", "boolean", { ifNotExists: true }),
         ),
       ],
-      new SchemaMigration(adapter),
-      new InternalMetadata(adapter),
+      new SchemaMigration(adapter.pool),
+      new InternalMetadata(adapter.pool),
     ).migrate(101);
     expect(await personColumnNames(adapter)).toContain("last_name");
   });
@@ -942,8 +942,8 @@ describe("MigrationTest", () => {
       migration.name === "ValidPeopleHaveLastNames";
     const migrator = new MigrationContext(
       [`${MIGRATIONS_ROOT}/valid`],
-      new SchemaMigration(adapter),
-      new InternalMetadata(adapter),
+      new SchemaMigration(adapter.pool),
+      new InternalMetadata(adapter.pool),
     );
     await migrator.migrate(null, nameFilter);
 
@@ -978,8 +978,8 @@ describe("MigrationTest", () => {
     const migrator = new Migrator(
       "up",
       migrations,
-      new SchemaMigration(adapter),
-      new InternalMetadata(adapter),
+      new SchemaMigration(adapter.pool),
+      new InternalMetadata(adapter.pool),
     );
     await expect(migrator.migrate()).rejects.toThrow("Something broke");
     // Migration should not be recorded as applied
@@ -1010,8 +1010,8 @@ describe("MigrationTest", () => {
       const migrator = new Migrator(
         "up",
         migrations,
-        new SchemaMigration(adapter),
-        new InternalMetadata(adapter),
+        new SchemaMigration(adapter.pool),
+        new InternalMetadata(adapter.pool),
       );
       await expect(migrator.migrate()).rejects.toThrow("Something broke");
       const versions = await migrator.getAllVersions();
@@ -1047,8 +1047,8 @@ describe("MigrationTest", () => {
     const migrator = new Migrator(
       "up",
       [proxy],
-      new SchemaMigration(adapter),
-      new InternalMetadata(adapter),
+      new SchemaMigration(adapter.pool),
+      new InternalMetadata(adapter.pool),
     );
     let err!: Error;
     try {
@@ -1078,8 +1078,8 @@ describe("MigrationTest", () => {
     const migrator = new Migrator(
       "up",
       [proxy],
-      new SchemaMigration(adapter),
-      new InternalMetadata(adapter),
+      new SchemaMigration(adapter.pool),
+      new InternalMetadata(adapter.pool),
     );
     let err!: Error;
     try {
@@ -1098,7 +1098,7 @@ describe("MigrationTest", () => {
   it("internal metadata table name", async () => {
     const adapter = Base.connection;
     const { InternalMetadata } = await import("./internal-metadata.js");
-    const internalMetadata = new InternalMetadata(adapter);
+    const internalMetadata = new InternalMetadata(adapter.pool);
     const originalTableName = Base.internalMetadataTableName;
     const savedPrefix = Base.tableNamePrefix;
     const savedSuffix = Base.tableNameSuffix;
@@ -1122,7 +1122,7 @@ describe("MigrationTest", () => {
   it("internal metadata stores environment when migration fails", async () => {
     const adapter = Base.connection;
     const { InternalMetadata } = await import("./internal-metadata.js");
-    const im = new InternalMetadata(adapter);
+    const im = new InternalMetadata(adapter.pool);
     await im.createTable();
 
     class FailingMigration extends Migration {
@@ -1139,8 +1139,8 @@ describe("MigrationTest", () => {
     const migrator = new Migrator(
       "up",
       [proxy],
-      new SchemaMigration(adapter),
-      new InternalMetadata(adapter),
+      new SchemaMigration(adapter.pool),
+      new InternalMetadata(adapter.pool),
     );
     await migrator.migrate().catch(() => {});
     const env = await im.get("environment");
@@ -1153,7 +1153,7 @@ describe("MigrationTest", () => {
   it("internal metadata stores environment when other data exists", async () => {
     const adapter = Base.connection;
     const { InternalMetadata } = await import("./internal-metadata.js");
-    const im = new InternalMetadata(adapter);
+    const im = new InternalMetadata(adapter.pool);
     await im.createTable();
     await im.set("custom_key", "custom_value");
 
@@ -1165,8 +1165,8 @@ describe("MigrationTest", () => {
     const migrator = new Migrator(
       "up",
       [proxy],
-      new SchemaMigration(adapter),
-      new InternalMetadata(adapter),
+      new SchemaMigration(adapter.pool),
+      new InternalMetadata(adapter.pool),
     );
     await migrator.migrate();
     expect(await im.get("environment")).toBe(envName(adapter));
@@ -1179,7 +1179,7 @@ describe("MigrationTest", () => {
 
     // migration_test.rb:727-730 — drop the table, then swap
     // `use_metadata_table: false` into the pool's db_config configuration_hash.
-    const im = new InternalMetadata(adapter);
+    const im = new InternalMetadata(adapter.pool);
     await im.dropTable();
 
     const { _setConfigurationHash } = await import("./database-configurations/database-config.js");
@@ -1199,8 +1199,8 @@ describe("MigrationTest", () => {
     const migrator = new Migrator(
       "up",
       [proxy],
-      new SchemaMigration(adapter),
-      new InternalMetadata(adapter),
+      new SchemaMigration(adapter.pool),
+      new InternalMetadata(adapter.pool),
     );
     try {
       await migrator.migrate();
@@ -1219,7 +1219,7 @@ describe("MigrationTest", () => {
   it("inserting a new entry into internal metadata", async () => {
     const adapter = Base.connection;
     const { InternalMetadata } = await import("./internal-metadata.js");
-    const im = new InternalMetadata(adapter);
+    const im = new InternalMetadata(adapter.pool);
     await im.createTable();
     try {
       await im.set("version", "foo");
@@ -1232,7 +1232,7 @@ describe("MigrationTest", () => {
   it("updating an existing entry into internal metadata", async () => {
     const adapter = Base.connection;
     const { InternalMetadata } = await import("./internal-metadata.js");
-    const im = new InternalMetadata(adapter);
+    const im = new InternalMetadata(adapter.pool);
     await im.createTable();
     await im.set("foo", "bar");
     await im.set("foo", "baz");
@@ -1246,7 +1246,7 @@ describe("MigrationTest", () => {
     // (no stale cache blocking re-creation) holds trivially in our implementation.
     const adapter = Base.connection;
     const { InternalMetadata } = await import("./internal-metadata.js");
-    const im = new InternalMetadata(adapter);
+    const im = new InternalMetadata(adapter.pool);
 
     // First transaction: create + write + commit
     await adapter.beginTransaction();
@@ -1280,7 +1280,7 @@ describe("MigrationTest", () => {
     // re-entrant across transactions. Verify that successive createTable() +
     // createVersion() pairs work correctly — the IF NOT EXISTS guard is idempotent.
     const adapter = Base.connection;
-    const sm = new SchemaMigration(adapter);
+    const sm = new SchemaMigration(adapter.pool);
 
     // First transaction: create + write + commit
     await adapter.beginTransaction();
@@ -1440,8 +1440,8 @@ describe("MigrationTest", () => {
     const migrator = new Migrator(
       "up",
       [],
-      new SchemaMigration(realAdapter),
-      new InternalMetadata(realAdapter),
+      new SchemaMigration(realAdapter.pool),
+      new InternalMetadata(realAdapter.pool),
     );
     const lockId = await migrator.generateMigratorAdvisoryLockId();
     const acquired = await (realAdapter as any).getAdvisoryLock(lockId);
@@ -1461,8 +1461,8 @@ describe("MigrationTest", () => {
     const migrator = new Migrator(
       "up",
       [],
-      new SchemaMigration(testAdapter),
-      new InternalMetadata(testAdapter),
+      new SchemaMigration(testAdapter.pool),
+      new InternalMetadata(testAdapter.pool),
     );
     const lockId = await migrator.generateMigratorAdvisoryLockId();
     // Must fit in a signed 63-bit integer
@@ -1491,8 +1491,8 @@ describe("MigrationTest", () => {
       const migrator = new Migrator(
         "up",
         [proxy],
-        new SchemaMigration(adapter),
-        new InternalMetadata(adapter),
+        new SchemaMigration(adapter.pool),
+        new InternalMetadata(adapter.pool),
       );
       await expect(migrator.migrate()).rejects.toThrow(ConcurrentMigrationError);
     } finally {
@@ -1522,8 +1522,8 @@ describe("MigrationTest", () => {
       const migrator = new Migrator(
         "up",
         [proxy],
-        new SchemaMigration(adapter),
-        new InternalMetadata(adapter),
+        new SchemaMigration(adapter.pool),
+        new InternalMetadata(adapter.pool),
       );
       await expect(migrator.run("up", 100)).rejects.toThrow(ConcurrentMigrationError);
     } finally {
@@ -1555,8 +1555,8 @@ describe("MigrationTest", () => {
         const migrator = new Migrator(
           "up",
           [proxy],
-          new SchemaMigration(realAdapter),
-          new InternalMetadata(realAdapter),
+          new SchemaMigration(realAdapter.pool),
+          new InternalMetadata(realAdapter.pool),
         );
         await migrator.migrate();
         expect(getSpy).toHaveBeenCalledTimes(1);
@@ -1585,8 +1585,8 @@ describe("MigrationTest", () => {
       const migrator = new Migrator(
         "up",
         [proxy],
-        new SchemaMigration(realAdapter),
-        new InternalMetadata(realAdapter),
+        new SchemaMigration(realAdapter.pool),
+        new InternalMetadata(realAdapter.pool),
         100,
       );
       const lockId = await migrator.generateMigratorAdvisoryLockId();

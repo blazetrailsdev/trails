@@ -59,8 +59,8 @@ describe("SchemaStatements#assumeMigratedUptoVersion", () => {
     restore = pointPoolAt([VALID]);
     previousGlobalPaths = Migrator.migrationsPaths;
     Migrator.migrationsPaths = [OLD_AND_NEW_VERSIONS];
-    await new SchemaMigration(Base.connection).dropTable();
-    await new SchemaMigration(Base.connection).createTable();
+    await new SchemaMigration(Base.connection.pool).dropTable();
+    await new SchemaMigration(Base.connection.pool).createTable();
   });
 
   afterEach(() => {
@@ -70,7 +70,7 @@ describe("SchemaStatements#assumeMigratedUptoVersion", () => {
 
   it("backfills every known version up to the target through the pool's migration context", async () => {
     await assumeMigratedUptoVersion(3);
-    expect(await new SchemaMigration(Base.connection).integerVersions()).toEqual([1, 2, 3]);
+    expect(await new SchemaMigration(Base.connection.pool).integerVersions()).toEqual([1, 2, 3]);
   });
 
   it("does not re-insert a version the schema_migrations table already holds", async () => {
@@ -93,7 +93,7 @@ describe("SchemaStatements#assumeMigratedUptoVersion", () => {
   });
 
   it("reports no applied versions when schema_migrations does not exist", async () => {
-    await new SchemaMigration(Base.connection).dropTable();
+    await new SchemaMigration(Base.connection.pool).dropTable();
     expect(await Base.connectionPool().migrationContext.getAllVersions()).toEqual([]);
     expect(await Base.connectionPool().migrationContext.currentVersion()).toBe(0);
   });

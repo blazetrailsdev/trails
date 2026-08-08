@@ -18,8 +18,8 @@ async function resolvePending(migrations: MigrationProxy[]): Promise<MigrationPr
     const migrator = new Migrator(
       "up",
       migrations,
-      new SchemaMigration(adapter),
-      new InternalMetadata(adapter),
+      new SchemaMigration(adapter.pool),
+      new InternalMetadata(adapter.pool),
     );
     pending = await migrator.pendingMigrationsReadOnly();
   });

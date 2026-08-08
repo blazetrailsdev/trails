@@ -148,6 +148,14 @@ export async function resetTestTables(adapter: DatabaseAdapter): Promise<void> {
 
 type ResetMode = "drop-all" | "reset";
 
+/**
+ * Drops or truncates per `mode`, then clears the pool's data-source cache: the
+ * drops are raw `DROP TABLE` statements rather than `SchemaStatements#drop_table`
+ * (`abstract/schema_statements.rb:485`), so nothing else invalidates the cache
+ * `InternalMetadata#table_exists?` reads (`internal_metadata.rb:108-110`) — a
+ * stale entry reports a dropped `ar_internal_metadata` as present and the next
+ * read raises on the missing table.
+ */
 async function resetTables(
   adapter: DatabaseAdapter,
   mode: ResetMode,
@@ -164,6 +172,7 @@ async function resetTables(
       await resetSqliteTables(adapter, mode, bootLaid);
       break;
   }
+  adapter.schemaCache.clearBang();
 }
 
 /**

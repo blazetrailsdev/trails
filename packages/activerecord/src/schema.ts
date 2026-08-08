@@ -71,7 +71,7 @@ export class Schema extends Current {
     //   connection_pool.schema_migration.create_table
     //   connection.assume_migrated_upto_version(info[:version]) if info[:version]
     //   connection_pool.internal_metadata.create_table_and_set_flags(env)
-    const schemaMigration = new SchemaMigration(adapter);
+    const schemaMigration = new SchemaMigration(adapter.pool);
     await schemaMigration.createTable();
     if (info.version !== undefined) {
       // Go through SchemaStatements#assumeMigratedUptoVersion (reached
@@ -95,7 +95,7 @@ export class Schema extends Current {
       getEnv("TRAILS_ENV") ??
       getEnv("NODE_ENV") ??
       DatabaseConfigurations.defaultEnv;
-    const internalMetadata = new InternalMetadata(adapter);
+    const internalMetadata = new InternalMetadata(adapter.pool);
     await internalMetadata.createTableAndSetFlags(environment);
   }
 

@@ -74,7 +74,7 @@ describe("MigrationTest", () => {
     const adapter = Base.connection;
     // Nothing drops schema_migrations between tests, so start from a clean
     // versions table to assert currentVersion === 1.
-    await new SchemaMigration(adapter).dropTable();
+    await new SchemaMigration(adapter.pool).dropTable();
     const migrations: MigrationProxy[] = [
       {
         version: 1,
@@ -85,8 +85,8 @@ describe("MigrationTest", () => {
     const migrator = new Migrator(
       "up",
       migrations,
-      new SchemaMigration(adapter),
-      new InternalMetadata(adapter),
+      new SchemaMigration(adapter.pool),
+      new InternalMetadata(adapter.pool),
     );
     await migrator.migrate();
     expect(await migrator.currentVersion()).toBe(1);

@@ -145,20 +145,19 @@ export class NullPool implements AbstractPool {
    * Ruby does not override `method_missing`, so *every* send NullPool has no
    * method for raises — not a fixed set of names.
    *
-   * A symbol key and an {@link ADAPTER_PROXY_PROBE_KEYS} name are not Ruby sends
-   * but JS-only probes — thenable duck-typing, serializers, test matchers — and
-   * read through to `undefined` as they do on the adapter proxy. A NullPool is
-   * held as adapter state and by InternalMetadata / SchemaMigration, so a
-   * serializer walking a failing assertion's object graph reaches one; raising
-   * from its `then` or `toJSON` would replace the real failure with a
-   * NoMethodError from the reporter. Ruby's Object supplies `inspect` and `to_s`
-   * to its NullPool as well, so raising on those two would itself be the
-   * divergence.
+   * A symbol key is the one carve-out the language forces: a JS `Symbol` cannot
+   * spell a Ruby send, so `Symbol.iterator`/`Symbol.toPrimitive` and friends are
+   * not sends NullPool is missing a method for and read through to `undefined`.
+   * String keys get no such carve-out — `pool.then` and `pool.toJSON` are a
+   * NoMethodError in Ruby and are one here. What Ruby *does* answer, it answers
+   * through the ancestor chain: `to_s` arrives as `Object.prototype.toString`
+   * and so satisfies `prop in target`, and {@link inspect} is declared below for
+   * the same reason.
    */
   constructor() {
     return new Proxy(this, {
       get(target, prop, receiver) {
-        if (typeof prop === "symbol" || prop in target || ADAPTER_PROXY_PROBE_KEYS.has(prop)) {
+        if (typeof prop === "symbol" || prop in target) {
           return Reflect.get(target, prop, receiver);
         }
         throw new NoMethodError(
@@ -166,6 +165,28 @@ export class NullPool implements AbstractPool {
         );
       },
     });
+  }
+
+  /**
+   * Ruby's `Object#inspect`, which `NullPool` inherits: it defines no `inspect`
+   * of its own and overrides no `method_missing`
+   * (`abstract/connection_pool.rb:14-51`), so the send resolves up the ancestor
+   * chain and answers a String rather than raising. JS has no `Object.prototype`
+   * member of that name for `prop in target` to find, so the inherited method is
+   * declared here to keep the send answering.
+   *
+   * `Object#inspect` dumps the class name and every instance variable as
+   * `@name=value`. Ruby's NullPool carries two (`abstract/connection_pool.rb:24-28`)
+   * and this renders the one the port also carries. `@mutex` is absent rather
+   * than placeheld: JS has no thread to lock against, so the port has no such
+   * field, and printing a key for state that does not exist would be the larger
+   * divergence. The `0x…` address is dropped for the same reason
+   * `AbstractAdapter#inspect` has to synthesize its own — `object_id` has no
+   * counterpart — and no caller reads either.
+   */
+  inspect(): string {
+    const v = this._serverVersion;
+    return `#<ActiveRecord::ConnectionAdapters::NullPool @server_version=${v == null ? "nil" : String(v)}>`;
   }
 
   /**

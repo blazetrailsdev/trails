@@ -1178,11 +1178,20 @@ describe("NullPool member parity", () => {
     }
     expect(pool.dirtiesQueryCache).toBe(true);
     expect(pool.schemaCache).toBeNull();
-    // A JS-only probe is not a Ruby send: a serializer reaching a NullPool
-    // through adapter state must see a non-callable, not a NoMethodError.
-    for (const probe of ["then", "toJSON", "asymmetricMatch", "nodeType", "inspect"]) {
-      expect(pool[probe]).toBeUndefined();
+    for (const probe of ["then", "toJSON", "asymmetricMatch", "nodeType"]) {
+      expect(() => pool[probe]).toThrow(NoMethodError);
     }
+    expect((pool.inspect as () => string)()).toBe(
+      "#<ActiveRecord::ConnectionAdapters::NullPool @server_version=nil>",
+    );
     expect(pool.toString).toBe(Object.prototype.toString);
+    expect(pool[Symbol.toStringTag as unknown as string]).toBeUndefined();
+  });
+
+  it("lets a failing assertion whose subject holds a NullPool report its own failure", () => {
+    const adapter = new AbstractAdapter();
+    expect(() =>
+      expect({ pool: adapter.pool, n: 1 }).toEqual({ pool: adapter.pool, n: 2 }),
+    ).toThrow(/expected/i);
   });
 });
