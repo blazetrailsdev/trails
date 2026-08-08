@@ -292,11 +292,13 @@ export function asJson(value: unknown, options?: EncodeOptions | null): unknown 
   if (typeof value === "number") return Float.asJson(value);
   if (typeof value === "bigint") return Numeric.asJson(value);
 
-  if (typeof value === "function") return Module.asJson(value as { name: string });
-
-  // A class of our own that defines `as_json`, exactly as Ruby's would.
+  // A class of our own that defines `as_json`, exactly as Ruby's would. A
+  // `def self.as_json` singleton outranks `Module#as_json` in Ruby's lookup,
+  // so this precedes the Module arm.
   const own = (value as { asJson?: (o?: unknown) => unknown }).asJson;
   if (typeof own === "function") return own.call(value, options ?? undefined);
+
+  if (typeof value === "function") return Module.asJson(value as { name: string });
 
   if (value instanceof Temporal.Instant || value instanceof Temporal.ZonedDateTime) {
     return Time.asJson(value);

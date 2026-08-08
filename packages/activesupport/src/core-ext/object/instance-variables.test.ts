@@ -1,24 +1,19 @@
 import { describe, expect, it } from "vitest";
 
+import { Object } from "./instance-variables.js";
+
 describe("ObjectInstanceVariableTest", () => {
+  /** Rails' `setup` (instance_variables_test.rb:7-11). */
+  function source(): object {
+    return { bar: "bar", baz: "baz" };
+  }
+
   it("instance variable names", () => {
-    class Obj {
-      name = "test";
-      value = 42;
-    }
-    const o = new Obj();
-    expect(Object.keys(o)).toContain("name");
-    expect(Object.keys(o)).toContain("value");
+    expect(Object.instanceVariableNames(source()).sort()).toEqual(["bar", "baz"]);
   });
 
   it("instance values", () => {
-    class Obj {
-      a = 1;
-      b = "two";
-    }
-    const o = new Obj();
-    expect(Object.values(o)).toContain(1);
-    expect(Object.values(o)).toContain("two");
+    expect(Object.instanceValues(source())).toEqual({ bar: "bar", baz: "baz" });
   });
 
   it("instance exec passes arguments to block", () => {
@@ -41,7 +36,7 @@ describe("ObjectInstanceVariableTest", () => {
   });
 
   it("instance exec with frozen obj", () => {
-    const obj = Object.freeze({ x: 10 });
+    const obj = globalThis.Object.freeze({ x: 10 });
     expect(() => {
       function instanceExec<T, R>(o: T, fn: (this: T) => R): R {
         return fn.call(o);

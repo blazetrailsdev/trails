@@ -7,8 +7,12 @@
  *
  * JavaScript has no instance variables; an object's own enumerable properties
  * are the analogue, so `Object.keys` stands in for Ruby's `instance_variables`.
- * They carry no leading `@`, which is why `instanceValues` has no `[1..-1]` to
- * strip and `instanceVariableNames` returns the names as they are.
+ *
+ * Ruby's two readers differ by the leading `@`: `instance_values` strips it
+ * (`ivar[1..-1]`, :17) and `instance_variable_names` keeps it (`["@y", "@x"]`,
+ * :23). JS property names never carry one, so the distinction collapses and
+ * both return the bare name. Synthesizing an `@` would invent a sigil no JS
+ * reader — `Object.keys`, `in`, a bracket access — would accept back.
  */
 export class Object {
   /** `Object#instance_values` (instance_variables.rb:14-18). */
@@ -23,8 +27,9 @@ export class Object {
 
   /**
    * `Object#instance_variable_names` (instance_variables.rb:24-26). Ruby's
-   * `map(&:name)` turns each ivar Symbol into its String; `Object.keys` already
-   * yields strings, so the map is the identity.
+   * `map(&:name)` turns each ivar Symbol into its String — `:@y` into `"@y"`.
+   * `Object.keys` already yields strings, and there is no `@` on them, so the
+   * map has nothing left to do.
    */
   static instanceVariableNames(self: object): string[] {
     return globalThis.Object.keys(self).map((ivar) => ivar);
