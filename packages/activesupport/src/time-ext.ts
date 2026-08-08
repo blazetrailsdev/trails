@@ -417,9 +417,9 @@ export function change(
   if (newNsec !== undefined) {
     if (options.usec !== undefined) {
       throw new ArgumentError(
-        `Can't change both :nsec and :usec at the same time: ${Object.entries(options)
+        `Can't change both :nsec and :usec at the same time: {${Object.entries(options)
           .map(([key, value]) => `${key}: ${String(value)}`)
-          .join(", ")}`,
+          .join(", ")}}`,
       );
     }
     newUsec = newNsec / 1000;
@@ -453,10 +453,9 @@ export function change(
     // `if new_offset` (time/calculations.rb:145-146). Ruby's `::Time.new` takes
     // the offset as a `"+HH:MM"` String or a seconds Integer; Temporal spells
     // the same fixed-offset zone with the String form only.
-    const absOffset = typeof newOffset === "number" ? Math.abs(newOffset) : 0;
     const timeZone =
       typeof newOffset === "number"
-        ? `${newOffset < 0 ? "-" : "+"}${String(Math.floor(absOffset / 3600)).padStart(2, "0")}:${String(Math.floor((absOffset % 3600) / 60)).padStart(2, "0")}`
+        ? `${newOffset < 0 ? "-" : "+"}${String(Math.floor(Math.abs(newOffset) / 3600)).padStart(2, "0")}:${String(Math.floor((Math.abs(newOffset) % 3600) / 60)).padStart(2, "0")}`
         : newOffset;
     const newTime = Temporal.ZonedDateTime.from({ timeZone, ...newComponents });
     return date instanceof Date ? newTime.toInstant() : newTime;
