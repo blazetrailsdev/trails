@@ -7,6 +7,7 @@
  */
 
 import { TimeZone } from "./values/time-zone.js";
+import { Duration } from "./duration.js";
 import { TimeWithZone } from "./time-with-zone.js";
 import { currentTime } from "./time-travel.js";
 import { instantFrom } from "./temporal.js";
@@ -34,7 +35,7 @@ export function getZone(): TimeZone | null {
  * Mirrors `IsolatedExecutionState[:time_zone] = find_zone!(time_zone)`
  * (zones.rb:41-43).
  */
-export function setZone(zone: TimeZone | string | null | false): void {
+export function setZone(zone: TimeZone | string | number | Duration | null | false): void {
   _zone = findZoneBang(zone);
 }
 
@@ -102,28 +103,33 @@ export function findZone(zone: unknown): TimeZone | null | false {
 }
 
 /**
- * Find a timezone, raising if not found.
- * Matches Rails' Time.find_zone!
+ * `Time.find_zone!` (core_ext/time/zones.rb:80-90): `return time_zone unless
+ * time_zone`, then `ActiveSupport::TimeZone[time_zone] || raise(ArgumentError,
+ * "Invalid Timezone: #{time_zone}")`. The whole argument dispatch — including
+ * the Numeric/Duration offset scan — lives in `TimeZone.find`, the port of
+ * `[]` (time_zone.rb:232-250).
+ *
+ * Deviation: `[]` returns `nil` for a name or offset it cannot match and
+ * raises only for an argument of the wrong class (time_zone.rb:249), while
+ * trails' `find` throws in both cases. The argument-class arm therefore stays
+ * here, so each of Rails' two messages is still raised for its own case.
  */
 export function findZoneBang(zone: unknown): TimeZone | null | false {
   if (zone === null || zone === undefined) return null;
   if (zone === false) return false;
-  if (zone instanceof TimeZone) return zone;
-  if (typeof zone === "string") {
+  if (
+    typeof zone === "string" ||
+    typeof zone === "number" ||
+    zone instanceof Duration ||
+    zone instanceof TimeZone
+  ) {
     try {
       return TimeZone.find(zone);
     } catch {
-      throw new ArgumentError(`Invalid time zone: ${zone}`);
+      throw new ArgumentError(`Invalid Timezone: ${String(zone)}`);
     }
   }
-  if (typeof zone === "number") {
-    try {
-      return TimeZone.find(zone.toString());
-    } catch {
-      throw new ArgumentError(`Invalid time zone: ${zone}`);
-    }
-  }
-  throw new ArgumentError(`Invalid time zone: invalid argument to TimeZone[]`);
+  throw new ArgumentError(`invalid argument to TimeZone[]: ${String(zone)}`);
 }
 
 /**

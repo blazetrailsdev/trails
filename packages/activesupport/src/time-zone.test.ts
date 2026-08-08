@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { TimeZone } from "./values/time-zone.js";
+import { Duration } from "./duration.js";
 import { TimeWithZone } from "./time-with-zone.js";
 import { instantFromDate } from "./testing/temporal-helpers.js";
 
@@ -53,19 +54,11 @@ describe("TimeZoneTest", () => {
   // mapping
   // ---------------------------------------------------------------------------
   it("from integer to map", () => {
-    const eastern = TimeZone.find("Eastern Time (US & Canada)");
-    const offset = eastern.utcOffset;
-    const zones = TimeZone.all().filter((z) => z.utcOffset === offset);
-    expect(zones.length).toBeGreaterThan(0);
-    expect(zones.some((z) => z.name === "Eastern Time (US & Canada)")).toBe(true);
+    expect(TimeZone.find(-28800)).toBeInstanceOf(TimeZone); // PST
   });
 
   it("from duration to map", () => {
-    const eastern = TimeZone.find("Eastern Time (US & Canada)");
-    const offset = eastern.utcOffset;
-    expect(offset).toBeLessThan(0);
-    const zones = TimeZone.all().filter((z) => z.utcOffset === offset);
-    expect(zones.length).toBeGreaterThan(0);
+    expect(TimeZone.find(Duration.minutes(-480))).toBeInstanceOf(TimeZone); // PST
   });
 
   it("from tzinfo to map", () => {
@@ -687,6 +680,14 @@ describe("TimeZoneTest", () => {
 
   it("all sorted", () => {
     const zones = TimeZone.all();
+    for (let i = 1; i < zones.length; i++) {
+      const previous = zones[i - 1];
+      const current = zones[i];
+      expect(
+        previous.utcOffset < current.utcOffset ||
+          (previous.utcOffset === current.utcOffset && previous.name < current.name),
+      ).toBe(true);
+    }
     expect(zones.length).toBeGreaterThan(100);
     // Verify we get a reasonable set of zones
     expect(zones.some((z) => z.name === "UTC")).toBe(true);

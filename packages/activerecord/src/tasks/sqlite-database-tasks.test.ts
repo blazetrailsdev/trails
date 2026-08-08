@@ -112,7 +112,14 @@ describe("SQLiteDatabaseTasks", () => {
     );
     await (seedAdapter as unknown as { close(): Promise<void> }).close();
 
-    await new SQLiteDatabaseTasks(sourceConfig).structureDump(dumpPath);
+    // Rails' structure_dump reaches its adapter with a bare
+    // `ActiveRecord::Base.lease_connection` (sqlite_database_tasks.rb:43,68-70),
+    // so the task's db_config has to be the established one before it runs —
+    // which is the caller's job, as it is for `db:schema:dump`
+    // (database_tasks.rb:523-530).
+    await DatabaseTasks.withTemporaryConnection(sourceConfig, async () => {
+      await new SQLiteDatabaseTasks(sourceConfig).structureDump(dumpPath);
+    });
 
     const dumped = fs.readFileSync(dumpPath, "utf8");
     expect(dumped).toMatch(/CREATE TABLE widgets/);
@@ -130,7 +137,9 @@ describe("SQLiteDatabaseTasks", () => {
       database: loadDbPath,
     });
     fs.writeFileSync(loadDbPath, "");
-    await new SQLiteDatabaseTasks(targetConfig).structureLoad(dumpPath);
+    await DatabaseTasks.withTemporaryConnection(targetConfig, async () => {
+      await new SQLiteDatabaseTasks(targetConfig).structureLoad(dumpPath);
+    });
 
     const loadedAdapter = new BetterSQLite3Adapter(loadDbPath);
     try {
