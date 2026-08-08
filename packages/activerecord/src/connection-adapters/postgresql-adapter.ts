@@ -3235,23 +3235,6 @@ export class PostgreSQLAdapter
       if (PostgreSQLAdapter._isConnectionError(error)) this._discardRawConnection();
       throw error;
     }
-    // Eagerly populate optimizer hints flag
-    if (this._hasOptimizerHints === null) {
-      try {
-        const result = await conn.query(
-          "SELECT COUNT(*) AS count FROM pg_available_extensions WHERE name = $1",
-          ["pg_hint_plan"],
-        );
-        this._hasOptimizerHints = Number(result.rows[0]?.count) > 0;
-      } catch (error) {
-        // Carry the version-probe block's recovery forward: tear down on a
-        // dead socket so the next _acquireFreshClient() opens a fresh pg.Client rather
-        // than handing back the stale handle (the recovery the former
-        // withClient body provided before being swallowed by a bare catch).
-        if (PostgreSQLAdapter._isConnectionError(error)) this._discardRawConnection();
-        this._hasOptimizerHints = false;
-      }
-    }
     return version;
   }
 
@@ -3396,10 +3379,16 @@ export class PostgreSQLAdapter
     return (await this.databaseVersion) >= 90400;
   }
 
-  private _hasOptimizerHints: boolean | null = null;
+  private _hasPgHintPlan?: boolean;
 
+  // Mirrors: PostgreSQLAdapter#supports_optimizer_hints?
+  // (postgresql_adapter.rb:444-449) — `unless defined?(@has_pg_hint_plan)`, so
+  // the `extension_available?` probe runs once, on first read.
   async supportsOptimizerHints(): Promise<boolean> {
-    return this._hasOptimizerHints ?? false;
+    if (this._hasPgHintPlan === undefined) {
+      this._hasPgHintPlan = await this.extensionAvailable("pg_hint_plan");
+    }
+    return this._hasPgHintPlan;
   }
 
   async supportsCommonTableExpressions(): Promise<boolean> {
