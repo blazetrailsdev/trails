@@ -944,31 +944,33 @@ export function _reapplyNestedAttrSetters(
 }
 
 /**
- * The association arm of Rails' `public_send("#{key}=", value)`
- * (attribute_assignment.rb:67-69). RFC 0087 §1 removed the generated
- * `#{name}=` property setter for the writers that do I/O at assignment —
- * `replace`'s diffed deletes+inserts (collection_association.rb:46-48) and
- * `ids_writer`'s resolving query (:61-83) — because a JS property setter
- * cannot await them, so the dispatch reaches them by their association-level
- * Rails names here instead.
+ * Resolves the association arm of Rails' `public_send("#{key}=", value)`
+ * (attribute_assignment.rb:67-69) to the writer it would reach. RFC 0087 §1
+ * removed the generated `#{name}=` property setter for the writers that do I/O
+ * at assignment — `replace`'s diffed deletes+inserts
+ * (collection_association.rb:46-48) and `ids_writer`'s resolving query (:61-83)
+ * — because a JS property setter cannot await them, so the dispatch finds them
+ * by their association-level Rails names here instead.
+ *
+ * Resolution only: the writer is returned unsent, so `respond_to?(setter)` and
+ * `public_send(setter, v)` stay separate steps and every caller of
+ * `_assignAttribute` gets the same one behaviour.
  */
-function associationWriterPromise(
+function associationWriter(
   self: AttributeIO,
   key: string,
-  value: unknown,
-): Promise<void> | undefined {
+): ((value: unknown) => unknown) | undefined {
   const ctor = (self as any).constructor as typeof Base;
   for (const ref of reflectOnAllAssociations(ctor)) {
     const name = String(ref.name);
     if (ref.isCollection()) {
-      if (key === name) return (self as any).association(name).writer(value);
+      if (key === name) return (value) => (self as any).association(name).writer(value);
       if (key === `${singularize(name)}Ids`)
-        return (self as any).association(name).idsWriter(value);
+        return (value) => (self as any).association(name).idsWriter(value);
     } else if (key === name && ref.macro === "hasOne") {
       // Rails' `#{name}=` removes the displaced record and saves the new one
       // inline (has_one_association.rb:59-84).
-      const result: unknown = (self as any).association(name).writer(value);
-      return result instanceof Promise ? (result as Promise<void>) : undefined;
+      return (value) => (self as any).association(name).writer(value);
     }
   }
   return undefined;
@@ -993,24 +995,18 @@ function associationWriterPromise(
  * (has_one_association.rb:69) a write; that promise is returned rather than
  * dropped.
  */
-function _assignAttribute(
-  self: AttributeIO,
-  key: string,
-  value: unknown,
-  awaitable: boolean,
-): Promise<void> | void {
+function _assignAttribute(self: AttributeIO, key: string, value: unknown): Promise<void> | void {
   const configs = (self as any).constructor?._nestedAttributeConfigs as
     | { associationName: string }[]
     | undefined;
   if (configs?.some((c) => `${c.associationName}Attributes` === key)) {
     return (self as any)[`set${camelize(key, true)}`](value) as Promise<void> | void;
   }
-  // Only an awaited caller can resolve these keys to a writer at all (see
-  // `associationWriterPromise`). On the synchronous surface there is genuinely
-  // no method for the key, so `attribute_writer_missing`
-  // (attribute_assignment.rb:71-73) answers, as in Rails when a setter is absent.
-  const associationWrite = awaitable ? associationWriterPromise(self, key, value) : undefined;
-  if (associationWrite) return associationWrite;
+  const writer = associationWriter(self, key);
+  if (writer) {
+    const result: unknown = writer(value);
+    return result instanceof Promise ? (result as Promise<void>) : undefined;
+  }
   const setter = findPrototypeSetter(self, key);
   if (setter) {
     const result: unknown = setter.call(self, value);
@@ -1053,7 +1049,19 @@ export function assignAttributes(this: AttributeIO, attrs: Record<string, unknow
   // sanitizer, so a blank strong-params object is a no-op rather than raising;
   // `isMassAssignmentEmpty` reads a wrapper's contents, not its own fields.
   if (isMassAssignmentEmpty(attrs)) return;
-  for (const pending of _assignAttributes(this, sanitizeForMassAssignment(attrs), false)) {
+  const newAttributes = sanitizeForMassAssignment(attrs);
+  // The one place the synchronous surface parts company with the awaitable one,
+  // and it lives here rather than in the shared `_assign_attribute` port:
+  // RFC 0087 §1 left no `#{key}=` property setter for the association writers
+  // that do I/O at assignment (collection_association.rb:46-48, :61-83;
+  // has_one_association.rb:59-84), so on a surface that cannot await them
+  // `respond_to?(setter)` is genuinely false and the key falls through to
+  // `writeAttribute`, which raises for a name that is not an attribute. Sent
+  // ahead of the loop so the write is never started, only refused.
+  for (const [key, value] of Object.entries(newAttributes)) {
+    if (associationWriter(this, key)) this.writeAttribute(key, value);
+  }
+  for (const pending of _assignAttributes(this, newAttributes)) {
     parkNestedReaderLoad(this as unknown as Base, pending);
   }
 }
@@ -1072,7 +1080,7 @@ export async function setAttributes(
 ): Promise<void> {
   assertHashAttributes(attrs);
   if (isMassAssignmentEmpty(attrs)) return;
-  for (const pending of _assignAttributes(this, sanitizeForMassAssignment(attrs), true)) {
+  for (const pending of _assignAttributes(this, sanitizeForMassAssignment(attrs))) {
     await pending;
   }
 }
@@ -1111,7 +1119,6 @@ function isNestedParameterHash(value: unknown): boolean {
 function* _assignAttributes(
   self: AttributeIO,
   attrs: Record<string, unknown>,
-  awaitable: boolean,
 ): Generator<Promise<void>, void, undefined> {
   let multiParameterAttributes: Record<string, unknown> | null = null;
   let nestedParameterAttributes: Record<string, unknown> | null = null;
@@ -1122,13 +1129,13 @@ function* _assignAttributes(
     } else if (isNestedParameterHash(value)) {
       (nestedParameterAttributes ??= {})[key] = value;
     } else {
-      const pending = _assignAttribute(self, key, value, awaitable);
+      const pending = _assignAttribute(self, key, value);
       if (pending) yield pending;
     }
   }
 
   if (nestedParameterAttributes) {
-    yield* assignNestedParameterAttributes(self, nestedParameterAttributes, awaitable);
+    yield* assignNestedParameterAttributes(self, nestedParameterAttributes);
   }
   if (multiParameterAttributes) {
     const multi = extractMultiparameterCallstack(multiParameterAttributes).multiparams;
@@ -1144,10 +1151,9 @@ function* _assignAttributes(
 function* assignNestedParameterAttributes(
   self: AttributeIO,
   pairs: Record<string, unknown>,
-  awaitable: boolean,
 ): Generator<Promise<void>, void, undefined> {
   for (const [k, v] of Object.entries(pairs)) {
-    const pending = _assignAttribute(self, k, v, awaitable);
+    const pending = _assignAttribute(self, k, v);
     if (pending) yield pending;
   }
 }
