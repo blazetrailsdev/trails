@@ -3,54 +3,52 @@ import { SchemaCreation } from "./schema-creation.js";
 import { CreateIndexDefinition, IndexDefinition, TableDefinition } from "./schema-definitions.js";
 import { Base } from "../../base.js";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
+import { currentAdapter } from "../../support/adapter-helper.js";
 import { describeIfPostgresqlAdapter } from "../../support/describe-if-postgresql-adapter.js";
 import type { TableDefinitionConn } from "./schema-definitions.js";
+import type { SchemaCreationConn } from "./schema-creation.js";
 
 // Rails hands `SchemaCreation.new` an `ActiveRecord::Base.lease_connection`
 // (adapter_test.rb, migration/columns_test.rb); a suite whose assertions turn on
 // one dialect's quoting runs under that dialect's `current_adapter?` gate.
-let conn: TableDefinitionConn;
+let conn: TableDefinitionConn & SchemaCreationConn;
 
 beforeAll(async () => {
-  conn = (await Base.leaseConnection()) as unknown as TableDefinitionConn;
+  conn = (await Base.leaseConnection()) as unknown as TableDefinitionConn & SchemaCreationConn;
 });
 
 describe("SchemaCreation#typeToSql blank type guard", () => {
   it("throws a descriptive error for an empty custom type", () => {
-    expect(() => new SchemaCreation("sqlite", conn).typeToSql("" as any)).toThrow(
-      /empty or blank type/,
-    );
+    expect(() => new SchemaCreation(conn).typeToSql("" as any)).toThrow(/empty or blank type/);
   });
 
   it("throws a descriptive error for a whitespace-only custom type", () => {
-    expect(() => new SchemaCreation("sqlite", conn).typeToSql("   " as any)).toThrow(
-      /empty or blank type/,
-    );
+    expect(() => new SchemaCreation(conn).typeToSql("   " as any)).toThrow(/empty or blank type/);
   });
 });
 
 describe("SchemaCreation#typeToSql virtual / nil pass-through", () => {
   it("returns '' for a nil type (Rails type_to_sql: type.to_s of nil)", () => {
-    expect(new SchemaCreation("sqlite", conn).typeToSql(undefined as any)).toBe("");
+    expect(new SchemaCreation(conn).typeToSql(undefined as any)).toBe("");
   });
 
   it("passes 'virtual' through verbatim, with no options.type/string fallback", () => {
     // Rails' type_to_sql has no :virtual case, so type_to_sql(:virtual) → "virtual".
     // The :virtual → options[:type] mapping is newColumnDefinition-only.
-    expect(
-      new SchemaCreation("sqlite", conn).typeToSql("virtual" as any, { type: "integer" } as any),
-    ).toBe("virtual");
+    expect(new SchemaCreation(conn).typeToSql("virtual" as any, { type: "integer" } as any)).toBe(
+      "virtual",
+    );
   });
 });
 
 describeIfPostgresqlAdapter("SchemaCreation drop-constraint visitors", () => {
   it("visit_DropForeignKey emits DROP CONSTRAINT with a quoted name", () => {
-    const sc = new SchemaCreation("postgres", conn) as any;
+    const sc = new SchemaCreation(conn) as any;
     expect(sc.visitDropForeignKey("fk_rails_abc")).toBe('DROP CONSTRAINT "fk_rails_abc"');
   });
 
   it("visit_DropCheckConstraint emits DROP CONSTRAINT with a quoted name", async () => {
-    const sc = new SchemaCreation("postgres", conn) as any;
+    const sc = new SchemaCreation(conn) as any;
     expect(await sc.visitDropCheckConstraint("chk_rails_abc")).toBe(
       'DROP CONSTRAINT "chk_rails_abc"',
     );
@@ -79,7 +77,7 @@ describeIfSqlite("SchemaCreation#visit_TableDefinition inline indexes", () => {
     td.string("email");
     td.index("email");
 
-    const sql = await new IndexesInCreate("sqlite", conn).accept(td);
+    const sql = await new IndexesInCreate(conn).accept(td);
     expect(sql).toContain("INDEX index_users_on_email (email)");
   });
 
@@ -91,32 +89,37 @@ describeIfSqlite("SchemaCreation#visit_TableDefinition inline indexes", () => {
     td.string("email");
     td.index("email");
 
-    const sql = await new SchemaCreation("sqlite", conn).accept(td);
+    const sql = await new SchemaCreation(conn).accept(td);
     expect(sql).not.toContain("INDEX");
   });
 });
 
+// Rails delegates every capability probe to `@conn`
+// (abstract/schema_creation.rb:16-21), so the visitor's answer is the lane
+// connection's — version gates included.
 describe("SchemaCreation support predicates", () => {
   it("supports_indexes_in_create? is true only on MySQL", () => {
-    expect((new SchemaCreation("mysql", conn) as any).supportsIndexesInCreate()).toBe(true);
-    expect((new SchemaCreation("postgres", conn) as any).supportsIndexesInCreate()).toBe(false);
-    expect((new SchemaCreation("sqlite", conn) as any).supportsIndexesInCreate()).toBe(false);
+    expect((new SchemaCreation(conn) as any).supportsIndexesInCreate()).toBe(
+      currentAdapter("Mysql2Adapter"),
+    );
   });
 
   it("supports_exclusion_constraints? is true only on PostgreSQL", () => {
-    expect((new SchemaCreation("postgres", conn) as any).supportsExclusionConstraints()).toBe(true);
-    expect((new SchemaCreation("mysql", conn) as any).supportsExclusionConstraints()).toBe(false);
+    expect((new SchemaCreation(conn) as any).supportsExclusionConstraints()).toBe(
+      currentAdapter("PostgreSQLAdapter"),
+    );
   });
 
   it("supports_unique_constraints? is true only on PostgreSQL", () => {
-    expect((new SchemaCreation("postgres", conn) as any).supportsUniqueConstraints()).toBe(true);
-    expect((new SchemaCreation("mysql", conn) as any).supportsUniqueConstraints()).toBe(false);
+    expect((new SchemaCreation(conn) as any).supportsUniqueConstraints()).toBe(
+      currentAdapter("PostgreSQLAdapter"),
+    );
   });
 });
 
 describeIfPostgresqlAdapter("SchemaCreation quoting delegations", () => {
   it("quote_column_name / quote_table_name delegate to the quoter", () => {
-    const sc = new SchemaCreation("postgres", conn) as any;
+    const sc = new SchemaCreation(conn) as any;
     expect(sc.quoteColumnName("title")).toBe('"title"');
     expect(sc.quoteTableName("posts")).toBe('"posts"');
   });
@@ -130,7 +133,7 @@ describeIfPostgresqlAdapter("SchemaCreation#quotedColumnsForIndex sub-part lengt
     const idx = new IndexDefinition("posts", "index_posts_on_title", false, ["title"], {
       lengths: { title: 10 },
     });
-    const sql = await (new SchemaCreation("postgres", conn) as any).visitCreateIndexDefinition(
+    const sql = await (new SchemaCreation(conn) as any).visitCreateIndexDefinition(
       new CreateIndexDefinition(idx, false),
     );
     expect(sql).not.toContain("(10)");
@@ -143,7 +146,7 @@ describeIfSqlite("SchemaCreation#quotedColumnsForIndex sub-part length gating", 
     const idx = new IndexDefinition("posts", "index_posts_on_title", false, ["title"], {
       lengths: { title: 10 },
     });
-    const sql = await (new SchemaCreation("sqlite", conn) as any).visitCreateIndexDefinition(
+    const sql = await (new SchemaCreation(conn) as any).visitCreateIndexDefinition(
       new CreateIndexDefinition(idx, false),
     );
     expect(sql).not.toContain("(10)");
@@ -161,6 +164,10 @@ describe("SchemaCreation#quotedColumns delegates to the connection", () => {
     quoteColumnName: (c: string) => `"${c}"`,
     quoteTableName: (t: string) => `"${t}"`,
     quoteDefaultExpression: (v: unknown) => String(v),
+    supportsIndexUsing: () => false,
+    supportsIndexInclude: async () => false,
+    supportsNullsNotDistinct: async () => false,
+    supportsPartialIndex: () => false,
     quotedColumnsForIndex(cols: string[], options: any) {
       // Stand-in for the connection's decoration, incl. PG opclass folding.
       // Mirrors options_for_index_columns: a String opclass applies to every
@@ -177,7 +184,7 @@ describe("SchemaCreation#quotedColumns delegates to the connection", () => {
       opclasses: { title: "text_pattern_ops" },
     });
     const sql = await (
-      new SchemaCreation("postgres", host as any) as any
+      new SchemaCreation(host as any) as any
     ).visitCreateIndexDefinition(new CreateIndexDefinition(idx, false));
     expect(sql).toContain('("title" text_pattern_ops)');
   });
@@ -191,7 +198,7 @@ describe("SchemaCreation#quotedColumns delegates to the connection", () => {
       {},
     );
     const sql = await (
-      new SchemaCreation("postgres", host as any) as any
+      new SchemaCreation(host as any) as any
     ).visitCreateIndexDefinition(new CreateIndexDefinition(idx, false));
     expect(sql).toContain("(lower(title))");
     expect(sql).not.toContain("DEFAULT_OPS");
@@ -200,14 +207,14 @@ describe("SchemaCreation#quotedColumns delegates to the connection", () => {
 
 describe("SchemaCreation#typeToSql decimal precision/scale", () => {
   it("raises when a decimal scale is given without a precision", () => {
-    expect(() => new SchemaCreation("sqlite", conn).typeToSql("decimal", { scale: 2 })).toThrow(
+    expect(() => new SchemaCreation(conn).typeToSql("decimal", { scale: 2 })).toThrow(
       "Error adding decimal column: precision cannot be empty if scale is specified",
     );
   });
 
   it("honors precision and scale when both are given", () => {
     expect(
-      new SchemaCreation("sqlite", conn).typeToSql("decimal", {
+      new SchemaCreation(conn).typeToSql("decimal", {
         precision: 8,
         scale: 2,
       }),
@@ -218,8 +225,6 @@ describe("SchemaCreation#typeToSql decimal precision/scale", () => {
     // Rails sources the default from native_database_types[:decimal], which
     // carries no :precision on SQLite/MySQL/PostgreSQL — so a precision-less
     // decimal dumps bare rather than defaulting to (10).
-    expect(new SchemaCreation("sqlite", conn).typeToSql("decimal")).toBe("decimal");
-    expect(new SchemaCreation("mysql", conn).typeToSql("decimal")).toBe("decimal");
-    expect(new SchemaCreation("postgres", conn).typeToSql("decimal")).toBe("decimal");
+    expect(new SchemaCreation(conn).typeToSql("decimal")).toBe("decimal");
   });
 });

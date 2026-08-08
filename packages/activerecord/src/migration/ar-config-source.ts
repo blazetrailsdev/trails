@@ -10,9 +10,9 @@ export interface MigrationArConfig {
   // (pending_migration_connection.rb:5-11) both name `ActiveRecord::Base` in a
   // method body, where Ruby resolves it by autoload. These are the call-time
   // reads that stand in for that.
-  configurations?: () => DatabaseConfigurations;
-  connectionHandler?: () => ConnectionHandler;
-  databaseTasks?: () => typeof import("../tasks/database-tasks.js").DatabaseTasks;
+  configurations: () => DatabaseConfigurations;
+  connectionHandler: () => ConnectionHandler;
+  databaseTasks: () => typeof import("../tasks/database-tasks.js").DatabaseTasks;
 }
 
 let _arConfig: MigrationArConfig | null = null;

@@ -215,7 +215,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   /** Mirrors: SQLite3::SchemaStatements#schema_creation */
   get schemaCreation(): SQLite3SchemaCreation {
-    return new SQLite3SchemaCreation("sqlite", this);
+    return new SQLite3SchemaCreation(this);
   }
 
   /** @internal */

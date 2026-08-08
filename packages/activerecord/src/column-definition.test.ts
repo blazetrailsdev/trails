@@ -12,10 +12,21 @@ import type {
 // under test is the adapter's schema_creation.
 class DummyCreation extends SchemaCreation {
   constructor() {
-    super("sqlite", {
+    // `DummyAdapter < AbstractAdapter`, so every capability probe
+    // `SchemaCreation` delegates to `@conn` answers the abstract default.
+    super({
       quoteColumnName: (name: string) => name,
       quoteTableName: (name: string) => name,
       quoteDefaultExpression,
+      nativeDatabaseTypes: () => ({ string: "varchar" }),
+      supportsCheckConstraints: async () => false,
+      supportsExclusionConstraints: () => false,
+      supportsIndexInclude: async () => false,
+      supportsIndexSortOrder: async () => false,
+      supportsIndexesInCreate: () => false,
+      supportsNullsNotDistinct: async () => false,
+      supportsPartialIndex: () => false,
+      supportsUniqueConstraints: () => false,
     });
   }
 

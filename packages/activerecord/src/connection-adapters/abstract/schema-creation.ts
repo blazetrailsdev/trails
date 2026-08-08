@@ -23,11 +23,7 @@ import {
   PrimaryKeyDefinition,
   TableDefinition,
 } from "./schema-definitions.js";
-import {
-  NATIVE_DATABASE_TYPES_BY_ADAPTER,
-  type NativeDatabaseType,
-  type NativeDatabaseTypes,
-} from "./native-database-types.js";
+import { type NativeDatabaseType, type NativeDatabaseTypes } from "./native-database-types.js";
 import type { SchemaQuoter } from "./assert-schema-adapter.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { NotImplementedError } from "../../errors.js";
@@ -43,31 +39,51 @@ type Definition =
   | CheckConstraintDefinition
   | PrimaryKeyDefinition;
 
+/**
+ * The connection surface `SchemaCreation` delegates to — Rails' `@conn`
+ * (abstract/schema_creation.rb:16-21). @internal
+ */
+export interface SchemaCreationConn extends SchemaQuoter {
+  nativeDatabaseTypes(): NativeDatabaseTypes;
+  supportsCheckConstraints(): Promise<boolean>;
+  supportsExclusionConstraints(): boolean;
+  supportsIndexInclude(): Promise<boolean>;
+  supportsIndexSortOrder(): Promise<boolean>;
+  supportsIndexesInCreate(): boolean;
+  supportsNullsNotDistinct(): Promise<boolean>;
+  supportsPartialIndex(): boolean;
+  supportsUniqueConstraints(): boolean;
+}
+
 export class SchemaCreation {
-  constructor(
-    protected adapterName: "sqlite" | "postgres" | "mysql",
-    /** Quoter used for identifier/table/default-expression quoting. */
-    protected adapter: SchemaQuoter,
-  ) {}
+  /** Rails' `SchemaCreation#initialize(conn)` (abstract/schema_creation.rb:6-9). */
+  constructor(protected adapter: SchemaCreationConn) {}
+
+  // Capability probes. Rails declares these as `delegate ... to: :@conn`
+  // (abstract/schema_creation.rb:16-21) — the connection answers them, so a
+  // version gate on the server (MariaDB >= 10.8.1 for `supports_index_sort_order?`,
+  // abstract_mysql_adapter.rb:409) reaches the visitor.
 
   protected supportsPartialIndex(): boolean {
-    return this.adapterName !== "mysql";
+    return this.adapter.supportsPartialIndex();
   }
 
   protected async supportsIndexSortOrder(): Promise<boolean> {
-    return this.adapterName !== "mysql";
+    return this.adapter.supportsIndexSortOrder();
   }
 
+  /** Not delegated: Rails defines it on `SchemaCreation` itself
+   * (abstract/schema_creation.rb:137-139), and only SQLite3 overrides it. */
   protected supportsIndexUsing(): boolean {
-    return this.adapterName === "postgres" || this.adapterName === "mysql";
+    return true;
   }
 
   protected async supportsIndexInclude(): Promise<boolean> {
-    return this.adapterName === "postgres";
+    return this.adapter.supportsIndexInclude();
   }
 
   protected async supportsNullsNotDistinct(): Promise<boolean> {
-    return this.adapterName === "postgres";
+    return this.adapter.supportsNullsNotDistinct();
   }
 
   // Quoting delegations. Rails declares these as `delegate ... to: :@conn`
@@ -91,17 +107,17 @@ export class SchemaCreation {
 
   /** @internal */
   protected supportsIndexesInCreate(): boolean {
-    return this.adapterName === "mysql";
+    return this.adapter.supportsIndexesInCreate();
   }
 
   /** @internal */
   protected supportsExclusionConstraints(): boolean {
-    return this.adapterName === "postgres";
+    return this.adapter.supportsExclusionConstraints();
   }
 
   /** @internal */
   protected supportsUniqueConstraints(): boolean {
-    return this.adapterName === "postgres";
+    return this.adapter.supportsUniqueConstraints();
   }
 
   /**
@@ -217,7 +233,7 @@ export class SchemaCreation {
 
   /** @internal */
   protected async supportsCheckConstraints(): Promise<boolean> {
-    return true;
+    return this.adapter.supportsCheckConstraints();
   }
 
   /**
@@ -425,10 +441,7 @@ export class SchemaCreation {
 
   /** @internal */
   protected nativeDatabaseTypes(): NativeDatabaseTypes {
-    const fromAdapter = (
-      this.adapter as { nativeDatabaseTypes?(): NativeDatabaseTypes }
-    ).nativeDatabaseTypes?.();
-    return fromAdapter ?? NATIVE_DATABASE_TYPES_BY_ADAPTER[this.adapterName];
+    return this.adapter.nativeDatabaseTypes();
   }
 
   typeToSql(type: ColumnType, options: ColumnOptions = {}): string {
@@ -468,11 +481,11 @@ export class SchemaCreation {
       }
     }
 
+    // Rails' `type_to_sql` lives on the connection, and only PostgreSQL's
+    // (postgresql/schema_statements.rb:988) appends `[]`; every adapter that
+    // reaches this body is one whose `type_to_sql` has no array arm.
     if (options.array && type !== "primary_key") {
-      if (this.adapterName !== "postgres") {
-        throw new Error("Array columns are only supported on PostgreSQL");
-      }
-      sql += "[]";
+      throw new Error("Array columns are only supported on PostgreSQL");
     }
 
     return sql;

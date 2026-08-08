@@ -15,7 +15,7 @@ import { migrationArConfig } from "./ar-config-source.js";
  * (`pending_migration_connection.rb:6,10`).
  */
 function connectionHandler(): ConnectionHandler {
-  const handler = migrationArConfig()?.connectionHandler?.();
+  const handler = migrationArConfig()?.connectionHandler();
   if (!handler) throw new ActiveRecordError("ActiveRecord::Base has not finished loading");
   return handler;
 }

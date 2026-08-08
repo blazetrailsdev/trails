@@ -9,14 +9,15 @@ import {
 import { SchemaCreation } from "./schema-creation.js";
 import { Base } from "../../base.js";
 import type { TableDefinitionConn } from "./schema-definitions.js";
+import type { SchemaCreationConn } from "./schema-creation.js";
 
 // Rails hands `TableDefinition#initialize` an `ActiveRecord::Base.lease_connection`
 // (migration/columns_test.rb); nothing below asserts one dialect's SQL, so the
 // ambient lane connection is what every definition is built against.
-let conn: TableDefinitionConn;
+let conn: TableDefinitionConn & SchemaCreationConn;
 
 beforeAll(async () => {
-  conn = (await Base.leaseConnection()) as unknown as TableDefinitionConn;
+  conn = (await Base.leaseConnection()) as unknown as TableDefinitionConn & SchemaCreationConn;
 });
 
 describe("IndexDefinition#concise_options", () => {
@@ -365,7 +366,7 @@ describe("TableDefinition#toSql blank type guard", () => {
   it("throws a descriptive error for an empty custom type", async () => {
     const td = new TableDefinition("t", { adapter: conn });
     td.column("bad", "" as any);
-    await expect(new SchemaCreation("sqlite", conn).accept(td)).rejects.toThrow(
+    await expect(new SchemaCreation(conn).accept(td)).rejects.toThrow(
       /Column "bad" has an empty or blank type/,
     );
   });
@@ -373,7 +374,7 @@ describe("TableDefinition#toSql blank type guard", () => {
   it("throws a descriptive error for a whitespace-only custom type", async () => {
     const td = new TableDefinition("t", { adapter: conn });
     td.column("bad", "   " as any);
-    await expect(new SchemaCreation("sqlite", conn).accept(td)).rejects.toThrow(
+    await expect(new SchemaCreation(conn).accept(td)).rejects.toThrow(
       /Column "bad" has an empty or blank type/,
     );
   });

@@ -4,7 +4,10 @@
  * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::SchemaCreation
  */
 
-import { SchemaCreation as AbstractSchemaCreation } from "../abstract/schema-creation.js";
+import {
+  SchemaCreation as AbstractSchemaCreation,
+  type SchemaCreationConn,
+} from "../abstract/schema-creation.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import type {
   ColumnOptions,
@@ -48,7 +51,7 @@ type MysqlTableDef = TableDefinition & { charset?: string; collation?: string };
 /** @internal Adapter surface consulted by the visitor's support flags and MariaDB branches.
  * Rails' `SchemaCreation#initialize(conn)` always receives the live adapter, so the quoting
  * half is required and dispatches polymorphically. */
-export interface VisitorHostAdapter extends TableDefinitionConn {
+export interface VisitorHostAdapter extends TableDefinitionConn, SchemaCreationConn {
   supportsCheckConstraints(): Promise<boolean>;
   supportsForeignKeys(): boolean;
   supportsIndexesInCreate(): boolean;
@@ -72,21 +75,13 @@ export class SchemaCreation extends AbstractSchemaCreation {
   declare protected adapter: VisitorHostAdapter;
 
   constructor(host: VisitorHostAdapter) {
-    super("mysql", host);
+    super(host);
   }
 
   /** @internal Live MariaDB lookup — consults the host adapter every call so a late
    * `getFullVersion()` flip (lazy detection on first probe) is honored. */
   protected async isMariadb(): Promise<boolean> {
     return this.adapter.isMariadb();
-  }
-
-  /** @internal Rails gates the index DESC/ASC suffix on `supports_index_sort_order?`
-   * (MariaDB >= 10.8.1 / MySQL >= 8.0.1). Consult the threaded adapter's version-gated
-   * flag. The base returns `adapterName !== "mysql"` (always false),
-   * so this override is what makes MySQL honor the version gate. */
-  protected override async supportsIndexSortOrder(): Promise<boolean> {
-    return this.adapter.supportsIndexSortOrder();
   }
 
   /** @internal */
