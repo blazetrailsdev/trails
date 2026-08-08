@@ -291,7 +291,9 @@ export class TimeZone {
    * offset. `null` for a name that resolves to no zone (Ruby's
    * `rescue TZInfo::InvalidTimezoneIdentifier; nil`, time_zone.rb:239-241) and
    * for an offset no zone matches (`all.find`, time_zone.rb:246); the only
-   * raise is the wrong-class arm at time_zone.rb:249.
+   * raise is the wrong-class arm at time_zone.rb:249. The string arm is
+   * `@lazy_zones_map[arg] ||= create(arg)` under its
+   * `rescue TZInfo::InvalidTimezoneIdentifier; nil` (time_zone.rb:237-241).
    *
    * A `Duration` argument reads its seconds through `inSeconds()`, standing in
    * for Ruby's `arg.abs` / `arg.to_i` delegating to `@value` — trails' Duration
@@ -300,8 +302,6 @@ export class TimeZone {
   static find(arg: unknown): TimeZone | null {
     if (arg instanceof TimeZone) return arg;
     if (typeof arg === "string") {
-      // `@lazy_zones_map[arg] ||= create(arg)` with the
-      // `rescue TZInfo::InvalidTimezoneIdentifier; nil` arm (time_zone.rb:237-241).
       try {
         return TimeZone.create(arg);
       } catch {
@@ -319,7 +319,9 @@ export class TimeZone {
   /**
    * `alias_method :create, :new` (time_zone.rb:211) — the allocator, whose
    * `initialize` resolves the zone through `find_tzinfo` (time_zone.rb:208) and
-   * so RAISES for a name TZInfo does not know, where `[]` returns `nil`.
+   * so RAISES for a name TZInfo does not know, where `[]` returns `nil`. The
+   * raised class is `Error`, not TZInfo's `InvalidTimezoneIdentifier` — trails
+   * resolves zones through `Intl`, which has no TZInfo error hierarchy to port.
    */
   static create(name: string): TimeZone {
     const cached = zoneCache.get(name);
@@ -338,12 +340,15 @@ export class TimeZone {
   /**
    * Every Rails-named timezone: `@zones ||= zones_map.values.sort`
    * (time_zone.rb:223-225), sorted by `<=>` — utc_offset, then name
-   * (time_zone.rb:333-337).
+   * (time_zone.rb:333-337). `zones_map` keeps a MAPPING entry only when `[]`
+   * resolves it (`zones[name] = timezone if timezone`, time_zone.rb:288-291),
+   * hence the nullish filter.
    */
   static all(): TimeZone[] {
     if (zones) return zones;
     zones = Object.keys(MAPPING)
-      .map((name) => TimeZone.find(name)!)
+      .map((name) => TimeZone.find(name))
+      .filter((zone): zone is TimeZone => zone != null)
       .sort(
         (a, b) => a.utcOffset - b.utcOffset || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0),
       );

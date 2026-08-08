@@ -1675,8 +1675,6 @@ function printHumanReport(report: Report, topN: number, maxDetail: number, verbo
       }
       const elided = f.extras.length - shown.length;
       if (elided > 0) console.log(`    ${p.dim}… +${elided} more${p.reset}`);
-      // Owners are --verbose-only: the report is already wide, and one line
-      // per moved name would multiply its height by default.
       if (verbose) {
         for (const e of shown) {
           const top = e.kind === "moved" ? e.owners?.[0] : undefined;
@@ -1789,6 +1787,11 @@ export function buildReport(
  * different: a stale tag is deleted, a refuted one is the signal that the file
  * needs per-name reasons — or renames — instead of a blanket.
  * Returns the failure message, or `null` when the run passes.
+ *
+ * A `moved-names` rejection lists each name with the Rails member it credits
+ * against: that owner is the verdict's evidence — five names crediting five
+ * unrelated classes across unrelated gems is a bare-short-name collision, ~80
+ * all crediting one `.rb` is a rename owed.
  */
 export function gateFileTagRejections(rejections: readonly FileTagRejection[]): string | null {
   if (rejections.length === 0) return null;
@@ -1804,10 +1807,6 @@ export function gateFileTagRejections(rejections: readonly FileTagRejection[]): 
         `MOVED-BY-SHORT-NAME name(s) that no longer score moved: ${list(r.staleMovedNames)}`
       );
     }
-    // Each moved name gets its crediting Rails member on its own line: that
-    // owner IS the verdict's evidence — five names crediting five unrelated
-    // classes across rack/actiondispatch/activerecord is a collision, ~80 all
-    // crediting one `.rb` is a rename owed.
     const owned = (r.movedNames ?? []).slice(0, 8).map((n) => {
       const top = r.movedOwners?.[n]?.[0];
       return top === undefined

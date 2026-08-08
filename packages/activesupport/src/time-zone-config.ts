@@ -140,6 +140,9 @@ export function dateInTimeZone(date: Date, zone: string | TimeZone): TimeWithZon
   return tz.local(date.getFullYear(), date.getMonth() + 1, date.getDate());
 }
 
-// One class, so `findZone`'s `instanceof` still narrows the raise `TimeZone[]`
-// makes at time_zone.rb:249 as well as the one `find_zone!` makes itself.
+/**
+ * Ruby's `ArgumentError`. One class across the package, so `findZone`'s
+ * `instanceof` narrows the raise `TimeZone[]` makes (time_zone.rb:249) as well
+ * as the one `find_zone!` makes itself.
+ */
 export { ArgumentError };
