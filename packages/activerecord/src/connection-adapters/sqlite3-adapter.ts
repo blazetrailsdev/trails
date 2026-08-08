@@ -1472,15 +1472,14 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   /**
    * Mirrors: SQLite3Adapter#get_database_version (`sqlite3_adapter.rb:476-478`)
    * — a pure fetch, run at most once through the pool memo
-   * (`pool_config.rb:39-41`) that `configureConnection` fills at connect time.
+   * (`pool_config.rb:39-41`), which `database_version` fills on demand.
    *
    * Deviation, language-forced: Rails reads the value through
-   * `query_value(..., "SCHEMA")`, whose trails counterpart is `async`, and the
-   * version-gated `supports*()` readers are sync. The query is issued on the
-   * driver so an in-process driver can answer synchronously; an async-only
-   * driver (no `openSync()`) answers a Promise, which the pool memo resolves.
-   * Nothing is open on the deferred async-checkout path, where Rails has no
-   * connection to ask at all.
+   * `query_value(..., "SCHEMA")`, whose trails counterpart is `async`. The
+   * query is issued on the driver so an in-process driver can answer
+   * synchronously; an async-only driver (no `openSync()`) answers a Promise,
+   * which the pool memo resolves. Nothing is open on the deferred
+   * async-checkout path, where Rails has no connection to ask at all.
    */
   override getDatabaseVersion(): Version | Promise<Version> {
     const driver = this.driver as SqliteConnection | undefined;
@@ -2919,8 +2918,8 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
         "The retries option is deprecated and will be removed in Rails 8.1. Use timeout instead.\n",
       );
     }
-    // Base only runs the sync version check; SQLite's PRAGMAs are the async
-    // work, awaited by the driver-async branch below. Void the base call.
+    // Base only runs the version check; SQLite's PRAGMAs are the async work,
+    // awaited by the driver-async branch below. Void the base call.
     void super.configureConnection();
     const stmts = this.configurePragmas();
     const warn = (label: string, e: unknown) =>

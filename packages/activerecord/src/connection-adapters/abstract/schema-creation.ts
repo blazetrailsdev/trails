@@ -111,7 +111,7 @@ export class SchemaCreation {
    * base supplies an identifier-quoting default so the shared visitor type-checks.
    * @internal
    */
-  protected quotedIncludeColumns(o: string | string[]): string {
+  protected async quotedIncludeColumns(o: string | string[]): Promise<string> {
     if (typeof o === "string") return o;
     return o.map((c) => this.adapter.quoteColumnName(c)).join(", ");
   }
@@ -318,7 +318,7 @@ export class SchemaCreation {
     if (this.supportsIndexUsing() && index.using) parts.push(`USING ${index.using}`);
     parts.push(`(${await this.quotedColumns(index)})`);
     if ((await this.supportsIndexInclude()) && index.include && index.include.length > 0) {
-      parts.push(`INCLUDE (${this.quotedIncludeColumns(index.include)})`);
+      parts.push(`INCLUDE (${await this.quotedIncludeColumns(index.include)})`);
     }
     if ((await this.supportsNullsNotDistinct()) && index.nullsNotDistinct)
       parts.push("NULLS NOT DISTINCT");

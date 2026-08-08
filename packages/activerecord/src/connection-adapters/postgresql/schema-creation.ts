@@ -345,9 +345,9 @@ export class SchemaCreation extends AbstractSchemaCreation {
    * shim is wired).
    * @internal
    */
-  protected quotedIncludeColumnsForIndex(o: string | string[]): string {
+  protected async quotedIncludeColumnsForIndex(o: string | string[]): Promise<string> {
     const host = this.adapter as PgSchemaCreationHost & {
-      quotedIncludeColumnsForIndex?(columns: string | string[]): string;
+      quotedIncludeColumnsForIndex?(columns: string | string[]): Promise<string>;
     };
     if (typeof host.quotedIncludeColumnsForIndex === "function") {
       return host.quotedIncludeColumnsForIndex(o);
@@ -362,7 +362,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
    * (postgresql/schema_creation.rb:143-144).
    * @internal
    */
-  protected override quotedIncludeColumns(o: string | string[]): string {
+  protected override async quotedIncludeColumns(o: string | string[]): Promise<string> {
     return typeof o === "string" ? o : this.quotedIncludeColumnsForIndex(o);
   }
 

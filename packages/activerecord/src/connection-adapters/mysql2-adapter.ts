@@ -1326,7 +1326,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     binds: unknown[] = [],
     options: ExplainOption[] = [],
   ): Promise<string> {
-    const clause = this._explainStatementClause(options);
+    const clause = await this._explainStatementClause(options);
     const start = Date.now();
     const result = await this.internalExecQuery(`${clause} ${sql}`, "EXPLAIN", binds);
     const elapsed = (Date.now() - start) / 1000;
@@ -1730,8 +1730,8 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   /**
-   * Mirrors: Mysql2Adapter#full_version (mysql2_adapter.rb:164-166). Sync like
-   * Rails, because `database_version` is the memo `configureConnection` warms.
+   * Mirrors: Mysql2Adapter#full_version (mysql2_adapter.rb:164-166) — a bare
+   * `database_version.full_version_string`, which fetches on demand.
    *
    * @internal
    */

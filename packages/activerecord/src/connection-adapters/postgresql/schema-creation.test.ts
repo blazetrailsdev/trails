@@ -199,17 +199,17 @@ describe("PostgreSQL SchemaCreation", () => {
     expect(sql).toContain(", VALIDATE CONSTRAINT");
   });
 
-  it("quotedIncludeColumns + tableModifierInCreate", () => {
-    expect(s().quotedIncludeColumnsForIndex("a, b")).toBe("a, b");
-    expect(s().quotedIncludeColumnsForIndex(["a", "b"])).toBe('"a", "b"');
-    expect(s().quotedIncludeColumns("raw, expr")).toBe("raw, expr");
-    expect(s().quotedIncludeColumns(["a", "b"])).toBe('"a", "b"');
+  it("quotedIncludeColumns + tableModifierInCreate", async () => {
+    expect(await s().quotedIncludeColumnsForIndex("a, b")).toBe("a, b");
+    expect(await s().quotedIncludeColumnsForIndex(["a", "b"])).toBe('"a", "b"');
+    expect(await s().quotedIncludeColumns("raw, expr")).toBe("raw, expr");
+    expect(await s().quotedIncludeColumns(["a", "b"])).toBe('"a", "b"');
     expect(s().tableModifierInCreate({ temporary: true })).toBe(" TEMPORARY");
     expect(s().tableModifierInCreate({ unlogged: true })).toBe(" UNLOGGED");
     expect(s().tableModifierInCreate({})).toBe("");
   });
 
-  it("quotedIncludeColumnsForIndex delegates to the adapter when threaded", () => {
+  it("quotedIncludeColumnsForIndex delegates to the adapter when threaded", async () => {
     const sc = new SchemaCreation({
       quoteColumnName: (n: string) => `"${n}"`,
       quoteTableName: (n: string) => `"${n}"`,
@@ -217,7 +217,7 @@ describe("PostgreSQL SchemaCreation", () => {
       typeToSql: (type: string) => type,
       quotedIncludeColumnsForIndex: () => "<<delegated>>",
     } as any) as any;
-    expect(sc.quotedIncludeColumnsForIndex(["a", "b"])).toBe("<<delegated>>");
+    expect(await sc.quotedIncludeColumnsForIndex(["a", "b"])).toBe("<<delegated>>");
   });
 
   // Rails' PostgreSQLAdapter#native_database_types replaces the constant's raw

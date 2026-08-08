@@ -65,7 +65,7 @@ export class InsertAll {
    * Builder.conflictTarget can read `index.columns` / `index.where`.
    */
   uniqueBy: string | string[] | IndexDefinition | undefined;
-  returning: string | string[] | Nodes.SqlLiteral | false;
+  returning: string | string[] | Nodes.SqlLiteral | false = false;
 
   onDuplicate: "skip" | "update" | Nodes.SqlLiteral | undefined;
   updateOnly: string | string[] | undefined;
@@ -83,6 +83,7 @@ export class InsertAll {
   // `@returning = primary_keys if @returning == true`), so it can be
   // re-resolved to the schema-cache value once that's available.
   private _returningDefaulted = false;
+  private _returningFromSupport = false;
 
   static async execute(
     relation: Relation<any>,
@@ -121,12 +122,7 @@ export class InsertAll {
           ? false
           : options.returning;
     } else {
-      const supportsReturning =
-        typeof (this.connection as any).supportsInsertReturning === "function"
-          ? (this.connection as any).supportsInsertReturning()
-          : false;
-      this.returning = supportsReturning ? this.primaryKeys() : false;
-      this._returningDefaulted = supportsReturning;
+      this._returningFromSupport = true;
     }
 
     if (this.inserts.length === 0) {
@@ -148,7 +144,6 @@ export class InsertAll {
 
     this.verifyAttributeNamesAreKnown();
     this.configureOnDuplicateUpdateLogic();
-    this.ensureValidOptionsForConnectionBang();
   }
 
   async execute(): Promise<Result> {
@@ -195,6 +190,17 @@ export class InsertAll {
     // conflict target see the schema-cache value rather than the model's
     // configured primary key. findUniqueIndexFor still reads model.primaryKey
     // directly for its `unique_by || model.primary_key` match.
+    if (this._returningFromSupport) {
+      this._returningFromSupport = false;
+      const supportsReturning =
+        typeof (this.connection as any).supportsInsertReturning === "function"
+          ? await (this.connection as any).supportsInsertReturning()
+          : false;
+      this.returning = supportsReturning ? this.primaryKeys() : false;
+      this._returningDefaulted = supportsReturning;
+    }
+    await this.ensureValidOptionsForConnectionBang();
+
     if (this._schemaCachePrimaryKeys === undefined) {
       this._schemaCachePrimaryKeys = await this.dbPrimaryKeys();
       if (this._returningDefaulted) {
@@ -365,11 +371,11 @@ export class InsertAll {
   }
 
   /** @internal */
-  private ensureValidOptionsForConnectionBang(): void {
+  private async ensureValidOptionsForConnectionBang(): Promise<void> {
     if (
       this.returning &&
       typeof (this.connection as any).supportsInsertReturning === "function" &&
-      !(this.connection as any).supportsInsertReturning()
+      !(await (this.connection as any).supportsInsertReturning())
     ) {
       throw new Error(
         `${(this.connection as any).constructor?.name ?? "Adapter"} does not support INSERT...RETURNING`,

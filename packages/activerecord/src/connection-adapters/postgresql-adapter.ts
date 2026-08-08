@@ -2398,7 +2398,7 @@ export class PostgreSQLAdapter
     binds: unknown[] = [],
     options: ExplainOption[] = [],
   ): Promise<string> {
-    const clause = this._explainStatementClause(options);
+    const clause = await this._explainStatementClause(options);
     const result = await this.internalExecQuery(`${clause} ${sql}`, "EXPLAIN", binds);
     const printer = new ExplainPrettyPrinter();
     return printer.pp(result.toArray());
@@ -2483,7 +2483,7 @@ export class PostgreSQLAdapter
    * printed header. Options are validated against the adapter's
    * allowlist before interpolation.
    */
-  private _explainStatementClause(options: ExplainOption[]): string {
+  private async _explainStatementClause(options: ExplainOption[]): Promise<string> {
     if (options.length === 0) return "EXPLAIN";
     const validated = this._validateExplainOptions(options);
     return `EXPLAIN (${validated.join(", ")})`;
@@ -4703,7 +4703,7 @@ export interface PostgreSQLAdapter {
 
   foreignKeys(tableName: string): Promise<ForeignKeyDefinition[]>;
 
-  quotedIncludeColumnsForIndex(columnNames: string | string[]): string;
+  quotedIncludeColumnsForIndex(columnNames: string | string[]): Promise<string>;
 
   /** @internal */
   columnNamesFromColumnNumbers(tableOid: number, columnNumbers: number[]): Promise<string[]>;
