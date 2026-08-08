@@ -19,6 +19,10 @@ import "../sqlite/better-sqlite3.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import { BetterSQLite3Adapter } from "../connection-adapters/better-sqlite3-adapter.js";
 import { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
+import { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
+import { ConnectionDescriptor } from "../connection-adapters/abstract/connection-descriptor.js";
+import { PoolConfig } from "../connection-adapters/pool-config.js";
+import { HashConfig } from "../database-configurations/hash-config.js";
 import { loadSchema } from "./load-schema-helper.js";
 import { stampCanonicalSchema } from "./canonical-schema-stamp.js";
 import {
@@ -57,6 +61,30 @@ import { activeLane } from "./connection.js";
 // base DB.
 function slotCount(): number {
   return workerForkCount() <= 1 ? 1 : slotPoolSize();
+}
+
+// Lease the template adapter out of a real ConnectionPool instead of
+// constructing it bare. A bare adapter keeps the constructor's NullPool seed
+// (`abstract-adapter.ts:833` = `abstract_adapter.rb:153`), so every
+// `connection.pool.db_config` read — `record_environment`
+// (`migration.rb:1512-1516`), `role` / `shard` / `inspect`
+// (`abstract_adapter.rb:286-296`) — reads `undefined` here where Ruby raises
+// NoMethodError. The env name is `arunit`, the entry `expandConfig` names for
+// the primary test connection (`connection.ts`, `config.example.yml`).
+async function pooledTemplateAdapter(
+  configurationHash: Record<string, unknown>,
+  adapterFactory: () => DatabaseAdapter,
+): Promise<{ adapter: DatabaseAdapter; pool: ConnectionPool }> {
+  const dbConfig = new HashConfig("arunit", "primary", configurationHash);
+  const poolConfig = new PoolConfig(
+    new ConnectionDescriptor("primary"),
+    dbConfig,
+    "writing",
+    "default",
+    { adapterFactory },
+  );
+  const pool = new ConnectionPool(poolConfig);
+  return { adapter: await pool.leaseConnection(), pool };
 }
 
 // Lay the canonical schema and stamp it, so the worker that claims this
@@ -117,10 +145,14 @@ const sqliteAdapter: DbTemplateAdapter = {
     const runToken = newRunToken();
     const templatePath = await templatePathFor(runToken);
 
-    const adapter = new BetterSQLite3Adapter(templatePath);
-    await buildTemplateSchema(adapter as unknown as DatabaseAdapter, runToken, () =>
-      adapter.close(),
+    const { adapter, pool } = await pooledTemplateAdapter(
+      { adapter: "sqlite3", database: templatePath },
+      () => new BetterSQLite3Adapter(templatePath) as unknown as DatabaseAdapter,
     );
+    await buildTemplateSchema(adapter, runToken, async () => {
+      await pool.disconnect();
+      await (adapter as unknown as { close(): void | Promise<void> }).close();
+    });
 
     process.env[TEMPLATE_PATH_ENV] = templatePath;
     process.env[RUN_TOKEN_ENV] = runToken;
@@ -186,10 +218,15 @@ const pgAdapter: DbTemplateAdapter = {
 
     await admin.query(`CREATE DATABASE ${quotePgDatabaseName(templateDb)}`);
 
-    const adapter = new PostgreSQLAdapter({
-      connectionString: settingsUrl("postgres", withDatabase(settings, templateDb)),
-      max: 1,
-    }) as unknown as DatabaseAdapter;
+    const templateSettings = withDatabase(settings, templateDb);
+    const { adapter, pool } = await pooledTemplateAdapter(
+      { adapter: "postgresql", ...driverConfig(templateSettings) },
+      () =>
+        new PostgreSQLAdapter({
+          connectionString: settingsUrl("postgres", templateSettings),
+          max: 1,
+        }) as unknown as DatabaseAdapter,
+    );
     try {
       await loadSchema(adapter);
       // Stamp ar_internal_metadata so every slot cloned from this template
@@ -203,7 +240,7 @@ const pgAdapter: DbTemplateAdapter = {
       // a disconnect/terminate that also throws would replace the original
       // error. Swallow teardown errors so the meaningful one always surfaces.
       try {
-        await (adapter as unknown as { disconnect(): Promise<void> }).disconnect?.();
+        await pool.disconnect();
         await pgTerminateConnections(admin, templateDb);
       } catch {
         // best-effort cleanup; the template DB is dropped at teardown anyway
@@ -310,13 +347,18 @@ const mysqlAdapter: DbTemplateAdapter = {
     // wall-clock cost at ~1× rather than N× sequential.
     await Promise.all(
       Array.from({ length: n }, (_, i) => i + 1).map(async (slot) => {
-        const adapter = new Mysql2Adapter({
-          ...driverConfig(withDatabase(settings, slotDatabaseName(baseDb, runToken, slot))),
-          connectionLimit: 1,
-          flags: ["FOUND_ROWS"],
-        }) as unknown as DatabaseAdapter;
+        const slotSettings = withDatabase(settings, slotDatabaseName(baseDb, runToken, slot));
+        const { adapter, pool } = await pooledTemplateAdapter(
+          { adapter: "mysql2", ...driverConfig(slotSettings) },
+          () =>
+            new Mysql2Adapter({
+              ...driverConfig(slotSettings),
+              connectionLimit: 1,
+              flags: ["FOUND_ROWS"],
+            }) as unknown as DatabaseAdapter,
+        );
         await buildTemplateSchema(adapter, runToken, async () => {
-          await (adapter as unknown as { disconnect(): Promise<void> }).disconnect?.();
+          await pool.disconnect();
         });
       }),
     );
