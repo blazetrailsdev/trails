@@ -3552,7 +3552,7 @@ export class Base extends Model {
       // Adapters that can't (MySQL 8, older SQLite) surface only the scalar
       // generated id, so leave `returning` null and fall back to writing that
       // id into the first still-unset returning column below.
-      const returningColumns = ctor._returningColumnsForInsert(adapter as any);
+      const returningColumns = await ctor._returningColumnsForInsert(adapter as any);
       const supportsReturning =
         (await (
           adapter as { supportsInsertReturning?(): Promise<boolean> }

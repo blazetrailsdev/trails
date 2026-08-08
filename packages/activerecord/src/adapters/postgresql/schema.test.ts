@@ -1002,7 +1002,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(indexLine).toContain(`"companies", ["firm_id", "type"]`);
       expect(indexLine).not.toContain(`["firm_id", "type", "name"`);
       expect(indexLine?.includes(`include: ["name","account_id"]`)).toBe(
-        adapter.supportsIndexInclude(),
+        await adapter.supportsIndexInclude(),
       );
     });
   });

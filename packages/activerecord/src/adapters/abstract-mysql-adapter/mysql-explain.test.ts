@@ -139,8 +139,8 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
   // members of the MySQLExplainTest class. These exercise the adapter directly
   // (no DB rows), so they need no fixtures.
   describe("explain helpers (trails-only)", () => {
-    it("buildExplainClause renders FORMAT=JSON without parens for { format: 'json' }", () => {
-      const clause = adapter.buildExplainClause([{ format: "json" }]);
+    it("buildExplainClause renders FORMAT=JSON without parens for { format: 'json' }", async () => {
+      const clause = await adapter.buildExplainClause([{ format: "json" }]);
       expect(clause).toBe("EXPLAIN FORMAT=JSON for:");
     });
 
@@ -154,8 +154,8 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       );
     });
 
-    it("buildExplainClause rejects unknown format", () => {
-      expect(() => adapter.buildExplainClause([{ format: "bogus" }])).toThrow();
+    it("buildExplainClause rejects unknown format", async () => {
+      await expect(adapter.buildExplainClause([{ format: "bogus" }])).rejects.toThrow();
     });
 
     it("explain executes with { format: 'json' } and returns JSON plan", async () => {

@@ -1330,10 +1330,9 @@ describe("PostgreSQLAdapter supports_* predicates (unit)", () => {
     (adapter as any)._databaseVersion = version;
     (adapter as any)._hasOptimizerHints = false;
     // `database_version` reads the pool memo (`abstract_adapter.rb:854-856`),
-    // so restubbing the adapter's own version has to restamp the memo too.
-    (
-      adapter.pool as unknown as { poolConfig: { setServerVersion(v: unknown): void } }
-    ).poolConfig.setServerVersion(version);
+    // so restubbing the adapter's own version has to clear the memo too —
+    // otherwise the first stub's value is the one every later read answers.
+    (adapter.pool as unknown as { _serverVersion: unknown })._serverVersion = null;
   }
 
   it("always-true predicates return true regardless of version", async () => {
