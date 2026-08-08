@@ -781,8 +781,7 @@ export abstract class SchemaDumper {
     // @connection.supports_check_constraints?`): adapters whose checkConstraints
     // raises NotImplementedError when unsupported (e.g. MySQL <8.0.16, MariaDB
     // <10.2.1) must not be queried.
-    if (host.supportsCheckConstraints && !(await host.supportsCheckConstraints()))
-      return undefined;
+    if (host.supportsCheckConstraints && !(await host.supportsCheckConstraints())) return undefined;
     const checkConstraints = ((await host.checkConstraints(tableName)) ?? []) as {
       expression: string;
       name?: string;
