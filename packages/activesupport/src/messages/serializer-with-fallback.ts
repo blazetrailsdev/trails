@@ -11,7 +11,13 @@
  * trails has no Ruby Marshal runtime, so the `:marshal` format is backed by the
  * fidelity `coder` (`cache/coder.ts`) — the same trails Marshal-equivalent the
  * cache serializers use — behind Rails' `\x04\x08` Marshal signature so
- * cross-format detection still works. `MessagePackWithFallback#available?` is
+ * cross-format detection still works. That signature is the only thing the
+ * `:marshal` format shares with Ruby's wire format: a payload produced by
+ * Ruby's `Marshal.dump` is NOT readable here, and by decision it never will be
+ * — Marshal is a Ruby-only wire format, excluded project-wide in
+ * `scripts/api-compare/unported-files.ts` (marshalling.rb,
+ * marshal_serialization_test.rb, and the legacy-ciphertext case in
+ * message_encryptor_test.rb). `MessagePackWithFallback#available?` is
  * likewise constant-true: message_pack is a bundled dep here, with no dynamic
  * require to rescue.
  */
