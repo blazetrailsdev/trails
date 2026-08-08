@@ -97,8 +97,12 @@ export function ambientPoolConfiguration(): Record<string, unknown> {
  * Synchronous factory that creates a fresh underlying adapter on the PRIMARY
  * lane database — the same database `Base.connection` rides (on the file-backed
  * sqlite lane its connections share the worker DB, exactly like Rails'
- * file-backed `arunit`). Use this as the `adapterFactory` for a test-local
- * {@link ConnectionPool}, or when a test needs a distinct adapter object.
+ * file-backed `arunit`). This is the `adapterFactory` for a test-local
+ * {@link ConnectionPool} — Rails' `ConnectionPool#new_connection`
+ * (`connection_pool.rb`) — and nothing else: the adapter it returns still
+ * carries the constructor's `NullPool` seed (`abstract_adapter.rb:153`) until a
+ * pool adopts it. A test that wants a pool-owned adapter calls
+ * {@link checkoutRawTestAdapter}.
  *
  * Wired at module load, importing only the active lane's driver.
  *
@@ -120,25 +124,32 @@ const { ConnectionDescriptor } =
   await import("./connection-adapters/abstract/connection-descriptor.js");
 
 /**
- * Hands a freshly-constructed raw adapter its own real `ConnectionPool` and
- * returns it.
+ * Returns a raw test adapter that came out of `ConnectionPool#checkout` — via
+ * `lease_connection` (`connection_pool.rb:315-319`, `lease.connection ||=
+ * checkout`), which is the only route by which a Ruby connection ever acquires
+ * a pool: `new_connection` builds it and the pool owns it from birth. Nothing
+ * assigns `pool` from outside; `ConnectionPool#newConnection` sets the
+ * back-reference on the connection it just adopted.
  *
- * Rails never has a pool-less connection in a test: every adapter a test drives
- * came out of `pool.checkout`, so `role` / `shard` / `db_config`
- * (`abstract_adapter.rb:286-296`, all bare `@pool.` sends) answer. The
- * constructor's `NullPool` seed (`abstract_adapter.rb:153`) answers none of
- * them — in Ruby it raises `NoMethodError`, and only trails' cast hides that.
+ * So `role` / `shard` / `db_config` (`abstract_adapter.rb:286-296`, all bare
+ * `@pool.` sends) answer. The constructor's `NullPool` seed
+ * (`abstract_adapter.rb:153`) answers none of them — in Ruby it raises
+ * `NoMethodError`, and only trails' cast hides that.
  *
- * The pool is built with `adapterFactory` returning this very adapter, so the
- * adapter IS the pool's single connection rather than a second one: the
- * driver-level cap of one server connection per raw adapter (max: 1 /
- * connectionLimit: 1) is untouched, and `pool: 1` says the same thing at the
- * pool layer. One pool per raw adapter, not one shared pool, so each keeps the
- * independent schema reflection a standalone adapter has today.
+ * {@link newRawTestAdapter} is the pool's `adapterFactory`, so the driver-level
+ * cap of one server connection per raw adapter (max: 1 / connectionLimit: 1) is
+ * untouched, and `pool: 1` says the same thing at the pool layer. One pool per
+ * raw adapter, not one shared pool, so each keeps the independent schema
+ * reflection a standalone adapter has.
+ *
+ * The lease (rather than a bare `checkout`) is what keeps the pool's single
+ * connection re-entrant: `ConnectionPool#schemaCache`'s `BoundSchemaReflection`
+ * reaches the adapter through `withConnection`, which would otherwise block on
+ * a `pool: 1` pool whose only connection the caller holds.
  *
  * @internal
  */
-function withRawTestPool(adapter: DatabaseAdapter): DatabaseAdapter {
+export async function checkoutRawTestAdapter(): Promise<DatabaseAdapter> {
   const dbConfig = new HashConfig(_primaryEnvConfig.envName, _primaryEnvConfig.name, {
     ..._primaryConfiguration,
     pool: 1,
@@ -148,10 +159,9 @@ function withRawTestPool(adapter: DatabaseAdapter): DatabaseAdapter {
     dbConfig,
     "writing",
     "default",
-    { adapterFactory: () => adapter },
+    { adapterFactory: newRawTestAdapter },
   );
-  (adapter as unknown as { pool: unknown }).pool = new RealConnectionPool(poolConfig);
-  return adapter;
+  return new RealConnectionPool(poolConfig).leaseConnection();
 }
 
 if (adapterType === "postgres") {
@@ -160,20 +170,18 @@ if (adapterType === "postgres") {
   // Constrain the driver pool to max: 1 so each pooled-adapter slot maps to
   // exactly one PG server connection (the outer ConnectionPool multiplexes).
   newRawTestAdapter = () =>
-    withRawTestPool(new PostgreSQLAdapter({ ...config, max: 1 }) as unknown as DatabaseAdapter);
+    new PostgreSQLAdapter({ ...config, max: 1 }) as unknown as DatabaseAdapter;
 } else if (adapterType === "mysql") {
   // Built from the config hash rather than a URL so a socket-configured run
   // (MYSQL_SOCK) reaches the driver — a URL cannot carry a socket path.
   const { Mysql2Adapter } = await import("./connection-adapters/mysql2-adapter.js");
   const [config] = adapterArgs as [Record<string, unknown>];
   newRawTestAdapter = () =>
-    withRawTestPool(
-      new Mysql2Adapter({
-        ...config,
-        connectionLimit: 1,
-        flags: ["FOUND_ROWS"],
-      }) as unknown as DatabaseAdapter,
-    );
+    new Mysql2Adapter({
+      ...config,
+      connectionLimit: 1,
+      flags: ["FOUND_ROWS"],
+    }) as unknown as DatabaseAdapter;
 } else {
   const { BetterSQLite3Adapter } = await import("./connection-adapters/better-sqlite3-adapter.js");
   // Recombined into the Rails-shaped single-hash form the adapter constructor
@@ -181,8 +189,7 @@ if (adapterType === "postgres") {
   // pool's resolver predates that overload.
   const [filename, options] = adapterArgs as [string, SQLite3AdapterOptions | undefined];
   const config: SQLite3Config = { ...options, database: filename };
-  newRawTestAdapter = () =>
-    withRawTestPool(new BetterSQLite3Adapter(config) as unknown as DatabaseAdapter);
+  newRawTestAdapter = () => new BetterSQLite3Adapter(config) as unknown as DatabaseAdapter;
 }
 
 // --- In-test pool for pool-mechanics suites ---------------------------------

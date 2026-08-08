@@ -9,7 +9,7 @@ import type { SchemaQuoter } from "./abstract/assert-schema-adapter.js";
 import { include } from "@blazetrails/activesupport";
 import { TableDefinition } from "./abstract/schema-definitions.js";
 import type { AbstractAdapter } from "./abstract-adapter.js";
-import { newRawTestAdapter } from "../test-adapter.js";
+import { checkoutRawTestAdapter } from "../test-adapter.js";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
@@ -814,7 +814,7 @@ describe("SchemaCache DDL invalidation", () => {
   }
 
   beforeEach(async () => {
-    adapter = newRawTestAdapter();
+    adapter = await checkoutRawTestAdapter();
     await adapter.dropTable("things", "stuff", { ifExists: true });
     await adapter.createTable("things", (t) => {
       t.string("name");

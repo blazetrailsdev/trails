@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { StatementPool } from "./statement-pool.js";
 import { isSqliteRun } from "../support/sqlite-template.js";
-import { newRawTestAdapter } from "../test-adapter.js";
+import { checkoutRawTestAdapter } from "../test-adapter.js";
 
 describe("StatementPoolTest", () => {
   it("#delete doesn't call dealloc if the statement didn't exist", async () => {
@@ -111,7 +111,7 @@ describe("StatementPoolTest", () => {
 
 describe("SQLite3 StatementPool integration", () => {
   it.skipIf(!isSqliteRun())("caches prepared statements across execute calls", async () => {
-    const adapter = newRawTestAdapter();
+    const adapter = await checkoutRawTestAdapter();
     const prepareSpy = vi.spyOn((adapter as any).driver, "prepare");
 
     try {

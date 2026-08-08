@@ -10,7 +10,7 @@ import { StrictValidationFailed } from "@blazetrails/activemodel";
 import { registerModel } from "../associations.js";
 import { fixtures } from "../test-fixtures.js";
 import { Topic } from "../test-helpers/models/topic.js";
-import { newRawTestAdapter } from "../test-adapter.js";
+import { checkoutRawTestAdapter } from "../test-adapter.js";
 import type { TestDatabaseAdapter } from "../test-adapter.js";
 import { rebuildCanonicalTables } from "../support/canonical-table-rebuild.js";
 import { assertQueriesCount, assertNoQueries } from "../testing/query-assertions.js";
@@ -93,7 +93,7 @@ describe("UniquenessCoveredByUniqueIndexAdapterResolutionTest", () => {
   }
 
   beforeAll(async () => {
-    adapter = newRawTestAdapter();
+    adapter = await checkoutRawTestAdapter();
     await rebuildCanonicalTables(adapter, ["topics"]);
     await adapter.addIndex("topics", "title", { unique: true, name: "topics_direct_index" });
     (DirectTopic as unknown as { _adapter: TestDatabaseAdapter })._adapter = adapter;
