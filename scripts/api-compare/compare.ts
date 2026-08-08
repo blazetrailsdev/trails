@@ -1468,6 +1468,10 @@ export interface SeenRubyMethod {
  * a bucket that genuinely lives there is spelled out in
  * `RUBY_FILE_TS_OVERRIDES`, which is the direct-match path and does not come
  * through here.
+ *
+ * A bucket registered in `NAME_COLLISION_CLUSTERS` is dropped before the vote
+ * for the same reason the barrel is: its hits are a coincidence of method
+ * names, not a port.
  */
 export const MISPLACED_MIN_HITS = 3;
 
@@ -1481,10 +1485,30 @@ function isPackageBarrel(file: string): boolean {
   return file === "index.ts";
 }
 
+/**
+ * Buckets whose cluster is a pure name collision: every hit is a TS method that
+ * belongs to an unrelated entity and happens to share a Ruby name, so the
+ * bucket has no port at all and must read as missing rather than partly ported.
+ * Keyed `<package>:<ruby file>`. Only-shrink: a row leaves when the file is
+ * ported, never when a better justification is found for keeping it.
+ *
+ * - `activesupport:deprecation/deprecators.rb` — trails has no `Deprecators`
+ *   class. `Deprecators`' delegating setters
+ *   (`vendor/rails/activesupport/lib/active_support/deprecation/deprecators.rb:19-49`)
+ *   are spelled exactly like `Deprecation`'s own `silenced=` / `behavior=` /
+ *   `disallowed_behavior=` / `disallowed_warnings=` / `silence`, so the bucket
+ *   scored 6/10 against `deprecation.ts` with zero ported.
+ */
+export const NAME_COLLISION_CLUSTERS: ReadonlySet<string> = new Set([
+  "activesupport:deprecation/deprecators.rb",
+]);
+
 export function selectMisplacedFile(
   fileHits: Map<string, number>,
   rubyMethodCount: number,
+  bucketKey?: string,
 ): string | null {
+  if (bucketKey !== undefined && NAME_COLLISION_CLUSTERS.has(bucketKey)) return null;
   let bestFile: string | null = null;
   let bestCount = 0;
   let secondCount = 0;
@@ -2402,7 +2426,7 @@ export function main() {
             fileHits.set(f, (fileHits.get(f) || 0) + 1);
           }
         }
-        misplacedActualFile = selectMisplacedFile(fileHits, seen.size);
+        misplacedActualFile = selectMisplacedFile(fileHits, seen.size, `${pkg}:${rubyFile}`);
       }
       const actualMethods = misplacedActualFile
         ? tsMethodsByFile.get(misplacedActualFile) || new Set<string>()

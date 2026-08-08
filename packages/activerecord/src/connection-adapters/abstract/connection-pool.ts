@@ -4,6 +4,7 @@
  * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool
  */
 
+import { NoMethodError } from "@blazetrails/activemodel";
 import { adapterNameFromConfig } from "../abstract-adapter.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
 import type { DatabaseConfig } from "../../database-configurations/database-config.js";
@@ -108,6 +109,12 @@ const ADAPTER_PROXY_PROBE_KEYS = new Set<string>([
 ]);
 
 /**
+ * Sends Ruby's NullPool has no method for and trails must raise on rather than
+ * answer `undefined` — see the NullPool constructor.
+ */
+const NULL_POOL_UNDEFINED_METHODS = new Set<string>(["role", "shard"]);
+
+/**
  * Mirrors: ActiveRecord::ConnectionAdapters::NullPool
  */
 export class NullPool implements AbstractPool {
@@ -116,6 +123,43 @@ export class NullPool implements AbstractPool {
 
   private _serverVersion: unknown = null;
   private _schemaReflection: SchemaReflection | null = null;
+
+  /**
+   * Type-only, emitted nowhere. Ruby's NullPool answers neither `role` nor
+   * `shard` (`abstract/connection_pool.rb:14-51`), so `AbstractAdapter#role`'s
+   * bare `@pool.role` (`abstract_adapter.rb:288`) raises NoMethodError on a
+   * pool-less adapter. TS cannot read a property absent from one member of the
+   * `ConnectionPool | NullPool` union, so the member is declared as the type
+   * that produces no value — `never` — and `declare` keeps it out of the class,
+   * so it really is absent and the constructor's dispatch below raises on it.
+   */
+  declare readonly role: never;
+  declare readonly shard: never;
+
+  constructor() {
+    // Ruby's NullPool is a plain object: a send it has no method for raises
+    // NoMethodError. A JS read of a missing property is silently `undefined`,
+    // which is what let a pool-less adapter's `role` answer `undefined` and
+    // `inspect` render `shard="undefined"` instead of failing. Ruby's dispatch
+    // is modelled with a Proxy because it is the only shape that raises
+    // *without* adding a `role`/`shard` member Rails' NullPool does not have.
+    // Only `role` and `shard` raise: every other member Ruby's NullPool lacks
+    // is reached through a caller that duck-types the absence instead of
+    // sending unconditionally (`clearQueryCache`'s `this.pool?.clearQueryCache`,
+    // query_cache.rb:232-234), and raising underneath those would be a
+    // behavior change unrelated to this reader. Those call sites are their own
+    // convergence, not a licence to leave this one silent.
+    return new Proxy(this, {
+      get(target, prop, receiver) {
+        if (typeof prop === "symbol" || !NULL_POOL_UNDEFINED_METHODS.has(prop)) {
+          return Reflect.get(target, prop, receiver);
+        }
+        throw new NoMethodError(
+          `undefined method '${prop}' for an instance of ActiveRecord::ConnectionAdapters::NullPool`,
+        );
+      },
+    });
+  }
 
   /**
    * Mirrors: ConnectionPool::NullPool#server_version
