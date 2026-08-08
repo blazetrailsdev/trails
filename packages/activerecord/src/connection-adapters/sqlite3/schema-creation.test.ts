@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { it, expect, beforeAll } from "vitest";
 import { SchemaCreation } from "./schema-creation.js";
 import {
   ForeignKeyDefinition,
@@ -6,10 +6,20 @@ import {
   IndexDefinition,
 } from "../abstract/schema-definitions.js";
 import { TableDefinition } from "./schema-definitions.js";
-import { schemaConn } from "../../support/schema-conn.js";
+import { Base } from "../../base.js";
+import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
+import type { TableDefinitionConn } from "../abstract/schema-definitions.js";
 
-describe("SQLite3::SchemaCreation", () => {
-  const sc = new SchemaCreation("sqlite", schemaConn("sqlite"));
+// Rails' SQLite3 DDL-rendering tests run under `current_adapter?(:SQLite3Adapter)`
+// against `ActiveRecord::Base.lease_connection`.
+describeIfSqlite("SQLite3::SchemaCreation", () => {
+  let conn: TableDefinitionConn;
+  let sc: SchemaCreation;
+
+  beforeAll(async () => {
+    conn = (await Base.leaseConnection()) as unknown as TableDefinitionConn;
+    sc = new SchemaCreation("sqlite", conn);
+  });
 
   it("appends DEFERRABLE INITIALLY DEFERRED when deferrable is 'deferred'", async () => {
     const fk = new ForeignKeyDefinition(
@@ -45,7 +55,7 @@ describe("SQLite3::SchemaCreation", () => {
 
   it("appends COLLATE clause when collation option is set", async () => {
     const td = new TableDefinition("articles", {
-      adapter: schemaConn("sqlite"),
+      adapter: conn,
       adapterName: "sqlite",
     });
     td.column("title", "string", { collation: "BINARY" } as any);
@@ -54,7 +64,7 @@ describe("SQLite3::SchemaCreation", () => {
 
   it("appends GENERATED ALWAYS AS VIRTUAL for virtual columns", async () => {
     const td = new TableDefinition("articles", {
-      adapter: schemaConn("sqlite"),
+      adapter: conn,
       adapterName: "sqlite",
     });
     td.column("full_name", "string", { as: "first_name || ' ' || last_name" } as any);
@@ -65,7 +75,7 @@ describe("SQLite3::SchemaCreation", () => {
 
   it("appends STORED for stored virtual columns", async () => {
     const td = new TableDefinition("articles", {
-      adapter: schemaConn("sqlite"),
+      adapter: conn,
       adapterName: "sqlite",
     });
     td.column("full_name", "string", { as: "first_name || ' ' || last_name", stored: true } as any);

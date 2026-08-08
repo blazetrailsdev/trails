@@ -41,7 +41,6 @@ import { Mysql2Adapter } from "./connection-adapters/mysql2-adapter.js";
 import { describeIfMysqlAdapter } from "./support/describe-if-mysql-adapter.js";
 import { leaseMysqlAdapter } from "./adapters/abstract-mysql-adapter/test-helper.js";
 import { anonymousMigration } from "./test-helpers/anonymous-migration.js";
-import { schemaConn } from "./support/schema-conn.js";
 import { InternalMetadata } from "./internal-metadata.js";
 
 // Mirrors `MIGRATIONS_ROOT` from cases/helper.rb:14 — the directory the
@@ -251,7 +250,7 @@ describe("MigrationTest", () => {
   });
 
   it("decimal scale without precision should raise", async () => {
-    const td = new TableDefinition("products", { adapter: schemaConn("sqlite") });
+    const td = new TableDefinition("products", { adapter: await Base.leaseConnection() });
     td.decimal("price", { scale: 2 });
     await expect(emitTableSql(td)).rejects.toThrow(
       "Error adding decimal column: precision cannot be empty if scale is specified",

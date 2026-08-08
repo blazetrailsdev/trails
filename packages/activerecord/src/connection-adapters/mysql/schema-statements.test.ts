@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
+import { Base } from "../../base.js";
 import { MysqlSchemaStatements } from "./schema-statements.js";
-import { schemaConn } from "../../support/schema-conn.js";
+
 import {
   isRowFormatDynamicByDefault,
   defaultRowFormat,
@@ -98,10 +99,9 @@ describe("MySQL::SchemaStatements", () => {
     expect(opts).toContain("limit");
   });
 
-  it("createTableDefinition returns MySQL TableDefinition", () => {
-    expect(createTableDefinition.call(schemaConn("mysql") as never, "users").tableName).toBe(
-      "users",
-    );
+  it("createTableDefinition returns MySQL TableDefinition", async () => {
+    const conn = await Base.leaseConnection();
+    expect(createTableDefinition.call(conn as never, "users").tableName).toBe("users");
   });
 
   it("defaultType: parses string/integer/function defaults", () => {

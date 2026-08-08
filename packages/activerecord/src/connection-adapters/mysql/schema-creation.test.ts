@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { it, expect, beforeAll } from "vitest";
 import { SchemaCreation, type VisitorHostAdapter } from "./schema-creation.js";
 import {
   AddColumnDefinition,
@@ -12,25 +12,37 @@ import {
 } from "../abstract/schema-definitions.js";
 import { TableDefinition as MyTd } from "./schema-definitions.js";
 import { Column } from "./column.js";
-import { schemaConn } from "../../support/schema-conn.js";
+import { Base } from "../../base.js";
+import { describeIfMysqlAdapter } from "../../support/describe-if-mysql-adapter.js";
 
 /**
  * Rails' `MySQL::SchemaCreation.new(conn)` always gets the live adapter, so these
- * DDL-rendering tests hand it the shared unconnected MySQL adapter; overrides for
- * the support-flag branches sit on a derived object so the shared one stays clean.
+ * DDL-rendering tests hand it `ActiveRecord::Base.lease_connection` under
+ * `current_adapter?(:Mysql2Adapter)`; overrides for the support-flag branches sit
+ * on a derived object so the leased connection stays clean.
  */
-const mysqlConn = (overrides: Record<string, unknown> = {}): VisitorHostAdapter =>
-  Object.assign(Object.create(schemaConn("mysql")), overrides) as VisitorHostAdapter;
+let leased: VisitorHostAdapter;
 
-describe("MySQL::SchemaCreation", () => {
-  const sc = new SchemaCreation(mysqlConn());
+const mysqlConn = (overrides: Record<string, unknown> = {}): VisitorHostAdapter =>
+  Object.assign(Object.create(leased), overrides) as VisitorHostAdapter;
+
+describeIfMysqlAdapter("MySQL::SchemaCreation", () => {
+  let sc: SchemaCreation;
+
+  beforeAll(async () => {
+    leased = (await Base.leaseConnection()) as unknown as VisitorHostAdapter;
+    sc = new SchemaCreation(mysqlConn());
+  });
 
   it("visitDropForeignKey returns DROP FOREIGN KEY sql", async () => {
     expect((sc as any).visitDropForeignKey("fk_name")).toBe("DROP FOREIGN KEY fk_name");
   });
 
   it("visitDropCheckConstraint uses CHECK for MySQL", async () => {
-    expect((sc as any).visitDropCheckConstraint("chk")).toBe("DROP CHECK chk");
+    // The lane's leased connection is MariaDB in CI, so the MySQL arm of
+    // `mariadb?` (mysql/schema_creation.rb:35) is selected explicitly.
+    const mysql = new SchemaCreation(mysqlConn({ isMariadb: () => false }));
+    expect((mysql as any).visitDropCheckConstraint("chk")).toBe("DROP CHECK chk");
   });
 
   it("visitDropCheckConstraint uses CONSTRAINT for MariaDB", async () => {
@@ -42,7 +54,9 @@ describe("MySQL::SchemaCreation", () => {
     const at = new AlterTable("posts");
     at.dropForeignKey("fk_name");
     at.checkConstraintDrops.push("chk");
-    const sql = await (sc as any).visitAlterTable(at);
+    const sql = await (
+      new SchemaCreation(mysqlConn({ isMariadb: () => false })) as any
+    ).visitAlterTable(at);
     expect(sql).toContain("DROP FOREIGN KEY fk_name");
     expect(sql).toContain("DROP CHECK chk");
   });
@@ -184,9 +198,13 @@ describe("MySQL::SchemaCreation", () => {
   });
 });
 
-describe("MySQL::TableDefinition#toSql via SchemaCreation.accept", () => {
+describeIfMysqlAdapter("MySQL::TableDefinition#toSql via SchemaCreation.accept", () => {
   // Rails has no MySQL::TableDefinition#to_sql; CREATE TABLE SQL is produced by
   // accepting the TableDefinition into the adapter's SchemaCreation visitor.
+  beforeAll(async () => {
+    leased = (await Base.leaseConnection()) as unknown as VisitorHostAdapter;
+  });
+
   const toSql = (td: MyTd, host: VisitorHostAdapter = mysqlConn()) =>
     new SchemaCreation(host).accept(td);
 
@@ -300,7 +318,11 @@ describe("MySQL::TableDefinition#toSql via SchemaCreation.accept", () => {
   });
 });
 
-describe("MySQL::TableDefinition column methods", () => {
+describeIfMysqlAdapter("MySQL::TableDefinition column methods", () => {
+  beforeAll(async () => {
+    leased = (await Base.leaseConnection()) as unknown as VisitorHostAdapter;
+  });
+
   it("defines one column per name, mirroring `names.each` in define_column_methods", () => {
     const td = new MyTd("t", { adapter: mysqlConn() });
     td.longtext("body", "summary");

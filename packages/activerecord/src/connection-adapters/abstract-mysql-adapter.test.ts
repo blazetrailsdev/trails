@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { schemaConn } from "../support/schema-conn.js";
+import { Base } from "../base.js";
+import { describeIfMysqlAdapter } from "../support/describe-if-mysql-adapter.js";
 import { Column } from "./mysql/column.js";
 import {
   ChangeColumnDefinition,
@@ -184,7 +185,7 @@ describe("AbstractMysqlAdapter#renameColumn wiring", () => {
   });
 });
 
-describe("AbstractMysqlAdapter#buildChangeColumnDefinition", () => {
+describeIfMysqlAdapter("AbstractMysqlAdapter#buildChangeColumnDefinition", () => {
   function makeTextColumn(
     opts: { collation?: string | null; defaultFunction?: string | null } = {},
   ) {
@@ -275,7 +276,7 @@ describe("AbstractMysqlAdapter#buildChangeColumnDefinition", () => {
     const col = makeTextColumn({ defaultFunction: "uuid()" });
     const adapter = await makeAdapter(col);
     const cd = await adapter.buildChangeColumnDefinition("users", "uid", "string");
-    const sql = await new SchemaCreation(schemaConn("mysql") as never).accept(cd);
+    const sql = await new SchemaCreation((await Base.leaseConnection()) as never).accept(cd);
     expect(sql).toContain("DEFAULT uuid()");
     expect(sql).not.toContain("DEFAULT 'uuid()'");
   });
@@ -458,9 +459,9 @@ describe("AbstractMysqlAdapter#buildChangeColumnDefaultDefinition (#1568)", () =
   });
 });
 
-describe("AbstractMysqlAdapter — DROP vs SET DEFAULT fragment (#1568)", () => {
-  function visit(cd: ChangeColumnDefaultDefinition): Promise<string> {
-    return new MysqlSchemaCreation(schemaConn("mysql") as never).accept(cd);
+describeIfMysqlAdapter("AbstractMysqlAdapter — DROP vs SET DEFAULT fragment (#1568)", () => {
+  async function visit(cd: ChangeColumnDefaultDefinition): Promise<string> {
+    return new MysqlSchemaCreation((await Base.leaseConnection()) as never).accept(cd);
   }
 
   async function buildFor(column: Column, defaultOrChanges: unknown) {
