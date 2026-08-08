@@ -12,6 +12,7 @@ import {
   resolveModuleName,
   buildModuleIncluderFqns,
   dedupeRubyMethodInto,
+  NAME_COLLISION_CLUSTERS,
   selectMisplacedFile,
   MISPLACED_MIN_HITS,
   blazetrailsDepKeys,
@@ -1468,6 +1469,27 @@ describe("selectMisplacedFile", () => {
     // `.../index.ts` files (encryption/index.ts) carry ported bodies.
     const result = selectMisplacedFile(hits(["encryption/index.ts", 6], ["b.ts", 1]), 10);
     expect(result).toBe("encryption/index.ts");
+  });
+
+  it("never clusters a bucket registered as a name collision", () => {
+    expect(
+      selectMisplacedFile(
+        hits(["deprecation.ts", 6], ["b.ts", 1]),
+        10,
+        "activesupport:deprecation/deprecators.rb",
+      ),
+    ).toBeNull();
+    expect(NAME_COLLISION_CLUSTERS.has("activesupport:deprecation/deprecators.rb")).toBe(true);
+  });
+
+  it("leaves an unregistered bucket's cluster alone", () => {
+    expect(
+      selectMisplacedFile(
+        hits(["deprecation.ts", 6], ["b.ts", 1]),
+        10,
+        "activesupport:deprecation/behaviors.rb",
+      ),
+    ).toBe("deprecation.ts");
   });
 
   it("accepts a clear leader even with multiple low-hit competitors", () => {

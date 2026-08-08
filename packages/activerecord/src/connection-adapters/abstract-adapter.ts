@@ -1412,15 +1412,11 @@ export class AbstractAdapter implements Quoting {
   }
 
   get role(): string {
-    // Ruby's `@pool.role` (`abstract_adapter.rb:288`) is an unchecked send that
-    // raises NoMethodError on a NullPool — which Rails never reaches, because an
-    // adapter is only ever obtained from a real pool. The cast is that same
-    // unchecked read; no trails path reads `role` off a pool-less adapter either.
-    return (this.pool as ConnectionPool).role;
+    return this.pool.role;
   }
 
   get shard(): string {
-    return (this.pool as ConnectionPool).shard;
+    return this.pool.shard;
   }
 
   /**

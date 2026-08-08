@@ -1159,4 +1159,12 @@ describe("NullPool member parity", () => {
     expect("role" in pool).toBe(false);
     expect("shard" in pool).toBe(false);
   });
+
+  it("raises NoMethodError on a pool-less adapter's role, shard and inspect", () => {
+    const adapter = new AbstractAdapter();
+    expect(adapter.pool).toBeInstanceOf(NullPool);
+    expect(() => adapter.role).toThrow(/undefined method 'role'/);
+    expect(() => adapter.shard).toThrow(/undefined method 'shard'/);
+    expect(() => adapter.inspect()).toThrow(/undefined method 'shard'/);
+  });
 });
