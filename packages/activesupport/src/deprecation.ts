@@ -24,7 +24,7 @@ interface AllowContext {
 export class Deprecation {
   behavior: DeprecationBehavior | DeprecationBehavior[] | ((...args: unknown[]) => void) | null =
     "stderr";
-  silenced = false;
+  private _silenced = false;
   // Rails: `attr_accessor :gem_name` (deprecation/reporting.rb:11).
   gemName?: string;
   horizon?: string;
@@ -36,6 +36,16 @@ export class Deprecation {
   // Rails: `@silence_counter = Concurrent::ThreadLocalVar.new(0)` (deprecation.rb:78).
   private _silenceCounter = 0;
   private _allowContexts: AllowContext[] = [];
+
+  // Rails: `@silenced || @silence_counter.value.nonzero?`
+  // (deprecation/reporting.rb:56-58).
+  get silenced(): boolean {
+    return this._silenced || this._silenceCounter !== 0;
+  }
+
+  set silenced(silenced: boolean) {
+    this._silenced = silenced;
+  }
 
   constructor(options?: { horizon?: string; gemName?: string; silenced?: boolean }) {
     this.horizon = options?.horizon;
@@ -97,7 +107,8 @@ export class Deprecation {
   }
 
   warn(message?: string, callstack?: unknown[]): void {
-    if (this.silenced || this._silenceCounter > 0) return;
+    // Rails: `return if silenced` (deprecation/reporting.rb:19).
+    if (this.silenced) return;
 
     const msg = message ?? "DEPRECATION WARNING";
     const fullMessage = `DEPRECATION WARNING: ${msg}`;

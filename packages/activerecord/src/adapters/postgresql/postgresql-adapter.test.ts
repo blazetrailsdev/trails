@@ -120,10 +120,9 @@ describeIfPg("PostgreSQLAdapter", () => {
     PostgreSQLAdapter.dbWarningsAction = savedWarningsAction;
     PostgreSQLAdapter.dbWarningsIgnore = savedWarningsIgnore;
     vi.restoreAllMocks();
-    // Only clean up over a connection the test actually opened. A test that
-    // never queried this adapter (e.g. `raise error when cannot translate
-    // exception`) cannot have created `ex`/`ex2`, and making the hook connect
-    // just to issue the DROP is what times its 30 s budget out under load.
+    // A test that never queried this adapter cannot have created `ex`/`ex2`,
+    // and making the hook connect just to issue the DROP times its 30 s budget
+    // out under load.
     if (adapter.isConnected()) {
       try {
         await adapter.exec(`DROP TABLE IF EXISTS ex, ex2 CASCADE`);

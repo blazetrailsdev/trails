@@ -37,7 +37,11 @@ export class Deprecators {
     this._deprecators.set(name, deprecator);
   }
 
-  /** Iterates over all deprecators in this collection. */
+  /**
+   * Iterates over all deprecators in this collection. Ruby's no-block arm
+   * (`return to_enum(__method__) unless block`, `deprecators.rb:41`) has no JS
+   * analogue — there is no Enumerator to return — so the block is required.
+   */
   each(block: (deprecator: Deprecation) => void): void {
     for (const deprecator of this._deprecators.values()) block(deprecator);
   }
