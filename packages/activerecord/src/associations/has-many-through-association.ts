@@ -46,6 +46,10 @@ export class HasManyThroughAssociation extends HasManyAssociation {
    * `this`, exactly as Rails does, and delegates the query itself to
    * `HasManyAssociation#findTarget` (Rails' `super`).
    *
+   * `target_reflection_has_associated_record?` gates every arm, as it does in
+   * Rails (`return [] unless ...`, :227) — including the JOIN-routable one,
+   * which the flat loader used to reach without it.
+   *
    * Rails' `return scope.to_a if disable_joins` is trails'
    * `_loadThroughViaDisableJoinsScope`: `scope()`'s own `disable_joins` branch
    * (association.rb:302) builds the DisableJoinsAssociationScope relation, and
