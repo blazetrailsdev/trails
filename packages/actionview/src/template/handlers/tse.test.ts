@@ -119,7 +119,7 @@ describe("Template::Handlers::Tse", () => {
     ).toThrow(/not yet implemented/);
   });
 
-  it("Tse.call mirrors `Handlers::ERB.call` and delegates to a fresh instance", () => {
+  it("Tse.call delegates to a fresh instance", () => {
     const code = Tse.call({ type: "text/html" }, "<%= name %>");
     expect(code).toMatch(/_ob\.append\(name\)/);
   });

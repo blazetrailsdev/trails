@@ -47,7 +47,7 @@ function registerDefaults(): void {
   registerExtensions(["ts", "js", "mjs", "cjs", "tsx", "jsx"], slash);
   registerExtensions(["css", "scss", "sass", "less"], slash);
   registerExtensions(["yml", "yaml"], (tag) => new RegExp(`#\\s*(${tag}):?\\s*(.*)$`));
-  registerExtensions(["ejs", "erb"], (tag) => new RegExp(`<%\\s*#\\s*(${tag}):?\\s*(.*?)\\s*%>`));
+  registerExtensions(["ejs", "tse"], (tag) => new RegExp(`<%\\s*#\\s*(${tag}):?\\s*(.*?)\\s*%>`));
 }
 
 registerDefaults();

@@ -55,18 +55,18 @@ describe("BacktraceCleaner", () => {
 
   test("#clean should omit ActionView template methods names", () => {
     const backtrace = [
-      "app/views/application/index.html.erb:4:in `block in _app_views_application_index_html_erb__1234_5678'",
+      "app/views/application/index.html.tse:4:in `block in _app_views_application_index_html_tse__1234_5678'",
     ];
     const result = cleaner.clean(backtrace, "all");
-    expect(result[0]).toBe("app/views/application/index.html.erb:4");
+    expect(result[0]).toBe("app/views/application/index.html.tse:4");
   });
 
   test("#clean should omit ActionView template methods names on Ruby 3.4+", () => {
     const backtrace = [
-      "app/views/application/index.html.erb:4:in 'block in _app_views_application_index_html_erb__1234_5678'",
+      "app/views/application/index.html.tse:4:in 'block in _app_views_application_index_html_tse__1234_5678'",
     ];
     const result = cleaner.clean(backtrace, "all");
-    expect(result[0]).toBe("app/views/application/index.html.erb:4");
+    expect(result[0]).toBe("app/views/application/index.html.tse:4");
   });
 
   test("#clean_frame should consider traces from irb lines as User code", () => {
@@ -100,18 +100,18 @@ describe("BacktraceCleaner", () => {
 
   test("#clean_frame should omit ActionView template methods names", () => {
     const frame = cleaner.cleanFrame(
-      "app/views/application/index.html.erb:4:in `block in _app_views_application_index_html_erb__1234_5678'",
+      "app/views/application/index.html.tse:4:in `block in _app_views_application_index_html_tse__1234_5678'",
       "all",
     );
-    expect(frame).toBe("app/views/application/index.html.erb:4");
+    expect(frame).toBe("app/views/application/index.html.tse:4");
   });
 
   test("#clean_frame should omit ActionView template methods names on Ruby 3.4+", () => {
     const frame = cleaner.cleanFrame(
-      "app/views/application/index.html.erb:4:in 'block in _app_views_application_index_html_erb__1234_5678'",
+      "app/views/application/index.html.tse:4:in 'block in _app_views_application_index_html_tse__1234_5678'",
       "all",
     );
-    expect(frame).toBe("app/views/application/index.html.erb:4");
+    expect(frame).toBe("app/views/application/index.html.tse:4");
   });
 
   test("setRoot strips application root from absolute paths", () => {

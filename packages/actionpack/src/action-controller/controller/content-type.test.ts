@@ -102,12 +102,12 @@ describe("ContentTypeTest", () => {
     expect(c.response.charset).toBe("utf-8");
   });
 
-  it.skip("test nil default for erb", () => {
-    // pending: requires ERB template rendering (ActionView not yet ported)
+  it.skip("test nil default for tse", () => {
+    // pending: requires TSE template rendering (ActionView not yet ported)
   });
 
-  it.skip("test default for erb", () => {
-    // pending: requires ERB template rendering (ActionView not yet ported)
+  it.skip("test default for tse", () => {
+    // pending: requires TSE template rendering (ActionView not yet ported)
   });
 
   it.skip("test default for builder", () => {

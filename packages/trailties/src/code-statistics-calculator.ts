@@ -2,14 +2,14 @@
  * Port of railties/lib/rails/code_statistics_calculator.rb.
  *
  * Counts lines/codeLines/classes/methods in source text by file type.
- * Patterns mirror Rails' for rb/erb/css/scss/js/coffee; ts/tsx add TS
+ * Patterns mirror Rails' for rb/erb (spelled tse here)/css/scss/js/coffee; ts/tsx add TS
  * equivalents (function, arrow, class method shorthand with leading
  * keyword, get/set accessors).
  */
 
 export type FileType =
   | "rb"
-  | "erb"
+  | "tse"
   | "css"
   | "scss"
   | "js"
@@ -49,7 +49,7 @@ export const PATTERNS: Record<FileType, PatternSet> = {
   rb: RB,
   rake: RB,
   minitest: { ...RB, method: /^\s*(def|test)\s+['"_a-z]/ },
-  erb: { lineComment: /((^\s*<%#.*%>)|(<!--.*-->))/ },
+  tse: { lineComment: /((^\s*<%#.*%>)|(<!--.*-->))/ },
   css: { lineComment: /^\s*\/\*.*\*\// },
   scss: { lineComment: /((^\s*\/\*.*\*\/)|(^\s*\/\/))/ },
   js: {
