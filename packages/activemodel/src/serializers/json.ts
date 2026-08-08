@@ -9,6 +9,7 @@ import {
   type SerializationRecord,
 } from "../serialization.js";
 import { ModelName } from "../naming.js";
+import { include, ToJsonWithActiveSupportEncoder, type Included } from "@blazetrails/activesupport";
 import { ArgumentError } from "../attribute-assignment.js";
 
 function isPlainJsonObject(v: unknown): v is Record<string, unknown> {
@@ -42,6 +43,7 @@ function describeJsonShape(v: unknown): string {
  * is the canonical mixin host for lighter-weight adopters and the
  * file-level Rails surface (`serializable_hash`, `model_name`).
  */
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class JSON {
   // Rails: included do; class_attribute :include_root_in_json, default: false; end
   // Typed boolean | string to match Model.includeRootInJson — Rails
@@ -184,24 +186,12 @@ export class JSON {
   ): void {
     serializableAddIncludes(this as unknown as SerializationRecord, options, callback);
   }
-
-  /**
-   * `JSON.stringify(instance)` consults a `toJSON` method when present.
-   * Delegating to `asJson()` ensures the host runs the same coercion +
-   * root-wrapping as the Rails entry point. Mirrors Model.toJSON
-   * (model.ts) and matches the surface ActiveSupport adds on Object via
-   * `as_json` indirection in Rails.
-   */
-  toJSON(): Record<string, unknown> {
-    return this.asJson();
-  }
-
-  /**
-   * Mirrors Ruby's `to_json` — encodes the model to a JSON string. Same
-   * shape as Model#toJson (model.ts:1720-1722) so JSONHost adopters
-   * stay compatible with Model-style consumers.
-   */
-  toJson(options?: SerializeOptions & { root?: boolean | string }): string {
-    return globalThis.JSON.stringify(this.asJson(options));
-  }
 }
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (core_ext/object/json.rb:47-49); the class/interface merge is how `include()` surfaces on the type side.
+export interface JSON {
+  /** `ActiveSupport::ToJsonWithActiveSupportEncoder#to_json` (json.rb:35-43). */
+  toJSON: Included<typeof ToJsonWithActiveSupportEncoder>["toJSON"];
+}
+
+include(JSON, ToJsonWithActiveSupportEncoder);

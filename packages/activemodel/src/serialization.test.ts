@@ -576,7 +576,7 @@ describe("SerializationTest", () => {
     });
 
     it("JSON.stringify(model) delegates to asJson via toJSON()", () => {
-      // Direct `JSON.stringify(model)` should match `model.toJson()` —
+      // Direct `JSON.stringify(model)` should match `model.toJSON()` —
       // without the hook, the default walker would enumerate
       // `_attributes`/`_dirty`/`errors`/etc. and potentially throw on
       // BigInt state.
@@ -587,7 +587,7 @@ describe("SerializationTest", () => {
         }
       }
       const r = new Row({ id: "42", name: "row-1" });
-      expect(JSON.stringify(r)).toBe(r.toJson());
+      expect(JSON.stringify(r)).toBe(r.toJSON());
       const parsed = JSON.parse(JSON.stringify(r));
       expect(parsed).toEqual({ id: 42, name: "row-1" });
     });
@@ -813,7 +813,7 @@ describe("Serialization", () => {
 
   it("toJson returns valid JSON string", () => {
     const p = new Post({ title: "Hello", body: "World", rating: 5 });
-    const parsed = JSON.parse(p.toJson());
+    const parsed = JSON.parse(p.toJSON() as string);
     expect(parsed.title).toBe("Hello");
     expect(parsed.rating).toBe(5);
   });

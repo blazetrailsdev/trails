@@ -2275,10 +2275,6 @@ export class Model {
     );
   }
 
-  toJson(options?: SerializeOptions): string {
-    return JSON.stringify(this.asJson(options));
-  }
-
   /**
    * Deserialize a JSON string into this model's attributes.
    *
