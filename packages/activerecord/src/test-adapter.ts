@@ -147,9 +147,17 @@ const { ConnectionDescriptor } =
  * reaches the adapter through `withConnection`, which would otherwise block on
  * a `pool: 1` pool whose only connection the caller holds.
  *
+ * The pool comes back alongside the adapter so callers can tear it down the way
+ * `connection_pool_test.rb:16-30`'s `teardown` does (`@pool.disconnect!`).
+ * Disconnecting only the adapter leaves the pool holding a released but never
+ * disconnected connection.
+ *
  * @internal
  */
-export async function checkoutRawTestAdapter(): Promise<DatabaseAdapter> {
+export async function checkoutRawTestAdapter(): Promise<{
+  adapter: DatabaseAdapter;
+  pool: ConnectionPool;
+}> {
   const dbConfig = new HashConfig(_primaryEnvConfig.envName, _primaryEnvConfig.name, {
     ..._primaryConfiguration,
     pool: 1,
@@ -161,7 +169,8 @@ export async function checkoutRawTestAdapter(): Promise<DatabaseAdapter> {
     "default",
     { adapterFactory: newRawTestAdapter },
   );
-  return new RealConnectionPool(poolConfig).leaseConnection();
+  const pool = new RealConnectionPool(poolConfig);
+  return { adapter: await pool.leaseConnection(), pool };
 }
 
 if (adapterType === "postgres") {

@@ -9,6 +9,7 @@ import type { SchemaQuoter } from "./abstract/assert-schema-adapter.js";
 import { include } from "@blazetrails/activesupport";
 import { TableDefinition } from "./abstract/schema-definitions.js";
 import type { AbstractAdapter } from "./abstract-adapter.js";
+import type { ConnectionPool } from "./abstract/connection-pool.js";
 import { checkoutRawTestAdapter } from "../test-adapter.js";
 import * as fs from "fs";
 import * as path from "path";
@@ -808,13 +809,14 @@ describe("DDL cache-invalidation safety-net", () => {
 
 describe("SchemaCache DDL invalidation", () => {
   let adapter: AbstractAdapter;
+  let pool: ConnectionPool;
 
   function warmCache(tableName: string) {
     adapter.internalSchemaCache.setColumns(tableName, [makeColumn("id", "integer")]);
   }
 
   beforeEach(async () => {
-    adapter = await checkoutRawTestAdapter();
+    ({ adapter, pool } = await checkoutRawTestAdapter());
     await adapter.dropTable("things", "stuff", { ifExists: true });
     await adapter.createTable("things", (t) => {
       t.string("name");
@@ -826,7 +828,8 @@ describe("SchemaCache DDL invalidation", () => {
 
   afterEach(async () => {
     await adapter.dropTable("things", "stuff", { ifExists: true });
-    await adapter.close();
+    pool.releaseConnection();
+    await pool.disconnectBang();
   });
 
   it("dropTable clears cache before DROP TABLE", async () => {

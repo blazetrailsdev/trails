@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import * as activesupport from "@blazetrails/activesupport";
 import * as fs from "node:fs";
 import * as os from "node:os";
@@ -8,9 +8,16 @@ import { SQLiteDatabaseTasks } from "./sqlite-database-tasks.js";
 import { DatabaseTasks } from "./database-tasks.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { DatabaseAlreadyExists, NoDatabaseError } from "../errors.js";
+import { SchemaDumper } from "../schema-dumper.js";
 
 function tmpDbPath(): string {
   return path.join(os.tmpdir(), `trails-sqlite-test-${process.pid}-${randomUUID()}.sqlite3`);
+}
+
+/** Rails seeds these fixtures with backticked `sqlite3` calls. */
+function runSqlite3(database: string, sql: string): void {
+  const result = activesupport.getChildProcess().spawnSync("sqlite3", [database, sql]);
+  if (result.status !== 0) throw new Error(`sqlite3 failed: ${result.stderr}`);
 }
 
 describe("SQLiteDatabaseTasks", () => {
@@ -158,6 +165,104 @@ describe("SQLiteDatabaseTasks", () => {
     } finally {
       await (loadedAdapter as unknown as { close(): Promise<void> }).close();
     }
+  });
+});
+
+// `sqlite_rake_test.rb:166-231` (SqliteStructureDumpTest) and `:245-262`
+// (SqliteStructureLoadTest). Rails seeds the fixture database with backticked
+// `sqlite3` calls; here that is the same CLI the tasks themselves shell out to.
+describe("SqliteStructureDumpTest", () => {
+  const created: string[] = [];
+  let database: string;
+  let configuration: HashConfig;
+
+  beforeEach(() => {
+    database = tmpDbPath();
+    created.push(database);
+    configuration = new HashConfig("development", "primary", {
+      adapter: "sqlite3",
+      database,
+    });
+    for (const table of ["bar", "foo", "prefix_foo", "ignored_foo"]) {
+      runSqlite3(database, `CREATE TABLE ${table}(id INTEGER)`);
+    }
+  });
+
+  afterEach(() => {
+    SchemaDumper.ignoreTables = [];
+    for (const file of created) {
+      try {
+        fs.unlinkSync(file);
+      } catch {
+        // ignore
+      }
+    }
+    created.length = 0;
+  });
+
+  it("test_structure_dump", async () => {
+    const filename = path.join(os.tmpdir(), `awesome-file-${randomUUID()}.sql`);
+    created.push(filename);
+
+    await new SQLiteDatabaseTasks(configuration).structureDump(filename);
+
+    expect(fs.existsSync(database)).toBe(true);
+    expect(fs.existsSync(filename)).toBe(true);
+    expect(fs.readFileSync(filename, "utf8")).toMatch(/CREATE TABLE foo/);
+    expect(fs.readFileSync(filename, "utf8")).toMatch(/CREATE TABLE bar/);
+  });
+
+  it("test_structure_dump_with_ignore_tables", async () => {
+    const filename = path.join(os.tmpdir(), `awesome-file-${randomUUID()}.sql`);
+    created.push(filename);
+    SchemaDumper.ignoreTables = [/^prefix_/, "ignored_foo"];
+
+    await new SQLiteDatabaseTasks(configuration).structureDump(filename);
+
+    expect(fs.existsSync(database)).toBe(true);
+    expect(fs.existsSync(filename)).toBe(true);
+    const contents = fs.readFileSync(filename, "utf8");
+    expect(contents).toMatch(/bar/);
+    expect(contents).not.toMatch(/prefix_foo/);
+    expect(contents).not.toMatch(/ignored_foo/);
+  });
+
+  it("test_structure_dump_execution_fails", async () => {
+    const filename = path.join(os.tmpdir(), `awesome-file-${randomUUID()}.sql`);
+    created.push(filename);
+
+    await expect(
+      new SQLiteDatabaseTasks(configuration).structureDump(filename, ["--noop"]),
+    ).rejects.toThrow(/failed to execute:/);
+  });
+});
+
+describe("SqliteStructureLoadTest", () => {
+  const created: string[] = [];
+
+  afterEach(() => {
+    for (const file of created) {
+      try {
+        fs.unlinkSync(file);
+      } catch {
+        // ignore
+      }
+    }
+    created.length = 0;
+  });
+
+  it("test_structure_load", async () => {
+    const database = tmpDbPath();
+    const filename = path.join(os.tmpdir(), `awesome-file-${randomUUID()}.sql`);
+    created.push(database, filename);
+    const configuration = new HashConfig("development", "primary", {
+      adapter: "sqlite3",
+      database,
+    });
+
+    fs.writeFileSync(filename, "select datetime('now', 'localtime');\n");
+    await new SQLiteDatabaseTasks(configuration).structureLoad(filename);
+    expect(fs.existsSync(database)).toBe(true);
   });
 });
 

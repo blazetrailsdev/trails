@@ -46,21 +46,28 @@ describe("MigrationTest", () => {
     // ActiveRecord::Base — so with no ivar set they answer Base's own.
     const baseAdapter = Base.connection;
     const basePool = Base.connectionPool();
-    const override = await checkoutRawTestAdapter();
-    expect(m.connection).toBe(baseAdapter);
-    internals._connectionOverride = override;
-    expect(m.connection).toBe(override);
-    // connectionPool is independent — _connectionOverride must not affect it
-    expect(m.connectionPool).toBe(basePool);
-    delete internals._connectionOverride;
-    expect(m.connection).toBe(baseAdapter);
-    const poolOverride = await checkoutRawTestAdapter();
-    internals._poolOverride = poolOverride;
-    expect(m.connectionPool).toBe(poolOverride);
-    // connection is independent — _poolOverride must not affect it
-    expect(m.connection).toBe(baseAdapter);
-    delete internals._poolOverride;
-    expect(m.connectionPool).toBe(basePool);
+    const { adapter: override, pool: overridePool } = await checkoutRawTestAdapter();
+    const { adapter: poolOverride, pool: poolOverridePool } = await checkoutRawTestAdapter();
+    try {
+      expect(m.connection).toBe(baseAdapter);
+      internals._connectionOverride = override;
+      expect(m.connection).toBe(override);
+      // connectionPool is independent — _connectionOverride must not affect it
+      expect(m.connectionPool).toBe(basePool);
+      delete internals._connectionOverride;
+      expect(m.connection).toBe(baseAdapter);
+      internals._poolOverride = poolOverride;
+      expect(m.connectionPool).toBe(poolOverride);
+      // connection is independent — _poolOverride must not affect it
+      expect(m.connection).toBe(baseAdapter);
+      delete internals._poolOverride;
+      expect(m.connectionPool).toBe(basePool);
+    } finally {
+      for (const pool of [overridePool, poolOverridePool]) {
+        pool.releaseConnection();
+        await pool.disconnectBang();
+      }
+    }
   });
 
   it("migration context with async migration() proxy", async () => {

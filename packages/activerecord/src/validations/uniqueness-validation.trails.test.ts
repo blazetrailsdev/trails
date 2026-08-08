@@ -12,6 +12,7 @@ import { fixtures } from "../test-fixtures.js";
 import { Topic } from "../test-helpers/models/topic.js";
 import { checkoutRawTestAdapter } from "../test-adapter.js";
 import type { TestDatabaseAdapter } from "../test-adapter.js";
+import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
 import { rebuildCanonicalTables } from "../support/canonical-table-rebuild.js";
 import { assertQueriesCount, assertNoQueries } from "../testing/query-assertions.js";
 
@@ -87,20 +88,22 @@ describe("UniquenessCoveredByUniqueIndexAdapterResolutionTest", () => {
   // stays off for every directly-assigned model. Rails has no counterpart —
   // its `klass.schema_cache` is always pool-resolved.
   let adapter: TestDatabaseAdapter;
+  let pool: ConnectionPool;
 
   class DirectTopic extends Topic {
     static _tableName = "topics";
   }
 
   beforeAll(async () => {
-    adapter = await checkoutRawTestAdapter();
+    ({ adapter, pool } = await checkoutRawTestAdapter());
     await rebuildCanonicalTables(adapter, ["topics"]);
     await adapter.addIndex("topics", "title", { unique: true, name: "topics_direct_index" });
     (DirectTopic as unknown as { _adapter: TestDatabaseAdapter })._adapter = adapter;
   });
 
   afterAll(async () => {
-    await adapter.disconnect?.();
+    pool.releaseConnection();
+    await pool.disconnectBang();
   });
 
   it("skips the existence check for a directly assigned adapter", async () => {

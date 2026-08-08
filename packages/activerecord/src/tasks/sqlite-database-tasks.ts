@@ -108,75 +108,120 @@ export class SQLiteDatabaseTasks {
   }
 
   async structureDump(filename: string, extraFlags?: string | string[] | null): Promise<void> {
-    void extraFlags;
+    // Rails has no in-memory lane, so `sqlite3 :memory: .schema` is a database
+    // the CLI just created and immediately discards. See
+    // `inMemoryStructureDump`.
+    if (isInMemoryDatabase(this.resolveDbPath())) return this.inMemoryStructureDump(filename);
+
+    const args: string[] = [];
+    if (extraFlags != null) args.push(...(Array.isArray(extraFlags) ? extraFlags : [extraFlags]));
+    args.push(this.dbConfig.database as string);
+
+    const { SchemaDumper } = await import("../connection-adapters/abstract/schema-dumper.js");
+    let ignoreTables = SchemaDumper.ignoreTables;
+    if (ignoreTables.length > 0) {
+      const connection = await this.connection();
+      ignoreTables = (await connection.dataSources()).filter((table) =>
+        ignoreTables.some((pattern) => {
+          if (!(pattern instanceof RegExp)) return pattern === table;
+          // Ruby's Regexp#=== carries no state; a JS `g`/`y` regex advances
+          // `lastIndex` on every `.test()`, so without this reset the second
+          // table tested against the same pattern can silently miss.
+          pattern.lastIndex = 0;
+          return pattern.test(table);
+        }),
+      );
+      const condition = ignoreTables.map((table) => connection.quote(table)).join(", ");
+      args.push(
+        `SELECT sql || ';' FROM sqlite_master WHERE tbl_name NOT IN (${condition}) ORDER BY tbl_name, type DESC, name`,
+      );
+    } else {
+      args.push(".schema --nosys");
+    }
+    await runCmd("sqlite3", args, filename);
+  }
+
+  async structureLoad(filename: string, extraFlags?: string | string[] | null): Promise<void> {
+    if (isInMemoryDatabase(this.resolveDbPath())) return this.inMemoryStructureLoad(filename);
+
+    const flags = extraFlags != null ? (Array.isArray(extraFlags) ? extraFlags : [extraFlags]) : [];
+    // Rails' backtick form redirects the dump file into sqlite3's stdin
+    // (`sqlite3 #{flags} #{database} < "#{filename}"`). The child-process
+    // adapter has no shell, so the same bytes go in through `input`.
+    const childProcess = await getChildProcessAsync();
+    const args = [...flags, this.dbConfig.database as string];
+    childProcess.spawnSync("sqlite3", args, {
+      encoding: "utf8",
+      input: getFs().readFileSync(filename, "utf8"),
+    });
+  }
+
+  /**
+   * The one deviation from Rails' CLI path, and the only place the bespoke
+   * ordering and `sqlite_%` filter survive.
+   *
+   * An in-memory database belongs to the connection that opened it, so there is
+   * no file for a child `sqlite3` to attach: `sqlite3 :memory: ".schema"` dumps
+   * a database it just created and throws away, which is how this arm reached
+   * CI as an empty dump. Rails has no in-memory lane and so no counterpart —
+   * `sqlite_database_tasks.rb:43-58` shells out unconditionally.
+   *
+   * Two things differ from Rails' query, both forced by re-executing the dump
+   * as a script rather than feeding it to the sqlite3 shell. Rails orders by
+   * `type DESC`, relying on the shell to resolve forward-referenced triggers
+   * lazily; `db.exec` applies statements strictly in order, so tables and views
+   * have to precede the indexes and triggers that reference them. And `.schema`
+   * omits SQLite's internal tables implicitly, where a direct `sqlite_master`
+   * read has to exclude them by name or emit reserved-name CREATEs that fail on
+   * load.
+   */
+  private async inMemoryStructureDump(filename: string): Promise<void> {
     const adapter = await this.connection();
     const { SchemaDumper } = await import("../connection-adapters/abstract/schema-dumper.js");
     const ignoreTables = SchemaDumper.ignoreTables;
 
-    // Order so that dependencies resolve during structure_load: create
-    // tables + views first, then their indexes and triggers (which both
-    // reference those tables). Rails' equivalent orders by `type DESC`
-    // because its CLI path runs through sqlite3's shell which resolves
-    // forward-referenced triggers lazily; when re-executing as a script
-    // through better-sqlite3's `db.exec` the statements are applied
-    // strictly in order, so triggers-before-tables would fail.
     const typeOrder =
       "CASE type WHEN 'table' THEN 0 WHEN 'view' THEN 1 " +
       "WHEN 'index' THEN 2 WHEN 'trigger' THEN 3 ELSE 4 END";
-    // Skip SQLite internals (sqlite_sequence, sqlite_stat*, etc.)
-    // — their names are reserved, so re-emitting their CREATE
-    // statements during structureLoad would fail. Rails' .schema CLI
-    // path filters these implicitly; we replicate that here.
     let where = "WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%'";
     let binds: unknown[] = [];
 
     if (ignoreTables.length > 0) {
-      const tablesRows = await adapter.execute(
-        "SELECT tbl_name FROM sqlite_master WHERE type IN ('table','view','index','trigger')",
-      );
-      const allTables = Array.from(
-        new Set(tablesRows.map((r) => String(r.tbl_name ?? "")).filter(Boolean)),
-      );
-      const excluded = allTables.filter((name) =>
-        ignoreTables.some((pat) => {
-          if (pat instanceof RegExp) {
-            // Reset lastIndex so global/sticky regex patterns don't
-            // produce false negatives across repeated .test() calls.
-            pat.lastIndex = 0;
-            return pat.test(name);
-          }
-          return pat === name;
+      const excluded = (await adapter.dataSources()).filter((table) =>
+        ignoreTables.some((pattern) => {
+          if (!(pattern instanceof RegExp)) return pattern === table;
+          pattern.lastIndex = 0;
+          return pattern.test(table);
         }),
       );
       if (excluded.length > 0) {
-        const placeholders = excluded.map(() => "?").join(", ");
-        where += ` AND tbl_name NOT IN (${placeholders})`;
+        where += ` AND tbl_name NOT IN (${excluded.map(() => "?").join(", ")})`;
         binds = excluded;
       }
     }
 
-    const query = `SELECT sql || ';' AS sql FROM sqlite_master ${where} ORDER BY ${typeOrder}, tbl_name, name`;
-    const rows = await adapter.execute(query, binds);
-    const output = rows.map((r) => String(r.sql ?? "")).join("\n");
-    getFs().writeFileSync(filename, output);
+    const rows = await adapter.execute(
+      `SELECT sql || ';' AS sql FROM sqlite_master ${where} ORDER BY ${typeOrder}, tbl_name, name`,
+      binds,
+    );
+    getFs().writeFileSync(filename, rows.map((r) => String(r.sql ?? "")).join("\n"));
   }
 
-  async structureLoad(filename: string, extraFlags?: string | string[] | null): Promise<void> {
-    void extraFlags;
+  /**
+   * The in-memory counterpart to {@link inMemoryStructureDump}.
+   *
+   * `exec` runs the whole script in one shot, so a dump carrying a trigger body
+   * (`CREATE TRIGGER ... BEGIN ...; ...; END`) survives, where splitting on
+   * semicolons would cut it in half. `register` matches `/sqlite/`, and every
+   * SQLite-family adapter extends `SQLite3Adapter`, which defines `exec`
+   * (`sqlite3-adapter.ts:1166`) — hence the cast rather than a feature-detect.
+   */
+  private async inMemoryStructureLoad(filename: string): Promise<void> {
     const sql = getFs().readFileSync(filename, "utf8");
     const adapter = await this.connection();
-    // SQLite's `db.exec` runs an entire script in one shot, so it's safe
-    // for dumps containing trigger bodies (CREATE TRIGGER ... BEGIN ...;
-    // ...; END) where naive semicolon splitting would break.
-    const exec = (adapter as unknown as { exec?: (sql: string) => Promise<void> | void }).exec;
-    if (typeof exec === "function") {
-      await exec.call(adapter, sql);
-    } else {
-      for (const statement of splitSqlStatements(sql)) {
-        await adapter.executeMutation(statement);
-      }
-    }
+    await (adapter as unknown as { exec(sql: string): Promise<void> }).exec(sql);
   }
+
 
   /**
    * Truncate every user table in the database — used by
@@ -267,65 +312,6 @@ export class SQLiteDatabaseTasks {
         new SQLiteDatabaseTasks(config).structureLoad(filename, flags),
     });
   }
-}
-
-/**
- * Split a SQL script into individual statements on semicolon boundaries,
- * respecting string literals ('...' and "..."), line comments (-- ...) and
- * block comments (slash-star ... star-slash). Simple enough for
- * structure-load files (which are DDL the adapter itself produced) but not a
- * full SQL parser.
- */
-function splitSqlStatements(sql: string): string[] {
-  const result: string[] = [];
-  let buf = "";
-  let i = 0;
-  const n = sql.length;
-  while (i < n) {
-    const ch = sql[i];
-    const next = sql[i + 1];
-    if (ch === "-" && next === "-") {
-      while (i < n && sql[i] !== "\n") i++;
-      continue;
-    }
-    if (ch === "/" && next === "*") {
-      i += 2;
-      while (i < n - 1 && !(sql[i] === "*" && sql[i + 1] === "/")) i++;
-      i += 2;
-      continue;
-    }
-    if (ch === "'" || ch === '"') {
-      const quote = ch;
-      buf += ch;
-      i++;
-      while (i < n) {
-        buf += sql[i];
-        if (sql[i] === quote && sql[i + 1] !== quote) {
-          i++;
-          break;
-        }
-        if (sql[i] === quote && sql[i + 1] === quote) {
-          buf += sql[i + 1];
-          i += 2;
-          continue;
-        }
-        i++;
-      }
-      continue;
-    }
-    if (ch === ";") {
-      const stmt = buf.trim();
-      if (stmt) result.push(stmt);
-      buf = "";
-      i++;
-      continue;
-    }
-    buf += ch;
-    i++;
-  }
-  const tail = buf.trim();
-  if (tail) result.push(tail);
-  return result;
 }
 
 /** @internal */
