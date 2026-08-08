@@ -222,7 +222,6 @@ export class SQLiteDatabaseTasks {
     await (adapter as unknown as { exec(sql: string): Promise<void> }).exec(sql);
   }
 
-
   /**
    * Truncate every user table in the database — used by
    * `DatabaseTasks.truncate_all` / `trails db seed:replant`. SQLite

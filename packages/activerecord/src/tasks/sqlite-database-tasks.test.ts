@@ -175,7 +175,15 @@ describe("SqliteStructureDumpTest", () => {
   let database: string;
   let configuration: HashConfig;
 
-  beforeEach(() => {
+  // `structure_dump` reads `data_sources` off the ambient connection, so the
+  // fixture database has to be the established one. Rails stubs the call
+  // instead (`sqlite_rake_test.rb:195`) because its `Base` is pinned to arunit;
+  // establishing is what #6232 did to the round-trip test in this same file
+  // when it retired `withOperationAdapter`, and it keeps the assertion
+  // lane-independent.
+  let previous: ReturnType<typeof Base.removeConnection>;
+
+  beforeEach(async () => {
     database = tmpDbPath();
     created.push(database);
     configuration = new HashConfig("development", "primary", {
@@ -185,19 +193,14 @@ describe("SqliteStructureDumpTest", () => {
     for (const table of ["bar", "foo", "prefix_foo", "ignored_foo"]) {
       runSqlite3(database, `CREATE TABLE ${table}(id INTEGER)`);
     }
+    previous = Base.removeConnection();
+    await Base.establishConnection({ adapter: "sqlite3", database });
   });
 
-  // `structure_dump` reaches `data_sources` through the ambient
-  // `Base.lease_connection`, which is not the fixture database — Rails stubs it
-  // for the same reason (`sqlite_rake_test.rb:195`).
-  async function stubDataSources(tables: string[]): Promise<void> {
-    const conn = await Base.connectionPool().leaseConnection();
-    vi.spyOn(conn, "dataSources").mockResolvedValue(tables);
-  }
-
-  afterEach(() => {
-    vi.restoreAllMocks();
+  afterEach(async () => {
     SchemaDumper.ignoreTables = [];
+    Base.removeConnection();
+    if (previous) await Base.establishConnection(previous.configuration);
     for (const file of created) {
       try {
         fs.unlinkSync(file);
@@ -224,7 +227,6 @@ describe("SqliteStructureDumpTest", () => {
     const filename = path.join(os.tmpdir(), `awesome-file-${randomUUID()}.sql`);
     created.push(filename);
     SchemaDumper.ignoreTables = [/^prefix_/, "ignored_foo"];
-    await stubDataSources(["foo", "bar", "prefix_foo", "ignored_foo"]);
 
     await new SQLiteDatabaseTasks(configuration).structureDump(filename);
 
@@ -242,7 +244,6 @@ describe("SqliteStructureDumpTest", () => {
     created.push(filename);
     runSqlite3(database, "CREATE TABLE prefix_bar(id INTEGER)");
     SchemaDumper.ignoreTables = [/^prefix_/g];
-    await stubDataSources(["bar", "prefix_foo", "prefix_bar"]);
 
     await new SQLiteDatabaseTasks(configuration).structureDump(filename);
 
@@ -361,6 +362,10 @@ describe("SQLiteDatabaseTasks in-memory URI variants", () => {
 // attach, so structureDump/structureLoad take the named non-CLI fallback
 // (`inMemoryStructureDump` / `inMemoryStructureLoad`). Rails has no in-memory
 // lane and so no counterpart test.
+//
+// Both tests seed through `structureLoad` rather than a second connection:
+// better-sqlite3 takes a plain filename, not a SQLite URI, so a `:memory:`
+// database cannot be shared with a second adapter.
 describe("SQLiteDatabaseTasks in-memory structure dump/load", () => {
   const created: string[] = [];
   const configuration = new HashConfig("development", "primary", {
@@ -371,7 +376,13 @@ describe("SQLiteDatabaseTasks in-memory structure dump/load", () => {
   // `removeConnection` hands back the config it removed, which is how the
   // file-scoped pool is put back afterwards — the suite guard in
   // `cases/helper.ts:174-183` fails any file that leaves a writing pool behind.
+  // It drains the pool on the way out (`disconnectPoolFromPoolManager`).
   let previous: ReturnType<typeof Base.removeConnection>;
+
+  async function freshDatabase(): Promise<void> {
+    Base.removeConnection();
+    await Base.establishConnection({ adapter: "sqlite3", database: ":memory:" });
+  }
 
   beforeEach(async () => {
     previous = Base.removeConnection();
@@ -380,11 +391,6 @@ describe("SQLiteDatabaseTasks in-memory structure dump/load", () => {
 
   afterEach(async () => {
     SchemaDumper.ignoreTables = [];
-    try {
-      await Base.connectionPool().disconnectBang();
-    } catch {
-      // best effort
-    }
     Base.removeConnection();
     if (previous) await Base.establishConnection(previous.configuration);
     for (const file of created) {
@@ -397,21 +403,26 @@ describe("SQLiteDatabaseTasks in-memory structure dump/load", () => {
     created.length = 0;
   });
 
-  const dumpPath = () => {
+  const sqlFile = (contents = ""): string => {
     const file = path.join(os.tmpdir(), `trails-mem-dump-${randomUUID()}.sql`);
     created.push(file);
+    if (contents) fs.writeFileSync(file, contents);
     return file;
   };
 
   it("honors ignoreTables", async () => {
-    const conn = await Base.connectionPool().leaseConnection();
-    for (const table of ["bar", "prefix_foo", "prefix_bar"]) {
-      await conn.executeMutation(`CREATE TABLE ${table}(id INTEGER)`);
-    }
+    const tasks = new SQLiteDatabaseTasks(configuration);
+    await tasks.structureLoad(
+      sqlFile(
+        "CREATE TABLE bar(id INTEGER);\n" +
+          "CREATE TABLE prefix_foo(id INTEGER);\n" +
+          "CREATE TABLE prefix_bar(id INTEGER);\n",
+      ),
+    );
     SchemaDumper.ignoreTables = [/^prefix_/g];
 
-    const filename = dumpPath();
-    await new SQLiteDatabaseTasks(configuration).structureDump(filename);
+    const filename = sqlFile();
+    await tasks.structureDump(filename);
 
     const contents = fs.readFileSync(filename, "utf8");
     expect(contents).toMatch(/CREATE TABLE bar/);
@@ -420,33 +431,33 @@ describe("SQLiteDatabaseTasks in-memory structure dump/load", () => {
   });
 
   it("round-trips a trigger body through structureLoad", async () => {
-    const conn = await Base.connectionPool().leaseConnection();
-    await conn.executeMutation(
-      "CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT, updated_at TEXT)",
+    const tasks = new SQLiteDatabaseTasks(configuration);
+    await tasks.structureLoad(
+      sqlFile(
+        "CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT, updated_at TEXT);\n" +
+          "CREATE INDEX index_widgets_on_name ON widgets(name);\n" +
+          "CREATE TRIGGER touch_widgets AFTER UPDATE ON widgets " +
+          "BEGIN " +
+          "UPDATE widgets SET updated_at = datetime('now') WHERE id = NEW.id; " +
+          "END;\n",
+      ),
     );
-    await conn.executeMutation("CREATE INDEX index_widgets_on_name ON widgets(name)");
-    await conn.executeMutation(
-      "CREATE TRIGGER touch_widgets AFTER UPDATE ON widgets " +
-        "BEGIN " +
-        "UPDATE widgets SET updated_at = datetime('now') WHERE id = NEW.id; " +
-        "END",
-    );
 
-    const filename = dumpPath();
-    await new SQLiteDatabaseTasks(configuration).structureDump(filename);
-    expect(fs.readFileSync(filename, "utf8")).toMatch(/CREATE TRIGGER touch_widgets/);
+    const dumped = sqlFile();
+    await tasks.structureDump(dumped);
+    expect(fs.readFileSync(dumped, "utf8")).toMatch(/CREATE TRIGGER touch_widgets/);
 
-    // A fresh in-memory database is a different database; load the dump back
-    // into it and the trigger body must have survived intact.
-    await Base.connectionPool().disconnectBang();
-    await Base.establishConnection({ adapter: "sqlite3", database: ":memory:" });
-    await new SQLiteDatabaseTasks(configuration).structureLoad(filename);
+    // A second in-memory database is a different, empty database. Loading the
+    // dump into it and dumping again proves the trigger body survived whole —
+    // splitting the script on semicolons would have cut it at the first one.
+    await freshDatabase();
+    await tasks.structureLoad(dumped);
 
-    const reloaded = await Base.connectionPool().leaseConnection();
-    const trigger = (await reloaded.execute(
-      "SELECT sql FROM sqlite_master WHERE type='trigger' AND name='touch_widgets'",
-    )) as Array<{ sql: string }>;
-    expect(trigger).toHaveLength(1);
-    expect(trigger[0].sql).toMatch(/UPDATE widgets SET updated_at/);
+    const reloaded = sqlFile();
+    await tasks.structureDump(reloaded);
+    const contents = fs.readFileSync(reloaded, "utf8");
+    expect(contents).toMatch(/CREATE TRIGGER touch_widgets/);
+    expect(contents).toMatch(/UPDATE widgets SET updated_at/);
+    expect(contents).toMatch(/index_widgets_on_name/);
   });
 });
