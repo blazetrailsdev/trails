@@ -5174,12 +5174,6 @@ registerMigrationArConfig({
   get tableNameSuffix() {
     return Base._tableNameSuffix;
   },
-  // Sync accessor for `Migration#connection`'s bare-migration fallback. Rails
-  // leases synchronously here; trails' Rails-named `leaseConnection` is now async
-  // (it awaits per-checkout `verifyBang`), so a synchronous migration getter
-  // uses the sync `leaseConnectionSync` escape hatch instead — it resolves a
-  // pinned connection / establishes a first lease without the async verify.
-  leaseConnection: () => Base.connectionPool().leaseConnectionSync(),
   configurations: () => Base.configurations(),
   connectionHandler: () => Base.connectionHandler,
   databaseTasks: () => DatabaseTasks,

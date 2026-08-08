@@ -413,6 +413,8 @@ export function isPreviouslyPersisted(this: PersistenceRecordDispatch): boolean 
 interface AttributeIO {
   readAttribute(name: string): unknown;
   writeAttribute(name: string, value: unknown): void;
+  // `_assign_attribute`'s no-setter arm (attribute_assignment.rb:70-74).
+  attributeWriterMissing(name: string, value: unknown): void;
 }
 
 type TouchOption = boolean | string | string[];
@@ -969,7 +971,8 @@ function associationWriter(
  * Mirrors Rails' `_assign_attribute` (ActiveModel
  * attribute_assignment.rb:67-75): dispatch through the public setter when one
  * exists (store accessors write to the store hash, not a standalone attribute
- * slot). Falls back to writeAttribute for plain columns and unknown keys.
+ * slot). A key with no setter is `respond_to?(setter)` false, so it reaches
+ * `attribute_writer_missing` (:73) and raises `UnknownAttributeError`.
  *
  * Rails lets setter exceptions propagate raw — the only rescue is the
  * `NoMethodError` arm that reaches `attribute_writer_missing` (:71-74) — so a
@@ -998,7 +1001,7 @@ function _assignAttribute(self: AttributeIO, key: string, value: unknown): Promi
     const result: unknown = setter.call(self, value);
     if (result instanceof Promise) return result as Promise<void>;
   } else {
-    self.writeAttribute(key, value);
+    self.attributeWriterMissing(key, value);
   }
 }
 

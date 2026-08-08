@@ -323,7 +323,6 @@ function announceMigrationText(header: string, message: string): string {
  * Mirrors: ActiveRecord::Migration
  */
 export abstract class Migration {
-  protected adapter!: DatabaseAdapter;
   /** @internal Per-migration connection override — mirrors Rails' @connection ivar. */
   protected _connectionOverride?: DatabaseAdapter;
   /** @internal Per-migration pool override — mirrors Rails' @pool ivar. */
@@ -1362,9 +1361,12 @@ export abstract class Migration {
   // --- Connection (Rails: Migration#connection, #connection_pool) ---
 
   get connection(): DatabaseAdapter {
-    // Rails: `@connection || ActiveRecord::Base.lease_connection`. A bare
-    // migration with no assigned connection leases one from the migration pool.
-    return this._connectionOverride ?? this.adapter ?? migrationArConfig()!.leaseConnection!();
+    // Rails: `@connection || DatabaseTasks.migration_connection`
+    // (`migration.rb:1036-1038`). `DatabaseTasks` is reached through the
+    // call-time config source rather than an import: naming
+    // `tasks/database-tasks.js` here would be a load-time edge back into a
+    // module that already imports this one.
+    return this._connectionOverride ?? migrationArConfig()!.databaseTasks!().migrationConnection();
   }
 
   set connection(conn: DatabaseAdapter | undefined) {

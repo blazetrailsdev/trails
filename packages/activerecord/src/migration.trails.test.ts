@@ -38,14 +38,15 @@ describe("MigrationTest", () => {
     }
     const m = new M();
     const internals = m as unknown as {
-      adapter: DatabaseAdapter;
       _connectionOverride?: DatabaseAdapter;
-      _poolOverride?: DatabaseAdapter;
+      _poolOverride?: unknown;
     };
+    // Both readers' second arm is DatabaseTasks.migration_connection /
+    // migration_connection_pool (migration.rb:1036-1042), which resolve off
+    // ActiveRecord::Base — so with no ivar set they answer Base's own.
     const baseAdapter = Base.connection;
     const basePool = Base.connectionPool();
     const override = await checkoutRawTestAdapter();
-    internals.adapter = baseAdapter;
     expect(m.connection).toBe(baseAdapter);
     internals._connectionOverride = override;
     expect(m.connection).toBe(override);

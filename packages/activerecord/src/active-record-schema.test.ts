@@ -198,7 +198,7 @@ describe("ActiveRecordSchemaTest", () => {
       }
     }
     const m = new TsMig();
-    (m as any).adapter = adapter;
+    m.connection = adapter;
     await m.up();
     // Verify timestamps were added
     await adapter.executeMutation(
@@ -232,7 +232,7 @@ describe("ActiveRecordSchemaTest", () => {
         }
       }
       const m = new BulkTsMig();
-      (m as any).adapter = adapter;
+      m.connection = adapter;
       await m.up();
       // Rails asserts column_exists?(:has_timestamps, :created_at, precision: 6, null: false).
       // The TS adapter mirror: timestamps columns should both be present and the
@@ -261,7 +261,7 @@ describe("ActiveRecordSchemaTest", () => {
       }
     }
     const m = new TsOptMig();
-    (m as any).adapter = adapter;
+    m.connection = adapter;
     await m.up();
     // null: true means we can insert without providing timestamp values
     await adapter.executeMutation(`INSERT INTO "ts_opts" ("name") VALUES ('test')`);
@@ -284,7 +284,7 @@ describe("ActiveRecordSchemaTest", () => {
       }
     }
     const m = new AddTsMig();
-    (m as any).adapter = adapter;
+    m.connection = adapter;
     await m.up();
     // Verify timestamps were added
     await adapter.executeMutation(

@@ -1,4 +1,3 @@
-import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { DatabaseConfigurations } from "../database-configurations.js";
 import type { ConnectionHandler } from "../connection-adapters/abstract/connection-handler.js";
 
@@ -6,7 +5,6 @@ import type { ConnectionHandler } from "../connection-adapters/abstract/connecti
 export interface MigrationArConfig {
   tableNamePrefix: string;
   tableNameSuffix: string;
-  leaseConnection?: () => DatabaseAdapter;
   // `Migration.pending_migrations` (migration.rb:757-769) and
   // `PendingMigrationConnection.with_temporary_pool`
   // (pending_migration_connection.rb:5-11) both name `ActiveRecord::Base` in a
