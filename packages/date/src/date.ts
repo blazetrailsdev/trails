@@ -382,8 +382,11 @@ function subsecDigits(nsec: Rational, precision: number): string {
  *
  * Only the directives the i18n format strings and the conformance mixins use
  * are recognised; Ruby leaves an unknown directive in place, and so does this.
- * The `^`, `#`, `E` and `O` flags are among the unrecognised ones, so `%^b`
- * still falls through verbatim rather than upcasing.
+ * Every flag the C reads is recognised, including the `E` and `O` POSIX locale
+ * extensions (`date_strftime.c:523-535`), which set their bit and are then
+ * ignored exactly as the C ignores them — each reads on only when the NEXT
+ * character is one its own whitelist names, so `%Oy` is `%y` and `%Oz` goes out
+ * verbatim.
  * `%z` and `%Z` both come off the subject: `::Date` has no zone of its own and
  * answers UTC, while a `::Time` built through the public constructor is in the
  * local zone and answers its real offset and abbreviation.
@@ -476,10 +479,6 @@ export function strftime(
         g = e;
         continue;
       }
-      // `date_strftime.c:523-535`: the POSIX locale extensions, ignored for
-      // now — `%Oy` is `%y`. Each sets its flag unconditionally and reads on
-      // only when the NEXT character is one its own whitelist names, so `%Oz`
-      // and `%Ez` go out verbatim.
       if (c === "E") {
         localeE = true;
         if (format[g + 1] !== undefined && "cCxXyY".includes(format[g + 1])) {
@@ -3141,8 +3140,8 @@ function cValidCivilP(y: number, m: number, d: number, sg = DEFAULT_SG): number 
  * it where MRI builds it. That is the residue of the substrate, not of the
  * conversions above: RFC 0088 `date-state-onto-temporal-plaindate`.
  *
- * @noRailsEquivalent The seam between the C's Julian day and
- * `Temporal.PlainDate`. Not exported.
+ * Not exported: it is the seam between the C's Julian day and the substrate,
+ * reachable only from the constructors and `Date.jd` below.
  */
 function plainDateFromJd(rjd: number): Temporal.PlainDate {
   const [y, m, d] = cJdToCivil(rjd);
@@ -3260,34 +3259,46 @@ function cValidOrdinalP(y: number, d: number, sg = DEFAULT_SG): number | null {
 
 /**
  * @internal `date_core.c` `c_find_fdoy` (`date_core.c:455-465`), the Julian day
- * of the first day of year `y`. Ruby scans January forwards because a caller's
- * `sg` can put the calendar reform on 1 January itself and delete it; under
- * {@link DEFAULT_SG} — the only `sg` reachable here, see there — the reform
- * deletes 1582-10-05..14 and nothing else, so 1 January is always the day the
- * scan finds. Its `ns` out-parameter and its success flag ride on the same
- * reform and have no bearer.
+ * of the first day of year `y`. Ruby scans January forwards, taking the first
+ * day `c_valid_civil_p` accepts, because the calendar reform can delete 1
+ * January itself. Its `ns` out-parameter and its `0` return — reached only when
+ * no day of January is valid — have no reader among the callers below, which is
+ * why the answer is the day alone.
  */
 function cFindFdoy(y: number, sg = DEFAULT_SG): number {
-  return cCivilToJd(y, 1, 1, sg);
+  for (let d = 1; d < 31; d++) {
+    const rjd = cValidCivilP(y, 1, d, sg);
+    if (rjd !== null) return rjd;
+  }
+  return 0;
 }
 
 /**
  * @internal `date_core.c` `c_find_ldoy` (`date_core.c:467-476`), the Julian day
- * of the last day of year `y`. As on {@link cFindFdoy}, Ruby scans December
- * backwards and the scan lands on 31 December.
+ * of the last day of year `y`, scanned backwards from 31 December for the same
+ * reason as {@link cFindFdoy}.
  */
 function cFindLdoy(y: number, sg = DEFAULT_SG): number {
-  return cCivilToJd(y, 12, 31, sg);
+  for (let i = 0; i < 30; i++) {
+    const rjd = cValidCivilP(y, 12, 31 - i, sg);
+    if (rjd !== null) return rjd;
+  }
+  return 0;
 }
 
 /**
  * @internal `date_core.c` `c_find_ldom` (`date_core.c:490-499`), the Julian day
- * of the last day of month `m` of year `y`. As on {@link cFindFdoy}, Ruby scans
- * the month backwards; the day the scan lands on is the last one the month has,
- * which is what `Temporal.PlainDate#daysInMonth` answers.
+ * of the last day of month `m` of year `y`. The scan is what makes the length
+ * of the month the CALENDAR's rather than the substrate's: February 1500 has 29
+ * days under `Date::ITALY` and 28 read proleptically, so `Date.new(1500, 2, -1)`
+ * counts back from the 29th as MRI does.
  */
 function cFindLdom(y: number, m: number, sg = DEFAULT_SG): number {
-  return cCivilToJd(y, m, new Temporal.PlainDate(y, m, 1).daysInMonth, sg);
+  for (let i = 0; i < 30; i++) {
+    const rjd = cValidCivilP(y, m, 31 - i, sg);
+    if (rjd !== null) return rjd;
+  }
+  return 0;
 }
 
 /**
@@ -3750,12 +3761,18 @@ export class Date {
    * The pair exists in C because the two representations disagree across the
    * reform: under `Date::ITALY` the days 1582-10-05..14 do not exist, and a
    * Julian date such as 1500-02-29 is a real day with no proleptic Gregorian
-   * spelling. Nothing trails exposes reaches that arm — reaching it needs both a
-   * pre-1582 date and a non-default `start`, and no AR column, `localize` call
-   * or format helper passes `start` at all — so `Date` is seated on the
-   * proleptic Gregorian `Temporal.PlainDate` and the reform surface
-   * (`Date::ITALY` and friends, `#start`, `#julian?`, `#new_start`) is gone with
-   * it. RFC 0088 `date-state-onto-temporal-plaindate`.
+   * spelling.
+   *
+   * The stored half is the civil date, and the Julian day is derived from it on
+   * read ({@link Date#jd}) through {@link cCivilToJd} under {@link DEFAULT_SG} —
+   * so `wday`, `yday` and `%s` are the reform's readings, not
+   * `Temporal.PlainDate`'s proleptic ones. What the substrate still cannot hold
+   * is the second case above: a Julian-only spelling has no
+   * `Temporal.PlainDate`, so `Date.new(1500, 2, 29)` raises where MRI builds it
+   * (story `date-state-julian-only-spellings-unbuildable`). The `start`
+   * ARGUMENT is what has no bearer — `#start`, `#julian?` and `#new_start` are
+   * absent with it, and every conversion below takes the one `sg` MRI defaults
+   * to. RFC 0088 `date-state-onto-temporal-plaindate`.
    */
   readonly #date: Temporal.PlainDate;
 

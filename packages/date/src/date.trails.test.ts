@@ -857,6 +857,12 @@ describe("Date", () => {
     expect(civilOrError(1581, 12, 31)).toEqual([1581, 12, 31]);
     expect(civilOrError(1582, 10, 10)).toBe("E");
     expect(civilOrError(1500, 2, 29)).toBe("E");
+    // c_find_ldom's scan makes February 1500 twenty-nine days long, as the
+    // Julian calendar has it, so the negative mday counts back from the 29th —
+    // and then hits the same missing seat.
+    expect(civilOrError(1500, 2, -1)).toBe("E");
+    expect(civilOrError(1582, 10, -1)).toEqual([1582, 10, 31]);
+    expect(civilOrError(1900, 2, -1)).toEqual([1900, 2, 28]);
     expect(civilOrError(1900, 2, 29)).toBe("E");
     expect(civilOrError(2000, 2, 29)).toEqual([2000, 2, 29]);
     expect(civilOrError(2100, 2, 29)).toBe("E");

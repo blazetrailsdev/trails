@@ -170,10 +170,12 @@ const MAPPING: Record<string, string> = {
   Samoa: "Pacific/Apia",
 };
 
-// `Intl.Locale#getTimeZones` is ECMA-402's IANA country→zone table — the data
-// `TZInfo::Country#zone_identifiers` reads — and is shipped by every runtime
-// trails targets, but TypeScript's `lib.es5`/`lib.esnext.intl` do not declare
-// it yet. Type-only; there is no runtime shim.
+/**
+ * `Intl.Locale#getTimeZones` is ECMA-402's IANA country→zone table — the data
+ * `TZInfo::Country#zone_identifiers` reads — and is shipped by every runtime
+ * trails targets, but TypeScript's `lib.es5`/`lib.esnext.intl` do not declare
+ * it yet. Type-only; there is no runtime shim.
+ */
 declare global {
   namespace Intl {
     interface Locale {

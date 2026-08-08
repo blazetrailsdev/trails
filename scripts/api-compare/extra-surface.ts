@@ -116,9 +116,16 @@ interface RubyEntity {
    * for a REOPENING-only file — one that adds methods to a class some other
    * file defined first, so the whole entity buckets there and the reopening
    * file owns no bucket of its own. `RUBY_FILE_TS_OVERRIDES` is the register
-   * of which of those files trails ports and where to; without this the TS
-   * port is scored against an empty allow-set and its whole surface reads as
-   * extra.
+   * of which of those files trails ports and where to, so it is what seeds the
+   * bucket; without it `time-zone-config.ts` — the port of
+   * `core_ext/time/zones.rb`, which adds `Time.zone` and friends to a `Time`
+   * that `core_ext/object/blank.rb` reopened first — is scored against an empty
+   * allow-set as a file with no Rails counterpart at all.
+   *
+   * Seeded only for a TS file nothing else covers. A `.ts` several Ruby files
+   * already map onto is scored once per mapping, each against its own
+   * allow-set, so another bucket for it would score it one more time over —
+   * counting the same names as extra again rather than resolving any of them.
    */
   methodFile?: string;
   /**
@@ -1382,20 +1389,6 @@ function buildPackageReport(
   const coveredTsFiles = new Set<string>();
   for (const rubyFile of rubyFileNames) coveredTsFiles.add(rubyFileToTs(rubyFile, pkg));
 
-  // A reopening-only file declares no class or module of its own, so the loops
-  // above never gave it a bucket even though it holds real Rails surface —
-  // `core_ext/time/zones.rb` adds `Time.zone` and friends to a `Time` that
-  // `core_ext/object/blank.rb` reopened first, and `time-zone-config.ts`, the
-  // port of it, was then scored against an empty allow-set as a file with no
-  // Rails counterpart at all. An entry in `RUBY_FILE_TS_OVERRIDES` is
-  // precisely the assertion that trails ports that file, and to which TS file,
-  // so it is what seeds the bucket: every entity with a method declared there,
-  // scored against that file's own methods.
-  //
-  // Only for a TS file nothing else covers. A `.ts` several Ruby files already
-  // map onto is scored once per mapping, each against its own allow-set, so
-  // seeding another bucket for it would score it one more time over — counting
-  // the same names as extra again rather than resolving any of them.
   for (const rubyFile of overriddenRubyFiles(pkg)) {
     if (rubyFiles.has(rubyFile)) continue;
     const tsFile = rubyFileToTs(rubyFile, pkg);
