@@ -18,7 +18,7 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import { StatementInvalid } from "../errors.js";
 import type { ReferentialAction } from "../connection-adapters/abstract/schema-definitions.js";
 import { fixtures } from "../test-fixtures.js";
-import { BetterSQLite3Adapter } from "../connection-adapters/better-sqlite3-adapter.js";
+import { newSqlitePool } from "../support/pooled-sqlite-adapter.js";
 import {
   ambientConnection,
   withCompositeRocketTables,
@@ -666,7 +666,8 @@ describeIfSupports("foreign_keys", "Migration", () => {
     });
 
     it("does not create foreign keys when bypassed by config", async () => {
-      const connection = new BetterSQLite3Adapter(":memory:", { foreignKeys: false });
+      const pool = newSqlitePool(":memory:", { foreignKeys: false });
+      const connection = await pool.checkout();
 
       try {
         // These live in this test's own `:memory:` connection, disconnected in
@@ -686,7 +687,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
         const foreignKeys = await connection.foreignKeys("astronauts");
         expect(foreignKeys.length).toBe(0);
       } finally {
-        connection.disconnectBang();
+        await pool.disconnect();
       }
     });
 

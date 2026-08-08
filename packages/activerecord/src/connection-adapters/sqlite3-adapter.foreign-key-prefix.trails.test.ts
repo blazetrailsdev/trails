@@ -1,13 +1,16 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import type { SQLite3Adapter } from "./sqlite3-adapter.js";
-import { BetterSQLite3Adapter } from "./better-sqlite3-adapter.js";
 import { Base } from "../base.js";
+import { newSqlitePool } from "../support/pooled-sqlite-adapter.js";
+import type { ConnectionPool } from "./abstract/connection-pool.js";
 
 describe("SQLite3Adapter addForeignKey under a table name prefix/suffix", () => {
   let adapter: SQLite3Adapter;
+  let pool: ConnectionPool;
 
   beforeEach(async () => {
-    adapter = new BetterSQLite3Adapter(":memory:");
+    pool = newSqlitePool();
+    adapter = (await pool.checkout()) as unknown as SQLite3Adapter;
     Base.tableNamePrefix = "p_";
     Base.tableNameSuffix = "_s";
     await adapter.createTable("p_rockets_s", { force: true }, (t) => {
@@ -22,7 +25,7 @@ describe("SQLite3Adapter addForeignKey under a table name prefix/suffix", () => 
     Base.tableNamePrefix = "";
     Base.tableNameSuffix = "";
     await adapter.dropTable("p_astronauts_s", "p_rockets_s", { ifExists: true });
-    await adapter.close();
+    await pool.disconnect();
   });
 
   it("reflects the singly prefixed table", async () => {
@@ -44,9 +47,11 @@ describe("SQLite3Adapter addForeignKey under a table name prefix/suffix", () => 
 
 describe("SQLite3Adapter alterTable under a table name prefix/suffix", () => {
   let adapter: SQLite3Adapter;
+  let pool: ConnectionPool;
 
   beforeEach(async () => {
-    adapter = new BetterSQLite3Adapter(":memory:");
+    pool = newSqlitePool();
+    adapter = (await pool.checkout()) as unknown as SQLite3Adapter;
     Base.tableNamePrefix = "p_";
     Base.tableNameSuffix = "_s";
     await adapter.createTable("p_rockets_s", { force: true }, (t) => {
@@ -61,7 +66,7 @@ describe("SQLite3Adapter alterTable under a table name prefix/suffix", () => {
     Base.tableNamePrefix = "";
     Base.tableNameSuffix = "";
     await adapter.dropTable("p_astronauts_s", "p_rockets_s", "rockets", { ifExists: true });
-    await adapter.close();
+    await pool.disconnect();
   });
 
   it("keeps a rebuilt foreign key pointing at the affixed table", async () => {

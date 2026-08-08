@@ -3,15 +3,19 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { SQLite3Adapter } from "./sqlite3-adapter.js";
-import { BetterSQLite3Adapter } from "./better-sqlite3-adapter.js";
+import { newSqlitePool } from "../support/pooled-sqlite-adapter.js";
+import type { ConnectionPool } from "./abstract/connection-pool.js";
 
 describe("SQLite3Adapter schema introspection", () => {
   let adapter: SQLite3Adapter;
+  let pool: ConnectionPool;
   let tmpDir: string;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-sqlite-introspect-"));
-    adapter = new BetterSQLite3Adapter(path.join(tmpDir, "db.sqlite3"));
+    const file = path.join(tmpDir, "db.sqlite3");
+    pool = newSqlitePool(file);
+    adapter = (await pool.checkout()) as unknown as SQLite3Adapter;
   });
 
   afterEach(async () => {
@@ -24,7 +28,7 @@ describe("SQLite3Adapter schema introspection", () => {
         "DROP TABLE IF EXISTS widgets; DROP TABLE IF EXISTS memberships; DROP TABLE IF EXISTS temp_widgets; DROP TABLE IF EXISTS aux.widgets",
       )
       .catch(() => undefined);
-    await adapter.close();
+    await pool.disconnect();
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 

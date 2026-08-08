@@ -159,13 +159,13 @@ export interface QueryCachePool {
   disableQueryCache?<T>(fn: () => T | Promise<T>, opts?: { dirties?: boolean }): T | Promise<T>;
   enableQueryCacheBang?(): void;
   disableQueryCacheBang?(): void;
-  clearQueryCache?(): void;
+  clearQueryCache(): void;
   dirtiesQueryCache?: boolean;
 }
 
 export interface QueryCacheHost extends DatabaseStatementsHost {
   _queryCache: Store | null;
-  pool?: DatabaseStatementsHost["pool"] & QueryCachePool;
+  pool: DatabaseStatementsHost["pool"] & QueryCachePool;
   // Mixed in from the QueryCache module below. Dispatched through `this` (not
   // the module-level functions) so a per-connection override is honored, as in
   // Rails' `def connection.cache_notification_info`.
@@ -422,11 +422,7 @@ export function disableQueryCacheBang(this: QueryCacheHost): void {
  * Mirrors: ActiveRecord::ConnectionAdapters::QueryCache#clear_query_cache
  */
 export function clearQueryCache(this: QueryCacheHost): void {
-  if (this.pool?.clearQueryCache) {
-    this.pool.clearQueryCache();
-    return;
-  }
-  this._queryCache?.clear();
+  this.pool.clearQueryCache();
 }
 
 /** The base (uncached) `selectAll` signature the override wraps via `super`. */
