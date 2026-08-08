@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { ApiManifest, ClassInfo, MethodInfo, ParamInfo } from "./types.js";
+import type { ApiManifest, ClassInfo, MethodInfo, ParamInfo } from "@blazetrails/parity/types";
 import { annotateAgainstTs, diffManifests } from "./version-diff.js";
 
 function method(name: string, over: Partial<MethodInfo> = {}): MethodInfo {

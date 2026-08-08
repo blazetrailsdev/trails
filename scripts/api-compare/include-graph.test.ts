@@ -6,7 +6,7 @@ import {
   includeGraphEntities,
   type GraphEntity,
 } from "./include-graph.js";
-import type { ClassInfo, MethodInfo } from "./types.js";
+import type { ClassInfo, MethodInfo } from "@blazetrails/parity/types";
 
 function method(name: string, calls?: string[]): MethodInfo {
   return { name, params: [], visibility: "public", calls };

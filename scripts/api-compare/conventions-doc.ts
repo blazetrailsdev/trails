@@ -17,7 +17,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as prettier from "prettier";
 import { ROOT_DIR } from "./config.js";
-import { explainConventions } from "./conventions.js";
+import { explainConventions } from "@blazetrails/parity/conventions";
 
 const DOC_PATH = path.join(ROOT_DIR, "docs", "ruby-ts-conventions.md");
 

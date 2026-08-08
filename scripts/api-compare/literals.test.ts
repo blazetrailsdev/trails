@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { compareLiteral, compareDefaults, constantNameMatches } from "./literals.js";
-import type { LiteralValue, ParamInfo } from "./types.js";
+import type { LiteralValue, ParamInfo } from "@blazetrails/parity/types";
 
 describe("compareLiteral", () => {
   it("matches numeric values written with different underscores (1000 === 1_000)", () => {

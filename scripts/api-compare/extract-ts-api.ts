@@ -41,7 +41,7 @@ import type {
   MethodInfo,
   ParamInfo,
   LiteralValue,
-} from "./types.js";
+} from "@blazetrails/parity/types";
 import {
   ROOT_DIR,
   OUTPUT_DIR,

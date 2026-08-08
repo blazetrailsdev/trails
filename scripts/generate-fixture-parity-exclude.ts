@@ -16,7 +16,7 @@
  * Run via `pnpm fixture-parity-baseline:refresh`.
  */
 import * as path from "path";
-import { writeJsonManifest } from "./api-compare/write-json-manifest.js";
+import { writeJsonManifest } from "@blazetrails/parity/write-json-manifest";
 
 // Capture the full violation set: neutralize the committed exclude so already
 // excluded files are still re-evaluated (otherwise the baseline can never grow

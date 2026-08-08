@@ -64,7 +64,13 @@
 
 import * as fs from "fs";
 import * as path from "path";
-import type { ApiManifest, ClassInfo, MethodInfo, PackageInfo, ParamInfo } from "./types.js";
+import type {
+  ApiManifest,
+  ClassInfo,
+  MethodInfo,
+  PackageInfo,
+  ParamInfo,
+} from "@blazetrails/parity/types";
 import {
   DIR_TO_PACKAGES,
   TEST_SUPPORT_PACKAGES,
@@ -83,7 +89,7 @@ import {
   isScopedSkip,
   rubyFileToTs,
   rubyMethodToTs,
-} from "./conventions.js";
+} from "@blazetrails/parity/conventions";
 import {
   isForwardingRubyEntry,
   matchArityAgainst,
@@ -112,7 +118,7 @@ import {
   constantNameMatches,
   displayLiteral,
 } from "./literals.js";
-import { isSourceUnported } from "./unported-files.js";
+import { isSourceUnported } from "@blazetrails/parity/unported-files";
 import {
   buildIncludeGraph,
   includeGraphCallSets,

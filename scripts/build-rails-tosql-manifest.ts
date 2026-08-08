@@ -21,8 +21,8 @@ import { readFile } from "fs/promises";
 import { existsSync } from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
-import { rubyMethodToTs, rubyFileToTs } from "./api-compare/conventions.js";
-import { writeJsonManifest } from "./api-compare/write-json-manifest.js";
+import { rubyMethodToTs, rubyFileToTs } from "@blazetrails/parity/conventions";
+import { writeJsonManifest } from "@blazetrails/parity/write-json-manifest";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");

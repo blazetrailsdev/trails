@@ -1070,7 +1070,7 @@ export function explainConventions(): string {
 
 <!-- GENERATED FILE — do not edit by hand.
      Regenerate with \`pnpm api:conventions\`. The source of truth is
-     \`explainConventions()\` in scripts/api-compare/conventions.ts; CI runs
+     \`explainConventions()\` in scripts/parity/conventions.ts; CI runs
      \`tsx scripts/api-compare/conventions-doc.ts --check\` and fails if this
      file drifts from it. -->
 

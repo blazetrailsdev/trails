@@ -37,8 +37,14 @@ import {
   staleCallTags,
   suppressTaggedCalls,
 } from "./compare.js";
-import { rubyMethodToTs } from "./conventions.js";
-import type { ApiManifest, ClassInfo, MethodInfo, PackageInfo, ParamInfo } from "./types.js";
+import { rubyMethodToTs } from "@blazetrails/parity/conventions";
+import type {
+  ApiManifest,
+  ClassInfo,
+  MethodInfo,
+  PackageInfo,
+  ParamInfo,
+} from "@blazetrails/parity/types";
 
 function cls(file: string, name: string, superclass?: string): ClassInfo {
   return {

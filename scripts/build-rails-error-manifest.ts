@@ -13,7 +13,7 @@
 import { readdir, readFile } from "fs/promises";
 import * as path from "path";
 import { fileURLToPath } from "url";
-import { writeJsonManifest } from "./api-compare/write-json-manifest.js";
+import { writeJsonManifest } from "@blazetrails/parity/write-json-manifest";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");

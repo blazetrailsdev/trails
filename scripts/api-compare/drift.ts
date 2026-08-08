@@ -17,7 +17,7 @@ import { promisify } from "node:util";
 
 import { SOURCES } from "../../vendor/sources.js";
 import { diffGemList, gemNamesFromPaths } from "./gem-list.js";
-import type { ApiManifest } from "./types.js";
+import type { ApiManifest } from "@blazetrails/parity/types";
 import { describeExtractorSkew, detectExtractorSkew } from "./extractor-skew.js";
 import { annotateAgainstTs, diffManifests } from "./version-diff.js";
 

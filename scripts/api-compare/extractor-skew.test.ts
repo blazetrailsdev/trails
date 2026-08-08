@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { ApiManifest } from "./types.js";
+import type { ApiManifest } from "@blazetrails/parity/types";
 import { describeExtractorSkew, detectExtractorSkew } from "./extractor-skew.js";
 
 function man(extractorHash: string | undefined): ApiManifest {

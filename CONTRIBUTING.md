@@ -242,7 +242,7 @@ The exact Ruby→TypeScript naming rules `api:compare` matches on — predicate/
 setter forms, token renames, file-path aliases, and the skip list with reasons —
 are catalogued in [docs/ruby-ts-conventions.md](docs/ruby-ts-conventions.md).
 That file is **generated** from `explainConventions()` in
-`scripts/api-compare/conventions.ts` (regenerate with `pnpm api:conventions`);
+`scripts/parity/conventions.ts` (regenerate with `pnpm api:conventions`);
 CI runs `tsx scripts/api-compare/conventions-doc.ts --check` and fails if it
 drifts, so it is always current — never hand-edit it, change the rule in
 `conventions.ts` instead.

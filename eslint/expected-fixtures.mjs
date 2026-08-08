@@ -65,7 +65,7 @@ function loadExclude() {
  * Trails test path (any sep) → Rails test rel path under cases/, or null.
  *
  * activerecord scope only — no AR path segments resolve to the
- * `railtie→trailtie` aliases in scripts/api-compare/conventions.ts, and
+ * `railtie→trailtie` aliases in scripts/parity/conventions.ts, and
  * AR has no erb→tse mappings. Naive kebab↔snake is sufficient. If the
  * rule is ever widened to actionpack/actionview/trailties, switch to
  * the shared `rubyToConventionTs` in scripts/test-compare/test-compare.ts.

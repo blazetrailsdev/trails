@@ -14,7 +14,7 @@
  *
  * Pure (no fs, no clone) so it's unit-testable directly.
  */
-import type { ApiManifest } from "./types.js";
+import type { ApiManifest } from "@blazetrails/parity/types";
 
 export interface ExtractorSkew {
   /** True when base and target were built by different extractor versions. */

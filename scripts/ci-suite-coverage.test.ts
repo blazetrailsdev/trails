@@ -325,7 +325,7 @@ function gateRegex(yml: string, name: string): RegExp {
  *  one of apiComparePackages() (vendor/sources.ts), so the comparison
  *  never scans it — set_gate's exclusion argument drops it before
  *  the COMPARISON_RE `^packages/` clause is applied.
- *  NOTE: scripts/api-compare/conventions.ts regenerates
+ *  NOTE: scripts/parity/conventions.ts regenerates
  *  docs/ruby-ts-conventions.md (checked by api:conventions --check in
  *  the job); the scripts/api-compare/ clause keeps that drift check
  *  gated on. As with the package gates, infra_files (which carves out

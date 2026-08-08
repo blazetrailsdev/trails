@@ -16,7 +16,7 @@ import * as path from "node:path";
 
 import { parseForESLint } from "@typescript-eslint/parser";
 
-import { writeJsonManifest } from "../api-compare/write-json-manifest.js";
+import { writeJsonManifest } from "@blazetrails/parity/write-json-manifest";
 
 import type { FileDeps } from "./rails-test-deps.js";
 

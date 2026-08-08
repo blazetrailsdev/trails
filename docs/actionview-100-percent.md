@@ -197,7 +197,7 @@ All three can land late; they're independent of rendering correctness.
   deprecator). Rails calls this `Railtie`; trails uses `Trailtie` for the
   framework-bootstrap class. File is `trailtie.ts` (not `railtie.ts`); the
   Ruby source mirror is still `railtie.rb`, so add the rename to
-  `FILE_OVERRIDES` in `scripts/api-compare/conventions.ts` (same pattern as
+  `FILE_OVERRIDES` in `scripts/parity/conventions.ts` (same pattern as
   the AR/AP trailties). Class name in code is `Trailtie`; the
   `ActionView::Railtie` Rails identifier doesn't appear in TS.
 

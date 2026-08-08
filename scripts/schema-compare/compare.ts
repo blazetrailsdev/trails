@@ -39,7 +39,7 @@ import {
 import { canonicalRegistrySchema } from "../../packages/activerecord/src/support/canonical-schema.js";
 import type { RailsColumnOptions, RailsTable } from "./parse-schema-rb.js";
 import { parseSchemaRbWithCoverage } from "./parse-schema-rb.js";
-import { writeJsonManifest } from "../api-compare/write-json-manifest.js";
+import { writeJsonManifest } from "@blazetrails/parity/write-json-manifest";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..", "..");

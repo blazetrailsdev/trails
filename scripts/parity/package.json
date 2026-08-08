@@ -3,7 +3,13 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Parity-pipeline runner scripts. Workspace package so dump.ts can import @blazetrails/arel directly.",
+  "description": "Rails-parity tooling core: conventions, manifests, baselines, caching (plus the SQL parity pipeline under pipeline/)",
+  "exports": {
+    "./conventions": "./conventions.ts",
+    "./types": "./types.ts",
+    "./unported-files": "./unported-files.ts",
+    "./write-json-manifest": "./write-json-manifest.ts"
+  },
   "dependencies": {
     "@blazetrails/activesupport": "workspace:*",
     "@blazetrails/activemodel": "workspace:*",

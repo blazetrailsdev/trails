@@ -144,9 +144,9 @@ import {
   unreviewedEntries,
   writeMarks,
 } from "./unreviewed-ratchet.js";
-import { rubyMethodToTsIgnoringSkip, snakeToCamel } from "./conventions.js";
+import { rubyMethodToTsIgnoringSkip, snakeToCamel } from "@blazetrails/parity/conventions";
 import { DEFAULT_REASON, TAG } from "./missing-rails-call-tags.js";
-import type { ApiManifest, ClassInfo, MethodInfo } from "./types.js";
+import type { ApiManifest, ClassInfo, MethodInfo } from "@blazetrails/parity/types";
 
 // The baseline is a directory of per-source-file JSON arrays (see header),
 // not a single file. Each entry lives at <BASELINE_DIR>/<package>/<tsFile

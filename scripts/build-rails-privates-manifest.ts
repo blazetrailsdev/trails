@@ -29,13 +29,13 @@
 import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
-import { rubyMethodToTs, rubyFileToTs } from "./api-compare/conventions.js";
+import { rubyMethodToTs, rubyFileToTs } from "@blazetrails/parity/conventions";
 import { libPathsManifest } from "../vendor/sources.js";
 import {
   writeJsonManifest,
   beginManifestBatch,
   flushManifestBatch,
-} from "./api-compare/write-json-manifest.js";
+} from "@blazetrails/parity/write-json-manifest";
 import { railsApiAvailable } from "./api-compare/require-rails-api.js";
 import { diffDeprecatedManifest } from "./deprecated-manifest-diff.js";
 
