@@ -463,10 +463,12 @@ export function change(
     return date instanceof Date ? newTime.toInstant() : newTime;
   }
 
-  if (self.timeZoneId === "UTC") {
-    // `elsif utc?` (time/calculations.rb:147-148).
-    const newTime = Temporal.ZonedDateTime.from({ timeZone: "UTC", ...newComponents });
-    return date instanceof Date ? newTime.toInstant() : newTime;
+  if (!(date instanceof Date) && self.timeZoneId === "UTC") {
+    // `elsif utc?` (time/calculations.rb:147-148). Ruby's `utc?` is an explicit
+    // flag set by `Time.utc`, never true for a `Time.local` receiver whatever
+    // the host zone is; a JS `Date` carries no such flag and reads back in the
+    // system zone, so it stays off this arm even under `TZ=UTC`.
+    return Temporal.ZonedDateTime.from({ timeZone: "UTC", ...newComponents });
   }
 
   if (date instanceof Date) {
