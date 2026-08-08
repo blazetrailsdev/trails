@@ -38,10 +38,6 @@ export interface GlobalIDOptions {
 
 export class GlobalID {
   readonly uri: string;
-  // Rails' `attr_reader :uri` holds the URI::GID itself and the readers below
-  // are `delegate ... to: :uri`. Here `uri` is the string form (every trails
-  // caller reads it as one), so the parsed GID is kept alongside it and is
-  // what the delegated readers — including `deconstructKeys` — go through.
   private readonly _uri: GID;
 
   /** Mirrors: GlobalID#initialize(gid, options) */
@@ -64,7 +60,15 @@ export class GlobalID {
     return this._uri.params;
   }
 
-  /** Mirrors: GlobalID#deconstruct_keys — `delegate :deconstruct_keys, to: :uri`. */
+  /**
+   * Mirrors: GlobalID#deconstruct_keys — `delegate :deconstruct_keys, to: :uri`.
+   *
+   * Rails' `attr_reader :uri` holds the URI::GID itself and `app` /
+   * `model_name` / `model_id` / `params` / `deconstruct_keys` all delegate to
+   * it. Here the public `uri` is its string form (every trails caller reads it
+   * as one), so the parsed GID is held privately and is what those readers
+   * delegate through.
+   */
   deconstructKeys(keys: readonly string[] | null = null): GidComponents {
     return this._uri.deconstructKeys(keys);
   }
