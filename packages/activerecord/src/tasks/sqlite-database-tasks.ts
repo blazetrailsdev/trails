@@ -99,10 +99,20 @@ export class SQLiteDatabaseTasks {
    * `sqlite_database_tasks.rb:31-38`. The `rescue` names `NoDatabaseError`
    * alone — every other failure propagates — and the `ensure` runs `create`
    * and `connection.reconnect!` whether or not it did.
+   *
+   * The `whenClosed()` drain is a TypeScript-async necessity, not an extra
+   * step: MRI's sqlite3 gem closes the handle synchronously inside
+   * `disconnect!` (`sqlite3_adapter.rb:221`), so `drop`'s `FileUtils.rm` always
+   * runs against a closed file. An async-only JS driver instead leaves
+   * `driver.close()` in flight and records it for a later drain
+   * (`sqlite3-adapter.ts` `whenClosed`), so without this the unlink — and the
+   * `create` that reopens the same path — can race the previous handle (#1269).
    */
   async purge(): Promise<void> {
     try {
-      (await this.connection()).disconnectBang();
+      const connection = await this.connection();
+      connection.disconnectBang();
+      await (connection as { whenClosed?: () => Promise<void> }).whenClosed?.();
       await this.drop();
     } catch (error) {
       if (!(error instanceof NoDatabaseError)) throw error;
