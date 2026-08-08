@@ -176,6 +176,16 @@ class TableBuilder {
   index(columns: string | string[], opts: IndexOpts = {}): void {
     this.indexes.push({ columns, opts });
   }
+
+  /**
+   * schema.rb's trailing `add_check_constraint :products, …` (schema.rb:1020).
+   * Carried on the TableDefinition so every adapter emits it inline in the
+   * CREATE TABLE — the only form SQLite accepts, and the form that survives the
+   * per-worker drop/rebuild, which replays the block rather than the schema file.
+   */
+  checkConstraint(expression: string, opts: { name?: string } = {}): void {
+    this.t.checkConstraint(expression, opts);
+  }
 }
 
 interface TableMeta {
@@ -1404,6 +1414,7 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
     t.string("name");
     t.decimal("price");
     t.decimal("discounted_price");
+    t.checkConstraint("price > discounted_price", { name: "products_price_check" });
   });
 
   await define("product_types", {}, (t) => {
@@ -2234,6 +2245,7 @@ export async function canonicalForeignKeyDependents(): Promise<Map<string, strin
   for (const def of await buildCanonicalRegistry()) {
     const probe = {
       column: () => {},
+      checkConstraint: () => {},
       foreignKey: (toTable: string) => {
         const children = dependents.get(toTable) ?? [];
         children.push(def.name);
@@ -2290,6 +2302,7 @@ export async function canonicalRegistrySchema(): Promise<Schema> {
       column: (name: string, type: string, options: Record<string, unknown> = {}) => {
         columns[name] = specFromColumnCall(type, options);
       },
+      checkConstraint: () => {},
       foreignKey: (toTable: string, opts: Partial<AddForeignKeyOptions> = {}) => {
         const join = (v: string | string[] | undefined): string | undefined =>
           Array.isArray(v) ? v.join(",") : v;
