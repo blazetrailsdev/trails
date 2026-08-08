@@ -340,6 +340,8 @@ export interface FileTagRejection {
   staleMovedNames?: string[];
 }
 
+const MOVED_BY_SHORT_NAME_RE = /MOVED-BY-SHORT-NAME:([^.]*)/;
+
 /**
  * The clause a file-level reason uses to declare, name by name, which of its
  * `moved` scores are bare-short-name coincidences rather than misplaced ports.
@@ -358,15 +360,17 @@ export interface FileTagRejection {
  * a moved name the reason does not list still refuses the blanket, and a
  * listed name that stops scoring `moved` is stale and must be deleted, so the
  * list can only shrink.
+ *
+ * The clause runs from the marker to the end of its sentence, and only
+ * identifier tokens in it count: a stray prose word is ignored rather than
+ * minted as a declaration no extra can ever match, which would read as
+ * permanent staleness. It cannot be spelled as a JSDoc `@tag` — a bare `@word`
+ * inside a `@noRailsEquivalent` reason truncates the reason (`proseTagAfter`,
+ * extract-ts-api.ts).
  */
-const MOVED_BY_SHORT_NAME_RE = /MOVED-BY-SHORT-NAME:([^.]*)/;
-
 export function declaredCoincidentalMovedNames(reason: string): Set<string> {
   const m = MOVED_BY_SHORT_NAME_RE.exec(reason);
   if (!m) return new Set();
-  // The clause runs to the sentence's period; only identifiers count, so a
-  // stray prose word inside it is ignored rather than minted as a declaration
-  // no extra can ever match (which would read as permanent staleness).
   return new Set(m[1].split(/[,\s]+/).filter((s) => /^[A-Za-z_$][\w$]*$/.test(s)));
 }
 
