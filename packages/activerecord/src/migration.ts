@@ -1919,15 +1919,6 @@ export class MigrationContext {
   }
 
   /**
-   * @internal The adapter every `Migrator` built here runs against — trails'
-   * stand-in for the `connection_pool` Rails' `MigrationContext` reaches
-   * through `DatabaseTasks` (`migration.rb:1361-1367`).
-   */
-  private get connection(): DatabaseAdapter {
-    return this.schemaMigration.connection;
-  }
-
-  /**
    * @internal Mirrors: ActiveRecord::MigrationContext#migrate
    * (`migration.rb:1228-1238`).
    */

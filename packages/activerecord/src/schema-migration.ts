@@ -84,8 +84,9 @@ export class SchemaMigration {
 
   /**
    * @internal The adapter this instance runs against. Rails holds `@pool` and
-   * exposes no such reader; `MigrationContext#connection` is the last caller
-   * and both go in `migration-collaborator-call-sites-pass-a-pool`.
+   * exposes no such reader. It has no caller left in the repo — the story
+   * `migration-collaborator-call-sites-pass-a-pool` scopes its removal, so it
+   * is left here rather than deleted out from under that story.
    */
   get connection(): DatabaseAdapter {
     // SEAM (delete in migration-collaborator-call-sites-pass-a-pool)

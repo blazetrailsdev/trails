@@ -1241,6 +1241,15 @@ export class DatabaseTasks {
    * before the `establish_connection` that can fail, so the restore always has
    * a real config to hand back.
    *
+   * Deviation, and the only one: Ruby's implicit `begin`/`ensure` covers the
+   * `:544` assignment too, so a raising `connection_db_config` leaves the local
+   * `nil` and `:549` still runs — but `establish_connection(nil)` reaches
+   * `DatabaseConfigurations#resolve`, whose `else` arm raises `TypeError`
+   * (`database_configurations.rb:174-185`). Rails' `ensure` therefore raises
+   * over the body's error in exactly the case this guard would cover. Reading
+   * outside the `try` skips the restore instead, surfacing the original
+   * failure; there is nothing established to restore at that point anyway.
+   *
    * Both establish calls hand over the `DatabaseConfig` OBJECT, as Rails does
    * (`:542,544`) — that is what lets `ConnectionHandler#establish_connection`
    * recognise an already-established pool for the same config and reuse it
