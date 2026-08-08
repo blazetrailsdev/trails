@@ -43,13 +43,14 @@ describe("MigrationTest", () => {
       _poolOverride?: DatabaseAdapter;
     };
     const baseAdapter = Base.connection;
+    const basePool = Base.connectionPool();
     const override = newRawTestAdapter();
     internals.adapter = baseAdapter;
     expect(m.connection).toBe(baseAdapter);
     internals._connectionOverride = override;
     expect(m.connection).toBe(override);
     // connectionPool is independent — _connectionOverride must not affect it
-    expect(m.connectionPool).toBe(baseAdapter);
+    expect(m.connectionPool).toBe(basePool);
     delete internals._connectionOverride;
     expect(m.connection).toBe(baseAdapter);
     const poolOverride = newRawTestAdapter();
@@ -58,7 +59,7 @@ describe("MigrationTest", () => {
     // connection is independent — _poolOverride must not affect it
     expect(m.connection).toBe(baseAdapter);
     delete internals._poolOverride;
-    expect(m.connectionPool).toBe(baseAdapter);
+    expect(m.connectionPool).toBe(basePool);
   });
 
   it("migration context with async migration() proxy", async () => {
