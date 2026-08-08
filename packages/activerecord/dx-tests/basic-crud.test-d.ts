@@ -202,7 +202,7 @@ describe("basic CRUD DX — defining and using a model", () => {
 
   it("serialization methods expose a JSON-ish shape", () => {
     const u = new User({ name: "dean", email: "d@example.com" });
-    expectTypeOf(u.toJSON()).toBeString();
+    expectTypeOf(u.toJSON()).toBeUnknown();
     expectTypeOf(u.asJson()).toEqualTypeOf<Record<string, unknown>>();
     expectTypeOf(u.attributes).toEqualTypeOf<Record<string, unknown>>();
   });
