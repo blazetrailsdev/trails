@@ -621,15 +621,16 @@ export interface DateParts {
   hour?: number;
   min?: number;
   sec?: number;
-  secFraction?: number | Rational;
+  secFraction?: number | bigint | Rational;
   /**
    * Seconds since the Unix epoch, which `rt_rewrite_frags` expands into a `:jd`
    * and a time of day. No ported sub-parser sets it: it is `Date._strptime`'s
    * `%s`/`%Q`, never anything `date__parse` answers. Both producers build it
-   * exactly — `%s` is the C's bignum `n` (`date_strptime.c:415-426`) and `%Q`
-   * its `rb_rational_new2(n, 1000)` (`date_strptime.c:428-442`).
+   * exactly: `%s` is the C's bignum `n` (`date_strptime.c:415-426`), a
+   * `bigint` because Ruby's Integer is arbitrary precision, and `%Q` its
+   * `rb_rational_new2(n, INT2FIX(1000))` (`date_strptime.c:428-442`).
    */
-  seconds?: number | Rational;
+  seconds?: number | bigint | Rational;
   zone?: string;
   offset?: number | Rational | null;
   /**
@@ -2478,7 +2479,7 @@ function dateStrptimeInternal(str: string, fmt: string, hash: DateParts): number
           if (readDigitsMax() === null) return fail();
           let n = BigInt(str.slice(osi, si));
           if (sign === -1) n = -n;
-          hash.seconds = new Rational(n, 1n);
+          hash.seconds = n;
           break again;
         }
 
@@ -2652,14 +2653,25 @@ function dateStrptime(str: string, fmt: string, hash: DateParts): DateParts | nu
  * makes the sum one, which is how an exact `:seconds` survives folding an
  * `:offset` in (`date_core.c:3850`).
  */
-function fAdd(x: number | Rational, y: number | Rational): number | Rational {
+function fAdd(
+  x: number | bigint | Rational,
+  y: number | bigint | Rational,
+): number | bigint | Rational {
   if (x instanceof Rational) return x.add(y);
   if (y instanceof Rational) return y.add(x);
+  if (typeof x === "bigint") return x + BigInt(y);
+  if (typeof y === "bigint") return BigInt(x) + y;
   return x + y;
 }
 
-function fIdiv(x: number | Rational, y: number): number {
-  return x instanceof Rational ? x.div(y) : div(x, y);
+function fIdiv(x: number | bigint | Rational, y: number): number {
+  if (x instanceof Rational) return x.div(y);
+  if (typeof x === "bigint") {
+    const d = BigInt(y);
+    const q = x / d;
+    return Number(x % d !== 0n && x < 0n !== d < 0n ? q - 1n : q);
+  }
+  return div(x, y);
 }
 
 /**
@@ -2667,8 +2679,14 @@ function fIdiv(x: number | Rational, y: number): number {
  * remainder of {@link fIdiv} — a `Rational` whenever `x` is one, which is how
  * an exact `:offset` reaches `:sec_fraction`.
  */
-function fMod(x: number | Rational, y: number): number | Rational {
-  return x instanceof Rational ? x.mod(y) : mod(x, y);
+function fMod(x: number | bigint | Rational, y: number): number | bigint | Rational {
+  if (x instanceof Rational) return x.mod(y);
+  if (typeof x === "bigint") {
+    const d = BigInt(y);
+    const r = x % d;
+    return r !== 0n && r < 0n !== d < 0n ? r + d : r;
+  }
+  return mod(x, y);
 }
 
 /**
@@ -2679,10 +2697,9 @@ function fMod(x: number | Rational, y: number): number | Rational {
  * still lands on the day before the epoch with a positive time of day.
  */
 function rtRewriteFrags(hash: DateParts): DateParts {
-  const secondsFrag: number | Rational | undefined = hash.seconds;
+  let seconds = hash.seconds;
   delete hash.seconds;
-  if (secondsFrag !== undefined) {
-    let seconds = secondsFrag;
+  if (seconds !== undefined) {
     const offset = hash.offset;
     if (offset != null) {
       seconds = fAdd(seconds, offset);
@@ -2822,8 +2839,10 @@ const SECOND_IN_NANOSECONDS = 1_000_000_000;
  * whenever its argument is — so the result here can carry a fraction of a
  * nanosecond, as `DateTime.parse("...00.9999999999").sec_fraction` does.
  */
-function secToNs(s: number | Rational): number | Rational {
-  return s instanceof Rational ? s.mul(SECOND_IN_NANOSECONDS) : s * SECOND_IN_NANOSECONDS;
+function secToNs(s: number | bigint | Rational): number | bigint | Rational {
+  if (s instanceof Rational) return s.mul(SECOND_IN_NANOSECONDS);
+  if (typeof s === "bigint") return s * BigInt(SECOND_IN_NANOSECONDS);
+  return s * SECOND_IN_NANOSECONDS;
 }
 
 /**
@@ -3401,7 +3420,7 @@ export function dtNewByFrags(hash: DateParts | null): DateTime {
 
   const df = timeToDf(rh, rmin, rs);
 
-  const t: number | Rational | null | undefined = hash.secFraction;
+  const t: number | bigint | Rational | null | undefined = hash.secFraction;
   const ns = t == null ? 0 : secToNs(t);
   // `ns_to_sec`, `m_sf`'s only reader, answers `rb_rational_new2` for an
   // Integer `sf` (`date_core.c:993-998`), so the store carries the Rational.

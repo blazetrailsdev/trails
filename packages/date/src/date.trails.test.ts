@@ -464,12 +464,8 @@ describe("Date", () => {
     //   Date._strptime("1234567890123", "%Q")  #=> {:seconds=>(1234567890123/1000)}
     //   Date._strptime("-1234567890123", "%Q") #=> {:seconds=>(-1234567890123/1000)}
     //   Date._strptime("9007199254740993", "%s") #=> {:seconds=>9007199254740993}
-    expect(RubyDate._strptime("1000000000", "%s")).toEqual({
-      seconds: new Rational(1000000000, 1),
-    });
-    expect(RubyDate._strptime("-1000000000", "%s")).toEqual({
-      seconds: new Rational(-1000000000, 1),
-    });
+    expect(RubyDate._strptime("1000000000", "%s")).toEqual({ seconds: 1000000000n });
+    expect(RubyDate._strptime("-1000000000", "%s")).toEqual({ seconds: -1000000000n });
     expect(RubyDate._strptime("1000000000500", "%Q")).toEqual({
       seconds: new Rational(2000000001n, 2n),
     });
@@ -480,7 +476,7 @@ describe("Date", () => {
       seconds: new Rational(-1234567890123n, 1000n),
     });
     expect(RubyDate._strptime("9007199254740993", "%s")).toEqual({
-      seconds: new Rational(9007199254740993n, 1n),
+      seconds: 9007199254740993n,
     });
   });
 
