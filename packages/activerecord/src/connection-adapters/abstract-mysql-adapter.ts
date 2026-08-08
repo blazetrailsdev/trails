@@ -1008,23 +1008,24 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     if (await this.isMariadb()) sql += ` AND cc.table_name = ${scope.name}`;
 
     const rows = await this.schemaQuery(sql);
-    const isMariadb = await this.isMariadb();
 
-    return rows.map((row) => {
-      const name = row["name"] as string;
-      let expression = row["expression"] as string;
-      if (expression.startsWith("(") && expression.endsWith(")")) {
-        expression = expression.slice(1, -1);
-      }
-      expression = this.stripWhitespaceCharacters(expression);
-      if (!isMariadb) {
-        // MySQL returns check constraints expression in an already escaped form.
-        // This leads to duplicate escaping later (e.g. when the expression is
-        // used in the SchemaDumper).
-        expression = expression.replace(/\\'/g, "'");
-      }
-      return new CheckConstraintDefinition(tableName, expression, name);
-    });
+    return Promise.all(
+      rows.map(async (row) => {
+        const name = row["name"] as string;
+        let expression = row["expression"] as string;
+        if (expression.startsWith("(") && expression.endsWith(")")) {
+          expression = expression.slice(1, -1);
+        }
+        expression = this.stripWhitespaceCharacters(expression);
+        if (!(await this.isMariadb())) {
+          // MySQL returns check constraints expression in an already escaped form.
+          // This leads to duplicate escaping later (e.g. when the expression is
+          // used in the SchemaDumper).
+          expression = expression.replace(/\\'/g, "'");
+        }
+        return new CheckConstraintDefinition(tableName, expression, name);
+      }),
+    );
   }
 
   async tableOptions(tableName: string): Promise<Record<string, string>> {

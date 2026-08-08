@@ -2918,14 +2918,21 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
         "The retries option is deprecated and will be removed in Rails 8.1. Use timeout instead.\n",
       );
     }
-    // Base only runs the version check; SQLite's PRAGMAs are the async work,
-    // awaited by the driver-async branch below. Void the base call.
-    void super.configureConnection();
+    // Rails runs `super` — i.e. `check_version` — before the pragmas
+    // (`sqlite3_adapter.rb:835-838`) and lets it raise. `checkVersion` is async
+    // here, so its result has to be threaded into what this returns rather than
+    // voided, or a too-old-SQLite error becomes an unhandled rejection instead
+    // of one `attemptConfigureConnection` can see. On the sync-driver path the
+    // pragmas still run synchronously — callers get a configured adapter as
+    // soon as the constructor returns — so only the check's *settlement*, not
+    // its start, trails them.
+    const checked = super.configureConnection();
     const stmts = this.configurePragmas();
     const warn = (label: string, e: unknown) =>
       console.warn(`${label} failed: ${e instanceof Error ? e.message : String(e)}`);
     if (this.driverIsAsync()) {
       return (async () => {
+        await checked;
         for (const [sql, label] of stmts) {
           try {
             await this.driver.pragma(sql);
@@ -2942,6 +2949,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
         warn(label, e);
       }
     }
+    return checked;
   }
 
   /** @internal */
