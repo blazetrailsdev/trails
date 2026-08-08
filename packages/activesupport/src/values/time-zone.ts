@@ -175,12 +175,14 @@ const zoneCache = new Map<string, TimeZone>();
 let zones: TimeZone[] | null = null;
 
 /**
- * Stands in for `TZInfo::InvalidTimezoneIdentifier`, which `find_tzinfo`'s
- * `TZInfo::Timezone.get` (time_zone.rb:208) raises for an identifier the zone
- * database does not know and `[]` rescues by class (time_zone.rb:239-241).
- * trails resolves zones through `Intl`, so the raise site is ours, but the
- * class has to exist for `[]` to catch that one failure rather than every
- * throw the probe could produce.
+ * Stands in for `TZInfo::InvalidTimezoneIdentifier` (`tzinfo/timezone.rb:26`,
+ * a `StandardError`), which `find_tzinfo`'s `TZInfo::Timezone.get`
+ * (time_zone.rb:208) raises for an identifier the zone database does not know
+ * — `raise InvalidTimezoneIdentifier, "Invalid identifier: #{identifier}"`
+ * (`tzinfo/data_source.rb:321`), whence the message — and which `[]` rescues by
+ * class (time_zone.rb:239-241). trails resolves zones through `Intl`, so the
+ * raise site is ours, but the class has to exist for `[]` to catch that one
+ * failure rather than every throw the probe could produce.
  *
  * @noRailsEquivalent PERMANENT — the class belongs to the TZInfo gem, not to
  *   Rails, and trails resolves zones through the runtime's own `Intl` database
@@ -193,15 +195,27 @@ export class InvalidTimezoneIdentifier extends Error {
 }
 
 /**
- * `Object#inspect` for the one place Rails interpolates it (time_zone.rb:249).
- * Ruby renders a bare object as `#<Object:0x…>`; the address is allocator
- * state with no JS counterpart, so the class name carries the shape.
+ * `Object#inspect`, for the one place Rails interpolates it (time_zone.rb:249).
+ * Ruby dispatches per class — `nil.inspect` is `"nil"`, `{}.inspect` is `"{}"`,
+ * `[1, 2].inspect` is `"[1, 2]"` — so `String(arg)`, which renders every object
+ * as `[object Object]`, loses the distinction the message exists to draw.
+ *
+ * A JS plain object is the Hash analogue and takes `Hash#inspect`'s `=>` form.
+ * `Object.new` has no JS counterpart to be told apart from it, so a non-plain
+ * object falls back to `#<Class>`: Ruby's `#<Object:0x…>` without the heap
+ * address, which is allocator state no port can reproduce.
  */
 function inspect(value: unknown): string {
   if (value === null || value === undefined) return "nil";
   if (typeof value === "string") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(inspect).join(", ")}]`;
   if (typeof value === "object") {
-    return `#<${(value.constructor as { name?: string } | undefined)?.name ?? "Object"}>`;
+    const proto = Object.getPrototypeOf(value) as object | null;
+    if (proto !== Object.prototype && proto !== null) {
+      return `#<${(value.constructor as { name?: string } | undefined)?.name ?? "Object"}>`;
+    }
+    const pairs = Object.entries(value).map(([k, v]) => `${inspect(k)}=>${inspect(v)}`);
+    return `{${pairs.join(", ")}}`;
   }
   return String(value);
 }
@@ -367,7 +381,13 @@ export class TimeZone {
     const ianaName = MAPPING[name] ?? name;
     try {
       new Intl.DateTimeFormat("en-US", { timeZone: ianaName });
-    } catch {
+    } catch (error) {
+      // ECMA-402 mandates a RangeError for a `timeZone` the runtime does not
+      // know, and only for that — so it is the one failure standing in for
+      // `Timezone.get`'s InvalidTimezoneIdentifier. Anything else out of the
+      // probe is a different fault and propagates, as a non-TZInfo error would
+      // through `find_tzinfo` (time_zone.rb:208).
+      if (!(error instanceof RangeError)) throw error;
       throw new InvalidTimezoneIdentifier(`Invalid identifier: ${ianaName}`);
     }
     return new TimeZone(name, ianaName);
