@@ -127,8 +127,7 @@ export class SQLiteDatabaseTasks {
 
   async structureDump(filename: string, extraFlags?: string | string[] | null): Promise<void> {
     void extraFlags;
-    const { adapter, owned } = await this.adapterForOperation();
-    try {
+    return this.withOperationAdapter(async (adapter) => {
       const { SchemaDumper } = await import("../connection-adapters/abstract/schema-dumper.js");
       const ignoreTables = SchemaDumper.ignoreTables;
 
@@ -178,16 +177,13 @@ export class SQLiteDatabaseTasks {
       const rows = await adapter.execute(query, binds);
       const output = rows.map((r) => String(r.sql ?? "")).join("\n");
       getFs().writeFileSync(filename, output);
-    } finally {
-      if (owned) await this.closeAdapter(adapter);
-    }
+    });
   }
 
   async structureLoad(filename: string, extraFlags?: string | string[] | null): Promise<void> {
     void extraFlags;
     const sql = getFs().readFileSync(filename, "utf8");
-    const { adapter, owned } = await this.adapterForOperation();
-    try {
+    return this.withOperationAdapter(async (adapter) => {
       // SQLite's `db.exec` runs an entire script in one shot, so it's safe
       // for dumps containing trigger bodies (CREATE TRIGGER ... BEGIN ...;
       // ...; END) where naive semicolon splitting would break.
@@ -199,9 +195,7 @@ export class SQLiteDatabaseTasks {
           await adapter.executeMutation(statement);
         }
       }
-    } finally {
-      if (owned) await this.closeAdapter(adapter);
-    }
+    });
   }
 
   /**
@@ -220,8 +214,7 @@ export class SQLiteDatabaseTasks {
    * the PG/MySQL truncateAll implementations provide.
    */
   async truncateAll(): Promise<void> {
-    const { adapter, owned } = await this.adapterForOperation();
-    try {
+    return this.withOperationAdapter(async (adapter) => {
       const bookkeeping = metadataTableNames();
       const rows = (
         (await adapter.execute(
@@ -253,9 +246,7 @@ export class SQLiteDatabaseTasks {
       } else {
         await run();
       }
-    } finally {
-      if (owned) await this.closeAdapter(adapter);
-    }
+    });
   }
 
   private resolveDbPath(): string {
@@ -273,30 +264,19 @@ export class SQLiteDatabaseTasks {
     return Base.connectionPool().leaseConnection();
   }
 
-  private async connectAdapter(): Promise<DatabaseAdapter> {
-    const { BetterSQLite3Adapter } =
-      await import("../connection-adapters/better-sqlite3-adapter.js");
-    return new BetterSQLite3Adapter(this.resolveDbPath());
-  }
-
   /**
-   * For in-memory databases opening a fresh adapter creates an unrelated empty
-   * DB, so we must reuse the pool-leased connection. For file-backed databases
-   * a fresh per-call adapter is correct.
+   * Run `fn` against a real pool-leased connection for this task's db_config,
+   * mirroring Rails' `DatabaseTasks.with_temporary_connection`
+   * (`tasks/database_tasks.rb:523-530`), which is how Rails' own
+   * `truncate_tables` / `dump_schema` reach a task-scoped adapter.
    *
-   * `owned` tells callers whether to close the adapter: borrowed pool
-   * connections must not be closed by the caller.
+   * In-memory databases are the exception: establishing a second pool on
+   * `:memory:` opens an unrelated empty database, so those reuse the caller's
+   * pool-leased connection (`connection`, `sqlite_database_tasks.rb:70-72`).
    */
-  private async adapterForOperation(): Promise<{ adapter: DatabaseAdapter; owned: boolean }> {
-    if (isInMemoryDatabase(this.resolveDbPath())) {
-      return { adapter: await this.connection(), owned: false };
-    }
-    return { adapter: await this.connectAdapter(), owned: true };
-  }
-
-  private async closeAdapter(adapter: DatabaseAdapter): Promise<void> {
-    const close = (adapter as unknown as { close?: () => Promise<void> }).close;
-    if (typeof close === "function") await close.call(adapter);
+  private async withOperationAdapter<T>(fn: (adapter: DatabaseAdapter) => Promise<T>): Promise<T> {
+    if (isInMemoryDatabase(this.resolveDbPath())) return fn(await this.connection());
+    return DatabaseTasks.withTemporaryConnection(this.dbConfig, fn);
   }
 
   /** @internal */

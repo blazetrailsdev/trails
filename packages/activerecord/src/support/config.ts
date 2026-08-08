@@ -305,7 +305,7 @@ export function mysqlPreparedStatements(read: EnvReader = getEnv): boolean {
  * driver options object needs.
  *
  * The credential is Rails' canonical `username` alone (as `database.yml` spells
- * it): `MySQLDatabaseTasks#buildAdapterConfig` / `PostgreSQLDatabaseTasks` read
+ * it): `MySQLDatabaseTasks` / `PostgreSQLDatabaseTasks` read
  * it directly, and `Mysql2Adapter` / `PostgreSQLAdapter` map it to the
  * driver-native `user` when building their driver config.
  *
