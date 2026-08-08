@@ -665,7 +665,7 @@ reason="rails-source-is-itself-disordered"` is the escape hatch and
 - Type-only files (`**/*.d.ts`).
 - Generated files (`packages/*/dist/**`, fixture outputs).
 - Files explicitly listed in
-  [`scripts/api-compare/unported-files.ts`](../scripts/parity/unported-files.ts).
+  [`scripts/parity/unported-files.ts`](../scripts/parity/unported-files.ts).
 - Restructuring across files — the
   [actionpack restructure audit](../actionpack-100-percent.md) covers
   inter-file moves; this plan is strictly within-file.
