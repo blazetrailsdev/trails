@@ -18,14 +18,14 @@ import { ActiveRecord } from "./ar-config.js";
 import { Base } from "./base.js";
 import { SchemaMigration } from "./schema-migration.js";
 import { InternalMetadata } from "./internal-metadata.js";
-import { newRawTestAdapter } from "./test-adapter.js";
+import { checkoutRawTestAdapter } from "./test-adapter.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Table } from "./connection-adapters/abstract/schema-definitions.js";
 import { fixtures } from "./test-fixtures.js";
 import { anonymousMigration } from "./test-helpers/anonymous-migration.js";
 
 describe("MigrationTest", () => {
-  // Ride the primary schema-loaded pool (`Base.connection`); `newRawTestAdapter`
+  // Ride the primary schema-loaded pool (`Base.connection`); `checkoutRawTestAdapter`
   // supplies the *distinct* adapter objects the override-routing identity checks
   // need (Rails builds a second connection from the primary config rather than
   // leasing a standing sidecar pool).
@@ -44,7 +44,7 @@ describe("MigrationTest", () => {
     };
     const baseAdapter = Base.connection;
     const basePool = Base.connectionPool();
-    const override = newRawTestAdapter();
+    const override = await checkoutRawTestAdapter();
     internals.adapter = baseAdapter;
     expect(m.connection).toBe(baseAdapter);
     internals._connectionOverride = override;
@@ -53,7 +53,7 @@ describe("MigrationTest", () => {
     expect(m.connectionPool).toBe(basePool);
     delete internals._connectionOverride;
     expect(m.connection).toBe(baseAdapter);
-    const poolOverride = newRawTestAdapter();
+    const poolOverride = await checkoutRawTestAdapter();
     internals._poolOverride = poolOverride;
     expect(m.connectionPool).toBe(poolOverride);
     // connection is independent — _poolOverride must not affect it

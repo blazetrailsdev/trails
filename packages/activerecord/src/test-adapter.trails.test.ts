@@ -8,7 +8,7 @@
 
 import { describe, expect, test } from "vitest";
 import { Base } from "./base.js";
-import { ambientPoolConfiguration, newRawTestAdapter } from "./test-adapter.js";
+import { ambientPoolConfiguration, checkoutRawTestAdapter } from "./test-adapter.js";
 import { currentAdapter, inMemoryDb } from "./support/adapter-helper.js";
 
 describe("ambientPoolConfiguration", () => {
@@ -19,7 +19,7 @@ describe("ambientPoolConfiguration", () => {
   // A `:memory:` database belongs to its own connection: on the sqlite3_mem lane
   // a second handle is a second, empty database by design.
   test.skipIf(inMemoryDb())("newRawTestAdapter opens the database Base rides", async () => {
-    const adapter = newRawTestAdapter();
+    const adapter = await checkoutRawTestAdapter();
     try {
       expect(await adapter.tableExists("posts")).toBe(true);
     } finally {
@@ -30,7 +30,7 @@ describe("ambientPoolConfiguration", () => {
   test.skipIf(!currentAdapter("SQLite3Adapter"))(
     "newRawTestAdapter opens sqlite with the ambient strict setting",
     async () => {
-      const adapter = newRawTestAdapter() as unknown as { _strictStrings: boolean } & {
+      const adapter = (await checkoutRawTestAdapter()) as unknown as { _strictStrings: boolean } & {
         disconnectBang(): Promise<void>;
       };
       try {
