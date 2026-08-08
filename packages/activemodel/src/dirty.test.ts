@@ -189,19 +189,19 @@ describe("DirtyTest", () => {
 
   it("to_json should work on model", () => {
     const p = new Person({ name: "Alice", age: 25 });
-    const json = p.toJson();
+    const json = p.toJSON() as string;
     expect(JSON.parse(json)).toEqual({ name: "Alice", age: 25 });
   });
 
   it("to_json should work on model with :except string option", () => {
     const p = new Person({ name: "Alice", age: 25 });
-    const json = p.toJson({ except: ["age"] });
+    const json = p.toJSON({ except: ["age"] }) as string;
     expect(JSON.parse(json)).toEqual({ name: "Alice" });
   });
 
   it("to_json should work on model with :except array option", () => {
     const p = new Person({ name: "Alice", age: 25 });
-    const json = p.toJson({ except: ["name", "age"] });
+    const json = p.toJSON({ except: ["name", "age"] }) as string;
     expect(JSON.parse(json)).toEqual({});
   });
 
@@ -209,7 +209,7 @@ describe("DirtyTest", () => {
     const p = new Person({ name: "Alice", age: 25 });
     p.writeAttribute("name", "Bob");
     p.changesApplied();
-    const json = p.toJson();
+    const json = p.toJSON() as string;
     expect(JSON.parse(json)).toEqual({ name: "Bob", age: 25 });
   });
 

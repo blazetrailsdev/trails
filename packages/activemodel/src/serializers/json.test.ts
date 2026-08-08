@@ -219,7 +219,7 @@ describe("Serializers::JSON host", () => {
     const p = new Person();
     p._name = "Grace";
     p._age = 60;
-    const s = p.toJson();
+    const s = p.toJSON() as string;
     expect(typeof s).toBe("string");
     expect(globalThis.JSON.parse(s)).toMatchObject({ name: "Grace", age: 60 });
   });

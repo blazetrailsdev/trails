@@ -23,9 +23,11 @@ const { books } = fixtures({ books: [Book, bookFixtureData] });
 const FORMATS = ["json"] as const;
 
 // Mirrors Rails' `public_send("to_#{format}")` / `from_#{format}` dispatch.
+// `to_json` translates to `toJSON` (docs/ruby-ts-conventions.md), so the `to`
+// side upcases the whole format where the `from` side capitalizes it.
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 const toFormat = (record: Contact, format: string, opts?: unknown) =>
-  (record as unknown as Record<string, (o?: unknown) => string>)[`to${cap(format)}`](opts);
+  (record as unknown as Record<string, (o?: unknown) => string>)[`to${format.toUpperCase()}`](opts);
 const fromFormat = (record: Contact, format: string, serialized: string) =>
   (record as unknown as Record<string, (s: string) => Contact>)[`from${cap(format)}`](serialized);
 

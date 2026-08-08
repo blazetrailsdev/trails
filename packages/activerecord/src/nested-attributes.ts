@@ -742,7 +742,7 @@ interface NestedReaderLoadHost {
  * first failure, so the owner is never saved against a half-assigned graph.
  * @internal
  */
-export async function awaitPendingNestedReaderLoads(record: Base): Promise<void> {
+async function awaitPendingNestedReaderLoads(record: Base): Promise<void> {
   const host = record as unknown as NestedReaderLoadHost;
   const pending = host._pendingNestedReaderLoads;
   if (!pending?.length) return;

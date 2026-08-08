@@ -11,7 +11,7 @@ describe("JsonSerializationTest", () => {
     Person.includeRootInJson = true;
     try {
       const p = new Person({ name: "Alice" });
-      const json = JSON.parse(p.toJson());
+      const json = JSON.parse(p.toJSON() as string);
       expect(json["person"]).toBeDefined();
       expect(json["person"]["name"]).toBe("Alice");
     } finally {
@@ -28,7 +28,7 @@ describe("JsonSerializationTest", () => {
     Person.includeRootInJson = "human";
     try {
       const p = new Person({ name: "Alice" });
-      const json = JSON.parse(p.toJson());
+      const json = JSON.parse(p.toJSON() as string);
       expect(json["human"]).toBeDefined();
       expect(json["human"]["name"]).toBe("Alice");
     } finally {
@@ -158,7 +158,7 @@ describe("JsonSerializationTest", () => {
 
   it("should encode all encodable attributes", () => {
     const p = new JsonPerson({ name: "Alice", age: 30 });
-    const json = p.toJson();
+    const json = p.toJSON() as string;
     const parsed = JSON.parse(json);
     expect(parsed.name).toBe("Alice");
     expect(parsed.age).toBe(30);
@@ -166,14 +166,14 @@ describe("JsonSerializationTest", () => {
 
   it("should allow attribute filtering with only", () => {
     const p = new JsonPerson({ name: "Alice", age: 30 });
-    const json = JSON.parse(p.toJson({ only: ["name"] }));
+    const json = JSON.parse(p.toJSON({ only: ["name"] }) as string);
     expect(json.name).toBe("Alice");
     expect(json.age).toBeUndefined();
   });
 
   it("should allow attribute filtering with except", () => {
     const p = new JsonPerson({ name: "Alice", age: 30 });
-    const json = JSON.parse(p.toJson({ except: ["age"] }));
+    const json = JSON.parse(p.toJSON({ except: ["age"] }) as string);
     expect(json.name).toBe("Alice");
     expect(json.age).toBeUndefined();
   });
@@ -214,7 +214,7 @@ describe("JsonSerializationTest", () => {
     }
     try {
       const p = new Person({ name: "Alice" });
-      const json = JSON.parse(p.toJson());
+      const json = JSON.parse(p.toJSON() as string);
       expect(json).toEqual({ person: { name: "Alice" } });
     } finally {
       Person.includeRootInJson = false;
@@ -230,7 +230,7 @@ describe("JsonSerializationTest", () => {
     }
     try {
       const p = new Person({ name: "Alice" });
-      const json = JSON.parse(p.toJson());
+      const json = JSON.parse(p.toJSON() as string);
       expect(json).toEqual({ human: { name: "Alice" } });
     } finally {
       Person.includeRootInJson = false;
@@ -275,7 +275,7 @@ describe("JsonSerializationTest", () => {
       }
     }
     const c = new Contact({ name: "Konata", age: 16 });
-    const json = c.toJson();
+    const json = c.toJSON() as string;
     expect(json).not.toMatch(/"contact":/);
     expect(json).toMatch(/"name":"Konata"/);
   });
@@ -287,7 +287,7 @@ describe("JsonSerializationTest", () => {
       }
     }
     const c = new Contact({ name: "Konata" });
-    const json = c.toJson();
+    const json = c.toJSON() as string;
     expect(json).not.toMatch(/"contact":/);
     expect(json).toMatch(/"name":"Konata"/);
   });

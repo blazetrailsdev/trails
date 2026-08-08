@@ -8,7 +8,7 @@
 import { Temporal } from "@blazetrails/date";
 import { camelize, singularize } from "@blazetrails/activesupport";
 import { reflectOnAllAssociations } from "./reflection.js";
-import { awaitPendingNestedReaderLoads, parkNestedReaderLoad } from "./nested-attributes.js";
+import { parkNestedReaderLoad } from "./nested-attributes.js";
 import type { Base } from "./base.js";
 import {
   ArgumentError,
@@ -88,11 +88,6 @@ export async function create(
   await this.ensureSchemaLoaded();
   const mergedAttrs = (this as any)._mergeCurrentScopeAttrs(attrs);
   const record = new this(mergedAttrs);
-  // `new(attributes, &block)` (persistence.rb:38-42) assigns inline, so the
-  // block sees a displacing nested key's write already settled. A JS
-  // constructor cannot await, so `assignAttributes` parks it; this is the first
-  // point that can drain it.
-  await awaitPendingNestedReaderLoads(record);
   if (block) block(record);
   await record.save();
   return record;
@@ -117,8 +112,6 @@ export async function createBang(
   await this.ensureSchemaLoaded();
   const mergedAttrs = (this as any)._mergeCurrentScopeAttrs(attrs);
   const record = new this(mergedAttrs);
-  // See create(): persistence.rb:47-51 assigns inline before the block.
-  await awaitPendingNestedReaderLoads(record);
   if (block) block(record);
   await record.saveBang();
   return record;
