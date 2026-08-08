@@ -12,6 +12,7 @@ import * as path from "node:path";
 import { randomUUID } from "node:crypto";
 import * as activesupport from "@blazetrails/activesupport";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
+import { DatabaseTasks } from "../../tasks/database-tasks.js";
 import { SQLiteDatabaseTasks } from "../../tasks/sqlite-database-tasks.js";
 import { HashConfig } from "../../database-configurations/hash-config.js";
 import { SchemaDumper } from "../../schema-dumper.js";
@@ -93,23 +94,27 @@ describeIfSqlite("SqliteStructureDumpTest", () => {
   // instead (`sqlite_rake_test.rb:195`) because its `Base` is pinned to arunit;
   // establishing keeps the assertion lane-independent.
   let previous: ReturnType<typeof Base.removeConnection>;
+  let previousFlags: typeof DatabaseTasks.structureDumpFlags;
 
   beforeEach(async () => {
     database = tmpDbPath();
     created.push(database);
-    for (const table of ["bar", "foo", "prefix_foo", "ignored_foo"]) {
-      runSqlite3(database, `CREATE TABLE ${table}(id INTEGER)`);
-    }
+    runSqlite3(database, "CREATE TABLE bar(id INTEGER)");
+    runSqlite3(database, "CREATE TABLE foo(id INTEGER)");
     configuration = new HashConfig("development", "primary", {
       adapter: "sqlite3",
       database,
     });
     previous = Base.removeConnection();
     await Base.establishConnection({ adapter: "sqlite3", database });
+    previousFlags = DatabaseTasks.structureDumpFlags;
+    SQLiteDatabaseTasks.register();
   });
 
   afterEach(async () => {
     vi.restoreAllMocks();
+    // `with_structure_dump_flags`' ensure (`sqlite_rake_test.rb:238-239`).
+    DatabaseTasks.structureDumpFlags = previousFlags;
     SchemaDumper.ignoreTables = [];
     Base.removeConnection();
     if (previous) await Base.establishConnection(previous.configuration);
@@ -128,7 +133,7 @@ describeIfSqlite("SqliteStructureDumpTest", () => {
     const filename = awesomeFile();
     created.push(filename);
 
-    await new SQLiteDatabaseTasks(configuration).structureDump(filename);
+    await DatabaseTasks.structureDump(configuration, filename);
 
     expect(fs.existsSync(dbfile)).toBeTruthy();
     expect(fs.existsSync(filename)).toBeTruthy();
@@ -140,9 +145,14 @@ describeIfSqlite("SqliteStructureDumpTest", () => {
     const dbfile = database;
     const filename = awesomeFile();
     created.push(filename);
+    // Rails stubs `data_sources` to add these two (`sqlite_rake_test.rb:195`);
+    // trails' structureDump reads the list off the live connection, so they
+    // have to exist for the ignore patterns to have anything to match.
+    runSqlite3(database, "CREATE TABLE prefix_foo(id INTEGER)");
+    runSqlite3(database, "CREATE TABLE ignored_foo(id INTEGER)");
     SchemaDumper.ignoreTables = [/^prefix_/, "ignored_foo"];
 
-    await new SQLiteDatabaseTasks(configuration).structureDump(filename);
+    await DatabaseTasks.structureDump(configuration, filename);
 
     expect(fs.existsSync(dbfile)).toBeTruthy();
     expect(fs.existsSync(filename)).toBeTruthy();
@@ -163,13 +173,12 @@ describeIfSqlite("SqliteStructureDumpTest", () => {
     const spawnSync = vi.spyOn(childProcess, "spawnSync");
 
     let message = "";
+    DatabaseTasks.structureDumpFlags = ["--noop"];
     await expect(
-      new SQLiteDatabaseTasks(configuration)
-        .structureDump(filename, ["--noop"])
-        .catch((e: Error) => {
-          message = e.message;
-          throw e;
-        }),
+      DatabaseTasks.structureDump(configuration, filename).catch((e: Error) => {
+        message = e.message;
+        throw e;
+      }),
     ).rejects.toThrow();
 
     expect(spawnSync).toHaveBeenCalledWith(
@@ -183,6 +192,10 @@ describeIfSqlite("SqliteStructureDumpTest", () => {
 
 describeIfSqlite("SqliteStructureLoadTest", () => {
   const created: string[] = [];
+
+  beforeEach(() => {
+    SQLiteDatabaseTasks.register();
+  });
 
   afterEach(() => {
     for (const file of created) {
@@ -205,7 +218,7 @@ describeIfSqlite("SqliteStructureLoadTest", () => {
     });
 
     fs.writeFileSync(filename, "select datetime('now', 'localtime');\n");
-    await new SQLiteDatabaseTasks(configuration).structureLoad(filename);
+    await DatabaseTasks.structureLoad(configuration, filename);
 
     expect(fs.existsSync(dbfile)).toBeTruthy();
   });
