@@ -9,7 +9,10 @@ import {
   AlterTable,
   type SchemaStatementsConstraintLike,
 } from "./schema-definitions.js";
-import { SchemaCreation as PgSchemaCreation } from "./schema-creation.js";
+import {
+  SchemaCreation as PgSchemaCreation,
+  type PgSchemaCreationHost,
+} from "./schema-creation.js";
 import { Base } from "../../base.js";
 import { describeIfPostgresqlAdapter } from "../../support/describe-if-postgresql-adapter.js";
 import type { TableDefinitionConn } from "../abstract/schema-definitions.js";
@@ -511,7 +514,7 @@ describeIfPostgresqlAdapter("TableDefinition#toSql default quoting", () => {
     const td = new TableDefinition("messages", { adapter: leased });
     td.string("body", { default: "Bob's" });
     td.uniqueConstraint("body", { name: "unique_body" });
-    const sql = await new PgSchemaCreation(leased as never).accept(td);
+    const sql = await new PgSchemaCreation(leased as unknown as PgSchemaCreationHost).accept(td);
     expect(sql).toContain("Bob''s");
     expect(sql).toContain('CONSTRAINT "unique_body"');
   });

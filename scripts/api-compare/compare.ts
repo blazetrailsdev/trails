@@ -2514,7 +2514,7 @@ export function main() {
         }
 
         // Defined by a reopening of this class in another Ruby file, and ported
-        // to that file's TS counterpart — see `reopeningMethodCreditedToOwnFile`.
+        // there — see `reopeningMethodCreditedToOwnFile`.
         const creditedToReopening = reopeningMethodCreditedToOwnFile(
           { rubyName, definedInFile },
           rubyFile,
