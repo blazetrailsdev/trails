@@ -10,8 +10,8 @@
  * and no name it declares has a Rails method to converge onto. Its sibling
  * subclass `connection-adapters/libsql-adapter.ts` carries the same reason.
  * MOVED-BY-SHORT-NAME: close, databaseExists, isOpen, open, prepare. Those
- * five score `moved` only because the oracle is one global set of bare
- * camelized Ruby names with no owner attached: `close` resolves to
+ * five score `moved` only because the oracle matches on bare camelized Ruby
+ * short names, and the owners it now reports are unrelated: `close` credits
  * `Rack::BodyProxy#close`, `prepare` to `Store::HashAccessor#prepare`,
  * `isOpen` to `Transaction#open?` (abstract/transaction.rb), `open` to
  * `SchemaCache#open` / `MigrationContext#open`, `databaseExists` to

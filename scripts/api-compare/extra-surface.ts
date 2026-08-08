@@ -80,6 +80,7 @@
  *                         `dx-tests/` or `defineSchema`-only modules.
  *   --novel-only          Drop moved-not-novel extras (filters barrel noise).
  *   --max-detail <N>      Cap names per file in detail listing (default 40).
+ *   --verbose             Print the crediting Rails owner of each moved name.
  *   --help                Print this message.
  */
 
@@ -334,6 +335,11 @@ export interface FileTagRejection {
   /** The names scoring `moved` and NOT declared (`moved-names` only). */
   movedNames?: string[];
   /**
+   * The Rails owners each of those names credits against (`moved-names`
+   * only), so the rejection states the evidence instead of naming a question.
+   */
+  movedOwners?: Record<string, RubyOwner[]>;
+  /**
    * Names the reason declares under `MOVED-BY-SHORT-NAME:` that no longer
    * score `moved` (`stale-moved-declaration` only).
    */
@@ -346,10 +352,11 @@ const MOVED_BY_SHORT_NAME_RE = /MOVED-BY-SHORT-NAME:([^.]*)/;
  * The clause a file-level reason uses to declare, name by name, which of its
  * `moved` scores are bare-short-name coincidences rather than misplaced ports.
  *
- * `moved` is decided by a single global Set of every camelized Ruby method
- * name in Rails-land (`buildGlobalRubyCandidates`), with no file, class, or
- * package attribution: a TS `close` on a libsql driver handle scores `moved`
- * off `Rack::BodyProxy#close`, and `prepare` off `Store::HashAccessor#prepare`.
+ * `moved` is decided by a single global map of every camelized Ruby method
+ * name in Rails-land (`buildGlobalRubyCandidates`): a TS `close` on a libsql
+ * driver handle scores `moved` off `Rack::BodyProxy#close`, and `prepare` off
+ * `Store::HashAccessor#prepare` — the owners the map carries (`RubyOwner`) are
+ * what let a reader see that at a glance rather than re-deriving it.
  * For a file that binds a third-party JS client — a population Ruby does not
  * have at all — every generic verb in the client's own protocol collides that
  * way, and there is no Rails name for any of them to move onto.
@@ -419,6 +426,20 @@ export function fileTagVerdict(
 function undeclaredMovedNames(extras: readonly ExtraName[], reason: string): string[] {
   const declared = declaredCoincidentalMovedNames(reason);
   return extras.filter((e) => e.kind === "moved" && !declared.has(e.name)).map((e) => e.name);
+}
+
+/** The Rails owners of each undeclared moved name, keyed by TS name. */
+function undeclaredMovedOwners(
+  extras: readonly ExtraName[],
+  reason: string,
+): Record<string, RubyOwner[]> {
+  const declared = declaredCoincidentalMovedNames(reason);
+  const out: Record<string, RubyOwner[]> = {};
+  for (const e of extras) {
+    if (e.kind !== "moved" || declared.has(e.name)) continue;
+    if (e.owners && e.owners.length > 0) out[e.name] = e.owners;
+  }
+  return out;
 }
 
 /** Declared names that no longer score `moved` — `stale-moved-declaration`. */
@@ -556,9 +577,41 @@ export function collectTaggedEntries(ts: ApiManifest): TaggedEntry[] {
   return out;
 }
 
+/**
+ * A Rails member a `moved` extra credits against: the package and `.rb` it is
+ * declared in, its enclosing constant, and the Ruby spelling
+ * (`Rack::BodyProxy#close`). This is the evidence that separates the two
+ * populations a bare `moved` verdict conflates — a misplaced port (many names
+ * crediting ONE Rails class in one `.rb`: a rename is owed) from a
+ * bare-short-name coincidence (a handful of names crediting unrelated classes
+ * across unrelated gems: nothing is owed).
+ */
+export interface RubyOwner {
+  package: string;
+  file: string;
+  /** The enclosing Ruby constant — the declaration itself when it IS one. */
+  fqn: string;
+  /** `Class#method`, `Class.method`, or the bare constant name. */
+  rubyName: string;
+}
+
+/**
+ * Owners kept per candidate name. A generic verb like `call` or `each` is
+ * declared hundreds of times across Rails-land, and the whole list is never
+ * read — the reader needs the top owner plus enough siblings to see whether
+ * they cluster in one class. Keeping all of them would multiply the oracle's
+ * memory by the method count for no added signal.
+ */
+const MAX_OWNERS_PER_NAME = 5;
+
 export interface ExtraName {
   name: string;
   kind: ExtraKind;
+  /**
+   * The Rails members this name credits against, `kind === "moved"` only —
+   * see `RubyOwner`. Absent for `novel` (nothing in Rails to credit).
+   */
+  owners?: RubyOwner[];
 }
 
 interface ExtraFile {
@@ -655,6 +708,8 @@ Options:
                        drift; rank order also flips to novel-first)
   --max-detail <N>     Per-file detail listing cap (default 40 names;
                        0 = unlimited)
+  --verbose            Under each file's detail, print the Rails file and
+                       Class#method every moved name credits against
   --help               This message
 
 TS files that no Rails file maps onto are scored too, with an empty allowed
@@ -690,6 +745,7 @@ export interface CliArgs {
   excludeGlobs: string[];
   novelOnly: boolean;
   maxDetail: number;
+  verbose: boolean;
 }
 
 export function parseArgs(argv: string[]): CliArgs {
@@ -698,6 +754,7 @@ export function parseArgs(argv: string[]): CliArgs {
   let json = false;
   let novelOnly = false;
   let maxDetail = 40;
+  let verbose = false;
   const excludeGlobs: string[] = [];
 
   const requireValue = (flag: string, v: string | undefined): string => {
@@ -733,6 +790,8 @@ export function parseArgs(argv: string[]): CliArgs {
       json = true;
     } else if (a === "--novel-only") {
       novelOnly = true;
+    } else if (a === "--verbose") {
+      verbose = true;
     } else if (a === "--exclude-glob") {
       excludeGlobs.push(requireValue("--exclude-glob", argv[++i]));
     } else {
@@ -741,7 +800,7 @@ export function parseArgs(argv: string[]): CliArgs {
       process.exit(1);
     }
   }
-  return { filterPkg, topN, json, excludeGlobs, novelOnly, maxDetail };
+  return { filterPkg, topN, json, excludeGlobs, novelOnly, maxDetail, verbose };
 }
 
 /**
@@ -1041,8 +1100,14 @@ function collectAllowedNames(
 
 /**
  * Build the global "all Ruby method candidate names anywhere in Rails-land"
- * set, used to classify each extra as novel (nowhere in Rails) vs moved
+ * map, used to classify each extra as novel (nowhere in Rails) vs moved
  * (somewhere in Rails, just not in the matched file).
+ *
+ * The value is the `RubyOwner` list the name credits against, in extraction
+ * order. `moved` is still `has(name)` — the owners are attribution, not
+ * scoring — but "where" is the whole question a `moved` verdict asks the
+ * reader, so the oracle carries it instead of throwing it away and leaving the
+ * next reader to re-derive the camelization by hand off `rails-api.json`.
  *
  * Includes private/protected (internal) Ruby methods: a TS name mirroring a
  * Rails-private method that lives in a *different* `.rb` is "moved" (it exists
@@ -1057,24 +1122,57 @@ function collectAllowedNames(
  * doesn't sit in its own file as novel-by-omission, which is exactly the
  * miscount this pass exists to remove.
  */
-export function buildGlobalRubyCandidates(ruby: ApiManifest): Set<string> {
-  const all = new Set<string>();
-  for (const pkg of Object.values(ruby.packages)) {
-    for (const consts of Object.values(pkg.fileConstants ?? {})) {
+export function buildGlobalRubyCandidates(ruby: ApiManifest): Map<string, RubyOwner[]> {
+  const all = new Map<string, RubyOwner[]>();
+  const add = (candidate: string, owner: RubyOwner): void => {
+    const owners = all.get(candidate);
+    if (!owners) {
+      all.set(candidate, [owner]);
+      return;
+    }
+    if (owners.length < MAX_OWNERS_PER_NAME) owners.push(owner);
+  };
+  for (const [pkgName, pkg] of Object.entries(ruby.packages)) {
+    for (const [file, consts] of Object.entries(pkg.fileConstants ?? {})) {
       for (const name of Object.keys(consts)) {
-        for (const c of rubyConstantCandidates(name)) all.add(c);
+        for (const c of rubyConstantCandidates(name)) {
+          add(c, { package: pkgName, file, fqn: name, rubyName: name });
+        }
       }
     }
-    const entities = [...Object.values(pkg.classes), ...Object.values(pkg.modules)] as ClassInfo[];
-    for (const e of entities) {
+    const entities = [...Object.entries(pkg.classes), ...Object.entries(pkg.modules)] as [
+      string,
+      ClassInfo,
+    ][];
+    for (const [fqn, e] of entities) {
+      const file = e.file ?? "";
       // Declaration names join the oracle on the same rule as methods and
       // constants: a TS class named after a Ruby class declared in a DIFFERENT
       // `.rb` is `moved`, not `novel`.
-      for (const c of rubyConstantCandidates(e.name)) all.add(c);
-      for (const m of [...e.instanceMethods, ...e.classMethods]) {
+      for (const c of rubyConstantCandidates(e.name)) {
+        add(c, { package: pkgName, file, fqn, rubyName: e.name });
+      }
+      for (const m of e.instanceMethods) {
         const candidates = rubyMethodCandidates(m.name);
         if (!candidates) continue;
-        for (const c of candidates) all.add(c);
+        const owner: RubyOwner = {
+          package: pkgName,
+          file: m.file ?? file,
+          fqn,
+          rubyName: `${fqn}#${m.name}`,
+        };
+        for (const c of candidates) add(c, owner);
+      }
+      for (const m of e.classMethods) {
+        const candidates = rubyMethodCandidates(m.name);
+        if (!candidates) continue;
+        const owner: RubyOwner = {
+          package: pkgName,
+          file: m.file ?? file,
+          fqn,
+          rubyName: `${fqn}.${m.name}`,
+        };
+        for (const c of candidates) add(c, owner);
       }
     }
   }
@@ -1190,7 +1288,7 @@ function buildPackageReport(
   ruby: ApiManifest,
   ts: ApiManifest,
   excludeGlobs: string[],
-  globalRubyCandidates: Set<string>,
+  globalRubyCandidates: Map<string, RubyOwner[]>,
   crossPackageModules: Record<string, ClassInfo>,
   crossPackagePkgByFqn: Record<string, string>,
   novelOnly: boolean,
@@ -1327,7 +1425,8 @@ function buildPackageReport(
         allowlistedCount++;
         continue;
       }
-      const kind: ExtraKind = globalRubyCandidates.has(name) ? "moved" : "novel";
+      const owners = globalRubyCandidates.get(name);
+      const kind: ExtraKind = owners ? "moved" : "novel";
       // Exempt by kind — see `collectInterfaceOnlyNames`. Deliberately AFTER
       // the tag check: an interface tagged to cover its MEMBERS keeps matching
       // its own name, so the tag doesn't go stale and the inheritance in
@@ -1336,7 +1435,7 @@ function buildPackageReport(
         interfaceExemptCount++;
         continue;
       }
-      scored.push({ name, kind });
+      scored.push({ name, kind, ...(owners ? { owners } : {}) });
     }
 
     const fileTagReason = fileTags[expectedTs];
@@ -1355,7 +1454,10 @@ function buildPackageReport(
           cause,
           ...(rubyFile !== null ? { rubyFile } : {}),
           ...(cause === "moved-names"
-            ? { movedNames: undeclaredMovedNames(scored, fileTagReason) }
+            ? {
+                movedNames: undeclaredMovedNames(scored, fileTagReason),
+                movedOwners: undeclaredMovedOwners(scored, fileTagReason),
+              }
             : {}),
           ...(cause === "stale-moved-declaration"
             ? { staleMovedNames: staleMovedDeclarations(scored, fileTagReason) }
@@ -1495,7 +1597,7 @@ export function printClassificationBlock(
   if (elided > 0) console.log(`${p.dim}    … +${elided} more${p.reset}`);
 }
 
-function printHumanReport(report: Report, topN: number, maxDetail: number): void {
+function printHumanReport(report: Report, topN: number, maxDetail: number, verbose: boolean): void {
   const { palette: p } = pickPalette();
 
   console.log(`\n${p.bold}Extra TS surface vs Rails${p.reset}  (the inverse of api:compare)`);
@@ -1573,6 +1675,17 @@ function printHumanReport(report: Report, topN: number, maxDetail: number): void
       }
       const elided = f.extras.length - shown.length;
       if (elided > 0) console.log(`    ${p.dim}… +${elided} more${p.reset}`);
+      // Owners are --verbose-only: the report is already wide, and one line
+      // per moved name would multiply its height by default.
+      if (verbose) {
+        for (const e of shown) {
+          const top = e.kind === "moved" ? e.owners?.[0] : undefined;
+          if (!top) continue;
+          console.log(
+            `      ${p.dim}${e.name.padEnd(24)} → ${top.package} ${top.file} ${top.rubyName}${p.reset}`,
+          );
+        }
+      }
     }
     console.log();
   }
@@ -1691,9 +1804,21 @@ export function gateFileTagRejections(rejections: readonly FileTagRejection[]): 
         `MOVED-BY-SHORT-NAME name(s) that no longer score moved: ${list(r.staleMovedNames)}`
       );
     }
+    // Each moved name gets its crediting Rails member on its own line: that
+    // owner IS the verdict's evidence — five names crediting five unrelated
+    // classes across rack/actiondispatch/activerecord is a collision, ~80 all
+    // crediting one `.rb` is a rename owed.
+    const owned = (r.movedNames ?? []).slice(0, 8).map((n) => {
+      const top = r.movedOwners?.[n]?.[0];
+      return top === undefined
+        ? `      ${n}`
+        : `      ${n} → ${top.package} ${top.file} ${top.rubyName}`;
+    });
+    const more = (r.movedNames?.length ?? 0) > 8 ? "\n      …" : "";
     return (
-      `  - ${r.package}  ${r.tsFile} — ${r.movedNames?.length ?? 0} moved name(s): ` +
-      list(r.movedNames)
+      `  - ${r.package}  ${r.tsFile} — ${r.movedNames?.length ?? 0} moved name(s):\n` +
+      owned.join("\n") +
+      more
     );
   });
   return (
@@ -1788,7 +1913,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   if (args.json) {
     console.log(JSON.stringify(report, null, 2));
   } else {
-    printHumanReport(report, args.topN, args.maxDetail);
+    printHumanReport(report, args.topN, args.maxDetail, args.verbose);
   }
 
   // Both gates are collected before exiting: a tree that is both stale and
