@@ -3170,20 +3170,6 @@ export class PostgreSQLAdapter
   // Mirrors: PostgreSQLAdapter supports_* methods
   // ---------------------------------------------------------------------------
 
-  // Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQLAdapter#check_version
-  // (postgresql_adapter.rb:669-673). Rails' `database_version` issues the
-  // round-trip itself when unmemoized; trails' sync getter cannot, so
-  // `_maybeConfigureConnection` fills the memo at the position Rails' `super`
-  // occupies, one line before this runs.
-  override checkVersion(): void {
-    if (this.databaseVersion < 9_03_00) {
-      // < 9.3
-      throw new Error(
-        `Your version of PostgreSQL (${this.databaseVersion}) is too old. Active Record supports PostgreSQL >= 9.3.`,
-      );
-    }
-  }
-
   // Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQLAdapter#build_insert_sql.
   // Like the SQLite form, but the timestamp-touch guard uses
   // `<table>.<col> IS NOT DISTINCT FROM excluded.<col>` (Rails qualifies the
@@ -3212,6 +3198,20 @@ export class PostgreSQLAdapter
     const ret = insert.returning();
     if (ret) sql += ` RETURNING ${ret}`;
     return sql;
+  }
+
+  // Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQLAdapter#check_version
+  // (postgresql_adapter.rb:669-673). Rails' `database_version` issues the
+  // round-trip itself when unmemoized; trails' sync getter cannot, so
+  // `_maybeConfigureConnection` fills the memo at the position Rails' `super`
+  // occupies, one line before this runs.
+  override checkVersion(): void {
+    if (this.databaseVersion < 9_03_00) {
+      // < 9.3
+      throw new Error(
+        `Your version of PostgreSQL (${this.databaseVersion}) is too old. Active Record supports PostgreSQL >= 9.3.`,
+      );
+    }
   }
 
   /**
