@@ -3461,7 +3461,7 @@ export function dtNewByFrags(hash: DateParts | null): DateTime {
   // `NUM2INT` (`date_core.c:8301`) reads the fragment into a C `int`, so a
   // `Rational` offset truncates toward zero before the bound below — not
   // `round()`: 34399.8 becomes 34399.
-  let of = to == null ? 0 : Math.trunc(to instanceof Rational ? to.toF() : to);
+  let of = to == null ? 0 : to instanceof Rational ? to.toI() : Math.trunc(to);
   if (of < -DAY_IN_SECONDS || of > DAY_IN_SECONDS) of = 0;
 
   return new DateTime(jdLocalToUtc(jd, df, of), dfLocalToUtc(df, of), sf, of);

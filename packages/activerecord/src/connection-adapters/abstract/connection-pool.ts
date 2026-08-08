@@ -143,14 +143,22 @@ export class NullPool implements AbstractPool {
    * not have.
    *
    * Ruby does not override `method_missing`, so *every* send NullPool has no
-   * method for raises — not a fixed set of names. A symbol key is not a Ruby
-   * send but a JS-only probe (thenable duck-typing, serializers), so those keep
-   * reading through and answering `undefined`.
+   * method for raises — not a fixed set of names.
+   *
+   * A symbol key and an {@link ADAPTER_PROXY_PROBE_KEYS} name are not Ruby sends
+   * but JS-only probes — thenable duck-typing, serializers, test matchers — and
+   * read through to `undefined` as they do on the adapter proxy. A NullPool is
+   * held as adapter state and by InternalMetadata / SchemaMigration, so a
+   * serializer walking a failing assertion's object graph reaches one; raising
+   * from its `then` or `toJSON` would replace the real failure with a
+   * NoMethodError from the reporter. Ruby's Object supplies `inspect` and `to_s`
+   * to its NullPool as well, so raising on those two would itself be the
+   * divergence.
    */
   constructor() {
     return new Proxy(this, {
       get(target, prop, receiver) {
-        if (typeof prop === "symbol" || prop in target) {
+        if (typeof prop === "symbol" || prop in target || ADAPTER_PROXY_PROBE_KEYS.has(prop)) {
           return Reflect.get(target, prop, receiver);
         }
         throw new NoMethodError(

@@ -1178,5 +1178,11 @@ describe("NullPool member parity", () => {
     }
     expect(pool.dirtiesQueryCache).toBe(true);
     expect(pool.schemaCache).toBeNull();
+    // A JS-only probe is not a Ruby send: a serializer reaching a NullPool
+    // through adapter state must see a non-callable, not a NoMethodError.
+    for (const probe of ["then", "toJSON", "asymmetricMatch", "nodeType", "inspect"]) {
+      expect(pool[probe]).toBeUndefined();
+    }
+    expect(pool.toString).toBe(Object.prototype.toString);
   });
 });
