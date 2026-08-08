@@ -398,11 +398,11 @@ describe("MigratorTest", () => {
     const two3 = trackedSensor("Two", 2);
     const three3 = trackedSensor("Three", 3);
     await new Migrator(
-      "up",
+      "down",
       [one3.proxy, two3.proxy, three3.proxy],
       schemaMigration,
       internalMetadata,
-    ).down();
+    ).migrate();
     expect(one3.state.wentDown).toBe(true);
     expect(two3.state.wentDown).toBe(false);
     expect(three3.state.wentDown).toBe(true);
@@ -440,12 +440,12 @@ describe("MigratorTest", () => {
     const m1 = trackedSensor(null, 1);
     const m2 = trackedSensor(null, 2);
     const migrator = new Migrator(
-      "up",
+      "down",
       [m0.proxy, m1.proxy, m2.proxy],
       schemaMigration,
       internalMetadata,
     );
-    await migrator.down();
+    await migrator.migrate();
     expect([m0, m1, m2].every((m) => !m.state.wentUp)).toBe(true);
     expect([m0, m1, m2].every((m) => m.state.wentDown)).toBe(true);
     expect(await migrator.currentVersion()).toBe(0);
@@ -600,7 +600,7 @@ describe("MigratorTest", () => {
   it("migrator going down due to version target", async () => {
     const { calls, migrator } = migratorClass(3);
 
-    await migrator.up(1);
+    await migrator.migrate(1);
     expect(calls).toEqual([["up", 1]]);
     calls.length = 0;
 
@@ -617,7 +617,7 @@ describe("MigratorTest", () => {
   });
 
   it("migrator output when running multiple migrations", async () => {
-    const { migrator } = migratorClass(3);
+    const { context: migrator } = migrationContextClass(3);
 
     let result = await migrator.migrate();
     expect(result.length).toBe(3);
@@ -692,7 +692,7 @@ describe("MigratorTest", () => {
   });
 
   it("get all versions", async () => {
-    const { migrator } = migratorClass(3);
+    const { context: migrator } = migrationContextClass(3);
 
     await migrator.migrate();
     expect(await migrator.getAllVersions()).toEqual([1, 2, 3]);

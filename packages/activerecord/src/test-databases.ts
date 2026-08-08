@@ -30,7 +30,7 @@ export async function createAndMigrate(
       new SchemaMigration(adapter),
       new InternalMetadata(adapter),
     );
-    await migrator.up();
+    await migrator.migrate();
   }
 }
 

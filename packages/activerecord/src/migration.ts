@@ -2337,37 +2337,51 @@ export class Migrator {
   /**
    * Run all pending migrations up, or migrate to a specific version.
    *
-   * Mirrors: ActiveRecord::Migrator#migrate
-   *
-   * Dispatches to {@link up} / {@link down}, which each build the per-run
-   * Migrator. A target equal to the current version goes to `up`, so an
+   * Mirrors: ActiveRecord::Migrator#migrate (`migration.rb:1452-1458`) — the
+   * advisory-lock gate. A target equal to the current version runs `up`, so an
    * unapplied migration below an already-applied target still runs. The target
    * is rejected up front because Ruby compares it against `current_version`
    * directly, while it may reach us as a string.
+   *
+   * Rails' `#migrate` takes no arguments; the `(targetVersion, block)`
+   * signature its callers still pass is what
+   * `migrator-run-surface-caller-migration` collapses. Until then the direction
+   * choice `MigrationContext#migrate` (`migration.rb:1228-1238`) makes is made
+   * here, on a per-run `Migrator` built the way Rails builds one.
    */
   async migrate(
     targetVersion?: number | string | null,
     block?: (m: MigrationProxy) => boolean,
   ): Promise<MigrationProxy[]> {
-    if (targetVersion === undefined || targetVersion === null) return this.up(null, block);
-
-    if (this._invalidTarget(targetVersion)) {
-      throw new UnknownMigrationVersionError(targetVersion);
+    // With no target this is Rails' `Migrator#migrate`, which runs the
+    // direction this Migrator was built with; with one it is
+    // `MigrationContext#migrate`'s dispatch (`migration.rb:1228-1238`).
+    let direction: "up" | "down" = this._direction;
+    if (targetVersion != null) {
+      direction = "up";
+      if (this._invalidTarget(targetVersion)) {
+        throw new UnknownMigrationVersionError(targetVersion);
+      }
+      const target = BigInt(targetVersion);
+      const current = BigInt(await this.currentVersion());
+      if (current === BigInt(0) && target === BigInt(0)) return [];
+      if (current > target) direction = "down";
     }
 
-    const target = BigInt(targetVersion);
-    const current = BigInt(await this.currentVersion());
-    if (current === BigInt(0) && target === BigInt(0)) return [];
-    if (current > target) return this.down(targetVersion, block);
-    return this.up(targetVersion, block);
-  }
-
-  /**
-   * The migration list handed to the per-run Migrator: Rails' `migrations` when
-   * no block is given, `migrations.select(&block)` when one is.
-   */
-  private _selectedMigrations(block?: (m: MigrationProxy) => boolean): MigrationProxy[] {
-    return block ? this._migrations.filter(block) : this._migrations;
+    const migrator = new Migrator(
+      direction,
+      block ? this._migrations.filter(block) : this._migrations,
+      this._schemaMigration,
+      this._internalMetadata,
+      targetVersion ?? null,
+    );
+    try {
+      return migrator.isUseAdvisoryLock()
+        ? await migrator.withAdvisoryLock(() => migrator.migrateWithoutLock())
+        : await migrator.migrateWithoutLock();
+    } finally {
+      this._invalidateMigrated();
+    }
   }
 
   /**
@@ -2379,130 +2393,6 @@ export class Migrator {
    */
   private _invalidateMigrated(): void {
     this._migratedVersions = undefined;
-  }
-
-  /**
-   * Run all pending migrations up to the target version (or all if no target).
-   *
-   * Mirrors: ActiveRecord::Migrator.up
-   *
-   * @internal
-   */
-  async up(
-    targetVersion?: number | string | null,
-    block?: (m: MigrationProxy) => boolean,
-  ): Promise<MigrationProxy[]> {
-    const migrator = new Migrator(
-      "up",
-      this._selectedMigrations(block),
-      this._schemaMigration,
-      this._internalMetadata,
-      targetVersion ?? null,
-    );
-    try {
-      return migrator.isUseAdvisoryLock()
-        ? await migrator.withAdvisoryLock(() => migrator.migrateWithoutLock())
-        : await migrator.migrateWithoutLock();
-    } finally {
-      this._invalidateMigrated();
-    }
-  }
-
-  /**
-   * Revert all applied migrations down to the target version.
-   *
-   * Mirrors: ActiveRecord::Migrator.down
-   *
-   * @internal
-   */
-  async down(
-    targetVersion?: number | string | null,
-    block?: (m: MigrationProxy) => boolean,
-  ): Promise<MigrationProxy[]> {
-    const migrator = new Migrator(
-      "down",
-      this._selectedMigrations(block),
-      this._schemaMigration,
-      this._internalMetadata,
-      targetVersion ?? null,
-    );
-    try {
-      return migrator.isUseAdvisoryLock()
-        ? await migrator.withAdvisoryLock(() => migrator.migrateWithoutLock())
-        : await migrator.migrateWithoutLock();
-    } finally {
-      this._invalidateMigrated();
-    }
-  }
-
-  /**
-   * Rollback N migrations.
-   *
-   * Mirrors: ActiveRecord::Migrator#rollback
-   */
-  async rollback(steps: number = 1): Promise<MigrationProxy[]> {
-    if (!Number.isInteger(steps) || steps < 0) {
-      throw new Error(`Invalid steps: ${steps}. Must be a non-negative integer.`);
-    }
-    let rolledBack: MigrationProxy[] = [];
-    const body = async (): Promise<void> => {
-      await this._ensureSchemaTable();
-      // Rails puts `rollback` on MigrationContext, which builds a Migrator with
-      // the direction baked in (`migration.rb:1240-1242` → `move`); the down
-      // Migrator is what `execute_migration_in_transaction` reads `@direction`
-      // from, and it owns the `migrated` memo the run mutates.
-      const down = new Migrator(
-        "down",
-        this._migrations,
-        this._schemaMigration,
-        this._internalMetadata,
-      );
-      const applied = await down.migrated();
-      const appliedMigrations = this._migrations.filter((m) => applied.has(m.version)).reverse();
-      const toRollback = appliedMigrations.slice(0, steps);
-
-      for (const proxy of toRollback) {
-        await down.executeMigrationInTransaction(proxy);
-      }
-      rolledBack = toRollback;
-    };
-    if (this.isUseAdvisoryLock()) {
-      await this.withAdvisoryLock(body);
-    } else {
-      await body();
-    }
-    return rolledBack;
-  }
-
-  /**
-   * Move forward N migrations.
-   *
-   * Mirrors: ActiveRecord::Migrator#forward
-   */
-  async forward(steps: number = 1): Promise<void> {
-    if (!Number.isInteger(steps) || steps < 0) {
-      throw new Error(`Invalid steps: ${steps}. Must be a non-negative integer.`);
-    }
-    const body = async (): Promise<void> => {
-      // As in `rollback`, the direction lives on the Migrator, not on the call.
-      const up = new Migrator(
-        "up",
-        this._migrations,
-        this._schemaMigration,
-        this._internalMetadata,
-      );
-      const pending = await up.pendingMigrations();
-      const toRun = pending.slice(0, steps);
-
-      for (const proxy of toRun) {
-        await up.executeMigrationInTransaction(proxy);
-      }
-    };
-    if (this.isUseAdvisoryLock()) {
-      await this.withAdvisoryLock(body);
-    } else {
-      await body();
-    }
   }
 
   /**
@@ -2658,10 +2548,7 @@ export class Migrator {
    *
    * Rails gates solely on `connection.advisory_locks_enabled?`
    * (`supports_advisory_locks? && @advisory_locks_enabled`), mirrored here by
-   * `isAdvisoryLocksEnabled()`. The `currentDatabase` requirement is enforced at
-   * the point it's actually needed — `generateMigratorAdvisoryLockId`, which
-   * throws if an advisory-lock-capable adapter can't supply the DB name —
-   * rather than silently skipping the lock here (which Rails never does).
+   * `isAdvisoryLocksEnabled()`.
    */
   isUseAdvisoryLock(): boolean {
     return this.connection.isAdvisoryLocksEnabled();
@@ -2669,18 +2556,11 @@ export class Migrator {
 
   /** @internal Mirrors: ActiveRecord::Migrator#generate_migrator_advisory_lock_id */
   async generateMigratorAdvisoryLockId(): Promise<bigint> {
-    if (typeof this.connection.currentDatabase !== "function") {
-      throw new Error(
-        `${this.connection.constructor.name} must implement currentDatabase() to support advisory-locked migrations`,
-      );
-    }
-    const dbName = await this.connection.currentDatabase();
-    if (!dbName) {
-      // currentDatabase() returned empty — adapter bug (MySQL stub returns "").
-      // Fall back to the salt; file a fix for the adapter.
-      return BigInt(Migrator._MIGRATOR_SALT);
-    }
-    return BigInt(Migrator._MIGRATOR_SALT) * BigInt(_crc32(dbName));
+    // Rails sends `current_database` unconditionally; an adapter that does not
+    // define it raises NoMethodError. The `!` reproduces that unconditional
+    // send — it is not a claim that the member is always present.
+    const dbNameHash = _crc32(await this.connection.currentDatabase!());
+    return BigInt(Migrator._MIGRATOR_SALT) * BigInt(dbNameHash);
   }
 
   /**

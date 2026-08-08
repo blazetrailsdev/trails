@@ -510,14 +510,14 @@ export class ConnectionPool implements ReapablePool {
 
   get schemaMigration(): SchemaMigration {
     if (!this._schemaMigration) {
-      this._schemaMigration = new SchemaMigration(this._getAdapterProxy());
+      this._schemaMigration = new SchemaMigration(this);
     }
     return this._schemaMigration;
   }
 
   get internalMetadata(): InternalMetadata {
     if (!this._internalMetadata) {
-      this._internalMetadata = new InternalMetadata(this._getAdapterProxy());
+      this._internalMetadata = new InternalMetadata(this);
     }
     return this._internalMetadata;
   }

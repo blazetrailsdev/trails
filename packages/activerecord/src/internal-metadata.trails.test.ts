@@ -2,10 +2,14 @@
 // no internal_metadata_test.rb, so these have no Rails counterpart to mirror.
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { InternalMetadata } from "./internal-metadata.js";
+import { Base } from "./base.js";
+import { fixtures } from "./test-fixtures.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 
 function fakeAdapter(defaultTimezone: string): DatabaseAdapter {
-  return { defaultTimezone } as unknown as DatabaseAdapter;
+  // `pool` is what the constructor discriminates an adapter on; a bare adapter
+  // carries a NullPool, and these cases only exercise `currentTime`.
+  return { defaultTimezone, pool: null } as unknown as DatabaseAdapter;
 }
 
 type CurrentTimeHost = { currentTime(connection: DatabaseAdapter): string };
@@ -46,5 +50,22 @@ describe("InternalMetadata#currentTime", () => {
   it("reads the clock the connection's default timezone selects", () => {
     expect(currentTime("utc")).toBe(FIXED_UTC);
     expect(currentTime("local")).toBe(FIXED_LOCAL);
+  });
+});
+
+fixtures({}, { useTransactionalTests: false });
+
+describe("InternalMetadata built from a connection pool", () => {
+  // Regression: `ConnectionPool#internalMetadata` used to hand over the pool's
+  // dispatch proxy, whose every member answers a Promise — so `toSql` returned
+  // one, `execute` rejected on it, and `tableExists()` swallowed that into a
+  // silent `false` even with the table right there.
+  it("reports the table as present after createTable", async () => {
+    const internalMetadata = new InternalMetadata(Base.connectionPool());
+    await internalMetadata.dropTable();
+    expect(await internalMetadata.tableExists()).toBe(false);
+
+    await internalMetadata.createTable();
+    expect(await internalMetadata.tableExists()).toBe(true);
   });
 });
