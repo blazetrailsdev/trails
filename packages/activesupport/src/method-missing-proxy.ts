@@ -1,3 +1,42 @@
+import { NameError } from "./core-ext/name-error.js";
+
+/**
+ * Ruby's `NoMethodError`, raised by the `else super` arm. It subclasses this
+ * package's {@link NameError} because Ruby's does (`NoMethodError < NameError`),
+ * so a `rescue NameError` site catches it. Local to this module rather than
+ * exported: the raise site is the proxy, and callers identify it the way they
+ * identify any Ruby error class here — by `name` and message.
+ */
+class NoMethodError extends NameError {
+  constructor(message: string) {
+    super(message);
+    this.name = "NoMethodError";
+  }
+}
+
+/**
+ * Names JS itself probes for on an arbitrary object to decide whether it
+ * implements a protocol — `await x` reads `then`, structured comparison reads
+ * `toJSON`, vitest's matchers read `asymmetricMatch`/`$$typeof`. A raising
+ * function in those slots would be *called* by the probe, so they stay absent.
+ */
+const PROTOCOL_PROBES = new Set([
+  "then",
+  "catch",
+  "finally",
+  "toJSON",
+  "asymmetricMatch",
+  "$$typeof",
+  "nodeType",
+]);
+
+/** Mirrors `delegate.respond_to?(method)` — public members only. */
+function respondsTo(delegate: unknown, prop: string | symbol): boolean {
+  if (delegate == null) return false;
+  if (typeof prop === "string" && prop.startsWith("_")) return false;
+  return prop in Object(delegate);
+}
+
 /**
  * Ruby-style `method_missing` forwarding for a TypeScript object.
  *
@@ -30,42 +69,6 @@
  * No amount of porting removes the need for a TS-side shape, so this is the one
  * shared one, the way `include()` is the one shape for Ruby `include`.
  */
-/**
- * Ruby's `NoMethodError` (a subclass of `NameError`), raised by the `else super`
- * arm. Local to this module rather than exported: the raise site is the proxy,
- * and callers identify it the way they identify any Ruby error class here — by
- * `name` and message.
- */
-class NoMethodError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "NoMethodError";
-  }
-}
-
-/**
- * Names JS itself probes for on an arbitrary object to decide whether it
- * implements a protocol — `await x` reads `then`, structured comparison reads
- * `toJSON`, vitest's matchers read `asymmetricMatch`/`$$typeof`. A raising
- * function in those slots would be *called* by the probe, so they stay absent.
- */
-const PROTOCOL_PROBES = new Set([
-  "then",
-  "catch",
-  "finally",
-  "toJSON",
-  "asymmetricMatch",
-  "$$typeof",
-  "nodeType",
-]);
-
-/** Mirrors `delegate.respond_to?(method)` — public members only. */
-function respondsTo(delegate: unknown, prop: string | symbol): boolean {
-  if (delegate == null) return false;
-  if (typeof prop === "string" && prop.startsWith("_")) return false;
-  return prop in Object(delegate);
-}
-
 export function methodMissingProxy<T extends object>(
   target: T,
   /** `delegate` reads the forwarding target; `overrides` is consulted first. */
