@@ -285,6 +285,11 @@ export class SingularAssociation extends Association {
    * `:through` routing. It is a named helper rather than an inline branch so
    * this body keeps the shape of Rails'.
    *
+   * `reflection` is re-read off the class rather than taken from `this`: the
+   * definition `Association` holds carries no `macro` / `joinForeignKey` /
+   * `scope`, which the scope builders below need. The name is already validated
+   * by `Association#initialize`, so the miss is defensive.
+   *
    * `_loaderWritebackSuppressed` is armed for the raise, not for a writeback:
    * the loader body writes nothing back, so what the flag buys here is
    * `setTarget` refusing a replacement that lands mid-query rather than losing
@@ -298,9 +303,6 @@ export class SingularAssociation extends Association {
       const assocName = this.reflection.name;
       const options = this.reflection.options;
       const ctor = owner.constructor as typeof Base;
-      // The rich reflection carries `macro` / `joinForeignKey` / `scope`, which the
-      // definition held on `this` does not; `Association#initialize` has already
-      // validated the name, so the miss is defensive.
       const reflection = ctor._reflectOnAssociation?.(assocName);
       if (!reflection) throw new AssociationNotFoundError(owner, assocName);
       const isBelongsTo = reflection.macro === "belongsTo";
