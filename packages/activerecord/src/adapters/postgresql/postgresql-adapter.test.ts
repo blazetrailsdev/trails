@@ -197,8 +197,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("reconnect after bad connection on check version", async () => {
       // Cache the true version off a live connection.
       expect(await adapter.getDatabaseVersion()).toBeGreaterThan(0);
-      // Mimic a connection that hasn't checked and cached the server version yet.
-      (adapter as unknown as { _databaseVersion: number | null })._databaseVersion = null;
       // Stub server_version to 0 (Rails: raw_connection.stub(:server_version, 0)).
       const versionSpy = vi.spyOn(adapter, "_serverVersion").mockResolvedValue(0);
       await expect(adapter.getDatabaseVersion()).rejects.toBeInstanceOf(ConnectionFailed);
@@ -209,7 +207,6 @@ describeIfPg("PostgreSQLAdapter", () => {
 
       // Can reconnect after a bad connection.
       await adapter.reconnectBang();
-      (adapter as unknown as { _databaseVersion: number | null })._databaseVersion = null;
       expect(await adapter.getDatabaseVersion()).toBeGreaterThan(0);
     });
 
