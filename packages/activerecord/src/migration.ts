@@ -1371,12 +1371,13 @@ export abstract class Migration {
     this._connectionOverride = conn;
   }
 
+  /**
+   * Mirrors: ActiveRecord::Migration#connection_pool (`migration.rb:1040-1042`).
+   * `DatabaseTasks` is reached through the call-time config source for the same
+   * reason `Migrator#connection` does — naming `tasks/database-tasks.js` here
+   * would be a load-time edge back into a module that already imports this one.
+   */
   get connectionPool(): ConnectionPool {
-    // Mirrors Rails: @pool || DatabaseTasks.migration_connection_pool
-    // (migration.rb:1040-1042). `DatabaseTasks` is reached through the call-time config
-    // source for the same reason `Migrator#connection` does — naming
-    // `tasks/database-tasks.js` here would be a load-time edge back into a
-    // module that already imports this one.
     return this._poolOverride ?? migrationArConfig()!.databaseTasks!().migrationConnectionPool();
   }
 

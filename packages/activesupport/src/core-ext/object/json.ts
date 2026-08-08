@@ -153,7 +153,8 @@ export class Enumerable {
 /**
  * `Range#as_json` (json.rb:157-161), over trails' begin/end/exclusive triple
  * (`range-ext.ts`). `to_s` is the ported `Range#to_s` in
- * `core-ext/range/conversions.ts`.
+ * `core-ext/range/conversions.ts`. The dispatcher reaches this arm ahead of
+ * `Hash`, which a range would otherwise take as a plain object.
  */
 export class Range {
   static asJson(value: RangeValue<unknown>): string {
@@ -302,11 +303,11 @@ function pad2(value: number): string {
 /**
  * @noRailsEquivalent PERMANENT — a Hash-shaped object: a bare object literal
  * (`Object.prototype` or null prototype), not a class instance like `Date` that
- * defines its own JSON form. Stands in for Ruby's `Hash === value`.
+ * defines its own JSON form. Stands in for Ruby's `Hash === value`, so a Range
+ * — a plain object here, but not a Hash in Ruby — misses it, both in the
+ * dispatcher below and in `JSONGemEncoder#jsonify`.
  */
 export function isPlainObject(value: object): boolean {
-  // A Range is a plain object here but is not a Hash in Ruby, so it must miss
-  // this test in `jsonify` too, or it never reaches `Range#as_json`.
   if (isRange(value)) return false;
   const proto = globalThis.Object.getPrototypeOf(value);
   return proto === globalThis.Object.prototype || proto === null;
@@ -343,8 +344,6 @@ export function asJson(value: unknown, options?: EncodeOptions | null): unknown 
   if (value instanceof Error) return Exception.asJson(value);
   if (value instanceof URL) return Generic.asJson(value);
   if (globalThis.Array.isArray(value)) return Array.asJson(value, options);
-  // Precedes the Hash arm: trails' Range is a plain object, so it would
-  // otherwise be picked up as an attribute bag.
   if (isRange(value)) return Range.asJson(value);
   if (value instanceof Map || isPlainObject(value as object)) return Hash.asJson(value, options);
   if (

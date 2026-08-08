@@ -498,8 +498,6 @@ export class PostgreSQLAdapter
   // Backs the `active` getter so a torn-down adapter reports inactive
   // even before the next lazy acquire would notice the missing connection.
   private _closed = false;
-  // The in-flight `client.end()` started by the synchronous disconnectBang,
-  // surfaced through `whenClosed()` so the pool can await the socket drain.
   private _closingDriver: Promise<void> | null = null;
   // Per-acquire generation. Each _doAcquire captures the current value; a
   // teardown that must invalidate the in-flight acquire bumps it. `discardBang`

@@ -1361,12 +1361,13 @@ export class DatabaseTasks {
    * stay out of the import cycle); `_baseClass` is the same constant, wired at
    * base.ts module init by `_registerBase`, which is what this sync reader can
    * name — as Ruby names `ActiveRecord::Base` directly.
+   *
+   * The Rails-named `leaseConnection` is async (it awaits per-checkout
+   * `verifyBang` — see ConnectionPool#checkout), so this sync reader uses the
+   * `leaseConnectionSync` escape hatch, which resolves a pinned connection /
+   * establishes a first lease without the async verify.
    */
   static migrationConnection(): import("../connection-adapters/abstract-adapter.js").AbstractAdapter {
-    // The Rails-named `leaseConnection` is now async (it awaits per-checkout
-    // `verifyBang` — see ConnectionPool#checkout). This sync accessor uses the
-    // `leaseConnectionSync` escape hatch, which resolves a pinned connection /
-    // establishes a first lease without the async verify.
     return this._baseClass!.connectionPool().leaseConnectionSync();
   }
 
