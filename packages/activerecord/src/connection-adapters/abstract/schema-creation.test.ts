@@ -183,9 +183,9 @@ describe("SchemaCreation#quotedColumns delegates to the connection", () => {
     const idx = new IndexDefinition("posts", "index_posts_on_title", false, ["title"], {
       opclasses: { title: "text_pattern_ops" },
     });
-    const sql = await (
-      new SchemaCreation(host as any) as any
-    ).visitCreateIndexDefinition(new CreateIndexDefinition(idx, false));
+    const sql = await (new SchemaCreation(host as any) as any).visitCreateIndexDefinition(
+      new CreateIndexDefinition(idx, false),
+    );
     expect(sql).toContain('("title" text_pattern_ops)');
   });
 
@@ -197,9 +197,9 @@ describe("SchemaCreation#quotedColumns delegates to the connection", () => {
       "lower(title)" as any,
       {},
     );
-    const sql = await (
-      new SchemaCreation(host as any) as any
-    ).visitCreateIndexDefinition(new CreateIndexDefinition(idx, false));
+    const sql = await (new SchemaCreation(host as any) as any).visitCreateIndexDefinition(
+      new CreateIndexDefinition(idx, false),
+    );
     expect(sql).toContain("(lower(title))");
     expect(sql).not.toContain("DEFAULT_OPS");
   });

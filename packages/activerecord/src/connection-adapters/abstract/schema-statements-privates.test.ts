@@ -44,6 +44,17 @@ function makeStatements(
       binds,
       "SCHEMA",
     );
+  // `SchemaCreation` delegates every capability probe to `@conn`
+  // (abstract/schema_creation.rb:16-21); the stub answers as SQLite3Adapter
+  // does, matching the `adapterName` it reports.
+  adapter["supportsCheckConstraints"] ??= async () => true;
+  adapter["supportsIndexesInCreate"] ??= () => false;
+  adapter["supportsPartialIndex"] ??= () => true;
+  adapter["supportsIndexInclude"] ??= async () => false;
+  adapter["supportsNullsNotDistinct"] ??= async () => false;
+  adapter["supportsIndexSortOrder"] ??= async () => true;
+  adapter["supportsExclusionConstraints"] ??= () => false;
+  adapter["supportsUniqueConstraints"] ??= () => false;
   // Real hosts override AbstractAdapter#native_database_types (the abstract one
   // is `{}`); the stub answers with SQLite's table so typeToSql resolves.
   adapter["nativeDatabaseTypes"] ??= () => NATIVE_DATABASE_TYPES_BY_ADAPTER["sqlite"];
