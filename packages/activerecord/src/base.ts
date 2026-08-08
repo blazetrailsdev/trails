@@ -4686,7 +4686,7 @@ export interface Base extends Included<typeof AutosaveAssociation> {
   slice(...keys: string[]): Record<string, unknown>;
   valuesAt(...keys: string[]): unknown[];
   assignAttributes(attrs: Record<string, unknown>): Promise<void> | void;
-  setAttributes(attrs: Record<string, unknown>): Promise<void>;
+  setAttributes(attrs: Record<string, unknown>): Promise<void> | void;
   updateAttribute(name: string, value: unknown): Promise<boolean | undefined>;
   updateAttributeBang(name: string, value: unknown): Promise<true | undefined>;
   updateColumn(name: string, value: unknown): Promise<boolean>;
