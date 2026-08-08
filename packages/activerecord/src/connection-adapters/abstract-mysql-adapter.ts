@@ -1778,7 +1778,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
         `SHOW COLUMNS FROM ${this.quoteTableName(tableName)} LIKE ${this.quote(columnName)}`,
         "SCHEMA",
       )
-    ).first()?.["Type"] as ColumnType;
+    ).first()!["Type"] as ColumnType;
     const td = this.createTableDefinition(tableName);
     const cd = td.newColumnDefinition(newColumnName, currentType, options);
     return this.schemaCreation.accept(new ChangeColumnDefinition(cd, column.name));
