@@ -39,30 +39,13 @@ function baseClass(): typeof Base {
 }
 
 /**
- * Stand-in for InternalMetadata when metadata storage is disabled
- * (`use_metadata_table: false`). All methods short-circuit and the
- * physical `ar_internal_metadata` table is never touched.
- *
  * Mirrors: ActiveRecord::InternalMetadata::NullInternalMetadata
+ * (`internal_metadata.rb:13-14`), an empty class. It is a null object in the
+ * identity sense only — callers branch on which class they got rather than
+ * calling methods that silently no-op.
  * @internal
  */
-export class NullInternalMetadata {
-  async createTable(): Promise<void> {}
-  async dropTable(): Promise<void> {}
-
-  async get(_key: string): Promise<string | null> {
-    return null;
-  }
-
-  /** @internal */
-  async tableExists(): Promise<boolean> {
-    return false;
-  }
-
-  get enabled(): boolean {
-    return false;
-  }
-}
+export class NullInternalMetadata {}
 
 export class InternalMetadata {
   private _pool: ConnectionPool | NullPool;

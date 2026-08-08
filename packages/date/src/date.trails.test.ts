@@ -17,16 +17,28 @@ import {
 } from "./date.js";
 import { Time as RubyTime } from "./time.js";
 
+/**
+ * The gem-shaped `::Date` / `::DateTime` RFC 0088's opt-in answers. The statics
+ * answer `Temporal` now ({@link RubyDate#toDate} / {@link RubyDateTime#toDatetime}),
+ * and these are the exported builders those statics themselves call — the way
+ * back to the object for the members the `Temporal` seat cannot carry: `zone`,
+ * `offset` and `secFraction` (a `Rational` past nanosecond precision), plus the
+ * gem's own `to_s` spelling.
+ */
+const gemDate = (str: string, comp?: boolean) => dNewByFrags(RubyDate._parse(str, comp));
+const gemDateTime = (str: string, comp?: boolean) => dtNewByFrags(RubyDate._parse(str, comp));
+
 /** The `y-mm-dd` a date names, for a one-line assertion. */
-function ymd(date: RubyDate): string {
-  return `${date.year}-${String(date.mon).padStart(2, "0")}-${String(date.day).padStart(2, "0")}`;
+function ymd(date: RubyDate | Temporal.PlainDate | Temporal.PlainDateTime): string {
+  const mon = date instanceof RubyDate ? date.mon : date.month;
+  return `${date.year}-${String(mon).padStart(2, "0")}-${String(date.day).padStart(2, "0")}`;
 }
 
 describe("Date", () => {
   it("parses a y-m-d string, padded or not", () => {
     for (const str of ["2008-07-02", "2008-7-2"]) {
       const date = RubyDate.parse(str);
-      expect([date.year, date.mon, date.day]).toEqual([2008, 7, 2]);
+      expect([date.year, date.month, date.day]).toEqual([2008, 7, 2]);
     }
   });
 
@@ -48,13 +60,13 @@ describe("Date", () => {
       "20080702123456",
     ]) {
       const date = RubyDate.parse(str);
-      expect([str, date.year, date.mon, date.day]).toEqual([str, 2008, 7, 2]);
+      expect([str, date.year, date.month, date.day]).toEqual([str, 2008, 7, 2]);
     }
   });
 
   it("reads a two-digit head with a four-digit tail as d/m/y, as s3e does", () => {
     const date = RubyDate.parse("01/01/2012");
-    expect([date.year, date.mon, date.day]).toEqual([2012, 1, 1]);
+    expect([date.year, date.month, date.day]).toEqual([2012, 1, 1]);
     expect(() => RubyDate.parse("12/13/2012")).toThrow("invalid date");
   });
 
@@ -64,12 +76,12 @@ describe("Date", () => {
     try {
       expect(Temporal.Now.plainDateISO("UTC").year).toBe(2008);
       const date = RubyDate.parse("Feb 3rd");
-      expect([date.year, date.mon, date.day]).toEqual([2008, 2, 3]);
+      expect([date.year, date.month, date.day]).toEqual([2008, 2, 3]);
     } finally {
       vi.useRealTimers();
     }
     const partial = RubyDate.parse("2008/07");
-    expect([partial.year, partial.mon, partial.day]).toEqual([2008, 7, 1]);
+    expect([partial.year, partial.month, partial.day]).toEqual([2008, 7, 1]);
   });
 
   it("reads a bare two-digit run as the day of this month, as parse_ddd does", () => {
@@ -77,7 +89,7 @@ describe("Date", () => {
     vi.setSystemTime(new Date("2008-08-04T12:00:00Z"));
     try {
       const date = RubyDate.parse("02");
-      expect([date.year, date.mon, date.day]).toEqual([2008, 8, 2]);
+      expect([date.year, date.month, date.day]).toEqual([2008, 8, 2]);
     } finally {
       vi.useRealTimers();
     }
@@ -88,7 +100,7 @@ describe("Date", () => {
     vi.setSystemTime(new Date("2008-08-04T12:00:00Z"));
     try {
       const date = RubyDate.parse("102");
-      expect([date.year, date.mon, date.day]).toEqual([2008, 4, 11]);
+      expect([date.year, date.month, date.day]).toEqual([2008, 4, 11]);
     } finally {
       vi.useRealTimers();
     }
@@ -96,12 +108,12 @@ describe("Date", () => {
 
   it("reads a five-digit run as a two-digit year and a day of the year", () => {
     const date = RubyDate.parse("20080");
-    expect([date.year, date.mon, date.day]).toEqual([2020, 3, 20]);
+    expect([date.year, date.month, date.day]).toEqual([2020, 3, 20]);
   });
 
   it("reads a seven-digit run as a four-digit year and a day of the year", () => {
     const date = RubyDate.parse("2008070");
-    expect([date.year, date.mon, date.day]).toEqual([2008, 3, 10]);
+    expect([date.year, date.month, date.day]).toEqual([2008, 3, 10]);
     expect(() => RubyDate.parse("2007366")).toThrow("invalid date");
   });
 
@@ -124,7 +136,7 @@ describe("Date", () => {
 
   it("takes the time of day out of the string first, as parse_time does", () => {
     const date = RubyDate.parse("2008070 10:30");
-    expect([date.year, date.mon, date.day]).toEqual([2008, 3, 10]);
+    expect([date.year, date.month, date.day]).toEqual([2008, 3, 10]);
     expect(() => RubyDate.parse("10:30")).toThrow("invalid date");
   });
 
@@ -135,7 +147,7 @@ describe("Date", () => {
       for (const str of ["11pm 5", "5 11pm"]) {
         expect(RubyDate._parse(str)).toEqual({ hour: 23, mday: 5 });
         const date = RubyDate.parse(str);
-        expect([date.year, date.mon, date.day]).toEqual([2008, 8, 5]);
+        expect([date.year, date.month, date.day]).toEqual([2008, 8, 5]);
       }
       expect(RubyDate._parse("11pm")).toEqual({ hour: 23 });
       expect(RubyDate._parse("3rd 5 bc")).toEqual({ mday: 3, hour: 5 });
@@ -149,27 +161,27 @@ describe("Date", () => {
     vi.setSystemTime(new Date("2008-08-04T12:00:00Z"));
     try {
       const mday = RubyDate.parse("3rd");
-      expect([mday.year, mday.mon, mday.day]).toEqual([2008, 8, 3]);
+      expect([mday.year, mday.month, mday.day]).toEqual([2008, 8, 3]);
       const mon = RubyDate.parse("Feb");
-      expect([mon.year, mon.mon, mon.day]).toEqual([2008, 2, 1]);
+      expect([mon.year, mon.month, mon.day]).toEqual([2008, 2, 1]);
     } finally {
       vi.useRealTimers();
     }
     const year = RubyDate.parse("'01");
-    expect([year.year, year.mon, year.day]).toEqual([2001, 1, 1]);
+    expect([year.year, year.month, year.day]).toEqual([2001, 1, 1]);
   });
 
   it("reads the VMS date either way round, as parse_vms does", () => {
     for (const str of ["3-FEB-2001", "FEB-3-2001"]) {
       const date = RubyDate.parse(str);
-      expect([str, date.year, date.mon, date.day]).toEqual([str, 2001, 2, 3]);
+      expect([str, date.year, date.month, date.day]).toEqual([str, 2001, 2, 3]);
     }
   });
 
   it("reads an apostrophized VMS year as the year, as s3e does", () => {
     for (const str of ["'01-FEB-3", "3-FEB-'01"]) {
       const date = RubyDate.parse(str);
-      expect([str, date.year, date.mon, date.day]).toEqual([str, 2001, 2, 3]);
+      expect([str, date.year, date.month, date.day]).toEqual([str, 2001, 2, 3]);
     }
   });
 
@@ -180,20 +192,20 @@ describe("Date", () => {
 
   it("reads a JIS X 0301 date, as parse_jis does", () => {
     const heisei = RubyDate.parse("H13.02.03");
-    expect([heisei.year, heisei.mon, heisei.day]).toEqual([2001, 2, 3]);
+    expect([heisei.year, heisei.month, heisei.day]).toEqual([2001, 2, 3]);
     const meiji = RubyDate.parse("M6.5.4");
-    expect([meiji.year, meiji.mon, meiji.day]).toEqual([1873, 5, 4]);
+    expect([meiji.year, meiji.month, meiji.day]).toEqual([1873, 5, 4]);
   });
 
   it("reads the ISO spellings parse_iso does not take, as parse_iso2 does", () => {
     const ordinal = RubyDate.parse("2001-034");
-    expect([ordinal.year, ordinal.mon, ordinal.day]).toEqual([2001, 2, 3]);
+    expect([ordinal.year, ordinal.month, ordinal.day]).toEqual([2001, 2, 3]);
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2008-08-04T12:00:00Z"));
     try {
       for (const str of ["--0203", "--02-03"]) {
         const date = RubyDate.parse(str);
-        expect([str, date.year, date.mon, date.day]).toEqual([str, 2008, 2, 3]);
+        expect([str, date.year, date.month, date.day]).toEqual([str, 2008, 2, 3]);
       }
     } finally {
       vi.useRealTimers();
@@ -203,16 +215,16 @@ describe("Date", () => {
 
   it("builds a week date from the commercial entry of rt_complete_frags' table", () => {
     const full = RubyDate.parse("2001-W05-6");
-    expect([full.year, full.mon, full.day]).toEqual([2001, 2, 3]);
+    expect([full.year, full.month, full.day]).toEqual([2001, 2, 3]);
     const comp = RubyDate.parse("01-W05-6");
-    expect([comp.year, comp.mon, comp.day]).toEqual([2001, 2, 3]);
+    expect([comp.year, comp.month, comp.day]).toEqual([2001, 2, 3]);
     const week = RubyDate.parse("2001-W05");
-    expect([week.year, week.mon, week.day]).toEqual([2001, 1, 29]);
+    expect([week.year, week.month, week.day]).toEqual([2001, 1, 29]);
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2008-08-04T12:00:00Z"));
     try {
       const today = RubyDate.parse("-W061");
-      expect([today.year, today.mon, today.day]).toEqual([2008, 2, 4]);
+      expect([today.year, today.month, today.day]).toEqual([2008, 2, 4]);
     } finally {
       vi.useRealTimers();
     }
@@ -222,7 +234,7 @@ describe("Date", () => {
     expect(() => RubyDate.parse("2001-W54-1")).toThrow("invalid date");
     expect(() => RubyDate.parse("2001-W00-1")).toThrow("invalid date");
     const long = RubyDate.parse("2020-W53-1");
-    expect([long.year, long.mon, long.day]).toEqual([2020, 12, 28]);
+    expect([long.year, long.month, long.day]).toEqual([2020, 12, 28]);
   });
 
   it("resolves a day of the week against today, as rt_complete_frags' wday entry does", () => {
@@ -249,11 +261,11 @@ describe("Date", () => {
 
   it("falls back to wday in the commercial arm, as rt__valid_date_frags_p does", () => {
     const sun = RubyDate.parse("2001-W05 sun");
-    expect([sun.year, sun.mon, sun.day]).toEqual([2001, 2, 4]);
+    expect([sun.year, sun.month, sun.day]).toEqual([2001, 2, 4]);
     const wed = RubyDate.parse("2001-W05 wed");
-    expect([wed.year, wed.mon, wed.day]).toEqual([2001, 1, 31]);
+    expect([wed.year, wed.month, wed.day]).toEqual([2001, 1, 31]);
     const cwday = RubyDate.parse("2001-W05-6 sun");
-    expect([cwday.year, cwday.mon, cwday.day]).toEqual([2001, 2, 3]);
+    expect([cwday.year, cwday.month, cwday.day]).toEqual([2001, 2, 3]);
   });
 
   it("prefers rt_complete_frags' wnum0 entry to the civil one on a year, a wday and a time", () => {
@@ -264,7 +276,7 @@ describe("Date", () => {
       ["mon 10:00:00 '90", "1990-01-01"],
     ] as const) {
       const date = RubyDate.parse(str);
-      const mon = String(date.mon).padStart(2, "0");
+      const mon = String(date.month).padStart(2, "0");
       const day = String(date.day).padStart(2, "0");
       expect([str, `${date.year}-${mon}-${day}`]).toEqual([str, expected]);
     }
@@ -282,7 +294,7 @@ describe("Date", () => {
       [[2020, -1, -1], "2021-01-03"],
     ] as const) {
       const date = RubyDate.commercial(args[0], args[1], args[2]);
-      const mon = String(date.mon).padStart(2, "0");
+      const mon = String(date.month).padStart(2, "0");
       const day = String(date.day).padStart(2, "0");
       expect([args, `${date.year}-${mon}-${day}`]).toEqual([args, expected]);
     }
@@ -356,7 +368,7 @@ describe("Date", () => {
     // ruby 3.3.11:
     //   DateTime.parse("2008-03-01T06:00:00." + "1" * 20).sec_fraction
     //   #=> (11111111111111111111/100000000000000000000)
-    const parsed = RubyDateTime.parse(`2008-03-01T06:00:00.${"1".repeat(20)}`);
+    const parsed = gemDateTime(`2008-03-01T06:00:00.${"1".repeat(20)}`);
     expect(parsed.secFraction).toEqual(new Rational(11111111111111111111n, 100000000000000000000n));
     // The same denominator drives %N's long division, which stays exact too.
     expect(parsed.strftime("%20N")).toBe("11111111111111111111");
@@ -373,7 +385,7 @@ describe("Date", () => {
     //   DateTime.strptime(..., "%FT%T.%N").strftime("%FT%H:%M:%S.%20N")
     //   #=> "2008-03-01T06:00:00.11111111111111111111"
     // (`%T` on the way out is the separate `strftime-lacks-composite-conversions`.)
-    expect(RubyDateTime.strptime(str, "%FT%T.%N").strftime("%FT%H:%M:%S.%20N")).toBe(
+    expect(dtNewByFrags(RubyDate._strptime(str, "%FT%T.%N")).strftime("%FT%H:%M:%S.%20N")).toBe(
       `2008-03-01T06:00:00.${"1".repeat(20)}`,
     );
   });
@@ -484,7 +496,9 @@ describe("Date", () => {
   it("expands an exact %Q through rt_rewrite_frags, as DateTime.strptime does", () => {
     // ruby 3.3.11:
     //   DateTime.strptime("1234567890123", "%Q").to_s #=> "2009-02-13T23:31:30+00:00"
-    expect(RubyDateTime.strptime("1234567890123", "%Q").toS()).toBe("2009-02-13T23:31:30+00:00");
+    expect(dtNewByFrags(RubyDate._strptime("1234567890123", "%Q")).toS()).toBe(
+      "2009-02-13T23:31:30+00:00",
+    );
   });
 
   it("builds the date the frags name, as Date.strptime does", () => {
@@ -623,8 +637,8 @@ describe("Date", () => {
   });
 
   it("counts wday from Sunday, as Ruby does", () => {
-    expect(RubyDate.parse("2008-07-02").wday).toBe(3);
-    expect(RubyDate.parse("2008-07-06").wday).toBe(0);
+    expect(gemDate("2008-07-02").wday).toBe(3);
+    expect(gemDate("2008-07-06").wday).toBe(0);
   });
 
   it("does not answer sec or hour, so localize resolves it against date.formats", () => {
@@ -635,50 +649,50 @@ describe("Date", () => {
 
   it("formats the strftime directives the date formats use", () => {
     const date = RubyDate.parse("2008-07-02");
-    expect(date.strftime("%Y-%m-%d")).toBe("2008-07-02");
-    expect(date.strftime("%b %d")).toBe("Jul 02");
-    expect(date.strftime("%B %d, %Y")).toBe("July 02, 2008");
-    expect(date.strftime("%a %A")).toBe("Wed Wednesday");
+    expect(strftime(date, "%Y-%m-%d")).toBe("2008-07-02");
+    expect(strftime(date, "%b %d")).toBe("Jul 02");
+    expect(strftime(date, "%B %d, %Y")).toBe("July 02, 2008");
+    expect(strftime(date, "%a %A")).toBe("Wed Wednesday");
   });
 
   it("formats the strftime directives the conformance mixins use", () => {
     const date = RubyDate.parse("2008-07-02");
-    expect(date.strftime("%C")).toBe("20");
-    expect(date.strftime("%u %w")).toBe("3 3");
-    expect(date.strftime("%I %k %l")).toBe("12  0 12");
-    expect(date.strftime("%L %N")).toBe("000 000000000");
-    expect(date.strftime("%:z")).toBe("+00:00");
-    expect(date.strftime("%n%t")).toBe("\n\t");
+    expect(strftime(date, "%C")).toBe("20");
+    expect(strftime(date, "%u %w")).toBe("3 3");
+    expect(strftime(date, "%I %k %l")).toBe("12  0 12");
+    expect(strftime(date, "%L %N")).toBe("000 000000000");
+    expect(strftime(date, "%:z")).toBe("+00:00");
+    expect(strftime(date, "%n%t")).toBe("\n\t");
   });
 
   it("computes %s from the receiver's own fields, as date_strftime does", () => {
-    expect(RubyDate.parse("2008-07-02").strftime("%s")).toBe("1214956800");
-    expect(RubyDate.parse("1969-12-31").strftime("%s")).toBe("-86400");
+    expect(strftime(RubyDate.parse("2008-07-02"), "%s")).toBe("1214956800");
+    expect(strftime(RubyDate.parse("1969-12-31"), "%s")).toBe("-86400");
     expect(new RubyDateTime(2008, 7, 2, 6, 30, 15).strftime("%s")).toBe("1214980215");
   });
 
   it("strips the padding for the %-d flag and leaves unknown directives alone", () => {
     const date = RubyDate.parse("2008-07-02");
-    expect(date.strftime("%-m/%-d")).toBe("7/2");
-    expect(date.strftime("%i")).toBe("%i");
+    expect(strftime(date, "%-m/%-d")).toBe("7/2");
+    expect(strftime(date, "%i")).toBe("%i");
   });
 
   it("formats the composite and week-based directives date_strftime expands", () => {
     // Every expectation is `ruby 3.3.11 -rdate`'s answer for the same receiver.
     const date = RubyDate.parse("2008-07-02");
     const dt = new RubyDateTime(2008, 3, 1, 6, 7, 8.5);
-    expect(date.strftime("%T|%R|%r|%X")).toBe("00:00:00|00:00|12:00:00 AM|00:00:00");
+    expect(strftime(date, "%T|%R|%r|%X")).toBe("00:00:00|00:00|12:00:00 AM|00:00:00");
     expect(dt.strftime("%T|%R|%r|%X")).toBe("06:07:08|06:07|06:07:08 AM|06:07:08");
-    expect(date.strftime("%c")).toBe("Wed Jul  2 00:00:00 2008");
+    expect(strftime(date, "%c")).toBe("Wed Jul  2 00:00:00 2008");
     expect(dt.strftime("%c")).toBe("Sat Mar  1 06:07:08 2008");
-    expect(date.strftime("%D|%v")).toBe("07/02/08| 2-JUL-2008");
+    expect(strftime(date, "%D|%v")).toBe("07/02/08| 2-JUL-2008");
     expect(dt.strftime("%D|%v")).toBe("03/01/08| 1-MAR-2008");
-    expect(date.strftime("%+")).toBe("Wed Jul  2 00:00:00 +00:00 2008");
-    expect(date.strftime("%G|%V|%U|%W")).toBe("2008|27|26|26");
+    expect(strftime(date, "%+")).toBe("Wed Jul  2 00:00:00 +00:00 2008");
+    expect(strftime(date, "%G|%V|%U|%W")).toBe("2008|27|26|26");
     expect(dt.strftime("%G|%V|%U|%W")).toBe("2008|09|08|08");
     // The week-based year runs back into the previous year here.
-    expect(RubyDate.parse("2021-01-03").strftime("%U|%W|%V|%G|%g|%y")).toBe("01|00|53|2020|20|21");
-    expect(date.strftime("%Q")).toBe("1214956800000");
+    expect(strftime(RubyDate.parse("2021-01-03"), "%U|%W|%V|%G|%g|%y")).toBe("01|00|53|2020|20|21");
+    expect(strftime(date, "%Q")).toBe("1214956800000");
     expect(dt.strftime("%Q")).toBe("1204351628500");
   });
 
@@ -689,12 +703,12 @@ describe("Date", () => {
 
   it("pads and left-strips a composite directive, as the STRFTIME macro does", () => {
     const date = RubyDate.parse("2008-07-02");
-    expect(date.strftime("%12T|%-T")).toBe("    00:00:00|00:00:00");
+    expect(strftime(date, "%12T|%-T")).toBe("    00:00:00|00:00:00");
   });
 
   it("round-trips %T through strptime and strftime", () => {
     const parsed = RubyDateTime.strptime("2008-03-01T06:07:08.5", "%FT%T.%N");
-    expect(parsed.strftime("%FT%T.%20N")).toBe("2008-03-01T06:07:08.50000000000000000000");
+    expect(strftime(parsed, "%FT%T.%20N")).toBe("2008-03-01T06:07:08.50000000000000000000");
   });
 
   it("honours the width prefix ahead of every directive, as date_strftime does", () => {
@@ -781,8 +795,8 @@ describe("Date", () => {
   });
 
   it("resolves the ordinal and week-date arms", () => {
-    expect(RubyDate.parse("2008070").strftime("%Y-%m-%d")).toBe("2008-03-10");
-    expect(RubyDate.parse("2001-W05-6").strftime("%Y-%m-%d")).toBe("2001-02-03");
+    expect(strftime(RubyDate.parse("2008070"), "%Y-%m-%d")).toBe("2008-03-10");
+    expect(strftime(RubyDate.parse("2001-W05-6"), "%Y-%m-%d")).toBe("2001-02-03");
   });
 
   it("reads wday, yday and the epoch off the Julian day, as m_wday and tmx_m_secs do", () => {
@@ -815,10 +829,10 @@ describe("Date", () => {
     // Every expectation is `ruby 3.3.11 -rdate`'s `Date.jd(jd)` — under the
     // default `Date::ITALY`, so 2299160 is the Julian 1582-10-04 the reform
     // deleted ten days after, not the proleptic Gregorian 1582-10-14.
-    expect(RubyDate.jd(2440588).toS()).toBe("1970-01-01");
-    expect(RubyDate.jd(2299161).toS()).toBe("1582-10-15");
-    expect(RubyDate.jd(2299160).toS()).toBe("1582-10-04");
-    expect(RubyDate.jd(2299160).yday).toBe(277);
+    expect(new RubyDate(RubyDate.jd(2440588)).toS()).toBe("1970-01-01");
+    expect(new RubyDate(RubyDate.jd(2299161)).toS()).toBe("1582-10-15");
+    expect(new RubyDate(RubyDate.jd(2299160)).toS()).toBe("1582-10-04");
+    expect(new RubyDate(RubyDate.jd(2299160)).yday).toBe(277);
   });
 
   it("reads a Temporal subject's wday and yday off the Julian day too", () => {
@@ -931,7 +945,7 @@ describe("DateTime", () => {
     //   DateTime.parse("2008-03-01T06:00:00+09:00").to_s        #=> "2008-03-01T06:00:00+09:00"
     //   Date.new(2008, 3, 1).to_s                               #=> "2008-03-01"
     expect(new RubyDateTime(2008, 3, 1, 6, 0, 0).toS()).toBe("2008-03-01T06:00:00+00:00");
-    expect(RubyDateTime.parse("2008-03-01T06:00:00+09:00").toS()).toBe("2008-03-01T06:00:00+09:00");
+    expect(gemDateTime("2008-03-01T06:00:00+09:00").toS()).toBe("2008-03-01T06:00:00+09:00");
     expect(new RubyDate(2008, 3, 1).toS()).toBe("2008-03-01");
   });
 
@@ -940,7 +954,7 @@ describe("DateTime", () => {
     //   DateTime.parse("2008-03-01T06:00:00+09:00").zone #=> "+09:00"
     //   ...strftime("%Y-%m-%dT%H:%M:%S %z %:z %::z %:::z %Z")
     //     #=> "2008-03-01T06:00:00 +0900 +09:00 +09:00:00 +09 +09:00"
-    const datetime = RubyDateTime.parse("2008-03-01T06:00:00+09:00");
+    const datetime = gemDateTime("2008-03-01T06:00:00+09:00");
     expect(datetime).toBeInstanceOf(RubyDateTime);
     expect(datetime.zone).toBe("+09:00");
     expect(datetime.strftime("%Y-%m-%dT%H:%M:%S %z %:z %::z %:::z %Z")).toBe(
@@ -953,12 +967,10 @@ describe("DateTime", () => {
     //   DateTime.parse("2008-03-01T06:00:00-04:30").zone #=> "-04:30"
     //   DateTime.parse("2008-03-01T06:00:00 EST").zone   #=> "-05:00"
     //   DateTime.parse("2008-03-01T06:00:00+05:45").offset #=> (23/96)
-    expect(RubyDateTime.parse("2008-03-01T06:00:00-04:30").zone).toBe("-04:30");
-    expect(RubyDateTime.parse("2008-03-01T06:00:00-04:30").strftime("%z %::z")).toBe(
-      "-0430 -04:30:00",
-    );
-    expect(RubyDateTime.parse("2008-03-01T06:00:00 EST").zone).toBe("-05:00");
-    expect(RubyDateTime.parse("2008-03-01T06:00:00+05:45").offset).toEqual(new Rational(23, 96));
+    expect(gemDateTime("2008-03-01T06:00:00-04:30").zone).toBe("-04:30");
+    expect(gemDateTime("2008-03-01T06:00:00-04:30").strftime("%z %::z")).toBe("-0430 -04:30:00");
+    expect(gemDateTime("2008-03-01T06:00:00 EST").zone).toBe("-05:00");
+    expect(gemDateTime("2008-03-01T06:00:00+05:45").offset).toEqual(new Rational(23, 96));
   });
 
   it("truncates a Rational offset fragment to an int, as NUM2INT does", () => {
@@ -967,19 +979,17 @@ describe("DateTime", () => {
     //   DateTime.parse("2008-03-01T06:00:00+9.5555").offset #=> (34399/86400)
     //   DateTime.parse("2008-03-01T06:00:00+9.5555").zone   #=> "+09:33"
     expect(RubyDate._parse("2008-03-01T06:00:00+9.5555").offset).toEqual(new Rational(171999, 5));
-    expect(RubyDateTime.parse("2008-03-01T06:00:00+9.5555").offset).toEqual(
-      new Rational(34399, 86400),
-    );
-    expect(RubyDateTime.parse("2008-03-01T06:00:00+9.5555").zone).toBe("+09:33");
+    expect(gemDateTime("2008-03-01T06:00:00+9.5555").offset).toEqual(new Rational(34399, 86400));
+    expect(gemDateTime("2008-03-01T06:00:00+9.5555").zone).toBe("+09:33");
   });
 
   it("defaults to +00:00 when the source named no zone", () => {
     // ruby 3.3.11: DateTime.parse("2008-07-02").strftime("%Y-%m-%dT%H:%M:%S %z")
     //   #=> "2008-07-02T00:00:00 +0000"
-    expect(RubyDateTime.parse("2008-07-02").strftime("%Y-%m-%dT%H:%M:%S %z")).toBe(
+    expect(strftime(RubyDateTime.parse("2008-07-02"), "%Y-%m-%dT%H:%M:%S %z")).toBe(
       "2008-07-02T00:00:00 +0000",
     );
-    expect(RubyDateTime.parse("2008-07-02").zone).toBe("+00:00");
+    expect(gemDateTime("2008-07-02").zone).toBe("+00:00");
     expect(new RubyDateTime(2008, 3, 1, 6).zone).toBe("+00:00");
   });
 
@@ -987,7 +997,7 @@ describe("DateTime", () => {
     // ruby 3.3.11: d = DateTime.parse("2008-03-01T24:00:00")
     //   [d.year, d.mon, d.mday, d.hour] #=> [2008, 3, 2, 0]
     const datetime = RubyDateTime.parse("2008-03-01T24:00:00");
-    expect([datetime.year, datetime.mon, datetime.day, datetime.hour]).toEqual([2008, 3, 2, 0]);
+    expect([datetime.year, datetime.month, datetime.day, datetime.hour]).toEqual([2008, 3, 2, 0]);
     expect(RubyDateTime.parse("2008-03-01T24:00:00+09:00").day).toBe(2);
   });
 
@@ -996,7 +1006,7 @@ describe("DateTime", () => {
     //   Date._parse("2008-03-01T06:00:00+99:00")[:offset] #=> nil
     //   DateTime.parse("2008-03-01T06:00:00+99:00").zone   #=> "+00:00"
     expect(RubyDate._parse("2008-03-01T06:00:00+99:00").offset).toBeNull();
-    expect(RubyDateTime.parse("2008-03-01T06:00:00+99:00").zone).toBe("+00:00");
+    expect(gemDateTime("2008-03-01T06:00:00+99:00").zone).toBe("+00:00");
     expect(dtNewByFrags({ year: 2008, mon: 3, mday: 1, offset: 999999 }).zone).toBe("+00:00");
   });
 
@@ -1068,13 +1078,13 @@ describe("DateTime", () => {
     //   d = DateTime.parse("2008-03-01T06:00:00.123456789+09:00")
     //   d.strftime("%N") #=> "123456789"
     //   d.sec_fraction   #=> (123456789/1000000000)
-    const datetime = RubyDateTime.parse("2008-03-01T06:00:00.123456789+09:00");
+    const datetime = gemDateTime("2008-03-01T06:00:00.123456789+09:00");
     expect(datetime.strftime("%N")).toBe("123456789");
     expect(datetime.secFraction).toEqual(new Rational(123456789, 1000000000));
     // ruby 3.3.11:
     //   DateTime.parse("2008-03-01T06:00:00.9999999999").strftime("%N")
     //     #=> "999999999"   (sf is (9999999999/10000000000); %N truncates)
-    expect(RubyDateTime.parse("2008-03-01T06:00:00.9999999999").strftime("%N")).toBe("999999999");
+    expect(strftime(RubyDateTime.parse("2008-03-01T06:00:00.9999999999"), "%N")).toBe("999999999");
   });
 
   it("rounds the fractional second to a nanosecond, where Time#nsec truncates", () => {
@@ -1162,7 +1172,7 @@ describe("DateTime", () => {
     //   d.strftime("%3N")  #=> "999"
     //   d.strftime("%9N")  #=> "999999999"
     //   d.strftime("%12N") #=> "999999999900"
-    const datetime = RubyDateTime.parse("2008-03-01T06:00:00.9999999999");
+    const datetime = gemDateTime("2008-03-01T06:00:00.9999999999");
     expect(datetime.strftime("%3N")).toBe("999");
     expect(datetime.strftime("%9N")).toBe("999999999");
     expect(datetime.strftime("%12N")).toBe("999999999900");
@@ -1274,7 +1284,7 @@ describe("strftime over a Temporal subject", () => {
     const date = RubyDate.parse("2008-07-02");
     const plain = Temporal.PlainDate.from("2008-07-02");
     for (const format of FORMATS) {
-      expect(strftime(plain, format)).toBe(date.strftime(format));
+      expect(strftime(plain, format)).toBe(strftime(date, format));
     }
     // ::Date is midnight, UTC — `%s` and the zone directives come off that.
     expect(strftime(plain, "%s %z %Z")).toBe("1214956800 +0000 +00:00");
@@ -1289,7 +1299,7 @@ describe("strftime over a Temporal subject", () => {
   });
 
   it("carries a ZonedDateTime's offset into %z, %Z and %s", () => {
-    const datetime = RubyDateTime.parse("2008-03-01T06:00:00+09:00");
+    const datetime = gemDateTime("2008-03-01T06:00:00+09:00");
     const zoned = Temporal.ZonedDateTime.from("2008-03-01T06:00:00+09:00[+09:00]");
     for (const format of FORMATS) {
       expect(strftime(zoned, format)).toBe(datetime.strftime(format));

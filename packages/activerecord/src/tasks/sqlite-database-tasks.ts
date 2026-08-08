@@ -95,34 +95,20 @@ export class SQLiteDatabaseTasks {
     }
   }
 
+  /**
+   * `sqlite_database_tasks.rb:31-38`. The `rescue` names `NoDatabaseError`
+   * alone — every other failure propagates — and the `ensure` runs `create`
+   * and `connection.reconnect!` whether or not it did.
+   */
   async purge(): Promise<void> {
-    await this.disconnect();
     try {
+      (await this.connection()).disconnectBang();
       await this.drop();
     } catch (error) {
       if (!(error instanceof NoDatabaseError)) throw error;
-    }
-    await this.create();
-    await this.reconnect();
-  }
-
-  private async disconnect(): Promise<void> {
-    try {
-      const pool = Base.connectionPool();
-      // `pool.disconnect()` awaits each adapter's async `driver.close()` before
-      // resolving, so async-only SQLite drivers are fully closed before the
-      // subsequent drop/create re-opens the same file (#1269).
-      await pool.disconnect();
-    } catch {
-      // best effort
-    }
-  }
-
-  private async reconnect(): Promise<void> {
-    try {
-      await this.establishConnection();
-    } catch {
-      // best effort
+    } finally {
+      await this.create();
+      await (await this.connection()).reconnectBang();
     }
   }
 

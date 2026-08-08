@@ -3819,8 +3819,8 @@ export class Date {
    * leaves the civil date to `get_s_civil`; there is one representation here,
    * so the conversion happens at the call.
    */
-  static jd(jd = 0): Date {
-    return new Date(plainDateFromJd(jd));
+  static jd(jd = 0): Temporal.PlainDate {
+    return new Date(plainDateFromJd(jd)).toDate();
   }
 
   /**
@@ -3829,10 +3829,10 @@ export class Date {
    * `c_valid_ordinal_p` rejects. A negative `yday` counts back from the last day
    * of the year, so `Date.ordinal(2001, -1)` is 2001-12-31.
    */
-  static ordinal(year = -4712, yday = 1): Date {
+  static ordinal(year = -4712, yday = 1): Temporal.PlainDate {
     const r = cValidOrdinalP(year, yday);
     if (r === null) throw new DateError("invalid date");
-    return new Date(plainDateFromJd(r));
+    return new Date(plainDateFromJd(r)).toDate();
   }
 
   /**
@@ -3842,8 +3842,8 @@ export class Date {
    * counts back from December and a negative `mday` from the month's end, so
    * `Date.civil(2001, -1, -1)` is 2001-12-31.
    */
-  static civil(year = -4712, month = 1, mday = 1): Date {
-    return new Date(year, month, mday);
+  static civil(year = -4712, month = 1, mday = 1): Temporal.PlainDate {
+    return new Date(year, month, mday).toDate();
   }
 
   /**
@@ -3853,10 +3853,10 @@ export class Date {
    * `cwday` counts back from Sunday and a negative `cweek` back from the end of
    * the commercial year, so `Date.commercial(2001, -1, -1)` is 2001-12-30.
    */
-  static commercial(cwyear = -4712, cweek = 1, cwday = 1): Date {
+  static commercial(cwyear = -4712, cweek = 1, cwday = 1): Temporal.PlainDate {
     const r = cValidCommercialP(cwyear, cweek, cwday);
     if (r === null) throw new DateError("invalid date");
-    return new Date(plainDateFromJd(r));
+    return new Date(plainDateFromJd(r)).toDate();
   }
 
   /**
@@ -3882,8 +3882,20 @@ export class Date {
    * calendar reform, which `Temporal.PlainDate` has no bearer for, so it is not
    * a parameter here.
    */
-  static strptime(str = JULIAN_EPOCH_DATE, fmt = "%F"): Date {
-    return dNewByFrags(Date._strptime(str, fmt));
+  /**
+   * The union is TypeScript's static-side variance, not the port's shape: Ruby's
+   * `DateTime < Date` makes `datetime_s_parse`'s DateTime a covariant override
+   * of `date_s_parse`'s Date, while `Temporal.PlainDateTime` is not a subtype of
+   * `Temporal.PlainDate` (it answers no `toPlainDateTime`/`toPlainYearMonth`/
+   * `toPlainMonthDay`), so a `PlainDate`-only declaration here makes
+   * {@link DateTime#parse} an illegal static override (TS2417). `Date.parse`
+   * itself only ever answers a `PlainDate`.
+   */
+  static strptime(
+    str = JULIAN_EPOCH_DATE,
+    fmt = "%F",
+  ): Temporal.PlainDate | Temporal.PlainDateTime {
+    return dNewByFrags(Date._strptime(str, fmt)).toDate();
   }
 
   /**
@@ -3970,8 +3982,17 @@ export class Date {
    * A string that named only a time of day answers no arm of
    * {@link rtValidDateFragsP} and raises.
    */
-  static parse(str: string, comp = true): Date {
-    return dNewByFrags(Date._parse(str, comp));
+  /**
+   * The union is TypeScript's static-side variance, not the port's shape: Ruby's
+   * `DateTime < Date` makes `datetime_s_parse`'s DateTime a covariant override
+   * of `date_s_parse`'s Date, while `Temporal.PlainDateTime` is not a subtype of
+   * `Temporal.PlainDate` (it answers no `toPlainDateTime`/`toPlainYearMonth`/
+   * `toPlainMonthDay`), so a `PlainDate`-only declaration here makes
+   * {@link DateTime#parse} an illegal static override (TS2417). `Date.parse`
+   * itself only ever answers a `PlainDate`.
+   */
+  static parse(str: string, comp = true): Temporal.PlainDate | Temporal.PlainDateTime {
+    return dNewByFrags(Date._parse(str, comp)).toDate();
   }
 
   get year(): number {
@@ -4025,6 +4046,26 @@ export class Date {
   get yday(): number {
     const [, rd] = cJdToOrdinal(this.jd);
     return rd;
+  }
+
+  /**
+   * Ruby `Date#to_date` (ruby/date, `date_core.c` `d_lite_to_date`), which
+   * answers the receiver's `::Date` value — `self` in MRI, because MRI's
+   * `::Date` value *is* the gem object. trails' `::Date` value is
+   * `Temporal.PlainDate` (RFC 0088's mapping table), so `self` is spelled as
+   * the seat.
+   *
+   * **This is the opt-in seam RFC 0088 left open**, and it is a conversion
+   * method rather than an options argument or a parallel entry point because
+   * the gem already names both directions and neither name is invented: the
+   * statics answer Temporal through `to_date` / `to_datetime`, and a caller who
+   * wants the gem-shaped object back hands the Temporal value to the
+   * constructor ({@link Date}'s `PlainDate` overload,
+   * {@link DateTime}'s), which is the same seat `d_simple_new_internal` writes.
+   * The exported {@link dNewByFrags} / {@link dtNewByFrags} answer it directly.
+   */
+  toDate(): Temporal.PlainDate {
+    return this.#date;
   }
 
   /** Ruby `Date#to_s` (ruby/date, `date_core.c` `d_lite_to_s`). */
@@ -4260,8 +4301,8 @@ export class DateTime extends Date {
    * `datetime_s_parse` → `dt_new_by_frags`), which is `Date.parse`'s
    * `Date._parse` followed by the DateTime-shaped build.
    */
-  static override parse(str: string, comp = true): DateTime {
-    return dtNewByFrags(Date._parse(str, comp));
+  static override parse(str: string, comp = true): Temporal.PlainDateTime {
+    return dtNewByFrags(Date._parse(str, comp)).toDatetime();
   }
 
   /**
@@ -4283,8 +4324,8 @@ export class DateTime extends Date {
    * calendar reform, which `Temporal.PlainDate` has no bearer for, so it is not
    * a parameter here.
    */
-  static override strptime(str = JULIAN_EPOCH_DATETIME, fmt = "%FT%T%z"): DateTime {
-    return dtNewByFrags(Date._strptime(str, fmt));
+  static override strptime(str = JULIAN_EPOCH_DATETIME, fmt = "%FT%T%z"): Temporal.PlainDateTime {
+    return dtNewByFrags(Date._strptime(str, fmt)).toDatetime();
   }
 
   /**
@@ -4336,6 +4377,46 @@ export class DateTime extends Date {
   override get jd(): number {
     const local = this.#mLocalJd();
     return cCivilToJd(local.year, local.month, local.day);
+  }
+
+  /**
+   * Ruby `DateTime#to_date` (ruby/date, `date_core.c` `dt_lite_to_date`), the
+   * calendar day alone. The inherited {@link Date#toDate} cannot stand in: the
+   * `Date` half was written from the constructor's *pre-conversion* civil date,
+   * which a `24:00:00` time of day rolls off — same reason `#civil` exists.
+   */
+  override toDate(): Temporal.PlainDate {
+    return this.#getCCivil();
+  }
+
+  /**
+   * Ruby `DateTime#to_datetime` (ruby/date, `date_core.c` `dt_lite_to_datetime`),
+   * which answers the receiver's `::DateTime` value — `self` in MRI. trails'
+   * `::DateTime` value is `Temporal.PlainDateTime` (RFC 0088's mapping table),
+   * read in LOCAL terms, as every reader above is.
+   *
+   * The offset is NOT carried into the seat. A `Temporal` offset time zone is
+   * minute-precision, and `date_zone_to_diff` (`date_parse.c:523-528`) answers
+   * seconds — the sub-minute offsets `time.ts:26-28` keeps as a `number` for
+   * exactly this reason. It stays reachable as a `number` on the gem-shaped
+   * object ({@link DateTime#offset}, {@link DateTime#zone}), which RFC 0088
+   * lists as one of the three carve-outs where Temporal has no analogue.
+   *
+   * `#sf` is a `Rational` of nanoseconds exact at any denominator, and
+   * `PlainDateTime` holds nanoseconds; the sub-nanosecond tail truncates, as
+   * `Time#nsec` does.
+   */
+  toDatetime(): Temporal.PlainDateTime {
+    const [h, min, s] = dfToTime(this.#mLocalDf());
+    const ns = Number(this.#sf.numerator / this.#sf.denominator);
+    return this.#getCCivil().toPlainDateTime({
+      hour: h,
+      minute: min,
+      second: s,
+      millisecond: Math.floor(ns / 1000000),
+      microsecond: Math.floor(ns / 1000) % 1000,
+      nanosecond: ns % 1000,
+    });
   }
 
   /** Ruby `DateTime#hour` (ruby/date, `date_core.c` `d_lite_hour` over `m_hour`, `date_core.c:1919-1932`). */
