@@ -65,7 +65,7 @@ export class InsertAll {
    * Builder.conflictTarget can read `index.columns` / `index.where`.
    */
   uniqueBy: string | string[] | IndexDefinition | undefined;
-  returning: string | string[] | Nodes.SqlLiteral | false = false;
+  returning: string | string[] | Nodes.SqlLiteral | false | undefined;
 
   onDuplicate: "skip" | "update" | Nodes.SqlLiteral | undefined;
   updateOnly: string | string[] | undefined;
@@ -83,7 +83,6 @@ export class InsertAll {
   // `@returning = primary_keys if @returning == true`), so it can be
   // re-resolved to the schema-cache value once that's available.
   private _returningDefaulted = false;
-  private _returningFromSupport = false;
 
   static async execute(
     relation: Relation<any>,
@@ -121,8 +120,6 @@ export class InsertAll {
         (Array.isArray(options.returning) && options.returning.length === 0)
           ? false
           : options.returning;
-    } else {
-      this._returningFromSupport = true;
     }
 
     if (this.inserts.length === 0) {
@@ -190,19 +187,20 @@ export class InsertAll {
     // conflict target see the schema-cache value rather than the model's
     // configured primary key. findUniqueIndexFor still reads model.primaryKey
     // directly for its `unique_by || model.primary_key` match.
-    if (this._returningFromSupport) {
-      this._returningFromSupport = false;
-      const supportsReturning =
-        typeof (this.connection as any).supportsInsertReturning === "function"
-          ? await (this.connection as any).supportsInsertReturning()
-          : false;
-      this.returning = supportsReturning ? this.primaryKeys() : false;
-      this._returningDefaulted = supportsReturning;
-    }
-    await this.ensureValidOptionsForConnectionBang();
-
     if (this._schemaCachePrimaryKeys === undefined) {
       this._schemaCachePrimaryKeys = await this.dbPrimaryKeys();
+      // Rails runs this in the constructor (`insert_all.rb:38`), keyed off
+      // `@returning.nil?`; `supports_insert_returning?` is async here, so it
+      // rides the same deferral `@unique_by` already takes and `returning`
+      // stays undefined — Ruby's nil — until now.
+      if (this.returning === undefined) {
+        const supportsReturning =
+          typeof (this.connection as any).supportsInsertReturning === "function"
+            ? await (this.connection as any).supportsInsertReturning()
+            : false;
+        this.returning = supportsReturning ? this.primaryKeys() : false;
+        this._returningDefaulted = supportsReturning;
+      }
       if (this._returningDefaulted) {
         // Rails: `@returning = primary_keys` then `@returning = false if
         // @returning == []` (insert_all.rb:39-40). For an id-less table the
@@ -215,6 +213,7 @@ export class InsertAll {
     if (!this._uniqueByResolved) {
       this.uniqueBy = await this.findUniqueIndexFor(this.uniqueBy);
       this._uniqueByResolved = true;
+      await this.ensureValidOptionsForConnectionBang();
     }
     if (this._updatableColumns) return;
     const exclude = new Set([...this.readonlyColumns(), ...this.uniqueByColumns()]);
