@@ -155,10 +155,10 @@ registerContextExitHook(evictQueryCacheStoresForContext);
  * Host interface for QueryCache connection-level mixin methods.
  */
 export interface QueryCachePool {
-  enableQueryCache?<T>(fn: () => T | Promise<T>): T | Promise<T>;
-  disableQueryCache?<T>(fn: () => T | Promise<T>, opts?: { dirties?: boolean }): T | Promise<T>;
-  enableQueryCacheBang?(): void;
-  disableQueryCacheBang?(): void;
+  enableQueryCache<T>(fn: () => T | Promise<T>): T | Promise<T>;
+  disableQueryCache<T>(fn: () => T | Promise<T>, opts?: { dirties?: boolean }): T | Promise<T>;
+  enableQueryCacheBang(): void;
+  disableQueryCacheBang(): void;
   clearQueryCache(): void;
   dirtiesQueryCache?: boolean;
 }
@@ -342,37 +342,15 @@ export function queryCacheEnabled(this: QueryCacheHost): boolean {
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::QueryCache#cache
  */
-export async function cache<T>(this: QueryCacheHost, fn: () => T | Promise<T>): Promise<T> {
-  if (this.pool?.enableQueryCache) {
-    return this.pool.enableQueryCache(fn) as Promise<T>;
-  }
-  const qc = this._queryCache;
-  if (!qc) return fn() as Promise<T>;
-  const oldEnabled = qc.enabled;
-  const oldDirties = qc.dirties;
-  qc.enabled = true;
-  qc.dirties = true;
-  try {
-    return await fn();
-  } finally {
-    qc.enabled = oldEnabled;
-    qc.dirties = oldDirties;
-  }
+export function cache<T>(this: QueryCacheHost, fn: () => T | Promise<T>): Promise<T> {
+  return this.pool.enableQueryCache(fn) as Promise<T>;
 }
 
 /**
  * Mirrors: ActiveRecord::ConnectionAdapters::QueryCache#enable_query_cache!
  */
 export function enableQueryCacheBang(this: QueryCacheHost): void {
-  if (this.pool?.enableQueryCacheBang) {
-    this.pool.enableQueryCacheBang();
-    return;
-  }
-  const qc = this._queryCache;
-  if (qc) {
-    qc.enabled = true;
-    qc.dirties = true;
-  }
+  this.pool.enableQueryCacheBang();
 }
 
 /**
@@ -380,42 +358,20 @@ export function enableQueryCacheBang(this: QueryCacheHost): void {
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::QueryCache#uncached
  */
-export async function uncached<T>(
+export function uncached<T>(
   this: QueryCacheHost,
   fn: () => T | Promise<T>,
   options: { dirties?: boolean } = {},
 ): Promise<T> {
   const { dirties = true } = options;
-  if (this.pool?.disableQueryCache) {
-    return this.pool.disableQueryCache(fn, { dirties }) as Promise<T>;
-  }
-  const qc = this._queryCache;
-  if (!qc) return fn() as Promise<T>;
-  const oldEnabled = qc.enabled;
-  const oldDirties = qc.dirties;
-  qc.enabled = false;
-  qc.dirties = dirties;
-  try {
-    return await fn();
-  } finally {
-    qc.enabled = oldEnabled;
-    qc.dirties = oldDirties;
-  }
+  return this.pool.disableQueryCache(fn, { dirties }) as Promise<T>;
 }
 
 /**
  * Mirrors: ActiveRecord::ConnectionAdapters::QueryCache#disable_query_cache!
  */
 export function disableQueryCacheBang(this: QueryCacheHost): void {
-  if (this.pool?.disableQueryCacheBang) {
-    this.pool.disableQueryCacheBang();
-    return;
-  }
-  const qc = this._queryCache;
-  if (qc) {
-    qc.enabled = false;
-    qc.dirties = true;
-  }
+  this.pool.disableQueryCacheBang();
 }
 
 /**
@@ -530,7 +486,7 @@ function clearCurrentThreadQueryCaches(host: QueryCacheHost): void {
   const cleared = new Set<Store>();
   ExecutorHooks.connectionHandler()?.eachConnectionPool(null, (pool) => {
     const p = pool as unknown as QueryCachePool & { queryCache?: Store };
-    p.clearQueryCache?.();
+    p.clearQueryCache();
     if (p.queryCache) cleared.add(p.queryCache);
   });
   if (host._queryCache && !cleared.has(host._queryCache)) host._queryCache.clear();

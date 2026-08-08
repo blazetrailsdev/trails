@@ -201,7 +201,7 @@ export class ConnectionHandler {
   clearActiveConnectionsBang(role?: string | null): void {
     this.eachConnectionPool(role, (pool) => {
       pool.releaseConnection();
-      (pool as unknown as QueryCachePool).disableQueryCacheBang?.();
+      (pool as unknown as QueryCachePool).disableQueryCacheBang();
     });
   }
 
