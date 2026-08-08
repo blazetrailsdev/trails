@@ -46,52 +46,42 @@ describe("MySQLDatabaseTasks", () => {
 
   it("test_purge_preserves_existing_database_charset_and_collation", async () => {
     const executeCalls: Array<{ sql: string; binds?: unknown[] }> = [];
-    const closeMock = vi.fn(async () => {});
-    let constructorOpts: unknown;
+    const establishCalls: Array<Record<string, unknown> | undefined> = [];
 
-    class FakeMysql2Adapter {
-      constructor(opts: unknown) {
-        constructorOpts = opts;
-      }
+    const tasks = new MySQLDatabaseTasks(config());
+    vi.spyOn(
+      tasks as unknown as { establishConnection(hash?: Record<string, unknown>): Promise<void> },
+      "establishConnection",
+    ).mockImplementation(async (hash?: Record<string, unknown>) => {
+      establishCalls.push(hash);
+    });
+    vi.spyOn(
+      tasks as unknown as { connection(): Promise<unknown> },
+      "connection",
+    ).mockResolvedValue({
       async execute(sql: string, binds?: unknown[]) {
         executeCalls.push({ sql, binds });
         return [{ DEFAULT_CHARACTER_SET_NAME: "utf8mb4", DEFAULT_COLLATION_NAME: "utf8mb4_bin" }];
-      }
-      close = closeMock;
-    }
-
-    vi.resetModules();
-    vi.doMock("../connection-adapters/mysql2-adapter.js", () => ({
-      Mysql2Adapter: FakeMysql2Adapter,
-    }));
+      },
+    });
 
     let dropCallCount = 0;
     let createCallArg: unknown;
+    vi.spyOn(tasks, "drop").mockImplementation(async () => {
+      dropCallCount++;
+    });
+    vi.spyOn(tasks, "create").mockImplementation(async (override) => {
+      createCallArg = override;
+    });
 
-    try {
-      const mod = await import("./mysql-database-tasks.js");
-      const tasks = new mod.MySQLDatabaseTasks(
-        new HashConfig("development", "primary", {
-          adapter: "mysql2",
-          database: "trails_test",
-        }),
-      );
-      vi.spyOn(tasks, "drop").mockImplementation(async () => {
-        dropCallCount++;
-      });
-      vi.spyOn(tasks, "create").mockImplementation(async (override) => {
-        createCallArg = override;
-      });
-      await tasks.purge();
-    } finally {
-      vi.doUnmock("../connection-adapters/mysql2-adapter.js");
-      vi.resetModules();
-    }
+    await tasks.purge();
 
-    // savedCharset must connect without a database (information_schema.SCHEMATA
+    // savedCharset must establish without a database (information_schema.SCHEMATA
     // is server-global; connecting to the target DB would fail with error 1049
     // if it doesn't exist yet).
-    expect((constructorOpts as Record<string, unknown>).database).toBeUndefined();
+    expect(establishCalls).toHaveLength(1);
+    expect(establishCalls[0]).toBeDefined();
+    expect(establishCalls[0]!.database).toBeUndefined();
 
     // savedCharset must have queried information_schema.SCHEMATA with the DB name
     expect(executeCalls).toHaveLength(1);
@@ -101,19 +91,25 @@ describe("MySQLDatabaseTasks", () => {
     // purge must drop then recreate with the saved charset/collation
     expect(dropCallCount).toBe(1);
     expect(createCallArg).toEqual({ charset: "utf8mb4", collation: "utf8mb4_bin" });
-    expect(closeMock).toHaveBeenCalledTimes(1);
   });
 
   it("test_truncate_all_queries_information_schema_and_truncates_each_user_table", async () => {
     const executeCalls: Array<{ sql: string; binds?: unknown[] }> = [];
     const mutationCalls: string[] = [];
-    const closeMock = vi.fn(async () => {});
+    const establishCalls: Array<Record<string, unknown> | undefined> = [];
 
-    class FakeMysql2Adapter {
-      constructor(_opts: unknown) {
-        void _opts;
-      }
-      async execute(sql: string, binds?: unknown[], _name?: string) {
+    const tasks = new MySQLDatabaseTasks(config());
+    vi.spyOn(
+      tasks as unknown as { establishConnection(hash?: Record<string, unknown>): Promise<void> },
+      "establishConnection",
+    ).mockImplementation(async (hash?: Record<string, unknown>) => {
+      establishCalls.push(hash);
+    });
+    vi.spyOn(
+      tasks as unknown as { connection(): Promise<unknown> },
+      "connection",
+    ).mockResolvedValue({
+      async execute(sql: string, binds?: unknown[]) {
         executeCalls.push({ sql, binds });
         // information_schema.tables result — three user tables plus the two
         // bookkeeping tables that truncateAll must skip (it subtracts the
@@ -125,30 +121,17 @@ describe("MySQLDatabaseTasks", () => {
           { table_name: "schema_migrations" },
           { table_name: "ar_internal_metadata" },
         ];
-      }
-      async executeMutation(sql: string, _binds?: unknown[], _name?: string) {
+      },
+      async executeMutation(sql: string) {
         mutationCalls.push(sql);
-      }
-      close = closeMock;
-    }
+      },
+    });
 
-    vi.resetModules();
-    vi.doMock("../connection-adapters/mysql2-adapter.js", () => ({
-      Mysql2Adapter: FakeMysql2Adapter,
-    }));
+    await tasks.truncateAll();
 
-    try {
-      const mod = await import("./mysql-database-tasks.js");
-      await new mod.MySQLDatabaseTasks(
-        new HashConfig("development", "primary", {
-          adapter: "mysql2",
-          database: "trails_test",
-        }),
-      ).truncateAll();
-    } finally {
-      vi.doUnmock("../connection-adapters/mysql2-adapter.js");
-      vi.resetModules();
-    }
+    // truncateAll runs against the target database, so it establishes the full
+    // config rather than the no-database admin one.
+    expect(establishCalls).toEqual([undefined]);
 
     // Exactly one information_schema query with the db name bound.
     expect(executeCalls).toHaveLength(1);
@@ -164,8 +147,5 @@ describe("MySQLDatabaseTasks", () => {
     // The bookkeeping rows returned by the mock are excluded.
     expect(mutationCalls).not.toContain("TRUNCATE TABLE `schema_migrations`");
     expect(mutationCalls).not.toContain("TRUNCATE TABLE `ar_internal_metadata`");
-
-    // Adapter was closed.
-    expect(closeMock).toHaveBeenCalledTimes(1);
   });
 });
