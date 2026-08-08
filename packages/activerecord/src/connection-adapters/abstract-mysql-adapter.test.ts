@@ -686,7 +686,7 @@ describe("AbstractMysqlAdapter#checkVersion", () => {
     (
       adapter as unknown as { getDatabaseVersion: () => InstanceType<typeof Version> }
     ).getDatabaseVersion = () => new Version("5.6.4");
-    expect(() => adapter.checkVersion()).not.toThrow();
+    await expect(adapter.checkVersion()).resolves.toBeUndefined();
   });
 });
 
