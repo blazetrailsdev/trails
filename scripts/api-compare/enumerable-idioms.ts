@@ -48,6 +48,10 @@ export const JS_ENUMERABLE_ALIASES = new Map<string, string[]>([
   // Ruby Array#concat mutates the receiver → JS `push(...xs)`; Array#concat's
   // new-array return is NOT the analogue.
   ["concat", ["push"]],
+  // `Regexp#match?` is exactly and only "does this pattern match?", which JS
+  // spells `RegExp#test` — the WHOLE call's analogue, not a building block, so
+  // it cannot silence a dropped call the way a loose pair would.
+  ["match?", ["test"]],
 ]);
 
 /** JS-native call names that count as making Ruby call `rubyCall`. */

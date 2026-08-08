@@ -1533,16 +1533,9 @@ function isPackageBarrel(file: string): boolean {
  * Keyed `<package>:<ruby file>`. Only-shrink: a row leaves when the file is
  * ported, never when a better justification is found for keeping it.
  *
- * - `activesupport:deprecation/deprecators.rb` — trails has no `Deprecators`
- *   class. `Deprecators`' delegating setters
- *   (`vendor/rails/activesupport/lib/active_support/deprecation/deprecators.rb:19-49`)
- *   are spelled exactly like `Deprecation`'s own `silenced=` / `behavior=` /
- *   `disallowed_behavior=` / `disallowed_warnings=` / `silence`, so the bucket
- *   scored 6/10 against `deprecation.ts` with zero ported.
+ * Currently empty.
  */
-export const NAME_COLLISION_CLUSTERS: ReadonlySet<string> = new Set([
-  "activesupport:deprecation/deprecators.rb",
-]);
+export const NAME_COLLISION_CLUSTERS: ReadonlySet<string> = new Set([]);
 
 export function selectMisplacedFile(
   fileHits: Map<string, number>,

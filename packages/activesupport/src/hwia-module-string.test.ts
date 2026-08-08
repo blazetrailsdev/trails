@@ -86,8 +86,8 @@ describe("DeprecationTest", () => {
   });
 
   it("gem option stored on instance", () => {
-    const d = new Deprecation({ gem: "MyGem" });
-    expect(d.gem).toBe("MyGem");
+    const d = new Deprecation({ gemName: "MyGem" });
+    expect(d.gemName).toBe("MyGem");
   });
 
   it("horizon option stored on instance", () => {

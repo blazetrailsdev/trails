@@ -25,17 +25,21 @@ export class Deprecation {
   behavior: DeprecationBehavior | DeprecationBehavior[] | ((...args: unknown[]) => void) | null =
     "stderr";
   silenced = false;
-  gem?: string;
+  // Rails: `attr_accessor :gem_name` (deprecation/reporting.rb:11).
+  gemName?: string;
   horizon?: string;
+  // Rails: `self.debug = false` (deprecation.rb:76).
+  debug = false;
   disallowedWarnings: (string | RegExp | "all")[] = [];
   disallowedBehavior: DeprecationBehavior | ((...args: unknown[]) => void) | null = "raise";
 
-  private _silencedForThread = false;
+  // Rails: `@silence_counter = Concurrent::ThreadLocalVar.new(0)` (deprecation.rb:78).
+  private _silenceCounter = 0;
   private _allowContexts: AllowContext[] = [];
 
-  constructor(options?: { horizon?: string; gem?: string; silenced?: boolean }) {
+  constructor(options?: { horizon?: string; gemName?: string; silenced?: boolean }) {
     this.horizon = options?.horizon;
-    this.gem = options?.gem;
+    this.gemName = options?.gemName;
     if (options?.silenced != null) this.silenced = options.silenced;
   }
 
@@ -93,7 +97,7 @@ export class Deprecation {
   }
 
   warn(message?: string, callstack?: unknown[]): void {
-    if (this.silenced || this._silencedForThread) return;
+    if (this.silenced || this._silenceCounter > 0) return;
 
     const msg = message ?? "DEPRECATION WARNING";
     const fullMessage = `DEPRECATION WARNING: ${msg}`;
@@ -113,14 +117,24 @@ export class Deprecation {
     this._runBehaviors(behaviors as any[], msg, fullMessage, stack);
   }
 
+  // Rails: deprecation/reporting.rb:41-46.
   silence<T>(fn: () => T): T {
-    const prev = this._silencedForThread;
-    this._silencedForThread = true;
+    this.beginSilence();
     try {
       return fn();
     } finally {
-      this._silencedForThread = prev;
+      this.endSilence();
     }
+  }
+
+  /** @internal Rails: deprecation/reporting.rb:48-50. */
+  beginSilence(): void {
+    this._silenceCounter += 1;
+  }
+
+  /** @internal Rails: deprecation/reporting.rb:52-54. */
+  endSilence(): void {
+    this._silenceCounter -= 1;
   }
 
   allow<T>(

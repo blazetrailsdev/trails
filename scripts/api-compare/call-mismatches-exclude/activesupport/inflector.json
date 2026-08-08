@@ -5,12 +5,5 @@
     "rubyName": "safe_constantize",
     "call": "match?",
     "reason": "Rails' `match?` here is in the `rescue LoadError` arm, matching the \"Unable to autoload constant\" message. trails has no Ruby autoload and `constantize` never raises LoadError, so the arm — and its `match?` — has no analogue."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "inflector.ts",
-    "rubyName": "underscore",
-    "call": "match?",
-    "reason": "Ruby `Regexp#match?` spells as `RegExp#test` in JS: `/[A-Z-]|::/.match?(word)` ports verbatim to `/[A-Z-]|::/.test(camelCasedWord)` (inflector.ts:71)."
   }
 ]
