@@ -56,7 +56,7 @@ describe("MultiDbMigratorTest (trails)", () => {
       internalMetadataB,
     );
 
-    await migratorA.up();
+    await migratorA.migrate();
 
     expect(await migratorA.getAllVersions()).toEqual([1, 2, 3]);
     expect(await migratorB.getAllVersions()).toEqual([]);

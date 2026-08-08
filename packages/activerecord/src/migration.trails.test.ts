@@ -88,7 +88,7 @@ describe("MigrationTest", () => {
       new SchemaMigration(adapter),
       new InternalMetadata(adapter),
     );
-    await migrator.up();
+    await migrator.migrate();
     expect(await migrator.currentVersion()).toBe(1);
   });
 

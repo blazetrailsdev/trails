@@ -5,6 +5,7 @@
  */
 
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
+import type { ConnectionPool, NullPool } from "./connection-adapters/abstract/connection-pool.js";
 import { ActiveRecordError } from "./errors.js";
 import type { Base } from "./base.js";
 import { Table, SelectManager, InsertManager, DeleteManager, Nodes, star } from "@blazetrails/arel";
@@ -45,41 +46,55 @@ export class NullSchemaMigration {
 }
 
 export class SchemaMigration {
-  private _adapter: DatabaseAdapter;
+  private _pool: ConnectionPool | NullPool;
+  /**
+   * SEAM (delete in migration-collaborator-call-sites-pass-a-pool): the adapter
+   * an adapter-built instance was handed, kept because a `NullPool`-backed
+   * adapter cannot check a connection out.
+   */
+  private _fallbackAdapter?: DatabaseAdapter;
   readonly arelTable: Table;
 
-  constructor(adapter: DatabaseAdapter) {
-    this._adapter = adapter;
+  /**
+   * Mirrors `SchemaMigration#initialize` (`schema_migration.rb:14-17`) — it
+   * holds a pool.
+   *
+   * SEAM (delete in migration-collaborator-call-sites-pass-a-pool): the adapter
+   * arm. Every construction site still passes an adapter; given one, hold its
+   * pool and keep the adapter itself as the fallback connection.
+   */
+  constructor(poolOrAdapter: ConnectionPool | NullPool | DatabaseAdapter) {
+    if ("pool" in poolOrAdapter) {
+      this._fallbackAdapter = poolOrAdapter;
+      this._pool = poolOrAdapter.pool;
+    } else {
+      this._pool = poolOrAdapter;
+    }
     this.arelTable = new Table(this.tableName);
   }
 
+  /** Mirrors `@pool.with_connection` (`schema_migration.rb:22-24`). */
+  private async _withConnection<T>(
+    fn: (connection: DatabaseAdapter) => T | Promise<T>,
+  ): Promise<T> {
+    // SEAM (delete in migration-collaborator-call-sites-pass-a-pool)
+    if (this._fallbackAdapter) return await fn(this._fallbackAdapter);
+    return await (this._pool as ConnectionPool).withConnection(fn);
+  }
+
   /**
-   * @internal The adapter this instance runs against. Rails keeps the
-   * equivalent state as `@pool` and hands it to collaborators that need a
-   * connection of their own — `MigrationContext` builds its `Migrator`s from
-   * `schema_migration`'s pool (`migration.rb:1260-1280`, via
-   * `DatabaseTasks.migration_connection_pool`). trails threads an adapter, so
-   * that is what is exposed here.
+   * @internal The adapter this instance runs against. Rails holds `@pool` and
+   * exposes no such reader. It has no caller left in the repo — the story
+   * `migration-collaborator-call-sites-pass-a-pool` scopes its removal, so it
+   * is left here rather than deleted out from under that story.
    */
   get connection(): DatabaseAdapter {
-    return this._adapter;
+    // SEAM (delete in migration-collaborator-call-sites-pass-a-pool)
+    return this._fallbackAdapter!;
   }
 
   get primaryKey(): string {
     return "version";
-  }
-
-  /**
-   * @internal Rails' `SchemaMigration` holds a connection *pool* and reaches a
-   * connection through `@pool.with_connection` (schema_migration.rb:12-17);
-   * trails hands it an adapter, and the one a pool supplies is the pool's
-   * dispatch proxy, whose members all resolve through `withConnection` and so
-   * answer a Promise even for Rails' synchronous `to_sql`. Awaiting is what
-   * keeps a pool-backed instance from feeding `execute` a Promise — which
-   * `tableExists` swallowed into a silent "no table".
-   */
-  private async _toSql(manager: { toSql?: unknown }): Promise<string> {
-    return await (this._adapter.toSql(manager as never) as string | Promise<string>);
   }
 
   // Rails: "#{Base.table_name_prefix}#{Base.schema_migrations_table_name}
@@ -95,15 +110,19 @@ export class SchemaMigration {
   // — rather than hand-built DDL — is what gets the adapter's own
   // TableDefinition and identifier quoting.
   async createTable(): Promise<void> {
-    if (await this._adapter.tableExists(this.tableName)) return;
-    await this._adapter.createTable(this.tableName, { id: false }, (t) => {
-      t.string(this.primaryKey, this._adapter.internalStringOptionsForPrimaryKey());
+    await this._withConnection(async (connection) => {
+      if (await connection.tableExists(this.tableName)) return;
+      await connection.createTable(this.tableName, { id: false }, (t) => {
+        t.string(this.primaryKey, connection.internalStringOptionsForPrimaryKey());
+      });
     });
   }
 
   // Rails: drop_table table_name, if_exists: true (schema_migration.rb:64-66).
   async dropTable(): Promise<void> {
-    await this._adapter.dropTable(this.tableName, { ifExists: true });
+    await this._withConnection((connection) =>
+      connection.dropTable(this.tableName, { ifExists: true }),
+    );
   }
 
   // Rails: connection.insert(im, "...", primary_key, version) — returns the
@@ -111,7 +130,7 @@ export class SchemaMigration {
   async createVersion(version: string): Promise<string> {
     const im = new InsertManager(this.arelTable);
     im.insert([[this.arelTable.get(this.primaryKey), version]]);
-    await this._adapter.execute(await this._toSql(im));
+    await this._withConnection((connection) => connection.execute(connection.toSql(im)));
     return version;
   }
 
@@ -119,21 +138,27 @@ export class SchemaMigration {
     const dm = new DeleteManager();
     dm.from(this.arelTable);
     dm.where(this.arelTable.get(this.primaryKey).eq(version));
-    await this._adapter.execute(await this._toSql(dm));
+    await this._withConnection((connection) => connection.execute(connection.toSql(dm)));
   }
 
   async deleteAllVersions(): Promise<void> {
-    const vers = await this.versions();
-    for (const version of vers) {
-      await this.deleteVersion(version);
-    }
+    // Rails checks the connection in eagerly around the whole walk
+    // (`schema_migration.rb:35-42`) rather than once per `delete_version`.
+    await this._withConnection(async () => {
+      const vers = await this.versions();
+      for (const version of vers) {
+        await this.deleteVersion(version);
+      }
+    });
   }
 
   async versions(): Promise<string[]> {
     const sm = new SelectManager(this.arelTable);
     sm.project(this.arelTable.get(this.primaryKey));
     sm.order(this.arelTable.get(this.primaryKey).asc());
-    const rows = await this._adapter.execute(await this._toSql(sm));
+    const rows = await this._withConnection((connection) =>
+      connection.execute(connection.toSql(sm)),
+    );
     return rows.map((row) => String(row[this.primaryKey]).trim());
   }
 
@@ -144,7 +169,9 @@ export class SchemaMigration {
   async count(): Promise<number> {
     const sm = new SelectManager(this.arelTable);
     sm.project(new Nodes.NamedFunction("COUNT", [star]).as("cnt"));
-    const rows = await this._adapter.execute(await this._toSql(sm));
+    const rows = await this._withConnection((connection) =>
+      connection.execute(connection.toSql(sm)),
+    );
     return Number(rows[0]?.cnt ?? 0);
   }
 
@@ -153,7 +180,7 @@ export class SchemaMigration {
       const sm = new SelectManager(this.arelTable);
       sm.project(new Nodes.Quoted(1));
       sm.take(1);
-      await this._adapter.execute(await this._toSql(sm));
+      await this._withConnection((connection) => connection.execute(connection.toSql(sm)));
       return true;
     } catch {
       return false;

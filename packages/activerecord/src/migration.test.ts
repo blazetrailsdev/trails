@@ -203,7 +203,7 @@ describe("MigrationTest", () => {
       [migrateProxy(100, (m) => m.addColumn("people", "last_name", "string"))],
       new SchemaMigration(adapter),
       new InternalMetadata(adapter),
-    ).up(100);
+    ).migrate(100);
     expect(await personColumnNames(adapter)).toContain("last_name");
 
     await expect(
@@ -212,7 +212,7 @@ describe("MigrationTest", () => {
         [migrateProxy(101, (m) => m.addColumn("people", "last_name", "string"))],
         new SchemaMigration(adapter),
         new InternalMetadata(adapter),
-      ).up(101),
+      ).migrate(101),
     ).rejects.toThrow();
   });
 
@@ -350,7 +350,7 @@ describe("MigrationTest", () => {
       [migrateProxy(100, (m) => m.addColumn("people", "last_name", "string"))],
       new SchemaMigration(adapter),
       new InternalMetadata(adapter),
-    ).up(100);
+    ).migrate(100);
     expect(await personColumnNames(adapter)).toContain("last_name");
 
     // if_not_exists: true must not raise even though the column already exists.
@@ -363,7 +363,7 @@ describe("MigrationTest", () => {
       ],
       new SchemaMigration(adapter),
       new InternalMetadata(adapter),
-    ).up(101);
+    ).migrate(101);
     expect(await personColumnNames(adapter)).toContain("last_name");
   });
 
@@ -610,7 +610,7 @@ describe("MigrationTest", () => {
       [migrateProxy(100, (m) => m.addColumn("people", "last_name", "string"))],
       new SchemaMigration(adapter),
       new InternalMetadata(adapter),
-    ).up(100);
+    ).migrate(100);
     expect(await personColumnNames(adapter)).toContain("last_name");
 
     await new Migrator(
@@ -618,22 +618,22 @@ describe("MigrationTest", () => {
       [migrateProxy(101, (m) => m.removeColumn("people", "last_name"))],
       new SchemaMigration(adapter),
       new InternalMetadata(adapter),
-    ).up(101);
+    ).migrate(101);
     expect(await personColumnNames(adapter)).not.toContain("last_name");
 
     // Removing a missing column with if_not_exists unset: SQLite removes
     // columns via a table rebuild — copying every column except the dropped one
     // — so a missing column is a no-op (`assert_nothing_raised`). PG and MySQL
     // raise.
-    const error = await new Migrator(
+    const error: unknown = await new Migrator(
       "up",
       [migrateProxy(102, (m) => m.removeColumn("people", "last_name"))],
       new SchemaMigration(adapter),
       new InternalMetadata(adapter),
     )
-      .up(102)
-      .catch((e) => e);
-    expect(error?.message ?? "").toMatch(
+      .migrate(102)
+      .catch((e: unknown) => e);
+    expect((error as Error | undefined)?.message ?? "").toMatch(
       adapterType === "sqlite"
         ? /^$/
         : /column "last_name" of relation "people" does not exist|check that.*exists/i,
@@ -659,7 +659,7 @@ describe("MigrationTest", () => {
       schemaMigration,
       new InternalMetadata(adapter),
     );
-    await migrator.up();
+    await migrator.migrate();
 
     expect(await migrator.currentVersion()).toBe(3);
     expect(await migrator.needsMigration()).toBe(false);
@@ -682,7 +682,7 @@ describe("MigrationTest", () => {
       new InternalMetadata(adapter),
     );
 
-    await migrator.up();
+    await migrator.migrate();
     expect(await migrator.currentVersion()).toBe(3);
     expect(await migrator.needsMigration()).toBe(false);
 
@@ -702,7 +702,7 @@ describe("MigrationTest", () => {
       new SchemaMigration(adapter),
       new InternalMetadata(adapter),
     );
-    await migrator.up();
+    await migrator.migrate();
 
     // Rails' `assert_column Person, :last_name`. Person rides the same
     // canonical connection the migration ran against, so it only needs its
@@ -773,7 +773,7 @@ describe("MigrationTest", () => {
       new InternalMetadata(adapter),
     );
     expect(await migrator.currentVersion()).toBe(0);
-    await migrator.up("20131219224947");
+    await migrator.migrate("20131219224947");
     expect(await migrator.currentVersion()).toBe(20131219224947);
   });
 
@@ -849,7 +849,7 @@ describe("MigrationTest", () => {
       [migrateProxy(100, (m) => m.addColumn("people", "last_name", "string"))],
       new SchemaMigration(adapter),
       new InternalMetadata(adapter),
-    ).up(100);
+    ).migrate(100);
     expect(await personColumnNames(adapter)).toContain("last_name");
 
     await new Migrator(
@@ -857,7 +857,7 @@ describe("MigrationTest", () => {
       [migrateProxy(101, (m) => m.removeColumn("people", "last_name"))],
       new SchemaMigration(adapter),
       new InternalMetadata(adapter),
-    ).up(101);
+    ).migrate(101);
     expect(await personColumnNames(adapter)).not.toContain("last_name");
 
     // if_exists: true must not raise even though the column is already gone.
@@ -866,7 +866,7 @@ describe("MigrationTest", () => {
       [migrateProxy(102, (m) => m.removeColumn("people", "last_name", { ifExists: true }))],
       new SchemaMigration(adapter),
       new InternalMetadata(adapter),
-    ).up(102);
+    ).migrate(102);
     expect(await personColumnNames(adapter)).not.toContain("last_name");
   });
 
@@ -883,7 +883,7 @@ describe("MigrationTest", () => {
       [migrateProxy(100, (m) => m.addColumn("people", "last_name", type))],
       new SchemaMigration(adapter),
       new InternalMetadata(adapter),
-    ).up(100);
+    ).migrate(100);
     expect(await personColumnNames(adapter)).toContain("last_name");
 
     await new Migrator(
@@ -891,7 +891,7 @@ describe("MigrationTest", () => {
       [migrateProxy(101, (m) => m.addColumn("people", "last_name", type, { ifNotExists: true }))],
       new SchemaMigration(adapter),
       new InternalMetadata(adapter),
-    ).up(101);
+    ).migrate(101);
     expect(await personColumnNames(adapter)).toContain("last_name");
   });
 
@@ -905,7 +905,7 @@ describe("MigrationTest", () => {
       [migrateProxy(100, (m) => m.addColumn("people", "last_name", "string"))],
       new SchemaMigration(adapter),
       new InternalMetadata(adapter),
-    ).up(100);
+    ).migrate(100);
     expect(await personColumnNames(adapter)).toContain("last_name");
 
     await new Migrator(
@@ -917,7 +917,7 @@ describe("MigrationTest", () => {
       ],
       new SchemaMigration(adapter),
       new InternalMetadata(adapter),
-    ).up(101);
+    ).migrate(101);
     expect(await personColumnNames(adapter)).toContain("last_name");
   });
 
@@ -945,7 +945,7 @@ describe("MigrationTest", () => {
       new SchemaMigration(adapter),
       new InternalMetadata(adapter),
     );
-    await migrator.up(null, nameFilter);
+    await migrator.migrate(null, nameFilter);
 
     expect(await adapter.columnExists("people", "last_name")).toBe(true);
     // Rails asserts `Reminder.first` raises StatementInvalid — the filtered-out
@@ -981,7 +981,7 @@ describe("MigrationTest", () => {
       new SchemaMigration(adapter),
       new InternalMetadata(adapter),
     );
-    await expect(migrator.up()).rejects.toThrow("Something broke");
+    await expect(migrator.migrate()).rejects.toThrow("Something broke");
     // Migration should not be recorded as applied
     const versions = await migrator.getAllVersions();
     expect(versions).not.toContain(100);
@@ -1142,7 +1142,7 @@ describe("MigrationTest", () => {
       new SchemaMigration(adapter),
       new InternalMetadata(adapter),
     );
-    await migrator.up().catch(() => {});
+    await migrator.migrate().catch(() => {});
     const env = await im.get("environment");
     // Rails stamps the environment in `record_environment` BEFORE running the
     // migrations, so a failing migration still leaves it recorded
@@ -1168,7 +1168,7 @@ describe("MigrationTest", () => {
       new SchemaMigration(adapter),
       new InternalMetadata(adapter),
     );
-    await migrator.up();
+    await migrator.migrate();
     expect(await im.get("environment")).toBe(envName(adapter));
     expect(await im.get("custom_key")).toBe("custom_value");
   });
@@ -1203,7 +1203,7 @@ describe("MigrationTest", () => {
       new InternalMetadata(adapter),
     );
     try {
-      await migrator.up();
+      await migrator.migrate();
 
       // im.get() short-circuits to null when disabled, so use a catalog query to
       // verify the table was physically not created (catalog tables always exist,

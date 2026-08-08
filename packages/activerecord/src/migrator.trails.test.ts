@@ -95,7 +95,7 @@ describe("Migrator trails extensions", () => {
       schemaMigration,
       internalMetadata,
     );
-    await migrator.up();
+    await migrator.migrate();
     const env = await new InternalMetadata(adapter).get("environment");
     expect(env).toBe(envName(adapter));
   });
@@ -111,7 +111,7 @@ describe("Migrator trails extensions", () => {
     const set = vi.spyOn(InternalMetadata.prototype, "set");
     let environmentWrites: number;
     try {
-      await migrator.up();
+      await migrator.migrate();
     } finally {
       environmentWrites = set.mock.calls.filter(([key]) => key === "environment").length;
       set.mockRestore();
@@ -160,13 +160,13 @@ describe("Migrator trails extensions", () => {
     // (migration.rb:1503-1505); target 0 stays valid.
     const list = (): MigrationProxy[] => [makeMigration(1, "M1"), makeMigration(2, "M2")];
     await expect(
-      new Migrator("up", list(), schemaMigration, internalMetadata).up(3),
+      new Migrator("up", list(), schemaMigration, internalMetadata).migrate(3),
     ).rejects.toThrow(UnknownMigrationVersionError);
     await expect(
-      new Migrator("up", list(), schemaMigration, internalMetadata).down(3),
+      new Migrator("down", list(), schemaMigration, internalMetadata).migrate(3),
     ).rejects.toThrow(UnknownMigrationVersionError);
     await expect(
-      new Migrator("up", list(), schemaMigration, internalMetadata).down(0),
+      new Migrator("down", list(), schemaMigration, internalMetadata).migrate(0),
     ).resolves.toEqual([]);
   });
 
@@ -181,7 +181,7 @@ describe("Migrator trails extensions", () => {
         ran.push("2");
       });
 
-    await new Migrator("up", [m2()], schemaMigration, internalMetadata).up();
+    await new Migrator("up", [m2()], schemaMigration, internalMetadata).migrate();
     expect(ran).toEqual(["2"]);
 
     ran.length = 0;
@@ -253,7 +253,7 @@ describe("Migrator trails extensions", () => {
       }),
     ];
 
-    await new Migrator("up", migrations(), schemaMigration, internalMetadata).up();
+    await new Migrator("up", migrations(), schemaMigration, internalMetadata).migrate();
     await new Migrator("up", migrations(), schemaMigration, internalMetadata).migrate(
       1,
       (m) => m.version !== 3,
@@ -264,12 +264,12 @@ describe("Migrator trails extensions", () => {
   it("down does not stamp the environment", async () => {
     // Rails' record_environment returns early when down? (migration.rb:1511).
     const migrator = new Migrator(
-      "up",
+      "down",
       [makeMigration(1, "M1")],
       schemaMigration,
       internalMetadata,
     );
-    await migrator.down();
+    await migrator.migrate();
     expect(await new InternalMetadata(adapter).get("environment")).toBeNull();
   });
 
@@ -404,31 +404,6 @@ describe("Migrator advisory lock wrapping", () => {
     expect(await migrator.currentVersion()).toBe(1);
   });
 
-  it("wraps rollback in advisory lock", async () => {
-    const adapter = Base.connection;
-    const lockLog: string[] = [];
-    addAdvisoryLockSupport(adapter);
-    adapter.getAdvisoryLock = async () => {
-      lockLog.push("lock");
-      return true;
-    };
-    adapter.releaseAdvisoryLock = async () => {
-      lockLog.push("unlock");
-      return true;
-    };
-
-    const migrator = new Migrator(
-      "up",
-      [makeMigration(1, "M1")],
-      schemaMigration,
-      internalMetadata,
-    );
-    await migrator.migrate();
-    lockLog.length = 0;
-    await migrator.rollback(1);
-    expect(lockLog).toEqual(["lock", "unlock"]);
-  });
-
   it("wraps run in advisory lock", async () => {
     const adapter = Base.connection;
     const lockLog: string[] = [];
@@ -480,7 +455,7 @@ describe("Migrator advisory lock wrapping", () => {
       schemaMigration,
       internalMetadata,
     );
-    await migrator.up();
+    await migrator.migrate();
     expect(lockLog).toEqual(["lock", "unlock"]);
   });
 
@@ -492,21 +467,9 @@ describe("Migrator advisory lock wrapping", () => {
       schemaMigration,
       internalMetadata,
     );
-    await migrator.up();
+    await migrator.migrate();
     lockLog.length = 0;
-    await migrator.down(0);
-    expect(lockLog).toEqual(["lock", "unlock"]);
-  });
-
-  it("wraps forward in advisory lock", async () => {
-    const { adapter, lockLog } = await lockableAdapter();
-    const migrator = new Migrator(
-      "up",
-      [makeMigration(1, "M1")],
-      schemaMigration,
-      internalMetadata,
-    );
-    await migrator.forward(1);
+    await migrator.migrate(0);
     expect(lockLog).toEqual(["lock", "unlock"]);
   });
 
@@ -557,27 +520,6 @@ describe("Migrator advisory lock wrapping", () => {
     await migrator.migrate();
     await migrator.migrate();
     expect(lockIds[0]).toBe(lockIds[1]);
-  });
-
-  it("throws when adapter supports advisory locks but lacks currentDatabase()", async () => {
-    // Use a raw mock (not SchemaAdapter) that omits currentDatabase()
-    const rawAdapter = {
-      adapterName: "sqlite" as const,
-      supportsAdvisoryLocks: () => true,
-      isAdvisoryLocksEnabled: () => true,
-      getAdvisoryLock: async (_id: unknown) => true,
-      releaseAdvisoryLock: async (_id: unknown) => true,
-      // currentDatabase intentionally absent
-    } as unknown as DatabaseAdapter;
-    const adapter = Base.connection;
-    const migrator = new Migrator(
-      "up",
-      [],
-      new SchemaMigration(adapter),
-      new InternalMetadata(adapter),
-    );
-    withMigrationConnection(rawAdapter);
-    await expect(migrator.migrate()).rejects.toThrow("must implement currentDatabase()");
   });
 
   it("isUseAdvisoryLock does not depend on currentDatabase", async () => {
@@ -727,7 +669,7 @@ describe("Migrator drives migrations through Migration#migrate", () => {
       schemaMigration,
       internalMetadata,
     );
-    await migrator.up();
+    await migrator.migrate();
     const banners = chunks.join("").split("\n").filter(Boolean);
     expect(banners[0]).toMatch(/^== 1 CreateWidgets: migrating =+$/);
     expect(banners[1]).toMatch(/^== 1 CreateWidgets: migrated \(\d+\.\d{4}s\) =+$/);
@@ -748,7 +690,7 @@ describe("Migrator drives migrations through Migration#migrate", () => {
       schemaMigration,
       internalMetadata,
     );
-    await migrator.up();
+    await migrator.migrate();
     const output = chunks.join("");
     expect(output).toContain("!! migrating !!");
     expect(output).toContain("!! migrated (");
@@ -762,7 +704,7 @@ describe("Migrator drives migrations through Migration#migrate", () => {
       schemaMigration,
       internalMetadata,
     );
-    await migrator.up();
+    await migrator.migrate();
     const output = chunks.join("");
     expect(output.match(/1 M1: migrating/g)).toHaveLength(1);
     expect(output.match(/1 M1: migrated/g)).toHaveLength(1);
@@ -780,7 +722,7 @@ describe("Migrator drives migrations through Migration#migrate", () => {
         schemaMigration,
         internalMetadata,
       );
-      await migrator.up();
+      await migrator.migrate();
       expect(chunks.join("")).toBe("");
     } finally {
       Migration.verbose = was;

@@ -14,7 +14,29 @@ import {
   resolveSchemaFormat,
 } from "../database.js";
 import { discoverMigrations } from "../migration-loader.js";
-import { InternalMetadata, Migrator, SchemaMigration } from "@blazetrails/activerecord";
+import {
+  InternalMetadata,
+  MigrationContext,
+  Migrator,
+  SchemaMigration,
+} from "@blazetrails/activerecord";
+import type { MigrationProxy } from "@blazetrails/activerecord";
+
+// `rollback` / `forward` live on MigrationContext (`migration.rb:1240-1246`);
+// these cases drive discovered migrations, so the context overrides
+// `migrations` the way Rails' own migrator_class helper does.
+function migrationContextFor(
+  migrationsPath: string,
+  migrations: MigrationProxy[],
+  schemaMigration: SchemaMigration,
+  internalMetadata: InternalMetadata,
+): MigrationContext {
+  return new (class extends MigrationContext {
+    override get migrations(): MigrationProxy[] {
+      return migrations;
+    }
+  })([migrationsPath], schemaMigration, internalMetadata);
+}
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
@@ -725,12 +747,12 @@ export class CreatePosts extends Migration {
     );
 
     const migrations = await discoverMigrations(tmpDir);
-    const migrator = new Migrator(
-      "up",
-      migrations,
-      new SchemaMigration(adapter),
-      new InternalMetadata(adapter),
-    );
+    const schemaMigration = new SchemaMigration(adapter);
+    const internalMetadata = new InternalMetadata(adapter);
+    const migrator = new Migrator("up", migrations, schemaMigration, internalMetadata);
+    // `rollback` lives on MigrationContext (`migration.rb:1240-1242`); it reads
+    // the same bookkeeping tables, over the same discovered migration list.
+    const context = migrationContextFor(tmpDir, migrations, schemaMigration, internalMetadata);
 
     // Status before migrate
     const beforeStatus = await migrator.migrationsStatus();
@@ -751,7 +773,7 @@ export class CreatePosts extends Migration {
     expect(tables).toHaveLength(1);
 
     // Rollback
-    await migrator.rollback(1);
+    await context.rollback(1);
 
     // Status after rollback
     const rollbackStatus = await migrator.migrationsStatus();
@@ -790,14 +812,18 @@ export class CreateComments extends Migration {
     );
 
     const migrations = await discoverMigrations(tmpDir);
-    const migrator = new Migrator(
-      "up",
+    const migrator = migrationContextFor(
+      tmpDir,
       migrations,
       new SchemaMigration(adapter),
       new InternalMetadata(adapter),
     );
 
-    await migrator.forward(1);
+    // `MigrationContext#forward` is `move(:up, steps)` (`migration.rb:1244`),
+    // which counts steps from the *current* migration — from version 0 a single
+    // step already lands on the second migration. Start at the first one so the
+    // step moves the schema forward by exactly one.
+    await migrator.migrate(20260101000000);
     const posts = await adapter.execute(
       `SELECT name FROM sqlite_master WHERE type='table' AND name='posts'`,
     );

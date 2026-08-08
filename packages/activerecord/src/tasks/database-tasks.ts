@@ -1237,10 +1237,18 @@ export class DatabaseTasks {
    * is reused), yields it, then re-establishes the original config
    * unconditionally in the `ensure` (`:547`).
    *
-   * Ruby's `ensure` covers the whole body, `original_db_config =
-   * migration_class.connection_db_config` included, so a `migration_class`
-   * with no pool still reaches `establish_connection(nil)` on the way out —
-   * the read is inside the `try` here for the same reason.
+   * `original_db_config` is read as the method's first statement (`:544`),
+   * before the `establish_connection` that can fail, so the restore always has
+   * a real config to hand back.
+   *
+   * Deviation, and the only one: Ruby's implicit `begin`/`ensure` covers the
+   * `:544` assignment too, so a raising `connection_db_config` leaves the local
+   * `nil` and `:549` still runs — but `establish_connection(nil)` reaches
+   * `DatabaseConfigurations#resolve`, whose `else` arm raises `TypeError`
+   * (`database_configurations.rb:174-185`). Rails' `ensure` therefore raises
+   * over the body's error in exactly the case this guard would cover. Reading
+   * outside the `try` skips the restore instead, surfacing the original
+   * failure; there is nothing established to restore at that point anyway.
    *
    * Both establish calls hand over the `DatabaseConfig` OBJECT, as Rails does
    * (`:542,544`) — that is what lets `ConnectionHandler#establish_connection`
@@ -1257,9 +1265,8 @@ export class DatabaseTasks {
     { clobber = false }: { clobber?: boolean } = {},
   ): Promise<T> {
     const migrationClass = this.migrationClass();
-    let originalDbConfig: DatabaseConfig | undefined;
+    const originalDbConfig = migrationClass.connectionDbConfig();
     try {
-      originalDbConfig = migrationClass.connectionDbConfig();
       // Rails: `connection_handler.establish_connection(db_config, clobber:)`
       // (database_tasks.rb:543). Ruby's `establish_connection(config_or_env = nil)`
       // takes no `clobber:`, so the kwarg can only be threaded through the handler.
@@ -1274,7 +1281,7 @@ export class DatabaseTasks {
       await pool.adapterReady;
       return await fn(pool);
     } finally {
-      await migrationClass.connectionHandler.establishConnection(originalDbConfig!, {
+      await migrationClass.connectionHandler.establishConnection(originalDbConfig, {
         owner: migrationClass.connectionClassForSelf(),
         clobber,
       }).adapterReady;

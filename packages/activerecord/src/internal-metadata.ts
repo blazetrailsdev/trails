@@ -6,6 +6,7 @@
 
 import { Temporal } from "@blazetrails/date";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
+import type { ConnectionPool, NullPool } from "./connection-adapters/abstract/connection-pool.js";
 import type { Base } from "./base.js";
 import { EnvironmentStorageError } from "./migration.js";
 import { ActiveRecordError } from "./errors.js";
@@ -64,12 +65,14 @@ export class NullInternalMetadata {
 }
 
 export class InternalMetadata {
-  private _connection: DatabaseAdapter;
+  private _pool: ConnectionPool | NullPool;
+  /**
+   * SEAM (delete in migration-collaborator-call-sites-pass-a-pool): the adapter
+   * an adapter-built instance was handed, kept because a `NullPool`-backed
+   * adapter cannot check a connection out.
+   */
+  private _fallbackAdapter?: DatabaseAdapter;
   readonly arelTable: Table;
-
-  private _q(name: string): string {
-    return this._connection.quoteColumnName(name);
-  }
 
   get primaryKey(): string {
     return "key";
@@ -86,17 +89,36 @@ export class InternalMetadata {
     return `${base.tableNamePrefix}${base.internalMetadataTableName}${base.tableNameSuffix}`;
   }
 
-  constructor(adapter: DatabaseAdapter) {
-    this._connection = adapter;
+  /**
+   * Mirrors `InternalMetadata#initialize` (`internal_metadata.rb:18-21`) — it
+   * holds a pool.
+   *
+   * SEAM (delete in migration-collaborator-call-sites-pass-a-pool): the adapter
+   * arm. Every construction site still passes an adapter; given one, hold its
+   * pool and keep the adapter itself as the fallback connection.
+   */
+  constructor(poolOrAdapter: ConnectionPool | NullPool | DatabaseAdapter) {
+    if ("pool" in poolOrAdapter) {
+      this._fallbackAdapter = poolOrAdapter;
+      this._pool = poolOrAdapter.pool;
+    } else {
+      this._pool = poolOrAdapter;
+    }
     this.arelTable = new Table(this.tableName);
+  }
+
+  /** Mirrors `@pool.with_connection` (`internal_metadata.rb:41-45`). */
+  private async _withConnection<T>(
+    fn: (connection: DatabaseAdapter) => T | Promise<T>,
+  ): Promise<T> {
+    // SEAM (delete in migration-collaborator-call-sites-pass-a-pool)
+    if (this._fallbackAdapter) return await fn(this._fallbackAdapter);
+    return await (this._pool as ConnectionPool).withConnection(fn);
   }
 
   /**
    * Mirrors ActiveRecord::InternalMetadata#enabled?
    * (`internal_metadata.rb:35-36`) — `@pool.db_config.use_metadata_table?`.
-   *
-   * trails threads an adapter rather than a pool, so the config is reached
-   * through `adapter.pool`.
    *
    * Deviation: a `NullPool` answers `NULL_CONFIG`, whose every key is undefined
    * (Rails' `NullConfig#method_missing` returns nil), so Rails would read that
@@ -108,8 +130,8 @@ export class InternalMetadata {
    * (`migration-context-collaborators-need-a-pool`).
    */
   get enabled(): boolean {
-    const pool = this._connection.pool as { dbConfig?: { useMetadataTable?: boolean } } | null;
-    return pool?.dbConfig?.useMetadataTable !== false;
+    const dbConfig = (this._pool as { dbConfig?: { useMetadataTable?: boolean } } | null)?.dbConfig;
+    return dbConfig?.useMetadataTable !== false;
   }
 
   // Rails: create_table(table_name, id: false) { |t| t.string :key, **...; t.string
@@ -119,11 +141,13 @@ export class InternalMetadata {
   // types and quoting now come from the adapter instead of an adapterName branch.
   async createTable(): Promise<void> {
     if (!this.enabled) return;
-    if (await this._connection.tableExists(this.tableName)) return;
-    await this._connection.createTable(this.tableName, { id: false }, (t) => {
-      t.string("key", this._connection.internalStringOptionsForPrimaryKey());
-      t.string("value");
-      t.timestamps();
+    await this._withConnection(async (connection) => {
+      if (await connection.tableExists(this.tableName)) return;
+      await connection.createTable(this.tableName, { id: false }, (t) => {
+        t.string("key", connection.internalStringOptionsForPrimaryKey());
+        t.string("value");
+        t.timestamps();
+      });
     });
   }
 
@@ -135,11 +159,13 @@ export class InternalMetadata {
    */
   async createTableAndSetFlags(environment: string, schemaSha1?: string): Promise<void> {
     if (!this.enabled) return;
-    await this.createTable();
-    await this.updateOrCreateEntry(this._connection, "environment", environment);
-    if (schemaSha1 !== undefined) {
-      await this.updateOrCreateEntry(this._connection, "schema_sha1", schemaSha1);
-    }
+    await this._withConnection(async (connection) => {
+      await this.createTable();
+      await this.updateOrCreateEntry(connection, "environment", environment);
+      if (schemaSha1 !== undefined) {
+        await this.updateOrCreateEntry(connection, "schema_sha1", schemaSha1);
+      }
+    });
   }
 
   async dropTable(): Promise<void> {
@@ -149,7 +175,9 @@ export class InternalMetadata {
     // config or adapter is actively using.
     if (!this.enabled) return;
     // Rails: drop_table table_name, if_exists: true (internal_metadata.rb:100-104).
-    await this._connection.dropTable(this.tableName, { ifExists: true });
+    await this._withConnection((connection) =>
+      connection.dropTable(this.tableName, { ifExists: true }),
+    );
   }
 
   async get(key: string): Promise<string | null> {
@@ -157,11 +185,13 @@ export class InternalMetadata {
     // probing ar_internal_metadata — callers shouldn't observe stale
     // rows from a previous run that had the flag enabled.
     if (!this.enabled) return null;
-    const entry = await this.selectEntry(this._connection, key);
-    if (!entry) return null;
-    const value = entry[this.valueKey];
-    if (value == null) return null;
-    return String(value);
+    return await this._withConnection(async (connection) => {
+      const entry = await this.selectEntry(connection, key);
+      if (!entry) return null;
+      const value = entry[this.valueKey];
+      if (value == null) return null;
+      return String(value);
+    });
   }
 
   async set(key: string, value: string): Promise<void> {
@@ -173,7 +203,7 @@ export class InternalMetadata {
       // migration.ts (the cycle is ESM-safe because EnvironmentStorageError is only used in method bodies).
       throw new EnvironmentStorageError();
     }
-    await this.updateOrCreateEntry(this._connection, key, value);
+    await this._withConnection((connection) => this.updateOrCreateEntry(connection, key, value));
   }
 
   /** @internal */
@@ -200,7 +230,7 @@ export class InternalMetadata {
     if (!this.enabled) return;
     const dm = new DeleteManager();
     dm.from(this.arelTable);
-    await this._connection.execute(this._connection.toSql(dm));
+    await this._withConnection((connection) => connection.execute(connection.toSql(dm)));
   }
 
   async count(): Promise<number> {
@@ -210,7 +240,9 @@ export class InternalMetadata {
     if (!this.enabled) return 0;
     const sm = new SelectManager(this.arelTable);
     sm.project(new Nodes.NamedFunction("COUNT", [star]).as("cnt"));
-    const rows = await this._connection.execute(this._connection.toSql(sm));
+    const rows = await this._withConnection((connection) =>
+      connection.execute(connection.toSql(sm)),
+    );
     return Number(rows[0]?.cnt ?? 0);
   }
 
@@ -231,7 +263,7 @@ export class InternalMetadata {
       const sm = new SelectManager(this.arelTable);
       sm.project(new Nodes.Quoted(1));
       sm.take(1);
-      await this._connection.execute(this._connection.toSql(sm));
+      await this._withConnection((connection) => connection.execute(connection.toSql(sm)));
       return true;
     } catch {
       return false;

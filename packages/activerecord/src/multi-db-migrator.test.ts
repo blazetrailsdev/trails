@@ -4,6 +4,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Migrator } from "./index.js";
+import { MigrationContext } from "./migration.js";
 import { SchemaMigration } from "./schema-migration.js";
 import { InternalMetadata } from "./internal-metadata.js";
 import type { MigrationProxy } from "./migration.js";
@@ -34,6 +35,21 @@ function sensor(
       ),
   };
   return proxy;
+}
+
+// Rails' `migrator_class(count)` subclasses MigrationContext and overrides
+// #migrations to return the sensor list, which is why its path argument is
+// never read (multi_db_migrator_test.rb:229-238).
+function migratorClass(
+  migrations: MigrationProxy[],
+  schemaMigration: SchemaMigration,
+  internalMetadata: InternalMetadata,
+): MigrationContext {
+  return new (class extends MigrationContext {
+    override get migrations(): MigrationProxy[] {
+      return migrations;
+    }
+  })(["db/migrate"], schemaMigration, internalMetadata);
 }
 
 describe("MultiDbMigratorTest", () => {
@@ -150,9 +166,9 @@ describe("MultiDbMigratorTest", () => {
 
   it("get all versions", async () => {
     const sensorsA = [sensor(1, "S1"), sensor(2, "S2"), sensor(3, "S3")];
-    const migratorA = new Migrator("up", sensorsA, schemaMigrationA, internalMetadataA);
+    const migratorA = migratorClass(sensorsA, schemaMigrationA, internalMetadataA);
 
-    await migratorA.up();
+    await migratorA.migrate();
     expect(await migratorA.getAllVersions()).toEqual([1, 2, 3]);
 
     await migratorA.rollback();
@@ -165,9 +181,9 @@ describe("MultiDbMigratorTest", () => {
     expect(await migratorA.getAllVersions()).toEqual([]);
 
     const sensorsB = [sensor(1, "S1"), sensor(2, "S2")];
-    const migratorB = new Migrator("up", sensorsB, schemaMigrationB, internalMetadataB);
+    const migratorB = migratorClass(sensorsB, schemaMigrationB, internalMetadataB);
 
-    await migratorB.up();
+    await migratorB.migrate();
     expect(await migratorB.getAllVersions()).toEqual([1, 2]);
 
     await migratorB.rollback();
@@ -217,29 +233,29 @@ describe("MultiDbMigratorTest", () => {
 
   it("migrator db has no schema migrations table", async () => {
     const sensorsA = [sensor(1, "S1"), sensor(2, "S2"), sensor(3, "S3")];
-    const migratorA = new Migrator("up", sensorsA, schemaMigrationA, internalMetadataA);
+    const migratorA = migratorClass(sensorsA, schemaMigrationA, internalMetadataA);
 
     await schemaMigrationA.dropTable();
     expect(await schemaMigrationA.tableExists()).toBe(false);
-    await migratorA.up(1);
+    await migratorA.migrate(1);
     expect(await schemaMigrationA.tableExists()).toBe(true);
     await migratorA.rollback();
 
     const sensorsB = [sensor(1, "S1"), sensor(2, "S2"), sensor(3, "S3")];
-    const migratorB = new Migrator("up", sensorsB, schemaMigrationB, internalMetadataB);
+    const migratorB = migratorClass(sensorsB, schemaMigrationB, internalMetadataB);
 
     await schemaMigrationB.dropTable();
     expect(await schemaMigrationB.tableExists()).toBe(false);
-    await migratorB.up(1);
+    await migratorB.migrate(1);
     expect(await schemaMigrationB.tableExists()).toBe(true);
     await migratorB.rollback();
   });
 
   it("migrator forward", async () => {
     const sensorsA = [sensor(1, "S1"), sensor(2, "S2"), sensor(3, "S3")];
-    const migratorA = new Migrator("up", sensorsA, schemaMigrationA, internalMetadataA);
+    const migratorA = migratorClass(sensorsA, schemaMigrationA, internalMetadataA);
 
-    await migratorA.up(1);
+    await migratorA.migrate(1);
     expect(await migratorA.currentVersion()).toBe(1);
 
     await migratorA.forward(2);
@@ -249,9 +265,9 @@ describe("MultiDbMigratorTest", () => {
     expect(await migratorA.currentVersion()).toBe(3);
 
     const sensorsB = [sensor(1, "S1"), sensor(2, "S2"), sensor(3, "S3")];
-    const migratorB = new Migrator("up", sensorsB, schemaMigrationB, internalMetadataB);
+    const migratorB = migratorClass(sensorsB, schemaMigrationB, internalMetadataB);
 
-    await migratorB.up(1);
+    await migratorB.migrate(1);
     expect(await migratorB.currentVersion()).toBe(1);
 
     await migratorB.forward(2);
