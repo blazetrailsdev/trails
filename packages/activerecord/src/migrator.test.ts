@@ -108,10 +108,10 @@ describe("MigratorTest", () => {
   // also stashes `@verbose_was` and its teardown restores it.
   beforeEach(async () => {
     adapter = Base.connection;
-    schemaMigration = new SchemaMigration(adapter);
+    schemaMigration = new SchemaMigration(adapter.pool);
     await schemaMigration.createTable();
     await schemaMigration.deleteAllVersions();
-    internalMetadata = new InternalMetadata(adapter);
+    internalMetadata = new InternalMetadata(adapter.pool);
     verboseWas = Migration.verbose;
   });
 

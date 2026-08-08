@@ -289,7 +289,7 @@ describe("TestDatabasesTest", () => {
     // ensuring the table exists before the delete keeps both statements from
     // erroring inside the fixtures transaction (a failed DELETE would poison
     // the PG transaction with 25P02).
-    const schemaMigration = new SchemaMigration(adapter);
+    const schemaMigration = new SchemaMigration(adapter.pool);
     await schemaMigration.createTable();
     await schemaMigration.deleteVersion("1");
 
@@ -302,10 +302,10 @@ describe("TestDatabasesTest", () => {
     // `connection.pool.db_config.env_name`, so the stamp follows the pool the
     // adapter is checked out of, not any TRAILS_ENV/NODE_ENV reading.
     const adapter = Base.connection;
-    const schemaMigration = new SchemaMigration(adapter);
+    const schemaMigration = new SchemaMigration(adapter.pool);
     await schemaMigration.createTable();
     await schemaMigration.deleteVersion("1");
-    const internalMetadata = new InternalMetadata(adapter);
+    const internalMetadata = new InternalMetadata(adapter.pool);
     await internalMetadata.createTable();
     await internalMetadata.deleteAllEntries();
 

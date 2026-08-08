@@ -151,8 +151,8 @@ export function createTrailCLI(deps: TrailCliDeps) {
     const migrator = new Migrator(
       "up",
       proxies,
-      new SchemaMigration(adapter),
-      new InternalMetadata(adapter),
+      new SchemaMigration(adapter.pool),
+      new InternalMetadata(adapter.pool),
     );
     // Migration output goes to stdout (Rails' Migration#write is `puts`), and
     // the browser has no process — so the shim's stdout is pointed at this

@@ -27,8 +27,8 @@ export async function createAndMigrate(
     const migrator = new Migrator(
       "up",
       migrations,
-      new SchemaMigration(adapter),
-      new InternalMetadata(adapter),
+      new SchemaMigration(adapter.pool),
+      new InternalMetadata(adapter.pool),
     );
     await migrator.migrate();
   }

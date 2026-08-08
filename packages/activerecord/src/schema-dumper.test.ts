@@ -413,7 +413,7 @@ describe("SchemaDumperTest", () => {
     const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
     const { SchemaMigration } = await import("./schema-migration.js");
     const adapter = Base.connection;
-    const sm = new SchemaMigration(adapter);
+    const sm = new SchemaMigration(adapter.pool);
     await sm.createTable();
     await sm.createVersion("20240601120000");
     const result = await TopLevelDumper.dumpWithVersion(adapter);

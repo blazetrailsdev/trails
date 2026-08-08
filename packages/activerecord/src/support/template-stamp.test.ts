@@ -18,8 +18,8 @@ import { describe, it, expect, vi } from "vitest";
 import "../sqlite/better-sqlite3.js";
 import { Base } from "../base.js";
 import { bootOutcome } from "./boot-outcome.js";
-import { BetterSQLite3Adapter } from "../connection-adapters/better-sqlite3-adapter.js";
 import { InternalMetadata } from "../internal-metadata.js";
+import { newSqlitePool } from "./pooled-sqlite-adapter.js";
 import {
   canonicalSchemaStamp,
   canonicalSchemaUpToDate,
@@ -39,14 +39,14 @@ const sqliteActive = isSqliteRun() && !!templatePath && !!runToken;
 
 describe.skipIf(!sqliteActive)("sqlite template stamp", () => {
   it("the template file is stamped with the canonical schema SHA1", async () => {
-    const adapter = new BetterSQLite3Adapter(templatePath);
+    const pool = newSqlitePool(templatePath);
     try {
-      const metadata = new InternalMetadata(adapter);
+      const metadata = new InternalMetadata(pool);
       expect(await metadata.get("schema_sha1"), "template must carry the stamped schema_sha1").toBe(
         canonicalSchemaStamp(runToken),
       );
     } finally {
-      await adapter.close();
+      await pool.disconnectBang();
     }
   });
 });

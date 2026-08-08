@@ -83,8 +83,8 @@ describe.skipIf(skip)("Migration", () => {
       const connection = await pool.leaseConnection();
       await new MigrationContext(
         pool.migrationsPaths,
-        new SchemaMigration(connection),
-        new InternalMetadata(connection),
+        new SchemaMigration(connection.pool),
+        new InternalMetadata(connection.pool),
       ).migrate();
       Migration.verbose = wasVerbose;
     };

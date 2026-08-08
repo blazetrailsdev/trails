@@ -524,7 +524,7 @@ export abstract class SchemaDumper {
     adapter: DatabaseAdapter,
     options: SchemaDumperOptions = {},
   ): Promise<string> {
-    const schemaMigration = new SchemaMigration(adapter);
+    const schemaMigration = new SchemaMigration(adapter.pool);
     let version = "0";
     if (await schemaMigration.tableExists()) {
       const versions = await schemaMigration.allVersions();

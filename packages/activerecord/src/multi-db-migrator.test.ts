@@ -65,10 +65,10 @@ describe("MultiDbMigratorTest", () => {
   beforeEach(async () => {
     adapterA = await Base.leaseConnection();
     adapterB = await ARUnit2Model.leaseConnection();
-    schemaMigrationA = new SchemaMigration(adapterA);
-    schemaMigrationB = new SchemaMigration(adapterB);
-    internalMetadataA = new InternalMetadata(adapterA);
-    internalMetadataB = new InternalMetadata(adapterB);
+    schemaMigrationA = new SchemaMigration(adapterA.pool);
+    schemaMigrationB = new SchemaMigration(adapterB.pool);
+    internalMetadataA = new InternalMetadata(adapterA.pool);
+    internalMetadataB = new InternalMetadata(adapterB.pool);
     await schemaMigrationA.createTable();
     await schemaMigrationB.createTable();
     await schemaMigrationA.deleteAllVersions();

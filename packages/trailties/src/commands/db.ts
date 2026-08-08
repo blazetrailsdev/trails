@@ -382,8 +382,8 @@ function createMigrator(
   return new Migrator(
     "up",
     migrations,
-    new SchemaMigration(adapter),
-    new InternalMetadata(adapter),
+    new SchemaMigration(adapter.pool),
+    new InternalMetadata(adapter.pool),
   );
 }
 
@@ -600,8 +600,8 @@ async function withMigrationTasksForDb(
     const migrator = new Migrator(
       "up",
       migrations,
-      new SchemaMigration(ctx.adapter),
-      new InternalMetadata(ctx.adapter),
+      new SchemaMigration(ctx.adapter.pool),
+      new InternalMetadata(ctx.adapter.pool),
     );
     opts.afterPending((await migrator.pendingMigrations()).length);
   }
@@ -662,8 +662,8 @@ async function runMigrateAll(targetVersion: string | null): Promise<void> {
           const migrator = new Migrator(
             "up",
             migrations,
-            new SchemaMigration(adapter),
-            new InternalMetadata(adapter),
+            new SchemaMigration(adapter.pool),
+            new InternalMetadata(adapter.pool),
           );
           const pending = await migrator.pendingMigrations();
           if (pending.length === 0) console.log(`${prefix}All migrations are up to date.`);
@@ -787,7 +787,7 @@ export function dbCommand(): Command {
     .action(async (opts: DatabaseOpts) => {
       await forEachDatabase(opts, async ({ adapter, prefix }) => {
         const envName = resolveEnv();
-        const internalMetadata = new InternalMetadata(adapter);
+        const internalMetadata = new InternalMetadata(adapter.pool);
         if (!internalMetadata.enabled) {
           const { EnvironmentStorageError } = await import("@blazetrails/activerecord");
           throw new EnvironmentStorageError();

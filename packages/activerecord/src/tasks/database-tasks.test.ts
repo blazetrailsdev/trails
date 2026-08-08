@@ -1057,7 +1057,7 @@ describe("DatabaseTasksMigrateStatusTest", () => {
     if (skipMigrationTestCase) return;
     // Mirror Rails test setup: @schema_migration.create_table (database_tasks_test.rb:1169)
     const pool = Base.connectionPool();
-    await new SchemaMigration(await pool.leaseConnection()).createTable();
+    await new SchemaMigration(pool).createTable();
     DatabaseTasks.registerMigrations([
       {
         version: 1,

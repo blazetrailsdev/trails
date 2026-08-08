@@ -274,8 +274,8 @@ describe("SchemaDumperAdapterTest", () => {
       await import("./connection-adapters/abstract/schema-dumper.js");
     const { SchemaMigration } = await import("./schema-migration.js");
     const { InternalMetadata } = await import("./internal-metadata.js");
-    await new SchemaMigration(adapter).createTable();
-    await new InternalMetadata(adapter).createTable();
+    await new SchemaMigration(adapter.pool).createTable();
+    await new InternalMetadata(adapter.pool).createTable();
     await adapter.createTable("reminders", {}, (t) => {
       t.string("name");
     });
@@ -289,7 +289,7 @@ describe("SchemaDumperAdapterTest", () => {
     const { SchemaDumper: TopLevelDumper } =
       await import("./connection-adapters/abstract/schema-dumper.js");
     const { SchemaMigration } = await import("./schema-migration.js");
-    const sm = new SchemaMigration(adapter);
+    const sm = new SchemaMigration(adapter.pool);
     await sm.createTable();
     await sm.deleteAllVersions();
     const result = await TopLevelDumper.dumpWithVersion(adapter);
@@ -300,7 +300,7 @@ describe("SchemaDumperAdapterTest", () => {
     const { SchemaDumper: TopLevelDumper } =
       await import("./connection-adapters/abstract/schema-dumper.js");
     const { SchemaMigration } = await import("./schema-migration.js");
-    const sm = new SchemaMigration(adapter);
+    const sm = new SchemaMigration(adapter.pool);
     await sm.createTable();
     // schema_migrations survives per-file truncation (truncate skips it by
     // design), so a prior run's version row can survive in the shared PG

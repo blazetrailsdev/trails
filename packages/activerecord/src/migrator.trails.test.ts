@@ -75,8 +75,8 @@ let schemaMigration: SchemaMigration;
 let internalMetadata: InternalMetadata;
 
 beforeEach(async () => {
-  schemaMigration = new SchemaMigration(Base.connection);
-  internalMetadata = new InternalMetadata(Base.connection);
+  schemaMigration = new SchemaMigration(Base.connection.pool);
+  internalMetadata = new InternalMetadata(Base.connection.pool);
   await schemaMigration.dropTable();
   await internalMetadata.dropTable();
 });
@@ -96,7 +96,7 @@ describe("Migrator trails extensions", () => {
       internalMetadata,
     );
     await migrator.migrate();
-    const env = await new InternalMetadata(adapter).get("environment");
+    const env = await new InternalMetadata(adapter.pool).get("environment");
     expect(env).toBe(envName(adapter));
   });
 
@@ -117,7 +117,7 @@ describe("Migrator trails extensions", () => {
       set.mockRestore();
     }
     expect(environmentWrites).toBe(1);
-    expect(await new InternalMetadata(adapter).get("environment")).toBe(envName(adapter));
+    expect(await new InternalMetadata(adapter.pool).get("environment")).toBe(envName(adapter));
   });
 
   it("executeMigrationInTransaction skips migrations already in migrated", async () => {
@@ -131,8 +131,8 @@ describe("Migrator trails extensions", () => {
 
     // Called directly, so nothing has run `runnable()` / `_ensureSchemaTable()`
     // for us — the guards read `migrated`, which needs the table present.
-    await new SchemaMigration(adapter).createTable();
-    await new InternalMetadata(adapter).createTable();
+    await new SchemaMigration(adapter.pool).createTable();
+    await new InternalMetadata(adapter.pool).createTable();
 
     const up = new Migrator("up", [proxy], schemaMigration, internalMetadata);
     expect(await up.executeMigrationInTransaction(proxy)).toBe(1);
@@ -270,7 +270,7 @@ describe("Migrator trails extensions", () => {
       internalMetadata,
     );
     await migrator.migrate();
-    expect(await new InternalMetadata(adapter).get("environment")).toBeNull();
+    expect(await new InternalMetadata(adapter.pool).get("environment")).toBeNull();
   });
 
   it("CheckPending with a Migrator creates schema_migrations before reading it", async () => {
@@ -533,8 +533,8 @@ describe("Migrator advisory lock wrapping", () => {
     const migrator = new Migrator(
       "up",
       [],
-      new SchemaMigration(Base.connection),
-      new InternalMetadata(Base.connection),
+      new SchemaMigration(Base.connection.pool),
+      new InternalMetadata(Base.connection.pool),
     );
     withMigrationConnection(adapter);
     expect(migrator.isUseAdvisoryLock()).toBe(true);
@@ -548,8 +548,8 @@ describe("Migrator advisory lock wrapping", () => {
     const migrator = new Migrator(
       "up",
       [],
-      new SchemaMigration(Base.connection),
-      new InternalMetadata(Base.connection),
+      new SchemaMigration(Base.connection.pool),
+      new InternalMetadata(Base.connection.pool),
     );
     withMigrationConnection(adapter);
     expect(migrator.isUseAdvisoryLock()).toBe(false);
@@ -590,7 +590,7 @@ describe("Migrator advisory lock wrapping", () => {
     // Rails reads `down?` off the Migrator, so up and down are two Migrators.
     const up = new Migrator("up", [makeMigration(1, "M1")], schemaMigration, internalMetadata);
     const down = new Migrator("down", [makeMigration(1, "M1")], schemaMigration, internalMetadata);
-    await new SchemaMigration(adapter).createTable();
+    await new SchemaMigration(adapter.pool).createTable();
 
     expect(await up.migrated()).toEqual(new Set());
     await up.recordVersionStateAfterMigrating(1);

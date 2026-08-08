@@ -49,7 +49,7 @@ describe("ActiveRecordSchemaTest", () => {
   it("has primary key", async () => {
     const oldPrimaryKeyPrefixType = Base.primaryKeyPrefixType;
     Base.primaryKeyPrefixType = "table_name_with_underscore";
-    const schemaMigration = new SchemaMigration(adapter);
+    const schemaMigration = new SchemaMigration(adapter.pool);
     try {
       expect(schemaMigration.primaryKey).toBe("version");
 
@@ -107,14 +107,14 @@ describe("ActiveRecordSchemaTest", () => {
         await new Migrator(
           "up",
           [],
-          new SchemaMigration(adapter),
-          new InternalMetadata(adapter),
+          new SchemaMigration(adapter.pool),
+          new InternalMetadata(adapter.pool),
         ).currentVersion(),
       ).toBe(7);
     } finally {
       // Rails ensure: drop_table :nep_schema_migrations (dropTable resolves the
       // still-prefixed table name).
-      await new SchemaMigration(adapter).dropTable();
+      await new SchemaMigration(adapter.pool).dropTable();
       Base.tableNamePrefix = saved;
     }
   });
