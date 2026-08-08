@@ -40,7 +40,6 @@ import {
   ARUNIT_DATABASE,
   ARUNIT2_DATABASE,
 } from "./adapters/abstract-mysql-adapter/test-helper.js";
-import { schemaConn } from "./support/schema-conn.js";
 
 // Drives Rails' AdapterTest casted/non-casted bind probes against the leased
 // connection and the canonical `events` table. The insert return value is
@@ -513,10 +512,11 @@ describe("AdapterTest", () => {
     expect(await conn.selectValues(sql)).toEqual(["foo"]);
   });
 
-  it("type_to_sql returns a String for unmapped types", () => {
-    expect(
-      new SchemaCreation("sqlite", schemaConn("sqlite")).typeToSql("special_db_type" as any),
-    ).toBe("special_db_type");
+  it("type_to_sql returns a String for unmapped types", async () => {
+    const conn = await Base.leaseConnection();
+    expect(new SchemaCreation("sqlite", conn as never).typeToSql("special_db_type" as any)).toBe(
+      "special_db_type",
+    );
   });
 
   it("inspect does not show secrets", () => {

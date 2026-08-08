@@ -1,18 +1,26 @@
-import { describe, it, expect } from "vitest";
+import { it, expect, beforeAll } from "vitest";
 import { SchemaCreation, type VisitorHostAdapter } from "./schema-creation.js";
 import { TableDefinition as MyTd } from "./schema-definitions.js";
-import { schemaConn } from "../../support/schema-conn.js";
+import { Base } from "../../base.js";
+import { describeIfMysqlAdapter } from "../../support/describe-if-mysql-adapter.js";
+
+let leased: VisitorHostAdapter;
 
 const mysqlConn = (overrides: Record<string, unknown> = {}): VisitorHostAdapter =>
-  Object.assign(Object.create(schemaConn("mysql")), overrides) as VisitorHostAdapter;
+  Object.assign(Object.create(leased), overrides) as VisitorHostAdapter;
 
 // `TableDefinition#index` stores the caller's options untouched
 // (schema_definitions.rb:518) and `index_in_create` normalizes them through
 // `@conn.add_index_options` (mysql/schema_creation.rb:99). Before that
 // convergence the visitor hand-copied a subset of the option keys, so an inline
 // `length:` (a MySQL prefix index) was silently dropped from the CREATE.
-describe("MySQL::SchemaCreation inline index options (trails)", () => {
-  const sc = new SchemaCreation(mysqlConn());
+describeIfMysqlAdapter("MySQL::SchemaCreation inline index options (trails)", () => {
+  let sc: SchemaCreation;
+
+  beforeAll(async () => {
+    leased = (await Base.leaseConnection()) as unknown as VisitorHostAdapter;
+    sc = new SchemaCreation(mysqlConn());
+  });
 
   it("routes an inline index's length option through addIndexOptions", async () => {
     const td = new MyTd("users", { adapter: mysqlConn() });

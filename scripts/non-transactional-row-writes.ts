@@ -339,7 +339,14 @@ export function writesThroughModel(src: string, writes: RowWrite[]): boolean {
 
 export function isOffender(src: string): boolean {
   if (hasTransactionalWiring(src)) return false;
-  const writes = rowWritesAtItScope(src);
+  // A `NON_MODEL_RECEIVERS` call writes no row on any connection, so it cannot
+  // leak one over the shared connection either — the receiver filter belongs to
+  // both arms, not only the model one. Without it a file whose sole textual
+  // match is `Object.create(SomeAdapter.prototype)` flips to an offender the
+  // moment it names an accessor anywhere.
+  const writes = rowWritesAtItScope(src).filter(
+    (write) => !NON_MODEL_RECEIVERS.has(write.receiver),
+  );
   if (writes.length === 0) return false;
   return reachesSharedConnection(src) || writesThroughModel(src, writes);
 }

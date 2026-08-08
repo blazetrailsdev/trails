@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, beforeAll } from "vitest";
 import {
   ForeignKeyDefinition,
   CheckConstraintDefinition,
@@ -9,7 +9,15 @@ import {
 } from "./schema-definitions.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 import { Base } from "../../base.js";
-import { schemaConn } from "../../support/schema-conn.js";
+import type { TableDefinitionConn } from "./schema-definitions.js";
+
+// Rails hands `TableDefinition#initialize` an `ActiveRecord::Base.lease_connection`
+// (migration/columns_test.rb). Nothing below asserts one dialect's SQL.
+let conn: TableDefinitionConn;
+
+beforeAll(async () => {
+  conn = (await Base.leaseConnection()) as unknown as TableDefinitionConn;
+});
 
 const originalFkPattern = SchemaDumper.fkIgnorePattern;
 const originalChkPattern = SchemaDumper.chkIgnorePattern;
@@ -56,7 +64,7 @@ describe("CheckConstraintDefinition#export_name_on_schema_dump?", () => {
 
 describe("TableDefinition#remove_column", () => {
   const td = (): TableDefinition => {
-    const t = new TableDefinition("astronauts", { adapter: schemaConn("sqlite") });
+    const t = new TableDefinition("astronauts", { adapter: conn });
     t.setPrimaryKey("astronauts", true);
     t.string("name");
     t.integer("rocket_id");
@@ -170,7 +178,7 @@ describe("ReferenceDefinition#foreign_table_name", () => {
   it("targets the singular table when Base.pluralizeTableNames is false", () => {
     Base.pluralizeTableNames = false;
     const ref = new ReferenceDefinition("user", { foreignKey: true, index: false });
-    const td = new TableDefinition("posts", { adapter: schemaConn("sqlite") });
+    const td = new TableDefinition("posts", { adapter: conn });
     ref.addTo(td);
     expect(td.foreignKeys[0].toTable).toBe("user");
   });
@@ -181,7 +189,7 @@ describe("ReferenceDefinition#foreign_table_name", () => {
       foreignKey: { toTable: "accounts" },
       index: false,
     });
-    const td = new TableDefinition("posts", { adapter: schemaConn("sqlite") });
+    const td = new TableDefinition("posts", { adapter: conn });
     ref.addTo(td);
     expect(td.foreignKeys[0].toTable).toBe("accounts");
   });
@@ -189,7 +197,7 @@ describe("ReferenceDefinition#foreign_table_name", () => {
 
 describe("TableDefinition column methods", () => {
   it("defines one column per name, mirroring `names.each` in define_column_methods", () => {
-    const td = new TableDefinition("posts", { adapter: schemaConn("sqlite") });
+    const td = new TableDefinition("posts", { adapter: conn });
     td.string("goat", "sheep", { limit: 40 });
 
     expect(td.columns.map((c) => c.name)).toEqual(["goat", "sheep"]);
@@ -197,14 +205,14 @@ describe("TableDefinition column methods", () => {
   });
 
   it("defines a single column when no options are passed", () => {
-    const td = new TableDefinition("posts", { adapter: schemaConn("sqlite") });
+    const td = new TableDefinition("posts", { adapter: conn });
     td.integer("votes");
 
     expect(td.columns.map((c) => c.name)).toEqual(["votes"]);
   });
 
   it("raises when called with no column name", () => {
-    const td = new TableDefinition("posts", { adapter: schemaConn("sqlite") });
+    const td = new TableDefinition("posts", { adapter: conn });
 
     expect(() => (td.timestamp as () => unknown)()).toThrow("Missing column name(s) for timestamp");
     expect(() => (td.string as (o: object) => unknown)({ limit: 40 })).toThrow(
@@ -215,7 +223,7 @@ describe("TableDefinition column methods", () => {
 
 describe("ColumnMethods#primary_key", () => {
   it("merges primary_key: true and honours the type argument on create_table", () => {
-    const td = new TableDefinition("posts", { adapter: schemaConn("sqlite") });
+    const td = new TableDefinition("posts", { adapter: conn });
     td.primaryKey("id", "uuid", { default: "gen_random_uuid()" });
 
     expect(td.columns.map((c) => c.name)).toEqual(["id"]);
@@ -225,7 +233,7 @@ describe("ColumnMethods#primary_key", () => {
   });
 
   it("defaults the type to primary_key", () => {
-    const td = new TableDefinition("posts", { adapter: schemaConn("sqlite") });
+    const td = new TableDefinition("posts", { adapter: conn });
     td.primaryKey("id");
 
     expect(td.columns[0].type).toBe("primary_key");
@@ -248,8 +256,7 @@ describe("IndexDefinition concise options", () => {
 });
 
 describe("TableDefinition#create_column_definition", () => {
-  const td = () =>
-    new TableDefinition("articles", { adapter: schemaConn("sqlite"), adapterName: "sqlite" });
+  const td = () => new TableDefinition("articles", { adapter: conn, adapterName: "sqlite" });
 
   it("raises on a column option outside valid_column_definition_options", () => {
     expect(() => td().column("title", "string", { preccision: true } as never)).toThrow(
