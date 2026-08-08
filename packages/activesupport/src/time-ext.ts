@@ -11,6 +11,7 @@
 
 import { Temporal } from "@blazetrails/date";
 import { instantFrom } from "./temporal.js";
+import { ArgumentError } from "./hash-utils.js";
 
 const DAY_NAMES = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
 
@@ -363,6 +364,9 @@ interface ChangeOptions {
   min?: number;
   sec?: number;
   usec?: number;
+  nsec?: number;
+  /** Ruby's `:offset` takes either a `"+HH:MM"` String or a seconds Integer. */
+  offset?: string | number;
 }
 
 /**
@@ -406,13 +410,63 @@ export function change(
   const newMin = options.min ?? (options.hour !== undefined ? 0 : self.minute);
   let newSec =
     options.sec ?? (options.hour !== undefined || options.min !== undefined ? 0 : self.second);
-  const newUsec =
-    options.usec ??
-    (options.hour !== undefined || options.min !== undefined || options.sec !== undefined
-      ? 0
-      : nsec / 1000);
+  const newOffset = options.offset ?? null;
+
+  let newUsec: number;
+  const newNsec = options.nsec;
+  if (newNsec !== undefined) {
+    if (options.usec !== undefined) {
+      throw new ArgumentError(
+        `Can't change both :nsec and :usec at the same time: ${Object.entries(options)
+          .map(([key, value]) => `${key}: ${String(value)}`)
+          .join(", ")}`,
+      );
+    }
+    newUsec = newNsec / 1000;
+  } else {
+    newUsec =
+      options.usec ??
+      (options.hour !== undefined || options.min !== undefined || options.sec !== undefined
+        ? 0
+        : nsec / 1000);
+  }
+
+  if (newUsec >= 1000000) throw new ArgumentError("argument out of range");
 
   newSec += newUsec / 1_000_000;
+
+  const secFloor = Math.floor(newSec);
+  const newNsecOfSec = Math.round((newSec - secFloor) * 1_000_000_000);
+  const newComponents = {
+    year: newYear,
+    month: newMonth,
+    day: newDay,
+    hour: newHour,
+    minute: newMin,
+    second: secFloor,
+    millisecond: Math.floor(newNsecOfSec / 1_000_000),
+    microsecond: Math.floor(newNsecOfSec / 1_000) % 1_000,
+    nanosecond: newNsecOfSec % 1_000,
+  };
+
+  if (newOffset !== null) {
+    // `if new_offset` (time/calculations.rb:145-146). Ruby's `::Time.new` takes
+    // the offset as a `"+HH:MM"` String or a seconds Integer; Temporal spells
+    // the same fixed-offset zone with the String form only.
+    const absOffset = typeof newOffset === "number" ? Math.abs(newOffset) : 0;
+    const timeZone =
+      typeof newOffset === "number"
+        ? `${newOffset < 0 ? "-" : "+"}${String(Math.floor(absOffset / 3600)).padStart(2, "0")}:${String(Math.floor((absOffset % 3600) / 60)).padStart(2, "0")}`
+        : newOffset;
+    const newTime = Temporal.ZonedDateTime.from({ timeZone, ...newComponents });
+    return date instanceof Date ? newTime.toInstant() : newTime;
+  }
+
+  if (self.timeZoneId === "UTC") {
+    // `elsif utc?` (time/calculations.rb:147-148).
+    const newTime = Temporal.ZonedDateTime.from({ timeZone: "UTC", ...newComponents });
+    return date instanceof Date ? newTime.toInstant() : newTime;
+  }
 
   if (date instanceof Date) {
     // `elsif zone` (time/calculations.rb:173-174): a JS `Date` carries no zone
@@ -422,21 +476,8 @@ export function change(
   }
 
   // `elsif zone.respond_to?(:utc_to_local)` (time/calculations.rb:150-172).
-  const secFloor = Math.floor(newSec);
-  const newNsec = Math.round((newSec - secFloor) * 1_000_000_000);
   let newTime = Temporal.ZonedDateTime.from(
-    {
-      timeZone: date.timeZoneId,
-      year: newYear,
-      month: newMonth,
-      day: newDay,
-      hour: newHour,
-      minute: newMin,
-      second: secFloor,
-      millisecond: Math.floor(newNsec / 1_000_000),
-      microsecond: Math.floor(newNsec / 1_000) % 1_000,
-      nanosecond: newNsec % 1_000,
-    },
+    { timeZone: date.timeZoneId, ...newComponents },
     // Ruby's `Time.new` with a zone object picks the first chronological
     // occurrence of an ambiguous nominal time; `"compatible"` is the same choice.
     { disambiguation: "compatible" },

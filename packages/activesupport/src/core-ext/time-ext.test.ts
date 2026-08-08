@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
-import type { Temporal } from "@blazetrails/date";
+import { Temporal } from "@blazetrails/date";
+import { ArgumentError } from "../hash-utils.js";
 import {
   nextDay,
   prevDay,
@@ -39,6 +40,29 @@ function d(year: number, month: number, day: number, hour = 0, min = 0, sec = 0,
 
 function utc(year: number, month = 1, day = 1, hour = 0, min = 0, sec = 0, ms = 0): Date {
   return new Date(Date.UTC(year, month - 1, day, hour, min, sec, ms));
+}
+
+function zoned(
+  timeZone: string,
+  year: number,
+  month: number,
+  day: number,
+  hour = 0,
+  minute = 0,
+  second = 0,
+  microsecond = 0,
+): Temporal.ZonedDateTime {
+  return Temporal.ZonedDateTime.from({
+    timeZone,
+    year,
+    month,
+    day,
+    hour,
+    minute,
+    second,
+    millisecond: Math.floor(microsecond / 1000),
+    microsecond: microsecond % 1000,
+  });
 }
 
 function withEnvTz<T>(tz: string, fn: () => T): T {
@@ -262,28 +286,56 @@ describe("TimeExtCalculationsTest", () => {
     expect(asDate(change(d(2005, 2, 22, 15, 15, 10), { min: 45 }))).toEqual(
       d(2005, 2, 22, 15, 45, 0),
     );
+
+    expect(() => change(d(2005, 1, 2, 11, 22, 33, 8), { usec: 1, nsec: 1 })).toThrow(ArgumentError);
+    expect(() => change(zoned("+03:00", 2015, 5, 9, 10, 0, 0), { nsec: 999999999 })).not.toThrow();
   });
 
   it("utc change", () => {
     const t1 = utc(2005, 2, 22, 15, 15, 10);
     const result = asDate(change(t1, { year: 2006 }));
     expect(result.getFullYear()).toBe(2006);
+
+    const t2 = zoned("UTC", 2005, 1, 2, 11, 22, 33, 2);
+    const changed = change(t2, { nsec: 8000 });
+    expect(changed.timeZoneId).toBe("UTC");
+    expect(changed.millisecond * 1000 + changed.microsecond).toBe(8);
   });
 
   it("offset change", () => {
-    const t = d(2005, 2, 22, 15, 15, 10);
-    const result = asDate(change(t, { year: 2006 }));
-    expect(result.getFullYear()).toBe(2006);
-    expect(result.getHours()).toBe(15);
-    expect(result.getMinutes()).toBe(15);
-    expect(result.getSeconds()).toBe(10);
+    const t = zoned("-08:00", 2005, 2, 22, 15, 15, 10);
+    expect(change(t, { year: 2006 }).equals(zoned("-08:00", 2006, 2, 22, 15, 15, 10))).toBe(true);
+    expect(change(t, { month: 6 }).equals(zoned("-08:00", 2005, 6, 22, 15, 15, 10))).toBe(true);
+    expect(change(t, { hour: 16 }).equals(zoned("-08:00", 2005, 2, 22, 16, 0, 0))).toBe(true);
+    expect(change(t, { hour: 16, min: 45 }).equals(zoned("-08:00", 2005, 2, 22, 16, 45, 0))).toBe(
+      true,
+    );
+
+    const t2 = zoned("-08:00", 2005, 2, 22, 15, 15, 0);
+    const withUsec = change(t2, { usec: 10 });
+    expect(withUsec.millisecond * 1000 + withUsec.microsecond).toBe(10);
+    expect(change(t2, { nsec: 10 }).nanosecond).toBe(10);
+    expect(() => change(t2, { usec: 1000000 })).toThrow(ArgumentError);
+    expect(() => change(t2, { nsec: 1000000000 })).toThrow(ArgumentError);
   });
 
   it("change offset", () => {
-    const t = d(2006, 2, 22, 15, 15, 10);
-    const result = asDate(change(t, { year: 2006 }));
-    expect(result.getFullYear()).toBe(2006);
-    expect(result.getHours()).toBe(15);
+    expect(
+      change(zoned("+01:00", 2006, 2, 22, 15, 15, 10), { offset: "-08:00" }).equals(
+        zoned("-08:00", 2006, 2, 22, 15, 15, 10),
+      ),
+    ).toBe(true);
+    expect(
+      change(zoned("+01:00", 2006, 2, 22, 15, 15, 10), { offset: -28800 }).equals(
+        zoned("-08:00", 2006, 2, 22, 15, 15, 10),
+      ),
+    ).toBe(true);
+    expect(() =>
+      change(zoned("+01:00", 2005, 2, 22, 15, 15, 45), { usec: 1000000, offset: "-08:00" }),
+    ).toThrow(ArgumentError);
+    expect(() =>
+      change(zoned("+01:00", 2005, 2, 22, 15, 15, 45), { nsec: 1000000000, offset: -28800 }),
+    ).toThrow(ArgumentError);
   });
 
   it.skip("change preserves offset for local times around end of dst");
