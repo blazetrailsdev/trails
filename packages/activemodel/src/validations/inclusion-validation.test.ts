@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { makeRange } from "@blazetrails/activesupport";
+import { Range } from "@blazetrails/activesupport";
 import { Model } from "../index.js";
 import { InclusionValidator } from "./inclusion.js";
 
@@ -51,7 +51,7 @@ describe("InclusionValidationTest", () => {
     class Topic extends Model {
       static {
         this.attribute("price", "integer");
-        this.validates("price", { inclusion: { in: makeRange(null, 1000) } });
+        this.validates("price", { inclusion: { in: new Range(null, 1000) } });
       }
     }
     expect(await new Topic({ price: -100 }).isValid()).toBe(true);
@@ -65,7 +65,7 @@ describe("InclusionValidationTest", () => {
     class Topic extends Model {
       static {
         this.attribute("price", "integer");
-        this.validates("price", { inclusion: { in: makeRange(0, null) } });
+        this.validates("price", { inclusion: { in: new Range(0, null) } });
       }
     }
     expect(await new Topic({ price: -1 }).isValid()).toBe(false);
@@ -128,7 +128,7 @@ describe("InclusionValidationTest", () => {
     class Topic extends Model {
       static {
         this.attribute("title", "string");
-        this.validates("title", { inclusion: { in: makeRange("aaa", "bbb") } });
+        this.validates("title", { inclusion: { in: new Range("aaa", "bbb") } });
       }
     }
     expect(await new Topic({ title: "bbc" }).isValid()).toBe(false);

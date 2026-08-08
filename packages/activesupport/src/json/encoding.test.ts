@@ -7,7 +7,7 @@ import { TimeZone } from "../values/time-zone.js";
 import { Encoding } from "./encoding.js";
 import { asJson } from "../core-ext/object/json.js";
 import { BigDecimal } from "../core-ext/big-decimal/conversions.js";
-import { makeRange } from "../range-ext.js";
+import { Range } from "../range-ext.js";
 
 /** Rails' `JSONTest::Hashlike` (encoding_test_cases.rb:16-20). */
 class Hashlike {
@@ -81,9 +81,9 @@ describe("TestJSONEncoding", () => {
 
   it("range", () => {
     // Rails' RangeTests (encoding_test_cases.rb:86-88).
-    expect(ActiveSupportJSON.encode(makeRange(1, 2))).toBe('"1..2"');
-    expect(ActiveSupportJSON.encode(makeRange(1, 2, true))).toBe('"1...2"');
-    expect(ActiveSupportJSON.encode(makeRange(1.5, 2.5))).toBe('"1.5..2.5"');
+    expect(ActiveSupportJSON.encode(new Range(1, 2))).toBe('"1..2"');
+    expect(ActiveSupportJSON.encode(new Range(1, 2, true))).toBe('"1...2"');
+    expect(ActiveSupportJSON.encode(new Range(1.5, 2.5))).toBe('"1.5..2.5"');
   });
 
   it("uri", () => {

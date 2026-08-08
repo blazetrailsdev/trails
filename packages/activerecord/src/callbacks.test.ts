@@ -8,7 +8,7 @@
  * id 1).
  */
 import { describe, it, expect } from "vitest";
-import { makeRange, throwAbort } from "@blazetrails/activesupport";
+import { Range, throwAbort } from "@blazetrails/activesupport";
 import { Base, RecordNotSaved, RecordNotDestroyed, RecordInvalid } from "./index.js";
 import { fixtures } from "./test-fixtures.js";
 import { ContextualCallbacksDeveloper } from "./test-helpers/models/contextual-callbacks-developer.js";
@@ -106,7 +106,7 @@ class ImmutableDeveloper extends Base {
     this.tableName = "developers";
     this.attribute("name", "string");
     this.attribute("salary", "integer");
-    this.validates("salary", { inclusion: { in: makeRange(50000, 200000) } });
+    this.validates("salary", { inclusion: { in: new Range(50000, 200000) } });
     this.beforeSave((record: ImmutableDeveloper) => record.cancel());
     this.beforeDestroy((record: ImmutableDeveloper) => record.cancel());
   }
@@ -123,7 +123,7 @@ class DeveloperWithCanceledCallbacks extends Base {
     this.tableName = "developers";
     this.attribute("name", "string");
     this.attribute("salary", "integer");
-    this.validates("salary", { inclusion: { in: makeRange(50000, 200000) } });
+    this.validates("salary", { inclusion: { in: new Range(50000, 200000) } });
     this.beforeSave((record: DeveloperWithCanceledCallbacks) => record.cancel());
     this.beforeDestroy((record: DeveloperWithCanceledCallbacks) => record.cancel());
   }

@@ -2,9 +2,8 @@ import { Temporal } from "@blazetrails/date";
 
 import { ActiveSupportJSON } from "../../json.js";
 import { Encoding, type EncodeOptions } from "../../json/encoding.js";
-import { isRange, type Range as RangeValue } from "../../range-ext.js";
+import { Range as RangeValue } from "../../range-ext.js";
 import { BigDecimal as BigDecimalValue } from "../big-decimal/conversions.js";
-import { toS } from "../range/conversions.js";
 import * as instanceVariables from "./instance-variables.js";
 
 /**
@@ -151,14 +150,11 @@ export class Enumerable {
 }
 
 /**
- * `Range#as_json` (json.rb:157-161), over trails' begin/end/exclusive triple
- * (`range-ext.ts`). `to_s` is the ported `Range#to_s` in
- * `core-ext/range/conversions.ts`. The dispatcher reaches this arm ahead of
- * `Hash`, which a range would otherwise take as a plain object.
+ * `Range#as_json` (json.rb:157-161).
  */
 export class Range {
   static asJson(value: RangeValue<unknown>): string {
-    return toS(value);
+    return value.toS();
   }
 }
 
@@ -303,12 +299,10 @@ function pad2(value: number): string {
 /**
  * @noRailsEquivalent PERMANENT — a Hash-shaped object: a bare object literal
  * (`Object.prototype` or null prototype), not a class instance like `Date` that
- * defines its own JSON form. Stands in for Ruby's `Hash === value`, so a Range
- * — a plain object here, but not a Hash in Ruby — misses it, both in the
+ * defines its own JSON form. Stands in for Ruby's `Hash === value`, both in the
  * dispatcher below and in `JSONGemEncoder#jsonify`.
  */
 export function isPlainObject(value: object): boolean {
-  if (isRange(value)) return false;
   const proto = globalThis.Object.getPrototypeOf(value);
   return proto === globalThis.Object.prototype || proto === null;
 }
@@ -344,7 +338,7 @@ export function asJson(value: unknown, options?: EncodeOptions | null): unknown 
   if (value instanceof Error) return Exception.asJson(value);
   if (value instanceof URL) return Generic.asJson(value);
   if (globalThis.Array.isArray(value)) return Array.asJson(value, options);
-  if (isRange(value)) return Range.asJson(value);
+  if (value instanceof RangeValue) return Range.asJson(value);
   if (value instanceof Map || isPlainObject(value as object)) return Hash.asJson(value, options);
   if (
     typeof (value as { [globalThis.Symbol.iterator]?: unknown })[globalThis.Symbol.iterator] ===

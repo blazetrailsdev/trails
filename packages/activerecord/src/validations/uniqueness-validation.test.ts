@@ -10,7 +10,7 @@
  */
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { makeRange } from "@blazetrails/activesupport";
+import { Range } from "@blazetrails/activesupport";
 import { Base } from "../index.js";
 import { registerModel } from "../associations.js";
 import { registerSubclass } from "../inheritance.js";
@@ -1006,7 +1006,7 @@ class BigIntTest extends Base {
   static {
     this.validates("engines_count", {
       uniqueness: true,
-      inclusion: { in: makeRange(0, INT_MAX_VALUE) },
+      inclusion: { in: new Range(0, INT_MAX_VALUE) },
     });
   }
 }
@@ -1015,7 +1015,7 @@ class BigIntTest extends Base {
 class BigIntReverseTest extends Base {
   static _tableName = "cars";
   static {
-    this.validates("engines_count", { inclusion: { in: makeRange(0, INT_MAX_VALUE) } });
+    this.validates("engines_count", { inclusion: { in: new Range(0, INT_MAX_VALUE) } });
     this.validates("engines_count", { uniqueness: true });
   }
 }

@@ -1,42 +1,28 @@
-import { type Range, rangeIncludesValue } from "../../range-ext.js";
+import { prepend } from "../../prepend.js";
+import { Range } from "../../range-ext.js";
 
 /**
  * `ActiveSupport::CompareWithRange`
  * (core_ext/range/compare_range.rb:2), which Ruby `prepend`s onto `Range`.
- *
- * JS has no `Range` class to reopen — trails carries the begin/end/exclusive
- * triple as data (`range-ext.ts`) — so the two prepended methods take the
- * receiver as their first parameter and `super` is `rangeIncludesValue`, the
- * native endpoint comparison. Ruby's native `Range#include?` iterates for
- * non-numeric endpoints; that arm is `rangeIncludesStringValue` (range-ext.ts)
- * and is outside these signatures, which take the numeric/`Date` endpoints the
- * range-vs-range comparison is defined over.
+ * `prepend()` is the trails idiom for `Module#prepend`, so `super` arrives as
+ * the wrapper's first argument.
  *
  * @boundary-file: endpoints are compared as `number` (JS `Date` coerced to
- *   epoch millis), exactly as `range-ext.ts`'s sibling comparators do — Ruby
- *   compares any `<=>`-able endpoint.
+ *   epoch millis), exactly as `range-ext.ts`'s comparators do — Ruby compares
+ *   any `<=>`-able endpoint.
  */
-
-/**
- * Ruby's `Range#max` on the `value.max` branch below (compare_range.rb:23,49).
- * Ruby raises `TypeError` for a non-Integer excluded end; mirror that rather
- * than silently comparing against a fractional endpoint.
- */
-function rangeMax<T extends number | Date>(range: Range<T>): T {
-  const end = range.end as T;
-  if (!range.excludeEnd) return end;
-  if (typeof end === "number") {
-    // Ruby's own `Range#max` message; activesupport has no ported TypeError.
-    // eslint-disable-next-line blazetrails/rails-error-parity
-    if (!Number.isInteger(end)) throw new TypeError("cannot exclude non Integer end value");
-    return (end - 1) as T;
-  }
-  // boundary: Date endpoints, as in range-ext.ts
-  return new Date(end.getTime() - 1) as T;
-}
 
 // boundary: Date endpoints, as in range-ext.ts
-const toNum = <T extends number | Date>(v: T): number => (v instanceof Date ? v.getTime() : v);
+const toNum = <T>(v: T): number => (v instanceof Date ? v.getTime() : (v as number));
+
+declare module "../../range-ext.js" {
+  interface Range<T> {
+    caseEquals(value: Range<T> | T): boolean;
+    isInclude(value: Range<T> | T): boolean;
+  }
+}
+
+type Super = (...args: unknown[]) => unknown;
 
 /**
  * Extends the default `Range#===` to support range comparisons.
@@ -50,13 +36,9 @@ const toNum = <T extends number | Date>(v: T): number => (v instanceof Date ? v.
  *  (5..9) === (11) # => false
  *
  * The given range must be fully bounded, with both start and end.
- *
- * @missingRailsCall last — Ruby reads the endpoint with `Range#last`
- * (compare_range.rb:24,50); trails' `Range` is the begin/end/exclusive triple
- * (range-ext.ts), whose endpoint field IS `end`, so there is no `last` to call.
  */
-export function caseEquals<T extends number | Date>(range: Range<T>, value: Range<T> | T): boolean {
-  if (isRange(value)) {
+export function caseEquals<T>(this: Range<T>, super_: Super, value: Range<T> | T): boolean {
+  if (value instanceof Range) {
     const isBackwardsOp = value.excludeEnd
       ? (a: number, b: number): boolean => a >= b
       : (a: number, b: number): boolean => a > b;
@@ -70,16 +52,16 @@ export function caseEquals<T extends number | Date>(range: Range<T>, value: Rang
     // 1...10 includes 1..9 but it does not include 1..10.
     // 1..10 includes 1...11 but it does not include 1...12.
     const operator =
-      range.excludeEnd && !value.excludeEnd
+      this.excludeEnd && !value.excludeEnd
         ? (a: number, b: number): boolean => a < b
         : (a: number, b: number): boolean => a <= b;
-    const valueMax = !range.excludeEnd && value.excludeEnd ? rangeMax(value) : value.end;
+    const valueMax = !this.excludeEnd && value.excludeEnd ? value.max() : value.last();
     return (
-      rangeIncludesValue(range, value.begin as T) &&
-      (range.end === null || operator(toNum(valueMax as T), toNum(range.end)))
+      (super_.call(this, value.first()) as boolean) &&
+      (this.end === null || operator(toNum(valueMax as T), toNum(this.last() as T)))
     );
   } else {
-    return rangeIncludesValue(range, value);
+    return super_.call(this, value) as boolean;
   }
 }
 
@@ -95,13 +77,9 @@ export function caseEquals<T extends number | Date>(range: Range<T>, value: Rang
  *  (5..9).include?(11) # => false
  *
  * The given range must be fully bounded, with both start and end.
- *
- * @missingRailsCall last — Ruby reads the endpoint with `Range#last`
- * (compare_range.rb:24,50); trails' `Range` is the begin/end/exclusive triple
- * (range-ext.ts), whose endpoint field IS `end`, so there is no `last` to call.
  */
-export function isInclude<T extends number | Date>(range: Range<T>, value: Range<T> | T): boolean {
-  if (isRange(value)) {
+export function isInclude<T>(this: Range<T>, super_: Super, value: Range<T> | T): boolean {
+  if (value instanceof Range) {
     const isBackwardsOp = value.excludeEnd
       ? (a: number, b: number): boolean => a >= b
       : (a: number, b: number): boolean => a > b;
@@ -115,24 +93,17 @@ export function isInclude<T extends number | Date>(range: Range<T>, value: Range
     // 1...10 includes 1..9 but it does not include 1..10.
     // 1..10 includes 1...11 but it does not include 1...12.
     const operator =
-      range.excludeEnd && !value.excludeEnd
+      this.excludeEnd && !value.excludeEnd
         ? (a: number, b: number): boolean => a < b
         : (a: number, b: number): boolean => a <= b;
-    const valueMax = !range.excludeEnd && value.excludeEnd ? rangeMax(value) : value.end;
+    const valueMax = !this.excludeEnd && value.excludeEnd ? value.max() : value.last();
     return (
-      rangeIncludesValue(range, value.begin as T) &&
-      (range.end === null || operator(toNum(valueMax as T), toNum(range.end)))
+      (super_.call(this, value.first()) as boolean) &&
+      (this.end === null || operator(toNum(valueMax as T), toNum(this.last() as T)))
     );
   } else {
-    return rangeIncludesValue(range, value);
+    return super_.call(this, value) as boolean;
   }
 }
 
-/**
- * Ruby's `value.is_a?(::Range)` (compare_range.rb:16,42). trails' `Range` is a
- * plain object, so the type test is structural.
- */
-function isRange<T extends number | Date>(value: Range<T> | T): value is Range<T> {
-  // boundary: Date endpoints, as in range-ext.ts
-  return typeof value === "object" && value !== null && !(value instanceof Date);
-}
+prepend(Range.prototype, { caseEquals, isInclude });

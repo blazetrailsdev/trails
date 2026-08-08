@@ -17,11 +17,7 @@
  */
 import { resolveValue } from "./resolve-value.js";
 import { ArgumentError, NoMethodError } from "../attribute-assignment.js";
-import {
-  rangeIncludesValue,
-  rangeIncludesStringValue,
-  type RangeExt as Range,
-} from "@blazetrails/activesupport";
+import { Range } from "@blazetrails/activesupport";
 
 export { resolveValue };
 
@@ -89,7 +85,7 @@ export function checkValidityBang(this: ClusivityHost): void {
       typeof (d as Record<symbol, unknown>)[Symbol.iterator] === "function");
   const isCallable = typeof d === "function";
   // ActiveSupport Range responds to #cover? / #include? — accept it like Rails.
-  if (!isString && !hasIncludeMethod && !isIterable && !isCallable && !isRange(d)) {
+  if (!isString && !hasIncludeMethod && !isIterable && !isCallable && !(d instanceof Range)) {
     throw new ArgumentError(ERROR_MESSAGE);
   }
 }
@@ -174,17 +170,16 @@ export function delimiter(this: ClusivityHost): unknown {
  *     end
  *   end
  *
- * ActiveSupport's `Range` (range-ext.ts) is the first-class Range type
- * here: a numeric/date range dispatches to `cover?` (endpoint check),
- * everything else to `include?`.
+ * A numeric/date range dispatches to `cover?` (endpoint check), everything
+ * else to `include?`.
  *
  * @internal
  */
 export function inclusionMethod(enumerable: unknown): "include?" | "cover?" {
-  if (isRange(enumerable)) {
+  if (enumerable instanceof Range) {
     const endpoint = enumerable.begin ?? enumerable.end;
-    // boundary: range-ext's comparators (rangeIncludesValue) accept JS Date
-    // alongside number, coercing to epoch for ordering — mirror that here.
+    // boundary: range-ext's comparators accept JS Date alongside number,
+    // coercing to epoch for ordering — mirror that here.
     // Per clusivity.rb:40-50 only Numeric/Time/Date endpoints select cover?;
     // a String range falls through to include?, whose membership is the
     // succ-order enumeration check (not a lexicographic cover) Ruby applies
@@ -194,29 +189,13 @@ export function inclusionMethod(enumerable: unknown): "include?" | "cover?" {
   return "include?";
 }
 
-function isRange(members: unknown): members is Range<number | Date | string> {
-  return (
-    typeof members === "object" &&
-    members !== null &&
-    "begin" in members &&
-    "end" in members &&
-    "excludeEnd" in members
-  );
-}
-
 function testMembership(members: unknown, value: unknown, method: "include?" | "cover?"): boolean {
-  if (isRange(members)) {
-    const endpoint = members.begin ?? members.end;
-    // A string-endpoint Range arrives via inclusionMethod's include? branch.
+  if (members instanceof Range) {
     // Ruby's `Range#include?` on strings is succ-order membership, not the
-    // lexicographic `cover?` the numeric/date branch uses.
-    if (typeof endpoint === "string") {
-      return typeof value === "string" && rangeIncludesStringValue(members as Range<string>, value);
-    }
-    if (method === "cover?") {
-      // Range#cover? semantics — endpoint check against the range bounds.
-      return rangeIncludesValue(members as Range<number | Date>, value as number | Date);
-    }
+    // lexicographic `cover?` the numeric/date branch uses; `Range#include?`
+    // carries that split itself.
+    if (method === "cover?") return members.cover(value);
+    return members.isInclude(value);
   }
   return isMemberOf(members, value);
 }
