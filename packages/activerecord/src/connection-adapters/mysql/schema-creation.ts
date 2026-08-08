@@ -29,9 +29,6 @@ import {
   limitToSize,
 } from "./schema-statements.js";
 
-/** MySQL-specific column options — extends the abstract ColumnOptions with `onUpdate`. */
-export type MysqlAddColumnOptions = ColumnOptions & { onUpdate?: string };
-
 interface MysqlColumnOptions extends Record<string, unknown> {
   column?: { sqlType?: string; type?: string; null?: boolean };
   charset?: string;
@@ -44,7 +41,6 @@ interface MysqlColumnOptions extends Record<string, unknown> {
   null?: boolean;
   default?: unknown;
   comment?: string;
-  onUpdate?: string;
 }
 
 type MysqlTableDef = TableDefinition & { charset?: string; collation?: string };
@@ -323,15 +319,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
       sql += ` AS (${mo.as})`;
       if (mo.stored) sql += this.isMariadb() ? " PERSISTENT" : " STORED";
     }
-    // Call super without primaryKey so ON UPDATE can be inserted before PRIMARY KEY,
-    // matching the original abstract ordering: DEFAULT → NOT NULL → AUTO_INCREMENT → ON UPDATE → PRIMARY KEY.
-    const optionsWithoutPk: ColumnOptions = mo.primaryKey
-      ? { ...options, primaryKey: false }
-      : options;
-    let withBase = await super.addColumnOptions(sql, optionsWithoutPk);
-    if (mo.onUpdate) withBase += ` ON UPDATE ${mo.onUpdate}`;
-    if (mo.primaryKey) withBase += " PRIMARY KEY";
-    return this.addSqlCommentBang(withBase, mo.comment);
+    return this.addSqlCommentBang(await super.addColumnOptions(sql, options), mo.comment);
   }
 
   /** @internal */

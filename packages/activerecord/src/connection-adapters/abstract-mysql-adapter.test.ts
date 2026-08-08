@@ -9,6 +9,7 @@ import { parseTableOptions } from "./abstract-mysql-adapter.js";
 import { SchemaCreation as MysqlSchemaCreation } from "./mysql/schema-creation.js";
 import { quote as mysqlQuote } from "./mysql/quoting.js";
 import { NullPool } from "./abstract/connection-pool.js";
+import { Result } from "../result.js";
 
 function makeColumn(opts: { autoIncrement?: boolean; defaultFunction?: string | null } = {}) {
   return new Column("id", null, { sqlType: "bigint" }, false, {
@@ -74,213 +75,65 @@ describe("AbstractMysqlAdapter#_columnMethodNames", () => {
 });
 
 describe("AbstractMysqlAdapter#renameColumnForAlter fallback", () => {
-  async function makeAdapter(columnName: string, extra: string, supportsRename = false) {
+  // Mirrors abstract_mysql_adapter.rb:863-878: when supports_rename_column? is false the
+  // arm rebuilds a CHANGE clause from column_for plus the live `SHOW COLUMNS ... LIKE` Type.
+  async function makeAdapter(field: Record<string, unknown>) {
     const { AbstractMysqlAdapter } = await import("./abstract-mysql-adapter.js");
     const adapter = Object.create(AbstractMysqlAdapter.prototype);
-    adapter.supportsRenameColumn = () => supportsRename;
+    const queries: [string, string | null | undefined][] = [];
+    adapter.supportsRenameColumn = () => false;
     adapter.pool = new NullPool();
     adapter.getDatabaseVersion = async () => {};
     adapter.quoteColumnName = (s: string) => `\`${s}\``;
-    adapter.columnDefinitions = async (_: string) => [
+    adapter.quoteTableName = (s: string) => `\`${s}\``;
+    adapter.quote = (v: unknown) => mysqlQuote.call(adapter, v);
+    adapter.columnDefinitions = async () => [
       {
-        Field: columnName,
+        Field: "col",
         Type: "int(11)",
-        Null: "NO",
+        Null: "YES",
         Default: null,
-        Extra: extra,
-        Collation: null,
+        Extra: "",
         Comment: "",
+        ...field,
       },
     ];
-    return adapter;
+    adapter.internalExecQuery = async (sql: string, name?: string | null) => {
+      queries.push([sql, name]);
+      return new Result(["Type"], [[(field.Type as string) ?? "int(11)"]]);
+    };
+    return { adapter, queries };
   }
 
-  it("rejects virtual/generated columns: rebuild path cannot preserve AS (<expr>)", async () => {
-    const adapter = await makeAdapter("gen_col", "VIRTUAL GENERATED");
-    adapter.columnDefinitions = async () => [
-      {
-        Field: "gen_col",
-        Type: "int(11)",
-        Null: "YES",
-        Default: null,
-        Extra: "VIRTUAL GENERATED",
-        Collation: null,
-        Comment: "",
-      },
-    ];
-    await expect(adapter.renameColumnForAlter("users", "gen_col", "gen_col2")).rejects.toThrow(
-      /virtual\/generated column/,
-    );
+  it("reads the current type from SHOW COLUMNS ... LIKE under the SCHEMA name", async () => {
+    const { adapter, queries } = await makeAdapter({ Type: "varchar(36)" });
+    const sql: string = await adapter.renameColumnForAlter("users", "col", "col2");
+    expect(queries).toEqual([["SHOW COLUMNS FROM `users` LIKE 'col'", "SCHEMA"]]);
+    expect(sql).toBe("CHANGE `col` `col2` varchar(36) DEFAULT NULL");
   });
 
-  it("allows auto_increment Extra without throwing", async () => {
-    const adapter = await makeAdapter("id", "auto_increment");
-    const sql: string = await adapter.renameColumnForAlter("users", "id", "user_id");
+  it("carries default, null, auto_increment and comment into the CHANGE clause", async () => {
+    const { adapter } = await makeAdapter({
+      Type: "bigint(20)",
+      Null: "NO",
+      Default: "7",
+      Extra: "auto_increment",
+      Comment: "the id",
+    });
+    const sql: string = await adapter.renameColumnForAlter("users", "col", "col2");
+    expect(sql).toContain("CHANGE `col` `col2` bigint(20)");
+    expect(sql).toContain("DEFAULT 7");
+    expect(sql).toContain("NOT NULL");
     expect(sql).toContain("AUTO_INCREMENT");
+    expect(sql).toContain("COMMENT 'the id'");
   });
 
-  it("preserves on update CURRENT_TIMESTAMP for datetime column", async () => {
-    const adapter = await makeAdapter("updated_at", "on update CURRENT_TIMESTAMP");
-    adapter.columnDefinitions = async () => [
-      {
-        Field: "updated_at",
-        Type: "datetime",
-        Null: "NO",
-        Default: "CURRENT_TIMESTAMP",
-        Extra: "on update CURRENT_TIMESTAMP",
-        Collation: null,
-        Comment: "",
-      },
-    ];
-    const sql: string = await adapter.renameColumnForAlter("users", "updated_at", "ts");
-    expect(sql).toContain("ON UPDATE");
-    expect(sql).toContain("CURRENT_TIMESTAMP");
-  });
-
-  it("preserves bare ON UPDATE Extra when Default is null (not folded into defaultFunction)", async () => {
-    // Datetime column with `on update CURRENT_TIMESTAMP` but Default=null — newColumnFromField's
-    // datetime+CURRENT_TIMESTAMP short-circuit doesn't fire (default is null), so on_update
-    // can't be folded into defaultFunction. Must round-trip via column.onUpdate / MysqlAddColumnOptions.
-    const adapter = await makeAdapter("ts", "on update CURRENT_TIMESTAMP");
-    adapter.columnDefinitions = async () => [
-      {
-        Field: "ts",
-        Type: "datetime",
-        Null: "YES",
-        Default: null,
-        Extra: "on update CURRENT_TIMESTAMP",
-        Collation: null,
-        Comment: "",
-      },
-    ];
-    const sql: string = await adapter.renameColumnForAlter("users", "ts", "ts2");
-    expect(sql).toContain("ON UPDATE CURRENT_TIMESTAMP");
-    expect(sql).not.toContain("DEFAULT");
-  });
-
-  it("preserves MySQL 8 compound DEFAULT_GENERATED on update Extra", async () => {
-    const adapter = await makeAdapter("col", "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)");
-    adapter.columnDefinitions = async () => [
-      {
-        Field: "col",
-        Type: "json",
-        Null: "YES",
-        Default: "json_array()",
-        Extra: "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)",
-        Collation: null,
-        Comment: "",
-      },
-    ];
+  it("returns rename_column_sql when the server supports RENAME COLUMN", async () => {
+    const { adapter, queries } = await makeAdapter({});
+    adapter.supportsRenameColumn = () => true;
     const sql: string = await adapter.renameColumnForAlter("users", "col", "col2");
-    expect(sql).toContain("ON UPDATE");
-    expect(sql).toContain("CURRENT_TIMESTAMP(6)");
-  });
-
-  it("emits DEFAULT CURRENT_TIMESTAMP unquoted when default is a timestamp function", async () => {
-    const adapter = await makeAdapter("updated_at", "on update CURRENT_TIMESTAMP");
-    adapter.columnDefinitions = async () => [
-      {
-        Field: "updated_at",
-        Type: "datetime",
-        Null: "YES",
-        Default: "CURRENT_TIMESTAMP",
-        Extra: "on update CURRENT_TIMESTAMP",
-        Collation: null,
-        Comment: "",
-      },
-    ];
-    const sql: string = await adapter.renameColumnForAlter("users", "updated_at", "ts");
-    expect(sql).toContain("DEFAULT CURRENT_TIMESTAMP");
-    expect(sql).not.toContain("DEFAULT 'CURRENT_TIMESTAMP'");
-  });
-
-  it.each([
-    ["NOW()", "(NOW())"],
-    ["CURRENT_DATE", "(CURRENT_DATE)"],
-    ["CURRENT_TIME", "(CURRENT_TIME)"],
-    ["uuid()", "(uuid())"],
-  ])(
-    "wraps DEFAULT_GENERATED default %s in parens (mirrors newColumnFromField)",
-    async (defaultVal, expectedFragment) => {
-      const adapter = await makeAdapter("col", "DEFAULT_GENERATED");
-      adapter.columnDefinitions = async () => [
-        {
-          Field: "col",
-          Type: "varchar(36)",
-          Null: "YES",
-          Default: defaultVal,
-          Extra: "DEFAULT_GENERATED",
-          Collation: null,
-          Comment: "",
-        },
-      ];
-      const sql: string = await adapter.renameColumnForAlter("users", "col", "col2");
-      expect(sql).toContain(`DEFAULT ${expectedFragment}`);
-      expect(sql).not.toContain(`DEFAULT '`);
-    },
-  );
-
-  it("detects non-DEFAULT_GENERATED keyword defaults via SHOW CREATE TABLE and emits unquoted", async () => {
-    // e.g. older MySQL function defaults outside RENAME_FUNC_DEFAULT_RE: defaultType()
-    // parses SHOW CREATE TABLE and returns "function" for any bare keyword default.
-    const adapter = await makeAdapter("col", "");
-    adapter.columnDefinitions = async () => [
-      {
-        Field: "col",
-        Type: "varchar(36)",
-        Null: "YES",
-        Default: "MY_CUSTOM_FUNC",
-        Extra: "",
-        Collation: null,
-        Comment: "",
-      },
-    ];
-    adapter.createTableInfo = async () =>
-      "CREATE TABLE `users` (\n  `col` varchar(36) DEFAULT MY_CUSTOM_FUNC\n)";
-    adapter.quoteTableName = (s: string) => `\`${s}\``;
-    const sql: string = await adapter.renameColumnForAlter("users", "col", "col2");
-    expect(sql).toContain("DEFAULT MY_CUSTOM_FUNC");
-    expect(sql).not.toContain("DEFAULT 'MY_CUSTOM_FUNC'");
-  });
-
-  it("treats non-function keyword default as quoted string when SHOW CREATE TABLE shows quoted literal", async () => {
-    const adapter = await makeAdapter("col", "");
-    adapter.columnDefinitions = async () => [
-      {
-        Field: "col",
-        Type: "varchar(36)",
-        Null: "YES",
-        Default: "hello",
-        Extra: "",
-        Collation: null,
-        Comment: "",
-      },
-    ];
-    adapter.createTableInfo = async () =>
-      "CREATE TABLE `users` (\n  `col` varchar(36) DEFAULT 'hello'\n)";
-    adapter.quoteTableName = (s: string) => `\`${s}\``;
-    const sql: string = await adapter.renameColumnForAlter("users", "col", "col2");
-    expect(sql).toContain("DEFAULT 'hello'");
-  });
-
-  it("wraps arbitrary DEFAULT_GENERATED expression in parens, not as a quoted string", async () => {
-    // e.g. MySQL 8 expression defaults like `json_array()` that aren't in RENAME_FUNC_DEFAULT_RE.
-    // newColumnFromField wraps these in () and sets defaultFunction — we must match.
-    const adapter = await makeAdapter("col", "DEFAULT_GENERATED");
-    adapter.columnDefinitions = async () => [
-      {
-        Field: "col",
-        Type: "json",
-        Null: "YES",
-        Default: "json_array()",
-        Extra: "DEFAULT_GENERATED",
-        Collation: null,
-        Comment: "",
-      },
-    ];
-    const sql: string = await adapter.renameColumnForAlter("users", "col", "col2");
-    expect(sql).toContain("DEFAULT (json_array())");
-    expect(sql).not.toContain("DEFAULT 'json_array()'");
+    expect(sql).toBe("RENAME COLUMN `col` TO `col2`");
+    expect(queries).toEqual([]);
   });
 });
 

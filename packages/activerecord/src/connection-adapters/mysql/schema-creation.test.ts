@@ -1,9 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  SchemaCreation,
-  type MysqlAddColumnOptions,
-  type VisitorHostAdapter,
-} from "./schema-creation.js";
+import { SchemaCreation, type VisitorHostAdapter } from "./schema-creation.js";
 import {
   AddColumnDefinition,
   ChangeColumnDefinition,
@@ -185,18 +181,6 @@ describe("MySQL::SchemaCreation", () => {
     // values get corrupted (e.g. enum('text') -> enum('TEXT')).
     expect(sc.typeToSql("enum('text','blob','tiny')", {})).toBe("enum('text','blob','tiny')");
     expect(sc.typeToSql("set('a','b')", {})).toBe("set('a','b')");
-  });
-
-  it("addColumnOptions emits ON UPDATE when onUpdate is set (MySQL-specific)", async () => {
-    const opts: MysqlAddColumnOptions = { onUpdate: "CURRENT_TIMESTAMP" };
-    const result = await sc.addColumnOptions("`updated_at` datetime", opts);
-    expect(result).toContain("ON UPDATE CURRENT_TIMESTAMP");
-  });
-
-  it("addColumnOptions does not emit ON UPDATE when onUpdate is absent", async () => {
-    const col = new ColumnDefinition("updated_at", "datetime", {});
-    const result = await sc.addColumnOptions("`updated_at` datetime", col.options);
-    expect(result).not.toContain("ON UPDATE");
   });
 });
 

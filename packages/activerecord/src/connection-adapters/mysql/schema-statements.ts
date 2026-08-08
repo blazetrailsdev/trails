@@ -263,13 +263,6 @@ export function newColumnFromField(
       [def, defFn] = [null, def];
   }
 
-  // Capture ON UPDATE <expr> only when it wasn't already folded into defFn. The datetime
-  // CURRENT_TIMESTAMP and DEFAULT_GENERATED branches fold ON UPDATE into the function-default
-  // string; for the remaining cases (e.g. datetime column with no default and a bare
-  // `on update CURRENT_TIMESTAMP` Extra) we preserve it as a first-class column attribute so
-  // renameColumnForAlter's rebuild can pass it through MysqlAddColumnOptions.onUpdate.
-  const onUpdateForColumn =
-    onUpdateMatch && (defFn == null || !/ ON UPDATE /i.test(defFn)) ? onUpdateMatch[1] : null;
   return new Column(fieldName, def, meta, field["Null"] === "YES", {
     defaultFunction: defFn ?? undefined,
     collation: field["Collation"] ?? null,
@@ -280,7 +273,6 @@ export function newColumnFromField(
     autoIncrement: /auto_increment/i.test(field["Extra"] ?? ""),
     virtual: /(virtual|stored|persistent)\s+generated/i.test(field["Extra"] ?? ""),
     extra: extraRaw,
-    onUpdate: onUpdateForColumn,
     comment: presence(field["Comment"] as string | undefined) ?? null,
   });
 }

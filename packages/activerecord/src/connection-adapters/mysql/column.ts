@@ -17,10 +17,6 @@ export class Column extends BaseColumn {
    *  sql_type_metadata); the schema dumper reads it to distinguish stored from
    *  virtual generated columns. */
   readonly extra: string;
-  /** MySQL `ON UPDATE <expr>` extracted from `Extra`. null when not set. Mirrors the
-   *  unparsed `ON UPDATE` portion of the column definition; used by renameColumnForAlter
-   *  to round-trip the attribute when folding into defaultFunction is not possible. */
-  readonly onUpdate: string | null;
 
   constructor(
     name: string,
@@ -42,7 +38,6 @@ export class Column extends BaseColumn {
       autoIncrement?: boolean;
       virtual?: boolean;
       extra?: string;
-      onUpdate?: string | null;
     } = {},
   ) {
     const meta = new SqlTypeMetadata({
@@ -62,7 +57,6 @@ export class Column extends BaseColumn {
     this.autoIncrement = options.autoIncrement ?? false;
     this.virtual = options.virtual ?? false;
     this.extra = options.extra ?? "";
-    this.onUpdate = options.onUpdate ?? null;
   }
 
   isUnsigned(): boolean {
@@ -93,7 +87,6 @@ export class Column extends BaseColumn {
       autoIncrement: this.autoIncrement,
       virtual: this.virtual,
       extra: this.extra,
-      onUpdate: this.onUpdate,
     };
   }
 
@@ -119,7 +112,6 @@ export class Column extends BaseColumn {
         autoIncrement: m.autoIncrement,
         virtual: m.virtual,
         extra: m.extra ?? "",
-        onUpdate: m.onUpdate ?? null,
       },
     );
   }
@@ -131,5 +123,4 @@ export interface MysqlColumnJSON extends ColumnJSON {
   autoIncrement: boolean;
   virtual: boolean;
   extra?: string;
-  onUpdate?: string | null;
 }
