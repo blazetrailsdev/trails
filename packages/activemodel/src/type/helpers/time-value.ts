@@ -168,7 +168,7 @@ export function newTime(
   hour: number | null | undefined,
   min: number | null | undefined,
   sec: number | null | undefined,
-  microsec: number | Rational | null | undefined,
+  microsec: number | bigint | Rational | null | undefined,
   offset?: number | Rational | null,
 ): Temporal.Instant | null {
   if (year == null || (year === 0 && mon === 0 && mday === 0)) return null;
@@ -176,7 +176,11 @@ export function newTime(
   // Treat missing month/day the same way rather than silently coercing to Jan 1.
   if (mon == null || mday == null) return null;
   const totalNano =
-    microsec instanceof Rational ? microsec.mul(1000).toI() : Math.trunc((microsec ?? 0) * 1000);
+    microsec instanceof Rational
+      ? microsec.mul(1000).toI()
+      : typeof microsec === "bigint"
+        ? Number(microsec * 1000n)
+        : Math.trunc((microsec ?? 0) * 1000);
   const components = {
     year,
     month: mon,
