@@ -1,3 +1,5 @@
+import { Range } from "@blazetrails/activesupport";
+
 import { Errors } from "./errors.js";
 import type { ConditionalOptions } from "./validator.js";
 import { VALIDATOR_DEFAULT_KEYS } from "./validator.js";
@@ -415,19 +417,16 @@ export function _validatesDefaultKeys(): string[] {
  * validator constructor expects. Mirrors Rails
  * `_parse_validates_options(options)`
  * (activemodel/lib/active_model/validations/validates.rb:166-177):
- * `true` → `{}`, plain hash → unchanged, Array → `{ in: options }`,
- * anything else → `{ with: options }`. Rails also routes `Range` to
- * `{ in: ... }`; TS has no first-class Range (see the note in
- * `validations/clusivity.ts`), so a Range-like dispatch slots in
- * here when one lands.
+ * `true` → `{}`, plain hash → unchanged, Range or Array → `{ in: options }`,
+ * anything else → `{ with: options }`.
  *
  * @internal Rails-private helper.
  */
 export function _parseValidatesOptions(options: unknown): Record<string, unknown> {
   if (options === true) return {};
-  if (Array.isArray(options)) return { in: options };
   if (options !== null && typeof options === "object" && options.constructor === Object) {
     return options as Record<string, unknown>;
   }
+  if (options instanceof Range || Array.isArray(options)) return { in: options };
   return { with: options };
 }

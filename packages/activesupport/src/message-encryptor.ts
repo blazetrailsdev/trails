@@ -1,4 +1,5 @@
 import { getCrypto } from "./crypto-adapter.js";
+import { MessageVerifier } from "./message-verifier.js";
 import { Codec, type MessageSerializer } from "./messages/codec.js";
 import type { ExpectedMetadataOptions, MetadataOptions } from "./messages/metadata.js";
 import {
@@ -51,10 +52,9 @@ export class MessageEncryptor extends Codec {
   declare fallBackTo: (fallback: this) => this;
 
   private secret: Buffer;
-  private signSecret: Buffer;
   private cipher: string;
-  private digest: string;
   private aeadMode: boolean;
+  private verifier?: MessageVerifier;
   private memoLengthOfEncodedIv?: number;
   private memoLengthOfEncodedAuthTag?: number;
 
@@ -83,17 +83,12 @@ export class MessageEncryptor extends Codec {
       forceLegacyMetadataSerializer: opts.forceLegacyMetadataSerializer,
     });
 
+    this.secret = typeof secret === "string" ? Buffer.from(secret) : secret;
     this.cipher = opts.cipher ?? (this.constructor as typeof MessageEncryptor).defaultCipher();
     this.aeadMode = this.newCipher().authenticated;
-    this.digest = opts.digest ?? "sha1";
-
-    this.secret = typeof secret === "string" ? Buffer.from(secret) : secret;
-
-    if (signSecret) {
-      this.signSecret = typeof signSecret === "string" ? Buffer.from(signSecret) : signSecret;
-    } else {
-      this.signSecret = this.secret;
-    }
+    this.verifier = !this.aeadMode
+      ? new MessageVerifier(signSecret ?? secret, { ...opts, serializer: NullSerializer })
+      : undefined;
 
     initializeRotator(
       this,
@@ -115,33 +110,19 @@ export class MessageEncryptor extends Codec {
   }
 
   createMessage(value: unknown, options: MetadataOptions = {}): string {
-    const encrypted = this.encrypt(this.serializeWithMetadata(value, options));
-    if (this.aeadMode) return encrypted;
-    return `${encrypted}${SEPARATOR}${this.sign(encrypted)}`;
+    return this.sign(this.encrypt(this.serializeWithMetadata(value, options)));
   }
 
   readMessage(message: string, options: ExpectedMetadataOptions = {}): unknown {
-    if (!message || typeof message !== "string") {
-      throw new Thrown("invalid_message_format", "invalid message string");
-    }
+    return this.deserializeWithMetadata(this.decrypt(this.verify(message)), options);
+  }
 
-    let encrypted = message;
+  private sign(data: string): string {
+    return this.verifier ? this.verifier.createMessage(data) : data;
+  }
 
-    if (!this.aeadMode) {
-      const lastDash = message.lastIndexOf(SEPARATOR);
-      if (lastDash === -1) {
-        throw new Thrown("invalid_message_format", "missing message digest");
-      }
-
-      encrypted = message.slice(0, lastDash);
-      const signature = message.slice(lastDash + SEPARATOR.length);
-
-      if (!this.verify(encrypted, signature)) {
-        throw new Thrown("invalid_message_format", "mismatched digest");
-      }
-    }
-
-    return this.deserializeWithMetadata(this.decrypt(encrypted), options);
+  private verify(data: string): string {
+    return this.verifier ? (this.verifier.readMessage(data) as string) : data;
   }
 
   private encrypt(data: string): string {
@@ -176,22 +157,6 @@ export class MessageEncryptor extends Codec {
       return decryptedData.toString("latin1");
     } catch (error) {
       throw new Thrown("invalid_message_format", error);
-    }
-  }
-
-  private sign(data: string): string {
-    return getCrypto().createHmac(this.digest, this.signSecret).update(data).digest("hex");
-  }
-
-  private verify(data: string, signature: string): boolean {
-    try {
-      const expected = this.sign(data);
-      const expectedBuf = Buffer.from(expected, "hex");
-      const sigBuf = Buffer.from(signature, "hex");
-      if (sigBuf.length !== expectedBuf.length) return false;
-      return getCrypto().timingSafeEqual(sigBuf, expectedBuf);
-    } catch {
-      return false;
     }
   }
 

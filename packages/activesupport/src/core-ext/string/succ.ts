@@ -1,8 +1,8 @@
 /**
  * `String#succ` — a Ruby *core* method, not a Rails extension, so it has no
  * `core_ext/string/*.rb` counterpart. It lives with the string core-ext rather
- * than with the range files that consume it (`rangeIncludesStringValue`
- * enumerates a string range by repeatedly applying it).
+ * than with the range files that consume it (`Range#include?` enumerates a
+ * string range by repeatedly applying it).
  *
  * @noRailsEquivalent PERMANENT — Ruby core `String#succ` (string.c
  * `rb_str_succ`), which Rails inherits rather than defines.

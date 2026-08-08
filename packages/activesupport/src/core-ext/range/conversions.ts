@@ -1,16 +1,22 @@
 import { Temporal } from "@blazetrails/date";
 
-import type { Range } from "../../range-ext.js";
+import { Range } from "../../range-ext.js";
 import { toFs as timeToFs } from "../../time-ext.js";
 
 /**
  * `ActiveSupport::RangeWithFormat`
  * (core_ext/range/conversions.rb:5), which Ruby `prepend`s onto `Range`.
  *
- * JS has no `Range` class to reopen — trails carries the begin/end/exclusive
- * triple as data (`range-ext.ts`) — so `to_fs` takes the receiver as its first
- * parameter, exactly as `compare-range.ts` does.
+ * `to_fs` defines no `super` call, so it is mixed onto `Range` with the
+ * settled `this`-typed-function idiom rather than through `prepend()`.
  */
+
+declare module "../../range-ext.js" {
+  interface Range<T> {
+    toFs(format?: string): string | undefined;
+    toFormattedS(format?: string): string | undefined;
+  }
+}
 
 /**
  * Ruby's `start.to_fs(:db)` (conversions.rb:12,18,24). Ruby dispatches on the
@@ -25,20 +31,6 @@ function toFsDb(value: unknown): string {
   // boundary: as above, an Instant is bridged to the Date `toFs` accepts.
   if (value instanceof Temporal.Instant) return timeToFs(new Date(value.epochMilliseconds), "db");
   return String(value);
-}
-
-/**
- * Ruby's `Range#to_s` (the `to_fs` fallback at conversions.rb:55).
- *
- * @noRailsEquivalent PERMANENT — `Range#to_s` is core Ruby, not a Rails
- * reopening, so no Rails file declares it; it is exported from here, the Rails
- * file whose `to_fs` falls back to it, rather than copied into
- * `core-ext/object/json.ts` for `Range#as_json`.
- */
-export function toS<T>(range: Range<T>): string {
-  const begin = range.begin !== null ? String(range.begin) : "";
-  const end = range.end !== null ? String(range.end) : "";
-  return `${begin}${range.excludeEnd ? "..." : ".."}${end}`;
 }
 
 export const RANGE_FORMATS: Record<string, (start: unknown, stop: unknown) => string | undefined> =
@@ -84,13 +76,15 @@ export const RANGE_FORMATS: Record<string, (start: unknown, stop: unknown) => st
  * formatter returns `nil` when its `if`/`elsif` chain falls through
  * (conversions.rb:20-26).
  */
-export function toFs<T>(range: Range<T>, format: string = "default"): string | undefined {
+export function toFs<T>(this: Range<T>, format: string = "default"): string | undefined {
   const formatter = RANGE_FORMATS[format];
   if (formatter) {
-    return formatter(range.begin, range.end);
+    return formatter(this.begin, this.end);
   } else {
-    return toS(range);
+    return this.toS();
   }
 }
 
 export const toFormattedS = toFs;
+
+Object.assign(Range.prototype, { toFs, toFormattedS });

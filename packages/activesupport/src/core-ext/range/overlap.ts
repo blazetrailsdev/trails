@@ -1,10 +1,10 @@
-import { isRange, type Range } from "../../range-ext.js";
+import { Range } from "../../range-ext.js";
 
 /**
  * `Range#overlap?` / `#overlaps?` (core_ext/range/overlap.rb:8,39), which Ruby
- * reopens `Range` to define. JS has no `Range` class to reopen — trails carries
- * the begin/end/exclusive triple as data (`range-ext.ts`) — so the receiver is
- * the first parameter, exactly as `compare-range.ts` does.
+ * reopens `Range` to define. The reopening is the settled `this`-typed-function
+ * mixin, assigned onto `Range.prototype` at the bottom of this file exactly
+ * where Ruby closes `class Range`.
  *
  * @boundary-file: endpoints are compared as `number` (JS `Date` coerced to
  *   epoch millis), as `range-ext.ts`'s sibling comparators do — Ruby compares
@@ -33,19 +33,19 @@ function _isEmptyRange<T extends number | Date>(b: T | null, e: T | null, excl: 
  *  (1..5).overlap?(4..6) # => true
  *  (1..5).overlap?(7..9) # => false
  */
-export function overlap<T extends number | Date>(range: Range<T>, other: Range<T>): boolean {
+export function overlap<T extends number | Date>(this: Range<T>, other: Range<T>): boolean {
   // eslint-disable-next-line blazetrails/rails-error-parity
-  if (!isRange(other)) throw new TypeError();
+  if (!(other instanceof Range)) throw new TypeError();
 
-  const selfBegin = range.begin;
+  const selfBegin = this.begin;
   const otherEnd = other.end;
   const otherExcl = other.excludeEnd;
 
   if (_isEmptyRange(selfBegin, otherEnd, otherExcl)) return false;
 
   const otherBegin = other.begin;
-  const selfEnd = range.end;
-  const selfExcl = range.excludeEnd;
+  const selfEnd = this.end;
+  const selfExcl = this.excludeEnd;
 
   if (_isEmptyRange(otherBegin, selfEnd, selfExcl)) return false;
   if (eq(selfBegin, otherBegin)) return true;
@@ -57,3 +57,12 @@ export function overlap<T extends number | Date>(range: Range<T>, other: Range<T
 }
 
 export const overlaps = overlap;
+
+declare module "../../range-ext.js" {
+  interface Range<T> {
+    overlap(other: Range<T>): boolean;
+    overlaps(other: Range<T>): boolean;
+  }
+}
+
+Object.assign(Range.prototype, { overlap, overlaps });

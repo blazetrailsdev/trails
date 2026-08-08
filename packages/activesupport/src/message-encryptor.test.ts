@@ -64,9 +64,7 @@ describe("MessageEncryptorTest", () => {
     expect(firstMessage).not.toEqual(secondMessage);
   });
 
-  // Needs Rails' wire format — story:
-  // converge-message-encryptor-sign-through-message-verifier.
-  it.skip("messing with either encrypted values causes failure", () => {
+  it("messing with either encrypted values causes failure", () => {
     const [text, iv] = (verifier.verify(encryptor.encryptAndSign(data)) as string).split("--") as [
       string,
       string,
@@ -90,8 +88,9 @@ describe("MessageEncryptorTest", () => {
     expect(encryptor.decryptAndVerify(message)).toEqual(data);
   });
 
-  // Rails' `Base64(payload)--digest` wire format, so this fails at `missing
-  // separator` — story: converge-message-encryptor-sign-through-message-verifier.
+  // Its payload is Marshal-serialized, so it fails at "Unsupported
+  // serialization format" — story:
+  // message-encryptor-marshal-payload-backwards-compatibility.
   it.skip("backwards compat for 64 bytes key", () => {
     // 64 bit key
     const secret = Buffer.from(

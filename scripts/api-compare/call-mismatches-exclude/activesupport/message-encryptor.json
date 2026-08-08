@@ -2,36 +2,8 @@
   {
     "package": "activesupport",
     "tsFile": "message-encryptor.ts",
-    "rubyName": "create_message",
-    "call": "order:encrypt,sign",
-    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "message-encryptor.ts",
     "rubyName": "key_len",
     "call": "new",
     "reason": "Rails' key_len is `OpenSSL::Cipher.new(cipher).key_len`; trails has no OpenSSL::Cipher binding, so keyLen derives the byte length from the cipher name instead of instantiating a cipher."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "message-encryptor.ts",
-    "rubyName": "read_message",
-    "call": "order:verify,deserializeWithMetadata",
-    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "message-encryptor.ts",
-    "rubyName": "sign",
-    "call": "create_message",
-    "reason": "Rails delegates signing to a nested `@verifier` MessageVerifier (`sign` -> `@verifier.create_message`); trails' encryptor HMACs inline, the same pre-existing structural divergence already recorded for `verify`."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "message-encryptor.ts",
-    "rubyName": "verify",
-    "call": "read_message",
-    "reason": "Rails delegates signing to a nested @verifier MessageVerifier (verify -> @verifier.read_message); trails' encryptor HMACs inline, a pre-existing structural divergence tracked separately from the Codec port."
   }
 ]
