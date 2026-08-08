@@ -15,12 +15,6 @@ function tmpDbPath(): string {
   return path.join(os.tmpdir(), `trails-sqlite-test-${process.pid}-${randomUUID()}.sqlite3`);
 }
 
-/** Rails seeds these fixtures with backticked `sqlite3` calls. */
-function runSqlite3(database: string, sql: string): void {
-  const result = activesupport.getChildProcess().spawnSync("sqlite3", [database, sql]);
-  if (result.status !== 0) throw new Error(`sqlite3 failed: ${result.stderr}`);
-}
-
 describe("SQLiteDatabaseTasks", () => {
   const created: string[] = [];
 
