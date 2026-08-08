@@ -225,6 +225,20 @@ describe("SqliteStructureDumpTest", () => {
     expect(contents).not.toMatch(/ignored_foo/);
   });
 
+  // trails-only: Ruby's Regexp#=== is stateless, a JS `g` regex is not.
+  it("ignores every match of a global ignore_tables pattern", async () => {
+    const filename = path.join(os.tmpdir(), `awesome-file-${randomUUID()}.sql`);
+    created.push(filename);
+    runSqlite3(database, "CREATE TABLE prefix_bar(id INTEGER)");
+    SchemaDumper.ignoreTables = [/^prefix_/g];
+
+    await new SQLiteDatabaseTasks(configuration).structureDump(filename);
+
+    const contents = fs.readFileSync(filename, "utf8");
+    expect(contents).not.toMatch(/prefix_bar/);
+    expect(contents).not.toMatch(/prefix_foo/);
+  });
+
   it("test_structure_dump_execution_fails", async () => {
     const filename = path.join(os.tmpdir(), `awesome-file-${randomUUID()}.sql`);
     created.push(filename);
