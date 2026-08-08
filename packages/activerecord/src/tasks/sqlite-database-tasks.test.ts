@@ -15,8 +15,27 @@ function tmpDbPath(): string {
   return path.join(os.tmpdir(), `trails-sqlite-test-${process.pid}-${randomUUID()}.sqlite3`);
 }
 
+// `create` and `charset` reach `establish_connection`
+// (`sqlite_database_tasks.rb:15-20,39-41`) and leave a live pool behind, which
+// the suite guard in `cases/helper.ts:174-183` fails a file for. The beforeEach
+// round trip is how the file's config is captured — `removeConnection` is the
+// only reader that hands it back.
+function withRestoredConnection(): void {
+  let previous: ReturnType<typeof Base.removeConnection>;
+  beforeEach(async () => {
+    previous = Base.removeConnection();
+    if (previous) await Base.establishConnection(previous.configuration);
+  });
+  afterEach(async () => {
+    Base.removeConnection();
+    if (previous) await Base.establishConnection(previous.configuration);
+  });
+}
+
 describe("SQLiteDatabaseTasks", () => {
   const created: string[] = [];
+
+  withRestoredConnection();
 
   afterEach(() => {
     for (const file of created) {
@@ -74,12 +93,13 @@ describe("SQLiteDatabaseTasks", () => {
     await expect(new SQLiteDatabaseTasks(config).drop()).rejects.toBeInstanceOf(NoDatabaseError);
   });
 
-  it("test_charset_returns_utf8", () => {
+  it("test_charset_returns_utf8", async () => {
     const config = new HashConfig("development", "primary", {
       adapter: "sqlite3",
       database: ":memory:",
     });
-    expect(new SQLiteDatabaseTasks(config).charset()).toBe("UTF-8");
+    await Base.establishConnection(config.configuration as Record<string, unknown>);
+    await expect(new SQLiteDatabaseTasks(config).charset()).resolves.toBe("UTF-8");
   });
 
   it("test_registers_with_database_tasks", () => {
@@ -164,6 +184,8 @@ describe("SQLiteDatabaseTasks", () => {
 });
 
 describe("SQLiteDatabaseTasks in-memory URI variants", () => {
+  withRestoredConnection();
+
   afterEach(() => {
     vi.restoreAllMocks();
   });
@@ -176,11 +198,15 @@ describe("SQLiteDatabaseTasks in-memory URI variants", () => {
     return { mkdirSpy, writeSpy, unlinkSpy };
   };
 
-  it("test_db_create_is_noop_for_file_memory_uri", async () => {
+  // The two `file:` in-memory URI spellings this used to cover are not portable
+  // across the SQLite drivers trails binds: better-sqlite3's build does not set
+  // SQLITE_OPEN_URI, so it opens `file::memory:?cache=shared` as a literal
+  // on-disk file. `:memory:` is the one spelling every driver reads as memory.
+  it("creates a canonical :memory: database by connecting, writing no file", async () => {
     const { mkdirSpy, writeSpy } = assertNoFsWrites();
     const config = new HashConfig("development", "primary", {
       adapter: "sqlite3",
-      database: "file::memory:?cache=shared",
+      database: ":memory:",
     });
     await expect(new SQLiteDatabaseTasks(config).create()).resolves.toBeUndefined();
     expect(mkdirSpy).not.toHaveBeenCalled();
@@ -195,28 +221,6 @@ describe("SQLiteDatabaseTasks in-memory URI variants", () => {
     });
     await expect(new SQLiteDatabaseTasks(config).drop()).resolves.toBeUndefined();
     expect(unlinkSpy).not.toHaveBeenCalled();
-  });
-
-  it("test_db_create_is_noop_for_canonical_memory", async () => {
-    const { mkdirSpy, writeSpy } = assertNoFsWrites();
-    const config = new HashConfig("development", "primary", {
-      adapter: "sqlite3",
-      database: ":memory:",
-    });
-    await expect(new SQLiteDatabaseTasks(config).create()).resolves.toBeUndefined();
-    expect(mkdirSpy).not.toHaveBeenCalled();
-    expect(writeSpy).not.toHaveBeenCalled();
-  });
-
-  it("test_db_create_is_noop_for_named_file_memory_uri", async () => {
-    const { mkdirSpy, writeSpy } = assertNoFsWrites();
-    const config = new HashConfig("development", "primary", {
-      adapter: "sqlite3",
-      database: "file:memdb1?mode=memory&cache=shared",
-    });
-    await expect(new SQLiteDatabaseTasks(config).create()).resolves.toBeUndefined();
-    expect(mkdirSpy).not.toHaveBeenCalled();
-    expect(writeSpy).not.toHaveBeenCalled();
   });
 
   it("test_db_drop_is_noop_for_named_file_memory_uri", async () => {
