@@ -47,10 +47,10 @@ export class SQLiteDatabaseTasks {
    * (`database_tasks.rb:119-120`), so the exception carries none of its own.
    *
    * `File.exist?(":memory:")` is false, so an in-memory database simply
-   * connects; Rails has no in-memory lane and so no guard here. The
-   * `establish_connection` below keeps trails' `root` join for a relative
-   * database name, which is what `purge` and the `sqlite3_mem` lane already
-   * depend on.
+   * connects; Rails has no in-memory lane and so no guard here. Both halves
+   * read the same raw `db_config.database`: the guard and the connect have to
+   * mean the same file, which is why the `root` join lives inline in `drop`
+   * (`:23-24`) and nowhere else.
    */
   async create(): Promise<void> {
     const fs = getFs();
@@ -60,12 +60,26 @@ export class SQLiteDatabaseTasks {
     await this.connection();
   }
 
+  /**
+   * `sqlite_database_tasks.rb:22-29`. This is the one place Rails joins
+   * `root`, and it writes the join inline — `File.absolute_path?(db_path)`
+   * short-circuits it for an already-absolute name.
+   *
+   * The in-memory return is trails-only: an in-memory database has no file to
+   * unlink, and Rails has no in-memory lane to need the guard. Per the
+   * PathAdapter contract a missing `isAbsolute` means the adapter does not model
+   * the relative/absolute distinction (e.g. a VFS), which takes the
+   * `File.absolute_path?` arm.
+   */
   async drop(): Promise<void> {
     const fs = getFs();
-    const dbPath = this.resolveDbPath();
+    const path = getPath();
+    const dbPath = this.dbConfig.database as string;
     if (isInMemoryDatabase(dbPath)) return;
+    const file =
+      !path.isAbsolute || path.isAbsolute(dbPath) ? dbPath : path.join(this.root, dbPath);
     try {
-      fs.unlinkSync(dbPath);
+      fs.unlinkSync(file);
     } catch (error: unknown) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") {
         throw new NoDatabaseError((error as Error).message);
@@ -74,7 +88,7 @@ export class SQLiteDatabaseTasks {
     }
     for (const suffix of ["-shm", "-wal"]) {
       try {
-        fs.unlinkSync(dbPath + suffix);
+        fs.unlinkSync(file + suffix);
       } catch {
         // ignore
       }
@@ -129,7 +143,8 @@ export class SQLiteDatabaseTasks {
     // Rails has no in-memory lane, so `sqlite3 :memory: .schema` is a database
     // the CLI just created and immediately discards. See
     // `inMemoryStructureDump`.
-    if (isInMemoryDatabase(this.resolveDbPath())) return this.inMemoryStructureDump(filename);
+    if (isInMemoryDatabase(this.dbConfig.database as string))
+      return this.inMemoryStructureDump(filename);
 
     const args: string[] = [];
     if (extraFlags != null) args.push(...(Array.isArray(extraFlags) ? extraFlags : [extraFlags]));
@@ -160,7 +175,8 @@ export class SQLiteDatabaseTasks {
   }
 
   async structureLoad(filename: string, extraFlags?: string | string[] | null): Promise<void> {
-    if (isInMemoryDatabase(this.resolveDbPath())) return this.inMemoryStructureLoad(filename);
+    if (isInMemoryDatabase(this.dbConfig.database as string))
+      return this.inMemoryStructureLoad(filename);
 
     const flags = extraFlags != null ? (Array.isArray(extraFlags) ? extraFlags : [extraFlags]) : [];
     // Rails' backtick form redirects the dump file into sqlite3's stdin
@@ -289,30 +305,19 @@ export class SQLiteDatabaseTasks {
     }
   }
 
-  private resolveDbPath(): string {
-    const path = getPath();
-    const database = this.dbConfig.database ?? ":memory:";
-    // Per PathAdapter contract, a missing isAbsolute means the adapter
-    // doesn't model relative/absolute distinctions (e.g. a VFS) — treat
-    // every path as already absolute.
-    if (isInMemoryDatabase(database)) return database;
-    if (!path.isAbsolute || path.isAbsolute(database)) return database;
-    return path.join(this.root, database);
-  }
-
   private async connection(): Promise<DatabaseAdapter> {
     return Base.connectionPool().leaseConnection();
   }
 
-  /** @internal */
-  private async establishConnection(config?: DatabaseConfig): Promise<void> {
-    // Always go through resolveDbPath so relative paths are joined against
-    // DatabaseTasks.root and missing database values default to ':memory:'.
-    const tasks = config != null ? new SQLiteDatabaseTasks(config, this.root) : this;
-    await Base.establishConnection({
-      ...tasks.dbConfig.configuration,
-      database: tasks.resolveDbPath(),
-    } as { adapter?: string; [key: string]: unknown });
+  /**
+   * `sqlite_database_tasks.rb:72-75`. Rails connects to `db_config` unchanged;
+   * the `root` join belongs to `drop` alone, so nothing rewrites `database`
+   * on the way through here.
+   */
+  private async establishConnection(config: DatabaseConfig = this.dbConfig): Promise<void> {
+    await Base.establishConnection(
+      config.configuration as { adapter?: string; [key: string]: unknown },
+    );
   }
 
   static register(): void {

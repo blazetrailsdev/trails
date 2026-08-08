@@ -306,6 +306,14 @@ export class SchemaStatements {
   /* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
 
   /**
+   * `@config` (`abstract_adapter.rb:132`). Rails' module bodies read the host's
+   * ivar directly; `_config` is protected on `AbstractAdapter`, which the
+   * merged host interface cannot surface, so the field is redeclared here to
+   * reach it typed rather than through an `as any` cast. @internal
+   */
+  declare protected _config: Record<string, unknown>;
+
+  /**
    * `AbstractAdapter#pool` is typed `unknown` (it holds a NullPool until a real
    * ConnectionPool claims the connection); narrow it once here. @internal
    */
@@ -2277,12 +2285,19 @@ export class SchemaStatements {
   }
 
   /** @internal */
+  /**
+   * `abstract/schema_statements.rb:1783-1785` — `@config.fetch(:foreign_keys, true)`.
+   *
+   * `Hash#fetch` yields the *stored* value whenever the key is present, so an
+   * explicit `foreign_keys: nil` disables foreign keys in Ruby; only an absent
+   * key takes the `true` default. `??` / `!== false` would answer `true` for
+   * that stored null, which is the one input the two expressions disagree on.
+   * The stored value is then read for Ruby truthiness, not as a boolean.
+   * @internal
+   */
   isForeignKeysEnabled(): boolean {
-    const adapter = this as any;
-    // Rails: `foreign_keys_enabled?` is `@config.fetch(:foreign_keys, true)`.
-    // AbstractAdapter stores its config in `_config` (there is no `config`
-    // getter), so read the real config hash; a missing key defaults to true.
-    return adapter._config?.foreignKeys !== false;
+    const foreignKeys = "foreignKeys" in this._config ? this._config.foreignKeys : true;
+    return foreignKeys != null && foreignKeys !== false;
   }
 
   /** @internal */

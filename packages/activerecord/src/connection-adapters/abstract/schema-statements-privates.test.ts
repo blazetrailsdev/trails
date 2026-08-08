@@ -21,6 +21,9 @@ function makeStatements(
 ) {
   const adapter: Record<string, unknown> = {
     adapterName: "sqlite" as const,
+    // Every real host is an AbstractAdapter, which always seats `@config`
+    // (`abstract_adapter.rb:132`); `foreign_keys_enabled?` reads it with `fetch`.
+    _config: {},
     quoteColumnName: (n: string) => `"${n}"`,
     quoteTableName: (n: string) => `"${n}"`,
     quoteDefaultExpression: (v: unknown) => `${v}`,

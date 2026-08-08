@@ -23,6 +23,10 @@ function makeStatements(options: { migrated?: number[]; versions?: number[] } = 
   };
   // The bodies under test are prototype methods mixed into the adapter, so
   // give the fake adapter that prototype and call them the way production does.
+  // `Object.setPrototypeOf` skips the AbstractAdapter constructor, which is what
+  // seats `@config` (`abstract_adapter.rb:132`); `foreign_keys_enabled?` reads it
+  // with `Hash#fetch`, so the shim has to seat it too.
+  (adapter as unknown as { _config?: Record<string, unknown> })._config ??= {};
   const ss = Object.setPrototypeOf(adapter, SchemaStatements.prototype) as SchemaStatements;
   return { ss, executed };
 }
