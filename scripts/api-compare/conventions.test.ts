@@ -342,6 +342,18 @@ describe("RUBY_FILE_TS_OVERRIDES", () => {
     expect(rubyFileToTs("core_ext/date_time/calculations.rb", "activesupport")).toBe("time-ext.ts");
   });
 
+  it("gives core_ext/object/json.rb its own bucket", () => {
+    // `Object`, `Time`, `Hash` and the rest are each first opened by another
+    // core_ext file, so without the entry their `as_json` buckets there —
+    // `Object#as_json` under `object/acts_like.rb`, whose expected TS file does
+    // not exist, so the misplaced-file cluster landed it on the `index.ts`
+    // barrel and paired it with `TimeWithZone#asJson`.
+    expect(hasRubyFileTsOverride("core_ext/object/json.rb", "activesupport")).toBe(true);
+    expect(rubyFileToTs("core_ext/object/json.rb", "activesupport")).toBe(
+      "core-ext/object/json.ts",
+    );
+  });
+
   it("leaves the acts_like.rb reopenings on the default kebab-case rule", () => {
     expect(hasRubyFileTsOverride("core_ext/date/acts_like.rb", "activesupport")).toBe(false);
     expect(hasRubyFileTsOverride("core_ext/date_time/acts_like.rb", "activesupport")).toBe(false);
