@@ -52,11 +52,12 @@ export class HasManyThroughAssociation extends HasManyAssociation {
    * that loader is what runs it. The routing predicate stays the single one
    * `HasManyAssociation`'s loader consults, so the branch here and the branch
    * there agree by construction rather than by two copies of the gate.
+   *
+   * The `_queryExecutor` arm is a diverged CollectionProxy running its own
+   * mutated Relation, which the through routing would discard —
+   * `HasManyAssociation#findTarget` is where that executor is honored.
    */
   protected override async findTarget(): Promise<Base[]> {
-    // A diverged CollectionProxy runs its own mutated Relation, which the
-    // through routing below would discard; `HasManyAssociation#findTarget` is
-    // where that executor is honored.
     if (this._queryExecutor) return super.findTarget();
     if (!this.targetReflectionHasAssociatedRecord()) return [];
     const reflection = (this.owner.constructor as typeof Base)._reflectOnAssociation?.(

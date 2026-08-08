@@ -742,6 +742,10 @@ function ensureNotNested(assoc: HasOneThroughAssociation): void {
  *
  * Mirrors: SingularAssociation#find_target as inherited by
  * HasOneThroughAssociation (has_one_through_association.rb).
+ *
+ * A has_many through step is loaded on a freshly built (uncached) holder: it
+ * runs under the *through* association's own name and options, so it must not
+ * disturb the owner's cached holder for that name.
  */
 async function loadHasOneThrough(
   record: Base,
@@ -761,9 +765,6 @@ async function loadHasOneThrough(
   } else if (throughAssoc.type === "belongsTo") {
     throughRecord = (await association.call(record, throughAssoc.name).loadTarget()) as Base | null;
   } else if (throughAssoc.type === "hasMany") {
-    // A freshly built (uncached) holder: this loads the through step under the
-    // *through* association's own name and options, so it must not disturb the
-    // owner's cached holder for that name.
     const throughHolder = _buildAssociationInstance.call(record, {
       name: throughAssoc.name,
       type: "hasMany",

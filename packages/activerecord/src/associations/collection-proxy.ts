@@ -882,20 +882,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * `strictLoadingValue` is applied afterward so it wins over cascade (Rails
    * applies `strict_loading_value` after `set_strict_loading` per record).
    */
-  private async _findTargetViaAssociation(queryExecutor?: () => Promise<Base[]>): Promise<Base[]> {
-    // A freshly built (uncached) holder rather than `record.association(name)`:
-    // this proxy IS the owner's holder for that name, so loading through the
-    // cached one would suppress the loader's writeback into it and mark it
-    // loaded behind the proxy's back.
-    const { _buildAssociationInstance } = await import("./instance-methods.js");
-    const assoc = _buildAssociationInstance.call(this._record, this._assocDef) as unknown as {
-      _queryExecutor?: () => Promise<Base[]>;
-      findTarget(): Promise<Base[]>;
-    };
-    assoc._queryExecutor = queryExecutor;
-    return assoc.findTarget();
-  }
-
   private async _execLoad(): Promise<T[]> {
     // Re-throw a foreign-key derivation error deferred from construction, so
     // the underivable-FK `ArgumentError` surfaces at load time (Rails'
@@ -922,6 +908,23 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       for (const r of results) (r as any)._strictLoading = sv;
     }
     return results;
+  }
+
+  /**
+   * Runs `find_target` (`association.rb:248`) on a freshly built holder for
+   * this proxy's definition rather than on `record.association(name)`: this
+   * proxy IS the owner's holder for that name, so loading through the cached
+   * one would suppress the loader's writeback into it and mark it loaded
+   * behind the proxy's back.
+   */
+  private async _findTargetViaAssociation(queryExecutor?: () => Promise<Base[]>): Promise<Base[]> {
+    const { _buildAssociationInstance } = await import("./instance-methods.js");
+    const assoc = _buildAssociationInstance.call(this._record, this._assocDef) as unknown as {
+      _queryExecutor?: () => Promise<Base[]>;
+      findTarget(): Promise<Base[]>;
+    };
+    assoc._queryExecutor = queryExecutor;
+    return assoc.findTarget();
   }
 
   /**
