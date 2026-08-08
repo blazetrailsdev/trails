@@ -119,7 +119,7 @@ export class Float {
  * always true.
  */
 export class BigDecimal {
-  static asJson(value: BigDecimalValue): string | null {
+  static asJson(value: BigDecimalValue): string {
     return value.toString();
   }
 }
