@@ -266,17 +266,17 @@ export class SQLiteDatabaseTasks {
 
   /**
    * Run `fn` against a real pool-leased connection for this task's db_config,
-   * mirroring Rails' `DatabaseTasks.with_temporary_connection`
-   * (`tasks/database_tasks.rb:523-530`), which is how Rails' own
-   * `truncate_tables` / `dump_schema` reach a task-scoped adapter.
+   * mirroring the `establish_connection` + `connection` pair Rails' task
+   * classes use to reach an adapter (`sqlite_database_tasks.rb:15-18`,
+   * `mysql_database_tasks.rb:71-77`) rather than constructing one bare.
    *
-   * In-memory databases are the exception: establishing a second pool on
-   * `:memory:` opens an unrelated empty database, so those reuse the caller's
-   * pool-leased connection (`connection`, `sqlite_database_tasks.rb:70-72`).
+   * In-memory databases skip the re-establish: `:memory:` names a fresh empty
+   * database on every open, so those reuse the caller's already-leased
+   * connection (`connection`, `sqlite_database_tasks.rb:70-72`).
    */
   private async withOperationAdapter<T>(fn: (adapter: DatabaseAdapter) => Promise<T>): Promise<T> {
-    if (isInMemoryDatabase(this.resolveDbPath())) return fn(await this.connection());
-    return DatabaseTasks.withTemporaryConnection(this.dbConfig, fn);
+    if (!isInMemoryDatabase(this.resolveDbPath())) await this.establishConnection();
+    return fn(await this.connection());
   }
 
   /** @internal */

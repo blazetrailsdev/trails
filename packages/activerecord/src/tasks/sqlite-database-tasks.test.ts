@@ -4,6 +4,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { randomUUID } from "node:crypto";
+import { Base } from "../base.js";
 import { SQLiteDatabaseTasks } from "./sqlite-database-tasks.js";
 import { DatabaseTasks } from "./database-tasks.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
@@ -16,7 +17,12 @@ function tmpDbPath(): string {
 describe("SQLiteDatabaseTasks", () => {
   const created: string[] = [];
 
-  afterEach(() => {
+  afterEach(async () => {
+    // structureDump / structureLoad / truncateAll now establish a pool for the
+    // task's db_config (Rails' `establish_connection` + `connection`), so the
+    // file owns it and must hand it back before the next file pins the
+    // writing list (cases/helper.ts).
+    await Base.removeConnection();
     for (const file of created) {
       try {
         fs.unlinkSync(file);
