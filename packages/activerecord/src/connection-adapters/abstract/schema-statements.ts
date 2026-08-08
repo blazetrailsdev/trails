@@ -315,6 +315,9 @@ export class SchemaStatements {
 
   /** Mirrors: SchemaStatements#schema_creation — `SchemaCreation.new(self)`. */
   get schemaCreation(): SchemaCreation {
+    // `SchemaStatements` types its host as `DatabaseAdapter & SchemaQuoter`,
+    // which does not surface the capability probes; every runtime `this` is an
+    // AbstractAdapter, which defines all of them (abstract-adapter.ts:1576-1962).
     return new SchemaCreation(this as unknown as SchemaCreationConn);
   }
 

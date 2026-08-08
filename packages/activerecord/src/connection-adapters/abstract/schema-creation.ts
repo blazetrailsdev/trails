@@ -59,15 +59,28 @@ export class SchemaCreation {
   /** Rails' `SchemaCreation#initialize(conn)` (abstract/schema_creation.rb:6-9). */
   constructor(protected adapter: SchemaCreationConn) {}
 
-  // Capability probes. Rails declares these as `delegate ... to: :@conn`
-  // (abstract/schema_creation.rb:16-21) — the connection answers them, so a
-  // version gate on the server (MariaDB >= 10.8.1 for `supports_index_sort_order?`,
-  // abstract_mysql_adapter.rb:409) reaches the visitor.
+  // Capability probes. Seven of these are `delegate ... to: :@conn`
+  // (abstract/schema_creation.rb:16-21): supports_indexes_in_create?,
+  // supports_partial_index?, supports_check_constraints?, supports_index_include?,
+  // supports_exclusion_constraints?, supports_unique_constraints? and
+  // supports_nulls_not_distinct?. The connection answers them, so its version
+  // gates reach the visitor.
 
   protected supportsPartialIndex(): boolean {
     return this.adapter.supportsPartialIndex();
   }
 
+  /**
+   * NOT one of `schema_creation.rb`'s delegated members, and not named anywhere
+   * in Rails' visitors: `supports_index_sort_order?` is an adapter predicate
+   * (abstract_adapter.rb:411, version-gated at abstract_mysql_adapter.rb:409)
+   * that Rails reads only from `add_options_for_index_columns`
+   * (abstract/schema_statements.rb:1640), which the visitor reaches through the
+   * delegated `quoted_columns_for_index`. It lives here because trails'
+   * `MySQL::SchemaCreation#quotedColumns` pulled that decoration into the
+   * visitor — a pre-existing deviation, filed as
+   * `mysql-schema-creation-quoted-columns-reimplements-the-delegated-decoration`.
+   */
   protected async supportsIndexSortOrder(): Promise<boolean> {
     return this.adapter.supportsIndexSortOrder();
   }
