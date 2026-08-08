@@ -257,6 +257,14 @@ export function rubyFileTsOverride(rubyFile: string, pkg?: string): string | und
   return Object.hasOwn(RUBY_FILE_TS_OVERRIDES, key) ? RUBY_FILE_TS_OVERRIDES[key] : undefined;
 }
 
+/** Every Ruby file `pkg` maps explicitly, in table order. */
+export function overriddenRubyFiles(pkg: string): string[] {
+  const prefix = `${pkg}:`;
+  return Object.keys(RUBY_FILE_TS_OVERRIDES)
+    .filter((key) => key.startsWith(prefix))
+    .map((key) => key.slice(prefix.length));
+}
+
 /** True when `rubyFile` has an explicit TS mapping in this package. */
 export function hasRubyFileTsOverride(rubyFile: string, pkg?: string): boolean {
   return rubyFileTsOverride(rubyFile, pkg) !== undefined;

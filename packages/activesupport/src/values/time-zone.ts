@@ -170,9 +170,23 @@ const MAPPING: Record<string, string> = {
   Samoa: "Pacific/Apia",
 };
 
+// `Intl.Locale#getTimeZones` is ECMA-402's IANA country→zone table — the data
+// `TZInfo::Country#zone_identifiers` reads — and is shipped by every runtime
+// trails targets, but TypeScript's `lib.es5`/`lib.esnext.intl` do not declare
+// it yet. Type-only; there is no runtime shim.
+declare global {
+  namespace Intl {
+    interface Locale {
+      getTimeZones(): string[] | undefined;
+    }
+  }
+}
+
 const zoneCache = new Map<string, TimeZone>();
 /** `@zones` (time_zone.rb:224). */
 let zones: TimeZone[] | null = null;
+/** `@country_zones` (time_zone.rb:260), a `Concurrent::Map` keyed by Alpha2 code. */
+const countryZonesMemo = new Map<string, TimeZone[]>();
 
 /**
  * Stands in for `TZInfo::InvalidTimezoneIdentifier` (`tzinfo/timezone.rb:26`,
@@ -909,19 +923,62 @@ export class TimeZone {
     return this.name === identifier || this.tzinfo === identifier;
   }
 
-  /** US zones */
+  /**
+   * A convenience method for returning a collection of TimeZone objects
+   * for time zones in the USA (time_zone.rb:252-254).
+   */
   static usZones(): TimeZone[] {
-    const usNames = [
-      "Hawaii",
-      "Alaska",
-      "Pacific Time (US & Canada)",
-      "Arizona",
-      "Mountain Time (US & Canada)",
-      "Central Time (US & Canada)",
-      "Eastern Time (US & Canada)",
-      "Indiana (East)",
-    ];
-    return usNames.map((n) => TimeZone.find(n)!);
+    return TimeZone.countryZones("us");
+  }
+
+  /**
+   * A convenience method for returning a collection of TimeZone objects for
+   * time zones in the country specified by its ISO 3166-1 Alpha2 code
+   * (time_zone.rb:256-262).
+   */
+  static countryZones(countryCode: string): TimeZone[] {
+    const code = countryCode.toUpperCase();
+    let memo = countryZonesMemo.get(code);
+    if (memo === undefined) {
+      memo = TimeZone.#loadCountryZones(code);
+      countryZonesMemo.set(code, memo);
+    }
+    return memo;
+  }
+
+  /**
+   * `load_country_zones` (time_zone.rb:283-296): every zone identifier the
+   * country has, each replaced by the Rails-named zones that MAP to it when
+   * MAPPING has any — `gb` answers both `Edinburgh` and `London` for
+   * `Europe/London` — and taken as its own IANA-named zone when it does not,
+   * which is how `sv` answers `America/El_Salvador`. Then `sort!`, by `<=>`
+   * (time_zone.rb:333-337).
+   *
+   * `TZInfo::Country.get(code).zone_identifiers` is
+   * `Intl.Locale#getTimeZones` here — the same IANA country table, read off the
+   * runtime's own tzdata rather than off a literal list, so a tzdata update
+   * moves the answer as it moves Rails'. It answers `undefined` for a code
+   * with no zones, where TZInfo raises `InvalidCountryCode`; trails resolves
+   * zones through `Intl`, which has no TZInfo error hierarchy to port, the same
+   * reasoning as {@link TimeZone.create}.
+   */
+  static #loadCountryZones(code: string): TimeZone[] {
+    const country = new Intl.Locale(`und-${code}`).getTimeZones() ?? [];
+    return country
+      .flatMap((tzId) => {
+        if (Object.values(MAPPING).includes(tzId)) {
+          const memo: TimeZone[] = [];
+          for (const [key, value] of Object.entries(MAPPING)) {
+            if (value === tzId) {
+              const zone = TimeZone.find(key);
+              if (zone) memo.push(zone);
+            }
+          }
+          return memo;
+        }
+        return [TimeZone.create(tzId)];
+      })
+      .sort((a, b) => a.compareTo(b) ?? 0);
   }
 
   toString(): string {

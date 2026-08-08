@@ -92,6 +92,7 @@ import {
   SKIP,
   SKIP_TS_MIRROR_IS_DRIFT,
   rubyFileToTs,
+  overriddenRubyFiles,
   rubyMethodToTs,
   rubyMethodToTsIgnoringSkip,
   scopedSkipMirrorName,
@@ -110,6 +111,16 @@ import { manifestIsStale } from "./build-freshness.js";
 interface RubyEntity {
   fqn: string;
   info: ClassInfo;
+  /**
+   * Contribute only the methods this entity declares in the named `.rb`. Set
+   * for a REOPENING-only file — one that adds methods to a class some other
+   * file defined first, so the whole entity buckets there and the reopening
+   * file owns no bucket of its own. `RUBY_FILE_TS_OVERRIDES` is the register
+   * of which of those files trails ports and where to; without this the TS
+   * port is scored against an empty allow-set and its whole surface reads as
+   * extra.
+   */
+  methodFile?: string;
   /**
    * Contribute only the entity's own constant name to the allow-set, not its
    * methods or mixins. Used for a `Foo::ClassMethods` submodule whose methods
@@ -1023,8 +1034,9 @@ function collectAllowedNames(
   // `scopedSkipMirrorName`: a scoped skip that names its TS spelling means the
   // port exists but not at the mapped site (a `prepend`ed module's `initialize`,
   // which has no TS constructor to wrap), so the declaration is the port.
-  const addMethods = (methods: MethodInfo[]): void => {
+  const addMethods = (methods: MethodInfo[], methodFile?: string): void => {
     for (const m of methods) {
+      if (methodFile !== undefined && m.file !== methodFile) continue;
       // Private/protected Ruby methods (internal) still count: a TS method
       // mirroring a Rails-private method isn't *extra* surface, it's a
       // visibility divergence — the method exists in Rails. Excluding them
@@ -1075,7 +1087,7 @@ function collectAllowedNames(
     for (const inc of mod.includes ?? []) walkMixin(inc, fqn);
   };
 
-  for (const { fqn, info, nameOnly } of entities) {
+  for (const { fqn, info, nameOnly, methodFile } of entities) {
     // The entity's own short name: since declaration names are TS surface
     // (`collectTsFileNames`), the Ruby constant they port has to be allowed
     // surface, or every faithfully ported class would read as drift. This
@@ -1086,8 +1098,8 @@ function collectAllowedNames(
     const short = fqn.split("::").pop();
     if (short) for (const c of rubyConstantCandidates(short)) allowed.add(c);
     if (nameOnly) continue;
-    addMethods(info.instanceMethods);
-    addMethods(info.classMethods);
+    addMethods(info.instanceMethods, methodFile);
+    addMethods(info.classMethods, methodFile);
     for (const inc of info.includes ?? []) walkMixin(inc, fqn);
     for (const ext of info.extends ?? []) walkMixin(ext, fqn);
 
@@ -1369,6 +1381,40 @@ function buildPackageReport(
   ]);
   const coveredTsFiles = new Set<string>();
   for (const rubyFile of rubyFileNames) coveredTsFiles.add(rubyFileToTs(rubyFile, pkg));
+
+  // A reopening-only file declares no class or module of its own, so the loops
+  // above never gave it a bucket even though it holds real Rails surface —
+  // `core_ext/time/zones.rb` adds `Time.zone` and friends to a `Time` that
+  // `core_ext/object/blank.rb` reopened first, and `time-zone-config.ts`, the
+  // port of it, was then scored against an empty allow-set as a file with no
+  // Rails counterpart at all. An entry in `RUBY_FILE_TS_OVERRIDES` is
+  // precisely the assertion that trails ports that file, and to which TS file,
+  // so it is what seeds the bucket: every entity with a method declared there,
+  // scored against that file's own methods.
+  //
+  // Only for a TS file nothing else covers. A `.ts` several Ruby files already
+  // map onto is scored once per mapping, each against its own allow-set, so
+  // seeding another bucket for it would score it one more time over — counting
+  // the same names as extra again rather than resolving any of them.
+  for (const rubyFile of overriddenRubyFiles(pkg)) {
+    if (rubyFiles.has(rubyFile)) continue;
+    const tsFile = rubyFileToTs(rubyFile, pkg);
+    if (coveredTsFiles.has(tsFile)) continue;
+    for (const [fqn, info] of [
+      ...Object.entries(rubyPkg.classes),
+      ...Object.entries(rubyPkg.modules),
+    ]) {
+      const declaresHere = (m: MethodInfo): boolean => m.file === rubyFile;
+      if (!info.instanceMethods.some(declaresHere) && !info.classMethods.some(declaresHere)) {
+        continue;
+      }
+      pushTo(rubyFiles, rubyFile, { fqn, info, methodFile: rubyFile });
+    }
+    if (rubyFiles.has(rubyFile)) {
+      rubyFileNames.add(rubyFile);
+      coveredTsFiles.add(tsFile);
+    }
+  }
 
   const scoreTargets: { tsFile: string; rubyFile: string | null }[] = [
     ...[...rubyFileNames].map((rubyFile) => ({
