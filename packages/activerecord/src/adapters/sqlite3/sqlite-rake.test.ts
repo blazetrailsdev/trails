@@ -179,7 +179,11 @@ describeIfSqlite("SqliteStructureDumpTest", () => {
         message = e.message;
         throw e;
       }),
-    ).rejects.toThrow();
+      // `assert_raise(RuntimeError)` (`sqlite_rake_test.rb:221`). Ruby's
+      // `fail "<msg>"` in `run_cmd` raises RuntimeError, the class a bare
+      // `raise "string"` produces; `runCmd`'s `throw new Error(...)` is its
+      // analogue, so the class is asserted rather than left open.
+    ).rejects.toThrow(Error);
 
     expect(spawnSync).toHaveBeenCalledWith(
       "sqlite3",
