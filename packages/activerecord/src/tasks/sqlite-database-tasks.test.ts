@@ -15,14 +15,13 @@ function tmpDbPath(): string {
   return path.join(os.tmpdir(), `trails-sqlite-test-${process.pid}-${randomUUID()}.sqlite3`);
 }
 
-// `create` and `charset` both leave a live pool behind now that they go through
-// `establish_connection` (`sqlite_database_tasks.rb:15-20,39-41`), so every
-// describe that reaches one restores the file's pool afterwards — the suite
-// guard in `cases/helper.ts:174-183` fails any file that leaves one behind.
+// `create` and `charset` reach `establish_connection`
+// (`sqlite_database_tasks.rb:15-20,39-41`) and leave a live pool behind, which
+// the suite guard in `cases/helper.ts:174-183` fails a file for. The beforeEach
+// round trip is how the file's config is captured — `removeConnection` is the
+// only reader that hands it back.
 function withRestoredConnection(): void {
   let previous: ReturnType<typeof Base.removeConnection>;
-  // The round trip is how the file-level config is captured: `removeConnection`
-  // is the only reader that hands it back.
   beforeEach(async () => {
     previous = Base.removeConnection();
     if (previous) await Base.establishConnection(previous.configuration);
@@ -199,14 +198,10 @@ describe("SQLiteDatabaseTasks in-memory URI variants", () => {
     return { mkdirSpy, writeSpy, unlinkSpy };
   };
 
-  // trails-only: `create` used to carry an in-memory guard around an
-  // `fs.writeFileSync` stand-in for connecting, and these three pinned it for
-  // each in-memory spelling. `sqlite_database_tasks.rb:15-20` has no such guard
-  // — `File.exist?(":memory:")` is false, so the converged `create` just
-  // connects — and the two URI spellings are not portable across the SQLite
-  // drivers trails binds (better-sqlite3's build does not set SQLITE_OPEN_URI,
-  // so it opens `file::memory:?cache=shared` as a literal on-disk file). What
-  // survives is the one spelling every driver reads as in-memory.
+  // The two `file:` in-memory URI spellings this used to cover are not portable
+  // across the SQLite drivers trails binds: better-sqlite3's build does not set
+  // SQLITE_OPEN_URI, so it opens `file::memory:?cache=shared` as a literal
+  // on-disk file. `:memory:` is the one spelling every driver reads as memory.
   it("creates a canonical :memory: database by connecting, writing no file", async () => {
     const { mkdirSpy, writeSpy } = assertNoFsWrites();
     const config = new HashConfig("development", "primary", {

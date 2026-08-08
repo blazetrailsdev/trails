@@ -47,7 +47,10 @@ export class SQLiteDatabaseTasks {
    * (`database_tasks.rb:119-120`), so the exception carries none of its own.
    *
    * `File.exist?(":memory:")` is false, so an in-memory database simply
-   * connects; Rails has no in-memory lane and so no guard here.
+   * connects; Rails has no in-memory lane and so no guard here. The
+   * `establish_connection` below keeps trails' `root` join for a relative
+   * database name, which is what `purge` and the `sqlite3_mem` lane already
+   * depend on.
    */
   async create(): Promise<void> {
     const fs = getFs();
@@ -114,7 +117,9 @@ export class SQLiteDatabaseTasks {
    * `any_raw_connection.encoding.to_s` (`sqlite3_adapter.rb:236-239`), i.e.
    * `PRAGMA encoding`; the literal this used to return could never satisfy
    * `SqliteDBCharsetTest#test_db_retrieves_charset`, which asserts `encoding`
-   * is called on the connection.
+   * is called on the connection. Ruby's send is duck-typed; `encoding` is
+   * declared on `SQLite3Adapter`, not on `AbstractAdapter` (Rails puts it there
+   * too), so TS needs the cast to reach it.
    */
   async charset(): Promise<string> {
     return ((await this.connection()) as SQLite3Adapter).encoding;
