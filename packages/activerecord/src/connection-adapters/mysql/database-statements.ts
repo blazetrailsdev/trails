@@ -57,8 +57,8 @@ export function isWriteQuery(sql: string): boolean {
 }
 
 export interface BuildExplainClauseHost {
-  isMariadb?(): boolean;
-  databaseVersion?: Version;
+  isMariadb?(): Promise<boolean>;
+  databaseVersion?: Version | Promise<Version>;
 }
 
 /**
@@ -66,13 +66,13 @@ export interface BuildExplainClauseHost {
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::DatabaseStatements#build_explain_clause
  */
-export function buildExplainClause(
+export async function buildExplainClause(
   this: BuildExplainClauseHost | void,
   options: ExplainOption[] = [],
-): string {
+): Promise<string> {
   if (options.length === 0) return "EXPLAIN";
   const clause = `EXPLAIN ${options.map((o) => (typeof o === "string" ? o.toUpperCase() : `FORMAT=${(o as { format: string }).format.toUpperCase()}`)).join(" ")}`;
-  if (isAnalyzeWithoutExplain.call(this) && clause.includes("ANALYZE")) {
+  if ((await isAnalyzeWithoutExplain.call(this)) && clause.includes("ANALYZE")) {
     return clause.replace("EXPLAIN ", "");
   }
   return clause;
@@ -80,7 +80,7 @@ export function buildExplainClause(
 
 interface SupportsInsertReturningHost {
   /** @internal */
-  supportsInsertReturning?(): boolean;
+  supportsInsertReturning?(): Promise<boolean>;
 }
 
 interface AutoIncrementColumnHost {
@@ -90,11 +90,13 @@ interface AutoIncrementColumnHost {
 /**
  * @internal
  */
-export function isAnalyzeWithoutExplain(this: BuildExplainClauseHost | void): boolean {
+export async function isAnalyzeWithoutExplain(
+  this: BuildExplainClauseHost | void,
+): Promise<boolean> {
   const host = this as BuildExplainClauseHost | null;
-  if (!host?.isMariadb?.()) return false;
+  if (!(await host?.isMariadb?.())) return false;
   // Rails: `database_version >= "10.1.0"` (mysql/database_statements.rb:50).
-  return (host.databaseVersion?.compare("10.1.0") ?? -1) >= 0;
+  return ((await host?.databaseVersion)?.compare("10.1.0") ?? -1) >= 0;
 }
 
 /** @internal */
@@ -105,11 +107,11 @@ export function defaultInsertValue(column: AutoIncrementColumnHost): Nodes.SqlLi
 }
 
 /** @internal */
-export function returningColumnValues(
+export async function returningColumnValues(
   this: SupportsInsertReturningHost | void,
   result: Result,
-): unknown[] | undefined {
-  if ((this as SupportsInsertReturningHost | null)?.supportsInsertReturning?.()) {
+): Promise<unknown[] | undefined> {
+  if (await (this as SupportsInsertReturningHost | null)?.supportsInsertReturning?.()) {
     return result.rows[0] as unknown[] | undefined;
   }
   // Falls back to abstract base behavior (last_inserted_id path)
@@ -200,7 +202,9 @@ export async function explain(
   options: ExplainOption[] = [],
 ): Promise<string> {
   const sql =
-    buildExplainClause.call(this, options) + " " + abstractToSql.call(this as any, arel, binds);
+    (await buildExplainClause.call(this, options)) +
+    " " +
+    abstractToSql.call(this as any, arel, binds);
   const start = Date.now();
   const result = await internalExecQuery.call(this as any, String(sql), "EXPLAIN", binds);
   const elapsed = (Date.now() - start) / 1000;

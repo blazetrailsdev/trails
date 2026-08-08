@@ -339,7 +339,7 @@ export interface AbstractAdapter {
   /** @internal */
   indexAlgorithm(algorithm?: string): string | undefined;
   /** @internal */
-  quotedColumnsForIndex(columnNames: string[], options?: Record<string, unknown>): string;
+  quotedColumnsForIndex(columnNames: string[], options?: Record<string, unknown>): Promise<string>;
   /** @internal */
   optionsForIndexColumns(
     options: string | Record<string, string> | undefined,
@@ -352,7 +352,7 @@ export interface AbstractAdapter {
       opclass?: string | Record<string, string>;
       length?: number | Record<string, number>;
     },
-  ): Map<string, string>;
+  ): Promise<Map<string, string>>;
   removeIndex(
     tableName: string,
     columnOrOptions?:
@@ -617,7 +617,7 @@ export interface AbstractAdapter {
   /** @internal Extracts the RETURNING values from an INSERT result. Adapters
    *  override for full-row dispatch (PG/SQLite/MySQL); the base yields a single
    *  value. Mirrors DatabaseStatements#returning_column_values. */
-  returningColumnValues?(result: Result): unknown[] | undefined;
+  returningColumnValues?(result: Result): unknown[] | undefined | Promise<unknown[] | undefined>;
   /** @internal Builds the per-table TRUNCATE statement; SQLite overrides with
    *  `DELETE FROM`. Mirrors DatabaseStatements#build_truncate_statement. */
   buildTruncateStatement(tableName: string): string;
@@ -894,7 +894,7 @@ export class AbstractAdapter implements Quoting {
    * `"EXPLAIN for:"` default lives in the `ActiveRecord::Explain` module and
    * only the PG/MySQL adapters carry a private override.
    */
-  buildExplainClause(options: ExplainOption[] = []): string {
+  async buildExplainClause(options: ExplainOption[] = []): Promise<string> {
     if (options.length === 0) return "EXPLAIN for:";
     const parts = options.map((o) => {
       if (typeof o === "string") return o.toUpperCase();
@@ -1581,20 +1581,20 @@ export class AbstractAdapter implements Quoting {
     return false;
   }
 
-  supportsInsertReturning(): boolean {
+  async supportsInsertReturning(): Promise<boolean> {
     return false;
   }
 
   /** @internal */
-  returnValueAfterInsert(column: Column): boolean {
+  async returnValueAfterInsert(column: Column): Promise<boolean> {
     return column.isAutoPopulated();
   }
 
-  supportsInsertOnDuplicateSkip(): boolean {
+  async supportsInsertOnDuplicateSkip(): Promise<boolean> {
     return false;
   }
 
-  supportsInsertOnDuplicateUpdate(): boolean {
+  async supportsInsertOnDuplicateUpdate(): Promise<boolean> {
     return false;
   }
 
@@ -1616,7 +1616,7 @@ export class AbstractAdapter implements Quoting {
     return false;
   }
 
-  supportsExpressionIndex(): boolean {
+  async supportsExpressionIndex(): Promise<boolean> {
     return false;
   }
 
@@ -1628,7 +1628,7 @@ export class AbstractAdapter implements Quoting {
     return false;
   }
 
-  supportsCheckConstraints(): boolean {
+  async supportsCheckConstraints(): Promise<boolean> {
     return false;
   }
 
@@ -1640,7 +1640,7 @@ export class AbstractAdapter implements Quoting {
     return false;
   }
 
-  supportsJson(): boolean {
+  async supportsJson(): Promise<boolean> {
     return false;
   }
 
@@ -1873,11 +1873,11 @@ export class AbstractAdapter implements Quoting {
     return false;
   }
 
-  supportsPartitionedIndexes(): boolean {
+  async supportsPartitionedIndexes(): Promise<boolean> {
     return false;
   }
 
-  supportsIndexSortOrder(): boolean {
+  async supportsIndexSortOrder(): Promise<boolean> {
     return false;
   }
 
@@ -1896,7 +1896,7 @@ export class AbstractAdapter implements Quoting {
     return true;
   }
 
-  supportsCommonTableExpressions(): boolean {
+  async supportsCommonTableExpressions(): Promise<boolean> {
     return false;
   }
 
@@ -1919,7 +1919,7 @@ export class AbstractAdapter implements Quoting {
 
   // --- Capability flags (batch 3) ---
 
-  supportsIndexInclude(): boolean {
+  async supportsIndexInclude(): Promise<boolean> {
     return false;
   }
 
@@ -1947,7 +1947,7 @@ export class AbstractAdapter implements Quoting {
     return false;
   }
 
-  supportsVirtualColumns(): boolean {
+  async supportsVirtualColumns(): Promise<boolean> {
     return false;
   }
 
@@ -1955,15 +1955,15 @@ export class AbstractAdapter implements Quoting {
     return false;
   }
 
-  supportsOptimizerHints(): boolean {
+  async supportsOptimizerHints(): Promise<boolean> {
     return false;
   }
 
-  supportsInsertConflictTarget(): boolean {
+  async supportsInsertConflictTarget(): Promise<boolean> {
     return false;
   }
 
-  supportsNullsNotDistinct(): boolean {
+  async supportsNullsNotDistinct(): Promise<boolean> {
     return false;
   }
 
@@ -1979,7 +1979,7 @@ export class AbstractAdapter implements Quoting {
     return false;
   }
 
-  supportsRestartDbTransaction(): boolean {
+  async supportsRestartDbTransaction(): Promise<boolean> {
     return false;
   }
 
@@ -2178,19 +2178,15 @@ export class AbstractAdapter implements Quoting {
 
   // Mirrors: AbstractAdapter#database_version (`abstract_adapter.rb:854-856`)
   // — `pool.server_version(self)`, the pool-level memo that makes every
-  // adapter's `get_database_version` a pure fetch run at most once. Overrides
-  // may narrow to `Version` or `number`.
-  get databaseVersion(): Version | number {
-    const v = this.pool.serverVersion(this) as Version | number | Promise<Version | number>;
-    if (v instanceof Promise) {
-      throw new Error(
-        "databaseVersion is only available synchronously after getDatabaseVersion() has resolved; await getDatabaseVersion() first",
-      );
-    }
-    return v;
+  // adapter's `get_database_version` a pure fetch run at most once. The memo
+  // is filled on demand, so this reads correctly from an adapter that has
+  // never connected; the fetch it may have to run is what makes the value
+  // awaitable. Overrides may narrow to `Version` or `number`.
+  get databaseVersion(): Version | number | Promise<Version | number> {
+    return this.pool.serverVersion(this) as Version | number | Promise<Version | number>;
   }
 
-  checkVersion(): void {
+  async checkVersion(): Promise<void> {
     checkVersionMixin.call(this as any);
   }
 
@@ -2531,16 +2527,7 @@ export class AbstractAdapter implements Quoting {
 
   /** @internal Mirrors: AbstractAdapter#configure_connection (`abstract_adapter.rb:1212-1214`) */
   configureConnection(..._args: unknown[]): void | Promise<void> {
-    // Deviation, language-forced: Rails' body is `check_version` alone because
-    // `database_version` (`abstract_adapter.rb:854-856`) is a sync reader that
-    // issues its own round-trip. `getDatabaseVersion()` is a real await, so the
-    // sync getter cannot self-fetch; filling the pool memo at the point Rails
-    // establishes the connection is what keeps every version-gated `supports*()`
-    // read a plain memo hit. The sync arm keeps SQLite's `configure_connection`
-    // synchronous, as Rails' is.
-    const serverVersion = this.pool.serverVersion(this);
-    if (serverVersion instanceof Promise) return serverVersion.then(() => this.checkVersion());
-    this.checkVersion();
+    return this.checkVersion();
   }
 
   /** @internal Mirrors: AbstractAdapter#translate_exception_class */

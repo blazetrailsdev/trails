@@ -17,12 +17,12 @@ describe("_returningColumnsForInsert memoization", () => {
   // Base class type; narrow to just the surface these tests drive.
   const schemaHost = Topic as unknown as {
     _returningColumnsForInsert(connection: {
-      returnValueAfterInsert(column: { name: string }): boolean;
-    }): string[];
+      returnValueAfterInsert(column: { name: string }): Promise<boolean>;
+    }): Promise<string[]>;
     resetColumnInformation(): void;
   };
 
-  it("does not let a subclass reuse the base's memo", () => {
+  it("does not let a subclass reuse the base's memo", async () => {
     // Ruby class instance variables are NOT inherited, so Rails' `||=` on
     // @_returning_columns_for_insert is genuinely per-class (model_schema.rb
     // :436-443). A plain JS static read walks the prototype chain, so without
@@ -43,11 +43,11 @@ describe("_returningColumnsForInsert memoization", () => {
     )._returningColumnsForInsertCache = sentinel;
 
     const connection = {
-      returnValueAfterInsert: (column: { name: string }) => column.name === "id",
+      returnValueAfterInsert: async (column: { name: string }) => column.name === "id",
     };
     const child = Child as unknown as typeof schemaHost;
 
-    expect(child._returningColumnsForInsert(connection)).not.toEqual(sentinel);
+    expect(await child._returningColumnsForInsert(connection)).not.toEqual(sentinel);
     expect(
       (Parent as unknown as { _returningColumnsForInsertCache?: string[] })
         ._returningColumnsForInsertCache,
@@ -58,17 +58,17 @@ describe("_returningColumnsForInsert memoization", () => {
     await Topic.loadSchema();
     let calls = 0;
     const connection = {
-      returnValueAfterInsert(column: { name: string }) {
+      async returnValueAfterInsert(column: { name: string }) {
         calls += 1;
         return column.name === "id";
       },
     };
 
-    expect(schemaHost._returningColumnsForInsert(connection)).toEqual(["id"]);
+    expect(await schemaHost._returningColumnsForInsert(connection)).toEqual(["id"]);
     const first = calls;
     expect(first).toBeGreaterThan(0);
 
-    expect(schemaHost._returningColumnsForInsert(connection)).toEqual(["id"]);
+    expect(await schemaHost._returningColumnsForInsert(connection)).toEqual(["id"]);
     expect(calls).toBe(first);
   });
 
@@ -76,19 +76,19 @@ describe("_returningColumnsForInsert memoization", () => {
     await Topic.loadSchema();
     let calls = 0;
     const connection = {
-      returnValueAfterInsert(column: { name: string }) {
+      async returnValueAfterInsert(column: { name: string }) {
         calls += 1;
         return column.name === "id";
       },
     };
 
-    schemaHost._returningColumnsForInsert(connection);
+    await schemaHost._returningColumnsForInsert(connection);
     const first = calls;
 
     schemaHost.resetColumnInformation();
     await Topic.loadSchema();
 
-    expect(schemaHost._returningColumnsForInsert(connection)).toEqual(["id"]);
+    expect(await schemaHost._returningColumnsForInsert(connection)).toEqual(["id"]);
     expect(calls).toBeGreaterThan(first);
   });
 
@@ -105,20 +105,20 @@ describe("_returningColumnsForInsert memoization", () => {
 
     let calls = 0;
     const connection = {
-      returnValueAfterInsert(column: { name: string }) {
+      async returnValueAfterInsert(column: { name: string }) {
         calls += 1;
         return column.name === "id";
       },
     };
 
-    sub._returningColumnsForInsert(connection);
+    await sub._returningColumnsForInsert(connection);
     const afterSubMemo = calls;
     // The descendant really did compute (and now owns) a memo of its own.
     expect(afterSubMemo).toBeGreaterThan(0);
     expect(Object.prototype.hasOwnProperty.call(Reply, "_returningColumnsForInsertCache")).toBe(
       true,
     );
-    sub._returningColumnsForInsert(connection);
+    await sub._returningColumnsForInsert(connection);
     expect(calls).toBe(afterSubMemo);
 
     // Resetting the BASE leaves the descendant's own `_columns` in place — a
@@ -133,8 +133,8 @@ describe("_returningColumnsForInsert memoization", () => {
     schemaHost.resetColumnInformation();
     await Reply.loadSchema();
 
-    const memoized = sub._returningColumnsForInsert(connection);
+    const memoized = await sub._returningColumnsForInsert(connection);
     Reflect.deleteProperty(Reply, "_returningColumnsForInsertCache");
-    expect(memoized).toEqual(sub._returningColumnsForInsert(connection));
+    expect(memoized).toEqual(await sub._returningColumnsForInsert(connection));
   });
 });

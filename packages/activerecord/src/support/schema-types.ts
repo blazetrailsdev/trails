@@ -219,10 +219,10 @@ export function columnsOf(table: TableSchema): Record<string, ColumnSpec> {
  * @internal
  */
 export async function supportsExpressionIndex(adapter: DatabaseAdapter): Promise<boolean> {
-  const a = adapter as { supportsExpressionIndex?: () => boolean };
+  const a = adapter as { supportsExpressionIndex?: () => Promise<boolean> };
   if (typeof a.supportsExpressionIndex !== "function") return false;
   try {
-    return a.supportsExpressionIndex();
+    return await a.supportsExpressionIndex();
   } catch {
     return false;
   }

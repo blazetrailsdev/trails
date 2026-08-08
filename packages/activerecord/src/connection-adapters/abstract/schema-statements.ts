@@ -847,10 +847,10 @@ export class SchemaStatements {
       [key: string]: unknown;
     } = {},
   ): Promise<void> {
-    const support = this as { supportsCheckConstraints?: () => boolean };
+    const support = this as { supportsCheckConstraints?: () => Promise<boolean> };
     if (
       typeof support.supportsCheckConstraints === "function" &&
-      !support.supportsCheckConstraints()
+      !(await support.supportsCheckConstraints())
     )
       return;
 
@@ -1849,12 +1849,17 @@ export class SchemaStatements {
     );
   }
 
-  quotedColumnsForIndex(columnNames: string[], options: Record<string, unknown> = {}): string {
+  async quotedColumnsForIndex(
+    columnNames: string[],
+    options: Record<string, unknown> = {},
+  ): Promise<string> {
     const quotedColumns = new Map(columnNames.map((name) => [name, this.quoteColumnName(name)]));
     return Array.from(
-      this.addOptionsForIndexColumns(
-        quotedColumns,
-        options as { order?: string | Record<string, string> },
+      (
+        await this.addOptionsForIndexColumns(
+          quotedColumns,
+          options as { order?: string | Record<string, string> },
+        )
       ).values(),
     ).join(", ");
   }
@@ -2008,16 +2013,19 @@ export class SchemaStatements {
   }
 
   /** @internal */
-  addOptionsForIndexColumns(
+  async addOptionsForIndexColumns(
     quotedColumns: Map<string, string>,
     options: {
       order?: string | Record<string, string>;
       opclass?: string | Record<string, string>;
       length?: number | Record<string, number>;
     } = {},
-  ): Map<string, string> {
+  ): Promise<Map<string, string>> {
     const adapter = this as any;
-    if (typeof adapter.supportsIndexSortOrder === "function" && adapter.supportsIndexSortOrder()) {
+    if (
+      typeof adapter.supportsIndexSortOrder === "function" &&
+      (await adapter.supportsIndexSortOrder())
+    ) {
       quotedColumns = this.addIndexSortOrder(quotedColumns, options);
     }
     return quotedColumns;
@@ -2304,7 +2312,7 @@ export class SchemaStatements {
     const adapter = this as any;
     if (
       typeof adapter.supportsCheckConstraints === "function" &&
-      !adapter.supportsCheckConstraints()
+      !(await adapter.supportsCheckConstraints())
     ) {
       return undefined;
     }

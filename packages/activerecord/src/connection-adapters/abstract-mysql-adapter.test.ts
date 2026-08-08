@@ -24,28 +24,30 @@ describe("AbstractMysqlAdapter#returnValueAfterInsert", () => {
     const { AbstractMysqlAdapter } = await import("./abstract-mysql-adapter.js");
     const adapter = Object.create(AbstractMysqlAdapter.prototype);
     adapter.supportsInsertReturning = () => false;
-    expect(adapter.returnValueAfterInsert(makeColumn({ autoIncrement: true }))).toBe(true);
+    expect(await adapter.returnValueAfterInsert(makeColumn({ autoIncrement: true }))).toBe(true);
   });
 
   it("returns false for non-auto-increment column when INSERT RETURNING not supported", async () => {
     const { AbstractMysqlAdapter } = await import("./abstract-mysql-adapter.js");
     const adapter = Object.create(AbstractMysqlAdapter.prototype);
     adapter.supportsInsertReturning = () => false;
-    expect(adapter.returnValueAfterInsert(makeColumn({ autoIncrement: false }))).toBe(false);
+    expect(await adapter.returnValueAfterInsert(makeColumn({ autoIncrement: false }))).toBe(false);
   });
 
   it("returns true for auto-populated column (default function) when INSERT RETURNING supported", async () => {
     const { AbstractMysqlAdapter } = await import("./abstract-mysql-adapter.js");
     const adapter = Object.create(AbstractMysqlAdapter.prototype);
     adapter.supportsInsertReturning = () => true;
-    expect(adapter.returnValueAfterInsert(makeColumn({ defaultFunction: "uuid()" }))).toBe(true);
+    expect(await adapter.returnValueAfterInsert(makeColumn({ defaultFunction: "uuid()" }))).toBe(
+      true,
+    );
   });
 
   it("returns false for plain column when INSERT RETURNING supported", async () => {
     const { AbstractMysqlAdapter } = await import("./abstract-mysql-adapter.js");
     const adapter = Object.create(AbstractMysqlAdapter.prototype);
     adapter.supportsInsertReturning = () => true;
-    expect(adapter.returnValueAfterInsert(makeColumn())).toBe(false);
+    expect(await adapter.returnValueAfterInsert(makeColumn())).toBe(false);
   });
 });
 
@@ -667,8 +669,8 @@ describe("AbstractMysqlAdapter#checkVersion", () => {
     (
       adapter as unknown as { getDatabaseVersion: () => InstanceType<typeof Version> }
     ).getDatabaseVersion = () => new Version("5.6.3");
-    expect(() => adapter.checkVersion()).toThrow(DatabaseVersionError);
-    expect(() => adapter.checkVersion()).toThrow(
+    await expect(adapter.checkVersion()).rejects.toThrow(DatabaseVersionError);
+    await expect(adapter.checkVersion()).rejects.toThrow(
       "Your version of MySQL (5.6.3) is too old. Active Record supports MySQL >= 5.6.4.",
     );
   });
@@ -684,7 +686,7 @@ describe("AbstractMysqlAdapter#checkVersion", () => {
     (
       adapter as unknown as { getDatabaseVersion: () => InstanceType<typeof Version> }
     ).getDatabaseVersion = () => new Version("5.6.4");
-    expect(() => adapter.checkVersion()).not.toThrow();
+    await expect(adapter.checkVersion()).resolves.toBeUndefined();
   });
 });
 

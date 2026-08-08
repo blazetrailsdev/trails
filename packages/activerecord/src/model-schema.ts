@@ -683,10 +683,10 @@ export function realInheritanceColumn(this: SchemaHost, value: string | null): v
 
 export const _inheritanceColumn = realInheritanceColumn;
 
-export function _returningColumnsForInsert(
+export async function _returningColumnsForInsert(
   this: SchemaHost,
-  connection: { returnValueAfterInsert?(column: { name: string }): boolean },
-): string[] {
+  connection: { returnValueAfterInsert?(column: { name: string }): Promise<boolean> },
+): Promise<string[]> {
   // Mirrors Rails _returning_columns_for_insert: the columns the DB auto-populates
   // on INSERT (auto-increment / serial / identity columns and DB-computed
   // defaults), falling back to the PK when the adapter reports none.
@@ -707,11 +707,14 @@ export function _returningColumnsForInsert(
   }
   const cols = columns.call(this) as { name: string; isAutoPopulated?: unknown }[];
   const memoize = (value: string[]): string[] => (this._returningColumnsForInsertCache = value);
-  const autoPopulated = cols
-    .filter(
-      (c) => typeof c.isAutoPopulated === "function" && connection.returnValueAfterInsert?.(c),
-    )
-    .map((c) => c.name);
+  const keep = await Promise.all(
+    cols.map(
+      async (c) =>
+        typeof c.isAutoPopulated === "function" &&
+        ((await connection.returnValueAfterInsert?.(c)) ?? false),
+    ),
+  );
+  const autoPopulated = cols.filter((_c, i) => keep[i]).map((c) => c.name);
   if (autoPopulated.length > 0) return memoize(autoPopulated);
   // PK fallback. Restrict to columns that actually exist on the table: Rails
   // reflects `primary_key` as nil for a table without that column (e.g. an

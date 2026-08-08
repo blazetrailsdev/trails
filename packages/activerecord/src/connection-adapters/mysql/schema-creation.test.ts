@@ -42,12 +42,12 @@ describeIfMysqlAdapter("MySQL::SchemaCreation", () => {
     // The lane's leased connection is MariaDB in CI, so the MySQL arm of
     // `mariadb?` (mysql/schema_creation.rb:35) is selected explicitly.
     const mysql = new SchemaCreation(mysqlConn({ isMariadb: () => false }));
-    expect((mysql as any).visitDropCheckConstraint("chk")).toBe("DROP CHECK chk");
+    expect(await (mysql as any).visitDropCheckConstraint("chk")).toBe("DROP CHECK chk");
   });
 
   it("visitDropCheckConstraint uses CONSTRAINT for MariaDB", async () => {
     const mdb = new SchemaCreation(mysqlConn({ isMariadb: () => true }));
-    expect((mdb as any).visitDropCheckConstraint("chk")).toBe("DROP CONSTRAINT chk");
+    expect(await (mdb as any).visitDropCheckConstraint("chk")).toBe("DROP CONSTRAINT chk");
   });
 
   it("visitAlterTable routes FK/check drops through the MySQL visitors", async () => {
@@ -87,12 +87,14 @@ describeIfMysqlAdapter("MySQL::SchemaCreation", () => {
 
   it("visitIndexDefinition generates inline INDEX sql", async () => {
     const idx = new IndexDefinition("users", "idx_users_email", false, ["email"]);
-    expect((sc as any).visitIndexDefinition(idx, false)).toBe("INDEX `idx_users_email` (`email`)");
+    expect(await (sc as any).visitIndexDefinition(idx, false)).toBe(
+      "INDEX `idx_users_email` (`email`)",
+    );
   });
 
   it("visitIndexDefinition generates CREATE UNIQUE INDEX with table", async () => {
     const idx = new IndexDefinition("users", "idx", true, ["email"]);
-    expect((sc as any).visitIndexDefinition(idx, true)).toBe(
+    expect(await (sc as any).visitIndexDefinition(idx, true)).toBe(
       "CREATE UNIQUE INDEX `idx` ON `users` (`email`)",
     );
   });
@@ -111,7 +113,7 @@ describeIfMysqlAdapter("MySQL::SchemaCreation", () => {
   it("visitCreateIndexDefinition appends algorithm", async () => {
     const idx = new IndexDefinition("users", "idx", false, ["col"]);
     const def = new CreateIndexDefinition(idx, false, "INPLACE");
-    expect((sc as any).visitCreateIndexDefinition(def)).toContain("INPLACE");
+    expect(await (sc as any).visitCreateIndexDefinition(def)).toContain("INPLACE");
   });
 
   it("emits inline index sort order when the adapter supports it", async () => {
@@ -119,7 +121,9 @@ describeIfMysqlAdapter("MySQL::SchemaCreation", () => {
     const idx = new IndexDefinition("users", "idx", false, ["email"], {
       orders: { email: "desc" },
     });
-    expect((withHost as any).visitIndexDefinition(idx, false)).toBe("INDEX `idx` (`email` DESC)");
+    expect(await (withHost as any).visitIndexDefinition(idx, false)).toBe(
+      "INDEX `idx` (`email` DESC)",
+    );
   });
 
   it("drops inline index sort order when the adapter version gate is unsupported", async () => {
@@ -127,7 +131,7 @@ describeIfMysqlAdapter("MySQL::SchemaCreation", () => {
     const idx = new IndexDefinition("users", "idx", false, ["email"], {
       orders: { email: "desc" },
     });
-    expect((withHost as any).visitIndexDefinition(idx, false)).toBe("INDEX `idx` (`email`)");
+    expect(await (withHost as any).visitIndexDefinition(idx, false)).toBe("INDEX `idx` (`email`)");
   });
 
   it("addTableOptionsBang appends charset and collation", async () => {

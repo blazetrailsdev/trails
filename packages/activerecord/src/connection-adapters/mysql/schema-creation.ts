@@ -49,13 +49,13 @@ type MysqlTableDef = TableDefinition & { charset?: string; collation?: string };
  * Rails' `SchemaCreation#initialize(conn)` always receives the live adapter, so the quoting
  * half is required and dispatches polymorphically. */
 export interface VisitorHostAdapter extends TableDefinitionConn {
-  supportsCheckConstraints(): boolean;
+  supportsCheckConstraints(): Promise<boolean>;
   supportsForeignKeys(): boolean;
   supportsIndexesInCreate(): boolean;
-  /** Version-gated: MariaDB ≥ 10.8.1 / MySQL ≥ 8.0.1. Reads the cached version
-   * synchronously and yields false when cold — warm via `getDatabaseVersion`. */
-  supportsIndexSortOrder(): boolean;
-  isMariadb(): boolean;
+  /** Version-gated: MariaDB ≥ 10.8.1 / MySQL ≥ 8.0.1 — fetches the server
+   * version on demand, so it is awaitable. */
+  supportsIndexSortOrder(): Promise<boolean>;
+  isMariadb(): Promise<boolean>;
   quote(value: unknown): string;
   /** Rails' `index_in_create` builds the IndexDefinition through `@conn.add_index_options`
    * (mysql/schema_creation.rb:99). */
@@ -77,7 +77,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
 
   /** @internal Live MariaDB lookup — consults the host adapter every call so a late
    * `getFullVersion()` flip (lazy detection on first probe) is honored. */
-  protected isMariadb(): boolean {
+  protected async isMariadb(): Promise<boolean> {
     return this.adapter.isMariadb();
   }
 
@@ -85,7 +85,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
    * (MariaDB >= 10.8.1 / MySQL >= 8.0.1). Consult the threaded adapter's version-gated
    * flag. The base returns `adapterName !== "mysql"` (always false),
    * so this override is what makes MySQL honor the version gate. */
-  protected override supportsIndexSortOrder(): boolean {
+  protected override async supportsIndexSortOrder(): Promise<boolean> {
     return this.adapter.supportsIndexSortOrder();
   }
 
@@ -179,8 +179,8 @@ export class SchemaCreation extends AbstractSchemaCreation {
   }
 
   /** @internal */
-  protected visitDropCheckConstraint(name: string): string {
-    return `DROP ${this.isMariadb() ? "CONSTRAINT" : "CHECK"} ${name}`;
+  protected override async visitDropCheckConstraint(name: string): Promise<string> {
+    return `DROP ${(await this.isMariadb()) ? "CONSTRAINT" : "CHECK"} ${name}`;
   }
 
   /** @internal */
@@ -209,7 +209,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
   }
 
   /** @internal Delegates to the adapter; honors MySQL 8.0.16+ / MariaDB 10.2.1+ version gating. */
-  protected supportsCheckConstraints(): boolean {
+  protected async supportsCheckConstraints(): Promise<boolean> {
     return this.adapter.supportsCheckConstraints();
   }
 
@@ -246,13 +246,13 @@ export class SchemaCreation extends AbstractSchemaCreation {
   }
 
   /** @internal */
-  protected override visitCreateIndexDefinition(o: CreateIndexDefinition): string {
-    const sql = this.visitIndexDefinition(o.index, true);
+  protected override async visitCreateIndexDefinition(o: CreateIndexDefinition): Promise<string> {
+    const sql = await this.visitIndexDefinition(o.index, true);
     return o.algorithm ? `${sql} ${o.algorithm}` : sql;
   }
 
   /** @internal */
-  protected visitIndexDefinition(o: IndexDefinition, create = false): string {
+  protected async visitIndexDefinition(o: IndexDefinition, create = false): Promise<string> {
     const indexType = o.type?.toUpperCase() ?? (o.unique ? "UNIQUE" : undefined);
 
     const parts: string[] = create ? ["CREATE"] : [];
@@ -261,13 +261,13 @@ export class SchemaCreation extends AbstractSchemaCreation {
     parts.push(this.adapter.quoteColumnName(o.name));
     if (o.using) parts.push(`USING ${o.using}`);
     if (create) parts.push(`ON ${this.adapter.quoteTableName(o.table)}`);
-    parts.push(`(${this.quotedColumns(o)})`);
+    parts.push(`(${await this.quotedColumns(o)})`);
 
     return this.addSqlCommentBang(parts.join(" "), o.comment);
   }
 
   /** @internal */
-  protected override quotedColumns(o: { columns: string | string[] }): string {
+  protected override async quotedColumns(o: { columns: string | string[] }): Promise<string> {
     if (typeof o.columns === "string") return o.columns;
     const idx = o as IndexDefinition;
     const quotedMap = new Map<string, string>(
@@ -279,7 +279,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
         length: idx.lengths as Record<string, number> | number | undefined,
         order: idx.orders as Record<string, string> | string | undefined,
       },
-      this.supportsIndexSortOrder(),
+      await this.supportsIndexSortOrder(),
     );
     return [...quotedMap.values()].join(", ");
   }
@@ -317,7 +317,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
     }
     if (mo.as) {
       sql += ` AS (${mo.as})`;
-      if (mo.stored) sql += this.isMariadb() ? " PERSISTENT" : " STORED";
+      if (mo.stored) sql += (await this.isMariadb()) ? " PERSISTENT" : " STORED";
     }
     return this.addSqlCommentBang(await super.addColumnOptions(sql, options), mo.comment);
   }

@@ -65,7 +65,7 @@ export class InsertAll {
    * Builder.conflictTarget can read `index.columns` / `index.where`.
    */
   uniqueBy: string | string[] | IndexDefinition | undefined;
-  returning: string | string[] | Nodes.SqlLiteral | false;
+  returning: string | string[] | Nodes.SqlLiteral | false | undefined;
 
   onDuplicate: "skip" | "update" | Nodes.SqlLiteral | undefined;
   updateOnly: string | string[] | undefined;
@@ -120,13 +120,6 @@ export class InsertAll {
         (Array.isArray(options.returning) && options.returning.length === 0)
           ? false
           : options.returning;
-    } else {
-      const supportsReturning =
-        typeof (this.connection as any).supportsInsertReturning === "function"
-          ? (this.connection as any).supportsInsertReturning()
-          : false;
-      this.returning = supportsReturning ? this.primaryKeys() : false;
-      this._returningDefaulted = supportsReturning;
     }
 
     if (this.inserts.length === 0) {
@@ -148,7 +141,6 @@ export class InsertAll {
 
     this.verifyAttributeNamesAreKnown();
     this.configureOnDuplicateUpdateLogic();
-    this.ensureValidOptionsForConnectionBang();
   }
 
   async execute(): Promise<Result> {
@@ -197,6 +189,18 @@ export class InsertAll {
     // directly for its `unique_by || model.primary_key` match.
     if (this._schemaCachePrimaryKeys === undefined) {
       this._schemaCachePrimaryKeys = await this.dbPrimaryKeys();
+      // Rails runs this in the constructor (`insert_all.rb:38`), keyed off
+      // `@returning.nil?`; `supports_insert_returning?` is async here, so it
+      // rides the same deferral `@unique_by` already takes and `returning`
+      // stays undefined — Ruby's nil — until now.
+      if (this.returning === undefined) {
+        const supportsReturning =
+          typeof (this.connection as any).supportsInsertReturning === "function"
+            ? await (this.connection as any).supportsInsertReturning()
+            : false;
+        this.returning = supportsReturning ? this.primaryKeys() : false;
+        this._returningDefaulted = supportsReturning;
+      }
       if (this._returningDefaulted) {
         // Rails: `@returning = primary_keys` then `@returning = false if
         // @returning == []` (insert_all.rb:39-40). For an id-less table the
@@ -209,6 +213,7 @@ export class InsertAll {
     if (!this._uniqueByResolved) {
       this.uniqueBy = await this.findUniqueIndexFor(this.uniqueBy);
       this._uniqueByResolved = true;
+      await this.ensureValidOptionsForConnectionBang();
     }
     if (this._updatableColumns) return;
     const exclude = new Set([...this.readonlyColumns(), ...this.uniqueByColumns()]);
@@ -365,11 +370,11 @@ export class InsertAll {
   }
 
   /** @internal */
-  private ensureValidOptionsForConnectionBang(): void {
+  private async ensureValidOptionsForConnectionBang(): Promise<void> {
     if (
       this.returning &&
       typeof (this.connection as any).supportsInsertReturning === "function" &&
-      !(this.connection as any).supportsInsertReturning()
+      !(await (this.connection as any).supportsInsertReturning())
     ) {
       throw new Error(
         `${(this.connection as any).constructor?.name ?? "Adapter"} does not support INSERT...RETURNING`,
@@ -445,11 +450,11 @@ export class InsertAll {
     // wrapper adapter that forgets to delegate doesn't silently fall through
     // and emit a bogus conflict target.
     const conn = this.connection as {
-      supportsInsertConflictTarget?: () => boolean;
+      supportsInsertConflictTarget?: () => Promise<boolean>;
     };
     const supports =
       typeof conn.supportsInsertConflictTarget === "function"
-        ? conn.supportsInsertConflictTarget()
+        ? await conn.supportsInsertConflictTarget()
         : false;
     if (!supports) {
       // Rails returns nil for a nil unique_by even when conflict targets are

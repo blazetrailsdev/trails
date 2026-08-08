@@ -8,18 +8,21 @@ import { adapterSupports, SUPPORTS_FEATURES } from "./supports.js";
 const MYSQL_FAMILY = ["Mysql2Adapter", "TrilogyAdapter"] as const;
 
 type LiveConnection = {
-  isMariadb?(): boolean;
-  databaseVersion: Version | number;
+  isMariadb?(): Promise<boolean>;
+  databaseVersion: Version | number | Promise<Version | number>;
   getDatabaseVersion(): Promise<Version | number>;
 } & Record<string, unknown>;
 
-function mysqlAtLeast(connection: LiveConnection, version: string): boolean {
-  return (connection.databaseVersion as Version).compare(version) >= 0;
+async function mysqlAtLeast(connection: LiveConnection, version: string): Promise<boolean> {
+  return ((await connection.databaseVersion) as Version).compare(version) >= 0;
 }
 
-function adapterHelperSupport(feature: string, connection: LiveConnection): boolean | undefined {
+async function adapterHelperSupport(
+  feature: string,
+  connection: LiveConnection,
+): Promise<boolean | undefined> {
   const mysql = currentAdapter(...MYSQL_FAMILY);
-  const mariadb = mysql && connection.isMariadb?.() === true;
+  const mariadb = mysql && (await connection.isMariadb?.()) === true;
   switch (feature) {
     case "default_expression":
       if (currentAdapter("PostgreSQLAdapter")) return true;
@@ -48,18 +51,18 @@ describe("supports table vs. the live adapter", () => {
 
   it("answers each feature key exactly as the connection does", async () => {
     const connection = (await Base.leaseConnection()) as unknown as LiveConnection;
-    await connection.getDatabaseVersion();
-
     const drift: string[] = [];
 
     for (const feature of SUPPORTS_FEATURES) {
-      const helperAnswer = adapterHelperSupport(feature, connection);
+      const helperAnswer = await adapterHelperSupport(feature, connection);
       let live: boolean;
       if (helperAnswer !== undefined) {
         live = helperAnswer;
       } else {
         const method = connection[methodName(feature)];
-        live = typeof method === "function" && (method as () => boolean).call(connection) === true;
+        live =
+          typeof method === "function" &&
+          (await (method as () => boolean | Promise<boolean>).call(connection)) === true;
       }
       const table = adapterSupports(feature);
       if (table !== live) drift.push(`${feature}: table=${table} adapter=${live}`);

@@ -709,12 +709,12 @@ describeIfSupports("foreign_keys", "Migration", () => {
 
         if (adapterType === "mysql") {
           const mysqlConn = conn as unknown as {
-            isMariadb?: () => boolean;
+            isMariadb?: () => Promise<boolean>;
             databaseVersion: unknown;
           };
-          if (mysqlConn.isMariadb?.() === true) {
+          if ((await mysqlConn.isMariadb?.()) === true) {
             expect(message).toMatch(/Duplicate key on write or update/);
-          } else if (String(mysqlConn.databaseVersion) < "8.0") {
+          } else if (String(await mysqlConn.databaseVersion) < "8.0") {
             expect(message).toMatch(/Can't write; duplicate key in table/);
           } else {
             expect(message).toMatch(/Duplicate foreign key constraint name/);

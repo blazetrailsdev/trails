@@ -1257,15 +1257,15 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return true;
   }
 
-  supportsExpressionIndex(): boolean {
-    return this.databaseVersion.compare("3.9.0") >= 0;
+  async supportsExpressionIndex(): Promise<boolean> {
+    return (await this.databaseVersion).compare("3.9.0") >= 0;
   }
 
   override supportsForeignKeys(): boolean {
     return true;
   }
 
-  override supportsCheckConstraints(): boolean {
+  override async supportsCheckConstraints(): Promise<boolean> {
     return true;
   }
 
@@ -1277,16 +1277,16 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return true;
   }
 
-  override supportsJson(): boolean {
+  override async supportsJson(): Promise<boolean> {
     return true;
   }
 
-  override supportsCommonTableExpressions(): boolean {
-    return this.databaseVersion.compare("3.8.3") >= 0;
+  override async supportsCommonTableExpressions(): Promise<boolean> {
+    return (await this.databaseVersion).compare("3.8.3") >= 0;
   }
 
-  supportsInsertReturning(): boolean {
-    return this.databaseVersion.compare("3.35.0") >= 0;
+  async supportsInsertReturning(): Promise<boolean> {
+    return (await this.databaseVersion).compare("3.35.0") >= 0;
   }
 
   /** Mirrors: SQLite3::DatabaseStatements#returning_column_values — the full
@@ -1321,31 +1321,31 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return this.executeMutation(this.buildTruncateStatement(tableName), [], name ?? "SQL");
   }
 
-  supportsInsertOnConflict(): boolean {
-    return this.databaseVersion.compare("3.24.0") >= 0;
+  async supportsInsertOnConflict(): Promise<boolean> {
+    return (await this.databaseVersion).compare("3.24.0") >= 0;
   }
 
-  override supportsInsertOnDuplicateSkip(): boolean {
-    return this.supportsInsertOnConflict();
+  override async supportsInsertOnDuplicateSkip(): Promise<boolean> {
+    return await this.supportsInsertOnConflict();
   }
 
-  override supportsInsertOnDuplicateUpdate(): boolean {
-    return this.supportsInsertOnConflict();
+  override async supportsInsertOnDuplicateUpdate(): Promise<boolean> {
+    return await this.supportsInsertOnConflict();
   }
 
-  override supportsInsertConflictTarget(): boolean {
-    return this.supportsInsertOnConflict();
+  override async supportsInsertConflictTarget(): Promise<boolean> {
+    return await this.supportsInsertOnConflict();
   }
 
   override supportsConcurrentConnections(): boolean {
     return !this._memoryDatabase;
   }
 
-  override supportsVirtualColumns(): boolean {
-    return this.databaseVersion.compare("3.31.0") >= 0;
+  override async supportsVirtualColumns(): Promise<boolean> {
+    return (await this.databaseVersion).compare("3.31.0") >= 0;
   }
 
-  override supportsIndexSortOrder(): boolean {
+  override async supportsIndexSortOrder(): Promise<boolean> {
     return true;
   }
 
@@ -1472,15 +1472,14 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   /**
    * Mirrors: SQLite3Adapter#get_database_version (`sqlite3_adapter.rb:476-478`)
    * — a pure fetch, run at most once through the pool memo
-   * (`pool_config.rb:39-41`) that `configureConnection` fills at connect time.
+   * (`pool_config.rb:39-41`), which `database_version` fills on demand.
    *
    * Deviation, language-forced: Rails reads the value through
-   * `query_value(..., "SCHEMA")`, whose trails counterpart is `async`, and the
-   * version-gated `supports*()` readers are sync. The query is issued on the
-   * driver so an in-process driver can answer synchronously; an async-only
-   * driver (no `openSync()`) answers a Promise, which the pool memo resolves.
-   * Nothing is open on the deferred async-checkout path, where Rails has no
-   * connection to ask at all.
+   * `query_value(..., "SCHEMA")`, whose trails counterpart is `async`. The
+   * query is issued on the driver so an in-process driver can answer
+   * synchronously; an async-only driver (no `openSync()`) answers a Promise,
+   * which the pool memo resolves. Nothing is open on the deferred
+   * async-checkout path, where Rails has no connection to ask at all.
    */
   override getDatabaseVersion(): Version | Promise<Version> {
     const driver = this.driver as SqliteConnection | undefined;
@@ -1496,10 +1495,10 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return toVersion(row);
   }
 
-  override checkVersion(): void {
-    if (this.databaseVersion.compare("3.8.0") < 0) {
+  override async checkVersion(): Promise<void> {
+    if ((await this.databaseVersion).compare("3.8.0") < 0) {
       throw new Error(
-        `Your version of SQLite (${this.databaseVersion}) is too old. Active Record supports SQLite >= 3.8.`,
+        `Your version of SQLite (${await this.databaseVersion}) is too old. Active Record supports SQLite >= 3.8.`,
       );
     }
   }
@@ -2363,7 +2362,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     // as a bare table name and returns zero rows.
     const { schema, bare } = this._splitTableName(tableName);
     const pragmaPrefix = schema ? `${quoteColumnName(schema)}.` : "";
-    const pragma = this.supportsVirtualColumns() ? "table_xinfo" : "table_info";
+    const pragma = (await this.supportsVirtualColumns()) ? "table_xinfo" : "table_info";
     return this.schemaQuery(`PRAGMA ${pragmaPrefix}${pragma}(${quoteColumnName(bare)})`);
   }
 
@@ -2919,14 +2918,21 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
         "The retries option is deprecated and will be removed in Rails 8.1. Use timeout instead.\n",
       );
     }
-    // Base only runs the sync version check; SQLite's PRAGMAs are the async
-    // work, awaited by the driver-async branch below. Void the base call.
-    void super.configureConnection();
+    // Rails runs `super` — i.e. `check_version` — before the pragmas
+    // (`sqlite3_adapter.rb:835-838`) and lets it raise. `checkVersion` is async
+    // here, so its result has to be threaded into what this returns rather than
+    // voided, or a too-old-SQLite error becomes an unhandled rejection instead
+    // of one `attemptConfigureConnection` can see. On the sync-driver path the
+    // pragmas still run synchronously — callers get a configured adapter as
+    // soon as the constructor returns — so only the check's *settlement*, not
+    // its start, trails them.
+    const checked = super.configureConnection();
     const stmts = this.configurePragmas();
     const warn = (label: string, e: unknown) =>
       console.warn(`${label} failed: ${e instanceof Error ? e.message : String(e)}`);
     if (this.driverIsAsync()) {
       return (async () => {
+        await checked;
         for (const [sql, label] of stmts) {
           try {
             await this.driver.pragma(sql);
@@ -2943,6 +2949,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
         warn(label, e);
       }
     }
+    return checked;
   }
 
   /** @internal */
@@ -3138,7 +3145,7 @@ dirtiesQueryCache(SQLite3Adapter, "execQuery", "execute");
  * @internal
  */
 export interface SQLite3Adapter {
-  get databaseVersion(): Version;
+  get databaseVersion(): Version | Promise<Version>;
 }
 /* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
 

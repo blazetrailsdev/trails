@@ -77,30 +77,32 @@ describe("PostgreSQL SchemaCreation", () => {
     expect(sql).toContain("DEFERRABLE INITIALLY DEFERRED");
   });
 
-  it("visitUniqueConstraintDefinition: basic + NULLS NOT DISTINCT + USING INDEX", () => {
+  it("visitUniqueConstraintDefinition: basic + NULLS NOT DISTINCT + USING INDEX", async () => {
     expect(
-      s().visitUniqueConstraintDefinition(new UniqueConstraintDefinition("t", "e", { name: "u" })),
+      await s().visitUniqueConstraintDefinition(
+        new UniqueConstraintDefinition("t", "e", { name: "u" }),
+      ),
     ).toContain('CONSTRAINT "u" UNIQUE');
     expect(
-      s().visitUniqueConstraintDefinition(
+      await s().visitUniqueConstraintDefinition(
         new UniqueConstraintDefinition("t", "e", { name: "u", nullsNotDistinct: true }),
       ),
     ).toContain("NULLS NOT DISTINCT");
     expect(
-      s().visitUniqueConstraintDefinition(
+      await s().visitUniqueConstraintDefinition(
         new UniqueConstraintDefinition("t", "e", { name: "u", usingIndex: "idx" }),
       ),
     ).toContain('USING INDEX "idx"');
   });
 
-  it("visitAddExclusionConstraint / visitAddUniqueConstraint", () => {
+  it("visitAddExclusionConstraint / visitAddUniqueConstraint", async () => {
     expect(
       s().visitAddExclusionConstraint(
         new ExclusionConstraintDefinition("t", "e WITH &&", { name: "c" }),
       ),
     ).toMatch(/^ADD CONSTRAINT/);
     expect(
-      s().visitAddUniqueConstraint(new UniqueConstraintDefinition("t", "col", { name: "c" })),
+      await s().visitAddUniqueConstraint(new UniqueConstraintDefinition("t", "col", { name: "c" })),
     ).toMatch(/^ADD CONSTRAINT/);
   });
 
@@ -170,9 +172,9 @@ describe("PostgreSQL SchemaCreation", () => {
     expect(sql).not.toContain("CONSTRAINT");
   });
 
-  it("visitUniqueConstraintDefinition: unnamed constraint omits CONSTRAINT prefix", () => {
+  it("visitUniqueConstraintDefinition: unnamed constraint omits CONSTRAINT prefix", async () => {
     const uc = new UniqueConstraintDefinition("t", "col", {});
-    const sql = s().visitUniqueConstraintDefinition(uc);
+    const sql = await s().visitUniqueConstraintDefinition(uc);
     expect(sql).toMatch(/^UNIQUE/);
     expect(sql).not.toContain("CONSTRAINT");
   });
@@ -197,17 +199,17 @@ describe("PostgreSQL SchemaCreation", () => {
     expect(sql).toContain(", VALIDATE CONSTRAINT");
   });
 
-  it("quotedIncludeColumns + tableModifierInCreate", () => {
-    expect(s().quotedIncludeColumnsForIndex("a, b")).toBe("a, b");
-    expect(s().quotedIncludeColumnsForIndex(["a", "b"])).toBe('"a", "b"');
-    expect(s().quotedIncludeColumns("raw, expr")).toBe("raw, expr");
-    expect(s().quotedIncludeColumns(["a", "b"])).toBe('"a", "b"');
+  it("quotedIncludeColumns + tableModifierInCreate", async () => {
+    expect(await s().quotedIncludeColumnsForIndex("a, b")).toBe("a, b");
+    expect(await s().quotedIncludeColumnsForIndex(["a", "b"])).toBe('"a", "b"');
+    expect(await s().quotedIncludeColumns("raw, expr")).toBe("raw, expr");
+    expect(await s().quotedIncludeColumns(["a", "b"])).toBe('"a", "b"');
     expect(s().tableModifierInCreate({ temporary: true })).toBe(" TEMPORARY");
     expect(s().tableModifierInCreate({ unlogged: true })).toBe(" UNLOGGED");
     expect(s().tableModifierInCreate({})).toBe("");
   });
 
-  it("quotedIncludeColumnsForIndex delegates to the adapter when threaded", () => {
+  it("quotedIncludeColumnsForIndex delegates to the adapter when threaded", async () => {
     const sc = new SchemaCreation({
       quoteColumnName: (n: string) => `"${n}"`,
       quoteTableName: (n: string) => `"${n}"`,
@@ -215,7 +217,7 @@ describe("PostgreSQL SchemaCreation", () => {
       typeToSql: (type: string) => type,
       quotedIncludeColumnsForIndex: () => "<<delegated>>",
     } as any) as any;
-    expect(sc.quotedIncludeColumnsForIndex(["a", "b"])).toBe("<<delegated>>");
+    expect(await sc.quotedIncludeColumnsForIndex(["a", "b"])).toBe("<<delegated>>");
   });
 
   // Rails' PostgreSQLAdapter#native_database_types replaces the constant's raw

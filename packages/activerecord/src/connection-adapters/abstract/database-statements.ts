@@ -1604,7 +1604,7 @@ async function insertStatement(
     // id so the single PK/auto-populated column is still filled. Returned as an
     // array to match Rails' `returning_column_values` shape.
     if (result instanceof Result) {
-      const rv = (this.returningColumnValues ?? returningColumnValues).call(this, result);
+      const rv = await (this.returningColumnValues ?? returningColumnValues).call(this, result);
       // `undefined` first element means no value was extracted (no RETURNING
       // clause emitted) — fall back to the insert id. A real `null` is a
       // legitimate RETURNING value and must be preserved, so guard on

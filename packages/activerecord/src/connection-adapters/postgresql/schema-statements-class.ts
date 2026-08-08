@@ -250,10 +250,10 @@ export class SchemaStatements extends AbstractSchemaStatements {
     return Number(count) > 0;
   }
 
-  quotedIncludeColumnsForIndex(columnNames: string | string[]): string {
+  async quotedIncludeColumnsForIndex(columnNames: string | string[]): Promise<string> {
     if (typeof columnNames === "string") return this.quoteColumnName(columnNames);
     const quotedColumns = new Map(columnNames.map((name) => [name, this.quoteColumnName(name)]));
-    return Array.from(this.addOptionsForIndexColumns(quotedColumns).values()).join(", ");
+    return Array.from((await this.addOptionsForIndexColumns(quotedColumns)).values()).join(", ");
   }
 
   // ---------------------------------------------------------------------------
@@ -395,7 +395,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     if (inherited.length > 0) {
       options.options = `INHERITS (${inherited.join(", ")})`;
     }
-    if (!options.options && this.supportsNativePartitioning()) {
+    if (!options.options && (await this.supportsNativePartitioning())) {
       const partDef = await this.tablePartitionDefinition(tableName);
       if (partDef) options.options = `PARTITION BY ${partDef}`;
     }
@@ -416,10 +416,10 @@ export class SchemaStatements extends AbstractSchemaStatements {
       attgenerated: string | null;
     }[]
   > {
-    const identityCol = this.supportsIdentityColumns()
+    const identityCol = (await this.supportsIdentityColumns())
       ? "attidentity"
       : `${this.quote("")}::varchar`;
-    const generatedCol = this.supportsVirtualColumns()
+    const generatedCol = (await this.supportsVirtualColumns())
       ? "attgenerated"
       : `${this.quote("")}::varchar`;
     const rows = await this.schemaQuery(

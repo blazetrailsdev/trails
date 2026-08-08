@@ -55,9 +55,9 @@ describe("SchemaDumperTest", () => {
   // mirror that by consulting the live adapter flag rather than blanket-excluding
   // the MySQL family — the CI MariaDB 11 lane supports it, so `companies` dumps
   // the descending `order:` exactly as Rails does there.
-  function dumpsIndexSortOrder(): boolean {
+  async function dumpsIndexSortOrder(): Promise<boolean> {
     return (
-      Base.adapter as unknown as { supportsIndexSortOrder(): boolean }
+      Base.adapter as unknown as { supportsIndexSortOrder(): Promise<boolean> }
     ).supportsIndexSortOrder();
   }
 
@@ -218,7 +218,7 @@ describe("SchemaDumperTest", () => {
     const base =
       'await ctx.addIndex("companies", ["firm_id", "type", "rating"], { name: "company_index"';
     const lengthPart = adapterType === "mysql" ? ", length: { type: 10 }" : "";
-    const orderPart = dumpsIndexSortOrder() ? ', order: { rating: "desc" }' : "";
+    const orderPart = (await dumpsIndexSortOrder()) ? ', order: { rating: "desc" }' : "";
     expect(line).toBe(`${base}${lengthPart}${orderPart} });`);
   });
 
@@ -250,7 +250,7 @@ describe("SchemaDumperTest", () => {
     // Rails IndexDefinition#concise_options collapses a uniform order map to a
     // scalar (`order: :desc`); backends that don't surface sort order here emit a
     // plain index (schema_dumper_test.rb:203-211).
-    const expected = dumpsIndexSortOrder()
+    const expected = (await dumpsIndexSortOrder())
       ? 'await ctx.addIndex("companies", ["name", "rating"], { name: "index_companies_on_name_and_rating", order: "desc" });'
       : 'await ctx.addIndex("companies", ["name", "rating"], { name: "index_companies_on_name_and_rating" });';
     expect(line).toBe(expected);

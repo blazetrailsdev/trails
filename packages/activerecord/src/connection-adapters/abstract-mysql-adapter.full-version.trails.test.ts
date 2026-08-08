@@ -20,15 +20,15 @@ describe("Mysql2Adapter#full_version", () => {
     return adapter;
   }
 
-  it("answers the full version string the Version carries", () => {
-    expect(adapterWith(new Version("10.6.5", "5.5.5-10.6.5-MariaDB")).fullVersion()).toBe(
+  it("answers the full version string the Version carries", async () => {
+    expect(await adapterWith(new Version("10.6.5", "5.5.5-10.6.5-MariaDB")).fullVersion()).toBe(
       "5.5.5-10.6.5-MariaDB",
     );
-    expect(adapterWith(new Version("10.6.5", "5.5.5-10.6.5-MariaDB")).isMariadb()).toBe(true);
+    expect(await adapterWith(new Version("10.6.5", "5.5.5-10.6.5-MariaDB")).isMariadb()).toBe(true);
   });
 
-  it("answers nil, not an empty string, when the Version carries none", () => {
-    expect(adapterWith(new Version("10.6.5")).fullVersion()).toBeNull();
-    expect(adapterWith(new Version("10.6.5")).isMariadb()).toBe(false);
+  it("answers nil, not an empty string, when the Version carries none", async () => {
+    expect(await adapterWith(new Version("10.6.5")).fullVersion()).toBeNull();
+    expect(await adapterWith(new Version("10.6.5")).isMariadb()).toBe(false);
   });
 });

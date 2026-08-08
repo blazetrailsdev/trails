@@ -1002,7 +1002,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(indexLine).toContain(`"companies", ["firm_id", "type"]`);
       expect(indexLine).not.toContain(`["firm_id", "type", "name"`);
       expect(indexLine?.includes(`include: ["name","account_id"]`)).toBe(
-        adapter.supportsIndexInclude(),
+        await adapter.supportsIndexInclude(),
       );
     });
   });
@@ -1011,8 +1011,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     itIfSupports("nulls_not_distinct", "nulls not distinct is dumped", async () => {
       try {
         await adapter.exec(`CREATE TABLE trains (id serial primary key, name varchar(50))`);
-        await adapter.getDatabaseVersion();
-        if (!adapter.supportsNullsNotDistinct()) return;
+        if (!(await adapter.supportsNullsNotDistinct())) return;
         await adapter.exec(
           `CREATE INDEX trains_name ON trains USING btree(name) NULLS NOT DISTINCT`,
         );
@@ -1026,8 +1025,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     itIfSupports("nulls_not_distinct", "nulls distinct is dumped", async () => {
       try {
         await adapter.exec(`CREATE TABLE trains (id serial primary key, name varchar(50))`);
-        await adapter.getDatabaseVersion();
-        if (!adapter.supportsNullsNotDistinct()) return;
+        if (!(await adapter.supportsNullsNotDistinct())) return;
         await adapter.exec(`CREATE INDEX trains_name ON trains USING btree(name) NULLS DISTINCT`);
         const lines: string[] = [];
         await adapter.createSchemaDumper(adapter).dumpTable(lines, "trains");

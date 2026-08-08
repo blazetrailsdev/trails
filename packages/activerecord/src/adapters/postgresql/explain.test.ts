@@ -105,18 +105,18 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(result).toContain("Result");
     });
 
-    it("buildExplainClause renders FORMAT JSON for { format: 'json' }", () => {
-      const clause = adapter.buildExplainClause([{ format: "json" }]);
+    it("buildExplainClause renders FORMAT JSON for { format: 'json' }", async () => {
+      const clause = await adapter.buildExplainClause([{ format: "json" }]);
       expect(clause).toBe("EXPLAIN (FORMAT JSON) for:");
     });
 
-    it("buildExplainClause combines string flags and format hash", () => {
-      const clause = adapter.buildExplainClause(["analyze", { format: "json" }]);
+    it("buildExplainClause combines string flags and format hash", async () => {
+      const clause = await adapter.buildExplainClause(["analyze", { format: "json" }]);
       expect(clause).toBe("EXPLAIN (ANALYZE, FORMAT JSON) for:");
     });
 
-    it("buildExplainClause rejects unknown format", () => {
-      expect(() => adapter.buildExplainClause([{ format: "bogus" }])).toThrow();
+    it("buildExplainClause rejects unknown format", async () => {
+      await expect(adapter.buildExplainClause([{ format: "bogus" }])).rejects.toThrow();
     });
 
     it("explain executes with { format: 'json' } and returns JSON plan", async () => {

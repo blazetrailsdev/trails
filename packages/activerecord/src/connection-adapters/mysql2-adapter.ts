@@ -582,7 +582,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     returning?: string[] | null,
   ): Promise<Result | number> {
     const inferredFromPk = pk !== false && pk != null;
-    if (this.supportsInsertReturning() && (returning?.length || inferredFromPk)) {
+    if ((await this.supportsInsertReturning()) && (returning?.length || inferredFromPk)) {
       const [returningSql, returningBinds] = sqlForInsert.call(
         this as never,
         sql,
@@ -1326,7 +1326,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     binds: unknown[] = [],
     options: ExplainOption[] = [],
   ): Promise<string> {
-    const clause = this._explainStatementClause(options);
+    const clause = await this._explainStatementClause(options);
     const start = Date.now();
     const result = await this.internalExecQuery(`${clause} ${sql}`, "EXPLAIN", binds);
     const elapsed = (Date.now() - start) / 1000;
@@ -1730,13 +1730,13 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   /**
-   * Mirrors: Mysql2Adapter#full_version (mysql2_adapter.rb:164-166). Sync like
-   * Rails, because `database_version` is the memo `configureConnection` warms.
+   * Mirrors: Mysql2Adapter#full_version (mysql2_adapter.rb:164-166) — a bare
+   * `database_version.full_version_string`, which fetches on demand.
    *
    * @internal
    */
-  override fullVersion(): string | null {
-    return this.databaseVersion.fullVersionString;
+  override async fullVersion(): Promise<string | null> {
+    return (await this.databaseVersion).fullVersionString;
   }
 
   /**

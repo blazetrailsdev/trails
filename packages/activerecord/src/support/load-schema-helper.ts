@@ -22,7 +22,7 @@ import { STUBBED_DDL_METHODS } from "./stubbed-ddl-methods.js";
  */
 async function loadPostgresqlSpecificSchema(adapter: PostgreSQLAdapter): Promise<void> {
   await adapter.enableExtension("uuid-ossp");
-  if (adapter.supportsPgcryptoUuid()) await adapter.enableExtension("pgcrypto");
+  if (await adapter.supportsPgcryptoUuid()) await adapter.enableExtension("pgcrypto");
 
   // `uuid_default = supports_pgcrypto_uuid? ? {} : { default: "uuid_generate_v4()" }`
   // (line 7), splatted into the three `id: :uuid` tables below. With pgcrypto the
@@ -30,7 +30,7 @@ async function loadPostgresqlSpecificSchema(adapter: PostgreSQLAdapter): Promise
   // does not exist, so the PK falls back to uuid-ossp's `uuid_generate_v4()`.
   // The bare string (not a thunk) is Rails verbatim: quoteDefaultExpression emits
   // a `()`-bearing string unquoted on a uuid column.
-  const uuidDefault: { default?: string } = adapter.supportsPgcryptoUuid()
+  const uuidDefault: { default?: string } = (await adapter.supportsPgcryptoUuid())
     ? {}
     : { default: "uuid_generate_v4()" };
 
@@ -54,9 +54,10 @@ async function loadPostgresqlSpecificSchema(adapter: PostgreSQLAdapter): Promise
     pg.uuid("uuid_parent_id");
   });
 
+  const supportsVirtualColumns = await adapter.supportsVirtualColumns();
   await adapter.createTable("defaults", { force: true }, (t) => {
     const pg = t as PgTableDefinition;
-    if (adapter.supportsVirtualColumns()) {
+    if (supportsVirtualColumns) {
       pg.virtual("virtual_stored_number", {
         type: "integer",
         as: "random_number * 10",
@@ -88,7 +89,7 @@ async function loadPostgresqlSpecificSchema(adapter: PostgreSQLAdapter): Promise
     pg.text("multiline_default", { default: "--- []\n\n" });
   });
 
-  if (adapter.supportsIdentityColumns()) {
+  if (await adapter.supportsIdentityColumns()) {
     await adapter.dropTable("postgresql_identity_table", { ifExists: true });
     await adapter.execute(
       "create table postgresql_identity_table (\n" +
@@ -266,7 +267,7 @@ async function loadPostgresqlSpecificSchema(adapter: PostgreSQLAdapter): Promise
     });
   });
 
-  if (adapter.supportsPartitionedIndexes()) {
+  if (await adapter.supportsPartitionedIndexes()) {
     await adapter.createTable(
       "measurements",
       { id: false, force: true, options: "PARTITION BY LIST (city_id)" },
@@ -299,7 +300,7 @@ async function loadPostgresqlSpecificSchema(adapter: PostgreSQLAdapter): Promise
     ifNotExists: true,
   });
 
-  if (adapter.supportsInsertReturning()) {
+  if (await adapter.supportsInsertReturning()) {
     await adapter.createTable(
       "pk_autopopulated_by_a_trigger_records",
       { force: true, id: false },
@@ -340,9 +341,10 @@ async function loadPostgresqlSpecificSchema(adapter: PostgreSQLAdapter): Promise
  * worker and so cannot pull in `supports.ts`'s `vitest` import.
  */
 async function loadMysql2SpecificSchema(adapter: AbstractMysqlAdapter): Promise<void> {
-  const supportsDefaultExpression = adapter.isMariadb()
-    ? adapter.databaseVersion.compare("10.2.1") >= 0
-    : adapter.databaseVersion.compare("8.0.13") >= 0;
+  const databaseVersion = await adapter.databaseVersion;
+  const supportsDefaultExpression = (await adapter.isMariadb())
+    ? databaseVersion.compare("10.2.1") >= 0
+    : databaseVersion.compare("8.0.13") >= 0;
 
   await adapter.createTable("datetime_defaults", { force: true }, (t) => {
     t.datetime("modified_datetime", { precision: null, default: () => "CURRENT_TIMESTAMP" });
@@ -427,7 +429,7 @@ async function loadMysql2SpecificSchema(adapter: AbstractMysqlAdapter): Promise<
     "CREATE PROCEDURE topics(IN num INT) SQL SECURITY INVOKER\nBEGIN\n  SELECT * FROM topics LIMIT num;\nEND\n",
   );
 
-  if (adapter.supportsInsertReturning()) {
+  if (await adapter.supportsInsertReturning()) {
     await adapter.createTable(
       "pk_autopopulated_by_a_trigger_records",
       { force: true, id: false },

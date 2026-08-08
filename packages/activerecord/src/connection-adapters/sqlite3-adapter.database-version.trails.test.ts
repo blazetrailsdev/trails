@@ -25,6 +25,6 @@ describe("SQLite3Adapter database version", () => {
   it("databaseVersion answers through the pool memo", async () => {
     adapter = new BetterSQLite3Adapter({ database: ":memory:" });
     const version = await adapter.getDatabaseVersion();
-    expect(adapter.databaseVersion.toString()).toBe(version.toString());
+    expect(String(await adapter.databaseVersion)).toBe(version.toString());
   });
 });

@@ -125,7 +125,7 @@ describe("ExplainTest", () => {
     let called = 0;
     adapter.explain = async () => `query plan ${sqls[called++]}`;
     try {
-      const clause = buildExplainClause(adapter);
+      const clause = await buildExplainClause(adapter);
       const expected = sqls.map((sql) => `${clause} ${sql}\nquery plan ${sql}`).join("\n\n");
       expect(await Base.execExplain(queries)).toBe(expected);
     } finally {
@@ -149,7 +149,7 @@ describe("ExplainTest", () => {
     let called = 0;
     adapter.explain = async () => `query plan ${sqls[called++]}`;
     try {
-      const clause = buildExplainClause(adapter);
+      const clause = await buildExplainClause(adapter);
       const expected = [
         `${clause} ${sqls[0]} [1]\nquery plan ${sqls[0]}`,
         `${clause} ${sqls[1]} [2]\nquery plan ${sqls[1]}`,

@@ -133,9 +133,13 @@ export class SchemaCreation extends AbstractSchemaCreation {
     }
     if (Array.isArray(o.uniqueConstraintAdds) && o.uniqueConstraintAdds.length > 0) {
       pgParts.push(
-        (o.uniqueConstraintAdds as UniqueConstraintDefinition[])
-          .map((con) => this.visitAddUniqueConstraint(con))
-          .join(", "),
+        (
+          await Promise.all(
+            (o.uniqueConstraintAdds as UniqueConstraintDefinition[]).map((con) =>
+              this.visitAddUniqueConstraint(con),
+            ),
+          )
+        ).join(", "),
       );
     }
     if (pgParts.length > 0) {
@@ -184,11 +188,11 @@ export class SchemaCreation extends AbstractSchemaCreation {
   }
 
   /** @internal */
-  protected visitUniqueConstraintDefinition(o: UniqueConstraintDefinition): string {
+  protected async visitUniqueConstraintDefinition(o: UniqueConstraintDefinition): Promise<string> {
     const p: string[] = [];
     if (o.name) p.push("CONSTRAINT", this.adapter.quoteColumnName(o.name));
     p.push("UNIQUE");
-    if (this.supportsNullsNotDistinct() && o.nullsNotDistinct) p.push("NULLS NOT DISTINCT");
+    if ((await this.supportsNullsNotDistinct()) && o.nullsNotDistinct) p.push("NULLS NOT DISTINCT");
     if (o.usingIndex) {
       p.push(`USING INDEX ${this.adapter.quoteColumnName(o.usingIndex)}`);
     } else {
@@ -216,8 +220,8 @@ export class SchemaCreation extends AbstractSchemaCreation {
   }
 
   /** @internal */
-  protected visitAddUniqueConstraint(o: UniqueConstraintDefinition): string {
-    return `ADD ${this.visitUniqueConstraintDefinition(o)}`;
+  protected async visitAddUniqueConstraint(o: UniqueConstraintDefinition): Promise<string> {
+    return `ADD ${await this.visitUniqueConstraintDefinition(o)}`;
   }
 
   /**
@@ -318,7 +322,9 @@ export class SchemaCreation extends AbstractSchemaCreation {
   }
 
   /** @internal */
-  protected override tableConstraintStatements(o: AbstractTableDefinition): string[] {
+  protected override async tableConstraintStatements(
+    o: AbstractTableDefinition,
+  ): Promise<string[]> {
     if ((o as { as?: unknown }).as) return [];
     const pg = o as PgTableDef;
     const result: string[] = [];
@@ -326,7 +332,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
       result.push(this.visitExclusionConstraintDefinition(exc));
     }
     for (const uc of pg.uniqueConstraints ?? []) {
-      result.push(this.visitUniqueConstraintDefinition(uc));
+      result.push(await this.visitUniqueConstraintDefinition(uc));
     }
     return result;
   }
@@ -339,9 +345,9 @@ export class SchemaCreation extends AbstractSchemaCreation {
    * shim is wired).
    * @internal
    */
-  protected quotedIncludeColumnsForIndex(o: string | string[]): string {
+  protected async quotedIncludeColumnsForIndex(o: string | string[]): Promise<string> {
     const host = this.adapter as PgSchemaCreationHost & {
-      quotedIncludeColumnsForIndex?(columns: string | string[]): string;
+      quotedIncludeColumnsForIndex?(columns: string | string[]): Promise<string>;
     };
     if (typeof host.quotedIncludeColumnsForIndex === "function") {
       return host.quotedIncludeColumnsForIndex(o);
@@ -356,7 +362,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
    * (postgresql/schema_creation.rb:143-144).
    * @internal
    */
-  protected override quotedIncludeColumns(o: string | string[]): string {
+  protected override async quotedIncludeColumns(o: string | string[]): Promise<string> {
     return typeof o === "string" ? o : this.quotedIncludeColumnsForIndex(o);
   }
 
