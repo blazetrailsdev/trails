@@ -30,7 +30,9 @@ import {
   bestBundle,
   isIndexStale,
   __setLockDirForTest,
+  __setLockWaitForTest,
   acquireTasksLock,
+  assertCleanWorktree,
   buildRfcContent,
   buildStoryContent,
   MutatorEarlyExit,
@@ -1386,7 +1388,10 @@ describe("numberFlag / stringFlag (value-flag validation)", () => {
 describe("commitAndPush (git mutation flow)", () => {
   // commitAndPush acquires the real shared lock — redirect it to a throwaway dir
   // so these tests don't block behind a live agent. git itself stays mocked.
-  afterEach(() => __setLockDirForTest(null));
+  afterEach(() => {
+    __setLockDirForTest(null);
+    __setLockWaitForTest(null);
+  });
   function setup() {
     const lockDir = mkdtempSync(join(tmpdir(), "trails-cap-lock-"));
     __setLockDirForTest(lockDir);
@@ -1407,6 +1412,56 @@ describe("commitAndPush (git mutation flow)", () => {
     });
     return { exit, seen, lockDir };
   }
+
+  it("holds the lock while probing the dirty tree, so a waiter never sees a holder's staged file", () => {
+    const { lockDir } = setup();
+    const lockPath = join(lockDir, "tasks-cli.lock");
+    const heldAt: Record<string, boolean> = {};
+    execFileSyncMock.mockImplementation((_file, args) => {
+      const label = args && args.length >= 3 ? args[2] : "";
+      heldAt[label] = existsSync(lockPath);
+      if (label === "diff-tree") return "story.md" as never;
+      return "" as never;
+    });
+    commitAndPush({
+      message: "test",
+      fileToStage: "/some/file.md",
+      mutator: () => {},
+      raceMessage: "unused",
+      raceExitCode: 99,
+    });
+    expect(heldAt.status).toBe(true);
+    expect(heldAt.checkout).toBe(true);
+    expect(heldAt.pull).toBe(true);
+  });
+
+  it("blocks on a live holder's lock instead of failing that holder's staged file", () => {
+    const { lockDir, exit, seen } = setup();
+    execFileSyncMock.mockImplementation((_file, args) => {
+      const label = args && args.length >= 3 ? args[2] : "";
+      seen.push(label);
+      if (label === "status") return "M  rfcs/0024/stories/held.md" as never;
+      if (label === "diff-tree") return "story.md" as never;
+      return "" as never;
+    });
+    __setLockWaitForTest(0);
+    const holder = acquireTasksLock(lockDir, { waitMs: 0, pollMs: 1 });
+    expect(holder).not.toBeNull();
+
+    expect(() =>
+      commitAndPush({
+        message: "second agent",
+        fileToStage: "/some/file.md",
+        mutator: () => {},
+        raceMessage: "unused",
+        raceExitCode: 99,
+      }),
+    ).toThrow(`exit ${LOCK_TIMEOUT_EXIT}`);
+    expect(exit).toHaveBeenCalledWith(LOCK_TIMEOUT_EXIT);
+    expect(exit).not.toHaveBeenCalledWith(1);
+    expect(seen).not.toContain("status");
+    releaseTasksLock(holder);
+  });
 
   it("happy path: pull → add → commit → push, no retry", () => {
     const { seen } = setup();
@@ -3707,6 +3762,47 @@ describe("duplicate RFC-dir reconciliation", () => {
       "finalized",
     );
     expect(existsSync(join(dir, "rfcs", "0000-foo", "stories", "r1.md"))).toBe(true);
+  });
+});
+
+describe("assertCleanWorktree releases the lock it refuses under", () => {
+  function lockDir(): string {
+    const dir = mkdtempSync(join(tmpdir(), "trails-clean-"));
+    mkdirSync(join(dir, ".git"));
+    return dir;
+  }
+  function statusReturns(porcelain: string) {
+    execFileSyncMock.mockImplementation(
+      (_file, args) => (args && args[2] === "status" ? porcelain : "") as never,
+    );
+  }
+
+  it("passes a clean tree through and leaves the lock held", () => {
+    const dir = lockDir();
+    statusReturns("");
+    const lock = acquireTasksLock(dir);
+    expect(existsSync(lock!.path)).toBe(true);
+    assertCleanWorktree(dir, lock);
+    expect(existsSync(lock!.path)).toBe(true);
+    releaseTasksLock(lock);
+  });
+
+  it("releases the lock before exiting on a genuinely dirty tree", () => {
+    const dir = lockDir();
+    vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
+      throw new Error(`exit ${code}`);
+    }) as never);
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    statusReturns("M  rfcs/0024/stories/x.md");
+
+    const lock = acquireTasksLock(dir);
+    expect(existsSync(lock!.path)).toBe(true);
+    expect(() => assertCleanWorktree(dir, lock)).toThrow("exit 1");
+    expect(existsSync(lock!.path)).toBe(false);
+
+    const next = acquireTasksLock(dir, { waitMs: 0, pollMs: 1 });
+    expect(next).not.toBeNull();
+    releaseTasksLock(next);
   });
 });
 
