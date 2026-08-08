@@ -371,8 +371,6 @@ describe("DatabaseStatements", () => {
           await fn();
         },
         quoteTableName: (n: string) => `"${n}"`,
-        // `truncate_tables` reads both names off the pool
-        // (`database_statements.rb:222-223`); there is no literal to fall back to.
         pool: {
           schemaMigration: { tableName: "schema_migrations" },
           internalMetadata: { tableName: "ar_internal_metadata" },

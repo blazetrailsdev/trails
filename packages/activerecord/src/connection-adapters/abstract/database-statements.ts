@@ -739,6 +739,11 @@ export async function truncate(
 /**
  * Truncates multiple tables, skipping schema_migrations and ar_internal_metadata.
  *
+ * Both names are sent bare (`database_statements.rb:222-223`), so a pool-less
+ * adapter raises NoMethodError rather than truncating against hardcoded
+ * defaults — Ruby's NullPool defines neither reader
+ * (`abstract/connection_pool.rb:24-48`).
+ *
  * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#truncate_tables
  */
 export async function truncateTables(
@@ -746,9 +751,6 @@ export async function truncateTables(
     Pick<Quoting, "quoteTableName"> & { pool: NonNullable<DatabaseStatementsHost["pool"]> },
   ...tableNames: string[]
 ): Promise<void> {
-  // `database_statements.rb:222-223` sends both bare, so a pool-less adapter
-  // raises NoMethodError rather than truncating against hardcoded defaults —
-  // Ruby's NullPool defines neither reader (`abstract/connection_pool.rb:24-48`).
   const schemaMigrationTable = this.pool.schemaMigration.tableName;
   const internalMetadataTable = this.pool.internalMetadata.tableName;
   const filtered = tableNames.filter(

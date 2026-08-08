@@ -3881,15 +3881,14 @@ export class Date {
    * which is `Date._strptime` followed by `d_new_by_frags`. `start` is the
    * calendar reform, which `Temporal.PlainDate` has no bearer for, so it is not
    * a parameter here.
-   */
-  /**
-   * The union is TypeScript's static-side variance, not the port's shape: Ruby's
-   * `DateTime < Date` makes `datetime_s_parse`'s DateTime a covariant override
-   * of `date_s_parse`'s Date, while `Temporal.PlainDateTime` is not a subtype of
+   *
+   * The union return is TypeScript's static-side variance, not the port's
+   * shape: Ruby's `DateTime < Date` makes `datetime_s_strptime`'s DateTime a
+   * covariant override, while `Temporal.PlainDateTime` is not a subtype of
    * `Temporal.PlainDate` (it answers no `toPlainDateTime`/`toPlainYearMonth`/
-   * `toPlainMonthDay`), so a `PlainDate`-only declaration here makes
-   * {@link DateTime#parse} an illegal static override (TS2417). `Date.parse`
-   * itself only ever answers a `PlainDate`.
+   * `toPlainMonthDay`), so a `PlainDate`-only declaration here makes the
+   * {@link DateTime} override illegal (TS2417). This only ever answers a
+   * `PlainDate`.
    */
   static strptime(
     str = JULIAN_EPOCH_DATE,
@@ -3981,15 +3980,14 @@ export class Date {
    *
    * A string that named only a time of day answers no arm of
    * {@link rtValidDateFragsP} and raises.
-   */
-  /**
-   * The union is TypeScript's static-side variance, not the port's shape: Ruby's
-   * `DateTime < Date` makes `datetime_s_parse`'s DateTime a covariant override
-   * of `date_s_parse`'s Date, while `Temporal.PlainDateTime` is not a subtype of
+   *
+   * The union return is TypeScript's static-side variance, not the port's
+   * shape: Ruby's `DateTime < Date` makes `datetime_s_parse`'s DateTime a
+   * covariant override, while `Temporal.PlainDateTime` is not a subtype of
    * `Temporal.PlainDate` (it answers no `toPlainDateTime`/`toPlainYearMonth`/
-   * `toPlainMonthDay`), so a `PlainDate`-only declaration here makes
-   * {@link DateTime#parse} an illegal static override (TS2417). `Date.parse`
-   * itself only ever answers a `PlainDate`.
+   * `toPlainMonthDay`), so a `PlainDate`-only declaration here makes the
+   * {@link DateTime} override illegal (TS2417). This only ever answers a
+   * `PlainDate`.
    */
   static parse(str: string, comp = true): Temporal.PlainDate | Temporal.PlainDateTime {
     return dNewByFrags(Date._parse(str, comp)).toDate();
@@ -4049,7 +4047,7 @@ export class Date {
   }
 
   /**
-   * Ruby `Date#to_date` (ruby/date, `date_core.c` `d_lite_to_date`), which
+   * Ruby `Date#to_date` (ruby/date, `date_core.c` `date_to_date`, `date_core.c:8977-8981`), which
    * answers the receiver's `::Date` value — `self` in MRI, because MRI's
    * `::Date` value *is* the gem object. trails' `::Date` value is
    * `Temporal.PlainDate` (RFC 0088's mapping table), so `self` is spelled as
@@ -4380,7 +4378,7 @@ export class DateTime extends Date {
   }
 
   /**
-   * Ruby `DateTime#to_date` (ruby/date, `date_core.c` `dt_lite_to_date`), the
+   * Ruby `DateTime#to_date` (ruby/date, `date_core.c` `datetime_to_date`, `date_core.c:9069-9095`), the
    * calendar day alone. The inherited {@link Date#toDate} cannot stand in: the
    * `Date` half was written from the constructor's *pre-conversion* civil date,
    * which a `24:00:00` time of day rolls off — same reason `#civil` exists.
@@ -4390,7 +4388,7 @@ export class DateTime extends Date {
   }
 
   /**
-   * Ruby `DateTime#to_datetime` (ruby/date, `date_core.c` `dt_lite_to_datetime`),
+   * Ruby `DateTime#to_datetime` (ruby/date, `date_core.c` `datetime_to_datetime`, `date_core.c:9101-9105`),
    * which answers the receiver's `::DateTime` value — `self` in MRI. trails'
    * `::DateTime` value is `Temporal.PlainDateTime` (RFC 0088's mapping table),
    * read in LOCAL terms, as every reader above is.
