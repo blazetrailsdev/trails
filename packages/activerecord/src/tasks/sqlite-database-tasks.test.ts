@@ -85,12 +85,8 @@ describe("SQLiteDatabaseTasks", () => {
   });
 
   it("create guards and connects against the same relative database", async () => {
-    // `sqlite_database_tasks.rb:15-20` reads the raw `db_config.database` in
-    // both halves: `File.exist?` guards it and `establish_connection` opens it.
-    // Only `drop` joins `root` (`:23-24`). Routing the connect through a
-    // root-joining resolver made the two halves mean different files for a
-    // relative `database:` — the guard tested the cwd-relative path and the
-    // connect created the root-joined one.
+    // `sqlite_database_tasks.rb:15-20` reads the raw `db_config.database` in both
+    // halves; only `drop` joins `root` (`:23-24`).
     const name = `trails-relative-${process.pid}-${randomUUID()}.sqlite3`;
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "trails-tasks-root-"));
     const cwdRelative = path.resolve(name);
@@ -106,8 +102,6 @@ describe("SQLiteDatabaseTasks", () => {
     expect(fs.existsSync(cwdRelative)).toBe(true);
     expect(fs.existsSync(rootJoined)).toBe(false);
 
-    // And the guard now sees the file the connect just made, so a second
-    // `create` raises rather than silently re-creating it elsewhere.
     await expect(new SQLiteDatabaseTasks(config, root).create()).rejects.toBeInstanceOf(
       DatabaseAlreadyExists,
     );
