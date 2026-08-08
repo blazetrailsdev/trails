@@ -1,10 +1,9 @@
 import { getApp } from "./config.js";
-import { GID, validateApp, type GidComponents } from "./uri/gid.js";
-// TYPE-ONLY on purpose: a runtime edge from here back into the
+import { GID, validateApp, type GidComponents } from "./uri/gid.js"; // TYPE-ONLY on purpose: a runtime edge from here back into the
 // global-id ↔ signed-global-id ↔ locator cycle would evaluate
 // `class SignedGlobalID extends GlobalID` while `GlobalID` is still in TDZ.
 // `find` therefore reaches Locator through a dynamic import.
-import type { LocateOptions, LocatorModel } from "./locator.js";
+import type { LocateOptions, LocatorLike, LocatorModel } from "./locator.js";
 import { constantize } from "@blazetrails/activesupport";
 
 /**
@@ -38,26 +37,35 @@ export interface GlobalIDOptions {
 
 export class GlobalID {
   readonly uri: string;
-  private readonly _components: GidComponents;
+  // Rails' `attr_reader :uri` holds the URI::GID itself and the readers below
+  // are `delegate ... to: :uri`. Here `uri` is the string form (every trails
+  // caller reads it as one), so the parsed GID is kept alongside it and is
+  // what the delegated readers — including `deconstructKeys` — go through.
+  private readonly _uri: GID;
 
   /** Mirrors: GlobalID#initialize(gid, options) */
   constructor(gid: string | GID, _options: GlobalIDOptions = {}) {
     const parsed = gid instanceof GID ? gid : GID.parse(gid);
     this.uri = parsed.toString();
-    this._components = parsed.deconstructKeys();
+    this._uri = parsed;
   }
 
   get app(): string {
-    return this._components.app;
+    return this._uri.app;
   }
   get modelName(): string {
-    return this._components.modelName;
+    return this._uri.modelName;
   }
   get modelId(): string | string[] {
-    return this._components.modelId;
+    return this._uri.modelId;
   }
   get params(): Record<string, string> {
-    return this._components.params;
+    return this._uri.params;
+  }
+
+  /** Mirrors: GlobalID#deconstruct_keys — `delegate :deconstruct_keys, to: :uri`. */
+  deconstructKeys(keys: readonly string[] | null = null): GidComponents {
+    return this._uri.deconstructKeys(keys);
   }
 
   /**
@@ -96,14 +104,36 @@ export class GlobalID {
     try {
       return new this(GID.parse(str), options);
     } catch {
-      try {
-        const b64 = str.replace(/-/g, "+").replace(/_/g, "/");
-        const decoded = atob(b64 + "=".repeat((4 - (b64.length % 4)) % 4));
-        return new this(GID.parse(decoded), options);
-      } catch {
-        return null;
-      }
+      return this.parseEncodedGid(str, options);
     }
+  }
+
+  /**
+   * Mirrors: GlobalID.parse_encoded_gid (private) —
+   * `new(Base64.urlsafe_decode64(gid), options) rescue nil`.
+   */
+  private static parseEncodedGid(gid: string, options: GlobalIDOptions): GlobalID | null {
+    try {
+      const b64 = gid.replace(/-/g, "+").replace(/_/g, "/");
+      const decoded = atob(b64 + "=".repeat((4 - (b64.length % 4)) % 4));
+      return new this(GID.parse(decoded), options);
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Mirrors: GlobalID.default_locator(default_locator) —
+   * `Locator.default_locator = default_locator`.
+   *
+   * Async because Locator is reached through a dynamic import: a runtime
+   * edge from here into the global-id ↔ signed-global-id ↔ locator cycle
+   * would evaluate `class SignedGlobalID extends GlobalID` with `GlobalID`
+   * still in TDZ (same constraint as `find` above).
+   */
+  static async defaultLocator(defaultLocator: LocatorLike): Promise<void> {
+    const { Locator } = await import("./locator.js");
+    Locator.defaultLocator = defaultLocator;
   }
 
   /** Mirrors: GlobalID#to_param — base64url without padding. */
@@ -116,13 +146,17 @@ export class GlobalID {
   }
 
   /**
-   * Mirrors: GlobalID#as_json — `JSON.stringify(gid)` produces `"gid://..."`.
-   * Rails' `as_json` calls `to_s`, so a SignedGlobalID serializes to its
-   * signed token rather than the bare URI; route through `toString()` to
-   * keep that polymorphism.
+   * Mirrors: GlobalID#as_json — `def as_json(*) = to_s`. Rails' `as_json`
+   * calls `to_s`, so a SignedGlobalID serializes to its signed token rather
+   * than the bare URI; route through `toString()` to keep that polymorphism.
    */
-  toJSON(): string {
+  asJson(): string {
     return this.toString();
+  }
+
+  /** @internal The JS serialization hook; delegates to the ported `asJson`. */
+  toJSON(): string {
+    return this.asJson();
   }
 
   /** @internal */

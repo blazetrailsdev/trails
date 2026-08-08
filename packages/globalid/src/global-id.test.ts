@@ -144,11 +144,24 @@ describe("GlobalIDCreationTest", () => {
 
   it("as JSON", () => {
     const gid = GlobalID.create(fakeModel(5));
-    // Mirror Rails GlobalID#as_json — JSON.stringify(gid) calls toJSON() and
-    // serializes to the URI string, wrapped in quotes.
+    expect(gid.asJson()).toBe("gid://bcx/Person/5");
+    // Rails' `to_json`; here JSON.stringify(gid) routes through toJSON().
     expect(JSON.stringify(gid)).toBe('"gid://bcx/Person/5"');
-    expect(JSON.stringify(GlobalID.create(fakeModel(4, "Person::Child")))).toBe(
-      '"gid://bcx/Person::Child/4"',
+
+    const uuidGid = GlobalID.create(fakeModel(uuid, "PersonUuid"));
+    expect(uuidGid.asJson()).toBe(`gid://bcx/PersonUuid/${uuid}`);
+    expect(JSON.stringify(uuidGid)).toBe(`"gid://bcx/PersonUuid/${uuid}"`);
+
+    const namespacedGid = GlobalID.create(fakeModel(4, "Person::Child"));
+    expect(namespacedGid.asJson()).toBe("gid://bcx/Person::Child/4");
+    expect(JSON.stringify(namespacedGid)).toBe('"gid://bcx/Person::Child/4"');
+
+    const cpkGid = GlobalID.create(
+      fakeModel(["tenant-key-value", "id-value"], "CompositePrimaryKeyModel"),
+    );
+    expect(cpkGid.asJson()).toBe("gid://bcx/CompositePrimaryKeyModel/tenant-key-value/id-value");
+    expect(JSON.stringify(cpkGid)).toBe(
+      '"gid://bcx/CompositePrimaryKeyModel/tenant-key-value/id-value"',
     );
   });
 
