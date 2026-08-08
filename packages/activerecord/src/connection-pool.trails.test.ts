@@ -1181,8 +1181,8 @@ describe("NullPool member parity", () => {
     for (const probe of ["then", "toJSON", "asymmetricMatch", "nodeType"]) {
       expect(() => pool[probe]).toThrow(NoMethodError);
     }
-    expect((pool.inspect as () => string)()).toMatch(
-      /^#<ActiveRecord::ConnectionAdapters::NullPool/,
+    expect((pool.inspect as () => string)()).toBe(
+      "#<ActiveRecord::ConnectionAdapters::NullPool @server_version=nil>",
     );
     expect(pool.toString).toBe(Object.prototype.toString);
     expect(pool[Symbol.toStringTag as unknown as string]).toBeUndefined();

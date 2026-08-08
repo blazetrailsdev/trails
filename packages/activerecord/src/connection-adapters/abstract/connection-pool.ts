@@ -173,14 +173,20 @@ export class NullPool implements AbstractPool {
    * (`abstract/connection_pool.rb:14-51`), so the send resolves up the ancestor
    * chain and answers a String rather than raising. JS has no `Object.prototype`
    * member of that name for `prop in target` to find, so the inherited method is
-   * declared here to keep the send answering. `Object#inspect` renders the class
-   * name and the instance variables; the `0x…` address it also prints is not
-   * reproducible and no caller reads it.
+   * declared here to keep the send answering.
+   *
+   * `Object#inspect` dumps the class name and every instance variable as
+   * `@name=value`. Ruby's NullPool carries two (`abstract/connection_pool.rb:24-28`)
+   * and this renders the one the port also carries. `@mutex` is absent rather
+   * than placeheld: JS has no thread to lock against, so the port has no such
+   * field, and printing a key for state that does not exist would be the larger
+   * divergence. The `0x…` address is dropped for the same reason
+   * `AbstractAdapter#inspect` has to synthesize its own — `object_id` has no
+   * counterpart — and no caller reads either.
    */
   inspect(): string {
-    return `#<ActiveRecord::ConnectionAdapters::NullPool server_version=${String(
-      this._serverVersion,
-    )}>`;
+    const v = this._serverVersion;
+    return `#<ActiveRecord::ConnectionAdapters::NullPool @server_version=${v == null ? "nil" : String(v)}>`;
   }
 
   /**
