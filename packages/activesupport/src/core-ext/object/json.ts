@@ -2,7 +2,9 @@ import { Temporal } from "@blazetrails/date";
 
 import { ActiveSupportJSON } from "../../json.js";
 import { Encoding, type EncodeOptions } from "../../json/encoding.js";
+import { isRange, type Range as RangeValue } from "../../range-ext.js";
 import { BigDecimal as BigDecimalValue } from "../big-decimal/conversions.js";
+import { toS } from "../range/conversions.js";
 import * as instanceVariables from "./instance-variables.js";
 
 /**
@@ -37,21 +39,28 @@ export interface ToJsonWithActiveSupportEncoderHost {
  * Ruby discriminates on `::JSON::State`, the argument the JSON gem's encoder
  * passes. `JSON.stringify` has no state object: it calls `toJSON(key)` with
  * the property key, a string — so the string is the discriminator here.
+ *
+ * Both Ruby arms answer a String, so the arm callers reach — no argument or an
+ * options hash — is declared `string`. It is the *last* overload deliberately:
+ * `Included<>` derives a host's method type by inferring from the final
+ * signature, so that is the one the mixin hosts get.
  */
-export const ToJsonWithActiveSupportEncoder = {
-  toJSON(
-    this: ToJsonWithActiveSupportEncoderHost,
-    options?: EncodeOptions | string | null,
-  ): unknown {
-    if (typeof options === "string") {
-      // Called from JSON.stringify, forward it to the JSON serializer
-      return this.asJson();
-    } else {
-      // to_json is being invoked directly, use ActiveSupport's encoder
-      return ActiveSupportJSON.encode(this, options ?? undefined);
-    }
-  },
-};
+function toJSON(this: ToJsonWithActiveSupportEncoderHost, options: string): unknown;
+function toJSON(this: ToJsonWithActiveSupportEncoderHost, options?: EncodeOptions | null): string;
+function toJSON(
+  this: ToJsonWithActiveSupportEncoderHost,
+  options?: EncodeOptions | string | null,
+): unknown {
+  if (typeof options === "string") {
+    // Called from JSON.stringify, forward it to the JSON serializer
+    return this.asJson();
+  } else {
+    // to_json is being invoked directly, use ActiveSupport's encoder
+    return ActiveSupportJSON.encode(this, options ?? undefined);
+  }
+}
+
+export const ToJsonWithActiveSupportEncoder = { toJSON };
 
 /**
  * `Module#as_json` (json.rb:52-56). A JS class or function is the Module
@@ -138,6 +147,17 @@ export class Regexp {
 export class Enumerable {
   static asJson(value: Iterable<unknown>, options?: EncodeOptions | null): unknown[] {
     return Array.asJson([...value], options);
+  }
+}
+
+/**
+ * `Range#as_json` (json.rb:157-161), over trails' begin/end/exclusive triple
+ * (`range-ext.ts`). `to_s` is the ported `Range#to_s` in
+ * `core-ext/range/conversions.ts`.
+ */
+export class Range {
+  static asJson(value: RangeValue<unknown>): string {
+    return toS(value);
   }
 }
 
@@ -248,6 +268,16 @@ export class DateTime {
   }
 }
 
+/**
+ * `URI::Generic#as_json` (json.rb:230-234). JS `URL` is the analogue of Ruby's
+ * parsed-URI object, and `toString()` is its `to_s`.
+ */
+export class Generic {
+  static asJson(value: URL): string {
+    return value.toString();
+  }
+}
+
 /** `Exception#as_json` (json.rb:256-260). */
 export class Exception {
   static asJson(value: Error): string {
@@ -275,6 +305,9 @@ function pad2(value: number): string {
  * defines its own JSON form. Stands in for Ruby's `Hash === value`.
  */
 export function isPlainObject(value: object): boolean {
+  // A Range is a plain object here but is not a Hash in Ruby, so it must miss
+  // this test in `jsonify` too, or it never reaches `Range#as_json`.
+  if (isRange(value)) return false;
   const proto = globalThis.Object.getPrototypeOf(value);
   return proto === globalThis.Object.prototype || proto === null;
 }
@@ -308,7 +341,11 @@ export function asJson(value: unknown, options?: EncodeOptions | null): unknown 
   if (value instanceof BigDecimalValue) return BigDecimal.asJson(value);
   if (value instanceof RegExp) return Regexp.asJson(value);
   if (value instanceof Error) return Exception.asJson(value);
+  if (value instanceof URL) return Generic.asJson(value);
   if (globalThis.Array.isArray(value)) return Array.asJson(value, options);
+  // Precedes the Hash arm: trails' Range is a plain object, so it would
+  // otherwise be picked up as an attribute bag.
+  if (isRange(value)) return Range.asJson(value);
   if (value instanceof Map || isPlainObject(value as object)) return Hash.asJson(value, options);
   if (
     typeof (value as { [globalThis.Symbol.iterator]?: unknown })[globalThis.Symbol.iterator] ===

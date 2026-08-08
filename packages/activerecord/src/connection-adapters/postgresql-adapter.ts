@@ -498,6 +498,9 @@ export class PostgreSQLAdapter
   // Backs the `active` getter so a torn-down adapter reports inactive
   // even before the next lazy acquire would notice the missing connection.
   private _closed = false;
+  // The in-flight `client.end()` started by the synchronous disconnectBang,
+  // surfaced through `whenClosed()` so the pool can await the socket drain.
+  private _closingDriver: Promise<void> | null = null;
   // Per-acquire generation. Each _doAcquire captures the current value; a
   // teardown that must invalidate the in-flight acquire bumps it. `discardBang`
   // (Rails' `discard!`) is the only teardown that bumps it AND records the
@@ -3004,8 +3007,9 @@ export class PostgreSQLAdapter
 
   /**
    * Mirrors Rails' `PostgreSQLAdapter#disconnect!`. Tears down the
-   * persistent connection asynchronously so no new queries can start;
-   * the underlying socket drains in the background.
+   * persistent connection synchronously so no new queries can start; the
+   * `client.end()` it starts is recorded in `_closingDriver` and surfaced
+   * through `whenClosed()`, which `ConnectionPool#disconnect` awaits.
    */
   override disconnectBang(): void {
     const conn = this._rawConnection;
@@ -3028,10 +3032,26 @@ export class PostgreSQLAdapter
     // is NOT recorded in _discardedAcquireGenerations, so _teardownRacedClient
     // end()s the socket (matching Rails' disconnect!) rather than abandoning it.
     if (this._acquiring) this._acquireGeneration++;
-    conn?.end().catch(() => {});
+    this._closingDriver = conn?.end().catch(() => {}) ?? null;
     // Rails' disconnect! calls reset_transaction; super.disconnectBang() does not.
     this.resetTransaction();
     super.disconnectBang();
+  }
+
+  /**
+   * The pending `client.end()` left in flight by `disconnectBang()`, which is
+   * synchronous as Rails' `disconnect!` is. `ConnectionPool#disconnect` awaits
+   * this, so `await pool.disconnect()` means the PG socket is actually closed
+   * — not merely that no further queries can start. Resolves immediately when
+   * nothing is draining.
+   *
+   * @noRailsEquivalent PERMANENT — Rails' `disconnect!`
+   * (postgresql_adapter.rb:386-392) closes the connection through libpq's
+   * synchronous `PG::Connection#close`, so there is no pending close for a
+   * Rails method to expose. node-pg's `Client#end()` is promise-returning.
+   */
+  whenClosed(): Promise<void> {
+    return this._closingDriver ?? Promise.resolve();
   }
 
   /**

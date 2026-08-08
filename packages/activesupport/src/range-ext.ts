@@ -31,6 +31,23 @@ export function makeRange<T>(begin: T | null, end: T | null, excludeEnd = false)
 }
 
 /**
+ * Ruby's `value.is_a?(::Range)` (overlap.rb:9, json.rb dispatch). trails' Range
+ * is the data triple above rather than a class, so the test is structural.
+ *
+ * @noRailsEquivalent PERMANENT — the class test it stands in for has no TS
+ * analogue while `Range` is an interface; see the interface's own tag.
+ */
+export function isRange(value: unknown): value is Range<unknown> {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "begin" in value &&
+    "end" in value &&
+    typeof (value as Range<unknown>).excludeEnd === "boolean"
+  );
+}
+
+/**
  * cover? — returns true if a numeric/date range covers a scalar value
  * (endpoint comparison via `<=>`).
  */

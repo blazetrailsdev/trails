@@ -62,7 +62,7 @@ export class JSONGemEncoder {
    * what base types of objects they are allowed to return or having to remember
    * to call `asJson` recursively.
    *
-   * Note: the `options` hash passed to `toJson` is only passed to `asJson`, not
+   * Note: the `options` hash passed to `toJSON` is only passed to `asJson`, not
    * any of this method's recursive `asJson` calls.
    *
    * Rails' private `JSONGemEncoder#jsonify` (encoding.rb:88-104). JS has a
