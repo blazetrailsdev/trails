@@ -1569,7 +1569,18 @@ export class CreatePosts extends Migration {
       adapter: "sqlite3",
       database: dbFile,
     });
-    await new SQLiteDatabaseTasks(config).truncateAll();
+    // Every Rails db task runs against an established connection —
+    // `with_temporary_connection` reads `connection_db_config` to restore
+    // (`tasks/database_tasks.rb:541-548`) and `connection` is
+    // `Base.lease_connection` (`tasks/sqlite_database_tasks.rb:68-70`); both
+    // raise ConnectionNotEstablished with no pool.
+    const { Base } = await import("@blazetrails/activerecord");
+    await Base.establishConnection({ adapter: "sqlite3", database: dbFile });
+    try {
+      await new SQLiteDatabaseTasks(config).truncateAll();
+    } finally {
+      await Base.removeConnection();
+    }
 
     const verify = new BetterSQLite3Adapter(dbFile);
     try {

@@ -10,7 +10,6 @@ import type { DatabaseConfig } from "../database-configurations/database-config.
 import { DatabaseAlreadyExists } from "../errors.js";
 import { Base } from "../base.js";
 import { DatabaseTasks, metadataTableNames } from "./database-tasks.js";
-import { coercePort } from "./task-utils.js";
 
 const ER_DB_CREATE_EXISTS = 1007;
 
@@ -149,31 +148,26 @@ export class MySQLDatabaseTasks {
    * Mysql2Adapter#truncate_tables behavior).
    */
   async truncateAll(): Promise<void> {
-    const { Mysql2Adapter } = await import("../connection-adapters/mysql2-adapter.js");
     const dbName = this.requireDatabaseName();
-    const adapter = new Mysql2Adapter({ ...this.buildAdapterConfig(), database: dbName });
+    await this.establishConnection();
+    const adapter = await this.connection();
+    const bookkeeping = metadataTableNames();
+    const rows = (await adapter.execute(
+      "SELECT table_name FROM information_schema.tables WHERE table_schema = ? " +
+        "AND table_type = 'BASE TABLE'",
+      [dbName],
+    )) as Array<{ table_name?: string; TABLE_NAME?: string }>;
+    const names = rows
+      .map((r) => r.table_name ?? r.TABLE_NAME)
+      .filter((n): n is string => typeof n === "string" && !bookkeeping.has(n));
+    if (names.length === 0) return;
+    await adapter.executeMutation("SET FOREIGN_KEY_CHECKS = 0");
     try {
-      const bookkeeping = metadataTableNames();
-      const rows = (await adapter.execute(
-        "SELECT table_name FROM information_schema.tables WHERE table_schema = ? " +
-          "AND table_type = 'BASE TABLE'",
-        [dbName],
-      )) as Array<{ table_name?: string; TABLE_NAME?: string }>;
-      const names = rows
-        .map((r) => r.table_name ?? r.TABLE_NAME)
-        .filter((n): n is string => typeof n === "string" && !bookkeeping.has(n));
-      if (names.length === 0) return;
-      await adapter.executeMutation("SET FOREIGN_KEY_CHECKS = 0");
-      try {
-        for (const name of names) {
-          await adapter.executeMutation(`TRUNCATE TABLE \`${name.replace(/`/g, "``")}\``);
-        }
-      } finally {
-        await adapter.executeMutation("SET FOREIGN_KEY_CHECKS = 1");
+      for (const name of names) {
+        await adapter.executeMutation(`TRUNCATE TABLE \`${name.replace(/`/g, "``")}\``);
       }
     } finally {
-      const close = (adapter as unknown as { close?: () => Promise<void> }).close;
-      if (typeof close === "function") await close.call(adapter);
+      await adapter.executeMutation("SET FOREIGN_KEY_CHECKS = 1");
     }
   }
 
@@ -218,52 +212,21 @@ export class MySQLDatabaseTasks {
   }
 
   private async savedCharset(): Promise<{ charset?: string; collation?: string }> {
-    const { Mysql2Adapter } = await import("../connection-adapters/mysql2-adapter.js");
     const dbName = this.requireDatabaseName();
     // Connect without selecting a database: information_schema.SCHEMATA is
     // server-global, and connecting to the target DB would fail with error 1049
     // if it doesn't exist yet (e.g. purge() called before create() on a clean env).
-    const adapter = new Mysql2Adapter(this.buildAdapterConfig());
-    try {
-      const rows = (await adapter.execute(
-        "SELECT DEFAULT_CHARACTER_SET_NAME, DEFAULT_COLLATION_NAME " +
-          "FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = ?",
-        [dbName],
-      )) as Array<{ DEFAULT_CHARACTER_SET_NAME?: string; DEFAULT_COLLATION_NAME?: string }>;
-      const row = rows[0];
-      if (!row) return {};
-      return { charset: row.DEFAULT_CHARACTER_SET_NAME, collation: row.DEFAULT_COLLATION_NAME };
-    } finally {
-      const close = (adapter as unknown as { close?: () => Promise<void> }).close;
-      if (typeof close === "function") await close.call(adapter);
-    }
-  }
-
-  private buildAdapterConfig(): {
-    host?: string;
-    port?: number;
-    user?: string;
-    password?: string;
-    socketPath?: string;
-  } {
-    const socket = this.resolvedField("socket");
-    const config: {
-      host?: string;
-      port?: number;
-      user?: string;
-      password?: string;
-      socketPath?: string;
-    } = {
-      user: this.resolvedField("username"),
-      password: this.resolvedField("password"),
-    };
-    if (socket) {
-      config.socketPath = socket;
-    } else {
-      config.host = this.resolvedField("host") ?? "localhost";
-      config.port = coercePort(this.resolvedField("port"), 3306);
-    }
-    return config;
+    await this.establishConnection(this.configurationHashWithoutDatabase());
+    const rows = (await (
+      await this.connection()
+    ).execute(
+      "SELECT DEFAULT_CHARACTER_SET_NAME, DEFAULT_COLLATION_NAME " +
+        "FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = ?",
+      [dbName],
+    )) as Array<{ DEFAULT_CHARACTER_SET_NAME?: string; DEFAULT_COLLATION_NAME?: string }>;
+    const row = rows[0];
+    if (!row) return {};
+    return { charset: row.DEFAULT_CHARACTER_SET_NAME, collation: row.DEFAULT_COLLATION_NAME };
   }
 
   private resolvedField(name: keyof UrlParts): string | undefined {
