@@ -1444,6 +1444,27 @@ describe("selectMisplacedFile", () => {
     expect(result).toBeNull();
   });
 
+  it("never resolves onto the package barrel", () => {
+    // The barrel re-exports the whole package, so it out-hits every real file
+    // and would clear all three thresholds. It is a re-export site, not a port
+    // location — PR #6225's `acts_like.rb ↦ activesupport/src/index.ts`.
+    expect(selectMisplacedFile(hits(["index.ts", 8], ["a.ts", 1]), 10)).toBeNull();
+  });
+
+  it("lets a real cluster win once the barrel is dropped from the vote", () => {
+    // Without the exclusion the barrel takes it at 9; with it, object.ts is the
+    // leader and its runner-up is the noise floor, not the barrel.
+    const result = selectMisplacedFile(hits(["index.ts", 9], ["object.ts", 6], ["b.ts", 1]), 10);
+    expect(result).toBe("object.ts");
+  });
+
+  it("keeps a directory barrel in the vote", () => {
+    // Only the package-src root `index.ts` is a pure re-export site; nested
+    // `.../index.ts` files (encryption/index.ts) carry ported bodies.
+    const result = selectMisplacedFile(hits(["encryption/index.ts", 6], ["b.ts", 1]), 10);
+    expect(result).toBe("encryption/index.ts");
+  });
+
   it("accepts a clear leader even with multiple low-hit competitors", () => {
     // 6/10 hits in winner, scattered noise elsewhere.
     const result = selectMisplacedFile(

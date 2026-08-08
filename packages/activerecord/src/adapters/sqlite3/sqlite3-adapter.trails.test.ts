@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "../../connection-adapters/better-sqlite3-adapter.js";
+import { isInMemoryDatabase } from "../../sqlite/sqlite-uri.js";
 
 describe("SqliteAdapter", () => {
   let adapter: SQLite3Adapter;
@@ -73,12 +74,8 @@ describe("SqliteAdapter", () => {
   });
 });
 
-describe("SQLite3Adapter._isMemoryFilename", () => {
-  const isMemoryFilename = (
-    SQLite3Adapter as unknown as {
-      _isMemoryFilename(filename: string): boolean;
-    }
-  )._isMemoryFilename.bind(SQLite3Adapter);
+describe("isInMemoryDatabase", () => {
+  const isMemoryFilename = isInMemoryDatabase;
 
   it("treats :memory: as in-memory", () => {
     expect(isMemoryFilename(":memory:")).toBe(true);

@@ -1355,6 +1355,14 @@ export const UNPORTED_FILES: UnportedFile[] = [
       "loadable. Ruby-only wire format, same as test_date_marshal.rb above; the " +
       "rest of the file stays counted.",
   },
+  {
+    pattern: "testing/error_reporter_assertions.rb",
+    package: "activesupport",
+    reason:
+      "Minitest assertion module (`assert_error_reported`) for Rails' own test suite; " +
+      "trails has no port, and its `subscribe`/`record`/`report` names otherwise cluster " +
+      "onto the unrelated `error-reporter.ts`.",
+  },
   // The activesupport `core_ext/*` tail with no trails counterpart (RFC 0072).
   {
     pattern: "core_ext/module/attribute_accessors_per_thread.rb",

@@ -22,25 +22,7 @@ import type { DatabaseConfig } from "../database-configurations/database-config.
 import { Base } from "../base.js";
 import { DatabaseTasks, metadataTableNames } from "./database-tasks.js";
 import { NoDatabaseError, DatabaseAlreadyExists } from "../errors.js";
-
-/**
- * True for SQLite in-memory database names per the SQLite URI spec
- * (https://www.sqlite.org/inmemorydb.html): `:memory:`, `file::memory:?...`,
- * and named in-memory URIs whose query string contains a real `mode=memory`
- * parameter (e.g. `file:memdb1?mode=memory&cache=shared`).
- *
- * Uses `URLSearchParams` rather than substring matching so paths that happen
- * to contain the text `mode=memory` are not misclassified. `SQLite3Adapter`
- * currently uses a broader substring check — aligning it is a follow-up.
- */
-function isInMemoryDatabase(name: string): boolean {
-  if (name === ":memory:") return true;
-  if (!name.startsWith("file:")) return false;
-  if (name.startsWith("file::memory:")) return true;
-  const q = name.indexOf("?");
-  if (q === -1) return false;
-  return new URLSearchParams(name.slice(q + 1)).get("mode") === "memory";
-}
+import { isInMemoryDatabase } from "../sqlite/sqlite-uri.js";
 
 export class SQLiteDatabaseTasks {
   private readonly dbConfig: DatabaseConfig;

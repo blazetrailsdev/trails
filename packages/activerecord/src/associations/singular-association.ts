@@ -266,10 +266,29 @@ export class SingularAssociation extends Association {
    * (association.rb:248) and on `HasManyThroughAssociation`
    * (has_many_through_association.rb:225).
    *
-   * The query itself lives in the functional loader below, which the reader
-   * sugar and the through loaders reach without an association instance; that
-   * owner/name/options triple is a trails-only calling convention, not Rails
-   * surface.
+   * One body serves belongs_to and has_one, as in Rails, because the macro
+   * difference lives in the scope the reflection builds — `_builtAssociationScope`
+   * is reached identically for both. `BelongsToAssociation` overrides only the
+   * `find_target?` predicate (`belongs_to_association.rb:124-126`), never
+   * `find_target`, which is why there is no belongs_to override either.
+   *
+   * It neither reads nor writes the association: Rails' body opens at the scope
+   * and ends at `scope.first` (`singular_association.rb:47-55`), returning the
+   * record. The cached read lives one level up in `Association#loadTarget` →
+   * `_findTarget`, mirroring `load_target`'s
+   * `(@stale_state && stale_target?) || find_target?` guard
+   * (`association.rb:190`). `reflection.check_validity!` has likewise already
+   * run in `Association#initialize` (`association.rb:41-45`), so a recursive or
+   * missing `inverse_of` has surfaced before this body.
+   *
+   * The one macro-conditional step Rails has no counterpart for is the has_one
+   * `:through` routing. It is a named helper rather than an inline branch so
+   * this body keeps the shape of Rails'.
+   *
+   * `reflection` is re-read off the class rather than taken from `this`: the
+   * definition `Association` holds carries no `macro` / `joinForeignKey` /
+   * `scope`, which the scope builders below need. The name is already validated
+   * by `Association#initialize`, so the miss is defensive.
    *
    * `_loaderWritebackSuppressed` is armed for the raise, not for a writeback:
    * the loader body writes nothing back, so what the flag buys here is
@@ -280,7 +299,109 @@ export class SingularAssociation extends Association {
   protected override async findTarget(): Promise<Base | null> {
     this._loaderWritebackSuppressed++;
     try {
-      return await findTarget(this.owner, this.reflection.name, this.reflection.options);
+      const owner = this.owner;
+      const assocName = this.reflection.name;
+      const options = this.reflection.options;
+      const ctor = owner.constructor as typeof Base;
+      const reflection = ctor._reflectOnAssociation?.(assocName);
+      if (!reflection) throw new AssociationNotFoundError(owner, assocName);
+      const isBelongsTo = reflection.macro === "belongsTo";
+
+      if (options.through) {
+        validateThroughReflection(ctor, assocName);
+      }
+
+      // Rails `Association#find_target`'s first statement. Gated by `find_target?`:
+      // a new-record owner without the key present never reaches `find_target` and
+      // so never raises.
+      if (
+        _violatesStrictLoading(owner, options) &&
+        _findTargetReachable(owner, assocName, options, isBelongsTo ? "belongsTo" : "foreign")
+      ) {
+        strictLoadingViolationBang(owner, assocName, {
+          polymorphic: isBelongsTo ? options.polymorphic : undefined,
+          className: options.className,
+        });
+      }
+
+      // has_one :through. Rails expresses `:through` inside the scope chain; trails
+      // still routes the shapes AssociationScope cannot build through the two-step
+      // `HasOneThroughAssociation#findTarget`.
+      if (!isBelongsTo && options.through) {
+        if (_canRouteThroughViaDisableJoinsAssociationScope(reflection, options)) {
+          return _loadSingularThroughViaDisableJoinsScope(owner, reflection, options);
+        }
+        if (!_routeThroughViaAssociationScope(owner, reflection, options)) {
+          const { findTarget: findThroughTarget } =
+            await import("./has-one-through-association.js");
+          return findThroughTarget(owner, assocName, options);
+        }
+        // Otherwise fall through to the scope path below.
+      }
+
+      let targetModel: typeof Base;
+      if (isBelongsTo && options.polymorphic) {
+        const typeCol = options.foreignType ?? `${underscore(assocName)}_type`;
+        const typeName = owner._readAttribute(typeCol) as string | null;
+        if (!typeName) return null;
+        // Rails resolves a polymorphic belongs_to via the owner class's
+        // polymorphic_class_for, honoring store_full_class_name and (when off)
+        // namespace-relative compute_type — not a bare global registry lookup.
+        targetModel = ctor.polymorphicClassFor(typeName);
+      } else {
+        targetModel = resolveAssocClass(owner, assocName, options.className ?? camelize(assocName));
+      }
+
+      if (options.inverseOf && !(isBelongsTo && options.polymorphic)) {
+        validateInverseOf(targetModel, assocName, options.inverseOf);
+      }
+
+      if (!isBelongsTo) {
+        _validateHasOnePolymorphicKeys(owner, assocName, options);
+      }
+
+      // Null-key short-circuit: read the SAME columns the eventual query reads, or
+      // a mismatch silently returns null where a real query would have found the
+      // row. That is `joinForeignKey` on the owner-side chain reflection for both
+      // macros — the owner's FK for belongs_to, its activeRecordPrimaryKey for
+      // has_one.
+      const ownerSideReflection = _ownerChainReflection(reflection) ?? reflection;
+      const keyColsForCheck = Array.isArray(ownerSideReflection.joinForeignKey)
+        ? ownerSideReflection.joinForeignKey
+        : [ownerSideReflection.joinForeignKey];
+      for (const col of keyColsForCheck) {
+        const v = owner._readAttribute(col);
+        if (v === null || v === undefined) return null;
+      }
+
+      let result: Base | null;
+      if (!_skipSingularStatementCache(reflection, targetModel, options)) {
+        // Rails `Association#find_target` via `reflection.association_scope_cache`
+        // / `sc.execute(binds, c)`.
+        result = await _loadSingularViaStatementCache(owner, assocName, reflection, targetModel);
+      } else {
+        // Rails' `scope.to_a` arm: AssociationScope builds the macro-specific WHERE
+        // (scalar, composite, `:as`, STI, polymorphic) for both macros, and adds
+        // LIMIT 1 because `reflection.isCollection()` is false.
+        const built = _builtAssociationScope(owner, assocName, reflection, targetModel);
+        const baseRelation = _scopeForAssociation(targetModel);
+        let rel = baseRelation.merge(built);
+        rel = applyAssociationScope(rel, options.scope, owner, reflection.scope);
+        // Rails returns the array and calls `Array#first` — no ORDER BY in SQL.
+        // `take` (unordered LIMIT 1) matches; `first` would route through
+        // `ordered_relation` and add one. See has_one_associations_test
+        // `test_has_one_does_not_use_order_by`.
+        result = await rel.take();
+      }
+
+      // Mirrors `Association#set_inverse_instance`: resolve via the reflection so
+      // automatic_inverse_of wires the parent too.
+      if (result) {
+        const inverseName = _resolveInverseName(ctor, assocName, options);
+        if (inverseName) _wireInverseAssociation(owner, result, inverseName);
+      }
+
+      return result;
     } finally {
       this._loaderWritebackSuppressed--;
     }
@@ -369,141 +490,4 @@ function _validateHasOnePolymorphicKeys(
     primaryKey,
     foreignKey,
   });
-}
-
-/**
- * Loads a singular association's target.
- *
- * Mirrors: ActiveRecord::Associations::SingularAssociation#find_target
- * (`singular_association.rb:47`), which delegates the query itself to
- * `Association#find_target` (`association.rb`) and takes `Array#first` of the
- * loaded rows. Like Rails, which builds an `Association` from a validated
- * reflection (`association.rb:41-45`), a name the model never declared raises
- * `AssociationNotFoundError` (`associations.rb:56`) before any load runs.
- *
- * One body serves belongs_to and has_one, as in Rails, because the macro
- * difference lives in the scope the reflection builds — `_builtAssociationScope`
- * below is reached identically for both. `BelongsToAssociation` overrides only
- * the `find_target?` predicate (`belongs_to_association.rb:124-126`), never
- * `find_target`, which is why there is no belongs_to override here either.
- *
- * It neither reads nor writes the association: Rails' body opens at the scope
- * and ends at `scope.first` (`singular_association.rb:47-55`), returning the
- * record. The cached read lives
- * one level up in `Association#loadTarget` → `doFindTarget`, mirroring
- * `load_target`'s `(@stale_state && stale_target?) || find_target?` guard
- * (`association.rb:190`). `reflection.check_validity!` has likewise already run
- * in `Association#initialize` (`association.rb:41-45`), so a recursive or
- * missing `inverse_of` has surfaced before this body.
- *
- * The one macro-conditional step Rails has no counterpart for is the has_one
- * `:through` routing. It is a named helper rather than an inline branch so this
- * body keeps the shape of Rails'.
- *
- * @internal
- */
-export async function findTarget(
-  record: Base,
-  assocName: string,
-  options: AssociationOptions,
-): Promise<Base | null> {
-  const ctor = record.constructor as typeof Base;
-  const reflection = ctor._reflectOnAssociation?.(assocName);
-  if (!reflection) throw new AssociationNotFoundError(record, assocName);
-  const isBelongsTo = reflection.macro === "belongsTo";
-
-  if (options.through) {
-    validateThroughReflection(ctor, assocName);
-  }
-
-  // Rails `Association#find_target`'s first statement. Gated by `find_target?`:
-  // a new-record owner without the key present never reaches `find_target` and
-  // so never raises.
-  if (
-    _violatesStrictLoading(record, options) &&
-    _findTargetReachable(record, assocName, options, isBelongsTo ? "belongsTo" : "foreign")
-  ) {
-    strictLoadingViolationBang(record, assocName, {
-      polymorphic: isBelongsTo ? options.polymorphic : undefined,
-      className: options.className,
-    });
-  }
-
-  // has_one :through. Rails expresses `:through` inside the scope chain; trails
-  // still routes the shapes AssociationScope cannot build through the two-step
-  // `HasOneThroughAssociation#findTarget`.
-  if (!isBelongsTo && options.through) {
-    if (_canRouteThroughViaDisableJoinsAssociationScope(reflection, options)) {
-      return _loadSingularThroughViaDisableJoinsScope(record, reflection, options);
-    }
-    if (!_routeThroughViaAssociationScope(record, reflection, options)) {
-      const { findTarget: findThroughTarget } = await import("./has-one-through-association.js");
-      return findThroughTarget(record, assocName, options);
-    }
-    // Otherwise fall through to the scope path below.
-  }
-
-  let targetModel: typeof Base;
-  if (isBelongsTo && options.polymorphic) {
-    const typeCol = options.foreignType ?? `${underscore(assocName)}_type`;
-    const typeName = record._readAttribute(typeCol) as string | null;
-    if (!typeName) return null;
-    // Rails resolves a polymorphic belongs_to via the owner class's
-    // polymorphic_class_for, honoring store_full_class_name and (when off)
-    // namespace-relative compute_type — not a bare global registry lookup.
-    targetModel = ctor.polymorphicClassFor(typeName);
-  } else {
-    targetModel = resolveAssocClass(record, assocName, options.className ?? camelize(assocName));
-  }
-
-  if (options.inverseOf && !(isBelongsTo && options.polymorphic)) {
-    validateInverseOf(targetModel, assocName, options.inverseOf);
-  }
-
-  if (!isBelongsTo) {
-    _validateHasOnePolymorphicKeys(record, assocName, options);
-  }
-
-  // Null-key short-circuit: read the SAME columns the eventual query reads, or
-  // a mismatch silently returns null where a real query would have found the
-  // row. That is `joinForeignKey` on the owner-side chain reflection for both
-  // macros — the owner's FK for belongs_to, its activeRecordPrimaryKey for
-  // has_one.
-  const ownerSideReflection = _ownerChainReflection(reflection) ?? reflection;
-  const keyColsForCheck = Array.isArray(ownerSideReflection.joinForeignKey)
-    ? ownerSideReflection.joinForeignKey
-    : [ownerSideReflection.joinForeignKey];
-  for (const col of keyColsForCheck) {
-    const v = record._readAttribute(col);
-    if (v === null || v === undefined) return null;
-  }
-
-  let result: Base | null;
-  if (!_skipSingularStatementCache(reflection, targetModel, options)) {
-    // Rails `Association#find_target` via `reflection.association_scope_cache`
-    // / `sc.execute(binds, c)`.
-    result = await _loadSingularViaStatementCache(record, assocName, reflection, targetModel);
-  } else {
-    // Rails' `scope.to_a` arm: AssociationScope builds the macro-specific WHERE
-    // (scalar, composite, `:as`, STI, polymorphic) for both macros, and adds
-    // LIMIT 1 because `reflection.isCollection()` is false.
-    const built = _builtAssociationScope(record, assocName, reflection, targetModel);
-    const baseRelation = _scopeForAssociation(targetModel);
-    let rel = baseRelation.merge(built);
-    rel = applyAssociationScope(rel, options.scope, record, reflection.scope);
-    // Rails returns the array and calls `Array#first` — no ORDER BY in SQL.
-    // `take` (unordered LIMIT 1) matches; `first` would route through
-    // `ordered_relation` and add one. See has_one_associations_test
-    // `test_has_one_does_not_use_order_by`.
-    result = await rel.take();
-  }
-
-  // Mirrors `Association#set_inverse_instance`: resolve via the reflection so
-  // automatic_inverse_of wires the parent too.
-  if (result) {
-    const inverseName = _resolveInverseName(ctor, assocName, options);
-    if (inverseName) _wireInverseAssociation(record, result, inverseName);
-  }
-
-  return result;
 }

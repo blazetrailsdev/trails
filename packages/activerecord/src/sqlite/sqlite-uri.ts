@@ -1,4 +1,33 @@
 /**
+ * True for SQLite in-memory database names per the SQLite URI spec
+ * (https://www.sqlite.org/inmemorydb.html): `:memory:`, `file::memory:...`,
+ * and named in-memory URIs whose query string carries a real `mode=memory`
+ * parameter (e.g. `file:memdb1?mode=memory&cache=shared`).
+ *
+ * Parses the query string rather than substring-matching, so a path that
+ * merely contains the text `mode=memory` (`file:/tmp/mode=memory.db`) is not
+ * misclassified. This is the single predicate both `SQLite3Adapter` and
+ * `SQLiteDatabaseTasks` classify with.
+ *
+ * No Rails counterpart, and `@internal` rather than tagged because the tag
+ * would be stale on a declaration `@internal` already drops from the compared
+ * surface: Rails never asks the question — `sqlite3_adapter.rb` compares
+ * `@config[:database]` against the literal `":memory:"`, and
+ * `tasks/sqlite_database_tasks.rb` operates on `db_config.database` directly
+ * and shells out. trails needs it for the `sqlite3_mem` lane, whose database is
+ * a shared-cache in-memory URI rather than the bare `:memory:` alias.
+ * @internal
+ */
+export function isInMemoryDatabase(database: string): boolean {
+  if (database === ":memory:") return true;
+  if (!database.startsWith("file:")) return false;
+  if (database.startsWith("file::memory:")) return true;
+  const q = database.indexOf("?");
+  if (q === -1) return false;
+  return new URLSearchParams(database.slice(q + 1)).get("mode") === "memory";
+}
+
+/**
  * Decode `file:` URIs (including `file://`, percent-encoding, and `?mode=`
  * query strings) and `:memory:` aliases. Returns `null` for memory databases,
  * otherwise the decoded filesystem path.
