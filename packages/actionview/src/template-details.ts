@@ -6,7 +6,7 @@
  */
 
 import type { TemplateHandler } from "./template/handlers.js";
-import { TemplateHandlerRegistry } from "./template/handlers.js";
+import { TemplateHandlers } from "./template/handlers.js";
 
 export type DetailKey = string | symbol | null;
 
@@ -107,7 +107,7 @@ export class TemplateDetails {
    */
   handlerClass(): TemplateHandler | undefined {
     if (typeof this.handler !== "string") return undefined;
-    return TemplateHandlerRegistry.handlerForExtension(this.handler);
+    return TemplateHandlers.handlerForExtension(this.handler);
   }
 
   /**
