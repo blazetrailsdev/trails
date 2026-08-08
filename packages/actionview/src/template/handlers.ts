@@ -129,29 +129,3 @@ export const TemplateHandlers = {
     cachedExtensions = null;
   },
 };
-
-/**
- * Back-compat alias. The previous name was `TemplateHandlerRegistry`; the
- * Rails-mirroring name is `TemplateHandlers`.
- *
- * @deprecated Use {@link TemplateHandlers}.
- */
-export const TemplateHandlerRegistry = {
-  register(handler: TemplateHandler): void {
-    for (const ext of handler.extensions) {
-      TemplateHandlers.registerTemplateHandler(ext, handler);
-    }
-  },
-  handlerForExtension(ext: string): TemplateHandler | undefined {
-    return TemplateHandlers.handlerForExtension(ext);
-  },
-  get extensions(): string[] {
-    return TemplateHandlers.extensions();
-  },
-  has(ext: string): boolean {
-    return TemplateHandlers.registeredTemplateHandler(ext) !== undefined;
-  },
-  clear(): void {
-    TemplateHandlers.clear();
-  },
-};

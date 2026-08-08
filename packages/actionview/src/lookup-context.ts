@@ -17,7 +17,7 @@
  */
 
 import type { RenderContext } from "./template/handlers.js";
-import { TemplateHandlerRegistry } from "./template/handlers.js";
+import { TemplateHandlers } from "./template/handlers.js";
 import type { TemplateResolver } from "./resolver/resolver.js";
 import type { Template } from "./template.js";
 import { Jaro } from "@blazetrails/did-you-mean";
@@ -41,7 +41,7 @@ function registerDetail(name: string, proc: DefaultProc): void {
 registerDetail("locale", () => ["en"]);
 registerDetail("formats", () => ["html", "text", "js", "css", "xml", "json"]);
 registerDetail("variants", () => []);
-registerDetail("handlers", () => TemplateHandlerRegistry.extensions as DetailValue);
+registerDetail("handlers", () => TemplateHandlers.extensions() as DetailValue);
 
 /** Whitelist of format symbols recognized by `formats=`. */
 const VALID_FORMAT_SYMBOLS: ReadonlySet<string> = new Set([
@@ -550,7 +550,7 @@ export class LookupContext {
    * @internal
    */
   findTemplate(name: string, prefix: string, format: string): Template | null {
-    const extensions = TemplateHandlerRegistry.extensions;
+    const extensions = TemplateHandlers.extensions();
     if (extensions.length === 0) return null;
 
     for (const resolver of this.resolvers) {
@@ -573,7 +573,7 @@ export class LookupContext {
    * @internal
    */
   findLayout(name: string, format: string): Template | null {
-    const extensions = TemplateHandlerRegistry.extensions;
+    const extensions = TemplateHandlers.extensions();
     if (extensions.length === 0) return null;
 
     for (const resolver of this.resolvers) {
@@ -718,11 +718,11 @@ export class LookupContext {
     locals: Record<string, unknown>,
     context: RenderContext,
   ): Promise<string> {
-    const handler = TemplateHandlerRegistry.handlerForExtension(template.extension);
+    const handler = TemplateHandlers.handlerForExtension(template.extension);
     if (!handler) {
       throw new Error(
         `No template handler registered for ".${template.extension}". ` +
-          `Register one with TemplateHandlerRegistry.register(handler).`,
+          `Register one with TemplateHandlers.registerTemplateHandler(extension, handler).`,
       );
     }
 

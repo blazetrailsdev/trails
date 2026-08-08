@@ -51,7 +51,8 @@ export class Application {
    * keep working.
    */
   private setupViews(): void {
-    ActionView.TemplateHandlerRegistry.register(new ActionView.RawHandler());
+    const rawHandler = new ActionView.RawHandler();
+    ActionView.TemplateHandlers.registerTemplateHandler(...rawHandler.extensions, rawHandler);
 
     // Add file system resolver pointing to the app's views directory
     const viewsPath = path.join(this.cwd, "src", "app", "views");
