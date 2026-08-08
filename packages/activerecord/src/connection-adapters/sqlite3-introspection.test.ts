@@ -4,14 +4,34 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { SQLite3Adapter } from "./sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "./better-sqlite3-adapter.js";
+import { ConnectionPool } from "./abstract/connection-pool.js";
+import { PoolConfig } from "./pool-config.js";
+import { ConnectionDescriptor } from "./abstract/connection-descriptor.js";
+import { HashConfig } from "../database-configurations/hash-config.js";
+import type { AbstractAdapter as DatabaseAdapter } from "./abstract-adapter.js";
 
 describe("SQLite3Adapter schema introspection", () => {
   let adapter: SQLite3Adapter;
+  let pool: ConnectionPool;
   let tmpDir: string;
 
-  beforeEach(() => {
+  // Checked out of a real pool, not constructed bare: `removeColumn` rebuilds
+  // the table and ends in `clear_query_cache`, whose `pool.clear_query_cache`
+  // (query_cache.rb:232-234) is an unchecked send that a NullPool adapter
+  // cannot answer.
+  beforeEach(async () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-sqlite-introspect-"));
-    adapter = new BetterSQLite3Adapter(path.join(tmpDir, "db.sqlite3"));
+    const file = path.join(tmpDir, "db.sqlite3");
+    pool = new ConnectionPool(
+      new PoolConfig(
+        new ConnectionDescriptor("primary"),
+        new HashConfig("test", "primary", { adapter: "sqlite3", database: file }),
+        "writing",
+        "default",
+        { adapterFactory: () => new BetterSQLite3Adapter(file) as unknown as DatabaseAdapter },
+      ),
+    );
+    adapter = (await pool.checkout()) as unknown as SQLite3Adapter;
   });
 
   afterEach(async () => {
@@ -24,7 +44,7 @@ describe("SQLite3Adapter schema introspection", () => {
         "DROP TABLE IF EXISTS widgets; DROP TABLE IF EXISTS memberships; DROP TABLE IF EXISTS temp_widgets; DROP TABLE IF EXISTS aux.widgets",
       )
       .catch(() => undefined);
-    await adapter.close();
+    await pool.disconnect();
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 

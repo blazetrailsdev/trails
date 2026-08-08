@@ -14,11 +14,29 @@ import type {
   SyncSqliteStatement,
 } from "../../sqlite-adapter.js";
 import { assertLogged } from "./test-helper.js";
+import { ConnectionPool } from "../../connection-adapters/abstract/connection-pool.js";
+import { PoolConfig } from "../../connection-adapters/pool-config.js";
+import { ConnectionDescriptor } from "../../connection-adapters/abstract/connection-descriptor.js";
+import { HashConfig } from "../../database-configurations/hash-config.js";
+import type { AbstractAdapter as DatabaseAdapter } from "../../connection-adapters/abstract-adapter.js";
 
 let adapter: SQLite3Adapter;
+let pool: ConnectionPool;
 
-beforeEach(() => {
-  adapter = new BetterSQLite3Adapter(":memory:");
+// Checked out of a real pool, not constructed bare: the alter_table rebuild
+// ends in `clear_query_cache`, whose `pool.clear_query_cache`
+// (query_cache.rb:232-234) is an unchecked send a NullPool cannot answer.
+beforeEach(async () => {
+  pool = new ConnectionPool(
+    new PoolConfig(
+      new ConnectionDescriptor("primary"),
+      new HashConfig("test", "primary", { adapter: "sqlite3", database: ":memory:" }),
+      "writing",
+      "default",
+      { adapterFactory: () => new BetterSQLite3Adapter(":memory:") as unknown as DatabaseAdapter },
+    ),
+  );
+  adapter = (await pool.checkout()) as unknown as SQLite3Adapter;
 });
 
 async function createExampleTable(): Promise<void> {
@@ -35,7 +53,7 @@ afterEach(async () => {
   await adapter.exec(
     `DROP TABLE IF EXISTS items; DROP TABLE IF EXISTS typed; DROP TABLE IF EXISTS no_pk; DROP TABLE IF EXISTS bin_esc; DROP TABLE IF EXISTS enc_test; DROP TABLE IF EXISTS def_vals; DROP TABLE IF EXISTS strict_items; DROP TABLE IF EXISTS custom_pk_src; DROP TABLE IF EXISTS custom_pk_dest; DROP TABLE IF EXISTS cpk_src; DROP TABLE IF EXISTS cpk_dest; DROP TABLE IF EXISTS custom_pk; DROP TABLE IF EXISTS change_pk; DROP TABLE IF EXISTS barcodes; DROP TABLE IF EXISTS test; DROP TABLE IF EXISTS testings; DROP TABLE IF EXISTS rowid_test; DROP TABLE IF EXISTS rowid_lower; DROP TABLE IF EXISTS text_pk; DROP TABLE IF EXISTS mixed_case; DROP TABLE IF EXISTS auto_inc; DROP TABLE IF EXISTS cpk; DROP TABLE IF EXISTS ex; DROP TABLE IF EXISTS json_defs`,
   );
-  await adapter.close();
+  await pool.disconnect();
   Notifications.unsubscribeAll();
 });
 
