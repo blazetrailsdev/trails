@@ -187,7 +187,16 @@ describe("SqliteStructureDumpTest", () => {
     }
   });
 
+  // `structure_dump` reaches `data_sources` through the ambient
+  // `Base.lease_connection`, which is not the fixture database — Rails stubs it
+  // for the same reason (`sqlite_rake_test.rb:195`).
+  async function stubDataSources(tables: string[]): Promise<void> {
+    const conn = await Base.connectionPool().leaseConnection();
+    vi.spyOn(conn, "dataSources").mockResolvedValue(tables);
+  }
+
   afterEach(() => {
+    vi.restoreAllMocks();
     SchemaDumper.ignoreTables = [];
     for (const file of created) {
       try {
@@ -215,6 +224,7 @@ describe("SqliteStructureDumpTest", () => {
     const filename = path.join(os.tmpdir(), `awesome-file-${randomUUID()}.sql`);
     created.push(filename);
     SchemaDumper.ignoreTables = [/^prefix_/, "ignored_foo"];
+    await stubDataSources(["foo", "bar", "prefix_foo", "ignored_foo"]);
 
     await new SQLiteDatabaseTasks(configuration).structureDump(filename);
 
@@ -232,6 +242,7 @@ describe("SqliteStructureDumpTest", () => {
     created.push(filename);
     runSqlite3(database, "CREATE TABLE prefix_bar(id INTEGER)");
     SchemaDumper.ignoreTables = [/^prefix_/g];
+    await stubDataSources(["bar", "prefix_foo", "prefix_bar"]);
 
     await new SQLiteDatabaseTasks(configuration).structureDump(filename);
 
