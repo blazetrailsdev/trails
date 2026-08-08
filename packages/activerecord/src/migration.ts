@@ -318,6 +318,38 @@ function announceMigrationText(header: string, message: string): string {
 }
 
 /**
+ * @internal Storage for the blocks `up`/`down` selected, drained by
+ * `Migration#reversible`. Rails' Struct has no such field: Ruby's `up`/`down`
+ * run their block inline (`yield unless reverting`), but a trails callback is
+ * async while the registering block is not, so the selected blocks are
+ * collected here and awaited after the block returns. The key is a
+ * module-private Symbol so the field is not part of the class' surface.
+ */
+const toRun = Symbol("toRun");
+
+/**
+ * Mirrors: ActiveRecord::Migration::ReversibleBlockHelper (migration.rb:873-880),
+ * `Struct.new(:reverting)` with `up` (`yield unless reverting`) and `down`
+ * (`yield if reverting`).
+ */
+export class ReversibleBlockHelper {
+  /** @internal */
+  [toRun]: Array<() => Promise<void>> = [];
+
+  constructor(public reverting: boolean) {}
+
+  /** @internal */
+  up(fn: () => Promise<void>): void {
+    if (!this.reverting) this[toRun].push(fn);
+  }
+
+  /** @internal */
+  down(fn: () => Promise<void>): void {
+    if (this.reverting) this[toRun].push(fn);
+  }
+}
+
+/**
  * Migration — base class for database migrations.
  *
  * Mirrors: ActiveRecord::Migration
@@ -1213,31 +1245,18 @@ export abstract class Migration {
    * `helper = ReversibleBlockHelper.new(reverting?)` then
    * `execute_block { yield helper }`. The helper runs each `up`/`down` block
    * inline as Ruby yields; the callbacks here are async and the block that
-   * registers them is not, so they are collected and awaited on the way out
-   * of the same `execute_block`. The whole invocation of `fn` — not just the
-   * selected callbacks — happens inside `execute_block`, so a recording pass
-   * defers the block's own statements to `replay` as Ruby's `yield helper`
-   * does (`migration/command_recorder.rb:148-152`).
+   * registers them is not, so they are collected on the helper and awaited on
+   * the way out of the same `execute_block`. The whole invocation of `fn` —
+   * not just the selected callbacks — happens inside `execute_block`, so a
+   * recording pass defers the block's own statements to `replay` as Ruby's
+   * `yield helper` does (`migration/command_recorder.rb:148-152`).
    */
-  async reversible(
-    fn?: (dir: {
-      up: (f: () => Promise<void>) => void;
-      down: (f: () => Promise<void>) => void;
-    }) => void,
-  ): Promise<void> {
+  async reversible(fn?: (dir: ReversibleBlockHelper) => void): Promise<void> {
     if (!fn) return;
-    const reverting = this.isReverting();
+    const helper = new ReversibleBlockHelper(this.isReverting());
     await this.executeBlock(async () => {
-      const toRun: Array<() => Promise<void>> = [];
-      fn({
-        up: (f) => {
-          if (!reverting) toRun.push(f);
-        },
-        down: (f) => {
-          if (reverting) toRun.push(f);
-        },
-      });
-      for (const f of toRun) await f();
+      fn(helper);
+      for (const f of helper[toRun]) await f();
     });
   }
 
