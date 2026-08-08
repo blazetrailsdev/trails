@@ -18,6 +18,7 @@ import {
   type SpawnSyncResult,
 } from "@blazetrails/activesupport";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
+import type { SQLite3Adapter } from "../connection-adapters/sqlite3-adapter.js";
 import type { DatabaseConfig } from "../database-configurations/database-config.js";
 import { Base } from "../base.js";
 import { DatabaseTasks, metadataTableNames } from "./database-tasks.js";
@@ -37,18 +38,23 @@ export class SQLiteDatabaseTasks {
     this.root = root;
   }
 
+  /**
+   * `sqlite_database_tasks.rb:15-20`. The database file is created by SQLite on
+   * connect, not by this method: Rails' trailing bare `connection` is what forces
+   * the checkout that opens it. `File.exist?` reads the *raw* configured
+   * database — only `drop` joins `root` (`:23-24`) — and the message the caller
+   * prints comes from `DatabaseTasks.create`'s rescue
+   * (`database_tasks.rb:119-120`), so the exception carries none of its own.
+   *
+   * `File.exist?(":memory:")` is false, so an in-memory database simply
+   * connects; Rails has no in-memory lane and so no guard here.
+   */
   async create(): Promise<void> {
     const fs = getFs();
-    const path = getPath();
-    const dbPath = this.resolveDbPath();
-    const inMemory = isInMemoryDatabase(dbPath);
-    if (!inMemory && fs.existsSync(dbPath)) {
-      throw new DatabaseAlreadyExists(`Database '${dbPath}' already exists`);
-    }
-    if (!inMemory) {
-      fs.mkdirSync(path.dirname(dbPath), { recursive: true });
-      fs.writeFileSync(dbPath, "");
-    }
+    if (fs.existsSync(this.dbConfig.database as string)) throw new DatabaseAlreadyExists();
+
+    await this.establishConnection();
+    await this.connection();
   }
 
   async drop(): Promise<void> {
@@ -103,8 +109,15 @@ export class SQLiteDatabaseTasks {
     }
   }
 
-  charset(): string {
-    return "UTF-8";
+  /**
+   * `sqlite_database_tasks.rb:39-41`. `SQLite3Adapter#encoding` is
+   * `any_raw_connection.encoding.to_s` (`sqlite3_adapter.rb:236-239`), i.e.
+   * `PRAGMA encoding`; the literal this used to return could never satisfy
+   * `SqliteDBCharsetTest#test_db_retrieves_charset`, which asserts `encoding`
+   * is called on the connection.
+   */
+  async charset(): Promise<string> {
+    return ((await this.connection()) as SQLite3Adapter).encoding;
   }
 
   async structureDump(filename: string, extraFlags?: string | string[] | null): Promise<void> {
