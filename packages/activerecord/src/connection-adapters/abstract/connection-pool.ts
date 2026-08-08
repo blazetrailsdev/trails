@@ -149,7 +149,10 @@ export class NullPool implements AbstractPool {
    * spell a Ruby send, so `Symbol.iterator`/`Symbol.toPrimitive` and friends are
    * not sends NullPool is missing a method for and read through to `undefined`.
    * String keys get no such carve-out — `pool.then` and `pool.toJSON` are a
-   * NoMethodError in Ruby and are one here.
+   * NoMethodError in Ruby and are one here. What Ruby *does* answer, it answers
+   * through the ancestor chain: `to_s` arrives as `Object.prototype.toString`
+   * and so satisfies `prop in target`, and {@link inspect} is declared below for
+   * the same reason.
    */
   constructor() {
     return new Proxy(this, {
@@ -162,6 +165,22 @@ export class NullPool implements AbstractPool {
         );
       },
     });
+  }
+
+  /**
+   * Ruby's `Object#inspect`, which `NullPool` inherits: it defines no `inspect`
+   * of its own and overrides no `method_missing`
+   * (`abstract/connection_pool.rb:14-51`), so the send resolves up the ancestor
+   * chain and answers a String rather than raising. JS has no `Object.prototype`
+   * member of that name for `prop in target` to find, so the inherited method is
+   * declared here to keep the send answering. `Object#inspect` renders the class
+   * name and the instance variables; the `0x…` address it also prints is not
+   * reproducible and no caller reads it.
+   */
+  inspect(): string {
+    return `#<ActiveRecord::ConnectionAdapters::NullPool server_version=${String(
+      this._serverVersion,
+    )}>`;
   }
 
   /**

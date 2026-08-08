@@ -1178,9 +1178,12 @@ describe("NullPool member parity", () => {
     }
     expect(pool.dirtiesQueryCache).toBe(true);
     expect(pool.schemaCache).toBeNull();
-    for (const probe of ["then", "toJSON", "asymmetricMatch", "nodeType", "inspect"]) {
+    for (const probe of ["then", "toJSON", "asymmetricMatch", "nodeType"]) {
       expect(() => pool[probe]).toThrow(NoMethodError);
     }
+    expect((pool.inspect as () => string)()).toMatch(
+      /^#<ActiveRecord::ConnectionAdapters::NullPool/,
+    );
     expect(pool.toString).toBe(Object.prototype.toString);
     expect(pool[Symbol.toStringTag as unknown as string]).toBeUndefined();
   });
