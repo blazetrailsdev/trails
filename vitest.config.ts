@@ -422,7 +422,7 @@ export default defineConfig({
             "scripts/api-compare/*.test.ts",
             "scripts/fixtures-compare/*.test.ts",
             "scripts/schema-compare/*.test.ts",
-            "scripts/parity/pipeline/**/*.test.ts",
+            "scripts/parity/**/*.test.ts",
             "scripts/*.test.ts",
             "scripts/test-deps/*.test.ts",
             "scripts/tasks/*.test.ts",
