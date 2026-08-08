@@ -1437,14 +1437,14 @@ jobs:
             echo "Ratchet baseline is in sync with a clean reseed."
             exit 0
           fi
-          echo "::error title=Ratchet baseline drift::This branch leaves the committed call-mismatch baseline out of sync with a clean reseed. Prefer the reviewable fix shown in the diff below — delete the stale \`call-mismatches-exclude/\` entries your change converged, and give any newly seeded rows a real reason. \`pnpm api:calls:reseed\` produces the same end state mechanically, at the cost of reordering untouched packages (see CONTRIBUTING.md)."
+          echo "::error title=Ratchet baseline drift::This branch leaves the committed call-mismatch baseline out of sync with a clean reseed. Prefer the reviewable fix shown in the diff below — delete the stale \`call-mismatches-exclude/\` entries your change converged, and give any newly seeded rows a real reason. \`pnpm parity:api:calls:reseed\` produces the same end state mechanically, at the cost of reordering untouched packages (see CONTRIBUTING.md)."
           git --no-pager diff --stat -- "$baseline" "$mark"
           git --no-pager diff -- "$baseline" "$mark"
           exit 1
       - name: Conventions doc up to date
         # docs/ruby-ts-conventions.md is generated from explainConventions()
         # in conventions.ts; fail if it drifts so the agent-facing doc can't
-        # go stale. Regenerate with `pnpm api:conventions`.
+        # go stale. Regenerate with `pnpm parity:api:conventions`.
         run: pnpm exec tsx scripts/api-compare/conventions-doc.ts --check
       - name: Deprecation manifest up to date
         # eslint/rails-deprecated-methods.json is generated from the vendored
@@ -1527,7 +1527,7 @@ jobs:
         # name-matched tests (RFC 0025). Reads output/convention-comparison.json
         # written by the step above — --no-regen because CI must not pay for the
         # extraction twice. Reseed after convergence with
-        # `pnpm test:assertions:ratchet:reseed`.
+        # `pnpm parity:test:assertions:reseed`.
         run: pnpm exec tsx scripts/test-compare/lint-assertion-mismatches.ts --no-regen
       - name: Fixtures comparison
         run: pnpm exec tsx scripts/fixtures-compare/compare.ts --package activerecord --ci

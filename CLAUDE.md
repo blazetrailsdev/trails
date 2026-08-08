@@ -264,6 +264,12 @@ tasks repo enumerates these as convergence classes.
 Run these in order. All of them are fast next to a review round, and each one
 catches a class of drift a reviewer would otherwise spend a cycle on.
 
+The compare tools live under the `parity:*` script namespace — `parity:api`,
+`parity:test`, `parity:fixtures`, `parity:schema`, plus their sub-commands
+(`parity:api:calls`, `parity:api:extra`, `parity:test:assertions`, …). The
+older `api:*` / `test:compare` / `test:assertions:*` names still work as
+delegating aliases, so the commands below are spelled either way.
+
 1. **Size.**
    `git diff --shortstat origin/main...HEAD -- ':!**/pnpm-lock.yaml' ':!**/__snapshots__/**' ':!**/*.md'`
    — compare against the LOC ceiling in your prompt's "Hard rules" block (see
