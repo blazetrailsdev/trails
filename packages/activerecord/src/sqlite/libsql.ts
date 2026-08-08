@@ -1,3 +1,23 @@
+/**
+ * @noRailsEquivalent PERMANENT — Ruby binds exactly one SQLite driver
+ * (`gem "sqlite3"`, sqlite3_adapter.rb:14) and the sqlite3 gem's C extension,
+ * not Rails, owns the handle protocol: `SQLite3Adapter` calls
+ * `::SQLite3::Database.new` (sqlite3_adapter.rb:34-35) and then `prepare`,
+ * `close`, `closed?` on an object Rails does not define
+ * (sqlite3_adapter.rb:98, 207, 224). trails has to write
+ * that layer in TS, so this file is the `libsql` npm client's binding — the
+ * driver object literals and the connection/statement handles behind them —
+ * and no name it declares has a Rails method to converge onto. Its sibling
+ * subclass `connection-adapters/libsql-adapter.ts` carries the same reason.
+ * MOVED-BY-SHORT-NAME: close, databaseExists, isOpen, open, prepare. Those
+ * five score `moved` only because the oracle is one global set of bare
+ * camelized Ruby names with no owner attached: `close` resolves to
+ * `Rack::BodyProxy#close`, `prepare` to `Store::HashAccessor#prepare`,
+ * `isOpen` to `Transaction#open?` (abstract/transaction.rb), `open` to
+ * `SchemaCache#open` / `MigrationContext#open`, `databaseExists` to
+ * `AbstractAdapter#database_exists?` — which the port already carries on the
+ * adapter, at its Rails name, one layer above this driver.
+ */
 import Database from "libsql";
 import { getFs } from "@blazetrails/activesupport/fs-adapter";
 import { ConfigurationError } from "../errors.js";

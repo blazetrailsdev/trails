@@ -2300,6 +2300,59 @@ describe("@noRailsEquivalent — extractor to report", () => {
     expect(gateFileTagRejections(report.fileTagRejections)).toContain("moved name(s)");
   });
 
+  it("accepts a file-level tag whose reason declares the moved name as a short-name coincidence", () => {
+    const report = reportFor(railsWithout([method("sync_replica")]), {
+      "connection-adapters/libsql-replica-adapter.ts": DRIVER_ADAPTER.replace(
+        "subclass onto.",
+        "subclass onto. MOVED-BY-SHORT-NAME: syncReplica.",
+      ),
+    });
+    expect(report.fileTagRejections).toEqual([]);
+    expect(report.packages[0].totalAllowlisted).toBe(2);
+    expect(report.packages[0].extraFiles.map((f) => f.tsFile)).not.toContain(
+      "connection-adapters/libsql-replica-adapter.ts",
+    );
+  });
+
+  it("still rejects when only some of the moved names are declared", () => {
+    const report = reportFor(railsWithout([method("sync_replica"), method("pragma")]), {
+      "connection-adapters/libsql-replica-adapter.ts": DRIVER_ADAPTER.replace(
+        "syncReplica(): void {}",
+        "syncReplica(): void {}\n      pragma(): void {}",
+      ).replace("subclass onto.", "subclass onto. MOVED-BY-SHORT-NAME: syncReplica."),
+    });
+    expect(report.fileTagRejections).toEqual([
+      {
+        package: "activerecord",
+        tsFile: "connection-adapters/libsql-replica-adapter.ts",
+        cause: "moved-names",
+        movedNames: ["pragma"],
+      },
+    ]);
+    expect(report.packages[0].totalAllowlisted).toBe(0);
+  });
+
+  it("rejects a declared name that no longer scores moved, so the declaration only shrinks", () => {
+    const report = reportFor(railsWithout(), {
+      "connection-adapters/libsql-replica-adapter.ts": DRIVER_ADAPTER.replace(
+        "subclass onto.",
+        "subclass onto. MOVED-BY-SHORT-NAME: syncReplica.",
+      ),
+    });
+    expect(report.fileTagRejections).toEqual([
+      {
+        package: "activerecord",
+        tsFile: "connection-adapters/libsql-replica-adapter.ts",
+        cause: "stale-moved-declaration",
+        staleMovedNames: ["syncReplica"],
+      },
+    ]);
+    expect(report.packages[0].totalAllowlisted).toBe(0);
+    expect(gateFileTagRejections(report.fileTagRejections)).toContain(
+      "no longer score moved: syncReplica",
+    );
+  });
+
   it("rejects a file-level tag when a Rails file maps onto the file", () => {
     const ruby = railsWithout();
     ruby.packages.activerecord.classes["ActiveRecord::ConnectionAdapters::SQLite3Adapter"] =
