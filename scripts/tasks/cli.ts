@@ -680,7 +680,7 @@ export function dirtyWorktreeLines(porcelain: string): string[] {
 // edits are stashed, rebased over, and reapplied — writing literal git conflict
 // markers into the story frontmatter when upstream touched the same lines. Both
 // corrupt or strand the edit, so stop up front and tell the user to commit.
-function assertCleanWorktree(cwd: string | undefined): void {
+export function assertCleanWorktree(cwd: string | undefined, lock: LockHandle | null): void {
   let porcelain: string;
   try {
     porcelain = git(["status", "--porcelain"], { silent: true, cwd });
@@ -698,6 +698,7 @@ function assertCleanWorktree(cwd: string | undefined): void {
       `    git -C "${where}" add -A && git -C "${where}" commit -m "wip"\n` +
       `  or stash them:  git -C "${where}" stash`,
   );
+  releaseTasksLock(lock);
   process.exit(1);
 }
 
@@ -1180,22 +1181,21 @@ export function commitAndPush(opts: {
       process.exit(1);
     }
   }
-  // Clear any loadIndex()-regenerated artifacts so the dirty-tree check and the
-  // pull below see a clean tree. Done BEFORE acquiring the lock: both operate
-  // only on this worktree's own files, and assertCleanWorktree may process.exit
-  // (skipping the lock's finally) — keeping them outside the critical section
-  // means that refusal can't leak the shared lock. Only needed before the first
-  // attempt — the retry path resets hard to origin/main, which discards them.
-  restoreGeneratedFiles(cwd);
-  // Bail before touching the remote if the user left hand edits in the tree —
-  // the pull below would corrupt them. (refine pre-cleans its file, so it sails
-  // past.)
-  assertCleanWorktree(cwd);
-  // Serialize the whole pull→commit→push section against every other agent's
-  // checkout. process.exit skips the `finally`, so the exit paths release
+  // Serialize the whole pre-flight→pull→commit→push section against every other
+  // agent's checkout. process.exit skips the `finally`, so the exit paths release
   // explicitly too (releaseTasksLock is idempotent; stale-steal backstops a
   // crash where neither runs).
   const lock = acquireTasksLock(cwd);
+  // Clear any loadIndex()-regenerated artifacts so the dirty-tree check and the
+  // pull below see a clean tree. Only needed before the first attempt — the
+  // retry path resets hard to origin/main, which discards them.
+  restoreGeneratedFiles(cwd);
+  // Bail before touching the remote if the user left hand edits in the tree —
+  // the pull below would corrupt them. (refine pre-cleans its file, so it sails
+  // past.) Inside the lock: every mutation shares one checkout and `flip` stages
+  // a story before committing it, so checking outside would let a waiter observe
+  // the holder's staged file and refuse as though the operator had left edits.
+  assertCleanWorktree(cwd, lock);
   let earlyExit: MutatorEarlyExit | null = null;
   try {
     for (let attempt = 0; attempt < 2; attempt++) {

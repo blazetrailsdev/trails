@@ -31,6 +31,7 @@ import {
   isIndexStale,
   __setLockDirForTest,
   acquireTasksLock,
+  assertCleanWorktree,
   buildRfcContent,
   buildStoryContent,
   MutatorEarlyExit,
@@ -3707,6 +3708,53 @@ describe("duplicate RFC-dir reconciliation", () => {
       "finalized",
     );
     expect(existsSync(join(dir, "rfcs", "0000-foo", "stories", "r1.md"))).toBe(true);
+  });
+});
+
+// The guard now runs INSIDE the critical section (a waiter must not observe a
+// holder's staged file), so its refusal path owns the lock and must hand it back.
+describe("assertCleanWorktree releases the lock it refuses under", () => {
+  function lockDir(): string {
+    const dir = mkdtempSync(join(tmpdir(), "trails-clean-"));
+    mkdirSync(join(dir, ".git"));
+    return dir;
+  }
+  // Only `status --porcelain` matters here; label reads args[2] as elsewhere.
+  function statusReturns(porcelain: string) {
+    execFileSyncMock.mockImplementation(
+      (_file, args) => (args && args[2] === "status" ? porcelain : "") as never,
+    );
+  }
+
+  it("passes a clean tree through and leaves the lock held", () => {
+    const dir = lockDir();
+    statusReturns("");
+    const lock = acquireTasksLock(dir);
+    expect(existsSync(lock!.path)).toBe(true);
+    assertCleanWorktree(dir, lock);
+    expect(existsSync(lock!.path)).toBe(true);
+    releaseTasksLock(lock);
+  });
+
+  // Without the release, the next mutation waits out LOCK_WAIT_MS and dies with
+  // LOCK_TIMEOUT_EXIT — one agent's refusal would wedge every other agent.
+  it("releases the lock before exiting on a genuinely dirty tree", () => {
+    const dir = lockDir();
+    vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
+      throw new Error(`exit ${code}`);
+    }) as never);
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    statusReturns("M  rfcs/0024/stories/x.md"); // staged, as `flip` leaves it
+
+    const lock = acquireTasksLock(dir);
+    expect(existsSync(lock!.path)).toBe(true);
+    expect(() => assertCleanWorktree(dir, lock)).toThrow("exit 1");
+    expect(existsSync(lock!.path)).toBe(false);
+
+    // Proof the wedge is gone: the next agent takes the lock immediately.
+    const next = acquireTasksLock(dir, { waitMs: 0, pollMs: 1 });
+    expect(next).not.toBeNull();
+    releaseTasksLock(next);
   });
 });
 
