@@ -371,9 +371,6 @@ function splitSqlStatements(sql: string): string[] {
 /** @internal */
 export async function runCmd(cmd: string, args: string[], out: string): Promise<void> {
   const childProcess = await getChildProcessAsync();
-  // `out` redirects the child's stdout at the fd level, matching
-  // `Kernel.system(cmd, *args, out: out)` — the bytes sqlite3 writes land in
-  // the file verbatim rather than round-tripping through a decoded string.
   const result: SpawnSyncResult = childProcess.spawnSync(cmd, args, { encoding: "utf8", out });
   if (result.error || result.status !== 0 || result.signal) {
     const details: string[] = [];

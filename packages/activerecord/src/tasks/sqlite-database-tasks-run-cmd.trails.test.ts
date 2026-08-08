@@ -5,11 +5,6 @@ import * as path from "node:path";
 import { randomUUID } from "node:crypto";
 import { runCmd } from "./sqlite-database-tasks.js";
 
-// Trails-only coverage for `run_cmd`'s output redirect
-// (vendor/rails/activerecord/lib/active_record/tasks/sqlite_database_tasks.rb:72-74:
-// `Kernel.system(cmd, *args, out: out)`). Rails hands the child an fd, so the
-// bytes it writes reach the file untouched; a decode/re-encode through a
-// JS string replaces anything that is not valid UTF-8 with U+FFFD.
 describe("SQLiteDatabaseTasks run_cmd output redirect", () => {
   const created: string[] = [];
 
