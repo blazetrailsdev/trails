@@ -77,8 +77,9 @@ export type LeasedTestAdapter = DatabaseAdapter & {
 // graph reaching test-adapter.ts (or adapter-helper.ts, which imports it) would
 // snapshot the fixture database while Base rides the worker clone —
 // `test-adapter.trails.test.ts` asserts the two stay equal.
+const _primaryEnvConfig = (await testConfigurationHashes()).envConfig;
 const _primaryConfiguration: Record<string, unknown> = {
-  ...(await testConfigurationHashes()).envConfig.configurationHash,
+  ..._primaryEnvConfig.configurationHash,
 };
 
 /**
@@ -111,24 +112,68 @@ export let newRawTestAdapter: () => DatabaseAdapter;
 // per-adapter key whitelisting that keeps config-only keys out of the drivers.
 const adapterArgs = buildAdapterArg(_primaryConfiguration.adapter as string, _primaryConfiguration);
 
+const { HashConfig } = await import("./database-configurations/hash-config.js");
+const { PoolConfig } = await import("./connection-adapters/pool-config.js");
+const { ConnectionPool: RealConnectionPool } =
+  await import("./connection-adapters/abstract/connection-pool.js");
+const { ConnectionDescriptor } =
+  await import("./connection-adapters/abstract/connection-descriptor.js");
+
+/**
+ * Hands a freshly-constructed raw adapter its own real `ConnectionPool` and
+ * returns it.
+ *
+ * Rails never has a pool-less connection in a test: every adapter a test drives
+ * came out of `pool.checkout`, so `role` / `shard` / `db_config`
+ * (`abstract_adapter.rb:286-296`, all bare `@pool.` sends) answer. The
+ * constructor's `NullPool` seed (`abstract_adapter.rb:153`) answers none of
+ * them — in Ruby it raises `NoMethodError`, and only trails' cast hides that.
+ *
+ * The pool is built with `adapterFactory` returning this very adapter, so the
+ * adapter IS the pool's single connection rather than a second one: the
+ * driver-level cap of one server connection per raw adapter (max: 1 /
+ * connectionLimit: 1) is untouched, and `pool: 1` says the same thing at the
+ * pool layer. One pool per raw adapter, not one shared pool, so each keeps the
+ * independent schema reflection a standalone adapter has today.
+ *
+ * @internal
+ */
+function withRawTestPool(adapter: DatabaseAdapter): DatabaseAdapter {
+  const dbConfig = new HashConfig(_primaryEnvConfig.envName, _primaryEnvConfig.name, {
+    ..._primaryConfiguration,
+    pool: 1,
+  });
+  const poolConfig = new PoolConfig(
+    new ConnectionDescriptor("primary"),
+    dbConfig,
+    "writing",
+    "default",
+    { adapterFactory: () => adapter },
+  );
+  (adapter as unknown as { pool: unknown }).pool = new RealConnectionPool(poolConfig);
+  return adapter;
+}
+
 if (adapterType === "postgres") {
   const { PostgreSQLAdapter } = await import("./connection-adapters/postgresql-adapter.js");
   const [config] = adapterArgs as [Record<string, unknown>];
   // Constrain the driver pool to max: 1 so each pooled-adapter slot maps to
   // exactly one PG server connection (the outer ConnectionPool multiplexes).
   newRawTestAdapter = () =>
-    new PostgreSQLAdapter({ ...config, max: 1 }) as unknown as DatabaseAdapter;
+    withRawTestPool(new PostgreSQLAdapter({ ...config, max: 1 }) as unknown as DatabaseAdapter);
 } else if (adapterType === "mysql") {
   // Built from the config hash rather than a URL so a socket-configured run
   // (MYSQL_SOCK) reaches the driver — a URL cannot carry a socket path.
   const { Mysql2Adapter } = await import("./connection-adapters/mysql2-adapter.js");
   const [config] = adapterArgs as [Record<string, unknown>];
   newRawTestAdapter = () =>
-    new Mysql2Adapter({
-      ...config,
-      connectionLimit: 1,
-      flags: ["FOUND_ROWS"],
-    }) as unknown as DatabaseAdapter;
+    withRawTestPool(
+      new Mysql2Adapter({
+        ...config,
+        connectionLimit: 1,
+        flags: ["FOUND_ROWS"],
+      }) as unknown as DatabaseAdapter,
+    );
 } else {
   const { BetterSQLite3Adapter } = await import("./connection-adapters/better-sqlite3-adapter.js");
   // Recombined into the Rails-shaped single-hash form the adapter constructor
@@ -136,7 +181,8 @@ if (adapterType === "postgres") {
   // pool's resolver predates that overload.
   const [filename, options] = adapterArgs as [string, SQLite3AdapterOptions | undefined];
   const config: SQLite3Config = { ...options, database: filename };
-  newRawTestAdapter = () => new BetterSQLite3Adapter(config) as unknown as DatabaseAdapter;
+  newRawTestAdapter = () =>
+    withRawTestPool(new BetterSQLite3Adapter(config) as unknown as DatabaseAdapter);
 }
 
 // --- In-test pool for pool-mechanics suites ---------------------------------
