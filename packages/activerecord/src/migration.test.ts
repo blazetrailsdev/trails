@@ -648,7 +648,7 @@ describe("MigrationTest", () => {
   it("migration context with default schema migration", async () => {
     const migrationsPath = `${MIGRATIONS_ROOT}/valid`;
     const adapter = Base.connection;
-    const schemaMigration = new SchemaMigration(adapter.pool);
+    const schemaMigration = adapter.pool.schemaMigration;
     const migrator = new MigrationContext([migrationsPath]);
     await migrator.migrate();
 
