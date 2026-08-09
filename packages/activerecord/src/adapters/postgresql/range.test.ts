@@ -72,7 +72,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     // OIDs were reassigned by the drop+recreate above. Clearing the data-source
     // cache re-reflects columns against the live catalog so the custom range
     // types resolve to their current OIDs.
-    PostgresqlRangesCls.resetColumnInformation();
+    void PostgresqlRangesCls.resetColumnInformation();
     await PostgresqlRangesCls.loadSchema();
     PostgresqlRanges = PostgresqlRangesCls;
 

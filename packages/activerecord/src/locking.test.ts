@@ -92,8 +92,8 @@ describe("OptimisticLockingTest", () => {
     registerModel("FunkyBulb", FunkyBulb);
     registerModel("FailedBulb", FailedBulb);
     registerModel("Engine", Engine);
-    Car.resetColumnInformation();
-    Wheel.resetColumnInformation();
+    void Car.resetColumnInformation();
+    void Wheel.resetColumnInformation();
     await Car.loadSchema();
     await Wheel.loadSchema();
     registerModel(Treasure);
@@ -691,11 +691,11 @@ describe("OptimisticLockingWithSchemaChangeTest", () => {
       null: false,
       default: 0,
     });
-    model.resetColumnInformation();
+    void model.resetColumnInformation();
   }
   async function removeCounterColumnFrom(model: typeof Base): Promise<void> {
     await (Base.connection as any).removeColumn(model.tableName, "test_count");
-    model.resetColumnInformation();
+    void model.resetColumnInformation();
   }
 
   // Mirrors Rails' private counter_test(model, expected_count) { |id| ... }.

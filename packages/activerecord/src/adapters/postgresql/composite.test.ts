@@ -62,7 +62,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   async function teardownCompositeType(): Promise<void> {
     await connection.execute("DROP TABLE IF EXISTS postgresql_composites CASCADE");
     await connection.execute("DROP TYPE IF EXISTS full_address");
-    PostgresqlComposite.resetColumnInformation();
+    void PostgresqlComposite.resetColumnInformation();
     await connection.reloadTypeMap();
   }
 
@@ -70,7 +70,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     beforeEach(async () => {
       connection = Base.connection as PostgreSQLAdapter;
       await setupCompositeType();
-      PostgresqlComposite.resetColumnInformation();
+      void PostgresqlComposite.resetColumnInformation();
       await PostgresqlComposite.loadSchema();
     });
 
@@ -111,7 +111,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       // Rails: @connection.send(:type_map).register_type "full_address", FullAddressType.new
       // Pre-registering by name lets loadAdditionalTypes alias the numeric OID to the type.
       connection.typeMap.registerType("full_address", new FullAddressType());
-      PostgresqlComposite.resetColumnInformation();
+      void PostgresqlComposite.resetColumnInformation();
       await PostgresqlComposite.loadSchema();
     });
 

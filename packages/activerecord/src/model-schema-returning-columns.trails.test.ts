@@ -85,7 +85,7 @@ describe("_returningColumnsForInsert memoization", () => {
     await schemaHost._returningColumnsForInsert(connection);
     const first = calls;
 
-    schemaHost.resetColumnInformation();
+    void schemaHost.resetColumnInformation();
     await Topic.loadSchema();
 
     expect(await schemaHost._returningColumnsForInsert(connection)).toEqual(["id"]);
@@ -100,7 +100,7 @@ describe("_returningColumnsForInsert memoization", () => {
     // which Reply would otherwise inherit through the prototype chain — the
     // descendant would never compute its OWN memo and this test would be
     // vacuous.
-    schemaHost.resetColumnInformation();
+    void schemaHost.resetColumnInformation();
     await Reply.loadSchema();
 
     let calls = 0;
@@ -130,7 +130,7 @@ describe("_returningColumnsForInsert memoization", () => {
     // class currently sees, so a stale memo is only ever as stale as the
     // `_columns` behind it — exactly what the pre-memo code, recomputing from
     // those same stale columns, already returned.
-    schemaHost.resetColumnInformation();
+    void schemaHost.resetColumnInformation();
     await Reply.loadSchema();
 
     const memoized = await sub._returningColumnsForInsert(connection);

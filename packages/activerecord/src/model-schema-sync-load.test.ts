@@ -227,7 +227,7 @@ describe("sync loadSchema / columnsHash", () => {
 
     const cols = { guid: { sqlType: "uuid", name: "guid", default: null } };
     (Shape as unknown as { adapter: unknown }).adapter = makeAdapter(cols);
-    Circle.resetColumnInformation();
+    void Circle.resetColumnInformation();
 
     expect(Object.keys(Circle.columnsHash())).toEqual(["guid"]);
   });

@@ -123,15 +123,14 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
       try {
         // Rails: PgArray.reset_column_information (array_test.rb:85)
-        PgArrays.resetColumnInformation();
-        await PgArrays.loadSchema();
+        await PgArrays.resetColumnInformation();
         // Rails: assert_equal([4, 4, 2], PgArray.column_defaults["score"])
         expect((PgArrays as any).columnDefaults["score"]).toEqual([4, 4, 2]);
         // Rails: assert_equal([4, 4, 2], PgArray.new.score)
         expect((new PgArrays() as any).score).toEqual([4, 4, 2]);
       } finally {
         // Rails: ensure PgArray.reset_column_information (array_test.rb:90)
-        PgArrays.resetColumnInformation();
+        void PgArrays.resetColumnInformation();
       }
     });
     it("default strings", async () => {
@@ -148,15 +147,14 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
       try {
         // Rails: PgArray.reset_column_information (array_test.rb:95)
-        PgArrays.resetColumnInformation();
-        await PgArrays.loadSchema();
+        await PgArrays.resetColumnInformation();
         // Rails: assert_equal(["foo", "bar"], PgArray.column_defaults["names"])
         expect((PgArrays as any).columnDefaults["names"]).toEqual(["foo", "bar"]);
         // Rails: assert_equal(["foo", "bar"], PgArray.new.names)
         expect((new PgArrays() as any).names).toEqual(["foo", "bar"]);
       } finally {
         // Rails: ensure PgArray.reset_column_information (array_test.rb:100)
-        PgArrays.resetColumnInformation();
+        void PgArrays.resetColumnInformation();
       }
     });
     it("schema dump with shorthand", async () => {
@@ -253,8 +251,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         }
       }
       // Rails: PgArray.reset_column_information (array_test.rb:139)
-      PgArrays.resetColumnInformation();
-      await PgArrays.loadSchema();
+      await PgArrays.resetColumnInformation();
       // Rails: assert_equal [], PgArray.column_defaults["tags"]
       expect((PgArrays as any).columnDefaults["tags"]).toEqual([]);
     });

@@ -560,7 +560,7 @@ describe("InheritanceComputeTypeTest", () => {
     const originalType = (Company as any).columnsHash()["type"].default;
     try {
       await Base.connection.changeColumnDefault("companies", "type", "Firm");
-      (Company as any).resetColumnInformation();
+      void (Company as any).resetColumnInformation();
       await Company.loadSchema();
 
       let firm = Company.new(); // without arguments
@@ -580,7 +580,7 @@ describe("InheritanceComputeTypeTest", () => {
       expect(firm).toBeInstanceOf(Client);
     } finally {
       await Base.connection.changeColumnDefault("companies", "type", originalType);
-      (Company as any).resetColumnInformation();
+      void (Company as any).resetColumnInformation();
       await Company.loadSchema();
     }
   });

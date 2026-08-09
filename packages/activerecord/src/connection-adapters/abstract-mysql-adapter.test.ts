@@ -161,7 +161,7 @@ describe("AbstractMysqlAdapter#renameColumn wiring", () => {
         },
       },
     });
-    adapter._execMutation = async (sql: string) => {
+    adapter.execute = async (sql: string) => {
       events.push(`exec:${sql}`);
     };
     adapter.renameColumnIndexes = async (
@@ -511,7 +511,7 @@ describe("AbstractMysqlAdapter#changeColumnDefault wiring (#1568)", () => {
     const executed: string[] = [];
     const adapter = await makeMinimalMysqlAdapter({
       columnFor: async () => column,
-      _execMutation: async (sql: string) => {
+      execute: async (sql: string) => {
         executed.push(sql);
       },
     });
@@ -544,7 +544,7 @@ describe("AbstractMysqlAdapter#changeColumnDefault wiring (#1568)", () => {
 });
 
 describe("AbstractMysqlAdapter#changeColumnNull (#1568)", () => {
-  // Record both `_execMutation` (UPDATE backfill) and `changeColumn` (ALTER
+  // Record both `execute` (UPDATE backfill) and `changeColumn` (ALTER
   // dispatch) into a single sequence so tests can assert relative ordering
   // — Rails requires the UPDATE to run BEFORE the ALTER, otherwise existing
   // NULL rows would fail the new NOT NULL constraint.
@@ -552,7 +552,7 @@ describe("AbstractMysqlAdapter#changeColumnNull (#1568)", () => {
     const events: Array<["exec", string] | ["changeColumn", unknown[]]> = [];
     const adapter = await makeMinimalMysqlAdapter({
       validateChangeColumnNullArgumentBang: (_: boolean) => {},
-      _execMutation: async (sql: string) => {
+      execute: async (sql: string) => {
         events.push(["exec", sql]);
       },
       changeColumn: async (...args: unknown[]) => {
@@ -590,7 +590,7 @@ describe("AbstractMysqlAdapter#changeColumnNull (#1568)", () => {
       validateChangeColumnNullArgumentBang: () => {
         throw new Error("bad null arg");
       },
-      _execMutation: async (sql: string) => {
+      execute: async (sql: string) => {
         executed.push(sql);
       },
       changeColumn: async (...args: unknown[]) => {

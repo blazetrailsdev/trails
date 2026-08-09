@@ -60,7 +60,7 @@ describe("STI subclass normalizes", () => {
     // Rails re-seeds `_default_attributes` from `columns_hash` and replays the
     // pending-decorator chain on every rebuild, so reflection must not revert
     // (or drop) the subclass's decorated definition.
-    ReloadedCompany.resetColumnInformation();
+    void ReloadedCompany.resetColumnInformation();
     await Company.loadSchema();
     await ReloadedCompany.loadSchema();
 
@@ -80,7 +80,7 @@ describe("STI subclass normalizes", () => {
     // Rails' reset_column_information invalidates the class AND its descendants,
     // so a subclass must not keep an old overlay merely because it still covers
     // every key — reflection can change a column's type/default in place.
-    Company.resetColumnInformation();
+    void Company.resetColumnInformation();
     await Company.loadSchema();
     await RefreshedCompany.loadSchema();
 

@@ -861,13 +861,58 @@ function clearAdapterDataSourceCache(host: SchemaHost): void {
 }
 
 /**
+ * Re-reflect the table entry `clearAdapterDataSourceCache` just dropped.
+ *
+ * Rails' readers re-read a cleared entry lazily **on the next access**, blocking
+ * on a connection checkout, so a cleared cache is invisible to the caller
+ * (`model_schema.rb:523-530`). trails' sync readers (`columnsHash()`,
+ * `columnNames()`, `columnDefaults`) answer only from a warm cache and cannot
+ * block, so a cleared entry reads as empty; re-warming it is what lets a ported
+ * body call `resetColumnInformation` and read straight after, as Rails does.
+ *
+ * The returned thenable starts the reflection when it is first awaited, never
+ * before — Rails' laziness, and load-bearing here: an eager fetch from a caller
+ * that does not await (a `beforeEach` reset, a `finally` cleanup) can resolve
+ * after a later DDL statement and write the pre-DDL columns back over the fresh
+ * entry. Best-effort: a model with no adapter or no such table stays cold.
+ */
+function rewarmDataSourceCache(host: SchemaHost): PromiseLike<void> | void {
+  let adapter: SchemaHost["connection"] | undefined;
+  try {
+    adapter = reflectionAdapter(host);
+  } catch {
+    return;
+  }
+  const table = (host as unknown as { tableName?: string }).tableName;
+  const cache = (
+    adapter as unknown as { schemaCache?: { columns?: (t: string) => Promise<unknown> } }
+  )?.schemaCache;
+  if (!table || typeof cache?.columns !== "function") return;
+  let started: Promise<void> | undefined;
+  return {
+    then(onFulfilled, onRejected) {
+      started ??= cache.columns!(table).then(
+        () => {},
+        () => {},
+      );
+      return started.then(onFulfilled, onRejected);
+    },
+  };
+}
+
+/**
  * Rails: clears column cache, schema cache, reloads schema.
  * Drops schema-sourced attribute defs so the next load re-reflects
  * them; user-declared defs (source === "user") are preserved, matching
  * Rails' reload_schema_from_cache behavior where user-provided
  * attributes survive reload.
+ *
+ * Returns the re-warm thenable (see {@link rewarmDataSourceCache}). Declared
+ * `PromiseLike<void> | void` rather than `async` on purpose: every write above the
+ * return happens synchronously, so the ~170 sync call sites are unaffected and
+ * only a caller that needs the re-warmed entry has to await.
  */
-export function resetColumnInformation(this: SchemaHost): void {
+export function resetColumnInformation(this: SchemaHost): PromiseLike<void> | void {
   // Rails reset_column_information calls initialize_find_by_cache right after
   // reload_schema_from_cache, resetting @find_by_statement_cache. Clearing it
   // here (lazy reinit on next access) mirrors that; reload_schema_from_cache
@@ -884,6 +929,7 @@ export function resetColumnInformation(this: SchemaHost): void {
   // class-level schema ivars without touching the schema cache.
   clearAdapterDataSourceCache(this);
   reloadSchemaFromCache.call(this);
+  return rewarmDataSourceCache(this);
 }
 
 /**

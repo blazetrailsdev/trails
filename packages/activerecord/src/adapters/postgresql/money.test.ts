@@ -37,14 +37,14 @@ describeIfPg("PostgreSQLAdapter", () => {
       (t as PgTableDefinition).money("wealth");
       (t as PgTableDefinition).money("depth", { default: "150.55" });
     });
-    PostgresqlMoney.resetColumnInformation();
+    void PostgresqlMoney.resetColumnInformation();
     await PostgresqlMoney.loadSchema();
   });
 
   afterEach(async () => {
     // Rails: @connection.drop_table "postgresql_moneys", if_exists: true
     await connection.dropTable("postgresql_moneys", { ifExists: true });
-    PostgresqlMoney.resetColumnInformation();
+    void PostgresqlMoney.resetColumnInformation();
   });
 
   describe("PostgresqlMoneyTest", () => {

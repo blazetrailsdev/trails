@@ -513,7 +513,12 @@ export function execQuery(
   name: string = "SQL",
   binds: unknown[] = [],
 ): Promise<Result> {
-  return internalExecQuery.call(this as DatabaseStatementsHost, sql, name, binds);
+  // Dispatch through the instance so an adapter's internalExecQuery override
+  // wins, as Ruby's virtual call does.
+  const run = ((this as DatabaseStatementsHost).internalExecQuery ?? internalExecQuery).bind(
+    this as DatabaseStatementsHost,
+  );
+  return run(sql, name, binds);
 }
 
 /**
@@ -537,7 +542,12 @@ export function execInsert(
     binds,
     returning ?? null,
   );
-  return internalExecQuery.call(this as DatabaseStatementsHost, sql, name ?? "SQL", binds);
+  // Dispatch through the instance so an adapter's internalExecQuery override
+  // wins, as Ruby's virtual call does.
+  const run = ((this as DatabaseStatementsHost).internalExecQuery ?? internalExecQuery).bind(
+    this as DatabaseStatementsHost,
+  );
+  return run(sql, name ?? "SQL", binds);
 }
 
 /**
@@ -2112,7 +2122,10 @@ export async function select(
   binds: unknown[] = [],
   _options?: { prepare?: boolean; async?: unknown; allowRetry?: boolean },
 ): Promise<Result> {
-  return internalExecQuery.call(this, sql, name, binds);
+  // Dispatch through the instance so an adapter's internalExecQuery override
+  // wins, as Ruby's virtual call does.
+  const run = (this.internalExecQuery ?? internalExecQuery).bind(this);
+  return run(sql, name, binds);
 }
 
 /**

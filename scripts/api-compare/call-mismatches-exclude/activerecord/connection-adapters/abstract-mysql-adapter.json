@@ -51,16 +51,23 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
+    "rubyName": "change_column",
+    "call": "order:quoteTableName,execute",
+    "reason": "ORDER-only: Ruby evaluates the interpolated quote_table_name / *_for_alter arguments before `execute`; TS source order puts the `execute` call first, so the extractor's textual ordering can never match. Same body, same call set."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
     "rubyName": "change_column_default",
-    "call": "order:changeColumnDefaultForAlter,quoteTableName",
-    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
+    "call": "order:changeColumnDefaultForAlter,execute",
+    "reason": "ORDER-only: Ruby evaluates the interpolated quote_table_name / *_for_alter arguments before `execute`; TS source order puts the `execute` call first, so the extractor's textual ordering can never match. Same body, same call set."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
     "rubyName": "change_column_null",
-    "call": "order:quoteColumnName,quoteTableName",
-    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
+    "call": "order:quoteColumnName,execute",
+    "reason": "ORDER-only: Ruby evaluates the interpolated quote_table_name / *_for_alter arguments before `execute`; TS source order puts the `execute` call first, so the extractor's textual ordering can never match. Same body, same call set."
   },
   {
     "package": "activerecord",
@@ -213,8 +220,8 @@
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
     "rubyName": "rename_column",
-    "call": "order:renameColumnForAlter,quoteTableName",
-    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
+    "call": "order:renameColumnForAlter,execute",
+    "reason": "ORDER-only: Ruby evaluates the interpolated quote_table_name / *_for_alter arguments before `execute`; TS source order puts the `execute` call first, so the extractor's textual ordering can never match. Same body, same call set."
   },
   {
     "package": "activerecord",

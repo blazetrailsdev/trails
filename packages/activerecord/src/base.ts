@@ -1515,7 +1515,7 @@ export class Base extends Model {
       // on that stale "loaded" state. `resetColumnInformation` shadows those
       // inherited flags with own `false`/`undefined` and scrubs the copied
       // foreign schema defs from a forked map.
-      (ModelSchema.resetColumnInformation as () => void).call(this);
+      void (ModelSchema.resetColumnInformation as () => PromiseLike<void> | void).call(this);
       return this.loadSchema();
     }
 

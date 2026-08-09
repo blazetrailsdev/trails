@@ -357,12 +357,7 @@ describe("PersistenceTest", () => {
     const originalType = (Topic as any).columnsHash()["type"].default;
     try {
       await adapter.changeColumnDefault("topics", "type", { from: originalType, to: "Reply" });
-      Topic.resetColumnInformation();
-      // trails reflects columns from the DB asynchronously; re-warm so the new
-      // "Reply" default is actually in effect (Rails reflects it synchronously
-      // in reset_column_information). Without this the assertion is vacuous —
-      // `new Topic` would never see the subclass default.
-      await (Topic as any).loadSchema();
+      await Topic.resetColumnInformation();
 
       const reply = topics("second");
       expect(reply).toBeInstanceOf(Reply);
@@ -373,7 +368,7 @@ describe("PersistenceTest", () => {
       expect((topic as any).constructor).toBe(Topic);
     } finally {
       await adapter.changeColumnDefault("topics", "type", { from: "Reply", to: originalType });
-      Topic.resetColumnInformation();
+      void Topic.resetColumnInformation();
     }
   });
 
@@ -384,11 +379,7 @@ describe("PersistenceTest", () => {
 
     try {
       await adapter.addColumn("topics", "foo", "string");
-      Topic.resetColumnInformation();
-      // trails reflects columns from the DB asynchronously; Rails' synchronous
-      // schema_cache reload is mirrored by re-warming the cache here so the new
-      // `foo` column is reflected before the child redefines its accessors.
-      await (Topic as any).loadSchema();
+      await Topic.resetColumnInformation();
 
       // this should redefine attribute methods
       const child = new Child();
@@ -397,7 +388,7 @@ describe("PersistenceTest", () => {
       expect((new Child({ foo: "bar" }) as any).foo).toBe("bar");
     } finally {
       await adapter.removeColumn("topics", "foo");
-      Topic.resetColumnInformation();
+      void Topic.resetColumnInformation();
     }
   });
 

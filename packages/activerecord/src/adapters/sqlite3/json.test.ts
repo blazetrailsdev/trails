@@ -34,7 +34,7 @@ describeIfSqlite("SQLite3JSONTest", () => {
   afterEach(async () => {
     // Mirrors Rails JSONSharedTestCases#teardown: drop_table :json_data_type.
     await adapter.dropTable("json_data_type", { ifExists: true });
-    JsonDataType.resetColumnInformation();
+    void JsonDataType.resetColumnInformation();
   });
 
   it("test_assigning_string_literal", async () => {

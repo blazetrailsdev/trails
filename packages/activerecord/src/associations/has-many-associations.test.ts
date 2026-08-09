@@ -1252,9 +1252,9 @@ describe("HasManyAssociationsTest", () => {
     // so reset the memoized column/PK information before reflecting the
     // canonical table — otherwise the ids_reader plucks a non-existent `id`
     // column on PG.
-    Car.resetColumnInformation();
-    Bulb.resetColumnInformation();
-    Company.resetColumnInformation();
+    void Car.resetColumnInformation();
+    void Bulb.resetColumnInformation();
+    void Company.resetColumnInformation();
     await Car.loadSchema();
     await Bulb.loadSchema();
     await Company.loadSchema();

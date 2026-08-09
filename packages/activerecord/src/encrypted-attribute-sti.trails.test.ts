@@ -95,7 +95,7 @@ describe("STI subclass encrypts", () => {
     // pending-decorator chain on every rebuild, so reflection must not revert
     // (or drop) the subclass's encrypted definition — it has to survive on the
     // `_pendingEncryptions` replay buffer plus copy-on-write.
-    ReflectedEncryptedCompany.resetColumnInformation();
+    void ReflectedEncryptedCompany.resetColumnInformation();
     await Company.loadSchema();
     await ReflectedEncryptedCompany.loadSchema();
 

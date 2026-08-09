@@ -430,16 +430,16 @@ describe("PrimaryKeyWithAutoIncrementTest", () => {
 
   beforeEach(async () => {
     await (Base.connection as any).dropTable("auto_increments", { ifExists: true });
-    AutoIncrement.resetColumnInformation();
+    void AutoIncrement.resetColumnInformation();
   });
 
   afterEach(async () => {
-    AutoIncrement.resetColumnInformation();
+    void AutoIncrement.resetColumnInformation();
     await (Base.connection as any).dropTable("auto_increments", { ifExists: true });
   });
 
   async function assertAutoIncremented() {
-    AutoIncrement.resetColumnInformation();
+    void AutoIncrement.resetColumnInformation();
     await AutoIncrement.loadSchema();
     const record1 = await AutoIncrement.createBang();
     expect(record1.id).not.toBeNull();
@@ -492,12 +492,12 @@ describe("PrimaryKeyAnyTypeTest", () => {
       id: { type: "string", limit: 42 },
       force: true,
     });
-    Barcode.resetColumnInformation();
+    void Barcode.resetColumnInformation();
     await Barcode.loadSchema();
   });
 
   afterAll(async () => {
-    Barcode.resetColumnInformation();
+    void Barcode.resetColumnInformation();
     await (Base.connection as any).dropTable("barcodes", { ifExists: true });
   });
 
@@ -508,7 +508,7 @@ describe("PrimaryKeyAnyTypeTest", () => {
     expect(col.null).toBe(false);
     expect(col.type).toBe("string");
     expect(col.limit).toBe(42);
-    Barcode.resetColumnInformation();
+    void Barcode.resetColumnInformation();
     await Barcode.loadSchema();
   });
 
@@ -735,7 +735,7 @@ describe("PrimaryKeyIntegerTest", () => {
 
   afterAll(async () => {
     if (adapterType === "sqlite") return;
-    Widget.resetColumnInformation();
+    void Widget.resetColumnInformation();
     await (Base.connection as any).dropTable("widgets", { ifExists: true });
   });
 
@@ -743,7 +743,7 @@ describe("PrimaryKeyIntegerTest", () => {
 
   it.skipIf(adapterType === "sqlite")("primary key column type with serial/integer", async () => {
     await (Base.connection as any).createTable("widgets", { id: { type: pkType }, force: true });
-    Widget.resetColumnInformation();
+    void Widget.resetColumnInformation();
     await Widget.loadSchema();
     const col = (Widget as any).columnsHash()["id"];
     // Rails: assert_equal :integer, column.type; assert_not_predicate column, :bigint?
@@ -755,7 +755,7 @@ describe("PrimaryKeyIntegerTest", () => {
     "primary key with serial/integer are automatically numbered",
     async () => {
       await (Base.connection as any).createTable("widgets", { id: { type: pkType }, force: true });
-      Widget.resetColumnInformation();
+      void Widget.resetColumnInformation();
       await Widget.loadSchema();
       const w = await Widget.createBang();
       expect(w.id).not.toBeNull();
@@ -775,7 +775,7 @@ describe("PrimaryKeyIntegerTest", () => {
       id: { type: "primary_key", limit: 4, unsigned: true },
       force: true,
     });
-    Widget.resetColumnInformation();
+    void Widget.resetColumnInformation();
     await Widget.loadSchema();
     const col = (Widget as any).columnsHash()["id"];
     // Rails: assert_predicate column, :auto_increment?
@@ -793,7 +793,7 @@ describe("PrimaryKeyIntegerTest", () => {
       id: { type: "bigint", unsigned: true },
       force: true,
     });
-    Widget.resetColumnInformation();
+    void Widget.resetColumnInformation();
     await Widget.loadSchema();
     const col = (Widget as any).columnsHash()["id"];
     // Rails: assert_predicate column, :auto_increment?

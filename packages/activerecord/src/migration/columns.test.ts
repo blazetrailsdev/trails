@@ -43,26 +43,26 @@ describe("Migration", () => {
     await connection.createTable("test_models", { force: true }, (t) => {
       t.timestamps({ null: true });
     });
-    TestModel.resetColumnInformation();
+    void TestModel.resetColumnInformation();
   });
 
   afterEach(async () => {
     const connection = await ambientConnection();
     await connection.dropTable("test_models", { ifExists: true });
-    TestModel.resetColumnInformation();
+    void TestModel.resetColumnInformation();
   });
 
   describe("ColumnsTest", () => {
     it("add rename", async () => {
       const connection = await ambientConnection();
       await connection.addColumn("test_models", "girlfriend", "string");
-      TestModel.resetColumnInformation();
+      void TestModel.resetColumnInformation();
 
       await TestModel.create({ girlfriend: "bobette" });
 
       await connection.renameColumn("test_models", "girlfriend", "exgirlfriend");
 
-      TestModel.resetColumnInformation();
+      void TestModel.resetColumnInformation();
       await TestModel.loadSchema();
       const bob = await TestModel.first();
 
@@ -76,7 +76,7 @@ describe("Migration", () => {
       await TestModel.create({ first_name: "foo" });
 
       await connection.renameColumn("test_models", "first_name", "nick_name");
-      TestModel.resetColumnInformation();
+      void TestModel.resetColumnInformation();
       await TestModel.loadSchema();
       expect(TestModel.columnNames()).toContain("nick_name");
       expect((await TestModel.all()).map((m) => m.nick_name)).toEqual(["foo"]);
@@ -89,7 +89,7 @@ describe("Migration", () => {
       await TestModel.create({ first_name: "foo" });
 
       await connection.renameColumn("test_models", "first_name", "nick_name");
-      TestModel.resetColumnInformation();
+      void TestModel.resetColumnInformation();
       await TestModel.loadSchema();
       expect(TestModel.columnNames()).toContain("nick_name");
       expect((await TestModel.all()).map((m) => m.nick_name)).toEqual(["foo"]);
@@ -106,7 +106,7 @@ describe("Migration", () => {
 
       await connection.renameColumn("test_models", "salary", "annual_salary");
 
-      TestModel.resetColumnInformation();
+      void TestModel.resetColumnInformation();
       await TestModel.loadSchema();
       expect(TestModel.columnNames()).toContain("annual_salary");
       const defaultAfter = (await connection.columns("test_models")).find(
@@ -129,7 +129,7 @@ describe("Migration", () => {
       await connection.addColumn("test_models", "first_name", "string");
       await connection.renameColumn("test_models", "first_name", "group");
 
-      TestModel.resetColumnInformation();
+      void TestModel.resetColumnInformation();
       await TestModel.loadSchema();
       expect(TestModel.columnNames()).toContain("group");
     });
@@ -238,7 +238,7 @@ describe("Migration", () => {
         await connection.changeColumn("test_models", "updated_at", "datetime", { null: false });
         await connection.changeColumn("test_models", "updated_at", "datetime", { null: false });
 
-        TestModel.resetColumnInformation();
+        void TestModel.resetColumnInformation();
         await TestModel.loadSchema();
         expect(TestModel.columnsHash()["updated_at"]?.null).toBe(false);
       } finally {
@@ -257,12 +257,12 @@ describe("Migration", () => {
         default: true,
       });
 
-      TestModel.resetColumnInformation();
+      void TestModel.resetColumnInformation();
       await TestModel.loadSchema();
       expect(TestModel.columnsHash()["funny"]?.null).toBe(false);
 
       await connection.changeColumn("test_models", "funny", "boolean", { null: true });
-      TestModel.resetColumnInformation();
+      void TestModel.resetColumnInformation();
       await TestModel.loadSchema();
       expect(TestModel.columnsHash()["funny"]?.null).toBe(true);
     });
@@ -307,7 +307,7 @@ describe("Migration", () => {
       expect(TestModel.new().queryAttribute("contributor")).toBe(true);
 
       await connection.changeColumn("test_models", "contributor", "boolean", { default: null });
-      TestModel.resetColumnInformation();
+      void TestModel.resetColumnInformation();
       await TestModel.loadSchema();
       expect(TestModel.new().queryAttribute("contributor")).toBe(false);
       expect(TestModel.new().contributor).toBeNull();
@@ -326,7 +326,7 @@ describe("Migration", () => {
         default: null,
         null: false,
       });
-      TestModel.resetColumnInformation();
+      void TestModel.resetColumnInformation();
       await TestModel.loadSchema();
       expect(TestModel.new().queryAttribute("contributor")).toBe(false);
       expect(TestModel.new().contributor).toBeNull();
@@ -339,7 +339,7 @@ describe("Migration", () => {
       expect(TestModel.new().queryAttribute("administrator")).toBe(true);
 
       await connection.changeColumn("test_models", "administrator", "boolean", { default: false });
-      TestModel.resetColumnInformation();
+      void TestModel.resetColumnInformation();
       await TestModel.loadSchema();
       expect(TestModel.new().queryAttribute("administrator")).toBe(false);
     });
@@ -379,7 +379,7 @@ describe("Migration", () => {
       await connection.addColumn("test_models", "first_name", "string");
       await connection.changeColumnDefault("test_models", "first_name", "Tester");
 
-      TestModel.resetColumnInformation();
+      void TestModel.resetColumnInformation();
       await TestModel.loadSchema();
       expect(TestModel.new().first_name).toBe("Tester");
     });
@@ -389,7 +389,7 @@ describe("Migration", () => {
       await connection.addColumn("test_models", "first_name", "string");
       await connection.changeColumnDefault("test_models", "first_name", null);
 
-      TestModel.resetColumnInformation();
+      void TestModel.resetColumnInformation();
       await TestModel.loadSchema();
       expect(TestModel.new().first_name).toBeNull();
     });
@@ -401,13 +401,13 @@ describe("Migration", () => {
 
       await connection.changeColumnDefault("test_models", "first_name", null);
 
-      TestModel.resetColumnInformation();
+      void TestModel.resetColumnInformation();
       await TestModel.loadSchema();
       expect(TestModel.new().first_name).toBeNull();
 
       await connection.changeColumnDefault("test_models", "age", null);
 
-      TestModel.resetColumnInformation();
+      void TestModel.resetColumnInformation();
       await TestModel.loadSchema();
       expect(TestModel.new().age).toBeNull();
     });
@@ -420,7 +420,7 @@ describe("Migration", () => {
         to: "Tester",
       });
 
-      TestModel.resetColumnInformation();
+      void TestModel.resetColumnInformation();
       await TestModel.loadSchema();
       expect(TestModel.new().first_name).toBe("Tester");
     });
@@ -433,7 +433,7 @@ describe("Migration", () => {
           (c) => c.name === "id_test",
         ) as (Column & { autoIncrement?: boolean }) | undefined;
         expect(renamed?.autoIncrement).toBe(true);
-        TestModel.resetColumnInformation();
+        void TestModel.resetColumnInformation();
       } finally {
         await connection.renameColumn("test_models", "id_test", "id");
       }
@@ -448,13 +448,13 @@ describe("Migration", () => {
           "created_at",
           () => "CURRENT_TIMESTAMP",
         );
-        TestModel.resetColumnInformation();
+        void TestModel.resetColumnInformation();
         await TestModel.loadSchema();
         expect(TestModel.columnsHash()["created_at"].defaultFunction).toBe("CURRENT_TIMESTAMP");
 
         await connection.addColumn("test_models", "edited_at", "datetime");
         await connection.changeColumnDefault("test_models", "edited_at", () => "CURRENT_TIMESTAMP");
-        TestModel.resetColumnInformation();
+        void TestModel.resetColumnInformation();
         await TestModel.loadSchema();
         expect(TestModel.columnsHash()["created_at"].defaultFunction).toBe("CURRENT_TIMESTAMP");
         expect(TestModel.columnsHash()["edited_at"].defaultFunction).toBe("CURRENT_TIMESTAMP");
@@ -471,7 +471,7 @@ describe("Migration", () => {
           "ruby_on_rails",
           () => "('Ruby ' || 'on ' || 'Rails')",
         );
-        TestModel.resetColumnInformation();
+        void TestModel.resetColumnInformation();
         await TestModel.loadSchema();
         expect(TestModel.columnsHash()["ruby_on_rails"].defaultFunction).toBe(
           "'Ruby ' || 'on ' || 'Rails'",
@@ -488,12 +488,12 @@ describe("Migration", () => {
       const fn = isMariaDb ? "current_timestamp(6)" : "(now())";
 
       await connection.changeColumnDefault("test_models", "created_at", () => fn);
-      TestModel.resetColumnInformation();
+      void TestModel.resetColumnInformation();
       await TestModel.loadSchema();
       expect(TestModel.columnsHash()["created_at"].defaultFunction).toBe(fn);
 
       await connection.changeColumnNull("test_models", "created_at", true);
-      TestModel.resetColumnInformation();
+      void TestModel.resetColumnInformation();
       await TestModel.loadSchema();
       expect(TestModel.columnsHash()["created_at"].defaultFunction).toBe(fn);
     });
@@ -502,7 +502,7 @@ describe("Migration", () => {
       const connection = await ambientConnection();
       await connection.addColumn("test_models", "first_name", "string");
       await connection.changeColumnNull("test_models", "first_name", false);
-      TestModel.resetColumnInformation();
+      void TestModel.resetColumnInformation();
 
       await expect(TestModel.create({ first_name: null })).rejects.toThrow(NotNullViolation);
     });
@@ -511,7 +511,7 @@ describe("Migration", () => {
       const connection = await ambientConnection();
       await connection.addColumn("test_models", "first_name", "string");
       await connection.changeColumnNull("test_models", "first_name", true);
-      TestModel.resetColumnInformation();
+      void TestModel.resetColumnInformation();
 
       const before = (await TestModel.count()) as number;
       await TestModel.create({ first_name: null });

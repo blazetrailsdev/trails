@@ -133,7 +133,6 @@ import {
   executeBatch as pgExecuteBatch,
   suppressCompositePrimaryKey,
   castResult,
-  performQuery,
   affectedRows as pgAffectedRows,
   handleWarnings,
   returningColumnValues as pgReturningColumnValues,
@@ -4466,7 +4465,7 @@ export class PostgreSQLAdapter
     if (this._sessionVariables["timezone"]) return;
     const tz = ActiveRecord.defaultTimezone;
     // Off the withRawConnection loop. This runs as the first step of
-    // performQuery (database-statements.ts), which is itself the block
+    // `_performQuery` (the adapter's one perform_query), which is itself the block
     // executing inside withRawConnection on the same async chain. Re-entering
     // withRawConnection would NOT deadlock — TransactionManager.synchronize is
     // reentrant per async chain (transaction.ts: getStore() === _currentLockOwner
@@ -5054,7 +5053,6 @@ const DEFAULT_FUNCTION_RE = /\w+\(.*\)|\(.*\)::\w+|CURRENT_DATE|CURRENT_TIMESTAM
 /** Mirrors the `nextval(...)` match inlined in Rails' `new_column_from_field`. */
 const SERIAL_SEQUENCE_RE = /^nextval\('"?(?<sequenceName>.+_(?<suffix>seq\d*))"?'::regclass\)$/;
 
-(PostgreSQLAdapter.prototype as any).performQuery = performQuery;
 (PostgreSQLAdapter.prototype as any).castResult = castResult;
 (PostgreSQLAdapter.prototype as any).handleWarnings = handleWarnings;
 // Mirrors: PostgreSQL::DatabaseStatements#build_truncate_statements (database_statements.rb)
