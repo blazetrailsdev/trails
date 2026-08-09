@@ -953,6 +953,103 @@ describe("Date", () => {
     // spelling is reachable — only the Temporal seat cannot hold it.
     expect(dNewByFrags(RubyDate._parse("1500-02-29")).toS()).toBe("1500-02-29");
   });
+
+  it("takes a start argument, and Date::JULIAN/GREGORIAN select every day", () => {
+    // ruby 3.3.11:
+    //   Date.new(1582, 10, 10, Date::GREGORIAN).to_s #=> "1582-10-10"
+    //   Date.new(1582, 10, 10, Date::GREGORIAN).jd   #=> 2299156
+    //   Date.new(1582, 10, 10)                       #=> raises Date::Error
+    //   Date.jd(2299160, Date::GREGORIAN).to_s       #=> "1582-10-14"
+    //   Date.jd(2299160).to_s                        #=> "1582-10-04"
+    //   Date.new(2001, 2, 3, Date::JULIAN).jd        #=> 2451957
+    //   Date.new(2001, 2, 3).jd                      #=> 2451944
+    //   Date.new(1500, 3, 1, Date::GREGORIAN).yday   #=> 60
+    //   Date.new(1500, 3, 1).yday                    #=> 61
+    expect(new RubyDate(1582, 10, 10, RubyDate.GREGORIAN).toS()).toBe("1582-10-10");
+    expect(new RubyDate(1582, 10, 10, RubyDate.GREGORIAN).jd).toBe(2299156);
+    expect(() => new RubyDate(1582, 10, 10)).toThrow(RubyDate.Error);
+    expect(ymd(RubyDate.jd(2299160, RubyDate.GREGORIAN))).toBe("1582-10-14");
+    expect(ymd(RubyDate.jd(2299160))).toBe("1582-10-04");
+    expect(new RubyDate(2001, 2, 3, RubyDate.JULIAN).jd).toBe(2451957);
+    expect(new RubyDate(2001, 2, 3).jd).toBe(2451944);
+    expect(new RubyDate(1500, 3, 1, RubyDate.GREGORIAN).yday).toBe(60);
+    expect(new RubyDate(1500, 3, 1).yday).toBe(61);
+  });
+
+  it("takes a start argument on every static that builds a date", () => {
+    // ruby 3.3.11:
+    //   Date.ordinal(1582, 355, Date::GREGORIAN).to_s      #=> "1582-12-21"
+    //   Date.ordinal(1582, 355).to_s                       #=> "1582-12-31"
+    //   Date.commercial(1582, 41, 4, Date::GREGORIAN).to_s #=> "1582-10-14"
+    //   Date.commercial(1582, 41, 4).to_s                  #=> "1582-10-21"
+    //   Date.parse("1582-10-10", true, Date::GREGORIAN).to_s          #=> "1582-10-10"
+    //   Date.strptime("1582-10-10", "%F", Date::GREGORIAN).to_s       #=> "1582-10-10"
+    expect(ymd(RubyDate.ordinal(1582, 355, RubyDate.GREGORIAN))).toBe("1582-12-21");
+    expect(ymd(RubyDate.ordinal(1582, 355))).toBe("1582-12-31");
+    expect(ymd(RubyDate.commercial(1582, 41, 4, RubyDate.GREGORIAN))).toBe("1582-10-14");
+    expect(ymd(RubyDate.commercial(1582, 41, 4))).toBe("1582-10-21");
+    expect(ymd(RubyDate.parse("1582-10-10", true, RubyDate.GREGORIAN))).toBe("1582-10-10");
+    expect(ymd(RubyDate.strptime("1582-10-10", "%F", RubyDate.GREGORIAN))).toBe("1582-10-10");
+    expect(() => RubyDate.parse("1582-10-10")).toThrow(RubyDate.Error);
+  });
+
+  it("answers start, julian?, gregorian? and new_start off the start it carries", () => {
+    // ruby 3.3.11:
+    //   Date.new(2001, 2, 3).start                     #=> 2299161.0
+    //   Date.new(2001, 2, 3, Date::ENGLAND).start      #=> 2361222.0
+    //   Date.new(2001, 2, 3, Date::JULIAN).start       #=> Infinity
+    //   Date.new(2001, 2, 3, Date::GREGORIAN).start    #=> -Infinity
+    //   Date.new(2001, 2, 3, 0).start                  #=> 2299161.0
+    //   Date.new(1582, 10, 15).julian?                 #=> false
+    //   Date.new(1582, 10, 15).gregorian?              #=> true
+    //   Date.new(1582, 10, 4).julian?                  #=> true
+    //   Date.new(2001, 2, 3, Date::JULIAN).julian?     #=> true
+    //   Date.new(2001, 2, 3, Date::GREGORIAN).julian?  #=> false
+    //   Date.new(1752, 9, 2, Date::ENGLAND).julian?    #=> true
+    //   Date.new(1752, 9, 2, Date::ENGLAND).jd         #=> 2361221
+    //   Date.new(1752, 9, 2).jd                        #=> 2361210
+    expect(new RubyDate(2001, 2, 3).start).toBe(2299161);
+    expect(new RubyDate(2001, 2, 3, RubyDate.ENGLAND).start).toBe(2361222);
+    expect(new RubyDate(2001, 2, 3, RubyDate.JULIAN).start).toBe(Infinity);
+    expect(new RubyDate(2001, 2, 3, RubyDate.GREGORIAN).start).toBe(-Infinity);
+    // `val2sg` (date_core.c:3320-3327): a start outside the reform window is
+    // ignored and DEFAULT_SG taken, as `val2off` ignores a bad offset.
+    expect(new RubyDate(2001, 2, 3, 0).start).toBe(2299161);
+    expect(new RubyDate(2001, 2, 3, NaN).start).toBe(2299161);
+
+    expect(new RubyDate(1582, 10, 15).isJulian).toBe(false);
+    expect(new RubyDate(1582, 10, 15).isGregorian).toBe(true);
+    expect(new RubyDate(1582, 10, 4).isJulian).toBe(true);
+    expect(new RubyDate(2001, 2, 3, RubyDate.JULIAN).isJulian).toBe(true);
+    expect(new RubyDate(2001, 2, 3, RubyDate.GREGORIAN).isJulian).toBe(false);
+    expect(new RubyDate(1752, 9, 2, RubyDate.ENGLAND).isJulian).toBe(true);
+    expect(new RubyDate(1752, 9, 2, RubyDate.ENGLAND).jd).toBe(2361221);
+    expect(new RubyDate(1752, 9, 2).jd).toBe(2361210);
+  });
+
+  it("re-reads the same Julian day under a new start, as new_start does", () => {
+    // ruby 3.3.11:
+    //   d0 = Date.new(2000, 2, 3)
+    //   d0.new_start(Date::JULIAN).to_s #=> "2000-01-21"
+    //   d0.new_start(Date::JULIAN).jd   #=> 2451578
+    //   d0.new_start.start              #=> 2299161.0
+    //   d0.julian.to_s                  #=> "2000-01-21"
+    //   d0.italy.to_s                   #=> "2000-02-03"
+    //   d0.england.to_s                 #=> "2000-02-03"
+    //   d0.england.start                #=> 2361222.0
+    //   d0.gregorian.to_s               #=> "2000-02-03"
+    const d0 = new RubyDate(2000, 2, 3);
+    expect(d0.isJulian).toBe(false);
+    expect(d0.newStart(RubyDate.JULIAN).isJulian).toBe(true);
+    expect(d0.newStart(RubyDate.JULIAN).toS()).toBe("2000-01-21");
+    expect(d0.newStart(RubyDate.JULIAN).jd).toBe(2451578);
+    expect(d0.newStart(RubyDate.ENGLAND).newStart().start).toBe(2299161);
+    expect(d0.julian().toS()).toBe("2000-01-21");
+    expect(d0.italy().toS()).toBe("2000-02-03");
+    expect(d0.england().toS()).toBe("2000-02-03");
+    expect(d0.england().start).toBe(2361222);
+    expect(d0.gregorian().toS()).toBe("2000-02-03");
+  });
 });
 
 describe("DateTime", () => {
@@ -1347,6 +1444,28 @@ describe("DateTime", () => {
     expect(new RubyDate(2008, 3, 1).strftime("%3N")).toBe("000");
     expect(new RubyDate(2008, 3, 1).strftime("%12N")).toBe("000000000000");
     expect(new RubyDate(2008, 3, 1).strftime("%12L")).toBe("000000000000");
+  });
+
+  it("takes a start argument after the offset, and keeps the time of day across new_start", () => {
+    // ruby 3.3.11:
+    //   dt = DateTime.new(1582, 10, 10, 6, 30, 0, "+02:00", Date::GREGORIAN)
+    //   dt.to_s                       #=> "1582-10-10T06:30:00+02:00"
+    //   dt.jd                         #=> 2299156
+    //   dt.start                      #=> -Infinity
+    //   dt.new_start(Date::ITALY).to_s #=> "1582-09-30T06:30:00+02:00"
+    //   DateTime.parse("1582-10-10T06:30:00+02:00", true, Date::GREGORIAN).to_s
+    //     #=> "1582-10-10T06:30:00+02:00"
+    const dt = new RubyDateTime(1582, 10, 10, 6, 30, 0, "+02:00", RubyDate.GREGORIAN);
+    expect(dt.toS()).toBe("1582-10-10T06:30:00+02:00");
+    expect(dt.jd).toBe(2299156);
+    expect(dt.start).toBe(-Infinity);
+    expect(dt.newStart(RubyDate.ITALY).toS()).toBe("1582-09-30T06:30:00+02:00");
+    // The `Temporal.ZonedDateTime` seat spells its own zone in brackets after
+    // the offset, which the gem's `to_s` has no counterpart for.
+    expect(
+      RubyDateTime.parse("1582-10-10T06:30:00+02:00", true, RubyDate.GREGORIAN).toString(),
+    ).toBe("1582-10-10T06:30:00+02:00[+02:00]");
+    expect(() => RubyDateTime.parse("1582-10-10T06:30:00+02:00")).toThrow(RubyDate.Error);
   });
 });
 

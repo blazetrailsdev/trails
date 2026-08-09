@@ -2934,16 +2934,65 @@ const UNIX_EPOCH_IN_CJD = 2440588;
 const ITALY = 2299161;
 
 /**
+ * @internal `date_core.c`'s `ENGLAND` (`date_core.c:187`), the Julian day of
+ * 1752-09-14 — the day the reform took effect in England and its colonies.
+ */
+const ENGLAND = 2361222;
+
+/**
+ * @internal `date_core.c`'s `JULIAN` (`date_core.c:188`), `positive_inf`. Every
+ * `sg` comparison is `jd < sg`, so an infinite start makes every day fall on
+ * the one side of the reform: under this one the date is read as Julian
+ * whatever it names.
+ */
+const JULIAN = Infinity;
+
+/** @internal `date_core.c`'s `GREGORIAN` (`date_core.c:189`), `negative_inf`. */
+const GREGORIAN = -Infinity;
+
+/**
  * @internal `date_core.c`'s `DEFAULT_SG` (`date_core.c:190`), the reform start
- * every constructor takes when none is passed. The `start` argument itself
- * (`Date::JULIAN` / `Date::GREGORIAN`, `date_core.c:188-189`) is not a
- * parameter here: `SimpleDateData` carries `sg` so that one process can hold
- * dates under several reforms at once, and every trails entry point takes this
- * one. The conversions below are the C's, over the C's own Julian-day state, so
- * every civil date `Date::ITALY` names — including the Julian-only ones such as
- * 1500-02-29 — is buildable and answers MRI's `wday`, `yday` and epoch.
+ * every constructor takes when none is passed. `SimpleDateData` carries `sg` so
+ * that one process can hold dates under several reforms at once, which is what
+ * the trailing `start` argument selects. The conversions below are the C's,
+ * over the C's own Julian-day state, so every civil date `Date::ITALY` names —
+ * including the Julian-only ones such as 1500-02-29 — is buildable and answers
+ * MRI's `wday`, `yday` and epoch.
  */
 const DEFAULT_SG = ITALY;
+
+/**
+ * @internal `date_core.c`'s `REFORM_BEGIN_JD` / `REFORM_END_JD`
+ * (`date_core.c:209-210`), the window a finite `start` has to fall in — ns
+ * 1582-01-01 through os 1930-12-31, the span over which the reform was actually
+ * adopted somewhere.
+ */
+const REFORM_BEGIN_JD = 2298874;
+const REFORM_END_JD = 2426355;
+
+/**
+ * @internal `date_core.c` `c_valid_start_p` (`date_core.c:888-898`): an
+ * infinite start is `Date::JULIAN` or `Date::GREGORIAN` and always valid, a
+ * `NaN` never is, and a finite one has to name a day inside the reform window.
+ */
+function cValidStartP(sg: number): boolean {
+  if (Number.isNaN(sg)) return false;
+  if (!Number.isFinite(sg)) return true;
+  if (sg < REFORM_BEGIN_JD || sg > REFORM_END_JD) return false;
+  return true;
+}
+
+/**
+ * @internal `date_core.c`'s `val2sg` macro (`date_core.c:3320-3327`), the macro
+ * every user-facing `start` argument is read through — the `start` counterpart
+ * of {@link val2off}: whatever {@link cValidStartP} rejects becomes
+ * {@link DEFAULT_SG}. The C's `rb_warning("invalid start is ignored")` is a
+ * `$VERBOSE`-only warning with no analogue here, as `val2off`'s is.
+ */
+function val2sg(vsg: number): number {
+  if (!cValidStartP(vsg)) return DEFAULT_SG;
+  return vsg;
+}
 
 /** @internal `date_core.c`'s seconds constants (`date_core.c:194-196`). */
 const MINUTE_IN_SECONDS = 60;
@@ -3147,8 +3196,8 @@ function cValidCivilP(y: number, m: number, d: number, sg = DEFAULT_SG): number 
  *
  * Not exported: it is the seam between the C's Julian day and the substrate.
  */
-function plainDateFromJd(rjd: number): Temporal.PlainDate {
-  const [y, m, d] = cJdToCivil(rjd);
+function plainDateFromJd(rjd: number, sg = DEFAULT_SG): Temporal.PlainDate {
+  const [y, m, d] = cJdToCivil(rjd, sg);
   try {
     return Temporal.PlainDate.from({ year: y, month: m, day: d }, { overflow: "reject" });
   } catch {
@@ -3351,19 +3400,19 @@ function cJdToOrdinal(jd: number, sg = DEFAULT_SG): [ry: number, rd: number] {
  * from Monday: the year's first day floored back to the Monday on or before it,
  * then `w` weeks and `d` days on.
  */
-function cCommercialToJd(y: number, w: number, d: number): number {
-  const rjd2 = cFindFdoy(y)! + 3;
+function cCommercialToJd(y: number, w: number, d: number, sg = DEFAULT_SG): number {
+  const rjd2 = cFindFdoy(y, sg)! + 3;
   return rjd2 - mod(rjd2, 7) + 7 * (w - 1) + (d - 1);
 }
 
 /** @internal `date_core.c` `c_jd_to_commercial` (`date_core.c:590-609`), the inverse of {@link cCommercialToJd}. */
-function cJdToCommercial(jd: number): [ry: number, rw: number, rd: number] {
-  const [a] = cJdToCivil(jd - 3);
+function cJdToCommercial(jd: number, sg = DEFAULT_SG): [ry: number, rw: number, rd: number] {
+  const [a] = cJdToCivil(jd - 3, sg);
   let ry: number;
-  let c2 = cCommercialToJd(a + 1, 1, 1);
+  let c2 = cCommercialToJd(a + 1, 1, 1, sg);
   if (jd >= c2) ry = a + 1;
   else {
-    c2 = cCommercialToJd(a, 1, 1);
+    c2 = cCommercialToJd(a, 1, 1, sg);
     ry = a;
   }
   const rw = 1 + div(jd - c2, 7);
@@ -3378,15 +3427,15 @@ function cJdToCommercial(jd: number): [ry: number, rw: number, rd: number] {
  * of the commercial year before rebuilding the date and rejecting it if the
  * round-trip does not name the same `y`/`w`/`d` back.
  */
-function cValidCommercialP(y: number, w: number, d: number): number | null {
+function cValidCommercialP(y: number, w: number, d: number, sg = DEFAULT_SG): number | null {
   if (d < 0) d += 8;
   if (w < 0) {
-    const c2 = cJdToCommercial(cCommercialToJd(y + 1, 1, 1) + w * 7);
+    const c2 = cJdToCommercial(cCommercialToJd(y + 1, 1, 1, sg) + w * 7, sg);
     if (c2[0] !== y) return null;
     w = c2[1];
   }
-  const rjd = cCommercialToJd(y, w, d);
-  const [ry, rw, rd] = cJdToCommercial(rjd);
+  const rjd = cCommercialToJd(y, w, d, sg);
+  const [ry, rw, rd] = cJdToCommercial(rjd, sg);
   if (y !== ry || w !== rw || d !== rd) return null;
   return rjd;
 }
@@ -3399,15 +3448,19 @@ function cValidCommercialP(y: number, w: number, d: number): number | null {
  * partial week before the year's first one. Week `0` is therefore empty in a
  * year whose 1 January is itself an `f`-day: there, 1 January opens week `1`.
  */
-function cWeeknumToJd(y: number, w: number, d: number, f: number): number {
-  const rjd2 = cFindFdoy(y)! + 6;
+function cWeeknumToJd(y: number, w: number, d: number, f: number, sg = DEFAULT_SG): number {
+  const rjd2 = cFindFdoy(y, sg)! + 6;
   return rjd2 - mod(rjd2 - f + 1, 7) - 7 + 7 * w + d;
 }
 
 /** @internal `date_core.c` `c_jd_to_weeknum` (`date_core.c:621-634`), the inverse of {@link cWeeknumToJd}. */
-function cJdToWeeknum(jd: number, f: number): [ry: number, rw: number, rd: number] {
-  const [ry] = cJdToCivil(jd);
-  const rjd = cFindFdoy(ry)! + 6;
+function cJdToWeeknum(
+  jd: number,
+  f: number,
+  sg = DEFAULT_SG,
+): [ry: number, rw: number, rd: number] {
+  const [ry] = cJdToCivil(jd, sg);
+  const rjd = cFindFdoy(ry, sg)! + 6;
   const j = jd - (rjd - mod(rjd - f + 1, 7)) + 7;
   return [ry, div(j, 7), mod(j, 7)];
 }
@@ -3419,15 +3472,21 @@ function cJdToWeeknum(jd: number, f: number): [ry: number, rw: number, rd: numbe
  * rather than a `1`..`7` one, so a negative day takes `7` where the commercial
  * one takes `8`.
  */
-function cValidWeeknumP(y: number, w: number, d: number, f: number): number | null {
+function cValidWeeknumP(
+  y: number,
+  w: number,
+  d: number,
+  f: number,
+  sg = DEFAULT_SG,
+): number | null {
   if (d < 0) d += 7;
   if (w < 0) {
-    const w2 = cJdToWeeknum(cWeeknumToJd(y + 1, 1, f, f) + w * 7, f);
+    const w2 = cJdToWeeknum(cWeeknumToJd(y + 1, 1, f, f, sg) + w * 7, f, sg);
     if (w2[0] !== y) return null;
     w = w2[1];
   }
-  const rjd = cWeeknumToJd(y, w, d, f);
-  const [ry, rw, rd] = cJdToWeeknum(rjd, f);
+  const rjd = cWeeknumToJd(y, w, d, f, sg);
+  const [ry, rw, rd] = cJdToWeeknum(rjd, f, sg);
   if (y !== ry || w !== rw || d !== rd) return null;
   return rjd;
 }
@@ -3446,8 +3505,8 @@ function rtValidJdP(jd: number): number {
  * `c_valid_ordinal_p` (`date_core.c:747-768`), which answers `nil` rather than
  * raising so its caller can fall through to the next kind of date.
  */
-function rtValidOrdinalP(y: number, d: number): number | null {
-  return cValidOrdinalP(y, d);
+function rtValidOrdinalP(y: number, d: number, sg = DEFAULT_SG): number | null {
+  return cValidOrdinalP(y, d, sg);
 }
 
 /**
@@ -3455,8 +3514,8 @@ function rtValidOrdinalP(y: number, d: number): number | null {
  * `c_valid_civil_p` (`date_core.c:766-790`), which answers `nil` rather than
  * raising so its caller can fall through to the next kind of date.
  */
-function rtValidCivilP(y: number, m: number, d: number): number | null {
-  return cValidCivilP(y, m, d);
+function rtValidCivilP(y: number, m: number, d: number, sg = DEFAULT_SG): number | null {
+  return cValidCivilP(y, m, d, sg);
 }
 
 /**
@@ -3479,23 +3538,22 @@ function rtValidCivilP(y: number, m: number, d: number): number | null {
  * (`date_core.c:4283-4300`) is what turns that `nil` into
  * `Date::Error, "invalid date"`.
  *
- * Ruby threads the calendar-reform start `sg` through every arm; the
- * `Temporal.PlainDate` substrate carries no reform, so the parameter is gone
- * and each arm answers the date itself rather than a Julian day.
+ * `sg` is the calendar-reform start every arm reads its date under, as Ruby
+ * threads it.
  */
-function rtValidDateFragsP(parts: DateParts): number | null {
+function rtValidDateFragsP(parts: DateParts, sg = DEFAULT_SG): number | null {
   if (parts.jd !== undefined) {
     const d = rtValidJdP(parts.jd);
     if (d !== null) return d;
   }
 
   if (parts.yday !== undefined && parts.year !== undefined) {
-    const d = rtValidOrdinalP(parts.year, parts.yday);
+    const d = rtValidOrdinalP(parts.year, parts.yday, sg);
     if (d !== null) return d;
   }
 
   if (parts.mday !== undefined && parts.mon !== undefined && parts.year !== undefined) {
-    const d = rtValidCivilP(parts.year, parts.mon, parts.mday);
+    const d = rtValidCivilP(parts.year, parts.mon, parts.mday, sg);
     if (d !== null) return d;
   }
 
@@ -3506,7 +3564,7 @@ function rtValidDateFragsP(parts: DateParts): number | null {
       if (wday !== undefined) if (wday === 0) wday = 7;
     }
     if (wday !== undefined && parts.cweek !== undefined && parts.cwyear !== undefined) {
-      const d = cValidCommercialP(parts.cwyear, parts.cweek, wday);
+      const d = cValidCommercialP(parts.cwyear, parts.cweek, wday, sg);
       if (d !== null) return d;
     }
   }
@@ -3518,7 +3576,7 @@ function rtValidDateFragsP(parts: DateParts): number | null {
       if (wday !== undefined) if (wday === 7) wday = 0;
     }
     if (wday !== undefined && parts.wnum0 !== undefined && parts.year !== undefined) {
-      const d = cValidWeeknumP(parts.year, parts.wnum0, wday, 0);
+      const d = cValidWeeknumP(parts.year, parts.wnum0, wday, 0, sg);
       if (d !== null) return d;
     }
   }
@@ -3529,7 +3587,7 @@ function rtValidDateFragsP(parts: DateParts): number | null {
     if (wday !== undefined) wday = mod(wday - 1, 7);
 
     if (wday !== undefined && parts.wnum1 !== undefined && parts.year !== undefined) {
-      const d = cValidWeeknumP(parts.year, parts.wnum1, wday, 1);
+      const d = cValidWeeknumP(parts.year, parts.wnum1, wday, 1, sg);
       if (d !== null) return d;
     }
   }
@@ -3544,7 +3602,7 @@ function rtValidDateFragsP(parts: DateParts): number | null {
  * `:mon` and a `:mday` — goes straight to {@link rtValidCivilP}, skipping both
  * {@link rtRewriteFrags} and {@link completeFrags}.
  */
-export function dNewByFrags(hash: DateParts | null): Date {
+export function dNewByFrags(hash: DateParts | null, sg = DEFAULT_SG): Date {
   let jd: number | null;
 
   if (hash === null) throw new DateError("invalid date");
@@ -3556,19 +3614,19 @@ export function dNewByFrags(hash: DateParts | null): Date {
     hash.mon !== undefined &&
     hash.mday !== undefined
   ) {
-    jd = rtValidCivilP(hash.year, hash.mon, hash.mday);
+    jd = rtValidCivilP(hash.year, hash.mon, hash.mday, sg);
   } else {
     hash = rtRewriteFrags(hash);
     completeFrags(hash);
     try {
-      jd = rtValidDateFragsP(hash);
+      jd = rtValidDateFragsP(hash, sg);
     } catch {
       jd = null;
     }
   }
 
   if (jd === null) throw new DateError("invalid date");
-  return new Date(SEAT, jd);
+  return new Date(SEAT, jd, sg);
 }
 
 /**
@@ -3616,7 +3674,7 @@ function of2str(of: number): string {
  * `DateTime.parse("2008-03-01T24:00:00")` is 2008-03-02T00:00:00. That now
  * falls out of the representation rather than being normalized here.
  */
-export function dtNewByFrags(hash: DateParts | null): DateTime {
+export function dtNewByFrags(hash: DateParts | null, sg = DEFAULT_SG): DateTime {
   let jd: number | null;
 
   if (hash === null) throw new DateError("invalid date");
@@ -3628,7 +3686,7 @@ export function dtNewByFrags(hash: DateParts | null): DateTime {
     hash.mon !== undefined &&
     hash.mday !== undefined
   ) {
-    jd = rtValidCivilP(hash.year, hash.mon, hash.mday);
+    jd = rtValidCivilP(hash.year, hash.mon, hash.mday, sg);
 
     if (hash.hour === undefined) hash.hour = 0;
     if (hash.min === undefined) hash.min = 0;
@@ -3638,7 +3696,7 @@ export function dtNewByFrags(hash: DateParts | null): DateTime {
     hash = rtRewriteFrags(hash);
     completeFrags(hash);
     try {
-      jd = rtValidDateFragsP(hash);
+      jd = rtValidDateFragsP(hash, sg);
     } catch {
       jd = null;
     }
@@ -3665,7 +3723,7 @@ export function dtNewByFrags(hash: DateParts | null): DateTime {
   let of = to == null ? 0 : to instanceof Rational ? to.toI() : Math.trunc(to);
   if (of < -DAY_IN_SECONDS || of > DAY_IN_SECONDS) of = 0;
 
-  return new DateTime(SEAT, jdLocalToUtc(jd, df, of), dfLocalToUtc(df, of), sf, of);
+  return new DateTime(SEAT, jdLocalToUtc(jd, df, of), dfLocalToUtc(df, of), sf, of, sg);
 }
 
 /**
@@ -3775,6 +3833,30 @@ export class Date {
   static Error = DateError;
 
   /**
+   * Ruby `Date::ITALY` (ruby/date, `date_core.c:186`), the Julian day of
+   * 1582-10-15 and the default `start`.
+   */
+  static ITALY = ITALY;
+
+  /**
+   * Ruby `Date::ENGLAND` (ruby/date, `date_core.c:187`), the Julian day of
+   * 1752-09-14.
+   */
+  static ENGLAND = ENGLAND;
+
+  /**
+   * Ruby `Date::JULIAN` (ruby/date, `date_core.c:188`), `Float::INFINITY` — a
+   * `start` under which every date is read as Julian.
+   */
+  static JULIAN = JULIAN;
+
+  /**
+   * Ruby `Date::GREGORIAN` (ruby/date, `date_core.c:189`), `-Float::INFINITY` —
+   * a `start` under which every date is read as (proleptic) Gregorian.
+   */
+  static GREGORIAN = GREGORIAN;
+
+  /**
    * @internal The whole of the state, where ruby/date's `SimpleDateData`
    * (`date_core.c:203-213`) carries a Julian day, a civil triple, the
    * calendar-reform start `sg` both are read under, and a `flags` word saying
@@ -3794,11 +3876,24 @@ export class Date {
    * reform's readings rather than proleptic ones, and `Date.new(1500, 2, 29)`
    * builds, as MRI's does.
    *
-   * The `start` ARGUMENT is what has no bearer — `#start`, `#julian?` and
-   * `#new_start` are absent with it, and every conversion below takes the one
-   * `sg` MRI defaults to. RFC 0088 `date-state-onto-temporal-plaindate`.
+   * The `start` ARGUMENT is {@link #sg} below: every conversion is read under
+   * it, and {@link Date#start}, {@link Date#isJulian} and
+   * {@link Date#newStart} answer off it.
    */
   readonly #jd: number;
+
+  /**
+   * @internal `SimpleDateData`'s `sg` (`date_core.c:203-213`), the
+   * calendar-reform start the date is read under — the `start` argument every
+   * constructor takes, {@link DEFAULT_SG} when none is passed.
+   *
+   * The C's `s_virtual_sg` (`date_core.c:1110-1120`) reads it back as
+   * `positive_inf`/`negative_inf` for a date outside the `Fixnum` Julian-day
+   * range, on the `nth` field that carries the overflow. There is no `nth`
+   * here — the Julian day is one JS number — so the virtual reading and the
+   * stored one never part company, and this field stands for both.
+   */
+  readonly #sg: number;
 
   /**
    * @internal `SimpleDateData`'s civil fields (`date_core.c:203-213`), which
@@ -3812,7 +3907,7 @@ export class Date {
    * `date_core.c` `date_s_civil`), which raises `Date::Error` on a civil date
    * `c_valid_civil_p` rejects.
    */
-  constructor(year?: number, month?: number, day?: number);
+  constructor(year?: number, month?: number, day?: number, start?: number);
   /**
    * @internal `date_core.c` `d_simple_new_internal` (`date_core.c:3036-3050`),
    * which writes an already-resolved day straight into a fresh
@@ -3821,15 +3916,18 @@ export class Date {
    * has already established the date is buildable. {@link SEAT} is the brand
    * that selects it.
    */
-  constructor(seat: typeof SEAT, rjd: number);
-  constructor(year: number | typeof SEAT = -4712, month = 1, day = 1) {
+  constructor(seat: typeof SEAT, rjd: number, sg: number);
+  constructor(year: number | typeof SEAT = -4712, month = 1, day = 1, start = DEFAULT_SG) {
     if (typeof year === "symbol") {
       this.#jd = month;
+      this.#sg = day;
       return;
     }
-    const r = cValidCivilP(year, month, day);
+    const sg = val2sg(start);
+    const r = cValidCivilP(year, month, day, sg);
     if (r === null) throw new DateError("invalid date");
     this.#jd = r;
+    this.#sg = sg;
   }
 
   /**
@@ -3844,7 +3942,7 @@ export class Date {
    * on `simple_dat_p`/`complex_dat_p` is the one TS makes on the receiver.
    */
   #getCCivil(): [ry: number, rm: number, rdom: number] {
-    return (this.#civil ??= cJdToCivil(this.jd));
+    return (this.#civil ??= cJdToCivil(this.jd, this.#sg));
   }
 
   /**
@@ -3854,8 +3952,8 @@ export class Date {
    * leaves the civil date to `get_s_civil`; there is one representation here,
    * so the conversion happens at the call.
    */
-  static jd(jd = 0): Temporal.PlainDate {
-    return new Date(SEAT, jd).toDate();
+  static jd(jd = 0, start = DEFAULT_SG): Temporal.PlainDate {
+    return new Date(SEAT, jd, val2sg(start)).toDate();
   }
 
   /**
@@ -3864,10 +3962,11 @@ export class Date {
    * `c_valid_ordinal_p` rejects. A negative `yday` counts back from the last day
    * of the year, so `Date.ordinal(2001, -1)` is 2001-12-31.
    */
-  static ordinal(year = -4712, yday = 1): Temporal.PlainDate {
-    const r = cValidOrdinalP(year, yday);
+  static ordinal(year = -4712, yday = 1, start = DEFAULT_SG): Temporal.PlainDate {
+    const sg = val2sg(start);
+    const r = cValidOrdinalP(year, yday, sg);
     if (r === null) throw new DateError("invalid date");
-    return new Date(SEAT, r).toDate();
+    return new Date(SEAT, r, sg).toDate();
   }
 
   /**
@@ -3877,8 +3976,8 @@ export class Date {
    * counts back from December and a negative `mday` from the month's end, so
    * `Date.civil(2001, -1, -1)` is 2001-12-31.
    */
-  static civil(year = -4712, month = 1, mday = 1): Temporal.PlainDate {
-    return new Date(year, month, mday).toDate();
+  static civil(year = -4712, month = 1, mday = 1, start = DEFAULT_SG): Temporal.PlainDate {
+    return new Date(year, month, mday, start).toDate();
   }
 
   /**
@@ -3888,10 +3987,11 @@ export class Date {
    * `cwday` counts back from Sunday and a negative `cweek` back from the end of
    * the commercial year, so `Date.commercial(2001, -1, -1)` is 2001-12-30.
    */
-  static commercial(cwyear = -4712, cweek = 1, cwday = 1): Temporal.PlainDate {
-    const r = cValidCommercialP(cwyear, cweek, cwday);
+  static commercial(cwyear = -4712, cweek = 1, cwday = 1, start = DEFAULT_SG): Temporal.PlainDate {
+    const sg = val2sg(start);
+    const r = cValidCommercialP(cwyear, cweek, cwday, sg);
     if (r === null) throw new DateError("invalid date");
-    return new Date(SEAT, r).toDate();
+    return new Date(SEAT, r, sg).toDate();
   }
 
   /**
@@ -3913,12 +4013,10 @@ export class Date {
   /**
    * Ruby `Date.strptime(string = '-4712-01-01', format = '%F', start =
    * Date::ITALY)` (`date_core.c` `date_s_strptime`, `date_core.c:4424-4447`),
-   * which is `Date._strptime` followed by `d_new_by_frags`. `start` is the
-   * calendar reform, which `Temporal.PlainDate` has no bearer for, so it is not
-   * a parameter here.
+   * which is `Date._strptime` followed by `d_new_by_frags`.
    */
-  static strptime(str = JULIAN_EPOCH_DATE, fmt = "%F"): Temporal.PlainDate {
-    return dNewByFrags(Date._strptime(str, fmt)).toDate();
+  static strptime(str = JULIAN_EPOCH_DATE, fmt = "%F", start = DEFAULT_SG): Temporal.PlainDate {
+    return dNewByFrags(Date._strptime(str, fmt), val2sg(start)).toDate();
   }
 
   /**
@@ -4005,8 +4103,8 @@ export class Date {
    * A string that named only a time of day answers no arm of
    * {@link rtValidDateFragsP} and raises.
    */
-  static parse(str: string, comp = true): Temporal.PlainDate {
-    return dNewByFrags(Date._parse(str, comp)).toDate();
+  static parse(str: string, comp = true, start = DEFAULT_SG): Temporal.PlainDate {
+    return dNewByFrags(Date._parse(str, comp), val2sg(start)).toDate();
   }
 
   get year(): number {
@@ -4058,8 +4156,97 @@ export class Date {
    * year, as the Julian leap day before it makes it in MRI.
    */
   get yday(): number {
-    const [, rd] = cJdToOrdinal(this.jd);
+    const [, rd] = cJdToOrdinal(this.jd, this.#sg);
     return rd;
+  }
+
+  /**
+   * Ruby `Date#julian?` (ruby/date, `date_core.c` `d_lite_julian_p`,
+   * `date_core.c:5679-5684`, over `m_julian_p`, `date_core.c:1683-1703`), true
+   * when the date falls before its own calendar reform:
+   * `(Date.new(1582, 10, 15) - 1).julian?` is true and
+   * `Date.new(1582, 10, 15).julian?` is false.
+   *
+   * The C's `isinf` arm is what makes `Date::JULIAN` julian everywhere and
+   * `Date::GREGORIAN` julian nowhere; the `jd < sg` below carries both directly,
+   * since `Infinity` and `-Infinity` compare that way — but the C tests the
+   * infinity explicitly, and so does this, because its answer for
+   * `Date::GREGORIAN` is `sg == positive_inf`, not the comparison.
+   */
+  get isJulian(): boolean {
+    const jd = this.jd;
+    const sg = this.#sg;
+    if (!Number.isFinite(sg)) return sg === JULIAN;
+    return jd < sg;
+  }
+
+  /**
+   * Ruby `Date#gregorian?` (ruby/date, `date_core.c` `d_lite_gregorian_p`,
+   * `date_core.c:5697-5702`, over `m_gregorian_p`, `date_core.c:1705-1708`).
+   */
+  get isGregorian(): boolean {
+    return !this.isJulian;
+  }
+
+  /**
+   * Ruby `Date#start` (ruby/date, `date_core.c` `d_lite_start`,
+   * `date_core.c:5751-5756`), the calendar-reform Julian day the date is read
+   * under: `Date.new(2001, 2, 3, Date::ENGLAND).start` is `2361222.0` and
+   * `Date.new(2001, 2, 3, Date::GREGORIAN).start` is `-Infinity`. The C answers
+   * a Double, which is a JS number.
+   */
+  get start(): number {
+    return this.#sg;
+  }
+
+  /**
+   * Ruby `Date#new_start(start = Date::ITALY)` (ruby/date, `date_core.c`
+   * `d_lite_new_start`, `date_core.c:5826-5839`), a copy of the receiver read
+   * under a different reform — the Julian day is kept and the civil triple
+   * decoded again, which is what makes `Date.new(2000, 2, 3).new_start(Date::JULIAN)`
+   * 2000-01-21.
+   *
+   * The C reaches its file-static `dup_obj_with_new_start`
+   * (`date_core.c:5801-5810`) from here and from `italy`/`england`/`julian`/
+   * `gregorian` alike. TS has no `dup_obj` — a copy has to name the class it is
+   * making — so this method IS that seam: `DateTime` overrides it to keep its
+   * time of day, and the four below call it rather than a private helper none
+   * of them could override.
+   */
+  newStart(start = DEFAULT_SG): Date {
+    return new Date(SEAT, this.jd, val2sg(start));
+  }
+
+  /**
+   * Ruby `Date#italy` (ruby/date, `date_core.c` `d_lite_italy`,
+   * `date_core.c:5848-5852`), `new_start` with `Date::ITALY`.
+   */
+  italy(): Date {
+    return this.newStart(ITALY);
+  }
+
+  /**
+   * Ruby `Date#england` (ruby/date, `date_core.c` `d_lite_england`,
+   * `date_core.c:5860-5864`), `new_start` with `Date::ENGLAND`.
+   */
+  england(): Date {
+    return this.newStart(ENGLAND);
+  }
+
+  /**
+   * Ruby `Date#julian` (ruby/date, `date_core.c` `d_lite_julian`,
+   * `date_core.c:5872-5876`), `new_start` with `Date::JULIAN`.
+   */
+  julian(): Date {
+    return this.newStart(JULIAN);
+  }
+
+  /**
+   * Ruby `Date#gregorian` (ruby/date, `date_core.c` `d_lite_gregorian`,
+   * `date_core.c:5884-5888`), `new_start` with `Date::GREGORIAN`.
+   */
+  gregorian(): Date {
+    return this.newStart(GREGORIAN);
   }
 
   /**
@@ -4091,7 +4278,7 @@ export class Date {
    * The exported {@link dNewByFrags} / {@link dtNewByFrags} answer it directly.
    */
   toDate(): Temporal.PlainDate {
-    return plainDateFromJd(this.jd);
+    return plainDateFromJd(this.jd, this.#sg);
   }
 
   /** Ruby `Date#to_s` (ruby/date, `date_core.c` `d_lite_to_s`). */
@@ -4146,8 +4333,13 @@ export class Date {
  * Both `Date.parse`/`Date.strptime` and `DateTime.parse`/`DateTime.strptime`
  * therefore declare exactly what they answer.
  */
-const DateWithoutParseStatics: (new (year?: number, month?: number, day?: number) => Date) &
-  (new (seat: typeof SEAT, rjd: number) => Date) &
+const DateWithoutParseStatics: (new (
+  year?: number,
+  month?: number,
+  day?: number,
+  start?: number,
+) => Date) &
+  (new (seat: typeof SEAT, rjd: number, sg: number) => Date) &
   Omit<typeof Date, "parse" | "strptime"> = Date;
 
 /**
@@ -4260,6 +4452,7 @@ export class DateTime extends DateWithoutParseStatics {
     minute?: number | Rational,
     second?: number | Rational,
     offset?: number | Rational | string,
+    start?: number,
   );
   /**
    * @internal `date_core.c` `d_complex_new_internal` (`date_core.c:3055-3071`),
@@ -4270,7 +4463,7 @@ export class DateTime extends DateWithoutParseStatics {
    * validate. The arguments are `d_complex_new_internal`'s own `rjd`, `df`,
    * `sf` and `of`, in that order, behind the {@link SEAT} brand.
    */
-  constructor(seat: typeof SEAT, rjd: number, df: number, sf: Rational, of: number);
+  constructor(seat: typeof SEAT, rjd: number, df: number, sf: Rational, of: number, sg: number);
   constructor(
     year: number | typeof SEAT,
     month?: number,
@@ -4279,13 +4472,14 @@ export class DateTime extends DateWithoutParseStatics {
     minute?: number | Rational,
     second?: number | Rational,
     offset?: number | Rational | string,
+    start = DEFAULT_SG,
   ) {
     if (typeof year === "symbol") {
       const rjd = month as number;
       const df = day as number;
       const sf = hour as Rational;
       const of = minute as number;
-      super(SEAT, jdUtcToLocal(rjd, df, of));
+      super(SEAT, jdUtcToLocal(rjd, df, of), second as number);
       this.#jd = rjd;
       this.#df = df;
       this.#sf = sf;
@@ -4310,8 +4504,9 @@ export class DateTime extends DateWithoutParseStatics {
     if (hFr !== 0) fr2 = hFr;
     if (dFr !== 0) fr2 = dFr;
     const rof = offset === undefined ? 0 : val2off(offset);
-    super(year, month ?? 1, d);
-    const rjd = cValidCivilP(year, month ?? 1, d);
+    const sg = val2sg(start);
+    super(year, month ?? 1, d, sg);
+    const rjd = cValidCivilP(year, month ?? 1, d, sg);
     if (rjd === null) throw new DateError("invalid date");
     const rt = cValidTimeP(h, min, s);
     if (rt === null) throw new DateError("invalid date");
@@ -4343,8 +4538,12 @@ export class DateTime extends DateWithoutParseStatics {
    * `datetime_s_parse` → `dt_new_by_frags`), which is `Date.parse`'s
    * `Date._parse` followed by the DateTime-shaped build.
    */
-  static parse(str: string, comp = true): Temporal.PlainDateTime | Temporal.ZonedDateTime {
-    return dtNewByFrags(Date._parse(str, comp)).toDatetime();
+  static parse(
+    str: string,
+    comp = true,
+    start = DEFAULT_SG,
+  ): Temporal.PlainDateTime | Temporal.ZonedDateTime {
+    return dtNewByFrags(Date._parse(str, comp), val2sg(start)).toDatetime();
   }
 
   /**
@@ -4362,15 +4561,14 @@ export class DateTime extends DateWithoutParseStatics {
    * '%FT%T%z', start = Date::ITALY)` (ruby/date, `date_core.c`
    * `datetime_s_strptime`, `date_core.c:8368-8392`), which is `Date._strptime`
    * followed by `dt_new_by_frags` — the DateTime-shaped build, so unlike
-   * `Date.strptime` it keeps the time of day the frags carry. `start` is the
-   * calendar reform, which `Temporal.PlainDate` has no bearer for, so it is not
-   * a parameter here.
+   * `Date.strptime` it keeps the time of day the frags carry.
    */
   static strptime(
     str = JULIAN_EPOCH_DATETIME,
     fmt = "%FT%T%z",
+    start = DEFAULT_SG,
   ): Temporal.PlainDateTime | Temporal.ZonedDateTime {
-    return dtNewByFrags(Date._strptime(str, fmt)).toDatetime();
+    return dtNewByFrags(Date._strptime(str, fmt), val2sg(start)).toDatetime();
   }
 
   /**
@@ -4403,13 +4601,24 @@ export class DateTime extends DateWithoutParseStatics {
   }
 
   /**
+   * Ruby has no `DateTime#new_start`: `d_lite_new_start` is inherited, and its
+   * `dup_obj` (`date_core.c:5801-5810`) copies the receiver's own class and
+   * `ComplexDateData` — day-fraction, sub-second and offset included — before
+   * `set_sg` writes the new reform in. TS has no `dup_obj`, so the copy is made
+   * here, where the fields are in scope; see {@link Date#newStart}.
+   */
+  override newStart(start = DEFAULT_SG): DateTime {
+    return new DateTime(SEAT, this.#jd, this.#df, this.#sf, this.#of, val2sg(start));
+  }
+
+  /**
    * Ruby `DateTime#to_date` (ruby/date, `date_core.c` `datetime_to_date`,
    * `date_core.c:9069-9095`), the calendar day alone: the C builds a fresh
    * `Date` on `m_local_jd` — the LOCAL day, which is where a `24:00:00` time of
    * day has already rolled the date on — and this is that `Date`'s seat.
    */
   override toDate(): Temporal.PlainDate {
-    return new Date(SEAT, this.#mLocalJd()).toDate();
+    return new Date(SEAT, this.#mLocalJd(), this.start).toDate();
   }
 
   /**
