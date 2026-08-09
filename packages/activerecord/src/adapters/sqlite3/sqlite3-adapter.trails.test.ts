@@ -4,6 +4,7 @@ import { BetterSQLite3Adapter } from "../../connection-adapters/better-sqlite3-a
 import { newSqlitePool } from "../../support/pooled-sqlite-adapter.js";
 import type { ConnectionPool } from "../../connection-adapters/abstract/connection-pool.js";
 import { isInMemoryDatabase } from "../../sqlite/sqlite-uri.js";
+import { fixtures } from "../../test-fixtures.js";
 
 describe("SqliteAdapter", () => {
   let adapter: SQLite3Adapter;
@@ -181,5 +182,23 @@ describe("SQLite3 databaseExists", () => {
       await a.close();
       fs.rmSync(dbPath, { force: true });
     }
+  });
+});
+
+// The write path binds every column value as a prepared-statement parameter,
+// and `toSqlAndBinds` now hands the adapter the `Attribute` objects Rails keeps
+// until `type_casted_binds` (abstract/quoting.rb:224). That is what lets
+// `_driverBind` see the cast `type` and bind a whole-valued float as
+// SQLITE_FLOAT, mirroring MRI's class-based INTEGER/FLOAT dispatch.
+describe("SQLite3 write-path float binds", () => {
+  fixtures([]);
+
+  it("binds a whole-valued float column as SQLITE_FLOAT", async () => {
+    const { NumericData } = await import("../../test-helpers/models/numeric-data.js");
+    const record = await NumericData.create({ temperature: 2.0 });
+    const rows = (await NumericData.connection.execute(
+      `SELECT typeof("temperature") AS t FROM "numeric_data" WHERE "id" = ${record.id}`,
+    )) as Array<{ t: string }>;
+    expect(rows[0].t).toBe("real");
   });
 });
