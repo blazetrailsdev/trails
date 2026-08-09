@@ -3147,15 +3147,11 @@ function cJdToWday(jd: number): number {
  * receiver: the two arms hold different days, and each class passes its own.
  *
  * The `isinf` arm is what makes `Date::JULIAN` julian everywhere and
- * `Date::GREGORIAN` julian nowhere. `Infinity` / `-Infinity` would carry both
- * through the `jd < sg` comparison below on their own, but the C tests the
- * infinity first, and its answer there is `sg == positive_inf`.
- *
- * `s_virtual_sg` (`date_core.c:1110-1120`) is the `sg` the C reads here: it
- * answers an infinity for a date whose Julian day overflowed a `Fixnum`, on the
- * `nth` field that carries the overflow. There is no `nth` here — the Julian
- * day is one JS number — so the virtual reading and the stored one never part
- * company.
+ * `Date::GREGORIAN` julian nowhere. The `sg` it reads is `s_virtual_sg`
+ * (`date_core.c:1110-1120`), which answers an infinity for a date whose Julian
+ * day overflowed a `Fixnum`, on the `nth` field that carries the overflow;
+ * there is no `nth` here — the Julian day is one JS number — so the virtual
+ * reading and the stored one never part company.
  */
 function mJulianP(jd: number, sg: number): boolean {
   if (!Number.isFinite(sg)) return sg === JULIAN;
@@ -3912,12 +3908,6 @@ export class Date {
    * @internal `SimpleDateData`'s `sg` (`date_core.c:203-213`), the
    * calendar-reform start the date is read under — the `start` argument every
    * constructor takes, {@link DEFAULT_SG} when none is passed.
-   *
-   * The C's `s_virtual_sg` (`date_core.c:1110-1120`) reads it back as
-   * `positive_inf`/`negative_inf` for a date outside the `Fixnum` Julian-day
-   * range, on the `nth` field that carries the overflow. There is no `nth`
-   * here — the Julian day is one JS number — so the virtual reading and the
-   * stored one never part company, and this field stands for both.
    */
   readonly #sg: number;
 
@@ -4236,7 +4226,7 @@ export class Date {
    * `DateTime`.
    */
   newStart(start = DEFAULT_SG): this {
-    return new Date(SEAT, this.jd, val2sg(start)) as this;
+    return new Date(SEAT, this.#jd, val2sg(start)) as this;
   }
 
   /**
