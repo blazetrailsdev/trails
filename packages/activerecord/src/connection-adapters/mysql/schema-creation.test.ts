@@ -112,7 +112,7 @@ describeIfMysqlAdapter("MySQL::SchemaCreation", () => {
 
   it("visitCreateIndexDefinition appends algorithm", async () => {
     const idx = new IndexDefinition("users", "idx", false, ["col"]);
-    const def = new CreateIndexDefinition(idx, false, "INPLACE");
+    const def = new CreateIndexDefinition(idx, "INPLACE");
     expect(await (sc as any).visitCreateIndexDefinition(def)).toContain("INPLACE");
   });
 

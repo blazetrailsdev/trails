@@ -243,7 +243,7 @@ export interface AbstractAdapter {
   dropTable(
     ...args:
       | [string, ...string[]]
-      | [string, ...string[], { ifExists?: boolean; force?: "cascade" }]
+      | [string, ...string[], { ifExists?: boolean; force?: boolean | "cascade" }]
   ): Promise<void>;
   renameTable(oldName: string, newName: string): Promise<void>;
   addColumn(

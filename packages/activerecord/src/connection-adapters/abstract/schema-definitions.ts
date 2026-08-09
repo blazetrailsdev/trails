@@ -174,8 +174,8 @@ export class AddColumnDefinition {
 export class CreateIndexDefinition {
   constructor(
     readonly index: IndexDefinition,
-    readonly ifNotExists: boolean = false,
     readonly algorithm?: string,
+    readonly ifNotExists: boolean = false,
   ) {}
 }
 

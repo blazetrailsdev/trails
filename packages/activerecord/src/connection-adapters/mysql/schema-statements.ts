@@ -73,7 +73,7 @@ export class MysqlSchemaStatements extends BaseSchemaStatements {
     if (ifNotExists && (await this.indexExists(tableName, idx.columns, { name: idx.name }))) {
       return;
     }
-    const createDef = new CreateIndexDefinition(idx, false, algorithmClause);
+    const createDef = new CreateIndexDefinition(idx, algorithmClause);
     await this.execute(await this.schemaCreation.accept(createDef));
   }
 
@@ -118,11 +118,15 @@ export class MysqlSchemaStatements extends BaseSchemaStatements {
   override async dropTable(
     ...args:
       | [string, ...string[]]
-      | [string, ...string[], { ifExists?: boolean; force?: "cascade"; temporary?: boolean }]
+      | [
+          string,
+          ...string[],
+          { ifExists?: boolean; force?: boolean | "cascade"; temporary?: boolean },
+        ]
   ): Promise<void> {
     const [tableNames, options] = this._splitTableNamesAndOptions(args) as [
       string[],
-      { ifExists?: boolean; force?: "cascade"; temporary?: boolean },
+      { ifExists?: boolean; force?: boolean | "cascade"; temporary?: boolean },
     ];
     if (tableNames.length === 0) {
       throw new ArgumentError("dropTable requires at least one table name");

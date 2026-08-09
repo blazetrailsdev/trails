@@ -72,13 +72,6 @@
   {
     "package": "activerecord",
     "tsFile": "migration.ts",
-    "rubyName": "maintain_test_schema!",
-    "call": "suppress_messages",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "migration.ts",
     "rubyName": "migrate",
     "call": "with_connection",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

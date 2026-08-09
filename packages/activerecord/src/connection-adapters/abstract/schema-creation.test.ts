@@ -134,7 +134,7 @@ describeIfPostgresqlAdapter("SchemaCreation#quotedColumnsForIndex sub-part lengt
       lengths: { title: 10 },
     });
     const sql = await (new SchemaCreation(conn) as any).visitCreateIndexDefinition(
-      new CreateIndexDefinition(idx, false),
+      new CreateIndexDefinition(idx),
     );
     expect(sql).not.toContain("(10)");
     expect(sql).toContain('("title")');
@@ -147,7 +147,7 @@ describeIfSqlite("SchemaCreation#quotedColumnsForIndex sub-part length gating", 
       lengths: { title: 10 },
     });
     const sql = await (new SchemaCreation(conn) as any).visitCreateIndexDefinition(
-      new CreateIndexDefinition(idx, false),
+      new CreateIndexDefinition(idx),
     );
     expect(sql).not.toContain("(10)");
     expect(sql).toContain('("title")');
@@ -184,7 +184,7 @@ describe("SchemaCreation#quotedColumns delegates to the connection", () => {
       opclasses: { title: "text_pattern_ops" },
     });
     const sql = await (new SchemaCreation(host as any) as any).visitCreateIndexDefinition(
-      new CreateIndexDefinition(idx, false),
+      new CreateIndexDefinition(idx),
     );
     expect(sql).toContain('("title" text_pattern_ops)');
   });
@@ -198,7 +198,7 @@ describe("SchemaCreation#quotedColumns delegates to the connection", () => {
       {},
     );
     const sql = await (new SchemaCreation(host as any) as any).visitCreateIndexDefinition(
-      new CreateIndexDefinition(idx, false),
+      new CreateIndexDefinition(idx),
     );
     expect(sql).toContain("(lower(title))");
     expect(sql).not.toContain("DEFAULT_OPS");

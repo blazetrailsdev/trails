@@ -1369,14 +1369,18 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   override async dropTable(
     ...args:
       | [string, ...string[]]
-      | [string, ...string[], { ifExists?: boolean; force?: "cascade"; temporary?: boolean }]
+      | [
+          string,
+          ...string[],
+          { ifExists?: boolean; force?: boolean | "cascade"; temporary?: boolean },
+        ]
   ): Promise<void> {
     const last = args[args.length - 1];
     const hasOpts = last !== null && last !== undefined && typeof last === "object";
     const tableNames = (hasOpts ? args.slice(0, -1) : args) as string[];
     const options = (hasOpts ? last : {}) as {
       ifExists?: boolean;
-      force?: "cascade";
+      force?: boolean | "cascade";
       temporary?: boolean;
     };
     if (tableNames.length === 0) {
