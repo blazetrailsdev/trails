@@ -1719,6 +1719,8 @@ function extractStepLogs(rawLog: string): Map<string, string> {
     if (command.includes("api-compare/compare.ts")) {
       stepName = command.includes("--privates") ? "api_compare_privates" : "api_compare";
     } else if (
+      command.includes("test-compare/compare.ts") ||
+      // Pre-RFC-0092 entry-point names, kept so historic logs still parse.
       command.includes("test-compare/test-compare.ts") ||
       command.includes("test-compare/convention-compare.ts")
     ) {

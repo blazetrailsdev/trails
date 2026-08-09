@@ -6,7 +6,7 @@ import {
   parseMinExtra,
   rubyToConventionTs,
   type ConventionFileResult,
-} from "./test-compare.js";
+} from "./compare.js";
 
 /** Build a ConventionFileResult with only the fields the helpers read. */
 function file(over: Partial<ConventionFileResult>): ConventionFileResult {

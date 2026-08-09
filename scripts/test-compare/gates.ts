@@ -257,7 +257,7 @@ export function gateFromGuardExpr(exprText: string, runsWhenTrue: boolean): Test
 }
 
 // ---------------------------------------------------------------------------
-// Gate-mismatch classification (consumed by test-compare.ts)
+// Gate-mismatch classification (consumed by compare.ts)
 // ---------------------------------------------------------------------------
 
 /**

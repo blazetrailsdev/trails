@@ -1985,7 +1985,7 @@ export class PostgreSQLAdapter
     if (this._transactionManager.openTransactions > 0) {
       return this._transactionManager.commitTransaction();
     }
-    if (!this._client) throw new Error("No active transaction");
+    if (!this._client) throw new ActiveRecordError("No active transaction");
     try {
       await this.internalExecute("COMMIT", "TRANSACTION");
     } catch (e) {
@@ -2025,7 +2025,7 @@ export class PostgreSQLAdapter
     if (this._transactionManager.openTransactions > 0) {
       return this._transactionManager.rollbackTransaction();
     }
-    if (!this._client) throw new Error("No active transaction");
+    if (!this._client) throw new ActiveRecordError("No active transaction");
     try {
       await this.internalExecute("ROLLBACK", "TRANSACTION");
     } catch (e) {
@@ -2048,26 +2048,32 @@ export class PostgreSQLAdapter
     return this.execRollbackDbTransaction();
   }
 
-  // Mirrors: DatabaseStatements#exec_rollback_db_transaction (database_statements.rb:78)
+  // Mirrors: PostgreSQL::DatabaseStatements#exec_rollback_db_transaction
+  // (postgresql/database_statements.rb:78-81). `internalExecute` already
+  // defaults `allowRetry: false` / `materializeTransactions: true`, so the two
+  // statements below are Ruby's two lines.
+  //
+  // The `finally` is the one deviation left, and it is trails' single
+  // persistent pg.Client, not a Rails behaviour: Ruby's adapter *is* the
+  // connection, so it has no `@client` to release, whereas here
+  // `beginDbTransaction` pins one and `_inTransaction` is read by the RETURNING
+  // savepoint wrap and the `CREATE INDEX CONCURRENTLY` guard. Leaving it set
+  // after a ROLLBACK strands both — pinned by
+  // `postgresql-adapter.exec-rollback-db-transaction.trails.test.ts`. Note that
+  // ROLLBACK does not drop server-side prepared statements, so the
+  // StatementPool deliberately stays attached for the connection's life.
+  //
+  // The `!this._client` guard and the `_isConnectionError` → discard branch
+  // this method used to carry were audited out under RFC 0085: the TransactionManager
+  // never reaches here without an open transaction (the direct `rollback()`
+  // pair keeps its own guard), and the query path recovers from a severed
+  // socket on its own, so the discard only duplicated what Rails leaves to
+  // `with_raw_connection` (`abstract_adapter.rb:1016-1018`).
   async execRollbackDbTransaction(): Promise<void> {
     await this._cancelAnyRunningQuery();
-    if (!this._client) throw new Error("No active transaction");
     try {
       await this.internalExecute("ROLLBACK", "TRANSACTION");
-    } catch (e) {
-      // ROLLBACK on a poisoned socket (e.g. 08P01 after the cancel
-      // race) — tear down and reconnect; closing the socket implicitly
-      // aborts the server-side TX. Mirrors the pool-discard safety net
-      // the pre-collapse design got via PoolClient.release(err).
-      if (PostgreSQLAdapter._isConnectionError(e)) {
-        this._discardRawConnection();
-        return;
-      }
-      throw e;
     } finally {
-      // See commit() — ROLLBACK doesn't drop server-side prepared
-      // statements, so we keep the StatementPool attached for the
-      // duration of the connection's life.
       this._client = null;
       this._inTransaction = false;
     }

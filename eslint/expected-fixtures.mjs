@@ -68,7 +68,7 @@ function loadExclude() {
  * `railtie→trailtie` aliases in scripts/parity/conventions.ts, and
  * AR has no erb→tse mappings. Naive kebab↔snake is sufficient. If the
  * rule is ever widened to actionpack/actionview/trailties, switch to
- * the shared `rubyToConventionTs` in scripts/test-compare/test-compare.ts.
+ * the shared `rubyToConventionTs` in scripts/test-compare/compare.ts.
  */
 export function trailsToRailsRel(absOrRelPath) {
   const norm = absOrRelPath.replace(/\\/g, "/");

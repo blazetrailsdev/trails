@@ -351,8 +351,7 @@ export class DatabaseTasks {
    * answers that list instead — the same override Rails' own
    * `migrator_class` test helper uses.
    */
-  /** @internal */
-  static async _migrationContextFor(
+  private static async _migrationContextFor(
     adapter: import("../connection-adapters/abstract-adapter.js").AbstractAdapter,
     dbConfig: DatabaseConfig,
   ): Promise<import("../migration.js").MigrationContext> {
@@ -1646,17 +1645,11 @@ export async function checkCurrentProtectedEnvironmentBang(
 ): Promise<void> {
   const { NoDatabaseError } = await import("../errors.js");
   const { EnvironmentMismatchError } = await import("../migration.js");
-  // Deviation: Rails uses `with_temporary_pool { |pool| pool.migration_context }`
-  // and rescues inside the block (`database_tasks.rb:635-636`, `:648-649`).
-  // `ConnectionPool#migrationContext` builds its collaborators over the pool's
-  // adapter proxy, which routes the synchronous `toSql` those queries need
-  // through `withConnection` and hands them a Promise instead of SQL; and
-  // `withTemporaryConnection` leases eagerly, so `NoDatabaseError` can surface
-  // from the lease. Both converge in
-  // `check-current-protected-environment-pool-migration-context-blocked-on-adapter-proxy`.
-  try {
-    await DatabaseTasks.withTemporaryConnection(dbConfig, async (adapter) => {
-      const migrationContext = await DatabaseTasks._migrationContextFor(adapter, dbConfig);
+  await DatabaseTasks.withTemporaryPool(dbConfig, async (pool) => {
+    // Ruby's block-level `rescue` (`database_tasks.rb:648-649`) covers the
+    // block body only; TS needs the explicit try/catch to scope it the same way.
+    try {
+      const migrationContext = pool.migrationContext;
       const current = migrationContext.currentEnvironment;
       const stored = await migrationContext.lastStoredEnvironment();
 
@@ -1667,11 +1660,11 @@ export async function checkCurrentProtectedEnvironmentBang(
       if (stored && stored !== current) {
         throw new EnvironmentMismatchError(current, stored);
       }
-    });
-  } catch (error) {
-    if (error instanceof NoDatabaseError) return;
-    throw error;
-  }
+    } catch (error) {
+      if (error instanceof NoDatabaseError) return;
+      throw error;
+    }
+  });
 }
 
 /** @internal */
