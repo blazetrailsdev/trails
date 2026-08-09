@@ -192,6 +192,31 @@ import {
 // permanently invisible to the gate — exactly the fidelity gap it exists to
 // catch. Same reason `delete` (Map#delete), `merge`, `fetch` — all real JS call
 // forms — stay in.
+//
+// MEASURED, 2026-08-08 (RFC 0092 `positional-idiom-analogues`): the question
+// "can the comparator tell an Array/Hash receiver from a Relation/association
+// one?" was put to the data, and the answer is no beyond what is already done.
+// The comparator's only receiver signal is the extractor's inert-receiver
+// filter (RFC 0083 `weakCalls` / {@link dropWeakCalls}), which drops a call
+// name when EVERY occurrence in the Ruby body sat on a local variable or a
+// literal. It is already applied to the population these rows come from, and
+// it has already taken everything it can prove: of the 106 activerecord
+// call-mismatch rows for `first`/`last`/`any?`/`size`/`include?`, **zero** are
+// weak. What survives is ivars (`@stack.last`, `@inserts.first`), bare
+// self-calls (23 of the 36 `any?` rows have no receiver at all), constants and
+// method chains — and those same arms carry the real query triggers:
+// `scope.first` (`associations/singular_association.rb:52`), `records.first` /
+// `records.last` (`relation/finder_methods.rb:584,637`), `target.first`
+// (`associations/has_many_association.rb:36`), `group_values.any?`
+// (`relation/calculations.rb:223,446`), `default_scopes.any?`
+// (`scoping/default.rb:56,157`). An ivar or a reader can hold either an Array
+// or a Relation, so no receiver-token rule separates them; the audit's
+// token proxy misclassifies in both directions. A property-analogue table or a
+// `NO_JS_CALL_FORM` entry for these names would therefore buy ~90 row deletions
+// at the price of making a dropped query trigger permanently invisible, so the
+// tables are deliberately left alone and those rows go to the reason-text
+// route (per-row human review), not to a mechanism. See the matching note in
+// enumerable-idioms.ts.
 export const NO_JS_CALL_FORM = new Set([
   "to_s", // template literal / implicit String() coercion — `${x}`
   "each", // for...of loop — no .forEach callee

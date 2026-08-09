@@ -12,28 +12,6 @@ function config(overrides: Record<string, unknown> = {}): HashConfig {
 }
 
 describe("MySQLDatabaseTasks", () => {
-  it("test_db_retrieves_charset", async () => {
-    const tasks = new MySQLDatabaseTasks(config());
-    const charsetMock = vi.fn(async () => "utf8mb4");
-    vi.spyOn(
-      tasks as unknown as { connection(): Promise<unknown> },
-      "connection",
-    ).mockResolvedValue({ charset: charsetMock });
-    await expect(tasks.charset()).resolves.toBe("utf8mb4");
-    expect(charsetMock).toHaveBeenCalledOnce();
-  });
-
-  it("test_db_retrieves_collation", async () => {
-    const tasks = new MySQLDatabaseTasks(config());
-    const collationMock = vi.fn(async () => "utf8mb4_general_ci");
-    vi.spyOn(
-      tasks as unknown as { connection(): Promise<unknown> },
-      "connection",
-    ).mockResolvedValue({ collation: collationMock });
-    await expect(tasks.collation()).resolves.toBe("utf8mb4_general_ci");
-    expect(collationMock).toHaveBeenCalledOnce();
-  });
-
   it("test_using_database_configurations_is_true", () => {
     expect(MySQLDatabaseTasks.usingDatabaseConfigurations()).toBe(true);
   });

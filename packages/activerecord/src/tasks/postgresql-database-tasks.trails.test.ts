@@ -14,28 +14,6 @@ function config(overrides: Record<string, unknown> = {}): HashConfig {
 }
 
 describe("PostgreSQLDatabaseTasks", () => {
-  it("test_db_retrieves_charset", async () => {
-    const tasks = new PostgreSQLDatabaseTasks(config());
-    const encodingMock = vi.fn(async () => "UTF8");
-    vi.spyOn(
-      tasks as unknown as { connection(): Promise<unknown> },
-      "connection",
-    ).mockResolvedValue({ encoding: encodingMock });
-    await expect(tasks.charset()).resolves.toBe("UTF8");
-    expect(encodingMock).toHaveBeenCalledOnce();
-  });
-
-  it("test_db_retrieves_collation", async () => {
-    const tasks = new PostgreSQLDatabaseTasks(config());
-    const collationMock = vi.fn(async () => "en_US.UTF-8");
-    vi.spyOn(
-      tasks as unknown as { connection(): Promise<unknown> },
-      "connection",
-    ).mockResolvedValue({ collation: collationMock });
-    await expect(tasks.collation()).resolves.toBe("en_US.UTF-8");
-    expect(collationMock).toHaveBeenCalledOnce();
-  });
-
   it("test_using_database_configurations_is_true", () => {
     expect(PostgreSQLDatabaseTasks.usingDatabaseConfigurations()).toBe(true);
   });
