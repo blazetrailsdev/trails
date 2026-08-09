@@ -7,23 +7,8 @@
 import { getFs, getChildProcessAsync, type SpawnSyncResult } from "@blazetrails/activesupport";
 import type { Mysql2Adapter } from "../connection-adapters/mysql2-adapter.js";
 import type { DatabaseConfig } from "../database-configurations/database-config.js";
-import { DatabaseAlreadyExists } from "../errors.js";
 import { Base } from "../base.js";
 import { DatabaseTasks, metadataTableNames } from "./database-tasks.js";
-
-const ER_DB_CREATE_EXISTS = 1007;
-
-function isMySQLDatabaseExistsError(error: unknown): boolean {
-  if (!error || typeof error !== "object") return false;
-  const e = error as { code?: unknown; errno?: unknown; message?: unknown };
-  if (e.code === "ER_DB_CREATE_EXISTS") return true;
-  if (e.errno === ER_DB_CREATE_EXISTS) return true;
-  return (
-    typeof e.message === "string" &&
-    e.message.includes("Can't create database") &&
-    e.message.includes("database exists")
-  );
-}
 
 type ConfigHash = Record<string, unknown>;
 
@@ -70,22 +55,11 @@ export class MySQLDatabaseTasks {
   }
 
   async create(charsetOverride?: { charset?: string; collation?: string }): Promise<void> {
-    const opts = this.creationOptions(charsetOverride);
-    const charset = opts.charset ? ` CHARACTER SET \`${this.escapeIdent(opts.charset)}\`` : "";
-    const collation = opts.collation ? ` COLLATE \`${this.escapeIdent(opts.collation)}\`` : "";
-    const dbName = this.requireDatabaseName();
-    const sql = `CREATE DATABASE \`${this.escapeIdent(dbName)}\`${charset}${collation}`;
     await this.establishConnection(this.configurationHashWithoutDatabase());
     try {
-      await (await this.connection()).executeMutation(sql);
-    } catch (error) {
-      if (isMySQLDatabaseExistsError(error)) {
-        throw new DatabaseAlreadyExists(`Database '${dbName}' already exists`, {
-          sql,
-          cause: error,
-        });
-      }
-      throw error;
+      await (
+        await this.connection()
+      ).createDatabase(this.requireDatabaseName(), this.creationOptions(charsetOverride));
     } finally {
       // Always restore the pool to the target DB so Base is not left pointing
       // at the no-database admin pool after create() returns or throws.
@@ -95,11 +69,7 @@ export class MySQLDatabaseTasks {
 
   async drop(): Promise<void> {
     await this.establishConnection();
-    await (
-      await this.connection()
-    ).executeMutation(
-      `DROP DATABASE IF EXISTS \`${this.escapeIdent(this.requireDatabaseName())}\``,
-    );
+    await (await this.connection()).dropDatabase(this.requireDatabaseName());
   }
 
   async purge(): Promise<void> {
@@ -300,11 +270,15 @@ export class MySQLDatabaseTasks {
       if (result.signal) details.push(`Signal: ${result.signal}`);
       if (result.stderr) details.push(`stderr:\n${String(result.stderr).trimEnd()}`);
       if (result.stdout) details.push(`stdout:\n${String(result.stdout).trimEnd()}`);
+      // `fail run_cmd_error(cmd, args, action)` (`mysql_database_tasks.rb:105`).
+      // Rails' first line is the whole message because `Kernel.system` lets the
+      // child write straight to the terminal; `spawnSync` captures it instead,
+      // so the captured streams follow the ported message rather than replacing
+      // it.
       throw new Error(
-        `failed to execute:\n${cmd} ${args.join(" ")}\n\n` +
-          (details.length ? `${details.join("\n\n")}\n\n` : "") +
-          `Make sure \`${cmd}\` is installed in your PATH and has proper permissions.\n` +
-          `(action: ${action})`,
+        runCmdError(cmd, args, action) +
+          `${cmd} ${args.join(" ")}\n\n` +
+          (details.length ? `${details.join("\n\n")}\n` : ""),
       );
     }
   }
@@ -313,10 +287,6 @@ export class MySQLDatabaseTasks {
     const name = this.dbConfig.database ?? this.urlParts.database;
     if (!name) throw new Error("MySQL configuration missing 'database'");
     return name;
-  }
-
-  private escapeIdent(value: string): string {
-    return value.replace(/`/g, "``");
   }
 
   /** @internal */
@@ -345,6 +315,6 @@ export class MySQLDatabaseTasks {
 export function runCmdError(cmd: string, _args: string[], _action: string): string {
   return (
     `failed to execute: \`${cmd}\`\n` +
-    `Please check the output for any errors and make sure that \`${cmd}\` is installed in your PATH and has proper permissions.\n\n`
+    `Please check the output above for any errors and make sure that \`${cmd}\` is installed in your PATH and has proper permissions.\n\n`
   );
 }
