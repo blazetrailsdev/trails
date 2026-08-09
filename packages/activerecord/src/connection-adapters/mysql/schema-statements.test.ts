@@ -479,6 +479,7 @@ describe("MySQL::SchemaStatements", () => {
   it("indexes: surfaces per-column prefix lengths from Sub_part", async () => {
     const idx = await indexHost([
       {
+        Table: "pages",
         Key_name: "index_pages_on_title",
         Column_name: "title",
         Non_unique: 1,
@@ -495,6 +496,7 @@ describe("MySQL::SchemaStatements", () => {
   it("indexes: surfaces desc orders when Collation is D", async () => {
     const idx = await indexHost([
       {
+        Table: "pages",
         Key_name: "index_pages_on_title",
         Column_name: "title",
         Non_unique: 1,
@@ -510,6 +512,7 @@ describe("MySQL::SchemaStatements", () => {
   it("indexes: surfaces desc orders for descending functional indexes", async () => {
     const idx = await indexHost([
       {
+        Table: "pages",
         Key_name: "index_pages_on_lower_title",
         Column_name: null,
         Expression: "lower(`title`)",
@@ -530,6 +533,7 @@ describe("MySQL::SchemaStatements", () => {
   it("indexes: collapses functional-index columns into a single SQL string", async () => {
     const idx = await indexHost([
       {
+        Table: "pages",
         Key_name: "index_pages_on_lower_title_and_pos",
         Column_name: null,
         Expression: "lower(`title`)",
@@ -539,6 +543,7 @@ describe("MySQL::SchemaStatements", () => {
         Collation: "A",
       },
       {
+        Table: "pages",
         Key_name: "index_pages_on_lower_title_and_pos",
         Column_name: "position",
         Expression: null,
@@ -563,6 +568,7 @@ describe("MySQL::SchemaStatements", () => {
     const idx = await indexHost(
       [
         {
+          Table: "pages",
           Key_name: "index_pages_on_lower_title_and_pos",
           Column_name: null,
           Expression: "lower(`title`)",
@@ -572,6 +578,7 @@ describe("MySQL::SchemaStatements", () => {
           Collation: "D",
         },
         {
+          Table: "pages",
           Key_name: "index_pages_on_lower_title_and_pos",
           Column_name: "position",
           Expression: null,

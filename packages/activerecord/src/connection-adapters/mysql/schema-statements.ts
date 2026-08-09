@@ -59,6 +59,7 @@ export class MysqlSchemaStatements extends BaseSchemaStatements {
     const byIndex = new Map<
       string,
       {
+        table: string;
         columns: string[];
         unique: boolean;
         using?: string;
@@ -90,6 +91,9 @@ export class MysqlSchemaStatements extends BaseSchemaStatements {
         const comment =
           rawComment != null && String(rawComment).trim() !== "" ? String(rawComment) : undefined;
         byIndex.set(keyName, {
+          // Rails stores `row["Table"]` in the tuple (mysql/schema_statements.rb:24)
+          // and builds the IndexDefinition from it (`:67`), not from the argument.
+          table: String((r.Table ?? r.TABLE) as string),
           columns: [],
           unique: nonUnique === 0,
           using,
@@ -125,7 +129,10 @@ export class MysqlSchemaStatements extends BaseSchemaStatements {
     }
     return await Promise.all(
       Array.from(byIndex.entries()).map(
-        async ([name, { columns, unique, using, type, comment, lengths, orders, expressions }]) => {
+        async ([
+          name,
+          { table, columns, unique, using, type, comment, lengths, orders, expressions },
+        ]) => {
           // Mirrors Rails' final `.map`: a functional (expression) index collapses
           // its columns array into a single SQL string via addOptionsForIndexColumns,
           // baking prefix length and DESC/ASC order inline. Non-expression columns
@@ -137,14 +144,14 @@ export class MysqlSchemaStatements extends BaseSchemaStatements {
             );
             await this.addOptionsForIndexColumns(quotedColumns, { order: orders, length: lengths });
             return new IndexDefinition(
-              tableName,
+              table,
               name,
               unique,
               Array.from(quotedColumns.values()).join(", "),
               { using, type, comment },
             );
           }
-          return new IndexDefinition(tableName, name, unique, columns, {
+          return new IndexDefinition(table, name, unique, columns, {
             lengths,
             orders,
             using,
