@@ -4201,9 +4201,24 @@ export class DateInfinity {
   /** Ruby `@d` (ruby/date, `lib/date.rb:19`), the sign of the constructor's argument. */
   readonly #d: number;
 
-  /** Ruby `Date::Infinity#initialize(d=1)` (ruby/date, `lib/date.rb:19`). */
+  /**
+   * Ruby `Date::Infinity#initialize(d=1)` (ruby/date, `lib/date.rb:19`), which
+   * stores `d <=> 0`.
+   *
+   * `Float::NAN <=> 0` is `nil`, so Ruby stores `nil` and leaves an object
+   * whose every later reader raises `NoMethodError` off it — `nan?` on
+   * `nil.zero?`, `infinite?` on `nil.nonzero?`, `-@`/`coerce` on `-nil`, `to_f`
+   * on `nil > 0` (`lib/date.rb:27-28`, `:32`, `:51-57`, `:59-66`). JS raises on
+   * none of those: `-null` is `-0` and `null > 0` is `false`, so deferring the
+   * failure the way Ruby does would mean inventing a raise site in each of
+   * those six bodies. The rejection is therefore taken here, at the one point
+   * Ruby's `nil` is produced, so no member below has to carry a `null` arm Ruby
+   * does not have.
+   */
   constructor(d: number = 1) {
-    this.#d = Math.sign(d);
+    const sign = Math.sign(d);
+    if (Number.isNaN(sign)) throw new TypeError("`d <=> 0` is nil for NaN");
+    this.#d = sign;
   }
 
   /** Ruby `Date::Infinity#d` (ruby/date, `lib/date.rb:21-23`), marked `protected`. */

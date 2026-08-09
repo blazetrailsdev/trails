@@ -1782,6 +1782,10 @@ describe("Date::Infinity", () => {
     expect(new RubyDate.Infinity(0).toF()).toBe(0);
   });
 
+  it("rejects a NaN, where Ruby's `d <=> 0` stores nil", () => {
+    expect(() => new RubyDate.Infinity(Number.NaN)).toThrow(TypeError);
+  });
+
   it("is neither zero nor finite, and is nan only at sign zero", () => {
     const inf = new RubyDate.Infinity();
     expect(inf.isZero()).toBe(false);
