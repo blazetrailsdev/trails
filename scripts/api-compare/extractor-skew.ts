@@ -16,6 +16,45 @@
  */
 import type { ApiManifest } from "@blazetrails/parity/types";
 
+/**
+ * The call-argument descriptor grammar BOTH extractors emit (RFC 0095 §Design,
+ * the §1 table): extract-ruby-api.rb#describe_arg and
+ * extract-ts-api.ts#describeArg. The comparator reads one stream against the
+ * other, so a spelling that drifts on one side alone silently stops matching —
+ * this list is the shared vocabulary the skew test pins against both sources.
+ */
+export const CALL_ARG_DESCRIPTOR_VOCABULARY = [
+  "id:",
+  "num:",
+  "str:",
+  "bool:",
+  "nil",
+  "const:",
+  "call:",
+  "constructor",
+  "kwargs{",
+  "array",
+  "hash",
+  "str-interp",
+  "binop:",
+  "unary",
+  "ternary",
+  "*splat",
+  "**splat",
+  "splat",
+  "blockpass",
+  "block",
+] as const;
+
+/**
+ * Descriptors only the RUBY side can produce. A Ruby Symbol is a JS string
+ * (CLAUDE.md "Symbols vs strings"), so the port spells `:dump` as `"dump"` and
+ * the TS extractor emits `str:` where Ruby emits `sym:`; normalization pairs
+ * them (RFC 0095 §Normalization). `zsuper` is Ruby's argument-less `super`,
+ * which has no TS spelling — `super(...)` there is always explicit.
+ */
+export const RUBY_ONLY_CALL_ARG_DESCRIPTORS = ["sym:", "zsuper"] as const;
+
 export interface ExtractorSkew {
   /** True when base and target were built by different extractor versions. */
   skewed: boolean;
