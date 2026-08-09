@@ -121,11 +121,18 @@ describeIfPg("PostgreSQLAdapter", () => {
           this.attribute("id", "integer");
         }
       }
-      await PgArrays.loadSchema();
-      // Rails: assert_equal([4, 4, 2], PgArray.column_defaults["score"])
-      expect((PgArrays as any).columnDefaults["score"]).toEqual([4, 4, 2]);
-      // Rails: assert_equal([4, 4, 2], PgArray.new.score)
-      expect((new PgArrays() as any).score).toEqual([4, 4, 2]);
+      try {
+        // Rails: PgArray.reset_column_information (array_test.rb:85)
+        PgArrays.resetColumnInformation();
+        await PgArrays.loadSchema();
+        // Rails: assert_equal([4, 4, 2], PgArray.column_defaults["score"])
+        expect((PgArrays as any).columnDefaults["score"]).toEqual([4, 4, 2]);
+        // Rails: assert_equal([4, 4, 2], PgArray.new.score)
+        expect((new PgArrays() as any).score).toEqual([4, 4, 2]);
+      } finally {
+        // Rails: ensure PgArray.reset_column_information (array_test.rb:90)
+        PgArrays.resetColumnInformation();
+      }
     });
     it("default strings", async () => {
       await adapter.addColumn("pg_arrays", "names", "string", {
@@ -139,11 +146,18 @@ describeIfPg("PostgreSQLAdapter", () => {
           this.attribute("id", "integer");
         }
       }
-      await PgArrays.loadSchema();
-      // Rails: assert_equal(["foo", "bar"], PgArray.column_defaults["names"])
-      expect((PgArrays as any).columnDefaults["names"]).toEqual(["foo", "bar"]);
-      // Rails: assert_equal(["foo", "bar"], PgArray.new.names)
-      expect((new PgArrays() as any).names).toEqual(["foo", "bar"]);
+      try {
+        // Rails: PgArray.reset_column_information (array_test.rb:95)
+        PgArrays.resetColumnInformation();
+        await PgArrays.loadSchema();
+        // Rails: assert_equal(["foo", "bar"], PgArray.column_defaults["names"])
+        expect((PgArrays as any).columnDefaults["names"]).toEqual(["foo", "bar"]);
+        // Rails: assert_equal(["foo", "bar"], PgArray.new.names)
+        expect((new PgArrays() as any).names).toEqual(["foo", "bar"]);
+      } finally {
+        // Rails: ensure PgArray.reset_column_information (array_test.rb:100)
+        PgArrays.resetColumnInformation();
+      }
     });
     it("schema dump with shorthand", async () => {
       const output = await SchemaDumper.dumpTableSchema(adapter, "pg_arrays");
