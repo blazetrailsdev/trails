@@ -4184,6 +4184,115 @@ class DateError extends ArgumentError {
 }
 
 /**
+ * Ruby `Date::Infinity` (ruby/date, `lib/date.rb:17-68`), the `:nodoc:`
+ * `Numeric` subclass a `Range` of dates uses as an unbounded endpoint. It is
+ * reached as `Date.Infinity`, the name Ruby nests it under; this binding is
+ * spelled `DateInfinity` for the same reason {@link DateError} is spelled that
+ * way — `Infinity` is a global, so declaring one shadows it for the whole
+ * module (`no-shadow-restricted-names`) and {@link JULIAN} / {@link GREGORIAN}
+ * are that global. A class EXPRESSION assigned straight to `Date.Infinity`
+ * would keep the name, but declaration emit rejects it over the `protected`
+ * {@link DateInfinity#d} (TS4094).
+ *
+ * `Numeric` has no trails port, so the class stands alone — every member the
+ * gem defines is here, and none of Ruby's inherited `Numeric` surface is.
+ */
+export class DateInfinity {
+  /** Ruby `@d` (ruby/date, `lib/date.rb:19`), the sign of the constructor's argument. */
+  readonly #d: number;
+
+  /** Ruby `Date::Infinity#initialize(d=1)` (ruby/date, `lib/date.rb:19`). */
+  constructor(d: number = 1) {
+    this.#d = Math.sign(d);
+  }
+
+  /** Ruby `Date::Infinity#d` (ruby/date, `lib/date.rb:21-23`), marked `protected`. */
+  protected d(): number {
+    return this.#d;
+  }
+
+  /** Ruby `Date::Infinity#zero?` (ruby/date, `lib/date.rb:25`). */
+  isZero(): false {
+    return false;
+  }
+
+  /** Ruby `Date::Infinity#finite?` (ruby/date, `lib/date.rb:26`). */
+  isFinite(): false {
+    return false;
+  }
+
+  /**
+   * Ruby `Date::Infinity#infinite?` (ruby/date, `lib/date.rb:27`), which
+   * answers `d.nonzero?` — the sign itself, or `nil` when it is zero — not a
+   * boolean.
+   */
+  isInfinite(): number | null {
+    return this.d() !== 0 ? this.d() : null;
+  }
+
+  /** Ruby `Date::Infinity#nan?` (ruby/date, `lib/date.rb:28`), `d.zero?`. */
+  isNan(): boolean {
+    return this.d() === 0;
+  }
+
+  /** Ruby `Date::Infinity#abs` (ruby/date, `lib/date.rb:30`). */
+  abs(): DateInfinity {
+    return new (this.constructor as new (d?: number) => DateInfinity)();
+  }
+
+  /** Ruby `Date::Infinity#-@` (ruby/date, `lib/date.rb:32`). */
+  negate(): DateInfinity {
+    return new (this.constructor as new (d?: number) => DateInfinity)(-this.d());
+  }
+
+  /** Ruby `Date::Infinity#+@` (ruby/date, `lib/date.rb:33`). */
+  identity(): DateInfinity {
+    return new (this.constructor as new (d?: number) => DateInfinity)(+this.d());
+  }
+
+  /**
+   * Ruby `Date::Infinity#<=>` (ruby/date, `lib/date.rb:35-48`). The `Numeric`
+   * arm answers `d` itself — the sign — rather than a spaceship of the two
+   * values, and the `coerce` fallback answers `nil` when `other` has no
+   * `coerce` (Ruby rescues the `NoMethodError`; JS raises a `TypeError` for
+   * the same call, which is what is caught here).
+   */
+  compareTo(other: unknown): number | null {
+    if (other instanceof DateInfinity) return Math.sign(this.d() - other.d());
+    if (other === Number.POSITIVE_INFINITY) return Math.sign(this.d() - 1);
+    if (other === Number.NEGATIVE_INFINITY) return Math.sign(this.d() + 1);
+    if (typeof other === "number" || other instanceof Rational) return this.d();
+    try {
+      const [l, r] = (other as { coerce(x: unknown): [number, number] }).coerce(this);
+      return Math.sign(l - r);
+    } catch (error) {
+      if (!(error instanceof TypeError)) throw error;
+    }
+    return null;
+  }
+
+  /**
+   * Ruby `Date::Infinity#coerce` (ruby/date, `lib/date.rb:51-57`). The `else`
+   * arm is `super` — `Numeric#coerce`, which raises `TypeError` for a value
+   * it cannot make a `Float` of.
+   */
+  coerce(other: unknown): [number, number] {
+    if (typeof other === "number" || other instanceof Rational) return [-this.d(), this.d()];
+    throw new TypeError(`can't convert ${String(other)} into Float`);
+  }
+
+  /** Ruby `Date::Infinity#to_f` (ruby/date, `lib/date.rb:59-66`). */
+  toF(): number {
+    if (this.#d === 0) return 0;
+    if (this.#d > 0) {
+      return Number.POSITIVE_INFINITY;
+    } else {
+      return Number.NEGATIVE_INFINITY;
+    }
+  }
+}
+
+/**
  * @noRailsEquivalent PERMANENT — the `ruby/date` gem's `::Date`. Rails never
  * defines the class, only reopens it. The gem does have a counterpart now that
  * it is vendored, but it is C — `vendor/date/ext/date/date_core.c` — and
@@ -4715,6 +4824,18 @@ export class Date {
   /** Ruby `Date#to_s` (ruby/date, `date_core.c` `d_lite_to_s`). */
   toS(): string {
     return this.strftime("%Y-%m-%d");
+  }
+
+  /**
+   * Ruby `Date::Infinity` (ruby/date, `lib/date.rb:17-68`) at the name Ruby
+   * nests it under. The class itself is {@link DateInfinity} above — see its
+   * own comment for why the binding is spelled that way.
+   */
+  static Infinity = DateInfinity;
+
+  /** Ruby `Date#infinite?` (ruby/date, `lib/date.rb:13-15`), which returns `false`. */
+  isInfinite(): false {
+    return false;
   }
 
   /**

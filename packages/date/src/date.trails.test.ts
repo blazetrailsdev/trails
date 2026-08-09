@@ -1770,3 +1770,60 @@ describe("strftime over a Temporal subject", () => {
     expect(strftime(plain, "%L %N %6N %12N")).toBe("123 123456789 123456 123456789000");
   });
 });
+
+describe("Date::Infinity", () => {
+  it("answers false for Date#infinite?", () => {
+    expect(new RubyDate(2001, 2, 3).isInfinite()).toBe(false);
+  });
+
+  it("reduces its argument to a sign", () => {
+    expect(new RubyDate.Infinity().toF()).toBe(Number.POSITIVE_INFINITY);
+    expect(new RubyDate.Infinity(-7).toF()).toBe(Number.NEGATIVE_INFINITY);
+    expect(new RubyDate.Infinity(0).toF()).toBe(0);
+  });
+
+  it("is neither zero nor finite, and is nan only at sign zero", () => {
+    const inf = new RubyDate.Infinity();
+    expect(inf.isZero()).toBe(false);
+    expect(inf.isFinite()).toBe(false);
+    expect(inf.isInfinite()).toBe(1);
+    expect(inf.negate().isInfinite()).toBe(-1);
+    expect(new RubyDate.Infinity(0).isInfinite()).toBeNull();
+    expect(inf.isNan()).toBe(false);
+    expect(new RubyDate.Infinity(0).isNan()).toBe(true);
+  });
+
+  it("answers a positive infinity for abs, and flips sign for -@ / +@", () => {
+    expect(new RubyDate.Infinity(-1).abs().toF()).toBe(Number.POSITIVE_INFINITY);
+    expect(new RubyDate.Infinity(1).negate().toF()).toBe(Number.NEGATIVE_INFINITY);
+    expect(new RubyDate.Infinity(-1).identity().toF()).toBe(Number.NEGATIVE_INFINITY);
+  });
+
+  it("compares against another Infinity, a Float infinity and a Numeric", () => {
+    const pos = new RubyDate.Infinity();
+    const neg = new RubyDate.Infinity(-1);
+    expect(pos.compareTo(neg)).toBe(1);
+    expect(neg.compareTo(pos)).toBe(-1);
+    expect(pos.compareTo(new RubyDate.Infinity())).toBe(0);
+
+    expect(pos.compareTo(Number.POSITIVE_INFINITY)).toBe(0);
+    expect(neg.compareTo(Number.POSITIVE_INFINITY)).toBe(-1);
+    expect(pos.compareTo(Number.NEGATIVE_INFINITY)).toBe(1);
+    expect(neg.compareTo(Number.NEGATIVE_INFINITY)).toBe(0);
+
+    expect(pos.compareTo(1000)).toBe(1);
+    expect(neg.compareTo(new Rational(1, 2))).toBe(-1);
+  });
+
+  it("falls back to the other value's coerce, and answers nil without one", () => {
+    const coercible = { coerce: () => [-1, 1] as [number, number] };
+    expect(new RubyDate.Infinity().compareTo(coercible)).toBe(-1);
+    expect(new RubyDate.Infinity().compareTo("foo")).toBeNull();
+  });
+
+  it("coerces a Numeric to the pair Ruby answers, and raises otherwise", () => {
+    expect(new RubyDate.Infinity().coerce(1)).toEqual([-1, 1]);
+    expect(new RubyDate.Infinity(-1).coerce(new Rational(1, 2))).toEqual([1, -1]);
+    expect(() => new RubyDate.Infinity().coerce("foo")).toThrow(TypeError);
+  });
+});
