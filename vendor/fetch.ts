@@ -213,7 +213,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
 
 /**
  * Fetch every (or one) source and reconcile the lockfile. Exported so the
- * api:compare orchestrator can run the fetch phase in-process instead of
+ * parity:api orchestrator can run the fetch phase in-process instead of
  * paying a separate `pnpm tsx` cold start (~1.7s) for it.
  *
  * `offline` enables the per-source fast-path in fetchSource (skip `git
