@@ -7,7 +7,7 @@ import { randomUUID } from "node:crypto";
 import { SQLiteDatabaseTasks } from "./sqlite-database-tasks.js";
 import { DatabaseTasks } from "./database-tasks.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
-import { DatabaseAlreadyExists } from "../errors.js";
+import { DatabaseAlreadyExists, NoDatabaseError } from "../errors.js";
 import { SchemaDumper } from "../schema-dumper.js";
 import { Base } from "../base.js";
 
