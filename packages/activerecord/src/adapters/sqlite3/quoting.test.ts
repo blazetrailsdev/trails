@@ -39,12 +39,7 @@ describeIfSqlite("SQLite3QuotingTest", () => {
   });
 
   it("quote string", async () => {
-    // Rails asserts quote_string("'") == "''" (escaped content, no wrapping
-    // quotes). Trails' quoteString wraps — round-trip the same "'" datum.
-    await adapter.exec(`CREATE TABLE "quote_test" ("id" INTEGER PRIMARY KEY, "val" TEXT)`);
-    await adapter.executeMutation(`INSERT INTO "quote_test" ("val") VALUES ('''')`);
-    const rows = await adapter.execute(`SELECT "val" FROM "quote_test"`);
-    expect(rows[0].val).toBe("'");
+    expect(adapter.quoteString("'")).toBe("''");
   });
 
   it("quote column name", async () => {
