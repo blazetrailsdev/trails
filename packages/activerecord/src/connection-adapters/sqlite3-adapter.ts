@@ -2473,7 +2473,16 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     await this.copyTableContents(from, to, columnsToCopy, rename);
   }
 
-  /** @internal */
+  /**
+   * Mirrors: SQLite3Adapter#copy_table_indexes (sqlite3_adapter.rb:651-677)
+   *
+   * @missingRailsCall add_index — SQLite puts the schema on the INDEX name
+   *   (`CREATE INDEX aux.by_name ON widgets (…)`); qualifying the table instead
+   *   is a syntax error, and `add_index` has no notion of an ATTACHed schema, so
+   *   the statement is assembled here. It still goes through `execute`, the
+   *   primitive `add_index` would have reached.
+   * @internal
+   */
   private async copyTableIndexes(
     from: string,
     to: string,
@@ -2532,12 +2541,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
         : `${quoteColumnName(newName)} ON ${quoteTableName(to)}`;
       let sql = `CREATE ${idx.unique ? "UNIQUE " : ""}INDEX ${target} (${colSql})`;
       if (idx.where) sql += ` WHERE ${idx.where}`;
-      // Rails reaches `add_index(to, columns, **options)` here
-      // (sqlite3_adapter.rb:701), which lands in `execute`. The statement is
-      // still assembled locally — SQLite puts the schema on the INDEX name, a
-      // form `add_index` has no notion of — but it goes through the same
-      // primitive, so it is logged and dirties the query cache.
-      // @missingRailsCall add_index — see the ATTACHed-schema note above.
       await this.execute(sql);
     }
   }
