@@ -42,7 +42,6 @@ export const CALL_ARG_DESCRIPTOR_VOCABULARY = [
   "*splat",
   "**splat",
   "splat",
-  "blockpass",
   "block",
 ] as const;
 
@@ -51,9 +50,11 @@ export const CALL_ARG_DESCRIPTOR_VOCABULARY = [
  * (CLAUDE.md "Symbols vs strings"), so the port spells `:dump` as `"dump"` and
  * the TS extractor emits `str:` where Ruby emits `sym:`; normalization pairs
  * them (RFC 0095 §Normalization). `zsuper` is Ruby's argument-less `super`,
- * which has no TS spelling — `super(...)` there is always explicit.
+ * which has no TS spelling — `super(...)` there is always explicit. `blockpass`
+ * is Ruby's `&blk` / `&:foo`, which TS cannot distinguish from an ordinary
+ * function-valued argument; a callback the port passes is flagged `block`.
  */
-export const RUBY_ONLY_CALL_ARG_DESCRIPTORS = ["sym:", "zsuper"] as const;
+export const RUBY_ONLY_CALL_ARG_DESCRIPTORS = ["sym:", "zsuper", "blockpass"] as const;
 
 export interface ExtractorSkew {
   /** True when base and target were built by different extractor versions. */

@@ -2721,7 +2721,7 @@ function extractCalls(node: ts.Node | undefined): string[] | undefined {
  * `call:` / `kwargs{k=…}`, plus the OPAQUE spellings (`?`, `array`, `hash`,
  * `str-interp`, `binop:<op>`, `unary<desc>`, `ternary`, `*splat`) that tell the
  * comparator to skip the site rather than guess at it, and the per-site
- * `splat` / `blockpass` / `block` flags.
+ * `splat` / `block` flags.
  *
  * Kept beside `collectCalls` rather than folded into it: that stream credits a
  * bare property READ (`this.joinsValues`) as a call, because Ruby has no field
@@ -2850,10 +2850,6 @@ function describeArg(node: ts.Expression, flags: string[]): string {
     return `unary${describeArg(expr.operand, flags)}`;
   }
   if (ts.isConditionalExpression(expr)) return "ternary";
-  if (ts.isArrowFunction(expr) || ts.isFunctionExpression(expr)) {
-    flags.push("blockpass");
-    return "?";
-  }
   return "?";
 }
 
