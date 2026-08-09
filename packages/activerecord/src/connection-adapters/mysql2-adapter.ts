@@ -304,8 +304,9 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    * `conn.execute()`. If the insert evicts an older entry, our pool's
    * `dealloc` sends COM_STMT_CLOSE via `unprepare` so the mysql2
    * driver's internal cache and the server both release the prepared
-   * statement. At `statementLimit` 0 the pool evicts (and deallocates) the
-   * previous entry on every insert, mirroring `StatementPool#[]=`.
+   * statement. There is no `statementLimit` 0 branch here because Rails has
+   * none: its `[]=` raises on the empty cache (statement_pool.rb:31-33), so a
+   * limit of 0 is unsupported rather than a caching switch.
    */
   private _trackPrepared(conn: mysql.Connection, sql: string): void {
     const pool = this._getStmtPool(conn);
