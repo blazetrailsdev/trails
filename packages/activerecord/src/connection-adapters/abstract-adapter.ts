@@ -2570,13 +2570,12 @@ export class AbstractAdapter implements Quoting {
    * reports back by mutating it — which is how Rails' `raw_execute` hands
    * `notification_payload` to `perform_query` for `row_count`/`statement_name`.
    *
-   * trails' `rawExecute` does not call `log` yet; wiring that up is RFC 0076
-   * `wire-raw-execute-through-log`. (This used to cite RFC 0023
-   * `unify-execute-mutation-into-perform-query` "which first needs performQuery
-   * on sqlite3/mysql2 (only PG assigns one today)" — both halves are now stale:
-   * that story is `done`, and all three adapters have the primitive, PG on the
-   * prototype, sqlite3 as `_performQuery`, mysql2 by calling the imported
-   * `performQuery` directly.)
+   * This is the single `sql.active_record` payload producer, as in Rails where
+   * `raw_execute` is its only caller (abstract/database_statements.rb:554); the
+   * adapters' query paths route through here rather than building the payload
+   * literal themselves. Rails' one other producer is the *cached* payload,
+   * `QueryCache#cache_notification_info` (query_cache.rb:308), which stays
+   * separate here too.
    */
   async log<T>(
     sql: string,
@@ -2584,15 +2583,15 @@ export class AbstractAdapter implements Quoting {
     binds: unknown[] = [],
     typeCastedBinds: unknown[] = [],
     isAsync = false,
-    block?: (payload: EventPayload) => Promise<T>,
-  ): Promise<T | void> {
+    block: (payload: EventPayload) => Promise<T>,
+  ): Promise<T> {
     try {
       // Rails: `current_transaction.user_transaction.presence`. Transaction
       // aliases `blank?` to `closed?` (transaction.rb:122), so a closed
       // transaction reports as nil rather than as itself.
       const userTx = this.currentTransaction().userTransaction;
       const presentTx = userTx.isBlank() ? null : userTx;
-      return await Notifications.instrumentAsync(
+      return (await Notifications.instrumentAsync(
         "sql.active_record",
         {
           sql,
@@ -2605,7 +2604,7 @@ export class AbstractAdapter implements Quoting {
           row_count: 0,
         },
         block,
-      );
+      )) as T;
     } catch (ex) {
       if (ex instanceof StatementInvalid) {
         throw ex.setQuery(sql, binds);

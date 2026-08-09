@@ -38,7 +38,7 @@ import {
   type TransactionalCallbackConditions,
 } from "@blazetrails/activemodel";
 import { setCurrentAdapterResolver } from "./type.js";
-import { Table, UpdateManager, DeleteManager, Nodes, sql as arelSql } from "@blazetrails/arel";
+import { Table, UpdateManager, DeleteManager, Nodes } from "@blazetrails/arel";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { ExplainOption } from "./connection-adapters/abstract/database-statements.js";
 import type { Relation } from "./relation.js";
@@ -924,16 +924,11 @@ interface _ConstructorAssociationWriter {
 // FloatType → SQLITE_FLOAT for whole-valued floats) is not observable for
 // table writes: a float column's REAL affinity converts an INTEGER-typed bind
 // on storage (verified: `typeof(col)` is 'real' either way).
-// Array columns keep their bespoke inline quoting: their
-// database value is an adapter-specific aggregate literal (`{…}` / `ARRAY[…]`)
-// that the drivers cannot bind as a single scalar parameter — the adapter's
-// `quote` (Rails' `quote(encode_array(value))`) type-casts every element.
-function writePathValueNode(
-  def: { type?: { name?: string } } | undefined,
-  raw: unknown,
-  adapter: { quote(value: unknown): string },
-): InstanceType<typeof Nodes.Node> | unknown {
-  if (def?.type?.name === "array") return arelSql(adapter.quote(raw));
+// Array columns bind like every other column: `value_for_database` yields the
+// PG `OID::Array::Data` wrapper, which `type_casted_binds` routes through
+// `encode_array` (postgresql/quoting.rb) so the driver receives the encoded
+// `{…}` literal as one bound parameter typed by the column.
+function writePathValueNode(raw: unknown): InstanceType<typeof Nodes.Node> {
   return new Nodes.BindParam(raw);
 }
 
@@ -3544,7 +3539,7 @@ export class Base extends Model {
     // parameter (see writePathValueNode), matching Rails' type_casted_binds.
     const valuesMap: Record<string, unknown> = {};
     columns.forEach((c, i) => {
-      valuesMap[c] = writePathValueNode(ctor._attributeDefinitions.get(c), values[i], adapter);
+      valuesMap[c] = writePathValueNode(values[i]);
     });
 
     this._pendingOperation = (async () => {
@@ -3659,10 +3654,7 @@ export class Base extends Model {
     }
 
     const updateValues: [InstanceType<typeof Nodes.Node>, unknown][] = declaredChanges.map(
-      (key) => [
-        table.get(key),
-        writePathValueNode(ctor._attributeDefinitions.get(key), dbValues[key], adapter),
-      ],
+      (key) => [table.get(key), writePathValueNode(dbValues[key])],
     );
 
     // Optimistic locking: include lock column in WHERE and increment it.
@@ -3695,10 +3687,7 @@ export class Base extends Model {
       // the attribute to Arel like every other SET column (optimistic.rb:
       // 101-108 → persistence.rb attributes_with_values), so the bumped lock
       // value is bound, not inlined — route through the same write-path node.
-      updateValues.push([
-        table.get(lockCol),
-        writePathValueNode(ctor._attributeDefinitions.get(lockCol), currentVersion + 1, adapter),
-      ]);
+      updateValues.push([table.get(lockCol), writePathValueNode(currentVersion + 1)]);
     }
 
     const um = new UpdateManager()

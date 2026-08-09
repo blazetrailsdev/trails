@@ -66,18 +66,19 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       }
     });
 
-    it("statementLimit = 0 disables named prepared statements", async () => {
+    it("statementLimit = 0 is unsupported and raises on the first prepare", async () => {
       const adapter = new Mysql2Adapter({ uri: MYSQL_TEST_URL, statementLimit: 0 });
+      // The outer beforeEach opts the *leased* adapter into prepared
+      // statements; this one is built locally and defaults to off, so without
+      // this the prepared path is never taken and the pool is never reached.
+      adapter.preparedStatements = true;
       await adapter.beginDbTransaction();
       try {
-        // Query still runs — just via `conn.query` (text protocol)
-        // instead of `conn.execute` (binary prepared). No pool is
-        // created because `_shouldPrepare` short-circuits, so we'd
-        // otherwise leak unbounded server-side PREPAREs. Rails'
-        // StatementPool#set is likewise a no-op at limit=0.
-        const rows = await adapter.execute("SELECT ? AS n", [1]);
-        expect(rows[0]).toBeDefined();
-        expect(adapter._statementPoolForTest()).toBeUndefined();
+        // Rails does not branch on the limit at the call site, and its pool has
+        // no zero-limit case either: `while 0 <= cache.size` runs on the empty
+        // cache and `nil.last` raises (statement_pool.rb:31-33). So a
+        // `statement_limit` of 0 is unsupported rather than a caching switch.
+        await expect(adapter.execute("SELECT ? AS n", [1])).rejects.toThrow();
       } finally {
         await adapter.rollback();
         await adapter.close();

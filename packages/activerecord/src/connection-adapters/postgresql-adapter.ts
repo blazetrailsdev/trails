@@ -10,7 +10,6 @@ import {
 } from "@blazetrails/activemodel";
 import {
   singularize,
-  Notifications,
   ActiveSupport,
   runLoadHooks,
   include,
@@ -542,7 +541,7 @@ export class PostgreSQLAdapter
    * `@config[:statement_limit]` inline at StatementPool construction
    * (postgresql_adapter.rb:1056) and never exposes. trails' constructor
    * destructures the adapter-level keys out of the config hash, so the value is
-   * held here — read by `buildStatementPool` and `_shouldPrepare`'s pool-limit
+   * held here — read by `buildStatementPool`'s pool-limit
    * check.
    *
    * @internal
@@ -1080,20 +1079,13 @@ export class PostgreSQLAdapter
     const bindArray = (this.typeCastedBinds(binds) ?? []).map((v) => this._bindForPg(v));
     const rewritten = this.rewriteBinds(sql, bindArray);
     this._noticeReceiverSqlWarnings = [];
-    const txPublicQuery = this.currentTransaction().userTransaction;
-    const payload: Record<string, unknown> = {
-      sql: rewritten,
-      name: name ?? "SQL",
-      binds: binds ?? [],
-      type_casted_binds: bindArray,
-      connection: this,
-      row_count: 0,
-      transaction: txPublicQuery.isOpen() ? txPublicQuery : null,
-    };
-    const pgResult: ArrayQueryResult = await Notifications.instrumentAsync(
-      "sql.active_record",
-      payload,
-      async () => {
+    const pgResult: ArrayQueryResult = await this.log(
+      rewritten,
+      name ?? "SQL",
+      binds ?? [],
+      bindArray,
+      false,
+      async (payload) => {
         try {
           // Materialize the pending lazy transaction before the query, mirroring
           // Rails' raw_execute (materialize_transactions defaults true). A no-bind
@@ -1609,15 +1601,12 @@ export class PostgreSQLAdapter
    * reused without binds).
    */
   private _shouldPrepare(binds: unknown[]): boolean {
-    if (!this.preparedStatements || binds.length === 0) return false;
-    // Gate on the live pool's maxSize (or the adapter default if not yet
-    // constructed). A direct `pool.setMaxSize(0)` — by a test or an
-    // operator shrinking the session — must reliably disable preparation,
-    // because `StatementPool#set` is a no-op at maxSize=0 and we'd
-    // otherwise keep allocating a fresh `a<n>` name per execution and
-    // leak server-side PREPAREs.
-    const poolLimit = this._statementPool?.maxSize ?? this._statementLimit;
-    return poolLimit > 0;
+    // Rails' gate and nothing more (the inverse of
+    // `without_prepared_statement?`, abstract_adapter.rb:1177). It does not
+    // consult `statement_limit`: a limit of 0 is unsupported in Rails, whose
+    // `StatementPool#[]=` loop raises on the empty cache
+    // (statement_pool.rb:31-33), so there is no zero-limit case to branch on.
+    return this.preparedStatements && binds.length > 0;
   }
 
   /**
@@ -1657,15 +1646,7 @@ export class PostgreSQLAdapter
     const bindArray = (this.typeCastedBinds(binds) ?? []).map((v) => this._bindForPg(v));
     const rewritten = this.rewriteBinds(sql, bindArray);
     this._noticeReceiverSqlWarnings = [];
-    const payload: Record<string, unknown> = {
-      sql: rewritten,
-      name,
-      binds,
-      type_casted_binds: bindArray,
-      connection: this,
-      row_count: 0,
-    };
-    const pgResult = await Notifications.instrumentAsync("sql.active_record", payload, async () => {
+    const pgResult = await this.log(rewritten, name, binds, bindArray, false, async (payload) => {
       try {
         const r = await this._runQuery(client, rewritten, bindArray, { rowMode: "array" });
         payload.row_count = r.rowCount ?? 0;
@@ -1743,20 +1724,10 @@ export class PostgreSQLAdapter
     // payload.sql is the rewritten SQL (`$1` not `?`) so ExplainSubscriber
     // stores something that can be re-EXPLAIN'd on the same adapter
     // without re-running rewriteBinds.
-    const txPublic = this.currentTransaction().userTransaction;
-    const payload: Record<string, unknown> = {
-      sql: rewritten,
-      name,
-      binds,
-      type_casted_binds: bindArray,
-      connection: this,
-      row_count: 0,
-      transaction: txPublic.isOpen() ? txPublic : null,
-    };
     this._noticeReceiverSqlWarnings = [];
     // Flush inside the instrumented callback so a warning raise is captured by
     // payload.exception — mirrors Rails' handle_warnings inside perform_query (line 166).
-    return await Notifications.instrumentAsync("sql.active_record", payload, async () => {
+    return await this.log(rewritten, name, binds, bindArray, false, async (payload) => {
       try {
         return await this.withRawConnection({ allowRetry }, async (conn) => {
           const client = conn as unknown as pg.Client;
@@ -1850,17 +1821,7 @@ export class PostgreSQLAdapter
     // something that can be re-EXPLAIN'd without re-running rewriteBinds
     // (and without re-appending RETURNING for bare INSERTs, which isn't
     // part of the logical query).
-    const txPublic = this.currentTransaction().userTransaction;
-    const payload: Record<string, unknown> = {
-      sql: pgSql,
-      name,
-      binds: originalBinds,
-      type_casted_binds: binds,
-      connection: this,
-      row_count: 0,
-      transaction: txPublic.isOpen() ? txPublic : null,
-    };
-    return await Notifications.instrumentAsync("sql.active_record", payload, async () => {
+    return await this.log(pgSql, name, originalBinds, binds, false, async (payload) => {
       try {
         return await this.withRawConnection(async (conn) => {
           const client = conn as unknown as pg.Client;
@@ -2317,15 +2278,7 @@ export class PostgreSQLAdapter
       // dropped or misattributed to the next query. Transaction-control SQL passes
       // no binds and keeps its byte-identical path (no reset/flush/rewrite).
       if (hasBinds) this._noticeReceiverSqlWarnings = [];
-      const payload: Record<string, unknown> = {
-        sql: runSql,
-        name,
-        binds,
-        type_casted_binds: bindArray,
-        connection: this,
-        row_count: 0,
-      };
-      const result = await Notifications.instrumentAsync("sql.active_record", payload, () =>
+      const result = await this.log(runSql, name, binds, bindArray, false, (payload) =>
         // materializeTransactions is handled above (not delegated to
         // withRawConnection) so transaction-control SQL — COMMIT/ROLLBACK/
         // SAVEPOINT — keeps its exact pre-existing materialize semantics. The

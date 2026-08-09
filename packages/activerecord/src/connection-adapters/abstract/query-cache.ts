@@ -1,3 +1,4 @@
+import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 import { Notifications } from "@blazetrails/activesupport";
 import {
   toSqlAndBinds,
@@ -608,8 +609,15 @@ function cacheNotificationInfoResult(
  * @internal
  */
 function sqlCacheKey(sql: string, binds: unknown[]): string {
+  // Rails keys on `[sql, binds]` (query_cache.rb:261) — Ruby Attributes compare
+  // by value, so the key is really the database values. JS object identity is
+  // not, so key on `value_for_database` to get the same equivalence.
+  const values =
+    binds && binds.length > 0
+      ? binds.map((b) => (b instanceof ModelAttribute ? b.valueForDatabase : b))
+      : binds;
   return binds && binds.length > 0
-    ? JSON.stringify([sql, binds], (_k, v) => (typeof v === "bigint" ? `${v}n` : v))
+    ? JSON.stringify([sql, values], (_k, v) => (typeof v === "bigint" ? `${v}n` : v))
     : sql;
 }
 

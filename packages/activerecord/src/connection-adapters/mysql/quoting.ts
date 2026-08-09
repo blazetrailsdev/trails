@@ -18,7 +18,6 @@ import {
   formatPlainDateForSql,
 } from "../abstract/sql-datetime.js";
 import {
-  quote as abstractQuote,
   toBytes,
   dispatchQuotedDate,
   dispatchQuotedTime,
@@ -166,25 +165,6 @@ export function columnNameWithOrderMatcher(): RegExp {
   const nulls = String.raw`(?:\s+NULLS\s+(?:FIRST|LAST))?`;
   const ordered = String.raw`${expr}${collate}${dir}${nulls}`;
   return new RegExp(`^${ordered}(?:\\s*,\\s*${ordered})*$`, "i");
-}
-
-/**
- * Quote a value for inclusion in a SQL literal.
- *
- * Rails' MySQL adapter has **no** `quote` override — `mysql/quoting.rb` defines
- * only `quote_column_name` / `quote_table_name` / `cast_bound_value`, so a MySQL
- * `quote` runs the abstract `quote` and the MySQL-specific behaviour flows in
- * through the dispatched helpers (`quote_string`, `quoted_binary`,
- * `quoted_date`/`quoted_time`). We mirror that here: the whole body
- * delegates to {@link abstractQuote} with `this` threaded so the string,
- * date/time and binary dispatch land on MySQL's {@link quoteString} /
- * {@link quotedDate} / {@link quotedBinary}. Non-finite numbers fall through
- * to the abstract `when Numeric then value.to_s` and render bare — Rails' MySQL
- * adapter has no non-finite override (only PG does). Booleans fall through to the
- * abstract `"TRUE"`/`"FALSE"`; binds serialize to 1/0 via {@link castBoundValue}.
- */
-export function quote(this: QuotingDispatchHost, value: unknown): string {
-  return abstractQuote.call(this, value);
 }
 
 /**

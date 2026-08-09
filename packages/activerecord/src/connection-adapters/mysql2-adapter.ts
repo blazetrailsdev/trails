@@ -1,6 +1,6 @@
 import mysql from "mysql2/promise";
 import { Temporal } from "@blazetrails/date";
-import { Notifications, BigDecimal } from "@blazetrails/activesupport";
+import { BigDecimal } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { AbstractAdapter as DatabaseAdapter } from "./abstract-adapter.js";
 import type { IndexDefinition } from "./abstract/schema-definitions.js";
@@ -287,16 +287,16 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   /**
-   * Gate named-prepared-statement routing through our pool. Mirrors
-   * Rails' `prepared_statements && !binds.empty?` plus the extra
-   * `statement_limit > 0` check that disables caching (and therefore
-   * the whole prepared-statement path) when the operator sets
-   * `statement_limit = 0`.
+   * Gate named-prepared-statement routing through our pool. Rails' gate is
+   * `prepared_statements && !binds.empty?` (the inverse of
+   * `without_prepared_statement?`, abstract_adapter.rb:1177) and nothing more.
+   * In particular it does not consult `statement_limit`: a limit of 0 is
+   * unsupported in Rails, whose `StatementPool#[]=` loop raises on the empty
+   * cache (statement_pool.rb:31-33), so there is nothing for this gate to
+   * degrade around.
    */
   private _shouldPrepare(binds: unknown[]): boolean {
-    if (!this.preparedStatements || binds.length === 0) return false;
-    const poolLimit = this._statementPool?.maxSize ?? this._statementLimit;
-    return poolLimit > 0;
+    return this.preparedStatements && binds.length > 0;
   }
 
   /**
@@ -304,11 +304,12 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    * `conn.execute()`. If the insert evicts an older entry, our pool's
    * `dealloc` sends COM_STMT_CLOSE via `unprepare` so the mysql2
    * driver's internal cache and the server both release the prepared
-   * statement. No-op when caching is disabled.
+   * statement. There is no `statementLimit` 0 branch here because Rails has
+   * none: its `[]=` raises on the empty cache (statement_pool.rb:31-33), so a
+   * limit of 0 is unsupported rather than a caching switch.
    */
   private _trackPrepared(conn: mysql.Connection, sql: string): void {
     const pool = this._getStmtPool(conn);
-    if (pool.maxSize === 0) return;
     // Use `get` (not `has`) so an already-cached entry is moved to
     // the MRU end of the LRU. Otherwise a hot statement executed
     // repeatedly would keep its original insertion position and get
@@ -616,21 +617,12 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     this._syncDatabaseTimezone();
     const driverSql = this.mysqlQuote(sql);
     const driverBinds = this.mysqlBinds(binds ?? []);
-    const txPublicQuery = this.currentTransaction().userTransaction;
     // Rails logs the caller's own binds (`QueryAttribute` objects) plus their
     // type-casted values, NOT the driver wire form — abstract_adapter.rb:1134-1145
     // / abstract/database_statements.rb:553-554. `driverBinds` stays scoped to
     // the driver call below.
-    const payload: Record<string, unknown> = {
-      sql: driverSql,
-      name: name ?? "SQL",
-      binds: binds ?? [],
-      type_casted_binds: this.typeCastedBinds(binds ?? []) ?? [],
-      connection: this,
-      row_count: 0,
-      transaction: txPublicQuery.isOpen() ? txPublicQuery : null,
-    };
-    return Notifications.instrumentAsync("sql.active_record", payload, async () => {
+    const typeCastedBinds = this.typeCastedBinds(binds ?? []) ?? [];
+    return this.log(driverSql, name, binds ?? [], typeCastedBinds, false, async (payload) => {
       try {
         // Thread allowRetry (Rails' select_all → internal_exec_query
         // `allow_retry: preparable`) into withRawConnection so idempotent SELECTs
@@ -973,17 +965,8 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     // Rails' raw_execute logs the caller's own binds plus their type-casted
     // values (abstract/database_statements.rb:552-556, abstract_adapter.rb:1134-1145),
     // never the mysql2 wire form; `driverBinds` stays scoped to the driver call.
-    const txPublicExec = this.currentTransaction().userTransaction;
-    const payload: Record<string, unknown> = {
-      sql: driverSql,
-      name,
-      binds,
-      type_casted_binds: this.typeCastedBinds(binds) ?? [],
-      connection: this,
-      row_count: 0,
-      transaction: txPublicExec.isOpen() ? txPublicExec : null,
-    };
-    return Notifications.instrumentAsync("sql.active_record", payload, async () => {
+    const typeCastedBinds = this.typeCastedBinds(binds) ?? [];
+    return this.log(driverSql, name, binds, typeCastedBinds, false, async (payload) => {
       try {
         return await this.withRawConnection({ allowRetry }, async (conn) => {
           const mysqlConn = conn as unknown as mysql.Connection;
@@ -1025,17 +1008,8 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     // Rails' raw_execute logs the caller's own binds plus their type-casted
     // values (abstract/database_statements.rb:552-556, abstract_adapter.rb:1134-1145),
     // never the mysql2 wire form; `driverBinds` stays scoped to the driver call.
-    const txPublicMut = this.currentTransaction().userTransaction;
-    const payload: Record<string, unknown> = {
-      sql: driverSql,
-      name,
-      binds,
-      type_casted_binds: this.typeCastedBinds(binds) ?? [],
-      connection: this,
-      row_count: 0,
-      transaction: txPublicMut.isOpen() ? txPublicMut : null,
-    };
-    return Notifications.instrumentAsync("sql.active_record", payload, async () => {
+    const typeCastedBinds = this.typeCastedBinds(binds) ?? [];
+    return this.log(driverSql, name, binds, typeCastedBinds, false, async (payload) => {
       try {
         return await this.withRawConnection(async (conn) => {
           const mysqlConn = conn as unknown as mysql.Connection;
@@ -1208,17 +1182,8 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       // driver, matching Rails internal_execute(sql, name, binds). Transaction-
       // control callers pass none, keeping their byte-identical no-bind path.
       const driverBinds = binds.length > 0 ? this.mysqlBinds(binds) : [];
-      const txPublicInt = this.currentTransaction().userTransaction;
-      const payload: Record<string, unknown> = {
-        sql: driverSql,
-        name,
-        binds,
-        type_casted_binds: this.typeCastedBinds(binds) ?? [],
-        connection: this,
-        row_count: 0,
-        transaction: txPublicInt.isOpen() ? txPublicInt : null,
-      };
-      return await Notifications.instrumentAsync("sql.active_record", payload, async () => {
+      const typeCastedBinds = this.typeCastedBinds(binds) ?? [];
+      return await this.log(driverSql, name, binds, typeCastedBinds, false, async (payload) => {
         try {
           // materializeTransactions is run BEFORE the loop (above) and we pass
           // `false` into withRawConnection — the same materialize-outside-the-loop

@@ -23,7 +23,13 @@ import {
 } from "./schema-statements.js";
 import type { RowFormatHost } from "./schema-statements.js";
 import { Version } from "../abstract-adapter.js";
-import { quote } from "./quoting.js";
+import { AbstractMysqlAdapter } from "../abstract-mysql-adapter.js";
+
+// MySQL has no `quote` override; the value quoter is the inherited abstract one
+// dispatching MySQL's `quoteString` (abstract/quoting.rb:76).
+const quote = AbstractMysqlAdapter.prototype.quote.bind(
+  Object.create(AbstractMysqlAdapter.prototype) as AbstractMysqlAdapter,
+);
 
 // Minimal ForeignKeysHost: foreignKeys() reads via schemaQuery, quotes the
 // table name, and maps referential actions. We stub schemaQuery to return the

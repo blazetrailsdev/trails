@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest";
 import { BinaryData } from "@blazetrails/activemodel";
 import { Temporal } from "@blazetrails/date";
 import {
-  quote as quoteFn,
   quoteColumnName,
   typeCast as typeCastFn,
   quotedBinary,
@@ -17,7 +16,9 @@ import { AbstractMysqlAdapter } from "../abstract-mysql-adapter.js";
 // the adapter prototype so date/time values reach MySQL's quotedDate override
 // and booleans reach its unquotedTrue/unquotedFalse.
 const HOST = Object.create(AbstractMysqlAdapter.prototype) as object;
-const quote = (value: unknown): string => quoteFn.call(HOST, value);
+// Rails' MySQL adapter defines no `quote` (mysql/quoting.rb); MySQL value
+// quoting is the inherited abstract `quote` plus the dispatched overrides.
+const quote = (value: unknown): string => (HOST as { quote(value: unknown): string }).quote(value);
 const typeCast = (value: unknown): unknown => typeCastFn.call(HOST, value);
 
 describe("MySQL quoting — quote", () => {

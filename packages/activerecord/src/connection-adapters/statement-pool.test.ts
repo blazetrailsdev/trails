@@ -161,7 +161,7 @@ describe("SQLite3 StatementPool integration", () => {
     expect(dealloced).toEqual(["stmt_b", "stmt_c"]);
   });
 
-  it("setMaxSize(0) evicts everything and blocks new inserts", async () => {
+  it("setMaxSize(0) evicts everything and raises on a further insert", async () => {
     const dealloced: string[] = [];
     class TestPool extends StatementPool<string> {
       protected dealloc(stmt: string): void {
@@ -174,9 +174,10 @@ describe("SQLite3 StatementPool integration", () => {
     await pool.setMaxSize(0);
     expect(pool.length).toBe(0);
     expect(dealloced.sort()).toEqual(["stmt_a", "stmt_b"]);
-    // set() is a no-op when maxSize is 0 — matches Rails' behavior
-    // where statement_limit = 0 disables caching.
-    await pool.set("c", "stmt_c");
+    // Rails' `[]=` has no zero-limit special case: `while 0 <= cache.size`
+    // runs on the empty cache, `Hash#shift` returns nil and `nil.last` raises
+    // (statement_pool.rb:31-33). A `statement_limit` of 0 is unsupported.
+    expect(() => pool.set("c", "stmt_c")).toThrow();
     expect(pool.length).toBe(0);
   });
 

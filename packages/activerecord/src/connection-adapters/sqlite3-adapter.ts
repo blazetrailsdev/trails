@@ -70,14 +70,7 @@ import {
   BinaryType,
   DecimalType,
 } from "@blazetrails/activemodel";
-import {
-  getFs,
-  getPath,
-  Notifications,
-  pluralize,
-  runLoadHooks,
-  trailsRoot,
-} from "@blazetrails/activesupport";
+import { getFs, getPath, pluralize, runLoadHooks, trailsRoot } from "@blazetrails/activesupport";
 import {
   returningColumnValues as sqliteReturningColumnValues,
   buildTruncateStatement as sqliteBuildTruncateStatement,
@@ -460,13 +453,12 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     await this.ensureConnected();
     await this.materializeTransactions();
 
-    const payload = this._notificationPayload(sql, binds, name);
     // Type-cast binds to driver-compatible primitives. Phase 2 threads
     // bind values through the visitor rather than inlining them, so the
     // `execute` path now receives non-empty bind arrays where it received
     // empty ones before.
     const driverBinds = binds.map(_driverBind, this) as SqliteBinds;
-    return Notifications.instrumentAsync("sql.active_record", payload, async () => {
+    return this.log(sql, name, binds, this.typeCastedBinds(binds) ?? [], false, async (payload) => {
       try {
         return (await this._performQuery(sql, driverBinds, payload)).rows;
       } catch (e: any) {
@@ -474,25 +466,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
         throw translated;
       }
     });
-  }
-
-  // Mirrors the `notification_payload` Rails' raw_execute builds before
-  // dispatching to perform_query.
-  private _notificationPayload(
-    sql: string,
-    binds: unknown[],
-    name: string,
-  ): Record<string, unknown> {
-    const txPublic = this.currentTransaction().userTransaction;
-    return {
-      sql,
-      name,
-      binds,
-      type_casted_binds: this.typeCastedBinds(binds) ?? [],
-      connection: this,
-      row_count: 0,
-      transaction: txPublic.isOpen() ? txPublic : null,
-    };
   }
 
   /**
@@ -615,9 +588,8 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     sql = this.preprocessQuery(sql);
     await this.ensureConnected();
     await this.materializeTransactions();
-    const payload = this._notificationPayload(sql, binds, name);
     const driverBinds = binds.map(_driverBind, this) as SqliteBinds;
-    return Notifications.instrumentAsync("sql.active_record", payload, async () => {
+    return this.log(sql, name, binds, this.typeCastedBinds(binds) ?? [], false, async (payload) => {
       try {
         // Use the values RETURNED by _performQuery, not this._last* — those
         // fields are shared and a concurrent write can overwrite them before
@@ -743,15 +715,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     await this.ensureConnected();
     try {
       if (materializeTransactions) await this.materializeTransactions();
-      const payload: Record<string, unknown> = {
-        sql,
-        name,
-        binds: [],
-        type_casted_binds: [],
-        connection: this,
-        row_count: 0,
-      };
-      return await Notifications.instrumentAsync("sql.active_record", payload, async () => {
+      return await this.log(sql, name, [], [], false, async () => {
         try {
           await this.driver.exec(sql);
           return 0;
@@ -805,43 +769,40 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     // default to a fresh statement and pool only on an explicit `prepare: true`;
     // the preparable decision lives upstream, not here.
     const prepare = options.prepare ?? false;
-    const txPublic = this.currentTransaction().userTransaction;
-    const payload: Record<string, unknown> = {
-      sql: processed,
-      name: name ?? "SQL",
-      binds,
-      type_casted_binds: this.typeCastedBinds(binds ?? []) ?? [],
-      connection: this,
-      row_count: 0,
-      transaction: txPublic.isOpen() ? txPublic : null,
-    };
-    return Notifications.instrumentAsync("sql.active_record", payload, async () => {
-      try {
-        const stmt = await (prepare
-          ? this._cachedStatement(processed)
-          : this._freshStatement(processed));
-        let result: Result;
-        if (!stmt.reader) {
-          await stmt.run(driverBinds);
-          result = Result.empty();
-        } else {
-          const rows = (await stmt.all(driverBinds)) as Record<string, unknown>[];
-          this._narrowSpilledBigInts(stmt, rows);
-          payload.row_count = rows.length;
-          result =
-            rows.length > 0
-              ? Result.fromRowHashes(rows)
-              : new Result(
-                  stmt.columns().map((c) => c.name),
-                  [],
-                );
+    return this.log(
+      processed,
+      name ?? "SQL",
+      binds ?? [],
+      this.typeCastedBinds(binds ?? []) ?? [],
+      false,
+      async (payload) => {
+        try {
+          const stmt = await (prepare
+            ? this._cachedStatement(processed)
+            : this._freshStatement(processed));
+          let result: Result;
+          if (!stmt.reader) {
+            await stmt.run(driverBinds);
+            result = Result.empty();
+          } else {
+            const rows = (await stmt.all(driverBinds)) as Record<string, unknown>[];
+            this._narrowSpilledBigInts(stmt, rows);
+            payload.row_count = rows.length;
+            result =
+              rows.length > 0
+                ? Result.fromRowHashes(rows)
+                : new Result(
+                    stmt.columns().map((c) => c.name),
+                    [],
+                  );
+          }
+          return this.castResult(result);
+        } catch (e: any) {
+          const translated = this._translateException(e, processed, binds);
+          throw translated;
         }
-        return this.castResult(result);
-      } catch (e: any) {
-        const translated = this._translateException(e, processed, binds);
-        throw translated;
-      }
-    });
+      },
+    );
   }
 
   // Mirrors: SQLite3::DatabaseStatements#begin_db_transaction
@@ -2435,8 +2396,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    * @internal
    */
   private async execCopyTable(sql: string): Promise<void> {
-    const payload = this._notificationPayload(sql, [], "SQL");
-    await Notifications.instrumentAsync("sql.active_record", payload, async () => {
+    await this.log(sql, "SQL", [], [], false, async () => {
       try {
         await this.driver.exec(sql);
       } catch (e) {

@@ -8,7 +8,6 @@ import {
 } from "./abstract/schema-definitions.js";
 import { parseTableOptions } from "./abstract-mysql-adapter.js";
 import { SchemaCreation as MysqlSchemaCreation } from "./mysql/schema-creation.js";
-import { quote as mysqlQuote } from "./mysql/quoting.js";
 import { NullPool } from "./abstract/connection-pool.js";
 import { Result } from "../result.js";
 
@@ -89,7 +88,6 @@ describe("AbstractMysqlAdapter#renameColumnForAlter fallback", () => {
     adapter.getDatabaseVersion = async () => {};
     adapter.quoteColumnName = (s: string) => `\`${s}\``;
     adapter.quoteTableName = (s: string) => `\`${s}\``;
-    adapter.quote = (v: unknown) => mysqlQuote.call(adapter, v);
     adapter.columnDefinitions = async () => [
       {
         Field: "col",
@@ -324,10 +322,12 @@ describe("AbstractMysqlAdapter quoting consistency — quote vs quoteString", ()
   });
 
   it("adapter.quote is consistent with standalone quote for strings containing single quotes and backslashes", async () => {
-    const { quote: standaloneQuote } = await import("./mysql/quoting.js");
     const adapter = await makeAdapter();
+    // Rails' MySQL adapter has no `quote` override (mysql/quoting.rb); the
+    // inherited `quote` wraps the self-dispatched `quote_string`
+    // (abstract/quoting.rb:76), which lands on MySQL's backslash escaping.
     for (const s of ["it's", "back\\slash", "\0null\nbyte\rreturn\x1aeof", "'; DROP TABLE t; --"]) {
-      expect(adapter.quote(s)).toBe(standaloneQuote.call(adapter, s));
+      expect(adapter.quote(s)).toBe(`'${adapter.quoteString(s)}'`);
     }
   });
 });
@@ -416,7 +416,6 @@ async function makeMinimalMysqlAdapter(overrides: Record<string, unknown> = {}) 
   adapter.pool = new NullPool();
   adapter.quoteColumnName = (s: string) => `\`${s}\``;
   adapter.quoteTableName = (s: string) => `\`${s}\``;
-  adapter.quote = mysqlQuote;
   Object.assign(adapter, overrides);
   return adapter;
 }
@@ -698,7 +697,6 @@ describe("AbstractMysqlAdapter#foreignKeys", () => {
     >;
     Object.assign(adapter, {
       schemaQuery: async () => rows,
-      quote: mysqlQuote,
     });
     return adapter;
   }
