@@ -1938,12 +1938,20 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    * comma-joined column list (e.g. "a,b" for composites).
    */
   private async _parseForeignKeyNames(tableName: string): Promise<Map<string, string>> {
-    const createSql = await this._createTableSql(tableName);
+    // `table_structure_sql(table_name, column_names)` with an explicit empty
+    // column list (sqlite3_adapter.rb:757) is Rails' own second parameter: the
+    // `Regexp.union([])` it produces is `(?!)`, so the split fires only before
+    // CONSTRAINT and never at the inner comma of a composite
+    // `FOREIGN KEY ("a", "b")` — which the column-union split does cut.
+    const fkStrings = (await this.tableStructureSql(tableName, [])).filter(
+      (columnString) =>
+        columnString.startsWith("CONSTRAINT") && columnString.includes("FOREIGN KEY"),
+    );
     const names = new Map<string, string>();
-    if (!createSql) return names;
-    const regex = /CONSTRAINT\s+(?:"((?:[^"]|"")*)"|(\w+))\s+FOREIGN\s+KEY\s*\(([^)]+)\)/gi;
-    let match: RegExpExecArray | null;
-    while ((match = regex.exec(createSql)) !== null) {
+    const regex = /CONSTRAINT\s+(?:"((?:[^"]|"")*)"|(\w+))\s+FOREIGN\s+KEY\s*\(([^)]+)\)/i;
+    for (const fkString of fkStrings) {
+      const match = regex.exec(fkString);
+      if (!match) continue;
       const name = match[1] ? match[1].replace(/""/g, '"') : match[2];
       const colList = match[3]
         .split(",")
@@ -2309,26 +2317,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   private static readonly UNQUOTED_OPEN_PARENS_REGEX = /\((?![^'"]*['"][^'"]*$)/;
   private static readonly FINAL_CLOSE_PARENS_REGEX = /\);*$/;
 
-  /**
-   * The raw CREATE TABLE SQL, read the way Rails' `table_structure_sql` reads it
-   * — `query_value(sql, "SCHEMA")` over the sqlite_master/sqlite_temp_master
-   * union (sqlite3_adapter.rb:763-775) — so the probe is instrumented as a
-   * `sql.active_record` SCHEMA query. Rails has no separate reader: its
-   * `foreign_keys` consumes `table_structure_sql`'s split column strings. trails
-   * cannot, because that split cuts inside a composite `FOREIGN KEY ("a", "b")`
-   * — every inner comma is followed by a quoted name in the column union — and
-   * trails reflects composite FK columns and constraint names out of the DDL
-   * where Rails takes them from PRAGMA foreign_key_list.
-   */
-  private async _createTableSql(tableName: string): Promise<string | null> {
-    const sql = `SELECT sql FROM
-  (SELECT * FROM sqlite_master UNION ALL
-   SELECT * FROM sqlite_temp_master)
-WHERE type = 'table' AND name = ${this.quote(tableName)}
-`;
-    return (await this.queryValue(sql, "SCHEMA")) as string | null;
-  }
-
   /** @internal */
   private async tableStructureSql(tableName: string, columnNames?: string[]): Promise<string[]> {
     // Rails: `unless column_names ... column_names = column_info.map { ... }`
@@ -2337,8 +2325,13 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
       const columnInfo = await this.tableInfo(tableName);
       columnNames = columnInfo.map((column) => String(column["name"]));
     }
+    const sql = `SELECT sql FROM
+  (SELECT * FROM sqlite_master UNION ALL
+   SELECT * FROM sqlite_temp_master)
+WHERE type = 'table' AND name = ${this.quote(tableName)}
+`;
     // Rails: `result = query_value(sql, "SCHEMA")` (sqlite3_adapter.rb:775).
-    const result = await this._createTableSql(tableName);
+    const result = (await this.queryValue(sql, "SCHEMA")) as string | null;
 
     if (!result) return [];
 
