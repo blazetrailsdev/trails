@@ -86,17 +86,18 @@ describe("DeprecationTest", () => {
   });
 
   it("gem option stored on instance", () => {
-    const d = new Deprecation({ gemName: "MyGem" });
+    const d = new Deprecation("8.1", "MyGem");
     expect(d.gemName).toBe("MyGem");
   });
 
   it("horizon option stored on instance", () => {
-    const d = new Deprecation({ horizon: "3.0" });
-    expect(d.horizon).toBe("3.0");
+    const d = new Deprecation("3.0");
+    expect(d.deprecationHorizon).toBe("3.0");
   });
 
   it("silenced option in constructor", () => {
-    const d = new Deprecation({ silenced: true });
+    const d = new Deprecation();
+    d.silenced = true;
     expect(d.silenced).toBe(true);
   });
 

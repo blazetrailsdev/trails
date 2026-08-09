@@ -171,6 +171,146 @@ const MAPPING: Record<string, string> = {
 };
 
 /**
+ * The tzdata backward-compatibility links, restricted to the identifiers
+ * `Intl.Locale#getTimeZones` reports for some country, each mapped to the
+ * canonical zone it links to.
+ *
+ * `TZInfo::Country#zone_identifiers` — what `load_country_zones`
+ * (time_zone.rb:275) actually reads — answers only canonical zones, so
+ * `TZInfo::Country.get("VA").zone_identifiers` is `["Europe/Rome"]`. ECMA-402's
+ * country table answers the link name instead (`Europe/Vatican`), and
+ * `Europe/Rome` is a MAPPING value while `Europe/Vatican` is not, so without
+ * this table `countryZones("va")` takes `create(tz_id)` and answers an
+ * IANA-named zone where Rails answers the Rails-named `Rome`. The runtime
+ * exposes no link table of its own —
+ * `Intl.DateTimeFormat#resolvedOptions().timeZone` echoes the link name back
+ * unchanged on node 24 — so it is carried here rather than derived.
+ */
+const CANONICAL_ZONE_IDENTIFIERS: Record<string, string> = {
+  "Africa/Accra": "Africa/Abidjan",
+  "Africa/Addis_Ababa": "Africa/Nairobi",
+  "Africa/Asmera": "Africa/Nairobi",
+  "Africa/Bamako": "Africa/Abidjan",
+  "Africa/Bangui": "Africa/Lagos",
+  "Africa/Banjul": "Africa/Abidjan",
+  "Africa/Blantyre": "Africa/Maputo",
+  "Africa/Brazzaville": "Africa/Lagos",
+  "Africa/Bujumbura": "Africa/Maputo",
+  "Africa/Conakry": "Africa/Abidjan",
+  "Africa/Dakar": "Africa/Abidjan",
+  "Africa/Dar_es_Salaam": "Africa/Nairobi",
+  "Africa/Djibouti": "Africa/Nairobi",
+  "Africa/Douala": "Africa/Lagos",
+  "Africa/Freetown": "Africa/Abidjan",
+  "Africa/Gaborone": "Africa/Maputo",
+  "Africa/Harare": "Africa/Maputo",
+  "Africa/Kampala": "Africa/Nairobi",
+  "Africa/Kigali": "Africa/Maputo",
+  "Africa/Kinshasa": "Africa/Lagos",
+  "Africa/Libreville": "Africa/Lagos",
+  "Africa/Lome": "Africa/Abidjan",
+  "Africa/Luanda": "Africa/Lagos",
+  "Africa/Lubumbashi": "Africa/Maputo",
+  "Africa/Lusaka": "Africa/Maputo",
+  "Africa/Malabo": "Africa/Lagos",
+  "Africa/Maseru": "Africa/Johannesburg",
+  "Africa/Mbabane": "Africa/Johannesburg",
+  "Africa/Mogadishu": "Africa/Nairobi",
+  "Africa/Niamey": "Africa/Lagos",
+  "Africa/Nouakchott": "Africa/Abidjan",
+  "Africa/Ouagadougou": "Africa/Abidjan",
+  "Africa/Porto-Novo": "Africa/Lagos",
+  "America/Anguilla": "America/Puerto_Rico",
+  "America/Antigua": "America/Puerto_Rico",
+  "America/Aruba": "America/Puerto_Rico",
+  "America/Blanc-Sablon": "America/Puerto_Rico",
+  "America/Buenos_Aires": "America/Argentina/Buenos_Aires",
+  "America/Catamarca": "America/Argentina/Catamarca",
+  "America/Cayman": "America/Panama",
+  "America/Coral_Harbour": "America/Panama",
+  "America/Cordoba": "America/Argentina/Cordoba",
+  "America/Creston": "America/Phoenix",
+  "America/Curacao": "America/Puerto_Rico",
+  "America/Dominica": "America/Puerto_Rico",
+  "America/Godthab": "America/Nuuk",
+  "America/Grenada": "America/Puerto_Rico",
+  "America/Guadeloupe": "America/Puerto_Rico",
+  "America/Indianapolis": "America/Indiana/Indianapolis",
+  "America/Jujuy": "America/Argentina/Jujuy",
+  "America/Kralendijk": "America/Puerto_Rico",
+  "America/Louisville": "America/Kentucky/Louisville",
+  "America/Lower_Princes": "America/Puerto_Rico",
+  "America/Marigot": "America/Puerto_Rico",
+  "America/Mendoza": "America/Argentina/Mendoza",
+  "America/Montserrat": "America/Puerto_Rico",
+  "America/Nassau": "America/Toronto",
+  "America/Port_of_Spain": "America/Puerto_Rico",
+  "America/St_Barthelemy": "America/Puerto_Rico",
+  "America/St_Kitts": "America/Puerto_Rico",
+  "America/St_Lucia": "America/Puerto_Rico",
+  "America/St_Thomas": "America/Puerto_Rico",
+  "America/St_Vincent": "America/Puerto_Rico",
+  "America/Tortola": "America/Puerto_Rico",
+  "Antarctica/DumontDUrville": "Pacific/Port_Moresby",
+  "Antarctica/McMurdo": "Pacific/Auckland",
+  "Antarctica/Syowa": "Asia/Riyadh",
+  "Arctic/Longyearbyen": "Europe/Berlin",
+  "Asia/Aden": "Asia/Riyadh",
+  "Asia/Bahrain": "Asia/Qatar",
+  "Asia/Brunei": "Asia/Kuching",
+  "Asia/Calcutta": "Asia/Kolkata",
+  "Asia/Katmandu": "Asia/Kathmandu",
+  "Asia/Kuala_Lumpur": "Asia/Singapore",
+  "Asia/Kuwait": "Asia/Riyadh",
+  "Asia/Muscat": "Asia/Dubai",
+  "Asia/Phnom_Penh": "Asia/Bangkok",
+  "Asia/Rangoon": "Asia/Yangon",
+  "Asia/Saigon": "Asia/Ho_Chi_Minh",
+  "Asia/Vientiane": "Asia/Bangkok",
+  "Atlantic/Faeroe": "Atlantic/Faroe",
+  "Atlantic/Reykjavik": "Africa/Abidjan",
+  "Atlantic/St_Helena": "Africa/Abidjan",
+  "Europe/Amsterdam": "Europe/Brussels",
+  "Europe/Bratislava": "Europe/Prague",
+  "Europe/Busingen": "Europe/Zurich",
+  "Europe/Copenhagen": "Europe/Berlin",
+  "Europe/Guernsey": "Europe/London",
+  "Europe/Isle_of_Man": "Europe/London",
+  "Europe/Jersey": "Europe/London",
+  "Europe/Kiev": "Europe/Kyiv",
+  "Europe/Ljubljana": "Europe/Belgrade",
+  "Europe/Luxembourg": "Europe/Brussels",
+  "Europe/Mariehamn": "Europe/Helsinki",
+  "Europe/Monaco": "Europe/Paris",
+  "Europe/Oslo": "Europe/Berlin",
+  "Europe/Podgorica": "Europe/Belgrade",
+  "Europe/San_Marino": "Europe/Rome",
+  "Europe/Sarajevo": "Europe/Belgrade",
+  "Europe/Skopje": "Europe/Belgrade",
+  "Europe/Stockholm": "Europe/Berlin",
+  "Europe/Vaduz": "Europe/Zurich",
+  "Europe/Vatican": "Europe/Rome",
+  "Europe/Zagreb": "Europe/Belgrade",
+  "Indian/Antananarivo": "Africa/Nairobi",
+  "Indian/Christmas": "Asia/Bangkok",
+  "Indian/Cocos": "Asia/Yangon",
+  "Indian/Comoro": "Africa/Nairobi",
+  "Indian/Kerguelen": "Indian/Maldives",
+  "Indian/Mahe": "Asia/Dubai",
+  "Indian/Mayotte": "Africa/Nairobi",
+  "Indian/Reunion": "Asia/Dubai",
+  "Pacific/Enderbury": "Pacific/Kanton",
+  "Pacific/Funafuti": "Pacific/Tarawa",
+  "Pacific/Majuro": "Pacific/Tarawa",
+  "Pacific/Midway": "Pacific/Pago_Pago",
+  "Pacific/Ponape": "Pacific/Guadalcanal",
+  "Pacific/Saipan": "Pacific/Guam",
+  "Pacific/Truk": "Pacific/Port_Moresby",
+  "Pacific/Wake": "Pacific/Tarawa",
+  "Pacific/Wallis": "Pacific/Tarawa",
+};
+
+/**
  * `Intl.Locale#getTimeZones` is ECMA-402's IANA country→zone table — the data
  * `TZInfo::Country#zone_identifiers` reads — and is shipped by every runtime
  * trails targets, but TypeScript's `lib.es5`/`lib.esnext.intl` do not declare
@@ -967,7 +1107,9 @@ export class TimeZone {
    * `TZInfo::Country.get(code).zone_identifiers` is
    * `Intl.Locale#getTimeZones` here — the same IANA country table, read off the
    * runtime's own tzdata rather than off a literal list, so a tzdata update
-   * moves the answer as it moves Rails'. `TZInfo::Country.get` RAISES
+   * moves the answer as it moves Rails'. It reports link names where TZInfo
+   * reports the canonical zone, so each identifier goes through
+   * {@link CANONICAL_ZONE_IDENTIFIERS} first. `TZInfo::Country.get` RAISES
    * `TZInfo::InvalidCountryCode` on a code it does not know and
    * `load_country_zones` does not rescue it, so an unknown code raises here
    * too; the class is `Error` rather than TZInfo's, for the same reason as
@@ -989,6 +1131,7 @@ export class TimeZone {
       throw new Error(`Invalid country code: ${code}`);
     }
     return country
+      .map((tzId) => CANONICAL_ZONE_IDENTIFIERS[tzId] ?? tzId)
       .flatMap((tzId) => {
         if (Object.values(MAPPING).includes(tzId)) {
           const memo: TimeZone[] = [];

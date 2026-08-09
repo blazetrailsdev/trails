@@ -14,7 +14,7 @@ import type { Migration } from "./migration.js";
 
 export { Deprecation as Deprecator };
 
-const _deprecator = new Deprecation({ gemName: "activerecord" });
+const _deprecator = new Deprecation();
 
 export function deprecator(): Deprecation {
   return _deprecator;

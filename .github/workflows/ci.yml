@@ -407,6 +407,14 @@ jobs:
           scripts/ci/check-control-bytes.sh --self-test
           scripts/ci/check-control-bytes.sh
 
+      # RFC 0087 Verification: the synchronous association-writer machinery the
+      # campaign deleted stays deleted.
+      - name: Sync association writers
+        if: ${{ !cancelled() }}
+        run: |
+          scripts/ci/check-sync-association-writers.sh --self-test
+          scripts/ci/check-sync-association-writers.sh
+
       # RFC 0011 Phase 4 guardrail. AR work tracking moved to the tasks repo;
       # `docs/activerecord/` is frozen so the two-source-of-truth split can't
       # self-heal. Fail any PR that adds or modifies a file under that path,
