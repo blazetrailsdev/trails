@@ -1446,6 +1446,55 @@ describe("DateTime", () => {
     expect(new RubyDate(2008, 3, 1).strftime("%12L")).toBe("000000000000");
   });
 
+  it("builds from a jd, an ordinal, a civil or a commercial date with a time of day and a start", () => {
+    // ruby 3.3.11 — DateTime has singleton methods of its own for all four
+    // (date_core.c:9971-9975), unlike Date's, which take a time of day, an
+    // offset and a trailing start:
+    //   DateTime.jd(2451944).to_s                    #=> "2001-02-03T00:00:00+00:00"
+    //   DateTime.jd(2451944, 4, 5, 6, "+7").to_s     #=> "2001-02-03T04:05:06+07:00"
+    //   DateTime.jd(2299160, 0, 0, 0, 0, Date::GREGORIAN).to_s
+    //                                                #=> "1582-10-14T00:00:00+00:00"
+    //   DateTime.jd(2299160).to_s                    #=> "1582-10-04T00:00:00+00:00"
+    //   DateTime.ordinal(2001, 34, 4, 5, 6, "+7").to_s #=> "2001-02-03T04:05:06+07:00"
+    //   DateTime.ordinal(1582, 355, 1, 2, 3, 0, Date::GREGORIAN).to_s
+    //                                                #=> "1582-12-21T01:02:03+00:00"
+    //   DateTime.civil(2001, 2, 3, 4, 5, 6, "+7").to_s #=> "2001-02-03T04:05:06+07:00"
+    //   DateTime.commercial(2001, 5, 6, 4, 5, 6, "+7").to_s
+    //                                                #=> "2001-02-03T04:05:06+07:00"
+    //   DateTime.commercial(1582, 41, 4, 0, 0, 0, 0, Date::GREGORIAN).to_s
+    //                                                #=> "1582-10-14T00:00:00+00:00"
+    //   DateTime.commercial(1582, 41, 4).to_s        #=> "1582-10-21T00:00:00+00:00"
+    //   DateTime.jd(2451944, 24).to_s                #=> "2001-02-04T00:00:00+00:00"
+    //   DateTime.jd(2451944, 0, 0, 0.5).sec_fraction #=> (1/2)
+    const iso = (v: Temporal.PlainDateTime | Temporal.ZonedDateTime) =>
+      v instanceof Temporal.ZonedDateTime ? v.toString({ timeZoneName: "never" }) : v.toString();
+
+    expect(iso(RubyDateTime.jd(2451944))).toBe("2001-02-03T00:00:00");
+    expect(iso(RubyDateTime.jd(2451944, 4, 5, 6, "+7"))).toBe("2001-02-03T04:05:06+07:00");
+    expect(iso(RubyDateTime.jd(2299160, 0, 0, 0, 0, RubyDate.GREGORIAN))).toBe(
+      "1582-10-14T00:00:00",
+    );
+    expect(iso(RubyDateTime.jd(2299160))).toBe("1582-10-04T00:00:00");
+    expect(iso(RubyDateTime.ordinal(2001, 34, 4, 5, 6, "+7"))).toBe("2001-02-03T04:05:06+07:00");
+    expect(iso(RubyDateTime.ordinal(1582, 355, 1, 2, 3, 0, RubyDate.GREGORIAN))).toBe(
+      "1582-12-21T01:02:03",
+    );
+    expect(iso(RubyDateTime.civil(2001, 2, 3, 4, 5, 6, "+7"))).toBe("2001-02-03T04:05:06+07:00");
+    expect(iso(RubyDateTime.commercial(2001, 5, 6, 4, 5, 6, "+7"))).toBe(
+      "2001-02-03T04:05:06+07:00",
+    );
+    expect(iso(RubyDateTime.commercial(1582, 41, 4, 0, 0, 0, 0, RubyDate.GREGORIAN))).toBe(
+      "1582-10-14T00:00:00",
+    );
+    expect(iso(RubyDateTime.commercial(1582, 41, 4))).toBe("1582-10-21T00:00:00");
+
+    // canon24oc and add_frac, the tail all four share with DateTime.new.
+    expect(iso(RubyDateTime.jd(2451944, 24))).toBe("2001-02-04T00:00:00");
+    const half = RubyDateTime.jd(2451944, 0, 0, 0.5);
+    expect(half).toBeInstanceOf(Temporal.PlainDateTime);
+    expect((half as Temporal.PlainDateTime).millisecond).toBe(500);
+  });
+
   it("takes a start argument after the offset, and keeps the time of day across new_start", () => {
     // ruby 3.3.11:
     //   dt = DateTime.new(1582, 10, 10, 6, 30, 0, "+02:00", Date::GREGORIAN)

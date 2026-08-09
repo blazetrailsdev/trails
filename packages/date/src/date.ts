@@ -3067,6 +3067,35 @@ function timeToDf(h: number, min: number, s: number): number {
 }
 
 /**
+ * @internal `date_core.c`'s `add_frac` macro (`date_core.c:3313-3317`), which
+ * every `DateTime` builder ends with: `d_lite_plus(ret, fr2)` when `fr2` is
+ * nonzero. `fr2` is carried in seconds here (see {@link num2intWithFrac}), so
+ * this is `d_lite_plus`'s `T_FLOAT` arm (`date_core.c:6064-6135`) inlined — the
+ * whole seconds go to `df`, carrying a day where they overflow one, and the
+ * remainder to `sf` in nanoseconds. The `T_RATIONAL` arm
+ * (`date_core.c:6174-6201`) is the `Rational` branch: its
+ * `sf = f_mul(t, INT2FIX(SECOND_IN_NANOSECONDS))` has no round in it, which is
+ * what keeps a fraction exact at any denominator. `fr2` is under a day by
+ * construction, so the C's `jd` term is `0` and its sign branch is never taken.
+ */
+function addFrac(
+  jd: number,
+  df: number,
+  fr2: number | Rational,
+): [jd: number, df: number, sf: Rational] {
+  df += fr2 instanceof Rational ? fr2.div(1) : Math.floor(fr2);
+  if (df >= DAY_IN_SECONDS) {
+    jd += 1;
+    df -= DAY_IN_SECONDS;
+  }
+  const sf =
+    fr2 instanceof Rational
+      ? (secToNs(fr2.mod(1)) as Rational)
+      : new Rational(Math.round(secToNs(fr2 - Math.floor(fr2)) as number), 1);
+  return [jd, df, sf];
+}
+
+/**
  * @internal `date_core.c` `df_to_time` (`date_core.c:950-957`); the `h`/`min`/`s`
  * out-parameters come back as the tuple.
  */
@@ -4337,8 +4366,10 @@ export class Date {
  * module-level functions (the trails mixin idiom) sidesteps the check: TS
  * compares the two static sides whatever shape the member takes.
  *
- * So `DateTime` extends `Date` under an alias whose STATIC side omits the two
- * members it re-declares, which is the only shape that removes the comparison
+ * So `DateTime` extends `Date` under an alias whose STATIC side omits the
+ * members it re-declares — `parse` and `strptime`, and the four builders
+ * `Init_date_core` gives `DateTime` singleton methods of its own
+ * (`date_core.c:9971-9975`) — which is the only shape that removes the comparison
  * without weakening either declaration. This is a type-level alias only — the
  * value is `Date` itself, so the runtime prototype chain, `instanceof`, and
  * every inherited static are unchanged, and the instance side is `Date` intact.
@@ -4352,7 +4383,7 @@ const DateWithoutParseStatics: (new (
   start?: number,
 ) => Date) &
   (new (seat: typeof SEAT, rjd: number, sg: number) => Date) &
-  Omit<typeof Date, "parse" | "strptime"> = Date;
+  Omit<typeof Date, "parse" | "strptime" | "jd" | "ordinal" | "civil" | "commercial"> = Date;
 
 /**
  * @noRailsEquivalent PERMANENT — the `ruby/date` gem's `::DateTime`, a `::Date`
@@ -4529,20 +4560,123 @@ export class DateTime extends DateWithoutParseStatics {
       fr2 = fr2 instanceof Rational ? fr2.add(DAY_IN_SECONDS) : fr2 + DAY_IN_SECONDS;
     }
     const localDf = timeToDf(rh, rmin, rs);
-    let jd = jdLocalToUtc(rjd, localDf, rof);
-    let df = dfLocalToUtc(localDf, rof);
-    df += fr2 instanceof Rational ? fr2.div(1) : Math.floor(fr2);
-    if (df >= DAY_IN_SECONDS) {
-      jd += 1;
-      df -= DAY_IN_SECONDS;
-    }
+    const [jd, df, sf] = addFrac(jdLocalToUtc(rjd, localDf, rof), dfLocalToUtc(localDf, rof), fr2);
     this.#jd = jd;
     this.#df = df;
-    this.#sf =
-      fr2 instanceof Rational
-        ? (secToNs(fr2.mod(1)) as Rational)
-        : new Rational(Math.round(secToNs(fr2 - Math.floor(fr2)) as number), 1);
+    this.#sf = sf;
     this.#of = rof;
+  }
+
+  /**
+   * Ruby `DateTime.jd(jd = 0, hour = 0, minute = 0, second = 0, offset = 0,
+   * start = Date::ITALY)` (ruby/date, `date_core.c` `datetime_s_jd`,
+   * `date_core.c:7654-7711`), a singleton method of its own rather than
+   * `Date.jd` inherited (`date_core.c:9971`): it takes a time of day and an
+   * offset, and answers a `DateTime`.
+   *
+   * The C's `switch (argc)` fall-through splits the second, minute and hour
+   * through {@link num2intWithFrac} under the `n` bounds `positive_inf`, `3`
+   * and `2` — only the LAST argument supplied may carry a fraction — and
+   * `canon24oc` (`date_core.c:3306-3312`) is the `rh === 24` fold that turns
+   * the day-ending `24:00:00` `c_valid_time_p` admits into midnight of the next
+   * day.
+   */
+  static jd(
+    jd = 0,
+    hour: number | Rational = 0,
+    minute: number | Rational = 0,
+    second: number | Rational = 0,
+    offset: number | Rational | string = 0,
+    start = DEFAULT_SG,
+  ): Temporal.PlainDateTime | Temporal.ZonedDateTime {
+    const sg = val2sg(start);
+    const rof = val2off(offset);
+    const [s, sFr] = num2intWithFrac(second, 1, false);
+    const [min, minFr] = num2intWithFrac(minute, MINUTE_IN_SECONDS, second !== 0);
+    const [h, hFr] = num2intWithFrac(hour, HOUR_IN_SECONDS, minute !== 0 || second !== 0);
+    let fr2: number | Rational = 0;
+    if (sFr !== 0) fr2 = sFr;
+    if (minFr !== 0) fr2 = minFr;
+    if (hFr !== 0) fr2 = hFr;
+
+    const rt = cValidTimeP(h, min, s);
+    if (rt === null) throw new DateError("invalid date");
+    let [rh] = rt;
+    const [, rmin, rs] = rt;
+    if (rh === 24) {
+      rh = 0;
+      fr2 = fr2 instanceof Rational ? fr2.add(DAY_IN_SECONDS) : fr2 + DAY_IN_SECONDS;
+    }
+    const localDf = timeToDf(rh, rmin, rs);
+    const [rjd2, df, sf] = addFrac(jdLocalToUtc(jd, localDf, rof), dfLocalToUtc(localDf, rof), fr2);
+    return new DateTime(SEAT, rjd2, df, sf, rof, sg).toDatetime();
+  }
+
+  /**
+   * Ruby `DateTime.ordinal(year = -4712, yday = 1, hour = 0, minute = 0,
+   * second = 0, offset = 0, start = Date::ITALY)` (ruby/date, `date_core.c`
+   * `datetime_s_ordinal`, `date_core.c:7726-7791`, `:9972`), which raises
+   * `Date::Error` on a date `c_valid_ordinal_p` rejects and then reads the time
+   * of day exactly as {@link DateTime.jd} does — one `n` bound higher, since
+   * `yday` precedes them.
+   */
+  static ordinal(
+    year = -4712,
+    yday = 1,
+    hour: number | Rational = 0,
+    minute: number | Rational = 0,
+    second: number | Rational = 0,
+    offset: number | Rational | string = 0,
+    start = DEFAULT_SG,
+  ): Temporal.PlainDateTime | Temporal.ZonedDateTime {
+    const sg = val2sg(start);
+    const rjd = cValidOrdinalP(year, yday, sg);
+    if (rjd === null) throw new DateError("invalid date");
+    return DateTime.jd(rjd, hour, minute, second, offset, sg);
+  }
+
+  /**
+   * Ruby `DateTime.civil(year = -4712, month = 1, mday = 1, hour = 0,
+   * minute = 0, second = 0, offset = 0, start = Date::ITALY)` (ruby/date,
+   * `date_core.c` `datetime_s_civil`, `date_core.c:7796-7800`, `:9973`), which
+   * is `datetime_initialize` itself — the same C function `DateTime.new` is
+   * defined over (`:9974`) — so it is the constructor here too, answering the
+   * `Temporal` seat as `Date.civil` does.
+   */
+  static civil(
+    year = -4712,
+    month = 1,
+    mday: number | Rational = 1,
+    hour?: number | Rational,
+    minute?: number | Rational,
+    second?: number | Rational,
+    offset?: number | Rational | string,
+    start = DEFAULT_SG,
+  ): Temporal.PlainDateTime | Temporal.ZonedDateTime {
+    return new DateTime(year, month, mday, hour, minute, second, offset, start).toDatetime();
+  }
+
+  /**
+   * Ruby `DateTime.commercial(cwyear = -4712, cweek = 1, cwday = 1, hour = 0,
+   * minute = 0, second = 0, offset = 0, start = Date::ITALY)` (ruby/date,
+   * `date_core.c` `datetime_s_commercial`, `date_core.c:7912-7980`, `:9975`),
+   * the week-date counterpart, which raises `Date::Error` on a date
+   * `c_valid_commercial_p` rejects.
+   */
+  static commercial(
+    cwyear = -4712,
+    cweek = 1,
+    cwday = 1,
+    hour: number | Rational = 0,
+    minute: number | Rational = 0,
+    second: number | Rational = 0,
+    offset: number | Rational | string = 0,
+    start = DEFAULT_SG,
+  ): Temporal.PlainDateTime | Temporal.ZonedDateTime {
+    const sg = val2sg(start);
+    const rjd = cValidCommercialP(cwyear, cweek, cwday, sg);
+    if (rjd === null) throw new DateError("invalid date");
+    return DateTime.jd(rjd, hour, minute, second, offset, sg);
   }
 
   /**
