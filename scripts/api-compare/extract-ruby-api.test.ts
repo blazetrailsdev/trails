@@ -1388,3 +1388,214 @@ describe("Ruby extractor metaprogrammed method surface", () => {
     expect(m["Unresolvable.self"] ?? []).toEqual([]);
   });
 });
+
+describe("Ruby extractor call-argument capture", () => {
+  const RUBY_SCRIPT = path.join(HERE, "extract-ruby-api.rb");
+
+  interface CallSite {
+    name: string;
+    args: string[];
+    flags: string[];
+  }
+
+  // Returns a map of "<fqn>#<method>" -> the ordered callArgs stream.
+  function rubyCallArgs(fixtures: Record<string, string>): Record<string, CallSite[] | undefined> {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "call-args-rb-"));
+    try {
+      for (const [rel, src] of Object.entries(fixtures)) {
+        const p = path.join(dir, rel);
+        fs.mkdirSync(path.dirname(p), { recursive: true });
+        fs.writeFileSync(p, src);
+      }
+      const rels = JSON.stringify(Object.keys(fixtures));
+      const driver = `
+        require_relative ${JSON.stringify(RUBY_SCRIPT)}
+        require "json"
+        ex = ApiExtractor.new
+        JSON.parse(${JSON.stringify(rels)}).each do |rel|
+          ex.process_file(File.join(${JSON.stringify(dir)}, rel), ${JSON.stringify(dir)})
+        end
+        out = {}
+        ex.classes.each do |fqn, info|
+          (info[:instanceMethods] + info[:classMethods]).each do |m|
+            out["#{fqn}##{m[:name]}"] = m[:callArgs]
+          end
+        end
+        puts JSON.generate(out)
+      `;
+      const stdout = execFileSync("ruby", ["-e", driver], { encoding: "utf-8" });
+      return JSON.parse(stdout);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  }
+
+  // The arguments of the one site named `name`, or undefined if there is none.
+  function argsOf(sites: CallSite[] | undefined, name: string): string[] | undefined {
+    return sites?.find((s) => s.name === name)?.args;
+  }
+
+  it("emits a descriptor for every extractable argument form", () => {
+    const c = rubyCallArgs({
+      "foo.rb": `
+        class Foo
+          def m(param)
+            visit(param, @collector, count, 1, 2.5, "sql", true, false, nil, :dump, Nodes::Grouping)
+          end
+        end
+      `,
+    });
+    expect(argsOf(c["Foo#m"], "visit")).toEqual([
+      "id:param",
+      "id:@collector",
+      "id:count",
+      "num:1",
+      "num:2.5",
+      "str:sql",
+      "bool:true",
+      "bool:false",
+      "nil",
+      "sym:dump",
+      "const:Grouping",
+    ]);
+  });
+
+  it("emits opaque descriptors the comparator has to skip", () => {
+    const c = rubyCallArgs({
+      "foo.rb": `
+        class Foo
+          def m(a, b)
+            visit([1], { k: 1 }, "id #{a}", a + b, -a, a ? b : nil)
+          end
+        end
+      `,
+    });
+    expect(argsOf(c["Foo#m"], "visit")).toEqual([
+      "array",
+      "hash",
+      "str-interp",
+      "binop:+",
+      "unaryid:a",
+      "ternary",
+    ]);
+  });
+
+  it("records keyword arguments as keys plus value descriptors", () => {
+    const c = rubyCallArgs({
+      "foo.rb": `
+        class Foo
+          def m(object)
+            assert_valid_value(object, action: :dump)
+            build(scope: relation, on: "posts", limit: 1)
+          end
+        end
+      `,
+    });
+    expect(argsOf(c["Foo#m"], "assert_valid_value")).toEqual([
+      "id:object",
+      "kwargs{action=sym:dump}",
+    ]);
+    expect(argsOf(c["Foo#m"], "build")).toEqual([
+      "kwargs{scope=id:relation,on=str:posts,limit=num:1}",
+    ]);
+  });
+
+  it("records a nested call by name and Foo.new as a constructor", () => {
+    const c = rubyCallArgs({
+      "foo.rb": `
+        class Foo
+          def m(o)
+            visit(o.relation, Nodes::Grouping.new(o))
+          end
+        end
+      `,
+    });
+    expect(argsOf(c["Foo#m"], "visit")).toEqual(["call:relation", "call:constructor"]);
+  });
+
+  it("flags splat, double-splat, block-pass and block sites", () => {
+    const c = rubyCallArgs({
+      "foo.rb": `
+        class Foo
+          def m(args, opts, xs)
+            build(*args)
+            build(**opts)
+            xs.map(&:to_s)
+            xs.each { |x| save(x) }
+          end
+        end
+      `,
+    });
+    const sites = c["Foo#m"] ?? [];
+    expect(sites.find((s) => s.name === "build")).toEqual({
+      name: "build",
+      args: ["*splat"],
+      flags: ["splat"],
+    });
+    expect(sites.filter((s) => s.name === "build")[1]).toEqual({
+      name: "build",
+      args: ["kwargs{**splat}"],
+      flags: ["splat"],
+    });
+    expect(sites.find((s) => s.name === "map")?.flags).toEqual(["blockpass"]);
+    expect(sites.find((s) => s.name === "each")?.flags).toEqual(["block"]);
+    expect(argsOf(sites, "save")).toEqual(["id:x"]);
+  });
+
+  it("records bare super as a zsuper site and super(args) with its arguments", () => {
+    const c = rubyCallArgs({
+      "foo.rb": `
+        class Foo
+          def m(a)
+            super(a)
+          end
+
+          def n
+            super
+          end
+        end
+      `,
+    });
+    expect(argsOf(c["Foo#m"], "super")).toEqual(["id:a"]);
+    expect(c["Foo#n"]).toEqual([{ name: "super", args: [], flags: ["zsuper"] }]);
+  });
+
+  it("records each syntactic call site exactly once, receiver first", () => {
+    const c = rubyCallArgs({
+      "foo.rb": `
+        class Foo
+          def m
+            foo(bar(1))
+          end
+
+          def n(x)
+            o.visit x, collector
+          end
+        end
+      `,
+    });
+    expect(c["Foo#m"]).toEqual([
+      { name: "foo", args: ["call:bar"], flags: [] },
+      { name: "bar", args: ["num:1"], flags: [] },
+    ]);
+    expect((c["Foo#n"] ?? []).map((s) => s.name)).toEqual(["o", "visit", "collector"]);
+    expect(argsOf(c["Foo#n"], "visit")).toEqual(["id:x", "id:collector"]);
+  });
+
+  it("keeps a zero-argument call site in the stream", () => {
+    const c = rubyCallArgs({
+      "foo.rb": `
+        class Foo
+          def m
+            reset
+            reset
+          end
+        end
+      `,
+    });
+    expect(c["Foo#m"]).toEqual([
+      { name: "reset", args: [], flags: [] },
+      { name: "reset", args: [], flags: [] },
+    ]);
+  });
+});

@@ -662,6 +662,8 @@ class ApiExtractor
     method_info[:depRefs] = dep_info[:depRefs] unless dep_info[:depRefs].empty?
     method_info[:calls] = calls unless calls.empty?
     method_info[:weakCalls] = weak_calls unless weak_calls.empty?
+    call_args = collect_call_args(body)
+    method_info[:callArgs] = call_args unless call_args.empty?
     skeleton = collect_method_skeleton(body)
     method_info[:skeleton] = skeleton unless skeleton.empty?
     opt_keys = collect_option_keys(body, params, fqn)
@@ -718,6 +720,8 @@ class ApiExtractor
     method_info[:depRefs] = dep_info[:depRefs] unless dep_info[:depRefs].empty?
     method_info[:calls] = calls unless calls.empty?
     method_info[:weakCalls] = weak_calls unless weak_calls.empty?
+    call_args = collect_call_args(body)
+    method_info[:callArgs] = call_args unless call_args.empty?
     skeleton = collect_method_skeleton(body)
     method_info[:skeleton] = skeleton unless skeleton.empty?
     opt_keys = collect_option_keys(body, params, fqn)
@@ -2047,6 +2051,16 @@ class ApiExtractor
     [calls.uniq, weak_calls]
   end
 
+  # Every syntactic call site in the body, in source order, with its argument
+  # descriptors (RFC 0025 §1). Kept beside collect_method_calls rather than
+  # folded into it: `calls` is a de-duplicated NAME set, so it drops both the
+  # repeats and the zero-argument sites the argument comparator has to see.
+  def collect_call_args(body_node)
+    sites = []
+    walk_for_call_args(body_node, sites)
+    sites
+  end
+
   SKELETON_IF_NODES = %i[if elsif unless if_mod unless_mod ifop case].freeze
   SKELETON_LOOP_NODES = %i[while until while_mod until_mod for].freeze
   SKELETON_LOGICAL_OPS = [:"||", :"&&", :and, :or].freeze
@@ -2318,6 +2332,174 @@ class ApiExtractor
     end
 
     node.each { |child| walk_for_calls(child, calls, weak) if child.is_a?(Array) }
+  end
+
+  # The argument half of walk_for_calls (RFC 0025 §1). Every syntactic call
+  # site is recorded exactly ONCE: record_call_site is terminal — it walks the
+  # receiver, emits the site, then walks the arguments — so a `:method_add_arg`
+  # wrapping an `:fcall` never re-enters the inner node the naive traversal
+  # would record a second time.
+  def walk_for_call_args(node, sites)
+    return unless node.is_a?(Array)
+
+    case node[0]
+    when :method_add_arg, :method_add_block, :command, :command_call, :call, :fcall, :vcall, :super
+      record_call_site(node, sites, [])
+    when :zsuper
+      sites << { name: "super", args: [], flags: ["zsuper"] }
+    else
+      node.each { |child| walk_for_call_args(child, sites) if child.is_a?(Array) }
+    end
+  end
+
+  # Ripper hangs the argument node off a different slot per call shape: `node[2]`
+  # for `:command` and `:method_add_arg`, `node[4]` for `:command_call`,
+  # `node[1]` for `:super`, and nothing at all for a paren-less `:call`.
+  def record_call_site(node, sites, flags)
+    case node[0]
+    when :method_add_block
+      # `each { … }` — the block flags the call it wraps, and its body is walked
+      # after the site so the stream stays in source order.
+      record_call_site(node[1], sites, flags + ["block"])
+      node.drop(2).each { |child| walk_for_call_args(child, sites) if child.is_a?(Array) }
+      return
+    when :method_add_arg then callee, args = node[1], node[2]
+    when :command then callee, args = node, node[2]
+    when :command_call then callee, args = node, node[4]
+    when :super then callee, args = node, node[1]
+    else callee, args = node, nil
+    end
+
+    walk_for_call_args(callee[1], sites) if callee[0] == :call || callee[0] == :command_call
+
+    name = call_site_name(callee)
+    if name
+      site_flags = flags.dup
+      sites << { name: name, args: describe_args(args, site_flags), flags: site_flags }
+    end
+
+    walk_for_call_args(args, sites)
+  end
+
+  # The same name filter walk_for_calls applies, so the two streams pair up.
+  def call_site_name(callee)
+    return "super" if callee[0] == :super
+
+    name =
+      if callee[0] == :call || callee[0] == :command_call
+        callee[3].is_a?(Array) ? ident_name(callee[3]) : nil
+      else
+        ident_name(callee[1])
+      end
+    return nil unless name && !name.start_with?("_") && name =~ /\A[a-z]/
+    name
+  end
+
+  def describe_args(node, flags)
+    return [] unless node.is_a?(Array)
+    return [] if node.empty?
+
+    case node[0]
+    when :arg_paren then describe_args(node[1], flags)
+    when :args_add_block
+      flag_once(flags, "blockpass") if node[2].is_a?(Array)
+      describe_args(node[1], flags)
+    when :args_add_star
+      flag_once(flags, "splat")
+      describe_args(node[1], flags) + ["*splat"] +
+        node.drop(3).map { |child| describe_arg(child, flags) }
+    else
+      # A plain argument list is a bare Array of argument nodes.
+      return node.map { |child| describe_arg(child, flags) } if node[0].is_a?(Array)
+      [describe_arg(node, flags)]
+    end
+  end
+
+  # `unary<desc>`, `binop:<op>`, `ternary`, `array`, `hash`, `str-interp` and
+  # `?` are the OPAQUE descriptors of RFC 0025 §1 — emitted as-is so the
+  # comparator can recognise and skip the site rather than guess at it.
+  def describe_arg(node, flags)
+    return "?" unless node.is_a?(Array)
+
+    case node[0]
+    when :@int, :@float, :@rational, :@imaginary then "num:#{node[1]}"
+    when :@label then "sym:#{node[1].chomp(":")}"
+    when :@kw
+      case node[1]
+      when "true", "false" then "bool:#{node[1]}"
+      when "nil" then "nil"
+      else "id:#{node[1]}"
+      end
+    when :@ident, :@ivar, :@gvar, :@cvar then "id:#{node[1]}"
+    when :@const then "const:#{node[1]}"
+    when :var_ref, :var_field, :top_const_ref then describe_arg(node[1], flags)
+    when :const_path_ref then describe_arg(node[2], flags)
+    when :string_literal then describe_string(node[1])
+    when :symbol_literal then "sym:#{ident_name(node[1]) || "?"}"
+    when :dyna_symbol
+      literal = describe_string(node[1])
+      literal.start_with?("str:") ? "sym:#{literal.delete_prefix("str:")}" : "?"
+    when :vcall, :fcall then "id:#{ident_name(node[1]) || "?"}"
+    when :call, :command, :command_call, :method_add_arg, :method_add_block
+      name = nested_call_name(node)
+      name ? "call:#{name}" : "?"
+    when :array then "array"
+    when :hash then "hash"
+    when :bare_assoc_hash then describe_kwargs(node[1], flags)
+    when :binary then "binop:#{node[2]}"
+    when :unary then "unary#{describe_arg(node[2], flags)}"
+    when :ifop then "ternary"
+    when :paren then describe_args(node[1], flags).first || "?"
+    else "?"
+    end
+  end
+
+  # Nested calls are recorded by NAME only (RFC 0025 §1); `Foo.new` reads as
+  # `constructor`, matching what `new Foo()` already credits on the TS side.
+  def nested_call_name(node)
+    case node[0]
+    when :method_add_arg, :method_add_block then nested_call_name(node[1])
+    when :command then ident_name(node[1])
+    when :call, :command_call
+      name = node[3].is_a?(Array) ? ident_name(node[3]) : nil
+      name == "new" ? "constructor" : name
+    when :fcall, :vcall then ident_name(node[1])
+    end
+  end
+
+  # `[:string_content, part…]` for a `:string_literal`, a bare part list for a
+  # `:dyna_symbol`. An interpolated part makes the whole value opaque.
+  def describe_string(node)
+    return "?" unless node.is_a?(Array)
+
+    parts = node[0] == :string_content ? node.drop(1) : node
+    return "?" unless parts.is_a?(Array)
+    return "str:" if parts.empty?
+    return "str-interp" unless parts.all? { |p| p.is_a?(Array) && p[0] == :@tstring_content }
+    "str:#{parts.map { |p| p[1] }.join}"
+  end
+
+  def describe_kwargs(assocs, flags)
+    return "hash" unless assocs.is_a?(Array)
+
+    pairs = assocs.map do |assoc|
+      next "?" unless assoc.is_a?(Array)
+      case assoc[0]
+      when :assoc_new
+        key = assoc[1]
+        label = key.is_a?(Array) && key[0] == :@label ? key[1].chomp(":") : nil
+        label ? "#{label}=#{describe_arg(assoc[2], flags)}" : "?"
+      when :assoc_splat
+        flag_once(flags, "splat")
+        "**splat"
+      else "?"
+      end
+    end
+    "kwargs{#{pairs.join(",")}}"
+  end
+
+  def flag_once(flags, flag)
+    flags << flag unless flags.include?(flag)
   end
 
   def collect_dep_refs(node, constants, identifiers, refs)

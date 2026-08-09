@@ -10,6 +10,21 @@ export interface LiteralValue {
   value?: string | boolean; // int/float token (underscores kept), string/symbol text, or boolean
 }
 
+/**
+ * One syntactic call site in a method body (RFC 0025 §1). `args` holds one
+ * descriptor per argument in order — `id:` / `num:` / `str:` / `bool:` / `nil`
+ * / `sym:` / `const:` / `call:` / `kwargs{k=…}` — plus the OPAQUE spellings
+ * (`?`, `array`, `hash`, `str-interp`, `binop:<op>`, `unary<desc>`, `ternary`,
+ * `*splat`) that mean "no cross-language agreement is possible here, skip the
+ * site". `flags` carries the per-site `splat` / `blockpass` / `block` /
+ * `zsuper` markers, which do the same for the site as a whole.
+ */
+export interface CallSite {
+  name: string;
+  args: string[];
+  flags: string[];
+}
+
 export interface ParamInfo {
   name: string;
   kind: "required" | "optional" | "rest" | "keyword" | "keyword_rest" | "block";
@@ -66,6 +81,15 @@ export interface MethodInfo {
    * extract-ruby-api.rb#walk_for_calls.
    */
   weakCalls?: string[];
+  /**
+   * Both extractors (RFC 0025 `## Call-argument fidelity`): every syntactic
+   * call site in the body, in source order, with its argument descriptors.
+   * `calls` / `callSeq` carry names only, so a port that calls `where` with a
+   * completely different argument list reads as identical to them. Ruby-side
+   * populated by extract-ruby-api.rb#collect_call_args; the TS side lands with
+   * `ts-extractor-emit-call-arguments`. Signal only; nothing gates on it yet.
+   */
+  callArgs?: CallSite[];
   /**
    * TS-side only (RFC 0083): the Ruby call names this declaration's JSDoc tags
    * as deliberately not made, via `@missingRailsCall <call> — <reason>`.
