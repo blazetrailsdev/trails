@@ -548,16 +548,21 @@ export class DatabaseTasks {
     }
   }
 
+  /**
+   * Mirrors: `DatabaseTasks.charset` (`database_tasks.rb:332-335`) — a bare
+   * send to the resolved task instance.
+   *
+   * Ruby gets the raise for free: a task class defining no `charset` answers
+   * NoMethodError. A trails handler is a plain object whose members are all
+   * optional (`registerTask` takes the object, not a class), so the absent
+   * send is raised explicitly; `constructor.name` stands in for Ruby's
+   * `.class.name` and reads `Object` for a handler registered as a literal.
+   */
   static async charset(
     configuration: DatabaseConfig | string | Record<string, unknown>,
   ): Promise<string | null> {
     const config = this.resolveConfiguration(configuration);
     const handler = this.databaseAdapterFor(config);
-    // Ruby sends `charset` to the task instance (`database_tasks.rb:332-335`);
-    // a task class defining none raises NoMethodError. A trails handler is a
-    // plain object of optional members, so the missing send has to be raised
-    // rather than falling out of the language — see `collation` below, whose
-    // NoMethodError `SqliteDBCollationTest#test_db_retrieves_collation` asserts.
     if (!handler.charset) {
       throw new NoMethodError(
         `undefined method 'charset' for an instance of ${handler.constructor.name}`,
@@ -574,13 +579,17 @@ export class DatabaseTasks {
     return this.charset(primary);
   }
 
+  /**
+   * Mirrors: `DatabaseTasks.collation` (`database_tasks.rb:342-345`). Same
+   * shape and same reason as {@link charset} above; `SQLiteDatabaseTasks`
+   * defines no `collation`, so SQLite raises here — which is what
+   * `SqliteDBCollationTest#test_db_retrieves_collation` asserts.
+   */
   static async collation(
     configuration: DatabaseConfig | string | Record<string, unknown>,
   ): Promise<string | null> {
     const config = this.resolveConfiguration(configuration);
     const handler = this.databaseAdapterFor(config);
-    // `database_tasks.rb:342-345` — a bare send, and SQLiteDatabaseTasks
-    // defines no `collation`, so SQLite raises NoMethodError here.
     if (!handler.collation) {
       throw new NoMethodError(
         `undefined method 'collation' for an instance of ${handler.constructor.name}`,

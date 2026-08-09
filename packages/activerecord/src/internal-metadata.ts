@@ -218,15 +218,15 @@ export class InternalMetadata {
    * (`internal_metadata.rb:108-110`) — `@pool.schema_cache.data_source_exists?`.
    * Unlike `SchemaMigration#table_exists?` this reads through the pool's schema
    * cache, not a checked-out connection; Rails has that difference deliberately.
+   *
+   * `NullPool#schema_cache` answers nil (`abstract/connection_pool.rb:38`), so
+   * the send raises NoMethodError on a pool-less collaborator. JS would answer
+   * a TypeError for the same read, so Ruby's error class is raised explicitly.
    * @internal
    */
   async tableExists(): Promise<boolean> {
     const schemaCache: BoundSchemaReflection | null = this._pool.schemaCache;
     if (schemaCache === null) {
-      // Ruby's NullPool#schema_cache answers nil
-      // (`abstract/connection_pool.rb:38`), so the send in
-      // `@pool.schema_cache.data_source_exists?` raises NoMethodError on nil;
-      // JS would answer a TypeError, so raise Ruby's error here.
       throw new NoMethodError("undefined method 'data_source_exists?' for nil");
     }
     return (await schemaCache.dataSourceExists(this.tableName)) ?? false;
