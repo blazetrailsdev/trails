@@ -1,5 +1,10 @@
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
-import { Railtie as BaseRailtie, Deprecation, deprecator } from "@blazetrails/activesupport";
+import {
+  Railtie as BaseRailtie,
+  Deprecation,
+  DEFAULT_BEHAVIORS,
+  deprecator,
+} from "@blazetrails/activesupport";
 import { Digest } from "@blazetrails/activesupport/digest";
 import { Trailtie, type ActiveSupportConfig } from "./active-support.js";
 
@@ -63,8 +68,8 @@ describe("RailtieTest", () => {
       Trailtie.runInitializers();
       for (const d of [deprecator, other]) {
         expect(d.silenced).toBe(true);
-        expect(d.behavior).toBe("silence");
-        expect(d.disallowedBehavior).toBe("silence");
+        expect(d.behavior).toEqual([DEFAULT_BEHAVIORS.get("silence")]);
+        expect(d.disallowedBehavior).toEqual([DEFAULT_BEHAVIORS.get("silence")]);
       }
     } finally {
       deprecator.behavior = savedBehavior;
@@ -87,8 +92,8 @@ describe("RailtieTest", () => {
     try {
       Trailtie.runInitializers();
       for (const d of [deprecator, other]) {
-        expect(d.behavior).toBe("raise");
-        expect(d.disallowedBehavior).toBe("raise");
+        expect(d.behavior).toEqual([DEFAULT_BEHAVIORS.get("raise")]);
+        expect(d.disallowedBehavior).toEqual([DEFAULT_BEHAVIORS.get("raise")]);
         expect(d.disallowedWarnings).toEqual(["bad"]);
       }
     } finally {

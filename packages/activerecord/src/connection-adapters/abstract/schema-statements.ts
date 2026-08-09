@@ -50,6 +50,7 @@ import {
   isPresent,
   presence,
   assertValidKeys,
+  KeyError,
 } from "@blazetrails/activesupport";
 import { SchemaDumper } from "./schema-dumper.js";
 import { rubyInspect } from "../../relation/ruby-inspect.js";
@@ -2326,9 +2327,7 @@ export class SchemaStatements {
    *
    * The inner fetch takes no default either, so an ABSENT `:expression` raises
    * where a stored nil interpolates as the empty string ("users__chk"). Rails
-   * raises Ruby's core `KeyError` there; trails has no ActiveRecord analogue of
-   * it and raises `ArgumentError`, which is the pre-existing spelling of this
-   * raise site.
+   * raises Ruby's core `KeyError` there, with `key not found: :expression`.
    * @internal
    */
   checkConstraintName(
@@ -2337,9 +2336,7 @@ export class SchemaStatements {
   ): string | undefined {
     if ("name" in options) return options.name;
     if (!("expression" in options)) {
-      throw new ArgumentError(
-        `check_constraint_name requires either :name or :expression to be specified`,
-      );
+      throw new KeyError("key not found: :expression");
     }
     const expression = options.expression;
     const identifier = `${tableName}_${expression ?? ""}_chk`;

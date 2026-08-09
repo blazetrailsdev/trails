@@ -3,7 +3,7 @@
  * (activesupport/lib/active_support/deprecation/deprecators.rb:1-60)
  */
 
-import type { Deprecation, DeprecationBehavior } from "../deprecation.js";
+import type { Deprecation, DeprecationBehaviorInput } from "../deprecation.js";
 
 type OptionName = "silenced" | "debug" | "behavior" | "disallowedBehavior" | "disallowedWarnings";
 
@@ -60,7 +60,7 @@ export class Deprecators {
    * Sets the deprecation warning behavior for all deprecators in this
    * collection.
    */
-  setBehavior(behavior: Deprecation["behavior"]): void {
+  setBehavior(behavior: DeprecationBehaviorInput): void {
     this.setOption("behavior", behavior);
   }
 
@@ -68,9 +68,7 @@ export class Deprecators {
    * Sets the disallowed deprecation warning behavior for all deprecators in
    * this collection.
    */
-  setDisallowedBehavior(
-    disallowedBehavior: DeprecationBehavior | ((...args: unknown[]) => void) | null,
-  ): void {
+  setDisallowedBehavior(disallowedBehavior: DeprecationBehaviorInput): void {
     this.setOption("disallowedBehavior", disallowedBehavior);
   }
 

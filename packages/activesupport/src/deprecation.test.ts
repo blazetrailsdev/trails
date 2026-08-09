@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Deprecation, DeprecationError, deprecator } from "./deprecation.js";
+import { Notifications } from "./notifications.js";
 
 describe("DeprecationTest", () => {
   let dep: Deprecation;
@@ -22,14 +23,6 @@ describe("DeprecationTest", () => {
 
   it(":stderr behavior writes to stderr", () => {
     dep.behavior = "stderr";
-    const spy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-    dep.warn("fubar");
-    expect(spy).toHaveBeenCalledWith(expect.stringContaining("fubar"));
-    spy.mockRestore();
-  });
-
-  it(":warn behavior writes to stderr", () => {
-    dep.behavior = "warn";
     const spy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
     dep.warn("fubar");
     expect(spy).toHaveBeenCalledWith(expect.stringContaining("fubar"));
@@ -566,14 +559,6 @@ describe("DeprecationTest", () => {
     spy.mockRestore();
   });
 
-  it(":stderr behavior with #warn", () => {
-    dep.behavior = "warn";
-    const spy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-    dep.warn("fubar");
-    expect(spy).toHaveBeenCalledWith(expect.stringContaining("fubar"));
-    spy.mockRestore();
-  });
-
   it(":log behavior", () => {
     dep.behavior = "log";
     const spy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
@@ -600,9 +585,25 @@ describe("DeprecationTest", () => {
   });
 
   it(":notify behavior", () => {
-    dep.behavior = "notify";
-    // notify is a no-op in our implementation; should not throw
-    expect(() => dep.warn("notify me")).not.toThrow();
+    const deprecator = new Deprecation("horizon", "MyGem::Custom");
+    deprecator.behavior = "notify";
+    const behavior = deprecator.behavior[0];
+
+    const events: Record<string, unknown>[] = [];
+    const sub = Notifications.subscribe("deprecation.my_gem_custom", (event) => {
+      events.push(event.payload as Record<string, unknown>);
+    });
+
+    try {
+      behavior("Some error!", ["call stack!"], deprecator);
+      expect(events.length).toBe(1);
+      expect(events[0].message).toBe("Some error!");
+      expect(events[0].callstack).toEqual(["call stack!"]);
+      expect(events[0].deprecationHorizon).toBe("horizon");
+      expect(events[0].gemName).toBe("MyGem::Custom");
+    } finally {
+      Notifications.unsubscribe(sub);
+    }
   });
 
   it(":report_error behavior", () => {
@@ -612,9 +613,9 @@ describe("DeprecationTest", () => {
   });
 
   it("invalid behavior", () => {
-    // Unknown string behaviors fall through the switch without action
-    dep.behavior = "unknown" as never;
-    expect(() => dep.warn("invalid")).not.toThrow();
+    expect(() => {
+      dep.behavior = "invalid" as never;
+    }).toThrow(":invalid is not a valid deprecation behavior.");
   });
 
   it("DeprecatedInstanceVariableProxy", () => {

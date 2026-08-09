@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { SerializerWithFallback, KeyError } from "./serializer-with-fallback.js";
+import { SerializerWithFallback } from "./serializer-with-fallback.js";
+import { KeyError } from "../core-ext/key-error.js";
 import { Entry } from "./entry.js";
 import { Store } from "./index.js";
 

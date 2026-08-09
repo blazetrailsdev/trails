@@ -11,6 +11,8 @@
  * cross-format dispatch still works.
  */
 
+import { KeyError } from "../core-ext/key-error.js";
+
 import { Entry } from "./entry.js";
 import { DeserializationError } from "./index.js";
 import { Store } from "./store.js";
@@ -30,14 +32,6 @@ function marshalLoad(payload: string): unknown {
     return coder.load(payload);
   } catch (error) {
     throw new DeserializationError(error instanceof Error ? error.message : String(error));
-  }
-}
-
-/** Thrown by `SerializerWithFallback.get` on unknown format. @internal */
-export class KeyError extends Error {
-  constructor(key: string) {
-    super(`key not found: ${JSON.stringify(key)}`);
-    this.name = "KeyError";
   }
 }
 
@@ -196,7 +190,7 @@ export const SerializerWithFallback = {
 
   get(format: string): Serializer & { load(dumped: unknown): unknown } {
     const s = SERIALIZERS[format];
-    if (!s) throw new KeyError(format);
+    if (!s) throw new KeyError(`key not found: ${JSON.stringify(format)}`);
     return { ...s, load: sharedLoad };
   },
 };
