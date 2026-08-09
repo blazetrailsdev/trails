@@ -4192,6 +4192,56 @@ class DateError extends ArgumentError {
  * methods, none of them these). The gem's `test/date/` suite is the fidelity
  * measure instead; see `vendor/sources.ts`'s `date` entry.
  */
+/**
+ * @internal `date_core.c` `simple_dat_p` (`date_core.c:1140`), true for the
+ * `SimpleDateData` a `Date` carries and false for the `ComplexDateData` a
+ * `DateTime` does. The C reads the data's `flags`; TS reads the class.
+ */
+function simpleDatP(dat: Date): boolean {
+  return !(dat instanceof DateTime);
+}
+
+/**
+ * @internal `date_core.c` `cmp_dd` (`date_core.c:6707-6761`), the full
+ * `nth`/`jd`/`df`/`sf` comparison — the arm every `Date`-to-`DateTime`
+ * comparison takes.
+ */
+function cmpDd(self: Date, other: Date): number {
+  const aNth = self.nth;
+  const bNth = other.nth;
+  if (aNth === bNth) {
+    const aJd = self.mJd();
+    const bJd = other.mJd();
+    if (aJd === bJd) {
+      const aDf = self.mDf();
+      const bDf = other.mDf();
+      if (aDf === bDf) {
+        const aSf = self.mSf();
+        const bSf = other.mSf();
+        const a = aSf.numerator * bSf.denominator;
+        const b = bSf.numerator * aSf.denominator;
+        if (a === b) return 0;
+        else if (a < b) return -1;
+        else return 1;
+      } else if (aDf < bDf) return -1;
+      else return 1;
+    } else if (aJd < bJd) return -1;
+    else return 1;
+  } else if (aNth < bNth) return -1;
+  else return 1;
+}
+
+/**
+ * @internal `date_core.c` `equal_gen` (`date_core.c:6845-6855`), the day
+ * comparison `d_lite_equal` falls back to. `m_real_local_jd` is
+ * {@link Date#jd}, and `f_jd(other)` is the same reader on the other side, so
+ * the Numeric and `Date` arms are one comparison over two operand spellings.
+ */
+function equalGen(self: Date, other: Date | number | bigint): boolean {
+  const jd = other instanceof Date ? other.jd : other;
+  return self.jd == jd;
+}
+
 export class Date {
   /**
    * Ruby `Date::Error` (ruby/date, `date_core.c` `Init_date_core`), raised by
@@ -4681,6 +4731,102 @@ export class Date {
   }
 
   /**
+   * @internal `date_core.c` `m_jd` (`date_core.c:1459-1469`), the STORED day —
+   * UTC on a `DateTime`, where {@link Date#mLocalJd} is the offset-corrected
+   * one. The C branches on `simple_dat_p`; TS branches on the receiver, so
+   * {@link DateTime} overrides this and the simple arm is here.
+   */
+  mJd(): number {
+    return this.#getSJd();
+  }
+
+  /**
+   * @internal `date_core.c` `m_df` (`date_core.c:1512-1522`), the day fraction
+   * in seconds. `SimpleDateData` has none, and the C's simple arm answers `0`.
+   */
+  mDf(): number {
+    return 0;
+  }
+
+  /**
+   * @internal `date_core.c` `m_sf` (`date_core.c:1552-1562`), the sub-second
+   * part. The C's simple arm answers `INT2FIX(0)`; storage here is uniformly a
+   * `Rational` ({@link DateTime}'s `#sf`), so this is that zero.
+   */
+  mSf(): Rational {
+    return new Rational(0, 1);
+  }
+
+  /**
+   * Ruby `Date#<=>` (ruby/date, `date_core.c` `d_lite_cmp`,
+   * `date_core.c:6804-6843`).
+   *
+   * The fast path is the one both operands being `SimpleDateData` under the
+   * same calendar reading buys: `nth` then the stored day, and nothing else,
+   * because a `Date` has no time of day. Anything else — a `DateTime` on either
+   * side, or a `Date` and a `DateTime` disagreeing on `m_gregorian_p` — goes to
+   * `cmp_dd` (`date_core.c:6707-6761`), which compares the full
+   * `nth`/`jd`/`df`/`sf` quadruple and is what makes
+   * `Date.new(2002,3,19) == DateTime.new(2002,3,19, 0,0,0)` true while
+   * `DateTime.new(2002,3,19, 0,0,1)` is not.
+   *
+   * `cmp_gen` (`date_core.c:6694-6705`), the `!k_date_p(other)` arm, compares
+   * `m_ajd` against a Numeric. `Date#ajd` is not ported, so `other` is a `Date`
+   * here; the arm is tracked against RFC 0088.
+   */
+  cmp(other: Date): number {
+    if (!(simpleDatP(this) && simpleDatP(other) && this.isGregorian === other.isGregorian))
+      return cmpDd(this, other);
+
+    const aNth = this.nth;
+    const bNth = other.nth;
+    if (aNth === bNth) {
+      const aJd = this.mJd();
+      const bJd = other.mJd();
+      if (aJd === bJd) return 0;
+      else if (aJd < bJd) return -1;
+      else return 1;
+    } else if (aNth < bNth) return -1;
+    else return 1;
+  }
+
+  /**
+   * Ruby `Date#==`, which `Date` gets from `Comparable`
+   * (`date_core.c` `Init_date_core`, `rb_include_module(cDate, rb_mComparable)`)
+   * over {@link Date#cmp}. It is the equality `assert_equal` reads, and it is
+   * NOT {@link Date#caseEquals}: `==` compares the instant, `===` the day.
+   */
+  equals(other: Date): boolean {
+    return this.cmp(other) === 0;
+  }
+
+  /**
+   * Ruby `Date#===` (ruby/date, `date_core.c` `d_lite_equal`,
+   * `date_core.c:6896-6923`), true when the two name the same DAY — the LOCAL
+   * day, `m_local_jd`, not the stored one — which is why
+   * `Date.new(2002,3,19) === DateTime.new(2002,3,19, 12,0,0)` is true where
+   * `==` is false.
+   *
+   * `equal_gen` (`date_core.c:6845-6855`) is the arm taken when the two
+   * disagree on `m_gregorian_p`, and against a `Date` it is
+   * `m_real_local_jd == other.jd` — {@link Date#jd} on both sides. Its
+   * `k_numeric_p` arm is the same comparison against a Numeric, and its
+   * `rb_num_coerce_cmp` fallback answers `nil` for an object that does not
+   * coerce.
+   */
+  caseEquals(other: Date | number | bigint): boolean {
+    if (!(other instanceof Date)) return equalGen(this, other);
+
+    if (!(this.isGregorian === other.isGregorian)) return equalGen(this, other);
+
+    const aNth = this.nth;
+    const bNth = other.nth;
+    const aJd = this.mLocalJd();
+    const bJd = other.mLocalJd();
+    return aNth === bNth && aJd === bJd;
+  }
+
+  /**
    * Ruby `Date#to_date` (ruby/date, `date_core.c` `date_to_date`, `date_core.c:8977-8981`), which
    * answers the receiver's `::Date` value — `self` in MRI, because MRI's
    * `::Date` value *is* the gem object. trails' `::Date` value is
@@ -4887,9 +5033,9 @@ export class DateTime extends DateWithoutParseStatics {
    * emitting `3`s.
    */
   constructor(
-    year: number | bigint,
-    month: number,
-    day: number | Rational,
+    year?: number | bigint,
+    month?: number,
+    day?: number | Rational,
     hour?: number | Rational,
     minute?: number | Rational,
     second?: number | Rational,
@@ -4915,7 +5061,7 @@ export class DateTime extends DateWithoutParseStatics {
     sg: number,
   );
   constructor(
-    year: number | bigint | typeof SEAT,
+    year?: number | bigint | typeof SEAT,
     month?: number | bigint,
     day?: number | Rational,
     hour?: number | Rational,
@@ -4966,6 +5112,10 @@ export class DateTime extends DateWithoutParseStatics {
     const sg = start === undefined ? DEFAULT_SG : val2sg(start);
     let nth: bigint;
     let rjd: number;
+    // `datetime_initialize`'s `y = INT2FIX(-4712); m = 1; d = 1;`
+    // (`date_core.c:7816-7818`), the defaults its `switch (argc)` falls through
+    // past; `month` and `day` take theirs at their own reads above.
+    year ??= -4712;
     if (guessStyle(year, sg) < 0) {
       const r = validGregorianP(year, (month as number) ?? 1, d);
       if (r === null) throw new DateError("invalid date");
@@ -5286,6 +5436,24 @@ export class DateTime extends DateWithoutParseStatics {
    */
   override mLocalJd(): number {
     return jdUtcToLocal(this.#jd, this.#df, this.#of);
+  }
+
+  /**
+   * @internal `date_core.c` `m_jd`'s complex arm (`date_core.c:1459-1469`),
+   * the stored UTC day.
+   */
+  override mJd(): number {
+    return this.#jd;
+  }
+
+  /** @internal `date_core.c` `m_df`'s complex arm (`date_core.c:1512-1522`). */
+  override mDf(): number {
+    return this.#df;
+  }
+
+  /** @internal `date_core.c` `m_sf`'s complex arm (`date_core.c:1552-1562`). */
+  override mSf(): Rational {
+    return this.#sf;
   }
 
   /**
