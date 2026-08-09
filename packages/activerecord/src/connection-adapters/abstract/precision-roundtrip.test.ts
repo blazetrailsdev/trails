@@ -16,7 +16,7 @@ import {
   formatPlainTimeForSqlMysql,
 } from "./sql-datetime.js";
 import { quote as quoteFn, typeCast as typeCastFn } from "./quoting.js";
-import { temporalToBindString } from "./database-statements.js";
+import { quotedTime as sqliteQuotedTime } from "../sqlite3/quoting.js";
 
 // `quote` / `typeCast` require a host receiver (no receiver-less dispatch); bind
 // an empty host so date/time values route through the abstract module helpers.
@@ -115,36 +115,39 @@ describe("formatPlainTimeForSql", () => {
   });
 });
 
-describe("temporalToBindString", () => {
+// The bind path renders date/time values with `type_cast`, which dispatches
+// `quoted_date` / `quoted_time` on the connection (abstract/quoting.rb:103-104).
+// A bare `{}` receiver exercises the abstract formats.
+describe("typeCast of Temporal bind values", () => {
+  const bind = (v: unknown) => typeCast(v);
+
   it("converts Instant to UTC string", () => {
     const v = Temporal.Instant.from("2026-04-26T14:23:55.123456Z");
-    expect(temporalToBindString(v)).toBe("2026-04-26 14:23:55.123456");
+    expect(bind(v)).toBe("2026-04-26 14:23:55.123456");
   });
 
   it("converts PlainDateTime to string", () => {
     const v = Temporal.PlainDateTime.from("2026-04-26T14:23:55.000001");
-    expect(temporalToBindString(v)).toBe("2026-04-26 14:23:55.000001");
+    expect(bind(v)).toBe("2026-04-26 14:23:55.000001");
   });
 
   it("converts PlainDate to string", () => {
-    expect(temporalToBindString(Temporal.PlainDate.from("2026-04-26"))).toBe("2026-04-26");
+    expect(bind(Temporal.PlainDate.from("2026-04-26"))).toBe("2026-04-26");
   });
 
   it("converts PlainTime to string", () => {
-    expect(temporalToBindString(Temporal.PlainTime.from("14:23:55.123456"))).toBe(
-      "14:23:55.123456",
-    );
+    expect(bind(Temporal.PlainTime.from("14:23:55.123456"))).toBe("14:23:55.123456");
   });
 
   it("converts ZonedDateTime to UTC instant string", () => {
     const v = Temporal.ZonedDateTime.from("2026-04-26T16:23:55+02:00[Europe/Paris]");
-    expect(temporalToBindString(v)).toBe("2026-04-26 14:23:55");
+    expect(bind(v)).toBe("2026-04-26 14:23:55");
   });
 
   it("passes non-Temporal values through unchanged", () => {
-    expect(temporalToBindString(42)).toBe(42);
-    expect(temporalToBindString("hello")).toBe("hello");
-    expect(temporalToBindString(null)).toBe(null);
+    expect(bind(42)).toBe(42);
+    expect(bind("hello")).toBe("hello");
+    expect(bind(null)).toBe(null);
   });
 });
 
@@ -192,15 +195,17 @@ describe("SQLite/MySQL fixed-6 microsecond field (quoted_date parity)", () => {
   });
 });
 
-describe("temporalToBindString adapter=sqlite uses 2000-01-01 prefix for PlainTime", () => {
+// The 2000-01-01 prefix is SQLite's `quoted_time` override, reached by
+// receiver — the same dispatch Rails uses (abstract/quoting.rb:103).
+describe("typeCast on a SQLite receiver uses 2000-01-01 prefix for PlainTime", () => {
   it("wraps PlainTime in 2000-01-01 for sqlite", () => {
     const v = Temporal.PlainTime.from("14:23:55.123456");
-    expect(temporalToBindString(v, "sqlite")).toBe("2000-01-01 14:23:55.123456");
+    expect(typeCastFn.call({ quotedTime: sqliteQuotedTime }, v)).toBe("2000-01-01 14:23:55.123456");
   });
 
   it("returns bare time string for postgres", () => {
     const v = Temporal.PlainTime.from("14:23:55.123456");
-    expect(temporalToBindString(v, "postgres")).toBe("14:23:55.123456");
+    expect(typeCast(v)).toBe("14:23:55.123456");
   });
 });
 

@@ -90,13 +90,7 @@ import { isWriteQuerySql } from "./sql-classification.js";
 import {
   quote as sqliteQuote,
   typeCast as sqliteTypeCast,
-  // Note: the standalone `quoteString` exported by sqlite3/quoting.ts
-  // returns a fully-quoted SQL literal (`'foo'`), not the escape-only
-  // form Rails' `quote_string` returns. The instance override below
-  // implements escape-only inline; the standalone is kept under an
-  // alias here for the few legacy call sites in this file that want
-  // the literal form.
-  quoteString as sqliteQuoteStringLiteral,
+  quoteString as sqliteQuoteString,
   quoteTableName,
   quoteColumnName,
   quoteTableNameForAssignment as sqliteQuoteTableNameForAssignment,
@@ -993,11 +987,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3::Quoting overrides.
    */
   override quoteString(s: string): string {
-    // Mirrors: SQLite3::Quoting#quote_string — escape-only (no
-    // surrounding quotes). The standalone sqlite3/quoting.ts
-    // `quoteString` wraps for historical reasons; this override
-    // matches the Rails contract: just `'` → `''`.
-    return s.replace(/'/g, "''");
+    return sqliteQuoteString(s);
   }
 
   // quoteTableName / quoteColumnName ARE kept: Rails' SQLite3::Quoting defines
@@ -1978,12 +1968,12 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     if (schema) {
       sql =
         schema.toLowerCase() === "temp"
-          ? `SELECT sql FROM sqlite_temp_master WHERE type='table' AND name=${sqliteQuoteStringLiteral(bare)}`
-          : `SELECT sql FROM ${quoteColumnName(schema)}.sqlite_master WHERE type='table' AND name=${sqliteQuoteStringLiteral(bare)}`;
+          ? `SELECT sql FROM sqlite_temp_master WHERE type='table' AND name='${sqliteQuoteString(bare)}'`
+          : `SELECT sql FROM ${quoteColumnName(schema)}.sqlite_master WHERE type='table' AND name='${sqliteQuoteString(bare)}'`;
     } else {
-      sql = `SELECT sql FROM sqlite_temp_master WHERE type='table' AND name=${sqliteQuoteStringLiteral(bare)}
+      sql = `SELECT sql FROM sqlite_temp_master WHERE type='table' AND name='${sqliteQuoteString(bare)}'
              UNION ALL
-             SELECT sql FROM sqlite_master WHERE type='table' AND name=${sqliteQuoteStringLiteral(bare)}`;
+             SELECT sql FROM sqlite_master WHERE type='table' AND name='${sqliteQuoteString(bare)}'`;
     }
     await this.ensureConnected();
     const stmt = await this.driver.prepare(sql);
@@ -2016,15 +2006,15 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   private quoteDefault(value: unknown): string {
     if (value === null) return "NULL";
-    if (typeof value === "string") return sqliteQuoteStringLiteral(value);
+    if (typeof value === "string") return `'${sqliteQuoteString(value)}'`;
     if (typeof value === "number") return String(value);
     if (typeof value === "boolean") return value ? "1" : "0";
     if (typeof value === "function") return String(value());
     // boundary: defensive Date branch in SQLite adapter literal quoting.
-    if (value instanceof globalThis.Date) return sqliteQuoteStringLiteral(value.toISOString());
+    if (value instanceof globalThis.Date) return `'${sqliteQuoteString(value.toISOString())}'`;
     // SqlLiteral or objects with toSql
     if (typeof (value as any)?.toSql === "function") return String((value as any).toSql());
-    return sqliteQuoteStringLiteral(String(value));
+    return `'${sqliteQuoteString(String(value))}'`;
   }
 
   // --- Schema introspection (drives SchemaCache.addAll) ---
@@ -2084,12 +2074,12 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       // Schema-qualified name (e.g. "aux.widgets") — query the attached schema's catalog.
       const { sqliteMaster, bare } = this._sqliteMasterFor(name);
       const rows = (await this.schemaQuery(
-        `SELECT 1 AS one FROM ${sqliteMaster} WHERE type='table' AND name=${sqliteQuoteStringLiteral(bare)}`,
+        `SELECT 1 AS one FROM ${sqliteMaster} WHERE type='table' AND name='${sqliteQuoteString(bare)}'`,
       )) as Array<{ one: number }>;
       return rows.length > 0;
     }
     const rows = (await this.schemaQuery(
-      `SELECT name FROM pragma_table_list WHERE schema <> 'temp' AND name NOT IN ('sqlite_sequence', 'sqlite_schema') AND name = ${sqliteQuoteStringLiteral(name)} AND type IN ('table')`,
+      `SELECT name FROM pragma_table_list WHERE schema <> 'temp' AND name NOT IN ('sqlite_sequence', 'sqlite_schema') AND name = '${sqliteQuoteString(name)}' AND type IN ('table')`,
     )) as Array<{ name: string }>;
     return rows.length > 0;
   }
@@ -2368,7 +2358,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   /** @internal */
   private async tableStructureSql(tableName: string, columnNames?: string[]): Promise<string[]> {
-    const querySql = `SELECT sql FROM (SELECT * FROM sqlite_master UNION ALL SELECT * FROM sqlite_temp_master) WHERE type = 'table' AND name = ${sqliteQuoteStringLiteral(tableName)}`;
+    const querySql = `SELECT sql FROM (SELECT * FROM sqlite_master UNION ALL SELECT * FROM sqlite_temp_master) WHERE type = 'table' AND name = '${sqliteQuoteString(tableName)}'`;
     const structStmt = await this.driver.prepare(querySql);
     const row = (await structStmt.get()) as { sql: string } | undefined;
     if (!row?.sql) return [];

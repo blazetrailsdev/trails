@@ -47,10 +47,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("quote string", async () => {
-      // Rails asserts quote_string("'") == "''" (escaped content, no wrapping
-      // quotes). Trails' quoteString wraps — round-trip the same "'" datum.
-      const rows = await adapter.execute("SELECT ? AS val", ["'"]);
-      expect(rows[0].val).toBe("'");
+      expect(adapter.quoteString("'")).toBe("''");
     });
 
     it("quote column name", async () => {

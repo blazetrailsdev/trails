@@ -9,6 +9,7 @@
 import { describe, it, expect } from "vitest";
 import { Base, UnknownPrimaryKey } from "./index.js";
 import { quoteSqlValue } from "./base.js";
+import { quotedDate as pgQuotedDate } from "./connection-adapters/postgresql/quoting.js";
 import { registerSubclass } from "./inheritance.js";
 import { Temporal } from "@blazetrails/date";
 import { Type } from "@blazetrails/activemodel";
@@ -17,6 +18,10 @@ import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/a
 import { reconcileVirtualAttributes, loadSchema } from "./model-schema.js";
 
 describe("quoteSqlValue", () => {
+  // Stands in for a PostgreSQLAdapter receiver: `quote` self-dispatches
+  // `quoted_date` onto it, exactly as the real adapter supplies it.
+  const pgHost = { quotedDate: pgQuotedDate };
+
   it("emits bare decimal for bigint (not quoted string)", () => {
     expect(quoteSqlValue(123n)).toBe("123");
     expect(quoteSqlValue(2n ** 62n)).toBe("4611686018427387904");
@@ -70,14 +75,15 @@ describe("quoteSqlValue", () => {
 
   it("renders the PG BC literal for a proleptic-year Instant (insert_all VALUES)", () => {
     // Regression guard: the PG inline VALUES path must carry the " BC" suffix
-    // and fixed-6 microseconds, matching the adapter's quoted_date.
+    // and fixed-6 microseconds — resolved from the connection's `quoted_date`
+    // (abstract/quoting.rb:85), not a dialect argument.
     const instant = Temporal.Instant.from("-000043-03-15T12:34:56.123456Z");
-    expect(quoteSqlValue(instant, "postgres")).toBe("'0044-03-15 12:34:56.123456 BC'");
+    expect(quoteSqlValue(instant, pgHost)).toBe("'0044-03-15 12:34:56.123456 BC'");
   });
 
   it("caps PG datetime literal fractional seconds at microseconds", () => {
     const instant = Temporal.Instant.from("2026-04-26T14:23:55.123456789Z");
-    expect(quoteSqlValue(instant, "postgres")).toBe("'2026-04-26 14:23:55.123456'");
+    expect(quoteSqlValue(instant, pgHost)).toBe("'2026-04-26 14:23:55.123456'");
   });
 });
 

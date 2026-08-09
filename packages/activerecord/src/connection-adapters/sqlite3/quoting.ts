@@ -26,16 +26,6 @@ import { Temporal } from "@blazetrails/date";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { BinaryData } from "@blazetrails/activemodel";
 
-export interface Quoting {
-  quotedTrue(): string;
-  unquotedTrue(): number;
-  quotedFalse(): string;
-  unquotedFalse(): number;
-  quoteTableName(name: string): string;
-  quoteColumnName(name: string): string;
-  quoteString(value: string): string;
-}
-
 export function quotedTrue(): string {
   return "1";
 }
@@ -65,8 +55,14 @@ export function quoteColumnName(name: string): string {
   return `"${name.replace(/"/g, '""')}"`;
 }
 
+/**
+ * Mirrors: Quoting#quote_string — SQLite3 has no override, so this is the
+ * abstract contract (abstract/quoting.rb:131-133) minus the backslash arm:
+ * SQLite treats a backslash as an ordinary character, so only `'` is doubled.
+ * **Escape-only** — `quote` adds the surrounding quotes (rb:75-76).
+ */
 export function quoteString(value: string): string {
-  return `'${value.replace(/'/g, "''")}'`;
+  return value.replace(/'/g, "''");
 }
 
 /**
@@ -78,22 +74,15 @@ export function quoteString(value: string): string {
  * `quotedTime`. A host receiver is required — every invocation routes through
  * an adapter via `.call(this, value)`.
  *
- * The symbol and string branches stay inline because our abstract `quote`
- * renders those through the module-level, backslash-escaping `quoteString`
- * rather than dispatching through `this`, so delegating would lose SQLite's
- * `''`-only escaping. Booleans and binary DO dispatch through `this` (mirroring
- * Rails' `self.quoted_true` / `self.quoted_binary`), so both ride the inherited
- * abstract branch straight back to SQLite's `quotedTrue` / `quotedBinary`.
+ * Strings, symbols
+ * and booleans have no arm here, exactly as in Rails: they ride the inherited
+ * abstract branches, which self-dispatch `quote_string` / `quoted_true` /
+ * `quoted_false` (rb:75-78) back onto SQLite's overrides.
  */
 export function quote(this: QuotingDispatchHost, value: unknown): string {
-  if (typeof value === "number" && !Number.isFinite(value)) return quoteString(String(value));
-  if (typeof value === "symbol") {
-    if (value.description === undefined) {
-      throw new TypeError("can't quote a Symbol without a description");
-    }
-    return quoteString(value.description);
-  }
-  if (typeof value === "string") return quoteString(value);
+  // rb: `when Numeric then value.finite? ? super : "'#{value}'"` — the
+  // non-finite literal is interpolated raw, not escaped.
+  if (typeof value === "number" && !Number.isFinite(value)) return `'${String(value)}'`;
   // A *bare* `ArrayBuffer` has no Rails counterpart (Rails only ever sees
   // `Type::Binary::Data` here), and nothing in trails produces one — no internal
   // caller reaches this. It is a boundary affordance: `quoteDefaultExpression`
