@@ -484,9 +484,9 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    * live implementation lives in the Rails-layout file
    * `sqlite3/database-statements.ts` (`performQuery`) so api:compare's
    * `perform_query` coverage points at reachable code; it is bound here with
-   * `this` as the adapter, whose `_cachedStatement` / `isWriteQuery` /
-   * `verifiedBang` / `dirtyCurrentTransaction` and `_last*` fields satisfy the
-   * `PerformQueryHost` interface.
+   * `this` as the adapter, whose `_cachedStatement` / `driver` /
+   * `verifiedBang` / `dirtyCurrentTransaction` and `_statementLock` / `_last*`
+   * fields satisfy the `PerformQueryHost` interface.
    *
    * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3::DatabaseStatements#perform_query
    */
@@ -590,8 +590,9 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    * deliberate trails deviation justified once at the `AbstractAdapter`
    * declaration (abstract-adapter.ts, `executeMutation` on the
    * DatabaseStatements signature block) — read it there before changing this.
-   * In particular, this cannot be rerouted through `execute`: better-sqlite3
-   * `.all()` throws on a non-reader statement.
+   * In particular, this cannot be rerouted through `execute`: the two share
+   * one `_performQuery` and differ only in what they answer — rows here, the
+   * affected-row count or insert rowid there.
    */
   async executeMutation(sql: string, binds: unknown[] = [], name: string = "SQL"): Promise<number> {
     // preprocessQuery runs Rails' check_if_write_query, which raises
@@ -809,8 +810,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
             ? this._cachedStatement(processed)
             : this._freshStatement(processed));
           let result: Result;
-          // Same statement lock `performQuery` holds — a write issued here must
-          // not land between another statement and its `sqlite3_changes()` read.
           const release = await acquireStatementLock(this);
           try {
             if (!stmt.reader) {

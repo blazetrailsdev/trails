@@ -157,6 +157,9 @@ export async function internalBeginTransaction(
  * a statement and its `sqlite3_changes()` readback. Every path that runs a
  * statement on the connection takes it, `internal_exec_query`'s included —
  * an unlocked write there would land between another's statement and readback.
+ *
+ * Callers take it AFTER preparing the statement: preparing connects on demand,
+ * and a connection's `configure_connection` PRAGMAs re-enter the primitive.
  * @internal
  */
 export async function acquireStatementLock(host: {
@@ -223,16 +226,11 @@ export async function performQuery(
   // contrast, is on Rails' success path only.
   try {
     const stmt = await this._cachedStatement(sql);
-    // The lock opens AFTER the statement is prepared: `_cachedStatement`
-    // connects on demand, and a connection's `configure_connection` PRAGMAs
-    // re-enter this primitive.
     const release = await acquireStatementLock(this);
     let rows: Record<string, unknown>[];
     let affectedRows: number;
     let insertRowid: number | bigint;
     try {
-      // `stmt.column_count.zero?` — no write predicate, so `INSERT … RETURNING`
-      // (nonzero column count) comes back as rows with `row_count = 1`.
       if (stmt.reader) {
         rows = (await stmt.all(driverBinds)) as Record<string, unknown>[];
       } else {

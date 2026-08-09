@@ -60,16 +60,15 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
     await adapter.executeMutation(`INSERT INTO "pq" ("nick") VALUES ('b')`);
     expect(await adapter.executeMutation(`UPDATE "pq" SET "nick" = 'z'`)).toBe(2);
 
-    // sqlite3_changes() is advanced only by DML, so a CREATE TABLE leaves the
-    // prior UPDATE's count standing — where a per-statement RunResult would
-    // report 0.
+    // sqlite3_changes() is advanced only by DML, so the DDL below leaves the
+    // UPDATE's count standing where a RunResult would report 0.
     await adapter.execute(`CREATE TABLE "pq_ddl" ("id" INTEGER)`);
     expect(adapter.affectedRows()).toBe(2);
   });
 
   it("execute returns the rows an INSERT ... RETURNING produces", async () => {
-    // Rails branches on `stmt.column_count.zero?` alone — no write predicate —
-    // so a RETURNING write comes back as rows with row_count = 1.
+    // `stmt.column_count.zero?` alone — no write predicate — so a RETURNING
+    // write comes back as rows with row_count = 1.
     await expect(
       adapter.execute(`INSERT INTO "pq" ("nick") VALUES ('a') RETURNING "id", "nick"`),
     ).resolves.toEqual([{ id: 1, nick: "a" }]);

@@ -5808,7 +5808,9 @@ export class DateTime extends DateWithoutParseStatics {
    * `c_valid_gregorian_p` — proleptic Gregorian, no reform round trip — and
    * stores `HAVE_CIVIL | HAVE_TIME` with no Julian day, while its positive/zero
    * arm goes through `c_valid_civil_p` under `sg` and stores `jd_local_to_utc`
-   * of it too. Both then validate the time of day with `c_valid_time_p`.
+   * of it too. Both then validate the time of day with `c_valid_time_p`. The
+   * negative arm's `set_to_complex` takes an `rjd` of `0`, so the base seat
+   * gets the civil triple and leaves ITS day to `get_s_jd` too.
    *
    * `datetime_initialize`'s `switch (argc)` fall-through
    * (`date_core.c:7826-7849`) splits the second, then the minute, then the
@@ -5826,11 +5828,13 @@ export class DateTime extends DateWithoutParseStatics {
    * day is `fr2 + DAY_IN_SECONDS`.
    *
    * `add_frac()` (`date_core.c:3313-3317`) then hands `fr2` to `d_lite_plus`,
-   * which answers a NEW object rather than writing back into the receiver —
-   * which is why the proleptic arm can finish without ever needing the day.
-   * The result is built here the same way, from {@link #getCJd} /
-   * {@link #getCDf}, so a zero `fr2` leaves the half-built receiver's day
-   * unread. `d_lite_plus`'s `T_FLOAT` arm (`date_core.c:6064-6135`), which is what makes
+   * which answers a NEW object rather than writing back into `self` — which is
+   * why the arm above can finish without ever needing the day. The result is
+   * built the same way here, from {@link DateTime.#getCJd} /
+   * {@link DateTime.#getCDf}, so a zero `fr2` leaves the half-built receiver's
+   * day unread.
+   *
+   * `d_lite_plus`'s `T_FLOAT` arm (`date_core.c:6064-6135`) is what makes
    * `DateTime.new(2008, 3, 1, 6, 0.5)` `06:00:30`: the fraction's whole seconds
    * go to `df`, carrying a day where they overflow one, and the rounded
    * remainder to `sf`. `fr2` is under a day by construction, so the C's `jd`
@@ -5969,8 +5973,6 @@ export class DateTime extends DateWithoutParseStatics {
     this.#time = [rh, rmin, rs];
     this.#sf = new Rational(0, 1);
     this.#of = rof;
-    // `add_frac()`: `d_lite_plus(ret, fr2)` answers a NEW object, so a zero
-    // `fr2` never reads the receiver's day.
     if (fr2 instanceof Rational ? !fr2.isZero() : fr2 !== 0) {
       const [jd, df, sf] = addFrac(this.#getCJd(), this.#getCDf(), fr2);
       return new DateTime(SEAT, nth, jd, df, sf, rof, sg) as this;
