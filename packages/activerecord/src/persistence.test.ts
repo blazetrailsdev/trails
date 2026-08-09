@@ -35,6 +35,7 @@ import { captureSql } from "./testing/sql-capture.js";
 import { ClothingItem, ClothingItemSized } from "./test-helpers/models/clothing-item.js";
 import { Dashboard } from "./test-helpers/models/dashboard.js";
 import { queryConstraints, queryConstraintsList } from "./persistence.js";
+import { reloadSchemaFromCache } from "./model-schema.js";
 // Imported under an alias: a top-level `Topic`/`Item` binding would make
 // esbuild rename the bespoke in-function `class Topic`/`class Item`
 // declarations in the later (still-bespoke) describe blocks to `Topic2`/`Item2`,
@@ -1519,7 +1520,11 @@ describe("PersistenceTest", () => {
 
   it("becomes after reload schema from cache", () => {
     (Reply as any).defineAttributeMethods();
-    Reply.resetColumnInformation(); // mirrors Reply.serialize(:content) reload
+    // Rails calls `Reply.serialize(:content)` purely to invoke
+    // `reload_schema_from_cache` (persistence_test.rb). That resets the class'
+    // schema state only — unlike `reset_column_information` it does not clear
+    // the pool's schema-cache entry (model_schema.rb:526).
+    reloadSchemaFromCache.call(Reply as never);
     const t = topics("first");
     expect(t.becomes(Reply)).toBeInstanceOf(Reply);
     expect(t.becomes(Reply).title).toBe("The First Topic");

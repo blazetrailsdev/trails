@@ -39,7 +39,7 @@ describe("sharedCacheDir", () => {
     const root = mkTmp();
     fs.mkdirSync(path.join(root, ".git"));
     expect(await sharedCacheDir(root)).toBe(
-      path.join(root, ".git", "api-compare-cache", `v${CACHE_VERSION}`),
+      path.join(root, ".git", "parity-cache", `v${CACHE_VERSION}`),
     );
   });
 
@@ -50,7 +50,7 @@ describe("sharedCacheDir", () => {
     const worktree = mkTmp();
     fs.writeFileSync(path.join(worktree, ".git"), `gitdir: ${worktreeGit}\n`);
     expect(await sharedCacheDir(worktree)).toBe(
-      path.join(repo, ".git", "api-compare-cache", `v${CACHE_VERSION}`),
+      path.join(repo, ".git", "parity-cache", `v${CACHE_VERSION}`),
     );
   });
 
@@ -107,13 +107,18 @@ describe("pruneSharedCache", () => {
     return root;
   }
   function cacheParent(root: string): string {
-    return path.join(root, ".git", "api-compare-cache");
+    return path.join(root, ".git", "parity-cache");
   }
   function currentDir(root: string): string {
     return path.join(cacheParent(root), `v${CACHE_VERSION}`);
   }
 
-  const EMPTY = { removedEntries: 0, removedFragments: 0, removedVersionDirs: 0 };
+  const EMPTY = {
+    removedEntries: 0,
+    removedFragments: 0,
+    removedVersionDirs: 0,
+    removedLegacyDir: false,
+  };
 
   it("no-ops cleanly when there is no cache or no .git", async () => {
     expect(await pruneSharedCache(mkTmp())).toEqual(EMPTY);
@@ -134,7 +139,7 @@ describe("pruneSharedCache", () => {
     fs.utimesSync(fresh, new Date(now - 1 * DAY), new Date(now - 1 * DAY));
 
     const result = await pruneSharedCache(root, { now, maxAgeMs: 14 * DAY });
-    expect(result).toEqual({ removedEntries: 1, removedFragments: 0, removedVersionDirs: 0 });
+    expect(result).toEqual({ ...EMPTY, removedEntries: 1 });
     expect(fs.existsSync(stale)).toBe(false);
     expect(fs.existsSync(fresh)).toBe(true);
   });
@@ -156,6 +161,19 @@ describe("pruneSharedCache", () => {
     expect(result.removedEntries).toBe(0);
     expect(fs.existsSync(staleTmp)).toBe(false);
     expect(fs.existsSync(unrelated)).toBe(true);
+  });
+
+  it("removes the superseded pre-rename api-compare-cache tree", async () => {
+    const root = mkRoot();
+    fs.mkdirSync(currentDir(root), { recursive: true });
+    const legacy = path.join(root, ".git", "api-compare-cache", "v2");
+    fs.mkdirSync(legacy, { recursive: true });
+    fs.writeFileSync(path.join(legacy, "rails-api-abc.json"), "{}");
+
+    const result = await pruneSharedCache(root, { now: 0, maxAgeMs: DAY });
+    expect(result.removedLegacyDir).toBe(true);
+    expect(fs.existsSync(path.join(root, ".git", "api-compare-cache"))).toBe(false);
+    expect(fs.existsSync(currentDir(root))).toBe(true);
   });
 
   it("removes superseded version dirs but never the current or a newer one", async () => {

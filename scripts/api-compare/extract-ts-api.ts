@@ -63,7 +63,7 @@ import {
   dependencyKey,
   hashParts,
   type ReadSet,
-} from "./shared-cache.js";
+} from "@blazetrails/parity/shared-cache";
 import { extractorSchemaToken } from "./extractor-schema.js";
 import { staleBuilds, staleBuildMessage } from "./build-freshness.js";
 import { NEGATED_CALL_PREFIX } from "./enumerable-idioms.js";
@@ -1697,8 +1697,7 @@ export function fileLevelNoRailsEquivalentReason(sourceFile: ts.SourceFile): str
  * in `TAGS_ALLOWED_AFTER_NO_RAILS_EQUIVALENT` are accepted, and anything else
  * — `@internal` above all — is prose that wrapped onto a continuation line.
  * That makes tag order load-bearing: a deliberate `@internal` must precede
- * `@noRailsEquivalent`, as schema-cache.ts `recordTouchedTables` already
- * writes it. `lineLeading` rides along so the caller can point at the fix that
+ * `@noRailsEquivalent`. `lineLeading` rides along so the caller can point at the fix that
  * actually applies.
  */
 function proseTagAfter(tag: ts.JSDocTag): { name: string; lineLeading: boolean } | undefined {

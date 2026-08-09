@@ -66,112 +66,6 @@ async function eagerWarmSchemaCache(adapter: TransactionalFixturesAdapter): Prom
 }
 
 /**
- * The DDL methods whose table names the recording window has to capture,
- * mapped to the arguments naming a table. Rails' schema statements clear the
- * schema cache from `create_table` and `drop_table` only
- * (`abstract/schema_statements.rb:306,542`), so every other method here would
- * otherwise go unrecorded — the harness notes them itself rather than have the
- * ported bodies carry a clear Rails does not have.
- *
- * @internal
- */
-const DDL_TABLE_ARGS: Record<string, (args: unknown[]) => unknown[]> = {
-  createTable: (args) => [args[0]],
-  dropTable: (args) => args,
-  changeTable: (args) => [args[0]],
-  addColumn: (args) => [args[0]],
-  removeColumn: (args) => [args[0]],
-  removeColumns: (args) => [args[0]],
-  renameColumn: (args) => [args[0]],
-  changeColumn: (args) => [args[0]],
-  changeColumnDefault: (args) => [args[0]],
-  changeColumnNull: (args) => [args[0]],
-  addIndex: (args) => [args[0]],
-  removeIndex: (args) => [args[0]],
-  renameIndex: (args) => [args[0]],
-  renameTable: (args) => [args[0], args[1]],
-};
-
-/**
- * Record every table the test's DDL touches, and clear its cache entry as the
- * DDL runs, for the duration of one test. Returns the restore function.
- *
- * This lives in the harness because Rails' DDL methods do not invalidate the
- * schema cache — only `create_table`'s non-force arm and `drop_table` do
- * (`abstract/schema_statements.rb:306,542`). Wrapping here keeps the ported
- * bodies faithful while preserving the per-table teardown below.
- *
- * Restore *deletes* a method it found on the prototype rather than writing the
- * original back: an assignment would leave an own property on the pooled
- * adapter that shadows the prototype for the rest of the run, so a later
- * prototype-level spy would never fire and its assertions would pass
- * vacuously. Only a genuine own value is written back.
- *
- * @internal
- */
-function recordDdlTouchedTables(adapter: TransactionalFixturesAdapter): () => void {
-  const sc = adapter.internalSchemaCache;
-  if (!sc) return () => {};
-  const pool = adapter.pool == null || adapter.pool instanceof NullPool ? null : adapter.pool;
-  const target = adapter as unknown as Record<string, unknown>;
-  const originals: Array<[string, unknown, boolean]> = [];
-  for (const [method, tableArgs] of Object.entries(DDL_TABLE_ARGS)) {
-    const original = target[method];
-    if (typeof original !== "function") continue;
-    originals.push([method, original, Object.prototype.hasOwnProperty.call(target, method)]);
-    target[method] = function (this: unknown, ...args: unknown[]) {
-      for (const name of tableArgs(args)) {
-        if (typeof name === "string") sc.clearDataSourceCacheBang(pool, name);
-      }
-      return (original as (...a: unknown[]) => unknown).apply(this, args);
-    };
-  }
-  return () => {
-    for (const [method, original, wasOwn] of originals) {
-      if (wasOwn) target[method] = original;
-      else delete target[method];
-    }
-  };
-}
-
-/**
- * Re-reflect only the tables a test's DDL touched, leaving every other
- * cached entry intact. DDL executed inside an `it()` body — `addColumn`,
- * `createTable`, `changeTable`, etc. — is captured by the recording window
- * {@link recordDdlTouchedTables} opened in `beforeEach`. The outer
- * transaction's rollback reverts that DDL on the database side, so
- * re-reflecting each touched table restores its cache entry to the
- * rolled-back shape (or drops it if the table no longer exists).
- * Unchanged-table entries persist across tests, mirroring Rails'
- * per-table `clear_data_source_cache!` rather than a blanket clear.
- *
- * @internal
- */
-async function reReflectTouchedTables(adapter: TransactionalFixturesAdapter): Promise<void> {
-  const sc = adapter.internalSchemaCache;
-  if (!sc) return;
-  const touched = sc.takeTouchedTables();
-  if (touched.size === 0) return;
-  const pool = adapter.pool == null || adapter.pool instanceof NullPool ? null : adapter.pool;
-  for (const table of touched) {
-    // Drop the stale (post-DDL) entry first, then re-read the rolled-back
-    // shape from the live DB. Raw adapters without a pool can't re-reflect
-    // async, so the clear alone is the per-table analogue of the old blanket
-    // `clear()` — the entry re-warms lazily on the next read.
-    sc.clearDataSourceCacheBang(pool, table);
-    if (pool === null) continue;
-    try {
-      // `add` is a no-op when the table no longer exists post-rollback
-      // (its `dataSourceExists` guard returns false); otherwise it re-reads
-      // the rolled-back columns/primary-key/indexes from the live DB.
-      await sc.add(pool, table);
-    } catch {
-      // best-effort re-reflect
-    }
-  }
-}
-
-/**
  * Detect a pooled adapter (returned by `createPooledTestAdapter()`). The
  * pool back-reference is set by `ConnectionPool#newConnection` (via
  * `adoptConnection`) when a connection is adopted into the pool;
@@ -276,18 +170,6 @@ async function pinConnectionPool(pool: ConnectionPool): Promise<void> {
  */
 export interface WithTransactionalFixturesOptions {
   /**
-   * Whether to re-reflect the schema cache for the tables a test's DDL
-   * touched after the outer transaction rolls back. Defaults to `true`.
-   *
-   * Unlike the historical behavior (a blanket `schemaCache.clear()`), only
-   * tables touched by `addColumn` / `createTable` / `changeTable` etc. during
-   * the test are re-reflected; unchanged entries persist across tests,
-   * mirroring Rails' persistent, pool-scoped schema cache. Files that do pure
-   * DML can set this to `false` to skip the per-test bookkeeping entirely.
-   */
-  invalidateSchemaCache?: boolean;
-
-  /**
    * Whether to eagerly warm the per-connection `SchemaCache` for all tables
    * once before the first test runs, so synchronous `columnsHash()` reads are
    * served warm. Defaults to `true`. Set to `false` for low-level adapter
@@ -335,11 +217,8 @@ export function withTransactionalFixtures(
   getAdapter: () => TransactionalFixturesAdapter,
   options: WithTransactionalFixturesOptions = {},
 ): void {
-  const {
-    invalidateSchemaCache = true,
-    eagerWarmSchemaCache: eagerWarm = true,
-    usesTransaction: usesTransactionNames = [],
-  } = options;
+  const { eagerWarmSchemaCache: eagerWarm = true, usesTransaction: usesTransactionNames = [] } =
+    options;
   // Eager warm runs lazily before the first test rather than in this helper's
   // beforeAll: callers register their schema-setup beforeAll *after* calling
   // the helper, so the schema does not yet exist when our beforeAll fires.
@@ -348,7 +227,6 @@ export function withTransactionalFixtures(
   // Tests in usesTransaction run without a wrapping transaction (Rails parity:
   // test_fixtures.rb:108-110 run_in_transaction? returns false for these).
   let _txnOpenedForTest = false;
-  let _restoreDdlRecording: (() => void) | null = null;
 
   beforeEach(async (ctx: TaskContext) => {
     const adapter = getAdapter();
@@ -367,11 +245,6 @@ export function withTransactionalFixtures(
       return;
     }
     _txnOpenedForTest = true;
-    // Open a recording window so teardown re-reflects only DDL-touched tables.
-    if (invalidateSchemaCache) {
-      adapter.internalSchemaCache?.recordTouchedTables();
-      _restoreDdlRecording = recordDdlTouchedTables(adapter);
-    }
     const pool = pooledAdapterPool(adapter);
     if (pool) {
       // Mirrors Rails test_fixtures.rb:177-184 pin/lease lifecycle:
@@ -474,11 +347,6 @@ export function withTransactionalFixtures(
     } else {
       const t = tm(adapter);
       while (t.openTransactions > 0) await t.rollbackTransaction();
-    }
-    if (invalidateSchemaCache) {
-      _restoreDdlRecording?.();
-      _restoreDdlRecording = null;
-      await reReflectTouchedTables(adapter);
     }
     const failed = pinResults.find((r) => r.status === "rejected");
     if (failed) throw failed.reason;

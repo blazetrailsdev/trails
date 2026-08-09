@@ -56,7 +56,7 @@ import {
   readShared,
   writeShared,
   pruneSharedCache,
-} from "./shared-cache.js";
+} from "@blazetrails/parity/shared-cache";
 
 const execFileAsync = promisify(execFile);
 
@@ -170,11 +170,17 @@ async function main(): Promise<void> {
   // failure here can never affect the comparison result.
   if (!force) {
     const pruned = await pruneSharedCache(ROOT);
-    if (pruned.removedEntries || pruned.removedFragments || pruned.removedVersionDirs) {
+    if (
+      pruned.removedEntries ||
+      pruned.removedFragments ||
+      pruned.removedVersionDirs ||
+      pruned.removedLegacyDir
+    ) {
       process.stdout.write(
         `Pruned shared cache: ${pruned.removedEntries} stale entr${pruned.removedEntries === 1 ? "y" : "ies"}, ` +
           `${pruned.removedFragments} tmp fragment${pruned.removedFragments === 1 ? "" : "s"}, ` +
-          `${pruned.removedVersionDirs} superseded version dir${pruned.removedVersionDirs === 1 ? "" : "s"}\n`,
+          `${pruned.removedVersionDirs} superseded version dir${pruned.removedVersionDirs === 1 ? "" : "s"}` +
+          `${pruned.removedLegacyDir ? ", plus the pre-rename api-compare-cache tree" : ""}\n`,
       );
     }
   }
