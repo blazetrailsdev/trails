@@ -89,4 +89,19 @@ describeIfMysqlAdapter("Mysql2AdapterPerformQueryTest (trails)", () => {
       await expect(adapter.execute(`SELECT * FROM pq`)).resolves.toEqual([]);
     });
   });
+  // Rails' internal_execute forwards `prepare:` to raw_execute → perform_query
+  // (abstract/database_statements.rb:552-558, 589-591). MySQL reaches prepared
+  // statements through `_trackPrepared` + `conn.execute`, so an explicit
+  // `prepare: true` must land the SQL in the statement pool.
+  it("internalExecute prepares when prepare is true", async () => {
+    await adapter.internalExecute("SELECT 1", "SQL", { prepare: true });
+    const pool = adapter._statementPoolForTest();
+    expect(pool?.get("SELECT 1")).toBeTruthy();
+  });
+
+  it("internalExecute does not prepare when prepare is false", async () => {
+    await adapter.internalExecute("SELECT 2", "SQL", { prepare: false });
+    const pool = adapter._statementPoolForTest();
+    expect(pool?.get("SELECT 2")).toBeFalsy();
+  });
 });

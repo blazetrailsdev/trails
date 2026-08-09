@@ -2191,7 +2191,7 @@ export function orderColumn(this: QueryMethodsHost, field: string): unknown {
     if (attrName === "count" && ((this as any)._groupColumns ?? []).length > 0) {
       return table?.get(attrName) ?? arelSql(attrName);
     }
-    const quoted = safeQuoteColumnName(modelClass, attrName);
+    const quoted = safeQuoteTableName(modelClass, attrName);
     return new Nodes.SqlLiteral(quoted, { retryable: true });
   });
 }

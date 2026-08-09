@@ -709,7 +709,10 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   override async internalExecute(
     sql: string,
     name: string = "SQL",
-    { materializeTransactions = true }: { materializeTransactions?: boolean } = {},
+    {
+      materializeTransactions = true,
+      prepare = false,
+    }: { materializeTransactions?: boolean; prepare?: boolean } = {},
   ): Promise<unknown> {
     sql = this.preprocessQuery(sql);
     await this.ensureConnected();
@@ -717,6 +720,18 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       if (materializeTransactions) await this.materializeTransactions();
       return await this.log(sql, name, [], [], false, async () => {
         try {
+          // Rails' internal_execute forwards `prepare:` to raw_execute →
+          // perform_query, whose prepare branch pools the statement
+          // (`@statements[sql] ||= raw_connection.prepare(sql)`,
+          // sqlite3/database_statements.rb:81-91) — `_cachedStatement` is that
+          // pool, the same seam internalExecQuery reaches. The unprepared arm
+          // stays on `exec` so multi-statement transaction control is unchanged.
+          if (prepare) {
+            const stmt = await this._cachedStatement(sql);
+            if (stmt.reader) await stmt.all([]);
+            else await stmt.run([]);
+            return 0;
+          }
           await this.driver.exec(sql);
           return 0;
         } catch (e: any) {
@@ -1812,9 +1827,9 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   private async _parseFkDeferrable(
     tableName: string,
   ): Promise<Map<string, "immediate" | "deferred" | false>> {
-    const createSql = await this._getCreateTableSql(tableName);
+    const fkStrings = await this._foreignKeyStrings(tableName);
     const result = new Map<string, "immediate" | "deferred" | false>();
-    if (!createSql) return result;
+    const createSql = fkStrings.join(",\n");
     // Rails builds fk_defs from every `CONSTRAINT ... FOREIGN KEY` clause and
     // records `mode || false` (sqlite3_adapter.rb:422-431), so a constraint
     // without a DEFERRABLE clause reflects as `false`, not nil — the DEFERRABLE
@@ -1923,23 +1938,17 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return options?.type ? this.typeToSql(String(options.type) as ColumnType, opts) : "";
   }
 
-  private async _getCreateTableSql(tableName: string): Promise<string | null> {
-    const { schema, bare } = this._splitTableName(tableName);
-    let sql: string;
-    if (schema) {
-      sql =
-        schema.toLowerCase() === "temp"
-          ? `SELECT sql FROM sqlite_temp_master WHERE type='table' AND name='${sqliteQuoteString(bare)}'`
-          : `SELECT sql FROM ${quoteColumnName(schema)}.sqlite_master WHERE type='table' AND name='${sqliteQuoteString(bare)}'`;
-    } else {
-      sql = `SELECT sql FROM sqlite_temp_master WHERE type='table' AND name='${sqliteQuoteString(bare)}'
-             UNION ALL
-             SELECT sql FROM sqlite_master WHERE type='table' AND name='${sqliteQuoteString(bare)}'`;
-    }
-    await this.ensureConnected();
-    const stmt = await this.driver.prepare(sql);
-    const row = (await stmt.get()) as { sql: string } | undefined;
-    return row?.sql ?? null;
+  /**
+   * Rails' `foreign_keys` selects the CONSTRAINT ... FOREIGN KEY column strings
+   * out of `table_structure_sql` (sqlite3_adapter.rb:421-425); both DEFERRABLE
+   * and constraint-name reflection read the same set.
+   */
+  private async _foreignKeyStrings(tableName: string): Promise<string[]> {
+    const structure = await this.tableStructureSql(tableName);
+    return structure.filter(
+      (columnString) =>
+        columnString.startsWith("CONSTRAINT") && columnString.includes("FOREIGN KEY"),
+    );
   }
 
   /**
@@ -1949,9 +1958,8 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    * comma-joined column list (e.g. "a,b" for composites).
    */
   private async _parseForeignKeyNames(tableName: string): Promise<Map<string, string>> {
-    const createSql = await this._getCreateTableSql(tableName);
+    const createSql = (await this._foreignKeyStrings(tableName)).join(",\n");
     const names = new Map<string, string>();
-    if (!createSql) return names;
     const regex = /CONSTRAINT\s+(?:"((?:[^"]|"")*)"|(\w+))\s+FOREIGN\s+KEY\s*\(([^)]+)\)/gi;
     let match: RegExpExecArray | null;
     while ((match = regex.exec(createSql)) !== null) {

@@ -1171,7 +1171,13 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       materializeTransactions = true,
       allowRetry = false,
       binds = [],
-    }: { materializeTransactions?: boolean; allowRetry?: boolean; binds?: unknown[] } = {},
+      prepare: prepareOption,
+    }: {
+      materializeTransactions?: boolean;
+      allowRetry?: boolean;
+      binds?: unknown[];
+      prepare?: boolean;
+    } = {},
   ): Promise<Mysql2RawResult> {
     sql = this.preprocessQuery(sql);
     try {
@@ -1216,7 +1222,10 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
               // internal_execute → raw_execute → cast_result. Array-mode rows keep
               // duplicate column names that the old hash-keyed conn.query collapsed.
               const conn = rawConn as unknown as mysql.Connection;
-              const prepare = this._shouldPrepare(binds);
+              // Rails' internal_execute forwards `prepare:` to raw_execute →
+              // perform_query (database_statements.rb:552-558, 589-591); this is
+              // the same seam internalExecQuery reaches (mysql2-adapter.ts:643).
+              const prepare = prepareOption ?? this._shouldPrepare(binds);
               if (prepare) this._trackPrepared(conn, driverSql);
               const rawResult = await mysql2PerformQuery.call(
                 this as any,

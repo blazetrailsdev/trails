@@ -1475,4 +1475,34 @@ describeIfPg("PostgreSQLAdapter#active", () => {
       await adapter.close();
     }
   });
+  // Regression: `schemaQuery -> internalExecQuery -> castResult -> getOidType ->
+  // loadAdditionalTypes -> schemaQuery` is a cycle. Rails cannot reach it because
+  // initialize_type_map preloads the common OIDs at connect
+  // (postgresql_adapter.rb:558-608); trails resolves the map lazily, so
+  // getOidType carries a reentrancy guard. Pre-fix this recursed until timeout.
+  it("getOidType does not re-enter loadAdditionalTypes", async () => {
+    const adapter = new PostgreSQLAdapter(PG_TEST_URL);
+    try {
+      await adapter.execute("SELECT 1");
+      const internals = adapter as unknown as {
+        _loadingAdditionalTypes: boolean;
+        loadAdditionalTypes(oids?: number[]): Promise<void>;
+        typeMap: { has(oid: number): boolean };
+      };
+      const spy = vi.spyOn(internals, "loadAdditionalTypes");
+      const unknownOid = 987654321;
+      internals._loadingAdditionalTypes = true;
+      try {
+        const type = await adapter.getOidType(unknownOid, -1, "col");
+        expect(type).toBeTruthy();
+      } finally {
+        internals._loadingAdditionalTypes = false;
+      }
+      expect(spy).not.toHaveBeenCalled();
+      // And no poisoning fallback was registered, so a later real load still runs.
+      expect(internals.typeMap.has(unknownOid)).toBe(false);
+    } finally {
+      await adapter.close();
+    }
+  });
 });
