@@ -2937,11 +2937,11 @@ const ITALY = 2299161;
  * @internal `date_core.c`'s `DEFAULT_SG` (`date_core.c:190`), the reform start
  * every constructor takes when none is passed. The `start` argument itself
  * (`Date::JULIAN` / `Date::GREGORIAN`, `date_core.c:188-189`) is not a
- * parameter here — `Date` is seated on `Temporal.PlainDate`, which can hold
- * only the spellings the proleptic Gregorian calendar has, so a Julian-only
- * civil date such as 1500-02-29 has no bearer. The conversions below are the
- * C's all the same, so every day both calendars can spell — which is every day
- * outside the ten the reform deleted — answers MRI's `wday`, `yday` and epoch.
+ * parameter here: `SimpleDateData` carries `sg` so that one process can hold
+ * dates under several reforms at once, and every trails entry point takes this
+ * one. The conversions below are the C's, over the C's own Julian-day state, so
+ * every civil date `Date::ITALY` names — including the Julian-only ones such as
+ * 1500-02-29 — is buildable and answers MRI's `wday`, `yday` and epoch.
  */
 const DEFAULT_SG = ITALY;
 
@@ -2995,22 +2995,20 @@ function dfUtcToLocal(df: number, of: number): number {
 
 /**
  * @internal `date_core.c` `jd_local_to_utc` (`date_core.c:922-932`), the day
- * half of the same move. The C carries the day on a Julian day number; `Date` is
- * seated on `Temporal.PlainDate`, so the `jd -= 1` / `jd += 1` the C writes are
- * a day subtracted from or added to the date.
+ * half of the same move, on the Julian day the C itself carries.
  */
-function jdLocalToUtc(jd: Temporal.PlainDate, df: number, of: number): Temporal.PlainDate {
+function jdLocalToUtc(jd: number, df: number, of: number): number {
   df -= of;
-  if (df < 0) return jd.subtract({ days: 1 });
-  if (df >= DAY_IN_SECONDS) return jd.add({ days: 1 });
+  if (df < 0) return jd - 1;
+  if (df >= DAY_IN_SECONDS) return jd + 1;
   return jd;
 }
 
 /** @internal `date_core.c` `jd_utc_to_local` (`date_core.c:933-943`). */
-function jdUtcToLocal(jd: Temporal.PlainDate, df: number, of: number): Temporal.PlainDate {
+function jdUtcToLocal(jd: number, df: number, of: number): number {
   df += of;
-  if (df < 0) return jd.subtract({ days: 1 });
-  if (df >= DAY_IN_SECONDS) return jd.add({ days: 1 });
+  if (df < 0) return jd - 1;
+  if (df >= DAY_IN_SECONDS) return jd + 1;
   return jd;
 }
 
@@ -3134,16 +3132,20 @@ function cValidCivilP(y: number, m: number, d: number, sg = DEFAULT_SG): number 
 }
 
 /**
- * @internal The `Temporal.PlainDate` a Julian day names — the seat `Date` keeps
- * its state on. `Date.jd` is `d_simple_new_internal` over a bare `HAVE_JD`
- * `SimpleDateData` in the C (`date_core.c:3036-3050`); here the day has to
- * become a civil date at the call, and a Julian-only day such as the one
- * 1500-02-29 names has no proleptic Gregorian spelling, so `Temporal` rejects
- * it where MRI builds it. That is the residue of the substrate, not of the
- * conversions above: RFC 0088 `date-state-onto-temporal-plaindate`.
+ * @internal The `Temporal.PlainDate` a Julian day names — the *return* seat,
+ * not the state. `Date` itself carries the Julian day (`SimpleDateData`'s
+ * `HAVE_JD` arm, `date_core.c:203-213`), so every civil date `Date::ITALY`
+ * names is buildable; this is only reached where RFC 0088's mapping table says
+ * a static answers `Temporal`, i.e. at {@link Date#toDate} and the statics over
+ * it.
  *
- * Not exported: it is the seam between the C's Julian day and the substrate,
- * reachable only from the constructors and `Date.jd` below.
+ * `Temporal.PlainDate` is proleptic Gregorian and can hold only the spellings
+ * that calendar has, so a Julian-only day such as the one 1500-02-29 names has
+ * no `Temporal` value and this raises. `new Date(1500, 2, 29)` itself does not:
+ * the gem-shaped object answers `to_s`, `jd`, `wday` and `yday` as MRI does,
+ * and only the conversion to the `Temporal` seat has nowhere to put it.
+ *
+ * Not exported: it is the seam between the C's Julian day and the substrate.
  */
 function plainDateFromJd(rjd: number): Temporal.PlainDate {
   const [y, m, d] = cJdToCivil(rjd);
@@ -3153,6 +3155,21 @@ function plainDateFromJd(rjd: number): Temporal.PlainDate {
     throw new DateError("invalid date");
   }
 }
+
+/**
+ * @internal The brand that selects `d_simple_new_internal`
+ * (`date_core.c:3036-3050`) / `d_complex_new_internal` (`date_core.c:3055-3071`)
+ * — the C's static "seat an already-resolved Julian day, validate nothing"
+ * constructors — over the public `Date.new` / `DateTime.new`.
+ *
+ * Both C functions are file-static, so `d_new_by_frags` and friends reach them
+ * while no Ruby caller can. TS has no member visibility between "the class
+ * body" and "exported", and both arms now take a leading `number`, so there is
+ * no type left to overload on: a JS `Symbol` as the first parameter is the
+ * brand that keeps the seam out of the public signature. It spells no Ruby
+ * Symbol — nothing reads it as a value.
+ */
+const SEAT: unique symbol = Symbol("d_simple_new_internal");
 
 /**
  * @internal `date_core.c` `c_valid_time_p` (`date_core.c:870-886`), which folds
@@ -3551,7 +3568,7 @@ export function dNewByFrags(hash: DateParts | null): Date {
   }
 
   if (jd === null) throw new DateError("invalid date");
-  return new Date(plainDateFromJd(jd));
+  return new Date(SEAT, jd);
 }
 
 /**
@@ -3648,7 +3665,7 @@ export function dtNewByFrags(hash: DateParts | null): DateTime {
   let of = to == null ? 0 : to instanceof Rational ? to.toI() : Math.trunc(to);
   if (of < -DAY_IN_SECONDS || of > DAY_IN_SECONDS) of = 0;
 
-  return new DateTime(jdLocalToUtc(plainDateFromJd(jd), df, of), dfLocalToUtc(df, of), sf, of);
+  return new DateTime(SEAT, jdLocalToUtc(jd, df, of), dfLocalToUtc(df, of), sf, of);
 }
 
 /**
@@ -3769,18 +3786,26 @@ export class Date {
    * Julian date such as 1500-02-29 is a real day with no proleptic Gregorian
    * spelling.
    *
-   * The stored half is the civil date, and the Julian day is derived from it on
-   * read ({@link Date#jd}) through {@link cCivilToJd} under {@link DEFAULT_SG} —
-   * so `wday`, `yday` and `%s` are the reform's readings, not
-   * `Temporal.PlainDate`'s proleptic ones. What the substrate still cannot hold
-   * is the second case above: a Julian-only spelling has no
-   * `Temporal.PlainDate`, so `Date.new(1500, 2, 29)` raises where MRI builds it
-   * (story `date-state-julian-only-spellings-unbuildable`). The `start`
-   * ARGUMENT is what has no bearer — `#start`, `#julian?` and `#new_start` are
-   * absent with it, and every conversion below takes the one `sg` MRI defaults
-   * to. RFC 0088 `date-state-onto-temporal-plaindate`.
+   * The stored half is the Julian day — the C's `HAVE_JD` arm — and the civil
+   * triple is decoded from it on read through {@link Date#getCCivil} over
+   * {@link cJdToCivil} under {@link DEFAULT_SG}, exactly as `get_c_civil`
+   * (`date_core.c:1297-1324`) does. Keeping the calendar-neutral half is what
+   * makes both cases above representable: `wday`, `yday` and `%s` are the
+   * reform's readings rather than proleptic ones, and `Date.new(1500, 2, 29)`
+   * builds, as MRI's does.
+   *
+   * The `start` ARGUMENT is what has no bearer — `#start`, `#julian?` and
+   * `#new_start` are absent with it, and every conversion below takes the one
+   * `sg` MRI defaults to. RFC 0088 `date-state-onto-temporal-plaindate`.
    */
-  readonly #date: Temporal.PlainDate;
+  readonly #jd: number;
+
+  /**
+   * @internal `ComplexDateData`/`SimpleDateData`'s civil fields, which
+   * `get_c_civil` (`date_core.c:1297-1324`) fills in on first read and the
+   * `HAVE_CIVIL` flag then marks present.
+   */
+  #civil?: [ry: number, rm: number, rdom: number];
 
   /**
    * Ruby `Date.new(year = -4712, month = 1, mday = 1)` (ruby/date,
@@ -3793,23 +3818,26 @@ export class Date {
    * which writes an already-resolved day straight into a fresh
    * `SimpleDateData` under `HAVE_JD` and validates nothing — every caller
    * (`d_new_by_frags`, `date_s_jd`, `date_s_ordinal`, `date_s_commercial`)
-   * has already established the date is buildable.
-   *
-   * It is a static C function the module-level `d_new_by_frags` calls; TS has
-   * no member visibility between "the class body" and "exported", so a
-   * `static #` seam would be unreachable from the module-level ports and a
-   * `WeakMap` seam would be machinery ruby/date has no counterpart for. This
-   * overload is the smallest seam that reaches `#date`.
+   * has already established the date is buildable. {@link SEAT} is the brand
+   * that selects it.
    */
-  constructor(rjd: Temporal.PlainDate);
-  constructor(year: number | Temporal.PlainDate = -4712, month = 1, day = 1) {
-    if (year instanceof Temporal.PlainDate) {
-      this.#date = year;
+  constructor(seat: typeof SEAT, rjd: number);
+  constructor(year: number | typeof SEAT = -4712, month = 1, day = 1) {
+    if (typeof year === "symbol") {
+      this.#jd = month;
       return;
     }
     const r = cValidCivilP(year, month, day);
     if (r === null) throw new DateError("invalid date");
-    this.#date = plainDateFromJd(r);
+    this.#jd = r;
+  }
+
+  /**
+   * @internal `date_core.c` `get_c_civil` (`date_core.c:1297-1324`), which
+   * decodes the local Julian day into the civil fields on first read.
+   */
+  protected getCCivil(): [ry: number, rm: number, rdom: number] {
+    return (this.#civil ??= cJdToCivil(this.jd));
   }
 
   /**
@@ -3820,7 +3848,7 @@ export class Date {
    * so the conversion happens at the call.
    */
   static jd(jd = 0): Temporal.PlainDate {
-    return new Date(plainDateFromJd(jd)).toDate();
+    return new Date(SEAT, jd).toDate();
   }
 
   /**
@@ -3832,7 +3860,7 @@ export class Date {
   static ordinal(year = -4712, yday = 1): Temporal.PlainDate {
     const r = cValidOrdinalP(year, yday);
     if (r === null) throw new DateError("invalid date");
-    return new Date(plainDateFromJd(r)).toDate();
+    return new Date(SEAT, r).toDate();
   }
 
   /**
@@ -3856,7 +3884,7 @@ export class Date {
   static commercial(cwyear = -4712, cweek = 1, cwday = 1): Temporal.PlainDate {
     const r = cValidCommercialP(cwyear, cweek, cwday);
     if (r === null) throw new DateError("invalid date");
-    return new Date(plainDateFromJd(r)).toDate();
+    return new Date(SEAT, r).toDate();
   }
 
   /**
@@ -3975,19 +4003,19 @@ export class Date {
   }
 
   get year(): number {
-    return this.#date.year;
+    return this.getCCivil()[0];
   }
 
   get mon(): number {
-    return this.#date.month;
+    return this.getCCivil()[1];
   }
 
   get month(): number {
-    return this.#date.month;
+    return this.getCCivil()[1];
   }
 
   get day(): number {
-    return this.#date.day;
+    return this.getCCivil()[2];
   }
 
   /**
@@ -3996,13 +4024,13 @@ export class Date {
    * `date_core.c:1486-1497`), the astronomical Julian day the date names. This
    * is the LOCAL day — `m_jd` (`date_core.c:1459-1469`) is the UTC one
    * `m_real_jd` and `tmx_m_secs` read, and the two part company on a
-   * `DateTime` with an offset. It is
-   * the calendar-neutral reading every field below is derived from, which is
-   * why they agree with MRI at and before the calendar reform where
+   * `DateTime` with an offset. It is the whole of `Date`'s state and the
+   * calendar-neutral reading every field above is decoded from, which is why
+   * they agree with MRI at and before the calendar reform where
    * `Temporal.PlainDate`'s own proleptic Gregorian readers do not.
    */
   get jd(): number {
-    return cCivilToJd(this.#date.year, this.#date.month, this.#date.day);
+    return this.#jd;
   }
 
   /**
@@ -4031,8 +4059,11 @@ export class Date {
    * Ruby `Date#to_date` (ruby/date, `date_core.c` `date_to_date`, `date_core.c:8977-8981`), which
    * answers the receiver's `::Date` value — `self` in MRI, because MRI's
    * `::Date` value *is* the gem object. trails' `::Date` value is
-   * `Temporal.PlainDate` (RFC 0088's mapping table), so `self` is spelled as
-   * the seat.
+   * `Temporal.PlainDate` (RFC 0088's mapping table), so `self` is converted to
+   * it here. `Temporal.PlainDate` is proleptic Gregorian, so a Julian-only
+   * civil date — 1500-02-29, a real day under `Date::ITALY` — has no value to
+   * convert to and this raises where the gem-shaped object itself is fine
+   * ({@link plainDateFromJd}).
    *
    * **This is the opt-in seam RFC 0088 left open**, and it is a conversion
    * method rather than an options argument or a parallel entry point because
@@ -4044,7 +4075,7 @@ export class Date {
    * The exported {@link dNewByFrags} / {@link dtNewByFrags} answer it directly.
    */
   toDate(): Temporal.PlainDate {
-    return this.#date;
+    return plainDateFromJd(this.jd);
   }
 
   /** Ruby `Date#to_s` (ruby/date, `date_core.c` `d_lite_to_s`). */
@@ -4123,15 +4154,14 @@ export class DateTime extends DateWithoutParseStatics {
    * Every reader converts back on the way out through {@link #mLocalJd} /
    * {@link #mLocalDf}, and the constructor converts in through
    * `jd_local_to_utc` / `df_local_to_utc`, as `dt_new_by_frags` does
-   * (`date_core.c:8311-8313`). The C carries the day as a Julian day number;
-   * `Date` is seated on `Temporal.PlainDate`, so this is that date.
+   * (`date_core.c:8311-8313`).
    */
-  readonly #date: Temporal.PlainDate;
+  readonly #jd: number;
   readonly #df: number;
   /**
    * @internal `ComplexDateData`'s `sf`, the sub-second part in **nanoseconds**
    * (`date_core.c:215-231`). `jd_local_to_utc` / `df_local_to_utc` do not touch
-   * it, so unlike {@link #date} and {@link #df} it is the same value read
+   * it, so unlike {@link #jd} and {@link #df} it is the same value read
    * locally or in UTC.
    *
    * The C's `d_lite_plus` T_FLOAT arm answers an Integer here
@@ -4142,15 +4172,6 @@ export class DateTime extends DateWithoutParseStatics {
    */
   readonly #sf: Rational;
   readonly #of: number;
-
-  /**
-   * @internal `ComplexDateData`'s civil fields, which the C comments as
-   * "decoded as local" and leaves to `get_c_civil` (`date_core.c:1297-1324`) to
-   * fill in on first read. The inherited `Date` state cannot stand in for them:
-   * it was written from the constructor's *pre-conversion* civil date, which a
-   * `24:00:00` time of day rolls off.
-   */
-  #civil?: Temporal.PlainDate;
 
   /**
    * Ruby `DateTime.new(y, m, d, h = 0, min = 0, s = 0, offset = 0)` (ruby/date,
@@ -4231,12 +4252,11 @@ export class DateTime extends DateWithoutParseStatics {
    * UTC (`date_core.c:8311-8313`) and the offset are written straight into a
    * fresh `ComplexDateData`, with neither a civil triple nor a time of day to
    * validate. The arguments are `d_complex_new_internal`'s own `rjd`, `df`,
-   * `sf` and `of`, in that order. Same TS shortcoming as {@link Date}'s
-   * counterpart overload.
+   * `sf` and `of`, in that order, behind the {@link SEAT} brand.
    */
-  constructor(rjd: Temporal.PlainDate, df: number, sf: Rational, of: number);
+  constructor(seat: typeof SEAT, rjd: number, df: number, sf: Rational, of: number);
   constructor(
-    year: number | Temporal.PlainDate,
+    year: number | typeof SEAT,
     month?: number,
     day?: number | Rational,
     hour?: number | Rational,
@@ -4244,12 +4264,13 @@ export class DateTime extends DateWithoutParseStatics {
     second?: number | Rational,
     offset?: number | Rational | string,
   ) {
-    if (year instanceof Temporal.PlainDate) {
-      const df = month ?? 0;
-      const sf = (day ?? new Rational(0, 1)) as Rational;
-      const of = (hour ?? 0) as number;
-      super(jdUtcToLocal(year, df, of));
-      this.#date = year;
+    if (typeof year === "symbol") {
+      const rjd = month as number;
+      const df = day as number;
+      const sf = hour as Rational;
+      const of = minute as number;
+      super(SEAT, jdUtcToLocal(rjd, df, of));
+      this.#jd = rjd;
       this.#df = df;
       this.#sf = sf;
       this.#of = of;
@@ -4285,14 +4306,14 @@ export class DateTime extends DateWithoutParseStatics {
       fr2 = fr2 instanceof Rational ? fr2.add(DAY_IN_SECONDS) : fr2 + DAY_IN_SECONDS;
     }
     const localDf = timeToDf(rh, rmin, rs);
-    let date = jdLocalToUtc(plainDateFromJd(rjd), localDf, rof);
+    let jd = jdLocalToUtc(rjd, localDf, rof);
     let df = dfLocalToUtc(localDf, rof);
     df += fr2 instanceof Rational ? fr2.div(1) : Math.floor(fr2);
     if (df >= DAY_IN_SECONDS) {
-      date = date.add({ days: 1 });
+      jd += 1;
       df -= DAY_IN_SECONDS;
     }
-    this.#date = date;
+    this.#jd = jd;
     this.#df = df;
     this.#sf =
       fr2 instanceof Rational
@@ -4306,7 +4327,7 @@ export class DateTime extends DateWithoutParseStatics {
    * `datetime_s_parse` → `dt_new_by_frags`), which is `Date.parse`'s
    * `Date._parse` followed by the DateTime-shaped build.
    */
-  static parse(str: string, comp = true): Temporal.PlainDateTime {
+  static parse(str: string, comp = true): Temporal.PlainDateTime | Temporal.ZonedDateTime {
     return dtNewByFrags(Date._parse(str, comp)).toDatetime();
   }
 
@@ -4329,7 +4350,10 @@ export class DateTime extends DateWithoutParseStatics {
    * calendar reform, which `Temporal.PlainDate` has no bearer for, so it is not
    * a parameter here.
    */
-  static strptime(str = JULIAN_EPOCH_DATETIME, fmt = "%FT%T%z"): Temporal.PlainDateTime {
+  static strptime(
+    str = JULIAN_EPOCH_DATETIME,
+    fmt = "%FT%T%z",
+  ): Temporal.PlainDateTime | Temporal.ZonedDateTime {
     return dtNewByFrags(Date._strptime(str, fmt)).toDatetime();
   }
 
@@ -4338,8 +4362,8 @@ export class DateTime extends DateWithoutParseStatics {
    * `local_jd` (`date_core.c:1326-1333`), the complex arm: the stored day read
    * back in local terms.
    */
-  #mLocalJd(): Temporal.PlainDate {
-    return jdUtcToLocal(this.#date, this.#df, this.#of);
+  #mLocalJd(): number {
+    return jdUtcToLocal(this.#jd, this.#df, this.#of);
   }
 
   /**
@@ -4351,47 +4375,23 @@ export class DateTime extends DateWithoutParseStatics {
   }
 
   /**
-   * @internal `date_core.c` `get_c_civil` (`date_core.c:1297-1324`), which
-   * decodes the local day into the civil fields on first read.
-   */
-  #getCCivil(): Temporal.PlainDate {
-    return (this.#civil ??= this.#mLocalJd());
-  }
-
-  override get year(): number {
-    return this.#getCCivil().year;
-  }
-
-  override get mon(): number {
-    return this.#getCCivil().month;
-  }
-
-  override get month(): number {
-    return this.#getCCivil().month;
-  }
-
-  override get day(): number {
-    return this.#getCCivil().day;
-  }
-
-  /**
    * Ruby `DateTime#jd` reads the LOCAL day, not the stored UTC one
-   * (`m_local_jd`, `date_core.c:1486-1497`), which is the day `wday` and `yday`
-   * are then `c_jd_to_wday` / `c_jd_to_ordinal` over.
+   * (`m_local_jd`, `date_core.c:1486-1497`), which is the day `wday`, `yday`
+   * and the inherited {@link Date#getCCivil} are then `c_jd_to_wday` /
+   * `c_jd_to_ordinal` / `c_jd_to_civil` over.
    */
   override get jd(): number {
-    const local = this.#mLocalJd();
-    return cCivilToJd(local.year, local.month, local.day);
+    return this.#mLocalJd();
   }
 
   /**
-   * Ruby `DateTime#to_date` (ruby/date, `date_core.c` `datetime_to_date`, `date_core.c:9069-9095`), the
-   * calendar day alone. The inherited {@link Date#toDate} cannot stand in: the
-   * `Date` half was written from the constructor's *pre-conversion* civil date,
-   * which a `24:00:00` time of day rolls off — same reason `#civil` exists.
+   * Ruby `DateTime#to_date` (ruby/date, `date_core.c` `datetime_to_date`,
+   * `date_core.c:9069-9095`), the calendar day alone: the C builds a fresh
+   * `Date` on `m_local_jd` — the LOCAL day, which is where a `24:00:00` time of
+   * day has already rolled the date on — and this is that `Date`'s seat.
    */
   override toDate(): Temporal.PlainDate {
-    return this.#getCCivil();
+    return new Date(SEAT, this.#mLocalJd()).toDate();
   }
 
   /**
@@ -4400,21 +4400,33 @@ export class DateTime extends DateWithoutParseStatics {
    * `::DateTime` value is `Temporal.PlainDateTime` (RFC 0088's mapping table),
    * read in LOCAL terms, as every reader above is.
    *
-   * The offset is NOT carried into the seat. A `Temporal` offset time zone is
-   * minute-precision, and `date_zone_to_diff` (`date_parse.c:523-528`) answers
-   * seconds — the sub-minute offsets `time.ts:26-28` keeps as a `number` for
-   * exactly this reason. It stays reachable as a `number` on the gem-shaped
-   * object ({@link DateTime#offset}, {@link DateTime#zone}), which RFC 0088
-   * lists as one of the three carve-outs where Temporal has no analogue.
+   * RFC 0088's mapping table says "+ offset where carried", so an `of` the
+   * string named comes out as a `Temporal.ZonedDateTime` in the offset time
+   * zone {@link of2str} spells, and an `of` of `0` — which is also what a
+   * string that named no zone leaves behind — as a bare `PlainDateTime`, the
+   * value `::DateTime` has when `m_of` is zero.
+   *
+   * **A sub-minute offset truncates to the minute in the seat.**
+   * `date_zone_to_diff` (`date_parse.c:523-528`) answers SECONDS — it multiplies
+   * the parsed `hh`, `mm` and `ss` out and keeps all three — while a `Temporal`
+   * offset time zone is minute-precision and has nowhere to put the seconds.
+   * The truncation is `of2str`'s own (`date_core.c:1973-1980`): its
+   * `"%c%02d:%02d"` drops the same seconds, so `DateTime#zone` already answers
+   * `"+00:44"` for the `-00:44:30`-style offsets that motivate the case, and
+   * spelling the zone with `of2str` makes the seat agree with `#zone` rather
+   * than inventing a third reading. The exact seconds stay reachable on the
+   * gem-shaped object ({@link DateTime#offset}, {@link DateTime#zone}); the
+   * `PlainDateTime` fallback was the alternative and is strictly lossier — it
+   * drops the whole offset rather than its last few seconds.
    *
    * `#sf` is a `Rational` of nanoseconds exact at any denominator, and
    * `PlainDateTime` holds nanoseconds; the sub-nanosecond tail truncates, as
    * `Time#nsec` does.
    */
-  toDatetime(): Temporal.PlainDateTime {
+  toDatetime(): Temporal.PlainDateTime | Temporal.ZonedDateTime {
     const [h, min, s] = dfToTime(this.#mLocalDf());
     const ns = Number(this.#sf.numerator / this.#sf.denominator);
-    return this.#getCCivil().toPlainDateTime({
+    const plain = this.toDate().toPlainDateTime({
       hour: h,
       minute: min,
       second: s,
@@ -4422,6 +4434,8 @@ export class DateTime extends DateWithoutParseStatics {
       microsecond: Math.floor(ns / 1000) % 1000,
       nanosecond: ns % 1000,
     });
+    if (this.#of === 0) return plain;
+    return plain.toZonedDateTime(of2str(this.#of));
   }
 
   /** Ruby `DateTime#hour` (ruby/date, `date_core.c` `d_lite_hour` over `m_hour`, `date_core.c:1919-1932`). */

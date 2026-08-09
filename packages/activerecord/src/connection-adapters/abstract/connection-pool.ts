@@ -72,43 +72,6 @@ export class NullConfig {
 const NULL_CONFIG = new NullConfig();
 
 /**
- * Property keys a serializer, test matcher, or framework may probe on an
- * arbitrary object while walking it (vitest error serialization, `await`,
- * `JSON.stringify`, asymmetric matchers, React element checks, DOM sniffing).
- *
- * The adapter proxy (`_getAdapterProxy`) is reachable from any translated
- * error via its `connectionPool`; if the `get` trap fabricated a callable for
- * these keys, the probe would dispatch to a raw connection that has no such
- * method (`conn[prop] is not a function`). The trap returns `undefined` for
- * every key here — and for all symbol keys — so probes see a non-callable.
- * Add new probe keys here rather than sprinkling checks in the trap.
- */
-const ADAPTER_PROXY_PROBE_KEYS = new Set<string>([
-  // Promise / thenable duck-typing
-  "then",
-  "catch",
-  "finally",
-  // JSON / serializer hooks
-  "toJSON",
-  "toString",
-  "valueOf",
-  "inspect",
-  // vitest / jest asymmetric matchers and mock sniffing
-  "asymmetricMatch",
-  "$$typeof",
-  "_isMockFunction",
-  "getMockName",
-  // React / DOM element checks
-  "nodeType",
-  "nodeName",
-  "tagName",
-  // Object plumbing a walker may touch
-  "constructor",
-  "prototype",
-  "hasOwnProperty",
-]);
-
-/**
  * Mirrors: ActiveRecord::ConnectionAdapters::NullPool
  */
 export class NullPool implements AbstractPool {
@@ -553,25 +516,25 @@ export class ConnectionPool implements ReapablePool {
               (pool.activeConnection ?? pool.connections[0])?.adapterName ??
               adapterNameFromConfig(pool.dbConfig.adapter)
             );
-          // Don't fabricate a method for serialization/matcher/framework probes.
-          // When this proxy is reachable from an error's `connectionPool` (Rails
-          // stamps the pool onto every translated error), a serializer, `await`,
-          // or an asymmetric matcher walks keys like `then`/`toJSON`/`Symbol.*`/
-          // `asymmetricMatch`; returning a callable there would run `conn.then()`
-          // etc. against a raw connection that has no such method
-          // (`conn[prop] is not a function`). See ADAPTER_PROXY_PROBE_KEYS.
-          if (typeof prop === "symbol" || ADAPTER_PROXY_PROBE_KEYS.has(prop)) {
-            return undefined;
-          }
-          // Only dispatch names a real connection exposes as a method. When a
-          // connection already exists (it does whenever a translated error was
-          // raised — a query was mid-flight), an unrecognised probe key not in
-          // the deny set still resolves to a non-callable instead of a
-          // dispatcher that would blow up on `conn[prop] is not a function`.
-          // With no connection yet, fabricate optimistically so first-use
-          // dispatch (schemaMigration etc.) still works.
-          const sample = pool.activeConnection ?? pool.connections[0];
-          if (sample && typeof (sample as any)[prop] !== "function") {
+          // A symbol key is the one carve-out the language forces, exactly as
+          // on `NullPool` above: a JS `Symbol` cannot spell a Ruby send, so
+          // `Symbol.iterator`/`Symbol.toPrimitive` and friends are not sends
+          // the adapter is missing a method for. String keys get no carve-out —
+          // `adapter.then` and `adapter.toJSON` are sends, and `then` in
+          // particular must NOT answer a callable, or `await`ing anything that
+          // holds this proxy would drive it as a thenable.
+          if (typeof prop === "symbol") return undefined;
+          // Only dispatch names a real adapter exposes as a method — the send
+          // set is the adapter's, exactly as it is in Ruby. A live connection
+          // answers for it whenever one exists (it does whenever a translated
+          // error was raised — a query was mid-flight); with none yet, the base
+          // class every adapter extends does, so `then` and `toJSON` resolve to
+          // a non-callable both before and after the first checkout rather than
+          // to a dispatcher that would blow up on `conn[prop] is not a
+          // function` — or, for `then`, make this proxy a thenable.
+          const sample: object =
+            pool.activeConnection ?? pool.connections[0] ?? AbstractAdapter.prototype;
+          if (typeof (sample as any)[prop] !== "function") {
             return undefined;
           }
           return (...args: unknown[]) => {
