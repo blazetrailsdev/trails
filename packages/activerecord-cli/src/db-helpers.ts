@@ -1,6 +1,12 @@
 import { join, resolve } from "path";
 import { getFsAsync } from "@blazetrails/activesupport";
-import { DatabaseTasks, DatabaseConfigurations, MigrationContext } from "@blazetrails/activerecord";
+import {
+  DatabaseTasks,
+  DatabaseConfigurations,
+  MigrationContext,
+  NullSchemaMigration,
+  NullInternalMetadata,
+} from "@blazetrails/activerecord";
 import { establishEnvironmentConnection, normalizeSqlitePaths } from "./environment.js";
 
 /**
@@ -41,7 +47,13 @@ export async function tryLoadModels(cwd: string): Promise<Record<string, unknown
 
 export function loadMigrations(cwd: string): import("@blazetrails/activerecord").MigrationProxy[] {
   const paths = DatabaseTasks.migrationsPaths.map((p) => resolve(join(cwd, p)));
-  const migrations = new MigrationContext(paths).migrations;
+  // Discovery only, so the collaborators are the null objects `Migration.copy`
+  // hands its own contexts (migration.rb:1065-1066) rather than a pool lookup.
+  const migrations = new MigrationContext(
+    paths,
+    new NullSchemaMigration(),
+    new NullInternalMetadata(),
+  ).migrations;
   DatabaseTasks.registerMigrations(migrations);
   return migrations;
 }

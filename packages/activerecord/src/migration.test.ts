@@ -8,7 +8,7 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { Base, Migrator, RecordNotUnique, StatementInvalid } from "./index.js";
 import { ActiveRecord } from "./ar-config.js";
-import { SchemaMigration } from "./schema-migration.js";
+import { SchemaMigration, NullSchemaMigration } from "./schema-migration.js";
 import type { MigrationProxy } from "./migration.js";
 import { ConcurrentMigrationError, MigrationContext } from "./migration.js";
 import { adapterType } from "./test-adapter.js";
@@ -41,7 +41,7 @@ import { Mysql2Adapter } from "./connection-adapters/mysql2-adapter.js";
 import { describeIfMysqlAdapter } from "./support/describe-if-mysql-adapter.js";
 import { leaseMysqlAdapter } from "./adapters/abstract-mysql-adapter/test-helper.js";
 import { anonymousMigration } from "./test-helpers/anonymous-migration.js";
-import { InternalMetadata } from "./internal-metadata.js";
+import { InternalMetadata, NullInternalMetadata } from "./internal-metadata.js";
 
 // Mirrors `MIGRATIONS_ROOT` from cases/helper.rb:14 — the directory the
 // versioned migration fixtures live under.
@@ -2271,7 +2271,11 @@ describe("MigrationTest", () => {
           // (year 9999) is definitely > tomorrow.
           const dir = new URL("./test-helpers/migrations/future_timestamp", import.meta.url)
             .pathname;
-          expect(() => new MigrationContext([dir]).migrations).toThrow(
+          expect(
+            () =>
+              new MigrationContext([dir], new NullSchemaMigration(), new NullInternalMetadata())
+                .migrations,
+          ).toThrow(
             /Invalid timestamp 99991231235959 for migration file: future_timestamp_migration/,
           );
         } finally {

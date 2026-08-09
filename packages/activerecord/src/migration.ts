@@ -36,8 +36,8 @@ import {
 } from "./connection-adapters/abstract/schema-statements.js";
 import type { UniqueConstraintOptions } from "./connection-adapters/postgresql/schema-definitions.js";
 import { CommandRecorder } from "./migration/command-recorder.js";
-import { SchemaMigration } from "./schema-migration.js";
-import { InternalMetadata } from "./internal-metadata.js";
+import { SchemaMigration, NullSchemaMigration } from "./schema-migration.js";
+import { InternalMetadata, NullInternalMetadata } from "./internal-metadata.js";
 import { DatabaseConfigurations } from "./database-configurations.js";
 import type { DatabaseConfig } from "./database-configurations/database-config.js";
 import { migrationArConfig } from "./migration/ar-config-source.js";
@@ -1515,7 +1515,14 @@ export abstract class Migration {
       fs.mkdirSync(destination, { recursive: true });
     }
 
-    const destinationMigrations = new MigrationContext([destination]).migrations;
+    const schemaMigration = new NullSchemaMigration();
+    const internalMetadata = new NullInternalMetadata();
+
+    const destinationMigrations = new MigrationContext(
+      [destination],
+      schemaMigration,
+      internalMetadata,
+    ).migrations;
     let last: MigrationProxy | undefined = destinationMigrations[destinationMigrations.length - 1];
 
     const copied: MigrationProxy[] = [];
@@ -1529,7 +1536,8 @@ export abstract class Migration {
         );
       }
       if (!fs.existsSync(sourcePath)) continue;
-      const sourceMigrations = new MigrationContext([sourcePath]).migrations;
+      const sourceMigrations = new MigrationContext([sourcePath], schemaMigration, internalMetadata)
+        .migrations;
 
       for (const source of sourceMigrations) {
         if (!source.filename) continue;
@@ -1897,39 +1905,32 @@ function byVersion(a: MigrationProxy, b: MigrationProxy): number {
  * Mirrors: ActiveRecord::MigrationContext (migration.rb:1211)
  */
 export class MigrationContext {
+  /** Mirrors: `attr_reader :migrations_paths, :schema_migration, :internal_metadata` (`migration.rb:1212`). */
   readonly migrationsPaths: string[];
-  private _schemaMigration?: SchemaMigration;
-  private _internalMetadata?: InternalMetadata;
+  readonly schemaMigration: SchemaMigration;
+  readonly internalMetadata: InternalMetadata;
 
   /**
-   * Rails defaults both collaborators from `connection_pool` right here —
-   * `schema_migration || SchemaMigration.new(connection_pool)`
-   * (`migration.rb:1214-1218`). The default is resolved on first read instead
-   * of in the constructor: Rails can name `connection_pool` eagerly because
-   * `DatabaseTasks.migration_connection_pool` always has one by the time a
-   * context is built, while trails builds connectionless contexts for file
-   * discovery (`migrations`, `migrationFiles`, `parseMigrationFilename` — the
-   * surface Rails' own context never consults `@schema_migration` from), where
-   * the pool lookup would throw at construction and take discovery with it.
+   * Mirrors: ActiveRecord::MigrationContext#initialize
+   * (`migration.rb:1214-1218`).
+   *
+   * A caller with no pool hands in the null objects `Migration.copy` does
+   * (`migration.rb:1065-1066`), which the discovery half (`migrations`,
+   * `migrationFiles`, `parseMigrationFilename`) never calls into. Rails'
+   * `NullSchemaMigration` / `NullInternalMetadata` are empty classes duck-typed
+   * into the same slot; TS has no duck typing, so they are seated through the
+   * declared type here.
    */
   constructor(
     migrationsPaths: string[],
-    schemaMigration?: SchemaMigration,
-    internalMetadata?: InternalMetadata,
+    schemaMigration?: SchemaMigration | NullSchemaMigration,
+    internalMetadata?: InternalMetadata | NullInternalMetadata,
   ) {
     this.migrationsPaths = migrationsPaths;
-    this._schemaMigration = schemaMigration;
-    this._internalMetadata = internalMetadata;
-  }
-
-  /** Mirrors: ActiveRecord::MigrationContext#schema_migration */
-  get schemaMigration(): SchemaMigration {
-    return (this._schemaMigration ??= new SchemaMigration(this.connectionPool()));
-  }
-
-  /** Mirrors: ActiveRecord::MigrationContext#internal_metadata */
-  get internalMetadata(): InternalMetadata {
-    return (this._internalMetadata ??= new InternalMetadata(this.connectionPool()));
+    this.schemaMigration = (schemaMigration ??
+      new SchemaMigration(this.connectionPool())) as SchemaMigration;
+    this.internalMetadata = (internalMetadata ??
+      new InternalMetadata(this.connectionPool())) as InternalMetadata;
   }
 
   /**

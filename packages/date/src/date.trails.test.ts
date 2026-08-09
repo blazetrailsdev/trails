@@ -926,6 +926,32 @@ describe("Date", () => {
       expect(() => date.toDate()).toThrow(RubyDate.Error);
     }
   });
+
+  it("raises from every static that answers the seat for a Julian-only spelling", () => {
+    // ruby 3.3.11 -rdate answers "1500-02-29" from all six — the gem's `::Date`
+    // value is the gem object, so `date_to_date` (date_core.c:8977-8981) is
+    // `self` and never raises. trails' `::Date` value is `Temporal.PlainDate`,
+    // proleptic Gregorian, which has no 1500-02-29; RFC 0088's mapping table
+    // names this the seat's limit rather than narrowing the default return.
+    //   Date.civil(1500, 2, 29) / Date.jd(2268992) / Date.ordinal(1500, 60) /
+    //   Date.commercial(1500, 9, 6) / Date.parse("1500-02-29") /
+    //   Date.strptime("1500-02-29", "%Y-%m-%d")
+    const statics: Array<() => Temporal.PlainDate> = [
+      () => RubyDate.civil(1500, 2, 29),
+      () => RubyDate.jd(2268992),
+      () => RubyDate.ordinal(1500, 60),
+      () => RubyDate.commercial(1500, 9, 6),
+      () => RubyDate.parse("1500-02-29"),
+      () => RubyDate.strptime("1500-02-29", "%Y-%m-%d"),
+    ];
+    for (const build of statics) {
+      expect(build).toThrow(new RubyDate.Error("invalid date"));
+    }
+
+    // The gem-shaped builders the same statics run over answer it, so the
+    // spelling is reachable — only the Temporal seat cannot hold it.
+    expect(dNewByFrags(RubyDate._parse("1500-02-29")).toS()).toBe("1500-02-29");
+  });
 });
 
 describe("DateTime", () => {
@@ -1019,6 +1045,22 @@ describe("DateTime", () => {
     expect((seat as Temporal.ZonedDateTime).toPlainDateTime().toString()).toBe(
       "2008-03-01T06:00:00",
     );
+  });
+
+  it("names an instant the truncated offset moves, which the gem-shaped object still holds", () => {
+    // ruby 3.3.11:
+    //   DateTime.parse("2008-03-01T06:00:00-00:44:30").to_time.to_i #=> 1204353870
+    //   #=> 2008-03-01 06:44:30 UTC
+    // The seat's zone is minute-precision (`of2str`, date_core.c:1973-1980), so
+    // its instant is 06:44:00 UTC — 30 seconds early, the size of the seconds
+    // `date_zone_to_diff` (date_parse.c:523-528) kept and Temporal cannot. The
+    // exact offset stays reachable on the gem-shaped object, which is where a
+    // caller who needs the moment MRI names reads it from.
+    const seat = RubyDateTime.parse("2008-03-01T06:00:00-00:44:30") as Temporal.ZonedDateTime;
+    expect(Number(seat.epochNanoseconds / 1000000000n)).toBe(1204353870 - 30);
+
+    const gem = gemDateTime("2008-03-01T06:00:00-00:44:30");
+    expect(gem.offset.mul(86400).toI()).toBe(-2670);
   });
 
   it("spells a half-hour and a named zone's offset", () => {

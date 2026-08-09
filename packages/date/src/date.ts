@@ -4072,6 +4072,15 @@ export class Date {
    * convert to and this raises where the gem-shaped object itself is fine
    * ({@link plainDateFromJd}).
    *
+   * **RFC 0088 records the raise as the seat's limit** rather than narrowing
+   * the default return to the gem-shaped object for those days: its mapping
+   * table names the range, which is every Julian leap day a Gregorian century
+   * rule removes — 1500-02-29, 1400-02-29, 1300-02-29 and so on back before
+   * the 1582 reform. Every static that answers the seat inherits it, since
+   * `Date.civil`, `Date.jd`, `Date.ordinal`, `Date.commercial`, `Date.parse`
+   * and `Date.strptime` all end here; a caller who needs those days reads the
+   * gem-shaped object from {@link dNewByFrags} instead.
+   *
    * **This is the opt-in seam RFC 0088 left open**, and it is a conversion
    * method rather than an options argument or a parallel entry point because
    * the gem already names both directions and neither name is invented: the
