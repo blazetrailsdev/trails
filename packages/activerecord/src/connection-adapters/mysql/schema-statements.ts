@@ -634,10 +634,8 @@ export async function foreignKeys(
 interface IndexesHost {
   schemaQuery(sql: string, binds?: unknown[]): Promise<Record<string, unknown>[]>;
   quoteTableName(name: string): string;
-  // Rails calls `add_options_for_index_columns` on the adapter itself
-  // (mysql/schema_statements.rb:62), which folds in the sub-part lengths and,
-  // behind the version-gated `supports_index_sort_order?`, the DESC/ASC suffix.
-  /** @internal */
+  /** Named by Rails on the adapter itself (mysql/schema_statements.rb:62).
+   * @internal */
   addOptionsForIndexColumns(
     quotedColumns: Map<string, string>,
     options: {
