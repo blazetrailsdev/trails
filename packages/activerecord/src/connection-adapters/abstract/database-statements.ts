@@ -2184,9 +2184,8 @@ export function combineMultiStatements(totalSql: string[]): string {
  * intentionally NOT wired yet: the `load_async` infrastructure (FutureResult,
  * async_enabled?, the async executor) is unported, so `async` is always
  * effectively false and the guard can never fire. Wiring it before then would
- * be dead code that fakes a feature we don't have. Tracked to land alongside
- * the `load_async` port — see story
- * `wire-asynchronous-query-inside-transaction-error-with-load-async` (RFC 0023).
+ * be dead code that fakes a feature we don't have. It lands with the
+ * `load_async` port, which owns the infrastructure the guard needs.
  * @internal
  */
 export async function select(
