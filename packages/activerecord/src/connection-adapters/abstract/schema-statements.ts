@@ -452,31 +452,18 @@ export class SchemaStatements {
     }
   }
 
-  /**
-   * Splits Rails' `*table_names, **options` splat into a tuple. Shared by
-   * SchemaStatements#dropTable and its dialect overrides so a new option
-   * added here is automatically picked up by subclasses.
-   * @internal
-   */
-  protected _splitTableNamesAndOptions(
-    args: ReadonlyArray<unknown>,
-  ): [string[], { ifExists?: boolean; force?: boolean | "cascade" }] {
-    const last = args[args.length - 1];
-    if (last !== null && last !== undefined && typeof last === "object") {
-      return [
-        args.slice(0, -1) as string[],
-        last as { ifExists?: boolean; force?: boolean | "cascade" },
-      ];
-    }
-    return [args as string[], {}];
-  }
-
   async dropTable(
     ...args:
       | [string, ...string[]]
       | [string, ...string[], { ifExists?: boolean; force?: boolean | "cascade" }]
   ): Promise<void> {
-    const [tableNames, options] = this._splitTableNamesAndOptions(args);
+    // TS has no kwargs, so Rails' `*table_names, **options`
+    // (abstract/schema_statements.rb:540) arrives as a trailing options object
+    // on the rest parameter.
+    const last = args[args.length - 1];
+    const hasOptions = last !== null && last !== undefined && typeof last === "object";
+    const tableNames = (hasOptions ? args.slice(0, -1) : args) as string[];
+    const options = (hasOptions ? last : {}) as { ifExists?: boolean; force?: boolean | "cascade" };
     if (tableNames.length === 0) {
       throw new ArgumentError("dropTable requires at least one table name");
     }
@@ -2034,11 +2021,7 @@ export class SchemaStatements {
       length?: number | Record<string, number>;
     } = {},
   ): Promise<Map<string, string>> {
-    const adapter = this as any;
-    if (
-      typeof adapter.supportsIndexSortOrder === "function" &&
-      (await adapter.supportsIndexSortOrder())
-    ) {
+    if (await this.supportsIndexSortOrder()) {
       quotedColumns = this.addIndexSortOrder(quotedColumns, options);
     }
     return quotedColumns;

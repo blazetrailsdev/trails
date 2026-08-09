@@ -124,7 +124,13 @@ export class SchemaStatements extends AbstractSchemaStatements {
   override async dropTable(
     ...args: Parameters<AbstractSchemaStatements["dropTable"]>
   ): Promise<void> {
-    const [tableNames, options] = this._splitTableNamesAndOptions(args);
+    // TS has no kwargs, so Rails' `*table_names, **options`
+    // (abstract/schema_statements.rb:540) arrives as a trailing options object
+    // on the rest parameter.
+    const last = args[args.length - 1];
+    const hasOptions = last !== null && last !== undefined && typeof last === "object";
+    const tableNames = (hasOptions ? args.slice(0, -1) : args) as string[];
+    const options = (hasOptions ? last : {}) as { ifExists?: boolean; force?: boolean | "cascade" };
     if (tableNames.length === 0) {
       throw new ArgumentError("dropTable requires at least one table name");
     }

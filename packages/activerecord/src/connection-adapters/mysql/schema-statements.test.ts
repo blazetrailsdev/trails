@@ -18,7 +18,6 @@ import {
   limitToSize,
   integerToSql,
   foreignKeys,
-  indexes,
   parseMysqlName,
 } from "./schema-statements.js";
 import type { RowFormatHost } from "./schema-statements.js";
@@ -468,7 +467,7 @@ describe("MySQL::SchemaStatements", () => {
     expect(fks[0].toTable).toBe("roc`kets");
   });
 
-  // Minimal IndexesHost: indexes() reads via schemaQuery and quotes the table
+  // Minimal host: indexes() reads via schemaQuery and quotes the table
   // name. Stub schemaQuery to return the `SHOW KEYS FROM` rows MySQL yields.
   const indexHost = (rows: Record<string, unknown>[], sortOrderSupported = true) =>
     Object.assign(Object.create(MysqlSchemaStatements.prototype) as MysqlSchemaStatements, {
@@ -478,57 +477,51 @@ describe("MySQL::SchemaStatements", () => {
     });
 
   it("indexes: surfaces per-column prefix lengths from Sub_part", async () => {
-    const idx = await indexes.call(
-      indexHost([
-        {
-          Key_name: "index_pages_on_title",
-          Column_name: "title",
-          Non_unique: 1,
-          Index_type: "BTREE",
-          Sub_part: 10,
-          Collation: "A",
-        },
-      ]),
-      "pages",
-    );
+    const idx = await indexHost([
+      {
+        Table: "pages",
+        Key_name: "index_pages_on_title",
+        Column_name: "title",
+        Non_unique: 1,
+        Index_type: "BTREE",
+        Sub_part: 10,
+        Collation: "A",
+      },
+    ]).indexes("pages");
     expect(idx).toHaveLength(1);
     expect(idx[0].lengths).toBe(10);
     expect(idx[0].orders).toEqual({});
   });
 
   it("indexes: surfaces desc orders when Collation is D", async () => {
-    const idx = await indexes.call(
-      indexHost([
-        {
-          Key_name: "index_pages_on_title",
-          Column_name: "title",
-          Non_unique: 1,
-          Index_type: "BTREE",
-          Sub_part: null,
-          Collation: "D",
-        },
-      ]),
-      "pages",
-    );
+    const idx = await indexHost([
+      {
+        Table: "pages",
+        Key_name: "index_pages_on_title",
+        Column_name: "title",
+        Non_unique: 1,
+        Index_type: "BTREE",
+        Sub_part: null,
+        Collation: "D",
+      },
+    ]).indexes("pages");
     expect(idx[0].orders).toBe("desc");
     expect(idx[0].lengths).toEqual({});
   });
 
   it("indexes: surfaces desc orders for descending functional indexes", async () => {
-    const idx = await indexes.call(
-      indexHost([
-        {
-          Key_name: "index_pages_on_lower_title",
-          Column_name: null,
-          Expression: "lower(`title`)",
-          Non_unique: 1,
-          Index_type: "BTREE",
-          Sub_part: null,
-          Collation: "D",
-        },
-      ]),
-      "pages",
-    );
+    const idx = await indexHost([
+      {
+        Table: "pages",
+        Key_name: "index_pages_on_lower_title",
+        Column_name: null,
+        Expression: "lower(`title`)",
+        Non_unique: 1,
+        Index_type: "BTREE",
+        Sub_part: null,
+        Collation: "D",
+      },
+    ]).indexes("pages");
     // Mirrors Rails' final `.map`: a functional index collapses its columns
     // into a single SQL string via add_options_for_index_columns, with the
     // DESC order baked inline and no separate orders/lengths Records.
@@ -538,29 +531,28 @@ describe("MySQL::SchemaStatements", () => {
   });
 
   it("indexes: collapses functional-index columns into a single SQL string", async () => {
-    const idx = await indexes.call(
-      indexHost([
-        {
-          Key_name: "index_pages_on_lower_title_and_pos",
-          Column_name: null,
-          Expression: "lower(`title`)",
-          Non_unique: 1,
-          Index_type: "BTREE",
-          Sub_part: null,
-          Collation: "A",
-        },
-        {
-          Key_name: "index_pages_on_lower_title_and_pos",
-          Column_name: "position",
-          Expression: null,
-          Non_unique: 1,
-          Index_type: "BTREE",
-          Sub_part: 4,
-          Collation: "D",
-        },
-      ]),
-      "pages",
-    );
+    const idx = await indexHost([
+      {
+        Table: "pages",
+        Key_name: "index_pages_on_lower_title_and_pos",
+        Column_name: null,
+        Expression: "lower(`title`)",
+        Non_unique: 1,
+        Index_type: "BTREE",
+        Sub_part: null,
+        Collation: "A",
+      },
+      {
+        Table: "pages",
+        Key_name: "index_pages_on_lower_title_and_pos",
+        Column_name: "position",
+        Expression: null,
+        Non_unique: 1,
+        Index_type: "BTREE",
+        Sub_part: 4,
+        Collation: "D",
+      },
+    ]).indexes("pages");
     // Expression columns pass through their parenthesized form; plain columns
     // are quoted with prefix length and DESC order baked in.
     expect(idx[0].columns).toBe("(lower(`title`)), `position`(4) DESC");
@@ -573,32 +565,31 @@ describe("MySQL::SchemaStatements", () => {
     // supports_index_sort_order? — false on MariaDB < 10.8.1 / MySQL < 8.0.1,
     // which drops the DESC/ASC suffix even when Collation="D". Prefix length
     // (via MySQL's add_index_length, ungated) is still baked in.
-    const idx = await indexes.call(
-      indexHost(
-        [
-          {
-            Key_name: "index_pages_on_lower_title_and_pos",
-            Column_name: null,
-            Expression: "lower(`title`)",
-            Non_unique: 1,
-            Index_type: "BTREE",
-            Sub_part: null,
-            Collation: "D",
-          },
-          {
-            Key_name: "index_pages_on_lower_title_and_pos",
-            Column_name: "position",
-            Expression: null,
-            Non_unique: 1,
-            Index_type: "BTREE",
-            Sub_part: 4,
-            Collation: "D",
-          },
-        ],
-        false,
-      ),
-      "pages",
-    );
+    const idx = await indexHost(
+      [
+        {
+          Table: "pages",
+          Key_name: "index_pages_on_lower_title_and_pos",
+          Column_name: null,
+          Expression: "lower(`title`)",
+          Non_unique: 1,
+          Index_type: "BTREE",
+          Sub_part: null,
+          Collation: "D",
+        },
+        {
+          Table: "pages",
+          Key_name: "index_pages_on_lower_title_and_pos",
+          Column_name: "position",
+          Expression: null,
+          Non_unique: 1,
+          Index_type: "BTREE",
+          Sub_part: 4,
+          Collation: "D",
+        },
+      ],
+      false,
+    ).indexes("pages");
     expect(idx[0].columns).toBe("(lower(`title`)), `position`(4)");
   });
 });
