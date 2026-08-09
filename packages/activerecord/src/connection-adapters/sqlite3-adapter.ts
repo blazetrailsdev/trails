@@ -720,7 +720,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     try {
       if (materializeTransactions) await this.materializeTransactions();
       const driverBinds = binds.map(_driverBind, this) as SqliteBinds;
-      return await this.log(sql, name, binds, this.typeCastedBinds(binds)!, false, async () => {
+      return await this.log(sql, name, binds, this.typeCastedBinds(binds), false, async () => {
         try {
           // Rails' perform_query prepares (pooling only on the `prepare` branch)
           // and binds type_casted_binds before stepping

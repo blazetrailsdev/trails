@@ -280,6 +280,7 @@ describe("DatabaseStatements", () => {
       const { internalExecQuery } = await import("./database-statements.js");
       const host = {
         log,
+        typeCastedBinds,
         execute: async () => [],
       } as unknown as DatabaseStatementsHost;
       await expect(internalExecQuery.call(host, "SELECT ?", "SQL", [1])).rejects.toThrow(
@@ -291,6 +292,7 @@ describe("DatabaseStatements", () => {
       const { internalExecQuery } = await import("./database-statements.js");
       const host = {
         log,
+        typeCastedBinds,
         internalExecute: async () => ({ rows: [[1]] }),
       } as unknown as DatabaseStatementsHost;
       const result = await internalExecQuery.call(host, "SELECT 1", "SQL");
@@ -303,6 +305,7 @@ describe("DatabaseStatements", () => {
       // translated StatementInvalid carrying no statement context.
       const host = {
         log,
+        typeCastedBinds,
         internalExecute: async () => {
           throw new StatementInvalid("duplicate key value violates unique constraint");
         },
@@ -323,6 +326,7 @@ describe("DatabaseStatements", () => {
       const { internalExecQuery } = await import("./database-statements.js");
       const host = {
         log,
+        typeCastedBinds,
         internalExecute: async () => {
           throw new StatementInvalid("boom", { sql: "ORIGINAL", binds: [99] });
         },
@@ -339,6 +343,7 @@ describe("DatabaseStatements", () => {
       const { internalExecQuery } = await import("./database-statements.js");
       const host = {
         log,
+        typeCastedBinds,
         execute: async () => [{ id: 1 }],
       } as unknown as DatabaseStatementsHost;
       const result = await internalExecQuery.call(host, "SELECT 1", "SQL");
@@ -722,7 +727,12 @@ describe("internal_exec_query is a virtual call", () => {
 
 describe("sqlForInsert", () => {
   it("returns sql and binds unchanged when adapter does not support RETURNING", () => {
-    const host: DatabaseStatementsHost = { pool, typeCastedBinds, log, supportsInsertReturning: () => false };
+    const host: DatabaseStatementsHost = {
+      pool,
+      typeCastedBinds,
+      log,
+      supportsInsertReturning: () => false,
+    };
     const [sql, binds] = sqlForInsert.call(host, "INSERT INTO t (x) VALUES (1)", "id", [], null);
     expect(sql).toBe("INSERT INTO t (x) VALUES (1)");
     expect(binds).toEqual([]);
