@@ -29,6 +29,12 @@ export class DeprecationError extends Error {
  * A Ruby Hash keyed by Symbols, so a `Map` and not an object literal: an
  * object literal's `raise` key would read as a ported member named `raise` and
  * make every Rails `raise` in the package look like a call to it.
+ *
+ * Two entries stop short of the Ruby. `:log` picks `Rails.logger` when it is
+ * defined and falls back to `ActiveSupport::Logger.new($stderr)`; trailties
+ * exposes no process-wide logger to activesupport, so only the fallback branch
+ * ports. `:report` hands the error to `ActiveSupport.error_reporter`, which
+ * trails has not ported, so there is nothing to report to yet.
  */
 export const DEFAULT_BEHAVIORS: ReadonlyMap<DeprecationBehavior, DeprecationBehaviorCallable> =
   new Map<DeprecationBehavior, DeprecationBehaviorCallable>([
@@ -52,9 +58,6 @@ export const DEFAULT_BEHAVIORS: ReadonlyMap<DeprecationBehavior, DeprecationBeha
     [
       "log",
       (message, callstack, deprecator) => {
-        // Rails picks `Rails.logger` when it is defined and falls back to
-        // `ActiveSupport::Logger.new($stderr)`; trailties does not expose a
-        // process-wide logger to activesupport, so only the fallback branch ports.
         stderr.write(message + "\n");
         if (deprecator.debug) stderr.write(callstack.join("\n  ") + "\n");
       },
@@ -77,47 +80,51 @@ export const DEFAULT_BEHAVIORS: ReadonlyMap<DeprecationBehavior, DeprecationBeha
 
     ["silence", () => {}],
 
-    // Rails reports through `ActiveSupport.error_reporter`, which trails has not
-    // ported; there is nothing to hand the error to yet.
     ["report", () => {}],
   ]);
 
+/** One element of what `behavior=` accepts (behaviors.rb:96-104). */
+type DeprecationBehaviorItem = DeprecationBehavior | ((...args: never[]) => void);
+
 /** Rails: the argument `behavior=` accepts (behaviors.rb:96-104). */
-export type DeprecationBehaviorInput =
-  | DeprecationBehavior
-  | DeprecationBehaviorCallable
-  | ((...args: any[]) => void)
-  | Array<DeprecationBehavior | ((...args: any[]) => void)>
-  | null;
+export type DeprecationBehaviorInput = DeprecationBehaviorItem | DeprecationBehaviorItem[] | null;
 
 /**
  * Mirrors: `ActiveSupport::Deprecation::Behavior#arity_coerce`
- * (behaviors.rb:124-140). Ruby's negative arities model a splat, which JS has
- * no analogue of — `Function#length` counts required parameters — so Rails'
- * `-2..3` arm is every arity up to 3.
+ * (behaviors.rb:124-140).
+ *
+ * Ruby's negative arities model a splat, which JS has no analogue of —
+ * `Function#length` counts required parameters — so Rails' `-2..3` arm is every
+ * arity up to 3. The message interpolates `behavior.inspect`, and every
+ * non-callable reaching here is one of the DEFAULT_BEHAVIORS Symbols, which a
+ * trails port spells as a plain string, so `inspect` is the leading colon.
  */
 function arityCoerce(behavior: unknown): DeprecationBehaviorCallable {
   if (typeof behavior !== "function") {
-    // Rails interpolates `behavior.inspect`, and every non-callable that
-    // reaches here is one of the DEFAULT_BEHAVIORS Symbols, which a trails
-    // port spells as a plain string — so `inspect` is the leading colon.
     const inspected = typeof behavior === "string" ? `:${behavior}` : String(behavior);
     throw new ArgumentError(`${inspected} is not a valid deprecation behavior.`);
   }
 
   const fn = behavior as (...args: unknown[]) => void;
-  switch (true) {
-    case fn.length === 2:
+  switch (arityOfCallable(fn)) {
+    case 2:
       return (message, callstack) => {
         fn(message, callstack);
       };
-    case fn.length <= 3:
+    case 0:
+    case 1:
+    case 3:
       return fn as DeprecationBehaviorCallable;
     default:
       return (message, callstack, deprecator) => {
         fn(message, callstack, deprecator.horizon, deprecator.gemName);
       };
   }
+}
+
+/** Mirrors: `arity_of_callable` (behaviors.rb:142-144). */
+function arityOfCallable(callable: (...args: unknown[]) => void): number {
+  return callable.length;
 }
 
 type AllowMatcher = string | RegExp;
@@ -154,10 +161,8 @@ export class Deprecation {
 
   /** Rails: `behavior=` (behaviors.rb:111-113). */
   set behavior(behavior: DeprecationBehaviorInput) {
-    this._behavior = wrap(behavior as any).map(
-      (b) =>
-        (typeof b === "string" ? DEFAULT_BEHAVIORS.get(b as DeprecationBehavior) : undefined) ??
-        arityCoerce(b),
+    this._behavior = wrap<DeprecationBehaviorItem>(behavior).map(
+      (b) => (typeof b === "string" ? DEFAULT_BEHAVIORS.get(b) : undefined) ?? arityCoerce(b),
     );
   }
 
@@ -173,10 +178,8 @@ export class Deprecation {
 
   /** Rails: `disallowed_behavior=` (behaviors.rb:119-121). */
   set disallowedBehavior(behavior: DeprecationBehaviorInput) {
-    this._disallowedBehavior = wrap(behavior as any).map(
-      (b) =>
-        (typeof b === "string" ? DEFAULT_BEHAVIORS.get(b as DeprecationBehavior) : undefined) ??
-        arityCoerce(b),
+    this._disallowedBehavior = wrap<DeprecationBehaviorItem>(behavior).map(
+      (b) => (typeof b === "string" ? DEFAULT_BEHAVIORS.get(b) : undefined) ?? arityCoerce(b),
     );
   }
 

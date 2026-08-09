@@ -1,6 +1,3 @@
-import { KeyError } from "../core-ext/key-error.js";
-
-export { KeyError };
 /**
  * Mirrors Rails `ActiveSupport::Cache::SerializerWithFallback`
  * (cache/serializer_with_fallback.rb).
@@ -13,6 +10,8 @@ export { KeyError };
  * the fidelity `coder` (`coder.ts`) but keep Rails' wire-prefix framing so
  * cross-format dispatch still works.
  */
+
+import { KeyError } from "../core-ext/key-error.js";
 
 import { Entry } from "./entry.js";
 import { DeserializationError } from "./index.js";

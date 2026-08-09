@@ -4,12 +4,12 @@ import { ActiveSupportJSON } from "../json.js";
 import { coder } from "../cache/coder.js";
 import { MessagePack } from "../message-pack/index.js";
 import {
-  KeyError,
   SERIALIZERS,
   SerializerWithFallback,
   type Format,
   type Serializer,
 } from "./serializer-with-fallback.js";
+import { KeyError } from "../core-ext/key-error.js";
 
 const FORMATS = Object.keys(SERIALIZERS) as Format[];
 

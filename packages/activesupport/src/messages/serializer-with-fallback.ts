@@ -1,6 +1,3 @@
-import { KeyError } from "../core-ext/key-error.js";
-
-export { KeyError };
 /**
  * Mirrors Rails `ActiveSupport::Messages::SerializerWithFallback`
  * (messages/serializer_with_fallback.rb).
@@ -24,6 +21,8 @@ export { KeyError };
  * likewise constant-true: message_pack is a bundled dep here, with no dynamic
  * require to rescue.
  */
+
+import { KeyError } from "../core-ext/key-error.js";
 
 import { Notifications } from "../notifications.js";
 import { ActiveSupportJSON } from "../json.js";

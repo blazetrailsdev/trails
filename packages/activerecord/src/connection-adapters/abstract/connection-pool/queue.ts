@@ -174,8 +174,8 @@ interface BiasableQueueHost {
  * toward a specific thread.
  */
 export function withABiasFor<T>(this: BiasableQueueHost, context: unknown, fn: () => T): T {
-  let previousCond!: BiasedConditionVariable;
-  let newCond!: BiasedConditionVariable;
+  let previousCond: BiasedConditionVariable | null = null;
+  let newCond: BiasedConditionVariable | null = null;
   synchronize(this, () => {
     previousCond = this._cond;
     this._cond = newCond = new BiasedConditionVariable(undefined, this._cond, context);
@@ -184,8 +184,8 @@ export function withABiasFor<T>(this: BiasableQueueHost, context: unknown, fn: (
     return fn();
   } finally {
     synchronize(this, () => {
-      this._cond = previousCond;
-      newCond.transferWaitersTo(previousCond);
+      if (previousCond) this._cond = previousCond;
+      if (newCond && previousCond) newCond.transferWaitersTo(previousCond);
     });
   }
 }
