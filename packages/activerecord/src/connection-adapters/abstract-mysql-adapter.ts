@@ -48,7 +48,6 @@ import { sql as arelSql, Nodes, Visitors } from "@blazetrails/arel";
 import { StatementPool as ConnectionStatementPool } from "./statement-pool.js";
 import type { SchemaCreation as MysqlSchemaCreation } from "./mysql/schema-creation.js";
 import {
-  quote as mysqlQuote,
   quoteString as mysqlQuoteString,
   quotedDate as mysqlQuotedDate,
   typeCast as mysqlTypeCast,
@@ -272,26 +271,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   // Rails-layout implementation in mysql/schema-statements.
   tableAliasLength(): number {
     return mysqlTableAliasLength();
-  }
-
-  /**
-   * Quote a value using MySQL-family escape rules (`\0 \n \r \Z \\ ''`
-   * via MYSQL_ESCAPE_MAP, booleans as `1/0`, Dates as
-   * `'YYYY-MM-DD HH:MM:SS[.microseconds]'`). Defined here so the
-   * MySQL-family adapter inherits MySQL semantics by default instead
-   * of falling through to the abstract SQL-92 defaults (booleans →
-   * `TRUE/FALSE`, plain `''` string escaping).
-   *
-   * Rails' `mysql/quoting.rb` has no `quote` override — MySQL inherits the
-   * abstract `quote` and its MySQL-specific behaviour flows in through the
-   * dispatched helpers (`quoted_binary`, `quote_string`, `quoted_date`/`quoted_time`).
-   * `mysqlQuote` keeps only the branches the abstract `quote` can't thread through
-   * `this` and delegates the rest; see its JSDoc.
-   */
-  override quote(value: unknown): string {
-    // `.call(this)` so `mysqlQuote`'s delegation to the abstract `quote`
-    // dispatches `quoted_date`/`quoted_time` onto this adapter's overrides.
-    return mysqlQuote.call(this, value);
   }
 
   /**

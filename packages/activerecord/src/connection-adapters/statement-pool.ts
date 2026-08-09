@@ -54,7 +54,6 @@ export class StatementPool<T = unknown> {
   }
 
   set(key: string, stmt: T): void | Promise<void> {
-    if (this._maxSize <= 0) return;
     this._statements.delete(key);
     const deallocating: Array<Promise<void>> = [];
     while (this._statements.size >= this._maxSize) {

@@ -542,7 +542,7 @@ export class PostgreSQLAdapter
    * `@config[:statement_limit]` inline at StatementPool construction
    * (postgresql_adapter.rb:1056) and never exposes. trails' constructor
    * destructures the adapter-level keys out of the config hash, so the value is
-   * held here — read by `buildStatementPool` and `_shouldPrepare`'s pool-limit
+   * held here — read by `buildStatementPool`'s pool-limit
    * check.
    *
    * @internal
@@ -1609,15 +1609,12 @@ export class PostgreSQLAdapter
    * reused without binds).
    */
   private _shouldPrepare(binds: unknown[]): boolean {
-    if (!this.preparedStatements || binds.length === 0) return false;
-    // Gate on the live pool's maxSize (or the adapter default if not yet
-    // constructed). A direct `pool.setMaxSize(0)` — by a test or an
-    // operator shrinking the session — must reliably disable preparation,
-    // because `StatementPool#set` is a no-op at maxSize=0 and we'd
-    // otherwise keep allocating a fresh `a<n>` name per execution and
-    // leak server-side PREPAREs.
-    const poolLimit = this._statementPool?.maxSize ?? this._statementLimit;
-    return poolLimit > 0;
+    // Rails' gate and nothing more (the inverse of
+    // `without_prepared_statement?`, abstract_adapter.rb:1177). A zero
+    // `statement_limit` degrades inside `StatementPool#[]=`, which evicts down
+    // to `max` (statement_pool.rb:32-36) and so DEALLOCATEs each name right
+    // after it is prepared, rather than by branching at the call site.
+    return this.preparedStatements && binds.length > 0;
   }
 
   /**

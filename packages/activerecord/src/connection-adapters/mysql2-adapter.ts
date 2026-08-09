@@ -287,16 +287,14 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   /**
-   * Gate named-prepared-statement routing through our pool. Mirrors
-   * Rails' `prepared_statements && !binds.empty?` plus the extra
-   * `statement_limit > 0` check that disables caching (and therefore
-   * the whole prepared-statement path) when the operator sets
-   * `statement_limit = 0`.
+   * Gate named-prepared-statement routing through our pool. Rails' gate is
+   * `prepared_statements && !binds.empty?` (the inverse of
+   * `without_prepared_statement?`, abstract_adapter.rb:1177) and nothing more —
+   * a zero `statement_limit` degrades inside `StatementPool#[]=`, which evicts
+   * down to `max` (statement_pool.rb:32-36), not by branching here.
    */
   private _shouldPrepare(binds: unknown[]): boolean {
-    if (!this.preparedStatements || binds.length === 0) return false;
-    const poolLimit = this._statementPool?.maxSize ?? this._statementLimit;
-    return poolLimit > 0;
+    return this.preparedStatements && binds.length > 0;
   }
 
   /**
@@ -304,11 +302,11 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    * `conn.execute()`. If the insert evicts an older entry, our pool's
    * `dealloc` sends COM_STMT_CLOSE via `unprepare` so the mysql2
    * driver's internal cache and the server both release the prepared
-   * statement. No-op when caching is disabled.
+   * statement. At `statementLimit` 0 the pool evicts (and deallocates) the
+   * previous entry on every insert, mirroring `StatementPool#[]=`.
    */
   private _trackPrepared(conn: mysql.Connection, sql: string): void {
     const pool = this._getStmtPool(conn);
-    if (pool.maxSize === 0) return;
     // Use `get` (not `has`) so an already-cached entry is moved to
     // the MRU end of the LRU. Otherwise a hot statement executed
     // repeatedly would keep its original insertion position and get

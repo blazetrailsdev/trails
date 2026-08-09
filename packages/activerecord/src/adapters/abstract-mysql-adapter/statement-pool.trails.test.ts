@@ -70,14 +70,14 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       const adapter = new Mysql2Adapter({ uri: MYSQL_TEST_URL, statementLimit: 0 });
       await adapter.beginDbTransaction();
       try {
-        // Query still runs — just via `conn.query` (text protocol)
-        // instead of `conn.execute` (binary prepared). No pool is
-        // created because `_shouldPrepare` short-circuits, so we'd
-        // otherwise leak unbounded server-side PREPAREs. Rails'
-        // StatementPool#set is likewise a no-op at limit=0.
+        // Rails does not branch on the limit: the prepared path still runs and
+        // `StatementPool#[]=` evicts down to `max` (statement_pool.rb:32-36),
+        // so a limit of 0 deallocates each statement as the next one lands
+        // rather than caching any across calls.
         const rows = await adapter.execute("SELECT ? AS n", [1]);
         expect(rows[0]).toBeDefined();
-        expect(adapter._statementPoolForTest()).toBeUndefined();
+        await adapter.execute("SELECT ? AS s", ["a"]);
+        expect(adapter._statementPoolForTest()!.length).toBeLessThanOrEqual(1);
       } finally {
         await adapter.rollback();
         await adapter.close();
