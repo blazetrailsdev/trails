@@ -104,6 +104,21 @@ describe("sanitization class-method dispatch threads `this.connection`", () => {
     expect(ClassMethods.sanitizeSqlArray.call({}, "")).toBe("");
   });
 
+  // Rails reads the order matcher off `adapter_class`
+  // (sanitization.rb:84-89 over connection_handling.rb:338), a class-level
+  // lookup that checks out no connection and raises when there is no pool to
+  // read a `db_config` from. So an adapterless host raises here rather than
+  // falling back to the abstract matcher, which would permit an ORDER BY
+  // spelling its own adapter rejects.
+  it("raises ConnectionNotDefined for sanitizeSqlForOrder with no adapter class", () => {
+    const host = {
+      ...ClassMethods,
+      connection: mysqlQuoter,
+      adapterClassSync: () => null,
+    };
+    expect(() => host.sanitizeSqlForOrder(["id = ?", 1])).toThrow(ConnectionNotDefined);
+  });
+
   it("propagates non-ConnectionNotDefined errors from host.connection", () => {
     const host = {
       get connection(): never {
