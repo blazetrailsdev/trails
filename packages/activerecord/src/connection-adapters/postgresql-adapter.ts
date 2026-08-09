@@ -4,7 +4,7 @@ import { type Type, ValueType, ArgumentError, BinaryData } from "@blazetrails/ac
 import {
   singularize,
   Notifications,
-  getErrorReporter,
+  ActiveSupport,
   runLoadHooks,
   include,
 } from "@blazetrails/activesupport";
@@ -1695,10 +1695,8 @@ export class PostgreSQLAdapter
         }
         if (action === "report") {
           // Mirrors Rails' `:report` → `Rails.error.report(warning, handled: true)`
-          // (active_record.rb:248–249). When no reporter is wired, silently no-op
-          // — Rails' Rails.error always exists in a booted app, but our
-          // activesupport accessor is opt-in.
-          getErrorReporter()?.report(sw, { handled: true });
+          // (active_record.rb:248–249).
+          ActiveSupport.errorReporter.report(sw, { handled: true });
         }
         if (typeof action === "function") action(sw);
       }

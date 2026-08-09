@@ -5,7 +5,7 @@
  */
 
 import { ArgumentError } from "@blazetrails/activemodel";
-import { presence } from "@blazetrails/activesupport";
+import { isPresent, presence } from "@blazetrails/activesupport";
 import { Version } from "../abstract-adapter.js";
 import { SqlTypeMetadata } from "../sql-type-metadata.js";
 import { TypeMetadata } from "./type-metadata.js";
@@ -148,6 +148,38 @@ export class MysqlSchemaStatements extends BaseSchemaStatements {
    */
   override validPrimaryKeyOptions(): string[] {
     return [...super.validPrimaryKeyOptions(), "unsigned", "autoIncrement"];
+  }
+
+  /**
+   * Mirrors: MySQL::SchemaStatements#add_index_length
+   *
+   * @internal
+   */
+  addIndexLength(
+    quotedColumns: Map<string, string>,
+    options: { length?: number | Record<string, number> } = {},
+  ): Map<string, string> {
+    const lengths = this.optionsForIndexColumns(options.length);
+    for (const [name, column] of quotedColumns) {
+      if (isPresent(lengths(name))) quotedColumns.set(name, `${column}(${lengths(name)})`);
+    }
+    return quotedColumns;
+  }
+
+  /**
+   * Mirrors: MySQL::SchemaStatements#add_options_for_index_columns
+   *
+   * @internal
+   */
+  override async addOptionsForIndexColumns(
+    quotedColumns: Map<string, string>,
+    options: {
+      order?: string | Record<string, string>;
+      length?: number | Record<string, number>;
+    } = {},
+  ): Promise<Map<string, string>> {
+    quotedColumns = this.addIndexLength(quotedColumns, options);
+    return super.addOptionsForIndexColumns(quotedColumns, options);
   }
 }
 
@@ -325,45 +357,6 @@ export function extractForeignKeyAction(specifier: string): "cascade" | "nullify
     default:
       return undefined;
   }
-}
-
-/** @internal */
-export function addIndexLength(
-  quotedColumns: Map<string, string>,
-  options: { length?: Record<string, number> | number } = {},
-): Map<string, string> {
-  if (options.length == null) return quotedColumns;
-  const lengthMap = typeof options.length === "object" ? options.length : null;
-  const scalar = typeof options.length === "number" ? options.length : null;
-  for (const [name, col] of quotedColumns) {
-    const len = lengthMap ? lengthMap[name] : scalar;
-    if (len != null) quotedColumns.set(name, `${col}(${len})`);
-  }
-  return quotedColumns;
-}
-
-/** @internal */
-export function addOptionsForIndexColumns(
-  quotedColumns: Map<string, string>,
-  options: {
-    length?: Record<string, number> | number;
-    order?: Record<string, string> | string;
-  } = {},
-  sortOrderSupported = true,
-): Map<string, string> {
-  quotedColumns = addIndexLength(quotedColumns, options);
-  // Rails gates the DESC/ASC suffix on `supports_index_sort_order?`
-  // (abstract/schema_statements.rb add_options_for_index_columns via super);
-  // MariaDB < 10.8.1 / MySQL < 8.0.1 silently drop it. The visitor threads the
-  // gate in — the pure helper defaults to supported for host-less unit tests.
-  if (options.order && sortOrderSupported) {
-    const orders = typeof options.order === "object" ? options.order : {};
-    for (const [name, col] of quotedColumns) {
-      const dir = typeof options.order === "string" ? options.order : orders[name];
-      if (dir) quotedColumns.set(name, `${col} ${dir.toUpperCase()}`);
-    }
-  }
-  return quotedColumns;
 }
 
 /**
@@ -645,11 +638,15 @@ export async function foreignKeys(
 interface IndexesHost {
   schemaQuery(sql: string, binds?: unknown[]): Promise<Record<string, unknown>[]>;
   quoteTableName(name: string): string;
-  // Version-gated in Rails (false on MariaDB < 10.8.1 / MySQL < 8.0.1): when
-  // false, `add_options_for_index_columns`'s `super` skips the DESC/ASC suffix
-  // (abstract/schema_statements.rb#add_index_sort_order), so a functional
-  // index's collapsed columns string must omit the order even when Collation="D".
-  supportsIndexSortOrder(): Promise<boolean>;
+  /** Named by Rails on the adapter itself (mysql/schema_statements.rb:62).
+   * @internal */
+  addOptionsForIndexColumns(
+    quotedColumns: Map<string, string>,
+    options: {
+      order?: string | Record<string, string>;
+      length?: number | Record<string, number>;
+    },
+  ): Promise<Map<string, string>>;
 }
 
 /** @internal
@@ -743,38 +740,35 @@ export async function indexes(this: IndexesHost, tableName: string): Promise<Ind
       if (desc) entry.orders[column] = "desc";
     }
   }
-  const supportsIndexSortOrder = await this.supportsIndexSortOrder();
-  return Array.from(byIndex.entries()).map(
-    ([name, { columns, unique, using, type, comment, lengths, orders, expressions }]) => {
-      // Mirrors Rails' final `.map`: a functional (expression) index collapses
-      // its columns array into a single SQL string via addOptionsForIndexColumns,
-      // baking prefix length and DESC/ASC order inline. Non-expression columns
-      // are quoted; expression columns pass through their parenthesized form.
-      // The separate lengths/orders Records are consumed here and dropped.
-      if (Object.keys(expressions).length > 0) {
-        const quotedColumns = new Map<string, string>(
-          columns.map((c) => [c, expressions[c] ?? quoteColumnName(c)]),
-        );
-        addOptionsForIndexColumns(
-          quotedColumns,
-          { order: orders, length: lengths },
-          supportsIndexSortOrder,
-        );
-        return new IndexDefinition(
-          tableName,
-          name,
-          unique,
-          Array.from(quotedColumns.values()).join(", "),
-          { using, type, comment },
-        );
-      }
-      return new IndexDefinition(tableName, name, unique, columns, {
-        lengths,
-        orders,
-        using,
-        type,
-        comment,
-      });
-    },
+  return await Promise.all(
+    Array.from(byIndex.entries()).map(
+      async ([name, { columns, unique, using, type, comment, lengths, orders, expressions }]) => {
+        // Mirrors Rails' final `.map`: a functional (expression) index collapses
+        // its columns array into a single SQL string via addOptionsForIndexColumns,
+        // baking prefix length and DESC/ASC order inline. Non-expression columns
+        // are quoted; expression columns pass through their parenthesized form.
+        // The separate lengths/orders Records are consumed here and dropped.
+        if (Object.keys(expressions).length > 0) {
+          const quotedColumns = new Map<string, string>(
+            columns.map((c) => [c, expressions[c] ?? quoteColumnName(c)]),
+          );
+          await this.addOptionsForIndexColumns(quotedColumns, { order: orders, length: lengths });
+          return new IndexDefinition(
+            tableName,
+            name,
+            unique,
+            Array.from(quotedColumns.values()).join(", "),
+            { using, type, comment },
+          );
+        }
+        return new IndexDefinition(tableName, name, unique, columns, {
+          lengths,
+          orders,
+          using,
+          type,
+          comment,
+        });
+      },
+    ),
   );
 }

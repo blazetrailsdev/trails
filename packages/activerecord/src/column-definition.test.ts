@@ -22,7 +22,6 @@ class DummyCreation extends SchemaCreation {
       supportsCheckConstraints: async () => false,
       supportsExclusionConstraints: () => false,
       supportsIndexInclude: async () => false,
-      supportsIndexSortOrder: async () => false,
       supportsIndexesInCreate: () => false,
       supportsNullsNotDistinct: async () => false,
       supportsPartialIndex: () => false,

@@ -25,12 +25,7 @@ import {
   IndexDefinition,
   TableDefinition,
 } from "../abstract/schema-definitions.js";
-import {
-  addOptionsForIndexColumns,
-  integerToSql,
-  typeWithSizeToSql,
-  limitToSize,
-} from "./schema-statements.js";
+import { integerToSql, typeWithSizeToSql, limitToSize } from "./schema-statements.js";
 
 interface MysqlColumnOptions extends Record<string, unknown> {
   column?: { sqlType?: string; type?: string; null?: boolean };
@@ -54,9 +49,6 @@ type MysqlTableDef = TableDefinition & { charset?: string; collation?: string };
 export interface VisitorHostAdapter extends TableDefinitionConn, SchemaCreationConn {
   supportsCheckConstraints(): Promise<boolean>;
   supportsIndexesInCreate(): boolean;
-  /** Version-gated: MariaDB ≥ 10.8.1 / MySQL ≥ 8.0.1 — fetches the server
-   * version on demand, so it is awaitable. */
-  supportsIndexSortOrder(): Promise<boolean>;
   isMariadb(): Promise<boolean>;
   quote(value: unknown): string;
   /** Rails' `index_in_create` builds the IndexDefinition through `@conn.add_index_options`
@@ -246,24 +238,6 @@ export class SchemaCreation extends AbstractSchemaCreation {
     parts.push(`(${await this.quotedColumns(o)})`);
 
     return this.addSqlCommentBang(parts.join(" "), o.comment);
-  }
-
-  /** @internal */
-  protected override async quotedColumns(o: { columns: string | string[] }): Promise<string> {
-    if (typeof o.columns === "string") return o.columns;
-    const idx = o as IndexDefinition;
-    const quotedMap = new Map<string, string>(
-      o.columns.map((c) => [c, this.adapter.quoteColumnName(c)]),
-    );
-    addOptionsForIndexColumns(
-      quotedMap,
-      {
-        length: idx.lengths as Record<string, number> | number | undefined,
-        order: idx.orders as Record<string, string> | string | undefined,
-      },
-      await this.supportsIndexSortOrder(),
-    );
-    return [...quotedMap.values()].join(", ");
   }
 
   /** @internal */

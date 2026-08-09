@@ -1,6 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { ActiveSupport } from "./index.js";
 import { Deprecation, DeprecationError, deprecator } from "./deprecation.js";
+import { ErrorReporter, type ReportedError } from "./error-reporter.js";
+import { Logger } from "./logger.js";
 import { Notifications } from "./notifications.js";
+import { _setTrailsLogger } from "./trails-logger-slot.js";
+
+/** Mirrors `deprecation_test.rb`'s `with_rails_logger` helper. */
+function withTrailsLogger<T>(logger: Logger | null, fn: () => T): T {
+  _setTrailsLogger(logger);
+  try {
+    return fn();
+  } finally {
+    _setTrailsLogger(null);
+  }
+}
 
 describe("DeprecationTest", () => {
   let dep: Deprecation;
@@ -561,26 +575,38 @@ describe("DeprecationTest", () => {
 
   it(":log behavior", () => {
     dep.behavior = "log";
-    const spy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-    dep.warn("log message");
-    expect(spy).toHaveBeenCalled();
-    spy.mockRestore();
+    const output: string[] = [];
+
+    withTrailsLogger(new Logger({ write: (s) => output.push(s) }), () => {
+      dep.behavior[0]("fubar", ["call stack!"], dep);
+    });
+
+    expect(output.join("")).toContain("fubar");
+    expect(output.join("")).not.toContain("call stack!");
   });
 
   it(":log behavior with debug", () => {
     dep.behavior = "log";
-    const spy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-    dep.warn("debug");
-    expect(spy).toHaveBeenCalled();
-    spy.mockRestore();
+    dep.debug = true;
+    const output: string[] = [];
+
+    withTrailsLogger(new Logger({ write: (s) => output.push(s) }), () => {
+      dep.behavior[0]("fubar", ["call stack!"], dep);
+    });
+
+    expect(output.join("")).toContain("fubar");
+    expect(output.join("")).toContain("call stack!");
   });
 
   it(":log behavior without Rails.logger", () => {
-    // In our TS impl, log writes to stderr (no Rails.logger)
     dep.behavior = "log";
     const spy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-    dep.warn("fallback");
-    expect(spy).toHaveBeenCalled();
+
+    withTrailsLogger(null, () => {
+      dep.behavior[0]("fubar", ["call stack!"], dep);
+    });
+
+    expect(spy).toHaveBeenCalledWith(expect.stringContaining("fubar"));
     spy.mockRestore();
   });
 
@@ -607,9 +633,23 @@ describe("DeprecationTest", () => {
   });
 
   it(":report_error behavior", () => {
-    dep.behavior = "report";
-    // report is a no-op in our implementation; should not throw
-    expect(() => dep.warn("report error")).not.toThrow();
+    const deprecator = new Deprecation("horizon", "MyGem::Custom");
+    deprecator.behavior = "report";
+    const previousReporter = ActiveSupport.errorReporter;
+    const reporter = new ErrorReporter();
+    const reports: ReportedError[] = [];
+    reporter.subscribe({ report: (r) => reports.push(r) });
+    ActiveSupport.errorReporter = reporter;
+    try {
+      deprecator.warn();
+    } finally {
+      ActiveSupport.errorReporter = previousReporter;
+    }
+    const report = reports[0];
+    expect(report.error).toBeInstanceOf(DeprecationError);
+    expect(report.handled).toBe(true);
+    expect(report.severity).toBe("warning");
+    expect(report.source).toBe("application");
   });
 
   it("invalid behavior", () => {

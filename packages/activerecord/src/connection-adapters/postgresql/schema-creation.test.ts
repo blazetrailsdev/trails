@@ -24,7 +24,6 @@ const s = () =>
     supportsCheckConstraints: async () => true,
     supportsExclusionConstraints: () => true,
     supportsIndexInclude: async () => true,
-    supportsIndexSortOrder: async () => true,
     supportsIndexesInCreate: () => false,
     supportsNullsNotDistinct: async () => true,
     supportsPartialIndex: () => true,
