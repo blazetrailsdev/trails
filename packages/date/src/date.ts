@@ -3250,18 +3250,21 @@ function cValidGregorianP(y: number, m: number, d: number): [rm: number, rd: num
  * The C's `ry`/`rm`/`rd` out-parameters come back as the tuple; its `nth` does
  * not, for the reason {@link guessStyle} states.
  *
- * `decode_year` (`date_core.c:1342-1371`) reduces to the `FIX2INT` its Bignum
- * arm ends at once `nth` is out: the year is shifted by 4712, divided by
- * `CM_PERIOD_GCY` into an `nth` that is zero over the whole representable
- * range, and shifted back — the identity, but for the truncation, which is what
- * answers `Date.new(2000.5, 1, 1)` as 2000-01-01 in MRI.
+ * `decode_year` (`date_core.c:1342-1371`) reduces to the shift, the `FIX2INT`
+ * its Bignum arm ends at, and the unshift once `nth` is out: the year is
+ * shifted by 4712, divided by `CM_PERIOD_GCY` into an `nth` that is zero over
+ * the whole representable range, and shifted back. That leaves the identity but
+ * for the truncation, which is what answers `Date.new(2000.5, 1, 1)` as
+ * 2000-01-01 and `Date.new(-2000.5, 1, 1, Date::GREGORIAN)` as -2001-01-01 in
+ * MRI — the truncation is of the SHIFTED value, so it rounds toward -4712
+ * rather than toward zero.
  */
 function validGregorianP(
   y: number,
   m: number,
   d: number,
 ): [ry: number, rm: number, rd: number] | null {
-  const ry = Math.trunc(y);
+  const ry = Math.trunc(y + 4712) - 4712;
   const r = cValidGregorianP(ry, m, d);
   if (r === null) return null;
   return [ry, r[0], r[1]];
@@ -3273,9 +3276,9 @@ function validGregorianP(
  * negative style is proleptic Gregorian, a positive one proleptic Julian, and
  * `0` means the reform round trip under `sg` decides.
  *
- * The C's middle arm — `!FIXNUM_P(y)`, a Bignum year — has no reachable
- * analogue: every `y` here is a JS number, which is the `FIXNUM` case, so the
- * arm is written as the range where a Bignum year begins. Beyond it the C
+ * The C's middle arm — `!FIXNUM_P(y)`, a year Ruby holds as something other
+ * than a Fixnum — is written here as the range a JS number stops being one
+ * over, which is what a non-integer or out-of-safe-range `y` is. Beyond it the C
  * decomposes the year into `nth` plus a residue (`decode_year`,
  * `date_core.c:1342-1371`) so the Julian day still fits a Fixnum; trails
  * carries the whole Julian day in a JS number instead, which is exact up to
