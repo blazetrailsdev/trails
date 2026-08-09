@@ -49,11 +49,13 @@ import * as os from "node:os";
 async function establishMigrationConnection(
   adapter: unknown,
   database = ":memory:",
+  extra: Record<string, unknown> = {},
 ): Promise<void> {
   const { Base, HashConfig } = await import("@blazetrails/activerecord");
   const config = new HashConfig("test", "primary", {
     adapter: "sqlite3",
     database,
+    ...extra,
   });
   const pool = Base.connectionHandler.establishConnection(config, {
     owner: Base,
@@ -1448,14 +1450,16 @@ export class CreatePosts extends Migration {
   });
 
   // internal_metadata.rb:35-36 — `enabled?` is `@pool.db_config.use_metadata_table?`.
-  function disableMetadataTable(adapter: unknown): void {
-    // Override the pool's db_config rather than replacing the pool: Rails'
-    // @pool is always a pool object (abstract_adapter.rb:153), and the rest of
-    // the adapter reads schema_reflection off it during the migration.
-    Object.defineProperty((adapter as { pool: object }).pool, "dbConfig", {
-      value: { useMetadataTable: false },
-      configurable: true,
-    });
+  // Re-establish over the same adapter with `use_metadata_table: false` in the
+  // db_config, the way database.yml turns the flag off — `enabled?` reads
+  // `@pool.db_config.use_metadata_table?` (internal_metadata.rb:35-36), so the
+  // config is the only place to set it.
+  async function disableMetadataTable(adapter: unknown, database?: string): Promise<void> {
+    const { Base } = await import("@blazetrails/activerecord");
+    // Hand the adapter back before it is leased into the replacement pool.
+    Base.connectionHandler.removeConnection("Base");
+    (adapter as { expire(): void }).expire();
+    await establishMigrationConnection(adapter, database, { useMetadataTable: false });
   }
 
   it("InternalMetadata with enabled=false refuses set writes with EnvironmentStorageError", async () => {
@@ -1467,7 +1471,7 @@ export class CreatePosts extends Migration {
     const adapter = new BetterSQLite3Adapter(dbFile);
     await establishMigrationConnection(adapter, dbFile);
     try {
-      disableMetadataTable(adapter);
+      await disableMetadataTable(adapter, dbFile);
       const disabledMeta = new InternalMetadata(adapter.pool);
       expect(disabledMeta.enabled).toBe(false);
 
@@ -1514,7 +1518,7 @@ export class CreatePosts extends Migration {
             })("CreateWidgets", 20260101000000),
         },
       ];
-      disableMetadataTable(adapter);
+      await disableMetadataTable(adapter);
       const migrator = new Migrator(
         "up",
         migrations,
@@ -1560,7 +1564,7 @@ export class CreatePosts extends Migration {
       const enabledMeta = new InternalMetadata(adapter.pool);
       await enabledMeta.createTable();
       await enabledMeta.set("environment", "production");
-      disableMetadataTable(adapter);
+      await disableMetadataTable(adapter, dbFile);
 
       // Disabled context should still report null (no stale read).
       const context = new MigrationContext(

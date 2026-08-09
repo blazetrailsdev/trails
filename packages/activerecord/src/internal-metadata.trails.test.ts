@@ -68,3 +68,31 @@ describe("InternalMetadata built from a connection pool", () => {
     expect(await internalMetadata.tableExists()).toBe(true);
   });
 });
+
+describe("InternalMetadata built over a NullPool", () => {
+  // `enabled?` is `@pool.db_config.use_metadata_table?`
+  // (internal_metadata.rb:35-36) and NullPool's NullConfig answers nil for
+  // every key (abstract/connection_pool.rb:17-22), so a pool-less collaborator
+  // reads as disabled — it does not fall back to the default.
+  it("reads as disabled", () => {
+    expect(new InternalMetadata(new NullPool()).enabled).toBeFalsy();
+  });
+
+  // NullPool defines no `with_connection`, so the send raises NoMethodError
+  // rather than silently doing nothing (abstract/connection_pool.rb:14-51).
+  it("raises NoMethodError rather than silently no-opping on a write", async () => {
+    const internalMetadata = new InternalMetadata(new NullPool());
+    await expect(internalMetadata.deleteAllEntries()).rejects.toThrow(
+      /undefined method 'withConnection'/,
+    );
+  });
+
+  // NullPool#schema_cache answers nil (abstract/connection_pool.rb:38), so
+  // `@pool.schema_cache.data_source_exists?` (internal_metadata.rb:108) raises.
+  it("raises NoMethodError from tableExists", async () => {
+    const internalMetadata = new InternalMetadata(new NullPool());
+    await expect(internalMetadata.tableExists()).rejects.toThrow(
+      /undefined method 'data_source_exists\?' for nil/,
+    );
+  });
+});

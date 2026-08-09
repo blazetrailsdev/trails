@@ -62,7 +62,7 @@ export class SchemaMigration {
   private async _withConnection<T>(
     fn: (connection: DatabaseAdapter) => T | Promise<T>,
   ): Promise<T> {
-    return await (this._pool as ConnectionPool).withConnection(fn);
+    return await this._pool.withConnection(fn);
   }
 
   get primaryKey(): string {

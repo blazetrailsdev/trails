@@ -21,6 +21,7 @@ import {
   stdout,
   stderr,
 } from "@blazetrails/activesupport";
+import { NoMethodError } from "@blazetrails/activemodel";
 import { ActiveRecordError, ConnectionNotDefined } from "../errors.js";
 import type { Base } from "../base.js";
 
@@ -552,7 +553,17 @@ export class DatabaseTasks {
   ): Promise<string | null> {
     const config = this.resolveConfiguration(configuration);
     const handler = this.databaseAdapterFor(config);
-    return handler.charset ? handler.charset(config) : null;
+    // Ruby sends `charset` to the task instance (`database_tasks.rb:332-335`);
+    // a task class defining none raises NoMethodError. A trails handler is a
+    // plain object of optional members, so the missing send has to be raised
+    // rather than falling out of the language — see `collation` below, whose
+    // NoMethodError `SqliteDBCollationTest#test_db_retrieves_collation` asserts.
+    if (!handler.charset) {
+      throw new NoMethodError(
+        `undefined method 'charset' for an instance of ${handler.constructor.name}`,
+      );
+    }
+    return handler.charset(config);
   }
 
   static async charsetCurrent(environment?: string): Promise<string | null> {
@@ -568,10 +579,14 @@ export class DatabaseTasks {
   ): Promise<string | null> {
     const config = this.resolveConfiguration(configuration);
     const handler = this.databaseAdapterFor(config);
-    if (handler.collation) {
-      return handler.collation(config);
+    // `database_tasks.rb:342-345` — a bare send, and SQLiteDatabaseTasks
+    // defines no `collation`, so SQLite raises NoMethodError here.
+    if (!handler.collation) {
+      throw new NoMethodError(
+        `undefined method 'collation' for an instance of ${handler.constructor.name}`,
+      );
     }
-    return null;
+    return handler.collation(config);
   }
 
   static async collationCurrent(environment?: string): Promise<string | null> {

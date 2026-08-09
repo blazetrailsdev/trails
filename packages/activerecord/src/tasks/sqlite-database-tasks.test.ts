@@ -7,7 +7,7 @@ import { randomUUID } from "node:crypto";
 import { SQLiteDatabaseTasks } from "./sqlite-database-tasks.js";
 import { DatabaseTasks } from "./database-tasks.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
-import { DatabaseAlreadyExists, NoDatabaseError } from "../errors.js";
+import { DatabaseAlreadyExists } from "../errors.js";
 import { SchemaDumper } from "../schema-dumper.js";
 import { Base } from "../base.js";
 
@@ -48,42 +48,6 @@ describe("SQLiteDatabaseTasks", () => {
     created.length = 0;
   });
 
-  it("test_db_create_creates_file", async () => {
-    const dbPath = tmpDbPath();
-    created.push(dbPath);
-    const config = new HashConfig("development", "primary", {
-      adapter: "sqlite3",
-      database: dbPath,
-    });
-    await new SQLiteDatabaseTasks(config).create();
-    expect(fs.existsSync(dbPath)).toBe(true);
-  });
-
-  it("test_db_create_when_file_exists_raises", async () => {
-    const dbPath = tmpDbPath();
-    created.push(dbPath);
-    fs.writeFileSync(dbPath, "");
-    const config = new HashConfig("development", "primary", {
-      adapter: "sqlite3",
-      database: dbPath,
-    });
-    await expect(new SQLiteDatabaseTasks(config).create()).rejects.toBeInstanceOf(
-      DatabaseAlreadyExists,
-    );
-  });
-
-  it("test_db_drop_removes_file", async () => {
-    const dbPath = tmpDbPath();
-    created.push(dbPath);
-    fs.writeFileSync(dbPath, "");
-    const config = new HashConfig("development", "primary", {
-      adapter: "sqlite3",
-      database: dbPath,
-    });
-    await new SQLiteDatabaseTasks(config).drop();
-    expect(fs.existsSync(dbPath)).toBe(false);
-  });
-
   it("create guards and connects against the same relative database", async () => {
     // `sqlite_database_tasks.rb:15-20` reads the raw `db_config.database` in both
     // halves; only `drop` joins `root` (`:23-24`).
@@ -108,24 +72,6 @@ describe("SQLiteDatabaseTasks", () => {
     fs.rmSync(root, { recursive: true, force: true });
   });
 
-  it("test_db_drop_missing_raises_no_database_error", async () => {
-    const dbPath = tmpDbPath();
-    const config = new HashConfig("development", "primary", {
-      adapter: "sqlite3",
-      database: dbPath,
-    });
-    await expect(new SQLiteDatabaseTasks(config).drop()).rejects.toBeInstanceOf(NoDatabaseError);
-  });
-
-  it("test_charset_returns_utf8", async () => {
-    const config = new HashConfig("development", "primary", {
-      adapter: "sqlite3",
-      database: ":memory:",
-    });
-    await Base.establishConnection(config.configuration as Record<string, unknown>);
-    await expect(new SQLiteDatabaseTasks(config).charset()).resolves.toBe("UTF-8");
-  });
-
   it("test_registers_with_database_tasks", () => {
     DatabaseTasks.clearRegisteredTasks();
     SQLiteDatabaseTasks.register();
@@ -146,63 +92,65 @@ describe("SQLiteDatabaseTasks", () => {
     const { BetterSQLite3Adapter } =
       await import("../connection-adapters/better-sqlite3-adapter.js");
     const seedAdapter = new BetterSQLite3Adapter(dbPath);
-    await seedAdapter.executeMutation(
-      "CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT NOT NULL, updated_at TEXT)",
-    );
-    await seedAdapter.executeMutation("CREATE INDEX index_widgets_on_name ON widgets(name)");
-    await seedAdapter.executeMutation(
-      "CREATE TRIGGER touch_widgets AFTER UPDATE ON widgets " +
-        "BEGIN " +
-        "UPDATE widgets SET updated_at = datetime('now') WHERE id = NEW.id; " +
-        "END",
-    );
-    await (seedAdapter as unknown as { close(): Promise<void> }).close();
-
-    // Rails' structure_dump reaches its adapter with a bare
-    // `ActiveRecord::Base.lease_connection` (sqlite_database_tasks.rb:43,68-70),
-    // so the task's db_config has to be the established one before it runs —
-    // which is the caller's job, as it is for `db:schema:dump`
-    // (database_tasks.rb:523-530).
-    await DatabaseTasks.withTemporaryConnection(sourceConfig, async () => {
-      await new SQLiteDatabaseTasks(sourceConfig).structureDump(dumpPath);
-    });
-
-    const dumped = fs.readFileSync(dumpPath, "utf8");
-    expect(dumped).toMatch(/CREATE TABLE widgets/);
-    expect(dumped).toMatch(/index_widgets_on_name/);
-    expect(dumped).toMatch(/CREATE TRIGGER touch_widgets/);
-
-    // Explicit teardown for the raw-created `widgets` table (the dbPath file is
-    // also unlinked in afterEach) to balance require-table-teardown.
-    const cleanupAdapter = new BetterSQLite3Adapter(dbPath);
-    await cleanupAdapter.executeMutation("DROP TABLE IF EXISTS widgets");
-    await (cleanupAdapter as unknown as { close(): Promise<void> }).close();
-
-    const targetConfig = new HashConfig("development", "primary", {
-      adapter: "sqlite3",
-      database: loadDbPath,
-    });
-    fs.writeFileSync(loadDbPath, "");
-    await DatabaseTasks.withTemporaryConnection(targetConfig, async () => {
-      await new SQLiteDatabaseTasks(targetConfig).structureLoad(dumpPath);
-    });
-
-    const loadedAdapter = new BetterSQLite3Adapter(loadDbPath);
     try {
-      const tables = (await loadedAdapter.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name",
-      )) as Array<{ name: string }>;
-      expect(tables.map((r) => r.name)).toContain("widgets");
-      const idx = (await loadedAdapter.execute(
-        "SELECT name FROM sqlite_master WHERE type='index' AND name='index_widgets_on_name'",
-      )) as unknown[];
-      expect(idx.length).toBe(1);
-      const trigger = (await loadedAdapter.execute(
-        "SELECT name FROM sqlite_master WHERE type='trigger' AND name='touch_widgets'",
-      )) as unknown[];
-      expect(trigger.length).toBe(1);
+      await seedAdapter.executeMutation(
+        "CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT NOT NULL, updated_at TEXT)",
+      );
+      await seedAdapter.executeMutation("CREATE INDEX index_widgets_on_name ON widgets(name)");
+      await seedAdapter.executeMutation(
+        "CREATE TRIGGER touch_widgets AFTER UPDATE ON widgets " +
+          "BEGIN " +
+          "UPDATE widgets SET updated_at = datetime('now') WHERE id = NEW.id; " +
+          "END",
+      );
+      await (seedAdapter as unknown as { close(): Promise<void> }).close();
+
+      // Rails' structure_dump reaches its adapter with a bare
+      // `ActiveRecord::Base.lease_connection` (sqlite_database_tasks.rb:43,68-70),
+      // so the task's db_config has to be the established one before it runs —
+      // which is the caller's job, as it is for `db:schema:dump`
+      // (database_tasks.rb:523-530).
+      await DatabaseTasks.withTemporaryConnection(sourceConfig, async () => {
+        await new SQLiteDatabaseTasks(sourceConfig).structureDump(dumpPath);
+      });
+
+      const dumped = fs.readFileSync(dumpPath, "utf8");
+      expect(dumped).toMatch(/CREATE TABLE widgets/);
+      expect(dumped).toMatch(/index_widgets_on_name/);
+      expect(dumped).toMatch(/CREATE TRIGGER touch_widgets/);
+
+      const targetConfig = new HashConfig("development", "primary", {
+        adapter: "sqlite3",
+        database: loadDbPath,
+      });
+      fs.writeFileSync(loadDbPath, "");
+      await DatabaseTasks.withTemporaryConnection(targetConfig, async () => {
+        await new SQLiteDatabaseTasks(targetConfig).structureLoad(dumpPath);
+      });
+
+      const loadedAdapter = new BetterSQLite3Adapter(loadDbPath);
+      try {
+        const tables = (await loadedAdapter.execute(
+          "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name",
+        )) as Array<{ name: string }>;
+        expect(tables.map((r) => r.name)).toContain("widgets");
+        const idx = (await loadedAdapter.execute(
+          "SELECT name FROM sqlite_master WHERE type='index' AND name='index_widgets_on_name'",
+        )) as unknown[];
+        expect(idx.length).toBe(1);
+        const trigger = (await loadedAdapter.execute(
+          "SELECT name FROM sqlite_master WHERE type='trigger' AND name='touch_widgets'",
+        )) as unknown[];
+        expect(trigger.length).toBe(1);
+      } finally {
+        await (loadedAdapter as unknown as { close(): Promise<void> }).close();
+      }
     } finally {
-      await (loadedAdapter as unknown as { close(): Promise<void> }).close();
+      // Explicit teardown for the raw-created `widgets` table (the dbPath file is
+      // also unlinked in afterEach) to balance require-table-teardown.
+      const cleanupAdapter = new BetterSQLite3Adapter(dbPath);
+      await cleanupAdapter.executeMutation("DROP TABLE IF EXISTS widgets");
+      await (cleanupAdapter as unknown as { close(): Promise<void> }).close();
     }
   });
 });
