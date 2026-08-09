@@ -5808,9 +5808,14 @@ export class DateTime extends DateWithoutParseStatics {
    * `c_valid_gregorian_p` — proleptic Gregorian, no reform round trip — and
    * stores `HAVE_CIVIL | HAVE_TIME` with no Julian day, while its positive/zero
    * arm goes through `c_valid_civil_p` under `sg` and stores `jd_local_to_utc`
-   * of it too. Both then validate the time of day with `c_valid_time_p`. The
-   * negative arm's `set_to_complex` takes an `rjd` of `0`, so the base seat
-   * gets the civil triple and leaves ITS day to `get_s_jd` too.
+   * of it too. Both then validate the time of day with `c_valid_time_p`.
+   *
+   * The negative arm's `set_to_complex` takes an `rjd` of `0` — no day — so the
+   * base is seeded through the civil constructor rather than the day seat,
+   * leaving ITS day to `get_s_jd` (`date_core.c:1168-1187`) as well. It is
+   * handed the ORIGINAL `year`, not the `ry` {@link validGregorianP} decoded:
+   * the base re-runs that same decode, so it derives the same {@link Date#nth},
+   * where the residue year would have collapsed it to zero.
    *
    * `datetime_initialize`'s `switch (argc)` fall-through
    * (`date_core.c:7826-7849`) splits the second, then the minute, then the
@@ -5963,7 +5968,7 @@ export class DateTime extends DateWithoutParseStatics {
       fr2 = fr2 instanceof Rational ? fr2.add(DAY_IN_SECONDS) : fr2 + DAY_IN_SECONDS;
     }
     if (rcivil !== undefined) {
-      super(SEAT, nth, rjd, sg);
+      super(year, (month as number) ?? 1, d, sg);
       this.#civil = rcivil;
     } else {
       const rjd2 = jdLocalToUtc(rjd, timeToDf(rh, rmin, rs), rof);

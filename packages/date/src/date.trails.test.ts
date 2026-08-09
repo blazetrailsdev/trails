@@ -1189,6 +1189,36 @@ describe("Date", () => {
 });
 
 describe("DateTime", () => {
+  it("leaves the inherited Date's day to get_s_jd on the proleptic-Gregorian arm", () => {
+    // `datetime_initialize`'s negative `guess_style` arm stores
+    // `HAVE_CIVIL | HAVE_TIME` with an `rjd` of `0` (date_core.c:7851-7870), so
+    // the inherited half must be seeded civil-only — seeding it with the day
+    // seat would leave `get_s_jd` (date_core.c:1168-1187) answering day 0
+    // rather than the date. `DateTime` overrides every reader that would
+    // notice, so the base method is reached directly here.
+    const proto = Object.getPrototypeOf(RubyDateTime.prototype);
+    let base = proto;
+    while (base !== null && !Object.hasOwn(base, "mLocalJd")) base = Object.getPrototypeOf(base);
+    const getSJd = (base as { mLocalJd(): number }).mLocalJd;
+
+    const proleptic = new RubyDateTime(2001, 2, 3, 4, 5, 6, 0, RubyDate.GREGORIAN);
+    expect(getSJd.call(proleptic)).toBe(2451944);
+    expect(proleptic.jd).toBe(2451944);
+
+    // The other arm resolves the day up front, so both halves agree there too.
+    const civil = new RubyDateTime(2001, 2, 3, 4, 5, 6, 0, RubyDate.ITALY);
+    expect(civil.jd).toBe(2451944);
+  });
+
+  it("keeps decode_year's nth through the proleptic-Gregorian arm", () => {
+    // The base is handed the ORIGINAL year, not the residue `ry`
+    // `valid_gregorian_p` decoded, so it re-derives the same `nth`; the residue
+    // would have collapsed it to zero.
+    const big = new RubyDateTime(2n ** 70n, 1, 1, 0, 0, 0, 0, RubyDate.GREGORIAN);
+    expect(big.year).toBe(2n ** 70n);
+    expect(big.jd).toBe(new RubyDateTime(2n ** 70n, 1, 1, 0, 0, 0, 0, RubyDate.ITALY).jd);
+  });
+
   it("answers sec and hour, so localize resolves it against time.formats", () => {
     const datetime = new RubyDateTime(2008, 3, 1, 6);
     expect("sec" in datetime).toBe(true);
