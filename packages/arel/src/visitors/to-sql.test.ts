@@ -601,25 +601,12 @@ describe("the to_sql visitor", () => {
 
       it("raises UnsupportedVisitError for a non-finite Float", () => {
         // Infinity is not integral, so it lands on the Float branch — there is
-        // no separate non-finite rule.
-        //
-        // Asserted through visitArray (`inject_join`, to_sql.rb:858) rather
-        // than Equality because trails' `unboundableSign` short-circuits a raw
-        // Infinity to 1=0/1=1 first. That short-circuit is a KNOWN DEVIATION,
-        // not the rule this file documents: Rails' `unboundable?` is purely
-        // duck-typed (`value.respond_to?(:unboundable?) && value.unboundable?`,
-        // to_sql.rb:905-907) and a Float answers it false, so Rails reaches
-        // visit_Float and raises. Tracked by story
-        // converge-arel-unboundable-sign-duck-typing; converging it is out of
-        // scope here (it also changes Quoted(INFINITY), which Rails renders as
-        // `= Infinity`).
-        const v = new Visitors.ToSql(testConnection);
-        const visitArray = (
-          v as unknown as { visitArray(a: ReadonlyArray<unknown>, c: unknown): void }
-        ).visitArray;
-        expect(() => visitArray.call(v, [Infinity], new Collectors.SQLString())).toThrow(
-          Visitors.UnsupportedVisitError,
-        );
+        // no separate non-finite rule. `unboundable?` is purely duck-typed
+        // (`value.respond_to?(:unboundable?) && value.unboundable?`,
+        // to_sql.rb:905-907) and a Float answers it false, so Equality visits
+        // its right (to_sql.rb:643) and reaches visit_Float, aliased to
+        // `unsupported` (to_sql.rb:839).
+        expect(() => compileRight(Infinity)).toThrow(Visitors.UnsupportedVisitError);
       });
 
       it("dispatches a bare Temporal on its Rails analogue", () => {
