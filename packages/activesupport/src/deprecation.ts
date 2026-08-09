@@ -27,8 +27,7 @@ export class Deprecation {
   private _silenced = false;
   // Rails: `attr_accessor :gem_name` (deprecation/reporting.rb:11).
   gemName: string;
-  // Rails: `attr_accessor :deprecation_horizon` — "The version number in which
-  // the deprecated behavior will be removed, by default." (deprecation.rb:65).
+  // Rails: `attr_accessor :deprecation_horizon` (deprecation.rb:65).
   deprecationHorizon: string;
   // Rails: `self.debug = false` (deprecation.rb:76).
   debug = false;
@@ -60,7 +59,6 @@ export class Deprecation {
   constructor(deprecationHorizon = "8.1", gemName = "Rails") {
     this.gemName = gemName;
     this.deprecationHorizon = deprecationHorizon;
-    // By default, warnings are not silenced and debugging is off.
     this.silenced = false;
     this.debug = false;
   }

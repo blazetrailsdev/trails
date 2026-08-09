@@ -78,10 +78,12 @@ async function runRubyExtract(): Promise<void> {
   if (stderr) process.stderr.write(stderr);
 }
 
-// The test-compare analogue of api-compare's `RAILS_INPUTS`: the lockfile
-// (re-fetch), sources.ts (registry edits, whence `testPathsManifest()`), and
-// the extractor script (output-shape changes). The shared cache keys on their
-// CONTENT, so a key computed in one worktree matches another's.
+/**
+ * The test-compare analogue of api-compare's `RAILS_INPUTS`: the lockfile
+ * (re-fetch), sources.ts (registry edits, whence `testPathsManifest()`), and
+ * the extractor script (output-shape changes). The shared cache keys on their
+ * CONTENT, so a key computed in one worktree matches another's.
+ */
 const RAILS_INPUTS = [
   join(ROOT, "vendor/sources.lock.json"),
   join(ROOT, "vendor/sources.ts"),
