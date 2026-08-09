@@ -3881,19 +3881,8 @@ export class Date {
    * which is `Date._strptime` followed by `d_new_by_frags`. `start` is the
    * calendar reform, which `Temporal.PlainDate` has no bearer for, so it is not
    * a parameter here.
-   *
-   * The union return is TypeScript's static-side variance, not the port's
-   * shape: Ruby's `DateTime < Date` makes `datetime_s_strptime`'s DateTime a
-   * covariant override, while `Temporal.PlainDateTime` is not a subtype of
-   * `Temporal.PlainDate` (it answers no `toPlainDateTime`/`toPlainYearMonth`/
-   * `toPlainMonthDay`), so a `PlainDate`-only declaration here makes the
-   * {@link DateTime} override illegal (TS2417). This only ever answers a
-   * `PlainDate`.
    */
-  static strptime(
-    str = JULIAN_EPOCH_DATE,
-    fmt = "%F",
-  ): Temporal.PlainDate | Temporal.PlainDateTime {
+  static strptime(str = JULIAN_EPOCH_DATE, fmt = "%F"): Temporal.PlainDate {
     return dNewByFrags(Date._strptime(str, fmt)).toDate();
   }
 
@@ -3980,16 +3969,8 @@ export class Date {
    *
    * A string that named only a time of day answers no arm of
    * {@link rtValidDateFragsP} and raises.
-   *
-   * The union return is TypeScript's static-side variance, not the port's
-   * shape: Ruby's `DateTime < Date` makes `datetime_s_parse`'s DateTime a
-   * covariant override, while `Temporal.PlainDateTime` is not a subtype of
-   * `Temporal.PlainDate` (it answers no `toPlainDateTime`/`toPlainYearMonth`/
-   * `toPlainMonthDay`), so a `PlainDate`-only declaration here makes the
-   * {@link DateTime} override illegal (TS2417). This only ever answers a
-   * `PlainDate`.
    */
-  static parse(str: string, comp = true): Temporal.PlainDate | Temporal.PlainDateTime {
+  static parse(str: string, comp = true): Temporal.PlainDate {
     return dNewByFrags(Date._parse(str, comp)).toDate();
   }
 
@@ -4097,6 +4078,32 @@ export class Date {
 }
 
 /**
+ * @internal Ruby's `DateTime < Date` makes `datetime_s_parse` /
+ * `datetime_s_strptime` covariant overrides of the `::Date` ones
+ * (`date_core.c`), because `::DateTime` is a `::Date`. TypeScript has no such
+ * covariance available: `Temporal.PlainDateTime` is not a subtype of
+ * `Temporal.PlainDate` (it answers no
+ * `toPlainDateTime`/`toPlainYearMonth`/`toPlainMonthDay`), so
+ * `class DateTime extends Date` is rejected as TS2417 — "Class static side
+ * 'typeof DateTime' incorrectly extends base class static side 'typeof Date'"
+ * — the moment the two sides disagree on the return type. Neither a
+ * `this`-parameter, a `this`-keyed generic return, nor assigning the statics as
+ * module-level functions (the trails mixin idiom) sidesteps the check: TS
+ * compares the two static sides whatever shape the member takes.
+ *
+ * So `DateTime` extends `Date` under an alias whose STATIC side omits the two
+ * members it re-declares, which is the only shape that removes the comparison
+ * without weakening either declaration. This is a type-level alias only — the
+ * value is `Date` itself, so the runtime prototype chain, `instanceof`, and
+ * every inherited static are unchanged, and the instance side is `Date` intact.
+ * Both `Date.parse`/`Date.strptime` and `DateTime.parse`/`DateTime.strptime`
+ * therefore declare exactly what they answer.
+ */
+const DateWithoutParseStatics: (new (year?: number, month?: number, day?: number) => Date) &
+  (new (rjd: Temporal.PlainDate) => Date) &
+  Omit<typeof Date, "parse" | "strptime"> = Date;
+
+/**
  * @noRailsEquivalent PERMANENT — the `ruby/date` gem's `::DateTime`, a `::Date`
  * that also answers `hour`, `min` and `sec`. Defined in C
  * (`vendor/date/ext/date/date_core.c`), so it is outside `api:compare`'s
@@ -4105,7 +4112,7 @@ export class Date {
  * `time.formats` (i18n/lib/i18n/backend/base.rb:105-115), while `%Z` keeps
  * `::Date`'s offset spelling rather than `::Time`'s `"UTC"`.
  */
-export class DateTime extends Date {
+export class DateTime extends DateWithoutParseStatics {
   /**
    * @internal `ComplexDateData`'s fields (`date_core.c:215-231`): the day and
    * the day-fraction, both **in UTC**, and `of`, the offset in seconds east of
@@ -4299,7 +4306,7 @@ export class DateTime extends Date {
    * `datetime_s_parse` → `dt_new_by_frags`), which is `Date.parse`'s
    * `Date._parse` followed by the DateTime-shaped build.
    */
-  static override parse(str: string, comp = true): Temporal.PlainDateTime {
+  static parse(str: string, comp = true): Temporal.PlainDateTime {
     return dtNewByFrags(Date._parse(str, comp)).toDatetime();
   }
 
@@ -4322,7 +4329,7 @@ export class DateTime extends Date {
    * calendar reform, which `Temporal.PlainDate` has no bearer for, so it is not
    * a parameter here.
    */
-  static override strptime(str = JULIAN_EPOCH_DATETIME, fmt = "%FT%T%z"): Temporal.PlainDateTime {
+  static strptime(str = JULIAN_EPOCH_DATETIME, fmt = "%FT%T%z"): Temporal.PlainDateTime {
     return dtNewByFrags(Date._strptime(str, fmt)).toDatetime();
   }
 

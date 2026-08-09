@@ -1,5 +1,6 @@
 /**
- * Per-connection Temporal type parsers for the pg driver.
+ * Per-connection type parsers for the pg driver — the Temporal ones, plus
+ * `int8`.
  *
  * pg's default OID parsers decode timestamp/date columns into JS Date
  * objects, losing microsecond precision. By passing `{ types: { getTypeParser } }`
@@ -34,15 +35,38 @@ const OID_TIMESTAMP_ARRAY = 1115;
 const OID_TIMESTAMPTZ_ARRAY = 1185;
 const OID_TIMETZ_ARRAY = 1270;
 
+// `int8` (bigint), which `count(*)` also answers. pg's built-in text parser
+// leaves it a String because a 64-bit integer does not fit a JS number, so
+// every `select_values` reader of a numeric column answered `"3"` on PG and `3`
+// on sqlite/mysql. Rails has no such split: the pg gem's own type map decodes
+// int8 to an Integer, which is why `SchemaMigration#count` /
+// `InternalMetadata#count` are `select_values(...).first` with no coercion
+// (`schema_migration.rb:91-98`, `internal_metadata.rb:64-71`).
+const OID_INT8 = 20;
+
 // Text-format parsers receive strings; binary-format parsers receive Buffer.
 type PgParser = (value: string | Buffer) => unknown;
 
 const passthrough: PgParser = (v) => v;
 
-const TEMPORAL_PARSERS: ReadonlyMap<number, PgParser> = new Map<number, PgParser>([
+/**
+ * Decodes an `int8` the way `IntegerType#narrowBigInt` does: a safe-range value
+ * is a plain JS `number`, and a genuine bignum past float64's exact-integer
+ * range stays a `bigint` rather than truncating onto the nearest float.
+ * `BigIntegerType#castValue` accepts both, so this is the same contract
+ * better-sqlite3 and mysql2 already hand the type layer.
+ */
+const parseInt8: PgParser = (v) => {
+  const value = BigInt(v as string);
+  const num = Number(value);
+  return Number.isSafeInteger(num) ? num : value;
+};
+
+const CONNECTION_PARSERS: ReadonlyMap<number, PgParser> = new Map<number, PgParser>([
   [OID_TIMESTAMPTZ, (v) => parsePostgresInstant(v as string)],
   [OID_TIMESTAMP, (v) => parsePostgresTimestampAsInstant(v as string)],
   [OID_DATE, (v) => parsePostgresDate(v as string)],
+  [OID_INT8, parseInt8],
   [OID_DATE_ARRAY, passthrough],
   [OID_TIME_ARRAY, passthrough],
   [OID_TIMESTAMP_ARRAY, passthrough],
@@ -75,7 +99,7 @@ export function makeGetTypeParser(pgTypes: {
   return function getTypeParser(oid: number, format?: string): PgParser {
     const fmt = format || "text";
     if (fmt === "text") {
-      const parser = TEMPORAL_PARSERS.get(oid);
+      const parser = CONNECTION_PARSERS.get(oid);
       if (parser) return parser;
     }
     return pgTypes.getTypeParser(oid, fmt as "text" | "binary") as PgParser;

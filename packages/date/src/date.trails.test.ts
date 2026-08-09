@@ -29,7 +29,7 @@ const gemDate = (str: string, comp?: boolean) => dNewByFrags(RubyDate._parse(str
 const gemDateTime = (str: string, comp?: boolean) => dtNewByFrags(RubyDate._parse(str, comp));
 
 /** The `y-mm-dd` a date names, for a one-line assertion. */
-function ymd(date: RubyDate | Temporal.PlainDate | Temporal.PlainDateTime): string {
+function ymd(date: RubyDate | Temporal.PlainDate): string {
   const mon = date instanceof RubyDate ? date.mon : date.month;
   return `${date.year}-${String(mon).padStart(2, "0")}-${String(date.day).padStart(2, "0")}`;
 }
