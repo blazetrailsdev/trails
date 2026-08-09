@@ -72,7 +72,13 @@ describe("RFC 0022 arel-AST convergence (relation layer)", () => {
       expect(sql).toContain("UNION ALL");
     });
 
-    it("threads both operand binds through one collector in order", () => {
+    it("threads both operand binds through one collector in order", async (ctx) => {
+      // Placeholders and a bind array only exist when prepared statements are
+      // on: Rails' non-prepared `to_sql_and_binds` compiles through
+      // `SubstituteBinds` and returns `binds == []`
+      // (database_statements.rb:31-45), which is MySQL/MariaDB's default. Rails
+      // gates its own bind assertions the same way (bind_parameter_test.rb:9).
+      ctx.skip(!(await Base.connection).preparedStatements);
       const rel = cteRelation();
       const sql = rawSql(rel);
       expect(sql).toContain(placeholder1);

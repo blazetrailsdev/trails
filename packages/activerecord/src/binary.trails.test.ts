@@ -49,14 +49,19 @@ describe("binary type_casted_binds payload", () => {
     expect(new Uint8Array(out[0] as Uint8Array)).toEqual(bytes);
   });
 
-  it("reaches type_cast wrapped, so the chain needs no bare-bytes arm", async () => {
-    // `BinaryType#serialize` wraps at the source (binary.rb:30-33), so Rails'
-    // `type_cast` only ever sees a `Type::Binary::Data` and its terminal
-    // `raise TypeError` (abstract/quoting.rb:105) is unreachable for bytes.
-    // Ours now matches: an unwrapped `Uint8Array` is not a bindable value.
+  it("casts both byte forms Rails reaches type_cast with", async () => {
+    // Rails sees bytes here two ways, and both arms are inherited from the
+    // abstract chain now that sqlite3/mysql end at `else super`:
+    //   - `Type::Binary::Data`, which `BinaryType#serialize` wraps at the source
+    //     (binary.rb:30-33) → unwrapped by rb:96's `value.to_s`.
+    //   - a BINARY/ASCII-8BIT `String` on the `execute(sql, binds)` boundary →
+    //     passed through by rb:102's `when nil, Numeric, String then value`.
+    //     A JS string can't hold arbitrary bytes, so a byte view is that form.
     const bytes = new Uint8Array([0xde, 0xad]);
     expect(new BinaryType().serialize(bytes)).toBeInstanceOf(BinaryData);
     const conn = await Base.connection;
-    expect(() => conn.typeCast(bytes)).toThrow(TypeError);
+    for (const cast of [conn.typeCast(new BinaryData(bytes)), conn.typeCast(bytes)]) {
+      expect(new Uint8Array(cast as Uint8Array)).toEqual(bytes);
+    }
   });
 });

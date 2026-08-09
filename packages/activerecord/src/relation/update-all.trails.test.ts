@@ -39,7 +39,13 @@ async function captureUpdate(
 describe("update_all value substitution", () => {
   fixtures({ topics: [Topic, {}] });
 
-  it("casts a wrong-typed value through the column type", async () => {
+  it("casts a wrong-typed value through the column type", async (ctx) => {
+    // Bind-slot assertions are prepared-statements-only: Rails' non-prepared
+    // `to_sql_and_binds` compiles through `SubstituteBinds`, inlining every
+    // value and returning `binds == []` (database_statements.rb:31-45) — the
+    // MySQL/MariaDB default. Rails gates its own bind assertions the same way
+    // (bind_parameter_test.rb:9).
+    ctx.skip(!(await Topic.leaseConnection()).preparedStatements);
     const rel = Topic.where({ id: 1 });
     // A raw ISO-8601 string is not a datetime — `type_for_attribute("written_on").cast`
     // must turn it into a Time, which then serializes to Rails' datetime format.
@@ -52,7 +58,13 @@ describe("update_all value substitution", () => {
     expect((binds[0] as Temporal.Instant).toString()).toBe("2004-04-15T10:20:30Z");
   });
 
-  it("sends values as bind params rather than inline literals", async () => {
+  it("sends values as bind params rather than inline literals", async (ctx) => {
+    // Bind-slot assertions are prepared-statements-only: Rails' non-prepared
+    // `to_sql_and_binds` compiles through `SubstituteBinds`, inlining every
+    // value and returning `binds == []` (database_statements.rb:31-45) — the
+    // MySQL/MariaDB default. Rails gates its own bind assertions the same way
+    // (bind_parameter_test.rb:9).
+    ctx.skip(!(await Topic.leaseConnection()).preparedStatements);
     const rel = Topic.where({ id: 1 });
     const { sql, binds } = await captureUpdate(rel, () => rel.updateAll({ title: "bound value" }));
 
@@ -60,7 +72,13 @@ describe("update_all value substitution", () => {
     expect(binds[0]).toBe("bound value");
   });
 
-  it("casts each value exactly once", async () => {
+  it("casts each value exactly once", async (ctx) => {
+    // Bind-slot assertions are prepared-statements-only: Rails' non-prepared
+    // `to_sql_and_binds` compiles through `SubstituteBinds`, inlining every
+    // value and returning `binds == []` (database_statements.rb:31-45) — the
+    // MySQL/MariaDB default. Rails gates its own bind assertions the same way
+    // (bind_parameter_test.rb:9).
+    ctx.skip(!(await Topic.leaseConnection()).preparedStatements);
     // Rails casts once (relation.rb:1389-1390 + identity QueryAttribute#type_cast,
     // query_attribute.rb:22-24). A non-idempotent type makes a second cast visible.
     // A stub type whose `serialize` does NOT re-enter `cast` — every real type
