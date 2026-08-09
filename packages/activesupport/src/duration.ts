@@ -492,6 +492,10 @@ function toDateInput(date: Date | Temporal.Instant): Date {
  * through `Date#since` — which widens the day into a zoned `Time`
  * (`core_ext/date/calculations.rb:61-63`) — and the rest through `advance`,
  * which keeps the receiver a calendar day.
+ *
+ * Rails' `@parts` is sparse (`duration.rb:228` rejects the zeroes) where
+ * `DurationParts` carries all seven keys, so a zero part is skipped: without
+ * that, a zero `seconds` would take the `Date#since` arm and widen the day.
  */
 function applyDurationToDate(
   date: Temporal.PlainDate,
@@ -501,9 +505,6 @@ function applyDurationToDate(
   let time: Temporal.PlainDate | TimeWithZone = date;
 
   for (const [type, number] of Object.entries(parts) as [keyof DurationParts, number][]) {
-    // Rails' `@parts` is sparse — a part is present only when it was set —
-    // where `DurationParts` carries all seven keys. Without this skip a zero
-    // `seconds` would take the `Date#since` arm and widen the day into a Time.
     if (number === 0) continue;
     const t = time;
     if (type === "seconds") {

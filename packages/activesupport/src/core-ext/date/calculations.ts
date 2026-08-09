@@ -256,28 +256,33 @@ export function change(
 }
 
 /**
- * Mirrors: `Date#compare_with_coercion` (`date/calculations.rb:152-158`). The
- * `Time` arm is trails' instant receivers — a JS `Date`, a
- * `Temporal.Instant` or a `TimeWithZone`, all of which `to_datetime <=>` reads
- * as a moment rather than a calendar day.
+ * Mirrors: `Date#compare_with_coercion` (`date/calculations.rb:152-158`).
+ *
+ * Ruby's `is_a?(Time)` arm is every trails receiver that carries a moment
+ * rather than a calendar day — a JS `Date` (a timestamp), a `Temporal.Instant`
+ * and a `TimeWithZone`; trails has no bare-`Time` class to key on. The day is
+ * widened by ruby/date's own `to_datetime` (`date_core.c`
+ * `d_lite_to_datetime`), which is midnight at offset 0 — `date_ext_test.rb:80`
+ * asserts that — not midnight in `Time.zone`.
  */
 export function compareWithCoercion(
   date: Temporal.PlainDate,
   other: Temporal.PlainDate | Date | Temporal.Instant | TimeWithZone,
 ): number {
-  // boundary: a JS `Date` is one of trails' `Time` receivers, and this is the
-  // arm keyed on being one.
+  // boundary: a JS `Date` is one of trails' moment receivers, and this arm is
+  // keyed on being one.
   if (other instanceof Date || other instanceof Temporal.Instant || other instanceof TimeWithZone) {
-    return Temporal.Instant.compare(inTimeZone(date).utc(), instantOf(other));
+    const toDatetime = date.toZonedDateTime("UTC").toInstant();
+    const instant =
+      other instanceof Temporal.Instant
+        ? other
+        : other instanceof TimeWithZone
+          ? other.utc()
+          : Temporal.Instant.fromEpochMilliseconds(other.getTime());
+    return Temporal.Instant.compare(toDatetime, instant);
   } else {
     return compareWithoutCoercion(date, other);
   }
-}
-
-function instantOf(other: Date | Temporal.Instant | TimeWithZone): Temporal.Instant {
-  if (other instanceof Temporal.Instant) return other;
-  if (other instanceof TimeWithZone) return other.utc();
-  return Temporal.Instant.fromEpochMilliseconds(other.getTime());
 }
 
 /**

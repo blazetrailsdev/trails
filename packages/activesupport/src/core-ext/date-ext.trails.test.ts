@@ -10,6 +10,7 @@ import { Temporal } from "@blazetrails/date";
 import * as DateExt from "./date/calculations.js";
 import { resetZone } from "../time-zone-config.js";
 import { Duration } from "../duration.js";
+import { TimeZone } from "../values/time-zone.js";
 
 const pd = (year: number, month: number, day: number) => new Temporal.PlainDate(year, month, day);
 
@@ -62,13 +63,13 @@ describe("date calculations coercion arms", () => {
     expect(DateExt.compareWithoutCoercion(pd(2005, 2, 22), pd(2005, 2, 21))).toBe(1);
   });
 
-  it("compare_with_coercion widens the day for a Time", () => {
+  it("compare_with_coercion widens the day to midnight at offset 0", () => {
     const date = pd(2005, 2, 21);
-    const midnight = DateExt.beginningOfDay(date).utc();
+    const midnight = date.toZonedDateTime("UTC").toInstant();
     expect(DateExt.compareWithCoercion(date, midnight.add({ hours: 1 }))).toBe(-1);
     expect(DateExt.compareWithCoercion(date, midnight)).toBe(0);
     expect(DateExt.compareWithCoercion(date, midnight.subtract({ hours: 1 }))).toBe(1);
     expect(DateExt.compareWithCoercion(date, new Date(midnight.epochMilliseconds))).toBe(0);
-    expect(DateExt.compareWithCoercion(date, DateExt.beginningOfDay(date))).toBe(0);
+    expect(DateExt.compareWithCoercion(date, TimeZone.find("UTC")!.local(2005, 2, 21))).toBe(0);
   });
 });
