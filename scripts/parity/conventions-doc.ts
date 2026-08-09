@@ -15,10 +15,11 @@
 
 import * as fs from "fs";
 import * as path from "path";
+import { fileURLToPath } from "url";
 import * as prettier from "prettier";
-import { ROOT_DIR } from "./config.js";
-import { explainConventions } from "@blazetrails/parity/conventions";
+import { explainConventions } from "./conventions.js";
 
+const ROOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const DOC_PATH = path.join(ROOT_DIR, "docs", "ruby-ts-conventions.md");
 
 async function render(): Promise<string> {

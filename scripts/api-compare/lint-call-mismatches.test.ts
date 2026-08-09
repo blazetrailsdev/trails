@@ -17,7 +17,14 @@ import {
   unreviewedCount,
   writeSplitBaseline,
   renderStaleTags,
+  applyReason,
+  findCategory,
+  matchesCategory,
+  parseSetReason,
+  REASON_CATEGORIES,
+  type ReasonCategory,
 } from "./lint-call-mismatches.js";
+import { findNonCanonicalBaselines } from "./baseline-json.js";
 import type { ApiManifest, ClassInfo, MethodInfo } from "@blazetrails/parity/types";
 
 const entry = (
@@ -385,6 +392,123 @@ describe("committed baseline", () => {
     for (const e of committed) {
       expect(e.package.trim().length).toBeGreaterThan(0);
       expect(e.reason.trim().length).toBeGreaterThan(0);
+    }
+  });
+});
+
+// --set-reason: the bulk-clearance mode (RFC 0092). What is pinned is the
+// predicate, the guard that keeps a reviewed reason from being flattened into a
+// class reason, and the serialization round-trip — including an em-dash, since
+// an escaped one is exactly what reds the canonical-form gate.
+describe("--set-reason categories", () => {
+  const cat: ReasonCategory = {
+    name: "test-cat",
+    calls: ["synchronize"],
+    reason: "Ruby guards the body with Mutex#synchronize — the port has no analogue call.",
+    note: "test evidence",
+    rows: [{ package: "activerecord", tsFile: "model.ts", rubyName: "save" }],
+  };
+
+  it("matches on call name and, when given, the named rows only", () => {
+    expect(matchesCategory(cat, entry("activerecord", "model.ts", "save", "synchronize"))).toBe(
+      true,
+    );
+    // Right row, wrong call.
+    expect(matchesCategory(cat, entry("activerecord", "model.ts", "save", "except"))).toBe(false);
+    // Right call, a row the category does not name — the Relation-homonym trap.
+    expect(matchesCategory(cat, entry("activerecord", "relation.ts", "size", "synchronize"))).toBe(
+      false,
+    );
+    expect(matchesCategory(cat, entry("arel", "model.ts", "save", "synchronize"))).toBe(false);
+  });
+
+  it("matches every row with the call when the category names no rows", () => {
+    const wide: ReasonCategory = { ...cat, rows: undefined };
+    expect(matchesCategory(wide, entry("arel", "nodes/node.ts", "x", "synchronize"))).toBe(true);
+  });
+
+  it("rewrites seeded rows and skips reviewed ones unless forced", () => {
+    const entries = [
+      entry("activerecord", "model.ts", "save", "synchronize", DEFAULT_REASON),
+      entry("activerecord", "model.ts", "save", "except", DEFAULT_REASON),
+    ];
+    const seeded = applyReason(entries, cat, false);
+    expect(seeded.matched.map(keyOf)).toEqual([keyOf(entries[0])]);
+    expect(seeded.skipped).toEqual([]);
+    expect(seeded.next[0].reason).toBe(cat.reason);
+    expect(seeded.next[1].reason).toBe(DEFAULT_REASON);
+
+    const reviewed = [entry("activerecord", "model.ts", "save", "synchronize", "a real finding")];
+    const guarded = applyReason(reviewed, cat, false);
+    expect(guarded.matched).toEqual([]);
+    expect(guarded.skipped.map(keyOf)).toEqual([keyOf(reviewed[0])]);
+    expect(guarded.next[0].reason).toBe("a real finding");
+
+    const forced = applyReason(reviewed, cat, true);
+    expect(forced.matched.map(keyOf)).toEqual([keyOf(reviewed[0])]);
+    expect(forced.skipped).toEqual([]);
+    expect(forced.next[0].reason).toBe(cat.reason);
+  });
+
+  it("is idempotent: a row already carrying the category reason is neither matched nor skipped", () => {
+    const already = [entry("activerecord", "model.ts", "save", "synchronize", cat.reason)];
+    const result = applyReason(already, cat, false);
+    expect(result.matched).toEqual([]);
+    expect(result.skipped).toEqual([]);
+  });
+
+  it("round-trips a reason carrying an em-dash through the canonical serialization", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "set-reason-"));
+    try {
+      const { next } = applyReason(
+        [entry("activerecord", "model.ts", "save", "synchronize", DEFAULT_REASON)],
+        cat,
+        false,
+      );
+      await writeSplitBaseline(next, dir);
+      const text = await fs.readFile(path.join(dir, "activerecord", "model.json"), "utf-8");
+      expect(text).toContain("—");
+      expect(text).not.toContain("\\u2014");
+      expect(
+        await findNonCanonicalBaselines([path.join(dir, "activerecord", "model.json")]),
+      ).toEqual([]);
+      expect((await loadSplitBaseline(dir))[0].reason).toBe(cat.reason);
+    } finally {
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("parses the category name in both spellings and reports a missing value", () => {
+    expect(parseSetReason(["--report"])).toBe(undefined);
+    expect(parseSetReason(["--set-reason", "mutex-sync-body"])).toBe("mutex-sync-body");
+    expect(parseSetReason(["--set-reason=mutex-sync-body"])).toBe("mutex-sync-body");
+    expect(parseSetReason(["--set-reason", "--dry-run"])).toBe("");
+    expect(parseSetReason(["--set-reason"])).toBe("");
+  });
+
+  it("defines every category with a distinct name, a reason and its evidence", () => {
+    expect(new Set(REASON_CATEGORIES.map((c) => c.name)).size).toBe(REASON_CATEGORIES.length);
+    for (const c of REASON_CATEGORIES) {
+      expect(findCategory(c.name)).toBe(c);
+      expect(c.calls.length).toBeGreaterThan(0);
+      expect(c.reason.trim().length).toBeGreaterThan(0);
+      expect(c.note.trim().length).toBeGreaterThan(0);
+      expect(c.reason).not.toBe(DEFAULT_REASON);
+    }
+  });
+
+  // The mode is only usable if the categories it ships have already been
+  // applied — a matching row still carrying the seeded default means the
+  // committed baseline and the table disagree.
+  it("leaves no committed row matching a defined category unreviewed", async () => {
+    const committed = await loadBaseline();
+    for (const c of REASON_CATEGORIES) {
+      const { matched, skipped } = applyReason(committed, c, false);
+      expect({ name: c.name, matched: matched.length, skipped: skipped.length }).toEqual({
+        name: c.name,
+        matched: 0,
+        skipped: 0,
+      });
     }
   });
 });

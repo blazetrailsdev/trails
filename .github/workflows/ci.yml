@@ -1445,7 +1445,7 @@ jobs:
         # docs/ruby-ts-conventions.md is generated from explainConventions()
         # in conventions.ts; fail if it drifts so the agent-facing doc can't
         # go stale. Regenerate with `pnpm parity:api:conventions`.
-        run: pnpm exec tsx scripts/api-compare/conventions-doc.ts --check
+        run: pnpm exec tsx scripts/parity/conventions-doc.ts --check
       - name: Deprecation manifest up to date
         # eslint/rails-deprecated-methods.json is generated from the vendored
         # Ruby; fail if it drifts — a partial regeneration silently DROPS

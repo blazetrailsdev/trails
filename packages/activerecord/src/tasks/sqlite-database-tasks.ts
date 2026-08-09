@@ -308,11 +308,17 @@ export class SQLiteDatabaseTasks {
    * `sqlite_database_tasks.rb:72-75`. Rails connects to `db_config` unchanged;
    * the `root` join belongs to `drop` alone, so nothing rewrites `database`
    * on the way through here.
+   *
+   * `establish_connection` alone opens nothing — it installs a pool lazily — so
+   * the trailing `connection.connect!` is what forces the database file open.
+   * `create` (`:15-20`) masks a missing one with its own bare `connection`, but
+   * `reconnect`/`purge` (`:31-37`) does not.
    */
   private async establishConnection(config: DatabaseConfig = this.dbConfig): Promise<void> {
     await Base.establishConnection(
       config.configuration as { adapter?: string; [key: string]: unknown },
     );
+    await (await this.connection()).connectBang();
   }
 
   static register(): void {

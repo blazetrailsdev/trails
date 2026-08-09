@@ -1612,24 +1612,39 @@ export class SchemaStatements {
     throw new NotImplementedError();
   }
 
+  /**
+   * `schema_statements.rb:1305-1309`:
+   * `options[:name] ||= check_constraint_name(table_name, expression: expression, **options)`.
+   * The double-splat comes LAST, so an `:expression` carried in options wins
+   * over the positional one. The `||=` is truthy where
+   * {@link checkConstraintName}'s `fetch` is key-presence — but it derives only
+   * for an absent key either way, because its own derive call splats the same
+   * options back through that `fetch`, which hands a stored nil straight back.
+   */
   checkConstraintOptions(
     tableName: string,
     expression: string,
     options: Record<string, unknown> = {},
   ): Record<string, unknown> {
     const dup = { ...options };
-    dup.name ??= this.checkConstraintName(tableName, { ...dup, expression } as {
+    dup.name ??= this.checkConstraintName(tableName, { expression, ...dup } as {
       name?: string;
       expression?: string;
     });
     return dup;
   }
 
+  /**
+   * `schema_statements.rb:1341-1343`. The argument guard is
+   * `!options.key?(:name) && !options.key?(:expression)` — key presence, not
+   * truthiness — so an explicitly supplied `name: ""` or `name: nil` satisfies
+   * it and falls through to the lookup, which then matches nothing.
+   */
   async checkConstraintExists(
     tableName: string,
     options: { name?: string; expression?: string; validate?: boolean },
   ): Promise<boolean> {
-    if (!options.name && !options.expression) {
+    if (!("name" in options) && !("expression" in options)) {
       throw new ArgumentError("At least one of :name or :expression must be supplied");
     }
     return (await this.checkConstraintFor(tableName, options)) !== undefined;
@@ -2300,19 +2315,34 @@ export class SchemaStatements {
     return foreignKeys != null && foreignKeys !== false;
   }
 
-  /** @internal */
+  /**
+   * `schema_statements.rb:1787-1795`, which is two `Hash#fetch` calls:
+   * `options.fetch(:name) { ... options.fetch(:expression) ... }`. `fetch` runs
+   * its block only when the KEY IS ABSENT, so a stored nil comes back as-is —
+   * `{name: nil, expression: "x"}.fetch(:name) { "derived" }` is nil, and a
+   * truthy check would instead conflate "no :name given" with "given, but nil".
+   * The `||=` in {@link checkConstraintOptions} (`:1305-1309`) is the
+   * deliberately different one.
+   *
+   * The inner fetch takes no default either, so an ABSENT `:expression` raises
+   * where a stored nil interpolates as the empty string ("users__chk"). Rails
+   * raises Ruby's core `KeyError` there; trails has no ActiveRecord analogue of
+   * it and raises `ArgumentError`, which is the pre-existing spelling of this
+   * raise site.
+   * @internal
+   */
   checkConstraintName(
     tableName: string,
     options: { name?: string; expression?: string } = {},
-  ): string {
-    if (options.name) return options.name;
-    if (options.expression === undefined) {
+  ): string | undefined {
+    if ("name" in options) return options.name;
+    if (!("expression" in options)) {
       throw new ArgumentError(
         `check_constraint_name requires either :name or :expression to be specified`,
       );
     }
     const expression = options.expression;
-    const identifier = `${tableName}_${expression}_chk`;
+    const identifier = `${tableName}_${expression ?? ""}_chk`;
     const hex = getCrypto().createHash("sha256").update(identifier).digest("hex").slice(0, 10);
     return `chk_rails_${hex}`;
   }
