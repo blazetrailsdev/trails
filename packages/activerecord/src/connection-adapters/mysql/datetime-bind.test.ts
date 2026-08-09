@@ -1,3 +1,4 @@
+import { quotingHost } from "../../support/quoting-host.js";
 import { Temporal } from "@blazetrails/date";
 import { describe, expect, it } from "vitest";
 import { typeCast as abstractTypeCast } from "../abstract/quoting.js";
@@ -11,7 +12,8 @@ import { quotedDate as mysqlQuotedDate } from "./quoting.js";
 describe("MySQL datetime bind formatting", () => {
   // Rails' `type_cast` dispatches `quoted_date` on the connection
   // (abstract/quoting.rb:104), so the MySQL cap comes from the receiver.
-  const bind = (v: unknown) => abstractTypeCast.call({ quotedDate: mysqlQuotedDate }, v);
+  const bind = (v: unknown) =>
+    abstractTypeCast.call(quotingHost({ quotedDate: mysqlQuotedDate }), v);
 
   it("emits YYYY-MM-DD HH:MM:SS.ffffff without T or Z", () => {
     const instant = Temporal.Instant.from("2026-05-08T14:32:00.123456Z");

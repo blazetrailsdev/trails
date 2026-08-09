@@ -66,12 +66,14 @@ import {
   unquotedTrue as abstractUnquotedTrue,
   unquotedFalse as abstractUnquotedFalse,
   quotedBinary as abstractQuotedBinary,
+  quotedDate as abstractQuotedDate,
+  quotedTime as abstractQuotedTime,
   castBoundValue as abstractCastBoundValue,
   sanitizeAsSqlComment as abstractSanitizeAsSqlComment,
   lookupCastType as abstractLookupCastType,
   Quoting as QuotingMixin,
 } from "./abstract/quoting.js";
-import type { Quoting } from "./abstract/quoting.js";
+import type { Quoting, QuotedTimeValue } from "./abstract/quoting.js";
 import { include } from "@blazetrails/activesupport";
 import {
   SchemaStatements,
@@ -1034,6 +1036,23 @@ export class AbstractAdapter implements Quoting {
 
   unquotedFalse(): boolean | number {
     return abstractUnquotedFalse();
+  }
+
+  /**
+   * Rails' `quote` / `type_cast` self-send `quoted_date` and `quoted_time`
+   * (abstract/quoting.rb:84-85, :101-102), so both must be real members of the
+   * receiver here — an adapter override (PostgreSQL's BC-suffixing `quotedDate`,
+   * SQLite's 2000-01-01 `quotedTime`) then resolves off the receiver.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::Quoting#quoted_date (rb:184-199)
+   */
+  quotedDate(value: Parameters<typeof abstractQuotedDate>[0]): string {
+    return abstractQuotedDate(value);
+  }
+
+  /** Mirrors: ActiveRecord::ConnectionAdapters::Quoting#quoted_time (rb:201-204) */
+  quotedTime(value: QuotedTimeValue): string {
+    return abstractQuotedTime.call(this, value);
   }
 
   quotedBinary(value: unknown): string {

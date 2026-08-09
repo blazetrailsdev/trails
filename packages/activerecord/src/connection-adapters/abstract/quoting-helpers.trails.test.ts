@@ -11,6 +11,8 @@
  * Renamed to `.trails.test.ts` (was `quoting-helpers.test.ts`) to make that
  * self-evident; it is why reviewers kept having to re-derive it.
  */
+import { quotingHost } from "../../support/quoting-host.js";
+import { NotImplementedError } from "../../errors.js";
 import { describe, expect, it } from "vitest";
 import { Temporal } from "@blazetrails/date";
 import { BinaryData } from "@blazetrails/activemodel";
@@ -57,23 +59,23 @@ describe("quotedDate", () => {
 describe("quotedTime", () => {
   it("formats a Temporal.PlainTime stripping the date prefix", () => {
     const v = Temporal.PlainTime.from("14:23:55");
-    expect(quotedTime.call({}, v)).toBe("14:23:55");
+    expect(quotedTime.call(quotingHost(), v)).toBe("14:23:55");
   });
 
   it("formats a Temporal.PlainDateTime stripping the date", () => {
     const v = Temporal.PlainDateTime.from("2026-04-26T14:23:55.123456");
-    expect(quotedTime.call({}, v)).toBe("14:23:55.123456");
+    expect(quotedTime.call(quotingHost(), v)).toBe("14:23:55.123456");
   });
 
   it("normalises the date component to 2000-01-01", () => {
     const v = Temporal.PlainDateTime.from("2099-12-31T09:00:00");
-    expect(quotedTime.call({}, v)).toBe("09:00:00");
+    expect(quotedTime.call(quotingHost(), v)).toBe("09:00:00");
   });
 
   it("dispatches through this.quotedDate (mirrors Rails quoted_time → self.quoted_date)", () => {
     // Override quotedDate to prove the self-dispatch chain is live; the prefix
     // is then stripped by quotedTime's date-removal regex.
-    const host = { quotedDate: () => "2000-01-01 11:22:33" };
+    const host = quotingHost({ quotedDate: () => "2000-01-01 11:22:33" });
     const v = Temporal.PlainTime.from("11:22:33");
     expect(quotedTime.call(host, v)).toBe("11:22:33");
   });
@@ -81,31 +83,31 @@ describe("quotedTime", () => {
 
 describe("quote dispatches through quoted_date/quoted_time", () => {
   it("routes Date/Time values through this.quotedDate", () => {
-    const host = { quotedDate: () => "DISPATCHED" };
+    const host = quotingHost({ quotedDate: () => "DISPATCHED" });
     const v = Temporal.PlainDate.from("2026-04-26");
     expect(quote.call(host, v)).toBe("'DISPATCHED'");
   });
 
   it("routes Time::Value (PlainTime) through this.quotedTime", () => {
-    const host = { quotedTime: () => "DISPATCHED_TIME" };
+    const host = quotingHost({ quotedTime: () => "DISPATCHED_TIME" });
     const v = Temporal.PlainTime.from("14:23:55");
     expect(quote.call(host, v)).toBe("'DISPATCHED_TIME'");
   });
 
-  it("falls back to the module quoted_date helper without a host", () => {
+  it("uses the abstract quoted_date on a receiver that does not override it", () => {
     const v = Temporal.PlainDate.from("2026-04-26");
-    expect(quote.call({}, v)).toBe("'2026-04-26'");
+    expect(quote.call(quotingHost(), v)).toBe("'2026-04-26'");
   });
 
-  it("falls back to the module quoted_time helper for PlainTime without a host", () => {
+  it("uses the abstract quoted_time on a receiver that does not override it", () => {
     const v = Temporal.PlainTime.from("14:23:55");
-    expect(quote.call({}, v)).toBe("'14:23:55'");
+    expect(quote.call(quotingHost(), v)).toBe("'14:23:55'");
   });
 });
 
 describe("quote dispatches through quoted_binary", () => {
   it("routes Type::Binary::Data through this.quotedBinary", () => {
-    const host = { quotedBinary: () => "DISPATCHED_BINARY" };
+    const host = quotingHost({ quotedBinary: () => "DISPATCHED_BINARY" });
     expect(quote.call(host, new BinaryData(new Uint8Array([0xde, 0xad])))).toBe(
       "DISPATCHED_BINARY",
     );
@@ -115,12 +117,12 @@ describe("quote dispatches through quoted_binary", () => {
     // Rails: `when Type::Binary::Data then quoted_binary(value)` (rb:83) hands the
     // wrapper to the override, which unwraps it (`value.to_s` / `value.hex`).
     let received: unknown;
-    const host = {
+    const host = quotingHost({
       quotedBinary: (value: unknown) => {
         received = value;
         return "";
       },
-    };
+    });
     const data = new BinaryData(new Uint8Array([0xde, 0xad]));
     quote.call(host, data);
     expect(received).toBe(data);
@@ -130,12 +132,12 @@ describe("quote dispatches through quoted_binary", () => {
     // Trails-only affordance: a raw view has no Ruby analogue (Rails only ever
     // sees Type::Binary::Data here), so it is normalized before dispatch.
     let received: unknown;
-    const host = {
+    const host = quotingHost({
       quotedBinary: (value: unknown) => {
         received = value;
         return "";
       },
-    };
+    });
     const bytes = new Uint8Array([0xde, 0xad]);
     quote.call(host, bytes);
     expect(received).toBeInstanceOf(Uint8Array);
@@ -145,7 +147,7 @@ describe("quote dispatches through quoted_binary", () => {
   it("falls back to the module quoted_binary helper without a host", () => {
     // Rails' abstract quoted_binary is `"'#{quote_string(value.to_s)}'"` —
     // the raw byte string, not a comma-joined element list.
-    expect(quote.call({}, new BinaryData("ab"))).toBe("'ab'");
+    expect(quote.call(quotingHost(), new BinaryData("ab"))).toBe("'ab'");
   });
 
   it("normalises every byte source in the module quoted_binary fallback", () => {
@@ -177,7 +179,7 @@ describe("type_cast unwraps Type::Binary::Data", () => {
     // BINARY-encoded String, so the analogue is `.bytes`. 0xde 0xad 0xbe 0xef is
     // not valid UTF-8: a `toString()` port would yield U+FFFD replacements.
     const bytes = new Uint8Array([0xde, 0xad, 0xbe, 0xef]);
-    const out = typeCast.call({}, new BinaryData(bytes));
+    const out = typeCast.call(quotingHost(), new BinaryData(bytes));
     expect(out).toBeInstanceOf(Uint8Array);
     expect(out).toEqual(bytes);
   });
@@ -185,32 +187,41 @@ describe("type_cast unwraps Type::Binary::Data", () => {
 
 describe("type_cast dispatches through quoted_date/quoted_time", () => {
   it("routes Date/Time values through this.quotedDate", () => {
-    const host = { quotedDate: () => "DISPATCHED" };
+    const host = quotingHost({ quotedDate: () => "DISPATCHED" });
     const v = Temporal.PlainDate.from("2026-04-26");
     expect(typeCast.call(host, v)).toBe("DISPATCHED");
   });
 
   it("routes Time::Value (PlainTime) through this.quotedTime", () => {
-    const host = { quotedTime: () => "DISPATCHED_TIME" };
+    const host = quotingHost({ quotedTime: () => "DISPATCHED_TIME" });
     const v = Temporal.PlainTime.from("14:23:55");
     expect(typeCast.call(host, v)).toBe("DISPATCHED_TIME");
   });
 
-  it("falls back to the module quoted_date helper without a host", () => {
+  it("uses the abstract quoted_date on a receiver that does not override it", () => {
     const v = Temporal.PlainDate.from("2026-04-26");
-    expect(typeCast.call({}, v)).toBe("2026-04-26");
+    expect(typeCast.call(quotingHost(), v)).toBe("2026-04-26");
   });
 
-  it("falls back to the module quoted_time helper for PlainTime without a host", () => {
+  it("uses the abstract quoted_time on a receiver that does not override it", () => {
     const v = Temporal.PlainTime.from("14:23:55");
-    expect(typeCast.call({}, v)).toBe("14:23:55");
+    expect(typeCast.call(quotingHost(), v)).toBe("14:23:55");
   });
 });
 
 describe("quote_table_name dispatches through quote_column_name", () => {
-  it("routes through this.quoteColumnName when present", () => {
-    const host = { quoteColumnName: (n: string) => `<<${n}>>` };
+  it("routes through this.quoteColumnName", () => {
+    const host = quotingHost({ quoteColumnName: (n: string) => `<<${n}>>` });
     expect(quoteTableName.call(host, "people")).toBe("<<people>>");
+  });
+
+  it("raises on a receiver with no quoter rather than answering with ANSI quotes", () => {
+    // rb:141-143 is an unconditional `quote_column_name(table_name)`, so a
+    // receiver that defines no quoter raises from the abstract
+    // `quote_column_name` (rb:61). It must NOT fall back to a module-level
+    // default and hand back a plausible-but-wrong `"people"` — that silent
+    // degradation is what the retired `dispatch*` probes produced.
+    expect(() => quoteTableName.call(quotingHost(), "people")).toThrow(NotImplementedError);
   });
 });
 
@@ -218,12 +229,12 @@ describe("boolean literals dispatch through the host", () => {
   // Rails reaches the pair via self (abstract/quoting.rb:77-78, 98-99), so an
   // adapter override applies to the *inherited* quote/type_cast. These pin the
   // dispatch, not just the values: a host that overrides the pair must win.
-  const host = {
+  const host = quotingHost({
     quotedTrue: () => "1",
     quotedFalse: () => "0",
     unquotedTrue: () => 1,
     unquotedFalse: () => 0,
-  };
+  });
 
   it("routes quote through this.quotedTrue/quotedFalse when present", () => {
     expect(quote.call(host, true)).toBe("1");
@@ -235,10 +246,10 @@ describe("boolean literals dispatch through the host", () => {
     expect(typeCast.call(host, false)).toBe(0);
   });
 
-  it("falls back to the module helpers for a host without the overrides", () => {
-    expect(quote.call({}, true)).toBe("TRUE");
-    expect(quote.call({}, false)).toBe("FALSE");
-    expect(typeCast.call({}, true)).toBe(true);
-    expect(typeCast.call({}, false)).toBe(false);
+  it("uses the abstract literals on a receiver that does not override them", () => {
+    expect(quote.call(quotingHost(), true)).toBe("TRUE");
+    expect(quote.call(quotingHost(), false)).toBe("FALSE");
+    expect(typeCast.call(quotingHost(), true)).toBe(true);
+    expect(typeCast.call(quotingHost(), false)).toBe(false);
   });
 });

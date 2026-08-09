@@ -11,7 +11,7 @@
  *   `Date` — #939 ("close the dual-typed window") made Temporal the sole
  *   date/time representation, so `quote` and `typeCast` both reject a JS `Date`
  *   with guidance rather than formatting it. rb:85 is ported onto the Temporal
- *   branches via `dispatchQuotedDate`.
+ *   branches via the `quoted_date` self-send.
  */
 
 import { Temporal } from "@blazetrails/date";
@@ -28,36 +28,27 @@ import {
 import { Value as TimeValue } from "../../type/time.js";
 
 /**
- * Host shape the standalone {@link quote} / {@link quoteTableName} dispatch
- * through, mirroring Rails where `quote` calls `self.quoted_date` /
- * `self.quoted_time` and `quote_table_name` calls `self.quote_column_name`.
- * Threading `this` lets an adapter override (e.g. PostgreSQL's BC-aware
- * `quotedDate`) flow into the inherited `quote`. A host receiver is required —
- * every invocation goes through an adapter via `.call(this, value)`; a host
- * that omits `quotedDate` / `quotedTime` / `quotedBinary` falls back to the
- * module-level helpers.
+ * Receiver shape for the `this`-typed functions in this module, standing in for
+ * the `self` Rails' `Quoting` module sends to: `quote` sends `quote_string`,
+ * `quoted_true`, `quoted_binary`, `quoted_time` and `quoted_date`
+ * (abstract/quoting.rb:73-89), and `quote_table_name` sends `quote_column_name`
+ * (rb:141-143). Every member is required, exactly as a Ruby self-send has no
+ * conditional arm — a receiver that defines none of them inherits the abstract
+ * ones, and one missing a quoter is a compile error here rather than a silent
+ * fall back to the ANSI answer.
  */
 export interface QuotingDispatchHost {
-  /** @internal */
-  quote?(value: unknown): string;
-  /** @internal */
-  quotedDate?(value: TemporalDateLike): string;
-  /** @internal */
-  quotedTime?(value: QuotedTimeValue): string;
-  /** @internal */
-  quotedBinary?(value: unknown): string;
-  /** @internal */
-  quoteString?(s: string): string;
-  /** @internal */
-  quoteColumnName?(name: string): string;
-  /** @internal */
-  quotedTrue?(): string;
-  /** @internal */
-  quotedFalse?(): string;
-  /** @internal */
-  unquotedTrue?(): boolean | number;
-  /** @internal */
-  unquotedFalse?(): boolean | number;
+  quote(value: unknown): string;
+  quotedDate(value: TemporalDateLike): string;
+  quotedTime(value: QuotedTimeValue): string;
+  quotedBinary(value: unknown): string;
+  quoteString(s: string): string;
+  quoteColumnName(name: string): string;
+  quoteTableName(name: string): string;
+  quotedTrue(): string;
+  quotedFalse(): string;
+  unquotedTrue(): boolean | number;
+  unquotedFalse(): boolean | number;
 }
 
 /**
@@ -94,10 +85,7 @@ export function quoteColumnName(_columnName: string): string {
  * (activerecord/.../abstract/quoting.rb L66 — `quote_column_name(table_name)`)
  */
 export function quoteTableName(this: QuotingDispatchHost, name: string): string {
-  if (typeof this.quoteColumnName === "function") {
-    return this.quoteColumnName(name);
-  }
-  return quoteColumnName(name);
+  return this.quoteColumnName(name);
 }
 
 /**
@@ -111,18 +99,17 @@ export function quote(this: QuotingDispatchHost, value: unknown): string {
   // surrounding quotes are added here, once, and the dialect's escape rules come
   // from the adapter's override.
   if (typeof value === "string") {
-    return `'${dispatchQuoteString(this, value)}'`;
+    return `'${this.quoteString(value)}'`;
   }
   if (typeof value === "symbol") {
     const desc = value.description;
     if (desc === undefined) throw new TypeError("Cannot quote a Symbol without a description");
-    return `'${dispatchQuoteString(this, desc)}'`;
+    return `'${this.quoteString(desc)}'`;
   }
   // Rails: `when true then quoted_true` / `when false then quoted_false`
   // (rb:77-78) — self-dispatched, so SQLite's `1`/`0` override applies to the
   // inherited `quote`. Thread `this` to mirror that.
-  if (typeof value === "boolean")
-    return value ? dispatchQuotedTrue(this) : dispatchQuotedFalse(this);
+  if (typeof value === "boolean") return value ? this.quotedTrue() : this.quotedFalse();
   if (value === null || value === undefined) return "NULL";
   // BigDecimals need to be put in a non-normalized (fixed, ".0"-bearing) form
   // and quoted bare — Rails: `when BigDecimal then value.to_s("F")`.
@@ -139,27 +126,27 @@ export function quote(this: QuotingDispatchHost, value: unknown): string {
   // MySQL/SQLite's `x'..'` hex) is honored. Thread `this` to mirror that. The
   // `Data` is passed through unwrapped, as Rails does; each override unwraps it
   // itself (`value.to_s` / `value.hex`).
-  if (value instanceof BinaryData) return dispatchQuotedBinary(this, value);
+  if (value instanceof BinaryData) return this.quotedBinary(value);
   // ArrayBuffer views have no Ruby analogue (#4868): Rails only ever sees
   // `Type::Binary::Data` here, so they must be normalized to bytes rather than
   // falling to the raise below. Kept at the rb:83 position and self-dispatched,
   // so a view and a `BinaryData` take the same path to the adapter override.
   if (ArrayBuffer.isView(value)) {
     const bytes = new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
-    return dispatchQuotedBinary(this, bytes);
+    return this.quotedBinary(bytes);
   }
   // Rails dispatches date/time literals through `self.quoted_time` (Time::Value)
   // and `self.quoted_date` (Date/Time) so adapter overrides — e.g. PostgreSQL's
   // BC-suffixing `quoted_date` — are honored. Thread `this` to mirror that.
   if (value instanceof TimeValue || value instanceof Temporal.PlainTime)
-    return `'${dispatchQuotedTime(this, value)}'`;
+    return `'${this.quotedTime(value)}'`;
   if (
     value instanceof Temporal.Instant ||
     value instanceof Temporal.PlainDateTime ||
     value instanceof Temporal.PlainDate ||
     value instanceof Temporal.ZonedDateTime
   ) {
-    return `'${dispatchQuotedDate(this, value)}'`;
+    return `'${this.quotedDate(value)}'`;
   }
   if (value instanceof Date)
     throw new TypeError(
@@ -189,8 +176,7 @@ export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
   // Rails: `when true then unquoted_true` / `when false then unquoted_false`
   // (rb:98-99) — self-dispatched, so MySQL's `1`/`0` override applies to the
   // inherited `type_cast`. Thread `this` to mirror that.
-  if (typeof value === "boolean")
-    return value ? dispatchUnquotedTrue(this) : dispatchUnquotedFalse(this);
+  if (typeof value === "boolean") return value ? this.unquotedTrue() : this.unquotedFalse();
   if (value === null || value === undefined) return value;
   // Rails: `when BigDecimal then value.to_s("F")` — bound as a fixed-form string.
   if (value instanceof BigDecimal) return value.toString("F");
@@ -210,14 +196,14 @@ export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
   // same self-dispatch `quote` uses. Thread `this` so adapter overrides — e.g.
   // PostgreSQL's BC-suffixing `quotedDate` — flow into `type_cast` too.
   if (value instanceof TimeValue || value instanceof Temporal.PlainTime)
-    return dispatchQuotedTime(this, value);
+    return this.quotedTime(value);
   if (
     value instanceof Temporal.Instant ||
     value instanceof Temporal.PlainDateTime ||
     value instanceof Temporal.PlainDate ||
     value instanceof Temporal.ZonedDateTime
   ) {
-    return dispatchQuotedDate(this, value);
+    return this.quotedDate(value);
   }
   if (value instanceof Date)
     throw new TypeError(
@@ -276,9 +262,9 @@ export function quoteTableNameForAssignment(
   table: string,
   attr: string,
 ): string {
-  // Rails: `quote_table_name("#{table}.#{attr}")` (abstract/quoting.rb:153) —
-  // self-dispatched, which MySQL's `table`.`attr` override depends on.
-  return quoteTableName.call(this, `${table}.${attr}`);
+  // Rails: `quote_table_name("#{table}.#{attr}")` (abstract/quoting.rb:152-154) —
+  // self-sent, which MySQL's `table`.`attr` override depends on.
+  return this.quoteTableName(`${table}.${attr}`);
 }
 
 /**
@@ -329,7 +315,7 @@ export function quoteDefaultExpression(
   // deliberately lacks. Falling straight to the module `quote` here would bypass
   // the dialect entirely and raise `can't quote Uint8Array` on a binary default.
   // Hosts without a `quote` keep the module helper.
-  return dispatchQuote(this, serialized);
+  return this.quote(serialized);
 }
 
 /**
@@ -464,8 +450,7 @@ export function columnNameWithOrderMatcher(): RegExp {
  * branch (abstract/quoting.rb `quote`/`type_cast`); there is no
  * `sql_literal?` predicate to mirror. Factored out here only because TS
  * cannot spell `===`-style case matching. Adapter-internal rather than public
- * API — sqlite3-adapter.ts imports it for the same branch — so it carries the
- * same `@internal` marking as the `dispatch*` helpers alongside it.
+ * API — sqlite3-adapter.ts imports it for the same branch — hence `@internal`.
  *
  * @internal
  */
@@ -476,101 +461,6 @@ export function isSqlLiteral(value: unknown): value is { value: string } {
     value.constructor?.name === "SqlLiteral" &&
     typeof (value as any).value === "string"
   );
-}
-
-/**
- * Self-dispatch binary quoting through the host, mirroring Rails' `quote`
- * calling `self.quoted_binary(value)` so an adapter override applies. Falls
- * back to the module-level helper when the host omits it.
- *
- * Takes `unknown` rather than `BinaryData`: the rb:83 branch passes a
- * `BinaryData`, but the abstract view branch passes normalized bytes and
- * SQLite's bare-`ArrayBuffer` branch dispatches the buffer itself. The
- * abstract/MySQL/SQLite/PostgreSQL `quotedBinary` all normalise these through
- * {@link toBytes}.
- * @internal
- */
-export function dispatchQuotedBinary(host: QuotingDispatchHost, value: unknown): string {
-  if (typeof host.quotedBinary === "function") {
-    return host.quotedBinary(value);
-  }
-  return quotedBinary(value);
-}
-
-/**
- * Dispatch through the host's `quotedDate` override if it defines one, else
- * the module-level helper. A host receiver is required — there are no
- * receiver-less callers (every invocation threads an adapter `this`).
- * @internal
- */
-export function dispatchQuotedDate(host: QuotingDispatchHost, value: TemporalDateLike): string {
-  if (typeof host.quotedDate === "function") {
-    return host.quotedDate(value);
-  }
-  return quotedDate(value);
-}
-
-/**
- * Dispatch through the host's `quote` override if it defines one, else the
- * module-level helper. Mirrors Rails' bare `quote(value)` self-dispatch inside
- * `quote_default_expression` (abstract/quoting.rb:162).
- * @internal
- */
-export function dispatchQuote(host: QuotingDispatchHost, value: unknown): string {
-  if (typeof host.quote === "function") {
-    return host.quote(value);
-  }
-  return quote.call(host, value);
-}
-
-/**
- * Dispatch the boolean literals through the host's overrides if it defines
- * them, else the module-level helpers, so an adapter's override applies to the
- * *inherited* `quote` / `type_cast` rather than forcing each adapter to
- * re-implement the whole boolean arm.
- *
- * One helper per Rails method — `when true then quoted_true` and `when false
- * then quoted_false` are four distinct `self.` sends (abstract/quoting.rb:77-78,
- * 98-99) — matching the one-method-per-helper shape of `dispatchQuotedTime` /
- * `dispatchQuotedBinary` / `dispatchQuotedDate`.
- * @internal
- */
-export function dispatchQuotedTrue(host: QuotingDispatchHost): string {
-  return typeof host.quotedTrue === "function" ? host.quotedTrue() : quotedTrue();
-}
-
-/** @internal */
-export function dispatchQuotedFalse(host: QuotingDispatchHost): string {
-  return typeof host.quotedFalse === "function" ? host.quotedFalse() : quotedFalse();
-}
-
-/**
- * Mirrors Rails' `quote_string(value.to_s)` inside `quote`
- * (abstract/quoting.rb:75-76) — self-dispatched, so an adapter's escape-only
- * override (PG's libpq `escape`, MySQL's backslash escapes, SQLite's `''`)
- * applies to the inherited `quote`.
- * @internal
- */
-export function dispatchQuoteString(host: QuotingDispatchHost, s: string): string {
-  return typeof host.quoteString === "function" ? host.quoteString(s) : quoteString(s);
-}
-
-/** @internal */
-export function dispatchUnquotedTrue(host: QuotingDispatchHost): boolean | number {
-  return typeof host.unquotedTrue === "function" ? host.unquotedTrue() : unquotedTrue();
-}
-
-/** @internal */
-export function dispatchUnquotedFalse(host: QuotingDispatchHost): boolean | number {
-  return typeof host.unquotedFalse === "function" ? host.unquotedFalse() : unquotedFalse();
-}
-
-/** @internal */
-export function dispatchQuotedTime(host: QuotingDispatchHost, value: QuotedTimeValue): string {
-  if (typeof host.quotedTime === "function") {
-    return host.quotedTime(value);
-  }
-  return quotedTime.call(host, value);
 }
 
 /**
@@ -642,7 +532,7 @@ export function quotedTime(this: QuotingDispatchHost, value: QuotedTimeValue): s
           value.nanosecond,
         )
       : value.with({ year: 2000, month: 1, day: 1 });
-  return dispatchQuotedDate(this, dt).replace(/^\d{4}-\d{2}-\d{2} /, "");
+  return this.quotedDate(dt).replace(/^\d{4}-\d{2}-\d{2} /, "");
 }
 
 /** @internal */
@@ -756,12 +646,13 @@ export interface Quoting {
 
 /**
  * Mixin object for AbstractAdapter: bundles standalone Quoting helpers so
- * `include(AbstractAdapter, Quoting)` credits them to the host class.
+ * `include(AbstractAdapter, Quoting)` credits them to the host class. The rest
+ * of the module's members are wired as one-line delegating methods on
+ * `AbstractAdapter` itself (`quoteString`, `quotedTrue`, `quotedDate`, …), so
+ * only the ones with no class-level counterpart travel through here.
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::Quoting (included in AbstractAdapter)
  */
 export const Quoting = {
-  quotedDate,
-  quotedTime,
   typeCastedBinds,
 };

@@ -13,8 +13,6 @@ import {
   quotedDate as abstractQuotedDate,
   typeCast as abstractTypeCast,
   toBytes,
-  dispatchUnquotedTrue,
-  dispatchUnquotedFalse,
   type QuotedTimeValue,
   type QuotingDispatchHost,
 } from "../abstract/quoting.js";
@@ -183,8 +181,7 @@ export function typeCast(this: QuotingDispatchHost, value: unknown, bindsAsFloat
   // Self-dispatched (rb:98-99) so the pair resolves through SQLite's
   // `unquotedTrue`/`unquotedFalse` overrides. The BigInt wrapper is why this arm
   // cannot simply delegate to the abstract `type_cast`: it must stay here.
-  if (typeof value === "boolean")
-    return BigInt(value ? dispatchUnquotedTrue(this) : dispatchUnquotedFalse(this));
+  if (typeof value === "boolean") return BigInt(value ? this.unquotedTrue() : this.unquotedFalse());
   if (typeof value === "number") {
     if (!Number.isFinite(value)) return null;
     // better-sqlite3 binds every JS number as SQLITE_FLOAT (there is no

@@ -1,3 +1,4 @@
+import { quotingHost } from "../../support/quoting-host.js";
 import {
   BinaryData,
   BinaryType,
@@ -31,7 +32,7 @@ import {
 // PG's quotedDate so date/time values reach the BC-suffixing override, and its
 // quotedBinary so binary values reach the bytea-hex override — a real adapter
 // host carries both.
-const HOST = { quotedDate, quotedBinary };
+const HOST = quotingHost({ quotedDate, quotedBinary });
 const quote = (value: unknown): string => quoteFn.call(HOST, value);
 const typeCast = (value: unknown): unknown => typeCastFn.call(HOST, value);
 
@@ -393,7 +394,7 @@ describe("PostgreSQL quoting", () => {
     // Rails' PG#quote calls super, whose Date branch is `'#{quoted_date(value)}'`
     // — dispatching through PG's BC-aware quoted_date. Threading `this` reaches it.
     const v = Temporal.PlainDate.from("-000043-03-15");
-    expect(quoteFn.call({ quotedDate }, v)).toBe("'0044-03-15 BC'");
+    expect(quoteFn.call(quotingHost({ quotedDate }), v)).toBe("'0044-03-15 BC'");
   });
 
   it("typeCast maps the infinity sentinels to the PG wire strings", () => {

@@ -20,8 +20,6 @@ import {
 import {
   typeCast as abstractTypeCast,
   toBytes,
-  dispatchQuotedDate,
-  dispatchQuotedTime,
   type QuotingDispatchHost,
 } from "../abstract/quoting.js";
 import { Temporal } from "@blazetrails/date";
@@ -230,14 +228,14 @@ export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
   // arms dispatch through `self.quoted_time` / `self.quoted_date`, threading
   // `this` so MySQL's microsecond-capping `quotedDate` override is honored.
   if (value instanceof TimeValue || value instanceof Temporal.PlainTime)
-    return dispatchQuotedTime(this, value);
+    return this.quotedTime(value);
   if (
     value instanceof Temporal.Instant ||
     value instanceof Temporal.PlainDateTime ||
     value instanceof Temporal.PlainDate ||
     value instanceof Temporal.ZonedDateTime
   ) {
-    return dispatchQuotedDate(this, value);
+    return this.quotedDate(value);
   }
   // Rails: `else super` (mysql/quoting.rb:119-120). Symbol/`Type::Binary::Data`
   // (rb:95-96), the self-dispatched `unquoted_true`/`unquoted_false` pair

@@ -1,3 +1,4 @@
+import { quotingHost } from "../../support/quoting-host.js";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/date";
 import { BinaryData } from "@blazetrails/activemodel";
@@ -28,7 +29,7 @@ import {
 // `x'..'` hex form, and the boolean pair so the inherited abstract boolean arm
 // self-dispatches back to SQLite's 1/0 — the same overrides
 // SQLite3Adapter supplies.
-const HOST = {
+const HOST = quotingHost({
   quotedDate,
   quotedTime,
   quotedBinary,
@@ -36,7 +37,7 @@ const HOST = {
   quotedFalse,
   unquotedTrue,
   unquotedFalse,
-};
+});
 const quote = (value: unknown): string => quoteFn.call(HOST, value);
 const typeCast = (value: unknown): unknown => typeCastFn.call(HOST, value);
 
@@ -199,7 +200,7 @@ describe("SQLite3::Quoting", () => {
     });
 
     it("dispatches PlainTime through the host quotedTime override", () => {
-      const host = { quotedTime: () => "DISPATCHED" };
+      const host = quotingHost({ quotedTime: () => "DISPATCHED" });
       expect(quoteFn.call(host, Temporal.PlainTime.from("14:23:55"))).toBe("'DISPATCHED'");
     });
   });
