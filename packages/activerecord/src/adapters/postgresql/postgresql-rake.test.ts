@@ -105,10 +105,17 @@ describeIfPostgresqlAdapter("PostgreSQLPurgeTest", () => {
     vi.restoreAllMocks();
   });
 
-  it.skip("clears active connections", () => {
-    // Not yet ported: `purge` clears the handler's active connections
-    // (`postgresql_rake_test.rb:208-216`), which trails' `purge` does not do —
-    // a production divergence, not a test-porting gap.
+  it("clears active connections", async () => {
+    const clearActiveConnectionsBang = vi.spyOn(
+      Base.connectionHandler,
+      "clearActiveConnectionsBang",
+    );
+
+    await withStubbedConnection(connection, async () => {
+      await DatabaseTasks.purge(configuration());
+    });
+
+    expect(clearActiveConnectionsBang).toHaveBeenCalled();
   });
 
   it.skip("establishes connection to postgresql database", () => {

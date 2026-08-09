@@ -435,6 +435,39 @@ export const REASON_CATEGORIES: ReasonCategory[] = [
       })),
     ],
   },
+  {
+    name: "mutex-sync-core-async-drain",
+    calls: ["synchronize"],
+    reason:
+      "Ruby guards the body with Mutex#synchronize; the ported body mutates pool " +
+      "state in a fully synchronous core and only then awaits the drains that " +
+      "core returns, so no other body observes an intermediate state and the " +
+      "mutex has no analogue call. The invariant a later refactor must not break " +
+      "is that every state mutation precedes the first await.",
+    note:
+      "2026-08-08 mutex/monitor audit, Tier 2 (addendum). Tier 1's text is false " +
+      "here: these four bodies DO have yield points. Each was re-read against its " +
+      "Rails counterpart (connection_pool.rb flush / discard! / " +
+      "clear_reloadable_connections, pool_config.rb discard_pool!) and is an " +
+      "`await Promise.all(<sync core>())` one-liner over a private core " +
+      "(`_flush`, `_discardBang`, `_clearReloadableConnections`, " +
+      "`_discardPoolBangSync`) that performs the whole mutation before returning " +
+      "the pending async `driver.close()` drains. Named outright rather than keyed " +
+      "on the call name, which the tiering splits three ways — see " +
+      "mutex-sync-body's note.",
+    rows: [
+      ...["flush", "discard!", "clear_reloadable_connections"].map((rubyName) => ({
+        package: "activerecord",
+        tsFile: "connection-adapters/abstract/connection-pool.ts",
+        rubyName,
+      })),
+      {
+        package: "activerecord",
+        tsFile: "connection-adapters/pool-config.ts",
+        rubyName: "discard_pool!",
+      },
+    ],
+  },
 ];
 
 export function findCategory(name: string): ReasonCategory | undefined {

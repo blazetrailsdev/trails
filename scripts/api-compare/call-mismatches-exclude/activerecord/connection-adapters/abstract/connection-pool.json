@@ -39,7 +39,7 @@
     "tsFile": "connection-adapters/abstract/connection-pool.ts",
     "rubyName": "clear_reloadable_connections",
     "call": "synchronize",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Ruby guards the body with Mutex#synchronize; the ported body mutates pool state in a fully synchronous core and only then awaits the drains that core returns, so no other body observes an intermediate state and the mutex has no analogue call. The invariant a later refactor must not break is that every state mutation precedes the first await."
   },
   {
     "package": "activerecord",
@@ -53,7 +53,7 @@
     "tsFile": "connection-adapters/abstract/connection-pool.ts",
     "rubyName": "discard!",
     "call": "synchronize",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Ruby guards the body with Mutex#synchronize; the ported body mutates pool state in a fully synchronous core and only then awaits the drains that core returns, so no other body observes an intermediate state and the mutex has no analogue call. The invariant a later refactor must not break is that every state mutation precedes the first await."
   },
   {
     "package": "activerecord",
@@ -81,7 +81,7 @@
     "tsFile": "connection-adapters/abstract/connection-pool.ts",
     "rubyName": "flush",
     "call": "synchronize",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Ruby guards the body with Mutex#synchronize; the ported body mutates pool state in a fully synchronous core and only then awaits the drains that core returns, so no other body observes an intermediate state and the mutex has no analogue call. The invariant a later refactor must not break is that every state mutation precedes the first await."
   },
   {
     "package": "activerecord",

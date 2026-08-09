@@ -9,20 +9,6 @@
   {
     "package": "activerecord",
     "tsFile": "tasks/mysql-database-tasks.ts",
-    "rubyName": "create",
-    "call": "create_database",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "tasks/mysql-database-tasks.ts",
-    "rubyName": "create",
-    "call": "order:creationOptions,establishConnection",
-    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "tasks/mysql-database-tasks.ts",
     "rubyName": "creation_options",
     "call": "include?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -37,22 +23,8 @@
   {
     "package": "activerecord",
     "tsFile": "tasks/mysql-database-tasks.ts",
-    "rubyName": "drop",
-    "call": "drop_database",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "tasks/mysql-database-tasks.ts",
     "rubyName": "purge",
     "call": "recreate_database",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "tasks/mysql-database-tasks.ts",
-    "rubyName": "run_cmd",
-    "call": "run_cmd_error",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

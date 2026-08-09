@@ -67,6 +67,11 @@ export class PostgreSQLDatabaseTasks {
   }
 
   async purge(): Promise<void> {
+    // `postgresql_database_tasks.rb:41` — the leased connection must go before
+    // the DROP/CREATE pair, or it survives pointing at a database that no
+    // longer exists. The handler spells Rails' `:all` role as "all"
+    // (`connection-handler.ts:113`).
+    Base.connectionHandler.clearActiveConnectionsBang("all");
     await this.drop();
     await this.create(true);
   }
