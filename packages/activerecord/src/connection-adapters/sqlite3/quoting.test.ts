@@ -277,8 +277,13 @@ describe("SQLite3::Quoting", () => {
       expect(typeCast(-7)).toBe(-7n);
     });
 
-    it("returns null for symbol without description", () => {
-      expect(typeCast(Symbol())).toBe(null);
+    // Rails' SQLite `type_cast` has no Symbol arm — it falls to `else super`
+    // (sqlite3/quoting.rb:122-123), so the abstract `when Symbol ... value.to_s`
+    // (abstract/quoting.rb:95-96) is what runs. The SQLite-local `?? null`
+    // this used to pin was the duplicated chain's own invention.
+    it("casts a symbol through the inherited abstract arm", () => {
+      expect(typeCast(Symbol("foo"))).toBe("foo");
+      expect(typeCast(Symbol())).toBe("Symbol()");
     });
 
     it("throws on unsupported types", () => {

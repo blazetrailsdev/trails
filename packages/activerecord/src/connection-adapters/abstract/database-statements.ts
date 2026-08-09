@@ -202,12 +202,31 @@ export class DatabaseStatementsBase {
  * (display SQL, statement-cache fallbacks) inlines this way, or an unbound `?`
  * would leak into executable SQL.
  */
-function compileInlined(visitor: Visitors.ToSql, node: Nodes.Node, host: unknown): string {
+function compileInlined(
+  visitor: Visitors.ToSql,
+  node: Nodes.Node,
+  host: unknown,
+): [string, boolean] {
   const collector = new Collectors.SubstituteBinds(
     host as { quote(value: unknown): string },
     new Collectors.SQLString(),
   );
-  return visitor.compile(node, collector);
+  // Rails reads `allow_retry = collector.retryable` after the compile
+  // (database_statements.rb:45), so the visitor can clear it mid-traversal.
+  const sql = visitor.compile(node, collector);
+  return [sql, collector.retryable];
+}
+
+/**
+ * Rails' `if prepared_statements` test in `to_sql_and_binds`
+ * (database_statements.rb:31). A host with no flag at all is not an adapter
+ * (bare visitor stand-ins in tests / statement-cache helpers); Rails' default
+ * is `true`, so only an explicit `false` selects the inlining collector.
+ */
+function isUnprepared(host: unknown): boolean {
+  return (
+    (host as { preparedStatements?: boolean } | null | undefined)?.preparedStatements === false
+  );
 }
 
 /**
@@ -236,7 +255,8 @@ export function toSql(
   // `compileWithBinds` for execution (placeholders + bind array).
   const visitor = (this as any)?.visitor as Visitors.ToSql | undefined;
   if (visitor && node instanceof Nodes.Node) {
-    return compileInlined(visitor, node, this);
+    const [inlinedSql] = compileInlined(visitor, node, this);
+    return inlinedSql;
   }
   if (node && typeof (node as any).toSql === "function") {
     return (node as any).toSql();
@@ -284,6 +304,15 @@ export function toSqlAndBinds(
     }
     const visitor = (this as any)?.visitor as Visitors.ToSql | undefined;
     if (visitor && node instanceof Nodes.Node) {
+      // Rails: `if prepared_statements ... else sql = visitor.compile(arel, collector)`
+      // (database_statements.rb:31-45). With prepared statements off the
+      // collector is a `SubstituteBinds` (abstract_adapter.rb#collector), so
+      // every value inlines during traversal and `binds` comes back empty —
+      // there is no bind extraction to fall back from.
+      if (isUnprepared(this)) {
+        const [inlinedSql, inlinedRetryable] = compileInlined(visitor, node, this);
+        return [inlinedSql, [], false, inlinedRetryable];
+      }
       const [sql, extractedBinds, compiledAllowRetry, compiledPreparable] =
         visitor.compileWithBinds(node);
       // Rails hands the compiled binds on untouched — `ActiveModel::Attribute`
@@ -303,7 +332,8 @@ export function toSqlAndBinds(
           extractedBinds.length,
         )
       ) {
-        return [compileInlined(visitor, node, this), [], false, compiledAllowRetry];
+        const [overLimitSql] = compileInlined(visitor, node, this);
+        return [overLimitSql, [], false, compiledAllowRetry];
       }
       return [sql, extractedBinds, compiledPreparable, compiledAllowRetry];
     }
@@ -363,7 +393,7 @@ export function cacheableQuery(
     sql = arel;
   } else if (visitor && node instanceof Nodes.Node) {
     // Returns empty binds below, so inline any BindParams into the SQL string.
-    sql = compileInlined(visitor, node, host);
+    [sql] = compileInlined(visitor, node, host);
   } else {
     sql = (node as any).toSql?.() ?? String(node);
   }

@@ -1,11 +1,16 @@
 import { describe, it, expect } from "vitest";
 import { SchemaCreation } from "./connection-adapters/abstract/schema-creation.js";
 import { ColumnDefinition } from "./connection-adapters/abstract/schema-definitions.js";
-import { quoteDefaultExpression } from "./connection-adapters/abstract/quoting.js";
+import { quoteDefaultExpression, lookupCastType } from "./connection-adapters/abstract/quoting.js";
+import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
+import { TypeMap } from "./type/type-map.js";
 import type {
   ColumnType,
   ColumnOptions,
 } from "./connection-adapters/abstract/schema-definitions.js";
+
+const TYPE_MAP = new TypeMap();
+AbstractAdapter.initializeTypeMap(TYPE_MAP);
 
 // Mirrors Rails' ColumnDefinitionTest::DummyAdapter: native_database_types
 // maps `string` to "varchar" and quote_column_name is the identity. The visitor
@@ -18,6 +23,11 @@ class DummyCreation extends SchemaCreation {
       quoteColumnName: (name: string) => name,
       quoteTableName: (name: string) => name,
       quoteDefaultExpression,
+      // `quote_default_expression` dispatches `lookup_cast_type` on the adapter
+      // (abstract/quoting.rb:161); `DummyAdapter < AbstractAdapter`, so it
+      // answers from the abstract type map.
+      lookupCastType: (sqlType: string | null) =>
+        lookupCastType.call({ typeMap: TYPE_MAP }, sqlType),
       nativeDatabaseTypes: () => ({ string: "varchar" }),
       supportsCheckConstraints: async () => false,
       supportsExclusionConstraints: () => false,
@@ -27,7 +37,7 @@ class DummyCreation extends SchemaCreation {
       supportsPartialIndex: () => false,
       supportsUniqueConstraints: () => false,
       useForeignKeys: () => true,
-    });
+    } as unknown as ConstructorParameters<typeof SchemaCreation>[0]);
   }
 
   typeToSql(type: ColumnType, options: ColumnOptions = {}): string {

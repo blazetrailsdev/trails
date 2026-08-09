@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { BinaryData } from "@blazetrails/activemodel";
+import { BinaryData, BinaryType } from "@blazetrails/activemodel";
 import { fixtures } from "./test-fixtures.js";
 import { Binary } from "./test-helpers/models/binary.js";
 import { Base } from "./base.js";
@@ -47,5 +47,16 @@ describe("binary type_casted_binds payload", () => {
     expect(String(out[0])).not.toBe("[object Object]");
     // PG's type_cast returns a Buffer (bytea); normalize before comparing bytes.
     expect(new Uint8Array(out[0] as Uint8Array)).toEqual(bytes);
+  });
+
+  it("reaches type_cast wrapped, so the chain needs no bare-bytes arm", async () => {
+    // `BinaryType#serialize` wraps at the source (binary.rb:30-33), so Rails'
+    // `type_cast` only ever sees a `Type::Binary::Data` and its terminal
+    // `raise TypeError` (abstract/quoting.rb:105) is unreachable for bytes.
+    // Ours now matches: an unwrapped `Uint8Array` is not a bindable value.
+    const bytes = new Uint8Array([0xde, 0xad]);
+    expect(new BinaryType().serialize(bytes)).toBeInstanceOf(BinaryData);
+    const conn = await Base.connection;
+    expect(() => conn.typeCast(bytes)).toThrow(TypeError);
   });
 });

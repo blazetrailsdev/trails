@@ -3,16 +3,29 @@ import { Temporal } from "@blazetrails/date";
 import {
   quote as quoteFn,
   quoteDefaultExpression as quoteDefaultExpressionFn,
+  lookupCastType,
 } from "./connection-adapters/abstract/quoting.js";
+import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
+import { TypeMap } from "./type/type-map.js";
 import { Nodes } from "@blazetrails/arel";
 
 // `quote` requires a host receiver (no receiver-less dispatch); bind an empty
 // host so date/time values route through the abstract module helpers.
 const quote = (value: unknown): string => quoteFn.call({}, value);
-// Likewise `quoteDefaultExpression` — an empty host has no `quote` override, so
-// values fall through to the abstract module quoting.
+// `quoteDefaultExpression` dispatches `lookup_cast_type` on its receiver
+// unconditionally (abstract/quoting.rb:161), so the host carries the abstract
+// adapter's type map — Rails' equivalent hosts are all `< AbstractAdapter`.
+// It has no `quote` override, so values fall through to the abstract module
+// quoting.
+const TYPE_MAP = new TypeMap();
+AbstractAdapter.initializeTypeMap(TYPE_MAP);
+const DEFAULT_EXPRESSION_HOST = {
+  lookupCastType(sqlType: string | null) {
+    return lookupCastType.call({ typeMap: TYPE_MAP }, sqlType);
+  },
+};
 const quoteDefaultExpression = (value: unknown, column?: { sqlType?: string | null } | null) =>
-  quoteDefaultExpressionFn.call({}, value, column);
+  quoteDefaultExpressionFn.call(DEFAULT_EXPRESSION_HOST, value, column);
 
 describe("quote", () => {
   it("returns NULL for null", () => {
