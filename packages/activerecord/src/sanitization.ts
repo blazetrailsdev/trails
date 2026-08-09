@@ -19,17 +19,26 @@ export type Quoter = Pick<
   "quote" | "quoteColumnName" | "quoteTableNameForAssignment" | "quoteString" | "castBoundValue"
 >;
 
-/** @internal */
-function _sanitizeSqlArray(quoter: Quoter, template: string, binds: unknown[]): string {
+/**
+ * `withConnection` is Rails' `with_connection { |c| ... }`, which each quoting
+ * branch opens for itself (sanitization.rb:167-179) — the `statement.blank?`
+ * arm between them answers without one, so the lookup cannot be hoisted ahead
+ * of it. @internal
+ */
+function _sanitizeSqlArray(
+  withConnection: () => Quoter,
+  template: string,
+  binds: unknown[],
+): string {
   const statement = template;
   const [first] = binds;
 
   if (isPlainHash(first) && /:\w+/.test(statement)) {
-    return replaceNamedBindVariables(quoter, statement, first as Record<string, unknown>);
+    return replaceNamedBindVariables(withConnection(), statement, first as Record<string, unknown>);
   }
 
   if (statement.includes("?")) {
-    return replaceBindVariables(quoter, statement, binds);
+    return replaceBindVariables(withConnection(), statement, binds);
   }
 
   if (statement === "") {
@@ -37,6 +46,7 @@ function _sanitizeSqlArray(quoter: Quoter, template: string, binds: unknown[]): 
     return statement;
   }
 
+  const quoter = withConnection();
   // Format-string support (e.g., "name = '%s'", "id = %d") — Rails:
   //   statement % values.collect { |v| connection.quote_string(v.to_s) }
   // Ruby's Kernel#format applies after each value is quoted to a string, so
@@ -215,7 +225,7 @@ function orderMatcherFor(host: QuoterHost): RegExp {
  * Mirrors: ActiveRecord::Sanitization::ClassMethods#sanitize_sql_array
  */
 export function sanitizeSqlArray(this: QuoterHost, template: string, ...binds: unknown[]): string {
-  return _sanitizeSqlArray(quoterFor(this), template, binds);
+  return _sanitizeSqlArray(() => quoterFor(this), template, binds);
 }
 
 /**

@@ -97,6 +97,13 @@ describe("sanitization class-method dispatch threads `this.connection`", () => {
     ).toThrow(ConnectionNotDefined);
   });
 
+  // Rails opens `with_connection` per quoting branch, and the `statement.blank?`
+  // arm sits between them (sanitization.rb:174-175) — it answers the statement
+  // back without ever asking for a connection.
+  it("answers a blank statement without asking for a connection", () => {
+    expect(ClassMethods.sanitizeSqlArray.call({}, "")).toBe("");
+  });
+
   it("propagates non-ConnectionNotDefined errors from host.connection", () => {
     const host = {
       get connection(): never {
