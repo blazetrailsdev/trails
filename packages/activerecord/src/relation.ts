@@ -5412,13 +5412,18 @@ export class Relation<T extends Base> {
     // Rails: `if prepared_statements ... else sql = visitor.compile(arel, collector)`
     // (database_statements.rb:31-45) — with prepared statements off the
     // collector is a `SubstituteBinds`, so every value inlines and `binds` is
-    // empty. `conn.toSql` is that compile.
+    // empty. Route through the connection's own `to_sql_and_binds` rather than
+    // `to_sql` so `allow_retry` is the collector's post-traversal `retryable`
+    // (rb:45), which a visitor can lower mid-compile (arel to_sql.rb:764-771).
     const conn = this._conn();
     if (conn.preparedStatements === false) {
+      const [inlinedSql, , inlinedPreparable, inlinedAllowRetry] = conn.toSqlAndBinds(
+        manager,
+      ) as unknown as [string, unknown[], boolean | null, boolean];
       this._lastSelectBinds = [];
-      this._lastSelectPreparable = false;
-      this._lastSelectRetryable = true;
-      return conn.toSql(manager);
+      this._lastSelectPreparable = inlinedPreparable === true;
+      this._lastSelectRetryable = inlinedAllowRetry;
+      return inlinedSql;
     }
     const v = this._arelVisitor();
     const [sql, binds, retryable, preparable] = v.compileWithBinds(manager.ast);

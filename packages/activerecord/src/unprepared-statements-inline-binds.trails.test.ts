@@ -41,4 +41,19 @@ describe("unprepared statements inline binds", () => {
     expect(select!.payload["binds"]).toEqual([]);
     expect(String(select!.payload["sql"])).toMatch(/IN \(1, ?2, ?3\)/);
   });
+
+  it("takes allow_retry from the collector, not a constant", async () => {
+    // Rails sets `collector.retryable = true`, compiles, then reads
+    // `allow_retry = collector.retryable` (database_statements.rb:29-45), so a
+    // `BoundSqlLiteral` lowering it mid-traversal (arel to_sql.rb:770-771) is
+    // reported non-retryable on the unprepared path too.
+    const conn = (await Topic.leaseConnection()) as unknown as {
+      unpreparedStatement(fn: () => Promise<void>): Promise<void>;
+    };
+    await conn.unpreparedStatement(async () => {
+      const rel = Topic.where("id = ?", 1) as unknown as { _lastSelectRetryable?: boolean };
+      await rel;
+      expect(rel._lastSelectRetryable).toBe(false);
+    });
+  });
 });
