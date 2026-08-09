@@ -3787,7 +3787,7 @@ export class Date {
    * spelling.
    *
    * The stored half is the Julian day — the C's `HAVE_JD` arm — and the civil
-   * triple is decoded from it on read through {@link Date#getCCivil} over
+   * triple is decoded from it on read through `get_c_civil` over
    * {@link cJdToCivil} under {@link DEFAULT_SG}, exactly as `get_c_civil`
    * (`date_core.c:1297-1324`) does. Keeping the calendar-neutral half is what
    * makes both cases above representable: `wday`, `yday` and `%s` are the
@@ -3836,7 +3836,7 @@ export class Date {
    * @internal `date_core.c` `get_c_civil` (`date_core.c:1297-1324`), which
    * decodes the local Julian day into the civil fields on first read.
    */
-  protected getCCivil(): [ry: number, rm: number, rdom: number] {
+  #getCCivil(): [ry: number, rm: number, rdom: number] {
     return (this.#civil ??= cJdToCivil(this.jd));
   }
 
@@ -4003,19 +4003,19 @@ export class Date {
   }
 
   get year(): number {
-    return this.getCCivil()[0];
+    return this.#getCCivil()[0];
   }
 
   get mon(): number {
-    return this.getCCivil()[1];
+    return this.#getCCivil()[1];
   }
 
   get month(): number {
-    return this.getCCivil()[1];
+    return this.#getCCivil()[1];
   }
 
   get day(): number {
-    return this.getCCivil()[2];
+    return this.#getCCivil()[2];
   }
 
   /**
@@ -4131,7 +4131,7 @@ export class Date {
  * therefore declare exactly what they answer.
  */
 const DateWithoutParseStatics: (new (year?: number, month?: number, day?: number) => Date) &
-  (new (rjd: Temporal.PlainDate) => Date) &
+  (new (seat: typeof SEAT, rjd: number) => Date) &
   Omit<typeof Date, "parse" | "strptime"> = Date;
 
 /**
@@ -4377,7 +4377,7 @@ export class DateTime extends DateWithoutParseStatics {
   /**
    * Ruby `DateTime#jd` reads the LOCAL day, not the stored UTC one
    * (`m_local_jd`, `date_core.c:1486-1497`), which is the day `wday`, `yday`
-   * and the inherited {@link Date#getCCivil} are then `c_jd_to_wday` /
+   * and the inherited `get_c_civil` are then `c_jd_to_wday` /
    * `c_jd_to_ordinal` / `c_jd_to_civil` over.
    */
   override get jd(): number {

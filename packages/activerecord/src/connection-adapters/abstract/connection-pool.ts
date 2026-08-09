@@ -516,22 +516,16 @@ export class ConnectionPool implements ReapablePool {
               (pool.activeConnection ?? pool.connections[0])?.adapterName ??
               adapterNameFromConfig(pool.dbConfig.adapter)
             );
-          // A symbol key is the one carve-out the language forces, exactly as
-          // on `NullPool` above: a JS `Symbol` cannot spell a Ruby send, so
-          // `Symbol.iterator`/`Symbol.toPrimitive` and friends are not sends
-          // the adapter is missing a method for. String keys get no carve-out —
-          // `adapter.then` and `adapter.toJSON` are sends, and `then` in
-          // particular must NOT answer a callable, or `await`ing anything that
-          // holds this proxy would drive it as a thenable.
+          // The one carve-out the language forces, as on `NullPool` above: a JS
+          // `Symbol` cannot spell a Ruby send.
           if (typeof prop === "symbol") return undefined;
-          // Only dispatch names a real adapter exposes as a method — the send
-          // set is the adapter's, exactly as it is in Ruby. A live connection
-          // answers for it whenever one exists (it does whenever a translated
-          // error was raised — a query was mid-flight); with none yet, the base
-          // class every adapter extends does, so `then` and `toJSON` resolve to
-          // a non-callable both before and after the first checkout rather than
-          // to a dispatcher that would blow up on `conn[prop] is not a
-          // function` — or, for `then`, make this proxy a thenable.
+          // The send set is the adapter's, as it is in Ruby — no name list. A
+          // live connection answers for it whenever one exists (it does
+          // whenever a translated error was raised); with none yet, the base
+          // class every adapter extends stands in, so a name no adapter defines
+          // never becomes a dispatcher that would blow up on
+          // `conn[prop] is not a function` — or, for `then`, make this proxy a
+          // thenable to anything `await`ing an object that holds it.
           const sample: object =
             pool.activeConnection ?? pool.connections[0] ?? AbstractAdapter.prototype;
           if (typeof (sample as any)[prop] !== "function") {
