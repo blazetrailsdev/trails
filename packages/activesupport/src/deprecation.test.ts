@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ActiveSupport } from "./index.js";
 import { Deprecation, DeprecationError, deprecator } from "./deprecation.js";
-import { ErrorReporter, type ReportedError } from "./error-reporter.js";
+import { ErrorReporter } from "./error-reporter.js";
+import { ErrorSubscriber } from "./error-reporter/test-helper.js";
 import { Logger } from "./logger.js";
 import { Notifications } from "./notifications.js";
 import { _setTrailsLogger } from "./trails-logger-slot.js";
@@ -637,19 +638,19 @@ describe("DeprecationTest", () => {
     deprecator.behavior = "report";
     const previousReporter = ActiveSupport.errorReporter;
     const reporter = new ErrorReporter();
-    const reports: ReportedError[] = [];
-    reporter.subscribe({ report: (r) => reports.push(r) });
+    const subscriber = new ErrorSubscriber();
+    reporter.subscribe(subscriber);
     ActiveSupport.errorReporter = reporter;
     try {
       deprecator.warn();
     } finally {
       ActiveSupport.errorReporter = previousReporter;
     }
-    const report = reports[0];
-    expect(report.error).toBeInstanceOf(DeprecationError);
-    expect(report.handled).toBe(true);
-    expect(report.severity).toBe("warning");
-    expect(report.source).toBe("application");
+    const [error, handled, severity, source] = subscriber.events[0];
+    expect(error).toBeInstanceOf(DeprecationError);
+    expect(handled).toBe(true);
+    expect(severity).toBe("warning");
+    expect(source).toBe("application");
   });
 
   it("invalid behavior", () => {

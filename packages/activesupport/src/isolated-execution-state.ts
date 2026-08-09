@@ -15,7 +15,13 @@
 import { getAsyncContext } from "./async-context-adapter.js";
 import type { AsyncContext, AsyncContextAdapter } from "./async-context-adapter.js";
 
-type Store = Map<string | symbol, unknown>;
+/**
+ * Ruby's `IsolatedExecutionState[key]` takes any object as a key — `ErrorReporter#disable`
+ * keys the store on `self` (`error_reporter.rb:186`) so each reporter gets its own slot.
+ */
+type IsolatedKey = string | symbol | object;
+
+type Store = Map<IsolatedKey, unknown>;
 
 let _ctx: AsyncContext<Store> | null = null;
 let _adapter: AsyncContextAdapter | null = null;
@@ -35,17 +41,17 @@ function store(): Store {
 }
 
 export const IsolatedExecutionState = {
-  get<T = unknown>(key: string | symbol): T | undefined {
+  get<T = unknown>(key: IsolatedKey): T | undefined {
     return store().get(key) as T | undefined;
   },
-  set<T>(key: string | symbol, value: T): T {
+  set<T>(key: IsolatedKey, value: T): T {
     store().set(key, value);
     return value;
   },
-  has(key: string | symbol): boolean {
+  has(key: IsolatedKey): boolean {
     return store().has(key);
   },
-  delete(key: string | symbol): boolean {
+  delete(key: IsolatedKey): boolean {
     return store().delete(key);
   },
   clear(): void {
@@ -56,7 +62,7 @@ export const IsolatedExecutionState = {
    * Mirrors Rails' `IsolatedExecutionState[key] ||= ...` idiom used for
    * per-context singletons (ExplainRegistry, ScopeRegistry, etc.).
    */
-  fetch<T>(key: string | symbol, init: () => T): T {
+  fetch<T>(key: IsolatedKey, init: () => T): T {
     const s = store();
     // `has`-then-`get` (rather than checking `get() !== undefined`) so a
     // caller that intentionally cached `undefined` doesn't re-run `init()`.
@@ -77,7 +83,7 @@ export const IsolatedExecutionState = {
    * The outer context's value for `key` is restored when `fn` returns.
    * Other keys are inherited via snapshot (the forked Map is a shallow copy).
    */
-  scope<T, R>(key: string | symbol, value: T, fn: () => R): R {
+  scope<T, R>(key: IsolatedKey, value: T, fn: () => R): R {
     const forked = new Map(store());
     forked.set(key, value);
     return ctx().run(forked, fn);

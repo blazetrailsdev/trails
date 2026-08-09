@@ -876,7 +876,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const reporter = new ErrorReporter();
       const events: Array<{ error: Error; handled: boolean }> = [];
       reporter.subscribe({
-        report: ({ error, handled }) => {
+        report: (error, { handled }) => {
           events.push({ error, handled });
         },
       });

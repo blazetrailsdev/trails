@@ -444,7 +444,6 @@ export { trailsLogger, _setTrailsLogger } from "./trails-logger-slot.js";
 export type {
   ErrorSeverity,
   ErrorContext,
-  ReportedError,
   ErrorSubscriber,
   HandleOptions,
   RecordOptions,
