@@ -4253,28 +4253,31 @@ export class DateInfinity {
   /**
    * Ruby `Date::Infinity#<=>` (ruby/date, `lib/date.rb:35-48`). The `Numeric`
    * arm answers `d` itself — the sign — rather than a spaceship of the two
-   * values, and the `coerce` fallback answers `nil` when `other` has no
-   * `coerce` (Ruby rescues the `NoMethodError`; JS raises a `TypeError` for
-   * the same call, which is what is caught here).
+   * values, and the `coerce` fallback answers `nil` for an `other` that has no
+   * `coerce`. Ruby spells that fallback `rescue NoMethodError`; the equivalent
+   * here is the presence check rather than a `catch`, because JS reports a
+   * missing method as the same `TypeError` a real `coerce` would raise from
+   * inside itself, and Ruby lets that one through.
    */
   compareTo(other: unknown): number | null {
     if (other instanceof DateInfinity) return Math.sign(this.d() - other.d());
     if (other === Number.POSITIVE_INFINITY) return Math.sign(this.d() - 1);
     if (other === Number.NEGATIVE_INFINITY) return Math.sign(this.d() + 1);
     if (typeof other === "number" || other instanceof Rational) return this.d();
-    try {
-      const [l, r] = (other as { coerce(x: unknown): [number, number] }).coerce(this);
+    const coerce = (other as { coerce?: (x: unknown) => [number, number] } | null)?.coerce;
+    if (typeof coerce === "function") {
+      const [l, r] = coerce.call(other, this);
       return Math.sign(l - r);
-    } catch (error) {
-      if (!(error instanceof TypeError)) throw error;
     }
     return null;
   }
 
   /**
    * Ruby `Date::Infinity#coerce` (ruby/date, `lib/date.rb:51-57`). The `else`
-   * arm is `super` — `Numeric#coerce`, which raises `TypeError` for a value
-   * it cannot make a `Float` of.
+   * arm is `super` — `Numeric#coerce`, whose `[Float(other), Float(self)]`
+   * cannot make a `Float` of a `Date::Infinity` and so raises `TypeError`.
+   * `Float()`'s own `ArgumentError` arm for an unparseable String is not
+   * modelled: the `:nodoc:` class is only ever coerced against a `Numeric`.
    */
   coerce(other: unknown): [number, number] {
     if (typeof other === "number" || other instanceof Rational) return [-this.d(), this.d()];
