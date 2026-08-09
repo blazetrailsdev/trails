@@ -411,13 +411,13 @@ export class SchemaStatements {
       return;
     }
 
+    const td = this.buildCreateTableDefinition(name, options, definer);
+
     if (options.force) {
       await this.dropTable(name, { force: options.force, ifExists: true });
     } else {
       await this.schemaCache.clearDataSourceCacheBang(name);
     }
-
-    const td = this.buildCreateTableDefinition(name, options, definer);
 
     await this.execute(await this.schemaCreation.accept(td));
 
