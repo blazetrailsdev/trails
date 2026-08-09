@@ -341,9 +341,9 @@ export interface AbstractAdapter {
   /** @internal */
   quotedColumnsForIndex(columnNames: string[], options?: Record<string, unknown>): Promise<string>;
   /** @internal */
-  optionsForIndexColumns(
-    options: string | Record<string, string> | undefined,
-  ): (col: string) => string | undefined;
+  optionsForIndexColumns<T extends string | number>(
+    options: T | Record<string, T> | undefined,
+  ): (col: string) => T | undefined;
   /** @internal */
   addOptionsForIndexColumns(
     quotedColumns: Map<string, string>,
