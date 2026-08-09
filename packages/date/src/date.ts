@@ -3222,9 +3222,8 @@ function mJulianP(jd: number, sg: number): boolean {
  * `c_virtual_sg` (`date_core.c:1122-1131`), which differ only in the union arm
  * they read and so are one function here, taking the fields — which makes it
  * `m_virtual_sg` (`date_core.c:1135-1142`), their dispatcher, at every call
- * site. A date whose day
- * outran a `Fixnum` — `nth` nonzero — is read proleptically whatever its stored
- * `sg` says: a positive `nth` is far enough past the reform to be Gregorian
+ * site. A date whose day outran a `Fixnum` — `nth` nonzero — is read
+ * proleptically whatever its stored `sg` says: a positive `nth` is far enough past the reform to be Gregorian
  * everywhere and a negative one far enough before it to be Julian everywhere.
  */
 function virtualSg(nth: bigint, sg: number): number {
@@ -3271,9 +3270,19 @@ function cJulianLeapP(y: number): boolean {
   return mod(y, 4) === 0;
 }
 
+/** @internal `date_core.c` `c_gregorian_leap_p` (`date_core.c:709-713`). */
+function cGregorianLeapP(y: number): boolean {
+  return (mod(y, 4) === 0 && y % 100 !== 0) || mod(y, 400) === 0;
+}
+
 /** @internal `date_core.c` `c_julian_last_day_of_month` (`date_core.c:714-720`). */
 function cJulianLastDayOfMonth(y: number, m: number): number {
   return MONTHTAB[cJulianLeapP(y) ? 1 : 0][m];
+}
+
+/** @internal `date_core.c` `c_gregorian_last_day_of_month` (`date_core.c:723-728`). */
+function cGregorianLastDayOfMonth(y: number, m: number): number {
+  return MONTHTAB[cGregorianLeapP(y) ? 1 : 0][m];
 }
 
 /**
@@ -3289,16 +3298,6 @@ function cValidJulianP(y: number, m: number, d: number): [rm: number, rd: number
   if (d < 0) d = last + d + 1;
   if (d < 1 || d > last) return null;
   return [m, d];
-}
-
-/** @internal `date_core.c` `c_gregorian_leap_p` (`date_core.c:709-713`). */
-function cGregorianLeapP(y: number): boolean {
-  return (mod(y, 4) === 0 && y % 100 !== 0) || mod(y, 400) === 0;
-}
-
-/** @internal `date_core.c` `c_gregorian_last_day_of_month` (`date_core.c:723-728`). */
-function cGregorianLastDayOfMonth(y: number, m: number): number {
-  return MONTHTAB[cGregorianLeapP(y) ? 1 : 0][m];
 }
 
 /**
