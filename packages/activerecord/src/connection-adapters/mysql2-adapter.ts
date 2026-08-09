@@ -955,14 +955,15 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     this._syncDatabaseTimezone();
     const driverSql = this.mysqlQuote(sql);
     const driverBinds = this.mysqlBinds(binds);
-    // payload records the exact values sent to mysql2 so LogSubscriber /
-    // ExplainSubscriber / QueryCache all observe what actually ran.
+    // Rails' raw_execute logs the caller's own binds plus their type-casted
+    // values (abstract/database_statements.rb:552-556, abstract_adapter.rb:1134-1145),
+    // never the mysql2 wire form; `driverBinds` stays scoped to the driver call.
     const txPublicExec = this.currentTransaction().userTransaction;
     const payload: Record<string, unknown> = {
       sql: driverSql,
       name,
-      binds: driverBinds,
-      type_casted_binds: this.typeCastedBinds(driverBinds) ?? [],
+      binds,
+      type_casted_binds: this.typeCastedBinds(binds) ?? [],
       connection: this,
       row_count: 0,
       transaction: txPublicExec.isOpen() ? txPublicExec : null,
@@ -1006,12 +1007,15 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     this._syncDatabaseTimezone();
     const driverSql = this.mysqlQuote(sql);
     const driverBinds = this.mysqlBinds(binds);
+    // Rails' raw_execute logs the caller's own binds plus their type-casted
+    // values (abstract/database_statements.rb:552-556, abstract_adapter.rb:1134-1145),
+    // never the mysql2 wire form; `driverBinds` stays scoped to the driver call.
     const txPublicMut = this.currentTransaction().userTransaction;
     const payload: Record<string, unknown> = {
       sql: driverSql,
       name,
-      binds: driverBinds,
-      type_casted_binds: this.typeCastedBinds(driverBinds) ?? [],
+      binds,
+      type_casted_binds: this.typeCastedBinds(binds) ?? [],
       connection: this,
       row_count: 0,
       transaction: txPublicMut.isOpen() ? txPublicMut : null,
@@ -1193,8 +1197,8 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       const payload: Record<string, unknown> = {
         sql: driverSql,
         name,
-        binds: driverBinds,
-        type_casted_binds: this.typeCastedBinds(driverBinds) ?? [],
+        binds,
+        type_casted_binds: this.typeCastedBinds(binds) ?? [],
         connection: this,
         row_count: 0,
         transaction: txPublicInt.isOpen() ? txPublicInt : null,
