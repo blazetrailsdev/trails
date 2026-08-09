@@ -42,7 +42,7 @@ export interface ErrorContext {
  */
 export interface ErrorSubscriber {
   report(
-    error: unknown,
+    error: Error,
     opts: {
       handled: boolean;
       severity: ErrorSeverity;
@@ -94,11 +94,18 @@ export class ErrorReporter {
 
   private subscribers: ErrorSubscriber[];
 
+  constructor(...subscribers: (ErrorSubscriber | ErrorSubscriber[])[]);
   constructor(
-    subscribers: (ErrorSubscriber | ErrorSubscriber[])[] = [],
-    { logger = null }: { logger?: ErrorReporterLogger | null } = {},
-  ) {
-    this.subscribers = subscribers.flat();
+    ...args: [
+      ...subscribers: (ErrorSubscriber | ErrorSubscriber[])[],
+      options: { logger?: ErrorReporterLogger | null },
+    ]
+  );
+  constructor(...args: unknown[]) {
+    const [subscribers, { logger = null }] = splitKwargs<{
+      logger?: ErrorReporterLogger | null;
+    }>(args);
+    this.subscribers = (subscribers as (ErrorSubscriber | ErrorSubscriber[])[]).flat();
     this.logger = logger;
     this.debugMode = false;
   }
@@ -111,18 +118,10 @@ export class ErrorReporter {
    */
   handle<T>(fn: () => T): T | null;
   handle<T>(opts: HandleOptions, fn: () => T): T | null;
-  handle<T>(errorClasses: ErrorClass[], fn: () => T): T | null;
-  handle<T>(errorClasses: ErrorClass[], opts: HandleOptions, fn: () => T): T | null;
-  handle<T>(
-    errorClassesOrOptsOrFn: ErrorClass[] | HandleOptions | (() => T),
-    optsOrFn?: HandleOptions | (() => T),
-    maybeFn?: () => T,
-  ): T | null {
-    const [errorClasses, opts, fn] = splitArgs<HandleOptions, T>(
-      errorClassesOrOptsOrFn,
-      optsOrFn,
-      maybeFn,
-    );
+  handle<T>(...args: [...errorClasses: ErrorClass[], fn: () => T]): T | null;
+  handle<T>(...args: [...errorClasses: ErrorClass[], opts: HandleOptions, fn: () => T]): T | null;
+  handle<T>(...args: unknown[]): T | null {
+    const [errorClasses, opts, fn] = splitBlockArgs<HandleOptions, T>(args);
     const {
       severity = "warning",
       context = {},
@@ -145,18 +144,10 @@ export class ErrorReporter {
    */
   record<T>(fn: () => T): T;
   record<T>(opts: RecordOptions, fn: () => T): T;
-  record<T>(errorClasses: ErrorClass[], fn: () => T): T;
-  record<T>(errorClasses: ErrorClass[], opts: RecordOptions, fn: () => T): T;
-  record<T>(
-    errorClassesOrOptsOrFn: ErrorClass[] | RecordOptions | (() => T),
-    optsOrFn?: RecordOptions | (() => T),
-    maybeFn?: () => T,
-  ): T {
-    const [errorClasses, opts, fn] = splitArgs<RecordOptions, T>(
-      errorClassesOrOptsOrFn,
-      optsOrFn,
-      maybeFn,
-    );
+  record<T>(...args: [...errorClasses: ErrorClass[], fn: () => T]): T;
+  record<T>(...args: [...errorClasses: ErrorClass[], opts: RecordOptions, fn: () => T]): T;
+  record<T>(...args: unknown[]): T {
+    const [errorClasses, opts, fn] = splitBlockArgs<RecordOptions, T>(args);
     const { severity = "error", context = {}, source = ErrorReporter.DEFAULT_SOURCE } = opts;
 
     try {
@@ -174,7 +165,7 @@ export class ErrorReporter {
    * String.
    */
   unexpected(
-    error: unknown,
+    error: Error | string,
     {
       severity = "warning",
       context = {},
@@ -185,13 +176,12 @@ export class ErrorReporter {
 
     if (this.debugMode) {
       this.ensureBacktrace(error);
-      const unexpected = new ErrorReporter.UnexpectedError(
-        `${(error as Error).name}: ${(error as Error).message}`,
-        { cause: error },
-      );
+      const unexpected = new ErrorReporter.UnexpectedError(`${error.name}: ${error.message}`, {
+        cause: error,
+      });
       // Ruby's third `raise` argument — the new error carries the original's
       // backtrace, so its first frame is the caller's, not this file's.
-      unexpected.stack = (error as Error).stack;
+      unexpected.stack = error.stack;
       throw unexpected;
     } else {
       return this.report(error, { handled: true, severity, context, source });
@@ -247,7 +237,7 @@ export class ErrorReporter {
    * block-based #handle and #record methods are not suitable.
    */
   report(
-    error: unknown,
+    error: Error,
     {
       handled = true,
       severity = handled ? ("warning" as const) : ("error" as const),
@@ -260,7 +250,8 @@ export class ErrorReporter {
       source?: string;
     } = {},
   ): null {
-    if ((error as Record<symbol, unknown>)?.[RAILS_ERROR_REPORTED] !== undefined) return null;
+    if ((error as unknown as Record<symbol, unknown>)?.[RAILS_ERROR_REPORTED] !== undefined)
+      return null;
     this.ensureBacktrace(error);
 
     if (!ErrorReporter.SEVERITIES.includes(severity)) {
@@ -289,7 +280,7 @@ export class ErrorReporter {
       }
     }
 
-    let marked = error;
+    let marked: unknown = error;
     while (marked != null) {
       if (!Object.isFrozen(marked)) {
         (marked as Record<symbol, unknown>)[RAILS_ERROR_REPORTED] = true;
@@ -307,9 +298,9 @@ export class ErrorReporter {
    * `Error.captureStackTrace`'s `constructorOpt` elides the same frames at
    * capture time, which is why no `first` survives here.
    */
-  private ensureBacktrace(error: unknown): void {
+  private ensureBacktrace(error: Error): void {
     if (Object.isFrozen(error)) return; // re-raising won't add a backtrace
-    if ((error as Error)?.stack != null) return;
+    if (error?.stack != null) return;
 
     Error.captureStackTrace?.(error as object, this.ensureBacktrace);
   }
@@ -356,44 +347,51 @@ function deleteIf<T>(array: T[], predicate: (element: T) => boolean): void {
   }
 }
 
-/** Ruby's `rescue *error_classes`. */
-function rescues(errorClasses: readonly ErrorClass[], error: unknown): boolean {
+/** Ruby's `rescue *error_classes`, which binds `error` to an Exception by construction. */
+function rescues(errorClasses: readonly ErrorClass[], error: unknown): error is Error {
   return errorClasses.some((cls) => error instanceof cls);
 }
 
 /**
- * Ruby's `def handle(*error_classes, **kwargs, &block)` binding, which TS has
- * to unpick by hand: the splat is the leading array, the kwargs the object, and
- * the block the trailing function. `error_classes = DEFAULT_RESCUE if
- * error_classes.empty?` is the same line in both `handle` and `record`
- * (`error_reporter.rb:79,115`).
+ * Ruby's trailing-`**kwargs` binding: the last argument is the kwargs Hash when
+ * it is a plain object, and is otherwise absent. TS has no kwargs, so the splat
+ * has to be unpicked from the end by hand.
  */
-function splitArgs<O, T>(
-  errorClassesOrOptsOrFn: ErrorClass[] | O | (() => T),
-  optsOrFn: O | (() => T) | undefined,
-  maybeFn: (() => T) | undefined,
-): [readonly ErrorClass[], O, () => T] {
-  let errorClasses: readonly ErrorClass[] = [];
-  let opts: O;
-  let fn: () => T;
+function splitKwargs<O>(args: readonly unknown[]): [readonly unknown[], O] {
+  const last = args[args.length - 1];
+  if (isKwargs(last)) return [args.slice(0, -1), last as O];
+  return [args, {} as O];
+}
 
-  if (typeof errorClassesOrOptsOrFn === "function") {
-    opts = {} as O;
-    fn = errorClassesOrOptsOrFn as () => T;
-  } else if (Array.isArray(errorClassesOrOptsOrFn)) {
-    errorClasses = errorClassesOrOptsOrFn;
-    if (typeof optsOrFn === "function") {
-      opts = {} as O;
-      fn = optsOrFn as () => T;
-    } else {
-      opts = (optsOrFn ?? {}) as O;
-      fn = maybeFn as () => T;
-    }
-  } else {
-    opts = errorClassesOrOptsOrFn;
-    fn = optsOrFn as () => T;
-  }
+/**
+ * Ruby's `def handle(*error_classes, **kwargs, &block)` binding. The block is
+ * always last, the kwargs Hash sits before it when present, and everything
+ * ahead of them is the `*error_classes` splat — so `handle(NameError,
+ * ArgumentError) { }` (`error_reporter.rb:82`) and `handle(fallback: -> { })
+ * { }` (`:104`) both land where Rails puts them. `error_classes =
+ * DEFAULT_RESCUE if error_classes.empty?` is the same line in both `handle` and
+ * `record` (`:79`, `:115`).
+ */
+function splitBlockArgs<O, T>(args: readonly unknown[]): [readonly ErrorClass[], O, () => T] {
+  const rest = args.slice();
+  const fn = rest.pop() as () => T;
+  const [errorClassArgs, opts] = splitKwargs<O>(rest);
 
+  let errorClasses = errorClassArgs as readonly ErrorClass[];
   if (errorClasses.length === 0) errorClasses = ErrorReporter.DEFAULT_RESCUE;
   return [errorClasses, opts, fn];
+}
+
+/**
+ * Whether a trailing argument is Ruby's kwargs Hash rather than a positional
+ * one. A subscriber, an error class and a block are all callable or
+ * class-shaped; only the kwargs Hash is a plain object.
+ */
+function isKwargs(value: unknown): boolean {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value) &&
+    Object.getPrototypeOf(value) === Object.prototype
+  );
 }

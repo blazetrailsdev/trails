@@ -85,7 +85,7 @@ describe("ErrorReporterTest", () => {
 
   it("#handle can be scoped to an exception class", () => {
     expect(() =>
-      reporter.handle([TypeError], () => {
+      reporter.handle(TypeError, () => {
         throw new RangeError();
       }),
     ).toThrow(RangeError);
@@ -94,7 +94,7 @@ describe("ErrorReporterTest", () => {
 
   it("#handle can be scoped to several exception classes", () => {
     expect(() =>
-      reporter.handle([TypeError, SyntaxError], () => {
+      reporter.handle(TypeError, SyntaxError, () => {
         throw new RangeError();
       }),
     ).toThrow(RangeError);
@@ -103,7 +103,7 @@ describe("ErrorReporterTest", () => {
 
   it("#handle swallows and reports matching errors", () => {
     const error = new RangeError("Oops");
-    reporter.handle([TypeError, RangeError], () => {
+    reporter.handle(TypeError, RangeError, () => {
       throw error;
     });
     expect(subscriber.events).toEqual([[error, true, "warning", "application", {}]]);
@@ -166,7 +166,7 @@ describe("ErrorReporterTest", () => {
 
   it("#record can be scoped to an exception class", () => {
     expect(() =>
-      reporter.record([TypeError], () => {
+      reporter.record(TypeError, () => {
         throw new RangeError();
       }),
     ).toThrow(RangeError);
@@ -175,7 +175,7 @@ describe("ErrorReporterTest", () => {
 
   it("#record can be scoped to several exception classes", () => {
     expect(() =>
-      reporter.record([TypeError, SyntaxError], () => {
+      reporter.record(TypeError, SyntaxError, () => {
         throw new RangeError();
       }),
     ).toThrow(RangeError);
@@ -185,7 +185,7 @@ describe("ErrorReporterTest", () => {
   it("#record report any matching, unhandled error and re-raise them", () => {
     const error = new RangeError("Oops");
     expect(() =>
-      reporter.record([TypeError, RangeError], () => {
+      reporter.record(TypeError, RangeError, () => {
         throw error;
       }),
     ).toThrow(RangeError);
