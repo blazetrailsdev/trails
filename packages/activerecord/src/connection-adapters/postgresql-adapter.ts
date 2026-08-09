@@ -2289,8 +2289,7 @@ export class PostgreSQLAdapter
           // AbstractAdapter#log. Translating here would duplicate that and, on an
           // already-translated error, re-wrap it as StatementInvalid.
           // Rails' internal_execute forwards `prepare:` to raw_execute →
-          // perform_query (database_statements.rb:552-558, 589-591); `_runQuery`
-          // is the same prepared-statement seam internalExecQuery reaches.
+          // perform_query (abstract/database_statements.rb:552-558, 589-591).
           const runResult = await this._runQuery(client, runSql, bindArray, {
             rowMode: "array",
             prepareHint: prepare,
@@ -2919,9 +2918,9 @@ export class PostgreSQLAdapter
       // connection rather than yielding an unconfigured one.
       .then(() => {
         if (this._rawConnection === live && !this._closed) {
-          // Through the public hook, not `_maybeConfigureConnection`: Rails'
-          // reset! ends in configure_connection (postgresql_adapter.rb:371), so
-          // a per-instance override observes the reset-path dispatch.
+          // Rails' reset! ends in configure_connection
+          // (postgresql_adapter.rb:371), so the dispatch goes through the
+          // public, overridable hook.
           return this.configureConnection(live).catch((error: unknown) => {
             if (this._rawConnection === live) {
               this._rawConnection = null;

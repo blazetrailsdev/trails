@@ -720,12 +720,8 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       if (materializeTransactions) await this.materializeTransactions();
       return await this.log(sql, name, [], [], false, async () => {
         try {
-          // Rails' internal_execute forwards `prepare:` to raw_execute →
-          // perform_query, whose prepare branch pools the statement
-          // (`@statements[sql] ||= raw_connection.prepare(sql)`,
-          // sqlite3/database_statements.rb:81-91) — `_cachedStatement` is that
-          // pool, the same seam internalExecQuery reaches. The unprepared arm
-          // stays on `exec` so multi-statement transaction control is unchanged.
+          // Rails: `stmt = @statements[sql] ||= raw_connection.prepare(sql)`
+          // (sqlite3/database_statements.rb:81-91).
           if (prepare) {
             const stmt = await this._cachedStatement(sql);
             if (stmt.reader) await stmt.all([]);
@@ -1827,17 +1823,23 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   private async _parseFkDeferrable(
     tableName: string,
   ): Promise<Map<string, "immediate" | "deferred" | false>> {
-    const fkStrings = await this._foreignKeyStrings(tableName);
+    // Rails: `table_structure_sql(table_name).select { |column_string|
+    // column_string.start_with?("CONSTRAINT") && column_string.include?("FOREIGN
+    // KEY") }` (sqlite3_adapter.rb:421-425).
+    const fkStrings = (await this.tableStructureSql(tableName)).filter(
+      (columnString) =>
+        columnString.startsWith("CONSTRAINT") && columnString.includes("FOREIGN KEY"),
+    );
     const result = new Map<string, "immediate" | "deferred" | false>();
-    const createSql = fkStrings.join(",\n");
     // Rails builds fk_defs from every `CONSTRAINT ... FOREIGN KEY` clause and
     // records `mode || false` (sqlite3_adapter.rb:422-431), so a constraint
     // without a DEFERRABLE clause reflects as `false`, not nil — the DEFERRABLE
     // suffix is optional here for that reason.
     const fkRegex =
-      /CONSTRAINT\s+[^(]*?FOREIGN KEY\s*\(([^)]+)\)\s*REFERENCES\s*"?([^"(,\s]+)"?\s*\(([^)]+)\)(?:[^,)]*DEFERRABLE\s+INITIALLY\s+(\w+))?/gi;
-    let match;
-    while ((match = fkRegex.exec(createSql)) !== null) {
+      /CONSTRAINT\s+[^(]*?FOREIGN KEY\s*\(([^)]+)\)\s*REFERENCES\s*"?([^"(,\s]+)"?\s*\(([^)]+)\)(?:[^,)]*DEFERRABLE\s+INITIALLY\s+(\w+))?/i;
+    for (const fkString of fkStrings) {
+      const match = fkRegex.exec(fkString);
+      if (!match) continue;
       const [, fromCols, toTbl, toCols, mode] = match;
       const fromKey = fromCols
         .split(",")
@@ -1939,30 +1941,21 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   /**
-   * Rails' `foreign_keys` selects the CONSTRAINT ... FOREIGN KEY column strings
-   * out of `table_structure_sql` (sqlite3_adapter.rb:421-425); both DEFERRABLE
-   * and constraint-name reflection read the same set.
-   */
-  private async _foreignKeyStrings(tableName: string): Promise<string[]> {
-    const structure = await this.tableStructureSql(tableName);
-    return structure.filter(
-      (columnString) =>
-        columnString.startsWith("CONSTRAINT") && columnString.includes("FOREIGN KEY"),
-    );
-  }
-
-  /**
    * Parse FK constraint names from CREATE TABLE SQL. PRAGMA
    * foreign_key_list doesn't expose names, but the DDL does when
    * CONSTRAINT <name> was used. Returns a map keyed by the
    * comma-joined column list (e.g. "a,b" for composites).
    */
   private async _parseForeignKeyNames(tableName: string): Promise<Map<string, string>> {
-    const createSql = (await this._foreignKeyStrings(tableName)).join(",\n");
+    const fkStrings = (await this.tableStructureSql(tableName)).filter(
+      (columnString) =>
+        columnString.startsWith("CONSTRAINT") && columnString.includes("FOREIGN KEY"),
+    );
     const names = new Map<string, string>();
-    const regex = /CONSTRAINT\s+(?:"((?:[^"]|"")*)"|(\w+))\s+FOREIGN\s+KEY\s*\(([^)]+)\)/gi;
-    let match: RegExpExecArray | null;
-    while ((match = regex.exec(createSql)) !== null) {
+    const regex = /CONSTRAINT\s+(?:"((?:[^"]|"")*)"|(\w+))\s+FOREIGN\s+KEY\s*\(([^)]+)\)/i;
+    for (const fkString of fkStrings) {
+      const match = regex.exec(fkString);
+      if (!match) continue;
       const name = match[1] ? match[1].replace(/""/g, '"') : match[2];
       const colList = match[3]
         .split(",")

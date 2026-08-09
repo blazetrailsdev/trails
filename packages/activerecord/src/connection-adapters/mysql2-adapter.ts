@@ -1223,8 +1223,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
               // duplicate column names that the old hash-keyed conn.query collapsed.
               const conn = rawConn as unknown as mysql.Connection;
               // Rails' internal_execute forwards `prepare:` to raw_execute →
-              // perform_query (database_statements.rb:552-558, 589-591); this is
-              // the same seam internalExecQuery reaches (mysql2-adapter.ts:643).
+              // perform_query (abstract/database_statements.rb:552-558, 589-591).
               const prepare = prepareOption ?? this._shouldPrepare(binds);
               if (prepare) this._trackPrepared(conn, driverSql);
               const rawResult = await mysql2PerformQuery.call(
