@@ -2048,27 +2048,18 @@ export class PostgreSQLAdapter
     return this.execRollbackDbTransaction();
   }
 
-  // Mirrors: PostgreSQL::DatabaseStatements#exec_rollback_db_transaction
-  // (postgresql/database_statements.rb:78-81). `internalExecute` already
-  // defaults `allowRetry: false` / `materializeTransactions: true`, so the two
-  // statements below are Ruby's two lines.
-  //
-  // The `finally` is the one deviation left, and it is trails' single
-  // persistent pg.Client, not a Rails behaviour: Ruby's adapter *is* the
-  // connection, so it has no `@client` to release, whereas here
-  // `beginDbTransaction` pins one and `_inTransaction` is read by the RETURNING
-  // savepoint wrap and the `CREATE INDEX CONCURRENTLY` guard. Leaving it set
-  // after a ROLLBACK strands both — pinned by
-  // `postgresql-adapter.exec-rollback-db-transaction.trails.test.ts`. Note that
-  // ROLLBACK does not drop server-side prepared statements, so the
-  // StatementPool deliberately stays attached for the connection's life.
-  //
-  // The `!this._client` guard and the `_isConnectionError` → discard branch
-  // this method used to carry were audited out under RFC 0085: the TransactionManager
-  // never reaches here without an open transaction (the direct `rollback()`
-  // pair keeps its own guard), and the query path recovers from a severed
-  // socket on its own, so the discard only duplicated what Rails leaves to
-  // `with_raw_connection` (`abstract_adapter.rb:1016-1018`).
+  /**
+   * Mirrors: `PostgreSQL::DatabaseStatements#exec_rollback_db_transaction`
+   * (`postgresql/database_statements.rb:78-81`). `internalExecute` already
+   * defaults `allowRetry: false` / `materializeTransactions: true`, so the two
+   * statements below are Ruby's two lines.
+   *
+   * Deviation, language-forced: the `finally` releases trails' single
+   * persistent pg.Client. Ruby's adapter *is* the connection and has no
+   * `@client` to release, whereas here `beginDbTransaction` pins one and
+   * `_inTransaction` gates the RETURNING savepoint wrap and the
+   * `CREATE INDEX CONCURRENTLY` guard.
+   */
   async execRollbackDbTransaction(): Promise<void> {
     await this._cancelAnyRunningQuery();
     try {

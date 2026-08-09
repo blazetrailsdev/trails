@@ -1646,8 +1646,6 @@ export async function checkCurrentProtectedEnvironmentBang(
   const { NoDatabaseError } = await import("../errors.js");
   const { EnvironmentMismatchError } = await import("../migration.js");
   await DatabaseTasks.withTemporaryPool(dbConfig, async (pool) => {
-    // Ruby's block-level `rescue` (`database_tasks.rb:648-649`) covers the
-    // block body only; TS needs the explicit try/catch to scope it the same way.
     try {
       const migrationContext = pool.migrationContext;
       const current = migrationContext.currentEnvironment;
