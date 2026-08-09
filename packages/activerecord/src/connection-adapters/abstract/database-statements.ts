@@ -1537,6 +1537,7 @@ export { deleteStatement as remove };
 // ---------------------------------------------------------------------------
 
 interface DatabaseStatementsDefaultsHost {
+  pool: ConnectionPool | NullPool;
   execute(
     sql: string,
     binds?: unknown[],
@@ -1639,7 +1640,7 @@ export const DatabaseStatements = {
     // SQL string passes through both unchanged, an Arel manager compiles here.
     arel = arelFromRelation(arel);
     const [sql, compiledBinds, compiledPreparable, compiledAllowRetry] = toSqlAndBinds.call(
-      this as unknown as DatabaseStatementsHost,
+      this as DatabaseStatementsHost,
       arel,
       binds ?? [],
       opts?.preparable ?? null,

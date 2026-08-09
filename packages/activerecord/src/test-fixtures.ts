@@ -312,13 +312,18 @@ function useTablelessFixtures(
   afterEach(async () => {
     const adapter = getAdapter();
     if (shouldDeleteFixtureRows(adapter, seededInTransaction)) {
-      for (const { table } of [...entries].reverse()) {
-        try {
-          await adapter.executeMutation(`DELETE FROM ${adapter.quoteTableName(table)}`);
-        } catch (e) {
-          if (!isTableMissingError(e)) throw e;
+      const tables = [...entries].reverse().map(({ table }) => table);
+      // Rails wraps its table_deletes in disable_referential_integrity
+      // unconditionally (database_statements.rb:492).
+      await adapter.disableReferentialIntegrity(async () => {
+        for (const table of tables) {
+          try {
+            await adapter.executeMutation(`DELETE FROM ${adapter.quoteTableName(table)}`);
+          } catch (e) {
+            if (!isTableMissingError(e)) throw e;
+          }
         }
-      }
+      }, tables);
     }
     for (const key of keys) delete store[key];
   });
