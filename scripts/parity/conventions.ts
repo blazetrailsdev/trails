@@ -175,8 +175,10 @@ export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
   "activesupport:core_ext/time/calculations.rb": "time-ext.ts",
   // The `Date` arm widens through `in_time_zone` before delegating to the
   // `Time` arm (`date/calculations.rb:55-87`), so it has its own receiver —
-  // `Temporal.PlainDate` — and its own file.
-  "activesupport:core_ext/date/calculations.rb": "date-ext.ts",
+  // `Temporal.PlainDate` — and its own file. The entry is what splits the
+  // bucket off `date/acts_like.rb` (Date's first reopening); the path it names
+  // is the one the default rule would produce anyway.
+  "activesupport:core_ext/date/calculations.rb": "core-ext/date/calculations.ts",
   "activesupport:core_ext/date_time/calculations.rb": "time-ext.ts",
   // The activesupport `core_ext/*` reopenings. Ruby splits one class's extensions
   // across a file per concern and reopens the class in each; the extractor stamps

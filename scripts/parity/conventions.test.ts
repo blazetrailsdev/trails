@@ -336,9 +336,13 @@ describe("RUBY_FILE_TS_OVERRIDES", () => {
     // without these the 129 methods the calculations.rb files add are measured
     // against files that define none of them. `Date` is its own receiver: its
     // calculations widen through `in_time_zone` (date/calculations.rb:55-87)
-    // rather than operating on an instant.
+    // rather than operating on an instant. Its file sits at the Rails path the
+    // default rule already produces; the entry is what splits the bucket off
+    // `date/acts_like.rb`, Date's first reopening.
     expect(rubyFileToTs("core_ext/time/calculations.rb", "activesupport")).toBe("time-ext.ts");
-    expect(rubyFileToTs("core_ext/date/calculations.rb", "activesupport")).toBe("date-ext.ts");
+    expect(rubyFileToTs("core_ext/date/calculations.rb", "activesupport")).toBe(
+      "core-ext/date/calculations.ts",
+    );
     expect(rubyFileToTs("core_ext/date_time/calculations.rb", "activesupport")).toBe("time-ext.ts");
   });
 

@@ -8,6 +8,8 @@
 
 import { Temporal } from "@blazetrails/date";
 import { instantFrom } from "./temporal.js";
+import { advance as dateAdvance, since as dateSince } from "./core-ext/date/calculations.js";
+import type { TimeWithZone } from "./time-with-zone.js";
 
 export type DurationParts = {
   years: number;
@@ -41,28 +43,45 @@ const PART_ORDER: (keyof DurationParts)[] = [
 // wall-clock length varies (DST, month/year length).
 const VARIABLE_PARTS: (keyof DurationParts)[] = ["years", "months", "weeks", "days"];
 
-function zeroParts(): DurationParts {
-  return { years: 0, months: 0, weeks: 0, days: 0, hours: 0, minutes: 0, seconds: 0 };
-}
-
-function mergeParts(a: DurationParts, b: DurationParts): DurationParts {
-  const result = zeroParts();
-  for (const key of PART_ORDER) {
-    result[key] = a[key] + b[key];
+// Mirrors Rails `@parts.merge(other._parts) { |_k, v, ov| v + ov }`
+// (duration.rb:270-272): a Ruby Hash keeps insertion order, and `sum`
+// (`:397-419`) applies the parts in exactly that order, so the receiver's keys
+// come first and the other's new keys are appended in `other._parts`' own
+// order, not in a canonical one.
+function mergeParts(
+  a: DurationParts,
+  aKeys: readonly (keyof DurationParts)[],
+  b: Partial<DurationParts>,
+): Partial<DurationParts> {
+  const result: Partial<DurationParts> = {};
+  for (const key of aKeys) {
+    result[key] = a[key] + (b[key] ?? 0);
+  }
+  for (const key of Object.keys(b) as (keyof DurationParts)[]) {
+    if (PART_ORDER.includes(key) && b[key] !== undefined && !aKeys.includes(key)) {
+      result[key] = a[key] + b[key];
+    }
   }
   return result;
 }
 
 export class Duration {
   readonly parts: DurationParts;
+
+  /**
+   * @internal The keys of Rails' `@parts` (`duration.rb:227`) — the units the
+   * duration was built from, zeroes rejected unless the whole duration is zero.
+   * `parts` itself stays a full fixed record so its readers stay total, so this
+   * carries the sparseness `@parts.reject!` gives Ruby, which `sum` (`:397-419`)
+   * and `inspect` (`:340-357`) both read as "the parts there are".
+   */
+  private readonly _partKeys: readonly (keyof DurationParts)[];
+
   private readonly _variable: boolean;
 
   // Mirrors Rails `Duration#initialize(value, parts, variable = nil)`
-  // (duration.rb:226-234). Deviations: trails carries no separate `@value`
-  // (totals derive from `parts` via inSeconds()), and `parts` stays a full
-  // fixed record instead of Rails' zero-rejected sparse hash — the nonzero
-  // filter in the `variable` computation below stands in for
-  // `@parts.reject! { |k, v| v.zero? }`.
+  // (duration.rb:226-234). trails carries no separate `@value` — totals derive
+  // from `parts` via inSeconds(), which is what `value == 0` reads here.
   constructor(parts: Partial<DurationParts> = {}, variable: boolean | null = null) {
     this.parts = {
       years: parts.years ?? 0,
@@ -73,7 +92,14 @@ export class Duration {
       minutes: parts.minutes ?? 0,
       seconds: parts.seconds ?? 0,
     };
-    this._variable = variable ?? VARIABLE_PARTS.some((part) => this.parts[part] !== 0);
+    // Ruby's `@parts` is a Hash, and both `sum` and `merge` read it in
+    // insertion order, so the argument's own key order is the part order.
+    const given = (Object.keys(parts) as (keyof DurationParts)[]).filter(
+      (part) => PART_ORDER.includes(part) && parts[part] !== undefined,
+    );
+    this._partKeys =
+      this.inSeconds() === 0 ? given : given.filter((part) => this.parts[part] !== 0);
+    this._variable = variable ?? this._partKeys.some((part) => VARIABLE_PARTS.includes(part));
   }
 
   // ---------------------------------------------------------------------------
@@ -114,17 +140,20 @@ export class Duration {
   plus(other: Duration | number): Duration {
     if (typeof other === "number") {
       return new Duration(
-        mergeParts(this.parts, { ...zeroParts(), seconds: other }),
+        mergeParts(this.parts, this._partKeys, { seconds: other }),
         this._variable,
       );
     }
-    return new Duration(mergeParts(this.parts, other.parts), this._variable || other._variable);
+    return new Duration(
+      mergeParts(this.parts, this._partKeys, other._givenParts()),
+      this._variable || other._variable,
+    );
   }
 
   minus(other: Duration | number): Duration {
     if (typeof other === "number") {
       return new Duration(
-        mergeParts(this.parts, { ...zeroParts(), seconds: -other }),
+        mergeParts(this.parts, this._partKeys, { seconds: -other }),
         this._variable,
       );
     }
@@ -132,21 +161,33 @@ export class Duration {
   }
 
   times(n: number): Duration {
-    const result = zeroParts();
-    for (const key of PART_ORDER) {
-      result[key] = this.parts[key] * n;
-    }
-    return new Duration(result, this._variable);
+    return new Duration(
+      this._transformValues((number) => number * n),
+      this._variable,
+    );
   }
 
   // Mirrors Rails `/` with a Numeric (duration.rb:297-305): divides each
   // part, preserving the receiver's variable flag.
   dividedBy(n: number): Duration {
-    const result = zeroParts();
-    for (const key of PART_ORDER) {
-      result[key] = this.parts[key] / n;
+    return new Duration(
+      this._transformValues((number) => number / n),
+      this._variable,
+    );
+  }
+
+  /** @internal Rails' `@parts` itself — the sparse hash `+` and `-` merge. */
+  private _givenParts(): Partial<DurationParts> {
+    return this._transformValues((number) => number);
+  }
+
+  /** @internal Rails' `@parts.transform_values` (`duration.rb:288`, `:299`). */
+  private _transformValues(fn: (number: number) => number): Partial<DurationParts> {
+    const result: Partial<DurationParts> = {};
+    for (const key of this._partKeys) {
+      result[key] = fn(this.parts[key]);
     }
-    return new Duration(result, this._variable);
+    return result;
   }
 
   negate(): Duration {
@@ -207,11 +248,23 @@ export class Duration {
   // Date application — applies each part sequentially like Rails does
   // ---------------------------------------------------------------------------
 
-  since(date: Date | Temporal.Instant = Temporal.Now.instant()): Temporal.Instant {
+  since(date: Temporal.PlainDate): Temporal.PlainDate | TimeWithZone;
+  since(date?: Date | Temporal.Instant): Temporal.Instant;
+  since(
+    date: Date | Temporal.Instant | Temporal.PlainDate = Temporal.Now.instant(),
+  ): Temporal.Instant | Temporal.PlainDate | TimeWithZone {
+    if (date instanceof Temporal.PlainDate)
+      return applyDurationToDate(date, this.parts, this._partKeys, 1);
     return applyDurationPreservingNs(date, this.parts, 1);
   }
 
-  ago(date: Date | Temporal.Instant = Temporal.Now.instant()): Temporal.Instant {
+  ago(date: Temporal.PlainDate): Temporal.PlainDate | TimeWithZone;
+  ago(date?: Date | Temporal.Instant): Temporal.Instant;
+  ago(
+    date: Date | Temporal.Instant | Temporal.PlainDate = Temporal.Now.instant(),
+  ): Temporal.Instant | Temporal.PlainDate | TimeWithZone {
+    if (date instanceof Temporal.PlainDate)
+      return applyDurationToDate(date, this.parts, this._partKeys, -1);
     return applyDurationPreservingNs(date, this.parts, -1);
   }
 
@@ -472,6 +525,56 @@ function toDateInput(date: Date | Temporal.Instant): Date {
   if (date instanceof Date) return date;
   if (date instanceof Temporal.Instant) return new Date(date.epochMilliseconds);
   throw new TypeError(`expected a time or date, got ${JSON.stringify(date)}`);
+}
+
+/**
+ * The `time.acts_like?(:date)` arm of `ActiveSupport::Duration#sum`
+ * (`duration.rb:397-419`): each part is applied in turn, the sub-day ones
+ * through `Date#since` — which widens the day into a zoned `Time`
+ * (`core_ext/date/calculations.rb:61-63`) — and the rest through `advance`,
+ * which keeps the receiver a calendar day.
+ *
+ * The loop walks `partKeys` — Rails' `@parts` keys, not every key
+ * `DurationParts` carries — so `0.days` advances by zero days and stays a
+ * `PlainDate` while `0.seconds` still takes the `since` arm and widens, which
+ * is what `@parts.reject! ... unless value == 0` (`duration.rb:228`) gives Ruby.
+ */
+function applyDurationToDate(
+  date: Temporal.PlainDate,
+  parts: DurationParts,
+  partKeys: readonly (keyof DurationParts)[],
+  sign: 1 | -1,
+): Temporal.PlainDate | TimeWithZone {
+  let time: Temporal.PlainDate | TimeWithZone = date;
+
+  for (const type of partKeys) {
+    const number = parts[type];
+    const t = time;
+    if (type === "seconds") {
+      time = dateOrTimeSince(t, sign * number);
+    } else if (type === "minutes") {
+      time = dateOrTimeSince(t, sign * number * 60);
+    } else if (type === "hours") {
+      time = dateOrTimeSince(t, sign * number * 3600);
+    } else {
+      time = dateOrTimeAdvance(t, { [type]: sign * number });
+    }
+  }
+
+  return time;
+}
+
+/** `t.since(seconds)` over either receiver {@link applyDurationToDate} carries. */
+function dateOrTimeSince(t: Temporal.PlainDate | TimeWithZone, seconds: number): TimeWithZone {
+  return t instanceof Temporal.PlainDate ? dateSince(t, seconds) : t.since(seconds);
+}
+
+/** `t.advance(options)` over either receiver {@link applyDurationToDate} carries. */
+function dateOrTimeAdvance(
+  t: Temporal.PlainDate | TimeWithZone,
+  options: Partial<DurationParts>,
+): Temporal.PlainDate | TimeWithZone {
+  return t instanceof Temporal.PlainDate ? dateAdvance(t, options) : t.advance(options);
 }
 
 /**

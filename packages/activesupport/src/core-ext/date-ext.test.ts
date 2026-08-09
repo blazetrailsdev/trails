@@ -23,7 +23,7 @@ import {
   isFuture,
   isToday,
 } from "../time-ext.js";
-import * as DateExt from "../date-ext.js";
+import * as DateExt from "./date/calculations.js";
 import { setZone, resetZone } from "../time-zone-config.js";
 import { TimeZone } from "../values/time-zone.js";
 
