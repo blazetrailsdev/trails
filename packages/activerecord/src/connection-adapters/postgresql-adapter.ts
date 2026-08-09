@@ -3904,7 +3904,12 @@ export class PostgreSQLAdapter
   // Mirrors: ReferentialIntegrity#disable_referential_integrity. Extracted to
   // postgresql/referential-integrity.ts (Rails houses this in the
   // ReferentialIntegrity module, not schema_statements.rb).
-  override disableReferentialIntegrity = disableReferentialIntegrity;
+  override disableReferentialIntegrity(
+    fn: () => Promise<void>,
+    scopedTables?: string[],
+  ): Promise<void> {
+    return disableReferentialIntegrity.call(this, fn, scopedTables);
+  }
 
   // Mirrors: ReferentialIntegrity#check_all_foreign_keys_valid!
   checkAllForeignKeysValidBang = checkAllForeignKeysValidBang;

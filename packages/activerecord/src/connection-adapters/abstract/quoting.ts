@@ -75,19 +75,6 @@ type TemporalDateLike =
   | Temporal.PlainTime;
 
 /**
- * ANSI double-quote identifier quoter (`""`-escaped). Not a Rails-layer
- * method — Rails' abstract `Quoting` has no `quote_identifier`. This is the
- * SQL-92 fallback used only by the `ABSTRACT_QUOTER` crutch in
- * `sanitization.ts`; every real adapter quotes through its own
- * dialect-specific helper.
- *
- * @internal
- */
-export function quoteIdentifier(name: string): string {
-  return `"${name.replace(/"/g, '""')}"`;
-}
-
-/**
  * Quotes the column name. Must be implemented by subclasses — the abstract
  * layer raises, mirroring Rails where every adapter defines its own.
  *

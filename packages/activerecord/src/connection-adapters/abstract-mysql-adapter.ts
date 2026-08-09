@@ -329,8 +329,13 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    * `quotedTrue`/`quotedFalse` are NOT overridden — Rails MySQL inherits the
    * abstract `"TRUE"`/`"FALSE"`. Binds serialize to 1/0 via `cast_bound_value`.
    */
-  override quoteTableName = mysqlQuoteTableName;
-  override quoteColumnName = mysqlQuoteColumnName;
+  override quoteTableName(name: string): string {
+    return mysqlQuoteTableName(name);
+  }
+
+  override quoteColumnName(name: string): string {
+    return mysqlQuoteColumnName(name);
+  }
 
   // Defined as methods, not class fields: Rails declares these with `def`
   // (`mysql/quoting.rb:72-77`), and the inherited `type_cast` reaches them
