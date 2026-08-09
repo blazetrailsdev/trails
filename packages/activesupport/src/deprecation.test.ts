@@ -127,17 +127,18 @@ describe("DeprecationTest", () => {
   });
 
   it("gem option stored on instance", () => {
-    const d = new Deprecation({ gemName: "MyGem" });
+    const d = new Deprecation("8.1", "MyGem");
     expect(d.gemName).toBe("MyGem");
   });
 
   it("horizon option stored on instance", () => {
-    const d = new Deprecation({ horizon: "3.0" });
-    expect(d.horizon).toBe("3.0");
+    const d = new Deprecation("3.0");
+    expect(d.deprecationHorizon).toBe("3.0");
   });
 
   it("silenced option in constructor", () => {
-    const d = new Deprecation({ silenced: true });
+    const d = new Deprecation();
+    d.silenced = true;
     expect(d.silenced).toBe(true);
   });
 
@@ -261,19 +262,20 @@ describe("DeprecationTest", () => {
   });
 
   it("custom gem_name", () => {
-    const d = new Deprecation({ gemName: "MyLib" });
+    const d = new Deprecation("2.0", "MyLib");
     expect(d.gemName).toBe("MyLib");
   });
 
   it("default gem_name is Rails", () => {
     const d = new Deprecation();
-    // No default gem, but we can set it
-    expect(d.gemName).toBeUndefined();
+    expect(d.gemName).toBe("Rails");
   });
 
   it("default deprecation_horizon is greater than the current Rails version", () => {
     const d = new Deprecation();
-    expect(d.horizon).toBeUndefined();
+    // Rails asserts against ActiveSupport::VERSION::STRING (8.0.2), which
+    // trails has no constant for.
+    expect(d.deprecationHorizon > "8.0.2").toBe(true);
   });
 
   it("disallowed_warnings with the default warning message", () => {

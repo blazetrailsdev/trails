@@ -12,7 +12,7 @@ describe("DeprecationTest", () => {
   beforeEach(() => {
     deprecators = new Deprecators();
     for (const name of deprecatorNames) {
-      deprecators.set(name, new Deprecation({ horizon: "2.0", gemName: name }));
+      deprecators.set(name, new Deprecation("2.0", name));
     }
   });
 

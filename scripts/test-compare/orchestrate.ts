@@ -21,12 +21,18 @@
  * test-compare's main(); only `--cached` is consumed here.
  *
  * `TEST_COMPARE_FORCE=1` forces a full run end-to-end, mirroring
- * `API_COMPARE_FORCE`: it overrides `--cached` and drops fetch's offline
- * fast-path.
+ * `API_COMPARE_FORCE`: it overrides `--cached`, drops fetch's offline
+ * fast-path, and bypasses the shared Rails-manifest cache.
+ *
+ * The Ruby extract is the dominant cost of a full run (~25s of ~31s), and every
+ * worktree extracts the same vendored Rails, so it goes through the same
+ * content-keyed cross-worktree cache api-compare uses
+ * (`scripts/api-compare/shared-cache.ts`): the first worktree to extract a
+ * given `vendor/` + extractor pays for all of them.
  */
 import { execFile } from "node:child_process";
-import { access } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
+import { access, readFile, stat, writeFile } from "node:fs/promises";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
@@ -34,6 +40,13 @@ import { runFetch } from "../../vendor/fetch.js";
 import { testPathsManifest } from "../../vendor/sources.js";
 import { main as extractTsTests } from "./extract-ts-tests.js";
 import { main as runCompare } from "./compare.js";
+import {
+  sharedCacheDir,
+  hashParts,
+  fileHash,
+  readShared,
+  writeShared,
+} from "../api-compare/shared-cache.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -66,6 +79,78 @@ async function runRubyExtract(): Promise<void> {
 }
 
 /**
+ * The test-compare analogue of api-compare's `RAILS_INPUTS`: the lockfile
+ * (re-fetch), sources.ts (registry edits, whence `testPathsManifest()`), and
+ * the extractor script (output-shape changes). The shared cache keys on their
+ * CONTENT, so a key computed in one worktree matches another's.
+ */
+const RAILS_INPUTS = [
+  join(ROOT, "vendor/sources.lock.json"),
+  join(ROOT, "vendor/sources.ts"),
+  join(DIR, "extract-ruby-tests.rb"),
+];
+
+/** Content key for the Rails test manifest, or null if any input is missing. */
+async function railsCacheKey(): Promise<string | null> {
+  const inputs = await Promise.all(RAILS_INPUTS.map(fileHash));
+  if (inputs.some((h) => h === null)) return null;
+  return hashParts(inputs as string[]);
+}
+
+/**
+ * True when `output/rails-tests.json` is already newer than every input — this
+ * worktree is warm, so re-running Ruby would reproduce it byte for byte. Cheap
+ * stats, checked before the shared cache so the common warm path never pays a
+ * multi-MB read+rewrite. Unlike api-compare's extractor the Ruby side has no
+ * mtime gate of its own, so this is the only thing standing between a warm run
+ * and the ~25s subprocess.
+ */
+async function railsOutputFresh(railsOut: string): Promise<boolean> {
+  try {
+    const outMtime = (await stat(railsOut)).mtimeMs;
+    const inMtimes = await Promise.all(RAILS_INPUTS.map((p) => stat(p).then((s) => s.mtimeMs)));
+    return inMtimes.every((m) => outMtime >= m);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Run the Ruby extractor, but first consult the cross-worktree shared cache.
+ * A hit writes `output/rails-tests.json` directly and skips the subprocess; a
+ * miss runs Ruby and publishes the result for sibling worktrees.
+ * `TEST_COMPARE_FORCE=1` bypasses both layers, as `API_COMPARE_FORCE` does.
+ */
+async function runRubyExtractShared(): Promise<void> {
+  const railsOut = join(OUTPUT_DIR, "rails-tests.json");
+  if (!force && (await railsOutputFresh(railsOut))) {
+    process.stdout.write("Rails test manifest is current; skipping Ruby extract\n");
+    return;
+  }
+
+  const sharedDir = force ? null : await sharedCacheDir(ROOT);
+  const key = sharedDir ? await railsCacheKey() : null;
+
+  if (sharedDir && key) {
+    const cached = await readShared(sharedDir, "rails-tests", key);
+    if (cached !== null) {
+      await writeFile(railsOut, cached);
+      process.stdout.write("Rails test manifest served from shared cross-worktree cache\n");
+      return;
+    }
+  }
+
+  await runRubyExtract();
+
+  if (sharedDir && key) {
+    const produced = await readFile(railsOut, "utf-8").catch(() => null);
+    if (produced !== null) {
+      await writeShared(sharedDir, "rails-tests", key, produced, basename(ROOT));
+    }
+  }
+}
+
+/**
  * Whether extraction can be skipped: `--cached` asked for it AND both
  * manifests are already on disk. A missing manifest falls back to a full run,
  * with the same two messages run.sh's bash version printed.
@@ -95,7 +180,7 @@ async function main(): Promise<void> {
 
     // Both extracts need only fetch's vendored sources, so they run in
     // parallel: ruby as a subprocess, ts in-process.
-    await Promise.all([runRubyExtract(), extractTsTests()]);
+    await Promise.all([runRubyExtractShared(), extractTsTests()]);
   }
 
   runCompare(forwardArgs);

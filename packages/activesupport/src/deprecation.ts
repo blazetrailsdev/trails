@@ -26,8 +26,9 @@ export class Deprecation {
     "stderr";
   private _silenced = false;
   // Rails: `attr_accessor :gem_name` (deprecation/reporting.rb:11).
-  gemName?: string;
-  horizon?: string;
+  gemName: string;
+  // Rails: `attr_accessor :deprecation_horizon` (deprecation.rb:65).
+  deprecationHorizon: string;
   // Rails: `self.debug = false` (deprecation.rb:76).
   debug = false;
   disallowedWarnings: (string | RegExp | "all")[] = [];
@@ -47,10 +48,19 @@ export class Deprecation {
     this._silenced = silenced;
   }
 
-  constructor(options?: { horizon?: string; gemName?: string; silenced?: boolean }) {
-    this.horizon = options?.horizon;
-    this.gemName = options?.gemName;
-    if (options?.silenced != null) this.silenced = options.silenced;
+  /**
+   * It accepts two parameters on initialization. The first is a version of
+   * library and the second is a library name.
+   *
+   *   new Deprecation("2.0", "MyLibrary")
+   *
+   * Mirrors: ActiveSupport::Deprecation#initialize (deprecation.rb:71-79).
+   */
+  constructor(deprecationHorizon = "8.1", gemName = "Rails") {
+    this.gemName = gemName;
+    this.deprecationHorizon = deprecationHorizon;
+    this.silenced = false;
+    this.debug = false;
   }
 
   private _matchesDisallowed(msg: string): boolean {
