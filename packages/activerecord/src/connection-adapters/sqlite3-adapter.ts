@@ -2295,13 +2295,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     });
 
     this.schemaCache.clearBang();
-    // The rebuild issues its index, DROP TABLE and content-copy DDL via
-    // driver.exec (to manage savepoint nesting), bypassing the executeMutation
-    // path that dirtiesQueryCache wraps. Rails' alter_table dirties the cache as
-    // a side effect of copy_table, which runs create_table/drop_table through
-    // `execute` and copy_table_contents through `internal_exec_query` — both in
-    // the dirties set — so clear it here to match.
-    this.clearQueryCache();
   }
 
   // --- Rails: table-rebuild helpers (move_table / copy_table family) ---
@@ -2396,23 +2389,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return this.tableStructure(tableName);
   }
 
-  /**
-   * Rails runs the copy-table family's DDL through `execute` and its INSERT
-   * through `internal_exec_query`, both of which translate driver errors
-   * (sqlite3_adapter.rb:593-648). These helpers go straight to the driver to
-   * stay inert w.r.t. savepoint nesting, so translate here instead.
-   * @internal
-   */
-  private async execCopyTable(sql: string): Promise<void> {
-    await this.log(sql, "SQL", [], [], false, async () => {
-      try {
-        await this.driver.exec(sql);
-      } catch (e) {
-        throw this._translateException(e, sql, []);
-      }
-    });
-  }
-
   /** @internal */
   private async moveTable(
     from: string,
@@ -2421,7 +2397,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     block?: (definition: SQLite3TableDefinition) => void,
   ): Promise<void> {
     await this.copyTable(from, to, options, block);
-    await this.execCopyTable(`DROP TABLE ${quoteTableName(from)}`);
+    await this.dropTable(from);
   }
 
   /** @internal */
@@ -2556,7 +2532,13 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
         : `${quoteColumnName(newName)} ON ${quoteTableName(to)}`;
       let sql = `CREATE ${idx.unique ? "UNIQUE " : ""}INDEX ${target} (${colSql})`;
       if (idx.where) sql += ` WHERE ${idx.where}`;
-      await this.execCopyTable(sql);
+      // Rails reaches `add_index(to, columns, **options)` here
+      // (sqlite3_adapter.rb:701), which lands in `execute`. The statement is
+      // still assembled locally — SQLite puts the schema on the INDEX name, a
+      // form `add_index` has no notion of — but it goes through the same
+      // primitive, so it is logged and dirties the query cache.
+      // @missingRailsCall add_index — see the ATTACHed-schema note above.
+      await this.execute(sql);
     }
   }
 
@@ -2576,7 +2558,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     const fromColsToCopy = validCols.map((col) => destToSrc[col]);
     const quotedDest = validCols.map((c) => quoteColumnName(c)).join(", ");
     const quotedSrc = fromColsToCopy.map((c) => quoteColumnName(c)).join(", ");
-    await this.execCopyTable(
+    await this.internalExecQuery(
       `INSERT INTO ${quoteTableName(to)} (${quotedDest}) SELECT ${quotedSrc} FROM ${quoteTableName(from)}`,
     );
   }
