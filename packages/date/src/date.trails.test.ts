@@ -927,6 +927,37 @@ describe("Date", () => {
     }
   });
 
+  it("takes guess_style's proleptic arms for an infinite start, as date_initialize does", () => {
+    // ruby 3.3.11 -rdate — `Date::GREGORIAN` is proleptic Gregorian everywhere,
+    // so 1500 has no leap day and 1582-10-10 is a real day the reform never
+    // deleted; `Date::JULIAN` is proleptic Julian everywhere, so 1900 does have
+    // one:
+    //   Date.new(1500, 2, 29, Date::GREGORIAN) #=> Date::Error: invalid date
+    //   Date.new(1500, 2, 28, Date::GREGORIAN).jd #=> 2268982
+    //   Date.new(1582, 10, 10, Date::GREGORIAN).to_s #=> "1582-10-10"
+    //   Date.new(1900, 2, 29, Date::JULIAN).to_s #=> "1900-02-29"
+    //   Date.new(2000, 1, 1, Date::JULIAN).jd #=> 2451558
+    expect(() => new RubyDate(1500, 2, 29, RubyDate.GREGORIAN)).toThrow("invalid date");
+    expect(new RubyDate(1500, 2, 28, RubyDate.GREGORIAN).jd).toBe(2268982);
+    expect(new RubyDate(1582, 10, 10, RubyDate.GREGORIAN).toS()).toBe("1582-10-10");
+    expect(new RubyDate(1900, 2, 29, RubyDate.JULIAN).toS()).toBe("1900-02-29");
+    expect(new RubyDate(2000, 1, 1, RubyDate.JULIAN).jd).toBe(2451558);
+    // datetime_initialize takes the same two arms:
+    //   DateTime.new(1500, 2, 29, 0, 0, 0, 0, Date::GREGORIAN) #=> Date::Error
+    //   DateTime.new(1900, 2, 29, 1, 2, 3, 0, Date::JULIAN).to_s
+    //     #=> "1900-02-29T01:02:03+00:00"
+    expect(() => new RubyDateTime(1500, 2, 29, 0, 0, 0, 0, RubyDate.GREGORIAN)).toThrow(
+      "invalid date",
+    );
+    expect(new RubyDateTime(1900, 2, 29, 1, 2, 3, 0, RubyDate.JULIAN).toS()).toBe(
+      "1900-02-29T01:02:03+00:00",
+    );
+    // A year past REFORM_END_YEAR takes the proleptic Gregorian arm under the
+    // default start too, and answers the same day:
+    //   Date.new(600000, 1, 1).jd #=> 220866560
+    expect(new RubyDate(600000, 1, 1).jd).toBe(220866560);
+  });
+
   it("raises from every static that answers the seat for a Julian-only spelling", () => {
     // ruby 3.3.11 -rdate answers "1500-02-29" from all six — the gem's `::Date`
     // value is the gem object, so `date_to_date` (date_core.c:8977-8981) is
@@ -1323,6 +1354,23 @@ describe("DateTime", () => {
     // fraction illegal:
     //   DateTime.new(2008, 3, 1, 6, 0, 0.5, 3600).sec_fraction #=> (1/2)
     expect(new RubyDateTime(2008, 3, 1, 6, 0, 0.5, 3600).secFraction).toEqual(new Rational(1, 2));
+  });
+
+  it("counts the offset and the start among the positions the fraction bound reads", () => {
+    // ruby 3.3.11 — num2int_with_frac's `argc > n` counts EVERY position, so an
+    // offset or a start makes an earlier fraction illegal:
+    //   DateTime.new(2008, 3, 1, 6, 0.5, 0, "+09:00")          #=> Date::Error: invalid fraction
+    //   DateTime.new(2008, 3, 1, 6, 0.5, 0, 0, Date::ITALY)    #=> Date::Error: invalid fraction
+    //   DateTime.new(2008, 3, 1.5, 0, 0, 0, "+09:00")          #=> Date::Error: invalid fraction
+    expect(() => new RubyDateTime(2008, 3, 1, 6, 0.5, undefined, "+09:00")).toThrow(
+      "invalid fraction",
+    );
+    expect(
+      () => new RubyDateTime(2008, 3, 1, 6, 0.5, undefined, undefined, RubyDate.ITALY),
+    ).toThrow("invalid fraction");
+    expect(() => new RubyDateTime(2008, 3, 1.5, undefined, undefined, undefined, "+09:00")).toThrow(
+      "invalid fraction",
+    );
   });
 
   it("carries the fraction of a legal non-final argument through add_frac", () => {

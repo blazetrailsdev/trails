@@ -2962,6 +2962,15 @@ const GREGORIAN = -Infinity;
 const DEFAULT_SG = ITALY;
 
 /**
+ * @internal `date_core.c`'s `REFORM_BEGIN_YEAR` / `REFORM_END_YEAR`
+ * (`date_core.c:207-208`), the years {@link guessStyle} brackets: a year before
+ * the first is proleptic Julian whatever `sg` says, and one after the last
+ * proleptic Gregorian.
+ */
+const REFORM_BEGIN_YEAR = 1582;
+const REFORM_END_YEAR = 1930;
+
+/**
  * @internal `date_core.c`'s `REFORM_BEGIN_JD` / `REFORM_END_JD`
  * (`date_core.c:209-210`), the window a finite `start` has to fall in — ns
  * 1582-01-01 through os 1930-12-31, the span over which the reform was actually
@@ -3195,6 +3204,71 @@ function div(n: number, d: number): number {
 /** @internal `date_core.c`'s `MOD` macro (`date_core.c:169-171`), floored modulo. */
 function mod(n: number, d: number): number {
   return n - d * div(n, d);
+}
+
+/**
+ * @internal `date_core.c`'s `monthtab` (`date_core.c:697-700`), the last day of
+ * each month indexed by leap year then by month, with a `0` in the unused
+ * zeroth column so the month is its own index.
+ */
+const MONTHTAB: readonly (readonly number[])[] = [
+  [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31],
+  [0, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31],
+];
+
+/** @internal `date_core.c` `c_gregorian_leap_p` (`date_core.c:709-713`). */
+function cGregorianLeapP(y: number): boolean {
+  return (mod(y, 4) === 0 && y % 100 !== 0) || mod(y, 400) === 0;
+}
+
+/** @internal `date_core.c` `c_gregorian_last_day_of_month` (`date_core.c:723-728`). */
+function cGregorianLastDayOfMonth(y: number, m: number): number {
+  return MONTHTAB[cGregorianLeapP(y) ? 1 : 0][m];
+}
+
+/**
+ * @internal `date_core.c` `c_valid_gregorian_p` (`date_core.c:747-765`), the
+ * PROLEPTIC Gregorian validity check — it reads no `sg` and does no Julian-day
+ * round trip, so it accepts exactly the days the Gregorian calendar has,
+ * extended in both directions. A negative `m` counts back from a thirteenth
+ * month and a negative `d` from the month's last day, as in
+ * {@link cValidCivilP}. The C's `rm`/`rd` out-parameters come back as the
+ * tuple, `null` for its `0`.
+ */
+function cValidGregorianP(y: number, m: number, d: number): [rm: number, rd: number] | null {
+  if (m < 0) m += 13;
+  if (m < 1 || m > 12) return null;
+  const last = cGregorianLastDayOfMonth(y, m);
+  if (d < 0) d = last + d + 1;
+  if (d < 1 || d > last) return null;
+  return [m, d];
+}
+
+/**
+ * @internal `date_core.c` `guess_style` (`date_core.c:1414-1433`), which
+ * answers `-inf`, `+inf` or `0` for the calendar the year and start select: a
+ * negative style is proleptic Gregorian, a positive one proleptic Julian, and
+ * `0` means the reform round trip under `sg` decides.
+ *
+ * The C's middle arm — `!FIXNUM_P(y)`, a Bignum year — has no reachable
+ * analogue: every `y` here is a JS number, which is the `FIXNUM` case, so the
+ * arm is written as the range where a Bignum year begins. Beyond it the C
+ * decomposes the year into `nth` plus a residue (`decode_year`,
+ * `date_core.c:1342-1371`) so the Julian day still fits a Fixnum; trails
+ * carries the whole Julian day in a JS number instead, which is exact up to
+ * `Number.MAX_SAFE_INTEGER` — roughly year ±2.4e10 — and loses precision, not
+ * range, above that. Years past that limit are the documented gap.
+ */
+function guessStyle(y: number, sg: number): number {
+  let style = 0;
+
+  if (!Number.isFinite(sg)) style = sg;
+  else if (!Number.isSafeInteger(y)) style = y > 0 ? GREGORIAN : JULIAN;
+  else {
+    if (y < REFORM_BEGIN_YEAR) style = JULIAN;
+    else if (y > REFORM_END_YEAR) style = GREGORIAN;
+  }
+  return style;
 }
 
 /**
@@ -3930,8 +4004,13 @@ export class Date {
    * The `start` ARGUMENT is {@link #sg} below: every conversion is read under
    * it, and {@link Date#start}, {@link Date#isJulian} and
    * {@link Date#newStart} answer off it.
+   *
+   * It is optional because `date_initialize`'s proleptic-Gregorian arm
+   * (`date_core.c:3532-3542`) stores `HAVE_CIVIL` alone with no Julian day at
+   * all; {@link Date.#getSJd} is `get_s_jd` (`date_core.c:1168-1187`), which
+   * fills it in on first read.
    */
-  readonly #jd: number;
+  #jd?: number;
 
   /**
    * @internal `SimpleDateData`'s `sg` (`date_core.c:203-213`), the
@@ -3969,10 +4048,32 @@ export class Date {
       return;
     }
     const sg = val2sg(start);
-    const r = cValidCivilP(year, month, day, sg);
-    if (r === null) throw new DateError("invalid date");
-    this.#jd = r;
-    this.#sg = sg;
+    if (guessStyle(year, sg) < 0) {
+      const r = cValidGregorianP(year, month, day);
+      if (r === null) throw new DateError("invalid date");
+      const [rm, rd] = r;
+      this.#sg = sg;
+      this.#civil = [year, rm, rd];
+    } else {
+      const r = cValidCivilP(year, month, day, sg);
+      if (r === null) throw new DateError("invalid date");
+      this.#jd = r;
+      this.#sg = sg;
+    }
+  }
+
+  /**
+   * @internal `date_core.c` `get_s_jd` (`date_core.c:1168-1187`), the lazy half
+   * of `SimpleDateData`: when the proleptic-Gregorian arm of `date_initialize`
+   * stored the civil triple alone, the Julian day is `c_civil_to_jd` of it
+   * under `s_virtual_sg` — the stored `sg` — computed on first read and kept.
+   */
+  #getSJd(): number {
+    if (this.#jd === undefined) {
+      const [year, mon, mday] = this.#civil as [number, number, number];
+      this.#jd = cCivilToJd(year, mon, mday, this.#sg);
+    }
+    return this.#jd;
   }
 
   /**
@@ -4180,7 +4281,7 @@ export class Date {
    * `Temporal.PlainDate`'s own proleptic Gregorian readers do not.
    */
   get jd(): number {
-    return this.#jd;
+    return this.#getSJd();
   }
 
   /**
@@ -4216,7 +4317,7 @@ export class Date {
    * one on `DateTime` — hence the override there.
    */
   get isJulian(): boolean {
-    return mJulianP(this.#jd, this.#sg);
+    return mJulianP(this.#getSJd(), this.#sg);
   }
 
   /**
@@ -4255,7 +4356,7 @@ export class Date {
    * `DateTime`.
    */
   newStart(start = DEFAULT_SG): this {
-    return new Date(SEAT, this.#jd, val2sg(start)) as this;
+    return new Date(SEAT, this.#getSJd(), val2sg(start)) as this;
   }
 
   /**
@@ -4440,9 +4541,18 @@ export class DateTime extends DateWithoutParseStatics {
    * (`date_core.c:8297-8306`, which sets `of` itself under its own seconds
    * bound rather than going through `val2off`).
    *
-   * `datetime_initialize` (`date_core.c:5147-5220`) validates the civil date with
-   * `c_valid_civil_p` and the time of day with `c_valid_time_p`, then stores the
-   * day and day-fraction in UTC — which is what the two conversions below do.
+   * `datetime_initialize` (`date_core.c:7850-7893`) branches on
+   * {@link guessStyle}: its negative arm validates the civil date with
+   * `c_valid_gregorian_p` — proleptic Gregorian, no reform round trip — and
+   * stores `HAVE_CIVIL | HAVE_TIME` with no Julian day, while its positive/zero
+   * arm goes through `c_valid_civil_p` under `sg` and stores `jd_local_to_utc`
+   * of it too. Both then validate the time of day with `c_valid_time_p`.
+   *
+   * The Julian day the C's negative arm leaves out is computed eagerly here,
+   * with the `get_c_jd` (`date_core.c:1262-1301`) body the C would run on first
+   * read — `c_civil_to_jd` under the stored `sg` — because `add_frac` is applied
+   * in place below rather than by handing `self` to `d_lite_plus`, so there is
+   * no point at which the day is still unread.
    *
    * `datetime_initialize`'s `switch (argc)` fall-through
    * (`date_core.c:7826-7849`) splits the second, then the minute, then the
@@ -4515,7 +4625,7 @@ export class DateTime extends DateWithoutParseStatics {
     minute?: number | Rational,
     second?: number | Rational,
     offset?: number | Rational | string,
-    start = DEFAULT_SG,
+    start?: number,
   ) {
     if (typeof year === "symbol") {
       const rjd = month as number;
@@ -4530,16 +4640,24 @@ export class DateTime extends DateWithoutParseStatics {
       return;
     }
     const [s, sFr] = num2intWithFrac(second ?? 0, 1, false);
-    const [min, minFr] = num2intWithFrac(minute ?? 0, MINUTE_IN_SECONDS, second !== undefined);
+    const [min, minFr] = num2intWithFrac(
+      minute ?? 0,
+      MINUTE_IN_SECONDS,
+      second !== undefined || offset !== undefined || start !== undefined,
+    );
     const [h, hFr] = num2intWithFrac(
       hour ?? 0,
       HOUR_IN_SECONDS,
-      minute !== undefined || second !== undefined,
+      minute !== undefined || second !== undefined || offset !== undefined || start !== undefined,
     );
     const [d, dFr] = num2intWithFrac(
       day ?? 1,
       DAY_IN_SECONDS,
-      hour !== undefined || minute !== undefined || second !== undefined,
+      hour !== undefined ||
+        minute !== undefined ||
+        second !== undefined ||
+        offset !== undefined ||
+        start !== undefined,
     );
     let fr2: number | Rational = 0;
     if (sFr !== 0) fr2 = sFr;
@@ -4547,10 +4665,18 @@ export class DateTime extends DateWithoutParseStatics {
     if (hFr !== 0) fr2 = hFr;
     if (dFr !== 0) fr2 = dFr;
     const rof = offset === undefined ? 0 : val2off(offset);
-    const sg = val2sg(start);
-    super(year, month ?? 1, d, sg);
-    const rjd = cValidCivilP(year, month ?? 1, d, sg);
-    if (rjd === null) throw new DateError("invalid date");
+    const sg = start === undefined ? DEFAULT_SG : val2sg(start);
+    let rjd: number;
+    if (guessStyle(year, sg) < 0) {
+      const r = cValidGregorianP(year, month ?? 1, d);
+      if (r === null) throw new DateError("invalid date");
+      const [rm, rd] = r;
+      rjd = cCivilToJd(year, rm, rd, sg);
+    } else {
+      const r = cValidCivilP(year, month ?? 1, d, sg);
+      if (r === null) throw new DateError("invalid date");
+      rjd = r;
+    }
     const rt = cValidTimeP(h, min, s);
     if (rt === null) throw new DateError("invalid date");
     let [rh] = rt;
@@ -4561,6 +4687,7 @@ export class DateTime extends DateWithoutParseStatics {
     }
     const localDf = timeToDf(rh, rmin, rs);
     const [jd, df, sf] = addFrac(jdLocalToUtc(rjd, localDf, rof), dfLocalToUtc(localDf, rof), fr2);
+    super(SEAT, jdUtcToLocal(jd, df, rof), sg);
     this.#jd = jd;
     this.#df = df;
     this.#sf = sf;
