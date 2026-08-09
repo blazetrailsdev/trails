@@ -237,24 +237,18 @@ describe("SQLiteDatabaseTasks in-memory URI variants", () => {
     expect(writeSpy).not.toHaveBeenCalled();
   });
 
-  it("test_db_drop_is_noop_for_file_memory_uri", async () => {
-    const { unlinkSpy } = assertNoFsWrites();
-    const config = new HashConfig("development", "primary", {
-      adapter: "sqlite3",
-      database: "file::memory:?cache=shared",
-    });
-    await expect(new SQLiteDatabaseTasks(config).drop()).resolves.toBeUndefined();
-    expect(unlinkSpy).not.toHaveBeenCalled();
-  });
-
-  it("test_db_drop_is_noop_for_named_file_memory_uri", async () => {
-    const { unlinkSpy } = assertNoFsWrites();
-    const config = new HashConfig("development", "primary", {
-      adapter: "sqlite3",
-      database: "file:memdb1?mode=memory&cache=shared",
-    });
-    await expect(new SQLiteDatabaseTasks(config).drop()).resolves.toBeUndefined();
-    expect(unlinkSpy).not.toHaveBeenCalled();
+  // `sqlite_database_tasks.rb:22-28` has no in-memory arm: `FileUtils.rm` of a
+  // name with no file raises `Errno::ENOENT`, which the rescue turns into
+  // `NoDatabaseError`. So dropping an in-memory database raises rather than
+  // silently doing nothing.
+  it("raises NoDatabaseError dropping an in-memory database, as FileUtils.rm does", async () => {
+    for (const database of [":memory:", "file::memory:?cache=shared"]) {
+      const config = new HashConfig("development", "primary", {
+        adapter: "sqlite3",
+        database,
+      });
+      await expect(new SQLiteDatabaseTasks(config).drop()).rejects.toThrow(NoDatabaseError);
+    }
   });
 });
 

@@ -516,24 +516,31 @@ export class ConnectionPool implements ReapablePool {
               (pool.activeConnection ?? pool.connections[0])?.adapterName ??
               adapterNameFromConfig(pool.dbConfig.adapter)
             );
-          // The carve-outs the language forces, as on `NullPool` above: neither
-          // a JS `Symbol` nor `constructor` spells a Ruby send — `constructor`
-          // is the object plumbing every JS walker reads to name a value's
-          // class, and dispatching it would call the adapter class without
-          // `new`.
+          // A JS `Symbol` cannot spell a Ruby send — the one carve-out the
+          // language forces, as on `NullPool` above.
           if (typeof prop === "symbol") return undefined;
           // The send set is the adapter's, as it is in Ruby — no name list. A
           // live connection answers for it whenever one exists (it does
           // whenever a translated error was raised); with none yet, the base
-          // class every adapter extends stands in, so a name no adapter defines
-          // never becomes a dispatcher that would blow up on
-          // `conn[prop] is not a function` — or, for `then`, make this proxy a
-          // thenable to anything `await`ing an object that holds it.
+          // class every adapter extends stands in, because Ruby knows the
+          // adapter's class without a connection and JS has no class here to
+          // ask until one is checked out.
           const sample: object =
             pool.activeConnection ?? pool.connections[0] ?? AbstractAdapter.prototype;
+          // `constructor` is the object plumbing every JS walker reads to name
+          // a value's class, not a Ruby send: dispatching it would call the
+          // adapter class without `new`.
           if (prop === "constructor") return (sample as any).constructor;
+          // What Ruby *does* answer, it answers through the ancestor chain, as
+          // `NullPool` lets `to_s` arrive as `Object.prototype.toString`.
+          if (prop in _target) return Reflect.get(_target, prop);
           if (typeof (sample as any)[prop] !== "function") {
-            return undefined;
+            // `AbstractAdapter` overrides no `method_missing`
+            // (`abstract_adapter.rb`), so a send it has no method for raises,
+            // exactly as `NullPool`'s trap raises for its own.
+            throw new NoMethodError(
+              `undefined method '${prop}' for an instance of ActiveRecord::ConnectionAdapters::AbstractAdapter`,
+            );
           }
           return (...args: unknown[]) => {
             return pool.withConnection((conn) => (conn as any)[prop](...args));
