@@ -2138,13 +2138,18 @@ export class AbstractAdapter implements Quoting {
     this.disconnectBang();
   }
 
-  // Async to let adapters with async driver-level connect (PostgreSQLAdapter)
-  // eagerly populate `_connection` here — mirroring Rails' `connect!` setting
-  // `@raw_connection` — so `withRawConnection` can yield `_connection` directly
-  // instead of re-acquiring inside the retry loop. The base stays a no-op;
-  // SQLite/MySQL inherit it unchanged (they populate via their own seams).
-  async connectBang(): Promise<void> {
-    // Concrete adapters override to establish the raw connection.
+  /**
+   * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#connect!
+   * (abstract_adapter.rb:778-781) — `verify!; self`, and nothing more. It is
+   * NOT a bare raw-connect primitive: routing through `verifyBang` is what
+   * promotes an unconfigured pool-opened connection instead of reconnecting,
+   * and what gives a `configure_connection` failure its `connection_retries`
+   * re-attempts through `reconnectBang`'s retry loop (adapter_test.rb:852).
+   * The raw open lives in each adapter's private `connect`, as in Rails.
+   */
+  async connectBang(): Promise<this> {
+    await this.verifyBang();
+    return this;
   }
 
   cleanBang(): void {
@@ -2399,6 +2404,8 @@ export class AbstractAdapter implements Quoting {
     const materializeTransactions = opts.materializeTransactions ?? true;
 
     const run = async (): Promise<T> => {
+      // Rails: `connect! if @raw_connection.nil? && reconnect_can_restore_state?`
+      // (abstract_adapter.rb:985), and `connect!` is `verify!` (rb:778-781).
       if (this._connection === null && this.isReconnectCanRestoreState()) await this.connectBang();
       // Drain any deferred connection-readiness work (PostgreSQLAdapter's
       // async reset barrier: ROLLBACK + DISCARD ALL + reconfigure) ONCE here,

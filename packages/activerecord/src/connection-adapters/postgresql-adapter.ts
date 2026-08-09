@@ -2726,21 +2726,6 @@ export class PostgreSQLAdapter
   }
 
   /**
-   * Mirrors Rails' `connect!` (abstract_adapter.rb:778), which is just
-   * `verify!`: with no raw connection, verifyBang drives
-   * `reconnectBang({ restoreTransactions: true })` — the retry loop that gives
-   * a configure_connection failure its connection_retries re-attempts
-   * (adapter_test.rb:852) — and eagerly populates `this._connection` so the
-   * base `withRawConnection` loop yields it directly. Called pre-loop by the
-   * base when `_connection` is null and the transaction state is restorable.
-   *
-   * @internal
-   */
-  override async connectBang(): Promise<void> {
-    await this.verifyBang();
-  }
-
-  /**
    * Tear down the current socket (fire-and-forget `client.end()`) and reset
    * all per-connection state WITHOUT re-opening. `_closed` stays false so the
    * next acquire re-opens lazily. Used by the connection-error handlers in the
