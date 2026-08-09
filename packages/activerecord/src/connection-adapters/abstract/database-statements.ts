@@ -165,7 +165,7 @@ export interface DatabaseStatementsHost {
   resetIsolationLevel?(): void | Promise<void>;
   emptyInsertStatementValue?(pk?: string | null): string;
   transaction?<T>(fn: (tx?: unknown) => Promise<T> | T, opts?: unknown): Promise<T | undefined>;
-  pool?: { schemaMigration?: { tableName: string }; internalMetadata?: { tableName: string } };
+  pool?: { schemaMigration: { tableName: string }; internalMetadata: { tableName: string } };
   /** @internal */
   checkIfWriteQuery?(sql: string): void;
   /** @internal */
@@ -739,14 +739,20 @@ export async function truncate(
 /**
  * Truncates multiple tables, skipping schema_migrations and ar_internal_metadata.
  *
+ * Both names are sent bare (`database_statements.rb:222-223`), so a pool-less
+ * adapter raises NoMethodError rather than truncating against hardcoded
+ * defaults — Ruby's NullPool defines neither reader
+ * (`abstract/connection_pool.rb:24-48`).
+ *
  * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#truncate_tables
  */
 export async function truncateTables(
-  this: DatabaseStatementsHost & Pick<Quoting, "quoteTableName">,
+  this: DatabaseStatementsHost &
+    Pick<Quoting, "quoteTableName"> & { pool: NonNullable<DatabaseStatementsHost["pool"]> },
   ...tableNames: string[]
 ): Promise<void> {
-  const schemaMigrationTable = this.pool?.schemaMigration?.tableName ?? "schema_migrations";
-  const internalMetadataTable = this.pool?.internalMetadata?.tableName ?? "ar_internal_metadata";
+  const schemaMigrationTable = this.pool.schemaMigration.tableName;
+  const internalMetadataTable = this.pool.internalMetadata.tableName;
   const filtered = tableNames.filter(
     (t) => t !== schemaMigrationTable && t !== internalMetadataTable,
   );

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { I18n } from "./i18n.js";
 import { toSentence } from "./array-utils.js";
 import { TimeZone } from "./values/time-zone.js";
-import { Date as RubyDate } from "@blazetrails/date";
+import { Date as RubyDate, Temporal, strftime } from "@blazetrails/date";
 import type { TimeWithZone } from "./time-with-zone.js";
 
 // Rails' activesupport/test/abstract_unit.rb:35 turns the check off for the
@@ -10,7 +10,7 @@ import type { TimeWithZone } from "./time-with-zone.js";
 I18n.setEnforceAvailableLocales(false);
 
 describe("I18nTest", () => {
-  let date: RubyDate;
+  let date: Temporal.PlainDate | Temporal.PlainDateTime;
   let time: TimeWithZone;
 
   beforeEach(async () => {
@@ -29,19 +29,19 @@ describe("I18nTest", () => {
   });
 
   it("date localization should use default format", () => {
-    expect(I18n.localize(date)).toBe(date.strftime("%Y-%m-%d"));
+    expect(I18n.localize(date)).toBe(strftime(date, "%Y-%m-%d"));
   });
 
   it("date localization with default format", () => {
-    expect(I18n.localize(date, { format: ":default" })).toBe(date.strftime("%Y-%m-%d"));
+    expect(I18n.localize(date, { format: ":default" })).toBe(strftime(date, "%Y-%m-%d"));
   });
 
   it("date localization with short format", () => {
-    expect(I18n.localize(date, { format: ":short" })).toBe(date.strftime("%b %d"));
+    expect(I18n.localize(date, { format: ":short" })).toBe(strftime(date, "%b %d"));
   });
 
   it("date localization with long format", () => {
-    expect(I18n.localize(date, { format: ":long" })).toBe(date.strftime("%B %d, %Y"));
+    expect(I18n.localize(date, { format: ":long" })).toBe(strftime(date, "%B %d, %Y"));
   });
 
   it("time localization should use default format", () => {

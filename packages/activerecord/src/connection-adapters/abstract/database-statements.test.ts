@@ -359,7 +359,10 @@ describe("DatabaseStatements", () => {
       const { truncateTables } = await import("./database-statements.js");
       const executed: string[] = [];
       let scopedTables: string[] | undefined;
-      const host: DatabaseStatementsHost & Pick<Quoting, "quoteTableName"> = {
+      const host: DatabaseStatementsHost &
+        Pick<Quoting, "quoteTableName"> & {
+          pool: NonNullable<DatabaseStatementsHost["pool"]>;
+        } = {
         execute: async (sql: string) => {
           executed.push(sql);
         },
@@ -368,6 +371,10 @@ describe("DatabaseStatements", () => {
           await fn();
         },
         quoteTableName: (n: string) => `"${n}"`,
+        pool: {
+          schemaMigration: { tableName: "schema_migrations" },
+          internalMetadata: { tableName: "ar_internal_metadata" },
+        },
       };
 
       // schema_migrations / ar_internal_metadata are filtered out before scoping.
