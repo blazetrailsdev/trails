@@ -1764,12 +1764,39 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     });
   }
 
+  private static readonly FK_REGEX =
+    /.*FOREIGN KEY\s+\("([^"]+)"\)\s+REFERENCES\s+"(\w+)"\s+\("(\w+)"\)/;
+  private static readonly DEFERRABLE_REGEX = /DEFERRABLE INITIALLY (\w+)/;
+
   async foreignKeys(tableName: string): Promise<ForeignKeyDefinition[]> {
     const { schema, bare } = this._splitTableName(tableName);
     const prefix = schema ? `${quoteColumnName(schema)}.` : "";
     const rows = await this.schemaQuery(
       `PRAGMA ${prefix}foreign_key_list(${quoteColumnName(bare)})`,
     );
+    // Deferred or immediate foreign keys can only be seen in the CREATE TABLE sql
+    // Rails: `table_structure_sql(table_name).select { |column_string|
+    // column_string.start_with?("CONSTRAINT") && column_string.include?("FOREIGN
+    // KEY") }.to_h { ... }` (sqlite3_adapter.rb:421-431). Like Rails' FK_REGEX,
+    // which matches a single quoted column on each side, this resolves only
+    // single-column constraints: the split lookahead cuts a composite
+    // `FOREIGN KEY ("a", "b")` at its inner comma, so a composite reflects as
+    // deferrable-absent in trails exactly as it does in Rails.
+    const fkStrings = (await this.tableStructureSql(tableName)).filter(
+      (columnString) =>
+        columnString.startsWith("CONSTRAINT") && columnString.includes("FOREIGN KEY"),
+    );
+    const deferrableByKey = new Map<string, "immediate" | "deferred" | false>();
+    for (const fkString of fkStrings) {
+      const fk = SQLite3Adapter.FK_REGEX.exec(fkString);
+      if (!fk) continue;
+      const [, from, table, to] = fk;
+      const mode = SQLite3Adapter.DEFERRABLE_REGEX.exec(fkString)?.[1];
+      deferrableByKey.set(
+        `${table},${from},${to}`,
+        mode === undefined ? false : mode.toLowerCase() === "deferred" ? "deferred" : "immediate",
+      );
+    }
     const grouped = new Map<number, Array<Record<string, unknown>>>();
     for (const row of rows) {
       const id = row.id as number;
@@ -1777,8 +1804,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       grouped.get(id)!.push(row);
     }
 
-    // Rails reads deferrable from the CREATE TABLE SQL since PRAGMA doesn't expose it.
-    const deferrableByKey = await this._parseFkDeferrable(tableName);
     // Use explicit CONSTRAINT names from DDL when available (PRAGMA doesn't expose them).
     const namesByColumn = await this._parseForeignKeyNames(tableName);
 
@@ -1822,40 +1847,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       );
     }
     return results;
-  }
-
-  // Mirrors Rails' SQLite3Adapter FK deferrable extraction — reads DEFERRABLE
-  // from CREATE TABLE SQL since PRAGMA foreign_key_list doesn't expose it.
-  private async _parseFkDeferrable(
-    tableName: string,
-  ): Promise<Map<string, "immediate" | "deferred" | false>> {
-    const createSql = await this._createTableSql(tableName);
-    const result = new Map<string, "immediate" | "deferred" | false>();
-    if (!createSql) return result;
-    // Rails builds fk_defs from every `CONSTRAINT ... FOREIGN KEY` clause and
-    // records `mode || false` (sqlite3_adapter.rb:422-431), so a constraint
-    // without a DEFERRABLE clause reflects as `false`, not nil — the DEFERRABLE
-    // suffix is optional here for that reason.
-    const fkRegex =
-      /CONSTRAINT\s+[^(]*?FOREIGN KEY\s*\(([^)]+)\)\s*REFERENCES\s*"?([^"(,\s]+)"?\s*\(([^)]+)\)(?:[^,)]*DEFERRABLE\s+INITIALLY\s+(\w+))?/gi;
-    let match;
-    while ((match = fkRegex.exec(createSql)) !== null) {
-      const [, fromCols, toTbl, toCols, mode] = match;
-      const fromKey = fromCols
-        .split(",")
-        .map((c) => c.trim().replace(/^"|"$/g, ""))
-        .join(",");
-      const toKey = toCols
-        .split(",")
-        .map((c) => c.trim().replace(/^"|"$/g, ""))
-        .join(",");
-      const key = `${toTbl},${fromKey},${toKey}`;
-      result.set(
-        key,
-        mode === undefined ? false : mode.toLowerCase() === "deferred" ? "deferred" : "immediate",
-      );
-    }
-    return result;
   }
 
   private _extractFkAction(
