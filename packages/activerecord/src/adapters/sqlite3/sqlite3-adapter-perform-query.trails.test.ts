@@ -171,4 +171,18 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
     await adapter.internalExecute(`SELECT 2`, "SQL", { prepare: false });
     expect(pool.get(`SELECT 2`)).toBeFalsy();
   });
+  it("internalExecute binds through to the driver", async () => {
+    await adapter.internalExecute(`INSERT INTO "pq" ("id", "nick") VALUES (?, ?)`, "SQL", {
+      binds: [7, "bound"],
+    });
+    expect(await adapter.queryValue(`SELECT "nick" FROM "pq" WHERE "id" = 7`)).toBe("bound");
+  });
+
+  it("internalExecute binds through to the driver when prepare is true", async () => {
+    await adapter.internalExecute(`INSERT INTO "pq" ("id", "nick") VALUES (?, ?)`, "SQL", {
+      binds: [8, "prepared"],
+      prepare: true,
+    });
+    expect(await adapter.queryValue(`SELECT "nick" FROM "pq" WHERE "id" = 8`)).toBe("prepared");
+  });
 });
