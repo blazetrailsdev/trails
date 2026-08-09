@@ -85,11 +85,17 @@ export function quoteColumnName(name: string): string {
   return `"${name.replace(/"/g, '""')}"`;
 }
 
+/**
+ * Mirrors: PostgreSQL::Quoting#quote_string (postgresql/quoting.rb:127-131) —
+ * `connection.escape(s)`, which is **escape-only**: libpq's PQescapeStringConn
+ * doubles `'` and, with `standard_conforming_strings` on (the server default
+ * since 9.1, and what `configure_connection` leaves in place), treats a
+ * backslash as an ordinary character. The surrounding quotes are added by the
+ * caller — abstract `quote` (abstract/quoting.rb:75-76). Rails has no `E'`
+ * handling anywhere in postgresql/quoting.rb.
+ */
 export function quoteString(value: string): string {
-  if (value.includes("\\")) {
-    return `E'${value.replace(/\\/g, "\\\\").replace(/'/g, "''")}'`;
-  }
-  return `'${value.replace(/'/g, "''")}'`;
+  return value.replace(/'/g, "''");
 }
 
 export function quoteBinaryColumn(value: Buffer): string {
@@ -131,23 +137,25 @@ export function quotedBinary(
 
 export function quote(this: QuotingDispatchHost, value: unknown): string {
   if (value instanceof XmlData) {
-    return `xml ${quoteString(value.toString())}`;
+    return `xml '${quoteString(value.toString())}'`;
   }
   if (value instanceof BitData) {
     if (value.isBinary()) return `B'${value.toString()}'`;
     if (value.isHex()) return `X'${value.toString()}'`;
     return null as unknown as string;
   }
+  // rb: `when Numeric then value.finite? ? super : "'#{value}'"` — the
+  // non-finite literal is interpolated raw, not escaped.
   if (typeof value === "number" && !Number.isFinite(value)) {
-    return quoteString(String(value));
+    return `'${String(value)}'`;
   }
   if (value instanceof ArrayData) {
     // Rails: `quote(encode_array(value))` — one serialization path, the
     // encoder's delimiter (`;` for box[]), with per-element type_cast.
-    return quoteString(encodeArray.call(this, value));
+    return quote.call(this, encodeArray.call(this, value));
   }
   if (value instanceof Range) {
-    return quoteString(encodeRange.call(this, value));
+    return quote.call(this, encodeRange.call(this, value));
   }
   // Mirrors: PostgreSQL::Quoting#quote raises IntegerOutOf64BitRange for
   // integers exceeding the 64-bit signed range. Covers both bigint and
@@ -157,7 +165,8 @@ export function quote(this: QuotingDispatchHost, value: unknown): string {
     if (ActiveRecord.raiseIntWiderThan64bit) checkIntegerRange(value);
     return String(value);
   }
-  if (typeof value === "string") return quoteString(value);
+  // Rails' PG `quote` has no String/Symbol arm: both fall to `super`, which
+  // interpolates `quote_string` between quotes once (abstract/quoting.rb:75-76).
   // Thread `this` so the inherited date/time dispatch reaches PG's
   // BC-suffixing `quotedDate` (mirrors Rails' `super` call in PG#quote).
   return abstractQuote.call(this, value);

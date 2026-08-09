@@ -1,12 +1,20 @@
 import pg from "pg";
 import { Temporal } from "@blazetrails/date";
-import { type Type, ValueType, ArgumentError, BinaryData } from "@blazetrails/activemodel";
+import {
+  type Type,
+  ValueType,
+  ArgumentError,
+  BinaryData,
+  DateInfinity,
+  DateNegativeInfinity,
+} from "@blazetrails/activemodel";
 import {
   singularize,
   Notifications,
   getErrorReporter,
   runLoadHooks,
   include,
+  BigDecimal,
 } from "@blazetrails/activesupport";
 import { sql as arelSql, Nodes, Visitors } from "@blazetrails/arel";
 import { isRubyTruthy } from "../ruby-truthy.js";
@@ -44,6 +52,8 @@ import {
   initializeInstanceTypeMap,
   initializeTypeMap as staticInitializeTypeMap,
 } from "./postgresql/type-map-init.js";
+import { dispatchQuotedTime } from "./abstract/quoting.js";
+import { Value as TimeValue } from "../type/time.js";
 import { inspectExplainOption } from "./abstract/database-statements.js";
 import type { ExplainOption } from "./abstract/database-statements.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./abstract-adapter.js";
@@ -90,7 +100,6 @@ import { StatementPool as GenericStatementPool } from "./statement-pool.js";
 import {
   transactionIsolationLevels,
   preprocessQuery,
-  temporalToBindString,
   extractTableRefFromInsertSql,
   sqlForInsert,
   execInsertReturningReadback,
@@ -3415,9 +3424,7 @@ export class PostgreSQLAdapter
 
   /**
    * Quote a value for inclusion in a SQL literal. PG-specific branches
-   * (XmlData, BitData, Range, ArrayData) fall through to the base
-   * dispatch, and strings use PG's `E'\\\\'`-escape form when a
-   * backslash is present.
+   * (XmlData, BitData, Range, ArrayData) fall through to the base dispatch.
    *
    * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::Quoting#quote
    */
@@ -3425,6 +3432,15 @@ export class PostgreSQLAdapter
     // `.call(this)` so the inherited date/time dispatch resolves to this
     // adapter's `quotedDate` (BC-suffixing), mirroring PG#quote's `super`.
     return pgQuote.call(this, value);
+  }
+
+  /**
+   * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::Quoting#quote_string
+   * (postgresql/quoting.rb:127-131) — escape-only, so the inherited `quote`
+   * dispatches here instead of the abstract backslash-doubling escape.
+   */
+  override quoteString(s: string): string {
+    return pgQuoteString(s);
   }
 
   /**
@@ -3449,8 +3465,9 @@ export class PostgreSQLAdapter
    * Buffer so pg binds them as bytea; pg has no built-in coercion for
    * BinaryData and would `JSON.stringify` it otherwise, corrupting bytes
    * 128–255 (the PG-only encryption binary round-trip failure surfaced
-   * by Phase 9b-1). Other values flow through `temporalToBindString` for
-   * Temporal / infinity sentinel handling.
+   * by Phase 9b-1). Date/time values dispatch through this adapter's
+   * `quotedDate` / `quotedTime`, as Rails' `type_cast` does
+   * (abstract/quoting.rb:103-104).
    *
    * Mirrors Rails' `type_casted_binds` calling `type_cast` per value.
    * Detection is duck-typed (`bytes: Uint8Array`) rather than delegating
@@ -3461,6 +3478,10 @@ export class PostgreSQLAdapter
    * @internal
    */
   private _bindForPg(value: unknown): unknown {
+    // PG's date/time infinity sentinels are `Number.±Infinity`, so they must be
+    // intercepted before any numeric handling; pg wants the wire strings.
+    if (value === DateInfinity) return "infinity";
+    if (value === DateNegativeInfinity) return "-infinity";
     // Duck-type BinaryData detection: instanceof would silently miss across
     // module-identity splits (e.g. duplicated @blazetrails/activemodel copies
     // in the dep tree), in which case the wrapper would slip past as a plain
@@ -3477,8 +3498,8 @@ export class PostgreSQLAdapter
     }
     // Date/time Temporal values bind through the adapter's BC-aware `quotedDate`
     // (proleptic years ≤ 0 get the " BC" suffix); `value_for_database` now yields
-    // the cast Temporal rather than a pre-quoted string. PlainTime keeps the
-    // abstract path's 2000-01-01-stripped form via temporalToBindString below.
+    // the cast Temporal rather than a pre-quoted string. PlainTime takes the
+    // `quoted_time` arm below.
     if (
       value instanceof Temporal.Instant ||
       value instanceof Temporal.PlainDate ||
@@ -3503,7 +3524,15 @@ export class PostgreSQLAdapter
     ) {
       return this.typeCast(value);
     }
-    return temporalToBindString(value, "postgres");
+    // Rails: `when Type::Time::Value then quoted_time(value)`
+    // (abstract/quoting.rb:103).
+    if (value instanceof TimeValue || value instanceof Temporal.PlainTime) {
+      return dispatchQuotedTime(this, value);
+    }
+    // Rails: `when BigDecimal then value.to_s("F")` (abstract/quoting.rb:101) —
+    // the driver needs a primitive, not the wrapper object.
+    if (value instanceof BigDecimal) return value.toString("F");
+    return value;
   }
 
   /**
@@ -3958,7 +3987,7 @@ export class PostgreSQLAdapter
     if (value === null) return "NULL";
     if (typeof value === "number") return String(value);
     if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
-    return pgQuoteString(String(value));
+    return `'${pgQuoteString(String(value))}'`;
   }
 
   /**

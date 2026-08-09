@@ -4,8 +4,8 @@
  * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::Quoting (module)
  *
  * In Rails, Quoting is a module mixed into AbstractMysqlAdapter.
- * Here we export standalone functions and an interface, matching
- * the pattern used by the PostgreSQL and SQLite3 adapters.
+ * Here we export standalone functions, matching the pattern used by
+ * the PostgreSQL and SQLite3 adapters.
  *
  * @boundary-file: SQL value quoting branches on `instanceof Date` alongside
  *   Temporal types; legacy Date values from custom-typed columns hit a
@@ -31,13 +31,6 @@ import { Value as TimeValue } from "../../type/time.js";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { BinaryData } from "@blazetrails/activemodel";
 
-export interface Quoting {
-  unquotedTrue(): number;
-  unquotedFalse(): number;
-  quoteTableName(name: string): string;
-  quoteColumnName(name: string): string;
-}
-
 // Rails MySQL overrides unquoted_true/false (1/0) but NOT quoted_true/false,
 // which inherit the abstract "TRUE"/"FALSE" (mysql/quoting.rb).
 export function unquotedTrue(): number {
@@ -52,14 +45,13 @@ export function unquotedFalse(): number {
  * Mirrors: MySQL::Quoting#quote_table_name —
  * `"`#{name.gsub('`', '``').gsub('.', '`.`')}`"`. The whole name is wrapped in
  * backticks with `.` rewritten as `` `.` `` so `foo.bar` → `` `foo`.`bar` ``
- * (no `*` special-casing, unlike quoteColumnName).
+ * (mysql/quoting.rb:41-43).
  */
 export function quoteTableName(name: string): string {
   return `\`${name.replace(/`/g, "``").replace(/\./g, "`.`")}\``;
 }
 
 export function quoteColumnName(name: string): string {
-  if (name === "*") return name;
   return `\`${name.replace(/`/g, "``")}\``;
 }
 
@@ -76,15 +68,16 @@ const MYSQL_ESCAPE_MAP: Record<string, string> = {
 };
 
 /**
- * Quote a string value for use in SQL. Single/double quotes, backslash,
+ * Escape a string value for use in SQL. Single/double quotes, backslash,
  * and control characters (NUL, newline, carriage return, Ctrl-Z) are
- * escaped with backslashes. Mirrors Rails MySQL `quote_string`, which
- * delegates to `mysql2`'s connection-level escape — uses backslash-escapes
- * (not SQL-standard `''` doubling). The npm `mysql2` driver's `escape()`
- * matches this same shape.
+ * escaped with backslashes. Mirrors Rails MySQL `quote_string`
+ * (`abstract_mysql_adapter.rb`), which delegates to `mysql2`'s
+ * connection-level escape — backslash-escapes, not SQL-standard `''`
+ * doubling. **Escape-only**: the surrounding quotes are added once by
+ * `quote` (abstract/quoting.rb:75-76), as in Rails.
  */
 export function quoteString(value: string): string {
-  return `'${value.replace(MYSQL_ESCAPE_RE, (ch) => MYSQL_ESCAPE_MAP[ch] ?? ch)}'`;
+  return value.replace(MYSQL_ESCAPE_RE, (ch) => MYSQL_ESCAPE_MAP[ch] ?? ch);
 }
 
 /**
@@ -182,25 +175,15 @@ export function columnNameWithOrderMatcher(): RegExp {
  * only `quote_column_name` / `quote_table_name` / `cast_bound_value`, so a MySQL
  * `quote` runs the abstract `quote` and the MySQL-specific behaviour flows in
  * through the dispatched helpers (`quote_string`, `quoted_binary`,
- * `quoted_date`/`quoted_time`). We mirror that here: only the branches whose
- * dispatch the abstract `quote` doesn't thread through `this` (symbols, strings)
- * stay inline; the rest
- * delegates to {@link abstractQuote} with `this` threaded so the date/time
- * dispatch lands on MySQL's {@link quotedDate}. Non-finite numbers fall through
+ * `quoted_date`/`quoted_time`). We mirror that here: the whole body
+ * delegates to {@link abstractQuote} with `this` threaded so the string,
+ * date/time and binary dispatch land on MySQL's {@link quoteString} /
+ * {@link quotedDate} / {@link quotedBinary}. Non-finite numbers fall through
  * to the abstract `when Numeric then value.to_s` and render bare — Rails' MySQL
  * adapter has no non-finite override (only PG does). Booleans fall through to the
  * abstract `"TRUE"`/`"FALSE"`; binds serialize to 1/0 via {@link castBoundValue}.
  */
 export function quote(this: QuotingDispatchHost, value: unknown): string {
-  if (typeof value === "symbol") {
-    const desc = value.description;
-    if (desc === undefined) throw new TypeError("Cannot quote a Symbol without a description");
-    return quoteString(desc);
-  }
-  if (typeof value === "string") return quoteString(value);
-  // nil, BigDecimal, finite numbers/bigints, Class, and date/time all match the
-  // abstract `quote`. Thread `this` so `quoted_date`/`quoted_time` dispatch onto
-  // MySQL's microsecond-capped {@link quotedDate} (and the inherited quotedTime).
   return abstractQuote.call(this, value);
 }
 

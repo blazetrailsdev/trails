@@ -47,6 +47,8 @@ export interface QuotingDispatchHost {
   /** @internal */
   quotedBinary?(value: unknown): string;
   /** @internal */
+  quoteString?(s: string): string;
+  /** @internal */
   quoteColumnName?(name: string): string;
   /** @internal */
   quotedTrue?(): string;
@@ -117,14 +119,17 @@ export function quoteTableName(this: QuotingDispatchHost, name: string): string 
  * Mirrors: ActiveRecord::ConnectionAdapters::Quoting#quote
  */
 export function quote(this: QuotingDispatchHost, value: unknown): string {
-  // rb:75 — `when String, Symbol, ActiveSupport::Multibyte::Chars`.
+  // rb:75-76 — `when String, Symbol, ActiveSupport::Multibyte::Chars` then
+  // `"'#{quote_string(value.to_s)}'"`. `quote_string` is self-dispatched, so the
+  // surrounding quotes are added here, once, and the dialect's escape rules come
+  // from the adapter's override.
   if (typeof value === "string") {
-    return `'${quoteString(value)}'`;
+    return `'${dispatchQuoteString(this, value)}'`;
   }
   if (typeof value === "symbol") {
     const desc = value.description;
     if (desc === undefined) throw new TypeError("Cannot quote a Symbol without a description");
-    return `'${quoteString(desc)}'`;
+    return `'${dispatchQuoteString(this, desc)}'`;
   }
   // Rails: `when true then quoted_true` / `when false then quoted_false`
   // (rb:77-78) — self-dispatched, so SQLite's `1`/`0` override applies to the
@@ -560,6 +565,17 @@ export function dispatchQuotedFalse(host: QuotingDispatchHost): string {
   return typeof host.quotedFalse === "function" ? host.quotedFalse() : quotedFalse();
 }
 
+/**
+ * Mirrors Rails' `quote_string(value.to_s)` inside `quote`
+ * (abstract/quoting.rb:75-76) — self-dispatched, so an adapter's escape-only
+ * override (PG's libpq `escape`, MySQL's backslash escapes, SQLite's `''`)
+ * applies to the inherited `quote`.
+ * @internal
+ */
+export function dispatchQuoteString(host: QuotingDispatchHost, s: string): string {
+  return typeof host.quoteString === "function" ? host.quoteString(s) : quoteString(s);
+}
+
 /** @internal */
 export function dispatchUnquotedTrue(host: QuotingDispatchHost): boolean | number {
   return typeof host.unquotedTrue === "function" ? host.unquotedTrue() : unquotedTrue();
@@ -702,16 +718,10 @@ export interface Quoting {
 
   /**
    * Mirrors: Quoting#quote_string — **escape-only**. Doubles `'` and
-   * applies any dialect-specific escape rules (MySQL `\\\0\n\r\Z`; PG
-   * may switch to `E'…'` form for backslashes inside `quote()`). Never
-   * adds surrounding `'`. For a fully-quoted SQL literal use
-   * `quote(value)` instead.
-   *
-   * Note: per-adapter standalone `quoteString` exports in
-   * `{sqlite3,mysql}/quoting.ts` historically wrap with surrounding
-   * `'...'` and are NOT escape-only. Adapter classes override
-   * `quoteString` to honor this contract; the standalones stay as
-   * literal-quoting helpers for legacy call sites.
+   * applies any dialect-specific escape rules (MySQL `\\\0\n\r\Z`).
+   * Never adds surrounding `'`; `quote` adds those once
+   * (abstract/quoting.rb:75-76, 131-133). For a fully-quoted SQL literal
+   * use `quote(value)` instead.
    */
   quoteString(s: string): string;
 

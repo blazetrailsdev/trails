@@ -1,6 +1,7 @@
 import { Temporal } from "@blazetrails/date";
 import { describe, expect, it } from "vitest";
-import { temporalToBindString } from "../abstract/database-statements.js";
+import { typeCast as abstractTypeCast } from "../abstract/quoting.js";
+import { quotedDate as mysqlQuotedDate } from "./quoting.js";
 
 // MySQL/MariaDB datetime columns now use the base AR DateTime type (matching
 // Rails' `register_class_with_precision m, %r(datetime)i, Type::DateTime`);
@@ -8,7 +9,9 @@ import { temporalToBindString } from "../abstract/database-statements.js";
 // renders the SQL literal with the 6-digit fractional cap that DATETIME(6)
 // enforces. These cases pin that bind-string formatting.
 describe("MySQL datetime bind formatting", () => {
-  const bind = (v: unknown) => temporalToBindString(v, "mysql");
+  // Rails' `type_cast` dispatches `quoted_date` on the connection
+  // (abstract/quoting.rb:104), so the MySQL cap comes from the receiver.
+  const bind = (v: unknown) => abstractTypeCast.call({ quotedDate: mysqlQuotedDate }, v);
 
   it("emits YYYY-MM-DD HH:MM:SS.ffffff without T or Z", () => {
     const instant = Temporal.Instant.from("2026-05-08T14:32:00.123456Z");

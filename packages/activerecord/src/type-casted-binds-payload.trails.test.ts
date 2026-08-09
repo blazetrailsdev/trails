@@ -61,8 +61,7 @@ describe("sql.active_record type_casted_binds", () => {
   });
 
   it("routes Temporal binds through the adapter's quoted_date", async () => {
-    // The deleted standalone helper converted Temporal values with
-    // `temporalToBindString`. Rails has no such helper: `type_cast` dispatches
+    // Rails has no bind-formatting helper: `type_cast` dispatches
     // Date/Time through `self.quoted_date` (abstract/quoting.rb:103-104), so the
     // adapter's own override is what fills the slot. This pins that the
     // conversion survived the sweep, and that it is the adapter's format —

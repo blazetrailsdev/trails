@@ -8,10 +8,11 @@ import type { Base } from "./base.js";
 import { stiName, isFinderNeedsTypeCondition } from "./inheritance.js";
 import type { Relation } from "./relation.js";
 import type { AdapterName } from "./connection-adapters/abstract-adapter.js";
+import type { QuotingDispatchHost } from "./connection-adapters/abstract/quoting.js";
 import { Result } from "./result.js";
 import { withPooledOrDirectConnection } from "./connection-handling.js";
 
-let _quoteSqlValue: ((v: unknown, dialect?: AdapterName) => string) | undefined;
+let _quoteSqlValue: ((v: unknown, connection?: QuotingDispatchHost) => string) | undefined;
 
 /**
  * @internal Receives base.ts's `quoteSqlValue` at module init. Importing it for
@@ -19,13 +20,15 @@ let _quoteSqlValue: ((v: unknown, dialect?: AdapterName) => string) | undefined;
  * leaving its own module-evaluation-time mixin wiring dependent on the graph's
  * entry order.
  */
-export function _registerQuoteSqlValue(fn: (v: unknown, dialect?: AdapterName) => string): void {
+export function _registerQuoteSqlValue(
+  fn: (v: unknown, connection?: QuotingDispatchHost) => string,
+): void {
   _quoteSqlValue = fn;
 }
 
-function quoteSqlValue(v: unknown, dialect?: AdapterName): string {
+function quoteSqlValue(v: unknown, connection?: QuotingDispatchHost): string {
   if (!_quoteSqlValue) throw new ActiveRecordError("ActiveRecord::Base has not finished loading");
-  return _quoteSqlValue(v, dialect);
+  return _quoteSqlValue(v, connection);
 }
 
 type ModelClass = typeof Base;
@@ -723,7 +726,10 @@ export class Builder implements InsertBuilder {
       if (arrayCols.has(key)) {
         return new Nodes.SqlLiteral(this._insertAll.connection.quote(value));
       }
-      return new Nodes.SqlLiteral(quoteSqlValue(value, this._dialect));
+      // Rails quotes every value with `connection.quote` (insert_all.rb Builder
+      // #values_list), so date/time literals resolve their dialect from the
+      // receiver's `quoted_date` / `quoted_time`.
+      return new Nodes.SqlLiteral(quoteSqlValue(value, this._insertAll.connection));
     });
     return new Nodes.ValuesList(rows);
   }

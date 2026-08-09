@@ -285,5 +285,12 @@
     "rubyName": "set_standard_conforming_strings",
     "call": "internal_execute",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/postgresql-adapter.ts",
+    "rubyName": "quote_string",
+    "call": "with_raw_connection",
+    "reason": "Language shortcoming: Rails' quote_string escapes through the live connection (`with_raw_connection { |c| c.escape(s) }`, postgresql/quoting.rb:127-131), but node-postgres exposes no escape entry point at all — sync or async — and `quote_string` is a sync method every `quote` call site depends on. The override reproduces libpq's standard_conforming_strings escaping inline in postgresql/quoting.ts (same divergence already baselined for that module's quote_string)."
   }
 ]

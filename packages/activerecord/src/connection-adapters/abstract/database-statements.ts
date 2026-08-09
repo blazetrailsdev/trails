@@ -20,31 +20,16 @@ import {
   Attribute as ModelAttribute,
   RangeError as ActiveModelRangeError,
 } from "@blazetrails/activemodel";
-import { Notifications, BigDecimal } from "@blazetrails/activesupport";
-import { Temporal } from "@blazetrails/date";
+import { Notifications } from "@blazetrails/activesupport";
 import {
   TransactionIsolationError,
   NotImplementedError,
   RangeError as ARRangeError,
   StatementInvalid,
 } from "../../errors.js";
-import {
-  formatInstantForSql,
-  formatPlainDateTimeForSql,
-  formatPlainDateForSql,
-  formatPlainTimeForSql,
-  formatInstantForSqlMysql,
-  formatPlainDateTimeForSqlMysql,
-  formatPlainTimeForSqlMysql,
-  formatInstantForSqlPostgres,
-  formatPlainDateTimeForSqlPostgres,
-  formatPlainDateForSqlPostgres,
-  defaultSqlTimezone,
-} from "./sql-datetime.js";
-import { Value as TimeValue } from "../../type/time.js";
+
 import type { Quoting } from "./quoting.js";
 import type { ConnectionPool, NullPool } from "./connection-pool.js";
-import { DateInfinity, DateNegativeInfinity } from "@blazetrails/activemodel";
 import { TransactionManager } from "./transaction.js";
 import { exceedsBindParamsLimit } from "./database-limits.js";
 import { Result } from "../../result.js";
@@ -1279,74 +1264,6 @@ export function withYamlFallback(value: unknown): unknown {
     const proto = Object.getPrototypeOf(value);
     if (proto === Object.prototype || proto === null) return JSON.stringify(value);
   }
-  return value;
-}
-
-/**
- * Convert a Temporal value to its SQL wire-string form for use as a bound
- * parameter. Drivers (pg extended protocol, mysql2 prepared, better-sqlite3)
- * reject raw Temporal objects; this shim converts them at the bind boundary.
- * Returns the value unchanged when it is not a Temporal type.
- *
- * Called directly by the PostgreSQL/MySQL adapter bind paths (with an adapter
- * argument for infinity sentinels and dialect-specific datetime literals) and by
- * `Base.quoteSqlValue`. It is NOT a `type_casted_binds` producer: that slot goes
- * through the adapter-dispatched `Quoting#typeCastedBinds` (quoting.rb:224),
- * whose Temporal handling is `typeCast`'s own `quotedDate`/`quotedTime`.
- */
-export function temporalToBindString(
-  value: unknown,
-  adapter?: "sqlite" | "postgres" | "mysql",
-): unknown {
-  // Postgres infinity sentinels must become the wire strings pg expects.
-  // Gated to postgres adapter only — SQLite/MySQL have no infinity concept.
-  if (adapter === "postgres") {
-    if (value === DateInfinity) return "infinity";
-    if (value === DateNegativeInfinity) return "-infinity";
-  }
-  // Cast decimals are BigDecimal values; drivers need a primitive, so send the
-  // fixed ("F") form (Rails' `type_cast`: `when BigDecimal then value.to_s("F")`)
-  // rather than letting the driver JSON-stringify the object.
-  if (value instanceof BigDecimal) return value.toString("F");
-  // Adapter-specific datetime literals:
-  //   - MySQL/MariaDB DATETIME(6) caps fractional at 6 digits (strict mode rejects 7–9).
-  //   - PostgreSQL uses quoted_date semantics: fixed-6 microseconds + " BC" for years ≤ 0.
-  // This keeps the inline insert_all VALUES path (quoteSqlValue → here) consistent
-  // with the bind path (the adapter's quotedDate) for both dialects.
-  const mysql = adapter === "mysql";
-  const postgres = adapter === "postgres";
-  if (value instanceof Temporal.Instant)
-    return mysql
-      ? formatInstantForSqlMysql(value)
-      : postgres
-        ? formatInstantForSqlPostgres(value)
-        : formatInstantForSql(value);
-  if (value instanceof Temporal.PlainDateTime)
-    return mysql
-      ? formatPlainDateTimeForSqlMysql(value)
-      : postgres
-        ? formatPlainDateTimeForSqlPostgres(value)
-        : formatPlainDateTimeForSql(value);
-  if (value instanceof Temporal.PlainDate)
-    return postgres ? formatPlainDateForSqlPostgres(value) : formatPlainDateForSql(value);
-  // A `Type::Time::Value` is the time-of-day wrapper `Type::Time#serialize`
-  // produces; read its components back out in `default_timezone` the way
-  // `quoted_time` does, then take the PlainTime arm below.
-  if (value instanceof TimeValue) {
-    value = value.getobj().toZonedDateTimeISO(defaultSqlTimezone()).toPlainTime();
-  }
-  if (value instanceof Temporal.PlainTime) {
-    // SQLite stores time with a fixed 2000-01-01 date prefix so it can be
-    // read back as a datetime string by the cast layer.
-    const t = mysql ? formatPlainTimeForSqlMysql(value) : formatPlainTimeForSql(value);
-    return adapter === "sqlite" ? `2000-01-01 ${t}` : t;
-  }
-  if (value instanceof Temporal.ZonedDateTime)
-    return mysql
-      ? formatInstantForSqlMysql(value.toInstant())
-      : postgres
-        ? formatInstantForSqlPostgres(value.toInstant())
-        : formatInstantForSql(value.toInstant());
   return value;
 }
 

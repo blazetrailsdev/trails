@@ -49,6 +49,7 @@ import { StatementPool as ConnectionStatementPool } from "./statement-pool.js";
 import type { SchemaCreation as MysqlSchemaCreation } from "./mysql/schema-creation.js";
 import {
   quote as mysqlQuote,
+  quoteString as mysqlQuoteString,
   quotedDate as mysqlQuotedDate,
   typeCast as mysqlTypeCast,
   castBoundValue as mysqlCastBoundValue,
@@ -166,18 +167,7 @@ const CR_SERVER_GONE_ERROR = 2006;
 const CR_SERVER_LOST = 2013;
 const ER_CLIENT_INTERACTION_TIMEOUT = 4031;
 
-// eslint-disable-next-line no-control-regex
-const QUOTE_STRING_RE = /['\\\x00\n\r\x1a]/g;
 type CreateTableArgs = Parameters<MysqlSchemaStatements["createTable"]>;
-
-const QUOTE_STRING_MAP: Record<string, string> = {
-  "'": "\\'",
-  "\\": "\\\\",
-  "\0": "\\0",
-  "\n": "\\n",
-  "\r": "\\r",
-  "\x1a": "\\Z",
-};
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class AbstractMysqlAdapter extends AbstractAdapter {
@@ -1198,7 +1188,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    * `'...'` for SQL-literal contexts.
    */
   override quoteString(s: string): string {
-    return s.replace(QUOTE_STRING_RE, (ch) => QUOTE_STRING_MAP[ch] ?? ch);
+    return mysqlQuoteString(s);
   }
 
   static dbconsole(

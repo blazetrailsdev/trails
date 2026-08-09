@@ -172,8 +172,11 @@ describe("MySQL quoting — quoteColumnName", () => {
     expect(quoteColumnName("foo`bar")).toBe("`foo``bar`");
   });
 
-  it("passes * through unquoted (column-list star)", () => {
-    expect(quoteColumnName("*")).toBe("*");
+  // Rails' quote_column_name is unconditional (mysql/quoting.rb:46-47) — a star
+  // projection never reaches it, because Arel's to_sql renders it as a
+  // SqlLiteral (arel/src/visitors/to-sql.ts).
+  it("quotes * like any other name", () => {
+    expect(quoteColumnName("*")).toBe("`*`");
   });
 });
 

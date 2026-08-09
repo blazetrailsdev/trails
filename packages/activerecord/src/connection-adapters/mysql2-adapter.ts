@@ -1,5 +1,6 @@
 import mysql from "mysql2/promise";
-import { Notifications } from "@blazetrails/activesupport";
+import { Temporal } from "@blazetrails/date";
+import { Notifications, BigDecimal } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { AbstractAdapter as DatabaseAdapter } from "./abstract-adapter.js";
 import type { IndexDefinition } from "./abstract/schema-definitions.js";
@@ -41,10 +42,9 @@ import {
   type Mysql2FieldDescriptor,
   type Mysql2RawResult,
 } from "./mysql2/database-statements.js";
-import {
-  temporalToBindString,
-  transactionIsolationLevels,
-} from "./abstract/database-statements.js";
+import { transactionIsolationLevels } from "./abstract/database-statements.js";
+import { dispatchQuotedDate, dispatchQuotedTime } from "./abstract/quoting.js";
+import { Value as TimeValue } from "../type/time.js";
 import { ActiveRecord } from "../ar-config.js";
 import { temporalTypeCast, TEMPORAL_POOL_OPTIONS } from "./mysql/temporal-type-cast.js";
 import type { SchemaSource } from "../schema-dumper.js";
@@ -893,8 +893,23 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         v = (v as { valueForDatabase: unknown }).valueForDatabase;
       }
       // `value_for_database` now yields cast Temporal values; convert to the SQL
-      // wire string the mysql2 driver expects (matching Rails' type_casted_binds).
-      v = temporalToBindString(v, "mysql");
+      // wire string the mysql2 driver expects. Rails' `type_cast` dispatches
+      // these through `self.quoted_time` / `self.quoted_date`
+      // (abstract/quoting.rb:103-104), so the microsecond capping comes from
+      // this adapter's `quotedDate` rather than a dialect argument.
+      if (v instanceof TimeValue || v instanceof Temporal.PlainTime) {
+        v = dispatchQuotedTime(this, v);
+      } else if (
+        v instanceof Temporal.Instant ||
+        v instanceof Temporal.PlainDateTime ||
+        v instanceof Temporal.PlainDate ||
+        v instanceof Temporal.ZonedDateTime
+      ) {
+        v = dispatchQuotedDate(this, v);
+      } else if (v instanceof BigDecimal) {
+        // Rails: `when BigDecimal then value.to_s("F")` (abstract/quoting.rb:101).
+        v = v.toString("F");
+      }
       // `BinaryType#serialize` yields a `Type::Binary::Data`; Rails' `type_cast`
       // unwraps it to its byte string at abstract/quoting.rb:96. This path
       // deliberately does not route through `typeCast` (see above), so unwrap

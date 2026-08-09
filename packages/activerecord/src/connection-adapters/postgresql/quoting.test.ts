@@ -405,7 +405,8 @@ describe("PostgreSQL quoting", () => {
     // objects needing a dedicated arm. They are not: `DateInfinity` IS
     // `Number.POSITIVE_INFINITY` (activemodel type/internal/sentinels.ts), so
     // they match the numeric arm and are returned identically, reaching
-    // `_bindForPg` → `temporalToBindString(v, "postgres")` exactly as before.
+    // `_bindForPg`, whose first two lines map them to the "infinity" wire
+    // strings exactly as before.
     // (On the typed path `OID::Date#serialize` has already mapped them to the
     // "infinity" wire string, so this is belt-and-braces.)
     expect(() => typeCast(DateInfinity)).not.toThrow();
