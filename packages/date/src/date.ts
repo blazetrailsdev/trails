@@ -3787,9 +3787,9 @@ export class Date {
    * spelling.
    *
    * The stored half is the Julian day — the C's `HAVE_JD` arm — and the civil
-   * triple is decoded from it on read through `get_c_civil` over
-   * {@link cJdToCivil} under {@link DEFAULT_SG}, exactly as `get_c_civil`
-   * (`date_core.c:1297-1324`) does. Keeping the calendar-neutral half is what
+   * triple is decoded from it on read through {@link cJdToCivil} under
+   * {@link DEFAULT_SG}, exactly as `get_s_civil` (`date_core.c:1189-1204`)
+   * does. Keeping the calendar-neutral half is what
    * makes both cases above representable: `wday`, `yday` and `%s` are the
    * reform's readings rather than proleptic ones, and `Date.new(1500, 2, 29)`
    * builds, as MRI's does.
@@ -3801,9 +3801,9 @@ export class Date {
   readonly #jd: number;
 
   /**
-   * @internal `ComplexDateData`/`SimpleDateData`'s civil fields, which
-   * `get_c_civil` (`date_core.c:1297-1324`) fills in on first read and the
-   * `HAVE_CIVIL` flag then marks present.
+   * @internal `SimpleDateData`'s civil fields (`date_core.c:203-213`), which
+   * the civil decode below fills in on first read and the `HAVE_CIVIL` flag
+   * then marks present.
    */
   #civil?: [ry: number, rm: number, rdom: number];
 
@@ -3833,8 +3833,15 @@ export class Date {
   }
 
   /**
-   * @internal `date_core.c` `get_c_civil` (`date_core.c:1297-1324`), which
-   * decodes the local Julian day into the civil fields on first read.
+   * @internal The C's civil decode, which fills the civil fields in on first
+   * read and sets `HAVE_CIVIL`. Ruby splits it in two by data shape, under an
+   * assertion each: `get_s_civil` (`date_core.c:1189-1204`) reads `x->s.jd`
+   * straight, and `get_c_civil` (`date_core.c:1297-1324`) reads
+   * `m_local_jd` — the stored UTC day taken back through `jd_utc_to_local`
+   * (`date_core.c:1326-1333`). One method stands in for both here because
+   * `this.jd` already IS that split: it is the stored day on `Date` and
+   * {@link DateTime#jd}'s `m_local_jd` on `DateTime`, so the branch the C makes
+   * on `simple_dat_p`/`complex_dat_p` is the one TS makes on the receiver.
    */
   #getCCivil(): [ry: number, rm: number, rdom: number] {
     return (this.#civil ??= cJdToCivil(this.jd));
@@ -4377,8 +4384,10 @@ export class DateTime extends DateWithoutParseStatics {
   /**
    * Ruby `DateTime#jd` reads the LOCAL day, not the stored UTC one
    * (`m_local_jd`, `date_core.c:1486-1497`), which is the day `wday`, `yday`
-   * and the inherited `get_c_civil` are then `c_jd_to_wday` /
-   * `c_jd_to_ordinal` / `c_jd_to_civil` over.
+   * and the inherited civil decode are then `c_jd_to_wday` /
+   * `c_jd_to_ordinal` / `c_jd_to_civil` over — which is what makes that decode
+   * `get_c_civil` (`date_core.c:1297-1324`) on a `DateTime` where it is
+   * `get_s_civil` (`:1189-1204`) on a `Date`.
    */
   override get jd(): number {
     return this.#mLocalJd();

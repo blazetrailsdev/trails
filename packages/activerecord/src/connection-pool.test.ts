@@ -611,6 +611,10 @@ it("adapter proxy treats a probe name as the send it is, with no carve-out set",
   // What Ruby *does* answer, it answers through the ancestor chain — the same
   // reason `NullPool` lets `to_s` arrive as `Object.prototype.toString`.
   expect(typeof proxy.hasOwnProperty).toBe("function");
+  // `constructor` is object plumbing, not a send: a walker reads it to name the
+  // value's class, so it answers the adapter class rather than a dispatcher
+  // that would call that class without `new`.
+  expect(proxy.constructor).toBe(AbstractAdapter);
   // A JS `Symbol` cannot spell a Ruby send — the one carve-out the language
   // forces, as on `NullPool`.
   expect(proxy[Symbol.iterator]).toBeUndefined();

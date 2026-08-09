@@ -516,8 +516,11 @@ export class ConnectionPool implements ReapablePool {
               (pool.activeConnection ?? pool.connections[0])?.adapterName ??
               adapterNameFromConfig(pool.dbConfig.adapter)
             );
-          // The one carve-out the language forces, as on `NullPool` above: a JS
-          // `Symbol` cannot spell a Ruby send.
+          // The carve-outs the language forces, as on `NullPool` above: neither
+          // a JS `Symbol` nor `constructor` spells a Ruby send — `constructor`
+          // is the object plumbing every JS walker reads to name a value's
+          // class, and dispatching it would call the adapter class without
+          // `new`.
           if (typeof prop === "symbol") return undefined;
           // The send set is the adapter's, as it is in Ruby — no name list. A
           // live connection answers for it whenever one exists (it does
@@ -528,6 +531,7 @@ export class ConnectionPool implements ReapablePool {
           // thenable to anything `await`ing an object that holds it.
           const sample: object =
             pool.activeConnection ?? pool.connections[0] ?? AbstractAdapter.prototype;
+          if (prop === "constructor") return (sample as any).constructor;
           if (typeof (sample as any)[prop] !== "function") {
             return undefined;
           }
