@@ -1272,39 +1272,47 @@ export class AbstractAdapter implements Quoting {
     let retriesAvailable = this.connectionRetries;
     const deadline = this.retryDeadline !== null ? Date.now() + this.retryDeadline * 1000 : null;
 
-    for (;;) {
-      try {
-        await this.reconnect();
+    // Rails wraps the whole retry loop in `@lock.synchronize`
+    // (abstract_adapter.rb:666-676) precisely because `reconnect` and
+    // `attempt_configure_connection` block on I/O. Every `await` below is a
+    // scheduling point at which a second `reconnectBang`/`verifyBang` could
+    // enter and race `_connection` / `_verified`, so the lock is a real
+    // guarantee to port, not a no-op for a single-threaded runtime.
+    return this._transactionManager.synchronize(async () => {
+      for (;;) {
+        try {
+          await this.reconnect();
 
-        this.enableLazyTransactionsBang();
-        this._rawConnectionDirty = false;
-        this._lastActivity = Date.now();
-        this._verified = true;
+          this.enableLazyTransactionsBang();
+          this._rawConnectionDirty = false;
+          this._lastActivity = Date.now();
+          this._verified = true;
 
-        await this.resetTransaction({ restore: opts.restoreTransactions ?? false }, async () => {
-          await this.clearCacheBang();
-          await this.attemptConfigureConnection();
-        });
-        return;
-      } catch (error) {
-        const translated = this.translateExceptionClass(error, undefined, undefined);
-        const retryDeadlineExceeded = deadline !== null && deadline < Date.now();
+          await this.resetTransaction({ restore: opts.restoreTransactions ?? false }, async () => {
+            await this.clearCacheBang();
+            await this.attemptConfigureConnection();
+          });
+          return;
+        } catch (error) {
+          const translated = this.translateExceptionClass(error, undefined, undefined);
+          const retryDeadlineExceeded = deadline !== null && deadline < Date.now();
 
-        if (!retryDeadlineExceeded && retriesAvailable > 0) {
-          retriesAvailable -= 1;
-          if (this.isRetryableConnectionError(translated)) {
-            await this.backoff(this.connectionRetries - retriesAvailable);
-            continue;
+          if (!retryDeadlineExceeded && retriesAvailable > 0) {
+            retriesAvailable -= 1;
+            if (this.isRetryableConnectionError(translated)) {
+              await this.backoff(this.connectionRetries - retriesAvailable);
+              continue;
+            }
           }
-        }
 
-        // Leave the adapter in a consistent unverified state and raise the
-        // translated exception (Rails' `raise translated_exception`).
-        this._lastActivity = 0;
-        this._verified = false;
-        throw translated;
+          // Leave the adapter in a consistent unverified state and raise the
+          // translated exception (Rails' `raise translated_exception`).
+          this._lastActivity = 0;
+          this._verified = false;
+          throw translated;
+        }
       }
-    }
+    });
   }
 
   /**
@@ -1363,20 +1371,31 @@ export class AbstractAdapter implements Quoting {
 
   async verifyBang(): Promise<void> {
     if (!(await this.active())) {
-      // Mirrors Rails' `verify!` (abstract_adapter.rb): an unconfigured raw
-      // connection (opened by the pool but never run through
-      // configure_connection) is promoted here rather than reconnected. If
-      // configure_connection fails, attemptConfigureConnection disconnects so
-      // the next verify takes the reconnect path.
-      if (this._unconfiguredConnection) {
-        this._connection = this._unconfiguredConnection;
-        this._unconfiguredConnection = null;
-        await this.attemptConfigureConnection();
-        this._lastActivity = Date.now();
-        this._verified = true;
-        return;
-      }
-      await this.reconnectBang({ restoreTransactions: true });
+      // Rails takes `@lock.synchronize` for exactly this branch
+      // (abstract_adapter.rb:759-772) and releases before the trailing
+      // `@verified = true`. Without it two concurrent verifies both observe
+      // `!active()`, both claim `_unconfiguredConnection`, and one handle is
+      // dropped — or both take the reconnect path and reconnect twice.
+      const promoted = await this._transactionManager.synchronize(async () => {
+        // Mirrors Rails' `verify!` (abstract_adapter.rb): an unconfigured raw
+        // connection (opened by the pool but never run through
+        // configure_connection) is promoted here rather than reconnected. If
+        // configure_connection fails, attemptConfigureConnection disconnects so
+        // the next verify takes the reconnect path.
+        if (this._unconfiguredConnection) {
+          this._connection = this._unconfiguredConnection;
+          this._unconfiguredConnection = null;
+          await this.attemptConfigureConnection();
+          this._lastActivity = Date.now();
+          this._verified = true;
+          return true;
+        }
+        await this.reconnectBang({ restoreTransactions: true });
+        return false;
+      });
+      // Rails `return`s from inside the synchronize block on the promotion
+      // path, skipping the trailing `@verified = true`/`verified!`.
+      if (promoted) return;
     }
     // Mirrors Rails: `connect_with_retry` calls `verified!` after a
     // successful (re)connect; verifyBang is the abstract-side entry

@@ -111,3 +111,67 @@ describe("AbstractAdapter#databaseExists", () => {
     await expect(a.databaseExists()).rejects.toBeInstanceOf(ConnectionFailed);
   });
 });
+
+// Rails holds `@lock` across the blocking work in `reconnect!`
+// (abstract_adapter.rb:666-676) and `verify!` (:759-772). Every `await` in the
+// ported bodies is a scheduling point, so without the port of that lock two
+// concurrent callers interleave — the second tears the connection down while
+// the first is still configuring it. These assert the interleaving, not the
+// end state.
+describe("AbstractAdapter connection lifecycle critical sections", () => {
+  it("reconnectBang serializes concurrent callers", async () => {
+    const a = new AbstractAdapter();
+    const events: string[] = [];
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    let first = true;
+    (a as any).reconnect = async () => {
+      events.push("enter");
+      if (first) {
+        first = false;
+        await gate;
+      }
+      events.push("exit");
+    };
+    (a as any).attemptConfigureConnection = async () => {};
+
+    const p1 = a.reconnectBang();
+    const p2 = a.reconnectBang();
+    // Both calls are in flight; only the first may have entered.
+    await Promise.resolve();
+    release();
+    await Promise.all([p1, p2]);
+
+    expect(events).toEqual(["enter", "exit", "enter", "exit"]);
+  });
+
+  it("verifyBang serializes concurrent callers and promotes the unconfigured connection once", async () => {
+    const a = new AbstractAdapter();
+    const events: string[] = [];
+    (a as any).active = async () => false;
+    (a as any)._unconfiguredConnection = { handle: 1 };
+    (a as any).attemptConfigureConnection = async () => {
+      events.push("configure:enter");
+      await Promise.resolve();
+      events.push("configure:exit");
+    };
+    (a as any).reconnect = async () => {
+      events.push("reconnect");
+    };
+
+    await Promise.all([a.verifyBang(), a.verifyBang()]);
+
+    // The promotion's configure must complete before the loser's reconnect
+    // starts — on the baseline the reconnect interleaves into it.
+    // The loser's reconnect (and its own configure, from reconnectBang's
+    // resetTransaction block) runs strictly after the promotion's configure.
+    expect(events).toEqual([
+      "configure:enter",
+      "configure:exit",
+      "reconnect",
+      "configure:enter",
+      "configure:exit",
+    ]);
+    expect((a as any)._connection).toEqual({ handle: 1 });
+  });
+});

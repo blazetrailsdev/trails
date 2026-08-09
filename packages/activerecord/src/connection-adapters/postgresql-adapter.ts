@@ -1232,21 +1232,27 @@ export class PostgreSQLAdapter
    * created (CREATE TYPE, CREATE DOMAIN, etc).
    */
   async reloadTypeMap(): Promise<void> {
-    this._typeMap = null;
-    await this.loadAdditionalTypes();
-    // A type-map reload signals the database's type universe changed — an
-    // extension or user type (hstore, enum, composite) was created or dropped,
-    // reassigning OIDs. A cached prepared statement that bound or returned one
-    // of those types embeds the now-stale OID in its server-side plan, so
-    // re-executing it raises "cache lookup failed for type <oid>". Drop the
-    // client-side statement map (NOT clearCacheBang) so the next prepare gets a
-    // fresh monotonic name and re-parses against the current OIDs. We
-    // deliberately skip the DEALLOCATE: reloadTypeMap runs mid-DDL-transaction
-    // (e.g. createEnum), and queuing DEALLOCATEs onto the pinned client there
-    // interleaves with the in-flight statement and desyncs the pg protocol.
-    // The orphaned server statements keep their old names — never reused — and
-    // are reclaimed on session reset/close.
-    this._statementPool?.reset();
+    // Rails holds `@lock.synchronize` over the whole body
+    // (postgresql_adapter.rb:358-370). The null-then-reload below leaves the
+    // type map absent across an await, so without the lock a concurrent
+    // reader — or a second reloadTypeMap — observes a null map mid-reload.
+    return this._transactionManager.synchronize(async () => {
+      this._typeMap = null;
+      await this.loadAdditionalTypes();
+      // A type-map reload signals the database's type universe changed — an
+      // extension or user type (hstore, enum, composite) was created or dropped,
+      // reassigning OIDs. A cached prepared statement that bound or returned one
+      // of those types embeds the now-stale OID in its server-side plan, so
+      // re-executing it raises "cache lookup failed for type <oid>". Drop the
+      // client-side statement map (NOT clearCacheBang) so the next prepare gets a
+      // fresh monotonic name and re-parses against the current OIDs. We
+      // deliberately skip the DEALLOCATE: reloadTypeMap runs mid-DDL-transaction
+      // (e.g. createEnum), and queuing DEALLOCATEs onto the pinned client there
+      // interleaves with the in-flight statement and desyncs the pg protocol.
+      // The orphaned server statements keep their old names — never reused — and
+      // are reclaimed on session reset/close.
+      this._statementPool?.reset();
+    });
   }
 
   /**

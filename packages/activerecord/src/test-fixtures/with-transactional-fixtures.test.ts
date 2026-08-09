@@ -10,6 +10,8 @@ import { SQLite3Adapter } from "../connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "../connection-adapters/better-sqlite3-adapter.js";
 import { NullTransaction } from "../connection-adapters/abstract/transaction.js";
 import { withTransactionalFixtures } from "./with-transactional-fixtures.js";
+import { fixtures } from "../test-fixtures.js";
+import { Computer } from "../test-helpers/models/computer.js";
 
 // Resolve a pool-leased adapter from the primary (schema-loaded) pool rather
 // than the divergent sidecar `_pool`. Rails has no sidecar test pool.
@@ -353,5 +355,72 @@ describe("concurrency isolation: two concurrent transaction chains stay independ
     expect(adapter.openTransactions).toBe(0);
     expect(adapter.inTransaction).toBe(false);
     expect(adapter.currentTransaction()).toBeInstanceOf(NullTransaction);
+  });
+});
+
+// MySQL/MariaDB have no transactional DDL: a DDL statement implicitly commits
+// the open fixture transaction, so `teardown_fixtures`' unpin rolls back an
+// empty transaction and the rows this block seeded stay durable. A later block
+// that declares `fixtures([])` deletes nothing (a load only deletes the tables
+// it is about to fill, `abstract/database_statements.rb:486-495`) and inherits
+// them. Rails runs the same shape (`batches_test.rb:570` calls `add_index` in a
+// transactional `BatchesTest`) but never asserts an unseeded table is empty, so
+// the escape is invisible there. These two blocks run in order and are red on
+// the MySQL and MariaDB lanes without the teardown repair; on SQLite and
+// PostgreSQL the rollback already covers the rows and they pass either way.
+describe("fixture rows do not survive a MySQL DDL implicit commit", () => {
+  fixtures(["computers"]);
+
+  it("seeds rows and then runs DDL that implicitly commits the pin", async () => {
+    expect(Number(await Computer.count())).toBeGreaterThan(0);
+    const conn = Base.connection;
+    await conn.addIndex("computers", "system", { name: "idx_fixture_pin_escape" });
+    await conn.removeIndex("computers", { name: "idx_fixture_pin_escape" });
+  });
+});
+
+describe("fixture rows do not survive a MySQL DDL implicit commit (next block)", () => {
+  fixtures([]);
+
+  it("starts with an empty table it did not seed", async () => {
+    expect(Number(await Computer.count())).toBe(0);
+  });
+});
+
+// The negative case. `teardown_fixtures` (`test_fixtures.rb:206-211`) issues no
+// DELETE, and the repair above is a recovery from an implicit commit, not a
+// per-test cleanup — so a pinned test that runs no DDL must leave teardown
+// exactly as Rails has it. Spying is the only way to see this: with the pin
+// intact the rollback removes the rows either way, so an unconditional DELETE
+// would be behaviorally invisible and silently reinstate what #6273 removed.
+describe("a pinned test that runs no DDL issues no teardown DELETE", () => {
+  const repairDeletes: string[] = [];
+  let target: Record<string, unknown>;
+  let original: unknown;
+
+  // The instance, not the prototype: the implicit-commit guard wraps and then
+  // restores `executeMutation` as an OWN property, so an earlier block's guard
+  // has already shadowed the prototype by the time this one runs.
+  beforeAll(() => {
+    target = Base.connection as unknown as Record<string, unknown>;
+    original = target.executeMutation;
+    target.executeMutation = function (this: unknown, ...args: unknown[]) {
+      if (args[2] === "Fixture Delete") repairDeletes.push(String(args[0]));
+      return (original as (...a: unknown[]) => unknown).apply(this, args);
+    };
+  });
+
+  afterAll(() => {
+    target.executeMutation = original;
+  });
+
+  fixtures(["computers"]);
+
+  it("loads fixtures and runs no DDL", async () => {
+    expect(Number(await Computer.count())).toBeGreaterThan(0);
+  });
+
+  it("saw no repair DELETE from the previous test's teardown", () => {
+    expect(repairDeletes).toEqual([]);
   });
 });
