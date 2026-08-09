@@ -24,10 +24,12 @@ import { Result } from "./result.js";
 class LifecycleTestAdapter extends AbstractAdapter {
   private _connected = false;
 
-  // The abstract quoteColumnName raises NotImplementedError (mirrors Rails —
-  // every adapter must define its own). These test adapters compile real SQL
-  // through Arel, so provide an ANSI quoter like a concrete adapter would.
-  override quoteColumnName(name: string): string {
+  // The abstract quote_column_name raises NotImplementedError (quoting.rb:60-63)
+  // and every real adapter defines its own in `ClassMethods`
+  // (sqlite3/quoting.rb:44, postgresql/quoting.rb:46), which is where the
+  // inherited instance methods send it (quoting.rb:135-143). These test adapters
+  // compile real SQL through Arel, so define the quoter there too.
+  static override quoteColumnName(name: string): string {
     return `"${name.replace(/"/g, '""')}"`;
   }
 
