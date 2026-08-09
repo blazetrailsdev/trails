@@ -1904,11 +1904,14 @@ function byVersion(a: MigrationProxy, b: MigrationProxy): number {
  *
  * Mirrors: ActiveRecord::MigrationContext (migration.rb:1211)
  */
-export class MigrationContext {
+export class MigrationContext<
+  S extends SchemaMigration | NullSchemaMigration = SchemaMigration,
+  I extends InternalMetadata | NullInternalMetadata = InternalMetadata,
+> {
   /** Mirrors: `attr_reader :migrations_paths, :schema_migration, :internal_metadata` (`migration.rb:1212`). */
   readonly migrationsPaths: string[];
-  readonly schemaMigration: SchemaMigration;
-  readonly internalMetadata: InternalMetadata;
+  readonly schemaMigration: S | SchemaMigration;
+  readonly internalMetadata: I | InternalMetadata;
 
   /**
    * Mirrors: ActiveRecord::MigrationContext#initialize
@@ -1920,31 +1923,21 @@ export class MigrationContext {
    * `NullSchemaMigration` (`schema_migration.rb:9`) / `NullInternalMetadata`
    * (`internal_metadata.rb:13`) are empty classes duck-typed into the same
    * slot, and `attr_reader` (`migration.rb:1212`) hands back whatever was
-   * seated; TS has no duck typing, so the readers stay typed as the real
-   * collaborators and the null objects are seated through that type here.
+   * seated.
    *
-   * The narrowing that buys is real rather than assumed: a null-object context
-   * is only ever a local temporary of the two functions that build one —
-   * `Migration.copy` and activerecord-cli's `loadMigrations` — each of which
-   * reads `migrations` off it and lets it go, so no such context reaches
-   * `up`/`down`/`currentVersion`. Declaring the readers as the union instead
-   * proves nothing extra: it moves the same unchecked narrowing onto the
-   * nineteen sites that use a connected context, where Rails asserts nothing
-   * either. Tracked for convergence as RFC 0051's
-   * `migration-context-collaborator-readers-cast-away-the-null-object`: the
-   * reader should stop claiming a type the field may not hold, which needs the
-   * discovery-only context to become distinguishable at the type level.
+   * TS has no duck typing, so the collaborators are the class' two type
+   * parameters, defaulted to the real classes: a context built with the null
+   * objects is a `MigrationContext<NullSchemaMigration, NullInternalMetadata>`,
+   * which is not assignable to `MigrationContext`, and the connected half
+   * (`up`/`down`/`currentVersion`, …) is annotated `this: MigrationContext`.
+   * Calling one of those on a discovery-only context is therefore a compile
+   * error rather than a null object receiving a `SchemaMigration` message, and
+   * the readers hand back exactly what was seated with no cast.
    */
-  constructor(
-    migrationsPaths: string[],
-    schemaMigration?: SchemaMigration | NullSchemaMigration,
-    internalMetadata?: InternalMetadata | NullInternalMetadata,
-  ) {
+  constructor(migrationsPaths: string[], schemaMigration?: S, internalMetadata?: I) {
     this.migrationsPaths = migrationsPaths;
-    this.schemaMigration = (schemaMigration ??
-      new SchemaMigration(this.connectionPool())) as SchemaMigration;
-    this.internalMetadata = (internalMetadata ??
-      new InternalMetadata(this.connectionPool())) as InternalMetadata;
+    this.schemaMigration = schemaMigration ?? new SchemaMigration(this.connectionPool());
+    this.internalMetadata = internalMetadata ?? new InternalMetadata(this.connectionPool());
   }
 
   /**
@@ -1962,6 +1955,7 @@ export class MigrationContext {
    * (`migration.rb:1228-1238`).
    */
   async migrate(
+    this: MigrationContext,
     targetVersion?: number | string | null,
     block?: (m: MigrationProxy) => boolean,
   ): Promise<MigrationProxy[]> {
@@ -1975,6 +1969,7 @@ export class MigrationContext {
 
   /** @internal Mirrors: ActiveRecord::MigrationContext#up (`migration.rb:1248-1256`) */
   async up(
+    this: MigrationContext,
     targetVersion?: number | string | null,
     block?: (m: MigrationProxy) => boolean,
   ): Promise<MigrationProxy[]> {
@@ -1992,6 +1987,7 @@ export class MigrationContext {
 
   /** @internal Mirrors: ActiveRecord::MigrationContext#down (`migration.rb:1258-1266`) */
   async down(
+    this: MigrationContext,
     targetVersion?: number | string | null,
     block?: (m: MigrationProxy) => boolean,
   ): Promise<MigrationProxy[]> {
@@ -2029,7 +2025,7 @@ export class MigrationContext {
    * migration, where `Migrator#rollback` walks the last N *applied* versions
    * and silently rolls back a different set when migrations ran out of order.
    */
-  async rollback(steps: number = 1): Promise<MigrationProxy[]> {
+  async rollback(this: MigrationContext, steps: number = 1): Promise<MigrationProxy[]> {
     return this.move("down", steps);
   }
 
@@ -2038,12 +2034,16 @@ export class MigrationContext {
    * (`migration.rb:1244-1246`) — `move(:up, steps)`. See {@link rollback} for
    * why this does not delegate to `Migrator#forward`.
    */
-  async forward(steps: number = 1): Promise<MigrationProxy[]> {
+  async forward(this: MigrationContext, steps: number = 1): Promise<MigrationProxy[]> {
     return this.move("up", steps);
   }
 
   /** @internal Mirrors: ActiveRecord::MigrationContext#run (`migration.rb:1268-1270`) */
-  async run(direction: "up" | "down", targetVersion: number | string): Promise<number | undefined> {
+  async run(
+    this: MigrationContext,
+    direction: "up" | "down",
+    targetVersion: number | string,
+  ): Promise<number | undefined> {
     const migrator = new Migrator(
       direction,
       this.migrations,
@@ -2061,14 +2061,14 @@ export class MigrationContext {
    * (`migration.rb:1272-1274`) — a fresh `Migrator` over this context's
    * migrations, so each read sees current schema_migrations.
    */
-  open(): Migrator {
+  open(this: MigrationContext): Migrator {
     return new Migrator("up", this.migrations, this.schemaMigration, this.internalMetadata);
   }
 
   /** @internal Mirrors: ActiveRecord::MigrationContext#migrations_status (`migration.rb:1317-1330`) */
-  async migrationsStatus(): Promise<
-    Array<{ status: "up" | "down"; version: string; name: string }>
-  > {
+  async migrationsStatus(
+    this: MigrationContext,
+  ): Promise<Array<{ status: "up" | "down"; version: string; name: string }>> {
     const dbList = new Set(await this.schemaMigration.normalizedVersions());
 
     const fileList = this.migrationFiles().map((file) => {
@@ -2106,7 +2106,7 @@ export class MigrationContext {
   }
 
   /** @internal Mirrors: ActiveRecord::MigrationContext#protected_environment? (`migration.rb:1344-1346`) */
-  async protectedEnvironment(): Promise<boolean> {
+  async protectedEnvironment(this: MigrationContext): Promise<boolean> {
     const stored = await this.lastStoredEnvironment();
     if (!stored) return false;
     const { Base } = await import("./base.js");
@@ -2114,7 +2114,7 @@ export class MigrationContext {
   }
 
   /** @internal Mirrors: ActiveRecord::MigrationContext#last_stored_environment (`migration.rb:1348-1357`) */
-  async lastStoredEnvironment(): Promise<string | null> {
+  async lastStoredEnvironment(this: MigrationContext): Promise<string | null> {
     const internalMetadata = this.internalMetadata;
     if (!internalMetadata.enabled) return null;
     if ((await this.currentVersion()) === 0) return null;
@@ -2131,7 +2131,7 @@ export class MigrationContext {
   }
 
   /** @internal Mirrors: ActiveRecord::MigrationContext#get_all_versions */
-  async getAllVersions(): Promise<number[]> {
+  async getAllVersions(this: MigrationContext): Promise<number[]> {
     if (await this.schemaMigration.tableExists()) {
       return this.schemaMigration.integerVersions();
     }
@@ -2142,7 +2142,7 @@ export class MigrationContext {
    * @internal Mirrors: ActiveRecord::MigrationContext#current_version
    * (`migration.rb:1292-1295`), whose bare `rescue NoDatabaseError` returns nil.
    */
-  async currentVersion(): Promise<number | undefined> {
+  async currentVersion(this: MigrationContext): Promise<number | undefined> {
     try {
       const versions = await this.getAllVersions();
       return versions.length > 0 ? Math.max(...versions) : 0;
@@ -2153,12 +2153,12 @@ export class MigrationContext {
   }
 
   /** @internal Mirrors: ActiveRecord::MigrationContext#needs_migration? */
-  async needsMigration(): Promise<boolean> {
+  async needsMigration(this: MigrationContext): Promise<boolean> {
     return (await this.pendingMigrationVersions()).length > 0;
   }
 
   /** @internal Mirrors: ActiveRecord::MigrationContext#pending_migration_versions */
-  async pendingMigrationVersions(): Promise<number[]> {
+  async pendingMigrationVersions(this: MigrationContext): Promise<number[]> {
     const applied = new Set(await this.getAllVersions());
     return this.migrations.map((m) => m.version).filter((v) => !applied.has(v));
   }
@@ -2244,7 +2244,11 @@ export class MigrationContext {
    * returns whatever `up` / `down` returned — so `rollback` / `forward` answer
    * the migrations that ran.
    */
-  async move(direction: "up" | "down", steps: number): Promise<MigrationProxy[]> {
+  async move(
+    this: MigrationContext,
+    direction: "up" | "down",
+    steps: number,
+  ): Promise<MigrationProxy[]> {
     const migrator = new Migrator(
       direction,
       this.migrations,

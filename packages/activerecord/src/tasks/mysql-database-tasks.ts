@@ -56,15 +56,10 @@ export class MySQLDatabaseTasks {
 
   async create(charsetOverride?: { charset?: string; collation?: string }): Promise<void> {
     await this.establishConnection(this.configurationHashWithoutDatabase());
-    try {
-      await (
-        await this.connection()
-      ).createDatabase(this.requireDatabaseName(), this.creationOptions(charsetOverride));
-    } finally {
-      // Always restore the pool to the target DB so Base is not left pointing
-      // at the no-database admin pool after create() returns or throws.
-      await this.establishConnection();
-    }
+    await (
+      await this.connection()
+    ).createDatabase(this.requireDatabaseName(), this.creationOptions(charsetOverride));
+    await this.establishConnection();
   }
 
   async drop(): Promise<void> {
@@ -297,17 +292,7 @@ export class MySQLDatabaseTasks {
 
   /** @internal */
   private configurationHashWithoutDatabase(): ConfigHash {
-    const { database: _db, ...rest } = this.configurationHash;
-    if (rest.url) {
-      try {
-        const parsed = new URL(String(rest.url));
-        parsed.pathname = "/";
-        rest.url = parsed.toString();
-      } catch {
-        // malformed URL — leave as-is and let the adapter surface the error
-      }
-    }
-    return rest;
+    return { ...this.configurationHash, database: null };
   }
 }
 
