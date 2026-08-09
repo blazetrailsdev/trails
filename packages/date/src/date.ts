@@ -4771,8 +4771,9 @@ export class Date {
    * `DateTime.new(2002,3,19, 0,0,1)` is not.
    *
    * `cmp_gen` (`date_core.c:6694-6705`), the `!k_date_p(other)` arm, compares
-   * `m_ajd` against a Numeric. `Date#ajd` is not ported, so `other` is a `Date`
-   * here; the arm is tracked against RFC 0088.
+   * `m_ajd` against a Numeric. `Date#ajd` is not ported at all, so there is
+   * nothing for that arm to read and `other` is a `Date` here; RFC 0088's
+   * `port-date-ajd-and-cmp-gen` carries both.
    */
   cmp(other: Date): number {
     if (!(simpleDatP(this) && simpleDatP(other) && this.isGregorian === other.isGregorian))
@@ -4961,8 +4962,13 @@ export class DateTime extends DateWithoutParseStatics {
   readonly #of: number;
 
   /**
-   * Ruby `DateTime.new(y, m, d, h = 0, min = 0, s = 0, offset = 0)` (ruby/date,
-   * `date_core.c` `datetime_s_new`).
+   * Ruby `DateTime.new(y = -4712, m = 1, d = 1, h = 0, min = 0, s = 0, offset = 0)`
+   * (ruby/date, `date_core.c` `datetime_s_new`).
+   *
+   * `datetime_initialize` seeds `y = INT2FIX(-4712); m = 1; d = 1;`
+   * (`date_core.c:7816-7818`) before its `switch (argc)` falls through past
+   * them, so `DateTime.new` with no arguments is the Julian epoch, as
+   * `Date.new` is; each of the three takes its default at its own read below.
    *
    * `offset` goes through {@link val2off} (`date_core.c:5071-5077`) over
    * {@link offsetToSec} (`date_core.c:2369-2452`), which reads it as a **day
@@ -5112,9 +5118,6 @@ export class DateTime extends DateWithoutParseStatics {
     const sg = start === undefined ? DEFAULT_SG : val2sg(start);
     let nth: bigint;
     let rjd: number;
-    // `datetime_initialize`'s `y = INT2FIX(-4712); m = 1; d = 1;`
-    // (`date_core.c:7816-7818`), the defaults its `switch (argc)` falls through
-    // past; `month` and `day` take theirs at their own reads above.
     year ??= -4712;
     if (guessStyle(year, sg) < 0) {
       const r = validGregorianP(year, (month as number) ?? 1, d);
