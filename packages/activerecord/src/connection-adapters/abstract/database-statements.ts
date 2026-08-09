@@ -17,12 +17,10 @@ import {
   InsertManager,
 } from "@blazetrails/arel";
 import { RangeError as ActiveModelRangeError } from "@blazetrails/activemodel";
-import { Notifications } from "@blazetrails/activesupport";
 import {
   TransactionIsolationError,
   NotImplementedError,
   RangeError as ARRangeError,
-  StatementInvalid,
 } from "../../errors.js";
 
 import type { Quoting } from "./quoting.js";
@@ -89,6 +87,19 @@ export interface DatabaseStatementsHost {
    * @internal
    */
   typeCastedBinds?(binds: unknown[] | null | undefined): unknown[] | undefined;
+  /**
+   * Mixed in from `AbstractAdapter` — the single `sql.active_record` payload
+   * producer (abstract_adapter.rb:1134).
+   * @internal
+   */
+  log?<T>(
+    sql: string,
+    name: string | null | undefined,
+    binds: unknown[],
+    typeCastedBinds: unknown[],
+    isAsync: boolean,
+    block: (payload: Record<string, unknown>) => Promise<T>,
+  ): Promise<T>;
   execute?(sql: string, binds?: unknown[], name?: string | null): Promise<unknown>;
   selectAll?(
     sql: string,
@@ -1286,8 +1297,10 @@ export function highPrecisionCurrentTimestamp(): Nodes.SqlLiteral {
 }
 
 /**
- * Wraps query execution in a `sql.active_record` instrumentation event,
- * mirroring Rails' `AbstractAdapter#log`.
+ * Wraps query execution in a `sql.active_record` instrumentation event by
+ * delegating to `AbstractAdapter#log` (abstract_adapter.rb:1134), the single
+ * payload producer — as in Rails, where `raw_execute` is `log`'s only caller
+ * (abstract/database_statements.rb:554).
  */
 async function logSql<T>(
   host: DatabaseStatementsHost,
@@ -1296,38 +1309,26 @@ async function logSql<T>(
   binds: unknown[] | undefined,
   fn: () => Promise<T>,
 ): Promise<T> {
-  // Rails' log() separates binds (Attribute objects) from type_casted_binds
-  // (primitive values). type_casted_binds can be a lazy callable in Rails;
-  // here we pass the primitive values directly.
   const bindArray = binds ?? [];
-  const payload: Record<string, unknown> = {
+  // `?? []` (never `?? bindArray`) so a host that somehow lacks the mixin
+  // emits an empty slot rather than silently reinstating the raw-uncast-binds
+  // divergence this file's `typeCastedBinds` sweep removed — Attribute objects
+  // in the payload would reach LogSubscriber as "[object Object]".
+  // Non-null: `log` is mixed in on every AbstractAdapter (abstract_adapter.rb:1134).
+  return host.log!(
     sql,
     name,
-    binds: bindArray,
-    // `?? []` (never `?? bindArray`) so a host that somehow lacks the mixin
-    // emits an empty slot rather than silently reinstating the raw-uncast-binds
-    // divergence this file's `typeCastedBinds` sweep removed — Attribute objects
-    // in the payload would reach LogSubscriber as "[object Object]".
-    type_casted_binds: host.typeCastedBinds?.(bindArray) ?? [],
-    connection: host,
-    row_count: 0,
-  };
-  return Notifications.instrumentAsync("sql.active_record", payload, async () => {
-    try {
+    bindArray,
+    host.typeCastedBinds?.(bindArray) ?? [],
+    false,
+    async (payload) => {
       const result = await fn();
       if (result instanceof Result) {
         payload.row_count = result.length;
       }
       return result;
-    } catch (e: any) {
-      // Mirrors AbstractAdapter#log's rescue: the driver error has already been
-      // translated to a StatementInvalid by with_raw_connection (with sql:/binds:
-      // nil), so we only attach the statement context here — set_query is a no-op
-      // when sql was already supplied, so this never double-translates.
-      if (e instanceof StatementInvalid) throw e.setQuery(sql, bindArray);
-      throw e;
-    }
-  }) as Promise<T>;
+    },
+  );
 }
 
 /**

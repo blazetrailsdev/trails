@@ -1,6 +1,6 @@
 import mysql from "mysql2/promise";
 import { Temporal } from "@blazetrails/date";
-import { Notifications, BigDecimal } from "@blazetrails/activesupport";
+import { BigDecimal } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { AbstractAdapter as DatabaseAdapter } from "./abstract-adapter.js";
 import type { IndexDefinition } from "./abstract/schema-definitions.js";
@@ -614,21 +614,17 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     this._syncDatabaseTimezone();
     const driverSql = this.mysqlQuote(sql);
     const driverBinds = this.mysqlBinds(binds ?? []);
-    const txPublicQuery = this.currentTransaction().userTransaction;
     // Rails logs the caller's own binds (`QueryAttribute` objects) plus their
     // type-casted values, NOT the driver wire form — abstract_adapter.rb:1134-1145
     // / abstract/database_statements.rb:553-554. `driverBinds` stays scoped to
     // the driver call below.
-    const payload: Record<string, unknown> = {
-      sql: driverSql,
-      name: name ?? "SQL",
-      binds: binds ?? [],
-      type_casted_binds: this.typeCastedBinds(binds ?? []) ?? [],
-      connection: this,
-      row_count: 0,
-      transaction: txPublicQuery.isOpen() ? txPublicQuery : null,
-    };
-    return Notifications.instrumentAsync("sql.active_record", payload, async () => {
+    return this.log(
+      driverSql,
+      name ?? "SQL",
+      binds ?? [],
+      this.typeCastedBinds(binds ?? []) ?? [],
+      false,
+      async (payload) => {
       try {
         // Thread allowRetry (Rails' select_all → internal_exec_query
         // `allow_retry: preparable`) into withRawConnection so idempotent SELECTs
@@ -971,17 +967,9 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     // Rails' raw_execute logs the caller's own binds plus their type-casted
     // values (abstract/database_statements.rb:552-556, abstract_adapter.rb:1134-1145),
     // never the mysql2 wire form; `driverBinds` stays scoped to the driver call.
-    const txPublicExec = this.currentTransaction().userTransaction;
-    const payload: Record<string, unknown> = {
-      sql: driverSql,
-      name,
-      binds,
-      type_casted_binds: this.typeCastedBinds(binds) ?? [],
-      connection: this,
-      row_count: 0,
-      transaction: txPublicExec.isOpen() ? txPublicExec : null,
-    };
-    return Notifications.instrumentAsync("sql.active_record", payload, async () => {
+    return this.log(driverSql, name, binds, this.typeCastedBinds(binds) ?? [], false, async (
+      payload,
+    ) => {
       try {
         return await this.withRawConnection({ allowRetry }, async (conn) => {
           const mysqlConn = conn as unknown as mysql.Connection;
@@ -1023,17 +1011,9 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     // Rails' raw_execute logs the caller's own binds plus their type-casted
     // values (abstract/database_statements.rb:552-556, abstract_adapter.rb:1134-1145),
     // never the mysql2 wire form; `driverBinds` stays scoped to the driver call.
-    const txPublicMut = this.currentTransaction().userTransaction;
-    const payload: Record<string, unknown> = {
-      sql: driverSql,
-      name,
-      binds,
-      type_casted_binds: this.typeCastedBinds(binds) ?? [],
-      connection: this,
-      row_count: 0,
-      transaction: txPublicMut.isOpen() ? txPublicMut : null,
-    };
-    return Notifications.instrumentAsync("sql.active_record", payload, async () => {
+    return this.log(driverSql, name, binds, this.typeCastedBinds(binds) ?? [], false, async (
+      payload,
+    ) => {
       try {
         return await this.withRawConnection(async (conn) => {
           const mysqlConn = conn as unknown as mysql.Connection;
@@ -1206,17 +1186,9 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       // driver, matching Rails internal_execute(sql, name, binds). Transaction-
       // control callers pass none, keeping their byte-identical no-bind path.
       const driverBinds = binds.length > 0 ? this.mysqlBinds(binds) : [];
-      const txPublicInt = this.currentTransaction().userTransaction;
-      const payload: Record<string, unknown> = {
-        sql: driverSql,
-        name,
-        binds,
-        type_casted_binds: this.typeCastedBinds(binds) ?? [],
-        connection: this,
-        row_count: 0,
-        transaction: txPublicInt.isOpen() ? txPublicInt : null,
-      };
-      return await Notifications.instrumentAsync("sql.active_record", payload, async () => {
+      return await this.log(driverSql, name, binds, this.typeCastedBinds(binds) ?? [], false, async (
+        payload,
+      ) => {
         try {
           // materializeTransactions is run BEFORE the loop (above) and we pass
           // `false` into withRawConnection — the same materialize-outside-the-loop
