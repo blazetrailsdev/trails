@@ -131,6 +131,17 @@ export class NullPool implements AbstractPool {
   declare readonly shard: never;
 
   /**
+   * Same shape and same reason as `role`/`shard` above. Ruby's NullPool answers
+   * neither `schema_migration` nor `internal_metadata`
+   * (`abstract/connection_pool.rb:14-51`), so `#truncate_tables`' bare
+   * `pool.schema_migration.table_name` (`abstract/database_statements.rb:222-223`)
+   * raises NoMethodError on a pool-less adapter rather than truncating against
+   * a hardcoded default.
+   */
+  declare readonly schemaMigration: never;
+  declare readonly internalMetadata: never;
+
+  /**
    * Mirrors: ConnectionPool::NullPool#initialize
    * (`abstract/connection_pool.rb:24-28`).
    *
