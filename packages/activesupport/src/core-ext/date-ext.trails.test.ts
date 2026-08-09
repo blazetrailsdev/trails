@@ -93,6 +93,32 @@ describe("date calculations coercion arms", () => {
     ).toEqual(pd(2017, 2, 28));
   });
 
+  it("plus_with_duration appends new keys in the other duration's own order", () => {
+    // `1.day + 1.month` merges into `1.second`'s parts as {seconds, days,
+    // months}, so the widened Time advances by a day and then a month rather
+    // than in a canonical order.
+    const dayThenMonth = Duration.days(1).plus(Duration.months(1));
+    const monthThenDay = Duration.months(1).plus(Duration.days(1));
+    expect(DateExt.plusWithDuration(pd(2017, 1, 30), dayThenMonth)).toEqual(pd(2017, 2, 28));
+    expect(DateExt.plusWithDuration(pd(2017, 1, 30), monthThenDay)).toEqual(pd(2017, 3, 1));
+    expect(
+      (
+        DateExt.plusWithDuration(
+          pd(2017, 1, 30),
+          Duration.seconds(1).plus(dayThenMonth),
+        ) as TimeWithZone
+      ).toDate(),
+    ).toEqual(pd(2017, 2, 28));
+    expect(
+      (
+        DateExt.plusWithDuration(
+          pd(2017, 1, 30),
+          Duration.seconds(1).plus(monthThenDay),
+        ) as TimeWithZone
+      ).toDate(),
+    ).toEqual(pd(2017, 3, 1));
+  });
+
   it("compare_without_coercion orders two dates", () => {
     expect(DateExt.compareWithoutCoercion(pd(2005, 2, 21), pd(2005, 2, 22))).toBe(-1);
     expect(DateExt.compareWithoutCoercion(pd(2005, 2, 21), pd(2005, 2, 21))).toBe(0);

@@ -46,7 +46,8 @@ const VARIABLE_PARTS: (keyof DurationParts)[] = ["years", "months", "weeks", "da
 // Mirrors Rails `@parts.merge(other._parts) { |_k, v, ov| v + ov }`
 // (duration.rb:270-272): a Ruby Hash keeps insertion order, and `sum`
 // (`:397-419`) applies the parts in exactly that order, so the receiver's keys
-// come first and the other's new keys are appended.
+// come first and the other's new keys are appended in `other._parts`' own
+// order, not in a canonical one.
 function mergeParts(
   a: DurationParts,
   aKeys: readonly (keyof DurationParts)[],
@@ -56,8 +57,8 @@ function mergeParts(
   for (const key of aKeys) {
     result[key] = a[key] + (b[key] ?? 0);
   }
-  for (const key of PART_ORDER) {
-    if (b[key] !== undefined && !aKeys.includes(key)) {
+  for (const key of Object.keys(b) as (keyof DurationParts)[]) {
+    if (PART_ORDER.includes(key) && b[key] !== undefined && !aKeys.includes(key)) {
       result[key] = a[key] + b[key];
     }
   }
