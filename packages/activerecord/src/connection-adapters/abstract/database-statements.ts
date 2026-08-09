@@ -16,10 +16,7 @@ import {
   Table,
   InsertManager,
 } from "@blazetrails/arel";
-import {
-  Attribute as ModelAttribute,
-  RangeError as ActiveModelRangeError,
-} from "@blazetrails/activemodel";
+import { RangeError as ActiveModelRangeError } from "@blazetrails/activemodel";
 import { Notifications } from "@blazetrails/activesupport";
 import {
   TransactionIsolationError,
@@ -278,11 +275,12 @@ export function toSqlAndBinds(
     if (visitor && node instanceof Nodes.Node) {
       const [sql, extractedBinds, compiledAllowRetry, compiledPreparable] =
         visitor.compileWithBinds(node);
-      // Type-cast bind objects (QueryAttribute) to primitive values
-      // for adapter execution, matching Rails' type_casted_binds
-      const castedBinds = extractedBinds.map((b) =>
-        b instanceof ModelAttribute ? b.valueForDatabase : b,
-      );
+      // Rails hands the compiled binds on untouched — `ActiveModel::Attribute`
+      // objects survive all the way to the adapter's `type_casted_binds`
+      // (abstract/quoting.rb:224), which is where `value_for_database` is
+      // read. Unwrapping here would drop the column type metadata the drivers
+      // dispatch on, and would put primitives in the `sql.active_record`
+      // payload's `binds` slot where Rails puts Attributes.
       // Mirrors Rails database_statements.rb:36-38: when the bind count exceeds
       // the adapter's parameter cap, recompile unprepared so every value inlines
       // via SubstituteBinds instead of overflowing the driver's variable limit.
@@ -291,12 +289,12 @@ export function toSqlAndBinds(
       if (
         exceedsBindParamsLimit(
           this as { preparedStatements?: boolean; bindParamsLength?(): number },
-          castedBinds.length,
+          extractedBinds.length,
         )
       ) {
         return [compileInlined(visitor, node, this), [], false, compiledAllowRetry];
       }
-      return [sql, castedBinds, compiledPreparable, compiledAllowRetry];
+      return [sql, extractedBinds, compiledPreparable, compiledAllowRetry];
     }
     const sql = (node as any).toSql();
     return [sql, [], preparable, allowRetry];
