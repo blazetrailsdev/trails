@@ -54,11 +54,11 @@ export class MySQLDatabaseTasks {
     this.urlParts = parseDbUrl(this.configurationHash.url as string | undefined);
   }
 
-  async create(charsetOverride?: { charset?: string; collation?: string }): Promise<void> {
+  async create(): Promise<void> {
     await this.establishConnection(this.configurationHashWithoutDatabase());
     await (
       await this.connection()
-    ).createDatabase(this.requireDatabaseName(), this.creationOptions(charsetOverride));
+    ).createDatabase(this.requireDatabaseName(), this.creationOptions());
     await this.establishConnection();
   }
 
@@ -68,13 +68,24 @@ export class MySQLDatabaseTasks {
   }
 
   async purge(): Promise<void> {
-    // Query the existing DB's charset/collation before dropping so recreating
-    // preserves them. MySQL 8's default (utf8mb4_0900_ai_ci) differs from CI
-    // provisioned DBs, so without preservation, purge would silently change
-    // collation and break case-sensitivity tests.
+    // Deviation, tracked as RFC 0051's `mysql-purge-does-not-call-recreate-database`:
+    // Rails is `establish_connection(configuration_hash_without_database)` /
+    // `recreate_database(db_config.database, creation_options)` /
+    // `establish_connection` (mysql_database_tasks.rb:26-30). trails drops and
+    // creates by hand so it can carry the existing database's charset/collation
+    // across: the test slot databases are made `CHARACTER SET utf8mb4 COLLATE
+    // utf8mb4_bin` (support/template-global-setup.ts), which is neither the
+    // server default nor present in the config hash `creation_options` reads,
+    // so recreating on `creation_options` alone silently changes collation and
+    // breaks the case-sensitivity tests. The preservation lives here rather
+    // than on `create`, whose signature is Rails' (mysql_database_tasks.rb:15-19).
     const saved = await this.savedCharset();
     await this.drop();
-    await this.create(saved);
+    await this.establishConnection(this.configurationHashWithoutDatabase());
+    await (
+      await this.connection()
+    ).createDatabase(this.requireDatabaseName(), { ...this.creationOptions(), ...saved });
+    await this.establishConnection();
   }
 
   async charset(): Promise<string> {
@@ -158,19 +169,12 @@ export class MySQLDatabaseTasks {
     DatabaseTasks.registerTask(/mysql/, handler);
   }
 
-  private creationOptions(override?: { charset?: string; collation?: string }): {
-    charset?: string;
-    collation?: string;
-  } {
+  private creationOptions(): { charset?: string; collation?: string } {
     const options: { charset?: string; collation?: string } = {};
-    if (override?.charset !== undefined) {
-      options.charset = override.charset;
-    } else if (this.configurationHash.encoding !== undefined) {
+    if (this.configurationHash.encoding !== undefined) {
       options.charset = String(this.configurationHash.encoding);
     }
-    if (override?.collation !== undefined) {
-      options.collation = override.collation;
-    } else if (this.configurationHash.collation !== undefined) {
+    if (this.configurationHash.collation !== undefined) {
       options.collation = String(this.configurationHash.collation);
     }
     return options;

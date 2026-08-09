@@ -1910,8 +1910,8 @@ export class MigrationContext<
 > {
   /** Mirrors: `attr_reader :migrations_paths, :schema_migration, :internal_metadata` (`migration.rb:1212`). */
   readonly migrationsPaths: string[];
-  readonly schemaMigration: S | SchemaMigration;
-  readonly internalMetadata: I | InternalMetadata;
+  readonly schemaMigration: S;
+  readonly internalMetadata: I;
 
   /**
    * Mirrors: ActiveRecord::MigrationContext#initialize
@@ -1932,12 +1932,19 @@ export class MigrationContext<
    * (`up`/`down`/`currentVersion`, …) is annotated `this: MigrationContext`.
    * Calling one of those on a discovery-only context is therefore a compile
    * error rather than a null object receiving a `SchemaMigration` message, and
-   * the readers hand back exactly what was seated with no cast.
+   * the readers hand back exactly what was seated, as `attr_reader` does.
+   *
+   * The two casts on the `||` fallbacks are the one thing TS cannot check: it
+   * has no way to say "when this argument is omitted, the parameter is its
+   * default", so it cannot see that omitting a collaborator leaves that
+   * parameter at `SchemaMigration` / `InternalMetadata`. They are false only
+   * for a call that names a null object as a type argument and then seats
+   * nothing, which is not a shape any caller can want.
    */
   constructor(migrationsPaths: string[], schemaMigration?: S, internalMetadata?: I) {
     this.migrationsPaths = migrationsPaths;
-    this.schemaMigration = schemaMigration ?? new SchemaMigration(this.connectionPool());
-    this.internalMetadata = internalMetadata ?? new InternalMetadata(this.connectionPool());
+    this.schemaMigration = schemaMigration ?? (new SchemaMigration(this.connectionPool()) as S);
+    this.internalMetadata = internalMetadata ?? (new InternalMetadata(this.connectionPool()) as I);
   }
 
   /**
