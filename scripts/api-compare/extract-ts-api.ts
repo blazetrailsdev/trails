@@ -1914,6 +1914,7 @@ export function extractFileLocalHelpers(
     if (!node.name) return out;
     if (isNotImplementedStub(node.body)) return out;
     const line = node.getSourceFile().getLineAndCharacterOfPosition(node.getStart()).line + 1;
+    const callArgs = extractCallArgs(node.body);
     out.push({
       name: node.name.text,
       visibility: "private",
@@ -1922,6 +1923,7 @@ export function extractFileLocalHelpers(
       line,
       file: relPath,
       internal: true,
+      ...(callArgs !== undefined ? { callArgs } : {}),
     });
     return out;
   }
@@ -1933,6 +1935,7 @@ export function extractFileLocalHelpers(
     if (!ts.isArrowFunction(init) && !ts.isFunctionExpression(init)) continue;
     if (isNotImplementedStub(init.body)) continue;
     const line = decl.getSourceFile().getLineAndCharacterOfPosition(decl.getStart()).line + 1;
+    const callArgs = extractCallArgs(init.body);
     out.push({
       name: decl.name.text,
       visibility: "private",
@@ -1941,6 +1944,7 @@ export function extractFileLocalHelpers(
       line,
       file: relPath,
       internal: true,
+      ...(callArgs !== undefined ? { callArgs } : {}),
     });
   }
   return out;
@@ -2744,7 +2748,9 @@ function walkForCallArgs(node: ts.Node, sites: CallSite[]): void {
     }
     ts.forEachChild(n, visit);
   };
-  ts.forEachChild(node, visit);
+  // The body ITSELF, not just its children: an expression-bodied arrow
+  // (`= (x) => where(x)`) IS the call site, and Ruby's body walk covers it.
+  visit(node);
 }
 
 /**
@@ -2770,16 +2776,25 @@ function recordCallSite(
   call.arguments?.forEach(visit);
 }
 
-/** The same name collectCalls credits for the site, so the two streams pair up. */
+/**
+ * The site name, under the SAME filter extract-ruby-api.rb#call_site_name
+ * applies (`:2385-2396`): a name starting with `_`, or with anything other than
+ * a lowercase letter, is dropped. Ruby never emits such a site, so recording one
+ * here manufactures a TS-only site that can never pair with the Ruby stream.
+ */
 function callSiteName(call: ts.CallExpression | ts.NewExpression): string | undefined {
   // `new Foo(...)` is Ruby's `Foo.new(...)`, which conventions.ts maps to the
   // TS `constructor` — the spelling collectCalls already records.
   if (ts.isNewExpression(call)) return "constructor";
   const callee = call.expression;
-  if (ts.isIdentifier(callee)) return callee.text;
-  if (ts.isPropertyAccessExpression(callee)) return callee.name.text;
   if (callee.kind === ts.SyntaxKind.SuperKeyword) return "super";
-  return undefined;
+  const name = ts.isIdentifier(callee)
+    ? callee.text
+    : ts.isPropertyAccessExpression(callee)
+      ? callee.name.text
+      : undefined;
+  if (name === undefined || name.startsWith("_") || !/^[a-z]/.test(name)) return undefined;
+  return name;
 }
 
 function describeArgs(args: ts.NodeArray<ts.Expression> | undefined, flags: string[]): string[] {

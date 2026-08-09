@@ -3105,6 +3105,44 @@ describe("callArgs", () => {
     ]);
   });
 
+  it("drops a site whose name the Ruby extractor's own filter would drop", () => {
+    // extract-ruby-api.rb#call_site_name (:2385-2396) never emits a site named
+    // `_foo` or one that does not start with a lowercase letter, so recording
+    // one here would be a TS-only site that can never pair.
+    expect(
+      site(
+        `class Foo {
+          create() {
+            this._private(1);
+            Klass(2);
+            this.save(3);
+          }
+        }`,
+      ),
+    ).toEqual([{ name: "save", args: ["num:3"], flags: [] }]);
+  });
+
+  it("records sites for a file-local private helper, both declaration forms", () => {
+    const info = extractFromFiles("/p", {
+      "quoting.ts": `
+        export function quote(value: unknown): string {
+          return helper(value) + arrowHelper(value);
+        }
+        function helper(value: unknown): string {
+          return where(value);
+        }
+        const arrowHelper = (value: unknown): string => where(value, 1);
+      `,
+    });
+    const fns = fileFunctionsOf(info, "quoting.ts");
+    expect(fns.find((f) => f.name === "helper")!.callArgs).toEqual([
+      { name: "where", args: ["id:value"], flags: [] },
+    ]);
+    expect(fns.find((f) => f.name === "arrowHelper")!.callArgs).toEqual([
+      { name: "where", args: ["id:value", "num:1"], flags: [] },
+    ]);
+  });
+
   it("emits no descriptor outside the vocabulary the Ruby extractor shares", () => {
     // The other half of the extractor-skew vocabulary pin
     // (extractor-skew.test.ts): a descriptor spelling invented on one side only
