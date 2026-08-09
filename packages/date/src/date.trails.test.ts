@@ -874,7 +874,7 @@ describe("Date", () => {
     year: number,
     month: number,
     day: number,
-  ): [number, number, number] | "E" => {
+  ): [number | bigint, number, number] | "E" => {
     try {
       const date = new RubyDate(year, month, day);
       return [date.year, date.mon, date.day];
@@ -956,6 +956,58 @@ describe("Date", () => {
     // default start too, and answers the same day:
     //   Date.new(600000, 1, 1).jd #=> 220866560
     expect(new RubyDate(600000, 1, 1).jd).toBe(220866560);
+  });
+
+  it("carries decode_year's nth, so a year past a double stays exact", () => {
+    // ruby 3.3.11 -rdate — the year and the day are Bignums, split into a
+    // `nth` and an `int` residue by decode_year/decode_jd
+    // (date_core.c:1342-1412):
+    //   Date.new(2**70, 1, 1).to_s #=> "1180591620717411303424-01-01"
+    //   Date.new(2**70, 1, 1).jd   #=> 431202235029879099711900
+    //   Date.new(2**70, 1, 1).year #=> 1180591620717411303424
+    //   Date.new(2**70, 1, 1).wday #=> 4
+    //   Date.new(2**70, 1, 1).julian? #=> false
+    const d = new RubyDate(2n ** 70n, 1, 1);
+    expect(d.toS()).toBe("1180591620717411303424-01-01");
+    expect(d.jd).toBe(431202235029879099711900n);
+    expect(d.year).toBe(1180591620717411303424n);
+    expect(d.wday).toBe(4);
+    expect(d.mon).toBe(1);
+    expect(d.day).toBe(1);
+    expect(d.isJulian).toBe(false);
+    // The residue year is validated as the real one is, so a day the residue's
+    // February does not have raises:
+    //   Date.new(2**70, 3, 1).to_s #=> "1180591620717411303424-03-01"
+    //   Date.new(2**70, 2, 30) #=> Date::Error: invalid date
+    expect(new RubyDate(2n ** 70n, 3, 1).toS()).toBe("1180591620717411303424-03-01");
+    expect(() => new RubyDate(2n ** 70n, 2, 30)).toThrow("invalid date");
+    // A negative nth is the mirror, and strftime spells the whole year:
+    //   Date.new(-(2**70), 1, 1).to_s #=> "-1180591620717411303424-01-01"
+    //   Date.new(2**70, 1, 1).strftime("%C|%y|%A") #=> "11805916207174113034|24|Thursday"
+    expect(new RubyDate(-(2n ** 70n), 1, 1).toS()).toBe("-1180591620717411303424-01-01");
+    expect(d.strftime("%C|%y|%A")).toBe("11805916207174113034|24|Thursday");
+    // date_s_jd runs decode_jd on the day it is given:
+    //   Date.jd(2**70).jd #=> 1180591620717411303424
+    // DateTime carries the same nth on ComplexDateData:
+    //   DateTime.new(2**70, 1, 1, 1, 2, 3).to_s
+    //     #=> "1180591620717411303424-01-01T01:02:03+00:00"
+    expect(new RubyDateTime(2n ** 70n, 1, 1, 1, 2, 3).toS()).toBe(
+      "1180591620717411303424-01-01T01:02:03+00:00",
+    );
+  });
+
+  it("truncates a fractional year through valid_civil_p, as decode_year does", () => {
+    // ruby 3.3.11 -rdate — valid_civil_p (date_core.c:2246-2277) runs
+    // decode_year before c_valid_civil_p's `int y`, and the truncation is of
+    // the 4712-SHIFTED year, so it rounds toward -4712 rather than toward zero:
+    //   Date.new(-2000.5, 1, 1).to_s #=> "-2001-01-01"
+    //   Date.new(1600.5, 1, 1).to_s  #=> "1600-01-01"
+    //   Date.new(1600.5, 1, 1).jd    #=> 2305448
+    //   Date.new(-2000.5, 1, 1, Date::JULIAN).to_s #=> "-2001-01-01"
+    expect(new RubyDate(-2000.5, 1, 1).toS()).toBe("-2001-01-01");
+    expect(new RubyDate(1600.5, 1, 1).toS()).toBe("1600-01-01");
+    expect(new RubyDate(1600.5, 1, 1).jd).toBe(2305448);
+    expect(new RubyDate(-2000.5, 1, 1, RubyDate.JULIAN).toS()).toBe("-2001-01-01");
   });
 
   it("raises from every static that answers the seat for a Julian-only spelling", () => {
