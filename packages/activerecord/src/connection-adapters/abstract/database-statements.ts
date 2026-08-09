@@ -43,6 +43,7 @@ import {
 } from "./sql-datetime.js";
 import { Value as TimeValue } from "../../type/time.js";
 import type { Quoting } from "./quoting.js";
+import type { ConnectionPool, NullPool } from "./connection-pool.js";
 import { DateInfinity, DateNegativeInfinity } from "@blazetrails/activemodel";
 import { TransactionManager } from "./transaction.js";
 import { exceedsBindParamsLimit } from "./database-limits.js";
@@ -165,7 +166,9 @@ export interface DatabaseStatementsHost {
   resetIsolationLevel?(): void | Promise<void>;
   emptyInsertStatementValue?(pk?: string | null): string;
   transaction?<T>(fn: (tx?: unknown) => Promise<T> | T, opts?: unknown): Promise<T | undefined>;
-  pool?: { schemaMigration: { tableName: string }; internalMetadata: { tableName: string } };
+  // Rails' host is an AbstractAdapter, whose @pool is a real ConnectionPool or
+  // the NullPool assigned in initialize (abstract_adapter.rb:153) — never absent.
+  pool: ConnectionPool | NullPool;
   /** @internal */
   checkIfWriteQuery?(sql: string): void;
   /** @internal */
@@ -747,8 +750,7 @@ export async function truncate(
  * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#truncate_tables
  */
 export async function truncateTables(
-  this: DatabaseStatementsHost &
-    Pick<Quoting, "quoteTableName"> & { pool: NonNullable<DatabaseStatementsHost["pool"]> },
+  this: DatabaseStatementsHost & Pick<Quoting, "quoteTableName">,
   ...tableNames: string[]
 ): Promise<void> {
   const schemaMigrationTable = this.pool.schemaMigration.tableName;
@@ -1535,6 +1537,7 @@ export { deleteStatement as remove };
 // ---------------------------------------------------------------------------
 
 interface DatabaseStatementsDefaultsHost {
+  pool: ConnectionPool | NullPool;
   execute(
     sql: string,
     binds?: unknown[],

@@ -1898,15 +1898,19 @@ function byVersion(a: MigrationProxy, b: MigrationProxy): number {
  */
 export class MigrationContext {
   readonly migrationsPaths: string[];
-  private readonly _schemaMigration?: SchemaMigration;
-  private readonly _internalMetadata?: InternalMetadata;
+  private _schemaMigration?: SchemaMigration;
+  private _internalMetadata?: InternalMetadata;
 
   /**
-   * Rails defaults `schema_migration` / `internal_metadata` from
-   * `connection_pool` (`migration.rb:1214-1218`); trails has no pool to reach
-   * from here, so they stay optional. A context built without them still
-   * answers the connectionless half — `migrationsPaths`, `migrations` and the
-   * file discovery under it — which is all the CLI's bootstrap needs.
+   * Rails defaults both collaborators from `connection_pool` right here —
+   * `schema_migration || SchemaMigration.new(connection_pool)`
+   * (`migration.rb:1214-1218`). The default is resolved on first read instead
+   * of in the constructor: Rails can name `connection_pool` eagerly because
+   * `DatabaseTasks.migration_connection_pool` always has one by the time a
+   * context is built, while trails builds connectionless contexts for file
+   * discovery (`migrations`, `migrationFiles`, `parseMigrationFilename` — the
+   * surface Rails' own context never consults `@schema_migration` from), where
+   * the pool lookup would throw at construction and take discovery with it.
    */
   constructor(
     migrationsPaths: string[],
@@ -1920,18 +1924,22 @@ export class MigrationContext {
 
   /** Mirrors: ActiveRecord::MigrationContext#schema_migration */
   get schemaMigration(): SchemaMigration {
-    if (!this._schemaMigration) {
-      throw new MigrationError("MigrationContext was built without a schema_migration");
-    }
-    return this._schemaMigration;
+    return (this._schemaMigration ??= new SchemaMigration(this.connectionPool()));
   }
 
   /** Mirrors: ActiveRecord::MigrationContext#internal_metadata */
   get internalMetadata(): InternalMetadata {
-    if (!this._internalMetadata) {
-      throw new MigrationError("MigrationContext was built without an internal_metadata");
-    }
-    return this._internalMetadata;
+    return (this._internalMetadata ??= new InternalMetadata(this.connectionPool()));
+  }
+
+  /**
+   * Mirrors: ActiveRecord::MigrationContext#connection_pool
+   * (`migration.rb:1365-1367`). `DatabaseTasks` is reached through the
+   * call-time config source rather than an import, for the same reason
+   * `Migration#connection_pool` does.
+   */
+  private connectionPool(): ConnectionPool {
+    return migrationArConfig()!.databaseTasks().migrationConnectionPool();
   }
 
   /**
