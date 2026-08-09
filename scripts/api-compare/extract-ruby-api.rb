@@ -2445,8 +2445,8 @@ class ApiExtractor
       name = nested_call_name(node)
       name ? "call:#{name}" : "?"
     when :array then "array"
-    when :hash then "hash"
-    when :bare_assoc_hash then describe_kwargs(node[1], flags)
+    when :hash then describe_hash(node[1], flags)
+    when :bare_assoc_hash then describe_kwargs(node[1], flags) || "hash"
     when :binary then "binop:#{node[2]}"
     when :unary then "unary#{describe_arg(node[2], flags)}"
     when :ifop then "ternary"
@@ -2480,23 +2480,42 @@ class ApiExtractor
     "str:#{parts.map { |p| p[1] }.join}"
   end
 
+  # A braced `{ … }` is the ObjectLiteralExpression the port writes, and the TS
+  # extractor reads that as `kwargs{…}` — so a hash whose keys are all
+  # keyword-shaped has to read the same here or every such site is a guaranteed
+  # cross-language mismatch. Anything else (string, dynamic or no keys) is the
+  # opaque `hash` of RFC 0025 §1.
+  def describe_hash(node, flags)
+    return "hash" unless node.is_a?(Array) && node[0] == :assoclist_from_args
+    describe_kwargs(node[1], flags) || "hash"
+  end
+
+  # nil when the assoc list is not keyword-shaped, so the caller can fall back
+  # to the opaque descriptor rather than emit a `kwargs{}` full of `?`.
   def describe_kwargs(assocs, flags)
-    return "hash" unless assocs.is_a?(Array)
+    return nil unless assocs.is_a?(Array) && !assocs.empty?
 
     pairs = assocs.map do |assoc|
-      next "?" unless assoc.is_a?(Array)
+      return nil unless assoc.is_a?(Array)
       case assoc[0]
       when :assoc_new
-        key = assoc[1]
-        label = key.is_a?(Array) && key[0] == :@label ? key[1].chomp(":") : nil
-        label ? "#{label}=#{describe_arg(assoc[2], flags)}" : "?"
+        key = assoc_key_name(assoc[1])
+        return nil unless key
+        "#{key}=#{describe_arg(assoc[2], flags)}"
       when :assoc_splat
         flags << "splat"
         "**splat"
-      else "?"
+      else return nil
       end
     end
     "kwargs{#{pairs.join(",")}}"
+  end
+
+  # `k:` and `:k =>` both spell the bare identifier key a TS object literal has.
+  def assoc_key_name(key)
+    return nil unless key.is_a?(Array)
+    return key[1].chomp(":") if key[0] == :@label
+    ident_name(key[1]) if key[0] == :symbol_literal
   end
 
   def collect_dep_refs(node, constants, identifiers, refs)

@@ -1465,7 +1465,7 @@ describe("Ruby extractor call-argument capture", () => {
       "foo.rb": `
         class Foo
           def m(a, b)
-            visit([1], { k: 1 }, "id #{a}", a + b, -a, a ? b : nil)
+            visit([1], { "k" => 1 }, "id #{a}", a + b, -a, a ? b : nil)
           end
         end
       `,
@@ -1497,6 +1497,45 @@ describe("Ruby extractor call-argument capture", () => {
     ]);
     expect(argsOf(c["Foo#m"], "build")).toEqual([
       "kwargs{scope=id:relation,on=str:posts,limit=num:1}",
+    ]);
+  });
+
+  it("recurses into a nested keyword hash", () => {
+    const c = rubyCallArgs({
+      "foo.rb": `
+        class Foo
+          def m
+            visit(a: { b: 1 }, c: { d: { e: :dump } })
+          end
+        end
+      `,
+    });
+    expect(argsOf(c["Foo#m"], "visit")).toEqual([
+      "kwargs{a=kwargs{b=num:1},c=kwargs{d=kwargs{e=sym:dump}}}",
+    ]);
+  });
+
+  it("reads a braced hash with keyword-shaped keys as kwargs, and any other as opaque", () => {
+    const c = rubyCallArgs({
+      "foo.rb": `
+        class Foo
+          def m(x)
+            visit({ a: 1 })
+            visit(:b => 2)
+            visit({})
+            visit({ "c" => 3 })
+            visit({ x => 4 })
+          end
+        end
+      `,
+    });
+    const sites = (c["Foo#m"] ?? []).filter((s) => s.name === "visit");
+    expect(sites.map((s) => s.args)).toEqual([
+      ["kwargs{a=num:1}"],
+      ["kwargs{b=num:2}"],
+      ["hash"],
+      ["hash"],
+      ["hash"],
     ]);
   });
 
