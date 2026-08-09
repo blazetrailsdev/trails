@@ -21,6 +21,7 @@ import {
   stdout,
   stderr,
 } from "@blazetrails/activesupport";
+import { NoMethodError } from "@blazetrails/activemodel";
 import { ActiveRecordError, ConnectionNotDefined } from "../errors.js";
 import type { Base } from "../base.js";
 
@@ -547,12 +548,27 @@ export class DatabaseTasks {
     }
   }
 
+  /**
+   * Mirrors: `DatabaseTasks.charset` (`database_tasks.rb:332-335`) — a bare
+   * send to the resolved task instance.
+   *
+   * Ruby gets the raise for free: a task class defining no `charset` answers
+   * NoMethodError. A trails handler is a plain object whose members are all
+   * optional (`registerTask` takes the object, not a class), so the absent
+   * send is raised explicitly; `constructor.name` stands in for Ruby's
+   * `.class.name` and reads `Object` for a handler registered as a literal.
+   */
   static async charset(
     configuration: DatabaseConfig | string | Record<string, unknown>,
   ): Promise<string | null> {
     const config = this.resolveConfiguration(configuration);
     const handler = this.databaseAdapterFor(config);
-    return handler.charset ? handler.charset(config) : null;
+    if (!handler.charset) {
+      throw new NoMethodError(
+        `undefined method 'charset' for an instance of ${handler.constructor.name}`,
+      );
+    }
+    return handler.charset(config);
   }
 
   static async charsetCurrent(environment?: string): Promise<string | null> {
@@ -563,15 +579,23 @@ export class DatabaseTasks {
     return this.charset(primary);
   }
 
+  /**
+   * Mirrors: `DatabaseTasks.collation` (`database_tasks.rb:342-345`). Same
+   * shape and same reason as {@link charset} above; `SQLiteDatabaseTasks`
+   * defines no `collation`, so SQLite raises here — which is what
+   * `SqliteDBCollationTest#test_db_retrieves_collation` asserts.
+   */
   static async collation(
     configuration: DatabaseConfig | string | Record<string, unknown>,
   ): Promise<string | null> {
     const config = this.resolveConfiguration(configuration);
     const handler = this.databaseAdapterFor(config);
-    if (handler.collation) {
-      return handler.collation(config);
+    if (!handler.collation) {
+      throw new NoMethodError(
+        `undefined method 'collation' for an instance of ${handler.constructor.name}`,
+      );
     }
-    return null;
+    return handler.collation(config);
   }
 
   static async collationCurrent(environment?: string): Promise<string | null> {

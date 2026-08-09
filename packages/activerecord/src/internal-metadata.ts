@@ -7,6 +7,8 @@
 import { Temporal } from "@blazetrails/date";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { ConnectionPool, NullPool } from "./connection-adapters/abstract/connection-pool.js";
+import type { BoundSchemaReflection } from "./connection-adapters/schema-cache.js";
+import { NoMethodError } from "@blazetrails/activemodel";
 import type { Base } from "./base.js";
 import { EnvironmentStorageError } from "./migration.js";
 import { ActiveRecordError } from "./errors.js";
@@ -79,25 +81,20 @@ export class InternalMetadata {
   private async _withConnection<T>(
     fn: (connection: DatabaseAdapter) => T | Promise<T>,
   ): Promise<T> {
-    return await (this._pool as ConnectionPool).withConnection(fn);
+    return await this._pool.withConnection(fn);
   }
 
   /**
    * Mirrors ActiveRecord::InternalMetadata#enabled?
    * (`internal_metadata.rb:35-36`) — `@pool.db_config.use_metadata_table?`.
    *
-   * Deviation: a `NullPool` answers `NULL_CONFIG`, whose every key is undefined
-   * (Rails' `NullConfig#method_missing` returns nil), so Rails would read that
-   * arm as disabled. Rails never gets there — its `InternalMetadata` is always
-   * built from a real pool — while trails builds one over bare, NullPool-backed
-   * adapters throughout the test suite and the trailties `db` commands, so the
-   * absent flag has to keep `DatabaseConfig#useMetadataTable`'s default. It
-   * converges once those call sites hold a pool
-   * (`migration-context-collaborators-need-a-pool`).
+   * A `NullPool` answers `NULL_CONFIG`, whose every key is undefined (Rails'
+   * `NullConfig#method_missing` returns nil, `abstract/connection_pool.rb:17-22`),
+   * so a pool-less collaborator reads as disabled here exactly as it does in
+   * Ruby. The return type carries that nil the way Ruby's predicate does.
    */
-  get enabled(): boolean {
-    const dbConfig = (this._pool as { dbConfig?: { useMetadataTable?: boolean } } | null)?.dbConfig;
-    return dbConfig?.useMetadataTable !== false;
+  get enabled(): boolean | null | undefined {
+    return this._pool.dbConfig.useMetadataTable;
   }
 
   // Rails: create_table(table_name, id: false) { |t| t.string :key, **...; t.string
@@ -221,12 +218,17 @@ export class InternalMetadata {
    * (`internal_metadata.rb:108-110`) — `@pool.schema_cache.data_source_exists?`.
    * Unlike `SchemaMigration#table_exists?` this reads through the pool's schema
    * cache, not a checked-out connection; Rails has that difference deliberately.
+   *
+   * `NullPool#schema_cache` answers nil (`abstract/connection_pool.rb:38`), so
+   * the send raises NoMethodError on a pool-less collaborator. JS would answer
+   * a TypeError for the same read, so Ruby's error class is raised explicitly.
    * @internal
    */
   async tableExists(): Promise<boolean> {
-    const schemaCache = (this._pool as ConnectionPool).schemaCache as {
-      dataSourceExists(name: string): Promise<boolean | undefined>;
-    };
+    const schemaCache: BoundSchemaReflection | null = this._pool.schemaCache;
+    if (schemaCache === null) {
+      throw new NoMethodError("undefined method 'data_source_exists?' for nil");
+    }
     return (await schemaCache.dataSourceExists(this.tableName)) ?? false;
   }
 

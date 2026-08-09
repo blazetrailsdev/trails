@@ -11,6 +11,8 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { randomUUID } from "node:crypto";
 import * as activesupport from "@blazetrails/activesupport";
+import { stdout, stderr } from "@blazetrails/activesupport";
+import { NoMethodError } from "@blazetrails/activemodel";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
 import { DatabaseTasks } from "../../tasks/database-tasks.js";
 import { SQLiteDatabaseTasks } from "../../tasks/sqlite-database-tasks.js";
@@ -32,55 +34,249 @@ function runSqlite3(database: string, sql: string): void {
   if (result.status !== 0) throw new Error(`sqlite3 failed: ${result.stderr}`);
 }
 
+/**
+ * Rails swaps `$stdout` / `$stderr` for a `StringIO` in `setup` and reads
+ * `.string` back (`sqlite_rake_test.rb:15-16, 86-87`). trails' analogue is the
+ * activesupport process adapter's streams, which is what `DatabaseTasks`
+ * writes its messages to.
+ */
+function captureStreams(): { out: () => string; err: () => string } {
+  let outString = "";
+  let errString = "";
+  vi.spyOn(stdout, "write").mockImplementation((chunk) => {
+    outString += String(chunk);
+    return true;
+  });
+  vi.spyOn(stderr, "write").mockImplementation((chunk) => {
+    errString += String(chunk);
+    return true;
+  });
+  return { out: () => outString, err: () => errString };
+}
+
 describeIfSqlite("SqliteDBCreateTest", () => {
-  it.skip("db checks database exists", () => {
-    // Not yet ported: asserts through Ruby's `assert_called_with(File, :exist?)`.
+  const database = "db_create.sqlite3";
+  let configuration: HashConfig;
+  let streams: ReturnType<typeof captureStreams>;
+
+  beforeEach(() => {
+    configuration = new HashConfig("development", "primary", {
+      adapter: "sqlite3",
+      database,
+    });
+    SQLiteDatabaseTasks.register();
+    streams = captureStreams();
   });
-  it.skip("when db created successfully outputs info to stdout", () => {
-    // Not yet ported: asserts on the `$stdout` StringIO the setup swaps in.
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
-  it.skip("db create when file exists", () => {
-    // Not yet ported: asserts on the `$stderr` StringIO the setup swaps in.
+
+  it("db checks database exists", async () => {
+    // `assert_called_with(File, :exist?, [@database], returns: false)`
+    // (`sqlite_rake_test.rb:25`) — trails reads the filesystem through the
+    // activesupport FsAdapter seam, so the spy sits there rather than on `fs`.
+    vi.spyOn(Base, "establishConnection").mockResolvedValue(undefined as never);
+    const existsSync = vi.spyOn(activesupport.getFs(), "existsSync").mockReturnValue(false);
+
+    await DatabaseTasks.create(configuration);
+
+    expect(existsSync).toHaveBeenCalledWith(database);
   });
-  it.skip("db create with file does nothing", () => {
-    // Not yet ported: asserts through Ruby's `assert_not_called`.
+
+  it("when db created successfully outputs info to stdout", async () => {
+    vi.spyOn(Base, "establishConnection").mockResolvedValue(undefined as never);
+    vi.spyOn(activesupport.getFs(), "existsSync").mockReturnValue(false);
+
+    await DatabaseTasks.create(configuration);
+
+    expect(streams.out()).toEqual(`Created database '${database}'\n`);
   });
-  it.skip("db create establishes a connection", () => {
-    // Not yet ported: stubs `Base.establish_connection` to collect its args.
+
+  it("db create when file exists", async () => {
+    vi.spyOn(activesupport.getFs(), "existsSync").mockReturnValue(true);
+
+    await DatabaseTasks.create(configuration);
+
+    expect(streams.err()).toEqual(`Database '${database}' already exists\n`);
   });
-  it.skip("db create with error prints message", () => {
-    // Not yet ported: asserts on the `$stderr` StringIO the setup swaps in.
+
+  it("db create with file does nothing", async () => {
+    vi.spyOn(activesupport.getFs(), "existsSync").mockReturnValue(true);
+    const establishConnection = vi.spyOn(Base, "establishConnection");
+
+    await DatabaseTasks.create(configuration);
+
+    expect(establishConnection).not.toHaveBeenCalled();
+  });
+
+  it("db create establishes a connection", async () => {
+    // Rails collects the args of the stubbed `establish_connection` and reads
+    // `configuration_hash` off the db_config it was handed
+    // (`sqlite_rake_test.rb:56-61`); trails hands it the configuration hash
+    // itself (`sqlite_database_tasks.rb:72-75`).
+    const calls: unknown[][] = [];
+    vi.spyOn(Base, "establishConnection").mockImplementation(async (...args: unknown[]) => {
+      calls.push(args);
+      return undefined as never;
+    });
+    vi.spyOn(activesupport.getFs(), "existsSync").mockReturnValue(false);
+
+    await DatabaseTasks.create(configuration);
+
+    expect(calls.map((c) => c[0])).toEqual([configuration.configuration]);
+  });
+
+  it("db create with error prints message", async () => {
+    vi.spyOn(activesupport.getFs(), "existsSync").mockReturnValue(false);
+    vi.spyOn(Base, "establishConnection").mockImplementation(() => {
+      throw new Error("boom");
+    });
+
+    await expect(DatabaseTasks.create(configuration)).rejects.toThrow(Error);
+    expect(streams.err()).toMatch(
+      `Couldn't create '${database}' database. Please check your configuration.`,
+    );
   });
 });
 
 describeIfSqlite("SqliteDBDropTest", () => {
-  it.skip("checks db dir is absolute", () => {
-    // Not yet ported: asserts through Ruby's `assert_called_with(File, :absolute_path?)`.
+  const root = "/rails/root";
+  const database = "db_create.sqlite3";
+  const databaseRoot = `${root}/${database}`;
+  let configuration: HashConfig;
+  let configurationRoot: HashConfig;
+  let streams: ReturnType<typeof captureStreams>;
+  let previousRoot: string;
+
+  beforeEach(() => {
+    configuration = new HashConfig("development", "primary", {
+      adapter: "sqlite3",
+      database,
+    });
+    configurationRoot = new HashConfig("development", "primary", {
+      adapter: "sqlite3",
+      database: databaseRoot,
+    });
+    SQLiteDatabaseTasks.register();
+    // Rails passes the root as `DatabaseTasks.drop @configuration, @root`'s
+    // trailing `*arguments`, which `database_adapter_for` forwards to the task
+    // constructor (`database_tasks.rb:566-572`). trails registers task
+    // singletons, so the root reaches `SQLiteDatabaseTasks` through
+    // `DatabaseTasks.root`.
+    previousRoot = DatabaseTasks.root;
+    DatabaseTasks.root = root;
+    streams = captureStreams();
   });
-  it.skip("removes file with absolute path", () => {
-    // Not yet ported: asserts through Ruby's `assert_called_with(FileUtils, :rm)`.
+
+  afterEach(() => {
+    DatabaseTasks.root = previousRoot;
+    vi.restoreAllMocks();
   });
-  it.skip("generates absolute path with given root", () => {
-    // Not yet ported: asserts through Ruby's `assert_called_with(File, :join)`.
+
+  it("checks db dir is absolute", async () => {
+    // `isAbsolute` is optional on the PathAdapter seam (a VFS need not model
+    // the distinction), so the spy target is narrowed to the arm that has it.
+    const pathAdapter = activesupport.getPath() as { isAbsolute(p: string): boolean };
+    const isAbsolute = vi.spyOn(pathAdapter, "isAbsolute").mockReturnValue(false);
+    vi.spyOn(activesupport.getFs(), "unlinkSync").mockImplementation(() => undefined);
+
+    await DatabaseTasks.drop(configuration);
+
+    expect(isAbsolute).toHaveBeenCalledWith(database);
   });
-  it.skip("removes file with relative path", () => {
-    // Not yet ported: asserts through Ruby's `assert_called_with(FileUtils, :rm)`.
+
+  it("removes file with absolute path", async () => {
+    const unlinkSync = vi
+      .spyOn(activesupport.getFs(), "unlinkSync")
+      .mockImplementation(() => undefined);
+
+    await DatabaseTasks.drop(configurationRoot);
+
+    expect(unlinkSync).toHaveBeenCalledWith(databaseRoot);
+    // Rails removes the two sidecars in one `FileUtils.rm_f([shm, wal])`
+    // (`sqlite_rake_test.rb:102`); trails unlinks each on its own.
+    expect(unlinkSync).toHaveBeenCalledWith(`${databaseRoot}-shm`);
+    expect(unlinkSync).toHaveBeenCalledWith(`${databaseRoot}-wal`);
   });
-  it.skip("when db dropped successfully outputs info to stdout", () => {
-    // Not yet ported: asserts on the `$stdout` StringIO the setup swaps in.
+
+  it("generates absolute path with given root", async () => {
+    const join = vi.spyOn(activesupport.getPath(), "join");
+    vi.spyOn(activesupport.getFs(), "unlinkSync").mockImplementation(() => undefined);
+
+    await DatabaseTasks.drop(configuration);
+
+    expect(join).toHaveBeenCalledWith(root, database);
+    expect(join).toHaveReturnedWith(`${root}/${database}`);
+  });
+
+  it("removes file with relative path", async () => {
+    const unlinkSync = vi
+      .spyOn(activesupport.getFs(), "unlinkSync")
+      .mockImplementation(() => undefined);
+
+    await DatabaseTasks.drop(configuration);
+
+    expect(unlinkSync).toHaveBeenCalledWith(databaseRoot);
+    expect(unlinkSync).toHaveBeenCalledWith(`${databaseRoot}-shm`);
+    expect(unlinkSync).toHaveBeenCalledWith(`${databaseRoot}-wal`);
+  });
+
+  it("when db dropped successfully outputs info to stdout", async () => {
+    vi.spyOn(activesupport.getFs(), "unlinkSync").mockImplementation(() => undefined);
+
+    await DatabaseTasks.drop(configuration);
+
+    expect(streams.out()).toEqual(`Dropped database '${database}'\n`);
   });
 });
 
 describeIfSqlite("SqliteDBCharsetTest", () => {
-  it.skip("db retrieves charset", () => {
-    // Not yet ported: asserts through Ruby's `assert_called(@connection, :encoding)`.
+  const database = "db_create.sqlite3";
+  let configuration: HashConfig;
+
+  beforeEach(() => {
+    configuration = new HashConfig("development", "primary", {
+      adapter: "sqlite3",
+      database,
+    });
+    SQLiteDatabaseTasks.register();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("db retrieves charset", async () => {
+    // Rails stubs `Base.lease_connection` with an object whose only member is
+    // `encoding` and asserts the send lands (`sqlite_rake_test.rb:142-146`);
+    // trails' `charset` leases the ambient connection, so the spy goes on its
+    // `encoding` getter (`sqlite_database_tasks.rb:39-41`).
+    const connection = await Base.connectionPool().leaseConnection();
+    const encoding = vi.spyOn(connection as unknown as { encoding: string }, "encoding", "get");
+
+    await DatabaseTasks.charset(configuration);
+
+    expect(encoding).toHaveBeenCalled();
   });
 });
 
 describeIfSqlite("SqliteDBCollationTest", () => {
-  it.skip("db retrieves collation", () => {
-    // Not yet ported: asserts `DatabaseTasks.collation` raises NoMethodError,
-    // which is Ruby's answer to a task class that defines no `collation`.
+  const database = "db_create.sqlite3";
+  let configuration: HashConfig;
+
+  beforeEach(() => {
+    configuration = new HashConfig("development", "primary", {
+      adapter: "sqlite3",
+      database,
+    });
+    SQLiteDatabaseTasks.register();
+  });
+
+  it("db retrieves collation", async () => {
+    // `database_tasks.rb:342-345` sends `collation` and SQLiteDatabaseTasks
+    // defines none, so the send raises.
+    await expect(DatabaseTasks.collation(configuration)).rejects.toBeInstanceOf(NoMethodError);
   });
 });
 

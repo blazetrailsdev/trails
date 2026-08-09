@@ -105,6 +105,16 @@ export class NullPool implements AbstractPool {
   declare readonly internalMetadata: never;
 
   /**
+   * Same shape and same reason again. Ruby's NullPool answers no
+   * `with_connection` (`abstract/connection_pool.rb:14-51`), so
+   * `SchemaMigration#with_connection`'s bare `@pool.with_connection`
+   * (`schema_migration.rb:22-24`) and `InternalMetadata`'s
+   * (`internal_metadata.rb:42`) raise NoMethodError on a pool-less
+   * collaborator rather than silently doing nothing.
+   */
+  declare readonly withConnection: never;
+
+  /**
    * Mirrors: ConnectionPool::NullPool#initialize
    * (`abstract/connection_pool.rb:24-28`).
    *
