@@ -1188,10 +1188,11 @@ describe("PersistenceTest", () => {
   });
 
   it("destroy many", async () => {
+    const before = await Topic.count();
     const t1 = await Topic.create({ title: "a" });
     const t2 = await Topic.create({ title: "b" });
     await Topic.destroy([t1.id, t2.id]);
-    expect(await Topic.count()).toBe(0);
+    expect(await Topic.count()).toBe(before);
   });
 
   it("destroy many with invalid id", async () => {
@@ -1320,9 +1321,10 @@ describe("PersistenceTest", () => {
   });
 
   it("class level destroy is affected by scoping", async () => {
+    const before = await Topic.count();
     const t = await Topic.create({ title: "test" });
     await Topic.destroy(t.id);
-    expect(await Topic.count()).toBe(0);
+    expect(await Topic.count()).toBe(before);
   });
 
   it("class level delete with invalid ids", async () => {
@@ -1332,9 +1334,10 @@ describe("PersistenceTest", () => {
   });
 
   it("class level delete is affected by scoping", async () => {
+    const before = await Topic.count();
     const t = await Topic.create({ title: "test" });
     await Topic.delete(t.id);
-    expect(await Topic.count()).toBe(0);
+    expect(await Topic.count()).toBe(before);
   });
 
   describe("QueryConstraintsTest", () => {
