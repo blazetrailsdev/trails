@@ -210,50 +210,6 @@ export async function resolveFixtureNames(
 }
 
 /**
- * Whether fixture rows must be DELETEd in teardown, or whether an outer
- * transaction will discard them for us.
- *
- * The skip is confined to **PostgreSQL**, the sole adapter where the DELETE is
- * actively harmful: a test that deliberately raised `StatementInvalid` aborts
- * the whole PG transaction (SQLSTATE 25P02), so a subsequent DELETE on that
- * pinned connection fails with "current transaction is aborted, commands
- * ignored…", poisoning teardown for the next test (or a vitest `retry` re-run).
- * MySQL/MariaDB and SQLite do not abort the transaction on a failed statement,
- * so they never hit that — and on MySQL an implicit commit (DDL auto-commits,
- * `test_fixtures` caveat) can durably persist seeded fixtures that the rollback
- * then cannot undo, making the DELETE the *only* cleanup. So off PG the DELETE
- * must always run (unchanged behavior).
- *
- * On PG the skip fires only for rows a still-open transaction will roll back —
- * precisely "were this test's `beforeEach` inserts seeded inside a transaction
- * that is still open now?". That mirrors Rails' `teardown_fixtures`, where the
- * rollback IS the teardown and no DELETE is issued. Both conditions are load-
- * bearing:
- *   - `seededInTransaction` alone would wrongly skip if that transaction had
- *     since committed/closed (rows now durable) — so we also require it open.
- *   - `openTransactions > 0` alone is unsafe on the non-transactional /
- *     `usesTransaction`-opt-out path: there the fixtures are autocommitted
- *     before the test body runs, so a test body that leaves its *own*
- *     transaction/savepoint open wraps none of those committed rows — skipping
- *     the DELETE would leak them. Gating on `seededInTransaction` confines the
- *     skip to rows the open transaction actually owns.
- */
-function shouldDeleteFixtureRows(adapter: DatabaseAdapter, seededInTransaction: boolean): boolean {
-  if (adapter.adapterName !== "postgres") return true;
-  return !(seededInTransaction && adapter.openTransactions > 0);
-}
-
-/** Returns true for "table/relation does not exist" errors from any adapter. */
-function isTableMissingError(e: unknown): boolean {
-  const msg = e instanceof Error ? e.message : String(e);
-  return (
-    msg.includes("no such table") || // SQLite
-    /Table '.*' doesn't exist/i.test(msg) || // MySQL: Table 'db.tbl' doesn't exist
-    /relation ".*" does not exist/i.test(msg) // PostgreSQL: relation "tbl" does not exist
-  );
-}
-
-/**
  * Result of the tableless overload: one `JoinTableAccessor` per entry, keyed by `table`.
  * The label union is derived from `entry.data`'s own keys so `accessor("root")` is
  * compile-time checked when the data literal is inlined (same pattern as the by-name overload).
@@ -288,9 +244,6 @@ function useTablelessFixtures(
 
   const keys = entries.map((e) => e.table);
   const store: Record<string, Record<string, unknown>> = {};
-  // Whether the most recent seed ran inside an open transaction (the fixture
-  // pin). Read in afterEach — see shouldDeleteFixtureRows.
-  let seededInTransaction = false;
 
   beforeEach(async () => {
     const adapter = getAdapter();
@@ -303,28 +256,16 @@ function useTablelessFixtures(
       tables.push(table);
     }
     const results = await insertPreparedFixtureSets(adapter, prepared);
-    seededInTransaction = adapter.openTransactions > 0;
     results.forEach((result, i) => {
       store[tables[i]] = result;
     });
   });
 
-  afterEach(async () => {
-    const adapter = getAdapter();
-    if (shouldDeleteFixtureRows(adapter, seededInTransaction)) {
-      const tables = [...entries].reverse().map(({ table }) => table);
-      // Rails wraps its table_deletes in disable_referential_integrity
-      // unconditionally (database_statements.rb:492).
-      await adapter.disableReferentialIntegrity(async () => {
-        for (const table of tables) {
-          try {
-            await adapter.executeMutation(`DELETE FROM ${adapter.quoteTableName(table)}`);
-          } catch (e) {
-            if (!isTableMissingError(e)) throw e;
-          }
-        }
-      }, tables);
-    }
+  // Rails' `teardown_fixtures` (`test_fixtures.rb`) issues no DELETE: it resets
+  // the fixture cache and the pinned pool and stops. The rows go away at the
+  // next load, because `insert_fixtures_set` prefixes its inserts with
+  // `table_deletes` (`abstract/database_statements.rb:486-495`).
+  afterEach(() => {
     for (const key of keys) delete store[key];
   });
 
@@ -483,11 +424,6 @@ function useFixtures(
 
   // Per-test mutable state: populated in beforeEach, cleared in afterEach.
   const store: Record<string, Record<string, unknown>> = {};
-  // Whether the most recent seed ran inside an open transaction (the fixture
-  // pin), keyed by seeding connection — a set whose model lives in another
-  // database seeds through that model's pool. Read in afterEach — see
-  // shouldDeleteFixtureRows.
-  const seededInTransaction = new Map<DatabaseAdapter, boolean>();
 
   // TODO(fixtures-adoption Spike S1): seed once per worker in a global beforeAll
   // (before the pinned transaction opens) when transactional fixtures are
@@ -506,7 +442,6 @@ function useFixtures(
     // by `model_class.connection_pool` and merges each group's table_rows into
     // a single insert_fixtures_set.
     const groups = new Map<DatabaseAdapter, { prepared: PreparedFixtureSet[]; keys: string[] }>();
-    seededInTransaction.clear();
     for (const [key, { table, model, data }] of Object.entries(fixtures)) {
       // Auto-register the (object-map) model, mirroring the by-name path's
       // `resolveFixtureNames` (fixtures-register-model-on-resolution, #4348):
@@ -533,51 +468,20 @@ function useFixtures(
     }
     for (const [adapter, group] of groups) {
       const results = await insertPreparedFixtureSets(adapter, group.prepared);
-      seededInTransaction.set(adapter, adapter.openTransactions > 0);
       results.forEach((result, i) => {
         store[group.keys[i]] = result;
       });
     }
   });
 
-  afterEach(async () => {
-    if (!fixtures) return;
-    const fixtureConnection = getAdapter();
-    // Delete in reverse insertion order, each set through the connection it was
-    // seeded on. Rails' fixture deletes are the `table_deletes` half of
-    // `insert_fixtures_set` and ride inside its `disable_referential_integrity`
-    // block (database_statements.rb:145-154), so a delete order an FK forbids —
-    // a table whose children the fixture set doesn't own, e.g. the HABTM join
-    // rows a test created itself — never reaches the database.
-    const deletesByAdapter = new Map<DatabaseAdapter, string[]>();
-    for (const [, { table, model }] of Object.entries(fixtures).reverse()) {
-      // Re-lease, rather than reusing the connection this set was seeded on.
-      // Rails never touches the seeding connection again in `teardown_fixtures`
-      // — the deletes are the `table_deletes` half of the *next*
-      // `insert_fixtures_set` (database_statements.rb:486-495), which runs on a
-      // freshly-leased connection. A test may deliberately have poisoned or
-      // evicted the seed-time connection (transactions.test.ts "connection
-      // removed from pool when begin raises…"), and teardown must not resurrect
-      // it.
-      const adapter = await leaseFixtureConnectionFor(model, fixtureConnection);
-      if (!shouldDeleteFixtureRows(adapter, seededInTransaction.get(adapter) ?? false)) continue;
-      const tables = deletesByAdapter.get(adapter);
-      if (tables === undefined) deletesByAdapter.set(adapter, [table]);
-      else tables.push(table);
-    }
-    for (const [adapter, tables] of deletesByAdapter) {
-      // Rails wraps its table_deletes in disable_referential_integrity
-      // unconditionally (database_statements.rb:492).
-      await adapter.disableReferentialIntegrity(async () => {
-        for (const table of tables) {
-          try {
-            await adapter.executeMutation(`DELETE FROM ${adapter.quoteTableName(table)}`);
-          } catch (e) {
-            if (!isTableMissingError(e)) throw e;
-          }
-        }
-      }, tables);
-    }
+  // Rails' `teardown_fixtures` (`test_fixtures.rb`) issues no DELETE at all: it
+  // resets the fixture cache and the shared pool and stops. The rows go away at
+  // the *next* load, whose `insert_fixtures_set` prefixes the inserts with a
+  // `DELETE FROM` per table it is about to fill
+  // (`abstract/database_statements.rb:486-495`), all inside that call's single
+  // `disable_referential_integrity` block on a freshly-leased connection. So
+  // teardown only drops this scope's resolved rows.
+  afterEach(() => {
     for (const key of Object.keys(store)) {
       delete store[key];
     }

@@ -65,17 +65,16 @@ export class SQLiteDatabaseTasks {
    * `root`, and it writes the join inline — `File.absolute_path?(db_path)`
    * short-circuits it for an already-absolute name.
    *
-   * The in-memory return is trails-only: an in-memory database has no file to
-   * unlink, and Rails has no in-memory lane to need the guard. Per the
-   * PathAdapter contract a missing `isAbsolute` means the adapter does not model
-   * the relative/absolute distinction (e.g. a VFS), which takes the
-   * `File.absolute_path?` arm.
+   * There is no in-memory arm: `FileUtils.rm(":memory:")` raises `Errno::ENOENT`,
+   * which the rescue turns into `NoDatabaseError`, so that is what an in-memory
+   * database answers here too. Per the PathAdapter contract a missing
+   * `isAbsolute` means the adapter does not model the relative/absolute
+   * distinction (e.g. a VFS), which takes the `File.absolute_path?` arm.
    */
   async drop(): Promise<void> {
     const fs = getFs();
     const path = getPath();
     const dbPath = this.dbConfig.database as string;
-    if (isInMemoryDatabase(dbPath)) return;
     const file =
       !path.isAbsolute || path.isAbsolute(dbPath) ? dbPath : path.join(this.root, dbPath);
     try {

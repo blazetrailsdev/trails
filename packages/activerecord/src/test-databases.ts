@@ -49,9 +49,9 @@ export async function eachDatabase(
 }
 
 // Only the canonical `:memory:` name is treated as in-memory by
-// SQLiteDatabaseTasks (create/drop skip it). URI variants like
+// the per-worker suffixing below. URI variants like
 // `file::memory:?cache=shared` are not currently special-cased there,
-// so we match only what the task layer actually handles.
+// so we match only the one spelling every driver reads as in-memory.
 function isInMemorySqlite(name: string): boolean {
   return name === ":memory:";
 }
@@ -89,8 +89,8 @@ export async function createAndLoadSchema(
         );
       }
       // Skip suffixing for the canonical SQLite in-memory database — `:memory:`
-      // is special-cased by SQLiteDatabaseTasks (create/drop are no-ops) and
-      // suffixing would turn it into an on-disk path like `:memory:-2`.
+      // has no file to suffix, and suffixing would turn it into an on-disk
+      // path like `:memory:-2`.
       if (!isInMemorySqlite(baseName)) {
         dbConfig._database = `${baseName}-${index}`;
       }

@@ -1,5 +1,6 @@
 import { it, expect, vi } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
+import { NoMethodError } from "@blazetrails/activemodel";
 import { Visitors } from "@blazetrails/arel";
 import { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 import { ConnectionDescriptor } from "./connection-adapters/abstract/connection-descriptor.js";
@@ -594,7 +595,8 @@ it("adapter proxy treats a probe name as the send it is, with no carve-out set",
 
   // `abstract/connection_pool.rb` gives the proxy no name set to consult: what
   // an adapter answers is what its class defines. None of these is an
-  // AbstractAdapter method, so none fabricates a dispatcher — before a checkout
+  // AbstractAdapter method, and `abstract_adapter.rb` overrides no
+  // `method_missing`, so each raises rather than answering — before a checkout
   // as well as after, since the base class stands in for the sample connection.
   for (const key of [
     "then",
@@ -605,8 +607,7 @@ it("adapter proxy treats a probe name as the send it is, with no carve-out set",
     "getMockName",
     "_isMockFunction",
   ]) {
-    expect(typeof proxy[key]).not.toBe("function");
-    expect(proxy[key]).toBeUndefined();
+    expect(() => proxy[key]).toThrow(NoMethodError);
   }
   // What Ruby *does* answer, it answers through the ancestor chain — the same
   // reason `NullPool` lets `to_s` arrive as `Object.prototype.toString`.
@@ -618,13 +619,6 @@ it("adapter proxy treats a probe name as the send it is, with no carve-out set",
   // A JS `Symbol` cannot spell a Ruby send — the one carve-out the language
   // forces, as on `NullPool`.
   expect(proxy[Symbol.iterator]).toBeUndefined();
-
-  // The pool is stamped onto every translated error, so a serializer or matcher
-  // reaches this proxy. Walking it (JSON.stringify invokes `toJSON`; an
-  // asymmetric matcher invokes `asymmetricMatch`) must not throw
-  // `conn[prop] is not a function`.
-  expect(() => JSON.stringify(proxy)).not.toThrow();
-  expect(proxy).not.toEqual(expect.objectContaining({ id: 1 }));
 
   // A deliberately failing assertion whose subject holds the proxy must report
   // its own failure, not an error from the reporter — the guard
@@ -653,12 +647,12 @@ it("adapter proxy still dispatches genuine adapter methods to the connection", a
 it("adapter proxy does not fabricate a method for an unknown probe key once a connection exists", async () => {
   const pool = makePool();
   // Materialise a connection (as when a query is mid-flight and an error is
-  // translated). An arbitrary probe key must resolve to a non-callable, since
-  // the live connection has no such method.
+  // translated). An arbitrary probe key must raise, since the live connection
+  // has no such method and Ruby's adapter overrides no `method_missing`.
   await pool.checkout();
   const proxy = (
     pool as unknown as { _getAdapterProxy(): Record<PropertyKey, unknown> }
   )._getAdapterProxy();
-  expect(proxy.someMatcherProbeKey).toBeUndefined();
+  expect(() => proxy.someMatcherProbeKey).toThrow(NoMethodError);
   await pool.disconnect();
 });
