@@ -66,9 +66,9 @@ async function runRubyExtract(): Promise<void> {
 }
 
 /**
- * Whether extraction can be skipped: `--cached` (or TEST_COMPARE_FORCE=0 with
- * the flag) asked for it AND both manifests are already on disk. A missing
- * manifest falls back to a full run, as run.sh's bash version did.
+ * Whether extraction can be skipped: `--cached` asked for it AND both
+ * manifests are already on disk. A missing manifest falls back to a full run,
+ * with the same two messages run.sh's bash version printed.
  */
 async function cacheHit(cached: boolean): Promise<boolean> {
   if (!cached) return false;
@@ -89,19 +89,15 @@ async function main(): Promise<void> {
   const forwardArgs = argv.filter((a) => a !== "--cached");
 
   if (!(await cacheHit(cached))) {
-    // Phase A — fetch every source registered in vendor/sources.ts. On warm
-    // runs use the offline fast-path (trust the lockfile pins, skip per-source
-    // `git rev-parse`); FORCE takes the full verifying path.
+    // Warm runs take fetch's offline fast-path (trust the lockfile pins, skip
+    // per-source `git rev-parse`); FORCE takes the full verifying path.
     await runFetch({ offline: !force });
 
-    // Phase B — ruby (subprocess) and ts (in-process) in parallel. Both only
-    // need fetch's vendored sources, which Phase A just produced. Per-package
-    // test paths reach the Ruby extractor through TEST_PATHS_JSON, built from
-    // vendor/sources.ts so the Ruby script carries no parallel package table.
+    // Both extracts need only fetch's vendored sources, so they run in
+    // parallel: ruby as a subprocess, ts in-process.
     await Promise.all([runRubyExtract(), extractTsTests()]);
   }
 
-  // Phase C — compare needs both extracts.
   runCompare(forwardArgs);
 }
 
