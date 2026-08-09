@@ -16,8 +16,6 @@ describe("adapter overrides live on the prototype, as Rails' `def` does", () => 
 
     expect(adapter.quoteColumnName("email")).toBe("`email`");
     expect(adapter.quoteTableName("foo.bar")).toBe("`foo`.`bar`");
-    // quote_table_name_for_assignment dispatches back through the receiver
-    // (`abstract/quoting.rb:153-155`), so it degrades with them.
     expect(adapter.quoteTableNameForAssignment("foo", "bar")).toBe("`foo`.`bar`");
   });
 

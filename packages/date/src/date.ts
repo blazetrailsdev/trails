@@ -3245,6 +3245,29 @@ function cValidGregorianP(y: number, m: number, d: number): [rm: number, rd: num
 }
 
 /**
+ * @internal `date_core.c` `valid_gregorian_p` (`date_core.c:2229-2236`), which
+ * is `decode_year` under a negative style followed by {@link cValidGregorianP}.
+ * The C's `ry`/`rm`/`rd` out-parameters come back as the tuple; its `nth` does
+ * not, for the reason {@link guessStyle} states.
+ *
+ * `decode_year` (`date_core.c:1342-1371`) reduces to the `FIX2INT` its Bignum
+ * arm ends at once `nth` is out: the year is shifted by 4712, divided by
+ * `CM_PERIOD_GCY` into an `nth` that is zero over the whole representable
+ * range, and shifted back — the identity, but for the truncation, which is what
+ * answers `Date.new(2000.5, 1, 1)` as 2000-01-01 in MRI.
+ */
+function validGregorianP(
+  y: number,
+  m: number,
+  d: number,
+): [ry: number, rm: number, rd: number] | null {
+  const ry = Math.trunc(y);
+  const r = cValidGregorianP(ry, m, d);
+  if (r === null) return null;
+  return [ry, r[0], r[1]];
+}
+
+/**
  * @internal `date_core.c` `guess_style` (`date_core.c:1414-1433`), which
  * answers `-inf`, `+inf` or `0` for the calendar the year and start select: a
  * negative style is proleptic Gregorian, a positive one proleptic Julian, and
@@ -4049,11 +4072,10 @@ export class Date {
     }
     const sg = val2sg(start);
     if (guessStyle(year, sg) < 0) {
-      const r = cValidGregorianP(year, month, day);
+      const r = validGregorianP(year, month, day);
       if (r === null) throw new DateError("invalid date");
-      const [rm, rd] = r;
       this.#sg = sg;
-      this.#civil = [year, rm, rd];
+      this.#civil = r;
     } else {
       const r = cValidCivilP(year, month, day, sg);
       if (r === null) throw new DateError("invalid date");
@@ -4668,10 +4690,10 @@ export class DateTime extends DateWithoutParseStatics {
     const sg = start === undefined ? DEFAULT_SG : val2sg(start);
     let rjd: number;
     if (guessStyle(year, sg) < 0) {
-      const r = cValidGregorianP(year, month ?? 1, d);
+      const r = validGregorianP(year, month ?? 1, d);
       if (r === null) throw new DateError("invalid date");
-      const [rm, rd] = r;
-      rjd = cCivilToJd(year, rm, rd, sg);
+      const [ry, rm, rd] = r;
+      rjd = cCivilToJd(ry, rm, rd, sg);
     } else {
       const r = cValidCivilP(year, month ?? 1, d, sg);
       if (r === null) throw new DateError("invalid date");
