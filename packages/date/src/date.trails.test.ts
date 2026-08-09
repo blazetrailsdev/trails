@@ -1488,6 +1488,28 @@ describe("DateTime", () => {
     );
     expect(iso(RubyDateTime.commercial(1582, 41, 4))).toBe("1582-10-21T00:00:00");
 
+    // `num2num_with_frac` / `num2int_with_frac` (date_core.c:3286-3304): a
+    // fraction is legal only in the LAST argument SUPPLIED, and an explicitly
+    // passed later zero is supplied.
+    //   DateTime.jd(2451944.5).to_s        #=> "2001-02-03T12:00:00+00:00"
+    //   DateTime.jd(2451944, 1.5).to_s     #=> "2001-02-03T01:30:00+00:00"
+    //   DateTime.jd(2451944, 1.5, 0)       #=> raises Date::Error "invalid fraction"
+    //   DateTime.jd(2451944.5, 0)          #=> raises Date::Error "invalid fraction"
+    //   DateTime.jd(Rational(1, 2)).to_s   #=> "-4712-01-01T12:00:00+00:00"
+    //   DateTime.ordinal(2001, 34.5).to_s  #=> "2001-02-03T12:00:00+00:00"
+    //   DateTime.ordinal(2001, 34.5, 0)    #=> raises Date::Error "invalid fraction"
+    //   DateTime.commercial(2001, 5, 6.5).to_s #=> "2001-02-03T12:00:00+00:00"
+    expect(iso(RubyDateTime.jd(2451944.5))).toBe("2001-02-03T12:00:00");
+    expect(iso(RubyDateTime.jd(2451944, 1.5))).toBe("2001-02-03T01:30:00");
+    expect(() => RubyDateTime.jd(2451944, 1.5, 0)).toThrow("invalid fraction");
+    expect(() => RubyDateTime.jd(2451944.5, 0)).toThrow("invalid fraction");
+    // Temporal pads a negative ISO year to six digits where the gem's `to_s`
+    // does not; the day and the time of day are the gem's.
+    expect(iso(RubyDateTime.jd(new Rational(1, 2)))).toBe("-004712-01-01T12:00:00");
+    expect(iso(RubyDateTime.ordinal(2001, 34.5))).toBe("2001-02-03T12:00:00");
+    expect(() => RubyDateTime.ordinal(2001, 34.5, 0)).toThrow("invalid fraction");
+    expect(iso(RubyDateTime.commercial(2001, 5, 6.5))).toBe("2001-02-03T12:00:00");
+
     // canon24oc and add_frac, the tail all four share with DateTime.new.
     expect(iso(RubyDateTime.jd(2451944, 24))).toBe("2001-02-04T00:00:00");
     const half = RubyDateTime.jd(2451944, 0, 0, 0.5);

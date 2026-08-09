@@ -4574,30 +4574,56 @@ export class DateTime extends DateWithoutParseStatics {
    * `Date.jd` inherited (`date_core.c:9971`): it takes a time of day and an
    * offset, and answers a `DateTime`.
    *
-   * The C's `switch (argc)` fall-through splits the second, minute and hour
-   * through {@link num2intWithFrac} under the `n` bounds `positive_inf`, `3`
-   * and `2` — only the LAST argument supplied may carry a fraction — and
-   * `canon24oc` (`date_core.c:3306-3312`) is the `rh === 24` fold that turns
-   * the day-ending `24:00:00` `c_valid_time_p` admits into midnight of the next
-   * day.
+   * The C's `switch (argc)` fall-through splits `jd` through
+   * `num2num_with_frac(jd, 1)` (`date_core.c:7685-7686`) and the second, minute
+   * and hour through `num2int_with_frac` under the `n` bounds `positive_inf`,
+   * `3` and `2` ({@link num2intWithFrac}). A fraction is legal only in the LAST
+   * argument SUPPLIED — the macro raises `"invalid fraction"` when `argc > n` —
+   * so `DateTime.jd(2451944.5)` is noon while `DateTime.jd(2451944, 1.5, 0)`
+   * raises, and an explicitly passed later `0` is a supplied argument. That is
+   * why every field below is optional rather than defaulted: `undefined` is the
+   * C's "not in `argc`".
+   *
+   * The fields are read in the C's own order — highest `argc` case first — so
+   * an earlier one's fraction overwrites a later one's in `fr2`, and
+   * `canon24oc` (`date_core.c:3306-3312`) folds the day-ending `24:00:00`
+   * `c_valid_time_p` admits into midnight of the next day.
    */
   static jd(
-    jd = 0,
-    hour: number | Rational = 0,
-    minute: number | Rational = 0,
-    second: number | Rational = 0,
-    offset: number | Rational | string = 0,
-    start = DEFAULT_SG,
+    jd: number | Rational = 0,
+    hour?: number | Rational,
+    minute?: number | Rational,
+    second?: number | Rational,
+    offset?: number | Rational | string,
+    start?: number,
   ): Temporal.PlainDateTime | Temporal.ZonedDateTime {
-    const sg = val2sg(start);
-    const rof = val2off(offset);
-    const [s, sFr] = num2intWithFrac(second, 1, false);
-    const [min, minFr] = num2intWithFrac(minute, MINUTE_IN_SECONDS, second !== 0);
-    const [h, hFr] = num2intWithFrac(hour, HOUR_IN_SECONDS, minute !== 0 || second !== 0);
+    const sg = start === undefined ? DEFAULT_SG : val2sg(start);
+    const rof = offset === undefined ? 0 : val2off(offset);
+    const [s, sFr] = num2intWithFrac(second ?? 0, 1, false);
+    const [min, minFr] = num2intWithFrac(
+      minute ?? 0,
+      MINUTE_IN_SECONDS,
+      second !== undefined || offset !== undefined || start !== undefined,
+    );
+    const [h, hFr] = num2intWithFrac(
+      hour ?? 0,
+      HOUR_IN_SECONDS,
+      minute !== undefined || second !== undefined || offset !== undefined || start !== undefined,
+    );
+    const [rjd, jdFr] = num2intWithFrac(
+      jd,
+      DAY_IN_SECONDS,
+      hour !== undefined ||
+        minute !== undefined ||
+        second !== undefined ||
+        offset !== undefined ||
+        start !== undefined,
+    );
     let fr2: number | Rational = 0;
     if (sFr !== 0) fr2 = sFr;
     if (minFr !== 0) fr2 = minFr;
     if (hFr !== 0) fr2 = hFr;
+    if (jdFr !== 0) fr2 = jdFr;
 
     const rt = cValidTimeP(h, min, s);
     if (rt === null) throw new DateError("invalid date");
@@ -4608,7 +4634,11 @@ export class DateTime extends DateWithoutParseStatics {
       fr2 = fr2 instanceof Rational ? fr2.add(DAY_IN_SECONDS) : fr2 + DAY_IN_SECONDS;
     }
     const localDf = timeToDf(rh, rmin, rs);
-    const [rjd2, df, sf] = addFrac(jdLocalToUtc(jd, localDf, rof), dfLocalToUtc(localDf, rof), fr2);
+    const [rjd2, df, sf] = addFrac(
+      jdLocalToUtc(rjd, localDf, rof),
+      dfLocalToUtc(localDf, rof),
+      fr2,
+    );
     return new DateTime(SEAT, rjd2, df, sf, rof, sg).toDatetime();
   }
 
@@ -4616,23 +4646,68 @@ export class DateTime extends DateWithoutParseStatics {
    * Ruby `DateTime.ordinal(year = -4712, yday = 1, hour = 0, minute = 0,
    * second = 0, offset = 0, start = Date::ITALY)` (ruby/date, `date_core.c`
    * `datetime_s_ordinal`, `date_core.c:7726-7791`, `:9972`), which raises
-   * `Date::Error` on a date `c_valid_ordinal_p` rejects and then reads the time
-   * of day exactly as {@link DateTime.jd} does — one `n` bound higher, since
-   * `yday` precedes them.
+   * `Date::Error` on a date `c_valid_ordinal_p` rejects.
+   *
+   * `yday` itself takes a fraction — `num2int_with_frac(d, 2)`
+   * (`date_core.c:7758-7759`), so `DateTime.ordinal(2001, 34.5)` is noon — and
+   * the `n` bounds are one higher than {@link DateTime.jd}'s, since `year`
+   * precedes them. `year` is the one field with no fraction: the C hands `vy`
+   * straight to `valid_ordinal_p`.
    */
   static ordinal(
     year = -4712,
-    yday = 1,
-    hour: number | Rational = 0,
-    minute: number | Rational = 0,
-    second: number | Rational = 0,
-    offset: number | Rational | string = 0,
-    start = DEFAULT_SG,
+    yday: number | Rational = 1,
+    hour?: number | Rational,
+    minute?: number | Rational,
+    second?: number | Rational,
+    offset?: number | Rational | string,
+    start?: number,
   ): Temporal.PlainDateTime | Temporal.ZonedDateTime {
-    const sg = val2sg(start);
-    const rjd = cValidOrdinalP(year, yday, sg);
+    const sg = start === undefined ? DEFAULT_SG : val2sg(start);
+    const rof = offset === undefined ? 0 : val2off(offset);
+    const [s, sFr] = num2intWithFrac(second ?? 0, 1, false);
+    const [min, minFr] = num2intWithFrac(
+      minute ?? 0,
+      MINUTE_IN_SECONDS,
+      second !== undefined || offset !== undefined || start !== undefined,
+    );
+    const [h, hFr] = num2intWithFrac(
+      hour ?? 0,
+      HOUR_IN_SECONDS,
+      minute !== undefined || second !== undefined || offset !== undefined || start !== undefined,
+    );
+    const [d, dFr] = num2intWithFrac(
+      yday,
+      DAY_IN_SECONDS,
+      hour !== undefined ||
+        minute !== undefined ||
+        second !== undefined ||
+        offset !== undefined ||
+        start !== undefined,
+    );
+    let fr2: number | Rational = 0;
+    if (sFr !== 0) fr2 = sFr;
+    if (minFr !== 0) fr2 = minFr;
+    if (hFr !== 0) fr2 = hFr;
+    if (dFr !== 0) fr2 = dFr;
+
+    const rjd = cValidOrdinalP(year, d, sg);
     if (rjd === null) throw new DateError("invalid date");
-    return DateTime.jd(rjd, hour, minute, second, offset, sg);
+    const rt = cValidTimeP(h, min, s);
+    if (rt === null) throw new DateError("invalid date");
+    let [rh] = rt;
+    const [, rmin, rs] = rt;
+    if (rh === 24) {
+      rh = 0;
+      fr2 = fr2 instanceof Rational ? fr2.add(DAY_IN_SECONDS) : fr2 + DAY_IN_SECONDS;
+    }
+    const localDf = timeToDf(rh, rmin, rs);
+    const [rjd2, df, sf] = addFrac(
+      jdLocalToUtc(rjd, localDf, rof),
+      dfLocalToUtc(localDf, rof),
+      fr2,
+    );
+    return new DateTime(SEAT, rjd2, df, sf, rof, sg).toDatetime();
   }
 
   /**
@@ -4651,7 +4726,7 @@ export class DateTime extends DateWithoutParseStatics {
     minute?: number | Rational,
     second?: number | Rational,
     offset?: number | Rational | string,
-    start = DEFAULT_SG,
+    start?: number,
   ): Temporal.PlainDateTime | Temporal.ZonedDateTime {
     return new DateTime(year, month, mday, hour, minute, second, offset, start).toDatetime();
   }
@@ -4661,22 +4736,65 @@ export class DateTime extends DateWithoutParseStatics {
    * minute = 0, second = 0, offset = 0, start = Date::ITALY)` (ruby/date,
    * `date_core.c` `datetime_s_commercial`, `date_core.c:7912-7980`, `:9975`),
    * the week-date counterpart, which raises `Date::Error` on a date
-   * `c_valid_commercial_p` rejects.
+   * `c_valid_commercial_p` rejects. `cwday` carries the fraction
+   * (`num2int_with_frac(d, 3)`, `date_core.c:7945-7946`); `cweek` is `NUM2INT`
+   * and `cwyear` is handed straight to `valid_commercial_p`, so neither does.
    */
   static commercial(
     cwyear = -4712,
     cweek = 1,
-    cwday = 1,
-    hour: number | Rational = 0,
-    minute: number | Rational = 0,
-    second: number | Rational = 0,
-    offset: number | Rational | string = 0,
-    start = DEFAULT_SG,
+    cwday: number | Rational = 1,
+    hour?: number | Rational,
+    minute?: number | Rational,
+    second?: number | Rational,
+    offset?: number | Rational | string,
+    start?: number,
   ): Temporal.PlainDateTime | Temporal.ZonedDateTime {
-    const sg = val2sg(start);
-    const rjd = cValidCommercialP(cwyear, cweek, cwday, sg);
+    const sg = start === undefined ? DEFAULT_SG : val2sg(start);
+    const rof = offset === undefined ? 0 : val2off(offset);
+    const [s, sFr] = num2intWithFrac(second ?? 0, 1, false);
+    const [min, minFr] = num2intWithFrac(
+      minute ?? 0,
+      MINUTE_IN_SECONDS,
+      second !== undefined || offset !== undefined || start !== undefined,
+    );
+    const [h, hFr] = num2intWithFrac(
+      hour ?? 0,
+      HOUR_IN_SECONDS,
+      minute !== undefined || second !== undefined || offset !== undefined || start !== undefined,
+    );
+    const [d, dFr] = num2intWithFrac(
+      cwday,
+      DAY_IN_SECONDS,
+      hour !== undefined ||
+        minute !== undefined ||
+        second !== undefined ||
+        offset !== undefined ||
+        start !== undefined,
+    );
+    let fr2: number | Rational = 0;
+    if (sFr !== 0) fr2 = sFr;
+    if (minFr !== 0) fr2 = minFr;
+    if (hFr !== 0) fr2 = hFr;
+    if (dFr !== 0) fr2 = dFr;
+
+    const rjd = cValidCommercialP(cwyear, cweek, d, sg);
     if (rjd === null) throw new DateError("invalid date");
-    return DateTime.jd(rjd, hour, minute, second, offset, sg);
+    const rt = cValidTimeP(h, min, s);
+    if (rt === null) throw new DateError("invalid date");
+    let [rh] = rt;
+    const [, rmin, rs] = rt;
+    if (rh === 24) {
+      rh = 0;
+      fr2 = fr2 instanceof Rational ? fr2.add(DAY_IN_SECONDS) : fr2 + DAY_IN_SECONDS;
+    }
+    const localDf = timeToDf(rh, rmin, rs);
+    const [rjd2, df, sf] = addFrac(
+      jdLocalToUtc(rjd, localDf, rof),
+      dfLocalToUtc(localDf, rof),
+      fr2,
+    );
+    return new DateTime(SEAT, rjd2, df, sf, rof, sg).toDatetime();
   }
 
   /**
