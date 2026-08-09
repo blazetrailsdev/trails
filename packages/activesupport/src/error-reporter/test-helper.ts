@@ -1,12 +1,22 @@
 import type {
+  ErrorContext,
+  ErrorSeverity,
   ErrorSubscriber as ErrorSubscriberInterface,
-  ReportedError,
 } from "../error-reporter.js";
 
+/** Mirrors: `activesupport/lib/active_support/error_reporter/test_helper.rb`. */
 export class ErrorSubscriber implements ErrorSubscriberInterface {
-  events: ReportedError[] = [];
+  events: Array<[unknown, boolean, ErrorSeverity, string, ErrorContext]> = [];
 
-  report(reportedError: ReportedError): void {
-    this.events.push(reportedError);
+  report(
+    error: unknown,
+    {
+      handled,
+      severity,
+      source,
+      context,
+    }: { handled: boolean; severity: ErrorSeverity; source: string; context: ErrorContext },
+  ): void {
+    this.events.push([error, handled, severity, source, context]);
   }
 }

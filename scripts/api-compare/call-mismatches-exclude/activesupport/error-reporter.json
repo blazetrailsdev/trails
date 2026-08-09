@@ -3,36 +3,8 @@
     "package": "activesupport",
     "tsFile": "error-reporter.ts",
     "rubyName": "report",
-    "call": "fatal",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "error-reporter.ts",
-    "rubyName": "report",
-    "call": "join",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "error-reporter.ts",
-    "rubyName": "report",
-    "call": "map",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "error-reporter.ts",
-    "rubyName": "report",
     "call": "merge",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "error-reporter.ts",
-    "rubyName": "set_context",
-    "call": "set",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails error_reporter.rb:201-203 forwards to `ActiveSupport::ExecutionContext.set(...)`; trails error-reporter.ts:66-68 merges into the reporter's own executionContext field — there is no global ExecutionContext singleton in trails."
   },
   {
     "package": "activesupport",
