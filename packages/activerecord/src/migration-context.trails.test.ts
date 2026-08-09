@@ -12,8 +12,8 @@ import {
 } from "./migration.js";
 import { ActiveRecord } from "./ar-config.js";
 import { Base } from "./base.js";
-import { SchemaMigration } from "./schema-migration.js";
-import { InternalMetadata } from "./internal-metadata.js";
+import { SchemaMigration, NullSchemaMigration } from "./schema-migration.js";
+import { InternalMetadata, NullInternalMetadata } from "./internal-metadata.js";
 import { DatabaseConfigurations } from "./database-configurations.js";
 import { fixtures } from "./test-fixtures.js";
 
@@ -25,7 +25,11 @@ describe("MigrationContext", () => {
   });
 
   it("migrations reads this context's migrationsPaths", () => {
-    const context = new MigrationContext([`${MIGRATIONS_ROOT}/valid`]);
+    const context = new MigrationContext(
+      [`${MIGRATIONS_ROOT}/valid`],
+      new NullSchemaMigration(),
+      new NullInternalMetadata(),
+    );
 
     expect(context.migrations.map((m) => [m.version, m.name])).toEqual([
       [1, "ValidPeopleHaveLastNames"],
@@ -35,10 +39,11 @@ describe("MigrationContext", () => {
   });
 
   it("migrations merges every path it was given, sorted by version", () => {
-    const context = new MigrationContext([
-      `${MIGRATIONS_ROOT}/valid_with_timestamps`,
-      `${MIGRATIONS_ROOT}/to_copy_with_timestamps`,
-    ]);
+    const context = new MigrationContext(
+      [`${MIGRATIONS_ROOT}/valid_with_timestamps`, `${MIGRATIONS_ROOT}/to_copy_with_timestamps`],
+      new NullSchemaMigration(),
+      new NullInternalMetadata(),
+    );
 
     expect(context.migrations.map((m) => m.version)).toEqual([
       20090101010101, 20090101010202, 20100101010101, 20100201010101, 20100301010101,
@@ -46,8 +51,16 @@ describe("MigrationContext", () => {
   });
 
   it("two contexts over two directories do not collide", () => {
-    const valid = new MigrationContext([`${MIGRATIONS_ROOT}/valid`]);
-    const timestamped = new MigrationContext([`${MIGRATIONS_ROOT}/valid_with_timestamps`]);
+    const valid = new MigrationContext(
+      [`${MIGRATIONS_ROOT}/valid`],
+      new NullSchemaMigration(),
+      new NullInternalMetadata(),
+    );
+    const timestamped = new MigrationContext(
+      [`${MIGRATIONS_ROOT}/valid_with_timestamps`],
+      new NullSchemaMigration(),
+      new NullInternalMetadata(),
+    );
 
     expect(valid.migrations.map((m) => m.version)).toEqual([1, 2, 3]);
     expect(timestamped.migrations.map((m) => m.version)).toEqual([
@@ -57,7 +70,11 @@ describe("MigrationContext", () => {
 
   it("migrations raises for a migration timestamp in the future", () => {
     ActiveRecord.validateMigrationTimestamps = true;
-    const context = new MigrationContext([`${MIGRATIONS_ROOT}/future_timestamp`]);
+    const context = new MigrationContext(
+      [`${MIGRATIONS_ROOT}/future_timestamp`],
+      new NullSchemaMigration(),
+      new NullInternalMetadata(),
+    );
 
     expect(() => context.migrations).toThrow(InvalidMigrationTimestampError);
   });
@@ -67,7 +84,11 @@ describe("MigrationContext", () => {
     const previous = ActiveRecord.timestampedMigrations;
     ActiveRecord.timestampedMigrations = false;
     try {
-      const context = new MigrationContext([`${MIGRATIONS_ROOT}/future_timestamp`]);
+      const context = new MigrationContext(
+        [`${MIGRATIONS_ROOT}/future_timestamp`],
+        new NullSchemaMigration(),
+        new NullInternalMetadata(),
+      );
       expect(context.migrations).toHaveLength(1);
     } finally {
       ActiveRecord.timestampedMigrations = previous;
