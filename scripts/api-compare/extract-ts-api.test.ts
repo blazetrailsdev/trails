@@ -2963,6 +2963,25 @@ describe("callArgs", () => {
     ]);
   });
 
+  it("describes an object spread as the double-splat, flagging the site", () => {
+    // extract-ruby-api.rb#describe_kwargs (:2495-2508) reads `:assoc_splat`
+    // (`**opts`) as `**splat` and flags the site; `{ ...opts }` is the same
+    // thing on this side, alone or beside ordinary keys.
+    expect(
+      site(
+        `class Foo {
+          create(opts: object) {
+            this.visit({ ...opts });
+            this.visit({ a: 1, ...opts });
+          }
+        }`,
+      ),
+    ).toEqual([
+      { name: "visit", args: ["kwargs{**splat}"], flags: ["splat"] },
+      { name: "visit", args: ["kwargs{a=num:1,**splat}"], flags: ["splat"] },
+    ]);
+  });
+
   it("describes a non-keyword or empty object literal as the opaque hash", () => {
     const sites = site(
       `class Foo {
