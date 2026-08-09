@@ -2974,7 +2974,7 @@ Ordered phases, referencing story IDs for each phase.
 ## Verification
 
 How we'll know the RFC worked — a concrete metric, count, or burndown target
-(e.g. "exclude list reaches zero entries", "test:compare delta ≥ +40"). State
+(e.g. "exclude list reaches zero entries", "parity:test delta ≥ +40"). State
 the number, not a vibe.
 
 ## Open questions

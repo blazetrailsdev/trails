@@ -3289,7 +3289,7 @@ describe("buildRfcContent", () => {
       "## Non-goals\n\nDeliberately descoped work, each with a one-line reason. This is where an\nRFC-level descoping decision lives canonically — don't leave it only in\nsession memory or a story comment.\n\n- **Name:** what it is, why it's out of scope.",
     );
     expect(content).toContain(
-      '## Verification\n\nHow we\'ll know the RFC worked — a concrete metric, count, or burndown target\n(e.g. "exclude list reaches zero entries", "test:compare delta ≥ +40"). State\nthe number, not a vibe.',
+      '## Verification\n\nHow we\'ll know the RFC worked — a concrete metric, count, or burndown target\n(e.g. "exclude list reaches zero entries", "parity:test delta ≥ +40"). State\nthe number, not a vibe.',
     );
     // The open-questions note must sit between the heading and the first question.
     expect(content).toContain(
