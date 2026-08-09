@@ -189,7 +189,8 @@ interface QuoterHost {
 
 /**
  * Resolves quoting via `connection`, which is the `with_connection { |c| ... }`
- * every `sanitize_sql_array` branch runs inside (sanitization.rb:167-179).
+ * each QUOTING branch of `sanitize_sql_array` opens for itself
+ * (sanitization.rb:167-179) — never the `statement.blank?` arm between them.
  * Rails has no adapter-free quoter to fall back to — `quote_column_name` is
  * `raise NotImplementedError` on the abstract (abstract/quoting.rb:61) — so a
  * caller with no connection surfaces the connection error rather than emitting
