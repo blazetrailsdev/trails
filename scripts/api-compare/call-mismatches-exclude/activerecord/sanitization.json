@@ -32,7 +32,7 @@
     "tsFile": "sanitization.ts",
     "rubyName": "sanitize_sql_for_order",
     "call": "order:constructor,disallowRawSqlBang",
-    "reason": "Call ORDER only: Rails' one `new` is the `String.new(condition.first)` AFTER disallow_raw_sql!, while `adapter_class` (connection_handling.rb:338) raises on its own when there is no pool to read a db_config from - trails' adapterClassSync answers null instead, so the equivalent raise is an explicit `new ConnectionNotDefined()` before the call. Converges when adapterClassSync propagates the pool error."
+    "reason": "Call ORDER only: Rails' one `new` is the `String.new(condition.first)` AFTER disallow_raw_sql!, while `adapter_class` (connection_handling.rb:338) raises on its own when there is no pool to read a db_config from - trails' adapterClassSync answers null instead, so the equivalent raise is an explicit `new ConnectionNotDefined()` before the call. Converges with story adapter-class-sync-swallows-the-pool-error-rails-raises (RFC 0077), which makes adapterClassSync propagate that error."
   },
   {
     "package": "activerecord",

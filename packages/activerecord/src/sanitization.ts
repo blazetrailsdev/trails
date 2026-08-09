@@ -283,14 +283,15 @@ export function sanitizeSqlForOrder(
       // (sanitization.rb:85-88); `disallowRawSqlBang` skips Node instances, so
       // `Arel.sql("field(id, ?)")` is permitted and only the substituted
       // result is returned.
-      // Rails reads the matcher off `adapter_class` — a class-level lookup
-      // that checks out no connection (connection_handling.rb:338, over
-      // `connection_pool.db_config.adapter_class`) — so this does too, and a
-      // host with no adapter to resolve raises rather than falling back to the
-      // abstract matcher, which is a permissiveness no adapter asked for.
-      // `column_name_with_order_matcher` lives in `Quoting::ClassMethods`
-      // (abstract/quoting.rb:33) and so is a static on each concrete adapter
-      // class, which the adapter constructor type does not carry.
+      // Rails reads the matcher off `adapter_class`, a class-level lookup that
+      // checks out no connection and raises when there is no pool to read a
+      // `db_config` from (connection_handling.rb:338). trails'
+      // `adapterClassSync` answers null there instead, so the raise is explicit
+      // — never a fall back to the abstract matcher, whose permissiveness no
+      // adapter asked for.
+      // `column_name_with_order_matcher` is in `Quoting::ClassMethods`
+      // (abstract/quoting.rb:33), so it is a static the adapter constructor
+      // type does not carry.
       const adapterClass = this.adapterClassSync() as {
         columnNameWithOrderMatcher(): RegExp;
       } | null;

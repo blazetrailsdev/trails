@@ -3220,7 +3220,9 @@ function mJulianP(jd: number, sg: number): boolean {
 /**
  * @internal `date_core.c` `s_virtual_sg` (`date_core.c:1110-1120`) and
  * `c_virtual_sg` (`date_core.c:1122-1131`), which differ only in the union arm
- * they read and so are one function here, taking the fields. A date whose day
+ * they read and so are one function here, taking the fields — which makes it
+ * `m_virtual_sg` (`date_core.c:1135-1142`), their dispatcher, at every call
+ * site. A date whose day
  * outran a `Fixnum` — `nth` nonzero — is read proleptically whatever its stored
  * `sg` says: a positive `nth` is far enough past the reform to be Gregorian
  * everywhere and a negative one far enough before it to be Julian everywhere.
