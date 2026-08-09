@@ -33,7 +33,7 @@ describe("DupTest", () => {
     // attribute accessor and `locking_enabled?` false. Register and warm it so
     // the optimistic-locking column is real (mirrors locking_test.rb's setup).
     registerModel("Car", Car);
-    Car.resetColumnInformation();
+    void Car.resetColumnInformation();
     await Car.loadSchema();
   });
 

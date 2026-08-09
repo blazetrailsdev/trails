@@ -1130,7 +1130,7 @@ describe("EncryptableRecord — ignore_case original_<name> column requirement",
       }
     } as any;
     Configurable.config.supportUnencryptedData = false;
-    Model.resetColumnInformation();
+    void Model.resetColumnInformation();
     await expect(async () => {
       await Model.loadSchema();
       new Model();

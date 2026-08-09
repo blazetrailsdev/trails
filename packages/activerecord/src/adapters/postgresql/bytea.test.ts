@@ -36,7 +36,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         t.binary("serialized");
       });
     });
-    ByteaDataType.resetColumnInformation();
+    void ByteaDataType.resetColumnInformation();
     await ByteaDataType.loadSchema();
     // Rails: @column = ByteaDataType.columns_hash["payload"]
     column = ByteaDataType.columnsHash()["payload"] as unknown as PgColumn;
@@ -47,7 +47,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   afterEach(async () => {
     // Rails: @connection.drop_table "bytea_data_type", if_exists: true
     await connection.dropTable("bytea_data_type", { ifExists: true });
-    ByteaDataType.resetColumnInformation();
+    void ByteaDataType.resetColumnInformation();
   });
 
   describe("PostgresqlByteaTest", () => {
@@ -187,7 +187,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       // Rails: klass = Class.new(ByteaDataType) { serialize :serialized, coder: Serializer.new }
       class ByteaSerialized extends ByteaDataType {}
       ByteaSerialized.serialize("serialized", { coder });
-      ByteaSerialized.resetColumnInformation();
+      void ByteaSerialized.resetColumnInformation();
       await ByteaSerialized.loadSchema();
       // Rails: obj = klass.new; obj.serialized = "hello world"; obj.save!
       const obj = new ByteaSerialized() as any;

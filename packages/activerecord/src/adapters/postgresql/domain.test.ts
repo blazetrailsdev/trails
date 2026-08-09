@@ -36,7 +36,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     // Rails' create_table auto-calls reload_type_map; raw execute() does not.
     // Without a full reload, registerDomainType can't find the base numeric OID.
     await connection.reloadTypeMap();
-    PostgresqlDomain.resetColumnInformation();
+    void PostgresqlDomain.resetColumnInformation();
     await PostgresqlDomain.loadSchema();
   });
 
@@ -44,7 +44,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     // Rails: teardown drop_table + DROP DOMAIN
     await connection.execute("DROP TABLE IF EXISTS postgresql_domains");
     await connection.execute("DROP DOMAIN IF EXISTS custom_money");
-    PostgresqlDomain.resetColumnInformation();
+    void PostgresqlDomain.resetColumnInformation();
     // Rails: reset_connection flushes the type map; mirror composite.test.ts:63-64
     await connection.reloadTypeMap();
   });

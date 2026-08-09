@@ -32,6 +32,7 @@ import {
   preprocessQuery,
   select,
   execInsert,
+  execQuery,
   sqlForInsert,
   arelFromRelation,
   extractTableRefFromInsertSql,
@@ -619,6 +620,51 @@ describe("execInsert", () => {
       "created_at",
     ]);
     expect(getCapturedSql()).toContain('RETURNING "id", "created_at"');
+  });
+});
+
+describe("internal_exec_query is a virtual call", () => {
+  // Ruby's exec_query / exec_insert / select call `internal_exec_query(...)` on
+  // self, so an adapter subclass's override (SQLite3Adapter's bind-aware,
+  // statement-pooling one) wins — abstract/database_statements.rb. The
+  // module-level ports must dispatch through the instance, not call the
+  // module-level function directly, or the override is silently dropped.
+  function makeOverrideHost() {
+    const seen: string[] = [];
+    const host: DatabaseStatementsHost = {
+      pool,
+      supportsInsertReturning: () => false,
+      quoteColumnName: (c) => `"${c}"`,
+      async internalExecQuery(sql: string) {
+        seen.push(sql);
+        return new Result(["overridden"], [[1]]);
+      },
+      async internalExecute() {
+        throw new Error("module-level internalExecQuery ran instead of the override");
+      },
+    };
+    return { host, seen };
+  }
+
+  it("execQuery reaches the adapter override", async () => {
+    const { host, seen } = makeOverrideHost();
+    const result = await execQuery.call(host, "SELECT 1");
+    expect(result.columns).toEqual(["overridden"]);
+    expect(seen).toEqual(["SELECT 1"]);
+  });
+
+  it("execInsert reaches the adapter override", async () => {
+    const { host, seen } = makeOverrideHost();
+    const result = await execInsert.call(host, "INSERT INTO t (x) VALUES (1)", null, [], "id");
+    expect(result.columns).toEqual(["overridden"]);
+    expect(seen).toEqual(["INSERT INTO t (x) VALUES (1)"]);
+  });
+
+  it("select reaches the adapter override", async () => {
+    const { host, seen } = makeOverrideHost();
+    const result = await select.call(host, "SELECT 2");
+    expect(result.columns).toEqual(["overridden"]);
+    expect(seen).toEqual(["SELECT 2"]);
   });
 });
 

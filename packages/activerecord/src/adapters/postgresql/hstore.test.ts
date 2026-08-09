@@ -61,9 +61,9 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     // Rails: Hstore.reset_column_information
-    Hstore.resetColumnInformation();
+    void Hstore.resetColumnInformation();
     await Hstore.loadSchema();
-    HstoreWithSerialize.resetColumnInformation();
+    void HstoreWithSerialize.resetColumnInformation();
     await HstoreWithSerialize.loadSchema();
 
     // Rails: @column = Hstore.columns_hash["tags"]
@@ -77,8 +77,8 @@ describeIfPg("PostgreSQLAdapter", () => {
     await connection.dropTable("hstores", { ifExists: true });
     // Rails: disable_extension!("hstore", @connection)
     await connection.disableExtension("hstore", { force: "cascade" }).catch(() => {});
-    Hstore.resetColumnInformation();
-    HstoreWithSerialize.resetColumnInformation();
+    void Hstore.resetColumnInformation();
+    void HstoreWithSerialize.resetColumnInformation();
   });
 
   describe("PostgresqlHstoreTest", () => {
@@ -137,7 +137,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         default: '"users"=>"read", "articles"=>"write"',
       });
       // Rails: Hstore.reset_column_information (ensure block also resets)
-      Hstore.resetColumnInformation();
+      void Hstore.resetColumnInformation();
       await Hstore.loadSchema();
       expect((Hstore as any).columnDefaults["permissions"]).toEqual({
         users: "read",
@@ -152,7 +152,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await connection.changeTable("hstores", async (t) => {
         await (t as PgTable).hstore("users", { default: "" });
       });
-      Hstore.resetColumnInformation();
+      void Hstore.resetColumnInformation();
       await Hstore.loadSchema();
       const col = (Hstore as any).columnsHash()["users"];
       expect(col.type).toBe("hstore");

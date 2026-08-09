@@ -278,7 +278,7 @@ export class SQLiteDatabaseTasks {
     };
     const run = async () => {
       for (const row of rows) {
-        await adapter.executeMutation(`DELETE FROM "${row.name.replace(/"/g, '""')}"`);
+        await adapter.execute(`DELETE FROM "${row.name.replace(/"/g, '""')}"`);
       }
       // Match TRUNCATE/RESTART IDENTITY semantics by clearing the
       // AUTOINCREMENT counters for the truncated tables. Rails'
@@ -290,7 +290,7 @@ export class SQLiteDatabaseTasks {
       )) as Array<{ name: string }>;
       if (hasSequence.length > 0 && rows.length > 0) {
         const list = rows.map((r) => `'${r.name.replace(/'/g, "''")}'`).join(", ");
-        await adapter.executeMutation(`DELETE FROM sqlite_sequence WHERE name IN (${list})`);
+        await adapter.execute(`DELETE FROM sqlite_sequence WHERE name IN (${list})`);
       }
     };
     if (typeof withFks.disableReferentialIntegrity === "function") {

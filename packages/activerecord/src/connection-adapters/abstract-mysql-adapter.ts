@@ -614,15 +614,15 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   async createDatabase(name: string, options: Record<string, unknown> = {}): Promise<void> {
     if (options.collation) {
-      await this._execMutation(
+      await this.execute(
         `CREATE DATABASE ${this.quoteTableName(name)} DEFAULT COLLATE ${this.quoteTableName(String(options.collation))}`,
       );
     } else if (options.charset) {
-      await this._execMutation(
+      await this.execute(
         `CREATE DATABASE ${this.quoteTableName(name)} DEFAULT CHARACTER SET ${this.quoteTableName(String(options.charset))}`,
       );
     } else if (await isRowFormatDynamicByDefault.call(this)) {
-      await this._execMutation(
+      await this.execute(
         `CREATE DATABASE ${this.quoteTableName(name)} DEFAULT CHARACTER SET \`utf8mb4\``,
       );
     } else {
@@ -633,7 +633,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   async dropDatabase(name: string): Promise<void> {
-    await this._execMutation(`DROP DATABASE IF EXISTS ${this.quoteTableName(name)}`);
+    await this.execute(`DROP DATABASE IF EXISTS ${this.quoteTableName(name)}`);
   }
 
   /**
@@ -689,16 +689,14 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     const raw = this.extractNewCommentValue(commentOrChanges);
     // Mirrors Rails: `comment = "" if comment.nil?` then `COMMENT #{quote(comment)}`.
     const c = raw == null ? "" : String(raw);
-    await this._execMutation(
-      `ALTER TABLE ${this.quoteTableName(tableName)} COMMENT ${this.quote(c)}`,
-    );
+    await this.execute(`ALTER TABLE ${this.quoteTableName(tableName)} COMMENT ${this.quote(c)}`);
   }
 
   async renameTable(tableName: string, newName: string): Promise<void> {
     this.validateTableLengthBang(newName);
     await this.schemaCache.clearDataSourceCacheBang(tableName);
     await this.schemaCache.clearDataSourceCacheBang(newName);
-    await this._execMutation(
+    await this.execute(
       `RENAME TABLE ${this.quoteTableName(tableName)} TO ${this.quoteTableName(newName)}`,
     );
     await this.renameTableIndexes(tableName, newName);
@@ -708,28 +706,13 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     if (await this.supportsRenameIndex()) {
       this.validateIndexLengthBang(tableName, newName);
 
-      await this._execMutation(
+      await this.execute(
         `ALTER TABLE ${this.quoteTableName(tableName)} RENAME INDEX ` +
           `${this.quoteTableName(oldName)} TO ${this.quoteTableName(newName)}`,
       );
     } else {
       await super.renameIndex(tableName, oldName, newName);
     }
-  }
-
-  /**
-   * Execute a DDL/DML statement on the concrete adapter.
-   * AbstractMysqlAdapter itself does not hold a connection; this delegates to
-   * the concrete subclass (Mysql2Adapter) which implements `execute` on
-   * DatabaseAdapter — the same public entry point Rails' DDL runs through.
-   * @internal
-   */
-  protected async _execMutation(sql: string): Promise<void> {
-    const exec = (this as unknown as { execute?: (sql: string) => Promise<unknown> }).execute;
-    if (typeof exec !== "function") {
-      throw new Error(`${this.constructor.name} must implement execute() to use DDL helpers`);
-    }
-    await exec.call(this, sql);
   }
 
   /**
@@ -747,7 +730,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
       columnName,
       defaultOrChanges,
     );
-    await this._execMutation(`ALTER TABLE ${this.quoteTableName(tableName)} ${fragment}`);
+    await this.execute(`ALTER TABLE ${this.quoteTableName(tableName)} ${fragment}`);
   }
 
   /**
@@ -817,7 +800,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     this.validateChangeColumnNullArgumentBang(null_);
     if (!null_ && default_ != null) {
       const colId = this.quoteColumnName(columnName);
-      await this._execMutation(
+      await this.execute(
         `UPDATE ${this.quoteTableName(tableName)} SET ${colId}=${this.quote(default_)} WHERE ${colId} IS NULL`,
       );
     }
@@ -845,7 +828,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     options: ColumnOptions = {},
   ): Promise<void> {
     const sql = `ALTER TABLE ${this.quoteTableName(tableName)} ${await this.changeColumnForAlter(tableName, columnName, type, options)}`;
-    await this._execMutation(sql);
+    await this.execute(sql);
   }
 
   async buildChangeColumnDefinition(
@@ -889,7 +872,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   async renameColumn(tableName: string, columnName: string, newColumnName: string): Promise<void> {
     const fragment = await this.renameColumnForAlter(tableName, columnName, newColumnName);
-    await this._execMutation(`ALTER TABLE ${this.quoteTableName(tableName)} ${fragment}`);
+    await this.execute(`ALTER TABLE ${this.quoteTableName(tableName)} ${fragment}`);
     await this.renameColumnIndexes(tableName, columnName, newColumnName);
   }
 
@@ -900,7 +883,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   ): Promise<void> {
     const createIndex = await this.buildCreateIndexDefinition(tableName, columnName, options);
     if (!createIndex) return;
-    await this._execMutation(await this.schemaCreation.accept(createIndex));
+    await this.execute(await this.schemaCreation.accept(createIndex));
   }
 
   /**

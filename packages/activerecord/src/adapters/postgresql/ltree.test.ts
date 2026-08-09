@@ -37,14 +37,14 @@ describeIfPg("PostgreSQLAdapter", () => {
       (t as PgTableDefinition).ltree("path");
     });
 
-    Ltree.resetColumnInformation();
+    void Ltree.resetColumnInformation();
     await Ltree.loadSchema();
   });
 
   afterEach(async () => {
     // Rails: @connection.drop_table "ltrees", if_exists: true
     await connection.dropTable("ltrees", { ifExists: true });
-    Ltree.resetColumnInformation();
+    void Ltree.resetColumnInformation();
   });
 
   describe("PostgresqlLtreeTest", () => {

@@ -137,13 +137,13 @@ export class MySQLDatabaseTasks {
       .map((r) => r.table_name ?? r.TABLE_NAME)
       .filter((n): n is string => typeof n === "string" && !bookkeeping.has(n));
     if (names.length === 0) return;
-    await adapter.executeMutation("SET FOREIGN_KEY_CHECKS = 0");
+    await adapter.execute("SET FOREIGN_KEY_CHECKS = 0");
     try {
       for (const name of names) {
-        await adapter.executeMutation(`TRUNCATE TABLE \`${name.replace(/`/g, "``")}\``);
+        await adapter.execute(`TRUNCATE TABLE \`${name.replace(/`/g, "``")}\``);
       }
     } finally {
-      await adapter.executeMutation("SET FOREIGN_KEY_CHECKS = 1");
+      await adapter.execute("SET FOREIGN_KEY_CHECKS = 1");
     }
   }
 

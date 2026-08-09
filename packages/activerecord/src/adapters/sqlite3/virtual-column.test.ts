@@ -47,7 +47,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await adapter.dropTable("virtual_columns", { ifExists: true }).catch(() => undefined);
-  VirtualColumn.resetColumnInformation();
+  void VirtualColumn.resetColumnInformation();
 });
 
 async function take(): Promise<Record<string, unknown>> {
@@ -60,7 +60,7 @@ function columnFor(name: string): Column {
 
 async function reloadColumnInformation(): Promise<void> {
   adapter.internalSchemaCache?.clear();
-  VirtualColumn.resetColumnInformation();
+  void VirtualColumn.resetColumnInformation();
   await VirtualColumn.loadSchema();
 }
 

@@ -280,7 +280,7 @@ class RevertCheckConstraintWithInvalidOption extends SilentMigration {
 // Mirrors Rails' `Horse.reset_column_information` followed by the lazy schema
 // reload its next attribute access triggers.
 async function resetHorse(): Promise<void> {
-  Horse.resetColumnInformation();
+  void Horse.resetColumnInformation();
   await loadSchemaFromAdapter.call(Horse);
 }
 
@@ -292,7 +292,7 @@ describe("InvertibleMigrationTest", () => {
         await connection.dropTable(table);
       }
     }
-    Horse.resetColumnInformation();
+    void Horse.resetColumnInformation();
   });
 
   it("no reverse", async () => {
@@ -603,7 +603,7 @@ describe("InvertibleMigrationTest", () => {
     const horse1 = await Horse.create();
     // populates existing horses with oldie = 1 but new ones have default 0
     await new UpOnlyMigration().migrate("up");
-    Horse.resetColumnInformation();
+    void Horse.resetColumnInformation();
     await horse1.reload();
     const horse2 = await Horse.create();
 
@@ -613,7 +613,7 @@ describe("InvertibleMigrationTest", () => {
     await new UpOnlyMigration().migrate("down"); // should be no error
     const connection = await Base.leaseConnection();
     expect(await connection.columnExists("horses", "oldie")).toBe(false);
-    Horse.resetColumnInformation();
+    void Horse.resetColumnInformation();
   });
 
   itIfSupports(

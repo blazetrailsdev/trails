@@ -26,13 +26,13 @@ describeIfPg("PostgreSQLAdapter", () => {
     await connection.execute(
       `CREATE TABLE postgresql_numbers (id SERIAL PRIMARY KEY, single REAL, double DOUBLE PRECISION)`,
     );
-    PostgresqlNumber.resetColumnInformation();
+    void PostgresqlNumber.resetColumnInformation();
     await PostgresqlNumber.loadSchema();
   });
 
   afterEach(async () => {
     await connection.execute("DROP TABLE IF EXISTS postgresql_numbers");
-    PostgresqlNumber.resetColumnInformation();
+    void PostgresqlNumber.resetColumnInformation();
   });
 
   describe("PostgreSQLNumberTest", () => {

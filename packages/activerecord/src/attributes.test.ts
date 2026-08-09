@@ -68,12 +68,12 @@ describe("CustomPropertiesTest", () => {
     const old = Base.immutableStringsByDefault;
     Base.immutableStringsByDefault = true;
     try {
-      OverloadedType.resetColumnInformation();
+      void OverloadedType.resetColumnInformation();
       await loadSchemaFromAdapter.call(OverloadedType);
       fn();
     } finally {
       Base.immutableStringsByDefault = old;
-      OverloadedType.resetColumnInformation();
+      void OverloadedType.resetColumnInformation();
       await loadSchemaFromAdapter.call(OverloadedType);
     }
   };

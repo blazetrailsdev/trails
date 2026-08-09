@@ -368,7 +368,7 @@ describe("Migration", () => {
         null: false,
         default: 99,
       });
-      PersonKlass.resetColumnInformation();
+      void PersonKlass.resetColumnInformation();
       await PersonKlass.loadSchema();
       expect(PersonKlass.columnDefaults["wealth"]).toBe(99);
       expect(PersonKlass.columnsHash()["wealth"].null).toBe(false);
@@ -376,14 +376,14 @@ describe("Migration", () => {
 
       // change column default to see that column doesn't lose its not null definition
       await personConnection.changeColumnDefault("testings", "wealth", 100);
-      PersonKlass.resetColumnInformation();
+      void PersonKlass.resetColumnInformation();
       await PersonKlass.loadSchema();
       expect(PersonKlass.columnDefaults["wealth"]).toBe(100);
       expect(PersonKlass.columnsHash()["wealth"].null).toBe(false);
 
       // rename column to see that column doesn't lose its not null and/or default definition
       await personConnection.renameColumn("testings", "wealth", "money");
-      PersonKlass.resetColumnInformation();
+      void PersonKlass.resetColumnInformation();
       await PersonKlass.loadSchema();
       expect(PersonKlass.columnsHash()["wealth"]).toBeUndefined();
       expect(PersonKlass.columnDefaults["money"]).toBe(100);
@@ -394,7 +394,7 @@ describe("Migration", () => {
         null: false,
         default: 1000,
       });
-      PersonKlass.resetColumnInformation();
+      void PersonKlass.resetColumnInformation();
       await PersonKlass.loadSchema();
       expect(PersonKlass.columnDefaults["money"]).toBe(1000);
       expect(PersonKlass.columnsHash()["money"].null).toBe(false);
@@ -404,7 +404,7 @@ describe("Migration", () => {
         null: true,
         default: null,
       });
-      PersonKlass.resetColumnInformation();
+      void PersonKlass.resetColumnInformation();
       await PersonKlass.loadSchema();
       expect(PersonKlass.columnsHash()["money"].default).toBeNull();
       expect(PersonKlass.columnsHash()["money"].null).toBe(true);
@@ -412,7 +412,7 @@ describe("Migration", () => {
       // change_column_null, make it not nullable and set null values to a default value
       await personConnection.execute("UPDATE testings SET money = NULL");
       await personConnection.changeColumnNull("testings", "money", false, 2000);
-      PersonKlass.resetColumnInformation();
+      void PersonKlass.resetColumnInformation();
       await PersonKlass.loadSchema();
       expect(PersonKlass.columnsHash()["money"].default).toBeNull();
       expect(PersonKlass.columnsHash()["money"].null).toBe(false);

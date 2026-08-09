@@ -87,12 +87,12 @@ async function personColumnNames(adp: DatabaseAdapter): Promise<string[]> {
   const original = (Person as any)._adapter;
   try {
     (Person as any).adapter = adp;
-    (Person as any).resetColumnInformation();
+    void (Person as any).resetColumnInformation();
     await loadSchemaFromAdapter.call(Person as any);
     return Person.columnNames();
   } finally {
     (Person as any)._adapter = original;
-    (Person as any).resetColumnInformation();
+    void (Person as any).resetColumnInformation();
   }
 }
 
@@ -136,7 +136,7 @@ afterEach(async () => {
   } catch {
     /* nothing to strip */
   }
-  (Person as any).resetColumnInformation();
+  void (Person as any).resetColumnInformation();
 });
 
 // Migration tests legitimately create ad-hoc tables (Rails' migration_test.rb
@@ -698,7 +698,7 @@ describe("MigrationTest", () => {
     // Rails' `assert_column Person, :last_name`. Person rides the same
     // canonical connection the migration ran against, so it only needs its
     // column cache re-read; the afterEach strips `last_name` again.
-    Person.resetColumnInformation();
+    void Person.resetColumnInformation();
     await loadSchemaFromAdapter.call(Person as any);
     expect(Person.columnNames()).toContain("last_name");
   });

@@ -15,7 +15,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
 
   async function emulateBooleans(value: boolean): Promise<void> {
     adapter.emulateBooleans = value;
-    BooleanType.resetColumnInformation();
+    void BooleanType.resetColumnInformation();
     await BooleanType.loadSchema();
   }
 

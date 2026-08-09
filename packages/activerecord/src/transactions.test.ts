@@ -1681,11 +1681,11 @@ describe("TransactionTest", () => {
   it.skipIf(adapterType !== "sqlite")("sqlite add column in transaction", async () => {
     const connection = await (Topic as any).leaseConnection();
     try {
-      (Topic as any).resetColumnInformation();
+      void (Topic as any).resetColumnInformation();
       await connection.addColumn("topics", "stuff", "string");
       expect((await connection.columns("topics")).map((c: any) => c.name)).toContain("stuff");
 
-      (Topic as any).resetColumnInformation();
+      void (Topic as any).resetColumnInformation();
       await connection.removeColumn("topics", "stuff");
       expect((await connection.columns("topics")).map((c: any) => c.name)).not.toContain("stuff");
 
@@ -1701,7 +1701,7 @@ describe("TransactionTest", () => {
       } catch {
         /* already removed */
       }
-      (Topic as any).resetColumnInformation();
+      void (Topic as any).resetColumnInformation();
     }
   });
 

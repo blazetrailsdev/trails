@@ -34,11 +34,8 @@ import { Result } from "../result.js";
 import { ExplainPrettyPrinter } from "./mysql/explain-pretty-printer.js";
 import {
   affectedRows as mysql2AffectedRows,
-  buildColumnTypes,
   castResult as mysql2CastResult,
   performQuery as mysql2PerformQuery,
-  unwrapMultiResult,
-  type Mysql2FieldDescriptor,
   type Mysql2RawResult,
 } from "./mysql2/database-statements.js";
 import {
@@ -620,6 +617,10 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     const driverSql = this.mysqlQuote(sql);
     const driverBinds = this.mysqlBinds(binds ?? []);
     const txPublicQuery = this.currentTransaction().userTransaction;
+    // Rails logs the caller's own binds (`QueryAttribute` objects) plus their
+    // type-casted values, NOT the driver wire form — abstract_adapter.rb:1134-1145
+    // / abstract/database_statements.rb:553-554. `driverBinds` stays scoped to
+    // the driver call below.
     const payload: Record<string, unknown> = {
       sql: driverSql,
       name: name ?? "SQL",
@@ -640,55 +641,21 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
           { allowRetry: options?.allowRetry ?? false },
           async (conn) => {
             const mysqlConn = conn as unknown as mysql.Connection;
-            const prepare = options?.prepare ?? this._shouldPrepare(binds ?? []);
-            if (prepare) this._trackPrepared(mysqlConn, driverSql);
-            // Request array-mode rows so duplicate column names
-            // (e.g. `SELECT 1 AS a, 2 AS a`) survive: object-keyed rows would
-            // collapse the second `a` onto the first. This mirrors Rails, whose
-            // `configure_connection` sets `query_options[:as] = :array`
-            // (mysql2_adapter.rb:159), making `raw_result.to_a` positional — so
-            // cast_result builds the Result from `result.fields` + positional rows.
-            const [rawResult, rawFields] = prepare
-              ? await mysqlConn.execute(
-                  { sql: driverSql, rowsAsArray: true } as any,
-                  driverBinds as any[],
-                )
-              : await mysqlConn.query({ sql: driverSql, rowsAsArray: true } as any, driverBinds);
-            // Unwrap mysql2's nested CALL/multi-result sets to the single result
-            // set Rails' cast_result reads (the same seam internalExecute uses).
-            // `fields` are the field descriptors for the returned rows — present
-            // whenever a SELECT projected columns, even at zero rows matched.
-            const { result, fields } = unwrapMultiResult(
-              rawResult,
-              rawFields as mysql.FieldPacket[] | undefined,
+            // Rails' internal_exec_query is `cast_result(raw_execute(...))` —
+            // one `perform_query` primitive per adapter, not a second inline
+            // driver call. `_performQuery` owns the array-mode query, the
+            // CALL/multi-result unwrap, the affected-row record and the warning
+            // fetch; `cast_result` builds the Result from its `{ rows, fields }`,
+            // preserving duplicate column names and column_types.
+            const raw = await this._performQuery(
+              mysqlConn,
+              driverSql,
+              binds ?? [],
+              driverBinds,
+              payload,
+              options?.prepare,
             );
-            // DML results in a ResultSetHeader (no rows array); SELECT results
-            // in an array of positional row arrays. Return empty Result for DML
-            // to avoid throwing on INSERT/UPDATE/DELETE passed to execQuery.
-            if (!Array.isArray(result)) {
-              payload.row_count = result.affectedRows ?? 0;
-              await this._handleWarningsOn(mysqlConn, driverSql);
-              return new Result([], []);
-            }
-            payload.row_count = result.length;
-            await this._handleWarningsOn(mysqlConn, driverSql);
-            // Build the Result from the field descriptors plus the positional
-            // (array-mode) rows, mirroring Rails' `cast_result`: columns come
-            // from `result.fields` and rows from `result.to_a`. This preserves
-            // duplicate column names and keeps the column set when zero rows
-            // matched (the field descriptors are present whenever a SELECT
-            // projected columns).
-            const fieldList = (fields ?? []) as unknown as Mysql2FieldDescriptor[];
-            const names = fieldList.map((f) => f.name);
-            if (names.length === 0) return Result.empty();
-            // Report column_types from the field descriptors (numeric/decimal
-            // families) so extra/computed select columns deserialize to the
-            // faithful trails type — a BigDecimal for NEWDECIMAL rather than the
-            // raw "1.1" driver string. Mirrors the PostgreSQL adapter's
-            // cast_result; node-mysql2 (decimalNumbers:false) has no driver-level
-            // BigDecimal cast, so the adapter reports the type map itself.
-            const columnTypes = buildColumnTypes(fieldList, (t) => this.lookupCastType(t));
-            return new Result(names, result as unknown[][], columnTypes);
+            return this.castResult(raw);
           },
         );
       } catch (e: any) {
@@ -932,10 +899,12 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     binds: unknown[],
     driverBinds: unknown[],
     payload: Record<string, unknown>,
+    // Rails' `raw_execute` takes `prepare:` and forwards it to `perform_query`;
+    // when the caller does not state one, fall back to `_shouldPrepare`.
+    prepare: boolean = this._shouldPrepare(binds),
   ): Promise<Mysql2RawResult> {
     // Track the SQL in our statement pool first so LRU eviction sends
     // COM_STMT_CLOSE (via unprepare) when we exceed `statement_limit`.
-    const prepare = this._shouldPrepare(binds);
     if (prepare) this._trackPrepared(conn, driverSql);
     // Hand the payload to the port so it records both keys the way Rails'
     // perform_query does (database_statements.rb:97-98):
@@ -959,6 +928,16 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    * Mirrors: ActiveRecord::ConnectionAdapters::Mysql2::DatabaseStatements#affected_rows
    * @internal
    */
+  /**
+   * Assigned onto the prototype below (Mirrors: Mysql2::DatabaseStatements#cast_result);
+   * declared here so `internal_exec_query`'s virtual call resolves against the
+   * concrete adapter rather than AbstractAdapter's optional member.
+   *
+   * @internal
+   */
+  declare castResult: typeof mysql2CastResult;
+
+  /** @internal */
   affectedRows(rawResult: Mysql2RawResult): number {
     return mysql2AffectedRows.call(this as any, rawResult);
   }

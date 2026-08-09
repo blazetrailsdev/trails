@@ -88,7 +88,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         await t.virtual("lower_name", { type: "string", as: "LOWER(name)", stored: true });
       });
       adapter.internalSchemaCache?.clear();
-      VirtualColumn.resetColumnInformation();
+      void VirtualColumn.resetColumnInformation();
       await VirtualColumn.loadSchema();
       const column = await findColumn("lower_name");
       expect(column!.isVirtual()).toBe(true);

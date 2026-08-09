@@ -270,7 +270,7 @@ describe("MultiParameterAttributeTest", () => {
         async () => {
           // Mirrors Rails: Topic.reset_column_information so the schema reloads with
           // awareAttributes: true active, wrapping written_on in TimeZoneConverter.
-          Topic.resetColumnInformation();
+          void Topic.resetColumnInformation();
           await Topic.loadSchema();
           const topic = new Topic();
           await topic.assignAttributes({
@@ -291,7 +291,7 @@ describe("MultiParameterAttributeTest", () => {
     } finally {
       // mirrors Rails ensure: Topic.reset_column_information
       // reload re-warms the adapter schema cache so later tests can load the schema sync.
-      Topic.resetColumnInformation();
+      void Topic.resetColumnInformation();
       await Topic.loadSchema();
     }
   });
@@ -299,7 +299,7 @@ describe("MultiParameterAttributeTest", () => {
   it("multiparameter attributes on time with time zone aware attributes and invalid time params", async () => {
     try {
       await withTimezoneConfig({ awareAttributes: true }, async () => {
-        Topic.resetColumnInformation();
+        void Topic.resetColumnInformation();
         await Topic.loadSchema();
         const topic = new Topic();
         await topic.assignAttributes({
@@ -310,7 +310,7 @@ describe("MultiParameterAttributeTest", () => {
         expect(topic.written_on).toBeNull();
       });
     } finally {
-      Topic.resetColumnInformation();
+      void Topic.resetColumnInformation();
       await Topic.loadSchema();
     }
   });
@@ -320,7 +320,7 @@ describe("MultiParameterAttributeTest", () => {
       await withTimezoneConfig(
         { default: "local", awareAttributes: false, zone: "Pacific Time (US & Canada)" },
         async () => {
-          Topic.resetColumnInformation();
+          void Topic.resetColumnInformation();
           await Topic.loadSchema();
           const topic = new Topic();
           await topic.assignAttributes({
@@ -337,7 +337,7 @@ describe("MultiParameterAttributeTest", () => {
         },
       );
     } finally {
-      Topic.resetColumnInformation();
+      void Topic.resetColumnInformation();
       await Topic.loadSchema();
     }
   });
@@ -349,7 +349,7 @@ describe("MultiParameterAttributeTest", () => {
         async () => {
           // Mirrors Rails: Topic.skip_time_zone_conversion_for_attributes = [:written_on]
           Topic.skipTimeZoneConversionForAttributes = ["written_on"];
-          Topic.resetColumnInformation();
+          void Topic.resetColumnInformation();
           await Topic.loadSchema();
           const topic = new Topic();
           await topic.assignAttributes({
@@ -369,7 +369,7 @@ describe("MultiParameterAttributeTest", () => {
     } finally {
       // Mirrors Rails ensure: Topic.skip_time_zone_conversion_for_attributes = []
       Topic.skipTimeZoneConversionForAttributes = [];
-      Topic.resetColumnInformation();
+      void Topic.resetColumnInformation();
       await Topic.loadSchema();
     }
   });
@@ -381,7 +381,7 @@ describe("MultiParameterAttributeTest", () => {
         async () => {
           // Mirrors Rails: Topic.reset_column_information so the schema reloads with
           // awareAttributes: true active, wrapping bonus_time in TimeZoneConverter.
-          Topic.resetColumnInformation();
+          void Topic.resetColumnInformation();
           await Topic.loadSchema();
           const topic = new Topic();
           await topic.assignAttributes({
@@ -407,7 +407,7 @@ describe("MultiParameterAttributeTest", () => {
         },
       );
     } finally {
-      Topic.resetColumnInformation();
+      void Topic.resetColumnInformation();
       await Topic.loadSchema();
     }
   });

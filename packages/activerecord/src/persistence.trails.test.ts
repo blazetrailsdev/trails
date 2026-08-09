@@ -215,7 +215,7 @@ describe("PersistenceTest (trails)", () => {
     // cannot find its columns — the cold-cache condition under which the bug
     // bites (otherwise a warm cross-file cache masks it). Only clears the
     // sibling `Aircraft`'s reflection, not the subclass's copied foreign defs.
-    Aircraft.resetColumnInformation();
+    void Aircraft.resetColumnInformation();
 
     const before = (await Aircraft.count()) as number;
     const aircraft = (await MinimalisticAircraft.create({ name: "Wright Flyer" })) as unknown as {

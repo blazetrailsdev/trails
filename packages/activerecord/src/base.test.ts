@@ -677,7 +677,7 @@ describe("BasicsTest", () => {
     const topic = await Topic.create({ content: payload as any });
     expect((topic as any).content).toEqual(payload);
 
-    Topic.resetColumnInformation();
+    void Topic.resetColumnInformation();
 
     // Rails stubs connection_pool.schema_cache to raise; reflecting the
     // columns then propagates that error. Already-loaded records are
