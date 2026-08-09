@@ -3171,6 +3171,23 @@ describe("callArgs", () => {
     expect(flags.filter((f) => !shared.has(f))).toEqual([]);
   });
 
+  it("spells a site the same way the calls stream does", () => {
+    // The site name is RAW on both sides (Ruby leaves `new` / snake_case; §2
+    // normalization is the comparator's job), so what "raw" means here is
+    // whatever `calls` already records — the two TS streams must not diverge.
+    const cls = extractFromSource(
+      `class Foo {
+        create() {
+          this.buildRecord(1);
+          new Node(2);
+          super.save();
+        }
+      }`,
+    );
+    const create = cls.instanceMethods.find((m) => m.name === "create")!;
+    expect(create.callArgs!.map((s) => s.name)).toEqual(create.callSeq);
+  });
+
   it("leaves the existing calls stream unchanged", () => {
     const cls = extractFromSource(
       `class Foo {

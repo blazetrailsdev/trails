@@ -2783,8 +2783,9 @@ function recordCallSite(
  * here manufactures a TS-only site that can never pair with the Ruby stream.
  */
 function callSiteName(call: ts.CallExpression | ts.NewExpression): string | undefined {
-  // `new Foo(...)` is Ruby's `Foo.new(...)`, which conventions.ts maps to the
-  // TS `constructor` — the spelling collectCalls already records.
+  // `new Foo(...)` is Ruby's `Foo.new(...)`. TS has no method named `new`, so
+  // `constructor` IS this site's raw TS spelling — the one conventions.ts:952
+  // maps Ruby `new` onto, and the one `calls` / `callSeq` already record.
   if (ts.isNewExpression(call)) return "constructor";
   const callee = call.expression;
   if (callee.kind === ts.SyntaxKind.SuperKeyword) return "super";
