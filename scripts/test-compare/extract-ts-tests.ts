@@ -61,7 +61,7 @@ function getPackageTestFiles(): Record<string, string[]> {
   return result;
 }
 
-function main() {
+export function main() {
   const manifest: TestManifest = {
     source: "typescript",
     generatedAt: new Date().toISOString(),

@@ -400,8 +400,7 @@ export function compareFileResults(
 // Main
 // ---------------------------------------------------------------------------
 
-function main() {
-  const args = process.argv.slice(2);
+export function main(args: string[] = process.argv.slice(2)) {
   const pkgIndex = args.indexOf("--package");
   let filterPkg: string | null = null;
   if (pkgIndex !== -1) {
