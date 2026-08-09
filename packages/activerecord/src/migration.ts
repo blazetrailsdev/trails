@@ -368,7 +368,9 @@ export class Migration {
    * (mirrors Rails `class << self; attr_accessor :delegate`, `migration.rb:684`).
    * Seeded with `Migration.delegate = new Migration()` at the bottom of this
    * file, exactly as Rails does at `migration.rb:813`.
-   * Distinct from the instance `delegate` getter, which returns the current adapter.
+   * Rails defines `delegate` and `nearest_delegate` only inside `class << self`
+   * (`migration.rb:684-689`); the instance side reaches the adapter through
+   * `connection` (`migration.rb:1006-1012`), never through a delegate reader.
    * @internal
    */
   static delegate: Migration | null = null;
@@ -1659,17 +1661,6 @@ export class Migration {
       return (delegate[name] as (...a: unknown[]) => unknown).apply(delegate, args);
     }
     throw new TypeError(`undefined method '${name}' for ${this.name}`);
-  }
-
-  // --- Delegation (Rails: Migration#nearest_delegate, #delegate) ---
-
-  /** Instance delegation target — returns the current adapter. Distinct from the class-level `Migration.delegate`. */
-  get delegate(): DatabaseAdapter {
-    return this.connection;
-  }
-
-  get nearestDelegate(): DatabaseAdapter {
-    return this.connection;
   }
 
   /** @internal */

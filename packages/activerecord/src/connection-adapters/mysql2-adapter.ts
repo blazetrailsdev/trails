@@ -3,7 +3,6 @@ import { Temporal } from "@blazetrails/date";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { AbstractAdapter as DatabaseAdapter } from "./abstract-adapter.js";
-import type { IndexDefinition } from "./abstract/schema-definitions.js";
 import type { ExplainOption } from "./abstract/database-statements.js";
 import { sqlForInsert } from "./abstract/database-statements.js";
 import type { MysqlAdapterOptions } from "./pool-config.js";
@@ -47,10 +46,7 @@ import { temporalTypeCast, TEMPORAL_POOL_OPTIONS } from "./mysql/temporal-type-c
 import type { SchemaSource } from "../schema-dumper.js";
 import { SchemaDumper as MysqlSchemaDumper } from "./mysql/schema-dumper.js";
 import { abandonRawSocket } from "./abandon-raw-socket.js";
-import {
-  indexes as mysqlIndexes,
-  parseMysqlName as mysqlParseName,
-} from "./mysql/schema-statements.js";
+import { parseMysqlName as mysqlParseName } from "./mysql/schema-statements.js";
 
 /**
  * Mysql2-flavored StatementPool. Evicted entries send COM_STMT_CLOSE
@@ -1326,42 +1322,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     return dumper;
   }
 
-  // ── Schema DDL ──
-
-  /**
-   * Mirrors Rails' MySQL `drop_table` which emits `DROP TEMPORARY TABLE`
-   * when `temporary: true` is passed. The abstract base omits this keyword.
-   */
-  override async dropTable(
-    ...args:
-      | [string, ...string[]]
-      | [
-          string,
-          ...string[],
-          { ifExists?: boolean; force?: boolean | "cascade"; temporary?: boolean },
-        ]
-  ): Promise<void> {
-    const last = args[args.length - 1];
-    const hasOpts = last !== null && last !== undefined && typeof last === "object";
-    const tableNames = (hasOpts ? args.slice(0, -1) : args) as string[];
-    const options = (hasOpts ? last : {}) as {
-      ifExists?: boolean;
-      force?: boolean | "cascade";
-      temporary?: boolean;
-    };
-    if (tableNames.length === 0) {
-      throw new ArgumentError("dropTable requires at least one table name");
-    }
-    const temporary = options.temporary ? " TEMPORARY" : "";
-    const ifExists = options.ifExists ? " IF EXISTS" : "";
-    const cascade = options.force === "cascade" ? " CASCADE" : "";
-    const quoted = tableNames.map((n) => this.quoteTableName(n)).join(", ");
-    for (const name of tableNames) {
-      await this.schemaCache.clearDataSourceCacheBang(name);
-    }
-    await this.execute(`DROP${temporary} TABLE${ifExists} ${quoted}${cascade}`);
-  }
-
   // ── Schema introspection ──
   // Mirrors Rails' MySQL SchemaStatements (connection_adapters/mysql/
   // schema_statements.rb + abstract_mysql_adapter.rb). All queries
@@ -1431,18 +1391,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     if (names.length === 0) return null;
     if (names.length === 1) return names[0];
     return names;
-  }
-
-  /** Delegates to {@link mysqlIndexes} in `mysql/schema-statements.ts`. */
-  async indexes(tableName: string): Promise<IndexDefinition[]> {
-    return mysqlIndexes.call(
-      {
-        schemaQuery: this.schemaQuery.bind(this),
-        quoteTableName: this.quoteTableName.bind(this),
-        addOptionsForIndexColumns: this.addOptionsForIndexColumns.bind(this),
-      },
-      tableName,
-    );
   }
 
   supportsAdvisoryLocks(): boolean {

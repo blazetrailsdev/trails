@@ -13,13 +13,9 @@ import { TableDefinition, Table as MysqlTable } from "./schema-definitions.js";
 import { Column } from "./column.js";
 import { SchemaStatements as BaseSchemaStatements } from "../abstract/schema-statements.js";
 import { SchemaCreation as MysqlSchemaCreation } from "./schema-creation.js";
-import {
-  CreateIndexDefinition,
-  ForeignKeyDefinition,
-  IndexDefinition,
-} from "../abstract/schema-definitions.js";
+import { ForeignKeyDefinition, IndexDefinition } from "../abstract/schema-definitions.js";
 import { quoteColumnName, unquoteIdentifier } from "./quoting.js";
-import type { AddIndexOptions, SchemaStatementsLike } from "../abstract/schema-definitions.js";
+import type { SchemaStatementsLike } from "../abstract/schema-definitions.js";
 import type { VisitorHostAdapter } from "./schema-creation.js";
 
 type CreateTableArgs = Parameters<BaseSchemaStatements["createTable"]>;
@@ -36,6 +32,130 @@ type CreateTableOptions = Extract<CreateTableArgs[1], { options?: string }>;
  * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements (partial)
  */
 export class MysqlSchemaStatements extends BaseSchemaStatements {
+  /** @internal
+   * Return user-defined indexes for the given table. Mirrors Rails'
+   * MySQL `indexes`: reads `SHOW KEYS FROM <table>`, skips the primary
+   * key, groups multi-column indexes by `Key_name`, maps `Index_type`
+   * (btree/hash → `using`; fulltext/spatial → `type`), and wraps
+   * functional-index `Expression` values in parens (unescaping `\'`).
+   * Returns `[]` when the table doesn't exist, matching Rails' rescue.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements#indexes
+   */
+  async indexes(tableName: string): Promise<IndexDefinition[]> {
+    let rows: Array<Record<string, unknown>>;
+    try {
+      rows = await this.schemaQuery(`SHOW KEYS FROM ${this.quoteTableName(tableName)}`);
+    } catch (e) {
+      // Mirrors Rails' `rescue StatementInvalid` — a missing table yields []
+      // rather than propagating ER_NO_SUCH_TABLE.
+      const message = `${(e as { message?: string })?.message ?? ""} ${
+        (e as { cause?: { message?: string } })?.cause?.message ?? ""
+      }`;
+      if (/Table '.+' doesn't exist/.test(message)) return [];
+      throw e;
+    }
+
+    const byIndex = new Map<
+      string,
+      {
+        columns: string[];
+        unique: boolean;
+        using?: string;
+        type?: string;
+        comment?: string;
+        lengths: Record<string, number>;
+        orders: Record<string, string>;
+        expressions: Record<string, string>;
+      }
+    >();
+    let currentIndex: string | null = null;
+    for (const r of rows) {
+      const keyName = String((r.Key_name ?? r.KEY_NAME) as string);
+      if (currentIndex !== keyName) {
+        if (keyName === "PRIMARY") continue; // skip the primary key
+        currentIndex = keyName;
+
+        const idxType = String((r.Index_type ?? r.INDEX_TYPE ?? "BTREE") as string).toLowerCase();
+        let using: string | undefined;
+        let type: string | undefined;
+        if (idxType === "fulltext" || idxType === "spatial") {
+          type = idxType;
+        } else if (idxType === "btree" || idxType === "hash") {
+          using = idxType;
+        }
+        const nonUnique = Number(r.Non_unique ?? r.NON_UNIQUE ?? 0);
+        // Mirrors Rails' `row["Index_comment"].presence` — blank (incl. whitespace-only) → nil.
+        const rawComment = r.Index_comment ?? r.INDEX_COMMENT;
+        const comment =
+          rawComment != null && String(rawComment).trim() !== "" ? String(rawComment) : undefined;
+        byIndex.set(keyName, {
+          columns: [],
+          unique: nonUnique === 0,
+          using,
+          type,
+          comment,
+          lengths: {},
+          orders: {},
+          expressions: {},
+        });
+      }
+
+      const entry = byIndex.get(currentIndex)!;
+      // Mirrors Rails' `row[:Collation] == "D"` — descending column/expression.
+      const desc = String((r.Collation ?? r.COLLATION) as string) === "D";
+      const rawExpr = r.Expression ?? r.EXPRESSION;
+      if (rawExpr != null) {
+        // MySQL 8+ functional indexes carry the raw SQL in `Expression` (and
+        // NULL in `Column_name`). Unescape `\'` then wrap in parens unless the
+        // expression already is, matching Rails' IndexDefinition shape.
+        let expr = String(rawExpr).replace(/\\'/g, "'");
+        if (!expr.startsWith("(")) expr = `(${expr})`;
+        entry.columns.push(expr);
+        entry.expressions[expr] = expr;
+        if (desc) entry.orders[expr] = "desc";
+      } else {
+        const column = String((r.Column_name ?? r.COLUMN_NAME) as string);
+        entry.columns.push(column);
+        // Mirrors Rails' `lengths.merge!(col => Sub_part.to_i) if row[:Sub_part]`.
+        const subPart = r.Sub_part ?? r.SUB_PART;
+        if (subPart != null) entry.lengths[column] = Number(subPart);
+        if (desc) entry.orders[column] = "desc";
+      }
+    }
+    return await Promise.all(
+      Array.from(byIndex.entries()).map(
+        async ([name, { columns, unique, using, type, comment, lengths, orders, expressions }]) => {
+          // Mirrors Rails' final `.map`: a functional (expression) index collapses
+          // its columns array into a single SQL string via addOptionsForIndexColumns,
+          // baking prefix length and DESC/ASC order inline. Non-expression columns
+          // are quoted; expression columns pass through their parenthesized form.
+          // The separate lengths/orders Records are consumed here and dropped.
+          if (Object.keys(expressions).length > 0) {
+            const quotedColumns = new Map<string, string>(
+              columns.map((c) => [c, expressions[c] ?? quoteColumnName(c)]),
+            );
+            await this.addOptionsForIndexColumns(quotedColumns, { order: orders, length: lengths });
+            return new IndexDefinition(
+              tableName,
+              name,
+              unique,
+              Array.from(quotedColumns.values()).join(", "),
+              { using, type, comment },
+            );
+          }
+          return new IndexDefinition(tableName, name, unique, columns, {
+            lengths,
+            orders,
+            using,
+            type,
+            comment,
+          });
+        },
+      ),
+    );
+  }
+
   /** Mirrors: MySQL::SchemaStatements#schema_creation */
   override get schemaCreation(): MysqlSchemaCreation {
     return new MysqlSchemaCreation(this as unknown as VisitorHostAdapter);
@@ -44,37 +164,6 @@ export class MysqlSchemaStatements extends BaseSchemaStatements {
   /** Mirrors: MySQL::SchemaStatements#update_table_definition */
   override updateTableDefinition(tableName: string, base?: unknown): MysqlTable {
     return new MysqlTable(tableName, (base ?? this) as SchemaStatementsLike);
-  }
-
-  /**
-   * `Migration#addIndex` routes through `this.connection.addIndex(...)`, so
-   * we override here. Mirrors Rails' `AbstractMysqlAdapter#add_index` /
-   * `#build_create_index_definition` pair: pre-flight via
-   * `indexExists()` and emit `CREATE INDEX` without `IF NOT EXISTS`
-   * (MySQL doesn't support the keyword; MariaDB does but Rails
-   * standardizes on the pre-flight for portability). Without this, the
-   * second `addIndex(..., { ifNotExists: true })` call trips
-   * `ER_DUP_KEYNAME` on MariaDB because `MysqlSchemaCreation`
-   * correctly omits the keyword.
-   *
-   * Mirrors: AbstractMysqlAdapter#add_index +
-   * AbstractMysqlAdapter#build_create_index_definition
-   */
-  override async addIndex(
-    tableName: string,
-    columnName: string | string[],
-    options: AddIndexOptions = {},
-  ): Promise<void> {
-    const [idx, algorithmClause, ifNotExists] = await this.addIndexOptions(
-      tableName,
-      columnName,
-      options as Record<string, unknown>,
-    );
-    if (ifNotExists && (await this.indexExists(tableName, idx.columns, { name: idx.name }))) {
-      return;
-    }
-    const createDef = new CreateIndexDefinition(idx, algorithmClause);
-    await this.execute(await this.schemaCreation.accept(createDef));
   }
 
   /**
@@ -124,10 +213,16 @@ export class MysqlSchemaStatements extends BaseSchemaStatements {
           { ifExists?: boolean; force?: boolean | "cascade"; temporary?: boolean },
         ]
   ): Promise<void> {
-    const [tableNames, options] = this._splitTableNamesAndOptions(args) as [
-      string[],
-      { ifExists?: boolean; force?: boolean | "cascade"; temporary?: boolean },
-    ];
+    // TS has no kwargs: Rails' `*table_names, **options` arrives as a trailing
+    // options object on the rest parameter, split back out here.
+    const last = args[args.length - 1];
+    const hasOptions = last !== null && last !== undefined && typeof last === "object";
+    const tableNames = (hasOptions ? args.slice(0, -1) : args) as string[];
+    const options = (hasOptions ? last : {}) as {
+      ifExists?: boolean;
+      force?: boolean | "cascade";
+      temporary?: boolean;
+    };
     if (tableNames.length === 0) {
       throw new ArgumentError("dropTable requires at least one table name");
     }
@@ -631,144 +726,4 @@ export async function foreignKeys(
     );
   }
   return results;
-}
-
-/** @internal Host surface for {@link indexes}: runs `SHOW KEYS` via the schema
- * channel and quotes the (optionally schema-qualified) table name. */
-interface IndexesHost {
-  schemaQuery(sql: string, binds?: unknown[]): Promise<Record<string, unknown>[]>;
-  quoteTableName(name: string): string;
-  /** Named by Rails on the adapter itself (mysql/schema_statements.rb:62).
-   * @internal */
-  addOptionsForIndexColumns(
-    quotedColumns: Map<string, string>,
-    options: {
-      order?: string | Record<string, string>;
-      length?: number | Record<string, number>;
-    },
-  ): Promise<Map<string, string>>;
-}
-
-/** @internal
- * Return user-defined indexes for the given table. Mirrors Rails'
- * MySQL `indexes`: reads `SHOW KEYS FROM <table>`, skips the primary
- * key, groups multi-column indexes by `Key_name`, maps `Index_type`
- * (btree/hash → `using`; fulltext/spatial → `type`), and wraps
- * functional-index `Expression` values in parens (unescaping `\'`).
- * Returns `[]` when the table doesn't exist, matching Rails' rescue.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements#indexes
- */
-export async function indexes(this: IndexesHost, tableName: string): Promise<IndexDefinition[]> {
-  let rows: Array<Record<string, unknown>>;
-  try {
-    rows = await this.schemaQuery(`SHOW KEYS FROM ${this.quoteTableName(tableName)}`);
-  } catch (e) {
-    // Mirrors Rails' `rescue StatementInvalid` — a missing table yields []
-    // rather than propagating ER_NO_SUCH_TABLE.
-    const message = `${(e as { message?: string })?.message ?? ""} ${
-      (e as { cause?: { message?: string } })?.cause?.message ?? ""
-    }`;
-    if (/Table '.+' doesn't exist/.test(message)) return [];
-    throw e;
-  }
-
-  const byIndex = new Map<
-    string,
-    {
-      columns: string[];
-      unique: boolean;
-      using?: string;
-      type?: string;
-      comment?: string;
-      lengths: Record<string, number>;
-      orders: Record<string, string>;
-      expressions: Record<string, string>;
-    }
-  >();
-  let currentIndex: string | null = null;
-  for (const r of rows) {
-    const keyName = String((r.Key_name ?? r.KEY_NAME) as string);
-    if (currentIndex !== keyName) {
-      if (keyName === "PRIMARY") continue; // skip the primary key
-      currentIndex = keyName;
-
-      const idxType = String((r.Index_type ?? r.INDEX_TYPE ?? "BTREE") as string).toLowerCase();
-      let using: string | undefined;
-      let type: string | undefined;
-      if (idxType === "fulltext" || idxType === "spatial") {
-        type = idxType;
-      } else if (idxType === "btree" || idxType === "hash") {
-        using = idxType;
-      }
-      const nonUnique = Number(r.Non_unique ?? r.NON_UNIQUE ?? 0);
-      // Mirrors Rails' `row["Index_comment"].presence` — blank (incl. whitespace-only) → nil.
-      const rawComment = r.Index_comment ?? r.INDEX_COMMENT;
-      const comment =
-        rawComment != null && String(rawComment).trim() !== "" ? String(rawComment) : undefined;
-      byIndex.set(keyName, {
-        columns: [],
-        unique: nonUnique === 0,
-        using,
-        type,
-        comment,
-        lengths: {},
-        orders: {},
-        expressions: {},
-      });
-    }
-
-    const entry = byIndex.get(currentIndex)!;
-    // Mirrors Rails' `row[:Collation] == "D"` — descending column/expression.
-    const desc = String((r.Collation ?? r.COLLATION) as string) === "D";
-    const rawExpr = r.Expression ?? r.EXPRESSION;
-    if (rawExpr != null) {
-      // MySQL 8+ functional indexes carry the raw SQL in `Expression` (and
-      // NULL in `Column_name`). Unescape `\'` then wrap in parens unless the
-      // expression already is, matching Rails' IndexDefinition shape.
-      let expr = String(rawExpr).replace(/\\'/g, "'");
-      if (!expr.startsWith("(")) expr = `(${expr})`;
-      entry.columns.push(expr);
-      entry.expressions[expr] = expr;
-      if (desc) entry.orders[expr] = "desc";
-    } else {
-      const column = String((r.Column_name ?? r.COLUMN_NAME) as string);
-      entry.columns.push(column);
-      // Mirrors Rails' `lengths.merge!(col => Sub_part.to_i) if row[:Sub_part]`.
-      const subPart = r.Sub_part ?? r.SUB_PART;
-      if (subPart != null) entry.lengths[column] = Number(subPart);
-      if (desc) entry.orders[column] = "desc";
-    }
-  }
-  return await Promise.all(
-    Array.from(byIndex.entries()).map(
-      async ([name, { columns, unique, using, type, comment, lengths, orders, expressions }]) => {
-        // Mirrors Rails' final `.map`: a functional (expression) index collapses
-        // its columns array into a single SQL string via addOptionsForIndexColumns,
-        // baking prefix length and DESC/ASC order inline. Non-expression columns
-        // are quoted; expression columns pass through their parenthesized form.
-        // The separate lengths/orders Records are consumed here and dropped.
-        if (Object.keys(expressions).length > 0) {
-          const quotedColumns = new Map<string, string>(
-            columns.map((c) => [c, expressions[c] ?? quoteColumnName(c)]),
-          );
-          await this.addOptionsForIndexColumns(quotedColumns, { order: orders, length: lengths });
-          return new IndexDefinition(
-            tableName,
-            name,
-            unique,
-            Array.from(quotedColumns.values()).join(", "),
-            { using, type, comment },
-          );
-        }
-        return new IndexDefinition(tableName, name, unique, columns, {
-          lengths,
-          orders,
-          using,
-          type,
-          comment,
-        });
-      },
-    ),
-  );
 }
