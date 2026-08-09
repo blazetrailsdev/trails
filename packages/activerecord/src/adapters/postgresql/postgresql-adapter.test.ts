@@ -870,8 +870,9 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("reports when behaviour report", async () => {
-      const { ErrorReporter, setErrorReporter } = await import("@blazetrails/activesupport");
+      const { ActiveSupport, ErrorReporter } = await import("@blazetrails/activesupport");
       PostgreSQLAdapter.dbWarningsAction = "report";
+      const previousReporter = ActiveSupport.errorReporter;
       const reporter = new ErrorReporter();
       const events: Array<{ error: Error; handled: boolean }> = [];
       reporter.subscribe({
@@ -879,7 +880,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           events.push({ error, handled });
         },
       });
-      setErrorReporter(reporter);
+      ActiveSupport.errorReporter = reporter;
       try {
         await adapter.execute("do $$ BEGIN RAISE WARNING 'PostgreSQL SQL warning'; END; $$");
         expect(events).toHaveLength(1);
@@ -887,7 +888,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         expect(events[0].error.message).toBe("PostgreSQL SQL warning");
         expect(events[0].handled).toBe(true);
       } finally {
-        setErrorReporter(null);
+        ActiveSupport.errorReporter = previousReporter;
       }
     });
 

@@ -10,8 +10,6 @@ import {
   newColumnFromField,
   fetchTypeMetadata,
   extractForeignKeyAction,
-  addIndexLength,
-  addOptionsForIndexColumns,
   dataSourceSql,
   quotedScope,
   tableAliasLength,
@@ -279,12 +277,17 @@ describe("MySQL::SchemaStatements", () => {
     expect(extractForeignKeyAction("SET NULL")).toBe("nullify");
   });
 
+  const schemaStatements = (sortOrderSupported = true) =>
+    Object.assign(Object.create(MysqlSchemaStatements.prototype) as MysqlSchemaStatements, {
+      supportsIndexSortOrder: async () => sortOrderSupported,
+    });
+
   it("addIndexLength appends (N) prefix length to column", () => {
     const cols = new Map([
       ["name", "`name`"],
       ["email", "`email`"],
     ]);
-    const result = addIndexLength(cols, { length: { email: 20 } });
+    const result = schemaStatements().addIndexLength(cols, { length: { email: 20 } });
     expect(result.get("name")).toBe("`name`");
     expect(result.get("email")).toBe("`email`(20)");
   });
@@ -294,35 +297,39 @@ describe("MySQL::SchemaStatements", () => {
       ["name", "`name`"],
       ["email", "`email`"],
     ]);
-    const result = addIndexLength(cols, { length: 10 });
+    const result = schemaStatements().addIndexLength(cols, { length: 10 });
     expect(result.get("name")).toBe("`name`(10)");
     expect(result.get("email")).toBe("`email`(10)");
   });
 
-  it("addOptionsForIndexColumns: applies length and per-column order", () => {
+  it("addOptionsForIndexColumns: applies length and per-column order", async () => {
     const cols = new Map([["name", "`name`"]]);
     expect(
-      addOptionsForIndexColumns(cols, { length: { name: 5 }, order: { name: "desc" } }).get("name"),
+      (
+        await schemaStatements().addOptionsForIndexColumns(cols, {
+          length: { name: 5 },
+          order: { name: "desc" },
+        })
+      ).get("name"),
     ).toBe("`name`(5) DESC");
   });
 
-  it("addOptionsForIndexColumns: string order applies to all columns", () => {
+  it("addOptionsForIndexColumns: string order applies to all columns", async () => {
     const cols = new Map([
       ["a", "`a`"],
       ["b", "`b`"],
     ]);
-    const result = addOptionsForIndexColumns(cols, { order: "asc" });
+    const result = await schemaStatements().addOptionsForIndexColumns(cols, { order: "asc" });
     expect(result.get("a")).toBe("`a` ASC");
     expect(result.get("b")).toBe("`b` ASC");
   });
 
-  it("addOptionsForIndexColumns: drops order when sort order is unsupported", () => {
+  it("addOptionsForIndexColumns: drops order when sort order is unsupported", async () => {
     const cols = new Map([["name", "`name`"]]);
-    const result = addOptionsForIndexColumns(
-      cols,
-      { length: { name: 5 }, order: { name: "desc" } },
-      false,
-    );
+    const result = await schemaStatements(false).addOptionsForIndexColumns(cols, {
+      length: { name: 5 },
+      order: { name: "desc" },
+    });
     expect(result.get("name")).toBe("`name`(5)");
   });
 
@@ -457,11 +464,12 @@ describe("MySQL::SchemaStatements", () => {
 
   // Minimal IndexesHost: indexes() reads via schemaQuery and quotes the table
   // name. Stub schemaQuery to return the `SHOW KEYS FROM` rows MySQL yields.
-  const indexHost = (rows: Record<string, unknown>[], sortOrderSupported = true) => ({
-    schemaQuery: async () => rows,
-    quoteTableName: (n: string) => `\`${n}\``,
-    supportsIndexSortOrder: async () => sortOrderSupported,
-  });
+  const indexHost = (rows: Record<string, unknown>[], sortOrderSupported = true) =>
+    Object.assign(Object.create(MysqlSchemaStatements.prototype) as MysqlSchemaStatements, {
+      schemaQuery: async () => rows,
+      quoteTableName: (n: string) => `\`${n}\``,
+      supportsIndexSortOrder: async () => sortOrderSupported,
+    });
 
   it("indexes: surfaces per-column prefix lengths from Sub_part", async () => {
     const idx = await indexes.call(

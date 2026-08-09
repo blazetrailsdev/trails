@@ -88,6 +88,7 @@ import { asyncContextAdapterConfig } from "./async-context-adapter.js";
 import { childProcessAdapterConfig } from "./child-process-adapter.js";
 import { osAdapterConfig } from "./os-adapter.js";
 import { processAdapterConfig } from "./process-adapter.js";
+import { ErrorReporter } from "./error-reporter.js";
 
 /**
  * ActiveSupport configuration — mirrors Rails' ActiveSupport module.
@@ -104,6 +105,14 @@ import { processAdapterConfig } from "./process-adapter.js";
  *   ActiveSupport.cryptoAdapter = "webcrypto";
  */
 export const ActiveSupport = {
+  /**
+   * Rails: `@error_reporter = ActiveSupport::ErrorReporter.new` plus
+   * `singleton_class.attr_accessor :error_reporter`
+   * (activesupport/lib/active_support.rb:104-105) — always a reporter, never
+   * nil, so `ActiveSupport.error_reporter.report(...)` call sites need no guard.
+   */
+  errorReporter: new ErrorReporter(),
+
   get fsAdapter(): string | null {
     return fsAdapterConfig.adapter;
   },
@@ -430,7 +439,8 @@ export { HtmlSafeTranslation } from "./html-safe-translation.js";
 // KeyGenerator uses getCrypto() adapter — import from "@blazetrails/activesupport/key-generator"
 export { BacktraceCleaner } from "./backtrace-cleaner.js";
 export { OrderedHash } from "./ordered-hash.js";
-export { ErrorReporter, getErrorReporter, setErrorReporter } from "./error-reporter.js";
+export { ErrorReporter } from "./error-reporter.js";
+export { trailsLogger, _setTrailsLogger } from "./trails-logger-slot.js";
 export type {
   ErrorSeverity,
   ErrorContext,

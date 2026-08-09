@@ -2025,9 +2025,9 @@ export class SchemaStatements {
   }
 
   /** @internal */
-  optionsForIndexColumns(
-    options: string | Record<string, string> | undefined,
-  ): (col: string) => string | undefined {
+  optionsForIndexColumns<T extends string | number>(
+    options: T | Record<string, T> | undefined,
+  ): (col: string) => T | undefined {
     if (options && typeof options === "object") {
       return (col: string) => options[col];
     }

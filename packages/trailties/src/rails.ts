@@ -11,6 +11,7 @@
 // members. `Trails` is never instantiated.
 import { EnvironmentInquirer } from "@blazetrails/activesupport";
 import { getEnv } from "@blazetrails/activesupport";
+import { trailsLogger, _setTrailsLogger } from "@blazetrails/activesupport";
 import type { CacheStore, Logger } from "@blazetrails/activesupport";
 import { Application } from "./application.js";
 import { BacktraceCleaner } from "./backtrace-cleaner.js";
@@ -21,7 +22,6 @@ import { VERSION } from "./version.js";
 
 let _application: Application | null = null;
 let _cache: CacheStore | null = null;
-let _logger: Logger | null = null;
 let _env: EnvironmentInquirer | undefined;
 let _backtraceCleaner: BacktraceCleaner | undefined;
 
@@ -60,11 +60,14 @@ export class Trails {
     _cache = value;
   }
 
+  // Rails' `Rails.logger` is `mattr_accessor :logger` (railties/lib/rails.rb:41).
+  // The storage is the activesupport slot so Active Support's own call-time
+  // `defined?(Rails.logger)` readers (Deprecation's `:log` behavior) see it.
   static get logger(): Logger | null {
-    return _logger;
+    return trailsLogger as Logger | null;
   }
   static set logger(value: Logger | null) {
-    _logger = value;
+    _setTrailsLogger(value);
   }
 
   static get version(): string {

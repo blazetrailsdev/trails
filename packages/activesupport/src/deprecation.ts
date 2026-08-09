@@ -1,8 +1,11 @@
 import { wrap } from "./array-utils.js";
 import { ArgumentError } from "./hash-utils.js";
 import { underscore } from "./inflector.js";
+import { ActiveSupport } from "./index.js";
+import { Logger } from "./logger.js";
 import { Notifications } from "./notifications.js";
 import { stderr } from "./process-adapter.js";
+import { trailsLogger } from "./trails-logger-slot.js";
 
 export type DeprecationBehavior = "raise" | "stderr" | "log" | "silence" | "notify" | "report";
 
@@ -30,11 +33,10 @@ export class DeprecationError extends Error {
  * object literal's `raise` key would read as a ported member named `raise` and
  * make every Rails `raise` in the package look like a call to it.
  *
- * Two entries stop short of the Ruby. `:log` picks `Rails.logger` when it is
- * defined and falls back to `ActiveSupport::Logger.new($stderr)`; trailties
- * exposes no process-wide logger to activesupport, so only the fallback branch
- * ports. `:report` hands the error to `ActiveSupport.error_reporter`, which
- * trails has not ported, so there is nothing to report to yet.
+ * `:log`'s `defined?(Rails.logger) && Rails.logger` is a call-time constant
+ * resolution, which ESM cannot express — `@blazetrails/trailties` depends on
+ * this package, not the reverse — so `Trails.logger` is read through the
+ * zero-import slot it stores itself in (`trails-logger-slot.ts`).
  */
 export const DEFAULT_BEHAVIORS: ReadonlyMap<DeprecationBehavior, DeprecationBehaviorCallable> =
   new Map<DeprecationBehavior, DeprecationBehaviorCallable>([
@@ -58,8 +60,9 @@ export const DEFAULT_BEHAVIORS: ReadonlyMap<DeprecationBehavior, DeprecationBeha
     [
       "log",
       (message, callstack, deprecator) => {
-        stderr.write(message + "\n");
-        if (deprecator.debug) stderr.write(callstack.join("\n  ") + "\n");
+        const logger = trailsLogger ?? new Logger(stderr);
+        logger.warn(message);
+        if (deprecator.debug) logger.debug(callstack.join("\n  "));
       },
     ],
 
@@ -80,7 +83,14 @@ export const DEFAULT_BEHAVIORS: ReadonlyMap<DeprecationBehavior, DeprecationBeha
 
     ["silence", () => {}],
 
-    ["report", () => {}],
+    [
+      "report",
+      (message, callstack) => {
+        const error = new DeprecationError(message);
+        error.stack = callstack.map((l) => String(l)).join("\n");
+        ActiveSupport.errorReporter.report(error);
+      },
+    ],
   ]);
 
 /** One element of what `behavior=` accepts (behaviors.rb:96-104). */
