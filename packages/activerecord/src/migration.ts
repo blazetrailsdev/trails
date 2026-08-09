@@ -1917,9 +1917,20 @@ export class MigrationContext {
    * A caller with no pool hands in the null objects `Migration.copy` does
    * (`migration.rb:1065-1066`), which the discovery half (`migrations`,
    * `migrationFiles`, `parseMigrationFilename`) never calls into. Rails'
-   * `NullSchemaMigration` / `NullInternalMetadata` are empty classes duck-typed
-   * into the same slot; TS has no duck typing, so they are seated through the
-   * declared type here.
+   * `NullSchemaMigration` (`schema_migration.rb:9`) / `NullInternalMetadata`
+   * (`internal_metadata.rb:13`) are empty classes duck-typed into the same
+   * slot, and `attr_reader` (`migration.rb:1212`) hands back whatever was
+   * seated; TS has no duck typing, so the readers stay typed as the real
+   * collaborators and the null objects are seated through that type here.
+   *
+   * The narrowing that buys is real rather than assumed: a null-object context
+   * is only ever a local temporary of the two functions that build one —
+   * `Migration.copy` and activerecord-cli's `loadMigrations` — each of which
+   * reads `migrations` off it and lets it go, so no such context reaches
+   * `up`/`down`/`currentVersion`. Declaring the readers as the union instead
+   * proves nothing extra: it moves the same unchecked narrowing onto the
+   * nineteen sites that use a connected context, where Rails asserts nothing
+   * either.
    */
   constructor(
     migrationsPaths: string[],
