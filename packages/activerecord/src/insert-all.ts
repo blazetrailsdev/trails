@@ -2,34 +2,14 @@ import { Temporal } from "@blazetrails/date";
 import { Nodes, Visitors } from "@blazetrails/arel";
 import { ArgumentError, SerializeCastValue } from "@blazetrails/activemodel";
 import { IndexDefinition } from "./connection-adapters/abstract/schema-definitions.js";
-import { ActiveRecordError, UnknownAttributeError } from "./errors.js";
+import { UnknownAttributeError } from "./errors.js";
 import type { Base } from "./base.js";
 
 import { stiName, isFinderNeedsTypeCondition } from "./inheritance.js";
 import type { Relation } from "./relation.js";
 import type { AdapterName } from "./connection-adapters/abstract-adapter.js";
-import type { QuotingDispatchHost } from "./connection-adapters/abstract/quoting.js";
 import { Result } from "./result.js";
 import { withPooledOrDirectConnection } from "./connection-handling.js";
-
-let _quoteSqlValue: ((v: unknown, connection?: QuotingDispatchHost) => string) | undefined;
-
-/**
- * @internal Receives base.ts's `quoteSqlValue` at module init. Importing it for
- * its value would be a load-time edge putting base.ts in an import cycle,
- * leaving its own module-evaluation-time mixin wiring dependent on the graph's
- * entry order.
- */
-export function _registerQuoteSqlValue(
-  fn: (v: unknown, connection?: QuotingDispatchHost) => string,
-): void {
-  _quoteSqlValue = fn;
-}
-
-function quoteSqlValue(v: unknown, connection?: QuotingDispatchHost): string {
-  if (!_quoteSqlValue) throw new ActiveRecordError("ActiveRecord::Base has not finished loading");
-  return _quoteSqlValue(v, connection);
-}
 
 type ModelClass = typeof Base;
 type AdapterDialect = AdapterName;
@@ -696,9 +676,8 @@ export class Builder implements InsertBuilder {
   }
 
   valuesList(): Nodes.ValuesList {
-    const arrayCols = this._arrayColumnSet();
     const model = this._insertAll.model;
-    const rows = this._insertAll.mapKeyWithValue<Nodes.Node>((key, value) => {
+    const rows = this._insertAll.mapKeyWithValue<unknown>((key, value) => {
       if (value instanceof Nodes.SqlLiteral) return value;
       // Cast then serialize via the column type if available, falling back
       // to SerializeCastValue.serializeCastValue (identity) when no type exists
@@ -718,18 +697,14 @@ export class Builder implements InsertBuilder {
       } else {
         value = SerializeCastValue.serializeCastValue(castValue);
       }
-      // Array columns serialize to an OID::Array `Data`; quote via the adapter's
-      // `quote` (Rails' `quote(encode_array(value))`) so each element gets
-      // `type_cast` (datetimes → `quoted_date`, binary → hex) instead of the bare
-      // `String(Data)` an inline literal falls to. Non-array values keep the
-      // scalar inline path.
-      if (arrayCols.has(key)) {
-        return new Nodes.SqlLiteral(this._insertAll.connection.quote(value));
-      }
-      // Rails quotes every value with `connection.quote` (insert_all.rb Builder
-      // #values_list), so date/time literals resolve their dialect from the
-      // receiver's `quoted_date` / `quoted_time`.
-      return new Nodes.SqlLiteral(quoteSqlValue(value, this._insertAll.connection));
+      // Rails hands the serialized value to the ValuesList *as a value*
+      // (insert_all.rb:246): `connection.visitor.compile` renders it, quoting
+      // each entry through `connection.quote` (to_sql.rb:106-114). So no
+      // pre-quoting here — the visitor's `quote` is the single quoting site,
+      // and date/time, binary and array `Data` values all resolve their dialect
+      // from the connection's own `quoted_date` / `quoted_binary` / array
+      // encoder there.
+      return value;
     });
     return new Nodes.ValuesList(rows);
   }
@@ -817,15 +792,5 @@ export class Builder implements InsertBuilder {
   firstColumn(): string | undefined {
     const [first] = this._insertAll.keys;
     return first === undefined ? undefined : this.quoteColumn(first);
-  }
-
-  private _arrayColumnSet(): Set<string> {
-    const keys = [...this._insertAll.keysIncludingTimestamps()];
-    return new Set(
-      keys.filter((c) => {
-        const def = this.model._attributeDefinitions.get(c);
-        return def?.type?.name === "array";
-      }),
-    );
   }
 }

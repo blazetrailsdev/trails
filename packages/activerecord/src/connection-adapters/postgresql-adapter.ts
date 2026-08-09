@@ -1,19 +1,10 @@
 import pg from "pg";
-import { Temporal } from "@blazetrails/date";
-import {
-  type Type,
-  ValueType,
-  ArgumentError,
-  BinaryData,
-  DateInfinity,
-  DateNegativeInfinity,
-} from "@blazetrails/activemodel";
+import { type Type, ValueType, ArgumentError, BinaryData } from "@blazetrails/activemodel";
 import {
   singularize,
   ActiveSupport,
   runLoadHooks,
   include,
-  BigDecimal,
 } from "@blazetrails/activesupport";
 import { sql as arelSql, Nodes, Visitors } from "@blazetrails/arel";
 import { isRubyTruthy } from "../ruby-truthy.js";
@@ -43,16 +34,10 @@ import {
 } from "./postgresql/quoting.js";
 import { TypeMapInitializer, type PgTypeRow } from "./postgresql/oid/type-map-initializer.js";
 import { Money } from "./postgresql/oid/money.js";
-import { Range as OidRange } from "./postgresql/oid/range.js";
-import { Data as ArrayData } from "./postgresql/oid/array.js";
-import { Data as XmlData } from "./postgresql/oid/xml.js";
-import { Data as BitData } from "./postgresql/oid/bit.js";
 import {
   initializeInstanceTypeMap,
   initializeTypeMap as staticInitializeTypeMap,
 } from "./postgresql/type-map-init.js";
-import { dispatchQuotedTime } from "./abstract/quoting.js";
-import { Value as TimeValue } from "../type/time.js";
 import { inspectExplainOption } from "./abstract/database-statements.js";
 import type { ExplainOption } from "./abstract/database-statements.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./abstract-adapter.js";
@@ -1073,10 +1058,9 @@ export class PostgreSQLAdapter
       fields: Array<{ name: string; dataTypeID: number }>;
       rows: unknown[][];
     }
-    // Type-cast bind objects (QueryAttribute) → primitives, then run each
-    // through `_bindForPg` for Temporal / BinaryData normalization before
-    // pg sees them.
-    const bindArray = (this.typeCastedBinds(binds) ?? []).map((v) => this._bindForPg(v));
+    // Mirrors `type_casted_binds` (abstract/quoting.rb:224): the single bind
+    // normalizer, mapping the adapter's `type_cast` over the binds.
+    const bindArray = this.typeCastedBinds(binds) ?? [];
     const rewritten = this.rewriteBinds(sql, bindArray);
     this._noticeReceiverSqlWarnings = [];
     const pgResult: ArrayQueryResult = await this.log(
@@ -1643,7 +1627,7 @@ export class PostgreSQLAdapter
     name: string,
     binds: unknown[],
   ): Promise<Result> {
-    const bindArray = (this.typeCastedBinds(binds) ?? []).map((v) => this._bindForPg(v));
+    const bindArray = this.typeCastedBinds(binds) ?? [];
     const rewritten = this.rewriteBinds(sql, bindArray);
     this._noticeReceiverSqlWarnings = [];
     const pgResult = await this.log(rewritten, name, binds, bindArray, false, async (payload) => {
@@ -1716,10 +1700,9 @@ export class PostgreSQLAdapter
     { allowRetry = false }: { allowRetry?: boolean } = {},
   ): Promise<Record<string, unknown>[]> {
     sql = this.preprocessQuery(sql);
-    // Type-cast bind objects (QueryAttribute) → primitives via `value_for_database`,
-    // then run each through `_bindForPg` for Temporal / BinaryData normalization —
-    // mirrors `type_casted_binds` and the execQuery path.
-    const bindArray = (this.typeCastedBinds(binds) ?? []).map((v) => this._bindForPg(v));
+    // Mirrors `type_casted_binds` (abstract/quoting.rb:224) — the same single
+    // normalizer the execQuery path uses.
+    const bindArray = this.typeCastedBinds(binds) ?? [];
     const rewritten = this.rewriteBinds(sql, bindArray);
     // payload.sql is the rewritten SQL (`$1` not `?`) so ExplainSubscriber
     // stores something that can be re-EXPLAIN'd on the same adapter
@@ -1809,12 +1792,10 @@ export class PostgreSQLAdapter
    */
   async executeMutation(sql: string, binds: unknown[] = [], name: string = "SQL"): Promise<number> {
     sql = this.preprocessQuery(sql);
-    // Type-cast bind objects (QueryAttribute) → primitives via `value_for_database`,
-    // then run each through `_bindForPg` for Temporal / BinaryData normalization —
-    // mirrors `type_casted_binds`. Without the typeCastedBinds unwrap, an INSERT
+    // Mirrors `type_casted_binds` (abstract/quoting.rb:224). Without the typeCastedBinds unwrap, an INSERT
     // routed through executeMutation would bind a raw QueryAttribute to pg.
     const originalBinds = binds;
-    binds = (this.typeCastedBinds(binds) ?? []).map((v) => this._bindForPg(v));
+    binds = this.typeCastedBinds(binds) ?? [];
     const pgSql = this.rewriteBinds(sql, binds);
     this._noticeReceiverSqlWarnings = [];
     // payload.sql records the rewritten SQL — ExplainSubscriber captures
@@ -2268,9 +2249,7 @@ export class PostgreSQLAdapter
       // matching Rails internal_execute(sql, name, binds). Transaction-control
       // callers pass none, keeping their byte-identical no-bind path (no rewrite).
       const hasBinds = binds.length > 0;
-      const bindArray = hasBinds
-        ? (this.typeCastedBinds(binds) ?? []).map((v) => this._bindForPg(v))
-        : [];
+      const bindArray = hasBinds ? (this.typeCastedBinds(binds) ?? []) : [];
       const runSql = hasBinds ? this.rewriteBinds(sql, bindArray) : sql;
       // A bound query here is the exec_insert RETURNING read-back; mirror
       // _instrumentedQueryOnClient by resetting the notice buffer up front and
@@ -3408,84 +3387,6 @@ export class PostgreSQLAdapter
   }
 
   /**
-   * Normalize a single bind value before handing it to node-postgres.
-   *
-   * BinaryData wrappers (produced by `Type::Binary::Data`-shape serializers
-   * like `EncryptedAttributeType` on binary columns) are unwrapped to a
-   * Buffer so pg binds them as bytea; pg has no built-in coercion for
-   * BinaryData and would `JSON.stringify` it otherwise, corrupting bytes
-   * 128–255 (the PG-only encryption binary round-trip failure surfaced
-   * by Phase 9b-1). Date/time values dispatch through this adapter's
-   * `quotedDate` / `quotedTime`, as Rails' `type_cast` does
-   * (abstract/quoting.rb:103-104).
-   *
-   * Mirrors Rails' `type_casted_binds` calling `type_cast` per value.
-   * Detection is duck-typed (`bytes: Uint8Array`) rather than delegating
-   * to `this.typeCast` so the gate survives split module identity in the
-   * dep tree (`pgTypeCast`'s `instanceof BinaryData` check would silently
-   * miss when the encryption module and the adapter resolve different
-   * copies of `@blazetrails/activemodel`).
-   * @internal
-   */
-  private _bindForPg(value: unknown): unknown {
-    // PG's date/time infinity sentinels are `Number.±Infinity`, so they must be
-    // intercepted before any numeric handling; pg wants the wire strings.
-    if (value === DateInfinity) return "infinity";
-    if (value === DateNegativeInfinity) return "-infinity";
-    // Duck-type BinaryData detection: instanceof would silently miss across
-    // module-identity splits (e.g. duplicated @blazetrails/activemodel copies
-    // in the dep tree), in which case the wrapper would slip past as a plain
-    // object and pg would JSON.stringify it. Checking the Uint8Array `bytes`
-    // shape directly is robust to that.
-    if (
-      value !== null &&
-      typeof value === "object" &&
-      (value as { bytes?: unknown }).bytes instanceof Uint8Array &&
-      !(value instanceof Uint8Array)
-    ) {
-      const u8 = (value as { bytes: Uint8Array }).bytes;
-      return Buffer.from(u8.buffer, u8.byteOffset, u8.byteLength);
-    }
-    // Date/time Temporal values bind through the adapter's BC-aware `quotedDate`
-    // (proleptic years ≤ 0 get the " BC" suffix); `value_for_database` now yields
-    // the cast Temporal rather than a pre-quoted string. PlainTime takes the
-    // `quoted_time` arm below.
-    if (
-      value instanceof Temporal.Instant ||
-      value instanceof Temporal.PlainDate ||
-      value instanceof Temporal.PlainDateTime ||
-      value instanceof Temporal.ZonedDateTime
-    ) {
-      return this.quotedDate(value);
-    }
-    // Object-valued binds reach pg as raw objects unless serialized to their pg
-    // literal string. Rails' `type_casted_binds` applies the adapter `type_cast`
-    // per value, which routes the PG OID `Data` wrappers — Range → `encode_range`,
-    // ArrayData → `encode_array`, Xml/Bit `Data` → `value.to_s` (Quoting#type_cast).
-    // These are the object-valued cast outputs `value_for_database` can emit
-    // (e.g. a `where` bind on a range/array/bit/xml column). Apply the cast
-    // narrowly to these wrapper types so we don't reintroduce the bind-everything
-    // pinned-client hang.
-    if (
-      value instanceof OidRange ||
-      value instanceof ArrayData ||
-      value instanceof XmlData ||
-      value instanceof BitData
-    ) {
-      return this.typeCast(value);
-    }
-    // Rails: `when Type::Time::Value then quoted_time(value)`
-    // (abstract/quoting.rb:103).
-    if (value instanceof TimeValue || value instanceof Temporal.PlainTime) {
-      return dispatchQuotedTime(this, value);
-    }
-    // Rails: `when BigDecimal then value.to_s("F")` (abstract/quoting.rb:101) —
-    // the driver needs a primitive, not the wrapper object.
-    if (value instanceof BigDecimal) return value.toString("F");
-    return value;
-  }
-
-  /**
    * Mirrors: PostgreSQL::Quoting#lookup_cast_type (postgresql/quoting.rb:195).
    * Resolves a sql_type string to its OID with a live
    * `SELECT '<sql_type>'::regtype::oid` SCHEMA query, then looks the OID up in
@@ -3856,12 +3757,7 @@ export class PostgreSQLAdapter
   // Mirrors: ReferentialIntegrity#disable_referential_integrity. Extracted to
   // postgresql/referential-integrity.ts (Rails houses this in the
   // ReferentialIntegrity module, not schema_statements.rb).
-  override disableReferentialIntegrity(
-    fn: () => Promise<void>,
-    scopedTables?: string[],
-  ): Promise<void> {
-    return disableReferentialIntegrity.call(this, fn, scopedTables);
-  }
+  override disableReferentialIntegrity = disableReferentialIntegrity;
 
   // Mirrors: ReferentialIntegrity#check_all_foreign_keys_valid!
   checkAllForeignKeysValidBang = checkAllForeignKeysValidBang;

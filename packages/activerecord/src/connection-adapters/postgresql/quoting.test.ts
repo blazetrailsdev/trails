@@ -396,22 +396,19 @@ describe("PostgreSQL quoting", () => {
     expect(quoteFn.call({ quotedDate }, v)).toBe("'0044-03-15 BC'");
   });
 
-  it("typeCast passes the infinity sentinels through without raising", () => {
+  it("typeCast maps the infinity sentinels to the PG wire strings", () => {
     // Trails-only: no Rails counterpart — Ruby has no equivalent of these
     // sentinels, and Rails' `type_cast` never sees one.
     //
-    // The `type_casted_binds` sweep put `typeCast` AHEAD of `_bindForPg` on
-    // every PG bind path, which would matter if the sentinels were opaque
-    // objects needing a dedicated arm. They are not: `DateInfinity` IS
-    // `Number.POSITIVE_INFINITY` (activemodel type/internal/sentinels.ts), so
-    // they match the numeric arm and are returned identically, reaching
-    // `_bindForPg`, whose first two lines map them to the "infinity" wire
-    // strings exactly as before.
+    // `type_casted_binds` (abstract/quoting.rb:224) is the only bind
+    // normalizer, so the mapping lives here. `DateInfinity` IS
+    // `Number.POSITIVE_INFINITY` (activemodel type/internal/sentinels.ts:25),
+    // so the arm must sit ahead of the numeric arm or the sentinel binds as a
+    // bare float pg cannot send to a date column.
     // (On the typed path `OID::Date#serialize` has already mapped them to the
     // "infinity" wire string, so this is belt-and-braces.)
-    expect(() => typeCast(DateInfinity)).not.toThrow();
-    expect(typeCast(DateInfinity)).toBe(DateInfinity);
-    expect(typeCast(DateNegativeInfinity)).toBe(DateNegativeInfinity);
+    expect(typeCast(DateInfinity)).toBe("infinity");
+    expect(typeCast(DateNegativeInfinity)).toBe("-infinity");
   });
 
   it("typeCast(new Date()) throws — Date is no longer accepted", () => {

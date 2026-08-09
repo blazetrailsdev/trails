@@ -51,7 +51,6 @@ import { _registerBase as _registerBaseWithSchemaMigration } from "./schema-migr
 import { _registerBase as _registerBaseWithInternalMetadata } from "./internal-metadata.js";
 import { _registerBase as _registerBaseWithSchemaDumper } from "./schema-dumper.js";
 import { _registerBase as _registerBaseWithNamedScoping } from "./scoping/named.js";
-import { _registerQuoteSqlValue } from "./insert-all.js";
 import {
   discriminateClassForRecord,
   stiName,
@@ -105,10 +104,7 @@ import {
   createAssociationCache,
 } from "./association-cache.js";
 import { ConnectionHandler } from "./connection-adapters/abstract/connection-handler.js";
-import {
-  quote as abstractQuote,
-  type QuotingDispatchHost,
-} from "./connection-adapters/abstract/quoting.js";
+
 import * as ConnectionHandling from "./connection-handling.js";
 import type { DatabaseConfig } from "./database-configurations/database-config.js";
 import * as ModelSchema from "./model-schema.js";
@@ -355,45 +351,6 @@ import {
   extractMultiparameterCallstack,
   executeMultiparameterAssignment,
 } from "./multiparameter-attribute-assignment.js";
-
-/** @internal */
-export function quoteSqlValue(v: unknown, connection?: QuotingDispatchHost): string {
-  if (v === null || v === undefined) return "NULL";
-  if (typeof v === "number" || typeof v === "bigint") return String(v);
-  if (typeof v === "boolean") return v ? "TRUE" : "FALSE";
-  // Temporal date/time values reach here because value_for_database now yields
-  // the cast Temporal (not a pre-quoted SQL string). Rails renders these with
-  // `quote`, which dispatches `quoted_date` / `quoted_time` on the connection
-  // (abstract/quoting.rb:75-86) — so the dialect comes from the receiver, not a
-  // parameter.
-  if (
-    v instanceof Temporal.Instant ||
-    v instanceof Temporal.PlainDateTime ||
-    v instanceof Temporal.PlainDate ||
-    v instanceof Temporal.PlainTime ||
-    v instanceof Temporal.ZonedDateTime
-  ) {
-    return abstractQuote.call(connection ?? {}, v);
-  }
-  // boundary: defensive SQL literal quoting fallback for legacy callers.
-  // Invalid (NaN) Date short-circuits to SQL NULL — toISOString() would throw
-  // a RangeError, and the generic object fallthrough would JSON-stringify it
-  // to the misleading string 'null'.
-  if (v instanceof Date) {
-    return Number.isNaN(v.getTime()) ? "NULL" : `'${v.toISOString()}'`;
-  }
-  if (typeof v === "object") {
-    let json: string | undefined;
-    try {
-      json = JSON.stringify(v, (_k, val) => (typeof val === "bigint" ? val.toString() : val));
-    } catch {
-      // circular structures or other non-serializable objects — fall through to NULL
-    }
-    if (json === undefined) return "NULL";
-    return `'${json.replace(/'/g, "''")}'`;
-  }
-  return `'${String(v).replace(/'/g, "''")}'`;
-}
 
 /**
  * A single column of a primary key.
@@ -5240,4 +5197,3 @@ _registerBaseWithSchemaMigration(Base);
 _registerBaseWithInternalMetadata(Base);
 _registerBaseWithSchemaDumper(Base);
 _registerBaseWithNamedScoping(Base);
-_registerQuoteSqlValue(quoteSqlValue);

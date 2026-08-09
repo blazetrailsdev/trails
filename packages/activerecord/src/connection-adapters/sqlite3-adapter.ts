@@ -2319,12 +2319,20 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   /** @internal */
   private async tableStructureSql(tableName: string, columnNames?: string[]): Promise<string[]> {
-    const querySql = `SELECT sql FROM (SELECT * FROM sqlite_master UNION ALL SELECT * FROM sqlite_temp_master) WHERE type = 'table' AND name = '${sqliteQuoteString(tableName)}'`;
-    const structStmt = await this.driver.prepare(querySql);
-    const row = (await structStmt.get()) as { sql: string } | undefined;
-    if (!row?.sql) return [];
-    const body = row.sql.replace(/\);\s*$/, "").replace(/^[^(]*\(/, "");
-    const names = columnNames ?? [];
+    // Rails: `unless column_names ... column_names = column_info.map { ... }`
+    // (sqlite3_adapter.rb:758-761).
+    if (!columnNames) {
+      const columnInfo = await this.tableInfo(tableName);
+      columnNames = columnInfo.map((column) => String(column["name"]));
+    }
+    // Rails: `result = query_value(sql, "SCHEMA")` (sqlite3_adapter.rb:775) —
+    // the reflection read is instrumented like every other SCHEMA query, and
+    // the table name goes through `quote` (rb:767), not a bare escape.
+    const querySql = `SELECT sql FROM (SELECT * FROM sqlite_master UNION ALL SELECT * FROM sqlite_temp_master) WHERE type = 'table' AND name = ${this.quote(tableName)}`;
+    const result = (await this.queryValue(querySql, "SCHEMA")) as string | null | undefined;
+    if (!result) return [];
+    const body = result.replace(/\);\s*$/, "").replace(/^[^(]*\(/, "");
+    const names = columnNames;
     let splitter: RegExp;
     // Rails' table_structure_sql anchors on a single `\s` before each column
     // name; we widen it to `\s*` so hand-written multi-line CREATE TABLE

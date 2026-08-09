@@ -243,14 +243,19 @@ describe("SQLite3::Quoting", () => {
       // Binary self-dispatches through the host, so it must reach the `x'..'`
       // hex form, not the abstract byte-string fallback. Cover all three shapes
       // that reach here — the `BinaryData` that `BinaryType#serialize` returns
-      // (activemodel/.../binary.rb:31), plus the raw `Uint8Array` and bare
-      // `ArrayBuffer` a caller may hand to a migration default.
+      // (activemodel/.../binary.rb:31) and the raw `Uint8Array` view, which
+      // takes the abstract `ArrayBuffer.isView` branch back to `quotedBinary`.
       expect(quoteDefaultExpression.call(HOST, new Uint8Array([0xde, 0xad]))).toBe("x'dead'");
-      expect(quoteDefaultExpression.call(HOST, new Uint8Array([0xde, 0xad]).buffer)).toBe(
-        "x'dead'",
-      );
       expect(quoteDefaultExpression.call(HOST, new BinaryData(new Uint8Array([0xde, 0xad])))).toBe(
         "x'dead'",
+      );
+      // A *bare* `ArrayBuffer` has no Rails counterpart — Rails only ever
+      // reaches `quote` with a `Type::Binary::Data`, and `ArrayBuffer.isView`
+      // is false for a bare buffer — so it falls to the abstract
+      // `else raise TypeError, "can't quote ..."` (abstract/quoting.rb:87) like
+      // any other unquotable object. Hand a view instead.
+      expect(() => quoteDefaultExpression.call(HOST, new Uint8Array([0xde, 0xad]).buffer)).toThrow(
+        /can't quote ArrayBuffer/,
       );
     });
   });
