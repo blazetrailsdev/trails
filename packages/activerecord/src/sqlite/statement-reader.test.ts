@@ -67,7 +67,7 @@ const adapters: [string, () => SQLite3Adapter, boolean][] = [
 // trails invention; Rails branches on `column_count.zero?` alone. Removing the
 // isWrite gate would cost `executeMutation` the atomic RunResult rowid that PR
 // 4893 introduced, so it is tracked separately as
-// sqlite-perform-query-iswrite-gate-drops-returning-rows.
+// sqlite-performquery-contract-deviations-need-lock.
 describe.each(adapters)("SQLite3Adapter RETURNING rows — %s", (_name, build, available) => {
   it.skipIf(!available)("internalExecQuery returns the RETURNING rows", async () => {
     const adapter = build();
