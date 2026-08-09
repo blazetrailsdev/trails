@@ -50,14 +50,16 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("integer types", async () => {
       // Verify that int2, int4, and int8 columns all come back through
-      // the pg driver as strings (int8) or numbers (int2/int4) as expected.
+      // the pg driver as numbers, int8 narrowing to a bigint past the
+      // safe-integer range.
       await adapter.executeMutation(`INSERT INTO "pg_int_types" DEFAULT VALUES`);
       const rows = await adapter.execute(`SELECT * FROM "pg_int_types"`);
       expect(typeof rows[0].small).toBe("number");
       expect(typeof rows[0].medium).toBe("number");
-      // pg-types returns int8 as string to avoid precision loss
-      expect(typeof rows[0].big).toBe("string");
-      expect(BigInt(rows[0].big as string)).toBe(9007199254740993n);
+      // The default is one past Number.MAX_SAFE_INTEGER, so the connection's
+      // int8 parser keeps it a bigint rather than truncating it onto a float.
+      expect(typeof rows[0].big).toBe("bigint");
+      expect(rows[0].big).toBe(9007199254740993n);
     });
 
     it("schema properly respects bigint ranges", async () => {

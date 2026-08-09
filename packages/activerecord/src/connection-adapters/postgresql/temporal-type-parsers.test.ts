@@ -18,6 +18,7 @@ const OID_TIME = 1083;
 const OID_TIMESTAMP = 1114;
 const OID_TIMESTAMPTZ = 1184;
 const OID_TIMETZ = 1266;
+const OID_INT8 = 20;
 
 function parse(oid: number, value: string): unknown {
   const parser = getTypeParser(oid, "text");
@@ -95,6 +96,21 @@ describe("getTypeParser — binary format", () => {
   it("delegates binary format to pg built-ins (always returns a function)", () => {
     expect(typeof getTypeParser(OID_TIMESTAMPTZ, "binary")).toBe("function");
     expect(typeof getTypeParser(OID_DATE, "binary")).toBe("function");
+  });
+});
+
+describe("getTypeParser — int8 (OID 20)", () => {
+  it("returns a number for a count(*) value", () => {
+    expect(parse(OID_INT8, "3")).toBe(3);
+  });
+
+  it("returns a bigint past the safe-integer range rather than truncating", () => {
+    expect(parse(OID_INT8, "9223372036854775807")).toBe(9223372036854775807n);
+    expect(parse(OID_INT8, "-9223372036854775808")).toBe(-9223372036854775808n);
+  });
+
+  it("returns a number at the safe-integer boundary", () => {
+    expect(parse(OID_INT8, String(Number.MAX_SAFE_INTEGER))).toBe(Number.MAX_SAFE_INTEGER);
   });
 });
 
