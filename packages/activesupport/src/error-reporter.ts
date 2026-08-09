@@ -104,7 +104,7 @@ export class ErrorReporter {
   constructor(...args: unknown[]) {
     const [subscribers, { logger = null }] = splitKwargs<{
       logger?: ErrorReporterLogger | null;
-    }>(args);
+    }>(args, respondsToReport);
     this.subscribers = (subscribers as (ErrorSubscriber | ErrorSubscriber[])[]).flat();
     this.logger = logger;
     this.debugMode = false;
@@ -356,10 +356,17 @@ function rescues(errorClasses: readonly ErrorClass[], error: unknown): error is 
  * Ruby's trailing-`**kwargs` binding: the last argument is the kwargs Hash when
  * it is a plain object, and is otherwise absent. TS has no kwargs, so the splat
  * has to be unpicked from the end by hand.
+ *
+ * `isPositional` vetoes that: Ruby's parser tells a kwargs Hash from a trailing
+ * positional argument, and where TS cannot, the caller supplies the same duck
+ * type Rails itself dispatches on.
  */
-function splitKwargs<O>(args: readonly unknown[]): [readonly unknown[], O] {
+function splitKwargs<O>(
+  args: readonly unknown[],
+  isPositional: (value: unknown) => boolean = () => false,
+): [readonly unknown[], O] {
   const last = args[args.length - 1];
-  if (isKwargs(last)) return [args.slice(0, -1), last as O];
+  if (isKwargs(last) && !isPositional(last)) return [args.slice(0, -1), last as O];
   return [args, {} as O];
 }
 
@@ -380,6 +387,14 @@ function splitBlockArgs<O, T>(args: readonly unknown[]): [readonly ErrorClass[],
   let errorClasses = errorClassArgs as readonly ErrorClass[];
   if (errorClasses.length === 0) errorClasses = ErrorReporter.DEFAULT_RESCUE;
   return [errorClasses, opts, fn];
+}
+
+/**
+ * `subscribe`'s duck type (`error_reporter.rb:162`), which is what tells a plain
+ * object subscriber from the constructor's `logger:` kwargs Hash.
+ */
+function respondsToReport(value: unknown): boolean {
+  return typeof (value as { report?: unknown })?.report === "function";
 }
 
 /**
