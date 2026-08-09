@@ -829,10 +829,10 @@ describe("Date", () => {
     // Every expectation is `ruby 3.3.11 -rdate`'s `Date.jd(jd)` — under the
     // default `Date::ITALY`, so 2299160 is the Julian 1582-10-04 the reform
     // deleted ten days after, not the proleptic Gregorian 1582-10-14.
-    expect(new RubyDate(RubyDate.jd(2440588)).toS()).toBe("1970-01-01");
-    expect(new RubyDate(RubyDate.jd(2299161)).toS()).toBe("1582-10-15");
-    expect(new RubyDate(RubyDate.jd(2299160)).toS()).toBe("1582-10-04");
-    expect(new RubyDate(RubyDate.jd(2299160)).yday).toBe(277);
+    expect(strftime(RubyDate.jd(2440588), "%Y-%m-%d")).toBe("1970-01-01");
+    expect(strftime(RubyDate.jd(2299161), "%Y-%m-%d")).toBe("1582-10-15");
+    expect(strftime(RubyDate.jd(2299160), "%Y-%m-%d")).toBe("1582-10-04");
+    expect(strftime(RubyDate.jd(2299160), "%j")).toBe("277");
   });
 
   it("reads a Temporal subject's wday and yday off the Julian day too", () => {
@@ -886,17 +886,14 @@ describe("Date", () => {
   it("raises Date::Error on a civil date c_valid_civil_p rejects", () => {
     // Every expectation is `ruby 3.3.11 -rdate`'s `Date.new(y, m, d)` under the
     // default `Date::ITALY`, where 1582-10-10 is one of the ten days the reform
-    // deleted. 1500-02-29 is the one MRI accepts and this does not: it is a
-    // real Julian day with no proleptic Gregorian spelling for
-    // `Temporal.PlainDate` to seat (`plainDateFromJd`, date.ts).
+    // deleted.
     expect(() => new RubyDate(2001, 2, 29)).toThrow(RubyDate.Error);
     expect(civilOrError(1581, 12, 31)).toEqual([1581, 12, 31]);
     expect(civilOrError(1582, 10, 10)).toBe("E");
-    expect(civilOrError(1500, 2, 29)).toBe("E");
+    expect(civilOrError(1500, 2, 29)).toEqual([1500, 2, 29]);
     // c_find_ldom's scan makes February 1500 twenty-nine days long, as the
-    // Julian calendar has it, so the negative mday counts back from the 29th —
-    // and then hits the same missing seat.
-    expect(civilOrError(1500, 2, -1)).toBe("E");
+    // Julian calendar has it, so the negative mday counts back from the 29th.
+    expect(civilOrError(1500, 2, -1)).toEqual([1500, 2, 29]);
     expect(civilOrError(1582, 10, -1)).toEqual([1582, 10, 31]);
     expect(civilOrError(1900, 2, -1)).toEqual([1900, 2, 28]);
     expect(civilOrError(1900, 2, 29)).toBe("E");
@@ -905,6 +902,29 @@ describe("Date", () => {
     expect(civilOrError(2100, 2, 28)).toEqual([2100, 2, 28]);
     expect(civilOrError(2001, 13, 1)).toBe("E");
     expect(civilOrError(-4712, 1, 1)).toEqual([-4712, 1, 1]);
+  });
+
+  it("builds a Julian-only civil date, as the HAVE_JD state does", () => {
+    // ruby 3.3.11 -rdate: Julian leap years have no century rule, so 1500,
+    // 1400 and 1300 are all leap under `Date::ITALY` and 29 February is a real
+    // day none of them has a proleptic Gregorian spelling for.
+    //   Date.new(1500, 2, 29) #=> "1500-02-29", jd 2268992, wday 6
+    //   Date.new(1400, 2, 29) #=> "1400-02-29", jd 2232467, wday 0
+    //   Date.new(1300, 2, 29) #=> "1300-02-29", jd 2195942, wday 1
+    for (const [y, jd, wday] of [
+      [1500, 2268992, 6],
+      [1400, 2232467, 0],
+      [1300, 2195942, 1],
+    ] as const) {
+      const date = new RubyDate(y, 2, 29);
+      expect(date.toS()).toBe(`${y}-02-29`);
+      expect(date.jd).toBe(jd);
+      expect(date.wday).toBe(wday);
+      expect(date.yday).toBe(60);
+      // The `Temporal.PlainDate` seat is where the spelling runs out, not the
+      // gem-shaped object: `to_date` is the only thing that raises.
+      expect(() => date.toDate()).toThrow(RubyDate.Error);
+    }
   });
 });
 
@@ -959,6 +979,45 @@ describe("DateTime", () => {
     expect(datetime.zone).toBe("+09:00");
     expect(datetime.strftime("%Y-%m-%dT%H:%M:%S %z %:z %::z %:::z %Z")).toBe(
       "2008-03-01T06:00:00 +0900 +09:00 +09:00:00 +09 +09:00",
+    );
+  });
+
+  it("carries the offset into the default return too, not only the gem-shaped one", () => {
+    // ruby 3.3.11:
+    //   DateTime.parse("2008-03-01T06:00:00+09:00").to_s   #=> "2008-03-01T06:00:00+09:00"
+    //   DateTime.parse("2008-03-01T06:00:00").to_s         #=> "2008-03-01T06:00:00+00:00"
+    //   DateTime.strptime("2008-03-01T06:00:00+09:00").to_s
+    //     #=> "2008-03-01T06:00:00+09:00"
+    const zoned = RubyDateTime.parse("2008-03-01T06:00:00+09:00");
+    expect(zoned).toBeInstanceOf(Temporal.ZonedDateTime);
+    expect((zoned as Temporal.ZonedDateTime).offset).toBe("+09:00");
+    expect(strftime(zoned, "%Y-%m-%dT%H:%M:%S%:z")).toBe("2008-03-01T06:00:00+09:00");
+
+    // A string that named no zone leaves `of` at 0, which is the value
+    // `::DateTime` has no zone to spell — a bare PlainDateTime.
+    const plain = RubyDateTime.parse("2008-03-01T06:00:00");
+    expect(plain).toBeInstanceOf(Temporal.PlainDateTime);
+    expect(strftime(plain, "%Y-%m-%dT%H:%M:%S%:z")).toBe("2008-03-01T06:00:00+00:00");
+
+    expect(
+      strftime(RubyDateTime.strptime("2008-03-01T06:00:00+09:00"), "%Y-%m-%dT%H:%M:%S%:z"),
+    ).toBe("2008-03-01T06:00:00+09:00");
+  });
+
+  it("truncates a sub-minute offset in the seat, as of2str's own spelling does", () => {
+    // ruby 3.3.11:
+    //   Date._parse("2008-03-01T06:00:00-00:44:30")[:offset] #=> -2670
+    //   DateTime.parse("2008-03-01T06:00:00-00:44:30").zone  #=> "-00:44"
+    // `date_zone_to_diff` (date_parse.c:523-528) keeps the 30 seconds; a
+    // Temporal offset time zone is minute-precision and `of2str`
+    // (date_core.c:1973-1980) drops them too, so the seat agrees with `#zone`.
+    expect(RubyDate._parse("2008-03-01T06:00:00-00:44:30").offset).toBe(-2670);
+    expect(gemDateTime("2008-03-01T06:00:00-00:44:30").zone).toBe("-00:44");
+    const seat = RubyDateTime.parse("2008-03-01T06:00:00-00:44:30");
+    expect(seat).toBeInstanceOf(Temporal.ZonedDateTime);
+    expect((seat as Temporal.ZonedDateTime).offset).toBe("-00:44");
+    expect((seat as Temporal.ZonedDateTime).toPlainDateTime().toString()).toBe(
+      "2008-03-01T06:00:00",
     );
   });
 

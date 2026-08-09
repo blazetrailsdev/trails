@@ -586,26 +586,37 @@ it("inspect does not show secrets", async () => {
   expect(pool2.inspect()).toMatch(/role="reading"/);
 });
 
-it("adapter proxy does not fabricate methods for serialization/matcher probe keys", async () => {
+it("adapter proxy treats a probe name as the send it is, with no carve-out set", async () => {
   const pool = makePool();
   const proxy = (
     pool as unknown as { _getAdapterProxy(): Record<PropertyKey, unknown> }
   )._getAdapterProxy();
 
-  // Keys a serializer / asymmetric matcher / framework walker may probe. None
-  // may resolve to a callable that would dispatch to a raw connection.
+  // `abstract/connection_pool.rb` gives the proxy no name set to consult: what
+  // an adapter answers is what its class defines. None of these is an
+  // AbstractAdapter method, so none fabricates a dispatcher — before a checkout
+  // as well as after, since the base class stands in for the sample connection.
   for (const key of [
     "then",
     "toJSON",
     "asymmetricMatch",
     "$$typeof",
     "nodeType",
-    "constructor",
-    "hasOwnProperty",
+    "getMockName",
+    "_isMockFunction",
   ]) {
     expect(typeof proxy[key]).not.toBe("function");
     expect(proxy[key]).toBeUndefined();
   }
+  // What Ruby *does* answer, it answers through the ancestor chain — the same
+  // reason `NullPool` lets `to_s` arrive as `Object.prototype.toString`.
+  expect(typeof proxy.hasOwnProperty).toBe("function");
+  // `constructor` is object plumbing, not a send: a walker reads it to name the
+  // value's class, so it answers the adapter class rather than a dispatcher
+  // that would call that class without `new`.
+  expect(proxy.constructor).toBe(AbstractAdapter);
+  // A JS `Symbol` cannot spell a Ruby send — the one carve-out the language
+  // forces, as on `NullPool`.
   expect(proxy[Symbol.iterator]).toBeUndefined();
 
   // The pool is stamped onto every translated error, so a serializer or matcher
@@ -614,6 +625,13 @@ it("adapter proxy does not fabricate methods for serialization/matcher probe key
   // `conn[prop] is not a function`.
   expect(() => JSON.stringify(proxy)).not.toThrow();
   expect(proxy).not.toEqual(expect.objectContaining({ id: 1 }));
+
+  // A deliberately failing assertion whose subject holds the proxy must report
+  // its own failure, not an error from the reporter — the guard
+  // `connection-pool.trails.test.ts` carries for `NullPool`.
+  expect(() => expect({ adapter: proxy, n: 1 }).toEqual({ adapter: proxy, n: 2 })).toThrow(
+    /expected/i,
+  );
 });
 
 it("adapter proxy still dispatches genuine adapter methods to the connection", async () => {
@@ -635,8 +653,8 @@ it("adapter proxy still dispatches genuine adapter methods to the connection", a
 it("adapter proxy does not fabricate a method for an unknown probe key once a connection exists", async () => {
   const pool = makePool();
   // Materialise a connection (as when a query is mid-flight and an error is
-  // translated). An arbitrary probe key not in the deny set must now resolve to
-  // a non-callable, since the live connection has no such method.
+  // translated). An arbitrary probe key must resolve to a non-callable, since
+  // the live connection has no such method.
   await pool.checkout();
   const proxy = (
     pool as unknown as { _getAdapterProxy(): Record<PropertyKey, unknown> }

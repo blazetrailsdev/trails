@@ -10,7 +10,7 @@ import type { TimeWithZone } from "./time-with-zone.js";
 I18n.setEnforceAvailableLocales(false);
 
 describe("I18nTest", () => {
-  let date: Temporal.PlainDate | Temporal.PlainDateTime;
+  let date: Temporal.PlainDate | Temporal.PlainDateTime | Temporal.ZonedDateTime;
   let time: TimeWithZone;
 
   beforeEach(async () => {
