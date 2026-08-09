@@ -66,8 +66,12 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       }
     });
 
-    it("statementLimit = 0 disables named prepared statements", async () => {
+    it("statementLimit = 0 is unsupported and raises on the first prepare", async () => {
       const adapter = new Mysql2Adapter({ uri: MYSQL_TEST_URL, statementLimit: 0 });
+      // The outer beforeEach opts the *leased* adapter into prepared
+      // statements; this one is built locally and defaults to off, so without
+      // this the prepared path is never taken and the pool is never reached.
+      adapter.preparedStatements = true;
       await adapter.beginDbTransaction();
       try {
         // Rails does not branch on the limit at the call site, and its pool has
