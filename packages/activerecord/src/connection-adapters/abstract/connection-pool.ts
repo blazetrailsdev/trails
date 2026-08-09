@@ -539,7 +539,8 @@ export class ConnectionPool implements ReapablePool {
             // (`abstract_adapter.rb`), so a send it has no method for raises,
             // exactly as `NullPool`'s trap raises for its own.
             throw new NoMethodError(
-              `undefined method '${prop}' for an instance of ActiveRecord::ConnectionAdapters::AbstractAdapter`,
+              `undefined method '${prop}' for an instance of ` +
+                `ActiveRecord::ConnectionAdapters::${(sample as any).constructor.name}`,
             );
           }
           return (...args: unknown[]) => {
