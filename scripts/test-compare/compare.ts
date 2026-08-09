@@ -20,7 +20,7 @@
  * shown for every package. Use --package to scope to one.
  *
  * Usage:
- *   npx tsx scripts/test-compare/test-compare.ts [--missing] [--json]
+ *   npx tsx scripts/test-compare/compare.ts [--missing] [--json]
  *     [--incomplete] [--gates] [--check] [--sort-extra] [--min-extra=N]
  *     [--package activesupport]
  *

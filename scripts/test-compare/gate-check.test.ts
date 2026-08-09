@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { GATE_ENFORCED_PACKAGES, gateMismatchOffenders } from "./test-compare.js";
+import { GATE_ENFORCED_PACKAGES, gateMismatchOffenders } from "./compare.js";
 
 describe("gateMismatchOffenders (hard-zero --check gate)", () => {
   it("enforces activerecord only", () => {

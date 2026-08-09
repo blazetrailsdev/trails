@@ -9,7 +9,7 @@
  *
  * Historically each node ran as its own process — `pnpm -s vendor:fetch`,
  * a second `pnpm -s vendor:fetch --print-test-paths` for the TEST_PATHS_JSON
- * handoff, `pnpm tsx extract-ts-tests.ts`, `pnpm tsx test-compare.ts` — so the
+ * handoff, `pnpm tsx extract-ts-tests.ts`, `pnpm tsx compare.ts` — so the
  * pipeline paid the ~1.7s tsx/Node cold start four times over. This entrypoint
  * pays it ONCE: every TypeScript phase runs in-process, and only the Ruby
  * extractor stays a subprocess (it's a `.rb`). The test-paths manifest that
@@ -33,7 +33,7 @@ import { promisify } from "node:util";
 import { runFetch } from "../../vendor/fetch.js";
 import { testPathsManifest } from "../../vendor/sources.js";
 import { main as extractTsTests } from "./extract-ts-tests.js";
-import { main as runCompare } from "./test-compare.js";
+import { main as runCompare } from "./compare.js";
 
 const execFileAsync = promisify(execFile);
 

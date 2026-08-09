@@ -1,4 +1,4 @@
-// Phase 3 of test:compare's assertion comparison (after count in test-compare.ts
+// Phase 3 of test:compare's assertion comparison (after count in compare.ts
 // and normalized *kind* in assertion-kinds.ts): compare the literal EXPECTED
 // VALUE each mapped assertion checks. A kind histogram treats `assert_equal 5,
 // foo` / `expect(foo).toEqual(5)` and `assert_equal 3, foo` /
