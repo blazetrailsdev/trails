@@ -641,12 +641,9 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
           { allowRetry: options?.allowRetry ?? false },
           async (conn) => {
             const mysqlConn = conn as unknown as mysql.Connection;
-            // Rails' internal_exec_query is `cast_result(raw_execute(...))` —
-            // one `perform_query` primitive per adapter, not a second inline
-            // driver call. `_performQuery` owns the array-mode query, the
-            // CALL/multi-result unwrap, the affected-row record and the warning
-            // fetch; `cast_result` builds the Result from its `{ rows, fields }`,
-            // preserving duplicate column names and column_types.
+            // Rails' internal_exec_query is `cast_result(raw_execute(...))`
+            // (abstract/database_statements.rb:527-534) — one perform_query
+            // primitive per adapter, not a second inline driver call.
             const raw = await this._performQuery(
               mysqlConn,
               driverSql,
@@ -921,6 +918,16 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   /**
+   * Assigned onto the prototype below; declared here so `internal_exec_query`'s
+   * virtual call resolves against the concrete adapter rather than
+   * AbstractAdapter's optional member.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::Mysql2::DatabaseStatements#cast_result
+   * @internal
+   */
+  declare castResult: typeof mysql2CastResult;
+
+  /**
    * Rows affected by the most recent write. Rails takes the statement result
    * and ignores it, reading `@affected_rows` instead — wired to the this-less
    * port so api:compare's `affected_rows` coverage points at reachable code.
@@ -928,16 +935,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    * Mirrors: ActiveRecord::ConnectionAdapters::Mysql2::DatabaseStatements#affected_rows
    * @internal
    */
-  /**
-   * Assigned onto the prototype below (Mirrors: Mysql2::DatabaseStatements#cast_result);
-   * declared here so `internal_exec_query`'s virtual call resolves against the
-   * concrete adapter rather than AbstractAdapter's optional member.
-   *
-   * @internal
-   */
-  declare castResult: typeof mysql2CastResult;
-
-  /** @internal */
   affectedRows(rawResult: Mysql2RawResult): number {
     return mysql2AffectedRows.call(this as any, rawResult);
   }
