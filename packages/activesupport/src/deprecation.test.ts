@@ -28,14 +28,6 @@ describe("DeprecationTest", () => {
     spy.mockRestore();
   });
 
-  it(":warn behavior writes to stderr", () => {
-    dep.behavior = "warn";
-    const spy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-    dep.warn("fubar");
-    expect(spy).toHaveBeenCalledWith(expect.stringContaining("fubar"));
-    spy.mockRestore();
-  });
-
   it("nil behavior is ignored", () => {
     dep.behavior = null;
     // Should not throw
@@ -566,14 +558,6 @@ describe("DeprecationTest", () => {
     spy.mockRestore();
   });
 
-  it(":stderr behavior with #warn", () => {
-    dep.behavior = "warn";
-    const spy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-    dep.warn("fubar");
-    expect(spy).toHaveBeenCalledWith(expect.stringContaining("fubar"));
-    spy.mockRestore();
-  });
-
   it(":log behavior", () => {
     dep.behavior = "log";
     const spy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
@@ -612,9 +596,9 @@ describe("DeprecationTest", () => {
   });
 
   it("invalid behavior", () => {
-    // Unknown string behaviors fall through the switch without action
-    dep.behavior = "unknown" as never;
-    expect(() => dep.warn("invalid")).not.toThrow();
+    expect(() => {
+      dep.behavior = "invalid" as never;
+    }).toThrow(":invalid is not a valid deprecation behavior.");
   });
 
   it("DeprecatedInstanceVariableProxy", () => {

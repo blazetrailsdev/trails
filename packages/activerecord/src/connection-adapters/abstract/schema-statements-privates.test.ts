@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
+import { KeyError } from "@blazetrails/activesupport";
 import {
   SchemaStatements,
   canRemoveIndexByName,
@@ -225,7 +226,8 @@ describe("SchemaStatements privates (PR 8)", () => {
     expect(ss.checkConstraintName("users", { expression: "age > 0" })).toMatch(
       /^chk_rails_[0-9a-f]{10}$/,
     );
-    expect(() => ss.checkConstraintName("users", {})).toThrow(/expression/);
+    expect(() => ss.checkConstraintName("users", {})).toThrow(KeyError);
+    expect(() => ss.checkConstraintName("users", {})).toThrow("key not found: :expression");
   });
 
   it("checkConstraintName returns an explicitly supplied nullish name instead of deriving", () => {
@@ -245,7 +247,8 @@ describe("SchemaStatements privates (PR 8)", () => {
     expect(ss.checkConstraintName("users", { expression: undefined })).toBe(
       ss.checkConstraintName("users", { expression: "" }),
     );
-    expect(() => ss.checkConstraintName("users", {})).toThrow(/expression/);
+    expect(() => ss.checkConstraintName("users", {})).toThrow(KeyError);
+    expect(() => ss.checkConstraintName("users", {})).toThrow("key not found: :expression");
   });
 
   it("checkConstraintOptions derives a name only when the key is absent", () => {

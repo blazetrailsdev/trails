@@ -174,14 +174,19 @@ interface BiasableQueueHost {
  * toward a specific thread.
  */
 export function withABiasFor<T>(this: BiasableQueueHost, context: unknown, fn: () => T): T {
-  const previousCond = this._cond;
-  const newCond = new BiasedConditionVariable(undefined, this._cond, context);
-  this._cond = newCond;
+  let previousCond!: BiasedConditionVariable;
+  let newCond!: BiasedConditionVariable;
+  synchronize(this, () => {
+    previousCond = this._cond;
+    this._cond = newCond = new BiasedConditionVariable(undefined, this._cond, context);
+  });
   try {
     return fn();
   } finally {
-    this._cond = previousCond;
-    newCond.transferWaitersTo(previousCond);
+    synchronize(this, () => {
+      this._cond = previousCond;
+      newCond.transferWaitersTo(previousCond);
+    });
   }
 }
 
@@ -215,11 +220,15 @@ export class Queue {
   }
 
   isAnyWaiting(): boolean {
-    return this._numWaiting > 0;
+    return synchronize(this, () => {
+      return this._numWaiting > 0;
+    });
   }
 
   numWaiting(): number {
-    return this._numWaiting;
+    return synchronize(this, () => {
+      return this._numWaiting;
+    });
   }
 
   /** @internal */
@@ -228,18 +237,22 @@ export class Queue {
   }
 
   add(element: DatabaseAdapter): void {
-    if (!this._cond.signal(element)) {
-      this._queue.push(element);
-    }
+    synchronize(this, () => {
+      if (!this._cond.signal(element)) {
+        this._queue.push(element);
+      }
+    });
   }
 
   delete(element: DatabaseAdapter): DatabaseAdapter | undefined {
-    const idx = this._queue.indexOf(element);
-    if (idx >= 0) {
-      this._queue.splice(idx, 1);
-      return element;
-    }
-    return undefined;
+    return synchronize(this, () => {
+      const idx = this._queue.indexOf(element);
+      if (idx >= 0) {
+        this._queue.splice(idx, 1);
+        return element;
+      }
+      return undefined;
+    });
   }
 
   /** @internal */
@@ -255,13 +268,15 @@ export class Queue {
   poll(): DatabaseAdapter | undefined;
   poll(timeout: number): Promise<DatabaseAdapter> | DatabaseAdapter;
   poll(timeout?: number): Promise<DatabaseAdapter> | DatabaseAdapter | undefined {
-    return this.internalPoll(timeout);
+    return synchronize(this, () => this.internalPoll(timeout));
   }
 
   clear(): DatabaseAdapter[] {
-    const items = [...this._queue];
-    this._queue = [];
-    return items;
+    return synchronize(this, () => {
+      const items = [...this._queue];
+      this._queue = [];
+      return items;
+    });
   }
 
   rejectAll(error: Error): void {

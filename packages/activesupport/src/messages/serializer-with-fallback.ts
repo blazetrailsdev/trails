@@ -1,3 +1,6 @@
+import { KeyError } from "../core-ext/key-error.js";
+
+export { KeyError };
 /**
  * Mirrors Rails `ActiveSupport::Messages::SerializerWithFallback`
  * (messages/serializer_with_fallback.rb).
@@ -43,14 +46,6 @@ export class RuntimeError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "RuntimeError";
-  }
-}
-
-/** Thrown by `SerializerWithFallback.get` on an unknown format. @internal */
-export class KeyError extends Error {
-  constructor(key: string) {
-    super(`key not found: ${JSON.stringify(key)}`);
-    this.name = "KeyError";
   }
 }
 
@@ -248,7 +243,7 @@ export const SerializerWithFallback = {
   /** Mirrors Rails' `SerializerWithFallback[format]`. */
   get(format: string): Serializer {
     const serializer = SERIALIZERS[format as Format];
-    if (!serializer) throw new KeyError(format);
+    if (!serializer) throw new KeyError(`key not found: ${JSON.stringify(format)}`);
     return serializer;
   },
 };

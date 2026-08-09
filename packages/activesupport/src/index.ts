@@ -1,4 +1,5 @@
 export { NameError } from "./core-ext/name-error.js";
+export { KeyError } from "./core-ext/key-error.js";
 export {
   registerFsAdapter,
   getFs,
@@ -344,8 +345,12 @@ export { NullStore } from "./cache/null-store.js";
 // FileStore uses getFs()/getPath() adapters but is kept as a subpath import for tree-shaking
 export type { CacheOptions, CacheStore } from "./cache/index.js";
 
-export { Deprecation, DeprecationError, deprecator } from "./deprecation.js";
-export type { DeprecationBehavior } from "./deprecation.js";
+export { Deprecation, DeprecationError, DEFAULT_BEHAVIORS, deprecator } from "./deprecation.js";
+export type {
+  DeprecationBehavior,
+  DeprecationBehaviorCallable,
+  DeprecationBehaviorInput,
+} from "./deprecation.js";
 export { Deprecators } from "./deprecation/deprecators.js";
 
 export * from "./time-ext.js";

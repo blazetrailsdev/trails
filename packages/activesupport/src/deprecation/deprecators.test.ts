@@ -75,14 +75,14 @@ describe("DeprecationTest", () => {
     const callback = (): void => {};
 
     deprecators.setBehavior(callback);
-    deprecators.each((deprecator) => expect(deprecator.behavior).toBe(callback));
+    deprecators.each((deprecator) => expect(deprecator.behavior).toEqual([callback]));
   });
 
   it("#disallowed_behavior= applies to each deprecator", () => {
     const callback = (): void => {};
 
     deprecators.setDisallowedBehavior(callback);
-    deprecators.each((deprecator) => expect(deprecator.disallowedBehavior).toBe(callback));
+    deprecators.each((deprecator) => expect(deprecator.disallowedBehavior).toEqual([callback]));
   });
 
   it("#disallowed_warnings= applies to each deprecator", () => {
