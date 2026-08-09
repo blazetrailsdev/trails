@@ -243,7 +243,7 @@ setter forms, token renames, file-path aliases, and the skip list with reasons â
 are catalogued in [docs/ruby-ts-conventions.md](docs/ruby-ts-conventions.md).
 That file is **generated** from `explainConventions()` in
 `scripts/parity/conventions.ts` (regenerate with `pnpm api:conventions`);
-CI runs `tsx scripts/api-compare/conventions-doc.ts --check` and fails if it
+CI runs `tsx scripts/parity/conventions-doc.ts --check` and fails if it
 drifts, so it is always current â€” never hand-edit it, change the rule in
 `conventions.ts` instead.
 

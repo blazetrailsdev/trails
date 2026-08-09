@@ -1018,7 +1018,7 @@ export function rubyMethodToTsIgnoringSkip(name: string): string[] | null {
  * Render the Ruby→TypeScript naming conventions as Markdown.
  *
  * This is the single source of truth for the agent-facing conventions doc:
- * `scripts/api-compare/conventions-doc.ts` writes the return value to a file
+ * `scripts/parity/conventions-doc.ts` writes the return value to a file
  * and CI re-runs it with `--check` to fail on drift. Everything that can be
  * derived from the live tables (operators, token renames, path aliases, the
  * skip list, worked examples) is computed here rather than hand-written, so
@@ -1079,7 +1079,7 @@ export function explainConventions(): string {
 <!-- GENERATED FILE — do not edit by hand.
      Regenerate with \`pnpm api:conventions\`. The source of truth is
      \`explainConventions()\` in scripts/parity/conventions.ts; CI runs
-     \`tsx scripts/api-compare/conventions-doc.ts --check\` and fails if this
+     \`tsx scripts/parity/conventions-doc.ts --check\` and fails if this
      file drifts from it. -->
 
 These are the exact rules \`api:compare\` uses to match a Ruby method or file to

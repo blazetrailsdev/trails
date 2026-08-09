@@ -1618,7 +1618,12 @@ export class SchemaStatements {
     options: Record<string, unknown> = {},
   ): Record<string, unknown> {
     const dup = { ...options };
-    dup.name ??= this.checkConstraintName(tableName, { ...dup, expression } as {
+    // `options[:name] ||= check_constraint_name(table_name, expression: expression, **options)`
+    // (`schema_statements.rb:1305-1309`): the double-splat comes last, so an
+    // `:expression` in options wins over the positional one, and the `||=`
+    // means a stored nil name is left nil (the derive call returns it back
+    // through `fetch`) — only an absent key derives.
+    dup.name ??= this.checkConstraintName(tableName, { expression, ...dup } as {
       name?: string;
       expression?: string;
     });
@@ -1629,7 +1634,10 @@ export class SchemaStatements {
     tableName: string,
     options: { name?: string; expression?: string; validate?: boolean },
   ): Promise<boolean> {
-    if (!options.name && !options.expression) {
+    // Rails guards on key presence — `!options.key?(:name) && !options.key?(:expression)`
+    // (`schema_statements.rb:1341-1343`) — so an explicitly supplied `name: ""`
+    // or `name: nil` satisfies the guard and falls through to the lookup.
+    if (!("name" in options) && !("expression" in options)) {
       throw new ArgumentError("At least one of :name or :expression must be supplied");
     }
     return (await this.checkConstraintFor(tableName, options)) !== undefined;
@@ -2304,8 +2312,14 @@ export class SchemaStatements {
   checkConstraintName(
     tableName: string,
     options: { name?: string; expression?: string } = {},
-  ): string {
-    if (options.name) return options.name;
+  ): string | undefined {
+    // Rails writes this as `options.fetch(:name) { derive }`
+    // (`schema_statements.rb:1787-1795`). `Hash#fetch` runs the block only when
+    // the key is ABSENT, so a stored nil is returned as-is — a truthy check
+    // would conflate "no :name given" with "given, but nil". The `||=` in
+    // check_constraint_options (`:1305-1309`) is the deliberately different
+    // one; see the note there.
+    if ("name" in options) return options.name;
     if (options.expression === undefined) {
       throw new ArgumentError(
         `check_constraint_name requires either :name or :expression to be specified`,

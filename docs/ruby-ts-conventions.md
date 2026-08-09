@@ -3,7 +3,7 @@
 <!-- GENERATED FILE — do not edit by hand.
      Regenerate with `pnpm api:conventions`. The source of truth is
      `explainConventions()` in scripts/parity/conventions.ts; CI runs
-     `tsx scripts/api-compare/conventions-doc.ts --check` and fails if this
+     `tsx scripts/parity/conventions-doc.ts --check` and fails if this
      file drifts from it. -->
 
 These are the exact rules `api:compare` uses to match a Ruby method or file to

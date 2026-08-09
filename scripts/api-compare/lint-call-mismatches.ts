@@ -61,8 +61,17 @@
  * `[]` file is never left behind, so a post-reseed git diff shows only real
  * baseline changes.
  *
+ * `--set-reason <category>` (RFC 0092) applies one cluster-vetted reason text to
+ * every baseline row a named category matches — the bulk-clearance shape the
+ * api:calls triage audit asked for, since hand-editing the shard JSON is
+ * forbidden (serializeBaseline owns the encoding) and `--write` PRESERVES
+ * existing reasons rather than setting them. See {@link REASON_CATEGORIES} for
+ * the category table, why each one's population is what it is, and why a
+ * call-name-only predicate is unsafe.
+ *
  * Usage:
  *   pnpm tsx scripts/api-compare/lint-call-mismatches.ts           # gate (CI)
+ *   pnpm tsx scripts/api-compare/lint-call-mismatches.ts --set-reason <cat> [--dry-run] [--force]
  *   pnpm tsx scripts/api-compare/lint-call-mismatches.ts --write   # reseed baseline
  *   pnpm tsx scripts/api-compare/lint-call-mismatches.ts --report  # read-only grouping
  *   pnpm tsx scripts/api-compare/lint-call-mismatches.ts --no-regen # gate the artifact on disk
@@ -346,6 +355,163 @@ export function renderStaleTags(staleTags: StaleTag[]): string | null {
   ].join("\n");
 }
 
+// ── --set-reason: bulk application of a cluster-vetted reason ───────────────
+//
+// A category is a NAMED PREDICATE over baseline rows plus the one reason text
+// that the cluster audit vetted for it, and it lives here rather than on the
+// command line so the rationale is reviewable in a diff instead of lost in a
+// shell history.
+//
+// The hard lesson from the 2026-08-08 audit: a call-name-only predicate is
+// UNSAFE for any name that also exists on `Relation` or an association proxy —
+// `except`, `merge!`, `size`, `first`, `any?` all flag as Ruby Hash/Array
+// idioms and as real query-modifier drops, and a class reason over the name
+// alone would bless dropping a query modifier. So a category either restricts
+// itself to rows it names outright (`rows`) or documents, in `note`, that its
+// call has no such homonym.
+
+export interface RowRef {
+  package: string;
+  tsFile: string;
+  rubyName: string;
+}
+
+export interface ReasonCategory {
+  /** `--set-reason <name>`. */
+  name: string;
+  /** The reason text written to every matched row. */
+  reason: string;
+  /** Ruby call names in the class. */
+  calls: string[];
+  /** When present, the rows the category applies to, named outright. */
+  rows?: RowRef[];
+  /** The audit evidence that vetted the class — printed by `--dry-run`. */
+  note: string;
+}
+
+export const REASON_CATEGORIES: ReasonCategory[] = [
+  {
+    name: "mutex-sync-body",
+    calls: ["synchronize"],
+    reason:
+      "Ruby guards the body with Mutex#synchronize; the ported body is fully " +
+      "synchronous — it has no yield point, so run-to-completion supplies what the " +
+      "mutex supplies and the port has no analogue call.",
+    // Tier 1 of the mutex audit. `synchronize` HAS no Relation homonym, but the
+    // rows are still named outright, because the audit's own tiering splits the
+    // call three ways and only this tier's warrant holds:
+    //   - Tier 2 (flush, discard!, clear_reloadable_connections, discard_pool!)
+    //     awaits AFTER a synchronous core mutation — same conclusion, different
+    //     warrant, so it must not be stamped with this text;
+    //   - Tier 3 awaits INSIDE the critical section, where the reason is simply
+    //     false (see 0084-wide-call-set-burndown/
+    //     port-async-critical-sections-for-mutex-guarded-lifecycle);
+    //   - the queue.ts rows CONVERGE instead — queue.ts already defines a
+    //     faithful pass-through `synchronize(_queue, block)` that nothing calls.
+    note:
+      "2026-08-08 mutex/monitor audit, Tier 1: all 32 Ruby call sites in the class " +
+      "were read and every one is a Mutex/Monitor/MonitorMixin; these rows are the " +
+      "subset whose TS body was then re-checked and found to contain no `await`.",
+    rows: [
+      {
+        package: "activerecord",
+        tsFile: "attribute-methods.ts",
+        rubyName: "define_attribute_methods",
+      },
+      {
+        package: "activerecord",
+        tsFile: "attribute-methods.ts",
+        rubyName: "undefine_attribute_methods",
+      },
+      { package: "activerecord", tsFile: "model-schema.ts", rubyName: "load_schema" },
+      { package: "activerecord", tsFile: "relation/delegation.ts", rubyName: "generate_method" },
+      {
+        package: "activerecord",
+        tsFile: "connection-adapters/abstract/connection-pool/reaper.ts",
+        rubyName: "register_pool",
+      },
+      ...["checkin", "checkout", "disconnect", "reap", "remove", "stat"].map((rubyName) => ({
+        package: "activerecord",
+        tsFile: "connection-adapters/abstract/connection-pool.ts",
+        rubyName,
+      })),
+    ],
+  },
+];
+
+export function findCategory(name: string): ReasonCategory | undefined {
+  return REASON_CATEGORIES.find((c) => c.name === name);
+}
+
+export function matchesCategory(cat: ReasonCategory, key: CallMismatchKey): boolean {
+  if (!cat.calls.includes(key.call)) return false;
+  if (cat.rows === undefined) return true;
+  return cat.rows.some(
+    (r) => r.package === key.package && r.tsFile === key.tsFile && r.rubyName === key.rubyName,
+  );
+}
+
+export interface SetReasonResult {
+  next: ExcludeEntry[];
+  /** Rows whose reason this run rewrote. */
+  matched: ExcludeEntry[];
+  /** Rows the predicate matched but that already carry a reviewed reason. */
+  skipped: ExcludeEntry[];
+}
+
+/**
+ * Rewrite the reason of every row `cat` matches. A row already carrying a
+ * non-default reason is SKIPPED unless `force`: that reason is someone's
+ * per-entry finding and must not be flattened into a class reason by accident.
+ * A row already carrying this category's own text is neither matched nor
+ * skipped — re-running the mode is a no-op.
+ */
+export function applyReason(
+  entries: ExcludeEntry[],
+  cat: ReasonCategory,
+  force: boolean,
+  defaultReason: string = DEFAULT_REASON,
+): SetReasonResult {
+  const matched: ExcludeEntry[] = [];
+  const skipped: ExcludeEntry[] = [];
+  const next = entries.map((e) => {
+    if (!matchesCategory(cat, e) || e.reason === cat.reason) return e;
+    if (e.reason !== defaultReason && !force) {
+      skipped.push(e);
+      return e;
+    }
+    const rewritten = { ...e, reason: cat.reason };
+    matched.push(rewritten);
+    return rewritten;
+  });
+  return { next, matched, skipped };
+}
+
+export function renderSetReason(
+  cat: ReasonCategory,
+  result: SetReasonResult,
+  dryRun: boolean,
+): string {
+  const byShard = tally(result.matched, (e) => relPathFor(e));
+  const lines = [
+    `call-mismatches --set-reason ${cat.name}: ${result.matched.length} row(s) ` +
+      `${dryRun ? "would be rewritten" : "rewritten"} across ${byShard.length} shard(s)`,
+    `  evidence: ${cat.note}`,
+    `  reason:   ${cat.reason}`,
+    ...byShard.map(([rel, n]) => `  ${rel}  ${n}`),
+  ];
+  if (result.skipped.length > 0) {
+    lines.push(
+      `\n  skipped ${result.skipped.length} row(s) already carrying a reviewed reason ` +
+        "(pass --force to overwrite):",
+      ...sortKeys(result.skipped).map(
+        (e) => `  ~ ${e.package}  ${e.tsFile}  ${e.rubyName}  ${e.call}`,
+      ),
+    );
+  }
+  return lines.join("\n");
+}
+
 export function unreviewedCount(entries: ExcludeEntry[]): number {
   return unreviewedEntries(entries, DEFAULT_REASON).length;
 }
@@ -549,6 +715,51 @@ async function reportMain(top: number, unreviewedOnly: boolean): Promise<number>
   return 0;
 }
 
+/**
+ * `--set-reason <category>`: rewrite the matched rows' reason through the
+ * ordinary writeSplitBaseline/serializeBaseline path, then RESEED the sharded
+ * unreviewed marks — every reason set lowers a shard's unreviewed count, which
+ * `slackByPath` gates as a stale HIGH mark, so a mode that skipped the reseed
+ * would leave the gate red by construction.
+ */
+async function setReasonMain(name: string, dryRun: boolean, force: boolean): Promise<number> {
+  const cat = findCategory(name);
+  if (cat === undefined) {
+    console.error(
+      `call-mismatches --set-reason: unknown category ${JSON.stringify(name)}. Defined:\n` +
+        REASON_CATEGORIES.map((c) => `  ${c.name}`).join("\n"),
+    );
+    return 2;
+  }
+
+  const baseline = await loadBaseline();
+  const result = applyReason(baseline, cat, force);
+  console.log(renderSetReason(cat, result, dryRun));
+  if (dryRun || result.matched.length === 0) return 0;
+
+  await writeSplitBaseline(result.next, BASELINE_DIR);
+  const counts = unreviewedCounts(result.next, DEFAULT_REASON, relPathFor);
+  const marks = nextMarks(counts, await loadMarks(MARK_DIR));
+  await writeMarks(MARK_DIR, marks);
+  console.log(
+    `\nWrote ${path.relative(ROOT_DIR, BASELINE_DIR)}/ and reseeded ` +
+      `${path.relative(ROOT_DIR, MARK_DIR)}/: ${unreviewedCount(result.next)} unreviewed, ` +
+      `${marks.size} per-file mark(s) totalling ${totalMark(marks)}.`,
+  );
+  return 0;
+}
+
+export function parseSetReason(argv: string[]): string | undefined {
+  const inline = argv.find((a) => a.startsWith("--set-reason="));
+  if (inline !== undefined) return inline.slice("--set-reason=".length);
+  const i = argv.indexOf("--set-reason");
+  if (i === -1) return undefined;
+  const next = argv[i + 1];
+  // A missing value reads as "" — which names no category, so the caller lists
+  // the table instead of silently consuming the following flag as a name.
+  return next === undefined || next.startsWith("--") ? "" : next;
+}
+
 export function parseTop(argv: string[], fallback: number): number {
   const raw = argv.find((a) => a.startsWith("--top="))?.slice("--top=".length);
   if (raw === undefined) return fallback;
@@ -565,6 +776,14 @@ async function runAsScript(): Promise<void> {
   if (path.resolve(self) !== invoked) return;
   const argv = process.argv.slice(2);
   const unreviewed = argv.includes("--unreviewed");
+  const setReason = parseSetReason(argv);
+  if (setReason !== undefined) {
+    // No artifact regeneration: this mode rewrites reasons only, never the row
+    // set, so the gate's own run is what re-derives the keys.
+    process.exit(
+      await setReasonMain(setReason, argv.includes("--dry-run"), argv.includes("--force")),
+    );
+  }
   if (!argv.includes("--report") && !unreviewed) {
     if (shouldRegenerate(argv, process.env)) {
       console.log("Regenerating output/call-mismatches.json (compare.ts --calls)…");
