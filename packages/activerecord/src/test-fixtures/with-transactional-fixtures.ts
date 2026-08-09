@@ -194,16 +194,18 @@ let pinBrokenByDdl = false;
 let seededFixtureTables: string[] = [];
 
 /**
- * Register the tables a fixture load just filled under the running test's pin.
- * Called by the `fixtures()` engine after `insert_fixtures_set`; only ever read
- * on the MySQL repair path below.
+ * The table a `DELETE FROM` names, unquoted. A fixture load prefixes its
+ * inserts with one `DELETE FROM` per table it is about to fill
+ * (`abstract/database_statements.rb:486-495`), so watching those under the pin
+ * identifies the seeded set without the load having to announce it.
  *
  * @internal
  */
-export function noteSeededFixtureTables(tables: readonly string[]): void {
-  for (const table of tables) {
-    if (!seededFixtureTables.includes(table)) seededFixtureTables.push(table);
-  }
+const DELETE_FROM_TABLE = /^\s*DELETE\s+FROM\s+[`"[]?([^\s`"\].]+)/i;
+
+function forgetSeededFixtureTables(): void {
+  seededFixtureTables = [];
+  pinBrokenByDdl = false;
 }
 
 /**
@@ -238,8 +240,12 @@ function guardMysqlImplicitCommit(adapter: TransactionalFixturesAdapter): () => 
     originals.push([method, original]);
     target[method] = function (this: unknown, ...args: unknown[]) {
       const sql = args[0];
-      if (typeof sql === "string" && MYSQL_IMPLICIT_COMMIT_STATEMENT.test(sql)) {
-        pinBrokenByDdl = true;
+      if (typeof sql === "string") {
+        if (MYSQL_IMPLICIT_COMMIT_STATEMENT.test(sql)) pinBrokenByDdl = true;
+        const deleted = DELETE_FROM_TABLE.exec(sql);
+        if (deleted && !seededFixtureTables.includes(deleted[1])) {
+          seededFixtureTables.push(deleted[1]);
+        }
       }
       return (original as (...a: unknown[]) => unknown).apply(this, args);
     };
@@ -266,9 +272,7 @@ function guardMysqlImplicitCommit(adapter: TransactionalFixturesAdapter): () => 
  */
 async function repairEscapedFixtureRows(adapter: TransactionalFixturesAdapter): Promise<void> {
   const tables = seededFixtureTables;
-  seededFixtureTables = [];
-  if (!pinBrokenByDdl) return;
-  pinBrokenByDdl = false;
+  forgetSeededFixtureTables();
   if (tables.length === 0) return;
   // One referential-integrity toggle for the whole set, the way
   // `insert_fixtures_set` wraps its own `DELETE FROM`s
@@ -573,6 +577,10 @@ export function withTransactionalFixtures(
     pendingPins = [];
     const pinResults = await Promise.allSettled(pins);
     if (!_txnOpenedForTest) {
+      // An unwrapped test (`uses_transaction`) commits its own rows; there is
+      // no pin to escape, so drop what it seeded rather than carry it into the
+      // next test's repair set.
+      forgetSeededFixtureTables();
       const failed = pinResults.find((r) => r.status === "rejected");
       if (failed) throw failed.reason;
       return;
