@@ -304,8 +304,9 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   private _readonly: boolean;
   private _strict: boolean;
   /**
-   * @internal The FIFO lock `performQuery` holds across a statement and its
-   * `sqlite3_changes()` readback — Rails' `@lock` around `perform_query`.
+   * @internal Tail of the FIFO queue `performQuery` joins to hold the
+   * connection across a statement and its `sqlite3_changes()` readback —
+   * Rails' `@lock` around `perform_query`. `null` while the queue is empty.
    */
   _statementLock: Promise<void> | null = null;
   /** @internal Rails' `@last_affected_rows`; read by the affected_rows port. */

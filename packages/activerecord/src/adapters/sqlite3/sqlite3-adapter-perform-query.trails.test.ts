@@ -14,6 +14,7 @@ import { Base } from "../../base.js";
 import { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "../../connection-adapters/better-sqlite3-adapter.js";
 import { ReadOnlyError } from "../../errors.js";
+import { acquireStatementLock } from "../../connection-adapters/sqlite3/database-statements.js";
 
 let adapter: SQLite3Adapter;
 
@@ -122,6 +123,68 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
     );
     expect(new Set(ids).size).toBe(n);
     expect([...ids].sort((a, b) => a - b)).toEqual(Array.from({ length: n }, (_, i) => i + 1));
+  });
+
+  it("serializes statements queued on one connection", async () => {
+    // The statement and its `changes()` / `last_insert_rowid()` readbacks are
+    // one critical section, so no second caller may be inside while another
+    // holds it — and arrival order is service order.
+    const host: { _statementLock: Promise<void> | null } = { _statementLock: null };
+    let inside = 0;
+    let arrivals = 0;
+    const served: number[] = [];
+
+    await Promise.all(
+      Array.from({ length: 25 }, async (_unused, i) => {
+        for (let stagger = 0; stagger < i % 4; stagger++) await Promise.resolve();
+        // The queue tail is published synchronously on entry, so the number
+        // taken here is this caller's place in it.
+        const arrival = arrivals++;
+        const release = await acquireStatementLock(host);
+        inside += 1;
+        expect(inside).toBe(1);
+        served.push(arrival);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        inside -= 1;
+        release();
+      }),
+    );
+
+    expect(served).toEqual(Array.from({ length: 25 }, (_unused, i) => i));
+  });
+
+  it("does not let a late statement barge ahead of one already queued", async () => {
+    // The release window is where a check-then-set lock loses its queue: the
+    // waiter is still parked in the microtask queue when a caller arriving in
+    // the same synchronous turn observes a free lock and claims it first.
+    const host: { _statementLock: Promise<void> | null } = { _statementLock: null };
+    const served: string[] = [];
+
+    const held = await acquireStatementLock(host);
+    const queued = (async () => {
+      const release = await acquireStatementLock(host);
+      served.push("queued");
+      release();
+    })();
+    await Promise.resolve();
+
+    held();
+    const late = (async () => {
+      const release = await acquireStatementLock(host);
+      served.push("late");
+      release();
+    })();
+
+    await Promise.all([queued, late]);
+    expect(served).toEqual(["queued", "late"]);
+  });
+
+  it("returns the rowid of each of two RETURNING inserts issued together", async () => {
+    const ids = await Promise.all([
+      adapter.executeMutation(`INSERT INTO "pq" ("nick") VALUES ('a') RETURNING "id"`),
+      adapter.executeMutation(`INSERT INTO "pq" ("nick") VALUES ('b') RETURNING "id"`),
+    ]);
+    expect([...ids].sort((a, b) => a - b)).toEqual([1, 2]);
   });
 
   // Rails' `preventing_writes?` returns false when `connection_descriptor` is nil

@@ -150,13 +150,19 @@ export async function internalBeginTransaction(
 }
 
 /**
- * The FIFO half of Rails' `@lock.synchronize` around `perform_query` (see
- * {@link performQuery}): resolve once no other statement holds the connection,
- * and answer the release. Non-reentrant on purpose — the whole point is that
- * two concurrently-issued writes on one connection cannot interleave between
- * a statement and its `sqlite3_changes()` readback. Every path that runs a
+ * Rails' `@lock.synchronize` around `perform_query` (see {@link performQuery}):
+ * wait until every statement queued ahead has finished, then answer the
+ * release. Non-reentrant on purpose — the whole point is that two
+ * concurrently-issued writes on one connection cannot interleave between a
+ * statement and its `sqlite3_changes()` readback. Every path that runs a
  * statement on the connection takes it, `internal_exec_query`'s included —
  * an unlocked write there would land between another's statement and readback.
+ *
+ * `_statementLock` is the TAIL of a queue, not a held/free flag: each caller
+ * chains its own release onto whatever tail it found and publishes the new
+ * tail, all synchronously before its first `await`. So arrival order fixes
+ * service order, and there is no window in which two callers can both observe
+ * a free lock and claim it.
  *
  * Callers take it AFTER preparing the statement: preparing connects on demand,
  * and a connection's `configure_connection` PRAGMAs re-enter the primitive.
@@ -165,14 +171,13 @@ export async function internalBeginTransaction(
 export async function acquireStatementLock(host: {
   _statementLock: Promise<void> | null;
 }): Promise<() => void> {
-  while (host._statementLock) await host._statementLock;
+  const ahead = host._statementLock ?? Promise.resolve();
   let release!: () => void;
-  host._statementLock = new Promise<void>((resolve) => {
-    release = () => {
-      host._statementLock = null;
-      resolve();
-    };
+  const mine = new Promise<void>((resolve) => {
+    release = resolve;
   });
+  host._statementLock = ahead.then(() => mine);
+  await ahead;
   return release;
 }
 
