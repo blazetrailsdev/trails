@@ -108,11 +108,11 @@ function recordDdlTouchedTables(adapter: TransactionalFixturesAdapter): () => vo
   if (!sc) return () => {};
   const pool = adapter.pool == null || adapter.pool instanceof NullPool ? null : adapter.pool;
   const target = adapter as unknown as Record<string, unknown>;
-  const originals: Array<[string, unknown]> = [];
+  const originals: Array<[string, unknown, boolean]> = [];
   for (const [method, tableArgs] of Object.entries(DDL_TABLE_ARGS)) {
     const original = target[method];
     if (typeof original !== "function") continue;
-    originals.push([method, original]);
+    originals.push([method, original, Object.prototype.hasOwnProperty.call(target, method)]);
     target[method] = function (this: unknown, ...args: unknown[]) {
       for (const name of tableArgs(args)) {
         if (typeof name === "string") sc.clearDataSourceCacheBang(pool, name);
@@ -120,8 +120,15 @@ function recordDdlTouchedTables(adapter: TransactionalFixturesAdapter): () => vo
       return (original as (...a: unknown[]) => unknown).apply(this, args);
     };
   }
+  // A method found on the prototype is *deleted*, not written back: assigning
+  // the original would leave an own property on the pooled adapter that shadows
+  // the prototype for the rest of the run, so a later prototype-level spy would
+  // never fire and its assertions would pass vacuously.
   return () => {
-    for (const [method, original] of originals) target[method] = original;
+    for (const [method, original, wasOwn] of originals) {
+      if (wasOwn) target[method] = original;
+      else delete target[method];
+    }
   };
 }
 
@@ -160,137 +167,6 @@ async function reReflectTouchedTables(adapter: TransactionalFixturesAdapter): Pr
       // best-effort re-reflect
     }
   }
-}
-
-/**
- * Statements that implicitly commit the open transaction on MySQL/MariaDB
- * (MySQL 8 reference, "Statements That Cause an Implicit Commit"). `TEMPORARY`
- * table DDL is the documented exception and is excluded.
- *
- * @internal
- */
-const MYSQL_IMPLICIT_COMMIT_STATEMENT =
-  /^\s*(?:CREATE\s+(?!TEMPORARY\b)|ALTER\s|DROP\s+(?!TEMPORARY\b)|RENAME\s+TABLE\b|TRUNCATE\b)/i;
-
-/** The SQL funnels a test can reach the server through. @internal */
-const SQL_ENTRY_POINTS = ["execute", "executeMutation", "internalExecQuery"];
-
-function isMysqlAdapter(adapter: TransactionalFixturesAdapter): boolean {
-  return /mysql|mariadb|trilogy/i.test(adapter.adapterName ?? "");
-}
-
-/**
- * Tables the running test's fixture load seeded, and whether a DDL statement
- * has implicitly committed the pin around them.
- *
- * Rails needs neither: on its MySQL lane the same escape happens (see
- * `guardMysqlImplicitCommit`), but nothing in its suite asserts that a table it
- * did not seed is empty, so the leak is invisible there. trails does assert
- * that, so the escape has to be repaired rather than tolerated.
- *
- * @internal
- */
-let pinBrokenByDdl = false;
-let seededFixtureTables: string[] = [];
-
-/**
- * The table a `DELETE FROM` names, unquoted. A fixture load prefixes its
- * inserts with one `DELETE FROM` per table it is about to fill
- * (`abstract/database_statements.rb:486-495`), so watching those under the pin
- * identifies the seeded set without the load having to announce it.
- *
- * @internal
- */
-const DELETE_FROM_TABLE = /^\s*DELETE\s+FROM\s+[`"[]?([^\s`"\].]+)/i;
-
-function forgetSeededFixtureTables(): void {
-  seededFixtureTables = [];
-  pinBrokenByDdl = false;
-}
-
-/**
- * Notice when a transactionally-pinned test issues DDL on MySQL/MariaDB.
- *
- * MySQL has no transactional DDL: the statement implicitly commits the open
- * fixture transaction, so `teardown_fixtures`' unpin (`test_fixtures.rb:206-211`)
- * rolls back an empty transaction and the rows this test seeded are already
- * durable. They then leak into every later `describe`, because a load only
- * deletes the tables it is about to fill
- * (`abstract/database_statements.rb:486-495`) — a `describe` declaring
- * `fixtures([])` deletes nothing and inherits whatever escaped.
- *
- * Rails runs this exact shape (`batches_test.rb:570` calls `add_index` inside a
- * transactional `BatchesTest`), so taking such files off the transactional path
- * would be a divergence, not a convergence. What Rails lacks is a test that
- * asserts an unseeded table is empty, which is why the escape is harmless there
- * and observable here. The pin is therefore repaired at teardown rather than
- * forbidden: see {@link repairEscapedFixtureRows}.
- *
- * Returns the restore function.
- *
- * @internal
- */
-function guardMysqlImplicitCommit(adapter: TransactionalFixturesAdapter): () => void {
-  if (!isMysqlAdapter(adapter)) return () => {};
-  const target = adapter as unknown as Record<string, unknown>;
-  const originals: Array<[string, unknown]> = [];
-  for (const method of SQL_ENTRY_POINTS) {
-    const original = target[method];
-    if (typeof original !== "function") continue;
-    originals.push([method, original]);
-    target[method] = function (this: unknown, ...args: unknown[]) {
-      const sql = args[0];
-      if (typeof sql === "string") {
-        if (MYSQL_IMPLICIT_COMMIT_STATEMENT.test(sql)) pinBrokenByDdl = true;
-        const deleted = DELETE_FROM_TABLE.exec(sql);
-        if (deleted && !seededFixtureTables.includes(deleted[1])) {
-          seededFixtureTables.push(deleted[1]);
-        }
-      }
-      return (original as (...a: unknown[]) => unknown).apply(this, args);
-    };
-  }
-  return () => {
-    for (const [method, original] of originals) target[method] = original;
-  };
-}
-
-/**
- * Undo what the rollback could not, and only that.
- *
- * This is deliberately NOT the per-test teardown DELETE that PR #6273 removed:
- * that one ran on every teardown on every adapter and put trails' teardown out
- * of step with `teardown_fixtures`, which issues no DELETE. This runs only when
- * MySQL has already destroyed the pin, and deletes only the tables this test's
- * own load filled — exactly the rows the rollback would have discarded on
- * SQLite and PostgreSQL. On the normal path (no DDL, or any non-MySQL adapter)
- * `pinBrokenByDdl` stays false and teardown remains cache/pool-reset only.
- *
- * Runs after the unpin, so the connection is live and the DELETEs commit.
- *
- * @internal
- */
-async function repairEscapedFixtureRows(adapter: TransactionalFixturesAdapter): Promise<void> {
-  const tables = seededFixtureTables;
-  const broken = pinBrokenByDdl;
-  forgetSeededFixtureTables();
-  // The gate that keeps this off the normal path: with the pin intact the
-  // rollback already discarded these rows, and issuing a DELETE anyway would be
-  // the unconditional teardown DELETE `teardown_fixtures` does not have.
-  if (!broken || tables.length === 0) return;
-  // One referential-integrity toggle for the whole set, the way
-  // `insert_fixtures_set` wraps its own `DELETE FROM`s
-  // (`abstract/database_statements.rb:483-497`) — otherwise a parent table's
-  // delete trips a child's foreign key.
-  await adapter.disableReferentialIntegrity(async () => {
-    for (const table of tables) {
-      await adapter.executeMutation(
-        `DELETE FROM ${adapter.quoteTableName(table)}`,
-        [],
-        "Fixture Delete",
-      );
-    }
-  }, tables);
 }
 
 /**
@@ -471,7 +347,6 @@ export function withTransactionalFixtures(
   // test_fixtures.rb:108-110 run_in_transaction? returns false for these).
   let _txnOpenedForTest = false;
   let _restoreDdlRecording: (() => void) | null = null;
-  let _restoreImplicitCommitGuard: (() => void) | null = null;
 
   beforeEach(async (ctx: TaskContext) => {
     const adapter = getAdapter();
@@ -490,8 +365,6 @@ export function withTransactionalFixtures(
       return;
     }
     _txnOpenedForTest = true;
-    // Arm the MySQL implicit-commit guard for the whole pinned window.
-    _restoreImplicitCommitGuard = guardMysqlImplicitCommit(adapter);
     // Open a recording window so teardown re-reflects only DDL-touched tables.
     if (invalidateSchemaCache) {
       adapter.internalSchemaCache?.recordTouchedTables();
@@ -573,26 +446,15 @@ export function withTransactionalFixtures(
     // pin. The failure is re-raised at the end of teardown so the rest of it
     // still runs — Rails raises straight out of the subscriber body, but its
     // pin is synchronous, so there is nothing left half-done to clean up.
-    // Disarm before teardown's own SQL: the unpin's ROLLBACK is not DDL, but
-    // the guard must not outlive the pin it protects.
-    _restoreImplicitCommitGuard?.();
-    _restoreImplicitCommitGuard = null;
     const pins = pendingPins;
     pendingPins = [];
     const pinResults = await Promise.allSettled(pins);
     if (!_txnOpenedForTest) {
-      // An unwrapped test (`uses_transaction`) commits its own rows; there is
-      // no pin to escape, so drop what it seeded rather than carry it into the
-      // next test's repair set.
-      forgetSeededFixtureTables();
       const failed = pinResults.find((r) => r.status === "rejected");
       if (failed) throw failed.reason;
       return;
     }
     const adapter = getAdapter();
-    // Only the scope that actually releases the pin may repair after it; a
-    // nested scope's teardown runs first, while the pin is still held.
-    let unpinned = false;
     if (fixtureConnectionPools !== null && pooledAdapterPool(adapter) !== null) {
       // Mirrors Rails test_fixtures.rb:206-211 teardown:
       //   @fixture_connection_pools.map(&:unpin_connection!)
@@ -606,20 +468,16 @@ export function withTransactionalFixtures(
           await pool.unpinConnectionBang();
         }
         fixtureConnectionPools = null;
-        unpinned = true;
       }
     } else {
       const t = tm(adapter);
       while (t.openTransactions > 0) await t.rollbackTransaction();
-      unpinned = true;
     }
     if (invalidateSchemaCache) {
       _restoreDdlRecording?.();
       _restoreDdlRecording = null;
       await reReflectTouchedTables(adapter);
     }
-    // After the unpin, so the DELETEs run on a live connection.
-    if (unpinned) await repairEscapedFixtureRows(adapter);
     const failed = pinResults.find((r) => r.status === "rejected");
     if (failed) throw failed.reason;
   });

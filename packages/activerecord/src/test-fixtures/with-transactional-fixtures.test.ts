@@ -11,7 +11,6 @@ import { BetterSQLite3Adapter } from "../connection-adapters/better-sqlite3-adap
 import { NullTransaction } from "../connection-adapters/abstract/transaction.js";
 import { withTransactionalFixtures } from "./with-transactional-fixtures.js";
 import { fixtures } from "../test-fixtures.js";
-import { Computer } from "../test-helpers/models/computer.js";
 
 // Resolve a pool-leased adapter from the primary (schema-loaded) pool rather
 // than the divergent sidecar `_pool`. Rails has no sidecar test pool.
@@ -358,69 +357,57 @@ describe("concurrency isolation: two concurrent transaction chains stay independ
   });
 });
 
-// MySQL/MariaDB have no transactional DDL: a DDL statement implicitly commits
-// the open fixture transaction, so `teardown_fixtures`' unpin rolls back an
-// empty transaction and the rows this block seeded stay durable. A later block
-// that declares `fixtures([])` deletes nothing (a load only deletes the tables
-// it is about to fill, `abstract/database_statements.rb:486-495`) and inherits
-// them. Rails runs the same shape (`batches_test.rb:570` calls `add_index` in a
-// transactional `BatchesTest`) but never asserts an unseeded table is empty, so
-// the escape is invisible there. These two blocks run in order and are red on
-// the MySQL and MariaDB lanes without the teardown repair; on SQLite and
-// PostgreSQL the rollback already covers the rows and they pass either way.
-describe("fixture rows do not survive a MySQL DDL implicit commit", () => {
-  fixtures(["computers"]);
-
-  it("seeds rows and then runs DDL that implicitly commits the pin", async () => {
-    expect(Number(await Computer.count())).toBeGreaterThan(0);
-    const conn = Base.connection;
-    await conn.addIndex("computers", "system", { name: "idx_fixture_pin_escape" });
-    await conn.removeIndex("computers", { name: "idx_fixture_pin_escape" });
-  });
-});
-
-describe("fixture rows do not survive a MySQL DDL implicit commit (next block)", () => {
+// The DDL recording window wraps adapter methods per test
+// (`recordDdlTouchedTables`) and must leave no trace: a method it found on the
+// prototype is deleted at restore, not written back. Writing it back would make
+// it an OWN property of the pooled adapter for the rest of the run, silently
+// shadowing the prototype — a later test that spies by patching the prototype
+// would never see its spy fire and would pass vacuously. Rails wraps nothing
+// here (`test_fixtures.rb:113`, `:146` touch no adapter method), so there is
+// nothing to restore.
+//
+// The two blocks run in order: the first arms the window and runs DDL through
+// it, the second inspects the adapter from a `beforeAll` — the only point that
+// is after the first block's teardown and before the next window is armed.
+describe("the DDL recording window arms around a test's DDL", () => {
   fixtures([]);
 
-  it("starts with an empty table it did not seed", async () => {
-    expect(Number(await Computer.count())).toBe(0);
+  it("runs DDL through the wrapped method", async () => {
+    const conn = Base.connection;
+    await conn.addIndex("computers", "system", { name: "idx_own_property_restore" });
+    await conn.removeIndex("computers", { name: "idx_own_property_restore" });
   });
 });
 
-// The negative case. `teardown_fixtures` (`test_fixtures.rb:206-211`) issues no
-// DELETE, and the repair above is a recovery from an implicit commit, not a
-// per-test cleanup — so a pinned test that runs no DDL must leave teardown
-// exactly as Rails has it. Spying is the only way to see this: with the pin
-// intact the rollback removes the rows either way, so an unconditional DELETE
-// would be behaviorally invisible and silently reinstate what #6273 removed.
-describe("a pinned test that runs no DDL issues no teardown DELETE", () => {
-  const repairDeletes: string[] = [];
-  let target: Record<string, unknown>;
-  let original: unknown;
+describe("the DDL recording window leaves no own property behind", () => {
+  let ownAddIndex = true;
+  const spied: string[] = [];
 
-  // The instance, not the prototype: the implicit-commit guard wraps and then
-  // restores `executeMutation` as an OWN property, so an earlier block's guard
-  // has already shadowed the prototype by the time this one runs.
-  beforeAll(() => {
-    target = Base.connection as unknown as Record<string, unknown>;
-    original = target.executeMutation;
-    target.executeMutation = function (this: unknown, ...args: unknown[]) {
-      if (args[2] === "Fixture Delete") repairDeletes.push(String(args[0]));
+  beforeAll(async () => {
+    const conn = Base.connection as unknown as Record<string, unknown>;
+    ownAddIndex = Object.prototype.hasOwnProperty.call(conn, "addIndex");
+
+    const proto = Object.getPrototypeOf(Base.connection) as Record<string, unknown>;
+    const original = proto.addIndex;
+    proto.addIndex = function (this: unknown, ...args: unknown[]) {
+      spied.push(String(args[0]));
       return (original as (...a: unknown[]) => unknown).apply(this, args);
     };
+    try {
+      await Base.connection.addIndex("computers", "system", { name: "idx_proto_spy" });
+      await Base.connection.removeIndex("computers", { name: "idx_proto_spy" });
+    } finally {
+      proto.addIndex = original;
+    }
   });
 
-  afterAll(() => {
-    target.executeMutation = original;
+  fixtures([]);
+
+  it("restored addIndex by deleting it, not by assigning it back", () => {
+    expect(ownAddIndex).toBe(false);
   });
 
-  fixtures(["computers"]);
-
-  it("loads fixtures and runs no DDL", async () => {
-    expect(Number(await Computer.count())).toBeGreaterThan(0);
-  });
-
-  it("saw no repair DELETE from the previous test's teardown", () => {
-    expect(repairDeletes).toEqual([]);
+  it("lets a prototype-level spy installed afterwards fire", () => {
+    expect(spied).toEqual(["computers"]);
   });
 });

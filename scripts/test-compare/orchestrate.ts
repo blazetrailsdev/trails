@@ -46,6 +46,7 @@ import {
   fileHash,
   readShared,
   writeShared,
+  pruneSharedCache,
 } from "../api-compare/shared-cache.js";
 
 const execFileAsync = promisify(execFile);
@@ -183,7 +184,39 @@ async function main(): Promise<void> {
     await Promise.all([runRubyExtractShared(), extractTsTests()]);
   }
 
+  await prune();
+
   runCompare(forwardArgs);
+}
+
+/**
+ * Prune the shared cache, api-compare's Phase D. The `rails-tests` entries this
+ * orchestrator publishes are content-keyed and therefore append-only — every
+ * `vendor/sources.lock.json` bump mints a new key and orphans the old multi-MB
+ * manifest — so a checkout that runs `test:compare` but never `api:compare`
+ * would otherwise grow the shared directory without bound.
+ *
+ * Unlike api-compare's, this runs *before* the comparison rather than after:
+ * `compare.ts`'s `main()` exits the process on a gate failure, so housekeeping
+ * placed after it would be skipped on exactly the runs that keep happening.
+ * It stays best-effort either way — every failure is swallowed, so it can
+ * change neither the comparison result nor the exit code. `TEST_COMPARE_FORCE=1`
+ * skips it, mirroring `API_COMPARE_FORCE`.
+ */
+async function prune(): Promise<void> {
+  if (force) return;
+  try {
+    const pruned = await pruneSharedCache(ROOT);
+    if (pruned.removedEntries || pruned.removedFragments || pruned.removedVersionDirs) {
+      process.stdout.write(
+        `Pruned shared cache: ${pruned.removedEntries} stale entr${pruned.removedEntries === 1 ? "y" : "ies"}, ` +
+          `${pruned.removedFragments} tmp fragment${pruned.removedFragments === 1 ? "" : "s"}, ` +
+          `${pruned.removedVersionDirs} superseded version dir${pruned.removedVersionDirs === 1 ? "" : "s"}\n`,
+      );
+    }
+  } catch {
+    // best-effort housekeeping
+  }
 }
 
 main().catch((err) => {
