@@ -355,21 +355,7 @@ export function renderStaleTags(staleTags: StaleTag[]): string | null {
   ].join("\n");
 }
 
-// ── --set-reason: bulk application of a cluster-vetted reason ───────────────
-//
-// A category is a NAMED PREDICATE over baseline rows plus the one reason text
-// that the cluster audit vetted for it, and it lives here rather than on the
-// command line so the rationale is reviewable in a diff instead of lost in a
-// shell history.
-//
-// The hard lesson from the 2026-08-08 audit: a call-name-only predicate is
-// UNSAFE for any name that also exists on `Relation` or an association proxy —
-// `except`, `merge!`, `size`, `first`, `any?` all flag as Ruby Hash/Array
-// idioms and as real query-modifier drops, and a class reason over the name
-// alone would bless dropping a query modifier. So a category either restricts
-// itself to rows it names outright (`rows`) or documents, in `note`, that its
-// call has no such homonym.
-
+/** One baseline row, identified without its `call`. */
 export interface RowRef {
   package: string;
   tsFile: string;
@@ -389,6 +375,20 @@ export interface ReasonCategory {
   note: string;
 }
 
+/**
+ * The `--set-reason` category table: each entry is a NAMED PREDICATE over
+ * baseline rows plus the one reason text a cluster audit vetted for it. The
+ * table lives in the source, not on the command line, so the rationale is
+ * reviewable in a diff instead of lost in a shell history.
+ *
+ * A call-name-only predicate is UNSAFE for any name that also exists on
+ * `Relation` or an association proxy: `except`, `merge!`, `size`, `first` and
+ * `any?` all flag both as Ruby Hash/Array idioms and as real query-modifier
+ * drops, so a class reason keyed on the name alone would bless dropping a
+ * query modifier. A category therefore either restricts itself to the rows it
+ * names outright (`rows`) or records in `note` that its call has no such
+ * homonym.
+ */
 export const REASON_CATEGORIES: ReasonCategory[] = [
   {
     name: "mutex-sync-body",
@@ -397,21 +397,19 @@ export const REASON_CATEGORIES: ReasonCategory[] = [
       "Ruby guards the body with Mutex#synchronize; the ported body is fully " +
       "synchronous — it has no yield point, so run-to-completion supplies what the " +
       "mutex supplies and the port has no analogue call.",
-    // Tier 1 of the mutex audit. `synchronize` HAS no Relation homonym, but the
-    // rows are still named outright, because the audit's own tiering splits the
-    // call three ways and only this tier's warrant holds:
-    //   - Tier 2 (flush, discard!, clear_reloadable_connections, discard_pool!)
-    //     awaits AFTER a synchronous core mutation — same conclusion, different
-    //     warrant, so it must not be stamped with this text;
-    //   - Tier 3 awaits INSIDE the critical section, where the reason is simply
-    //     false (see 0084-wide-call-set-burndown/
-    //     port-async-critical-sections-for-mutex-guarded-lifecycle);
-    //   - the queue.ts rows CONVERGE instead — queue.ts already defines a
-    //     faithful pass-through `synchronize(_queue, block)` that nothing calls.
     note:
-      "2026-08-08 mutex/monitor audit, Tier 1: all 32 Ruby call sites in the class " +
+      "2026-08-08 mutex/monitor audit, Tier 1. All 32 Ruby call sites in the class " +
       "were read and every one is a Mutex/Monitor/MonitorMixin; these rows are the " +
-      "subset whose TS body was then re-checked and found to contain no `await`.",
+      "subset whose TS body was then re-checked and found to contain no `await`. " +
+      "`synchronize` has no Relation homonym, but the rows are named outright anyway " +
+      "because the tiering splits the call three ways and only Tier 1's warrant is " +
+      "this text: Tier 2 (flush, discard!, clear_reloadable_connections, " +
+      "discard_pool!) awaits AFTER a synchronous core mutation — same conclusion, " +
+      "different warrant; Tier 3 awaits INSIDE the critical section, where the reason " +
+      "is false (0084-wide-call-set-burndown/" +
+      "port-async-critical-sections-for-mutex-guarded-lifecycle); and the queue.ts " +
+      "rows converge instead, since queue.ts already defines a faithful pass-through " +
+      "`synchronize(_queue, block)` that nothing calls.",
     rows: [
       {
         package: "activerecord",
@@ -720,7 +718,9 @@ async function reportMain(top: number, unreviewedOnly: boolean): Promise<number>
  * ordinary writeSplitBaseline/serializeBaseline path, then RESEED the sharded
  * unreviewed marks — every reason set lowers a shard's unreviewed count, which
  * `slackByPath` gates as a stale HIGH mark, so a mode that skipped the reseed
- * would leave the gate red by construction.
+ * would leave the gate red by construction. It regenerates no artifact: the
+ * mode rewrites reasons only, never the row set, so the gate's own run is what
+ * re-derives the keys.
  */
 async function setReasonMain(name: string, dryRun: boolean, force: boolean): Promise<number> {
   const cat = findCategory(name);
@@ -749,14 +749,18 @@ async function setReasonMain(name: string, dryRun: boolean, force: boolean): Pro
   return 0;
 }
 
+/**
+ * The `--set-reason <cat>` / `--set-reason=<cat>` category name, or undefined
+ * when the mode was not asked for. A missing value reads as `""`, which names
+ * no category, so the caller lists the table instead of silently consuming the
+ * following flag as a name.
+ */
 export function parseSetReason(argv: string[]): string | undefined {
   const inline = argv.find((a) => a.startsWith("--set-reason="));
   if (inline !== undefined) return inline.slice("--set-reason=".length);
   const i = argv.indexOf("--set-reason");
   if (i === -1) return undefined;
   const next = argv[i + 1];
-  // A missing value reads as "" — which names no category, so the caller lists
-  // the table instead of silently consuming the following flag as a name.
   return next === undefined || next.startsWith("--") ? "" : next;
 }
 
@@ -778,8 +782,6 @@ async function runAsScript(): Promise<void> {
   const unreviewed = argv.includes("--unreviewed");
   const setReason = parseSetReason(argv);
   if (setReason !== undefined) {
-    // No artifact regeneration: this mode rewrites reasons only, never the row
-    // set, so the gate's own run is what re-derives the keys.
     process.exit(
       await setReasonMain(setReason, argv.includes("--dry-run"), argv.includes("--force")),
     );

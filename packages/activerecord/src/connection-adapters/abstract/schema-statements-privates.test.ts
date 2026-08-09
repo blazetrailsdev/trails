@@ -240,6 +240,12 @@ describe("SchemaStatements privates (PR 8)", () => {
     expect(ss.checkConstraintName("users", { expression: "age > 0" })).toMatch(
       /^chk_rails_[0-9a-f]{10}$/,
     );
+    // The inner `options.fetch(:expression)` is the same rule: a stored nil
+    // interpolates as "" ("users__chk"), and only an ABSENT key raises.
+    expect(ss.checkConstraintName("users", { expression: undefined })).toBe(
+      ss.checkConstraintName("users", { expression: "" }),
+    );
+    expect(() => ss.checkConstraintName("users", {})).toThrow(/expression/);
   });
 
   it("checkConstraintOptions derives a name only when the key is absent", () => {
@@ -291,8 +297,6 @@ describe("SchemaStatements privates (PR 8)", () => {
 
   it("addCheckConstraint skips the DDL when ifNotExists and the constraint exists", async () => {
     const ss = makeStatements();
-    // checkConstraintName returns `string | undefined` — `fetch(:name)` hands
-    // back an explicit nil — but this derive path always names one.
     const name = ss.checkConstraintName("users", { expression: "age > 0" })!;
     vi.spyOn(ss, "checkConstraints").mockResolvedValue([
       new CheckConstraintDefinition("users", "age > 0", name),
@@ -311,8 +315,6 @@ describe("SchemaStatements privates (PR 8)", () => {
     // An explicit `undefined` is the JS analogue, so it must not match, and must
     // not raise on `name.toString()`.
     const ss = makeStatements();
-    // checkConstraintName returns `string | undefined` — `fetch(:name)` hands
-    // back an explicit nil — but this derive path always names one.
     const name = ss.checkConstraintName("users", { expression: "age > 0" })!;
     vi.spyOn(ss, "checkConstraints").mockResolvedValue([
       new CheckConstraintDefinition("users", "age > 0", name),
