@@ -407,10 +407,6 @@ export class SchemaStatements {
       throw new Error("Options `:force` and `:if_not_exists` cannot be used simultaneously.");
     }
 
-    if (options.ifNotExists && (await this.tableExists(name))) {
-      return;
-    }
-
     const td = this.buildCreateTableDefinition(name, options, definer);
 
     if (options.force) {

@@ -1519,7 +1519,7 @@ describe("PersistenceTest", () => {
 
   it("becomes after reload schema from cache", () => {
     (Reply as any).defineAttributeMethods();
-    Reply.resetColumnInformation(); // mirrors Reply.serialize(:content) reload
+    Reply.serialize("content"); // invoke reload_schema_from_cache
     const t = topics("first");
     expect(t.becomes(Reply)).toBeInstanceOf(Reply);
     expect(t.becomes(Reply).title).toBe("The First Topic");

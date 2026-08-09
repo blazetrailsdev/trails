@@ -1,5 +1,6 @@
 /**
- * Cross-worktree shared cache for `pnpm api:compare`.
+ * Cross-worktree shared cache for the `parity:*` tools (`api:compare` and
+ * `test:compare` both read and write it).
  *
  * Every worktree extracts the SAME vendored Rails sources and TS packages, so
  * the expensive extracts (ruby `rails-api.json`, the TS Compiler-API pass)
@@ -17,7 +18,14 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import { createHash } from "crypto";
 
-export const CACHE_VERSION = 2;
+export const CACHE_VERSION = 3;
+
+/**
+ * The pre-rename directory name. `api-compare-cache` claimed one of the two
+ * tools that write here; `pruneSharedCache` removes the whole tree so the
+ * rename doesn't orphan it in every checkout forever.
+ */
+const LEGACY_CACHE_DIR_NAME = "api-compare-cache";
 
 /**
  * Default staleness horizon for cache entries: an entry whose mtime is older
@@ -52,7 +60,7 @@ export async function sharedCacheDir(rootDir: string): Promise<string | null> {
     const gitdir = path.resolve(rootDir, match[1].trim());
     commonDir = path.dirname(path.dirname(gitdir));
   }
-  return path.join(commonDir, "api-compare-cache", `v${CACHE_VERSION}`);
+  return path.join(commonDir, "parity-cache", `v${CACHE_VERSION}`);
 }
 
 /** sha1 over NUL-delimited parts (delimiter prevents boundary ambiguity). */
@@ -368,6 +376,8 @@ export interface PruneResult {
   removedFragments: number;
   /** Superseded `v<N>` (N < CACHE_VERSION) sibling directories removed wholesale. */
   removedVersionDirs: number;
+  /** Whether the superseded pre-rename `api-compare-cache` tree was removed. */
+  removedLegacyDir: boolean;
 }
 
 /**
@@ -376,7 +386,9 @@ export interface PruneResult {
  *   1. Entry files (and crashed-writer `.tmp-` fragments) in the current
  *      `v${CACHE_VERSION}` dir whose mtime is older than `maxAgeMs` — orphaned
  *      content keys and partial writes (see CACHE_MAX_AGE_MS).
- *   2. Sibling `v<N>` directories left behind by a SUPERSEDED CACHE_VERSION,
+ *   2. The pre-rename `api-compare-cache` tree, wholesale — the rename to
+ *      `parity-cache` moved the parent, so nothing else would ever reclaim it.
+ *   3. Sibling `v<N>` directories left behind by a SUPERSEDED CACHE_VERSION,
  *      i.e. only N < CACHE_VERSION. Higher-numbered dirs belong to a newer code
  *      version that may be running concurrently (a bisect or mixed-version
  *      parallel run); wiping those would mutually destroy the live cache, so we
@@ -391,10 +403,23 @@ export async function pruneSharedCache(
   rootDir: string,
   opts: { now?: number; maxAgeMs?: number } = {},
 ): Promise<PruneResult> {
-  const result: PruneResult = { removedEntries: 0, removedFragments: 0, removedVersionDirs: 0 };
+  const result: PruneResult = {
+    removedEntries: 0,
+    removedFragments: 0,
+    removedVersionDirs: 0,
+    removedLegacyDir: false,
+  };
   const currentDir = await sharedCacheDir(rootDir);
   if (!currentDir) return result;
   const parent = path.dirname(currentDir);
+  const legacyDir = path.join(path.dirname(parent), LEGACY_CACHE_DIR_NAME);
+  try {
+    await fs.stat(legacyDir);
+    await fs.rm(legacyDir, { recursive: true, force: true });
+    result.removedLegacyDir = true;
+  } catch {
+    // best-effort
+  }
   const now = opts.now ?? Date.now();
   const maxAgeMs = opts.maxAgeMs ?? CACHE_MAX_AGE_MS;
 

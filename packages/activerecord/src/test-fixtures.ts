@@ -565,8 +565,7 @@ export function fixtures(
   fixturesOrNames: FixtureMap | readonly FixtureName[] | readonly TablelessFixtureEntry[],
   options: FixturesOptions | undefined = undefined,
 ): Record<string, unknown> {
-  const { usesTransaction, invalidateSchemaCache, useTransactionalTests, connection } =
-    options ?? {};
+  const { usesTransaction, useTransactionalTests, connection } = options ?? {};
 
   // Caller-supplied connection/adapter thunk wins over the default handler
   // connection: multi-database suites seed through a model-specific
@@ -578,10 +577,7 @@ export function fixtures(
   // real DML, visible across pooled connections. Mirrors the direct-adapter
   // escape hatch the view/signed-id suites used before converging here.
   if (useTransactionalTests !== false) {
-    withTransactionalFixtures(getConnection, {
-      usesTransaction,
-      invalidateSchemaCache,
-    });
+    withTransactionalFixtures(getConnection, { usesTransaction });
   }
 
   return useFixtures(fixturesOrNames as FixtureMap, getConnection);

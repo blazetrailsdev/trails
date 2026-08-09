@@ -33,7 +33,7 @@
  */
 import * as fs from "fs/promises";
 import * as path from "path";
-import { hashParts } from "./shared-cache.js";
+import { hashParts } from "@blazetrails/parity/shared-cache";
 
 /**
  * Base version for output-shape changes that AREN'T a new field name — e.g. a
