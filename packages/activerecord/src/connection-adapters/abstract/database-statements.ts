@@ -218,18 +218,6 @@ function compileInlined(
 }
 
 /**
- * Rails' `if prepared_statements` test in `to_sql_and_binds`
- * (database_statements.rb:31). A host with no flag at all is not an adapter
- * (bare visitor stand-ins in tests / statement-cache helpers); Rails' default
- * is `true`, so only an explicit `false` selects the inlining collector.
- */
-function isUnprepared(host: unknown): boolean {
-  return (
-    (host as { preparedStatements?: boolean } | null | undefined)?.preparedStatements === false
-  );
-}
-
-/**
  * Converts an arel AST to SQL.
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#to_sql
@@ -307,11 +295,13 @@ export function toSqlAndBinds(
       // Rails: `if prepared_statements ... else sql = visitor.compile(arel, collector)`
       // (database_statements.rb:31-45). With prepared statements off the
       // collector is a `SubstituteBinds` (abstract_adapter.rb#collector), so
-      // every value inlines during traversal and `binds` comes back empty —
-      // there is no bind extraction to fall back from.
-      if (isUnprepared(this)) {
+      // every value inlines during traversal, `binds` comes back empty and
+      // `preparable` is never assigned. A host carrying no flag at all is not an
+      // adapter (bare visitor stand-ins), and Rails' default is `true`, so only
+      // an explicit `false` takes this branch.
+      if ((this as { preparedStatements?: boolean } | undefined)?.preparedStatements === false) {
         const [inlinedSql, inlinedRetryable] = compileInlined(visitor, node, this);
-        return [inlinedSql, [], false, inlinedRetryable];
+        return [inlinedSql, [], preparable, inlinedRetryable];
       }
       const [sql, extractedBinds, compiledAllowRetry, compiledPreparable] =
         visitor.compileWithBinds(node);
@@ -332,8 +322,11 @@ export function toSqlAndBinds(
           extractedBinds.length,
         )
       ) {
-        const [overLimitSql] = compileInlined(visitor, node, this);
-        return [overLimitSql, [], false, compiledAllowRetry];
+        // Rails re-enters `to_sql_and_binds` under `unprepared_statement`
+        // (database_statements.rb:36-38), so the retryable flag is the *inner*
+        // compile's, not the abandoned prepared one's.
+        const [overLimitSql, overLimitRetryable] = compileInlined(visitor, node, this);
+        return [overLimitSql, [], false, overLimitRetryable];
       }
       return [sql, extractedBinds, compiledPreparable, compiledAllowRetry];
     }
