@@ -148,4 +148,45 @@ describe("PostgreSQLDatabaseTasks", () => {
       expect(normalizeSchemaSearchPath("  , public, ,")).toEqual(["public"]);
     });
   });
+
+  it("a global ignore_tables regexp excludes every matching data source", async () => {
+    // Ruby's `Regexp#===` (`postgresql_database_tasks.rb:68`) carries no state,
+    // so a `/g` pattern must not skip alternate tables here.
+    const { SchemaDumper } = await import("../schema-dumper.js");
+    const previous = SchemaDumper.ignoreTables;
+    SchemaDumper.ignoreTables = [/^prefix_/g];
+    const tasks = new PostgreSQLDatabaseTasks(config());
+    vi.spyOn(
+      tasks as unknown as { connection: () => Promise<unknown> },
+      "connection",
+    ).mockResolvedValue({
+      dataSources: async () => ["prefix_a", "prefix_b", "prefix_c"],
+      schemaSearchPath: async () => "public",
+    });
+    let args: string[] = [];
+    vi.spyOn(
+      tasks as unknown as {
+        runCmd: (cmd: string, args: string[], action: string) => Promise<void>;
+      },
+      "runCmd",
+    ).mockImplementation(async (_cmd, passed) => {
+      args = passed;
+    });
+    vi.spyOn(
+      tasks as unknown as { removeSqlHeaderComments: () => Promise<void> },
+      "removeSqlHeaderComments",
+    ).mockResolvedValue(undefined);
+
+    try {
+      await tasks.structureDump("/dev/null");
+    } finally {
+      SchemaDumper.ignoreTables = previous;
+      vi.restoreAllMocks();
+    }
+
+    expect(args).toEqual(
+      expect.arrayContaining(["-T", "prefix_a", "-T", "prefix_b", "-T", "prefix_c"]),
+    );
+    expect(args.filter((a) => a === "-T")).toHaveLength(3);
+  });
 });
