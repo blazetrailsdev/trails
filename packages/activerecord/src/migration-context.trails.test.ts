@@ -98,6 +98,13 @@ describe("MigrationContext", () => {
     // @ts-expect-error discovery-only context has no InternalMetadata
     void (() => context.lastStoredEnvironment());
 
+    // …and a context typed for the null objects cannot skip seating them, so
+    // `initialize`'s `schema_migration || SchemaMigration.new(connection_pool)`
+    // fallback (`migration.rb:1215-1216`) can never hand back a real
+    // collaborator through a reader typed for a null one.
+    // @ts-expect-error a narrowed context must seat both collaborators
+    void (() => new MigrationContext<NullSchemaMigration, NullInternalMetadata>([""]));
+
     expect(context.schemaMigration).toBeInstanceOf(NullSchemaMigration);
     expect(context.internalMetadata).toBeInstanceOf(NullInternalMetadata);
   });

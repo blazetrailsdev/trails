@@ -1893,6 +1893,24 @@ function byVersion(a: MigrationProxy, b: MigrationProxy): number {
 }
 
 /**
+ * The `schema_migration` / `internal_metadata` arguments of
+ * `MigrationContext#initialize` (`migration.rb:1214`), whose Ruby defaults are
+ * `nil`. Both may be omitted — but only while the context's collaborators are
+ * still the real ones, so `MigrationContext#initialize`'s
+ * `schema_migration || SchemaMigration.new(connection_pool)` fallback
+ * (`migration.rb:1215-1216`) cannot be reached by a context typed for the null
+ * objects `Migration.copy` seats (`migration.rb:1065-1066`).
+ * @internal
+ */
+type SeatedCollaborators<S, I> = [S] extends [SchemaMigration]
+  ? [I] extends [InternalMetadata]
+    ? [] | [schemaMigration: S] | [schemaMigration: S, internalMetadata: I]
+    : [schemaMigration: S, internalMetadata: I]
+  : [I] extends [InternalMetadata]
+    ? [schemaMigration: S] | [schemaMigration: S, internalMetadata: I]
+    : [schemaMigration: S, internalMetadata: I];
+
+/**
  * = \Migration \Context
  *
  * MigrationContext sets the context in which a migration is run.
@@ -1934,14 +1952,15 @@ export class MigrationContext<
    * error rather than a null object receiving a `SchemaMigration` message, and
    * the readers hand back exactly what was seated, as `attr_reader` does.
    *
-   * The two casts on the `||` fallbacks are the one thing TS cannot check: it
-   * has no way to say "when this argument is omitted, the parameter is its
-   * default", so it cannot see that omitting a collaborator leaves that
-   * parameter at `SchemaMigration` / `InternalMetadata`. They are false only
-   * for a call that names a null object as a type argument and then seats
-   * nothing, which is not a shape any caller can want.
+   * TS cannot say "when this argument is omitted, its type parameter is at its
+   * default", so the two `||` fallbacks are written through {@link SeatedCollaborators}:
+   * seating nothing is only well-typed when the parameters still are the real
+   * collaborators, which is the sole branch that reaches them. Omitting a
+   * collaborator on a narrowed context — the one call that would make them
+   * lie — does not compile.
    */
-  constructor(migrationsPaths: string[], schemaMigration?: S, internalMetadata?: I) {
+  constructor(migrationsPaths: string[], ...seated: SeatedCollaborators<S, I>) {
+    const [schemaMigration, internalMetadata] = seated;
     this.migrationsPaths = migrationsPaths;
     this.schemaMigration = schemaMigration ?? (new SchemaMigration(this.connectionPool()) as S);
     this.internalMetadata = internalMetadata ?? (new InternalMetadata(this.connectionPool()) as I);
