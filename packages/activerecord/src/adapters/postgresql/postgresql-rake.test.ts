@@ -21,6 +21,7 @@ import { DatabaseTasks } from "../../tasks/database-tasks.js";
 import { PostgreSQLDatabaseTasks } from "../../tasks/postgresql-database-tasks.js";
 import { HashConfig } from "../../database-configurations/hash-config.js";
 import { SchemaDumper } from "../../schema-dumper.js";
+import { ARUNIT_DATABASE } from "../../support/config.js";
 import { DatabaseAlreadyExists } from "../../errors.js";
 import { Base } from "../../base.js";
 
@@ -425,15 +426,26 @@ describeIfPostgresqlAdapter("PostgreSQLStructureDumpTest", () => {
     getFs().rmSync(filename, { force: true });
   });
 
-  it.skip("structure dump", () => {
-    // Not yet ported. Rails runs the real `pg_dump` here — every other case in
-    // this class stubs `Kernel.system` — and asserts the dump it produced
-    // contains "PostgreSQL database dump complete"
-    // (`postgresql_rake_test.rb:333-343`). That end-to-end assertion needs a
-    // `pg_dump` on PATH whose major version is not older than the server, and
-    // the PG lane runs a postgres:17 service against a runner carrying only the
-    // 16 client, which pg_dump refuses. Tracked by
-    // `provision-version-matched-pg-client-in-pg-lane`.
+  // This test actually runs a dump so we can ensure all the arguments are parsed correctly.
+  // All other tests in this class just mock the call (using assert_called_with) to make the tests quicker.
+  it("structure dump", async () => {
+    // The only case here that shells out for real, so the class-wide
+    // `Kernel.system` double comes back off.
+    spawnSync.mockRestore();
+    expect(getFs().readFileSync(filename, "utf8")).toEqual("");
+
+    // `ARTest.config["connections"]["postgresql"]["arunit"]["database"]`
+    // (`postgresql_rake_test.rb:331`).
+    const config = new HashConfig("default_env", "primary", {
+      adapter: "postgresql",
+      database: ARUNIT_DATABASE,
+    });
+
+    await DatabaseTasks.structureDump(config, filename);
+
+    expect(
+      getFs().readFileSync(filename, "utf8").includes("PostgreSQL database dump complete"),
+    ).toBeTruthy();
   });
 
   it("structure dump header comments removed", async () => {

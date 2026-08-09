@@ -1063,6 +1063,23 @@ jobs:
         run: |
           psql -h localhost -U postgres -d activerecord_unittest \
             -v ON_ERROR_STOP=1 -f scripts/db-init/postgres/01-rails-role.sql
+      # PostgreSQLStructureDumpTest#test_structure_dump runs the real pg_dump
+      # (postgresql_rake_test.rb:333-343) — every other case in that class stubs
+      # Kernel.system. psql happily talks to a newer server, so the step above
+      # works on the runner's preinstalled client, but pg_dump aborts outright
+      # when the server is newer than it, and the service is postgres:17. Pull
+      # the matching client from PGDG so the dump runs.
+      - name: Install a pg_dump matching the server major
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+            https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] \
+            https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list >/dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client-17
+          pg_dump --version
       # Trailing slash is load-bearing: the bare `packages/activerecord` filter
       # is a substring match that also sweeps in packages/activerecord-cli/**.
       # Those already run in the dedicated step below, so the slash avoids a
