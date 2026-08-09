@@ -457,8 +457,9 @@ export class SchemaStatements {
       | [string, ...string[]]
       | [string, ...string[], { ifExists?: boolean; force?: boolean | "cascade" }]
   ): Promise<void> {
-    // TS has no kwargs: Rails' `*table_names, **options` arrives as a trailing
-    // options object on the rest parameter, split back out here.
+    // TS has no kwargs, so Rails' `*table_names, **options`
+    // (abstract/schema_statements.rb:540) arrives as a trailing options object
+    // on the rest parameter.
     const last = args[args.length - 1];
     const hasOptions = last !== null && last !== undefined && typeof last === "object";
     const tableNames = (hasOptions ? args.slice(0, -1) : args) as string[];
