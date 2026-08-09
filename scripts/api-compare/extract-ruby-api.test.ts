@@ -1553,11 +1553,21 @@ describe("Ruby extractor call-argument capture", () => {
           def n
             super
           end
+
+          def o
+            super do
+              reset
+            end
+          end
         end
       `,
     });
     expect(argsOf(c["Foo#m"], "super")).toEqual(["id:a"]);
     expect(c["Foo#n"]).toEqual([{ name: "super", args: [], flags: ["zsuper"] }]);
+    expect(c["Foo#o"]).toEqual([
+      { name: "super", args: [], flags: ["block", "zsuper"] },
+      { name: "reset", args: [], flags: [] },
+    ]);
   });
 
   it("records each syntactic call site exactly once, receiver first", () => {

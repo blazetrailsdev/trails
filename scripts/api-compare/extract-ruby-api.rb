@@ -2343,10 +2343,9 @@ class ApiExtractor
     return unless node.is_a?(Array)
 
     case node[0]
-    when :method_add_arg, :method_add_block, :command, :command_call, :call, :fcall, :vcall, :super
+    when :method_add_arg, :method_add_block, :command, :command_call, :call, :fcall, :vcall,
+         :super, :zsuper
       record_call_site(node, sites, [])
-    when :zsuper
-      sites << { name: "super", args: [], flags: ["zsuper"] }
     else
       node.each { |child| walk_for_call_args(child, sites) if child.is_a?(Array) }
     end
@@ -2367,6 +2366,7 @@ class ApiExtractor
     when :command then callee, args = node, node[2]
     when :command_call then callee, args = node, node[4]
     when :super then callee, args = node, node[1]
+    when :zsuper then callee, args, flags = node, nil, flags + ["zsuper"]
     else callee, args = node, nil
     end
 
@@ -2375,7 +2375,8 @@ class ApiExtractor
     name = call_site_name(callee)
     if name
       site_flags = flags.dup
-      sites << { name: name, args: describe_args(args, site_flags), flags: site_flags }
+      descriptors = describe_args(args, site_flags)
+      sites << { name: name, args: descriptors, flags: site_flags.uniq }
     end
 
     walk_for_call_args(args, sites)
@@ -2383,7 +2384,7 @@ class ApiExtractor
 
   # The same name filter walk_for_calls applies, so the two streams pair up.
   def call_site_name(callee)
-    return "super" if callee[0] == :super
+    return "super" if callee[0] == :super || callee[0] == :zsuper
 
     name =
       if callee[0] == :call || callee[0] == :command_call
@@ -2402,10 +2403,10 @@ class ApiExtractor
     case node[0]
     when :arg_paren then describe_args(node[1], flags)
     when :args_add_block
-      flag_once(flags, "blockpass") if node[2].is_a?(Array)
+      flags << "blockpass" if node[2].is_a?(Array)
       describe_args(node[1], flags)
     when :args_add_star
-      flag_once(flags, "splat")
+      flags << "splat"
       describe_args(node[1], flags) + ["*splat"] +
         node.drop(3).map { |child| describe_arg(child, flags) }
     else
@@ -2490,16 +2491,12 @@ class ApiExtractor
         label = key.is_a?(Array) && key[0] == :@label ? key[1].chomp(":") : nil
         label ? "#{label}=#{describe_arg(assoc[2], flags)}" : "?"
       when :assoc_splat
-        flag_once(flags, "splat")
+        flags << "splat"
         "**splat"
       else "?"
       end
     end
     "kwargs{#{pairs.join(",")}}"
-  end
-
-  def flag_once(flags, flag)
-    flags << flag unless flags.include?(flag)
   end
 
   def collect_dep_refs(node, constants, identifiers, refs)
