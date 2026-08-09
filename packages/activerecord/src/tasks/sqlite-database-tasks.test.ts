@@ -242,7 +242,11 @@ describe("SQLiteDatabaseTasks in-memory URI variants", () => {
   // `NoDatabaseError`. So dropping an in-memory database raises rather than
   // silently doing nothing.
   it("raises NoDatabaseError dropping an in-memory database, as FileUtils.rm does", async () => {
-    for (const database of [":memory:", "file::memory:?cache=shared"]) {
+    for (const database of [
+      ":memory:",
+      "file::memory:?cache=shared",
+      "file:memdb1?mode=memory&cache=shared",
+    ]) {
       const config = new HashConfig("development", "primary", {
         adapter: "sqlite3",
         database,
