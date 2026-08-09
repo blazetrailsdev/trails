@@ -40,7 +40,6 @@ import {
   leaseFixtureConnection,
   leaseFixtureConnectionFor,
 } from "./test-fixtures/fixture-connection.js";
-import { canonicalForeignKeyDependents } from "./support/canonical-schema.js";
 
 /**
  * A tableless fixture entry: seeds rows directly into the named table with no
@@ -484,7 +483,6 @@ function useFixtures(
   // database seeds through that model's pool. Read in afterEach — see
   // shouldDeleteFixtureRows.
   const seededInTransaction = new Map<DatabaseAdapter, boolean>();
-  const setAdapters = new Map<string, DatabaseAdapter>();
 
   // TODO(fixtures-adoption Spike S1): seed once per worker in a global beforeAll
   // (before the pinned transaction opens) when transactional fixtures are
@@ -504,7 +502,6 @@ function useFixtures(
     // a single insert_fixtures_set.
     const groups = new Map<DatabaseAdapter, { prepared: PreparedFixtureSet[]; keys: string[] }>();
     seededInTransaction.clear();
-    setAdapters.clear();
     for (const [key, { table, model, data }] of Object.entries(fixtures)) {
       // Auto-register the (object-map) model, mirroring the by-name path's
       // `resolveFixtureNames` (fixtures-register-model-on-resolution, #4348):
@@ -517,7 +514,6 @@ function useFixtures(
         registerModel(model);
       }
       const adapter = await leaseFixtureConnectionFor(model, fixtureConnection);
-      setAdapters.set(key, adapter);
       let group = groups.get(adapter);
       if (group === undefined) {
         group = { prepared: [], keys: [] };
@@ -549,16 +545,25 @@ function useFixtures(
     // a table whose children the fixture set doesn't own, e.g. the HABTM join
     // rows a test created itself — never reaches the database.
     const deletesByAdapter = new Map<DatabaseAdapter, string[]>();
-    for (const [key, { table }] of Object.entries(fixtures).reverse()) {
-      const adapter = setAdapters.get(key) ?? fixtureConnection;
+    for (const [, { table, model }] of Object.entries(fixtures).reverse()) {
+      // Re-lease, rather than reusing the connection this set was seeded on.
+      // Rails never touches the seeding connection again in `teardown_fixtures`
+      // — the deletes are the `table_deletes` half of the *next*
+      // `insert_fixtures_set` (database_statements.rb:486-495), which runs on a
+      // freshly-leased connection. A test may deliberately have poisoned or
+      // evicted the seed-time connection (transactions.test.ts "connection
+      // removed from pool when begin raises…"), and teardown must not resurrect
+      // it.
+      const adapter = await leaseFixtureConnectionFor(model, fixtureConnection);
       if (!shouldDeleteFixtureRows(adapter, seededInTransaction.get(adapter) ?? false)) continue;
       const tables = deletesByAdapter.get(adapter);
       if (tables === undefined) deletesByAdapter.set(adapter, [table]);
       else tables.push(table);
     }
-    const dependents = deletesByAdapter.size > 0 ? await canonicalForeignKeyDependents() : null;
     for (const [adapter, tables] of deletesByAdapter) {
-      const tableDeletes = async () => {
+      // Rails wraps its table_deletes in disable_referential_integrity
+      // unconditionally (database_statements.rb:492).
+      await adapter.disableReferentialIntegrity(async () => {
         for (const table of tables) {
           try {
             await adapter.executeMutation(`DELETE FROM ${adapter.quoteTableName(table)}`);
@@ -566,21 +571,7 @@ function useFixtures(
             if (!isTableMissingError(e)) throw e;
           }
         }
-      };
-      // Rails wraps its table_deletes unconditionally (database_statements.rb:492).
-      // We cannot yet, because this loop deletes through the adapter captured at
-      // seed time, which a test may have evicted or poisoned by then — and PG's
-      // wrap opens a nested transaction that a connection whose
-      // `begin_db_transaction` raises re-raises through. Skipping the wrap where
-      // no foreign key points into the set keeps it off exactly those sets.
-      // Converging is tracked by
-      // 0064-ar-test-infra-layout-fidelity/converge-fixture-teardown-delete-onto-a-live-connection,
-      // which retires this conditional along with the stale-connection cause.
-      if (tables.some((table) => (dependents?.get(table)?.length ?? 0) > 0)) {
-        await adapter.disableReferentialIntegrity(tableDeletes, tables);
-      } else {
-        await tableDeletes();
-      }
+      }, tables);
     }
     for (const key of Object.keys(store)) {
       delete store[key];

@@ -184,11 +184,14 @@ describe("MigrationContext connected surface", () => {
     await expect(context.forward(1)).rejects.toThrow(UnknownMigrationVersionError);
   });
 
-  it("a context built without a schemaMigration raises rather than half-answering", () => {
+  it("a context built without a schemaMigration defaults it from the connection pool", () => {
     const discoveryOnly = new MigrationContext([`${MIGRATIONS_ROOT}/valid`]);
 
+    // Discovery never consults the collaborators, so it answers regardless.
     expect(discoveryOnly.migrations).toHaveLength(3);
-    expect(() => discoveryOnly.schemaMigration).toThrow(/without a schema_migration/);
-    expect(() => discoveryOnly.internalMetadata).toThrow(/without an internal_metadata/);
+    // Rails: `schema_migration || SchemaMigration.new(connection_pool)`
+    // (migration.rb:1214-1218).
+    expect(discoveryOnly.schemaMigration).toBeInstanceOf(SchemaMigration);
+    expect(discoveryOnly.internalMetadata).toBeInstanceOf(InternalMetadata);
   });
 });

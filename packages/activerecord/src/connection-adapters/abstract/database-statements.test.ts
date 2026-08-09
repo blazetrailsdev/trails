@@ -44,6 +44,12 @@ import { ActiveRecord } from "../../ar-config.js";
 import type { QueryTransformer } from "../../query-transformers.js";
 import type { Quoting } from "./quoting.js";
 import { fixtures } from "../../test-fixtures.js";
+import { newSqlitePool } from "../../support/pooled-sqlite-adapter.js";
+
+// Rails' DatabaseStatements host is an AbstractAdapter, whose @pool is a real
+// ConnectionPool (abstract_adapter.rb:153), so the mock hosts below hold one
+// rather than a two-member literal standing in for it.
+const pool = newSqlitePool();
 
 describe("DatabaseStatements", () => {
   // `to_sql` compiles through `Table.engine`'s connection (arel/nodes/node.rb:148-153),
@@ -93,6 +99,7 @@ describe("DatabaseStatements", () => {
     it("wraps block in begin/commit on success", async () => {
       const calls: string[] = [];
       const host: DatabaseStatementsHost = {
+        pool,
         beginDbTransaction: async () => {
           calls.push("begin");
         },
@@ -114,6 +121,7 @@ describe("DatabaseStatements", () => {
 
     it("catches Rollback errors and returns undefined", async () => {
       const host: DatabaseStatementsHost = {
+        pool,
         beginDbTransaction: async () => {},
         commitDbTransaction: async () => {},
         rollbackDbTransaction: async () => {},
@@ -192,6 +200,7 @@ describe("DatabaseStatements", () => {
     it("sets written on open transaction for write queries", () => {
       const txn = { open: true, written: false };
       const host: DatabaseStatementsHost = {
+        pool,
         currentTransaction: () => txn,
         isWriteQuery: () => true,
       };
@@ -202,6 +211,7 @@ describe("DatabaseStatements", () => {
     it("does not set written for read queries", () => {
       const txn = { open: true, written: false };
       const host: DatabaseStatementsHost = {
+        pool,
         currentTransaction: () => txn,
         isWriteQuery: () => false,
       };
@@ -213,6 +223,7 @@ describe("DatabaseStatements", () => {
   describe("is transaction open", () => {
     it("returns true when transaction is open", () => {
       const host: DatabaseStatementsHost = {
+        pool,
         currentTransaction: () => ({ open: true }),
       };
       expect(isTransactionOpen.call(host)).toBe(true);
@@ -220,6 +231,7 @@ describe("DatabaseStatements", () => {
 
     it("returns false when no transaction", () => {
       const host: DatabaseStatementsHost = {
+        pool,
         currentTransaction: () => ({ open: false }),
       };
       expect(isTransactionOpen.call(host)).toBe(false);
@@ -299,6 +311,7 @@ describe("DatabaseStatements", () => {
       const { insertFixturesSet } = await import("./database-statements.js");
       const host: DatabaseStatementsHost &
         Pick<Quoting, "quote" | "quoteTableName" | "quoteColumnName"> = {
+        pool,
         execute: async (sql: string) => {
           executed.push(sql);
         },
@@ -330,6 +343,7 @@ describe("DatabaseStatements", () => {
       let scopedTables: string[] | undefined;
       const host: DatabaseStatementsHost &
         Pick<Quoting, "quote" | "quoteTableName" | "quoteColumnName"> = {
+        pool,
         execute: async () => {},
         transaction: async <T>(fn: (tx?: unknown) => Promise<T> | T) => {
           await fn();
@@ -359,10 +373,8 @@ describe("DatabaseStatements", () => {
       const { truncateTables } = await import("./database-statements.js");
       const executed: string[] = [];
       let scopedTables: string[] | undefined;
-      const host: DatabaseStatementsHost &
-        Pick<Quoting, "quoteTableName"> & {
-          pool: NonNullable<DatabaseStatementsHost["pool"]>;
-        } = {
+      const host: DatabaseStatementsHost & Pick<Quoting, "quoteTableName"> = {
+        pool,
         execute: async (sql: string) => {
           executed.push(sql);
         },
@@ -371,10 +383,6 @@ describe("DatabaseStatements", () => {
           await fn();
         },
         quoteTableName: (n: string) => `"${n}"`,
-        pool: {
-          schemaMigration: { tableName: "schema_migrations" },
-          internalMetadata: { tableName: "ar_internal_metadata" },
-        },
       };
 
       // schema_migrations / ar_internal_metadata are filtered out before scoping.
@@ -395,6 +403,7 @@ describe("DatabaseStatements", () => {
     } {
       const executed: Array<{ sql: string; name?: string | null; receiver: unknown }> = [];
       const host: QuoterHost = {
+        pool,
         async execute(sql: string, _binds?: unknown[], name?: string | null) {
           // captures `this` to verify receiver is preserved
           executed.push({ sql, name, receiver: this });
@@ -491,13 +500,14 @@ describe("performQuery", () => {
 
 describe("preprocessQuery", () => {
   it("returns sql unchanged when no write guard or transaction", () => {
-    const host: DatabaseStatementsHost = {};
+    const host: DatabaseStatementsHost = { pool };
     expect(preprocessQuery.call(host, "SELECT 1")).toBe("SELECT 1");
   });
 
   it("calls checkIfWriteQuery on the host", () => {
     let checked: string | undefined;
     const host: DatabaseStatementsHost = {
+      pool,
       checkIfWriteQuery(sql) {
         checked = sql;
       },
@@ -520,7 +530,7 @@ describe("preprocessQuery", () => {
     }
 
     it("applies registered transformers in order, threading the connection", () => {
-      const host: DatabaseStatementsHost = {};
+      const host: DatabaseStatementsHost = { pool };
       const seen: unknown[] = [];
       withTransformers(
         [
@@ -540,7 +550,7 @@ describe("preprocessQuery", () => {
     });
 
     it("does not double-apply when a transformer re-enters preprocessQuery", () => {
-      const host: DatabaseStatementsHost = {};
+      const host: DatabaseStatementsHost = { pool };
       let nested = "";
       withTransformers(
         [
@@ -565,6 +575,7 @@ describe("preprocessQuery", () => {
 describe("select", () => {
   it("delegates to internalExecQuery and returns a Result", async () => {
     const host: DatabaseStatementsHost = {
+      pool,
       async internalExecute(_sql, _name, _binds) {
         return [{ id: 1 }];
       },
@@ -578,6 +589,7 @@ describe("execInsert", () => {
   function makeInsertHost(supportsReturning: boolean) {
     let capturedSql = "";
     const host: DatabaseStatementsHost = {
+      pool,
       supportsInsertReturning: () => supportsReturning,
       quoteColumnName: (c) => `"${c}"`,
       internalExecute: async (sql: string) => {
@@ -612,7 +624,7 @@ describe("execInsert", () => {
 
 describe("sqlForInsert", () => {
   it("returns sql and binds unchanged when adapter does not support RETURNING", () => {
-    const host: DatabaseStatementsHost = { supportsInsertReturning: () => false };
+    const host: DatabaseStatementsHost = { pool, supportsInsertReturning: () => false };
     const [sql, binds] = sqlForInsert.call(host, "INSERT INTO t (x) VALUES (1)", "id", [], null);
     expect(sql).toBe("INSERT INTO t (x) VALUES (1)");
     expect(binds).toEqual([]);
@@ -620,6 +632,7 @@ describe("sqlForInsert", () => {
 
   it("appends RETURNING clause when pk is supplied and adapter supports it", () => {
     const host: DatabaseStatementsHost = {
+      pool,
       supportsInsertReturning: () => true,
       quoteColumnName: (c) => `"${c}"`,
     };
@@ -629,6 +642,7 @@ describe("sqlForInsert", () => {
 
   it("uses explicit returning list when provided", () => {
     const host: DatabaseStatementsHost = {
+      pool,
       supportsInsertReturning: () => true,
       quoteColumnName: (c) => `"${c}"`,
     };
@@ -647,6 +661,7 @@ describe("sqlForInsert", () => {
     // want any pk-derived RETURNING column. extractTableRefFromInsertSql /
     // primaryKey lookup must be skipped too.
     const host: DatabaseStatementsHost = {
+      pool,
       supportsInsertReturning: () => true,
       quoteColumnName: (c) => `"${c}"`,
       primaryKey: () => {
@@ -659,6 +674,7 @@ describe("sqlForInsert", () => {
 
   it("still honours explicit returning list when pk=false", () => {
     const host: DatabaseStatementsHost = {
+      pool,
       supportsInsertReturning: () => true,
       quoteColumnName: (c) => `"${c}"`,
     };
@@ -716,13 +732,13 @@ describe("defaultInsertValue", () => {
 
 describe("returningColumnValues", () => {
   it("returns [first value of first row] from result", () => {
-    const host: DatabaseStatementsHost = {};
+    const host: DatabaseStatementsHost = { pool };
     const result = new Result(["id"], [[42]]);
     expect(returningColumnValues.call(host, result)).toEqual([42]);
   });
 
   it("returns [undefined] for empty result", () => {
-    const host: DatabaseStatementsHost = {};
+    const host: DatabaseStatementsHost = { pool };
     expect(returningColumnValues.call(host, Result.empty())).toEqual([undefined]);
   });
 });
@@ -738,6 +754,7 @@ describe("buildFixtureSql / buildFixtureStatements / buildTruncateStatement(s) /
   function makeHost(quoter: { q?: (n: string) => string } = {}): FixtureHost {
     const q = quoter.q ?? ((n: string) => `"${n}"`);
     return {
+      pool,
       quote: (v: unknown) => (typeof v === "string" ? `'${v}'` : String(v)),
       quoteTableName: q,
       quoteColumnName: q,
@@ -824,6 +841,7 @@ describe("buildFixtureSql / buildFixtureStatements / buildTruncateStatement(s) /
 
     it("uses adapter quote() for value escaping", () => {
       const host: FixtureHost = {
+        pool,
         quote: (v: unknown) => (typeof v === "string" ? `E'${v}'` : String(v)),
         quoteTableName: (n) => `"${n}"`,
         quoteColumnName: (n) => `"${n}"`,
