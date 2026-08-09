@@ -418,7 +418,7 @@ export async function pruneSharedCache(
     await fs.rm(legacyDir, { recursive: true, force: true });
     result.removedLegacyDir = true;
   } catch {
-    // absent (the common case, once swept) or unremovable — best-effort
+    // best-effort
   }
   const now = opts.now ?? Date.now();
   const maxAgeMs = opts.maxAgeMs ?? CACHE_MAX_AGE_MS;
