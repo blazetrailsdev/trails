@@ -77,15 +77,24 @@ describe("sanitization class-method dispatch threads `this.connection`", () => {
     expect(ClassMethods.sanitizeSqlArray.call(mysqlHost, "name = ?", "x")).toBe("name = 'x'");
   });
 
-  it("falls back to abstract quoter when host.connection throws ConnectionNotDefined", () => {
+  // Rails has no adapter-free quoter: every `sanitize_sql_array` branch runs
+  // inside `with_connection { |c| ... }` (sanitization.rb:167-179) and the
+  // abstract `quote_column_name` is `raise NotImplementedError`
+  // (abstract/quoting.rb:61). A host with no connection therefore surfaces the
+  // connection error rather than emitting the ANSI SQL no adapter asked for —
+  // which on MySQL would have been silently wrong.
+  it("raises ConnectionNotDefined when host.connection has no adapter", () => {
     const host = {
       get connection(): never {
         throw new ConnectionNotDefined("No database connection defined.");
       },
     };
-    expect(ClassMethods.sanitizeSqlHashForAssignment.call(host, { name: "x" }, "users")).toBe(
-      `"users"."name" = 'x'`,
-    );
+    expect(() =>
+      ClassMethods.sanitizeSqlHashForAssignment.call(host, { name: "x" }, "users"),
+    ).toThrow(ConnectionNotDefined);
+    expect(() =>
+      ClassMethods.sanitizeSqlHashForAssignment.call({}, { name: "x" }, "users"),
+    ).toThrow(ConnectionNotDefined);
   });
 
   it("propagates non-ConnectionNotDefined errors from host.connection", () => {

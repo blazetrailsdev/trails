@@ -5,13 +5,7 @@
  */
 
 import { Nodes, sql as arelSql } from "@blazetrails/arel";
-import {
-  quote as abstractQuote,
-  quoteIdentifier as abstractQuoteIdentifier,
-  quoteString as abstractQuoteString,
-  castBoundValue as abstractCastBoundValue,
-  columnNameWithOrderMatcher as abstractColumnNameWithOrderMatcher,
-} from "./connection-adapters/abstract/quoting.js";
+import { columnNameWithOrderMatcher as abstractColumnNameWithOrderMatcher } from "./connection-adapters/abstract/quoting.js";
 import type { Quoting } from "./connection-adapters/abstract/quoting.js";
 import {
   ConnectionNotDefined,
@@ -24,26 +18,6 @@ export type Quoter = Pick<
   Quoting,
   "quote" | "quoteColumnName" | "quoteTableNameForAssignment" | "quoteString" | "castBoundValue"
 >;
-
-/**
- * Guarded no-connection fallback, used only by {@link quoterFor} when a model
- * class has no resolvable adapter (e.g. `connection` raises
- * `ConnectionNotDefined`). Every connected caller quotes through the live
- * adapter's quoter; this pins SQL-92 rules purely so sanitization can still
- * run before a connection is established. @internal
- */
-const ABSTRACT_QUOTER: Quoter = {
-  // `abstractQuote` requires a host receiver; this ANSI fallback has no adapter,
-  // so bind a bare host — date/time values route through the module helpers.
-  quote: (v) => abstractQuote.call({}, v),
-  quoteColumnName: (n) => abstractQuoteIdentifier(n),
-  // ANSI fallback: the abstract `quoteTableNameForAssignment` delegates to the
-  // throwing `quoteColumnName`, so render `"table"."attr"` directly here.
-  quoteTableNameForAssignment: (t, a) =>
-    `${abstractQuoteIdentifier(t)}.${abstractQuoteIdentifier(a)}`,
-  quoteString: (s) => abstractQuoteString(s),
-  castBoundValue: (v) => abstractCastBoundValue(v),
-};
 
 /** @internal */
 function _sanitizeSqlArray(quoter: Quoter, template: string, binds: unknown[]): string {
@@ -204,17 +178,16 @@ interface QuoterHost {
 }
 
 /**
- * Resolves quoting via `connection`. Only `ConnectionNotDefined` triggers
- * fallback to the abstract quoter; other errors propagate. @internal
+ * Resolves quoting via `connection`, which is the `with_connection { |c| ... }`
+ * every `sanitize_sql_array` branch runs inside (sanitization.rb:167-179).
+ * Rails has no adapter-free quoter to fall back to — `quote_column_name` is
+ * `raise NotImplementedError` on the abstract (abstract/quoting.rb:61) — so a
+ * caller with no connection surfaces the connection error rather than emitting
+ * ANSI SQL no adapter asked for. @internal
  */
 function quoterFor(host: QuoterHost): Quoter {
-  let conn: Quoter | null | undefined;
-  try {
-    conn = host.connection as Quoter | null | undefined;
-  } catch (err) {
-    if (!(err instanceof ConnectionNotDefined)) throw err;
-  }
-  if (!conn || typeof conn.quote !== "function") return ABSTRACT_QUOTER;
+  const conn = host.connection as Quoter | null | undefined;
+  if (!conn || typeof conn.quote !== "function") throw new ConnectionNotDefined();
   return conn;
 }
 
