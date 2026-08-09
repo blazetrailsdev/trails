@@ -41,6 +41,7 @@ import type {
   MethodInfo,
   ParamInfo,
   LiteralValue,
+  CallSite,
 } from "@blazetrails/parity/types";
 import {
   ROOT_DIR,
@@ -701,6 +702,7 @@ export function extractFromProgram(
         const fnOptionKeys = extractOptionKeys(node.parameters, checker);
         const fnCalls = extractCalls(node.body);
         const fnCallSeq = extractCallSeq(node.body);
+        const fnCallArgs = extractCallArgs(node.body);
         const fnSkeleton = extractSkeleton(node.body);
         const internal = hasInternalJsDocTag(node);
         const noRailsEquivalent = noRailsEquivalentReason(node);
@@ -717,6 +719,7 @@ export function extractFromProgram(
           ...(fnOptionKeys !== undefined ? { optionKeys: fnOptionKeys } : {}),
           ...(fnCalls !== undefined ? { calls: fnCalls } : {}),
           ...(fnCallSeq !== undefined ? { callSeq: fnCallSeq } : {}),
+          ...(fnCallArgs !== undefined ? { callArgs: fnCallArgs } : {}),
           ...(fnSkeleton !== undefined ? { skeleton: fnSkeleton } : {}),
           ...(fnMissingRailsCalls !== undefined ? { missingRailsCalls: fnMissingRailsCalls } : {}),
         });
@@ -918,6 +921,7 @@ export function extractFromProgram(
                 : undefined;
             const calls = extractCalls(body);
             const callSeq = extractCallSeq(body);
+            const callArgs = extractCallArgs(body);
             const internal = hasInternalJsDocTag(decl);
             // A renamed export (`export { withRoutesHelpers as with }`) is its
             // own surface entry: the declaration's tag justifies the DECLARED
@@ -951,6 +955,7 @@ export function extractFromProgram(
               ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
               ...(calls !== undefined ? { calls } : {}),
               ...(callSeq !== undefined ? { callSeq } : {}),
+              ...(callArgs !== undefined ? { callArgs } : {}),
               ...(exportedMissingRailsCalls !== undefined
                 ? { missingRailsCalls: exportedMissingRailsCalls }
                 : {}),
@@ -1826,6 +1831,7 @@ export function harvestObjectLiteralMethods(
     let optionKeys: string[] | null | undefined;
     let calls: string[] | undefined;
     let callSeq: string[] | undefined;
+    let callArgs: CallSite[] | undefined;
     let internal = hasInternalJsDocTag(prop);
     let noRailsEquivalent = noRailsEquivalentReason(prop);
     const propMissingRailsCalls = missingRailsCallTags(prop);
@@ -1835,6 +1841,7 @@ export function harvestObjectLiteralMethods(
       optionKeys = extractOptionKeys(prop.parameters, checker);
       calls = extractCalls(prop.body);
       callSeq = extractCallSeq(prop.body);
+      callArgs = extractCallArgs(prop.body);
     } else if (ts.isShorthandPropertyAssignment(prop)) {
       mname = prop.name.text;
       params = paramsOfCallableRef(prop.name, checker) ?? [];
@@ -1845,11 +1852,13 @@ export function harvestObjectLiteralMethods(
       mname = prop.name.text;
       calls = extractCalls(prop.body);
       callSeq = extractCallSeq(prop.body);
+      callArgs = extractCallArgs(prop.body);
     } else if (ts.isSetAccessorDeclaration(prop) && prop.name && ts.isIdentifier(prop.name)) {
       mname = prop.name.text;
       params = extractParameters(prop.parameters);
       calls = extractCalls(prop.body);
       callSeq = extractCallSeq(prop.body);
+      callArgs = extractCallArgs(prop.body);
     } else if (ts.isPropertyAssignment(prop) && ts.isIdentifier(prop.name)) {
       const init = prop.initializer;
       if (ts.isFunctionExpression(init) || ts.isArrowFunction(init)) {
@@ -1858,6 +1867,7 @@ export function harvestObjectLiteralMethods(
         optionKeys = extractOptionKeys(init.parameters, checker);
         calls = extractCalls(init.body);
         callSeq = extractCallSeq(init.body);
+        callArgs = extractCallArgs(init.body);
       } else {
         // `foo: bar` / `foo: NS.bar` — count if the RHS resolves to a
         // callable. Catches `readAttributeForValidation:
@@ -1887,6 +1897,7 @@ export function harvestObjectLiteralMethods(
       ...(optionKeys !== undefined ? { optionKeys } : {}),
       ...(calls !== undefined ? { calls } : {}),
       ...(callSeq !== undefined ? { callSeq } : {}),
+      ...(callArgs !== undefined ? { callArgs } : {}),
       ...(propMissingRailsCalls !== undefined ? { missingRailsCalls: propMissingRailsCalls } : {}),
     });
   }
@@ -1903,6 +1914,7 @@ export function extractFileLocalHelpers(
     if (!node.name) return out;
     if (isNotImplementedStub(node.body)) return out;
     const line = node.getSourceFile().getLineAndCharacterOfPosition(node.getStart()).line + 1;
+    const callArgs = extractCallArgs(node.body);
     out.push({
       name: node.name.text,
       visibility: "private",
@@ -1911,6 +1923,7 @@ export function extractFileLocalHelpers(
       line,
       file: relPath,
       internal: true,
+      ...(callArgs !== undefined ? { callArgs } : {}),
     });
     return out;
   }
@@ -1922,6 +1935,7 @@ export function extractFileLocalHelpers(
     if (!ts.isArrowFunction(init) && !ts.isFunctionExpression(init)) continue;
     if (isNotImplementedStub(init.body)) continue;
     const line = decl.getSourceFile().getLineAndCharacterOfPosition(decl.getStart()).line + 1;
+    const callArgs = extractCallArgs(init.body);
     out.push({
       name: decl.name.text,
       visibility: "private",
@@ -1930,6 +1944,7 @@ export function extractFileLocalHelpers(
       line,
       file: relPath,
       internal: true,
+      ...(callArgs !== undefined ? { callArgs } : {}),
     });
   }
   return out;
@@ -2042,6 +2057,7 @@ export function extractClass(
       const suppressed = namespaceSelfDelegationName(member.body, checker) === memberName;
       const calls = suppressed ? undefined : extractCalls(member.body);
       const callSeq = suppressed ? undefined : extractCallSeq(member.body);
+      const callArgs = suppressed ? undefined : extractCallArgs(member.body);
       const skeleton = suppressed ? undefined : extractSkeleton(member.body);
       const delegatesTo = delegationTargetName(member.body, memberName, name, checker);
       if (delegatesTo) delegationTargets.add(delegatesTo);
@@ -2057,6 +2073,7 @@ export function extractClass(
         ...(optionKeys !== undefined ? { optionKeys } : {}),
         ...(calls !== undefined ? { calls } : {}),
         ...(callSeq !== undefined ? { callSeq } : {}),
+        ...(callArgs !== undefined ? { callArgs } : {}),
         ...(skeleton !== undefined ? { skeleton } : {}),
         ...(delegatesTo !== undefined ? { delegatesTo } : {}),
       };
@@ -2078,6 +2095,7 @@ export function extractClass(
       // calls here so calls-parity can flag a ported constructor that drops it.
       const calls = extractCalls(member.body);
       const callSeq = extractCallSeq(member.body);
+      const callArgs = extractCallArgs(member.body);
       const skeleton = extractSkeleton(member.body);
       instanceMethods.push({
         name: "constructor",
@@ -2089,9 +2107,11 @@ export function extractClass(
         ...tagged,
         ...(calls !== undefined ? { calls } : {}),
         ...(callSeq !== undefined ? { callSeq } : {}),
+        ...(callArgs !== undefined ? { callArgs } : {}),
         ...(skeleton !== undefined ? { skeleton } : {}),
       });
     } else if (ts.isGetAccessorDeclaration(member) && memberName) {
+      const callArgs = extractCallArgs(member.body);
       const method: MethodInfo = {
         name: memberName,
         visibility,
@@ -2101,6 +2121,7 @@ export function extractClass(
         isStatic,
         ...(internal ? { internal: true } : {}),
         ...tagged,
+        ...(callArgs !== undefined ? { callArgs } : {}),
       };
       if (isStatic) {
         classMethods.push(method);
@@ -2109,6 +2130,7 @@ export function extractClass(
       }
     } else if (ts.isSetAccessorDeclaration(member) && memberName) {
       const params = extractParameters(member.parameters);
+      const callArgs = extractCallArgs(member.body);
       const method: MethodInfo = {
         name: memberName,
         visibility,
@@ -2118,6 +2140,7 @@ export function extractClass(
         isStatic,
         ...(internal ? { internal: true } : {}),
         ...tagged,
+        ...(callArgs !== undefined ? { callArgs } : {}),
       };
       if (isStatic) {
         classMethods.push(method);
@@ -2692,6 +2715,182 @@ function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
 function extractCalls(node: ts.Node | undefined): string[] | undefined {
   const names = collectCalls(node);
   return names === undefined ? undefined : [...names].sort();
+}
+
+/**
+ * Every SYNTACTIC call site in the body, in source order, with its argument
+ * descriptors (RFC 0025 `## Call-argument fidelity`, RFC 0095 §Design). The
+ * Ruby half is extract-ruby-api.rb#collect_call_args and the descriptor grammar
+ * is shared: `id:` / `num:` / `str:` / `bool:` / `nil` / `sym:` / `const:` /
+ * `call:` / `kwargs{k=…}`, plus the OPAQUE spellings (`?`, `array`, `hash`,
+ * `str-interp`, `binop:<op>`, `unary<desc>`, `ternary`, `*splat`) that tell the
+ * comparator to skip the site rather than guess at it, and the per-site
+ * `splat` / `block` flags.
+ *
+ * Kept beside `collectCalls` rather than folded into it: that stream credits a
+ * bare property READ (`this.joinsValues`) as a call, because Ruby has no field
+ * access. A read is not a call site and carries no argument list, so recording
+ * it here would make "the TS body has no comparable site" indistinguishable
+ * from "the TS body calls it with zero arguments" — which manufactures rows.
+ */
+function extractCallArgs(node: ts.Node | undefined): CallSite[] | undefined {
+  if (!node) return undefined;
+  const sites: CallSite[] = [];
+  walkForCallArgs(node, sites);
+  return sites.length === 0 ? undefined : sites;
+}
+
+function walkForCallArgs(node: ts.Node, sites: CallSite[]): void {
+  const visit = (n: ts.Node): void => {
+    if (ts.isCallExpression(n) || ts.isNewExpression(n)) {
+      recordCallSite(n, sites, visit);
+      return;
+    }
+    ts.forEachChild(n, visit);
+  };
+  // The body ITSELF, not just its children: an expression-bodied arrow
+  // (`= (x) => where(x)`) IS the call site, and Ruby's body walk covers it.
+  visit(node);
+}
+
+/**
+ * Terminal, like extract-ruby-api.rb#record_call_site: the receiver is walked,
+ * then the site is emitted, then the arguments are walked — so `foo(bar(1))` is
+ * exactly two sites in source order, and no node is recorded twice.
+ */
+function recordCallSite(
+  call: ts.CallExpression | ts.NewExpression,
+  sites: CallSite[],
+  visit: (n: ts.Node) => void,
+): void {
+  const callee = call.expression;
+  if (!ts.isIdentifier(callee) && callee.kind !== ts.SyntaxKind.SuperKeyword) visit(callee);
+
+  const name = callSiteName(call);
+  if (name !== undefined) {
+    const flags: string[] = [];
+    const args = describeArgs(call.arguments, flags);
+    sites.push({ name, args, flags: [...new Set(flags)] });
+  }
+
+  call.arguments?.forEach(visit);
+}
+
+/**
+ * The site name, under the SAME filter extract-ruby-api.rb#call_site_name
+ * applies (`:2385-2396`): a name starting with `_`, or with anything other than
+ * a lowercase letter, is dropped. Ruby never emits such a site, so recording one
+ * here manufactures a TS-only site that can never pair with the Ruby stream.
+ */
+function callSiteName(call: ts.CallExpression | ts.NewExpression): string | undefined {
+  // `new Foo(...)` is Ruby's `Foo.new(...)`. TS has no method named `new`, so
+  // `constructor` IS this site's raw TS spelling — the one conventions.ts:952
+  // maps Ruby `new` onto, and the one `calls` / `callSeq` already record.
+  if (ts.isNewExpression(call)) return "constructor";
+  const callee = call.expression;
+  if (callee.kind === ts.SyntaxKind.SuperKeyword) return "super";
+  const name = ts.isIdentifier(callee)
+    ? callee.text
+    : ts.isPropertyAccessExpression(callee)
+      ? callee.name.text
+      : undefined;
+  if (name === undefined || name.startsWith("_") || !/^[a-z]/.test(name)) return undefined;
+  return name;
+}
+
+function describeArgs(args: ts.NodeArray<ts.Expression> | undefined, flags: string[]): string[] {
+  if (!args) return [];
+  const out: string[] = [];
+  for (const arg of args) {
+    const expr = unwrapArg(arg);
+    // Ruby drops a block (`each { … }`) and a block-pass (`&blk`) from the
+    // argument list and flags the site instead; the port's callback argument is
+    // the same thing, so it is flagged and dropped here too.
+    if (ts.isArrowFunction(expr) || ts.isFunctionExpression(expr)) {
+      flags.push("block");
+      continue;
+    }
+    if (ts.isSpreadElement(expr)) {
+      flags.push("splat");
+      out.push("*splat");
+      continue;
+    }
+    out.push(describeArg(expr, flags));
+  }
+  return out;
+}
+
+/** `await x`, `x as T`, `x!`, `(x)` and `x satisfies T` all describe as `x`. */
+function unwrapArg(node: ts.Expression): ts.Expression {
+  let expr = node;
+  for (;;) {
+    if (ts.isParenthesizedExpression(expr) || ts.isAwaitExpression(expr)) expr = expr.expression;
+    else if (ts.isAsExpression(expr) || ts.isSatisfiesExpression(expr)) expr = expr.expression;
+    else if (ts.isNonNullExpression(expr)) expr = expr.expression;
+    else return expr;
+  }
+}
+
+function describeArg(node: ts.Expression, flags: string[]): string {
+  const expr = unwrapArg(node);
+  if (ts.isIdentifier(expr)) {
+    if (expr.text === "undefined") return "nil";
+    return /^[A-Z]/.test(expr.text) ? `const:${expr.text}` : `id:${expr.text}`;
+  }
+  if (expr.kind === ts.SyntaxKind.ThisKeyword) return "id:this";
+  if (ts.isNumericLiteral(expr) || ts.isBigIntLiteral(expr)) return `num:${expr.text}`;
+  if (ts.isStringLiteral(expr) || ts.isNoSubstitutionTemplateLiteral(expr))
+    return `str:${expr.text}`;
+  if (ts.isTemplateExpression(expr)) return "str-interp";
+  if (expr.kind === ts.SyntaxKind.TrueKeyword) return "bool:true";
+  if (expr.kind === ts.SyntaxKind.FalseKeyword) return "bool:false";
+  if (expr.kind === ts.SyntaxKind.NullKeyword) return "nil";
+  if (ts.isNewExpression(expr)) return "call:constructor";
+  if (ts.isCallExpression(expr)) {
+    const name = callSiteName(expr);
+    return name === undefined ? "?" : `call:${name}`;
+  }
+  if (ts.isPropertyAccessExpression(expr)) {
+    // A property READ is Ruby's reader send (`x.foo`) or its ivar (`@foo`) —
+    // `const:` when the name is constant-shaped, matching `Foo::BAR`.
+    const name = expr.name.text;
+    if (/^[A-Z]/.test(name)) return `const:${name}`;
+    return expr.expression.kind === ts.SyntaxKind.ThisKeyword ? `id:${name}` : `call:${name}`;
+  }
+  if (ts.isObjectLiteralExpression(expr)) return describeObjectLiteral(expr, flags);
+  if (ts.isArrayLiteralExpression(expr)) return "array";
+  if (ts.isBinaryExpression(expr)) {
+    return `binop:${ts.tokenToString(expr.operatorToken.kind) ?? "?"}`;
+  }
+  if (ts.isPrefixUnaryExpression(expr) || ts.isPostfixUnaryExpression(expr)) {
+    return `unary${describeArg(expr.operand, flags)}`;
+  }
+  if (ts.isConditionalExpression(expr)) return "ternary";
+  return "?";
+}
+
+/**
+ * An object literal is the port's spelling of Ruby's keyword arguments, and
+ * extract-ruby-api.rb#describe_hash reads a keyword-shaped `{ … }` as
+ * `kwargs{…}` for exactly that reason. Anything else — a computed, string or
+ * numeric key, or an empty literal — is the opaque `hash` of RFC 0025 §1.
+ */
+function describeObjectLiteral(node: ts.ObjectLiteralExpression, flags: string[]): string {
+  if (node.properties.length === 0) return "hash";
+  const pairs: string[] = [];
+  for (const prop of node.properties) {
+    if (ts.isShorthandPropertyAssignment(prop)) {
+      pairs.push(`${prop.name.text}=id:${prop.name.text}`);
+    } else if (ts.isSpreadAssignment(prop)) {
+      flags.push("splat");
+      pairs.push("**splat");
+    } else if (ts.isPropertyAssignment(prop) && ts.isIdentifier(prop.name)) {
+      pairs.push(`${prop.name.text}=${describeArg(prop.initializer, flags)}`);
+    } else {
+      return "hash";
+    }
+  }
+  return `kwargs{${pairs.join(",")}}`;
 }
 
 function collectCalls(node: ts.Node | undefined): string[] | undefined {

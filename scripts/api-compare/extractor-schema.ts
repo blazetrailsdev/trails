@@ -74,6 +74,7 @@ export const EXTRACTOR_OUTPUT_FIELDS = [
   "depRefs",
   "calls",
   "callSeq",
+  "callArgs",
   "skeleton",
   "internal",
   "option_keys",

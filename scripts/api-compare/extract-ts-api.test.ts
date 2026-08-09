@@ -22,9 +22,10 @@ import {
   tsLiteralValue,
 } from "./extract-ts-api.js";
 import { collectTsFileNames } from "./extra-surface.js";
+import { CALL_ARG_DESCRIPTOR_VOCABULARY } from "./extractor-skew.js";
 import { overlappingSubDirs, packageSrcDir } from "./config.js";
 import { COMPARED_TS_FILES, walkTsFilesSync } from "./ts-file-walk.js";
-import type { ClassInfo, MethodInfo, PackageInfo } from "@blazetrails/parity/types";
+import type { CallSite, ClassInfo, MethodInfo, PackageInfo } from "@blazetrails/parity/types";
 
 const VIRTUAL = "virtual.ts";
 
@@ -2857,5 +2858,366 @@ describe("@missingRailsCall extraction", () => {
     });
     const fns = fileFunctionsOf(info, "registry.ts");
     expect(fns.find((f) => f.name === "registerModel")!.missingRailsCalls).toEqual(["first"]);
+  });
+});
+
+describe("callArgs", () => {
+  const site = (source: string, method = "create"): CallSite[] =>
+    extractFromSource(source).instanceMethods.find((m) => m.name === method)!.callArgs!;
+
+  it("records one entry per syntactic call site, in source order", () => {
+    const sites = site(
+      `class Foo {
+        create() {
+          this.build(1);
+          this.save();
+        }
+      }`,
+    );
+    expect(sites).toEqual([
+      { name: "build", args: ["num:1"], flags: [] },
+      { name: "save", args: [], flags: [] },
+    ]);
+  });
+
+  it("records a nested call as its own site, by name in the outer argument list", () => {
+    // Two sites, not three: the recorder is terminal, so the outer site is
+    // emitted once and the inner one is reached through the arguments.
+    expect(
+      site(
+        `class Foo {
+          create() {
+            foo(bar(1));
+          }
+        }`,
+      ),
+    ).toEqual([
+      { name: "foo", args: ["call:bar"], flags: [] },
+      { name: "bar", args: ["num:1"], flags: [] },
+    ]);
+  });
+
+  it("emits no entry for a property read, so a read and a call differ", () => {
+    const read = site(
+      `class Foo {
+        create() {
+          this.foo;
+        }
+      }`,
+    );
+    const called = site(
+      `class Foo {
+        create() {
+          this.foo();
+        }
+      }`,
+    );
+    expect(read).toBeUndefined();
+    expect(called).toEqual([{ name: "foo", args: [], flags: [] }]);
+  });
+
+  it("describes each literal argument form of the shared grammar", () => {
+    expect(
+      site(
+        `class Foo {
+          create(value: unknown) {
+            this.visit(value, 1, "s", true, false, null, undefined, Klass, this.name, o.left);
+          }
+        }`,
+      ),
+    ).toEqual([
+      {
+        name: "visit",
+        args: [
+          "id:value",
+          "num:1",
+          "str:s",
+          "bool:true",
+          "bool:false",
+          "nil",
+          "nil",
+          "const:Klass",
+          "id:name",
+          "call:left",
+        ],
+        flags: [],
+      },
+    ]);
+  });
+
+  it("describes an object literal as kwargs, including shorthand and nesting", () => {
+    expect(
+      site(
+        `class Foo {
+          create(scope: unknown) {
+            this.visit({ scope, action: "dump", nested: { deep: 1 } });
+          }
+        }`,
+      ),
+    ).toEqual([
+      {
+        name: "visit",
+        args: ["kwargs{scope=id:scope,action=str:dump,nested=kwargs{deep=num:1}}"],
+        flags: [],
+      },
+    ]);
+  });
+
+  it("describes an object spread as the double-splat, flagging the site", () => {
+    // extract-ruby-api.rb#describe_kwargs (:2495-2508) reads `:assoc_splat`
+    // (`**opts`) as `**splat` and flags the site; `{ ...opts }` is the same
+    // thing on this side, alone or beside ordinary keys.
+    expect(
+      site(
+        `class Foo {
+          create(opts: object) {
+            this.visit({ ...opts });
+            this.visit({ a: 1, ...opts });
+          }
+        }`,
+      ),
+    ).toEqual([
+      { name: "visit", args: ["kwargs{**splat}"], flags: ["splat"] },
+      { name: "visit", args: ["kwargs{a=num:1,**splat}"], flags: ["splat"] },
+    ]);
+  });
+
+  it("describes a non-keyword or empty object literal as the opaque hash", () => {
+    const sites = site(
+      `class Foo {
+        create(key: string) {
+          this.visit({});
+          this.visit({ [key]: 1 });
+          this.visit({ "a-b": 1 });
+        }
+      }`,
+    );
+    expect(sites.map((s) => s.args)).toEqual([["hash"], ["hash"], ["hash"]]);
+  });
+
+  it("emits the opaque descriptors for the forms the two languages cannot agree on", () => {
+    const sites = site(
+      `class Foo {
+        create(a: number, b: number) {
+          this.visit([1, 2]);
+          this.visit(\`x\${a}\`);
+          this.visit(a + b);
+          this.visit(!a);
+          this.visit(a ? b : a);
+        }
+      }`,
+    );
+    expect(sites.map((s) => s.args)).toEqual([
+      ["array"],
+      ["str-interp"],
+      ["binop:+"],
+      ["unaryid:a"],
+      ["ternary"],
+    ]);
+  });
+
+  it("flags a spread argument and a callback, and drops the callback from the list", () => {
+    expect(
+      site(
+        `class Foo {
+          create(args: unknown[]) {
+            this.visit(1, ...args);
+            this.each((x) => this.save(x));
+          }
+        }`,
+      ),
+    ).toEqual([
+      { name: "visit", args: ["num:1", "*splat"], flags: ["splat"] },
+      { name: "each", args: [], flags: ["block"] },
+      { name: "save", args: ["id:x"], flags: [] },
+    ]);
+  });
+
+  it("records `new Foo(...)` as constructor, matching the Ruby `new` mapping", () => {
+    expect(
+      site(
+        `class Foo {
+          create() {
+            this.visit(new Node(1));
+          }
+        }`,
+      ),
+    ).toEqual([
+      { name: "visit", args: ["call:constructor"], flags: [] },
+      { name: "constructor", args: ["num:1"], flags: [] },
+    ]);
+  });
+
+  it("unwraps await / as / non-null / parenthesized wrappers to the inner expression", () => {
+    expect(
+      site(
+        `class Foo {
+          async create(value: unknown) {
+            this.visit(await this.load(), (value as string), value!);
+          }
+        }`,
+      ),
+    ).toEqual([
+      { name: "visit", args: ["call:load", "id:value", "id:value"], flags: [] },
+      { name: "load", args: [], flags: [] },
+    ]);
+  });
+
+  it("walks the receiver before the site it receives, matching the Ruby order", () => {
+    expect(
+      site(
+        `class Foo {
+          create() {
+            this.klass().unscoped(1);
+          }
+        }`,
+      ),
+    ).toEqual([
+      { name: "klass", args: [], flags: [] },
+      { name: "unscoped", args: ["num:1"], flags: [] },
+    ]);
+  });
+
+  it("records sites for a bare super call and a file-level function", () => {
+    const cls = extractFromSource(
+      `class Foo extends Bar {
+        constructor(a: number) {
+          super(a);
+        }
+      }`,
+    );
+    const ctor = cls.instanceMethods.find((m) => m.name === "constructor")!;
+    expect(ctor.callArgs).toEqual([{ name: "super", args: ["id:a"], flags: [] }]);
+
+    const info = extractFromFiles("/p", {
+      "quoting.ts": `
+        export function quote(value: unknown): string {
+          return quoteString(typeCast(value));
+        }
+      `,
+    });
+    expect(fileFunctionsOf(info, "quoting.ts").find((f) => f.name === "quote")!.callArgs).toEqual([
+      { name: "quoteString", args: ["call:typeCast"], flags: [] },
+      { name: "typeCast", args: ["id:value"], flags: [] },
+    ]);
+  });
+
+  it("records sites for an object-literal member and a get accessor", () => {
+    const [member] = objectLiteralMethods(
+      `export const ClassMethods = {
+        create() {
+          this.save(1);
+        },
+      };`,
+    );
+    expect(member.callArgs).toEqual([{ name: "save", args: ["num:1"], flags: [] }]);
+
+    const cls = extractFromSource(
+      `class Foo {
+        get scope() {
+          return this.build("x");
+        }
+      }`,
+    );
+    expect(cls.instanceMethods.find((m) => m.name === "scope")!.callArgs).toEqual([
+      { name: "build", args: ["str:x"], flags: [] },
+    ]);
+  });
+
+  it("drops a site whose name the Ruby extractor's own filter would drop", () => {
+    // extract-ruby-api.rb#call_site_name (:2385-2396) never emits a site named
+    // `_foo` or one that does not start with a lowercase letter, so recording
+    // one here would be a TS-only site that can never pair.
+    expect(
+      site(
+        `class Foo {
+          create() {
+            this._private(1);
+            Klass(2);
+            this.save(3);
+          }
+        }`,
+      ),
+    ).toEqual([{ name: "save", args: ["num:3"], flags: [] }]);
+  });
+
+  it("records sites for a file-local private helper, both declaration forms", () => {
+    const info = extractFromFiles("/p", {
+      "quoting.ts": `
+        export function quote(value: unknown): string {
+          return helper(value) + arrowHelper(value);
+        }
+        function helper(value: unknown): string {
+          return where(value);
+        }
+        const arrowHelper = (value: unknown): string => where(value, 1);
+      `,
+    });
+    const fns = fileFunctionsOf(info, "quoting.ts");
+    expect(fns.find((f) => f.name === "helper")!.callArgs).toEqual([
+      { name: "where", args: ["id:value"], flags: [] },
+    ]);
+    expect(fns.find((f) => f.name === "arrowHelper")!.callArgs).toEqual([
+      { name: "where", args: ["id:value", "num:1"], flags: [] },
+    ]);
+  });
+
+  it("emits no descriptor outside the vocabulary the Ruby extractor shares", () => {
+    // The other half of the extractor-skew vocabulary pin
+    // (extractor-skew.test.ts): a descriptor spelling invented on one side only
+    // stops matching silently, so every descriptor the TS extractor can produce
+    // has to be one extract-ruby-api.rb#describe_arg also produces.
+    const shared = new Set<string>(CALL_ARG_DESCRIPTOR_VOCABULARY);
+    const kindOf = (desc: string): string => {
+      if (desc.startsWith("kwargs{")) return "kwargs{";
+      if (desc.startsWith("unary")) return "unary";
+      const colon = desc.indexOf(":");
+      return colon === -1 ? desc : desc.slice(0, colon + 1);
+    };
+    const sites = site(
+      `class Foo {
+        create(a: number, b: number, xs: unknown[], scope: unknown) {
+          this.visit(a, 1, "s", true, false, null, undefined, Klass, this.name, o.left);
+          this.visit({ scope, nested: { deep: 1 } }, {}, [1], \`x\${a}\`);
+          this.visit(a + b, !a, a ? b : a, ...xs, new Node(), this.load(), /re/);
+          this.each((x) => x);
+        }
+      }`,
+    );
+    const kinds = [...new Set(sites.flatMap((s) => s.args).map(kindOf))];
+    expect(kinds.filter((k) => k !== "?" && !shared.has(k))).toEqual([]);
+    const flags = [...new Set(sites.flatMap((s) => s.flags))];
+    expect(flags.filter((f) => !shared.has(f))).toEqual([]);
+  });
+
+  it("spells a site the same way the calls stream does", () => {
+    // The site name is RAW on both sides (Ruby leaves `new` / snake_case; §2
+    // normalization is the comparator's job), so what "raw" means here is
+    // whatever `calls` already records — the two TS streams must not diverge.
+    const cls = extractFromSource(
+      `class Foo {
+        create() {
+          this.buildRecord(1);
+          new Node(2);
+          super.save();
+        }
+      }`,
+    );
+    const create = cls.instanceMethods.find((m) => m.name === "create")!;
+    expect(create.callArgs!.map((s) => s.name)).toEqual(create.callSeq);
+  });
+
+  it("leaves the existing calls stream unchanged", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        create() {
+          this.build(1);
+          this.save();
+        }
+      }`,
+    );
+    const create = cls.instanceMethods.find((m) => m.name === "create")!;
+    expect(create.calls).toEqual(["build", "save"]);
+    expect(create.callSeq).toEqual(["build", "save"]);
   });
 });
