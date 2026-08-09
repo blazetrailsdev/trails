@@ -573,16 +573,6 @@ export function dispatchUnquotedFalse(host: QuotingDispatchHost): boolean | numb
   return typeof host.unquotedFalse === "function" ? host.unquotedFalse() : unquotedFalse();
 }
 
-/**
- * Dispatch through the host's `quoteString` override if it defines one, else
- * the module-level helper. Mirrors the bare `quote_string(value.to_s)` send
- * inside `quote` (abstract/quoting.rb:76).
- * @internal
- */
-export function dispatchQuoteString(host: QuotingDispatchHost, s: string): string {
-  return typeof host.quoteString === "function" ? host.quoteString(s) : quoteString(s);
-}
-
 /** @internal */
 export function dispatchQuotedTime(host: QuotingDispatchHost, value: QuotedTimeValue): string {
   if (typeof host.quotedTime === "function") {
