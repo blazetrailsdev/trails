@@ -357,18 +357,6 @@ describe("concurrency isolation: two concurrent transaction chains stay independ
   });
 });
 
-// The DDL recording window wraps adapter methods per test
-// (`recordDdlTouchedTables`) and must leave no trace: a method it found on the
-// prototype is deleted at restore, not written back. Writing it back would make
-// it an OWN property of the pooled adapter for the rest of the run, silently
-// shadowing the prototype — a later test that spies by patching the prototype
-// would never see its spy fire and would pass vacuously. Rails wraps nothing
-// here (`test_fixtures.rb:113`, `:146` touch no adapter method), so there is
-// nothing to restore.
-//
-// The two blocks run in order: the first arms the window and runs DDL through
-// it, the second inspects the adapter from a `beforeAll` — the only point that
-// is after the first block's teardown and before the next window is armed.
 describe("the DDL recording window arms around a test's DDL", () => {
   fixtures([]);
 
@@ -380,6 +368,8 @@ describe("the DDL recording window arms around a test's DDL", () => {
 });
 
 describe("the DDL recording window leaves no own property behind", () => {
+  // The `beforeAll` is the only point after the previous block's teardown and
+  // before this block's window is armed.
   let ownAddIndex = true;
   const spied: string[] = [];
 

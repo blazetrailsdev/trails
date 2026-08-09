@@ -101,6 +101,12 @@ const DDL_TABLE_ARGS: Record<string, (args: unknown[]) => unknown[]> = {
  * (`abstract/schema_statements.rb:306,542`). Wrapping here keeps the ported
  * bodies faithful while preserving the per-table teardown below.
  *
+ * Restore *deletes* a method it found on the prototype rather than writing the
+ * original back: an assignment would leave an own property on the pooled
+ * adapter that shadows the prototype for the rest of the run, so a later
+ * prototype-level spy would never fire and its assertions would pass
+ * vacuously. Only a genuine own value is written back.
+ *
  * @internal
  */
 function recordDdlTouchedTables(adapter: TransactionalFixturesAdapter): () => void {
@@ -120,10 +126,6 @@ function recordDdlTouchedTables(adapter: TransactionalFixturesAdapter): () => vo
       return (original as (...a: unknown[]) => unknown).apply(this, args);
     };
   }
-  // A method found on the prototype is *deleted*, not written back: assigning
-  // the original would leave an own property on the pooled adapter that shadows
-  // the prototype for the rest of the run, so a later prototype-level spy would
-  // never fire and its assertions would pass vacuously.
   return () => {
     for (const [method, original, wasOwn] of originals) {
       if (wasOwn) target[method] = original;
