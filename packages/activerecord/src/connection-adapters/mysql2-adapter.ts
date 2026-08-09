@@ -715,29 +715,35 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         // on every withRawConnection call.
         this._client = conn;
         this._statementPool = null;
-        // Configure the freshly-opened socket exactly as Rails does on every
-        // fresh connect (attempt_configure_connection via connect!/reconnect!).
-        // trails' connectBang opens the raw socket directly (bypassing verify!),
-        // so without this the eager query-loop connect would never configure
-        // its first connection. Gated by _connectionConfigured so a following
-        // verifyBang/reconnectBang can't double-configure.
+        // Rails has no configure-inside-raw-connect: every dispatch flows
+        // through connect!/reconnect!/verify! (mysql2_adapter.rb:144 opens the
+        // socket and nothing else). `reconnect()` passes configure=false and is
+        // already that shape — reconnectBang's attemptConfigureConnection is
+        // its single dispatch — and so is `connectBang()`, which routes through
+        // verifyBang.
+        //
+        // The one caller left that can reach an UNCONFIGURED socket is
+        // `rawConnectionForBlock()` → `getConn()`: withRawConnection runs its
+        // pre-loop `connectBang()` only when
+        // `_connection === null && isReconnectCanRestoreState()`
+        // (abstract-adapter.ts:2383), so a dirty raw connection or a
+        // non-restorable transaction stack skips the lifecycle entirely and the
+        // acquisition seam opens the first socket itself. Without this the
+        // query would run on a socket that never saw configure_connection.
+        // What deviates is the dispatch SITE, not the dispatch: the call is
+        // `attempt_configure_connection` (abstract_adapter.rb:1216) itself, so
+        // there is one teardown-on-failure implementation rather than a
+        // bespoke copy of it here. Retiring the site means the acquisition seam
+        // must stop opening sockets — tracked separately.
+        //
         // Await so the connect-once warm + checkVersion complete before the
         // socket is handed out — a too-old server rejects the connect (Rails'
-        // configure_connection → check_version raises during connect).
-        // `reconnect()` passes configure=false: it opens the socket only
-        // (Rails' `Mysql2Adapter#connect`, mysql2_adapter.rb:144) and leaves
-        // the single overridable-hook dispatch to reconnectBang's
-        // attemptConfigureConnection, so a user override never observes
-        // duplicate configure_connection calls per connect
+        // configure_connection → check_version raises during connect). The
+        // `_connectionConfigured` gate keeps a following
+        // verifyBang/reconnectBang from double-configuring, so a user override
+        // never observes duplicate configure_connection calls per connect
         // (adapter_test.rb:852).
-        if (configure) {
-          try {
-            await this.configureConnection();
-          } catch (configureError) {
-            this.disconnectBang();
-            throw configureError;
-          }
-        }
+        if (configure) await this.attemptConfigureConnection();
         return conn;
       },
       (err) => {

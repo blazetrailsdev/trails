@@ -69,7 +69,7 @@ function pad2(n: number): string {
  * `time.ts` constructs one.
  */
 export interface StrftimeSubject {
-  year: number;
+  year: number | bigint;
   mon: number;
   day: number;
   wday: number;
@@ -172,10 +172,13 @@ function msecs(subject: StrftimeSubject): number {
  * @internal `m_local_jd` (`date_core.c:1485-1497`), the Julian day the
  * week-number readers below work off. The subject carries the civil date and no
  * `df`, so the `complex_dat_p` arm's `local_jd` shift has no bearer and the
- * conversion is {@link cCivilToJd} over it.
+ * conversion is {@link cCivilToJd} over it. The subject carries the REAL year,
+ * `nth` and all, where the C's `c_civil_to_jd` takes the residue `int`, so the
+ * conversion back is where the magnitude drops — as it does in the C's own
+ * `int` day, which is what these week readers are defined over.
  */
 function mLocalJd(subject: StrftimeSubject): number {
-  return cCivilToJd(subject.year, subject.mon, subject.day);
+  return cCivilToJd(Number(subject.year), subject.mon, subject.day);
 }
 
 /**
@@ -291,12 +294,12 @@ function fmt(
   precision: number,
   defPad: string,
   defPrec: number,
-  val: number,
+  val: number | bigint,
 ): string {
   if (precision <= 0) precision = defPrec;
   if (left) precision = 1;
   const sign = val < 0 ? "-" : "";
-  const digits = String(Math.abs(val));
+  const digits = String(typeof val === "bigint" ? (val < 0n ? -val : val) : Math.abs(val));
   return padding === "0" || (padding === "" && defPad === "0")
     ? sign + digits.padStart(Math.max(precision - sign.length, 0), "0")
     : (sign + digits).padStart(precision, " ");
@@ -510,7 +513,7 @@ export function strftime(
       break;
     }
 
-    const num = (defPad: string, defPrec: number, val: number): string =>
+    const num = (defPad: string, defPrec: number, val: number | bigint): string =>
       fmt(padding, left, precision, defPad, defPrec, val);
     const text = (value: string): string =>
       fillPadding(padding, left, precision, value.length) +
@@ -526,7 +529,12 @@ export function strftime(
     let formatted: string | undefined;
     switch (spec) {
       case "Y":
-        formatted = num("0", 0 <= subject.year ? 4 : 5, subject.year);
+        // `date_strftime.c:236-246`: a Fixnum year widens to 5 for the sign,
+        // where a Bignum one takes the plain default of 4.
+        formatted =
+          typeof subject.year === "bigint"
+            ? num("0", 4, subject.year)
+            : num("0", 0 <= subject.year ? 4 : 5, subject.year);
         break;
       case "C":
         formatted = num("0", 2, div(subject.year, 100));
@@ -705,7 +713,7 @@ const ABBR_DAYS = "sun|mon|tue|wed|thu|fri|sat";
  * answers `{... :offset => nil}` there.
  */
 export interface DateParts {
-  jd?: number;
+  jd?: number | bigint;
   year?: number;
   mon?: number;
   mday?: number;
@@ -2971,6 +2979,22 @@ const REFORM_BEGIN_YEAR = 1582;
 const REFORM_END_YEAR = 1930;
 
 /**
+ * @internal `date_core.c`'s calendar periods (`date_core.c:200-205`): the
+ * Julian and Gregorian cycles, their least common multiple with the week, and
+ * the largest multiple of it a `Fixnum` day can hold. `CM_PERIOD` days are
+ * `CM_PERIOD_JCY` Julian years and `CM_PERIOD_GCY` Gregorian ones exactly, and
+ * a whole number of weeks besides, which is what lets {@link decodeYear} and
+ * {@link decodeJd} split a value into a multiple of the period plus a residue
+ * without moving the weekday.
+ */
+const JC_PERIOD0 = 1461; /* 365.25 * 4 */
+const GC_PERIOD0 = 146097; /* 365.2425 * 400 */
+const CM_PERIOD0 = 71149239; /* (lcm 7 1461 146097) */
+const CM_PERIOD = Math.trunc(0xfffffff / CM_PERIOD0) * CM_PERIOD0;
+const CM_PERIOD_JCY = (CM_PERIOD / JC_PERIOD0) * 4;
+const CM_PERIOD_GCY = (CM_PERIOD / GC_PERIOD0) * 400;
+
+/**
  * @internal `date_core.c`'s `REFORM_BEGIN_JD` / `REFORM_END_JD`
  * (`date_core.c:209-210`), the window a finite `start` has to fall in — ns
  * 1582-01-01 through os 1930-12-31, the span over which the reform was actually
@@ -3185,24 +3209,49 @@ function cJdToWday(jd: number): number {
  * receiver: the two arms hold different days, and each class passes its own.
  *
  * The `isinf` arm is what makes `Date::JULIAN` julian everywhere and
- * `Date::GREGORIAN` julian nowhere. The `sg` it reads is `s_virtual_sg`
- * (`date_core.c:1110-1120`), which answers an infinity for a date whose Julian
- * day overflowed a `Fixnum`, on the `nth` field that carries the overflow;
- * there is no `nth` here — the Julian day is one JS number — so the virtual
- * reading and the stored one never part company.
+ * `Date::GREGORIAN` julian nowhere. The `sg` its callers read is
+ * {@link virtualSg}, which answers an infinity once `nth` is nonzero.
  */
 function mJulianP(jd: number, sg: number): boolean {
   if (!Number.isFinite(sg)) return sg === JULIAN;
   return jd < sg;
 }
 
+/**
+ * @internal `date_core.c` `s_virtual_sg` (`date_core.c:1110-1120`) and
+ * `c_virtual_sg` (`date_core.c:1122-1131`), which differ only in the union arm
+ * they read and so are one function here, taking the fields — which makes it
+ * `m_virtual_sg` (`date_core.c:1135-1142`), their dispatcher, at every call
+ * site. A date whose day outran a `Fixnum` — `nth` nonzero — is read
+ * proleptically whatever its stored `sg` says: a positive `nth` is far enough past the reform to be Gregorian
+ * everywhere and a negative one far enough before it to be Julian everywhere.
+ */
+function virtualSg(nth: bigint, sg: number): number {
+  if (!Number.isFinite(sg)) return sg;
+  if (nth === 0n) return sg;
+  else if (nth < 0n) return JULIAN;
+  return GREGORIAN;
+}
+
 /** @internal `date_core.c`'s `DIV` macro (`date_core.c:168-170`), floored division. */
-function div(n: number, d: number): number {
+function div(n: number, d: number): number;
+function div(n: bigint, d: number): bigint;
+function div(n: number | bigint, d: number): number | bigint;
+function div(n: number | bigint, d: number): number | bigint {
+  if (typeof n === "bigint") {
+    const bd = BigInt(d);
+    const q = n / bd;
+    return n % bd !== 0n && n < 0n !== bd < 0n ? q - 1n : q;
+  }
   return Math.floor(n / d);
 }
 
 /** @internal `date_core.c`'s `MOD` macro (`date_core.c:169-171`), floored modulo. */
-function mod(n: number, d: number): number {
+function mod(n: number, d: number): number;
+function mod(n: bigint, d: number): bigint;
+function mod(n: number | bigint, d: number): number | bigint;
+function mod(n: number | bigint, d: number): number | bigint {
+  if (typeof n === "bigint") return n - BigInt(d) * div(n, d);
   return n - d * div(n, d);
 }
 
@@ -3216,14 +3265,39 @@ const MONTHTAB: readonly (readonly number[])[] = [
   [0, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31],
 ];
 
+/** @internal `date_core.c` `c_julian_leap_p` (`date_core.c:702-707`). */
+function cJulianLeapP(y: number): boolean {
+  return mod(y, 4) === 0;
+}
+
 /** @internal `date_core.c` `c_gregorian_leap_p` (`date_core.c:709-713`). */
 function cGregorianLeapP(y: number): boolean {
   return (mod(y, 4) === 0 && y % 100 !== 0) || mod(y, 400) === 0;
 }
 
+/** @internal `date_core.c` `c_julian_last_day_of_month` (`date_core.c:714-720`). */
+function cJulianLastDayOfMonth(y: number, m: number): number {
+  return MONTHTAB[cJulianLeapP(y) ? 1 : 0][m];
+}
+
 /** @internal `date_core.c` `c_gregorian_last_day_of_month` (`date_core.c:723-728`). */
 function cGregorianLastDayOfMonth(y: number, m: number): number {
   return MONTHTAB[cGregorianLeapP(y) ? 1 : 0][m];
+}
+
+/**
+ * @internal `date_core.c` `c_valid_julian_p` (`date_core.c:729-745`), the
+ * PROLEPTIC Julian twin of {@link cValidGregorianP} — the arm
+ * {@link validCivilP} takes for a year far enough before the reform that no
+ * `sg` can put it after one.
+ */
+function cValidJulianP(y: number, m: number, d: number): [rm: number, rd: number] | null {
+  if (m < 0) m += 13;
+  if (m < 1 || m > 12) return null;
+  const last = cJulianLastDayOfMonth(y, m);
+  if (d < 0) d = last + d + 1;
+  if (d < 1 || d > last) return null;
+  return [m, d];
 }
 
 /**
@@ -3246,28 +3320,112 @@ function cValidGregorianP(y: number, m: number, d: number): [rm: number, rd: num
 
 /**
  * @internal `date_core.c` `valid_gregorian_p` (`date_core.c:2229-2236`), which
- * is `decode_year` under a negative style followed by {@link cValidGregorianP}.
- * The C's `ry`/`rm`/`rd` out-parameters come back as the tuple; its `nth` does
- * not, for the reason {@link guessStyle} states.
- *
- * `decode_year` (`date_core.c:1342-1371`) reduces to the shift, the `FIX2INT`
- * its Bignum arm ends at, and the unshift once `nth` is out: the year is
- * shifted by 4712, divided by `CM_PERIOD_GCY` into an `nth` that is zero over
- * the whole representable range, and shifted back. That leaves the identity but
- * for the truncation, which is what answers `Date.new(2000.5, 1, 1)` as
- * 2000-01-01 and `Date.new(-2000.5, 1, 1, Date::GREGORIAN)` as -2001-01-01 in
- * MRI — the truncation is of the SHIFTED value, so it rounds toward -4712
- * rather than toward zero.
+ * is {@link decodeYear} under a negative style followed by
+ * {@link cValidGregorianP}. The C's `nth`/`ry`/`rm`/`rd` out-parameters come
+ * back as the tuple.
  */
 function validGregorianP(
-  y: number,
+  y: number | bigint,
   m: number,
   d: number,
-): [ry: number, rm: number, rd: number] | null {
-  const ry = Math.trunc(y + 4712) - 4712;
+): [nth: bigint, ry: number, rm: number, rd: number] | null {
+  const [nth, ry] = decodeYear(y, -1);
   const r = cValidGregorianP(ry, m, d);
   if (r === null) return null;
-  return [ry, r[0], r[1]];
+  return [nth, ry, r[0], r[1]];
+}
+
+/**
+ * @internal `date_core.c`'s `FIXNUM_P` (ruby.h), the test `guess_style` and
+ * `decode_year` branch on: an Integer small enough for Ruby to hold unboxed.
+ * A JS number stops being one where it stops being a safe integer — a
+ * fraction is not an Integer at all and takes the same arm — and a `bigint`
+ * outside that range is the `Bignum` the C's `big:` label is for.
+ */
+function fixnumP(y: number | bigint): boolean {
+  if (typeof y === "bigint") return -MAX_SAFE_INTEGER_BIG <= y && y <= MAX_SAFE_INTEGER_BIG;
+  return Number.isSafeInteger(y);
+}
+
+const MAX_SAFE_INTEGER_BIG = BigInt(Number.MAX_SAFE_INTEGER);
+
+/**
+ * @internal Ruby's `rb_big_norm` (`bignum.c`), which every Integer arithmetic
+ * result passes through: a Bignum small enough for a Fixnum comes back AS a
+ * Fixnum, so `Date.new(600000, 1, 1).jd` is one Integer whatever `nth` the
+ * split gave it. TS has no such unified Integer, so the same normalization is
+ * what keeps a `bigint` out of the answers a JS number holds exactly.
+ */
+function bigNorm(n: bigint): number | bigint {
+  if (-MAX_SAFE_INTEGER_BIG <= n && n <= MAX_SAFE_INTEGER_BIG) return Number(n);
+  return n;
+}
+
+/**
+ * @internal `date_core.c` `decode_year` (`date_core.c:1342-1371`), which splits
+ * a year of any magnitude into a count of whole calendar periods — `nth` — and
+ * a residue year that always fits an `int`, so every conversion below can keep
+ * taking `int`s. The value divided is the year SHIFTED by 4712, so the
+ * truncation the C's `FIX2INT` performs on its `big:` arm rounds toward -4712
+ * rather than toward zero: `Date.new(-2000.5, 1, 1)` is -2001-01-01 and
+ * `Date.new(2000.5, 1, 1)` is 2000-01-01 in MRI.
+ *
+ * The C's `FIXNUM_P` arm and its `big:` label are both here: the first is exact
+ * in a JS number, and the second is exact only for a `bigint` argument — a
+ * `double` that large has already lost the low bits before this is reached.
+ */
+function decodeYear(y: number | bigint, style: number): [nth: bigint, ry: number] {
+  const period = style < 0 ? CM_PERIOD_GCY : CM_PERIOD_JCY;
+  if (typeof y === "number" && fixnumP(y) && y < Number.MAX_SAFE_INTEGER - 4712) {
+    let it = y + 4712; /* shift */
+    const inth = div(it, period);
+    if (inth) it = mod(it, period);
+    return [BigInt(inth), it - 4712 /* unshift */];
+  }
+  if (typeof y === "number") {
+    let t = y + 4712; /* shift */
+    const nth = div(t, period);
+    if (nth) t = mod(t, period);
+    return [BigInt(nth), Math.trunc(t) - 4712 /* unshift */];
+  }
+  let t = y + 4712n; /* shift */
+  const nth = div(t, period);
+  if (nth) t = mod(t, period);
+  return [nth, Number(t) - 4712 /* unshift */];
+}
+
+/**
+ * @internal `date_core.c` `encode_year` (`date_core.c:1373-1390`), the way back
+ * from a `nth` and a residue year to the year the date names — a `bigint` once
+ * `nth` is nonzero, as MRI's is a Bignum.
+ */
+function encodeYear(nth: bigint, y: number, style: number): number | bigint {
+  const period = style < 0 ? CM_PERIOD_GCY : CM_PERIOD_JCY;
+  if (nth === 0n) return y;
+  return bigNorm(BigInt(period) * nth + BigInt(y));
+}
+
+/**
+ * @internal `date_core.c` `decode_jd` (`date_core.c:1393-1402`), the Julian-day
+ * counterpart of {@link decodeYear} over {@link CM_PERIOD}. The same `nth`
+ * carries both, which is what keeps the split consistent: `CM_PERIOD` days are
+ * `CM_PERIOD_GCY` Gregorian years.
+ */
+function decodeJd(jd: number | bigint): [nth: bigint, rjd: number] {
+  if (typeof jd === "bigint") {
+    const nth = div(jd, CM_PERIOD);
+    if (nth === 0n) return [nth, Number(jd)];
+    return [nth, Number(mod(jd, CM_PERIOD))];
+  }
+  const nth = div(jd, CM_PERIOD);
+  if (nth === 0) return [0n, jd];
+  return [BigInt(nth), mod(jd, CM_PERIOD)];
+}
+
+/** @internal `date_core.c` `encode_jd` (`date_core.c:1404-1412`). */
+function encodeJd(nth: bigint, jd: number): number | bigint {
+  if (nth === 0n) return jd;
+  return bigNorm(BigInt(CM_PERIOD) * nth + BigInt(jd));
 }
 
 /**
@@ -3277,19 +3435,15 @@ function validGregorianP(
  * `0` means the reform round trip under `sg` decides.
  *
  * The C's middle arm — `!FIXNUM_P(y)`, a year Ruby holds as something other
- * than a Fixnum — is written here as the range a JS number stops being one
- * over, which is what a non-integer or out-of-safe-range `y` is. Beyond it the C
- * decomposes the year into `nth` plus a residue (`decode_year`,
- * `date_core.c:1342-1371`) so the Julian day still fits a Fixnum; trails
- * carries the whole Julian day in a JS number instead, which is exact up to
- * `Number.MAX_SAFE_INTEGER` — roughly year ±2.4e10 — and loses precision, not
- * range, above that. Years past that limit are the documented gap.
+ * than a Fixnum ({@link fixnumP}) — reads such a year proleptically without
+ * ever comparing it to the reform years, because {@link decodeYear} is about to
+ * fold it into a `nth` and a residue that no longer names the same century.
  */
-function guessStyle(y: number, sg: number): number {
+function guessStyle(y: number | bigint, sg: number): number {
   let style = 0;
 
   if (!Number.isFinite(sg)) style = sg;
-  else if (!Number.isSafeInteger(y)) style = y > 0 ? GREGORIAN : JULIAN;
+  else if (!fixnumP(y)) style = y > 0 ? GREGORIAN : JULIAN;
   else {
     if (y < REFORM_BEGIN_YEAR) style = JULIAN;
     else if (y > REFORM_END_YEAR) style = GREGORIAN;
@@ -3310,6 +3464,10 @@ function guessStyle(y: number, sg: number): number {
  * The C's `rm`/`rd` out-parameters are the folded month and day, which every
  * caller re-derives from the `rjd` it keeps, so `rjd` alone comes back — `null`
  * for the C's `0`.
+ *
+ * `y` is an ALREADY-DECODED integer year, as the C's `int y` is: the truncation
+ * and the `nth` split are {@link validCivilP}'s, which is what every constructor
+ * reaches this through.
  */
 function cValidCivilP(y: number, m: number, d: number, sg = DEFAULT_SG): number | null {
   let ry: number;
@@ -3329,6 +3487,35 @@ function cValidCivilP(y: number, m: number, d: number, sg = DEFAULT_SG): number 
   [ry, rm, rd] = cJdToCivil(rjd, sg);
   if (ry !== y || rm !== m || rd !== d) return null;
   return rjd;
+}
+
+/**
+ * @internal `date_core.c` `valid_civil_p` (`date_core.c:2246-2277`), the year-
+ * decoding wrapper every constructor's non-proleptic arm goes through: it
+ * re-reads {@link guessStyle} and either validates the residue year under the
+ * reform ({@link cValidCivilP}, whose `int y` this is what supplies) or, where
+ * the style is proleptic, under the plain calendar and converts by hand.
+ *
+ * The C's `ry`/`rm`/`rd` out-parameters are the folded triple every caller
+ * re-derives from `rjd`, so the `nth` and the `rjd` alone come back.
+ */
+function validCivilP(
+  y: number | bigint,
+  m: number,
+  d: number,
+  sg: number,
+): [nth: bigint, rjd: number] | null {
+  const style = guessStyle(y, sg);
+
+  if (style === 0) {
+    const jd = cValidCivilP(Number(y), m, d, sg);
+    if (jd === null) return null;
+    return decodeJd(jd);
+  }
+  const [nth, ry] = decodeYear(y, style);
+  const r = style < 0 ? cValidGregorianP(ry, m, d) : cValidJulianP(ry, m, d);
+  if (r === null) return null;
+  return [nth, cCivilToJd(ry, r[0], r[1], style)];
 }
 
 /**
@@ -3448,6 +3635,23 @@ function num2intWithFrac(
     return [whole, fr * unitInSeconds];
   }
   return [whole, 0];
+}
+
+/**
+ * @internal `date_core.c`'s `num2num_with_frac` macro (`date_core.c:3286-3294`),
+ * which differs from {@link num2intWithFrac} (`:3296-3305`) only in NOT running
+ * the truncated whole through `NUM2INT`: `datetime_s_jd` (`date_core.c:7685`)
+ * takes its Julian day this way so a day past a `Fixnum` reaches `decode_jd`
+ * whole. A JS number is not narrowed either way, so that arm is the `int` one;
+ * a `bigint` is the `Bignum` the macro keeps, and carries no fraction.
+ */
+function num2numWithFrac(
+  v: number | bigint | Rational,
+  unitInSeconds: number,
+  argcGtN: boolean,
+): [whole: number | bigint, fr: number | Rational] {
+  if (typeof v === "bigint") return [v, 0];
+  return num2intWithFrac(v, unitInSeconds, argcGtN);
 }
 
 /**
@@ -3647,7 +3851,7 @@ function cValidWeeknumP(
  * answers the Julian day back: every integer names a day, so there is nothing
  * to reject.
  */
-function rtValidJdP(jd: number): number {
+function rtValidJdP(jd: number | bigint): number | bigint {
   return jd;
 }
 
@@ -3662,11 +3866,21 @@ function rtValidOrdinalP(y: number, d: number, sg = DEFAULT_SG): number | null {
 
 /**
  * @internal `date_core.c` `rt__valid_civil_p` (`date_core.c:4141-4155`) over
- * `c_valid_civil_p` (`date_core.c:766-790`), which answers `nil` rather than
- * raising so its caller can fall through to the next kind of date.
+ * {@link validCivilP} (`date_core.c:2246-2277`), which answers `nil` rather
+ * than raising so its caller can fall through to the next kind of date. The
+ * `nth` the split leaves goes straight back in through {@link encodeJd}
+ * (`date_core.c:4152`): the answer is one whole Julian day, which
+ * `d_new_by_frags` / `dt_new_by_frags` decode again on the way into the object.
  */
-function rtValidCivilP(y: number, m: number, d: number, sg = DEFAULT_SG): number | null {
-  return cValidCivilP(y, m, d, sg);
+function rtValidCivilP(
+  y: number | bigint,
+  m: number,
+  d: number,
+  sg = DEFAULT_SG,
+): number | bigint | null {
+  const r = validCivilP(y, m, d, sg);
+  if (r === null) return null;
+  return encodeJd(r[0], r[1]);
 }
 
 /**
@@ -3692,7 +3906,7 @@ function rtValidCivilP(y: number, m: number, d: number, sg = DEFAULT_SG): number
  * `sg` is the calendar-reform start every arm reads its date under, as Ruby
  * threads it.
  */
-function rtValidDateFragsP(parts: DateParts, sg = DEFAULT_SG): number | null {
+function rtValidDateFragsP(parts: DateParts, sg = DEFAULT_SG): number | bigint | null {
   if (parts.jd !== undefined) {
     const d = rtValidJdP(parts.jd);
     if (d !== null) return d;
@@ -3754,7 +3968,7 @@ function rtValidDateFragsP(parts: DateParts, sg = DEFAULT_SG): number | null {
  * {@link rtRewriteFrags} and {@link completeFrags}.
  */
 export function dNewByFrags(hash: DateParts | null, sg = DEFAULT_SG): Date {
-  let jd: number | null;
+  let jd: number | bigint | null;
 
   if (hash === null) throw new DateError("invalid date");
 
@@ -3777,7 +3991,8 @@ export function dNewByFrags(hash: DateParts | null, sg = DEFAULT_SG): Date {
   }
 
   if (jd === null) throw new DateError("invalid date");
-  return new Date(SEAT, jd, sg);
+  const [nth, rjd] = decodeJd(jd);
+  return new Date(SEAT, nth, rjd, sg);
 }
 
 /**
@@ -3826,7 +4041,7 @@ function of2str(of: number): string {
  * falls out of the representation rather than being normalized here.
  */
 export function dtNewByFrags(hash: DateParts | null, sg = DEFAULT_SG): DateTime {
-  let jd: number | null;
+  let jd: number | bigint | null;
 
   if (hash === null) throw new DateError("invalid date");
 
@@ -3874,7 +4089,8 @@ export function dtNewByFrags(hash: DateParts | null, sg = DEFAULT_SG): DateTime 
   let of = to == null ? 0 : to instanceof Rational ? to.toI() : Math.trunc(to);
   if (of < -DAY_IN_SECONDS || of > DAY_IN_SECONDS) of = 0;
 
-  return new DateTime(SEAT, jdLocalToUtc(jd, df, of), dfLocalToUtc(df, of), sf, of, sg);
+  const [nth, rjd] = decodeJd(jd);
+  return new DateTime(SEAT, nth, jdLocalToUtc(rjd, df, of), dfLocalToUtc(df, of), sf, of, sg);
 }
 
 /**
@@ -4039,6 +4255,20 @@ export class Date {
   #jd?: number;
 
   /**
+   * @internal `SimpleDateData`'s `nth` (`date_core.c:203-213`), the count of
+   * whole {@link CM_PERIOD}s the Julian day — and, over
+   * {@link CM_PERIOD_GCY}/{@link CM_PERIOD_JCY}, the year — sits above zero. It
+   * is what keeps `Date.new(2**70, 1, 1)` exact: the residue in {@link #jd} and
+   * the civil triple stays an `int`, as the C's does, and every conversion
+   * below keeps taking `int`s while {@link encodeJd} / {@link encodeYear} put
+   * the magnitude back on the way out.
+   *
+   * Not `#`-private: {@link DateTime} reads it, and `ComplexDateData` carries
+   * the same field (`date_core.c:215-231`).
+   */
+  nth: bigint;
+
+  /**
    * @internal `SimpleDateData`'s `sg` (`date_core.c:203-213`), the
    * calendar-reform start the date is read under — the `start` argument every
    * constructor takes, {@link DEFAULT_SG} when none is passed.
@@ -4057,7 +4287,7 @@ export class Date {
    * `date_core.c` `date_s_civil`), which raises `Date::Error` on a civil date
    * `c_valid_civil_p` rejects.
    */
-  constructor(year?: number, month?: number, day?: number, start?: number);
+  constructor(year?: number | bigint, month?: number, day?: number, start?: number);
   /**
    * @internal `date_core.c` `d_simple_new_internal` (`date_core.c:3036-3050`),
    * which writes an already-resolved day straight into a fresh
@@ -4066,23 +4296,33 @@ export class Date {
    * has already established the date is buildable. {@link SEAT} is the brand
    * that selects it.
    */
-  constructor(seat: typeof SEAT, rjd: number, sg: number);
-  constructor(year: number | typeof SEAT = -4712, month = 1, day = 1, start = DEFAULT_SG) {
+  constructor(seat: typeof SEAT, nth: bigint, rjd: number, sg: number);
+  constructor(
+    year: number | bigint | typeof SEAT = -4712,
+    month: number | bigint = 1,
+    day = 1,
+    start = DEFAULT_SG,
+  ) {
     if (typeof year === "symbol") {
-      this.#jd = month;
-      this.#sg = day;
+      this.nth = month as bigint;
+      this.#jd = day;
+      this.#sg = start;
       return;
     }
     const sg = val2sg(start);
     if (guessStyle(year, sg) < 0) {
-      const r = validGregorianP(year, month, day);
+      const r = validGregorianP(year, month as number, day);
       if (r === null) throw new DateError("invalid date");
+      const [nth, ry, rm, rd] = r;
+      this.nth = nth;
       this.#sg = sg;
-      this.#civil = r;
+      this.#civil = [ry, rm, rd];
     } else {
-      const r = cValidCivilP(year, month, day, sg);
+      const r = validCivilP(year, month as number, day, sg);
       if (r === null) throw new DateError("invalid date");
-      this.#jd = r;
+      const [nth, rjd] = r;
+      this.nth = nth;
+      this.#jd = rjd;
       this.#sg = sg;
     }
   }
@@ -4096,9 +4336,21 @@ export class Date {
   #getSJd(): number {
     if (this.#jd === undefined) {
       const [year, mon, mday] = this.#civil as [number, number, number];
-      this.#jd = cCivilToJd(year, mon, mday, this.#sg);
+      this.#jd = cCivilToJd(year, mon, mday, virtualSg(this.nth, this.#sg));
     }
     return this.#jd;
+  }
+
+  /**
+   * @internal `date_core.c` `m_local_jd` (`date_core.c:1486-1497`), the STORED
+   * day read back in local terms — the residue day every conversion below is
+   * taken over, where {@link Date#jd} answers `m_real_local_jd`
+   * (`date_core.c:1499-1510`), the same day with {@link nth} encoded back in.
+   * The C branches on `simple_dat_p`; TS branches on the receiver, so
+   * {@link DateTime} overrides this and the simple arm is here.
+   */
+  mLocalJd(): number {
+    return this.#getSJd();
   }
 
   /**
@@ -4108,12 +4360,13 @@ export class Date {
    * straight, and `get_c_civil` (`date_core.c:1297-1324`) reads
    * `m_local_jd` — the stored UTC day taken back through `jd_utc_to_local`
    * (`date_core.c:1326-1333`). One method stands in for both here because
-   * `this.jd` already IS that split: it is the stored day on `Date` and
-   * {@link DateTime#jd}'s `m_local_jd` on `DateTime`, so the branch the C makes
-   * on `simple_dat_p`/`complex_dat_p` is the one TS makes on the receiver.
+   * `m_local_jd` already IS that split: {@link Date#mLocalJd} is the stored day
+   * on `Date` and the offset-corrected one on `DateTime`, so the branch the C
+   * makes on `simple_dat_p`/`complex_dat_p` is the one TS makes on the
+   * receiver.
    */
   #getCCivil(): [ry: number, rm: number, rdom: number] {
-    return (this.#civil ??= cJdToCivil(this.jd, this.#sg));
+    return (this.#civil ??= cJdToCivil(this.mLocalJd(), virtualSg(this.nth, this.#sg)));
   }
 
   /**
@@ -4123,8 +4376,9 @@ export class Date {
    * leaves the civil date to `get_s_civil`; there is one representation here,
    * so the conversion happens at the call.
    */
-  static jd(jd = 0, start = DEFAULT_SG): Temporal.PlainDate {
-    return new Date(SEAT, jd, val2sg(start)).toDate();
+  static jd(jd: number | bigint = 0, start = DEFAULT_SG): Temporal.PlainDate {
+    const [nth, rjd] = decodeJd(jd);
+    return new Date(SEAT, nth, rjd, val2sg(start)).toDate();
   }
 
   /**
@@ -4137,7 +4391,7 @@ export class Date {
     const sg = val2sg(start);
     const r = cValidOrdinalP(year, yday, sg);
     if (r === null) throw new DateError("invalid date");
-    return new Date(SEAT, r, sg).toDate();
+    return new Date(SEAT, 0n, r, sg).toDate();
   }
 
   /**
@@ -4162,7 +4416,7 @@ export class Date {
     const sg = val2sg(start);
     const r = cValidCommercialP(cwyear, cweek, cwday, sg);
     if (r === null) throw new DateError("invalid date");
-    return new Date(SEAT, r, sg).toDate();
+    return new Date(SEAT, 0n, r, sg).toDate();
   }
 
   /**
@@ -4278,8 +4532,18 @@ export class Date {
     return dNewByFrags(Date._parse(str, comp), val2sg(start)).toDate();
   }
 
-  get year(): number {
-    return this.#getCCivil()[0];
+  /**
+   * Ruby `Date#year` (ruby/date, `date_core.c` `d_lite_year`,
+   * `date_core.c:5302-5306`) over `m_real_year` (`date_core.c:1746-1762`): the
+   * residue year `m_year` holds with {@link nth} encoded back in, which is a
+   * `bigint` — MRI's Bignum — once the year outruns a `Fixnum`.
+   */
+  get year(): number | bigint {
+    const nth = this.nth;
+    const year = this.#getCCivil()[0];
+
+    if (nth === 0n) return year;
+    return encodeYear(nth, year, this.isGregorian ? -1 : +1);
   }
 
   get mon(): number {
@@ -4305,8 +4569,8 @@ export class Date {
    * they agree with MRI at and before the calendar reform where
    * `Temporal.PlainDate`'s own proleptic Gregorian readers do not.
    */
-  get jd(): number {
-    return this.#getSJd();
+  get jd(): number | bigint {
+    return encodeJd(this.nth, this.mLocalJd());
   }
 
   /**
@@ -4316,7 +4580,7 @@ export class Date {
    * Saturday under `Date::ITALY` and a Monday read proleptically.
    */
   get wday(): number {
-    return cJdToWday(this.jd);
+    return cJdToWday(this.mLocalJd());
   }
 
   /**
@@ -4327,7 +4591,7 @@ export class Date {
    * year, as the Julian leap day before it makes it in MRI.
    */
   get yday(): number {
-    const [, rd] = cJdToOrdinal(this.jd, this.#sg);
+    const [, rd] = cJdToOrdinal(this.mLocalJd(), virtualSg(this.nth, this.#sg));
     return rd;
   }
 
@@ -4342,7 +4606,7 @@ export class Date {
    * one on `DateTime` — hence the override there.
    */
   get isJulian(): boolean {
-    return mJulianP(this.#getSJd(), this.#sg);
+    return mJulianP(this.#getSJd(), virtualSg(this.nth, this.#sg));
   }
 
   /**
@@ -4381,7 +4645,7 @@ export class Date {
    * `DateTime`.
    */
   newStart(start = DEFAULT_SG): this {
-    return new Date(SEAT, this.#getSJd(), val2sg(start)) as this;
+    return new Date(SEAT, this.nth, this.#getSJd(), val2sg(start)) as this;
   }
 
   /**
@@ -4445,7 +4709,7 @@ export class Date {
    * The exported {@link dNewByFrags} / {@link dtNewByFrags} answer it directly.
    */
   toDate(): Temporal.PlainDate {
-    return plainDateFromJd(this.jd, this.#sg);
+    return plainDateFromJd(this.mLocalJd(), this.#sg);
   }
 
   /** Ruby `Date#to_s` (ruby/date, `date_core.c` `d_lite_to_s`). */
@@ -4503,12 +4767,12 @@ export class Date {
  * therefore declare exactly what they answer.
  */
 const DateWithoutParseStatics: (new (
-  year?: number,
+  year?: number | bigint,
   month?: number,
   day?: number,
   start?: number,
 ) => Date) &
-  (new (seat: typeof SEAT, rjd: number, sg: number) => Date) &
+  (new (seat: typeof SEAT, nth: bigint, rjd: number, sg: number) => Date) &
   Omit<typeof Date, "parse" | "strptime" | "jd" | "ordinal" | "civil" | "commercial"> = Date;
 
 /**
@@ -4528,7 +4792,7 @@ export class DateTime extends DateWithoutParseStatics {
    * `Date._parse` answers as `:offset`. A `Temporal` offset time zone is
    * minute-precision and could not hold `date_zone_to_diff`'s seconds.
    *
-   * Every reader converts back on the way out through {@link #mLocalJd} /
+   * Every reader converts back on the way out through {@link mLocalJd} /
    * {@link #mLocalDf}, and the constructor converts in through
    * `jd_local_to_utc` / `df_local_to_utc`, as `dt_new_by_frags` does
    * (`date_core.c:8311-8313`).
@@ -4623,7 +4887,7 @@ export class DateTime extends DateWithoutParseStatics {
    * emitting `3`s.
    */
   constructor(
-    year: number,
+    year: number | bigint,
     month: number,
     day: number | Rational,
     hour?: number | Rational,
@@ -4641,10 +4905,18 @@ export class DateTime extends DateWithoutParseStatics {
    * validate. The arguments are `d_complex_new_internal`'s own `rjd`, `df`,
    * `sf` and `of`, in that order, behind the {@link SEAT} brand.
    */
-  constructor(seat: typeof SEAT, rjd: number, df: number, sf: Rational, of: number, sg: number);
   constructor(
-    year: number | typeof SEAT,
-    month?: number,
+    seat: typeof SEAT,
+    nth: bigint,
+    rjd: number,
+    df: number,
+    sf: Rational,
+    of: number,
+    sg: number,
+  );
+  constructor(
+    year: number | bigint | typeof SEAT,
+    month?: number | bigint,
     day?: number | Rational,
     hour?: number | Rational,
     minute?: number | Rational,
@@ -4653,11 +4925,12 @@ export class DateTime extends DateWithoutParseStatics {
     start?: number,
   ) {
     if (typeof year === "symbol") {
-      const rjd = month as number;
-      const df = day as number;
-      const sf = hour as Rational;
-      const of = minute as number;
-      super(SEAT, jdUtcToLocal(rjd, df, of), second as number);
+      const nth = month as bigint;
+      const rjd = day as number;
+      const df = hour as number;
+      const sf = minute as Rational;
+      const of = second as number;
+      super(SEAT, nth, jdUtcToLocal(rjd, df, of), offset as number);
       this.#jd = rjd;
       this.#df = df;
       this.#sf = sf;
@@ -4691,16 +4964,18 @@ export class DateTime extends DateWithoutParseStatics {
     if (dFr !== 0) fr2 = dFr;
     const rof = offset === undefined ? 0 : val2off(offset);
     const sg = start === undefined ? DEFAULT_SG : val2sg(start);
+    let nth: bigint;
     let rjd: number;
     if (guessStyle(year, sg) < 0) {
-      const r = validGregorianP(year, month ?? 1, d);
+      const r = validGregorianP(year, (month as number) ?? 1, d);
       if (r === null) throw new DateError("invalid date");
-      const [ry, rm, rd] = r;
+      const [rnth, ry, rm, rd] = r;
+      nth = rnth;
       rjd = cCivilToJd(ry, rm, rd, sg);
     } else {
-      const r = cValidCivilP(year, month ?? 1, d, sg);
+      const r = validCivilP(year, (month as number) ?? 1, d, sg);
       if (r === null) throw new DateError("invalid date");
-      rjd = r;
+      [nth, rjd] = r;
     }
     const rt = cValidTimeP(h, min, s);
     if (rt === null) throw new DateError("invalid date");
@@ -4712,7 +4987,7 @@ export class DateTime extends DateWithoutParseStatics {
     }
     const localDf = timeToDf(rh, rmin, rs);
     const [jd, df, sf] = addFrac(jdLocalToUtc(rjd, localDf, rof), dfLocalToUtc(localDf, rof), fr2);
-    super(SEAT, jdUtcToLocal(jd, df, rof), sg);
+    super(SEAT, nth, jdUtcToLocal(jd, df, rof), sg);
     this.#jd = jd;
     this.#df = df;
     this.#sf = sf;
@@ -4729,7 +5004,15 @@ export class DateTime extends DateWithoutParseStatics {
    * The C's `switch (argc)` fall-through splits `jd` through
    * `num2num_with_frac(jd, 1)` (`date_core.c:7685-7686`) and the second, minute
    * and hour through `num2int_with_frac` under the `n` bounds `positive_inf`,
-   * `3` and `2` ({@link num2intWithFrac}). A fraction is legal only in the LAST
+   * `3` and `2` ({@link num2intWithFrac}) — the day keeps its own macro
+   * ({@link num2numWithFrac}) so {@link decodeJd} can split one past a
+   * `Fixnum`, as `d_complex_new_internal` is handed the `nth`
+   * (`date_core.c:7697-7702`). Such a day is outside `Temporal.PlainDateTime`'s
+   * range and so raises at the seat this static answers, exactly as the
+   * Julian-only spellings RFC 0088's mapping table already names do; the
+   * gem-shaped {@link dtNewByFrags} carries it.
+   *
+   * A fraction is legal only in the LAST
    * argument SUPPLIED — the macro raises `"invalid fraction"` when `argc > n` —
    * so `DateTime.jd(2451944.5)` is noon while `DateTime.jd(2451944, 1.5, 0)`
    * raises, and an explicitly passed later `0` is a supplied argument. That is
@@ -4742,7 +5025,7 @@ export class DateTime extends DateWithoutParseStatics {
    * `c_valid_time_p` admits into midnight of the next day.
    */
   static jd(
-    jd: number | Rational = 0,
+    jd: number | bigint | Rational = 0,
     hour?: number | Rational,
     minute?: number | Rational,
     second?: number | Rational,
@@ -4762,7 +5045,9 @@ export class DateTime extends DateWithoutParseStatics {
       HOUR_IN_SECONDS,
       minute !== undefined || second !== undefined || offset !== undefined || start !== undefined,
     );
-    const [rjd, jdFr] = num2intWithFrac(
+    // `num2num_with_frac`, not `num2int_with_frac` (`date_core.c:7685`): the
+    // day stays whole so `decode_jd` below can split one past a `Fixnum`.
+    const [rjd, jdFr] = num2numWithFrac(
       jd,
       DAY_IN_SECONDS,
       hour !== undefined ||
@@ -4786,12 +5071,13 @@ export class DateTime extends DateWithoutParseStatics {
       fr2 = fr2 instanceof Rational ? fr2.add(DAY_IN_SECONDS) : fr2 + DAY_IN_SECONDS;
     }
     const localDf = timeToDf(rh, rmin, rs);
+    const [nth, rrjd] = decodeJd(rjd);
     const [rjd2, df, sf] = addFrac(
-      jdLocalToUtc(rjd, localDf, rof),
+      jdLocalToUtc(rrjd, localDf, rof),
       dfLocalToUtc(localDf, rof),
       fr2,
     );
-    return new DateTime(SEAT, rjd2, df, sf, rof, sg).toDatetime();
+    return new DateTime(SEAT, nth, rjd2, df, sf, rof, sg).toDatetime();
   }
 
   /**
@@ -4854,12 +5140,13 @@ export class DateTime extends DateWithoutParseStatics {
       fr2 = fr2 instanceof Rational ? fr2.add(DAY_IN_SECONDS) : fr2 + DAY_IN_SECONDS;
     }
     const localDf = timeToDf(rh, rmin, rs);
+    const [nth, rrjd] = decodeJd(rjd);
     const [rjd2, df, sf] = addFrac(
-      jdLocalToUtc(rjd, localDf, rof),
+      jdLocalToUtc(rrjd, localDf, rof),
       dfLocalToUtc(localDf, rof),
       fr2,
     );
-    return new DateTime(SEAT, rjd2, df, sf, rof, sg).toDatetime();
+    return new DateTime(SEAT, nth, rjd2, df, sf, rof, sg).toDatetime();
   }
 
   /**
@@ -4941,12 +5228,13 @@ export class DateTime extends DateWithoutParseStatics {
       fr2 = fr2 instanceof Rational ? fr2.add(DAY_IN_SECONDS) : fr2 + DAY_IN_SECONDS;
     }
     const localDf = timeToDf(rh, rmin, rs);
+    const [nth, rrjd] = decodeJd(rjd);
     const [rjd2, df, sf] = addFrac(
-      jdLocalToUtc(rjd, localDf, rof),
+      jdLocalToUtc(rrjd, localDf, rof),
       dfLocalToUtc(localDf, rof),
       fr2,
     );
-    return new DateTime(SEAT, rjd2, df, sf, rof, sg).toDatetime();
+    return new DateTime(SEAT, nth, rjd2, df, sf, rof, sg).toDatetime();
   }
 
   /**
@@ -4990,9 +5278,13 @@ export class DateTime extends DateWithoutParseStatics {
   /**
    * @internal `date_core.c` `m_local_jd` (`date_core.c:1486-1497`) over
    * `local_jd` (`date_core.c:1326-1333`), the complex arm: the stored day read
-   * back in local terms.
+   * back in local terms. It is the day `wday`, `yday` and the inherited civil
+   * decode are `c_jd_to_wday` / `c_jd_to_ordinal` / `c_jd_to_civil` over — which
+   * is what makes that decode `get_c_civil` (`date_core.c:1297-1324`) on a
+   * `DateTime` where it is `get_s_civil` (`:1189-1204`) on a `Date` — and what
+   * `Date#jd`, inherited, encodes {@link Date#nth} back into.
    */
-  #mLocalJd(): number {
+  override mLocalJd(): number {
     return jdUtcToLocal(this.#jd, this.#df, this.#of);
   }
 
@@ -5002,18 +5294,6 @@ export class DateTime extends DateWithoutParseStatics {
    */
   #mLocalDf(): number {
     return dfUtcToLocal(this.#df, this.#of);
-  }
-
-  /**
-   * Ruby `DateTime#jd` reads the LOCAL day, not the stored UTC one
-   * (`m_local_jd`, `date_core.c:1486-1497`), which is the day `wday`, `yday`
-   * and the inherited civil decode are then `c_jd_to_wday` /
-   * `c_jd_to_ordinal` / `c_jd_to_civil` over — which is what makes that decode
-   * `get_c_civil` (`date_core.c:1297-1324`) on a `DateTime` where it is
-   * `get_s_civil` (`:1189-1204`) on a `Date`.
-   */
-  override get jd(): number {
-    return this.#mLocalJd();
   }
 
   /**
@@ -5031,11 +5311,19 @@ export class DateTime extends DateWithoutParseStatics {
    * {@link mJulianP}.
    */
   override get isJulian(): boolean {
-    return mJulianP(this.#jd, this.start);
+    return mJulianP(this.#jd, virtualSg(this.nth, this.start));
   }
 
   override newStart(start = DEFAULT_SG): this {
-    return new DateTime(SEAT, this.#jd, this.#df, this.#sf, this.#of, val2sg(start)) as this;
+    return new DateTime(
+      SEAT,
+      this.nth,
+      this.#jd,
+      this.#df,
+      this.#sf,
+      this.#of,
+      val2sg(start),
+    ) as this;
   }
 
   /**
@@ -5045,7 +5333,7 @@ export class DateTime extends DateWithoutParseStatics {
    * day has already rolled the date on — and this is that `Date`'s seat.
    */
   override toDate(): Temporal.PlainDate {
-    return new Date(SEAT, this.#mLocalJd(), this.start).toDate();
+    return new Date(SEAT, this.nth, this.mLocalJd(), this.start).toDate();
   }
 
   /**

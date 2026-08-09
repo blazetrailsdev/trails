@@ -5,7 +5,6 @@
  */
 
 import { Nodes, sql as arelSql } from "@blazetrails/arel";
-import { columnNameWithOrderMatcher as abstractColumnNameWithOrderMatcher } from "./connection-adapters/abstract/quoting.js";
 import type { Quoting } from "./connection-adapters/abstract/quoting.js";
 import {
   ConnectionNotDefined,
@@ -203,23 +202,6 @@ function quoterFor(host: QuoterHost): Quoter {
 }
 
 /**
- * Resolves the adapter's `column_name_with_order_matcher`
- * (Rails `adapter_class.column_name_with_order_matcher`), falling back to the
- * abstract matcher when no connection is resolvable. @internal
- */
-function orderMatcherFor(host: QuoterHost): RegExp {
-  let conn: unknown;
-  try {
-    conn = host.connection;
-  } catch (err) {
-    if (!(err instanceof ConnectionNotDefined)) throw err;
-  }
-  const matcher = (conn as { constructor?: { columnNameWithOrderMatcher?: () => RegExp } } | null)
-    ?.constructor?.columnNameWithOrderMatcher;
-  return typeof matcher === "function" ? matcher() : abstractColumnNameWithOrderMatcher();
-}
-
-/**
  * Threads the active adapter as the quoter, matching Rails'
  * `connection.quote` dispatch.
  *
@@ -283,6 +265,7 @@ export function sanitizeSqlForAssignment(
  */
 export function sanitizeSqlForOrder(
   this: QuoterHost & {
+    adapterClassSync(): unknown;
     disallowRawSqlBang(args: (string | symbol | Nodes.Node)[], permit?: RegExp): void;
     sanitizeSqlArray(template: string, ...binds: unknown[]): string;
   },
@@ -300,7 +283,16 @@ export function sanitizeSqlForOrder(
       // (sanitization.rb:85-88); `disallowRawSqlBang` skips Node instances, so
       // `Arel.sql("field(id, ?)")` is permitted and only the substituted
       // result is returned.
-      this.disallowRawSqlBang([first as string | symbol | Nodes.Node], orderMatcherFor(this));
+      // `column_name_with_order_matcher` is in `Quoting::ClassMethods`
+      // (abstract/quoting.rb:33), so it is a static the adapter constructor
+      // type does not carry.
+      const adapterClass = this.adapterClassSync() as {
+        columnNameWithOrderMatcher(): RegExp;
+      };
+      this.disallowRawSqlBang(
+        [first as string | symbol | Nodes.Node],
+        adapterClass.columnNameWithOrderMatcher(),
+      );
       const sanitized = this.sanitizeSqlArray(firstText, ...condition.slice(1));
       return arelSql(sanitized);
     }

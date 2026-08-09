@@ -874,7 +874,7 @@ describe("Date", () => {
     year: number,
     month: number,
     day: number,
-  ): [number, number, number] | "E" => {
+  ): [number | bigint, number, number] | "E" => {
     try {
       const date = new RubyDate(year, month, day);
       return [date.year, date.mon, date.day];
@@ -958,6 +958,78 @@ describe("Date", () => {
     expect(new RubyDate(600000, 1, 1).jd).toBe(220866560);
   });
 
+  it("carries decode_year's nth, so a year past a double stays exact", () => {
+    // ruby 3.3.11 -rdate — the year and the day are Bignums, split into a
+    // `nth` and an `int` residue by decode_year/decode_jd
+    // (date_core.c:1342-1412):
+    //   Date.new(2**70, 1, 1).to_s #=> "1180591620717411303424-01-01"
+    //   Date.new(2**70, 1, 1).jd   #=> 431202235029879099711900
+    //   Date.new(2**70, 1, 1).year #=> 1180591620717411303424
+    //   Date.new(2**70, 1, 1).wday #=> 4
+    //   Date.new(2**70, 1, 1).julian? #=> false
+    const d = new RubyDate(2n ** 70n, 1, 1);
+    expect(d.toS()).toBe("1180591620717411303424-01-01");
+    expect(d.jd).toBe(431202235029879099711900n);
+    expect(d.year).toBe(1180591620717411303424n);
+    expect(d.wday).toBe(4);
+    expect(d.mon).toBe(1);
+    expect(d.day).toBe(1);
+    expect(d.isJulian).toBe(false);
+    // The residue year is validated as the real one is, so a day the residue's
+    // February does not have raises:
+    //   Date.new(2**70, 3, 1).to_s #=> "1180591620717411303424-03-01"
+    //   Date.new(2**70, 2, 30) #=> Date::Error: invalid date
+    expect(new RubyDate(2n ** 70n, 3, 1).toS()).toBe("1180591620717411303424-03-01");
+    expect(() => new RubyDate(2n ** 70n, 2, 30)).toThrow("invalid date");
+    // A negative nth is the mirror, and strftime spells the whole year:
+    //   Date.new(-(2**70), 1, 1).to_s #=> "-1180591620717411303424-01-01"
+    //   Date.new(2**70, 1, 1).strftime("%C|%y|%A") #=> "11805916207174113034|24|Thursday"
+    expect(new RubyDate(-(2n ** 70n), 1, 1).toS()).toBe("-1180591620717411303424-01-01");
+    expect(d.strftime("%C|%y|%A")).toBe("11805916207174113034|24|Thursday");
+    // date_s_jd runs decode_jd on the day it is given:
+    //   Date.jd(2**70).jd #=> 1180591620717411303424
+    // DateTime carries the same nth on ComplexDateData:
+    //   DateTime.new(2**70, 1, 1, 1, 2, 3).to_s
+    //     #=> "1180591620717411303424-01-01T01:02:03+00:00"
+    expect(new RubyDateTime(2n ** 70n, 1, 1, 1, 2, 3).toS()).toBe(
+      "1180591620717411303424-01-01T01:02:03+00:00",
+    );
+  });
+
+  it("threads decode_jd through the frags builders and the jd statics", () => {
+    // ruby 3.3.11 -rdate — `d_new_by_frags` (date_core.c:4315) and
+    // `dt_new_by_frags` (:8311) decode the Julian day rt__valid_*_p answered
+    // back into the stored `nth`, which is the same object `Date.jd` /
+    // `DateTime.jd` build (date_core.c:7697):
+    //   Date.jd(2**70).to_s #=> "3232350070754114273-01-08"
+    //   Date.jd(2**70).jd   #=> 1180591620717411303424
+    //   Date.jd(2**70).wday #=> 3
+    //   DateTime.jd(2**70, 1, 2, 3).to_s
+    //     #=> "3232350070754114273-01-08T01:02:03+00:00"
+    const d = dNewByFrags({ jd: 2n ** 70n });
+    expect(d.toS()).toBe("3232350070754114273-01-08");
+    expect(d.jd).toBe(1180591620717411303424n);
+    expect(d.year).toBe(3232350070754114273n);
+    expect(d.wday).toBe(3);
+    const dt = dtNewByFrags({ jd: 2n ** 70n, hour: 1, min: 2, sec: 3 });
+    expect(dt.toS()).toBe("3232350070754114273-01-08T01:02:03+00:00");
+    expect(dt.jd).toBe(1180591620717411303424n);
+  });
+
+  it("truncates a fractional year through valid_civil_p, as decode_year does", () => {
+    // ruby 3.3.11 -rdate — valid_civil_p (date_core.c:2246-2277) runs
+    // decode_year before c_valid_civil_p's `int y`, and the truncation is of
+    // the 4712-SHIFTED year, so it rounds toward -4712 rather than toward zero:
+    //   Date.new(-2000.5, 1, 1).to_s #=> "-2001-01-01"
+    //   Date.new(1600.5, 1, 1).to_s  #=> "1600-01-01"
+    //   Date.new(1600.5, 1, 1).jd    #=> 2305448
+    //   Date.new(-2000.5, 1, 1, Date::JULIAN).to_s #=> "-2001-01-01"
+    expect(new RubyDate(-2000.5, 1, 1).toS()).toBe("-2001-01-01");
+    expect(new RubyDate(1600.5, 1, 1).toS()).toBe("1600-01-01");
+    expect(new RubyDate(1600.5, 1, 1).jd).toBe(2305448);
+    expect(new RubyDate(-2000.5, 1, 1, RubyDate.JULIAN).toS()).toBe("-2001-01-01");
+  });
+
   it("raises from every static that answers the seat for a Julian-only spelling", () => {
     // ruby 3.3.11 -rdate answers "1500-02-29" from all six — the gem's `::Date`
     // value is the gem object, so `date_to_date` (date_core.c:8977-8981) is
@@ -983,6 +1055,26 @@ describe("Date", () => {
     // The gem-shaped builders the same statics run over answer it, so the
     // spelling is reachable — only the Temporal seat cannot hold it.
     expect(dNewByFrags(RubyDate._parse("1500-02-29")).toS()).toBe("1500-02-29");
+  });
+
+  it("raises from the seat for a day past Temporal's range, decoded nth and all", () => {
+    // The `nth` a Julian day past CM_PERIOD carries (date_core.c:1393-1412) is
+    // ~year 580000 at its smallest, and `Temporal.PlainDate` stops at ±271821 —
+    // so every static that answers the seat raises for one, the same way and
+    // for the same reason the Julian-only spelling above does. MRI answers a
+    // `::Date`/`::DateTime`, its own gem object:
+    //   Date.jd(2**70).to_s #=> "3232350070754114273-01-08"
+    //   DateTime.jd(2**70, 1, 2, 3).to_s
+    //     #=> "3232350070754114273-01-08T01:02:03+00:00"
+    expect(() => RubyDate.jd(2n ** 70n)).toThrow(RubyDate.Error);
+    expect(() => RubyDateTime.jd(2n ** 70n, 1, 2, 3)).toThrow(RubyDate.Error);
+
+    // The decode itself is intact underneath: the gem-shaped builders those
+    // statics run over answer the day, `nth` and all.
+    expect(dNewByFrags({ jd: 2n ** 70n }).toS()).toBe("3232350070754114273-01-08");
+    expect(dtNewByFrags({ jd: 2n ** 70n, hour: 1, min: 2, sec: 3 }).toS()).toBe(
+      "3232350070754114273-01-08T01:02:03+00:00",
+    );
   });
 
   it("takes a start argument, and Date::JULIAN/GREGORIAN select every day", () => {
