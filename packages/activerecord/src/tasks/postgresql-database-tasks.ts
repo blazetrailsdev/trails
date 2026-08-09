@@ -9,6 +9,7 @@ import {
   getOsAsync,
   getPath,
   getChildProcessAsync,
+  isBlank,
   type SpawnSyncResult,
 } from "@blazetrails/activesupport";
 import type { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
@@ -77,75 +78,57 @@ export class PostgreSQLDatabaseTasks {
   }
 
   async structureDump(filename: string, extraFlags?: string | string[] | null): Promise<void> {
-    // Use --dbname=NAME instead of a positional argument so database names
-    // beginning with "-" aren't parsed as pg_dump options.
-    const args = [
-      "--schema-only",
-      "--no-privileges",
-      "--no-owner",
-      "--file",
-      filename,
-      `--dbname=${this.dbConfig.database}`,
-    ];
+    // `ActiveRecord.dump_schemas` is `DatabaseTasks.dumpSchemas` here; Ruby's
+    // `:schema_search_path` / `:all` Symbols are the same strings.
+    const dumpSchemas = DatabaseTasks.dumpSchemas;
+    let searchPath: string | undefined;
+    if (dumpSchemas === "schema_search_path") {
+      const raw = this.configurationHash.schemaSearchPath;
+      searchPath = typeof raw === "string" ? raw : undefined;
+    } else if (dumpSchemas === "all") {
+      searchPath = undefined;
+    } else if (typeof dumpSchemas === "string") {
+      searchPath = dumpSchemas;
+    }
+
+    const args = ["--schema-only", "--no-privileges", "--no-owner"];
+    args.push("--file", filename);
+
     if (extraFlags) {
       args.push(...(Array.isArray(extraFlags) ? extraFlags : [extraFlags]));
     }
 
-    // Rails: reads ActiveRecord.dump_schemas to decide which PG schemas
-    // pg_dump includes. Trails equivalent: DatabaseTasks.dumpSchemas.
-    //
-    // The configured search_path (from config.schemaSearchPath) is
-    // used for TWO purposes:
-    // 1. --schema= filter args for pg_dump (when dumpSchemas isn't "all")
-    // 2. SET search_path footer appended to the dump file
-    // These are separated so dumpSchemas="all" still appends the footer.
-    // Trails uses camelCase config keys throughout; no snake_case fallback.
-    const rawSearchPath = this.configurationHash.schemaSearchPath;
-    const configuredSearchPath = typeof rawSearchPath === "string" ? rawSearchPath : undefined;
-
-    const dumpSchemas = DatabaseTasks.dumpSchemas;
-    let schemaFilter: string | undefined;
-    if (dumpSchemas === "schema_search_path") {
-      schemaFilter = configuredSearchPath;
-    } else if (dumpSchemas === "all") {
-      schemaFilter = undefined;
-    } else if (typeof dumpSchemas === "string") {
-      schemaFilter = dumpSchemas;
-    }
-
-    if (schemaFilter && schemaFilter.trim().length > 0) {
-      for (const schema of normalizeSchemaSearchPath(schemaFilter)) {
-        args.push(`--schema=${schema}`);
+    if (!isBlank(searchPath)) {
+      for (const part of normalizeSchemaSearchPath(searchPath as string)) {
+        args.push(`--schema=${part}`);
       }
     }
 
-    // Rails: applies SchemaDumper.ignore_tables as -T exclusions.
-    const { SchemaDumper } = await import("../connection-adapters/abstract/schema-dumper.js");
-    for (const pattern of SchemaDumper.ignoreTables) {
-      if (typeof pattern === "string") args.push("-T", pattern);
-      // Regex patterns can't be expressed as pg_dump -T flags.
+    const { SchemaDumper } = await import("../schema-dumper.js");
+    let ignoreTables: (string | RegExp)[] = SchemaDumper.ignoreTables;
+    if (ignoreTables.length > 0) {
+      const dataSources = await (await this.connection()).dataSources();
+      ignoreTables = dataSources.filter((table) =>
+        ignoreTables.some((pattern) =>
+          typeof pattern === "string" ? pattern === table : pattern.test(table),
+        ),
+      );
+      for (const table of ignoreTables) args.push("-T", table as string);
     }
 
+    args.push(this.dbConfig.database as string);
     await this.runCmd("pg_dump", args, "dumping");
     await this.removeSqlHeaderComments(filename);
-
-    // Rails: appends `SET search_path TO <path>;` at the end of the
-    // dump so loading it restores the session search_path. Uses the
-    // configured search_path (not the filtered schema list) so
-    // dumpSchemas="all" still appends when a search_path is set.
-    if (configuredSearchPath && configuredSearchPath.trim().length > 0) {
-      const sanitized = configuredSearchPath.trim().replace(/[;\n\r]/g, "");
-      if (sanitized.length > 0) {
-        getFs().appendFileSync(filename, `SET search_path TO ${sanitized};\n\n`);
-      }
-    }
+    getFs().appendFileSync(
+      filename,
+      `SET search_path TO ${await (await this.connection()).schemaSearchPath()};\n\n`,
+    );
   }
 
   async structureLoad(filename: string, extraFlags?: string | string[] | null): Promise<void> {
     const os = await getOsAsync();
+    // Ruby's `File::NULL`.
     const nullDevice = os.platform() === "win32" ? "NUL" : "/dev/null";
-    // --dbname=NAME avoids psql treating a db name starting with "-" as a
-    // flag.
     const args = [
       "--set",
       ON_ERROR_STOP_1,
@@ -155,11 +138,11 @@ export class PostgreSQLDatabaseTasks {
       nullDevice,
       "--file",
       filename,
-      `--dbname=${this.dbConfig.database}`,
     ];
     if (extraFlags) {
       args.push(...(Array.isArray(extraFlags) ? extraFlags : [extraFlags]));
     }
+    args.push(this.dbConfig.database as string);
     await this.runCmd("psql", args, "loading");
   }
 
@@ -239,10 +222,11 @@ export class PostgreSQLDatabaseTasks {
   }
 
   /** @internal */
-  private async establishConnection(configHash?: Record<string, unknown>): Promise<void> {
-    await Base.establishConnection(
-      (configHash ?? this.dbConfig.configuration) as { adapter?: string; [key: string]: unknown },
-    );
+  private async establishConnection(config?: Record<string, unknown>): Promise<void> {
+    // `establish_connection(config = db_config)`
+    // (`postgresql_database_tasks.rb:85-87`) — the default is the db_config
+    // object itself, which `Base.establish_connection` accepts.
+    await Base.establishConnection(config ?? this.dbConfig);
   }
 
   /** @internal */
