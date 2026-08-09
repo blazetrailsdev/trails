@@ -4,8 +4,9 @@
  * Rails' SQLite3 adapter has one SQL primitive, perform_query, which branches on
  * `stmt.column_count.zero?` and sources affected rows from a separate
  * `raw_connection.changes` read. These assert the branch and that read hold for
- * the better-sqlite3 analogue (`stmt.reader` / `RunResult`), including the case
- * where a statement both returns rows and writes (`INSERT ... RETURNING`).
+ * the better-sqlite3 analogue (`stmt.reader` / `SELECT changes()`), including
+ * the case where a statement both returns rows and writes
+ * (`INSERT ... RETURNING`).
  */
 import { it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
@@ -31,7 +32,7 @@ afterEach(async () => {
 describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
   it("execute runs a non-row-returning statement and returns no rows", async () => {
     // `.all()` throws on a statement with no result columns, so this is the
-    // branch that lets DDL flow through the public `execute`.
+    // `column_count.zero?` branch that lets DDL flow through `execute`.
     await expect(adapter.execute(`CREATE TABLE "pq_ddl" ("id" INTEGER)`)).resolves.toEqual([]);
     await expect(adapter.execute(`INSERT INTO "pq" ("nick") VALUES ('a')`)).resolves.toEqual([]);
   });
@@ -54,6 +55,27 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
     expect(adapter.affectedRows()).toBe(2);
   });
 
+  it("affectedRows is preserved across DDL", async () => {
+    await adapter.executeMutation(`INSERT INTO "pq" ("nick") VALUES ('a')`);
+    await adapter.executeMutation(`INSERT INTO "pq" ("nick") VALUES ('b')`);
+    expect(await adapter.executeMutation(`UPDATE "pq" SET "nick" = 'z'`)).toBe(2);
+
+    // sqlite3_changes() is advanced only by DML, so a CREATE TABLE leaves the
+    // prior UPDATE's count standing — where a per-statement RunResult would
+    // report 0.
+    await adapter.execute(`CREATE TABLE "pq_ddl" ("id" INTEGER)`);
+    expect(adapter.affectedRows()).toBe(2);
+  });
+
+  it("execute returns the rows an INSERT ... RETURNING produces", async () => {
+    // Rails branches on `stmt.column_count.zero?` alone — no write predicate —
+    // so a RETURNING write comes back as rows with row_count = 1.
+    await expect(
+      adapter.execute(`INSERT INTO "pq" ("nick") VALUES ('a') RETURNING "id", "nick"`),
+    ).resolves.toEqual([{ id: 1, nick: "a" }]);
+    expect(adapter.affectedRows()).toBe(1);
+  });
+
   it("affectedRows is not reset by transaction control in the run branch", async () => {
     await adapter.executeMutation(`INSERT INTO "pq" ("nick") VALUES ('a')`);
     await adapter.executeMutation(`INSERT INTO "pq" ("nick") VALUES ('b')`);
@@ -66,8 +88,9 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
   });
 
   it("executeMutation returns the inserted id for INSERT ... RETURNING", async () => {
-    // A write takes the `.run()` branch even with RETURNING, so the id comes
-    // from the RunResult's lastInsertRowid, atomically with the insert.
+    // A RETURNING write takes the `.all()` branch (nonzero column count), so
+    // the id comes from `last_insert_rowid()` read under the statement lock —
+    // atomically with the insert.
     const id = await adapter.executeMutation(
       `INSERT INTO "pq" ("nick") VALUES ('a') RETURNING "id"`,
     );
@@ -81,8 +104,8 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
   });
 
   it("returns distinct insert ids for concurrent inserts", async () => {
-    // The count/rowid come from the RunResult, not a follow-up
-    // `last_insert_rowid()` read — so inserts issued concurrently (interleaving
+    // The statement and its `last_insert_rowid()` readback are serialized by
+    // the FIFO statement lock — so inserts issued concurrently (interleaving
     // at await points) each get their own id. The id is returned from
     // _performQuery as a local rather than re-read from the shared
     // this._lastInsertRowid, which a concurrent insert would overwrite before

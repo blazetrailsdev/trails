@@ -5740,9 +5740,33 @@ export class DateTime extends DateWithoutParseStatics {
    * {@link #mLocalDf}, and the constructor converts in through
    * `jd_local_to_utc` / `df_local_to_utc`, as `dt_new_by_frags` does
    * (`date_core.c:8311-8313`).
+   *
+   * Both are optional because `datetime_initialize`'s proleptic-Gregorian arm
+   * (`date_core.c:7851-7870`) stores `HAVE_CIVIL | HAVE_TIME` with an `rjd` of
+   * `0` — no Julian day and no day-fraction at all. {@link DateTime.#getCJd}
+   * (`get_c_jd`, `date_core.c:1264-1301`) and {@link DateTime.#getCDf}
+   * (`get_c_df`, `:1208-1225`) fill them in on first read.
    */
-  #jd: number;
-  readonly #df: number;
+  #jd?: number;
+  #df?: number;
+
+  /**
+   * @internal `ComplexDateData`'s time-of-day fields (`date_core.c:215-231`),
+   * which `set_to_complex` writes under `HAVE_TIME` and {@link #getCDf} /
+   * {@link #getCJd} read through `time_to_df`. Undefined on the
+   * `d_complex_new_internal` seat, which stores `HAVE_JD | HAVE_DF` and leaves
+   * `get_c_time` (`date_core.c:1227-1244`) to decode the time from `df`.
+   */
+  readonly #time?: [rh: number, rmin: number, rs: number];
+
+  /**
+   * @internal `ComplexDateData`'s civil fields (`date_core.c:215-231`), which
+   * `set_to_complex` writes under `HAVE_CIVIL` and {@link #getCJd} reads
+   * through `c_civil_to_jd`. They are the complex struct's own — the union's
+   * other arm keeps {@link Date}'s, which a `DateTime` never reads because it
+   * overrides {@link mLocalJd}.
+   */
+  readonly #civil?: [ry: number, rm: number, rdom: number];
   /**
    * @internal `ComplexDateData`'s `sf`, the sub-second part in **nanoseconds**
    * (`date_core.c:215-231`). `jd_local_to_utc` / `df_local_to_utc` do not touch
@@ -5786,12 +5810,6 @@ export class DateTime extends DateWithoutParseStatics {
    * arm goes through `c_valid_civil_p` under `sg` and stores `jd_local_to_utc`
    * of it too. Both then validate the time of day with `c_valid_time_p`.
    *
-   * The Julian day the C's negative arm leaves out is computed eagerly here,
-   * with the `get_c_jd` (`date_core.c:1262-1301`) body the C would run on first
-   * read — `c_civil_to_jd` under the stored `sg` — because `add_frac` is applied
-   * in place below rather than by handing `self` to `d_lite_plus`, so there is
-   * no point at which the day is still unread.
-   *
    * `datetime_initialize`'s `switch (argc)` fall-through
    * (`date_core.c:7826-7849`) splits the second, then the minute, then the
    * hour, then the day through {@link num2intWithFrac}, under the `n` bounds
@@ -5807,8 +5825,12 @@ export class DateTime extends DateWithoutParseStatics {
    * `add_frac` to apply. `fr2` is carried in seconds here, so the C's `fr2 + 1`
    * day is `fr2 + DAY_IN_SECONDS`.
    *
-   * `add_frac()` (`date_core.c:3313-3317`) then hands `fr2` to `d_lite_plus`'s
-   * `T_FLOAT` arm (`date_core.c:6064-6135`), which is what makes
+   * `add_frac()` (`date_core.c:3313-3317`) then hands `fr2` to `d_lite_plus`,
+   * which answers a NEW object rather than writing back into the receiver —
+   * which is why the proleptic arm can finish without ever needing the day.
+   * The result is built here the same way, from {@link #getCJd} /
+   * {@link #getCDf}, so a zero `fr2` leaves the half-built receiver's day
+   * unread. `d_lite_plus`'s `T_FLOAT` arm (`date_core.c:6064-6135`), which is what makes
    * `DateTime.new(2008, 3, 1, 6, 0.5)` `06:00:30`: the fraction's whole seconds
    * go to `df`, carrying a day where they overflow one, and the rounded
    * remainder to `sf`. `fr2` is under a day by construction, so the C's `jd`
@@ -5914,14 +5936,15 @@ export class DateTime extends DateWithoutParseStatics {
     const rof = offset === undefined ? 0 : val2off(offset);
     const sg = start === undefined ? DEFAULT_SG : val2sg(start);
     let nth: bigint;
-    let rjd: number;
+    let rjd = 0;
+    let rcivil: [ry: number, rm: number, rd: number] | undefined;
     year ??= -4712;
     if (guessStyle(year, sg) < 0) {
       const r = validGregorianP(year, (month as number) ?? 1, d);
       if (r === null) throw new DateError("invalid date");
       const [rnth, ry, rm, rd] = r;
       nth = rnth;
-      rjd = cCivilToJd(ry, rm, rd, sg);
+      rcivil = [ry, rm, rd];
     } else {
       const r = validCivilP(year, (month as number) ?? 1, d, sg);
       if (r === null) throw new DateError("invalid date");
@@ -5935,13 +5958,54 @@ export class DateTime extends DateWithoutParseStatics {
       rh = 0;
       fr2 = fr2 instanceof Rational ? fr2.add(DAY_IN_SECONDS) : fr2 + DAY_IN_SECONDS;
     }
-    const localDf = timeToDf(rh, rmin, rs);
-    const [jd, df, sf] = addFrac(jdLocalToUtc(rjd, localDf, rof), dfLocalToUtc(localDf, rof), fr2);
-    super(SEAT, nth, jdUtcToLocal(jd, df, rof), sg);
-    this.#jd = jd;
-    this.#df = df;
-    this.#sf = sf;
+    if (rcivil !== undefined) {
+      super(SEAT, nth, rjd, sg);
+      this.#civil = rcivil;
+    } else {
+      const rjd2 = jdLocalToUtc(rjd, timeToDf(rh, rmin, rs), rof);
+      super(SEAT, nth, rjd2, sg);
+      this.#jd = rjd2;
+    }
+    this.#time = [rh, rmin, rs];
+    this.#sf = new Rational(0, 1);
     this.#of = rof;
+    // `add_frac()`: `d_lite_plus(ret, fr2)` answers a NEW object, so a zero
+    // `fr2` never reads the receiver's day.
+    if (fr2 instanceof Rational ? !fr2.isZero() : fr2 !== 0) {
+      const [jd, df, sf] = addFrac(this.#getCJd(), this.#getCDf(), fr2);
+      return new DateTime(SEAT, nth, jd, df, sf, rof, sg) as this;
+    }
+  }
+
+  /**
+   * @internal `date_core.c` `get_c_jd` (`date_core.c:1264-1301`), the lazy half
+   * of `ComplexDateData`: when `datetime_initialize`'s proleptic-Gregorian arm
+   * stored the civil triple and the time of day alone, the day is
+   * `c_civil_to_jd` of the triple under `c_virtual_sg` — the stored `sg` —
+   * taken through `jd_local_to_utc` with `time_to_df` of the time, computed on
+   * first read and kept.
+   */
+  #getCJd(): number {
+    if (this.#jd === undefined) {
+      const [year, mon, mday] = this.#civil as [number, number, number];
+      const jd = cCivilToJd(year, mon, mday, virtualSg(this.nth, this.start));
+      const [rh, rmin, rs] = this.#time as [number, number, number];
+      this.#jd = jdLocalToUtc(jd, timeToDf(rh, rmin, rs), this.#of);
+    }
+    return this.#jd;
+  }
+
+  /**
+   * @internal `date_core.c` `get_c_df` (`date_core.c:1208-1225`), the
+   * day-fraction's half of the same split: `df_local_to_utc` of `time_to_df`
+   * over the stored time of day.
+   */
+  #getCDf(): number {
+    if (this.#df === undefined) {
+      const [rh, rmin, rs] = this.#time as [number, number, number];
+      this.#df = dfLocalToUtc(timeToDf(rh, rmin, rs), this.#of);
+    }
+    return this.#df;
   }
 
   /**
@@ -6235,7 +6299,7 @@ export class DateTime extends DateWithoutParseStatics {
    * `Date#jd`, inherited, encodes {@link Date#nth} back into.
    */
   override mLocalJd(): number {
-    return jdUtcToLocal(this.#jd, this.#df, this.#of);
+    return jdUtcToLocal(this.#getCJd(), this.#getCDf(), this.#of);
   }
 
   /**
@@ -6243,7 +6307,7 @@ export class DateTime extends DateWithoutParseStatics {
    * the stored UTC day.
    */
   override mJd(): number {
-    return this.#jd;
+    return this.#getCJd();
   }
 
   /** @internal `canonicalize_c_jd`'s `x->c.jd = ` (`date_core.c:1251-1261`). */
@@ -6253,7 +6317,7 @@ export class DateTime extends DateWithoutParseStatics {
 
   /** @internal `date_core.c` `m_df`'s complex arm (`date_core.c:1512-1522`). */
   override mDf(): number {
-    return this.#df;
+    return this.#getCDf();
   }
 
   /** @internal `date_core.c` `m_sf`'s complex arm (`date_core.c:1552-1562`). */
@@ -6283,7 +6347,7 @@ export class DateTime extends DateWithoutParseStatics {
   }
 
   override mLocalDf(): number {
-    return dfUtcToLocal(this.#df, this.#of);
+    return dfUtcToLocal(this.#getCDf(), this.#of);
   }
 
   /**
@@ -6301,15 +6365,15 @@ export class DateTime extends DateWithoutParseStatics {
    * {@link mJulianP}.
    */
   override get isJulian(): boolean {
-    return mJulianP(this.#jd, virtualSg(this.nth, this.start));
+    return mJulianP(this.#getCJd(), virtualSg(this.nth, this.start));
   }
 
   override newStart(start = DEFAULT_SG): this {
     return new DateTime(
       SEAT,
       this.nth,
-      this.#jd,
-      this.#df,
+      this.#getCJd(),
+      this.#getCDf(),
       this.#sf,
       this.#of,
       val2sg(start),

@@ -155,6 +155,26 @@ class ExpoSqliteConnection implements SqliteConnection {
     return this.raw.getAllAsync(`PRAGMA ${source}`);
   }
 
+  /**
+   * `sqlite3_changes()` / `sqlite3_last_insert_rowid()` — the ruby sqlite3
+   * gem's `Database#changes` / `#last_insert_row_id`, which Rails'
+   * `perform_query` reads after every statement. No driver here exposes them
+   * as an API, so they are read with the SQL functions of the same names: a
+   * pure read, which leaves both counters alone. The prepared statements are
+   * cached because `perform_query` reads them on EVERY statement.
+   */
+  async changes(): Promise<number> {
+    const row = (await this.raw.getFirstAsync("SELECT changes() AS v")) as { v: number };
+    return row.v;
+  }
+
+  async lastInsertRowId(): Promise<number | bigint> {
+    const row = (await this.raw.getFirstAsync("SELECT last_insert_rowid() AS v")) as {
+      v: number | bigint;
+    };
+    return row.v;
+  }
+
   async close(): Promise<void> {
     this._open = false;
     await this.raw.closeAsync();

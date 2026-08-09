@@ -62,12 +62,6 @@ const adapters: [string, () => SQLite3Adapter, boolean][] = [
   ["node-sqlite", () => new NodeSQLiteAdapter(":memory:"), isNodeSqliteAvailable],
 ];
 
-// `execute` (via `_performQuery`) still drops RETURNING rows on EVERY driver,
-// because that path gates rows on `stmt.reader && !isWriteQuery(sql)` — a
-// trails invention; Rails branches on `column_count.zero?` alone. Removing the
-// isWrite gate would cost `executeMutation` the atomic RunResult rowid that PR
-// 4893 introduced, so it is tracked separately as
-// sqlite-performquery-contract-deviations-need-lock.
 describe.each(adapters)("SQLite3Adapter RETURNING rows — %s", (_name, build, available) => {
   it.skipIf(!available)("internalExecQuery returns the RETURNING rows", async () => {
     const adapter = build();
@@ -80,6 +74,22 @@ describe.each(adapters)("SQLite3Adapter RETURNING rows — %s", (_name, build, a
       expect(result.columns).toEqual(["id", "name"]);
       expect(result.rows).toHaveLength(1);
       expect(result.rows[0]?.[1]).toBe("gear");
+    } finally {
+      await adapter.execute('DROP TABLE IF EXISTS "widgets"');
+      await adapter.close();
+    }
+  });
+
+  it.skipIf(!available)("execute returns the RETURNING rows", async () => {
+    const adapter = build();
+    try {
+      await adapter.execute("CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT NOT NULL)");
+
+      const rows = await adapter.execute(
+        "INSERT INTO widgets (name) VALUES ('cog') RETURNING id, name",
+      );
+      expect(rows).toEqual([{ id: 1, name: "cog" }]);
+      expect(adapter.affectedRows()).toBe(1);
     } finally {
       await adapter.execute('DROP TABLE IF EXISTS "widgets"');
       await adapter.close();

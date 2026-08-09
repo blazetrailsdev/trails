@@ -9,14 +9,17 @@
  * driver object literals and the connection/statement handles behind them —
  * and no name it declares has a Rails method to converge onto. Its sibling
  * subclass `connection-adapters/libsql-adapter.ts` carries the same reason.
- * MOVED-BY-SHORT-NAME: close, databaseExists, isOpen, open, prepare. Those
- * five score `moved` only because the oracle matches on bare camelized Ruby
- * short names, and the owners it now reports are unrelated: `close` credits
- * `Rack::BodyProxy#close`, `prepare` to `Store::HashAccessor#prepare`,
+ * MOVED-BY-SHORT-NAME: changes, close, databaseExists, isOpen, open, prepare.
+ * Those six score `moved` only because the oracle matches on bare camelized
+ * Ruby short names, and the owners it now reports are unrelated: `close`
+ * credits `Rack::BodyProxy#close`, `prepare` to `Store::HashAccessor#prepare`,
  * `isOpen` to `Transaction#open?` (abstract/transaction.rb), `open` to
  * `SchemaCache#open` / `MigrationContext#open`, `databaseExists` to
  * `AbstractAdapter#database_exists?` — which the port already carries on the
- * adapter, at its Rails name, one layer above this driver.
+ * adapter, at its Rails name, one layer above this driver — and `changes` to
+ * `ActiveModel::AttributeMutationTracker#changes`, where this one is
+ * `sqlite3_changes()` off the handle, the sqlite3 gem's
+ * `SQLite3::Database#changes`.
  */
 import Database from "libsql";
 import { getFs } from "@blazetrails/activesupport/fs-adapter";
@@ -109,6 +112,27 @@ class LibsqlConnection implements SqliteConnection, SyncSqliteConnection {
   pragma(source: string, opts?: { simple?: boolean }): unknown {
     return this.raw.pragma(source, opts);
   }
+
+  /**
+   * `sqlite3_changes()` / `sqlite3_last_insert_rowid()` — the ruby sqlite3
+   * gem's `Database#changes` / `#last_insert_row_id`, which Rails'
+   * `perform_query` reads after every statement. No driver here exposes them
+   * as an API, so they are read with the SQL functions of the same names: a
+   * pure read, which leaves both counters alone. The prepared statements are
+   * cached because `perform_query` reads them on EVERY statement.
+   */
+  changes(): number {
+    this.#changesStmt ??= this.raw.prepare("SELECT changes() AS v");
+    return (this.#changesStmt.get() as { v: number }).v;
+  }
+
+  lastInsertRowId(): number | bigint {
+    this.#lastInsertRowIdStmt ??= this.raw.prepare("SELECT last_insert_rowid() AS v");
+    return (this.#lastInsertRowIdStmt.get() as { v: number | bigint }).v;
+  }
+
+  #changesStmt?: Database.Statement;
+  #lastInsertRowIdStmt?: Database.Statement;
 
   close(): void {
     this.raw.close();

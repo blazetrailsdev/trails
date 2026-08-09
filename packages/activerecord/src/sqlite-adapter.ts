@@ -60,6 +60,20 @@ export interface SqliteConnection {
   prepare(sql: string): SqliteStatement | Promise<SqliteStatement>;
   exec(sql: string): void | Promise<void>;
   pragma(source: string, opts?: { simple?: boolean }): unknown | Promise<unknown>;
+  /**
+   * `sqlite3_changes()` — the ruby sqlite3 gem's `SQLite3::Database#changes`,
+   * which Rails' `perform_query` reads after every statement
+   * (`sqlite3/database_statements.rb:113`). Connection-level, so unlike a
+   * per-statement `RunResult.changes` it is advanced only by DML and PRESERVED
+   * across DDL and transaction control.
+   */
+  changes(): number | Promise<number>;
+  /**
+   * `sqlite3_last_insert_rowid()` — the gem's
+   * `SQLite3::Database#last_insert_row_id`. Connection-level for the same
+   * reason as {@link changes}.
+   */
+  lastInsertRowId(): number | bigint | Promise<number | bigint>;
   /** Idempotent. After close(), all calls reject / throw. */
   close(): void | Promise<void>;
   /** True between successful open() and close(). */
@@ -90,6 +104,8 @@ export interface SyncSqliteConnection {
   prepare(sql: string): SyncSqliteStatement;
   exec(sql: string): void;
   pragma(source: string, opts?: { simple?: boolean }): unknown;
+  changes(): number;
+  lastInsertRowId(): number | bigint;
   close(): void;
   isOpen(): boolean;
   readonly raw: unknown;

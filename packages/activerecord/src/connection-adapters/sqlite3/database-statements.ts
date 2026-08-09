@@ -9,7 +9,7 @@
  */
 
 import { sql as arelSql } from "@blazetrails/arel";
-import type { SqliteBinds, SqliteStatement } from "../../sqlite-adapter.js";
+import type { SqliteBinds, SqliteConnection, SqliteStatement } from "../../sqlite-adapter.js";
 import { TransactionIsolationError } from "../../errors.js";
 import { Result } from "../../result.js";
 import { stripSqlComments } from "../sql-classification.js";
@@ -104,9 +104,10 @@ interface InternalBeginTransactionHost {
 // with_raw_connection performs around the round-trip.
 interface PerformQueryHost {
   _cachedStatement(sql: string): Promise<SqliteStatement>;
-  isWriteQuery(sql: string): boolean;
+  readonly driver: SqliteConnection;
   verifiedBang(): void;
   dirtyCurrentTransaction(): void;
+  _statementLock: Promise<void> | null;
   _lastAffectedRows: number;
   _lastInsertRowid: number | bigint;
 }
@@ -149,21 +150,52 @@ export async function internalBeginTransaction(
 }
 
 /**
+ * The FIFO half of Rails' `@lock.synchronize` around `perform_query` (see
+ * {@link performQuery}): resolve once no other statement holds the connection,
+ * and answer the release. Non-reentrant on purpose — the whole point is that
+ * two concurrently-issued writes on one connection cannot interleave between
+ * a statement and its `sqlite3_changes()` readback. Every path that runs a
+ * statement on the connection takes it, `internal_exec_query`'s included —
+ * an unlocked write there would land between another's statement and readback.
+ * @internal
+ */
+export async function acquireStatementLock(host: {
+  _statementLock: Promise<void> | null;
+}): Promise<() => void> {
+  while (host._statementLock) await host._statementLock;
+  let release!: () => void;
+  host._statementLock = new Promise<void>((resolve) => {
+    release = () => {
+      host._statementLock = null;
+      resolve();
+    };
+  });
+  return release;
+}
+
+/**
  * The single SQL primitive: run a statement and return its rows plus the
- * atomic affected-rows / insert-rowid from the same RunResult. Reads take
- * `.all()`; every write (incl. `INSERT … RETURNING`) and transaction-control
- * takes `.run()`.
+ * affected-rows / insert-rowid the connection reports for it. As Rails does,
+ * the branch is the statement's column count alone (`stmt.reader` is
+ * `column_count > 0`): a statement that returns columns — including
+ * `INSERT … RETURNING` — takes `.all()`, and one that returns none takes
+ * `.run()`.
  *
- * Follows Rails' `perform_query` for the read/affected-rows contract, but
- * DEVIATES on the branch axis and the RETURNING return: Rails branches on
- * `stmt.column_count.zero?`, so `INSERT … RETURNING` (nonzero column count)
- * comes back as `Result.new(columns, to_a)` with `row_count = 1`. Here it
- * takes `.run()` and returns `[]` (`row_count = 0`) — deliberately, so the
- * insert id / count come from the RunResult ATOMICALLY rather than a
- * follow-up `last_insert_rowid()` read that races under concurrent writes.
- * Nothing calls this expecting RETURNING rows: multi-column RETURNING
- * read-back goes through `internalExecQuery` (`.all()`) and single-column
- * through `executeMutation`'s rowid.
+ * The counts come from `raw_connection.changes` /
+ * `raw_connection.last_insert_row_id` after the statement, exactly as Rails'
+ * `@last_affected_rows = raw_connection.changes` does, so they are the
+ * connection-level `sqlite3_changes()` — advanced only by DML and PRESERVED
+ * across DDL and transaction control — rather than the per-statement
+ * `RunResult`, which reports `0` for DDL.
+ *
+ * Rails can read them post-hoc because `perform_query` runs inside
+ * `with_raw_connection`'s `@lock.synchronize`, and one Ruby thread is never
+ * inside two of them at once. Here the same discipline is a FIFO lock over
+ * `_statementLock` held across the statement AND the two counter reads: an
+ * interleaving `Promise.all` write would otherwise land between them and be
+ * reported as this statement's rowid (the race PR #4893 first hit). The
+ * connection's own reentrant `synchronize` cannot serve — a `Promise.all` of
+ * writes inside one transaction shares its lock owner and re-enters.
  *
  * This is the live primitive `execute` / `executeMutation` delegate to. It is
  * written against the async `SqliteStatement` / `SqliteConnection` driver
@@ -191,38 +223,26 @@ export async function performQuery(
   // contrast, is on Rails' success path only.
   try {
     const stmt = await this._cachedStatement(sql);
-    // Dispatch through the virtual isWriteQuery — the same predicate
-    // check_if_write_query uses (abstract-adapter.ts) — so the readonly guard
-    // and the affected-rows gate can never disagree.
-    const isWrite = this.isWriteQuery(sql);
+    // The lock opens AFTER the statement is prepared: `_cachedStatement`
+    // connects on demand, and a connection's `configure_connection` PRAGMAs
+    // re-enter this primitive.
+    const release = await acquireStatementLock(this);
     let rows: Record<string, unknown>[];
-    // Default to the tracked counts so a non-write (BEGIN/COMMIT/read) returns
-    // the last write's values intact, as sqlite3_changes() does.
-    let affectedRows = this._lastAffectedRows;
-    let insertRowid = this._lastInsertRowid;
-    // Reads take `.all()` (rows); everything else — writes (incl.
-    // `INSERT … RETURNING`) and transaction-control — takes `.run()`, whose
-    // RunResult carries the affected-row count and insert rowid ATOMICALLY.
-    // Sourcing those from `.run()` (not a separate `SELECT changes()`) is
-    // essential under concurrency: `Promise.all` inserts interleave at await
-    // points, so a follow-up `last_insert_rowid()` read would report another
-    // statement's rowid. Gating on `!isWrite` also keeps a `SELECT`, which is
-    // reader=true, on the `.all()` path; a write is never misread as a reader
-    // because isWriteQuery classifies INSERT/UPDATE/DELETE/DDL as writes.
-    if (stmt.reader && !isWrite) {
-      rows = (await stmt.all(driverBinds)) as Record<string, unknown>[];
-    } else {
-      const result = await stmt.run(driverBinds);
-      if (isWrite) {
-        // DDL takes this branch too and reports changes = 0 — a small
-        // deviation from Rails' sqlite3_changes(), which is preserved across
-        // DDL; matching it would need a handle read that isn't atomic under
-        // concurrency, and no caller reads affected_rows after a DDL (it is
-        // consumed right after its DML).
-        affectedRows = Number(result.changes ?? 0);
-        insertRowid = result.lastInsertRowid;
+    let affectedRows: number;
+    let insertRowid: number | bigint;
+    try {
+      // `stmt.column_count.zero?` — no write predicate, so `INSERT … RETURNING`
+      // (nonzero column count) comes back as rows with `row_count = 1`.
+      if (stmt.reader) {
+        rows = (await stmt.all(driverBinds)) as Record<string, unknown>[];
+      } else {
+        await stmt.run(driverBinds);
+        rows = [];
       }
-      rows = [];
+      affectedRows = await this.driver.changes();
+      insertRowid = await this.driver.lastInsertRowId();
+    } finally {
+      release();
     }
     // Persist for the affected_rows() port / public accessor. The RETURNED
     // locals — not these fields — are what executeMutation uses for its return
