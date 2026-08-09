@@ -135,8 +135,6 @@ export class ErrorReporter {
     } catch (error) {
       if (!rescues(errorClasses, error)) throw error;
       this.report(error, { handled: true, severity, context, source });
-      // Ruby's `fallback.call if fallback` — a non-callable raises, which is
-      // what "#handle raises if the fallback is not a callable" pins.
       return fallback != null && fallback !== false ? (fallback as () => T)() : null;
     }
   }
@@ -216,7 +214,7 @@ export class ErrorReporter {
 
   /** Unregister an error subscriber. Accepts either a subscriber or a class. */
   unsubscribe(subscriber: ErrorSubscriber | ErrorSubscriberClass): void {
-    this.subscribers = this.subscribers.filter((s) => !caseEquals(subscriber, s));
+    deleteIf(this.subscribers, (s) => caseEquals(subscriber, s));
   }
 
   /**
@@ -231,8 +229,7 @@ export class ErrorReporter {
     try {
       return fn();
     } finally {
-      const at = disabledSubscribers.indexOf(subscriber);
-      if (at !== -1) disabledSubscribers.splice(at, 1);
+      deleteFrom(disabledSubscribers, subscriber);
     }
   }
 
@@ -314,10 +311,6 @@ export class ErrorReporter {
     if (Object.isFrozen(error)) return; // re-raising won't add a backtrace
     if ((error as Error)?.stack != null) return;
 
-    // Ruby raises the error to build a real backtrace, then shifts the frames
-    // belonging to this file back off. V8 does both at once: it captures at the
-    // call site and `constructorOpt` elides everything from `ensureBacktrace`
-    // inward.
     Error.captureStackTrace?.(error as object, this.ensureBacktrace);
   }
 }
@@ -349,6 +342,18 @@ const RAILS_ERROR_REPORTED = Symbol.for("__rails_error_reported");
 function caseEquals(subscriber: unknown, s: unknown): boolean {
   if (typeof subscriber === "function") return s instanceof (subscriber as ErrorSubscriberClass);
   return subscriber === s;
+}
+
+/** Ruby's `Array#delete`, which removes every equal element in place. */
+function deleteFrom<T>(array: T[], value: T): void {
+  deleteIf(array, (element) => element === value);
+}
+
+/** Ruby's `Array#delete_if`, which filters in place rather than returning a new array. */
+function deleteIf<T>(array: T[], predicate: (element: T) => boolean): void {
+  for (let i = array.length - 1; i >= 0; i--) {
+    if (predicate(array[i])) array.splice(i, 1);
+  }
 }
 
 /** Ruby's `rescue *error_classes`. */
