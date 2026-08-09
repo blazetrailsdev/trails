@@ -70,14 +70,11 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       const adapter = new Mysql2Adapter({ uri: MYSQL_TEST_URL, statementLimit: 0 });
       await adapter.beginDbTransaction();
       try {
-        // Rails does not branch on the limit: the prepared path still runs and
-        // `StatementPool#[]=` evicts down to `max` (statement_pool.rb:32-36),
-        // so a limit of 0 deallocates each statement as the next one lands
-        // rather than caching any across calls.
-        const rows = await adapter.execute("SELECT ? AS n", [1]);
-        expect(rows[0]).toBeDefined();
-        await adapter.execute("SELECT ? AS s", ["a"]);
-        expect(adapter._statementPoolForTest()!.length).toBeLessThanOrEqual(1);
+        // Rails does not branch on the limit at the call site, and its pool has
+        // no zero-limit case either: `while 0 <= cache.size` runs on the empty
+        // cache and `nil.last` raises (statement_pool.rb:31-33). So a
+        // `statement_limit` of 0 is unsupported rather than a caching switch.
+        await expect(adapter.execute("SELECT ? AS n", [1])).rejects.toThrow();
       } finally {
         await adapter.rollback();
         await adapter.close();

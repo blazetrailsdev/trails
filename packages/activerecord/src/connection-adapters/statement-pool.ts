@@ -56,10 +56,14 @@ export class StatementPool<T = unknown> {
   set(key: string, stmt: T): void | Promise<void> {
     this._statements.delete(key);
     const deallocating: Array<Promise<void>> = [];
-    while (this._statements.size >= this._maxSize) {
-      const firstKey = this._statements.keys().next().value;
-      if (firstKey === undefined) break;
-      const evicted = this._statements.get(firstKey)!;
+    while (this._maxSize <= this._statements.size) {
+      // `dealloc(cache.shift.last)` (statement_pool.rb:32). The non-null
+      // assertion carries Rails' failure mode rather than papering over it: at
+      // `statement_limit` 0 the loop runs on an empty cache, Ruby's
+      // `Hash#shift` returns nil and `nil.last` raises NoMethodError. A limit
+      // of 0 is unsupported in Rails, and the destructure raises here for the
+      // same reason at the same point.
+      const [firstKey, evicted] = this._statements.entries().next().value!;
       this._statements.delete(firstKey);
       const pending = this.dealloc(evicted);
       if (pending) deallocating.push(pending);
