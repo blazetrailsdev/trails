@@ -14,22 +14,30 @@ import { HashConfig } from "../../database-configurations/hash-config.js";
 import { Base } from "../../base.js";
 
 /**
- * `ActiveRecord::Base.stub(:lease_connection, @connection)`
- * (`postgresql_rake_test.rb:290`). trails' task classes reach the connection
- * through `Base.connectionPool().leaseConnection()`
+ * `with_stubbed_connection` (`postgresql_rake_test.rb:272-274`), which is
+ * `ActiveRecord::Base.stub(:lease_connection, @connection, &block)`. trails'
+ * task classes reach the connection through
+ * `Base.connectionPool().leaseConnection()`
  * (`postgresql-database-tasks.ts:179`), so the pool is where the double goes.
  */
-function stubLeaseConnection(connection: unknown): void {
-  vi.spyOn(Base, "connectionPool").mockReturnValue({
+async function withStubbedConnection(
+  connection: unknown,
+  block: () => Promise<void>,
+): Promise<void> {
+  const spy = vi.spyOn(Base, "connectionPool").mockReturnValue({
     leaseConnection: async () => connection,
   } as unknown as ReturnType<typeof Base.connectionPool>);
+  try {
+    await block();
+  } finally {
+    spy.mockRestore();
+  }
 }
 
-function configuration(overrides: Record<string, unknown> = {}): HashConfig {
+function configuration(): HashConfig {
   return new HashConfig("default_env", "primary", {
     adapter: "postgresql",
     database: "my-app-db",
-    ...overrides,
   });
 }
 
@@ -85,10 +93,11 @@ describeIfPostgresqlAdapter("PostgreSQLPurgeTest", () => {
       createDatabase: vi.fn(async () => {}),
       dropDatabase: vi.fn(async () => {}),
     };
+    // `ActiveRecord::Base.stub(:establish_connection, nil)`
+    // (`postgresql_rake_test.rb:236`).
     vi.spyOn(Base, "establishConnection").mockResolvedValue(
       undefined as unknown as Awaited<ReturnType<typeof Base.establishConnection>>,
     );
-    stubLeaseConnection(connection);
     PostgreSQLDatabaseTasks.register();
   });
 
@@ -99,7 +108,7 @@ describeIfPostgresqlAdapter("PostgreSQLPurgeTest", () => {
   it.skip("clears active connections", () => {
     // Not yet ported: `purge` clears the handler's active connections
     // (`postgresql_rake_test.rb:208-216`), which trails' `purge` does not do —
-    // a production divergence, not a test-porting one.
+    // a production divergence, not a test-porting gap.
   });
 
   it.skip("establishes connection to postgresql database", () => {
@@ -108,13 +117,17 @@ describeIfPostgresqlAdapter("PostgreSQLPurgeTest", () => {
   });
 
   it("drops database", async () => {
-    await DatabaseTasks.purge(configuration());
+    await withStubbedConnection(connection, async () => {
+      await DatabaseTasks.purge(configuration());
+    });
 
     expect(connection.dropDatabase).toHaveBeenCalledWith("my-app-db");
   });
 
   it("creates database", async () => {
-    await DatabaseTasks.purge(configuration());
+    await withStubbedConnection(connection, async () => {
+      await DatabaseTasks.purge(configuration());
+    });
 
     expect(connection.createDatabase).toHaveBeenCalledWith("my-app-db", {
       adapter: "postgresql",
@@ -130,32 +143,32 @@ describeIfPostgresqlAdapter("PostgreSQLPurgeTest", () => {
 });
 
 describeIfPostgresqlAdapter("PostgreSQLDBCharsetTest", () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
+  beforeEach(() => {
+    PostgreSQLDatabaseTasks.register();
   });
 
   it("db retrieves charset", async () => {
     const encoding = vi.fn(async () => "UTF8");
-    stubLeaseConnection({ encoding });
-    PostgreSQLDatabaseTasks.register();
 
-    await DatabaseTasks.charset(configuration());
+    await withStubbedConnection({ encoding }, async () => {
+      await DatabaseTasks.charset(configuration());
+    });
 
     expect(encoding).toHaveBeenCalled();
   });
 });
 
 describeIfPostgresqlAdapter("PostgreSQLDBCollationTest", () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
+  beforeEach(() => {
+    PostgreSQLDatabaseTasks.register();
   });
 
   it("db retrieves collation", async () => {
     const collation = vi.fn(async () => "en_US.UTF-8");
-    stubLeaseConnection({ collation });
-    PostgreSQLDatabaseTasks.register();
 
-    await DatabaseTasks.collation(configuration());
+    await withStubbedConnection({ collation }, async () => {
+      await DatabaseTasks.collation(configuration());
+    });
 
     expect(collation).toHaveBeenCalled();
   });

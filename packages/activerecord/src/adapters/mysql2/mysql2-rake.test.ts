@@ -6,7 +6,7 @@
  * so the tests port straight across wherever the Ruby stubbing they lean on
  * has an analogue.
  */
-import { it, expect, afterEach, vi } from "vitest";
+import { it, expect, beforeEach, vi } from "vitest";
 import { describeIfMysqlAdapter } from "../../support/describe-if-mysql-adapter.js";
 import { DatabaseTasks } from "../../tasks/database-tasks.js";
 import { MySQLDatabaseTasks } from "../../tasks/mysql-database-tasks.js";
@@ -14,22 +14,29 @@ import { HashConfig } from "../../database-configurations/hash-config.js";
 import { Base } from "../../base.js";
 
 /**
- * `ActiveRecord::Base.stub(:lease_connection, @connection)`
+ * `ActiveRecord::Base.stub(:lease_connection, @connection, &block)`
  * (`mysql2_rake_test.rb:235`). trails' task classes reach the connection
  * through `Base.connectionPool().leaseConnection()`
  * (`mysql-database-tasks.ts:283`), so the pool is where the double goes.
  */
-function stubLeaseConnection(connection: unknown): void {
-  vi.spyOn(Base, "connectionPool").mockReturnValue({
+async function withStubbedConnection(
+  connection: unknown,
+  block: () => Promise<void>,
+): Promise<void> {
+  const spy = vi.spyOn(Base, "connectionPool").mockReturnValue({
     leaseConnection: async () => connection,
   } as unknown as ReturnType<typeof Base.connectionPool>);
+  try {
+    await block();
+  } finally {
+    spy.mockRestore();
+  }
 }
 
-function configuration(overrides: Record<string, unknown> = {}): HashConfig {
+function configuration(): HashConfig {
   return new HashConfig("default_env", "primary", {
     adapter: "mysql2",
     database: "my-app-db",
-    ...overrides,
   });
 }
 
@@ -84,32 +91,32 @@ describeIfMysqlAdapter("MySQLPurgeTest", () => {
 });
 
 describeIfMysqlAdapter("MysqlDBCharsetTest", () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
+  beforeEach(() => {
+    MySQLDatabaseTasks.register();
   });
 
   it("db retrieves charset", async () => {
     const charset = vi.fn(async () => "utf8mb4");
-    stubLeaseConnection({ charset });
-    MySQLDatabaseTasks.register();
 
-    await DatabaseTasks.charset(configuration());
+    await withStubbedConnection({ charset }, async () => {
+      await DatabaseTasks.charset(configuration());
+    });
 
     expect(charset).toHaveBeenCalled();
   });
 });
 
 describeIfMysqlAdapter("MysqlDBCollationTest", () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
+  beforeEach(() => {
+    MySQLDatabaseTasks.register();
   });
 
   it("db retrieves collation", async () => {
     const collation = vi.fn(async () => "utf8mb4_general_ci");
-    stubLeaseConnection({ collation });
-    MySQLDatabaseTasks.register();
 
-    await DatabaseTasks.collation(configuration());
+    await withStubbedConnection({ collation }, async () => {
+      await DatabaseTasks.collation(configuration());
+    });
 
     expect(collation).toHaveBeenCalled();
   });
