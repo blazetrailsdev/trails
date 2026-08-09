@@ -1057,6 +1057,26 @@ describe("Date", () => {
     expect(dNewByFrags(RubyDate._parse("1500-02-29")).toS()).toBe("1500-02-29");
   });
 
+  it("raises from the seat for a day past Temporal's range, decoded nth and all", () => {
+    // The `nth` a Julian day past CM_PERIOD carries (date_core.c:1393-1412) is
+    // ~year 580000 at its smallest, and `Temporal.PlainDate` stops at ±271821 —
+    // so every static that answers the seat raises for one, the same way and
+    // for the same reason the Julian-only spelling above does. MRI answers a
+    // `::Date`/`::DateTime`, its own gem object:
+    //   Date.jd(2**70).to_s #=> "3232350070754114273-01-08"
+    //   DateTime.jd(2**70, 1, 2, 3).to_s
+    //     #=> "3232350070754114273-01-08T01:02:03+00:00"
+    expect(() => RubyDate.jd(2n ** 70n)).toThrow(RubyDate.Error);
+    expect(() => RubyDateTime.jd(2n ** 70n, 1, 2, 3)).toThrow(RubyDate.Error);
+
+    // The decode itself is intact underneath: the gem-shaped builders those
+    // statics run over answer the day, `nth` and all.
+    expect(dNewByFrags({ jd: 2n ** 70n }).toS()).toBe("3232350070754114273-01-08");
+    expect(dtNewByFrags({ jd: 2n ** 70n, hour: 1, min: 2, sec: 3 }).toS()).toBe(
+      "3232350070754114273-01-08T01:02:03+00:00",
+    );
+  });
+
   it("takes a start argument, and Date::JULIAN/GREGORIAN select every day", () => {
     // ruby 3.3.11:
     //   Date.new(1582, 10, 10, Date::GREGORIAN).to_s #=> "1582-10-10"

@@ -5004,7 +5004,15 @@ export class DateTime extends DateWithoutParseStatics {
    * The C's `switch (argc)` fall-through splits `jd` through
    * `num2num_with_frac(jd, 1)` (`date_core.c:7685-7686`) and the second, minute
    * and hour through `num2int_with_frac` under the `n` bounds `positive_inf`,
-   * `3` and `2` ({@link num2intWithFrac}). A fraction is legal only in the LAST
+   * `3` and `2` ({@link num2intWithFrac}) — the day keeps its own macro
+   * ({@link num2numWithFrac}) so {@link decodeJd} can split one past a
+   * `Fixnum`, as `d_complex_new_internal` is handed the `nth`
+   * (`date_core.c:7697-7702`). Such a day is outside `Temporal.PlainDateTime`'s
+   * range and so raises at the seat this static answers, exactly as the
+   * Julian-only spellings RFC 0088's mapping table already names do; the
+   * gem-shaped {@link dtNewByFrags} carries it.
+   *
+   * A fraction is legal only in the LAST
    * argument SUPPLIED — the macro raises `"invalid fraction"` when `argc > n` —
    * so `DateTime.jd(2451944.5)` is noon while `DateTime.jd(2451944, 1.5, 0)`
    * raises, and an explicitly passed later `0` is a supplied argument. That is
