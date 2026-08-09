@@ -11,10 +11,11 @@
  */
 
 import { Temporal } from "@blazetrails/date";
-import { IsolatedExecutionState } from "./isolated-execution-state.js";
-import { TimeWithZone } from "./time-with-zone.js";
-import { TimeZone } from "./values/time-zone.js";
-import { ArgumentError, findZoneBang, getZone } from "./time-zone-config.js";
+import { Duration } from "../../duration.js";
+import { IsolatedExecutionState } from "../../isolated-execution-state.js";
+import { TimeWithZone } from "../../time-with-zone.js";
+import { TimeZone } from "../../values/time-zone.js";
+import { ArgumentError, findZoneBang, getZone } from "../../time-zone-config.js";
 
 /**
  * Mirrors: `DateAndTime::Calculations::DAYS_INTO_WEEK`
@@ -128,19 +129,102 @@ export function since(date: Temporal.PlainDate, seconds: number): TimeWithZone {
   return inTimeZone(date).since(seconds);
 }
 
+/**
+ * Mirrors: `alias :in :since` (`date/calculations.rb:64`). `in` is a reserved
+ * word, so it cannot be a binding name; the export name can be one, and that
+ * is the name importers and the comparator see.
+ */
+export { since as in };
+
 /** Mirrors: `Date#beginning_of_day` (`date/calculations.rb:67-69`) */
 export function beginningOfDay(date: Temporal.PlainDate): TimeWithZone {
   return inTimeZone(date);
 }
+
+/** Mirrors: `alias :midnight :beginning_of_day` (`date/calculations.rb:70`) */
+export const midnight = beginningOfDay;
+
+/** Mirrors: `alias :at_midnight :beginning_of_day` (`date/calculations.rb:71`) */
+export const atMidnight = beginningOfDay;
+
+/** Mirrors: `alias :at_beginning_of_day :beginning_of_day` (`date/calculations.rb:72`) */
+export const atBeginningOfDay = beginningOfDay;
 
 /** Mirrors: `Date#middle_of_day` (`date/calculations.rb:75-77`) */
 export function middleOfDay(date: Temporal.PlainDate): TimeWithZone {
   return inTimeZone(date).middleOfDay();
 }
 
+/** Mirrors: `alias :midday :middle_of_day` (`date/calculations.rb:78`) */
+export const midday = middleOfDay;
+
+/** Mirrors: `alias :noon :middle_of_day` (`date/calculations.rb:79`) */
+export const noon = middleOfDay;
+
+/** Mirrors: `alias :at_midday :middle_of_day` (`date/calculations.rb:80`) */
+export const atMidday = middleOfDay;
+
+/** Mirrors: `alias :at_noon :middle_of_day` (`date/calculations.rb:81`) */
+export const atNoon = middleOfDay;
+
+/** Mirrors: `alias :at_middle_of_day :middle_of_day` (`date/calculations.rb:82`) */
+export const atMiddleOfDay = middleOfDay;
+
 /** Mirrors: `Date#end_of_day` (`date/calculations.rb:85-87`) */
 export function endOfDay(date: Temporal.PlainDate): TimeWithZone {
   return inTimeZone(date).endOfDay();
+}
+
+/** Mirrors: `alias :at_end_of_day :end_of_day` (`date/calculations.rb:88`) */
+export const atEndOfDay = endOfDay;
+
+/** Mirrors: `Date#plus_with_duration` (`date/calculations.rb:90-96`) */
+export function plusWithDuration(
+  date: Temporal.PlainDate,
+  other: Duration | number,
+): Temporal.PlainDate | TimeWithZone {
+  if (other instanceof Duration) {
+    return other.since(date);
+  } else {
+    return plusWithoutDuration(date, other);
+  }
+}
+
+/**
+ * Mirrors: `alias_method :plus_without_duration, :+` (`date/calculations.rb:97`)
+ * — ruby/date's own `Date#+`, which answers the day `other` days later
+ * (`date_core.c` `d_lite_plus`).
+ */
+export function plusWithoutDuration(date: Temporal.PlainDate, other: number): Temporal.PlainDate {
+  return date.add({ days: other });
+}
+
+/** Mirrors: `Date#minus_with_duration` (`date/calculations.rb:100-106`) */
+export function minusWithDuration(
+  date: Temporal.PlainDate,
+  other: Duration | number | Temporal.PlainDate,
+): Temporal.PlainDate | TimeWithZone | number {
+  if (other instanceof Duration) {
+    return plusWithDuration(date, other.negate());
+  } else {
+    return minusWithoutDuration(date, other);
+  }
+}
+
+/**
+ * Mirrors: `alias_method :minus_without_duration, :-` (`date/calculations.rb:107`)
+ * — ruby/date's own `Date#-`, which answers a day count against another Date
+ * and the day `other` days earlier against a number (`date_core.c`
+ * `d_lite_minus`).
+ */
+export function minusWithoutDuration(
+  date: Temporal.PlainDate,
+  other: number | Temporal.PlainDate,
+): Temporal.PlainDate | number {
+  if (other instanceof Temporal.PlainDate) {
+    return date.since(other, { largestUnit: "day" }).days;
+  }
+  return date.subtract({ days: other });
 }
 
 /** Mirrors: `Date#advance` (`date/calculations.rb:127-135`) */
@@ -169,4 +253,41 @@ export function change(
     "month" in options ? options.month! : date.month,
     "day" in options ? options.day! : date.day,
   );
+}
+
+/**
+ * Mirrors: `Date#compare_with_coercion` (`date/calculations.rb:152-158`). The
+ * `Time` arm is trails' instant receivers — a JS `Date`, a
+ * `Temporal.Instant` or a `TimeWithZone`, all of which `to_datetime <=>` reads
+ * as a moment rather than a calendar day.
+ */
+export function compareWithCoercion(
+  date: Temporal.PlainDate,
+  other: Temporal.PlainDate | Date | Temporal.Instant | TimeWithZone,
+): number {
+  // boundary: a JS `Date` is one of trails' `Time` receivers, and this is the
+  // arm keyed on being one.
+  if (other instanceof Date || other instanceof Temporal.Instant || other instanceof TimeWithZone) {
+    return Temporal.Instant.compare(inTimeZone(date).utc(), instantOf(other));
+  } else {
+    return compareWithoutCoercion(date, other);
+  }
+}
+
+function instantOf(other: Date | Temporal.Instant | TimeWithZone): Temporal.Instant {
+  if (other instanceof Temporal.Instant) return other;
+  if (other instanceof TimeWithZone) return other.utc();
+  return Temporal.Instant.fromEpochMilliseconds(other.getTime());
+}
+
+/**
+ * Mirrors: `alias_method :compare_without_coercion, :<=>`
+ * (`date/calculations.rb:159`) — ruby/date's own `Date#<=>`
+ * (`date_core.c` `d_lite_cmp`).
+ */
+export function compareWithoutCoercion(
+  date: Temporal.PlainDate,
+  other: Temporal.PlainDate,
+): number {
+  return Temporal.PlainDate.compare(date, other);
 }

@@ -1,0 +1,74 @@
+/**
+ * trails-only cover for the arms of `core_ext/date/calculations.rb` that Rails'
+ * own `date_ext_test.rb` never names: the ten `alias`es (`:70-72`, `:78-82`,
+ * `:88`) and the two coercion arms `compare_with_coercion` (`:152-158`) and
+ * `plus_without_duration`/`minus_without_duration` (`:97`, `:107`).
+ */
+
+import { describe, it, expect, afterEach } from "vitest";
+import { Temporal } from "@blazetrails/date";
+import * as DateExt from "./date/calculations.js";
+import { resetZone } from "../time-zone-config.js";
+import { Duration } from "../duration.js";
+
+const pd = (year: number, month: number, day: number) => new Temporal.PlainDate(year, month, day);
+
+describe("date calculations aliases", () => {
+  afterEach(() => {
+    resetZone();
+  });
+
+  it("beginning_of_day aliases", () => {
+    expect(DateExt.midnight).toBe(DateExt.beginningOfDay);
+    expect(DateExt.atMidnight).toBe(DateExt.beginningOfDay);
+    expect(DateExt.atBeginningOfDay).toBe(DateExt.beginningOfDay);
+  });
+
+  it("middle_of_day aliases", () => {
+    expect(DateExt.midday).toBe(DateExt.middleOfDay);
+    expect(DateExt.noon).toBe(DateExt.middleOfDay);
+    expect(DateExt.atMidday).toBe(DateExt.middleOfDay);
+    expect(DateExt.atNoon).toBe(DateExt.middleOfDay);
+    expect(DateExt.atMiddleOfDay).toBe(DateExt.middleOfDay);
+  });
+
+  it("end_of_day alias", () => {
+    expect(DateExt.atEndOfDay).toBe(DateExt.endOfDay);
+  });
+
+  it("in is an alias of since", () => {
+    expect(DateExt.in).toBe(DateExt.since);
+    expect(DateExt.in(pd(2005, 2, 21), 45).hour).toBe(0);
+  });
+});
+
+describe("date calculations coercion arms", () => {
+  it("plus_without_duration answers the day n days later", () => {
+    expect(DateExt.plusWithoutDuration(pd(2005, 2, 21), 3)).toEqual(pd(2005, 2, 24));
+  });
+
+  it("minus_without_duration answers a day count against a date", () => {
+    expect(DateExt.minusWithoutDuration(pd(2005, 2, 24), pd(2005, 2, 21))).toBe(3);
+    expect(DateExt.minusWithoutDuration(pd(2005, 2, 24), 3)).toEqual(pd(2005, 2, 21));
+  });
+
+  it("minus_with_duration subtracts a duration", () => {
+    expect(DateExt.minusWithDuration(pd(2017, 1, 3), Duration.days(2))).toEqual(pd(2017, 1, 1));
+  });
+
+  it("compare_without_coercion orders two dates", () => {
+    expect(DateExt.compareWithoutCoercion(pd(2005, 2, 21), pd(2005, 2, 22))).toBe(-1);
+    expect(DateExt.compareWithoutCoercion(pd(2005, 2, 21), pd(2005, 2, 21))).toBe(0);
+    expect(DateExt.compareWithoutCoercion(pd(2005, 2, 22), pd(2005, 2, 21))).toBe(1);
+  });
+
+  it("compare_with_coercion widens the day for a Time", () => {
+    const date = pd(2005, 2, 21);
+    const midnight = DateExt.beginningOfDay(date).utc();
+    expect(DateExt.compareWithCoercion(date, midnight.add({ hours: 1 }))).toBe(-1);
+    expect(DateExt.compareWithCoercion(date, midnight)).toBe(0);
+    expect(DateExt.compareWithCoercion(date, midnight.subtract({ hours: 1 }))).toBe(1);
+    expect(DateExt.compareWithCoercion(date, new Date(midnight.epochMilliseconds))).toBe(0);
+    expect(DateExt.compareWithCoercion(date, DateExt.beginningOfDay(date))).toBe(0);
+  });
+});

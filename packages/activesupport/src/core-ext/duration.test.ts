@@ -1,12 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { Temporal } from "@blazetrails/date";
-import { Duration } from "../duration.js";
+import { Duration, days } from "../duration.js";
+import { current, minusWithDuration, plusWithDuration } from "./date/calculations.js";
 
 function asDate(instant: Temporal.Instant): Date {
   return new Date(instant.epochMilliseconds);
 }
 
 describe("DurationTest", () => {
+  const civil = (year: number, month: number, day: number) =>
+    new Temporal.PlainDate(year, month, day);
+
   it("is a", () => {
     const d = Duration.days(1);
     expect(d instanceof Duration).toBe(true);
@@ -107,10 +111,9 @@ describe("DurationTest", () => {
   });
 
   it("minus with duration does not break subtraction of date from date", () => {
-    // In JS, date subtraction is native arithmetic — no Duration patching needed
-    const today = new Date();
-    const diff = today.getTime() - today.getTime();
-    expect(diff).toBe(0);
+    const today = current();
+    expect(() => minusWithDuration(today, today)).not.toThrow();
+    expect(minusWithDuration(today, today)).toBe(0);
   });
 
   it("unary plus", () => {
@@ -162,43 +165,36 @@ describe("DurationTest", () => {
   });
 
   it("date added with zero days", () => {
-    const date = new Date(2017, 0, 1); // Jan 1 2017
-    const result = Duration.days(0).since(date);
-    expect(asDate(result).getFullYear()).toBe(2017);
-    expect(asDate(result).getMonth()).toBe(0);
-    expect(asDate(result).getDate()).toBe(1);
+    expect(plusWithDuration(civil(2017, 1, 1), days(0))).toEqual(civil(2017, 1, 1));
+    expect(plusWithDuration(civil(2017, 1, 1), days(0))).toBeInstanceOf(Temporal.PlainDate);
   });
 
   it("date added with multiplied duration", () => {
-    const date = new Date(2017, 0, 1);
-    const result = Duration.days(1).times(2).since(date);
-    expect(asDate(result).getFullYear()).toBe(2017);
-    expect(asDate(result).getDate()).toBe(3);
+    expect(plusWithDuration(civil(2017, 1, 1), days(1).times(2))).toEqual(civil(2017, 1, 3));
+    expect(plusWithDuration(civil(2017, 1, 1), days(1).times(2))).toBeInstanceOf(
+      Temporal.PlainDate,
+    );
   });
 
   it("date added with multiplied duration larger than one month", () => {
-    const date = new Date(2017, 0, 1);
-    const result = Duration.days(1).times(45).since(date);
-    expect(asDate(result).getFullYear()).toBe(2017);
-    expect(asDate(result).getMonth()).toBe(1); // February
-    expect(asDate(result).getDate()).toBe(15);
+    expect(plusWithDuration(civil(2017, 1, 1), days(1).times(45))).toEqual(civil(2017, 2, 15));
+    expect(plusWithDuration(civil(2017, 1, 1), days(1).times(45))).toBeInstanceOf(
+      Temporal.PlainDate,
+    );
   });
 
   it("date added with divided duration", () => {
-    const date = new Date(2017, 0, 1);
-    // 4.days / 2 = 172800 seconds
-    const ms = Duration.days(4).dividedBy(2).inSeconds() * 1000;
-    const expected = new Date(date.getTime() + ms);
-    const result = Duration.days(4).dividedBy(2).since(date);
-    expect(asDate(result).getDate()).toBe(expected.getDate());
+    expect(plusWithDuration(civil(2017, 1, 1), days(4).dividedBy(2))).toEqual(civil(2017, 1, 3));
+    expect(plusWithDuration(civil(2017, 1, 1), days(4).dividedBy(2))).toBeInstanceOf(
+      Temporal.PlainDate,
+    );
   });
 
   it("date added with divided duration larger than one month", () => {
-    const date = new Date(2017, 0, 1);
-    const secs = Duration.days(90).dividedBy(2).inSeconds();
-    const result = new Date(date.getTime() + secs * 1000);
-    expect(result.getMonth()).toBe(1); // February
-    expect(result.getDate()).toBe(15);
+    expect(plusWithDuration(civil(2017, 1, 1), days(90).dividedBy(2))).toEqual(civil(2017, 2, 15));
+    expect(plusWithDuration(civil(2017, 1, 1), days(90).dividedBy(2))).toBeInstanceOf(
+      Temporal.PlainDate,
+    );
   });
 
   it("plus with time", () => {

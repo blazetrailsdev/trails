@@ -8,6 +8,8 @@
 
 import { Temporal } from "@blazetrails/date";
 import { instantFrom } from "./temporal.js";
+import { advance as dateAdvance, since as dateSince } from "./core-ext/date/calculations.js";
+import type { TimeWithZone } from "./time-with-zone.js";
 
 export type DurationParts = {
   years: number;
@@ -207,11 +209,21 @@ export class Duration {
   // Date application — applies each part sequentially like Rails does
   // ---------------------------------------------------------------------------
 
-  since(date: Date | Temporal.Instant = Temporal.Now.instant()): Temporal.Instant {
+  since(date: Temporal.PlainDate): Temporal.PlainDate | TimeWithZone;
+  since(date?: Date | Temporal.Instant): Temporal.Instant;
+  since(
+    date: Date | Temporal.Instant | Temporal.PlainDate = Temporal.Now.instant(),
+  ): Temporal.Instant | Temporal.PlainDate | TimeWithZone {
+    if (date instanceof Temporal.PlainDate) return applyDurationToDate(date, this.parts, 1);
     return applyDurationPreservingNs(date, this.parts, 1);
   }
 
-  ago(date: Date | Temporal.Instant = Temporal.Now.instant()): Temporal.Instant {
+  ago(date: Temporal.PlainDate): Temporal.PlainDate | TimeWithZone;
+  ago(date?: Date | Temporal.Instant): Temporal.Instant;
+  ago(
+    date: Date | Temporal.Instant | Temporal.PlainDate = Temporal.Now.instant(),
+  ): Temporal.Instant | Temporal.PlainDate | TimeWithZone {
+    if (date instanceof Temporal.PlainDate) return applyDurationToDate(date, this.parts, -1);
     return applyDurationPreservingNs(date, this.parts, -1);
   }
 
@@ -472,6 +484,53 @@ function toDateInput(date: Date | Temporal.Instant): Date {
   if (date instanceof Date) return date;
   if (date instanceof Temporal.Instant) return new Date(date.epochMilliseconds);
   throw new TypeError(`expected a time or date, got ${JSON.stringify(date)}`);
+}
+
+/**
+ * The `time.acts_like?(:date)` arm of `ActiveSupport::Duration#sum`
+ * (`duration.rb:397-419`): each part is applied in turn, the sub-day ones
+ * through `Date#since` — which widens the day into a zoned `Time`
+ * (`core_ext/date/calculations.rb:61-63`) — and the rest through `advance`,
+ * which keeps the receiver a calendar day.
+ */
+function applyDurationToDate(
+  date: Temporal.PlainDate,
+  parts: DurationParts,
+  sign: 1 | -1,
+): Temporal.PlainDate | TimeWithZone {
+  let time: Temporal.PlainDate | TimeWithZone = date;
+
+  for (const [type, number] of Object.entries(parts) as [keyof DurationParts, number][]) {
+    // Rails' `@parts` is sparse — a part is present only when it was set —
+    // where `DurationParts` carries all seven keys. Without this skip a zero
+    // `seconds` would take the `Date#since` arm and widen the day into a Time.
+    if (number === 0) continue;
+    const t = time;
+    if (type === "seconds") {
+      time = dateOrTimeSince(t, sign * number);
+    } else if (type === "minutes") {
+      time = dateOrTimeSince(t, sign * number * 60);
+    } else if (type === "hours") {
+      time = dateOrTimeSince(t, sign * number * 3600);
+    } else {
+      time = dateOrTimeAdvance(t, { [type]: sign * number });
+    }
+  }
+
+  return time;
+}
+
+/** `t.since(seconds)` over either receiver {@link applyDurationToDate} carries. */
+function dateOrTimeSince(t: Temporal.PlainDate | TimeWithZone, seconds: number): TimeWithZone {
+  return t instanceof Temporal.PlainDate ? dateSince(t, seconds) : t.since(seconds);
+}
+
+/** `t.advance(options)` over either receiver {@link applyDurationToDate} carries. */
+function dateOrTimeAdvance(
+  t: Temporal.PlainDate | TimeWithZone,
+  options: Partial<DurationParts>,
+): Temporal.PlainDate | TimeWithZone {
+  return t instanceof Temporal.PlainDate ? dateAdvance(t, options) : t.advance(options);
 }
 
 /**
