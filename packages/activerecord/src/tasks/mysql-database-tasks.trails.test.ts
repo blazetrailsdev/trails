@@ -33,6 +33,7 @@ describe("MySQLDatabaseTasks", () => {
     ).mockImplementation(async (hash?: Record<string, unknown>) => {
       establishCalls.push(hash);
     });
+    const createDatabaseCalls: Array<[string, unknown]> = [];
     vi.spyOn(
       tasks as unknown as { connection(): Promise<unknown> },
       "connection",
@@ -41,25 +42,27 @@ describe("MySQLDatabaseTasks", () => {
         executeCalls.push({ sql, binds });
         return [{ DEFAULT_CHARACTER_SET_NAME: "utf8mb4", DEFAULT_COLLATION_NAME: "utf8mb4_bin" }];
       },
+      async createDatabase(name: string, options: unknown) {
+        createDatabaseCalls.push([name, options]);
+      },
     });
 
     let dropCallCount = 0;
-    let createCallArg: unknown;
     vi.spyOn(tasks, "drop").mockImplementation(async () => {
       dropCallCount++;
-    });
-    vi.spyOn(tasks, "create").mockImplementation(async (override) => {
-      createCallArg = override;
     });
 
     await tasks.purge();
 
-    // savedCharset must establish without a database (information_schema.SCHEMATA
-    // is server-global; connecting to the target DB would fail with error 1049
-    // if it doesn't exist yet).
-    expect(establishCalls).toHaveLength(1);
+    // savedCharset and the recreate must both establish without a database
+    // (information_schema.SCHEMATA is server-global; connecting to the target DB
+    // would fail with error 1049 if it doesn't exist yet), and the trailing
+    // establish returns the pool to the recreated database.
+    expect(establishCalls).toHaveLength(3);
     expect(establishCalls[0]).toBeDefined();
-    expect(establishCalls[0]!.database).toBeUndefined();
+    expect(establishCalls[0]!.database).toBeNull();
+    expect(establishCalls[1]!.database).toBeNull();
+    expect(establishCalls[2]).toBeUndefined();
 
     // savedCharset must have queried information_schema.SCHEMATA with the DB name
     expect(executeCalls).toHaveLength(1);
@@ -68,7 +71,9 @@ describe("MySQLDatabaseTasks", () => {
 
     // purge must drop then recreate with the saved charset/collation
     expect(dropCallCount).toBe(1);
-    expect(createCallArg).toEqual({ charset: "utf8mb4", collation: "utf8mb4_bin" });
+    expect(createDatabaseCalls).toEqual([
+      ["trails_test", { charset: "utf8mb4", collation: "utf8mb4_bin" }],
+    ]);
   });
 
   it("test_truncate_all_queries_information_schema_and_truncates_each_user_table", async () => {
