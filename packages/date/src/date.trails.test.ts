@@ -996,6 +996,26 @@ describe("Date", () => {
     );
   });
 
+  it("threads decode_jd through the frags builders and the jd statics", () => {
+    // ruby 3.3.11 -rdate — `d_new_by_frags` (date_core.c:4315) and
+    // `dt_new_by_frags` (:8311) decode the Julian day rt__valid_*_p answered
+    // back into the stored `nth`, which is the same object `Date.jd` /
+    // `DateTime.jd` build (date_core.c:7697):
+    //   Date.jd(2**70).to_s #=> "3232350070754114273-01-08"
+    //   Date.jd(2**70).jd   #=> 1180591620717411303424
+    //   Date.jd(2**70).wday #=> 3
+    //   DateTime.jd(2**70, 1, 2, 3).to_s
+    //     #=> "3232350070754114273-01-08T01:02:03+00:00"
+    const d = dNewByFrags({ jd: 2n ** 70n });
+    expect(d.toS()).toBe("3232350070754114273-01-08");
+    expect(d.jd).toBe(1180591620717411303424n);
+    expect(d.year).toBe(3232350070754114273n);
+    expect(d.wday).toBe(3);
+    const dt = dtNewByFrags({ jd: 2n ** 70n, hour: 1, min: 2, sec: 3 });
+    expect(dt.toS()).toBe("3232350070754114273-01-08T01:02:03+00:00");
+    expect(dt.jd).toBe(1180591620717411303424n);
+  });
+
   it("truncates a fractional year through valid_civil_p, as decode_year does", () => {
     // ruby 3.3.11 -rdate — valid_civil_p (date_core.c:2246-2277) runs
     // decode_year before c_valid_civil_p's `int y`, and the truncation is of

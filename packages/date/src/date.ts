@@ -713,7 +713,7 @@ const ABBR_DAYS = "sun|mon|tue|wed|thu|fri|sat";
  * answers `{... :offset => nil}` there.
  */
 export interface DateParts {
-  jd?: number;
+  jd?: number | bigint;
   year?: number;
   mon?: number;
   mday?: number;
@@ -3638,6 +3638,23 @@ function num2intWithFrac(
 }
 
 /**
+ * @internal `date_core.c`'s `num2num_with_frac` macro (`date_core.c:3286-3294`),
+ * which differs from {@link num2intWithFrac} (`:3296-3305`) only in NOT running
+ * the truncated whole through `NUM2INT`: `datetime_s_jd` (`date_core.c:7685`)
+ * takes its Julian day this way so a day past a `Fixnum` reaches `decode_jd`
+ * whole. A JS number is not narrowed either way, so that arm is the `int` one;
+ * a `bigint` is the `Bignum` the macro keeps, and carries no fraction.
+ */
+function num2numWithFrac(
+  v: number | bigint | Rational,
+  unitInSeconds: number,
+  argcGtN: boolean,
+): [whole: number | bigint, fr: number | Rational] {
+  if (typeof v === "bigint") return [v, 0];
+  return num2intWithFrac(v, unitInSeconds, argcGtN);
+}
+
+/**
  * @internal `date_core.c` `c_valid_ordinal_p` (`date_core.c:674-695`) over
  * `c_ordinal_to_jd` (`date_core.c:556-564`), the `d`th day of year `y`. A
  * negative `d` counts back from the last day of the year — `-1` is 31 December
@@ -3834,7 +3851,7 @@ function cValidWeeknumP(
  * answers the Julian day back: every integer names a day, so there is nothing
  * to reject.
  */
-function rtValidJdP(jd: number): number {
+function rtValidJdP(jd: number | bigint): number | bigint {
   return jd;
 }
 
@@ -3849,11 +3866,21 @@ function rtValidOrdinalP(y: number, d: number, sg = DEFAULT_SG): number | null {
 
 /**
  * @internal `date_core.c` `rt__valid_civil_p` (`date_core.c:4141-4155`) over
- * `c_valid_civil_p` (`date_core.c:766-790`), which answers `nil` rather than
- * raising so its caller can fall through to the next kind of date.
+ * {@link validCivilP} (`date_core.c:2246-2277`), which answers `nil` rather
+ * than raising so its caller can fall through to the next kind of date. The
+ * `nth` the split leaves goes straight back in through {@link encodeJd}
+ * (`date_core.c:4152`): the answer is one whole Julian day, which
+ * `d_new_by_frags` / `dt_new_by_frags` decode again on the way into the object.
  */
-function rtValidCivilP(y: number, m: number, d: number, sg = DEFAULT_SG): number | null {
-  return cValidCivilP(y, m, d, sg);
+function rtValidCivilP(
+  y: number | bigint,
+  m: number,
+  d: number,
+  sg = DEFAULT_SG,
+): number | bigint | null {
+  const r = validCivilP(y, m, d, sg);
+  if (r === null) return null;
+  return encodeJd(r[0], r[1]);
 }
 
 /**
@@ -3879,7 +3906,7 @@ function rtValidCivilP(y: number, m: number, d: number, sg = DEFAULT_SG): number
  * `sg` is the calendar-reform start every arm reads its date under, as Ruby
  * threads it.
  */
-function rtValidDateFragsP(parts: DateParts, sg = DEFAULT_SG): number | null {
+function rtValidDateFragsP(parts: DateParts, sg = DEFAULT_SG): number | bigint | null {
   if (parts.jd !== undefined) {
     const d = rtValidJdP(parts.jd);
     if (d !== null) return d;
@@ -3941,7 +3968,7 @@ function rtValidDateFragsP(parts: DateParts, sg = DEFAULT_SG): number | null {
  * {@link rtRewriteFrags} and {@link completeFrags}.
  */
 export function dNewByFrags(hash: DateParts | null, sg = DEFAULT_SG): Date {
-  let jd: number | null;
+  let jd: number | bigint | null;
 
   if (hash === null) throw new DateError("invalid date");
 
@@ -3964,7 +3991,8 @@ export function dNewByFrags(hash: DateParts | null, sg = DEFAULT_SG): Date {
   }
 
   if (jd === null) throw new DateError("invalid date");
-  return new Date(SEAT, 0n, jd, sg);
+  const [nth, rjd] = decodeJd(jd);
+  return new Date(SEAT, nth, rjd, sg);
 }
 
 /**
@@ -4013,7 +4041,7 @@ function of2str(of: number): string {
  * falls out of the representation rather than being normalized here.
  */
 export function dtNewByFrags(hash: DateParts | null, sg = DEFAULT_SG): DateTime {
-  let jd: number | null;
+  let jd: number | bigint | null;
 
   if (hash === null) throw new DateError("invalid date");
 
@@ -4061,7 +4089,8 @@ export function dtNewByFrags(hash: DateParts | null, sg = DEFAULT_SG): DateTime 
   let of = to == null ? 0 : to instanceof Rational ? to.toI() : Math.trunc(to);
   if (of < -DAY_IN_SECONDS || of > DAY_IN_SECONDS) of = 0;
 
-  return new DateTime(SEAT, 0n, jdLocalToUtc(jd, df, of), dfLocalToUtc(df, of), sf, of, sg);
+  const [nth, rjd] = decodeJd(jd);
+  return new DateTime(SEAT, nth, jdLocalToUtc(rjd, df, of), dfLocalToUtc(df, of), sf, of, sg);
 }
 
 /**
@@ -4988,7 +5017,7 @@ export class DateTime extends DateWithoutParseStatics {
    * `c_valid_time_p` admits into midnight of the next day.
    */
   static jd(
-    jd: number | Rational = 0,
+    jd: number | bigint | Rational = 0,
     hour?: number | Rational,
     minute?: number | Rational,
     second?: number | Rational,
@@ -5008,7 +5037,9 @@ export class DateTime extends DateWithoutParseStatics {
       HOUR_IN_SECONDS,
       minute !== undefined || second !== undefined || offset !== undefined || start !== undefined,
     );
-    const [rjd, jdFr] = num2intWithFrac(
+    // `num2num_with_frac`, not `num2int_with_frac` (`date_core.c:7685`): the
+    // day stays whole so `decode_jd` below can split one past a `Fixnum`.
+    const [rjd, jdFr] = num2numWithFrac(
       jd,
       DAY_IN_SECONDS,
       hour !== undefined ||
@@ -5032,12 +5063,13 @@ export class DateTime extends DateWithoutParseStatics {
       fr2 = fr2 instanceof Rational ? fr2.add(DAY_IN_SECONDS) : fr2 + DAY_IN_SECONDS;
     }
     const localDf = timeToDf(rh, rmin, rs);
+    const [nth, rrjd] = decodeJd(rjd);
     const [rjd2, df, sf] = addFrac(
-      jdLocalToUtc(rjd, localDf, rof),
+      jdLocalToUtc(rrjd, localDf, rof),
       dfLocalToUtc(localDf, rof),
       fr2,
     );
-    return new DateTime(SEAT, 0n, rjd2, df, sf, rof, sg).toDatetime();
+    return new DateTime(SEAT, nth, rjd2, df, sf, rof, sg).toDatetime();
   }
 
   /**
@@ -5100,12 +5132,13 @@ export class DateTime extends DateWithoutParseStatics {
       fr2 = fr2 instanceof Rational ? fr2.add(DAY_IN_SECONDS) : fr2 + DAY_IN_SECONDS;
     }
     const localDf = timeToDf(rh, rmin, rs);
+    const [nth, rrjd] = decodeJd(rjd);
     const [rjd2, df, sf] = addFrac(
-      jdLocalToUtc(rjd, localDf, rof),
+      jdLocalToUtc(rrjd, localDf, rof),
       dfLocalToUtc(localDf, rof),
       fr2,
     );
-    return new DateTime(SEAT, 0n, rjd2, df, sf, rof, sg).toDatetime();
+    return new DateTime(SEAT, nth, rjd2, df, sf, rof, sg).toDatetime();
   }
 
   /**
@@ -5187,12 +5220,13 @@ export class DateTime extends DateWithoutParseStatics {
       fr2 = fr2 instanceof Rational ? fr2.add(DAY_IN_SECONDS) : fr2 + DAY_IN_SECONDS;
     }
     const localDf = timeToDf(rh, rmin, rs);
+    const [nth, rrjd] = decodeJd(rjd);
     const [rjd2, df, sf] = addFrac(
-      jdLocalToUtc(rjd, localDf, rof),
+      jdLocalToUtc(rrjd, localDf, rof),
       dfLocalToUtc(localDf, rof),
       fr2,
     );
-    return new DateTime(SEAT, 0n, rjd2, df, sf, rof, sg).toDatetime();
+    return new DateTime(SEAT, nth, rjd2, df, sf, rof, sg).toDatetime();
   }
 
   /**

@@ -525,10 +525,16 @@ export function adapterClass(this: typeof Base): Promise<new (...args: any[]) =>
  * Synchronous, non-leasing variant of {@link adapterClass}. Resolves the
  * adapter constructor from a directly-assigned `_adapter` (test/simple setups)
  * or the pool's pre-warmed sync adapter cache, without ever leasing a
- * connection. Returns `null` when no pool/adapter is resolvable yet. Mirrors
- * Rails' `model.adapter_class` — a class-level lookup that does not check out a
- * connection — for code paths (e.g. `column_name_with_order_matcher`) that only
- * need static adapter metadata.
+ * connection. Mirrors Rails' `model.adapter_class` — a class-level lookup that
+ * does not check out a connection — for code paths (e.g.
+ * `column_name_with_order_matcher`) that only need static adapter metadata.
+ *
+ * `connection_pool` resolves `strict: true` (connection_handling.rb:342), so
+ * `adapter_class` (connection_handling.rb:338) RAISES for a model with no
+ * established connection; the pool error propagates here for the same reason,
+ * rather than being answered as a `null` every caller has to re-raise. `null`
+ * is left for the one condition Rails cannot be in — the adapter module not yet
+ * imported, which Ruby's autoload does synchronously and ESM cannot.
  */
 export function adapterClassSync(
   this: typeof Base,
@@ -537,13 +543,9 @@ export function adapterClassSync(
   if (directAdapter) {
     return directAdapter.constructor as new (...args: any[]) => DatabaseAdapter;
   }
-  let pool: ConnectionPool | undefined;
-  try {
-    pool = connectionPool.call(this);
-  } catch {
-    return null;
-  }
-  return pool.dbConfig.adapterClassSync() as (new (...args: any[]) => DatabaseAdapter) | null;
+  return connectionPool.call(this).dbConfig.adapterClassSync() as
+    | (new (...args: any[]) => DatabaseAdapter)
+    | null;
 }
 
 export function removeConnection(this: typeof Base): DatabaseConfig | undefined {
