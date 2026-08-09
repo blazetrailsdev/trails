@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Deprecation, DeprecationError, deprecator } from "./deprecation.js";
+import { Notifications } from "./notifications.js";
 
 describe("DeprecationTest", () => {
   let dep: Deprecation;
@@ -584,9 +585,25 @@ describe("DeprecationTest", () => {
   });
 
   it(":notify behavior", () => {
-    dep.behavior = "notify";
-    // notify is a no-op in our implementation; should not throw
-    expect(() => dep.warn("notify me")).not.toThrow();
+    const deprecator = new Deprecation("horizon", "MyGem::Custom");
+    deprecator.behavior = "notify";
+    const behavior = deprecator.behavior[0];
+
+    const events: Record<string, unknown>[] = [];
+    const sub = Notifications.subscribe("deprecation.my_gem_custom", (event) => {
+      events.push(event.payload as Record<string, unknown>);
+    });
+
+    try {
+      behavior("Some error!", ["call stack!"], deprecator);
+      expect(events.length).toBe(1);
+      expect(events[0].message).toBe("Some error!");
+      expect(events[0].callstack).toEqual(["call stack!"]);
+      expect(events[0].deprecationHorizon).toBe("horizon");
+      expect(events[0].gemName).toBe("MyGem::Custom");
+    } finally {
+      Notifications.unsubscribe(sub);
+    }
   });
 
   it(":report_error behavior", () => {

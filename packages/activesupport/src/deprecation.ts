@@ -67,12 +67,12 @@ export const DEFAULT_BEHAVIORS: ReadonlyMap<DeprecationBehavior, DeprecationBeha
       "notify",
       (message, callstack, deprecator) => {
         Notifications.instrument(
-          `deprecation.${underscore(deprecator.gemName ?? "").replace(/\//g, "_")}`,
+          `deprecation.${underscore(deprecator.gemName).replace(/\//g, "_")}`,
           {
             message,
             callstack,
             gemName: deprecator.gemName,
-            deprecationHorizon: deprecator.horizon,
+            deprecationHorizon: deprecator.deprecationHorizon,
           },
         );
       },
@@ -117,7 +117,7 @@ function arityCoerce(behavior: unknown): DeprecationBehaviorCallable {
       return fn as DeprecationBehaviorCallable;
     default:
       return (message, callstack, deprecator) => {
-        fn(message, callstack, deprecator.horizon, deprecator.gemName);
+        fn(message, callstack, deprecator.deprecationHorizon, deprecator.gemName);
       };
   }
 }
