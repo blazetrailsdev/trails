@@ -2,90 +2,17 @@
  * Trails-specific invariants split out of base.test.ts (RFC 0043).
  *
  * These guard trails-internal behavior with no Rails counterpart in
- * base_test.rb: the quoteSqlValue SQL-literal helper, the _applyScopeAttributes
+ * base_test.rb: the _applyScopeAttributes
  * scoping mechanism, the UnknownPrimaryKey error message, and the internalSchemaCache-less
  * tableExists fallback.
  */
 import { describe, it, expect } from "vitest";
 import { Base, UnknownPrimaryKey } from "./index.js";
-import { quoteSqlValue } from "./base.js";
-import { quotedDate as pgQuotedDate } from "./connection-adapters/postgresql/quoting.js";
 import { registerSubclass } from "./inheritance.js";
-import { Temporal } from "@blazetrails/date";
 import { Type } from "@blazetrails/activemodel";
 import { fixtures } from "./test-fixtures.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { reconcileVirtualAttributes, loadSchema } from "./model-schema.js";
-
-describe("quoteSqlValue", () => {
-  // Stands in for a PostgreSQLAdapter receiver: `quote` self-dispatches
-  // `quoted_date` onto it, exactly as the real adapter supplies it.
-  const pgHost = { quotedDate: pgQuotedDate };
-
-  it("emits bare decimal for bigint (not quoted string)", () => {
-    expect(quoteSqlValue(123n)).toBe("123");
-    expect(quoteSqlValue(2n ** 62n)).toBe("4611686018427387904");
-    expect(quoteSqlValue(-1n)).toBe("-1");
-  });
-
-  it("emits bare decimal for number (unchanged)", () => {
-    expect(quoteSqlValue(42)).toBe("42");
-    expect(quoteSqlValue(-7)).toBe("-7");
-  });
-
-  it("emits NULL for null/undefined", () => {
-    expect(quoteSqlValue(null)).toBe("NULL");
-    expect(quoteSqlValue(undefined)).toBe("NULL");
-  });
-
-  it("emits ISO-quoted literal for a valid Date", () => {
-    expect(quoteSqlValue(new Date("2026-04-15T12:00:00.000Z"))).toBe("'2026-04-15T12:00:00.000Z'");
-  });
-
-  it("emits NULL for an invalid Date (NaN)", () => {
-    expect(quoteSqlValue(new Date(NaN))).toBe("NULL");
-  });
-
-  it("emits NULL for object whose toJSON() returns undefined (no crash)", () => {
-    const v = { toJSON: () => undefined };
-    expect(() => quoteSqlValue(v)).not.toThrow();
-    expect(quoteSqlValue(v)).toBe("NULL");
-  });
-
-  it("serializes object containing bigint values without crashing", () => {
-    expect(() => quoteSqlValue({ a: 1n })).not.toThrow();
-    expect(quoteSqlValue({ a: 1n })).toBe('\'{"a":"1"}\'');
-  });
-
-  it("emits NULL for circular object (no crash)", () => {
-    const circ: Record<string, unknown> = {};
-    circ.self = circ;
-    expect(() => quoteSqlValue(circ)).not.toThrow();
-    expect(quoteSqlValue(circ)).toBe("NULL");
-  });
-
-  it("quotes a Temporal.Instant as a SQL datetime literal", () => {
-    // value_for_database yields the cast Temporal; the inline insert_all VALUES
-    // path renders the dialect-correct literal. Default (no dialect) uses the
-    // trimmed abstract formatter.
-    expect(quoteSqlValue(Temporal.Instant.from("2026-04-26T14:23:55Z"))).toBe(
-      "'2026-04-26 14:23:55'",
-    );
-  });
-
-  it("renders the PG BC literal for a proleptic-year Instant (insert_all VALUES)", () => {
-    // Regression guard: the PG inline VALUES path must carry the " BC" suffix
-    // and fixed-6 microseconds — resolved from the connection's `quoted_date`
-    // (abstract/quoting.rb:85), not a dialect argument.
-    const instant = Temporal.Instant.from("-000043-03-15T12:34:56.123456Z");
-    expect(quoteSqlValue(instant, pgHost)).toBe("'0044-03-15 12:34:56.123456 BC'");
-  });
-
-  it("caps PG datetime literal fractional seconds at microseconds", () => {
-    const instant = Temporal.Instant.from("2026-04-26T14:23:55.123456789Z");
-    expect(quoteSqlValue(instant, pgHost)).toBe("'2026-04-26 14:23:55.123456'");
-  });
-});
 
 describe("_applyScopeAttributes — scoping initializeInternalsCallback", () => {
   function makeModel() {

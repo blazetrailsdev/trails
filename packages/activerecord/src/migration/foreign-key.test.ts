@@ -872,23 +872,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
           });
         };
 
-        if (adapterType === "sqlite") {
-          // SQLite adds the key by rebuilding the table, and trails' rebuild
-          // issues its CREATE TABLE straight through the driver
-          // (sqlite3-adapter.ts alterTable), so nothing reaches
-          // sql.active_record and Rails' assert_queries_match would see an
-          // empty log. Match the same clause against the DDL that landed —
-          // Rails' end anchor still applies, the FK clause terminating the
-          // CREATE TABLE. Story instrument-sqlite-alter-table-rebuild-queries
-          // (RFC 0023) removes this branch.
-          await addTheKey();
-          const ddl = await conn.selectValue(
-            "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'astronauts'",
-          );
-          expect(String(ddl)).toMatch(deferrableClause);
-        } else {
-          await assertQueriesMatch(deferrableClause, undefined, false, addTheKey);
-        }
+        await assertQueriesMatch(deferrableClause, undefined, false, addTheKey);
 
         const foreignKeys = await conn.foreignKeys("astronauts");
         expect(foreignKeys.length).toBe(1);
