@@ -1602,10 +1602,10 @@ export class PostgreSQLAdapter
    */
   private _shouldPrepare(binds: unknown[]): boolean {
     // Rails' gate and nothing more (the inverse of
-    // `without_prepared_statement?`, abstract_adapter.rb:1177). A zero
-    // `statement_limit` degrades inside `StatementPool#[]=`, which evicts down
-    // to `max` (statement_pool.rb:32-36) and so DEALLOCATEs each name right
-    // after it is prepared, rather than by branching at the call site.
+    // `without_prepared_statement?`, abstract_adapter.rb:1177). It does not
+    // consult `statement_limit`: a limit of 0 is unsupported in Rails, whose
+    // `StatementPool#[]=` loop raises on the empty cache
+    // (statement_pool.rb:31-33), so there is no zero-limit case to branch on.
     return this.preparedStatements && binds.length > 0;
   }
 
