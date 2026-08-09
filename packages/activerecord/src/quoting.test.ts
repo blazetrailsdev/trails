@@ -6,7 +6,7 @@ import {
   quoteString,
   quoteColumnName,
   quoteTableName as quoteTableNameFn,
-  quoteTableNameForAssignment,
+  quoteTableNameForAssignment as quoteTableNameForAssignmentFn,
   quotedDate,
   quotedTime as quotedTimeFn,
   quotedTrue,
@@ -29,6 +29,8 @@ const HOST = {};
 const quote = (value: unknown): string => quoteFn.call(HOST, value);
 const quoteTableName = (name: string): string => quoteTableNameFn.call(HOST, name);
 const typeCast = (value: unknown): unknown => typeCastFn.call(HOST, value);
+const quoteTableNameForAssignment = (table: string, attr: string): string =>
+  quoteTableNameForAssignmentFn.call(HOST, table, attr);
 const quotedTime = (value: Temporal.PlainTime | Temporal.PlainDateTime): string =>
   quotedTimeFn.call(HOST, value);
 import {

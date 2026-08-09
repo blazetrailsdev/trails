@@ -11,10 +11,9 @@
 import {
   quote as abstractQuote,
   quotedDate as abstractQuotedDate,
+  typeCast as abstractTypeCast,
   toBytes,
   dispatchQuotedBinary,
-  dispatchQuotedDate,
-  dispatchQuotedTime,
   dispatchUnquotedTrue,
   dispatchUnquotedFalse,
   type QuotedTimeValue,
@@ -222,37 +221,18 @@ export function typeCast(this: QuotingDispatchHost, value: unknown, bindsAsFloat
     if (bindsAsFloat) return value;
     return Number.isInteger(value) ? BigInt(value) : value;
   }
-  if (typeof value === "string" || typeof value === "bigint") return value;
-  // Rails SQLite3::Quoting#_type_cast: `when BigDecimal then value.to_f` — a
-  // float, NOT the abstract adapter's `value.to_s("F")` string. (quote() still
-  // emits the fixed-form string via the inherited abstract quoter.)
+  // Rails SQLite3::Quoting#type_cast: `when BigDecimal, Rational then value.to_f`
+  // (sqlite3/quoting.rb:114-115) — a float, NOT the abstract adapter's
+  // `value.to_s("F")` string. (quote() still emits the fixed-form string via the
+  // inherited abstract quoter.)
   if (value instanceof BigDecimal) return Number(value.toString("F"));
-  if (typeof value === "symbol") return value.description ?? null;
-  // Rails dispatches date/time through `self.quoted_time` / `self.quoted_date`
-  // (abstract/quoting.rb:93-101) — which SQLite overrides to keep a `2000-01-01`
-  // prefix on times. Thread `this` so the dispatch lands on those overrides.
-  if (value instanceof TimeValue || value instanceof Temporal.PlainTime)
-    return dispatchQuotedTime(this, value);
-  if (
-    value instanceof Temporal.Instant ||
-    value instanceof Temporal.PlainDateTime ||
-    value instanceof Temporal.PlainDate ||
-    value instanceof Temporal.ZonedDateTime
-  ) {
-    return dispatchQuotedDate(this, value);
-  }
-  if (value instanceof Date)
-    throw new TypeError(
-      "typeCast: JS Date is not accepted — use a Temporal type (Instant, PlainDateTime, etc.)",
-    );
-  // Rails' SQLite `type_cast` falls through to `super` for anything it does not
-  // special-case, reaching the abstract `when ... Type::Binary::Data then
-  // value.to_s` (abstract/quoting.rb:96). This chain does not delegate, so the
-  // arm is inlined: `to_s` on a `Data` is the raw byte string, hence `.bytes`
-  // (never `toString()`, which UTF-8-decodes and mangles bytes >= 0x80).
-  if (value instanceof BinaryData) return value.bytes;
-  if (value instanceof Uint8Array || value instanceof ArrayBuffer) return value;
-  throw new TypeError(`can't cast ${Object.prototype.toString.call(value)} to a SQLite3 type`);
+  // Rails: `else super` (sqlite3/quoting.rb:122-123). Every remaining arm —
+  // Symbol/`Type::Binary::Data` (rb:95-96), String, the `quoted_time` /
+  // `quoted_date` dispatch (rb:102-104) and the terminal raise (rb:105) — is
+  // inherited from the abstract `type_cast` rather than duplicated here, so a
+  // new abstract arm costs exactly one edit. `this` is threaded so the
+  // self-dispatched arms still land on SQLite's overrides.
+  return abstractTypeCast.call(this, value);
 }
 
 // Rails uses recursive regex \g<2> to match nested function calls like

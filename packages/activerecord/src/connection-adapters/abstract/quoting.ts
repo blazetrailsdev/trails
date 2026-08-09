@@ -186,15 +186,6 @@ export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
   // path for a binary attribute lands here.
   if (typeof value === "symbol") return value.description ?? String(value);
   if (value instanceof BinaryData) return value.bytes;
-  // ArrayBuffer views have no Ruby analogue (#4868): Rails only ever sees a
-  // `Type::Binary::Data` here. `quote` already normalizes a view to bytes at the
-  // rb:83 position; `type_cast` must do the same at rb:96, or a bare Uint8Array
-  // bind (MySQL's binary driver binds are not `Data`-wrapped) falls through to
-  // the raise below with "can't cast Uint8Array".
-  if (value instanceof Uint8Array) return value;
-  if (ArrayBuffer.isView(value)) {
-    return new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
-  }
   // Rails: `when true then unquoted_true` / `when false then unquoted_false`
   // (rb:98-99) — self-dispatched, so MySQL's `1`/`0` override applies to the
   // inherited `type_cast`. Thread `this` to mirror that.
@@ -204,7 +195,16 @@ export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
   // Rails: `when BigDecimal then value.to_s("F")` — bound as a fixed-form string.
   if (value instanceof BigDecimal) return value.toString("F");
   if (typeof value === "number" || typeof value === "bigint") return value;
+  // Rails: `when nil, Numeric, String then value` (rb:102). A Ruby String here
+  // is frequently a BINARY/ASCII-8BIT one — `execute(sql, binds)` callers bind
+  // raw bytes that way, which is what sqlite3's `test_type_cast_binary_encoding_
+  // _without_logger` (test/cases/adapters/sqlite3/quoting_test.rb:32) and
+  // `test_type_cast_should_not_mutate_encoding` (sqlite3_adapter_test.rb:482)
+  // pass. A JS string is UTF-16 and cannot carry arbitrary bytes, so the byte
+  // views are this arm's analogue, not a fourth branch: they pass through
+  // untouched exactly as Rails passes the String through.
   if (typeof value === "string") return value;
+  if (ArrayBuffer.isView(value)) return value;
   // Rails dispatches `Type::Time::Value` through `self.quoted_time` and
   // `Date`/`Time` through `self.quoted_date` (abstract/quoting.rb:103-104), the
   // same self-dispatch `quote` uses. Thread `this` so adapter overrides — e.g.
@@ -240,32 +240,21 @@ export function castBoundValue(value: unknown): unknown {
  */
 export interface QuotingHost {
   /** @internal */
-  lookupCastType?(sqlType: string | null): unknown;
+  lookupCastType(sqlType: string | null): unknown;
 }
 
 /**
  * Look up the cast type from a column. Delegates to lookupCastType(column.sql_type)
  * on the adapter, matching Rails' internal delegation chain.
  *
- * Rails can call `lookup_cast_type` unconditionally because every host of this
- * module is an adapter. This standalone version is also bound to adapter-less
- * hosts (the MySQL schema quoter) that have no type
- * map, so it keeps the guard and hands back the raw sql_type for them; the
- * adapter method (`AbstractAdapter#lookupCastTypeFromColumn`) is the
- * unconditional one-liner.
- *
  * Mirrors: ActiveRecord::ConnectionAdapters::Quoting#lookup_cast_type_from_column
+ * (abstract/quoting.rb:125-127 — `lookup_cast_type(column.sql_type)`)
  */
 export function lookupCastTypeFromColumn(
-  this: QuotingHost | void,
+  this: QuotingHost,
   column: { sqlType: string | null },
 ): unknown {
-  const sqlType = column.sqlType;
-  if (!sqlType) return null;
-  if (this && typeof this === "object" && typeof this.lookupCastType === "function") {
-    return this.lookupCastType(sqlType);
-  }
-  return sqlType;
+  return this.lookupCastType(column.sqlType);
 }
 
 /**
@@ -282,11 +271,14 @@ export function quoteString(s: string): string {
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::Quoting#quote_table_name_for_assignment
  */
-export function quoteTableNameForAssignment(table: string, attr: string): string {
-  // `quoteTableName` requires a host receiver; this module-level helper has no
-  // adapter, so bind a bare host — dispatch falls to the throwing
-  // `quoteColumnName`, matching Rails' abstract behaviour.
-  return quoteTableName.call({}, `${table}.${attr}`);
+export function quoteTableNameForAssignment(
+  this: QuotingDispatchHost,
+  table: string,
+  attr: string,
+): string {
+  // Rails: `quote_table_name("#{table}.#{attr}")` (abstract/quoting.rb:153) —
+  // self-dispatched, which MySQL's `table`.`attr` override depends on.
+  return quoteTableName.call(this, `${table}.${attr}`);
 }
 
 /**
@@ -319,13 +311,13 @@ export function quoteDefaultExpression(
   }
   if (isSqlLiteral(value)) return value.value;
   // Rails: `value = lookup_cast_type(column.sql_type).serialize(value)`
-  // (abstract/quoting.rb:161). Rails dispatches `lookup_cast_type`
-  // unconditionally; the optional call is for the adapter-free hosts this
-  // standalone version also serves, which have no type map, so their values pass
-  // through unserialized.
+  // (abstract/quoting.rb:161) — dispatched unconditionally, since every host of
+  // this module is an adapter carrying a type map. `column` stays optional only
+  // because trails' DDL callers reach `SET DEFAULT` with no column in hand
+  // (schema-statements.ts:600); Rails' signature requires it.
   let serialized: unknown = value;
   if (column != null) {
-    const castType = this.lookupCastType?.(column.sqlType ?? null) as {
+    const castType = this.lookupCastType(column.sqlType ?? null) as {
       serialize?(v: unknown): unknown;
     } | null;
     if (castType && typeof castType.serialize === "function") {

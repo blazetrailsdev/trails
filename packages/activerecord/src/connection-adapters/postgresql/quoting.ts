@@ -247,7 +247,6 @@ export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
     const u8 = value.bytes;
     return Buffer.from(u8.buffer, u8.byteOffset, u8.byteLength);
   }
-  if (value instanceof Uint8Array) return value;
   if (value instanceof XmlData || value instanceof BitData) {
     return value.toString();
   }
@@ -255,14 +254,14 @@ export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
     // Rails: `when OID::Array::Data then encode_array(value)`.
     return encodeArray.call(this, value);
   }
-  // A bare JS Array has no Ruby analogue at this position — Rails only ever
-  // reaches `type_cast` with an `OID::Array::Data`, which carries the encoder
-  // `encode_array` needs. Ours arrive unwrapped on the `execute(sql, binds)`
-  // path, where node-postgres does the array *encoding* itself, so the array
-  // stays an array rather than raising "can't cast Array". The elements still
-  // go through `type_cast_array` (quoting.rb:221-226) so a Temporal or
-  // BinaryData element is converted rather than handed to the driver raw —
-  // the encoder is what we skip here, not the per-element cast.
+  // Rails' `when OID::Array::Data` above is the only array arm it needs, because
+  // a pg-ruby bind is always a String — the encoder has already run.
+  // node-postgres instead accepts a JS array and encodes it itself, so
+  // `execute(sql, [["one", "two"]])` (array.test.ts "mutate array") reaches here
+  // unwrapped. The elements still go through `type_cast_array`
+  // (postgresql/quoting.rb:221-226) so a Temporal or BinaryData element is cast
+  // rather than handed to the driver raw — the encoder is what this skips, not
+  // the per-element cast.
   if (Array.isArray(value)) return typeCastArray.call(this, value);
   if (value instanceof Range) {
     return encodeRange.call(this, value);

@@ -18,16 +18,14 @@ import {
   formatPlainDateForSql,
 } from "../abstract/sql-datetime.js";
 import {
+  typeCast as abstractTypeCast,
   toBytes,
   dispatchQuotedDate,
   dispatchQuotedTime,
-  dispatchUnquotedTrue,
-  dispatchUnquotedFalse,
   type QuotingDispatchHost,
 } from "../abstract/quoting.js";
 import { Temporal } from "@blazetrails/date";
 import { Value as TimeValue } from "../../type/time.js";
-import { BigDecimal } from "@blazetrails/activesupport";
 import { BinaryData } from "@blazetrails/activemodel";
 
 // Rails MySQL overrides unquoted_true/false (1/0) but NOT quoted_true/false,
@@ -225,37 +223,12 @@ export function quotedDate(
  * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::Quoting#type_cast
  */
 export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
-  if (typeof value === "symbol") return value.description ?? String(value);
-  // Rails' MySQL `type_cast` falls through to `super` for anything it does not
-  // special-case, reaching the abstract `when ... Type::Binary::Data then
-  // value.to_s` (abstract/quoting.rb:96). This chain does not delegate, so the
-  // arm is inlined: `to_s` on a `Data` is the raw byte string, hence `.bytes`
-  // (never `toString()`, which UTF-8-decodes and mangles bytes >= 0x80).
-  if (value instanceof BinaryData) return value.bytes;
-  // Same rb:96 position, same reason as the abstract chain: an ArrayBuffer view
-  // has no Ruby analogue (#4868), and mysql2's binary binds arrive as a bare
-  // Uint8Array rather than a `Data`, so without this arm they reach the raise
-  // below with "can't cast Uint8Array".
-  if (value instanceof Uint8Array) return value;
-  if (ArrayBuffer.isView(value)) {
-    return new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
-  }
-  // Rails' MySQL `type_cast` falls through to `super` here, whose boolean arm is
-  // self-dispatched (abstract/quoting.rb:98-99) and lands on MySQL's `1`/`0`
-  // override. This chain does not delegate, so the arm is inlined — but it
-  // dispatches through `this` rather than the module-level pair, so the receiver
-  // decides, as in Rails.
-  if (typeof value === "boolean")
-    return value ? dispatchUnquotedTrue(this) : dispatchUnquotedFalse(this);
-  if (value === null || value === undefined) return value;
-  if (typeof value === "number" || typeof value === "bigint") return value;
-  if (typeof value === "string") return value;
-  // Rails type_cast: `when BigDecimal then value.to_s("F")`.
-  if (value instanceof BigDecimal) return value.toString("F");
-  // Rails dispatches date/time through `self.quoted_time` / `self.quoted_date`
-  // (abstract/quoting.rb:93-101); thread `this` so MySQL's microsecond-capping
-  // `quotedDate` override is honored here. Always invoked with an adapter
-  // receiver — the standalone is never called receiver-less.
+  // Rails' MySQL override special-cases only the temporal arms — `when
+  // ActiveSupport::TimeWithZone` / `when Time` / `when Date`
+  // (mysql/quoting.rb:94-118) — because mysql2 handles those classes more
+  // efficiently than Strings. trails' drivers take the SQL wire string, so the
+  // arms dispatch through `self.quoted_time` / `self.quoted_date`, threading
+  // `this` so MySQL's microsecond-capping `quotedDate` override is honored.
   if (value instanceof TimeValue || value instanceof Temporal.PlainTime)
     return dispatchQuotedTime(this, value);
   if (
@@ -266,9 +239,10 @@ export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
   ) {
     return dispatchQuotedDate(this, value);
   }
-  if (value instanceof Date)
-    throw new TypeError(
-      "typeCast: JS Date is not accepted — use a Temporal type (Instant, PlainDateTime, etc.)",
-    );
-  throw new TypeError(`can't cast ${(value as object).constructor?.name ?? typeof value}`);
+  // Rails: `else super` (mysql/quoting.rb:119-120). Symbol/`Type::Binary::Data`
+  // (rb:95-96), the self-dispatched `unquoted_true`/`unquoted_false` pair
+  // (rb:98-99), BigDecimal, the pass-throughs and the terminal raise (rb:105)
+  // are all inherited from the abstract `type_cast` rather than duplicated
+  // here, so a new abstract arm costs exactly one edit.
+  return abstractTypeCast.call(this, value);
 }

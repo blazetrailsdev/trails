@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { BinaryData } from "@blazetrails/activemodel";
+import { BinaryData, BinaryType } from "@blazetrails/activemodel";
 import { fixtures } from "./test-fixtures.js";
 import { Binary } from "./test-helpers/models/binary.js";
 import { Base } from "./base.js";
@@ -47,5 +47,21 @@ describe("binary type_casted_binds payload", () => {
     expect(String(out[0])).not.toBe("[object Object]");
     // PG's type_cast returns a Buffer (bytea); normalize before comparing bytes.
     expect(new Uint8Array(out[0] as Uint8Array)).toEqual(bytes);
+  });
+
+  it("casts both byte forms Rails reaches type_cast with", async () => {
+    // Rails sees bytes here two ways, and both arms are inherited from the
+    // abstract chain now that sqlite3/mysql end at `else super`:
+    //   - `Type::Binary::Data`, which `BinaryType#serialize` wraps at the source
+    //     (binary.rb:30-33) → unwrapped by rb:96's `value.to_s`.
+    //   - a BINARY/ASCII-8BIT `String` on the `execute(sql, binds)` boundary →
+    //     passed through by rb:102's `when nil, Numeric, String then value`.
+    //     A JS string can't hold arbitrary bytes, so a byte view is that form.
+    const bytes = new Uint8Array([0xde, 0xad]);
+    expect(new BinaryType().serialize(bytes)).toBeInstanceOf(BinaryData);
+    const conn = await Base.connection;
+    for (const cast of [conn.typeCast(new BinaryData(bytes)), conn.typeCast(bytes)]) {
+      expect(new Uint8Array(cast as Uint8Array)).toEqual(bytes);
+    }
   });
 });

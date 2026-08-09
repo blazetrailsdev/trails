@@ -370,6 +370,10 @@ function compileManagerWithBinds(rel: CalculationRelation, manager: any): [strin
     bindParamsLength?(): number;
   };
   const visitor = conn.visitor;
+  // Rails' non-prepared `to_sql_and_binds` branch (database_statements.rb:44):
+  // the collector is a `SubstituteBinds`, so every value inlines and no binds
+  // are sent — not just the over-limit case below.
+  if (conn.preparedStatements === false) return [conn.toSql(manager), []];
   if (visitor?.compileWithBinds) {
     const [sql, rawBinds] = visitor.compileWithBinds(manager.ast);
     const binds = rawBinds.map(typeCastCalcBind);

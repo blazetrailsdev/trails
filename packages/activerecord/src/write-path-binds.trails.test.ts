@@ -16,7 +16,12 @@ import { Task } from "./test-helpers/models/task.js";
 describe("write-path prepared-statement binds", () => {
   fixtures({});
 
-  it("binds non-string column values on INSERT and UPDATE", async () => {
+  it("binds non-string column values on INSERT and UPDATE", async (ctx) => {
+    // Prepared-statements-only: Rails' non-prepared `to_sql_and_binds` compiles
+    // through `SubstituteBinds`, so every value inlines and `binds == []`
+    // (database_statements.rb:31-45) — the MySQL/MariaDB default. Rails gates
+    // its own bind assertions the same way (bind_parameter_test.rb:9).
+    ctx.skip(!(await Task.leaseConnection()).preparedStatements);
     const starting = Temporal.Instant.from("2024-03-05T07:08:09.123456Z");
     const ending = Temporal.Instant.from("2025-03-05T07:08:09.123456Z");
     const events: Record<string, unknown>[] = [];
