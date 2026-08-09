@@ -621,13 +621,8 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     // type-casted values, NOT the driver wire form — abstract_adapter.rb:1134-1145
     // / abstract/database_statements.rb:553-554. `driverBinds` stays scoped to
     // the driver call below.
-    return this.log(
-      driverSql,
-      name ?? "SQL",
-      binds ?? [],
-      this.typeCastedBinds(binds ?? []) ?? [],
-      false,
-      async (payload) => {
+    const typeCastedBinds = this.typeCastedBinds(binds ?? []) ?? [];
+    return this.log(driverSql, name, binds ?? [], typeCastedBinds, false, async (payload) => {
       try {
         // Thread allowRetry (Rails' select_all → internal_exec_query
         // `allow_retry: preparable`) into withRawConnection so idempotent SELECTs
@@ -970,9 +965,8 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     // Rails' raw_execute logs the caller's own binds plus their type-casted
     // values (abstract/database_statements.rb:552-556, abstract_adapter.rb:1134-1145),
     // never the mysql2 wire form; `driverBinds` stays scoped to the driver call.
-    return this.log(driverSql, name, binds, this.typeCastedBinds(binds) ?? [], false, async (
-      payload,
-    ) => {
+    const typeCastedBinds = this.typeCastedBinds(binds) ?? [];
+    return this.log(driverSql, name, binds, typeCastedBinds, false, async (payload) => {
       try {
         return await this.withRawConnection({ allowRetry }, async (conn) => {
           const mysqlConn = conn as unknown as mysql.Connection;
@@ -1014,9 +1008,8 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     // Rails' raw_execute logs the caller's own binds plus their type-casted
     // values (abstract/database_statements.rb:552-556, abstract_adapter.rb:1134-1145),
     // never the mysql2 wire form; `driverBinds` stays scoped to the driver call.
-    return this.log(driverSql, name, binds, this.typeCastedBinds(binds) ?? [], false, async (
-      payload,
-    ) => {
+    const typeCastedBinds = this.typeCastedBinds(binds) ?? [];
+    return this.log(driverSql, name, binds, typeCastedBinds, false, async (payload) => {
       try {
         return await this.withRawConnection(async (conn) => {
           const mysqlConn = conn as unknown as mysql.Connection;
@@ -1189,9 +1182,8 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       // driver, matching Rails internal_execute(sql, name, binds). Transaction-
       // control callers pass none, keeping their byte-identical no-bind path.
       const driverBinds = binds.length > 0 ? this.mysqlBinds(binds) : [];
-      return await this.log(driverSql, name, binds, this.typeCastedBinds(binds) ?? [], false, async (
-        payload,
-      ) => {
+      const typeCastedBinds = this.typeCastedBinds(binds) ?? [];
+      return await this.log(driverSql, name, binds, typeCastedBinds, false, async (payload) => {
         try {
           // materializeTransactions is run BEFORE the loop (above) and we pass
           // `false` into withRawConnection — the same materialize-outside-the-loop
