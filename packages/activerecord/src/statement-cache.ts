@@ -254,9 +254,7 @@ export class StatementCache {
       if (this._queryBuilder instanceof PartialQuery) {
         return await this._model.findBySql(sql, [], { allowRetry, preparable: true });
       }
-      // Type-cast bind objects to primitives for the adapter
-      const castedBinds = bindValues.map((b) => (b instanceof Attribute ? b.valueForDatabase : b));
-      return await this._model.findBySql(sql, castedBinds, { allowRetry, preparable: true });
+      return await this._model.findBySql(sql, bindValues, { allowRetry, preparable: true });
     } catch (e) {
       // Mirrors statement_cache.rb:154 — `rescue ::RangeError` → `[]`. An
       // out-of-range bind (e.g. a belongs_to FK beyond the column's integer

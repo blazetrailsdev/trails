@@ -366,15 +366,8 @@ describe("BindParameterTest", () => {
     const sub = Notifications.subscribe("sql.active_record", (e: Event) => subscriber.call(e));
     try {
       await Topic.find(1);
-      // Rails asserts `attr.value == 1` on the QueryAttribute payload binds
-      // (bind_parameter_test.rb:148-152). trails type-casts binds to primitives
-      // in the relation layer, so the payload carries `[1]` rather than Attribute
-      // objects — the `?? attr` fallback matches the primitive trails emits. (The
-      // payload can't preserve Attribute objects without production changes; the
-      // stronger `binds are logged` assertion is deferred to RFC 0077 story
-      // `tosqlandbinds-preserve-attribute-binds` for that reason.)
       const message = subscriber.events.find((e) =>
-        (e.payload.binds as any[])?.some((attr) => Number(attr?.value ?? attr) === 1),
+        (e.payload.binds as any[])?.some((attr) => attr?.value === 1),
       );
       expect(message).toBeTruthy();
     } finally {
