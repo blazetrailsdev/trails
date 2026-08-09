@@ -43,15 +43,22 @@ const PART_ORDER: (keyof DurationParts)[] = [
 // wall-clock length varies (DST, month/year length).
 const VARIABLE_PARTS: (keyof DurationParts)[] = ["years", "months", "weeks", "days"];
 
+// Mirrors Rails `@parts.merge(other._parts) { |_k, v, ov| v + ov }`
+// (duration.rb:270-272): a Ruby Hash keeps insertion order, and `sum`
+// (`:397-419`) applies the parts in exactly that order, so the receiver's keys
+// come first and the other's new keys are appended.
 function mergeParts(
   a: DurationParts,
   aKeys: readonly (keyof DurationParts)[],
   b: Partial<DurationParts>,
 ): Partial<DurationParts> {
   const result: Partial<DurationParts> = {};
+  for (const key of aKeys) {
+    result[key] = a[key] + (b[key] ?? 0);
+  }
   for (const key of PART_ORDER) {
-    if (aKeys.includes(key) || b[key] !== undefined) {
-      result[key] = a[key] + (b[key] ?? 0);
+    if (b[key] !== undefined && !aKeys.includes(key)) {
+      result[key] = a[key] + b[key];
     }
   }
   return result;
@@ -84,7 +91,11 @@ export class Duration {
       minutes: parts.minutes ?? 0,
       seconds: parts.seconds ?? 0,
     };
-    const given = PART_ORDER.filter((part) => parts[part] !== undefined);
+    // Ruby's `@parts` is a Hash, and both `sum` and `merge` read it in
+    // insertion order, so the argument's own key order is the part order.
+    const given = (Object.keys(parts) as (keyof DurationParts)[]).filter(
+      (part) => PART_ORDER.includes(part) && parts[part] !== undefined,
+    );
     this._partKeys =
       this.inSeconds() === 0 ? given : given.filter((part) => this.parts[part] !== 0);
     this._variable = variable ?? this._partKeys.some((part) => VARIABLE_PARTS.includes(part));

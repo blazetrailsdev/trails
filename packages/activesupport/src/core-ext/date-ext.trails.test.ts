@@ -82,6 +82,17 @@ describe("date calculations coercion arms", () => {
     ).toEqual(pd(2017, 1, 2));
   });
 
+  it("plus_with_duration applies the parts in merge order", () => {
+    // `@parts.merge(other._parts)` (duration.rb:270) keeps the receiver's keys
+    // first, and `sum` applies them in that order.
+    expect(
+      DateExt.plusWithDuration(pd(2017, 1, 30), Duration.months(1).plus(Duration.days(1))),
+    ).toEqual(pd(2017, 3, 1));
+    expect(
+      DateExt.plusWithDuration(pd(2017, 1, 30), Duration.days(1).plus(Duration.months(1))),
+    ).toEqual(pd(2017, 2, 28));
+  });
+
   it("compare_without_coercion orders two dates", () => {
     expect(DateExt.compareWithoutCoercion(pd(2005, 2, 21), pd(2005, 2, 22))).toBe(-1);
     expect(DateExt.compareWithoutCoercion(pd(2005, 2, 21), pd(2005, 2, 21))).toBe(0);
