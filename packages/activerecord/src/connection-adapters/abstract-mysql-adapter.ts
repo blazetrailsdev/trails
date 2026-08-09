@@ -927,7 +927,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     if (ifNotExists && (await this.indexExists(tableName, idx.columns, { name: idx.name }))) {
       return undefined;
     }
-    return new CreateIndexDefinition(idx, false, algorithmClause);
+    return new CreateIndexDefinition(idx, algorithmClause);
   }
 
   addSqlCommentBang(sql: string, comment: string): string {
@@ -2037,7 +2037,11 @@ export interface AbstractMysqlAdapter {
   dropTable(
     ...args:
       | [string, ...string[]]
-      | [string, ...string[], { ifExists?: boolean; force?: "cascade"; temporary?: boolean }]
+      | [
+          string,
+          ...string[],
+          { ifExists?: boolean; force?: boolean | "cascade"; temporary?: boolean },
+        ]
   ): Promise<void>;
 
   /** @internal */

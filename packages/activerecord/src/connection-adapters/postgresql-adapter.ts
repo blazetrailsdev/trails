@@ -3826,10 +3826,6 @@ export class PostgreSQLAdapter
       opts = columnOrOptions ?? {};
     }
 
-    if (opts.algorithm === "concurrently" && this._inTransaction) {
-      throw new Error("DROP INDEX CONCURRENTLY cannot run inside a transaction");
-    }
-
     let table = Utils.extractSchemaQualifiedName(tableName);
     let resolveOpts = opts;
     if (opts.name != null) {
@@ -3860,9 +3856,10 @@ export class PostgreSQLAdapter
       await this.indexNameForRemove(table.toString(), positional, nameOpts),
     );
 
-    const algorithm = this.indexAlgorithm(opts.algorithm);
     await this.execute(
-      `DROP INDEX${algorithm ? ` ${algorithm}` : ""} ${this.quoteTableName(indexToRemove.toString())}`,
+      // `?? ""` is Ruby's `#{nil}` — `index_algorithm` returns nil with no
+      // `:algorithm`, so the statement carries the empty slot Rails emits.
+      `DROP INDEX ${this.indexAlgorithm(opts.algorithm) ?? ""} ${this.quoteTableName(indexToRemove.toString())}`,
     );
   }
 

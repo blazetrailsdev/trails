@@ -189,14 +189,14 @@ class DropTableMigration extends SilentMigration {
 
 class LegacyMigration extends Migration {
   static async up(): Promise<void> {
-    const m = Migration._delegate ?? new LegacyMigration();
+    const m = Migration.delegate ?? new LegacyMigration();
     await m.createTable("horses", (t) => {
       t.column("content", "text");
       t.column("remind_at", "datetime");
     });
   }
   static async down(): Promise<void> {
-    const m = Migration._delegate ?? new LegacyMigration();
+    const m = Migration.delegate ?? new LegacyMigration();
     await m.dropTable("horses");
   }
 }

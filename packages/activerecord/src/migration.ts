@@ -354,7 +354,7 @@ export class ReversibleBlockHelper {
  *
  * Mirrors: ActiveRecord::Migration
  */
-export abstract class Migration {
+export class Migration {
   /** @internal Per-migration connection override — mirrors Rails' @connection ivar. */
   protected _connectionOverride?: DatabaseAdapter;
   /** @internal Per-migration pool override — mirrors Rails' @pool ivar. */
@@ -364,11 +364,14 @@ export abstract class Migration {
   private _recorder = new CommandRecorder();
   private _name?: string;
   /**
-   * Class-level delegation target set from outside (mirrors Rails `class << self; attr_accessor :delegate`).
+   * The migration instance class-level schema operations route through
+   * (mirrors Rails `class << self; attr_accessor :delegate`, `migration.rb:684`).
+   * Seeded with `Migration.delegate = new Migration()` at the bottom of this
+   * file, exactly as Rails does at `migration.rb:813`.
    * Distinct from the instance `delegate` getter, which returns the current adapter.
    * @internal
    */
-  static delegate: DatabaseAdapter | null = null;
+  static delegate: Migration | null = null;
   private _version?: number;
 
   /** Mirrors: ActiveRecord::Migration.verbose (`cattr_accessor`, `migration.rb:797`). */
@@ -415,13 +418,6 @@ export abstract class Migration {
   static forVersion(v: string | number): typeof Migration {
     return findVersion(v) as unknown as typeof Migration;
   }
-
-  /**
-   * The migration instance currently executing a legacy class-level
-   * `self.up`/`self.down` body, so that body's schema operations route through
-   * it. Mirrors Rails' `Migration.delegate` (`active_record/migration.rb:951`).
-   */
-  static _delegate?: Migration;
 
   /**
    * Run the migration in the given direction (class method).
@@ -474,12 +470,12 @@ export abstract class Migration {
     if (!owns(direction)) return async (): Promise<void> => {}; // Rails: return unless respond_to?
     const fn = (ctor as unknown as Record<string, () => Promise<void>>)[direction];
     return async (): Promise<void> => {
-      const prev = Migration._delegate;
-      Migration._delegate = this;
+      const prev = Migration.delegate;
+      Migration.delegate = this;
       try {
         await fn.call(ctor);
       } finally {
-        Migration._delegate = prev;
+        Migration.delegate = prev;
       }
     };
   }
@@ -542,7 +538,7 @@ export abstract class Migration {
   async dropTable(
     ...args: Array<
       | string
-      | { ifExists?: boolean; force?: "cascade"; temporary?: boolean }
+      | { ifExists?: boolean; force?: boolean | "cascade"; temporary?: boolean }
       | ((t: TableDefinition) => void)
     >
   ): Promise<void> {
@@ -553,7 +549,7 @@ export abstract class Migration {
     const last = rest[rest.length - 1];
     const hasOptions = last !== null && typeof last === "object";
     const options = hasOptions
-      ? (last as { ifExists?: boolean; force?: "cascade"; temporary?: boolean })
+      ? (last as { ifExists?: boolean; force?: boolean | "cascade"; temporary?: boolean })
       : undefined;
     const names = (hasOptions ? rest.slice(0, -1) : rest) as string[];
     if (this._recording) {
@@ -1638,12 +1634,19 @@ export abstract class Migration {
 
   static async maintainTestSchemaBang(): Promise<void> {
     if (ActiveRecord.maintainTestSchema) {
-      await this.loadSchemaIfPendingBang();
+      // Rails writes `suppress_messages { load_schema_if_pending! }`
+      // (migration.rb:719); the bare class-level call lands in
+      // `method_missing` (migration.rb:723-725), which forwards to
+      // `nearest_delegate`. TS has no static `method_missing`, so the
+      // forwarding Ruby does implicitly is spelled out here.
+      await this.nearestDelegate?.suppressMessages(async () => {
+        await this.loadSchemaIfPendingBang();
+      });
     }
   }
 
   /** @internal */
-  static get nearestDelegate(): DatabaseAdapter | null {
+  static get nearestDelegate(): Migration | null {
     return (
       this.delegate ?? (Object.getPrototypeOf(this) as typeof Migration).nearestDelegate ?? null
     );
@@ -1651,7 +1654,7 @@ export abstract class Migration {
 
   /** @internal */
   static methodMissing(name: string, ...args: unknown[]): unknown {
-    const delegate = this.nearestDelegate as Record<string, unknown> | null;
+    const delegate = this.nearestDelegate as unknown as Record<string, unknown> | null;
     if (delegate !== null && typeof delegate[name] === "function") {
       return (delegate[name] as (...a: unknown[]) => unknown).apply(delegate, args);
     }
@@ -3006,3 +3009,8 @@ export class CheckPending {
     return null;
   }
 }
+
+// Rails: `self.delegate = new` (`migration.rb:813`) — instantiate the delegate
+// after the class body, so class-level schema operations have a delegate before
+// any migration runs.
+Migration.delegate = new Migration();

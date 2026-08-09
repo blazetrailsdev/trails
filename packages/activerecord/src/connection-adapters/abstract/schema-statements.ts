@@ -407,25 +407,17 @@ export class SchemaStatements {
       throw new Error("Options `:force` and `:if_not_exists` cannot be used simultaneously.");
     }
 
-    if (options.force) {
-      if (await this.tableExists(name)) {
-        if (options.force === "cascade") {
-          await this.dropTable(name, { force: "cascade" });
-        } else {
-          await this.dropTable(name);
-        }
-      }
-    }
-
     if (options.ifNotExists && (await this.tableExists(name))) {
       return;
     }
 
-    if (!options.force) {
+    const td = this.buildCreateTableDefinition(name, options, definer);
+
+    if (options.force) {
+      await this.dropTable(name, { force: options.force, ifExists: true });
+    } else {
       await this.schemaCache.clearDataSourceCacheBang(name);
     }
-
-    const td = this.buildCreateTableDefinition(name, options, definer);
 
     await this.execute(await this.schemaCreation.accept(td));
 
@@ -472,10 +464,13 @@ export class SchemaStatements {
    */
   protected _splitTableNamesAndOptions(
     args: ReadonlyArray<unknown>,
-  ): [string[], { ifExists?: boolean; force?: "cascade" }] {
+  ): [string[], { ifExists?: boolean; force?: boolean | "cascade" }] {
     const last = args[args.length - 1];
     if (last !== null && last !== undefined && typeof last === "object") {
-      return [args.slice(0, -1) as string[], last as { ifExists?: boolean; force?: "cascade" }];
+      return [
+        args.slice(0, -1) as string[],
+        last as { ifExists?: boolean; force?: boolean | "cascade" },
+      ];
     }
     return [args as string[], {}];
   }
@@ -483,7 +478,7 @@ export class SchemaStatements {
   async dropTable(
     ...args:
       | [string, ...string[]]
-      | [string, ...string[], { ifExists?: boolean; force?: "cascade" }]
+      | [string, ...string[], { ifExists?: boolean; force?: boolean | "cascade" }]
   ): Promise<void> {
     const [tableNames, options] = this._splitTableNamesAndOptions(args);
     if (tableNames.length === 0) {
@@ -1558,7 +1553,7 @@ export class SchemaStatements {
       columnName,
       options,
     );
-    return new CreateIndexDefinition(idx, ifNotExists, algorithm);
+    return new CreateIndexDefinition(idx, algorithm, ifNotExists);
   }
 
   async indexNameExists(tableName: string, indexName: string): Promise<boolean> {
@@ -1652,7 +1647,7 @@ export class SchemaStatements {
   }
 
   async removeConstraint(tableName: string, constraintName: string): Promise<void> {
-    const at = new AlterTable(tableName);
+    const at = this.createAlterTable(tableName);
     at.dropConstraint(constraintName);
     await this.execute(await this.schemaCreation.accept(at));
   }
