@@ -709,18 +709,35 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   override async internalExecute(
     sql: string,
     name: string = "SQL",
-    { materializeTransactions = true }: { materializeTransactions?: boolean } = {},
+    {
+      materializeTransactions = true,
+      binds = [],
+      prepare = false,
+    }: { materializeTransactions?: boolean; binds?: unknown[]; prepare?: boolean } = {},
   ): Promise<unknown> {
     sql = this.preprocessQuery(sql);
     await this.ensureConnected();
     try {
       if (materializeTransactions) await this.materializeTransactions();
-      return await this.log(sql, name, [], [], false, async () => {
+      const driverBinds = binds.map(_driverBind, this) as SqliteBinds;
+      return await this.log(sql, name, binds, this.typeCastedBinds(binds), false, async () => {
         try {
+          // Rails' perform_query prepares (pooling only on the `prepare` branch)
+          // and binds type_casted_binds before stepping
+          // (sqlite3/database_statements.rb:81-107). The bare `exec` arm below
+          // has no Rails counterpart: it carries the multi-statement
+          // transaction-control SQL that better-sqlite3's single-statement
+          // `prepare` rejects, and it is reachable only with no binds.
+          if (prepare || binds.length > 0) {
+            const stmt = await (prepare ? this._cachedStatement(sql) : this._freshStatement(sql));
+            if (stmt.reader) await stmt.all(driverBinds);
+            else await stmt.run(driverBinds);
+            return 0;
+          }
           await this.driver.exec(sql);
           return 0;
         } catch (e: any) {
-          const translated = this._translateException(e, sql, []);
+          const translated = this._translateException(e, sql, binds);
           throw translated;
         }
       });
@@ -1747,12 +1764,39 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     });
   }
 
+  private static readonly FK_REGEX =
+    /.*FOREIGN KEY\s+\("([^"]+)"\)\s+REFERENCES\s+"(\w+)"\s+\("(\w+)"\)/;
+  private static readonly DEFERRABLE_REGEX = /DEFERRABLE INITIALLY (\w+)/;
+
   async foreignKeys(tableName: string): Promise<ForeignKeyDefinition[]> {
     const { schema, bare } = this._splitTableName(tableName);
     const prefix = schema ? `${quoteColumnName(schema)}.` : "";
     const rows = await this.schemaQuery(
       `PRAGMA ${prefix}foreign_key_list(${quoteColumnName(bare)})`,
     );
+    // Deferred or immediate foreign keys can only be seen in the CREATE TABLE sql
+    // Rails: `table_structure_sql(table_name).select { |column_string|
+    // column_string.start_with?("CONSTRAINT") && column_string.include?("FOREIGN
+    // KEY") }.to_h { ... }` (sqlite3_adapter.rb:421-431). Like Rails' FK_REGEX,
+    // which matches a single quoted column on each side, this resolves only
+    // single-column constraints: the split lookahead cuts a composite
+    // `FOREIGN KEY ("a", "b")` at its inner comma, so a composite reflects as
+    // deferrable-absent in trails exactly as it does in Rails.
+    const fkStrings = (await this.tableStructureSql(tableName)).filter(
+      (columnString) =>
+        columnString.startsWith("CONSTRAINT") && columnString.includes("FOREIGN KEY"),
+    );
+    const deferrableByKey = new Map<string, "immediate" | "deferred" | false>();
+    for (const fkString of fkStrings) {
+      const fk = SQLite3Adapter.FK_REGEX.exec(fkString);
+      if (!fk) continue;
+      const [, from, table, to] = fk;
+      const mode = SQLite3Adapter.DEFERRABLE_REGEX.exec(fkString)?.[1];
+      deferrableByKey.set(
+        `${table},${from},${to}`,
+        mode === undefined ? false : mode.toLowerCase() === "deferred" ? "deferred" : "immediate",
+      );
+    }
     const grouped = new Map<number, Array<Record<string, unknown>>>();
     for (const row of rows) {
       const id = row.id as number;
@@ -1760,8 +1804,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       grouped.get(id)!.push(row);
     }
 
-    // Rails reads deferrable from the CREATE TABLE SQL since PRAGMA doesn't expose it.
-    const deferrableByKey = await this._parseFkDeferrable(tableName);
     // Use explicit CONSTRAINT names from DDL when available (PRAGMA doesn't expose them).
     const namesByColumn = await this._parseForeignKeyNames(tableName);
 
@@ -1805,40 +1847,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       );
     }
     return results;
-  }
-
-  // Mirrors Rails' SQLite3Adapter FK deferrable extraction — reads DEFERRABLE
-  // from CREATE TABLE SQL since PRAGMA foreign_key_list doesn't expose it.
-  private async _parseFkDeferrable(
-    tableName: string,
-  ): Promise<Map<string, "immediate" | "deferred" | false>> {
-    const createSql = await this._getCreateTableSql(tableName);
-    const result = new Map<string, "immediate" | "deferred" | false>();
-    if (!createSql) return result;
-    // Rails builds fk_defs from every `CONSTRAINT ... FOREIGN KEY` clause and
-    // records `mode || false` (sqlite3_adapter.rb:422-431), so a constraint
-    // without a DEFERRABLE clause reflects as `false`, not nil — the DEFERRABLE
-    // suffix is optional here for that reason.
-    const fkRegex =
-      /CONSTRAINT\s+[^(]*?FOREIGN KEY\s*\(([^)]+)\)\s*REFERENCES\s*"?([^"(,\s]+)"?\s*\(([^)]+)\)(?:[^,)]*DEFERRABLE\s+INITIALLY\s+(\w+))?/gi;
-    let match;
-    while ((match = fkRegex.exec(createSql)) !== null) {
-      const [, fromCols, toTbl, toCols, mode] = match;
-      const fromKey = fromCols
-        .split(",")
-        .map((c) => c.trim().replace(/^"|"$/g, ""))
-        .join(",");
-      const toKey = toCols
-        .split(",")
-        .map((c) => c.trim().replace(/^"|"$/g, ""))
-        .join(",");
-      const key = `${toTbl},${fromKey},${toKey}`;
-      result.set(
-        key,
-        mode === undefined ? false : mode.toLowerCase() === "deferred" ? "deferred" : "immediate",
-      );
-    }
-    return result;
   }
 
   private _extractFkAction(
@@ -1923,25 +1931,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return options?.type ? this.typeToSql(String(options.type) as ColumnType, opts) : "";
   }
 
-  private async _getCreateTableSql(tableName: string): Promise<string | null> {
-    const { schema, bare } = this._splitTableName(tableName);
-    let sql: string;
-    if (schema) {
-      sql =
-        schema.toLowerCase() === "temp"
-          ? `SELECT sql FROM sqlite_temp_master WHERE type='table' AND name='${sqliteQuoteString(bare)}'`
-          : `SELECT sql FROM ${quoteColumnName(schema)}.sqlite_master WHERE type='table' AND name='${sqliteQuoteString(bare)}'`;
-    } else {
-      sql = `SELECT sql FROM sqlite_temp_master WHERE type='table' AND name='${sqliteQuoteString(bare)}'
-             UNION ALL
-             SELECT sql FROM sqlite_master WHERE type='table' AND name='${sqliteQuoteString(bare)}'`;
-    }
-    await this.ensureConnected();
-    const stmt = await this.driver.prepare(sql);
-    const row = (await stmt.get()) as { sql: string } | undefined;
-    return row?.sql ?? null;
-  }
-
   /**
    * Parse FK constraint names from CREATE TABLE SQL. PRAGMA
    * foreign_key_list doesn't expose names, but the DDL does when
@@ -1949,12 +1938,20 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    * comma-joined column list (e.g. "a,b" for composites).
    */
   private async _parseForeignKeyNames(tableName: string): Promise<Map<string, string>> {
-    const createSql = await this._getCreateTableSql(tableName);
+    // `table_structure_sql(table_name, column_names)` with an explicit empty
+    // column list (sqlite3_adapter.rb:757) is Rails' own second parameter: the
+    // `Regexp.union([])` it produces is `(?!)`, so the split fires only before
+    // CONSTRAINT and never at the inner comma of a composite
+    // `FOREIGN KEY ("a", "b")` — which the column-union split does cut.
+    const fkStrings = (await this.tableStructureSql(tableName, [])).filter(
+      (columnString) =>
+        columnString.startsWith("CONSTRAINT") && columnString.includes("FOREIGN KEY"),
+    );
     const names = new Map<string, string>();
-    if (!createSql) return names;
-    const regex = /CONSTRAINT\s+(?:"((?:[^"]|"")*)"|(\w+))\s+FOREIGN\s+KEY\s*\(([^)]+)\)/gi;
-    let match: RegExpExecArray | null;
-    while ((match = regex.exec(createSql)) !== null) {
+    const regex = /CONSTRAINT\s+(?:"((?:[^"]|"")*)"|(\w+))\s+FOREIGN\s+KEY\s*\(([^)]+)\)/i;
+    for (const fkString of fkStrings) {
+      const match = regex.exec(fkString);
+      if (!match) continue;
       const name = match[1] ? match[1].replace(/""/g, '"') : match[2];
       const colList = match[3]
         .split(",")
@@ -2317,6 +2314,9 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return this.schemaQuery(`PRAGMA ${pragmaPrefix}${pragma}(${quoteColumnName(bare)})`);
   }
 
+  private static readonly UNQUOTED_OPEN_PARENS_REGEX = /\((?![^'"]*['"][^'"]*$)/;
+  private static readonly FINAL_CLOSE_PARENS_REGEX = /\);*$/;
+
   /** @internal */
   private async tableStructureSql(tableName: string, columnNames?: string[]): Promise<string[]> {
     // Rails: `unless column_names ... column_names = column_info.map { ... }`
@@ -2325,29 +2325,30 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       const columnInfo = await this.tableInfo(tableName);
       columnNames = columnInfo.map((column) => String(column["name"]));
     }
-    // Rails: `result = query_value(sql, "SCHEMA")` (sqlite3_adapter.rb:775) —
-    // the reflection read is instrumented like every other SCHEMA query, and
-    // the table name goes through `quote` (rb:767), not a bare escape.
-    const querySql = `SELECT sql FROM (SELECT * FROM sqlite_master UNION ALL SELECT * FROM sqlite_temp_master) WHERE type = 'table' AND name = ${this.quote(tableName)}`;
-    const result = (await this.queryValue(querySql, "SCHEMA")) as string | null | undefined;
+    const sql = `SELECT sql FROM
+  (SELECT * FROM sqlite_master UNION ALL
+   SELECT * FROM sqlite_temp_master)
+WHERE type = 'table' AND name = ${this.quote(tableName)}
+`;
+    // Rails: `result = query_value(sql, "SCHEMA")` (sqlite3_adapter.rb:775).
+    const result = (await this.queryValue(sql, "SCHEMA")) as string | null;
+
     if (!result) return [];
-    const body = result.replace(/\);\s*$/, "").replace(/^[^(]*\(/, "");
-    const names = columnNames;
-    let splitter: RegExp;
-    // Rails' table_structure_sql anchors on a single `\s` before each column
-    // name; we widen it to `\s*` so hand-written multi-line CREATE TABLE
-    // (`,\n    "col"`) still splits — the newline+indent would otherwise defeat
-    // the single-`\s` lookahead. This is the column-reflection path for
-    // `columns()` (COLLATE / AUTOINCREMENT / GENERATED enrichment), so the
-    // multi-line tolerance is load-bearing (see adapters/sqlite3/collation.test.ts).
-    // Still safe: the lookahead requires a quoted column name or CONSTRAINT.
-    if (names.length > 0) {
-      const escaped = names.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
-      splitter = new RegExp(`,(?=\\s*(?:CONSTRAINT|"(?:${escaped})"))`, "i");
-    } else {
-      splitter = /,(?=\s*(?:CONSTRAINT|"))/;
-    }
-    return body.split(splitter).map((s) => s.trim());
+
+    // Splitting with left parentheses and discarding the first part will return all
+    // columns separated with comma(,).
+    const openParens = SQLite3Adapter.UNQUOTED_OPEN_PARENS_REGEX.exec(result);
+    const partitioned = openParens ? result.slice(openParens.index + openParens[0].length) : "";
+    // column definitions can have a comma in them, so split on commas followed
+    // by a space and a column name in quotes or followed by the keyword CONSTRAINT
+    const union =
+      columnNames.length > 0
+        ? columnNames.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")
+        : "(?!)";
+    return partitioned
+      .replace(SQLite3Adapter.FINAL_CLOSE_PARENS_REGEX, "")
+      .split(new RegExp(`,(?=\\s(?:CONSTRAINT|"(?:${union})"))`, "i"))
+      .map((columnString) => columnString.trim());
   }
 
   /** @internal */

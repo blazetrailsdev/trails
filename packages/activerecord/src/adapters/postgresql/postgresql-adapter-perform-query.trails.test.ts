@@ -9,7 +9,9 @@
  * readonly guard survive the fold.
  */
 import { it, expect, beforeEach, afterEach, vi } from "vitest";
-import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL, SQLSubscriber } from "./test-helper.js";
+import { QueryAttribute } from "../../relation/query-attribute.js";
+import { Value } from "../../type.js";
 import { Base } from "../../base.js";
 import type { AbstractAdapter } from "../../connection-adapters/abstract-adapter.js";
 import { ReadOnlyError } from "../../errors.js";
@@ -95,5 +97,39 @@ describeIfPg("PostgreSQLAdapterPerformQueryTest (trails)", () => {
     await adapter.reconnect(); // opens a fresh session; configure clears the cache
     await adapter.execute(`SELECT 1`); // fresh session must re-apply the timezone
     expect(spy).toHaveBeenCalled();
+  });
+  // Rails' internal_execute forwards `prepare:` to raw_execute → perform_query
+  // (abstract/database_statements.rb:552-558, 589-591). PG reaches preparation
+  // through `_runQuery`, whose `prepareHint` these two assert both ways.
+  it("internalExecute prepares when prepare is true", async () => {
+    const bind = new QueryAttribute("", 1, new Value());
+    const subscriber = new SQLSubscriber();
+    subscriber.start();
+    try {
+      await adapter.internalExecute("SELECT $1::integer", "SQL", {
+        binds: [bind],
+        prepare: true,
+      });
+      const payload = subscriber.payloads.find((p) => p["sql"] === "SELECT $1::integer");
+      expect(payload?.["statement_name"]).toBeTruthy();
+    } finally {
+      subscriber.stop();
+    }
+  });
+
+  it("internalExecute does not prepare when prepare is false", async () => {
+    const bind = new QueryAttribute("", 2, new Value());
+    const subscriber = new SQLSubscriber();
+    subscriber.start();
+    try {
+      await adapter.internalExecute("SELECT $1::integer + 0", "SQL", {
+        binds: [bind],
+        prepare: false,
+      });
+      const payload = subscriber.payloads.find((p) => p["sql"] === "SELECT $1::integer + 0");
+      expect(payload?.["statement_name"]).toBeUndefined();
+    } finally {
+      subscriber.stop();
+    }
   });
 });

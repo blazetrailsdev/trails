@@ -16,14 +16,14 @@ describeIfSqlite("SQLite3CollationTest", () => {
 
   beforeEach(async () => {
     adapter = (await Base.leaseConnection()) as unknown as SQLite3Adapter;
-    await adapter.dropTable("collation_table_sqlite3", { ifExists: true });
-    await adapter.exec(`CREATE TABLE "collation_table_sqlite3" (
-      "id" INTEGER PRIMARY KEY AUTOINCREMENT,
-      "string_nocase" VARCHAR(255) COLLATE "NOCASE",
-      "text_rtrim" TEXT COLLATE "RTRIM",
-      "decimal_col" DECIMAL(6, 2),
-      "string_after_decimal_nocase" VARCHAR(255) COLLATE "NOCASE"
-    )`);
+    await adapter.createTable("collation_table_sqlite3", { force: true }, (t) => {
+      t.string("string_nocase", { collation: "NOCASE" });
+      t.text("text_rtrim", { collation: "RTRIM" });
+      // The decimal column might interfere with collation parsing.
+      // Thus, add this column type and some other string column afterwards.
+      t.decimal("decimal_col", { precision: 6, scale: 2 });
+      t.string("string_after_decimal_nocase", { collation: "NOCASE" });
+    });
   });
 
   afterEach(async () => {

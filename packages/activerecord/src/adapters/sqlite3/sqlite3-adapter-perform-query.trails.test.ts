@@ -154,4 +154,35 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
       expect(adapter.currentTransaction().isDirty()).toBe(true);
     });
   });
+  // Rails' internal_execute forwards `prepare:` to raw_execute → perform_query,
+  // whose prepare branch pools the statement (`@statements[sql] ||=
+  // raw_connection.prepare(sql)`, sqlite3/database_statements.rb:81-91). The
+  // unprepared arm stays on `exec`, which never touches the pool.
+  it("internalExecute prepares when prepare is true", async () => {
+    const pool = (adapter as unknown as { _statementPool: { get(sql: string): unknown } })
+      ._statementPool;
+    await adapter.internalExecute(`SELECT 1`, "SQL", { prepare: true });
+    expect(pool.get(`SELECT 1`)).toBeTruthy();
+  });
+
+  it("internalExecute does not prepare when prepare is false", async () => {
+    const pool = (adapter as unknown as { _statementPool: { get(sql: string): unknown } })
+      ._statementPool;
+    await adapter.internalExecute(`SELECT 2`, "SQL", { prepare: false });
+    expect(pool.get(`SELECT 2`)).toBeFalsy();
+  });
+  it("internalExecute binds through to the driver", async () => {
+    await adapter.internalExecute(`INSERT INTO "pq" ("id", "nick") VALUES (?, ?)`, "SQL", {
+      binds: [7, "bound"],
+    });
+    expect(await adapter.queryValue(`SELECT "nick" FROM "pq" WHERE "id" = 7`)).toBe("bound");
+  });
+
+  it("internalExecute binds through to the driver when prepare is true", async () => {
+    await adapter.internalExecute(`INSERT INTO "pq" ("id", "nick") VALUES (?, ?)`, "SQL", {
+      binds: [8, "prepared"],
+      prepare: true,
+    });
+    expect(await adapter.queryValue(`SELECT "nick" FROM "pq" WHERE "id" = 8`)).toBe("prepared");
+  });
 });

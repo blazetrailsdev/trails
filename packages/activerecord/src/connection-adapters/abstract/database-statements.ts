@@ -86,7 +86,7 @@ export interface DatabaseStatementsHost {
    * adapter's `type_cast` override applies.
    * @internal
    */
-  typeCastedBinds?(binds: unknown[] | null | undefined): unknown[] | undefined;
+  typeCastedBinds(binds: unknown[] | null | undefined): unknown[] | undefined;
   /**
    * Mixed in from `AbstractAdapter` — the single `sql.active_record` payload
    * producer (abstract_adapter.rb:1134).
@@ -1333,16 +1333,14 @@ async function logSql<T>(
   fn: () => Promise<T>,
 ): Promise<T> {
   const bindArray = binds ?? [];
-  // `?? []` (never `?? bindArray`) so a host that somehow lacks the mixin
-  // emits an empty slot rather than silently reinstating the raw-uncast-binds
-  // divergence this file's `typeCastedBinds` sweep removed — Attribute objects
-  // in the payload would reach LogSubscriber as "[object Object]".
-  // Non-null: `log` is mixed in on every AbstractAdapter (abstract_adapter.rb:1134).
+  // Non-null: `log` is mixed in on every AbstractAdapter (abstract_adapter.rb:1134),
+  // and `type_casted_binds` is `binds&.map` (quoting.rb:224-232) — nil only for a
+  // nil argument, which `bindArray` never is.
   return host.log!(
     sql,
     name,
     bindArray,
-    host.typeCastedBinds?.(bindArray) ?? [],
+    host.typeCastedBinds(bindArray)!,
     false,
     async (payload) => {
       const result = await fn();
@@ -1487,6 +1485,7 @@ export { deleteStatement as remove };
 
 interface DatabaseStatementsDefaultsHost {
   pool: ConnectionPool | NullPool;
+  typeCastedBinds(binds: unknown[] | null | undefined): unknown[] | undefined;
   execute(
     sql: string,
     binds?: unknown[],
@@ -1835,9 +1834,7 @@ export async function rawExecute(
   materializeTransactions = true,
   batch = false,
 ): Promise<unknown> {
-  // `?? []` rather than the raw binds: an adapter missing the mixin should fail
-  // loudly at the driver, not bind Attribute objects.
-  const tcBinds = this.typeCastedBinds?.(binds ?? []) ?? [];
+  const tcBinds = this.typeCastedBinds(binds ?? []);
   return (this as any).withRawConnection({ allowRetry, materializeTransactions }, (conn: unknown) =>
     (this as any).performQuery(conn, sql, binds ?? [], tcBinds, { prepare, batch }),
   );

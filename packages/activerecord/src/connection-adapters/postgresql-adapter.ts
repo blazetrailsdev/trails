@@ -827,6 +827,8 @@ export class PostgreSQLAdapter
    * deadlock. Rebuilds the base type map first (mirroring reload_type_map's
    * clear) so the registrations layer onto a fresh map.
    */
+  private _loadingAdditionalTypes = false;
+
   private async _eagerLoadAdditionalTypes(client: pg.Client): Promise<void> {
     this._typeMap = null;
     const initializer = new TypeMapInitializer(this.typeMap);
@@ -911,6 +913,15 @@ export class PostgreSQLAdapter
     sqlType: string = "",
   ): Promise<Type> {
     if (!this.typeMap.has(oid)) {
+      // Reentrancy guard, with no Rails counterpart: Rails' initialize_type_map
+      // preloads the common OIDs at connect (postgresql_adapter.rb:558-608), so
+      // get_oid_type for pg_type's own columns never misses and
+      // load_additional_types cannot recurse. trails resolves the map lazily, so
+      // a schema query issued *during* load_additional_types would re-enter it
+      // (schemaQuery -> internalExecQuery -> castResult -> getOidType -> ...).
+      // Return an unregistered fallback instead — registering it on the map
+      // would poison the OID permanently (see lookupCastTypeFromColumn below).
+      if (this._loadingAdditionalTypes) return new ValueType();
       await this.loadAdditionalTypes([oid]);
     }
     return this.typeMap.fetch(oid, fmod, sqlType, () => {
@@ -1155,9 +1166,14 @@ export class PostgreSQLAdapter
    */
   async loadAdditionalTypes(oids?: number[]): Promise<void> {
     const initializer = new TypeMapInitializer(this.typeMap);
-    for await (const query of this.loadTypesQueries(initializer, oids)) {
-      const rows = (await this.schemaQuery(query)) as unknown as PgTypeRow[];
-      initializer.run(rows);
+    this._loadingAdditionalTypes = true;
+    try {
+      for await (const query of this.loadTypesQueries(initializer, oids)) {
+        const rows = (await this.schemaQuery(query)) as unknown as PgTypeRow[];
+        initializer.run(rows);
+      }
+    } finally {
+      this._loadingAdditionalTypes = false;
     }
   }
 
@@ -2235,7 +2251,13 @@ export class PostgreSQLAdapter
       materializeTransactions = true,
       allowRetry = false,
       binds = [],
-    }: { materializeTransactions?: boolean; allowRetry?: boolean; binds?: unknown[] } = {},
+      prepare,
+    }: {
+      materializeTransactions?: boolean;
+      allowRetry?: boolean;
+      binds?: unknown[];
+      prepare?: boolean;
+    } = {},
   ): Promise<unknown> {
     sql = preprocessQuery.call(this as any, sql);
     try {
@@ -2266,7 +2288,15 @@ export class PostgreSQLAdapter
           // rescue then attaches sql + binds via set_query — mirroring Rails'
           // AbstractAdapter#log. Translating here would duplicate that and, on an
           // already-translated error, re-wrap it as StatementInvalid.
-          const runResult = await this._runQuery(client, runSql, bindArray, { rowMode: "array" });
+          // Rails' internal_execute forwards `prepare:` to raw_execute →
+          // perform_query (abstract/database_statements.rb:552-558, 589-591).
+          const runResult = await this._runQuery(client, runSql, bindArray, {
+            rowMode: "array",
+            prepareHint: prepare,
+            onPrepared: (stmtName) => {
+              payload.statement_name = stmtName;
+            },
+          });
           const count = runResult.rowCount ?? runResult.rows.length;
           payload.row_count = count;
           return runResult;
@@ -2888,7 +2918,10 @@ export class PostgreSQLAdapter
       // connection rather than yielding an unconfigured one.
       .then(() => {
         if (this._rawConnection === live && !this._closed) {
-          return this._maybeConfigureConnection(live).catch((error: unknown) => {
+          // Rails' reset! ends in configure_connection
+          // (postgresql_adapter.rb:371), so the dispatch goes through the
+          // public, overridable hook.
+          return this.configureConnection(live).catch((error: unknown) => {
             if (this._rawConnection === live) {
               this._rawConnection = null;
               this._connectionConfigured = false;
@@ -2920,18 +2953,26 @@ export class PostgreSQLAdapter
    * `_maybeConfigureConnection` which gates on a boolean so the
    * persistent client is configured exactly once per connection.
    *
-   * The inherited `reconnectBang` lifecycle calls this argless after the
-   * raw `reconnect()` has nulled `_rawConnection`. PG opens the new
-   * connection lazily on the next acquire, where `_acquireFreshClient`
-   * runs `_maybeConfigureConnection` itself — so the argless call is a
-   * no-op (configure-on-next-acquire), mirroring Rails' connect-time
-   * `configure_connection`.
+   * Rails' `configure_connection` (postgresql_adapter.rb:956) is argless and
+   * operates on `@raw_connection`, so the argless call configures the current
+   * raw connection here too. The optional `client` parameter is the node-pg
+   * acquire-ordering escape hatch: `_acquireFreshClient` must configure the
+   * freshly-opened socket *before* installing it as `_rawConnection`, and libpq
+   * has no equivalent window because Rails' `connect` assigns `@raw_connection`
+   * first. Passing it is the only deviation, and it names the same connection
+   * Rails' body would have read.
+   *
+   * The inherited `reconnectBang` lifecycle calls this argless after the raw
+   * `reconnect()` has nulled `_rawConnection`; PG opens the new connection
+   * lazily on the next acquire, so that call still resolves to
+   * configure-on-next-acquire.
    *
    * @internal
    */
   async configureConnection(client?: pg.Client): Promise<void> {
-    if (!client) return;
-    return this._maybeConfigureConnection(client);
+    const conn = client ?? this._rawConnection;
+    if (!conn) return;
+    return this._maybeConfigureConnection(conn);
   }
 
   /**

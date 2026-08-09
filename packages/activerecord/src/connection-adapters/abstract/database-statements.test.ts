@@ -71,6 +71,11 @@ const log: NonNullable<DatabaseStatementsHost["log"]> = async (
   }
 };
 
+// `typeCastedBinds` is likewise mixed in on every adapter by
+// `include(AbstractAdapter, QuotingMixin)` (abstract-adapter.ts), so it is a
+// required member of DatabaseStatementsHost rather than an optional one.
+const typeCastedBinds: DatabaseStatementsHost["typeCastedBinds"] = (binds) => binds ?? [];
+
 describe("DatabaseStatements", () => {
   // `to_sql` compiles through `Table.engine`'s connection (arel/nodes/node.rb:148-153),
   // so these Arel assertions need a connection, as Rails' do via helper.rb.
@@ -121,6 +126,7 @@ describe("DatabaseStatements", () => {
       const host: DatabaseStatementsHost = {
         log,
         pool,
+        typeCastedBinds,
         beginDbTransaction: async () => {
           calls.push("begin");
         },
@@ -144,6 +150,7 @@ describe("DatabaseStatements", () => {
       const host: DatabaseStatementsHost = {
         log,
         pool,
+        typeCastedBinds,
         beginDbTransaction: async () => {},
         commitDbTransaction: async () => {},
         rollbackDbTransaction: async () => {},
@@ -224,6 +231,7 @@ describe("DatabaseStatements", () => {
       const host: DatabaseStatementsHost = {
         log,
         pool,
+        typeCastedBinds,
         currentTransaction: () => txn,
         isWriteQuery: () => true,
       };
@@ -236,6 +244,7 @@ describe("DatabaseStatements", () => {
       const host: DatabaseStatementsHost = {
         log,
         pool,
+        typeCastedBinds,
         currentTransaction: () => txn,
         isWriteQuery: () => false,
       };
@@ -249,6 +258,7 @@ describe("DatabaseStatements", () => {
       const host: DatabaseStatementsHost = {
         log,
         pool,
+        typeCastedBinds,
         currentTransaction: () => ({ open: true }),
       };
       expect(isTransactionOpen.call(host)).toBe(true);
@@ -258,6 +268,7 @@ describe("DatabaseStatements", () => {
       const host: DatabaseStatementsHost = {
         log,
         pool,
+        typeCastedBinds,
         currentTransaction: () => ({ open: false }),
       };
       expect(isTransactionOpen.call(host)).toBe(false);
@@ -269,6 +280,7 @@ describe("DatabaseStatements", () => {
       const { internalExecQuery } = await import("./database-statements.js");
       const host = {
         log,
+        typeCastedBinds,
         execute: async () => [],
       } as unknown as DatabaseStatementsHost;
       await expect(internalExecQuery.call(host, "SELECT ?", "SQL", [1])).rejects.toThrow(
@@ -280,6 +292,7 @@ describe("DatabaseStatements", () => {
       const { internalExecQuery } = await import("./database-statements.js");
       const host = {
         log,
+        typeCastedBinds,
         internalExecute: async () => ({ rows: [[1]] }),
       } as unknown as DatabaseStatementsHost;
       const result = await internalExecQuery.call(host, "SELECT 1", "SQL");
@@ -292,6 +305,7 @@ describe("DatabaseStatements", () => {
       // translated StatementInvalid carrying no statement context.
       const host = {
         log,
+        typeCastedBinds,
         internalExecute: async () => {
           throw new StatementInvalid("duplicate key value violates unique constraint");
         },
@@ -312,6 +326,7 @@ describe("DatabaseStatements", () => {
       const { internalExecQuery } = await import("./database-statements.js");
       const host = {
         log,
+        typeCastedBinds,
         internalExecute: async () => {
           throw new StatementInvalid("boom", { sql: "ORIGINAL", binds: [99] });
         },
@@ -328,6 +343,7 @@ describe("DatabaseStatements", () => {
       const { internalExecQuery } = await import("./database-statements.js");
       const host = {
         log,
+        typeCastedBinds,
         execute: async () => [{ id: 1 }],
       } as unknown as DatabaseStatementsHost;
       const result = await internalExecQuery.call(host, "SELECT 1", "SQL");
@@ -343,6 +359,7 @@ describe("DatabaseStatements", () => {
       const host: DatabaseStatementsHost &
         Pick<Quoting, "quote" | "quoteTableName" | "quoteColumnName"> = {
         pool,
+        typeCastedBinds,
         execute: async (sql: string) => {
           executed.push(sql);
         },
@@ -375,6 +392,7 @@ describe("DatabaseStatements", () => {
       const host: DatabaseStatementsHost &
         Pick<Quoting, "quote" | "quoteTableName" | "quoteColumnName"> = {
         pool,
+        typeCastedBinds,
         execute: async () => {},
         transaction: async <T>(fn: (tx?: unknown) => Promise<T> | T) => {
           await fn();
@@ -406,6 +424,7 @@ describe("DatabaseStatements", () => {
       let scopedTables: string[] | undefined;
       const host: DatabaseStatementsHost & Pick<Quoting, "quoteTableName"> = {
         pool,
+        typeCastedBinds,
         execute: async (sql: string) => {
           executed.push(sql);
         },
@@ -435,6 +454,7 @@ describe("DatabaseStatements", () => {
       const executed: Array<{ sql: string; name?: string | null; receiver: unknown }> = [];
       const host: QuoterHost = {
         pool,
+        typeCastedBinds,
         async execute(sql: string, _binds?: unknown[], name?: string | null) {
           // captures `this` to verify receiver is preserved
           executed.push({ sql, name, receiver: this });
@@ -531,7 +551,7 @@ describe("performQuery", () => {
 
 describe("preprocessQuery", () => {
   it("returns sql unchanged when no write guard or transaction", () => {
-    const host: DatabaseStatementsHost = { pool, log };
+    const host: DatabaseStatementsHost = { pool, typeCastedBinds, log };
     expect(preprocessQuery.call(host, "SELECT 1")).toBe("SELECT 1");
   });
 
@@ -540,6 +560,7 @@ describe("preprocessQuery", () => {
     const host: DatabaseStatementsHost = {
       log,
       pool,
+      typeCastedBinds,
       checkIfWriteQuery(sql) {
         checked = sql;
       },
@@ -562,7 +583,7 @@ describe("preprocessQuery", () => {
     }
 
     it("applies registered transformers in order, threading the connection", () => {
-      const host: DatabaseStatementsHost = { pool, log };
+      const host: DatabaseStatementsHost = { pool, typeCastedBinds, log };
       const seen: unknown[] = [];
       withTransformers(
         [
@@ -582,7 +603,7 @@ describe("preprocessQuery", () => {
     });
 
     it("does not double-apply when a transformer re-enters preprocessQuery", () => {
-      const host: DatabaseStatementsHost = { pool, log };
+      const host: DatabaseStatementsHost = { pool, typeCastedBinds, log };
       let nested = "";
       withTransformers(
         [
@@ -609,6 +630,7 @@ describe("select", () => {
     const host: DatabaseStatementsHost = {
       log,
       pool,
+      typeCastedBinds,
       async internalExecute(_sql, _name, _binds) {
         return [{ id: 1 }];
       },
@@ -624,6 +646,7 @@ describe("execInsert", () => {
     const host: DatabaseStatementsHost = {
       log,
       pool,
+      typeCastedBinds,
       supportsInsertReturning: () => supportsReturning,
       quoteColumnName: (c) => `"${c}"`,
       internalExecute: async (sql: string) => {
@@ -666,6 +689,7 @@ describe("internal_exec_query is a virtual call", () => {
     const seen: string[] = [];
     const host: DatabaseStatementsHost = {
       pool,
+      typeCastedBinds,
       supportsInsertReturning: () => false,
       quoteColumnName: (c) => `"${c}"`,
       async internalExecQuery(sql: string) {
@@ -703,7 +727,12 @@ describe("internal_exec_query is a virtual call", () => {
 
 describe("sqlForInsert", () => {
   it("returns sql and binds unchanged when adapter does not support RETURNING", () => {
-    const host: DatabaseStatementsHost = { pool, log, supportsInsertReturning: () => false };
+    const host: DatabaseStatementsHost = {
+      pool,
+      typeCastedBinds,
+      log,
+      supportsInsertReturning: () => false,
+    };
     const [sql, binds] = sqlForInsert.call(host, "INSERT INTO t (x) VALUES (1)", "id", [], null);
     expect(sql).toBe("INSERT INTO t (x) VALUES (1)");
     expect(binds).toEqual([]);
@@ -713,6 +742,7 @@ describe("sqlForInsert", () => {
     const host: DatabaseStatementsHost = {
       log,
       pool,
+      typeCastedBinds,
       supportsInsertReturning: () => true,
       quoteColumnName: (c) => `"${c}"`,
     };
@@ -724,6 +754,7 @@ describe("sqlForInsert", () => {
     const host: DatabaseStatementsHost = {
       log,
       pool,
+      typeCastedBinds,
       supportsInsertReturning: () => true,
       quoteColumnName: (c) => `"${c}"`,
     };
@@ -744,6 +775,7 @@ describe("sqlForInsert", () => {
     const host: DatabaseStatementsHost = {
       log,
       pool,
+      typeCastedBinds,
       supportsInsertReturning: () => true,
       quoteColumnName: (c) => `"${c}"`,
       primaryKey: () => {
@@ -758,6 +790,7 @@ describe("sqlForInsert", () => {
     const host: DatabaseStatementsHost = {
       log,
       pool,
+      typeCastedBinds,
       supportsInsertReturning: () => true,
       quoteColumnName: (c) => `"${c}"`,
     };
@@ -815,13 +848,13 @@ describe("defaultInsertValue", () => {
 
 describe("returningColumnValues", () => {
   it("returns [first value of first row] from result", () => {
-    const host: DatabaseStatementsHost = { pool, log };
+    const host: DatabaseStatementsHost = { pool, typeCastedBinds, log };
     const result = new Result(["id"], [[42]]);
     expect(returningColumnValues.call(host, result)).toEqual([42]);
   });
 
   it("returns [undefined] for empty result", () => {
-    const host: DatabaseStatementsHost = { pool, log };
+    const host: DatabaseStatementsHost = { pool, typeCastedBinds, log };
     expect(returningColumnValues.call(host, Result.empty())).toEqual([undefined]);
   });
 });
@@ -838,6 +871,7 @@ describe("buildFixtureSql / buildFixtureStatements / buildTruncateStatement(s) /
     const q = quoter.q ?? ((n: string) => `"${n}"`);
     return {
       pool,
+      typeCastedBinds,
       log,
       quote: (v: unknown) => (typeof v === "string" ? `'${v}'` : String(v)),
       quoteTableName: q,
@@ -926,6 +960,7 @@ describe("buildFixtureSql / buildFixtureStatements / buildTruncateStatement(s) /
     it("uses adapter quote() for value escaping", () => {
       const host: FixtureHost = {
         pool,
+        typeCastedBinds,
         quote: (v: unknown) => (typeof v === "string" ? `E'${v}'` : String(v)),
         quoteTableName: (n) => `"${n}"`,
         quoteColumnName: (n) => `"${n}"`,

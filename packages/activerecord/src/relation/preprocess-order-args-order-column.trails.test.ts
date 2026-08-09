@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { Nodes } from "@blazetrails/arel";
 import { fixtures } from "../test-fixtures.js";
 import { Topic } from "../test-helpers/models/topic.js";
@@ -54,5 +54,22 @@ describe("preprocessOrderArgs routes through orderColumn", () => {
 
   it("leaves a String arg unchanged", () => {
     expect(preprocess(Topic.all(), ["title ASC"])).toEqual(["title ASC"]);
+  });
+  it("quotes the fallback through quote_table_name, as Rails' order_column does", () => {
+    // `order_column`'s else arm is
+    // `Arel.sql(model.adapter_class.quote_table_name(attr_name), retryable: true)`
+    // (query_methods.rb:2153-2161). Both quoters emit the same bytes on every
+    // adapter trails ships, so only the dispatch is observable.
+    const connection = (Topic as unknown as { connection: Record<string, unknown> }).connection;
+    const quoteTableName = vi.spyOn(connection as never, "quoteTableName");
+    const quoteColumnName = vi.spyOn(connection as never, "quoteColumnName");
+    try {
+      preprocess(Topic.all(), [Symbol.for("nonexistent")]);
+      expect(quoteTableName).toHaveBeenCalledWith("nonexistent");
+      expect(quoteColumnName).not.toHaveBeenCalledWith("nonexistent");
+    } finally {
+      quoteTableName.mockRestore();
+      quoteColumnName.mockRestore();
+    }
   });
 });
