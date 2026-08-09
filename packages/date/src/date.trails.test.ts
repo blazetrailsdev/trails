@@ -1460,6 +1460,25 @@ describe("DateTime", () => {
     expect(dt.jd).toBe(2299156);
     expect(dt.start).toBe(-Infinity);
     expect(dt.newStart(RubyDate.ITALY).toS()).toBe("1582-09-30T06:30:00+02:00");
+
+    // `m_julian_p` (date_core.c:1683-1703) reads the STORED UTC day, not the
+    // local one `jd` answers, so an offset that carries the date across the
+    // reform flips the answer while `jd` is the same on both.
+    //   DateTime.new(1582, 10, 15, 0, 30, 0, "+02:00").jd       #=> 2299161
+    //   DateTime.new(1582, 10, 15, 0, 30, 0, "+02:00").julian?  #=> true
+    //   DateTime.new(1582, 10, 15, 23, 30, 0, "-02:00").jd      #=> 2299161
+    //   DateTime.new(1582, 10, 15, 23, 30, 0, "-02:00").julian? #=> false
+    // `dup_obj` copies the receiver's own class, so the aliases answer a
+    // DateTime with its time of day intact:
+    //   DateTime.new(1582, 10, 10, 6, 30, 0, "+02:00", Date::GREGORIAN).italy.to_s
+    //     #=> "1582-09-30T06:30:00+02:00"
+    expect(dt.italy()).toBeInstanceOf(RubyDateTime);
+    expect(dt.italy().toS()).toBe("1582-09-30T06:30:00+02:00");
+
+    const east = new RubyDateTime(1582, 10, 15, 0, 30, 0, "+02:00");
+    const west = new RubyDateTime(1582, 10, 15, 23, 30, 0, "-02:00");
+    expect([east.jd, west.jd]).toEqual([2299161, 2299161]);
+    expect([east.isJulian, west.isJulian]).toEqual([true, false]);
     // The `Temporal.ZonedDateTime` seat spells its own zone in brackets after
     // the offset, which the gem's `to_s` has no counterpart for.
     expect(

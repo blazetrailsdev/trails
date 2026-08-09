@@ -3136,6 +3136,32 @@ function cJdToWday(jd: number): number {
   return mod(jd + 1, 7);
 }
 
+/**
+ * @internal `date_core.c` `m_julian_p` (`date_core.c:1683-1703`), which reads
+ * the STORED Julian day — `x->s.jd` on the simple arm and `x->c.jd`, the UTC
+ * one, on the complex arm — rather than `m_local_jd`. So a `DateTime` whose
+ * offset carries it across the reform answers off the UTC day:
+ * `DateTime.new(1582, 10, 15, 0, 30, 0, "+02:00").julian?` is true while
+ * `DateTime.new(1582, 10, 15, 23, 30, 0, "-02:00")` is false, though both
+ * answer 2299161 to `jd`. That is why this takes the day rather than reading a
+ * receiver: the two arms hold different days, and each class passes its own.
+ *
+ * The `isinf` arm is what makes `Date::JULIAN` julian everywhere and
+ * `Date::GREGORIAN` julian nowhere. `Infinity` / `-Infinity` would carry both
+ * through the `jd < sg` comparison below on their own, but the C tests the
+ * infinity first, and its answer there is `sg == positive_inf`.
+ *
+ * `s_virtual_sg` (`date_core.c:1110-1120`) is the `sg` the C reads here: it
+ * answers an infinity for a date whose Julian day overflowed a `Fixnum`, on the
+ * `nth` field that carries the overflow. There is no `nth` here — the Julian
+ * day is one JS number — so the virtual reading and the stored one never part
+ * company.
+ */
+function mJulianP(jd: number, sg: number): boolean {
+  if (!Number.isFinite(sg)) return sg === JULIAN;
+  return jd < sg;
+}
+
 /** @internal `date_core.c`'s `DIV` macro (`date_core.c:168-170`), floored division. */
 function div(n: number, d: number): number {
   return Math.floor(n / d);
@@ -4167,17 +4193,11 @@ export class Date {
    * `(Date.new(1582, 10, 15) - 1).julian?` is true and
    * `Date.new(1582, 10, 15).julian?` is false.
    *
-   * The C's `isinf` arm is what makes `Date::JULIAN` julian everywhere and
-   * `Date::GREGORIAN` julian nowhere; the `jd < sg` below carries both directly,
-   * since `Infinity` and `-Infinity` compare that way — but the C tests the
-   * infinity explicitly, and so does this, because its answer for
-   * `Date::GREGORIAN` is `sg == positive_inf`, not the comparison.
+   * {@link mJulianP} reads the STORED day, which is `this.#jd` here and the UTC
+   * one on `DateTime` — hence the override there.
    */
   get isJulian(): boolean {
-    const jd = this.jd;
-    const sg = this.#sg;
-    if (!Number.isFinite(sg)) return sg === JULIAN;
-    return jd < sg;
+    return mJulianP(this.#jd, this.#sg);
   }
 
   /**
@@ -4211,17 +4231,19 @@ export class Date {
    * `gregorian` alike. TS has no `dup_obj` — a copy has to name the class it is
    * making — so this method IS that seam: `DateTime` overrides it to keep its
    * time of day, and the four below call it rather than a private helper none
-   * of them could override.
+   * of them could override. The `this` return type is `dup_obj`'s own
+   * `rb_obj_class(obj)`, which is why the four answer a `DateTime` on a
+   * `DateTime`.
    */
-  newStart(start = DEFAULT_SG): Date {
-    return new Date(SEAT, this.jd, val2sg(start));
+  newStart(start = DEFAULT_SG): this {
+    return new Date(SEAT, this.jd, val2sg(start)) as this;
   }
 
   /**
    * Ruby `Date#italy` (ruby/date, `date_core.c` `d_lite_italy`,
    * `date_core.c:5848-5852`), `new_start` with `Date::ITALY`.
    */
-  italy(): Date {
+  italy(): this {
     return this.newStart(ITALY);
   }
 
@@ -4229,7 +4251,7 @@ export class Date {
    * Ruby `Date#england` (ruby/date, `date_core.c` `d_lite_england`,
    * `date_core.c:5860-5864`), `new_start` with `Date::ENGLAND`.
    */
-  england(): Date {
+  england(): this {
     return this.newStart(ENGLAND);
   }
 
@@ -4237,7 +4259,7 @@ export class Date {
    * Ruby `Date#julian` (ruby/date, `date_core.c` `d_lite_julian`,
    * `date_core.c:5872-5876`), `new_start` with `Date::JULIAN`.
    */
-  julian(): Date {
+  julian(): this {
     return this.newStart(JULIAN);
   }
 
@@ -4245,7 +4267,7 @@ export class Date {
    * Ruby `Date#gregorian` (ruby/date, `date_core.c` `d_lite_gregorian`,
    * `date_core.c:5884-5888`), `new_start` with `Date::GREGORIAN`.
    */
-  gregorian(): Date {
+  gregorian(): this {
     return this.newStart(GREGORIAN);
   }
 
@@ -4607,8 +4629,19 @@ export class DateTime extends DateWithoutParseStatics {
    * `set_sg` writes the new reform in. TS has no `dup_obj`, so the copy is made
    * here, where the fields are in scope; see {@link Date#newStart}.
    */
-  override newStart(start = DEFAULT_SG): DateTime {
-    return new DateTime(SEAT, this.#jd, this.#df, this.#sf, this.#of, val2sg(start));
+  /**
+   * Ruby `DateTime#julian?` is `d_lite_julian_p` inherited, but `m_julian_p`
+   * (`date_core.c:1683-1703`) reads `x->c.jd` on the complex arm — the STORED
+   * UTC day, not the `m_local_jd` {@link DateTime#jd} answers. The stored day
+   * is private to each class, so the reading is made here; see
+   * {@link mJulianP}.
+   */
+  override get isJulian(): boolean {
+    return mJulianP(this.#jd, this.start);
+  }
+
+  override newStart(start = DEFAULT_SG): this {
+    return new DateTime(SEAT, this.#jd, this.#df, this.#sf, this.#of, val2sg(start)) as this;
   }
 
   /**
