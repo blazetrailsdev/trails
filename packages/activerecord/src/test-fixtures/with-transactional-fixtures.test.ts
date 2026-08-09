@@ -10,6 +10,8 @@ import { SQLite3Adapter } from "../connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "../connection-adapters/better-sqlite3-adapter.js";
 import { NullTransaction } from "../connection-adapters/abstract/transaction.js";
 import { withTransactionalFixtures } from "./with-transactional-fixtures.js";
+import { fixtures } from "../test-fixtures.js";
+import { Computer } from "../test-helpers/models/computer.js";
 
 // Resolve a pool-leased adapter from the primary (schema-loaded) pool rather
 // than the divergent sidecar `_pool`. Rails has no sidecar test pool.
@@ -353,5 +355,34 @@ describe("concurrency isolation: two concurrent transaction chains stay independ
     expect(adapter.openTransactions).toBe(0);
     expect(adapter.inTransaction).toBe(false);
     expect(adapter.currentTransaction()).toBeInstanceOf(NullTransaction);
+  });
+});
+
+// MySQL/MariaDB have no transactional DDL: a DDL statement implicitly commits
+// the open fixture transaction, so `teardown_fixtures`' unpin rolls back an
+// empty transaction and the rows this block seeded stay durable. A later block
+// that declares `fixtures([])` deletes nothing (a load only deletes the tables
+// it is about to fill, `abstract/database_statements.rb:486-495`) and inherits
+// them. Rails runs the same shape (`batches_test.rb:570` calls `add_index` in a
+// transactional `BatchesTest`) but never asserts an unseeded table is empty, so
+// the escape is invisible there. These two blocks run in order and are red on
+// the MySQL and MariaDB lanes without the teardown repair; on SQLite and
+// PostgreSQL the rollback already covers the rows and they pass either way.
+describe("fixture rows do not survive a MySQL DDL implicit commit", () => {
+  fixtures(["computers"]);
+
+  it("seeds rows and then runs DDL that implicitly commits the pin", async () => {
+    expect(Number(await Computer.count())).toBeGreaterThan(0);
+    const conn = Base.connection;
+    await conn.addIndex("computers", "system", { name: "idx_fixture_pin_escape" });
+    await conn.removeIndex("computers", { name: "idx_fixture_pin_escape" });
+  });
+});
+
+describe("fixture rows do not survive a MySQL DDL implicit commit (next block)", () => {
+  fixtures([]);
+
+  it("starts with an empty table it did not seed", async () => {
+    expect(Number(await Computer.count())).toBe(0);
   });
 });

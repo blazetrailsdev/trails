@@ -33,6 +33,7 @@ import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/a
 import { Base } from "./base.js";
 import { registerModel } from "./associations.js";
 import {
+  noteSeededFixtureTables,
   withTransactionalFixtures,
   type WithTransactionalFixturesOptions,
 } from "./test-fixtures/with-transactional-fixtures.js";
@@ -255,6 +256,7 @@ function useTablelessFixtures(
       prepared.push(await prepareJoinTableFixtures(adapter, table, data));
       tables.push(table);
     }
+    noteSeededFixtureTables(tables);
     const results = await insertPreparedFixtureSets(adapter, prepared);
     results.forEach((result, i) => {
       store[tables[i]] = result;
@@ -466,6 +468,9 @@ function useFixtures(
       );
       group.keys.push(key);
     }
+    // Register the filled tables so a MySQL implicit commit that escapes the
+    // fixture pin can be repaired at teardown (with-transactional-fixtures.ts).
+    noteSeededFixtureTables(Object.values(fixtures).map((set) => set.table));
     for (const [adapter, group] of groups) {
       const results = await insertPreparedFixtureSets(adapter, group.prepared);
       results.forEach((result, i) => {
