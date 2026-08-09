@@ -1930,7 +1930,10 @@ export class MigrationContext {
    * `up`/`down`/`currentVersion`. Declaring the readers as the union instead
    * proves nothing extra: it moves the same unchecked narrowing onto the
    * nineteen sites that use a connected context, where Rails asserts nothing
-   * either.
+   * either. Tracked for convergence as RFC 0051's
+   * `migration-context-collaborator-readers-cast-away-the-null-object`: the
+   * reader should stop claiming a type the field may not hold, which needs the
+   * discovery-only context to become distinguishable at the type level.
    */
   constructor(
     migrationsPaths: string[],
