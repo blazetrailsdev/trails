@@ -386,3 +386,41 @@ describe("fixture rows do not survive a MySQL DDL implicit commit (next block)",
     expect(Number(await Computer.count())).toBe(0);
   });
 });
+
+// The negative case. `teardown_fixtures` (`test_fixtures.rb:206-211`) issues no
+// DELETE, and the repair above is a recovery from an implicit commit, not a
+// per-test cleanup — so a pinned test that runs no DDL must leave teardown
+// exactly as Rails has it. Spying is the only way to see this: with the pin
+// intact the rollback removes the rows either way, so an unconditional DELETE
+// would be behaviorally invisible and silently reinstate what #6273 removed.
+describe("a pinned test that runs no DDL issues no teardown DELETE", () => {
+  const repairDeletes: string[] = [];
+  let target: Record<string, unknown>;
+  let original: unknown;
+
+  // The instance, not the prototype: the implicit-commit guard wraps and then
+  // restores `executeMutation` as an OWN property, so an earlier block's guard
+  // has already shadowed the prototype by the time this one runs.
+  beforeAll(() => {
+    target = Base.connection as unknown as Record<string, unknown>;
+    original = target.executeMutation;
+    target.executeMutation = function (this: unknown, ...args: unknown[]) {
+      if (args[2] === "Fixture Delete") repairDeletes.push(String(args[0]));
+      return (original as (...a: unknown[]) => unknown).apply(this, args);
+    };
+  });
+
+  afterAll(() => {
+    target.executeMutation = original;
+  });
+
+  fixtures(["computers"]);
+
+  it("loads fixtures and runs no DDL", async () => {
+    expect(Number(await Computer.count())).toBeGreaterThan(0);
+  });
+
+  it("saw no repair DELETE from the previous test's teardown", () => {
+    expect(repairDeletes).toEqual([]);
+  });
+});

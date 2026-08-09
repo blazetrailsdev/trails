@@ -272,8 +272,12 @@ function guardMysqlImplicitCommit(adapter: TransactionalFixturesAdapter): () => 
  */
 async function repairEscapedFixtureRows(adapter: TransactionalFixturesAdapter): Promise<void> {
   const tables = seededFixtureTables;
+  const broken = pinBrokenByDdl;
   forgetSeededFixtureTables();
-  if (tables.length === 0) return;
+  // The gate that keeps this off the normal path: with the pin intact the
+  // rollback already discarded these rows, and issuing a DELETE anyway would be
+  // the unconditional teardown DELETE `teardown_fixtures` does not have.
+  if (!broken || tables.length === 0) return;
   // One referential-integrity toggle for the whole set, the way
   // `insert_fixtures_set` wraps its own `DELETE FROM`s
   // (`abstract/database_statements.rb:483-497`) — otherwise a parent table's
