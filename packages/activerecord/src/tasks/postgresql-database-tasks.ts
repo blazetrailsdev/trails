@@ -109,9 +109,14 @@ export class PostgreSQLDatabaseTasks {
     if (ignoreTables.length > 0) {
       const dataSources = await (await this.connection()).dataSources();
       ignoreTables = dataSources.filter((table) =>
-        ignoreTables.some((pattern) =>
-          typeof pattern === "string" ? pattern === table : pattern.test(table),
-        ),
+        ignoreTables.some((pattern) => {
+          if (!(pattern instanceof RegExp)) return pattern === table;
+          // Ruby's Regexp#=== carries no state; a JS `g`/`y` regex advances
+          // `lastIndex` on every `.test()`, so without this reset the second
+          // table tested against the same pattern can silently miss.
+          pattern.lastIndex = 0;
+          return pattern.test(table);
+        }),
       );
       for (const table of ignoreTables) args.push("-T", table as string);
     }

@@ -426,10 +426,14 @@ describeIfPostgresqlAdapter("PostgreSQLStructureDumpTest", () => {
   });
 
   it.skip("structure dump", () => {
-    // Not yet ported: the only case in this class that shells out for real
-    // (`postgresql_rake_test.rb:326-336`), so it needs the `pg_dump` client
-    // binary on PATH. The trails PG lane image ships libpq but not the
-    // PostgreSQL client utilities.
+    // Not yet ported. Rails runs the real `pg_dump` here — every other case in
+    // this class stubs `Kernel.system` — and asserts the dump it produced
+    // contains "PostgreSQL database dump complete"
+    // (`postgresql_rake_test.rb:333-343`). That end-to-end assertion needs a
+    // `pg_dump` on PATH whose major version is not older than the server, and
+    // the PG lane runs a postgres:17 service against a runner carrying only the
+    // 16 client, which pg_dump refuses. Tracked by
+    // `provision-version-matched-pg-client-in-pg-lane`.
   });
 
   it("structure dump header comments removed", async () => {
