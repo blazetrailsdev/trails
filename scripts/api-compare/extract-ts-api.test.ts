@@ -1,7 +1,7 @@
 /**
  * Focused tests for the extractor's re-export path resolution.
  * End-to-end re-export recognition is covered transitively by
- * `api:compare` + the manifest; these pin the path-math so keys
+ * `parity:api` + the manifest; these pin the path-math so keys
  * stay platform-stable and the two supported patterns both
  * resolve to the same target.
  */

@@ -1,7 +1,7 @@
 /**
  * Only-shrink ratchet for the ASSERTION-LEVEL fidelity counters (RFC 0025).
  *
- * `pnpm test:compare` measures three divergences inside name-MATCHED tests and
+ * `pnpm parity:test` measures three divergences inside name-MATCHED tests and
  * writes them to output/convention-comparison.json as per-package totals:
  * `totalAssertionMismatch` (different NUMBER of assertions), `totalKindMismatch`
  * (same count, divergent KINDS), `totalValueMismatch` (same kinds, divergent
@@ -24,7 +24,7 @@ export const COUNTERS = ["assertionCount", "kind", "value"] as const;
 
 export type Counter = (typeof COUNTERS)[number];
 
-/** Human label per counter, matching the `test:compare` summary tokens. */
+/** Human label per counter, matching the `parity:test` summary tokens. */
 export const COUNTER_LABELS: Record<Counter, string> = {
   assertionCount: "assertion-count-mismatch",
   kind: "assertion-kind-mismatch",
@@ -193,7 +193,7 @@ export function renderExceeded(exceeded: Violation[], markPath: string): string 
     "",
     "A matched test now asserts a different number of things, different kinds of things, or",
     "different literal values than its Rails counterpart. Read the Rails test and converge the",
-    "port's assertions — `pnpm test:compare --assertions` has the per-test breakdown.",
+    "port's assertions — `pnpm parity:test --assertions` has the per-test breakdown.",
     `The mark in ${markPath} only shrinks; it is never raised to admit new debt.`,
   ].join("\n");
 }
@@ -204,7 +204,7 @@ export function renderUnmarked(unmarked: string[], markPath: string): string {
     `assertion-mismatch ratchet: ${unmarked.length} package(s) are absent from ${markPath}:`,
     ...unmarked.map((p) => `  ${p}`),
     "An unmarked package would let its whole assertion debt in unmeasured. Seed it with",
-    "`pnpm test:assertions:ratchet:reseed`.",
+    "`pnpm parity:test:assertions:reseed`.",
   ].join("\n");
 }
 

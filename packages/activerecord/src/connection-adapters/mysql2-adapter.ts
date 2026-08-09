@@ -890,7 +890,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   /**
    * Rows affected by the most recent write. Rails takes the statement result
    * and ignores it, reading `@affected_rows` instead — wired to the this-less
-   * port so api:compare's `affected_rows` coverage points at reachable code.
+   * port so parity:api's `affected_rows` coverage points at reachable code.
    *
    * Mirrors: ActiveRecord::ConnectionAdapters::Mysql2::DatabaseStatements#affected_rows
    * @internal

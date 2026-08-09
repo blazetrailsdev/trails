@@ -1,4 +1,4 @@
-// Option-key comparison for api:compare (advisory — never changes the parity %).
+// Option-key comparison for parity:api (advisory — never changes the parity %).
 // The matcher pairs Ruby↔TS methods by name and arity.ts checks positional
 // ranges; neither looks at the keys a method accepts inside an options hash.
 // These helpers diff the two key sets for a name-matched pair.

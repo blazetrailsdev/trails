@@ -13,7 +13,7 @@
  * `ActionDispatch` module at load time (via the `on_load` block in
  * `middleware/cookies.rb`), so the Ruby-API extractor attributes them
  * to the file where `module ActionDispatch` is first opened
- * (`deprecator.rb`). Re-exporting them here keeps api:compare matching
+ * (`deprecator.rb`). Re-exporting them here keeps parity:api matching
  * the Rails surface without duplicating the implementations.
  */
 

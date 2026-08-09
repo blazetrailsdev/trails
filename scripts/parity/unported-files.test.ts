@@ -43,7 +43,7 @@ describe("isSourceUnported package scoping", () => {
 
   it("accounts for every file in the vendored i18n lib tree", async () => {
     // RFC 0074 enrollment invariant: each i18n source file is either measured
-    // by api:compare or excluded here with a reason — nothing falls through
+    // by parity:api or excluded here with a reason — nothing falls through
     // unnoticed. Walking the real tree (rather than pinning a hand-written
     // list) is what catches a file sitting BESIDE an excluded directory:
     // `locale/` does not reach `locale.rb`, nor `tests/` reach `tests.rb`.

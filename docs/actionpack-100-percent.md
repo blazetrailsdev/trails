@@ -11,15 +11,15 @@ pnpm tsx scripts/api-compare/extract-ts-api.ts
 for p in actiondispatch actioncontroller abstractcontroller; do
   pnpm tsx scripts/api-compare/compare.ts --package "$p" --privates | tail -3
 done
-pnpm run test:compare 2>&1 | grep -E "(actiondispatch|actioncontroller|abstractcontroller)  —"
+pnpm run parity:test 2>&1 | grep -E "(actiondispatch|actioncontroller|abstractcontroller)  —"
 ```
 
-> `pnpm api:compare` is a chained `&&` script and won't forward
+> `pnpm parity:api` is a chained `&&` script and won't forward
 > `--package`; invoke `compare.ts` directly for scoped totals.
 
 ## Status (2026-05-24)
 
-| Package            | api:compare       | files at 100% | inheritance   | test:compare     |
+| Package            | parity:api        | files at 100% | inheritance   | parity:test      |
 | ------------------ | ----------------- | ------------- | ------------- | ---------------- |
 | abstractcontroller | 82/82 (100%)      | 11/11         | 3/4 (75%)     | 42/52 (81%)      |
 | actiondispatch     | 1277/1350 (94.6%) | 75/83         | 58/66 (87.9%) | 577/1622 (35.6%) |
@@ -27,8 +27,8 @@ pnpm run test:compare 2>&1 | grep -E "(actiondispatch|actioncontroller|abstractc
 
 **Two large bodies of work remain:**
 
-1. **api:compare** — 82 methods across 5 partial files (most upstream-blocked on ActionView). See [Stories — API surface](#stories--api-surface).
-2. **test:compare** — ~2350 Rails test cases not yet ported. Heaviest on routing, test_case, integration, render. See [Stories — Test ports](#stories--test-ports).
+1. **parity:api** — 82 methods across 5 partial files (most upstream-blocked on ActionView). See [Stories — API surface](#stories--api-surface).
+2. **parity:test** — ~2350 Rails test cases not yet ported. Heaviest on routing, test_case, integration, render. See [Stories — Test ports](#stories--test-ports).
 
 ### Start here (next ~3 PRs to pick up)
 
@@ -41,7 +41,7 @@ stories to pick up next:
 2. **T-AD11 (part 1)** (~250 LOC) — first ~60-test split of
    `dispatch/routing_test.rb` (185 missing → 3 PRs; group by Rails
    describe block). Pure test port, no upstream dependency, biggest
-   single test:compare lever.
+   single parity:test lever.
 3. **S9** (~250 LOC) — Mapper `mount()` end-to-end + direct/resolve
    consumption. S8 shipped (#2487); S9 is the next routing lever.
 
@@ -306,10 +306,10 @@ Future-wired stubs blocked on unported targets (`Response.defaultCharset` /
 
 ## Stories — Test ports
 
-`test:compare` is name-match (path + description), not behavior. Many ported
+`parity:test` is name-match (path + description), not behavior. Many ported
 tests today have shallower assertions than Rails because the underlying API
 isn't ready. As each API story lands, audit matching tests and replace
-stubs with real assertions. **Goal: 100% test:compare with Rails-equivalent
+stubs with real assertions. **Goal: 100% parity:test with Rails-equivalent
 assertions.**
 
 Each story below is one Rails test file → one ~150–250 LOC PR. Read the
@@ -379,12 +379,12 @@ Listed for visibility; tracked here so they aren't re-spawned prematurely:
 General workflow (worktrees, build/test/prettier loop, draft PR + `/link`)
 lives in **CLAUDE.md** — start there. actionpack-specific notes only:
 
-- Implement in the TS file the api:compare row points to; don't relocate
+- Implement in the TS file the parity:api row points to; don't relocate
   methods. Scope: `--package actiondispatch|actioncontroller|abstractcontroller`.
 - For class-attached mixin methods, **use declared class fields inside the
   class body** — `declare module "./X" { interface … }` declaration merging
-  is NOT picked up by the api:compare extractor (#2137).
-- For test-port PRs, **preserve test names exactly** — test:compare matches
+  is NOT picked up by the parity:api extractor (#2137).
+- For test-port PRs, **preserve test names exactly** — parity:test matches
   on name; renames silently drop the match.
 - Quote the Rails source lines being mirrored in the PR body. Per #2129
   findings, a "Rails-design rationale" preamble listing intentional choices
@@ -484,7 +484,7 @@ lives in **CLAUDE.md** — start there. actionpack-specific notes only:
 
 **From #2428 (SystemTestCase + Driver + Server shell)**
 
-- [ ] ~30 LOC: Browser class stubs (9 methods, 0% in api:compare). `:nodoc:` in Rails but tracked.
+- [ ] ~30 LOC: Browser class stubs (9 methods, 0% in parity:api). `:nodoc:` in Rails but tracked.
 - [ ] `servedBy()` wiring into `startApplication()`.
 - [ ] `urlHelpers()` returns undefined — needs routing infra.
 - [ ] 3 missing `testing/integration.rb` methods — identify and bundle.
@@ -581,7 +581,7 @@ lives in **CLAUDE.md** — start there. actionpack-specific notes only:
   `globalThis` for constant lookup; accepts String|Class only.
 - **`render` guard:** `this.performed` instead of `responseBody`.
 - **camelCase scriptNamer keys:** `Mapper._mountedScriptNamers` keyed on
-  camelCase, matching the project-wide convention (api:compare expects
+  camelCase, matching the project-wide convention (parity:api expects
   Ruby snake_case method names to be ported as TS camelCase, including
   Rails payload keys).
 

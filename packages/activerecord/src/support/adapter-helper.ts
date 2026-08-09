@@ -23,7 +23,7 @@
  * and `supports_sql_standard_drop_constraint?`) are rendered by
  * `support/supports.ts` as one feature-keyed table rather than as ~19
  * individual exports here — its keys are the same `supports_<key>?` names, and
- * the test:compare gate extractor reads those keys. That file also carries
+ * the parity:test gate extractor reads those keys. That file also carries
  * feature keys with no `adapter_helper.rb` counterpart (they are the adapters'
  * own `supports_*?` methods, which Rails tests call directly on the
  * connection); they stay there for the same reason.

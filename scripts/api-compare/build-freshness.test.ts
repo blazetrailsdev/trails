@@ -1,5 +1,5 @@
 /**
- * Tests for the stale-build guard: a checkout-based `api:extra` baseline is
+ * Tests for the stale-build guard: a checkout-based `parity:api:extra` baseline is
  * only trustworthy while every package's `dist` was produced from the sources
  * currently on disk, and `git checkout` never updates `dist`.
  *

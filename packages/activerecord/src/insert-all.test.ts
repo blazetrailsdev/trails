@@ -38,7 +38,7 @@ import { Speedometer } from "./test-helpers/models/speedometer.js";
 
 // Adapter capability gates (mirror Rails' supports_* predicates / current_adapter?).
 // Feature-gated tests use itIfSupports(...) / adapterSupports(...) so the
-// test:compare gate extractor sees the same supports_* features Rails skips on.
+// parity:test gate extractor sees the same supports_* features Rails skips on.
 // These two remain as plain booleans because they feed a helper / a guard-only
 // `skip if` (not a comparable feature gate).
 const supportsInsertReturning = adapterSupports("insert_returning");

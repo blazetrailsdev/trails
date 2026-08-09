@@ -4,7 +4,7 @@
  *
  * For each Rails method that uses a sibling package (e.g., ActiveRecord → Arel),
  * checks whether the corresponding TypeScript method also uses it. Reports a
- * score and per-file details, similar to api:compare.
+ * score and per-file details, similar to parity:api.
  *
  * Usage:
  *   npx tsx scripts/api-compare/lint-deps.ts [--package activerecord] [--dep arel]

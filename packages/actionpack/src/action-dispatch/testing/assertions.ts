@@ -3,7 +3,7 @@
  * `action_dispatch/testing/assertions.rb`. Rails includes
  * ResponseAssertions + RoutingAssertions + Rails::Dom::Testing::Assertions
  * into the host test class; trails re-exports their helpers here as
- * `this`-typed functions so api:compare sees the full mixed-in surface
+ * `this`-typed functions so parity:api sees the full mixed-in surface
  * on this file.
  *
  * The HTML branch of `htmlDocument` (rails-dom-testing) remains deferred.

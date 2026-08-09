@@ -1,5 +1,5 @@
 // Port of `Rails` module from `railties/lib/rails.rb`.
-// Renamed `Rails` → `Trails`; `api:compare` wires the alias via the
+// Renamed `Rails` → `Trails`; `parity:api` wires the alias via the
 // `Rails: "Trails"` entry in `TS_CLASS_RENAMES` (compare.ts).
 //
 // Modeled as a class with static accessors (cf.

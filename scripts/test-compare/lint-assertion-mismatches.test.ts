@@ -100,7 +100,7 @@ describe("main", () => {
   it("names the missing artifact rather than surfacing a bare ENOENT", async () => {
     await writeFixtures({}, {});
     await fs.rm(paths.artifact);
-    await expect(main(false, paths)).rejects.toThrow(/pnpm test:compare --json/);
+    await expect(main(false, paths)).rejects.toThrow(/pnpm parity:test --json/);
   });
 });
 

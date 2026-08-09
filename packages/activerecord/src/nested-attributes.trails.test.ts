@@ -1,7 +1,7 @@
 /**
  * Trails-only nested-attributes cases with no counterpart in Rails'
  * nested_attributes_test.rb. Kept separate from the faithful mirror
- * (`nested-attributes.test.ts`) so `test:compare` maps the mirror cleanly.
+ * (`nested-attributes.test.ts`) so `parity:test` maps the mirror cleanly.
  *
  * These exercise composite-foreign-key and counter-cache interactions that the
  * Rails suite does not cover but trails needs to guard.

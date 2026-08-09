@@ -1621,7 +1621,7 @@ export class PostgreSQLAdapter
 
   /**
    * Rows affected by a write, read from its `PG::Result` (`cmd_tuples`).
-   * Wired to the existing this-less port so api:compare coverage points at live
+   * Wired to the existing this-less port so parity:api coverage points at live
    * code. Unlike sqlite3, PG holds no `@last_affected_rows` state — the count is
    * sourced strictly from the passed result, matching Rails.
    *

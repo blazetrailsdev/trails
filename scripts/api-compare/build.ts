@@ -1,11 +1,11 @@
 #!/usr/bin/env npx tsx
 /**
- * api:build — reconcile per-method `@missingRailsCall` JSDoc blocks (minimal,
+ * parity:api:build — reconcile per-method `@missingRailsCall` JSDoc blocks (minimal,
  * reconcile-only slice of docs/infrastructure/api-build-stub-generation-plan.md;
  * stub generation is a later phase).
  *
  * Reads the call-mismatch artifact (output/call-mismatches.json,
- * written by `pnpm api:compare --calls`) and, for each matched TS
+ * written by `pnpm parity:api --calls`) and, for each matched TS
  * method, rewrites its JSDoc so that:
  *
  *   - every currently-missing Rails call WITH a curated baseline reason carries
@@ -28,7 +28,7 @@
  * Method bodies are NEVER edited — only JSDoc blocks.
  *
  * Usage:
- *   pnpm api:build --package <pkg> [--file <tsFile>] [--dry-run]
+ *   pnpm parity:api:build --package <pkg> [--file <tsFile>] [--dry-run]
  *
  * Hard rules: no node:* imports, no process.* in the library surface (the CLI
  * entry guard is the sole exception, matching lint-call-mismatches.ts).
@@ -78,7 +78,7 @@ export const DEFAULT_TAG_REASON = DEFAULT_REASON;
 const PLACEHOLDER_REASONS = new Set([
   DEFAULT_TAG_REASON,
   NARROW_DEFAULT_REASON,
-  "unported (api:build stub)",
+  "unported (parity:api:build stub)",
 ]);
 
 export interface ArtifactMismatch {
@@ -398,7 +398,7 @@ export function buildExpectations(
  * A dropped row that carried the seeded {@link DEFAULT_TAG_REASON} in the
  * baseline (its tag reason came from the curated narrow one, which wins) leaves
  * its shard stale-HIGH, and the gate's slack arm reds on the next run — with a
- * whole-repo `api:calls:reseed`, a compare regeneration this run never
+ * whole-repo `parity:api:calls:reseed`, a compare regeneration this run never
  * needed, as the only remedy. The shard makes the fix precise: only the sources
  * actually rewritten are recomputed, so every other shard keeps its committed
  * value. Only-shrink comes free from `nextMarks` (it takes the min), and a
@@ -439,7 +439,7 @@ async function main(argv: string[]): Promise<number> {
   const onlyFile = fileIdx !== -1 ? argv[fileIdx + 1] : undefined;
   const dryRun = argv.includes("--dry-run");
   if (!pkg) {
-    console.error("api:build: --package <pkg> is required (minimal reconcile-only slice).");
+    console.error("parity:api:build: --package <pkg> is required (minimal reconcile-only slice).");
     return 1;
   }
 
@@ -447,8 +447,8 @@ async function main(argv: string[]): Promise<number> {
   const absent = missingScope(artifact);
   if (absent.length > 0) {
     console.error(
-      `api:build: artifact compared a PARTIAL scope (missing: ${absent.join(", ")}). ` +
-        "Regenerate with `API_COMPARE_FORCE=1 pnpm api:compare --calls` first.",
+      `parity:api:build: artifact compared a PARTIAL scope (missing: ${absent.join(", ")}). ` +
+        "Regenerate with `API_COMPARE_FORCE=1 pnpm parity:api --calls` first.",
     );
     return 1;
   }
@@ -485,7 +485,7 @@ async function main(argv: string[]): Promise<number> {
           reasons.get(keyOf({ package: pkg, tsFile, rubyName, call })) ?? DEFAULT_TAG_REASON,
       );
     } catch (err) {
-      console.error(`api:build: ${err instanceof Error ? err.message : String(err)}`);
+      console.error(`parity:api:build: ${err instanceof Error ? err.message : String(err)}`);
       return 1;
     }
     const { text: next, harvested, tagged, unmatched, skipped: fileSkipped } = reconciled;
@@ -510,21 +510,23 @@ async function main(argv: string[]): Promise<number> {
     await writeSplitBaseline(remaining, BASELINE_DIR);
     const { marks, moved } = await lowerMarksForDropped(MARK_DIR, droppedEntries, remaining);
     console.log(
-      `api:build: lowered ${moved.length} unreviewed high-water mark(s) under ` +
+      `parity:api:build: lowered ${moved.length} unreviewed high-water mark(s) under ` +
         `${path.relative(ROOT_DIR, MARK_DIR)}/ for the source(s) rewritten above ` +
         `(${totalMark(marks)} unreviewed entr(ies) still marked repo-wide).`,
     );
     for (const rel of moved) console.log(`  - ${rel}`);
   }
   console.log(
-    `api:build: ${dropped} baseline entr(ies) ${dryRun ? "would migrate" : "migrated"} to ` +
+    `parity:api:build: ${dropped} baseline entr(ies) ${dryRun ? "would migrate" : "migrated"} to ` +
       `@missingRailsCall tags and ${dryRun ? "would be" : "were"} dropped from ` +
       `${path.relative(ROOT_DIR, BASELINE_DIR)}/.`,
   );
-  console.log(`api:build: ${changed} file(s) ${dryRun ? "would change" : "updated"} (${pkg}).`);
+  console.log(
+    `parity:api:build: ${changed} file(s) ${dryRun ? "would change" : "updated"} (${pkg}).`,
+  );
   if (skipped > 0) {
     console.log(
-      `api:build: ${skipped} missing call(s) left untagged — their baseline reason is still ` +
+      `parity:api:build: ${skipped} missing call(s) left untagged — their baseline reason is still ` +
         "the seeded placeholder. Write per-entry prose in " +
         `${path.relative(ROOT_DIR, BASELINE_DIR)}/ (or at the call site) to migrate them.`,
     );

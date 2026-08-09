@@ -1,8 +1,8 @@
 #!/usr/bin/env npx tsx
 /**
- * Source-hash pinning for api:compare (RFC 0025-fidelity-verification-tooling).
+ * Source-hash pinning for parity:api (RFC 0025-fidelity-verification-tooling).
  *
- * api:compare validates method NAMES (plus advisory arity / option-keys /
+ * parity:api validates method NAMES (plus advisory arity / option-keys /
  * literals / call-set), but nothing records WHICH Rails source a matched TS
  * method was ported against. So when `vendor/rails` is bumped, methods whose
  * Ruby bodies changed upstream rot silently, and a green name-match can't be
@@ -13,7 +13,7 @@
  * ── Pin lifecycle ───────────────────────────────────────────────────────────
  *   port → verify → pin → (Rails bump) → drift report → re-verify → re-pin
  *
- *   1. PORT a Rails method to TS; api:compare name-matches the pair and writes
+ *   1. PORT a Rails method to TS; parity:api name-matches the pair and writes
  *      its current Ruby body digest to output/body-hashes.json.
  *   2. VERIFY the port is faithful (a convergence story, review, or test).
  *   3. PIN it: `tsx body-pins.ts --pin <ruby-file>` records the current digest
@@ -46,7 +46,7 @@
  *   tsx body-pins.ts --prune             # drop pins whose pair no longer matches
  *   tsx body-pins.ts                      # list pin/unpinned counts (no writes)
  *
- * (Run `pnpm api:compare` first so output/body-hashes.json is fresh.)
+ * (Run `pnpm parity:api` first so output/body-hashes.json is fresh.)
  *
  * Hard rules: no node:* imports, no process.* in the library surface (the CLI
  * entry guard is the sole exception, matching lint-call-mismatches.ts), async
@@ -235,7 +235,7 @@ export async function loadArtifact(): Promise<Artifact> {
   );
   if (!exists) {
     throw new Error(
-      `Missing ${path.relative(ROOT_DIR, ARTIFACT_PATH)} — run \`pnpm api:compare\` ` +
+      `Missing ${path.relative(ROOT_DIR, ARTIFACT_PATH)} — run \`pnpm parity:api\` ` +
         "first to write the body-hashes artifact.",
     );
   }
@@ -255,7 +255,7 @@ async function main(args: string[]): Promise<number> {
     console.error(
       `\nbody-pins: artifact compared a PARTIAL scope — missing ${absent.length} ` +
         `package(s): ${absent.join(", ")}.\nRegenerate the full surface first: ` +
-        "`API_COMPARE_FORCE=1 pnpm api:compare`.\n",
+        "`API_COMPARE_FORCE=1 pnpm parity:api`.\n",
     );
     return 1;
   }

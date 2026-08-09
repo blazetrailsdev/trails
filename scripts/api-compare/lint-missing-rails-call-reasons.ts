@@ -1,17 +1,17 @@
 #!/usr/bin/env npx tsx
 /**
- * api:reasons — enforce the `@missingRailsCall` empty-reason contract in CI.
+ * parity:api:reasons — enforce the `@missingRailsCall` empty-reason contract in CI.
  *
  * `parseJsdoc` (build.ts) already rejects a bare or whitespace-only tag, but
- * its only caller is `api:build`: an opt-in developer command with no CI job,
+ * its only caller is `parity:api:build`: an opt-in developer command with no CI job,
  * which also needs the call-mismatch artifact and rewrites source files.
  * This lint runs that same check over every JSDoc block under
  * `packages/<pkg>/src` — read-only and artifact-free — so the tag is gated
  * like its sibling `@noRailsEquivalent` (validated by `noRailsEquivalentReason`
- * on every `api:extra` / `api:compare` run).
+ * on every `parity:api:extra` / `parity:api` run).
  *
  * Usage:
- *   pnpm api:reasons
+ *   pnpm parity:api:reasons
  *
  * Hard rules: no node:* imports, no process.* outside the CLI entry guard.
  */
@@ -62,14 +62,16 @@ export async function main(): Promise<number> {
     errors.push(...lintFileText(path.relative(ROOT_DIR, abs), await fs.readFile(abs, "utf-8")));
   }
   if (errors.length > 0) {
-    for (const error of errors) console.error(`api:reasons: ${error}`);
+    for (const error of errors) console.error(`parity:api:reasons: ${error}`);
     console.error(
-      `api:reasons: ${errors.length} tag(s) without a reason — see the empty-reason ` +
+      `parity:api:reasons: ${errors.length} tag(s) without a reason — see the empty-reason ` +
         "contract in docs/infrastructure/api-build-stub-generation-plan.md.",
     );
     return 1;
   }
-  console.log(`api:reasons: ${files.length} file(s) checked, every ${TAG} carries a reason.`);
+  console.log(
+    `parity:api:reasons: ${files.length} file(s) checked, every ${TAG} carries a reason.`,
+  );
   return 0;
 }
 

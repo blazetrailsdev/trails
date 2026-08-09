@@ -679,7 +679,7 @@ export function defineDynamicSelectReaders(record: Base): void {
 }
 
 // ---------------------------------------------------------------------------
-// Methods missing from api:compare — added for 100% parity
+// Methods missing from parity:api — added for 100% parity
 // ---------------------------------------------------------------------------
 
 /**

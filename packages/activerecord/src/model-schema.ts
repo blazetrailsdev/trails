@@ -573,7 +573,7 @@ export async function createTable(this: typeof Base): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// Missing ClassMethods from api:compare
+// Missing ClassMethods from parity:api
 // ---------------------------------------------------------------------------
 
 interface SchemaHost {

@@ -18,7 +18,7 @@
  * Unmapped TS members (those not present in the method-order list) stay
  * in their existing relative position, after the mapped block.
  *
- * Run after `pnpm api:compare` — invoked from run.sh alongside the
+ * Run after `pnpm parity:api` — invoked from run.sh alongside the
  * privates manifest builder.
  */
 import * as fs from "fs";

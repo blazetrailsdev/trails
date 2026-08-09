@@ -232,17 +232,17 @@ on both sides.
     consults `eslint/rails-private-methods.json` when present, otherwise
     treats the allowlist as empty rather than firing on every file.
   - First-run developers will see the structure rule as a no-op until
-    they run `pnpm api:compare` (or the underlying
+    they run `pnpm parity:api` (or the underlying
     `ruby scripts/api-compare/extract-ruby-api.rb` +
     `ruby scripts/rails-structure/extract-rails-structure.rb`). The rule
-    prints a one-time "cache missing — run `pnpm api:compare`" diagnostic
+    prints a one-time "cache missing — run `pnpm parity:api`" diagnostic
     at startup.
   - Ruby remains a dev/CI dependency only, same as today.
 - **Refresh trigger**: same gate as
   [`extract-ruby-api.rb`](../scripts/api-compare/extract-ruby-api.rb) lines
   16–28 — compare cache mtime to `vendor/rails/.git/HEAD`, honour
   `API_COMPARE_FORCE=1`. Regeneration runs whenever the extractor is
-  invoked, locally via `pnpm api:compare` or in CI via the explicit
+  invoked, locally via `pnpm parity:api` or in CI via the explicit
   workflow step (next bullet).
 - **CI integration**: verified against `.github/workflows/ci.yml`. The
   default `lint` job (line 130) runs `pnpm lint` only — no Rails fetch,
@@ -255,7 +255,7 @@ on both sides.
   compare.ts`, (6) `tsx compare.ts --privates`, (7) `tsx lint-deps.ts`,
   (8) `tsx build-rails-privates-manifest.ts && eslint packages/arel/src`,
   (9) test-compare. The Rails-derived ESLint gate is step 8; steps 5–7
-  validate api:compare itself. The structure rule plugs in with two new steps
+  validate parity:api itself. The structure rule plugs in with two new steps
   inserted after `extract-ruby-api.rb`: (1) `ruby
 extract-rails-structure.rb` → `output/rails-structure.json`, (2) `tsx
 build-rails-structure-manifest.ts` → `eslint/rails-file-structure.cache.json`.
@@ -266,7 +266,7 @@ build-rails-structure-manifest.ts` → `eslint/rails-file-structure.cache.json`.
   the existing precedent for `rails-private-jsdoc`.
 - **Local dev**: extend `prelint` (`package.json:13`) to also run
   `tsx build-rails-structure-manifest.ts`. On a fresh clone before
-  `pnpm api:compare` ever runs, the underlying `output/rails-api.json`
+  `pnpm parity:api` ever runs, the underlying `output/rails-api.json`
   and `output/rails-structure.json` won't exist; both manifest builders
   already handle that case (lines 56–62 of
   `build-rails-privates-manifest.ts` emit an empty manifest with a
@@ -314,7 +314,7 @@ Reuse the data encoded in
 - TS↔Ruby filename mapping (kebab→snake, `trailtie`↔`railtie`, package-root
   conventions).
 - Method renames (`saveBang` ↔ `save!`, etc.).
-- Symbol normalization for the api:compare matcher.
+- Symbol normalization for the parity:api matcher.
 
 **Runtime constraint**: ESLint loads rules under Node without a TS loader,
 and the repo ships no built `scripts/api-compare/conventions.js` artifact —
@@ -330,7 +330,7 @@ This is the approach used by the
 builder (`scripts/build-rails-file-structure-manifest.ts`) calls
 `rubyMethodToTs` and `rubyFileToTs` directly while reading
 `rails-api.json`, then writes the pre-resolved manifest. When
-`conventions.ts` gains a new rename, the next `pnpm api:compare` run
+`conventions.ts` gains a new rename, the next `pnpm parity:api` run
 regenerates the JSON and the rule picks it up — single source of truth
 preserved without runtime coupling.
 
@@ -556,7 +556,7 @@ need to swap, the fix is one range covering both.
   registers `rails-private-jsdoc`, gated by glob to Rails-mirroring
   packages.
 - The cache file is read at rule-construction time; if absent, the rule
-  reports a single "cache missing — run pnpm api:compare" diagnostic
+  reports a single "cache missing — run pnpm parity:api" diagnostic
   rather than failing all files.
 - Tests in `eslint/rails-file-structure.test.mjs` follow the
   `RuleTester` pattern used by sibling rules.
@@ -564,7 +564,7 @@ need to swap, the fix is one range covering both.
 #### Which CI job enforces method order (decided)
 
 Enforcement is **deliberately restricted to the Rails API/Test Comparison
-job**, which runs `pnpm api:compare` and therefore has a real
+job**, which runs `pnpm parity:api` and therefore has a real
 `scripts/api-compare/output/rails-api.json` to build the manifest from. The
 Lint job has no Ruby toolchain and no `rails-api.json`, so its manifest is
 the builder's empty fallback — reproducing one there would mean running the
@@ -596,7 +596,7 @@ implementation LOC excluding generated JSON.
 | wave      | scope                                                                                                    |  est. LOC | notes                                                                                                                                                                                                                                                         |
 | --------- | -------------------------------------------------------------------------------------------------------- | --------: | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **PR 1**  | Ruby extractor + JSON cache (generated, not committed) + CI workflow step                                |      ~250 | adds `scripts/rails-structure/extract-rails-structure.rb` + generated `output/rails-structure.json`; CI step runs the extractor directly (mirrors `.github/workflows/ci.yml:396` for `extract-ruby-api.rb`); no baseline commit                               |
-| **PR 2**  | Manifest builder + plumb cache into `pnpm api:compare`                                                   |      ~150 | reads `output/rails-structure.json`; emits `eslint/rails-file-structure.{cache,index}.json` with names + paths **pre-resolved** via `conventions.ts` at build time (§3.1). No conventions sidecar; the rule does zero name mapping at lint time. No rule yet. |
+| **PR 2**  | Manifest builder + plumb cache into `pnpm parity:api`                                                    |      ~150 | reads `output/rails-structure.json`; emits `eslint/rails-file-structure.{cache,index}.json` with names + paths **pre-resolved** via `conventions.ts` at build time (§3.1). No conventions sidecar; the rule does zero name mapping at lint time. No rule yet. |
 | **PR 3**  | ESLint rule skeleton (loads cache, registers plugin, supports `@rails-structure-skip`); no checks active |      ~150 | establishes plumbing + RuleTester scaffold                                                                                                                                                                                                                    |
 | **PR 4**  | `include-position` check (smallest surface, lowest false-positive rate)                                  |      ~200 | likely <20 violations across repo; cleanups fold into PR 8+                                                                                                                                                                                                   |
 | **PR 5**  | `method-order` check, **warn-only**; emit per-file violation counts to a report file for triage          |      ~200 | the report drives subsequent cleanup waves                                                                                                                                                                                                                    |
@@ -645,7 +645,7 @@ reason="rails-source-is-itself-disordered"` is the escape hatch and
   than their Rails counterpart (e.g., the `Errors<T>` arc, certain Arel
   helpers) are caught by the path-map in `conventions.ts`. If the path
   map has no entry for a TS file, the rule skips it silently — that's
-  the same behaviour as `api:compare` and is the right default.
+  the same behaviour as `parity:api` and is the right default.
 - **Merged files.** Some TS files combine multiple Ruby files
   (`moves.ts`). The rule consults `moves.ts` and validates each chunk's
   internal order, but does not enforce inter-chunk ordering — chunk

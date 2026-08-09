@@ -30,16 +30,16 @@ Work-size legend (rough order-of-magnitude):
 
 Live package-scoped api numbers come from
 `pnpm tsx scripts/api-compare/compare.ts --package <name>` (after the
-extract step has run; `pnpm api:compare` is a chained `&&` script and
+extract step has run; `pnpm parity:api` is a chained `&&` script and
 doesn't forward `--package` to `compare.ts`). Test numbers come from
-`pnpm test:compare`. Doc snapshots may lag — re-check before scoping.
+`pnpm parity:test`. Doc snapshots may lag — re-check before scoping.
 
-| Doc                                                      | api:compare                          | Priority | Work | Notes                                                                                                                                                                                                                                                                        |
+| Doc                                                      | parity:api                           | Priority | Work | Notes                                                                                                                                                                                                                                                                        |
 | -------------------------------------------------------- | ------------------------------------ | -------- | ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`actionpack-100-percent.md`](actionpack-100-percent.md) | AD 94.6% / AC 85.8% / Abs 100% (api) | P1       | L    | Consolidated tracker for ActionDispatch + ActionController + AbstractController (was two docs). Open: AC `base.rb` 38%, http_authentication, test_case, strong_parameters; AD partials + journey follow-ups + test:compare clusters.                                         |
+| [`actionpack-100-percent.md`](actionpack-100-percent.md) | AD 94.6% / AC 85.8% / Abs 100% (api) | P1       | L    | Consolidated tracker for ActionDispatch + ActionController + AbstractController (was two docs). Open: AC `base.rb` 38%, http_authentication, test_case, strong_parameters; AD partials + journey follow-ups + parity:test clusters.                                          |
 | [`actionview-100-percent.md`](actionview-100-percent.md) | 8.2% (api)                           | P3       | XL   | Roadmap. `.tse` extension; ERB-style tags; build-time compilation into gitignored `.trails/` mirror dir; dual render API (typed registry + explicit import); trails-tsc promoted to own package with plugin API. Phase 0.5 stubs unblock actionpack followups blocked on AV. |
 | [`activesupport.md`](activesupport.md)                   | 24.7% (denominator stale)            | P2       | —    | **Not a 100% target.** Scope is "what siblings need + standalone runtime utilities"; Ruby-isms explicitly out.                                                                                                                                                               |
-| [`rack-100-percent.md`](rack-100-percent.md)             | 60% (api) / 100% (test name-match)   | P2       | M    | 12 PR slots, ~2.3k LOC total. Multipart cluster directly unblocks actiondispatch `param_builder`. test:compare 100% is name-match only — audit test bodies as each slot lands. Session/Static deferred (separate gems / out of scope).                                       |
+| [`rack-100-percent.md`](rack-100-percent.md)             | 60% (api) / 100% (test name-match)   | P2       | M    | 12 PR slots, ~2.3k LOC total. Multipart cluster directly unblocks actiondispatch `param_builder`. parity:test 100% is name-match only — audit test bodies as each slot lands. Session/Static deferred (separate gems / out of scope).                                        |
 
 ## Plans / backlogs
 
@@ -53,7 +53,7 @@ doesn't forward `--package` to `compare.ts`). Test numbers come from
 | [`html-sanitizer-plan.md`](html-sanitizer-plan.md)                                          | P3       | M    | HTML sanitizer implementation plan for ActionText / ActionView safe-list sanitization.                                                  |
 | [`trailties-template-builder.md`](trailties/trailties-template-builder.md)                  | P2       | M    | Generator templates — TypeScript-native plan. Locked 2026-05-21.                                                                        |
 | [`trailties-thor-port.md`](trailties/trailties-thor-port.md)                                | P2       | M    | Commander → Thor port for trailties CLI.                                                                                                |
-| [`lint-deps-plan.md`](infrastructure/lint-deps-plan.md)                                     | P2       | S    | lint:deps — Arel + ActiveModel dep-parity plan. Phase 1 done.                                                                           |
+| [`lint-deps-plan.md`](infrastructure/lint-deps-plan.md)                                     | P2       | S    | parity:api:deps — Arel + ActiveModel dep-parity plan. Phase 1 done.                                                                     |
 | [`rails-file-structure-mirror-plan.md`](infrastructure/rails-file-structure-mirror-plan.md) | P2       | S    | Rails file-structure mirror plan. Planning stage; method-order slice landed.                                                            |
 
 ## Verification harnesses
@@ -61,4 +61,4 @@ doesn't forward `--package` to `compare.ts`). Test numbers come from
 | Doc                                                                     | Priority | Work | Notes                                                                                                                                                       |
 | ----------------------------------------------------------------------- | -------- | ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [`parity-verification.md`](activerecord/parity-verification.md)         | P1       | —    | Schema + query parity pipelines (`pnpm parity:pipeline:schema` / `pnpm parity:pipeline:query`). Both shipped; reference for adding fixtures + format bumps. |
-| [`api-compare-baselining.md`](infrastructure/api-compare-baselining.md) | P1       | —    | How to take a trustworthy `api:compare` / `api:extra` baseline, and why every checkout needs a rebuild.                                                     |
+| [`api-compare-baselining.md`](infrastructure/api-compare-baselining.md) | P1       | —    | How to take a trustworthy `parity:api` / `parity:api:extra` baseline, and why every checkout needs a rebuild.                                               |

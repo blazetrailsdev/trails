@@ -14,7 +14,7 @@
  * wouldn't restore the canonical columns. See the `beforeAll` comment and
  * `locking.test.ts` for the same pattern.
  *
- * Test names mirror the Ruby method names verbatim (`test:compare` matches on
+ * Test names mirror the Ruby method names verbatim (`parity:test` matches on
  * them). Tests blocked by a JS-language impossibility (immutable strings, Ruby
  * symbol coercion, sync side-effecting getters over async persistence) are
  * reclassified in scripts/api-compare/unported-files.ts rather than kept as

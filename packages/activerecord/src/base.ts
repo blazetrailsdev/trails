@@ -4037,7 +4037,7 @@ export class Base extends Model {
    * NOT Rails: `find_global_id` exists nowhere in Rails or globalid — apps call
    * `GlobalID::Locator.locate` directly, and globalid's railtie injects only the
    * instance-side `GlobalID::Identification`. Left deliberately un-suppressed in
-   * `api:extra` so it keeps reporting as extra surface until it is removed or a
+   * `parity:api:extra` so it keeps reporting as extra surface until it is removed or a
    * caller justifies it (tasks 0023 globalid-model-side-finders-are-uncalled-
    * trails-invention).
    */
@@ -4942,7 +4942,7 @@ include(Base, {
 include(Base, {
   attributeNamesForSerialization: Serialization.attributeNamesForSerialization,
 });
-// Wire private/internal helpers onto Base so api:compare credits them to base.rb.
+// Wire private/internal helpers onto Base so parity:api credits them to base.rb.
 // These are standalone exports in their respective module files; the include()
 // call here is the only thing that causes the extractor to attribute them to base.ts.
 include(Base, {
@@ -5012,12 +5012,12 @@ include(Base, {
     return TouchLater.hasDeferTouchAttrs(this);
   },
   // normalizeChangedInPlaceAttributes now lives on Model.prototype (this PR wires
-  // the before_validation there). Reference it directly so api:compare credits
+  // the before_validation there). Reference it directly so parity:api credits
   // base.ts without a wrapper that would shadow — and diverge from — the single
   // Model implementation.
   normalizeChangedInPlaceAttributes: Model.prototype.normalizeChangedInPlaceAttributes,
   // normalizeAttribute lives on Model.prototype (inherited). Wire via direct
-  // prototype reference so api:compare credits it to base.ts without shadowing
+  // prototype reference so parity:api credits it to base.ts without shadowing
   // Model's implementation via a wrapper that would create a circular call.
   normalizeAttribute: Model.prototype.normalizeAttribute,
   // readAttributeBeforeTypeCast/attributesBeforeTypeCast — inherited from Model.prototype
@@ -5053,7 +5053,7 @@ include(Base, {
   rememberTransactionRecordState: _rememberTransactionRecordState,
   restoreTransactionRecordState: _restoreTransactionRecordState,
   isTransactionIncludeAnyAction: _isTransactionIncludeAnyAction,
-  // TouchLater privates (instance-level) wired here for api:compare credit.
+  // TouchLater privates (instance-level) wired here for parity:api credit.
   surreptitiouslyTouch: TouchLater.surreptitiouslyTouch,
   touchDeferredAttributes: TouchLater.touchDeferredAttributes,
 });

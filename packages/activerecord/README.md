@@ -10,8 +10,8 @@ The goal has two halves:
 
 - **Rails parity wherever the languages allow it.** Class names, method
   signatures, and behavior are designed to match Rails. Progress isn't measured
-  by feel — we port the Rails test suite **test for test** (`test:compare`) and
-  match the public API surface method for method (`api:compare`), so behavior is
+  by feel — we port the Rails test suite **test for test** (`parity:test`) and
+  match the public API surface method for method (`parity:api`), so behavior is
   pinned to Rails' own tests rather than to our interpretation of them.
 - **Rails-quality developer experience where the languages diverge.** Some Ruby
   idioms have no TypeScript equivalent — synchronous DB access, `!`/`?` in
@@ -397,15 +397,15 @@ command set (with project-layout details and the programmatic API) is in the
 
 ActiveRecord is built **Rails-port-first**: read the Rails source, implement the
 behavior, then unskip the tests that prove it. Tests live next to their source
-as `*.test.ts`, named to match the corresponding Rails test so `test:compare`
+as `*.test.ts`, named to match the corresponding Rails test so `parity:test`
 can match them — **never rename a test to make it pass**.
 
 ```sh
 pnpm vitest run path/to/file.test.ts   # run an individual file (don't run the whole suite locally)
-pnpm api:compare --package activerecord # method-level coverage vs Rails source
-pnpm test:compare                       # test-name coverage vs the Rails test suite
+pnpm parity:api --package activerecord # method-level coverage vs Rails source
+pnpm parity:test                       # test-name coverage vs the Rails test suite
 pnpm test:types                         # DX typecheck suites (dx-tests/, virtualized-dx-tests/)
-pnpm api:conventions                    # regenerate docs/ruby-ts-conventions.md
+pnpm parity:api:conventions                    # regenerate docs/ruby-ts-conventions.md
 ```
 
 The methodology — implementation-first principles, the `@internal` JSDoc

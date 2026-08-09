@@ -7,7 +7,7 @@
  * needs no live server, DDL-driven error-translation probes drawn from the
  * abstract-adapter suite, the empty-result-set column-reporting guard, and the
  * extended database-timezone re-sync assertions) — kept out of the mirror so
- * test:compare maps cleanly.
+ * parity:test maps cleanly.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {

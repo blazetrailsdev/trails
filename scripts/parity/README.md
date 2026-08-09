@@ -2,7 +2,7 @@
 
 The parity comparison tools live in four sibling directories, all driven
 through the `parity:*` scripts in the root `package.json` (the older `api:*` /
-`test:compare` names are delegating aliases).
+`test:compare` aliases have been removed).
 
 | Directory                   | Subject compared                      | Entry point  |
 | --------------------------- | ------------------------------------- | ------------ |

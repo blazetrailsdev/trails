@@ -1,6 +1,6 @@
 #!/usr/bin/env -S npx tsx
 /**
- * In-process orchestrator for `pnpm api:compare` (driver: run.sh).
+ * In-process orchestrator for `pnpm parity:api` (driver: run.sh).
  *
  * The pipeline is a small dependency DAG:
  *

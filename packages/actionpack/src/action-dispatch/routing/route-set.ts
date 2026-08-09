@@ -219,7 +219,7 @@ export class MountedHelpers {}
  * @internal Rails: anonymous Module returned by `generate_url_helpers`.
  * Wraps a {@link RoutesProxy} so the singleton-level `url_for` /
  * `polymorphic_url` / etc. calls in the Rails source map onto methods on
- * an exported class — making them visible to `api:compare`.
+ * an exported class — making them visible to `parity:api`.
  */
 export class UrlHelpersModule {
   /** @internal Rails: `@_proxy = proxy_class.new(routes)`. */
@@ -254,7 +254,7 @@ export class UrlHelpersModule {
     // copies helper methods onto a controller's prototype via `for...in`,
     // which only sees *own enumerable* properties. Class methods live on
     // the prototype and are non-enumerable, so re-publish each as a bound
-    // own property here. The prototype methods remain (so `api:compare`
+    // own property here. The prototype methods remain (so `parity:api`
     // extracts them); the own copies make them mountable.
     for (const name of [
       "urlFor",

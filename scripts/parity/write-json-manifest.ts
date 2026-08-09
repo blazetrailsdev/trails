@@ -5,7 +5,7 @@
  * Raw `JSON.stringify(data, null, 2)` is NOT prettier-stable: prettier's JSON
  * printer collapses short arrays onto one line (printWidth 100), so a
  * stringify-emitted manifest re-expands every array and the tracked tree goes
- * dirty the moment anyone runs `pnpm lint` or `pnpm api:compare`.
+ * dirty the moment anyone runs `pnpm lint` or `pnpm parity:api`.
  *
  * Prettier 3 exposes no synchronous format API, and the emitters that call
  * this are transpiled to CJS by tsx (top-level `await` is a hard esbuild

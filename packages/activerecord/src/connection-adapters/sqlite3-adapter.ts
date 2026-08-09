@@ -505,7 +505,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    * The single SQL primitive `raw_execute` — and, in trails, `execute` /
    * `executeMutation` — delegate to. The live implementation lives in the
    * Rails-layout file `sqlite3/database-statements.ts` (`performQuery`) so
-   * api:compare's `perform_query` coverage points at reachable code; it is
+   * parity:api's `perform_query` coverage points at reachable code; it is
    * assigned to the prototype below with `this` as the adapter, whose
    * `_cachedStatement` / `_freshStatement` / `verifiedBang` /
    * `dirtyCurrentTransaction` and `_statementLock` / `_last*` fields satisfy

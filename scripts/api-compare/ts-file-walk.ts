@@ -4,7 +4,7 @@
  * There are two deliberate populations, and they are not interchangeable:
  *
  * - `COMMITTED_TS_FILES` — what is *committed* under `packages/<pkg>/src`.
- *   The JSDoc lints (`api:reasons`, `api:detached`) police source text, so
+ *   The JSDoc lints (`parity:api:reasons`, `parity:api:detached`) police source text, so
  *   `*.test.ts` and `*.d.ts` count, and only build/vendor output is skipped.
  * - `COMPARED_TS_FILES` — what api-compare *measures against Rails*. Tests and
  *   declaration files are not part of the ported surface, so they are out.
@@ -63,7 +63,7 @@ export function walkTsFilesSync(
 
 /** Every file of `population` under `dir`, recursively, in `readdir` order.
  *  The flat async counterpart to `walkTsFilesSync`, for roots with no
- *  `<pkg>/src` layer (`api:detached` walks `scripts/` with it). A missing
+ *  `<pkg>/src` layer (`parity:api:detached` walks `scripts/` with it). A missing
  *  directory yields no files rather than throwing. */
 export async function walkTsFiles(dir: string, population: TsFilePopulation): Promise<string[]> {
   let names: string[];

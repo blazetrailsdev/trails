@@ -1,7 +1,7 @@
 // Trails-native template DSL — the JS/TS analogue of railties'
 // Ruby-shape `gem`, `route`, `environment`, `initializer` actions.
 //
-// Kept separate from `actions.ts` (Rails-shape mirror) so `api:compare`
+// Kept separate from `actions.ts` (Rails-shape mirror) so `parity:api`
 // stays clean. These actions mutate `package.json` and `src/config/*.ts`
 // files in a trails app; they have no Ruby counterpart.
 

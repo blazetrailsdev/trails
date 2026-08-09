@@ -377,7 +377,7 @@ export class Metal extends AbstractController {
   }
 
   // Rails-private rendering helpers — wired onto the class so the
-  // `metal/rendering.rb` privates resolve as `Metal._foo` (api:compare
+  // `metal/rendering.rb` privates resolve as `Metal._foo` (parity:api
   // surface) while keeping the implementation in `metal/rendering.ts`.
   /** @internal */
   static _normalizeOptions = _normalizeOptionsFn;

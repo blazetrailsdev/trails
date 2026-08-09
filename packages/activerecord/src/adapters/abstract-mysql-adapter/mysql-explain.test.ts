@@ -135,7 +135,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
   });
 
   // TS-only coverage of our buildExplainClause/Relation#explain plumbing. Not
-  // Rails tests — kept in a sibling block so test:compare doesn't read them as
+  // Rails tests — kept in a sibling block so parity:test doesn't read them as
   // members of the MySQLExplainTest class. These exercise the adapter directly
   // (no DB rows), so they need no fixtures.
   describe("explain helpers (trails-only)", () => {

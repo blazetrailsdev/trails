@@ -6,11 +6,11 @@
  * assertion-mismatch-mark.json; see assertion-ratchet.ts for the contract.
  *
  * Usage:
- *   pnpm test:assertions:ratchet            # gate (regenerates the artifact first)
- *   pnpm test:assertions:ratchet:reseed     # lower the mark after convergence
+ *   pnpm parity:test:assertions            # gate (regenerates the artifact first)
+ *   pnpm parity:test:assertions:reseed     # lower the mark after convergence
  *   pnpm tsx scripts/test-compare/lint-assertion-mismatches.ts --no-regen
  *
- * A plain run regenerates the artifact via `pnpm test:compare --json`: gating a
+ * A plain run regenerates the artifact via `pnpm parity:test --json`: gating a
  * STALE convention-comparison.json reports movement that never happened, and
  * `--write` would commit that fiction as the new mark. Opt out with
  * `--no-regen`, TEST_COMPARE_SKIP_REGEN=1, or any CI value — CI writes the
@@ -52,7 +52,7 @@ export function shouldRegenerate(argv: string[], env: Record<string, string | un
 
 export function regenerateArtifact(env: Record<string, string | undefined>): Promise<void> {
   return new Promise((resolve, reject) => {
-    const child = spawn("pnpm", ["test:compare", "--json"], {
+    const child = spawn("pnpm", ["parity:test", "--json"], {
       cwd: ROOT_DIR,
       env,
       stdio: "inherit",
@@ -60,7 +60,7 @@ export function regenerateArtifact(env: Record<string, string | undefined>): Pro
     child.on("error", reject);
     child.on("close", (code, signal) => {
       if (code === 0) resolve();
-      else reject(new Error(`\`pnpm test:compare --json\` exited with ${signal ?? code}`));
+      else reject(new Error(`\`pnpm parity:test --json\` exited with ${signal ?? code}`));
     });
   });
 }
@@ -72,7 +72,7 @@ async function loadArtifact(file: string): Promise<ComparisonArtifact> {
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
     throw new Error(
-      `Missing ${path.relative(ROOT_DIR, file)} — run \`pnpm test:compare --json\` first to ` +
+      `Missing ${path.relative(ROOT_DIR, file)} — run \`pnpm parity:test --json\` first to ` +
         "write it.",
       { cause: e },
     );
@@ -129,7 +129,7 @@ async function runAsScript(): Promise<void> {
   if (path.resolve(self) !== invoked) return;
   const argv = process.argv.slice(2);
   if (shouldRegenerate(argv, process.env)) {
-    console.log("Regenerating output/convention-comparison.json (test:compare --json)…");
+    console.log("Regenerating output/convention-comparison.json (parity:test --json)…");
     try {
       await regenerateArtifact(process.env);
     } catch (e) {

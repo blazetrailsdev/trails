@@ -166,7 +166,7 @@ export class SchemaDumper extends BaseSchemaDumper {
 
   // Rails `schema_default` / `schema_expression` live in
   // `connection_adapters/abstract/schema_dumper.rb`, so the ports stay in this
-  // file (the api:compare-mapped location) — the sole definitions, consumed by
+  // file (the parity:api-mapped location) — the sole definitions, consumed by
   // the single `emitTable`/`columnSpec` dispatch. `_adapter` is a trails-only
   // helper on the base (it reaches base-private `_source`).
 

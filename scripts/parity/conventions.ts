@@ -113,7 +113,7 @@ export const PATH_SEGMENT_ALIASES: Record<string, string> = {
  * An entry here does two things: it names the TS file the Ruby file's methods
  * are measured against, and it makes the Ruby file own a comparison bucket even
  * when Ruby reopens the class/module elsewhere. The second half matters —
- * api:compare buckets an entity's whole method set under the ONE file that
+ * parity:api buckets an entity's whole method set under the ONE file that
  * first defined a method on it, so a reopening file's methods are otherwise
  * measured against the DEFINING file's TS counterpart and report missing
  * forever no matter what is ported. `inflector/methods.rb` (folded into
@@ -322,7 +322,7 @@ export const OPERATORS = new Set([
 ]);
 
 /**
- * Ruby methods api:compare never expects a TS counterpart for, grouped by the
+ * Ruby methods parity:api never expects a TS counterpart for, grouped by the
  * reason they're skipped. The grouping is the single source of truth for both
  * the `SKIP` lookup set (below) and the generated conventions doc — keeping the
  * rationale machine-readable means a future skip can't land without a reason,
@@ -594,7 +594,7 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       "expected TS file is config.ts; export status is not why — in the default " +
       "full-surface run the TS extractor records file-local functions too, so " +
       "the non-exported `expandConfig` (connection.ts:269) is as visible to " +
-      "api:compare as the three exported ones, and exporting it would not match " +
+      "parity:api as the three exported ones, and exporting it would not match " +
       "it. (Under --public-only the two sides drop it symmetrically: Ruby's " +
       "`expand_config` is itself private, under config.rb's `private` at :13, " +
       "so neither side offers it.) Moving it into config.ts is the only thing " +
@@ -968,7 +968,7 @@ export function rubyMethodToTsIgnoringSkip(name: string): string[] | null {
     // The `isPrefixed` form is intentionally NOT offered as a fallback
     // here — Ruby already conveys the predicate via the `is_` prefix,
     // and offering `isIsNumber` would let a trails author land that
-    // doubled form and still get api:compare credit. Test on the Ruby
+    // doubled form and still get parity:api credit. Test on the Ruby
     // base name (with the underscore) so e.g. `isolation_level?` —
     // which camelizes to `isolationLevel` — is NOT swept into this
     // branch.
@@ -1079,18 +1079,18 @@ export function explainConventions(): string {
   return `# Ruby → TypeScript naming conventions
 
 <!-- GENERATED FILE — do not edit by hand.
-     Regenerate with \`pnpm api:conventions\`. The source of truth is
+     Regenerate with \`pnpm parity:api:conventions\`. The source of truth is
      \`explainConventions()\` in scripts/parity/conventions.ts; CI runs
      \`tsx scripts/parity/conventions-doc.ts --check\` and fails if this
      file drifts from it. -->
 
-These are the exact rules \`api:compare\` uses to match a Ruby method or file to
+These are the exact rules \`parity:api\` uses to match a Ruby method or file to
 its trails TypeScript counterpart. Follow them when porting Rails code so the
 comparison credits your implementation.
 
 ## Method names
 
-The Example column shows the TS **symbol name(s)** api:compare looks for (it
+The Example column shows the TS **symbol name(s)** parity:api looks for (it
 matches the first candidate present in the target file), not a call expression.
 
 | Ruby | TypeScript | Example |
@@ -1129,7 +1129,7 @@ writers, so they get no \`set*\` candidate.
 
 ## Operators
 
-These Ruby operator methods have no api:compare counterpart (map them to named
+These Ruby operator methods have no parity:api counterpart (map them to named
 methods like \`get()\`/\`set()\` as the surrounding code does):
 
 ${operatorList}
@@ -1170,13 +1170,13 @@ ${pathAliasRows}
 
 ## Skipped methods
 
-api:compare never expects a TS counterpart for these Ruby methods:
+parity:api never expects a TS counterpart for these Ruby methods:
 
 ${skipSections}
 
 ## Scoped skipped methods
 
-api:compare skips these Ruby methods, but only within the listed files — they
+parity:api skips these Ruby methods, but only within the listed files — they
 have a real TS surface elsewhere, so the skip is file-scoped to avoid silencing
 a genuine gap:
 
@@ -1184,7 +1184,7 @@ ${scopedSkipSections}
 
 ## Ruby-only classes
 
-api:compare expects no TS counterpart for these Ruby classes at all — neither
+parity:api expects no TS counterpart for these Ruby classes at all — neither
 their methods nor their place in the inheritance chain. Each one only papers
 over a gap in the Ruby standard library that JavaScript does not have:
 

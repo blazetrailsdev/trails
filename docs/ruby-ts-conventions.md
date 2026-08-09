@@ -1,18 +1,18 @@
 # Ruby → TypeScript naming conventions
 
 <!-- GENERATED FILE — do not edit by hand.
-     Regenerate with `pnpm api:conventions`. The source of truth is
+     Regenerate with `pnpm parity:api:conventions`. The source of truth is
      `explainConventions()` in scripts/parity/conventions.ts; CI runs
      `tsx scripts/parity/conventions-doc.ts --check` and fails if this
      file drifts from it. -->
 
-These are the exact rules `api:compare` uses to match a Ruby method or file to
+These are the exact rules `parity:api` uses to match a Ruby method or file to
 its trails TypeScript counterpart. Follow them when porting Rails code so the
 comparison credits your implementation.
 
 ## Method names
 
-The Example column shows the TS **symbol name(s)** api:compare looks for (it
+The Example column shows the TS **symbol name(s)** parity:api looks for (it
 matches the first candidate present in the target file), not a call expression.
 
 | Ruby                                                                                                                     | TypeScript                           | Example                                               |
@@ -51,7 +51,7 @@ writers, so they get no `set*` candidate.
 
 ## Operators
 
-These Ruby operator methods have no api:compare counterpart (map them to named
+These Ruby operator methods have no parity:api counterpart (map them to named
 methods like `get()`/`set()` as the surrounding code does):
 
 `[]`, `[]=`, `==`, `===`, `!=`, `<=>`, `+`, `-`, `*`, `/`, `%`, `&`, `|`, `^`, `~`, `!`, `!~`, `=~`, `>>`, `<<`, `~@`
@@ -96,7 +96,7 @@ applied first (trails railties are not `Rails::Railtie` subclasses):
 
 ## Skipped methods
 
-api:compare never expects a TS counterpart for these Ruby methods:
+parity:api never expects a TS counterpart for these Ruby methods:
 
 - Ruby core object / value-protocol methods with no meaningful public TypeScript surface (identity, reflection, coercion).
   - `dup`, `clone`, `freeze`, `hash`, `inspect`, `pretty_print`, `object_id`, `class`, `send`, `public_send`, `tap`, `then`, `yield_self`, `respond_to?`, `respond_to_missing?`, `method_missing`, `is_a?`, `kind_of?`, `instance_of?`, `nil?`, `equal?`, `eql?`, `instance_variable_get`, `instance_variable_set`, `instance_variables`, `initialize_copy`, `initialize_dup`, `initialize_clone`, `encode_with`, `init_with`, `to_ary`, `to_a`, `to_i`, `to_f`, `to_h`, `to_hash`, `to_r`, `to_c`
@@ -115,7 +115,7 @@ api:compare never expects a TS counterpart for these Ruby methods:
 
 ## Scoped skipped methods
 
-api:compare skips these Ruby methods, but only within the listed files — they
+parity:api skips these Ruby methods, but only within the listed files — they
 have a real TS surface elsewhere, so the skip is file-scoped to avoid silencing
 a genuine gap:
 
@@ -133,14 +133,14 @@ a genuine gap:
   - `perform_calculation` (only in: `relation.rb`)
 - AdapterHelper's four hand-written capability predicates are rendered by packages/activerecord/src/support/supports.ts as entries in one feature-keyed table (`default_expression`, `non_unique_constraint_name`, `text_column_with_default`, `sql_standard_drop_constraint`) rather than as four exports on adapter-helper.ts, exactly as the ~15 predicates `adapter_helper.rb` itself generates with `define_method` are. The table keys are the `supports_<key>?` names, so the pairing is checkable; duplicating them as free functions here would give two sources of truth for the same capability. Scoped to adapter_helper.rb, the only Ruby file in the tree that defines these names.
   - `supports_default_expression?`, `supports_non_unique_constraint_name?`, `supports_text_column_with_default?`, `supports_sql_standard_drop_constraint?` (only in: `adapter_helper.rb`)
-- `module ARTest` opens in config.rb and is reopened in connection.rb, so the Ruby extractor records one ARTest entity filed under config.rb and every ARTest method buckets there. Two populations end up in that bucket, neither of which is a gap. (1) `connection_name` / `test_configuration_hashes` / `connect` (connection.rb) and `expand_config` (config.rb) ARE ported — all four in packages/activerecord/src/support/connection.ts, next to the CONNECTIONS entries they name and expand. They miss only because the bucket's expected TS file is config.ts; export status is not why — in the default full-surface run the TS extractor records file-local functions too, so the non-exported `expandConfig` (connection.ts:269) is as visible to api:compare as the three exported ones, and exporting it would not match it. (Under --public-only the two sides drop it symmetrically: Ruby's `expand_config` is itself private, under config.rb's `private` at :13, so neither side offers it.) Moving it into config.ts is the only thing that would match it, and that is what cannot happen: it is typed on `NamedConnection` and `ARUNIT_ENTRY_NAMES`, both declared in connection.ts, which already imports from config.ts — so the move would CREATE an import cycle, and dragging those declarations along would relocate the `connections:` vocabulary out of the file mirroring connection.rb. (2) `config` / `config_file` / `read_config` are the memoized read of test/config.yml; trails ships no config.yml — the `connections:` hash is expressed directly as the CONNECTIONS table in connection.ts and the sub-setting readers in config.ts — so there is no file to locate, copy from config.example.yml, or parse. Scoped to config.rb, the only Ruby file in the tree that defines these names.
+- `module ARTest` opens in config.rb and is reopened in connection.rb, so the Ruby extractor records one ARTest entity filed under config.rb and every ARTest method buckets there. Two populations end up in that bucket, neither of which is a gap. (1) `connection_name` / `test_configuration_hashes` / `connect` (connection.rb) and `expand_config` (config.rb) ARE ported — all four in packages/activerecord/src/support/connection.ts, next to the CONNECTIONS entries they name and expand. They miss only because the bucket's expected TS file is config.ts; export status is not why — in the default full-surface run the TS extractor records file-local functions too, so the non-exported `expandConfig` (connection.ts:269) is as visible to parity:api as the three exported ones, and exporting it would not match it. (Under --public-only the two sides drop it symmetrically: Ruby's `expand_config` is itself private, under config.rb's `private` at :13, so neither side offers it.) Moving it into config.ts is the only thing that would match it, and that is what cannot happen: it is typed on `NamedConnection` and `ARUNIT_ENTRY_NAMES`, both declared in connection.ts, which already imports from config.ts — so the move would CREATE an import cycle, and dragging those declarations along would relocate the `connections:` vocabulary out of the file mirroring connection.rb. (2) `config` / `config_file` / `read_config` are the memoized read of test/config.yml; trails ships no config.yml — the `connections:` hash is expressed directly as the CONNECTIONS table in connection.ts and the sub-setting readers in config.ts — so there is no file to locate, copy from config.example.yml, or parse. Scoped to config.rb, the only Ruby file in the tree that defines these names.
   - `config`, `config_file`, `read_config`, `expand_config`, `connection_name`, `test_configuration_hashes`, `connect` (only in: `config.rb`)
 - `ActiveSupport::Messages::Rotator#initialize` (messages/rotator.rb:6-12) is an `initialize` on a module Rails installs with `prepend`, so it runs as part of the _host's_ constructor chain via `super`. TypeScript has no expression for that: `prepend()` (packages/activesupport/src/prepend.ts) wraps methods on the prototype and cannot wrap a constructor, so the port keeps the Rails name as an exported `initialize` function that each rotatable class calls from its own constructor (message-verifier.ts, message-encryptor.ts). There is no TS `constructor` at the mapped site for the comparison to find — the same shape as the `included`/`extended`/`inherited` hooks. Scoped to messages/rotator.rb so a real class's `initialize` is still expected to map to a `constructor`.
   - `initialize` (only in: `messages/rotator.rb`; ported in TS as `initialize`)
 
 ## Ruby-only classes
 
-api:compare expects no TS counterpart for these Ruby classes at all — neither
+parity:api expects no TS counterpart for these Ruby classes at all — neither
 their methods nor their place in the inheritance chain. Each one only papers
 over a gap in the Ruby standard library that JavaScript does not have:
 

@@ -46,7 +46,7 @@ if (!railsFileStructureManifestReady) {
   console.warn(
     "[eslint.config] rails-file-structure-method-order NOT registered: " +
       "eslint/rails-file-structure-method-order.json has no order data " +
-      "(run `pnpm api:compare` to build it). Method order is enforced by the " +
+      "(run `pnpm parity:api` to build it). Method order is enforced by the " +
       "Rails API/Test Comparison CI job, not this run.",
   );
 }
@@ -369,7 +369,7 @@ export default defineConfig(
   //    `runCallbacks("<event>")` / `runAllCallbacks`. Manifest:
   //    eslint/rails-callback-invocations.json (built by
   //    `pnpm tsx scripts/build-rails-privates-manifest.ts`, refreshed on
-  //    `pnpm api:compare`). Pre-existing violators are grandfathered in
+  //    `pnpm parity:api`). Pre-existing violators are grandfathered in
   //    eslint/rails-callback-invocations-exclude.json and ratcheted down. ──
   {
     files: ["packages/activerecord/src/**/*.ts"],
@@ -420,7 +420,7 @@ export default defineConfig(
   // members + top-level functions match the Rails source order
   // documented in `eslint/rails-file-structure-method-order.json` (built
   // by `pnpm tsx scripts/build-rails-file-structure-manifest.ts`,
-  // invoked by `pnpm api:compare`). Autofixable.
+  // invoked by `pnpm parity:api`). Autofixable.
   //
   // Enforcement lives in the Rails API/Test Comparison job, the only job that
   // builds rails-api.json. Everywhere else (the Lint job, a local `pnpm lint`

@@ -10,7 +10,7 @@ type ContactFakeColumnsHost = typeof Base & { column: typeof column };
 // deviations that keep it from being named after it: trails' `leaseConnection`
 // is async so a class-body caller takes the sync escape hatch, and the adapter
 // kind is asserted rather than cast. The distinct name also matters to
-// api:compare — a `leaseConnection` taking an argument would make the calls
+// parity:api — a `leaseConnection` taking an argument would make the calls
 // gate treat every `lease_connection` call in the package as significant.
 function fakeConnection(klass: typeof Base): FakeActiveRecordAdapter {
   const connection = klass.connectionPool().leaseConnectionSync();

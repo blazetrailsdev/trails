@@ -1,4 +1,4 @@
-# lint:deps — Arel + ActiveModel dep-parity plan
+# parity:api:deps — Arel + ActiveModel dep-parity plan
 
 ## Phase 1 — Linter improvements ✅ DONE
 

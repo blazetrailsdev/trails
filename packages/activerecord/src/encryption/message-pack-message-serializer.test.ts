@@ -14,7 +14,7 @@ describe("ActiveRecord::Encryption::MessagePackMessageSerializerTest", () => {
     // isBinary() returns true: mirrors Rails' MessagePackMessageSerializer#binary?,
     // which signals that the serialized form must be stored in a binary column.
     // The wire format is now real MessagePack binary (the test name predates that
-    // change; it stays verbatim so test:compare keeps matching the Rails test).
+    // change; it stays verbatim so parity:test keeps matching the Rails test).
     expect(new MessagePackMessageSerializer().isBinary()).toBe(true);
   });
 

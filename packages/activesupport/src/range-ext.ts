@@ -52,7 +52,7 @@ export class Range<T> {
    * silently reporting a fractional maximum.
    *
    * @noRailsEquivalent PERMANENT — core Ruby `Range#max`, read by
-   * `compare_range.rb:24,50`. No Rails file declares it, so `api:extra` has
+   * `compare_range.rb:24,50`. No Rails file declares it, so `parity:api:extra` has
    * no Ruby name to credit it against.
    */
   max(): T | null {

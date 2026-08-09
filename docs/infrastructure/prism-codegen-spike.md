@@ -539,7 +539,7 @@ step:
 
 - It writes an unreviewed machine draft carrying a loud
   `// PRISM-CODEGEN DRAFT` marker. The porting agent finishes the body against
-  `vendor/rails` under normal `test:compare` discipline and deletes the marker
+  `vendor/rails` under normal `parity:test` discipline and deletes the marker
   before committing.
 - It never stages, commits, or formats anything, and it must **never** be wired
   into an autofix step, a lint-staged entry, or a git hook. Nothing in CI runs

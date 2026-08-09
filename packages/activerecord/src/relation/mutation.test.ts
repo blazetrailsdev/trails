@@ -205,7 +205,7 @@ describe("RelationMutationTest", () => {
 
   // Rails generates two separate loops that both produce "##{method}!" test names:
   // one for MULTI_VALUE_METHODS (above) and one for SINGLE_VALUE_METHODS (here).
-  // The duplicate name is intentional — test:compare matches by description count.
+  // The duplicate name is intentional — parity:test matches by description count.
   it("#!", () => {
     // Every single-value bang returns self and sets its `*_value` scalar.
     const SINGLE: ReadonlyArray<[string, unknown, string, unknown]> = [

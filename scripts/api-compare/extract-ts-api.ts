@@ -1185,7 +1185,7 @@ export function extractFromProgram(
   // Extend-detection pass: mirrors the include-detection pass above, but for
   // `extend(Host, Mod)` calls. `extend()` wires class-level (static) methods
   // whereas `include()` wires instance-level methods; both are tracked on the
-  // same `extends` field because api:compare's expected set conflates them.
+  // same `extends` field because parity:api's expected set conflates them.
   for (const sourceFile of program.getSourceFiles()) {
     if (!sourceFile.fileName.startsWith(srcDir)) continue;
     if (sourceFile.fileName.endsWith(".test.ts")) continue;
@@ -1309,7 +1309,7 @@ export function extractFromProgram(
   //       Object.defineProperty(Cls.prototype, name, { value: fn });
   //     }
   //
-  // Without this pass, api:compare cannot see those methods on the host class.
+  // Without this pass, parity:api cannot see those methods on the host class.
   for (const sourceFile of program.getSourceFiles()) {
     if (!sourceFile.fileName.startsWith(srcDir)) continue;
     if (sourceFile.fileName.endsWith(".test.ts")) continue;
@@ -1530,7 +1530,7 @@ function extractDefinePropertyForOf(
  *   - `const helper = (...) => {}` / `const helper = function (...) {}`
  *
  * Helpers whose body is just `throw new NotImplementedError(...)` are
- * skipped: they satisfy api:compare's name match but contribute no
+ * skipped: they satisfy parity:api's name match but contribute no
  * behavior, and Rails reserves NotImplementedError for abstract methods
  * subclasses must override — they should not inflate the privates score.
  *
@@ -1564,8 +1564,8 @@ export function paramsOfCallableRef(
  * (`@missingRailsCall <call> — <reason>`), or undefined when it carries none.
  *
  * Read from the RAW comment text through the shared `suppressedCallsIn` parser
- * rather than `ts.getJSDocTags`, so the tag means exactly what api:build and
- * api:reasons already mean by it — including the empty-reason contract (a bare
+ * rather than `ts.getJSDocTags`, so the tag means exactly what parity:api:build and
+ * parity:api:reasons already mean by it — including the empty-reason contract (a bare
  * tag throws here too) and the continuation rules that keep a Ruby ivar in the
  * reason prose from re-parsing as a tag boundary.
  *
@@ -1577,7 +1577,7 @@ export function paramsOfCallableRef(
  * does. The paths that record no call-set (namespace and interface members,
  * the mixin pseudo-module's constructor) need no wiring: `checkCalls` skips a
  * pair with no TS call-set, so a call there is never flagged, never tagged by
- * api:build, and has nothing to suppress.
+ * parity:api:build, and has nothing to suppress.
  *
  * `fileHasMissingRailsCallTag` is declared with the imports, not next to this
  * function: a worker thread runs the whole extraction from the
@@ -2048,7 +2048,7 @@ export function extractClass(
       // same-named module function pulled in via a namespace import — e.g.
       // `buildJoins(arel) { _qm.buildJoins.call(this, arel); }` in relation.ts,
       // where the real port lives in relation/query-methods.ts — is a Rails-layout
-      // wrapper (kept so api:compare finds the method where Rails declares it,
+      // wrapper (kept so parity:api finds the method where Rails declares it,
       // see PR #4676), NOT a second body. Its extracted call-set is just the
       // delegate name, so comparing it flags every Ruby call as phantom-missing
       // (double-attribution). Suppress the wrapper's call-set so the canonical
@@ -2223,7 +2223,7 @@ function propertySignatureParams(
  * Member rule: every method signature AND every property signature counts,
  * callable or not. `find(id): T` and `find: (id) => T` are interchangeable in
  * TypeScript, so recording only method signatures would make a member's
- * visibility to api:compare / api:extra depend on the author's syntax choice.
+ * visibility to parity:api / parity:api:extra depend on the author's syntax choice.
  * Non-callable properties count for the same reason class property
  * declarations do (see extractClass) — a Rails attr_reader ports as a plain
  * property, so skipping them would be its own divergence. A property whose

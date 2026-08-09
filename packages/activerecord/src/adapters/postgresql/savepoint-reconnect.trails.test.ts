@@ -11,7 +11,7 @@
  * materialize_transactions` (abstract_adapter.rb:1046) into each adapter's
  * `internalExecute` finally. Its regression test runs on sqlite, which has no
  * reconnect loop; this file exercises the live-adapter reconnect path. Kept in
- * a `.trails` file so test:compare maps cleanly (no such Rails test exists).
+ * a `.trails` file so parity:test maps cleanly (no such Rails test exists).
  */
 import { it, expect, beforeEach, afterEach, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";

@@ -2252,7 +2252,7 @@ export async function canonicalForeignKeyDependents(): Promise<Map<string, strin
 /**
  * Declarative view of the registry: table -> column -> `ColumnSpec`, derived by
  * replaying every `create_table` block against a probe that records columns
- * instead of emitting DDL. This is what lets `schema:compare` diff the
+ * instead of emitting DDL. This is what lets `parity:schema` diff the
  * transcription that actually lays the tables against `schema.rb`, rather than
  * only the parallel `TEST_SCHEMA` map (which lays nothing).
  *

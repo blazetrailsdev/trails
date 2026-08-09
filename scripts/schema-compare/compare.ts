@@ -1,9 +1,9 @@
-// schema:compare — structural parity check of the two hand transcriptions of
+// parity:schema — structural parity check of the two hand transcriptions of
 // vendor/rails/activerecord/test/schema/schema.rb against the vendored source
 // they are documented to mirror, and against each other:
 //   * TEST_SCHEMA (packages/activerecord/src/test-helpers/test-schema.ts) — the
 //     declarative map, read by the canonical-table ESLint rule and
-//     fixtures:compare;
+//     parity:fixtures;
 //   * the canonical registry (packages/activerecord/src/support/
 //     canonical-schema.ts) — the `create_table` sequence that actually lays
 //     every table at boot.
@@ -74,7 +74,7 @@ export const SCHEMA_FILES: readonly string[] = [
  * the baseline is reported as debt, anything new is fatal. Entries are table
  * names, or `table.column` for a column on an otherwise-canonical table.
  *
- * The list only ever shrinks. Reseed with `pnpm schema:compare:reseed` after
+ * The list only ever shrinks. Reseed with `pnpm parity:schema:reseed` after
  * *removing* inventions — the reseed refuses to grow the file, so a red gate
  * can never be "fixed" by blessing the invention that turned it red.
  */
@@ -830,7 +830,7 @@ export async function main(): Promise<void> {
   for (const key of stale) {
     console.log(
       `note  BASELINE-STALE  ${key} — invented by neither transcription; drop it with ` +
-        `pnpm schema:compare:reseed`,
+        `pnpm parity:schema:reseed`,
     );
   }
 

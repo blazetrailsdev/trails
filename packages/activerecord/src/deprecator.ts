@@ -39,13 +39,13 @@ export interface ActiveRecord {
  * Defers loading of the actual migration class until it is needed.
  *
  * Mirrors: ActiveRecord::MigrationProxy (defined in migration.rb,
- * mapped to deprecator.rb by the api:compare extractor)
+ * mapped to deprecator.rb by the parity:api extractor)
  *
  * This is the file-loading proxy: it resolves `name` out of `filename` and
  * constructs the migration, mirroring `load_migration`'s
  * `name.constantize.new(name, version)`. It stays separate from the
  * `MigrationProxy` interface in `migration.ts` — the already-resolved shape
- * `Migrator` consumes, whose `loadMigration` is async — because api:compare
+ * `Migrator` consumes, whose `loadMigration` is async — because parity:api
  * buckets the `MigrationProxy` surface under `deprecator.rb` while `Migrator`
  * must keep its collaborator type in `migration.ts`. Both delegate to a real
  * `Migration`.

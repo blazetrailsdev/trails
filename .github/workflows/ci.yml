@@ -1401,10 +1401,10 @@ jobs:
         run: pnpm exec tsx scripts/api-compare/lint-inheritance-excludes.ts
       - name: Missing-call reasons gate
         # Enforces the `@missingRailsCall` empty-reason contract (the same
-        # `parseJsdoc` check `api:build` uses) over every JSDoc block under
-        # packages/*/src. Read-only and artifact-free: `api:build` itself is
-        # opt-in and rewrites files, so without this step a hand-authored bare
-        # tag would sit undetected. See the empty-reason bullet in
+        # `parseJsdoc` check `parity:api:build` uses) over every JSDoc block
+        # under packages/*/src. Read-only and artifact-free: `parity:api:build`
+        # itself is opt-in and rewrites files, so without this step a
+        # hand-authored bare tag would sit undetected. See the bullet in
         # docs/infrastructure/api-build-stub-generation-plan.md.
         run: pnpm exec tsx scripts/api-compare/lint-missing-rails-call-reasons.ts
       - name: Detached JSDoc tag blocks gate

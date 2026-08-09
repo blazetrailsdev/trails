@@ -1,5 +1,5 @@
 // Mirrors rails-html-sanitizer test/sanitizer_test.rb -> FullSanitizerTest.
-// Test names track Rails' test_* methods for test:compare alignment.
+// Test names track Rails' test_* methods for parity:test alignment.
 // Where libxml2/Loofah outputs differ from sanitize-html/htmlparser2 we
 // document the divergence in the assertion comment.
 

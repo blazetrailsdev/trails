@@ -91,7 +91,7 @@ export interface PackageRoots {
 }
 
 /**
- * The extraction roots of every package `api:compare` actually extracts.
+ * The extraction roots of every package `parity:api` actually extracts.
  *
  * Derived from `PACKAGES` rather than a `packages/` listing so the freshness
  * guards see the same tree the extractor does: workspaces that are not

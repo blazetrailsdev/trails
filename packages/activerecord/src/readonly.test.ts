@@ -10,7 +10,7 @@
  * wrote into the shared worker DB — the cross-file collisions that forced
  * `dropExisting` shields in sibling suites.
  *
- * Test names mirror the Ruby method names verbatim (`test:compare` matches on
+ * Test names mirror the Ruby method names verbatim (`parity:test` matches on
  * them). Tests blocked by a genuine trails gap (association collection proxy,
  * has_many through) are `it.skip` with a precise reason rather than silently
  * stubbed or adapted.

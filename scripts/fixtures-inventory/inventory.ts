@@ -240,7 +240,7 @@ function renderDoc(rows: Row[]): string {
     "This is a **TS-side structural** classification, not the full Phase A " +
       "tiering contract. The Phase A plan envisioned deriving tiers from a " +
       "Rails-counterpart map (`scripts/api-compare/test-mapping.json`), parsed " +
-      "`fixtures :foo` usage on the Rails side, and `fixtures:compare` " +
+      "`fixtures :foo` usage on the Rails side, and `parity:fixtures` " +
       "readiness. Those committed inputs **do not exist in this repo** " +
       "(`test-mapping.json` is absent; there is no Rails-fixture-usage " +
       "extractor), so this script cannot consume them. Instead it uses the " +
@@ -254,7 +254,7 @@ function renderDoc(rows: Row[]): string {
     "Consequence: a Tier 1 here means *structurally mechanical to convert*, " +
       "not *confirmed to have a fixtures-using Rails counterpart*. Treat the " +
       "tiers as an **upper bound** on the convertible pool — the true pool is " +
-      "smaller once Rails-counterpart/`fixtures:compare` filtering is applied. " +
+      "smaller once Rails-counterpart/`parity:fixtures` filtering is applied. " +
       "That only strengthens the recommendation below (a small pool gets " +
       "smaller). Classification is rough by design — it drives a planning " +
       "decision, not automated conversion.",

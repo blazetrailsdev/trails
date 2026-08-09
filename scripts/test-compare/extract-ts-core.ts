@@ -408,7 +408,7 @@ export function extractTestsFromSource(content: string, relativePath: string): T
         //
         // Restricted to gating modifiers (skipIf / runIf) — `each` and friends
         // generate multiple runtime tests from a template title, so static
-        // extraction of the template name would add noise to test:compare.
+        // extraction of the template name would add noise to parity:test.
         const inner: ts.PropertyAccessExpression = expression.expression;
         const base = inner.expression;
         const modifier = inner.name.text;

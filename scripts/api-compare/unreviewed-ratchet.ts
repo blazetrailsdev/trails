@@ -343,7 +343,7 @@ export function renderSlack(slack: MarkDelta[], markDir: string): string {
     "A mark is a measurement of remaining unreviewed debt; left high it hands the next " +
     "story a “before” value no clean tree produces, and the drift is discovered only " +
     "when someone reseeds. A mark only shrinks, so tightening is always safe:\n" +
-    "  pnpm api:calls:reseed\n" +
+    "  pnpm parity:api:calls:reseed\n" +
     slack.map((d) => `  - ${d.file}  mark ${d.mark}, only ${d.count} unreviewed`).join("\n")
   );
 }

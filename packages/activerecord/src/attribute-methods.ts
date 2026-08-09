@@ -798,7 +798,7 @@ export function attributeNamesForSerialization(this: InstanceMethodHost): string
 }
 
 // ---------------------------------------------------------------------------
-// Sub-module method delegates — api:compare requires exported function
+// Sub-module method delegates — parity:api requires exported function
 // declarations (not re-export statements) to count a method as present in
 // this file. Each function below delegates to the canonical implementation in
 // the relevant sub-module file so attribute_methods.rb reaches 100%.

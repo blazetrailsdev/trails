@@ -1,12 +1,12 @@
 #!/usr/bin/env -S npx tsx
 /**
- * Cross-version Rails API drift report (upgrade worklist): `pnpm api:drift
+ * Cross-version Rails API drift report (upgrade worklist): `pnpm parity:api:drift
  * --ref <tag>`. Scopes a future bump off our v8.0.2 pin: fetches the ref
  * reproducibly (own lock entry in output/drift.lock.json — the canonical pin
  * stays the single active source), extracts its Ruby API to
  * output/rails-api@<ref>.json, diffs it against output/rails-api.json via the
  * pure version-diff.ts core, annotates against the ported surface
- * (output/ts-api.json), and writes output/version-drift.json. Prereq: api:compare.
+ * (output/ts-api.json), and writes output/version-drift.json. Prereq: parity:api.
  */
 import { execFile } from "node:child_process";
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
@@ -124,13 +124,13 @@ async function gemspecPaths(cloneRoot: string): Promise<string[]> {
 /** Gem-level add/remove between the base pin and the target ref, derived from
  *  each ref's monorepo subgem list. Surfaces whole-gem drift that
  *  `diffManifests` can't see (it only diffs gems present in both manifests).
- *  The base list comes from the vendored source `api:compare` already fetched
+ *  The base list comes from the vendored source `parity:api` already fetched
  *  (`vendor/rails`, the exact pin `rails-api.json` was extracted from) — not a
  *  re-clone — so it can't disagree with the base manifest. */
 async function gemListDelta(targetClone: string) {
   const baseSource = join(ROOT, "vendor", RAILS!.name);
   if (!existsSync(baseSource)) {
-    throw new Error(`missing ${baseSource} — run \`pnpm api:compare\` first`);
+    throw new Error(`missing ${baseSource} — run \`pnpm parity:api\` first`);
   }
   const [baseGems, targetGems] = await Promise.all([
     gemspecPaths(baseSource).then(gemNamesFromPaths),
@@ -140,13 +140,13 @@ async function gemListDelta(targetClone: string) {
 }
 
 async function readManifest(path: string): Promise<ApiManifest> {
-  if (!existsSync(path)) throw new Error(`missing ${path} — run \`pnpm api:compare\` first`);
+  if (!existsSync(path)) throw new Error(`missing ${path} — run \`pnpm parity:api\` first`);
   return JSON.parse(await readFile(path, "utf8")) as ApiManifest;
 }
 
 /** Re-extract the pinned base manifest (output/rails-api.json) with the current
  *  extractor, clearing extractor-version skew against a fresh target. Uses the
- *  canonical vendor checkout's lib paths (the same source `api:compare` builds
+ *  canonical vendor checkout's lib paths (the same source `parity:api` builds
  *  the base from) and forces a rebuild past the mtime cache gate. */
 async function rebuildBaseManifest(): Promise<void> {
   console.log(
@@ -188,7 +188,7 @@ export async function runDrift(ref: string): Promise<string> {
     if (skew.skewed) {
       throw new Error(
         `[drift] base still skewed after rebuild: ${describeExtractorSkew(skew)} ` +
-          `Run \`pnpm api:compare\` and re-run \`pnpm api:drift\`.`,
+          `Run \`pnpm parity:api\` and re-run \`pnpm parity:api:drift\`.`,
       );
     }
     console.log("[drift] base rebuilt; extractor versions now match");
@@ -225,7 +225,7 @@ export async function runDrift(ref: string): Promise<string> {
 function parseRef(argv: string[]): string {
   const i = argv.indexOf("--ref");
   if (i === -1 || !argv[i + 1]) {
-    throw new Error("usage: pnpm api:drift --ref <tag>   (e.g. --ref v8.1.3)");
+    throw new Error("usage: pnpm parity:api:drift --ref <tag>   (e.g. --ref v8.1.3)");
   }
   return argv[i + 1];
 }

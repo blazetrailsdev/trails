@@ -23,7 +23,7 @@
  * spurious matches against unrelated Rails-private accessors that
  * happen to share a name.
  *
- * Run after `pnpm api:compare` (or `ruby scripts/api-compare/extract-ruby-api.rb`):
+ * Run after `pnpm parity:api` (or `ruby scripts/api-compare/extract-ruby-api.rb`):
  *   pnpm rails-privates:manifest
  */
 import * as fs from "fs";
@@ -446,7 +446,7 @@ function checkDeprecatedManifest(): void {
 // receiver (`conn._run_checkin_callbacks`, `scope.each(&:_run_destroy_callbacks)`)
 // fires another object's callbacks and does not constrain the enclosing method.
 //
-// Run after `pnpm api:compare` (or standalone: `pnpm rails-privates:manifest`).
+// Run after `pnpm parity:api` (or standalone: `pnpm rails-privates:manifest`).
 function callbackEventsInRuby(src: string): Map<string, Set<string>> {
   const byMethod = new Map<string, Set<string>>();
   const lines = src.split("\n");
@@ -479,7 +479,7 @@ interface CallbackManifest {
 
 // Ruby → TS name resolution for the callback pass. This deliberately does NOT
 // reuse only `rubyMethodToTs`: that function's general-purpose `SKIP` set
-// (conventions.ts) drops Ruby object/value-protocol methods api:compare doesn't
+// (conventions.ts) drops Ruby object/value-protocol methods parity:api doesn't
 // track — including `initialize_dup`/`initialize_clone`/`initialize_copy`. Those
 // are irrelevant to parity but ARE real callback-firing sites here
 // (core.rb#initialize_dup fires `_run_initialize_callbacks`), so the callback

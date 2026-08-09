@@ -2192,9 +2192,9 @@ async function printSummary() {
   console.log(`  Workflow runs: ${runCount}`);
   console.log(`  Workflow jobs: ${jobCount} (${rawLogCount} logs fetched)`);
   console.log(`  Workflow steps: ${stepCount}`);
-  console.log(`  Commits with test:compare stats: ${testStatCount}`);
-  console.log(`  Commits with api:compare stats: ${apiStatCount}`);
-  console.log(`  Commits with api:compare --privates stats: ${apiPrivatesStatCount}`);
+  console.log(`  Commits with parity:test stats: ${testStatCount}`);
+  console.log(`  Commits with parity:api stats: ${apiStatCount}`);
+  console.log(`  Commits with parity:api --privates stats: ${apiPrivatesStatCount}`);
   console.log(`  Commits with compare logs: ${logCount}`);
   console.log(`  Database: ${DB_PATH}`);
 
@@ -2208,7 +2208,7 @@ async function printSummary() {
   `);
 
   if (latestTestStats.length > 0) {
-    console.log("\n  Latest test:compare:");
+    console.log("\n  Latest parity:test:");
     for (const row of latestTestStats) {
       const pkg = row.readAttribute("package");
       const matched = row.readAttribute("matched");
@@ -2230,7 +2230,7 @@ async function printSummary() {
   `);
 
   if (latestApiStats.length > 0) {
-    console.log("\n  Latest api:compare:");
+    console.log("\n  Latest parity:api:");
     for (const row of latestApiStats) {
       const pkg = row.readAttribute("package");
       const matched = row.readAttribute("matched");
@@ -2252,7 +2252,7 @@ async function printSummary() {
   `);
 
   if (latestApiPrivatesStats.length > 0) {
-    console.log("\n  Latest api:compare --privates:");
+    console.log("\n  Latest parity:api --privates:");
     for (const row of latestApiPrivatesStats) {
       const pkg = row.readAttribute("package");
       const matched = row.readAttribute("matched");

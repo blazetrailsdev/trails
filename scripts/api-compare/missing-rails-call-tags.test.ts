@@ -129,7 +129,7 @@ describe("suppressedCallsIn", () => {
     ).toEqual([]);
   });
 
-  it("treats the placeholder as unjustified even when api:build wrapped it", () => {
+  it("treats the placeholder as unjustified even when parity:api:build wrapped it", () => {
     const wrapped = [
       "/**",
       " * @missingRailsCall first — Baseline (RFC 0047): wide call-set flag seeded",
@@ -141,7 +141,7 @@ describe("suppressedCallsIn", () => {
   });
 });
 
-describe("api:build over a hand-written one-line tag", () => {
+describe("parity:api:build over a hand-written one-line tag", () => {
   const expectations = new Map([["bar", { rubyNames: ["bar"], calls: new Set(["first"]) }]]);
   const reason = "the caller already ordered.";
   const src = [

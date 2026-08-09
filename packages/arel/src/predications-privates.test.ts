@@ -5,7 +5,7 @@ import { Predications } from "./predications.js";
 // Audit follow-up: cover the Predications private helpers that mirror
 // Arel::Predications' private API (grouping_any, grouping_all,
 // infinity?, unboundable?, open_ended?). Trails surfaces them on the
-// mixin object for Rails-fidelity / api:compare privates coverage;
+// mixin object for Rails-fidelity / parity:api privates coverage;
 // these tests pin their behavior. The three predicate helpers delegate to
 // the single implementation in predications-range.ts.
 
@@ -173,7 +173,7 @@ describe("Predications.isInfinity / isUnboundable / isOpenEnded", () => {
 });
 
 describe("Attribute private helpers (mirror Predications)", () => {
-  // The helpers are `protected` for Rails-fidelity / api:compare
+  // The helpers are `protected` for Rails-fidelity / parity:api
   // coverage, not as a public surface. Tests cast to access them —
   // same pattern as HomogeneousIn#ivars / SelectManager#collapse.
   type AttributePrivates = Nodes.Attribute & {

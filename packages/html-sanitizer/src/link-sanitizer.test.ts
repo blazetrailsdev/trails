@@ -1,5 +1,5 @@
 // Mirrors rails-html-sanitizer test/sanitizer_test.rb -> LinkSanitizerTest.
-// Test names track Rails' test_* methods for test:compare alignment.
+// Test names track Rails' test_* methods for parity:test alignment.
 
 import { describe, expect, test } from "vitest";
 import { LinkSanitizer } from "./link-sanitizer.js";

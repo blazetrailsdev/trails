@@ -1159,7 +1159,7 @@ A story is mergeable when:
    decision) — verified against the Rails file cited in the story.
 2. No stubs in landed code; if the upstream method is unimplemented in
    Rails, leave it out rather than ship a no-op.
-3. `api:compare` and `test:compare` deltas are non-negative for the
+3. `parity:api` and `parity:test` deltas are non-negative for the
    touched packages.
 
 ### Completed stories

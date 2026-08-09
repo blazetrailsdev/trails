@@ -326,7 +326,7 @@ function gateRegex(yml: string, name: string): RegExp {
  *  never scans it — set_gate's exclusion argument drops it before
  *  the COMPARISON_RE `^packages/` clause is applied.
  *  NOTE: scripts/parity/conventions.ts regenerates
- *  docs/ruby-ts-conventions.md (checked by api:conventions --check in
+ *  docs/ruby-ts-conventions.md (checked by parity:api:conventions --check in
  *  the job); the scripts/api-compare/ clause keeps that drift check
  *  gated on. As with the package gates, infra_files (which carves out
  *  the single-consumer scripts/ subtrees) feeds the INFRA_RE half of
@@ -378,7 +378,7 @@ function gateRegex(yml: string, name: string): RegExp {
  *  script) — so neither needs the full matrix.
  *
  *  Exception: docs/ruby-ts-conventions.md is GENERATED from
- *  conventions.ts and guarded by `api:conventions --check` in the
+ *  conventions.ts and guarded by `parity:api:conventions --check` in the
  *  rails-comparison job. Treat a change to it as non-docs-only so a
  *  hand-edit (ignoring the file's do-not-edit banner) still runs the
  *  drift check instead of short-circuiting to a green docs-only run.

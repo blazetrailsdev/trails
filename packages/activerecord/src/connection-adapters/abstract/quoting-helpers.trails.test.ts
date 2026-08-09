@@ -4,7 +4,7 @@
  * but no `quoting_helpers_test.rb`, and the self-dispatch helpers exercised here
  * (`dispatchQuotedBinary` / `dispatchQuotedDate` / `dispatchQuotedTime`) are a
  * trails construct standing in for Ruby's `self.quoted_binary` sends. Nothing in
- * this file is matched by `test:compare` — it lands in "extra (TS only)" — so the
+ * this file is matched by `parity:test` — it lands in "extra (TS only)" — so the
  * describe/it names here are ours to choose and are NOT bound by the
  * never-reword-a-test-name rule, which exists to protect Rails-matched names.
  *

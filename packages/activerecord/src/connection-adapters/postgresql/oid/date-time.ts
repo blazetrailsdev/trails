@@ -34,7 +34,7 @@ export class DateTime extends DateTimeType {
 
   /**
    * Rails' `cast_value` — public here so subclasses can call directly
-   * and api:compare matches the Rails method name. Base `cast()`
+   * and parity:api matches the Rails method name. Base `cast()`
    * handles the nil short-circuit and dispatches here, so we fall
    * through to the parent's `castValue` (NOT `cast`) to avoid the
    * virtual-dispatch loop that would re-enter this method.

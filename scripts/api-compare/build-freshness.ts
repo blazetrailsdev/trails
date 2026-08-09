@@ -1,5 +1,5 @@
 /**
- * Guard against measuring `api:compare` / `api:extra` against a BUILD that does
+ * Guard against measuring `parity:api` / `parity:api:extra` against a BUILD that does
  * not correspond to the checked-out sources — one belonging to a different
  * commit, or (see `staleBuilds`) no build at all.
  *
@@ -9,7 +9,7 @@
  * extracted surface of the IMPORTER depends on the sibling's BUILD OUTPUT.
  *
  * `dist/` is untracked, so `git checkout` never updates it. Taking an
- * `api:extra` baseline the documented way (check out `origin/main`, measure,
+ * `parity:api:extra` baseline the documented way (check out `origin/main`, measure,
  * check the branch back out) therefore measures one commit's sources against
  * the other commit's build, and packages the diff never touched move. No cache
  * layer can repair that: the shared cache is content-keyed and its entries
@@ -218,7 +218,7 @@ export async function staleBuilds(roots: readonly PackageRoots[]): Promise<Stale
 /**
  * Whether `manifestPath` predates the sources it claims to describe.
  *
- * `api:extra` reads the manifests `api:compare` left behind rather than
+ * `parity:api:extra` reads the manifests `parity:api` left behind rather than
  * re-extracting, so running it alone after a checkout reports the PREVIOUS
  * commit's totals with nothing to signal it — the same stale baseline the build
  * guard exists to stop, one step further downstream.
@@ -278,7 +278,7 @@ export function staleBuildMessage(stale: StaleBuild[]): string {
   const missing = stale.filter((entry) => entry.status === NOT_BUILT).length;
   const noun = missing === stale.length ? "a missing build" : "a stale build";
   return [
-    `api:compare would measure ${stale.length} package(s) against ${noun}:`,
+    `parity:api would measure ${stale.length} package(s) against ${noun}:`,
     ...stale.map((entry) => `  packages/${entry.dir} — ${entry.status}`),
     "",
     "Cross-package imports resolve through packages/<pkg>/dist/*.d.ts, so what",

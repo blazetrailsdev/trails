@@ -2,11 +2,11 @@
 /**
  * Generate (or verify) the agent-facing Ruby→TypeScript conventions doc from
  * the live tables in conventions.ts — so the doc can never drift from the
- * rules api:compare actually applies.
+ * rules parity:api actually applies.
  *
  * Usage:
- *   pnpm api:conventions            # write the doc
- *   pnpm api:conventions --check    # exit 1 if the doc is out of date (CI)
+ *   pnpm parity:api:conventions            # write the doc
+ *   pnpm parity:api:conventions --check    # exit 1 if the doc is out of date (CI)
  *
  * The rendered Markdown is run through Prettier (with the repo config) before
  * writing and before comparing, so the committed file is byte-identical to a
@@ -35,7 +35,9 @@ async function main(): Promise<void> {
   if (check) {
     const actual = fs.existsSync(DOC_PATH) ? fs.readFileSync(DOC_PATH, "utf-8") : "";
     if (actual !== expected) {
-      console.error(`${rel} is out of date.\nRun \`pnpm api:conventions\` and commit the result.`);
+      console.error(
+        `${rel} is out of date.\nRun \`pnpm parity:api:conventions\` and commit the result.`,
+      );
       process.exit(1);
     }
     console.log(`${rel} is up to date.`);

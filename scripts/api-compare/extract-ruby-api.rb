@@ -375,7 +375,7 @@ class ApiExtractor
     # `verify_authenticity_token`). Collect the names so process_def can
     # override Ruby visibility — without this, RDoc-public-but-Ruby-private
     # methods land in the privates manifest and falsely hide real public
-    # surface from website docs / api:compare.
+    # surface from website docs / parity:api.
     @current_doc_methods = Set.new
     source.each_line do |line|
       next unless line =~ /^\s*def\s+(?:self\.)?([\w_!?=]+).*#\s*:doc:/

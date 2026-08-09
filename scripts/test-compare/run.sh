@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Driver for `pnpm test:compare`. Forwards any extra args ("$@") to the
+# Driver for `pnpm parity:test`. Forwards any extra args ("$@") to the
 # orchestrator, which passes them through to test-compare's main() so flags
 # like `--package`, `--missing`, `--json`, `--incomplete` reach the comparison
 # step. `--cached` is consumed by the orchestrator (skip extraction when both

@@ -18,7 +18,7 @@ Mirror, method by method and line by line:
 - **Names.** Method, class, module, constant, and field names come from Rails,
   translated by the rules in
   [docs/ruby-ts-conventions.md](docs/ruby-ts-conventions.md) — that file is
-  generated from `scripts/parity/conventions.ts` and is what `api:compare`
+  generated from `scripts/parity/conventions.ts` and is what `parity:api`
   actually matches on, so read it _before_ you pick a name, not after CI
   disagrees. It also covers file paths (`PATH_SEGMENT_ALIASES`,
   `RUBY_FILE_TS_OVERRIDES`). If your name isn't the one that table produces
@@ -35,7 +35,7 @@ Mirror, method by method and line by line:
   method.
 - **No extra abstraction.** Do not add a helper, wrapper, indirection layer, or
   "cleaner" rewrite that Rails does not have. Extra surface is measured —
-  `pnpm api:extra` reports every public TS name with no Ruby counterpart. If
+  `pnpm parity:api:extra` reports every public TS name with no Ruby counterpart. If
   you genuinely need one, declare it with a `@noRailsEquivalent <reason>` JSDoc
   tag; that tag is the only sanctioned exception and the reason is reviewed.
 - **Errors.** Same error class, same message string, same raise site.
@@ -153,7 +153,7 @@ tasks repo enumerates these as convergence classes.
 - Two reference tables answer "what do I call this?" without guessing, and both
   are CI-verified current:
   **[docs/ruby-ts-conventions.md](docs/ruby-ts-conventions.md)** for the
-  Ruby→TS name and file-path translations `api:compare` matches on (generated
+  Ruby→TS name and file-path translations `parity:api` matches on (generated
   from `scripts/parity/conventions.ts` — change the rule there, never
   hand-edit the doc), and `SKIP_GROUPS` / `SCOPED_SKIP_GROUPS` in that same
   source file for the members deliberately not mirrored, each with its reason.
@@ -235,7 +235,7 @@ tasks repo enumerates these as convergence classes.
   comments for non-obvious context (hidden bug, broader invariant, etc.).
 - Do NOT add empty stubs or placeholder interfaces. If a feature isn't
   implemented yet, don't create an empty file for it.
-- **NEVER rename or reword test names.** Test names are how `test:compare`
+- **NEVER rename or reword test names.** Test names are how `parity:test`
   matches our tests to Rails tests. If a test fails or the behavior doesn't
   match the name, fix the implementation — not the name. Read the
   corresponding Rails test first. The one thing that does change is the token
@@ -243,7 +243,7 @@ tasks repo enumerates these as convergence classes.
   apply to test names too — trails spells `tse`, never `erb`, everywhere,
   including inside a `describe`/`it` string. Rails'
   `test "ERB::Util.html_escape should escape unsafe characters"` is
-  `it("TSE::Util.html_escape should escape unsafe characters")`; `test:compare`
+  `it("TSE::Util.html_escape should escape unsafe characters")`; `parity:test`
   normalizes both sides, so the renamed name still credits. `ERB` survives only
   where the text quotes the Ruby side (a `Mirrors:` JSDoc line, a Rails path).
 - **Canonical tables only — no bespoke tables.** In AR tests, get the canonical
@@ -267,8 +267,8 @@ catches a class of drift a reviewer would otherwise spend a cycle on.
 The compare tools live under the `parity:*` script namespace — `parity:api`,
 `parity:test`, `parity:fixtures`, `parity:schema`, plus their sub-commands
 (`parity:api:calls`, `parity:api:extra`, `parity:test:assertions`, …). The
-older `api:*` / `test:compare` / `test:assertions:*` names still work as
-delegating aliases, so the commands below are spelled either way.
+older `api:*` / `test:compare` / `test:assertions:*` aliases have been removed —
+`parity:*` is the only spelling.
 
 1. **Size.**
    `git diff --shortstat origin/main...HEAD -- ':!**/pnpm-lock.yaml' ':!**/__snapshots__/**' ':!**/*.md'`
@@ -280,7 +280,7 @@ delegating aliases, so the commands below are spelled either way.
    an invented shortcut.
 
    ```bash
-   pnpm api:calls   # the call-set ratchet (RFC 0047)
+   pnpm parity:api:calls   # the call-set ratchet (RFC 0047)
    ```
 
    The lint reads an artifact on disk and regenerates it first, so a plain
@@ -291,12 +291,12 @@ delegating aliases, so the commands below are spelled either way.
    force past a warm cache (it under-reports vs CI):
 
    ```bash
-   API_COMPARE_FORCE=1 pnpm api:compare --calls
+   API_COMPARE_FORCE=1 pnpm parity:api --calls
    ```
 
    (RFC 0084 folded the narrow RFC 0044 ratchet — a second gate over its own
    artifact — into this one, whose population subsumed it. There is one
-   artifact and one baseline now, and since the rename one `api:calls` script.)
+   artifact and one baseline now, and since the rename one `parity:api:calls` script.)
 
    **New mismatch?** The right fix is almost always to make the TS body call
    what Rails calls. Baselining is the fallback, and it costs a reviewed
@@ -314,7 +314,7 @@ delegating aliases, so the commands below are spelled either way.
    exclude tree and buries the one row you meant to retire in an unreviewable
    diff.
 
-3. **Did you add any public TS name?** `pnpm api:extra --package <pkg>` — it
+3. **Did you add any public TS name?** `pnpm parity:api:extra --package <pkg>` — it
    lists every public TS method, getter, class, and top-level function in a
    Rails-matched file with no Ruby counterpart. Anything you added and can't
    trace to a Ruby method is invented surface: delete it, fold it into the
@@ -325,9 +325,9 @@ delegating aliases, so the commands below are spelled either way.
 4. **Working in `arel` or `activemodel`?** `pnpm lint --fix` after step 2 —
    `blazetrails/rails-file-structure-method-order` enforces Rails source order
    for class members and top-level functions and is autofixable, but it needs
-   the manifest `pnpm api:compare` builds. Without a compare run it silently
+   the manifest `pnpm parity:api` builds. Without a compare run it silently
    passes everything, then fails in the `Rails API/Test Comparison` CI job.
-5. **`pnpm api:compare` / `pnpm test:compare`** deltas must be non-negative.
+5. **`pnpm parity:api` / `pnpm parity:test`** deltas must be non-negative.
 
 ## Module mixins (Ruby `include` → TypeScript)
 
@@ -347,7 +347,7 @@ export class Model {
 }
 ```
 
-Why: code lives in the file that matches Rails' layout (so `api:compare`
+Why: code lives in the file that matches Rails' layout (so `parity:api`
 finds it), no delegation wrappers, type-checked via the host interface,
 and `this` resolves to the actual subclass at runtime.
 

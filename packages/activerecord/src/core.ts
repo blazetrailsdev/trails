@@ -389,7 +389,7 @@ export function strictLoadingBang<T extends StrictLoadingFields>(
 }
 
 // ---------------------------------------------------------------------------
-// Instance methods missing from api:compare
+// Instance methods missing from parity:api
 // ---------------------------------------------------------------------------
 
 export function initWithAttributes(
@@ -448,7 +448,7 @@ export function fullInspect(this: CoreRecord): string {
 }
 
 // ---------------------------------------------------------------------------
-// Class methods missing from api:compare
+// Class methods missing from parity:api
 // ---------------------------------------------------------------------------
 
 interface CoreHost {

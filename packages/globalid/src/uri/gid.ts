@@ -295,7 +295,7 @@ export class GID {
   // the standard URI library calls them while parsing/assigning. We don't
   // subclass URI in TS — public parsing goes through GID.parse → parseGid,
   // not through these hooks. They exist for two reasons:
-  //   1. api:compare parity (the methods need to be present on URI::GID).
+  //   1. parity:api parity (the methods need to be present on URI::GID).
   //   2. Subclass extension points: a TS subclass of GID can override these
   //      to plug into the validation pipeline if needed.
   // Each delegates to the same standalone helpers parseGid/validateApp use,
@@ -338,7 +338,7 @@ export class GID {
   /**
    * @internal Mirrors URI::GID#set_model_components.
    *
-   * Nominal stub for api:compare parity. In Rails this assigns
+   * Nominal stub for parity:api parity. In Rails this assigns
    * `@model_name` and `@model_id` from the path; our GID instances are
    * built from a parsed `GidComponents` snapshot at construction time
    * (via parseGid in the public path, or directly from args in build()),

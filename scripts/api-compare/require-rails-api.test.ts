@@ -31,8 +31,8 @@ describe("railsApiAvailable", () => {
     expect(railsApiAvailable(options(EXISTING, []))).toBe(true);
   });
 
-  it("throws naming pnpm api:compare when rails-api.json is missing", () => {
-    expect(() => railsApiAvailable(options(MISSING, []))).toThrow(/pnpm api:compare/);
+  it("throws naming pnpm parity:api when rails-api.json is missing", () => {
+    expect(() => railsApiAvailable(options(MISSING, []))).toThrow(/pnpm parity:api/);
   });
 
   it("names the rule that would go inert", () => {

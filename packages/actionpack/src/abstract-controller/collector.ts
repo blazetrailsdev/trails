@@ -96,7 +96,7 @@ const COLLECTOR_HANDLER: ProxyHandler<Collector> = {
  * class-eval time. The trails Proxy resolves MIME dispatch dynamically
  * from `MimeType.lookup`, so the Rails-shaped eager generation step is
  * a no-op for us — the Proxy already picks up any MIME registered later.
- * Kept as a Rails-named entry point so `api:compare` matches and so
+ * Kept as a Rails-named entry point so `parity:api` matches and so
  * `MimeType.register_callback`-style wiring has a target to call. The
  * mime arg is validated via `MimeType.isRegistered` to surface typos early.
  *

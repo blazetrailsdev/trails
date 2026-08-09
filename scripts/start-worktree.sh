@@ -8,7 +8,7 @@
 #      branched off origin/main.
 #   3. Runs `pnpm install` inside the new worktree.
 #   4. Symlinks the fetched Rails and Rack source directories from the main
-#      worktree so api:compare / test:compare don't have to refetch.
+#      worktree so parity:api / parity:test don't have to refetch.
 set -euo pipefail
 
 if [[ $# -ne 1 || -z "${1:-}" ]]; then

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Driver for `pnpm api:compare`. Forwards any extra args ("$@") to the
+# Driver for `pnpm parity:api`. Forwards any extra args ("$@") to the
 # orchestrator, which passes them through to compare's main() so flags like
 # `--package`, `--public-only`, `--privates-only`, `--files`, `--incomplete`,
 # `--missing`, `--inheritance` reach the comparison step.

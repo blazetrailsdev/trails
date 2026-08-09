@@ -1,5 +1,5 @@
 // Normalizes Rails assertion method names and trails (vitest) matcher names to a
-// shared set of *canonical kinds* so test:compare can compare not just how MANY
+// shared set of *canonical kinds* so parity:test can compare not just how MANY
 // assertions a matched pair makes (see `assertionCount` in compare.ts) but
 // WHAT each one checks. A count match can hide a semantic divergence: Rails
 // `assert_equal x, foo` (equality) vs trails `expect(foo).toBeTruthy()`

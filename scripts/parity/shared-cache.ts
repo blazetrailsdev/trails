@@ -1,6 +1,6 @@
 /**
- * Cross-worktree shared cache for the `parity:*` tools (`api:compare` and
- * `test:compare` both read and write it).
+ * Cross-worktree shared cache for the `parity:*` tools (`parity:api` and
+ * `parity:test` both read and write it).
  *
  * Every worktree extracts the SAME vendored Rails sources and TS packages, so
  * the expensive extracts (ruby `rails-api.json`, the TS Compiler-API pass)

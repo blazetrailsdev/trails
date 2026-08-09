@@ -407,7 +407,7 @@ describe("TestCallbacksWithMissingConditions", () => {
 // ==========================================================================
 // trails-only coverage — not in Rails callbacks_test.rb but exercises
 // real behavior worth keeping. Kept in this file (rather than a separate
-// one) so it stays alongside the API under test; test:compare ignores
+// one) so it stays alongside the API under test; parity:test ignores
 // these because no Rails counterpart references them.
 // ==========================================================================
 describe("AbstractController::Base — trails-only", () => {

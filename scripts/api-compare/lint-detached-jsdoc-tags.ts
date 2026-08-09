@@ -1,6 +1,6 @@
 #!/usr/bin/env npx tsx
 /**
- * api:detached — flag JSDoc blocks whose api-compare-significant tags
+ * parity:api:detached — flag JSDoc blocks whose api-compare-significant tags
  * (`@internal`, `@noRailsEquivalent`) are detached from the declaration they
  * were written for.
  *
@@ -37,7 +37,7 @@
  *     tree and flagging it would be noise.
  *
  * Population: every `.ts` file under `packages/<pkg>/src` — the set
- * `api:reasons` checks, where a tag has api-compare meaning — plus every `.ts`
+ * `parity:api:reasons` checks, where a tag has api-compare meaning — plus every `.ts`
  * under `scripts/`, where the motivating defect actually lived (PR 5654, in
  * `extract-ts-api.ts`). The api-compare tooling tags its own helpers
  * `@internal`, and a detached block there misleads a reader just the same.
@@ -46,7 +46,7 @@
  * explicitly; see `isCommentPosition`.
  *
  * Usage:
- *   pnpm api:detached
+ *   pnpm parity:api:detached
  *
  * Hard rules: no node:* imports, no process.* outside the CLI entry guard.
  */
@@ -196,16 +196,16 @@ export async function main(): Promise<number> {
   if (found.length > 0) {
     for (const d of found) {
       console.error(
-        `api:detached: ${d.file}:${d.line} — @${d.tags.join(", @")} ${d.kind}: ${d.detail}`,
+        `parity:api:detached: ${d.file}:${d.line} — @${d.tags.join(", @")} ${d.kind}: ${d.detail}`,
       );
     }
     console.error(
-      `api:detached: ${found.length} detached tag block(s) — move the block flush against ` +
+      `parity:api:detached: ${found.length} detached tag block(s) — move the block flush against ` +
         "the declaration it documents, or the tag does not apply to it.",
     );
     return 1;
   }
-  console.log(`api:detached: ${files.length} file(s) checked, no detached tag blocks.`);
+  console.log(`parity:api:detached: ${files.length} file(s) checked, no detached tag blocks.`);
   return 0;
 }
 

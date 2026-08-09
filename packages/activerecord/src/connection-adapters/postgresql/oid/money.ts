@@ -45,7 +45,7 @@ export class Money extends DecimalType {
    * numeric casting.
    */
   /**
-   * Rails' cast_value — exposed publicly so api:compare matches the
+   * Rails' cast_value — exposed publicly so parity:api matches the
    * Rails method name and callers can invoke the hook directly. Base
    * `cast()` now handles the nil short-circuit and dispatches here, so
    * we only fall through to the parent's `castValue` (NOT `cast`) to

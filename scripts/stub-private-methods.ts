@@ -1,7 +1,7 @@
 #!/usr/bin/env -S npx tsx
 /**
  * Stubs out missing private methods in existing activerecord TS files.
- * For each method reported by `api:compare` as missing, appends a non-exported
+ * For each method reported by `parity:api` as missing, appends a non-exported
  * function with the same parameter names as the Rails source. Body throws
  * NotImplementedError.
  *

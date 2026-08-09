@@ -721,8 +721,8 @@ interface CallSkeleton {
 }
 
 /** A flag a `@missingRailsCall` tag suppressed. Reported in the artifact
- *  because the mismatch list no longer carries it and `api:build` reconciles
- *  tags against that list: without this, the next api:build run would read the
+ *  because the mismatch list no longer carries it and `parity:api:build` reconciles
+ *  tags against that list: without this, the next parity:api:build run would read the
  *  call as satisfied, drop the tag it just honoured, and hand the flag straight
  *  back to the ratchet. */
 export interface SuppressedCall {
@@ -1143,7 +1143,7 @@ export function superclassesMatch(
 /**
  * Comparison bucket a method participates in.
  *   - "all":     default — public + private combined (full surface).
- *                Reported by `pnpm api:compare` with no flags.
+ *                Reported by `pnpm parity:api` with no flags.
  *   - "public":  `--public-only` — drops `internal: true` on both sides
  *                for a contract-only view (matches the historical
  *                default's numbers).
@@ -2200,7 +2200,7 @@ export function main() {
     // doesn't exist but a sibling file in the same package implements
     // most of its methods (e.g. trailties' `commands/server/server_command.rb`
     // is implemented at `commands/server.ts`). Surfaces as a "misplaced"
-    // file in the summary, mirroring how test:compare flags misplaced tests.
+    // file in the summary, mirroring how parity:test flags misplaced tests.
     const tsFilesByMethod = new Map<string, Set<string>>();
     for (const [tsFile, methods] of tsMethodsByFile) {
       for (const m of methods) {

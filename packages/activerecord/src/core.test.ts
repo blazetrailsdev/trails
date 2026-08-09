@@ -1,6 +1,6 @@
 /**
  * Mirrors: activerecord/test/cases/core_test.rb
- * Test names are kept verbatim per CLAUDE.md so test:compare matches Rails.
+ * Test names are kept verbatim per CLAUDE.md so parity:test matches Rails.
  */
 import { describe, it, expect } from "vitest";
 import { Base } from "./index.js";

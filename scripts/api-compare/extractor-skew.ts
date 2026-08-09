@@ -1,8 +1,8 @@
 /**
  * Extractor-version skew detection for the cross-version drift report.
  *
- * `pnpm api:drift` diffs a pinned base manifest (`output/rails-api.json`, last
- * produced by `pnpm api:compare`) against a freshly-extracted target. If the
+ * `pnpm parity:api:drift` diffs a pinned base manifest (`output/rails-api.json`, last
+ * produced by `pnpm parity:api`) against a freshly-extracted target. If the
  * base was built by a DIFFERENT version of `extract-ruby-api.rb` than the
  * target, the diff conflates extractor-version drift with real Rails drift —
  * observed live as call-set changes jumping 545 → 1627 with no Rails change,

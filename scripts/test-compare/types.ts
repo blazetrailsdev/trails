@@ -61,7 +61,7 @@ export interface TestCaseInfo {
   /**
    * Raw (non-deduplicated) count of assertion calls in the test body — one per
    * `expect(...)`/`assert*` call, not per distinct kind. Populated on both the
-   * Ruby and TS extractors so test:compare can compare exact assertion counts
+   * Ruby and TS extractors so parity:test can compare exact assertion counts
    * between a matched Rails test and its trails port.
    */
   assertionCount?: number;
@@ -69,7 +69,7 @@ export interface TestCaseInfo {
    * Raw (non-deduplicated) assertion-kind tokens in the test body — the Ruby
    * assertion method name (`assert_equal`) or, on the TS side, the terminal
    * matcher of an `expect(...)` chain (`toEqual`, `not:toBeNull`) / a trails
-   * `assert*`/`expect*` helper callee. Feeds test:compare's assertion-kind
+   * `assert*`/`expect*` helper callee. Feeds parity:test's assertion-kind
    * histogram comparison (see scripts/test-compare/assertion-kinds.ts). Same
    * length as `assertionCount`; `assertions` is this list deduped.
    */
@@ -79,7 +79,7 @@ export interface TestCaseInfo {
    * tagged literal token (`n:5`, `s:foo`, `b:true`, `x:nil`) for the assertion's
    * expected argument where it is a literal, or `null` for a non-literal
    * (variable/expression) or an assertion with no comparable value. Feeds
-   * test:compare's literal expected-value comparison (assertion-values.ts).
+   * parity:test's literal expected-value comparison (assertion-values.ts).
    */
   assertionValues?: (string | null)[];
   /** Whether the test is pending/skipped */
