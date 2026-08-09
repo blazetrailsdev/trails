@@ -11,6 +11,7 @@ import * as DateExt from "./date/calculations.js";
 import { resetZone } from "../time-zone-config.js";
 import { Duration } from "../duration.js";
 import { TimeZone } from "../values/time-zone.js";
+import { TimeWithZone } from "../time-with-zone.js";
 
 const pd = (year: number, month: number, day: number) => new Temporal.PlainDate(year, month, day);
 
@@ -55,6 +56,30 @@ describe("date calculations coercion arms", () => {
 
   it("minus_with_duration subtracts a duration", () => {
     expect(DateExt.minusWithDuration(pd(2017, 1, 3), Duration.days(2))).toEqual(pd(2017, 1, 1));
+  });
+
+  it("plus_with_duration widens for a zero sub-day part and not for a zero day part", () => {
+    // `@parts.reject! { |k, v| v.zero? } unless value == 0` (duration.rb:228)
+    // keeps `0.seconds`, which `sum` routes through `Date#since`.
+    expect(DateExt.plusWithDuration(pd(2017, 1, 1), Duration.seconds(0))).toBeInstanceOf(
+      TimeWithZone,
+    );
+    expect(DateExt.plusWithDuration(pd(2017, 1, 1), Duration.minutes(0))).toBeInstanceOf(
+      TimeWithZone,
+    );
+    expect(DateExt.plusWithDuration(pd(2017, 1, 1), Duration.hours(0))).toBeInstanceOf(
+      TimeWithZone,
+    );
+    expect(DateExt.plusWithDuration(pd(2017, 1, 1), Duration.days(0))).toEqual(pd(2017, 1, 1));
+    expect(DateExt.plusWithDuration(pd(2017, 1, 1), Duration.months(0))).toEqual(pd(2017, 1, 1));
+  });
+
+  it("plus_with_duration drops the zeroes of a non-zero duration", () => {
+    // `1.day + 0.seconds` has a non-zero value, so `@parts` rejects the zero
+    // and the result stays a calendar day.
+    expect(
+      DateExt.plusWithDuration(pd(2017, 1, 1), Duration.days(1).plus(Duration.seconds(0))),
+    ).toEqual(pd(2017, 1, 2));
   });
 
   it("compare_without_coercion orders two dates", () => {
