@@ -223,18 +223,6 @@ export const UNPORTED_FILES: UnportedFile[] = [
   },
   // --- Permanently not-portable: Rake tasks / dbconsole PTY ---
   {
-    testFile: "adapters/postgresql/postgresql_rake_test.rb",
-    reason:
-      "Tests Rake db:create/drop/migrate tasks via shell exec. " +
-      "Rake and PTY shell-out have no Node.js equivalent; Trails uses migration scripts instead.",
-  },
-  {
-    testFile: "adapters/mysql2/mysql2_rake_test.rb",
-    reason:
-      "Tests Rake db:create/drop/migrate tasks for MySQL via shell exec. " +
-      "Rake and PTY shell-out have no Node.js equivalent.",
-  },
-  {
     testFile: "adapters/postgresql/dbconsole_test.rb",
     reason:
       "Tests `rails dbconsole` PTY/exec invocation for PostgreSQL. " +

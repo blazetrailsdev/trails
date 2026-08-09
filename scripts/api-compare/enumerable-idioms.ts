@@ -14,6 +14,18 @@
  * pairs are deliberately absent. Aliases are consulted only to decide whether a
  * TS body already makes a call; they never widen which Ruby calls count as
  * ported, so adding one can never introduce a new mismatch.
+ *
+ * NO POSITIONAL/PROPERTY ANALOGUES HERE, and that is a measured decision, not
+ * an oversight (RFC 0092 `positional-idiom-analogues`, 2026-08-08). `first` →
+ * `[0]`, `last` → `.at(-1)`, `size` → `.length`, `any?` → `.length > 0` are
+ * property or index forms, not call names, so they could only be credited
+ * through `NO_JS_CALL_FORM` (compare.ts) — which suppresses the Ruby call for
+ * EVERY receiver. The evidence against doing that is recorded at that table's
+ * "DELIBERATELY NOT suppressed" comment: the one receiver distinction the
+ * comparator has (the RFC 0083 inert-receiver filter) is already applied, and
+ * zero of the 106 surviving activerecord rows for these names are inert, while
+ * several are genuine Relation receivers whose `.first`/`.any?` runs a query.
+ * Those rows are handed to the reason-text route instead.
  */
 export const JS_ENUMERABLE_ALIASES = new Map<string, string[]>([
   ["any?", ["some"]],

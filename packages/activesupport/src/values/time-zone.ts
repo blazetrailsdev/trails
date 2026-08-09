@@ -189,6 +189,8 @@ const zoneCache = new Map<string, TimeZone>();
 let zones: TimeZone[] | null = null;
 /** `@country_zones` (time_zone.rb:260), a `Concurrent::Map` keyed by Alpha2 code. */
 const countryZonesMemo = new Map<string, TimeZone[]>();
+/** `@zones_map` (time_zone.rb:287), the memo `zones_map` reads through. */
+let zonesMapMemo: Record<string, TimeZone> | null = null;
 
 /**
  * Stands in for `TZInfo::InvalidTimezoneIdentifier` (`tzinfo/timezone.rb:26`,
@@ -412,16 +414,9 @@ export class TimeZone {
   /**
    * Every Rails-named timezone: `@zones ||= zones_map.values.sort`
    * (time_zone.rb:223-225), sorted by `<=>` (time_zone.rb:333-337).
-   * `zones_map` keeps a MAPPING entry only when `[]` resolves it
-   * (`zones[name] = timezone if timezone`, time_zone.rb:288-291), hence the
-   * nullish filter.
    */
   static all(): TimeZone[] {
-    if (zones) return zones;
-    zones = Object.keys(MAPPING)
-      .map((name) => TimeZone.find(name))
-      .filter((zone): zone is TimeZone => zone != null)
-      .sort((a, b) => a.compareTo(b) ?? 0);
+    zones ??= Object.values(TimeZone.#zonesMap()).sort((a, b) => a.compareTo(b) ?? 0);
     return zones;
   }
 
@@ -949,6 +944,19 @@ export class TimeZone {
   }
 
   /**
+   * `clear` (time_zone.rb:264-269): drops all four memos — `@lazy_zones_map`,
+   * `@country_zones`, `@zones` and `@zones_map`. Rails' railtie calls it on
+   * reload; here it is what gives a caller that has moved tzdata or stubbed
+   * `Intl` a clean slate.
+   */
+  static clear(): void {
+    zoneCache.clear();
+    countryZonesMemo.clear();
+    zones = null;
+    zonesMapMemo = null;
+  }
+
+  /**
    * `load_country_zones` (time_zone.rb:283-296): every zone identifier the
    * country has, each replaced by the Rails-named zones that MAP to it when
    * MAPPING has any — `gb` answers both `Edinburgh` and `London` for
@@ -994,6 +1002,20 @@ export class TimeZone {
         return [TimeZone.create(tzId)];
       })
       .sort((a, b) => a.compareTo(b) ?? 0);
+  }
+
+  /**
+   * `zones_map` (time_zone.rb:286-291): every MAPPING name that `[]` resolves,
+   * keyed by that name — `zones[name] = timezone if timezone`, hence the
+   * nullish guard — under the `@zones_map` memo `all` reads through.
+   */
+  static #zonesMap(): Record<string, TimeZone> {
+    zonesMapMemo ??= Object.keys(MAPPING).reduce<Record<string, TimeZone>>((zones, name) => {
+      const timezone = TimeZone.find(name);
+      if (timezone != null) zones[name] = timezone;
+      return zones;
+    }, {});
+    return zonesMapMemo;
   }
 
   toString(): string {
