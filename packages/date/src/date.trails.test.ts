@@ -945,7 +945,8 @@ describe("Date", () => {
       () => RubyDate.strptime("1500-02-29", "%Y-%m-%d"),
     ];
     for (const build of statics) {
-      expect(build).toThrow(new RubyDate.Error("invalid date"));
+      expect(build).toThrow(RubyDate.Error);
+      expect(build).toThrow("invalid date");
     }
 
     // The gem-shaped builders the same statics run over answer it, so the
