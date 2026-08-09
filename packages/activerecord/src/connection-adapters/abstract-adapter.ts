@@ -60,6 +60,7 @@ import {
   typeCast as abstractTypeCast,
   quoteString as abstractQuoteString,
   quoteColumnName as abstractQuoteColumnName,
+  quoteTableName as abstractQuoteTableName,
   isSqlLiteral,
   quotedTrue as abstractQuotedTrue,
   quotedFalse as abstractQuotedFalse,
@@ -981,15 +982,30 @@ export class AbstractAdapter implements Quoting {
     return abstractQuoteString(s);
   }
 
+  /**
+   * Mirrors: Quoting::ClassMethods#quote_column_name (abstract/quoting.rb:60-63)
+   * — the raise every adapter must override.
+   */
+  static quoteColumnName(name: string): string {
+    return abstractQuoteColumnName(name);
+  }
+
+  /**
+   * Mirrors: Quoting::ClassMethods#quote_table_name (abstract/quoting.rb:65-68)
+   * — `quote_column_name(table_name)`, sent on the class.
+   */
+  static quoteTableName(name: string): string {
+    return abstractQuoteTableName.call(this, name);
+  }
+
   quoteTableName(name: string): string {
-    // Rails: abstract quote_table_name delegates to quote_column_name via
-    // dynamic dispatch (abstract/quoting.rb:66-67), so an adapter that
-    // overrides only quoteColumnName still gets correct table-name quoting.
-    return this.quoteColumnName(name);
+    // Rails: `self.class.quote_table_name(table_name)` (abstract/quoting.rb:140-143).
+    return (this.constructor as typeof AbstractAdapter).quoteTableName(name);
   }
 
   quoteColumnName(name: string): string {
-    return abstractQuoteColumnName(name);
+    // Rails: `self.class.quote_column_name(column_name)` (abstract/quoting.rb:135-138).
+    return (this.constructor as typeof AbstractAdapter).quoteColumnName(name);
   }
 
   quoteTableNameForAssignment(table: string, attr: string): string {

@@ -24,26 +24,25 @@ import type { RowFormatHost } from "./schema-statements.js";
 import { Version } from "../abstract-adapter.js";
 import { AbstractMysqlAdapter } from "../abstract-mysql-adapter.js";
 
-// MySQL has no `quote` override; the value quoter is the inherited abstract one
-// dispatching MySQL's `quoteString` (abstract/quoting.rb:76).
-const quote = AbstractMysqlAdapter.prototype.quote.bind(
-  Object.create(AbstractMysqlAdapter.prototype) as AbstractMysqlAdapter,
-);
+// `quotedScope` / `dataSourceSql` / `foreignKeys` self-send `quote`
+// (mysql/schema_statements.rb), and MySQL — which has no `quote` override — self-sends
+// `quote_string` from the inherited abstract `quote` (abstract/quoting.rb:76). So the
+// receiver has to be a real MySQL adapter, as it is in Rails, not an object carrying a
+// pre-bound `quote`.
+const mysqlAdapterHost = <T extends object>(overrides?: T): AbstractMysqlAdapter & T =>
+  Object.assign(Object.create(AbstractMysqlAdapter.prototype), overrides);
 
 // Minimal ForeignKeysHost: foreignKeys() reads via schemaQuery, quotes the
 // table name, and maps referential actions. We stub schemaQuery to return the
 // information_schema rows MySQL would yield (1 row per FK column).
 function fkHost(rows: Record<string, unknown>[]) {
-  return {
+  return mysqlAdapterHost({
     schemaQuery: async () => rows,
-    quote,
     extractForeignKeyAction,
-  };
+  });
 }
 
-// quotedScope/dataSourceSql dispatch quoting through the adapter instance
-// (`this.quote`); supply a minimal host carrying the MySQL `quote` standalone.
-const quoteHost = { quote };
+const quoteHost = mysqlAdapterHost();
 
 function rowFormatHost(isMariadb: boolean, version: string, probeResult = 0) {
   const queries: string[] = [];

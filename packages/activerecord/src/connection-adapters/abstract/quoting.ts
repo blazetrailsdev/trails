@@ -31,12 +31,22 @@ import { Value as TimeValue } from "../../type/time.js";
  * Receiver shape for the `this`-typed functions in this module, standing in for
  * the `self` Rails' `Quoting` module sends to: `quote` sends `quote_string`,
  * `quoted_true`, `quoted_binary`, `quoted_time` and `quoted_date`
- * (abstract/quoting.rb:73-89), and `quote_table_name` sends `quote_column_name`
- * (rb:141-143). Every member is required, exactly as a Ruby self-send has no
+ * (abstract/quoting.rb:73-89), and `ClassMethods#quote_table_name` sends
+ * `quote_column_name` (rb:65-68). Every member is required, exactly as a Ruby self-send has no
  * conditional arm — a receiver that defines none of them inherits the abstract
  * ones, and one missing a quoter is a compile error here rather than a silent
  * fall back to the ANSI answer.
  */
+/**
+ * Receiver shape for `Quoting::ClassMethods` (abstract/quoting.rb:8-69), whose
+ * only member either function here sends is `quote_column_name`. Narrower than
+ * {@link QuotingDispatchHost} because Rails' class-level `quote_table_name` runs
+ * on the adapter class, which carries no instance quoting members.
+ */
+export interface QuotingClassMethods {
+  quoteColumnName(name: string): string;
+}
+
 export interface QuotingDispatchHost {
   quote(value: unknown): string;
   quotedDate(value: TemporalDateLike): string;
@@ -84,7 +94,7 @@ export function quoteColumnName(_columnName: string): string {
  * Mirrors: ActiveRecord::ConnectionAdapters::Quoting::ClassMethods#quote_table_name
  * (activerecord/.../abstract/quoting.rb L66 — `quote_column_name(table_name)`)
  */
-export function quoteTableName(this: QuotingDispatchHost, name: string): string {
+export function quoteTableName(this: QuotingClassMethods, name: string): string {
   return this.quoteColumnName(name);
 }
 
@@ -310,11 +320,9 @@ export function quoteDefaultExpression(
       serialized = castType.serialize(value);
     }
   }
-  // Rails: `quote(value)` (abstract/quoting.rb:162) — self-dispatched, so a host
-  // that overrides `quote` gets its own dialect quoting, including the raw-view branches the abstract `quote`
-  // deliberately lacks. Falling straight to the module `quote` here would bypass
-  // the dialect entirely and raise `can't quote Uint8Array` on a binary default.
-  // Hosts without a `quote` keep the module helper.
+  // Rails: `quote(value)` (abstract/quoting.rb:162) — self-sent, so the receiver's
+  // dialect quoting applies, including the raw-view branches the abstract `quote`
+  // deliberately lacks.
   return this.quote(serialized);
 }
 
