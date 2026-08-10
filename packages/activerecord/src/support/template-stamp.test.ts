@@ -14,7 +14,7 @@
  * The second probe covers every lane, MySQL included, by replaying the fast
  * path's arm against the worker's own database.
  */
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import "../sqlite/better-sqlite3.js";
 import { Base } from "../base.js";
 import { bootOutcome } from "./boot-outcome.js";
@@ -25,8 +25,6 @@ import {
   canonicalSchemaUpToDate,
   adapterSpecificTables,
   stampCanonicalSchema,
-  snapshotWidthDegraded,
-  clearSnapshotWidthDegraded,
 } from "./canonical-schema-stamp.js";
 import { resetTestTables } from "./drop-all-tables.js";
 import { loadAdapterSpecificSchema } from "./load-schema-helper.js";
@@ -93,54 +91,41 @@ describe.skipIf(!runToken)("adapter-specific tables snapshot", () => {
   });
 });
 
-describe.skipIf(!runToken)("snapshot width backstop", () => {
-  it("survives a snapshot wider than the value column", async () => {
+describe.skipIf(!runToken)("snapshot value width", () => {
+  it("round-trips a snapshot far wider than the value column", async () => {
     // `ar_internal_metadata.value` is `t.string` (internal_metadata.rb:85-93),
     // which MySQL alone renders `varchar(255)` (abstract_mysql_adapter.rb:33);
     // PG and SQLite impose no limit (postgresql_adapter.rb:136,
     // sqlite3_adapter.rb:71). Widening the column would diverge from Rails, so
-    // MySQL degrades to a re-lay instead — and must not raise ValueTooLong.
+    // the snapshot is split across as many rows as it needs instead — and the
+    // set must come back whole on every lane, MySQL included, rather than
+    // degrading to a re-lay once the adapter-specific half outgrows 255 chars.
     const connection = await Base.leaseConnection();
     const before = await adapterSpecificTables(connection);
     const oversized = Array.from({ length: 200 }, (_, i) => `padding_table_${i}`);
     try {
       await stampCanonicalSchema(connection, undefined, oversized);
-      const stored = await adapterSpecificTables(connection);
-      if (connection.adapterName === "mysql") {
-        expect(stored).toBeNull();
-      } else {
-        expect(stored).toEqual(oversized.slice().sort());
-      }
+      expect(await adapterSpecificTables(connection)).toEqual(oversized.slice().sort());
     } finally {
       await stampCanonicalSchema(connection, undefined, before ?? undefined);
-      clearSnapshotWidthDegraded();
     }
   });
 
-  it("says so when the memo switches itself off", async () => {
-    // ~110 characters of MySQL headroom, and crossing it costs the whole
-    // per-boot memo (~2.5 min of MariaDB CI per run) with no failing test.
+  it("a shrinking snapshot does not read back the chunks it no longer uses", async () => {
+    // The chunk rows a wider snapshot wrote survive the narrower one that
+    // replaces it, so the count row — written last — is what bounds the read.
     const connection = await Base.leaseConnection();
     const before = await adapterSpecificTables(connection);
-    const oversized = Array.from({ length: 200 }, (_, i) => `padding_table_${i}`);
-    clearSnapshotWidthDegraded();
-    const warn = vi.spyOn(console, "error").mockImplementation(() => {});
     try {
-      await stampCanonicalSchema(connection, undefined, oversized);
-      if (connection.adapterName === "mysql") {
-        expect(snapshotWidthDegraded()).toBe(true);
-        expect(warn).toHaveBeenCalledTimes(1);
-        // Once per process, not once per stamp: every worker boot re-stamps.
-        await stampCanonicalSchema(connection, undefined, oversized);
-        expect(warn).toHaveBeenCalledTimes(1);
-      } else {
-        expect(snapshotWidthDegraded()).toBe(false);
-        expect(warn).not.toHaveBeenCalled();
-      }
+      await stampCanonicalSchema(
+        connection,
+        undefined,
+        Array.from({ length: 200 }, (_, i) => `padding_table_${i}`),
+      );
+      await stampCanonicalSchema(connection, undefined, ["defaults"]);
+      expect(await adapterSpecificTables(connection)).toEqual(["defaults"]);
     } finally {
-      warn.mockRestore();
       await stampCanonicalSchema(connection, undefined, before ?? undefined);
-      clearSnapshotWidthDegraded();
     }
   });
 });

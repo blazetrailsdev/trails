@@ -32,9 +32,11 @@ function stampFor(runToken: string): string {
 }
 
 /**
- * `ar_internal_metadata` key holding the **adapter-specific** tables the load
- * that stamped this database laid — the `<adapter>_specific_schema.rb` half
- * only, as it stood before any test ran.
+ * `ar_internal_metadata` key holding the **chunk count** of the
+ * **adapter-specific** tables snapshot — the `<adapter>_specific_schema.rb`
+ * half only, as it stood before any test ran. The encoded set itself lives in
+ * `${ADAPTER_SPECIFIC_TABLES_KEY}_0`, `_1`, … (see
+ * {@link VALUE_CHUNK_LENGTH}).
  *
  * Persisted rather than recomputed because a worker arriving on a stamped
  * database cannot tell an adapter-specific table (`defaults`,
@@ -50,59 +52,24 @@ const ADAPTER_SPECIFIC_TABLES_KEY = "adapter_specific_tables";
  * which Rails' MySQL adapter renders as `varchar(255)`
  * (`abstract_mysql_adapter.rb:33`). PostgreSQL's and SQLite's `string` carries
  * no length limit (`postgresql_adapter.rb:136`, `sqlite3_adapter.rb:71`), so
- * the cap is MySQL's alone — applying it everywhere would silently disable the
- * memo on PostgreSQL, whose adapter-specific half is the largest of the three.
+ * the cap is MySQL's alone — but the snapshot is written the same way on every
+ * lane, because a lane-conditional encoding is a lane-conditional bug.
  *
- * Rather than widen the column — that would be a schema divergence from Rails —
- * a value that would not fit is written empty, and the boot falls back to
- * re-laying the adapter-specific arm. Only the memo is lost, never correctness.
+ * Widening the column is not available: `ar_internal_metadata`'s shape is
+ * Rails'. So the encoded set is *split* across as many rows as it needs, each
+ * one at most a MySQL `value` wide, with {@link ADAPTER_SPECIFIC_TABLES_KEY}
+ * holding the count. The snapshot therefore no longer depends on fitting a
+ * single 255-char column, and the memo cannot switch itself off as the
+ * adapter-specific half grows.
  *
- * The recorded half is small by construction (1 table on SQLite, 7 on MySQL,
- * 24 on PostgreSQL), so this is a backstop, not an expected path.
- *
- * The MySQL headroom is ~110 characters — roughly five more table names in
- * `loadMysql2SpecificSchema` — so the backstop is close enough to trip that it
- * must not trip *silently*: crossing it costs the whole memo (~2.5 min of
- * MariaDB CI per run) with no failing test to say so. Hence
- * {@link snapshotWidthDegraded}, and the one warning below.
+ * The rows stay inside the database they describe, so the snapshot is
+ * self-keying: no cross-process sidecar, and `sqlite3_mem`'s per-worker
+ * `:memory:` databases each carry their own.
  */
-const MYSQL_MAX_VALUE_LENGTH = 255;
+const VALUE_CHUNK_LENGTH = 255;
 
-function fitsValueColumn(adapter: DatabaseAdapter, encoded: string): boolean {
-  return adapter.adapterName !== "mysql" || encoded.length <= MYSQL_MAX_VALUE_LENGTH;
-}
-
-let widthDegraded = false;
-
-/**
- * Whether this process has written an empty snapshot because the encoded set
- * did not fit {@link MYSQL_MAX_VALUE_LENGTH} — i.e. whether the memo has
- * switched itself off on this lane. Read back by `template-stamp.test.ts`.
- *
- * @internal
- */
-export function snapshotWidthDegraded(): boolean {
-  return widthDegraded;
-}
-
-/**
- * Reset, so the case that deliberately overflows the column does not leave the
- * flag set for a later reader.
- *
- * @internal
- */
-export function clearSnapshotWidthDegraded(): void {
-  widthDegraded = false;
-}
-
-function recordSnapshotWidthDegraded(encoded: string): void {
-  if (widthDegraded) return;
-  widthDegraded = true;
-  console.error(
-    `[canonical-schema-stamp] adapter-specific snapshot is ${encoded.length} chars, over ` +
-      `ar_internal_metadata.value's ${MYSQL_MAX_VALUE_LENGTH}-char MySQL width — the ` +
-      `per-boot memo is now OFF on this lane and every worker re-lays the adapter-specific arm.`,
-  );
+function chunkKey(index: number): string {
+  return `${ADAPTER_SPECIFIC_TABLES_KEY}_${index}`;
 }
 
 /**
@@ -126,19 +93,25 @@ async function adapterSpecificHalf(adapter: DatabaseAdapter): Promise<string[]> 
 
 /**
  * The adapter-specific tables the stamping load laid, or `null` if this
- * database carries no snapshot (an unstamped run, one laid before this key
- * existed, or one whose set did not fit {@link MYSQL_MAX_VALUE_LENGTH}). A `null`
- * puts the caller back on the re-lay-the-arm path.
+ * database carries no snapshot (an unstamped run, or one laid before these keys
+ * existed). A `null` puts the caller back on the re-lay-the-arm path.
  *
  * @internal
  */
 export async function adapterSpecificTables(adapter: DatabaseAdapter): Promise<string[] | null> {
   const metadata = new InternalMetadata(adapter.pool);
   if (!(await metadata.tableExists())) return null;
-  const raw = await metadata.get(ADAPTER_SPECIFIC_TABLES_KEY);
-  if (raw == null || raw === "") return null;
+  const count = await metadata.get(ADAPTER_SPECIFIC_TABLES_KEY);
+  if (count == null || !/^\d+$/.test(count)) return null;
+  let encoded = "";
+  for (let index = 0; index < Number(count); index++) {
+    const chunk = await metadata.get(chunkKey(index));
+    // A missing chunk means a half-written snapshot; re-lay rather than guess.
+    if (chunk == null) return null;
+    encoded += chunk;
+  }
   try {
-    const parsed: unknown = JSON.parse(raw);
+    const parsed: unknown = JSON.parse(encoded);
     return Array.isArray(parsed) ? (parsed as string[]) : null;
   } catch {
     return null;
@@ -173,15 +146,17 @@ export async function stampCanonicalSchema(
   await metadata.createTableAndSetFlags("test", stampFor(runToken));
   const snapshot = laid ?? (await adapterSpecificHalf(adapter));
   const encoded = JSON.stringify([...snapshot].sort());
-  // An over-long value is written as empty rather than skipped: skipping would
-  // leave an earlier, now-stale snapshot in place on a database whose metadata
-  // table survived, and {@link adapterSpecificTables} reads empty as absent.
-  if (fitsValueColumn(adapter, encoded)) {
-    await metadata.set(ADAPTER_SPECIFIC_TABLES_KEY, encoded);
-    return;
+  const chunks: string[] = [];
+  for (let at = 0; at < encoded.length; at += VALUE_CHUNK_LENGTH) {
+    chunks.push(encoded.slice(at, at + VALUE_CHUNK_LENGTH));
   }
-  recordSnapshotWidthDegraded(encoded);
-  await metadata.set(ADAPTER_SPECIFIC_TABLES_KEY, "");
+  // The count goes in last: a reader that catches this mid-write sees the
+  // previous count, and {@link adapterSpecificTables} answers null for any
+  // chunk it cannot find rather than splicing two snapshots together.
+  for (const [index, chunk] of chunks.entries()) {
+    await metadata.set(chunkKey(index), chunk);
+  }
+  await metadata.set(ADAPTER_SPECIFIC_TABLES_KEY, String(chunks.length));
 }
 
 /**
