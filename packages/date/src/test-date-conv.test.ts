@@ -15,6 +15,12 @@
  * off the gem-shaped receiver rather than off the converted value: MRI's
  * `to_date` answers `self`, so `d2.day_fraction` there *is* `d.day_fraction`,
  * while a `Temporal.PlainDate` has no time of day to carry one.
+ *
+ * `test_to_time__from_datetime`'s last block asserts
+ * `t.subsec == Rational(456789123456789123, 10**18)`. `Temporal` holds
+ * nanoseconds, so the sub-nanosecond tail truncates in the seat the way
+ * `Time#nsec` truncates it in MRI (see `DateTime#toDatetime`); that block reads
+ * the nanosecond here.
  */
 import { describe, it, expect } from "vitest";
 import { Temporal, Date, DateTime, Rational, Time } from "./index.js";
@@ -110,9 +116,6 @@ describe("TestDateConv", () => {
       2004, 9, 19, 1, 2, 3, 456789123,
     ]);
 
-    // Ruby's last block asserts `t.subsec == Rational(456789123456789123, 10**18)`.
-    // `Temporal` holds nanoseconds, so the sub-nanosecond tail truncates here the
-    // way `Time#nsec` truncates it in MRI (see `DateTime#toDatetime`).
     d = new DateTime(2004, 9, 19, 1, 2, 3, 0).plus(
       new Rational(456789123456789123n, 86400000000000000000000n),
     );

@@ -14,6 +14,10 @@
  * `test_parse__comp` (`DateTime.now`) and `test_parse__d_to_s`
  * (`DateTime#to_s`) each need a reader this package has not ported. They are
  * filed against RFC 0088.
+ *
+ * `test_parse__ex`'s two trailing `begin ... rescue ArgumentError => e` blocks
+ * assert that what `parse('')` raises is both an `ArgumentError` and a
+ * `Date::Error`; they are the last two expectations of `parse  ex`.
  */
 import { describe, it, expect } from "vitest";
 import { ArgumentError, Date, DateTime, Rational, dtNewByFrags, type DateParts } from "./date.js";
@@ -118,6 +122,10 @@ describe("TestDateParse", () => {
     for (const [x, y] of cases) {
       const h = Date._parse(...x);
       const a = valuesAt(h, "year", "mon", "mday", "hour", "min", "sec", "zone", "offset", "wday");
+      if (y[1] === -1) {
+        a[1] = -1;
+        a[2] = h.yday ?? null;
+      }
       expect(a, `<failed at ${x[0]}>`).toEqual(y);
     }
   });
@@ -271,8 +279,6 @@ describe("TestDateParse", () => {
     expect(() => DateTime.parse("2001-03-01T23:59:61")).toThrow(Date.Error);
     expect(() => Date.parse("23:55")).toThrow(Date.Error);
 
-    // Ruby's two trailing `begin ... rescue ArgumentError => e` blocks assert
-    // that what `parse('')` raises is BOTH an ArgumentError and a Date::Error.
     expect(() => Date.parse("")).toThrow(ArgumentError);
     expect(() => DateTime.parse("")).toThrow(ArgumentError);
   });

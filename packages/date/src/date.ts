@@ -1534,15 +1534,6 @@ function parseDay(str: string, hash: DateParts): string | null {
 const NUMBER = "(?<!\\d)\\d";
 
 /**
- * @internal Onig's `\b` over a UTF-8 String is Unicode-aware, so it closes a
- * zone spelled in non-ASCII letters (`test_parse_utf8`'s `"日本"`); JS's `\b` is
- * defined over ASCII `\w` alone and would not. This is that boundary, in the
- * one position — the end of `parse_time`'s alphabetic zone alternatives
- * (`date_parse.c:720-723`) — where the difference is observable.
- */
-const WORD_BOUNDARY = "(?![\\p{L}\\p{N}_])";
-
-/**
  * @internal `date_parse.c` `parse_time2_cb` (`date_parse.c:613-653`): the hour/minute/second of the time
  * text `parse_time` matched, with `p`/`pm` moving the hour into the afternoon.
  */
@@ -1611,6 +1602,9 @@ function parseTimeCb(m: RegExpExecArray, hash: DateParts): number {
  * Onig's `[[:alpha:]]` is Unicode-aware over a UTF-8 String, so a zone spelled
  * in non-ASCII letters — `test_parse_utf8`'s `"日本"` — is a zone there. `\p{Alpha}`
  * under the `u` flag is the JS class with that repertoire; `[A-Za-z]` is not.
+ * The `\b` that closes each of those two alternatives is Unicode-aware for the
+ * same reason, and JS's is defined over ASCII `\w` alone — so it is spelled as
+ * the equivalent lookahead rather than as `\b`, which would reject `"日本"`.
  */
 function parseTime(str: string, hash: DateParts): string | null {
   const patSource =
@@ -1639,11 +1633,9 @@ function parseTime(str: string, hash: DateParts): string | null {
     "(" +
     "(?:gmt|utc?)?[-+]\\d+(?:[,.:]\\d+(?::\\d+)?)?" +
     "|" +
-    "[\\p{Alpha}.\\s]+(?:standard|daylight)\\stime" +
-    WORD_BOUNDARY +
+    "[\\p{Alpha}.\\s]+(?:standard|daylight)\\stime(?![\\p{L}\\p{N}_])" +
     "|" +
-    "[\\p{Alpha}]+(?:\\sdst)?" +
-    WORD_BOUNDARY +
+    "[\\p{Alpha}]+(?:\\sdst)?(?![\\p{L}\\p{N}_])" +
     ")" +
     ")?";
   return subx(str, " ", new RegExp(patSource, "iu"), hash, parseTimeCb);
