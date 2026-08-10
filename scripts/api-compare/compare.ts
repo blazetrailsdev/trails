@@ -1868,8 +1868,6 @@ export function main() {
     const tsCallsByFileName = new Map<string, Map<string, string[][]>>();
     const tsCallSeqByFileName = new Map<string, Map<string, string[][]>>();
     const tsSkeletonByFileName = new Map<string, Map<string, string[][]>>();
-    // Body call-argument streams scoped per (file, name), for the advisory
-    // call-argument check (RFC 0095).
     const tsCallArgsByFileName = new Map<string, Map<string, CallSite[][]>>();
     const tsMissingCallTagsByFileName = new Map<string, Map<string, Set<string>>>();
     // Same call-sets unioned by NAME across this package and its deps (the same
@@ -2286,7 +2284,6 @@ export function main() {
       // First-sighting Ruby body digest per name (source-hash pinning, RFC 0025).
       const rubyBodyDigestByName = new Map<string, string>();
       const rubySkeletonByName = new Map<string, string[]>();
-      // First-sighting Ruby call-argument stream per name (RFC 0095).
       const rubyCallArgsByName = new Map<string, CallSite[]>();
       for (const item of items) {
         const f = flattenIncludedMethodInfos(item.info, item.fqn, rubyPkg, moduleFqnByShort, pkg);
@@ -2455,32 +2452,29 @@ export function main() {
         callMismatches.push({ rubyFile, tsFile, rubyName, tsName, missing: flagged });
       };
 
-      // Advisory call-argument check (RFC 0095): for the same name-matched pair
-      // checkCalls receives, pair the two bodies' call sites and diff the
-      // arguments each passes (see call-args.ts). Never affects the parity %,
-      // and — like the call set — computed only under `--calls`, the mode that
-      // writes the artifact.
+      // Advisory call-argument check (RFC 0095), on the pair checkCalls
+      // receives; computed only under `--calls`, the mode that writes it.
       const checkCallArgs = (rubyName: string, tsName: string, tsFile: string) => {
         if (!callsGate) return;
         const rubySites = rubyCallArgsByName.get(rubyName);
         if (!rubySites || rubySites.length === 0) return;
-        // Only an unambiguous TS body compares: two overloads/overrides recorded
-        // under one (file, name) give no ground for choosing whose call sites
-        // the Ruby ones pair against, exactly as the skeleton record requires.
+        // Two overloads/overrides under one (file, name) give no ground for
+        // choosing whose call sites the Ruby ones pair against — as for a
+        // skeleton record, only an unambiguous TS body compares.
         const tsSites = tsCallArgsByFileName.get(tsFile)?.get(tsName);
         if (tsSites?.length !== 1) return;
         for (const { ruby, ts } of pairCallSites(rubySites, tsSites[0])) {
           const result = compareCallArgs(ruby, ts);
           if (result.verdict === "skip") continue;
           callArgsCompared++;
-          if (result.verdict === "match") continue;
+          if (result.verdict !== "mismatch") continue;
           callArgMismatches.push({
             rubyFile,
             tsFile,
             rubyName,
             tsName,
             call: ruby.name,
-            class: result.class!,
+            class: result.class,
             rubyArgs: result.rubyArgs,
             tsArgs: result.tsArgs,
           });

@@ -56,14 +56,17 @@ export type CallArgVerdict = "match" | "mismatch" | "skip";
  *  because it is the local-identifier dimension surfacing here. */
 export type CallArgClass = "shape" | "naming";
 
-export interface CallArgResult {
-  verdict: CallArgVerdict;
-  /** Present only on a `mismatch`. */
-  class?: CallArgClass;
-  /** The normalized lists the verdict was reached on — what a row reports. */
-  rubyArgs: string[];
-  tsArgs: string[];
-}
+/** A `class` rides on the `mismatch` arm only, so a consumer that has narrowed
+ *  the verdict reads it without asserting it is there. */
+export type CallArgResult =
+  | {
+      verdict: "skip" | "match";
+      class?: undefined;
+      /** The normalized lists the verdict was reached on — what a row reports. */
+      rubyArgs: string[];
+      tsArgs: string[];
+    }
+  | { verdict: "mismatch"; class: CallArgClass; rubyArgs: string[]; tsArgs: string[] };
 
 /**
  * The comparison key for one identifier or nested call name.
@@ -336,11 +339,6 @@ export function compareCallArgs(ruby: CallSite, ts: CallSite): CallArgResult {
   const tsArgs = normalizeArgs(stripMixinReceiver(ruby.args, ts.args));
   if (rubyArgs === null || tsArgs === null) return empty;
 
-  const verdict = argsEqual(rubyArgs, tsArgs) ? "match" : "mismatch";
-  return {
-    verdict,
-    ...(verdict === "mismatch" ? { class: classify(rubyArgs, tsArgs) } : {}),
-    rubyArgs,
-    tsArgs,
-  };
+  if (argsEqual(rubyArgs, tsArgs)) return { verdict: "match", rubyArgs, tsArgs };
+  return { verdict: "mismatch", class: classify(rubyArgs, tsArgs), rubyArgs, tsArgs };
 }
