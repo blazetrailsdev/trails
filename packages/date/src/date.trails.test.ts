@@ -2035,3 +2035,25 @@ describe("Date::Infinity as a Range endpoint", () => {
     );
   });
 });
+
+/**
+ * Trails-only: `Init_date_core` registers `date_s_valid_civil_p` and
+ * `date_s_gregorian_leap_p` under a second name each (`date_core.c:9659`,
+ * `:9676`), and no test in `vendor/date/test/date/` calls either spelling.
+ */
+describe("Date's second registration names", () => {
+  it("valid_date? is valid_civil? — the same C function", () => {
+    expect(RubyDate.isValidDate(2001, 2, 3)).toBe(true);
+    expect(RubyDate.isValidDate(2001, 2, 29)).toBe(false);
+    expect(RubyDate.isValidDate(1582, 10, 5, RubyDate.ITALY)).toBe(false);
+    expect(RubyDate.isValidDate(1582, 10, 5, RubyDate.GREGORIAN)).toBe(true);
+    expect(RubyDate.isValidDate("2001", 2, 3)).toBe(false);
+  });
+
+  it("leap? is gregorian_leap? — the same C function", () => {
+    expect(RubyDate.isLeap(2000)).toBe(true);
+    expect(RubyDate.isLeap(1900)).toBe(false);
+    expect(RubyDate.isLeap(2004)).toBe(true);
+    expect(() => RubyDate.isLeap("2000")).toThrow(TypeError);
+  });
+});
