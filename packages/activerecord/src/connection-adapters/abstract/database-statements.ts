@@ -1379,7 +1379,7 @@ export async function rawExecQuery(
  * Unlike `rawExecQuery` above, this one still wraps in `log`, where Rails'
  * `internal_exec_query` (database_statements.rb:546-548) leaves the logging to
  * `raw_execute`. Dropping it is tracked by
- * 0076-execute-primitive-convergence/route-adapters-through-raw-execute: this
+ * 0076-execute-primitive-convergence/wire-raw-execute-through-log: this
  * body is reached only by an adapter that overrides `internalExecute` but NOT
  * `internalExecQuery`, and for such a host `log`'s rescue is the only thing
  * attaching `set_query` context to a translated StatementInvalid.
