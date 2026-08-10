@@ -63,8 +63,24 @@ export const ALLOWED_PATHS: ReadonlyMap<string, string> = new Map([
   ],
 ]);
 
-/** Directories the scan never descends into: upstream Ruby and build output. */
-export const SKIPPED_DIRS: readonly string[] = ["node_modules", "dist", ".git", "coverage"];
+/**
+ * Directories the scan never descends into: build output, and `tasks/` — the
+ * separate work-tracking repo `start-worktree.sh` places inside the worktree.
+ * Its several thousand story bodies are prose ABOUT past work, live in another
+ * repo's history, and are not references this repo can fix.
+ *
+ * `tasks/` is a symlink locally and a real directory in CI, so it has to be
+ * named rather than left to fall out of the symlink handling below — a
+ * population that differs between the two is how a gate passes locally and
+ * fails on the runner.
+ */
+export const SKIPPED_DIRS: readonly string[] = [
+  "node_modules",
+  "dist",
+  ".git",
+  "coverage",
+  "tasks",
+];
 
 /** `vendor/rails` is upstream Ruby; the rest of `vendor/` (README.md, fetch.ts,
  *  sources.ts) IS in scope — excluding `vendor/` wholesale is the miss the #6305
@@ -142,6 +158,9 @@ async function walk(dir: string, root: string, out: string[]): Promise<void> {
   for (const entry of entries) {
     const full = path.join(dir, entry.name);
     const rel = path.relative(root, full);
+    // A symlink is neither followed nor read: it resolves outside the tree as
+    // often as not, and following one would double-count or wander off it.
+    if (entry.isSymbolicLink()) continue;
     if (entry.isDirectory()) {
       if (SKIPPED_DIRS.includes(entry.name)) continue;
       if (SKIPPED_PATHS.includes(rel)) continue;

@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
+import * as fs from "fs/promises";
+import * as os from "os";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import {
   ALLOWED_PATHS,
   LEGACY_SCRIPT_NAMES,
+  SKIPPED_DIRS,
   findLegacyScriptNames,
   isAliasDefinition,
   scanText,
@@ -48,6 +51,31 @@ describe("legacy compare-script name gate", () => {
     expect(isAliasDefinition("package.json", line)).toBe(true);
     expect(isAliasDefinition("packages/date/package.json", line)).toBe(false);
     expect(isAliasDefinition("package.json", `// see pnpm ${spell("api", "extra")}`)).toBe(false);
+  });
+
+  it("skips the sibling tasks repo and every symlink, so CI sees this population", async () => {
+    // `tasks/` is a symlink in a worktree and a real directory on the runner.
+    // Leaving that to chance is what let 3813 story-body references pass here
+    // and fail in CI.
+    expect(SKIPPED_DIRS).toContain("tasks");
+
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "trails-legacy-names-"));
+    try {
+      // A REAL tasks/ directory, which is what the runner has.
+      await fs.mkdir(path.join(root, "tasks"));
+      await fs.writeFile(path.join(root, "tasks", "story.md"), `pnpm ${spell("api", "compare")}\n`);
+      // A symlinked one, which is what a worktree has.
+      const outside = await fs.mkdtemp(path.join(os.tmpdir(), "trails-legacy-names-out-"));
+      await fs.writeFile(path.join(outside, "note.md"), `pnpm ${spell("api", "compare")}\n`);
+      await fs.symlink(outside, path.join(root, "linked"));
+
+      expect(await findLegacyScriptNames(root)).toEqual([]);
+      // ...and the same text IS a hit when it is genuinely in the population.
+      expect((await findLegacyScriptNames(outside)).map((h) => h.file)).toEqual(["note.md"]);
+      await fs.rm(outside, { recursive: true, force: true });
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
   });
 
   it("allowlists exactly the three intentional mentions", () => {

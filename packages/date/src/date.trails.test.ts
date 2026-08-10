@@ -1109,20 +1109,29 @@ describe("Date", () => {
    *   Date.commercial(600000, 9, 6).to_s #=> "600000-03-04"
    *   Date.commercial(600000, 9, 6).jd   #=> 220866623
    *
-   * The `Temporal` seat reads the RESIDUE day (`m_local_jd`) and so spells the
-   * residue year, which is what `Date.civil` and `Date.weeknum` already answer
-   * for the same day (filed as `date-seat-drops-nth-and-spells-the-residue-year`).
-   * All four agreeing is the point: hardcoding `nth = 0` handed the seat the
-   * WHOLE Julian day and made ordinal/commercial raise instead. The frags path
-   * over the same wrappers (`rt__valid_ordinal_p`, `rt__valid_commercial_p`,
-   * date_core.c:4125-4168) keeps MRI's whole answer, `nth` and all, since it
-   * answers the gem-shaped object.
+   * All four spellings agreeing is the point, and what they now agree on is the
+   * raise: the seat takes the WHOLE day (`encode_jd`) and no
+   * `Temporal.PlainDate` holds a year one `CM_PERIOD_GCY` past the residue.
+   * They agreed on a residue-year date until
+   * `date-seat-drops-nth-and-spells-the-residue-year` — `+015600-02-29` for all
+   * four — which is the shared-but-wrong answer that story was filed for; the
+   * provenance this test is about is unchanged, since hardcoding `nth = 0`
+   * would still make ordinal/commercial disagree with civil.
+   *
+   * The frags path over the same wrappers (`rt__valid_ordinal_p`,
+   * `rt__valid_commercial_p`, date_core.c:4125-4168) keeps MRI's whole answer,
+   * `nth` and all, since it answers the gem-shaped object.
    */
   it("takes ordinal's and commercial's nth from valid_*_p, as civil already does", () => {
-    expect(RubyDate.ordinal(600000, 60).toString()).toBe(RubyDate.civil(600000, 2, 29).toString());
-    expect(RubyDate.commercial(600000, 9, 6).toString()).toBe(
-      RubyDate.civil(600000, 3, 4).toString(),
-    );
+    for (const build of [
+      () => RubyDate.civil(600000, 2, 29),
+      () => RubyDate.ordinal(600000, 60),
+      () => RubyDate.civil(600000, 3, 4),
+      () => RubyDate.commercial(600000, 9, 6),
+    ]) {
+      expect(build).toThrow(RubyDate.Error);
+      expect(build).toThrow("invalid date");
+    }
 
     const o = dNewByFrags({ year: 600000, yday: 60 });
     expect([o.toS(), o.jd, o.year]).toEqual(["600000-02-29", 220866619, 600000]);

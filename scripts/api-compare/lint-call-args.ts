@@ -2,7 +2,7 @@
 /**
  * Ratcheting gate for the call-ARGUMENT parity dimension (RFC 0095).
  *
- * `api:calls` compares the SET OF CALL NAMES a ported body makes, so a body can
+ * `parity:api:calls` compares the SET OF CALL NAMES a ported body makes, so a body can
  * call `where` where Rails calls `where`, hand it a completely different
  * argument list, and stay green. This gate ratchets
  * output/call-arg-mismatches.json — written by compare.ts under `--calls`.
