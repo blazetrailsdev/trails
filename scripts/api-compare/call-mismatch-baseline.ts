@@ -65,21 +65,18 @@ export interface CallMismatchKey {
   tsFile: string;
   rubyName: string;
   call: string;
-  /** Which dimension the row belongs to. Absent means `"calls"`, so every shard
-   *  file written before RFC 0095 loads unchanged and no migration is needed. */
+  /** Absent means `"calls"`, so every shard written before RFC 0095 loads
+   *  unchanged and needs no migration. */
   kind?: RowKind;
-  /** `kind: "args"` only: the extra key component that separates two sites of
-   *  one call passing different argument lists (see call-args-baseline.ts). */
+  /** `kind: "args"` only: the extra key component separating two sites of one
+   *  call that pass different argument lists. */
   rubyArgs?: string[];
 }
 
-/** The two dimensions sharing a shard file. A shard holds the call-set rows and
- *  the call-argument rows for ONE source file, and each gate filters to its own
- *  kind — which is what keeps RFC 0084's row-count debt metric exactly the
- *  call-set rows, independent of the argument dimension. Physical separation
- *  was the original design and was reversed: two trees sharded the same way
- *  made every burndown PR touching one file's arguments and its call set edit
- *  two files in two directories, and every rebase eat two conflict surfaces. */
+/** The two dimensions sharing a shard file. Each gate filters to its own kind,
+ *  which is what keeps RFC 0084's row-count debt metric exactly the call-set
+ *  rows; a second parallel tree was the original design and was reversed
+ *  because it doubled the conflict surface of every burndown PR (RFC 0095). */
 export type RowKind = "calls" | "args";
 
 /** The rows of one dimension. `kind` absent reads as `"calls"`. */

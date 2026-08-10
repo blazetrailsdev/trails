@@ -162,8 +162,7 @@ import type { ApiManifest, ClassInfo, MethodInfo } from "@blazetrails/parity/typ
 // The baseline is a directory of per-source-file JSON arrays (see header),
 // not a single file. Each entry lives at <BASELINE_DIR>/<package>/<tsFile
 // with .ts→.json>.
-/** Exported so the call-ARGUMENT gate reads the SAME tree rather than deriving
- *  its own path to it (RFC 0095: one shard file per source file, both kinds). */
+/** Exported so the call-ARGUMENT gate reads the SAME tree (RFC 0095). */
 export const BASELINE_DIR = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
   "call-mismatches-exclude",
@@ -213,17 +212,16 @@ export async function loadSplitBaseline(dir: string): Promise<ExcludeEntry[]> {
 }
 
 /** The committed CALL-SET baseline, merged across its split files. A shard also
- *  holds the call-argument rows for the same source file (RFC 0095), which this
- *  gate must not see: they would read as stale here, and RFC 0084's row-count
- *  debt metric is exactly the rows this filter keeps. @internal */
+ *  holds the same file's call-argument rows (RFC 0095), which would read as
+ *  stale here; RFC 0084's debt metric is exactly what this filter keeps.
+ *  @internal */
 export async function loadBaseline(): Promise<ExcludeEntry[]> {
   return rowsOfKind(await loadSplitBaseline(BASELINE_DIR), "calls");
 }
 
-/** The rows of the OTHER dimension, which a reseed here must write back
- *  untouched — `--write` rebuilds each shard from this gate's population alone,
- *  so without this the first call-set reseed would silently delete every
- *  call-argument row in the tree. */
+/** The other dimension's rows, which a reseed must write back untouched:
+ *  `--write` rebuilds each shard from this gate's population alone, so without
+ *  them the first call-set reseed would delete every call-argument row. */
 export async function loadForeignRows(): Promise<ExcludeEntry[]> {
   return rowsOfKind(await loadSplitBaseline(BASELINE_DIR), "args");
 }
