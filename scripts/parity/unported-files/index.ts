@@ -1,11 +1,11 @@
-// The merged unported-file register. See ./types.ts for the entry schema
-// and the per-package modules for the entries themselves.
-//
-// Entry ORDER carries no meaning: all three predicates below are `.some()`
-// existence checks over the whole array. The concatenation order here is
-// fixed only so the merged array is deterministic, and
-// unported-files.test.ts pins the merged set against a committed snapshot
-// of the pre-split array.
+/**
+ * The merged unported-file register. Entry schema lives in ./types.ts, the
+ * entries themselves in the per-package modules.
+ *
+ * Entry order carries no meaning — every predicate here is a `.some()`
+ * existence check over the whole array — so the concatenation below is fixed
+ * only to keep the merged array deterministic.
+ */
 
 import type { UnportedFile } from "./types.js";
 import { ACTIVERECORD_TEST_SUPPORT_UNPORTED_FILES } from "./activerecord-test-support.js";

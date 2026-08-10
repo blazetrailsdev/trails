@@ -26,6 +26,10 @@ the entry schema and the `UnportedFile` type. Never move an entry between
 modules by adding or removing its `package` field — that changes what
 parity:api and parity:test exclude.
 
+`baseline.json` is the pre-split snapshot of the register, held to an
+only-shrink rule: adding an exclusion never touches it, and retiring a
+pre-split entry means deleting that one row by hand in the same commit.
+
 ## Naming rules
 
 - **The main entry point of a compare dir is `compare.ts`**, with its test as

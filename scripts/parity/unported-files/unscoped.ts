@@ -1,9 +1,9 @@
-// Entries with no `package` field: they match across ALL packages.
-// This file is where an entry lives precisely BECAUSE it carries no
-// package scope — do not add `package:` to an entry to move it out of
-// here, that narrows what parity:api / parity:test exclude.
-//
-// See ./types.ts for the entry schema.
+/**
+ * Entries with no `package` field, so they match across every package. That
+ * absence is why they live here rather than under a package name: adding
+ * `package:` to move one out narrows what parity:api / parity:test exclude.
+ * Schema: ./types.ts.
+ */
 
 import type { UnportedFile } from "./types.js";
 

@@ -1,7 +1,7 @@
-// Entries scoped to `package: "activerecord-test-support"`.
-// The `package` field — not this file's name — is what scopes the match.
-//
-// See ./types.ts for the entry schema.
+/**
+ * Entries scoped to `package: "activerecord-test-support"`. The `package` field, not this file's
+ * name, is what scopes the match. Schema: ./types.ts.
+ */
 
 import type { UnportedFile } from "./types.js";
 

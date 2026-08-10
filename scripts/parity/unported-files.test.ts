@@ -116,23 +116,26 @@ const BASELINE: unknown[] = JSON.parse(
 );
 
 describe("UNPORTED_FILES per-package split", () => {
-  // `unported-files/baseline.json` is a verbatim snapshot of the single
-  // `UNPORTED_FILES` array as it stood before it was split into per-package
-  // modules. Merging the shards must reproduce it entry-for-entry: a shard
-  // that drops an entry, duplicates one, or quietly gains/loses a `package`
-  // field changes what parity:api and parity:test exclude, and nothing else
-  // in the suite would notice.
+  // `unported-files/baseline.json` is a verbatim snapshot of `UNPORTED_FILES`
+  // as it stood before it was split into per-package modules. Merging the
+  // shards must still yield every one of those entries, byte-identical: an
+  // entry silently dropped by a shard, or one that gains or loses a `package`
+  // field on the way into a differently-named file, changes what parity:api
+  // and parity:test exclude, and nothing else in the suite would notice.
   //
-  // Compared as a multiset, not a sequence: all three predicates are
-  // `.some()` existence checks, so concatenation order carries no meaning and
-  // pinning it would only forbid adding a new package shard.
-  it("merges to exactly the pre-split register", () => {
+  // Only-shrink, like the call-mismatch baselines: adding a new exclusion does
+  // not touch this file. Genuinely retiring a pre-split entry does — delete
+  // that one row from baseline.json, in the same commit, by hand.
+  //
+  // Entries are compared as a set, not a sequence: the predicates are `.some()`
+  // existence checks, so pinning order would only forbid adding a shard.
+  it("still carries every entry the pre-split register had", () => {
     const key = (e: unknown) => JSON.stringify(e);
-    expect(UNPORTED_FILES.map(key).sort()).toEqual(BASELINE.map(key).sort());
-    expect(UNPORTED_FILES).toHaveLength(BASELINE.length);
+    const merged = new Set(UNPORTED_FILES.map(key));
+    expect(BASELINE.map(key).filter((e) => !merged.has(e))).toEqual([]);
   });
 
-  it("keeps every shard's entries distinct", () => {
+  it("does not double-count an entry across shards", () => {
     const seen = new Set(UNPORTED_FILES.map((e) => JSON.stringify(e)));
     expect(seen.size).toBe(UNPORTED_FILES.length);
   });
