@@ -1,6 +1,12 @@
 /**
  * Port of ruby/date's `test/date/test_date_strftime.rb`, the standard
- * directive set (`:70-215`, through `test_strftime__minus`).
+ * directive set (`:70-215`, through `test_strftime__minus`) and the GNU
+ * coreutils extensions (`:216-356`, through `test_strftime__gnuext_complex`)
+ * plus `test_overflow` (`:445-452`).
+ *
+ * `test__different_format` (`:359-443`) is not here: it exercises the instance
+ * formatters (`ctime`/`asctime`/`iso8601`/`xmlschema`/`rfc3339`/`jisx0301`)
+ * and the `limit:` kwarg, none of which are ported yet.
  *
  * The gem's statics answer `Temporal` under RFC 0088, so where Ruby writes
  * `DateTime.parse(s)` and then calls `#strftime` on the result, this file goes
@@ -16,7 +22,14 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { Date as RubyDate, DateTime as RubyDateTime, Rational, dtNewByFrags } from "./date.js";
+import {
+  ArgumentError,
+  Errno,
+  Date as RubyDate,
+  DateTime as RubyDateTime,
+  Rational,
+  dtNewByFrags,
+} from "./date.js";
 import { Time as RubyTime } from "./time.js";
 
 const gemDateTimeParse = (str: string) => dtNewByFrags(RubyDate._parse(str));
@@ -255,6 +268,169 @@ describe("TestDateStrftime", () => {
     const d = new RubyDateTime(1969, 12, 31, 23, 59, 59);
     expect(d.strftime("%s")).toEqual("-1");
     expect(d.strftime("%Q")).toEqual("-1000");
+  });
+
+  it("strftime gnuext", () => {
+    // coreutils
+    let d = new RubyDateTime(2006, 8, 8, 23, 15, 33, new Rational(9, 24));
+
+    expect(d.strftime("%-Y")).toEqual("2006");
+    expect(d.strftime("%-5Y")).toEqual("2006");
+    expect(d.strftime("%5Y")).toEqual("02006");
+    expect(d.strftime("%_Y")).toEqual("2006");
+    expect(d.strftime("%_5Y")).toEqual(" 2006");
+    expect(d.strftime("%05Y")).toEqual("02006");
+
+    expect(d.strftime("%-d")).toEqual("8");
+    expect(d.strftime("%-3d")).toEqual("8");
+    expect(d.strftime("%3d")).toEqual("008");
+    expect(d.strftime("%_d")).toEqual(" 8");
+    expect(d.strftime("%_3d")).toEqual("  8");
+    expect(d.strftime("%03d")).toEqual("008");
+
+    expect(d.strftime("%-e")).toEqual("8");
+    expect(d.strftime("%-3e")).toEqual("8");
+    expect(d.strftime("%3e")).toEqual("  8");
+    expect(d.strftime("%_e")).toEqual(" 8");
+    expect(d.strftime("%_3e")).toEqual("  8");
+    expect(d.strftime("%03e")).toEqual("008");
+
+    expect(d.strftime("%-10A")).toEqual("Tuesday");
+    expect(d.strftime("%10A")).toEqual("   Tuesday");
+    expect(d.strftime("%_10A")).toEqual("   Tuesday");
+    expect(d.strftime("%010A")).toEqual("000Tuesday");
+    expect(d.strftime("%^A")).toEqual("TUESDAY");
+    expect(d.strftime("%#A")).toEqual("TUESDAY");
+
+    expect(d.strftime("%-6a")).toEqual("Tue");
+    expect(d.strftime("%6a")).toEqual("   Tue");
+    expect(d.strftime("%_6a")).toEqual("   Tue");
+    expect(d.strftime("%06a")).toEqual("000Tue");
+    expect(d.strftime("%^a")).toEqual("TUE");
+    expect(d.strftime("%#a")).toEqual("TUE");
+    expect(d.strftime("%#6a")).toEqual("   TUE");
+
+    expect(d.strftime("%-10B")).toEqual("August");
+    expect(d.strftime("%10B")).toEqual("    August");
+    expect(d.strftime("%_10B")).toEqual("    August");
+    expect(d.strftime("%010B")).toEqual("0000August");
+    expect(d.strftime("%^B")).toEqual("AUGUST");
+    expect(d.strftime("%#B")).toEqual("AUGUST");
+
+    expect(d.strftime("%-6b")).toEqual("Aug");
+    expect(d.strftime("%6b")).toEqual("   Aug");
+    expect(d.strftime("%_6b")).toEqual("   Aug");
+    expect(d.strftime("%06b")).toEqual("000Aug");
+    expect(d.strftime("%^b")).toEqual("AUG");
+    expect(d.strftime("%#b")).toEqual("AUG");
+    expect(d.strftime("%#6b")).toEqual("   AUG");
+
+    expect(d.strftime("%-6h")).toEqual("Aug");
+    expect(d.strftime("%6h")).toEqual("   Aug");
+    expect(d.strftime("%_6h")).toEqual("   Aug");
+    expect(d.strftime("%06h")).toEqual("000Aug");
+    expect(d.strftime("%^h")).toEqual("AUG");
+    expect(d.strftime("%#h")).toEqual("AUG");
+    expect(d.strftime("%#6h")).toEqual("   AUG");
+
+    expect(d.strftime("%^p")).toEqual("PM");
+    expect(d.strftime("%#p")).toEqual("pm");
+    expect(d.strftime("%^P")).toEqual("PM");
+    expect(d.strftime("%#P")).toEqual("PM");
+
+    expect(d.strftime("%7z")).toEqual("+000900");
+    expect(d.strftime("%_7z")).toEqual("   +900");
+    expect(d.strftime("%:z")).toEqual("+09:00");
+    expect(d.strftime("%8:z")).toEqual("+0009:00");
+    expect(d.strftime("%_8:z")).toEqual("   +9:00");
+    expect(d.strftime("%::z")).toEqual("+09:00:00");
+    expect(d.strftime("%11::z")).toEqual("+0009:00:00");
+    expect(d.strftime("%_11::z")).toEqual("   +9:00:00");
+    expect(d.strftime("%:::z")).toEqual("+09");
+    expect(d.strftime("%5:::z")).toEqual("+0009");
+    expect(d.strftime("%_5:::z")).toEqual("   +9");
+    expect(d.strftime("%-:::z")).toEqual("+9");
+
+    d = new RubyDateTime(-200, 8, 8, 23, 15, 33, new Rational(9, 24));
+
+    expect(d.strftime("%Y")).toEqual("-0200");
+    expect(d.strftime("%-Y")).toEqual("-200");
+    expect(d.strftime("%-5Y")).toEqual("-200");
+    expect(d.strftime("%5Y")).toEqual("-0200");
+    expect(d.strftime("%_Y")).toEqual(" -200");
+    expect(d.strftime("%_5Y")).toEqual(" -200");
+    expect(d.strftime("%05Y")).toEqual("-0200");
+
+    d = new RubyDateTime(-2000, 8, 8, 23, 15, 33, new Rational(9, 24));
+
+    expect(d.strftime("%Y")).toEqual("-2000");
+    expect(d.strftime("%-Y")).toEqual("-2000");
+    expect(d.strftime("%-5Y")).toEqual("-2000");
+    expect(d.strftime("%5Y")).toEqual("-2000");
+    expect(d.strftime("%_Y")).toEqual("-2000");
+    expect(d.strftime("%_5Y")).toEqual("-2000");
+    expect(d.strftime("%05Y")).toEqual("-2000");
+  });
+
+  it("strftime gnuext LN", () => {
+    // coreutils
+    const d = gemDateTimeParse("2008-11-25T00:11:22.0123456789");
+    expect(d.strftime("%L")).toEqual("012");
+    expect(d.strftime("%0L")).toEqual("012");
+    expect(d.strftime("%1L")).toEqual("0");
+    expect(d.strftime("%2L")).toEqual("01");
+    expect(d.strftime("%11L")).toEqual("01234567890");
+    expect(d.strftime("%011L")).toEqual("01234567890");
+    expect(d.strftime("%_11L")).toEqual("01234567890");
+    expect(d.strftime("%N")).toEqual("012345678");
+    expect(d.strftime("%0N")).toEqual("012345678");
+    expect(d.strftime("%1N")).toEqual("0");
+    expect(d.strftime("%2N")).toEqual("01");
+    expect(d.strftime("%11N")).toEqual("01234567890");
+    expect(d.strftime("%011N")).toEqual("01234567890");
+    expect(d.strftime("%_11N")).toEqual("01234567890");
+  });
+
+  it("strftime gnuext z", () => {
+    // coreutils
+    const d = gemDateTimeParse("2006-08-08T23:15:33+09:08:07");
+    expect(d.strftime("%z")).toEqual("+0908");
+    expect(d.strftime("%:z")).toEqual("+09:08");
+    expect(d.strftime("%::z")).toEqual("+09:08:07");
+    expect(d.strftime("%:::z")).toEqual("+09:08:07");
+  });
+
+  it("strftime gnuext complex", () => {
+    const d = gemDateTimeParse("2001-02-03T04:05:06+09:00");
+    expect(d.strftime("%-100c")).toEqual("Sat Feb  3 04:05:06 2001");
+    expect(d.strftime("%100c")).toEqual("Sat Feb  3 04:05:06 2001".padStart(100));
+    expect(d.strftime("%_100c")).toEqual("Sat Feb  3 04:05:06 2001".padStart(100));
+    expect(d.strftime("%0100c")).toEqual("Sat Feb  3 04:05:06 2001".padStart(100, "0"));
+    expect(d.strftime("%^c")).toEqual("SAT FEB  3 04:05:06 2001");
+
+    expect(d.strftime("%-100+")).toEqual("Sat Feb  3 04:05:06 +09:00 2001");
+    expect(d.strftime("%100+")).toEqual("Sat Feb  3 04:05:06 +09:00 2001".padStart(100));
+    expect(d.strftime("%_100+")).toEqual("Sat Feb  3 04:05:06 +09:00 2001".padStart(100));
+    expect(d.strftime("%0100+")).toEqual("Sat Feb  3 04:05:06 +09:00 2001".padStart(100, "0"));
+    expect(d.strftime("%^+")).toEqual("SAT FEB  3 04:05:06 +09:00 2001");
+  });
+
+  it("overflow", () => {
+    // `assert_raise(ArgumentError, Errno::ERANGE)` names two acceptable
+    // classes, and `date_strftime_alloc` raises the second
+    // (`date_core.c:1780` → `rb_syserr_fail`).
+    for (const strftime of [
+      () => new RubyDate(2000, 1, 1).strftime("%2147483647c"),
+      () => new RubyDateTime(2000, 1, 1).strftime("%2147483647c"),
+    ]) {
+      let raised: unknown;
+      try {
+        strftime();
+      } catch (error) {
+        raised = error;
+      }
+      expect(raised instanceof ArgumentError || raised instanceof Errno.ERANGE).toBe(true);
+    }
   });
 });
 

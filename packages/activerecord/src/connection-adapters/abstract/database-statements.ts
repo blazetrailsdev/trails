@@ -640,18 +640,9 @@ export async function execDelete(
   binds: unknown[] = [],
 ): Promise<number> {
   const host = this as DatabaseStatementsHost;
-  if (binds.length > 0) {
-    throw new Error("execDelete requires execQuery on the adapter when binds are provided");
-  }
-  const doExecute = host?.execute?.bind(host) ?? execute;
-  // Rails is `affected_rows(internal_execute(sql, name, binds))` (:165, :172).
-  // Two deviations remain here, both tracked by
-  // 0076-execute-primitive-convergence/exec-delete-update-through-internal-execute:
-  // the primitive is `execute` rather than `internal_execute` (the mixin's
-  // `affectedRows` is still the NotImplementedError hook at :570), and trails'
-  // `execute` takes (sql, binds, name), so the label goes in the third slot.
-  // Forwarding `name` at all is what this call site fixes.
-  return doExecute(sql, binds, name) as Promise<number>;
+  const doInternalExecute = host?.internalExecute?.bind(host) ?? internalExecute.bind(host);
+  const doAffectedRows = host?.affectedRows?.bind(host) ?? affectedRows;
+  return doAffectedRows(await doInternalExecute(sql, name, { binds }));
 }
 
 /**
@@ -666,18 +657,9 @@ export async function execUpdate(
   binds: unknown[] = [],
 ): Promise<number> {
   const host = this as DatabaseStatementsHost;
-  if (binds.length > 0) {
-    throw new Error("execUpdate requires execQuery on the adapter when binds are provided");
-  }
-  const doExecute = host?.execute?.bind(host) ?? execute;
-  // Rails is `affected_rows(internal_execute(sql, name, binds))` (:165, :172).
-  // Two deviations remain here, both tracked by
-  // 0076-execute-primitive-convergence/exec-delete-update-through-internal-execute:
-  // the primitive is `execute` rather than `internal_execute` (the mixin's
-  // `affectedRows` is still the NotImplementedError hook at :570), and trails'
-  // `execute` takes (sql, binds, name), so the label goes in the third slot.
-  // Forwarding `name` at all is what this call site fixes.
-  return doExecute(sql, binds, name) as Promise<number>;
+  const doInternalExecute = host?.internalExecute?.bind(host) ?? internalExecute.bind(host);
+  const doAffectedRows = host?.affectedRows?.bind(host) ?? affectedRows;
+  return doAffectedRows(await doInternalExecute(sql, name, { binds }));
 }
 
 /**
@@ -690,7 +672,7 @@ export function execInsertAll(
     internalExecQuery(sql: string, name?: string | null): Promise<Result>;
   },
   sql: string,
-  name: string = "SQL",
+  name: string,
 ): Promise<Result> {
   return this.internalExecQuery(sql, name);
 }
@@ -1925,7 +1907,7 @@ export function preprocessQuery(this: DatabaseStatementsHost, sql: string): stri
 export function internalExecute(
   this: DatabaseStatementsHost,
   sql: string,
-  name: string = "SQL",
+  name: string | null = "SQL",
   {
     binds = [],
     prepare = false,

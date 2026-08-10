@@ -1445,6 +1445,29 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   override disconnectBang(): void {
+    // Rails' `disconnect!` (sqlite3_adapter.rb:221) runs under the same `@lock`
+    // that `with_raw_connection` holds around `perform_query`
+    // (abstract/database_statements.rb:552-559), so a close can never land
+    // between a statement's preparation and its execution. `_statementLock` is
+    // that lock here, and it cannot be awaited from a sync body — so when it is
+    // held, chain the close onto its tail rather than closing the handle out
+    // from under a queued statement. `close()` / `whenClosed()` drain it.
+    const ahead = this._statementLock;
+    if (ahead) {
+      this._chainClose(ahead.then(() => this._disconnect()));
+    } else {
+      this._disconnect();
+    }
+  }
+
+  /**
+   * @internal The body of `disconnect!`, split out so `disconnectBang` can run
+   * it either inline or on the tail of `_statementLock`.
+   * Ruby's `@lock.synchronize` blocks the thread, so Rails' `disconnect!` has
+   * one straight-line body; a JS runtime has no blocking wait and can only
+   * defer.
+   */
+  private _disconnect(): void {
     super.disconnectBang();
     // driver is undefined when an async-only connection was never completed
     // (constructed-but-pending); optional-chain like the `active` getter so a
@@ -1455,15 +1478,22 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       // can't await here (sync void contract), so retain it for close() to drain
       // and chain repeated disconnect cycles so no earlier teardown is lost.
       const closing = this.driver.close();
-      if (closing) {
-        const settled = closing.catch(() => {});
-        this._closingDriver = this._closingDriver
-          ? this._closingDriver.then(() => settled)
-          : settled;
-      }
+      if (closing) this._chainClose(closing);
     }
     // Closing the handle implicitly rolls back any in-flight raw transaction.
     this._inTransaction = false;
+  }
+
+  /**
+   * @internal Appends a teardown promise to `_closingDriver` so repeated
+   * disconnect cycles are drained in order and no earlier teardown is lost.
+   * Same blocking-wait shortcoming as `_disconnect`: Rails' `disconnect!`
+   * closes the handle synchronously (sqlite3_adapter.rb:221) and has nothing
+   * to chain.
+   */
+  private _chainClose(closing: Promise<void>): void {
+    const settled = closing.catch(() => {});
+    this._closingDriver = this._closingDriver ? this._closingDriver.then(() => settled) : settled;
   }
 
   /**

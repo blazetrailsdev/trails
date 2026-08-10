@@ -270,25 +270,32 @@ export async function performQuery(
   insertRowid: number | bigint;
 }> {
   const { prepare = false, notificationPayload, batch = false } = options;
-  // Rails' three arms (sqlite3/database_statements.rb:78-108): batch, which
-  // hands the whole multi-statement string to `execute_batch2`; prepared,
-  // which takes the statement from the pool; and unprepared, which prepares a
-  // fresh statement rather than caching it.
-  const stmt = batch
-    ? null
-    : prepare
-      ? await this._cachedStatement(sql)
-      : await this._freshStatement(sql);
+  // The lock is taken BEFORE the statement is prepared: Rails' `@lock` is held
+  // by `with_raw_connection` (abstract/database_statements.rb:552-559) around
+  // the whole of `perform_query`, preparation included, and `disconnect!` takes
+  // the same lock — so a close can never land between a statement's
+  // preparation and its execution.
+  //
   // An uncontended acquisition answers synchronously, so don't `await` it —
   // `await` on a plain value still yields a microtask, and on the
   // transaction-control path that is enough for a pool `disconnect` to close
   // the handle before the statement runs.
   const acquired = acquireStatementLock(this);
   const release = typeof acquired === "function" ? acquired : await acquired;
+  let stmt: SqliteStatement | null = null;
   let rows: Record<string, unknown>[];
   let affectedRows: number;
   let insertRowid: number | bigint;
   try {
+    // Rails' three arms (sqlite3/database_statements.rb:78-108): batch, which
+    // hands the whole multi-statement string to `execute_batch2`; prepared,
+    // which takes the statement from the pool; and unprepared, which prepares a
+    // fresh statement rather than caching it.
+    stmt = batch
+      ? null
+      : prepare
+        ? await this._cachedStatement(sql)
+        : await this._freshStatement(sql);
     if (stmt === null) {
       await rawConnection.exec(sql);
       rows = [];

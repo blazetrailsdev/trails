@@ -37,17 +37,35 @@ export function unquotedFalse(): number {
 }
 
 /**
+ * Mirrors: MySQL::Quoting::QUOTED_COLUMN_NAMES / QUOTED_TABLE_NAMES
+ * (mysql/quoting.rb:11-12) — the `Concurrent::Map`s the class-side quoters memoize
+ * through. Keyed on the name exactly as passed, as in Ruby (mysql/quoting.rb:46-52).
+ */
+const QUOTED_COLUMN_NAMES = new Map<string, string>();
+const QUOTED_TABLE_NAMES = new Map<string, string>();
+
+/**
  * Mirrors: MySQL::Quoting#quote_table_name —
  * `"`#{name.gsub('`', '``').gsub('.', '`.`')}`"`. The whole name is wrapped in
  * backticks with `.` rewritten as `` `.` `` so `foo.bar` → `` `foo`.`bar` ``
  * (mysql/quoting.rb:41-43).
  */
 export function quoteTableName(name: string): string {
-  return `\`${name.replace(/`/g, "``").replace(/\./g, "`.`")}\``;
+  let quoted = QUOTED_TABLE_NAMES.get(name);
+  if (quoted === undefined) {
+    quoted = `\`${name.replace(/`/g, "``").replace(/\./g, "`.`")}\``;
+    QUOTED_TABLE_NAMES.set(name, quoted);
+  }
+  return quoted;
 }
 
 export function quoteColumnName(name: string): string {
-  return `\`${name.replace(/`/g, "``")}\``;
+  let quoted = QUOTED_COLUMN_NAMES.get(name);
+  if (quoted === undefined) {
+    quoted = `\`${name.replace(/`/g, "``")}\``;
+    QUOTED_COLUMN_NAMES.set(name, quoted);
+  }
+  return quoted;
 }
 
 // eslint-disable-next-line no-control-regex

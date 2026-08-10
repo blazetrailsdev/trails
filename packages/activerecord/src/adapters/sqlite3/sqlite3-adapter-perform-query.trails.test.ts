@@ -179,6 +179,35 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
     expect(served).toEqual(["queued", "late"]);
   });
 
+  it("does not close the handle out from under a statement holding the lock", async () => {
+    // Rails' disconnect! (sqlite3_adapter.rb:221) runs under the same @lock
+    // with_raw_connection holds around perform_query
+    // (abstract/database_statements.rb:552-559), so a pool teardown can never
+    // land between a statement's preparation and its execution.
+    const closing = new BetterSQLite3Adapter(":memory:");
+    // Private :memory: handle, closed by the disconnect this test provokes —
+    // nothing outlives the test to collide with a sibling fork.
+    // eslint-disable-next-line blazetrails/require-table-teardown
+    await closing.exec(`CREATE TABLE "dc" ("id" INTEGER PRIMARY KEY)`);
+    const release = await acquireStatementLock(closing);
+    const held = closing._statementLock;
+
+    const queued = closing.executeMutation(`INSERT INTO "dc" DEFAULT VALUES`);
+    // Yield until the statement has joined the lock queue, so the disconnect
+    // below is provoked at exactly the moment Rails' @lock covers.
+    for (let i = 0; i < 100 && closing._statementLock === held; i++) await Promise.resolve();
+    expect(closing._statementLock).not.toBe(held);
+
+    closing.disconnectBang();
+    expect(closing.isOpen).toBe(true);
+
+    release();
+    await expect(queued).resolves.toBe(1);
+
+    await closing.whenClosed();
+    expect(closing.isOpen).toBe(false);
+  });
+
   it("returns the rowid of each of two RETURNING inserts issued together", async () => {
     const ids = await Promise.all([
       adapter.executeMutation(`INSERT INTO "pq" ("nick") VALUES ('a') RETURNING "id"`),
