@@ -8,7 +8,7 @@
     "./conventions": "./conventions.ts",
     "./shared-cache": "./shared-cache.ts",
     "./types": "./types.ts",
-    "./unported-files": "./unported-files.ts",
+    "./unported-files": "./unported-files/index.ts",
     "./write-json-manifest": "./write-json-manifest.ts"
   },
   "dependencies": {

@@ -1,5 +1,7 @@
+import { readFileSync } from "node:fs";
 import { readdir } from "node:fs/promises";
-import { join, relative } from "node:path";
+import { dirname, join, relative } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { describe, it, expect } from "vitest";
 
@@ -9,7 +11,7 @@ import {
   isTestCaseUnported,
   isTestFileUnported,
   UNPORTED_FILES,
-} from "./unported-files.js";
+} from "./unported-files/index.js";
 
 async function walkRb(dir: string): Promise<string[]> {
   const out: string[] = [];
@@ -103,6 +105,36 @@ describe("isSourceUnported package scoping", () => {
 
   it("does not match unrelated source files", () => {
     expect(isSourceUnported("some/unrelated/file.rb", "did-you-mean")).toBe(false);
+  });
+});
+
+const BASELINE: unknown[] = JSON.parse(
+  readFileSync(
+    join(dirname(fileURLToPath(import.meta.url)), "unported-files", "baseline.json"),
+    "utf8",
+  ),
+);
+
+describe("UNPORTED_FILES per-package split", () => {
+  // `unported-files/baseline.json` is a verbatim snapshot of the single
+  // `UNPORTED_FILES` array as it stood before it was split into per-package
+  // modules. Merging the shards must reproduce it entry-for-entry: a shard
+  // that drops an entry, duplicates one, or quietly gains/loses a `package`
+  // field changes what parity:api and parity:test exclude, and nothing else
+  // in the suite would notice.
+  //
+  // Compared as a multiset, not a sequence: all three predicates are
+  // `.some()` existence checks, so concatenation order carries no meaning and
+  // pinning it would only forbid adding a new package shard.
+  it("merges to exactly the pre-split register", () => {
+    const key = (e: unknown) => JSON.stringify(e);
+    expect(UNPORTED_FILES.map(key).sort()).toEqual(BASELINE.map(key).sort());
+    expect(UNPORTED_FILES).toHaveLength(BASELINE.length);
+  });
+
+  it("keeps every shard's entries distinct", () => {
+    const seen = new Set(UNPORTED_FILES.map((e) => JSON.stringify(e)));
+    expect(seen.size).toBe(UNPORTED_FILES.length);
   });
 });
 

@@ -14,7 +14,17 @@ undocumented — write `parity:*` everywhere).
 
 `scripts/parity/` itself holds what all four share — `conventions.ts` (the
 Ruby→TS name and path translation table, and the source `docs/ruby-ts-conventions.md`
-is generated from), `unported-files.ts`, and the manifest writer.
+is generated from), `unported-files/`, and the manifest writer.
+
+`unported-files/` is the exclusion register. One module per `package` value
+plus `unscoped.ts` for the entries that carry no `package` (those match across
+every package — that is what "unscoped" means, and it is why they cannot be
+filed under a package name). `index.ts` concatenates them into `UNPORTED_FILES`
+and owns the three `is*Unported` predicates every consumer imports through the
+`@blazetrails/parity/unported-files` subpath; `types.ts` is the single home for
+the entry schema and the `UnportedFile` type. Never move an entry between
+modules by adding or removing its `package` field — that changes what
+parity:api and parity:test exclude.
 
 ## Naming rules
 

@@ -619,7 +619,7 @@ const DETAIL_PACKAGES = new Set([
   "actionview",
 ]);
 
-// Files intentionally excluded from comparison live in unported-files.ts.
+// Files intentionally excluded from comparison live in unported-files/.
 
 // ---------------------------------------------------------------------------
 // Types
@@ -3242,7 +3242,7 @@ function printReport(
 
     console.log(`\n${"=".repeat(100)}`);
     const excludedNote =
-      pkg.excludedFiles.length > 0 ? "  (some intentionally excluded, see unported-files.ts)" : "";
+      pkg.excludedFiles.length > 0 ? "  (some intentionally excluded, see unported-files/)" : "";
     const inh = pkg.inheritance;
     const inhPct = inh.checked > 0 ? Math.round((inh.matched / inh.checked) * 1000) / 10 : 0;
     const inhExcludedNote = inh.excluded > 0 ? `, ${inh.excluded} excluded` : "";
