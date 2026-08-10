@@ -8,7 +8,20 @@
  */
 
 import { Temporal } from "@js-temporal/polyfill";
-import { ArgumentError, Date, DateTime, Rational, of2str, strftime } from "./date.js";
+import {
+  ArgumentError,
+  Date,
+  DateTime,
+  Rational,
+  SEAT,
+  cCivilToJd,
+  dfLocalToUtc,
+  decodeYear,
+  jdLocalToUtc,
+  of2str,
+  strftime,
+  timeToDf,
+} from "./date.js";
 
 /**
  * The `utc_offset` argument MRI's `Time.new` accepts: `"UTC"`, an offset —
@@ -362,29 +375,47 @@ export class Time {
    * `utc_offset` carried across. A leap second — `sec == 60` — is stored as
    * `59`, which the gem's `DateTime` has no room for.
    *
-   * The C reaches `d_complex_new_internal` directly and so hands it `s` and
-   * `sf` as separate fields, and `of` as seconds. That seat is private to
-   * `./date.ts`; the public constructor is the same one `DateTime.now` uses,
-   * and it takes the whole second and its fraction as one `second` and the
-   * offset as a fraction of a day — hence the two `Rational`s here.
+   * The C reaches `d_complex_new_internal` directly, so the whole second, the
+   * sub-second `sf` in NANOSECONDS and the offset `of` in SECONDS each land in
+   * their own field — and this goes through the same {@link SEAT}, rather than
+   * the public constructor, for that reason: that one takes the second and its
+   * fraction as one `second` and the offset as a fraction of a day, which is a
+   * lossy spelling of what the C hands over exactly.
+   *
+   * The seat stores the day and day-fraction already taken to UTC, where the C
+   * stores `HAVE_CIVIL | HAVE_TIME` and defers that move to `get_c_jd`
+   * (`date_core.c:1264-1301`) — the same `jd_local_to_utc` /`df_local_to_utc`
+   * of `time_to_df(h, min, s)`, made here instead of on first read. The C's
+   * trailing `set_sg(dat, DEFAULT_SG)` is the `Date.ITALY` argument: the day was
+   * resolved under `GREGORIAN` — a `::Time` is proleptic Gregorian — and only
+   * the stored reform changes after it.
    */
   toDatetime(): Temporal.PlainDateTime | Temporal.ZonedDateTime {
+    const y = this.year;
+    const m = this.mon;
+    const d = this.day;
+
+    const h = this.hour;
+    const min = this.min;
     let s = this.sec;
     if (s === 60) s = 59;
-    const sf = new Rational(BigInt(s) * 1_000_000_000n + BigInt(this.nsec), 1_000_000_000n);
+
+    const sf = new Rational(this.nsec, 1);
     const of = this.utcOffset;
+
+    const [nth, ry] = decodeYear(y, -1);
+
+    const rjd = cCivilToJd(ry, m, d, Date.GREGORIAN);
+    const df = timeToDf(h, min, s);
     return new DateTime(
-      this.year,
-      this.mon,
-      this.day,
-      this.hour,
-      this.min,
+      SEAT,
+      nth,
+      jdLocalToUtc(rjd, df, of),
+      dfLocalToUtc(df, of),
       sf,
-      new Rational(of, 86400),
-      Date.GREGORIAN,
-    )
-      .newStart()
-      .toDatetime();
+      of,
+      Date.ITALY,
+    ).toDatetime();
   }
 
   strftime(format: string): string {
