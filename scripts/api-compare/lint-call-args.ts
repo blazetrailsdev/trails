@@ -8,14 +8,14 @@
  * output/call-arg-mismatches.json — written by compare.ts under `--calls`.
  *
  * Same only-shrink contract as lint-call-mismatches.ts, which is the template
- * throughout: a committed baseline lists the currently-known mismatches keyed
- * by `package + tsFile + rubyName + call + rubyArgs`, each with a one-line
+ * throughout: the baseline lists the currently-known mismatches keyed by
+ * `package + tsFile + rubyName + call + rubyArgs`, each with a one-line
  * `reason`, and CI fails on a NEW mismatch absent from it (the ratchet) or a
  * STALE entry that no longer flags (only-shrink — a converged call site must be
- * REMOVED). The baseline is its own tree, call-mismatches-args-exclude/,
- * sharded per source file (`<package>/<tsFile .ts→.json>`) so the
- * merge-conflict boundary matches the unit of work; it cannot fold into
- * call-mismatches-exclude/, and call-args-baseline.ts says why.
+ * REMOVED). Rows live in the EXISTING call-mismatches-exclude/ shards next to
+ * the call-set rows for the same source file, discriminated by `kind: "args"`;
+ * each gate filters the shard to its own kind, and the two only-shrink arms
+ * stay independent — an args row going stale never reds the call-set gate.
  *
  * Per RFC 0095 §4 the gate ratchets `shape` rows only — argument count, order,
  * literal values, kwarg keys. `naming` rows (differing only in how a `ref:`
@@ -26,11 +26,13 @@
  * ── Before the seed ─────────────────────────────────────────────────────────
  * The baseline is seeded by its own `main`-only PR (RFC 0095
  * `call-args-baseline-seed`) AFTER this gate lands, because a seed generated on
- * a branch drifts from what CI measures. Until then the tree does not exist,
- * and an ABSENT tree is reported as UNSEEDED and exits 0 rather than failing
- * every PR on the merge train with the whole population — self-closing the
- * moment the seed lands. An EMPTY tree is a converged dimension, and stays
- * gated.
+ * a branch drifts from what CI measures. Until then the shards carry no `args`
+ * row at all while the artifact flags hundreds, and that combination — zero
+ * baselined AND some flagged — is reported as UNSEEDED and exits 0 rather than
+ * failing every PR on the merge train with the whole population. It self-closes
+ * the moment the seed lands, and it cannot swallow a converged dimension: zero
+ * baselined with zero flagged takes the normal path and passes as a real
+ * green.
  *
  * A plain gating run first regenerates the artifact itself by shelling out to
  * `pnpm parity:api --calls` (see gate-regen.ts): gating a stale artifact is
@@ -59,21 +61,20 @@ import {
   reseed,
   sortKeys,
 } from "./call-args-baseline.js";
-import { missingScope } from "./call-mismatch-baseline.js";
 import {
-  listJsonFiles,
-  pruneEmptyDirs,
-  reportNonCanonicalBaselines,
-  serializeBaseline,
-} from "./baseline-json.js";
+  type CallMismatchKey as CallMismatchKeyed,
+  missingScope,
+  rowsOfKind,
+} from "./call-mismatch-baseline.js";
+import { listJsonFiles, reportNonCanonicalBaselines } from "./baseline-json.js";
 import { NO_REGEN_FLAG, regenerateArtifact, shouldRegenerate } from "./gate-regen.js";
-import { relPathFor } from "./lint-call-mismatches.js";
+import {
+  BASELINE_DIR,
+  loadBaseline as loadCallSetRows,
+  relPathFor,
+  writeSplitBaseline,
+} from "./lint-call-mismatches.js";
 import { parseTop, renderReport } from "./report-call-args.js";
-
-const BASELINE_DIR = path.join(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "call-mismatches-args-exclude",
-);
 
 const ARTIFACT_PATH = path.join(OUTPUT_DIR, "call-arg-mismatches.json");
 
@@ -83,47 +84,14 @@ async function readJson<T>(file: string): Promise<T> {
   return JSON.parse(await fs.readFile(file, "utf-8")) as T;
 }
 
-/** The committed baseline, merged across its split files. @internal */
+/** This gate's rows — the `kind: "args"` half of the shared shards. The
+ *  call-set rows in the same files belong to lint-call-mismatches.ts and would
+ *  read as stale here. @internal */
 export async function loadBaseline(dir: string = BASELINE_DIR): Promise<CallArgExcludeEntry[]> {
   const files = (await listJsonFiles(dir)).sort();
-  const merged: CallArgExcludeEntry[] = [];
-  for (const f of files) merged.push(...(await readJson<CallArgExcludeEntry[]>(f)));
-  return sortKeys(merged);
-}
-
-/** Whether the baseline tree exists — see the UNSEEDED arm in the header. */
-export async function baselineSeeded(dir: string = BASELINE_DIR): Promise<boolean> {
-  return fs.access(dir).then(
-    () => true,
-    () => false,
-  );
-}
-
-/** Repartition the reseeded baseline across the split files: one sorted array
- *  per (package, tsFile), creating files for newly-flagged sources and DELETING
- *  a file (plus any emptied parent dirs) once all its rows converge, so a
- *  post-reseed git diff shows only real baseline changes. */
-export async function writeSplitBaseline(
-  entries: CallArgExcludeEntry[],
-  dir: string = BASELINE_DIR,
-): Promise<void> {
-  const byFile = new Map<string, CallArgExcludeEntry[]>();
-  for (const e of entries) {
-    const rel = relPathFor(e);
-    (byFile.get(rel) ?? byFile.set(rel, []).get(rel)!).push(e);
-  }
-
-  const existing = new Set((await listJsonFiles(dir)).map((f) => path.relative(dir, f)));
-
-  for (const [rel, arr] of byFile) {
-    const dest = path.join(dir, rel);
-    await fs.mkdir(path.dirname(dest), { recursive: true });
-    await fs.writeFile(dest, serializeBaseline(sortKeys(arr)));
-    existing.delete(rel);
-  }
-
-  for (const rel of existing) await fs.rm(path.join(dir, rel));
-  await pruneEmptyDirs(dir);
+  const merged: CallMismatchKeyed[] = [];
+  for (const f of files) merged.push(...(await readJson<CallMismatchKeyed[]>(f)));
+  return sortKeys(rowsOfKind(merged, "args") as CallArgExcludeEntry[]);
 }
 
 async function loadArtifact(): Promise<CallArgArtifact> {
@@ -144,12 +112,12 @@ export function renderKey(k: CallArgKey): string {
   return `${k.package}  ${k.tsFile}  ${k.rubyName}  ${k.call}(${k.rubyArgs.join(", ")})`;
 }
 
-export function renderUnseeded(rows: CallArgKey[], dir: string): string {
+export function renderUnseeded(rows: CallArgKey[]): string {
   return (
-    `call-args ratchet: UNSEEDED — ${path.relative(ROOT_DIR, dir)}/ does not exist yet, ` +
-    `so the ${rows.length} flagged shape row(s) are reported, not gated. The baseline is ` +
-    "seeded on `main` by its own PR (RFC 0095 call-args-baseline-seed); this arm " +
-    "disappears the moment that tree exists."
+    "call-args ratchet: UNSEEDED — no `args` row is baselined yet, so the " +
+    `${rows.length} flagged shape row(s) are reported, not gated. The baseline is seeded on ` +
+    "`main` by its own PR (RFC 0095 call-args-baseline-seed); this arm disappears the " +
+    "moment the first row lands."
   );
 }
 
@@ -175,7 +143,8 @@ export async function main(write: boolean): Promise<number> {
 
   if (write) {
     const next = reseed(current, await loadBaseline(), DEFAULT_REASON);
-    await writeSplitBaseline(next);
+    // The call-set rows share these shards and are not this gate's to rewrite.
+    await writeSplitBaseline([...next, ...(await loadCallSetRows())], BASELINE_DIR);
     console.log(
       `Wrote ${path.relative(ROOT_DIR, BASELINE_DIR)}/: ${next.length} baselined call-argument ` +
         `mismatch(es) (shape only; ${naming} naming row(s) are report-only)`,
@@ -183,12 +152,11 @@ export async function main(write: boolean): Promise<number> {
     return 0;
   }
 
-  if (!(await baselineSeeded())) {
-    console.log(renderUnseeded(current, BASELINE_DIR));
+  const baseline = await loadBaseline();
+  if (baseline.length === 0 && current.length > 0) {
+    console.log(renderUnseeded(current));
     return 0;
   }
-
-  const baseline = await loadBaseline();
 
   const dups = findDuplicateKeys(baseline);
   if (dups.length > 0) {

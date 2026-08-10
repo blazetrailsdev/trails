@@ -325,8 +325,9 @@ write.
    pnpm parity:api:calls:args   # the call-argument ratchet (RFC 0095)
    ```
 
-   Same only-shrink contract, same no-reseed rule, over its own tree
-   (`call-mismatches-args-exclude/`, keyed with the argument list). It gates
+   Same only-shrink contract, same no-reseed rule, over the SAME
+   `call-mismatches-exclude/` shards — its rows carry `kind: "args"` and the
+   argument list in the key, and each gate reads only its own kind. It gates
    `shape` rows — count, order, literal values, kwarg keys; `naming` rows (a
    `ref:` identifier spelled differently) are report-only via
    `pnpm parity:api:calls:args:report`. New row? Pass what Rails passes;

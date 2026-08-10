@@ -65,6 +65,39 @@ export interface CallMismatchKey {
   tsFile: string;
   rubyName: string;
   call: string;
+  /** Which dimension the row belongs to. Absent means `"calls"`, so every shard
+   *  file written before RFC 0095 loads unchanged and no migration is needed. */
+  kind?: RowKind;
+  /** `kind: "args"` only: the extra key component that separates two sites of
+   *  one call passing different argument lists (see call-args-baseline.ts). */
+  rubyArgs?: string[];
+}
+
+/** The two dimensions sharing a shard file. A shard holds the call-set rows and
+ *  the call-argument rows for ONE source file, and each gate filters to its own
+ *  kind — which is what keeps RFC 0084's row-count debt metric exactly the
+ *  call-set rows, independent of the argument dimension. Physical separation
+ *  was the original design and was reversed: two trees sharded the same way
+ *  made every burndown PR touching one file's arguments and its call set edit
+ *  two files in two directories, and every rebase eat two conflict surfaces. */
+export type RowKind = "calls" | "args";
+
+/** The rows of one dimension. `kind` absent reads as `"calls"`. */
+export function rowsOfKind<T extends CallMismatchKey>(entries: T[], kind: RowKind): T[] {
+  return entries.filter((e) => (e.kind ?? "calls") === kind);
+}
+
+/** Ordering key for a row inside a shard, covering BOTH kinds so one comparator
+ *  writes the whole file. A call-set row's key is unchanged, so adding the
+ *  argument dimension never reorders an existing shard. */
+export function shardKeyOf(k: CallMismatchKey): string {
+  return k.kind === "args" ? `${keyOf(k)} args ${(k.rubyArgs ?? []).join(",")}` : keyOf(k);
+}
+
+export function compareShardKeys(a: CallMismatchKey, b: CallMismatchKey): number {
+  const ka = shardKeyOf(a);
+  const kb = shardKeyOf(b);
+  return ka < kb ? -1 : ka > kb ? 1 : 0;
 }
 
 export interface ExcludeEntry extends CallMismatchKey {

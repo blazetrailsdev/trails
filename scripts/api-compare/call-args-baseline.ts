@@ -3,40 +3,30 @@
  * lint-call-args.ts): the row shape, the key grain the baseline is recorded at,
  * and the diff/reseed/sort primitives the gate agrees on.
  *
- * This mirrors call-mismatch-baseline.ts (the call-SET ratchet, RFC 0047) and
- * deliberately does NOT reuse its key: that key is
- * `package + tsFile + rubyName + call`, which has no argument component, so two
- * differently-wrong argument lists at the same call would collapse into one
- * row. RFC 0084 also measures that baseline's ROW COUNT as the call-set debt
- * metric, and folding a second dimension into it corrupts the measurement. So
- * the two trees stay separate, and only the dimension-neutral pieces are shared
- * — baseline-json.ts, gate-regen.ts, and the partial-scope guard in
- * call-mismatch-baseline.ts.
+ * Rows live in the EXISTING per-file shards of call-mismatches-exclude/,
+ * alongside the call-set rows for the same source file, carrying `kind: "args"`
+ * and the extra `rubyArgs` key component. The call-set key has no argument
+ * component, so two differently-wrong argument lists at one call would collapse
+ * into a single row without it; the `kind` discriminator is what keeps RFC
+ * 0084's row-count debt metric exactly the call-set rows (see
+ * call-mismatch-baseline.ts#RowKind for why a second tree was reversed).
  *
  * Only `shape` rows are gated (RFC 0095 §4); `naming` rows stay report-only.
  *
  * Hard rules: no node:* imports, no process.*, async fs only.
  */
 
+import { type CallMismatchKey, compareShardKeys, shardKeyOf } from "./call-mismatch-baseline.js";
+
 /** One flagged call site at the grain the baseline records. `rubyArgs` is part
  *  of the key: one call in one method can be wrong two ways at two sites. */
-export interface CallArgKey {
-  package: string;
-  tsFile: string;
-  rubyName: string;
-  call: string;
+export interface CallArgKey extends CallMismatchKey {
+  kind: "args";
   rubyArgs: string[];
 }
 
 export interface CallArgExcludeEntry extends CallArgKey {
   reason: string;
-}
-
-export interface CallArgRow extends CallArgKey {
-  rubyFile: string;
-  tsName: string;
-  class: string;
-  tsArgs: string[];
 }
 
 export interface CallArgArtifact {
@@ -45,16 +35,30 @@ export interface CallArgArtifact {
   packages?: string[];
   /** Sites compared — the report's denominator. */
   compared: number;
-  mismatches: CallArgRow[];
-}
-
-export function keyOf(k: CallArgKey): string {
-  return `${k.package} ${k.tsFile} ${k.rubyName} ${k.call} ${k.rubyArgs.join(",")}`;
+  mismatches: (CallArgKey & {
+    rubyFile: string;
+    tsName: string;
+    class: string;
+    tsArgs: string[];
+  })[];
 }
 
 /** The rows the gate ratchets: `shape` only. */
-export function gatedRows(artifact: CallArgArtifact): CallArgRow[] {
-  return artifact.mismatches.filter((m) => m.class === "shape");
+export function gatedRows(artifact: CallArgArtifact): CallArgKey[] {
+  return artifact.mismatches
+    .filter((m) => m.class === "shape")
+    .map((m) => ({
+      package: m.package,
+      tsFile: m.tsFile,
+      rubyName: m.rubyName,
+      call: m.call,
+      kind: "args" as const,
+      rubyArgs: m.rubyArgs,
+    }));
+}
+
+export function sortKeys<T extends CallMismatchKey>(entries: T[]): T[] {
+  return [...entries].sort(compareShardKeys);
 }
 
 /** `added` — flagged now, absent from the baseline (the ratchet failure);
@@ -63,25 +67,12 @@ export function diffAgainstBaseline(
   current: CallArgKey[],
   baseline: CallArgExcludeEntry[],
 ): { added: CallArgKey[]; stale: CallArgExcludeEntry[] } {
-  const currentKeys = new Set(current.map(keyOf));
-  const baselineKeys = new Set(baseline.map(keyOf));
+  const currentKeys = new Set(current.map(shardKeyOf));
+  const baselineKeys = new Set(baseline.map(shardKeyOf));
   return {
-    added: current.filter((k) => !baselineKeys.has(keyOf(k))),
-    stale: baseline.filter((e) => !currentKeys.has(keyOf(e))),
+    added: current.filter((k) => !baselineKeys.has(shardKeyOf(k))),
+    stale: baseline.filter((e) => !currentKeys.has(shardKeyOf(e))),
   };
-}
-
-/** Total order on baseline entries: ascending UTF-16 code-unit order of
- *  `keyOf`. Deliberately NOT `localeCompare`, for the reason spelled out in
- *  call-mismatch-baseline.ts#compareKeys. */
-export function compareKeys(a: CallArgKey, b: CallArgKey): number {
-  const ka = keyOf(a);
-  const kb = keyOf(b);
-  return ka < kb ? -1 : ka > kb ? 1 : 0;
-}
-
-export function sortKeys<T extends CallArgKey>(entries: T[]): T[] {
-  return [...entries].sort(compareKeys);
 }
 
 /** Rebuild the baseline from the live artifact: keep each still-flagging row,
@@ -91,19 +82,12 @@ export function reseed(
   baseline: CallArgExcludeEntry[],
   defaultReason: string,
 ): CallArgExcludeEntry[] {
-  const reasons = new Map(baseline.map((e) => [keyOf(e), e.reason]));
+  const reasons = new Map(baseline.map((e) => [shardKeyOf(e), e.reason]));
   const byKey = new Map<string, CallArgExcludeEntry>();
   for (const k of current) {
-    const key = keyOf(k);
+    const key = shardKeyOf(k);
     if (byKey.has(key)) continue;
-    byKey.set(key, {
-      package: k.package,
-      tsFile: k.tsFile,
-      rubyName: k.rubyName,
-      call: k.call,
-      rubyArgs: k.rubyArgs,
-      reason: reasons.get(key) ?? defaultReason,
-    });
+    byKey.set(key, { ...k, reason: reasons.get(key) ?? defaultReason });
   }
   return sortKeys([...byKey.values()]);
 }
@@ -114,7 +98,7 @@ export function findDuplicateKeys(baseline: CallArgExcludeEntry[]): string[] {
   const seen = new Set<string>();
   const dups = new Set<string>();
   for (const e of baseline) {
-    const k = keyOf(e);
+    const k = shardKeyOf(e);
     if (seen.has(k)) dups.add(k);
     seen.add(k);
   }

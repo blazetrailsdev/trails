@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { shardKeyOf as keyOf } from "./call-mismatch-baseline.js";
 import {
   type CallArgArtifact,
   type CallArgExcludeEntry,
@@ -6,7 +7,6 @@ import {
   diffAgainstBaseline,
   findDuplicateKeys,
   gatedRows,
-  keyOf,
   reseed,
   sortKeys,
 } from "./call-args-baseline.js";
@@ -19,6 +19,7 @@ function key(over: Partial<CallArgKey> = {}): CallArgKey {
     call: "visit",
     rubyArgs: ["ref:o", "ref:collector"],
     ...over,
+    kind: "args",
   };
 }
 
@@ -27,7 +28,7 @@ function entry(over: Partial<CallArgExcludeEntry> = {}): CallArgExcludeEntry {
 }
 
 it("keyOf includes the Ruby argument list, separating two sites of one call", () => {
-  expect(keyOf(key())).toBe("arel visitors/to-sql.ts inject_join visit ref:o,ref:collector");
+  expect(keyOf(key())).toBe("arel visitors/to-sql.ts inject_join visit args ref:o,ref:collector");
   expect(keyOf(key())).not.toBe(keyOf(key({ rubyArgs: ["ref:o"] })));
 });
 
@@ -40,12 +41,8 @@ describe("gatedRows", () => {
     ],
   } as unknown as CallArgArtifact;
 
-  it("gates shape rows", () => {
-    expect(gatedRows(artifact).map((r) => r.call)).toEqual(["visit"]);
-  });
-
-  it("leaves naming rows out of the gated population", () => {
-    expect(gatedRows(artifact).some((r) => r.class === "naming")).toBe(false);
+  it("gates shape rows, leaving naming ones out and stamping kind", () => {
+    expect(gatedRows(artifact)).toEqual([key()]);
   });
 });
 

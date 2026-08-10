@@ -185,9 +185,16 @@ RFC 0095 adds a second, independent gate over the same `--calls` extraction:
 `api:calls` compares the SET OF CALL NAMES a body makes, so a port can call
 `where` where Rails calls `where`, hand it a completely different argument list,
 and stay green. `pnpm parity:api:calls:args` (`lint-call-args.ts`, CI step
-"Call-argument ratchet") ratchets `output/call-arg-mismatches.json` against its
-own tree, `scripts/api-compare/call-mismatches-args-exclude/`, keyed
-`package + tsFile + rubyName + call + rubyArgs` and sharded per source file.
+"Call-argument ratchet") ratchets `output/call-arg-mismatches.json` against the
+**same** `scripts/api-compare/call-mismatches-exclude/` shards the call-set gate
+uses — one shard file per source file, holding both dimensions. Its rows carry
+`kind: "args"` and are keyed `package + tsFile + rubyName + call + rubyArgs`;
+a row with `kind` absent or `"calls"` belongs to the call-set gate. Each gate
+filters the shard to its own kind, which is what keeps RFC 0084's row-count debt
+metric exactly the call-set rows. (A second parallel tree was the original
+design and was reversed: sharding both dimensions the same way meant every
+burndown PR touching one file's arguments and its call set edited two files in
+two directories, and every rebase ate two conflict surfaces.)
 
 It carries the identical contract to the calls ratchet above and for the same
 reasons: **only-shrink** (delete the converged row by hand — do NOT
@@ -208,9 +215,11 @@ Two things are specific to it:
   order is an argument-ORDER defect (`inject_join(list, collector, join_str)`
   ported as `injectJoin(nodes, connector, collector)`), and it is gated.
 
-The baseline is seeded on `main` by its own PR. Until that tree exists the gate
-reports the population and exits 0; the arm closes itself the moment the seed
-lands.
+The `args` rows are seeded on `main` by their own PR. Until then no `args` row
+is baselined while the artifact flags hundreds, and that combination is reported
+and exits 0; the arm closes itself the moment the first row lands, and it cannot
+swallow a converged dimension (nothing baselined AND nothing flagged is a real
+green).
 
 ### Assertion-mismatch ratchet
 

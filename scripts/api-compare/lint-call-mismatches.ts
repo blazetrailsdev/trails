@@ -119,11 +119,13 @@ import {
   type CallMismatchKey,
   type ExcludeEntry,
   compareKeys,
+  compareShardKeys,
   diffAgainstBaseline,
   findDuplicateKeys,
   flattenArtifact,
   missingScope,
   reseed,
+  rowsOfKind,
   type StaleTag,
 } from "./call-mismatch-baseline.js";
 import {
@@ -160,7 +162,9 @@ import type { ApiManifest, ClassInfo, MethodInfo } from "@blazetrails/parity/typ
 // The baseline is a directory of per-source-file JSON arrays (see header),
 // not a single file. Each entry lives at <BASELINE_DIR>/<package>/<tsFile
 // with .ts→.json>.
-const BASELINE_DIR = path.join(
+/** Exported so the call-ARGUMENT gate reads the SAME tree rather than deriving
+ *  its own path to it (RFC 0095: one shard file per source file, both kinds). */
+export const BASELINE_DIR = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
   "call-mismatches-exclude",
 );
@@ -208,9 +212,20 @@ export async function loadSplitBaseline(dir: string): Promise<ExcludeEntry[]> {
   return sortKeys(merged);
 }
 
-/** The committed baseline, merged across its split files. @internal */
+/** The committed CALL-SET baseline, merged across its split files. A shard also
+ *  holds the call-argument rows for the same source file (RFC 0095), which this
+ *  gate must not see: they would read as stale here, and RFC 0084's row-count
+ *  debt metric is exactly the rows this filter keeps. @internal */
 export async function loadBaseline(): Promise<ExcludeEntry[]> {
-  return loadSplitBaseline(BASELINE_DIR);
+  return rowsOfKind(await loadSplitBaseline(BASELINE_DIR), "calls");
+}
+
+/** The rows of the OTHER dimension, which a reseed here must write back
+ *  untouched — `--write` rebuilds each shard from this gate's population alone,
+ *  so without this the first call-set reseed would silently delete every
+ *  call-argument row in the tree. */
+export async function loadForeignRows(): Promise<ExcludeEntry[]> {
+  return rowsOfKind(await loadSplitBaseline(BASELINE_DIR), "args");
 }
 
 // Repartition the reseeded baseline back across the split files under `dir`.
@@ -231,7 +246,7 @@ export async function writeSplitBaseline(entries: ExcludeEntry[], dir: string): 
   for (const [rel, arr] of byFile) {
     const dest = path.join(dir, rel);
     await fs.mkdir(path.dirname(dest), { recursive: true });
-    await fs.writeFile(dest, serializeBaseline(sortKeys(arr)));
+    await fs.writeFile(dest, serializeBaseline([...arr].sort(compareShardKeys)));
     existing.delete(rel);
   }
 
@@ -626,7 +641,7 @@ async function main(write: boolean, showSeededKeys: boolean): Promise<number> {
 
   if (write) {
     const next = reseed(current, baseline, DEFAULT_REASON);
-    await writeSplitBaseline(next, BASELINE_DIR);
+    await writeSplitBaseline([...next, ...(await loadForeignRows())], BASELINE_DIR);
     console.log(
       `Wrote ${path.relative(ROOT_DIR, BASELINE_DIR)}/: ${next.length} baselined call mismatches`,
     );

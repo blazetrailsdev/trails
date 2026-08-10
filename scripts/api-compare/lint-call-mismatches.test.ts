@@ -9,7 +9,9 @@ import {
   DEFAULT_REASON,
   bucketFor,
   indexTsMembers,
+  BASELINE_DIR,
   loadBaseline,
+  loadForeignRows,
   loadSplitBaseline,
   parseTop,
   relPathFor,
@@ -510,5 +512,13 @@ describe("--set-reason categories", () => {
         skipped: 0,
       });
     }
+  });
+});
+
+describe("the shared shards", () => {
+  it("holds no args row today, so the call-set row count is what it was before RFC 0095", async () => {
+    const all = await loadSplitBaseline(BASELINE_DIR);
+    expect(await loadForeignRows()).toEqual([]);
+    expect((await loadBaseline()).length).toBe(all.length);
   });
 });
