@@ -136,4 +136,21 @@ describe.skipIf(!runToken)("boot outcome", () => {
     expect(outcome, "boot must record which arm it took").not.toBeNull();
     expect(outcome?.stamped, `boot arm ${outcome?.arm} must leave the database stamped`).toBe(true);
   });
+
+  it.skipIf(bootOutcome()?.arm !== "fastPath")(
+    "a fast-path boot took the memo instead of re-laying the adapter-specific arm",
+    () => {
+      // The #6121 saving, pinned rather than timed: a fast path whose snapshot is
+      // intact truncates the adapter-specific tables in place, and the arm that
+      // re-lays them is what costs ~2.5 min per MariaDB run. Before this, an
+      // adapter-specific half wider than MySQL's `varchar(255)`
+      // (`abstract_mysql_adapter.rb:31-34` over `internal_metadata.rb:84-93`)
+      // stored no snapshot at all, so every worker on that lane re-laid the arm
+      // and only got slower. This runs on all four lanes, so it fails there now.
+      expect(
+        bootOutcome()?.relaidAdapterSpecific,
+        "a fast-path boot with an intact snapshot must skip the adapter-specific arm",
+      ).toBe(false);
+    },
+  );
 });
