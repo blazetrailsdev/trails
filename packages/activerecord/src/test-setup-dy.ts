@@ -77,7 +77,7 @@ if (await canonicalSchemaUpToDate(await Base.leaseConnection())) {
   // this database is entitled to the same fast path. Without this the stamp is
   // single-use per database and every recycle pays the full purge+reload.
   await stampCanonicalSchema(conn, undefined, intact ? laid : undefined);
-  await recordBootOutcome("fastPath", await canonicalSchemaUpToDate(conn), !intact);
+  await recordBootOutcome("fastPath", await canonicalSchemaUpToDate(conn));
 } else {
   // `DatabaseTasks.purge` re-establishes Base's pool on the recreated database,
   // so the connection has to be leased after it, not before.
@@ -89,7 +89,7 @@ if (await canonicalSchemaUpToDate(await Base.leaseConnection())) {
   const canonicalConn = await Base.leaseConnection();
   await loadSchema(canonicalConn);
   await stampCanonicalSchema(canonicalConn);
-  await recordBootOutcome("fullLoad", await canonicalSchemaUpToDate(canonicalConn), true);
+  await recordBootOutcome("fullLoad", await canonicalSchemaUpToDate(canonicalConn));
 }
 
 // Permanent worker-startup assertion: a broken arm of the load path fails here

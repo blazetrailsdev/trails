@@ -17,25 +17,13 @@ export type BootArm = "fastPath" | "fullLoad";
 export interface BootOutcome {
   arm: BootArm;
   stamped: boolean;
-  /**
-   * Whether this boot re-laid the `<adapter>_specific_schema.rb` half. A fast
-   * path that found the stamp's snapshot intact skips that arm and truncates
-   * those tables in place instead — the per-file saving measured in #6121. It
-   * is recorded rather than timed so a lane where the memo silently stops
-   * being taken fails a test instead of only getting slower.
-   */
-  relaidAdapterSpecific: boolean;
 }
 
 let outcome: BootOutcome | null = null;
 
 /** @internal */
-export function recordBootOutcome(
-  arm: BootArm,
-  stamped: boolean,
-  relaidAdapterSpecific: boolean,
-): void {
-  outcome = { arm, stamped, relaidAdapterSpecific };
+export function recordBootOutcome(arm: BootArm, stamped: boolean): void {
+  outcome = { arm, stamped };
 }
 
 /**
