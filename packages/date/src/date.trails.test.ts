@@ -1758,6 +1758,17 @@ describe("DateTime", () => {
     ).toBe("1582-10-10T06:30:00+02:00[+02:00]");
     expect(() => RubyDateTime.parse("1582-10-10T06:30:00+02:00")).toThrow(RubyDate.Error);
   });
+
+  it("new_offset fills the day and day-fraction in on the proleptic-Gregorian seat", () => {
+    // `set_of` (`date_core.c:5890-5897`) runs `get_c_jd` / `get_c_df` before it
+    // writes the new offset, because `datetime_initialize`'s proleptic-Gregorian
+    // arm (`:7851-7870`) stores the civil triple and the time of day alone.
+    //   d = DateTime.new(2001, 2, 3, 4, 5, 6, "-02:00", Date::GREGORIAN)
+    //   d.new_offset("+09:00").to_s #=> "2001-02-03T15:05:06+09:00"
+    const d = new RubyDateTime(2001, 2, 3, 4, 5, 6, "-02:00", RubyDate.GREGORIAN);
+    const shifted = d.newOffset("+09:00");
+    expect([shifted.jd, shifted.hour, shifted.min, shifted.sec]).toEqual([2451944, 15, 5, 6]);
+  });
 });
 
 describe("Time", () => {
