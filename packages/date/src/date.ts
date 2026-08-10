@@ -429,8 +429,15 @@ export const Errno = { ERANGE };
  * string grows on its own, so that bound is the only part of the C's buffer
  * machinery that is observable — and it is observable, as the two
  * {@link ERANGE} arms are what `test_strftime` asserts: a precision past it
- * (`date_strftime.c:577-582`) and a rendered field past it
- * (`FILL_PADDING`, `date_strftime.c:124-126`).
+ * (`date_strftime.c:577-582`) and output past it (`FILL_PADDING`,
+ * `date_strftime.c:124-126`, over `NEEDS`, `:94`).
+ *
+ * The second bound is over the ACCUMULATED output, not the field alone: the C
+ * writes every field into the one buffer and measures against
+ * `char *endp = s + maxsize` (`date_strftime.c:54`), so a format whose fields
+ * are each short but whose total runs past `endp` fails there too — which is
+ * what `'%100000Y' * 13` does, thirteen fields none of which is itself past
+ * `1024 * flen`.
  */
 export function strftime(
   value:
@@ -711,7 +718,7 @@ export function strftime(
       f = spec === undefined ? format.length : g + 1;
       continue;
     }
-    if (formatted.length > maxsize) throw new ERANGE(format);
+    if (out.length + formatted.length > maxsize) throw new ERANGE(format);
     out += formatted;
     f = g + 1;
   }
@@ -832,11 +839,19 @@ const ABBR_DAYS = "sun|mon|tue|wed|thu|fri|sat";
  */
 export interface DateParts {
   jd?: number | bigint;
-  year?: number;
+  /**
+   * The year, which is a `bigint` once the token outruns a JS number: the C
+   * reads it with `str2num` (`date_parse.c:51`), Ruby's arbitrary-precision
+   * `String#to_i`, so `Date._parse("Jan 1" + "0" * 100_000, limit: 100_010)`
+   * answers a 100,001-digit `:year` — the same Bignum {@link Date#year} already
+   * answers. Normalized through {@link bigNorm}, so an ordinary year is a
+   * `number` as MRI's is a Fixnum.
+   */
+  year?: number | bigint;
   mon?: number;
   mday?: number;
   yday?: number;
-  cwyear?: number;
+  cwyear?: number | bigint;
   cweek?: number;
   cwday?: number;
   wday?: number;
@@ -891,6 +906,24 @@ type DateFrag =
   | "hour"
   | "min"
   | "sec";
+
+/**
+ * @internal `date_parse.c`'s `cstr2num` / `str2num` macros
+ * (`date_parse.c:50-51`), both `rb_cstr_to_inum(s, 10, 0)`: base ten with
+ * `badcheck` off, so a span carrying no digits reads as `0` rather than
+ * raising, and the answer is a Ruby Integer — arbitrary precision, hence a
+ * `bigint` past what a JS number holds exactly ({@link bigNorm}).
+ */
+function cstr2num(s: string): number | bigint {
+  const m = /^[+-]?\d*/.exec(s)!;
+  if (!/\d/.test(m[0])) return 0;
+  return bigNorm(BigInt(m[0]));
+}
+
+/** @internal `date_parse.c`'s `f_negate` macro (`date_parse.c:20`), `-x`. */
+function fNegate(x: number | bigint): number | bigint {
+  return typeof x === "bigint" ? bigNorm(-x) : -x;
+}
 
 /** @internal `date_parse.c` `comp_year69`: `69` is 1969, `68` is 2068. */
 function compYear69(y: number): number {
@@ -1478,7 +1511,7 @@ function s3e(
       const l = digitSpan(y, s, ep);
       ep = s + l;
       if (l > 2) c = false;
-      hash.year = Number(y.slice(bp, ep));
+      hash.year = cstr2num(y.slice(bp, ep));
     }
   }
 
@@ -1792,7 +1825,7 @@ function parseIso21Cb(m: RegExpExecArray, hash: DateParts): number {
   const w = m[2];
   const d = m[3];
 
-  if (y !== undefined) hash.cwyear = Number(y);
+  if (y !== undefined) hash.cwyear = cstr2num(y);
   hash.cweek = Number(w);
   if (d !== undefined) hash.cwday = Number(d);
 
@@ -1860,7 +1893,7 @@ function parseIso25Cb(m: RegExpExecArray, hash: DateParts): number {
   const y = m[1];
   const d = m[2];
 
-  hash.year = Number(y);
+  hash.year = cstr2num(y);
   hash.yday = Number(d);
 
   return 1;
@@ -1958,7 +1991,7 @@ function parseJisCb(m: RegExpExecArray, hash: DateParts): number {
 
   const ep = gengo(e[0]);
 
-  hash.year = Number(y) + ep;
+  hash.year = fAdd(cstr2num(y), ep);
   hash.mon = Number(mon);
   hash.mday = Number(d);
 
@@ -2050,7 +2083,7 @@ function parseDot(str: string, hash: DateParts): string | null {
 /** @internal `date_parse.c` `parse_year_cb` (`date_parse.c:1662-1670`). */
 function parseYearCb(m: RegExpExecArray, hash: DateParts): number {
   const y = m[1];
-  hash.year = Number(y);
+  hash.year = cstr2num(y);
   return 1;
 }
 
@@ -3077,8 +3110,8 @@ function dateStrptime(str: string, fmt: string, hash: DateParts): DateParts | nu
   const cent = hash._cent;
   delete hash._cent;
   if (cent !== undefined) {
-    if (hash.cwyear !== undefined) hash.cwyear = hash.cwyear + cent * 100;
-    if (hash.year !== undefined) hash.year = hash.year + cent * 100;
+    if (hash.cwyear !== undefined) hash.cwyear = fAdd(hash.cwyear, cent * 100);
+    if (hash.year !== undefined) hash.year = fAdd(hash.year, cent * 100);
   }
 
   const merid = hash._merid;
@@ -3101,6 +3134,11 @@ function dateStrptime(str: string, fmt: string, hash: DateParts): DateParts | nu
  * makes the sum one, which is how an exact `:seconds` survives folding an
  * `:offset` in (`date_core.c:3850`).
  */
+function fAdd(x: number | bigint, y: number | bigint): number | bigint;
+function fAdd(
+  x: number | bigint | Rational,
+  y: number | bigint | Rational,
+): number | bigint | Rational;
 function fAdd(
   x: number | bigint | Rational,
   y: number | bigint | Rational,
@@ -3742,6 +3780,37 @@ function cValidGregorianP(y: number, m: number, d: number): [rm: number, rd: num
 }
 
 /**
+ * @internal `date_core.c` `valid_ordinal_p` (`date_core.c:2199-2227`), the
+ * year-decoding wrapper `Date.ordinal` goes through: it re-reads
+ * {@link guessStyle} and either validates the year under the reform
+ * ({@link cValidOrdinalP}, whose `int y` this is what supplies) or decodes it
+ * into a `nth` and a residue year first and validates that proleptically.
+ *
+ * As with {@link validCivilP}, the C's `ry`/`rd` out-parameters are the folded
+ * pair every caller re-derives from `rjd`, so the `nth` and the `rjd` alone
+ * come back — which is also why the C's second `decode_year` (`:2218`, the
+ * `nth` non-zero arm) has nothing left to write and is not here: it fills only
+ * `ry`, from a `nth2` the C itself discards.
+ */
+function validOrdinalP(
+  y: number | bigint,
+  d: number,
+  sg: number,
+): [nth: bigint, rjd: number] | null {
+  const style = guessStyle(y, sg);
+
+  if (style === 0) {
+    const jd = cValidOrdinalP(Number(y), d, sg);
+    if (jd === null) return null;
+    return decodeJd(jd);
+  }
+  const [nth, ry] = decodeYear(y, style);
+  const rjd = cValidOrdinalP(ry, d, style);
+  if (rjd === null) return null;
+  return [nth, rjd];
+}
+
+/**
  * @internal `date_core.c` `valid_gregorian_p` (`date_core.c:2229-2236`), which
  * is {@link decodeYear} under a negative style followed by
  * {@link cValidGregorianP}. The C's `nth`/`ry`/`rm`/`rd` out-parameters come
@@ -3957,6 +4026,79 @@ function validCivilP(
   const r = style < 0 ? cValidGregorianP(ry, m, d) : cValidJulianP(ry, m, d);
   if (r === null) return null;
   return [nth, cCivilToJd(ry, r[0], r[1], style)];
+}
+
+/**
+ * @internal `date_core.c` `valid_commercial_p` (`date_core.c:2274-2302`), the
+ * week-date counterpart of {@link validOrdinalP} — the same `guess_style`
+ * branch over {@link cValidCommercialP}.
+ */
+function validCommercialP(
+  y: number | bigint,
+  w: number,
+  d: number,
+  sg: number,
+): [nth: bigint, rjd: number] | null {
+  const style = guessStyle(y, sg);
+
+  if (style === 0) {
+    const jd = cValidCommercialP(Number(y), w, d, sg);
+    if (jd === null) return null;
+    return decodeJd(jd);
+  }
+  const [nth, ry] = decodeYear(y, style);
+  const rjd = cValidCommercialP(ry, w, d, style);
+  if (rjd === null) return null;
+  return [nth, rjd];
+}
+
+/**
+ * @internal `date_core.c` `valid_weeknum_p` (`date_core.c:2304-2332`), the
+ * `:wnum0`/`:wnum1` counterpart of {@link validCommercialP}.
+ */
+function validWeeknumP(
+  y: number | bigint,
+  w: number,
+  d: number,
+  f: number,
+  sg: number,
+): [nth: bigint, rjd: number] | null {
+  const style = guessStyle(y, sg);
+
+  if (style === 0) {
+    const jd = cValidWeeknumP(Number(y), w, d, f, sg);
+    if (jd === null) return null;
+    return decodeJd(jd);
+  }
+  const [nth, ry] = decodeYear(y, style);
+  const rjd = cValidWeeknumP(ry, w, d, f, style);
+  if (rjd === null) return null;
+  return [nth, rjd];
+}
+
+/**
+ * @internal `date_core.c` `valid_nth_kday_p` (`date_core.c:2336-2364`), the
+ * `n`th-weekday counterpart of {@link validWeeknumP}. `:nodoc:` and
+ * `#ifndef NDEBUG` in the C, as {@link Date.nthKday} itself is.
+ */
+function validNthKdayP(
+  y: number | bigint,
+  m: number,
+  n: number,
+  k: number,
+  sg: number,
+): [nth: bigint, rjd: number] | null {
+  const style = guessStyle(y, sg);
+
+  if (style === 0) {
+    const jd = cValidNthKdayP(Number(y), m, n, k, sg);
+    if (jd === null) return null;
+    return decodeJd(jd);
+  }
+  const [nth, ry] = decodeYear(y, style);
+  const rjd = cValidNthKdayP(ry, m, n, k, style);
+  if (rjd === null) return null;
+  return [nth, rjd];
 }
 
 /**
@@ -4355,12 +4497,16 @@ function rtValidJdP(jd: number | bigint): number | bigint {
 }
 
 /**
- * @internal `date_core.c` `rt__valid_ordinal_p` (`date_core.c:4126-4139`) over
- * `c_valid_ordinal_p` (`date_core.c:747-768`), which answers `nil` rather than
- * raising so its caller can fall through to the next kind of date.
+ * @internal `date_core.c` `rt__valid_ordinal_p` (`date_core.c:4125-4138`) over
+ * {@link validOrdinalP} (`date_core.c:2199-2227`), which answers `nil` rather
+ * than raising so its caller can fall through to the next kind of date. As in
+ * {@link rtValidCivilP}, the `nth` the split leaves goes straight back in
+ * through {@link encodeJd} (`date_core.c:4136`).
  */
-function rtValidOrdinalP(y: number, d: number, sg = DEFAULT_SG): number | null {
-  return cValidOrdinalP(y, d, sg);
+function rtValidOrdinalP(y: number | bigint, d: number, sg = DEFAULT_SG): number | bigint | null {
+  const r = validOrdinalP(y, d, sg);
+  if (r === null) return null;
+  return encodeJd(r[0], r[1]);
 }
 
 /**
@@ -4378,6 +4524,37 @@ function rtValidCivilP(
   sg = DEFAULT_SG,
 ): number | bigint | null {
   const r = validCivilP(y, m, d, sg);
+  if (r === null) return null;
+  return encodeJd(r[0], r[1]);
+}
+
+/**
+ * @internal `date_core.c` `rt__valid_commercial_p` (`date_core.c:4155-4168`)
+ * over {@link validCommercialP}, the same shape as {@link rtValidCivilP}.
+ */
+function rtValidCommercialP(
+  y: number | bigint,
+  w: number,
+  d: number,
+  sg = DEFAULT_SG,
+): number | bigint | null {
+  const r = validCommercialP(y, w, d, sg);
+  if (r === null) return null;
+  return encodeJd(r[0], r[1]);
+}
+
+/**
+ * @internal `date_core.c` `rt__valid_weeknum_p` (`date_core.c:4170-4183`) over
+ * {@link validWeeknumP}, the same shape as {@link rtValidCivilP}.
+ */
+function rtValidWeeknumP(
+  y: number | bigint,
+  w: number,
+  d: number,
+  f: number,
+  sg = DEFAULT_SG,
+): number | bigint | null {
+  const r = validWeeknumP(y, w, d, f, sg);
   if (r === null) return null;
   return encodeJd(r[0], r[1]);
 }
@@ -4428,7 +4605,7 @@ function rtValidDateFragsP(parts: DateParts, sg = DEFAULT_SG): number | bigint |
       if (wday !== undefined) if (wday === 0) wday = 7;
     }
     if (wday !== undefined && parts.cweek !== undefined && parts.cwyear !== undefined) {
-      const d = cValidCommercialP(parts.cwyear, parts.cweek, wday, sg);
+      const d = rtValidCommercialP(parts.cwyear, parts.cweek, wday, sg);
       if (d !== null) return d;
     }
   }
@@ -4440,7 +4617,7 @@ function rtValidDateFragsP(parts: DateParts, sg = DEFAULT_SG): number | bigint |
       if (wday !== undefined) if (wday === 7) wday = 0;
     }
     if (wday !== undefined && parts.wnum0 !== undefined && parts.year !== undefined) {
-      const d = cValidWeeknumP(parts.year, parts.wnum0, wday, 0, sg);
+      const d = rtValidWeeknumP(parts.year, parts.wnum0, wday, 0, sg);
       if (d !== null) return d;
     }
   }
@@ -4451,7 +4628,7 @@ function rtValidDateFragsP(parts: DateParts, sg = DEFAULT_SG): number | bigint |
     if (wday !== undefined) wday = mod(wday - 1, 7);
 
     if (wday !== undefined && parts.wnum1 !== undefined && parts.year !== undefined) {
-      const d = cValidWeeknumP(parts.year, parts.wnum1, wday, 1, sg);
+      const d = rtValidWeeknumP(parts.year, parts.wnum1, wday, 1, sg);
       if (d !== null) return d;
     }
   }
@@ -4599,6 +4776,45 @@ export function dtNewByFrags(hash: DateParts | null, sg = DEFAULT_SG): DateTime 
  */
 function round(x: number): number {
   return x < 0 ? -Math.round(-x) : Math.round(x);
+}
+
+/**
+ * @internal The `limit:` kwarg every `Date._parse`-family singleton takes
+ * (`date_core.c` `get_limit` / `check_limit`, `date_core.c:4452-4479`). Ruby's
+ * trailing kwargs Hash is the trailing options object here, so an omitted one
+ * is the C's `NIL_P(opt)` — the 128-character default — and an explicit
+ * `{ limit: null }` is the C's `NIL_P(limit)`, which is `SIZE_MAX`, i.e. no
+ * bound at all.
+ */
+interface ParseOpt {
+  limit?: number | null;
+}
+
+/** @internal `date_core.c` `get_limit` (`date_core.c:4452-4461`). */
+function getLimit(opt: ParseOpt | undefined): number {
+  if (opt !== undefined) {
+    const limit = opt.limit;
+    if (limit == null) return Infinity;
+    return limit;
+  }
+  return 128;
+}
+
+/**
+ * @internal `date_core.c` `check_limit` (`date_core.c:4467-4479`), which runs
+ * BEFORE any sub-parser so a pathological string is rejected rather than
+ * walked. A `nil` string is let through to the sub-parser that answers `{}` for
+ * it (`NIL_P(str)`, `date_core.c:4471`). The C measures `RSTRING_LEN` — bytes —
+ * where a JS string measures UTF-16 code units; the gem's own tests are ASCII,
+ * where the two agree.
+ */
+function checkLimit(str: string | null | undefined, opt: ParseOpt | undefined): void {
+  if (str == null) return;
+  const slen = str.length;
+  const limit = getLimit(opt);
+  if (slen > limit) {
+    throw new ArgumentError(`string length (${slen}) exceeds the limit ${limit}`);
+  }
 }
 
 /** @internal `date_core.c` `day_to_sec` (`date_core.c:1029-1035`). */
@@ -5684,7 +5900,7 @@ export class Date {
    * of the year, so `Date.ordinal(2001, -1)` is 2001-12-31.
    */
   static ordinal(
-    year = -4712,
+    year: number | bigint = -4712,
     yday: number | Rational = 1,
     start = DEFAULT_SG,
   ): Temporal.PlainDate {
@@ -5692,9 +5908,9 @@ export class Date {
     checkNumeric(year, "year");
     const sg = val2sg(start);
     const [d, fr2] = num2intWithFrac(yday, 1, false);
-    const r = cValidOrdinalP(year, d, sg);
+    const r = validOrdinalP(year, d, sg);
     if (r === null) throw new DateError("invalid date");
-    return addFracTo(new Date(SEAT, 0n, r, sg), fr2).toDate();
+    return addFracTo(new Date(SEAT, r[0], r[1], sg), fr2).toDate();
   }
 
   /**
@@ -5727,7 +5943,7 @@ export class Date {
    * the commercial year, so `Date.commercial(2001, -1, -1)` is 2001-12-30.
    */
   static commercial(
-    cwyear = -4712,
+    cwyear: number | bigint = -4712,
     cweek = 1,
     cwday: number | Rational = 1,
     start = DEFAULT_SG,
@@ -5737,9 +5953,9 @@ export class Date {
     checkNumeric(cwyear, "year");
     const sg = val2sg(start);
     const [d, fr2] = num2intWithFrac(cwday, 1, false);
-    const r = cValidCommercialP(cwyear, cweek, d, sg);
+    const r = validCommercialP(cwyear, cweek, d, sg);
     if (r === null) throw new DateError("invalid date");
-    return addFracTo(new Date(SEAT, 0n, r, sg), fr2).toDate();
+    return addFracTo(new Date(SEAT, r[0], r[1], sg), fr2).toDate();
   }
 
   /**
@@ -5758,7 +5974,7 @@ export class Date {
    * day never moves midnight off its own date.
    */
   static weeknum(
-    year = -4712,
+    year: number | bigint = -4712,
     week = 0,
     day: number | Rational = 1,
     firstday = 0,
@@ -5766,10 +5982,9 @@ export class Date {
   ): Temporal.PlainDate {
     const sg = val2sg(start);
     const [d, fr2] = num2intWithFrac(day, 1, false);
-    const rjd = cValidWeeknumP(year, week, d, firstday, sg);
-    if (rjd === null) throw new DateError("invalid date");
-    const [nth, rrjd] = decodeJd(rjd);
-    return addFracTo(new Date(SEAT, nth, rrjd, sg), fr2).toDate();
+    const r = validWeeknumP(year, week, d, firstday, sg);
+    if (r === null) throw new DateError("invalid date");
+    return addFracTo(new Date(SEAT, r[0], r[1], sg), fr2).toDate();
   }
 
   /**
@@ -5781,7 +5996,7 @@ export class Date {
    * (`num2int_with_frac(k, positive_inf)`, `date_core.c:3741`).
    */
   static nthKday(
-    year = -4712,
+    year: number | bigint = -4712,
     month = 1,
     n = 1,
     k: number | Rational = 1,
@@ -5789,10 +6004,9 @@ export class Date {
   ): Temporal.PlainDate {
     const sg = val2sg(start);
     const [rk, fr2] = num2intWithFrac(k, 1, false);
-    const rjd = cValidNthKdayP(year, month, n, rk, sg);
-    if (rjd === null) throw new DateError("invalid date");
-    const [nth, rrjd] = decodeJd(rjd);
-    return addFracTo(new Date(SEAT, nth, rrjd, sg), fr2).toDate();
+    const r = validNthKdayP(year, month, n, rk, sg);
+    if (r === null) throw new DateError("invalid date");
+    return addFracTo(new Date(SEAT, r[0], r[1], sg), fr2).toDate();
   }
 
   /**
@@ -5867,8 +6081,13 @@ export class Date {
    * editing it (`date_parse.c:2186-2229`). `:_comp` starts out as `comp`
    * (`date_parse.c:2172`) and only ever turns false, so an absent one is `comp`,
    * and the year is completed only within `0..99` (`date_parse.c:2267-2287`).
+   *
+   * `date_s__parse_internal` (`date_core.c:4481-4498`) {@link checkLimit}s the
+   * string against the `limit:` kwarg first, so a string past the limit raises
+   * `ArgumentError` before `date__parse` runs at all.
    */
-  static _parse(str: string, comp = true): DateParts {
+  static _parse(str: string, comp = true, opt?: ParseOpt): DateParts {
+    checkLimit(str, opt);
     const hash: DateParts = {};
     str = parseDay(str, hash) ?? str;
     str = parseTime(str, hash) ?? str;
@@ -5892,16 +6111,16 @@ export class Date {
     if (/[a-z]/i.test(str)) str = parseBc(str, hash) ?? str;
     if (/\d/.test(str)) parseFrag(str, hash);
     if (hash._bc) {
-      if (hash.cwyear !== undefined) hash.cwyear = -hash.cwyear + 1;
-      if (hash.year !== undefined) hash.year = -hash.year + 1;
+      if (hash.cwyear !== undefined) hash.cwyear = fAdd(fNegate(hash.cwyear), 1);
+      if (hash.year !== undefined) hash.year = fAdd(fNegate(hash.year), 1);
     }
     delete hash._bc;
     if (comp && hash._comp !== false) {
       if (hash.cwyear !== undefined && hash.cwyear >= 0 && hash.cwyear <= 99) {
-        hash.cwyear = compYear69(hash.cwyear);
+        hash.cwyear = compYear69(Number(hash.cwyear));
       }
       if (hash.year !== undefined && hash.year >= 0 && hash.year <= 99) {
-        hash.year = compYear69(hash.year);
+        hash.year = compYear69(Number(hash.year));
       }
     }
     {
@@ -5928,8 +6147,13 @@ export class Date {
    * A string that named only a time of day answers no arm of
    * {@link rtValidDateFragsP} and raises.
    */
-  static parse(str = JULIAN_EPOCH_DATE, comp = true, start = DEFAULT_SG): Temporal.PlainDate {
-    return dNewByFrags(Date._parse(str, comp), val2sg(start)).toDate();
+  static parse(
+    str = JULIAN_EPOCH_DATE,
+    comp = true,
+    start = DEFAULT_SG,
+    opt?: ParseOpt,
+  ): Temporal.PlainDate {
+    return dNewByFrags(Date._parse(str, comp, opt), val2sg(start)).toDate();
   }
 
   /**
@@ -5939,7 +6163,8 @@ export class Date {
    * for a string that is not one. Unlike {@link Date._parse} it guesses
    * nothing — the pattern is anchored end to end.
    */
-  static _rfc2822(str: string): DateParts {
+  static _rfc2822(str: string, opt?: ParseOpt): DateParts {
+    checkLimit(str, opt);
     return dateRfc2822(str);
   }
 
@@ -5948,8 +6173,8 @@ export class Date {
    * `rb_define_singleton_method` onto `date_s__rfc2822` itself): RFC 822 is
    * what RFC 2822 obsoleted, and the gem parses both with the one function.
    */
-  static _rfc822(str: string): DateParts {
-    return Date._rfc2822(str);
+  static _rfc822(str: string, opt?: ParseOpt): DateParts {
+    return Date._rfc2822(str, opt);
   }
 
   /**
@@ -5958,13 +6183,21 @@ export class Date {
    * `date_core.c:4855-4877`), which is `Date._rfc2822` followed by
    * `d_new_by_frags`.
    */
-  static rfc2822(str = JULIAN_EPOCH_DATETIME_RFC3339, start = DEFAULT_SG): Temporal.PlainDate {
-    return dNewByFrags(Date._rfc2822(str), val2sg(start)).toDate();
+  static rfc2822(
+    str = JULIAN_EPOCH_DATETIME_RFC3339,
+    start = DEFAULT_SG,
+    opt?: ParseOpt,
+  ): Temporal.PlainDate {
+    return dNewByFrags(Date._rfc2822(str, opt), val2sg(start)).toDate();
   }
 
   /** Ruby `Date.rfc822` (ruby/date, `date_core.c:9465`), `Date.rfc2822`'s alias. */
-  static rfc822(str = JULIAN_EPOCH_DATETIME_RFC3339, start = DEFAULT_SG): Temporal.PlainDate {
-    return Date.rfc2822(str, start);
+  static rfc822(
+    str = JULIAN_EPOCH_DATETIME_RFC3339,
+    start = DEFAULT_SG,
+    opt?: ParseOpt,
+  ): Temporal.PlainDate {
+    return Date.rfc2822(str, start, opt);
   }
 
   /**
@@ -5973,7 +6206,8 @@ export class Date {
    * `date_parse.c`): the frags of an RFC 2616 date-time in any of its three
    * formats, and an empty hash for a string that is none of them.
    */
-  static _httpdate(str: string): DateParts {
+  static _httpdate(str: string, opt?: ParseOpt): DateParts {
+    checkLimit(str, opt);
     return dateHttpdate(str);
   }
 
@@ -5982,8 +6216,12 @@ export class Date {
    * Date::ITALY, limit: 128)` (ruby/date, `date_core.c` `date_s_httpdate`,
    * `date_core.c:4923-4945`).
    */
-  static httpdate(str = JULIAN_EPOCH_DATETIME_HTTPDATE, start = DEFAULT_SG): Temporal.PlainDate {
-    return dNewByFrags(Date._httpdate(str), val2sg(start)).toDate();
+  static httpdate(
+    str = JULIAN_EPOCH_DATETIME_HTTPDATE,
+    start = DEFAULT_SG,
+    opt?: ParseOpt,
+  ): Temporal.PlainDate {
+    return dNewByFrags(Date._httpdate(str, opt), val2sg(start)).toDate();
   }
 
   /**
@@ -7532,7 +7770,7 @@ export class DateTime extends DateWithoutParseStatics {
    * straight to `valid_ordinal_p`.
    */
   static ordinal(
-    year = -4712,
+    year: number | bigint = -4712,
     yday: number | Rational = 1,
     hour?: number | Rational,
     minute?: number | Rational,
@@ -7573,8 +7811,8 @@ export class DateTime extends DateWithoutParseStatics {
     if (hFr !== 0) fr2 = hFr;
     if (dFr !== 0) fr2 = dFr;
 
-    const rjd = cValidOrdinalP(year, d, sg);
-    if (rjd === null) throw new DateError("invalid date");
+    const r = validOrdinalP(year, d, sg);
+    if (r === null) throw new DateError("invalid date");
     const rt = cValidTimeP(h, min, s);
     if (rt === null) throw new DateError("invalid date");
     let [rh] = rt;
@@ -7584,7 +7822,7 @@ export class DateTime extends DateWithoutParseStatics {
       fr2 = fr2 instanceof Rational ? fr2.add(DAY_IN_SECONDS) : fr2 + DAY_IN_SECONDS;
     }
     const localDf = timeToDf(rh, rmin, rs);
-    const [nth, rrjd] = decodeJd(rjd);
+    const [nth, rrjd] = r;
     const [rjd2, df, sf] = addFrac(
       jdLocalToUtc(rrjd, localDf, rof),
       dfLocalToUtc(localDf, rof),
@@ -7624,7 +7862,7 @@ export class DateTime extends DateWithoutParseStatics {
    * and `cwyear` is handed straight to `valid_commercial_p`, so neither does.
    */
   static commercial(
-    cwyear = -4712,
+    cwyear: number | bigint = -4712,
     cweek = 1,
     cwday: number | Rational = 1,
     hour?: number | Rational,
@@ -7667,8 +7905,8 @@ export class DateTime extends DateWithoutParseStatics {
     if (hFr !== 0) fr2 = hFr;
     if (dFr !== 0) fr2 = dFr;
 
-    const rjd = cValidCommercialP(cwyear, cweek, d, sg);
-    if (rjd === null) throw new DateError("invalid date");
+    const r = validCommercialP(cwyear, cweek, d, sg);
+    if (r === null) throw new DateError("invalid date");
     const rt = cValidTimeP(h, min, s);
     if (rt === null) throw new DateError("invalid date");
     let [rh] = rt;
@@ -7678,7 +7916,7 @@ export class DateTime extends DateWithoutParseStatics {
       fr2 = fr2 instanceof Rational ? fr2.add(DAY_IN_SECONDS) : fr2 + DAY_IN_SECONDS;
     }
     const localDf = timeToDf(rh, rmin, rs);
-    const [nth, rrjd] = decodeJd(rjd);
+    const [nth, rrjd] = r;
     const [rjd2, df, sf] = addFrac(
       jdLocalToUtc(rrjd, localDf, rof),
       dfLocalToUtc(localDf, rof),
@@ -7696,7 +7934,7 @@ export class DateTime extends DateWithoutParseStatics {
    * `firstday` and `year` do not.
    */
   static weeknum(
-    year = -4712,
+    year: number | bigint = -4712,
     week = 0,
     day: number | Rational = 1,
     firstday = 0,
@@ -7734,8 +7972,8 @@ export class DateTime extends DateWithoutParseStatics {
     if (hFr !== 0) fr2 = hFr;
     if (dFr !== 0) fr2 = dFr;
 
-    const rjd = cValidWeeknumP(year, week, d, firstday, sg);
-    if (rjd === null) throw new DateError("invalid date");
+    const r = validWeeknumP(year, week, d, firstday, sg);
+    if (r === null) throw new DateError("invalid date");
     const rt = cValidTimeP(h, min, s);
     if (rt === null) throw new DateError("invalid date");
     let [rh] = rt;
@@ -7745,7 +7983,7 @@ export class DateTime extends DateWithoutParseStatics {
       fr2 = fr2 instanceof Rational ? fr2.add(DAY_IN_SECONDS) : fr2 + DAY_IN_SECONDS;
     }
     const localDf = timeToDf(rh, rmin, rs);
-    const [nth, rrjd] = decodeJd(rjd);
+    const [nth, rrjd] = r;
     const [rjd2, df, sf] = addFrac(
       jdLocalToUtc(rrjd, localDf, rof),
       dfLocalToUtc(localDf, rof),
@@ -7762,7 +8000,7 @@ export class DateTime extends DateWithoutParseStatics {
    * (`num2int_with_frac(k, 4)`, `date_core.c:8089-8090`).
    */
   static nthKday(
-    year = -4712,
+    year: number | bigint = -4712,
     month = 1,
     n = 1,
     k: number | Rational = 1,
@@ -7800,8 +8038,8 @@ export class DateTime extends DateWithoutParseStatics {
     if (hFr !== 0) fr2 = hFr;
     if (kFr !== 0) fr2 = kFr;
 
-    const rjd = cValidNthKdayP(year, month, n, rk, sg);
-    if (rjd === null) throw new DateError("invalid date");
+    const r = validNthKdayP(year, month, n, rk, sg);
+    if (r === null) throw new DateError("invalid date");
     const rt = cValidTimeP(h, min, s);
     if (rt === null) throw new DateError("invalid date");
     let [rh] = rt;
@@ -7811,7 +8049,7 @@ export class DateTime extends DateWithoutParseStatics {
       fr2 = fr2 instanceof Rational ? fr2.add(DAY_IN_SECONDS) : fr2 + DAY_IN_SECONDS;
     }
     const localDf = timeToDf(rh, rmin, rs);
-    const [nth, rrjd] = decodeJd(rjd);
+    const [nth, rrjd] = r;
     const [rjd2, df, sf] = addFrac(
       jdLocalToUtc(rrjd, localDf, rof),
       dfLocalToUtc(localDf, rof),
@@ -7880,8 +8118,9 @@ export class DateTime extends DateWithoutParseStatics {
     str = JULIAN_EPOCH_DATETIME,
     comp = true,
     start = DEFAULT_SG,
+    opt?: ParseOpt,
   ): Temporal.PlainDateTime | Temporal.ZonedDateTime {
-    return dtNewByFrags(Date._parse(str, comp), val2sg(start)).toDatetime();
+    return dtNewByFrags(Date._parse(str, comp, opt), val2sg(start)).toDatetime();
   }
 
   /**
@@ -7893,16 +8132,18 @@ export class DateTime extends DateWithoutParseStatics {
   static rfc2822(
     str = JULIAN_EPOCH_DATETIME_RFC3339,
     start = DEFAULT_SG,
+    opt?: ParseOpt,
   ): Temporal.PlainDateTime | Temporal.ZonedDateTime {
-    return dtNewByFrags(Date._rfc2822(str), val2sg(start)).toDatetime();
+    return dtNewByFrags(Date._rfc2822(str, opt), val2sg(start)).toDatetime();
   }
 
   /** Ruby `DateTime.rfc822` (ruby/date, `date_core.c:9598`), `DateTime.rfc2822`'s alias. */
   static rfc822(
     str = JULIAN_EPOCH_DATETIME_RFC3339,
     start = DEFAULT_SG,
+    opt?: ParseOpt,
   ): Temporal.PlainDateTime | Temporal.ZonedDateTime {
-    return DateTime.rfc2822(str, start);
+    return DateTime.rfc2822(str, start, opt);
   }
 
   /**
@@ -7913,8 +8154,9 @@ export class DateTime extends DateWithoutParseStatics {
   static httpdate(
     str = JULIAN_EPOCH_DATETIME_HTTPDATE,
     start = DEFAULT_SG,
+    opt?: ParseOpt,
   ): Temporal.PlainDateTime | Temporal.ZonedDateTime {
-    return dtNewByFrags(Date._httpdate(str), val2sg(start)).toDatetime();
+    return dtNewByFrags(Date._httpdate(str, opt), val2sg(start)).toDatetime();
   }
 
   /**

@@ -152,6 +152,11 @@ export function userInputInTimeZone(
  * default zone (`isUtc()` → "UTC", else host-local), matching Rails'
  * `is_utc?` branching.
  *
+ * `year` is read the way `Time.utc`'s year argument is, and so takes the
+ * Bignum `::Date._parse` answers for a year past a JS number (ruby/date,
+ * `date_parse.c`'s `str2num`): `Number` makes it the `Infinity` Temporal
+ * rejects, which lands on the same `rescue nil` MRI's `RangeError` does.
+ *
  * `microsec` is read the way `Time.utc`'s microsecond argument is: a Rational
  * one carries sub-microsecond resolution down into `nsec`, which is what
  * `Type::Time` relies on when it hands a raw `:sec_fraction` straight through
@@ -162,7 +167,7 @@ export function userInputInTimeZone(
  */
 export function newTime(
   this: TimezoneAware | void,
-  year: number | null | undefined,
+  year: number | bigint | null | undefined,
   mon: number | null | undefined,
   mday: number | null | undefined,
   hour: number | null | undefined,
@@ -182,7 +187,7 @@ export function newTime(
         ? Number(microsec * 1000n)
         : Math.trunc((microsec ?? 0) * 1000);
   const components = {
-    year,
+    year: Number(year),
     month: mon,
     day: mday,
     hour: hour ?? 0,
