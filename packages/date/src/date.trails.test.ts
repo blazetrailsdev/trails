@@ -1794,6 +1794,21 @@ describe("DateTime", () => {
     const shifted = d.newOffset("+09:00");
     expect([shifted.jd, shifted.hour, shifted.min, shifted.sec]).toEqual([2451944, 15, 5, 6]);
   });
+
+  // `test_date_arith.rb`'s `test_new_offset` only reads `#offset` back, so it
+  // never forces the deferred civil seat that `set_of` (`date_core.c:5890-5898`)
+  // runs `get_c_jd`/`get_c_df` for. A civil-built receiver carries no stored
+  // day or day-fraction until then.
+  it("forces the deferred civil seat before copying it under the new offset", () => {
+    const d = new RubyDateTime(2002, 3, 14);
+    const shifted = d.newOffset("+0900");
+
+    expect(shifted.offset).toEqual(new Rational(9, 24));
+    expect(shifted.jd).toBe(2452348);
+    expect([shifted.year, shifted.mon, shifted.mday]).toEqual([2002, 3, 14]);
+    expect([shifted.hour, shifted.min, shifted.sec]).toEqual([9, 0, 0]);
+    expect(shifted.toS()).toBe("2002-03-14T09:00:00+09:00");
+  });
 });
 
 describe("Time", () => {
