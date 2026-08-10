@@ -743,7 +743,10 @@ export { NameError } from "@blazetrails/activesupport";
 export class SQLWarning extends AdapterError {
   readonly code: string | null;
   readonly level: string | null;
-  sql?: string;
+  // `handle_warnings` assigns whatever its caller passes: the PG::Result on
+  // PostgreSQL (postgresql/database_statements.rb:166, :220) and the SQL string
+  // on MySQL, so Rails' `sql` is not a String on every adapter.
+  sql?: unknown;
 
   /**
    * `connectionPool` is inherited via {@link AdapterError}'s accessor; we
@@ -754,7 +757,7 @@ export class SQLWarning extends AdapterError {
     message?: string,
     code?: string | null,
     level?: string | null,
-    sql?: string,
+    sql?: unknown,
     connectionPool?: unknown,
   ) {
     super(message ?? "SQL Warning", { connectionPool });
