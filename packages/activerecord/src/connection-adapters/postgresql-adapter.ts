@@ -206,6 +206,24 @@ export class PostgreSQLAdapter
     return pgColumnNameWithOrderMatcher();
   }
 
+  /**
+   * Mirrors: PostgreSQL::Quoting::ClassMethods#quote_column_name
+   * (postgresql/quoting.rb:46-48). Lives on the class, as in Rails — the
+   * instance quoter is the inherited `self.class` delegator
+   * (abstract/quoting.rb:135-138).
+   */
+  static override quoteColumnName(name: string): string {
+    return pgQuoteColumnName(name);
+  }
+
+  /**
+   * Mirrors: PostgreSQL::Quoting::ClassMethods#quote_table_name
+   * (postgresql/quoting.rb:54-56).
+   */
+  static override quoteTableName(name: string): string {
+    return pgQuoteTableName(name);
+  }
+
   // Mirrors Rails' PostgreSQLAdapter.dbconsole, which exports PG* env vars
   // before exec'ing psql. We can't mutate the process environment (no
   // process.* access), so we return the env map the PTY exec would set;
@@ -3358,14 +3376,6 @@ export class PostgreSQLAdapter
 
   supportsLazyTransactions(): boolean {
     return true;
-  }
-
-  quoteColumnName(name: string): string {
-    return pgQuoteColumnName(name);
-  }
-
-  quoteTableName(name: string): string {
-    return pgQuoteTableName(name);
   }
 
   /**

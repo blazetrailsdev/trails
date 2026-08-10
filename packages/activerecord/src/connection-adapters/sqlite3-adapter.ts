@@ -248,6 +248,23 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return new RegExp(`^${ordered}(?:\\s*,\\s*${ordered})*$`, "i");
   }
 
+  /**
+   * Mirrors: SQLite3::Quoting::ClassMethods#quote_column_name
+   * (sqlite3/quoting.rb:44-46). Lives on the class, as in Rails — the instance
+   * quoter is the inherited `self.class` delegator (abstract/quoting.rb:135-138).
+   */
+  static override quoteColumnName(name: string): string {
+    return quoteColumnName(name);
+  }
+
+  /**
+   * Mirrors: SQLite3::Quoting::ClassMethods#quote_table_name
+   * (sqlite3/quoting.rb:48-50) — dot-split, so `foo.bar` → `"foo"."bar"`.
+   */
+  static override quoteTableName(name: string): string {
+    return quoteTableName(name);
+  }
+
   /** @internal */
   override arelVisitor(): Visitors.ToSql {
     return new Visitors.SQLite(this);
@@ -1019,21 +1036,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    */
   override quoteString(s: string): string {
     return sqliteQuoteString(s);
-  }
-
-  // quoteTableName / quoteColumnName ARE kept: Rails' SQLite3::Quoting defines
-  // both explicitly (sqlite3/quoting.rb:44-50) — column → `"x"`, table →
-  // dot-split `"."` — while Rails' abstract leaves quote_column_name a
-  // NotImplementedError and quote_table_name a no-split default
-  // (abstract/quoting.rb:60-67). Inheriting Trails' broader abstract here would
-  // diverge from SQLite's concrete Rails method.
-
-  override quoteTableName(name: string): string {
-    return quoteTableName(name);
-  }
-
-  override quoteColumnName(name: string): string {
-    return quoteColumnName(name);
   }
 
   override quoteTableNameForAssignment(table: string, attr: string): string {
