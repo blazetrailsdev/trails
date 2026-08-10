@@ -318,8 +318,6 @@ describe("DatabaseStatements", () => {
         },
         withRawConnection: async (_opts: unknown, block: (conn: unknown) => Promise<unknown>) =>
           block(null),
-        // Rails' perform_query reports back by mutating the notification payload
-        // (postgresql/database_statements.rb), which is the seam under test.
         performQuery: (
           _conn: unknown,
           _sql: string,

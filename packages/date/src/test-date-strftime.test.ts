@@ -83,9 +83,7 @@ Object.assign(STRFTIME_2001_02_03, STRFTIME_2001_02_03_CVS19);
 Object.assign(STRFTIME_2001_02_03, STRFTIME_2001_02_03_GNUext);
 
 describe("TestDateStrftime", () => {
-  // Ruby's `case f[-1,1] ... when` arms: the expected value for `%E`/`%O` turns
-  // on the directive letter, so the assertion is inside the branch there too.
-  /* eslint-disable vitest/no-conditional-expect */
+  /* eslint-disable vitest/no-conditional-expect -- Ruby's `case f[-1,1] ... when` arms decide the expected value */
   it("strftime", () => {
     const d = new RubyDate(2001, 2, 3);
     for (const [f, s] of Object.entries(STRFTIME_2001_02_03)) {
@@ -163,10 +161,9 @@ describe("TestDateStrftime", () => {
     }
   });
 
-  // Ruby's `omit if s.empty? || s == '%G'` — a runtime skip, not a branch.
   it("strftime 3 2", { timeout: 120_000 }, (ctx) => {
     const s = RubyTime.now().strftime("%G");
-    // eslint-disable-next-line vitest/no-conditional-in-test
+    // eslint-disable-next-line vitest/no-conditional-in-test -- Ruby's `omit if`
     if (s.length === 0 || s === "%G") return ctx.skip();
     for (const d of dateRange(new RubyDate(1970, 1, 1), new RubyDate(2037, 12, 31))) {
       const t = RubyTime.utc(Number(d.year), d.mon, d.day);
@@ -259,8 +256,10 @@ function inspect(value: unknown): string {
 
 /**
  * Ruby's `(Date.new(1970,1,1)..Date.new(2037,12,31)).each`, whose `Range#each`
- * walks by `Date#succ`. RFC 0088 has not ported `succ` yet, so the walk goes
- * through `Temporal.PlainDate#add` and rebuilds the gem object per day.
+ * walks by `Date#succ` (`date_core.c` `d_lite_next_day` over `d_lite_plus`).
+ * Neither `#succ` nor `#+` is ported yet — they belong to
+ * 0088-date-gem-port/port-test-date-arith-operators — so the walk goes through
+ * `Temporal.PlainDate#add` and rebuilds the gem object per day.
  */
 function* dateRange(from: RubyDate, to: RubyDate): Generator<RubyDate> {
   const last = to.toDate();

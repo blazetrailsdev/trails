@@ -5877,6 +5877,10 @@ export class Date {
   }
 
   /** Ruby `Date#to_s` (ruby/date, `date_core.c` `d_lite_to_s`). */
+  toS(): string {
+    return this.strftime("%Y-%m-%d");
+  }
+
   /**
    * Ruby `Date#deconstruct_keys(array_of_names_or_nil)` (ruby/date,
    * `date_core.c` `d_lite_deconstruct_keys`, `date_core.c:7500-7504`), the
@@ -5886,10 +5890,6 @@ export class Date {
    */
   deconstructKeys(keys: string[] | null): Record<string, unknown> {
     return deconstructKeys(this, keys, false);
-  }
-
-  toS(): string {
-    return this.strftime("%Y-%m-%d");
   }
 
   /**
@@ -6764,6 +6764,10 @@ export class DateTime extends DateWithoutParseStatics {
    * `date_core.c:8701-8706`), a distinct C function from `d_lite_to_s` — which
    * is why `::Date#to_s` keeps the date-only form.
    */
+  override toS(): string {
+    return this.strftime("%Y-%m-%dT%H:%M:%S%:z");
+  }
+
   /**
    * Ruby `DateTime#deconstruct_keys(array_of_names_or_nil)` (ruby/date,
    * `date_core.c` `dt_lite_deconstruct_keys`), which is the same body under
@@ -6771,10 +6775,6 @@ export class DateTime extends DateWithoutParseStatics {
    */
   override deconstructKeys(keys: string[] | null): Record<string, unknown> {
     return deconstructKeys(this, keys, true);
-  }
-
-  override toS(): string {
-    return this.strftime("%Y-%m-%dT%H:%M:%S%:z");
   }
 
   /**
