@@ -267,8 +267,11 @@ catches a class of drift a reviewer would otherwise spend a cycle on.
 The compare tools live under the `parity:*` script namespace — `parity:api`,
 `parity:test`, `parity:fixtures`, `parity:schema`, plus their sub-commands
 (`parity:api:calls`, `parity:api:extra`, `parity:test:assertions`, …). The
-older `api:*` / `test:compare` / `test:assertions:*` aliases have been removed —
-`parity:*` is the only spelling.
+older `api:*` / `test:compare` / `test:assertions:*` aliases are deprecated and
+undocumented: they still delegate so a stale prompt or a muscle-memory
+invocation keeps working, but they are scheduled for deletion. Never spell one
+in a doc, a comment, a script, or a CI step — `parity:*` is the only name to
+write.
 
 1. **Size.**
    `git diff --shortstat origin/main...HEAD -- ':!**/pnpm-lock.yaml' ':!**/__snapshots__/**' ':!**/*.md'`
