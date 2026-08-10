@@ -1,6 +1,7 @@
 import { Subscriber, getClassState } from "./subscriber.js";
 import type { Event } from "./notifications/instrumenter.js";
 import type { Logger } from "./logger.js";
+import { trailsLogger } from "./trails-logger-slot.js";
 
 /**
  * Check whether a logger has a given level enabled.
@@ -91,8 +92,17 @@ export class LogSubscriber extends Subscriber {
 
   private static _logger: Logger | null = null;
 
+  /**
+   * Rails `LogSubscriber.logger`
+   * (`activesupport/lib/active_support/log_subscriber.rb:93-97`), which falls
+   * back to the application logger. `defined?(Rails) && Rails.respond_to?(:logger)`
+   * is a call-time constant resolution; `trailsLogger` is the zero-import slot
+   * `Trails.logger` writes itself into, read here at call time for the same
+   * reason. The memoization is Rails' `||=`, so a later `Trails.logger =` does
+   * not retroactively change a subscriber that has already read it.
+   */
   static get logger(): Logger | null {
-    return this._logger;
+    return (this._logger ??= trailsLogger as Logger | null);
   }
 
   static set logger(value: Logger | null) {
@@ -187,8 +197,15 @@ export class LogSubscriber extends Subscriber {
 
   eventLevels: Map<string, (logger: Logger) => boolean> = new Map();
 
+  /**
+   * Rails `LogSubscriber#logger`
+   * (`activesupport/lib/active_support/log_subscriber.rb:138-140`), which names
+   * `LogSubscriber` itself — NOT `self.class`. A subclass's own `logger=` sets
+   * a class-level ivar the instance path never reads, so every subscriber logs
+   * through the one base-class logger.
+   */
   get logger(): Logger | null {
-    return (this.constructor as typeof LogSubscriber).logger;
+    return LogSubscriber.logger;
   }
 
   get colorizeLogging(): boolean {
