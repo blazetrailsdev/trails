@@ -53,6 +53,24 @@ licence to write the old names in a comment, a doc or a script. The fix for a
 hit is always the `parity:*` spelling — the three-entry allowlist in
 `legacy-script-names.ts` is closed.
 
+## Everything in the namespace is read-only unless asked to write
+
+A bare `parity:*` invocation reports and exits; writing is always an explicit
+flag (`--write` on the ratchets, `--reseed` on the baselines). That includes
+`parity:test:stubs`, which lists the stub files it _would_ generate and creates
+none until you pass `--write` — it used to write by default, and a single
+verification run once produced 200 files that a `git add -A` swept into a
+commit.
+
+## The AR closure rollup
+
+`parity:api` prints an `AR closure` line beside `Data layer`: the data-layer
+packages plus only those support-gem files ActiveRecord/ActiveModel actually
+`require`. `api-compare/ar-closure.ts` derives that file set by walking
+`require` lines from `vendor/rails/{activerecord,activemodel}/lib`
+transitively and writes `api-compare/output/ar-closure.json` on every run, so a
+moved `require` changes the scope with no code change.
+
 ## Baselines, marks and excludes
 
 Every file below records **known, unfixed divergence**. They are all
