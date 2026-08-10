@@ -84,9 +84,8 @@ async function readJson<T>(file: string): Promise<T> {
   return JSON.parse(await fs.readFile(file, "utf-8")) as T;
 }
 
-/** This gate's rows — the `kind: "args"` half of the shared shards. The
- *  call-set rows in the same files belong to lint-call-mismatches.ts and would
- *  read as stale here. @internal */
+/** This gate's rows — the `kind: "args"` half of the shared shards; the
+ *  call-set rows in the same files would read as stale here. @internal */
 export async function loadBaseline(dir: string = BASELINE_DIR): Promise<CallArgExcludeEntry[]> {
   const files = (await listJsonFiles(dir)).sort();
   const merged: CallMismatchKeyed[] = [];

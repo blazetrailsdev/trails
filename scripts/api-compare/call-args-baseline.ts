@@ -3,13 +3,11 @@
  * lint-call-args.ts): the row shape, the key grain the baseline is recorded at,
  * and the diff/reseed/sort primitives the gate agrees on.
  *
- * Rows live in the EXISTING per-file shards of call-mismatches-exclude/,
- * alongside the call-set rows for the same source file, carrying `kind: "args"`
- * and the extra `rubyArgs` key component. The call-set key has no argument
- * component, so two differently-wrong argument lists at one call would collapse
- * into a single row without it; the `kind` discriminator is what keeps RFC
- * 0084's row-count debt metric exactly the call-set rows (see
- * call-mismatch-baseline.ts#RowKind for why a second tree was reversed).
+ * Rows live in the EXISTING per-file shards of call-mismatches-exclude/, next
+ * to the call-set rows for the same source file, carrying `kind: "args"` and
+ * the extra `rubyArgs` key component — without which two differently-wrong
+ * argument lists at one call would collapse into a single row. See
+ * call-mismatch-baseline.ts#RowKind.
  *
  * Only `shape` rows are gated (RFC 0095 §4); `naming` rows stay report-only.
  *
