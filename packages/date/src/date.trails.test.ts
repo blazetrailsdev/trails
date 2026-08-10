@@ -1956,7 +1956,7 @@ describe("Date::Infinity as a Range endpoint", () => {
     expect(pos.equals("foo")).toBe(false);
     expect(() => pos.lessThan("foo")).toThrow(ArgumentError);
     expect(() => pos.isBetween("foo", pos)).toThrow(
-      /comparison of Date::Infinity with an instance of String failed/,
+      /comparison of Date::Infinity with String failed/,
     );
   });
 });

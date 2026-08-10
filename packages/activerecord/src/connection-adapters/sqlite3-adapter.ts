@@ -2562,8 +2562,6 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
       if (!cols.length) continue;
       const escapedFrom = bareFrom.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       const newName = name.replace(new RegExp(`(^|_)(${escapedFrom})_`), `$1${bareTo}_`);
-      // sqlite3_adapter.rb:668-675 — the options hash and the add_index call it
-      // splats into, in Rails' own build order.
       const options: {
         name: string;
         internal: boolean;

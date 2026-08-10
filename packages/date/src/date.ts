@@ -4489,15 +4489,15 @@ export class DateInfinity {
    * Ruby `Comparable#cmp_int` over `rb_cmperr` (Ruby core `compar.c`), the one
    * body every operator below is derived from: a `nil` `<=>` is an
    * `ArgumentError`, not a `false`. `rb_cmperr` names the operand by `inspect`
-   * for `nil`, `true`, `false` and the Numerics, and by class otherwise.
+   * when it is a special constant or a Float, and by `rb_obj_class` otherwise.
    */
   #cmpint(other: unknown): number {
     const c = this.compareTo(other);
     if (c === null) {
       const rhs =
-        other === null || typeof other === "boolean" || kNumericP(other)
+        other == null || typeof other === "boolean" || kNumericP(other)
           ? String(other)
-          : `an instance of ${(other as object)?.constructor?.name ?? typeof other}`;
+          : ((other as object)?.constructor?.name ?? typeof other);
       throw new ArgumentError(`comparison of Date::Infinity with ${rhs} failed`);
     }
     return c;
@@ -4969,9 +4969,8 @@ export class Date {
   }
 
   /**
-   * Ruby `Date.valid_civil?(year, month, mday, start = Date::ITALY)` — and
-   * `Date.valid_date?`, the same C function under a second name
-   * (`date_core.c` `date_s_valid_civil_p`, `date_core.c:2600-2622`, `:9658-9659`).
+   * Ruby `Date.valid_civil?(year, month, mday, start = Date::ITALY)`
+   * (ruby/date, `date_core.c` `date_s_valid_civil_p`, `date_core.c:2600-2622`).
    * `valid_civil_sub` (`:2526-2560`) is `date_initialize`'s own branch on
    * `guess_style` without the `need_jd` half.
    */
@@ -4989,16 +4988,6 @@ export class Date {
       return validGregorianP(year as number, month as number, mday as number) !== null;
     }
     return validCivilP(year as number, month as number, mday as number, sg) !== null;
-  }
-
-  /** Ruby `Date.valid_date?`, `date_s_valid_civil_p` under its second name (`date_core.c:9659`). */
-  static isValidDate(
-    year: unknown,
-    month: unknown,
-    mday: unknown,
-    start: number = DEFAULT_SG,
-  ): boolean {
-    return Date.isValidCivil(year, month, mday, start);
   }
 
   /**
@@ -5043,19 +5032,13 @@ export class Date {
   }
 
   /**
-   * Ruby `Date.gregorian_leap?(year)` — and `Date.leap?`, the same C function
-   * under a second name (`date_core.c` `date_s_gregorian_leap_p`,
-   * `date_core.c:2995-3004`, `:9674-9676`).
+   * Ruby `Date.gregorian_leap?(year)` (ruby/date, `date_core.c`
+   * `date_s_gregorian_leap_p`, `date_core.c:2995-3004`).
    */
   static isGregorianLeap(year: unknown): boolean {
     checkNumeric(year, "year");
     const [, ry] = decodeYear(year as number, -1);
     return cGregorianLeapP(ry);
-  }
-
-  /** Ruby `Date.leap?`, `date_s_gregorian_leap_p` under its second name (`date_core.c:9676`). */
-  static isLeap(year: unknown): boolean {
-    return Date.isGregorianLeap(year);
   }
 
   /**
