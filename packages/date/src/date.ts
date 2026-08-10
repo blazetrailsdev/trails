@@ -4541,6 +4541,23 @@ function expectNumeric(x: unknown): void {
 }
 
 /**
+ * @internal `Float#to_r` (`rational.c` `float_to_r`), the exact binary value of
+ * a JS number. `d_lite_rshift`'s `f_add3` answers a Float for a Float `other`
+ * and its `f_idiv` / `f_mod` then work in Float; the value is the same either
+ * way, and carrying it as an exact {@link Rational} lets the one `else` arm
+ * serve both Numerics.
+ */
+function fToR(x: number): Rational {
+  let n = x;
+  let d = 1n;
+  while (!Number.isInteger(n)) {
+    n *= 2;
+    d *= 2n;
+  }
+  return new Rational(BigInt(n), d);
+}
+
+/**
  * @internal `f_mul(n, INT2FIX(12))` as `d_lite_next_year` / `d_lite_prev_year`
  * (`date_core.c:6554-6563`, `:6571-6580`) apply it — the one place the month
  * wrappers scale their argument before handing it to `Date#>>` / `Date#<<`,
@@ -5791,13 +5808,19 @@ export class Date {
    * canonicalizes a denominator of 1 back to an Integer, which is what puts
    * `Date.new(2000,1,31).next_year(Rational(1,2))` — `f_mul(n, 12)` is `(6/1)`,
    * so `t` is an Integer — on the C's `FIXNUM_P(t)` arm and answers 2000-07-31.
-   * The `else` arm is the C's `f_idiv` / `f_mod` pair, and a `t` that is
-   * genuinely fractional falls out of it as a fractional month, which
-   * `valid_civil_p` rejects exactly as the C's `FIX2INT` of a Rational does not
-   * survive.
+   * The `else` arm is the C's `f_idiv` / `f_mod` pair. Its `FIX2INT` is the
+   * non-Fixnum `rb_num2int`, which TRUNCATES: `f_mod` is a floor-mod, so the
+   * remainder is non-negative and the truncation is the bigint division below.
+   * That is what keeps `Date.new(2000,1,31) >> Rational(1,2)` on 2000-01-31 and
+   * puts `>> Rational(3,2)` on 2000-02-29 rather than walking into February by
+   * the fraction. A non-integral Float takes the same arm through
+   * {@link fToR}, since `Float#to_r` is exact and `f_idiv` / `f_mod` read the
+   * same integers off it that the C's Float arithmetic does.
    */
   rshift(other: number | bigint | Rational): this {
-    const t = new Rational(BigInt(this.year) * 12n + BigInt(this.mon - 1), 1).add(other);
+    const t = new Rational(BigInt(this.year) * 12n + BigInt(this.mon - 1), 1).add(
+      typeof other === "number" && !Number.isInteger(other) ? fToR(other) : other,
+    );
     let y: number | bigint;
     let m: number;
     if (t.denominator === 1n) {
@@ -5809,7 +5832,7 @@ export class Date {
       let q = t.numerator / d12;
       if (t.numerator % d12 !== 0n && t.numerator < 0n) q -= 1n;
       y = bigNorm(q);
-      m = t.toF() - 12 * Number(q) + 1;
+      m = Number((t.numerator - q * d12) / t.denominator) + 1;
     }
     let d = this.mday;
     const sg = this.start;
