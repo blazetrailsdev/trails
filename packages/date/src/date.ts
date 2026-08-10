@@ -4576,6 +4576,56 @@ function equalGen(self: Date, other: unknown): boolean | null {
   return null;
 }
 
+/**
+ * ruby/date `deconstruct_keys` (`date_core.c:7416-7464`), the one body both
+ * `d_lite_deconstruct_keys` (`:7500-7504`) and `dt_lite_deconstruct_keys`
+ * carry an `is_datetime` flag into: `keys` of `null` answers every pair, an
+ * Array answers only the names it lists, and an unlisted name is simply
+ * absent.
+ */
+function deconstructKeys(
+  self: Date,
+  keys: string[] | null,
+  isDatetime: boolean,
+): Record<string, unknown> {
+  const h: Record<string, unknown> = {};
+
+  if (keys === null) {
+    h["year"] = self.year;
+    h["month"] = self.mon;
+    h["day"] = self.day;
+    h["yday"] = self.yday;
+    h["wday"] = self.wday;
+    if (isDatetime) {
+      const dt = self as DateTime;
+      h["hour"] = dt.hour;
+      h["min"] = dt.min;
+      h["sec"] = dt.sec;
+      h["sec_fraction"] = dt.secFraction;
+      h["zone"] = dt.zone;
+    }
+
+    return h;
+  }
+
+  for (const key of keys) {
+    if (key === "year") h[key] = self.year;
+    if (key === "month") h[key] = self.mon;
+    if (key === "day") h[key] = self.day;
+    if (key === "yday") h[key] = self.yday;
+    if (key === "wday") h[key] = self.wday;
+    if (isDatetime) {
+      const dt = self as DateTime;
+      if (key === "hour") h[key] = dt.hour;
+      if (key === "min") h[key] = dt.min;
+      if (key === "sec") h[key] = dt.sec;
+      if (key === "sec_fraction") h[key] = dt.secFraction;
+      if (key === "zone") h[key] = dt.zone;
+    }
+  }
+  return h;
+}
+
 export class Date {
   /**
    * Ruby `Date::Error` (ruby/date, `date_core.c` `Init_date_core`), raised by
@@ -4606,6 +4656,32 @@ export class Date {
    * a `start` under which every date is read as (proleptic) Gregorian.
    */
   static GREGORIAN = GREGORIAN;
+
+  /**
+   * Ruby `Date::MONTHNAMES` (ruby/date, `date_core.c:9598` over `monthnames`,
+   * `date_core.c:9420-9426`), whose element `0` is `nil` so the array is
+   * indexed by month number. Frozen, as `mk_ary_of_str`
+   * (`date_core.c:9445-9457`) leaves it.
+   */
+  static MONTHNAMES: readonly (string | null)[] = Object.freeze([null, ...MONTH_NAMES]);
+
+  /**
+   * Ruby `Date::ABBR_MONTHNAMES` (ruby/date, `date_core.c:9603` over
+   * `abbr_monthnames`, `date_core.c:9428-9433`).
+   */
+  static ABBR_MONTHNAMES: readonly (string | null)[] = Object.freeze([null, ...ABBR_MONTH_NAMES]);
+
+  /**
+   * Ruby `Date::DAYNAMES` (ruby/date, `date_core.c:9609` over `daynames`,
+   * `date_core.c:9435-9438`), indexed by `wday`.
+   */
+  static DAYNAMES: readonly string[] = Object.freeze([...DAY_NAMES]);
+
+  /**
+   * Ruby `Date::ABBR_DAYNAMES` (ruby/date, `date_core.c:9614` over
+   * `abbr_daynames`, `date_core.c:9440-9443`).
+   */
+  static ABBR_DAYNAMES: readonly string[] = Object.freeze([...ABBR_DAY_NAMES]);
 
   /**
    * @internal The whole of the state, where ruby/date's `SimpleDateData`
@@ -5801,6 +5877,17 @@ export class Date {
   }
 
   /** Ruby `Date#to_s` (ruby/date, `date_core.c` `d_lite_to_s`). */
+  /**
+   * Ruby `Date#deconstruct_keys(array_of_names_or_nil)` (ruby/date,
+   * `date_core.c` `d_lite_deconstruct_keys`, `date_core.c:7500-7504`), the
+   * pattern-matching reader. The key names are Ruby Symbols and stay in the
+   * Ruby spelling — `sec_fraction`, not `secFraction` — because they are the
+   * hash's *data*, not a TS member.
+   */
+  deconstructKeys(keys: string[] | null): Record<string, unknown> {
+    return deconstructKeys(this, keys, false);
+  }
+
   toS(): string {
     return this.strftime("%Y-%m-%d");
   }
@@ -5822,7 +5909,7 @@ export class Date {
    * reader of its own — only `::DateTime` and `::Time` do — so the value is
    * passed to the formatter rather than exposed as a member.
    */
-  strftime(format: string): string {
+  strftime(format = "%Y-%m-%d"): string {
     return strftime(
       {
         year: this.year,
@@ -6677,6 +6764,15 @@ export class DateTime extends DateWithoutParseStatics {
    * `date_core.c:8701-8706`), a distinct C function from `d_lite_to_s` — which
    * is why `::Date#to_s` keeps the date-only form.
    */
+  /**
+   * Ruby `DateTime#deconstruct_keys(array_of_names_or_nil)` (ruby/date,
+   * `date_core.c` `dt_lite_deconstruct_keys`), which is the same body under
+   * `is_datetime` — so it answers the time-of-day and zone pairs too.
+   */
+  override deconstructKeys(keys: string[] | null): Record<string, unknown> {
+    return deconstructKeys(this, keys, true);
+  }
+
   override toS(): string {
     return this.strftime("%Y-%m-%dT%H:%M:%S%:z");
   }
@@ -6689,7 +6785,7 @@ export class DateTime extends DateWithoutParseStatics {
    * the stored `sf` sits a fraction of a nanosecond above it — and what lets
    * `%12N` answer `"999999999900"`, reaching past the nanosecond for the tail.
    */
-  override strftime(format: string): string {
+  override strftime(format = "%Y-%m-%dT%H:%M:%S%:z"): string {
     return strftime(
       {
         year: this.year,

@@ -193,6 +193,19 @@ export class Time {
   /** @internal Seconds east of UTC — Ruby's `Time#utc_offset`. */
   readonly #utcOffset: number;
 
+  /** Ruby `Time.now`, the current time in the local zone. */
+  static now(): Time {
+    const plain = Temporal.Now.plainDateTimeISO();
+    return new Time(
+      plain.year,
+      plain.month,
+      plain.day,
+      plain.hour,
+      plain.minute,
+      plain.second + plain.millisecond / 1_000 + plain.microsecond / 1_000_000,
+    );
+  }
+
   /**
    * Ruby `Time.utc(year, month, day, hour = 0, min = 0, sec = 0, usec = 0)`.
    * MRI's seventh positional is the microsecond, not a zone — `Time.utc` names
