@@ -54,25 +54,19 @@ describe("the split call-argument baseline", () => {
     expect(await fs.readdir(dir)).toEqual([]);
   });
 
-  it("reports an absent tree as unseeded and an existing one as seeded", async () => {
+  it("counts only an ABSENT tree as unseeded — an empty one is a converged dimension", async () => {
     expect(await baselineSeeded(path.join(dir, "nope"))).toBe(false);
-    expect(await baselineSeeded(dir)).toBe(true);
-  });
-
-  it("stays seeded when the tree exists but is empty — a converged dimension is gated", async () => {
     expect(await baselineSeeded(dir)).toBe(true);
     expect(await loadBaseline(dir)).toEqual([]);
   });
 });
 
-describe("console rendering", () => {
-  it("prints the argument list that makes a row its own key", () => {
-    expect(renderKey(entry())).toContain("visit(ref:o, ref:collector)");
-  });
+it("prints the argument list that makes a row its own key", () => {
+  expect(renderKey(entry())).toContain("visit(ref:o, ref:collector)");
+});
 
-  it("names the seeding story in the unseeded notice", () => {
-    const out = renderUnseeded([entry()], "/x/call-mismatches-args-exclude");
-    expect(out).toContain("UNSEEDED");
-    expect(out).toContain("call-args-baseline-seed");
-  });
+it("names the seeding story in the unseeded notice", () => {
+  const out = renderUnseeded([entry()], "/x/call-mismatches-args-exclude");
+  expect(out).toContain("UNSEEDED");
+  expect(out).toContain("call-args-baseline-seed");
 });

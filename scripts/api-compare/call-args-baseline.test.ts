@@ -26,14 +26,9 @@ function entry(over: Partial<CallArgExcludeEntry> = {}): CallArgExcludeEntry {
   return { ...key(), reason: "reviewed", ...over };
 }
 
-describe("keyOf", () => {
-  it("includes the Ruby argument list", () => {
-    expect(keyOf(key())).toBe("arel visitors/to-sql.ts inject_join visit ref:o,ref:collector");
-  });
-
-  it("separates two sites of the same call passing different arguments", () => {
-    expect(keyOf(key())).not.toBe(keyOf(key({ rubyArgs: ["ref:o"] })));
-  });
+it("keyOf includes the Ruby argument list, separating two sites of one call", () => {
+  expect(keyOf(key())).toBe("arel visitors/to-sql.ts inject_join visit ref:o,ref:collector");
+  expect(keyOf(key())).not.toBe(keyOf(key({ rubyArgs: ["ref:o"] })));
 });
 
 describe("gatedRows", () => {
