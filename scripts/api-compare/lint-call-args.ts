@@ -77,7 +77,6 @@ const BASELINE_DIR = path.join(
 
 const ARTIFACT_PATH = path.join(OUTPUT_DIR, "call-arg-mismatches.json");
 
-/** Seed string for a row nobody has reviewed yet. */
 export const DEFAULT_REASON = "TODO: unreviewed — replace with a one-line justification";
 
 async function readJson<T>(file: string): Promise<T> {
