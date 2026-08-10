@@ -382,13 +382,23 @@ export class Time {
    * fraction as one `second` and the offset as a fraction of a day, which is a
    * lossy spelling of what the C hands over exactly.
    *
-   * The seat stores the day and day-fraction already taken to UTC, where the C
-   * stores `HAVE_CIVIL | HAVE_TIME` and defers that move to `get_c_jd`
-   * (`date_core.c:1264-1301`) — the same `jd_local_to_utc` / `df_local_to_utc`
-   * of `time_to_df(h, min, s)`, made here instead of on first read. The C's
-   * trailing `set_sg(dat, DEFAULT_SG)` is the `Date.ITALY` argument: the day was
-   * resolved under `GREGORIAN` — a `::Time` is proleptic Gregorian — and only
-   * the stored reform changes after it.
+   * **The `HAVE_CIVIL | HAVE_TIME` the C's flags word names is not observable
+   * on the result, and this is why the seat below is the `HAVE_JD | HAVE_DF`
+   * one.** `time_to_datetime`'s very next statement is
+   * `set_sg(dat, DEFAULT_SG)`, and `set_sg` (`date_core.c:5787-5800`) is not a
+   * field assignment: on the complex arm it runs `get_c_jd(x)`, `get_c_df(x)`
+   * and `clear_civil(x)` *before* storing the new `sg`. So the civil triple and
+   * the time of day the flags word promised are resolved to a day and a
+   * day-fraction and then discarded, under the `GREGORIAN` the build used —
+   * `c_virtual_sg` still reads it at that point — and never under `DEFAULT_SG`.
+   * That eager resolve is exactly `jd_local_to_utc(c_civil_to_jd(ry, m, d,
+   * GREGORIAN), time_to_df(h, min, s), of)` and `df_local_to_utc(time_to_df(h,
+   * min, s), of)` (`get_c_jd`, `date_core.c:1264-1294`; `get_c_df`,
+   * `date_core.c:1208-1225`), which is what the two calls below are. Handing a
+   * civil seat the triple and deferring instead would resolve it under
+   * `Date.ITALY` on first read and answer a different day for every date before
+   * the reform — `Time.utc(1582, 10, 13).to_datetime` is `1582-10-03`, which is
+   * the `GREGORIAN` reading, not the `ITALY` one.
    */
   toDatetime(): Temporal.PlainDateTime | Temporal.ZonedDateTime {
     const y = this.year;
@@ -405,12 +415,12 @@ export class Time {
 
     const [nth, ry] = decodeYear(y, -1);
 
-    const rjd = cCivilToJd(ry, m, d, Date.GREGORIAN);
+    const jd = cCivilToJd(ry, m, d, Date.GREGORIAN);
     const df = timeToDf(h, min, s);
     return new DateTime(
       SEAT,
       nth,
-      jdLocalToUtc(rjd, df, of),
+      jdLocalToUtc(jd, df, of),
       dfLocalToUtc(df, of),
       sf,
       of,

@@ -3,11 +3,6 @@
  * low-level `Date._strptime` frags API: the directive table, the width
  * prefixes, and the arms that fail.
  *
- * `test__strptime__3` — the iso8601 / ctime / date(1) / rfc822 table at
- * `:120-215` — is the one test of that range not here: it is ~145 lines on its
- * own and the four below already put this PR at the LOC ceiling. It is filed
- * against RFC 0088 as its own story.
- *
  * `_strptime` answers the frag Hash itself rather than a date, so RFC 0088's
  * `Temporal`-by-default mapping does not reach these tests — the values below
  * are the ones `date__strptime` (`date_strptime.c:159-663`) writes, under the
@@ -176,6 +171,235 @@ describe("TestDateStrptime", () => {
       wday: 6,
     });
     expect(Date._strptime("Anton von Webern", "Anton von Webern")).toEqual({});
+  });
+
+  it(" strptime  3", () => {
+    const table: [[string, string], unknown[]][] = [
+      // iso8601
+      [
+        ["2001-02-03", "%Y-%m-%d"],
+        [2001, 2, 3, null, null, null, null, null, null],
+      ],
+      [
+        ["2001-02-03T23:59:60", "%Y-%m-%dT%H:%M:%S"],
+        [2001, 2, 3, 23, 59, 60, null, null, null],
+      ],
+      [
+        ["2001-02-03T23:59:60+09:00", "%Y-%m-%dT%H:%M:%S%Z"],
+        [2001, 2, 3, 23, 59, 60, "+09:00", 9 * 3600, null],
+      ],
+      [
+        ["-2001-02-03T23:59:60+09:00", "%Y-%m-%dT%H:%M:%S%Z"],
+        [-2001, 2, 3, 23, 59, 60, "+09:00", 9 * 3600, null],
+      ],
+      [
+        ["+012345-02-03T23:59:60+09:00", "%Y-%m-%dT%H:%M:%S%Z"],
+        [12345, 2, 3, 23, 59, 60, "+09:00", 9 * 3600, null],
+      ],
+      [
+        ["-012345-02-03T23:59:60+09:00", "%Y-%m-%dT%H:%M:%S%Z"],
+        [-12345, 2, 3, 23, 59, 60, "+09:00", 9 * 3600, null],
+      ],
+
+      // ctime(3), asctime(3)
+      [
+        ["Thu Jul 29 14:47:19 1999", "%c"],
+        [1999, 7, 29, 14, 47, 19, null, null, 4],
+      ],
+      [
+        ["Thu Jul 29 14:47:19 -1999", "%c"],
+        [-1999, 7, 29, 14, 47, 19, null, null, 4],
+      ],
+
+      // date(1)
+      [
+        ["Thu Jul 29 16:39:41 EST 1999", "%a %b %d %H:%M:%S %Z %Y"],
+        [1999, 7, 29, 16, 39, 41, "EST", -5 * 3600, 4],
+      ],
+      [
+        ["Thu Jul 29 16:39:41 MET DST 1999", "%a %b %d %H:%M:%S %Z %Y"],
+        [1999, 7, 29, 16, 39, 41, "MET DST", 2 * 3600, 4],
+      ],
+      [
+        ["Thu Jul 29 16:39:41 AMT 1999", "%a %b %d %H:%M:%S %Z %Y"],
+        [1999, 7, 29, 16, 39, 41, "AMT", null, 4],
+      ],
+      [
+        ["Thu Jul 29 16:39:41 AMT -1999", "%a %b %d %H:%M:%S %Z %Y"],
+        [-1999, 7, 29, 16, 39, 41, "AMT", null, 4],
+      ],
+      [
+        ["Thu Jul 29 16:39:41 GMT+09 1999", "%a %b %d %H:%M:%S %Z %Y"],
+        [1999, 7, 29, 16, 39, 41, "GMT+09", 9 * 3600, 4],
+      ],
+      [
+        ["Thu Jul 29 16:39:41 GMT+0908 1999", "%a %b %d %H:%M:%S %Z %Y"],
+        [1999, 7, 29, 16, 39, 41, "GMT+0908", 9 * 3600 + 8 * 60, 4],
+      ],
+      [
+        ["Thu Jul 29 16:39:41 GMT+090807 1999", "%a %b %d %H:%M:%S %Z %Y"],
+        [1999, 7, 29, 16, 39, 41, "GMT+090807", 9 * 3600 + 8 * 60 + 7, 4],
+      ],
+      [
+        ["Thu Jul 29 16:39:41 GMT-09 1999", "%a %b %d %H:%M:%S %Z %Y"],
+        [1999, 7, 29, 16, 39, 41, "GMT-09", -9 * 3600, 4],
+      ],
+      [
+        ["Thu Jul 29 16:39:41 GMT-09:08 1999", "%a %b %d %H:%M:%S %Z %Y"],
+        [1999, 7, 29, 16, 39, 41, "GMT-09:08", -9 * 3600 - 8 * 60, 4],
+      ],
+      [
+        ["Thu Jul 29 16:39:41 GMT-09:08:07 1999", "%a %b %d %H:%M:%S %Z %Y"],
+        [1999, 7, 29, 16, 39, 41, "GMT-09:08:07", -9 * 3600 - 8 * 60 - 7, 4],
+      ],
+      [
+        ["Thu Jul 29 16:39:41 GMT-3.5 1999", "%a %b %d %H:%M:%S %Z %Y"],
+        [1999, 7, 29, 16, 39, 41, "GMT-3.5", -3 * 3600 - 30 * 60, 4],
+      ],
+      [
+        ["Thu Jul 29 16:39:41 GMT-3,5 1999", "%a %b %d %H:%M:%S %Z %Y"],
+        [1999, 7, 29, 16, 39, 41, "GMT-3,5", -3 * 3600 - 30 * 60, 4],
+      ],
+      [
+        ["Thu Jul 29 16:39:41 Mountain Daylight Time 1999", "%a %b %d %H:%M:%S %Z %Y"],
+        [1999, 7, 29, 16, 39, 41, "Mountain Daylight Time", -6 * 3600, 4],
+      ],
+      [
+        ["Thu Jul 29 16:39:41 E. Australia Standard Time 1999", "%a %b %d %H:%M:%S %Z %Y"],
+        [1999, 7, 29, 16, 39, 41, "E. Australia Standard Time", 10 * 3600, 4],
+      ],
+
+      // rfc822
+      [
+        ["Thu, 29 Jul 1999 09:54:21 UT", "%a, %d %b %Y %H:%M:%S %Z"],
+        [1999, 7, 29, 9, 54, 21, "UT", 0, 4],
+      ],
+      [
+        ["Thu, 29 Jul 1999 09:54:21 GMT", "%a, %d %b %Y %H:%M:%S %Z"],
+        [1999, 7, 29, 9, 54, 21, "GMT", 0, 4],
+      ],
+      [
+        ["Thu, 29 Jul 1999 09:54:21 PDT", "%a, %d %b %Y %H:%M:%S %Z"],
+        [1999, 7, 29, 9, 54, 21, "PDT", -7 * 3600, 4],
+      ],
+      [
+        ["Thu, 29 Jul 1999 09:54:21 z", "%a, %d %b %Y %H:%M:%S %Z"],
+        [1999, 7, 29, 9, 54, 21, "z", 0, 4],
+      ],
+      [
+        ["Thu, 29 Jul 1999 09:54:21 +0900", "%a, %d %b %Y %H:%M:%S %Z"],
+        [1999, 7, 29, 9, 54, 21, "+0900", 9 * 3600, 4],
+      ],
+      [
+        ["Thu, 29 Jul 1999 09:54:21 +0430", "%a, %d %b %Y %H:%M:%S %Z"],
+        [1999, 7, 29, 9, 54, 21, "+0430", 4 * 3600 + 30 * 60, 4],
+      ],
+      [
+        ["Thu, 29 Jul 1999 09:54:21 -0430", "%a, %d %b %Y %H:%M:%S %Z"],
+        [1999, 7, 29, 9, 54, 21, "-0430", -4 * 3600 - 30 * 60, 4],
+      ],
+      [
+        ["Thu, 29 Jul -1999 09:54:21 -0430", "%a, %d %b %Y %H:%M:%S %Z"],
+        [-1999, 7, 29, 9, 54, 21, "-0430", -4 * 3600 - 30 * 60, 4],
+      ],
+
+      // etc
+      [
+        ["06-DEC-99", "%d-%b-%y"],
+        [1999, 12, 6, null, null, null, null, null, null],
+      ],
+      [
+        ["sUnDay oCtoBer 31 01", "%A %B %d %y"],
+        [2001, 10, 31, null, null, null, null, null, 0],
+      ],
+      [
+        ["October\t\n\v\f\r 15,\t\n\v\f\r99", "%B %d, %y"],
+        [1999, 10, 15, null, null, null, null, null, null],
+      ],
+      [
+        ["October\t\n\v\f\r 15,\t\n\v\f\r99", "%B%t%d,%n%y"],
+        [1999, 10, 15, null, null, null, null, null, null],
+      ],
+
+      [
+        ["09:02:11 AM", "%I:%M:%S %p"],
+        [null, null, null, 9, 2, 11, null, null, null],
+      ],
+      [
+        ["09:02:11 A.M.", "%I:%M:%S %p"],
+        [null, null, null, 9, 2, 11, null, null, null],
+      ],
+      [
+        ["09:02:11 PM", "%I:%M:%S %p"],
+        [null, null, null, 21, 2, 11, null, null, null],
+      ],
+      [
+        ["09:02:11 P.M.", "%I:%M:%S %p"],
+        [null, null, null, 21, 2, 11, null, null, null],
+      ],
+
+      [
+        ["12:33:44 AM", "%r"],
+        [null, null, null, 0, 33, 44, null, null, null],
+      ],
+      [
+        ["01:33:44 AM", "%r"],
+        [null, null, null, 1, 33, 44, null, null, null],
+      ],
+      [
+        ["11:33:44 AM", "%r"],
+        [null, null, null, 11, 33, 44, null, null, null],
+      ],
+      [
+        ["12:33:44 PM", "%r"],
+        [null, null, null, 12, 33, 44, null, null, null],
+      ],
+      [
+        ["01:33:44 PM", "%r"],
+        [null, null, null, 13, 33, 44, null, null, null],
+      ],
+      [
+        ["11:33:44 PM", "%r"],
+        [null, null, null, 23, 33, 44, null, null, null],
+      ],
+
+      [
+        ["11:33:44 PM AMT", "%I:%M:%S %p %Z"],
+        [null, null, null, 23, 33, 44, "AMT", null, null],
+      ],
+      [
+        ["11:33:44 P.M. AMT", "%I:%M:%S %p %Z"],
+        [null, null, null, 23, 33, 44, "AMT", null, null],
+      ],
+
+      [
+        ["fri1feb034pm+5", "%a%d%b%y%H%p%Z"],
+        [2003, 2, 1, 16, null, null, "+5", 5 * 3600, 5],
+      ],
+      [
+        ["E.  Australia Standard Time", "%Z"],
+        [null, null, null, null, null, null, "E.  Australia Standard Time", 10 * 3600, null],
+      ],
+
+      // out of range
+      [
+        ["+0.9999999999999999999999", "%Z"],
+        [null, null, null, null, null, null, "+0.9999999999999999999999", +1 * 3600, null],
+      ],
+      [
+        ["+9999999999999999999999.0", "%Z"],
+        [null, null, null, null, null, null, "+9999999999999999999999.0", null, null],
+      ],
+    ];
+    for (const [x, y] of table) {
+      const h = Date._strptime(...x);
+      const a = valuesAt(h, "year", "mon", "mday", "hour", "min", "sec", "zone", "offset", "wday");
+      if (y[1] === -1) {
+        a[1] = -1;
+        a[2] = h?.yday;
+      }
+      expect(a).toEqual(y);
+    }
   });
 
   it(" strptime  width", () => {
