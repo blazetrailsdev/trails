@@ -572,7 +572,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    */
   override async execInsert(
     sql: string,
-    name?: string | null,
+    name: string | null = null,
     binds: unknown[] = [],
     pk?: string | false | null,
     sequenceName?: string | null,
@@ -587,7 +587,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         binds,
         returning ?? null,
       );
-      const result = await this.internalExecQuery(returningSql, name ?? "SQL", returningBinds);
+      const result = await this.internalExecQuery(returningSql, name, returningBinds);
       this.dirtyCurrentTransaction();
       return result;
     }
@@ -599,7 +599,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   // routes through so cached reads never clear the cache.
   override async execQuery(
     sql: string,
-    name?: string | null,
+    name: string | null = "SQL",
     binds?: unknown[],
     options?: { prepare?: boolean; allowRetry?: boolean },
   ): Promise<Result> {
@@ -608,7 +608,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
 
   override async internalExecQuery(
     sql: string,
-    name?: string | null,
+    name: string | null = "SQL",
     binds?: unknown[],
     options?: { prepare?: boolean; allowRetry?: boolean },
   ): Promise<Result> {
@@ -908,7 +908,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   async execute(
     sql: string,
     binds: unknown[] = [],
-    name: string = "SQL",
+    name: string | null = "SQL",
     { allowRetry = false }: { allowRetry?: boolean } = {},
   ): Promise<Record<string, unknown>[]> {
     sql = this.preprocessQuery(sql);
@@ -955,7 +955,11 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    * Execute an INSERT/UPDATE/DELETE and return affected rows or insert ID.
    * Wrapped in a `sql.active_record` notification — see `execute`.
    */
-  async executeMutation(sql: string, binds: unknown[] = [], name: string = "SQL"): Promise<number> {
+  async executeMutation(
+    sql: string,
+    binds: unknown[] = [],
+    name: string | null = "SQL",
+  ): Promise<number> {
     sql = this.preprocessQuery(sql);
     this._syncDatabaseTimezone();
     const driverSql = this.mysqlQuote(sql);
@@ -1120,7 +1124,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   // query_value/update path. Transaction-control callers ignore the return.
   override async internalExecute(
     sql: string,
-    name: string = "SQL",
+    name: string | null = "SQL",
     {
       materializeTransactions = true,
       allowRetry = false,

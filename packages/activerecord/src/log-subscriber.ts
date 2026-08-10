@@ -133,7 +133,7 @@ export class LogSubscriber extends BaseLogSubscriber {
       binds = `  ${safeJsonStringify(bindPairs)}`;
     }
 
-    const colorizedName = this.colorizePayloadName(name, payload.name as string | undefined);
+    const colorizedName = this.colorizePayloadName(name, payload.name as string | null | undefined);
     const colorizedSql = this.colorizeLogging
       ? this.color(sql, this.sqlColor(sql), { bold: true })
       : sql;
@@ -264,7 +264,7 @@ export class LogSubscriber extends BaseLogSubscriber {
     return [null, value];
   }
 
-  private colorizePayloadName(name: string, payloadName: string | undefined): string {
+  private colorizePayloadName(name: string, payloadName: string | null | undefined): string {
     if (!payloadName || payloadName === "" || payloadName === "SQL") {
       return this.color(name, BaseLogSubscriber.MAGENTA, { bold: true });
     }

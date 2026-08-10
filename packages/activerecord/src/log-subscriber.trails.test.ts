@@ -39,6 +39,48 @@ function makeEvent(payload: Record<string, unknown>): Event {
   return event;
 }
 
+describe("LogSubscriber nil payload name (trails)", () => {
+  let logger: CapturingLogger;
+  let subscriber: TestSubscriber;
+
+  beforeEach(() => {
+    logger = new CapturingLogger();
+    TestSubscriber.logger = logger;
+    BaseLogSubscriber.colorizeLogging = false;
+    LogSubscriber.colorizeLogging = false;
+    subscriber = new TestSubscriber();
+  });
+
+  afterEach(() => {
+    TestSubscriber.logger = null;
+    // The colorization arm below flips this global on; leaving it on would
+    // bleed ANSI escapes into every later file sharing the worker.
+    BaseLogSubscriber.colorizeLogging = false;
+    LogSubscriber.colorizeLogging = false;
+  });
+
+  // A nameless `select_all` now reaches the subscriber with `name: nil` rather
+  // than the `"SQL"` default, so pin the two places log_subscriber.rb:18-30
+  // reads it: `"#{payload[:name]} (…)"` interpolates nil to the empty string,
+  // and `colorize_payload_name`'s `payload_name.blank?` arm takes nil down the
+  // same MAGENTA branch as `"SQL"`. IGNORE_PAYLOAD_NAMES must not swallow it.
+  it("renders a nil name as the empty string and still logs", () => {
+    subscriber.sql(makeEvent({ sql: "select 1", name: null }));
+    expect(logger.messages.length).toBe(1);
+    expect(logger.messages[0]).toBe("   (0.0ms)  select 1");
+  });
+
+  it("colorizes a nil name the same as SQL", () => {
+    BaseLogSubscriber.colorizeLogging = true;
+    LogSubscriber.colorizeLogging = true;
+    subscriber.sql(makeEvent({ sql: "select 1", name: null }));
+    subscriber.sql(makeEvent({ sql: "select 1", name: "Topic Load" }));
+    expect(logger.messages[0]).toContain(BaseLogSubscriber.MAGENTA);
+    expect(logger.messages[0]).not.toContain(BaseLogSubscriber.CYAN);
+    expect(logger.messages[1]).toContain(BaseLogSubscriber.CYAN);
+  });
+});
+
 describe("LogSubscriber bigint bind rendering (trails)", () => {
   let logger: CapturingLogger;
   let subscriber: TestSubscriber;

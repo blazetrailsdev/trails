@@ -110,7 +110,7 @@ export interface DatabaseStatementsHost {
   /** @internal */
   internalExecute?(
     sql: string,
-    name?: string,
+    name?: string | null,
     opts?: {
       materializeTransactions?: boolean;
       allowRetry?: boolean;
@@ -128,7 +128,7 @@ export interface DatabaseStatementsHost {
   /** @internal */
   dirtyCurrentTransaction?(): void;
   /** @internal */
-  rawExecute?(sql: string, name?: string, binds?: unknown[]): Promise<unknown>;
+  rawExecute?(sql: string, name?: string | null, binds?: unknown[]): Promise<unknown>;
   /** @internal */
   castResult?(rawResult: unknown): Result;
   /** @internal */
@@ -145,7 +145,7 @@ export interface DatabaseStatementsHost {
   withinNewTransaction?<T>(opts: unknown, fn: (tx?: unknown) => Promise<T> | T): Promise<T>;
   disableReferentialIntegrity?(fn: () => Promise<void>, tables?: string[]): Promise<void>;
   /** @internal */
-  executeBatch?(statements: string[], name?: string): Promise<void>;
+  executeBatch?(statements: string[], name?: string | null): Promise<void>;
   /** @internal */
   buildTruncateStatement?(tableName: string): string;
   /** @internal */
@@ -417,7 +417,7 @@ export function selectAll(sql: string, _name?: string | null, _binds?: unknown[]
 export async function selectOne(
   this: DatabaseStatementsHost | void,
   sql: string,
-  name?: string | null,
+  name: string | null = null,
   binds?: unknown[],
 ): Promise<Record<string, unknown> | undefined> {
   const doSelect = (this as DatabaseStatementsHost)?.selectAll ?? selectAll;
@@ -433,7 +433,7 @@ export async function selectOne(
 export function selectValue(
   this: DatabaseStatementsHost | void,
   sql: string,
-  name?: string | null,
+  name: string | null = null,
   binds?: unknown[],
 ): Promise<unknown> {
   return selectRows.call(this, sql, name, binds).then((rows) => singleValueFromRows(rows));
@@ -447,7 +447,7 @@ export function selectValue(
 export function selectValues(
   this: DatabaseStatementsHost | void,
   sql: string,
-  name?: string | null,
+  name: string | null = null,
   binds?: unknown[],
 ): Promise<unknown[]> {
   return selectRows.call(this, sql, name, binds).then((rows) => rows.map((row) => row[0]));
@@ -461,7 +461,7 @@ export function selectValues(
 export async function selectRows(
   this: DatabaseStatementsHost | void,
   sql: string,
-  name?: string | null,
+  name: string | null = null,
   binds?: unknown[],
 ): Promise<unknown[][]> {
   const doSelect = (this as DatabaseStatementsHost)?.selectAll ?? selectAll;
@@ -511,7 +511,7 @@ export async function query(
   // Dispatch through the instance so an adapter's internalExecQuery override
   // wins, as Ruby's virtual call does.
   const run = (this.internalExecQuery ?? internalExecQuery).bind(this);
-  const result = await run(sql, name ?? "SQL", binds);
+  const result = await run(sql, name, binds);
   return result.rows;
 }
 
@@ -542,7 +542,7 @@ export function execute(_sql: string, _binds?: unknown[], _name?: string | null)
 export function execQuery(
   this: DatabaseStatementsHost | void,
   sql: string,
-  name: string = "SQL",
+  name: string | null = "SQL",
   binds: unknown[] = [],
 ): Promise<Result> {
   // Dispatch through the instance so an adapter's internalExecQuery override
@@ -561,7 +561,7 @@ export function execQuery(
 export function execInsert(
   this: DatabaseStatementsHost | void,
   sql: string,
-  name?: string | null,
+  name: string | null = null,
   binds: unknown[] = [],
   pk?: string | false | null,
   _sequenceName?: string | null,
@@ -579,7 +579,7 @@ export function execInsert(
   const run = ((this as DatabaseStatementsHost).internalExecQuery ?? internalExecQuery).bind(
     this as DatabaseStatementsHost,
   );
-  return run(sql, name ?? "SQL", binds);
+  return run(sql, name, binds);
 }
 
 /**
@@ -602,7 +602,7 @@ export function execInsert(
 export async function execInsertReturningReadback(
   this: DatabaseStatementsHost,
   sql: string,
-  name: string | null | undefined,
+  name: string | null,
   binds: unknown[],
   pk: string | false | null | undefined,
   returning: string[] | null | undefined,
@@ -623,7 +623,7 @@ export async function execInsertReturningReadback(
   // Dispatch through the instance so SQLite's bind-aware internalExecQuery
   // override (`.all()`) is used; PG/MySQL fall to the mixed-in default.
   const run = (this.internalExecQuery ?? internalExecQuery).bind(this);
-  const result = await run(returningSql, name ?? "SQL", returningBinds);
+  const result = await run(returningSql, name, returningBinds);
   this.dirtyCurrentTransaction?.();
   return result;
 }
@@ -636,7 +636,7 @@ export async function execInsertReturningReadback(
 export async function execDelete(
   this: DatabaseStatementsHost | void,
   sql: string,
-  name?: string | null,
+  name: string | null = null,
   binds: unknown[] = [],
 ): Promise<number> {
   const host = this as DatabaseStatementsHost;
@@ -644,7 +644,14 @@ export async function execDelete(
     throw new Error("execDelete requires execQuery on the adapter when binds are provided");
   }
   const doExecute = host?.execute?.bind(host) ?? execute;
-  return doExecute(sql) as Promise<number>;
+  // Rails is `affected_rows(internal_execute(sql, name, binds))` (:165, :172).
+  // Two deviations remain here, both tracked by
+  // 0076-execute-primitive-convergence/exec-delete-update-through-internal-execute:
+  // the primitive is `execute` rather than `internal_execute` (the mixin's
+  // `affectedRows` is still the NotImplementedError hook at :570), and trails'
+  // `execute` takes (sql, binds, name), so the label goes in the third slot.
+  // Forwarding `name` at all is what this call site fixes.
+  return doExecute(sql, binds, name) as Promise<number>;
 }
 
 /**
@@ -655,7 +662,7 @@ export async function execDelete(
 export async function execUpdate(
   this: DatabaseStatementsHost | void,
   sql: string,
-  name?: string | null,
+  name: string | null = null,
   binds: unknown[] = [],
 ): Promise<number> {
   const host = this as DatabaseStatementsHost;
@@ -663,7 +670,14 @@ export async function execUpdate(
     throw new Error("execUpdate requires execQuery on the adapter when binds are provided");
   }
   const doExecute = host?.execute?.bind(host) ?? execute;
-  return doExecute(sql) as Promise<number>;
+  // Rails is `affected_rows(internal_execute(sql, name, binds))` (:165, :172).
+  // Two deviations remain here, both tracked by
+  // 0076-execute-primitive-convergence/exec-delete-update-through-internal-execute:
+  // the primitive is `execute` rather than `internal_execute` (the mixin's
+  // `affectedRows` is still the NotImplementedError hook at :570), and trails'
+  // `execute` takes (sql, binds, name), so the label goes in the third slot.
+  // Forwarding `name` at all is what this call site fixes.
+  return doExecute(sql, binds, name) as Promise<number>;
 }
 
 /**
@@ -700,7 +714,7 @@ export function explain(_arel: unknown, _binds?: unknown[], _options?: unknown[]
 export async function insert(
   this: DatabaseStatementsHost | void,
   arel: unknown,
-  name?: string | null,
+  name: string | null = null,
   pk?: string | null,
   idValue?: unknown,
   sequenceName?: string | null,
@@ -721,7 +735,7 @@ export async function insert(
 export async function update(
   this: DatabaseStatementsHost | void,
   arel: unknown,
-  name?: string | null,
+  name: string | null = null,
   binds: unknown[] = [],
 ): Promise<number> {
   const [sql, resolvedBinds] = toSqlAndBinds(arel, binds);
@@ -736,7 +750,7 @@ export async function update(
 export async function deleteStatement(
   this: DatabaseStatementsHost | void,
   arel: unknown,
-  name?: string | null,
+  name: string | null = null,
   binds: unknown[] = [],
 ): Promise<number> {
   const [sql, resolvedBinds] = toSqlAndBinds(arel, binds);
@@ -755,12 +769,12 @@ export { deleteStatement as delete };
 export async function truncate(
   this: DatabaseStatementsHost & Pick<Quoting, "quoteTableName">,
   tableName: string,
-  name?: string | null,
+  name: string | null = null,
 ): Promise<unknown> {
   const sql = (this.buildTruncateStatement ?? buildTruncateStatement).call(this, tableName);
   // Rails: execute(build_truncate_statement(table_name), name). Trails' execute
   // signature is (sql, binds, name), so the log label goes in the third slot.
-  return (this.execute ?? execute).call(this, sql, [], name ?? undefined);
+  return (this.execute ?? execute).call(this, sql, [], name);
 }
 
 /**
@@ -1317,38 +1331,6 @@ export function highPrecisionCurrentTimestamp(): Nodes.SqlLiteral {
 }
 
 /**
- * Wraps query execution in a `sql.active_record` instrumentation event by
- * delegating to `AbstractAdapter#log` (abstract_adapter.rb:1134), the single
- * payload producer.
- */
-async function logSql<T>(
-  host: DatabaseStatementsHost,
-  sql: string,
-  name: string,
-  binds: unknown[] | undefined,
-  fn: () => Promise<T>,
-): Promise<T> {
-  const bindArray = binds ?? [];
-  // Non-null: `log` is mixed in on every AbstractAdapter (abstract_adapter.rb:1134),
-  // and `type_casted_binds` is `binds&.map` (quoting.rb:224-232) — nil only for a
-  // nil argument, which `bindArray` never is.
-  return host.log!(
-    sql,
-    name,
-    bindArray,
-    host.typeCastedBinds(bindArray)!,
-    false,
-    async (payload) => {
-      const result = await fn();
-      if (result instanceof Result) {
-        payload.row_count = result.length;
-      }
-      return result;
-    },
-  );
-}
-
-/**
  * Executes a raw query and returns an ActiveRecord::Result.
  * Delegates to rawExecute + castResult.
  *
@@ -1361,19 +1343,18 @@ async function logSql<T>(
 export async function rawExecQuery(
   this: DatabaseStatementsHost,
   sql: string,
-  name?: string | null,
+  name: string | null = null,
   binds?: unknown[],
 ): Promise<Result> {
   if (!this.rawExecute) {
     throw new Error("rawExecQuery requires rawExecute on the adapter");
   }
-  const sqlName = name ?? "SQL";
   // Rails is `cast_result(raw_execute(...))` and nothing else
   // (abstract/database_statements.rb:540-542): `raw_execute` is the single
   // logging site (`:553`) and materializes through `with_raw_connection`
   // (`:555`), so wrapping it again here would emit two `sql.active_record`
   // events for one query.
-  const rawResult = await this.rawExecute(sql, sqlName, binds);
+  const rawResult = await this.rawExecute(sql, name, binds);
   return this.castResult ? this.castResult(rawResult) : normalizeResult(rawResult);
 }
 
@@ -1392,11 +1373,10 @@ export async function rawExecQuery(
 export async function internalExecQuery(
   this: DatabaseStatementsHost,
   sql: string,
-  name?: string | null,
+  name: string | null = "SQL",
   binds?: unknown[],
   options?: { prepare?: boolean; allowRetry?: boolean; materializeTransactions?: boolean },
 ): Promise<Result> {
-  const sqlName = name ?? "SQL";
   // Rails is `cast_result(internal_execute(...))` and nothing else
   // (abstract/database_statements.rb:545-547). `internal_execute` reaches
   // `raw_execute` (`:588-591` → `:552-558`), which both logs (`:553`) and
@@ -1407,7 +1387,7 @@ export async function internalExecQuery(
     // reaches the driver and allow_retry / materialize_transactions survive
     // (Rails internal_exec_query(...) → internal_execute(...) → raw_execute).
     // trails carries all of them in the opts object rather than positionally.
-    const rawResult = await this.internalExecute(sql, sqlName, {
+    const rawResult = await this.internalExecute(sql, name, {
       binds,
       prepare: options?.prepare,
       allowRetry: options?.allowRetry,
@@ -1422,7 +1402,7 @@ export async function internalExecQuery(
   }
   // Fallback: delegate through this.execute only when there are no binds
   const doExecute = this?.execute?.bind(this) ?? execute;
-  const result = await doExecute(sql);
+  const result = await doExecute(sql, [], name);
   return normalizeResult(result);
 }
 
@@ -1494,10 +1474,10 @@ interface DatabaseStatementsDefaultsHost {
   execute(
     sql: string,
     binds?: unknown[],
-    name?: string,
+    name?: string | null,
     opts?: { allowRetry?: boolean },
   ): Promise<Record<string, unknown>[]>;
-  executeMutation(sql: string, binds?: unknown[], name?: string): Promise<number>;
+  executeMutation(sql: string, binds?: unknown[], name?: string | null): Promise<number>;
   selectAll(
     arel: unknown,
     name?: string | null,
@@ -1534,7 +1514,7 @@ interface DatabaseStatementsDefaultsHost {
 async function insertStatement(
   this: any,
   arel: unknown,
-  name?: string | null,
+  name: string | null = null,
   pk?: string | null,
   idValue?: unknown,
   sequenceName?: string | null,
@@ -1584,7 +1564,7 @@ export const DatabaseStatements = {
   async selectAll(
     this: DatabaseStatementsDefaultsHost,
     arel: unknown,
-    name?: string | null,
+    name: string | null = null,
     binds?: unknown[],
     opts?: { allowRetry?: boolean; preparable?: boolean | null },
   ): Promise<Result> {
@@ -1637,7 +1617,7 @@ export const DatabaseStatements = {
   async selectOne(
     this: DatabaseStatementsDefaultsHost,
     arel: unknown,
-    name?: string | null,
+    name: string | null = null,
     binds?: unknown[],
   ): Promise<Record<string, unknown> | undefined> {
     return (await this.selectAll(arel, name, binds)).first();
@@ -1646,7 +1626,7 @@ export const DatabaseStatements = {
   async selectValue(
     this: DatabaseStatementsDefaultsHost,
     arel: unknown,
-    name?: string | null,
+    name: string | null = null,
     binds?: unknown[],
   ): Promise<unknown> {
     const rows = await this.selectRows(arel, name, binds);
@@ -1656,7 +1636,7 @@ export const DatabaseStatements = {
   async selectValues(
     this: DatabaseStatementsDefaultsHost,
     arel: unknown,
-    name?: string | null,
+    name: string | null = null,
     binds?: unknown[],
   ): Promise<unknown[]> {
     const rows = await this.selectRows(arel, name, binds);
@@ -1666,7 +1646,7 @@ export const DatabaseStatements = {
   async selectRows(
     this: DatabaseStatementsDefaultsHost,
     arel: unknown,
-    name?: string | null,
+    name: string | null = null,
     binds?: unknown[],
   ): Promise<unknown[][]> {
     return (await this.selectAll(arel, name, binds)).rows;
@@ -1675,7 +1655,7 @@ export const DatabaseStatements = {
   async execQuery(
     this: DatabaseStatementsDefaultsHost,
     sql: string,
-    name?: string | null,
+    name: string | null = "SQL",
     binds?: unknown[],
     options?: { prepare?: boolean; allowRetry?: boolean; materializeTransactions?: boolean },
   ): Promise<Result> {
@@ -1683,38 +1663,38 @@ export const DatabaseStatements = {
     // once pool integration lands (connection-pool track). Real adapters that
     // override execQuery should forward allowRetry to their execute path.
     void options;
-    const rows = await this.execute(sql, binds, name ?? "SQL");
+    const rows = await this.execute(sql, binds, name);
     return Result.fromRowHashes(rows);
   },
 
   async execInsert(
     this: DatabaseStatementsDefaultsHost,
     sql: string,
-    name?: string | null,
+    name: string | null = null,
     binds?: unknown[],
     _pk?: string | false | null,
     _sequenceName?: string | null,
     _returning?: string[] | null,
   ): Promise<number> {
-    return this.executeMutation(sql, binds, name ?? "SQL");
+    return this.executeMutation(sql, binds, name);
   },
 
   async execDelete(
     this: DatabaseStatementsDefaultsHost,
     sql: string,
-    name?: string | null,
+    name: string | null = null,
     binds?: unknown[],
   ): Promise<number> {
-    return this.executeMutation(sql, binds, name ?? "SQL");
+    return this.executeMutation(sql, binds, name);
   },
 
   async execUpdate(
     this: DatabaseStatementsDefaultsHost,
     sql: string,
-    name?: string | null,
+    name: string | null = null,
     binds?: unknown[],
   ): Promise<number> {
-    return this.executeMutation(sql, binds, name ?? "SQL");
+    return this.executeMutation(sql, binds, name);
   },
 
   isWriteQuery(sql: string): boolean {
@@ -1746,7 +1726,7 @@ export const DatabaseStatements = {
   async update(
     this: any,
     arel: unknown,
-    name?: string | null,
+    name: string | null = null,
     binds: unknown[] = [],
   ): Promise<number> {
     const [sql, resolvedBinds] = toSqlAndBinds.call(this, arel, binds);
@@ -1756,7 +1736,7 @@ export const DatabaseStatements = {
   async delete(
     this: any,
     arel: unknown,
-    name?: string | null,
+    name: string | null = null,
     binds: unknown[] = [],
   ): Promise<number> {
     const [sql, resolvedBinds] = toSqlAndBinds.call(this, arel, binds);
@@ -1835,7 +1815,7 @@ export const DatabaseStatements = {
 export async function rawExecute(
   this: DatabaseStatementsHost,
   sql: string,
-  name?: string | null,
+  name: string | null = null,
   binds?: unknown[],
   prepare = false,
   isAsync = false,

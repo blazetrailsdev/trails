@@ -478,7 +478,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   async execute(
     sql: string,
     binds: unknown[] = [],
-    name: string = "SQL",
+    name: string | null = "SQL",
   ): Promise<Record<string, unknown>[]> {
     sql = this.preprocessQuery(sql);
     await this.ensureConnected();
@@ -637,7 +637,11 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    * one `performQuery` and differ only in what they answer — rows here, the
    * affected-row count or insert rowid there.
    */
-  async executeMutation(sql: string, binds: unknown[] = [], name: string = "SQL"): Promise<number> {
+  async executeMutation(
+    sql: string,
+    binds: unknown[] = [],
+    name: string | null = "SQL",
+  ): Promise<number> {
     // preprocessQuery runs Rails' check_if_write_query, which raises
     // ReadOnlyError while writes are prevented — see isPreventingWrites below.
     sql = this.preprocessQuery(sql);
@@ -701,7 +705,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    */
   override async execInsert(
     sql: string,
-    name?: string | null,
+    name: string | null = null,
     binds: unknown[] = [],
     pk?: string | false | null,
     _sequenceName?: string | null,
@@ -716,7 +720,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       returning,
     );
     if (readback !== undefined) return readback;
-    return this.executeMutation(sql, binds, name ?? "SQL");
+    return this.executeMutation(sql, binds, name);
   }
 
   /**
@@ -812,7 +816,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    */
   override async rawExecute(
     sql: string,
-    name: string | null = "SQL",
+    name: string | null = null,
     binds: unknown[] = [],
     prepare = false,
     _async = false,
@@ -826,7 +830,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       const driverBinds = binds.map(_driverBind, this) as SqliteBinds;
       return await this.log(
         sql,
-        name ?? "SQL",
+        name,
         binds,
         this.typeCastedBinds(binds),
         false,
@@ -890,7 +894,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     const prepare = options.prepare ?? false;
     return this.log(
       processed,
-      name ?? "SQL",
+      name,
       binds ?? [],
       this.typeCastedBinds(binds ?? []) ?? [],
       false,
