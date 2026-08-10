@@ -73,17 +73,20 @@ export interface CallArgResult {
  * spelling for (`@ast` is `this.ast`, which the TS extractor records as
  * `id:ast`).
  *
- * A trailing `?` / `!` / `=` is KEPT: those are the marks
- * conventions.ts#rubyMethodToTsIgnoringSkip keys its rename candidates off, and
- * {@link refKeysEqual} resolves them at comparison time, where the Ruby side is
- * known. Folding them here would have to guess the mark back on from the TS
- * spelling, and `is_valid` is not a predicate.
+ * A name carrying a `?` / `!` / `=` keeps its RAW Ruby spelling, uncamelized:
+ * those are the marks conventions.ts#rubyMethodToTsIgnoringSkip keys its rename
+ * candidates off, and it must see the Ruby name it was written for — handed the
+ * camelized `isNumber?` it reads the `is_` prefix as absent and offers the
+ * doubled `isIsNumber` its `is_number?` arm exists to refuse
+ * (conventions.ts:966). {@link refKeysEqual} does that lookup at comparison
+ * time, where the Ruby side is known; a TS identifier can carry none of the
+ * three marks, so only the Ruby side is ever spelled this way.
  */
 function normalizeRef(rawName: string): string {
   if (rawName === "new") return "constructor";
   const name = rawName.replace(/^[@$]+/, "");
   if (name === "self") return "this";
-  return snakeToCamel(name);
+  return /[?!=]$/.test(name) ? name : snakeToCamel(name);
 }
 
 /**

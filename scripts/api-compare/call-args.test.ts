@@ -159,6 +159,16 @@ describe("compareCallArgs", () => {
     ).toBe("match");
   });
 
+  it("does not match an is_ predicate to the doubled isIs spelling", () => {
+    expect(
+      compareCallArgs(site("check", ["call:is_number?"]), site("check", ["call:isIsNumber"]))
+        .verdict,
+    ).toBe("mismatch");
+    expect(
+      compareCallArgs(site("check", ["call:is_number?"]), site("check", ["call:isNumber"])).verdict,
+    ).toBe("match");
+  });
+
   it("does not hide a rename of a non-predicate is_ identifier", () => {
     const result = compareCallArgs(site("check", ["id:is_valid"]), site("check", ["id:valid"]));
     expect(result.verdict).toBe("mismatch");
