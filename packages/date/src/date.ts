@@ -689,6 +689,21 @@ export class ArgumentError extends Error {
 }
 
 /**
+ * @internal Ruby core `FloatDomainError`, a `RangeError` subclass, spelled
+ * locally for the reason {@link NoMethodError} below is. `rb_num2int` — what
+ * `FIX2INT` is for the non-Fixnum operand of `d_lite_rshift`'s `f_idiv` /
+ * `f_mod` arm (`date_core.c:6459`) — raises it for a non-finite Float, with the
+ * Float's own `to_s` as the message: `Date.new(2000,1,31) >> Float::INFINITY`
+ * is `FloatDomainError: Infinity`.
+ */
+class FloatDomainError extends RangeError {
+  constructor(message: string) {
+    super(message);
+    this.name = "FloatDomainError";
+  }
+}
+
+/**
  * @internal Ruby core `NoMethodError`. It is here rather than imported because
  * `@blazetrails/date` is the bottom of the dependency graph — activemodel's
  * copy (`attribute-assignment.ts`) imports this package, not the reverse — and
@@ -4545,9 +4560,12 @@ function expectNumeric(x: unknown): void {
  * a JS number. `d_lite_rshift`'s `f_add3` answers a Float for a Float `other`
  * and its `f_idiv` / `f_mod` then work in Float; the value is the same either
  * way, and carrying it as an exact {@link Rational} lets the one `else` arm
- * serve both Numerics.
+ * serve both Numerics. A non-finite Float has no exact ratio and Ruby's own
+ * `rb_num2int` refuses it, so it raises {@link FloatDomainError} here — the
+ * error `f_idiv` reaches first in the C.
  */
 function fToR(x: number): Rational {
+  if (!Number.isFinite(x)) throw new FloatDomainError(String(x));
   let n = x;
   let d = 1n;
   while (!Number.isInteger(n)) {
