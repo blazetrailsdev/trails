@@ -66,6 +66,7 @@ import * as fs from "fs";
 import * as path from "path";
 import type {
   ApiManifest,
+  CallSite,
   ClassInfo,
   MethodInfo,
   PackageInfo,
@@ -111,6 +112,10 @@ import {
   parseInheritanceExcludes,
 } from "./inheritance-exclude.js";
 import { matchOptionKeysAgainst } from "./options-keys.js";
+// call-args.ts imports NO_JS_CALL_FORM back from this module and reads it at
+// CALL time for exactly that reason (see its isSkippedCallName): the pair is a
+// cycle, and only a module-evaluation-time read of either side would break.
+import { compareCallArgs, pairCallSites, type CallArgClass } from "./call-args.js";
 import { callOf } from "./call-mismatch-baseline.js";
 import {
   compareDefaults,
@@ -667,6 +672,7 @@ interface PackageResult {
   optionKeys: OptionKeyResult;
   literals: LiteralResult;
   calls: CallResult;
+  callArgs: CallArgsResult;
   bodyHashes: BodyHashRecord[];
 }
 
@@ -834,6 +840,31 @@ interface CallMismatch {
   rubyName: string;
   tsName: string;
   missing: string[];
+}
+
+/**
+ * Advisory (RFC 0095): one call site whose ARGUMENTS differ between the Ruby
+ * body and the matched TS one. `api:calls` compares the set of call NAMES, so a
+ * port that calls `injectJoin` where Rails calls `inject_join` and reorders its
+ * arguments reads as identical to it. `call` is the Ruby call name; `class`
+ * splits the population the way RFC 0095's rollout gates it — `shape` (count,
+ * order, literal values, kwarg keys) and the report-only `naming`.
+ */
+interface CallArgMismatch {
+  rubyFile: string;
+  tsFile: string;
+  rubyName: string;
+  tsName: string;
+  call: string;
+  class: CallArgClass;
+  rubyArgs: string[];
+  tsArgs: string[];
+}
+
+interface CallArgsResult {
+  compared: number;
+  mismatched: number;
+  mismatches: CallArgMismatch[];
 }
 
 // Advisory: a default's or constant's literal value differs for a matched pair.
@@ -1837,6 +1868,9 @@ export function main() {
     const tsCallsByFileName = new Map<string, Map<string, string[][]>>();
     const tsCallSeqByFileName = new Map<string, Map<string, string[][]>>();
     const tsSkeletonByFileName = new Map<string, Map<string, string[][]>>();
+    // Body call-argument streams scoped per (file, name), for the advisory
+    // call-argument check (RFC 0095).
+    const tsCallArgsByFileName = new Map<string, Map<string, CallSite[][]>>();
     const tsMissingCallTagsByFileName = new Map<string, Map<string, Set<string>>>();
     // Same call-sets unioned by NAME across this package and its deps (the same
     // scope tsParamsByName uses). Consulted ONLY by the delegation-transparency
@@ -1908,6 +1942,11 @@ export function main() {
         const byName = tsCallSeqByFileName.get(file) ?? new Map<string, string[][]>();
         byName.set(m.name, [...(byName.get(m.name) ?? []), m.callSeq]);
         tsCallSeqByFileName.set(file, byName);
+      }
+      if (m.callArgs !== undefined) {
+        const byName = tsCallArgsByFileName.get(file) ?? new Map<string, CallSite[][]>();
+        byName.set(m.name, [...(byName.get(m.name) ?? []), m.callArgs]);
+        tsCallArgsByFileName.set(file, byName);
       }
       if (m.skeleton !== undefined) {
         const byName = tsSkeletonByFileName.get(file) ?? new Map<string, string[][]>();
@@ -2196,6 +2235,8 @@ export function main() {
     const callTagsUsed = new Map<string, Set<string>>();
     const suppressedCalls: SuppressedCall[] = [];
     const callSkeletons: CallSkeleton[] = [];
+    let callArgsCompared = 0;
+    const callArgMismatches: CallArgMismatch[] = [];
     const bodyHashRecords: BodyHashRecord[] = [];
     const fileResults: FileResult[] = [];
 
@@ -2245,6 +2286,8 @@ export function main() {
       // First-sighting Ruby body digest per name (source-hash pinning, RFC 0025).
       const rubyBodyDigestByName = new Map<string, string>();
       const rubySkeletonByName = new Map<string, string[]>();
+      // First-sighting Ruby call-argument stream per name (RFC 0095).
+      const rubyCallArgsByName = new Map<string, CallSite[]>();
       for (const item of items) {
         const f = flattenIncludedMethodInfos(item.info, item.fqn, rubyPkg, moduleFqnByShort, pkg);
         const rubyMethods = [...f.instance, ...f.klass];
@@ -2264,6 +2307,9 @@ export function main() {
           }
           if (rm.skeleton && !rubySkeletonByName.has(rm.name)) {
             rubySkeletonByName.set(rm.name, rm.skeleton);
+          }
+          if (rm.callArgs && !rubyCallArgsByName.has(rm.name)) {
+            rubyCallArgsByName.set(rm.name, rm.callArgs);
           }
           if (rm.bodyDigest && !rubyBodyDigestByName.has(rm.name)) {
             rubyBodyDigestByName.set(rm.name, rm.bodyDigest);
@@ -2409,6 +2455,38 @@ export function main() {
         callMismatches.push({ rubyFile, tsFile, rubyName, tsName, missing: flagged });
       };
 
+      // Advisory call-argument check (RFC 0095): for the same name-matched pair
+      // checkCalls receives, pair the two bodies' call sites and diff the
+      // arguments each passes (see call-args.ts). Never affects the parity %,
+      // and — like the call set — computed only under `--calls`, the mode that
+      // writes the artifact.
+      const checkCallArgs = (rubyName: string, tsName: string, tsFile: string) => {
+        if (!callsGate) return;
+        const rubySites = rubyCallArgsByName.get(rubyName);
+        if (!rubySites || rubySites.length === 0) return;
+        // Only an unambiguous TS body compares: two overloads/overrides recorded
+        // under one (file, name) give no ground for choosing whose call sites
+        // the Ruby ones pair against, exactly as the skeleton record requires.
+        const tsSites = tsCallArgsByFileName.get(tsFile)?.get(tsName);
+        if (tsSites?.length !== 1) return;
+        for (const { ruby, ts } of pairCallSites(rubySites, tsSites[0])) {
+          const result = compareCallArgs(ruby, ts);
+          if (result.verdict === "skip") continue;
+          callArgsCompared++;
+          if (result.verdict === "match") continue;
+          callArgMismatches.push({
+            rubyFile,
+            tsFile,
+            rubyName,
+            tsName,
+            call: ruby.name,
+            class: result.class!,
+            rubyArgs: result.rubyArgs,
+            tsArgs: result.tsArgs,
+          });
+        }
+      };
+
       // Advisory arity check for one name-matched pair: flag when the Ruby and
       // TS positional-arg ranges don't overlap (see arity.ts). Also drives the
       // option-key check, which shares the same matched (ruby, ts) pairs.
@@ -2426,6 +2504,7 @@ export function main() {
         checkOptionKeys(rubyName, tsName, tsFile);
         checkLiterals(rubyName, tsName, tsFile);
         checkCalls(rubyName, tsName, tsFile);
+        checkCallArgs(rubyName, tsName, tsFile);
         checkBody(rubyName, tsName, tsFile);
         if (isArityOverridden(rubyName, rubyFile)) return;
         // Ruby writers (`foo=`) map to a TS setter/assignable property; the name
@@ -2851,6 +2930,11 @@ export function main() {
         suppressed: suppressedCalls,
         skeletons: callSkeletons,
       },
+      callArgs: {
+        compared: callArgsCompared,
+        mismatched: callArgMismatches.length,
+        mismatches: callArgMismatches,
+      },
       bodyHashes: bodyHashRecords,
     });
   }
@@ -2987,6 +3071,31 @@ export function main() {
       ),
     );
 
+    // Advisory call-argument artifact (RFC 0095), flat across packages, in the
+    // shape of call-mismatches.json above — including the `packages` field its
+    // own ratchet will read to reject a partial-scope artifact. Written under
+    // `--calls` for the same reason: a plain run computes no call arguments and
+    // would overwrite this with an empty result.
+    const callArgsPath = path.join(OUTPUT_DIR, `call-arg-mismatches${modeSuffix}.json`);
+    const callArgsFlat = results.flatMap((r) =>
+      r.callArgs.mismatches.map((m) => ({ package: r.package, ...m })),
+    );
+    fs.writeFileSync(
+      callArgsPath,
+      JSON.stringify(
+        {
+          generatedAt: new Date().toISOString(),
+          note: "Advisory, ungated. Arguments a matched TS call site passes vs the Ruby one, normalized (identifiers camelized, literals through literals.ts). `shape` = count/order/value/kwarg-key difference; `naming` = a ref: identifier spelled differently.",
+          packages: [...new Set(results.map((r) => r.package))].sort(),
+          compared: results.reduce((n, r) => n + r.callArgs.compared, 0),
+          mismatched: callArgsFlat.length,
+          mismatches: callArgsFlat,
+        },
+        null,
+        2,
+      ),
+    );
+
     const skeletonsPath = path.join(OUTPUT_DIR, `call-skeletons${modeSuffix}.json`);
     const skeletonsFlat = results.flatMap((r) =>
       r.calls.skeletons.map((s) => ({ package: r.package, ...s })),
@@ -3100,6 +3209,8 @@ function printReport(
   let grandLiteralsMismatched = 0;
   let grandCallsCompared = 0;
   let grandCallsMismatched = 0;
+  let grandCallArgsCompared = 0;
+  let grandCallArgsMismatched = 0;
 
   // Source-hash pinning (RFC 0025): the set of pinned (package, rubyFile,
   // rubyName) keys, read from the committed manifest so the summary can report
@@ -3123,6 +3234,8 @@ function printReport(
     grandLiteralsMismatched += pkg.literals.mismatched;
     grandCallsCompared += pkg.calls.compared;
     grandCallsMismatched += pkg.calls.mismatched;
+    grandCallArgsCompared += pkg.callArgs.compared;
+    grandCallArgsMismatched += pkg.callArgs.mismatched;
 
     console.log(`\n${"=".repeat(100)}`);
     const excludedNote =
@@ -3272,6 +3385,12 @@ function printReport(
     console.log(
       `  Calls (advisory): ${grandCallsCompared} matched pairs checked, ` +
         `${grandCallsMismatched} omit a ported-method call Rails makes — see output/call-mismatches.json`,
+    );
+  }
+  if (grandCallArgsCompared > 0) {
+    console.log(
+      `  Call args (advisory): ${grandCallArgsCompared} call sites compared, ` +
+        `${grandCallArgsMismatched} pass different arguments — see output/call-arg-mismatches.json`,
     );
   }
   console.log(`${"=".repeat(100)}\n`);

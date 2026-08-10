@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { CallSite } from "@blazetrails/parity/types";
-import { compareCallArgs, normalizeArg, normalizeArgs } from "./call-args.js";
+import { compareCallArgs, normalizeArg, normalizeArgs, pairCallSites } from "./call-args.js";
 
 function site(name: string, args: string[], flags: string[] = []): CallSite {
   return { name, args, flags };
@@ -275,5 +275,45 @@ describe("compareCallArgs", () => {
     const result = compareCallArgs(site("visit", ["id:o"]), site("visit", ["id:node"]));
     expect(result.rubyArgs).toEqual(["ref:o"]);
     expect(result.tsArgs).toEqual(["ref:node"]);
+  });
+});
+
+describe("pairCallSites", () => {
+  it("pairs the nth Ruby site against the nth TS site of the same name", () => {
+    const pairs = pairCallSites(
+      [site("visit", ["id:o"]), site("visit", ["id:x"])],
+      [site("visit", ["id:node"]), site("visit", ["id:n"])],
+    );
+    expect(pairs.map((p) => p.ts.args)).toEqual([["id:node"], ["id:n"]]);
+  });
+
+  it("camelizes the Ruby call name to find its TS site", () => {
+    const pairs = pairCallSites(
+      [site("inject_join", ["id:list"])],
+      [site("injectJoin", ["id:list"])],
+    );
+    expect(pairs).toHaveLength(1);
+  });
+
+  it("pairs Ruby new against the TS constructor site", () => {
+    const pairs = pairCallSites([site("new", ["id:o"])], [site("constructor", ["id:o"])]);
+    expect(pairs).toHaveLength(1);
+  });
+
+  it("pairs a predicate against the TS spelling the port chose", () => {
+    expect(pairCallSites([site("empty?", [])], [site("isEmpty", [])])).toHaveLength(1);
+    expect(pairCallSites([site("empty?", [])], [site("empty", [])])).toHaveLength(1);
+  });
+
+  it("drops a Ruby site the TS body never makes", () => {
+    expect(pairCallSites([site("visit", ["id:o"])], [])).toEqual([]);
+  });
+
+  it("does not reuse one TS site for two Ruby sites", () => {
+    const pairs = pairCallSites(
+      [site("visit", ["id:o"]), site("visit", ["id:x"])],
+      [site("visit", ["id:node"])],
+    );
+    expect(pairs).toHaveLength(1);
   });
 });

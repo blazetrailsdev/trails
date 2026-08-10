@@ -282,6 +282,44 @@ function argsEqual(rubyArgs: string[], tsArgs: string[]): boolean {
   );
 }
 
+/** Every TS spelling a Ruby call name can faithfully take, through the same
+ *  table {@link refKeysEqual} asks — so a `?` / `!` / `=` name pairs against the
+ *  spelling the port actually chose. `new` is `constructor`, exactly as the
+ *  call-set gate credits `new Foo()` (extract-ts-api.ts#callSiteName). */
+function tsCallNameKeys(rubyName: string): string[] {
+  if (rubyName === "new") return ["constructor"];
+  if (/[?!=]$/.test(rubyName)) return rubyMethodToTsIgnoringSkip(rubyName) ?? [];
+  return [snakeToCamel(rubyName)];
+}
+
+/**
+ * Pair the call sites of one already name-matched (Ruby, TS) method pair: the
+ * nth Ruby site named `x` against the nth TS site whose name is a faithful
+ * spelling of `x`, both streams in source order. No new METHOD matching is
+ * introduced — the method pair is the one checkCalls already received; this is
+ * only which site within the two bodies compares against which.
+ *
+ * A Ruby site with no unconsumed TS counterpart is dropped rather than
+ * reported: "the port makes no such call" is the call-set gate's finding
+ * (call-mismatches.json), and re-reporting it here as an argument mismatch
+ * would double-count one divergence in two artifacts.
+ */
+export function pairCallSites(
+  rubySites: readonly CallSite[],
+  tsSites: readonly CallSite[],
+): { ruby: CallSite; ts: CallSite }[] {
+  const consumed = new Set<number>();
+  const pairs: { ruby: CallSite; ts: CallSite }[] = [];
+  for (const ruby of rubySites) {
+    const keys = new Set(tsCallNameKeys(ruby.name));
+    const i = tsSites.findIndex((ts, idx) => !consumed.has(idx) && keys.has(ts.name));
+    if (i === -1) continue;
+    consumed.add(i);
+    pairs.push({ ruby, ts: tsSites[i] });
+  }
+  return pairs;
+}
+
 /** Compare one name-matched pair of call sites, mirroring
  *  literals.ts#compareLiteral's verdict shape. "skip" whenever the two
  *  languages cannot agree on the site at all — a splat / double-splat /
