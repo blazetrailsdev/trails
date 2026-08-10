@@ -35,10 +35,8 @@ describe("the split call-argument baseline", () => {
   });
 
   it("shards entries per source file, mirroring the source tree", async () => {
-    await writeSplitBaseline(
-      [entry(), entry({ package: "activerecord", tsFile: "relation.ts" })],
-      dir,
-    );
+    const other = entry({ package: "activerecord", tsFile: "relation.ts" });
+    await writeSplitBaseline([entry(), other], dir);
     expect(await fs.readdir(path.join(dir, "arel", "visitors"))).toEqual(["to-sql.json"]);
     expect(await fs.readdir(path.join(dir, "activerecord"))).toEqual(["relation.json"]);
   });
@@ -61,11 +59,8 @@ describe("the split call-argument baseline", () => {
   });
 });
 
-it("prints the argument list that makes a row its own key", () => {
+it("prints the argument list that makes a row its own key, and names the seeding story", () => {
   expect(renderKey(entry())).toContain("visit(ref:o, ref:collector)");
-});
-
-it("names the seeding story in the unseeded notice", () => {
   const out = renderUnseeded([entry()], "/x/call-mismatches-args-exclude");
   expect(out).toContain("UNSEEDED");
   expect(out).toContain("call-args-baseline-seed");
