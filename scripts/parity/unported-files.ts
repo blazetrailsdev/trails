@@ -1325,6 +1325,19 @@ export const UNPORTED_FILES: UnportedFile[] = [
       "Not applicable: JS has no Marshal, and the wire format is Ruby-only.",
   },
   {
+    testFile: "test_date_new.rb",
+    className: "TestDateNew",
+    // As with the TestSH entry below, `tests` matches the extracted description
+    // — the `def test_` name with its `test_` prefix stripped. `test_memsize`
+    // extracts as `memsize`; a `test_`-prefixed entry here is a silent no-op.
+    tests: ["memsize"],
+    reason:
+      "`ObjectSpace.memsize_of` is Ruby's heap-introspection API, and the test " +
+      "asserts the byte size the C `SimpleDateData`/`ComplexDateData` structs " +
+      "allocate. JS has no analogue and the port has no C struct layout to " +
+      "measure; the rest of the file stays counted.",
+  },
+  {
     testFile: "test_switch_hitter.rb",
     className: "TestSH",
     // `tests` matches the extracted description, which is the `def test_` name
