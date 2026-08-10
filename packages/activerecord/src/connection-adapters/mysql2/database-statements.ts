@@ -119,8 +119,10 @@ export function buildColumnTypes(
 interface PerformQueryHost {
   _affectedRowsBeforeWarnings?: number;
   _statements?: Map<string, unknown>;
-  handleWarnings?(sql: string): void;
+  handleWarnings?(sql: string, conn?: unknown): void | Promise<void>;
   verified?(): void;
+  _shouldPrepare?(binds: unknown[]): boolean;
+  _trackPrepared?(conn: unknown, sql: string): void;
 }
 
 /** @internal */
@@ -236,8 +238,17 @@ export async function performQuery(
     batch?: boolean;
   } = {},
 ): Promise<Mysql2RawResult> {
-  const { prepare = false, notificationPayload } = options;
+  const { notificationPayload } = options;
+  // Rails' `raw_execute` always states `prepare:`; where a trails caller does
+  // not, fall back to the adapter's own `_shouldPrepare`.
+  const prepare = options.prepare ?? this._shouldPrepare?.(binds) ?? false;
   const hasBinds = binds != null && binds.length > 0;
+
+  // Rails' prepared arm is `@statements[sql] ||= raw_connection.prepare(sql)`
+  // (mysql2/database_statements.rb:70); node-mysql2 prepares inside `execute`,
+  // so the pool is tracked here instead, before the statement is handed over —
+  // an eviction then sends COM_STMT_CLOSE while the entry is still ours.
+  if (prepare) this._trackPrepared?.(rawConnection, sql);
 
   let rawResult: unknown;
   let rawFields: mysql.FieldPacket[] | undefined;
@@ -286,7 +297,7 @@ export async function performQuery(
   }
 
   this.verified?.();
-  this.handleWarnings?.(sql);
+  await this.handleWarnings?.(sql, rawConnection);
 
   return { rows, fields: fieldList, affectedRows, insertId };
 }

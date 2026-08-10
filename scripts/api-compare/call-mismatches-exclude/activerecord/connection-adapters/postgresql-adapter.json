@@ -198,6 +198,34 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/postgresql-adapter.ts",
+    "rubyName": "perform_query",
+    "call": "handle_warnings",
+    "reason": "Satisfied by a different path: PG warnings are buffered by the notice receiver and flushed by `_flushWarnings(sql)` at the tail of `performQuery`."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/postgresql-adapter.ts",
+    "rubyName": "perform_query",
+    "call": "is_cached_plan_failure?",
+    "reason": "Satisfied by a different path: the invalid-cached-plan rescue (purge + retry, or PreparedStatementCacheExpired inside a transaction) lives in `_runQuery`, which `performQuery` delegates to."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/postgresql-adapter.ts",
+    "rubyName": "perform_query",
+    "call": "prepare_statement",
+    "reason": "Satisfied by a different path: `prepareStatement` is reached through the shared `_runQuery` helper (postgresql-adapter.ts), which every bound path routes through, rather than inline in `performQuery`."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/postgresql-adapter.ts",
+    "rubyName": "perform_query",
+    "call": "synchronize",
+    "reason": "Satisfied by a different path: the statement-pool purge on a cached-plan failure happens inside `_runQuery`; there is no `@lock` to synchronize on in the single-threaded runtime."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/postgresql-adapter.ts",
     "rubyName": "prepare_statement",
     "call": "translate_exception_class",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

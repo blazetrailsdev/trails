@@ -107,7 +107,7 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
     // The statement and its `last_insert_rowid()` readback are serialized by
     // the FIFO statement lock — so inserts issued concurrently (interleaving
     // at await points) each get their own id. The id is returned from
-    // _performQuery as a local rather than re-read from the shared
+    // performQuery as a local rather than re-read from the shared
     // this._lastInsertRowid, which a concurrent insert would overwrite before
     // the post-await continuation reads it. NOTE: a race is timing-dependent —
     // bare inserts interleave too little to reproduce it reliably here (the
