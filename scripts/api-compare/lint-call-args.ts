@@ -77,7 +77,7 @@ const BASELINE_DIR = path.join(
 
 const ARTIFACT_PATH = path.join(OUTPUT_DIR, "call-arg-mismatches.json");
 
-/** The seed string a `--write` writes for a row nobody has reviewed yet. */
+/** Seed string for a row nobody has reviewed yet. */
 export const DEFAULT_REASON = "TODO: unreviewed — replace with a one-line justification";
 
 async function readJson<T>(file: string): Promise<T> {
@@ -159,8 +159,7 @@ export async function main(write: boolean): Promise<number> {
   const current: CallArgKey[] = gatedRows(artifact);
 
   // Determinism guard (RFC 0044): an artifact covering fewer packages than CI
-  // must neither seed nor pass a gate. Shared with the call-set ratchet — the
-  // check reads only the `packages` field both artifacts carry.
+  // must neither seed nor pass a gate. Shared with the call-set ratchet.
   const absent = missingScope({ packages: artifact.packages, mismatches: [] });
   if (absent.length > 0) {
     console.error(
@@ -237,8 +236,8 @@ export async function main(write: boolean): Promise<number> {
   return 1;
 }
 
-/** `--report`: the whole artifact, `naming` rows included — the class the gate
- *  excludes is only reachable here. Never fails. */
+/** `--report`: the whole artifact, `naming` included — the class the gate
+ *  excludes is reachable only here. Never fails. */
 async function reportMain(top: number): Promise<number> {
   console.log(renderReport(await loadArtifact(), top));
   return 0;
