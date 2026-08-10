@@ -270,10 +270,6 @@ export async function performQuery(
   insertRowid: number | bigint;
 }> {
   const { prepare = false, notificationPayload, batch = false } = options;
-  // Rails' three arms (sqlite3/database_statements.rb:78-108): batch, which
-  // hands the whole multi-statement string to `execute_batch2`; prepared,
-  // which takes the statement from the pool; and unprepared, which prepares a
-  // fresh statement rather than caching it.
   // The lock is taken BEFORE the statement is prepared: Rails' `@lock` is held
   // by `with_raw_connection` (abstract/database_statements.rb:552-559) around
   // the whole of `perform_query`, preparation included, and `disconnect!` takes
@@ -291,6 +287,10 @@ export async function performQuery(
   let affectedRows: number;
   let insertRowid: number | bigint;
   try {
+    // Rails' three arms (sqlite3/database_statements.rb:78-108): batch, which
+    // hands the whole multi-statement string to `execute_batch2`; prepared,
+    // which takes the statement from the pool; and unprepared, which prepares a
+    // fresh statement rather than caching it.
     stmt = batch
       ? null
       : prepare
