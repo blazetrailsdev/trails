@@ -1810,26 +1810,45 @@ describe("Time", () => {
 
   it("hands to_datetime's seat the whole second, the sub-second and the offset apart", () => {
     // ruby 3.3.11:
-    //   Time.new(2008, 3, 1, 6, 0, 7.25, 3600).to_datetime.strftime("%H:%M:%S.%6N%:z")
-    //     #=> "06:00:07.250000+01:00"
-    //   Time.new(2008, 3, 1, 6, 0, 7.25, -1800).to_datetime.zone #=> "-00:30"
+    //   Time.new(2008, 3, 1, 6, 0, 7.456789, 3600).to_datetime.strftime("%H:%M:%S.%9N%:z")
+    //     #=> "06:00:07.456788999+01:00"
+    //   Time.new(2008, 3, 1, 6, 0, 7.456789, -1800).to_datetime.zone #=> "-00:30"
     // `time_to_datetime` (date_core.c:8901-8935) passes `s`, `sf` in
     // nanoseconds and `of` in SECONDS as three separate fields of
     // `d_complex_new_internal`; folding `s` into `sf` or spelling `of` as a
     // fraction of a day is a lossier hand-over of the same values. A HALF-hour
     // offset is the one that catches the fraction spelling: `Rational(1800,
     // 86400)` and the seconds it came from only agree when nothing rounds.
-    const dt = new RubyTime(2008, 3, 1, 6, 0, 7.25, 3600).toDatetime();
+    const dt = new RubyTime(2008, 3, 1, 6, 0, 7.456789, 3600).toDatetime();
     expect((dt as Temporal.ZonedDateTime).offset).toBe("+01:00");
     expect((dt as Temporal.ZonedDateTime).toPlainDateTime().toString()).toBe(
-      "2008-03-01T06:00:07.25",
+      "2008-03-01T06:00:07.456788999",
     );
 
-    const west = new RubyTime(2008, 3, 1, 6, 0, 7.25, -1800).toDatetime();
+    const west = new RubyTime(2008, 3, 1, 6, 0, 7.456789, -1800).toDatetime();
     expect((west as Temporal.ZonedDateTime).offset).toBe("-00:30");
     expect((west as Temporal.ZonedDateTime).toPlainDateTime().toString()).toBe(
-      "2008-03-01T06:00:07.25",
+      "2008-03-01T06:00:07.456788999",
     );
+  });
+
+  it("rolls a 60th second into the next minute, as ::Time does", () => {
+    // ruby 3.3.11:
+    //   Time.utc(2015, 6, 30, 23, 59, 60)             #=> 2015-07-01 00:00:00 UTC
+    //   Time.utc(2015, 6, 30, 23, 59, 60).sec         #=> 0
+    //   Time.utc(2015, 6, 30, 23, 59, 60).strftime("%S") #=> "00"
+    //   Time.utc(2015, 6, 30, 23, 59, 60).to_datetime.to_s
+    //     #=> "2015-07-01T00:00:00+00:00"
+    //   Time.utc(2015, 6, 30, 23, 59, 61)             #=> ArgumentError
+    // MRI admits the 60th second and, with no `right/` zoneinfo loaded, rolls
+    // it; `Temporal` rejects it in the slot, so the roll is spelled in the
+    // constructor. This is what leaves `time_to_datetime`'s `s == 60` fold
+    // (`date_core.c:8913-8915`) unreachable on both runtimes.
+    const t = RubyTime.utc(2015, 6, 30, 23, 59, 60);
+    expect(t.sec).toBe(0);
+    expect(t.strftime("%Y-%m-%d %H:%M:%S")).toBe("2015-07-01 00:00:00");
+    expect(t.toDatetime().toString()).toBe("2015-07-01T00:00:00");
+    expect(() => RubyTime.utc(2015, 6, 30, 23, 59, 61)).toThrow(ArgumentError);
   });
 
   it("keeps the day the offset carries across midnight", () => {

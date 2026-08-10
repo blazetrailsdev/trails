@@ -2982,7 +2982,13 @@ function rtRewriteFrags(hash: DateParts): DateParts {
   return hash;
 }
 
-function completeFrags(parts: DateParts): void {
+/**
+ * @internal `date_core.c` `rt_complete_frags` (`date_core.c:3877-4116`). `klass`
+ * is read only by the `time` block below — `f_le_p(klass, cDateTime)`
+ * (`:4098`), which is what makes a time-only frag set answer TODAY's date
+ * through `DateTime.strptime` and stay a `Date::Error` through `Date.strptime`.
+ */
+function completeFrags(klass: typeof Date | typeof DateTime, parts: DateParts): void {
   const tab: [string | null, DateFrag[]][] = [
     ["time", ["hour", "min", "sec"]],
     [null, ["jd"]],
@@ -3074,6 +3080,18 @@ function completeFrags(parts: DateParts): void {
       parts.wday ??= 1;
     }
   }
+
+  if (g && k === "time") {
+    if (klass === DateTime || klass.prototype instanceof DateTime) {
+      const d = Temporal.Now.plainDateISO();
+      parts.jd ??= cCivilToJd(d.year, d.month, d.day);
+    }
+  }
+
+  if (parts.hour === undefined) parts.hour = 0;
+  if (parts.min === undefined) parts.min = 0;
+  if (parts.sec === undefined) parts.sec = 0;
+  else if (parts.sec > 59) parts.sec = 59;
 }
 
 /**
@@ -4271,7 +4289,7 @@ export function dNewByFrags(hash: DateParts | null, sg = DEFAULT_SG): Date {
     jd = rtValidCivilP(hash.year, hash.mon, hash.mday, sg);
   } else {
     hash = rtRewriteFrags(hash);
-    completeFrags(hash);
+    completeFrags(Date, hash);
     try {
       jd = rtValidDateFragsP(hash, sg);
     } catch {
@@ -4349,7 +4367,7 @@ export function dtNewByFrags(hash: DateParts | null, sg = DEFAULT_SG): DateTime 
     else if (hash.sec === 60) hash.sec = 59;
   } else {
     hash = rtRewriteFrags(hash);
-    completeFrags(hash);
+    completeFrags(DateTime, hash);
     try {
       jd = rtValidDateFragsP(hash, sg);
     } catch {
@@ -4753,7 +4771,7 @@ function expectNumeric(x: unknown): void {
  * `rb_num2int` refuses it, so it raises {@link FloatDomainError} here — the
  * error `f_idiv` reaches first in the C.
  */
-function fToR(x: number): Rational {
+export function fToR(x: number): Rational {
   if (!Number.isFinite(x)) throw new FloatDomainError(String(x));
   let n = x;
   let d = 1n;

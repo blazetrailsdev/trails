@@ -7,7 +7,7 @@
 
 import { Temporal } from "@js-temporal/polyfill";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ArgumentError } from "./date.js";
+import { ArgumentError, Rational } from "./date.js";
 import { Time } from "./time.js";
 
 describe("Time", () => {
@@ -117,6 +117,25 @@ describe("Time", () => {
     expect(Time.utc(2008, 3, 1, 6, 0, 59.9999999999).nsec).toBe(999999999);
     expect(Time.utc(2008, 3, 1, 6, 0, 2.000000001).nsec).toBe(1);
     expect(Time.utc(2008, 3, 1, 6, 0, 30.987654321).nsec).toBe(987654321);
+    expect(Time.utc(2008, 3, 1, 6, 0, 7.456789).nsec).toBe(456788999);
+  });
+
+  it("Time.new takes a Rational second, as MRI's does", () => {
+    // ruby 3.3.11:
+    //   Time.new(2008, 3, 1, 6, 0, Rational(1, 3)).nsec           #=> 333333333
+    //   Time.new(2008, 3, 1, 6, 0, Rational(1, 3)).strftime("%9N") #=> "333333333"
+    //   Time.new(2008, 3, 1, 6, 0, Rational(7, 2)).sec            #=> 3
+    // MRI's `::Time` holds the second as a Rational, which is the form
+    // `datetime_to_time` (`date_core.c:9053-9055`) passes as
+    // `f_add(INT2FIX(m_sec(dat)), m_sf_in_sec(dat))`.
+    const time = new Time(2008, 3, 1, 6, 0, new Rational(1, 3), "UTC");
+    expect(time.sec).toBe(0);
+    expect(time.nsec).toBe(333333333);
+    expect(time.strftime("%9N")).toBe("333333333");
+
+    const half = Time.utc(2008, 3, 1, 6, 0, new Rational(7, 2));
+    expect(half.sec).toBe(3);
+    expect(half.nsec).toBe(500000000);
   });
 
   it("a whole second carries no fraction", () => {

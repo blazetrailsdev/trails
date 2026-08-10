@@ -1,7 +1,22 @@
 /**
- * Port of ruby/date's `test/date/test_date_strptime.rb`, lines 70-305 — the
- * low-level `Date._strptime` frags API: the directive table, the width
- * prefixes, and the arms that fail.
+ * Port of ruby/date's `test/date/test_date_strptime.rb` — the low-level
+ * `Date._strptime` frags API (lines 70-305: the directive table, the width
+ * prefixes, and the arms that fail) and the public `Date.strptime` /
+ * `DateTime.strptime` above it (lines 306-end).
+ *
+ * The public half calls `Date.strptime` / `DateTime.strptime` themselves, as
+ * the Ruby does. Those answer RFC 0088's `Temporal` seat rather than a
+ * `Date`/`DateTime`, so `assert_equal(d, Date.strptime(...))` is spelled as an
+ * equality between two seats and each reader is the seat's name for the same
+ * value: `mon` is `month`, `mday` is `day`, `min` is `minute`, `sec` is
+ * `second`, `yday` is `dayOfYear`, and the commercial triple `cwyear` /
+ * `cweek` / `cwday` is `yearOfWeek` / `weekOfYear` / `dayOfWeek`. Two have no
+ * seat reader and are read one step out: `sec_fraction` as the `millisecond`
+ * the same moment carries, and `d.strftime('%U')` through the exported
+ * {@link strftime}, which takes a `Temporal` subject. The gem's own `to_s` —
+ * the INPUT `Date.strptime(d.to_s)` parses — is the one thing built from a
+ * gem-shaped receiver, since it is a spelling no `Temporal` `toString`
+ * produces.
  *
  * `_strptime` answers the frag Hash itself rather than a date, so RFC 0088's
  * `Temporal`-by-default mapping does not reach these tests — the values below
@@ -25,8 +40,9 @@
 
 /* eslint-disable vitest/no-conditional-expect */
 
+import { Temporal } from "@js-temporal/polyfill";
 import { describe, it, expect } from "vitest";
-import { Date, DateTime, Rational } from "./date.js";
+import { Date, DateTime, Rational, strftime } from "./date.js";
 import type { DateParts } from "./date.js";
 
 const STRFTIME_2001_02_03: Record<string, [string, DateParts]> = {
@@ -98,6 +114,22 @@ Object.assign(STRFTIME_2001_02_03, STRFTIME_2001_02_03_GNUext);
  *  Hash does not carry. */
 function valuesAt(h: DateParts | null, ...keys: (keyof DateParts)[]): unknown[] {
   return keys.map((key) => (h?.[key] === undefined ? null : h[key]));
+}
+
+/** Ruby's `[d.year, d.mon, d.mday, d.hour, d.min, d.sec]` off the `Temporal` seat. */
+function ymdhms(d: Temporal.PlainDateTime | Temporal.ZonedDateTime): number[] {
+  return [d.year, d.month, d.day, d.hour, d.minute, d.second];
+}
+
+/** Ruby's `[d.cwyear, d.cweek, d.cwday, d.hour, d.min, d.sec]`; the seat spells
+ *  the ISO week date `yearOfWeek` / `weekOfYear` / `dayOfWeek`. */
+function cwymdhms(d: Temporal.PlainDateTime | Temporal.ZonedDateTime): (number | undefined)[] {
+  return [d.yearOfWeek, d.weekOfYear, d.dayOfWeek, d.hour, d.minute, d.second];
+}
+
+/** Ruby's `[d.year, d.strftime(fmt).to_i, d.wday, d.hour, d.min, d.sec]`. */
+function wnumWdayHms(d: Temporal.PlainDateTime | Temporal.ZonedDateTime, fmt: string): number[] {
+  return [d.year, Number(strftime(d, fmt)), d.dayOfWeek % 7, d.hour, d.minute, d.second];
 }
 
 describe("TestDateStrptime", () => {
@@ -602,5 +634,197 @@ describe("TestDateStrptime", () => {
     expect(Date._strptime("+23:60", "%Z")?.offset).toBeNull();
     expect(Date._strptime("+23:00:60", "%Z")?.offset).toBeNull();
     expect(Date._strptime("+23:00:60", "%Z")?.offset).toBeNull();
+  });
+  it("strptime", () => {
+    expect(Date.strptime().toString()).toBe(Date.civil().toString());
+    const d = new Date(2002, 3, 14);
+    expect(Date.strptime(d.toS()).toString()).toBe(Date.civil(2002, 3, 14).toString());
+    expect(Date.strptime("2002-03-14").toString()).toBe(Date.civil(2002, 3, 14).toString());
+
+    const dt = new DateTime(2002, 3, 14, 11, 22, 33, 0);
+    expect(DateTime.strptime(dt.toS()).toString()).toBe(
+      DateTime.civil(2002, 3, 14, 11, 22, 33, 0).toString(),
+    );
+    expect(DateTime.strptime("2002-03-14T11:22:33Z").toString()).toBe(
+      DateTime.civil(2002, 3, 14, 11, 22, 33, 0).toString(),
+    );
+    expect(DateTime.strptime("2002-03-14T11:22:33Z", "%Y-%m-%dT%H:%M:%S%Z").toString()).toBe(
+      DateTime.civil(2002, 3, 14, 11, 22, 33, 0).toString(),
+    );
+    expect(DateTime.strptime("2002-03-14T11:22:33+09:00", "%Y-%m-%dT%H:%M:%S%Z").toString()).toBe(
+      DateTime.civil(2002, 3, 14, 11, 22, 33, new Rational(9, 24)).toString(),
+    );
+    expect(DateTime.strptime("2002-03-14T11:22:33-09:00", "%FT%T%Z").toString()).toBe(
+      DateTime.civil(2002, 3, 14, 11, 22, 33, new Rational(-9, 24)).toString(),
+    );
+    // `+ 123456789.to_r/1000000000/86400` is a nanosecond added to the same
+    // moment, which the seat carries as its own sub-second.
+    expect(DateTime.strptime("2002-03-14T11:22:33.123456789-09:00", "%FT%T.%N%Z").toString()).toBe(
+      new DateTime(2002, 3, 14, 11, 22, 33, new Rational(-9, 24))
+        .plus(new Rational(123456789, 1000000000 * 86400))
+        .toDatetime()
+        .toString(),
+    );
+  });
+
+  it("strptime  2", () => {
+    for (let d = new Date(2006, 6, 1); d.cmp(new Date(2007, 6, 1))! <= 0; d = d.plus(1)) {
+      for (const fmt of [
+        "%Y %m %d",
+        "%C %y %m %d",
+
+        "%Y %j",
+        "%C %y %j",
+
+        "%G %V %w",
+        "%G %V %u",
+        "%C %g %V %w",
+        "%C %g %V %u",
+
+        "%Y %U %w",
+        "%Y %U %u",
+        "%Y %W %w",
+        "%Y %W %u",
+        "%C %y %U %w",
+        "%C %y %U %u",
+        "%C %y %W %w",
+        "%C %y %W %u",
+      ]) {
+        const s = d.strftime(fmt);
+        const d2 = Date.strptime(s, fmt);
+        expect([fmt, d.toS(), d2.toString()]).toEqual([fmt, d.toS(), d.toS()]);
+      }
+
+      for (const fmt of [
+        "%Y %m %d %H %M %S",
+        "%Y %m %d %H %M %S %N",
+        "%C %y %m %d %H %M %S",
+        "%C %y %m %d %H %M %S %N",
+
+        "%Y %j %H %M %S",
+        "%Y %j %H %M %S %N",
+        "%C %y %j %H %M %S",
+        "%C %y %j %H %M %S %N",
+
+        "%s",
+        "%s %N",
+        "%Q",
+        "%Q %N",
+      ]) {
+        const s = d.strftime(fmt);
+        const d2 = DateTime.strptime(s, fmt);
+        expect([fmt, d.toS(), d2.toString()]).toEqual([fmt, d.toS(), `${d.toS()}T00:00:00`]);
+      }
+    }
+  });
+
+  it("strptime  minus", () => {
+    let d = DateTime.strptime("-1", "%s");
+    expect(ymdhms(d)).toEqual([1969, 12, 31, 23, 59, 59]);
+    d = DateTime.strptime("-86400", "%s");
+    expect(ymdhms(d)).toEqual([1969, 12, 31, 0, 0, 0]);
+
+    // `sec_fraction` has no seat, so `Rational(1, 10**3)` is read as the
+    // millisecond the same moment carries; `(0/1)` is a whole second.
+    d = DateTime.strptime("-999", "%Q");
+    expect([...ymdhms(d), d.millisecond]).toEqual([1969, 12, 31, 23, 59, 59, 1]);
+    d = DateTime.strptime("-1000", "%Q");
+    expect([...ymdhms(d), d.millisecond]).toEqual([1969, 12, 31, 23, 59, 59, 0]);
+  });
+
+  it("strptime  comp", () => {
+    const n = DateTime.strptime(Temporal.Now.plainDateISO().toString(), "%F");
+
+    let d = DateTime.strptime("073", "%j");
+    expect([d.year, d.dayOfYear, d.hour, d.minute, d.second]).toEqual([n.year, 73, 0, 0, 0]);
+    d = DateTime.strptime("13", "%d");
+    expect(ymdhms(d)).toEqual([n.year, n.month, 13, 0, 0, 0]);
+
+    d = DateTime.strptime("Mar", "%b");
+    expect(ymdhms(d)).toEqual([n.year, 3, 1, 0, 0, 0]);
+    d = DateTime.strptime("2004", "%Y");
+    expect(ymdhms(d)).toEqual([2004, 1, 1, 0, 0, 0]);
+
+    d = DateTime.strptime("Mar 13", "%b %d");
+    expect(ymdhms(d)).toEqual([n.year, 3, 13, 0, 0, 0]);
+    d = DateTime.strptime("Mar 2004", "%b %Y");
+    expect(ymdhms(d)).toEqual([2004, 3, 1, 0, 0, 0]);
+    d = DateTime.strptime("23:55", "%H:%M");
+    expect(ymdhms(d)).toEqual([n.year, n.month, n.day, 23, 55, 0]);
+    d = DateTime.strptime("23:55:30", "%H:%M:%S");
+    expect(ymdhms(d)).toEqual([n.year, n.month, n.day, 23, 55, 30]);
+
+    d = DateTime.strptime("Sun 23:55", "%a %H:%M");
+    const d2 = d.subtract({ days: d.dayOfWeek % 7 });
+    expect(ymdhms(d)).toEqual([d2.year, d2.month, d2.day, 23, 55, 0]);
+    d = DateTime.strptime("Aug 23:55", "%b %H:%M");
+    expect(ymdhms(d)).toEqual([n.year, 8, 1, 23, 55, 0]);
+
+    d = DateTime.strptime("2004", "%G");
+    expect(cwymdhms(d)).toEqual([2004, 1, 1, 0, 0, 0]);
+    d = DateTime.strptime("11", "%V");
+    expect(cwymdhms(d)).toEqual([n.yearOfWeek, 11, 1, 0, 0, 0]);
+    d = DateTime.strptime("6", "%u");
+    expect(cwymdhms(d)).toEqual([n.yearOfWeek, n.weekOfYear, 6, 0, 0, 0]);
+
+    d = DateTime.strptime("11-6", "%V-%u");
+    expect(cwymdhms(d)).toEqual([n.yearOfWeek, 11, 6, 0, 0, 0]);
+    d = DateTime.strptime("2004-11", "%G-%V");
+    expect(cwymdhms(d)).toEqual([2004, 11, 1, 0, 0, 0]);
+
+    d = DateTime.strptime("11-6", "%U-%w");
+    expect(wnumWdayHms(d, "%U")).toEqual([n.year, 11, 6, 0, 0, 0]);
+    d = DateTime.strptime("2004-11", "%Y-%U");
+    expect(wnumWdayHms(d, "%U")).toEqual([2004, 11, 0, 0, 0, 0]);
+
+    d = DateTime.strptime("11-6", "%W-%w");
+    expect(wnumWdayHms(d, "%W")).toEqual([n.year, 11, 6, 0, 0, 0]);
+    d = DateTime.strptime("2004-11", "%Y-%W");
+    expect(wnumWdayHms(d, "%W")).toEqual([2004, 11, 1, 0, 0, 0]);
+  });
+
+  it("strptime  d to s", () => {
+    const d = new Date(2002, 3, 14);
+    expect(Date.strptime(d.toS()).toString()).toBe(Date.civil(2002, 3, 14).toString());
+
+    const dt = new DateTime(2002, 3, 14, 11, 22, 33, new Rational(9, 24));
+    expect(DateTime.strptime(dt.toS()).toString()).toBe(
+      DateTime.civil(2002, 3, 14, 11, 22, 33, new Rational(9, 24)).toString(),
+    );
+  });
+
+  it("strptime  ex", () => {
+    expect(() => Date.strptime("")).toThrow(Date.Error);
+    expect(() => DateTime.strptime("")).toThrow(Date.Error);
+    expect(() => Date.strptime("2001-02-29", "%F")).toThrow(Date.Error);
+    expect(() => DateTime.strptime("2001-02-29T23:59:60", "%FT%T")).toThrow(Date.Error);
+    expect(() => DateTime.strptime("2001-03-01T23:59:60", "%FT%T")).not.toThrow();
+    expect(() => DateTime.strptime("2001-03-01T23:59:61", "%FT%T")).toThrow(Date.Error);
+    expect(() => Date.strptime("23:55", "%H:%M")).toThrow(Date.Error);
+    expect(() => Date.strptime("01-31-2011", "%m/%d/%Y")).toThrow(Date.Error);
+  });
+
+  it("given string", () => {
+    const s = "2001-02-03T04:05:06Z";
+    const s0 = s;
+
+    expect(Date._strptime(s, "%FT%T%Z")).not.toEqual({});
+    expect(s).toBe(s0);
+  });
+
+  it("sz", () => {
+    let d = DateTime.strptime("0 -0200", "%s %z");
+    expect(ymdhms(d)).toEqual([1969, 12, 31, 22, 0, 0]);
+    expect((d as Temporal.ZonedDateTime).offset).toBe("-02:00");
+    d = DateTime.strptime("9 +0200", "%s %z");
+    expect(ymdhms(d)).toEqual([1970, 1, 1, 2, 0, 9]);
+    expect((d as Temporal.ZonedDateTime).offset).toBe("+02:00");
+
+    d = DateTime.strptime("0 -0200", "%Q %z");
+    expect(ymdhms(d)).toEqual([1969, 12, 31, 22, 0, 0]);
+    expect((d as Temporal.ZonedDateTime).offset).toBe("-02:00");
+    d = DateTime.strptime("9000 +0200", "%Q %z");
+    expect(ymdhms(d)).toEqual([1970, 1, 1, 2, 0, 9]);
+    expect((d as Temporal.ZonedDateTime).offset).toBe("+02:00");
   });
 });
