@@ -5865,11 +5865,14 @@ export class Date {
    * **This is the opt-in seam RFC 0088 left open**, and it is a conversion
    * method rather than an options argument or a parallel entry point because
    * the gem already names both directions and neither name is invented: the
-   * statics answer Temporal through `to_date` / `to_datetime`, and a caller who
-   * wants the gem-shaped object back hands the Temporal value to the
-   * constructor ({@link Date}'s `PlainDate` overload,
-   * {@link DateTime}'s), which is the same seat `d_simple_new_internal` writes.
-   * The exported {@link dNewByFrags} / {@link dtNewByFrags} answer it directly.
+   * statics answer Temporal through `to_date` / `to_datetime`, and the
+   * exported {@link dNewByFrags} / {@link dtNewByFrags} answer the other
+   * direction — they are the *sole* gem-shaped seat, both ending at
+   * `d_simple_new_internal` (`date_core.c:3036`) exactly as `date_s_jd`
+   * (`:3377-3387`) does. `Date`'s constructor takes only
+   * `(year?, month?, day?, start?)` and the `SEAT` form; handing it a
+   * `Temporal.PlainDate` raises `TypeError: invalid year (not numeric)` from
+   * `check_numeric` (`date_core.c:67-72`).
    */
   toDate(): Temporal.PlainDate {
     return plainDateFromJd(this.mLocalJd(), this.#sg);
@@ -6655,12 +6658,23 @@ export class DateTime extends DateWithoutParseStatics {
    * Ruby `DateTime#new_offset(offset = 0)` (ruby/date, `date_core.c`
    * `d_lite_new_offset`, `:5920-5934`) over `dup_obj_with_new_offset`
    * (`:5901-5909`): the day and day-fraction are stored in UTC, so only `of`
-   * changes. `Init_date_core` gives it to `::DateTime` alone (`:10018`). TS has
+   * changes — but `set_of` (`:5890-5897`) fills the day and day-fraction in
+   * with `get_c_jd` / `get_c_df` before it writes the new `of`, because the
+   * proleptic-Gregorian arm may have stored neither.
+   * `Init_date_core` gives it to `::DateTime` alone (`:10018`). TS has
    * no `dup_obj`, so the copy is made here; see {@link DateTime#newStart}.
    */
   newOffset(offset: number | bigint | Rational | string = 0): this {
     const rof = val2off(offset);
-    return new DateTime(SEAT, this.nth, this.#jd, this.#df, this.#sf, rof, this.start) as this;
+    return new DateTime(
+      SEAT,
+      this.nth,
+      this.#getCJd(),
+      this.#getCDf(),
+      this.#sf,
+      rof,
+      this.start,
+    ) as this;
   }
 
   override newStart(start = DEFAULT_SG): this {
