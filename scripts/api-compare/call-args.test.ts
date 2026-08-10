@@ -1,0 +1,267 @@
+import { describe, it, expect } from "vitest";
+import type { CallSite } from "@blazetrails/parity/types";
+import { compareCallArgs, normalizeArg, normalizeArgs } from "./call-args.js";
+
+function site(name: string, args: string[], flags: string[] = []): CallSite {
+  return { name, args, flags };
+}
+
+describe("normalizeArg", () => {
+  it("camelizes identifiers", () => {
+    expect(normalizeArg("id:join_str")).toBe("ref:joinStr");
+  });
+
+  it("collapses id: and call: into one ref: bucket", () => {
+    expect(normalizeArg("call:table_name")).toBe(normalizeArg("id:table_name"));
+  });
+
+  it("reads Ruby new as constructor", () => {
+    expect(normalizeArg("call:new")).toBe("ref:constructor");
+    expect(normalizeArg("call:constructor")).toBe("ref:constructor");
+  });
+
+  it("reads Ruby self as this", () => {
+    expect(normalizeArg("id:self")).toBe("ref:this");
+  });
+
+  it("strips a Ruby ivar sigil", () => {
+    expect(normalizeArg("id:@ast")).toBe(normalizeArg("id:ast"));
+  });
+
+  it("keeps a name that merely starts with is", () => {
+    expect(normalizeArg("id:is_valid")).toBe("ref:isValid");
+    expect(normalizeArg("id:isolation_level")).toBe("ref:isolationLevel");
+  });
+
+  it("spells a symbol as its JS string", () => {
+    expect(normalizeArg("sym:dump")).toBe("str:dump");
+  });
+
+  it("compares the colon-kept symbol spelling equal to the bare one", () => {
+    expect(normalizeArg("str::dump")).toBe(normalizeArg("sym:dump"));
+  });
+
+  it("camelizes an identifier-shaped string", () => {
+    expect(normalizeArg("str:join_str")).toBe("str:joinStr");
+  });
+
+  it("compares a non-identifier string byte-for-byte", () => {
+    expect(normalizeArg("str: GROUP BY ")).toBe("str: GROUP BY ");
+    expect(normalizeArg("str:AND ")).toBe("str:AND ");
+  });
+
+  it("canonicalizes an escape through literals.ts", () => {
+    expect(normalizeArg("str:\\n")).toBe(normalizeArg("str:\n"));
+  });
+
+  it("normalizes numbers through one numeric key", () => {
+    expect(normalizeArg("num:1.0")).toBe("num:1");
+    expect(normalizeArg("num:1_000")).toBe("num:1000");
+  });
+
+  it("passes booleans, nil and constants through", () => {
+    expect(normalizeArg("bool:true")).toBe("bool:true");
+    expect(normalizeArg("nil")).toBe("nil");
+    expect(normalizeArg("const:Arel")).toBe("const:Arel");
+  });
+
+  it("normalizes kwargs keys and values, order-insensitively", () => {
+    expect(normalizeArg("kwargs{inverse_of=sym:posts,auto_include=bool:true}")).toBe(
+      normalizeArg("kwargs{autoInclude=bool:true,inverseOf=str:posts}"),
+    );
+  });
+
+  it("normalizes a kwarg key through the option-key renames", () => {
+    expect(normalizeArg("kwargs{constructor=id:klass}")).toBe(
+      normalizeArg("kwargs{constructorFn=id:klass}"),
+    );
+  });
+
+  it("is uncomparable for a numeric token it cannot parse", () => {
+    expect(normalizeArg("num:123n")).toBeNull();
+  });
+
+  it("is uncomparable for an opaque descriptor", () => {
+    for (const opaque of ["?", "array", "hash", "str-interp", "ternary", "binop:+", "unaryid:x"]) {
+      expect(normalizeArg(opaque)).toBeNull();
+    }
+  });
+
+  it("is uncomparable for an opaque descriptor nested inside kwargs", () => {
+    expect(normalizeArg("kwargs{scope=?}")).toBeNull();
+    expect(normalizeArg("kwargs{on=array}")).toBeNull();
+    expect(normalizeArg("kwargs{opts=kwargs{k=str-interp}}")).toBeNull();
+  });
+
+  it("is uncomparable for a double-splat kwarg", () => {
+    expect(normalizeArg("kwargs{**splat}")).toBeNull();
+  });
+});
+
+describe("normalizeArgs", () => {
+  it("is uncomparable when any member is opaque", () => {
+    expect(normalizeArgs(["id:x", "?"])).toBeNull();
+    expect(normalizeArgs(["id:x", "sym:foo"])).toEqual(["ref:x", "str:foo"]);
+  });
+});
+
+describe("compareCallArgs", () => {
+  it("matches identical argument lists across the naming pipeline", () => {
+    expect(
+      compareCallArgs(
+        site("visit", ["id:o", "id:collector"]),
+        site("visit", ["id:o", "id:collector"]),
+      ).verdict,
+    ).toBe("match");
+    expect(
+      compareCallArgs(
+        site("infix_value", ["id:o", "id:join_str"]),
+        site("infixValue", ["id:o", "id:joinStr"]),
+      ).verdict,
+    ).toBe("match");
+  });
+
+  it("flags a reordered argument list as shape", () => {
+    const result = compareCallArgs(
+      site("inject_join", ["id:list", "id:collector", "str: AND "]),
+      site("injectJoin", ["id:list", "str: AND ", "id:collector"]),
+    );
+    expect(result.verdict).toBe("mismatch");
+    expect(result.class).toBe("shape");
+  });
+
+  it("flags a differing argument count as shape", () => {
+    const result = compareCallArgs(
+      site("quote_table_name", ["id:name"]),
+      site("quoteTableName", []),
+    );
+    expect(result.verdict).toBe("mismatch");
+    expect(result.class).toBe("shape");
+  });
+
+  it("flags a changed literal as shape", () => {
+    const result = compareCallArgs(
+      site("assert_valid_value", ["id:object", "kwargs{action=sym:dump}"]),
+      site("assertValidValue", ["id:object", "kwargs{action=str:load}"]),
+    );
+    expect(result.verdict).toBe("mismatch");
+    expect(result.class).toBe("shape");
+  });
+
+  it("flags a changed kwarg key as shape", () => {
+    const result = compareCallArgs(
+      site("build", ["kwargs{inverse_of=id:reflection}"]),
+      site("build", ["kwargs{inverse=id:reflection}"]),
+    );
+    expect(result.verdict).toBe("mismatch");
+    expect(result.class).toBe("shape");
+  });
+
+  it("matches a predicate against either candidate spelling", () => {
+    for (const ts of ["isAbleToTypeCast", "ableToTypeCast"]) {
+      expect(
+        compareCallArgs(site("visit", ["call:able_to_type_cast?"]), site("visit", [`call:${ts}`]))
+          .verdict,
+      ).toBe("match");
+    }
+    expect(
+      compareCallArgs(site("save", ["call:save!"]), site("save", ["call:saveBang"])).verdict,
+    ).toBe("match");
+  });
+
+  it("does not match an is_ predicate to the doubled isIs spelling", () => {
+    expect(
+      compareCallArgs(site("check", ["call:is_number?"]), site("check", ["call:isIsNumber"]))
+        .verdict,
+    ).toBe("mismatch");
+    expect(
+      compareCallArgs(site("check", ["call:is_number?"]), site("check", ["call:isNumber"])).verdict,
+    ).toBe("match");
+  });
+
+  it("does not hide a rename of a non-predicate is_ identifier", () => {
+    const result = compareCallArgs(site("check", ["id:is_valid"]), site("check", ["id:valid"]));
+    expect(result.verdict).toBe("mismatch");
+    expect(result.class).toBe("naming");
+  });
+
+  it("flags a renamed identifier as naming", () => {
+    const result = compareCallArgs(
+      site("visit", ["id:o", "id:collector"]),
+      site("visit", ["id:node", "id:collector"]),
+    );
+    expect(result.verdict).toBe("mismatch");
+    expect(result.class).toBe("naming");
+  });
+
+  it("skips a splat on either side", () => {
+    expect(
+      compareCallArgs(site("build", ["*splat"], ["splat"]), site("build", ["id:x"])).verdict,
+    ).toBe("skip");
+    expect(
+      compareCallArgs(site("build", ["id:x"]), site("build", ["*splat"], ["splat"])).verdict,
+    ).toBe("skip");
+  });
+
+  it("skips a block-pass", () => {
+    expect(
+      compareCallArgs(site("map", ["id:x"], ["blockpass"]), site("map", ["id:y"])).verdict,
+    ).toBe("skip");
+  });
+
+  it("skips a zsuper", () => {
+    expect(compareCallArgs(site("super", [], ["zsuper"]), site("super", [])).verdict).toBe("skip");
+  });
+
+  it("skips super", () => {
+    expect(compareCallArgs(site("super", ["id:x"]), site("super", ["id:y"])).verdict).toBe("skip");
+  });
+
+  it("skips a NO_JS_CALL_FORM name", () => {
+    expect(compareCallArgs(site("to_s", ["id:x"]), site("to_s", ["id:y"])).verdict).toBe("skip");
+    expect(compareCallArgs(site("present?", ["id:x"]), site("present?", ["id:y"])).verdict).toBe(
+      "skip",
+    );
+  });
+
+  it("skips an Enumerable idiom", () => {
+    expect(compareCallArgs(site("detect", ["id:x"]), site("find", ["id:y"])).verdict).toBe("skip");
+  });
+
+  it("skips a site with an opaque argument", () => {
+    expect(compareCallArgs(site("where", ["hash"]), site("where", ["hash"])).verdict).toBe("skip");
+  });
+
+  it("compares the non-block arguments of a block-flagged site", () => {
+    expect(
+      compareCallArgs(
+        site("inject_join", ["id:list"], ["block"]),
+        site("injectJoin", ["id:list"], ["block"]),
+      ).verdict,
+    ).toBe("match");
+  });
+
+  it("drops the leading this-mixin receiver the port adds", () => {
+    expect(
+      compareCallArgs(
+        site("delete_through_records", ["id:records"]),
+        site("deleteThroughRecords", ["id:this", "id:records"]),
+      ).verdict,
+    ).toBe("match");
+  });
+
+  it("keeps a genuine extra argument visible", () => {
+    const result = compareCallArgs(
+      site("delete_through_records", ["id:records"]),
+      site("deleteThroughRecords", ["id:this", "id:records", "id:method"]),
+    );
+    expect(result.verdict).toBe("mismatch");
+    expect(result.class).toBe("shape");
+  });
+
+  it("reports the normalized lists on a mismatch", () => {
+    const result = compareCallArgs(site("visit", ["id:o"]), site("visit", ["id:node"]));
+    expect(result.rubyArgs).toEqual(["ref:o"]);
+    expect(result.tsArgs).toEqual(["ref:node"]);
+  });
+});
