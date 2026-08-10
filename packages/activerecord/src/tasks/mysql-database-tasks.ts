@@ -99,6 +99,26 @@ export class MySQLDatabaseTasks {
   async structureDump(filename: string, extraFlags?: string | string[] | null): Promise<void> {
     const args = this.prepareCommandOptions();
     args.push("--result-file", filename, "--no-data", "--routines", "--skip-comments");
+
+    const { SchemaDumper } = await import("../schema-dumper.js");
+    let ignoreTables: (string | RegExp)[] = SchemaDumper.ignoreTables;
+    if (ignoreTables.length > 0) {
+      const dataSources = await (await this.connection()).dataSources();
+      ignoreTables = dataSources.filter((table) =>
+        ignoreTables.some((pattern) => {
+          if (!(pattern instanceof RegExp)) return pattern === table;
+          // Ruby's Regexp#=== carries no state; a JS `g`/`y` regex advances
+          // `lastIndex` on every `.test()`, so without this reset the second
+          // table tested against the same pattern can silently miss.
+          pattern.lastIndex = 0;
+          return pattern.test(table);
+        }),
+      );
+      for (const table of ignoreTables) {
+        args.push(`--ignore-table=${this.requireDatabaseName()}.${table as string}`);
+      }
+    }
+
     args.push(this.requireDatabaseName());
     if (extraFlags) {
       args.unshift(...(Array.isArray(extraFlags) ? extraFlags : [extraFlags]));
