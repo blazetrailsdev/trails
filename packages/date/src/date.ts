@@ -2395,37 +2395,42 @@ function match(
  * not, and `date_zone_to_diff` turns its name into the `:offset`.
  */
 function rfc2822Cb(m: RegExpExecArray, hash: DateParts): number {
-  const s: (string | undefined)[] = [undefined, ...m.slice(1)];
+  const s1 = m[1];
+  const s2 = m[2];
+  const s3 = m[3];
+  const s4 = m[4];
+  const s5 = m[5];
+  const s6 = m[6];
+  const s7 = m[7];
+  const s8 = m[8];
 
-  if (s[1] !== undefined) {
-    hash.wday = dayNum(s[1]);
+  if (s1 !== undefined) {
+    hash.wday = dayNum(s1);
   }
-  hash.mday = Number(s[2]);
-  hash.mon = monNum(s[3] as string);
-  let y = Number(s[4]);
-  if ((s[4] as string).length < 4) y = compYear50(y);
+  hash.mday = Number(s2);
+  hash.mon = monNum(s3);
+  let y = Number(s4);
+  if (s4.length < 4) y = compYear50(y);
   hash.year = y;
-  hash.hour = Number(s[5]);
-  hash.min = Number(s[6]);
-  if (s[7] !== undefined) hash.sec = Number(s[7]);
-  hash.zone = s[8];
-  hash.offset = dateZoneToDiff(s[8] as string);
+  hash.hour = Number(s5);
+  hash.min = Number(s6);
+  if (s7 !== undefined) hash.sec = Number(s7);
+  hash.zone = s8;
+  hash.offset = dateZoneToDiff(s8);
 
   return 1;
 }
 
 /** @internal `date_parse.c` `rfc2822` (`date_parse.c:2829-2842`). */
 function rfc2822(str: string, hash: DateParts): number {
-  const pat = new RegExp(
+  const patSource =
     `^\\s*(?:(${ABBR_DAYS})\\s*,\\s+)?` +
-      `(\\d{1,2})\\s+` +
-      `(${ABBR_MONTHS})\\s+` +
-      `(-?\\d{2,})\\s+` +
-      `(\\d{2}):(\\d{2})(?::(\\d{2}))?\\s*` +
-      `([-+]\\d{4}|ut|gmt|e[sd]t|c[sd]t|m[sd]t|p[sd]t|[a-ik-z])\\s*$`,
-    "i",
-  );
-  return match(str, pat, hash, rfc2822Cb);
+    `(\\d{1,2})\\s+` +
+    `(${ABBR_MONTHS})\\s+` +
+    `(-?\\d{2,})\\s+` +
+    `(\\d{2}):(\\d{2})(?::(\\d{2}))?\\s*` +
+    `([-+]\\d{4}|ut|gmt|e[sd]t|c[sd]t|m[sd]t|p[sd]t|[a-ik-z])\\s*$`;
+  return match(str, new RegExp(patSource, "i"), hash, rfc2822Cb);
 }
 
 /** @internal `date_parse.c` `date__rfc2822` (`date_parse.c:2844-2855`). */
@@ -2441,16 +2446,14 @@ function dateRfc2822(str: string): DateParts {
  * `:offset` is the literal `0` rather than a `date_zone_to_diff` of it.
  */
 function httpdateType1Cb(m: RegExpExecArray, hash: DateParts): number {
-  const s: (string | undefined)[] = [undefined, ...m.slice(1)];
-
-  hash.wday = dayNum(s[1] as string);
-  hash.mday = Number(s[2]);
-  hash.mon = monNum(s[3] as string);
-  hash.year = Number(s[4]);
-  hash.hour = Number(s[5]);
-  hash.min = Number(s[6]);
-  hash.sec = Number(s[7]);
-  hash.zone = s[8];
+  hash.wday = dayNum(m[1]);
+  hash.mday = Number(m[2]);
+  hash.mon = monNum(m[3]);
+  hash.year = Number(m[4]);
+  hash.hour = Number(m[5]);
+  hash.min = Number(m[6]);
+  hash.sec = Number(m[7]);
+  hash.zone = m[8];
   hash.offset = 0;
 
   return 1;
@@ -2458,16 +2461,14 @@ function httpdateType1Cb(m: RegExpExecArray, hash: DateParts): number {
 
 /** @internal `date_parse.c` `httpdate_type1` (`date_parse.c:2886-2899`). */
 function httpdateType1(str: string, hash: DateParts): number {
-  const pat = new RegExp(
+  const patSource =
     `^\\s*(${ABBR_DAYS})\\s*,\\s+` +
-      `(\\d{2})\\s+` +
-      `(${ABBR_MONTHS})\\s+` +
-      `(-?\\d{4})\\s+` +
-      `(\\d{2}):(\\d{2}):(\\d{2})\\s+` +
-      `(gmt)\\s*$`,
-    "i",
-  );
-  return match(str, pat, hash, httpdateType1Cb);
+    `(\\d{2})\\s+` +
+    `(${ABBR_MONTHS})\\s+` +
+    `(-?\\d{4})\\s+` +
+    `(\\d{2}):(\\d{2}):(\\d{2})\\s+` +
+    `(gmt)\\s*$`;
+  return match(str, new RegExp(patSource, "i"), hash, httpdateType1Cb);
 }
 
 /**
@@ -2476,18 +2477,16 @@ function httpdateType1(str: string, hash: DateParts): number {
  * `comp_year69` — and only within `0..99`.
  */
 function httpdateType2Cb(m: RegExpExecArray, hash: DateParts): number {
-  const s: (string | undefined)[] = [undefined, ...m.slice(1)];
-
-  hash.wday = dayNum(s[1] as string);
-  hash.mday = Number(s[2]);
-  hash.mon = monNum(s[3] as string);
-  let y = Number(s[4]);
+  hash.wday = dayNum(m[1]);
+  hash.mday = Number(m[2]);
+  hash.mon = monNum(m[3]);
+  let y = Number(m[4]);
   if (y >= 0 && y <= 99) y = compYear69(y);
   hash.year = y;
-  hash.hour = Number(s[5]);
-  hash.min = Number(s[6]);
-  hash.sec = Number(s[7]);
-  hash.zone = s[8];
+  hash.hour = Number(m[5]);
+  hash.min = Number(m[6]);
+  hash.sec = Number(m[7]);
+  hash.zone = m[8];
   hash.offset = 0;
 
   return 1;
@@ -2495,16 +2494,14 @@ function httpdateType2Cb(m: RegExpExecArray, hash: DateParts): number {
 
 /** @internal `date_parse.c` `httpdate_type2` (`date_parse.c:2932-2946`). */
 function httpdateType2(str: string, hash: DateParts): number {
-  const pat = new RegExp(
+  const patSource =
     `^\\s*(${DAYS})\\s*,\\s+` +
-      `(\\d{2})\\s*-\\s*` +
-      `(${ABBR_MONTHS})\\s*-\\s*` +
-      `(\\d{2})\\s+` +
-      `(\\d{2}):(\\d{2}):(\\d{2})\\s+` +
-      `(gmt)\\s*$`,
-    "i",
-  );
-  return match(str, pat, hash, httpdateType2Cb);
+    `(\\d{2})\\s*-\\s*` +
+    `(${ABBR_MONTHS})\\s*-\\s*` +
+    `(\\d{2})\\s+` +
+    `(\\d{2}):(\\d{2}):(\\d{2})\\s+` +
+    `(gmt)\\s*$`;
+  return match(str, new RegExp(patSource, "i"), hash, httpdateType2Cb);
 }
 
 /**
@@ -2513,30 +2510,26 @@ function httpdateType2(str: string, hash: DateParts): number {
  * `:zone` and no `:offset`.
  */
 function httpdateType3Cb(m: RegExpExecArray, hash: DateParts): number {
-  const s: (string | undefined)[] = [undefined, ...m.slice(1)];
-
-  hash.wday = dayNum(s[1] as string);
-  hash.mon = monNum(s[2] as string);
-  hash.mday = Number(s[3]);
-  hash.hour = Number(s[4]);
-  hash.min = Number(s[5]);
-  hash.sec = Number(s[6]);
-  hash.year = Number(s[7]);
+  hash.wday = dayNum(m[1]);
+  hash.mon = monNum(m[2]);
+  hash.mday = Number(m[3]);
+  hash.hour = Number(m[4]);
+  hash.min = Number(m[5]);
+  hash.sec = Number(m[6]);
+  hash.year = Number(m[7]);
 
   return 1;
 }
 
 /** @internal `date_parse.c` `httpdate_type3` (`date_parse.c:2975-2988`). */
 function httpdateType3(str: string, hash: DateParts): number {
-  const pat = new RegExp(
+  const patSource =
     `^\\s*(${ABBR_DAYS})\\s+` +
-      `(${ABBR_MONTHS})\\s+` +
-      `(\\d{1,2})\\s+` +
-      `(\\d{2}):(\\d{2}):(\\d{2})\\s+` +
-      `(\\d{4})\\s*$`,
-    "i",
-  );
-  return match(str, pat, hash, httpdateType3Cb);
+    `(${ABBR_MONTHS})\\s+` +
+    `(\\d{1,2})\\s+` +
+    `(\\d{2}):(\\d{2}):(\\d{2})\\s+` +
+    `(\\d{4})\\s*$`;
+  return match(str, new RegExp(patSource, "i"), hash, httpdateType3Cb);
 }
 
 /**
@@ -5710,6 +5703,11 @@ export class Date {
    * raises `Date::Error` on a date `c_valid_civil_p` rejects. A negative `month`
    * counts back from December and a negative `mday` from the month's end, so
    * `Date.civil(2001, -1, -1)` is 2001-12-31.
+   *
+   * It is the one caller that sees `date_initialize`'s `add_frac()`
+   * (`date_core.c:3556-3558`): it answers that function's return value, where
+   * `Date.new` reaches it through `Class#new` and the return is discarded. So
+   * the fraction the constructor peeled off `mday` is applied here.
    */
   static civil(
     year = -4712,
