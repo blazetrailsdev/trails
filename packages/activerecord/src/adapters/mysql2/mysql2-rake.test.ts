@@ -15,6 +15,7 @@ import { MySQLDatabaseTasks } from "../../tasks/mysql-database-tasks.js";
 import { HashConfig } from "../../database-configurations/hash-config.js";
 import { DatabaseAlreadyExists } from "../../errors.js";
 import { Base } from "../../base.js";
+import { SchemaDumper } from "../../schema-dumper.js";
 
 /**
  * `ActiveRecord::Base.stub(:lease_connection, @connection, &block)`
@@ -363,11 +364,34 @@ describeIfMysqlAdapter("MySQLStructureDumpTest", () => {
     expect(spawnSync).toHaveBeenCalledWith("mysqldump", expectedCommand, expect.anything());
   });
 
-  it.skip("structure dump with ignore tables", () => {
-    // Not yet ported: trails' `structureDump` never consults
-    // `SchemaDumper.ignoreTables` / `connection.dataSources`
-    // (`mysql_database_tasks.rb:47-51`), so no `--ignore-table=` args are ever
-    // emitted — a production gap, not a test-porting gap.
+  it("structure dump with ignore tables", async () => {
+    const previous = SchemaDumper.ignoreTables;
+    SchemaDumper.ignoreTables = [/^prefix_/, "ignored_foo"];
+    try {
+      await withStubbedConnection(
+        { dataSources: async () => ["foo", "bar", "prefix_foo", "ignored_foo"] },
+        async () => {
+          await DatabaseTasks.structureDump(configurationDb, filename);
+        },
+      );
+    } finally {
+      SchemaDumper.ignoreTables = previous;
+    }
+
+    expect(spawnSync).toHaveBeenCalledWith(
+      "mysqldump",
+      [
+        "--result-file",
+        filename,
+        "--no-data",
+        "--routines",
+        "--skip-comments",
+        "--ignore-table=test-db.prefix_foo",
+        "--ignore-table=test-db.ignored_foo",
+        "test-db",
+      ],
+      expect.anything(),
+    );
   });
 
   it("warn when external structure dump command execution fails", async () => {
