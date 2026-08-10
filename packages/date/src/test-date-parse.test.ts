@@ -267,6 +267,26 @@ describe("TestDateParse", () => {
     expect(h.offset).toBe(5025);
   });
 
+  /**
+   * Ruby's `EnvUtil.timeout(3)` guards against the quadratic sub-parser walk
+   * the `limit:` here is what makes safe; there is no vitest analogue and the
+   * ported walk is linear, so only the assertions carry over.
+   */
+  it(" parse too long year", () => {
+    let str = "Jan 1" + "0".repeat(100_000);
+    let h = Date._parse(str, true, { limit: 100_010 });
+    // Ruby's `Math.log10(h[:year])` over a Bignum. JS `Math.log10` takes a
+    // number, which this 100_001-digit year is not, so the same base-ten log is
+    // read off the digit count.
+    expect(String(h.year).length - 1).toBe(100_000);
+    expect(h.mon).toBe(1);
+
+    str = "Jan - 1" + "0".repeat(100_000);
+    h = Date._parse(str, true, { limit: 100_010 });
+    expect(h.mon).toBe(1);
+    expect(h).not.toHaveProperty("year");
+  });
+
   it("parse utf8", () => {
     const h = DateTime._parse("Sun\u{3000}Aug 16 01:02:03 \u{65e5}\u{672c} 2009");
     expect(h.year).toBe(2009);
@@ -368,6 +388,30 @@ describe("TestDateParse", () => {
 
     const dt = DateTime.httpdate("Sat, 03 Feb 2001 04:05:06 GMT", Date.ITALY + 10);
     expect(dt.equals(new DateTime(2001, 2, 3, 4, 5, 6, "+00:00").toDatetime())).toBe(true);
+  });
+
+  /**
+   * Ruby asserts the same raise for every `_`-parser and its builder. The
+   * `_iso8601`, `_rfc3339`, `_xmlschema` and `_jisx0301` families are not
+   * ported yet (RFC 0088), so their arms are absent rather than renamed.
+   */
+  it("length limit", () => {
+    expect(() => Date._parse("1".repeat(1000))).toThrow(ArgumentError);
+    expect(() => Date._rfc2822("1".repeat(1000))).toThrow(ArgumentError);
+    expect(() => Date._rfc822("1".repeat(1000))).toThrow(ArgumentError);
+    expect(() => Date._httpdate("1".repeat(1000))).toThrow(ArgumentError);
+
+    expect(() => Date.parse("1".repeat(1000))).toThrow(ArgumentError);
+    expect(() => Date.rfc2822("1".repeat(1000))).toThrow(ArgumentError);
+    expect(() => Date.rfc822("1".repeat(1000))).toThrow(ArgumentError);
+    expect(() => Date.httpdate("1".repeat(1000))).toThrow(ArgumentError);
+
+    expect(() => DateTime.parse("1".repeat(1000))).toThrow(ArgumentError);
+    expect(() => DateTime.rfc2822("1".repeat(1000))).toThrow(ArgumentError);
+    expect(() => DateTime.rfc822("1".repeat(1000))).toThrow(ArgumentError);
+    expect(() => DateTime.httpdate("1".repeat(1000))).toThrow(ArgumentError);
+
+    expect(() => Date._parse("Jan " + "9".repeat(1000000))).toThrow(ArgumentError);
   });
 });
 

@@ -162,7 +162,7 @@ export function userInputInTimeZone(
  */
 export function newTime(
   this: TimezoneAware | void,
-  year: number | null | undefined,
+  year: number | bigint | null | undefined,
   mon: number | null | undefined,
   mday: number | null | undefined,
   hour: number | null | undefined,
@@ -182,7 +182,10 @@ export function newTime(
         ? Number(microsec * 1000n)
         : Math.trunc((microsec ?? 0) * 1000);
   const components = {
-    year,
+    // `::Date._parse` answers a Bignum `:year` for a year past a JS number
+    // (ruby/date, `date_parse.c`'s `str2num`); `Number` makes it the
+    // `Infinity` `Temporal` rejects below, which is the `rescue nil` arm.
+    year: Number(year),
     month: mon,
     day: mday,
     hour: hour ?? 0,

@@ -117,7 +117,7 @@ export class DateType extends ValueType<DateCastResult> {
    * @internal Rails-private helper.
    */
   protected newDate(
-    year: number | null | undefined,
+    year: number | bigint | null | undefined,
     mon: number | null | undefined,
     mday: number | null | undefined,
   ): Temporal.PlainDate | null {
@@ -126,7 +126,12 @@ export class DateType extends ValueType<DateCastResult> {
     // month/day the same way rather than silently coercing to Jan 1.
     if (mon == null || mday == null) return null;
     try {
-      return Temporal.PlainDate.from({ year, month: mon, day: mday }, { overflow: "reject" });
+      // A Bignum `:year` becomes the `Infinity` `Temporal` rejects; see
+      // `newTime` (helpers/time-value.ts).
+      return Temporal.PlainDate.from(
+        { year: Number(year), month: mon, day: mday },
+        { overflow: "reject" },
+      );
     } catch {
       return null;
     }
