@@ -8,7 +8,7 @@
  */
 
 import { Temporal } from "@js-temporal/polyfill";
-import { ArgumentError, Rational, strftime } from "./date.js";
+import { ArgumentError, Date, DateTime, Rational, of2str, strftime } from "./date.js";
 
 /**
  * The `utc_offset` argument MRI's `Time.new` accepts: `"UTC"`, an offset —
@@ -193,9 +193,30 @@ export class Time {
   /** @internal Seconds east of UTC — Ruby's `Time#utc_offset`. */
   readonly #utcOffset: number;
 
-  /** Ruby `Time.utc(year, month, day, hour = 0, min = 0, sec = 0)`. */
-  static utc(year: number, month: number, day: number, hour = 0, min = 0, sec = 0): Time {
-    return new Time(year, month, day, hour, min, sec, "UTC");
+  /**
+   * Ruby `Time.utc(year, month, day, hour = 0, min = 0, sec = 0, usec = 0)`.
+   * MRI's seventh positional is the microsecond, not a zone — `Time.utc` names
+   * its zone in the method — so it folds into `sec` here.
+   */
+  static utc(year: number, month: number, day: number, hour = 0, min = 0, sec = 0, usec = 0): Time {
+    return new Time(year, month, day, hour, min, sec + usec / 1_000_000, "UTC");
+  }
+
+  /**
+   * Ruby `Time.mktime(year, month, day, hour = 0, min = 0, sec = 0, usec = 0)`,
+   * the `Time.local` alias, which builds in the LOCAL zone. As with
+   * {@link Time.utc}, the seventh positional is the microsecond.
+   */
+  static mktime(
+    year: number,
+    month: number,
+    day: number,
+    hour = 0,
+    min = 0,
+    sec = 0,
+    usec = 0,
+  ): Time {
+    return new Time(year, month, day, hour, min, sec + usec / 1_000_000);
   }
 
   /**
@@ -305,6 +326,65 @@ export class Time {
   /** Ruby `Time#utc_offset`, the receiver's offset from UTC in seconds. */
   get utcOffset(): number {
     return this.#utcOffset;
+  }
+
+  /** Ruby `Time#gmt_offset`, the `utc_offset` alias. */
+  get gmtOffset(): number {
+    return this.#utcOffset;
+  }
+
+  /**
+   * Ruby `Time#to_time` (ruby/date, `date_core.c` `time_to_time`,
+   * `date_core.c:8860-8864`), which answers `self` — MRI's `::Time` value IS
+   * the receiver. trails' is `Temporal.ZonedDateTime` (RFC 0088's mapping
+   * table), so `self` is converted to it here, keeping the receiver's zone
+   * where it has one and its offset where it does not.
+   */
+  toTime(): Temporal.ZonedDateTime {
+    return this.#plain.toZonedDateTime(this.#timeZoneId ?? of2str(this.#utcOffset));
+  }
+
+  /**
+   * Ruby `Time#to_date` (ruby/date, `date_core.c` `time_to_date`,
+   * `date_core.c:8872-8892`), the receiver's civil day: the C builds it under
+   * `GREGORIAN` — a `::Time` is proleptic Gregorian, so 1582-10-13 is a real
+   * day for it — and then `set_sg(dat, DEFAULT_SG)` puts the reform back, which
+   * is why `Time.utc(1582, 10, 13).to_date` reads `1582-10-03`.
+   */
+  toDate(): Temporal.PlainDate {
+    return new Date(this.year, this.mon, this.day, Date.GREGORIAN).newStart().toDate();
+  }
+
+  /**
+   * Ruby `Time#to_datetime` (ruby/date, `date_core.c` `time_to_datetime`,
+   * `date_core.c:8901-8935`), the same `GREGORIAN`-then-`set_sg` build as
+   * {@link Time#toDate} with the time of day, the sub-second and the receiver's
+   * `utc_offset` carried across. A leap second — `sec == 60` — is stored as
+   * `59`, which the gem's `DateTime` has no room for.
+   *
+   * The C reaches `d_complex_new_internal` directly and so hands it `s` and
+   * `sf` as separate fields, and `of` as seconds. That seat is private to
+   * `./date.ts`; the public constructor is the same one `DateTime.now` uses,
+   * and it takes the whole second and its fraction as one `second` and the
+   * offset as a fraction of a day — hence the two `Rational`s here.
+   */
+  toDatetime(): Temporal.PlainDateTime | Temporal.ZonedDateTime {
+    let s = this.sec;
+    if (s === 60) s = 59;
+    const sf = new Rational(BigInt(s) * 1_000_000_000n + BigInt(this.nsec), 1_000_000_000n);
+    const of = this.utcOffset;
+    return new DateTime(
+      this.year,
+      this.mon,
+      this.day,
+      this.hour,
+      this.min,
+      sf,
+      new Rational(of, 86400),
+      Date.GREGORIAN,
+    )
+      .newStart()
+      .toDatetime();
   }
 
   strftime(format: string): string {

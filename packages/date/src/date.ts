@@ -689,6 +689,70 @@ export class ArgumentError extends Error {
 }
 
 /**
+ * @internal Ruby core `NoMethodError`. It is here rather than imported because
+ * `@blazetrails/date` is the bottom of the dependency graph — activemodel's
+ * copy (`attribute-assignment.ts`) imports this package, not the reverse — and
+ * because {@link ArgumentError} above already sets the precedent for a Ruby
+ * core error class the gem raises being spelled locally.
+ *
+ * `Date::Infinity` is the one raiser: `lib/date.rb:19` stores `d <=> 0`, which
+ * is `nil` for a NaN, and every reader below then calls a method on that `nil`.
+ */
+class NoMethodError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "NoMethodError";
+  }
+}
+
+/**
+ * @internal Ruby `<=>` as `Date::Infinity` uses it, which is three operators:
+ * `Float#<=>`, whose NaN arm answers `nil` and is what puts a `nil` in `@d`
+ * (`lib/date.rb:19`); `Integer#<=>` for a stored sign; and `NilClass#<=>` —
+ * inherited `Object#<=>`, which answers `0` for an identical operand and `nil`
+ * otherwise — once that `nil` is stored.
+ */
+function spaceship(a: number | null, b: number | null): number | null {
+  if (a === null || b === null) return a === b ? 0 : null;
+  if (a === b) return 0;
+  const c = Math.sign(a - b);
+  return Number.isNaN(c) ? null : c;
+}
+
+/**
+ * @internal Ruby `Float()` (`object.c` `rb_Float`), which converts through
+ * `to_f` and raises rather than answering `nil`.
+ */
+function rbFloat(val: unknown): number {
+  if (typeof val === "number") return val;
+  if (typeof val === "string") {
+    const f = Number(val.replace(/_/g, ""));
+    if (val.trim() === "" || Number.isNaN(f)) {
+      throw new ArgumentError(`invalid value for Float(): ${JSON.stringify(val)}`);
+    }
+    return f;
+  }
+  if (val == null) throw new TypeError("can't convert nil into Float");
+  const toF = (val as { toF?: () => number }).toF;
+  if (typeof toF === "function") return toF.call(val);
+  throw new TypeError(`can't convert ${(val as object).constructor.name} into Float`);
+}
+
+/**
+ * @internal Ruby `Numeric#coerce` (`numeric.c` `num_coerce`), which is what
+ * {@link DateInfinity#coerce}'s `else` arm reaches through `super`
+ * (ruby/date, `lib/date.rb:54`). Note the pair comes back `[y, x]` — the
+ * OTHER operand first — on both arms. `CLASS_OF` is total in Ruby (nil's class
+ * is `NilClass`) where `Object.getPrototypeOf(null)` raises, so a nullish `y`
+ * short-circuits to the unequal-classes arm that `Float()` then rejects.
+ */
+function numCoerce(x: unknown, y: unknown): [number, number] {
+  if (y != null && Object.getPrototypeOf(x) === Object.getPrototypeOf(y))
+    return [y as number, x as number];
+  return [rbFloat(y), rbFloat(x)];
+}
+
+/**
  * @internal The alternations `date_parse.c` builds its patterns from
  * (ruby/date, `date_parse.c` `ABBR_MONTHS` / `ABBR_DAYS`). Ruby matches the
  * abbreviation and lets the rest of the name run off the end of the token, so
@@ -4103,7 +4167,7 @@ export function dNewByFrags(hash: DateParts | null, sg = DEFAULT_SG): Date {
  * offset in seconds, which is what `DateTime#zone` answers. Seconds below the
  * minute are dropped, as the `"%c%02d:%02d"` format has nowhere to put them.
  */
-function of2str(of: number): string {
+export function of2str(of: number): string {
   const s = of < 0 ? "-" : "+";
   const a = of < 0 ? -of : of;
   const h = Math.floor(a / HOUR_IN_SECONDS);
@@ -4300,31 +4364,30 @@ class DateError extends ArgumentError {
  * gem defines is here, and none of Ruby's inherited `Numeric` surface is.
  */
 export class DateInfinity {
-  /** Ruby `@d` (ruby/date, `lib/date.rb:19`), the sign of the constructor's argument. */
-  readonly #d: number;
+  /**
+   * Ruby `@d` (ruby/date, `lib/date.rb:19`), the sign of the constructor's
+   * argument — or `nil`, for the NaN whose `<=> 0` has no answer.
+   */
+  readonly #d: number | null;
 
   /**
    * Ruby `Date::Infinity#initialize(d=1)` (ruby/date, `lib/date.rb:19`), which
    * stores `d <=> 0`.
    *
-   * `Float::NAN <=> 0` is `nil`, so Ruby stores `nil` and leaves an object
-   * whose every later reader raises `NoMethodError` off it — `nan?` on
-   * `nil.zero?`, `infinite?` on `nil.nonzero?`, `-@`/`coerce` on `-nil`, `to_f`
-   * on `nil > 0` (`lib/date.rb:27-28`, `:32`, `:51-57`, `:59-66`). JS raises on
-   * none of those: `-null` is `-0` and `null > 0` is `false`, so deferring the
-   * failure the way Ruby does would mean inventing a raise site in each of
-   * those six bodies. The rejection is therefore taken here, at the one point
-   * Ruby's `nil` is produced, so no member below has to carry a `null` arm Ruby
-   * does not have.
+   * `Float::NAN <=> 0` is `nil`, so Ruby BUILDS the object and stores `nil`.
+   * Each reader below then raises `NoMethodError` off that stored `nil` at its
+   * own call site, or — where the operator involved is `<=>` itself — answers
+   * `nil` without raising. JS raises on none of Ruby's `nil`-receiver sites
+   * (`-null` is `-0`, `null > 0` is `false`), so the raise is spelled
+   * explicitly in each body Ruby raises from, at the same operator and with
+   * the same message.
    */
   constructor(d: number = 1) {
-    const sign = Math.sign(d);
-    if (Number.isNaN(sign)) throw new TypeError("`d <=> 0` is nil for NaN");
-    this.#d = sign;
+    this.#d = spaceship(d, 0);
   }
 
   /** Ruby `Date::Infinity#d` (ruby/date, `lib/date.rb:21-23`), marked `protected`. */
-  protected d(): number {
+  protected d(): number | null {
     return this.#d;
   }
 
@@ -4344,12 +4407,16 @@ export class DateInfinity {
    * boolean.
    */
   isInfinite(): number | null {
-    return this.d() !== 0 ? this.d() : null;
+    const d = this.d();
+    if (d === null) throw new NoMethodError("undefined method 'nonzero?' for nil");
+    return d !== 0 ? d : null;
   }
 
   /** Ruby `Date::Infinity#nan?` (ruby/date, `lib/date.rb:28`), `d.zero?`. */
   isNan(): boolean {
-    return this.d() === 0;
+    const d = this.d();
+    if (d === null) throw new NoMethodError("undefined method 'zero?' for nil");
+    return d === 0;
   }
 
   /** Ruby `Date::Infinity#abs` (ruby/date, `lib/date.rb:30`). */
@@ -4359,12 +4426,16 @@ export class DateInfinity {
 
   /** Ruby `Date::Infinity#-@` (ruby/date, `lib/date.rb:32`). */
   negate(): DateInfinity {
-    return new (this.constructor as new (d?: number) => DateInfinity)(-this.d());
+    const d = this.d();
+    if (d === null) throw new NoMethodError("undefined method '-@' for nil");
+    return new (this.constructor as new (d?: number) => DateInfinity)(-d);
   }
 
   /** Ruby `Date::Infinity#+@` (ruby/date, `lib/date.rb:33`). */
   identity(): DateInfinity {
-    return new (this.constructor as new (d?: number) => DateInfinity)(+this.d());
+    const d = this.d();
+    if (d === null) throw new NoMethodError("undefined method '+@' for nil");
+    return new (this.constructor as new (d?: number) => DateInfinity)(+d);
   }
 
   /**
@@ -4374,36 +4445,44 @@ export class DateInfinity {
    * `coerce`. Ruby spells that fallback `rescue NoMethodError`; the equivalent
    * here is the presence check rather than a `catch`, because JS reports a
    * missing method as the same `TypeError` a real `coerce` would raise from
-   * inside itself, and Ruby lets that one through.
+   * inside itself, and Ruby lets that one through. The pair it answers goes
+   * back through `l <=> r` (`lib/date.rb:43`) — the same nil-producing
+   * {@link spaceship} the arms above use, so an incomparable or NaN-ish pair
+   * answers `nil` rather than a `NaN` a raw `Math.sign` would let out.
    */
   compareTo(other: unknown): number | null {
-    if (other instanceof DateInfinity) return Math.sign(this.d() - other.d());
-    if (other === Number.POSITIVE_INFINITY) return Math.sign(this.d() - 1);
-    if (other === Number.NEGATIVE_INFINITY) return Math.sign(this.d() + 1);
+    if (other instanceof DateInfinity) return spaceship(this.d(), other.d());
+    if (other === Number.POSITIVE_INFINITY) return spaceship(this.d(), 1);
+    if (other === Number.NEGATIVE_INFINITY) return spaceship(this.d(), -1);
     if (typeof other === "number" || other instanceof Rational) return this.d();
     const coerce = (other as { coerce?: (x: unknown) => [number, number] } | null)?.coerce;
     if (typeof coerce === "function") {
       const [l, r] = coerce.call(other, this);
-      return Math.sign(l - r);
+      return spaceship(l, r);
     }
     return null;
   }
 
   /**
    * Ruby `Date::Infinity#coerce` (ruby/date, `lib/date.rb:51-57`). The `else`
-   * arm is `super` — `Numeric#coerce`, whose `[Float(other), Float(self)]`
-   * cannot make a `Float` of a `Date::Infinity` and so raises `TypeError`.
-   * `Float()`'s own `ArgumentError` arm for an unparseable String is not
-   * modelled: the `:nodoc:` class is only ever coerced against a `Numeric`.
+   * arm is `super` — `Numeric#coerce` ({@link numCoerce}), which takes both
+   * sides through `Float()`; `Float(self)` succeeds, because `rb_Float`
+   * converts through `to_f` and {@link DateInfinity#toF} is defined.
    */
   coerce(other: unknown): [number, number] {
-    if (typeof other === "number" || other instanceof Rational) return [-this.d(), this.d()];
-    throw new TypeError(`can't convert ${String(other)} into Float`);
+    if (typeof other === "number" || other instanceof Rational) {
+      const d = this.d();
+      if (d === null) throw new NoMethodError("undefined method '-@' for nil");
+      return [-d, d];
+    } else {
+      return numCoerce(this, other);
+    }
   }
 
   /** Ruby `Date::Infinity#to_f` (ruby/date, `lib/date.rb:59-66`). */
   toF(): number {
     if (this.#d === 0) return 0;
+    if (this.#d === null) throw new NoMethodError("undefined method '>' for nil");
     if (this.#d > 0) {
       return Number.POSITIVE_INFINITY;
     } else {
@@ -5588,6 +5667,63 @@ export class Date {
   }
 
   /**
+   * Ruby `Date#eql?` (ruby/date, `date_core.c` `d_lite_eql_p`,
+   * `date_core.c:6924-6932`), registered on `cDate` next to `<=>` and `===`
+   * (`date_core.c:9794-9797`). It is NOT {@link Date#equals}: `==` admits a
+   * Numeric through `cmp_gen`, `eql?` answers `false` for it — `!k_date_p` is
+   * the first arm and there is no coercion tail, so a non-`Date` operand is
+   * `false` rather than `nil`.
+   */
+  isEql(other: unknown): boolean {
+    if (!(other instanceof Date)) return false;
+    return this.cmp(other) === 0;
+  }
+
+  /**
+   * Ruby `Date#hash` (ruby/date, `date_core.c` `d_lite_hash`,
+   * `date_core.c:6934-6948`), over the `nth`/`jd`/`df`/`sf` quadruple —
+   * the same four `cmp_dd` (`date_core.c:6707-6761`) compares, which is what
+   * makes {@link Date#isEql}-equal dates hash alike. The C reads the STORED
+   * `m_jd`, not `m_local_jd`, and does not canonicalize first; both are kept.
+   *
+   * The mixing function is not: `rb_memhash` is MRI's seeded siphash over the
+   * four machine words, an interpreter-private digest with no JS counterpart
+   * (and one whose `h[0]` is a raw `VALUE` — a pointer for a Bignum `nth`, so
+   * not even reproducible across two MRI runs). The quadruple is folded here
+   * instead, which is the property the C function exists for.
+   */
+  hash(): number {
+    const h: [bigint, number, number, Rational] = [this.nth, this.mJd(), this.mDf(), this.mSf()];
+    let v = 0;
+    for (const part of [h[0], h[1], h[2], h[3].numerator, h[3].denominator]) {
+      v = Math.imul(v ^ Number(BigInt.asIntN(32, BigInt(part))), 0x01000193) | 0;
+    }
+    return v;
+  }
+
+  /**
+   * Ruby `Date#to_time` (ruby/date, `date_core.c` `date_to_time`,
+   * `date_core.c:8949-8971`): midnight of the receiver's day in the LOCAL zone,
+   * `f_local3(rb_cTime, m_real_year, m_mon, m_mday)`. A Julian receiver is
+   * taken through `d_lite_gregorian` first, which is why
+   * `Date.new(2001, 2, 3, Date::JULIAN).to_time` is the 16th — the civil
+   * reading moves, the day does not.
+   *
+   * trails' `::Time` value is `Temporal.ZonedDateTime` (RFC 0088's mapping
+   * table): `Time.local` is a zoned wall-clock time, so the local zone is named
+   * rather than an offset frozen in, and the class is not `./time.ts`'s `Time`
+   * because that module imports this one. The C's `if (m_julian_p(adat))
+   * { self = g; }` reassignment is a conditional binding here — the repo's
+   * `@typescript-eslint/no-this-alias` forbids `let self = this`.
+   */
+  toTime(): Temporal.ZonedDateTime {
+    const self: Date = this.isJulian ? this.gregorian() : this;
+    return new Temporal.PlainDateTime(Number(self.year), self.mon, self.day).toZonedDateTime(
+      Temporal.Now.timeZoneId(),
+    );
+  }
+
+  /**
    * Ruby `Date#to_date` (ruby/date, `date_core.c` `date_to_date`, `date_core.c:8977-8981`), which
    * answers the receiver's `::Date` value — `self` in MRI, because MRI's
    * `::Date` value *is* the gem object. trails' `::Date` value is
@@ -5617,6 +5753,26 @@ export class Date {
    */
   toDate(): Temporal.PlainDate {
     return plainDateFromJd(this.mLocalJd(), this.#sg);
+  }
+
+  /**
+   * Ruby `Date#to_datetime` (ruby/date, `date_core.c` `date_to_datetime`,
+   * `date_core.c:8992-9027`), the same day at midnight: the C copies the
+   * receiver's data into a fresh `DateTime` and, on the complex arm, zeroes
+   * `df`, `sf`, `hour`, `min` and `sec` — so a `Date` never carries a time of
+   * day across. `Date` is always the simple arm, whose copy is a straight
+   * `bdat->s = adat->s`; the seat below is that copy.
+   */
+  toDatetime(): Temporal.PlainDateTime | Temporal.ZonedDateTime {
+    return new DateTime(
+      SEAT,
+      this.nth,
+      this.mJd(),
+      0,
+      new Rational(0, 1),
+      0,
+      this.#sg,
+    ).toDatetime();
   }
 
   /**
@@ -6385,6 +6541,31 @@ export class DateTime extends DateWithoutParseStatics {
       this.#of,
       val2sg(start),
     ) as this;
+  }
+
+  /**
+   * Ruby `DateTime#to_time` (ruby/date, `date_core.c` `datetime_to_time`,
+   * `date_core.c:9032-9062`), `Time.new(y, m, d, h, min, sec + m_sf_in_sec, of)`
+   * — the receiver's own offset carried across, where {@link Date#toTime}'s
+   * `f_local3` has none to carry. A Julian receiver goes through
+   * `d_lite_gregorian` first, as it does there. The C's `if (m_julian_p(dat))
+   * { self = g; }` reassignment is a conditional binding here — the repo's
+   * `@typescript-eslint/no-this-alias` forbids `let self = this`.
+   */
+  override toTime(): Temporal.ZonedDateTime {
+    const self: DateTime = this.isJulian ? this.gregorian() : this;
+    const ns = Number(self.#sf.numerator / self.#sf.denominator);
+    return new Temporal.PlainDateTime(
+      Number(self.year),
+      self.mon,
+      self.day,
+      self.hour,
+      self.min,
+      self.sec,
+      Math.floor(ns / 1000000),
+      Math.floor(ns / 1000) % 1000,
+      ns % 1000,
+    ).toZonedDateTime(of2str(self.#of));
   }
 
   /**
