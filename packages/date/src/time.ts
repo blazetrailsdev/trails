@@ -384,7 +384,7 @@ export class Time {
    *
    * The seat stores the day and day-fraction already taken to UTC, where the C
    * stores `HAVE_CIVIL | HAVE_TIME` and defers that move to `get_c_jd`
-   * (`date_core.c:1264-1301`) — the same `jd_local_to_utc` /`df_local_to_utc`
+   * (`date_core.c:1264-1301`) — the same `jd_local_to_utc` / `df_local_to_utc`
    * of `time_to_df(h, min, s)`, made here instead of on first read. The C's
    * trailing `set_sg(dat, DEFAULT_SG)` is the `Date.ITALY` argument: the day was
    * resolved under `GREGORIAN` — a `::Time` is proleptic Gregorian — and only

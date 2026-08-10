@@ -3552,6 +3552,12 @@ export function decodeYear(y: number | bigint, style: number): [nth: bigint, ry:
  * from a `nth` and a residue year to the year the date names — a `bigint` once
  * `nth` is nonzero, as MRI's is a Bignum.
  */
+function encodeYear(nth: bigint, y: number, style: number): number | bigint {
+  const period = style < 0 ? CM_PERIOD_GCY : CM_PERIOD_JCY;
+  if (nth === 0n) return y;
+  return bigNorm(BigInt(period) * nth + BigInt(y));
+}
+
 /**
  * @internal The `NUM2LONG` MRI performs on `m_real_year` (`date_core.c:1746-1762`)
  * when `date_to_time` (`date_core.c:8949-8971`) and `datetime_to_time`
@@ -3568,12 +3574,6 @@ function realYearToLong(year: number | bigint): number {
     throw new RangeError("bignum too big to convert into `long'");
   }
   return Number(year);
-}
-
-function encodeYear(nth: bigint, y: number, style: number): number | bigint {
-  const period = style < 0 ? CM_PERIOD_GCY : CM_PERIOD_JCY;
-  if (nth === 0n) return y;
-  return bigNorm(BigInt(period) * nth + BigInt(y));
 }
 
 /**
