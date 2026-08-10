@@ -148,9 +148,9 @@ export function renderKey(k: CallArgKey): string {
 export function renderUnseeded(rows: CallArgKey[], dir: string): string {
   return (
     `call-args ratchet: UNSEEDED — ${path.relative(ROOT_DIR, dir)}/ does not exist yet, ` +
-    `so the ${rows.length} flagged shape row(s) are reported, not gated.\n` +
-    "The baseline is seeded on `main` by its own PR (RFC 0095 call-args-baseline-seed); " +
-    "this arm disappears the moment that tree exists."
+    `so the ${rows.length} flagged shape row(s) are reported, not gated. The baseline is ` +
+    "seeded on `main` by its own PR (RFC 0095 call-args-baseline-seed); this arm " +
+    "disappears the moment that tree exists."
   );
 }
 
@@ -235,8 +235,8 @@ export async function main(write: boolean): Promise<number> {
   return 1;
 }
 
-/** `--report`: the whole artifact, `naming` included — the class the gate
- *  excludes is reachable only here. Never fails. */
+/** `--report`: the whole artifact, `naming` included — the excluded class is
+ *  reachable only here. Never fails. */
 async function reportMain(top: number): Promise<number> {
   console.log(renderReport(await loadArtifact(), top));
   return 0;
