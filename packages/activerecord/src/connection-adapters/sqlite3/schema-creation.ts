@@ -10,7 +10,6 @@ import type {
   ForeignKeyDefinition,
 } from "../abstract/schema-definitions.js";
 import type { ColumnOptions } from "../abstract/schema-definitions.js";
-import { quoteColumnName } from "./quoting.js";
 
 export class SchemaCreation extends AbstractSchemaCreation {
   /**
@@ -41,7 +40,8 @@ export class SchemaCreation extends AbstractSchemaCreation {
     if (o.ifNotExists) parts.push("IF NOT EXISTS");
     if (index.type) parts.push(index.type.toUpperCase());
     parts.push(
-      `${quoteColumnName(schema)}.${quoteColumnName(index.name)} ON ${quoteColumnName(bare)}`,
+      `${this.adapter.quoteColumnName(schema)}.${this.adapter.quoteColumnName(index.name)} ` +
+        `ON ${this.adapter.quoteColumnName(bare)}`,
     );
     if (this.supportsIndexUsing() && index.using) parts.push(`USING ${index.using}`);
     parts.push(`(${await this.quotedColumns(index)})`);
