@@ -2,8 +2,8 @@
  * Port of the ruby/date gem's `test/date/test_switch_hitter.rb` (`TestSH`).
  *
  * The gem's own `test/date/` suite is RFC 0088's fidelity measure —
- * `api:compare` cannot score a C extension, so `vendor/sources.ts` sets
- * `compareApi: false` for this package and `test:compare` carries the gate.
+ * `parity:api` cannot score a C extension, so `vendor/sources.ts` sets
+ * `compareApi: false` for this package and `parity:test` carries the gate.
  *
  * The constructors are exercised on the GEM-SHAPED objects rather than on the
  * `Temporal` seat the statics answer, for the reason `test-date-attr.test.ts`

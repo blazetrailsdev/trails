@@ -2582,7 +2582,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
    * does this, for every destination Rails can name. The one arm that does not
    * is the schema-qualified one, which Rails has no notion of; it is recorded at
    * that branch, not as a `@missingRailsCall` tag — the tag is per-method, and
-   * `api:calls` fails it as STALE now that the method does make the call.
+   * `parity:api:calls` fails it as STALE now that the method does make the call.
    * @internal
    */
   private async copyTableIndexes(

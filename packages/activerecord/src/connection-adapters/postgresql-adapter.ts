@@ -1602,7 +1602,7 @@ export class PostgreSQLAdapter
 
   /**
    * The single SQL primitive every query path funnels through, extracted to
-   * `postgresql/database-statements.ts` (`performQuery`) so api:compare's
+   * `postgresql/database-statements.ts` (`performQuery`) so parity:api's
    * file-level match sees it where Rails puts it.
    *
    * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#perform_query

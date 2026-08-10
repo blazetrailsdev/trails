@@ -844,7 +844,7 @@ interface CallMismatch {
 
 /**
  * Advisory (RFC 0095): one call site whose ARGUMENTS differ between the Ruby
- * body and the matched TS one. `api:calls` compares the set of call NAMES, so a
+ * body and the matched TS one. `parity:api:calls` compares the set of call NAMES, so a
  * port that calls `injectJoin` where Rails calls `inject_join` and reorders its
  * arguments reads as identical to it. `call` is the Ruby call name; `class`
  * splits the population the way RFC 0095's rollout gates it — `shape` (count,

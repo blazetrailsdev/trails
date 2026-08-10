@@ -71,6 +71,7 @@
     "api:detached": "pnpm parity:api:detached",
     "api:calls": "pnpm parity:api:calls",
     "api:calls:report": "pnpm parity:api:calls:report",
+    "api:calls:args:report": "pnpm parity:api:calls:args:report",
     "api:calls:unreviewed": "pnpm parity:api:calls:unreviewed",
     "api:calls:reseed": "pnpm parity:api:calls:reseed",
     "api:arity": "pnpm parity:api:arity",

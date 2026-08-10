@@ -2,9 +2,9 @@
  * Port of the ruby/date gem's `test/date/test_date_attr.rb`, which walks every
  * reader on a `Date` and on the `DateTime` naming the same day.
  *
- * The gem's own `test/date/` suite is RFC 0088's fidelity measure — `api:compare`
+ * The gem's own `test/date/` suite is RFC 0088's fidelity measure — `parity:api`
  * cannot score a C extension, so `vendor/sources.ts` sets `compareApi: false`
- * for this package and `test:compare` carries the whole gate.
+ * for this package and `parity:test` carries the whole gate.
  *
  * These readers are exercised on the GEM-SHAPED objects, not on the `Temporal`
  * seat the statics answer: `#jd`, `#mjd`, `#ld`, `#day_fraction`, `#cwyear` and

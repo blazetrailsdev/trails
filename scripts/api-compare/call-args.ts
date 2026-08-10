@@ -1,4 +1,4 @@
-// Call-argument comparison for api:compare (RFC 0095). `api:calls` compares the
+// Call-argument comparison for parity:api (RFC 0095). `parity:api:calls` compares the
 // SET OF CALL NAMES a body makes; a port can call `where` where Rails calls
 // `where`, pass a completely different argument list, and every gate stays
 // green. This module pairs one Ruby call site against the matched TS one and
