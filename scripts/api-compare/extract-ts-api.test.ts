@@ -2865,6 +2865,26 @@ describe("callArgs", () => {
   const site = (source: string, method = "create"): CallSite[] =>
     extractFromSource(source).instanceMethods.find((m) => m.name === method)!.callArgs!;
 
+  it("escapes a descriptor delimiter inside a string value", () => {
+    expect(
+      site(
+        `class Foo {
+          create() {
+            this.injectJoin(list, collector, ", ");
+            this.toSentence({ lastWordConnector: ", or ", sep: "a=b{c}d" });
+          }
+        }`,
+      ),
+    ).toEqual([
+      { name: "injectJoin", args: ["id:list", "id:collector", "str:%2C "], flags: [] },
+      {
+        name: "toSentence",
+        args: ["kwargs{lastWordConnector=str:%2C or ,sep=str:a%3Db%7Bc%7Dd}"],
+        flags: [],
+      },
+    ]);
+  });
+
   it("records one entry per syntactic call site, in source order", () => {
     const sites = site(
       `class Foo {

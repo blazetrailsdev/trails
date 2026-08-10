@@ -2831,6 +2831,15 @@ function unwrapArg(node: ts.Expression): ts.Expression {
   }
 }
 
+/**
+ * Mirrors extract-ruby-api.rb#escape_descriptor_text: the four grammar
+ * delimiters, so a string VALUE carrying one does not read as one. Rationale
+ * and the inverse: call-args.ts#unescapeDescriptorText.
+ */
+function escapeDescriptorText(text: string): string {
+  return text.replace(/[%,={}]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
+}
+
 function describeArg(node: ts.Expression, flags: string[]): string {
   const expr = unwrapArg(node);
   if (ts.isIdentifier(expr)) {
@@ -2840,7 +2849,7 @@ function describeArg(node: ts.Expression, flags: string[]): string {
   if (expr.kind === ts.SyntaxKind.ThisKeyword) return "id:this";
   if (ts.isNumericLiteral(expr) || ts.isBigIntLiteral(expr)) return `num:${expr.text}`;
   if (ts.isStringLiteral(expr) || ts.isNoSubstitutionTemplateLiteral(expr))
-    return `str:${expr.text}`;
+    return `str:${escapeDescriptorText(expr.text)}`;
   if (ts.isTemplateExpression(expr)) return "str-interp";
   if (expr.kind === ts.SyntaxKind.TrueKeyword) return "bool:true";
   if (expr.kind === ts.SyntaxKind.FalseKeyword) return "bool:false";

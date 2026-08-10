@@ -131,7 +131,10 @@ function normalizeLiteralArg(kind: LiteralValue["kind"], value: string): string 
 }
 
 /** Split a `kwargs{…}` body on its TOP-LEVEL commas — a value can itself be a
- *  `kwargs{…}`, whose commas are not separators. */
+ *  `kwargs{…}`, whose commas are not separators. A `,` inside a `str:` payload
+ *  is not one either, and never reaches here: both extractors percent-escape
+ *  the four grammar delimiters (extract-ruby-api.rb#escape_descriptor_text,
+ *  extract-ts-api.ts#escapeDescriptorText). */
 function splitPairs(body: string): string[] {
   const pairs: string[] = [];
   let depth = 0;
@@ -147,6 +150,27 @@ function splitPairs(body: string): string[] {
   }
   pairs.push(body.slice(start));
   return pairs;
+}
+
+/**
+ * Undo the extractors' delimiter escaping, once the descriptor has been split
+ * down to a single payload.
+ *
+ * The descriptor grammar is a FLAT string split on `,` `=` `{` `}`, and a string
+ * value can contain every one of them — `injectJoin(list, collector, ", ")`.
+ * Unescaped, that comma splits a `kwargs{…}` into a fragment with no `=` and the
+ * whole call site is silently dropped as uncomparable, losing exactly the
+ * SQL-fragment arguments RFC 0095 §2 calls load-bearing.
+ *
+ * Percent- rather than backslash-escaped, because a `str:` payload's backslash
+ * is NOT free: literals.ts#normalizeLiteral canonicalizes `\n` and friends, so a
+ * backslash escape here would consume the marker that arm reads and `"\\n"`
+ * would stop comparing equal to a real newline.
+ */
+function unescapeDescriptorText(text: string): string {
+  return text.replace(/%(25|2C|3D|7B|7D)/g, (_, hex: string) =>
+    String.fromCharCode(parseInt(hex, 16)),
+  );
 }
 
 /** Keys go through options-keys.ts#normalizeRubyKey — the same pipeline the
@@ -191,7 +215,9 @@ export function normalizeArg(descriptor: string): string | null {
   if (kind === "id" || kind === "call") return `ref:${normalizeRef(value)}`;
   if (kind === "const") return `const:${value}`;
   const literalKind = LITERAL_KINDS[kind];
-  return literalKind === undefined ? null : normalizeLiteralArg(literalKind, value);
+  return literalKind === undefined
+    ? null
+    : normalizeLiteralArg(literalKind, unescapeDescriptorText(value));
 }
 
 /** Normalize a whole argument list, or null when any member is opaque. */

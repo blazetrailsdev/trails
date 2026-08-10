@@ -93,6 +93,18 @@ describe("normalizeArg", () => {
     expect(normalizeArg("kwargs{opts=kwargs{k=str-interp}}")).toBeNull();
   });
 
+  it("unescapes a descriptor delimiter inside a string value", () => {
+    expect(normalizeArg("str:%2C ")).toBe("str:, ");
+    expect(normalizeArg("str:a%3Db%7Bc%7Dd")).toBe("str:a=b{c}d");
+    expect(normalizeArg("str:100%25")).toBe("str:100%");
+  });
+
+  it("splits kwargs on the delimiters a string value does not carry", () => {
+    expect(normalizeArg("kwargs{last_word_connector=str:%2C or ,sep=str:a%3Db%7Bc%7Dd}")).toBe(
+      "kwargs{lastWordConnector=str:, or ,sep=str:a=b{c}d}",
+    );
+  });
+
   it("is uncomparable for a double-splat kwarg", () => {
     expect(normalizeArg("kwargs{**splat}")).toBeNull();
   });

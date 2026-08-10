@@ -2477,7 +2477,13 @@ class ApiExtractor
     return "?" unless parts.is_a?(Array)
     return "str:" if parts.empty?
     return "str-interp" unless parts.all? { |p| p.is_a?(Array) && p[0] == :@tstring_content }
-    "str:#{parts.map { |p| p[1] }.join}"
+    "str:#{escape_descriptor_text(parts.map { |p| p[1] }.join)}"
+  end
+
+  # The four grammar delimiters, so a string VALUE carrying one does not read as
+  # one. Rationale and the inverse: call-args.ts#unescapeDescriptorText.
+  def escape_descriptor_text(text)
+    text.gsub(/[%,={}]/) { |c| format("%%%02X", c.ord) }
   end
 
   # A braced `{ … }` is the ObjectLiteralExpression the port writes, and the TS
