@@ -1593,9 +1593,29 @@ describe("Ruby extractor call-argument capture", () => {
       args: ["kwargs{**splat}"],
       flags: ["splat"],
     });
-    expect(sites.find((s) => s.name === "map")?.flags).toEqual(["blockpass"]);
-    expect(sites.find((s) => s.name === "each")?.flags).toEqual(["block"]);
+    // `xs` is a local, so both sites are also weak-receiver ones.
+    expect(sites.find((s) => s.name === "map")?.flags).toEqual(["weak", "blockpass"]);
+    expect(sites.find((s) => s.name === "each")?.flags).toEqual(["block", "weak"]);
     expect(argsOf(sites, "save")).toEqual(["id:x"]);
+  });
+
+  it("flags a site whose receiver is inert as weak, per site", () => {
+    const c = rubyCallArgs({
+      "foo.rb": `
+        class Foo
+          def m(node_class, o)
+            node_class.new o.ast
+            Nodes::Union.new o.ast
+          end
+        end
+      `,
+    });
+    const sites = c["Foo#m"] ?? [];
+    // Ruby resolves the same NAME two ways here: `new` on a local is inert, on
+    // a constant it is a genuine call to a ported collaborator. The per-method
+    // weak-NAME set cannot tell them apart; the per-site flag can.
+    expect(sites.filter((s) => s.name === "new").map((s) => s.flags)).toEqual([["weak"], []]);
+    expect(sites.filter((s) => s.name === "ast").every((s) => s.flags.includes("weak"))).toBe(true);
   });
 
   it("records bare super as a zsuper site and super(args) with its arguments", () => {
