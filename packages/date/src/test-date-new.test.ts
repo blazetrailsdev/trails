@@ -205,6 +205,16 @@ describe("TestDateNew", () => {
     expect([...ymd(dt), dt.hour, dt.minute, dt.second]).toEqual([-1, 12, 31, 23, 59, 59]);
   });
 
+  it.skip("civil reform", () => {
+    // Blocked, not omitted: the test's `d = Date.jd(...); d -= 1` has no
+    // receiver here. `Date.jd` answers a `Temporal.PlainDate` (RFC 0088's
+    // headline decision, vendor/sources.ts:212-221), which carries no `-`, and
+    // `Date#-` (`d_lite_minus`, date_core.c:6344) is unported even on the
+    // instance path — only `Date#+` exists. `Temporal.subtract` walks the
+    // proleptic ISO calendar, so it lands on 1752-09-13 rather than the
+    // reform's 1752-09-02. Filed as 0088 `port-test-date-new-civil-reform`.
+  });
+
   it("civil ex", () => {
     expect(() => Date.civil(2001, 2, 29)).toThrow(Date.Error);
     expect(() => DateTime.civil(2001, 2, 28, 23, 59, 60, 0)).toThrow(Date.Error);

@@ -2527,9 +2527,11 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
   /**
    * Mirrors: SQLite3Adapter#copy_table_indexes (sqlite3_adapter.rb:651-677)
    *
-   * The one arm that does NOT reach `add_index` is the schema-qualified
-   * destination (`aux.posts`), which Rails has no notion of — see the comment
-   * at that branch.
+   * Rails calls `add_index` unconditionally (`sqlite3_adapter.rb:674`) and so
+   * does this, for every destination Rails can name. The one arm that does not
+   * is the schema-qualified one, which Rails has no notion of; it is recorded at
+   * that branch, not as a `@missingRailsCall` tag — the tag is per-method, and
+   * `api:calls` fails it as STALE now that the method does make the call.
    * @internal
    */
   private async copyTableIndexes(
@@ -2572,11 +2574,13 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
       if (idx.unique) options.unique = true;
       if (idx.where) options.where = idx.where;
       if (idx.orders) options.order = idx.orders;
-      // SQLite puts the schema on the INDEX name, not on the table it indexes
-      // (`CREATE INDEX aux.by_name ON widgets (...)`); qualifying the table
-      // instead is a syntax error. Rails has no ATTACHed-schema notion here at
-      // all, so its add_index call is unconditional and ours covers every case
-      // Rails has — the qualified arm below is the trails-only remainder.
+      // MISSING RAILS CALL (add_index, sqlite3_adapter.rb:674) — this branch
+      // only. SQLite puts the schema on the INDEX name, not on the table it
+      // indexes (`CREATE INDEX aux.by_name ON widgets (...)`); qualifying the
+      // table instead is a syntax error, and `add_index` quotes the table, so
+      // it cannot express a qualified destination. Rails has no ATTACHed-schema
+      // notion here at all — every destination Rails can name takes the
+      // `addIndex` call below, and this arm is the trails-only remainder.
       const { schema: toSchema } = this._splitTableName(to);
       if (toSchema === undefined || toSchema === "") {
         await this.addIndex(to, cols, options);
