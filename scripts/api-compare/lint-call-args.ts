@@ -92,7 +92,7 @@ export async function loadBaseline(dir: string = BASELINE_DIR): Promise<CallArgE
   return sortKeys(merged);
 }
 
-/** Whether the baseline tree exists at all — see the UNSEEDED arm in the header. */
+/** Whether the baseline tree exists — see the UNSEEDED arm in the header. */
 export async function baselineSeeded(dir: string = BASELINE_DIR): Promise<boolean> {
   return fs.access(dir).then(
     () => true,

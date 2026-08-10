@@ -43,7 +43,7 @@ export interface CallArgArtifact {
   /** The packages the run compared; absent on an artifact predating the field,
    *  which `missingScope` reads as the partial scope it is. */
   packages?: string[];
-  /** Total sites compared, for the report's denominator. */
+  /** Sites compared — the report's denominator. */
   compared: number;
   mismatches: CallArgRow[];
 }
@@ -52,7 +52,7 @@ export function keyOf(k: CallArgKey): string {
   return `${k.package} ${k.tsFile} ${k.rubyName} ${k.call} ${k.rubyArgs.join(",")}`;
 }
 
-/** The artifact rows the gate ratchets: `shape` only. */
+/** The rows the gate ratchets: `shape` only. */
 export function gatedRows(artifact: CallArgArtifact): CallArgRow[] {
   return artifact.mismatches.filter((m) => m.class === "shape");
 }
@@ -85,8 +85,7 @@ export function sortKeys<T extends CallArgKey>(entries: T[]): T[] {
 }
 
 /** Rebuild the baseline from the live artifact: keep each still-flagging row,
- *  reusing a prior reason when present and seeding new ones with
- *  `defaultReason`. Dropped rows are the stale entries the gate rejects. */
+ *  reusing a prior reason and seeding new ones with `defaultReason`. */
 export function reseed(
   current: CallArgKey[],
   baseline: CallArgExcludeEntry[],
