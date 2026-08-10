@@ -139,7 +139,7 @@ export class SelectManager extends TreeManager {
     if (locking === true) {
       locking = new SqlLiteral("FOR UPDATE");
     } else if (locking instanceof SqlLiteral) {
-      // Rails' empty `when Arel::Nodes::SqlLiteral` arm: pass through.
+      // Rails' empty `when Arel::Nodes::SqlLiteral` arm (select_manager.rb:56).
     } else if (typeof locking === "string") {
       locking = new SqlLiteral(locking);
     }
