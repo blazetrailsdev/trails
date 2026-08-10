@@ -160,7 +160,7 @@ describe("TestDateStrftime", () => {
     expect(d.strftime("%P")).toEqual("pm");
   });
 
-  it("strftime 3 1", { timeout: 120_000 }, () => {
+  it("strftime 3 1", { timeout: 30_000 }, () => {
     for (const d of dateRange(new RubyDate(1970, 1, 1), new RubyDate(2037, 12, 31))) {
       const t = RubyTime.utc(Number(d.year), d.mon, d.day);
       expect(d.strftime("%U")).toEqual(t.strftime("%U"));
@@ -168,7 +168,7 @@ describe("TestDateStrftime", () => {
     }
   });
 
-  it("strftime 3 2", { timeout: 120_000 }, (ctx) => {
+  it("strftime 3 2", { timeout: 30_000 }, (ctx) => {
     const s = RubyTime.now().strftime("%G");
     // eslint-disable-next-line vitest/no-conditional-in-test -- Ruby's `omit if`
     if (s.length === 0 || s === "%G") return ctx.skip();

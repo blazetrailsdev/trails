@@ -1,15 +1,21 @@
 /**
  * Port of ruby/date's `test/date/test_date.rb`.
  *
- * `test_range_infinite_float`, `test_sub`, `test_eql_p`, `test_hash` and
- * `test_submillisecond_comparison` are not here yet: each needs gem surface
- * RFC 0088 has not ported (`Date::Infinity`, `#+`/`#-`/`#>>`/`#<<`/`#succ`,
- * `Marshal`, `#<=>`/`#eql?`/`#hash`), so they are filed against 0088 rather
- * than stubbed here.
+ * `test_range_infinite_float`, `test_sub`, `test_hash` and
+ * `test_infinity_comparison` are not here yet: each needs gem surface RFC 0088
+ * has not ported (`Date.today`, `#+`/`#-`/`#>>`/`#<<`/`#succ`, `Marshal`,
+ * `#hash`, and MRI's `flo_cmp` `infinite?` protocol for a `Float` receiver), so
+ * they are filed against 0088 rather than stubbed here.
  */
 
 import { describe, it, expect } from "vitest";
-import { Date as RubyDate, DateTime as RubyDateTime, Rational, dtNewByFrags } from "./date.js";
+import {
+  Date as RubyDate,
+  DateTime as RubyDateTime,
+  Rational,
+  dNewByFrags,
+  dtNewByFrags,
+} from "./date.js";
 
 describe("TestDate", () => {
   it("const", () => {
@@ -32,12 +38,37 @@ describe("TestDate", () => {
     expect(Object.isFrozen(RubyDate.ABBR_DAYNAMES)).toEqual(true);
   });
 
+  it("eql p", () => {
+    const d = dNewByFrags({ jd: 0 });
+    const d2 = dNewByFrags({ jd: 0 });
+    const dt = dtNewByFrags({ jd: 0 });
+    const dt2 = dtNewByFrags({ jd: 0 });
+
+    expect(d.equals(d2)).toEqual(true);
+    expect(d.equals(0)).toEqual(false);
+
+    expect(dt.equals(dt2)).toEqual(true);
+    expect(dt.equals(0)).toEqual(false);
+
+    expect(d.equals(dt)).toEqual(true);
+    expect(d2.equals(dt2)).toEqual(true);
+  });
+
   it("freeze", () => {
     const d = new RubyDate();
     Object.freeze(d);
     expect(Object.isFrozen(d)).toEqual(true);
     expect(Number.isInteger(d.yday)).toEqual(true);
     expect(typeof d.toS()).toEqual("string");
+  });
+
+  it("submillisecond comparison", () => {
+    const d1 = new RubyDateTime(2013, 12, 6, 0, 0, new Rational(1, 10000));
+    const d2 = new RubyDateTime(2013, 12, 6, 0, 0, new Rational(2, 10000));
+    // d1 is 0.0001s earlier than d2
+    expect(d1.cmp(d2)).toEqual(-1);
+    expect(d1.cmp(d1)).toEqual(0);
+    expect(d2.cmp(d1)).toEqual(1);
   });
 
   it("deconstruct keys", () => {

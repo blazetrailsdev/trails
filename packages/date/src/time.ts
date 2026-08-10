@@ -400,7 +400,15 @@ export class Time {
       .toDatetime();
   }
 
+  /**
+   * `zone` is a getter rather than a value because reading it builds a
+   * `Temporal.ZonedDateTime` to find the tzdata abbreviation, and only `%Z`
+   * ever asks for it — computing it eagerly made every `Time#strftime` pay for
+   * a directive it usually does not carry.
+   */
   strftime(format: string): string {
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    const self = this;
     return strftime(
       {
         year: this.year,
@@ -412,7 +420,9 @@ export class Time {
         min: this.min,
         sec: this.sec,
         nsec: new Rational(this.nsec, 1),
-        zone: this.zone ?? "",
+        get zone(): string {
+          return self.zone ?? "";
+        },
         utcOffset: this.utcOffset,
       },
       format,
