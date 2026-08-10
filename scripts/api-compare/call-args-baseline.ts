@@ -57,15 +57,12 @@ export function gatedRows(artifact: CallArgArtifact): CallArgRow[] {
   return artifact.mismatches.filter((m) => m.class === "shape");
 }
 
-export interface CallArgDiff {
-  added: CallArgKey[]; // flagged now, absent from the baseline — the ratchet
-  stale: CallArgExcludeEntry[]; // baselined, no longer flags — only-shrink
-}
-
+/** `added` — flagged now, absent from the baseline (the ratchet failure);
+ *  `stale` — baselined but no longer flagging (the only-shrink failure). */
 export function diffAgainstBaseline(
   current: CallArgKey[],
   baseline: CallArgExcludeEntry[],
-): CallArgDiff {
+): { added: CallArgKey[]; stale: CallArgExcludeEntry[] } {
   const currentKeys = new Set(current.map(keyOf));
   const baselineKeys = new Set(baseline.map(keyOf));
   return {
