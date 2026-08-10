@@ -270,4 +270,36 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
     });
     expect(await adapter.queryValue(`SELECT "nick" FROM "pq" WHERE "id" = 8`)).toBe("prepared");
   });
+
+  // Rails' perform_query takes `raw_connection.execute_batch2(sql)` when
+  // `batch: true` (sqlite3/database_statements.rb:79-80) — the only arm that
+  // accepts more than one statement, since `prepare` is single-statement. Only
+  // `raw_execute` carries the keyword (abstract/database_statements.rb:552);
+  // `internal_execute` has no `batch:` and so always prepares.
+  it("rawExecute runs multi-statement SQL through the batch arm", async () => {
+    await adapter.rawExecute(
+      `INSERT INTO "pq" ("nick") VALUES ('one');\nINSERT INTO "pq" ("nick") VALUES ('two')`,
+      "SQL",
+      [],
+      false,
+      false,
+      false,
+      true,
+      true,
+    );
+    expect(await adapter.queryValue(`SELECT COUNT(*) FROM "pq"`)).toBe(2);
+  });
+
+  it("internalExecute rejects multi-statement SQL, having no batch arm", async () => {
+    await expect(adapter.internalExecute(`SELECT 1;\nSELECT 2`, "SQL")).rejects.toThrow();
+  });
+
+  it("executeBatch combines the statements and runs them through the batch arm", async () => {
+    await adapter.executeBatch([
+      `INSERT INTO "pq" ("nick") VALUES ('a')`,
+      `INSERT INTO "pq" ("nick") VALUES ('b')`,
+      `INSERT INTO "pq" ("nick") VALUES ('c')`,
+    ]);
+    expect(await adapter.queryValue(`SELECT COUNT(*) FROM "pq"`)).toBe(3);
+  });
 });

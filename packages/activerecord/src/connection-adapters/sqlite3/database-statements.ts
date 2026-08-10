@@ -13,6 +13,7 @@ import type { SqliteBinds, SqliteConnection, SqliteStatement } from "../../sqlit
 import { TransactionIsolationError } from "../../errors.js";
 import { Result } from "../../result.js";
 import { stripSqlComments } from "../sql-classification.js";
+import { combineMultiStatements } from "../abstract/database-statements.js";
 
 // Matches Rails' build_read_query_regexp(:pragma) which combines
 // DEFAULT_READ_QUERY [:begin, :commit, :explain, :release, :rollback, :savepoint, :select, :with]
@@ -113,7 +114,16 @@ interface PerformQueryHost {
 }
 
 interface ExecuteBatchHost {
-  executeMutation(sql: string, binds?: unknown[], name?: string): Promise<unknown>;
+  rawExecute(
+    sql: string,
+    name?: string | null,
+    binds?: unknown[],
+    prepare?: boolean,
+    async?: boolean,
+    allowRetry?: boolean,
+    materializeTransactions?: boolean,
+    batch?: boolean,
+  ): Promise<unknown>;
 }
 
 interface QuoteTableNameHost {
@@ -281,18 +291,15 @@ export async function executeBatch(
   statements: string[],
   name?: string | null,
 ): Promise<void> {
-  // Match Rails' execute_batch → raw_execute, which skips the query_transformers
-  // pass: batch statements carry no QueryLogs comment. Flag the call so
-  // preprocessQuery skips the transformer pass (write-checks still run); the flag
-  // is consumed synchronously there before any await, so it never spans the await.
-  const host = this as ExecuteBatchHost & { _inQueryTransformers?: boolean };
-  host._inQueryTransformers = true;
-  try {
-    const sql = statements.join(";\n");
-    await this.executeMutation(sql, [], name ?? "SQL");
-  } finally {
-    host._inQueryTransformers = false;
-  }
+  const sql = combineMultiStatements(statements);
+  // Rails: `raw_execute(sql, name, batch: true, **kwargs)`
+  // (sqlite3/database_statements.rb:126-129); the positional defaults below are
+  // `raw_execute`'s own (abstract/database_statements.rb:552). Going through
+  // `raw_execute` rather than `internal_execute` is also what leaves batch
+  // statements uncommented — `preprocess_query`, which runs the
+  // query_transformers, is `internal_execute`'s step (`:589-591`) — so the
+  // `_inQueryTransformers` suppression flag this used to set is gone with it.
+  await this.rawExecute(sql, name, [], false, false, false, true, true);
 }
 
 /** @internal */

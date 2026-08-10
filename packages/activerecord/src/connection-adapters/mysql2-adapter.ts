@@ -655,12 +655,14 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   /**
-   * Ensure the persistent connection is established. Creates it lazily on
-   * first call, serializing concurrent callers through a single Promise.
-   * Mirrors Rails' `with_raw_connection` which reconnects after
-   * `disconnect!`.
+   * Open the socket and nothing else, as Rails' private `Mysql2Adapter#connect`
+   * does (mysql2_adapter.rb:144), serializing concurrent callers through a
+   * single Promise. Every `configure_connection` dispatch belongs to the
+   * lifecycle (`attempt_configure_connection`, abstract_adapter.rb:1216), and
+   * no caller reaches an unconfigured socket: `getConn` and
+   * `awaitRawConnectionReady` establish through `connectBang`.
    */
-  private async _ensureClient(configure = true): Promise<mysql.Connection> {
+  private async _ensureClient(): Promise<mysql.Connection> {
     if (this._client) return this._client;
     // Return the in-flight promise only if it belongs to the current generation.
     // After disconnectBang() the generation advances, so stale in-flight
@@ -710,35 +712,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         // on every withRawConnection call.
         this._client = conn;
         this._statementPool = null;
-        // Rails has no configure-inside-raw-connect: every dispatch flows
-        // through connect!/reconnect!/verify! (mysql2_adapter.rb:144 opens the
-        // socket and nothing else). `reconnect()` passes configure=false and is
-        // already that shape — reconnectBang's attemptConfigureConnection is
-        // its single dispatch — and so is `connectBang()`, which routes through
-        // verifyBang.
-        //
-        // The one caller left that can reach an UNCONFIGURED socket is
-        // `rawConnectionForBlock()` → `getConn()`: withRawConnection runs its
-        // pre-loop `connectBang()` only when
-        // `_connection === null && isReconnectCanRestoreState()`
-        // (abstract-adapter.ts:2383), so a dirty raw connection or a
-        // non-restorable transaction stack skips the lifecycle entirely and the
-        // acquisition seam opens the first socket itself. Without this the
-        // query would run on a socket that never saw configure_connection.
-        // What deviates is the dispatch SITE, not the dispatch: the call is
-        // `attempt_configure_connection` (abstract_adapter.rb:1216) itself, so
-        // there is one teardown-on-failure implementation rather than a
-        // bespoke copy of it here. Retiring the site means the acquisition seam
-        // must stop opening sockets — tracked separately.
-        //
-        // Await so the connect-once warm + checkVersion complete before the
-        // socket is handed out — a too-old server rejects the connect (Rails'
-        // configure_connection → check_version raises during connect). The
-        // `_connectionConfigured` gate keeps a following
-        // verifyBang/reconnectBang from double-configuring, so a user override
-        // never observes duplicate configure_connection calls per connect
-        // (adapter_test.rb:852).
-        if (configure) await this.attemptConfigureConnection();
         return conn;
       },
       (err) => {
@@ -764,27 +737,30 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
 
   /**
    * Get the active connection — always the single persistent connection.
+   * Establishing it goes through the lifecycle (`connect!`, which is
+   * `verify!` — abstract_adapter.rb:778), never a bare raw connect, so the
+   * socket handed out has always seen `configure_connection`.
    */
   private async getConn(): Promise<mysql.Connection> {
+    await this.awaitRawConnectionReady();
     return this._ensureClient();
   }
 
   /**
-   * Overrides the abstract acquisition seam so withRawConnection's retry loop
-   * acquires a mysql.Connection. Called on every loop iteration so a
-   * reconnectBang() + continue picks up the fresh _client automatically.
+   * Establish the socket before the base `withRawConnection` loop yields
+   * `this._connection`, so the loop never acquires one itself — Rails yields
+   * the `@raw_connection` `connect!`/`verify!`/`reconnect!` already
+   * established (abstract_adapter.rb:1030-1070). Its own pre-loop `connect!`
+   * is gated on `@raw_connection.nil? && reconnect_can_restore_state?`, so a
+   * dirty connection or a non-restorable stack would otherwise leave the seam
+   * to open the first — unconfigured — socket, as PostgreSQLAdapter found.
+   *
    * @internal
    */
-  protected override async rawConnectionForBlock(): Promise<AbstractAdapter | null> {
-    // getConn() is called inside withRawConnection's try/finally, so a
-    // connection-acquisition failure still triggers dirtyCurrentTransaction()
-    // in the finally. Rails gates the ensure-dirty inside the begin…yield…ensure
-    // that wraps the already-resolved @raw_connection (abstract_adapter.rb:1044),
-    // not the pre-loop connect! — so this is a minor fidelity gap. It matches the
-    // PG adapter's posture and is intentional: over-dirtying on acquisition
-    // failure is conservative (may produce an extra savepoint) but cannot produce
-    // the reverse wrong behavior (skipping a needed savepoint).
-    return (await this.getConn()) as unknown as AbstractAdapter;
+  protected override async awaitRawConnectionReady(): Promise<void> {
+    if (this._client === null && !this._permanentlyClosed && !this._isFakeConnection) {
+      await this.connectBang();
+    }
   }
 
   /**
@@ -1065,7 +1041,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    * `super.materializeBang()` runs after this returns.
    */
   async beginDbTransaction(): Promise<void> {
-    await this._ensureClient();
     await this.internalExecute("BEGIN", "TRANSACTION", {
       materializeTransactions: false,
       allowRetry: true,
@@ -1410,7 +1385,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   // no client-side lock tracking, just issue the SQL and return the result.
 
   async getAdvisoryLock(lockId: number | bigint | string): Promise<boolean> {
-    const conn = await this._ensureClient();
+    const conn = await this.getConn();
     const [rows] = await conn.query("SELECT GET_LOCK(?, 0) AS locked", [String(lockId)]);
     return (rows as Record<string, unknown>[])[0]?.locked === 1;
   }
@@ -1469,9 +1444,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       // raises out of `reconnect!` (mysql2_adapter.rb:150 → :144). Awaiting here
       // lets the inherited `reconnectBang` translate + re-raise the
       // `ConnectionNotEstablished` (carrying the pool) instead of swallowing it.
-      // configure=false: Rails' raw connect opens the socket without configuring;
-      // reconnectBang's attemptConfigureConnection dispatches the hook once.
-      await this._ensureClient(false);
+      await this._ensureClient();
     });
   }
 

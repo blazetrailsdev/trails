@@ -4299,7 +4299,15 @@ function dayToSec(d: Rational): Rational {
  * C's `rb_warning("fraction of offset is ignored")` has no port analogue: it
  * writes to stderr under `$VERBOSE` only and is not part of the value.
  */
-function offsetToSec(vof: number | Rational | string): number | null {
+function offsetToSec(vof: number | bigint | Rational | string): number | null {
+  // `default:` (`:2398-2405`) — `expect_numeric` then `f_to_r`, so a Bignum
+  // arrives at the `T_RATIONAL` arm and a non-Numeric raises; a Numeric whose
+  // `to_r` is not a Rational reaches `Check_Type` and raises there.
+  if (typeof vof === "bigint") return offsetToSec(new Rational(vof, 1));
+  if (typeof vof !== "number" && typeof vof !== "string" && !(vof instanceof Rational)) {
+    expectNumeric(vof);
+    throw new TypeError("expected Rational");
+  }
   if (typeof vof === "number") {
     if (Number.isInteger(vof)) {
       if (vof !== -1 && vof !== 0 && vof !== 1) return null;
@@ -4333,7 +4341,7 @@ function offsetToSec(vof: number | Rational | string): number | null {
  * user-facing `offset` argument is read through: whatever `offset_to_sec`
  * rejects warns `"invalid offset is ignored"` and becomes `0`.
  */
-function val2off(vof: number | Rational | string): number {
+function val2off(vof: number | bigint | Rational | string): number {
   return offsetToSec(vof) ?? 0;
 }
 
@@ -4518,6 +4526,53 @@ function simpleDatP(dat: Date): boolean {
  */
 function kNumericP(other: unknown): other is number | bigint | Rational {
   return typeof other === "number" || typeof other === "bigint" || other instanceof Rational;
+}
+
+/**
+ * @internal `date_core.c` `expect_numeric` (`:2014-2019`), the `k_numeric_p`
+ * guard the `default:` arm of every arithmetic operator ends at. The parameter
+ * types already spell the numeric union, but they do not hold at a JS call
+ * site, and the gem's own `test__plus__ex` / `test__minus__ex` assert the
+ * `TypeError` for a String, a `Time` and a `Numeric` whose `to_r` answers
+ * itself (`vendor/date/test/date/test_date_arith.rb:33,:73`).
+ */
+function expectNumeric(x: unknown): void {
+  if (!kNumericP(x)) throw new TypeError("expected numeric");
+}
+
+/**
+ * @internal `date_core.c` `minus_dd` (`:6272-6321`), the difference between two
+ * dates in days, as a Rational: the whole {@link CM_PERIOD}s, days,
+ * day-fraction and sub-second, each carried into the term below, then summed.
+ */
+function minusDd(self: Date, other: Date): Rational {
+  let n = self.nth - other.nth;
+  let d: number;
+  [n, d] = canonicalizeJd(n, self.mJd() - other.mJd());
+  let df = self.mDf() - other.mDf();
+  let sf = self.mSf().add(other.mSf().mul(-1));
+
+  if (df < 0) {
+    d -= 1;
+    df += DAY_IN_SECONDS;
+  } else if (df >= DAY_IN_SECONDS) {
+    d += 1;
+    df -= DAY_IN_SECONDS;
+  }
+
+  if (sf.cmp(0) < 0) {
+    df -= 1;
+    sf = sf.add(SECOND_IN_NANOSECONDS);
+  } else if (sf.cmp(SECOND_IN_NANOSECONDS) >= 0) {
+    df += 1;
+    sf = sf.add(-SECOND_IN_NANOSECONDS);
+  }
+
+  let r = new Rational(n === 0n ? 0n : n * BigInt(CM_PERIOD), 1);
+  if (d) r = r.add(d);
+  if (df) r = r.add(isecToDay(df));
+  if (!sf.isZero()) r = r.add(nsToDay(sf));
+  return r;
 }
 
 /**
@@ -5296,8 +5351,10 @@ export class Date {
    * sub-second. JS has no Fixnum/Bignum/Float split — a `number` is any of the
    * three — so the arms are selected by `Number.isInteger` and by `bigint`,
    * which is the same partition the C's `TYPE()` makes. The C's `default:` arm,
-   * which sends `to_r` to anything else and re-dispatches, has no counterpart:
-   * the parameter type is already the numeric union. The Rational arm keeps the
+   * which sends `to_r` to anything else and re-dispatches, is reduced to its
+   * `expect_numeric` head ({@link expectNumeric}): the parameter type spells the
+   * numeric union, but it does not hold at a JS call site and the gem asserts
+   * the raise. The Rational arm keeps the
    * C's `wholenum_p` re-dispatch, since a Rational whose denominator reduced to
    * one is an Integer to Ruby. `modf` splits off a Float's fractional part and
    * leaves the whole one in its out-parameter; JS has no `modf`, so the two
@@ -5311,6 +5368,7 @@ export class Date {
    * whose `day_fraction` is `(1/2)`.
    */
   plus(other: number | bigint | Rational): this {
+    expectNumeric(other);
     if (typeof other === "number" && Number.isInteger(other)) {
       let nth = this.nth;
       let t = other;
@@ -5586,6 +5644,68 @@ export class Date {
   dNewInternal(nth: bigint, rjd: number, df: number, sf: Rational, of: number): this {
     if (!df && sf.isZero() && !of) return new Date(SEAT, nth, rjd, this.start) as this;
     return new Date(SEAT, nth, rjd, this.start, df, sf, of) as this;
+  }
+
+  /**
+   * Ruby `Date#-` (ruby/date, `date_core.c` `d_lite_minus`, `:6343-6360`): the
+   * difference in days as a Rational against another date ({@link minusDd}),
+   * and a date `other` days before the receiver against a Numeric. The C's
+   * `T_FIXNUM` arm negates the `long` and the rest reach `f_negate`, which is
+   * one negation here.
+   */
+  minus(other: Date | number | bigint | Rational): this | Rational {
+    if (other instanceof Date) return minusDd(this, other);
+    expectNumeric(other);
+    if (other instanceof Rational) return this.plus(other.mul(-1));
+    return this.plus(-other);
+  }
+
+  /** Ruby `Date#prev_day(n = 1)` (ruby/date, `date_core.c` `d_lite_prev_day`,
+   *  `:6386-6395`), which is `Date#-` of `n`. */
+  prevDay(n: number | bigint | Rational = 1): this {
+    return this.minus(n) as this;
+  }
+
+  /**
+   * Ruby `Date#>>` (ruby/date, `date_core.c` `d_lite_rshift`, `:6441-6478`), a
+   * date `other` months after the receiver. When the new month has no such day
+   * the last day of it is used — the `while` walking `d` down, which is why
+   * `Date.new(2000,1,31) >> 1` is 2000-02-29.
+   */
+  rshift(other: number | bigint): this {
+    const t = BigInt(this.year) * 12n + BigInt(this.mon - 1) + BigInt(other);
+    const y = bigNorm(div(t, 12));
+    const m = Number(mod(t, 12)) + 1;
+    let d = this.mday;
+    const sg = this.start;
+
+    let r: [nth: bigint, rjd: number] | null;
+    for (;;) {
+      r = validCivilP(y, m, d, sg);
+      if (r !== null) break;
+      if (--d < 1) throw new DateError("invalid date");
+    }
+    const [nth, rjd] = r;
+    const rjd2 = encodeJd(nth, rjd);
+    return this.plus(bigNorm(BigInt(rjd2) - BigInt(this.jd)));
+  }
+
+  /** Ruby `Date#<<` (ruby/date, `date_core.c` `d_lite_lshift`, `:6507-6512`),
+   *  which is `Date#>>` of the negated argument. */
+  lshift(other: number | bigint): this {
+    return this.rshift(-other);
+  }
+
+  /** Ruby `Date#prev_month(n = 1)` (ruby/date, `date_core.c`
+   *  `d_lite_prev_month`, `:6537-6546`), which is `Date#<<` of `n`. */
+  prevMonth(n: number | bigint = 1): this {
+    return this.lshift(n);
+  }
+
+  /** Ruby `Date#prev_year(n = 1)` (ruby/date, `date_core.c` `d_lite_prev_year`,
+   *  `:6571-6580`), which is `Date#<<` of `n * 12`. */
+  prevYear(n: number | bigint = 1): this {
+    return this.lshift(typeof n === "bigint" ? n * 12n : n * 12);
   }
 
   /**
@@ -6529,6 +6649,18 @@ export class DateTime extends DateWithoutParseStatics {
    */
   override get isJulian(): boolean {
     return mJulianP(this.#getCJd(), virtualSg(this.nth, this.start));
+  }
+
+  /**
+   * Ruby `DateTime#new_offset(offset = 0)` (ruby/date, `date_core.c`
+   * `d_lite_new_offset`, `:5920-5934`) over `dup_obj_with_new_offset`
+   * (`:5901-5909`): the day and day-fraction are stored in UTC, so only `of`
+   * changes. `Init_date_core` gives it to `::DateTime` alone (`:10018`). TS has
+   * no `dup_obj`, so the copy is made here; see {@link DateTime#newStart}.
+   */
+  newOffset(offset: number | bigint | Rational | string = 0): this {
+    const rof = val2off(offset);
+    return new DateTime(SEAT, this.nth, this.#jd, this.#df, this.#sf, rof, this.start) as this;
   }
 
   override newStart(start = DEFAULT_SG): this {

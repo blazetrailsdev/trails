@@ -827,8 +827,6 @@ export class PostgreSQLAdapter
    * deadlock. Rebuilds the base type map first (mirroring reload_type_map's
    * clear) so the registrations layer onto a fresh map.
    */
-  private _loadingAdditionalTypes = false;
-
   private async _eagerLoadAdditionalTypes(client: pg.Client): Promise<void> {
     this._typeMap = null;
     const initializer = new TypeMapInitializer(this.typeMap);
@@ -913,15 +911,6 @@ export class PostgreSQLAdapter
     sqlType: string = "",
   ): Promise<Type> {
     if (!this.typeMap.has(oid)) {
-      // Reentrancy guard, with no Rails counterpart: Rails' initialize_type_map
-      // preloads the common OIDs at connect (postgresql_adapter.rb:558-608), so
-      // get_oid_type for pg_type's own columns never misses and
-      // load_additional_types cannot recurse. trails resolves the map lazily, so
-      // a schema query issued *during* load_additional_types would re-enter it
-      // (schemaQuery -> internalExecQuery -> castResult -> getOidType -> ...).
-      // Return an unregistered fallback instead — registering it on the map
-      // would poison the OID permanently (see lookupCastTypeFromColumn below).
-      if (this._loadingAdditionalTypes) return new ValueType();
       await this.loadAdditionalTypes([oid]);
     }
     return this.typeMap.fetch(oid, fmod, sqlType, () => {
@@ -1166,14 +1155,21 @@ export class PostgreSQLAdapter
    */
   async loadAdditionalTypes(oids?: number[]): Promise<void> {
     const initializer = new TypeMapInitializer(this.typeMap);
-    this._loadingAdditionalTypes = true;
-    try {
-      for await (const query of this.loadTypesQueries(initializer, oids)) {
-        const rows = (await this.schemaQuery(query)) as unknown as PgTypeRow[];
-        initializer.run(rows);
-      }
-    } finally {
-      this._loadingAdditionalTypes = false;
+    for await (const query of this.loadTypesQueries(initializer, oids)) {
+      // `internal_execute` is UNCAST, which is what keeps the cycle
+      // unreachable: `cast_result` would resolve every pg_type column through
+      // `get_oid_type`, re-entering this method. Ruby's PG::Result already
+      // yields hash rows; node-pg's array mode needs the field names put back.
+      const result = (await this.internalExecute(query, "SCHEMA", {
+        binds: [],
+        allowRetry: true,
+        materializeTransactions: false,
+      })) as { fields?: Array<{ name: string }>; rows?: unknown[][] };
+      const records = new Result(
+        (result.fields ?? []).map((f) => f.name),
+        result.rows ?? [],
+      ).toArray() as unknown as PgTypeRow[];
+      initializer.run(records);
     }
   }
 
