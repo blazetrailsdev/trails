@@ -224,8 +224,7 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
     for (let i = 0; i < 100 && closing._statementLock === held; i++) await Promise.resolve();
 
     closing.disconnectBang();
-    // Asked WHILE the close is still queued behind the statement — the window
-    // Rails does not have. It must not answer until the handle is closed.
+    // Asked while the close is still queued behind the statement.
     const answered = closing.active();
 
     release();

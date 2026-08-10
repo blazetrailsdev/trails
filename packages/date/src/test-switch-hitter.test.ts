@@ -16,7 +16,15 @@
  * Ruby's `Encoding::US_ASCII` assertions in `test_zone` / `test_to_s` /
  * `test_inspect` have no JS analogue — a JS string carries no encoding tag —
  * so the ported assertion is the property the Ruby one is checking for: the
- * answer is ASCII-only.
+ * answer is ASCII-only. `test_enc` is the same conversion: its `euc-jp` and
+ * `ascii-8bit` arms differ only in the tag `force_encoding` puts on an
+ * identical string, so each pair ports to one assertion on the value.
+ *
+ * `test_base` is `def test_base ... end if defined?(Date.test_all)`, and
+ * `Date.test_all` is registered only under `#ifndef NDEBUG`
+ * (`date_core.c:10045-10057`) — so a released gem never defines the method and
+ * never defines the test. trails has no debug build either, which is what the
+ * ported body asserts.
  *
  * `test_canon24oc`'s three static spellings answer the `Temporal` seat, which
  * has no `#hour`/`#offset`, so each is asserted through the seat's own
@@ -49,7 +57,9 @@ function isUsAscii(s: string): boolean {
  * -5,000,000 or `test_period2`'s Bignum Julian days, and `#mon`/`#wday`/
  * `#gregorian` are gem-object members. These are the same `d_new_by_frags`
  * (`date_core.c:4110-4147`) the statics themselves run over, given the `:jd`
- * the C's `date_s_jd` sets.
+ * the C's `date_s_jd` sets. `gemDateTimeJd`'s `offset` is the `:offset` frag,
+ * seconds east of UTC — what `DateTime.jd`'s own `'+12:00'` argument reaches
+ * `d_new_by_frags` as (`val2off`, `date_core.c:5071-5077`).
  */
 const gemJd = (jd: number | bigint, sg?: number) => dNewByFrags({ jd }, sg);
 const gemDateTimeJd = (
@@ -57,9 +67,6 @@ const gemDateTimeJd = (
   hour: number,
   min: number,
   sec: number,
-  // The `:offset` frag is seconds east of UTC, which is what `DateTime.jd`'s
-  // own `'+12:00'` argument reaches `d_new_by_frags` as (`val2off`,
-  // `date_core.c:5071-5077`).
   offset: number,
   sg?: number,
 ) => dtNewByFrags({ jd, hour, min, sec, offset }, sg);
