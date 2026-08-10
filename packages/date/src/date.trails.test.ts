@@ -35,6 +35,12 @@ function ymd(date: RubyDate | Temporal.PlainDate): string {
 }
 
 describe("Date", () => {
+  it("raises rather than dropping the day fraction Date#+ cannot seat on a Date", () => {
+    expect(() => new RubyDate(2001, 1, 1).plus(new Rational(1, 2))).toThrow(RubyDate.Error);
+    expect(new RubyDate(2001, 1, 1).plus(1).toS()).toBe("2001-01-02");
+    expect(new RubyDate(2001, 1, 1).plus(-1).toS()).toBe("2000-12-31");
+  });
+
   it("parses a y-m-d string, padded or not", () => {
     for (const str of ["2008-07-02", "2008-7-2"]) {
       const date = RubyDate.parse(str);
