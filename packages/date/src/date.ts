@@ -4546,7 +4546,10 @@ function expectNumeric(x: unknown): void {
  * arm is the subtraction below; it is widened to every JS `number` because
  * Ruby's non-Fixnum Float reaches `Float#<=>`, which answers the same sign.
  * Everything else goes through `rb_cmpint`, which raises `ArgumentError` for
- * the `nil` a `<=>` that declines to answer gives back. `test_step__compare`
+ * the `nil` a `<=>` that declines to answer gives back — including the `nil`
+ * Ruby's own `Object#<=>` answers for an unrelated operand, which is why an
+ * object carrying no `cmp` at all takes that arm rather than failing on the
+ * call. `test_step__compare`
  * (`vendor/date/test/date/test_date_arith.rb:290-303`) asserts both arms of
  * that through `Date#step`'s step argument.
  */
@@ -4557,12 +4560,40 @@ function fCmp(x: unknown, y: number): number {
     else if (c < 0) return -1;
     return 0;
   }
-  const c = (x as { cmp(y: number): number | null }).cmp(y);
+  const cmp = (x as { cmp?: (y: number) => number | null | undefined } | null)?.cmp;
+  const c = typeof cmp === "function" ? cmp.call(x, y) : null;
   if (c === null || c === undefined) {
     const klass = x === null || x === undefined ? String(x) : (x.constructor?.name ?? "Object");
     throw new ArgumentError(`comparison of ${klass} with ${y} failed`);
   }
   return c > 0 ? 1 : c < 0 ? -1 : 0;
+}
+
+/**
+ * @internal The loop of `date_core.c` `d_lite_upto` (`:6665-6671`) as a
+ * generator, driving both arms of {@link Date#upto} the way
+ * {@link dLiteStepEnum} drives {@link Date#step}. The C writes this loop out
+ * rather than calling `d_lite_step`, so it is its own body here too.
+ */
+function* dLiteUptoEnum(self: Date, max: Date): Generator<Date> {
+  let date = self;
+  while (date.cmp(max)! <= 0) {
+    yield date;
+    date = date.plus(1);
+  }
+}
+
+/**
+ * @internal The loop of `date_core.c` `d_lite_downto` (`:6686-6692`), the
+ * counterpart to {@link dLiteUptoEnum} and, like it, written out in the C
+ * rather than delegated to `d_lite_step`.
+ */
+function* dLiteDowntoEnum(self: Date, min: Date): Generator<Date> {
+  let date = self;
+  while (date.cmp(min)! >= 0) {
+    yield date;
+    date = date.plus(-1);
+  }
 }
 
 /**
@@ -5824,22 +5855,30 @@ export class Date {
 
   /**
    * Ruby `Date#upto(max)` (ruby/date, `date_core.c` `d_lite_upto`,
-   * `:6659-6672`), equivalent to {@link Date#step} with `max` and `1`.
+   * `:6659-6672`). Documented as equivalent to {@link Date#step} with `max` and
+   * `1`, but the C is its own loop over `d_lite_cmp` and `d_lite_plus` and does
+   * not dispatch through `d_lite_step`, so this does not either.
    */
   upto(max: Date): Generator<this>;
   upto(max: Date, block: (date: this) => void): this;
   upto(max: Date, block?: (date: this) => void): this | Generator<this> {
-    return block === undefined ? this.step(max, 1) : this.step(max, 1, block);
+    if (block === undefined) return dLiteUptoEnum(this, max) as Generator<this>;
+    for (const date of dLiteUptoEnum(this, max)) block(date as this);
+    return this;
   }
 
   /**
    * Ruby `Date#downto(min)` (ruby/date, `date_core.c` `d_lite_downto`,
-   * `:6680-6693`), equivalent to {@link Date#step} with `min` and `-1`.
+   * `:6680-6693`). Documented as equivalent to {@link Date#step} with `min` and
+   * `-1`, but the C is its own loop over `d_lite_cmp` and `d_lite_plus` and
+   * does not dispatch through `d_lite_step`, so this does not either.
    */
   downto(min: Date): Generator<this>;
   downto(min: Date, block: (date: this) => void): this;
   downto(min: Date, block?: (date: this) => void): this | Generator<this> {
-    return block === undefined ? this.step(min, -1) : this.step(min, -1, block);
+    if (block === undefined) return dLiteDowntoEnum(this, min) as Generator<this>;
+    for (const date of dLiteDowntoEnum(this, min)) block(date as this);
+    return this;
   }
 
   /**
