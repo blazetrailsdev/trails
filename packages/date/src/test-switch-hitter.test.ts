@@ -647,7 +647,12 @@ describe("TestSH", () => {
 
     const today = RubyDate.today();
     expect(new RubyDate(today.year, today.month, today.day).strftime("new 105")).toBe("new 105");
-    expect(new RubyDateTime(2001, 2, 3).strftime("super $record")).toBe("super $record");
+    const now = RubyDateTime.now();
+    expect(
+      new RubyDateTime(now.year, now.month, now.day, now.hour, now.minute, now.second).strftime(
+        "super $record",
+      ),
+    ).toBe("super $record");
   });
 
   it("dup", () => {
