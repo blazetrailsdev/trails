@@ -48,6 +48,22 @@ describe("Date", () => {
     expect(new RubyDate(2001, 1, 1).plus(-1).toS()).toBe("2000-12-31");
   });
 
+  it("discards date_initialize's add_frac under Date.new and keeps it under Date.civil", () => {
+    const d = new RubyDate(2001, 2, 3.5);
+    expect(d.dayFraction).toBe(0);
+    expect(d.complexDatP()).toBe(false);
+    expect(d.toS()).toBe("2001-02-03");
+    expect(RubyDate.civil(2001, 2, 3.5).equals(RubyDate.civil(2001, 2, 3))).toBe(true);
+  });
+
+  it("seats Date.today's civil triple under GREGORIAN, so the reform only changes the start", () => {
+    const today = RubyDate.today();
+    const jd = new RubyDate(today.year, today.month, today.day, RubyDate.GREGORIAN).jd;
+    for (const start of [RubyDate.JULIAN, RubyDate.GREGORIAN, RubyDate.ITALY]) {
+      expect(RubyDate.today(start).equals(RubyDate.jd(jd, start))).toBe(true);
+    }
+  });
+
   it("raises TypeError when deconstruct_keys is handed neither nil nor an Array", () => {
     const d = new RubyDate(1999, 5, 23);
     expect(() => d.deconstructKeys("year" as unknown as string[])).toThrow(TypeError);

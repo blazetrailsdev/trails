@@ -812,6 +812,7 @@ function numCoerce(x: unknown, y: unknown): [number, number] {
  * `"Jul"`, `"July"` and `"JULY"` all land on the same month.
  */
 const ABBR_MONTHS = "jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec";
+const DAYS = "sunday|monday|tuesday|wednesday|thursday|friday|saturday";
 const ABBR_DAYS = "sun|mon|tue|wed|thu|fri|sat";
 
 /**
@@ -2361,8 +2362,206 @@ function parseFrag(str: string, hash: DateParts): string | null {
  * date. `:time` names no date, so it has no completion branch here — Ruby's
  * only fills a `:jd` for `DateTime` — and the string goes on to raise.
  */
+/** @internal `date_parse.c` `comp_year50` (`date_parse.c:2310-2316`): `50` is 1950, `49` is 2049. */
+function compYear50(y: number): number {
+  return y >= 50 ? y + 1900 : y + 2000;
+}
+
+/**
+ * @internal `date_parse.c` `match` (`date_parse.c:303-320`), which the
+ * `MATCH(s, p, c)` macro (`:298-302`) is one line over: the format-specific
+ * parsers below anchor their pattern to the whole string, so unlike
+ * {@link subx} they take nothing out of it and answer only whether it matched.
+ */
+function match(
+  str: string,
+  pat: RegExp,
+  hash: DateParts,
+  cb: (m: RegExpExecArray, hash: DateParts) => number,
+): number {
+  const m = pat.exec(str);
+
+  if (m === null) return 0;
+
+  cb(m, hash);
+
+  return 1;
+}
+
+/**
+ * @internal `date_parse.c` `rfc2822_cb` (`date_parse.c:2797-2826`): a two- or
+ * three-digit year is completed by `comp_year50` rather than `comp_year69`, so
+ * `50` is 1950 and `100` is 2000. The seconds group is optional; the zone is
+ * not, and `date_zone_to_diff` turns its name into the `:offset`.
+ */
+function rfc2822Cb(m: RegExpExecArray, hash: DateParts): number {
+  const s: (string | undefined)[] = [undefined, ...m.slice(1)];
+
+  if (s[1] !== undefined) {
+    hash.wday = dayNum(s[1]);
+  }
+  hash.mday = Number(s[2]);
+  hash.mon = monNum(s[3] as string);
+  let y = Number(s[4]);
+  if ((s[4] as string).length < 4) y = compYear50(y);
+  hash.year = y;
+  hash.hour = Number(s[5]);
+  hash.min = Number(s[6]);
+  if (s[7] !== undefined) hash.sec = Number(s[7]);
+  hash.zone = s[8];
+  hash.offset = dateZoneToDiff(s[8] as string);
+
+  return 1;
+}
+
+/** @internal `date_parse.c` `rfc2822` (`date_parse.c:2829-2842`). */
+function rfc2822(str: string, hash: DateParts): number {
+  const pat = new RegExp(
+    `^\\s*(?:(${ABBR_DAYS})\\s*,\\s+)?` +
+      `(\\d{1,2})\\s+` +
+      `(${ABBR_MONTHS})\\s+` +
+      `(-?\\d{2,})\\s+` +
+      `(\\d{2}):(\\d{2})(?::(\\d{2}))?\\s*` +
+      `([-+]\\d{4}|ut|gmt|e[sd]t|c[sd]t|m[sd]t|p[sd]t|[a-ik-z])\\s*$`,
+    "i",
+  );
+  return match(str, pat, hash, rfc2822Cb);
+}
+
+/** @internal `date_parse.c` `date__rfc2822` (`date_parse.c:2844-2855`). */
+function dateRfc2822(str: string): DateParts {
+  const hash: DateParts = {};
+  rfc2822(str, hash);
+  return hash;
+}
+
+/**
+ * @internal `date_parse.c` `httpdate_type1_cb` (`date_parse.c:2861-2884`): RFC
+ * 1123's `Sat, 03 Feb 2001 04:05:06 GMT`, whose zone is always `GMT`, so the
+ * `:offset` is the literal `0` rather than a `date_zone_to_diff` of it.
+ */
+function httpdateType1Cb(m: RegExpExecArray, hash: DateParts): number {
+  const s: (string | undefined)[] = [undefined, ...m.slice(1)];
+
+  hash.wday = dayNum(s[1] as string);
+  hash.mday = Number(s[2]);
+  hash.mon = monNum(s[3] as string);
+  hash.year = Number(s[4]);
+  hash.hour = Number(s[5]);
+  hash.min = Number(s[6]);
+  hash.sec = Number(s[7]);
+  hash.zone = s[8];
+  hash.offset = 0;
+
+  return 1;
+}
+
+/** @internal `date_parse.c` `httpdate_type1` (`date_parse.c:2886-2899`). */
+function httpdateType1(str: string, hash: DateParts): number {
+  const pat = new RegExp(
+    `^\\s*(${ABBR_DAYS})\\s*,\\s+` +
+      `(\\d{2})\\s+` +
+      `(${ABBR_MONTHS})\\s+` +
+      `(-?\\d{4})\\s+` +
+      `(\\d{2}):(\\d{2}):(\\d{2})\\s+` +
+      `(gmt)\\s*$`,
+    "i",
+  );
+  return match(str, pat, hash, httpdateType1Cb);
+}
+
+/**
+ * @internal `date_parse.c` `httpdate_type2_cb` (`date_parse.c:2905-2929`): RFC
+ * 850's `Saturday, 03-Feb-01 04:05:06 GMT`, whose two-digit year goes through
+ * `comp_year69` — and only within `0..99`.
+ */
+function httpdateType2Cb(m: RegExpExecArray, hash: DateParts): number {
+  const s: (string | undefined)[] = [undefined, ...m.slice(1)];
+
+  hash.wday = dayNum(s[1] as string);
+  hash.mday = Number(s[2]);
+  hash.mon = monNum(s[3] as string);
+  let y = Number(s[4]);
+  if (y >= 0 && y <= 99) y = compYear69(y);
+  hash.year = y;
+  hash.hour = Number(s[5]);
+  hash.min = Number(s[6]);
+  hash.sec = Number(s[7]);
+  hash.zone = s[8];
+  hash.offset = 0;
+
+  return 1;
+}
+
+/** @internal `date_parse.c` `httpdate_type2` (`date_parse.c:2932-2946`). */
+function httpdateType2(str: string, hash: DateParts): number {
+  const pat = new RegExp(
+    `^\\s*(${DAYS})\\s*,\\s+` +
+      `(\\d{2})\\s*-\\s*` +
+      `(${ABBR_MONTHS})\\s*-\\s*` +
+      `(\\d{2})\\s+` +
+      `(\\d{2}):(\\d{2}):(\\d{2})\\s+` +
+      `(gmt)\\s*$`,
+    "i",
+  );
+  return match(str, pat, hash, httpdateType2Cb);
+}
+
+/**
+ * @internal `date_parse.c` `httpdate_type3_cb` (`date_parse.c:2952-2971`):
+ * `asctime`'s `Sat Feb  3 04:05:06 2001`, which names no zone at all — so no
+ * `:zone` and no `:offset`.
+ */
+function httpdateType3Cb(m: RegExpExecArray, hash: DateParts): number {
+  const s: (string | undefined)[] = [undefined, ...m.slice(1)];
+
+  hash.wday = dayNum(s[1] as string);
+  hash.mon = monNum(s[2] as string);
+  hash.mday = Number(s[3]);
+  hash.hour = Number(s[4]);
+  hash.min = Number(s[5]);
+  hash.sec = Number(s[6]);
+  hash.year = Number(s[7]);
+
+  return 1;
+}
+
+/** @internal `date_parse.c` `httpdate_type3` (`date_parse.c:2975-2988`). */
+function httpdateType3(str: string, hash: DateParts): number {
+  const pat = new RegExp(
+    `^\\s*(${ABBR_DAYS})\\s+` +
+      `(${ABBR_MONTHS})\\s+` +
+      `(\\d{1,2})\\s+` +
+      `(\\d{2}):(\\d{2}):(\\d{2})\\s+` +
+      `(\\d{4})\\s*$`,
+    "i",
+  );
+  return match(str, pat, hash, httpdateType3Cb);
+}
+
+/**
+ * @internal `date_parse.c` `date__httpdate` (`date_parse.c:2990-3010`): the
+ * three HTTP date formats in RFC 2616's own order, the first that matches
+ * winning.
+ */
+function dateHttpdate(str: string): DateParts {
+  const hash: DateParts = {};
+
+  if (httpdateType1(str, hash)) return hash;
+  if (httpdateType2(str, hash)) return hash;
+  httpdateType3(str, hash);
+
+  return hash;
+}
+
 /** `date_core.c`'s `JULIAN_EPOCH_DATE` (`date_core.c:251`). */
 const JULIAN_EPOCH_DATE = "-4712-01-01";
+
+/** `date_core.c`'s `JULIAN_EPOCH_DATETIME_RFC3339` (`date_core.c:253`). */
+const JULIAN_EPOCH_DATETIME_RFC3339 = "Mon, 1 Jan -4712 00:00:00 +0000";
+
+/** `date_core.c`'s `JULIAN_EPOCH_DATETIME_HTTPDATE` (`date_core.c:254`). */
+const JULIAN_EPOCH_DATETIME_HTTPDATE = "Mon, 01 Jan -4712 00:00:00 GMT";
 
 /** `date_core.c`'s `JULIAN_EPOCH_DATETIME` (`date_core.c:252`). */
 const JULIAN_EPOCH_DATETIME = `${JULIAN_EPOCH_DATE}T00:00:00+00:00`;
@@ -5171,6 +5370,13 @@ export class Date {
   #civil?: [ry: number, rm: number, rdom: number];
 
   /**
+   * @internal `date_initialize`'s `fr2` local (`date_core.c:3502`, seeded at
+   * `:3515`): the day-fraction `num2int_with_frac` peeled off `mday`, which
+   * only `date_s_civil` gets to apply — see the constructor.
+   */
+  #fr2: number | Rational = 0;
+
+  /**
    * Ruby `Date.new(year = -4712, month = 1, mday = 1)` (ruby/date,
    * `date_core.c` `date_s_civil`), which raises `Date::Error` on a civil date
    * `c_valid_civil_p` rejects.
@@ -5184,12 +5390,14 @@ export class Date {
    *
    * `add_frac()` (`date_core.c:3557`, the macro at `:3313-3317`) then answers
    * `d_lite_plus(self, fr2)` — a DIFFERENT object from the one being
-   * initialized, carrying `ComplexDateData` for the day-fraction. Ruby returns
-   * it because `date_s_civil` returns `date_initialize`'s `ret` rather than the
-   * allocated receiver, and a JS constructor may override its own result the
-   * same way. So `Date.new(2001, 1, 1) + Rational(1, 2)` and
-   * `Date.new(2001, 1, Rational(3, 2))` are both a `Date` with a
-   * `day_fraction`, and neither is a `DateTime`.
+   * initialized, carrying `ComplexDateData` for the day-fraction. Only
+   * `date_s_civil` (`:3478`) ever sees it: it answers `date_initialize`'s
+   * `ret` directly, while `Date.new` reaches the same C function through
+   * `Class#new`, which DISCARDS `initialize`'s return value —
+   * `Date.new(2001, 2, 3.5).day_fraction` is `0` where
+   * `Date.civil(2001, 2, 3.5).day_fraction` is `(1/2)`. A JS constructor has no
+   * analogue of that discard (its return IS what `new` answers), so `fr2` is
+   * kept on the instance here and {@link Date.civil} runs `add_frac` itself.
    */
   constructor(year?: number | bigint, month?: number, day?: number | Rational, start?: number);
   /**
@@ -5258,6 +5466,7 @@ export class Date {
     checkNumeric(year, "year");
     const sg = val2sg(start);
     const [d, fr2] = num2intWithFrac(day, 1, false);
+    this.#fr2 = fr2;
     if (guessStyle(year, sg) < 0) {
       const r = validGregorianP(year, month as number, d);
       if (r === null) throw new DateError("invalid date");
@@ -5273,8 +5482,6 @@ export class Date {
       this.#jd = rjd;
       this.#sg = sg;
     }
-
-    return addFracTo(this, fr2);
   }
 
   /**
@@ -5510,7 +5717,8 @@ export class Date {
     mday: number | Rational = 1,
     start = DEFAULT_SG,
   ): Temporal.PlainDate {
-    return new Date(year, month, mday, start).toDate();
+    const ret = new Date(year, month, mday, start);
+    return addFracTo(ret, ret.#fr2).toDate();
   }
 
   /**
@@ -5724,6 +5932,60 @@ export class Date {
    */
   static parse(str = JULIAN_EPOCH_DATE, comp = true, start = DEFAULT_SG): Temporal.PlainDate {
     return dNewByFrags(Date._parse(str, comp), val2sg(start)).toDate();
+  }
+
+  /**
+   * Ruby `Date._rfc2822(string, limit: 128)` (ruby/date, `date_core.c`
+   * `date_s__rfc2822`, `date_core.c:4825-4834` → `date__rfc2822` in
+   * `date_parse.c`): the frags of one RFC 2822 date-time, and an empty hash
+   * for a string that is not one. Unlike {@link Date._parse} it guesses
+   * nothing — the pattern is anchored end to end.
+   */
+  static _rfc2822(str: string): DateParts {
+    return dateRfc2822(str);
+  }
+
+  /**
+   * Ruby `Date._rfc822` (ruby/date, `date_core.c:9464`, an
+   * `rb_define_singleton_method` onto `date_s__rfc2822` itself): RFC 822 is
+   * what RFC 2822 obsoleted, and the gem parses both with the one function.
+   */
+  static _rfc822(str: string): DateParts {
+    return Date._rfc2822(str);
+  }
+
+  /**
+   * Ruby `Date.rfc2822(string = 'Mon, 1 Jan -4712 00:00:00 +0000', start =
+   * Date::ITALY, limit: 128)` (ruby/date, `date_core.c` `date_s_rfc2822`,
+   * `date_core.c:4855-4877`), which is `Date._rfc2822` followed by
+   * `d_new_by_frags`.
+   */
+  static rfc2822(str = JULIAN_EPOCH_DATETIME_RFC3339, start = DEFAULT_SG): Temporal.PlainDate {
+    return dNewByFrags(Date._rfc2822(str), val2sg(start)).toDate();
+  }
+
+  /** Ruby `Date.rfc822` (ruby/date, `date_core.c:9465`), `Date.rfc2822`'s alias. */
+  static rfc822(str = JULIAN_EPOCH_DATETIME_RFC3339, start = DEFAULT_SG): Temporal.PlainDate {
+    return Date.rfc2822(str, start);
+  }
+
+  /**
+   * Ruby `Date._httpdate(string, limit: 128)` (ruby/date, `date_core.c`
+   * `date_s__httpdate`, `date_core.c:4893-4902` → `date__httpdate` in
+   * `date_parse.c`): the frags of an RFC 2616 date-time in any of its three
+   * formats, and an empty hash for a string that is none of them.
+   */
+  static _httpdate(str: string): DateParts {
+    return dateHttpdate(str);
+  }
+
+  /**
+   * Ruby `Date.httpdate(string = 'Mon, 01 Jan -4712 00:00:00 GMT', start =
+   * Date::ITALY, limit: 128)` (ruby/date, `date_core.c` `date_s_httpdate`,
+   * `date_core.c:4923-4945`).
+   */
+  static httpdate(str = JULIAN_EPOCH_DATETIME_HTTPDATE, start = DEFAULT_SG): Temporal.PlainDate {
+    return dNewByFrags(Date._httpdate(str), val2sg(start)).toDate();
   }
 
   /**
@@ -6833,6 +7095,9 @@ const DateWithoutParseStatics: (new (
     | "weeknum"
     | "nthKday"
     | "today"
+    | "rfc2822"
+    | "rfc822"
+    | "httpdate"
   > = Date;
 
 /**
@@ -7619,6 +7884,39 @@ export class DateTime extends DateWithoutParseStatics {
     start = DEFAULT_SG,
   ): Temporal.PlainDateTime | Temporal.ZonedDateTime {
     return dtNewByFrags(Date._parse(str, comp), val2sg(start)).toDatetime();
+  }
+
+  /**
+   * Ruby `DateTime.rfc2822(string = 'Mon, 1 Jan -4712 00:00:00 +0000', start =
+   * Date::ITALY, limit: 128)` (ruby/date, `date_core.c` `datetime_s_rfc2822`,
+   * `date_core.c:8584-8607`), which is `Date._rfc2822` followed by the
+   * DateTime-shaped build.
+   */
+  static rfc2822(
+    str = JULIAN_EPOCH_DATETIME_RFC3339,
+    start = DEFAULT_SG,
+  ): Temporal.PlainDateTime | Temporal.ZonedDateTime {
+    return dtNewByFrags(Date._rfc2822(str), val2sg(start)).toDatetime();
+  }
+
+  /** Ruby `DateTime.rfc822` (ruby/date, `date_core.c:9598`), `DateTime.rfc2822`'s alias. */
+  static rfc822(
+    str = JULIAN_EPOCH_DATETIME_RFC3339,
+    start = DEFAULT_SG,
+  ): Temporal.PlainDateTime | Temporal.ZonedDateTime {
+    return DateTime.rfc2822(str, start);
+  }
+
+  /**
+   * Ruby `DateTime.httpdate(string = 'Mon, 01 Jan -4712 00:00:00 GMT', start =
+   * Date::ITALY, limit: 128)` (ruby/date, `date_core.c` `datetime_s_httpdate`,
+   * `date_core.c:8623-8646`).
+   */
+  static httpdate(
+    str = JULIAN_EPOCH_DATETIME_HTTPDATE,
+    start = DEFAULT_SG,
+  ): Temporal.PlainDateTime | Temporal.ZonedDateTime {
+    return dtNewByFrags(Date._httpdate(str), val2sg(start)).toDatetime();
   }
 
   /**
