@@ -7,7 +7,7 @@ const currentFormatLog = `
 ==========================================================================================
 
 ==========================================================================================
-  did-you-mean  —  10/20 tests (50%) (3 skipped, 2 assertion-count-mismatch (see --assertions), 5 extra (TS only))  |  1/2 files  |  4 misplaced
+  did-you-mean  —  10/20 tests (50%) (3 skipped, 2 assertion-count-mismatch (see --assertions), 7 assertion-kind-mismatch (see --assertions), 5 extra (TS only))  |  1/2 files  |  4 misplaced
 ==========================================================================================
 
   Overall: 141/151 tests (93.4%) (53 extra (TS only))  |  7/8 files  |  4 misplaced
@@ -31,6 +31,8 @@ describe("parseTestCompareFromLogs", () => {
       filesMapped: 6,
       filesTotal: 6,
       misplaced: 0,
+      assertionCountMismatch: 0,
+      assertionKindMismatch: 0,
     });
     expect(results.get("did-you-mean")).toEqual({
       matched: 10,
@@ -40,6 +42,24 @@ describe("parseTestCompareFromLogs", () => {
       filesMapped: 1,
       filesTotal: 2,
       misplaced: 4,
+      assertionCountMismatch: 2,
+      assertionKindMismatch: 7,
+    });
+  });
+
+  // The counters are advisory: a mapped test whose body checks a different
+  // number (or different kinds) of things than the Ruby. They must not be
+  // confused with skipped, which the same parenthetical also carries.
+  it("reads both assertion counters off the real activerecord line", () => {
+    const log =
+      "  activerecord  —  8231/8407 tests (97.9%) (7 skipped, 6 wrong describe, " +
+      "1979 assertion-count-mismatch (see --assertions), 4067 assertion-kind-mismatch " +
+      "(see --assertions))  |  278/278 files  |  0 misplaced\n";
+
+    expect(parseTestCompareFromLogs(log).get("activerecord")).toMatchObject({
+      skipped: 7,
+      assertionCountMismatch: 1979,
+      assertionKindMismatch: 4067,
     });
   });
 
@@ -55,6 +75,9 @@ describe("parseTestCompareFromLogs", () => {
       filesMapped: 40,
       filesTotal: 50,
       misplaced: 7,
+      // The pre-#3825 format has no assertion counters at all.
+      assertionCountMismatch: 0,
+      assertionKindMismatch: 0,
     });
   });
 

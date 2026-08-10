@@ -346,6 +346,8 @@ class TestCompareStat extends Base {
     this.attribute("files_mapped", "integer", { default: 0 });
     this.attribute("files_total", "integer", { default: 0 });
     this.attribute("misplaced", "integer", { default: 0 });
+    this.attribute("assertion_count_mismatch", "integer", { default: 0 });
+    this.attribute("assertion_kind_mismatch", "integer", { default: 0 });
   }
 }
 
@@ -654,6 +656,13 @@ async function migrateDb(adapter: SQLite3Adapter) {
       });
     }
 
+    for (const col of ["assertion_count_mismatch", "assertion_kind_mismatch"]) {
+      if (await columnExists(adapter, "test_compare_stats", col)) continue;
+      await adapter.executeMutation(
+        `ALTER TABLE test_compare_stats ADD COLUMN ${col} INTEGER DEFAULT 0`,
+      );
+    }
+
     for (const table of ["api_calls_stats", "api_call_args_stats"]) {
       if (await tableExists(adapter, table)) continue;
       await adapter.createTable(table, {}, (t) => {
@@ -860,6 +869,8 @@ async function migrateDb(adapter: SQLite3Adapter) {
       t.integer("files_mapped", { default: 0 });
       t.integer("files_total", { default: 0 });
       t.integer("misplaced", { default: 0 });
+      t.integer("assertion_count_mismatch", { default: 0 });
+      t.integer("assertion_kind_mismatch", { default: 0 });
       t.index(["merge_commit_sha", "package"], { unique: true });
     });
 
@@ -2115,6 +2126,8 @@ async function syncCompareStats(
           files_mapped: s.filesMapped,
           files_total: s.filesTotal,
           misplaced: s.misplaced,
+          assertion_count_mismatch: s.assertionCountMismatch,
+          assertion_kind_mismatch: s.assertionKindMismatch,
         })),
         { uniqueBy: ["merge_commit_sha", "package"] },
       );
