@@ -2615,10 +2615,9 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
    * Mirrors: SQLite3Adapter#copy_table_indexes (sqlite3_adapter.rb:651-677)
    *
    * Rails calls `add_index` unconditionally (`sqlite3_adapter.rb:674`) and so
-   * does this, for every destination Rails can name. The one arm that does not
-   * is the schema-qualified one, which Rails has no notion of; it is recorded at
-   * that branch, not as a `@missingRailsCall` tag — the tag is per-method, and
-   * `parity:api:calls` fails it as STALE now that the method does make the call.
+   * does this, for a schema-qualified destination as much as a bare one: the
+   * qualifier lands on the INDEX name, which is where SQLite takes it, in
+   * `SQLite3::SchemaCreation#visit_CreateIndexDefinition`.
    * @internal
    */
   private async copyTableIndexes(
@@ -2661,41 +2660,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
       if (idx.unique) options.unique = true;
       if (idx.where) options.where = idx.where;
       if (idx.orders) options.order = idx.orders;
-      // MISSING RAILS CALL (add_index, sqlite3_adapter.rb:674) — this branch
-      // only. SQLite puts the schema on the INDEX name, not on the table it
-      // indexes (`CREATE INDEX aux.by_name ON widgets (...)`); qualifying the
-      // table instead is a syntax error, and `add_index` quotes the table, so
-      // it cannot express a qualified destination. Rails has no ATTACHed-schema
-      // notion here at all — every destination Rails can name takes the
-      // `addIndex` call below, and this arm is the trails-only remainder.
-      const { schema: toSchema } = this._splitTableName(to);
-      if (toSchema === undefined || toSchema === "") {
-        await this.addIndex(to, cols, options);
-        continue;
-      }
-      // Rails forwards `index.orders` to add_index, whose add_index_sort_order
-      // appends any present direction upcased (`column << " #{orders[name].upcase}"`)
-      // keyed off the column name as it appears in the copied list. This
-      // hand-built CREATE INDEX stands in for add_index, so it must stay
-      // value-agnostic: `indexes()` only records "desc" today, but an "asc" or
-      // upper-cased entry must not be silently dropped.
-      // Mirrors Rails' options_for_index_columns: IndexDefinition#conciseOptions
-      // collapses a uniform order map to a bare direction, which add_index then
-      // applies to every column.
-      const rawOrders = idx.orders;
-      const orders: Record<string, string> =
-        typeof rawOrders === "string"
-          ? Object.fromEntries((Array.isArray(cols) ? cols : [cols]).map((c) => [c, rawOrders]))
-          : rawOrders;
-      const colSql = Array.isArray(cols)
-        ? cols
-            .map((c) => `${quoteColumnName(c)}${orders[c] ? ` ${orders[c].toUpperCase()}` : ""}`)
-            .join(", ")
-        : cols;
-      const target = `${quoteColumnName(toSchema)}.${quoteColumnName(newName)} ON ${quoteColumnName(bareTo)}`;
-      let sql = `CREATE ${idx.unique ? "UNIQUE " : ""}INDEX ${target} (${colSql})`;
-      if (idx.where) sql += ` WHERE ${idx.where}`;
-      await this.execute(sql);
+      await this.addIndex(to, cols, options);
     }
   }
 

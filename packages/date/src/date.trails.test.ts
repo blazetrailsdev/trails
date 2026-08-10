@@ -1109,20 +1109,29 @@ describe("Date", () => {
    *   Date.commercial(600000, 9, 6).to_s #=> "600000-03-04"
    *   Date.commercial(600000, 9, 6).jd   #=> 220866623
    *
-   * The `Temporal` seat reads the RESIDUE day (`m_local_jd`) and so spells the
-   * residue year, which is what `Date.civil` and `Date.weeknum` already answer
-   * for the same day (filed as `date-seat-drops-nth-and-spells-the-residue-year`).
-   * All four agreeing is the point: hardcoding `nth = 0` handed the seat the
-   * WHOLE Julian day and made ordinal/commercial raise instead. The frags path
-   * over the same wrappers (`rt__valid_ordinal_p`, `rt__valid_commercial_p`,
-   * date_core.c:4125-4168) keeps MRI's whole answer, `nth` and all, since it
-   * answers the gem-shaped object.
+   * All four spellings agreeing is the point, and what they now agree on is the
+   * raise: the seat takes the WHOLE day (`encode_jd`) and no
+   * `Temporal.PlainDate` holds a year one `CM_PERIOD_GCY` past the residue.
+   * They agreed on a residue-year date until
+   * `date-seat-drops-nth-and-spells-the-residue-year` — `+015600-02-29` for all
+   * four — which is the shared-but-wrong answer that story was filed for; the
+   * provenance this test is about is unchanged, since hardcoding `nth = 0`
+   * would still make ordinal/commercial disagree with civil.
+   *
+   * The frags path over the same wrappers (`rt__valid_ordinal_p`,
+   * `rt__valid_commercial_p`, date_core.c:4125-4168) keeps MRI's whole answer,
+   * `nth` and all, since it answers the gem-shaped object.
    */
   it("takes ordinal's and commercial's nth from valid_*_p, as civil already does", () => {
-    expect(RubyDate.ordinal(600000, 60).toString()).toBe(RubyDate.civil(600000, 2, 29).toString());
-    expect(RubyDate.commercial(600000, 9, 6).toString()).toBe(
-      RubyDate.civil(600000, 3, 4).toString(),
-    );
+    for (const build of [
+      () => RubyDate.civil(600000, 2, 29),
+      () => RubyDate.ordinal(600000, 60),
+      () => RubyDate.civil(600000, 3, 4),
+      () => RubyDate.commercial(600000, 9, 6),
+    ]) {
+      expect(build).toThrow(RubyDate.Error);
+      expect(build).toThrow("invalid date");
+    }
 
     const o = dNewByFrags({ year: 600000, yday: 60 });
     expect([o.toS(), o.jd, o.year]).toEqual(["600000-02-29", 220866619, 600000]);
@@ -1148,6 +1157,25 @@ describe("Date", () => {
     expect(dtNewByFrags({ jd: 2n ** 70n, hour: 1, min: 2, sec: 3 }).toS()).toBe(
       "3232350070754114273-01-08T01:02:03+00:00",
     );
+
+    // A year one CM_PERIOD_GCY (584388) past the residue is the smallest such
+    // day, and it is the one the residue reading answered a plausible date for
+    // — 600000 came back spelled "+015600-..." from every one of these.
+    //   Date.civil(600000, 2, 29).to_s      #=> "600000-02-29"
+    //   Date.ordinal(600000, 60).to_s       #=> "600000-02-29"
+    //   Date.commercial(600000, 9, 6).to_s  #=> "600000-03-04"
+    //   Date.civil(600000, 2, 29).jd        #=> 220866619
+    for (const build of [
+      () => RubyDate.civil(600000, 2, 29),
+      () => RubyDate.ordinal(600000, 60),
+      () => RubyDate.commercial(600000, 9, 6),
+      () => RubyDate.weeknum(600000, 9, 6),
+    ]) {
+      expect(build).toThrow(RubyDate.Error);
+      expect(build).toThrow("invalid date");
+    }
+    expect(dNewByFrags({ year: 600000, yday: 60 }).toS()).toBe("600000-02-29");
+    expect(dNewByFrags({ year: 600000, yday: 60 }).jd).toBe(220866619);
   });
 
   it("takes a start argument, and Date::JULIAN/GREGORIAN select every day", () => {
@@ -2143,5 +2171,42 @@ describe("Date's second registration names", () => {
     expect(RubyDate.isLeap(1900)).toBe(false);
     expect(RubyDate.isLeap(2004)).toBe(true);
     expect(() => RubyDate.isLeap("2000")).toThrow(TypeError);
+  });
+});
+
+/**
+ * Ruby's Rational arithmetic does NOT fold a denominator of one back to an
+ * Integer — on ruby 3.3.11 `(Rational(1,2) * 12).class` is `Rational`, `(6/1)`
+ * — so `date_core.c`'s `FIXNUM_P` branches see a reducible Rational as a
+ * Rational, and only `wholenum_p`, a predicate, tests for the fold. The gem's
+ * own tests pass Integers throughout and never pin which arm a Rational takes,
+ * which is why these live here.
+ */
+describe("a reducible Rational operand at the C's Integer branches", () => {
+  it("takes d_lite_rshift's f_idiv/f_mod arm, never the FIXNUM_P one", () => {
+    // ruby 3.3.11 -rdate:
+    //   Date.new(2000,1,31).next_year(Rational(1,2)).to_s #=> "2000-07-31"
+    //   (Date.new(2000,1,31) >> Rational(1,2)).to_s       #=> "2000-01-31"
+    //   (Date.new(2000,1,31) >> Rational(3,2)).to_s       #=> "2000-02-29"
+    //   (Date.new(2000,1,31) >> Rational(23,2)).to_s      #=> "2000-12-31"
+    //   Date.new(2000,1,31).next_year(Rational(4,2)).to_s #=> "2002-01-31"
+    // 23/2 is the case that pins the arm: FIX2INT truncates the 11.5 months
+    // f_mod leaves, which is the else arm's arithmetic and not a Fixnum one.
+    expect(new RubyDate(2000, 1, 31).nextYear(new Rational(1, 2)).toS()).toBe("2000-07-31");
+    expect(new RubyDate(2000, 1, 31).rshift(new Rational(1, 2)).toS()).toBe("2000-01-31");
+    expect(new RubyDate(2000, 1, 31).rshift(new Rational(3, 2)).toS()).toBe("2000-02-29");
+    expect(new RubyDate(2000, 1, 31).rshift(new Rational(23, 2)).toS()).toBe("2000-12-31");
+    expect(new RubyDate(2000, 1, 31).nextYear(new Rational(4, 2)).toS()).toBe("2002-01-31");
+  });
+
+  it("takes d_lite_plus's wholenum_p re-dispatch for a whole Rational", () => {
+    // ruby 3.3.11 -rdate: wholenum_p is a predicate over the denominator, so a
+    // Rational(2,1) addend re-dispatches through rb_rational_num as the Integer
+    // 2 and the sum is a whole day.
+    //   (Date.new(2001,1,1) + Rational(2,1)).to_s #=> "2001-01-03"
+    //   (Date.new(2001,1,1) + Rational(2,1)).jd   #=> 2451913
+    const d = new RubyDate(2001, 1, 1).plus(new Rational(2, 1));
+    expect(d.toS()).toBe("2001-01-03");
+    expect(d.jd).toBe(2451913);
   });
 });

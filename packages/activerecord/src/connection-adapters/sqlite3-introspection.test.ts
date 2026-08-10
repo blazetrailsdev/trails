@@ -243,6 +243,36 @@ describe("SQLite3Adapter schema introspection", () => {
     expect(rows.rows).toEqual([["gizmo"]]);
   });
 
+  it("copyTableIndexes puts an ATTACHed schema on the index name, not the table", async () => {
+    // SQLite qualifies the INDEX, not the table it indexes; `CREATE INDEX
+    // by_name ON aux.widgets (...)` is a syntax error. copy_table_indexes
+    // therefore reaches add_index for a qualified destination too — the
+    // qualifier is moved in SQLite3::SchemaCreation#visit_CreateIndexDefinition.
+    const auxPath = path.join(tmpDir, "aux-copy-index.sqlite3");
+    await adapter.executeMutation(`ATTACH DATABASE '${auxPath}' AS aux`);
+    await adapter.executeMutation(
+      "CREATE TABLE aux.widgets (id INTEGER PRIMARY KEY, name TEXT, doomed TEXT)",
+    );
+    await adapter.executeMutation("CREATE INDEX aux.by_name ON widgets (name)");
+
+    await adapter.removeColumn("aux.widgets", "doomed");
+
+    // sqlite_master strips the schema qualifier from the stored DDL, so the
+    // qualifier is read back as WHICH catalog holds the index: aux, not main.
+    // Qualifying the table instead would have raised a syntax error.
+    const inAux = (
+      await adapter.selectAll("SELECT sql FROM aux.sqlite_master WHERE type='index'")
+    ).rows.map((row) => String(row[0]));
+    expect(inAux).toEqual(['CREATE INDEX "by_name" ON "widgets" ("name")']);
+    const inMain = await adapter.selectAll(
+      "SELECT name FROM main.sqlite_master WHERE type='index'",
+    );
+    expect(inMain.rows).toEqual([]);
+    expect(
+      ((await adapter.indexes("aux.widgets")) as Array<{ name: string }>).map((i) => i.name),
+    ).toEqual(["by_name"]);
+  });
+
   it("dataSourceExists matches both tables and views, hides sqlite_* internals", async () => {
     await adapter.executeMutation(
       "CREATE TABLE widgets (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT)",

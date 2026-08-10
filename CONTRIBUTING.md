@@ -182,7 +182,7 @@ pointer above is the intended fix.
 #### The call-ARGUMENT ratchet (`pnpm parity:api:calls:args`)
 
 RFC 0095 adds a second, independent gate over the same `--calls` extraction:
-`api:calls` compares the SET OF CALL NAMES a body makes, so a port can call
+`parity:api:calls` compares the SET OF CALL NAMES a body makes, so a port can call
 `where` where Rails calls `where`, hand it a completely different argument list,
 and stay green. `pnpm parity:api:calls:args` (`lint-call-args.ts`, CI step
 "Call-argument ratchet") ratchets `output/call-arg-mismatches.json` against the
