@@ -644,9 +644,13 @@ export async function execDelete(
     throw new Error("execDelete requires execQuery on the adapter when binds are provided");
   }
   const doExecute = host?.execute?.bind(host) ?? execute;
-  // Rails: `affected_rows(internal_execute(sql, name, binds))` — the caller's
-  // label reaches the payload. trails' execute signature is (sql, binds, name),
-  // so the label goes in the third slot.
+  // Rails is `affected_rows(internal_execute(sql, name, binds))` (:165, :172).
+  // Two deviations remain here, both tracked by
+  // 0076-execute-primitive-convergence/exec-delete-update-through-internal-execute:
+  // the primitive is `execute` rather than `internal_execute` (the mixin's
+  // `affectedRows` is still the NotImplementedError hook at :570), and trails'
+  // `execute` takes (sql, binds, name), so the label goes in the third slot.
+  // Forwarding `name` at all is what this call site fixes.
   return doExecute(sql, binds, name) as Promise<number>;
 }
 
@@ -666,9 +670,13 @@ export async function execUpdate(
     throw new Error("execUpdate requires execQuery on the adapter when binds are provided");
   }
   const doExecute = host?.execute?.bind(host) ?? execute;
-  // Rails: `affected_rows(internal_execute(sql, name, binds))` — the caller's
-  // label reaches the payload. trails' execute signature is (sql, binds, name),
-  // so the label goes in the third slot.
+  // Rails is `affected_rows(internal_execute(sql, name, binds))` (:165, :172).
+  // Two deviations remain here, both tracked by
+  // 0076-execute-primitive-convergence/exec-delete-update-through-internal-execute:
+  // the primitive is `execute` rather than `internal_execute` (the mixin's
+  // `affectedRows` is still the NotImplementedError hook at :570), and trails'
+  // `execute` takes (sql, binds, name), so the label goes in the third slot.
+  // Forwarding `name` at all is what this call site fixes.
   return doExecute(sql, binds, name) as Promise<number>;
 }
 
