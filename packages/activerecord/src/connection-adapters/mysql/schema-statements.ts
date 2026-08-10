@@ -32,7 +32,7 @@ type CreateTableOptions = Extract<CreateTableArgs[1], { options?: string }>;
  * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements (partial)
  */
 export class MysqlSchemaStatements extends BaseSchemaStatements {
-  /** @internal
+  /**
    * Return user-defined indexes for the given table. Mirrors Rails'
    * MySQL `indexes`: reads `SHOW KEYS FROM <table>`, skips the primary
    * key, groups multi-column indexes by `Key_name`, maps `Index_type`
